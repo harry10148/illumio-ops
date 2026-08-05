@@ -44,6 +44,8 @@ tests/.pytest_cache/
 
 # Reports output
 reports/
+# design/v2 的報表殼原型是設計成果，不是 runtime 產出，必須進版控
+!design/v2/reports/
 build/
 dist/
 scripts/audit_i18n_report.md

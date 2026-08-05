@@ -1,0 +1,15 @@
+{
+ "status": [
+  {
+   "avg_latency_ms": 3509,
+   "destination": "graylog",
+   "dlq": 0,
+   "failed": 0,
+   "failed_1h": 0,
+   "pending": 0,
+   "sent": 128334,
+   "sent_1h": 790,
+   "success_1h": 100.0
+  }
+ ]
+}

@@ -1,0 +1,165 @@
+{
+ "groups": [
+  {
+   "count": 1,
+   "key": "CVE"
+  },
+  {
+   "count": 6,
+   "key": "Net"
+  },
+  {
+   "count": 3,
+   "key": "Quarantine"
+  },
+  {
+   "count": 18,
+   "key": "app"
+  },
+  {
+   "count": 6,
+   "key": "env"
+  },
+  {
+   "count": 2,
+   "key": "loc"
+  },
+  {
+   "count": 8,
+   "key": "os"
+  },
+  {
+   "count": 46,
+   "key": "role"
+  },
+  {
+   "count": 6,
+   "key": "type"
+  }
+ ],
+ "items": [
+  {
+   "href": "/orgs/1/labels/184",
+   "key": "CVE",
+   "name": "CVE=CVE-2025-53770",
+   "value": "CVE-2025-53770"
+  },
+  {
+   "href": "/orgs/1/labels/140",
+   "key": "Net",
+   "name": "Net=DMZ-192.168.30",
+   "value": "DMZ-192.168.30"
+  },
+  {
+   "href": "/orgs/1/labels/141",
+   "key": "Net",
+   "name": "Net=LAN-192.168.20",
+   "value": "LAN-192.168.20"
+  },
+  {
+   "href": "/orgs/1/labels/143",
+   "key": "Net",
+   "name": "Net=MGMT-192.168.10",
+   "value": "MGMT-192.168.10"
+  },
+  {
+   "href": "/orgs/1/labels/188",
+   "key": "Net",
+   "name": "Net=Quarantine-172.16.50",
+   "value": "Quarantine-172.16.50"
+  },
+  {
+   "href": "/orgs/1/labels/142",
+   "key": "Net",
+   "name": "Net=Server-172.16.15",
+   "value": "Server-172.16.15"
+  },
+  {
+   "href": "/orgs/1/labels/144",
+   "key": "Net",
+   "name": "Net=Test-192.168.40",
+   "value": "Test-192.168.40"
+  },
+  {
+   "href": "/orgs/1/labels/232",
+   "key": "Quarantine",
+   "name": "Quarantine=Mild",
+   "value": "Mild"
+  },
+  {
+   "href": "/orgs/1/labels/133",
+   "key": "Quarantine",
+   "name": "Quarantine=Moderate",
+   "value": "Moderate"
+  },
+  {
+   "href": "/orgs/1/labels/134",
+   "key": "Quarantine",
+   "name": "Quarantine=Severe",
+   "value": "Severe"
+  },
+  {
+   "href": "/orgs/1/labels/41",
+   "key": "app",
+   "name": "app=Calico",
+   "value": "Calico"
+  },
+  {
+   "href": "/orgs/1/labels/121",
+   "key": "app",
+   "name": "app=CoreServices",
+   "value": "CoreServices"
+  },
+  {
+   "href": "/orgs/1/labels/64",
+   "key": "app",
+   "name": "app=Default",
+   "value": "Default"
+  },
+  {
+   "href": "/orgs/1/labels/116",
+   "key": "app",
+   "name": "app=DemoApp",
+   "value": "DemoApp"
+  },
+  {
+   "href": "/orgs/1/labels/180",
+   "key": "app",
+   "name": "app=ERP",
+   "value": "ERP"
+  },
+  {
+   "href": "/orgs/1/labels/72",
+   "key": "app",
+   "name": "app=Endpoint",
+   "value": "Endpoint"
+  },
+  {
+   "href": "/orgs/1/labels/186",
+   "key": "app",
+   "name": "app=FakeApp",
+   "value": "FakeApp"
+  },
+  {
+   "href": "/orgs/1/labels/181",
+   "key": "app",
+   "name": "app=HR",
+   "value": "HR"
+  },
+  {
+   "href": "/orgs/1/labels/40",
+   "key": "app",
+   "name": "app=Illumio",
+   "value": "Illumio"
+  },
+  {
+   "href": "/orgs/1/labels/29",
+   "key": "app",
+   "name": "app=Infrastructure",
+   "value": "Infrastructure"
+  }
+ ],
+ "ok": true,
+ "total": 96,
+ "truncated": true
+}

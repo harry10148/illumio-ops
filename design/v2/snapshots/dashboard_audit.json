@@ -1,0 +1,238 @@
+{
+ "ok": true,
+ "summary": {
+  "action_matrix": [
+   {
+    "action": "This workload acts as a network hub (high reachability or articulation point). Apply stricter east-west policy boundaries to limit lateral movement.",
+    "action_code": "RESTRICT_TRANSIT_NODE_ACCESS",
+    "apps": [
+     "audit (global)"
+    ],
+    "count": 1,
+    "flow_total": 0,
+    "severity": "CRITICAL"
+   },
+   {
+    "action": "Move scoped workloads from visibility/testing into selective or full enforcement.",
+    "action_code": "MOVE_TO_ENFORCEMENT",
+    "apps": [
+     "audit (global)"
+    ],
+    "count": 2,
+    "flow_total": 0,
+    "severity": "MEDIUM"
+   },
+   {
+    "action": "Resolve pending/failed usage queries before making policy retirement decisions.",
+    "action_code": "RESOLVE_QUERY_FAILURES",
+    "apps": [
+     "audit (global)"
+    ],
+    "count": 1,
+    "flow_total": 0,
+    "severity": "MEDIUM"
+   },
+   {
+    "action": "Review high-impact provisions and confirm boundary-sensitive changes were authorized.",
+    "action_code": "REVIEW_HIGH_IMPACT_PROVISIONS",
+    "apps": [
+     "audit (global)"
+    ],
+    "count": 1,
+    "flow_total": 0,
+    "severity": "MEDIUM"
+   }
+  ],
+  "attention_items": [
+   {
+    "count": 3,
+    "event_type": "agent.tampering",
+    "recommendation": "Investigate workload for compromise; review iptables changes",
+    "risk": "CRITICAL",
+    "summary": "Firewall rules tampered outside Illumio"
+   },
+   {
+    "count": 7,
+    "event_type": "sec_policy.create",
+    "recommendation": "Review workloads_affected count; verify change was intentional",
+    "risk": "MEDIUM",
+    "summary": "Security policy provisioned Total workloads affected: 534."
+   },
+   {
+    "count": 2,
+    "event_type": "rule_set.create",
+    "recommendation": "Verify change was authorized; review scope",
+    "risk": "MEDIUM",
+    "summary": "Ruleset created"
+   },
+   {
+    "count": 8,
+    "event_type": "rule_set.update",
+    "recommendation": "Verify change was authorized; review scope",
+    "risk": "MEDIUM",
+    "summary": "Ruleset modified"
+   }
+  ],
+  "blast_radius": [
+   {
+    "action": "Review high-impact provisions and confirm boundary-sensitive changes were authorized.",
+    "action_code": "REVIEW_HIGH_IMPACT_PROVISIONS",
+    "app_env_key": "audit|global",
+    "evidence": {
+     "actors": [
+      "admin@lab.local"
+     ],
+     "count": 7,
+     "event_type": "sec_policy.create",
+     "src_ips": [
+      "172.16.15.106"
+     ]
+    },
+    "finding": "audit (global): High blast-radius posture detected",
+    "severity": "MEDIUM"
+   }
+  ],
+  "blind_spots": [
+   {
+    "action": "Move scoped workloads from visibility/testing into selective or full enforcement.",
+    "action_code": "MOVE_TO_ENFORCEMENT",
+    "app_env_key": "audit|global",
+    "evidence": {
+     "actors": [
+      "admin@lab.local"
+     ],
+     "count": 8,
+     "event_type": "rule_set.update",
+     "parser_note_rows": 13,
+     "src_ips": [
+      "172.16.15.106",
+      "192.168.20.99"
+     ]
+    },
+    "finding": "audit (global): Visibility/enforcement blind spot detected",
+    "severity": "MEDIUM"
+   }
+  ],
+  "boundary_breaches": [],
+  "date_range": [
+   "2026-07-17",
+   "2026-07-24"
+  ],
+  "generated_at": "2026-07-24 06:21:38",
+  "health": {
+   "connectivity_event_count": 0,
+   "security_concern_count": 3,
+   "total_health_events": 1101
+  },
+  "kpis": [
+   {
+    "label": "事件總數",
+    "label_key": "rpt_au_kpi_total_events",
+    "value": "3,082"
+   },
+   {
+    "label": "健康事件",
+    "label_key": "rpt_au_kpi_health_events",
+    "value": "1,101"
+   },
+   {
+    "label": "安全疑慮",
+    "label_key": "rpt_au_kpi_security_concerns",
+    "value": "3"
+   },
+   {
+    "label": "Agent 連線",
+    "label_key": "rpt_au_kpi_agent_connectivity",
+    "value": "0"
+   },
+   {
+    "label": "登入失敗",
+    "label_key": "rpt_au_kpi_failed_logins",
+    "value": "11"
+   },
+   {
+    "label": "Policy 發佈",
+    "label_key": "rpt_au_kpi_policy_provisions",
+    "value": "7"
+   },
+   {
+    "label": "草稿規則變更",
+    "label_key": "rpt_au_kpi_draft_rule_changes",
+    "value": "10"
+   },
+   {
+    "label": "高風險事件",
+    "label_key": "rpt_au_kpi_high_risk_events",
+    "value": "0"
+   }
+  ],
+  "policy": {
+   "high_risk_count": 0,
+   "provision_count": 7,
+   "rule_change_count": 10,
+   "total_workloads_affected": 534
+  },
+  "record_count": 3082,
+  "suspicious_pivot_behavior": [
+   {
+    "action": "This workload acts as a network hub (high reachability or articulation point). Apply stricter east-west policy boundaries to limit lateral movement.",
+    "action_code": "RESTRICT_TRANSIT_NODE_ACCESS",
+    "app_env_key": "audit|global",
+    "evidence": {
+     "actors": [
+      "podman"
+     ],
+     "count": 3,
+     "event_type": "agent.tampering",
+     "src_ips": [
+      "172.16.15.170"
+     ]
+    },
+    "finding": "audit (global): Suspicious pivot behavior detected",
+    "severity": "CRITICAL"
+   }
+  ],
+  "top_events": [
+   {
+    "Count": 1098,
+    "Event Type": "agent.update"
+   },
+   {
+    "Count": 998,
+    "Event Type": "container_cluster.security_policy_applied"
+   },
+   {
+    "Count": 503,
+    "Event Type": "workload_interfaces.update"
+   },
+   {
+    "Count": 204,
+    "Event Type": "user.pce_session_terminated"
+   },
+   {
+    "Count": 203,
+    "Event Type": "user.create_session"
+   },
+   {
+    "Count": 14,
+    "Event Type": "agent.upload_existing_ip_table_rules"
+   },
+   {
+    "Count": 8,
+    "Event Type": "rule_set.update"
+   },
+   {
+    "Count": 7,
+    "Event Type": "sec_policy.create"
+   },
+   {
+    "Count": 7,
+    "Event Type": "system_task.prune_old_log_events"
+   },
+   {
+    "Count": 6,
+    "Event Type": "user.login"
+   }
+  ]
+ }
+}

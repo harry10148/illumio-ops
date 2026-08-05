@@ -1,0 +1,367 @@
+{
+ "alerts": {
+  "failed": 0,
+  "fired_24h": 50,
+  "recent": [
+   {
+    "channel": "mail",
+    "counts": {
+     "events": 0,
+     "health": 1,
+     "metrics": 0,
+     "traffic": 0
+    },
+    "error": "",
+    "force_test": false,
+    "status": "success",
+    "subject": "[INFO] 流量聚合基準不符：警示",
+    "target": "***MASKED***",
+    "timestamp": "2026-08-04T11:21:03Z"
+   },
+   {
+    "channel": "line",
+    "counts": {
+     "events": 0,
+     "health": 1,
+     "metrics": 0,
+     "traffic": 0
+    },
+    "error": "",
+    "force_test": false,
+    "status": "success",
+    "subject": "[INFO] 流量聚合基準不符：警示",
+    "target": "***MASKED***",
+    "timestamp": "2026-08-04T12:21:33Z"
+   },
+   {
+    "channel": "mail",
+    "counts": {
+     "events": 0,
+     "health": 1,
+     "metrics": 0,
+     "traffic": 0
+    },
+    "error": "",
+    "force_test": false,
+    "status": "success",
+    "subject": "[INFO] 流量聚合基準不符：警示",
+    "target": "***MASKED***",
+    "timestamp": "2026-08-04T12:21:33Z"
+   },
+   {
+    "channel": "line",
+    "counts": {
+     "events": 0,
+     "health": 1,
+     "metrics": 0,
+     "traffic": 0
+    },
+    "error": "",
+    "force_test": false,
+    "status": "success",
+    "subject": "[INFO] 流量聚合基準不符：警示",
+    "target": "***MASKED***",
+    "timestamp": "2026-08-04T13:21:33Z"
+   },
+   {
+    "channel": "mail",
+    "counts": {
+     "events": 0,
+     "health": 1,
+     "metrics": 0,
+     "traffic": 0
+    },
+    "error": "",
+    "force_test": false,
+    "status": "success",
+    "subject": "[INFO] 流量聚合基準不符：警示",
+    "target": "***MASKED***",
+    "timestamp": "2026-08-04T13:21:33Z"
+   }
+  ],
+  "suppressed": 0,
+  "verdict": "ok"
+ },
+ "as_of": "2026-08-04T14:19:20Z",
+ "blocked": {
+  "allowed": 9278201,
+  "blocked": 0,
+  "flagged": 18985324,
+  "potential": 18985324,
+  "unknown": 650245,
+  "verdict": "ok",
+  "vs_prev_pct": -21,
+  "window_days": 7
+ },
+ "data_integrity": [],
+ "enforcement": {
+  "by_mode": {
+   "full": 0,
+   "idle": 0,
+   "selective": 19,
+   "visibility_only": 0
+  },
+  "total": 19
+ },
+ "job_health": [
+  {
+   "detail": "",
+   "interval_seconds": 60,
+   "job_id": "cache_lag_monitor",
+   "last_run": "2026-08-04T14:19:00Z",
+   "last_status": "ok",
+   "level": "ok"
+  },
+  {
+   "detail": "",
+   "interval_seconds": 30,
+   "job_id": "monitor_cycle",
+   "last_run": "2026-08-04T14:19:01Z",
+   "last_status": "ok",
+   "level": "ok"
+  },
+  {
+   "detail": "",
+   "interval_seconds": 3600,
+   "job_id": "pce_cache_aggregate",
+   "last_run": "2026-08-04T13:40:11Z",
+   "last_status": "ok",
+   "level": "ok"
+  },
+  {
+   "detail": "",
+   "interval_seconds": 86400,
+   "job_id": "pce_cache_archive",
+   "last_run": "2026-08-04T06:41:17Z",
+   "last_status": "ok",
+   "level": "ok"
+  },
+  {
+   "detail": "",
+   "interval_seconds": 1800,
+   "job_id": "pce_cache_capacity_monitor",
+   "last_run": "2026-08-04T14:13:10Z",
+   "last_status": "ok",
+   "level": "ok"
+  },
+  {
+   "detail": "",
+   "interval_seconds": 300,
+   "job_id": "pce_cache_ingest_events",
+   "last_run": "2026-08-04T14:19:11Z",
+   "last_status": "ok",
+   "level": "ok"
+  },
+  {
+   "detail": "",
+   "interval_seconds": 120,
+   "job_id": "pce_cache_ingest_traffic",
+   "last_run": "2026-08-04T14:19:13Z",
+   "last_status": "ok",
+   "level": "ok"
+  },
+  {
+   "detail": "",
+   "interval_seconds": 86400,
+   "job_id": "pce_cache_retention",
+   "last_run": "2026-08-04T06:42:30Z",
+   "last_status": "ok",
+   "level": "ok"
+  },
+  {
+   "detail": "",
+   "interval_seconds": 600,
+   "job_id": "posture_summary",
+   "last_run": "2026-08-04T14:10:30Z",
+   "last_status": "ok",
+   "level": "ok"
+  },
+  {
+   "detail": "",
+   "interval_seconds": 5,
+   "job_id": "siem_dispatch",
+   "last_run": "2026-08-04T14:18:45Z",
+   "last_status": "ok",
+   "level": "ok"
+  },
+  {
+   "detail": "",
+   "interval_seconds": 60,
+   "job_id": "tick_report_schedules",
+   "last_run": "2026-08-04T14:19:00Z",
+   "last_status": "ok",
+   "level": "ok"
+  },
+  {
+   "detail": "",
+   "interval_seconds": 300,
+   "job_id": "tick_rule_schedules",
+   "last_run": "2026-08-04T14:14:50Z",
+   "last_status": "ok",
+   "level": "ok"
+  },
+  {
+   "detail": "",
+   "interval_seconds": 86400,
+   "job_id": "tls_renew_check",
+   "last_run": "2026-08-04T06:40:50Z",
+   "last_status": "ok",
+   "level": "ok"
+  },
+  {
+   "detail": "",
+   "interval_seconds": 300,
+   "job_id": "ven_summary",
+   "last_run": "2026-08-04T14:15:10Z",
+   "last_status": "ok",
+   "level": "ok"
+  }
+ ],
+ "os_dist": {
+  "by_family": {
+   "Linux": 15,
+   "Other": 1,
+   "Windows": 3
+  },
+  "total": 19
+ },
+ "pipeline": {
+  "cache_lag": [
+   {
+    "lag_s": 8,
+    "level": "ok",
+    "source": "traffic"
+   },
+   {
+    "lag_s": 11,
+    "level": "ok",
+    "source": "events"
+   }
+  ],
+  "dlq": 0,
+  "siem_idle": false,
+  "siem_success_1h": 100.0,
+  "verdict": "ok"
+ },
+ "posture": {
+  "available": true,
+  "components": [
+   {
+    "effective_weight": 0.3,
+    "key": "coverage",
+    "label_key": "gui_posture_coverage",
+    "note_key": "gui_posture_coverage_note",
+    "points": 0.03,
+    "unit": "%",
+    "value": 0.1,
+    "weight": 0.3
+   },
+   {
+    "effective_weight": 0.3,
+    "key": "readiness",
+    "label_key": "gui_posture_readiness",
+    "note_key": "gui_posture_readiness_note",
+    "points": 7.68,
+    "unit": "%",
+    "value": 25.6,
+    "weight": 0.3
+   },
+   {
+    "detail": {
+     "lateral_control_ratio": 1.0,
+     "penalty": 32,
+     "ransomware_apps": 1738,
+     "uncovered_pct": 95.2
+    },
+    "effective_weight": 0.4,
+    "key": "risk_health",
+    "label_key": "gui_posture_risk_health",
+    "note_key": "gui_posture_risk_health_note",
+    "points": 27.2,
+    "risk_subscores": [
+     {
+      "key": "ransomware_containment",
+      "label_key": "gui_posture_sub_ransomware",
+      "max_penalty": 40,
+      "penalty_points": 2,
+      "unit": "%",
+      "value": 95
+     },
+     {
+      "key": "lateral_containment",
+      "label_key": "gui_posture_sub_lateral",
+      "max_penalty": 30,
+      "penalty_points": 0,
+      "unit": "%",
+      "value": 100
+     },
+     {
+      "key": "flow_coverage",
+      "label_key": "gui_posture_sub_coverage",
+      "max_penalty": 30,
+      "penalty_points": 30,
+      "unit": "%",
+      "value": 0
+     }
+    ],
+    "unit": "%",
+    "value": 68.0,
+    "weight": 0.4
+   }
+  ],
+  "formula": "coverage×0.3 + readiness×0.3 + risk_health×0.4",
+  "generated_at": "2026-07-24T06:41:29.787874+00:00",
+  "remediation": [
+   {
+    "current": 0.1,
+    "key": "coverage",
+    "label_key": "gui_posture_coverage",
+    "recommendation_key": "gui_posture_rmd_policy_coverage",
+    "recoverable_points": 30.0,
+    "target": 100
+   },
+   {
+    "current": 25.6,
+    "key": "readiness",
+    "label_key": "gui_posture_readiness",
+    "recommendation_key": "gui_posture_rmd_readiness",
+    "recoverable_points": 22.3,
+    "target": 100
+   },
+   {
+    "current": 0,
+    "key": "flow_coverage",
+    "label_key": "gui_posture_sub_coverage",
+    "recommendation_key": "gui_posture_rmd_coverage",
+    "recoverable_points": 12.0,
+    "target": 100
+   },
+   {
+    "current": 95,
+    "key": "ransomware_containment",
+    "label_key": "gui_posture_sub_ransomware",
+    "recommendation_key": "gui_posture_rmd_ransomware",
+    "recoverable_points": 0.8,
+    "target": 100
+   }
+  ],
+  "score": 35,
+  "source_date": "2026-07-24T06:41:29.787874+00:00"
+ },
+ "tls": {
+  "check_failed": false,
+  "days_remaining": 1722,
+  "enabled": true,
+  "expiring_soon": false
+ },
+ "ven": {
+  "attention": [],
+  "computed_at": "2026-08-04T14:15:10Z",
+  "degraded": 0,
+  "offline": 0,
+  "oldest_heartbeat_age_s": 286,
+  "online": 19,
+  "total": 19,
+  "verdict": "ok"
+ }
+}

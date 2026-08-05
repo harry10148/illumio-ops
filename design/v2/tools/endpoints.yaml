@@ -1,0 +1,161 @@
+# design/v2/tools/endpoints.yaml — id 對應 snapshots/<id>.json
+#
+# 轉錄來源（source-first；每個 POST/query payload 鍵名皆逐一核對呼叫端 JS）：
+#   - traffic_search : src/static/js/quarantine.js:271-296 (runTrafficAnalyzer)
+#   - workload_search: src/static/js/quarantine.js:518-534 (runWorkloadSearch)
+#       實際是 GET /api/workloads?<qs>（JS 組了一個 `payload` dict 但從未送出，
+#       真正呼叫是 fetch('/api/workloads?' + qp.toString())；此處以原始碼為準，
+#       更正計畫草稿裡誤植的 POST）。
+#   - top10          : src/static/js/dashboard.js:2048-2058 (runTop10Query，消費端) +
+#                       src/gui/routes/dashboard.py:539-546 (api_save_dashboard_query，
+#                       決定「已存查詢」的真實 flat 形狀——filters dict 在儲存時就被
+#                       展平，stored query 從不含巢狀 filters 鍵) +
+#                       src/gui/routes/dashboard.py:649-729 (api_dashboard_top10，
+#                       只讀 flat key，證實未讀 d.get("filters"))
+#   - fb_suggest      : src/static/js/filter-bar.js:757-760 (_objfbFetchSuggest)
+#   - fb_browse       : src/static/js/filter-bar.js:653      (一般 browse 呼叫；
+#                       550 的 type=_totals 呼叫是同一支路由的另一種查詢，不另建 id)
+#
+# `mask: catalog` 旗標（2026-08-03 使用者裁決＋2026-08-03 二次修訂）：該端點的
+# 字典鍵名本身是 identifier（i18n key／event type key／表單 schema 描述），
+# 不是機密欄位名——套一般語意式 key 遮罩會把非機密內容一併打光。
+# capture_snapshots.py 改呼叫 masking.mask_values_only()：完全跳過 key
+# 判定，只掃長 hex 值。三個：
+#   - event_catalog / ui_translations：鍵是 i18n/事件型別 key，值是顯示文字
+#     （gui_password 是「密碼」欄位的顯示字串、agent.refresh_token 是事件
+#     型別代碼，都不是憑證本尊）。
+#   - alert_plugins：src/gui/routes/config.py:151-178 api_alert_plugins() 只
+#     從編譯期常數 PLUGIN_METADATA 組出表單 schema，從不含任何即時設定值；
+#     其中 "secret": field.secret（src/alerts/metadata.py:15 FieldMeta.secret:
+#     bool）是「這個欄位要不要用密碼框顯示」的 UI 布林旗標，不是密碼本尊。
+#     語意式規則命中 key 名 "secret" 會連 SMTP host/寄件者/收件者等完全
+#     無關欄位也一併打光（實測驗證：全部 5 插件 14 個欄位描述被清空）。
+
+# ── GET（無 payload） ──────────────────────────────────────────────
+- {id: status,              method: GET,  path: /api/status}
+- {id: dashboard_overview,  method: GET,  path: /api/dashboard/overview}
+- {id: dashboard_queries,   method: GET,  path: /api/dashboard/queries}
+- {id: dashboard_snapshot,  method: GET,  path: /api/dashboard/snapshot}
+- {id: dashboard_audit,     method: GET,  path: /api/dashboard/audit_summary}
+- {id: dashboard_pu,        method: GET,  path: /api/dashboard/policy_usage_summary}
+- {id: reports_list,        method: GET,  path: /api/reports}
+- {id: report_schedules,    method: GET,  path: /api/report-schedules}
+- {id: rhc_enablement,      method: GET,  path: /api/rule_hit_count/enablement}
+- {id: rules,               method: GET,  path: /api/rules}
+- {id: event_catalog,       method: GET,  path: /api/event-catalog, mask: catalog}
+- {id: events_viewer,       method: GET,  path: "/api/events/viewer?limit=100"}
+- {id: rs_status,           method: GET,  path: /api/rule_scheduler/status}
+- {id: rs_rulesets,         method: GET,  path: /api/rule_scheduler/rulesets}
+- {id: rs_schedules,        method: GET,  path: /api/rule_scheduler/schedules}
+- {id: rs_logs,             method: GET,  path: /api/rule_scheduler/logs}
+- {id: settings,            method: GET,  path: /api/settings}
+- {id: alert_plugins,       method: GET,  path: /api/alert-plugins, mask: catalog}
+- {id: security,            method: GET,  path: /api/security}
+- {id: tls_status,          method: GET,  path: /api/tls/status}
+- {id: pce_profiles,        method: GET,  path: /api/pce-profiles}
+- {id: labels,              method: GET,  path: /api/labels}
+- {id: logs_index,          method: GET,  path: /api/logs}
+- {id: ui_translations,     method: GET,  path: /api/ui_translations, mask: catalog}
+
+# ── SIEM／cache 端點（2026-08-03 Task 3 追加；blueprint 前綴見
+#   src/siem/web.py:12 url_prefix="/api/siem"、src/pce_cache/web.py:13
+#   url_prefix="/api/cache"）。逐一讀過 route handler 確認無必填 query
+#   參數（全部只讀 optional args 或完全不吃 query）：
+#   - siem_status      : src/siem/web.py:160-224 dispatch_status()      無參數
+#   - siem_destinations: src/siem/web.py:30-42   list_destinations()    無參數；
+#       回應內 hec_token 等欄位已由 _redact_secrets() 打上 __set/__length，
+#       語意式遮罩會再遮一次 hec_token 本尊（token 為 standalone 機密詞）。
+#   - siem_forwarder   : src/siem/web.py:374-381 get_forwarder()        無參數
+#   - siem_dlq         : src/siem/web.py:227-255 list_dlq()             選填
+#       dest（預設 ""）、limit（預設 50，上限 500）——用預設值即可，不必附加。
+#   - cache_status     : src/pce_cache/web.py:130-152 api_cache_status()    無參數
+#   - cache_lag        : src/pce_cache/web.py:155-187 api_cache_lag()       無參數
+#   - cache_health     : src/pce_cache/web.py:190-247 api_cache_health()    無參數
+#   - cache_throughput : src/pce_cache/web.py:250-273 api_cache_throughput() 無參數
+#   - cache_settings   : src/pce_cache/web.py:276-280 get_cache_settings()  無參數
+#   - archive_status   : src/pce_cache/web.py:330-341 archive_status()      無參數
+- {id: siem_status,        method: GET,  path: /api/siem/status}
+- {id: siem_destinations,  method: GET,  path: /api/siem/destinations}
+- {id: siem_forwarder,     method: GET,  path: /api/siem/forwarder}
+- {id: siem_dlq,           method: GET,  path: /api/siem/dlq}
+- {id: cache_status,       method: GET,  path: /api/cache/status}
+- {id: cache_lag,          method: GET,  path: /api/cache/lag}
+- {id: cache_health,       method: GET,  path: /api/cache/health}
+- {id: cache_throughput,   method: GET,  path: /api/cache/throughput}
+- {id: cache_settings,     method: GET,  path: /api/cache/settings}
+- {id: archive_status,     method: GET,  path: /api/cache/archive/status}
+
+# ── GET，path 依賴另一筆已抓快照的第一筆資料（capture_snapshots.py 執行期解析）──
+# path_from 語法：<snapshot_id>.<jsonpath>；resolve_path_from() 依序解析
+# dict key／list[0] 兩種寫法。抓取順序依 yaml 由上而下，故被依賴的快照必須排在前面。
+- id: rs_ruleset_detail
+  method: GET
+  # src/gui/routes/rule_scheduler.py:191 @bp.route('/api/rule_scheduler/rulesets/<rs_id>')
+  path: "/api/rule_scheduler/rulesets/{rs_id}"
+  path_from: "rs_rulesets.items[0].id"
+  note: "rs_id 取自 rs_rulesets 快照第一筆 items[].id"
+- id: report_sched_history
+  method: GET
+  # src/gui/routes/reports.py:1221 @bp.route('/api/report-schedules/<int:schedule_id>/history')
+  path: "/api/report-schedules/{schedule_id}/history"
+  path_from: "report_schedules.schedules[0].id"
+  note: "schedule_id 取自 report_schedules 快照第一筆 schedules[].id"
+- id: module_log_sample
+  method: GET
+  # src/gui/routes/admin.py:30 @bp.route('/api/logs/<module_name>')
+  path: "/api/logs/{module_name}"
+  path_from: "logs_index.modules[0].name"
+  note: "module_name 取自 logs_index 快照第一個 modules[].name"
+
+# ── POST（body 鍵名轉錄自 Step 1 呼叫端；值用測試機上合理的查詢參數）───────
+- id: traffic_search
+  method: POST
+  path: /api/quarantine/search
+  # src/static/js/quarantine.js:271-293 runTrafficAnalyzer()
+  #   mins/sort_by/search 讀自 #qt-mins/#qt-sort/#qt-search；
+  #   source 讀自 #traffic-source（預設 'live'）；
+  #   policy_decision 讀自 qt-pd-radio（未選則 '-1'＝全部）；
+  #   draft_policy_decision 僅在 qt-dpd-radio 有勾選時才附加（此處示範情境不勾）；
+  #   Object.assign(payload, filterBar.getFilters()) 會疊加 FilterBar pill
+  #   （services/ports/process_name/.../any_label 等），空 pill 時不產生任何鍵。
+  payload:
+    mins: 1440          # 24h 時間窗（分鐘）
+    sort_by: bandwidth  # #qt-sort 預設選項（第一個 <option>）
+    search: ""
+    source: live         # #traffic-source 預設值
+    policy_decision: "-1" # 未勾選 radio 時的預設值（全部）
+- id: workload_search
+  method: GET
+  # src/static/js/quarantine.js:518-534 runWorkloadSearch()：實際發出的是
+  # GET /api/workloads?name=&ip_address=&hostname=（qp URLSearchParams），
+  # 函式內組出的 `payload` dict 從未被送出——原始碼為準，不採計畫草稿的 POST。
+  path: "/api/workloads?name=&ip_address=&hostname="
+- id: top10
+  method: POST
+  path: /api/dashboard/top10
+  # src/static/js/dashboard.js:2048-2051 runTop10Query()：payload = { ...q, mins }，
+  # q 取自 _dashboardQueries[idx]（GET /api/dashboard/queries 的一筆，
+  # dashboard.js:1405 直接回傳 cm.config['settings']['dashboard_queries']）。
+  # 该儲存陣列的真實形狀由 src/gui/routes/dashboard.py:539-546
+  # (api_save_dashboard_query) 決定：filters dict 在儲存當下就被依 whitelist
+  # 展平進頂層 flat key（src_labels/ports/port/proto/...），從不含巢狀
+  # `filters` 鍵——先前版本誤把「送出去儲存」的 request body 形狀
+  # （dashboard.js:1868-1875 saveDashboardQuery，有 filters 鍵）當成
+  # 「查詢時讀出來」的 stored-query 形狀，兩者是生命週期的不同階段。
+  # api_dashboard_top10（dashboard.py:649-729）也只讀 d.get("name in flat
+  # keys 如 port/proto/src_label/ports 等，從未讀 d.get("filters")。
+  # 這裡採最小忠實呼叫：{name, rank_by, pd, mins}（不含任何 flat 篩選鍵，
+  # 對應「未加篩選的已存查詢」）。
+  payload:
+    name: "Top10 Demo"
+    rank_by: bandwidth   # dq-rank 第三個 <option>，對應 gui_rank_bw
+    pd: 3                 # dq-pd 預設 radio（3＝全部）
+    mins: 1440
+- id: fb_suggest
+  method: GET
+  # src/static/js/filter-bar.js:759 `/api/filter-objects/suggest?q=${q}&types=${types}&limit=10`
+  path: "/api/filter-objects/suggest?q=web&types=label&limit=10"
+- id: fb_browse
+  method: GET
+  # src/static/js/filter-bar.js:653 `/api/filter-objects/browse?type=${cat}&offset=${offset}&limit=20`
+  path: "/api/filter-objects/browse?type=label&offset=0&limit=20"

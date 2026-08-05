@@ -1,0 +1,4927 @@
+{
+ "data": [
+  {
+   "agent": {
+    "active_pce_fqdn": null,
+    "config": {
+     "log_traffic": false,
+     "mode": "selective",
+     "visibility_level": "enhanced_data_collection"
+    },
+    "href": "/orgs/1/agents/1345",
+    "status": {
+     "agent_health": [],
+     "agent_health_errors": {
+      "errors": [],
+      "warnings": []
+     },
+     "agent_version": "25.2.40-4047",
+     "firewall_rule_count": 0,
+     "fw_config_current": true,
+     "instance_id": null,
+     "last_heartbeat_on": "2026-08-03T06:24:21.479909Z",
+     "managed_since": "2026-06-29T01:51:34.283798Z",
+     "security_policy_applied_at": "2026-07-25T05:18:30.491937Z",
+     "security_policy_received_at": "2026-07-25T05:18:30.491937Z",
+     "security_policy_refresh_at": "2026-07-25T05:18:30.491937Z",
+     "security_policy_sync_state": "applied",
+     "status": "active",
+     "uid": "3D47D2D3-5145-5934-A5A7-432703B62F46",
+     "uptime_seconds": 781616
+    },
+    "target_pce_fqdn": null,
+    "type": "Host"
+   },
+   "agent_to_pce_certificate_authentication_id": null,
+   "blocked_connection_action": "drop",
+   "caps": [
+    "write"
+   ],
+   "containers_inherit_host_policy": false,
+   "created_at": "2026-06-29T01:51:34.212283Z",
+   "created_by": {
+    "href": "/orgs/1/agents/1345"
+   },
+   "data_center": null,
+   "data_center_zone": null,
+   "datacenter_nat_1to1": false,
+   "deleted": false,
+   "description": "",
+   "distinguished_name": null,
+   "enforcement_mode": "selective",
+   "external_data_reference": null,
+   "external_data_set": null,
+   "firewall_coexistence": {
+    "illumio_primary": true
+   },
+   "hostname": "Harrys-MacBook-Air.local",
+   "href": "/orgs/1/workloads/4716377d-ab36-448d-88ca-532e6d80103b",
+   "ignored_interface_names": [],
+   "interfaces": [
+    {
+     "address": "fe80::c43:b752:711:b5de",
+     "cidr_block": 64,
+     "default_gateway_address": null,
+     "friendly_name": null,
+     "link_state": null,
+     "loopback": false,
+     "name": "en0",
+     "network": {
+      "href": "/orgs/1/networks/38423fa8-8f0a-4b33-a204-9cc502344df8",
+      "name": "External"
+     },
+     "network_detection_mode": "manual",
+     "public_ip": null
+    },
+    {
+     "address": "100.95.216.244",
+     "cidr_block": 0,
+     "default_gateway_address": null,
+     "friendly_name": null,
+     "link_state": null,
+     "loopback": false,
+     "name": "utun100",
+     "network": {
+      "href": "/orgs/1/networks/d6b7a10f-7765-456b-ae46-f147f3157511",
+      "name": "External"
+     },
+     "network_detection_mode": "manual",
+     "public_ip": null
+    },
+    {
+     "address": "fe80::a005:3194:27a9:cba1",
+     "cidr_block": 64,
+     "default_gateway_address": null,
+     "friendly_name": null,
+     "link_state": null,
+     "loopback": false,
+     "name": "utun100",
+     "network": {
+      "href": "/orgs/1/networks/38423fa8-8f0a-4b33-a204-9cc502344df8",
+      "name": "External"
+     },
+     "network_detection_mode": "manual",
+     "public_ip": null
+    },
+    {
+     "address": "fddf:a159:5429:bd2b:eda9:3280:ba2d:3d0e",
+     "cidr_block": 64,
+     "default_gateway_address": null,
+     "friendly_name": null,
+     "link_state": null,
+     "loopback": false,
+     "name": "utun100",
+     "network": {
+      "href": "/orgs/1/networks/38423fa8-8f0a-4b33-a204-9cc502344df8",
+      "name": "External"
+     },
+     "network_detection_mode": "manual",
+     "public_ip": null
+    },
+    {
+     "address": "fe80::cb23:27c3:48a8:581d",
+     "cidr_block": 64,
+     "default_gateway_address": null,
+     "friendly_name": null,
+     "link_state": null,
+     "loopback": false,
+     "name": "utun5",
+     "network": {
+      "href": "/orgs/1/networks/38423fa8-8f0a-4b33-a204-9cc502344df8",
+      "name": "External"
+     },
+     "network_detection_mode": "manual",
+     "public_ip": null
+    },
+    {
+     "address": "fe80::ef68:ab53:be5c:366c",
+     "cidr_block": 64,
+     "default_gateway_address": null,
+     "friendly_name": null,
+     "link_state": null,
+     "loopback": false,
+     "name": "utun6",
+     "network": {
+      "href": "/orgs/1/networks/38423fa8-8f0a-4b33-a204-9cc502344df8",
+      "name": "External"
+     },
+     "network_detection_mode": "manual",
+     "public_ip": null
+    },
+    {
+     "address": "fe80::5043:1ff:fe55:a8cb",
+     "cidr_block": 64,
+     "default_gateway_address": null,
+     "friendly_name": null,
+     "link_state": null,
+     "loopback": false,
+     "name": "awdl0",
+     "network": {
+      "href": "/orgs/1/networks/38423fa8-8f0a-4b33-a204-9cc502344df8",
+      "name": "External"
+     },
+     "network_detection_mode": "manual",
+     "public_ip": null
+    },
+    {
+     "address": "fe80::5043:1ff:fe55:a8cb",
+     "cidr_block": 64,
+     "default_gateway_address": null,
+     "friendly_name": null,
+     "link_state": null,
+     "loopback": false,
+     "name": "llw0",
+     "network": {
+      "href": "/orgs/1/networks/38423fa8-8f0a-4b33-a204-9cc502344df8",
+      "name": "External"
+     },
+     "network_detection_mode": "manual",
+     "public_ip": null
+    },
+    {
+     "address": "172.16.9.26",
+     "cidr_block": 22,
+     "default_gateway_address": "172.16.8.3",
+     "friendly_name": null,
+     "link_state": null,
+     "loopback": false,
+     "name": "en0",
+     "network": {
+      "href": "/orgs/1/networks/d6b7a10f-7765-456b-ae46-f147f3157511",
+      "name": "External"
+     },
+     "network_detection_mode": "manual",
+     "public_ip": "192.168.20.103"
+    },
+    {
+     "address": "fe80::a4c7:b24d:47b6:3925",
+     "cidr_block": 64,
+     "default_gateway_address": null,
+     "friendly_name": null,
+     "link_state": null,
+     "loopback": false,
+     "name": "utun0",
+     "network": {
+      "href": "/orgs/1/networks/38423fa8-8f0a-4b33-a204-9cc502344df8",
+      "name": "External"
+     },
+     "network_detection_mode": "manual",
+     "public_ip": null
+    },
+    {
+     "address": "fe80::82c4:5abe:d507:bb37",
+     "cidr_block": 64,
+     "default_gateway_address": null,
+     "friendly_name": null,
+     "link_state": null,
+     "loopback": false,
+     "name": "utun1",
+     "network": {
+      "href": "/orgs/1/networks/38423fa8-8f0a-4b33-a204-9cc502344df8",
+      "name": "External"
+     },
+     "network_detection_mode": "manual",
+     "public_ip": null
+    },
+    {
+     "address": "fe80::f16:2e4:be5c:b258",
+     "cidr_block": 64,
+     "default_gateway_address": null,
+     "friendly_name": null,
+     "link_state": null,
+     "loopback": false,
+     "name": "utun2",
+     "network": {
+      "href": "/orgs/1/networks/38423fa8-8f0a-4b33-a204-9cc502344df8",
+      "name": "External"
+     },
+     "network_detection_mode": "manual",
+     "public_ip": null
+    },
+    {
+     "address": "fe80::ce81:b1c:bd2c:69e",
+     "cidr_block": 64,
+     "default_gateway_address": null,
+     "friendly_name": null,
+     "link_state": null,
+     "loopback": false,
+     "name": "utun3",
+     "network": {
+      "href": "/orgs/1/networks/38423fa8-8f0a-4b33-a204-9cc502344df8",
+      "name": "External"
+     },
+     "network_detection_mode": "manual",
+     "public_ip": null
+    }
+   ],
+   "labels": [
+    {
+     "href": "/orgs/1/labels/135",
+     "key": "role",
+     "value": "MAC"
+    },
+    {
+     "href": "/orgs/1/labels/72",
+     "key": "app",
+     "value": "Endpoint"
+    },
+    {
+     "href": "/orgs/1/labels/53",
+     "key": "env",
+     "value": "Physical"
+    },
+    {
+     "href": "/orgs/1/labels/242",
+     "key": "loc",
+     "value": "external"
+    }
+   ],
+   "managed": true,
+   "name": "Harrys-MacBook-Air.local",
+   "online": true,
+   "os_detail": "25.5.0 root:xnu-12377.121.10~1/RELEASE_ARM64_T8112 (macOS 26.5.2 unknown)",
+   "os_id": "macOS-universal-26.5",
+   "public_ip": "192.168.20.99",
+   "risk_summary": null,
+   "service_principal_name": null,
+   "service_provider": null,
+   "services": {},
+   "updated_at": "2026-07-19T23:54:30.940560Z",
+   "updated_by": {
+    "href": "/orgs/1/agents/1345"
+   },
+   "ven": {
+    "hostname": "Harrys-MacBook-Air.local",
+    "href": "/orgs/1/vens/4716377d-ab36-448d-88ca-532e6d80103b",
+    "name": null,
+    "status": "active",
+    "ven_type": "endpoint",
+    "version": "25.2.40-4047"
+   },
+   "visibility_level": "enhanced_data_collection"
+  },
+  {
+   "agent": {
+    "active_pce_fqdn": null,
+    "config": {
+     "log_traffic": false,
+     "mode": "selective",
+     "visibility_level": "enhanced_data_collection"
+    },
+    "href": "/orgs/1/agents/1307",
+    "status": {
+     "agent_health": [],
+     "agent_health_errors": {
+      "errors": [],
+      "warnings": []
+     },
+     "agent_version": "23.4.11-8",
+     "firewall_rule_count": 0,
+     "fw_config_current": true,
+     "instance_id": null,
+     "last_heartbeat_on": "2026-08-03T06:23:07.549455Z",
+     "managed_since": "2026-04-05T05:09:32.548620Z",
+     "security_policy_applied_at": "2026-08-03T05:48:41.052763Z",
+     "security_policy_received_at": "2026-08-03T05:48:41.052763Z",
+     "security_policy_refresh_at": "2026-08-03T05:48:41.052763Z",
+     "security_policy_sync_state": "applied",
+     "status": "active",
+     "uid": null,
+     "uptime_seconds": 399852
+    },
+    "target_pce_fqdn": null,
+    "type": "Host"
+   },
+   "agent_to_pce_certificate_authentication_id": null,
+   "blocked_connection_action": "drop",
+   "caps": [
+    "write"
+   ],
+   "containers_inherit_host_policy": false,
+   "created_at": "2026-04-05T05:09:32.526671Z",
+   "created_by": {
+    "href": "/orgs/1/agents/1307"
+   },
+   "data_center": null,
+   "data_center_zone": null,
+   "datacenter_nat_1to1": false,
+   "deleted": false,
+   "description": null,
+   "distinguished_name": null,
+   "enforcement_mode": "selective",
+   "external_data_reference": null,
+   "external_data_set": null,
+   "firewall_coexistence": {
+    "illumio_primary": true
+   },
+   "hostname": "k8s-node02",
+   "href": "/orgs/1/workloads/03daf1e6-683d-4305-a5bf-964e6e5ee580",
+   "ignored_interface_names": [],
+   "interfaces": [
+    {
+     "address": "172.16.15.122",
+     "cidr_block": 24,
+     "default_gateway_address": "172.16.15.254",
+     "friendly_name": null,
+     "link_state": null,
+     "loopback": false,
+     "name": "ens33",
+     "network": {
+      "href": "/orgs/1/networks/27058b12-718b-4538-8cb9-e59169fa75ed",
+      "name": "Corporate"
+     },
+     "network_detection_mode": "single_private_brn",
+     "public_ip": null
+    },
+    {
+     "address": "fe80::250:56ff:feaf:39a",
+     "cidr_block": 64,
+     "default_gateway_address": null,
+     "friendly_name": null,
+     "link_state": null,
+     "loopback": false,
+     "name": "ens33",
+     "network": {
+      "href": "/orgs/1/networks/633cc308-4001-4541-a1e0-1aa0fd219f28",
+      "name": "Corporate"
+     },
+     "network_detection_mode": "link_local",
+     "public_ip": null
+    },
+    {
+     "address": "10.85.58.192",
+     "cidr_block": 32,
+     "default_gateway_address": null,
+     "friendly_name": null,
+     "link_state": null,
+     "loopback": false,
+     "name": "vxlan.calico",
+     "network": {
+      "href": "/orgs/1/networks/27058b12-718b-4538-8cb9-e59169fa75ed",
+      "name": "Corporate"
+     },
+     "network_detection_mode": "single_private_brn",
+     "public_ip": null
+    },
+    {
+     "address": "fe80::644a:b5ff:fe30:6fa9",
+     "cidr_block": 64,
+     "default_gateway_address": null,
+     "friendly_name": null,
+     "link_state": null,
+     "loopback": false,
+     "name": "vxlan.calico",
+     "network": {
+      "href": "/orgs/1/networks/633cc308-4001-4541-a1e0-1aa0fd219f28",
+      "name": "Corporate"
+     },
+     "network_detection_mode": "link_local",
+     "public_ip": null
+    }
+   ],
+   "labels": [
+    {
+     "href": "/orgs/1/labels/56",
+     "key": "role",
+     "value": "Worker"
+    },
+    {
+     "href": "/orgs/1/labels/15",
+     "key": "env",
+     "value": "Kubernetes"
+    },
+    {
+     "href": "/orgs/1/labels/55",
+     "key": "app",
+     "value": "K8sNode"
+    },
+    {
+     "href": "/orgs/1/labels/145",
+     "key": "loc",
+     "value": "TP"
+    },
+    {
+     "href": "/orgs/1/labels/69",
+     "key": "os",
+     "value": "Ubuntu"
+    }
+   ],
+   "managed": true,
+   "name": null,
+   "online": true,
+   "os_detail": "5.15.0-186-generic #196-Ubuntu SMP Sat Jun 20 16:09:34 UTC 2026 (Ubuntu 22.04.5 LTS)",
+   "os_id": "ubuntu-x86_64-xenial",
+   "public_ip": "172.16.15.122",
+   "risk_summary": null,
+   "service_principal_name": null,
+   "service_provider": null,
+   "services": {},
+   "updated_at": "2026-07-29T15:21:19.333641Z",
+   "updated_by": {
+    "href": "/orgs/1/agents/1307"
+   },
+   "ven": {
+    "hostname": "k8s-node02",
+    "href": "/orgs/1/vens/03daf1e6-683d-4305-a5bf-964e6e5ee580",
+    "name": null,
+    "status": "active",
+    "ven_type": "containerized",
+    "version": "23.4.11-8"
+   },
+   "visibility_level": "enhanced_data_collection"
+  },
+  {
+   "agent": {
+    "active_pce_fqdn": null,
+    "config": {
+     "log_traffic": false,
+     "mode": "selective",
+     "visibility_level": "enhanced_data_collection"
+    },
+    "href": "/orgs/1/agents/1308",
+    "status": {
+     "agent_health": [],
+     "agent_health_errors": {
+      "errors": [],
+      "warnings": []
+     },
+     "agent_version": "23.4.11-8",
+     "firewall_rule_count": 0,
+     "fw_config_current": true,
+     "instance_id": null,
+     "last_heartbeat_on": "2026-08-03T06:22:33.455303Z",
+     "managed_since": "2026-04-05T05:09:37.899604Z",
+     "security_policy_applied_at": "2026-07-29T15:44:27.179730Z",
+     "security_policy_received_at": "2026-07-29T15:44:27.179730Z",
+     "security_policy_refresh_at": "2026-07-29T15:44:27.179730Z",
+     "security_policy_sync_state": "applied",
+     "status": "active",
+     "uid": null,
+     "uptime_seconds": 399822
+    },
+    "target_pce_fqdn": null,
+    "type": "Host"
+   },
+   "agent_to_pce_certificate_authentication_id": null,
+   "blocked_connection_action": "drop",
+   "caps": [
+    "write"
+   ],
+   "containers_inherit_host_policy": false,
+   "created_at": "2026-04-05T05:09:37.876861Z",
+   "created_by": {
+    "href": "/orgs/1/agents/1308"
+   },
+   "data_center": null,
+   "data_center_zone": null,
+   "datacenter_nat_1to1": false,
+   "deleted": false,
+   "description": null,
+   "distinguished_name": null,
+   "enforcement_mode": "selective",
+   "external_data_reference": null,
+   "external_data_set": null,
+   "firewall_coexistence": {
+    "illumio_primary": true
+   },
+   "hostname": "k8s-node01",
+   "href": "/orgs/1/workloads/01617631-38e2-4144-9c90-0296165ee9d8",
+   "ignored_interface_names": [],
+   "interfaces": [
+    {
+     "address": "172.16.15.121",
+     "cidr_block": 24,
+     "default_gateway_address": "172.16.15.254",
+     "friendly_name": null,
+     "link_state": null,
+     "loopback": false,
+     "name": "ens33",
+     "network": {
+      "href": "/orgs/1/networks/27058b12-718b-4538-8cb9-e59169fa75ed",
+      "name": "Corporate"
+     },
+     "network_detection_mode": "single_private_brn",
+     "public_ip": null
+    },
+    {
+     "address": "fe80::250:56ff:feaf:7294",
+     "cidr_block": 64,
+     "default_gateway_address": null,
+     "friendly_name": null,
+     "link_state": null,
+     "loopback": false,
+     "name": "ens33",
+     "network": {
+      "href": "/orgs/1/networks/633cc308-4001-4541-a1e0-1aa0fd219f28",
+      "name": "Corporate"
+     },
+     "network_detection_mode": "link_local",
+     "public_ip": null
+    },
+    {
+     "address": "10.85.85.192",
+     "cidr_block": 32,
+     "default_gateway_address": null,
+     "friendly_name": null,
+     "link_state": null,
+     "loopback": false,
+     "name": "vxlan.calico",
+     "network": {
+      "href": "/orgs/1/networks/27058b12-718b-4538-8cb9-e59169fa75ed",
+      "name": "Corporate"
+     },
+     "network_detection_mode": "single_private_brn",
+     "public_ip": null
+    },
+    {
+     "address": "fe80::6400:91ff:fece:5d5",
+     "cidr_block": 64,
+     "default_gateway_address": null,
+     "friendly_name": null,
+     "link_state": null,
+     "loopback": false,
+     "name": "vxlan.calico",
+     "network": {
+      "href": "/orgs/1/networks/633cc308-4001-4541-a1e0-1aa0fd219f28",
+      "name": "Corporate"
+     },
+     "network_detection_mode": "link_local",
+     "public_ip": null
+    }
+   ],
+   "labels": [
+    {
+     "href": "/orgs/1/labels/56",
+     "key": "role",
+     "value": "Worker"
+    },
+    {
+     "href": "/orgs/1/labels/15",
+     "key": "env",
+     "value": "Kubernetes"
+    },
+    {
+     "href": "/orgs/1/labels/55",
+     "key": "app",
+     "value": "K8sNode"
+    },
+    {
+     "href": "/orgs/1/labels/145",
+     "key": "loc",
+     "value": "TP"
+    },
+    {
+     "href": "/orgs/1/labels/69",
+     "key": "os",
+     "value": "Ubuntu"
+    }
+   ],
+   "managed": true,
+   "name": null,
+   "online": true,
+   "os_detail": "5.15.0-186-generic #196-Ubuntu SMP Sat Jun 20 16:09:34 UTC 2026 (Ubuntu 22.04.5 LTS)",
+   "os_id": "ubuntu-x86_64-xenial",
+   "public_ip": "172.16.15.121",
+   "risk_summary": null,
+   "service_principal_name": null,
+   "service_provider": null,
+   "services": {},
+   "updated_at": "2026-07-29T15:21:25.293938Z",
+   "updated_by": {
+    "href": "/orgs/1/agents/1308"
+   },
+   "ven": {
+    "hostname": "k8s-node01",
+    "href": "/orgs/1/vens/01617631-38e2-4144-9c90-0296165ee9d8",
+    "name": null,
+    "status": "active",
+    "ven_type": "containerized",
+    "version": "23.4.11-8"
+   },
+   "visibility_level": "enhanced_data_collection"
+  },
+  {
+   "agent": {
+    "active_pce_fqdn": null,
+    "config": {
+     "log_traffic": false,
+     "mode": "selective",
+     "visibility_level": "enhanced_data_collection"
+    },
+    "href": "/orgs/1/agents/1309",
+    "status": {
+     "agent_health": [],
+     "agent_health_errors": {
+      "errors": [],
+      "warnings": []
+     },
+     "agent_version": "23.4.11-8",
+     "firewall_rule_count": 0,
+     "fw_config_current": true,
+     "instance_id": null,
+     "last_heartbeat_on": "2026-08-03T06:23:59.459244Z",
+     "managed_since": "2026-04-05T05:09:38.864086Z",
+     "security_policy_applied_at": "2026-07-29T15:42:27.069777Z",
+     "security_policy_received_at": "2026-07-29T15:42:27.069777Z",
+     "security_policy_refresh_at": "2026-07-29T15:42:27.069777Z",
+     "security_policy_sync_state": "applied",
+     "status": "active",
+     "uid": null,
+     "uptime_seconds": 400143
+    },
+    "target_pce_fqdn": null,
+    "type": "Host"
+   },
+   "agent_to_pce_certificate_authentication_id": null,
+   "blocked_connection_action": "drop",
+   "caps": [
+    "write"
+   ],
+   "containers_inherit_host_policy": false,
+   "created_at": "2026-04-05T05:09:38.837891Z",
+   "created_by": {
+    "href": "/orgs/1/agents/1309"
+   },
+   "data_center": null,
+   "data_center_zone": null,
+   "datacenter_nat_1to1": false,
+   "deleted": false,
+   "description": "",
+   "distinguished_name": null,
+   "enforcement_mode": "selective",
+   "external_data_reference": null,
+   "external_data_set": null,
+   "firewall_coexistence": {
+    "illumio_primary": true
+   },
+   "hostname": "k8s-master",
+   "href": "/orgs/1/workloads/08e76a74-4baf-406e-bd43-20a9ef10a9a7",
+   "ignored_interface_names": [],
+   "interfaces": [
+    {
+     "address": "fe80::250:56ff:feaf:1ae1",
+     "cidr_block": 64,
+     "default_gateway_address": null,
+     "friendly_name": null,
+     "link_state": null,
+     "loopback": false,
+     "name": "ens33",
+     "network": {
+      "href": "/orgs/1/networks/633cc308-4001-4541-a1e0-1aa0fd219f28",
+      "name": "Corporate"
+     },
+     "network_detection_mode": "link_local",
+     "public_ip": null
+    },
+    {
+     "address": "10.85.235.192",
+     "cidr_block": 32,
+     "default_gateway_address": null,
+     "friendly_name": null,
+     "link_state": null,
+     "loopback": false,
+     "name": "vxlan.calico",
+     "network": {
+      "href": "/orgs/1/networks/27058b12-718b-4538-8cb9-e59169fa75ed",
+      "name": "Corporate"
+     },
+     "network_detection_mode": "single_private_brn",
+     "public_ip": null
+    },
+    {
+     "address": "fe80::64d5:cfff:fed3:6b7e",
+     "cidr_block": 64,
+     "default_gateway_address": null,
+     "friendly_name": null,
+     "link_state": null,
+     "loopback": false,
+     "name": "vxlan.calico",
+     "network": {
+      "href": "/orgs/1/networks/633cc308-4001-4541-a1e0-1aa0fd219f28",
+      "name": "Corporate"
+     },
+     "network_detection_mode": "link_local",
+     "public_ip": null
+    },
+    {
+     "address": "172.16.15.120",
+     "cidr_block": 24,
+     "default_gateway_address": "172.16.15.254",
+     "friendly_name": null,
+     "link_state": null,
+     "loopback": false,
+     "name": "ens33",
+     "network": {
+      "href": "/orgs/1/networks/27058b12-718b-4538-8cb9-e59169fa75ed",
+      "name": "Corporate"
+     },
+     "network_detection_mode": "single_private_brn",
+     "public_ip": null
+    }
+   ],
+   "labels": [
+    {
+     "href": "/orgs/1/labels/15",
+     "key": "env",
+     "value": "Kubernetes"
+    },
+    {
+     "href": "/orgs/1/labels/55",
+     "key": "app",
+     "value": "K8sNode"
+    },
+    {
+     "href": "/orgs/1/labels/54",
+     "key": "role",
+     "value": "Master"
+    },
+    {
+     "href": "/orgs/1/labels/145",
+     "key": "loc",
+     "value": "TP"
+    },
+    {
+     "href": "/orgs/1/labels/69",
+     "key": "os",
+     "value": "Ubuntu"
+    }
+   ],
+   "managed": true,
+   "name": "k8s-master",
+   "online": true,
+   "os_detail": "5.15.0-186-generic #196-Ubuntu SMP Sat Jun 20 16:09:34 UTC 2026 (Ubuntu 22.04.5 LTS)",
+   "os_id": "ubuntu-x86_64-xenial",
+   "public_ip": "172.16.15.120",
+   "risk_summary": null,
+   "service_principal_name": null,
+   "service_provider": null,
+   "services": {},
+   "updated_at": "2026-07-29T15:21:22.490429Z",
+   "updated_by": {
+    "href": "/orgs/1/agents/1309"
+   },
+   "ven": {
+    "hostname": "k8s-master",
+    "href": "/orgs/1/vens/08e76a74-4baf-406e-bd43-20a9ef10a9a7",
+    "name": null,
+    "status": "active",
+    "ven_type": "containerized",
+    "version": "23.4.11-8"
+   },
+   "visibility_level": "enhanced_data_collection"
+  },
+  {
+   "agent": {
+    "active_pce_fqdn": null,
+    "config": {
+     "log_traffic": false,
+     "mode": "selective",
+     "visibility_level": "enhanced_data_collection"
+    },
+    "href": "/orgs/1/agents/685",
+    "status": {
+     "agent_health": [],
+     "agent_health_errors": {
+      "errors": [],
+      "warnings": []
+     },
+     "agent_version": "25.2.40-4047",
+     "firewall_rule_count": 0,
+     "fw_config_current": true,
+     "instance_id": null,
+     "last_heartbeat_on": "2026-08-03T06:22:37.838508Z",
+     "managed_since": "2024-09-02T02:10:17.045301Z",
+     "security_policy_applied_at": "2026-07-30T01:15:00.767436Z",
+     "security_policy_received_at": "2026-07-30T01:15:00.767436Z",
+     "security_policy_refresh_at": "2026-07-30T01:15:00.767436Z",
+     "security_policy_sync_state": "applied",
+     "status": "active",
+     "uid": "ACAD2F42-4457-FB82-0118-0F6D5D2D5B18",
+     "uptime_seconds": 364728
+    },
+    "target_pce_fqdn": null,
+    "type": "Host"
+   },
+   "agent_to_pce_certificate_authentication_id": null,
+   "blocked_connection_action": "drop",
+   "caps": [
+    "write"
+   ],
+   "containers_inherit_host_policy": false,
+   "created_at": "2024-09-02T02:10:17.008892Z",
+   "created_by": {
+    "href": "/orgs/1/agents/685"
+   },
+   "data_center": null,
+   "data_center_zone": null,
+   "datacenter_nat_1to1": false,
+   "deleted": false,
+   "description": "",
+   "distinguished_name": null,
+   "enforcement_mode": "selective",
+   "external_data_reference": null,
+   "external_data_set": null,
+   "firewall_coexistence": {
+    "illumio_primary": true
+   },
+   "hostname": "win11-ilo-test",
+   "href": "/orgs/1/workloads/08e142ff-449d-412c-bb2e-47c4ecf4c565",
+   "ignored_interface_names": [],
+   "interfaces": [
+    {
+     "address": "172.16.15.151",
+     "cidr_block": 24,
+     "default_gateway_address": "172.16.15.254",
+     "friendly_name": null,
+     "link_state": null,
+     "loopback": false,
+     "name": "eth32769",
+     "network": {
+      "href": "/orgs/1/networks/27058b12-718b-4538-8cb9-e59169fa75ed",
+      "name": "Corporate"
+     },
+     "network_detection_mode": "single_private_brn",
+     "public_ip": null
+    }
+   ],
+   "labels": [
+    {
+     "href": "/orgs/1/labels/39",
+     "key": "role",
+     "value": "PC"
+    },
+    {
+     "href": "/orgs/1/labels/49",
+     "key": "app",
+     "value": "Jumpdesk"
+    },
+    {
+     "href": "/orgs/1/labels/21",
+     "key": "env",
+     "value": "VMware"
+    },
+    {
+     "href": "/orgs/1/labels/68",
+     "key": "os",
+     "value": "WinPC"
+    },
+    {
+     "href": "/orgs/1/labels/145",
+     "key": "loc",
+     "value": "TP"
+    },
+    {
+     "href": "/orgs/1/labels/142",
+     "key": "Net",
+     "value": "Server-172.16.15"
+    }
+   ],
+   "managed": true,
+   "name": "win11-ilo-test",
+   "online": true,
+   "os_detail": "22621.1.amd64fre.ni_release.220506-1250 (Windows 10 Enterprise)",
+   "os_id": "win-x86_64-client",
+   "public_ip": "192.168.40.100",
+   "risk_summary": null,
+   "service_principal_name": null,
+   "service_provider": null,
+   "services": {},
+   "updated_at": "2026-07-29T15:21:26.284197Z",
+   "updated_by": {
+    "href": "/orgs/1/agents/685"
+   },
+   "ven": {
+    "hostname": "win11-ilo-test",
+    "href": "/orgs/1/vens/08e142ff-449d-412c-bb2e-47c4ecf4c565",
+    "name": null,
+    "status": "active",
+    "ven_type": "endpoint",
+    "version": "25.2.40-4047"
+   },
+   "visibility_level": "enhanced_data_collection"
+  },
+  {
+   "agent": {
+    "active_pce_fqdn": null,
+    "config": {
+     "log_traffic": false,
+     "mode": "idle",
+     "visibility_level": "flow_summary"
+    },
+    "href": "/orgs/1/agents/1341",
+    "status": {
+     "agent_health": [],
+     "agent_health_errors": {
+      "errors": [],
+      "warnings": []
+     },
+     "agent_version": "25.2.40-4047",
+     "firewall_rule_count": 0,
+     "fw_config_current": true,
+     "instance_id": null,
+     "last_heartbeat_on": "2026-08-03T06:25:49.590326Z",
+     "managed_since": "2026-05-14T16:30:50.080006Z",
+     "security_policy_applied_at": "2026-07-29T15:29:11.118196Z",
+     "security_policy_received_at": "2026-07-29T15:29:11.118196Z",
+     "security_policy_refresh_at": "2026-07-29T15:29:11.118196Z",
+     "security_policy_sync_state": "applied",
+     "status": "active",
+     "uid": "fc3e4d56-31b3-91ba-6eee-12e0da7ac66a",
+     "uptime_seconds": 400303
+    },
+    "target_pce_fqdn": null,
+    "type": "Host"
+   },
+   "agent_to_pce_certificate_authentication_id": null,
+   "blocked_connection_action": "drop",
+   "caps": [
+    "write"
+   ],
+   "containers_inherit_host_policy": false,
+   "created_at": "2026-05-14T16:30:50.055704Z",
+   "created_by": {
+    "href": "/orgs/1/agents/1341"
+   },
+   "data_center": null,
+   "data_center_zone": null,
+   "datacenter_nat_1to1": false,
+   "deleted": false,
+   "description": "",
+   "distinguished_name": null,
+   "enforcement_mode": "idle",
+   "external_data_reference": null,
+   "external_data_set": null,
+   "hostname": "pce.lab.local",
+   "href": "/orgs/1/workloads/da7aa018-06fa-4ef5-89c6-0bf5b1b08e61",
+   "ignored_interface_names": [],
+   "interfaces": [
+    {
+     "address": "172.16.15.130",
+     "cidr_block": 24,
+     "default_gateway_address": "172.16.15.254",
+     "friendly_name": null,
+     "link_state": null,
+     "loopback": false,
+     "name": "ens34",
+     "network": {
+      "href": "/orgs/1/networks/27058b12-718b-4538-8cb9-e59169fa75ed",
+      "name": "Corporate"
+     },
+     "network_detection_mode": "single_private_brn",
+     "public_ip": null
+    }
+   ],
+   "labels": [],
+   "managed": true,
+   "name": "pce.lab.local",
+   "online": true,
+   "os_detail": "5.14.0-611.49.1.el9_7.x86_64 #1 SMP PREEMPT_DYNAMIC Tue Apr 7 14:39:16 EDT 2026 (Red Hat Enterprise Linux release 9.7 (Plow))",
+   "os_id": "centos-x86_64-9.0",
+   "public_ip": "172.16.15.130",
+   "risk_summary": {
+    "ransomware": {
+     "last_updated_at": "2026-08-03T05:06:44Z",
+     "ransomware_protection_percent": 0.0,
+     "workload_exposure_severity": "critical"
+    }
+   },
+   "service_principal_name": null,
+   "service_provider": null,
+   "services": {},
+   "updated_at": "2026-06-26T08:49:31.443521Z",
+   "updated_by": {
+    "href": "/users/11"
+   },
+   "ven": {
+    "hostname": "pce.lab.local",
+    "href": "/orgs/1/vens/da7aa018-06fa-4ef5-89c6-0bf5b1b08e61",
+    "name": null,
+    "status": "active",
+    "ven_type": "server",
+    "version": "25.2.40-4047"
+   },
+   "visibility_level": "flow_summary"
+  },
+  {
+   "agent": {
+    "active_pce_fqdn": null,
+    "config": {
+     "log_traffic": false,
+     "mode": "idle",
+     "visibility_level": "flow_summary"
+    },
+    "href": "/orgs/1/agents/1344",
+    "status": {
+     "agent_health": [],
+     "agent_health_errors": {
+      "errors": [],
+      "warnings": []
+     },
+     "agent_version": "25.2.40-4047",
+     "firewall_rule_count": 0,
+     "fw_config_current": true,
+     "instance_id": null,
+     "last_heartbeat_on": "2026-08-03T06:23:30.534537Z",
+     "managed_since": "2026-06-13T08:01:17.039331Z",
+     "security_policy_applied_at": "2026-07-29T18:01:46.604916Z",
+     "security_policy_received_at": "2026-07-29T18:01:46.604916Z",
+     "security_policy_refresh_at": "2026-07-29T18:01:46.604916Z",
+     "security_policy_sync_state": "applied",
+     "status": "active",
+     "uid": "aa742f42-3d4d-3337-3622-6d67bf0d827c",
+     "uptime_seconds": 400187
+    },
+    "target_pce_fqdn": null,
+    "type": "Host"
+   },
+   "agent_to_pce_certificate_authentication_id": null,
+   "blocked_connection_action": "drop",
+   "caps": [
+    "write"
+   ],
+   "containers_inherit_host_policy": false,
+   "created_at": "2026-06-13T08:01:17.015001Z",
+   "created_by": {
+    "href": "/orgs/1/agents/1344"
+   },
+   "data_center": null,
+   "data_center_zone": null,
+   "datacenter_nat_1to1": false,
+   "deleted": false,
+   "description": null,
+   "distinguished_name": null,
+   "enforcement_mode": "idle",
+   "external_data_reference": null,
+   "external_data_set": null,
+   "hostname": "garylog",
+   "href": "/orgs/1/workloads/ad94226e-8107-4cdf-82c2-b3edfbe8d91a",
+   "ignored_interface_names": [],
+   "interfaces": [
+    {
+     "address": "172.16.15.105",
+     "cidr_block": 24,
+     "default_gateway_address": "172.16.15.254",
+     "friendly_name": null,
+     "link_state": null,
+     "loopback": false,
+     "name": "ens33",
+     "network": {
+      "href": "/orgs/1/networks/27058b12-718b-4538-8cb9-e59169fa75ed",
+      "name": "Corporate"
+     },
+     "network_detection_mode": "single_private_brn",
+     "public_ip": null
+    },
+    {
+     "address": "fe80::250:56ff:feaf:b322",
+     "cidr_block": 64,
+     "default_gateway_address": null,
+     "friendly_name": null,
+     "link_state": null,
+     "loopback": false,
+     "name": "ens33",
+     "network": {
+      "href": "/orgs/1/networks/633cc308-4001-4541-a1e0-1aa0fd219f28",
+      "name": "Corporate"
+     },
+     "network_detection_mode": "link_local",
+     "public_ip": null
+    }
+   ],
+   "labels": [],
+   "managed": true,
+   "name": null,
+   "online": true,
+   "os_detail": "5.15.0-186-generic #196-Ubuntu SMP Sat Jun 20 16:09:34 UTC 2026 (Ubuntu 22.04.4 LTS)",
+   "os_id": "ubuntu-x86_64-xenial",
+   "public_ip": "172.16.15.105",
+   "risk_summary": {
+    "ransomware": {
+     "last_updated_at": "2026-08-03T05:06:44Z",
+     "ransomware_protection_percent": 0.0,
+     "workload_exposure_severity": "critical"
+    }
+   },
+   "service_principal_name": null,
+   "service_provider": null,
+   "services": {},
+   "updated_at": "2026-07-29T17:51:45.656261Z",
+   "updated_by": {
+    "href": "/orgs/1/agents/1344"
+   },
+   "ven": {
+    "hostname": "garylog",
+    "href": "/orgs/1/vens/ad94226e-8107-4cdf-82c2-b3edfbe8d91a",
+    "name": null,
+    "status": "active",
+    "ven_type": "server",
+    "version": "25.2.40-4047"
+   },
+   "visibility_level": "flow_summary"
+  },
+  {
+   "agent": {
+    "active_pce_fqdn": null,
+    "config": {
+     "log_traffic": false,
+     "mode": "selective",
+     "visibility_level": "enhanced_data_collection"
+    },
+    "href": "/orgs/1/agents/570",
+    "status": {
+     "agent_health": [],
+     "agent_health_errors": {
+      "errors": [],
+      "warnings": []
+     },
+     "agent_version": "25.2.40-4047",
+     "firewall_rule_count": 0,
+     "fw_config_current": true,
+     "instance_id": null,
+     "last_heartbeat_on": "2026-08-03T06:23:22.296288Z",
+     "managed_since": "2024-07-03T03:43:52.261269Z",
+     "security_policy_applied_at": "2026-07-29T15:27:04.508637Z",
+     "security_policy_received_at": "2026-07-29T15:27:04.508637Z",
+     "security_policy_refresh_at": "2026-07-29T15:27:04.508637Z",
+     "security_policy_sync_state": "applied",
+     "status": "active",
+     "uid": null,
+     "uptime_seconds": 400223
+    },
+    "target_pce_fqdn": null,
+    "type": "Host"
+   },
+   "agent_to_pce_certificate_authentication_id": null,
+   "blocked_connection_action": "drop",
+   "caps": [
+    "write"
+   ],
+   "containers_inherit_host_policy": false,
+   "created_at": "2024-07-03T03:43:52.242692Z",
+   "created_by": {
+    "href": "/orgs/1/agents/570"
+   },
+   "data_center": null,
+   "data_center_zone": null,
+   "datacenter_nat_1to1": false,
+   "deleted": false,
+   "description": "",
+   "distinguished_name": null,
+   "enforcement_mode": "selective",
+   "external_data_reference": null,
+   "external_data_set": null,
+   "hostname": "ipmi-ex",
+   "href": "/orgs/1/workloads/192fe68f-3e67-4728-bf9a-be55419d2d24",
+   "ignored_interface_names": [],
+   "interfaces": [
+    {
+     "address": "192.168.10.30",
+     "cidr_block": 24,
+     "default_gateway_address": "192.168.10.254",
+     "friendly_name": null,
+     "link_state": null,
+     "loopback": false,
+     "name": "ens33",
+     "network": {
+      "href": "/orgs/1/networks/27058b12-718b-4538-8cb9-e59169fa75ed",
+      "name": "Corporate"
+     },
+     "network_detection_mode": "single_private_brn",
+     "public_ip": null
+    },
+    {
+     "address": "fe80::250:56ff:feaf:75e7",
+     "cidr_block": 64,
+     "default_gateway_address": null,
+     "friendly_name": null,
+     "link_state": null,
+     "loopback": false,
+     "name": "ens33",
+     "network": {
+      "href": "/orgs/1/networks/633cc308-4001-4541-a1e0-1aa0fd219f28",
+      "name": "Corporate"
+     },
+     "network_detection_mode": "link_local",
+     "public_ip": null
+    }
+   ],
+   "labels": [
+    {
+     "href": "/orgs/1/labels/69",
+     "key": "os",
+     "value": "Ubuntu"
+    },
+    {
+     "href": "/orgs/1/labels/21",
+     "key": "env",
+     "value": "VMware"
+    },
+    {
+     "href": "/orgs/1/labels/65",
+     "key": "role",
+     "value": "IMPI-Export"
+    },
+    {
+     "href": "/orgs/1/labels/29",
+     "key": "app",
+     "value": "Infrastructure"
+    },
+    {
+     "href": "/orgs/1/labels/145",
+     "key": "loc",
+     "value": "TP"
+    },
+    {
+     "href": "/orgs/1/labels/143",
+     "key": "Net",
+     "value": "MGMT-192.168.10"
+    }
+   ],
+   "managed": true,
+   "name": "ipmi-ex",
+   "online": true,
+   "os_detail": "5.15.0-186-generic #196-Ubuntu SMP Sat Jun 20 16:09:34 UTC 2026 (Ubuntu 22.04.5 LTS)",
+   "os_id": "ubuntu-x86_64-xenial",
+   "public_ip": "192.168.10.30",
+   "risk_summary": {
+    "ransomware": {
+     "last_updated_at": "2026-08-03T05:06:44Z",
+     "ransomware_protection_percent": 0.0,
+     "workload_exposure_severity": "fully_protected"
+    }
+   },
+   "service_principal_name": null,
+   "service_provider": null,
+   "services": {},
+   "updated_at": "2026-07-29T15:17:24.001971Z",
+   "updated_by": {
+    "href": "/orgs/1/agents/570"
+   },
+   "ven": {
+    "hostname": "ipmi-ex",
+    "href": "/orgs/1/vens/192fe68f-3e67-4728-bf9a-be55419d2d24",
+    "name": null,
+    "status": "active",
+    "ven_type": "server",
+    "version": "25.2.40-4047"
+   },
+   "visibility_level": "enhanced_data_collection"
+  },
+  {
+   "agent": {
+    "active_pce_fqdn": null,
+    "config": {
+     "log_traffic": false,
+     "mode": "illuminated",
+     "visibility_level": "enhanced_data_collection"
+    },
+    "href": "/orgs/1/agents/4",
+    "status": {
+     "agent_health": [],
+     "agent_health_errors": {
+      "errors": [],
+      "warnings": []
+     },
+     "agent_version": "25.2.40-4047",
+     "firewall_rule_count": 0,
+     "fw_config_current": true,
+     "instance_id": null,
+     "last_heartbeat_on": "2026-08-03T06:24:06.059304Z",
+     "managed_since": "2024-06-24T08:39:48.350393Z",
+     "security_policy_applied_at": "2026-07-29T16:08:40.032866Z",
+     "security_policy_received_at": "2026-07-29T16:08:40.032866Z",
+     "security_policy_refresh_at": "2026-07-29T16:08:40.032866Z",
+     "security_policy_sync_state": "applied",
+     "status": "active",
+     "uid": "6A762F42-F6B1-9AE7-28B7-5FC71921063F",
+     "uptime_seconds": 397695
+    },
+    "target_pce_fqdn": null,
+    "type": "Host"
+   },
+   "agent_to_pce_certificate_authentication_id": null,
+   "blocked_connection_action": "drop",
+   "caps": [
+    "write"
+   ],
+   "containers_inherit_host_policy": false,
+   "created_at": "2024-06-24T08:39:48.313679Z",
+   "created_by": {
+    "href": "/orgs/1/agents/4"
+   },
+   "data_center": null,
+   "data_center_zone": null,
+   "datacenter_nat_1to1": false,
+   "deleted": false,
+   "description": "",
+   "distinguished_name": null,
+   "enforcement_mode": "visibility_only",
+   "external_data_reference": null,
+   "external_data_set": null,
+   "hostname": "dc",
+   "href": "/orgs/1/workloads/743a6abc-a353-44c4-a951-ce2331fe21dd",
+   "ignored_interface_names": [],
+   "interfaces": [
+    {
+     "address": "172.16.15.100",
+     "cidr_block": 24,
+     "default_gateway_address": "172.16.15.254",
+     "friendly_name": null,
+     "link_state": null,
+     "loopback": false,
+     "name": "eth32769",
+     "network": {
+      "href": "/orgs/1/networks/27058b12-718b-4538-8cb9-e59169fa75ed",
+      "name": "Corporate"
+     },
+     "network_detection_mode": "single_private_brn",
+     "public_ip": null
+    }
+   ],
+   "labels": [
+    {
+     "href": "/orgs/1/labels/21",
+     "key": "env",
+     "value": "VMware"
+    },
+    {
+     "href": "/orgs/1/labels/19",
+     "key": "role",
+     "value": "DomainController"
+    },
+    {
+     "href": "/orgs/1/labels/145",
+     "key": "loc",
+     "value": "TP"
+    },
+    {
+     "href": "/orgs/1/labels/121",
+     "key": "app",
+     "value": "CoreServices"
+    },
+    {
+     "href": "/orgs/1/labels/67",
+     "key": "os",
+     "value": "WinServer"
+    },
+    {
+     "href": "/orgs/1/labels/142",
+     "key": "Net",
+     "value": "Server-172.16.15"
+    }
+   ],
+   "managed": true,
+   "name": "dc",
+   "online": true,
+   "os_detail": "20348.1.amd64fre.fe_release.210507-1500 (Windows Server 2022 Standard)",
+   "os_id": "win-x86_64-server",
+   "public_ip": "172.16.15.100",
+   "risk_summary": {
+    "ransomware": {
+     "last_updated_at": "2026-08-03T05:06:44Z",
+     "ransomware_protection_percent": 0.0,
+     "workload_exposure_severity": "critical"
+    }
+   },
+   "service_principal_name": null,
+   "service_provider": null,
+   "services": {},
+   "updated_at": "2026-06-27T15:15:45.765842Z",
+   "updated_by": {
+    "href": "/users/11"
+   },
+   "ven": {
+    "hostname": "dc",
+    "href": "/orgs/1/vens/743a6abc-a353-44c4-a951-ce2331fe21dd",
+    "name": null,
+    "status": "active",
+    "ven_type": "server",
+    "version": "25.2.40-4047"
+   },
+   "visibility_level": "enhanced_data_collection"
+  },
+  {
+   "agent": {
+    "active_pce_fqdn": null,
+    "config": {
+     "log_traffic": false,
+     "mode": "selective",
+     "visibility_level": "enhanced_data_collection"
+    },
+    "href": "/orgs/1/agents/898",
+    "status": {
+     "agent_health": [],
+     "agent_health_errors": {
+      "errors": [],
+      "warnings": []
+     },
+     "agent_version": "25.2.40-4047",
+     "firewall_rule_count": 0,
+     "fw_config_current": true,
+     "instance_id": null,
+     "last_heartbeat_on": "2026-08-03T06:24:39.450463Z",
+     "managed_since": "2024-12-26T04:25:33.568245Z",
+     "security_policy_applied_at": "2026-07-29T15:29:30.734654Z",
+     "security_policy_received_at": "2026-07-29T15:29:30.734654Z",
+     "security_policy_refresh_at": "2026-07-29T15:29:30.734654Z",
+     "security_policy_sync_state": "applied",
+     "status": "active",
+     "uid": null,
+     "uptime_seconds": 400278
+    },
+    "target_pce_fqdn": null,
+    "type": "Host"
+   },
+   "agent_to_pce_certificate_authentication_id": null,
+   "blocked_connection_action": "drop",
+   "caps": [
+    "write"
+   ],
+   "containers_inherit_host_policy": false,
+   "created_at": "2024-12-26T04:25:33.548991Z",
+   "created_by": {
+    "href": "/orgs/1/agents/898"
+   },
+   "data_center": null,
+   "data_center_zone": null,
+   "datacenter_nat_1to1": false,
+   "deleted": false,
+   "description": "",
+   "distinguished_name": null,
+   "enforcement_mode": "selective",
+   "external_data_reference": null,
+   "external_data_set": null,
+   "hostname": "ftp",
+   "href": "/orgs/1/workloads/c742e9c6-f6a6-44a9-8ce2-5bc87fedaab1",
+   "ignored_interface_names": [],
+   "interfaces": [
+    {
+     "address": "172.16.15.102",
+     "cidr_block": 24,
+     "default_gateway_address": "172.16.15.254",
+     "friendly_name": null,
+     "link_state": null,
+     "loopback": false,
+     "name": "ens33",
+     "network": {
+      "href": "/orgs/1/networks/27058b12-718b-4538-8cb9-e59169fa75ed",
+      "name": "Corporate"
+     },
+     "network_detection_mode": "single_private_brn",
+     "public_ip": null
+    },
+    {
+     "address": "fe80::250:56ff:feaf:fe7a",
+     "cidr_block": 64,
+     "default_gateway_address": null,
+     "friendly_name": null,
+     "link_state": null,
+     "loopback": false,
+     "name": "ens33",
+     "network": {
+      "href": "/orgs/1/networks/633cc308-4001-4541-a1e0-1aa0fd219f28",
+      "name": "Corporate"
+     },
+     "network_detection_mode": "link_local",
+     "public_ip": null
+    }
+   ],
+   "labels": [
+    {
+     "href": "/orgs/1/labels/137",
+     "key": "role",
+     "value": "FTP"
+    },
+    {
+     "href": "/orgs/1/labels/69",
+     "key": "os",
+     "value": "Ubuntu"
+    },
+    {
+     "href": "/orgs/1/labels/21",
+     "key": "env",
+     "value": "VMware"
+    },
+    {
+     "href": "/orgs/1/labels/142",
+     "key": "Net",
+     "value": "Server-172.16.15"
+    },
+    {
+     "href": "/orgs/1/labels/145",
+     "key": "loc",
+     "value": "TP"
+    },
+    {
+     "href": "/orgs/1/labels/121",
+     "key": "app",
+     "value": "CoreServices"
+    }
+   ],
+   "managed": true,
+   "name": "ftp",
+   "online": true,
+   "os_detail": "5.15.0-186-generic #196-Ubuntu SMP Sat Jun 20 16:09:34 UTC 2026 (Ubuntu 22.04.5 LTS)",
+   "os_id": "ubuntu-x86_64-xenial",
+   "public_ip": "172.16.15.143",
+   "risk_summary": {
+    "ransomware": {
+     "last_updated_at": "2026-08-03T05:06:44Z",
+     "ransomware_protection_percent": 0.0,
+     "workload_exposure_severity": "fully_protected"
+    }
+   },
+   "service_principal_name": null,
+   "service_provider": null,
+   "services": {},
+   "updated_at": "2026-07-29T15:18:39.552784Z",
+   "updated_by": {
+    "href": "/orgs/1/agents/898"
+   },
+   "ven": {
+    "hostname": "ftp",
+    "href": "/orgs/1/vens/c742e9c6-f6a6-44a9-8ce2-5bc87fedaab1",
+    "name": null,
+    "status": "active",
+    "ven_type": "server",
+    "version": "25.2.40-4047"
+   },
+   "visibility_level": "enhanced_data_collection"
+  },
+  {
+   "agent": {
+    "active_pce_fqdn": null,
+    "config": {
+     "log_traffic": false,
+     "mode": "selective",
+     "visibility_level": "enhanced_data_collection"
+    },
+    "href": "/orgs/1/agents/891",
+    "status": {
+     "agent_health": [],
+     "agent_health_errors": {
+      "errors": [],
+      "warnings": []
+     },
+     "agent_version": "25.2.40-4047",
+     "firewall_rule_count": 0,
+     "fw_config_current": true,
+     "instance_id": null,
+     "last_heartbeat_on": "2026-08-03T06:25:47.040344Z",
+     "managed_since": "2024-12-20T12:04:17.739481Z",
+     "security_policy_applied_at": "2026-07-29T15:29:35.586717Z",
+     "security_policy_received_at": "2026-07-29T15:29:35.586717Z",
+     "security_policy_refresh_at": "2026-07-29T15:29:35.586717Z",
+     "security_policy_sync_state": "applied",
+     "status": "active",
+     "uid": null,
+     "uptime_seconds": 400013
+    },
+    "target_pce_fqdn": null,
+    "type": "Host"
+   },
+   "agent_to_pce_certificate_authentication_id": null,
+   "blocked_connection_action": "drop",
+   "caps": [
+    "write"
+   ],
+   "containers_inherit_host_policy": false,
+   "created_at": "2024-12-20T12:04:17.718677Z",
+   "created_by": {
+    "href": "/orgs/1/agents/891"
+   },
+   "data_center": null,
+   "data_center_zone": null,
+   "datacenter_nat_1to1": false,
+   "deleted": false,
+   "description": "",
+   "distinguished_name": null,
+   "enforcement_mode": "selective",
+   "external_data_reference": null,
+   "external_data_set": null,
+   "hostname": "d-web2",
+   "href": "/orgs/1/workloads/883bd741-8bec-4000-b0d8-8e37f53ebd00",
+   "ignored_interface_names": [],
+   "interfaces": [
+    {
+     "address": "172.16.15.162",
+     "cidr_block": 24,
+     "default_gateway_address": "172.16.15.254",
+     "friendly_name": null,
+     "link_state": null,
+     "loopback": false,
+     "name": "ens33",
+     "network": {
+      "href": "/orgs/1/networks/27058b12-718b-4538-8cb9-e59169fa75ed",
+      "name": "Corporate"
+     },
+     "network_detection_mode": "single_private_brn",
+     "public_ip": null
+    },
+    {
+     "address": "fe80::250:56ff:feaf:196a",
+     "cidr_block": 64,
+     "default_gateway_address": null,
+     "friendly_name": null,
+     "link_state": null,
+     "loopback": false,
+     "name": "ens33",
+     "network": {
+      "href": "/orgs/1/networks/633cc308-4001-4541-a1e0-1aa0fd219f28",
+      "name": "Corporate"
+     },
+     "network_detection_mode": "link_local",
+     "public_ip": null
+    }
+   ],
+   "labels": [
+    {
+     "href": "/orgs/1/labels/1",
+     "key": "role",
+     "value": "Web"
+    },
+    {
+     "href": "/orgs/1/labels/116",
+     "key": "app",
+     "value": "DemoApp"
+    },
+    {
+     "href": "/orgs/1/labels/21",
+     "key": "env",
+     "value": "VMware"
+    },
+    {
+     "href": "/orgs/1/labels/69",
+     "key": "os",
+     "value": "Ubuntu"
+    },
+    {
+     "href": "/orgs/1/labels/142",
+     "key": "Net",
+     "value": "Server-172.16.15"
+    },
+    {
+     "href": "/orgs/1/labels/145",
+     "key": "loc",
+     "value": "TP"
+    }
+   ],
+   "managed": true,
+   "name": "d-web2",
+   "online": true,
+   "os_detail": "5.4.0-216-generic #236-Ubuntu SMP Fri Apr 11 19:53:21 UTC 2025 (Ubuntu 20.04.6 LTS)",
+   "os_id": "ubuntu-x86_64-xenial",
+   "public_ip": "172.16.15.162",
+   "risk_summary": {
+    "ransomware": {
+     "last_updated_at": "2026-08-03T05:06:44Z",
+     "ransomware_protection_percent": 0.0,
+     "workload_exposure_severity": "fully_protected"
+    }
+   },
+   "service_principal_name": null,
+   "service_provider": null,
+   "services": {},
+   "updated_at": "2026-04-29T13:07:21.960372Z",
+   "updated_by": {
+    "href": "/orgs/1/agents/891"
+   },
+   "ven": {
+    "hostname": "d-web2",
+    "href": "/orgs/1/vens/883bd741-8bec-4000-b0d8-8e37f53ebd00",
+    "name": null,
+    "status": "active",
+    "ven_type": "server",
+    "version": "25.2.40-4047"
+   },
+   "visibility_level": "enhanced_data_collection"
+  },
+  {
+   "agent": {
+    "active_pce_fqdn": null,
+    "config": {
+     "log_traffic": false,
+     "mode": "selective",
+     "visibility_level": "flow_summary"
+    },
+    "href": "/orgs/1/agents/1343",
+    "status": {
+     "agent_health": [
+      {
+       "severity": "error",
+       "type": "security_policy_refresh_failure"
+      },
+      {
+       "severity": "error",
+       "type": "tampering_error"
+      }
+     ],
+     "agent_health_errors": {
+      "errors": [
+       "tampering_error",
+       "security_policy_refresh_failure"
+      ],
+      "warnings": []
+     },
+     "agent_version": "25.2.40-4047",
+     "firewall_rule_count": 0,
+     "fw_config_current": true,
+     "instance_id": null,
+     "last_heartbeat_on": "2026-08-03T06:25:02.760070Z",
+     "managed_since": "2026-06-08T06:55:22.981008Z",
+     "security_policy_applied_at": "2026-07-13T14:45:42.535648Z",
+     "security_policy_received_at": "2026-08-03T04:31:42.308895Z",
+     "security_policy_refresh_at": "2026-07-13T14:45:42.535648Z",
+     "security_policy_sync_state": "applied",
+     "status": "active",
+     "uid": "949f2f42-633e-34f1-5e77-d64dcefa04c8",
+     "uptime_seconds": 400256
+    },
+    "target_pce_fqdn": null,
+    "type": "Host"
+   },
+   "agent_to_pce_certificate_authentication_id": null,
+   "blocked_connection_action": "drop",
+   "caps": [
+    "write"
+   ],
+   "containers_inherit_host_policy": false,
+   "created_at": "2026-06-08T06:55:22.954720Z",
+   "created_by": {
+    "href": "/orgs/1/agents/1343"
+   },
+   "data_center": null,
+   "data_center_zone": null,
+   "datacenter_nat_1to1": false,
+   "deleted": false,
+   "description": "",
+   "distinguished_name": null,
+   "enforcement_mode": "selective",
+   "external_data_reference": null,
+   "external_data_set": null,
+   "hostname": "podman",
+   "href": "/orgs/1/workloads/5f262bcb-e605-40c3-b9f6-27e6b2013e4d",
+   "ignored_interface_names": [],
+   "interfaces": [
+    {
+     "address": "fe80::250:56ff:feaf:71e3",
+     "cidr_block": 64,
+     "default_gateway_address": null,
+     "friendly_name": null,
+     "link_state": null,
+     "loopback": false,
+     "name": "ens33",
+     "network": {
+      "href": "/orgs/1/networks/633cc308-4001-4541-a1e0-1aa0fd219f28",
+      "name": "Corporate"
+     },
+     "network_detection_mode": "link_local",
+     "public_ip": null
+    },
+    {
+     "address": "172.16.15.170",
+     "cidr_block": 24,
+     "default_gateway_address": "172.16.15.254",
+     "friendly_name": null,
+     "link_state": null,
+     "loopback": false,
+     "name": "ens33",
+     "network": {
+      "href": "/orgs/1/networks/27058b12-718b-4538-8cb9-e59169fa75ed",
+      "name": "Corporate"
+     },
+     "network_detection_mode": "single_private_brn",
+     "public_ip": null
+    }
+   ],
+   "labels": [],
+   "managed": true,
+   "name": "podman",
+   "online": true,
+   "os_detail": "4.18.0-553.6.1.el8.x86_64 #1 SMP Thu May 30 04:13:58 UTC 2024 (CentOS Stream release 8)",
+   "os_id": "centos-x86_64-8.0",
+   "public_ip": "172.16.15.170",
+   "risk_summary": {
+    "ransomware": {
+     "last_updated_at": "2026-08-03T05:06:44Z",
+     "ransomware_protection_percent": 0.0,
+     "workload_exposure_severity": "fully_protected"
+    }
+   },
+   "service_principal_name": null,
+   "service_provider": null,
+   "services": {},
+   "updated_at": "2026-06-12T07:46:38.286171Z",
+   "updated_by": {
+    "href": "/users/11"
+   },
+   "ven": {
+    "hostname": "podman",
+    "href": "/orgs/1/vens/5f262bcb-e605-40c3-b9f6-27e6b2013e4d",
+    "name": null,
+    "status": "active",
+    "ven_type": "server",
+    "version": "25.2.40-4047"
+   },
+   "visibility_level": "flow_summary"
+  },
+  {
+   "agent": {
+    "active_pce_fqdn": null,
+    "config": {
+     "log_traffic": false,
+     "mode": "selective",
+     "visibility_level": "enhanced_data_collection"
+    },
+    "href": "/orgs/1/agents/1084",
+    "status": {
+     "agent_health": [],
+     "agent_health_errors": {
+      "errors": [],
+      "warnings": []
+     },
+     "agent_version": "25.2.40-4047",
+     "firewall_rule_count": 0,
+     "fw_config_current": true,
+     "instance_id": null,
+     "last_heartbeat_on": "2026-08-03T06:25:38.973135Z",
+     "managed_since": "2025-06-05T12:12:48.889423Z",
+     "security_policy_applied_at": "2026-07-29T15:28:43.671670Z",
+     "security_policy_received_at": "2026-07-29T15:28:43.671670Z",
+     "security_policy_refresh_at": "2026-07-29T15:28:43.671670Z",
+     "security_policy_sync_state": "applied",
+     "status": "active",
+     "uid": null,
+     "uptime_seconds": 400287
+    },
+    "target_pce_fqdn": null,
+    "type": "Host"
+   },
+   "agent_to_pce_certificate_authentication_id": null,
+   "blocked_connection_action": "drop",
+   "caps": [
+    "write"
+   ],
+   "containers_inherit_host_policy": false,
+   "created_at": "2025-06-05T12:12:48.868865Z",
+   "created_by": {
+    "href": "/orgs/1/agents/1084"
+   },
+   "data_center": null,
+   "data_center_zone": null,
+   "datacenter_nat_1to1": false,
+   "deleted": false,
+   "description": "",
+   "distinguished_name": null,
+   "enforcement_mode": "selective",
+   "external_data_reference": null,
+   "external_data_set": null,
+   "hostname": "ilo-flow",
+   "href": "/orgs/1/workloads/925e4eaa-6587-44f4-82df-8b6059121d2e",
+   "ignored_interface_names": [],
+   "interfaces": [
+    {
+     "address": "172.16.15.135",
+     "cidr_block": 24,
+     "default_gateway_address": "172.16.15.254",
+     "friendly_name": null,
+     "link_state": null,
+     "loopback": false,
+     "name": "ens33",
+     "network": {
+      "href": "/orgs/1/networks/27058b12-718b-4538-8cb9-e59169fa75ed",
+      "name": "Corporate"
+     },
+     "network_detection_mode": "single_private_brn",
+     "public_ip": null
+    },
+    {
+     "address": "fe80::250:56ff:feaf:864c",
+     "cidr_block": 64,
+     "default_gateway_address": null,
+     "friendly_name": null,
+     "link_state": null,
+     "loopback": false,
+     "name": "ens33",
+     "network": {
+      "href": "/orgs/1/networks/633cc308-4001-4541-a1e0-1aa0fd219f28",
+      "name": "Corporate"
+     },
+     "network_detection_mode": "link_local",
+     "public_ip": null
+    }
+   ],
+   "labels": [
+    {
+     "href": "/orgs/1/labels/21",
+     "key": "env",
+     "value": "VMware"
+    },
+    {
+     "href": "/orgs/1/labels/40",
+     "key": "app",
+     "value": "Illumio"
+    },
+    {
+     "href": "/orgs/1/labels/124",
+     "key": "role",
+     "value": "Flowlink"
+    },
+    {
+     "href": "/orgs/1/labels/142",
+     "key": "Net",
+     "value": "Server-172.16.15"
+    },
+    {
+     "href": "/orgs/1/labels/152",
+     "key": "os",
+     "value": "RockyLinux"
+    },
+    {
+     "href": "/orgs/1/labels/145",
+     "key": "loc",
+     "value": "TP"
+    }
+   ],
+   "managed": true,
+   "name": "ilo-flow",
+   "online": true,
+   "os_detail": "5.14.0-503.38.1.el9_5.x86_64 #1 SMP PREEMPT_DYNAMIC Wed Apr 16 16:38:39 UTC 2025 (Rocky Linux release 9.5 (Blue Onyx))",
+   "os_id": "centos-x86_64-9.0",
+   "public_ip": "172.16.15.135",
+   "risk_summary": {
+    "ransomware": {
+     "last_updated_at": "2026-08-03T05:06:44Z",
+     "ransomware_protection_percent": 0.0,
+     "workload_exposure_severity": "fully_protected"
+    }
+   },
+   "service_principal_name": null,
+   "service_provider": null,
+   "services": {},
+   "updated_at": "2026-04-24T05:21:33.705657Z",
+   "updated_by": {
+    "href": "/users/11"
+   },
+   "ven": {
+    "hostname": "ilo-flow",
+    "href": "/orgs/1/vens/925e4eaa-6587-44f4-82df-8b6059121d2e",
+    "name": null,
+    "status": "active",
+    "ven_type": "server",
+    "version": "25.2.40-4047"
+   },
+   "visibility_level": "enhanced_data_collection"
+  },
+  {
+   "agent": {
+    "active_pce_fqdn": null,
+    "config": {
+     "log_traffic": false,
+     "mode": "selective",
+     "visibility_level": "flow_summary"
+    },
+    "href": "/orgs/1/agents/1334",
+    "status": {
+     "agent_health": [],
+     "agent_health_errors": {
+      "errors": [],
+      "warnings": []
+     },
+     "agent_version": "25.2.40-4047",
+     "firewall_rule_count": 0,
+     "fw_config_current": true,
+     "instance_id": null,
+     "last_heartbeat_on": "2026-08-03T06:26:39.316471Z",
+     "managed_since": "2026-04-29T13:55:34.109258Z",
+     "security_policy_applied_at": "2026-07-29T15:29:42.230115Z",
+     "security_policy_received_at": "2026-07-29T15:29:42.230115Z",
+     "security_policy_refresh_at": "2026-07-29T15:29:42.230115Z",
+     "security_policy_sync_state": "applied",
+     "status": "active",
+     "uid": "ceaf2f42-aa2d-7752-645f-8566ed790fe4",
+     "uptime_seconds": 400373
+    },
+    "target_pce_fqdn": null,
+    "type": "Host"
+   },
+   "agent_to_pce_certificate_authentication_id": null,
+   "blocked_connection_action": "drop",
+   "caps": [
+    "write"
+   ],
+   "containers_inherit_host_policy": false,
+   "created_at": "2026-04-29T13:55:34.080495Z",
+   "created_by": {
+    "href": "/orgs/1/agents/1334"
+   },
+   "data_center": null,
+   "data_center_zone": null,
+   "datacenter_nat_1to1": false,
+   "deleted": false,
+   "description": "",
+   "distinguished_name": null,
+   "enforcement_mode": "selective",
+   "external_data_reference": null,
+   "external_data_set": null,
+   "hostname": "batch.lab.local",
+   "href": "/orgs/1/workloads/82f29350-bfa4-4a43-b22f-c4c3a6128e78",
+   "ignored_interface_names": [],
+   "interfaces": [
+    {
+     "address": "172.16.15.106",
+     "cidr_block": 24,
+     "default_gateway_address": "172.16.15.254",
+     "friendly_name": null,
+     "link_state": null,
+     "loopback": false,
+     "name": "ens33",
+     "network": {
+      "href": "/orgs/1/networks/27058b12-718b-4538-8cb9-e59169fa75ed",
+      "name": "Corporate"
+     },
+     "network_detection_mode": "single_private_brn",
+     "public_ip": null
+    },
+    {
+     "address": "fe80::250:56ff:feaf:e6a9",
+     "cidr_block": 64,
+     "default_gateway_address": null,
+     "friendly_name": null,
+     "link_state": null,
+     "loopback": false,
+     "name": "ens33",
+     "network": {
+      "href": "/orgs/1/networks/633cc308-4001-4541-a1e0-1aa0fd219f28",
+      "name": "Corporate"
+     },
+     "network_detection_mode": "link_local",
+     "public_ip": null
+    },
+    {
+     "address": "172.17.0.1",
+     "cidr_block": 16,
+     "default_gateway_address": null,
+     "friendly_name": null,
+     "link_state": null,
+     "loopback": false,
+     "name": "docker0",
+     "network": {
+      "href": "/orgs/1/networks/27058b12-718b-4538-8cb9-e59169fa75ed",
+      "name": "Corporate"
+     },
+     "network_detection_mode": "single_private_brn",
+     "public_ip": null
+    }
+   ],
+   "labels": [
+    {
+     "href": "/orgs/1/labels/233",
+     "key": "role",
+     "value": "Batch"
+    },
+    {
+     "href": "/orgs/1/labels/121",
+     "key": "app",
+     "value": "CoreServices"
+    },
+    {
+     "href": "/orgs/1/labels/21",
+     "key": "env",
+     "value": "VMware"
+    },
+    {
+     "href": "/orgs/1/labels/145",
+     "key": "loc",
+     "value": "TP"
+    },
+    {
+     "href": "/orgs/1/labels/142",
+     "key": "Net",
+     "value": "Server-172.16.15"
+    },
+    {
+     "href": "/orgs/1/labels/69",
+     "key": "os",
+     "value": "Ubuntu"
+    }
+   ],
+   "managed": true,
+   "name": "batch.lab.local",
+   "online": true,
+   "os_detail": "6.8.0-136-generic #136-Ubuntu SMP PREEMPT_DYNAMIC Wed Jul 1 21:53:05 UTC 2026 (Ubuntu 24.04.3 LTS)",
+   "os_id": "ubuntu-x86_64-xenial",
+   "public_ip": "172.16.15.106",
+   "risk_summary": {
+    "ransomware": {
+     "last_updated_at": "2026-08-03T05:06:44Z",
+     "ransomware_protection_percent": 0.0,
+     "workload_exposure_severity": "fully_protected"
+    }
+   },
+   "service_principal_name": null,
+   "service_provider": null,
+   "services": {},
+   "updated_at": "2026-07-29T15:19:34.205676Z",
+   "updated_by": {
+    "href": "/orgs/1/agents/1334"
+   },
+   "ven": {
+    "hostname": "batch.lab.local",
+    "href": "/orgs/1/vens/82f29350-bfa4-4a43-b22f-c4c3a6128e78",
+    "name": null,
+    "status": "active",
+    "ven_type": "server",
+    "version": "25.2.40-4047"
+   },
+   "visibility_level": "flow_summary"
+  },
+  {
+   "agent": {
+    "active_pce_fqdn": null,
+    "config": {
+     "log_traffic": false,
+     "mode": "selective",
+     "visibility_level": "enhanced_data_collection"
+    },
+    "href": "/orgs/1/agents/1039",
+    "status": {
+     "agent_health": [],
+     "agent_health_errors": {
+      "errors": [],
+      "warnings": []
+     },
+     "agent_version": "25.2.40-4047",
+     "firewall_rule_count": 0,
+     "fw_config_current": true,
+     "instance_id": null,
+     "last_heartbeat_on": "2026-08-03T06:25:19.305285Z",
+     "managed_since": "2025-04-24T12:52:21.518047Z",
+     "security_policy_applied_at": "2026-07-29T15:30:39.647655Z",
+     "security_policy_received_at": "2026-07-29T15:30:39.647655Z",
+     "security_policy_refresh_at": "2026-07-29T15:30:39.647655Z",
+     "security_policy_sync_state": "applied",
+     "status": "active",
+     "uid": null,
+     "uptime_seconds": 400342
+    },
+    "target_pce_fqdn": null,
+    "type": "Host"
+   },
+   "agent_to_pce_certificate_authentication_id": null,
+   "blocked_connection_action": "drop",
+   "caps": [
+    "write"
+   ],
+   "containers_inherit_host_policy": false,
+   "created_at": "2025-04-24T12:52:21.498738Z",
+   "created_by": {
+    "href": "/orgs/1/agents/1039"
+   },
+   "data_center": null,
+   "data_center_zone": null,
+   "datacenter_nat_1to1": false,
+   "deleted": false,
+   "description": "",
+   "distinguished_name": null,
+   "enforcement_mode": "selective",
+   "external_data_reference": null,
+   "external_data_set": null,
+   "firewall_coexistence": {
+    "illumio_primary": true
+   },
+   "hostname": "wg",
+   "href": "/orgs/1/workloads/f05ae26c-5f8a-4a19-8971-057bf9421664",
+   "ignored_interface_names": [],
+   "interfaces": [
+    {
+     "address": "192.168.20.99",
+     "cidr_block": 24,
+     "default_gateway_address": "192.168.20.254",
+     "friendly_name": null,
+     "link_state": null,
+     "loopback": false,
+     "name": "ens33",
+     "network": {
+      "href": "/orgs/1/networks/27058b12-718b-4538-8cb9-e59169fa75ed",
+      "name": "Corporate"
+     },
+     "network_detection_mode": "single_private_brn",
+     "public_ip": null
+    },
+    {
+     "address": "fe80::250:56ff:feaf:fb55",
+     "cidr_block": 64,
+     "default_gateway_address": null,
+     "friendly_name": null,
+     "link_state": null,
+     "loopback": false,
+     "name": "ens33",
+     "network": {
+      "href": "/orgs/1/networks/633cc308-4001-4541-a1e0-1aa0fd219f28",
+      "name": "Corporate"
+     },
+     "network_detection_mode": "link_local",
+     "public_ip": null
+    }
+   ],
+   "labels": [
+    {
+     "href": "/orgs/1/labels/142",
+     "key": "Net",
+     "value": "Server-172.16.15"
+    },
+    {
+     "href": "/orgs/1/labels/145",
+     "key": "loc",
+     "value": "TP"
+    },
+    {
+     "href": "/orgs/1/labels/21",
+     "key": "env",
+     "value": "VMware"
+    },
+    {
+     "href": "/orgs/1/labels/29",
+     "key": "app",
+     "value": "Infrastructure"
+    },
+    {
+     "href": "/orgs/1/labels/48",
+     "key": "role",
+     "value": "WireGuard"
+    },
+    {
+     "href": "/orgs/1/labels/69",
+     "key": "os",
+     "value": "Ubuntu"
+    }
+   ],
+   "managed": true,
+   "name": "wg",
+   "online": true,
+   "os_detail": "5.15.0-186-generic #196-Ubuntu SMP Sat Jun 20 16:09:34 UTC 2026 (Ubuntu 22.04.5 LTS)",
+   "os_id": "ubuntu-x86_64-xenial",
+   "public_ip": "192.168.20.99",
+   "risk_summary": {
+    "ransomware": {
+     "last_updated_at": "2026-08-03T05:06:44Z",
+     "ransomware_protection_percent": 0.0,
+     "workload_exposure_severity": "fully_protected"
+    }
+   },
+   "service_principal_name": null,
+   "service_provider": null,
+   "services": {},
+   "updated_at": "2026-07-29T15:20:24.343190Z",
+   "updated_by": {
+    "href": "/orgs/1/agents/1039"
+   },
+   "ven": {
+    "hostname": "wg",
+    "href": "/orgs/1/vens/f05ae26c-5f8a-4a19-8971-057bf9421664",
+    "name": null,
+    "status": "active",
+    "ven_type": "server",
+    "version": "25.2.40-4047"
+   },
+   "visibility_level": "enhanced_data_collection"
+  },
+  {
+   "agent": {
+    "active_pce_fqdn": null,
+    "config": {
+     "log_traffic": false,
+     "mode": "selective",
+     "visibility_level": "enhanced_data_collection"
+    },
+    "href": "/orgs/1/agents/894",
+    "status": {
+     "agent_health": [],
+     "agent_health_errors": {
+      "errors": [],
+      "warnings": []
+     },
+     "agent_version": "25.2.40-4047",
+     "firewall_rule_count": 0,
+     "fw_config_current": true,
+     "instance_id": null,
+     "last_heartbeat_on": "2026-08-03T06:25:34.012050Z",
+     "managed_since": "2024-12-20T12:04:22.474512Z",
+     "security_policy_applied_at": "2026-07-29T15:29:17.878686Z",
+     "security_policy_received_at": "2026-07-29T15:29:17.878686Z",
+     "security_policy_refresh_at": "2026-07-29T15:29:17.878686Z",
+     "security_policy_sync_state": "applied",
+     "status": "active",
+     "uid": null,
+     "uptime_seconds": 400322
+    },
+    "target_pce_fqdn": null,
+    "type": "Host"
+   },
+   "agent_to_pce_certificate_authentication_id": null,
+   "blocked_connection_action": "drop",
+   "caps": [
+    "write"
+   ],
+   "containers_inherit_host_policy": false,
+   "created_at": "2024-12-20T12:04:22.454510Z",
+   "created_by": {
+    "href": "/orgs/1/agents/894"
+   },
+   "data_center": null,
+   "data_center_zone": null,
+   "datacenter_nat_1to1": false,
+   "deleted": false,
+   "description": "",
+   "distinguished_name": null,
+   "enforcement_mode": "selective",
+   "external_data_reference": null,
+   "external_data_set": null,
+   "hostname": "d-api",
+   "href": "/orgs/1/workloads/d2e42695-3b3e-4c4d-a1a9-828289661003",
+   "ignored_interface_names": [],
+   "interfaces": [
+    {
+     "address": "172.16.15.163",
+     "cidr_block": 24,
+     "default_gateway_address": "172.16.15.254",
+     "friendly_name": null,
+     "link_state": null,
+     "loopback": false,
+     "name": "ens33",
+     "network": {
+      "href": "/orgs/1/networks/27058b12-718b-4538-8cb9-e59169fa75ed",
+      "name": "Corporate"
+     },
+     "network_detection_mode": "single_private_brn",
+     "public_ip": null
+    },
+    {
+     "address": "fe80::250:56ff:feaf:fa2e",
+     "cidr_block": 64,
+     "default_gateway_address": null,
+     "friendly_name": null,
+     "link_state": null,
+     "loopback": false,
+     "name": "ens33",
+     "network": {
+      "href": "/orgs/1/networks/633cc308-4001-4541-a1e0-1aa0fd219f28",
+      "name": "Corporate"
+     },
+     "network_detection_mode": "link_local",
+     "public_ip": null
+    }
+   ],
+   "labels": [
+    {
+     "href": "/orgs/1/labels/110",
+     "key": "role",
+     "value": "Apiserver"
+    },
+    {
+     "href": "/orgs/1/labels/116",
+     "key": "app",
+     "value": "DemoApp"
+    },
+    {
+     "href": "/orgs/1/labels/21",
+     "key": "env",
+     "value": "VMware"
+    },
+    {
+     "href": "/orgs/1/labels/142",
+     "key": "Net",
+     "value": "Server-172.16.15"
+    },
+    {
+     "href": "/orgs/1/labels/69",
+     "key": "os",
+     "value": "Ubuntu"
+    },
+    {
+     "href": "/orgs/1/labels/145",
+     "key": "loc",
+     "value": "TP"
+    }
+   ],
+   "managed": true,
+   "name": "d-api",
+   "online": true,
+   "os_detail": "5.4.0-216-generic #236-Ubuntu SMP Fri Apr 11 19:53:21 UTC 2025 (Ubuntu 20.04.6 LTS)",
+   "os_id": "ubuntu-x86_64-xenial",
+   "public_ip": "172.16.15.163",
+   "risk_summary": {
+    "ransomware": {
+     "last_updated_at": "2026-08-03T05:06:44Z",
+     "ransomware_protection_percent": 0.0,
+     "workload_exposure_severity": "fully_protected"
+    }
+   },
+   "service_principal_name": null,
+   "service_provider": null,
+   "services": {},
+   "updated_at": "2026-06-26T09:08:02.134457Z",
+   "updated_by": {
+    "href": "/users/11"
+   },
+   "ven": {
+    "hostname": "d-api",
+    "href": "/orgs/1/vens/d2e42695-3b3e-4c4d-a1a9-828289661003",
+    "name": null,
+    "status": "active",
+    "ven_type": "server",
+    "version": "25.2.40-4047"
+   },
+   "visibility_level": "enhanced_data_collection"
+  },
+  {
+   "agent": {
+    "active_pce_fqdn": null,
+    "config": {
+     "log_traffic": false,
+     "mode": "selective",
+     "visibility_level": "enhanced_data_collection"
+    },
+    "href": "/orgs/1/agents/890",
+    "status": {
+     "agent_health": [],
+     "agent_health_errors": {
+      "errors": [],
+      "warnings": []
+     },
+     "agent_version": "25.2.40-4047",
+     "firewall_rule_count": 0,
+     "fw_config_current": true,
+     "instance_id": null,
+     "last_heartbeat_on": "2026-08-03T06:25:26.454541Z",
+     "managed_since": "2024-12-20T12:04:12.439488Z",
+     "security_policy_applied_at": "2026-07-29T15:29:41.393688Z",
+     "security_policy_received_at": "2026-07-29T15:29:41.393688Z",
+     "security_policy_refresh_at": "2026-07-29T15:29:41.393688Z",
+     "security_policy_sync_state": "applied",
+     "status": "active",
+     "uid": null,
+     "uptime_seconds": 400322
+    },
+    "target_pce_fqdn": null,
+    "type": "Host"
+   },
+   "agent_to_pce_certificate_authentication_id": null,
+   "blocked_connection_action": "drop",
+   "caps": [
+    "write"
+   ],
+   "containers_inherit_host_policy": false,
+   "created_at": "2024-12-20T12:04:12.372265Z",
+   "created_by": {
+    "href": "/orgs/1/agents/890"
+   },
+   "data_center": null,
+   "data_center_zone": null,
+   "datacenter_nat_1to1": false,
+   "deleted": false,
+   "description": "",
+   "distinguished_name": null,
+   "enforcement_mode": "selective",
+   "external_data_reference": null,
+   "external_data_set": null,
+   "hostname": "d-db",
+   "href": "/orgs/1/workloads/25952d04-a842-4d38-9449-fd33137b473e",
+   "ignored_interface_names": [],
+   "interfaces": [
+    {
+     "address": "172.16.15.160",
+     "cidr_block": 24,
+     "default_gateway_address": "172.16.15.254",
+     "friendly_name": null,
+     "link_state": null,
+     "loopback": false,
+     "name": "ens33",
+     "network": {
+      "href": "/orgs/1/networks/27058b12-718b-4538-8cb9-e59169fa75ed",
+      "name": "Corporate"
+     },
+     "network_detection_mode": "single_private_brn",
+     "public_ip": null
+    },
+    {
+     "address": "fe80::250:56ff:feaf:1fc5",
+     "cidr_block": 64,
+     "default_gateway_address": null,
+     "friendly_name": null,
+     "link_state": null,
+     "loopback": false,
+     "name": "ens33",
+     "network": {
+      "href": "/orgs/1/networks/633cc308-4001-4541-a1e0-1aa0fd219f28",
+      "name": "Corporate"
+     },
+     "network_detection_mode": "link_local",
+     "public_ip": null
+    }
+   ],
+   "labels": [
+    {
+     "href": "/orgs/1/labels/2",
+     "key": "role",
+     "value": "Database"
+    },
+    {
+     "href": "/orgs/1/labels/116",
+     "key": "app",
+     "value": "DemoApp"
+    },
+    {
+     "href": "/orgs/1/labels/21",
+     "key": "env",
+     "value": "VMware"
+    },
+    {
+     "href": "/orgs/1/labels/69",
+     "key": "os",
+     "value": "Ubuntu"
+    },
+    {
+     "href": "/orgs/1/labels/142",
+     "key": "Net",
+     "value": "Server-172.16.15"
+    },
+    {
+     "href": "/orgs/1/labels/145",
+     "key": "loc",
+     "value": "TP"
+    }
+   ],
+   "managed": true,
+   "name": "d-db",
+   "online": true,
+   "os_detail": "5.4.0-216-generic #236-Ubuntu SMP Fri Apr 11 19:53:21 UTC 2025 (Ubuntu 20.04.6 LTS)",
+   "os_id": "ubuntu-x86_64-xenial",
+   "public_ip": "172.16.15.160",
+   "risk_summary": {
+    "ransomware": {
+     "last_updated_at": "2026-08-03T05:06:44Z",
+     "ransomware_protection_percent": 0.0,
+     "workload_exposure_severity": "fully_protected"
+    }
+   },
+   "service_principal_name": null,
+   "service_provider": null,
+   "services": {},
+   "updated_at": "2026-04-29T13:07:22.968372Z",
+   "updated_by": {
+    "href": "/orgs/1/agents/890"
+   },
+   "ven": {
+    "hostname": "d-db",
+    "href": "/orgs/1/vens/25952d04-a842-4d38-9449-fd33137b473e",
+    "name": null,
+    "status": "active",
+    "ven_type": "server",
+    "version": "25.2.40-4047"
+   },
+   "visibility_level": "enhanced_data_collection"
+  },
+  {
+   "agent": {
+    "active_pce_fqdn": null,
+    "config": {
+     "log_traffic": false,
+     "mode": "selective",
+     "visibility_level": "enhanced_data_collection"
+    },
+    "href": "/orgs/1/agents/893",
+    "status": {
+     "agent_health": [],
+     "agent_health_errors": {
+      "errors": [],
+      "warnings": []
+     },
+     "agent_version": "25.2.40-4047",
+     "firewall_rule_count": 0,
+     "fw_config_current": true,
+     "instance_id": null,
+     "last_heartbeat_on": "2026-08-03T06:25:29.993586Z",
+     "managed_since": "2024-12-20T12:04:19.725116Z",
+     "security_policy_applied_at": "2026-07-29T15:29:55.167011Z",
+     "security_policy_received_at": "2026-07-29T15:29:55.167011Z",
+     "security_policy_refresh_at": "2026-07-29T15:29:55.167011Z",
+     "security_policy_sync_state": "applied",
+     "status": "active",
+     "uid": null,
+     "uptime_seconds": 400324
+    },
+    "target_pce_fqdn": null,
+    "type": "Host"
+   },
+   "agent_to_pce_certificate_authentication_id": null,
+   "blocked_connection_action": "drop",
+   "caps": [
+    "write"
+   ],
+   "containers_inherit_host_policy": false,
+   "created_at": "2024-12-20T12:04:19.707442Z",
+   "created_by": {
+    "href": "/orgs/1/agents/893"
+   },
+   "data_center": null,
+   "data_center_zone": null,
+   "datacenter_nat_1to1": false,
+   "deleted": false,
+   "description": "",
+   "distinguished_name": null,
+   "enforcement_mode": "selective",
+   "external_data_reference": null,
+   "external_data_set": null,
+   "hostname": "d-web1",
+   "href": "/orgs/1/workloads/18994e1c-16c5-4f42-8024-306299f4141c",
+   "ignored_interface_names": [],
+   "interfaces": [
+    {
+     "address": "172.16.15.161",
+     "cidr_block": 24,
+     "default_gateway_address": "172.16.15.254",
+     "friendly_name": null,
+     "link_state": null,
+     "loopback": false,
+     "name": "ens33",
+     "network": {
+      "href": "/orgs/1/networks/27058b12-718b-4538-8cb9-e59169fa75ed",
+      "name": "Corporate"
+     },
+     "network_detection_mode": "single_private_brn",
+     "public_ip": null
+    },
+    {
+     "address": "fe80::250:56ff:feaf:12e3",
+     "cidr_block": 64,
+     "default_gateway_address": null,
+     "friendly_name": null,
+     "link_state": null,
+     "loopback": false,
+     "name": "ens33",
+     "network": {
+      "href": "/orgs/1/networks/633cc308-4001-4541-a1e0-1aa0fd219f28",
+      "name": "Corporate"
+     },
+     "network_detection_mode": "link_local",
+     "public_ip": null
+    }
+   ],
+   "labels": [
+    {
+     "href": "/orgs/1/labels/1",
+     "key": "role",
+     "value": "Web"
+    },
+    {
+     "href": "/orgs/1/labels/116",
+     "key": "app",
+     "value": "DemoApp"
+    },
+    {
+     "href": "/orgs/1/labels/21",
+     "key": "env",
+     "value": "VMware"
+    },
+    {
+     "href": "/orgs/1/labels/69",
+     "key": "os",
+     "value": "Ubuntu"
+    },
+    {
+     "href": "/orgs/1/labels/142",
+     "key": "Net",
+     "value": "Server-172.16.15"
+    },
+    {
+     "href": "/orgs/1/labels/145",
+     "key": "loc",
+     "value": "TP"
+    }
+   ],
+   "managed": true,
+   "name": "d-web1",
+   "online": true,
+   "os_detail": "5.4.0-216-generic #236-Ubuntu SMP Fri Apr 11 19:53:21 UTC 2025 (Ubuntu 20.04.6 LTS)",
+   "os_id": "ubuntu-x86_64-xenial",
+   "public_ip": "172.16.15.161",
+   "risk_summary": {
+    "ransomware": {
+     "last_updated_at": "2026-08-03T05:06:44Z",
+     "ransomware_protection_percent": 0.0,
+     "workload_exposure_severity": "fully_protected"
+    }
+   },
+   "service_principal_name": null,
+   "service_provider": null,
+   "services": {},
+   "updated_at": "2026-04-29T13:07:23.061620Z",
+   "updated_by": {
+    "href": "/orgs/1/agents/893"
+   },
+   "ven": {
+    "hostname": "d-web1",
+    "href": "/orgs/1/vens/18994e1c-16c5-4f42-8024-306299f4141c",
+    "name": null,
+    "status": "active",
+    "ven_type": "server",
+    "version": "25.2.40-4047"
+   },
+   "visibility_level": "enhanced_data_collection"
+  },
+  {
+   "agent": {
+    "active_pce_fqdn": null,
+    "config": {
+     "log_traffic": false,
+     "mode": "selective",
+     "visibility_level": "enhanced_data_collection"
+    },
+    "href": "/orgs/1/agents/1214",
+    "status": {
+     "agent_health": [],
+     "agent_health_errors": {
+      "errors": [],
+      "warnings": []
+     },
+     "agent_version": "25.2.40-4047",
+     "firewall_rule_count": 0,
+     "fw_config_current": true,
+     "instance_id": null,
+     "last_heartbeat_on": "2026-08-03T06:25:44.071487Z",
+     "managed_since": "2025-08-14T06:30:20.770128Z",
+     "security_policy_applied_at": "2026-07-29T16:23:59.651800Z",
+     "security_policy_received_at": "2026-07-29T16:23:59.651800Z",
+     "security_policy_refresh_at": "2026-07-29T16:23:59.651800Z",
+     "security_policy_sync_state": "applied",
+     "status": "active",
+     "uid": "1CFD2F42-1F35-7EFD-160C-EBD8875F3540",
+     "uptime_seconds": 397801
+    },
+    "target_pce_fqdn": null,
+    "type": "Host"
+   },
+   "agent_to_pce_certificate_authentication_id": null,
+   "blocked_connection_action": "drop",
+   "caps": [
+    "write"
+   ],
+   "containers_inherit_host_policy": false,
+   "created_at": "2025-08-14T06:30:20.750842Z",
+   "created_by": {
+    "href": "/orgs/1/agents/1214"
+   },
+   "data_center": null,
+   "data_center_zone": null,
+   "datacenter_nat_1to1": false,
+   "deleted": false,
+   "description": "",
+   "distinguished_name": null,
+   "enforcement_mode": "selective",
+   "external_data_reference": null,
+   "external_data_set": null,
+   "firewall_coexistence": {
+    "illumio_primary": true
+   },
+   "hostname": "win10-jd",
+   "href": "/orgs/1/workloads/622bbda7-2950-488e-b0d3-43feb1ffa088",
+   "ignored_interface_names": [],
+   "interfaces": [
+    {
+     "address": "172.16.15.150",
+     "cidr_block": 24,
+     "default_gateway_address": "172.16.15.254",
+     "friendly_name": null,
+     "link_state": null,
+     "loopback": false,
+     "name": "eth32769",
+     "network": {
+      "href": "/orgs/1/networks/d6b7a10f-7765-456b-ae46-f147f3157511",
+      "name": "External"
+     },
+     "network_detection_mode": "manual",
+     "public_ip": null
+    }
+   ],
+   "labels": [
+    {
+     "href": "/orgs/1/labels/39",
+     "key": "role",
+     "value": "PC"
+    },
+    {
+     "href": "/orgs/1/labels/49",
+     "key": "app",
+     "value": "Jumpdesk"
+    },
+    {
+     "href": "/orgs/1/labels/21",
+     "key": "env",
+     "value": "VMware"
+    },
+    {
+     "href": "/orgs/1/labels/145",
+     "key": "loc",
+     "value": "TP"
+    },
+    {
+     "href": "/orgs/1/labels/142",
+     "key": "Net",
+     "value": "Server-172.16.15"
+    },
+    {
+     "href": "/orgs/1/labels/68",
+     "key": "os",
+     "value": "WinPC"
+    },
+    {
+     "href": "/orgs/1/labels/232",
+     "key": "Quarantine",
+     "value": "Mild"
+    }
+   ],
+   "managed": true,
+   "name": "win10-jd",
+   "online": true,
+   "os_detail": "19041.1.amd64fre.vb_release.191206-1406 (Windows 10 Enterprise)",
+   "os_id": "win-x86_64-client",
+   "public_ip": "172.16.15.150",
+   "risk_summary": null,
+   "service_principal_name": null,
+   "service_provider": null,
+   "services": {},
+   "updated_at": "2026-06-28T04:01:54.105474Z",
+   "updated_by": {
+    "href": "/users/11"
+   },
+   "ven": {
+    "hostname": "win10-jd",
+    "href": "/orgs/1/vens/622bbda7-2950-488e-b0d3-43feb1ffa088",
+    "name": null,
+    "status": "active",
+    "ven_type": "endpoint",
+    "version": "25.2.40-4047"
+   },
+   "visibility_level": "enhanced_data_collection"
+  },
+  {
+   "agent": {
+    "config": {
+     "log_traffic": false,
+     "mode": "illuminated",
+     "visibility_level": "flow_summary"
+    }
+   },
+   "agent_to_pce_certificate_authentication_id": null,
+   "blocked_connection_action": null,
+   "caps": [
+    "write"
+   ],
+   "containers_inherit_host_policy": null,
+   "created_at": "2025-05-25T11:45:41.021291Z",
+   "created_by": {
+    "href": "/users/1"
+   },
+   "data_center": "",
+   "data_center_zone": null,
+   "datacenter_nat_1to1": false,
+   "deleted": false,
+   "description": "",
+   "distinguished_name": "",
+   "enforcement_mode": "visibility_only",
+   "external_data_reference": null,
+   "external_data_set": null,
+   "hostname": "",
+   "href": "/orgs/1/workloads/2c10dcd1-3bf6-4a7c-b441-14f549a8f1eb",
+   "ignored_interface_names": [],
+   "interfaces": [
+    {
+     "address": "172.16.14.254",
+     "cidr_block": null,
+     "default_gateway_address": null,
+     "friendly_name": null,
+     "link_state": null,
+     "loopback": false,
+     "name": "lan",
+     "network": {
+      "href": "/orgs/1/networks/27058b12-718b-4538-8cb9-e59169fa75ed",
+      "name": "Corporate"
+     },
+     "network_detection_mode": "single_private_brn",
+     "public_ip": null
+    },
+    {
+     "address": "172.16.15.254",
+     "cidr_block": null,
+     "default_gateway_address": null,
+     "friendly_name": null,
+     "link_state": null,
+     "loopback": false,
+     "name": "lan",
+     "network": {
+      "href": "/orgs/1/networks/27058b12-718b-4538-8cb9-e59169fa75ed",
+      "name": "Corporate"
+     },
+     "network_detection_mode": "single_private_brn",
+     "public_ip": null
+    },
+    {
+     "address": "172.16.50.254",
+     "cidr_block": null,
+     "default_gateway_address": null,
+     "friendly_name": null,
+     "link_state": null,
+     "loopback": false,
+     "name": "lan",
+     "network": {
+      "href": "/orgs/1/networks/27058b12-718b-4538-8cb9-e59169fa75ed",
+      "name": "Corporate"
+     },
+     "network_detection_mode": "single_private_brn",
+     "public_ip": null
+    },
+    {
+     "address": "192.168.10.254",
+     "cidr_block": null,
+     "default_gateway_address": null,
+     "friendly_name": null,
+     "link_state": null,
+     "loopback": false,
+     "name": "lan",
+     "network": {
+      "href": "/orgs/1/networks/27058b12-718b-4538-8cb9-e59169fa75ed",
+      "name": "Corporate"
+     },
+     "network_detection_mode": "single_private_brn",
+     "public_ip": null
+    },
+    {
+     "address": "192.168.20.254",
+     "cidr_block": null,
+     "default_gateway_address": null,
+     "friendly_name": null,
+     "link_state": null,
+     "loopback": false,
+     "name": "lan",
+     "network": {
+      "href": "/orgs/1/networks/27058b12-718b-4538-8cb9-e59169fa75ed",
+      "name": "Corporate"
+     },
+     "network_detection_mode": "single_private_brn",
+     "public_ip": null
+    },
+    {
+     "address": "192.168.30.254",
+     "cidr_block": null,
+     "default_gateway_address": null,
+     "friendly_name": null,
+     "link_state": null,
+     "loopback": false,
+     "name": "lan",
+     "network": {
+      "href": "/orgs/1/networks/27058b12-718b-4538-8cb9-e59169fa75ed",
+      "name": "Corporate"
+     },
+     "network_detection_mode": "single_private_brn",
+     "public_ip": null
+    },
+    {
+     "address": "192.168.40.254",
+     "cidr_block": null,
+     "default_gateway_address": null,
+     "friendly_name": null,
+     "link_state": null,
+     "loopback": false,
+     "name": "lan",
+     "network": {
+      "href": "/orgs/1/networks/27058b12-718b-4538-8cb9-e59169fa75ed",
+      "name": "Corporate"
+     },
+     "network_detection_mode": "single_private_brn",
+     "public_ip": null
+    },
+    {
+     "address": "114.35.37.162",
+     "cidr_block": null,
+     "default_gateway_address": null,
+     "friendly_name": null,
+     "link_state": null,
+     "loopback": false,
+     "name": "wan",
+     "network": {
+      "href": "/orgs/1/networks/27058b12-718b-4538-8cb9-e59169fa75ed",
+      "name": "Corporate"
+     },
+     "network_detection_mode": "single_private_brn",
+     "public_ip": null
+    }
+   ],
+   "labels": [
+    {
+     "href": "/orgs/1/labels/44",
+     "key": "role",
+     "value": "Firewall"
+    },
+    {
+     "href": "/orgs/1/labels/75",
+     "key": "app",
+     "value": "Traffic"
+    },
+    {
+     "href": "/orgs/1/labels/18",
+     "key": "env",
+     "value": "NetworkDevice"
+    },
+    {
+     "href": "/orgs/1/labels/145",
+     "key": "loc",
+     "value": "TP"
+    },
+    {
+     "href": "/orgs/1/labels/71",
+     "key": "os",
+     "value": "OEMOS"
+    }
+   ],
+   "managed": false,
+   "name": "Fortigate",
+   "online": true,
+   "os_detail": "",
+   "os_id": "",
+   "public_ip": null,
+   "risk_summary": null,
+   "service_principal_name": null,
+   "service_provider": null,
+   "services": {},
+   "updated_at": "2026-04-22T00:15:45.905119Z",
+   "updated_by": {
+    "href": "/users/11"
+   },
+   "ven": null,
+   "visibility_level": "flow_summary"
+  },
+  {
+   "agent": {
+    "config": {
+     "log_traffic": false,
+     "mode": "illuminated",
+     "visibility_level": "flow_summary"
+    }
+   },
+   "agent_to_pce_certificate_authentication_id": null,
+   "blocked_connection_action": null,
+   "caps": [
+    "write"
+   ],
+   "containers_inherit_host_policy": null,
+   "created_at": "2024-06-25T07:33:07.531969Z",
+   "created_by": {
+    "href": "/users/1"
+   },
+   "data_center": "",
+   "data_center_zone": null,
+   "datacenter_nat_1to1": false,
+   "deleted": false,
+   "description": "",
+   "distinguished_name": "",
+   "enforcement_mode": "visibility_only",
+   "external_data_reference": null,
+   "external_data_set": null,
+   "hostname": "",
+   "href": "/orgs/1/workloads/e425bdac-c315-48a8-937d-ea0028b57731",
+   "ignored_interface_names": [],
+   "interfaces": [
+    {
+     "address": "192.168.20.31",
+     "cidr_block": null,
+     "default_gateway_address": null,
+     "friendly_name": null,
+     "link_state": null,
+     "loopback": false,
+     "name": "eth0",
+     "network": {
+      "href": "/orgs/1/networks/27058b12-718b-4538-8cb9-e59169fa75ed",
+      "name": "Corporate"
+     },
+     "network_detection_mode": "single_private_brn",
+     "public_ip": null
+    }
+   ],
+   "labels": [
+    {
+     "href": "/orgs/1/labels/39",
+     "key": "role",
+     "value": "PC"
+    },
+    {
+     "href": "/orgs/1/labels/49",
+     "key": "app",
+     "value": "Jumpdesk"
+    },
+    {
+     "href": "/orgs/1/labels/21",
+     "key": "env",
+     "value": "VMware"
+    },
+    {
+     "href": "/orgs/1/labels/68",
+     "key": "os",
+     "value": "WinPC"
+    },
+    {
+     "href": "/orgs/1/labels/145",
+     "key": "loc",
+     "value": "TP"
+    },
+    {
+     "href": "/orgs/1/labels/141",
+     "key": "Net",
+     "value": "LAN-192.168.20"
+    }
+   ],
+   "managed": false,
+   "name": "win10-s",
+   "online": true,
+   "os_detail": "",
+   "os_id": "",
+   "public_ip": null,
+   "risk_summary": null,
+   "service_principal_name": null,
+   "service_provider": null,
+   "services": {},
+   "updated_at": "2026-04-22T00:15:45.905119Z",
+   "updated_by": {
+    "href": "/users/11"
+   },
+   "ven": null,
+   "visibility_level": "flow_summary"
+  },
+  {
+   "agent": {
+    "config": {
+     "log_traffic": false,
+     "mode": "illuminated",
+     "visibility_level": "flow_summary"
+    }
+   },
+   "agent_to_pce_certificate_authentication_id": null,
+   "blocked_connection_action": null,
+   "caps": [
+    "write"
+   ],
+   "containers_inherit_host_policy": null,
+   "created_at": "2024-06-25T07:35:50.977452Z",
+   "created_by": {
+    "href": "/users/1"
+   },
+   "data_center": "",
+   "data_center_zone": null,
+   "datacenter_nat_1to1": false,
+   "deleted": false,
+   "description": "",
+   "distinguished_name": "",
+   "enforcement_mode": "visibility_only",
+   "external_data_reference": null,
+   "external_data_set": null,
+   "hostname": "",
+   "href": "/orgs/1/workloads/5acb4025-a938-4ce8-bc6d-db4c3a5d2346",
+   "ignored_interface_names": [],
+   "interfaces": [
+    {
+     "address": "192.168.20.253",
+     "cidr_block": null,
+     "default_gateway_address": null,
+     "friendly_name": null,
+     "link_state": null,
+     "loopback": false,
+     "name": "eth0",
+     "network": {
+      "href": "/orgs/1/networks/27058b12-718b-4538-8cb9-e59169fa75ed",
+      "name": "Corporate"
+     },
+     "network_detection_mode": "single_private_brn",
+     "public_ip": null
+    }
+   ],
+   "labels": [
+    {
+     "href": "/orgs/1/labels/18",
+     "key": "env",
+     "value": "NetworkDevice"
+    },
+    {
+     "href": "/orgs/1/labels/50",
+     "key": "role",
+     "value": "WIFI"
+    },
+    {
+     "href": "/orgs/1/labels/71",
+     "key": "os",
+     "value": "OEMOS"
+    },
+    {
+     "href": "/orgs/1/labels/75",
+     "key": "app",
+     "value": "Traffic"
+    },
+    {
+     "href": "/orgs/1/labels/145",
+     "key": "loc",
+     "value": "TP"
+    },
+    {
+     "href": "/orgs/1/labels/141",
+     "key": "Net",
+     "value": "LAN-192.168.20"
+    }
+   ],
+   "managed": false,
+   "name": "WIFI",
+   "online": true,
+   "os_detail": "",
+   "os_id": "",
+   "public_ip": null,
+   "risk_summary": null,
+   "service_principal_name": null,
+   "service_provider": null,
+   "services": {},
+   "updated_at": "2026-04-22T00:15:45.905119Z",
+   "updated_by": {
+    "href": "/users/11"
+   },
+   "ven": null,
+   "visibility_level": "flow_summary"
+  },
+  {
+   "agent": {
+    "config": {
+     "log_traffic": false,
+     "mode": "illuminated",
+     "visibility_level": "flow_summary"
+    }
+   },
+   "agent_to_pce_certificate_authentication_id": null,
+   "blocked_connection_action": null,
+   "caps": [
+    "write"
+   ],
+   "containers_inherit_host_policy": null,
+   "created_at": "2024-06-25T07:38:46.662378Z",
+   "created_by": {
+    "href": "/users/1"
+   },
+   "data_center": "",
+   "data_center_zone": null,
+   "datacenter_nat_1to1": false,
+   "deleted": false,
+   "description": "",
+   "distinguished_name": "",
+   "enforcement_mode": "visibility_only",
+   "external_data_reference": null,
+   "external_data_set": null,
+   "hostname": "",
+   "href": "/orgs/1/workloads/37bae066-c2a1-4ea0-811e-2fc41fbbebef",
+   "ignored_interface_names": [],
+   "interfaces": [
+    {
+     "address": "192.168.30.44",
+     "cidr_block": null,
+     "default_gateway_address": null,
+     "friendly_name": null,
+     "link_state": null,
+     "loopback": false,
+     "name": "eth1",
+     "network": {
+      "href": "/orgs/1/networks/27058b12-718b-4538-8cb9-e59169fa75ed",
+      "name": "Corporate"
+     },
+     "network_detection_mode": "single_private_brn",
+     "public_ip": null
+    },
+    {
+     "address": "192.168.10.45",
+     "cidr_block": null,
+     "default_gateway_address": null,
+     "friendly_name": null,
+     "link_state": null,
+     "loopback": false,
+     "name": "eth0",
+     "network": {
+      "href": "/orgs/1/networks/27058b12-718b-4538-8cb9-e59169fa75ed",
+      "name": "Corporate"
+     },
+     "network_detection_mode": "single_private_brn",
+     "public_ip": null
+    },
+    {
+     "address": "192.168.10.44",
+     "cidr_block": null,
+     "default_gateway_address": null,
+     "friendly_name": null,
+     "link_state": null,
+     "loopback": false,
+     "name": "eth0",
+     "network": {
+      "href": "/orgs/1/networks/27058b12-718b-4538-8cb9-e59169fa75ed",
+      "name": "Corporate"
+     },
+     "network_detection_mode": "single_private_brn",
+     "public_ip": null
+    },
+    {
+     "address": "192.168.30.144",
+     "cidr_block": null,
+     "default_gateway_address": null,
+     "friendly_name": null,
+     "link_state": null,
+     "loopback": false,
+     "name": "eth1",
+     "network": {
+      "href": "/orgs/1/networks/27058b12-718b-4538-8cb9-e59169fa75ed",
+      "name": "Corporate"
+     },
+     "network_detection_mode": "single_private_brn",
+     "public_ip": null
+    },
+    {
+     "address": "192.168.30.145",
+     "cidr_block": null,
+     "default_gateway_address": null,
+     "friendly_name": null,
+     "link_state": null,
+     "loopback": false,
+     "name": "eth1",
+     "network": {
+      "href": "/orgs/1/networks/27058b12-718b-4538-8cb9-e59169fa75ed",
+      "name": "Corporate"
+     },
+     "network_detection_mode": "single_private_brn",
+     "public_ip": null
+    },
+    {
+     "address": "172.16.15.44",
+     "cidr_block": null,
+     "default_gateway_address": null,
+     "friendly_name": null,
+     "link_state": null,
+     "loopback": false,
+     "name": "eth2",
+     "network": {
+      "href": "/orgs/1/networks/27058b12-718b-4538-8cb9-e59169fa75ed",
+      "name": "Corporate"
+     },
+     "network_detection_mode": "single_private_brn",
+     "public_ip": null
+    },
+    {
+     "address": "172.16.50.44",
+     "cidr_block": null,
+     "default_gateway_address": null,
+     "friendly_name": null,
+     "link_state": null,
+     "loopback": false,
+     "name": "eth3",
+     "network": {
+      "href": "/orgs/1/networks/27058b12-718b-4538-8cb9-e59169fa75ed",
+      "name": "Corporate"
+     },
+     "network_detection_mode": "single_private_brn",
+     "public_ip": null
+    }
+   ],
+   "labels": [
+    {
+     "href": "/orgs/1/labels/140",
+     "key": "Net",
+     "value": "DMZ-192.168.30"
+    },
+    {
+     "href": "/orgs/1/labels/45",
+     "key": "role",
+     "value": "WAF"
+    },
+    {
+     "href": "/orgs/1/labels/71",
+     "key": "os",
+     "value": "OEMOS"
+    },
+    {
+     "href": "/orgs/1/labels/75",
+     "key": "app",
+     "value": "Traffic"
+    },
+    {
+     "href": "/orgs/1/labels/18",
+     "key": "env",
+     "value": "NetworkDevice"
+    },
+    {
+     "href": "/orgs/1/labels/145",
+     "key": "loc",
+     "value": "TP"
+    }
+   ],
+   "managed": false,
+   "name": "Imperva",
+   "online": true,
+   "os_detail": "",
+   "os_id": "",
+   "public_ip": null,
+   "risk_summary": null,
+   "service_principal_name": null,
+   "service_provider": null,
+   "services": {},
+   "updated_at": "2026-04-22T00:15:45.905119Z",
+   "updated_by": {
+    "href": "/users/11"
+   },
+   "ven": null,
+   "visibility_level": "flow_summary"
+  },
+  {
+   "agent": {
+    "config": {
+     "log_traffic": false,
+     "mode": "illuminated",
+     "visibility_level": "flow_summary"
+    }
+   },
+   "agent_to_pce_certificate_authentication_id": null,
+   "blocked_connection_action": null,
+   "caps": [
+    "write"
+   ],
+   "containers_inherit_host_policy": null,
+   "created_at": "2024-07-09T04:08:26.006271Z",
+   "created_by": {
+    "href": "/users/1"
+   },
+   "data_center": "",
+   "data_center_zone": null,
+   "datacenter_nat_1to1": false,
+   "deleted": false,
+   "description": "",
+   "distinguished_name": "",
+   "enforcement_mode": "visibility_only",
+   "external_data_reference": null,
+   "external_data_set": null,
+   "hostname": "",
+   "href": "/orgs/1/workloads/793f6787-787e-41f6-a248-df3402c060be",
+   "ignored_interface_names": [],
+   "interfaces": [
+    {
+     "address": "192.168.20.10",
+     "cidr_block": null,
+     "default_gateway_address": null,
+     "friendly_name": null,
+     "link_state": null,
+     "loopback": false,
+     "name": "etho",
+     "network": {
+      "href": "/orgs/1/networks/27058b12-718b-4538-8cb9-e59169fa75ed",
+      "name": "Corporate"
+     },
+     "network_detection_mode": "single_private_brn",
+     "public_ip": null
+    }
+   ],
+   "labels": [
+    {
+     "href": "/orgs/1/labels/53",
+     "key": "env",
+     "value": "Physical"
+    },
+    {
+     "href": "/orgs/1/labels/78",
+     "key": "role",
+     "value": "IPMI"
+    },
+    {
+     "href": "/orgs/1/labels/29",
+     "key": "app",
+     "value": "Infrastructure"
+    },
+    {
+     "href": "/orgs/1/labels/145",
+     "key": "loc",
+     "value": "TP"
+    },
+    {
+     "href": "/orgs/1/labels/141",
+     "key": "Net",
+     "value": "LAN-192.168.20"
+    },
+    {
+     "href": "/orgs/1/labels/71",
+     "key": "os",
+     "value": "OEMOS"
+    }
+   ],
+   "managed": false,
+   "name": "SuperMirco",
+   "online": true,
+   "os_detail": "",
+   "os_id": "",
+   "public_ip": null,
+   "risk_summary": null,
+   "service_principal_name": null,
+   "service_provider": null,
+   "services": {},
+   "updated_at": "2026-04-22T00:15:45.905119Z",
+   "updated_by": {
+    "href": "/users/11"
+   },
+   "ven": null,
+   "visibility_level": "flow_summary"
+  },
+  {
+   "agent": {
+    "config": {
+     "log_traffic": false,
+     "mode": "illuminated",
+     "visibility_level": "flow_summary"
+    }
+   },
+   "agent_to_pce_certificate_authentication_id": null,
+   "blocked_connection_action": null,
+   "caps": [
+    "write"
+   ],
+   "containers_inherit_host_policy": null,
+   "created_at": "2024-06-25T07:24:54.846648Z",
+   "created_by": {
+    "href": "/users/1"
+   },
+   "data_center": "",
+   "data_center_zone": null,
+   "datacenter_nat_1to1": false,
+   "deleted": false,
+   "description": "",
+   "distinguished_name": "",
+   "enforcement_mode": "visibility_only",
+   "external_data_reference": null,
+   "external_data_set": null,
+   "hostname": "",
+   "href": "/orgs/1/workloads/8097a9a0-3da5-4480-b1af-d0492579c0a7",
+   "ignored_interface_names": [],
+   "interfaces": [
+    {
+     "address": "172.16.15.52",
+     "cidr_block": null,
+     "default_gateway_address": null,
+     "friendly_name": null,
+     "link_state": null,
+     "loopback": false,
+     "name": "eth2",
+     "network": {
+      "href": "/orgs/1/networks/27058b12-718b-4538-8cb9-e59169fa75ed",
+      "name": "Corporate"
+     },
+     "network_detection_mode": "single_private_brn",
+     "public_ip": null
+    },
+    {
+     "address": "192.168.30.52",
+     "cidr_block": null,
+     "default_gateway_address": null,
+     "friendly_name": null,
+     "link_state": null,
+     "loopback": false,
+     "name": "eth1",
+     "network": {
+      "href": "/orgs/1/networks/27058b12-718b-4538-8cb9-e59169fa75ed",
+      "name": "Corporate"
+     },
+     "network_detection_mode": "single_private_brn",
+     "public_ip": null
+    },
+    {
+     "address": "192.168.10.52",
+     "cidr_block": null,
+     "default_gateway_address": null,
+     "friendly_name": null,
+     "link_state": null,
+     "loopback": false,
+     "name": "eth0",
+     "network": {
+      "href": "/orgs/1/networks/27058b12-718b-4538-8cb9-e59169fa75ed",
+      "name": "Corporate"
+     },
+     "network_detection_mode": "single_private_brn",
+     "public_ip": null
+    },
+    {
+     "address": "192.168.30.153",
+     "cidr_block": null,
+     "default_gateway_address": null,
+     "friendly_name": null,
+     "link_state": null,
+     "loopback": false,
+     "name": "eth1",
+     "network": {
+      "href": "/orgs/1/networks/27058b12-718b-4538-8cb9-e59169fa75ed",
+      "name": "Corporate"
+     },
+     "network_detection_mode": "single_private_brn",
+     "public_ip": null
+    },
+    {
+     "address": "172.16.15.55",
+     "cidr_block": null,
+     "default_gateway_address": null,
+     "friendly_name": null,
+     "link_state": null,
+     "loopback": false,
+     "name": "eth2",
+     "network": {
+      "href": "/orgs/1/networks/27058b12-718b-4538-8cb9-e59169fa75ed",
+      "name": "Corporate"
+     },
+     "network_detection_mode": "single_private_brn",
+     "public_ip": null
+    }
+   ],
+   "labels": [
+    {
+     "href": "/orgs/1/labels/140",
+     "key": "Net",
+     "value": "DMZ-192.168.30"
+    },
+    {
+     "href": "/orgs/1/labels/18",
+     "key": "env",
+     "value": "NetworkDevice"
+    },
+    {
+     "href": "/orgs/1/labels/6",
+     "key": "role",
+     "value": "LoadBalancer"
+    },
+    {
+     "href": "/orgs/1/labels/71",
+     "key": "os",
+     "value": "OEMOS"
+    },
+    {
+     "href": "/orgs/1/labels/75",
+     "key": "app",
+     "value": "Traffic"
+    },
+    {
+     "href": "/orgs/1/labels/145",
+     "key": "loc",
+     "value": "TP"
+    }
+   ],
+   "managed": false,
+   "name": "APV2",
+   "online": true,
+   "os_detail": "",
+   "os_id": "",
+   "public_ip": null,
+   "risk_summary": null,
+   "service_principal_name": null,
+   "service_provider": null,
+   "services": {},
+   "updated_at": "2026-04-22T00:15:45.905119Z",
+   "updated_by": {
+    "href": "/users/11"
+   },
+   "ven": null,
+   "visibility_level": "flow_summary"
+  },
+  {
+   "agent": {
+    "config": {
+     "log_traffic": false,
+     "mode": "illuminated",
+     "visibility_level": "flow_summary"
+    }
+   },
+   "agent_to_pce_certificate_authentication_id": null,
+   "blocked_connection_action": null,
+   "caps": [
+    "write"
+   ],
+   "containers_inherit_host_policy": null,
+   "created_at": "2024-06-25T06:42:53.507412Z",
+   "created_by": {
+    "href": "/users/1"
+   },
+   "data_center": "",
+   "data_center_zone": null,
+   "datacenter_nat_1to1": false,
+   "deleted": false,
+   "description": "",
+   "distinguished_name": "",
+   "enforcement_mode": "visibility_only",
+   "external_data_reference": null,
+   "external_data_set": null,
+   "hostname": "",
+   "href": "/orgs/1/workloads/e39a5f8f-1c18-43c6-b0f2-bc7d38fb3f14",
+   "ignored_interface_names": [],
+   "interfaces": [
+    {
+     "address": "192.168.10.10",
+     "cidr_block": null,
+     "default_gateway_address": null,
+     "friendly_name": null,
+     "link_state": null,
+     "loopback": false,
+     "name": "eth0",
+     "network": {
+      "href": "/orgs/1/networks/27058b12-718b-4538-8cb9-e59169fa75ed",
+      "name": "Corporate"
+     },
+     "network_detection_mode": "single_private_brn",
+     "public_ip": null
+    }
+   ],
+   "labels": [
+    {
+     "href": "/orgs/1/labels/21",
+     "key": "env",
+     "value": "VMware"
+    },
+    {
+     "href": "/orgs/1/labels/29",
+     "key": "app",
+     "value": "Infrastructure"
+    },
+    {
+     "href": "/orgs/1/labels/71",
+     "key": "os",
+     "value": "OEMOS"
+    },
+    {
+     "href": "/orgs/1/labels/120",
+     "key": "role",
+     "value": "ESXi"
+    },
+    {
+     "href": "/orgs/1/labels/145",
+     "key": "loc",
+     "value": "TP"
+    },
+    {
+     "href": "/orgs/1/labels/143",
+     "key": "Net",
+     "value": "MGMT-192.168.10"
+    }
+   ],
+   "managed": false,
+   "name": "ESXi",
+   "online": true,
+   "os_detail": "",
+   "os_id": "",
+   "public_ip": null,
+   "risk_summary": null,
+   "service_principal_name": null,
+   "service_provider": null,
+   "services": {},
+   "updated_at": "2026-04-22T00:15:45.905119Z",
+   "updated_by": {
+    "href": "/users/11"
+   },
+   "ven": null,
+   "visibility_level": "flow_summary"
+  },
+  {
+   "agent": {
+    "config": {
+     "log_traffic": false,
+     "mode": "illuminated",
+     "visibility_level": "flow_summary"
+    }
+   },
+   "agent_to_pce_certificate_authentication_id": null,
+   "blocked_connection_action": null,
+   "caps": [
+    "write"
+   ],
+   "containers_inherit_host_policy": null,
+   "created_at": "2024-06-25T07:24:15.421865Z",
+   "created_by": {
+    "href": "/users/1"
+   },
+   "data_center": "",
+   "data_center_zone": null,
+   "datacenter_nat_1to1": false,
+   "deleted": false,
+   "description": "",
+   "distinguished_name": "",
+   "enforcement_mode": "visibility_only",
+   "external_data_reference": null,
+   "external_data_set": null,
+   "hostname": "",
+   "href": "/orgs/1/workloads/f23f90c0-003c-4b53-8e18-9424d01d108d",
+   "ignored_interface_names": [],
+   "interfaces": [
+    {
+     "address": "192.168.30.153",
+     "cidr_block": null,
+     "default_gateway_address": null,
+     "friendly_name": null,
+     "link_state": null,
+     "loopback": false,
+     "name": "eth1",
+     "network": {
+      "href": "/orgs/1/networks/27058b12-718b-4538-8cb9-e59169fa75ed",
+      "name": "Corporate"
+     },
+     "network_detection_mode": "single_private_brn",
+     "public_ip": null
+    },
+    {
+     "address": "172.16.15.51",
+     "cidr_block": 32,
+     "default_gateway_address": null,
+     "friendly_name": null,
+     "link_state": null,
+     "loopback": false,
+     "name": "eth2",
+     "network": {
+      "href": "/orgs/1/networks/27058b12-718b-4538-8cb9-e59169fa75ed",
+      "name": "Corporate"
+     },
+     "network_detection_mode": "single_private_brn",
+     "public_ip": null
+    },
+    {
+     "address": "192.168.30.51",
+     "cidr_block": 32,
+     "default_gateway_address": null,
+     "friendly_name": null,
+     "link_state": null,
+     "loopback": false,
+     "name": "eth1",
+     "network": {
+      "href": "/orgs/1/networks/27058b12-718b-4538-8cb9-e59169fa75ed",
+      "name": "Corporate"
+     },
+     "network_detection_mode": "single_private_brn",
+     "public_ip": null
+    },
+    {
+     "address": "192.168.10.51",
+     "cidr_block": 32,
+     "default_gateway_address": null,
+     "friendly_name": null,
+     "link_state": null,
+     "loopback": false,
+     "name": "eth0",
+     "network": {
+      "href": "/orgs/1/networks/27058b12-718b-4538-8cb9-e59169fa75ed",
+      "name": "Corporate"
+     },
+     "network_detection_mode": "single_private_brn",
+     "public_ip": null
+    },
+    {
+     "address": "172.16.15.55",
+     "cidr_block": null,
+     "default_gateway_address": null,
+     "friendly_name": null,
+     "link_state": null,
+     "loopback": false,
+     "name": "eth2",
+     "network": {
+      "href": "/orgs/1/networks/27058b12-718b-4538-8cb9-e59169fa75ed",
+      "name": "Corporate"
+     },
+     "network_detection_mode": "single_private_brn",
+     "public_ip": null
+    }
+   ],
+   "labels": [
+    {
+     "href": "/orgs/1/labels/140",
+     "key": "Net",
+     "value": "DMZ-192.168.30"
+    },
+    {
+     "href": "/orgs/1/labels/6",
+     "key": "role",
+     "value": "LoadBalancer"
+    },
+    {
+     "href": "/orgs/1/labels/18",
+     "key": "env",
+     "value": "NetworkDevice"
+    },
+    {
+     "href": "/orgs/1/labels/71",
+     "key": "os",
+     "value": "OEMOS"
+    },
+    {
+     "href": "/orgs/1/labels/75",
+     "key": "app",
+     "value": "Traffic"
+    },
+    {
+     "href": "/orgs/1/labels/145",
+     "key": "loc",
+     "value": "TP"
+    }
+   ],
+   "managed": false,
+   "name": "APV1",
+   "online": true,
+   "os_detail": "",
+   "os_id": "",
+   "public_ip": null,
+   "risk_summary": null,
+   "service_principal_name": null,
+   "service_provider": null,
+   "services": {},
+   "updated_at": "2026-04-22T00:15:45.905119Z",
+   "updated_by": {
+    "href": "/users/11"
+   },
+   "ven": null,
+   "visibility_level": "flow_summary"
+  },
+  {
+   "agent": {
+    "config": {
+     "log_traffic": false,
+     "mode": "illuminated",
+     "visibility_level": "flow_summary"
+    }
+   },
+   "agent_to_pce_certificate_authentication_id": null,
+   "blocked_connection_action": null,
+   "caps": [
+    "write"
+   ],
+   "containers_inherit_host_policy": null,
+   "created_at": "2024-06-25T07:40:00.602775Z",
+   "created_by": {
+    "href": "/users/1"
+   },
+   "data_center": "",
+   "data_center_zone": null,
+   "datacenter_nat_1to1": false,
+   "deleted": false,
+   "description": "",
+   "distinguished_name": "",
+   "enforcement_mode": "visibility_only",
+   "external_data_reference": null,
+   "external_data_set": null,
+   "hostname": "",
+   "href": "/orgs/1/workloads/447986e3-b19a-41ba-a64a-505b4fe94f41",
+   "ignored_interface_names": [],
+   "interfaces": [
+    {
+     "address": "172.16.15.141",
+     "cidr_block": null,
+     "default_gateway_address": null,
+     "friendly_name": null,
+     "link_state": null,
+     "loopback": false,
+     "name": "eth0",
+     "network": {
+      "href": "/orgs/1/networks/27058b12-718b-4538-8cb9-e59169fa75ed",
+      "name": "Corporate"
+     },
+     "network_detection_mode": "single_private_brn",
+     "public_ip": null
+    }
+   ],
+   "labels": [
+    {
+     "href": "/orgs/1/labels/122",
+     "key": "os",
+     "value": "Debian"
+    },
+    {
+     "href": "/orgs/1/labels/21",
+     "key": "env",
+     "value": "VMware"
+    },
+    {
+     "href": "/orgs/1/labels/52",
+     "key": "role",
+     "value": "Kali"
+    },
+    {
+     "href": "/orgs/1/labels/142",
+     "key": "Net",
+     "value": "Server-172.16.15"
+    },
+    {
+     "href": "/orgs/1/labels/119",
+     "key": "app",
+     "value": "Security"
+    },
+    {
+     "href": "/orgs/1/labels/242",
+     "key": "loc",
+     "value": "external"
+    }
+   ],
+   "managed": false,
+   "name": "Kali",
+   "online": true,
+   "os_detail": "",
+   "os_id": "",
+   "public_ip": null,
+   "risk_summary": null,
+   "service_principal_name": null,
+   "service_provider": null,
+   "services": {},
+   "updated_at": "2026-05-22T17:22:35.086843Z",
+   "updated_by": {
+    "href": "/users/11"
+   },
+   "ven": null,
+   "visibility_level": "flow_summary"
+  },
+  {
+   "agent": {
+    "config": {
+     "log_traffic": false,
+     "mode": "illuminated",
+     "visibility_level": "flow_summary"
+    }
+   },
+   "agent_to_pce_certificate_authentication_id": null,
+   "blocked_connection_action": null,
+   "caps": [
+    "write"
+   ],
+   "containers_inherit_host_policy": null,
+   "created_at": "2024-06-25T07:46:15.296944Z",
+   "created_by": {
+    "href": "/users/1"
+   },
+   "data_center": "",
+   "data_center_zone": null,
+   "datacenter_nat_1to1": false,
+   "deleted": false,
+   "description": "",
+   "distinguished_name": "",
+   "enforcement_mode": "visibility_only",
+   "external_data_reference": null,
+   "external_data_set": null,
+   "hostname": "",
+   "href": "/orgs/1/workloads/8e351432-09a1-432f-8f85-5176c2df1ece",
+   "ignored_interface_names": [],
+   "interfaces": [
+    {
+     "address": "192.168.20.100",
+     "cidr_block": null,
+     "default_gateway_address": null,
+     "friendly_name": null,
+     "link_state": null,
+     "loopback": false,
+     "name": "eth0",
+     "network": {
+      "href": "/orgs/1/networks/27058b12-718b-4538-8cb9-e59169fa75ed",
+      "name": "Corporate"
+     },
+     "network_detection_mode": "single_private_brn",
+     "public_ip": null
+    },
+    {
+     "address": "192.168.20.101",
+     "cidr_block": null,
+     "default_gateway_address": null,
+     "friendly_name": null,
+     "link_state": null,
+     "loopback": false,
+     "name": "eth0",
+     "network": {
+      "href": "/orgs/1/networks/27058b12-718b-4538-8cb9-e59169fa75ed",
+      "name": "Corporate"
+     },
+     "network_detection_mode": "single_private_brn",
+     "public_ip": null
+    },
+    {
+     "address": "192.168.20.102",
+     "cidr_block": null,
+     "default_gateway_address": null,
+     "friendly_name": null,
+     "link_state": null,
+     "loopback": false,
+     "name": "eth0",
+     "network": {
+      "href": "/orgs/1/networks/27058b12-718b-4538-8cb9-e59169fa75ed",
+      "name": "Corporate"
+     },
+     "network_detection_mode": "single_private_brn",
+     "public_ip": null
+    },
+    {
+     "address": "192.168.20.103",
+     "cidr_block": null,
+     "default_gateway_address": null,
+     "friendly_name": null,
+     "link_state": null,
+     "loopback": false,
+     "name": "eth0",
+     "network": {
+      "href": "/orgs/1/networks/27058b12-718b-4538-8cb9-e59169fa75ed",
+      "name": "Corporate"
+     },
+     "network_detection_mode": "single_private_brn",
+     "public_ip": null
+    },
+    {
+     "address": "192.168.20.104",
+     "cidr_block": null,
+     "default_gateway_address": null,
+     "friendly_name": null,
+     "link_state": null,
+     "loopback": false,
+     "name": "eth0",
+     "network": {
+      "href": "/orgs/1/networks/27058b12-718b-4538-8cb9-e59169fa75ed",
+      "name": "Corporate"
+     },
+     "network_detection_mode": "single_private_brn",
+     "public_ip": null
+    },
+    {
+     "address": "192.168.20.105",
+     "cidr_block": null,
+     "default_gateway_address": null,
+     "friendly_name": null,
+     "link_state": null,
+     "loopback": false,
+     "name": "eth0",
+     "network": {
+      "href": "/orgs/1/networks/27058b12-718b-4538-8cb9-e59169fa75ed",
+      "name": "Corporate"
+     },
+     "network_detection_mode": "single_private_brn",
+     "public_ip": null
+    },
+    {
+     "address": "192.168.20.106",
+     "cidr_block": null,
+     "default_gateway_address": null,
+     "friendly_name": null,
+     "link_state": null,
+     "loopback": false,
+     "name": "eth0",
+     "network": {
+      "href": "/orgs/1/networks/27058b12-718b-4538-8cb9-e59169fa75ed",
+      "name": "Corporate"
+     },
+     "network_detection_mode": "single_private_brn",
+     "public_ip": null
+    },
+    {
+     "address": "192.168.20.107",
+     "cidr_block": null,
+     "default_gateway_address": null,
+     "friendly_name": null,
+     "link_state": null,
+     "loopback": false,
+     "name": "eth0",
+     "network": {
+      "href": "/orgs/1/networks/27058b12-718b-4538-8cb9-e59169fa75ed",
+      "name": "Corporate"
+     },
+     "network_detection_mode": "single_private_brn",
+     "public_ip": null
+    },
+    {
+     "address": "192.168.20.108",
+     "cidr_block": null,
+     "default_gateway_address": null,
+     "friendly_name": null,
+     "link_state": null,
+     "loopback": false,
+     "name": "eth0",
+     "network": {
+      "href": "/orgs/1/networks/27058b12-718b-4538-8cb9-e59169fa75ed",
+      "name": "Corporate"
+     },
+     "network_detection_mode": "single_private_brn",
+     "public_ip": null
+    },
+    {
+     "address": "192.168.20.109",
+     "cidr_block": null,
+     "default_gateway_address": null,
+     "friendly_name": null,
+     "link_state": null,
+     "loopback": false,
+     "name": "eth0",
+     "network": {
+      "href": "/orgs/1/networks/27058b12-718b-4538-8cb9-e59169fa75ed",
+      "name": "Corporate"
+     },
+     "network_detection_mode": "single_private_brn",
+     "public_ip": null
+    },
+    {
+     "address": "192.168.20.110",
+     "cidr_block": null,
+     "default_gateway_address": null,
+     "friendly_name": null,
+     "link_state": null,
+     "loopback": false,
+     "name": "eth0",
+     "network": {
+      "href": "/orgs/1/networks/27058b12-718b-4538-8cb9-e59169fa75ed",
+      "name": "Corporate"
+     },
+     "network_detection_mode": "single_private_brn",
+     "public_ip": null
+    },
+    {
+     "address": "192.168.20.111",
+     "cidr_block": null,
+     "default_gateway_address": null,
+     "friendly_name": null,
+     "link_state": null,
+     "loopback": false,
+     "name": "eth0",
+     "network": {
+      "href": "/orgs/1/networks/27058b12-718b-4538-8cb9-e59169fa75ed",
+      "name": "Corporate"
+     },
+     "network_detection_mode": "single_private_brn",
+     "public_ip": null
+    },
+    {
+     "address": "192.168.20.112",
+     "cidr_block": null,
+     "default_gateway_address": null,
+     "friendly_name": null,
+     "link_state": null,
+     "loopback": false,
+     "name": "eth0",
+     "network": {
+      "href": "/orgs/1/networks/27058b12-718b-4538-8cb9-e59169fa75ed",
+      "name": "Corporate"
+     },
+     "network_detection_mode": "single_private_brn",
+     "public_ip": null
+    },
+    {
+     "address": "192.168.20.113",
+     "cidr_block": null,
+     "default_gateway_address": null,
+     "friendly_name": null,
+     "link_state": null,
+     "loopback": false,
+     "name": "eth0",
+     "network": {
+      "href": "/orgs/1/networks/27058b12-718b-4538-8cb9-e59169fa75ed",
+      "name": "Corporate"
+     },
+     "network_detection_mode": "single_private_brn",
+     "public_ip": null
+    },
+    {
+     "address": "192.168.20.114",
+     "cidr_block": null,
+     "default_gateway_address": null,
+     "friendly_name": null,
+     "link_state": null,
+     "loopback": false,
+     "name": "eth0",
+     "network": {
+      "href": "/orgs/1/networks/27058b12-718b-4538-8cb9-e59169fa75ed",
+      "name": "Corporate"
+     },
+     "network_detection_mode": "single_private_brn",
+     "public_ip": null
+    },
+    {
+     "address": "192.168.20.115",
+     "cidr_block": null,
+     "default_gateway_address": null,
+     "friendly_name": null,
+     "link_state": null,
+     "loopback": false,
+     "name": "eth0",
+     "network": {
+      "href": "/orgs/1/networks/27058b12-718b-4538-8cb9-e59169fa75ed",
+      "name": "Corporate"
+     },
+     "network_detection_mode": "single_private_brn",
+     "public_ip": null
+    },
+    {
+     "address": "192.168.20.116",
+     "cidr_block": null,
+     "default_gateway_address": null,
+     "friendly_name": null,
+     "link_state": null,
+     "loopback": false,
+     "name": "eth0",
+     "network": {
+      "href": "/orgs/1/networks/27058b12-718b-4538-8cb9-e59169fa75ed",
+      "name": "Corporate"
+     },
+     "network_detection_mode": "single_private_brn",
+     "public_ip": null
+    },
+    {
+     "address": "192.168.20.117",
+     "cidr_block": null,
+     "default_gateway_address": null,
+     "friendly_name": null,
+     "link_state": null,
+     "loopback": false,
+     "name": "eth0",
+     "network": {
+      "href": "/orgs/1/networks/27058b12-718b-4538-8cb9-e59169fa75ed",
+      "name": "Corporate"
+     },
+     "network_detection_mode": "single_private_brn",
+     "public_ip": null
+    },
+    {
+     "address": "192.168.20.118",
+     "cidr_block": null,
+     "default_gateway_address": null,
+     "friendly_name": null,
+     "link_state": null,
+     "loopback": false,
+     "name": "eth0",
+     "network": {
+      "href": "/orgs/1/networks/27058b12-718b-4538-8cb9-e59169fa75ed",
+      "name": "Corporate"
+     },
+     "network_detection_mode": "single_private_brn",
+     "public_ip": null
+    },
+    {
+     "address": "192.168.20.119",
+     "cidr_block": null,
+     "default_gateway_address": null,
+     "friendly_name": null,
+     "link_state": null,
+     "loopback": false,
+     "name": "eth0",
+     "network": {
+      "href": "/orgs/1/networks/27058b12-718b-4538-8cb9-e59169fa75ed",
+      "name": "Corporate"
+     },
+     "network_detection_mode": "single_private_brn",
+     "public_ip": null
+    },
+    {
+     "address": "192.168.20.120",
+     "cidr_block": null,
+     "default_gateway_address": null,
+     "friendly_name": null,
+     "link_state": null,
+     "loopback": false,
+     "name": "eth0",
+     "network": {
+      "href": "/orgs/1/networks/27058b12-718b-4538-8cb9-e59169fa75ed",
+      "name": "Corporate"
+     },
+     "network_detection_mode": "single_private_brn",
+     "public_ip": null
+    },
+    {
+     "address": "192.168.20.121",
+     "cidr_block": null,
+     "default_gateway_address": null,
+     "friendly_name": null,
+     "link_state": null,
+     "loopback": false,
+     "name": "eth0",
+     "network": {
+      "href": "/orgs/1/networks/27058b12-718b-4538-8cb9-e59169fa75ed",
+      "name": "Corporate"
+     },
+     "network_detection_mode": "single_private_brn",
+     "public_ip": null
+    },
+    {
+     "address": "192.168.20.122",
+     "cidr_block": null,
+     "default_gateway_address": null,
+     "friendly_name": null,
+     "link_state": null,
+     "loopback": false,
+     "name": "eth0",
+     "network": {
+      "href": "/orgs/1/networks/27058b12-718b-4538-8cb9-e59169fa75ed",
+      "name": "Corporate"
+     },
+     "network_detection_mode": "single_private_brn",
+     "public_ip": null
+    },
+    {
+     "address": "192.168.20.123",
+     "cidr_block": null,
+     "default_gateway_address": null,
+     "friendly_name": null,
+     "link_state": null,
+     "loopback": false,
+     "name": "eth0",
+     "network": {
+      "href": "/orgs/1/networks/27058b12-718b-4538-8cb9-e59169fa75ed",
+      "name": "Corporate"
+     },
+     "network_detection_mode": "single_private_brn",
+     "public_ip": null
+    },
+    {
+     "address": "192.168.20.124",
+     "cidr_block": null,
+     "default_gateway_address": null,
+     "friendly_name": null,
+     "link_state": null,
+     "loopback": false,
+     "name": "eth0",
+     "network": {
+      "href": "/orgs/1/networks/27058b12-718b-4538-8cb9-e59169fa75ed",
+      "name": "Corporate"
+     },
+     "network_detection_mode": "single_private_brn",
+     "public_ip": null
+    },
+    {
+     "address": "192.168.20.125",
+     "cidr_block": null,
+     "default_gateway_address": null,
+     "friendly_name": null,
+     "link_state": null,
+     "loopback": false,
+     "name": "eth0",
+     "network": {
+      "href": "/orgs/1/networks/27058b12-718b-4538-8cb9-e59169fa75ed",
+      "name": "Corporate"
+     },
+     "network_detection_mode": "single_private_brn",
+     "public_ip": null
+    },
+    {
+     "address": "192.168.20.126",
+     "cidr_block": null,
+     "default_gateway_address": null,
+     "friendly_name": null,
+     "link_state": null,
+     "loopback": false,
+     "name": "eth0",
+     "network": {
+      "href": "/orgs/1/networks/27058b12-718b-4538-8cb9-e59169fa75ed",
+      "name": "Corporate"
+     },
+     "network_detection_mode": "single_private_brn",
+     "public_ip": null
+    },
+    {
+     "address": "192.168.20.127",
+     "cidr_block": null,
+     "default_gateway_address": null,
+     "friendly_name": null,
+     "link_state": null,
+     "loopback": false,
+     "name": "eth0",
+     "network": {
+      "href": "/orgs/1/networks/27058b12-718b-4538-8cb9-e59169fa75ed",
+      "name": "Corporate"
+     },
+     "network_detection_mode": "single_private_brn",
+     "public_ip": null
+    },
+    {
+     "address": "192.168.20.128",
+     "cidr_block": null,
+     "default_gateway_address": null,
+     "friendly_name": null,
+     "link_state": null,
+     "loopback": false,
+     "name": "eth0",
+     "network": {
+      "href": "/orgs/1/networks/27058b12-718b-4538-8cb9-e59169fa75ed",
+      "name": "Corporate"
+     },
+     "network_detection_mode": "single_private_brn",
+     "public_ip": null
+    },
+    {
+     "address": "192.168.20.129",
+     "cidr_block": null,
+     "default_gateway_address": null,
+     "friendly_name": null,
+     "link_state": null,
+     "loopback": false,
+     "name": "eth0",
+     "network": {
+      "href": "/orgs/1/networks/27058b12-718b-4538-8cb9-e59169fa75ed",
+      "name": "Corporate"
+     },
+     "network_detection_mode": "single_private_brn",
+     "public_ip": null
+    },
+    {
+     "address": "192.168.20.130",
+     "cidr_block": null,
+     "default_gateway_address": null,
+     "friendly_name": null,
+     "link_state": null,
+     "loopback": false,
+     "name": "eth0",
+     "network": {
+      "href": "/orgs/1/networks/27058b12-718b-4538-8cb9-e59169fa75ed",
+      "name": "Corporate"
+     },
+     "network_detection_mode": "single_private_brn",
+     "public_ip": null
+    },
+    {
+     "address": "192.168.20.131",
+     "cidr_block": null,
+     "default_gateway_address": null,
+     "friendly_name": null,
+     "link_state": null,
+     "loopback": false,
+     "name": "eth0",
+     "network": {
+      "href": "/orgs/1/networks/27058b12-718b-4538-8cb9-e59169fa75ed",
+      "name": "Corporate"
+     },
+     "network_detection_mode": "single_private_brn",
+     "public_ip": null
+    },
+    {
+     "address": "192.168.20.132",
+     "cidr_block": null,
+     "default_gateway_address": null,
+     "friendly_name": null,
+     "link_state": null,
+     "loopback": false,
+     "name": "eth0",
+     "network": {
+      "href": "/orgs/1/networks/27058b12-718b-4538-8cb9-e59169fa75ed",
+      "name": "Corporate"
+     },
+     "network_detection_mode": "single_private_brn",
+     "public_ip": null
+    },
+    {
+     "address": "192.168.20.133",
+     "cidr_block": null,
+     "default_gateway_address": null,
+     "friendly_name": null,
+     "link_state": null,
+     "loopback": false,
+     "name": "eth0",
+     "network": {
+      "href": "/orgs/1/networks/27058b12-718b-4538-8cb9-e59169fa75ed",
+      "name": "Corporate"
+     },
+     "network_detection_mode": "single_private_brn",
+     "public_ip": null
+    },
+    {
+     "address": "192.168.20.134",
+     "cidr_block": null,
+     "default_gateway_address": null,
+     "friendly_name": null,
+     "link_state": null,
+     "loopback": false,
+     "name": "eth0",
+     "network": {
+      "href": "/orgs/1/networks/27058b12-718b-4538-8cb9-e59169fa75ed",
+      "name": "Corporate"
+     },
+     "network_detection_mode": "single_private_brn",
+     "public_ip": null
+    },
+    {
+     "address": "192.168.20.135",
+     "cidr_block": null,
+     "default_gateway_address": null,
+     "friendly_name": null,
+     "link_state": null,
+     "loopback": false,
+     "name": "eth0",
+     "network": {
+      "href": "/orgs/1/networks/27058b12-718b-4538-8cb9-e59169fa75ed",
+      "name": "Corporate"
+     },
+     "network_detection_mode": "single_private_brn",
+     "public_ip": null
+    },
+    {
+     "address": "192.168.20.136",
+     "cidr_block": null,
+     "default_gateway_address": null,
+     "friendly_name": null,
+     "link_state": null,
+     "loopback": false,
+     "name": "eth0",
+     "network": {
+      "href": "/orgs/1/networks/27058b12-718b-4538-8cb9-e59169fa75ed",
+      "name": "Corporate"
+     },
+     "network_detection_mode": "single_private_brn",
+     "public_ip": null
+    },
+    {
+     "address": "192.168.20.137",
+     "cidr_block": null,
+     "default_gateway_address": null,
+     "friendly_name": null,
+     "link_state": null,
+     "loopback": false,
+     "name": "eth0",
+     "network": {
+      "href": "/orgs/1/networks/27058b12-718b-4538-8cb9-e59169fa75ed",
+      "name": "Corporate"
+     },
+     "network_detection_mode": "single_private_brn",
+     "public_ip": null
+    },
+    {
+     "address": "192.168.20.138",
+     "cidr_block": null,
+     "default_gateway_address": null,
+     "friendly_name": null,
+     "link_state": null,
+     "loopback": false,
+     "name": "eth0",
+     "network": {
+      "href": "/orgs/1/networks/27058b12-718b-4538-8cb9-e59169fa75ed",
+      "name": "Corporate"
+     },
+     "network_detection_mode": "single_private_brn",
+     "public_ip": null
+    },
+    {
+     "address": "192.168.20.139",
+     "cidr_block": null,
+     "default_gateway_address": null,
+     "friendly_name": null,
+     "link_state": null,
+     "loopback": false,
+     "name": "eth0",
+     "network": {
+      "href": "/orgs/1/networks/27058b12-718b-4538-8cb9-e59169fa75ed",
+      "name": "Corporate"
+     },
+     "network_detection_mode": "single_private_brn",
+     "public_ip": null
+    },
+    {
+     "address": "192.168.20.140",
+     "cidr_block": null,
+     "default_gateway_address": null,
+     "friendly_name": null,
+     "link_state": null,
+     "loopback": false,
+     "name": "eth0",
+     "network": {
+      "href": "/orgs/1/networks/27058b12-718b-4538-8cb9-e59169fa75ed",
+      "name": "Corporate"
+     },
+     "network_detection_mode": "single_private_brn",
+     "public_ip": null
+    },
+    {
+     "address": "192.168.20.141",
+     "cidr_block": null,
+     "default_gateway_address": null,
+     "friendly_name": null,
+     "link_state": null,
+     "loopback": false,
+     "name": "eth0",
+     "network": {
+      "href": "/orgs/1/networks/27058b12-718b-4538-8cb9-e59169fa75ed",
+      "name": "Corporate"
+     },
+     "network_detection_mode": "single_private_brn",
+     "public_ip": null
+    },
+    {
+     "address": "192.168.20.142",
+     "cidr_block": null,
+     "default_gateway_address": null,
+     "friendly_name": null,
+     "link_state": null,
+     "loopback": false,
+     "name": "eth0",
+     "network": {
+      "href": "/orgs/1/networks/27058b12-718b-4538-8cb9-e59169fa75ed",
+      "name": "Corporate"
+     },
+     "network_detection_mode": "single_private_brn",
+     "public_ip": null
+    },
+    {
+     "address": "192.168.20.143",
+     "cidr_block": null,
+     "default_gateway_address": null,
+     "friendly_name": null,
+     "link_state": null,
+     "loopback": false,
+     "name": "eth0",
+     "network": {
+      "href": "/orgs/1/networks/27058b12-718b-4538-8cb9-e59169fa75ed",
+      "name": "Corporate"
+     },
+     "network_detection_mode": "single_private_brn",
+     "public_ip": null
+    },
+    {
+     "address": "192.168.20.144",
+     "cidr_block": null,
+     "default_gateway_address": null,
+     "friendly_name": null,
+     "link_state": null,
+     "loopback": false,
+     "name": "eth0",
+     "network": {
+      "href": "/orgs/1/networks/27058b12-718b-4538-8cb9-e59169fa75ed",
+      "name": "Corporate"
+     },
+     "network_detection_mode": "single_private_brn",
+     "public_ip": null
+    },
+    {
+     "address": "192.168.20.145",
+     "cidr_block": null,
+     "default_gateway_address": null,
+     "friendly_name": null,
+     "link_state": null,
+     "loopback": false,
+     "name": "eth0",
+     "network": {
+      "href": "/orgs/1/networks/27058b12-718b-4538-8cb9-e59169fa75ed",
+      "name": "Corporate"
+     },
+     "network_detection_mode": "single_private_brn",
+     "public_ip": null
+    },
+    {
+     "address": "192.168.20.146",
+     "cidr_block": null,
+     "default_gateway_address": null,
+     "friendly_name": null,
+     "link_state": null,
+     "loopback": false,
+     "name": "eth0",
+     "network": {
+      "href": "/orgs/1/networks/27058b12-718b-4538-8cb9-e59169fa75ed",
+      "name": "Corporate"
+     },
+     "network_detection_mode": "single_private_brn",
+     "public_ip": null
+    },
+    {
+     "address": "192.168.20.147",
+     "cidr_block": null,
+     "default_gateway_address": null,
+     "friendly_name": null,
+     "link_state": null,
+     "loopback": false,
+     "name": "eth0",
+     "network": {
+      "href": "/orgs/1/networks/27058b12-718b-4538-8cb9-e59169fa75ed",
+      "name": "Corporate"
+     },
+     "network_detection_mode": "single_private_brn",
+     "public_ip": null
+    },
+    {
+     "address": "192.168.20.148",
+     "cidr_block": null,
+     "default_gateway_address": null,
+     "friendly_name": null,
+     "link_state": null,
+     "loopback": false,
+     "name": "eth0",
+     "network": {
+      "href": "/orgs/1/networks/27058b12-718b-4538-8cb9-e59169fa75ed",
+      "name": "Corporate"
+     },
+     "network_detection_mode": "single_private_brn",
+     "public_ip": null
+    },
+    {
+     "address": "192.168.20.149",
+     "cidr_block": null,
+     "default_gateway_address": null,
+     "friendly_name": null,
+     "link_state": null,
+     "loopback": false,
+     "name": "eth0",
+     "network": {
+      "href": "/orgs/1/networks/27058b12-718b-4538-8cb9-e59169fa75ed",
+      "name": "Corporate"
+     },
+     "network_detection_mode": "single_private_brn",
+     "public_ip": null
+    },
+    {
+     "address": "192.168.20.150",
+     "cidr_block": null,
+     "default_gateway_address": null,
+     "friendly_name": null,
+     "link_state": null,
+     "loopback": false,
+     "name": "eth0",
+     "network": {
+      "href": "/orgs/1/networks/27058b12-718b-4538-8cb9-e59169fa75ed",
+      "name": "Corporate"
+     },
+     "network_detection_mode": "single_private_brn",
+     "public_ip": null
+    }
+   ],
+   "labels": [
+    {
+     "href": "/orgs/1/labels/72",
+     "key": "app",
+     "value": "Endpoint"
+    },
+    {
+     "href": "/orgs/1/labels/73",
+     "key": "role",
+     "value": "DHCP-client"
+    },
+    {
+     "href": "/orgs/1/labels/53",
+     "key": "env",
+     "value": "Physical"
+    },
+    {
+     "href": "/orgs/1/labels/145",
+     "key": "loc",
+     "value": "TP"
+    },
+    {
+     "href": "/orgs/1/labels/141",
+     "key": "Net",
+     "value": "LAN-192.168.20"
+    }
+   ],
+   "managed": false,
+   "name": "DHCP-Client",
+   "online": true,
+   "os_detail": "",
+   "os_id": "",
+   "public_ip": null,
+   "risk_summary": null,
+   "service_principal_name": null,
+   "service_provider": null,
+   "services": {},
+   "updated_at": "2026-04-22T00:15:45.905119Z",
+   "updated_by": {
+    "href": "/users/11"
+   },
+   "ven": null,
+   "visibility_level": "flow_summary"
+  }
+ ],
+ "ok": true,
+ "truncated": false
+}

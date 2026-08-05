@@ -1,0 +1,189 @@
+/* ============================================================================
+   design/v2 tokens — Direction B "Ops dark console" (Gate 1 winner)
+   Visual DNA transcribed from design/v2/pitch/direction-b.html:
+     · dark-first; light theme is the alternate, never the origin
+     · the top chrome stays dark in BOTH themes (instrument bezel)
+     · tone marks keep a FIXED hue across themes (a green LED is the same
+       green on paper and on glass); only ink + fill are themed
+     · numerals are monospace + tabular everywhere
+     · 1px hairlines, 2–3px radii, no elevation theatre
+
+   CONTRACT (Task 7 → Tasks 8-12 may use ONLY tokens declared here):
+     --tone-{ok,warn,crit,info,neutral}-{bg,fg,border}
+     --surface-{0,1,2}   --text-{1,2,3}   --space-{1..8}
+     --font-{ui,mono}    --radius-{s,m,l}
+   EXTENDED SET (also tokens — same rule: no hardcoded colors outside this
+   file): --line, --line-soft, --accent*, --chrome*, --track, --overlay,
+   --shadow-{1,2}, --fs-*, --row-h, --ctl-h, --lead.
+
+   DENSITY: [data-density="compact"] retunes --space-*, --fs-*, --lead, --row-h,
+   --ctl-h, --chrome-h, --nav-pad-y only. No rule outside this file may branch on
+   [data-density] — if a measurement needs to change with density, it becomes a
+   token here.
+   ============================================================================ */
+
+:root {
+  --font-ui: "Noto Sans", "Noto Sans CJK TC", "PingFang TC", "Microsoft JhengHei", sans-serif;
+  --font-mono: "Noto Sans Mono", "DejaVu Sans Mono", "SFMono-Regular", Consolas, monospace;
+
+  --radius-s: 2px;
+  --radius-m: 3px;
+  --radius-l: 6px;
+
+  /* spacing — cozy (default) */
+  --space-1: 2px;
+  --space-2: 4px;
+  --space-3: 6px;
+  --space-4: 8px;
+  --space-5: 12px;
+  --space-6: 16px;
+  --space-7: 24px;
+  --space-8: 32px;
+
+  /* type scale — cozy (default) */
+  --fs-micro: 9.5px;   /* uppercase eyebrows, column heads */
+  --fs-mini: 10.5px;   /* meta, captions */
+  --fs-body: 11.5px;   /* table cells, list rows */
+  --fs-ui: 13px;       /* base body */
+  --fs-lead: 15px;     /* panel lead numbers */
+  --fs-num: 19px;      /* instrument readouts */
+  --fs-display: 30px;  /* headline figures */
+  --lead: 1.35;
+
+  --row-h: 26px;       /* dense table row */
+  --ctl-h: 28px;       /* buttons / inputs */
+  --chrome-h: 46px;    /* top bar height */
+  --nav-pad-y: 15px;   /* area nav vertical padding (sets the tab hit area) */
+}
+
+[data-density="compact"] {
+  --space-1: 1px;
+  --space-2: 3px;
+  --space-3: 4px;
+  --space-4: 6px;
+  --space-5: 9px;
+  --space-6: 12px;
+  --space-7: 18px;
+  --space-8: 24px;
+
+  --fs-micro: 9px;
+  --fs-mini: 10px;
+  --fs-body: 11px;
+  --fs-ui: 12px;
+  --fs-lead: 14px;
+  --fs-num: 17px;
+  --fs-display: 26px;
+  --lead: 1.28;
+
+  --row-h: 21px;
+  --ctl-h: 24px;
+  --chrome-h: 40px;
+  --nav-pad-y: 12px;
+}
+
+/* ---------------------------------------------------------------- dark ---- */
+:root,
+[data-theme="dark"] {
+  color-scheme: dark;
+
+  --surface-0: #0B0E13;
+  --surface-1: #151A21;
+  --surface-2: #1B212A;
+
+  --text-1: #E6EAF0;
+  --text-2: #9AA4B2;
+  --text-3: #6E7A8A;
+
+  --line: #232A34;
+  --line-soft: #1D242D;
+  --track: #1E252F;
+
+  --accent: #3987e5;
+  --accent-fg: #6da7ec;
+  --accent-on: #FFFFFF;
+
+  /* chrome = the dark bezel; identical in light theme by design */
+  --chrome: #0E1218;
+  --chrome-edge: #000000;
+  --chrome-text-1: #FFFFFF;
+  --chrome-text-2: #8C97A8;
+  --chrome-text-3: #6B7788;
+  --chrome-line: rgba(255, 255, 255, .09);
+  --chrome-hover: rgba(255, 255, 255, .05);
+  --chrome-active: rgba(57, 135, 229, .16);
+
+  --overlay: rgba(3, 5, 9, .66);
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, .45);
+  --shadow-2: 0 14px 40px rgba(0, 0, 0, .58);
+
+  --tone-ok-border: #0ca30c;
+  --tone-ok-bg: #0F2A14;
+  --tone-ok-fg: #3ec93e;
+  --tone-warn-border: #fab219;
+  --tone-warn-bg: #2E2410;
+  --tone-warn-fg: #fab219;
+  --tone-crit-border: #d03b3b;
+  --tone-crit-bg: #2C1417;
+  --tone-crit-fg: #f07070;
+  --tone-info-border: #3987e5;
+  --tone-info-bg: #132437;
+  --tone-info-fg: #6da7ec;
+  --tone-neutral-border: #8b929e;
+  --tone-neutral-bg: #1E242D;
+  --tone-neutral-fg: #9AA4B2;
+}
+
+/* --------------------------------------------------------------- light ---- */
+[data-theme="light"] {
+  color-scheme: light;
+
+  --surface-0: #EEF1F5;
+  --surface-1: #FFFFFF;
+  --surface-2: #F5F7FA;
+
+  --text-1: #12161C;
+  --text-2: #414B59;
+  --text-3: #6E7A8A;
+
+  --line: #DDE2E9;
+  --line-soft: #E7EBF0;
+  --track: #E9EDF2;
+
+  --accent: #2a78d6;
+  --accent-fg: #1c5cab;
+  --accent-on: #FFFFFF;
+
+  --chrome: #12161C;
+  --chrome-edge: #05070A;
+  --chrome-text-1: #FFFFFF;
+  --chrome-text-2: #8C97A8;
+  --chrome-text-3: #6B7788;
+  --chrome-line: rgba(255, 255, 255, .10);
+  --chrome-hover: rgba(255, 255, 255, .06);
+  --chrome-active: rgba(57, 135, 229, .22);
+
+  --overlay: rgba(18, 22, 28, .38);
+  --shadow-1: 0 1px 2px rgba(18, 22, 28, .10);
+  --shadow-2: 0 14px 40px rgba(18, 22, 28, .22);
+
+  /* borders keep the dark-theme hue — the mark is the constant */
+  --tone-ok-bg: #E4F3E4;
+  --tone-ok-fg: #0a7d0a;
+  --tone-warn-bg: #FBF0D8;
+  --tone-warn-fg: #8a5d00;
+  --tone-crit-bg: #FAE6E6;
+  --tone-crit-fg: #c22f2f;
+  --tone-info-bg: #E3EEFB;
+  --tone-info-fg: #1c5cab;
+  --tone-neutral-bg: #EDF0F4;
+  --tone-neutral-fg: #5c6472;
+}
+
+/* Tone carrier: any element with data-tone="ok|warn|crit|info|neutral" exposes
+   --mark / --ink / --fill so components never name a tone directly. */
+[data-tone] { --mark: var(--tone-neutral-border); --ink: var(--tone-neutral-fg); --fill: var(--tone-neutral-bg); }
+[data-tone="ok"] { --mark: var(--tone-ok-border); --ink: var(--tone-ok-fg); --fill: var(--tone-ok-bg); }
+[data-tone="warn"] { --mark: var(--tone-warn-border); --ink: var(--tone-warn-fg); --fill: var(--tone-warn-bg); }
+[data-tone="crit"] { --mark: var(--tone-crit-border); --ink: var(--tone-crit-fg); --fill: var(--tone-crit-bg); }
+[data-tone="info"] { --mark: var(--tone-info-border); --ink: var(--tone-info-fg); --fill: var(--tone-info-bg); }
+[data-tone="neutral"] { --mark: var(--tone-neutral-border); --ink: var(--tone-neutral-fg); --fill: var(--tone-neutral-bg); }

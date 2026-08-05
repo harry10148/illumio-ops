@@ -1,0 +1,559 @@
+{
+ "cap": 500,
+ "data": [
+  {
+   "d_href": "/orgs/1/kubernetes_workloads/4c58673c-73e0-41ba-8ff2-13e34a09d291",
+   "d_ip": "10.96.242.54",
+   "d_labels": [
+    {
+     "href": "/orgs/1/labels/240",
+     "key": "app",
+     "value": "onlineboutique"
+    },
+    {
+     "href": "/orgs/1/labels/15",
+     "key": "env",
+     "value": "Kubernetes"
+    },
+    {
+     "href": "/orgs/1/labels/145",
+     "key": "loc",
+     "value": "TP"
+    }
+   ],
+   "d_name": "frontend",
+   "d_process": "",
+   "d_user": "",
+   "dir": "<->",
+   "draft_pd": "",
+   "first_seen": "2026-08-02T00:06:11Z",
+   "last_seen": "2026-08-03T00:01:32Z",
+   "pd": 1,
+   "s_href": "/orgs/1/kubernetes_workloads/be73d238-b9b4-490a-8b2f-25fdc62f06a8",
+   "s_ip": "10.85.58.213",
+   "s_labels": [
+    {
+     "href": "/orgs/1/labels/240",
+     "key": "app",
+     "value": "onlineboutique"
+    },
+    {
+     "href": "/orgs/1/labels/15",
+     "key": "env",
+     "value": "Kubernetes"
+    },
+    {
+     "href": "/orgs/1/labels/145",
+     "key": "loc",
+     "value": "TP"
+    }
+   ],
+   "s_name": "loadgenerator",
+   "s_process": "",
+   "s_user": "",
+   "svc": "TCP/80",
+   "svc_process": "",
+   "svc_user": "",
+   "val_fmt": "58617.09 Mbps"
+  },
+  {
+   "d_href": "/orgs/1/kubernetes_workloads/4c58673c-73e0-41ba-8ff2-13e34a09d291",
+   "d_ip": "10.96.242.54",
+   "d_labels": [
+    {
+     "href": "/orgs/1/labels/240",
+     "key": "app",
+     "value": "onlineboutique"
+    },
+    {
+     "href": "/orgs/1/labels/15",
+     "key": "env",
+     "value": "Kubernetes"
+    },
+    {
+     "href": "/orgs/1/labels/145",
+     "key": "loc",
+     "value": "TP"
+    }
+   ],
+   "d_name": "frontend",
+   "d_process": "",
+   "d_user": "",
+   "dir": "<->",
+   "draft_pd": "",
+   "first_seen": "2026-08-03T00:01:32Z",
+   "last_seen": "2026-08-03T06:21:38Z",
+   "pd": 1,
+   "s_href": "/orgs/1/kubernetes_workloads/be73d238-b9b4-490a-8b2f-25fdc62f06a8",
+   "s_ip": "10.85.58.213",
+   "s_labels": [
+    {
+     "href": "/orgs/1/labels/240",
+     "key": "app",
+     "value": "onlineboutique"
+    },
+    {
+     "href": "/orgs/1/labels/15",
+     "key": "env",
+     "value": "Kubernetes"
+    },
+    {
+     "href": "/orgs/1/labels/145",
+     "key": "loc",
+     "value": "TP"
+    }
+   ],
+   "s_name": "loadgenerator",
+   "s_process": "",
+   "s_user": "",
+   "svc": "TCP/80",
+   "svc_process": "",
+   "svc_user": "",
+   "val_fmt": "18199.02 Mbps"
+  },
+  {
+   "d_href": "/orgs/1/kubernetes_workloads/b00370c5-f91a-46ea-aa92-b27092affa3c",
+   "d_ip": "10.85.58.229",
+   "d_labels": [
+    {
+     "href": "/orgs/1/labels/240",
+     "key": "app",
+     "value": "onlineboutique"
+    },
+    {
+     "href": "/orgs/1/labels/15",
+     "key": "env",
+     "value": "Kubernetes"
+    },
+    {
+     "href": "/orgs/1/labels/145",
+     "key": "loc",
+     "value": "TP"
+    }
+   ],
+   "d_name": "recommendationservice",
+   "d_process": "",
+   "d_user": "",
+   "dir": "<->",
+   "draft_pd": "",
+   "first_seen": "2026-08-02T00:06:11Z",
+   "last_seen": "2026-08-03T00:01:32Z",
+   "pd": 1,
+   "s_href": "/orgs/1/kubernetes_workloads/d99e98d0-dc58-42d3-8e8e-859365104d3c",
+   "s_ip": "10.109.206.35",
+   "s_labels": [
+    {
+     "href": "/orgs/1/labels/240",
+     "key": "app",
+     "value": "onlineboutique"
+    },
+    {
+     "href": "/orgs/1/labels/15",
+     "key": "env",
+     "value": "Kubernetes"
+    },
+    {
+     "href": "/orgs/1/labels/145",
+     "key": "loc",
+     "value": "TP"
+    }
+   ],
+   "s_name": "productcatalogservice",
+   "s_process": "",
+   "s_user": "",
+   "svc": "TCP/57326",
+   "svc_process": "",
+   "svc_user": "",
+   "val_fmt": "6766.88 Mbps"
+  },
+  {
+   "d_href": "/orgs/1/kubernetes_workloads/d99e98d0-dc58-42d3-8e8e-859365104d3c",
+   "d_ip": "10.109.206.35",
+   "d_labels": [
+    {
+     "href": "/orgs/1/labels/240",
+     "key": "app",
+     "value": "onlineboutique"
+    },
+    {
+     "href": "/orgs/1/labels/15",
+     "key": "env",
+     "value": "Kubernetes"
+    },
+    {
+     "href": "/orgs/1/labels/145",
+     "key": "loc",
+     "value": "TP"
+    }
+   ],
+   "d_name": "productcatalogservice",
+   "d_process": "",
+   "d_user": "",
+   "dir": "<->",
+   "draft_pd": "",
+   "first_seen": "2026-08-02T00:06:11Z",
+   "last_seen": "2026-08-03T00:01:32Z",
+   "pd": 1,
+   "s_href": "/orgs/1/kubernetes_workloads/52626732-2d15-4b02-a57e-231c8f33b8f4",
+   "s_ip": "10.85.58.219",
+   "s_labels": [
+    {
+     "href": "/orgs/1/labels/240",
+     "key": "app",
+     "value": "onlineboutique"
+    },
+    {
+     "href": "/orgs/1/labels/15",
+     "key": "env",
+     "value": "Kubernetes"
+    },
+    {
+     "href": "/orgs/1/labels/145",
+     "key": "loc",
+     "value": "TP"
+    }
+   ],
+   "s_name": "frontend",
+   "s_process": "",
+   "s_user": "",
+   "svc": "TCP/3550",
+   "svc_process": "",
+   "svc_user": "",
+   "val_fmt": "5911.87 Mbps"
+  },
+  {
+   "d_href": "/orgs/1/kubernetes_workloads/b00370c5-f91a-46ea-aa92-b27092affa3c",
+   "d_ip": "10.85.58.229",
+   "d_labels": [
+    {
+     "href": "/orgs/1/labels/240",
+     "key": "app",
+     "value": "onlineboutique"
+    },
+    {
+     "href": "/orgs/1/labels/15",
+     "key": "env",
+     "value": "Kubernetes"
+    },
+    {
+     "href": "/orgs/1/labels/145",
+     "key": "loc",
+     "value": "TP"
+    }
+   ],
+   "d_name": "recommendationservice",
+   "d_process": "",
+   "d_user": "",
+   "dir": "<->",
+   "draft_pd": "",
+   "first_seen": "2026-08-03T00:01:32Z",
+   "last_seen": "2026-08-03T06:21:38Z",
+   "pd": 1,
+   "s_href": "/orgs/1/kubernetes_workloads/d99e98d0-dc58-42d3-8e8e-859365104d3c",
+   "s_ip": "10.109.206.35",
+   "s_labels": [
+    {
+     "href": "/orgs/1/labels/240",
+     "key": "app",
+     "value": "onlineboutique"
+    },
+    {
+     "href": "/orgs/1/labels/15",
+     "key": "env",
+     "value": "Kubernetes"
+    },
+    {
+     "href": "/orgs/1/labels/145",
+     "key": "loc",
+     "value": "TP"
+    }
+   ],
+   "s_name": "productcatalogservice",
+   "s_process": "",
+   "s_user": "",
+   "svc": "TCP/57326",
+   "svc_process": "",
+   "svc_user": "",
+   "val_fmt": "2090.43 Mbps"
+  },
+  {
+   "d_href": "/orgs/1/kubernetes_workloads/d99e98d0-dc58-42d3-8e8e-859365104d3c",
+   "d_ip": "10.109.206.35",
+   "d_labels": [
+    {
+     "href": "/orgs/1/labels/240",
+     "key": "app",
+     "value": "onlineboutique"
+    },
+    {
+     "href": "/orgs/1/labels/15",
+     "key": "env",
+     "value": "Kubernetes"
+    },
+    {
+     "href": "/orgs/1/labels/145",
+     "key": "loc",
+     "value": "TP"
+    }
+   ],
+   "d_name": "productcatalogservice",
+   "d_process": "",
+   "d_user": "",
+   "dir": "<->",
+   "draft_pd": "",
+   "first_seen": "2026-08-03T00:01:32Z",
+   "last_seen": "2026-08-03T06:21:38Z",
+   "pd": 1,
+   "s_href": "/orgs/1/kubernetes_workloads/52626732-2d15-4b02-a57e-231c8f33b8f4",
+   "s_ip": "10.85.58.219",
+   "s_labels": [
+    {
+     "href": "/orgs/1/labels/240",
+     "key": "app",
+     "value": "onlineboutique"
+    },
+    {
+     "href": "/orgs/1/labels/15",
+     "key": "env",
+     "value": "Kubernetes"
+    },
+    {
+     "href": "/orgs/1/labels/145",
+     "key": "loc",
+     "value": "TP"
+    }
+   ],
+   "s_name": "frontend",
+   "s_process": "",
+   "s_user": "",
+   "svc": "TCP/3550",
+   "svc_process": "",
+   "svc_user": "",
+   "val_fmt": "1747.31 Mbps"
+  },
+  {
+   "d_href": "/orgs/1/kubernetes_workloads/38f239e5-655d-4c90-8e5c-6b9165ea4040",
+   "d_ip": "10.97.120.159",
+   "d_labels": [
+    {
+     "href": "/orgs/1/labels/240",
+     "key": "app",
+     "value": "onlineboutique"
+    },
+    {
+     "href": "/orgs/1/labels/15",
+     "key": "env",
+     "value": "Kubernetes"
+    },
+    {
+     "href": "/orgs/1/labels/145",
+     "key": "loc",
+     "value": "TP"
+    }
+   ],
+   "d_name": "currencyservice",
+   "d_process": "",
+   "d_user": "",
+   "dir": "<->",
+   "draft_pd": "",
+   "first_seen": "2026-08-02T00:06:11Z",
+   "last_seen": "2026-08-03T00:01:32Z",
+   "pd": 1,
+   "s_href": "/orgs/1/kubernetes_workloads/52626732-2d15-4b02-a57e-231c8f33b8f4",
+   "s_ip": "10.85.58.219",
+   "s_labels": [
+    {
+     "href": "/orgs/1/labels/240",
+     "key": "app",
+     "value": "onlineboutique"
+    },
+    {
+     "href": "/orgs/1/labels/15",
+     "key": "env",
+     "value": "Kubernetes"
+    },
+    {
+     "href": "/orgs/1/labels/145",
+     "key": "loc",
+     "value": "TP"
+    }
+   ],
+   "s_name": "frontend",
+   "s_process": "",
+   "s_user": "",
+   "svc": "TCP/7000",
+   "svc_process": "",
+   "svc_user": "",
+   "val_fmt": "1431.69 Mbps"
+  },
+  {
+   "d_href": "/orgs/1/kubernetes_workloads/d7d082e9-e22a-49ec-9e39-09344316de2a",
+   "d_ip": "10.85.58.232",
+   "d_labels": [
+    {
+     "href": "/orgs/1/labels/240",
+     "key": "app",
+     "value": "onlineboutique"
+    },
+    {
+     "href": "/orgs/1/labels/15",
+     "key": "env",
+     "value": "Kubernetes"
+    },
+    {
+     "href": "/orgs/1/labels/145",
+     "key": "loc",
+     "value": "TP"
+    }
+   ],
+   "d_name": "redis-cart",
+   "d_process": "",
+   "d_user": "",
+   "dir": "<->",
+   "draft_pd": "",
+   "first_seen": "2026-08-02T00:06:11Z",
+   "last_seen": "2026-08-03T00:01:32Z",
+   "pd": 1,
+   "s_href": "/orgs/1/kubernetes_workloads/5d0dd488-b64f-4660-aa00-6675e2471358",
+   "s_ip": "10.85.85.250",
+   "s_labels": [
+    {
+     "href": "/orgs/1/labels/240",
+     "key": "app",
+     "value": "onlineboutique"
+    },
+    {
+     "href": "/orgs/1/labels/15",
+     "key": "env",
+     "value": "Kubernetes"
+    },
+    {
+     "href": "/orgs/1/labels/145",
+     "key": "loc",
+     "value": "TP"
+    }
+   ],
+   "s_name": "cartservice",
+   "s_process": "",
+   "s_user": "",
+   "svc": "TCP/6379",
+   "svc_process": "",
+   "svc_user": "",
+   "val_fmt": "771.99 Mbps"
+  },
+  {
+   "d_href": "/orgs/1/kubernetes_workloads/a99eaedf-2648-471b-a9c0-1ac6ab7508e2",
+   "d_ip": "10.101.174.175",
+   "d_labels": [
+    {
+     "href": "/orgs/1/labels/240",
+     "key": "app",
+     "value": "onlineboutique"
+    },
+    {
+     "href": "/orgs/1/labels/15",
+     "key": "env",
+     "value": "Kubernetes"
+    },
+    {
+     "href": "/orgs/1/labels/145",
+     "key": "loc",
+     "value": "TP"
+    }
+   ],
+   "d_name": "cartservice",
+   "d_process": "",
+   "d_user": "",
+   "dir": "<->",
+   "draft_pd": "",
+   "first_seen": "2026-08-02T00:06:11Z",
+   "last_seen": "2026-08-03T00:01:32Z",
+   "pd": 1,
+   "s_href": "/orgs/1/kubernetes_workloads/52626732-2d15-4b02-a57e-231c8f33b8f4",
+   "s_ip": "10.85.58.219",
+   "s_labels": [
+    {
+     "href": "/orgs/1/labels/240",
+     "key": "app",
+     "value": "onlineboutique"
+    },
+    {
+     "href": "/orgs/1/labels/15",
+     "key": "env",
+     "value": "Kubernetes"
+    },
+    {
+     "href": "/orgs/1/labels/145",
+     "key": "loc",
+     "value": "TP"
+    }
+   ],
+   "s_name": "frontend",
+   "s_process": "",
+   "s_user": "",
+   "svc": "TCP/7070",
+   "svc_process": "",
+   "svc_user": "",
+   "val_fmt": "705.29 Mbps"
+  },
+  {
+   "d_href": "/orgs/1/kubernetes_workloads/ea917678-7003-4389-a2fc-d39e00d01b6d",
+   "d_ip": "10.110.228.112",
+   "d_labels": [
+    {
+     "href": "/orgs/1/labels/240",
+     "key": "app",
+     "value": "onlineboutique"
+    },
+    {
+     "href": "/orgs/1/labels/15",
+     "key": "env",
+     "value": "Kubernetes"
+    },
+    {
+     "href": "/orgs/1/labels/145",
+     "key": "loc",
+     "value": "TP"
+    }
+   ],
+   "d_name": "redis-cart",
+   "d_process": "",
+   "d_user": "",
+   "dir": "<->",
+   "draft_pd": "",
+   "first_seen": "2026-08-02T00:01:39Z",
+   "last_seen": "2026-08-03T00:02:11Z",
+   "pd": 1,
+   "s_href": "/orgs/1/kubernetes_workloads/5d0dd488-b64f-4660-aa00-6675e2471358",
+   "s_ip": "10.85.85.250",
+   "s_labels": [
+    {
+     "href": "/orgs/1/labels/240",
+     "key": "app",
+     "value": "onlineboutique"
+    },
+    {
+     "href": "/orgs/1/labels/15",
+     "key": "env",
+     "value": "Kubernetes"
+    },
+    {
+     "href": "/orgs/1/labels/145",
+     "key": "loc",
+     "value": "TP"
+    }
+   ],
+   "s_name": "cartservice",
+   "s_process": "",
+   "s_user": "",
+   "svc": "TCP/6379",
+   "svc_process": "",
+   "svc_user": "",
+   "val_fmt": "668.60 Mbps"
+  }
+ ],
+ "ok": true,
+ "source": "cache",
+ "total": 500,
+ "truncated": true
+}

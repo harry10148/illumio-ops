@@ -1,0 +1,702 @@
+<!doctype html>
+<html lang="zh-Hant" data-doc="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>illumio-ops · UI 重新設計 v2 Phase 1 · 樣本導覽</title>
+<style>
+/* design/v2/tour — Direction B「Ops dark console」的紙本分身。
+   token 值逐字抄自 design/v2/mockup/assets/tokens.css，維持同一套視覺 DNA。 */
+:root {
+  --font-ui: "Noto Sans", "Noto Sans CJK TC", "PingFang TC", "Microsoft JhengHei", sans-serif;
+  --font-mono: "Noto Sans Mono", "DejaVu Sans Mono", "SFMono-Regular", Consolas, monospace;
+  --radius-s: 2px; --radius-m: 3px; --radius-l: 6px;
+
+  --surface-0: #0B0E13; --surface-1: #151A21; --surface-2: #1B212A;
+  --text-1: #E6EAF0; --text-2: #9AA4B2; --text-3: #6E7A8A;
+  --line: #232A34; --line-soft: #1D242D; --track: #1E252F;
+  --accent: #3987e5; --accent-fg: #6da7ec; --accent-on: #FFFFFF;
+  --chrome: #0E1218; --chrome-edge: #000000;
+  --chrome-text-1: #FFFFFF; --chrome-text-2: #8C97A8; --chrome-text-3: #6B7788;
+  --chrome-line: rgba(255,255,255,.09); --chrome-hover: rgba(255,255,255,.05);
+  --shadow-1: 0 1px 2px rgba(0,0,0,.45); --shadow-2: 0 14px 40px rgba(0,0,0,.58);
+  --ok: #0ca30c; --ok-fg: #3ec93e; --ok-bg: #0F2A14;
+  --warn: #fab219; --warn-fg: #fab219; --warn-bg: #2E2410;
+  --info: #3987e5; --info-fg: #6da7ec; --info-bg: #132437;
+  --neutral: #8b929e; --neutral-fg: #9AA4B2; --neutral-bg: #1E242D;
+}
+:root[data-doc="light"] {
+  --surface-0: #EEF1F5; --surface-1: #FFFFFF; --surface-2: #F5F7FA;
+  --text-1: #12161C; --text-2: #414B59; --text-3: #6E7A8A;
+  --line: #DDE2E9; --line-soft: #E7EBF0; --track: #E9EDF2;
+  --accent: #2a78d6; --accent-fg: #1c5cab;
+  --shadow-1: 0 1px 2px rgba(18,22,28,.10); --shadow-2: 0 14px 40px rgba(18,22,28,.22);
+  --ok-fg: #0a7d0a; --ok-bg: #E4F3E4;
+  --warn-fg: #8a5d00; --warn-bg: #FBF0D8;
+  --info-fg: #1c5cab; --info-bg: #E3EEFB;
+  --neutral-fg: #5c6472; --neutral-bg: #EDF0F4;
+}
+
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  margin: 0; background: var(--surface-0); color: var(--text-1);
+  font: 13px/1.5 var(--font-ui); -webkit-font-smoothing: antialiased;
+}
+a { color: var(--accent-fg); text-decoration: none; }
+a:hover { text-decoration: underline; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+code, .mono, kbd { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+h1, h2, h3, h4 { margin: 0; font-weight: 600; letter-spacing: -.01em; }
+p { margin: 0; }
+
+.eyebrow {
+  font-size: 9.5px; letter-spacing: .12em; text-transform: uppercase;
+  color: var(--text-3); font-weight: 600;
+}
+
+/* ── 頂欄：和產品同一片儀器邊框，換主題也不變色 ───────────────────────── */
+.chrome {
+  position: sticky; top: 0; z-index: 40;
+  background: var(--chrome); border-bottom: 1px solid var(--chrome-edge);
+  box-shadow: var(--shadow-1);
+}
+.chrome-in {
+  max-width: 1360px; margin: 0 auto; padding: 0 20px;
+  height: 46px; display: flex; align-items: center; gap: 18px;
+}
+.brand { display: flex; align-items: baseline; gap: 6px; color: var(--chrome-text-1); }
+.brand b { font-size: 14px; letter-spacing: -.02em; }
+.brand i {
+  width: 1px; height: 12px; background: var(--chrome-line);
+  display: inline-block; transform: translateY(1px);
+}
+.brand span { color: var(--chrome-text-2); font-size: 12px; }
+.chrome nav { display: flex; gap: 2px; margin-left: auto; flex-wrap: wrap; }
+.chrome nav a {
+  color: var(--chrome-text-2); padding: 5px 9px; border-radius: var(--radius-m);
+  font-size: 12px;
+}
+.chrome nav a:hover { background: var(--chrome-hover); color: var(--chrome-text-1); text-decoration: none; }
+.doctoggle {
+  background: transparent; color: var(--chrome-text-2); cursor: pointer;
+  border: 1px solid var(--chrome-line); border-radius: var(--radius-m);
+  padding: 4px 9px; font: inherit; font-size: 11px;
+}
+.doctoggle:hover { color: var(--chrome-text-1); background: var(--chrome-hover); }
+
+.wrap { max-width: 1360px; margin: 0 auto; padding: 0 20px 80px; }
+
+/* ── 開場 ───────────────────────────────────────────────────────────────── */
+.masthead { padding: 44px 0 28px; border-bottom: 1px solid var(--line); }
+.masthead h1 { font-size: 30px; margin: 10px 0 12px; }
+.masthead .lead { color: var(--text-2); max-width: 62ch; font-size: 14px; line-height: 1.6; }
+.facts { display: flex; flex-wrap: wrap; gap: 0; margin-top: 22px; border: 1px solid var(--line); border-radius: var(--radius-m); overflow: hidden; }
+.facts div { padding: 9px 14px; border-right: 1px solid var(--line); background: var(--surface-1); }
+.facts div:last-child { border-right: 0; }
+.facts dt { font-size: 9.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--text-3); margin: 0 0 3px; }
+.facts dd { margin: 0; font-family: var(--font-mono); font-size: 15px; color: var(--text-1); }
+
+/* ── 摘要區 ─────────────────────────────────────────────────────────────── */
+.grid2 { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 20px; margin-top: 26px; }
+.panel { border: 1px solid var(--line); border-radius: var(--radius-m); background: var(--surface-1); }
+.panel > h3 {
+  font-size: 9.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--text-3);
+  padding: 9px 14px; border-bottom: 1px solid var(--line); background: var(--surface-2);
+}
+.panel .body { padding: 14px; display: grid; gap: 10px; }
+.panel .body p { color: var(--text-2); line-height: 1.65; }
+
+table.cov { width: 100%; border-collapse: collapse; font-size: 12px; }
+table.cov th, table.cov td { padding: 6px 14px; text-align: left; border-bottom: 1px solid var(--line-soft); }
+table.cov th { font-size: 9.5px; letter-spacing: .1em; text-transform: uppercase; color: var(--text-3); font-weight: 600; }
+table.cov td.n { font-family: var(--font-mono); font-variant-numeric: tabular-nums; text-align: right; }
+table.cov tr:last-child td { border-bottom: 0; }
+table.cov tfoot td { border-top: 1px solid var(--line); font-weight: 600; color: var(--text-1); }
+.bar { display: block; height: 3px; background: var(--track); border-radius: 2px; overflow: hidden; }
+.bar i { display: block; height: 100%; background: var(--ok); }
+
+.runbox { font-family: var(--font-mono); font-size: 12px; }
+.runbox pre {
+  margin: 0; padding: 10px 12px; background: var(--surface-2);
+  border: 1px solid var(--line); border-radius: var(--radius-m);
+  color: var(--text-1); overflow-x: auto;
+}
+.linklist { display: grid; gap: 1px; background: var(--line-soft); border: 1px solid var(--line-soft); border-radius: var(--radius-m); overflow: hidden; }
+.linklist a { display: flex; gap: 10px; align-items: baseline; padding: 8px 12px; background: var(--surface-1); }
+.linklist a:hover { background: var(--surface-2); text-decoration: none; }
+.linklist a b { font-weight: 600; color: var(--text-1); font-size: 12px; }
+.linklist a small { color: var(--text-3); font-family: var(--font-mono); font-size: 10.5px; margin-left: auto; }
+
+/* ── 區段 ───────────────────────────────────────────────────────────────── */
+/* 頂欄是 sticky 的，錨點跳轉要留出它的高度，否則標題會躲到欄後面。 */
+.area, .route, .limits { scroll-margin-top: 62px; }
+.area { padding-top: 46px; }
+.area-head { display: flex; align-items: baseline; gap: 12px; border-bottom: 1px solid var(--line); padding-bottom: 10px; }
+.area-head h2 { font-size: 19px; }
+.area-head .slug { font-family: var(--font-mono); font-size: 11px; color: var(--text-3); }
+.area-head p { color: var(--text-2); margin-left: auto; text-align: right; font-size: 12px; }
+
+.route { margin-top: 22px; border: 1px solid var(--line); border-radius: var(--radius-m); background: var(--surface-1); overflow: hidden; }
+.route > header { padding: 12px 16px; border-bottom: 1px solid var(--line); background: var(--surface-2); display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.route > header h3 { font-size: 14px; }
+.route > header code { font-size: 11px; color: var(--text-3); }
+.route > header .seg { margin-left: auto; }
+.route .blurb { padding: 12px 16px 0; color: var(--text-2); line-height: 1.65; max-width: 78ch; }
+
+/* 分段控制：亮 / 暗 / 審視態 */
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: var(--radius-m); overflow: hidden; background: var(--surface-1); }
+.seg button {
+  font: inherit; font-size: 11px; padding: 4px 11px; cursor: pointer;
+  background: transparent; color: var(--text-2); border: 0; border-right: 1px solid var(--line);
+  display: inline-flex; align-items: center; gap: 6px;
+}
+.seg button:last-child { border-right: 0; }
+.seg button:hover { background: var(--surface-2); color: var(--text-1); }
+.seg button[aria-pressed="true"] { background: var(--accent); color: var(--accent-on); }
+.seg button .dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; opacity: .55; }
+.seg button[aria-pressed="true"] .dot { opacity: 1; }
+
+/* 螢幕框：全頁截圖可在框內自行捲動，不裁切也不撐爆版面 */
+.screen { margin: 12px 16px 0; border: 1px solid var(--line); border-radius: var(--radius-m); background: var(--surface-0); overflow: hidden; }
+.screen .bezel {
+  display: flex; align-items: center; gap: 8px; padding: 5px 10px;
+  background: var(--chrome); border-bottom: 1px solid var(--chrome-edge); color: var(--chrome-text-3);
+  font-family: var(--font-mono); font-size: 10.5px;
+}
+.screen .bezel .led { width: 6px; height: 6px; border-radius: 50%; background: var(--ok); box-shadow: 0 0 6px var(--ok); }
+.screen .bezel .state { color: var(--chrome-text-1); }
+.screen .bezel a { margin-left: auto; color: var(--chrome-text-2); font-size: 10.5px; }
+.screen .view { max-height: 78vh; overflow: auto; background: var(--surface-0); }
+.screen .view img { display: block; width: 100%; height: auto; }
+
+.thumbs { display: flex; gap: 10px; padding: 12px 16px 0; }
+.thumbs button {
+  padding: 0; border: 1px solid var(--line); border-radius: var(--radius-s); cursor: pointer;
+  background: var(--surface-0); overflow: hidden; width: 132px; text-align: left;
+}
+.thumbs button:hover { border-color: var(--text-3); }
+.thumbs button[aria-pressed="true"] { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.thumbs button span {
+  display: block; padding: 3px 6px; font-size: 9.5px; letter-spacing: .08em; text-transform: uppercase;
+  color: var(--text-3); border-top: 1px solid var(--line); background: var(--surface-1);
+}
+.thumbs button[aria-pressed="true"] span { color: var(--text-1); }
+.thumbs button .crop { height: 62px; overflow: hidden; }
+.thumbs button img { display: block; width: 100%; height: auto; }
+
+/* 功能錨點 */
+.covs { padding: 14px 16px 16px; display: grid; gap: 10px; }
+.covs .grouphead { font-size: 9.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--text-3); font-weight: 600; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip {
+  display: inline-flex; align-items: baseline; gap: 7px; max-width: 100%;
+  border: 1px solid var(--line); border-radius: var(--radius-m); padding: 3px 9px;
+  background: var(--surface-2); font-size: 11.5px; color: var(--text-2);
+}
+.chip b { font-family: var(--font-mono); font-size: 11px; color: var(--accent-fg); font-weight: 600; }
+.chip.xc b { color: var(--neutral-fg); }
+
+/* 已知侷限 */
+.limits { margin-top: 52px; border: 1px solid var(--line); border-left: 2px solid var(--warn); border-radius: var(--radius-m); background: var(--surface-1); }
+.limits > h2 { font-size: 15px; padding: 14px 18px 0; }
+.limits ul { margin: 10px 0 0; padding: 0 18px 18px 34px; display: grid; gap: 9px; color: var(--text-2); line-height: 1.65; }
+.limits li strong { color: var(--text-1); font-weight: 600; }
+.limits code { font-size: 11.5px; color: var(--text-1); background: var(--surface-2); padding: 1px 4px; border-radius: var(--radius-s); }
+
+footer.doc { margin-top: 44px; padding-top: 16px; border-top: 1px solid var(--line); color: var(--text-3); font-size: 11.5px; display: flex; gap: 14px; flex-wrap: wrap; }
+
+@media (max-width: 900px) {
+  .grid2 { grid-template-columns: 1fr; }
+  .area-head { flex-wrap: wrap; }
+  .area-head p { margin-left: 0; text-align: left; width: 100%; }
+  .thumbs { flex-wrap: wrap; }
+  .chrome nav { display: none; }
+}
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+</style>
+</head>
+<body>
+<div class="chrome"><div class="chrome-in">
+  <span class="brand"><b>illumio</b><i></i><span>ops · 樣本導覽</span></span>
+  <nav><a href="#a-overview">總覽</a><a href="#a-investigate">調查</a><a href="#a-alerting">告警</a><a href="#a-automation">自動化</a><a href="#a-reports">報表</a><a href="#a-system">系統</a><a href="#a-login">登入</a><a href="#limits">已知侷限</a></nav>
+  <button class="doctoggle" id="doctheme" type="button">本頁：暗</button>
+</div></div>
+
+<div class="wrap">
+<header class="masthead">
+  <div class="eyebrow">UI/UX 全面重新設計 v2 · Phase 1 · 使用者閘門 2</div>
+  <h1>互動樣本導覽</h1>
+  <p class="lead">這是 Phase 1 的全部產出：一份跑得動的靜態樣本，把現行 GUI 的 102 項功能
+  重新編排進六個區。以下逐頁附亮色、暗色，以及一張「審視態」——同時開啟該頁所有抽屜與彈窗，
+  讓藏在互動後面的東西也能一次看完。看完請決定是否放行進 Phase 2（逐區改 src/）。</p>
+  <dl class="facts">
+    <div><dt>功能覆蓋</dt><dd>102 / 102</dd></div>
+    <div><dt>畫面</dt><dd>21</dd></div>
+    <div><dt>截圖</dt><dd>63</dd></div>
+    <div><dt>視窗寬度</dt><dd>1440</dd></div>
+    <div><dt>產出時間</dt><dd>2026-08-05 01:45</dd></div>
+  </dl>
+</header>
+
+<div class="grid2">
+  <div class="panel">
+    <h3>功能覆蓋對帳</h3>
+    <table class="cov">
+  <thead><tr><th>功能群</th><th class="n">清單</th><th class="n">DOM 實作</th><th>覆蓋</th></tr></thead>
+  <tbody><tr><td><b>OV</b> 總覽</td><td class='n'>16</td><td class='n'>16</td><td style='width:120px'><span class='bar'><i style='width:100%'></i></span></td></tr><tr><td><b>IV</b> 調查</td><td class='n'>15</td><td class='n'>15</td><td style='width:120px'><span class='bar'><i style='width:100%'></i></span></td></tr><tr><td><b>AL</b> 告警</td><td class='n'>14</td><td class='n'>14</td><td style='width:120px'><span class='bar'><i style='width:100%'></i></span></td></tr><tr><td><b>AU</b> 自動化</td><td class='n'>13</td><td class='n'>13</td><td style='width:120px'><span class='bar'><i style='width:100%'></i></span></td></tr><tr><td><b>RP</b> 報表</td><td class='n'>9</td><td class='n'>9</td><td style='width:120px'><span class='bar'><i style='width:100%'></i></span></td></tr><tr><td><b>SY</b> 系統</td><td class='n'>18</td><td class='n'>18</td><td style='width:120px'><span class='bar'><i style='width:100%'></i></span></td></tr><tr><td><b>LG</b> 登入</td><td class='n'>3</td><td class='n'>3</td><td style='width:120px'><span class='bar'><i style='width:100%'></i></span></td></tr><tr><td><b>XC</b> 跨區元件</td><td class='n'>14</td><td class='n'>14</td><td style='width:120px'><span class='bar'><i style='width:100%'></i></span></td></tr></tbody>
+  <tfoot><tr><td>合計</td><td class="n">102</td><td class="n">102</td>
+  <td><span class="bar"><i style="width:100%"></i></span></td></tr></tfoot>
+</table>
+  </div>
+  <div class="panel">
+    <h3>如何開互動樣本</h3>
+    <div class="body runbox">
+      <pre>python3 -m http.server 8378 -d design/v2/mockup</pre>
+      <p style="font-family: var(--font-ui)">然後開 <code>http://127.0.0.1:8378/index.html</code>（主畫面）
+      或 <code>http://127.0.0.1:8378/login.html</code>（登入頁；加 <code>?demo=first-login</code>、
+      <code>?demo=signed-out</code> 可切換分支）。頂欄右上的使用者選單可切主題與密度，
+      <kbd>⌘K</kbd> 開指令面板。</p>
+    </div>
+  </div>
+</div>
+
+<div class="grid2">
+  <div class="panel">
+    <h3>一併交付的東西</h3>
+    <div class="body">
+      <div class="linklist">
+        <a href="../reports/reskinned/traffic.html"><b>流量報表（重排後）</b><small>HTML</small></a>
+        <a href="../reports/reskinned/traffic.pdf"><b>流量報表（重排後）</b><small>PDF</small></a>
+        <a href="../reports/reskinned/audit.html"><b>稽核報表（重排後）</b><small>HTML</small></a>
+        <a href="../reports/reskinned/audit.pdf"><b>稽核報表（重排後）</b><small>PDF</small></a>
+        <a href="../cli-flows.md"><b>CLI 選單流程稿</b><small>Markdown</small></a>
+        <a href="../coverage.yaml"><b>功能覆蓋清單</b><small>YAML</small></a>
+      </div>
+      <p>兩份報表是用真機資料重跑的，不是示意稿；原始版本保留在
+      <code>design/v2/reports/original/</code> 可逐頁對照。</p>
+    </div>
+  </div>
+  <div class="panel">
+    <h3>怎麼看這份導覽</h3>
+    <div class="body">
+      <p>每個路由一張主畫面，下面三張縮圖就是這一頁的三種狀態，點縮圖換主畫面。
+      主畫面是完整長截圖，可以在框內直接往下捲；要看原始像素就按「原尺寸開啟」。</p>
+      <p>下面這排會一次把所有路由切到同一態，方便整份掃過去比對：</p>
+      <div class="seg" role="group" aria-label="全部畫面狀態"><button type="button" data-all-state="light" aria-pressed="false"><i class="dot"></i>亮</button><button type="button" data-all-state="dark" aria-pressed="true"><i class="dot"></i>暗</button><button type="button" data-all-state="audit" aria-pressed="false"><i class="dot"></i>審視態</button></div>
+    </div>
+  </div>
+</div>
+
+<section class="area" id="a-overview">
+  <div class="area-head"><h2>總覽</h2><span class="slug">overview</span><p>開機第一眼：這台機器現在好不好、接下來該做什麼。</p></div>
+  <article class="route" id="r-overview" data-shot-light="shots/overview--light.png" data-label-light="亮色主題 · 1440 寬全頁" data-shot-dark="shots/overview--dark.png" data-label-dark="暗色主題 · 1440 寬全頁" data-shot-audit="shots/overview--audit.png" data-label-audit="審視態 · __openAllForAudit() 開啟 7 個面">
+  <header>
+    <h3>總覽</h3>
+    <code>#/overview</code>
+    <div class="seg" role="group" aria-label="overview 畫面狀態"><button type="button" data-state="light" aria-pressed="false"><i class="dot"></i>亮</button><button type="button" data-state="dark" aria-pressed="true"><i class="dot"></i>暗</button><button type="button" data-state="audit" aria-pressed="false"><i class="dot"></i>審視態</button></div>
+  </header>
+  <p class="blurb">系統狀態、posture score、待辦動作與近期事件收在同一頁；健康列只出現在本頁（頂欄下方），離開總覽就收起來。</p>
+  <div class="screen">
+    <div class="bezel"><i class="led"></i><span class="state">暗色主題 · 1440 寬全頁</span>
+      <a href="shots/overview--dark.png" target="_blank" rel="noopener">原尺寸開啟 ↗</a></div>
+    <div class="view"><img loading="lazy" src="shots/overview--dark.png" alt="總覽 畫面截圖"></div>
+  </div>
+  <div class="thumbs"><button type="button" data-state="light" aria-pressed="false"><span class="crop"><img loading="lazy" src="shots/overview--light.png" alt="overview 亮 縮圖"></span><span>亮</span></button><button type="button" data-state="dark" aria-pressed="true"><span class="crop"><img loading="lazy" src="shots/overview--dark.png" alt="overview 暗 縮圖"></span><span>暗</span></button><button type="button" data-state="audit" aria-pressed="false"><span class="crop"><img loading="lazy" src="shots/overview--audit.png" alt="overview 審視態 縮圖"></span><span>審視態</span></button></div>
+  <div class="covs"><div><div class="grouphead">本頁功能錨點 · 16</div><div class="chips"><span class="chip "><b>OV-01</b>系統狀態總覽卡</span><span class="chip "><b>OV-02</b>posture score 卡+詳情</span><span class="chip "><b>OV-03</b>Top Actions 區</span><span class="chip "><b>OV-04</b>自訂查詢卡 CRUD</span><span class="chip "><b>OV-05</b>Top10 查詢</span><span class="chip "><b>OV-06</b>audit 摘要卡</span><span class="chip "><b>OV-07</b>policy usage 摘要卡</span><span class="chip "><b>OV-08</b>dashboard snapshot</span><span class="chip "><b>OV-09</b>報表最近產出 meta</span><span class="chip "><b>OV-10</b>pipeline 健康摘要(唯讀)</span><span class="chip "><b>OV-11</b>job 健康摘要(唯讀)</span><span class="chip "><b>OV-12</b>資料完整性卡(唯讀)</span><span class="chip "><b>OV-13</b>近期事件表</span><span class="chip "><b>OV-14</b>TLS 卡</span><span class="chip "><b>OV-15</b>告警管道卡(唯讀)</span><span class="chip "><b>OV-16</b>Integrations 狀態卡摘要(_buildOvCards)</span></div></div><div><div class="grouphead">在此頁驗收的跨區元件 · 5</div><div class="chips"><span class="chip xc"><b>XC-01</b>全域健康列 5 燈+popover</span><span class="chip xc"><b>XC-02</b>Cmd+K 指令面板</span><span class="chip xc"><b>XC-10</b>錯誤卡+重試+技術細節</span><span class="chip xc"><b>XC-13</b>頂欄使用者選單</span><span class="chip xc"><b>XC-14</b>URL hash 路由狀態同步</span></div></div></div>
+</article>
+</section><section class="area" id="a-investigate">
+  <div class="area-head"><h2>調查</h2><span class="slug">investigate</span><p>查流量、查 workload、查事件——所有「發生了什麼」的問題都在這一區。</p></div>
+  <article class="route" id="r-investigate-traffic" data-shot-light="shots/investigate-traffic--light.png" data-label-light="亮色主題 · 1440 寬全頁" data-shot-dark="shots/investigate-traffic--dark.png" data-label-dark="暗色主題 · 1440 寬全頁" data-shot-audit="shots/investigate-traffic--audit.png" data-label-audit="審視態 · __openAllForAudit() 開啟 8 個面">
+  <header>
+    <h3>流量分析</h3>
+    <code>#/investigate/traffic</code>
+    <div class="seg" role="group" aria-label="investigate-traffic 畫面狀態"><button type="button" data-state="light" aria-pressed="false"><i class="dot"></i>亮</button><button type="button" data-state="dark" aria-pressed="true"><i class="dot"></i>暗</button><button type="button" data-state="audit" aria-pressed="false"><i class="dot"></i>審視態</button></div>
+  </header>
+  <p class="blurb">流量分析器：選視窗與來源（即時快取／Archive），用 FilterBar 收斂條件，看 KPI 與明細分頁。</p>
+  <div class="screen">
+    <div class="bezel"><i class="led"></i><span class="state">暗色主題 · 1440 寬全頁</span>
+      <a href="shots/investigate-traffic--dark.png" target="_blank" rel="noopener">原尺寸開啟 ↗</a></div>
+    <div class="view"><img loading="lazy" src="shots/investigate-traffic--dark.png" alt="流量分析 畫面截圖"></div>
+  </div>
+  <div class="thumbs"><button type="button" data-state="light" aria-pressed="false"><span class="crop"><img loading="lazy" src="shots/investigate-traffic--light.png" alt="investigate-traffic 亮 縮圖"></span><span>亮</span></button><button type="button" data-state="dark" aria-pressed="true"><span class="crop"><img loading="lazy" src="shots/investigate-traffic--dark.png" alt="investigate-traffic 暗 縮圖"></span><span>暗</span></button><button type="button" data-state="audit" aria-pressed="false"><span class="crop"><img loading="lazy" src="shots/investigate-traffic--audit.png" alt="investigate-traffic 審視態 縮圖"></span><span>審視態</span></button></div>
+  <div class="covs"><div><div class="grouphead">本頁功能錨點 · 7</div><div class="chips"><span class="chip "><b>IV-01</b>流量分析器查詢+KPI</span><span class="chip "><b>IV-02</b>流量來源切換 即時快取/Archive（actions.py:92-107）</span><span class="chip "><b>IV-03</b>進階篩選(FilterBar)</span><span class="chip "><b>IV-04</b>流量查詢指南</span><span class="chip "><b>IV-05</b>流量結果分頁</span><span class="chip "><b>IV-06</b>archive 狀態/範圍</span><span class="chip "><b>IV-07</b>cache backfill</span></div></div><div><div class="grouphead">在此頁驗收的跨區元件 · 5</div><div class="chips"><span class="chip xc"><b>XC-03</b>FilterBar pill/AND-OR/include-exclude/zone</span><span class="chip xc"><b>XC-04</b>物件選擇 modal(suggest+browse)</span><span class="chip xc"><b>XC-09</b>空狀態成因提示</span><span class="chip xc"><b>XC-11</b>說明側欄(篩選語法/隔離指南)</span><span class="chip xc"><b>XC-12</b>toast/popover/欄寬拖曳/skeleton</span></div></div></div>
+</article><article class="route" id="r-investigate-workloads" data-shot-light="shots/investigate-workloads--light.png" data-label-light="亮色主題 · 1440 寬全頁" data-shot-dark="shots/investigate-workloads--dark.png" data-label-dark="暗色主題 · 1440 寬全頁" data-shot-audit="shots/investigate-workloads--audit.png" data-label-audit="審視態 · __openAllForAudit() 開啟 8 個面">
+  <header>
+    <h3>Workload 搜尋</h3>
+    <code>#/investigate/workloads</code>
+    <div class="seg" role="group" aria-label="investigate-workloads 畫面狀態"><button type="button" data-state="light" aria-pressed="false"><i class="dot"></i>亮</button><button type="button" data-state="dark" aria-pressed="true"><i class="dot"></i>暗</button><button type="button" data-state="audit" aria-pressed="false"><i class="dot"></i>審視態</button></div>
+  </header>
+  <p class="blurb">workload 搜尋與隔離：單台套用、批次套用、解除隔離；破壞性動作一律先出影響摘要再確認。</p>
+  <div class="screen">
+    <div class="bezel"><i class="led"></i><span class="state">暗色主題 · 1440 寬全頁</span>
+      <a href="shots/investigate-workloads--dark.png" target="_blank" rel="noopener">原尺寸開啟 ↗</a></div>
+    <div class="view"><img loading="lazy" src="shots/investigate-workloads--dark.png" alt="Workload 搜尋 畫面截圖"></div>
+  </div>
+  <div class="thumbs"><button type="button" data-state="light" aria-pressed="false"><span class="crop"><img loading="lazy" src="shots/investigate-workloads--light.png" alt="investigate-workloads 亮 縮圖"></span><span>亮</span></button><button type="button" data-state="dark" aria-pressed="true"><span class="crop"><img loading="lazy" src="shots/investigate-workloads--dark.png" alt="investigate-workloads 暗 縮圖"></span><span>暗</span></button><button type="button" data-state="audit" aria-pressed="false"><span class="crop"><img loading="lazy" src="shots/investigate-workloads--audit.png" alt="investigate-workloads 審視態 縮圖"></span><span>審視態</span></button></div>
+  <div class="covs"><div><div class="grouphead">本頁功能錨點 · 5</div><div class="chips"><span class="chip "><b>IV-08</b>workload 搜尋+分頁</span><span class="chip "><b>IV-09</b>隔離 apply 單台</span><span class="chip "><b>IV-10</b>隔離 bulk apply</span><span class="chip "><b>IV-11</b>隔離 lift</span><span class="chip "><b>IV-12</b>流量更新加速+倒數</span></div></div><div><div class="grouphead">在此頁驗收的跨區元件 · 1</div><div class="chips"><span class="chip xc"><b>XC-08</b>破壞性確認 modal+影響摘要</span></div></div></div>
+</article><article class="route" id="r-investigate-events" data-shot-light="shots/investigate-events--light.png" data-label-light="亮色主題 · 1440 寬全頁" data-shot-dark="shots/investigate-events--dark.png" data-label-dark="暗色主題 · 1440 寬全頁" data-shot-audit="shots/investigate-events--audit.png" data-label-audit="審視態 · __openAllForAudit() 開啟 3 個面">
+  <header>
+    <h3>事件檢視</h3>
+    <code>#/investigate/events</code>
+    <div class="seg" role="group" aria-label="investigate-events 畫面狀態"><button type="button" data-state="light" aria-pressed="false"><i class="dot"></i>亮</button><button type="button" data-state="dark" aria-pressed="true"><i class="dot"></i>暗</button><button type="button" data-state="audit" aria-pressed="false"><i class="dot"></i>審視態</button></div>
+  </header>
+  <p class="blurb">事件檢視器：三層事件分類目錄、逐批載入詳情，並可與影子規則的判定結果對照。</p>
+  <div class="screen">
+    <div class="bezel"><i class="led"></i><span class="state">暗色主題 · 1440 寬全頁</span>
+      <a href="shots/investigate-events--dark.png" target="_blank" rel="noopener">原尺寸開啟 ↗</a></div>
+    <div class="view"><img loading="lazy" src="shots/investigate-events--dark.png" alt="事件檢視 畫面截圖"></div>
+  </div>
+  <div class="thumbs"><button type="button" data-state="light" aria-pressed="false"><span class="crop"><img loading="lazy" src="shots/investigate-events--light.png" alt="investigate-events 亮 縮圖"></span><span>亮</span></button><button type="button" data-state="dark" aria-pressed="true"><span class="crop"><img loading="lazy" src="shots/investigate-events--dark.png" alt="investigate-events 暗 縮圖"></span><span>暗</span></button><button type="button" data-state="audit" aria-pressed="false"><span class="crop"><img loading="lazy" src="shots/investigate-events--audit.png" alt="investigate-events 審視態 縮圖"></span><span>審視態</span></button></div>
+  <div class="covs"><div><div class="grouphead">本頁功能錨點 · 3</div><div class="chips"><span class="chip "><b>IV-13</b>事件檢視器三層 catalog</span><span class="chip "><b>IV-14</b>事件 load-more+詳情卡</span><span class="chip "><b>IV-15</b>shadow compare</span></div></div></div>
+</article>
+</section><section class="area" id="a-alerting">
+  <div class="area-head"><h2>告警</h2><span class="slug">alerting</span><p>規則怎麼寫、怎麼測、怎麼送出去。</p></div>
+  <article class="route" id="r-alerting-rules" data-shot-light="shots/alerting-rules--light.png" data-label-light="亮色主題 · 1440 寬全頁" data-shot-dark="shots/alerting-rules--dark.png" data-label-dark="暗色主題 · 1440 寬全頁" data-shot-audit="shots/alerting-rules--audit.png" data-label-audit="審視態 · __openAllForAudit() 開啟 7 個面">
+  <header>
+    <h3>規則</h3>
+    <code>#/alerting/rules</code>
+    <div class="seg" role="group" aria-label="alerting-rules 畫面狀態"><button type="button" data-state="light" aria-pressed="false"><i class="dot"></i>亮</button><button type="button" data-state="dark" aria-pressed="true"><i class="dot"></i>暗</button><button type="button" data-state="audit" aria-pressed="false"><i class="dot"></i>審視態</button></div>
+  </header>
+  <p class="blurb">告警規則清單與四型編輯抽屜（事件／系統健康／流量／頻寬），改完可用沙盤測試先跑一次。</p>
+  <div class="screen">
+    <div class="bezel"><i class="led"></i><span class="state">暗色主題 · 1440 寬全頁</span>
+      <a href="shots/alerting-rules--dark.png" target="_blank" rel="noopener">原尺寸開啟 ↗</a></div>
+    <div class="view"><img loading="lazy" src="shots/alerting-rules--dark.png" alt="規則 畫面截圖"></div>
+  </div>
+  <div class="thumbs"><button type="button" data-state="light" aria-pressed="false"><span class="crop"><img loading="lazy" src="shots/alerting-rules--light.png" alt="alerting-rules 亮 縮圖"></span><span>亮</span></button><button type="button" data-state="dark" aria-pressed="true"><span class="crop"><img loading="lazy" src="shots/alerting-rules--dark.png" alt="alerting-rules 暗 縮圖"></span><span>暗</span></button><button type="button" data-state="audit" aria-pressed="false"><span class="crop"><img loading="lazy" src="shots/alerting-rules--audit.png" alt="alerting-rules 審視態 縮圖"></span><span>審視態</span></button></div>
+  <div class="covs"><div><div class="grouphead">本頁功能錨點 · 7</div><div class="chips"><span class="chip "><b>AL-01</b>規則清單+啟停+刪除</span><span class="chip "><b>AL-02</b>Event 規則 drawer</span><span class="chip "><b>AL-03</b>System health 規則 drawer</span><span class="chip "><b>AL-04</b>Traffic 規則 drawer</span><span class="chip "><b>AL-05</b>Bandwidth 規則 drawer</span><span class="chip "><b>AL-06</b>規則 highlight 定位</span><span class="chip "><b>AL-07</b>rule_test 沙盤測試</span></div></div></div>
+</article><article class="route" id="r-alerting-ops" data-shot-light="shots/alerting-ops--light.png" data-label-light="亮色主題 · 1440 寬全頁" data-shot-dark="shots/alerting-ops--dark.png" data-label-dark="暗色主題 · 1440 寬全頁" data-shot-audit="shots/alerting-ops--audit.png" data-label-audit="審視態 · __openAllForAudit() 開啟 5 個面">
+  <header>
+    <h3>動作</h3>
+    <code>#/alerting/ops</code>
+    <div class="seg" role="group" aria-label="alerting-ops 畫面狀態"><button type="button" data-state="light" aria-pressed="false"><i class="dot"></i>亮</button><button type="button" data-state="dark" aria-pressed="true"><i class="dot"></i>暗</button><button type="button" data-state="audit" aria-pressed="false"><i class="dot"></i>審視態</button></div>
+  </header>
+  <p class="blurb">告警運維台：單次執行、debug 模式、測試送出、水位重置、最佳實務套用，輸出直接落在主控台。</p>
+  <div class="screen">
+    <div class="bezel"><i class="led"></i><span class="state">暗色主題 · 1440 寬全頁</span>
+      <a href="shots/alerting-ops--dark.png" target="_blank" rel="noopener">原尺寸開啟 ↗</a></div>
+    <div class="view"><img loading="lazy" src="shots/alerting-ops--dark.png" alt="動作 畫面截圖"></div>
+  </div>
+  <div class="thumbs"><button type="button" data-state="light" aria-pressed="false"><span class="crop"><img loading="lazy" src="shots/alerting-ops--light.png" alt="alerting-ops 亮 縮圖"></span><span>亮</span></button><button type="button" data-state="dark" aria-pressed="true"><span class="crop"><img loading="lazy" src="shots/alerting-ops--dark.png" alt="alerting-ops 暗 縮圖"></span><span>暗</span></button><button type="button" data-state="audit" aria-pressed="false"><span class="crop"><img loading="lazy" src="shots/alerting-ops--audit.png" alt="alerting-ops 審視態 縮圖"></span><span>審視態</span></button></div>
+  <div class="covs"><div><div class="grouphead">本頁功能錨點 · 7</div><div class="chips"><span class="chip "><b>AL-08</b>run-once</span><span class="chip "><b>AL-09</b>debug 模式</span><span class="chip "><b>AL-10</b>測試告警(全+單管道)</span><span class="chip "><b>AL-11</b>watermark 重置</span><span class="chip "><b>AL-12</b>最佳實務套用</span><span class="chip "><b>AL-13</b>輸出主控台</span><span class="chip "><b>AL-14</b>管道狀態卡(唯讀)</span></div></div></div>
+</article>
+</section><section class="area" id="a-automation">
+  <div class="area-head"><h2>自動化</h2><span class="slug">automation</span><p>排程器與背景工作：不用人在場也會跑的東西。</p></div>
+  <article class="route" id="r-automation-rules" data-shot-light="shots/automation-rules--light.png" data-label-light="亮色主題 · 1440 寬全頁" data-shot-dark="shots/automation-rules--dark.png" data-label-dark="暗色主題 · 1440 寬全頁" data-shot-audit="shots/automation-rules--audit.png" data-label-audit="審視態 · __openAllForAudit() 開啟 6 個面">
+  <header>
+    <h3>規則排程</h3>
+    <code>#/automation/rules</code>
+    <div class="seg" role="group" aria-label="automation-rules 畫面狀態"><button type="button" data-state="light" aria-pressed="false"><i class="dot"></i>亮</button><button type="button" data-state="dark" aria-pressed="true"><i class="dot"></i>暗</button><button type="button" data-state="audit" aria-pressed="false"><i class="dot"></i>審視態</button></div>
+  </header>
+  <p class="blurb">規則排程器：狀態列與時間軸交代下一次何時跑，ruleset／rule 兩層都能各自排程並與 PCE 對帳。</p>
+  <div class="screen">
+    <div class="bezel"><i class="led"></i><span class="state">暗色主題 · 1440 寬全頁</span>
+      <a href="shots/automation-rules--dark.png" target="_blank" rel="noopener">原尺寸開啟 ↗</a></div>
+    <div class="view"><img loading="lazy" src="shots/automation-rules--dark.png" alt="規則排程 畫面截圖"></div>
+  </div>
+  <div class="thumbs"><button type="button" data-state="light" aria-pressed="false"><span class="crop"><img loading="lazy" src="shots/automation-rules--light.png" alt="automation-rules 亮 縮圖"></span><span>亮</span></button><button type="button" data-state="dark" aria-pressed="true"><span class="crop"><img loading="lazy" src="shots/automation-rules--dark.png" alt="automation-rules 暗 縮圖"></span><span>暗</span></button><button type="button" data-state="audit" aria-pressed="false"><span class="crop"><img loading="lazy" src="shots/automation-rules--audit.png" alt="automation-rules 審視態 縮圖"></span><span>審視態</span></button></div>
+  <div class="covs"><div><div class="grouphead">本頁功能錨點 · 10</div><div class="chips"><span class="chip "><b>AU-01</b>rule scheduler 狀態列+KPI</span><span class="chip "><b>AU-02</b>排程時間軸</span><span class="chip "><b>AU-03</b>ruleset 瀏覽+詳情</span><span class="chip "><b>AU-04</b>rule 個別搜尋</span><span class="chip "><b>AU-05</b>ruleset 層排程 drawer</span><span class="chip "><b>AU-06</b>rule 層排程 drawer</span><span class="chip "><b>AU-07</b>one-time expire_at 語意</span><span class="chip "><b>AU-08</b>排程清單+PCE 對帳狀態</span><span class="chip "><b>AU-09</b>立即檢查</span><span class="chip "><b>AU-10</b>執行紀錄+清除</span></div></div></div>
+</article><article class="route" id="r-automation-reports" data-shot-light="shots/automation-reports--light.png" data-label-light="亮色主題 · 1440 寬全頁" data-shot-dark="shots/automation-reports--dark.png" data-label-dark="暗色主題 · 1440 寬全頁" data-shot-audit="shots/automation-reports--audit.png" data-label-audit="審視態 · __openAllForAudit() 開啟 5 個面">
+  <header>
+    <h3>報表排程</h3>
+    <code>#/automation/reports</code>
+    <div class="seg" role="group" aria-label="automation-reports 畫面狀態"><button type="button" data-state="light" aria-pressed="false"><i class="dot"></i>亮</button><button type="button" data-state="dark" aria-pressed="true"><i class="dot"></i>暗</button><button type="button" data-state="audit" aria-pressed="false"><i class="dot"></i>審視態</button></div>
+  </header>
+  <p class="blurb">報表排程：清單增修刪、啟停、立即執行，以及每一筆的執行歷史。</p>
+  <div class="screen">
+    <div class="bezel"><i class="led"></i><span class="state">暗色主題 · 1440 寬全頁</span>
+      <a href="shots/automation-reports--dark.png" target="_blank" rel="noopener">原尺寸開啟 ↗</a></div>
+    <div class="view"><img loading="lazy" src="shots/automation-reports--dark.png" alt="報表排程 畫面截圖"></div>
+  </div>
+  <div class="thumbs"><button type="button" data-state="light" aria-pressed="false"><span class="crop"><img loading="lazy" src="shots/automation-reports--light.png" alt="automation-reports 亮 縮圖"></span><span>亮</span></button><button type="button" data-state="dark" aria-pressed="true"><span class="crop"><img loading="lazy" src="shots/automation-reports--dark.png" alt="automation-reports 暗 縮圖"></span><span>暗</span></button><button type="button" data-state="audit" aria-pressed="false"><span class="crop"><img loading="lazy" src="shots/automation-reports--audit.png" alt="automation-reports 審視態 縮圖"></span><span>審視態</span></button></div>
+  <div class="covs"><div><div class="grouphead">本頁功能錨點 · 2</div><div class="chips"><span class="chip "><b>AU-11</b>報表排程清單 CRUD</span><span class="chip "><b>AU-12</b>報表排程 toggle/run-now/history</span></div></div></div>
+</article><article class="route" id="r-automation-jobs" data-shot-light="shots/automation-jobs--light.png" data-label-light="亮色主題 · 1440 寬全頁" data-shot-dark="shots/automation-jobs--dark.png" data-label-dark="暗色主題 · 1440 寬全頁" data-shot-audit="shots/automation-jobs--audit.png" data-label-audit="審視態 · __openAllForAudit() 開啟 3 個面">
+  <header>
+    <h3>Job 健康</h3>
+    <code>#/automation/jobs</code>
+    <div class="seg" role="group" aria-label="automation-jobs 畫面狀態"><button type="button" data-state="light" aria-pressed="false"><i class="dot"></i>亮</button><button type="button" data-state="dark" aria-pressed="true"><i class="dot"></i>暗</button><button type="button" data-state="audit" aria-pressed="false"><i class="dot"></i>審視態</button></div>
+  </header>
+  <p class="blurb">背景工作的健康與歷史（唯讀），可只列出異常的那幾筆。</p>
+  <div class="screen">
+    <div class="bezel"><i class="led"></i><span class="state">暗色主題 · 1440 寬全頁</span>
+      <a href="shots/automation-jobs--dark.png" target="_blank" rel="noopener">原尺寸開啟 ↗</a></div>
+    <div class="view"><img loading="lazy" src="shots/automation-jobs--dark.png" alt="Job 健康 畫面截圖"></div>
+  </div>
+  <div class="thumbs"><button type="button" data-state="light" aria-pressed="false"><span class="crop"><img loading="lazy" src="shots/automation-jobs--light.png" alt="automation-jobs 亮 縮圖"></span><span>亮</span></button><button type="button" data-state="dark" aria-pressed="true"><span class="crop"><img loading="lazy" src="shots/automation-jobs--dark.png" alt="automation-jobs 暗 縮圖"></span><span>暗</span></button><button type="button" data-state="audit" aria-pressed="false"><span class="crop"><img loading="lazy" src="shots/automation-jobs--audit.png" alt="automation-jobs 審視態 縮圖"></span><span>審視態</span></button></div>
+  <div class="covs"><div><div class="grouphead">本頁功能錨點 · 1</div><div class="chips"><span class="chip "><b>AU-13</b>背景 job 健康與歷史</span></div></div></div>
+</article>
+</section><section class="area" id="a-reports">
+  <div class="area-head"><h2>報表</h2><span class="slug">reports</span><p>11 型報表的產生、參數、進度與產出管理。</p></div>
+  <article class="route" id="r-reports" data-shot-light="shots/reports--light.png" data-label-light="亮色主題 · 1440 寬全頁" data-shot-dark="shots/reports--dark.png" data-label-dark="暗色主題 · 1440 寬全頁" data-shot-audit="shots/reports--audit.png" data-label-audit="審視態 · __openAllForAudit() 開啟 7 個面">
+  <header>
+    <h3>報表</h3>
+    <code>#/reports</code>
+    <div class="seg" role="group" aria-label="reports 畫面狀態"><button type="button" data-state="light" aria-pressed="false"><i class="dot"></i>亮</button><button type="button" data-state="dark" aria-pressed="true"><i class="dot"></i>暗</button><button type="button" data-state="audit" aria-pressed="false"><i class="dot"></i>審視態</button></div>
+  </header>
+  <p class="blurb">11 型報表卡、產生抽屜的型專屬參數、統一進度元件，以及產出清單的下載、瀏覽與刪除。</p>
+  <div class="screen">
+    <div class="bezel"><i class="led"></i><span class="state">暗色主題 · 1440 寬全頁</span>
+      <a href="shots/reports--dark.png" target="_blank" rel="noopener">原尺寸開啟 ↗</a></div>
+    <div class="view"><img loading="lazy" src="shots/reports--dark.png" alt="報表 畫面截圖"></div>
+  </div>
+  <div class="thumbs"><button type="button" data-state="light" aria-pressed="false"><span class="crop"><img loading="lazy" src="shots/reports--light.png" alt="reports 亮 縮圖"></span><span>亮</span></button><button type="button" data-state="dark" aria-pressed="true"><span class="crop"><img loading="lazy" src="shots/reports--dark.png" alt="reports 暗 縮圖"></span><span>暗</span></button><button type="button" data-state="audit" aria-pressed="false"><span class="crop"><img loading="lazy" src="shots/reports--audit.png" alt="reports 審視態 縮圖"></span><span>審視態</span></button></div>
+  <div class="covs"><div><div class="grouphead">本頁功能錨點 · 9</div><div class="chips"><span class="chip "><b>RP-01</b>11 型報表卡+最近產出</span><span class="chip "><b>RP-02</b>產生 drawer(型專屬參數)</span><span class="chip "><b>RP-03</b>產生進度步驟+async 輪詢</span><span class="chip "><b>RP-04</b>部分結果處理提示</span><span class="chip "><b>RP-05</b>RHC enablement 檢查/啟用</span><span class="chip "><b>RP-06</b>產出清單 下載/瀏覽</span><span class="chip "><b>RP-07</b>產出清單 單刪/批刪</span><span class="chip "><b>RP-08</b>報表語言切換</span><span class="chip "><b>RP-09</b>Labels 查詢輔助</span></div></div><div><div class="grouphead">在此頁驗收的跨區元件 · 1</div><div class="chips"><span class="chip xc"><b>XC-07</b>統一進度元件(可收合)</span></div></div></div>
+</article>
+</section><section class="area" id="a-system">
+  <div class="area-head"><h2>系統</h2><span class="slug">system</span><p>連線、快取、轉送、憑證、外觀——設定都收在這裡。</p></div>
+  <article class="route" id="r-system-pce" data-shot-light="shots/system-pce--light.png" data-label-light="亮色主題 · 1440 寬全頁" data-shot-dark="shots/system-pce--dark.png" data-label-dark="暗色主題 · 1440 寬全頁" data-shot-audit="shots/system-pce--audit.png" data-label-audit="審視態 · __openAllForAudit() 開啟 5 個面">
+  <header>
+    <h3>PCE 連線</h3>
+    <code>#/system/pce</code>
+    <div class="seg" role="group" aria-label="system-pce 畫面狀態"><button type="button" data-state="light" aria-pressed="false"><i class="dot"></i>亮</button><button type="button" data-state="dark" aria-pressed="true"><i class="dot"></i>暗</button><button type="button" data-state="audit" aria-pressed="false"><i class="dot"></i>審視態</button></div>
+  </header>
+  <p class="blurb">PCE profile 的新增、切換與連線測試；設定列會追蹤未儲存的變更，離開前擋你一下。</p>
+  <div class="screen">
+    <div class="bezel"><i class="led"></i><span class="state">暗色主題 · 1440 寬全頁</span>
+      <a href="shots/system-pce--dark.png" target="_blank" rel="noopener">原尺寸開啟 ↗</a></div>
+    <div class="view"><img loading="lazy" src="shots/system-pce--dark.png" alt="PCE 連線 畫面截圖"></div>
+  </div>
+  <div class="thumbs"><button type="button" data-state="light" aria-pressed="false"><span class="crop"><img loading="lazy" src="shots/system-pce--light.png" alt="system-pce 亮 縮圖"></span><span>亮</span></button><button type="button" data-state="dark" aria-pressed="true"><span class="crop"><img loading="lazy" src="shots/system-pce--dark.png" alt="system-pce 暗 縮圖"></span><span>暗</span></button><button type="button" data-state="audit" aria-pressed="false"><span class="crop"><img loading="lazy" src="shots/system-pce--audit.png" alt="system-pce 審視態 縮圖"></span><span>審視態</span></button></div>
+  <div class="covs"><div><div class="grouphead">本頁功能錨點 · 2</div><div class="chips"><span class="chip "><b>SY-01</b>PCE profiles CRUD/切換</span><span class="chip "><b>SY-18</b>設定 dirty 追蹤+儲存列狀態</span></div></div></div>
+</article><article class="route" id="r-system-cache" data-shot-light="shots/system-cache--light.png" data-label-light="亮色主題 · 1440 寬全頁" data-shot-dark="shots/system-cache--dark.png" data-label-dark="暗色主題 · 1440 寬全頁" data-shot-audit="shots/system-cache--audit.png" data-label-audit="審視態 · __openAllForAudit() 開啟 5 個面">
+  <header>
+    <h3>快取</h3>
+    <code>#/system/cache</code>
+    <div class="seg" role="group" aria-label="system-cache 畫面狀態"><button type="button" data-state="light" aria-pressed="false"><i class="dot"></i>亮</button><button type="button" data-state="dark" aria-pressed="true"><i class="dot"></i>暗</button><button type="button" data-state="audit" aria-pressed="false"><i class="dot"></i>審視態</button></div>
+  </header>
+  <p class="blurb">快取設定與狀態、lag 列、retention 立即執行、流量過濾器（含 IP 驗證）與取樣設定。</p>
+  <div class="screen">
+    <div class="bezel"><i class="led"></i><span class="state">暗色主題 · 1440 寬全頁</span>
+      <a href="shots/system-cache--dark.png" target="_blank" rel="noopener">原尺寸開啟 ↗</a></div>
+    <div class="view"><img loading="lazy" src="shots/system-cache--dark.png" alt="快取 畫面截圖"></div>
+  </div>
+  <div class="thumbs"><button type="button" data-state="light" aria-pressed="false"><span class="crop"><img loading="lazy" src="shots/system-cache--light.png" alt="system-cache 亮 縮圖"></span><span>亮</span></button><button type="button" data-state="dark" aria-pressed="true"><span class="crop"><img loading="lazy" src="shots/system-cache--dark.png" alt="system-cache 暗 縮圖"></span><span>暗</span></button><button type="button" data-state="audit" aria-pressed="false"><span class="crop"><img loading="lazy" src="shots/system-cache--audit.png" alt="system-cache 審視態 縮圖"></span><span>審視態</span></button></div>
+  <div class="covs"><div><div class="grouphead">本頁功能錨點 · 6</div><div class="chips"><span class="chip "><b>SY-02</b>cache 設定表單</span><span class="chip "><b>SY-03</b>cache 重啟 banner+daemon restart</span><span class="chip "><b>SY-04</b>retention 立即執行</span><span class="chip "><b>SY-05</b>流量過濾器+IP 驗證</span><span class="chip "><b>SY-06</b>流量取樣設定</span><span class="chip "><b>SY-17</b>cache 狀態卡+lag 列</span></div></div></div>
+</article><article class="route" id="r-system-siem" data-shot-light="shots/system-siem--light.png" data-label-light="亮色主題 · 1440 寬全頁" data-shot-dark="shots/system-siem--dark.png" data-label-dark="暗色主題 · 1440 寬全頁" data-shot-audit="shots/system-siem--audit.png" data-label-audit="審視態 · __openAllForAudit() 開啟 6 個面">
+  <header>
+    <h3>轉發器</h3>
+    <code>#/system/siem</code>
+    <div class="seg" role="group" aria-label="system-siem 畫面狀態"><button type="button" data-state="light" aria-pressed="false"><i class="dot"></i>亮</button><button type="button" data-state="dark" aria-pressed="true"><i class="dot"></i>暗</button><button type="button" data-state="audit" aria-pressed="false"><i class="dot"></i>審視態</button></div>
+  </header>
+  <p class="blurb">SIEM forwarder 與目的地設定、測試送出，以及 DLQ 的搜尋、回放、匯出與清除。</p>
+  <div class="screen">
+    <div class="bezel"><i class="led"></i><span class="state">暗色主題 · 1440 寬全頁</span>
+      <a href="shots/system-siem--dark.png" target="_blank" rel="noopener">原尺寸開啟 ↗</a></div>
+    <div class="view"><img loading="lazy" src="shots/system-siem--dark.png" alt="轉發器 畫面截圖"></div>
+  </div>
+  <div class="thumbs"><button type="button" data-state="light" aria-pressed="false"><span class="crop"><img loading="lazy" src="shots/system-siem--light.png" alt="system-siem 亮 縮圖"></span><span>亮</span></button><button type="button" data-state="dark" aria-pressed="true"><span class="crop"><img loading="lazy" src="shots/system-siem--dark.png" alt="system-siem 暗 縮圖"></span><span>暗</span></button><button type="button" data-state="audit" aria-pressed="false"><span class="crop"><img loading="lazy" src="shots/system-siem--audit.png" alt="system-siem 審視態 縮圖"></span><span>審視態</span></button></div>
+  <div class="covs"><div><div class="grouphead">本頁功能錨點 · 4</div><div class="chips"><span class="chip "><b>SY-07</b>SIEM forwarder 設定</span><span class="chip "><b>SY-08</b>SIEM 目的地 CRUD+條件</span><span class="chip "><b>SY-09</b>SIEM 測試送出</span><span class="chip "><b>SY-10</b>DLQ 搜尋/分頁/回放/清除/匯出/檢視</span></div></div></div>
+</article><article class="route" id="r-system-tls" data-shot-light="shots/system-tls--light.png" data-label-light="亮色主題 · 1440 寬全頁" data-shot-dark="shots/system-tls--dark.png" data-label-dark="暗色主題 · 1440 寬全頁" data-shot-audit="shots/system-tls--audit.png" data-label-audit="審視態 · __openAllForAudit() 開啟 4 個面">
+  <header>
+    <h3>TLS / HTTPS</h3>
+    <code>#/system/tls</code>
+    <div class="seg" role="group" aria-label="system-tls 畫面狀態"><button type="button" data-state="light" aria-pressed="false"><i class="dot"></i>亮</button><button type="button" data-state="dark" aria-pressed="true"><i class="dot"></i>暗</button><button type="button" data-state="audit" aria-pressed="false"><i class="dot"></i>審視態</button></div>
+  </header>
+  <p class="blurb">TLS 憑證狀態、續期、CSR 產生與憑證匯入。</p>
+  <div class="screen">
+    <div class="bezel"><i class="led"></i><span class="state">暗色主題 · 1440 寬全頁</span>
+      <a href="shots/system-tls--dark.png" target="_blank" rel="noopener">原尺寸開啟 ↗</a></div>
+    <div class="view"><img loading="lazy" src="shots/system-tls--dark.png" alt="TLS / HTTPS 畫面截圖"></div>
+  </div>
+  <div class="thumbs"><button type="button" data-state="light" aria-pressed="false"><span class="crop"><img loading="lazy" src="shots/system-tls--light.png" alt="system-tls 亮 縮圖"></span><span>亮</span></button><button type="button" data-state="dark" aria-pressed="true"><span class="crop"><img loading="lazy" src="shots/system-tls--dark.png" alt="system-tls 暗 縮圖"></span><span>暗</span></button><button type="button" data-state="audit" aria-pressed="false"><span class="crop"><img loading="lazy" src="shots/system-tls--audit.png" alt="system-tls 審視態 縮圖"></span><span>審視態</span></button></div>
+  <div class="covs"><div><div class="grouphead">本頁功能錨點 · 1</div><div class="chips"><span class="chip "><b>SY-11</b>TLS 狀態/續期/CSR/匯入</span></div></div></div>
+</article><article class="route" id="r-system-security" data-shot-light="shots/system-security--light.png" data-label-light="亮色主題 · 1440 寬全頁" data-shot-dark="shots/system-security--dark.png" data-label-dark="暗色主題 · 1440 寬全頁" data-shot-audit="shots/system-security--audit.png" data-label-audit="審視態 · __openAllForAudit() 開啟 4 個面">
+  <header>
+    <h3>安全</h3>
+    <code>#/system/security</code>
+    <div class="seg" role="group" aria-label="system-security 畫面狀態"><button type="button" data-state="light" aria-pressed="false"><i class="dot"></i>亮</button><button type="button" data-state="dark" aria-pressed="true"><i class="dot"></i>暗</button><button type="button" data-state="audit" aria-pressed="false"><i class="dot"></i>審視態</button></div>
+  </header>
+  <p class="blurb">認證與 session 的安全設定，以及 GUI 停止。</p>
+  <div class="screen">
+    <div class="bezel"><i class="led"></i><span class="state">暗色主題 · 1440 寬全頁</span>
+      <a href="shots/system-security--dark.png" target="_blank" rel="noopener">原尺寸開啟 ↗</a></div>
+    <div class="view"><img loading="lazy" src="shots/system-security--dark.png" alt="安全 畫面截圖"></div>
+  </div>
+  <div class="thumbs"><button type="button" data-state="light" aria-pressed="false"><span class="crop"><img loading="lazy" src="shots/system-security--light.png" alt="system-security 亮 縮圖"></span><span>亮</span></button><button type="button" data-state="dark" aria-pressed="true"><span class="crop"><img loading="lazy" src="shots/system-security--dark.png" alt="system-security 暗 縮圖"></span><span>暗</span></button><button type="button" data-state="audit" aria-pressed="false"><span class="crop"><img loading="lazy" src="shots/system-security--audit.png" alt="system-security 審視態 縮圖"></span><span>審視態</span></button></div>
+  <div class="covs"><div><div class="grouphead">本頁功能錨點 · 2</div><div class="chips"><span class="chip "><b>SY-12</b>安全設定(認證/session)</span><span class="chip "><b>SY-16</b>GUI 停止</span></div></div></div>
+</article><article class="route" id="r-system-display" data-shot-light="shots/system-display--light.png" data-label-light="亮色主題 · 1440 寬全頁" data-shot-dark="shots/system-display--dark.png" data-label-dark="暗色主題 · 1440 寬全頁" data-shot-audit="shots/system-display--audit.png" data-label-audit="審視態 · __openAllForAudit() 開啟 3 個面">
+  <header>
+    <h3>介面與報表</h3>
+    <code>#/system/display</code>
+    <div class="seg" role="group" aria-label="system-display 畫面狀態"><button type="button" data-state="light" aria-pressed="false"><i class="dot"></i>亮</button><button type="button" data-state="dark" aria-pressed="true"><i class="dot"></i>暗</button><button type="button" data-state="audit" aria-pressed="false"><i class="dot"></i>審視態</button></div>
+  </header>
+  <p class="blurb">顯示偏好：主題、密度、時區、語言——每一項切換都立刻反映在整個介面上。</p>
+  <div class="screen">
+    <div class="bezel"><i class="led"></i><span class="state">暗色主題 · 1440 寬全頁</span>
+      <a href="shots/system-display--dark.png" target="_blank" rel="noopener">原尺寸開啟 ↗</a></div>
+    <div class="view"><img loading="lazy" src="shots/system-display--dark.png" alt="介面與報表 畫面截圖"></div>
+  </div>
+  <div class="thumbs"><button type="button" data-state="light" aria-pressed="false"><span class="crop"><img loading="lazy" src="shots/system-display--light.png" alt="system-display 亮 縮圖"></span><span>亮</span></button><button type="button" data-state="dark" aria-pressed="true"><span class="crop"><img loading="lazy" src="shots/system-display--dark.png" alt="system-display 暗 縮圖"></span><span>暗</span></button><button type="button" data-state="audit" aria-pressed="false"><span class="crop"><img loading="lazy" src="shots/system-display--audit.png" alt="system-display 審視態 縮圖"></span><span>審視態</span></button></div>
+  <div class="covs"><div><div class="grouphead">本頁功能錨點 · 1</div><div class="chips"><span class="chip "><b>SY-13</b>顯示偏好(主題/密度/時區/語言)</span></div></div><div><div class="grouphead">在此頁驗收的跨區元件 · 2</div><div class="chips"><span class="chip xc"><b>XC-05</b>亮暗主題+密度</span><span class="chip xc"><b>XC-06</b>時區+雙語</span></div></div></div>
+</article><article class="route" id="r-system-channels" data-shot-light="shots/system-channels--light.png" data-label-light="亮色主題 · 1440 寬全頁" data-shot-dark="shots/system-channels--dark.png" data-label-dark="暗色主題 · 1440 寬全頁" data-shot-audit="shots/system-channels--audit.png" data-label-audit="審視態 · __openAllForAudit() 開啟 3 個面">
+  <header>
+    <h3>通知通道</h3>
+    <code>#/system/channels</code>
+    <div class="seg" role="group" aria-label="system-channels 畫面狀態"><button type="button" data-state="light" aria-pressed="false"><i class="dot"></i>亮</button><button type="button" data-state="dark" aria-pressed="true"><i class="dot"></i>暗</button><button type="button" data-state="audit" aria-pressed="false"><i class="dot"></i>審視態</button></div>
+  </header>
+  <p class="blurb">五種告警管道的連線設定；憑證欄位一律遮罩後顯示。</p>
+  <div class="screen">
+    <div class="bezel"><i class="led"></i><span class="state">暗色主題 · 1440 寬全頁</span>
+      <a href="shots/system-channels--dark.png" target="_blank" rel="noopener">原尺寸開啟 ↗</a></div>
+    <div class="view"><img loading="lazy" src="shots/system-channels--dark.png" alt="通知通道 畫面截圖"></div>
+  </div>
+  <div class="thumbs"><button type="button" data-state="light" aria-pressed="false"><span class="crop"><img loading="lazy" src="shots/system-channels--light.png" alt="system-channels 亮 縮圖"></span><span>亮</span></button><button type="button" data-state="dark" aria-pressed="true"><span class="crop"><img loading="lazy" src="shots/system-channels--dark.png" alt="system-channels 暗 縮圖"></span><span>暗</span></button><button type="button" data-state="audit" aria-pressed="false"><span class="crop"><img loading="lazy" src="shots/system-channels--audit.png" alt="system-channels 審視態 縮圖"></span><span>審視態</span></button></div>
+  <div class="covs"><div><div class="grouphead">本頁功能錨點 · 1</div><div class="chips"><span class="chip "><b>SY-14</b>告警管道連線設定(5 插件)</span></div></div></div>
+</article><article class="route" id="r-system-logs" data-shot-light="shots/system-logs--light.png" data-label-light="亮色主題 · 1440 寬全頁" data-shot-dark="shots/system-logs--dark.png" data-label-dark="暗色主題 · 1440 寬全頁" data-shot-audit="shots/system-logs--audit.png" data-label-audit="審視態 · __openAllForAudit() 開啟 4 個面">
+  <header>
+    <h3>模組日誌</h3>
+    <code>#/system/logs</code>
+    <div class="seg" role="group" aria-label="system-logs 畫面狀態"><button type="button" data-state="light" aria-pressed="false"><i class="dot"></i>亮</button><button type="button" data-state="dark" aria-pressed="true"><i class="dot"></i>暗</button><button type="button" data-state="audit" aria-pressed="false"><i class="dot"></i>審視態</button></div>
+  </header>
+  <p class="blurb">模組日誌檢視器：挑模組、篩層級、看尾端輸出。</p>
+  <div class="screen">
+    <div class="bezel"><i class="led"></i><span class="state">暗色主題 · 1440 寬全頁</span>
+      <a href="shots/system-logs--dark.png" target="_blank" rel="noopener">原尺寸開啟 ↗</a></div>
+    <div class="view"><img loading="lazy" src="shots/system-logs--dark.png" alt="模組日誌 畫面截圖"></div>
+  </div>
+  <div class="thumbs"><button type="button" data-state="light" aria-pressed="false"><span class="crop"><img loading="lazy" src="shots/system-logs--light.png" alt="system-logs 亮 縮圖"></span><span>亮</span></button><button type="button" data-state="dark" aria-pressed="true"><span class="crop"><img loading="lazy" src="shots/system-logs--dark.png" alt="system-logs 暗 縮圖"></span><span>暗</span></button><button type="button" data-state="audit" aria-pressed="false"><span class="crop"><img loading="lazy" src="shots/system-logs--audit.png" alt="system-logs 審視態 縮圖"></span><span>審視態</span></button></div>
+  <div class="covs"><div><div class="grouphead">本頁功能錨點 · 1</div><div class="chips"><span class="chip "><b>SY-15</b>模組日誌檢視器</span></div></div></div>
+</article>
+</section><section class="area" id="a-login">
+  <div class="area-head"><h2>登入</h2><span class="slug">login</span><p>進門與出門。</p></div>
+  <article class="route" id="r-login" data-shot-light="shots/login--light.png" data-label-light="亮色主題 · 1440 寬全頁" data-shot-dark="shots/login--dark.png" data-label-dark="暗色主題 · 1440 寬全頁" data-shot-audit="shots/login--audit.png" data-label-audit="審視態 · __openAllForAudit() 開啟 3 個面">
+  <header>
+    <h3>登入表單本身：帳號、密碼、錯誤訊息。</h3>
+    <code>login.html</code>
+    <div class="seg" role="group" aria-label="login 畫面狀態"><button type="button" data-state="light" aria-pressed="false"><i class="dot"></i>亮</button><button type="button" data-state="dark" aria-pressed="true"><i class="dot"></i>暗</button><button type="button" data-state="audit" aria-pressed="false"><i class="dot"></i>審視態</button></div>
+  </header>
+  <p class="blurb">登入表單本身：帳號、密碼、錯誤訊息。</p>
+  <div class="screen">
+    <div class="bezel"><i class="led"></i><span class="state">暗色主題 · 1440 寬全頁</span>
+      <a href="shots/login--dark.png" target="_blank" rel="noopener">原尺寸開啟 ↗</a></div>
+    <div class="view"><img loading="lazy" src="shots/login--dark.png" alt="登入表單本身：帳號、密碼、錯誤訊息。 畫面截圖"></div>
+  </div>
+  <div class="thumbs"><button type="button" data-state="light" aria-pressed="false"><span class="crop"><img loading="lazy" src="shots/login--light.png" alt="login 亮 縮圖"></span><span>亮</span></button><button type="button" data-state="dark" aria-pressed="true"><span class="crop"><img loading="lazy" src="shots/login--dark.png" alt="login 暗 縮圖"></span><span>暗</span></button><button type="button" data-state="audit" aria-pressed="false"><span class="crop"><img loading="lazy" src="shots/login--audit.png" alt="login 審視態 縮圖"></span><span>審視態</span></button></div>
+  <div class="covs"><div><div class="grouphead">本頁功能錨點 · 3</div><div class="chips"><span class="chip "><b>LG-01</b>登入表單</span><span class="chip "><b>LG-02</b>首次登入改密碼</span><span class="chip "><b>LG-03</b>登出</span></div></div></div>
+</article><article class="route" id="r-login-first-login" data-shot-light="shots/login-first-login--light.png" data-label-light="亮色主題 · 1440 寬全頁" data-shot-dark="shots/login-first-login--dark.png" data-label-dark="暗色主題 · 1440 寬全頁" data-shot-audit="shots/login-first-login--audit.png" data-label-audit="審視態 · __openAllForAudit() 開啟 3 個面">
+  <header>
+    <h3>首次登入強制改密碼的分支，含密碼規則檢核。 · first-login</h3>
+    <code>login.html?demo=first-login</code>
+    <div class="seg" role="group" aria-label="login-first-login 畫面狀態"><button type="button" data-state="light" aria-pressed="false"><i class="dot"></i>亮</button><button type="button" data-state="dark" aria-pressed="true"><i class="dot"></i>暗</button><button type="button" data-state="audit" aria-pressed="false"><i class="dot"></i>審視態</button></div>
+  </header>
+  <p class="blurb">首次登入強制改密碼的分支，含密碼規則檢核。</p>
+  <div class="screen">
+    <div class="bezel"><i class="led"></i><span class="state">暗色主題 · 1440 寬全頁</span>
+      <a href="shots/login-first-login--dark.png" target="_blank" rel="noopener">原尺寸開啟 ↗</a></div>
+    <div class="view"><img loading="lazy" src="shots/login-first-login--dark.png" alt="首次登入強制改密碼的分支，含密碼規則檢核。 · first-login 畫面截圖"></div>
+  </div>
+  <div class="thumbs"><button type="button" data-state="light" aria-pressed="false"><span class="crop"><img loading="lazy" src="shots/login-first-login--light.png" alt="login-first-login 亮 縮圖"></span><span>亮</span></button><button type="button" data-state="dark" aria-pressed="true"><span class="crop"><img loading="lazy" src="shots/login-first-login--dark.png" alt="login-first-login 暗 縮圖"></span><span>暗</span></button><button type="button" data-state="audit" aria-pressed="false"><span class="crop"><img loading="lazy" src="shots/login-first-login--audit.png" alt="login-first-login 審視態 縮圖"></span><span>審視態</span></button></div>
+  <div class="covs"><div><div class="grouphead">本頁功能錨點 · 3</div><div class="chips"><span class="chip "><b>LG-01</b>登入表單</span><span class="chip "><b>LG-02</b>首次登入改密碼</span><span class="chip "><b>LG-03</b>登出</span></div></div></div>
+</article><article class="route" id="r-login-signed-out" data-shot-light="shots/login-signed-out--light.png" data-label-light="亮色主題 · 1440 寬全頁" data-shot-dark="shots/login-signed-out--dark.png" data-label-dark="暗色主題 · 1440 寬全頁" data-shot-audit="shots/login-signed-out--audit.png" data-label-audit="審視態 · __openAllForAudit() 開啟 3 個面">
+  <header>
+    <h3>登出後回到登入頁的狀態，會說明你是被登出的還是自己離開的。 · signed-out</h3>
+    <code>login.html?demo=signed-out</code>
+    <div class="seg" role="group" aria-label="login-signed-out 畫面狀態"><button type="button" data-state="light" aria-pressed="false"><i class="dot"></i>亮</button><button type="button" data-state="dark" aria-pressed="true"><i class="dot"></i>暗</button><button type="button" data-state="audit" aria-pressed="false"><i class="dot"></i>審視態</button></div>
+  </header>
+  <p class="blurb">登出後回到登入頁的狀態，會說明你是被登出的還是自己離開的。</p>
+  <div class="screen">
+    <div class="bezel"><i class="led"></i><span class="state">暗色主題 · 1440 寬全頁</span>
+      <a href="shots/login-signed-out--dark.png" target="_blank" rel="noopener">原尺寸開啟 ↗</a></div>
+    <div class="view"><img loading="lazy" src="shots/login-signed-out--dark.png" alt="登出後回到登入頁的狀態，會說明你是被登出的還是自己離開的。 · signed-out 畫面截圖"></div>
+  </div>
+  <div class="thumbs"><button type="button" data-state="light" aria-pressed="false"><span class="crop"><img loading="lazy" src="shots/login-signed-out--light.png" alt="login-signed-out 亮 縮圖"></span><span>亮</span></button><button type="button" data-state="dark" aria-pressed="true"><span class="crop"><img loading="lazy" src="shots/login-signed-out--dark.png" alt="login-signed-out 暗 縮圖"></span><span>暗</span></button><button type="button" data-state="audit" aria-pressed="false"><span class="crop"><img loading="lazy" src="shots/login-signed-out--audit.png" alt="login-signed-out 審視態 縮圖"></span><span>審視態</span></button></div>
+  <div class="covs"><div><div class="grouphead">本頁功能錨點 · 3</div><div class="chips"><span class="chip "><b>LG-01</b>登入表單</span><span class="chip "><b>LG-02</b>首次登入改密碼</span><span class="chip "><b>LG-03</b>登出</span></div></div></div>
+</article>
+</section>
+
+<section class="limits" id="limits">
+  <h2>已知侷限</h2>
+  <ul>
+    <li><strong>這是快照驅動的靜態樣本，不是可用系統。</strong>畫面上的每一個數字都來自
+      <code>design/v2/snapshots/</code> 裡真機錄下的 API 回應，所以看起來是真的——但它不會重新查詢。</li>
+    <li><strong>寫入類操作不會真的執行。</strong>儲存、刪除、隔離、送出測試、重置水位這些動作，
+      抽屜與確認框照常開，影響摘要照常算，但按下去只會顯示一句誠實說明：這是樣本，不會動到任何東西。</li>
+    <li><strong>審視態是為了驗收，不是真實畫面。</strong>它呼叫 <code>window.__openAllForAudit()</code>
+      把該路由所有抽屜、彈窗、popover 一次打開，好讓藏在互動後的功能錨點被看見；
+      實際使用時這些面不會同時出現，堆疊與遮擋屬正常現象。指令面板與使用者選單是全域面，
+      只留在總覽的審視態裡（XC-02／XC-13 也掛在總覽），其餘各頁把版面讓回給該頁自己的抽屜。
+      另外，抽屜是固定定位的，長截圖裡它只覆蓋第一個視窗高度，下方頁面照常延伸——這是全頁截圖的性質，不是破圖。
+      同理，設定頁那條固定在畫面底部的儲存列，截圖時改用它在流內的佔位位置畫（<code>.savedock</code> 本來就在那裡預留了高度），
+      否則它會橫切在長截圖中央。</li>
+    <li><strong>守門測試就是這份樣本的驗收依據。</strong>三個「翻車點」各有一族測試盯著：
+      告警規則欄位（<code>test_alert_rule_fields.py</code>）、FilterBar 語意
+      （<code>test_filterbar_semantics.py</code>）、規則排程模型
+      （<code>test_rule_scheduler_model.py</code>）——這三處是設計最容易失真的地方。</li>
+    <li><strong>覆蓋與資料來源另有兩道機械閘。</strong><code>gate_coverage.py</code> 實際開瀏覽器走完每條路由，
+      比對 DOM 裡的 <code>data-cov</code> 錨點與清單，少一個就不給過；
+      <code>lint_no_inline_data.py</code> 禁止在 mockup 裡手寫假資料，逼所有畫面都吃快照。</li>
+    <li><strong>還沒做的：</strong>行動裝置寬度、完整鍵盤操作流程、真實 API 的錯誤與延遲時序、
+      以及英文介面的實際排版。這些留到 Phase 2 逐區改 <code>src/</code> 時處理。</li>
+    <li><strong>快照與截圖中的通知收件人與寄件設定（email／LINE／SMTP 帳號與主機）已遮罩為
+      <code>***MASKED***</code>。</strong>這是抓取端（<code>design/v2/tools/masking.py</code>）的個資（PII）
+      遮罩，跟機密欄位遮罩走同一條 pipeline 但屬不同類別——收件人與寄件位址本身不是憑證，
+      只是不該外流的真實聯絡方式。系統／告警管道頁的 SMTP 欄位因此顯示為遮罩值，不是空值。</li>
+    <li><strong>標了「驗證面板」的區塊不會出現在實作裡。</strong>抽屜與設定頁底部那些印出
+      request body／送出參數的面板，是為了讓審閱者對照「畫面收了什麼、後端會收到什麼」而加的
+      驗證裝置；它們是樣本，Phase 2 改 <code>src/</code> 時不會做進產品介面。</li>
+    <li><strong>健康列只在總覽出現。</strong>五盞燈原本常駐頂欄下方，Gate 2 依使用者裁決改成
+      總覽專屬（spec §1.1）；其餘各區的頂欄只有導覽列。健康資料仍然餵給總覽的卡片。</li>
+  </ul>
+</section>
+
+<footer class="doc">
+  <span>illumio-ops · design/v2</span>
+  <span>產出：<code>python3 design/v2/tools/tour.py</code></span>
+  <span>2026-08-05 01:45</span>
+</footer>
+</div>
+<script>
+// 每個路由段自己記住現在看的是哪一態；頂欄的全域切換一次改全部。
+(function () {
+  // HTML 屬性名一律小寫，所以 dataset 的鍵是 shotLight / labelLight（data-shot-light）。
+  function shotOf(sec, state) {
+    return { light: sec.dataset.shotLight, dark: sec.dataset.shotDark, audit: sec.dataset.shotAudit }[state];
+  }
+  function labelOf(sec, state) {
+    return { light: sec.dataset.labelLight, dark: sec.dataset.labelDark, audit: sec.dataset.labelAudit }[state];
+  }
+
+  function apply(sec, state) {
+    var img = sec.querySelector(".view img");
+    var label = sec.querySelector(".bezel .state");
+    var full = sec.querySelector(".bezel a");
+    var src = shotOf(sec, state);
+    if (!src) return;
+    img.src = src;
+    label.textContent = labelOf(sec, state);
+    full.href = src;
+    sec.querySelectorAll("[data-state]").forEach(function (b) {
+      b.setAttribute("aria-pressed", b.dataset.state === state ? "true" : "false");
+    });
+    sec.querySelector(".view").scrollTop = 0;
+  }
+
+  document.querySelectorAll(".route").forEach(function (sec) {
+    sec.querySelectorAll("[data-state]").forEach(function (b) {
+      b.addEventListener("click", function () { apply(sec, b.dataset.state); });
+    });
+  });
+
+  document.querySelectorAll("[data-all-state]").forEach(function (b) {
+    b.addEventListener("click", function () {
+      document.querySelectorAll("[data-all-state]").forEach(function (o) {
+        o.setAttribute("aria-pressed", o === b ? "true" : "false");
+      });
+      document.querySelectorAll(".route").forEach(function (sec) { apply(sec, b.dataset.allState); });
+    });
+  });
+
+  var root = document.documentElement;
+  var toggle = document.getElementById("doctheme");
+  if (toggle) {
+    toggle.addEventListener("click", function () {
+      var next = root.dataset.doc === "light" ? "dark" : "light";
+      root.dataset.doc = next;
+      toggle.textContent = next === "light" ? "本頁：亮" : "本頁：暗";
+    });
+  }
+})();
+</script>
+</body>
+</html>

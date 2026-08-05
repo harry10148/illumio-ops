@@ -1,0 +1,5 @@
+{
+ "dispatch_tick_seconds": 5,
+ "dlq_max_per_dest": 10000,
+ "enabled": true
+}

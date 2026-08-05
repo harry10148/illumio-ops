@@ -1,0 +1,249 @@
+{
+ "plugins": {
+  "line": {
+   "description": "將精簡的告警內容傳送至 LINE 使用者、聊天室或群組。",
+   "display_name": "LINE Messaging API",
+   "fields": [
+    {
+     "config_path": [
+      "alerts",
+      "line_channel_access_token"
+     ],
+     "help": "",
+     "input_type": "text",
+     "key": "alerts.line_channel_access_token",
+     "label": "Channel Access Token",
+     "list_delimiter": ",",
+     "placeholder": "",
+     "required": true,
+     "secret": true,
+     "value_type": "string"
+    },
+    {
+     "config_path": [
+      "alerts",
+      "line_target_id"
+     ],
+     "help": "",
+     "input_type": "text",
+     "key": "alerts.line_target_id",
+     "label": "目標 ID",
+     "list_delimiter": ",",
+     "placeholder": "Uxxxxxxxx",
+     "required": true,
+     "secret": false,
+     "value_type": "string"
+    }
+   ],
+   "name": "line"
+  },
+  "mail": {
+   "description": "以 HTML Email 寄送廠商對齊格式的告警內容。",
+   "display_name": "Email（SMTP）",
+   "fields": [
+    {
+     "config_path": [
+      "email",
+      "sender"
+     ],
+     "help": "",
+     "input_type": "text",
+     "key": "sender",
+     "label": "寄件者",
+     "list_delimiter": ",",
+     "placeholder": "monitor@example.com",
+     "required": true,
+     "secret": false,
+     "value_type": "string"
+    },
+    {
+     "config_path": [
+      "email",
+      "recipients"
+     ],
+     "help": "",
+     "input_type": "list",
+     "key": "recipients",
+     "label": "收件者",
+     "list_delimiter": ",",
+     "placeholder": "ops@example.com, soc@example.com",
+     "required": true,
+     "secret": false,
+     "value_type": "string_list"
+    },
+    {
+     "config_path": [
+      "smtp",
+      "host"
+     ],
+     "help": "",
+     "input_type": "text",
+     "key": "smtp.host",
+     "label": "SMTP 主機",
+     "list_delimiter": ",",
+     "placeholder": "smtp.example.com",
+     "required": true,
+     "secret": false,
+     "value_type": "string"
+    },
+    {
+     "config_path": [
+      "smtp",
+      "port"
+     ],
+     "help": "",
+     "input_type": "number",
+     "key": "smtp.port",
+     "label": "SMTP Port",
+     "list_delimiter": ",",
+     "placeholder": "587",
+     "required": true,
+     "secret": false,
+     "value_type": "integer"
+    },
+    {
+     "config_path": [
+      "smtp",
+      "user"
+     ],
+     "help": "",
+     "input_type": "text",
+     "key": "smtp.user",
+     "label": "SMTP 使用者名稱",
+     "list_delimiter": ",",
+     "placeholder": "",
+     "required": false,
+     "secret": false,
+     "value_type": "string"
+    },
+    {
+     "config_path": [
+      "smtp",
+      "password"
+     ],
+     "help": "",
+     "input_type": "text",
+     "key": "smtp.password",
+     "label": "SMTP 密碼",
+     "list_delimiter": ",",
+     "placeholder": "",
+     "required": false,
+     "secret": true,
+     "value_type": "string"
+    },
+    {
+     "config_path": [
+      "smtp",
+      "enable_tls"
+     ],
+     "help": "寄送郵件前啟用 STARTTLS。",
+     "input_type": "checkbox",
+     "key": "smtp.enable_tls",
+     "label": "STARTTLS",
+     "list_delimiter": ",",
+     "placeholder": "",
+     "required": false,
+     "secret": false,
+     "value_type": "boolean"
+    },
+    {
+     "config_path": [
+      "smtp",
+      "enable_auth"
+     ],
+     "help": "以使用者名稱／密碼向 SMTP 伺服器認證。",
+     "input_type": "checkbox",
+     "key": "smtp.enable_auth",
+     "label": "SMTP 認證",
+     "list_delimiter": ",",
+     "placeholder": "",
+     "required": false,
+     "secret": false,
+     "value_type": "boolean"
+    }
+   ],
+   "name": "mail"
+  },
+  "teams": {
+   "description": "透過 Power Automate Workflow webhook 將 Adaptive Card 張貼到 Teams 頻道。",
+   "display_name": "Microsoft Teams",
+   "fields": [
+    {
+     "config_path": [
+      "alerts",
+      "teams_webhook_url"
+     ],
+     "help": "",
+     "input_type": "text",
+     "key": "alerts.teams_webhook_url",
+     "label": "Workflow Webhook URL",
+     "list_delimiter": ",",
+     "placeholder": "https://prod-XX.logic.azure.com:443/workflows/.../triggers/manual/paths/invoke?...",
+     "required": true,
+     "secret": true,
+     "value_type": "string"
+    }
+   ],
+   "name": "teams"
+  },
+  "telegram": {
+   "description": "將精煉後的警示推送至 Telegram Bot 對話。",
+   "display_name": "Telegram Bot",
+   "fields": [
+    {
+     "config_path": [
+      "alerts",
+      "telegram_bot_token"
+     ],
+     "help": "",
+     "input_type": "text",
+     "key": "alerts.telegram_bot_token",
+     "label": "Bot Token",
+     "list_delimiter": ",",
+     "placeholder": "123456789:AAExxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+     "required": true,
+     "secret": true,
+     "value_type": "string"
+    },
+    {
+     "config_path": [
+      "alerts",
+      "telegram_chat_id"
+     ],
+     "help": "",
+     "input_type": "text",
+     "key": "alerts.telegram_chat_id",
+     "label": "Chat ID",
+     "list_delimiter": ",",
+     "placeholder": "-1001234567890 or 1284061527",
+     "required": true,
+     "secret": false,
+     "value_type": "string"
+    }
+   ],
+   "name": "telegram"
+  },
+  "webhook": {
+   "description": "以 POST 將標準格式的告警內容送至 HTTP 端點。",
+   "display_name": "Webhook",
+   "fields": [
+    {
+     "config_path": [
+      "alerts",
+      "webhook_url"
+     ],
+     "help": "",
+     "input_type": "text",
+     "key": "alerts.webhook_url",
+     "label": "Webhook URL",
+     "list_delimiter": ",",
+     "placeholder": "https://hooks.example.com/events",
+     "required": true,
+     "secret": false,
+     "value_type": "string"
+    }
+   ],
+   "name": "webhook"
+  }
+ }
+}

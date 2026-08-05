@@ -1,0 +1,2170 @@
+{
+ "alert_channels": [
+  {
+   "configured": true,
+   "description": "以 HTML Email 寄送廠商對齊格式的告警內容。",
+   "display_name": "Email（SMTP）",
+   "enabled": true,
+   "last_error": "",
+   "last_status": "success",
+   "last_target": "***MASKED***",
+   "last_timestamp": "2026-08-04T13:21:33Z",
+   "missing_required": [],
+   "name": "mail"
+  },
+  {
+   "configured": true,
+   "description": "將精簡的告警內容傳送至 LINE 使用者、聊天室或群組。",
+   "display_name": "LINE Messaging API",
+   "enabled": true,
+   "last_error": "",
+   "last_status": "success",
+   "last_target": "***MASKED***",
+   "last_timestamp": "2026-08-04T13:21:33Z",
+   "missing_required": [],
+   "name": "line"
+  },
+  {
+   "configured": false,
+   "description": "以 POST 將標準格式的告警內容送至 HTTP 端點。",
+   "display_name": "Webhook",
+   "enabled": false,
+   "last_error": "",
+   "last_status": "",
+   "last_target": "***MASKED***",
+   "last_timestamp": "",
+   "missing_required": [
+    "alerts.webhook_url"
+   ],
+   "name": "webhook"
+  },
+  {
+   "configured": false,
+   "description": "將精煉後的警示推送至 Telegram Bot 對話。",
+   "display_name": "Telegram Bot",
+   "enabled": false,
+   "last_error": "",
+   "last_status": "",
+   "last_target": "***MASKED***",
+   "last_timestamp": "",
+   "missing_required": [
+    "alerts.telegram_bot_token",
+    "alerts.telegram_chat_id"
+   ],
+   "name": "telegram"
+  },
+  {
+   "configured": false,
+   "description": "透過 Power Automate Workflow webhook 將 Adaptive Card 張貼到 Teams 頻道。",
+   "display_name": "Microsoft Teams",
+   "enabled": false,
+   "last_error": "",
+   "last_status": "",
+   "last_target": "***MASKED***",
+   "last_timestamp": "",
+   "missing_required": [
+    "alerts.teams_webhook_url"
+   ],
+   "name": "teams"
+  }
+ ],
+ "api_url": "https://pce.lab.local:8443",
+ "cooldowns": [
+  {
+   "id": 18,
+   "name": "Agent 遭竄改",
+   "remaining_mins": 0
+  },
+  {
+   "id": 19,
+   "name": "Agent 已暫停",
+   "remaining_mins": 0
+  },
+  {
+   "id": 20,
+   "name": "偵測到 Agent 複製",
+   "remaining_mins": 0
+  },
+  {
+   "id": 21,
+   "name": "Agent 心跳遺失",
+   "remaining_mins": 0
+  },
+  {
+   "id": 22,
+   "name": "Agent 離線",
+   "remaining_mins": 0
+  },
+  {
+   "id": 23,
+   "name": "已找回 Lost Agent",
+   "remaining_mins": 0
+  },
+  {
+   "id": 24,
+   "name": "登入失敗",
+   "remaining_mins": 0
+  },
+  {
+   "id": 25,
+   "name": "API 驗證失敗",
+   "remaining_mins": 0
+  },
+  {
+   "id": 26,
+   "name": "Policy 更新失敗",
+   "remaining_mins": 0
+  },
+  {
+   "id": 27,
+   "name": "Rule Set 變更",
+   "remaining_mins": 0
+  },
+  {
+   "id": 28,
+   "name": "Security Policy 已佈署",
+   "remaining_mins": 0
+  },
+  {
+   "id": 29,
+   "name": "API 授權失敗",
+   "remaining_mins": 0
+  },
+  {
+   "id": 30,
+   "name": "API 金鑰新增 / 刪除",
+   "remaining_mins": 0
+  },
+  {
+   "id": 31,
+   "name": "安全規則變更",
+   "remaining_mins": 0
+  },
+  {
+   "id": 32,
+   "name": "批次 Workload 取消配對",
+   "remaining_mins": 0
+  },
+  {
+   "id": 33,
+   "name": "驗證設定變更",
+   "remaining_mins": 0
+  },
+  {
+   "id": 34,
+   "name": "高 Blocked 流量",
+   "remaining_mins": 0
+  },
+  {
+   "id": "6aa5c0369d694a7d96408d6e7ed206ef",
+   "name": "Design-v2 sample: PCE health",
+   "remaining_mins": 0
+  },
+  {
+   "id": "68d21d1ab31d49949caab9edaf141675",
+   "name": "Design-v2 sample: bandwidth",
+   "remaining_mins": 0
+  }
+ ],
+ "dispatch_history": [
+  {
+   "channel": "line",
+   "counts": {
+    "events": 0,
+    "health": 1,
+    "metrics": 0,
+    "traffic": 0
+   },
+   "error": "",
+   "force_test": false,
+   "status": "success",
+   "subject": "[INFO] 流量聚合基準不符：警示",
+   "target": "***MASKED***",
+   "timestamp": "2026-08-03T20:21:03Z"
+  },
+  {
+   "channel": "mail",
+   "counts": {
+    "events": 0,
+    "health": 1,
+    "metrics": 0,
+    "traffic": 0
+   },
+   "error": "",
+   "force_test": false,
+   "status": "success",
+   "subject": "[INFO] 流量聚合基準不符：警示",
+   "target": "***MASKED***",
+   "timestamp": "2026-08-03T20:21:03Z"
+  },
+  {
+   "channel": "line",
+   "counts": {
+    "events": 0,
+    "health": 1,
+    "metrics": 0,
+    "traffic": 0
+   },
+   "error": "",
+   "force_test": false,
+   "status": "success",
+   "subject": "[INFO] 流量聚合基準不符：警示",
+   "target": "***MASKED***",
+   "timestamp": "2026-08-03T21:21:02Z"
+  },
+  {
+   "channel": "mail",
+   "counts": {
+    "events": 0,
+    "health": 1,
+    "metrics": 0,
+    "traffic": 0
+   },
+   "error": "",
+   "force_test": false,
+   "status": "success",
+   "subject": "[INFO] 流量聚合基準不符：警示",
+   "target": "***MASKED***",
+   "timestamp": "2026-08-03T21:21:02Z"
+  },
+  {
+   "channel": "line",
+   "counts": {
+    "events": 1,
+    "health": 0,
+    "metrics": 0,
+    "traffic": 0
+   },
+   "error": "",
+   "force_test": false,
+   "status": "success",
+   "subject": "[WARNING] Agent 遭竄改：podman | 172.16.15.170",
+   "target": "***MASKED***",
+   "timestamp": "2026-08-03T22:04:33Z"
+  },
+  {
+   "channel": "mail",
+   "counts": {
+    "events": 1,
+    "health": 0,
+    "metrics": 0,
+    "traffic": 0
+   },
+   "error": "",
+   "force_test": false,
+   "status": "success",
+   "subject": "[WARNING] Agent 遭竄改：podman | 172.16.15.170",
+   "target": "***MASKED***",
+   "timestamp": "2026-08-03T22:04:33Z"
+  },
+  {
+   "channel": "line",
+   "counts": {
+    "events": 0,
+    "health": 1,
+    "metrics": 0,
+    "traffic": 0
+   },
+   "error": "",
+   "force_test": false,
+   "status": "success",
+   "subject": "[INFO] 流量聚合基準不符：警示",
+   "target": "***MASKED***",
+   "timestamp": "2026-08-03T22:21:03Z"
+  },
+  {
+   "channel": "mail",
+   "counts": {
+    "events": 0,
+    "health": 1,
+    "metrics": 0,
+    "traffic": 0
+   },
+   "error": "",
+   "force_test": false,
+   "status": "success",
+   "subject": "[INFO] 流量聚合基準不符：警示",
+   "target": "***MASKED***",
+   "timestamp": "2026-08-03T22:21:03Z"
+  },
+  {
+   "channel": "line",
+   "counts": {
+    "events": 0,
+    "health": 1,
+    "metrics": 0,
+    "traffic": 0
+   },
+   "error": "",
+   "force_test": false,
+   "status": "success",
+   "subject": "[INFO] 流量聚合基準不符：警示",
+   "target": "***MASKED***",
+   "timestamp": "2026-08-03T23:21:03Z"
+  },
+  {
+   "channel": "mail",
+   "counts": {
+    "events": 0,
+    "health": 1,
+    "metrics": 0,
+    "traffic": 0
+   },
+   "error": "",
+   "force_test": false,
+   "status": "success",
+   "subject": "[INFO] 流量聚合基準不符：警示",
+   "target": "***MASKED***",
+   "timestamp": "2026-08-03T23:21:03Z"
+  },
+  {
+   "channel": "line",
+   "counts": {
+    "events": 0,
+    "health": 1,
+    "metrics": 0,
+    "traffic": 0
+   },
+   "error": "",
+   "force_test": false,
+   "status": "success",
+   "subject": "[INFO] Design-v2 sample: PCE health：警示",
+   "target": "***MASKED***",
+   "timestamp": "2026-08-04T00:03:03Z"
+  },
+  {
+   "channel": "mail",
+   "counts": {
+    "events": 0,
+    "health": 1,
+    "metrics": 0,
+    "traffic": 0
+   },
+   "error": "",
+   "force_test": false,
+   "status": "success",
+   "subject": "[INFO] Design-v2 sample: PCE health：警示",
+   "target": "***MASKED***",
+   "timestamp": "2026-08-04T00:03:03Z"
+  },
+  {
+   "channel": "line",
+   "counts": {
+    "events": 0,
+    "health": 1,
+    "metrics": 0,
+    "traffic": 0
+   },
+   "error": "",
+   "force_test": false,
+   "status": "success",
+   "subject": "[INFO] 流量聚合基準不符：警示",
+   "target": "***MASKED***",
+   "timestamp": "2026-08-04T00:21:03Z"
+  },
+  {
+   "channel": "mail",
+   "counts": {
+    "events": 0,
+    "health": 1,
+    "metrics": 0,
+    "traffic": 0
+   },
+   "error": "",
+   "force_test": false,
+   "status": "success",
+   "subject": "[INFO] 流量聚合基準不符：警示",
+   "target": "***MASKED***",
+   "timestamp": "2026-08-04T00:21:03Z"
+  },
+  {
+   "channel": "line",
+   "counts": {
+    "events": 0,
+    "health": 1,
+    "metrics": 0,
+    "traffic": 0
+   },
+   "error": "",
+   "force_test": false,
+   "status": "success",
+   "subject": "[INFO] 流量聚合基準不符：警示",
+   "target": "***MASKED***",
+   "timestamp": "2026-08-04T01:21:02Z"
+  },
+  {
+   "channel": "mail",
+   "counts": {
+    "events": 0,
+    "health": 1,
+    "metrics": 0,
+    "traffic": 0
+   },
+   "error": "",
+   "force_test": false,
+   "status": "success",
+   "subject": "[INFO] 流量聚合基準不符：警示",
+   "target": "***MASKED***",
+   "timestamp": "2026-08-04T01:21:02Z"
+  },
+  {
+   "channel": "line",
+   "counts": {
+    "events": 1,
+    "health": 0,
+    "metrics": 0,
+    "traffic": 0
+   },
+   "error": "",
+   "force_test": false,
+   "status": "success",
+   "subject": "[INFO] Security Policy 已佈署：admin@lab.local | 192.168.20.32",
+   "target": "***MASKED***",
+   "timestamp": "2026-08-04T02:19:32Z"
+  },
+  {
+   "channel": "mail",
+   "counts": {
+    "events": 1,
+    "health": 0,
+    "metrics": 0,
+    "traffic": 0
+   },
+   "error": "",
+   "force_test": false,
+   "status": "success",
+   "subject": "[INFO] Security Policy 已佈署：admin@lab.local | 192.168.20.32",
+   "target": "***MASKED***",
+   "timestamp": "2026-08-04T02:19:32Z"
+  },
+  {
+   "channel": "line",
+   "counts": {
+    "events": 0,
+    "health": 1,
+    "metrics": 0,
+    "traffic": 0
+   },
+   "error": "",
+   "force_test": false,
+   "status": "success",
+   "subject": "[INFO] 流量聚合基準不符：警示",
+   "target": "***MASKED***",
+   "timestamp": "2026-08-04T02:21:02Z"
+  },
+  {
+   "channel": "mail",
+   "counts": {
+    "events": 0,
+    "health": 1,
+    "metrics": 0,
+    "traffic": 0
+   },
+   "error": "",
+   "force_test": false,
+   "status": "success",
+   "subject": "[INFO] 流量聚合基準不符：警示",
+   "target": "***MASKED***",
+   "timestamp": "2026-08-04T02:21:02Z"
+  },
+  {
+   "channel": "line",
+   "counts": {
+    "events": 1,
+    "health": 0,
+    "metrics": 0,
+    "traffic": 0
+   },
+   "error": "",
+   "force_test": false,
+   "status": "success",
+   "subject": "[INFO] Rule Set 變更：admin@lab.local | 192.168.20.32",
+   "target": "***MASKED***",
+   "timestamp": "2026-08-04T02:24:32Z"
+  },
+  {
+   "channel": "mail",
+   "counts": {
+    "events": 1,
+    "health": 0,
+    "metrics": 0,
+    "traffic": 0
+   },
+   "error": "",
+   "force_test": false,
+   "status": "success",
+   "subject": "[INFO] Rule Set 變更：admin@lab.local | 192.168.20.32",
+   "target": "***MASKED***",
+   "timestamp": "2026-08-04T02:24:32Z"
+  },
+  {
+   "channel": "line",
+   "counts": {
+    "events": 0,
+    "health": 1,
+    "metrics": 0,
+    "traffic": 0
+   },
+   "error": "",
+   "force_test": false,
+   "status": "success",
+   "subject": "[INFO] 流量聚合基準不符：警示",
+   "target": "***MASKED***",
+   "timestamp": "2026-08-04T03:21:02Z"
+  },
+  {
+   "channel": "mail",
+   "counts": {
+    "events": 0,
+    "health": 1,
+    "metrics": 0,
+    "traffic": 0
+   },
+   "error": "",
+   "force_test": false,
+   "status": "success",
+   "subject": "[INFO] 流量聚合基準不符：警示",
+   "target": "***MASKED***",
+   "timestamp": "2026-08-04T03:21:02Z"
+  },
+  {
+   "channel": "line",
+   "counts": {
+    "events": 0,
+    "health": 1,
+    "metrics": 0,
+    "traffic": 0
+   },
+   "error": "",
+   "force_test": false,
+   "status": "success",
+   "subject": "[INFO] 流量聚合基準不符：警示",
+   "target": "***MASKED***",
+   "timestamp": "2026-08-04T04:21:03Z"
+  },
+  {
+   "channel": "mail",
+   "counts": {
+    "events": 0,
+    "health": 1,
+    "metrics": 0,
+    "traffic": 0
+   },
+   "error": "",
+   "force_test": false,
+   "status": "success",
+   "subject": "[INFO] 流量聚合基準不符：警示",
+   "target": "***MASKED***",
+   "timestamp": "2026-08-04T04:21:03Z"
+  },
+  {
+   "channel": "line",
+   "counts": {
+    "events": 0,
+    "health": 1,
+    "metrics": 0,
+    "traffic": 0
+   },
+   "error": "",
+   "force_test": false,
+   "status": "success",
+   "subject": "[INFO] 流量聚合基準不符：警示",
+   "target": "***MASKED***",
+   "timestamp": "2026-08-04T05:21:03Z"
+  },
+  {
+   "channel": "mail",
+   "counts": {
+    "events": 0,
+    "health": 1,
+    "metrics": 0,
+    "traffic": 0
+   },
+   "error": "",
+   "force_test": false,
+   "status": "success",
+   "subject": "[INFO] 流量聚合基準不符：警示",
+   "target": "***MASKED***",
+   "timestamp": "2026-08-04T05:21:03Z"
+  },
+  {
+   "channel": "line",
+   "counts": {
+    "events": 0,
+    "health": 1,
+    "metrics": 0,
+    "traffic": 0
+   },
+   "error": "",
+   "force_test": false,
+   "status": "success",
+   "subject": "[INFO] 流量聚合基準不符：警示",
+   "target": "***MASKED***",
+   "timestamp": "2026-08-04T06:21:03Z"
+  },
+  {
+   "channel": "mail",
+   "counts": {
+    "events": 0,
+    "health": 1,
+    "metrics": 0,
+    "traffic": 0
+   },
+   "error": "",
+   "force_test": false,
+   "status": "success",
+   "subject": "[INFO] 流量聚合基準不符：警示",
+   "target": "***MASKED***",
+   "timestamp": "2026-08-04T06:21:03Z"
+  },
+  {
+   "channel": "line",
+   "counts": {
+    "events": 0,
+    "health": 1,
+    "metrics": 0,
+    "traffic": 0
+   },
+   "error": "",
+   "force_test": false,
+   "status": "success",
+   "subject": "[INFO] Design-v2 sample: PCE health：警示",
+   "target": "***MASKED***",
+   "timestamp": "2026-08-04T06:25:32Z"
+  },
+  {
+   "channel": "mail",
+   "counts": {
+    "events": 0,
+    "health": 1,
+    "metrics": 0,
+    "traffic": 0
+   },
+   "error": "",
+   "force_test": false,
+   "status": "success",
+   "subject": "[INFO] Design-v2 sample: PCE health：警示",
+   "target": "***MASKED***",
+   "timestamp": "2026-08-04T06:25:32Z"
+  },
+  {
+   "channel": "line",
+   "counts": {
+    "events": 0,
+    "health": 1,
+    "metrics": 0,
+    "traffic": 0
+   },
+   "error": "",
+   "force_test": false,
+   "status": "success",
+   "subject": "[INFO] 流量聚合基準不符：警示",
+   "target": "***MASKED***",
+   "timestamp": "2026-08-04T07:21:03Z"
+  },
+  {
+   "channel": "mail",
+   "counts": {
+    "events": 0,
+    "health": 1,
+    "metrics": 0,
+    "traffic": 0
+   },
+   "error": "",
+   "force_test": false,
+   "status": "success",
+   "subject": "[INFO] 流量聚合基準不符：警示",
+   "target": "***MASKED***",
+   "timestamp": "2026-08-04T07:21:03Z"
+  },
+  {
+   "channel": "line",
+   "counts": {
+    "events": 0,
+    "health": 1,
+    "metrics": 0,
+    "traffic": 0
+   },
+   "error": "",
+   "force_test": false,
+   "status": "success",
+   "subject": "[INFO] Design-v2 sample: PCE health：警示",
+   "target": "***MASKED***",
+   "timestamp": "2026-08-04T07:53:03Z"
+  },
+  {
+   "channel": "mail",
+   "counts": {
+    "events": 0,
+    "health": 1,
+    "metrics": 0,
+    "traffic": 0
+   },
+   "error": "",
+   "force_test": false,
+   "status": "success",
+   "subject": "[INFO] Design-v2 sample: PCE health：警示",
+   "target": "***MASKED***",
+   "timestamp": "2026-08-04T07:53:03Z"
+  },
+  {
+   "channel": "line",
+   "counts": {
+    "events": 0,
+    "health": 1,
+    "metrics": 0,
+    "traffic": 0
+   },
+   "error": "",
+   "force_test": false,
+   "status": "success",
+   "subject": "[INFO] 流量聚合基準不符：警示",
+   "target": "***MASKED***",
+   "timestamp": "2026-08-04T08:21:04Z"
+  },
+  {
+   "channel": "mail",
+   "counts": {
+    "events": 0,
+    "health": 1,
+    "metrics": 0,
+    "traffic": 0
+   },
+   "error": "",
+   "force_test": false,
+   "status": "success",
+   "subject": "[INFO] 流量聚合基準不符：警示",
+   "target": "***MASKED***",
+   "timestamp": "2026-08-04T08:21:04Z"
+  },
+  {
+   "channel": "line",
+   "counts": {
+    "events": 0,
+    "health": 1,
+    "metrics": 0,
+    "traffic": 0
+   },
+   "error": "",
+   "force_test": false,
+   "status": "success",
+   "subject": "[INFO] 流量聚合基準不符：警示",
+   "target": "***MASKED***",
+   "timestamp": "2026-08-04T09:21:04Z"
+  },
+  {
+   "channel": "mail",
+   "counts": {
+    "events": 0,
+    "health": 1,
+    "metrics": 0,
+    "traffic": 0
+   },
+   "error": "",
+   "force_test": false,
+   "status": "success",
+   "subject": "[INFO] 流量聚合基準不符：警示",
+   "target": "***MASKED***",
+   "timestamp": "2026-08-04T09:21:04Z"
+  },
+  {
+   "channel": "line",
+   "counts": {
+    "events": 0,
+    "health": 1,
+    "metrics": 0,
+    "traffic": 0
+   },
+   "error": "",
+   "force_test": false,
+   "status": "success",
+   "subject": "[INFO] 流量聚合基準不符：警示",
+   "target": "***MASKED***",
+   "timestamp": "2026-08-04T10:21:03Z"
+  },
+  {
+   "channel": "mail",
+   "counts": {
+    "events": 0,
+    "health": 1,
+    "metrics": 0,
+    "traffic": 0
+   },
+   "error": "",
+   "force_test": false,
+   "status": "success",
+   "subject": "[INFO] 流量聚合基準不符：警示",
+   "target": "***MASKED***",
+   "timestamp": "2026-08-04T10:21:03Z"
+  },
+  {
+   "channel": "line",
+   "counts": {
+    "events": 0,
+    "health": 1,
+    "metrics": 0,
+    "traffic": 0
+   },
+   "error": "",
+   "force_test": false,
+   "status": "success",
+   "subject": "[INFO] Design-v2 sample: PCE health：警示",
+   "target": "***MASKED***",
+   "timestamp": "2026-08-04T11:15:03Z"
+  },
+  {
+   "channel": "mail",
+   "counts": {
+    "events": 0,
+    "health": 1,
+    "metrics": 0,
+    "traffic": 0
+   },
+   "error": "",
+   "force_test": false,
+   "status": "success",
+   "subject": "[INFO] Design-v2 sample: PCE health：警示",
+   "target": "***MASKED***",
+   "timestamp": "2026-08-04T11:15:03Z"
+  },
+  {
+   "channel": "line",
+   "counts": {
+    "events": 0,
+    "health": 1,
+    "metrics": 0,
+    "traffic": 0
+   },
+   "error": "",
+   "force_test": false,
+   "status": "success",
+   "subject": "[INFO] 流量聚合基準不符：警示",
+   "target": "***MASKED***",
+   "timestamp": "2026-08-04T11:21:03Z"
+  },
+  {
+   "channel": "mail",
+   "counts": {
+    "events": 0,
+    "health": 1,
+    "metrics": 0,
+    "traffic": 0
+   },
+   "error": "",
+   "force_test": false,
+   "status": "success",
+   "subject": "[INFO] 流量聚合基準不符：警示",
+   "target": "***MASKED***",
+   "timestamp": "2026-08-04T11:21:03Z"
+  },
+  {
+   "channel": "line",
+   "counts": {
+    "events": 0,
+    "health": 1,
+    "metrics": 0,
+    "traffic": 0
+   },
+   "error": "",
+   "force_test": false,
+   "status": "success",
+   "subject": "[INFO] 流量聚合基準不符：警示",
+   "target": "***MASKED***",
+   "timestamp": "2026-08-04T12:21:33Z"
+  },
+  {
+   "channel": "mail",
+   "counts": {
+    "events": 0,
+    "health": 1,
+    "metrics": 0,
+    "traffic": 0
+   },
+   "error": "",
+   "force_test": false,
+   "status": "success",
+   "subject": "[INFO] 流量聚合基準不符：警示",
+   "target": "***MASKED***",
+   "timestamp": "2026-08-04T12:21:33Z"
+  },
+  {
+   "channel": "line",
+   "counts": {
+    "events": 0,
+    "health": 1,
+    "metrics": 0,
+    "traffic": 0
+   },
+   "error": "",
+   "force_test": false,
+   "status": "success",
+   "subject": "[INFO] 流量聚合基準不符：警示",
+   "target": "***MASKED***",
+   "timestamp": "2026-08-04T13:21:33Z"
+  },
+  {
+   "channel": "mail",
+   "counts": {
+    "events": 0,
+    "health": 1,
+    "metrics": 0,
+    "traffic": 0
+   },
+   "error": "",
+   "force_test": false,
+   "status": "success",
+   "subject": "[INFO] 流量聚合基準不符：警示",
+   "target": "***MASKED***",
+   "timestamp": "2026-08-04T13:21:33Z"
+  }
+ ],
+ "event_overflow": {},
+ "event_parser_samples": [
+  {
+   "action": "PUT FILTERED",
+   "actor": "podman",
+   "event_type": "agent.update",
+   "known_event_type": true,
+   "parser_notes": [],
+   "resource_name": "",
+   "resource_type": "",
+   "source_ip": "172.16.15.170",
+   "target_name": "podman",
+   "target_type": "workload",
+   "timestamp": "2026-08-04T14:06:51.705Z"
+  },
+  {
+   "action": "POST /api/v2/users/create_session",
+   "actor": "System",
+   "event_type": "user.create_session",
+   "known_event_type": true,
+   "parser_notes": [],
+   "resource_name": "",
+   "resource_type": "",
+   "source_ip": "FILTERED",
+   "target_name": "admin@lab.local",
+   "target_type": "user",
+   "timestamp": "2026-08-04T14:05:10.828Z"
+  },
+  {
+   "action": "",
+   "actor": "System",
+   "event_type": "user.pce_session_terminated",
+   "known_event_type": true,
+   "parser_notes": [],
+   "resource_name": "",
+   "resource_type": "",
+   "source_ip": "",
+   "target_name": "admin@lab.local",
+   "target_type": "user",
+   "timestamp": "2026-08-04T14:04:46.201Z"
+  },
+  {
+   "action": "",
+   "actor": "System",
+   "event_type": "user.pce_session_terminated",
+   "known_event_type": true,
+   "parser_notes": [],
+   "resource_name": "",
+   "resource_type": "",
+   "source_ip": "",
+   "target_name": "admin@lab.local",
+   "target_type": "user",
+   "timestamp": "2026-08-04T14:13:46.504Z"
+  },
+  {
+   "action": "",
+   "actor": "System",
+   "event_type": "user.pce_session_terminated",
+   "known_event_type": true,
+   "parser_notes": [],
+   "resource_name": "",
+   "resource_type": "",
+   "source_ip": "",
+   "target_name": "admin@lab.local",
+   "target_type": "user",
+   "timestamp": "2026-08-04T14:13:46.494Z"
+  },
+  {
+   "action": "POST /api/v2/users/create_session",
+   "actor": "System",
+   "event_type": "user.create_session",
+   "known_event_type": true,
+   "parser_notes": [],
+   "resource_name": "",
+   "resource_type": "",
+   "source_ip": "FILTERED",
+   "target_name": "admin@lab.local",
+   "target_type": "user",
+   "timestamp": "2026-08-04T14:13:11.044Z"
+  },
+  {
+   "action": "PUT FILTERED",
+   "actor": "podman",
+   "event_type": "agent.update",
+   "known_event_type": true,
+   "parser_notes": [],
+   "resource_name": "",
+   "resource_type": "",
+   "source_ip": "172.16.15.170",
+   "target_name": "podman",
+   "target_type": "workload",
+   "timestamp": "2026-08-04T14:11:51.744Z"
+  },
+  {
+   "action": "POST /api/v2/users/create_session",
+   "actor": "System",
+   "event_type": "user.create_session",
+   "known_event_type": true,
+   "parser_notes": [],
+   "resource_name": "",
+   "resource_type": "",
+   "source_ip": "FILTERED",
+   "target_name": "admin@lab.local",
+   "target_type": "user",
+   "timestamp": "2026-08-04T14:11:11.541Z"
+  },
+  {
+   "action": "",
+   "actor": "System",
+   "event_type": "user.pce_session_terminated",
+   "known_event_type": true,
+   "parser_notes": [],
+   "resource_name": "",
+   "resource_type": "",
+   "source_ip": "",
+   "target_name": "admin@lab.local",
+   "target_type": "user",
+   "timestamp": "2026-08-04T14:10:46.410Z"
+  },
+  {
+   "action": "POST /api/v2/users/create_session",
+   "actor": "System",
+   "event_type": "user.create_session",
+   "known_event_type": true,
+   "parser_notes": [],
+   "resource_name": "",
+   "resource_type": "",
+   "source_ip": "FILTERED",
+   "target_name": "admin@lab.local",
+   "target_type": "user",
+   "timestamp": "2026-08-04T14:09:12.212Z"
+  }
+ ],
+ "event_parser_stats": {
+  "action_resolved": 4,
+  "actor_resolved": 1,
+  "last_batch_known": 7,
+  "last_batch_total": 7,
+  "last_batch_unknown": 0,
+  "parser_note_count": 0,
+  "resource_resolved": 0,
+  "source_ip_resolved": 4,
+  "target_resolved": 7
+ },
+ "event_timeline": [
+  {
+   "details": {
+    "message": "[{\"status\":\"normal\",\"type\":\"standalone\",\"fqdn\":\"pce.lab.local\",\"available_seconds\":5220,\"notifications\":[],\"listen_only_",
+    "status": 200
+   },
+   "kind": "pce_ok",
+   "timestamp": "2026-08-04T14:05:00Z",
+   "title": "health ok"
+  },
+  {
+   "details": {
+    "message": "cache rows=0",
+    "status": 200
+   },
+   "kind": "pce_ok",
+   "timestamp": "2026-08-04T14:05:00Z",
+   "title": "events ok"
+  },
+  {
+   "details": {
+    "flows": 254,
+    "reason": "aggregation_basis",
+    "rule_id": "68d21d1ab31d49949caab9edaf141675",
+    "rule_name": "Design-v2 sample: bandwidth",
+    "span_minutes": 845.0,
+    "window_minutes": 60
+   },
+   "kind": "suppressed",
+   "timestamp": "2026-08-04T14:05:01Z",
+   "title": "Design-v2 sample: bandwidth"
+  },
+  {
+   "details": {
+    "message": "cache ingest ok",
+    "status": 200
+   },
+   "kind": "pce_ok",
+   "timestamp": "2026-08-04T14:05:13Z",
+   "title": "traffic ok"
+  },
+  {
+   "details": {
+    "message": "[{\"status\":\"normal\",\"type\":\"standalone\",\"fqdn\":\"pce.lab.local\",\"available_seconds\":5220,\"notifications\":[],\"listen_only_",
+    "status": 200
+   },
+   "kind": "pce_ok",
+   "timestamp": "2026-08-04T14:05:30Z",
+   "title": "health ok"
+  },
+  {
+   "details": {
+    "message": "cache rows=0",
+    "status": 200
+   },
+   "kind": "pce_ok",
+   "timestamp": "2026-08-04T14:05:30Z",
+   "title": "events ok"
+  },
+  {
+   "details": {
+    "flows": 238,
+    "reason": "aggregation_basis",
+    "rule_id": "68d21d1ab31d49949caab9edaf141675",
+    "rule_name": "Design-v2 sample: bandwidth",
+    "span_minutes": 845.5,
+    "window_minutes": 60
+   },
+   "kind": "suppressed",
+   "timestamp": "2026-08-04T14:05:30Z",
+   "title": "Design-v2 sample: bandwidth"
+  },
+  {
+   "details": {
+    "message": "[{\"status\":\"normal\",\"type\":\"standalone\",\"fqdn\":\"pce.lab.local\",\"available_seconds\":5280,\"notifications\":[],\"listen_only_",
+    "status": 200
+   },
+   "kind": "pce_ok",
+   "timestamp": "2026-08-04T14:06:00Z",
+   "title": "health ok"
+  },
+  {
+   "details": {
+    "message": "cache rows=0",
+    "status": 200
+   },
+   "kind": "pce_ok",
+   "timestamp": "2026-08-04T14:06:00Z",
+   "title": "events ok"
+  },
+  {
+   "details": {
+    "flows": 237,
+    "reason": "aggregation_basis",
+    "rule_id": "68d21d1ab31d49949caab9edaf141675",
+    "rule_name": "Design-v2 sample: bandwidth",
+    "span_minutes": 846.0,
+    "window_minutes": 60
+   },
+   "kind": "suppressed",
+   "timestamp": "2026-08-04T14:06:01Z",
+   "title": "Design-v2 sample: bandwidth"
+  },
+  {
+   "details": {
+    "message": "[{\"status\":\"normal\",\"type\":\"standalone\",\"fqdn\":\"pce.lab.local\",\"available_seconds\":5280,\"notifications\":[],\"listen_only_",
+    "status": 200
+   },
+   "kind": "pce_ok",
+   "timestamp": "2026-08-04T14:06:30Z",
+   "title": "health ok"
+  },
+  {
+   "details": {
+    "message": "cache rows=0",
+    "status": 200
+   },
+   "kind": "pce_ok",
+   "timestamp": "2026-08-04T14:06:30Z",
+   "title": "events ok"
+  },
+  {
+   "details": {
+    "flows": 243,
+    "reason": "aggregation_basis",
+    "rule_id": "68d21d1ab31d49949caab9edaf141675",
+    "rule_name": "Design-v2 sample: bandwidth",
+    "span_minutes": 846.5,
+    "window_minutes": 60
+   },
+   "kind": "suppressed",
+   "timestamp": "2026-08-04T14:06:30Z",
+   "title": "Design-v2 sample: bandwidth"
+  },
+  {
+   "details": {
+    "message": "[{\"status\":\"normal\",\"type\":\"standalone\",\"fqdn\":\"pce.lab.local\",\"available_seconds\":5341,\"notifications\":[],\"listen_only_",
+    "status": 200
+   },
+   "kind": "pce_ok",
+   "timestamp": "2026-08-04T14:07:00Z",
+   "title": "health ok"
+  },
+  {
+   "details": {
+    "message": "cache rows=0",
+    "status": 200
+   },
+   "kind": "pce_ok",
+   "timestamp": "2026-08-04T14:07:00Z",
+   "title": "events ok"
+  },
+  {
+   "details": {
+    "flows": 242,
+    "reason": "aggregation_basis",
+    "rule_id": "68d21d1ab31d49949caab9edaf141675",
+    "rule_name": "Design-v2 sample: bandwidth",
+    "span_minutes": 847.0,
+    "window_minutes": 60
+   },
+   "kind": "suppressed",
+   "timestamp": "2026-08-04T14:07:00Z",
+   "title": "Design-v2 sample: bandwidth"
+  },
+  {
+   "details": {
+    "message": "cache ingest ok",
+    "status": 200
+   },
+   "kind": "pce_ok",
+   "timestamp": "2026-08-04T14:07:12Z",
+   "title": "traffic ok"
+  },
+  {
+   "details": {
+    "message": "[{\"status\":\"normal\",\"type\":\"standalone\",\"fqdn\":\"pce.lab.local\",\"available_seconds\":5341,\"notifications\":[],\"listen_only_",
+    "status": 200
+   },
+   "kind": "pce_ok",
+   "timestamp": "2026-08-04T14:07:30Z",
+   "title": "health ok"
+  },
+  {
+   "details": {
+    "message": "cache rows=0",
+    "status": 200
+   },
+   "kind": "pce_ok",
+   "timestamp": "2026-08-04T14:07:30Z",
+   "title": "events ok"
+  },
+  {
+   "details": {
+    "flows": 241,
+    "reason": "aggregation_basis",
+    "rule_id": "68d21d1ab31d49949caab9edaf141675",
+    "rule_name": "Design-v2 sample: bandwidth",
+    "span_minutes": 847.5,
+    "window_minutes": 60
+   },
+   "kind": "suppressed",
+   "timestamp": "2026-08-04T14:07:30Z",
+   "title": "Design-v2 sample: bandwidth"
+  },
+  {
+   "details": {
+    "message": "[{\"status\":\"normal\",\"type\":\"standalone\",\"fqdn\":\"pce.lab.local\",\"available_seconds\":5341,\"notifications\":[],\"listen_only_",
+    "status": 200
+   },
+   "kind": "pce_ok",
+   "timestamp": "2026-08-04T14:08:00Z",
+   "title": "health ok"
+  },
+  {
+   "details": {
+    "message": "cache rows=0",
+    "status": 200
+   },
+   "kind": "pce_ok",
+   "timestamp": "2026-08-04T14:08:00Z",
+   "title": "events ok"
+  },
+  {
+   "details": {
+    "flows": 235,
+    "reason": "aggregation_basis",
+    "rule_id": "68d21d1ab31d49949caab9edaf141675",
+    "rule_name": "Design-v2 sample: bandwidth",
+    "span_minutes": 848.0,
+    "window_minutes": 60
+   },
+   "kind": "suppressed",
+   "timestamp": "2026-08-04T14:08:01Z",
+   "title": "Design-v2 sample: bandwidth"
+  },
+  {
+   "details": {
+    "message": "[{\"status\":\"normal\",\"type\":\"standalone\",\"fqdn\":\"pce.lab.local\",\"available_seconds\":5402,\"notifications\":[],\"listen_only_",
+    "status": 200
+   },
+   "kind": "pce_ok",
+   "timestamp": "2026-08-04T14:08:30Z",
+   "title": "health ok"
+  },
+  {
+   "details": {
+    "message": "cache rows=0",
+    "status": 200
+   },
+   "kind": "pce_ok",
+   "timestamp": "2026-08-04T14:08:30Z",
+   "title": "events ok"
+  },
+  {
+   "details": {
+    "flows": 236,
+    "reason": "aggregation_basis",
+    "rule_id": "68d21d1ab31d49949caab9edaf141675",
+    "rule_name": "Design-v2 sample: bandwidth",
+    "span_minutes": 848.5,
+    "window_minutes": 60
+   },
+   "kind": "suppressed",
+   "timestamp": "2026-08-04T14:08:30Z",
+   "title": "Design-v2 sample: bandwidth"
+  },
+  {
+   "details": {
+    "message": "[{\"status\":\"normal\",\"type\":\"standalone\",\"fqdn\":\"pce.lab.local\",\"available_seconds\":5402,\"notifications\":[],\"listen_only_",
+    "status": 200
+   },
+   "kind": "pce_ok",
+   "timestamp": "2026-08-04T14:09:00Z",
+   "title": "health ok"
+  },
+  {
+   "details": {
+    "message": "cache rows=0",
+    "status": 200
+   },
+   "kind": "pce_ok",
+   "timestamp": "2026-08-04T14:09:00Z",
+   "title": "events ok"
+  },
+  {
+   "details": {
+    "flows": 236,
+    "reason": "aggregation_basis",
+    "rule_id": "68d21d1ab31d49949caab9edaf141675",
+    "rule_name": "Design-v2 sample: bandwidth",
+    "span_minutes": 849.0,
+    "window_minutes": 60
+   },
+   "kind": "suppressed",
+   "timestamp": "2026-08-04T14:09:01Z",
+   "title": "Design-v2 sample: bandwidth"
+  },
+  {
+   "details": {
+    "message": "cache ingest ok",
+    "status": 200
+   },
+   "kind": "pce_ok",
+   "timestamp": "2026-08-04T14:09:11Z",
+   "title": "events ok"
+  },
+  {
+   "details": {
+    "message": "cache ingest ok",
+    "status": 200
+   },
+   "kind": "pce_ok",
+   "timestamp": "2026-08-04T14:09:13Z",
+   "title": "traffic ok"
+  },
+  {
+   "details": {
+    "message": "[{\"status\":\"normal\",\"type\":\"standalone\",\"fqdn\":\"pce.lab.local\",\"available_seconds\":5463,\"notifications\":[],\"listen_only_",
+    "status": 200
+   },
+   "kind": "pce_ok",
+   "timestamp": "2026-08-04T14:09:30Z",
+   "title": "health ok"
+  },
+  {
+   "details": {
+    "overflow_risk": false,
+    "parser_notes": 0,
+    "query_since": "",
+    "query_until": "",
+    "sample_event_ids": [
+     "/orgs/1/events/ad8b49a9-afa5-4f77-be0d-990762dc2887",
+     "/orgs/1/events/08f9ef0f-028d-4605-b1bc-5d2484c56a82",
+     "/orgs/1/events/ee9b47c2-dc51-4057-a6c0-d76b5f024465",
+     "/orgs/1/events/0f7944c5-01d8-48bd-9a75-799fef3ab853",
+     "/orgs/1/events/74a58146-59ae-4aa3-8d1b-4c95eca733cd"
+    ],
+    "total": 6,
+    "unknown": 0
+   },
+   "kind": "event_batch",
+   "timestamp": "2026-08-04T14:09:30Z",
+   "title": "event batch processed"
+  },
+  {
+   "details": {
+    "message": "cache rows=6",
+    "status": 200
+   },
+   "kind": "pce_ok",
+   "timestamp": "2026-08-04T14:09:30Z",
+   "title": "events ok"
+  },
+  {
+   "details": {
+    "flows": 228,
+    "reason": "aggregation_basis",
+    "rule_id": "68d21d1ab31d49949caab9edaf141675",
+    "rule_name": "Design-v2 sample: bandwidth",
+    "span_minutes": 849.5,
+    "window_minutes": 60
+   },
+   "kind": "suppressed",
+   "timestamp": "2026-08-04T14:09:30Z",
+   "title": "Design-v2 sample: bandwidth"
+  },
+  {
+   "details": {
+    "message": "[{\"status\":\"normal\",\"type\":\"standalone\",\"fqdn\":\"pce.lab.local\",\"available_seconds\":5463,\"notifications\":[],\"listen_only_",
+    "status": 200
+   },
+   "kind": "pce_ok",
+   "timestamp": "2026-08-04T14:10:00Z",
+   "title": "health ok"
+  },
+  {
+   "details": {
+    "message": "cache rows=0",
+    "status": 200
+   },
+   "kind": "pce_ok",
+   "timestamp": "2026-08-04T14:10:00Z",
+   "title": "events ok"
+  },
+  {
+   "details": {
+    "flows": 227,
+    "reason": "aggregation_basis",
+    "rule_id": "68d21d1ab31d49949caab9edaf141675",
+    "rule_name": "Design-v2 sample: bandwidth",
+    "span_minutes": 850.0,
+    "window_minutes": 60
+   },
+   "kind": "suppressed",
+   "timestamp": "2026-08-04T14:10:00Z",
+   "title": "Design-v2 sample: bandwidth"
+  },
+  {
+   "details": {
+    "message": "[{\"status\":\"normal\",\"type\":\"standalone\",\"fqdn\":\"pce.lab.local\",\"available_seconds\":5524,\"notifications\":[],\"listen_only_",
+    "status": 200
+   },
+   "kind": "pce_ok",
+   "timestamp": "2026-08-04T14:10:30Z",
+   "title": "health ok"
+  },
+  {
+   "details": {
+    "message": "cache rows=0",
+    "status": 200
+   },
+   "kind": "pce_ok",
+   "timestamp": "2026-08-04T14:10:30Z",
+   "title": "events ok"
+  },
+  {
+   "details": {
+    "flows": 233,
+    "reason": "aggregation_basis",
+    "rule_id": "68d21d1ab31d49949caab9edaf141675",
+    "rule_name": "Design-v2 sample: bandwidth",
+    "span_minutes": 850.5,
+    "window_minutes": 60
+   },
+   "kind": "suppressed",
+   "timestamp": "2026-08-04T14:10:30Z",
+   "title": "Design-v2 sample: bandwidth"
+  },
+  {
+   "details": {
+    "message": "[{\"status\":\"normal\",\"type\":\"standalone\",\"fqdn\":\"pce.lab.local\",\"available_seconds\":5524,\"notifications\":[],\"listen_only_",
+    "status": 200
+   },
+   "kind": "pce_ok",
+   "timestamp": "2026-08-04T14:11:00Z",
+   "title": "health ok"
+  },
+  {
+   "details": {
+    "message": "cache rows=0",
+    "status": 200
+   },
+   "kind": "pce_ok",
+   "timestamp": "2026-08-04T14:11:00Z",
+   "title": "events ok"
+  },
+  {
+   "details": {
+    "flows": 233,
+    "reason": "aggregation_basis",
+    "rule_id": "68d21d1ab31d49949caab9edaf141675",
+    "rule_name": "Design-v2 sample: bandwidth",
+    "span_minutes": 851.0,
+    "window_minutes": 60
+   },
+   "kind": "suppressed",
+   "timestamp": "2026-08-04T14:11:00Z",
+   "title": "Design-v2 sample: bandwidth"
+  },
+  {
+   "details": {
+    "message": "cache ingest ok",
+    "status": 200
+   },
+   "kind": "pce_ok",
+   "timestamp": "2026-08-04T14:11:13Z",
+   "title": "traffic ok"
+  },
+  {
+   "details": {
+    "message": "[{\"status\":\"normal\",\"type\":\"standalone\",\"fqdn\":\"pce.lab.local\",\"available_seconds\":5585,\"notifications\":[],\"listen_only_",
+    "status": 200
+   },
+   "kind": "pce_ok",
+   "timestamp": "2026-08-04T14:11:30Z",
+   "title": "health ok"
+  },
+  {
+   "details": {
+    "message": "cache rows=0",
+    "status": 200
+   },
+   "kind": "pce_ok",
+   "timestamp": "2026-08-04T14:11:30Z",
+   "title": "events ok"
+  },
+  {
+   "details": {
+    "flows": 256,
+    "reason": "aggregation_basis",
+    "rule_id": "68d21d1ab31d49949caab9edaf141675",
+    "rule_name": "Design-v2 sample: bandwidth",
+    "span_minutes": 851.5,
+    "window_minutes": 60
+   },
+   "kind": "suppressed",
+   "timestamp": "2026-08-04T14:11:30Z",
+   "title": "Design-v2 sample: bandwidth"
+  },
+  {
+   "details": {
+    "message": "[{\"status\":\"normal\",\"type\":\"standalone\",\"fqdn\":\"pce.lab.local\",\"available_seconds\":5585,\"notifications\":[],\"listen_only_",
+    "status": 200
+   },
+   "kind": "pce_ok",
+   "timestamp": "2026-08-04T14:12:00Z",
+   "title": "health ok"
+  },
+  {
+   "details": {
+    "message": "cache rows=0",
+    "status": 200
+   },
+   "kind": "pce_ok",
+   "timestamp": "2026-08-04T14:12:00Z",
+   "title": "events ok"
+  },
+  {
+   "details": {
+    "flows": 256,
+    "reason": "aggregation_basis",
+    "rule_id": "68d21d1ab31d49949caab9edaf141675",
+    "rule_name": "Design-v2 sample: bandwidth",
+    "span_minutes": 852.0,
+    "window_minutes": 60
+   },
+   "kind": "suppressed",
+   "timestamp": "2026-08-04T14:12:01Z",
+   "title": "Design-v2 sample: bandwidth"
+  },
+  {
+   "details": {
+    "message": "[{\"status\":\"normal\",\"type\":\"standalone\",\"fqdn\":\"pce.lab.local\",\"available_seconds\":5646,\"notifications\":[],\"listen_only_",
+    "status": 200
+   },
+   "kind": "pce_ok",
+   "timestamp": "2026-08-04T14:12:30Z",
+   "title": "health ok"
+  },
+  {
+   "details": {
+    "message": "cache rows=0",
+    "status": 200
+   },
+   "kind": "pce_ok",
+   "timestamp": "2026-08-04T14:12:30Z",
+   "title": "events ok"
+  },
+  {
+   "details": {
+    "flows": 255,
+    "reason": "aggregation_basis",
+    "rule_id": "68d21d1ab31d49949caab9edaf141675",
+    "rule_name": "Design-v2 sample: bandwidth",
+    "span_minutes": 852.5,
+    "window_minutes": 60
+   },
+   "kind": "suppressed",
+   "timestamp": "2026-08-04T14:12:31Z",
+   "title": "Design-v2 sample: bandwidth"
+  },
+  {
+   "details": {
+    "message": "[{\"status\":\"normal\",\"type\":\"standalone\",\"fqdn\":\"pce.lab.local\",\"available_seconds\":5646,\"notifications\":[],\"listen_only_",
+    "status": 200
+   },
+   "kind": "pce_ok",
+   "timestamp": "2026-08-04T14:13:00Z",
+   "title": "health ok"
+  },
+  {
+   "details": {
+    "message": "cache rows=0",
+    "status": 200
+   },
+   "kind": "pce_ok",
+   "timestamp": "2026-08-04T14:13:00Z",
+   "title": "events ok"
+  },
+  {
+   "details": {
+    "flows": 254,
+    "reason": "aggregation_basis",
+    "rule_id": "68d21d1ab31d49949caab9edaf141675",
+    "rule_name": "Design-v2 sample: bandwidth",
+    "span_minutes": 853.0,
+    "window_minutes": 60
+   },
+   "kind": "suppressed",
+   "timestamp": "2026-08-04T14:13:01Z",
+   "title": "Design-v2 sample: bandwidth"
+  },
+  {
+   "details": {
+    "message": "cache ingest ok",
+    "status": 200
+   },
+   "kind": "pce_ok",
+   "timestamp": "2026-08-04T14:13:12Z",
+   "title": "traffic ok"
+  },
+  {
+   "details": {
+    "message": "[{\"status\":\"normal\",\"type\":\"standalone\",\"fqdn\":\"pce.lab.local\",\"available_seconds\":5707,\"notifications\":[],\"listen_only_",
+    "status": 200
+   },
+   "kind": "pce_ok",
+   "timestamp": "2026-08-04T14:13:30Z",
+   "title": "health ok"
+  },
+  {
+   "details": {
+    "message": "cache rows=0",
+    "status": 200
+   },
+   "kind": "pce_ok",
+   "timestamp": "2026-08-04T14:13:30Z",
+   "title": "events ok"
+  },
+  {
+   "details": {
+    "flows": 258,
+    "reason": "aggregation_basis",
+    "rule_id": "68d21d1ab31d49949caab9edaf141675",
+    "rule_name": "Design-v2 sample: bandwidth",
+    "span_minutes": 853.5,
+    "window_minutes": 60
+   },
+   "kind": "suppressed",
+   "timestamp": "2026-08-04T14:13:31Z",
+   "title": "Design-v2 sample: bandwidth"
+  },
+  {
+   "details": {
+    "message": "[{\"status\":\"normal\",\"type\":\"standalone\",\"fqdn\":\"pce.lab.local\",\"available_seconds\":5707,\"notifications\":[],\"listen_only_",
+    "status": 200
+   },
+   "kind": "pce_ok",
+   "timestamp": "2026-08-04T14:14:00Z",
+   "title": "health ok"
+  },
+  {
+   "details": {
+    "message": "cache rows=0",
+    "status": 200
+   },
+   "kind": "pce_ok",
+   "timestamp": "2026-08-04T14:14:00Z",
+   "title": "events ok"
+  },
+  {
+   "details": {
+    "flows": 253,
+    "reason": "aggregation_basis",
+    "rule_id": "68d21d1ab31d49949caab9edaf141675",
+    "rule_name": "Design-v2 sample: bandwidth",
+    "span_minutes": 854.0,
+    "window_minutes": 60
+   },
+   "kind": "suppressed",
+   "timestamp": "2026-08-04T14:14:01Z",
+   "title": "Design-v2 sample: bandwidth"
+  },
+  {
+   "details": {
+    "message": "cache ingest ok",
+    "status": 200
+   },
+   "kind": "pce_ok",
+   "timestamp": "2026-08-04T14:14:11Z",
+   "title": "events ok"
+  },
+  {
+   "details": {
+    "message": "[{\"status\":\"normal\",\"type\":\"standalone\",\"fqdn\":\"pce.lab.local\",\"available_seconds\":5767,\"notifications\":[],\"listen_only_",
+    "status": 200
+   },
+   "kind": "pce_ok",
+   "timestamp": "2026-08-04T14:14:30Z",
+   "title": "health ok"
+  },
+  {
+   "details": {
+    "overflow_risk": false,
+    "parser_notes": 0,
+    "query_since": "",
+    "query_until": "",
+    "sample_event_ids": [
+     "/orgs/1/events/948c7beb-98ad-4322-b8f2-6b0059642e83",
+     "/orgs/1/events/a0d22e41-61f7-4157-a9c0-8a2808931632",
+     "/orgs/1/events/e85e918f-c456-4c80-8186-6e9f2126a9fc",
+     "/orgs/1/events/2a06c017-846e-4d1e-830d-dbb061e481ec",
+     "/orgs/1/events/cfd9a222-3baa-485d-af2c-a69d2ab21226"
+    ],
+    "total": 7,
+    "unknown": 0
+   },
+   "kind": "event_batch",
+   "timestamp": "2026-08-04T14:14:30Z",
+   "title": "event batch processed"
+  },
+  {
+   "details": {
+    "message": "cache rows=7",
+    "status": 200
+   },
+   "kind": "pce_ok",
+   "timestamp": "2026-08-04T14:14:30Z",
+   "title": "events ok"
+  },
+  {
+   "details": {
+    "flows": 260,
+    "reason": "aggregation_basis",
+    "rule_id": "68d21d1ab31d49949caab9edaf141675",
+    "rule_name": "Design-v2 sample: bandwidth",
+    "span_minutes": 854.5,
+    "window_minutes": 60
+   },
+   "kind": "suppressed",
+   "timestamp": "2026-08-04T14:14:31Z",
+   "title": "Design-v2 sample: bandwidth"
+  },
+  {
+   "details": {
+    "message": "[{\"status\":\"normal\",\"type\":\"standalone\",\"fqdn\":\"pce.lab.local\",\"available_seconds\":5767,\"notifications\":[],\"listen_only_",
+    "status": 200
+   },
+   "kind": "pce_ok",
+   "timestamp": "2026-08-04T14:15:00Z",
+   "title": "health ok"
+  },
+  {
+   "details": {
+    "message": "cache rows=0",
+    "status": 200
+   },
+   "kind": "pce_ok",
+   "timestamp": "2026-08-04T14:15:00Z",
+   "title": "events ok"
+  },
+  {
+   "details": {
+    "flows": 259,
+    "reason": "aggregation_basis",
+    "rule_id": "68d21d1ab31d49949caab9edaf141675",
+    "rule_name": "Design-v2 sample: bandwidth",
+    "span_minutes": 855.0,
+    "window_minutes": 60
+   },
+   "kind": "suppressed",
+   "timestamp": "2026-08-04T14:15:01Z",
+   "title": "Design-v2 sample: bandwidth"
+  },
+  {
+   "details": {
+    "message": "cache ingest ok",
+    "status": 200
+   },
+   "kind": "pce_ok",
+   "timestamp": "2026-08-04T14:15:13Z",
+   "title": "traffic ok"
+  },
+  {
+   "details": {
+    "message": "[{\"status\":\"normal\",\"type\":\"standalone\",\"fqdn\":\"pce.lab.local\",\"available_seconds\":5828,\"notifications\":[],\"listen_only_",
+    "status": 200
+   },
+   "kind": "pce_ok",
+   "timestamp": "2026-08-04T14:15:30Z",
+   "title": "health ok"
+  },
+  {
+   "details": {
+    "message": "cache rows=0",
+    "status": 200
+   },
+   "kind": "pce_ok",
+   "timestamp": "2026-08-04T14:15:30Z",
+   "title": "events ok"
+  },
+  {
+   "details": {
+    "flows": 254,
+    "reason": "aggregation_basis",
+    "rule_id": "68d21d1ab31d49949caab9edaf141675",
+    "rule_name": "Design-v2 sample: bandwidth",
+    "span_minutes": 855.5,
+    "window_minutes": 60
+   },
+   "kind": "suppressed",
+   "timestamp": "2026-08-04T14:15:30Z",
+   "title": "Design-v2 sample: bandwidth"
+  },
+  {
+   "details": {
+    "message": "[{\"status\":\"normal\",\"type\":\"standalone\",\"fqdn\":\"pce.lab.local\",\"available_seconds\":5828,\"notifications\":[],\"listen_only_",
+    "status": 200
+   },
+   "kind": "pce_ok",
+   "timestamp": "2026-08-04T14:16:00Z",
+   "title": "health ok"
+  },
+  {
+   "details": {
+    "message": "cache rows=0",
+    "status": 200
+   },
+   "kind": "pce_ok",
+   "timestamp": "2026-08-04T14:16:00Z",
+   "title": "events ok"
+  },
+  {
+   "details": {
+    "flows": 251,
+    "reason": "aggregation_basis",
+    "rule_id": "68d21d1ab31d49949caab9edaf141675",
+    "rule_name": "Design-v2 sample: bandwidth",
+    "span_minutes": 856.0,
+    "window_minutes": 60
+   },
+   "kind": "suppressed",
+   "timestamp": "2026-08-04T14:16:01Z",
+   "title": "Design-v2 sample: bandwidth"
+  },
+  {
+   "details": {
+    "message": "[{\"status\":\"normal\",\"type\":\"standalone\",\"fqdn\":\"pce.lab.local\",\"available_seconds\":5889,\"notifications\":[],\"listen_only_",
+    "status": 200
+   },
+   "kind": "pce_ok",
+   "timestamp": "2026-08-04T14:16:30Z",
+   "title": "health ok"
+  },
+  {
+   "details": {
+    "message": "cache rows=0",
+    "status": 200
+   },
+   "kind": "pce_ok",
+   "timestamp": "2026-08-04T14:16:30Z",
+   "title": "events ok"
+  },
+  {
+   "details": {
+    "flows": 252,
+    "reason": "aggregation_basis",
+    "rule_id": "68d21d1ab31d49949caab9edaf141675",
+    "rule_name": "Design-v2 sample: bandwidth",
+    "span_minutes": 856.5,
+    "window_minutes": 60
+   },
+   "kind": "suppressed",
+   "timestamp": "2026-08-04T14:16:30Z",
+   "title": "Design-v2 sample: bandwidth"
+  },
+  {
+   "details": {
+    "message": "[{\"status\":\"normal\",\"type\":\"standalone\",\"fqdn\":\"pce.lab.local\",\"available_seconds\":5889,\"notifications\":[],\"listen_only_",
+    "status": 200
+   },
+   "kind": "pce_ok",
+   "timestamp": "2026-08-04T14:17:00Z",
+   "title": "health ok"
+  },
+  {
+   "details": {
+    "message": "cache rows=0",
+    "status": 200
+   },
+   "kind": "pce_ok",
+   "timestamp": "2026-08-04T14:17:00Z",
+   "title": "events ok"
+  },
+  {
+   "details": {
+    "flows": 250,
+    "reason": "aggregation_basis",
+    "rule_id": "68d21d1ab31d49949caab9edaf141675",
+    "rule_name": "Design-v2 sample: bandwidth",
+    "span_minutes": 857.0,
+    "window_minutes": 60
+   },
+   "kind": "suppressed",
+   "timestamp": "2026-08-04T14:17:01Z",
+   "title": "Design-v2 sample: bandwidth"
+  },
+  {
+   "details": {
+    "message": "cache ingest ok",
+    "status": 200
+   },
+   "kind": "pce_ok",
+   "timestamp": "2026-08-04T14:17:12Z",
+   "title": "traffic ok"
+  },
+  {
+   "details": {
+    "message": "[{\"status\":\"normal\",\"type\":\"standalone\",\"fqdn\":\"pce.lab.local\",\"available_seconds\":5950,\"notifications\":[],\"listen_only_",
+    "status": 200
+   },
+   "kind": "pce_ok",
+   "timestamp": "2026-08-04T14:17:30Z",
+   "title": "health ok"
+  },
+  {
+   "details": {
+    "message": "cache rows=0",
+    "status": 200
+   },
+   "kind": "pce_ok",
+   "timestamp": "2026-08-04T14:17:30Z",
+   "title": "events ok"
+  },
+  {
+   "details": {
+    "flows": 253,
+    "reason": "aggregation_basis",
+    "rule_id": "68d21d1ab31d49949caab9edaf141675",
+    "rule_name": "Design-v2 sample: bandwidth",
+    "span_minutes": 857.5,
+    "window_minutes": 60
+   },
+   "kind": "suppressed",
+   "timestamp": "2026-08-04T14:17:30Z",
+   "title": "Design-v2 sample: bandwidth"
+  },
+  {
+   "details": {
+    "message": "[{\"status\":\"normal\",\"type\":\"standalone\",\"fqdn\":\"pce.lab.local\",\"available_seconds\":5950,\"notifications\":[],\"listen_only_",
+    "status": 200
+   },
+   "kind": "pce_ok",
+   "timestamp": "2026-08-04T14:18:00Z",
+   "title": "health ok"
+  },
+  {
+   "details": {
+    "message": "cache rows=0",
+    "status": 200
+   },
+   "kind": "pce_ok",
+   "timestamp": "2026-08-04T14:18:00Z",
+   "title": "events ok"
+  },
+  {
+   "details": {
+    "flows": 253,
+    "reason": "aggregation_basis",
+    "rule_id": "68d21d1ab31d49949caab9edaf141675",
+    "rule_name": "Design-v2 sample: bandwidth",
+    "span_minutes": 858.0,
+    "window_minutes": 60
+   },
+   "kind": "suppressed",
+   "timestamp": "2026-08-04T14:18:01Z",
+   "title": "Design-v2 sample: bandwidth"
+  },
+  {
+   "details": {
+    "message": "[{\"status\":\"normal\",\"type\":\"standalone\",\"fqdn\":\"pce.lab.local\",\"available_seconds\":6011,\"notifications\":[],\"listen_only_",
+    "status": 200
+   },
+   "kind": "pce_ok",
+   "timestamp": "2026-08-04T14:18:30Z",
+   "title": "health ok"
+  },
+  {
+   "details": {
+    "message": "cache rows=0",
+    "status": 200
+   },
+   "kind": "pce_ok",
+   "timestamp": "2026-08-04T14:18:30Z",
+   "title": "events ok"
+  },
+  {
+   "details": {
+    "flows": 255,
+    "reason": "aggregation_basis",
+    "rule_id": "68d21d1ab31d49949caab9edaf141675",
+    "rule_name": "Design-v2 sample: bandwidth",
+    "span_minutes": 858.5,
+    "window_minutes": 60
+   },
+   "kind": "suppressed",
+   "timestamp": "2026-08-04T14:18:30Z",
+   "title": "Design-v2 sample: bandwidth"
+  },
+  {
+   "details": {
+    "message": "[{\"status\":\"normal\",\"type\":\"standalone\",\"fqdn\":\"pce.lab.local\",\"available_seconds\":6011,\"notifications\":[],\"listen_only_",
+    "status": 200
+   },
+   "kind": "pce_ok",
+   "timestamp": "2026-08-04T14:19:00Z",
+   "title": "health ok"
+  },
+  {
+   "details": {
+    "message": "cache rows=0",
+    "status": 200
+   },
+   "kind": "pce_ok",
+   "timestamp": "2026-08-04T14:19:00Z",
+   "title": "events ok"
+  },
+  {
+   "details": {
+    "flows": 255,
+    "reason": "aggregation_basis",
+    "rule_id": "68d21d1ab31d49949caab9edaf141675",
+    "rule_name": "Design-v2 sample: bandwidth",
+    "span_minutes": 859.0,
+    "window_minutes": 60
+   },
+   "kind": "suppressed",
+   "timestamp": "2026-08-04T14:19:01Z",
+   "title": "Design-v2 sample: bandwidth"
+  },
+  {
+   "details": {
+    "message": "cache ingest ok",
+    "status": 200
+   },
+   "kind": "pce_ok",
+   "timestamp": "2026-08-04T14:19:11Z",
+   "title": "events ok"
+  },
+  {
+   "details": {
+    "message": "cache ingest ok",
+    "status": 200
+   },
+   "kind": "pce_ok",
+   "timestamp": "2026-08-04T14:19:13Z",
+   "title": "traffic ok"
+  }
+ ],
+ "event_watermark": "2026-07-23T15:00:23Z",
+ "health_check": true,
+ "language": "zh_TW",
+ "pce_stats": {
+  "consecutive_failures": 0,
+  "event_poll_status": "ok",
+  "health_status": "ok",
+  "last_batch_notes": 0,
+  "last_batch_overflow": false,
+  "last_batch_total": 7,
+  "last_batch_unknown": 0,
+  "last_error": "degraded: status=critical",
+  "last_error_stage": "health",
+  "last_error_status": "200",
+  "last_event_poll": "2026-08-04T14:19:13Z",
+  "last_health_check": "2026-08-04T14:19:00Z",
+  "last_success": "2026-08-04T14:19:13Z"
+ },
+ "rules_count": 19,
+ "theme": "light",
+ "throttle_state": {
+  "18": {
+   "cooldown_suppressed": 1,
+   "last_allowed_at": "",
+   "last_suppressed_at": "2026-07-29T15:45:09Z",
+   "next_allowed_at": "2026-07-29T15:50:09Z",
+   "recent_dispatches": [],
+   "rule_name": "Agent 遭竄改",
+   "throttle": "",
+   "throttle_suppressed": 0
+  },
+  "25": {
+   "cooldown_suppressed": 1,
+   "last_allowed_at": "2026-07-30T07:35:09Z",
+   "last_suppressed_at": "2026-07-30T07:55:10Z",
+   "next_allowed_at": "2026-07-30T08:05:09Z",
+   "recent_dispatches": [],
+   "rule_name": "API 驗證失敗",
+   "throttle": "1/15m",
+   "throttle_suppressed": 0
+  },
+  "29": {
+   "cooldown_suppressed": 0,
+   "last_allowed_at": "2026-07-31T04:00:09Z",
+   "last_suppressed_at": "",
+   "next_allowed_at": "",
+   "recent_dispatches": [],
+   "rule_name": "API 授權失敗",
+   "throttle": "1/15m",
+   "throttle_suppressed": 0
+  },
+  "6aa5c0369d694a7d96408d6e7ed206ef": {
+   "cooldown_suppressed": 6,
+   "last_allowed_at": "",
+   "last_suppressed_at": "2026-08-04T11:15:30Z",
+   "next_allowed_at": "2026-08-04T11:45:00Z",
+   "recent_dispatches": [],
+   "rule_name": "Design-v2 sample: PCE health",
+   "throttle": "",
+   "throttle_suppressed": 0
+  }
+ },
+ "timezone": "UTC+8",
+ "unknown_events": {},
+ "version": "4.1.0"
+}

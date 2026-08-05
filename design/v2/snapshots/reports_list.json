@@ -1,0 +1,4156 @@
+{
+ "ok": true,
+ "reports": [
+  {
+   "attack_summary": {},
+   "attack_summary_counts": {},
+   "execution_stats": {},
+   "failed_rule_details": [],
+   "filename": "Illumio_Rule_Hit_Count_Report_2026-07-23_1532.html",
+   "mtime": 1784820751.8438253,
+   "pending_rule_details": [],
+   "report_type": "rule_hit_count",
+   "reused_rule_details": [],
+   "size": 235838,
+   "summary": ""
+  },
+  {
+   "attack_summary": {},
+   "attack_summary_counts": {},
+   "execution_stats": {},
+   "failed_rule_details": [],
+   "filename": "Illumio_Rule_Hit_Count_Report_2026-07-23_1503.html",
+   "mtime": 1784819008.6856077,
+   "pending_rule_details": [],
+   "report_type": "rule_hit_count",
+   "reused_rule_details": [],
+   "size": 235844,
+   "summary": ""
+  },
+  {
+   "attack_summary": {},
+   "attack_summary_counts": {},
+   "execution_stats": {},
+   "failed_rule_details": [],
+   "filename": "Illumio_Readiness_Report_2026-07-23_1503.html",
+   "mtime": 1784818995.9275727,
+   "pending_rule_details": [],
+   "report_type": "readiness",
+   "reused_rule_details": [],
+   "size": 242930,
+   "summary": ""
+  },
+  {
+   "attack_summary": {
+    "action_matrix": [
+     {
+      "action": "將範圍內 Workload 由 visibility/testing 推進到 selective 或 full Enforcement。",
+      "action_code": "MOVE_TO_ENFORCEMENT",
+      "apps": [
+       "coreservices (vmware)",
+       "demoapp (vmware)",
+       "endpoint (physical)",
+       "illumio (kubernetes)",
+       "illumio (vmware)"
+      ],
+      "count": 15,
+      "flow_total": 405692,
+      "severity": "CRITICAL"
+     },
+     {
+      "action": "將 Unmanaged 資產納管，或明確隔離其存取路徑。",
+      "action_code": "ONBOARD_UNMANAGED",
+      "apps": [
+       "coreservices (vmware)",
+       "demoapp (vmware)",
+       "endpoint (physical)",
+       "illumio (vmware)",
+       "infrastructure (vmware)"
+      ],
+      "count": 16,
+      "flow_total": 405283,
+      "severity": "HIGH"
+     },
+     {
+      "action": "收斂 Ringfence 範圍，只保留必要的 App 對 App 存取路徑。",
+      "action_code": "DEFINE_RINGFENCE_SCOPE",
+      "apps": [
+       "coreservices (vmware)",
+       "demoapp (vmware)",
+       "endpoint (physical)"
+      ],
+      "count": 3,
+      "flow_total": 22135,
+      "severity": "HIGH"
+     },
+     {
+      "action": "將跨邊界通訊埠收斂為明確 allowlist，移除過寬存取範圍。",
+      "action_code": "LOCK_BOUNDARY_PORTS",
+      "apps": [
+       "coreservices (vmware)",
+       "endpoint (physical)"
+      ],
+      "count": 2,
+      "flow_total": 18,
+      "severity": "HIGH"
+     },
+     {
+      "action": "此 Workload 在流量圖中扮演網路樞紐角色（高可達性或 articulation point），請套用更嚴格的東西向 Policy 邊界以限制橫向移動。",
+      "action_code": "RESTRICT_TRANSIT_NODE_ACCESS",
+      "apps": [
+       "coreservices (vmware) · 172.16.15.106, 172.16.15.100, 172.16.15.102",
+       "172.16.15.100, 172.16.15.101, 20.27.177.113, 192.168.20.32 +1"
+      ],
+      "count": 2,
+      "flow_total": 0,
+      "severity": "HIGH"
+     }
+    ],
+    "blast_radius": [
+     {
+      "action": "降低可橫向移動路徑，並優先分段高可達性的節點。",
+      "action_code": "TIGHTEN_LATERAL_POLICY",
+      "app_env_key": "endpoint|physical",
+      "evidence": {
+       "max_depth": 4,
+       "reachability_count": 4
+      },
+      "finding": "endpoint (physical) · 192.168.20.103, 172.16.9.26, 10.10.0.3 · 192.168.20.103, 172.16.9.26, 10.10.0.3: 偵測到高擴散半徑風險 — 可達節點 4、最大路徑深度 4",
+      "severity": "HIGH"
+     },
+     {
+      "action": "降低可橫向移動路徑，並優先分段高可達性的節點。",
+      "action_code": "TIGHTEN_LATERAL_POLICY",
+      "app_env_key": "jumpdesk|vmware",
+      "evidence": {
+       "max_depth": 4,
+       "reachability_count": 4
+      },
+      "finding": "jumpdesk (vmware) · 172.16.15.150 · 172.16.15.150: 偵測到高擴散半徑風險 — 可達節點 4、最大路徑深度 4",
+      "severity": "HIGH"
+     }
+    ],
+    "blind_spots": [
+     {
+      "action": "將範圍內 Workload 由 visibility/testing 推進到 selective 或 full Enforcement。",
+      "action_code": "MOVE_TO_ENFORCEMENT",
+      "app_env_key": "coreservices|vmware",
+      "evidence": {
+       "allowed_ratio": 0.018,
+       "blocked_or_pb_flow_count": 2244,
+       "flow_count": 8045,
+       "mixed_traffic_ratio": 0.9465,
+       "unmanaged_traversable_flows": 2
+      },
+      "finding": "coreservices (vmware) · 172.16.15.106, 172.16.15.100, 172.16.15.102: 偵測到 Enforcement 落差／偵測到可視性或強制執行盲點 — 流量數 8045、被擋或 PB 流量 2244",
+      "severity": "CRITICAL"
+     },
+     {
+      "action": "將範圍內 Workload 由 visibility/testing 推進到 selective 或 full Enforcement。",
+      "action_code": "MOVE_TO_ENFORCEMENT",
+      "app_env_key": "demoapp|vmware",
+      "evidence": {
+       "allowed_ratio": 0.1143,
+       "blocked_or_pb_flow_count": 113,
+       "flow_count": 210,
+       "mixed_traffic_ratio": 0.7551
+      },
+      "finding": "demoapp (vmware): 偵測到 Enforcement 落差／偵測到可視性或強制執行盲點 — 流量數 210、被擋或 PB 流量 113",
+      "severity": "CRITICAL"
+     },
+     {
+      "action": "將範圍內 Workload 由 visibility/testing 推進到 selective 或 full Enforcement。",
+      "action_code": "MOVE_TO_ENFORCEMENT",
+      "app_env_key": "endpoint|physical",
+      "evidence": {
+       "allowed_ratio": 0.0049,
+       "blocked_or_pb_flow_count": 9021,
+       "flow_count": 13880,
+       "mixed_traffic_ratio": 0.9876,
+       "unmanaged_traversable_flows": 9
+      },
+      "finding": "endpoint (physical) · 192.168.20.103, 172.16.9.26, 10.10.0.3: 偵測到 Enforcement 落差／偵測到可視性或強制執行盲點 — 流量數 13880、被擋或 PB 流量 9021",
+      "severity": "CRITICAL"
+     },
+     {
+      "action": "將範圍內 Workload 由 visibility/testing 推進到 selective 或 full Enforcement。",
+      "action_code": "MOVE_TO_ENFORCEMENT",
+      "app_env_key": "illumio|kubernetes",
+      "evidence": {
+       "allowed_ratio": 0.0,
+       "blocked_or_pb_flow_count": 9,
+       "flow_count": 9
+      },
+      "finding": "illumio (kubernetes): 偵測到 Enforcement 落差 — 流量數 9、被擋或 PB 流量 9",
+      "severity": "CRITICAL"
+     },
+     {
+      "action": "將範圍內 Workload 由 visibility/testing 推進到 selective 或 full Enforcement。",
+      "action_code": "MOVE_TO_ENFORCEMENT",
+      "app_env_key": "illumio|vmware",
+      "evidence": {
+       "allowed_ratio": 0.125,
+       "blocked_or_pb_flow_count": 17,
+       "flow_count": 32,
+       "mixed_traffic_ratio": 0.7188
+      },
+      "finding": "illumio (vmware): 偵測到 Enforcement 落差／偵測到可視性或強制執行盲點 — 流量數 32、被擋或 PB 流量 17",
+      "severity": "CRITICAL"
+     }
+    ],
+    "boundary_breaches": [
+     {
+      "action": "收斂 Ringfence 範圍，只保留必要的 App 對 App 存取路徑。",
+      "action_code": "DEFINE_RINGFENCE_SCOPE",
+      "app_env_key": "coreservices|vmware",
+      "evidence": {
+       "flow_count": 8045,
+       "remote_allowed_ratio": 0.0,
+       "remote_flow_count": 12,
+       "ringfence_ratio": 0.0014
+      },
+      "finding": "coreservices (vmware) · 172.16.15.106, 172.16.15.100, 172.16.15.102: 偵測到邊界控制弱點 — 流量數 8045、遠端存取流量 12",
+      "severity": "HIGH"
+     },
+     {
+      "action": "收斂 Ringfence 範圍，只保留必要的 App 對 App 存取路徑。",
+      "action_code": "DEFINE_RINGFENCE_SCOPE",
+      "app_env_key": "demoapp|vmware",
+      "evidence": {
+       "flow_count": 210,
+       "ringfence_ratio": 0.0667
+      },
+      "finding": "demoapp (vmware): 偵測到邊界控制弱點 — 流量數 210、ringfence 佔比 0.07",
+      "severity": "HIGH"
+     },
+     {
+      "action": "收斂 Ringfence 範圍，只保留必要的 App 對 App 存取路徑。",
+      "action_code": "DEFINE_RINGFENCE_SCOPE",
+      "app_env_key": "endpoint|physical",
+      "evidence": {
+       "flow_count": 13880,
+       "remote_allowed_ratio": 0.0,
+       "remote_flow_count": 6,
+       "ringfence_ratio": 0.0022
+      },
+      "finding": "endpoint (physical) · 192.168.20.103, 172.16.9.26, 10.10.0.3: 偵測到邊界控制弱點 — 流量數 13880、遠端存取流量 6",
+      "severity": "HIGH"
+     }
+    ],
+    "suspicious_pivot_behavior": [
+     {
+      "action": "此 Workload 在流量圖中扮演網路樞紐角色（高可達性或 articulation point），請套用更嚴格的東西向 Policy 邊界以限制橫向移動。",
+      "action_code": "RESTRICT_TRANSIT_NODE_ACCESS",
+      "app_env_key": "coreservices|vmware",
+      "evidence": {
+       "bridge_score": 90.0,
+       "reachability_count": 3
+      },
+      "finding": "coreservices (vmware) · 172.16.15.106, 172.16.15.100, 172.16.15.102 · 172.16.15.106, 172.16.15.100, 172.16.15.102: 偵測到可疑橫向樞紐行為 — 可達節點 3、橋接分數 90.0",
+      "severity": "HIGH"
+     },
+     {
+      "action": "此 Workload 在流量圖中扮演網路樞紐角色（高可達性或 articulation point），請套用更嚴格的東西向 Policy 邊界以限制橫向移動。",
+      "action_code": "RESTRICT_TRANSIT_NODE_ACCESS",
+      "app_env_key": "unlabeled|unlabeled",
+      "evidence": {
+       "bridge_score": 90.0,
+       "reachability_count": 3
+      },
+      "finding": "172.16.15.100, 172.16.15.101, 20.27.177.113, 192.168.20.32 +1 · 172.16.15.100, 172.16.15.101, 20.27.177.113, 192.168.20.32 +1: 偵測到可疑橫向樞紐行為 — 可達節點 3、橋接分數 90.0",
+      "severity": "HIGH"
+     }
+    ]
+   },
+   "attack_summary_counts": {
+    "action_matrix": 5,
+    "blast_radius": 2,
+    "blind_spots": 5,
+    "boundary_breaches": 3,
+    "suspicious_pivot_behavior": 2
+   },
+   "execution_stats": {},
+   "failed_rule_details": [],
+   "filename": "Illumio_Traffic_Report_SecurityRisk_2026-07-23_1500.html",
+   "mtime": 1784818813.2964735,
+   "pending_rule_details": [],
+   "report_type": "traffic",
+   "reused_rule_details": [],
+   "size": 409462,
+   "summary": "Attack posture boundary 3 | pivot 2 | blast 2 | blind 5 | actions 5"
+  },
+  {
+   "attack_summary": {
+    "action_matrix": [],
+    "blast_radius": [],
+    "blind_spots": [],
+    "boundary_breaches": [],
+    "suspicious_pivot_behavior": []
+   },
+   "attack_summary_counts": {
+    "action_matrix": 0,
+    "blast_radius": 0,
+    "blind_spots": 0,
+    "boundary_breaches": 0,
+    "suspicious_pivot_behavior": 0
+   },
+   "execution_stats": {},
+   "failed_rule_details": [],
+   "filename": "Illumio_Traffic_Report_2026-07-23_1456.html",
+   "mtime": 1784818587.3103774,
+   "pending_rule_details": [],
+   "report_type": "traffic",
+   "reused_rule_details": [],
+   "size": 298259,
+   "summary": "traffic records 203036"
+  },
+  {
+   "attack_summary": {},
+   "attack_summary_counts": {},
+   "execution_stats": {},
+   "failed_rule_details": [],
+   "filename": "Illumio_Rule_Hit_Count_Report_2026-07-23_1021.html",
+   "mtime": 1784802064.9787092,
+   "pending_rule_details": [],
+   "report_type": "rule_hit_count",
+   "reused_rule_details": [],
+   "size": 50968,
+   "summary": ""
+  },
+  {
+   "attack_summary": {
+    "action_matrix": [
+     {
+      "action": "此 Workload 在流量圖中扮演網路樞紐角色（高可達性或 articulation point），請套用更嚴格的東西向 Policy 邊界以限制橫向移動。",
+      "action_code": "RESTRICT_TRANSIT_NODE_ACCESS",
+      "apps": [
+       "audit (global)"
+      ],
+      "count": 1,
+      "flow_total": 0,
+      "severity": "CRITICAL"
+     },
+     {
+      "action": "將範圍內 Workload 由 visibility/testing 推進到 selective 或 full Enforcement。",
+      "action_code": "MOVE_TO_ENFORCEMENT",
+      "apps": [
+       "audit (global)"
+      ],
+      "count": 2,
+      "flow_total": 0,
+      "severity": "MEDIUM"
+     },
+     {
+      "action": "先排除 pending/failed usage query，再進行 Policy 下線判斷。",
+      "action_code": "RESOLVE_QUERY_FAILURES",
+      "apps": [
+       "audit (global)"
+      ],
+      "count": 1,
+      "flow_total": 0,
+      "severity": "MEDIUM"
+     },
+     {
+      "action": "檢查高影響範圍 provision，確認邊界敏感變更皆經授權。",
+      "action_code": "REVIEW_HIGH_IMPACT_PROVISIONS",
+      "apps": [
+       "audit (global)"
+      ],
+      "count": 1,
+      "flow_total": 0,
+      "severity": "MEDIUM"
+     }
+    ],
+    "blast_radius": [],
+    "blind_spots": [
+     {
+      "action": "將範圍內 Workload 由 visibility/testing 推進到 selective 或 full Enforcement。",
+      "action_code": "MOVE_TO_ENFORCEMENT",
+      "app_env_key": "audit|global",
+      "evidence": {
+       "actors": [
+        "admin@lab.local"
+       ],
+       "count": 8,
+       "event_type": "rule_set.update",
+       "parser_note_rows": 13,
+       "src_ips": [
+        "172.16.15.106",
+        "192.168.20.99"
+       ]
+      },
+      "finding": "audit (global): 偵測到可視性或強制執行盲點",
+      "severity": "MEDIUM"
+     }
+    ],
+    "boundary_breaches": [
+     {
+      "action": "檢查高影響範圍 provision，確認邊界敏感變更皆經授權。",
+      "action_code": "REVIEW_HIGH_IMPACT_PROVISIONS",
+      "app_env_key": "audit|global",
+      "evidence": {
+       "actors": [
+        "admin@lab.local"
+       ],
+       "count": 7,
+       "event_type": "sec_policy.create",
+       "src_ips": [
+        "172.16.15.106"
+       ]
+      },
+      "finding": "audit (global): 偵測到邊界控制弱點",
+      "severity": "MEDIUM"
+     }
+    ],
+    "suspicious_pivot_behavior": [
+     {
+      "action": "此 Workload 在流量圖中扮演網路樞紐角色（高可達性或 articulation point），請套用更嚴格的東西向 Policy 邊界以限制橫向移動。",
+      "action_code": "RESTRICT_TRANSIT_NODE_ACCESS",
+      "app_env_key": "audit|global",
+      "evidence": {
+       "actors": [
+        "podman"
+       ],
+       "count": 2,
+       "event_type": "agent.tampering",
+       "src_ips": [
+        "172.16.15.170"
+       ]
+      },
+      "finding": "audit (global): 偵測到可疑橫向樞紐行為",
+      "severity": "CRITICAL"
+     }
+    ]
+   },
+   "attack_summary_counts": {
+    "action_matrix": 4,
+    "blast_radius": 0,
+    "blind_spots": 1,
+    "boundary_breaches": 1,
+    "suspicious_pivot_behavior": 1
+   },
+   "execution_stats": {},
+   "failed_rule_details": [],
+   "filename": "illumio_audit_report_2026-07-23_1020.html",
+   "mtime": 1784802050.0777087,
+   "pending_rule_details": [],
+   "report_type": "audit",
+   "reused_rule_details": [],
+   "size": 241734,
+   "summary": "Attack posture boundary 1 | pivot 1 | blast 0 | blind 1 | actions 4"
+  },
+  {
+   "attack_summary": {},
+   "attack_summary_counts": {},
+   "execution_stats": {},
+   "failed_rule_details": [],
+   "filename": "illumio_ven_status_2026-07-23_1020.html",
+   "mtime": 1784802045.9767087,
+   "pending_rule_details": [],
+   "report_type": "",
+   "reused_rule_details": [],
+   "size": 91465,
+   "summary": ""
+  },
+  {
+   "attack_summary": {},
+   "attack_summary_counts": {},
+   "execution_stats": {},
+   "failed_rule_details": [],
+   "filename": "Illumio_Readiness_Report_2026-07-23_1020.html",
+   "mtime": 1784802038.7007084,
+   "pending_rule_details": [],
+   "report_type": "readiness",
+   "reused_rule_details": [],
+   "size": 58317,
+   "summary": ""
+  },
+  {
+   "attack_summary": {
+    "action_matrix": [
+     {
+      "action": "將範圍內 Workload 由 visibility/testing 推進到 selective 或 full Enforcement。",
+      "action_code": "MOVE_TO_ENFORCEMENT",
+      "apps": [
+       "coreservices (vmware)",
+       "demoapp (vmware)",
+       "endpoint (physical)",
+       "illumio (kubernetes)",
+       "illumio (vmware)"
+      ],
+      "count": 15,
+      "flow_total": 403768,
+      "severity": "CRITICAL"
+     },
+     {
+      "action": "將 Unmanaged 資產納管，或明確隔離其存取路徑。",
+      "action_code": "ONBOARD_UNMANAGED",
+      "apps": [
+       "coreservices (vmware)",
+       "demoapp (vmware)",
+       "endpoint (physical)",
+       "illumio (vmware)",
+       "infrastructure (vmware)"
+      ],
+      "count": 16,
+      "flow_total": 403367,
+      "severity": "HIGH"
+     },
+     {
+      "action": "收斂 Ringfence 範圍，只保留必要的 App 對 App 存取路徑。",
+      "action_code": "DEFINE_RINGFENCE_SCOPE",
+      "apps": [
+       "coreservices (vmware)",
+       "demoapp (vmware)",
+       "endpoint (physical)"
+      ],
+      "count": 3,
+      "flow_total": 20204,
+      "severity": "HIGH"
+     },
+     {
+      "action": "將跨邊界通訊埠收斂為明確 allowlist，移除過寬存取範圍。",
+      "action_code": "LOCK_BOUNDARY_PORTS",
+      "apps": [
+       "coreservices (vmware)",
+       "endpoint (physical)"
+      ],
+      "count": 2,
+      "flow_total": 13,
+      "severity": "HIGH"
+     },
+     {
+      "action": "此 Workload 在流量圖中扮演網路樞紐角色（高可達性或 articulation point），請套用更嚴格的東西向 Policy 邊界以限制橫向移動。",
+      "action_code": "RESTRICT_TRANSIT_NODE_ACCESS",
+      "apps": [
+       "coreservices (vmware) · 172.16.15.106, 172.16.15.100, 172.16.15.102",
+       "172.16.15.100, 172.16.15.101, 192.168.20.32, 20.27.177.113 +1"
+      ],
+      "count": 2,
+      "flow_total": 0,
+      "severity": "HIGH"
+     }
+    ],
+    "blast_radius": [
+     {
+      "action": "降低可橫向移動路徑，並優先分段高可達性的節點。",
+      "action_code": "TIGHTEN_LATERAL_POLICY",
+      "app_env_key": "endpoint|physical",
+      "evidence": {
+       "max_depth": 4,
+       "reachability_count": 4
+      },
+      "finding": "endpoint (physical) · 172.16.9.26, 10.10.0.3 · 172.16.9.26, 10.10.0.3: 偵測到高擴散半徑風險 — 可達節點 4、最大路徑深度 4",
+      "severity": "HIGH"
+     },
+     {
+      "action": "降低可橫向移動路徑，並優先分段高可達性的節點。",
+      "action_code": "TIGHTEN_LATERAL_POLICY",
+      "app_env_key": "jumpdesk|vmware",
+      "evidence": {
+       "max_depth": 4,
+       "reachability_count": 4
+      },
+      "finding": "jumpdesk (vmware) · 172.16.15.150 · 172.16.15.150: 偵測到高擴散半徑風險 — 可達節點 4、最大路徑深度 4",
+      "severity": "HIGH"
+     }
+    ],
+    "blind_spots": [
+     {
+      "action": "將範圍內 Workload 由 visibility/testing 推進到 selective 或 full Enforcement。",
+      "action_code": "MOVE_TO_ENFORCEMENT",
+      "app_env_key": "coreservices|vmware",
+      "evidence": {
+       "allowed_ratio": 0.0186,
+       "blocked_or_pb_flow_count": 2273,
+       "flow_count": 6981,
+       "mixed_traffic_ratio": 0.9534,
+       "unmanaged_traversable_flows": 2
+      },
+      "finding": "coreservices (vmware) · 172.16.15.106, 172.16.15.100, 172.16.15.102: 偵測到 Enforcement 落差／偵測到可視性或強制執行盲點 — 流量數 6981、被擋或 PB 流量 2273",
+      "severity": "CRITICAL"
+     },
+     {
+      "action": "將範圍內 Workload 由 visibility/testing 推進到 selective 或 full Enforcement。",
+      "action_code": "MOVE_TO_ENFORCEMENT",
+      "app_env_key": "demoapp|vmware",
+      "evidence": {
+       "allowed_ratio": 0.1116,
+       "blocked_or_pb_flow_count": 115,
+       "flow_count": 215,
+       "mixed_traffic_ratio": 0.7612
+      },
+      "finding": "demoapp (vmware): 偵測到 Enforcement 落差／偵測到可視性或強制執行盲點 — 流量數 215、被擋或 PB 流量 115",
+      "severity": "CRITICAL"
+     },
+     {
+      "action": "將範圍內 Workload 由 visibility/testing 推進到 selective 或 full Enforcement。",
+      "action_code": "MOVE_TO_ENFORCEMENT",
+      "app_env_key": "endpoint|physical",
+      "evidence": {
+       "allowed_ratio": 0.0035,
+       "blocked_or_pb_flow_count": 8536,
+       "flow_count": 13008,
+       "mixed_traffic_ratio": 0.9958,
+       "unmanaged_traversable_flows": 5
+      },
+      "finding": "endpoint (physical) · 172.16.9.26, 10.10.0.3: 偵測到 Enforcement 落差／偵測到可視性或強制執行盲點 — 流量數 13008、被擋或 PB 流量 8536",
+      "severity": "CRITICAL"
+     },
+     {
+      "action": "將範圍內 Workload 由 visibility/testing 推進到 selective 或 full Enforcement。",
+      "action_code": "MOVE_TO_ENFORCEMENT",
+      "app_env_key": "illumio|kubernetes",
+      "evidence": {
+       "allowed_ratio": 0.0,
+       "blocked_or_pb_flow_count": 9,
+       "flow_count": 9
+      },
+      "finding": "illumio (kubernetes): 偵測到 Enforcement 落差 — 流量數 9、被擋或 PB 流量 9",
+      "severity": "CRITICAL"
+     },
+     {
+      "action": "將範圍內 Workload 由 visibility/testing 推進到 selective 或 full Enforcement。",
+      "action_code": "MOVE_TO_ENFORCEMENT",
+      "app_env_key": "illumio|vmware",
+      "evidence": {
+       "allowed_ratio": 0.125,
+       "blocked_or_pb_flow_count": 17,
+       "flow_count": 32,
+       "mixed_traffic_ratio": 0.7188
+      },
+      "finding": "illumio (vmware): 偵測到 Enforcement 落差／偵測到可視性或強制執行盲點 — 流量數 32、被擋或 PB 流量 17",
+      "severity": "CRITICAL"
+     }
+    ],
+    "boundary_breaches": [
+     {
+      "action": "收斂 Ringfence 範圍，只保留必要的 App 對 App 存取路徑。",
+      "action_code": "DEFINE_RINGFENCE_SCOPE",
+      "app_env_key": "coreservices|vmware",
+      "evidence": {
+       "flow_count": 6981,
+       "remote_allowed_ratio": 0.0,
+       "remote_flow_count": 12,
+       "ringfence_ratio": 0.0019
+      },
+      "finding": "coreservices (vmware) · 172.16.15.106, 172.16.15.100, 172.16.15.102: 偵測到邊界控制弱點 — 流量數 6981、遠端存取流量 12",
+      "severity": "HIGH"
+     },
+     {
+      "action": "收斂 Ringfence 範圍，只保留必要的 App 對 App 存取路徑。",
+      "action_code": "DEFINE_RINGFENCE_SCOPE",
+      "app_env_key": "demoapp|vmware",
+      "evidence": {
+       "flow_count": 215,
+       "ringfence_ratio": 0.0651
+      },
+      "finding": "demoapp (vmware): 偵測到邊界控制弱點 — 流量數 215、ringfence 佔比 0.07",
+      "severity": "HIGH"
+     },
+     {
+      "action": "收斂 Ringfence 範圍，只保留必要的 App 對 App 存取路徑。",
+      "action_code": "DEFINE_RINGFENCE_SCOPE",
+      "app_env_key": "endpoint|physical",
+      "evidence": {
+       "flow_count": 13008,
+       "remote_allowed_ratio": 0.0,
+       "remote_flow_count": 1,
+       "ringfence_ratio": 0.0018
+      },
+      "finding": "endpoint (physical) · 172.16.9.26, 10.10.0.3: 偵測到邊界控制弱點 — 流量數 13008、遠端存取流量 1",
+      "severity": "HIGH"
+     }
+    ],
+    "suspicious_pivot_behavior": [
+     {
+      "action": "此 Workload 在流量圖中扮演網路樞紐角色（高可達性或 articulation point），請套用更嚴格的東西向 Policy 邊界以限制橫向移動。",
+      "action_code": "RESTRICT_TRANSIT_NODE_ACCESS",
+      "app_env_key": "coreservices|vmware",
+      "evidence": {
+       "bridge_score": 90.0,
+       "reachability_count": 3
+      },
+      "finding": "coreservices (vmware) · 172.16.15.106, 172.16.15.100, 172.16.15.102 · 172.16.15.106, 172.16.15.100, 172.16.15.102: 偵測到可疑橫向樞紐行為 — 可達節點 3、橋接分數 90.0",
+      "severity": "HIGH"
+     },
+     {
+      "action": "此 Workload 在流量圖中扮演網路樞紐角色（高可達性或 articulation point），請套用更嚴格的東西向 Policy 邊界以限制橫向移動。",
+      "action_code": "RESTRICT_TRANSIT_NODE_ACCESS",
+      "app_env_key": "unlabeled|unlabeled",
+      "evidence": {
+       "bridge_score": 90.0,
+       "reachability_count": 3
+      },
+      "finding": "172.16.15.100, 172.16.15.101, 192.168.20.32, 20.27.177.113 +1 · 172.16.15.100, 172.16.15.101, 192.168.20.32, 20.27.177.113 +1: 偵測到可疑橫向樞紐行為 — 可達節點 3、橋接分數 90.0",
+      "severity": "HIGH"
+     }
+    ]
+   },
+   "attack_summary_counts": {
+    "action_matrix": 5,
+    "blast_radius": 2,
+    "blind_spots": 5,
+    "boundary_breaches": 3,
+    "suspicious_pivot_behavior": 2
+   },
+   "execution_stats": {},
+   "failed_rule_details": [],
+   "filename": "Illumio_Traffic_Report_SecurityRisk_2026-07-23_1017.html",
+   "mtime": 1784801880.029705,
+   "pending_rule_details": [],
+   "report_type": "traffic",
+   "reused_rule_details": [],
+   "size": 215003,
+   "summary": "Attack posture boundary 3 | pivot 2 | blast 2 | blind 5 | actions 5"
+  },
+  {
+   "attack_summary": {
+    "action_matrix": [],
+    "blast_radius": [],
+    "blind_spots": [],
+    "boundary_breaches": [],
+    "suspicious_pivot_behavior": []
+   },
+   "attack_summary_counts": {
+    "action_matrix": 0,
+    "blast_radius": 0,
+    "blind_spots": 0,
+    "boundary_breaches": 0,
+    "suspicious_pivot_behavior": 0
+   },
+   "execution_stats": {},
+   "failed_rule_details": [],
+   "filename": "Illumio_Traffic_Report_2026-07-23_1014.html",
+   "mtime": 1784801668.7057102,
+   "pending_rule_details": [],
+   "report_type": "traffic",
+   "reused_rule_details": [],
+   "size": 102544,
+   "summary": "traffic records 202068"
+  },
+  {
+   "attack_summary": {},
+   "attack_summary_counts": {},
+   "execution_stats": {},
+   "failed_rule_details": [],
+   "filename": "Illumio_Policy_Diff_Report_2026-07-16_1206.html",
+   "mtime": 1784203599.9609673,
+   "pending_rule_details": [],
+   "report_type": "",
+   "reused_rule_details": [],
+   "size": 47792,
+   "summary": ""
+  },
+  {
+   "attack_summary": {},
+   "attack_summary_counts": {},
+   "execution_stats": {},
+   "failed_rule_details": [],
+   "filename": "illumio_ven_status_2026-07-14_1506.html",
+   "mtime": 1784041619.7790644,
+   "pending_rule_details": [],
+   "report_type": "",
+   "reused_rule_details": [],
+   "size": 90480,
+   "summary": ""
+  },
+  {
+   "attack_summary": {},
+   "attack_summary_counts": {},
+   "execution_stats": {},
+   "failed_rule_details": [],
+   "filename": "Illumio_Policy_Resolver_Report_2026-07-14_1506_raw.zip",
+   "mtime": 1784041573.6853523,
+   "pending_rule_details": [],
+   "report_type": "",
+   "reused_rule_details": [],
+   "size": 498,
+   "summary": ""
+  },
+  {
+   "attack_summary": {},
+   "attack_summary_counts": {},
+   "execution_stats": {},
+   "failed_rule_details": [],
+   "filename": "illumio_ven_status_2026-07-13_1456.html",
+   "mtime": 1783954604.6545312,
+   "pending_rule_details": [],
+   "report_type": "",
+   "reused_rule_details": [],
+   "size": 89400,
+   "summary": ""
+  },
+  {
+   "attack_summary": {},
+   "attack_summary_counts": {},
+   "execution_stats": {},
+   "failed_rule_details": [],
+   "filename": "Illumio_App_Summary_Kube-Prom-Stack_2026-07-13_1446.html",
+   "mtime": 1783954013.3031917,
+   "pending_rule_details": [],
+   "report_type": "",
+   "reused_rule_details": [],
+   "size": 56305,
+   "summary": ""
+  },
+  {
+   "attack_summary": {},
+   "attack_summary_counts": {},
+   "execution_stats": {},
+   "failed_rule_details": [],
+   "filename": "Illumio_Readiness_Report_2026-07-13_1446.html",
+   "mtime": 1783953961.837843,
+   "pending_rule_details": [],
+   "report_type": "readiness",
+   "reused_rule_details": [],
+   "size": 58886,
+   "summary": ""
+  },
+  {
+   "attack_summary": {},
+   "attack_summary_counts": {},
+   "execution_stats": {},
+   "failed_rule_details": [],
+   "filename": "Illumio_Rule_Hit_Count_Report_2026-07-13_1434.html",
+   "mtime": 1783953250.5625944,
+   "pending_rule_details": [],
+   "report_type": "rule_hit_count",
+   "reused_rule_details": [],
+   "size": 49779,
+   "summary": ""
+  },
+  {
+   "attack_summary": {},
+   "attack_summary_counts": {},
+   "execution_stats": {},
+   "failed_rule_details": [],
+   "filename": "Illumio_Rule_Hit_Count_Report_2026-07-13_1320.html",
+   "mtime": 1783948825.5876372,
+   "pending_rule_details": [],
+   "report_type": "rule_hit_count",
+   "reused_rule_details": [],
+   "size": 49371,
+   "summary": ""
+  },
+  {
+   "attack_summary": {},
+   "attack_summary_counts": {},
+   "execution_stats": {},
+   "failed_rule_details": [],
+   "filename": "Illumio_Policy_Diff_Report_2026-07-13_1318.html",
+   "mtime": 1783948714.6370487,
+   "pending_rule_details": [],
+   "report_type": "",
+   "reused_rule_details": [],
+   "size": 48578,
+   "summary": ""
+  },
+  {
+   "attack_summary": {},
+   "attack_summary_counts": {},
+   "execution_stats": {},
+   "failed_rule_details": [],
+   "filename": "Illumio_Rule_Hit_Count_Report_2026-07-12_1447.html",
+   "mtime": 1783867628.9039278,
+   "pending_rule_details": [],
+   "report_type": "rule_hit_count",
+   "reused_rule_details": [],
+   "size": 49434,
+   "summary": ""
+  },
+  {
+   "attack_summary": {},
+   "attack_summary_counts": {},
+   "execution_stats": {},
+   "failed_rule_details": [],
+   "filename": "Illumio_Rule_Hit_Count_Report_2026-07-11_0155.html",
+   "mtime": 1783734936.168272,
+   "pending_rule_details": [],
+   "report_type": "rule_hit_count",
+   "reused_rule_details": [],
+   "size": 48932,
+   "summary": ""
+  },
+  {
+   "attack_summary": {},
+   "attack_summary_counts": {},
+   "execution_stats": {},
+   "failed_rule_details": [],
+   "filename": "Illumio_Rule_Hit_Count_Report_2026-07-11_0150.html",
+   "mtime": 1783734634.9426622,
+   "pending_rule_details": [],
+   "report_type": "rule_hit_count",
+   "reused_rule_details": [],
+   "size": 48932,
+   "summary": ""
+  },
+  {
+   "attack_summary": {
+    "action_matrix": [
+     {
+      "action": "將範圍內 Workload 由 visibility/testing 推進到 selective 或 full Enforcement。",
+      "action_code": "MOVE_TO_ENFORCEMENT",
+      "apps": [
+       "calico (kubernetes)",
+       "coreservices (vmware)",
+       "default (kubernetes)",
+       "demoapp (vmware)",
+       "endpoint (physical)"
+      ],
+      "count": 16,
+      "flow_total": 38473,
+      "severity": "CRITICAL"
+     },
+     {
+      "action": "將 Unmanaged 資產納管，或明確隔離其存取路徑。",
+      "action_code": "ONBOARD_UNMANAGED",
+      "apps": [
+       "coreservices (vmware)",
+       "demoapp (vmware)",
+       "endpoint (physical)",
+       "illumio (vmware)",
+       "infrastructure (vmware)"
+      ],
+      "count": 12,
+      "flow_total": 35443,
+      "severity": "HIGH"
+     },
+     {
+      "action": "收斂 Ringfence 範圍，只保留必要的 App 對 App 存取路徑。",
+      "action_code": "DEFINE_RINGFENCE_SCOPE",
+      "apps": [
+       "calico (kubernetes)",
+       "coreservices (vmware)",
+       "default (kubernetes)"
+      ],
+      "count": 3,
+      "flow_total": 9506,
+      "severity": "HIGH"
+     },
+     {
+      "action": "降低可橫向移動路徑，並優先分段高可達性的節點。",
+      "action_code": "TIGHTEN_LATERAL_POLICY",
+      "apps": [
+       "endpoint (physical) · 10.10.0.3, 172.16.9.26, 192.168.40.108",
+       "jumpdesk (vmware) · 172.16.15.150"
+      ],
+      "count": 2,
+      "flow_total": 0,
+      "severity": "HIGH"
+     },
+     {
+      "action": "將跨邊界通訊埠收斂為明確 allowlist，移除過寬存取範圍。",
+      "action_code": "LOCK_BOUNDARY_PORTS",
+      "apps": [
+       "coreservices (vmware)"
+      ],
+      "count": 1,
+      "flow_total": 40,
+      "severity": "HIGH"
+     }
+    ],
+    "blast_radius": [
+     {
+      "action": "降低可橫向移動路徑，並優先分段高可達性的節點。",
+      "action_code": "TIGHTEN_LATERAL_POLICY",
+      "app_env_key": "endpoint|physical",
+      "evidence": {
+       "max_depth": 4,
+       "reachability_count": 4
+      },
+      "finding": "endpoint (physical) · 10.10.0.3, 172.16.9.26, 192.168.40.108 · 10.10.0.3, 172.16.9.26, 192.168.40.108: 偵測到高擴散半徑風險 — 可達節點 4、最大路徑深度 4",
+      "severity": "HIGH"
+     },
+     {
+      "action": "降低可橫向移動路徑，並優先分段高可達性的節點。",
+      "action_code": "TIGHTEN_LATERAL_POLICY",
+      "app_env_key": "jumpdesk|vmware",
+      "evidence": {
+       "max_depth": 4,
+       "reachability_count": 4
+      },
+      "finding": "jumpdesk (vmware) · 172.16.15.150 · 172.16.15.150: 偵測到高擴散半徑風險 — 可達節點 4、最大路徑深度 4",
+      "severity": "HIGH"
+     }
+    ],
+    "blind_spots": [
+     {
+      "action": "將範圍內 Workload 由 visibility/testing 推進到 selective 或 full Enforcement。",
+      "action_code": "MOVE_TO_ENFORCEMENT",
+      "app_env_key": "calico|kubernetes",
+      "evidence": {
+       "allowed_ratio": 0.1489,
+       "blocked_or_pb_flow_count": 40,
+       "flow_count": 47
+      },
+      "finding": "calico (kubernetes): 偵測到 Enforcement 落差 — 流量數 47、被擋或 PB 流量 40",
+      "severity": "CRITICAL"
+     },
+     {
+      "action": "將範圍內 Workload 由 visibility/testing 推進到 selective 或 full Enforcement。",
+      "action_code": "MOVE_TO_ENFORCEMENT",
+      "app_env_key": "coreservices|vmware",
+      "evidence": {
+       "allowed_ratio": 0.0164,
+       "blocked_or_pb_flow_count": 9200,
+       "flow_count": 9353,
+       "mixed_traffic_ratio": 0.9104,
+       "unmanaged_traversable_flows": 6
+      },
+      "finding": "coreservices (vmware) · 172.16.15.106, 172.16.15.100: 偵測到 Enforcement 落差／偵測到可視性或強制執行盲點 — 流量數 9353、被擋或 PB 流量 9200",
+      "severity": "CRITICAL"
+     },
+     {
+      "action": "將範圍內 Workload 由 visibility/testing 推進到 selective 或 full Enforcement。",
+      "action_code": "MOVE_TO_ENFORCEMENT",
+      "app_env_key": "default|kubernetes",
+      "evidence": {
+       "allowed_ratio": 0.0,
+       "blocked_or_pb_flow_count": 106,
+       "flow_count": 106
+      },
+      "finding": "default (kubernetes): 偵測到 Enforcement 落差 — 流量數 106、被擋或 PB 流量 106",
+      "severity": "CRITICAL"
+     },
+     {
+      "action": "將範圍內 Workload 由 visibility/testing 推進到 selective 或 full Enforcement。",
+      "action_code": "MOVE_TO_ENFORCEMENT",
+      "app_env_key": "demoapp|vmware",
+      "evidence": {
+       "allowed_ratio": 0.096,
+       "blocked_or_pb_flow_count": 546,
+       "flow_count": 604,
+       "mixed_traffic_ratio": 0.6233
+      },
+      "finding": "demoapp (vmware): 偵測到 Enforcement 落差／偵測到可視性或強制執行盲點 — 流量數 604、被擋或 PB 流量 546",
+      "severity": "CRITICAL"
+     },
+     {
+      "action": "將範圍內 Workload 由 visibility/testing 推進到 selective 或 full Enforcement。",
+      "action_code": "MOVE_TO_ENFORCEMENT",
+      "app_env_key": "endpoint|physical",
+      "evidence": {
+       "allowed_ratio": 0.0157,
+       "blocked_or_pb_flow_count": 6841,
+       "flow_count": 6950,
+       "mixed_traffic_ratio": 0.966,
+       "unmanaged_traversable_flows": 23
+      },
+      "finding": "endpoint (physical) · 10.10.0.3, 172.16.9.26, 192.168.40.108: 偵測到 Enforcement 落差／偵測到可視性或強制執行盲點 — 流量數 6950、被擋或 PB 流量 6841",
+      "severity": "CRITICAL"
+     }
+    ],
+    "boundary_breaches": [
+     {
+      "action": "收斂 Ringfence 範圍，只保留必要的 App 對 App 存取路徑。",
+      "action_code": "DEFINE_RINGFENCE_SCOPE",
+      "app_env_key": "calico|kubernetes",
+      "evidence": {
+       "flow_count": 47,
+       "ringfence_ratio": 0.0
+      },
+      "finding": "calico (kubernetes): 偵測到邊界控制弱點 — 流量數 47、ringfence 佔比 0.0",
+      "severity": "HIGH"
+     },
+     {
+      "action": "收斂 Ringfence 範圍，只保留必要的 App 對 App 存取路徑。",
+      "action_code": "DEFINE_RINGFENCE_SCOPE",
+      "app_env_key": "coreservices|vmware",
+      "evidence": {
+       "flow_count": 9353,
+       "remote_allowed_ratio": 0.0,
+       "remote_flow_count": 40,
+       "ringfence_ratio": 0.0065
+      },
+      "finding": "coreservices (vmware) · 172.16.15.106, 172.16.15.100: 偵測到邊界控制弱點 — 流量數 9353、遠端存取流量 40",
+      "severity": "HIGH"
+     },
+     {
+      "action": "收斂 Ringfence 範圍，只保留必要的 App 對 App 存取路徑。",
+      "action_code": "DEFINE_RINGFENCE_SCOPE",
+      "app_env_key": "default|kubernetes",
+      "evidence": {
+       "flow_count": 106,
+       "ringfence_ratio": 0.0
+      },
+      "finding": "default (kubernetes): 偵測到邊界控制弱點 — 流量數 106、ringfence 佔比 0.0",
+      "severity": "HIGH"
+     }
+    ],
+    "suspicious_pivot_behavior": [
+     {
+      "action": "此 Workload 在流量圖中扮演網路樞紐角色（高可達性或 articulation point），請套用更嚴格的東西向 Policy 邊界以限制橫向移動。",
+      "action_code": "RESTRICT_TRANSIT_NODE_ACCESS",
+      "app_env_key": "coreservices|vmware",
+      "evidence": {
+       "bridge_score": 90.0,
+       "reachability_count": 3
+      },
+      "finding": "coreservices (vmware) · 172.16.15.106, 172.16.15.100 · 172.16.15.106, 172.16.15.100: 偵測到可疑橫向樞紐行為 — 可達節點 3、橋接分數 90.0",
+      "severity": "HIGH"
+     }
+    ]
+   },
+   "attack_summary_counts": {
+    "action_matrix": 5,
+    "blast_radius": 2,
+    "blind_spots": 5,
+    "boundary_breaches": 3,
+    "suspicious_pivot_behavior": 1
+   },
+   "execution_stats": {},
+   "failed_rule_details": [],
+   "filename": "Illumio_Traffic_Report_NetworkInventory_2026-07-06_1331.html",
+   "mtime": 1783344662.8872151,
+   "pending_rule_details": [],
+   "report_type": "traffic",
+   "reused_rule_details": [],
+   "size": 170769,
+   "summary": "Attack posture boundary 3 | pivot 1 | blast 2 | blind 5 | actions 5"
+  },
+  {
+   "attack_summary": {
+    "action_matrix": [
+     {
+      "action": "將範圍內 Workload 由 visibility/testing 推進到 selective 或 full Enforcement。",
+      "action_code": "MOVE_TO_ENFORCEMENT",
+      "apps": [
+       "calico (kubernetes)",
+       "coreservices (vmware)",
+       "default (kubernetes)",
+       "demoapp (vmware)",
+       "endpoint (physical)"
+      ],
+      "count": 16,
+      "flow_total": 38473,
+      "severity": "CRITICAL"
+     },
+     {
+      "action": "將 Unmanaged 資產納管，或明確隔離其存取路徑。",
+      "action_code": "ONBOARD_UNMANAGED",
+      "apps": [
+       "coreservices (vmware)",
+       "demoapp (vmware)",
+       "endpoint (physical)",
+       "illumio (vmware)",
+       "infrastructure (vmware)"
+      ],
+      "count": 12,
+      "flow_total": 35443,
+      "severity": "HIGH"
+     },
+     {
+      "action": "收斂 Ringfence 範圍，只保留必要的 App 對 App 存取路徑。",
+      "action_code": "DEFINE_RINGFENCE_SCOPE",
+      "apps": [
+       "calico (kubernetes)",
+       "coreservices (vmware)",
+       "default (kubernetes)"
+      ],
+      "count": 3,
+      "flow_total": 9506,
+      "severity": "HIGH"
+     },
+     {
+      "action": "降低可橫向移動路徑，並優先分段高可達性的節點。",
+      "action_code": "TIGHTEN_LATERAL_POLICY",
+      "apps": [
+       "endpoint (physical) · 10.10.0.3, 172.16.9.26, 192.168.40.108",
+       "jumpdesk (vmware) · 172.16.15.150"
+      ],
+      "count": 2,
+      "flow_total": 0,
+      "severity": "HIGH"
+     },
+     {
+      "action": "將跨邊界通訊埠收斂為明確 allowlist，移除過寬存取範圍。",
+      "action_code": "LOCK_BOUNDARY_PORTS",
+      "apps": [
+       "coreservices (vmware)"
+      ],
+      "count": 1,
+      "flow_total": 40,
+      "severity": "HIGH"
+     }
+    ],
+    "blast_radius": [
+     {
+      "action": "降低可橫向移動路徑，並優先分段高可達性的節點。",
+      "action_code": "TIGHTEN_LATERAL_POLICY",
+      "app_env_key": "endpoint|physical",
+      "evidence": {
+       "max_depth": 4,
+       "reachability_count": 4
+      },
+      "finding": "endpoint (physical) · 10.10.0.3, 172.16.9.26, 192.168.40.108 · 10.10.0.3, 172.16.9.26, 192.168.40.108: 偵測到高擴散半徑風險 — 可達節點 4、最大路徑深度 4",
+      "severity": "HIGH"
+     },
+     {
+      "action": "降低可橫向移動路徑，並優先分段高可達性的節點。",
+      "action_code": "TIGHTEN_LATERAL_POLICY",
+      "app_env_key": "jumpdesk|vmware",
+      "evidence": {
+       "max_depth": 4,
+       "reachability_count": 4
+      },
+      "finding": "jumpdesk (vmware) · 172.16.15.150 · 172.16.15.150: 偵測到高擴散半徑風險 — 可達節點 4、最大路徑深度 4",
+      "severity": "HIGH"
+     }
+    ],
+    "blind_spots": [
+     {
+      "action": "將範圍內 Workload 由 visibility/testing 推進到 selective 或 full Enforcement。",
+      "action_code": "MOVE_TO_ENFORCEMENT",
+      "app_env_key": "calico|kubernetes",
+      "evidence": {
+       "allowed_ratio": 0.1489,
+       "blocked_or_pb_flow_count": 40,
+       "flow_count": 47
+      },
+      "finding": "calico (kubernetes): 偵測到 Enforcement 落差 — 流量數 47、被擋或 PB 流量 40",
+      "severity": "CRITICAL"
+     },
+     {
+      "action": "將範圍內 Workload 由 visibility/testing 推進到 selective 或 full Enforcement。",
+      "action_code": "MOVE_TO_ENFORCEMENT",
+      "app_env_key": "coreservices|vmware",
+      "evidence": {
+       "allowed_ratio": 0.0164,
+       "blocked_or_pb_flow_count": 9200,
+       "flow_count": 9353,
+       "mixed_traffic_ratio": 0.9104,
+       "unmanaged_traversable_flows": 6
+      },
+      "finding": "coreservices (vmware) · 172.16.15.106, 172.16.15.100: 偵測到 Enforcement 落差／偵測到可視性或強制執行盲點 — 流量數 9353、被擋或 PB 流量 9200",
+      "severity": "CRITICAL"
+     },
+     {
+      "action": "將範圍內 Workload 由 visibility/testing 推進到 selective 或 full Enforcement。",
+      "action_code": "MOVE_TO_ENFORCEMENT",
+      "app_env_key": "default|kubernetes",
+      "evidence": {
+       "allowed_ratio": 0.0,
+       "blocked_or_pb_flow_count": 106,
+       "flow_count": 106
+      },
+      "finding": "default (kubernetes): 偵測到 Enforcement 落差 — 流量數 106、被擋或 PB 流量 106",
+      "severity": "CRITICAL"
+     },
+     {
+      "action": "將範圍內 Workload 由 visibility/testing 推進到 selective 或 full Enforcement。",
+      "action_code": "MOVE_TO_ENFORCEMENT",
+      "app_env_key": "demoapp|vmware",
+      "evidence": {
+       "allowed_ratio": 0.096,
+       "blocked_or_pb_flow_count": 546,
+       "flow_count": 604,
+       "mixed_traffic_ratio": 0.6233
+      },
+      "finding": "demoapp (vmware): 偵測到 Enforcement 落差／偵測到可視性或強制執行盲點 — 流量數 604、被擋或 PB 流量 546",
+      "severity": "CRITICAL"
+     },
+     {
+      "action": "將範圍內 Workload 由 visibility/testing 推進到 selective 或 full Enforcement。",
+      "action_code": "MOVE_TO_ENFORCEMENT",
+      "app_env_key": "endpoint|physical",
+      "evidence": {
+       "allowed_ratio": 0.0157,
+       "blocked_or_pb_flow_count": 6841,
+       "flow_count": 6950,
+       "mixed_traffic_ratio": 0.966,
+       "unmanaged_traversable_flows": 23
+      },
+      "finding": "endpoint (physical) · 10.10.0.3, 172.16.9.26, 192.168.40.108: 偵測到 Enforcement 落差／偵測到可視性或強制執行盲點 — 流量數 6950、被擋或 PB 流量 6841",
+      "severity": "CRITICAL"
+     }
+    ],
+    "boundary_breaches": [
+     {
+      "action": "收斂 Ringfence 範圍，只保留必要的 App 對 App 存取路徑。",
+      "action_code": "DEFINE_RINGFENCE_SCOPE",
+      "app_env_key": "calico|kubernetes",
+      "evidence": {
+       "flow_count": 47,
+       "ringfence_ratio": 0.0
+      },
+      "finding": "calico (kubernetes): 偵測到邊界控制弱點 — 流量數 47、ringfence 佔比 0.0",
+      "severity": "HIGH"
+     },
+     {
+      "action": "收斂 Ringfence 範圍，只保留必要的 App 對 App 存取路徑。",
+      "action_code": "DEFINE_RINGFENCE_SCOPE",
+      "app_env_key": "coreservices|vmware",
+      "evidence": {
+       "flow_count": 9353,
+       "remote_allowed_ratio": 0.0,
+       "remote_flow_count": 40,
+       "ringfence_ratio": 0.0065
+      },
+      "finding": "coreservices (vmware) · 172.16.15.106, 172.16.15.100: 偵測到邊界控制弱點 — 流量數 9353、遠端存取流量 40",
+      "severity": "HIGH"
+     },
+     {
+      "action": "收斂 Ringfence 範圍，只保留必要的 App 對 App 存取路徑。",
+      "action_code": "DEFINE_RINGFENCE_SCOPE",
+      "app_env_key": "default|kubernetes",
+      "evidence": {
+       "flow_count": 106,
+       "ringfence_ratio": 0.0
+      },
+      "finding": "default (kubernetes): 偵測到邊界控制弱點 — 流量數 106、ringfence 佔比 0.0",
+      "severity": "HIGH"
+     }
+    ],
+    "suspicious_pivot_behavior": [
+     {
+      "action": "此 Workload 在流量圖中扮演網路樞紐角色（高可達性或 articulation point），請套用更嚴格的東西向 Policy 邊界以限制橫向移動。",
+      "action_code": "RESTRICT_TRANSIT_NODE_ACCESS",
+      "app_env_key": "coreservices|vmware",
+      "evidence": {
+       "bridge_score": 90.0,
+       "reachability_count": 3
+      },
+      "finding": "coreservices (vmware) · 172.16.15.106, 172.16.15.100 · 172.16.15.106, 172.16.15.100: 偵測到可疑橫向樞紐行為 — 可達節點 3、橋接分數 90.0",
+      "severity": "HIGH"
+     }
+    ]
+   },
+   "attack_summary_counts": {
+    "action_matrix": 5,
+    "blast_radius": 2,
+    "blind_spots": 5,
+    "boundary_breaches": 3,
+    "suspicious_pivot_behavior": 1
+   },
+   "execution_stats": {},
+   "failed_rule_details": [],
+   "filename": "Illumio_Traffic_Report_SecurityRisk_2026-07-06_1329.html",
+   "mtime": 1783344590.82808,
+   "pending_rule_details": [],
+   "report_type": "traffic",
+   "reused_rule_details": [],
+   "size": 211919,
+   "summary": "Attack posture boundary 3 | pivot 1 | blast 2 | blind 5 | actions 5"
+  },
+  {
+   "attack_summary": {
+    "action_matrix": [],
+    "blast_radius": [],
+    "blind_spots": [],
+    "boundary_breaches": [],
+    "suspicious_pivot_behavior": []
+   },
+   "attack_summary_counts": {
+    "action_matrix": 0,
+    "blast_radius": 0,
+    "blind_spots": 0,
+    "boundary_breaches": 0,
+    "suspicious_pivot_behavior": 0
+   },
+   "execution_stats": {},
+   "failed_rule_details": [],
+   "filename": "Illumio_Traffic_Report_2026-07-06_1329.html",
+   "mtime": 1783344555.5400145,
+   "pending_rule_details": [],
+   "report_type": "traffic",
+   "reused_rule_details": [],
+   "size": 98967,
+   "summary": "traffic records 19889"
+  },
+  {
+   "attack_summary": {},
+   "attack_summary_counts": {},
+   "execution_stats": {},
+   "failed_rule_details": [],
+   "filename": "illumio_ven_status_2026-07-05_1344.html",
+   "mtime": 1783259061.5698116,
+   "pending_rule_details": [],
+   "report_type": "",
+   "reused_rule_details": [],
+   "size": 89777,
+   "summary": ""
+  },
+  {
+   "attack_summary": {
+    "action_matrix": [
+     {
+      "action": "將範圍內 Workload 由 visibility/testing 推進到 selective 或 full Enforcement。",
+      "action_code": "MOVE_TO_ENFORCEMENT",
+      "apps": [
+       "audit (global)"
+      ],
+      "count": 3,
+      "flow_total": 0,
+      "severity": "HIGH"
+     },
+     {
+      "action": "先排除 pending/failed usage query，再進行 Policy 下線判斷。",
+      "action_code": "RESOLVE_QUERY_FAILURES",
+      "apps": [
+       "audit (global)"
+      ],
+      "count": 1,
+      "flow_total": 0,
+      "severity": "MEDIUM"
+     },
+     {
+      "action": "檢查高影響範圍 provision，確認邊界敏感變更皆經授權。",
+      "action_code": "REVIEW_HIGH_IMPACT_PROVISIONS",
+      "apps": [
+       "audit (global)"
+      ],
+      "count": 1,
+      "flow_total": 0,
+      "severity": "MEDIUM"
+     }
+    ],
+    "blast_radius": [],
+    "blind_spots": [
+     {
+      "action": "將範圍內 Workload 由 visibility/testing 推進到 selective 或 full Enforcement。",
+      "action_code": "MOVE_TO_ENFORCEMENT",
+      "app_env_key": "audit|global",
+      "evidence": {
+       "actors": [
+        "admin@lab.local"
+       ],
+       "count": 1,
+       "event_type": "agents.unpair",
+       "parser_note_rows": 11,
+       "src_ips": [
+        "192.168.20.99"
+       ]
+      },
+      "finding": "audit (global): 偵測到可視性或強制執行盲點",
+      "severity": "HIGH"
+     }
+    ],
+    "boundary_breaches": [
+     {
+      "action": "檢查高影響範圍 provision，確認邊界敏感變更皆經授權。",
+      "action_code": "REVIEW_HIGH_IMPACT_PROVISIONS",
+      "app_env_key": "audit|global",
+      "evidence": {
+       "actors": [
+        "admin@lab.local"
+       ],
+       "count": 4,
+       "event_type": "sec_policy.create",
+       "src_ips": [
+        "192.168.20.99"
+       ]
+      },
+      "finding": "audit (global): 偵測到邊界控制弱點",
+      "severity": "MEDIUM"
+     }
+    ],
+    "suspicious_pivot_behavior": []
+   },
+   "attack_summary_counts": {
+    "action_matrix": 3,
+    "blast_radius": 0,
+    "blind_spots": 1,
+    "boundary_breaches": 1,
+    "suspicious_pivot_behavior": 0
+   },
+   "execution_stats": {},
+   "failed_rule_details": [],
+   "filename": "illumio_audit_report_2026-07-05_1343.html",
+   "mtime": 1783259009.6097534,
+   "pending_rule_details": [],
+   "report_type": "audit",
+   "reused_rule_details": [],
+   "size": 223817,
+   "summary": "Attack posture boundary 1 | pivot 0 | blast 0 | blind 1 | actions 3"
+  },
+  {
+   "attack_summary": {
+    "action_matrix": [
+     {
+      "action": "將範圍內 Workload 由 visibility/testing 推進到 selective 或 full Enforcement。",
+      "action_code": "MOVE_TO_ENFORCEMENT",
+      "apps": [
+       "calico (kubernetes)",
+       "coreservices (vmware)",
+       "default (kubernetes)",
+       "demoapp (vmware)",
+       "endpoint (physical)"
+      ],
+      "count": 16,
+      "flow_total": 38268,
+      "severity": "CRITICAL"
+     },
+     {
+      "action": "將 Unmanaged 資產納管，或明確隔離其存取路徑。",
+      "action_code": "ONBOARD_UNMANAGED",
+      "apps": [
+       "coreservices (vmware)",
+       "demoapp (vmware)",
+       "endpoint (physical)",
+       "illumio (vmware)",
+       "infrastructure (vmware)"
+      ],
+      "count": 12,
+      "flow_total": 35069,
+      "severity": "HIGH"
+     },
+     {
+      "action": "收斂 Ringfence 範圍，只保留必要的 App 對 App 存取路徑。",
+      "action_code": "DEFINE_RINGFENCE_SCOPE",
+      "apps": [
+       "calico (kubernetes)",
+       "coreservices (vmware)",
+       "default (kubernetes)"
+      ],
+      "count": 3,
+      "flow_total": 9794,
+      "severity": "HIGH"
+     },
+     {
+      "action": "降低可橫向移動路徑，並優先分段高可達性的節點。",
+      "action_code": "TIGHTEN_LATERAL_POLICY",
+      "apps": [
+       "endpoint (physical) · 10.10.0.3, 172.16.9.26, 192.168.40.108",
+       "jumpdesk (vmware) · 172.16.15.150"
+      ],
+      "count": 2,
+      "flow_total": 0,
+      "severity": "HIGH"
+     },
+     {
+      "action": "將跨邊界通訊埠收斂為明確 allowlist，移除過寬存取範圍。",
+      "action_code": "LOCK_BOUNDARY_PORTS",
+      "apps": [
+       "coreservices (vmware)"
+      ],
+      "count": 1,
+      "flow_total": 43,
+      "severity": "HIGH"
+     }
+    ],
+    "blast_radius": [
+     {
+      "action": "降低可橫向移動路徑，並優先分段高可達性的節點。",
+      "action_code": "TIGHTEN_LATERAL_POLICY",
+      "app_env_key": "endpoint|physical",
+      "evidence": {
+       "max_depth": 4,
+       "reachability_count": 4
+      },
+      "finding": "endpoint (physical) · 10.10.0.3, 172.16.9.26, 192.168.40.108 · 10.10.0.3, 172.16.9.26, 192.168.40.108: 偵測到高擴散半徑風險 — 可達節點 4、最大路徑深度 4",
+      "severity": "HIGH"
+     },
+     {
+      "action": "降低可橫向移動路徑，並優先分段高可達性的節點。",
+      "action_code": "TIGHTEN_LATERAL_POLICY",
+      "app_env_key": "jumpdesk|vmware",
+      "evidence": {
+       "max_depth": 4,
+       "reachability_count": 4
+      },
+      "finding": "jumpdesk (vmware) · 172.16.15.150 · 172.16.15.150: 偵測到高擴散半徑風險 — 可達節點 4、最大路徑深度 4",
+      "severity": "HIGH"
+     }
+    ],
+    "blind_spots": [
+     {
+      "action": "將範圍內 Workload 由 visibility/testing 推進到 selective 或 full Enforcement。",
+      "action_code": "MOVE_TO_ENFORCEMENT",
+      "app_env_key": "calico|kubernetes",
+      "evidence": {
+       "allowed_ratio": 0.1346,
+       "blocked_or_pb_flow_count": 45,
+       "flow_count": 52
+      },
+      "finding": "calico (kubernetes): 偵測到 Enforcement 落差 — 流量數 52、被擋或 PB 流量 45",
+      "severity": "CRITICAL"
+     },
+     {
+      "action": "將範圍內 Workload 由 visibility/testing 推進到 selective 或 full Enforcement。",
+      "action_code": "MOVE_TO_ENFORCEMENT",
+      "app_env_key": "coreservices|vmware",
+      "evidence": {
+       "allowed_ratio": 0.0179,
+       "blocked_or_pb_flow_count": 9451,
+       "flow_count": 9623,
+       "mixed_traffic_ratio": 0.907,
+       "unmanaged_traversable_flows": 7
+      },
+      "finding": "coreservices (vmware) · 172.16.15.100, 172.16.15.106: 偵測到 Enforcement 落差／偵測到可視性或強制執行盲點 — 流量數 9623、被擋或 PB 流量 9451",
+      "severity": "CRITICAL"
+     },
+     {
+      "action": "將範圍內 Workload 由 visibility/testing 推進到 selective 或 full Enforcement。",
+      "action_code": "MOVE_TO_ENFORCEMENT",
+      "app_env_key": "default|kubernetes",
+      "evidence": {
+       "allowed_ratio": 0.0,
+       "blocked_or_pb_flow_count": 119,
+       "flow_count": 119
+      },
+      "finding": "default (kubernetes): 偵測到 Enforcement 落差 — 流量數 119、被擋或 PB 流量 119",
+      "severity": "CRITICAL"
+     },
+     {
+      "action": "將範圍內 Workload 由 visibility/testing 推進到 selective 或 full Enforcement。",
+      "action_code": "MOVE_TO_ENFORCEMENT",
+      "app_env_key": "demoapp|vmware",
+      "evidence": {
+       "allowed_ratio": 0.0985,
+       "blocked_or_pb_flow_count": 586,
+       "flow_count": 650,
+       "mixed_traffic_ratio": 0.6096
+      },
+      "finding": "demoapp (vmware): 偵測到 Enforcement 落差／偵測到可視性或強制執行盲點 — 流量數 650、被擋或 PB 流量 586",
+      "severity": "CRITICAL"
+     },
+     {
+      "action": "將範圍內 Workload 由 visibility/testing 推進到 selective 或 full Enforcement。",
+      "action_code": "MOVE_TO_ENFORCEMENT",
+      "app_env_key": "endpoint|physical",
+      "evidence": {
+       "allowed_ratio": 0.0139,
+       "blocked_or_pb_flow_count": 6306,
+       "flow_count": 6395,
+       "mixed_traffic_ratio": 0.9631,
+       "unmanaged_traversable_flows": 23
+      },
+      "finding": "endpoint (physical) · 10.10.0.3, 172.16.9.26, 192.168.40.108: 偵測到 Enforcement 落差／偵測到可視性或強制執行盲點 — 流量數 6395、被擋或 PB 流量 6306",
+      "severity": "CRITICAL"
+     }
+    ],
+    "boundary_breaches": [
+     {
+      "action": "收斂 Ringfence 範圍，只保留必要的 App 對 App 存取路徑。",
+      "action_code": "DEFINE_RINGFENCE_SCOPE",
+      "app_env_key": "calico|kubernetes",
+      "evidence": {
+       "flow_count": 52,
+       "ringfence_ratio": 0.0
+      },
+      "finding": "calico (kubernetes): 偵測到邊界控制弱點 — 流量數 52、ringfence 佔比 0.0",
+      "severity": "HIGH"
+     },
+     {
+      "action": "收斂 Ringfence 範圍，只保留必要的 App 對 App 存取路徑。",
+      "action_code": "DEFINE_RINGFENCE_SCOPE",
+      "app_env_key": "coreservices|vmware",
+      "evidence": {
+       "flow_count": 9623,
+       "remote_allowed_ratio": 0.0,
+       "remote_flow_count": 43,
+       "ringfence_ratio": 0.0068
+      },
+      "finding": "coreservices (vmware) · 172.16.15.100, 172.16.15.106: 偵測到邊界控制弱點 — 流量數 9623、遠端存取流量 43",
+      "severity": "HIGH"
+     },
+     {
+      "action": "收斂 Ringfence 範圍，只保留必要的 App 對 App 存取路徑。",
+      "action_code": "DEFINE_RINGFENCE_SCOPE",
+      "app_env_key": "default|kubernetes",
+      "evidence": {
+       "flow_count": 119,
+       "ringfence_ratio": 0.0
+      },
+      "finding": "default (kubernetes): 偵測到邊界控制弱點 — 流量數 119、ringfence 佔比 0.0",
+      "severity": "HIGH"
+     }
+    ],
+    "suspicious_pivot_behavior": [
+     {
+      "action": "此 Workload 在流量圖中扮演網路樞紐角色（高可達性或 articulation point），請套用更嚴格的東西向 Policy 邊界以限制橫向移動。",
+      "action_code": "RESTRICT_TRANSIT_NODE_ACCESS",
+      "app_env_key": "coreservices|vmware",
+      "evidence": {
+       "bridge_score": 90.0,
+       "reachability_count": 3
+      },
+      "finding": "coreservices (vmware) · 172.16.15.100, 172.16.15.106 · 172.16.15.100, 172.16.15.106: 偵測到可疑橫向樞紐行為 — 可達節點 3、橋接分數 90.0",
+      "severity": "HIGH"
+     }
+    ]
+   },
+   "attack_summary_counts": {
+    "action_matrix": 5,
+    "blast_radius": 2,
+    "blind_spots": 5,
+    "boundary_breaches": 3,
+    "suspicious_pivot_behavior": 1
+   },
+   "execution_stats": {},
+   "failed_rule_details": [],
+   "filename": "Illumio_Traffic_Report_NetworkInventory_2026-07-05_1341.html",
+   "mtime": 1783258879.2306054,
+   "pending_rule_details": [],
+   "report_type": "traffic",
+   "reused_rule_details": [],
+   "size": 168616,
+   "summary": "Attack posture boundary 3 | pivot 1 | blast 2 | blind 5 | actions 5"
+  },
+  {
+   "attack_summary": {
+    "action_matrix": [
+     {
+      "action": "將範圍內 Workload 由 visibility/testing 推進到 selective 或 full Enforcement。",
+      "action_code": "MOVE_TO_ENFORCEMENT",
+      "apps": [
+       "calico (kubernetes)",
+       "coreservices (vmware)",
+       "default (kubernetes)",
+       "demoapp (vmware)",
+       "endpoint (physical)"
+      ],
+      "count": 16,
+      "flow_total": 38268,
+      "severity": "CRITICAL"
+     },
+     {
+      "action": "將 Unmanaged 資產納管，或明確隔離其存取路徑。",
+      "action_code": "ONBOARD_UNMANAGED",
+      "apps": [
+       "coreservices (vmware)",
+       "demoapp (vmware)",
+       "endpoint (physical)",
+       "illumio (vmware)",
+       "infrastructure (vmware)"
+      ],
+      "count": 12,
+      "flow_total": 35069,
+      "severity": "HIGH"
+     },
+     {
+      "action": "收斂 Ringfence 範圍，只保留必要的 App 對 App 存取路徑。",
+      "action_code": "DEFINE_RINGFENCE_SCOPE",
+      "apps": [
+       "calico (kubernetes)",
+       "coreservices (vmware)",
+       "default (kubernetes)"
+      ],
+      "count": 3,
+      "flow_total": 9794,
+      "severity": "HIGH"
+     },
+     {
+      "action": "降低可橫向移動路徑，並優先分段高可達性的節點。",
+      "action_code": "TIGHTEN_LATERAL_POLICY",
+      "apps": [
+       "endpoint (physical) · 10.10.0.3, 172.16.9.26, 192.168.40.108",
+       "jumpdesk (vmware) · 172.16.15.150"
+      ],
+      "count": 2,
+      "flow_total": 0,
+      "severity": "HIGH"
+     },
+     {
+      "action": "將跨邊界通訊埠收斂為明確 allowlist，移除過寬存取範圍。",
+      "action_code": "LOCK_BOUNDARY_PORTS",
+      "apps": [
+       "coreservices (vmware)"
+      ],
+      "count": 1,
+      "flow_total": 43,
+      "severity": "HIGH"
+     }
+    ],
+    "blast_radius": [
+     {
+      "action": "降低可橫向移動路徑，並優先分段高可達性的節點。",
+      "action_code": "TIGHTEN_LATERAL_POLICY",
+      "app_env_key": "endpoint|physical",
+      "evidence": {
+       "max_depth": 4,
+       "reachability_count": 4
+      },
+      "finding": "endpoint (physical) · 10.10.0.3, 172.16.9.26, 192.168.40.108 · 10.10.0.3, 172.16.9.26, 192.168.40.108: 偵測到高擴散半徑風險 — 可達節點 4、最大路徑深度 4",
+      "severity": "HIGH"
+     },
+     {
+      "action": "降低可橫向移動路徑，並優先分段高可達性的節點。",
+      "action_code": "TIGHTEN_LATERAL_POLICY",
+      "app_env_key": "jumpdesk|vmware",
+      "evidence": {
+       "max_depth": 4,
+       "reachability_count": 4
+      },
+      "finding": "jumpdesk (vmware) · 172.16.15.150 · 172.16.15.150: 偵測到高擴散半徑風險 — 可達節點 4、最大路徑深度 4",
+      "severity": "HIGH"
+     }
+    ],
+    "blind_spots": [
+     {
+      "action": "將範圍內 Workload 由 visibility/testing 推進到 selective 或 full Enforcement。",
+      "action_code": "MOVE_TO_ENFORCEMENT",
+      "app_env_key": "calico|kubernetes",
+      "evidence": {
+       "allowed_ratio": 0.1346,
+       "blocked_or_pb_flow_count": 45,
+       "flow_count": 52
+      },
+      "finding": "calico (kubernetes): 偵測到 Enforcement 落差 — 流量數 52、被擋或 PB 流量 45",
+      "severity": "CRITICAL"
+     },
+     {
+      "action": "將範圍內 Workload 由 visibility/testing 推進到 selective 或 full Enforcement。",
+      "action_code": "MOVE_TO_ENFORCEMENT",
+      "app_env_key": "coreservices|vmware",
+      "evidence": {
+       "allowed_ratio": 0.0179,
+       "blocked_or_pb_flow_count": 9451,
+       "flow_count": 9623,
+       "mixed_traffic_ratio": 0.907,
+       "unmanaged_traversable_flows": 7
+      },
+      "finding": "coreservices (vmware) · 172.16.15.100, 172.16.15.106: 偵測到 Enforcement 落差／偵測到可視性或強制執行盲點 — 流量數 9623、被擋或 PB 流量 9451",
+      "severity": "CRITICAL"
+     },
+     {
+      "action": "將範圍內 Workload 由 visibility/testing 推進到 selective 或 full Enforcement。",
+      "action_code": "MOVE_TO_ENFORCEMENT",
+      "app_env_key": "default|kubernetes",
+      "evidence": {
+       "allowed_ratio": 0.0,
+       "blocked_or_pb_flow_count": 119,
+       "flow_count": 119
+      },
+      "finding": "default (kubernetes): 偵測到 Enforcement 落差 — 流量數 119、被擋或 PB 流量 119",
+      "severity": "CRITICAL"
+     },
+     {
+      "action": "將範圍內 Workload 由 visibility/testing 推進到 selective 或 full Enforcement。",
+      "action_code": "MOVE_TO_ENFORCEMENT",
+      "app_env_key": "demoapp|vmware",
+      "evidence": {
+       "allowed_ratio": 0.0985,
+       "blocked_or_pb_flow_count": 586,
+       "flow_count": 650,
+       "mixed_traffic_ratio": 0.6096
+      },
+      "finding": "demoapp (vmware): 偵測到 Enforcement 落差／偵測到可視性或強制執行盲點 — 流量數 650、被擋或 PB 流量 586",
+      "severity": "CRITICAL"
+     },
+     {
+      "action": "將範圍內 Workload 由 visibility/testing 推進到 selective 或 full Enforcement。",
+      "action_code": "MOVE_TO_ENFORCEMENT",
+      "app_env_key": "endpoint|physical",
+      "evidence": {
+       "allowed_ratio": 0.0139,
+       "blocked_or_pb_flow_count": 6306,
+       "flow_count": 6395,
+       "mixed_traffic_ratio": 0.9631,
+       "unmanaged_traversable_flows": 23
+      },
+      "finding": "endpoint (physical) · 10.10.0.3, 172.16.9.26, 192.168.40.108: 偵測到 Enforcement 落差／偵測到可視性或強制執行盲點 — 流量數 6395、被擋或 PB 流量 6306",
+      "severity": "CRITICAL"
+     }
+    ],
+    "boundary_breaches": [
+     {
+      "action": "收斂 Ringfence 範圍，只保留必要的 App 對 App 存取路徑。",
+      "action_code": "DEFINE_RINGFENCE_SCOPE",
+      "app_env_key": "calico|kubernetes",
+      "evidence": {
+       "flow_count": 52,
+       "ringfence_ratio": 0.0
+      },
+      "finding": "calico (kubernetes): 偵測到邊界控制弱點 — 流量數 52、ringfence 佔比 0.0",
+      "severity": "HIGH"
+     },
+     {
+      "action": "收斂 Ringfence 範圍，只保留必要的 App 對 App 存取路徑。",
+      "action_code": "DEFINE_RINGFENCE_SCOPE",
+      "app_env_key": "coreservices|vmware",
+      "evidence": {
+       "flow_count": 9623,
+       "remote_allowed_ratio": 0.0,
+       "remote_flow_count": 43,
+       "ringfence_ratio": 0.0068
+      },
+      "finding": "coreservices (vmware) · 172.16.15.100, 172.16.15.106: 偵測到邊界控制弱點 — 流量數 9623、遠端存取流量 43",
+      "severity": "HIGH"
+     },
+     {
+      "action": "收斂 Ringfence 範圍，只保留必要的 App 對 App 存取路徑。",
+      "action_code": "DEFINE_RINGFENCE_SCOPE",
+      "app_env_key": "default|kubernetes",
+      "evidence": {
+       "flow_count": 119,
+       "ringfence_ratio": 0.0
+      },
+      "finding": "default (kubernetes): 偵測到邊界控制弱點 — 流量數 119、ringfence 佔比 0.0",
+      "severity": "HIGH"
+     }
+    ],
+    "suspicious_pivot_behavior": [
+     {
+      "action": "此 Workload 在流量圖中扮演網路樞紐角色（高可達性或 articulation point），請套用更嚴格的東西向 Policy 邊界以限制橫向移動。",
+      "action_code": "RESTRICT_TRANSIT_NODE_ACCESS",
+      "app_env_key": "coreservices|vmware",
+      "evidence": {
+       "bridge_score": 90.0,
+       "reachability_count": 3
+      },
+      "finding": "coreservices (vmware) · 172.16.15.100, 172.16.15.106 · 172.16.15.100, 172.16.15.106: 偵測到可疑橫向樞紐行為 — 可達節點 3、橋接分數 90.0",
+      "severity": "HIGH"
+     }
+    ]
+   },
+   "attack_summary_counts": {
+    "action_matrix": 5,
+    "blast_radius": 2,
+    "blind_spots": 5,
+    "boundary_breaches": 3,
+    "suspicious_pivot_behavior": 1
+   },
+   "execution_stats": {},
+   "failed_rule_details": [],
+   "filename": "Illumio_Traffic_Report_SecurityRisk_2026-07-05_1339.html",
+   "mtime": 1783258771.3184798,
+   "pending_rule_details": [],
+   "report_type": "traffic",
+   "reused_rule_details": [],
+   "size": 208175,
+   "summary": "Attack posture boundary 3 | pivot 1 | blast 2 | blind 5 | actions 5"
+  },
+  {
+   "attack_summary": {},
+   "attack_summary_counts": {},
+   "execution_stats": {},
+   "failed_rule_details": [],
+   "filename": "Illumio_App_Summary_DemoApp_2026-07-02_0855.html",
+   "mtime": 1782982557.1255307,
+   "pending_rule_details": [],
+   "report_type": "",
+   "reused_rule_details": [],
+   "size": 53415,
+   "summary": ""
+  },
+  {
+   "attack_summary": {},
+   "attack_summary_counts": {},
+   "execution_stats": {},
+   "failed_rule_details": [],
+   "filename": "Illumio_Policy_Diff_Report_2026-07-02_0825.html",
+   "mtime": 1782980720.9249656,
+   "pending_rule_details": [],
+   "report_type": "",
+   "reused_rule_details": [],
+   "size": 47512,
+   "summary": ""
+  },
+  {
+   "attack_summary": {
+    "action_matrix": [
+     {
+      "action": "將範圍內 Workload 由 visibility/testing 推進到 selective 或 full Enforcement。",
+      "action_code": "MOVE_TO_ENFORCEMENT",
+      "count": 14
+     },
+     {
+      "action": "將 Unmanaged 資產納管，或明確隔離其存取路徑。",
+      "action_code": "ONBOARD_UNMANAGED",
+      "count": 12
+     },
+     {
+      "action": "降低可橫向移動路徑，並優先分段高可達性的節點。",
+      "action_code": "TIGHTEN_LATERAL_POLICY",
+      "count": 5
+     },
+     {
+      "action": "收斂 Ringfence 範圍，只保留必要的 App 對 App 存取路徑。",
+      "action_code": "DEFINE_RINGFENCE_SCOPE",
+      "count": 4
+     },
+     {
+      "action": "將跨邊界通訊埠收斂為明確 allowlist，移除過寬存取範圍。",
+      "action_code": "LOCK_BOUNDARY_PORTS",
+      "count": 2
+     }
+    ],
+    "blast_radius": [
+     {
+      "action": "降低可橫向移動路徑，並優先分段高可達性的節點。",
+      "action_code": "TIGHTEN_LATERAL_POLICY",
+      "app_env_key": "coreservices|vmware",
+      "evidence": {
+       "max_depth": 4,
+       "reachability_count": 6
+      },
+      "finding": "coreservices (vmware) · 172.16.15.100, 172.16.15.106, 172.16.15.102 · 172.16.15.100, 172.16.15.106, 172.16.15.102: 偵測到高擴散半徑風險",
+      "severity": "HIGH"
+     },
+     {
+      "action": "降低可橫向移動路徑，並優先分段高可達性的節點。",
+      "action_code": "TIGHTEN_LATERAL_POLICY",
+      "app_env_key": "infrastructure|vmware",
+      "evidence": {
+       "max_depth": 4,
+       "reachability_count": 6
+      },
+      "finding": "infrastructure (vmware) · 10.10.0.3, 192.168.20.99, 192.168.10.30, 172.16.15.103 · 10.10.0.3, 192.168.20.99, 192.168.10.30, 172.16.15.103: 偵測到高擴散半徑風險",
+      "severity": "HIGH"
+     },
+     {
+      "action": "降低可橫向移動路徑，並優先分段高可達性的節點。",
+      "action_code": "TIGHTEN_LATERAL_POLICY",
+      "app_env_key": "jumpdesk|vmware",
+      "evidence": {
+       "max_depth": 4,
+       "reachability_count": 7
+      },
+      "finding": "jumpdesk (vmware) · 172.16.15.150 · 172.16.15.150: 偵測到高擴散半徑風險",
+      "severity": "HIGH"
+     },
+     {
+      "action": "降低可橫向移動路徑，並優先分段高可達性的節點。",
+      "action_code": "TIGHTEN_LATERAL_POLICY",
+      "app_env_key": "traffic|networkdevice",
+      "evidence": {
+       "max_depth": 4,
+       "reachability_count": 6
+      },
+      "finding": "traffic (networkdevice) · 172.16.15.254, 192.168.10.44 · 172.16.15.254, 192.168.10.44: 偵測到高擴散半徑風險",
+      "severity": "HIGH"
+     },
+     {
+      "action": "降低可橫向移動路徑，並優先分段高可達性的節點。",
+      "action_code": "TIGHTEN_LATERAL_POLICY",
+      "app_env_key": "unlabeled|unlabeled",
+      "evidence": {
+       "max_depth": 4,
+       "reachability_count": 6
+      },
+      "finding": "172.16.15.101, 172.16.15.100, 192.168.20.32, 192.168.20.30 +4 · 172.16.15.101, 172.16.15.100, 192.168.20.32, 192.168.20.30 +4: 偵測到高擴散半徑風險",
+      "severity": "HIGH"
+     }
+    ],
+    "blind_spots": [
+     {
+      "action": "將範圍內 Workload 由 visibility/testing 推進到 selective 或 full Enforcement。",
+      "action_code": "MOVE_TO_ENFORCEMENT",
+      "app_env_key": "coreservices|vmware",
+      "evidence": {
+       "allowed_ratio": 0.0055,
+       "blocked_or_pb_flow_count": 62186,
+       "flow_count": 62531
+      },
+      "finding": "coreservices (vmware) · 172.16.15.100, 172.16.15.106, 172.16.15.102: 偵測到 Enforcement 落差",
+      "severity": "CRITICAL"
+     },
+     {
+      "action": "將範圍內 Workload 由 visibility/testing 推進到 selective 或 full Enforcement。",
+      "action_code": "MOVE_TO_ENFORCEMENT",
+      "app_env_key": "demoapp|vmware",
+      "evidence": {
+       "allowed_ratio": 0.0057,
+       "blocked_or_pb_flow_count": 15541,
+       "flow_count": 15630
+      },
+      "finding": "demoapp (vmware) · 172.16.15.161, 172.16.15.162: 偵測到 Enforcement 落差",
+      "severity": "CRITICAL"
+     },
+     {
+      "action": "將範圍內 Workload 由 visibility/testing 推進到 selective 或 full Enforcement。",
+      "action_code": "MOVE_TO_ENFORCEMENT",
+      "app_env_key": "endpoint|physical",
+      "evidence": {
+       "allowed_ratio": 0.0,
+       "blocked_or_pb_flow_count": 16,
+       "flow_count": 16
+      },
+      "finding": "endpoint (physical): 偵測到 Enforcement 落差",
+      "severity": "CRITICAL"
+     },
+     {
+      "action": "將範圍內 Workload 由 visibility/testing 推進到 selective 或 full Enforcement。",
+      "action_code": "MOVE_TO_ENFORCEMENT",
+      "app_env_key": "illumio|kubernetes",
+      "evidence": {
+       "allowed_ratio": 0.0938,
+       "blocked_or_pb_flow_count": 58,
+       "flow_count": 64
+      },
+      "finding": "illumio (kubernetes): 偵測到 Enforcement 落差",
+      "severity": "CRITICAL"
+     },
+     {
+      "action": "將範圍內 Workload 由 visibility/testing 推進到 selective 或 full Enforcement。",
+      "action_code": "MOVE_TO_ENFORCEMENT",
+      "app_env_key": "illumio|vmware",
+      "evidence": {
+       "allowed_ratio": 0.1375,
+       "blocked_or_pb_flow_count": 69,
+       "flow_count": 80
+      },
+      "finding": "illumio (vmware) · 172.16.15.135: 偵測到 Enforcement 落差",
+      "severity": "CRITICAL"
+     }
+    ],
+    "boundary_breaches": [
+     {
+      "action": "收斂 Ringfence 範圍，只保留必要的 App 對 App 存取路徑。",
+      "action_code": "DEFINE_RINGFENCE_SCOPE",
+      "app_env_key": "calico|kubernetes",
+      "evidence": {
+       "flow_count": 26,
+       "ringfence_ratio": 0.0
+      },
+      "finding": "calico (kubernetes): 偵測到邊界控制弱點",
+      "severity": "HIGH"
+     },
+     {
+      "action": "收斂 Ringfence 範圍，只保留必要的 App 對 App 存取路徑。",
+      "action_code": "DEFINE_RINGFENCE_SCOPE",
+      "app_env_key": "coreservices|vmware",
+      "evidence": {
+       "flow_count": 62531,
+       "ringfence_ratio": 0.0006
+      },
+      "finding": "coreservices (vmware) · 172.16.15.100, 172.16.15.106, 172.16.15.102: 偵測到邊界控制弱點",
+      "severity": "HIGH"
+     },
+     {
+      "action": "將跨邊界通訊埠收斂為明確 allowlist，移除過寬存取範圍。",
+      "action_code": "LOCK_BOUNDARY_PORTS",
+      "app_env_key": "coreservices|vmware",
+      "evidence": {
+       "remote_allowed_ratio": 0.0,
+       "remote_flow_count": 35
+      },
+      "finding": "coreservices (vmware) · 172.16.15.100, 172.16.15.106, 172.16.15.102: 偵測到邊界控制弱點",
+      "severity": "HIGH"
+     },
+     {
+      "action": "收斂 Ringfence 範圍，只保留必要的 App 對 App 存取路徑。",
+      "action_code": "DEFINE_RINGFENCE_SCOPE",
+      "app_env_key": "default|kubernetes",
+      "evidence": {
+       "flow_count": 70,
+       "ringfence_ratio": 0.0
+      },
+      "finding": "default (kubernetes): 偵測到邊界控制弱點",
+      "severity": "HIGH"
+     },
+     {
+      "action": "收斂 Ringfence 範圍，只保留必要的 App 對 App 存取路徑。",
+      "action_code": "DEFINE_RINGFENCE_SCOPE",
+      "app_env_key": "demoapp|vmware",
+      "evidence": {
+       "flow_count": 15630,
+       "ringfence_ratio": 0.0028
+      },
+      "finding": "demoapp (vmware) · 172.16.15.161, 172.16.15.162: 偵測到邊界控制弱點",
+      "severity": "HIGH"
+     }
+    ],
+    "suspicious_pivot_behavior": [
+     {
+      "action": "此 Workload 在流量圖中扮演網路樞紐角色（高可達性或 articulation point），請套用更嚴格的東西向 Policy 邊界以限制橫向移動。",
+      "action_code": "RESTRICT_TRANSIT_NODE_ACCESS",
+      "app_env_key": "coreservices|vmware",
+      "evidence": {
+       "bridge_score": 94.3,
+       "reachability_count": 6
+      },
+      "finding": "coreservices (vmware) · 172.16.15.100, 172.16.15.106, 172.16.15.102 · 172.16.15.100, 172.16.15.106, 172.16.15.102: 偵測到可疑橫向樞紐行為",
+      "severity": "CRITICAL"
+     },
+     {
+      "action": "此 Workload 在流量圖中扮演網路樞紐角色（高可達性或 articulation point），請套用更嚴格的東西向 Policy 邊界以限制橫向移動。",
+      "action_code": "RESTRICT_TRANSIT_NODE_ACCESS",
+      "app_env_key": "unlabeled|unlabeled",
+      "evidence": {
+       "bridge_score": 94.3,
+       "reachability_count": 6
+      },
+      "finding": "172.16.15.101, 172.16.15.100, 192.168.20.32, 192.168.20.30 +4 · 172.16.15.101, 172.16.15.100, 192.168.20.32, 192.168.20.30 +4: 偵測到可疑橫向樞紐行為",
+      "severity": "CRITICAL"
+     }
+    ]
+   },
+   "attack_summary_counts": {
+    "action_matrix": 5,
+    "blast_radius": 5,
+    "blind_spots": 5,
+    "boundary_breaches": 5,
+    "suspicious_pivot_behavior": 2
+   },
+   "execution_stats": {},
+   "failed_rule_details": [],
+   "filename": "Illumio_Traffic_Report_2026-06-27_0533_raw.zip",
+   "mtime": 1782538430.2228389,
+   "pending_rule_details": [],
+   "report_type": "traffic",
+   "reused_rule_details": [],
+   "size": 2076982,
+   "summary": "Attack posture boundary 5 | pivot 2 | blast 5 | blind 5 | actions 5"
+  },
+  {
+   "attack_summary": {},
+   "attack_summary_counts": {},
+   "execution_stats": {},
+   "failed_rule_details": [],
+   "filename": "Illumio_Traffic_Report_2026-06-27_0533.xlsx",
+   "mtime": 1782538420.0838273,
+   "pending_rule_details": [],
+   "report_type": "",
+   "reused_rule_details": [],
+   "size": 347498,
+   "summary": ""
+  },
+  {
+   "attack_summary": {
+    "action_matrix": [
+     {
+      "action": "將範圍內 Workload 由 visibility/testing 推進到 selective 或 full Enforcement。",
+      "action_code": "MOVE_TO_ENFORCEMENT",
+      "count": 14
+     },
+     {
+      "action": "將 Unmanaged 資產納管，或明確隔離其存取路徑。",
+      "action_code": "ONBOARD_UNMANAGED",
+      "count": 12
+     },
+     {
+      "action": "降低可橫向移動路徑，並優先分段高可達性的節點。",
+      "action_code": "TIGHTEN_LATERAL_POLICY",
+      "count": 5
+     },
+     {
+      "action": "收斂 Ringfence 範圍，只保留必要的 App 對 App 存取路徑。",
+      "action_code": "DEFINE_RINGFENCE_SCOPE",
+      "count": 4
+     },
+     {
+      "action": "將跨邊界通訊埠收斂為明確 allowlist，移除過寬存取範圍。",
+      "action_code": "LOCK_BOUNDARY_PORTS",
+      "count": 2
+     }
+    ],
+    "blast_radius": [
+     {
+      "action": "降低可橫向移動路徑，並優先分段高可達性的節點。",
+      "action_code": "TIGHTEN_LATERAL_POLICY",
+      "app_env_key": "coreservices|vmware",
+      "evidence": {
+       "max_depth": 4,
+       "reachability_count": 6
+      },
+      "finding": "coreservices (vmware) · 172.16.15.100, 172.16.15.106, 172.16.15.102 · 172.16.15.100, 172.16.15.106, 172.16.15.102: 偵測到高擴散半徑風險",
+      "severity": "HIGH"
+     },
+     {
+      "action": "降低可橫向移動路徑，並優先分段高可達性的節點。",
+      "action_code": "TIGHTEN_LATERAL_POLICY",
+      "app_env_key": "infrastructure|vmware",
+      "evidence": {
+       "max_depth": 4,
+       "reachability_count": 6
+      },
+      "finding": "infrastructure (vmware) · 10.10.0.3, 192.168.20.99, 192.168.10.30, 172.16.15.103 · 10.10.0.3, 192.168.20.99, 192.168.10.30, 172.16.15.103: 偵測到高擴散半徑風險",
+      "severity": "HIGH"
+     },
+     {
+      "action": "降低可橫向移動路徑，並優先分段高可達性的節點。",
+      "action_code": "TIGHTEN_LATERAL_POLICY",
+      "app_env_key": "jumpdesk|vmware",
+      "evidence": {
+       "max_depth": 4,
+       "reachability_count": 7
+      },
+      "finding": "jumpdesk (vmware) · 172.16.15.150 · 172.16.15.150: 偵測到高擴散半徑風險",
+      "severity": "HIGH"
+     },
+     {
+      "action": "降低可橫向移動路徑，並優先分段高可達性的節點。",
+      "action_code": "TIGHTEN_LATERAL_POLICY",
+      "app_env_key": "traffic|networkdevice",
+      "evidence": {
+       "max_depth": 4,
+       "reachability_count": 6
+      },
+      "finding": "traffic (networkdevice) · 172.16.15.254, 192.168.10.44 · 172.16.15.254, 192.168.10.44: 偵測到高擴散半徑風險",
+      "severity": "HIGH"
+     },
+     {
+      "action": "降低可橫向移動路徑，並優先分段高可達性的節點。",
+      "action_code": "TIGHTEN_LATERAL_POLICY",
+      "app_env_key": "unlabeled|unlabeled",
+      "evidence": {
+       "max_depth": 4,
+       "reachability_count": 6
+      },
+      "finding": "172.16.15.101, 172.16.15.100, 192.168.20.32, 192.168.20.30 +4 · 172.16.15.101, 172.16.15.100, 192.168.20.32, 192.168.20.30 +4: 偵測到高擴散半徑風險",
+      "severity": "HIGH"
+     }
+    ],
+    "blind_spots": [
+     {
+      "action": "將範圍內 Workload 由 visibility/testing 推進到 selective 或 full Enforcement。",
+      "action_code": "MOVE_TO_ENFORCEMENT",
+      "app_env_key": "coreservices|vmware",
+      "evidence": {
+       "allowed_ratio": 0.0055,
+       "blocked_or_pb_flow_count": 62186,
+       "flow_count": 62531
+      },
+      "finding": "coreservices (vmware) · 172.16.15.100, 172.16.15.106, 172.16.15.102: 偵測到 Enforcement 落差",
+      "severity": "CRITICAL"
+     },
+     {
+      "action": "將範圍內 Workload 由 visibility/testing 推進到 selective 或 full Enforcement。",
+      "action_code": "MOVE_TO_ENFORCEMENT",
+      "app_env_key": "demoapp|vmware",
+      "evidence": {
+       "allowed_ratio": 0.0057,
+       "blocked_or_pb_flow_count": 15541,
+       "flow_count": 15630
+      },
+      "finding": "demoapp (vmware) · 172.16.15.161, 172.16.15.162: 偵測到 Enforcement 落差",
+      "severity": "CRITICAL"
+     },
+     {
+      "action": "將範圍內 Workload 由 visibility/testing 推進到 selective 或 full Enforcement。",
+      "action_code": "MOVE_TO_ENFORCEMENT",
+      "app_env_key": "endpoint|physical",
+      "evidence": {
+       "allowed_ratio": 0.0,
+       "blocked_or_pb_flow_count": 16,
+       "flow_count": 16
+      },
+      "finding": "endpoint (physical): 偵測到 Enforcement 落差",
+      "severity": "CRITICAL"
+     },
+     {
+      "action": "將範圍內 Workload 由 visibility/testing 推進到 selective 或 full Enforcement。",
+      "action_code": "MOVE_TO_ENFORCEMENT",
+      "app_env_key": "illumio|kubernetes",
+      "evidence": {
+       "allowed_ratio": 0.0938,
+       "blocked_or_pb_flow_count": 58,
+       "flow_count": 64
+      },
+      "finding": "illumio (kubernetes): 偵測到 Enforcement 落差",
+      "severity": "CRITICAL"
+     },
+     {
+      "action": "將範圍內 Workload 由 visibility/testing 推進到 selective 或 full Enforcement。",
+      "action_code": "MOVE_TO_ENFORCEMENT",
+      "app_env_key": "illumio|vmware",
+      "evidence": {
+       "allowed_ratio": 0.1375,
+       "blocked_or_pb_flow_count": 69,
+       "flow_count": 80
+      },
+      "finding": "illumio (vmware) · 172.16.15.135: 偵測到 Enforcement 落差",
+      "severity": "CRITICAL"
+     }
+    ],
+    "boundary_breaches": [
+     {
+      "action": "收斂 Ringfence 範圍，只保留必要的 App 對 App 存取路徑。",
+      "action_code": "DEFINE_RINGFENCE_SCOPE",
+      "app_env_key": "calico|kubernetes",
+      "evidence": {
+       "flow_count": 26,
+       "ringfence_ratio": 0.0
+      },
+      "finding": "calico (kubernetes): 偵測到邊界控制弱點",
+      "severity": "HIGH"
+     },
+     {
+      "action": "收斂 Ringfence 範圍，只保留必要的 App 對 App 存取路徑。",
+      "action_code": "DEFINE_RINGFENCE_SCOPE",
+      "app_env_key": "coreservices|vmware",
+      "evidence": {
+       "flow_count": 62531,
+       "ringfence_ratio": 0.0006
+      },
+      "finding": "coreservices (vmware) · 172.16.15.100, 172.16.15.106, 172.16.15.102: 偵測到邊界控制弱點",
+      "severity": "HIGH"
+     },
+     {
+      "action": "將跨邊界通訊埠收斂為明確 allowlist，移除過寬存取範圍。",
+      "action_code": "LOCK_BOUNDARY_PORTS",
+      "app_env_key": "coreservices|vmware",
+      "evidence": {
+       "remote_allowed_ratio": 0.0,
+       "remote_flow_count": 35
+      },
+      "finding": "coreservices (vmware) · 172.16.15.100, 172.16.15.106, 172.16.15.102: 偵測到邊界控制弱點",
+      "severity": "HIGH"
+     },
+     {
+      "action": "收斂 Ringfence 範圍，只保留必要的 App 對 App 存取路徑。",
+      "action_code": "DEFINE_RINGFENCE_SCOPE",
+      "app_env_key": "default|kubernetes",
+      "evidence": {
+       "flow_count": 70,
+       "ringfence_ratio": 0.0
+      },
+      "finding": "default (kubernetes): 偵測到邊界控制弱點",
+      "severity": "HIGH"
+     },
+     {
+      "action": "收斂 Ringfence 範圍，只保留必要的 App 對 App 存取路徑。",
+      "action_code": "DEFINE_RINGFENCE_SCOPE",
+      "app_env_key": "demoapp|vmware",
+      "evidence": {
+       "flow_count": 15630,
+       "ringfence_ratio": 0.0028
+      },
+      "finding": "demoapp (vmware) · 172.16.15.161, 172.16.15.162: 偵測到邊界控制弱點",
+      "severity": "HIGH"
+     }
+    ],
+    "suspicious_pivot_behavior": [
+     {
+      "action": "此 Workload 在流量圖中扮演網路樞紐角色（高可達性或 articulation point），請套用更嚴格的東西向 Policy 邊界以限制橫向移動。",
+      "action_code": "RESTRICT_TRANSIT_NODE_ACCESS",
+      "app_env_key": "coreservices|vmware",
+      "evidence": {
+       "bridge_score": 94.3,
+       "reachability_count": 6
+      },
+      "finding": "coreservices (vmware) · 172.16.15.100, 172.16.15.106, 172.16.15.102 · 172.16.15.100, 172.16.15.106, 172.16.15.102: 偵測到可疑橫向樞紐行為",
+      "severity": "CRITICAL"
+     },
+     {
+      "action": "此 Workload 在流量圖中扮演網路樞紐角色（高可達性或 articulation point），請套用更嚴格的東西向 Policy 邊界以限制橫向移動。",
+      "action_code": "RESTRICT_TRANSIT_NODE_ACCESS",
+      "app_env_key": "unlabeled|unlabeled",
+      "evidence": {
+       "bridge_score": 94.3,
+       "reachability_count": 6
+      },
+      "finding": "172.16.15.101, 172.16.15.100, 192.168.20.32, 192.168.20.30 +4 · 172.16.15.101, 172.16.15.100, 192.168.20.32, 192.168.20.30 +4: 偵測到可疑橫向樞紐行為",
+      "severity": "CRITICAL"
+     }
+    ]
+   },
+   "attack_summary_counts": {
+    "action_matrix": 5,
+    "blast_radius": 5,
+    "blind_spots": 5,
+    "boundary_breaches": 5,
+    "suspicious_pivot_behavior": 2
+   },
+   "execution_stats": {},
+   "failed_rule_details": [],
+   "filename": "Illumio_Traffic_Report_SecurityRisk_2026-06-27_0533.html",
+   "mtime": 1782538417.4128244,
+   "pending_rule_details": [],
+   "report_type": "traffic",
+   "reused_rule_details": [],
+   "size": 239657,
+   "summary": "Attack posture boundary 5 | pivot 2 | blast 5 | blind 5 | actions 5"
+  },
+  {
+   "attack_summary": {},
+   "attack_summary_counts": {},
+   "execution_stats": {},
+   "failed_rule_details": [],
+   "filename": "illumio_ven_status_2026-06-26_0530.html",
+   "mtime": 1782451826.5411124,
+   "pending_rule_details": [],
+   "report_type": "",
+   "reused_rule_details": [],
+   "size": 96610,
+   "summary": ""
+  },
+  {
+   "attack_summary": {
+    "action_matrix": [
+     {
+      "action": "將範圍內工作負載由 visibility/testing 推進到 selective 或 full enforcement。",
+      "action_code": "MOVE_TO_ENFORCEMENT",
+      "count": 1
+     },
+     {
+      "action": "先排除 pending/failed usage query，再進行政策下線判斷。",
+      "action_code": "RESOLVE_QUERY_FAILURES",
+      "count": 1
+     },
+     {
+      "action": "檢查高影響範圍 provision，確認邊界敏感變更皆經授權。",
+      "action_code": "REVIEW_HIGH_IMPACT_PROVISIONS",
+      "count": 1
+     }
+    ],
+    "blast_radius": [],
+    "blind_spots": [
+     {
+      "action": "將範圍內工作負載由 visibility/testing 推進到 selective 或 full enforcement。",
+      "action_code": "MOVE_TO_ENFORCEMENT",
+      "app_env_key": "audit|global",
+      "evidence": {
+       "actors": [
+        "admin@lab.local"
+       ],
+       "count": 2,
+       "event_type": "rule_set.update",
+       "src_ips": [
+        "172.16.15.106"
+       ]
+      },
+      "finding": "audit (global): 偵測到可視性或強制執行盲點",
+      "severity": "MEDIUM"
+     },
+     {
+      "action": "先排除 pending/failed usage query，再進行政策下線判斷。",
+      "action_code": "RESOLVE_QUERY_FAILURES",
+      "app_env_key": "audit|global",
+      "evidence": {
+       "parser_note_rows": 1
+      },
+      "finding": "audit (global): 偵測到可視性或強制執行盲點",
+      "severity": "MEDIUM"
+     }
+    ],
+    "boundary_breaches": [
+     {
+      "action": "檢查高影響範圍 provision，確認邊界敏感變更皆經授權。",
+      "action_code": "REVIEW_HIGH_IMPACT_PROVISIONS",
+      "app_env_key": "audit|global",
+      "evidence": {
+       "actors": [
+        "admin@lab.local"
+       ],
+       "count": 2,
+       "event_type": "sec_policy.create",
+       "src_ips": [
+        "172.16.15.106"
+       ]
+      },
+      "finding": "audit (global): 偵測到邊界控制弱點",
+      "severity": "MEDIUM"
+     }
+    ],
+    "suspicious_pivot_behavior": []
+   },
+   "attack_summary_counts": {
+    "action_matrix": 3,
+    "blast_radius": 0,
+    "blind_spots": 2,
+    "boundary_breaches": 1,
+    "suspicious_pivot_behavior": 0
+   },
+   "execution_stats": {},
+   "failed_rule_details": [],
+   "filename": "Illumio_Audit_Report_2026-06-26_0530_raw.zip",
+   "mtime": 1782451825.941112,
+   "pending_rule_details": [],
+   "report_type": "audit",
+   "reused_rule_details": [],
+   "size": 54383,
+   "summary": "Attack posture boundary 1 | pivot 0 | blast 0 | blind 2 | actions 3"
+  },
+  {
+   "attack_summary": {},
+   "attack_summary_counts": {},
+   "execution_stats": {},
+   "failed_rule_details": [],
+   "filename": "Illumio_Audit_Report_2026-06-26_0530.xlsx",
+   "mtime": 1782451825.890112,
+   "pending_rule_details": [],
+   "report_type": "",
+   "reused_rule_details": [],
+   "size": 7055,
+   "summary": ""
+  },
+  {
+   "attack_summary": {
+    "action_matrix": [
+     {
+      "action": "將範圍內工作負載由 visibility/testing 推進到 selective 或 full enforcement。",
+      "action_code": "MOVE_TO_ENFORCEMENT",
+      "count": 1
+     },
+     {
+      "action": "先排除 pending/failed usage query，再進行政策下線判斷。",
+      "action_code": "RESOLVE_QUERY_FAILURES",
+      "count": 1
+     },
+     {
+      "action": "檢查高影響範圍 provision，確認邊界敏感變更皆經授權。",
+      "action_code": "REVIEW_HIGH_IMPACT_PROVISIONS",
+      "count": 1
+     }
+    ],
+    "blast_radius": [],
+    "blind_spots": [
+     {
+      "action": "將範圍內工作負載由 visibility/testing 推進到 selective 或 full enforcement。",
+      "action_code": "MOVE_TO_ENFORCEMENT",
+      "app_env_key": "audit|global",
+      "evidence": {
+       "actors": [
+        "admin@lab.local"
+       ],
+       "count": 2,
+       "event_type": "rule_set.update",
+       "src_ips": [
+        "172.16.15.106"
+       ]
+      },
+      "finding": "audit (global): 偵測到可視性或強制執行盲點",
+      "severity": "MEDIUM"
+     },
+     {
+      "action": "先排除 pending/failed usage query，再進行政策下線判斷。",
+      "action_code": "RESOLVE_QUERY_FAILURES",
+      "app_env_key": "audit|global",
+      "evidence": {
+       "parser_note_rows": 1
+      },
+      "finding": "audit (global): 偵測到可視性或強制執行盲點",
+      "severity": "MEDIUM"
+     }
+    ],
+    "boundary_breaches": [
+     {
+      "action": "檢查高影響範圍 provision，確認邊界敏感變更皆經授權。",
+      "action_code": "REVIEW_HIGH_IMPACT_PROVISIONS",
+      "app_env_key": "audit|global",
+      "evidence": {
+       "actors": [
+        "admin@lab.local"
+       ],
+       "count": 2,
+       "event_type": "sec_policy.create",
+       "src_ips": [
+        "172.16.15.106"
+       ]
+      },
+      "finding": "audit (global): 偵測到邊界控制弱點",
+      "severity": "MEDIUM"
+     }
+    ],
+    "suspicious_pivot_behavior": []
+   },
+   "attack_summary_counts": {
+    "action_matrix": 3,
+    "blast_radius": 0,
+    "blind_spots": 2,
+    "boundary_breaches": 1,
+    "suspicious_pivot_behavior": 0
+   },
+   "execution_stats": {},
+   "failed_rule_details": [],
+   "filename": "illumio_audit_report_2026-06-26_0530.html",
+   "mtime": 1782451825.876112,
+   "pending_rule_details": [],
+   "report_type": "audit",
+   "reused_rule_details": [],
+   "size": 229024,
+   "summary": "Attack posture boundary 1 | pivot 0 | blast 0 | blind 2 | actions 3"
+  },
+  {
+   "attack_summary": {
+    "action_matrix": [
+     {
+      "action": "將範圍內工作負載由 visibility/testing 推進到 selective 或 full enforcement。",
+      "action_code": "MOVE_TO_ENFORCEMENT",
+      "count": 12
+     },
+     {
+      "action": "將 unmanaged 資產納管，或明確隔離其存取路徑。",
+      "action_code": "ONBOARD_UNMANAGED",
+      "count": 12
+     },
+     {
+      "action": "收斂 ringfence 範圍，只保留必要的 app-to-app 存取路徑。",
+      "action_code": "DEFINE_RINGFENCE_SCOPE",
+      "count": 7
+     },
+     {
+      "action": "此 workload 在流量圖中扮演網路樞紐角色（高可達性或 articulation point），請套用更嚴格的東西向政策邊界以限制橫向移動。",
+      "action_code": "RESTRICT_TRANSIT_NODE_ACCESS",
+      "count": 2
+     },
+     {
+      "action": "降低可橫向移動路徑，並優先分段高可達性的節點。",
+      "action_code": "TIGHTEN_LATERAL_POLICY",
+      "count": 2
+     }
+    ],
+    "blast_radius": [
+     {
+      "action": "降低可橫向移動路徑，並優先分段高可達性的節點。",
+      "action_code": "TIGHTEN_LATERAL_POLICY",
+      "app_env_key": "infrastructure|vmware",
+      "evidence": {
+       "max_depth": 4,
+       "reachability_count": 4
+      },
+      "finding": "infrastructure (vmware) · 10.10.0.3, 192.168.20.99 · 10.10.0.3, 192.168.20.99: 偵測到高擴散半徑風險",
+      "severity": "HIGH"
+     },
+     {
+      "action": "降低可橫向移動路徑，並優先分段高可達性的節點。",
+      "action_code": "TIGHTEN_LATERAL_POLICY",
+      "app_env_key": "jumpdesk|vmware",
+      "evidence": {
+       "max_depth": 4,
+       "reachability_count": 4
+      },
+      "finding": "jumpdesk (vmware) · 172.16.15.150 · 172.16.15.150: 偵測到高擴散半徑風險",
+      "severity": "HIGH"
+     }
+    ],
+    "blind_spots": [
+     {
+      "action": "將範圍內工作負載由 visibility/testing 推進到 selective 或 full enforcement。",
+      "action_code": "MOVE_TO_ENFORCEMENT",
+      "app_env_key": "coreservices|vmware",
+      "evidence": {
+       "allowed_ratio": 0.1578,
+       "blocked_or_pb_flow_count": 1441,
+       "flow_count": 1711
+      },
+      "finding": "coreservices (vmware) · 172.16.15.106, 172.16.15.100: 偵測到強制執行落差",
+      "severity": "CRITICAL"
+     },
+     {
+      "action": "將範圍內工作負載由 visibility/testing 推進到 selective 或 full enforcement。",
+      "action_code": "MOVE_TO_ENFORCEMENT",
+      "app_env_key": "endpoint|physical",
+      "evidence": {
+       "allowed_ratio": 0.0,
+       "blocked_or_pb_flow_count": 20,
+       "flow_count": 20
+      },
+      "finding": "endpoint (physical): 偵測到強制執行落差",
+      "severity": "CRITICAL"
+     },
+     {
+      "action": "將範圍內工作負載由 visibility/testing 推進到 selective 或 full enforcement。",
+      "action_code": "MOVE_TO_ENFORCEMENT",
+      "app_env_key": "illumio|kubernetes",
+      "evidence": {
+       "allowed_ratio": 0.1,
+       "blocked_or_pb_flow_count": 18,
+       "flow_count": 20
+      },
+      "finding": "illumio (kubernetes): 偵測到強制執行落差",
+      "severity": "CRITICAL"
+     },
+     {
+      "action": "將範圍內工作負載由 visibility/testing 推進到 selective 或 full enforcement。",
+      "action_code": "MOVE_TO_ENFORCEMENT",
+      "app_env_key": "illumio|vmware",
+      "evidence": {
+       "allowed_ratio": 0.1136,
+       "blocked_or_pb_flow_count": 39,
+       "flow_count": 44
+      },
+      "finding": "illumio (vmware) · 172.16.15.135: 偵測到強制執行落差",
+      "severity": "CRITICAL"
+     },
+     {
+      "action": "將範圍內工作負載由 visibility/testing 推進到 selective 或 full enforcement。",
+      "action_code": "MOVE_TO_ENFORCEMENT",
+      "app_env_key": "infrastructure|vmware",
+      "evidence": {
+       "allowed_ratio": 0.0356,
+       "blocked_or_pb_flow_count": 1028,
+       "flow_count": 1066
+      },
+      "finding": "infrastructure (vmware) · 10.10.0.3, 192.168.20.99: 偵測到強制執行落差",
+      "severity": "CRITICAL"
+     }
+    ],
+    "boundary_breaches": [
+     {
+      "action": "收斂 ringfence 範圍，只保留必要的 app-to-app 存取路徑。",
+      "action_code": "DEFINE_RINGFENCE_SCOPE",
+      "app_env_key": "calico|kubernetes",
+      "evidence": {
+       "flow_count": 12,
+       "ringfence_ratio": 0.0
+      },
+      "finding": "calico (kubernetes): 偵測到邊界控制弱點",
+      "severity": "HIGH"
+     },
+     {
+      "action": "收斂 ringfence 範圍，只保留必要的 app-to-app 存取路徑。",
+      "action_code": "DEFINE_RINGFENCE_SCOPE",
+      "app_env_key": "coreservices|vmware",
+      "evidence": {
+       "flow_count": 1711,
+       "ringfence_ratio": 0.0099
+      },
+      "finding": "coreservices (vmware) · 172.16.15.106, 172.16.15.100: 偵測到邊界控制弱點",
+      "severity": "HIGH"
+     },
+     {
+      "action": "將跨邊界通訊埠收斂為明確 allowlist，移除過寬存取範圍。",
+      "action_code": "LOCK_BOUNDARY_PORTS",
+      "app_env_key": "coreservices|vmware",
+      "evidence": {
+       "remote_allowed_ratio": 0.0,
+       "remote_flow_count": 7
+      },
+      "finding": "coreservices (vmware) · 172.16.15.106, 172.16.15.100: 偵測到邊界控制弱點",
+      "severity": "HIGH"
+     },
+     {
+      "action": "收斂 ringfence 範圍，只保留必要的 app-to-app 存取路徑。",
+      "action_code": "DEFINE_RINGFENCE_SCOPE",
+      "app_env_key": "default|kubernetes",
+      "evidence": {
+       "flow_count": 27,
+       "ringfence_ratio": 0.0
+      },
+      "finding": "default (kubernetes): 偵測到邊界控制弱點",
+      "severity": "HIGH"
+     },
+     {
+      "action": "收斂 ringfence 範圍，只保留必要的 app-to-app 存取路徑。",
+      "action_code": "DEFINE_RINGFENCE_SCOPE",
+      "app_env_key": "demoapp|vmware",
+      "evidence": {
+       "flow_count": 186,
+       "ringfence_ratio": 0.0645
+      },
+      "finding": "demoapp (vmware): 偵測到邊界控制弱點",
+      "severity": "HIGH"
+     }
+    ],
+    "suspicious_pivot_behavior": [
+     {
+      "action": "此 workload 在流量圖中扮演網路樞紐角色（高可達性或 articulation point），請套用更嚴格的東西向政策邊界以限制橫向移動。",
+      "action_code": "RESTRICT_TRANSIT_NODE_ACCESS",
+      "app_env_key": "coreservices|vmware",
+      "evidence": {
+       "bridge_score": 90.0,
+       "reachability_count": 3
+      },
+      "finding": "coreservices (vmware) · 172.16.15.106, 172.16.15.100 · 172.16.15.106, 172.16.15.100: 偵測到可疑橫向樞紐行為",
+      "severity": "HIGH"
+     },
+     {
+      "action": "此 workload 在流量圖中扮演網路樞紐角色（高可達性或 articulation point），請套用更嚴格的東西向政策邊界以限制橫向移動。",
+      "action_code": "RESTRICT_TRANSIT_NODE_ACCESS",
+      "app_env_key": "unlabeled|unlabeled",
+      "evidence": {
+       "bridge_score": 90.0,
+       "reachability_count": 3
+      },
+      "finding": "172.16.15.130, 172.16.15.100, 172.16.15.101, 192.168.20.32 +2 · 172.16.15.130, 172.16.15.100, 172.16.15.101, 192.168.20.32 +2: 偵測到可疑橫向樞紐行為",
+      "severity": "HIGH"
+     }
+    ]
+   },
+   "attack_summary_counts": {
+    "action_matrix": 5,
+    "blast_radius": 2,
+    "blind_spots": 5,
+    "boundary_breaches": 5,
+    "suspicious_pivot_behavior": 2
+   },
+   "execution_stats": {},
+   "failed_rule_details": [],
+   "filename": "Illumio_Traffic_Report_2026-06-26_0530_raw.zip",
+   "mtime": 1782451822.6791089,
+   "pending_rule_details": [],
+   "report_type": "traffic",
+   "reused_rule_details": [],
+   "size": 116982,
+   "summary": "Attack posture boundary 5 | pivot 2 | blast 2 | blind 5 | actions 5"
+  },
+  {
+   "attack_summary": {},
+   "attack_summary_counts": {},
+   "execution_stats": {},
+   "failed_rule_details": [],
+   "filename": "Illumio_Traffic_Report_2026-06-26_0530.xlsx",
+   "mtime": 1782451822.5001087,
+   "pending_rule_details": [],
+   "report_type": "",
+   "reused_rule_details": [],
+   "size": 330298,
+   "summary": ""
+  },
+  {
+   "attack_summary": {
+    "action_matrix": [
+     {
+      "action": "將範圍內工作負載由 visibility/testing 推進到 selective 或 full enforcement。",
+      "action_code": "MOVE_TO_ENFORCEMENT",
+      "count": 12
+     },
+     {
+      "action": "將 unmanaged 資產納管，或明確隔離其存取路徑。",
+      "action_code": "ONBOARD_UNMANAGED",
+      "count": 12
+     },
+     {
+      "action": "收斂 ringfence 範圍，只保留必要的 app-to-app 存取路徑。",
+      "action_code": "DEFINE_RINGFENCE_SCOPE",
+      "count": 7
+     },
+     {
+      "action": "此 workload 在流量圖中扮演網路樞紐角色（高可達性或 articulation point），請套用更嚴格的東西向政策邊界以限制橫向移動。",
+      "action_code": "RESTRICT_TRANSIT_NODE_ACCESS",
+      "count": 2
+     },
+     {
+      "action": "降低可橫向移動路徑，並優先分段高可達性的節點。",
+      "action_code": "TIGHTEN_LATERAL_POLICY",
+      "count": 2
+     }
+    ],
+    "blast_radius": [
+     {
+      "action": "降低可橫向移動路徑，並優先分段高可達性的節點。",
+      "action_code": "TIGHTEN_LATERAL_POLICY",
+      "app_env_key": "infrastructure|vmware",
+      "evidence": {
+       "max_depth": 4,
+       "reachability_count": 4
+      },
+      "finding": "infrastructure (vmware) · 10.10.0.3, 192.168.20.99 · 10.10.0.3, 192.168.20.99: 偵測到高擴散半徑風險",
+      "severity": "HIGH"
+     },
+     {
+      "action": "降低可橫向移動路徑，並優先分段高可達性的節點。",
+      "action_code": "TIGHTEN_LATERAL_POLICY",
+      "app_env_key": "jumpdesk|vmware",
+      "evidence": {
+       "max_depth": 4,
+       "reachability_count": 4
+      },
+      "finding": "jumpdesk (vmware) · 172.16.15.150 · 172.16.15.150: 偵測到高擴散半徑風險",
+      "severity": "HIGH"
+     }
+    ],
+    "blind_spots": [
+     {
+      "action": "將範圍內工作負載由 visibility/testing 推進到 selective 或 full enforcement。",
+      "action_code": "MOVE_TO_ENFORCEMENT",
+      "app_env_key": "coreservices|vmware",
+      "evidence": {
+       "allowed_ratio": 0.1578,
+       "blocked_or_pb_flow_count": 1441,
+       "flow_count": 1711
+      },
+      "finding": "coreservices (vmware) · 172.16.15.106, 172.16.15.100: 偵測到強制執行落差",
+      "severity": "CRITICAL"
+     },
+     {
+      "action": "將範圍內工作負載由 visibility/testing 推進到 selective 或 full enforcement。",
+      "action_code": "MOVE_TO_ENFORCEMENT",
+      "app_env_key": "endpoint|physical",
+      "evidence": {
+       "allowed_ratio": 0.0,
+       "blocked_or_pb_flow_count": 20,
+       "flow_count": 20
+      },
+      "finding": "endpoint (physical): 偵測到強制執行落差",
+      "severity": "CRITICAL"
+     },
+     {
+      "action": "將範圍內工作負載由 visibility/testing 推進到 selective 或 full enforcement。",
+      "action_code": "MOVE_TO_ENFORCEMENT",
+      "app_env_key": "illumio|kubernetes",
+      "evidence": {
+       "allowed_ratio": 0.1,
+       "blocked_or_pb_flow_count": 18,
+       "flow_count": 20
+      },
+      "finding": "illumio (kubernetes): 偵測到強制執行落差",
+      "severity": "CRITICAL"
+     },
+     {
+      "action": "將範圍內工作負載由 visibility/testing 推進到 selective 或 full enforcement。",
+      "action_code": "MOVE_TO_ENFORCEMENT",
+      "app_env_key": "illumio|vmware",
+      "evidence": {
+       "allowed_ratio": 0.1136,
+       "blocked_or_pb_flow_count": 39,
+       "flow_count": 44
+      },
+      "finding": "illumio (vmware) · 172.16.15.135: 偵測到強制執行落差",
+      "severity": "CRITICAL"
+     },
+     {
+      "action": "將範圍內工作負載由 visibility/testing 推進到 selective 或 full enforcement。",
+      "action_code": "MOVE_TO_ENFORCEMENT",
+      "app_env_key": "infrastructure|vmware",
+      "evidence": {
+       "allowed_ratio": 0.0356,
+       "blocked_or_pb_flow_count": 1028,
+       "flow_count": 1066
+      },
+      "finding": "infrastructure (vmware) · 10.10.0.3, 192.168.20.99: 偵測到強制執行落差",
+      "severity": "CRITICAL"
+     }
+    ],
+    "boundary_breaches": [
+     {
+      "action": "收斂 ringfence 範圍，只保留必要的 app-to-app 存取路徑。",
+      "action_code": "DEFINE_RINGFENCE_SCOPE",
+      "app_env_key": "calico|kubernetes",
+      "evidence": {
+       "flow_count": 12,
+       "ringfence_ratio": 0.0
+      },
+      "finding": "calico (kubernetes): 偵測到邊界控制弱點",
+      "severity": "HIGH"
+     },
+     {
+      "action": "收斂 ringfence 範圍，只保留必要的 app-to-app 存取路徑。",
+      "action_code": "DEFINE_RINGFENCE_SCOPE",
+      "app_env_key": "coreservices|vmware",
+      "evidence": {
+       "flow_count": 1711,
+       "ringfence_ratio": 0.0099
+      },
+      "finding": "coreservices (vmware) · 172.16.15.106, 172.16.15.100: 偵測到邊界控制弱點",
+      "severity": "HIGH"
+     },
+     {
+      "action": "將跨邊界通訊埠收斂為明確 allowlist，移除過寬存取範圍。",
+      "action_code": "LOCK_BOUNDARY_PORTS",
+      "app_env_key": "coreservices|vmware",
+      "evidence": {
+       "remote_allowed_ratio": 0.0,
+       "remote_flow_count": 7
+      },
+      "finding": "coreservices (vmware) · 172.16.15.106, 172.16.15.100: 偵測到邊界控制弱點",
+      "severity": "HIGH"
+     },
+     {
+      "action": "收斂 ringfence 範圍，只保留必要的 app-to-app 存取路徑。",
+      "action_code": "DEFINE_RINGFENCE_SCOPE",
+      "app_env_key": "default|kubernetes",
+      "evidence": {
+       "flow_count": 27,
+       "ringfence_ratio": 0.0
+      },
+      "finding": "default (kubernetes): 偵測到邊界控制弱點",
+      "severity": "HIGH"
+     },
+     {
+      "action": "收斂 ringfence 範圍，只保留必要的 app-to-app 存取路徑。",
+      "action_code": "DEFINE_RINGFENCE_SCOPE",
+      "app_env_key": "demoapp|vmware",
+      "evidence": {
+       "flow_count": 186,
+       "ringfence_ratio": 0.0645
+      },
+      "finding": "demoapp (vmware): 偵測到邊界控制弱點",
+      "severity": "HIGH"
+     }
+    ],
+    "suspicious_pivot_behavior": [
+     {
+      "action": "此 workload 在流量圖中扮演網路樞紐角色（高可達性或 articulation point），請套用更嚴格的東西向政策邊界以限制橫向移動。",
+      "action_code": "RESTRICT_TRANSIT_NODE_ACCESS",
+      "app_env_key": "coreservices|vmware",
+      "evidence": {
+       "bridge_score": 90.0,
+       "reachability_count": 3
+      },
+      "finding": "coreservices (vmware) · 172.16.15.106, 172.16.15.100 · 172.16.15.106, 172.16.15.100: 偵測到可疑橫向樞紐行為",
+      "severity": "HIGH"
+     },
+     {
+      "action": "此 workload 在流量圖中扮演網路樞紐角色（高可達性或 articulation point），請套用更嚴格的東西向政策邊界以限制橫向移動。",
+      "action_code": "RESTRICT_TRANSIT_NODE_ACCESS",
+      "app_env_key": "unlabeled|unlabeled",
+      "evidence": {
+       "bridge_score": 90.0,
+       "reachability_count": 3
+      },
+      "finding": "172.16.15.130, 172.16.15.100, 172.16.15.101, 192.168.20.32 +2 · 172.16.15.130, 172.16.15.100, 172.16.15.101, 192.168.20.32 +2: 偵測到可疑橫向樞紐行為",
+      "severity": "HIGH"
+     }
+    ]
+   },
+   "attack_summary_counts": {
+    "action_matrix": 5,
+    "blast_radius": 2,
+    "blind_spots": 5,
+    "boundary_breaches": 5,
+    "suspicious_pivot_behavior": 2
+   },
+   "execution_stats": {},
+   "failed_rule_details": [],
+   "filename": "Illumio_Traffic_Report_SecurityRisk_2026-06-26_0530.html",
+   "mtime": 1782451819.7291062,
+   "pending_rule_details": [],
+   "report_type": "traffic",
+   "reused_rule_details": [],
+   "size": 216812,
+   "summary": "Attack posture boundary 5 | pivot 2 | blast 2 | blind 5 | actions 5"
+  },
+  {
+   "attack_summary": {},
+   "attack_summary_counts": {},
+   "execution_stats": {},
+   "failed_rule_details": [],
+   "filename": "Illumio_App_Summary_Kube-Prom-Stack_2026-06-25_1529.html",
+   "mtime": 1782401396.524724,
+   "pending_rule_details": [],
+   "report_type": "",
+   "reused_rule_details": [],
+   "size": 55364,
+   "summary": ""
+  },
+  {
+   "attack_summary": {
+    "action_matrix": [
+     {
+      "action": "將範圍內工作負載由 visibility/testing 推進到 selective 或 full enforcement。",
+      "action_code": "MOVE_TO_ENFORCEMENT",
+      "count": 12
+     },
+     {
+      "action": "將 unmanaged 資產納管，或明確隔離其存取路徑。",
+      "action_code": "ONBOARD_UNMANAGED",
+      "count": 12
+     },
+     {
+      "action": "收斂 ringfence 範圍，只保留必要的 app-to-app 存取路徑。",
+      "action_code": "DEFINE_RINGFENCE_SCOPE",
+      "count": 7
+     },
+     {
+      "action": "此 workload 在流量圖中扮演網路樞紐角色（高可達性或 articulation point），請套用更嚴格的東西向政策邊界以限制橫向移動。",
+      "action_code": "RESTRICT_TRANSIT_NODE_ACCESS",
+      "count": 2
+     },
+     {
+      "action": "降低可橫向移動路徑，並優先分段高可達性的節點。",
+      "action_code": "TIGHTEN_LATERAL_POLICY",
+      "count": 2
+     }
+    ],
+    "blast_radius": [
+     {
+      "action": "降低可橫向移動路徑，並優先分段高可達性的節點。",
+      "action_code": "TIGHTEN_LATERAL_POLICY",
+      "app_env_key": "infrastructure|vmware",
+      "evidence": {
+       "max_depth": 4,
+       "reachability_count": 4
+      },
+      "finding": "infrastructure (vmware) · 10.10.0.3 · 10.10.0.3: 偵測到高擴散半徑風險",
+      "severity": "HIGH"
+     },
+     {
+      "action": "降低可橫向移動路徑，並優先分段高可達性的節點。",
+      "action_code": "TIGHTEN_LATERAL_POLICY",
+      "app_env_key": "jumpdesk|vmware",
+      "evidence": {
+       "max_depth": 4,
+       "reachability_count": 4
+      },
+      "finding": "jumpdesk (vmware) · 172.16.15.150 · 172.16.15.150: 偵測到高擴散半徑風險",
+      "severity": "HIGH"
+     }
+    ],
+    "blind_spots": [
+     {
+      "action": "將範圍內工作負載由 visibility/testing 推進到 selective 或 full enforcement。",
+      "action_code": "MOVE_TO_ENFORCEMENT",
+      "app_env_key": "coreservices|vmware",
+      "evidence": {
+       "allowed_ratio": 0.1953,
+       "blocked_or_pb_flow_count": 1001,
+       "flow_count": 1244
+      },
+      "finding": "coreservices (vmware) · 172.16.15.106, 172.16.15.100: 偵測到強制執行落差",
+      "severity": "CRITICAL"
+     },
+     {
+      "action": "將範圍內工作負載由 visibility/testing 推進到 selective 或 full enforcement。",
+      "action_code": "MOVE_TO_ENFORCEMENT",
+      "app_env_key": "endpoint|physical",
+      "evidence": {
+       "allowed_ratio": 0.0,
+       "blocked_or_pb_flow_count": 20,
+       "flow_count": 20
+      },
+      "finding": "endpoint (physical): 偵測到強制執行落差",
+      "severity": "CRITICAL"
+     },
+     {
+      "action": "將範圍內工作負載由 visibility/testing 推進到 selective 或 full enforcement。",
+      "action_code": "MOVE_TO_ENFORCEMENT",
+      "app_env_key": "illumio|kubernetes",
+      "evidence": {
+       "allowed_ratio": 0.1,
+       "blocked_or_pb_flow_count": 18,
+       "flow_count": 20
+      },
+      "finding": "illumio (kubernetes): 偵測到強制執行落差",
+      "severity": "CRITICAL"
+     },
+     {
+      "action": "將範圍內工作負載由 visibility/testing 推進到 selective 或 full enforcement。",
+      "action_code": "MOVE_TO_ENFORCEMENT",
+      "app_env_key": "illumio|vmware",
+      "evidence": {
+       "allowed_ratio": 0.1429,
+       "blocked_or_pb_flow_count": 30,
+       "flow_count": 35
+      },
+      "finding": "illumio (vmware) · 172.16.15.135: 偵測到強制執行落差",
+      "severity": "CRITICAL"
+     },
+     {
+      "action": "將範圍內工作負載由 visibility/testing 推進到 selective 或 full enforcement。",
+      "action_code": "MOVE_TO_ENFORCEMENT",
+      "app_env_key": "infrastructure|vmware",
+      "evidence": {
+       "allowed_ratio": 0.0347,
+       "blocked_or_pb_flow_count": 1000,
+       "flow_count": 1036
+      },
+      "finding": "infrastructure (vmware) · 10.10.0.3: 偵測到強制執行落差",
+      "severity": "CRITICAL"
+     }
+    ],
+    "boundary_breaches": [
+     {
+      "action": "收斂 ringfence 範圍，只保留必要的 app-to-app 存取路徑。",
+      "action_code": "DEFINE_RINGFENCE_SCOPE",
+      "app_env_key": "calico|kubernetes",
+      "evidence": {
+       "flow_count": 10,
+       "ringfence_ratio": 0.0
+      },
+      "finding": "calico (kubernetes): 偵測到邊界控制弱點",
+      "severity": "HIGH"
+     },
+     {
+      "action": "收斂 ringfence 範圍，只保留必要的 app-to-app 存取路徑。",
+      "action_code": "DEFINE_RINGFENCE_SCOPE",
+      "app_env_key": "coreservices|vmware",
+      "evidence": {
+       "flow_count": 1244,
+       "ringfence_ratio": 0.0137
+      },
+      "finding": "coreservices (vmware) · 172.16.15.106, 172.16.15.100: 偵測到邊界控制弱點",
+      "severity": "HIGH"
+     },
+     {
+      "action": "將跨邊界通訊埠收斂為明確 allowlist，移除過寬存取範圍。",
+      "action_code": "LOCK_BOUNDARY_PORTS",
+      "app_env_key": "coreservices|vmware",
+      "evidence": {
+       "remote_allowed_ratio": 0.0,
+       "remote_flow_count": 7
+      },
+      "finding": "coreservices (vmware) · 172.16.15.106, 172.16.15.100: 偵測到邊界控制弱點",
+      "severity": "HIGH"
+     },
+     {
+      "action": "收斂 ringfence 範圍，只保留必要的 app-to-app 存取路徑。",
+      "action_code": "DEFINE_RINGFENCE_SCOPE",
+      "app_env_key": "default|kubernetes",
+      "evidence": {
+       "flow_count": 23,
+       "ringfence_ratio": 0.0
+      },
+      "finding": "default (kubernetes): 偵測到邊界控制弱點",
+      "severity": "HIGH"
+     },
+     {
+      "action": "收斂 ringfence 範圍，只保留必要的 app-to-app 存取路徑。",
+      "action_code": "DEFINE_RINGFENCE_SCOPE",
+      "app_env_key": "demoapp|vmware",
+      "evidence": {
+       "flow_count": 161,
+       "ringfence_ratio": 0.0745
+      },
+      "finding": "demoapp (vmware): 偵測到邊界控制弱點",
+      "severity": "HIGH"
+     }
+    ],
+    "suspicious_pivot_behavior": [
+     {
+      "action": "此 workload 在流量圖中扮演網路樞紐角色（高可達性或 articulation point），請套用更嚴格的東西向政策邊界以限制橫向移動。",
+      "action_code": "RESTRICT_TRANSIT_NODE_ACCESS",
+      "app_env_key": "coreservices|vmware",
+      "evidence": {
+       "bridge_score": 90.0,
+       "reachability_count": 3
+      },
+      "finding": "coreservices (vmware) · 172.16.15.106, 172.16.15.100 · 172.16.15.106, 172.16.15.100: 偵測到可疑橫向樞紐行為",
+      "severity": "HIGH"
+     },
+     {
+      "action": "此 workload 在流量圖中扮演網路樞紐角色（高可達性或 articulation point），請套用更嚴格的東西向政策邊界以限制橫向移動。",
+      "action_code": "RESTRICT_TRANSIT_NODE_ACCESS",
+      "app_env_key": "unlabeled|unlabeled",
+      "evidence": {
+       "bridge_score": 90.0,
+       "reachability_count": 3
+      },
+      "finding": "172.16.15.100, 172.16.15.101, 192.168.20.32, 20.27.177.113 +1 · 172.16.15.100, 172.16.15.101, 192.168.20.32, 20.27.177.113 +1: 偵測到可疑橫向樞紐行為",
+      "severity": "HIGH"
+     }
+    ]
+   },
+   "attack_summary_counts": {
+    "action_matrix": 5,
+    "blast_radius": 2,
+    "blind_spots": 5,
+    "boundary_breaches": 5,
+    "suspicious_pivot_behavior": 2
+   },
+   "execution_stats": {},
+   "failed_rule_details": [],
+   "filename": "Illumio_Traffic_Report_SecurityRisk_2026-06-25_1527.html",
+   "mtime": 1782401272.9856312,
+   "pending_rule_details": [],
+   "report_type": "traffic",
+   "reused_rule_details": [],
+   "size": 217596,
+   "summary": "Attack posture boundary 5 | pivot 2 | blast 2 | blind 5 | actions 5"
+  },
+  {
+   "attack_summary": {},
+   "attack_summary_counts": {},
+   "execution_stats": {},
+   "failed_rule_details": [],
+   "filename": "illumio_ven_status_2026-06-25_0530.html",
+   "mtime": 1782365435.3597898,
+   "pending_rule_details": [],
+   "report_type": "",
+   "reused_rule_details": [],
+   "size": 96629,
+   "summary": ""
+  },
+  {
+   "attack_summary": {
+    "action_matrix": [
+     {
+      "action": "先排除 pending/failed usage query，再進行政策下線判斷。",
+      "action_code": "RESOLVE_QUERY_FAILURES",
+      "count": 1
+     },
+     {
+      "action": "此 workload 在流量圖中扮演網路樞紐角色（高可達性或 articulation point），請套用更嚴格的東西向政策邊界以限制橫向移動。",
+      "action_code": "RESTRICT_TRANSIT_NODE_ACCESS",
+      "count": 1
+     }
+    ],
+    "blast_radius": [],
+    "blind_spots": [
+     {
+      "action": "先排除 pending/failed usage query，再進行政策下線判斷。",
+      "action_code": "RESOLVE_QUERY_FAILURES",
+      "app_env_key": "audit|global",
+      "evidence": {
+       "parser_note_rows": 1
+      },
+      "finding": "audit (global): 偵測到可視性或強制執行盲點",
+      "severity": "MEDIUM"
+     }
+    ],
+    "boundary_breaches": [],
+    "suspicious_pivot_behavior": [
+     {
+      "action": "此 workload 在流量圖中扮演網路樞紐角色（高可達性或 articulation point），請套用更嚴格的東西向政策邊界以限制橫向移動。",
+      "action_code": "RESTRICT_TRANSIT_NODE_ACCESS",
+      "app_env_key": "audit|global",
+      "evidence": {
+       "actors": [
+        "k8s-node01",
+        "k8s-master",
+        "k8s-node02"
+       ],
+       "count": 4,
+       "event_type": "agent.tampering",
+       "src_ips": [
+        "172.16.15.121",
+        "172.16.15.120",
+        "172.16.15.122"
+       ]
+      },
+      "finding": "audit (global): 偵測到可疑橫向樞紐行為",
+      "severity": "CRITICAL"
+     }
+    ]
+   },
+   "attack_summary_counts": {
+    "action_matrix": 2,
+    "blast_radius": 0,
+    "blind_spots": 1,
+    "boundary_breaches": 0,
+    "suspicious_pivot_behavior": 1
+   },
+   "execution_stats": {},
+   "failed_rule_details": [],
+   "filename": "Illumio_Audit_Report_2026-06-25_0530_raw.zip",
+   "mtime": 1782365431.8447876,
+   "pending_rule_details": [],
+   "report_type": "audit",
+   "reused_rule_details": [],
+   "size": 28409,
+   "summary": "Attack posture boundary 0 | pivot 1 | blast 0 | blind 1 | actions 2"
+  },
+  {
+   "attack_summary": {},
+   "attack_summary_counts": {},
+   "execution_stats": {},
+   "failed_rule_details": [],
+   "filename": "Illumio_Audit_Report_2026-06-25_0530.xlsx",
+   "mtime": 1782365431.8097878,
+   "pending_rule_details": [],
+   "report_type": "",
+   "reused_rule_details": [],
+   "size": 7055,
+   "summary": ""
+  },
+  {
+   "attack_summary": {
+    "action_matrix": [
+     {
+      "action": "先排除 pending/failed usage query，再進行政策下線判斷。",
+      "action_code": "RESOLVE_QUERY_FAILURES",
+      "count": 1
+     },
+     {
+      "action": "此 workload 在流量圖中扮演網路樞紐角色（高可達性或 articulation point），請套用更嚴格的東西向政策邊界以限制橫向移動。",
+      "action_code": "RESTRICT_TRANSIT_NODE_ACCESS",
+      "count": 1
+     }
+    ],
+    "blast_radius": [],
+    "blind_spots": [
+     {
+      "action": "先排除 pending/failed usage query，再進行政策下線判斷。",
+      "action_code": "RESOLVE_QUERY_FAILURES",
+      "app_env_key": "audit|global",
+      "evidence": {
+       "parser_note_rows": 1
+      },
+      "finding": "audit (global): 偵測到可視性或強制執行盲點",
+      "severity": "MEDIUM"
+     }
+    ],
+    "boundary_breaches": [],
+    "suspicious_pivot_behavior": [
+     {
+      "action": "此 workload 在流量圖中扮演網路樞紐角色（高可達性或 articulation point），請套用更嚴格的東西向政策邊界以限制橫向移動。",
+      "action_code": "RESTRICT_TRANSIT_NODE_ACCESS",
+      "app_env_key": "audit|global",
+      "evidence": {
+       "actors": [
+        "k8s-node01",
+        "k8s-master",
+        "k8s-node02"
+       ],
+       "count": 4,
+       "event_type": "agent.tampering",
+       "src_ips": [
+        "172.16.15.121",
+        "172.16.15.120",
+        "172.16.15.122"
+       ]
+      },
+      "finding": "audit (global): 偵測到可疑橫向樞紐行為",
+      "severity": "CRITICAL"
+     }
+    ]
+   },
+   "attack_summary_counts": {
+    "action_matrix": 2,
+    "blast_radius": 0,
+    "blind_spots": 1,
+    "boundary_breaches": 0,
+    "suspicious_pivot_behavior": 1
+   },
+   "execution_stats": {},
+   "failed_rule_details": [],
+   "filename": "illumio_audit_report_2026-06-25_0530.html",
+   "mtime": 1782365431.7947876,
+   "pending_rule_details": [],
+   "report_type": "audit",
+   "reused_rule_details": [],
+   "size": 194454,
+   "summary": "Attack posture boundary 0 | pivot 1 | blast 0 | blind 1 | actions 2"
+  },
+  {
+   "attack_summary": {
+    "action_matrix": [
+     {
+      "action": "將範圍內工作負載由 visibility/testing 推進到 selective 或 full enforcement。",
+      "action_code": "MOVE_TO_ENFORCEMENT",
+      "count": 12
+     },
+     {
+      "action": "將 unmanaged 資產納管，或明確隔離其存取路徑。",
+      "action_code": "ONBOARD_UNMANAGED",
+      "count": 12
+     },
+     {
+      "action": "收斂 ringfence 範圍，只保留必要的 app-to-app 存取路徑。",
+      "action_code": "DEFINE_RINGFENCE_SCOPE",
+      "count": 7
+     },
+     {
+      "action": "此 workload 在流量圖中扮演網路樞紐角色（高可達性或 articulation point），請套用更嚴格的東西向政策邊界以限制橫向移動。",
+      "action_code": "RESTRICT_TRANSIT_NODE_ACCESS",
+      "count": 2
+     },
+     {
+      "action": "降低可橫向移動路徑，並優先分段高可達性的節點。",
+      "action_code": "TIGHTEN_LATERAL_POLICY",
+      "count": 2
+     }
+    ],
+    "blast_radius": [
+     {
+      "action": "降低可橫向移動路徑，並優先分段高可達性的節點。",
+      "action_code": "TIGHTEN_LATERAL_POLICY",
+      "app_env_key": "infrastructure|vmware",
+      "evidence": {
+       "max_depth": 4,
+       "reachability_count": 4
+      },
+      "finding": "infrastructure (vmware) · 10.10.0.3 · 10.10.0.3: 偵測到高擴散半徑風險",
+      "severity": "HIGH"
+     },
+     {
+      "action": "降低可橫向移動路徑，並優先分段高可達性的節點。",
+      "action_code": "TIGHTEN_LATERAL_POLICY",
+      "app_env_key": "jumpdesk|vmware",
+      "evidence": {
+       "max_depth": 4,
+       "reachability_count": 4
+      },
+      "finding": "jumpdesk (vmware) · 172.16.15.150 · 172.16.15.150: 偵測到高擴散半徑風險",
+      "severity": "HIGH"
+     }
+    ],
+    "blind_spots": [
+     {
+      "action": "將範圍內工作負載由 visibility/testing 推進到 selective 或 full enforcement。",
+      "action_code": "MOVE_TO_ENFORCEMENT",
+      "app_env_key": "coreservices|vmware",
+      "evidence": {
+       "allowed_ratio": 0.236,
+       "blocked_or_pb_flow_count": 735,
+       "flow_count": 962
+      },
+      "finding": "coreservices (vmware) · 172.16.15.106, 172.16.15.100: 偵測到強制執行落差",
+      "severity": "CRITICAL"
+     },
+     {
+      "action": "將範圍內工作負載由 visibility/testing 推進到 selective 或 full enforcement。",
+      "action_code": "MOVE_TO_ENFORCEMENT",
+      "app_env_key": "endpoint|physical",
+      "evidence": {
+       "allowed_ratio": 0.0,
+       "blocked_or_pb_flow_count": 20,
+       "flow_count": 20
+      },
+      "finding": "endpoint (physical): 偵測到強制執行落差",
+      "severity": "CRITICAL"
+     },
+     {
+      "action": "將範圍內工作負載由 visibility/testing 推進到 selective 或 full enforcement。",
+      "action_code": "MOVE_TO_ENFORCEMENT",
+      "app_env_key": "illumio|kubernetes",
+      "evidence": {
+       "allowed_ratio": 0.1053,
+       "blocked_or_pb_flow_count": 17,
+       "flow_count": 19
+      },
+      "finding": "illumio (kubernetes): 偵測到強制執行落差",
+      "severity": "CRITICAL"
+     },
+     {
+      "action": "將範圍內工作負載由 visibility/testing 推進到 selective 或 full enforcement。",
+      "action_code": "MOVE_TO_ENFORCEMENT",
+      "app_env_key": "illumio|vmware",
+      "evidence": {
+       "allowed_ratio": 0.1562,
+       "blocked_or_pb_flow_count": 27,
+       "flow_count": 32
+      },
+      "finding": "illumio (vmware) · 172.16.15.135: 偵測到強制執行落差",
+      "severity": "CRITICAL"
+     },
+     {
+      "action": "將範圍內工作負載由 visibility/testing 推進到 selective 或 full enforcement。",
+      "action_code": "MOVE_TO_ENFORCEMENT",
+      "app_env_key": "infrastructure|vmware",
+      "evidence": {
+       "allowed_ratio": 0.0398,
+       "blocked_or_pb_flow_count": 820,
+       "flow_count": 854
+      },
+      "finding": "infrastructure (vmware) · 10.10.0.3: 偵測到強制執行落差",
+      "severity": "CRITICAL"
+     }
+    ],
+    "boundary_breaches": [
+     {
+      "action": "收斂 ringfence 範圍，只保留必要的 app-to-app 存取路徑。",
+      "action_code": "DEFINE_RINGFENCE_SCOPE",
+      "app_env_key": "calico|kubernetes",
+      "evidence": {
+       "flow_count": 6,
+       "ringfence_ratio": 0.0
+      },
+      "finding": "calico (kubernetes): 偵測到邊界控制弱點",
+      "severity": "HIGH"
+     },
+     {
+      "action": "收斂 ringfence 範圍，只保留必要的 app-to-app 存取路徑。",
+      "action_code": "DEFINE_RINGFENCE_SCOPE",
+      "app_env_key": "coreservices|vmware",
+      "evidence": {
+       "flow_count": 962,
+       "ringfence_ratio": 0.0166
+      },
+      "finding": "coreservices (vmware) · 172.16.15.106, 172.16.15.100: 偵測到邊界控制弱點",
+      "severity": "HIGH"
+     },
+     {
+      "action": "將跨邊界通訊埠收斂為明確 allowlist，移除過寬存取範圍。",
+      "action_code": "LOCK_BOUNDARY_PORTS",
+      "app_env_key": "coreservices|vmware",
+      "evidence": {
+       "remote_allowed_ratio": 0.0,
+       "remote_flow_count": 6
+      },
+      "finding": "coreservices (vmware) · 172.16.15.106, 172.16.15.100: 偵測到邊界控制弱點",
+      "severity": "HIGH"
+     },
+     {
+      "action": "收斂 ringfence 範圍，只保留必要的 app-to-app 存取路徑。",
+      "action_code": "DEFINE_RINGFENCE_SCOPE",
+      "app_env_key": "default|kubernetes",
+      "evidence": {
+       "flow_count": 11,
+       "ringfence_ratio": 0.0
+      },
+      "finding": "default (kubernetes): 偵測到邊界控制弱點",
+      "severity": "HIGH"
+     },
+     {
+      "action": "收斂 ringfence 範圍，只保留必要的 app-to-app 存取路徑。",
+      "action_code": "DEFINE_RINGFENCE_SCOPE",
+      "app_env_key": "demoapp|vmware",
+      "evidence": {
+       "flow_count": 142,
+       "ringfence_ratio": 0.0704
+      },
+      "finding": "demoapp (vmware): 偵測到邊界控制弱點",
+      "severity": "HIGH"
+     }
+    ],
+    "suspicious_pivot_behavior": [
+     {
+      "action": "此 workload 在流量圖中扮演網路樞紐角色（高可達性或 articulation point），請套用更嚴格的東西向政策邊界以限制橫向移動。",
+      "action_code": "RESTRICT_TRANSIT_NODE_ACCESS",
+      "app_env_key": "coreservices|vmware",
+      "evidence": {
+       "bridge_score": 90.0,
+       "reachability_count": 3
+      },
+      "finding": "coreservices (vmware) · 172.16.15.106, 172.16.15.100 · 172.16.15.106, 172.16.15.100: 偵測到可疑橫向樞紐行為",
+      "severity": "HIGH"
+     },
+     {
+      "action": "此 workload 在流量圖中扮演網路樞紐角色（高可達性或 articulation point），請套用更嚴格的東西向政策邊界以限制橫向移動。",
+      "action_code": "RESTRICT_TRANSIT_NODE_ACCESS",
+      "app_env_key": "unlabeled|unlabeled",
+      "evidence": {
+       "bridge_score": 90.0,
+       "reachability_count": 3
+      },
+      "finding": "172.16.15.100, 172.16.15.101, 192.168.20.32, 20.27.177.113 +1 · 172.16.15.100, 172.16.15.101, 192.168.20.32, 20.27.177.113 +1: 偵測到可疑橫向樞紐行為",
+      "severity": "HIGH"
+     }
+    ]
+   },
+   "attack_summary_counts": {
+    "action_matrix": 5,
+    "blast_radius": 2,
+    "blind_spots": 5,
+    "boundary_breaches": 5,
+    "suspicious_pivot_behavior": 2
+   },
+   "execution_stats": {},
+   "failed_rule_details": [],
+   "filename": "Illumio_Traffic_Report_2026-06-25_0530_raw.zip",
+   "mtime": 1782365423.0167825,
+   "pending_rule_details": [],
+   "report_type": "traffic",
+   "reused_rule_details": [],
+   "size": 90514,
+   "summary": "Attack posture boundary 5 | pivot 2 | blast 2 | blind 5 | actions 5"
+  },
+  {
+   "attack_summary": {},
+   "attack_summary_counts": {},
+   "execution_stats": {},
+   "failed_rule_details": [],
+   "filename": "Illumio_Traffic_Report_2026-06-25_0530.xlsx",
+   "mtime": 1782365422.8697824,
+   "pending_rule_details": [],
+   "report_type": "",
+   "reused_rule_details": [],
+   "size": 336882,
+   "summary": ""
+  },
+  {
+   "attack_summary": {
+    "action_matrix": [
+     {
+      "action": "將範圍內工作負載由 visibility/testing 推進到 selective 或 full enforcement。",
+      "action_code": "MOVE_TO_ENFORCEMENT",
+      "count": 12
+     },
+     {
+      "action": "將 unmanaged 資產納管，或明確隔離其存取路徑。",
+      "action_code": "ONBOARD_UNMANAGED",
+      "count": 12
+     },
+     {
+      "action": "收斂 ringfence 範圍，只保留必要的 app-to-app 存取路徑。",
+      "action_code": "DEFINE_RINGFENCE_SCOPE",
+      "count": 7
+     },
+     {
+      "action": "此 workload 在流量圖中扮演網路樞紐角色（高可達性或 articulation point），請套用更嚴格的東西向政策邊界以限制橫向移動。",
+      "action_code": "RESTRICT_TRANSIT_NODE_ACCESS",
+      "count": 2
+     },
+     {
+      "action": "降低可橫向移動路徑，並優先分段高可達性的節點。",
+      "action_code": "TIGHTEN_LATERAL_POLICY",
+      "count": 2
+     }
+    ],
+    "blast_radius": [
+     {
+      "action": "降低可橫向移動路徑，並優先分段高可達性的節點。",
+      "action_code": "TIGHTEN_LATERAL_POLICY",
+      "app_env_key": "infrastructure|vmware",
+      "evidence": {
+       "max_depth": 4,
+       "reachability_count": 4
+      },
+      "finding": "infrastructure (vmware) · 10.10.0.3 · 10.10.0.3: 偵測到高擴散半徑風險",
+      "severity": "HIGH"
+     },
+     {
+      "action": "降低可橫向移動路徑，並優先分段高可達性的節點。",
+      "action_code": "TIGHTEN_LATERAL_POLICY",
+      "app_env_key": "jumpdesk|vmware",
+      "evidence": {
+       "max_depth": 4,
+       "reachability_count": 4
+      },
+      "finding": "jumpdesk (vmware) · 172.16.15.150 · 172.16.15.150: 偵測到高擴散半徑風險",
+      "severity": "HIGH"
+     }
+    ],
+    "blind_spots": [
+     {
+      "action": "將範圍內工作負載由 visibility/testing 推進到 selective 或 full enforcement。",
+      "action_code": "MOVE_TO_ENFORCEMENT",
+      "app_env_key": "coreservices|vmware",
+      "evidence": {
+       "allowed_ratio": 0.236,
+       "blocked_or_pb_flow_count": 735,
+       "flow_count": 962
+      },
+      "finding": "coreservices (vmware) · 172.16.15.106, 172.16.15.100: 偵測到強制執行落差",
+      "severity": "CRITICAL"
+     },
+     {
+      "action": "將範圍內工作負載由 visibility/testing 推進到 selective 或 full enforcement。",
+      "action_code": "MOVE_TO_ENFORCEMENT",
+      "app_env_key": "endpoint|physical",
+      "evidence": {
+       "allowed_ratio": 0.0,
+       "blocked_or_pb_flow_count": 20,
+       "flow_count": 20
+      },
+      "finding": "endpoint (physical): 偵測到強制執行落差",
+      "severity": "CRITICAL"
+     },
+     {
+      "action": "將範圍內工作負載由 visibility/testing 推進到 selective 或 full enforcement。",
+      "action_code": "MOVE_TO_ENFORCEMENT",
+      "app_env_key": "illumio|kubernetes",
+      "evidence": {
+       "allowed_ratio": 0.1053,
+       "blocked_or_pb_flow_count": 17,
+       "flow_count": 19
+      },
+      "finding": "illumio (kubernetes): 偵測到強制執行落差",
+      "severity": "CRITICAL"
+     },
+     {
+      "action": "將範圍內工作負載由 visibility/testing 推進到 selective 或 full enforcement。",
+      "action_code": "MOVE_TO_ENFORCEMENT",
+      "app_env_key": "illumio|vmware",
+      "evidence": {
+       "allowed_ratio": 0.1562,
+       "blocked_or_pb_flow_count": 27,
+       "flow_count": 32
+      },
+      "finding": "illumio (vmware) · 172.16.15.135: 偵測到強制執行落差",
+      "severity": "CRITICAL"
+     },
+     {
+      "action": "將範圍內工作負載由 visibility/testing 推進到 selective 或 full enforcement。",
+      "action_code": "MOVE_TO_ENFORCEMENT",
+      "app_env_key": "infrastructure|vmware",
+      "evidence": {
+       "allowed_ratio": 0.0398,
+       "blocked_or_pb_flow_count": 820,
+       "flow_count": 854
+      },
+      "finding": "infrastructure (vmware) · 10.10.0.3: 偵測到強制執行落差",
+      "severity": "CRITICAL"
+     }
+    ],
+    "boundary_breaches": [
+     {
+      "action": "收斂 ringfence 範圍，只保留必要的 app-to-app 存取路徑。",
+      "action_code": "DEFINE_RINGFENCE_SCOPE",
+      "app_env_key": "calico|kubernetes",
+      "evidence": {
+       "flow_count": 6,
+       "ringfence_ratio": 0.0
+      },
+      "finding": "calico (kubernetes): 偵測到邊界控制弱點",
+      "severity": "HIGH"
+     },
+     {
+      "action": "收斂 ringfence 範圍，只保留必要的 app-to-app 存取路徑。",
+      "action_code": "DEFINE_RINGFENCE_SCOPE",
+      "app_env_key": "coreservices|vmware",
+      "evidence": {
+       "flow_count": 962,
+       "ringfence_ratio": 0.0166
+      },
+      "finding": "coreservices (vmware) · 172.16.15.106, 172.16.15.100: 偵測到邊界控制弱點",
+      "severity": "HIGH"
+     },
+     {
+      "action": "將跨邊界通訊埠收斂為明確 allowlist，移除過寬存取範圍。",
+      "action_code": "LOCK_BOUNDARY_PORTS",
+      "app_env_key": "coreservices|vmware",
+      "evidence": {
+       "remote_allowed_ratio": 0.0,
+       "remote_flow_count": 6
+      },
+      "finding": "coreservices (vmware) · 172.16.15.106, 172.16.15.100: 偵測到邊界控制弱點",
+      "severity": "HIGH"
+     },
+     {
+      "action": "收斂 ringfence 範圍，只保留必要的 app-to-app 存取路徑。",
+      "action_code": "DEFINE_RINGFENCE_SCOPE",
+      "app_env_key": "default|kubernetes",
+      "evidence": {
+       "flow_count": 11,
+       "ringfence_ratio": 0.0
+      },
+      "finding": "default (kubernetes): 偵測到邊界控制弱點",
+      "severity": "HIGH"
+     },
+     {
+      "action": "收斂 ringfence 範圍，只保留必要的 app-to-app 存取路徑。",
+      "action_code": "DEFINE_RINGFENCE_SCOPE",
+      "app_env_key": "demoapp|vmware",
+      "evidence": {
+       "flow_count": 142,
+       "ringfence_ratio": 0.0704
+      },
+      "finding": "demoapp (vmware): 偵測到邊界控制弱點",
+      "severity": "HIGH"
+     }
+    ],
+    "suspicious_pivot_behavior": [
+     {
+      "action": "此 workload 在流量圖中扮演網路樞紐角色（高可達性或 articulation point），請套用更嚴格的東西向政策邊界以限制橫向移動。",
+      "action_code": "RESTRICT_TRANSIT_NODE_ACCESS",
+      "app_env_key": "coreservices|vmware",
+      "evidence": {
+       "bridge_score": 90.0,
+       "reachability_count": 3
+      },
+      "finding": "coreservices (vmware) · 172.16.15.106, 172.16.15.100 · 172.16.15.106, 172.16.15.100: 偵測到可疑橫向樞紐行為",
+      "severity": "HIGH"
+     },
+     {
+      "action": "此 workload 在流量圖中扮演網路樞紐角色（高可達性或 articulation point），請套用更嚴格的東西向政策邊界以限制橫向移動。",
+      "action_code": "RESTRICT_TRANSIT_NODE_ACCESS",
+      "app_env_key": "unlabeled|unlabeled",
+      "evidence": {
+       "bridge_score": 90.0,
+       "reachability_count": 3
+      },
+      "finding": "172.16.15.100, 172.16.15.101, 192.168.20.32, 20.27.177.113 +1 · 172.16.15.100, 172.16.15.101, 192.168.20.32, 20.27.177.113 +1: 偵測到可疑橫向樞紐行為",
+      "severity": "HIGH"
+     }
+    ]
+   },
+   "attack_summary_counts": {
+    "action_matrix": 5,
+    "blast_radius": 2,
+    "blind_spots": 5,
+    "boundary_breaches": 5,
+    "suspicious_pivot_behavior": 2
+   },
+   "execution_stats": {},
+   "failed_rule_details": [],
+   "filename": "Illumio_Traffic_Report_SecurityRisk_2026-06-25_0530.html",
+   "mtime": 1782365420.2177808,
+   "pending_rule_details": [],
+   "report_type": "traffic",
+   "reused_rule_details": [],
+   "size": 219788,
+   "summary": "Attack posture boundary 5 | pivot 2 | blast 2 | blind 5 | actions 5"
+  },
+  {
+   "attack_summary": {},
+   "attack_summary_counts": {},
+   "execution_stats": {},
+   "failed_rule_details": [],
+   "filename": "Illumio_Traffic_Report_2026-06-16_0534.xlsx",
+   "mtime": 1781588089.935513,
+   "pending_rule_details": [],
+   "report_type": "",
+   "reused_rule_details": [],
+   "size": 361687,
+   "summary": ""
+  },
+  {
+   "attack_summary": {},
+   "attack_summary_counts": {},
+   "execution_stats": {},
+   "failed_rule_details": [],
+   "filename": "Illumio_Traffic_Report_2026-06-14_0534.xlsx",
+   "mtime": 1781415260.039089,
+   "pending_rule_details": [],
+   "report_type": "",
+   "reused_rule_details": [],
+   "size": 344798,
+   "summary": ""
+  },
+  {
+   "attack_summary": {},
+   "attack_summary_counts": {},
+   "execution_stats": {},
+   "failed_rule_details": [],
+   "filename": "Illumio_Audit_Report_2026-06-12_0530.xlsx",
+   "mtime": 1781242244.7903514,
+   "pending_rule_details": [],
+   "report_type": "",
+   "reused_rule_details": [],
+   "size": 7057,
+   "summary": ""
+  },
+  {
+   "attack_summary": {},
+   "attack_summary_counts": {},
+   "execution_stats": {},
+   "failed_rule_details": [],
+   "filename": "Illumio_Traffic_Report_2026-06-12_0530.xlsx",
+   "mtime": 1781242230.3073943,
+   "pending_rule_details": [],
+   "report_type": "",
+   "reused_rule_details": [],
+   "size": 322939,
+   "summary": ""
+  },
+  {
+   "attack_summary": {},
+   "attack_summary_counts": {},
+   "execution_stats": {},
+   "failed_rule_details": [],
+   "filename": "Illumio_Audit_Report_2026-06-11_0531.xlsx",
+   "mtime": 1781155865.387095,
+   "pending_rule_details": [],
+   "report_type": "",
+   "reused_rule_details": [],
+   "size": 7057,
+   "summary": ""
+  },
+  {
+   "attack_summary": {},
+   "attack_summary_counts": {},
+   "execution_stats": {},
+   "failed_rule_details": [],
+   "filename": "Illumio_Traffic_Report_2026-06-11_0530.xlsx",
+   "mtime": 1781155853.5441322,
+   "pending_rule_details": [],
+   "report_type": "",
+   "reused_rule_details": [],
+   "size": 326390,
+   "summary": ""
+  },
+  {
+   "attack_summary": {},
+   "attack_summary_counts": {},
+   "execution_stats": {},
+   "failed_rule_details": [],
+   "filename": "Illumio_Traffic_Report_2026-06-10_0531.xlsx",
+   "mtime": 1781069465.0346274,
+   "pending_rule_details": [],
+   "report_type": "",
+   "reused_rule_details": [],
+   "size": 329751,
+   "summary": ""
+  },
+  {
+   "attack_summary": {},
+   "attack_summary_counts": {},
+   "execution_stats": {},
+   "failed_rule_details": [],
+   "filename": "Illumio_Traffic_Report_2026-06-09_0530.xlsx",
+   "mtime": 1780983060.9776018,
+   "pending_rule_details": [],
+   "report_type": "",
+   "reused_rule_details": [],
+   "size": 332141,
+   "summary": ""
+  },
+  {
+   "attack_summary": {},
+   "attack_summary_counts": {},
+   "execution_stats": {},
+   "failed_rule_details": [],
+   "filename": "Illumio_Audit_Report_2026-06-08_0531.xlsx",
+   "mtime": 1780896675.8432958,
+   "pending_rule_details": [],
+   "report_type": "",
+   "reused_rule_details": [],
+   "size": 7057,
+   "summary": ""
+  },
+  {
+   "attack_summary": {},
+   "attack_summary_counts": {},
+   "execution_stats": {},
+   "failed_rule_details": [],
+   "filename": "Illumio_Traffic_Report_2026-06-08_0530.xlsx",
+   "mtime": 1780896657.5692365,
+   "pending_rule_details": [],
+   "report_type": "",
+   "reused_rule_details": [],
+   "size": 331631,
+   "summary": ""
+  },
+  {
+   "attack_summary": {},
+   "attack_summary_counts": {},
+   "execution_stats": {},
+   "failed_rule_details": [],
+   "filename": "Illumio_Traffic_Report_2026-06-07_0530.xlsx",
+   "mtime": 1780810256.45114,
+   "pending_rule_details": [],
+   "report_type": "",
+   "reused_rule_details": [],
+   "size": 333182,
+   "summary": ""
+  },
+  {
+   "attack_summary": {},
+   "attack_summary_counts": {},
+   "execution_stats": {},
+   "failed_rule_details": [],
+   "filename": "Illumio_Traffic_Report_2026-06-06_0530.xlsx",
+   "mtime": 1780723858.4496715,
+   "pending_rule_details": [],
+   "report_type": "",
+   "reused_rule_details": [],
+   "size": 333281,
+   "summary": ""
+  },
+  {
+   "attack_summary": {},
+   "attack_summary_counts": {},
+   "execution_stats": {},
+   "failed_rule_details": [],
+   "filename": "Illumio_Traffic_Report_2026-06-05_0530.xlsx",
+   "mtime": 1780637462.7955334,
+   "pending_rule_details": [],
+   "report_type": "",
+   "reused_rule_details": [],
+   "size": 332776,
+   "summary": ""
+  },
+  {
+   "attack_summary": {},
+   "attack_summary_counts": {},
+   "execution_stats": {},
+   "failed_rule_details": [],
+   "filename": "Illumio_Traffic_Report_2026-06-04_0531.xlsx",
+   "mtime": 1780551065.1419709,
+   "pending_rule_details": [],
+   "report_type": "",
+   "reused_rule_details": [],
+   "size": 326219,
+   "summary": ""
+  },
+  {
+   "attack_summary": {},
+   "attack_summary_counts": {},
+   "execution_stats": {},
+   "failed_rule_details": [],
+   "filename": "Illumio_Traffic_Report_2026-06-03_0531.xlsx",
+   "mtime": 1780464669.36107,
+   "pending_rule_details": [],
+   "report_type": "",
+   "reused_rule_details": [],
+   "size": 329374,
+   "summary": ""
+  },
+  {
+   "attack_summary": {},
+   "attack_summary_counts": {},
+   "execution_stats": {},
+   "failed_rule_details": [],
+   "filename": "Illumio_Traffic_Report_2026-06-02_0531.xlsx",
+   "mtime": 1780378273.3804808,
+   "pending_rule_details": [],
+   "report_type": "",
+   "reused_rule_details": [],
+   "size": 332520,
+   "summary": ""
+  },
+  {
+   "attack_summary": {},
+   "attack_summary_counts": {},
+   "execution_stats": {},
+   "failed_rule_details": [],
+   "filename": "Illumio_Traffic_Report_2026-06-01_0530.xlsx",
+   "mtime": 1780291859.918441,
+   "pending_rule_details": [],
+   "report_type": "",
+   "reused_rule_details": [],
+   "size": 327829,
+   "summary": ""
+  },
+  {
+   "attack_summary": {},
+   "attack_summary_counts": {},
+   "execution_stats": {},
+   "failed_rule_details": [],
+   "filename": "Illumio_Traffic_Report_2026-05-31_0531.xlsx",
+   "mtime": 1780205468.116136,
+   "pending_rule_details": [],
+   "report_type": "",
+   "reused_rule_details": [],
+   "size": 336580,
+   "summary": ""
+  }
+ ]
+}

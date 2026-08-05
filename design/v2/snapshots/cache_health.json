@@ -1,0 +1,30 @@
+{
+ "cache_lag": [
+  {
+   "lag_s": 65,
+   "level": "ok",
+   "source": "traffic"
+  },
+  {
+   "lag_s": 126,
+   "level": "ok",
+   "source": "events"
+  }
+ ],
+ "capacity": {
+  "archiver_lag_seconds": {
+   "audit": 22500,
+   "traffic": 22558
+  },
+  "db_bytes": 5331083264,
+  "disk_free_bytes": 22281646080,
+  "siem_pending": 0
+ },
+ "dlq": 0,
+ "lag_levels": [
+  "ok",
+  "ok"
+ ],
+ "siem_success_1h": 100.0,
+ "verdict": "ok"
+}

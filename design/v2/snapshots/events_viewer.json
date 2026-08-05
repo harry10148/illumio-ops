@@ -1,0 +1,5213 @@
+{
+ "items": [
+  {
+   "category": "User Access",
+   "description": "A user successfully creates a new session.",
+   "event_id": "/orgs/1/events/9e26a50d-62ec-46ef-9122-dcfd556fff86",
+   "event_type": "user.create_session",
+   "known_event_type": true,
+   "normalized": {
+    "action": "POST /api/v2/users/create_session",
+    "action_method": "POST",
+    "action_path": "/api/v2/users/create_session",
+    "actor": "System",
+    "actor_agent": "",
+    "actor_type": "system",
+    "actor_user": "",
+    "category": "user",
+    "event_id": "/orgs/1/events/9e26a50d-62ec-46ef-9122-dcfd556fff86",
+    "event_type": "user.create_session",
+    "href": "/orgs/1/events/9e26a50d-62ec-46ef-9122-dcfd556fff86",
+    "known_event_type": true,
+    "notification_types": [
+     "user.pce_session_created"
+    ],
+    "notifications_count": 1,
+    "parser_notes": [],
+    "resource_changes_count": 0,
+    "resource_name": "",
+    "resource_type": "",
+    "severity": "info",
+    "source": "System | FILTERED",
+    "source_ip": "FILTERED",
+    "status": "success",
+    "target_name": "admin@lab.local",
+    "target_type": "user",
+    "timestamp": "2026-08-03T06:25:10.883Z",
+    "verb": "create_session",
+    "workloads_affected": 0
+   },
+   "parser_notes": [],
+   "raw": {
+    "action": {
+     "api_endpoint": "/api/v2/users/create_session",
+     "api_method": "POST",
+     "http_status_code": 201,
+     "src_ip": "FILTERED",
+     "uuid": "7b2bbd72-c0f1-4cd1-a975-30fcb3e3bf7f"
+    },
+    "created_by": {
+     "system": {}
+    },
+    "event_type": "user.create_session",
+    "href": "/orgs/1/events/9e26a50d-62ec-46ef-9122-dcfd556fff86",
+    "notifications": [
+     {
+      "info": {
+       "user": {
+        "href": "/users/11",
+        "username": "admin@lab.local"
+       }
+      },
+      "notification_type": "user.pce_session_created",
+      "uuid": "12a3cb54-b5a4-4b60-b739-dd31cbcc50a7"
+     }
+    ],
+    "pce_fqdn": "pce.lab.local",
+    "resource_changes": [],
+    "severity": "info",
+    "status": "success",
+    "timestamp": "2026-08-03T06:25:10.883Z"
+   },
+   "remediation": "Normal authentication activity. Monitor for unusual patterns:\nlogins at odd hours, from new IPs, or failed attempts preceding success.\n",
+   "severity": "info",
+   "status": "success",
+   "timestamp": "2026-08-03T06:25:10.883Z",
+   "type_group": "user"
+  },
+  {
+   "category": "User Access",
+   "description": "A user's PCE session is terminated.",
+   "event_id": "/orgs/1/events/034d401a-256e-4829-beeb-06cb636ddb27",
+   "event_type": "user.pce_session_terminated",
+   "known_event_type": true,
+   "normalized": {
+    "action": "",
+    "action_method": "",
+    "action_path": "",
+    "actor": "System",
+    "actor_agent": "",
+    "actor_type": "system",
+    "actor_user": "",
+    "category": "user",
+    "event_id": "/orgs/1/events/034d401a-256e-4829-beeb-06cb636ddb27",
+    "event_type": "user.pce_session_terminated",
+    "href": "/orgs/1/events/034d401a-256e-4829-beeb-06cb636ddb27",
+    "known_event_type": true,
+    "notification_types": [
+     "user.pce_session_terminated"
+    ],
+    "notifications_count": 1,
+    "parser_notes": [],
+    "resource_changes_count": 0,
+    "resource_name": "",
+    "resource_type": "",
+    "severity": "info",
+    "source": "System",
+    "source_ip": "",
+    "status": "",
+    "target_name": "admin@lab.local",
+    "target_type": "user",
+    "timestamp": "2026-08-03T06:24:32.017Z",
+    "verb": "pce_session_terminated",
+    "workloads_affected": 0
+   },
+   "parser_notes": [],
+   "raw": {
+    "action": null,
+    "created_by": {
+     "system": {}
+    },
+    "event_type": "user.pce_session_terminated",
+    "href": "/orgs/1/events/034d401a-256e-4829-beeb-06cb636ddb27",
+    "notifications": [
+     {
+      "info": {
+       "reason": "timeout",
+       "user": {
+        "href": "/users/11",
+        "username": "admin@lab.local"
+       }
+      },
+      "notification_type": "user.pce_session_terminated",
+      "uuid": "fb4a84a9-0e97-47ef-902e-74a4e8c4d157"
+     }
+    ],
+    "pce_fqdn": "pce.lab.local",
+    "resource_changes": [],
+    "severity": "info",
+    "status": null,
+    "timestamp": "2026-08-03T06:24:32.017Z"
+   },
+   "remediation": "Normal authentication activity. Monitor for unusual patterns:\nlogins at odd hours, from new IPs, or failed attempts preceding success.\n",
+   "severity": "info",
+   "status": null,
+   "timestamp": "2026-08-03T06:24:32.017Z",
+   "type_group": "user"
+  },
+  {
+   "category": "User Access",
+   "description": "A user successfully creates a new session.",
+   "event_id": "/orgs/1/events/a34d1c81-bfbd-47fc-b3ed-5d90c3b426e7",
+   "event_type": "user.create_session",
+   "known_event_type": true,
+   "normalized": {
+    "action": "POST /api/v2/users/create_session",
+    "action_method": "POST",
+    "action_path": "/api/v2/users/create_session",
+    "actor": "System",
+    "actor_agent": "",
+    "actor_type": "system",
+    "actor_user": "",
+    "category": "user",
+    "event_id": "/orgs/1/events/a34d1c81-bfbd-47fc-b3ed-5d90c3b426e7",
+    "event_type": "user.create_session",
+    "href": "/orgs/1/events/a34d1c81-bfbd-47fc-b3ed-5d90c3b426e7",
+    "known_event_type": true,
+    "notification_types": [
+     "user.pce_session_created"
+    ],
+    "notifications_count": 1,
+    "parser_notes": [],
+    "resource_changes_count": 0,
+    "resource_name": "",
+    "resource_type": "",
+    "severity": "info",
+    "source": "System | FILTERED",
+    "source_ip": "FILTERED",
+    "status": "success",
+    "target_name": "admin@lab.local",
+    "target_type": "user",
+    "timestamp": "2026-08-03T06:23:11.513Z",
+    "verb": "create_session",
+    "workloads_affected": 0
+   },
+   "parser_notes": [],
+   "raw": {
+    "action": {
+     "api_endpoint": "/api/v2/users/create_session",
+     "api_method": "POST",
+     "http_status_code": 201,
+     "src_ip": "FILTERED",
+     "uuid": "f6b2331c-a7da-458d-9a23-6130fac340f7"
+    },
+    "created_by": {
+     "system": {}
+    },
+    "event_type": "user.create_session",
+    "href": "/orgs/1/events/a34d1c81-bfbd-47fc-b3ed-5d90c3b426e7",
+    "notifications": [
+     {
+      "info": {
+       "user": {
+        "href": "/users/11",
+        "username": "admin@lab.local"
+       }
+      },
+      "notification_type": "user.pce_session_created",
+      "uuid": "23e407af-c642-4f8b-9355-c2c380d47ed8"
+     }
+    ],
+    "pce_fqdn": "pce.lab.local",
+    "resource_changes": [],
+    "severity": "info",
+    "status": "success",
+    "timestamp": "2026-08-03T06:23:11.513Z"
+   },
+   "remediation": "Normal authentication activity. Monitor for unusual patterns:\nlogins at odd hours, from new IPs, or failed attempts preceding success.\n",
+   "severity": "info",
+   "status": "success",
+   "timestamp": "2026-08-03T06:23:11.513Z",
+   "type_group": "user"
+  },
+  {
+   "category": "User Access",
+   "description": "A user's PCE session is terminated.",
+   "event_id": "/orgs/1/events/f16497a7-2258-4930-86c4-49ea4d61fb98",
+   "event_type": "user.pce_session_terminated",
+   "known_event_type": true,
+   "normalized": {
+    "action": "",
+    "action_method": "",
+    "action_path": "",
+    "actor": "System",
+    "actor_agent": "",
+    "actor_type": "system",
+    "actor_user": "",
+    "category": "user",
+    "event_id": "/orgs/1/events/f16497a7-2258-4930-86c4-49ea4d61fb98",
+    "event_type": "user.pce_session_terminated",
+    "href": "/orgs/1/events/f16497a7-2258-4930-86c4-49ea4d61fb98",
+    "known_event_type": true,
+    "notification_types": [
+     "user.pce_session_terminated"
+    ],
+    "notifications_count": 1,
+    "parser_notes": [],
+    "resource_changes_count": 0,
+    "resource_name": "",
+    "resource_type": "",
+    "severity": "info",
+    "source": "System",
+    "source_ip": "",
+    "status": "",
+    "target_name": "admin@lab.local",
+    "target_type": "user",
+    "timestamp": "2026-08-03T06:21:31.928Z",
+    "verb": "pce_session_terminated",
+    "workloads_affected": 0
+   },
+   "parser_notes": [],
+   "raw": {
+    "action": null,
+    "created_by": {
+     "system": {}
+    },
+    "event_type": "user.pce_session_terminated",
+    "href": "/orgs/1/events/f16497a7-2258-4930-86c4-49ea4d61fb98",
+    "notifications": [
+     {
+      "info": {
+       "reason": "timeout",
+       "user": {
+        "href": "/users/11",
+        "username": "admin@lab.local"
+       }
+      },
+      "notification_type": "user.pce_session_terminated",
+      "uuid": "57b74784-edcc-46ca-ad01-e3439c6cf853"
+     }
+    ],
+    "pce_fqdn": "pce.lab.local",
+    "resource_changes": [],
+    "severity": "info",
+    "status": null,
+    "timestamp": "2026-08-03T06:21:31.928Z"
+   },
+   "remediation": "Normal authentication activity. Monitor for unusual patterns:\nlogins at odd hours, from new IPs, or failed attempts preceding success.\n",
+   "severity": "info",
+   "status": null,
+   "timestamp": "2026-08-03T06:21:31.928Z",
+   "type_group": "user"
+  },
+  {
+   "category": "User Access",
+   "description": "A user's PCE session is terminated.",
+   "event_id": "/orgs/1/events/2b526af4-8758-4b56-a07d-a2c15960f0cd",
+   "event_type": "user.pce_session_terminated",
+   "known_event_type": true,
+   "normalized": {
+    "action": "",
+    "action_method": "",
+    "action_path": "",
+    "actor": "System",
+    "actor_agent": "",
+    "actor_type": "system",
+    "actor_user": "",
+    "category": "user",
+    "event_id": "/orgs/1/events/2b526af4-8758-4b56-a07d-a2c15960f0cd",
+    "event_type": "user.pce_session_terminated",
+    "href": "/orgs/1/events/2b526af4-8758-4b56-a07d-a2c15960f0cd",
+    "known_event_type": true,
+    "notification_types": [
+     "user.pce_session_terminated"
+    ],
+    "notifications_count": 1,
+    "parser_notes": [],
+    "resource_changes_count": 0,
+    "resource_name": "",
+    "resource_type": "",
+    "severity": "info",
+    "source": "System",
+    "source_ip": "",
+    "status": "",
+    "target_name": "admin@lab.local",
+    "target_type": "user",
+    "timestamp": "2026-08-03T06:21:31.918Z",
+    "verb": "pce_session_terminated",
+    "workloads_affected": 0
+   },
+   "parser_notes": [],
+   "raw": {
+    "action": null,
+    "created_by": {
+     "system": {}
+    },
+    "event_type": "user.pce_session_terminated",
+    "href": "/orgs/1/events/2b526af4-8758-4b56-a07d-a2c15960f0cd",
+    "notifications": [
+     {
+      "info": {
+       "reason": "timeout",
+       "user": {
+        "href": "/users/11",
+        "username": "admin@lab.local"
+       }
+      },
+      "notification_type": "user.pce_session_terminated",
+      "uuid": "79db810e-3512-4690-907f-a1ecfb53e67d"
+     }
+    ],
+    "pce_fqdn": "pce.lab.local",
+    "resource_changes": [],
+    "severity": "info",
+    "status": null,
+    "timestamp": "2026-08-03T06:21:31.918Z"
+   },
+   "remediation": "Normal authentication activity. Monitor for unusual patterns:\nlogins at odd hours, from new IPs, or failed attempts preceding success.\n",
+   "severity": "info",
+   "status": null,
+   "timestamp": "2026-08-03T06:21:31.918Z",
+   "type_group": "user"
+  },
+  {
+   "category": "User Access",
+   "description": "A user successfully creates a new session.",
+   "event_id": "/orgs/1/events/cc39bbb2-3279-4e76-b8c8-01c1670dfea3",
+   "event_type": "user.create_session",
+   "known_event_type": true,
+   "normalized": {
+    "action": "POST /api/v2/users/create_session",
+    "action_method": "POST",
+    "action_path": "/api/v2/users/create_session",
+    "actor": "System",
+    "actor_agent": "",
+    "actor_type": "system",
+    "actor_user": "",
+    "category": "user",
+    "event_id": "/orgs/1/events/cc39bbb2-3279-4e76-b8c8-01c1670dfea3",
+    "event_type": "user.create_session",
+    "href": "/orgs/1/events/cc39bbb2-3279-4e76-b8c8-01c1670dfea3",
+    "known_event_type": true,
+    "notification_types": [
+     "user.pce_session_created"
+    ],
+    "notifications_count": 1,
+    "parser_notes": [],
+    "resource_changes_count": 0,
+    "resource_name": "",
+    "resource_type": "",
+    "severity": "info",
+    "source": "System | FILTERED",
+    "source_ip": "FILTERED",
+    "status": "success",
+    "target_name": "admin@lab.local",
+    "target_type": "user",
+    "timestamp": "2026-08-03T06:21:11.280Z",
+    "verb": "create_session",
+    "workloads_affected": 0
+   },
+   "parser_notes": [],
+   "raw": {
+    "action": {
+     "api_endpoint": "/api/v2/users/create_session",
+     "api_method": "POST",
+     "http_status_code": 201,
+     "src_ip": "FILTERED",
+     "uuid": "0a66815b-841f-4a7d-9e05-2c528836c7a2"
+    },
+    "created_by": {
+     "system": {}
+    },
+    "event_type": "user.create_session",
+    "href": "/orgs/1/events/cc39bbb2-3279-4e76-b8c8-01c1670dfea3",
+    "notifications": [
+     {
+      "info": {
+       "user": {
+        "href": "/users/11",
+        "username": "admin@lab.local"
+       }
+      },
+      "notification_type": "user.pce_session_created",
+      "uuid": "b34a4630-1e1c-45f3-bb5f-743e08fc3594"
+     }
+    ],
+    "pce_fqdn": "pce.lab.local",
+    "resource_changes": [],
+    "severity": "info",
+    "status": "success",
+    "timestamp": "2026-08-03T06:21:11.280Z"
+   },
+   "remediation": "Normal authentication activity. Monitor for unusual patterns:\nlogins at odd hours, from new IPs, or failed attempts preceding success.\n",
+   "severity": "info",
+   "status": "success",
+   "timestamp": "2026-08-03T06:21:11.280Z",
+   "type_group": "user"
+  },
+  {
+   "category": "User Access",
+   "description": "A user successfully creates a new session.",
+   "event_id": "/orgs/1/events/6d9c1fbe-eda9-48b2-bd45-8d3c446431f5",
+   "event_type": "user.create_session",
+   "known_event_type": true,
+   "normalized": {
+    "action": "POST /api/v2/users/create_session",
+    "action_method": "POST",
+    "action_path": "/api/v2/users/create_session",
+    "actor": "System",
+    "actor_agent": "",
+    "actor_type": "system",
+    "actor_user": "",
+    "category": "user",
+    "event_id": "/orgs/1/events/6d9c1fbe-eda9-48b2-bd45-8d3c446431f5",
+    "event_type": "user.create_session",
+    "href": "/orgs/1/events/6d9c1fbe-eda9-48b2-bd45-8d3c446431f5",
+    "known_event_type": true,
+    "notification_types": [
+     "user.pce_session_created"
+    ],
+    "notifications_count": 1,
+    "parser_notes": [],
+    "resource_changes_count": 0,
+    "resource_name": "",
+    "resource_type": "",
+    "severity": "info",
+    "source": "System | FILTERED",
+    "source_ip": "FILTERED",
+    "status": "success",
+    "target_name": "admin@lab.local",
+    "target_type": "user",
+    "timestamp": "2026-08-03T06:19:11.776Z",
+    "verb": "create_session",
+    "workloads_affected": 0
+   },
+   "parser_notes": [],
+   "raw": {
+    "action": {
+     "api_endpoint": "/api/v2/users/create_session",
+     "api_method": "POST",
+     "http_status_code": 201,
+     "src_ip": "FILTERED",
+     "uuid": "6757cb4f-1411-42a0-abfb-7fce36ef0092"
+    },
+    "created_by": {
+     "system": {}
+    },
+    "event_type": "user.create_session",
+    "href": "/orgs/1/events/6d9c1fbe-eda9-48b2-bd45-8d3c446431f5",
+    "notifications": [
+     {
+      "info": {
+       "user": {
+        "href": "/users/11",
+        "username": "admin@lab.local"
+       }
+      },
+      "notification_type": "user.pce_session_created",
+      "uuid": "f4eb565a-8ce4-44d5-9f83-f4da2dcb8a77"
+     }
+    ],
+    "pce_fqdn": "pce.lab.local",
+    "resource_changes": [],
+    "severity": "info",
+    "status": "success",
+    "timestamp": "2026-08-03T06:19:11.776Z"
+   },
+   "remediation": "Normal authentication activity. Monitor for unusual patterns:\nlogins at odd hours, from new IPs, or failed attempts preceding success.\n",
+   "severity": "info",
+   "status": "success",
+   "timestamp": "2026-08-03T06:19:11.776Z",
+   "type_group": "user"
+  },
+  {
+   "category": "User Access",
+   "description": "A user's PCE session is terminated.",
+   "event_id": "/orgs/1/events/2975f4e8-858f-4d9b-851c-28882aa27bb1",
+   "event_type": "user.pce_session_terminated",
+   "known_event_type": true,
+   "normalized": {
+    "action": "",
+    "action_method": "",
+    "action_path": "",
+    "actor": "System",
+    "actor_agent": "",
+    "actor_type": "system",
+    "actor_user": "",
+    "category": "user",
+    "event_id": "/orgs/1/events/2975f4e8-858f-4d9b-851c-28882aa27bb1",
+    "event_type": "user.pce_session_terminated",
+    "href": "/orgs/1/events/2975f4e8-858f-4d9b-851c-28882aa27bb1",
+    "known_event_type": true,
+    "notification_types": [
+     "user.pce_session_terminated"
+    ],
+    "notifications_count": 1,
+    "parser_notes": [],
+    "resource_changes_count": 0,
+    "resource_name": "",
+    "resource_type": "",
+    "severity": "info",
+    "source": "System",
+    "source_ip": "",
+    "status": "",
+    "target_name": "admin@lab.local",
+    "target_type": "user",
+    "timestamp": "2026-08-03T06:18:31.840Z",
+    "verb": "pce_session_terminated",
+    "workloads_affected": 0
+   },
+   "parser_notes": [],
+   "raw": {
+    "action": null,
+    "created_by": {
+     "system": {}
+    },
+    "event_type": "user.pce_session_terminated",
+    "href": "/orgs/1/events/2975f4e8-858f-4d9b-851c-28882aa27bb1",
+    "notifications": [
+     {
+      "info": {
+       "reason": "timeout",
+       "user": {
+        "href": "/users/11",
+        "username": "admin@lab.local"
+       }
+      },
+      "notification_type": "user.pce_session_terminated",
+      "uuid": "9c63282b-43a8-4650-a6b9-50ab7e8ccaf4"
+     }
+    ],
+    "pce_fqdn": "pce.lab.local",
+    "resource_changes": [],
+    "severity": "info",
+    "status": null,
+    "timestamp": "2026-08-03T06:18:31.840Z"
+   },
+   "remediation": "Normal authentication activity. Monitor for unusual patterns:\nlogins at odd hours, from new IPs, or failed attempts preceding success.\n",
+   "severity": "info",
+   "status": null,
+   "timestamp": "2026-08-03T06:18:31.840Z",
+   "type_group": "user"
+  },
+  {
+   "category": "Containers & Workloads",
+   "description": "This event is triggered when workload interfaces are updated, such as when an IP address changes, a new interface is added, or an interface shuts down.",
+   "event_id": "/orgs/1/events/d66cae5a-48d2-443a-b513-b9f3a21894e6",
+   "event_type": "workload_interfaces.update",
+   "known_event_type": true,
+   "normalized": {
+    "action": "PUT FILTERED",
+    "action_method": "PUT",
+    "action_path": "FILTERED",
+    "actor": "Harrys-MacBook-Air.local",
+    "actor_agent": "Harrys-MacBook-Air.local",
+    "actor_type": "agent",
+    "actor_user": "",
+    "category": "workload_interfaces",
+    "event_id": "/orgs/1/events/d66cae5a-48d2-443a-b513-b9f3a21894e6",
+    "event_type": "workload_interfaces.update",
+    "href": "/orgs/1/events/d66cae5a-48d2-443a-b513-b9f3a21894e6",
+    "known_event_type": true,
+    "notification_types": [],
+    "notifications_count": 0,
+    "parser_notes": [],
+    "resource_changes_count": 1,
+    "resource_name": "Harrys-MacBook-Air.local",
+    "resource_type": "workload",
+    "severity": "info",
+    "source": "Harrys-MacBook-Air.local | 192.168.20.32",
+    "source_ip": "192.168.20.32",
+    "status": "success",
+    "target_name": "Harrys-MacBook-Air.local",
+    "target_type": "workload",
+    "timestamp": "2026-08-03T06:17:59.499Z",
+    "verb": "update",
+    "workloads_affected": 0
+   },
+   "parser_notes": [],
+   "raw": {
+    "action": {
+     "api_endpoint": "FILTERED",
+     "api_method": "PUT",
+     "http_status_code": 200,
+     "src_ip": "192.168.20.32",
+     "uuid": "7711d6f8-707e-4d65-8140-c78a138c7e0b"
+    },
+    "created_by": {
+     "agent": {
+      "hostname": "Harrys-MacBook-Air.local",
+      "href": "/orgs/1/agents/1345"
+     },
+     "ven": {
+      "hostname": "Harrys-MacBook-Air.local",
+      "href": "/orgs/1/vens/4716377d-ab36-448d-88ca-532e6d80103b"
+     }
+    },
+    "event_type": "workload_interfaces.update",
+    "href": "/orgs/1/events/d66cae5a-48d2-443a-b513-b9f3a21894e6",
+    "notifications": [],
+    "pce_fqdn": "pce.lab.local",
+    "resource_changes": [
+     {
+      "change_type": "update",
+      "changes": {
+       "workload_interfaces": {
+        "updated": [
+         {
+          "changes": {
+           "address": {
+            "after": "fe80::5043:1ff:fe55:a8cb",
+            "before": "fe80::78c7:a2ff:fe14:bbd2"
+           }
+          },
+          "resource": {
+           "address": "fe80::5043:1ff:fe55:a8cb",
+           "href": "/orgs/1/workloads/4716377d-ab36-448d-88ca-532e6d80103b/interfaces/awdl0",
+           "name": "awdl0",
+           "network": {
+            "href": "/orgs/1/networks/38423fa8-8f0a-4b33-a204-9cc502344df8",
+            "name": "External"
+           }
+          }
+         },
+         {
+          "changes": {
+           "address": {
+            "after": "fe80::5043:1ff:fe55:a8cb",
+            "before": "fe80::78c7:a2ff:fe14:bbd2"
+           }
+          },
+          "resource": {
+           "address": "fe80::5043:1ff:fe55:a8cb",
+           "href": "/orgs/1/workloads/4716377d-ab36-448d-88ca-532e6d80103b/interfaces/llw0",
+           "name": "llw0",
+           "network": {
+            "href": "/orgs/1/networks/38423fa8-8f0a-4b33-a204-9cc502344df8",
+            "name": "External"
+           }
+          }
+         }
+        ]
+       }
+      },
+      "resource": {
+       "workload": {
+        "hostname": "Harrys-MacBook-Air.local",
+        "href": "/orgs/1/workloads/4716377d-ab36-448d-88ca-532e6d80103b",
+        "labels": [
+         {
+          "href": "/orgs/1/labels/53",
+          "key": "env",
+          "value": "Physical"
+         },
+         {
+          "href": "/orgs/1/labels/72",
+          "key": "app",
+          "value": "Endpoint"
+         },
+         {
+          "href": "/orgs/1/labels/135",
+          "key": "role",
+          "value": "MAC"
+         },
+         {
+          "href": "/orgs/1/labels/242",
+          "key": "loc",
+          "value": "external"
+         }
+        ],
+        "name": "Harrys-MacBook-Air.local"
+       }
+      },
+      "uuid": "b5d2808a-b2a9-45ed-b847-7c773431e6e7"
+     }
+    ],
+    "severity": "info",
+    "status": "success",
+    "timestamp": "2026-08-03T06:17:59.499Z"
+   },
+   "remediation": "",
+   "severity": "info",
+   "status": "success",
+   "timestamp": "2026-08-03T06:17:59.499Z",
+   "type_group": "workload_interfaces"
+  },
+  {
+   "category": "User Access",
+   "description": "A user successfully creates a new session.",
+   "event_id": "/orgs/1/events/db715769-4b25-4f77-bfb4-be47bcd19a79",
+   "event_type": "user.create_session",
+   "known_event_type": true,
+   "normalized": {
+    "action": "POST /api/v2/users/create_session",
+    "action_method": "POST",
+    "action_path": "/api/v2/users/create_session",
+    "actor": "System",
+    "actor_agent": "",
+    "actor_type": "system",
+    "actor_user": "",
+    "category": "user",
+    "event_id": "/orgs/1/events/db715769-4b25-4f77-bfb4-be47bcd19a79",
+    "event_type": "user.create_session",
+    "href": "/orgs/1/events/db715769-4b25-4f77-bfb4-be47bcd19a79",
+    "known_event_type": true,
+    "notification_types": [
+     "user.pce_session_created"
+    ],
+    "notifications_count": 1,
+    "parser_notes": [],
+    "resource_changes_count": 0,
+    "resource_name": "",
+    "resource_type": "",
+    "severity": "info",
+    "source": "System | FILTERED",
+    "source_ip": "FILTERED",
+    "status": "success",
+    "target_name": "admin@lab.local",
+    "target_type": "user",
+    "timestamp": "2026-08-03T06:17:11.460Z",
+    "verb": "create_session",
+    "workloads_affected": 0
+   },
+   "parser_notes": [],
+   "raw": {
+    "action": {
+     "api_endpoint": "/api/v2/users/create_session",
+     "api_method": "POST",
+     "http_status_code": 201,
+     "src_ip": "FILTERED",
+     "uuid": "b73d29f2-796c-4396-887e-6ae8e70ac8a4"
+    },
+    "created_by": {
+     "system": {}
+    },
+    "event_type": "user.create_session",
+    "href": "/orgs/1/events/db715769-4b25-4f77-bfb4-be47bcd19a79",
+    "notifications": [
+     {
+      "info": {
+       "user": {
+        "href": "/users/11",
+        "username": "admin@lab.local"
+       }
+      },
+      "notification_type": "user.pce_session_created",
+      "uuid": "d25d9361-f2e6-4054-a2cd-adabde041955"
+     }
+    ],
+    "pce_fqdn": "pce.lab.local",
+    "resource_changes": [],
+    "severity": "info",
+    "status": "success",
+    "timestamp": "2026-08-03T06:17:11.460Z"
+   },
+   "remediation": "Normal authentication activity. Monitor for unusual patterns:\nlogins at odd hours, from new IPs, or failed attempts preceding success.\n",
+   "severity": "info",
+   "status": "success",
+   "timestamp": "2026-08-03T06:17:11.460Z",
+   "type_group": "user"
+  },
+  {
+   "category": "User Access",
+   "description": "A user's PCE session is terminated.",
+   "event_id": "/orgs/1/events/341ce8f1-ae38-4271-a02c-f717bed5e696",
+   "event_type": "user.pce_session_terminated",
+   "known_event_type": true,
+   "normalized": {
+    "action": "",
+    "action_method": "",
+    "action_path": "",
+    "actor": "System",
+    "actor_agent": "",
+    "actor_type": "system",
+    "actor_user": "",
+    "category": "user",
+    "event_id": "/orgs/1/events/341ce8f1-ae38-4271-a02c-f717bed5e696",
+    "event_type": "user.pce_session_terminated",
+    "href": "/orgs/1/events/341ce8f1-ae38-4271-a02c-f717bed5e696",
+    "known_event_type": true,
+    "notification_types": [
+     "user.pce_session_terminated"
+    ],
+    "notifications_count": 1,
+    "parser_notes": [],
+    "resource_changes_count": 0,
+    "resource_name": "",
+    "resource_type": "",
+    "severity": "info",
+    "source": "System",
+    "source_ip": "",
+    "status": "",
+    "target_name": "admin@lab.local",
+    "target_type": "user",
+    "timestamp": "2026-08-03T06:15:31.758Z",
+    "verb": "pce_session_terminated",
+    "workloads_affected": 0
+   },
+   "parser_notes": [],
+   "raw": {
+    "action": null,
+    "created_by": {
+     "system": {}
+    },
+    "event_type": "user.pce_session_terminated",
+    "href": "/orgs/1/events/341ce8f1-ae38-4271-a02c-f717bed5e696",
+    "notifications": [
+     {
+      "info": {
+       "reason": "timeout",
+       "user": {
+        "href": "/users/11",
+        "username": "admin@lab.local"
+       }
+      },
+      "notification_type": "user.pce_session_terminated",
+      "uuid": "081003ba-1036-414c-aae0-9bebffb8832f"
+     }
+    ],
+    "pce_fqdn": "pce.lab.local",
+    "resource_changes": [],
+    "severity": "info",
+    "status": null,
+    "timestamp": "2026-08-03T06:15:31.758Z"
+   },
+   "remediation": "Normal authentication activity. Monitor for unusual patterns:\nlogins at odd hours, from new IPs, or failed attempts preceding success.\n",
+   "severity": "info",
+   "status": null,
+   "timestamp": "2026-08-03T06:15:31.758Z",
+   "type_group": "user"
+  },
+  {
+   "category": "User Access",
+   "description": "A user's PCE session is terminated.",
+   "event_id": "/orgs/1/events/7278c290-048b-4924-85ba-55626bed735a",
+   "event_type": "user.pce_session_terminated",
+   "known_event_type": true,
+   "normalized": {
+    "action": "",
+    "action_method": "",
+    "action_path": "",
+    "actor": "System",
+    "actor_agent": "",
+    "actor_type": "system",
+    "actor_user": "",
+    "category": "user",
+    "event_id": "/orgs/1/events/7278c290-048b-4924-85ba-55626bed735a",
+    "event_type": "user.pce_session_terminated",
+    "href": "/orgs/1/events/7278c290-048b-4924-85ba-55626bed735a",
+    "known_event_type": true,
+    "notification_types": [
+     "user.pce_session_terminated"
+    ],
+    "notifications_count": 1,
+    "parser_notes": [],
+    "resource_changes_count": 0,
+    "resource_name": "",
+    "resource_type": "",
+    "severity": "info",
+    "source": "System",
+    "source_ip": "",
+    "status": "",
+    "target_name": "admin@lab.local",
+    "target_type": "user",
+    "timestamp": "2026-08-03T06:15:31.739Z",
+    "verb": "pce_session_terminated",
+    "workloads_affected": 0
+   },
+   "parser_notes": [],
+   "raw": {
+    "action": null,
+    "created_by": {
+     "system": {}
+    },
+    "event_type": "user.pce_session_terminated",
+    "href": "/orgs/1/events/7278c290-048b-4924-85ba-55626bed735a",
+    "notifications": [
+     {
+      "info": {
+       "reason": "timeout",
+       "user": {
+        "href": "/users/11",
+        "username": "admin@lab.local"
+       }
+      },
+      "notification_type": "user.pce_session_terminated",
+      "uuid": "e64f6ecc-b057-4a36-9dd2-0e73efc64ecf"
+     }
+    ],
+    "pce_fqdn": "pce.lab.local",
+    "resource_changes": [],
+    "severity": "info",
+    "status": null,
+    "timestamp": "2026-08-03T06:15:31.739Z"
+   },
+   "remediation": "Normal authentication activity. Monitor for unusual patterns:\nlogins at odd hours, from new IPs, or failed attempts preceding success.\n",
+   "severity": "info",
+   "status": null,
+   "timestamp": "2026-08-03T06:15:31.739Z",
+   "type_group": "user"
+  },
+  {
+   "category": "User Access",
+   "description": "A user successfully creates a new session.",
+   "event_id": "/orgs/1/events/243105aa-d687-4c6e-8dda-3fd402692ee4",
+   "event_type": "user.create_session",
+   "known_event_type": true,
+   "normalized": {
+    "action": "POST /api/v2/users/create_session",
+    "action_method": "POST",
+    "action_path": "/api/v2/users/create_session",
+    "actor": "System",
+    "actor_agent": "",
+    "actor_type": "system",
+    "actor_user": "",
+    "category": "user",
+    "event_id": "/orgs/1/events/243105aa-d687-4c6e-8dda-3fd402692ee4",
+    "event_type": "user.create_session",
+    "href": "/orgs/1/events/243105aa-d687-4c6e-8dda-3fd402692ee4",
+    "known_event_type": true,
+    "notification_types": [
+     "user.pce_session_created"
+    ],
+    "notifications_count": 1,
+    "parser_notes": [],
+    "resource_changes_count": 0,
+    "resource_name": "",
+    "resource_type": "",
+    "severity": "info",
+    "source": "System | FILTERED",
+    "source_ip": "FILTERED",
+    "status": "success",
+    "target_name": "admin@lab.local",
+    "target_type": "user",
+    "timestamp": "2026-08-03T06:15:11.100Z",
+    "verb": "create_session",
+    "workloads_affected": 0
+   },
+   "parser_notes": [],
+   "raw": {
+    "action": {
+     "api_endpoint": "/api/v2/users/create_session",
+     "api_method": "POST",
+     "http_status_code": 201,
+     "src_ip": "FILTERED",
+     "uuid": "bc33a313-c296-4c85-ace8-7c05ef7c2ed8"
+    },
+    "created_by": {
+     "system": {}
+    },
+    "event_type": "user.create_session",
+    "href": "/orgs/1/events/243105aa-d687-4c6e-8dda-3fd402692ee4",
+    "notifications": [
+     {
+      "info": {
+       "user": {
+        "href": "/users/11",
+        "username": "admin@lab.local"
+       }
+      },
+      "notification_type": "user.pce_session_created",
+      "uuid": "2d6d98cc-d09f-4f71-a81c-a5e8d4c60f4e"
+     }
+    ],
+    "pce_fqdn": "pce.lab.local",
+    "resource_changes": [],
+    "severity": "info",
+    "status": "success",
+    "timestamp": "2026-08-03T06:15:11.100Z"
+   },
+   "remediation": "Normal authentication activity. Monitor for unusual patterns:\nlogins at odd hours, from new IPs, or failed attempts preceding success.\n",
+   "severity": "info",
+   "status": "success",
+   "timestamp": "2026-08-03T06:15:11.100Z",
+   "type_group": "user"
+  },
+  {
+   "category": "User Access",
+   "description": "A user successfully creates a new session.",
+   "event_id": "/orgs/1/events/263f01a4-a15c-4ed1-9427-08a4377161f0",
+   "event_type": "user.create_session",
+   "known_event_type": true,
+   "normalized": {
+    "action": "POST /api/v2/users/create_session",
+    "action_method": "POST",
+    "action_path": "/api/v2/users/create_session",
+    "actor": "System",
+    "actor_agent": "",
+    "actor_type": "system",
+    "actor_user": "",
+    "category": "user",
+    "event_id": "/orgs/1/events/263f01a4-a15c-4ed1-9427-08a4377161f0",
+    "event_type": "user.create_session",
+    "href": "/orgs/1/events/263f01a4-a15c-4ed1-9427-08a4377161f0",
+    "known_event_type": true,
+    "notification_types": [
+     "user.pce_session_created"
+    ],
+    "notifications_count": 1,
+    "parser_notes": [],
+    "resource_changes_count": 0,
+    "resource_name": "",
+    "resource_type": "",
+    "severity": "info",
+    "source": "System | FILTERED",
+    "source_ip": "FILTERED",
+    "status": "success",
+    "target_name": "admin@lab.local",
+    "target_type": "user",
+    "timestamp": "2026-08-03T06:13:10.849Z",
+    "verb": "create_session",
+    "workloads_affected": 0
+   },
+   "parser_notes": [],
+   "raw": {
+    "action": {
+     "api_endpoint": "/api/v2/users/create_session",
+     "api_method": "POST",
+     "http_status_code": 201,
+     "src_ip": "FILTERED",
+     "uuid": "19abd888-f889-43dc-b65c-28da970b6b87"
+    },
+    "created_by": {
+     "system": {}
+    },
+    "event_type": "user.create_session",
+    "href": "/orgs/1/events/263f01a4-a15c-4ed1-9427-08a4377161f0",
+    "notifications": [
+     {
+      "info": {
+       "user": {
+        "href": "/users/11",
+        "username": "admin@lab.local"
+       }
+      },
+      "notification_type": "user.pce_session_created",
+      "uuid": "64b4503b-de41-442f-a89a-2ec8a26e9ebb"
+     }
+    ],
+    "pce_fqdn": "pce.lab.local",
+    "resource_changes": [],
+    "severity": "info",
+    "status": "success",
+    "timestamp": "2026-08-03T06:13:10.849Z"
+   },
+   "remediation": "Normal authentication activity. Monitor for unusual patterns:\nlogins at odd hours, from new IPs, or failed attempts preceding success.\n",
+   "severity": "info",
+   "status": "success",
+   "timestamp": "2026-08-03T06:13:10.849Z",
+   "type_group": "user"
+  },
+  {
+   "category": "User Access",
+   "description": "A user's PCE session is terminated.",
+   "event_id": "/orgs/1/events/0def7371-ecd7-4775-8976-fa8a9250fbb2",
+   "event_type": "user.pce_session_terminated",
+   "known_event_type": true,
+   "normalized": {
+    "action": "",
+    "action_method": "",
+    "action_path": "",
+    "actor": "System",
+    "actor_agent": "",
+    "actor_type": "system",
+    "actor_user": "",
+    "category": "user",
+    "event_id": "/orgs/1/events/0def7371-ecd7-4775-8976-fa8a9250fbb2",
+    "event_type": "user.pce_session_terminated",
+    "href": "/orgs/1/events/0def7371-ecd7-4775-8976-fa8a9250fbb2",
+    "known_event_type": true,
+    "notification_types": [
+     "user.pce_session_terminated"
+    ],
+    "notifications_count": 1,
+    "parser_notes": [],
+    "resource_changes_count": 0,
+    "resource_name": "",
+    "resource_type": "",
+    "severity": "info",
+    "source": "System",
+    "source_ip": "",
+    "status": "",
+    "target_name": "admin@lab.local",
+    "target_type": "user",
+    "timestamp": "2026-08-03T06:12:31.689Z",
+    "verb": "pce_session_terminated",
+    "workloads_affected": 0
+   },
+   "parser_notes": [],
+   "raw": {
+    "action": null,
+    "created_by": {
+     "system": {}
+    },
+    "event_type": "user.pce_session_terminated",
+    "href": "/orgs/1/events/0def7371-ecd7-4775-8976-fa8a9250fbb2",
+    "notifications": [
+     {
+      "info": {
+       "reason": "timeout",
+       "user": {
+        "href": "/users/11",
+        "username": "admin@lab.local"
+       }
+      },
+      "notification_type": "user.pce_session_terminated",
+      "uuid": "81be5207-40fd-4974-9d5e-5f2890907926"
+     }
+    ],
+    "pce_fqdn": "pce.lab.local",
+    "resource_changes": [],
+    "severity": "info",
+    "status": null,
+    "timestamp": "2026-08-03T06:12:31.689Z"
+   },
+   "remediation": "Normal authentication activity. Monitor for unusual patterns:\nlogins at odd hours, from new IPs, or failed attempts preceding success.\n",
+   "severity": "info",
+   "status": null,
+   "timestamp": "2026-08-03T06:12:31.689Z",
+   "type_group": "user"
+  },
+  {
+   "category": "User Access",
+   "description": "A user successfully creates a new session.",
+   "event_id": "/orgs/1/events/b84cead6-02cc-4cea-8422-267d2cc8bf6d",
+   "event_type": "user.create_session",
+   "known_event_type": true,
+   "normalized": {
+    "action": "POST /api/v2/users/create_session",
+    "action_method": "POST",
+    "action_path": "/api/v2/users/create_session",
+    "actor": "System",
+    "actor_agent": "",
+    "actor_type": "system",
+    "actor_user": "",
+    "category": "user",
+    "event_id": "/orgs/1/events/b84cead6-02cc-4cea-8422-267d2cc8bf6d",
+    "event_type": "user.create_session",
+    "href": "/orgs/1/events/b84cead6-02cc-4cea-8422-267d2cc8bf6d",
+    "known_event_type": true,
+    "notification_types": [
+     "user.pce_session_created"
+    ],
+    "notifications_count": 1,
+    "parser_notes": [],
+    "resource_changes_count": 0,
+    "resource_name": "",
+    "resource_type": "",
+    "severity": "info",
+    "source": "System | FILTERED",
+    "source_ip": "FILTERED",
+    "status": "success",
+    "target_name": "admin@lab.local",
+    "target_type": "user",
+    "timestamp": "2026-08-03T06:11:11.370Z",
+    "verb": "create_session",
+    "workloads_affected": 0
+   },
+   "parser_notes": [],
+   "raw": {
+    "action": {
+     "api_endpoint": "/api/v2/users/create_session",
+     "api_method": "POST",
+     "http_status_code": 201,
+     "src_ip": "FILTERED",
+     "uuid": "0e9b9362-03d3-415d-b297-8846aff11099"
+    },
+    "created_by": {
+     "system": {}
+    },
+    "event_type": "user.create_session",
+    "href": "/orgs/1/events/b84cead6-02cc-4cea-8422-267d2cc8bf6d",
+    "notifications": [
+     {
+      "info": {
+       "user": {
+        "href": "/users/11",
+        "username": "admin@lab.local"
+       }
+      },
+      "notification_type": "user.pce_session_created",
+      "uuid": "8c600ec7-b5d2-4690-81cb-e227f09f27a9"
+     }
+    ],
+    "pce_fqdn": "pce.lab.local",
+    "resource_changes": [],
+    "severity": "info",
+    "status": "success",
+    "timestamp": "2026-08-03T06:11:11.370Z"
+   },
+   "remediation": "Normal authentication activity. Monitor for unusual patterns:\nlogins at odd hours, from new IPs, or failed attempts preceding success.\n",
+   "severity": "info",
+   "status": "success",
+   "timestamp": "2026-08-03T06:11:11.370Z",
+   "type_group": "user"
+  },
+  {
+   "category": "User Access",
+   "description": "A user's PCE session is terminated.",
+   "event_id": "/orgs/1/events/b53ee28e-d1c6-4fa0-88b1-fbccffc42639",
+   "event_type": "user.pce_session_terminated",
+   "known_event_type": true,
+   "normalized": {
+    "action": "",
+    "action_method": "",
+    "action_path": "",
+    "actor": "System",
+    "actor_agent": "",
+    "actor_type": "system",
+    "actor_user": "",
+    "category": "user",
+    "event_id": "/orgs/1/events/b53ee28e-d1c6-4fa0-88b1-fbccffc42639",
+    "event_type": "user.pce_session_terminated",
+    "href": "/orgs/1/events/b53ee28e-d1c6-4fa0-88b1-fbccffc42639",
+    "known_event_type": true,
+    "notification_types": [
+     "user.pce_session_terminated"
+    ],
+    "notifications_count": 1,
+    "parser_notes": [],
+    "resource_changes_count": 0,
+    "resource_name": "",
+    "resource_type": "",
+    "severity": "info",
+    "source": "System",
+    "source_ip": "",
+    "status": "",
+    "target_name": "admin@lab.local",
+    "target_type": "user",
+    "timestamp": "2026-08-03T06:09:31.613Z",
+    "verb": "pce_session_terminated",
+    "workloads_affected": 0
+   },
+   "parser_notes": [],
+   "raw": {
+    "action": null,
+    "created_by": {
+     "system": {}
+    },
+    "event_type": "user.pce_session_terminated",
+    "href": "/orgs/1/events/b53ee28e-d1c6-4fa0-88b1-fbccffc42639",
+    "notifications": [
+     {
+      "info": {
+       "reason": "timeout",
+       "user": {
+        "href": "/users/11",
+        "username": "admin@lab.local"
+       }
+      },
+      "notification_type": "user.pce_session_terminated",
+      "uuid": "3414acb3-c63e-4bb7-997f-20e6c3a6d98a"
+     }
+    ],
+    "pce_fqdn": "pce.lab.local",
+    "resource_changes": [],
+    "severity": "info",
+    "status": null,
+    "timestamp": "2026-08-03T06:09:31.613Z"
+   },
+   "remediation": "Normal authentication activity. Monitor for unusual patterns:\nlogins at odd hours, from new IPs, or failed attempts preceding success.\n",
+   "severity": "info",
+   "status": null,
+   "timestamp": "2026-08-03T06:09:31.613Z",
+   "type_group": "user"
+  },
+  {
+   "category": "User Access",
+   "description": "A user's PCE session is terminated.",
+   "event_id": "/orgs/1/events/8a0ad69c-d35a-484f-a44d-9a419d6d70fe",
+   "event_type": "user.pce_session_terminated",
+   "known_event_type": true,
+   "normalized": {
+    "action": "",
+    "action_method": "",
+    "action_path": "",
+    "actor": "System",
+    "actor_agent": "",
+    "actor_type": "system",
+    "actor_user": "",
+    "category": "user",
+    "event_id": "/orgs/1/events/8a0ad69c-d35a-484f-a44d-9a419d6d70fe",
+    "event_type": "user.pce_session_terminated",
+    "href": "/orgs/1/events/8a0ad69c-d35a-484f-a44d-9a419d6d70fe",
+    "known_event_type": true,
+    "notification_types": [
+     "user.pce_session_terminated"
+    ],
+    "notifications_count": 1,
+    "parser_notes": [],
+    "resource_changes_count": 0,
+    "resource_name": "",
+    "resource_type": "",
+    "severity": "info",
+    "source": "System",
+    "source_ip": "",
+    "status": "",
+    "target_name": "admin@lab.local",
+    "target_type": "user",
+    "timestamp": "2026-08-03T06:09:31.599Z",
+    "verb": "pce_session_terminated",
+    "workloads_affected": 0
+   },
+   "parser_notes": [],
+   "raw": {
+    "action": null,
+    "created_by": {
+     "system": {}
+    },
+    "event_type": "user.pce_session_terminated",
+    "href": "/orgs/1/events/8a0ad69c-d35a-484f-a44d-9a419d6d70fe",
+    "notifications": [
+     {
+      "info": {
+       "reason": "timeout",
+       "user": {
+        "href": "/users/11",
+        "username": "admin@lab.local"
+       }
+      },
+      "notification_type": "user.pce_session_terminated",
+      "uuid": "7e157b18-00cc-4745-add2-2fd85dfd0b7c"
+     }
+    ],
+    "pce_fqdn": "pce.lab.local",
+    "resource_changes": [],
+    "severity": "info",
+    "status": null,
+    "timestamp": "2026-08-03T06:09:31.599Z"
+   },
+   "remediation": "Normal authentication activity. Monitor for unusual patterns:\nlogins at odd hours, from new IPs, or failed attempts preceding success.\n",
+   "severity": "info",
+   "status": null,
+   "timestamp": "2026-08-03T06:09:31.599Z",
+   "type_group": "user"
+  },
+  {
+   "category": "User Access",
+   "description": "A user successfully creates a new session.",
+   "event_id": "/orgs/1/events/fde614a4-6e40-4627-b604-2abb3b1bbd17",
+   "event_type": "user.create_session",
+   "known_event_type": true,
+   "normalized": {
+    "action": "POST /api/v2/users/create_session",
+    "action_method": "POST",
+    "action_path": "/api/v2/users/create_session",
+    "actor": "System",
+    "actor_agent": "",
+    "actor_type": "system",
+    "actor_user": "",
+    "category": "user",
+    "event_id": "/orgs/1/events/fde614a4-6e40-4627-b604-2abb3b1bbd17",
+    "event_type": "user.create_session",
+    "href": "/orgs/1/events/fde614a4-6e40-4627-b604-2abb3b1bbd17",
+    "known_event_type": true,
+    "notification_types": [
+     "user.pce_session_created"
+    ],
+    "notifications_count": 1,
+    "parser_notes": [],
+    "resource_changes_count": 0,
+    "resource_name": "",
+    "resource_type": "",
+    "severity": "info",
+    "source": "System | FILTERED",
+    "source_ip": "FILTERED",
+    "status": "success",
+    "target_name": "admin@lab.local",
+    "target_type": "user",
+    "timestamp": "2026-08-03T06:09:12.256Z",
+    "verb": "create_session",
+    "workloads_affected": 0
+   },
+   "parser_notes": [],
+   "raw": {
+    "action": {
+     "api_endpoint": "/api/v2/users/create_session",
+     "api_method": "POST",
+     "http_status_code": 201,
+     "src_ip": "FILTERED",
+     "uuid": "0758d069-e3de-4258-900b-8facfa3a8e57"
+    },
+    "created_by": {
+     "system": {}
+    },
+    "event_type": "user.create_session",
+    "href": "/orgs/1/events/fde614a4-6e40-4627-b604-2abb3b1bbd17",
+    "notifications": [
+     {
+      "info": {
+       "user": {
+        "href": "/users/11",
+        "username": "admin@lab.local"
+       }
+      },
+      "notification_type": "user.pce_session_created",
+      "uuid": "2540cb73-831e-4019-8c85-aae3fd8b593d"
+     }
+    ],
+    "pce_fqdn": "pce.lab.local",
+    "resource_changes": [],
+    "severity": "info",
+    "status": "success",
+    "timestamp": "2026-08-03T06:09:12.256Z"
+   },
+   "remediation": "Normal authentication activity. Monitor for unusual patterns:\nlogins at odd hours, from new IPs, or failed attempts preceding success.\n",
+   "severity": "info",
+   "status": "success",
+   "timestamp": "2026-08-03T06:09:12.256Z",
+   "type_group": "user"
+  },
+  {
+   "category": "User Access",
+   "description": "A user successfully creates a new session.",
+   "event_id": "/orgs/1/events/1f826a59-b9e3-406d-9b0b-df150a9e29bc",
+   "event_type": "user.create_session",
+   "known_event_type": true,
+   "normalized": {
+    "action": "POST /api/v2/users/create_session",
+    "action_method": "POST",
+    "action_path": "/api/v2/users/create_session",
+    "actor": "System",
+    "actor_agent": "",
+    "actor_type": "system",
+    "actor_user": "",
+    "category": "user",
+    "event_id": "/orgs/1/events/1f826a59-b9e3-406d-9b0b-df150a9e29bc",
+    "event_type": "user.create_session",
+    "href": "/orgs/1/events/1f826a59-b9e3-406d-9b0b-df150a9e29bc",
+    "known_event_type": true,
+    "notification_types": [
+     "user.pce_session_created"
+    ],
+    "notifications_count": 1,
+    "parser_notes": [],
+    "resource_changes_count": 0,
+    "resource_name": "",
+    "resource_type": "",
+    "severity": "info",
+    "source": "System | FILTERED",
+    "source_ip": "FILTERED",
+    "status": "success",
+    "target_name": "admin@lab.local",
+    "target_type": "user",
+    "timestamp": "2026-08-03T06:07:11.043Z",
+    "verb": "create_session",
+    "workloads_affected": 0
+   },
+   "parser_notes": [],
+   "raw": {
+    "action": {
+     "api_endpoint": "/api/v2/users/create_session",
+     "api_method": "POST",
+     "http_status_code": 201,
+     "src_ip": "FILTERED",
+     "uuid": "f5a7da3f-bf8a-46b1-9367-dba68d0d27a8"
+    },
+    "created_by": {
+     "system": {}
+    },
+    "event_type": "user.create_session",
+    "href": "/orgs/1/events/1f826a59-b9e3-406d-9b0b-df150a9e29bc",
+    "notifications": [
+     {
+      "info": {
+       "user": {
+        "href": "/users/11",
+        "username": "admin@lab.local"
+       }
+      },
+      "notification_type": "user.pce_session_created",
+      "uuid": "40ae3135-19cd-4577-85a1-b72a523b91eb"
+     }
+    ],
+    "pce_fqdn": "pce.lab.local",
+    "resource_changes": [],
+    "severity": "info",
+    "status": "success",
+    "timestamp": "2026-08-03T06:07:11.043Z"
+   },
+   "remediation": "Normal authentication activity. Monitor for unusual patterns:\nlogins at odd hours, from new IPs, or failed attempts preceding success.\n",
+   "severity": "info",
+   "status": "success",
+   "timestamp": "2026-08-03T06:07:11.043Z",
+   "type_group": "user"
+  },
+  {
+   "category": "User Access",
+   "description": "A user's PCE session is terminated.",
+   "event_id": "/orgs/1/events/a618911b-2b9e-4f7c-8133-4066ef0cc47d",
+   "event_type": "user.pce_session_terminated",
+   "known_event_type": true,
+   "normalized": {
+    "action": "",
+    "action_method": "",
+    "action_path": "",
+    "actor": "System",
+    "actor_agent": "",
+    "actor_type": "system",
+    "actor_user": "",
+    "category": "user",
+    "event_id": "/orgs/1/events/a618911b-2b9e-4f7c-8133-4066ef0cc47d",
+    "event_type": "user.pce_session_terminated",
+    "href": "/orgs/1/events/a618911b-2b9e-4f7c-8133-4066ef0cc47d",
+    "known_event_type": true,
+    "notification_types": [
+     "user.pce_session_terminated"
+    ],
+    "notifications_count": 1,
+    "parser_notes": [],
+    "resource_changes_count": 0,
+    "resource_name": "",
+    "resource_type": "",
+    "severity": "info",
+    "source": "System",
+    "source_ip": "",
+    "status": "",
+    "target_name": "admin@lab.local",
+    "target_type": "user",
+    "timestamp": "2026-08-03T06:06:31.482Z",
+    "verb": "pce_session_terminated",
+    "workloads_affected": 0
+   },
+   "parser_notes": [],
+   "raw": {
+    "action": null,
+    "created_by": {
+     "system": {}
+    },
+    "event_type": "user.pce_session_terminated",
+    "href": "/orgs/1/events/a618911b-2b9e-4f7c-8133-4066ef0cc47d",
+    "notifications": [
+     {
+      "info": {
+       "reason": "timeout",
+       "user": {
+        "href": "/users/11",
+        "username": "admin@lab.local"
+       }
+      },
+      "notification_type": "user.pce_session_terminated",
+      "uuid": "39a299f3-c195-4c12-969b-1ccda1d7524f"
+     }
+    ],
+    "pce_fqdn": "pce.lab.local",
+    "resource_changes": [],
+    "severity": "info",
+    "status": null,
+    "timestamp": "2026-08-03T06:06:31.482Z"
+   },
+   "remediation": "Normal authentication activity. Monitor for unusual patterns:\nlogins at odd hours, from new IPs, or failed attempts preceding success.\n",
+   "severity": "info",
+   "status": null,
+   "timestamp": "2026-08-03T06:06:31.482Z",
+   "type_group": "user"
+  },
+  {
+   "category": "User Access",
+   "description": "A user successfully creates a new session.",
+   "event_id": "/orgs/1/events/6315278f-0026-42a8-8c8f-5bb68e4595c3",
+   "event_type": "user.create_session",
+   "known_event_type": true,
+   "normalized": {
+    "action": "POST /api/v2/users/create_session",
+    "action_method": "POST",
+    "action_path": "/api/v2/users/create_session",
+    "actor": "System",
+    "actor_agent": "",
+    "actor_type": "system",
+    "actor_user": "",
+    "category": "user",
+    "event_id": "/orgs/1/events/6315278f-0026-42a8-8c8f-5bb68e4595c3",
+    "event_type": "user.create_session",
+    "href": "/orgs/1/events/6315278f-0026-42a8-8c8f-5bb68e4595c3",
+    "known_event_type": true,
+    "notification_types": [
+     "user.pce_session_created"
+    ],
+    "notifications_count": 1,
+    "parser_notes": [],
+    "resource_changes_count": 0,
+    "resource_name": "",
+    "resource_type": "",
+    "severity": "info",
+    "source": "System | FILTERED",
+    "source_ip": "FILTERED",
+    "status": "success",
+    "target_name": "admin@lab.local",
+    "target_type": "user",
+    "timestamp": "2026-08-03T06:05:10.821Z",
+    "verb": "create_session",
+    "workloads_affected": 0
+   },
+   "parser_notes": [],
+   "raw": {
+    "action": {
+     "api_endpoint": "/api/v2/users/create_session",
+     "api_method": "POST",
+     "http_status_code": 201,
+     "src_ip": "FILTERED",
+     "uuid": "772d2b6c-4479-4ef7-8550-264b1a550c5c"
+    },
+    "created_by": {
+     "system": {}
+    },
+    "event_type": "user.create_session",
+    "href": "/orgs/1/events/6315278f-0026-42a8-8c8f-5bb68e4595c3",
+    "notifications": [
+     {
+      "info": {
+       "user": {
+        "href": "/users/11",
+        "username": "admin@lab.local"
+       }
+      },
+      "notification_type": "user.pce_session_created",
+      "uuid": "4418bb92-425e-4a4e-bb98-c1e020feae06"
+     }
+    ],
+    "pce_fqdn": "pce.lab.local",
+    "resource_changes": [],
+    "severity": "info",
+    "status": "success",
+    "timestamp": "2026-08-03T06:05:10.821Z"
+   },
+   "remediation": "Normal authentication activity. Monitor for unusual patterns:\nlogins at odd hours, from new IPs, or failed attempts preceding success.\n",
+   "severity": "info",
+   "status": "success",
+   "timestamp": "2026-08-03T06:05:10.821Z",
+   "type_group": "user"
+  },
+  {
+   "category": "User Access",
+   "description": "A user's PCE session is terminated.",
+   "event_id": "/orgs/1/events/7835c8cd-bed4-43aa-bd9e-46f7df74ce88",
+   "event_type": "user.pce_session_terminated",
+   "known_event_type": true,
+   "normalized": {
+    "action": "",
+    "action_method": "",
+    "action_path": "",
+    "actor": "System",
+    "actor_agent": "",
+    "actor_type": "system",
+    "actor_user": "",
+    "category": "user",
+    "event_id": "/orgs/1/events/7835c8cd-bed4-43aa-bd9e-46f7df74ce88",
+    "event_type": "user.pce_session_terminated",
+    "href": "/orgs/1/events/7835c8cd-bed4-43aa-bd9e-46f7df74ce88",
+    "known_event_type": true,
+    "notification_types": [
+     "user.pce_session_terminated"
+    ],
+    "notifications_count": 1,
+    "parser_notes": [],
+    "resource_changes_count": 0,
+    "resource_name": "",
+    "resource_type": "",
+    "severity": "info",
+    "source": "System",
+    "source_ip": "",
+    "status": "",
+    "target_name": "admin@lab.local",
+    "target_type": "user",
+    "timestamp": "2026-08-03T06:03:31.403Z",
+    "verb": "pce_session_terminated",
+    "workloads_affected": 0
+   },
+   "parser_notes": [],
+   "raw": {
+    "action": null,
+    "created_by": {
+     "system": {}
+    },
+    "event_type": "user.pce_session_terminated",
+    "href": "/orgs/1/events/7835c8cd-bed4-43aa-bd9e-46f7df74ce88",
+    "notifications": [
+     {
+      "info": {
+       "reason": "timeout",
+       "user": {
+        "href": "/users/11",
+        "username": "admin@lab.local"
+       }
+      },
+      "notification_type": "user.pce_session_terminated",
+      "uuid": "fe5dfc9a-6079-4597-ba19-fc280442c7a4"
+     }
+    ],
+    "pce_fqdn": "pce.lab.local",
+    "resource_changes": [],
+    "severity": "info",
+    "status": null,
+    "timestamp": "2026-08-03T06:03:31.403Z"
+   },
+   "remediation": "Normal authentication activity. Monitor for unusual patterns:\nlogins at odd hours, from new IPs, or failed attempts preceding success.\n",
+   "severity": "info",
+   "status": null,
+   "timestamp": "2026-08-03T06:03:31.403Z",
+   "type_group": "user"
+  },
+  {
+   "category": "User Access",
+   "description": "A user's PCE session is terminated.",
+   "event_id": "/orgs/1/events/31285ab9-57a2-413a-8cce-cbc3b6f8044f",
+   "event_type": "user.pce_session_terminated",
+   "known_event_type": true,
+   "normalized": {
+    "action": "",
+    "action_method": "",
+    "action_path": "",
+    "actor": "System",
+    "actor_agent": "",
+    "actor_type": "system",
+    "actor_user": "",
+    "category": "user",
+    "event_id": "/orgs/1/events/31285ab9-57a2-413a-8cce-cbc3b6f8044f",
+    "event_type": "user.pce_session_terminated",
+    "href": "/orgs/1/events/31285ab9-57a2-413a-8cce-cbc3b6f8044f",
+    "known_event_type": true,
+    "notification_types": [
+     "user.pce_session_terminated"
+    ],
+    "notifications_count": 1,
+    "parser_notes": [],
+    "resource_changes_count": 0,
+    "resource_name": "",
+    "resource_type": "",
+    "severity": "info",
+    "source": "System",
+    "source_ip": "",
+    "status": "",
+    "target_name": "admin@lab.local",
+    "target_type": "user",
+    "timestamp": "2026-08-03T06:03:31.392Z",
+    "verb": "pce_session_terminated",
+    "workloads_affected": 0
+   },
+   "parser_notes": [],
+   "raw": {
+    "action": null,
+    "created_by": {
+     "system": {}
+    },
+    "event_type": "user.pce_session_terminated",
+    "href": "/orgs/1/events/31285ab9-57a2-413a-8cce-cbc3b6f8044f",
+    "notifications": [
+     {
+      "info": {
+       "reason": "timeout",
+       "user": {
+        "href": "/users/11",
+        "username": "admin@lab.local"
+       }
+      },
+      "notification_type": "user.pce_session_terminated",
+      "uuid": "26d257e4-438f-4c4a-9640-81c98b48ea9f"
+     }
+    ],
+    "pce_fqdn": "pce.lab.local",
+    "resource_changes": [],
+    "severity": "info",
+    "status": null,
+    "timestamp": "2026-08-03T06:03:31.392Z"
+   },
+   "remediation": "Normal authentication activity. Monitor for unusual patterns:\nlogins at odd hours, from new IPs, or failed attempts preceding success.\n",
+   "severity": "info",
+   "status": null,
+   "timestamp": "2026-08-03T06:03:31.392Z",
+   "type_group": "user"
+  },
+  {
+   "category": "User Access",
+   "description": "A user successfully creates a new session.",
+   "event_id": "/orgs/1/events/5cda43ed-4b38-47df-a2f1-6f64bdd1c244",
+   "event_type": "user.create_session",
+   "known_event_type": true,
+   "normalized": {
+    "action": "POST /api/v2/users/create_session",
+    "action_method": "POST",
+    "action_path": "/api/v2/users/create_session",
+    "actor": "System",
+    "actor_agent": "",
+    "actor_type": "system",
+    "actor_user": "",
+    "category": "user",
+    "event_id": "/orgs/1/events/5cda43ed-4b38-47df-a2f1-6f64bdd1c244",
+    "event_type": "user.create_session",
+    "href": "/orgs/1/events/5cda43ed-4b38-47df-a2f1-6f64bdd1c244",
+    "known_event_type": true,
+    "notification_types": [
+     "user.pce_session_created"
+    ],
+    "notifications_count": 1,
+    "parser_notes": [],
+    "resource_changes_count": 0,
+    "resource_name": "",
+    "resource_type": "",
+    "severity": "info",
+    "source": "System | FILTERED",
+    "source_ip": "FILTERED",
+    "status": "success",
+    "target_name": "admin@lab.local",
+    "target_type": "user",
+    "timestamp": "2026-08-03T06:03:11.170Z",
+    "verb": "create_session",
+    "workloads_affected": 0
+   },
+   "parser_notes": [],
+   "raw": {
+    "action": {
+     "api_endpoint": "/api/v2/users/create_session",
+     "api_method": "POST",
+     "http_status_code": 201,
+     "src_ip": "FILTERED",
+     "uuid": "c0b3b67e-030f-4d7f-a274-c3442b550aaa"
+    },
+    "created_by": {
+     "system": {}
+    },
+    "event_type": "user.create_session",
+    "href": "/orgs/1/events/5cda43ed-4b38-47df-a2f1-6f64bdd1c244",
+    "notifications": [
+     {
+      "info": {
+       "user": {
+        "href": "/users/11",
+        "username": "admin@lab.local"
+       }
+      },
+      "notification_type": "user.pce_session_created",
+      "uuid": "961a23d7-f5e3-4983-b870-7c1ccbfcbd5d"
+     }
+    ],
+    "pce_fqdn": "pce.lab.local",
+    "resource_changes": [],
+    "severity": "info",
+    "status": "success",
+    "timestamp": "2026-08-03T06:03:11.170Z"
+   },
+   "remediation": "Normal authentication activity. Monitor for unusual patterns:\nlogins at odd hours, from new IPs, or failed attempts preceding success.\n",
+   "severity": "info",
+   "status": "success",
+   "timestamp": "2026-08-03T06:03:11.170Z",
+   "type_group": "user"
+  },
+  {
+   "category": "User Access",
+   "description": "A user successfully creates a new session.",
+   "event_id": "/orgs/1/events/9ca1d655-2531-46e8-bdf8-d47eab4f188e",
+   "event_type": "user.create_session",
+   "known_event_type": true,
+   "normalized": {
+    "action": "POST /api/v2/users/create_session",
+    "action_method": "POST",
+    "action_path": "/api/v2/users/create_session",
+    "actor": "System",
+    "actor_agent": "",
+    "actor_type": "system",
+    "actor_user": "",
+    "category": "user",
+    "event_id": "/orgs/1/events/9ca1d655-2531-46e8-bdf8-d47eab4f188e",
+    "event_type": "user.create_session",
+    "href": "/orgs/1/events/9ca1d655-2531-46e8-bdf8-d47eab4f188e",
+    "known_event_type": true,
+    "notification_types": [
+     "user.pce_session_created"
+    ],
+    "notifications_count": 1,
+    "parser_notes": [],
+    "resource_changes_count": 0,
+    "resource_name": "",
+    "resource_type": "",
+    "severity": "info",
+    "source": "System | FILTERED",
+    "source_ip": "FILTERED",
+    "status": "success",
+    "target_name": "admin@lab.local",
+    "target_type": "user",
+    "timestamp": "2026-08-03T06:01:10.973Z",
+    "verb": "create_session",
+    "workloads_affected": 0
+   },
+   "parser_notes": [],
+   "raw": {
+    "action": {
+     "api_endpoint": "/api/v2/users/create_session",
+     "api_method": "POST",
+     "http_status_code": 201,
+     "src_ip": "FILTERED",
+     "uuid": "91656ded-513c-4b84-a6d5-c9a3fe14b67c"
+    },
+    "created_by": {
+     "system": {}
+    },
+    "event_type": "user.create_session",
+    "href": "/orgs/1/events/9ca1d655-2531-46e8-bdf8-d47eab4f188e",
+    "notifications": [
+     {
+      "info": {
+       "user": {
+        "href": "/users/11",
+        "username": "admin@lab.local"
+       }
+      },
+      "notification_type": "user.pce_session_created",
+      "uuid": "aa8a1bd9-5fa8-45f8-9ce0-3407c6ea23de"
+     }
+    ],
+    "pce_fqdn": "pce.lab.local",
+    "resource_changes": [],
+    "severity": "info",
+    "status": "success",
+    "timestamp": "2026-08-03T06:01:10.973Z"
+   },
+   "remediation": "Normal authentication activity. Monitor for unusual patterns:\nlogins at odd hours, from new IPs, or failed attempts preceding success.\n",
+   "severity": "info",
+   "status": "success",
+   "timestamp": "2026-08-03T06:01:10.973Z",
+   "type_group": "user"
+  },
+  {
+   "category": "User Access",
+   "description": "A user's PCE session is terminated.",
+   "event_id": "/orgs/1/events/ae384666-1331-46f3-9c2c-9ca53fe4d89a",
+   "event_type": "user.pce_session_terminated",
+   "known_event_type": true,
+   "normalized": {
+    "action": "",
+    "action_method": "",
+    "action_path": "",
+    "actor": "System",
+    "actor_agent": "",
+    "actor_type": "system",
+    "actor_user": "",
+    "category": "user",
+    "event_id": "/orgs/1/events/ae384666-1331-46f3-9c2c-9ca53fe4d89a",
+    "event_type": "user.pce_session_terminated",
+    "href": "/orgs/1/events/ae384666-1331-46f3-9c2c-9ca53fe4d89a",
+    "known_event_type": true,
+    "notification_types": [
+     "user.pce_session_terminated"
+    ],
+    "notifications_count": 1,
+    "parser_notes": [],
+    "resource_changes_count": 0,
+    "resource_name": "",
+    "resource_type": "",
+    "severity": "info",
+    "source": "System",
+    "source_ip": "",
+    "status": "",
+    "target_name": "admin@lab.local",
+    "target_type": "user",
+    "timestamp": "2026-08-03T06:00:31.313Z",
+    "verb": "pce_session_terminated",
+    "workloads_affected": 0
+   },
+   "parser_notes": [],
+   "raw": {
+    "action": null,
+    "created_by": {
+     "system": {}
+    },
+    "event_type": "user.pce_session_terminated",
+    "href": "/orgs/1/events/ae384666-1331-46f3-9c2c-9ca53fe4d89a",
+    "notifications": [
+     {
+      "info": {
+       "reason": "timeout",
+       "user": {
+        "href": "/users/11",
+        "username": "admin@lab.local"
+       }
+      },
+      "notification_type": "user.pce_session_terminated",
+      "uuid": "7d86e9b0-981e-4d0b-a101-5527f96cd13d"
+     }
+    ],
+    "pce_fqdn": "pce.lab.local",
+    "resource_changes": [],
+    "severity": "info",
+    "status": null,
+    "timestamp": "2026-08-03T06:00:31.313Z"
+   },
+   "remediation": "Normal authentication activity. Monitor for unusual patterns:\nlogins at odd hours, from new IPs, or failed attempts preceding success.\n",
+   "severity": "info",
+   "status": null,
+   "timestamp": "2026-08-03T06:00:31.313Z",
+   "type_group": "user"
+  },
+  {
+   "category": "User Access",
+   "description": "A user successfully creates a new session.",
+   "event_id": "/orgs/1/events/851ca5ae-28c3-402c-b09d-0d92481c2c3c",
+   "event_type": "user.create_session",
+   "known_event_type": true,
+   "normalized": {
+    "action": "POST /api/v2/users/create_session",
+    "action_method": "POST",
+    "action_path": "/api/v2/users/create_session",
+    "actor": "System",
+    "actor_agent": "",
+    "actor_type": "system",
+    "actor_user": "",
+    "category": "user",
+    "event_id": "/orgs/1/events/851ca5ae-28c3-402c-b09d-0d92481c2c3c",
+    "event_type": "user.create_session",
+    "href": "/orgs/1/events/851ca5ae-28c3-402c-b09d-0d92481c2c3c",
+    "known_event_type": true,
+    "notification_types": [
+     "user.pce_session_created"
+    ],
+    "notifications_count": 1,
+    "parser_notes": [],
+    "resource_changes_count": 0,
+    "resource_name": "",
+    "resource_type": "",
+    "severity": "info",
+    "source": "System | FILTERED",
+    "source_ip": "FILTERED",
+    "status": "success",
+    "target_name": "admin@lab.local",
+    "target_type": "user",
+    "timestamp": "2026-08-03T05:59:12.044Z",
+    "verb": "create_session",
+    "workloads_affected": 0
+   },
+   "parser_notes": [],
+   "raw": {
+    "action": {
+     "api_endpoint": "/api/v2/users/create_session",
+     "api_method": "POST",
+     "http_status_code": 201,
+     "src_ip": "FILTERED",
+     "uuid": "f554790d-131d-4781-b00f-dd578ebab656"
+    },
+    "created_by": {
+     "system": {}
+    },
+    "event_type": "user.create_session",
+    "href": "/orgs/1/events/851ca5ae-28c3-402c-b09d-0d92481c2c3c",
+    "notifications": [
+     {
+      "info": {
+       "user": {
+        "href": "/users/11",
+        "username": "admin@lab.local"
+       }
+      },
+      "notification_type": "user.pce_session_created",
+      "uuid": "06a6ec38-da5c-4439-b4e1-b08e23b419ee"
+     }
+    ],
+    "pce_fqdn": "pce.lab.local",
+    "resource_changes": [],
+    "severity": "info",
+    "status": "success",
+    "timestamp": "2026-08-03T05:59:12.044Z"
+   },
+   "remediation": "Normal authentication activity. Monitor for unusual patterns:\nlogins at odd hours, from new IPs, or failed attempts preceding success.\n",
+   "severity": "info",
+   "status": "success",
+   "timestamp": "2026-08-03T05:59:12.044Z",
+   "type_group": "user"
+  },
+  {
+   "category": "User Access",
+   "description": "A user's PCE session is terminated.",
+   "event_id": "/orgs/1/events/e0ae74c8-166a-4df3-96ca-f94b3db1f50a",
+   "event_type": "user.pce_session_terminated",
+   "known_event_type": true,
+   "normalized": {
+    "action": "",
+    "action_method": "",
+    "action_path": "",
+    "actor": "System",
+    "actor_agent": "",
+    "actor_type": "system",
+    "actor_user": "",
+    "category": "user",
+    "event_id": "/orgs/1/events/e0ae74c8-166a-4df3-96ca-f94b3db1f50a",
+    "event_type": "user.pce_session_terminated",
+    "href": "/orgs/1/events/e0ae74c8-166a-4df3-96ca-f94b3db1f50a",
+    "known_event_type": true,
+    "notification_types": [
+     "user.pce_session_terminated"
+    ],
+    "notifications_count": 1,
+    "parser_notes": [],
+    "resource_changes_count": 0,
+    "resource_name": "",
+    "resource_type": "",
+    "severity": "info",
+    "source": "System",
+    "source_ip": "",
+    "status": "",
+    "target_name": "admin@lab.local",
+    "target_type": "user",
+    "timestamp": "2026-08-03T05:57:31.263Z",
+    "verb": "pce_session_terminated",
+    "workloads_affected": 0
+   },
+   "parser_notes": [],
+   "raw": {
+    "action": null,
+    "created_by": {
+     "system": {}
+    },
+    "event_type": "user.pce_session_terminated",
+    "href": "/orgs/1/events/e0ae74c8-166a-4df3-96ca-f94b3db1f50a",
+    "notifications": [
+     {
+      "info": {
+       "reason": "timeout",
+       "user": {
+        "href": "/users/11",
+        "username": "admin@lab.local"
+       }
+      },
+      "notification_type": "user.pce_session_terminated",
+      "uuid": "883beaf8-0605-4506-b029-8768cd7d9280"
+     }
+    ],
+    "pce_fqdn": "pce.lab.local",
+    "resource_changes": [],
+    "severity": "info",
+    "status": null,
+    "timestamp": "2026-08-03T05:57:31.263Z"
+   },
+   "remediation": "Normal authentication activity. Monitor for unusual patterns:\nlogins at odd hours, from new IPs, or failed attempts preceding success.\n",
+   "severity": "info",
+   "status": null,
+   "timestamp": "2026-08-03T05:57:31.263Z",
+   "type_group": "user"
+  },
+  {
+   "category": "User Access",
+   "description": "A user's PCE session is terminated.",
+   "event_id": "/orgs/1/events/5561efbc-6865-4651-b645-76b46c7ba310",
+   "event_type": "user.pce_session_terminated",
+   "known_event_type": true,
+   "normalized": {
+    "action": "",
+    "action_method": "",
+    "action_path": "",
+    "actor": "System",
+    "actor_agent": "",
+    "actor_type": "system",
+    "actor_user": "",
+    "category": "user",
+    "event_id": "/orgs/1/events/5561efbc-6865-4651-b645-76b46c7ba310",
+    "event_type": "user.pce_session_terminated",
+    "href": "/orgs/1/events/5561efbc-6865-4651-b645-76b46c7ba310",
+    "known_event_type": true,
+    "notification_types": [
+     "user.pce_session_terminated"
+    ],
+    "notifications_count": 1,
+    "parser_notes": [],
+    "resource_changes_count": 0,
+    "resource_name": "",
+    "resource_type": "",
+    "severity": "info",
+    "source": "System",
+    "source_ip": "",
+    "status": "",
+    "target_name": "admin@lab.local",
+    "target_type": "user",
+    "timestamp": "2026-08-03T05:57:31.251Z",
+    "verb": "pce_session_terminated",
+    "workloads_affected": 0
+   },
+   "parser_notes": [],
+   "raw": {
+    "action": null,
+    "created_by": {
+     "system": {}
+    },
+    "event_type": "user.pce_session_terminated",
+    "href": "/orgs/1/events/5561efbc-6865-4651-b645-76b46c7ba310",
+    "notifications": [
+     {
+      "info": {
+       "reason": "timeout",
+       "user": {
+        "href": "/users/11",
+        "username": "admin@lab.local"
+       }
+      },
+      "notification_type": "user.pce_session_terminated",
+      "uuid": "e4f65f1b-0d36-49e8-acab-4a6b6007ec92"
+     }
+    ],
+    "pce_fqdn": "pce.lab.local",
+    "resource_changes": [],
+    "severity": "info",
+    "status": null,
+    "timestamp": "2026-08-03T05:57:31.251Z"
+   },
+   "remediation": "Normal authentication activity. Monitor for unusual patterns:\nlogins at odd hours, from new IPs, or failed attempts preceding success.\n",
+   "severity": "info",
+   "status": null,
+   "timestamp": "2026-08-03T05:57:31.251Z",
+   "type_group": "user"
+  },
+  {
+   "category": "User Access",
+   "description": "A user successfully creates a new session.",
+   "event_id": "/orgs/1/events/ff242250-8ad4-4e80-ad52-9b3c11c82a93",
+   "event_type": "user.create_session",
+   "known_event_type": true,
+   "normalized": {
+    "action": "POST /api/v2/users/create_session",
+    "action_method": "POST",
+    "action_path": "/api/v2/users/create_session",
+    "actor": "System",
+    "actor_agent": "",
+    "actor_type": "system",
+    "actor_user": "",
+    "category": "user",
+    "event_id": "/orgs/1/events/ff242250-8ad4-4e80-ad52-9b3c11c82a93",
+    "event_type": "user.create_session",
+    "href": "/orgs/1/events/ff242250-8ad4-4e80-ad52-9b3c11c82a93",
+    "known_event_type": true,
+    "notification_types": [
+     "user.pce_session_created"
+    ],
+    "notifications_count": 1,
+    "parser_notes": [],
+    "resource_changes_count": 0,
+    "resource_name": "",
+    "resource_type": "",
+    "severity": "info",
+    "source": "System | FILTERED",
+    "source_ip": "FILTERED",
+    "status": "success",
+    "target_name": "admin@lab.local",
+    "target_type": "user",
+    "timestamp": "2026-08-03T05:57:10.858Z",
+    "verb": "create_session",
+    "workloads_affected": 0
+   },
+   "parser_notes": [],
+   "raw": {
+    "action": {
+     "api_endpoint": "/api/v2/users/create_session",
+     "api_method": "POST",
+     "http_status_code": 201,
+     "src_ip": "FILTERED",
+     "uuid": "59640501-5e5f-4fe3-8362-aec4c0af63ca"
+    },
+    "created_by": {
+     "system": {}
+    },
+    "event_type": "user.create_session",
+    "href": "/orgs/1/events/ff242250-8ad4-4e80-ad52-9b3c11c82a93",
+    "notifications": [
+     {
+      "info": {
+       "user": {
+        "href": "/users/11",
+        "username": "admin@lab.local"
+       }
+      },
+      "notification_type": "user.pce_session_created",
+      "uuid": "7b29fb65-c357-45e3-ad06-2b2e2a671ad8"
+     }
+    ],
+    "pce_fqdn": "pce.lab.local",
+    "resource_changes": [],
+    "severity": "info",
+    "status": "success",
+    "timestamp": "2026-08-03T05:57:10.858Z"
+   },
+   "remediation": "Normal authentication activity. Monitor for unusual patterns:\nlogins at odd hours, from new IPs, or failed attempts preceding success.\n",
+   "severity": "info",
+   "status": "success",
+   "timestamp": "2026-08-03T05:57:10.858Z",
+   "type_group": "user"
+  },
+  {
+   "category": "User Access",
+   "description": "A user successfully creates a new session.",
+   "event_id": "/orgs/1/events/a7b7a098-5196-4060-a6c0-54c27edcce93",
+   "event_type": "user.create_session",
+   "known_event_type": true,
+   "normalized": {
+    "action": "POST /api/v2/users/create_session",
+    "action_method": "POST",
+    "action_path": "/api/v2/users/create_session",
+    "actor": "System",
+    "actor_agent": "",
+    "actor_type": "system",
+    "actor_user": "",
+    "category": "user",
+    "event_id": "/orgs/1/events/a7b7a098-5196-4060-a6c0-54c27edcce93",
+    "event_type": "user.create_session",
+    "href": "/orgs/1/events/a7b7a098-5196-4060-a6c0-54c27edcce93",
+    "known_event_type": true,
+    "notification_types": [
+     "user.pce_session_created"
+    ],
+    "notifications_count": 1,
+    "parser_notes": [],
+    "resource_changes_count": 0,
+    "resource_name": "",
+    "resource_type": "",
+    "severity": "info",
+    "source": "System | FILTERED",
+    "source_ip": "FILTERED",
+    "status": "success",
+    "target_name": "admin@lab.local",
+    "target_type": "user",
+    "timestamp": "2026-08-03T05:55:11.599Z",
+    "verb": "create_session",
+    "workloads_affected": 0
+   },
+   "parser_notes": [],
+   "raw": {
+    "action": {
+     "api_endpoint": "/api/v2/users/create_session",
+     "api_method": "POST",
+     "http_status_code": 201,
+     "src_ip": "FILTERED",
+     "uuid": "0a925975-3739-48f2-929c-4e4938d00aa6"
+    },
+    "created_by": {
+     "system": {}
+    },
+    "event_type": "user.create_session",
+    "href": "/orgs/1/events/a7b7a098-5196-4060-a6c0-54c27edcce93",
+    "notifications": [
+     {
+      "info": {
+       "user": {
+        "href": "/users/11",
+        "username": "admin@lab.local"
+       }
+      },
+      "notification_type": "user.pce_session_created",
+      "uuid": "e9c1ef1b-0c61-4160-9ede-48179bcc81d5"
+     }
+    ],
+    "pce_fqdn": "pce.lab.local",
+    "resource_changes": [],
+    "severity": "info",
+    "status": "success",
+    "timestamp": "2026-08-03T05:55:11.599Z"
+   },
+   "remediation": "Normal authentication activity. Monitor for unusual patterns:\nlogins at odd hours, from new IPs, or failed attempts preceding success.\n",
+   "severity": "info",
+   "status": "success",
+   "timestamp": "2026-08-03T05:55:11.599Z",
+   "type_group": "user"
+  },
+  {
+   "category": "User Access",
+   "description": "A user's PCE session is terminated.",
+   "event_id": "/orgs/1/events/1ee347ec-ee69-4a58-99e7-bcd944fd8def",
+   "event_type": "user.pce_session_terminated",
+   "known_event_type": true,
+   "normalized": {
+    "action": "",
+    "action_method": "",
+    "action_path": "",
+    "actor": "System",
+    "actor_agent": "",
+    "actor_type": "system",
+    "actor_user": "",
+    "category": "user",
+    "event_id": "/orgs/1/events/1ee347ec-ee69-4a58-99e7-bcd944fd8def",
+    "event_type": "user.pce_session_terminated",
+    "href": "/orgs/1/events/1ee347ec-ee69-4a58-99e7-bcd944fd8def",
+    "known_event_type": true,
+    "notification_types": [
+     "user.pce_session_terminated"
+    ],
+    "notifications_count": 1,
+    "parser_notes": [],
+    "resource_changes_count": 0,
+    "resource_name": "",
+    "resource_type": "",
+    "severity": "info",
+    "source": "System",
+    "source_ip": "",
+    "status": "",
+    "target_name": "admin@lab.local",
+    "target_type": "user",
+    "timestamp": "2026-08-03T05:54:31.152Z",
+    "verb": "pce_session_terminated",
+    "workloads_affected": 0
+   },
+   "parser_notes": [],
+   "raw": {
+    "action": null,
+    "created_by": {
+     "system": {}
+    },
+    "event_type": "user.pce_session_terminated",
+    "href": "/orgs/1/events/1ee347ec-ee69-4a58-99e7-bcd944fd8def",
+    "notifications": [
+     {
+      "info": {
+       "reason": "timeout",
+       "user": {
+        "href": "/users/11",
+        "username": "admin@lab.local"
+       }
+      },
+      "notification_type": "user.pce_session_terminated",
+      "uuid": "58a41fcf-9a46-411b-a951-f6a5dbb15a67"
+     }
+    ],
+    "pce_fqdn": "pce.lab.local",
+    "resource_changes": [],
+    "severity": "info",
+    "status": null,
+    "timestamp": "2026-08-03T05:54:31.152Z"
+   },
+   "remediation": "Normal authentication activity. Monitor for unusual patterns:\nlogins at odd hours, from new IPs, or failed attempts preceding success.\n",
+   "severity": "info",
+   "status": null,
+   "timestamp": "2026-08-03T05:54:31.152Z",
+   "type_group": "user"
+  },
+  {
+   "category": "User Access",
+   "description": "A user successfully creates a new session.",
+   "event_id": "/orgs/1/events/20d453ff-50cc-4018-9808-1367ea89f5f2",
+   "event_type": "user.create_session",
+   "known_event_type": true,
+   "normalized": {
+    "action": "POST /api/v2/users/create_session",
+    "action_method": "POST",
+    "action_path": "/api/v2/users/create_session",
+    "actor": "System",
+    "actor_agent": "",
+    "actor_type": "system",
+    "actor_user": "",
+    "category": "user",
+    "event_id": "/orgs/1/events/20d453ff-50cc-4018-9808-1367ea89f5f2",
+    "event_type": "user.create_session",
+    "href": "/orgs/1/events/20d453ff-50cc-4018-9808-1367ea89f5f2",
+    "known_event_type": true,
+    "notification_types": [
+     "user.pce_session_created"
+    ],
+    "notifications_count": 1,
+    "parser_notes": [],
+    "resource_changes_count": 0,
+    "resource_name": "",
+    "resource_type": "",
+    "severity": "info",
+    "source": "System | FILTERED",
+    "source_ip": "FILTERED",
+    "status": "success",
+    "target_name": "admin@lab.local",
+    "target_type": "user",
+    "timestamp": "2026-08-03T05:53:11.023Z",
+    "verb": "create_session",
+    "workloads_affected": 0
+   },
+   "parser_notes": [],
+   "raw": {
+    "action": {
+     "api_endpoint": "/api/v2/users/create_session",
+     "api_method": "POST",
+     "http_status_code": 201,
+     "src_ip": "FILTERED",
+     "uuid": "c568c0c6-bd4e-4af5-89c1-ce82458b8dd4"
+    },
+    "created_by": {
+     "system": {}
+    },
+    "event_type": "user.create_session",
+    "href": "/orgs/1/events/20d453ff-50cc-4018-9808-1367ea89f5f2",
+    "notifications": [
+     {
+      "info": {
+       "user": {
+        "href": "/users/11",
+        "username": "admin@lab.local"
+       }
+      },
+      "notification_type": "user.pce_session_created",
+      "uuid": "93e85b33-aee4-4012-abcd-17af9d997264"
+     }
+    ],
+    "pce_fqdn": "pce.lab.local",
+    "resource_changes": [],
+    "severity": "info",
+    "status": "success",
+    "timestamp": "2026-08-03T05:53:11.023Z"
+   },
+   "remediation": "Normal authentication activity. Monitor for unusual patterns:\nlogins at odd hours, from new IPs, or failed attempts preceding success.\n",
+   "severity": "info",
+   "status": "success",
+   "timestamp": "2026-08-03T05:53:11.023Z",
+   "type_group": "user"
+  },
+  {
+   "category": "User Access",
+   "description": "A user's PCE session is terminated.",
+   "event_id": "/orgs/1/events/73c39041-804a-4162-baae-8d660a185982",
+   "event_type": "user.pce_session_terminated",
+   "known_event_type": true,
+   "normalized": {
+    "action": "",
+    "action_method": "",
+    "action_path": "",
+    "actor": "System",
+    "actor_agent": "",
+    "actor_type": "system",
+    "actor_user": "",
+    "category": "user",
+    "event_id": "/orgs/1/events/73c39041-804a-4162-baae-8d660a185982",
+    "event_type": "user.pce_session_terminated",
+    "href": "/orgs/1/events/73c39041-804a-4162-baae-8d660a185982",
+    "known_event_type": true,
+    "notification_types": [
+     "user.pce_session_terminated"
+    ],
+    "notifications_count": 1,
+    "parser_notes": [],
+    "resource_changes_count": 0,
+    "resource_name": "",
+    "resource_type": "",
+    "severity": "info",
+    "source": "System",
+    "source_ip": "",
+    "status": "",
+    "target_name": "admin@lab.local",
+    "target_type": "user",
+    "timestamp": "2026-08-03T05:51:31.046Z",
+    "verb": "pce_session_terminated",
+    "workloads_affected": 0
+   },
+   "parser_notes": [],
+   "raw": {
+    "action": null,
+    "created_by": {
+     "system": {}
+    },
+    "event_type": "user.pce_session_terminated",
+    "href": "/orgs/1/events/73c39041-804a-4162-baae-8d660a185982",
+    "notifications": [
+     {
+      "info": {
+       "reason": "timeout",
+       "user": {
+        "href": "/users/11",
+        "username": "admin@lab.local"
+       }
+      },
+      "notification_type": "user.pce_session_terminated",
+      "uuid": "e9d8147d-7b1f-4765-a2ec-857be9eb1b26"
+     }
+    ],
+    "pce_fqdn": "pce.lab.local",
+    "resource_changes": [],
+    "severity": "info",
+    "status": null,
+    "timestamp": "2026-08-03T05:51:31.046Z"
+   },
+   "remediation": "Normal authentication activity. Monitor for unusual patterns:\nlogins at odd hours, from new IPs, or failed attempts preceding success.\n",
+   "severity": "info",
+   "status": null,
+   "timestamp": "2026-08-03T05:51:31.046Z",
+   "type_group": "user"
+  },
+  {
+   "category": "User Access",
+   "description": "A user's PCE session is terminated.",
+   "event_id": "/orgs/1/events/377ef55a-6993-4742-a392-d48e573aafc4",
+   "event_type": "user.pce_session_terminated",
+   "known_event_type": true,
+   "normalized": {
+    "action": "",
+    "action_method": "",
+    "action_path": "",
+    "actor": "System",
+    "actor_agent": "",
+    "actor_type": "system",
+    "actor_user": "",
+    "category": "user",
+    "event_id": "/orgs/1/events/377ef55a-6993-4742-a392-d48e573aafc4",
+    "event_type": "user.pce_session_terminated",
+    "href": "/orgs/1/events/377ef55a-6993-4742-a392-d48e573aafc4",
+    "known_event_type": true,
+    "notification_types": [
+     "user.pce_session_terminated"
+    ],
+    "notifications_count": 1,
+    "parser_notes": [],
+    "resource_changes_count": 0,
+    "resource_name": "",
+    "resource_type": "",
+    "severity": "info",
+    "source": "System",
+    "source_ip": "",
+    "status": "",
+    "target_name": "admin@lab.local",
+    "target_type": "user",
+    "timestamp": "2026-08-03T05:51:31.035Z",
+    "verb": "pce_session_terminated",
+    "workloads_affected": 0
+   },
+   "parser_notes": [],
+   "raw": {
+    "action": null,
+    "created_by": {
+     "system": {}
+    },
+    "event_type": "user.pce_session_terminated",
+    "href": "/orgs/1/events/377ef55a-6993-4742-a392-d48e573aafc4",
+    "notifications": [
+     {
+      "info": {
+       "reason": "timeout",
+       "user": {
+        "href": "/users/11",
+        "username": "admin@lab.local"
+       }
+      },
+      "notification_type": "user.pce_session_terminated",
+      "uuid": "0dbcfda2-94b1-49e5-967d-a6ca235fabbe"
+     }
+    ],
+    "pce_fqdn": "pce.lab.local",
+    "resource_changes": [],
+    "severity": "info",
+    "status": null,
+    "timestamp": "2026-08-03T05:51:31.035Z"
+   },
+   "remediation": "Normal authentication activity. Monitor for unusual patterns:\nlogins at odd hours, from new IPs, or failed attempts preceding success.\n",
+   "severity": "info",
+   "status": null,
+   "timestamp": "2026-08-03T05:51:31.035Z",
+   "type_group": "user"
+  },
+  {
+   "category": "User Access",
+   "description": "A user successfully creates a new session.",
+   "event_id": "/orgs/1/events/9ab74b09-2059-4f1c-abea-67b0cb1c6532",
+   "event_type": "user.create_session",
+   "known_event_type": true,
+   "normalized": {
+    "action": "POST /api/v2/users/create_session",
+    "action_method": "POST",
+    "action_path": "/api/v2/users/create_session",
+    "actor": "System",
+    "actor_agent": "",
+    "actor_type": "system",
+    "actor_user": "",
+    "category": "user",
+    "event_id": "/orgs/1/events/9ab74b09-2059-4f1c-abea-67b0cb1c6532",
+    "event_type": "user.create_session",
+    "href": "/orgs/1/events/9ab74b09-2059-4f1c-abea-67b0cb1c6532",
+    "known_event_type": true,
+    "notification_types": [
+     "user.pce_session_created"
+    ],
+    "notifications_count": 1,
+    "parser_notes": [],
+    "resource_changes_count": 0,
+    "resource_name": "",
+    "resource_type": "",
+    "severity": "info",
+    "source": "System | FILTERED",
+    "source_ip": "FILTERED",
+    "status": "success",
+    "target_name": "admin@lab.local",
+    "target_type": "user",
+    "timestamp": "2026-08-03T05:51:11.170Z",
+    "verb": "create_session",
+    "workloads_affected": 0
+   },
+   "parser_notes": [],
+   "raw": {
+    "action": {
+     "api_endpoint": "/api/v2/users/create_session",
+     "api_method": "POST",
+     "http_status_code": 201,
+     "src_ip": "FILTERED",
+     "uuid": "e02bc776-8423-430f-9391-530c783d6515"
+    },
+    "created_by": {
+     "system": {}
+    },
+    "event_type": "user.create_session",
+    "href": "/orgs/1/events/9ab74b09-2059-4f1c-abea-67b0cb1c6532",
+    "notifications": [
+     {
+      "info": {
+       "user": {
+        "href": "/users/11",
+        "username": "admin@lab.local"
+       }
+      },
+      "notification_type": "user.pce_session_created",
+      "uuid": "b015bf0d-dc02-4115-8e55-e17a82500f7a"
+     }
+    ],
+    "pce_fqdn": "pce.lab.local",
+    "resource_changes": [],
+    "severity": "info",
+    "status": "success",
+    "timestamp": "2026-08-03T05:51:11.170Z"
+   },
+   "remediation": "Normal authentication activity. Monitor for unusual patterns:\nlogins at odd hours, from new IPs, or failed attempts preceding success.\n",
+   "severity": "info",
+   "status": "success",
+   "timestamp": "2026-08-03T05:51:11.170Z",
+   "type_group": "user"
+  },
+  {
+   "category": "User Access",
+   "description": "A user successfully creates a new session.",
+   "event_id": "/orgs/1/events/28ee5044-17cb-4399-88e1-4e8b18a811c2",
+   "event_type": "user.create_session",
+   "known_event_type": true,
+   "normalized": {
+    "action": "POST /api/v2/users/create_session",
+    "action_method": "POST",
+    "action_path": "/api/v2/users/create_session",
+    "actor": "System",
+    "actor_agent": "",
+    "actor_type": "system",
+    "actor_user": "",
+    "category": "user",
+    "event_id": "/orgs/1/events/28ee5044-17cb-4399-88e1-4e8b18a811c2",
+    "event_type": "user.create_session",
+    "href": "/orgs/1/events/28ee5044-17cb-4399-88e1-4e8b18a811c2",
+    "known_event_type": true,
+    "notification_types": [
+     "user.pce_session_created"
+    ],
+    "notifications_count": 1,
+    "parser_notes": [],
+    "resource_changes_count": 0,
+    "resource_name": "",
+    "resource_type": "",
+    "severity": "info",
+    "source": "System | FILTERED",
+    "source_ip": "FILTERED",
+    "status": "success",
+    "target_name": "admin@lab.local",
+    "target_type": "user",
+    "timestamp": "2026-08-03T05:49:11.776Z",
+    "verb": "create_session",
+    "workloads_affected": 0
+   },
+   "parser_notes": [],
+   "raw": {
+    "action": {
+     "api_endpoint": "/api/v2/users/create_session",
+     "api_method": "POST",
+     "http_status_code": 201,
+     "src_ip": "FILTERED",
+     "uuid": "a34c3c7d-7fc7-46b1-b659-65c2ee5f824a"
+    },
+    "created_by": {
+     "system": {}
+    },
+    "event_type": "user.create_session",
+    "href": "/orgs/1/events/28ee5044-17cb-4399-88e1-4e8b18a811c2",
+    "notifications": [
+     {
+      "info": {
+       "user": {
+        "href": "/users/11",
+        "username": "admin@lab.local"
+       }
+      },
+      "notification_type": "user.pce_session_created",
+      "uuid": "6b3bc81e-9d41-4ab0-ae0d-efbc91818d9e"
+     }
+    ],
+    "pce_fqdn": "pce.lab.local",
+    "resource_changes": [],
+    "severity": "info",
+    "status": "success",
+    "timestamp": "2026-08-03T05:49:11.776Z"
+   },
+   "remediation": "Normal authentication activity. Monitor for unusual patterns:\nlogins at odd hours, from new IPs, or failed attempts preceding success.\n",
+   "severity": "info",
+   "status": "success",
+   "timestamp": "2026-08-03T05:49:11.776Z",
+   "type_group": "user"
+  },
+  {
+   "category": "Containers & Workloads",
+   "description": "Triggers when a security policy is successfully applied to a container cluster.",
+   "event_id": "/orgs/1/events/fca0d1f3-ca69-4658-88fc-1463c3fa7fad",
+   "event_type": "container_cluster.security_policy_applied",
+   "known_event_type": true,
+   "normalized": {
+    "action": "PUT /container_clusters/103701a1-b8a9-4f8c-875d-3e00e0937854/security_policy_applied",
+    "action_method": "PUT",
+    "action_path": "/container_clusters/103701a1-b8a9-4f8c-875d-3e00e0937854/security_policy_applied",
+    "actor": "local_k8s",
+    "actor_agent": "local_k8s",
+    "actor_type": "container_cluster",
+    "actor_user": "",
+    "category": "container_cluster",
+    "event_id": "/orgs/1/events/fca0d1f3-ca69-4658-88fc-1463c3fa7fad",
+    "event_type": "container_cluster.security_policy_applied",
+    "href": "/orgs/1/events/fca0d1f3-ca69-4658-88fc-1463c3fa7fad",
+    "known_event_type": true,
+    "notification_types": [],
+    "notifications_count": 0,
+    "parser_notes": [],
+    "resource_changes_count": 0,
+    "resource_name": "",
+    "resource_type": "",
+    "severity": "info",
+    "source": "local_k8s | 172.16.15.121",
+    "source_ip": "172.16.15.121",
+    "status": "success",
+    "target_name": "local_k8s",
+    "target_type": "container_cluster",
+    "timestamp": "2026-08-03T05:48:41.069Z",
+    "verb": "security_policy_applied",
+    "workloads_affected": 0
+   },
+   "parser_notes": [],
+   "raw": {
+    "action": {
+     "api_endpoint": "/api/v2/orgs/1/container_clusters/103701a1-b8a9-4f8c-875d-3e00e0937854/security_policy_applied",
+     "api_method": "PUT",
+     "http_status_code": 200,
+     "src_ip": "172.16.15.121",
+     "uuid": "da8fecce-1b24-49a9-bd24-b5c0d496358d"
+    },
+    "created_by": {
+     "container_cluster": {
+      "href": "/orgs/1/container_clusters/103701a1-b8a9-4f8c-875d-3e00e0937854",
+      "name": "local_k8s"
+     }
+    },
+    "event_type": "container_cluster.security_policy_applied",
+    "href": "/orgs/1/events/fca0d1f3-ca69-4658-88fc-1463c3fa7fad",
+    "notifications": [],
+    "pce_fqdn": "pce.lab.local",
+    "resource_changes": [],
+    "severity": "info",
+    "status": "success",
+    "timestamp": "2026-08-03T05:48:41.069Z"
+   },
+   "remediation": "Container/Kubernetes cluster event. Policy application and\nacknowledgement events are normal during cluster operations.\nProfile changes affect how container workloads are segmented.\n",
+   "severity": "info",
+   "status": "success",
+   "timestamp": "2026-08-03T05:48:41.069Z",
+   "type_group": "container_cluster"
+  },
+  {
+   "category": "User Access",
+   "description": "A user's PCE session is terminated.",
+   "event_id": "/orgs/1/events/6faf8002-d72a-494e-9c0d-f8cb42ab9de8",
+   "event_type": "user.pce_session_terminated",
+   "known_event_type": true,
+   "normalized": {
+    "action": "",
+    "action_method": "",
+    "action_path": "",
+    "actor": "System",
+    "actor_agent": "",
+    "actor_type": "system",
+    "actor_user": "",
+    "category": "user",
+    "event_id": "/orgs/1/events/6faf8002-d72a-494e-9c0d-f8cb42ab9de8",
+    "event_type": "user.pce_session_terminated",
+    "href": "/orgs/1/events/6faf8002-d72a-494e-9c0d-f8cb42ab9de8",
+    "known_event_type": true,
+    "notification_types": [
+     "user.pce_session_terminated"
+    ],
+    "notifications_count": 1,
+    "parser_notes": [],
+    "resource_changes_count": 0,
+    "resource_name": "",
+    "resource_type": "",
+    "severity": "info",
+    "source": "System",
+    "source_ip": "",
+    "status": "",
+    "target_name": "admin@lab.local",
+    "target_type": "user",
+    "timestamp": "2026-08-03T05:48:30.936Z",
+    "verb": "pce_session_terminated",
+    "workloads_affected": 0
+   },
+   "parser_notes": [],
+   "raw": {
+    "action": null,
+    "created_by": {
+     "system": {}
+    },
+    "event_type": "user.pce_session_terminated",
+    "href": "/orgs/1/events/6faf8002-d72a-494e-9c0d-f8cb42ab9de8",
+    "notifications": [
+     {
+      "info": {
+       "reason": "timeout",
+       "user": {
+        "href": "/users/11",
+        "username": "admin@lab.local"
+       }
+      },
+      "notification_type": "user.pce_session_terminated",
+      "uuid": "5e0618bb-3b4a-4dde-90e4-2bd08cc45845"
+     }
+    ],
+    "pce_fqdn": "pce.lab.local",
+    "resource_changes": [],
+    "severity": "info",
+    "status": null,
+    "timestamp": "2026-08-03T05:48:30.936Z"
+   },
+   "remediation": "Normal authentication activity. Monitor for unusual patterns:\nlogins at odd hours, from new IPs, or failed attempts preceding success.\n",
+   "severity": "info",
+   "status": null,
+   "timestamp": "2026-08-03T05:48:30.936Z",
+   "type_group": "user"
+  },
+  {
+   "category": "User Access",
+   "description": "A user successfully creates a new session.",
+   "event_id": "/orgs/1/events/0a985308-92c7-43f4-81a0-7d6e40a08fb0",
+   "event_type": "user.create_session",
+   "known_event_type": true,
+   "normalized": {
+    "action": "POST /api/v2/users/create_session",
+    "action_method": "POST",
+    "action_path": "/api/v2/users/create_session",
+    "actor": "System",
+    "actor_agent": "",
+    "actor_type": "system",
+    "actor_user": "",
+    "category": "user",
+    "event_id": "/orgs/1/events/0a985308-92c7-43f4-81a0-7d6e40a08fb0",
+    "event_type": "user.create_session",
+    "href": "/orgs/1/events/0a985308-92c7-43f4-81a0-7d6e40a08fb0",
+    "known_event_type": true,
+    "notification_types": [
+     "user.pce_session_created"
+    ],
+    "notifications_count": 1,
+    "parser_notes": [],
+    "resource_changes_count": 0,
+    "resource_name": "",
+    "resource_type": "",
+    "severity": "info",
+    "source": "System | FILTERED",
+    "source_ip": "FILTERED",
+    "status": "success",
+    "target_name": "admin@lab.local",
+    "target_type": "user",
+    "timestamp": "2026-08-03T05:47:11.581Z",
+    "verb": "create_session",
+    "workloads_affected": 0
+   },
+   "parser_notes": [],
+   "raw": {
+    "action": {
+     "api_endpoint": "/api/v2/users/create_session",
+     "api_method": "POST",
+     "http_status_code": 201,
+     "src_ip": "FILTERED",
+     "uuid": "e7d80116-adc2-4d6a-9db0-e8af17a1f99b"
+    },
+    "created_by": {
+     "system": {}
+    },
+    "event_type": "user.create_session",
+    "href": "/orgs/1/events/0a985308-92c7-43f4-81a0-7d6e40a08fb0",
+    "notifications": [
+     {
+      "info": {
+       "user": {
+        "href": "/users/11",
+        "username": "admin@lab.local"
+       }
+      },
+      "notification_type": "user.pce_session_created",
+      "uuid": "e225d125-5697-4100-a567-f97776fce6cb"
+     }
+    ],
+    "pce_fqdn": "pce.lab.local",
+    "resource_changes": [],
+    "severity": "info",
+    "status": "success",
+    "timestamp": "2026-08-03T05:47:11.581Z"
+   },
+   "remediation": "Normal authentication activity. Monitor for unusual patterns:\nlogins at odd hours, from new IPs, or failed attempts preceding success.\n",
+   "severity": "info",
+   "status": "success",
+   "timestamp": "2026-08-03T05:47:11.581Z",
+   "type_group": "user"
+  },
+  {
+   "category": "Containers & Workloads",
+   "description": "This event is triggered when workload interfaces are updated, such as when an IP address changes, a new interface is added, or an interface shuts down.",
+   "event_id": "/orgs/1/events/3d1c9f61-bb4a-49e2-aabf-e7062491f29f",
+   "event_type": "workload_interfaces.update",
+   "known_event_type": true,
+   "normalized": {
+    "action": "PUT FILTERED",
+    "action_method": "PUT",
+    "action_path": "FILTERED",
+    "actor": "Harrys-MacBook-Air.local",
+    "actor_agent": "Harrys-MacBook-Air.local",
+    "actor_type": "agent",
+    "actor_user": "",
+    "category": "workload_interfaces",
+    "event_id": "/orgs/1/events/3d1c9f61-bb4a-49e2-aabf-e7062491f29f",
+    "event_type": "workload_interfaces.update",
+    "href": "/orgs/1/events/3d1c9f61-bb4a-49e2-aabf-e7062491f29f",
+    "known_event_type": true,
+    "notification_types": [],
+    "notifications_count": 0,
+    "parser_notes": [],
+    "resource_changes_count": 1,
+    "resource_name": "Harrys-MacBook-Air.local",
+    "resource_type": "workload",
+    "severity": "info",
+    "source": "Harrys-MacBook-Air.local | 192.168.20.32",
+    "source_ip": "192.168.20.32",
+    "status": "success",
+    "target_name": "Harrys-MacBook-Air.local",
+    "target_type": "workload",
+    "timestamp": "2026-08-03T05:47:04.324Z",
+    "verb": "update",
+    "workloads_affected": 0
+   },
+   "parser_notes": [],
+   "raw": {
+    "action": {
+     "api_endpoint": "FILTERED",
+     "api_method": "PUT",
+     "http_status_code": 200,
+     "src_ip": "192.168.20.32",
+     "uuid": "22b8408a-c967-4368-bdad-b5bbc29adac8"
+    },
+    "created_by": {
+     "agent": {
+      "hostname": "Harrys-MacBook-Air.local",
+      "href": "/orgs/1/agents/1345"
+     },
+     "ven": {
+      "hostname": "Harrys-MacBook-Air.local",
+      "href": "/orgs/1/vens/4716377d-ab36-448d-88ca-532e6d80103b"
+     }
+    },
+    "event_type": "workload_interfaces.update",
+    "href": "/orgs/1/events/3d1c9f61-bb4a-49e2-aabf-e7062491f29f",
+    "notifications": [],
+    "pce_fqdn": "pce.lab.local",
+    "resource_changes": [
+     {
+      "change_type": "update",
+      "changes": {
+       "workload_interfaces": {
+        "updated": [
+         {
+          "changes": {
+           "address": {
+            "after": "fe80::78c7:a2ff:fe14:bbd2",
+            "before": "fe80::d8dc:4aff:fe25:4c8"
+           }
+          },
+          "resource": {
+           "address": "fe80::78c7:a2ff:fe14:bbd2",
+           "href": "/orgs/1/workloads/4716377d-ab36-448d-88ca-532e6d80103b/interfaces/awdl0",
+           "name": "awdl0",
+           "network": {
+            "href": "/orgs/1/networks/38423fa8-8f0a-4b33-a204-9cc502344df8",
+            "name": "External"
+           }
+          }
+         },
+         {
+          "changes": {
+           "address": {
+            "after": "fe80::78c7:a2ff:fe14:bbd2",
+            "before": "fe80::d8dc:4aff:fe25:4c8"
+           }
+          },
+          "resource": {
+           "address": "fe80::78c7:a2ff:fe14:bbd2",
+           "href": "/orgs/1/workloads/4716377d-ab36-448d-88ca-532e6d80103b/interfaces/llw0",
+           "name": "llw0",
+           "network": {
+            "href": "/orgs/1/networks/38423fa8-8f0a-4b33-a204-9cc502344df8",
+            "name": "External"
+           }
+          }
+         }
+        ]
+       }
+      },
+      "resource": {
+       "workload": {
+        "hostname": "Harrys-MacBook-Air.local",
+        "href": "/orgs/1/workloads/4716377d-ab36-448d-88ca-532e6d80103b",
+        "labels": [
+         {
+          "href": "/orgs/1/labels/53",
+          "key": "env",
+          "value": "Physical"
+         },
+         {
+          "href": "/orgs/1/labels/72",
+          "key": "app",
+          "value": "Endpoint"
+         },
+         {
+          "href": "/orgs/1/labels/135",
+          "key": "role",
+          "value": "MAC"
+         },
+         {
+          "href": "/orgs/1/labels/242",
+          "key": "loc",
+          "value": "external"
+         }
+        ],
+        "name": "Harrys-MacBook-Air.local"
+       }
+      },
+      "uuid": "f4b911a2-02a3-45cd-a4f1-62ca1e041ebe"
+     }
+    ],
+    "severity": "info",
+    "status": "success",
+    "timestamp": "2026-08-03T05:47:04.324Z"
+   },
+   "remediation": "",
+   "severity": "info",
+   "status": "success",
+   "timestamp": "2026-08-03T05:47:04.324Z",
+   "type_group": "workload_interfaces"
+  },
+  {
+   "category": "User Access",
+   "description": "A user's PCE session is terminated.",
+   "event_id": "/orgs/1/events/e5a971e4-b9dc-47a4-82c5-ecf7bc27781f",
+   "event_type": "user.pce_session_terminated",
+   "known_event_type": true,
+   "normalized": {
+    "action": "",
+    "action_method": "",
+    "action_path": "",
+    "actor": "System",
+    "actor_agent": "",
+    "actor_type": "system",
+    "actor_user": "",
+    "category": "user",
+    "event_id": "/orgs/1/events/e5a971e4-b9dc-47a4-82c5-ecf7bc27781f",
+    "event_type": "user.pce_session_terminated",
+    "href": "/orgs/1/events/e5a971e4-b9dc-47a4-82c5-ecf7bc27781f",
+    "known_event_type": true,
+    "notification_types": [
+     "user.pce_session_terminated"
+    ],
+    "notifications_count": 1,
+    "parser_notes": [],
+    "resource_changes_count": 0,
+    "resource_name": "",
+    "resource_type": "",
+    "severity": "info",
+    "source": "System",
+    "source_ip": "",
+    "status": "",
+    "target_name": "admin@lab.local",
+    "target_type": "user",
+    "timestamp": "2026-08-03T05:45:30.872Z",
+    "verb": "pce_session_terminated",
+    "workloads_affected": 0
+   },
+   "parser_notes": [],
+   "raw": {
+    "action": null,
+    "created_by": {
+     "system": {}
+    },
+    "event_type": "user.pce_session_terminated",
+    "href": "/orgs/1/events/e5a971e4-b9dc-47a4-82c5-ecf7bc27781f",
+    "notifications": [
+     {
+      "info": {
+       "reason": "timeout",
+       "user": {
+        "href": "/users/11",
+        "username": "admin@lab.local"
+       }
+      },
+      "notification_type": "user.pce_session_terminated",
+      "uuid": "d23cfdb4-0933-414b-a098-94420c113585"
+     }
+    ],
+    "pce_fqdn": "pce.lab.local",
+    "resource_changes": [],
+    "severity": "info",
+    "status": null,
+    "timestamp": "2026-08-03T05:45:30.872Z"
+   },
+   "remediation": "Normal authentication activity. Monitor for unusual patterns:\nlogins at odd hours, from new IPs, or failed attempts preceding success.\n",
+   "severity": "info",
+   "status": null,
+   "timestamp": "2026-08-03T05:45:30.872Z",
+   "type_group": "user"
+  },
+  {
+   "category": "User Access",
+   "description": "A user's PCE session is terminated.",
+   "event_id": "/orgs/1/events/7279feee-244e-4797-ba53-4785ce1b996f",
+   "event_type": "user.pce_session_terminated",
+   "known_event_type": true,
+   "normalized": {
+    "action": "",
+    "action_method": "",
+    "action_path": "",
+    "actor": "System",
+    "actor_agent": "",
+    "actor_type": "system",
+    "actor_user": "",
+    "category": "user",
+    "event_id": "/orgs/1/events/7279feee-244e-4797-ba53-4785ce1b996f",
+    "event_type": "user.pce_session_terminated",
+    "href": "/orgs/1/events/7279feee-244e-4797-ba53-4785ce1b996f",
+    "known_event_type": true,
+    "notification_types": [
+     "user.pce_session_terminated"
+    ],
+    "notifications_count": 1,
+    "parser_notes": [],
+    "resource_changes_count": 0,
+    "resource_name": "",
+    "resource_type": "",
+    "severity": "info",
+    "source": "System",
+    "source_ip": "",
+    "status": "",
+    "target_name": "admin@lab.local",
+    "target_type": "user",
+    "timestamp": "2026-08-03T05:45:30.861Z",
+    "verb": "pce_session_terminated",
+    "workloads_affected": 0
+   },
+   "parser_notes": [],
+   "raw": {
+    "action": null,
+    "created_by": {
+     "system": {}
+    },
+    "event_type": "user.pce_session_terminated",
+    "href": "/orgs/1/events/7279feee-244e-4797-ba53-4785ce1b996f",
+    "notifications": [
+     {
+      "info": {
+       "reason": "timeout",
+       "user": {
+        "href": "/users/11",
+        "username": "admin@lab.local"
+       }
+      },
+      "notification_type": "user.pce_session_terminated",
+      "uuid": "0f137f35-766b-4694-93a1-6187907b5e8a"
+     }
+    ],
+    "pce_fqdn": "pce.lab.local",
+    "resource_changes": [],
+    "severity": "info",
+    "status": null,
+    "timestamp": "2026-08-03T05:45:30.861Z"
+   },
+   "remediation": "Normal authentication activity. Monitor for unusual patterns:\nlogins at odd hours, from new IPs, or failed attempts preceding success.\n",
+   "severity": "info",
+   "status": null,
+   "timestamp": "2026-08-03T05:45:30.861Z",
+   "type_group": "user"
+  },
+  {
+   "category": "User Access",
+   "description": "A user successfully creates a new session.",
+   "event_id": "/orgs/1/events/87c35d8e-991d-47c0-aaff-939f0b383739",
+   "event_type": "user.create_session",
+   "known_event_type": true,
+   "normalized": {
+    "action": "POST /api/v2/users/create_session",
+    "action_method": "POST",
+    "action_path": "/api/v2/users/create_session",
+    "actor": "System",
+    "actor_agent": "",
+    "actor_type": "system",
+    "actor_user": "",
+    "category": "user",
+    "event_id": "/orgs/1/events/87c35d8e-991d-47c0-aaff-939f0b383739",
+    "event_type": "user.create_session",
+    "href": "/orgs/1/events/87c35d8e-991d-47c0-aaff-939f0b383739",
+    "known_event_type": true,
+    "notification_types": [
+     "user.pce_session_created"
+    ],
+    "notifications_count": 1,
+    "parser_notes": [],
+    "resource_changes_count": 0,
+    "resource_name": "",
+    "resource_type": "",
+    "severity": "info",
+    "source": "System | FILTERED",
+    "source_ip": "FILTERED",
+    "status": "success",
+    "target_name": "admin@lab.local",
+    "target_type": "user",
+    "timestamp": "2026-08-03T05:45:11.603Z",
+    "verb": "create_session",
+    "workloads_affected": 0
+   },
+   "parser_notes": [],
+   "raw": {
+    "action": {
+     "api_endpoint": "/api/v2/users/create_session",
+     "api_method": "POST",
+     "http_status_code": 201,
+     "src_ip": "FILTERED",
+     "uuid": "40fbf595-66a2-4d36-ab4a-da48eea280bc"
+    },
+    "created_by": {
+     "system": {}
+    },
+    "event_type": "user.create_session",
+    "href": "/orgs/1/events/87c35d8e-991d-47c0-aaff-939f0b383739",
+    "notifications": [
+     {
+      "info": {
+       "user": {
+        "href": "/users/11",
+        "username": "admin@lab.local"
+       }
+      },
+      "notification_type": "user.pce_session_created",
+      "uuid": "56e63c60-8fc5-4412-afff-28972b531625"
+     }
+    ],
+    "pce_fqdn": "pce.lab.local",
+    "resource_changes": [],
+    "severity": "info",
+    "status": "success",
+    "timestamp": "2026-08-03T05:45:11.603Z"
+   },
+   "remediation": "Normal authentication activity. Monitor for unusual patterns:\nlogins at odd hours, from new IPs, or failed attempts preceding success.\n",
+   "severity": "info",
+   "status": "success",
+   "timestamp": "2026-08-03T05:45:11.603Z",
+   "type_group": "user"
+  },
+  {
+   "category": "Containers & Workloads",
+   "description": "This event is triggered when workload interfaces are updated, such as when an IP address changes, a new interface is added, or an interface shuts down.",
+   "event_id": "/orgs/1/events/af137c62-0d91-4edd-b25c-6d403711f7b5",
+   "event_type": "workload_interfaces.update",
+   "known_event_type": true,
+   "normalized": {
+    "action": "PUT FILTERED",
+    "action_method": "PUT",
+    "action_path": "FILTERED",
+    "actor": "Harrys-MacBook-Air.local",
+    "actor_agent": "Harrys-MacBook-Air.local",
+    "actor_type": "agent",
+    "actor_user": "",
+    "category": "workload_interfaces",
+    "event_id": "/orgs/1/events/af137c62-0d91-4edd-b25c-6d403711f7b5",
+    "event_type": "workload_interfaces.update",
+    "href": "/orgs/1/events/af137c62-0d91-4edd-b25c-6d403711f7b5",
+    "known_event_type": true,
+    "notification_types": [],
+    "notifications_count": 0,
+    "parser_notes": [],
+    "resource_changes_count": 1,
+    "resource_name": "Harrys-MacBook-Air.local",
+    "resource_type": "workload",
+    "severity": "info",
+    "source": "Harrys-MacBook-Air.local | 192.168.20.32",
+    "source_ip": "192.168.20.32",
+    "status": "success",
+    "target_name": "Harrys-MacBook-Air.local",
+    "target_type": "workload",
+    "timestamp": "2026-08-03T05:44:21.159Z",
+    "verb": "update",
+    "workloads_affected": 0
+   },
+   "parser_notes": [],
+   "raw": {
+    "action": {
+     "api_endpoint": "FILTERED",
+     "api_method": "PUT",
+     "http_status_code": 200,
+     "src_ip": "192.168.20.32",
+     "uuid": "850bcee4-17a1-43a9-964f-2b763d872605"
+    },
+    "created_by": {
+     "agent": {
+      "hostname": "Harrys-MacBook-Air.local",
+      "href": "/orgs/1/agents/1345"
+     },
+     "ven": {
+      "hostname": "Harrys-MacBook-Air.local",
+      "href": "/orgs/1/vens/4716377d-ab36-448d-88ca-532e6d80103b"
+     }
+    },
+    "event_type": "workload_interfaces.update",
+    "href": "/orgs/1/events/af137c62-0d91-4edd-b25c-6d403711f7b5",
+    "notifications": [],
+    "pce_fqdn": "pce.lab.local",
+    "resource_changes": [
+     {
+      "change_type": "update",
+      "changes": {
+       "workload_interfaces": {
+        "updated": [
+         {
+          "changes": {
+           "address": {
+            "after": "fe80::d8dc:4aff:fe25:4c8",
+            "before": "fe80::6071:7cff:feee:a672"
+           }
+          },
+          "resource": {
+           "address": "fe80::d8dc:4aff:fe25:4c8",
+           "href": "/orgs/1/workloads/4716377d-ab36-448d-88ca-532e6d80103b/interfaces/awdl0",
+           "name": "awdl0",
+           "network": {
+            "href": "/orgs/1/networks/38423fa8-8f0a-4b33-a204-9cc502344df8",
+            "name": "External"
+           }
+          }
+         },
+         {
+          "changes": {
+           "address": {
+            "after": "fe80::d8dc:4aff:fe25:4c8",
+            "before": "fe80::6071:7cff:feee:a672"
+           }
+          },
+          "resource": {
+           "address": "fe80::d8dc:4aff:fe25:4c8",
+           "href": "/orgs/1/workloads/4716377d-ab36-448d-88ca-532e6d80103b/interfaces/llw0",
+           "name": "llw0",
+           "network": {
+            "href": "/orgs/1/networks/38423fa8-8f0a-4b33-a204-9cc502344df8",
+            "name": "External"
+           }
+          }
+         }
+        ]
+       }
+      },
+      "resource": {
+       "workload": {
+        "hostname": "Harrys-MacBook-Air.local",
+        "href": "/orgs/1/workloads/4716377d-ab36-448d-88ca-532e6d80103b",
+        "labels": [
+         {
+          "href": "/orgs/1/labels/53",
+          "key": "env",
+          "value": "Physical"
+         },
+         {
+          "href": "/orgs/1/labels/72",
+          "key": "app",
+          "value": "Endpoint"
+         },
+         {
+          "href": "/orgs/1/labels/135",
+          "key": "role",
+          "value": "MAC"
+         },
+         {
+          "href": "/orgs/1/labels/242",
+          "key": "loc",
+          "value": "external"
+         }
+        ],
+        "name": "Harrys-MacBook-Air.local"
+       }
+      },
+      "uuid": "78cfb681-0c78-4e22-b644-9684583822d8"
+     }
+    ],
+    "severity": "info",
+    "status": "success",
+    "timestamp": "2026-08-03T05:44:21.159Z"
+   },
+   "remediation": "",
+   "severity": "info",
+   "status": "success",
+   "timestamp": "2026-08-03T05:44:21.159Z",
+   "type_group": "workload_interfaces"
+  },
+  {
+   "category": "User Access",
+   "description": "A user successfully creates a new session.",
+   "event_id": "/orgs/1/events/aeda10e6-a1e7-4c62-8570-02e7d07db87b",
+   "event_type": "user.create_session",
+   "known_event_type": true,
+   "normalized": {
+    "action": "POST /api/v2/users/create_session",
+    "action_method": "POST",
+    "action_path": "/api/v2/users/create_session",
+    "actor": "System",
+    "actor_agent": "",
+    "actor_type": "system",
+    "actor_user": "",
+    "category": "user",
+    "event_id": "/orgs/1/events/aeda10e6-a1e7-4c62-8570-02e7d07db87b",
+    "event_type": "user.create_session",
+    "href": "/orgs/1/events/aeda10e6-a1e7-4c62-8570-02e7d07db87b",
+    "known_event_type": true,
+    "notification_types": [
+     "user.pce_session_created"
+    ],
+    "notifications_count": 1,
+    "parser_notes": [],
+    "resource_changes_count": 0,
+    "resource_name": "",
+    "resource_type": "",
+    "severity": "info",
+    "source": "System | FILTERED",
+    "source_ip": "FILTERED",
+    "status": "success",
+    "target_name": "admin@lab.local",
+    "target_type": "user",
+    "timestamp": "2026-08-03T05:43:11.175Z",
+    "verb": "create_session",
+    "workloads_affected": 0
+   },
+   "parser_notes": [],
+   "raw": {
+    "action": {
+     "api_endpoint": "/api/v2/users/create_session",
+     "api_method": "POST",
+     "http_status_code": 201,
+     "src_ip": "FILTERED",
+     "uuid": "cc3a366d-086c-4ed1-97bd-6c511f738785"
+    },
+    "created_by": {
+     "system": {}
+    },
+    "event_type": "user.create_session",
+    "href": "/orgs/1/events/aeda10e6-a1e7-4c62-8570-02e7d07db87b",
+    "notifications": [
+     {
+      "info": {
+       "user": {
+        "href": "/users/11",
+        "username": "admin@lab.local"
+       }
+      },
+      "notification_type": "user.pce_session_created",
+      "uuid": "546adf4b-2a86-4aa5-82ff-e8e4f8349d20"
+     }
+    ],
+    "pce_fqdn": "pce.lab.local",
+    "resource_changes": [],
+    "severity": "info",
+    "status": "success",
+    "timestamp": "2026-08-03T05:43:11.175Z"
+   },
+   "remediation": "Normal authentication activity. Monitor for unusual patterns:\nlogins at odd hours, from new IPs, or failed attempts preceding success.\n",
+   "severity": "info",
+   "status": "success",
+   "timestamp": "2026-08-03T05:43:11.175Z",
+   "type_group": "user"
+  },
+  {
+   "category": "Containers & Workloads",
+   "description": "This event is triggered when workload interfaces are updated, such as when an IP address changes, a new interface is added, or an interface shuts down.",
+   "event_id": "/orgs/1/events/cb524a48-d0f8-4ece-88c5-3e1794c03327",
+   "event_type": "workload_interfaces.update",
+   "known_event_type": true,
+   "normalized": {
+    "action": "PUT FILTERED",
+    "action_method": "PUT",
+    "action_path": "FILTERED",
+    "actor": "Harrys-MacBook-Air.local",
+    "actor_agent": "Harrys-MacBook-Air.local",
+    "actor_type": "agent",
+    "actor_user": "",
+    "category": "workload_interfaces",
+    "event_id": "/orgs/1/events/cb524a48-d0f8-4ece-88c5-3e1794c03327",
+    "event_type": "workload_interfaces.update",
+    "href": "/orgs/1/events/cb524a48-d0f8-4ece-88c5-3e1794c03327",
+    "known_event_type": true,
+    "notification_types": [],
+    "notifications_count": 0,
+    "parser_notes": [],
+    "resource_changes_count": 1,
+    "resource_name": "Harrys-MacBook-Air.local",
+    "resource_type": "workload",
+    "severity": "info",
+    "source": "Harrys-MacBook-Air.local | 192.168.20.32",
+    "source_ip": "192.168.20.32",
+    "status": "success",
+    "target_name": "Harrys-MacBook-Air.local",
+    "target_type": "workload",
+    "timestamp": "2026-08-03T05:42:59.133Z",
+    "verb": "update",
+    "workloads_affected": 0
+   },
+   "parser_notes": [],
+   "raw": {
+    "action": {
+     "api_endpoint": "FILTERED",
+     "api_method": "PUT",
+     "http_status_code": 200,
+     "src_ip": "192.168.20.32",
+     "uuid": "1efdfd34-87ec-45c4-bf93-354c1d47caf9"
+    },
+    "created_by": {
+     "agent": {
+      "hostname": "Harrys-MacBook-Air.local",
+      "href": "/orgs/1/agents/1345"
+     },
+     "ven": {
+      "hostname": "Harrys-MacBook-Air.local",
+      "href": "/orgs/1/vens/4716377d-ab36-448d-88ca-532e6d80103b"
+     }
+    },
+    "event_type": "workload_interfaces.update",
+    "href": "/orgs/1/events/cb524a48-d0f8-4ece-88c5-3e1794c03327",
+    "notifications": [],
+    "pce_fqdn": "pce.lab.local",
+    "resource_changes": [
+     {
+      "change_type": "update",
+      "changes": {
+       "workload_interfaces": {
+        "updated": [
+         {
+          "changes": {
+           "address": {
+            "after": "fe80::6071:7cff:feee:a672",
+            "before": "fe80::43a:7bff:fe98:b3a4"
+           }
+          },
+          "resource": {
+           "address": "fe80::6071:7cff:feee:a672",
+           "href": "/orgs/1/workloads/4716377d-ab36-448d-88ca-532e6d80103b/interfaces/awdl0",
+           "name": "awdl0",
+           "network": {
+            "href": "/orgs/1/networks/38423fa8-8f0a-4b33-a204-9cc502344df8",
+            "name": "External"
+           }
+          }
+         },
+         {
+          "changes": {
+           "address": {
+            "after": "fe80::6071:7cff:feee:a672",
+            "before": "fe80::43a:7bff:fe98:b3a4"
+           }
+          },
+          "resource": {
+           "address": "fe80::6071:7cff:feee:a672",
+           "href": "/orgs/1/workloads/4716377d-ab36-448d-88ca-532e6d80103b/interfaces/llw0",
+           "name": "llw0",
+           "network": {
+            "href": "/orgs/1/networks/38423fa8-8f0a-4b33-a204-9cc502344df8",
+            "name": "External"
+           }
+          }
+         }
+        ]
+       }
+      },
+      "resource": {
+       "workload": {
+        "hostname": "Harrys-MacBook-Air.local",
+        "href": "/orgs/1/workloads/4716377d-ab36-448d-88ca-532e6d80103b",
+        "labels": [
+         {
+          "href": "/orgs/1/labels/53",
+          "key": "env",
+          "value": "Physical"
+         },
+         {
+          "href": "/orgs/1/labels/72",
+          "key": "app",
+          "value": "Endpoint"
+         },
+         {
+          "href": "/orgs/1/labels/135",
+          "key": "role",
+          "value": "MAC"
+         },
+         {
+          "href": "/orgs/1/labels/242",
+          "key": "loc",
+          "value": "external"
+         }
+        ],
+        "name": "Harrys-MacBook-Air.local"
+       }
+      },
+      "uuid": "e3899ffe-19c4-413d-ab6d-e6136462e77b"
+     }
+    ],
+    "severity": "info",
+    "status": "success",
+    "timestamp": "2026-08-03T05:42:59.133Z"
+   },
+   "remediation": "",
+   "severity": "info",
+   "status": "success",
+   "timestamp": "2026-08-03T05:42:59.133Z",
+   "type_group": "workload_interfaces"
+  },
+  {
+   "category": "User Access",
+   "description": "A user's PCE session is terminated.",
+   "event_id": "/orgs/1/events/a390fc24-15e0-4df5-a7eb-b1e86d466c33",
+   "event_type": "user.pce_session_terminated",
+   "known_event_type": true,
+   "normalized": {
+    "action": "",
+    "action_method": "",
+    "action_path": "",
+    "actor": "System",
+    "actor_agent": "",
+    "actor_type": "system",
+    "actor_user": "",
+    "category": "user",
+    "event_id": "/orgs/1/events/a390fc24-15e0-4df5-a7eb-b1e86d466c33",
+    "event_type": "user.pce_session_terminated",
+    "href": "/orgs/1/events/a390fc24-15e0-4df5-a7eb-b1e86d466c33",
+    "known_event_type": true,
+    "notification_types": [
+     "user.pce_session_terminated"
+    ],
+    "notifications_count": 1,
+    "parser_notes": [],
+    "resource_changes_count": 0,
+    "resource_name": "",
+    "resource_type": "",
+    "severity": "info",
+    "source": "System",
+    "source_ip": "",
+    "status": "",
+    "target_name": "admin@lab.local",
+    "target_type": "user",
+    "timestamp": "2026-08-03T05:42:30.811Z",
+    "verb": "pce_session_terminated",
+    "workloads_affected": 0
+   },
+   "parser_notes": [],
+   "raw": {
+    "action": null,
+    "created_by": {
+     "system": {}
+    },
+    "event_type": "user.pce_session_terminated",
+    "href": "/orgs/1/events/a390fc24-15e0-4df5-a7eb-b1e86d466c33",
+    "notifications": [
+     {
+      "info": {
+       "reason": "timeout",
+       "user": {
+        "href": "/users/11",
+        "username": "admin@lab.local"
+       }
+      },
+      "notification_type": "user.pce_session_terminated",
+      "uuid": "94413c94-3586-445d-9d08-4e7dd26f83f5"
+     }
+    ],
+    "pce_fqdn": "pce.lab.local",
+    "resource_changes": [],
+    "severity": "info",
+    "status": null,
+    "timestamp": "2026-08-03T05:42:30.811Z"
+   },
+   "remediation": "Normal authentication activity. Monitor for unusual patterns:\nlogins at odd hours, from new IPs, or failed attempts preceding success.\n",
+   "severity": "info",
+   "status": null,
+   "timestamp": "2026-08-03T05:42:30.811Z",
+   "type_group": "user"
+  },
+  {
+   "category": "User Access",
+   "description": "A user successfully creates a new session.",
+   "event_id": "/orgs/1/events/2810e7cd-8d02-48c3-92e9-abbc4b4ad495",
+   "event_type": "user.create_session",
+   "known_event_type": true,
+   "normalized": {
+    "action": "POST /api/v2/users/create_session",
+    "action_method": "POST",
+    "action_path": "/api/v2/users/create_session",
+    "actor": "System",
+    "actor_agent": "",
+    "actor_type": "system",
+    "actor_user": "",
+    "category": "user",
+    "event_id": "/orgs/1/events/2810e7cd-8d02-48c3-92e9-abbc4b4ad495",
+    "event_type": "user.create_session",
+    "href": "/orgs/1/events/2810e7cd-8d02-48c3-92e9-abbc4b4ad495",
+    "known_event_type": true,
+    "notification_types": [
+     "user.pce_session_created"
+    ],
+    "notifications_count": 1,
+    "parser_notes": [],
+    "resource_changes_count": 0,
+    "resource_name": "",
+    "resource_type": "",
+    "severity": "info",
+    "source": "System | FILTERED",
+    "source_ip": "FILTERED",
+    "status": "success",
+    "target_name": "admin@lab.local",
+    "target_type": "user",
+    "timestamp": "2026-08-03T05:41:10.918Z",
+    "verb": "create_session",
+    "workloads_affected": 0
+   },
+   "parser_notes": [],
+   "raw": {
+    "action": {
+     "api_endpoint": "/api/v2/users/create_session",
+     "api_method": "POST",
+     "http_status_code": 201,
+     "src_ip": "FILTERED",
+     "uuid": "279fe615-20be-4df5-aea5-486650539268"
+    },
+    "created_by": {
+     "system": {}
+    },
+    "event_type": "user.create_session",
+    "href": "/orgs/1/events/2810e7cd-8d02-48c3-92e9-abbc4b4ad495",
+    "notifications": [
+     {
+      "info": {
+       "user": {
+        "href": "/users/11",
+        "username": "admin@lab.local"
+       }
+      },
+      "notification_type": "user.pce_session_created",
+      "uuid": "4f0ad720-f1c0-42db-9186-b5272951b89f"
+     }
+    ],
+    "pce_fqdn": "pce.lab.local",
+    "resource_changes": [],
+    "severity": "info",
+    "status": "success",
+    "timestamp": "2026-08-03T05:41:10.918Z"
+   },
+   "remediation": "Normal authentication activity. Monitor for unusual patterns:\nlogins at odd hours, from new IPs, or failed attempts preceding success.\n",
+   "severity": "info",
+   "status": "success",
+   "timestamp": "2026-08-03T05:41:10.918Z",
+   "type_group": "user"
+  },
+  {
+   "category": "User Access",
+   "description": "A user's PCE session is terminated.",
+   "event_id": "/orgs/1/events/bb4f7396-e5fe-447f-9f4e-dbe10d9d9cba",
+   "event_type": "user.pce_session_terminated",
+   "known_event_type": true,
+   "normalized": {
+    "action": "",
+    "action_method": "",
+    "action_path": "",
+    "actor": "System",
+    "actor_agent": "",
+    "actor_type": "system",
+    "actor_user": "",
+    "category": "user",
+    "event_id": "/orgs/1/events/bb4f7396-e5fe-447f-9f4e-dbe10d9d9cba",
+    "event_type": "user.pce_session_terminated",
+    "href": "/orgs/1/events/bb4f7396-e5fe-447f-9f4e-dbe10d9d9cba",
+    "known_event_type": true,
+    "notification_types": [
+     "user.pce_session_terminated"
+    ],
+    "notifications_count": 1,
+    "parser_notes": [],
+    "resource_changes_count": 0,
+    "resource_name": "",
+    "resource_type": "",
+    "severity": "info",
+    "source": "System",
+    "source_ip": "",
+    "status": "",
+    "target_name": "admin@lab.local",
+    "target_type": "user",
+    "timestamp": "2026-08-03T05:39:30.727Z",
+    "verb": "pce_session_terminated",
+    "workloads_affected": 0
+   },
+   "parser_notes": [],
+   "raw": {
+    "action": null,
+    "created_by": {
+     "system": {}
+    },
+    "event_type": "user.pce_session_terminated",
+    "href": "/orgs/1/events/bb4f7396-e5fe-447f-9f4e-dbe10d9d9cba",
+    "notifications": [
+     {
+      "info": {
+       "reason": "timeout",
+       "user": {
+        "href": "/users/11",
+        "username": "admin@lab.local"
+       }
+      },
+      "notification_type": "user.pce_session_terminated",
+      "uuid": "41b25a7c-884e-4a39-91d5-750fea7d21d8"
+     }
+    ],
+    "pce_fqdn": "pce.lab.local",
+    "resource_changes": [],
+    "severity": "info",
+    "status": null,
+    "timestamp": "2026-08-03T05:39:30.727Z"
+   },
+   "remediation": "Normal authentication activity. Monitor for unusual patterns:\nlogins at odd hours, from new IPs, or failed attempts preceding success.\n",
+   "severity": "info",
+   "status": null,
+   "timestamp": "2026-08-03T05:39:30.727Z",
+   "type_group": "user"
+  },
+  {
+   "category": "User Access",
+   "description": "A user's PCE session is terminated.",
+   "event_id": "/orgs/1/events/d5987f0a-e895-46e0-bd0a-28a5b4fe38d0",
+   "event_type": "user.pce_session_terminated",
+   "known_event_type": true,
+   "normalized": {
+    "action": "",
+    "action_method": "",
+    "action_path": "",
+    "actor": "System",
+    "actor_agent": "",
+    "actor_type": "system",
+    "actor_user": "",
+    "category": "user",
+    "event_id": "/orgs/1/events/d5987f0a-e895-46e0-bd0a-28a5b4fe38d0",
+    "event_type": "user.pce_session_terminated",
+    "href": "/orgs/1/events/d5987f0a-e895-46e0-bd0a-28a5b4fe38d0",
+    "known_event_type": true,
+    "notification_types": [
+     "user.pce_session_terminated"
+    ],
+    "notifications_count": 1,
+    "parser_notes": [],
+    "resource_changes_count": 0,
+    "resource_name": "",
+    "resource_type": "",
+    "severity": "info",
+    "source": "System",
+    "source_ip": "",
+    "status": "",
+    "target_name": "admin@lab.local",
+    "target_type": "user",
+    "timestamp": "2026-08-03T05:39:30.714Z",
+    "verb": "pce_session_terminated",
+    "workloads_affected": 0
+   },
+   "parser_notes": [],
+   "raw": {
+    "action": null,
+    "created_by": {
+     "system": {}
+    },
+    "event_type": "user.pce_session_terminated",
+    "href": "/orgs/1/events/d5987f0a-e895-46e0-bd0a-28a5b4fe38d0",
+    "notifications": [
+     {
+      "info": {
+       "reason": "timeout",
+       "user": {
+        "href": "/users/11",
+        "username": "admin@lab.local"
+       }
+      },
+      "notification_type": "user.pce_session_terminated",
+      "uuid": "7f3c10b5-44d1-4134-a03b-0228a9f09c9b"
+     }
+    ],
+    "pce_fqdn": "pce.lab.local",
+    "resource_changes": [],
+    "severity": "info",
+    "status": null,
+    "timestamp": "2026-08-03T05:39:30.714Z"
+   },
+   "remediation": "Normal authentication activity. Monitor for unusual patterns:\nlogins at odd hours, from new IPs, or failed attempts preceding success.\n",
+   "severity": "info",
+   "status": null,
+   "timestamp": "2026-08-03T05:39:30.714Z",
+   "type_group": "user"
+  },
+  {
+   "category": "User Access",
+   "description": "A user successfully creates a new session.",
+   "event_id": "/orgs/1/events/a1df1ae4-9ef7-400a-8986-8833e71461b6",
+   "event_type": "user.create_session",
+   "known_event_type": true,
+   "normalized": {
+    "action": "POST /api/v2/users/create_session",
+    "action_method": "POST",
+    "action_path": "/api/v2/users/create_session",
+    "actor": "System",
+    "actor_agent": "",
+    "actor_type": "system",
+    "actor_user": "",
+    "category": "user",
+    "event_id": "/orgs/1/events/a1df1ae4-9ef7-400a-8986-8833e71461b6",
+    "event_type": "user.create_session",
+    "href": "/orgs/1/events/a1df1ae4-9ef7-400a-8986-8833e71461b6",
+    "known_event_type": true,
+    "notification_types": [
+     "user.pce_session_created"
+    ],
+    "notifications_count": 1,
+    "parser_notes": [],
+    "resource_changes_count": 0,
+    "resource_name": "",
+    "resource_type": "",
+    "severity": "info",
+    "source": "System | FILTERED",
+    "source_ip": "FILTERED",
+    "status": "success",
+    "target_name": "admin@lab.local",
+    "target_type": "user",
+    "timestamp": "2026-08-03T05:39:11.877Z",
+    "verb": "create_session",
+    "workloads_affected": 0
+   },
+   "parser_notes": [],
+   "raw": {
+    "action": {
+     "api_endpoint": "/api/v2/users/create_session",
+     "api_method": "POST",
+     "http_status_code": 201,
+     "src_ip": "FILTERED",
+     "uuid": "93ed2f3f-9eb2-4e13-9ef0-7176caba78a7"
+    },
+    "created_by": {
+     "system": {}
+    },
+    "event_type": "user.create_session",
+    "href": "/orgs/1/events/a1df1ae4-9ef7-400a-8986-8833e71461b6",
+    "notifications": [
+     {
+      "info": {
+       "user": {
+        "href": "/users/11",
+        "username": "admin@lab.local"
+       }
+      },
+      "notification_type": "user.pce_session_created",
+      "uuid": "d35ef265-b9b0-4ba4-8e29-286fa7fb16dc"
+     }
+    ],
+    "pce_fqdn": "pce.lab.local",
+    "resource_changes": [],
+    "severity": "info",
+    "status": "success",
+    "timestamp": "2026-08-03T05:39:11.877Z"
+   },
+   "remediation": "Normal authentication activity. Monitor for unusual patterns:\nlogins at odd hours, from new IPs, or failed attempts preceding success.\n",
+   "severity": "info",
+   "status": "success",
+   "timestamp": "2026-08-03T05:39:11.877Z",
+   "type_group": "user"
+  },
+  {
+   "category": "Containers & Workloads",
+   "description": "Triggers when a security policy is successfully applied to a container cluster.",
+   "event_id": "/orgs/1/events/01bd6a6e-af3c-4f8d-b22b-4f02a47e78fb",
+   "event_type": "container_cluster.security_policy_applied",
+   "known_event_type": true,
+   "normalized": {
+    "action": "PUT /container_clusters/103701a1-b8a9-4f8c-875d-3e00e0937854/security_policy_applied",
+    "action_method": "PUT",
+    "action_path": "/container_clusters/103701a1-b8a9-4f8c-875d-3e00e0937854/security_policy_applied",
+    "actor": "local_k8s",
+    "actor_agent": "local_k8s",
+    "actor_type": "container_cluster",
+    "actor_user": "",
+    "category": "container_cluster",
+    "event_id": "/orgs/1/events/01bd6a6e-af3c-4f8d-b22b-4f02a47e78fb",
+    "event_type": "container_cluster.security_policy_applied",
+    "href": "/orgs/1/events/01bd6a6e-af3c-4f8d-b22b-4f02a47e78fb",
+    "known_event_type": true,
+    "notification_types": [],
+    "notifications_count": 0,
+    "parser_notes": [],
+    "resource_changes_count": 0,
+    "resource_name": "",
+    "resource_type": "",
+    "severity": "info",
+    "source": "local_k8s | 172.16.15.121",
+    "source_ip": "172.16.15.121",
+    "status": "success",
+    "target_name": "local_k8s",
+    "target_type": "container_cluster",
+    "timestamp": "2026-08-03T05:38:40.994Z",
+    "verb": "security_policy_applied",
+    "workloads_affected": 0
+   },
+   "parser_notes": [],
+   "raw": {
+    "action": {
+     "api_endpoint": "/api/v2/orgs/1/container_clusters/103701a1-b8a9-4f8c-875d-3e00e0937854/security_policy_applied",
+     "api_method": "PUT",
+     "http_status_code": 200,
+     "src_ip": "172.16.15.121",
+     "uuid": "e2f4b7b7-dd7e-4736-bac1-ad9f6c2a1073"
+    },
+    "created_by": {
+     "container_cluster": {
+      "href": "/orgs/1/container_clusters/103701a1-b8a9-4f8c-875d-3e00e0937854",
+      "name": "local_k8s"
+     }
+    },
+    "event_type": "container_cluster.security_policy_applied",
+    "href": "/orgs/1/events/01bd6a6e-af3c-4f8d-b22b-4f02a47e78fb",
+    "notifications": [],
+    "pce_fqdn": "pce.lab.local",
+    "resource_changes": [],
+    "severity": "info",
+    "status": "success",
+    "timestamp": "2026-08-03T05:38:40.994Z"
+   },
+   "remediation": "Container/Kubernetes cluster event. Policy application and\nacknowledgement events are normal during cluster operations.\nProfile changes affect how container workloads are segmented.\n",
+   "severity": "info",
+   "status": "success",
+   "timestamp": "2026-08-03T05:38:40.994Z",
+   "type_group": "container_cluster"
+  },
+  {
+   "category": "User Access",
+   "description": "A user successfully creates a new session.",
+   "event_id": "/orgs/1/events/b9a9810f-66bf-4eeb-876c-a9f974c15e35",
+   "event_type": "user.create_session",
+   "known_event_type": true,
+   "normalized": {
+    "action": "POST /api/v2/users/create_session",
+    "action_method": "POST",
+    "action_path": "/api/v2/users/create_session",
+    "actor": "System",
+    "actor_agent": "",
+    "actor_type": "system",
+    "actor_user": "",
+    "category": "user",
+    "event_id": "/orgs/1/events/b9a9810f-66bf-4eeb-876c-a9f974c15e35",
+    "event_type": "user.create_session",
+    "href": "/orgs/1/events/b9a9810f-66bf-4eeb-876c-a9f974c15e35",
+    "known_event_type": true,
+    "notification_types": [
+     "user.pce_session_created"
+    ],
+    "notifications_count": 1,
+    "parser_notes": [],
+    "resource_changes_count": 0,
+    "resource_name": "",
+    "resource_type": "",
+    "severity": "info",
+    "source": "System | FILTERED",
+    "source_ip": "FILTERED",
+    "status": "success",
+    "target_name": "admin@lab.local",
+    "target_type": "user",
+    "timestamp": "2026-08-03T05:37:10.860Z",
+    "verb": "create_session",
+    "workloads_affected": 0
+   },
+   "parser_notes": [],
+   "raw": {
+    "action": {
+     "api_endpoint": "/api/v2/users/create_session",
+     "api_method": "POST",
+     "http_status_code": 201,
+     "src_ip": "FILTERED",
+     "uuid": "6bc3f891-b395-4b96-baf1-2fc0412ae9c7"
+    },
+    "created_by": {
+     "system": {}
+    },
+    "event_type": "user.create_session",
+    "href": "/orgs/1/events/b9a9810f-66bf-4eeb-876c-a9f974c15e35",
+    "notifications": [
+     {
+      "info": {
+       "user": {
+        "href": "/users/11",
+        "username": "admin@lab.local"
+       }
+      },
+      "notification_type": "user.pce_session_created",
+      "uuid": "2f5681cf-4360-4380-8a59-3db47d36a76f"
+     }
+    ],
+    "pce_fqdn": "pce.lab.local",
+    "resource_changes": [],
+    "severity": "info",
+    "status": "success",
+    "timestamp": "2026-08-03T05:37:10.860Z"
+   },
+   "remediation": "Normal authentication activity. Monitor for unusual patterns:\nlogins at odd hours, from new IPs, or failed attempts preceding success.\n",
+   "severity": "info",
+   "status": "success",
+   "timestamp": "2026-08-03T05:37:10.860Z",
+   "type_group": "user"
+  },
+  {
+   "category": "User Access",
+   "description": "A user's PCE session is terminated.",
+   "event_id": "/orgs/1/events/71431b7d-a803-445a-849e-827ae76b023d",
+   "event_type": "user.pce_session_terminated",
+   "known_event_type": true,
+   "normalized": {
+    "action": "",
+    "action_method": "",
+    "action_path": "",
+    "actor": "System",
+    "actor_agent": "",
+    "actor_type": "system",
+    "actor_user": "",
+    "category": "user",
+    "event_id": "/orgs/1/events/71431b7d-a803-445a-849e-827ae76b023d",
+    "event_type": "user.pce_session_terminated",
+    "href": "/orgs/1/events/71431b7d-a803-445a-849e-827ae76b023d",
+    "known_event_type": true,
+    "notification_types": [
+     "user.pce_session_terminated"
+    ],
+    "notifications_count": 1,
+    "parser_notes": [],
+    "resource_changes_count": 0,
+    "resource_name": "",
+    "resource_type": "",
+    "severity": "info",
+    "source": "System",
+    "source_ip": "",
+    "status": "",
+    "target_name": "admin@lab.local",
+    "target_type": "user",
+    "timestamp": "2026-08-03T05:36:30.587Z",
+    "verb": "pce_session_terminated",
+    "workloads_affected": 0
+   },
+   "parser_notes": [],
+   "raw": {
+    "action": null,
+    "created_by": {
+     "system": {}
+    },
+    "event_type": "user.pce_session_terminated",
+    "href": "/orgs/1/events/71431b7d-a803-445a-849e-827ae76b023d",
+    "notifications": [
+     {
+      "info": {
+       "reason": "timeout",
+       "user": {
+        "href": "/users/11",
+        "username": "admin@lab.local"
+       }
+      },
+      "notification_type": "user.pce_session_terminated",
+      "uuid": "52d2a189-6a4e-495a-9ccc-921528828773"
+     }
+    ],
+    "pce_fqdn": "pce.lab.local",
+    "resource_changes": [],
+    "severity": "info",
+    "status": null,
+    "timestamp": "2026-08-03T05:36:30.587Z"
+   },
+   "remediation": "Normal authentication activity. Monitor for unusual patterns:\nlogins at odd hours, from new IPs, or failed attempts preceding success.\n",
+   "severity": "info",
+   "status": null,
+   "timestamp": "2026-08-03T05:36:30.587Z",
+   "type_group": "user"
+  },
+  {
+   "category": "User Access",
+   "description": "A user successfully creates a new session.",
+   "event_id": "/orgs/1/events/89b486ed-ecc0-4ef4-87d6-2a55e8ae534d",
+   "event_type": "user.create_session",
+   "known_event_type": true,
+   "normalized": {
+    "action": "POST /api/v2/users/create_session",
+    "action_method": "POST",
+    "action_path": "/api/v2/users/create_session",
+    "actor": "System",
+    "actor_agent": "",
+    "actor_type": "system",
+    "actor_user": "",
+    "category": "user",
+    "event_id": "/orgs/1/events/89b486ed-ecc0-4ef4-87d6-2a55e8ae534d",
+    "event_type": "user.create_session",
+    "href": "/orgs/1/events/89b486ed-ecc0-4ef4-87d6-2a55e8ae534d",
+    "known_event_type": true,
+    "notification_types": [
+     "user.pce_session_created"
+    ],
+    "notifications_count": 1,
+    "parser_notes": [],
+    "resource_changes_count": 0,
+    "resource_name": "",
+    "resource_type": "",
+    "severity": "info",
+    "source": "System | FILTERED",
+    "source_ip": "FILTERED",
+    "status": "success",
+    "target_name": "admin@lab.local",
+    "target_type": "user",
+    "timestamp": "2026-08-03T05:35:10.990Z",
+    "verb": "create_session",
+    "workloads_affected": 0
+   },
+   "parser_notes": [],
+   "raw": {
+    "action": {
+     "api_endpoint": "/api/v2/users/create_session",
+     "api_method": "POST",
+     "http_status_code": 201,
+     "src_ip": "FILTERED",
+     "uuid": "c6b0ddd2-545f-4a36-a629-718c4a536567"
+    },
+    "created_by": {
+     "system": {}
+    },
+    "event_type": "user.create_session",
+    "href": "/orgs/1/events/89b486ed-ecc0-4ef4-87d6-2a55e8ae534d",
+    "notifications": [
+     {
+      "info": {
+       "user": {
+        "href": "/users/11",
+        "username": "admin@lab.local"
+       }
+      },
+      "notification_type": "user.pce_session_created",
+      "uuid": "c757d32f-a23f-4eaa-8e41-e2a9c824c304"
+     }
+    ],
+    "pce_fqdn": "pce.lab.local",
+    "resource_changes": [],
+    "severity": "info",
+    "status": "success",
+    "timestamp": "2026-08-03T05:35:10.990Z"
+   },
+   "remediation": "Normal authentication activity. Monitor for unusual patterns:\nlogins at odd hours, from new IPs, or failed attempts preceding success.\n",
+   "severity": "info",
+   "status": "success",
+   "timestamp": "2026-08-03T05:35:10.990Z",
+   "type_group": "user"
+  },
+  {
+   "category": "User Access",
+   "description": "A user's PCE session is terminated.",
+   "event_id": "/orgs/1/events/29f3f777-306e-4610-90af-4ee074fdbb72",
+   "event_type": "user.pce_session_terminated",
+   "known_event_type": true,
+   "normalized": {
+    "action": "",
+    "action_method": "",
+    "action_path": "",
+    "actor": "System",
+    "actor_agent": "",
+    "actor_type": "system",
+    "actor_user": "",
+    "category": "user",
+    "event_id": "/orgs/1/events/29f3f777-306e-4610-90af-4ee074fdbb72",
+    "event_type": "user.pce_session_terminated",
+    "href": "/orgs/1/events/29f3f777-306e-4610-90af-4ee074fdbb72",
+    "known_event_type": true,
+    "notification_types": [
+     "user.pce_session_terminated"
+    ],
+    "notifications_count": 1,
+    "parser_notes": [],
+    "resource_changes_count": 0,
+    "resource_name": "",
+    "resource_type": "",
+    "severity": "info",
+    "source": "System",
+    "source_ip": "",
+    "status": "",
+    "target_name": "admin@lab.local",
+    "target_type": "user",
+    "timestamp": "2026-08-03T05:33:30.525Z",
+    "verb": "pce_session_terminated",
+    "workloads_affected": 0
+   },
+   "parser_notes": [],
+   "raw": {
+    "action": null,
+    "created_by": {
+     "system": {}
+    },
+    "event_type": "user.pce_session_terminated",
+    "href": "/orgs/1/events/29f3f777-306e-4610-90af-4ee074fdbb72",
+    "notifications": [
+     {
+      "info": {
+       "reason": "timeout",
+       "user": {
+        "href": "/users/11",
+        "username": "admin@lab.local"
+       }
+      },
+      "notification_type": "user.pce_session_terminated",
+      "uuid": "7f9405c2-43c4-41cb-ab49-625574759bd5"
+     }
+    ],
+    "pce_fqdn": "pce.lab.local",
+    "resource_changes": [],
+    "severity": "info",
+    "status": null,
+    "timestamp": "2026-08-03T05:33:30.525Z"
+   },
+   "remediation": "Normal authentication activity. Monitor for unusual patterns:\nlogins at odd hours, from new IPs, or failed attempts preceding success.\n",
+   "severity": "info",
+   "status": null,
+   "timestamp": "2026-08-03T05:33:30.525Z",
+   "type_group": "user"
+  },
+  {
+   "category": "User Access",
+   "description": "A user's PCE session is terminated.",
+   "event_id": "/orgs/1/events/22e15e11-12c1-4c99-82d7-8844b384ce9c",
+   "event_type": "user.pce_session_terminated",
+   "known_event_type": true,
+   "normalized": {
+    "action": "",
+    "action_method": "",
+    "action_path": "",
+    "actor": "System",
+    "actor_agent": "",
+    "actor_type": "system",
+    "actor_user": "",
+    "category": "user",
+    "event_id": "/orgs/1/events/22e15e11-12c1-4c99-82d7-8844b384ce9c",
+    "event_type": "user.pce_session_terminated",
+    "href": "/orgs/1/events/22e15e11-12c1-4c99-82d7-8844b384ce9c",
+    "known_event_type": true,
+    "notification_types": [
+     "user.pce_session_terminated"
+    ],
+    "notifications_count": 1,
+    "parser_notes": [],
+    "resource_changes_count": 0,
+    "resource_name": "",
+    "resource_type": "",
+    "severity": "info",
+    "source": "System",
+    "source_ip": "",
+    "status": "",
+    "target_name": "admin@lab.local",
+    "target_type": "user",
+    "timestamp": "2026-08-03T05:33:30.512Z",
+    "verb": "pce_session_terminated",
+    "workloads_affected": 0
+   },
+   "parser_notes": [],
+   "raw": {
+    "action": null,
+    "created_by": {
+     "system": {}
+    },
+    "event_type": "user.pce_session_terminated",
+    "href": "/orgs/1/events/22e15e11-12c1-4c99-82d7-8844b384ce9c",
+    "notifications": [
+     {
+      "info": {
+       "reason": "timeout",
+       "user": {
+        "href": "/users/11",
+        "username": "admin@lab.local"
+       }
+      },
+      "notification_type": "user.pce_session_terminated",
+      "uuid": "58618b6d-7b92-4c08-b2d5-a94f8a22bfa7"
+     }
+    ],
+    "pce_fqdn": "pce.lab.local",
+    "resource_changes": [],
+    "severity": "info",
+    "status": null,
+    "timestamp": "2026-08-03T05:33:30.512Z"
+   },
+   "remediation": "Normal authentication activity. Monitor for unusual patterns:\nlogins at odd hours, from new IPs, or failed attempts preceding success.\n",
+   "severity": "info",
+   "status": null,
+   "timestamp": "2026-08-03T05:33:30.512Z",
+   "type_group": "user"
+  },
+  {
+   "category": "User Access",
+   "description": "A user successfully creates a new session.",
+   "event_id": "/orgs/1/events/96863342-254e-4330-a247-10469219e8ef",
+   "event_type": "user.create_session",
+   "known_event_type": true,
+   "normalized": {
+    "action": "POST /api/v2/users/create_session",
+    "action_method": "POST",
+    "action_path": "/api/v2/users/create_session",
+    "actor": "System",
+    "actor_agent": "",
+    "actor_type": "system",
+    "actor_user": "",
+    "category": "user",
+    "event_id": "/orgs/1/events/96863342-254e-4330-a247-10469219e8ef",
+    "event_type": "user.create_session",
+    "href": "/orgs/1/events/96863342-254e-4330-a247-10469219e8ef",
+    "known_event_type": true,
+    "notification_types": [
+     "user.pce_session_created"
+    ],
+    "notifications_count": 1,
+    "parser_notes": [],
+    "resource_changes_count": 0,
+    "resource_name": "",
+    "resource_type": "",
+    "severity": "info",
+    "source": "System | FILTERED",
+    "source_ip": "FILTERED",
+    "status": "success",
+    "target_name": "admin@lab.local",
+    "target_type": "user",
+    "timestamp": "2026-08-03T05:33:11.299Z",
+    "verb": "create_session",
+    "workloads_affected": 0
+   },
+   "parser_notes": [],
+   "raw": {
+    "action": {
+     "api_endpoint": "/api/v2/users/create_session",
+     "api_method": "POST",
+     "http_status_code": 201,
+     "src_ip": "FILTERED",
+     "uuid": "e5082042-af82-4cbd-b50e-d01f97bf6b37"
+    },
+    "created_by": {
+     "system": {}
+    },
+    "event_type": "user.create_session",
+    "href": "/orgs/1/events/96863342-254e-4330-a247-10469219e8ef",
+    "notifications": [
+     {
+      "info": {
+       "user": {
+        "href": "/users/11",
+        "username": "admin@lab.local"
+       }
+      },
+      "notification_type": "user.pce_session_created",
+      "uuid": "98336ad5-7e90-4e43-85eb-8af99853ddd6"
+     }
+    ],
+    "pce_fqdn": "pce.lab.local",
+    "resource_changes": [],
+    "severity": "info",
+    "status": "success",
+    "timestamp": "2026-08-03T05:33:11.299Z"
+   },
+   "remediation": "Normal authentication activity. Monitor for unusual patterns:\nlogins at odd hours, from new IPs, or failed attempts preceding success.\n",
+   "severity": "info",
+   "status": "success",
+   "timestamp": "2026-08-03T05:33:11.299Z",
+   "type_group": "user"
+  },
+  {
+   "category": "User Access",
+   "description": "A user successfully creates a new session.",
+   "event_id": "/orgs/1/events/44e818d1-087b-461e-b861-51f4c3624f7f",
+   "event_type": "user.create_session",
+   "known_event_type": true,
+   "normalized": {
+    "action": "POST /api/v2/users/create_session",
+    "action_method": "POST",
+    "action_path": "/api/v2/users/create_session",
+    "actor": "System",
+    "actor_agent": "",
+    "actor_type": "system",
+    "actor_user": "",
+    "category": "user",
+    "event_id": "/orgs/1/events/44e818d1-087b-461e-b861-51f4c3624f7f",
+    "event_type": "user.create_session",
+    "href": "/orgs/1/events/44e818d1-087b-461e-b861-51f4c3624f7f",
+    "known_event_type": true,
+    "notification_types": [
+     "user.pce_session_created"
+    ],
+    "notifications_count": 1,
+    "parser_notes": [],
+    "resource_changes_count": 0,
+    "resource_name": "",
+    "resource_type": "",
+    "severity": "info",
+    "source": "System | FILTERED",
+    "source_ip": "FILTERED",
+    "status": "success",
+    "target_name": "admin@lab.local",
+    "target_type": "user",
+    "timestamp": "2026-08-03T05:31:10.868Z",
+    "verb": "create_session",
+    "workloads_affected": 0
+   },
+   "parser_notes": [],
+   "raw": {
+    "action": {
+     "api_endpoint": "/api/v2/users/create_session",
+     "api_method": "POST",
+     "http_status_code": 201,
+     "src_ip": "FILTERED",
+     "uuid": "b54c26ea-4977-4e53-8bc9-565b257f8e1a"
+    },
+    "created_by": {
+     "system": {}
+    },
+    "event_type": "user.create_session",
+    "href": "/orgs/1/events/44e818d1-087b-461e-b861-51f4c3624f7f",
+    "notifications": [
+     {
+      "info": {
+       "user": {
+        "href": "/users/11",
+        "username": "admin@lab.local"
+       }
+      },
+      "notification_type": "user.pce_session_created",
+      "uuid": "a12030e0-486e-4b6f-a9b4-6307b5d9d648"
+     }
+    ],
+    "pce_fqdn": "pce.lab.local",
+    "resource_changes": [],
+    "severity": "info",
+    "status": "success",
+    "timestamp": "2026-08-03T05:31:10.868Z"
+   },
+   "remediation": "Normal authentication activity. Monitor for unusual patterns:\nlogins at odd hours, from new IPs, or failed attempts preceding success.\n",
+   "severity": "info",
+   "status": "success",
+   "timestamp": "2026-08-03T05:31:10.868Z",
+   "type_group": "user"
+  },
+  {
+   "category": "Containers & Workloads",
+   "description": "This event is triggered when workload interfaces are updated, such as when an IP address changes, a new interface is added, or an interface shuts down.",
+   "event_id": "/orgs/1/events/e8f31273-02b1-4073-94f8-e073c4fbfbfb",
+   "event_type": "workload_interfaces.update",
+   "known_event_type": true,
+   "normalized": {
+    "action": "PUT FILTERED",
+    "action_method": "PUT",
+    "action_path": "FILTERED",
+    "actor": "Harrys-MacBook-Air.local",
+    "actor_agent": "Harrys-MacBook-Air.local",
+    "actor_type": "agent",
+    "actor_user": "",
+    "category": "workload_interfaces",
+    "event_id": "/orgs/1/events/e8f31273-02b1-4073-94f8-e073c4fbfbfb",
+    "event_type": "workload_interfaces.update",
+    "href": "/orgs/1/events/e8f31273-02b1-4073-94f8-e073c4fbfbfb",
+    "known_event_type": true,
+    "notification_types": [],
+    "notifications_count": 0,
+    "parser_notes": [],
+    "resource_changes_count": 1,
+    "resource_name": "Harrys-MacBook-Air.local",
+    "resource_type": "workload",
+    "severity": "info",
+    "source": "Harrys-MacBook-Air.local | 192.168.20.32",
+    "source_ip": "192.168.20.32",
+    "status": "success",
+    "target_name": "Harrys-MacBook-Air.local",
+    "target_type": "workload",
+    "timestamp": "2026-08-03T05:31:04.055Z",
+    "verb": "update",
+    "workloads_affected": 0
+   },
+   "parser_notes": [],
+   "raw": {
+    "action": {
+     "api_endpoint": "FILTERED",
+     "api_method": "PUT",
+     "http_status_code": 200,
+     "src_ip": "192.168.20.32",
+     "uuid": "c4ed91d5-493e-42a4-8ff1-1f87cef44176"
+    },
+    "created_by": {
+     "agent": {
+      "hostname": "Harrys-MacBook-Air.local",
+      "href": "/orgs/1/agents/1345"
+     },
+     "ven": {
+      "hostname": "Harrys-MacBook-Air.local",
+      "href": "/orgs/1/vens/4716377d-ab36-448d-88ca-532e6d80103b"
+     }
+    },
+    "event_type": "workload_interfaces.update",
+    "href": "/orgs/1/events/e8f31273-02b1-4073-94f8-e073c4fbfbfb",
+    "notifications": [],
+    "pce_fqdn": "pce.lab.local",
+    "resource_changes": [
+     {
+      "change_type": "update",
+      "changes": {
+       "workload_interfaces": {
+        "updated": [
+         {
+          "changes": {
+           "address": {
+            "after": "fe80::43a:7bff:fe98:b3a4",
+            "before": "fe80::9828:efff:fe63:3658"
+           }
+          },
+          "resource": {
+           "address": "fe80::43a:7bff:fe98:b3a4",
+           "href": "/orgs/1/workloads/4716377d-ab36-448d-88ca-532e6d80103b/interfaces/awdl0",
+           "name": "awdl0",
+           "network": {
+            "href": "/orgs/1/networks/38423fa8-8f0a-4b33-a204-9cc502344df8",
+            "name": "External"
+           }
+          }
+         },
+         {
+          "changes": {
+           "address": {
+            "after": "fe80::43a:7bff:fe98:b3a4",
+            "before": "fe80::9828:efff:fe63:3658"
+           }
+          },
+          "resource": {
+           "address": "fe80::43a:7bff:fe98:b3a4",
+           "href": "/orgs/1/workloads/4716377d-ab36-448d-88ca-532e6d80103b/interfaces/llw0",
+           "name": "llw0",
+           "network": {
+            "href": "/orgs/1/networks/38423fa8-8f0a-4b33-a204-9cc502344df8",
+            "name": "External"
+           }
+          }
+         }
+        ]
+       }
+      },
+      "resource": {
+       "workload": {
+        "hostname": "Harrys-MacBook-Air.local",
+        "href": "/orgs/1/workloads/4716377d-ab36-448d-88ca-532e6d80103b",
+        "labels": [
+         {
+          "href": "/orgs/1/labels/53",
+          "key": "env",
+          "value": "Physical"
+         },
+         {
+          "href": "/orgs/1/labels/72",
+          "key": "app",
+          "value": "Endpoint"
+         },
+         {
+          "href": "/orgs/1/labels/135",
+          "key": "role",
+          "value": "MAC"
+         },
+         {
+          "href": "/orgs/1/labels/242",
+          "key": "loc",
+          "value": "external"
+         }
+        ],
+        "name": "Harrys-MacBook-Air.local"
+       }
+      },
+      "uuid": "3b5c4e5b-472c-410f-a6f1-bd141123f029"
+     }
+    ],
+    "severity": "info",
+    "status": "success",
+    "timestamp": "2026-08-03T05:31:04.055Z"
+   },
+   "remediation": "",
+   "severity": "info",
+   "status": "success",
+   "timestamp": "2026-08-03T05:31:04.055Z",
+   "type_group": "workload_interfaces"
+  },
+  {
+   "category": "User Access",
+   "description": "A user's PCE session is terminated.",
+   "event_id": "/orgs/1/events/74f95733-d102-4498-b724-2510ae642a60",
+   "event_type": "user.pce_session_terminated",
+   "known_event_type": true,
+   "normalized": {
+    "action": "",
+    "action_method": "",
+    "action_path": "",
+    "actor": "System",
+    "actor_agent": "",
+    "actor_type": "system",
+    "actor_user": "",
+    "category": "user",
+    "event_id": "/orgs/1/events/74f95733-d102-4498-b724-2510ae642a60",
+    "event_type": "user.pce_session_terminated",
+    "href": "/orgs/1/events/74f95733-d102-4498-b724-2510ae642a60",
+    "known_event_type": true,
+    "notification_types": [
+     "user.pce_session_terminated"
+    ],
+    "notifications_count": 1,
+    "parser_notes": [],
+    "resource_changes_count": 0,
+    "resource_name": "",
+    "resource_type": "",
+    "severity": "info",
+    "source": "System",
+    "source_ip": "",
+    "status": "",
+    "target_name": "admin@lab.local",
+    "target_type": "user",
+    "timestamp": "2026-08-03T05:30:30.408Z",
+    "verb": "pce_session_terminated",
+    "workloads_affected": 0
+   },
+   "parser_notes": [],
+   "raw": {
+    "action": null,
+    "created_by": {
+     "system": {}
+    },
+    "event_type": "user.pce_session_terminated",
+    "href": "/orgs/1/events/74f95733-d102-4498-b724-2510ae642a60",
+    "notifications": [
+     {
+      "info": {
+       "reason": "timeout",
+       "user": {
+        "href": "/users/11",
+        "username": "admin@lab.local"
+       }
+      },
+      "notification_type": "user.pce_session_terminated",
+      "uuid": "bc5b3bca-4ef0-45af-80a3-60fb542e34e8"
+     }
+    ],
+    "pce_fqdn": "pce.lab.local",
+    "resource_changes": [],
+    "severity": "info",
+    "status": null,
+    "timestamp": "2026-08-03T05:30:30.408Z"
+   },
+   "remediation": "Normal authentication activity. Monitor for unusual patterns:\nlogins at odd hours, from new IPs, or failed attempts preceding success.\n",
+   "severity": "info",
+   "status": null,
+   "timestamp": "2026-08-03T05:30:30.408Z",
+   "type_group": "user"
+  },
+  {
+   "category": "User Access",
+   "description": "A user successfully creates a new session.",
+   "event_id": "/orgs/1/events/a19e3b20-15be-4d47-8de3-d43078030bf2",
+   "event_type": "user.create_session",
+   "known_event_type": true,
+   "normalized": {
+    "action": "POST /api/v2/users/create_session",
+    "action_method": "POST",
+    "action_path": "/api/v2/users/create_session",
+    "actor": "System",
+    "actor_agent": "",
+    "actor_type": "system",
+    "actor_user": "",
+    "category": "user",
+    "event_id": "/orgs/1/events/a19e3b20-15be-4d47-8de3-d43078030bf2",
+    "event_type": "user.create_session",
+    "href": "/orgs/1/events/a19e3b20-15be-4d47-8de3-d43078030bf2",
+    "known_event_type": true,
+    "notification_types": [
+     "user.pce_session_created"
+    ],
+    "notifications_count": 1,
+    "parser_notes": [],
+    "resource_changes_count": 0,
+    "resource_name": "",
+    "resource_type": "",
+    "severity": "info",
+    "source": "System | FILTERED",
+    "source_ip": "FILTERED",
+    "status": "success",
+    "target_name": "admin@lab.local",
+    "target_type": "user",
+    "timestamp": "2026-08-03T05:29:11.832Z",
+    "verb": "create_session",
+    "workloads_affected": 0
+   },
+   "parser_notes": [],
+   "raw": {
+    "action": {
+     "api_endpoint": "/api/v2/users/create_session",
+     "api_method": "POST",
+     "http_status_code": 201,
+     "src_ip": "FILTERED",
+     "uuid": "2f208f07-023d-475d-b2ee-e505b6b210e6"
+    },
+    "created_by": {
+     "system": {}
+    },
+    "event_type": "user.create_session",
+    "href": "/orgs/1/events/a19e3b20-15be-4d47-8de3-d43078030bf2",
+    "notifications": [
+     {
+      "info": {
+       "user": {
+        "href": "/users/11",
+        "username": "admin@lab.local"
+       }
+      },
+      "notification_type": "user.pce_session_created",
+      "uuid": "9e7a262b-34c1-456a-84a1-adb38b66c914"
+     }
+    ],
+    "pce_fqdn": "pce.lab.local",
+    "resource_changes": [],
+    "severity": "info",
+    "status": "success",
+    "timestamp": "2026-08-03T05:29:11.832Z"
+   },
+   "remediation": "Normal authentication activity. Monitor for unusual patterns:\nlogins at odd hours, from new IPs, or failed attempts preceding success.\n",
+   "severity": "info",
+   "status": "success",
+   "timestamp": "2026-08-03T05:29:11.832Z",
+   "type_group": "user"
+  },
+  {
+   "category": "User Access",
+   "description": "A user's PCE session is terminated.",
+   "event_id": "/orgs/1/events/ef842ce8-0e58-4d6f-98bb-9d505203584d",
+   "event_type": "user.pce_session_terminated",
+   "known_event_type": true,
+   "normalized": {
+    "action": "",
+    "action_method": "",
+    "action_path": "",
+    "actor": "System",
+    "actor_agent": "",
+    "actor_type": "system",
+    "actor_user": "",
+    "category": "user",
+    "event_id": "/orgs/1/events/ef842ce8-0e58-4d6f-98bb-9d505203584d",
+    "event_type": "user.pce_session_terminated",
+    "href": "/orgs/1/events/ef842ce8-0e58-4d6f-98bb-9d505203584d",
+    "known_event_type": true,
+    "notification_types": [
+     "user.pce_session_terminated"
+    ],
+    "notifications_count": 1,
+    "parser_notes": [],
+    "resource_changes_count": 0,
+    "resource_name": "",
+    "resource_type": "",
+    "severity": "info",
+    "source": "System",
+    "source_ip": "",
+    "status": "",
+    "target_name": "admin@lab.local",
+    "target_type": "user",
+    "timestamp": "2026-08-03T05:27:30.394Z",
+    "verb": "pce_session_terminated",
+    "workloads_affected": 0
+   },
+   "parser_notes": [],
+   "raw": {
+    "action": null,
+    "created_by": {
+     "system": {}
+    },
+    "event_type": "user.pce_session_terminated",
+    "href": "/orgs/1/events/ef842ce8-0e58-4d6f-98bb-9d505203584d",
+    "notifications": [
+     {
+      "info": {
+       "reason": "timeout",
+       "user": {
+        "href": "/users/11",
+        "username": "admin@lab.local"
+       }
+      },
+      "notification_type": "user.pce_session_terminated",
+      "uuid": "1164923a-9abe-43b7-8d79-336e645f168b"
+     }
+    ],
+    "pce_fqdn": "pce.lab.local",
+    "resource_changes": [],
+    "severity": "info",
+    "status": null,
+    "timestamp": "2026-08-03T05:27:30.394Z"
+   },
+   "remediation": "Normal authentication activity. Monitor for unusual patterns:\nlogins at odd hours, from new IPs, or failed attempts preceding success.\n",
+   "severity": "info",
+   "status": null,
+   "timestamp": "2026-08-03T05:27:30.394Z",
+   "type_group": "user"
+  },
+  {
+   "category": "User Access",
+   "description": "A user's PCE session is terminated.",
+   "event_id": "/orgs/1/events/11646dd9-a182-4a88-8113-8ba86e684e21",
+   "event_type": "user.pce_session_terminated",
+   "known_event_type": true,
+   "normalized": {
+    "action": "",
+    "action_method": "",
+    "action_path": "",
+    "actor": "System",
+    "actor_agent": "",
+    "actor_type": "system",
+    "actor_user": "",
+    "category": "user",
+    "event_id": "/orgs/1/events/11646dd9-a182-4a88-8113-8ba86e684e21",
+    "event_type": "user.pce_session_terminated",
+    "href": "/orgs/1/events/11646dd9-a182-4a88-8113-8ba86e684e21",
+    "known_event_type": true,
+    "notification_types": [
+     "user.pce_session_terminated"
+    ],
+    "notifications_count": 1,
+    "parser_notes": [],
+    "resource_changes_count": 0,
+    "resource_name": "",
+    "resource_type": "",
+    "severity": "info",
+    "source": "System",
+    "source_ip": "",
+    "status": "",
+    "target_name": "admin@lab.local",
+    "target_type": "user",
+    "timestamp": "2026-08-03T05:27:30.382Z",
+    "verb": "pce_session_terminated",
+    "workloads_affected": 0
+   },
+   "parser_notes": [],
+   "raw": {
+    "action": null,
+    "created_by": {
+     "system": {}
+    },
+    "event_type": "user.pce_session_terminated",
+    "href": "/orgs/1/events/11646dd9-a182-4a88-8113-8ba86e684e21",
+    "notifications": [
+     {
+      "info": {
+       "reason": "timeout",
+       "user": {
+        "href": "/users/11",
+        "username": "admin@lab.local"
+       }
+      },
+      "notification_type": "user.pce_session_terminated",
+      "uuid": "ae8ab66b-10e2-4176-b7cf-59ef9d8398bb"
+     }
+    ],
+    "pce_fqdn": "pce.lab.local",
+    "resource_changes": [],
+    "severity": "info",
+    "status": null,
+    "timestamp": "2026-08-03T05:27:30.382Z"
+   },
+   "remediation": "Normal authentication activity. Monitor for unusual patterns:\nlogins at odd hours, from new IPs, or failed attempts preceding success.\n",
+   "severity": "info",
+   "status": null,
+   "timestamp": "2026-08-03T05:27:30.382Z",
+   "type_group": "user"
+  },
+  {
+   "category": "User Access",
+   "description": "A user successfully creates a new session.",
+   "event_id": "/orgs/1/events/ac14fffa-6716-42c2-a0f5-6069f88f6dae",
+   "event_type": "user.create_session",
+   "known_event_type": true,
+   "normalized": {
+    "action": "POST /api/v2/users/create_session",
+    "action_method": "POST",
+    "action_path": "/api/v2/users/create_session",
+    "actor": "System",
+    "actor_agent": "",
+    "actor_type": "system",
+    "actor_user": "",
+    "category": "user",
+    "event_id": "/orgs/1/events/ac14fffa-6716-42c2-a0f5-6069f88f6dae",
+    "event_type": "user.create_session",
+    "href": "/orgs/1/events/ac14fffa-6716-42c2-a0f5-6069f88f6dae",
+    "known_event_type": true,
+    "notification_types": [
+     "user.pce_session_created"
+    ],
+    "notifications_count": 1,
+    "parser_notes": [],
+    "resource_changes_count": 0,
+    "resource_name": "",
+    "resource_type": "",
+    "severity": "info",
+    "source": "System | FILTERED",
+    "source_ip": "FILTERED",
+    "status": "success",
+    "target_name": "admin@lab.local",
+    "target_type": "user",
+    "timestamp": "2026-08-03T05:27:11.361Z",
+    "verb": "create_session",
+    "workloads_affected": 0
+   },
+   "parser_notes": [],
+   "raw": {
+    "action": {
+     "api_endpoint": "/api/v2/users/create_session",
+     "api_method": "POST",
+     "http_status_code": 201,
+     "src_ip": "FILTERED",
+     "uuid": "44e20cc1-41e5-4c3a-93cf-e8b6a2a8d7bc"
+    },
+    "created_by": {
+     "system": {}
+    },
+    "event_type": "user.create_session",
+    "href": "/orgs/1/events/ac14fffa-6716-42c2-a0f5-6069f88f6dae",
+    "notifications": [
+     {
+      "info": {
+       "user": {
+        "href": "/users/11",
+        "username": "admin@lab.local"
+       }
+      },
+      "notification_type": "user.pce_session_created",
+      "uuid": "d3a5717f-838e-4150-b5cb-5c35a041a6c6"
+     }
+    ],
+    "pce_fqdn": "pce.lab.local",
+    "resource_changes": [],
+    "severity": "info",
+    "status": "success",
+    "timestamp": "2026-08-03T05:27:11.361Z"
+   },
+   "remediation": "Normal authentication activity. Monitor for unusual patterns:\nlogins at odd hours, from new IPs, or failed attempts preceding success.\n",
+   "severity": "info",
+   "status": "success",
+   "timestamp": "2026-08-03T05:27:11.361Z",
+   "type_group": "user"
+  }
+ ],
+ "ok": true,
+ "summary": {
+  "category": "",
+  "event_type": "",
+  "fetched_count": 67,
+  "has_more": false,
+  "limit": 100,
+  "matched_count": 67,
+  "offset": 0,
+  "query_since": "2026-08-03T05:27:06Z",
+  "query_until": "2026-08-03T06:27:06Z",
+  "returned_count": 67,
+  "type_group": ""
+ }
+}

@@ -1,0 +1,20 @@
+{
+ "sources": [
+  {
+   "lag_seconds": 65,
+   "last_error": null,
+   "last_status": "ok",
+   "last_sync_at": "2026-08-03T12:55:12.971171",
+   "level": "ok",
+   "source": "traffic"
+  },
+  {
+   "lag_seconds": 126,
+   "last_error": null,
+   "last_status": "ok",
+   "last_sync_at": "2026-08-03T12:54:11.674793",
+   "level": "ok",
+   "source": "events"
+  }
+ ]
+}

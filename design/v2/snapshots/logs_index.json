@@ -1,0 +1,32 @@
+{
+ "modules": [
+  {
+   "count": 500,
+   "i18n_key": "gui_ml_mod_monitor",
+   "label": "Monitor & Analysis",
+   "name": "monitor"
+  },
+  {
+   "count": 500,
+   "i18n_key": "gui_ml_mod_rule_scheduler",
+   "label": "Rule Scheduler",
+   "name": "rule_scheduler"
+  },
+  {
+   "count": 0,
+   "label": "Report Scheduler",
+   "name": "report_scheduler"
+  },
+  {
+   "count": 0,
+   "label": "Report Generation",
+   "name": "reports"
+  },
+  {
+   "count": 0,
+   "label": "Manual Actions",
+   "name": "actions"
+  }
+ ],
+ "ok": true
+}

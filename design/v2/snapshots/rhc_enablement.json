@@ -1,0 +1,7 @@
+{
+ "detail": "PCE report template and VEN scopes both enabled",
+ "ok": true,
+ "pce_report_enabled": true,
+ "state": "enabled",
+ "ven_scopes_enabled": true
+}

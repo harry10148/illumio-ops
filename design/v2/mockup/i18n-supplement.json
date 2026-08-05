@@ -1,0 +1,3059 @@
+{
+  "_readme": [
+    "design/v2 i18n supplement — keys the shipping catalogue (snapshots/ui_translations.json) does NOT have.",
+    "This file is BOTH the mockup's runtime fallback AND the Phase-2 i18n key backlog:",
+    "every key here must be added to the product catalogue (src/i18n) before the redesign ships.",
+    "Rule for Tasks 8-12: never hardcode a visible string. If the catalogue lacks the key, add it here with zh + en.",
+    "Resolution order is catalogue -> supplement (see js/core/i18n.mjs); keys that exist in the catalogue must NOT be duplicated here."
+  ],
+  "_resolved_from_catalogue": {
+    "_note": "Task-6 stragglers that turned out to exist in the shipping catalogue — no supplement key needed, use these instead of literals.",
+    "table header type": "gui_col_type",
+    "table header file": "gui_col_filename",
+    "table header size": "gui_col_size",
+    "Theme button label": "gui_theme",
+    "theme values dark/light": "gui_theme_dark / gui_theme_light",
+    "density label": "gui_density",
+    "status word enabled": "gui_enabled",
+    "status word expiring_soon": "gui_tls_expiring_soon",
+    "generic actions": "gui_save / gui_cancel / gui_close / gui_confirm / gui_prev / gui_next / gui_search / gui_no_data / gui_user",
+    "health light names": "gui_ov_job_health / gui_dashboard_pce_health / gui_ov_cache_lag_label / gui_ov_pipeline_title / gui_ov_alert_channels"
+  },
+  "keys": {
+    "gui_rules_search_placeholder": {
+      "zh": "篩選規則…",
+      "en": "Filter rules...",
+      "_note": "index.html:1270 references this key but the captured catalogue (1509 keys) does not have it — a real product i18n gap found by Task 10, not a v2-only string"
+    },
+    "login_btn": {
+      "zh": "登入",
+      "en": "Sign in",
+      "_note": "src/i18n_zh_TW.json + src/i18n_en.json; absent from /api/ui_translations (prefix filter)"
+    },
+    "login_btn_changing": {
+      "zh": "變更密碼中...",
+      "en": "Changing password...",
+      "_note": "src/i18n_zh_TW.json + src/i18n_en.json; absent from /api/ui_translations (prefix filter)"
+    },
+    "login_btn_signing_in": {
+      "zh": "登入中...",
+      "en": "Signing in...",
+      "_note": "src/i18n_zh_TW.json + src/i18n_en.json; absent from /api/ui_translations (prefix filter)"
+    },
+    "login_btn_success": {
+      "zh": "登入成功",
+      "en": "Signed in",
+      "_note": "src/i18n_zh_TW.json + src/i18n_en.json; absent from /api/ui_translations (prefix filter)"
+    },
+    "login_change_pw_btn": {
+      "zh": "變更密碼並繼續",
+      "en": "Change password and continue",
+      "_note": "src/i18n_zh_TW.json + src/i18n_en.json; absent from /api/ui_translations (prefix filter)"
+    },
+    "login_confirm_password": {
+      "zh": "再次輸入新密碼",
+      "en": "Confirm new password",
+      "_note": "src/i18n_zh_TW.json + src/i18n_en.json; absent from /api/ui_translations (prefix filter)"
+    },
+    "login_err_pw_mismatch": {
+      "zh": "兩次輸入的新密碼不一致。",
+      "en": "Passwords do not match.",
+      "_note": "src/i18n_zh_TW.json + src/i18n_en.json; absent from /api/ui_translations (prefix filter)"
+    },
+    "login_err_pw_short": {
+      "zh": "新密碼至少需要 12 個字元。",
+      "en": "Password must be at least 12 characters.",
+      "_note": "src/i18n_zh_TW.json + src/i18n_en.json; absent from /api/ui_translations (prefix filter)"
+    },
+    "login_footer": {
+      "zh": "Illumio PCE Ops — 受保護的 GUI 存取頁面",
+      "en": "Illumio PCE Ops | Security Operations",
+      "_note": "src/i18n_zh_TW.json + src/i18n_en.json; absent from /api/ui_translations (prefix filter)"
+    },
+    "login_header": {
+      "zh": "登入 PCE Ops",
+      "en": "PCE Ops",
+      "_note": "src/i18n_zh_TW.json + src/i18n_en.json; absent from /api/ui_translations (prefix filter)"
+    },
+    "login_must_change_banner": {
+      "zh": "首次設定：請設定新密碼以繼續使用。預設密碼「illumio」無法繼續使用。",
+      "en": "First-time setup: please choose a new password to continue. The default 'illumio' password cannot be reused.",
+      "_note": "src/i18n_zh_TW.json + src/i18n_en.json; absent from /api/ui_translations (prefix filter)"
+    },
+    "login_new_password": {
+      "zh": "新密碼",
+      "en": "New password",
+      "_note": "src/i18n_zh_TW.json + src/i18n_en.json; absent from /api/ui_translations (prefix filter)"
+    },
+    "login_password": {
+      "zh": "密碼",
+      "en": "Password",
+      "_note": "src/i18n_zh_TW.json + src/i18n_en.json; absent from /api/ui_translations (prefix filter)"
+    },
+    "login_password_placeholder": {
+      "zh": "輸入密碼",
+      "en": "Enter password",
+      "_note": "src/i18n_zh_TW.json + src/i18n_en.json; absent from /api/ui_translations (prefix filter)"
+    },
+    "login_subheader": {
+      "zh": "請輸入帳號與密碼以繼續。",
+      "en": "Illumio operations and monitoring portal",
+      "_note": "src/i18n_zh_TW.json + src/i18n_en.json; absent from /api/ui_translations (prefix filter)"
+    },
+    "login_username": {
+      "zh": "帳號",
+      "en": "Username",
+      "_note": "src/i18n_zh_TW.json + src/i18n_en.json; absent from /api/ui_translations (prefix filter)"
+    },
+    "login_username_placeholder": {
+      "zh": "輸入帳號",
+      "en": "Enter username",
+      "_note": "src/i18n_zh_TW.json + src/i18n_en.json; absent from /api/ui_translations (prefix filter)"
+    },
+    "rpt_filter_objects": {
+      "zh": "來源／目的／任一側（Labels、IP、Workloads、IP Lists）",
+      "en": "Source / Destination / Either Side (Labels, IPs, Workloads, IP Lists)",
+      "_note": "src/i18n_zh_TW.json + src/i18n_en.json; absent from /api/ui_translations (prefix filter)"
+    },
+    "rpt_filter_pd": {
+      "zh": "Policy 判定",
+      "en": "Policy Decision",
+      "_note": "src/i18n_zh_TW.json + src/i18n_en.json; absent from /api/ui_translations (prefix filter)"
+    },
+    "rpt_filter_toggle": {
+      "zh": "流量篩選條件（選填）",
+      "en": "Traffic Filters (optional)",
+      "_note": "src/i18n_zh_TW.json + src/i18n_en.json; absent from /api/ui_translations (prefix filter)"
+    },
+    "rpt_pd_allowed": {
+      "zh": "Allowed",
+      "en": "Allowed",
+      "_note": "src/i18n_zh_TW.json + src/i18n_en.json; absent from /api/ui_translations (prefix filter)"
+    },
+    "rpt_pd_blocked": {
+      "zh": "Blocked",
+      "en": "Blocked",
+      "_note": "src/i18n_zh_TW.json + src/i18n_en.json; absent from /api/ui_translations (prefix filter)"
+    },
+    "rpt_pd_potential": {
+      "zh": "Potentially Blocked",
+      "en": "Potentially Blocked",
+      "_note": "src/i18n_zh_TW.json + src/i18n_en.json; absent from /api/ui_translations (prefix filter)"
+    },
+    "rs_sch_draft_block": {
+      "zh": "僅為 Draft 的規則無法建立排程。",
+      "en": "Draft-only rules cannot be scheduled.",
+      "_note": "AU-05/06 pre-flight. Exists in the backend catalogue (src/i18n/data/zh_explicit.json:1379, src/i18n_en.json:4046) and is returned by POST /api/rule_scheduler/schedules (rule_scheduler.py:311, :319), but the captured GUI catalogue does not carry it."
+    },
+    "rs_sch_pce_unreachable": {
+      "zh": "無法確認部署狀態：PCE 沒有回應（請檢查連線與憑證）。",
+      "en": "Cannot verify provisioning state: the PCE did not respond (check connectivity and credentials).",
+      "_note": "AU-05/06 pre-flight, the 502 branch (rule_scheduler.py:315-317). The product has EN only (src/i18n_en.json:4631); zh is supplied here."
+    },
+    "v2_al_add_rule": {
+      "zh": "新增規則",
+      "en": "Add rule",
+      "_note": "AL-01 label above the four + buttons (index.html:1276-1279)"
+    },
+    "v2_al_bp_append": {
+      "zh": "只補缺少的（append_missing）",
+      "en": "Append missing only (append_missing)",
+      "_note": "AL-12; rules.js:588-593 maps the prompt's 1 to this mode"
+    },
+    "v2_al_bp_i_append": {
+      "zh": "新增 {added} 條、略過 {skipped} 條（簽章相同者視為已存在）。",
+      "en": "Adds {added}, skips {skipped} (a matching signature counts as already present).",
+      "_note": "AL-12 impact"
+    },
+    "v2_al_bp_i_backup": {
+      "zh": "兩種模式都會先把目前規則存進 rule_backups（只保留最近 10 份，config.py:851-864）。",
+      "en": "Both modes snapshot the current rules into rule_backups first (only the last 10 are kept, config.py:851-864).",
+      "_note": "AL-12 impact"
+    },
+    "v2_al_bp_i_keep": {
+      "zh": "你現有的規則全部保留。",
+      "en": "All of your current rules are kept.",
+      "_note": "AL-12 impact"
+    },
+    "v2_al_bp_i_lost": {
+      "zh": "會消失：{type} · {name}",
+      "en": "Would be lost: {type} · {name}",
+      "_note": "AL-12 impact; listed rule by rule, computed by signature"
+    },
+    "v2_al_bp_i_replace": {
+      "zh": "整份規則被 {total} 條最佳實務取代，目前的 {now} 條全部移除。",
+      "en": "The whole rule list is replaced by the {total} best-practice rules; all {now} current rules are removed.",
+      "_note": "AL-12 impact"
+    },
+    "v2_al_bp_mode": {
+      "zh": "載入方式",
+      "en": "Load mode",
+      "_note": "AL-12"
+    },
+    "v2_al_bp_note": {
+      "zh": "產品用 window.prompt 問模式再連續兩次 confirm（rules.js:584-608）；這裡改成選項＋一次帶影響清單的確認，問題與後果同時看得到。",
+      "en": "The product asks for the mode with window.prompt and then two confirms (rules.js:584-608); this asks once, with the consequences listed next to the choice.",
+      "_note": "AL-12 DESIGN-ADDED interaction change, stated"
+    },
+    "v2_al_bp_replace": {
+      "zh": "完整取代（replace）",
+      "en": "Replace everything (replace)",
+      "_note": "AL-12; rules.js:588-593 maps the prompt's 2 to this mode"
+    },
+    "v2_al_bp_stat_append": {
+      "zh": "以目前設定試算：append_missing 會新增 {added} 條、略過 {skipped} 條。",
+      "en": "Dry run against the current config: append_missing would add {added} and skip {skipped}.",
+      "_note": "AL-12; computed with config.py:823-843's own signature"
+    },
+    "v2_al_bp_stat_replace": {
+      "zh": "replace 會以 {total} 條最佳實務取代目前的 {now} 條，其中 {lost} 條不在最佳實務清單內。",
+      "en": "replace would swap the current {now} rules for the {total} best-practice ones; {lost} of the current rules are not in that set.",
+      "_note": "AL-12"
+    },
+    "v2_al_bulk_delete": {
+      "zh": "刪除所選",
+      "en": "Delete selected",
+      "_note": "AL-01 bulk bar (deleteSelected, rules.js:163)"
+    },
+    "v2_al_ch_note": {
+      "zh": "唯讀：管道的啟用與設定在系統區的告警管道設定；這裡只呈現 status.alert_channels 的最後一次派送結果（actions.js:10-33 同一組欄位）。",
+      "en": "Read-only: enabling and configuring a channel happens in the system area; this card only shows the last dispatch result from status.alert_channels (the same fields as actions.js:10-33).",
+      "_note": "AL-14"
+    },
+    "v2_al_chip_all": {
+      "zh": "全部",
+      "en": "All",
+      "_note": "AL-01 type chip that clears the filter (rules.js:266-295 toggles the same way)"
+    },
+    "v2_al_console_clear": {
+      "zh": "清空主控台",
+      "en": "Clear console",
+      "_note": "AL-13 console header action"
+    },
+    "v2_al_console_empty": {
+      "zh": "尚無輸出。上面的動作都在真後端執行；設計稿只會把要送出的請求記在這裡。",
+      "en": "No output yet. Every action above runs on a real backend; this page only records the request it would send.",
+      "_note": "AL-13 empty state — deliberately not fake output"
+    },
+    "v2_al_console_not_run": {
+      "zh": "（未執行：設計稿沒有後端）",
+      "en": "(not executed: the mockup has no backend)",
+      "_note": "AL-13 line 2 of each entry"
+    },
+    "v2_al_debug_note": {
+      "zh": "Debug 的 Policy Dec. 編號與規則的 pd 不同：1=Blocked、2=Allowed、3=All（analyzer.py:2527-2529）。時間窗會被夾在 5–10080 分鐘（actions.py:546）。",
+      "en": "Debug's Policy Dec. numbering is not the rule pd numbering: 1=Blocked, 2=Allowed, 3=All (analyzer.py:2527-2529). The window is clamped to 5-10080 minutes (actions.py:546).",
+      "_note": "AL-09 — a real numbering trap worth stating"
+    },
+    "v2_al_del_count": {
+      "zh": "刪除 {n} 條規則",
+      "en": "Delete {n} rules",
+      "_note": "AL-01 delete impact line 1"
+    },
+    "v2_al_del_more": {
+      "zh": "…另外 {n} 條",
+      "en": "...and {n} more",
+      "_note": "AL-01 delete impact overflow line"
+    },
+    "v2_al_del_norecover": {
+      "zh": "刪除沒有復原路徑：只有「載入最佳實務」會先建立 rule_backups 備份（config.py:851-864）。",
+      "en": "Deleting has no undo path: only Load Best Practices takes a rule_backups snapshot first (config.py:851-864).",
+      "_note": "AL-01 delete impact; verified there is no restore endpoint for manual deletes"
+    },
+    "v2_al_del_order": {
+      "zh": "產品逐條送出 DELETE /api/rules/<idx>，索引由大到小，避免刪除過程索引位移。",
+      "en": "The product sends one DELETE /api/rules/<idx> per rule, highest index first, so indices do not shift mid-delete.",
+      "_note": "AL-01 delete impact; rules.js:164 sorts descending"
+    },
+    "v2_al_ev_related_more": {
+      "zh": "…另 {n} 個",
+      "en": "...and {n} more",
+      "_note": "AL-02 catalogue card; the related-events list is capped at 8 (rules.js:427-437 renders all of them)"
+    },
+    "v2_al_fb_none": {
+      "zh": "目前沒有任何篩選條件（送出的 filters 是空物件）。",
+      "en": "No filters set — the payload's filters is an empty object.",
+      "_note": "FilterBar serialisation empty state"
+    },
+    "v2_al_fb_note": {
+      "zh": "儲存時送出的是這些複數鍵（rules.py:26-35 白名單）；規則裡既有的單數欄位由 FilterBar 讀入（filter-bar.mjs _objfbDeserialize :247-279），存回時會被複數鍵取代。label_group 不開放：rules.py:36-40 直接回 400。",
+      "en": "Saving sends these plural keys (whitelisted at rules.py:26-35). The singular fields already stored on a rule are read back in by the FilterBar (filter-bar.mjs _objfbDeserialize :247-279) and replaced by the plural keys on save. label_group is not offered: rules.py:36-40 returns 400 for it.",
+      "_note": "AL-04/AL-05 — the legacy/v2 key duality, stated once"
+    },
+    "v2_al_fb_serialized": {
+      "zh": "FilterBar 序列化後的欄位",
+      "en": "Fields the FilterBar serialises",
+      "_note": "traffic/bandwidth drawer; live view of _objfbSerialize output"
+    },
+    "v2_al_fmt_bp": {
+      "zh": "best-practices：{ok, output, summary}，summary 帶 mode/added/replaced/skipped/total 與 backup_id（config.py:888-896）。",
+      "en": "best-practices: {ok, output, summary}, with mode/added/replaced/skipped/total and backup_id (config.py:888-896).",
+      "_note": "AL-13 format reference"
+    },
+    "v2_al_fmt_debug": {
+      "zh": "debug：output 是 run_debug_mode 期間擷取並去除 ANSI 的 stdout（actions.py:560-566），通常有數十行。",
+      "en": "debug: output is the stdout captured during run_debug_mode with ANSI stripped (actions.py:560-566), usually dozens of lines.",
+      "_note": "AL-13 format reference"
+    },
+    "v2_al_fmt_err": {
+      "zh": "失敗一律是 {ok:false, error, description}，前端不會把它當成完成（actions.js:60-72）；429 rate_limit_exceeded 也走這條。",
+      "en": "Failures always come back as {ok:false, error, description} and are never reported as completed (actions.js:60-72); a 429 rate_limit_exceeded uses the same shape.",
+      "_note": "AL-13 format reference"
+    },
+    "v2_al_fmt_run": {
+      "zh": "run：{ok, output}，output 是「分析週期與警報發送完成」這類單行摘要（actions.py:531）。",
+      "en": "run: {ok, output}, where output is a one-line summary such as \"analysis cycle and alerts completed\" (actions.py:531).",
+      "_note": "AL-13 format reference"
+    },
+    "v2_al_fmt_test": {
+      "zh": "test-alert：output 是 channel=status 的摘要，另外 results[] 每筆由前端印成 channel: status -> target | error（actions.js:97-101）。",
+      "en": "test-alert: output is a channel=status summary, and each results[] entry is printed by the front end as channel: status -> target | error (actions.js:97-101).",
+      "_note": "AL-13 format reference"
+    },
+    "v2_al_fmt_title": {
+      "zh": "真實輸出長什麼樣",
+      "en": "What the real output looks like",
+      "_note": "AL-13 format reference"
+    },
+    "v2_al_fmt_wm": {
+      "zh": "reset-watermark：{ok, cleared[], output}，cleared 列出真正被清掉的 key（actions.py:629-633）。",
+      "en": "reset-watermark: {ok, cleared[], output}, where cleared lists the keys actually removed (actions.py:629-633).",
+      "_note": "AL-13 format reference"
+    },
+    "v2_al_fn_bw_metric": {
+      "zh": "選項值就是規則儲存的 type：bandwidth（Mbps 峰值）或 volume（MB 累計）。",
+      "en": "The option value is the rule's stored type: bandwidth (peak Mbps) or volume (cumulative MB).",
+      "_note": "AL-05 metric radio hint"
+    },
+    "v2_al_fn_cooldown_remaining": {
+      "zh": "剩餘冷卻分鐘數，由 alert_history 與 cooldown_minutes 算出（rules.py:110-126），不是儲存欄位。",
+      "en": "Minutes of cooldown left, computed from alert_history and cooldown_minutes (rules.py:110-126); not a stored field.",
+      "_note": "read-only field note"
+    },
+    "v2_al_fn_desc": {
+      "zh": "告警內文用的說明。表單沒有這個欄位——建立時後端直接抄規則名稱（rules.py:171）。",
+      "en": "The description used in the alert body. The form has no field for it: the create endpoint copies the rule name (rules.py:171).",
+      "_note": "read-only field note"
+    },
+    "v2_al_fn_desc_flow": {
+      "zh": "流量／頻寬規則的說明＝規則名稱（rules.py:275/365）。",
+      "en": "For flow and bandwidth rules the description is the rule name (rules.py:275/365).",
+      "_note": "AL-04/05 read-only field note"
+    },
+    "v2_al_fn_desc_system": {
+      "zh": "系統規則的說明由後端以 rule_pce_health_desc 填入（rules.py:209）。",
+      "en": "For system rules the backend fills the description from rule_pce_health_desc (rules.py:209).",
+      "_note": "AL-03 read-only field note"
+    },
+    "v2_al_fn_filter_key": {
+      "zh": "事件規則固定為 event_type（rules.py:168）；matcher.py:60-66 只比對事件的 event_type，不讀這個欄位。",
+      "en": "Always event_type for event rules (rules.py:168); matcher.py:60-66 matches on the event's event_type and never reads this field.",
+      "_note": "read-only field note"
+    },
+    "v2_al_fn_filter_scalar": {
+      "zh": "規則裡既有的單數篩選欄位（rules.py:41-47）；由上方 FilterBar 讀入與改寫。",
+      "en": "The singular filter fields already stored on the rule (rules.py:41-47); read and rewritten by the FilterBar above.",
+      "_note": "AL-04/05 stored filter rows"
+    },
+    "v2_al_fn_flow_threshold": {
+      "zh": "流量／頻寬規則固定為 count（rules.py:277/367）；表單沒有門檻型別選項。",
+      "en": "Flow and bandwidth rules are fixed at count (rules.py:277/367); the form has no threshold-type control.",
+      "_note": "AL-04/05 read-only field note"
+    },
+    "v2_al_fn_i18n_key": {
+      "zh": "內建規則的字典鍵，由 apply_best_practices 寫入（config.py:775-795）；手動建立的規則沒有這個欄位。",
+      "en": "Catalogue key for a built-in rule, written by apply_best_practices (config.py:775-795); hand-made rules do not carry it.",
+      "_note": "read-only field note for name_key / desc_key / rec_key"
+    },
+    "v2_al_fn_match_system": {
+      "zh": "系統規則永遠是空的 match_fields（rules.py:215）；matcher.py 的欄位比對只走事件規則。",
+      "en": "System rules always carry an empty match_fields (rules.py:215); matcher.py's field matching only runs for event rules.",
+      "_note": "AL-03 read-only field note"
+    },
+    "v2_al_fn_name_event": {
+      "zh": "事件規則的名稱不是輸入的：saveEvent 取事件目錄的標題（rules.js:519-520）。",
+      "en": "An event rule's name is not typed: saveEvent takes the catalogue title (rules.js:519-520).",
+      "_note": "AL-02 name field hint"
+    },
+    "v2_al_fn_proto_bw": {
+      "zh": "頻寬／傳輸量規則的 proto 一律寫入 None（rules.py:355/374）——沒有通訊協定選項可設。",
+      "en": "Bandwidth and volume rules always store proto as None (rules.py:355/374) — there is no protocol control to set it.",
+      "_note": "AL-05 note"
+    },
+    "v2_al_fn_rec": {
+      "zh": "告警的建議處置。表單沒有這個欄位——建立時後端填預設字串（rules.py:172，gui_rule_default_rec_check_logs）。",
+      "en": "The recommended action shown in the alert. No form field: the create endpoint writes a default string (rules.py:172, gui_rule_default_rec_check_logs).",
+      "_note": "read-only field note"
+    },
+    "v2_al_fn_rec_flow": {
+      "zh": "流量規則填 gui_rule_default_rec_check_policy、頻寬規則填 gui_rule_default_rec_check_logs（rules.py:275/365）。",
+      "en": "Flow rules get gui_rule_default_rec_check_policy, bandwidth rules gui_rule_default_rec_check_logs (rules.py:275/365).",
+      "_note": "AL-04/05 read-only field note"
+    },
+    "v2_al_fn_rec_system": {
+      "zh": "系統規則的建議處置由後端以 rule_pce_health_rec 填入（rules.py:210）。",
+      "en": "For system rules the backend fills the recommendation from rule_pce_health_rec (rules.py:210).",
+      "_note": "AL-03 read-only field note"
+    },
+    "v2_al_fn_sys_threshold": {
+      "zh": "系統規則固定為 immediate / 1 / 10（rules.py:211-214）：健康檢查一失敗就觸發，只有冷卻可調。",
+      "en": "System rules are fixed at immediate / 1 / 10 (rules.py:211-214): a failed health check fires at once and only the cooldown is configurable.",
+      "_note": "AL-03 read-only field note"
+    },
+    "v2_al_fn_throttle": {
+      "zh": "每小時發送上限（例：1/15m）。R5 之後 UI 不再提供這個欄位（rules.js:86、index.html:2673 註解），既有值仍保存在後端並生效。",
+      "en": "Per-rule send cap (e.g. 1/15m). The UI stopped offering it after R5 (rules.js:86, index.html:2673 comment); stored values are kept and still enforced.",
+      "_note": "read-only field note"
+    },
+    "v2_al_fn_throttle_state": {
+      "zh": "後端每次讀取時計算的抑制計數（rules.py:127-131）：cooldown_suppressed / throttle_suppressed / next_allowed_at。",
+      "en": "Suppression counters recomputed on every read (rules.py:127-131): cooldown_suppressed / throttle_suppressed / next_allowed_at.",
+      "_note": "read-only field note"
+    },
+    "v2_al_fn_type": {
+      "zh": "規則型別，由建立端點決定（rules.py:167/205/269/355），之後不可改。",
+      "en": "Rule type, fixed by the create endpoint (rules.py:167/205/269/355); it cannot be changed afterwards.",
+      "_note": "read-only field note"
+    },
+    "v2_al_form_section": {
+      "zh": "產品表單欄位",
+      "en": "Fields the product form collects",
+      "_note": "drawer section head; these are the keys save*() actually sends"
+    },
+    "v2_al_hl_clear": {
+      "zh": "清除定位",
+      "en": "Clear selection",
+      "_note": "AL-06"
+    },
+    "v2_al_hl_empty": {
+      "zh": "在任一列按 JSON，或直接開 #/alerting/rules?hl=<index>，就會定位到那條規則並在這裡展開它的完整 JSON。",
+      "en": "Press JSON on any row, or open #/alerting/rules?hl=<index> directly, to jump to that rule and expand its full JSON here.",
+      "_note": "AL-06 empty state body"
+    },
+    "v2_al_hl_none": {
+      "zh": "未指定規則",
+      "en": "No rule selected",
+      "_note": "AL-06 empty state title"
+    },
+    "v2_al_hl_note": {
+      "zh": "對應 GET /api/rules/<idx>/highlight（rules.py:515-525），該端點回傳同一條規則的語法上色 JSON。註：目前產品前端沒有任何呼叫端（全 repo grep 只有路由定義），此處是把既有端點接上使用者介面。",
+      "en": "Mirrors GET /api/rules/<idx>/highlight (rules.py:515-525), which returns the same rule as syntax-highlighted JSON. Note: no shipping front-end code calls it today (a repo-wide grep finds only the route), so this view gives the existing endpoint a caller.",
+      "_note": "AL-06 provenance + the DESIGN-ADDED part stated plainly"
+    },
+    "v2_al_hl_title": {
+      "zh": "規則 JSON（定位）",
+      "en": "Rule JSON (deep link)",
+      "_note": "AL-06 rail panel title"
+    },
+    "v2_al_list_note": {
+      "zh": "本頁的啟停、刪除、儲存都只改記憶體中的快照副本；離開路由即還原。真正的寫入端點見每個 drawer 底部的 payload。",
+      "en": "Toggles, deletes and saves on this page only change the in-memory snapshot copy and reset when you leave the route. The real write endpoints are printed at the bottom of each drawer.",
+      "_note": "AL-01 honesty note"
+    },
+    "v2_al_meta_counts": {
+      "zh": "共 {total} 條 · 顯示 {shown} · 啟用 {on} · 冷卻中 {cd}",
+      "en": "{total} rules · {shown} shown · {on} enabled · {cd} cooling down",
+      "_note": "AL-01 panel meta; all four figures counted from the rules snapshot"
+    },
+    "v2_al_mock_delete": {
+      "zh": "已從本頁的暫存副本移除；未送出 DELETE。",
+      "en": "Removed from this page's in-memory copy; no DELETE was sent.",
+      "_note": "AL-01 honest confirmation after the mock delete"
+    },
+    "v2_al_mock_save": {
+      "zh": "設計稿不會送出這個請求：沒有後端，儲存只關閉抽屜。",
+      "en": "The mockup does not send this request: there is no backend here, so saving only closes the drawer.",
+      "_note": "drawer honesty note"
+    },
+    "v2_al_ops_intro": {
+      "zh": "每個按鈕都對應一個 POST /api/actions/*。設計稿沒有後端：按下去只會把「會送出的請求」寫進下方主控台，不會執行、也不會捏造輸出。",
+      "en": "Every button here maps to a POST /api/actions/*. The mockup has no backend: pressing one records the request it would send in the console below, and never executes it or invents output.",
+      "_note": "ops sub-view intro"
+    },
+    "v2_al_payload": {
+      "zh": "儲存時送出的 payload",
+      "en": "Payload sent on save",
+      "_note": "drawer section head; transcribed from the save handler"
+    },
+    "v2_al_ro_section": {
+      "zh": "後端欄位（表單不收）",
+      "en": "Backend fields the form does not collect",
+      "_note": "drawer section head;每個欄位標註來源，避免像上一次改版那樣整批消失"
+    },
+    "v2_al_run_note": {
+      "zh": "真實執行會取 analysis 檔案鎖並序列化（actions.py:519-531）；同時另一個分析在跑會回 409。",
+      "en": "A real run takes the analysis file lock and serialises (actions.py:519-531); a concurrent analysis returns 409.",
+      "_note": "AL-08"
+    },
+    "v2_al_scope_body": {
+      "zh": "規則的條件、門檻與篩選都在這裡編輯；每個 drawer 底部會印出實際會送出的 payload 與端點。",
+      "en": "Rule conditions, thresholds and filters are edited here; every drawer prints the exact payload and endpoint it would send.",
+      "_note": "rules rail"
+    },
+    "v2_al_scope_ops": {
+      "zh": "要真的跑一次分析、送測試告警或重置 watermark，在維運操作頁。",
+      "en": "Running an analysis, sending a test alert or resetting the watermark all live in the ops sub-view.",
+      "_note": "rules rail; points at #/alerting/ops"
+    },
+    "v2_al_scope_title": {
+      "zh": "這頁能改什麼",
+      "en": "What this page changes",
+      "_note": "rules rail, second card"
+    },
+    "v2_al_sel_clear": {
+      "zh": "清除選取",
+      "en": "Clear selection",
+      "_note": "AL-01 bulk bar; the second button next to Delete selected"
+    },
+    "v2_al_src_bw": {
+      "zh": "來源：index.html m-bw（:2720-2770）＋ rules.js saveBW（:572-583）；PUT 會同時送 rule_type 與 type（:578）。",
+      "en": "Source: index.html m-bw (:2720-2770) and rules.js saveBW (:572-583); the PUT sends both rule_type and type (:578).",
+      "_note": "AL-05 provenance"
+    },
+    "v2_al_src_event": {
+      "zh": "來源：index.html m-event（:2581-2645）＋ rules.js saveEvent（:515-543）。分類／事件連動來自 event_catalog 快照（populateEvents :366-390、updateEventFilters :445-457）。",
+      "en": "Source: index.html m-event (:2581-2645) and rules.js saveEvent (:515-543). The category/event chain comes from the event_catalog snapshot (populateEvents :366-390, updateEventFilters :445-457).",
+      "_note": "AL-02 provenance"
+    },
+    "v2_al_src_system": {
+      "zh": "來源：index.html m-system（:2647-2677）＋ rules.js saveSystemRule（:545-560）；rules.py:196-198 只接受 pce_health。",
+      "en": "Source: index.html m-system (:2647-2677) and rules.js saveSystemRule (:545-560); rules.py:196-198 accepts pce_health only.",
+      "_note": "AL-03 provenance"
+    },
+    "v2_al_src_traffic": {
+      "zh": "來源：index.html m-traffic（:2679-2718）＋ rules.js saveTraffic（:562-570）。",
+      "en": "Source: index.html m-traffic (:2679-2718) and rules.js saveTraffic (:562-570).",
+      "_note": "AL-04 provenance"
+    },
+    "v2_al_stored_filters": {
+      "zh": "已儲存的篩選欄位（legacy scalar）",
+      "en": "Stored filter fields (legacy scalars)",
+      "_note": "traffic/bandwidth drawer; rules.py:41-47 _RULE_LEGACY_SCALAR_KEYS"
+    },
+    "v2_al_test_alert_note": {
+      "zh": "單一管道會送 {\"channel\": \"<name>\"}；管道未啟用或未設定時後端回 400（actions.py:580-585）。灰掉的按鈕就是這種管道。",
+      "en": "A single-channel test sends {\"channel\": \"<name>\"}; the backend returns 400 when that channel is disabled or unconfigured (actions.py:580-585). The dimmed buttons are exactly those channels.",
+      "_note": "AL-10"
+    },
+    "v2_al_test_bad_json": {
+      "zh": "無法解析 JSON：",
+      "en": "Could not parse the JSON:",
+      "_note": "AL-07 parse error"
+    },
+    "v2_al_test_desc": {
+      "zh": "貼上一筆 PCE 原始事件 JSON，看目前哪些事件規則會命中。",
+      "en": "Paste one raw PCE event as JSON to see which event rules would fire on it.",
+      "_note": "AL-07"
+    },
+    "v2_al_test_load": {
+      "zh": "載入",
+      "en": "Load",
+      "_note": "AL-07"
+    },
+    "v2_al_test_meta": {
+      "zh": "樣例來自快照的 {n} 筆真實事件",
+      "en": "{n} real captured events available as samples",
+      "_note": "AL-07 panel meta"
+    },
+    "v2_al_test_none": {
+      "zh": "沒有規則命中",
+      "en": "No rule matches",
+      "_note": "AL-07 empty result"
+    },
+    "v2_al_test_none_body": {
+      "zh": "這筆事件不會觸發任何目前啟用中的事件規則。改事件型別、status 或 severity 再比對一次。",
+      "en": "This event fires none of the current event rules. Change its event type, status or severity and match again.",
+      "_note": "AL-07 empty result body"
+    },
+    "v2_al_test_note": {
+      "zh": "命中判定是 src/events/matcher.py:8-89（matches_event_rule）的逐句移植，跑在快照裡的原始事件上，因此這裡的數字是真的。兩點差異要知道：(1) Python re 與 JavaScript RegExp 是不同引擎，罕見的 regex 樣式可能不一致；(2) 產品的 /api/events/rule_test（events.py:203-300）是反過來問「某條規則會命中最近哪些事件」，而且會同時跑 legacy matcher（shadow.py:34）做對照。",
+      "en": "Matching is a statement-for-statement port of src/events/matcher.py:8-89 (matches_event_rule) run over the raw events in the snapshot, so the numbers here are real. Two known differences: (1) Python's re and JavaScript's RegExp are different engines, so an exotic pattern could disagree; (2) the product's /api/events/rule_test (events.py:203-300) asks the inverse question — which recent events a given rule matches — and also runs the legacy matcher (shadow.py:34) for comparison.",
+      "_note": "AL-07 provenance + DESIGN-ADDED inversion, stated"
+    },
+    "v2_al_test_result": {
+      "zh": "{total} 條啟用中的事件規則中，{hits} 條命中。",
+      "en": "{hits} of {total} enabled event rules match.",
+      "_note": "AL-07 result headline; disabled rules are excluded because analyzer.py:1040 skips them"
+    },
+    "v2_al_test_run": {
+      "zh": "比對",
+      "en": "Match",
+      "_note": "AL-07"
+    },
+    "v2_al_test_sample": {
+      "zh": "載入樣例事件",
+      "en": "Load a sample event",
+      "_note": "AL-07 sample picker"
+    },
+    "v2_al_test_title": {
+      "zh": "規則測試沙盤",
+      "en": "Rule test sandbox",
+      "_note": "AL-07 panel title"
+    },
+    "v2_al_toggle_note": {
+      "zh": "PUT /api/rules/{idx} {\"enabled\": {enabled}} —— 設計稿只改本機暫存，未送出。",
+      "en": "PUT /api/rules/{idx} {\"enabled\": {enabled}} — the mockup only changed its local copy.",
+      "_note": "AL-01 toggle; rules.js:130-147 is the real request"
+    },
+    "v2_al_wm_cooldowns": {
+      "zh": "目前有 {n} 條規則的冷卻紀錄",
+      "en": "{n} rules currently hold a cooldown record",
+      "_note": "AL-11"
+    },
+    "v2_al_wm_i1": {
+      "zh": "清除 event_watermark：下次分析會從頭重抓事件。",
+      "en": "Clears event_watermark: the next analysis re-reads events from the start.",
+      "_note": "AL-11 impact"
+    },
+    "v2_al_wm_i2": {
+      "zh": "清除 alert_history：所有規則的冷卻歸零，剛發過的告警可以立刻再發。",
+      "en": "Clears alert_history: every rule's cooldown resets, so a just-sent alert can fire again immediately.",
+      "_note": "AL-11 impact"
+    },
+    "v2_al_wm_i3": {
+      "zh": "清除 event_seen：已經看過的事件會被當成新事件再處理一次。",
+      "en": "Clears event_seen: already-seen events are processed again as if new.",
+      "_note": "AL-11 impact"
+    },
+    "v2_al_wm_i4": {
+      "zh": "這是除錯工具，正常運轉時不需要用；後端會在 analysis lock 內清除，否則會被進行中的週期原樣寫回（actions.py:620-628）。",
+      "en": "This is a debug tool, not part of normal operation; the backend clears under the analysis lock, otherwise a running cycle would write the old values straight back (actions.py:620-628).",
+      "_note": "AL-11 impact"
+    },
+    "v2_al_wm_seen": {
+      "zh": "已看過事件的去重集合",
+      "en": "The seen-event dedup set",
+      "_note": "AL-11"
+    },
+    "v2_au_action_hint": {
+      "zh": "啟用＝時段內開、時段外關；停用＝時段內關、時段外開（引擎：target = in_window，disable 取反，rule_scheduler.py:355）。",
+      "en": "Enable = on inside the window, off outside it. Disable = the negation (engine: target = in_window, negated for disable, rule_scheduler.py:355).",
+      "_note": "AU-05/06 action semantics"
+    },
+    "v2_au_check_empty": {
+      "zh": "這份 mockup 沒有引擎、也沒有 PCE，所以不會偽造一次執行的輸出。按下按鈕改為把引擎的判定式套在已存排程上，算出「現在這一刻它們各自會怎麼判」。",
+      "en": "This mockup has no engine and no PCE, so it will not fabricate run output. The button instead applies the engine's own decision rules to the stored schedules and shows how each one would be judged right now.",
+      "_note": "AU-09 honest empty state"
+    },
+    "v2_au_check_flow": {
+      "zh": "POST /api/rule_scheduler/check\n  with _rs_db_lock:      # 與其他寫入路由共用同一把鎖\n      db.load()          # 先重讀，避免整檔覆寫互相清掉\n      logs = engine.check(silent=True, tz_str=...)\n  _append_rs_logs(logs)  # deque(maxlen=200)\n  return {ok: true, logs: [...去除 ANSI...]}",
+      "en": "POST /api/rule_scheduler/check\n  with _rs_db_lock:      # shared with every other writing route\n      db.load()          # re-read first; whole-file writes must not clobber\n      logs = engine.check(silent=True, tz_str=...)\n  _append_rs_logs(logs)  # deque(maxlen=200)\n  return {ok: true, logs: [...ANSI stripped...]}",
+      "_note": "AU-09 code pane; transcribed from rule_scheduler.py:432-445"
+    },
+    "v2_au_check_real": {
+      "zh": "真實行為：POST /api/rule_scheduler/check 會在寫入鎖裡重讀排程庫、跑一次 engine.check(silent=True)、把產生的行寫進伺服器的紀錄環，再去掉 ANSI 色碼回傳（rule_scheduler.py:432-445）。也就是說，按下去就會真的切換 PCE 規則。",
+      "en": "What really happens: POST /api/rule_scheduler/check re-reads the schedule store inside the write lock, runs engine.check(silent=True) once, appends the produced lines to the server's log ring and returns them with ANSI stripped (rule_scheduler.py:432-445). Pressing it really does toggle PCE rules.",
+      "_note": "AU-09 honest description of the real endpoint"
+    },
+    "v2_au_check_toast": {
+      "zh": "已用轉錄後的判定式重算，未執行任何切換。",
+      "en": "Recomputed with the transcribed decision rules; nothing was toggled.",
+      "_note": "AU-09 toast"
+    },
+    "v2_au_dec_clock": {
+      "zh": "以瀏覽器時間 {now} 計算。",
+      "en": "Computed against the browser clock, {now}.",
+      "_note": "AU-09 preview clock line"
+    },
+    "v2_au_dec_expired": {
+      "zh": "已過期 → 停用並移除排程",
+      "en": "Expired → disable and drop the schedule",
+      "_note": "AU-09 verdict — rule_scheduler.py:355-378"
+    },
+    "v2_au_dec_in_window": {
+      "zh": "在時段內",
+      "en": "inside the window",
+      "_note": "AU-09 verdict fragment"
+    },
+    "v2_au_dec_keep_enabled": {
+      "zh": "未到期 → 維持啟用",
+      "en": "Not yet expired → stay enabled",
+      "_note": "AU-09 verdict — rule_scheduler.py:379"
+    },
+    "v2_au_dec_note": {
+      "zh": "判定式逐句轉錄自 rule_scheduler.py:302-399：先看 Draft（擋下就不動），再算 one_time 是否過期、recurring 是否落在視窗內，最後由 action 決定目標狀態。這是計算，不是執行結果：沒有切換、沒有寫紀錄，機器那端完全不知道。",
+      "en": "The rules are transcribed statement by statement from rule_scheduler.py:302-399: the draft gate first (a block means no action), then whether a one_time entry has expired and whether a recurring window contains the moment, then the action decides the target state. This is a computation, not a result: nothing toggled, nothing logged, the appliance never hears about it.",
+      "_note": "AU-09 preview provenance"
+    },
+    "v2_au_dec_out_window": {
+      "zh": "不在時段內",
+      "en": "outside the window",
+      "_note": "AU-09 verdict fragment"
+    },
+    "v2_au_dec_skip_draft": {
+      "zh": "略過：目標仍是 Draft",
+      "en": "Skipped: target is still Draft",
+      "_note": "AU-09 verdict — rule_scheduler.py:381-385"
+    },
+    "v2_au_dec_title": {
+      "zh": "判定預覽（不執行）",
+      "en": "Decision preview (no run)",
+      "_note": "AU-09 preview section head"
+    },
+    "v2_au_del_i_count": {
+      "zh": "刪除 {n} 筆排程（本頁為 mockup，只改記憶體）",
+      "en": "Delete {n} schedules (mockup: in-memory only)",
+      "_note": "AU-08 delete impact line"
+    },
+    "v2_au_del_i_fail": {
+      "zh": "註記清除失敗的 href 會列在回應的 note_clear_failed 裡；本地排程已刪，那段註記不會再有人清。",
+      "en": "Any href whose note could not be cleared comes back in note_clear_failed; the local entry is already gone, so nobody will clear that note again.",
+      "_note": "AU-08 delete impact — rule_scheduler.py:414-424"
+    },
+    "v2_au_del_i_note": {
+      "zh": "同時會清掉 PCE 物件 description 裡的排程註記。",
+      "en": "The schedule note in the PCE object's description is cleared too.",
+      "_note": "AU-08 delete impact — transcribed from rule_scheduler.py:409-431"
+    },
+    "v2_au_detail_only": {
+      "zh": "只有 ruleset {id} 的規則清單被擷取進快照（擷取器把 rs_ruleset_detail 綁在 rs_rulesets.items[0].id，見 test_capture_snapshots.py:91-101）。真實環境點任何一個 ruleset 都會即時向 PCE 取回規則。",
+      "en": "Only ruleset {id} has a captured rule list (the capture pins rs_ruleset_detail to rs_rulesets.items[0].id — test_capture_snapshots.py:91-101). On a live appliance every ruleset fetches its rules from the PCE on click.",
+      "_note": "AU-03 honest gap for non-captured rulesets"
+    },
+    "v2_au_dow_off_list": {
+      "zh": "不在產品星期清單內",
+      "en": "not in the product's day-of-week list",
+      "_note": "AU-11/AU-12 list-cell flag for an unmapped day_of_week, same pattern as v2_au_rep_type_off_list"
+    },
+    "v2_au_dow_unknown": {
+      "zh": "這筆排程存的 day_of_week 是「{value}」，不在產品下拉選單的七個值裡（monday…sunday，index.html:1638-1645、config_models.py:124）。排程比對用 now.strftime(\"%A\").lower()（report_scheduler.py:259），只會產生 monday…sunday，永遠不會等於「{value}」——這筆排程實際上從未在預期的星期觸發，這是產品端的真實 bug，不是本頁的簡化。這裡把原值保留成一個選項並標記 ⚠，不做靜默正規化。",
+      "en": "This schedule stores day_of_week \"{value}\", which is not one of the product dropdown's seven values (monday…sunday, index.html:1638-1645, config_models.py:124). The match is now.strftime(\"%A\").lower() (report_scheduler.py:259), which only ever produces monday…sunday — it can never equal \"{value}\", so this schedule has in fact never fired on its intended day. This is a real product bug, not a simplification made here. The stored value is kept as an option and marked ⚠ instead of being silently normalized.",
+      "_note": "AU-11 unknown day_of_week warning (fix round I2) — mirrors v2_au_rep_type_unknown's keep-and-flag treatment"
+    },
+    "v2_au_expire_engine": {
+      "zh": "到期時間一過，引擎會 disable 並 provision 目標，成功才刪掉排程與 PCE 註記；失敗就保留排程、下一輪重試（rule_scheduler.py:355-378，2026-07-24 審查 BUG-1 的修法：不可讓規則留在 enabled 卻沒人管）。",
+      "en": "Once the moment passes the engine disables and provisions the target, and only removes the schedule and the PCE note if that succeeded; on failure the schedule stays and the next tick retries (rule_scheduler.py:355-378 — the 2026-07-24 review fix: a rule must never be left enabled with nobody watching it).",
+      "_note": "AU-07 expire semantics"
+    },
+    "v2_au_fmt_hint": {
+      "zh": "表單只存一個值；選「全部格式」時儲存會展開成 html + csv + xlsx 三種（dashboard.js:443-444）。",
+      "en": "The form stores one value; choosing all expands to html + csv + xlsx on save (dashboard.js:443-444).",
+      "_note": "AU-11 format field hint"
+    },
+    "v2_au_job_ago": {
+      "zh": "前",
+      "en": "ago",
+      "_note": "AU-13 relative-age suffix"
+    },
+    "v2_au_job_all": {
+      "zh": "看全部",
+      "en": "Show all",
+      "_note": "AU-13 filter toggle (pressed state)"
+    },
+    "v2_au_job_asof": {
+      "zh": "所有「距今」都是相對快照擷取的那一刻（{at}），不是你現在的時間。",
+      "en": "Every age is measured against the capture instant ({at}), not your clock.",
+      "_note": "AU-13 frozen-time honesty"
+    },
+    "v2_au_job_beat": {
+      "zh": "節拍",
+      "en": "Beat",
+      "_note": "AU-13 column head for the age/interval meter"
+    },
+    "v2_au_job_beat_note": {
+      "zh": "節拍為本設計新增（DESIGN-ADDED）：長條是「上次執行距快照時刻」占 interval 的比例，刻度就是一個 interval，超過刻度代表這一拍已經遲了。兩個值都由 job_health 既有欄位相減得出，沒有另外取數，也沒有重新判定 level。",
+      "en": "The beat meter is DESIGN-ADDED: the bar is the age of the last run at capture time as a fraction of the job's interval, and the tick is exactly one interval, so anything past the tick is a late beat. Both figures are subtraction on fields already in job_health — no extra fetch, and level is never re-judged.",
+      "_note": "AU-13 beat provenance"
+    },
+    "v2_au_job_err_note": {
+      "zh": "上次執行失敗",
+      "en": "the last run failed",
+      "_note": "AU-13 KPI sub-line"
+    },
+    "v2_au_job_hist_note": {
+      "zh": "誠實說明：後端每個 job 只保存「上次執行」一筆（last_run / last_status / detail），沒有逐次執行的歷史端點，所以這裡不畫執行時間軸。要看實際發生了什麼：規則排程的逐輪紀錄在「規則排程」子頁，其餘 job 走系統日誌。",
+      "en": "Stated plainly: the backend keeps only the LAST run per job (last_run / last_status / detail); there is no per-run history endpoint, so no run timeline is drawn here. For what actually happened: the rule scheduler's per-tick log is on the rule-schedule sub-view, and everything else is in the system logs.",
+      "_note": "AU-13 history honesty"
+    },
+    "v2_au_job_level_note": {
+      "zh": "level 由後端判定，此頁不重算：error＝上次執行失敗、warn＝從未執行或已逾期、ok＝正常（integrations.js:1502-1503）。狀態欄只有在 warn 且確實跑過時才接「逾期」兩字（:1513-1515）。",
+      "en": "level is the backend's verdict and is not recomputed here: error = the last run failed, warn = never ran or overdue, ok = healthy (integrations.js:1502-1503). The status cell appends 逾期 only when a warn job HAS run before (:1513-1515).",
+      "_note": "AU-13 level semantics"
+    },
+    "v2_au_job_next": {
+      "zh": "下一拍",
+      "en": "next",
+      "_note": "AU-13 projected next-run label"
+    },
+    "v2_au_job_ok_note": {
+      "zh": "level 為 ok 的 job",
+      "en": "jobs whose level is ok",
+      "_note": "AU-13 KPI sub-line"
+    },
+    "v2_au_job_only_bad": {
+      "zh": "只看異常",
+      "en": "Only problems",
+      "_note": "AU-13 filter toggle"
+    },
+    "v2_au_job_total": {
+      "zh": "Job 總數",
+      "en": "Jobs",
+      "_note": "AU-13 KPI label"
+    },
+    "v2_au_job_total_note": {
+      "zh": "dashboard_overview.job_health 的全部項目",
+      "en": "every entry in dashboard_overview.job_health",
+      "_note": "AU-13 KPI sub-line"
+    },
+    "v2_au_job_warn_note": {
+      "zh": "從未執行或已逾期",
+      "en": "never ran, or overdue",
+      "_note": "AU-13 KPI sub-line"
+    },
+    "v2_au_jobs_intro": {
+      "zh": "這是排程與整台機器的心跳：上面兩個子頁的排程都靠這些背景 job 觸發。總覽只給一個燈，這一頁給每一個 job 的間隔、上次執行，以及離下一拍還有多久。",
+      "en": "This is the heartbeat under both schedule pages: every schedule above is fired by one of these background jobs. The overview shows one light; this page shows each job's interval, last run and how far it is into its own beat.",
+      "_note": "AU jobs sub-view lead paragraph"
+    },
+    "v2_au_kind_mismatch": {
+      "zh": "型態與 href 不一致",
+      "en": "kind disagrees with href",
+      "_note": "AU-08 mismatch flag"
+    },
+    "v2_au_kind_note": {
+      "zh": "目標欄同時標示型態與位址。型態取自 href：ruleset 是 /rule_sets/<id>，rule 則在後面再多一段 /sec_rules/、/rules/ 或 /deny_rules/（三種規則集合，rule_scheduler.py:160-166）。欄位 is_ruleset 是表單當時的宣告，而它並非裝飾——api_client.py:1325 用它決定要 provision 的範圍（is_ruleset 為真就 provision 這個 href，否則往上取到父 ruleset）。兩者不一致代表切換打在這個物件、卻 provision 了另一個範圍，所以就地標紅，不靜默取其一。",
+      "en": "The target column states kind and address together. The kind comes from the href: a ruleset ends at /rule_sets/<id>, a rule adds one more pair of segments — /sec_rules/, /rules/ or /deny_rules/ (the PCE's three rule collections, rule_scheduler.py:160-166). is_ruleset is what the form claimed, and it is not decoration: api_client.py:1325 uses it to choose the provision scope (the href itself when true, otherwise the parent ruleset). A disagreement means the toggle lands on one object while another scope is provisioned, so it is flagged in place rather than silently resolved.",
+      "_note": "AU-08 dual-target model note"
+    },
+    "v2_au_kpi_snapday": {
+      "zh": "快照的執行紀錄止於 {day}：當日 {runs} 次檢查、{hits} 次切換、{errors} 次錯誤。上面四格用的是產品自己的算式（以瀏覽器當日午夜為界，rule-scheduler.js:783-795），靜態快照必然落在 0——這一行讓那個 0 讀起來是日期問題，不是排程器停擺。",
+      "en": "The captured log ends on {day}: {runs} checks, {hits} toggles, {errors} errors that day. The four figures above use the product's own arithmetic (the browser's midnight, rule-scheduler.js:783-795), which on a static snapshot is always zero — this line makes that zero read as a date, not as a dead scheduler.",
+      "_note": "AU-01 DESIGN-ADDED sub-line"
+    },
+    "v2_au_log_cap": {
+      "zh": "紀錄是行程內的環狀緩衝，上限 200 筆，最舊的自動淘汰（src/gui/__init__.py:103）；快照剛好抓滿 200 筆。「清除」只清畫面，伺服器那份不動（rule-scheduler.js:640-643）——這是產品行為，不是本頁的簡化。",
+      "en": "The history is an in-process ring buffer capped at 200 entries, oldest evicted (src/gui/__init__.py:103); the snapshot caught exactly 200. Clear empties the pane only and leaves the server's copy alone (rule-scheduler.js:640-643) — that is the product's behaviour, not a mockup shortcut.",
+      "_note": "AU-10 log provenance"
+    },
+    "v2_au_log_clear_note": {
+      "zh": "只清掉畫面上的輸出；伺服器的紀錄環沒有被動到。",
+      "en": "Cleared the pane only; the server's ring buffer is untouched.",
+      "_note": "AU-10 clear toast"
+    },
+    "v2_au_log_meta": {
+      "zh": "{n} 筆執行紀錄",
+      "en": "{n} log entries",
+      "_note": "AU-10 panel meta"
+    },
+    "v2_au_mock_delete": {
+      "zh": "mockup 不會呼叫 API：只從這一頁的副本移除。",
+      "en": "The mockup calls no API: removed from this page's copy only.",
+      "_note": "shared mock-delete impact line"
+    },
+    "v2_au_mock_run": {
+      "zh": "真實環境會開一條背景執行緒跑報表，狀態由 running 變成 success 或 failed；這裡只把狀態改成 running，讓你看見那一段。",
+      "en": "On a real appliance this starts a background thread and the state moves running → success or failed; here only the running state is shown so the transition is visible.",
+      "_note": "AU-12 run-now toast suffix"
+    },
+    "v2_au_mock_save": {
+      "zh": "mockup 不會呼叫 API：只改了這一頁記憶體中的副本，離開路由就還原。",
+      "en": "The mockup calls no API: this edited the in-memory copy only, and leaving the route resets it.",
+      "_note": "shared mock-save toast"
+    },
+    "v2_au_mock_toggle": {
+      "zh": "只切換了畫面上的副本。",
+      "en": "Toggled the on-screen copy only.",
+      "_note": "AU-12 toggle toast suffix"
+    },
+    "v2_au_name_hint": {
+      "zh": "同時送出 name 與 detail_name（rule-scheduler.js:449, :456）；清單的描述欄讀的是 detail_name。",
+      "en": "Sent as both name and detail_name (rule-scheduler.js:449, :456); the list's description column reads detail_name.",
+      "_note": "AU-05/06 name field hint"
+    },
+    "v2_au_note_en": {
+      "zh": "這段字會寫進 PCE 物件的 description 欄位，固定使用英文——它是不透明資料，之後的報表會原樣輸出，寫中文會流進 EN 模式的稽核報表（rule_scheduler.py:357-360）。註記寫入失敗時整筆排程回滾並回 502（:375-390）。",
+      "en": "This string goes into the PCE object's description and is always English — it is opaque data that later report runs surface verbatim, so Chinese would leak into EN-mode audit reports (rule_scheduler.py:357-360). If the note write fails the whole schedule is rolled back and the call answers 502 (:375-390).",
+      "_note": "AU-05/06 note provenance"
+    },
+    "v2_au_note_preview": {
+      "zh": "會寫進 PCE 的註記",
+      "en": "Note written into the PCE",
+      "_note": "AU-05/06 section head"
+    },
+    "v2_au_open_captured": {
+      "zh": "改看 ruleset {id}（有擷取到規則）",
+      "en": "Open ruleset {id} (rules captured)",
+      "_note": "AU-03 recovery action"
+    },
+    "v2_au_pf_draft": {
+      "zh": "僅為 Draft 的規則無法建立排程（送出會被 400 擋下）。",
+      "en": "Draft-only objects cannot be scheduled (the POST answers 400).",
+      "_note": "AU-05/06 pre-flight block, mirrors rs_sch_draft_block"
+    },
+    "v2_au_pf_note": {
+      "zh": "真實的三道關卡都在寫入之前、且一律 fail-closed：has_draft_changes 為真 → 400；get_provision_state 回 unknown → 502「PCE 沒有回應」（刻意與 draft 分開講，否則操作者會去找一個不存在的 draft）；狀態不是 active → 400。（rule_scheduler.py:302-330）mockup 沒有 PCE，這裡以快照的 provision_state 代打，並標明它代表哪一關。",
+      "en": "All three real gates run before anything is stored and all fail closed: has_draft_changes true → 400; get_provision_state unknown → 502 \"the PCE did not answer\" (deliberately worded apart from the draft case, or the operator hunts a draft that does not exist); state not active → 400. (rule_scheduler.py:302-330) The mockup has no PCE, so the captured provision_state stands in — and says which gate it stands for.",
+      "_note": "AU-05/06 pre-flight provenance"
+    },
+    "v2_au_pf_ok": {
+      "zh": "目標目前是 ACTIVE，可以建立排程。",
+      "en": "The target is ACTIVE; a schedule can be created.",
+      "_note": "AU-05/06 pre-flight pass"
+    },
+    "v2_au_pf_unknown": {
+      "zh": "這一層沒有擷取到部署狀態；真實環境會在這一步即時向 PCE 問一次。",
+      "en": "No provisioning state was captured at this level; a live appliance asks the PCE at this point.",
+      "_note": "AU-05/06 pre-flight unknown"
+    },
+    "v2_au_pick_ruleset": {
+      "zh": "從左側挑一個 ruleset 以檢視它的規則。",
+      "en": "Pick a ruleset on the left to see its rules.",
+      "_note": "AU-03 detail placeholder"
+    },
+    "v2_au_preflight": {
+      "zh": "前置檢查",
+      "en": "Pre-flight",
+      "_note": "AU-05/06 pre-flight strip label"
+    },
+    "v2_au_recon": {
+      "zh": "PCE 對帳",
+      "en": "PCE reconciliation",
+      "_note": "AU-08 column head"
+    },
+    "v2_au_recon_note": {
+      "zh": "對帳三態逐條轉錄自 rule_scheduler.py:258-300：抓 ruleset 失敗＝未知（維持原狀，不會把排程標成已刪除）；href 找得到＝顯示 PCE 上的 enabled 並清掉舊的 deleted 旗標；href 找不到＝標成已刪除。產品把三態壓成一個徽章，這裡分開講，因為「未知」和「已刪除」要處理的問題不一樣。",
+      "en": "The three states are transcribed from rule_scheduler.py:258-300: the ruleset fetch failed → unknown (nothing is re-flagged; a schedule is never marked deleted on a fetch error); the href resolves → show the PCE's enabled and clear any stale deleted flag; the href is gone → mark deleted. The product collapses all three into one badge; they are kept apart here because unknown and deleted are different problems.",
+      "_note": "AU-08 reconciliation provenance"
+    },
+    "v2_au_recon_unknown": {
+      "zh": "未知",
+      "en": "unknown",
+      "_note": "AU-08 reconciliation state: the ruleset fetch failed, so live state is unknown"
+    },
+    "v2_au_rep_app_on": {
+      "zh": "app_summary 會多出 app / env 兩個欄位，且 app 為必填（dashboard.js:447-449）。",
+      "en": "app_summary adds the app / env fields, and app is required (dashboard.js:447-449).",
+      "_note": "AU-11 report-type conditional block"
+    },
+    "v2_au_rep_del_i1": {
+      "zh": "排程本身會被刪除，之後不再產生新報表。",
+      "en": "The schedule is deleted; no further reports are produced.",
+      "_note": "AU-11 delete impact"
+    },
+    "v2_au_rep_del_i2": {
+      "zh": "已經產出的報表檔案不受影響，仍留在報表清單裡。",
+      "en": "Reports already produced are untouched and stay in the report list.",
+      "_note": "AU-11 delete impact"
+    },
+    "v2_au_rep_filters_off": {
+      "zh": "此報表類型沒有流量篩選區；儲存時也不會送出 filters（dashboard.js:446）。",
+      "en": "This report type has no traffic filter block, and no filters are sent on save (dashboard.js:446).",
+      "_note": "AU-11 report-type conditional block"
+    },
+    "v2_au_rep_filters_on": {
+      "zh": "此報表類型會顯示流量篩選區（FilterBar）與政策決策選項（dashboard.js:383-387）；mockup 不重複搬一份 FilterBar，改在此註明。",
+      "en": "This report type shows the traffic filter block and the policy-decision options (dashboard.js:383-387); the mockup states the rule instead of porting the FilterBar again.",
+      "_note": "AU-11 report-type conditional block"
+    },
+    "v2_au_rep_hist_empty": {
+      "zh": "這台機器的狀態檔裡還沒有這個排程的執行紀錄（last_run 也是空的）。",
+      "en": "The appliance's state file has no run record for this schedule yet (last_run is empty too).",
+      "_note": "AU-12 honest empty state"
+    },
+    "v2_au_rep_hist_meta": {
+      "zh": "{n} 筆",
+      "en": "{n} entries",
+      "_note": "AU-12 panel meta"
+    },
+    "v2_au_rep_hist_note": {
+      "zh": "誠實說明：GET /api/report-schedules/<id>/history 讀的是狀態檔裡該排程「目前狀態」那一筆，有就回一筆、沒有就回空陣列（reports.py:1221-1232）——它不是一份逐次執行的歷史。所以這一頁不會把它畫成時間軸。",
+      "en": "Stated plainly: GET /api/report-schedules/<id>/history reads the schedule's CURRENT state row from the state file and returns it as a one-element list, or an empty one (reports.py:1221-1232) — it is not a per-run history. So this page does not draw it as a timeline.",
+      "_note": "AU-12 endpoint honesty"
+    },
+    "v2_au_rep_history": {
+      "zh": "執行歷史",
+      "en": "Run history",
+      "_note": "AU-12 panel title"
+    },
+    "v2_au_rep_meta": {
+      "zh": "{total} 筆 · 啟用 {on}",
+      "en": "{total} schedules · {on} enabled",
+      "_note": "AU-11 panel meta"
+    },
+    "v2_au_rep_tick": {
+      "zh": "誰在觸發這些排程",
+      "en": "What fires these schedules",
+      "_note": "AU-12 side panel title"
+    },
+    "v2_au_rep_tick_note": {
+      "zh": "報表排程由背景 job tick_report_schedules 每 60 秒檢查一次；那個 job 的健康狀況在「背景工作」子頁。排程沒跑，先看那裡。",
+      "en": "Report schedules are fired by the tick_report_schedules background job, checked every 60 seconds; that job's health lives on the jobs sub-view. If a schedule did not run, look there first.",
+      "_note": "AU-12 hand-off to AU-13"
+    },
+    "v2_au_rep_type_off_list": {
+      "zh": "不在產品類型清單內",
+      "en": "not in the product's type list",
+      "_note": "AU-11 list-cell flag for an unmapped report_type (the product prints the raw value, dashboard.js:331)"
+    },
+    "v2_au_rep_type_unknown": {
+      "zh": "這筆排程存的 report_type 是「{type}」，不在產品表單的十一個選項裡（index.html:1591-1603、dashboard.js:317-329）。產品開啟這張表單時把 select.value 設成這個不存在的值（dashboard.js:401），瀏覽器對不存在的 <option> 一律回傳 selectedIndex=-1、value=\"\"——不是「落回第一個選項」；按儲存時 saveSchedule() 讀到的就是這個空字串，PUT 送出 report_type=\"\"（清空欄位，不是改成別的類型，dashboard.js:450）。這裡把原值保留成一個選項並標記 ⚠，讓它不會被默默清空。",
+      "en": "This schedule stores report_type \"{type}\", which is not one of the product form's eleven options (index.html:1591-1603, dashboard.js:317-329). Opening the form sets the select's value to this nonexistent value (dashboard.js:401); a browser <select> given a value with no matching <option> reports selectedIndex=-1 and value=\"\" — it does NOT fall back to the first option. Saving reads that empty string and PUTs report_type=\"\" (the field is CLEARED, not changed to another type, dashboard.js:450). Here the stored value is kept as a real option and marked ⚠ so it cannot be silently blanked.",
+      "_note": "AU-11 unknown report_type warning — a real data oddity in this snapshot; corrected 2026-08 fix round (M2): the product clears the field, it does not rewrite it"
+    },
+    "v2_au_reports_intro": {
+      "zh": "報表排程不改政策，只產檔案並寄信。每一筆的欄位以 report_schedules 的鍵為準逐一列出：表單管得到的可以改，其餘標為後端寫入並註明來歷——欄位被表單吃掉，正是上一次重構最常見的失誤。",
+      "en": "Report schedules change no policy; they produce files and mail them. Every key report_schedules carries is listed: the ones the form owns are editable, the rest are marked backend-written with their origin — a field swallowed by a form is exactly how the last redesign lost data.",
+      "_note": "AU reports sub-view lead paragraph"
+    },
+    "v2_au_ro_detail": {
+      "zh": "建立當下抄下來的目標描述，供清單顯示，不參與判定。",
+      "en": "A copy of the target's description taken at creation time; shown in lists, never used in the decision.",
+      "_note": "read-only field provenance"
+    },
+    "v2_au_ro_enabled": {
+      "zh": "由清單的啟用／停用鈕擁有（POST /toggle），不是表單欄位；新增時一律送 true。",
+      "en": "Owned by the list's enable/disable button (POST /toggle), not by the form; creation always sends true.",
+      "_note": "AU-11 read-only field provenance"
+    },
+    "v2_au_ro_href": {
+      "zh": "位址，由被排程的物件決定；排程的每一個動作都以它為準。",
+      "en": "The address, decided by the object being scheduled; every action addresses it.",
+      "_note": "read-only field provenance"
+    },
+    "v2_au_ro_id": {
+      "zh": "從 href 取出的物件 ID（_extract_id_href）。",
+      "en": "The object id extracted from the href (_extract_id_href).",
+      "_note": "read-only field provenance"
+    },
+    "v2_au_ro_is_ruleset": {
+      "zh": "由 href 形狀推得；表單會送出，但不是可編輯欄位。",
+      "en": "Derived from the href shape; sent by the form but not an editable field.",
+      "_note": "read-only field provenance"
+    },
+    "v2_au_ro_recon": {
+      "zh": "與 PCE 對帳的結果，每次列出排程時重算（rule_scheduler.py:258-300）。",
+      "en": "The reconciliation result, recomputed every time schedules are listed (rule_scheduler.py:258-300).",
+      "_note": "read-only field provenance"
+    },
+    "v2_au_ro_sched_id": {
+      "zh": "建立時由伺服器指派（毫秒時戳），也是 PUT / DELETE / toggle / run 的位址。",
+      "en": "Server-assigned at creation (a millisecond timestamp) and the address used by PUT / DELETE / toggle / run.",
+      "_note": "AU-11 read-only field provenance"
+    },
+    "v2_au_ro_state": {
+      "zh": "由排程器每輪寫入的執行狀態，不是設定值。",
+      "en": "Run state written by the scheduler on every tick, not a setting.",
+      "_note": "read-only field provenance"
+    },
+    "v2_au_rs_meta": {
+      "zh": "共 {total} 個 ruleset · 每頁 {size}",
+      "en": "{total} rulesets · {size} per page",
+      "_note": "AU-03 list meta (rs_rulesets.total/size)"
+    },
+    "v2_au_rs_page_note": {
+      "zh": "分頁沿用 /api/rule_scheduler/rulesets 的 page/size/total（rule_scheduler.py:142）。快照只擷取了第一頁，翻頁在 mockup 內不會再取資料。",
+      "en": "Paging follows /api/rule_scheduler/rulesets page/size/total (rule_scheduler.py:142). Only the first page was captured, so paging fetches nothing in the mockup.",
+      "_note": "AU-03 paging honesty"
+    },
+    "v2_au_rules_intro": {
+      "zh": "這一頁的東西會自己動手：排程時間一到，PCE 上的規則就被打開或關掉。所以每一列都先講清楚它動的是「整個 ruleset」還是「單一條 rule」。",
+      "en": "Everything on this page acts on its own: when a window opens, a PCE rule is switched on or off. So every row states first whether its target is a whole ruleset or one single rule.",
+      "_note": "AU rules sub-view lead paragraph"
+    },
+    "v2_au_sched_meta": {
+      "zh": "{total} 筆 · ruleset {rulesets} · rule {rules}",
+      "en": "{total} rows · {rulesets} ruleset · {rules} rule",
+      "_note": "AU-08 panel meta — the dual-target split, stated in the header"
+    },
+    "v2_au_search_hits": {
+      "zh": "{hits} / {total} 條規則符合",
+      "en": "{hits} of {total} rules match",
+      "_note": "AU-04 result count"
+    },
+    "v2_au_search_note": {
+      "zh": "搜尋條件逐字轉錄自 /api/rule_scheduler/rules/search（rule_scheduler.py:172-176）：ID 為完全相符、描述為不分大小寫的子字串。差異已標明——真實端點會把同一條件套在 PCE 全量 ruleset 上（rule_scheduler.py:156-189）並回傳跨 ruleset 的命中；mockup 只有這一份 ruleset 詳情，所以同一條件只跑在這幾條規則上。",
+      "en": "The predicate is transcribed from /api/rule_scheduler/rules/search (rule_scheduler.py:172-176): ID is an exact match, description is a case-insensitive substring. The difference is stated rather than hidden — the real endpoint runs it over every ruleset on the PCE (rule_scheduler.py:156-189) and returns hits across the whole policy; the mockup has one captured ruleset, so it runs over those rules.",
+      "_note": "AU-04 scope honesty"
+    },
+    "v2_au_search_scope": {
+      "zh": "搜尋範圍",
+      "en": "Search scope",
+      "_note": "AU-04 scope select label (gui_rs_search_btn is the button word, not a field label)"
+    },
+    "v2_au_status_meta": {
+      "zh": "每 {every} 檢查 · 已存 {rows} 筆排程",
+      "en": "checks every {every} · {rows} stored",
+      "_note": "AU-01 panel meta (rs_status.check_interval_seconds + rs_schedules length)"
+    },
+    "v2_au_stored_fields": {
+      "zh": "後端另外儲存的欄位",
+      "en": "Fields the backend stores",
+      "_note": "AU-05/06 + AU-11 read-only section head"
+    },
+    "v2_au_target_note_rule": {
+      "zh": "目標是單一條規則：href 在 ruleset 後面再帶一段 /sec_rules/、/rules/ 或 /deny_rules/，排程只切換這一條，同 ruleset 的其他規則不受影響（provision 仍然是整個父 ruleset，api_client.py:1325）。來源／目的／服務是這條規則自己的內容，會一起存進排程紀錄供日後辨識。",
+      "en": "The target is one single rule: the href adds /sec_rules/, /rules/ or /deny_rules/ after the ruleset, and only that rule is toggled; its siblings are untouched (the provision still covers the parent ruleset, api_client.py:1325). Source / destination / service are this rule's own, and are stored with the schedule so it stays identifiable later.",
+      "_note": "AU-06 target identity card"
+    },
+    "v2_au_target_note_ruleset": {
+      "zh": "目標是整個 ruleset：排程切換的是這個 ruleset 自己的 enabled，底下所有規則一起生效或失效。來源／目的／服務固定是「全部」，因為排程不挑規則。",
+      "en": "The target is the whole ruleset: the schedule toggles the ruleset's own enabled flag, so every rule inside it follows. Source / destination / service read 全部 because the schedule does not pick rules.",
+      "_note": "AU-05 target identity card"
+    },
+    "v2_au_tl_days_fmt": {
+      "zh": "{n} 天／週 {range}",
+      "en": "{n} days/wk {range}",
+      "_note": "AU-02 lane reading; the full day list is the tooltip and the AU-08 timing column"
+    },
+    "v2_au_tl_empty_why": {
+      "zh": "timeline_24h 是空陣列——這台機器過去 24 小時沒有任何規則切換：兩筆 ruleset 排程被 Draft 擋下，唯一的 rule 排程每次檢查都已在目標狀態（見下方執行紀錄）。產品在同樣的資料下顯示同一句空狀態。",
+      "en": "timeline_24h is an empty array — no rule was toggled in the last 24 hours: both ruleset schedules are blocked as Draft, and the one rule schedule was already in its target state at every check (see the execution log below). The product shows the same empty state on the same payload.",
+      "_note": "AU-02 honest empty state, explains WHY the product's own timeline is blank"
+    },
+    "v2_au_tl_lane_note": {
+      "zh": "泳道為本設計新增（DESIGN-ADDED）：產品的時間軸只畫「已經切換過」的次數，看不出「今晚幾點會翻」。每條泳道是一筆已存排程的作用時段，資料同 rs_schedules，跨午夜的視窗依引擎的算法拆成兩段（rule_scheduler.py:346-353）；單次到期排程畫成一路延伸到到期日的淡色長條。",
+      "en": "The lanes are DESIGN-ADDED: the product's timeline only counts toggles that already happened, so it cannot show what flips tonight. Each lane is one stored schedule's window, from the same rs_schedules rows, with midnight-crossing windows split exactly as the engine splits them (rule_scheduler.py:346-353); a one-time schedule is drawn as a pale bar running to its expiry.",
+      "_note": "AU-02 lane provenance"
+    },
+    "v2_au_tl_toggle_row": {
+      "zh": "已發生的切換",
+      "en": "Toggles that happened",
+      "_note": "AU-02 row label for the product's own 24h bucket row (timeline_24h)"
+    },
+    "v2_au_tl_until_fmt": {
+      "zh": "直到 {when}",
+      "en": "until {when}",
+      "_note": "AU-02 lane reading for a one_time schedule"
+    },
+    "v2_au_tz_hint": {
+      "zh": "每筆排程各自帶時區，引擎逐筆換算（rule_scheduler.py:334-338）；留 local 代表跟著系統設定。",
+      "en": "Each schedule carries its own timezone and the engine converts per entry (rule_scheduler.py:334-338); local means follow the system setting.",
+      "_note": "AU-05/06 timezone hint"
+    },
+    "v2_au_wrap_hint": {
+      "zh": "結束時間可以早於開始時間：引擎把它當跨午夜視窗處理（rule_scheduler.py:350-353）。",
+      "en": "The end may precede the start: the engine reads that as a window crossing midnight (rule_scheduler.py:350-353).",
+      "_note": "AU-05/06 wraparound hint"
+    },
+    "v2_cmd_density": {
+      "zh": "切換密度（寬鬆／緊湊）",
+      "en": "Toggle density (cozy / compact)"
+    },
+    "v2_cmd_empty": {
+      "zh": "沒有符合的指令",
+      "en": "No matching command"
+    },
+    "v2_cmd_group_area": {
+      "zh": "區域",
+      "en": "Area"
+    },
+    "v2_cmd_group_display": {
+      "zh": "顯示",
+      "en": "Display"
+    },
+    "v2_cmd_hint": {
+      "zh": "↑↓ 選擇 · Enter 執行 · Esc 關閉",
+      "en": "Up/Down to select, Enter to run, Esc to close"
+    },
+    "v2_cmd_open": {
+      "zh": "指令面板",
+      "en": "Commands"
+    },
+    "v2_cmd_placeholder": {
+      "zh": "輸入區域名稱或指令…",
+      "en": "Jump to an area or run a command..."
+    },
+    "v2_cmd_theme": {
+      "zh": "切換佈景（深色／淺色）",
+      "en": "Toggle theme (dark / light)"
+    },
+    "v2_col_age": {
+      "zh": "距今",
+      "en": "Age",
+      "_note": "Task-6 straggler: dispatch table header 'age'"
+    },
+    "v2_col_channel": {
+      "zh": "管道",
+      "en": "Channel",
+      "_note": "Task-6 straggler: dispatch table header 'ch'"
+    },
+    "v2_col_subject": {
+      "zh": "主旨",
+      "en": "Subject",
+      "_note": "Task-6 straggler: dispatch table header 'subject'"
+    },
+    "v2_density_compact": {
+      "zh": "緊湊",
+      "en": "Compact"
+    },
+    "v2_density_cozy": {
+      "zh": "寬鬆",
+      "en": "Cozy"
+    },
+    "v2_err_body": {
+      "zh": "讀不到快照「{id}」。mockup 必須以 http 服務（例如 python -m http.server），直接開檔（file://）會被瀏覽器擋下。",
+      "en": "Snapshot \"{id}\" is unreachable. Serve the mockup over http (python -m http.server); opening it as file:// is blocked by the browser."
+    },
+    "v2_err_detail": {
+      "zh": "技術細節",
+      "en": "Technical detail"
+    },
+    "v2_err_retry": {
+      "zh": "重試",
+      "en": "Retry"
+    },
+    "v2_err_title": {
+      "zh": "資料載入失敗",
+      "en": "Could not load data"
+    },
+    "v2_health_chan_fail": {
+      "zh": "{name}：上次送出 {status}",
+      "en": "{name}: last dispatch {status}"
+    },
+    "v2_health_chan_live": {
+      "zh": "{live}/{total} 個管道已啟用並完成設定",
+      "en": "{live}/{total} channels enabled and configured"
+    },
+    "v2_health_clear": {
+      "zh": "沒有異常訊號",
+      "en": "No abnormal signal"
+    },
+    "v2_health_goto": {
+      "zh": "前往",
+      "en": "Go to"
+    },
+    "v2_health_job_line": {
+      "zh": "{job}：{status}（每 {interval}，{age} 前）",
+      "en": "{job}: {status} (every {interval}, {age} ago)"
+    },
+    "v2_health_jobs_ok": {
+      "zh": "{ok}/{total} 個 job 正常",
+      "en": "{ok}/{total} jobs healthy"
+    },
+    "v2_health_lag_line": {
+      "zh": "{source} 落後 {age}",
+      "en": "{source} is {age} behind"
+    },
+    "v2_health_pce_failures": {
+      "zh": "連續失敗 {n} 次（{stage}）",
+      "en": "{n} consecutive failures ({stage})"
+    },
+    "v2_health_pce_last_error": {
+      "zh": "上次錯誤（{stage}）：{message}",
+      "en": "Last error ({stage}): {message}"
+    },
+    "v2_health_pce_last_success": {
+      "zh": "上次成功：{age} 前",
+      "en": "Last success: {age} ago"
+    },
+    "v2_health_pce_sticky": {
+      "zh": "上次錯誤不會在成功後清除，也沒有時間戳，僅供追溯；燈號不看這個欄位。",
+      "en": "The last error is never cleared on success and carries no timestamp. It is history only — the light does not read it."
+    },
+    "v2_health_queue_active": {
+      "zh": "處理中",
+      "en": "active"
+    },
+    "v2_health_queue_idle": {
+      "zh": "閒置",
+      "en": "idle"
+    },
+    "v2_health_reasons": {
+      "zh": "判定原因",
+      "en": "Why this reading"
+    },
+    "v2_health_siem_queue": {
+      "zh": "SIEM 佇列：{state}",
+      "en": "SIEM queue: {state}"
+    },
+    "v2_iv_accel_note": {
+      "zh": "持續模式每 10 分鐘重送一次，時間到自動停止（quarantine.js:734-737）。",
+      "en": "Persistent mode re-issues every 10 minutes and stops when the timer expires (quarantine.js:734-737).",
+      "_note": "IV-12 note"
+    },
+    "v2_iv_archive_files": {
+      "zh": "{files} 個檔 · 略過 {skipped}",
+      "en": "{files} files · {skipped} skipped",
+      "_note": "IV-06; archive_status.files/skipped have no shipping label"
+    },
+    "v2_iv_archive_load_note": {
+      "zh": "載入封存需要後端；此為快照畫面。",
+      "en": "Loading an archive needs the backend; this is a snapshot view.",
+      "_note": "IV-06 honest note for the load button"
+    },
+    "v2_iv_backfill_note": {
+      "zh": "回補會呼叫 PCE API 寫入本地快取；此畫面不會真的執行。",
+      "en": "A backfill calls the PCE API and writes the local cache; this screen does not run one.",
+      "_note": "IV-07 honest note"
+    },
+    "v2_iv_backfill_queued": {
+      "zh": "回補 {source}：{start} → {end}（示意）",
+      "en": "Backfill {source}: {start} → {end} (mock)",
+      "_note": "IV-07 toast"
+    },
+    "v2_iv_browse_captured": {
+      "zh": "快照只擷取到第一頁（{n}）；其餘要靠 browse 端點。",
+      "en": "The capture holds the first page ({n}); the rest needs the browse endpoint.",
+      "_note": "XC-04/XC-03; fb_browse.json is limit=20 of total 96"
+    },
+    "v2_iv_browser_added": {
+      "zh": "已加入 {n} 個物件",
+      "en": "Added {n} objects",
+      "_note": "XC-04 toast"
+    },
+    "v2_iv_cause_archive_r": {
+      "zh": "已載入 {rows} 列 / {files} 個檔",
+      "en": "{rows} rows from {files} files loaded",
+      "_note": "XC-09 cause 2 reading for the archive source, from archive_status"
+    },
+    "v2_iv_cause_cache": {
+      "zh": "快取有在收流量嗎？",
+      "en": "Is the cache collecting traffic?",
+      "_note": "XC-09 cause 1; answered from cache_settings.enabled"
+    },
+    "v2_iv_cause_cache_r": {
+      "zh": "raw {raw} 列 · agg {agg} 列",
+      "en": "raw {raw} rows · agg {agg} rows",
+      "_note": "XC-09 cause 1 reading, from cache_status"
+    },
+    "v2_iv_cause_filter": {
+      "zh": "條件是不是太嚴？",
+      "en": "Are the filters too tight?",
+      "_note": "XC-09 cause 3"
+    },
+    "v2_iv_cause_filter_n": {
+      "zh": "{n} 個條件",
+      "en": "{n} filter keys",
+      "_note": "XC-09 cause 3 reading"
+    },
+    "v2_iv_cause_filter_none": {
+      "zh": "沒有套用任何條件",
+      "en": "No filter is applied",
+      "_note": "XC-09 cause 3 reading when nothing is set"
+    },
+    "v2_iv_cause_filter_q": {
+      "zh": "快速搜尋：{q}",
+      "en": "Quick search: {q}",
+      "_note": "XC-09 cause 3 reading"
+    },
+    "v2_iv_cause_window": {
+      "zh": "查詢時間窗有資料嗎？",
+      "en": "Does the window hold any data?",
+      "_note": "XC-09 cause 2"
+    },
+    "v2_iv_cause_window_r": {
+      "zh": "查詢窗 {mins} 分鐘；超過保留天數的流量已被清掉",
+      "en": "Window {mins} min; traffic older than the retention above is already purged",
+      "_note": "XC-09 cause 2 reading for the live cache, from cache_settings.traffic_raw_retention_days"
+    },
+    "v2_iv_days": {
+      "zh": "保留 {n} 天",
+      "en": "kept {n} days",
+      "_note": "XC-09 retention reading"
+    },
+    "v2_iv_ev_all": {
+      "zh": "已顯示全部 {n} 筆",
+      "en": "All {n} events shown",
+      "_note": "IV-14 load-more end state"
+    },
+    "v2_iv_ev_catalog": {
+      "zh": "目錄：{cats} 個分類 · {types} 種事件",
+      "en": "Catalogue: {cats} categories · {types} event types",
+      "_note": "IV-13; the option counts come from event_catalog"
+    },
+    "v2_iv_ev_more_server": {
+      "zh": "後端還有更多事件（summary.has_more）；此頁只有擷取到的這一批。",
+      "en": "The server has more events (summary.has_more); this page only holds the captured page.",
+      "_note": "IV-14 load-more end state"
+    },
+    "v2_iv_ev_window": {
+      "zh": "{since} → {until}",
+      "en": "{since} → {until}",
+      "_note": "IV-13 meta; events.js:247 renders the same range"
+    },
+    "v2_iv_ev_window_note": {
+      "zh": "時間窗要重查後端；此頁顯示的是快照當下的區間。",
+      "en": "Changing the window needs a refetch; this page shows the captured range.",
+      "_note": "IV-13 honest note"
+    },
+    "v2_iv_filters_applied": {
+      "zh": "已套用 {n} 個篩選 key",
+      "en": "Applied {n} filter keys",
+      "_note": "IV-03 toast"
+    },
+    "v2_iv_kpi_basis": {
+      "zh": "取自本次結果的 {n} 列",
+      "en": "Derived from the {n} rows returned",
+      "_note": "index.html:821 tw-kpi-*-delta is a placeholder no code fills; a delta needs a previous query, so the slot states the basis instead"
+    },
+    "v2_iv_minutes": {
+      "zh": "{n} 分鐘",
+      "en": "{n} min",
+      "_note": "IV-12 duration radios; index.html:2521-2523 hardcodes '30 min' etc."
+    },
+    "v2_iv_more_ips": {
+      "zh": "…另外 {n} 個位址",
+      "en": "…and {n} more addresses",
+      "_note": "IV-08 interface list overflow"
+    },
+    "v2_iv_more_targets": {
+      "zh": "…另外 {n} 台",
+      "en": "…and {n} more",
+      "_note": "IV-09/IV-10 impact list overflow"
+    },
+    "v2_iv_payload": {
+      "zh": "送出的篩選條件",
+      "en": "Serialized filters",
+      "_note": "IV-03; the dict FilterBar posts to /api/quarantine/search"
+    },
+    "v2_iv_payload_note": {
+      "zh": "這就是 FilterBar 送給後端的 key；AND 模式給 src/dst 分欄的 key，OR 模式給 any_* 單值 key。",
+      "en": "These are the keys FilterBar posts: per-side keys in AND mode, single any_* keys in OR mode.",
+      "_note": "IV-03/XC-03; states the AND/OR contract the parity test guards"
+    },
+    "v2_iv_query_snapshot": {
+      "zh": "快照結果 {n} 列（此頁不會重新查 PCE）",
+      "en": "{n} rows from the snapshot (this page does not re-query the PCE)",
+      "_note": "IV-01 toast; XC-12's toast leg"
+    },
+    "v2_iv_shadow_current": {
+      "zh": "現行",
+      "en": "Current",
+      "_note": "IV-15 column; shadow.py:82 current_count"
+    },
+    "v2_iv_shadow_delta": {
+      "zh": "差異",
+      "en": "Delta",
+      "_note": "IV-15 column; shadow.py:84 delta"
+    },
+    "v2_iv_shadow_desc": {
+      "zh": "以同一批事件同時跑現行比對器與舊版比對器，列出結果不同的規則。",
+      "en": "Runs the current and the legacy matcher over the same events and lists the rules whose results differ.",
+      "_note": "IV-15; transcribed from src/events/shadow.py:1-20"
+    },
+    "v2_iv_shadow_legacy": {
+      "zh": "舊版",
+      "en": "Legacy",
+      "_note": "IV-15 column; shadow.py:83 legacy_count"
+    },
+    "v2_iv_shadow_title": {
+      "zh": "Shadow 比對（新舊事件比對器）",
+      "en": "Shadow compare (event matcher diff)",
+      "_note": "IV-15; the endpoint has no shipping UI, so it has no catalogue key either"
+    },
+    "v2_iv_shadow_unavailable": {
+      "zh": "需要真後端：此比對必須即時向 PCE 取事件，沒有可用的快照，因此不顯示任何結果。",
+      "en": "Needs a live backend: this comparison fetches events from the PCE, there is no snapshot for it, so no rows are shown.",
+      "_note": "IV-15 honest empty state"
+    },
+    "v2_lg_demo": {
+      "zh": "示範回應",
+      "en": "Demo response",
+      "_note": "login.html has no backend; the selector picks which server response to render"
+    },
+    "v2_lg_invalid_form": {
+      "zh": "表單格式錯誤（invalid_form）",
+      "en": "Invalid form (invalid_form)",
+      "_note": "auth.py:98 returns the bare literal"
+    },
+    "v2_lg_logout_menu": {
+      "zh": "入口在頂欄使用者選單（XC-13）；此頁呈現的是登出後的著陸狀態。",
+      "en": "The control lives in the top-bar user menu (XC-13); this page is the landing state after it.",
+      "_note": "shell.mjs usermenu"
+    },
+    "v2_lg_logout_route": {
+      "zh": "登出：POST /logout → session.clear() → 302 導向 /login。",
+      "en": "Sign-out: POST /logout → session.clear() → 302 to /login.",
+      "_note": "auth.py:141-145"
+    },
+    "v2_lg_mock": {
+      "zh": "此頁不會呼叫任何 API；上方是產品會送出的 request，不是本頁送出的。",
+      "en": "This page calls no API. The body above is what the product would send, not what this page sent.",
+      "_note": "mockup honesty"
+    },
+    "v2_lg_ok_note": {
+      "zh": "登入成功後導向 /（index.html）。此頁沒有後端，未實際認證。",
+      "en": "On success the product redirects to / (index.html). This page has no backend and authenticated nothing.",
+      "_note": "login.js:44-50"
+    },
+    "v2_lg_out_first": {
+      "zh": "200 首次登入需改密碼",
+      "en": "200 must change password",
+      "_note": "auth.py:129-137"
+    },
+    "v2_lg_out_form": {
+      "zh": "400 表單格式錯誤",
+      "en": "400 invalid_form",
+      "_note": "auth.py:98"
+    },
+    "v2_lg_out_invalid": {
+      "zh": "401 帳號或密碼錯誤",
+      "en": "401 invalid credentials",
+      "_note": "auth.py:139"
+    },
+    "v2_lg_out_ok": {
+      "zh": "200 登入成功",
+      "en": "200 signed in",
+      "_note": "outcome selector"
+    },
+    "v2_lg_out_signed": {
+      "zh": "已登出",
+      "en": "Signed out",
+      "_note": "auth.py:141-145"
+    },
+    "v2_lg_plate": {
+      "zh": "這台設備",
+      "en": "This appliance",
+      "_note": "DESIGN-ADDED identity plate"
+    },
+    "v2_lg_plate_why": {
+      "zh": "DESIGN-ADDED：產品登入頁不說明你正要登入哪一台。位址／版本／TLS 在認證前就可讀，是登入前最該知道的三件事。",
+      "en": "DESIGN-ADDED: the product's login page never says which appliance you are signing into. Address, version and TLS posture are all readable before authentication.",
+      "_note": "src/templates/login.html has no such block"
+    },
+    "v2_lg_pw_csrf": {
+      "zh": "帶上登入回應給的 csrf_token（X-CSRF-Token 標頭）；沒有它這個 POST 會被擋。",
+      "en": "Carries the csrf_token from the login response in the X-CSRF-Token header; without it this POST is rejected.",
+      "_note": "login.js:103-106"
+    },
+    "v2_lg_pw_endpoint": {
+      "zh": "送出：POST /api/security {new_password, confirm_password}",
+      "en": "Sends POST /api/security {new_password, confirm_password}",
+      "_note": "login.js:100-109"
+    },
+    "v2_lg_pw_masked": {
+      "zh": "********",
+      "en": "********",
+      "_note": "the request pane never prints a typed password"
+    },
+    "v2_lg_pw_ok_note": {
+      "zh": "此頁沒有後端，密碼未變更。",
+      "en": "This page has no backend; no password was changed.",
+      "_note": "mockup honesty"
+    },
+    "v2_lg_pw_rule": {
+      "zh": "新密碼至少 12 個字元，且兩次輸入必須一致——前端與後端都會檢查。",
+      "en": "At least 12 characters and both boxes must match — checked on the client and again on the server.",
+      "_note": "login.js:87-99 + config.py:108-111"
+    },
+    "v2_lg_request": {
+      "zh": "送出內容",
+      "en": "Request",
+      "_note": "the body POST /api/login would carry"
+    },
+    "v2_lg_required": {
+      "zh": "必填",
+      "en": "Required",
+      "_note": "client-side guard; the product relies on the input's required attribute"
+    },
+    "v2_lg_resp_first": {
+      "zh": "回應：200 {\"ok\": true, \"csrf_token\": \"…\", \"must_change_password\": true}",
+      "en": "Response: 200 {\"ok\": true, \"csrf_token\": \"…\", \"must_change_password\": true}",
+      "_note": "auth.py:129-137"
+    },
+    "v2_lg_resp_form": {
+      "zh": "回應：400 {\"error\": \"invalid_form\"}（字面字串，非 i18n key；pydantic 訊息含送出的密碼故被丟棄）",
+      "en": "Response: 400 {\"error\": \"invalid_form\"} — a literal, not an i18n key; the pydantic message is dropped because it embeds the submitted password",
+      "_note": "auth.py:92-98"
+    },
+    "v2_lg_resp_invalid": {
+      "zh": "回應：401 {\"error\": \"gui_err_invalid_auth\"}",
+      "en": "Response: 401 {\"error\": \"gui_err_invalid_auth\"}",
+      "_note": "auth.py:139"
+    },
+    "v2_lg_resp_ok": {
+      "zh": "回應：200 {\"ok\": true, \"csrf_token\": \"…\"}",
+      "en": "Response: 200 {\"ok\": true, \"csrf_token\": \"…\"}",
+      "_note": "auth.py:120-137"
+    },
+    "v2_lg_resp_signed": {
+      "zh": "回應：302 → /login（session.clear()）",
+      "en": "Response: 302 → /login (session.clear())",
+      "_note": "auth.py:141-145"
+    },
+    "v2_lg_signed_out": {
+      "zh": "已登出",
+      "en": "Signed out",
+      "_note": "LG-03"
+    },
+    "v2_lg_signed_out_body": {
+      "zh": "session 已清除，請重新登入。",
+      "en": "The session was cleared. Sign in again to continue.",
+      "_note": "auth.py:141-145"
+    },
+    "v2_lg_tls_ca": {
+      "zh": "CA 簽發",
+      "en": "CA-signed",
+      "_note": "tls_status.self_signed === false"
+    },
+    "v2_nav_alerting": {
+      "zh": "告警",
+      "en": "Alerting",
+      "_note": "area nav"
+    },
+    "v2_nav_automation": {
+      "zh": "自動化",
+      "en": "Automation",
+      "_note": "area nav"
+    },
+    "v2_nav_investigate": {
+      "zh": "調查",
+      "en": "Investigate",
+      "_note": "area nav"
+    },
+    "v2_nav_overview": {
+      "zh": "總覽",
+      "en": "Overview",
+      "_note": "area nav; distinct from gui_tab_dashboard because v2 areas are not v1 tabs"
+    },
+    "v2_nav_reports": {
+      "zh": "報表",
+      "en": "Reports",
+      "_note": "area nav"
+    },
+    "v2_nav_system": {
+      "zh": "系統",
+      "en": "System",
+      "_note": "area nav"
+    },
+    "v2_ov_cert_subject": {
+      "zh": "憑證主體",
+      "en": "Subject",
+      "_note": "tls_status.cert_info.subject"
+    },
+    "v2_ov_cert_valid_until": {
+      "zh": "有效期至",
+      "en": "Valid until",
+      "_note": "tls_status.cert_info.not_after"
+    },
+    "v2_ov_cond_and": {
+      "zh": "且",
+      "en": "and",
+      "_note": "joins the flat filter keys of one saved query"
+    },
+    "v2_ov_cond_none": {
+      "zh": "沒有篩選條件",
+      "en": "No filters"
+    },
+    "v2_ov_current": {
+      "zh": "目前",
+      "en": "Current",
+      "_note": "posture remediation: current vs target"
+    },
+    "v2_ov_dead_panel": {
+      "zh": "產品在 index.html:1023-1028 保留了這塊面板，但沒有任何 JS 會填它；此處改由 dashboard_snapshot 的 action_matrix 供稿。",
+      "en": "The product keeps this panel in index.html:1023-1028 but no JS ever fills it; here it is fed by dashboard_snapshot's action_matrix."
+    },
+    "v2_ov_detail": {
+      "zh": "詳情",
+      "en": "Details",
+      "_note": "Task 8 overview: opens the posture breakdown drawer"
+    },
+    "v2_ov_events_window": {
+      "zh": "查詢區間 {since} → {until}",
+      "en": "Window {since} → {until}"
+    },
+    "v2_ov_hero_recomputed": {
+      "zh": "標題分數改用 snapshot.maturity_score/maturity_grade：產品的 hero 以英文字串比對本地化後的 KPI 標籤，中文環境永遠比不中，於是回報 0/?。",
+      "en": "The headline uses snapshot.maturity_score/maturity_grade: the product's hero matches the English word \"maturity\" against an already-localised KPI label, so a zh appliance always reports 0/?."
+    },
+    "v2_ov_last_batch": {
+      "zh": "最近批次",
+      "en": "Last batch",
+      "_note": "status.pce_stats.last_batch_total / _unknown"
+    },
+    "v2_ov_last_batch_fmt": {
+      "zh": "{total} / {unknown} 筆不明",
+      "en": "{total} / {unknown} unknown",
+      "_note": "OV-01: status.pce_stats.last_batch_total / last_batch_unknown — review finding, was hardcoded English '... unknown'"
+    },
+    "v2_ov_last_dispatch": {
+      "zh": "上次送出",
+      "en": "Last dispatch",
+      "_note": "alert channel last_status/last_timestamp"
+    },
+    "v2_ov_last_poll": {
+      "zh": "上次輪詢",
+      "en": "Last poll",
+      "_note": "status.pce_stats.last_event_poll"
+    },
+    "v2_ov_latest_per_type": {
+      "zh": "每型最新一筆",
+      "en": "Latest per type",
+      "_note": "reports_list grouped by report_type"
+    },
+    "v2_ov_list_hint": {
+      "zh": "逗號分隔",
+      "en": "Comma separated"
+    },
+    "v2_ov_missing_fields": {
+      "zh": "缺少設定：{fields}",
+      "en": "Missing settings: {fields}",
+      "_note": "alert_channels[].missing_required"
+    },
+    "v2_ov_no_truncation": {
+      "zh": "近 7 天沒有偵測到集合截斷。產品在空清單時整張卡不顯示；此處保留卡片以說明「沒有問題」也是一種結果。",
+      "en": "No collection truncation detected in the last 7 days. The product hides this card when the list is empty; the card stays here because \"nothing wrong\" is also a result."
+    },
+    "v2_ov_pce_failures": {
+      "zh": "連續失敗",
+      "en": "Consecutive failures",
+      "_note": "status.pce_stats.consecutive_failures label"
+    },
+    "v2_ov_plugin_fields": {
+      "zh": "{n} 個設定欄位",
+      "en": "{n} settings",
+      "_note": "alert_plugins.plugins[name].fields — configuration fields, not filters"
+    },
+    "v2_ov_query_added": {
+      "zh": "已新增查詢「{name}」",
+      "en": "Added query \"{name}\""
+    },
+    "v2_ov_query_deleted": {
+      "zh": "已刪除查詢「{name}」",
+      "en": "Deleted query \"{name}\""
+    },
+    "v2_ov_query_local": {
+      "zh": "此 mockup 只改動畫面上的副本，不會寫回設定檔。欄位與儲存鍵名轉錄自 dashboard_queries 快照。",
+      "en": "This mockup edits the on-screen copy only; nothing is written back. Fields and stored key names are transcribed from the dashboard_queries snapshot."
+    },
+    "v2_ov_query_saved": {
+      "zh": "已更新查詢「{name}」",
+      "en": "Updated query \"{name}\""
+    },
+    "v2_ov_report_count": {
+      "zh": "{n} 份",
+      "en": "{n} files"
+    },
+    "v2_ov_report_untyped": {
+      "zh": "未標記類型",
+      "en": "Untyped",
+      "_note": "reports_list report_type === '' — the file has no .metadata.json sidecar"
+    },
+    "v2_ov_system_status": {
+      "zh": "系統狀態",
+      "en": "System status",
+      "_note": "OV-01 card title; the catalogue has no title for the status.json summary"
+    },
+    "v2_ov_top10_meta_fmt": {
+      "zh": "{source} · 上限 {cap} · {rows}",
+      "en": "{source} · cap {cap} · {rows}",
+      "_note": "OV-05 header meta: top10.source/cap + v2_table_rows — review finding, was hardcoded English '· cap …'"
+    },
+    "v2_ov_top10_windows": {
+      "zh": "同一組來源／目的／Service 可能出現多列：分析器由連續的 cache 觀測推導每個視窗的流量，一個 flow 因此每個觀測視窗各一列（將游標移到列上可看 first_seen → last_seen）。",
+      "en": "One source/destination/service pair can occupy several rows: the analyzer derives per-window traffic from successive cache observations, so a flow yields one row per observation window (hover a row for first_seen → last_seen)."
+    },
+    "v2_ov_watermark": {
+      "zh": "事件水位",
+      "en": "Event watermark",
+      "_note": "status.event_watermark label"
+    },
+    "v2_progress_collapse": {
+      "zh": "收合",
+      "en": "Collapse"
+    },
+    "v2_progress_done": {
+      "zh": "已完成",
+      "en": "Done"
+    },
+    "v2_progress_expand": {
+      "zh": "展開",
+      "en": "Expand"
+    },
+    "v2_rp_app_required": {
+      "zh": "App label 必填，未選會被擋下（gui_app_required）。",
+      "en": "The app label is required; an empty value is rejected (gui_app_required).",
+      "_note": "dashboard.js:1128-1132"
+    },
+    "v2_rp_async_types": {
+      "zh": "會走非同步 job 的型別：流量三型與 App 摘要；其餘為同步回應。",
+      "en": "Types that take the async job path: the three traffic profiles and app summary. The rest answer synchronously.",
+      "_note": "dashboard.js:866-897"
+    },
+    "v2_rp_cat_meta": {
+      "zh": "{types} 型 · 已產出 {files} 份",
+      "en": "{types} types · {files} files",
+      "_note": "RP-01 panel meta"
+    },
+    "v2_rp_cat_note": {
+      "zh": "每張卡的「最近產出」來自 /api/reports 的 mtime，依 report_type 取最新一筆（dashboard.js:239-255 的檔名前綴規則）。時間以 UTC 顯示，與本 mockup 其他頁一致；產品用瀏覽器本地時間。",
+      "en": "Each card's last-produced stamp comes from /api/reports mtime, newest per report_type (the filename prefix rules of dashboard.js:239-255). Times are UTC, as everywhere in this mockup; the product prints browser-local time.",
+      "_note": "dashboard.js:223-298 loadRcardMeta"
+    },
+    "v2_rp_catalogue": {
+      "zh": "報表型錄",
+      "en": "Report catalogue",
+      "_note": "RP-01 panel title"
+    },
+    "v2_rp_date_iso": {
+      "zh": "此型別送出的是 ISO 時間：start_date=<日>T00:00:00Z、end_date=<日>T23:59:59Z。",
+      "en": "This type sends ISO instants: start_date=<day>T00:00:00Z, end_date=<day>T23:59:59Z.",
+      "_note": "dashboard.js:940-947 / :986-991"
+    },
+    "v2_rp_date_raw": {
+      "zh": "此型別送出的是原始 YYYY-MM-DD 字串，不轉 ISO。",
+      "en": "This type sends the bare YYYY-MM-DD string, not an ISO instant.",
+      "_note": "dashboard.js:1051-1058 / :1134-1151 / :1224"
+    },
+    "v2_rp_date_sticky": {
+      "zh": "產品只在欄位為空時才填預設值（今天−7 ~ 今天），所以切換報表型別時會沿用上一型別留下的日期（dashboard.js:718-724）。此 mockup 每次開啟都重設。",
+      "en": "The product only fills the default (today−7 … today) when the input is EMPTY, so switching type keeps whatever the previous type left behind (dashboard.js:718-724). This mockup resets on every open.",
+      "_note": "dashboard.js:718-724"
+    },
+    "v2_rp_del_bulk_partial": {
+      "zh": "批次刪除是單一 POST /api/reports/bulk-delete，回應會分成 deleted 與 errors——部分失敗只會多跳一個警告 toast。",
+      "en": "Bulk delete is one POST /api/reports/bulk-delete whose response splits into deleted and errors; a partial failure only adds a warning toast.",
+      "_note": "dashboard.js:159-181"
+    },
+    "v2_rp_del_more": {
+      "zh": "…另外 {n} 份",
+      "en": "…and {n} more",
+      "_note": "impact line"
+    },
+    "v2_rp_del_norecover": {
+      "zh": "檔案直接從報表輸出目錄移除，無法復原。",
+      "en": "The files leave the report output directory. There is no undo.",
+      "_note": "impact line"
+    },
+    "v2_rp_del_one": {
+      "zh": "刪除 {filename}",
+      "en": "Delete {filename}",
+      "_note": "impact line"
+    },
+    "v2_rp_demo_run": {
+      "zh": "執行示範",
+      "en": "Run demo",
+      "_note": "RP-03 control"
+    },
+    "v2_rp_demo_stop": {
+      "zh": "結束示範",
+      "en": "End demo",
+      "_note": "RP-03 control"
+    },
+    "v2_rp_dl_note": {
+      "zh": "下載：GET /api/reports/download/{filename}",
+      "en": "Download: GET /api/reports/download/{filename}",
+      "_note": "dashboard.js download"
+    },
+    "v2_rp_ds_gate": {
+      "zh": "資料來源選單只有在 _CACHE_AVAILABLE 為真時才會出現（dashboard.js:679-716）；快取關閉時整列隱藏，body 也不會帶 data_source。",
+      "en": "The data-source select only appears when _CACHE_AVAILABLE is true (dashboard.js:679-716); with the cache off the whole row is hidden and the body carries no data_source.",
+      "_note": "dashboard.js:679-716"
+    },
+    "v2_rp_file_hint": {
+      "zh": "CSV 模式改用 multipart/form-data 上傳，欄位名為 file。",
+      "en": "CSV mode switches to multipart/form-data with the field name `file`.",
+      "_note": "dashboard.js:922-928 / :1216-1219 / :1277-1280"
+    },
+    "v2_rp_file_placeholder": {
+      "zh": "<選擇的 CSV 檔>",
+      "en": "<the selected CSV file>",
+      "_note": "payload preview placeholder"
+    },
+    "v2_rp_files_n": {
+      "zh": "{n} 份",
+      "en": "{n} files",
+      "_note": "RP-01 per-type file count"
+    },
+    "v2_rp_fmt_pd": {
+      "zh": "Policy Diff 只接受 html 與 csv；選其他值會被轉成 html。",
+      "en": "Policy Diff accepts html and csv only; anything else is coerced to html.",
+      "_note": "dashboard.js:1084"
+    },
+    "v2_rp_fmt_pr": {
+      "zh": "Policy Resolver 忽略此選單，固定送出 format:'all'。",
+      "en": "Policy Resolver ignores this select and always sends format:'all'.",
+      "_note": "dashboard.js:1109"
+    },
+    "v2_rp_fn_profile": {
+      "zh": "由被點下的報表卡決定，沒有對應輸入框（dashboard.js:962-967）",
+      "en": "decided by the card you clicked; there is no input for it (dashboard.js:962-967)",
+      "_note": "field-contract row"
+    },
+    "v2_rp_form_section": {
+      "zh": "表單欄位",
+      "en": "Form fields",
+      "_note": "drawer section head"
+    },
+    "v2_rp_label_pick": {
+      "zh": "已選 {label}",
+      "en": "Picked {label}",
+      "_note": "toast"
+    },
+    "v2_rp_labels_n": {
+      "zh": "{n} 個 label",
+      "en": "{n} labels",
+      "_note": "RP-09 panel meta"
+    },
+    "v2_rp_labels_note": {
+      "zh": "點一個 label 會帶著它開啟 App 摘要報表的產生 drawer。清單來自 /api/labels。",
+      "en": "Picking a label opens the app-summary generate drawer with it. The list comes from /api/labels.",
+      "_note": "RP-09"
+    },
+    "v2_rp_labels_src": {
+      "zh": "選項來自 /api/labels。本快照只抓了不帶 key 的一份清單（endpoints.yaml:56），所以 App 與 Env 兩個選單餵的是同一份；產品分別以 ?key=app 與 ?key=env 取得。",
+      "en": "Options come from /api/labels. The snapshot captured one unkeyed list (endpoints.yaml:56), so both selects are fed from it; the product fetches ?key=app and ?key=env separately.",
+      "_note": "dashboard.js:729-742 _populateAppLabelSelects"
+    },
+    "v2_rp_lang_field_hint": {
+      "zh": "預設值來自 UI 語言：zh_TW 以外一律送 en（syncReportLangToUi）。",
+      "en": "The default follows the UI language: anything other than zh_TW is sent as en (syncReportLangToUi).",
+      "_note": "dashboard.js:646-654"
+    },
+    "v2_rp_lang_note": {
+      "zh": "報表語言與 UI 語言是兩件事：這裡改的是產生 drawer 的預設值，會隨每次產生一起送出 lang。",
+      "en": "Report language and UI language are separate: this sets the generate drawer's default, and lang travels with every generate.",
+      "_note": "dashboard.js:646-654"
+    },
+    "v2_rp_lang_set": {
+      "zh": "報表語言預設值改為 {lang}",
+      "en": "Report language default set to {lang}",
+      "_note": "toast"
+    },
+    "v2_rp_lang_ui": {
+      "zh": "目前 UI 語言",
+      "en": "Current UI language",
+      "_note": "status.language"
+    },
+    "v2_rp_last": {
+      "zh": "最近產出",
+      "en": "Last produced",
+      "_note": "RP-01 card readout label"
+    },
+    "v2_rp_mock_gen": {
+      "zh": "此 mockup 不會產生報表。按下「產生」只會跑轉錄自產品的進度步驟，最後停在說明步驟。",
+      "en": "This mockup generates nothing. Generate runs the transcribed progress sequence and stops on the step that says so.",
+      "_note": "mockup honesty"
+    },
+    "v2_rp_no_summary": {
+      "zh": "無摘要",
+      "en": "no summary",
+      "_note": "reports_list summary === ''"
+    },
+    "v2_rp_out_meta": {
+      "zh": "顯示 {shown} / 共 {total}",
+      "en": "{shown} shown of {total}",
+      "_note": "RP-06 panel meta"
+    },
+    "v2_rp_out_note": {
+      "zh": "清單、刪除與批次刪除只改本頁記憶體中的副本；離開路由再回來就會復原。型別欄是 DESIGN-ADDED——產品的清單沒有型別欄，型別只在卡片上出現。",
+      "en": "The list, delete and bulk delete only touch this page's in-memory copy; leaving and returning resets it. The type column is DESIGN-ADDED — the product's list has no type column at all.",
+      "_note": "dashboard.js:120-181"
+    },
+    "v2_rp_out_section": {
+      "zh": "輸出",
+      "en": "Output",
+      "_note": "drawer section head: format + language"
+    },
+    "v2_rp_partial_body": {
+      "zh": "當某些輸出格式失敗、但至少有一種成功時，後端回 partial 並列出失敗的格式；成功的檔案照樣進報表清單。",
+      "en": "When some output formats fail but at least one succeeds the backend answers partial and names the failures; the files that did succeed still land in the report list.",
+      "_note": "dashboard.js:633-645 _handlePartialReport"
+    },
+    "v2_rp_partial_k1": {
+      "zh": "為 true 時走部分產出流程，toast 是 warning 而不是 success",
+      "en": "true switches to the partial path; the toast is a warning, not a success",
+      "_note": "dashboard.js:633-640"
+    },
+    "v2_rp_partial_k2": {
+      "zh": "失敗的格式清單，直接填進訊息的 {formats}",
+      "en": "the failed format list, substituted into {formats}",
+      "_note": "dashboard.js:641"
+    },
+    "v2_rp_partial_k3": {
+      "zh": "成功產出的檔名，仍會出現在下方清單",
+      "en": "the filenames that did succeed; they still appear in the list below",
+      "_note": "dashboard.js:643-645"
+    },
+    "v2_rp_partial_title": {
+      "zh": "部分產出",
+      "en": "Partial output",
+      "_note": "RP-04 panel title"
+    },
+    "v2_rp_partial_where": {
+      "zh": "目前會回報 partial 的端點：稽核報表與 Policy 使用報表（多格式輸出）。",
+      "en": "The endpoints that can answer partial today: the audit report and the policy-usage report, both multi-format.",
+      "_note": "reports.py multi-format writers"
+    },
+    "v2_rp_path_api": {
+      "zh": "API 模式的第一步",
+      "en": "first step, API mode",
+      "_note": "dashboard.js:955"
+    },
+    "v2_rp_path_async": {
+      "zh": "非同步 job 輪詢期間顯示",
+      "en": "shown while an async job is polled",
+      "_note": "dashboard.js:870"
+    },
+    "v2_rp_path_audit": {
+      "zh": "稽核報表在 3000ms 後補上的第二步",
+      "en": "audit only, added after 3000 ms",
+      "_note": "dashboard.js:998-1000"
+    },
+    "v2_rp_path_csv": {
+      "zh": "CSV 模式的第一步",
+      "en": "first step, CSV mode",
+      "_note": "dashboard.js:920"
+    },
+    "v2_rp_path_done": {
+      "zh": "終態",
+      "en": "terminal state",
+      "_note": "dashboard.js:559"
+    },
+    "v2_rp_payload": {
+      "zh": "送出內容",
+      "en": "Request body",
+      "_note": "drawer section head"
+    },
+    "v2_rp_poll_note": {
+      "zh": "非同步 job：每 {interval} 秒輪詢 /api/reports/job/<id>，狀態 running→done|error，逾時上限約 {deadline} 分鐘（_pollReportJob）。",
+      "en": "Async job: /api/reports/job/<id> is polled every {interval}s, status running→done|error, with a deadline of about {deadline} minutes (_pollReportJob).",
+      "_note": "dashboard.js:866-897"
+    },
+    "v2_rp_progress_body": {
+      "zh": "產品用同一個 <div> 覆寫五次狀態文字（_showGenProgress/_updateGenStep）。統一進度元件（XC-07）保留每一步，並且可以收合後繼續操作——長跑的報表就是它存在的理由。",
+      "en": "The product overwrites one status line five times (_showGenProgress/_updateGenStep). The unified progress card keeps every step and can be collapsed so work continues — long report runs are the reason it exists.",
+      "_note": "dashboard.js:529-558"
+    },
+    "v2_rp_progress_title": {
+      "zh": "產生進度",
+      "en": "Generation progress",
+      "_note": "RP-03 panel title"
+    },
+    "v2_rp_quick_days": {
+      "zh": "近 {n} 天",
+      "en": "Last {n}d",
+      "_note": "index.html:2807-2813 data-action=setDateRange"
+    },
+    "v2_rp_rhc_enable": {
+      "zh": "對全部 VEN 啟用",
+      "en": "Enable for all VENs",
+      "_note": "the destructive action"
+    },
+    "v2_rp_rhc_i_all": {
+      "zh": "會 provision 到生產 policy，範圍是全部 VEN",
+      "en": "Provisions to production policy, across every VEN",
+      "_note": "impact line"
+    },
+    "v2_rp_rhc_i_cli": {
+      "zh": "要指定 label 範圍請改用 CLI 精靈",
+      "en": "Use the CLI wizard to scope it by label instead",
+      "_note": "impact line"
+    },
+    "v2_rp_rhc_i_draft": {
+      "zh": "會寫入 draft firewall_settings",
+      "en": "Writes draft firewall_settings",
+      "_note": "impact line"
+    },
+    "v2_rp_rhc_mock": {
+      "zh": "此 mockup 不會呼叫啟用端點。",
+      "en": "This mockup calls no enablement endpoint.",
+      "_note": "mockup honesty"
+    },
+    "v2_rp_rhc_native": {
+      "zh": "非 CSV 模式時 source 送出的是 'native'（不是 'api'）。",
+      "en": "In non-CSV mode this type sends source:'native', not 'api'.",
+      "_note": "dashboard.js:1285-1286"
+    },
+    "v2_rp_rhc_pce": {
+      "zh": "PCE 報表樣板",
+      "en": "PCE report template",
+      "_note": "rhc_enablement.pce_report_enabled"
+    },
+    "v2_rp_rhc_reactive": {
+      "zh": "DESIGN-ADDED：產品從不主動查 /api/rule_hit_count/enablement，只有在產生失敗後才反應式地問你要不要啟用。這張卡在你按下產生之前就把狀態說清楚。",
+      "en": "DESIGN-ADDED: the product never calls /api/rule_hit_count/enablement up front — it only asks reactively after a generate fails. This card states the answer before you press generate.",
+      "_note": "dashboard.js:1295-1306"
+    },
+    "v2_rp_rhc_state": {
+      "zh": "啟用狀態",
+      "en": "Enablement state",
+      "_note": "rhc_enablement.state"
+    },
+    "v2_rp_rhc_ven": {
+      "zh": "VEN 範圍",
+      "en": "VEN scopes",
+      "_note": "rhc_enablement.ven_scopes_enabled"
+    },
+    "v2_rp_ro_section": {
+      "zh": "表單以外送出的欄位",
+      "en": "Sent, but not a form field",
+      "_note": "field-contract section head"
+    },
+    "v2_rp_sec_app": {
+      "zh": "App/Env",
+      "en": "App/Env",
+      "_note": "generate-form section badge"
+    },
+    "v2_rp_sec_dates": {
+      "zh": "日期區間",
+      "en": "Date range",
+      "_note": "generate-form section badge"
+    },
+    "v2_rp_sec_ds": {
+      "zh": "資料來源",
+      "en": "Data source",
+      "_note": "generate-form section badge"
+    },
+    "v2_rp_sec_filters": {
+      "zh": "流量篩選",
+      "en": "Traffic filters",
+      "_note": "generate-form section badge"
+    },
+    "v2_rp_sec_snapshot": {
+      "zh": "即時快照",
+      "en": "Snapshot",
+      "_note": "generate-form section badge; no date range"
+    },
+    "v2_rp_sec_source": {
+      "zh": "來源",
+      "en": "Source",
+      "_note": "generate-form section badge"
+    },
+    "v2_rp_sel_clear": {
+      "zh": "清除選取",
+      "en": "Clear selection",
+      "_note": "bulk bar"
+    },
+    "v2_rp_src_app": {
+      "zh": "轉錄自 dashboard.js:1125-1160（_doGenerateAppSummary）。",
+      "en": "Transcribed from dashboard.js:1125-1160 (_doGenerateAppSummary).",
+      "_note": "provenance"
+    },
+    "v2_rp_src_audit": {
+      "zh": "轉錄自 dashboard.js:980-1005（_doGenerateAudit）。",
+      "en": "Transcribed from dashboard.js:980-1005 (_doGenerateAudit).",
+      "_note": "provenance"
+    },
+    "v2_rp_src_pd": {
+      "zh": "轉錄自 dashboard.js:1078-1095（_doGeneratePolicyDiff）。",
+      "en": "Transcribed from dashboard.js:1078-1095 (_doGeneratePolicyDiff).",
+      "_note": "provenance"
+    },
+    "v2_rp_src_pr": {
+      "zh": "轉錄自 dashboard.js:1100-1120（_doGeneratePolicyResolver）。",
+      "en": "Transcribed from dashboard.js:1100-1120 (_doGeneratePolicyResolver).",
+      "_note": "provenance"
+    },
+    "v2_rp_src_pu": {
+      "zh": "轉錄自 dashboard.js:1205-1235（_doGeneratePolicyUsage）。",
+      "en": "Transcribed from dashboard.js:1205-1235 (_doGeneratePolicyUsage).",
+      "_note": "provenance"
+    },
+    "v2_rp_src_readiness": {
+      "zh": "轉錄自 dashboard.js:1045-1065（_doGenerateReadiness）。",
+      "en": "Transcribed from dashboard.js:1045-1065 (_doGenerateReadiness).",
+      "_note": "provenance"
+    },
+    "v2_rp_src_rhc": {
+      "zh": "轉錄自 dashboard.js:1265-1300（_doGenerateRuleHitCount）。",
+      "en": "Transcribed from dashboard.js:1265-1300 (_doGenerateRuleHitCount).",
+      "_note": "provenance"
+    },
+    "v2_rp_src_traffic": {
+      "zh": "轉錄自 dashboard.js:900-975（_doGenerateTraffic，三種 traffic_report_profile 共用）。",
+      "en": "Transcribed from dashboard.js:900-975 (_doGenerateTraffic; the three traffic profiles share it).",
+      "_note": "provenance"
+    },
+    "v2_rp_src_ven": {
+      "zh": "轉錄自 dashboard.js:1015-1035（_doGenerateVen）。",
+      "en": "Transcribed from dashboard.js:1015-1035 (_doGenerateVen).",
+      "_note": "provenance"
+    },
+    "v2_rp_step_mock": {
+      "zh": "（mockup：此處沒有後端，產出不會發生）",
+      "en": "(mockup: no backend here, nothing is produced)",
+      "_note": "the honest final step"
+    },
+    "v2_rp_untyped": {
+      "zh": "未標記型別",
+      "en": "Untyped",
+      "_note": "report_type === '' — no metadata sidecar"
+    },
+    "v2_rp_untyped_note": {
+      "zh": "{total} 份產出中有 {rawEmpty} 份沒有 metadata sidecar（reports.py:215），report_type 是空字串；其中 {recovered} 份靠檔名規則（dashboard.js:239-255）救回型別、算進對應卡片的「最近產出」，真正維持「未標記型別」、列在清單裡而不是丟掉的只有 {stillUntyped} 份。",
+      "en": "{rawEmpty} of the {total} outputs have no metadata sidecar (reports.py:215) and carry an empty report_type. {recovered} of those are recovered by the filename-prefix rule (dashboard.js:239-255) and count towards their card's last-produced stamp; only {stillUntyped} remain genuinely untyped and are listed as such rather than dropped.",
+      "_note": "dashboard.js:254 `if (!t) return;` — numbers are computed live in reports.mjs from the snapshot, never hardcoded here"
+    },
+    "v2_rp_view_note": {
+      "zh": "瀏覽：GET /api/reports/view/{filename}（僅 HTML 產出）",
+      "en": "View: GET /api/reports/view/{filename} (HTML outputs only)",
+      "_note": "dashboard.js download/view"
+    },
+    "v2_shell_route": {
+      "zh": "路由",
+      "en": "Route"
+    },
+    "v2_shell_sources": {
+      "zh": "資料來源",
+      "en": "Data sources"
+    },
+    "v2_shell_wip_body": {
+      "zh": "「{area}」的畫面由 Phase 1 後續任務（Task 8–12）建置。這層殼已備妥路由、健康列、指令面板與共用元件。",
+      "en": "The {area} area is delivered by the later Phase 1 tasks (Task 8-12). This shell already provides routing, the health rail, the command palette and the shared components."
+    },
+    "v2_shell_wip_title": {
+      "zh": "此區尚未建置",
+      "en": "Area not built yet"
+    },
+    "v2_status_degraded": {
+      "zh": "降級",
+      "en": "Degraded",
+      "_note": "Task-6 straggler: VEN/PCE status word 'degraded'"
+    },
+    "v2_sy_cache_1h_bug": {
+      "zh": "卡片上的 (1h) 增量來自 /api/cache/throughput，與左邊的總量是兩次不同時間點的讀數；產品也一樣。",
+      "en": "The (1h) delta comes from /api/cache/throughput and is a different reading instant from the total beside it; the product does the same.",
+      "_note": "integrations.js:113-156"
+    },
+    "v2_sy_cache_async": {
+      "zh": "非同步匯出門檻（事件數）",
+      "en": "Async export threshold (events)",
+      "_note": "integrations.js:251 prints the raw key with no data-i18n"
+    },
+    "v2_sy_cache_capacity": {
+      "zh": "容量",
+      "en": "Capacity",
+      "_note": "section head; /api/cache/health capacity block"
+    },
+    "v2_sy_cache_db_bytes": {
+      "zh": "快取資料庫大小",
+      "en": "Cache database size",
+      "_note": "cache_health.capacity.db_bytes"
+    },
+    "v2_sy_cache_disk_free": {
+      "zh": "磁碟可用空間",
+      "en": "Disk free",
+      "_note": "compared against disk_free_warn_gb"
+    },
+    "v2_sy_cache_ev_poll": {
+      "zh": "事件輪詢間隔（秒）",
+      "en": "Event poll interval (s)",
+      "_note": "integrations.js:237 prints the raw key with no data-i18n"
+    },
+    "v2_sy_cache_label_fix": {
+      "zh": "上面四個欄位在產品裡是直接印 snake_case 的鍵名（integrations.js:237/240/248/251，沒有 data-i18n）。這裡給了正式的 i18n key，鍵名保留在右側 <code> 欄。",
+      "en": "The four fields above are rendered as raw snake_case keys in the product (integrations.js:237/240/248/251, no data-i18n). They get real i18n keys here, with the stored key kept in the right-hand code slot.",
+      "_note": "Phase-2 i18n backlog"
+    },
+    "v2_sy_cache_lag_note": {
+      "zh": "last_status 為 error 時一律以紅色與 ⚠ 呈現，因為失敗的擷取仍會更新 last_sync_at——只看延遲秒數會誤判為健康。",
+      "en": "A last_status of error is painted red with ⚠ regardless of level: a failed poll still bumps last_sync_at, so the lag alone would read as healthy.",
+      "_note": "integrations.js:157-180"
+    },
+    "v2_sy_cache_nogui": {
+      "zh": "後端保有、此表單沒有控制項",
+      "en": "Stored by the backend, no control in this form",
+      "_note": "the six orphan keys"
+    },
+    "v2_sy_cache_nogui_body": {
+      "zh": "列在這裡而不是丟掉：上一次改版就是靠「畫面上沒有＝可以不管」弄丟欄位的。這六個鍵仍會原封不動地跟著每次儲存送出。",
+      "en": "Listed rather than dropped: the previous redesign lost fields exactly by treating \"not on screen\" as \"not there\". All six still travel unchanged with every save.",
+      "_note": "field contract"
+    },
+    "v2_sy_cache_nogui_note": {
+      "zh": "buildCacheForm 沒有為這個鍵建立任何控制項；它之所以沒有遺失，是因為儲存時是覆蓋既有設定物件（integrations.js:269）",
+      "en": "buildCacheForm builds no control for this key; it survives only because the save merges over the cached settings object (integrations.js:269)",
+      "_note": "field-contract row"
+    },
+    "v2_sy_cache_payload_src": {
+      "zh": "送出：PUT /api/cache/settings，body 是「既有設定物件 + 本表單覆寫」（integrations.js:264-297）。",
+      "en": "Sends PUT /api/cache/settings whose body is the stored settings object with this form's keys written over it (integrations.js:264-297).",
+      "_note": "provenance"
+    },
+    "v2_sy_cache_rate": {
+      "zh": "每分鐘 API 呼叫上限",
+      "en": "API calls per minute",
+      "_note": "integrations.js:248 prints the raw key with no data-i18n"
+    },
+    "v2_sy_cache_restart_always": {
+      "zh": "後端固定回 requires_restart:true，且每次儲存成功都會叫出這條橫幅——它無法告訴你「你這次的改動」是否真的需要重啟。",
+      "en": "The backend hardcodes requires_restart:true and the banner is raised after every successful save, so it cannot tell you whether YOUR change needs a restart.",
+      "_note": "integrations.js:300 + gui/settings_helpers.py:23"
+    },
+    "v2_sy_cache_show_banner": {
+      "zh": "顯示重啟橫幅",
+      "en": "Show restart banner",
+      "_note": "demo control for SY-03"
+    },
+    "v2_sy_cache_siem_pending": {
+      "zh": "SIEM 待送列數",
+      "en": "SIEM pending rows",
+      "_note": "compared against siem_pending_warn_rows"
+    },
+    "v2_sy_cache_tr_poll": {
+      "zh": "流量輪詢間隔（秒）",
+      "en": "Traffic poll interval (s)",
+      "_note": "integrations.js:240 prints the raw key with no data-i18n"
+    },
+    "v2_sy_ch_meta": {
+      "zh": "{live} / {total} 已啟用",
+      "en": "{live} of {total} enabled",
+      "_note": "SY-14 panel meta"
+    },
+    "v2_sy_ch_payload_src": {
+      "zh": "送出：POST /api/settings，body 依 config_path 合併 alerts／email／smtp 三個區段，啟用清單寫進 alerts.active。",
+      "en": "Sends POST /api/settings; the body merges the alerts, email and smtp sections along config_path, and the enabled list becomes alerts.active.",
+      "_note": "settings.js:263-292 + :689-698"
+    },
+    "v2_sy_ch_schema_src": {
+      "zh": "每張卡的欄位完全由 /api/alert-plugins 的 schema 產生：input_type 決定控制項、value_type 決定送出前的型別轉換、config_path 決定寫回設定檔的位置。",
+      "en": "Every field on these cards is generated from the /api/alert-plugins schema: input_type picks the control, value_type drives the coercion before send, and config_path decides where the value is written back.",
+      "_note": "settings.js:180-226 + :263-292"
+    },
+    "v2_sy_ch_secret_fix": {
+      "zh": "DESIGN-ADDED：機密欄位一律留空並在下方陳述「已設定／未設定」與長度。產品把伺服器的遮罩字串塞回密碼框，使用者無法分辨那是遮罩還是真的值。",
+      "en": "DESIGN-ADDED: secret boxes stay empty and the set/not-set state and length are stated below. The product puts the server's mask string back into the password box, where it is indistinguishable from a real value.",
+      "_note": "config.py:428-431"
+    },
+    "v2_sy_ch_test_mock": {
+      "zh": "此 mockup 不會送出測試告警。",
+      "en": "This mockup sends no test alert.",
+      "_note": "toast"
+    },
+    "v2_sy_ch_test_req": {
+      "zh": "測試 {name} — 此 mockup 不會送出。",
+      "en": "Test {name} — this mockup sends nothing.",
+      "_note": "toast"
+    },
+    "v2_sy_ch_test_skipped": {
+      "zh": "測試送出會略過啟用狀態直接投遞；未設定完整的管道會回報缺少的欄位。",
+      "en": "A test send bypasses the enabled state and dispatches directly; an incompletely configured channel reports which fields are missing.",
+      "_note": "actions.js"
+    },
+    "v2_sy_clean": {
+      "zh": "沒有未儲存的變更",
+      "en": "No unsaved changes",
+      "_note": "the resting state of the dirty ledger"
+    },
+    "v2_sy_dirty": {
+      "zh": "未儲存變更",
+      "en": "Unsaved changes",
+      "_note": "the dirty ledger"
+    },
+    "v2_sy_discard": {
+      "zh": "放棄變更",
+      "en": "Discard",
+      "_note": "restores every tracked control to its baseline"
+    },
+    "v2_sy_discarded": {
+      "zh": "已還原為載入時的值。",
+      "en": "Restored to the values this page loaded with.",
+      "_note": "toast"
+    },
+    "v2_sy_disp_dashq": {
+      "zh": "settings.settings 另外還存著自訂查詢（dashboard_queries），那是總覽頁 OV-04 的資料，不在這一頁編輯。",
+      "en": "settings.settings also stores dashboard_queries; those belong to the overview's saved-query card (OV-04) and are not edited here.",
+      "_note": "scope note"
+    },
+    "v2_sy_disp_density_new": {
+      "zh": "DESIGN-ADDED：密度是 v2 才有的，產品沒有對應設定；只調間距與字級，不換顏色。",
+      "en": "DESIGN-ADDED: density is new in v2 and has no product counterpart. It retunes spacing and type size only, never colour.",
+      "_note": "XC-05"
+    },
+    "v2_sy_disp_health": {
+      "zh": "啟用健康檢查",
+      "en": "Enable health check",
+      "_note": "settings.settings.enable_health_check"
+    },
+    "v2_sy_disp_health_new": {
+      "zh": "DESIGN-ADDED：這個鍵存在於 settings.settings，但產品的顯示設定沒有對應控制項——只能靠改設定檔。",
+      "en": "DESIGN-ADDED: this key lives in settings.settings but the product's display section has no control for it — the config file was the only way to change it.",
+      "_note": "field contract"
+    },
+    "v2_sy_disp_lang_partial": {
+      "zh": "擷取到的產品字典只有這台設備當下的語言（zh-Hant），所以切到 English 時，只有 i18n-supplement.json 裡有 en 的鍵會真的變——這正是補充字典同時是 Phase-2 backlog 的原因。",
+      "en": "The captured product catalogue only carries this appliance's active language (zh-Hant), so in English only the keys that have an `en` in i18n-supplement.json actually switch — which is exactly why that file is also the Phase-2 backlog.",
+      "_note": "i18n.mjs resolution order"
+    },
+    "v2_sy_disp_lang_reload": {
+      "zh": "切換語言會重新掛載本頁。",
+      "en": "Switching the language re-mounts this page.",
+      "_note": "XC-06"
+    },
+    "v2_sy_disp_other": {
+      "zh": "其他",
+      "en": "Other",
+      "_note": "section head"
+    },
+    "v2_sy_disp_payload_src": {
+      "zh": "送出：POST /api/settings，只帶 settings 與 report 兩個區段。",
+      "en": "Sends POST /api/settings carrying only the settings and report sections.",
+      "_note": "provenance"
+    },
+    "v2_sy_disp_stored_theme": {
+      "zh": "設定檔中的主題",
+      "en": "Theme stored in config",
+      "_note": "settings.settings.theme"
+    },
+    "v2_sy_disp_theme_apply": {
+      "zh": "即時切換是 v2 的行為。產品要按下儲存、重新載入後才會換皮膚。",
+      "en": "Live switching is v2 behaviour: the product only changes skin after a save and a reload.",
+      "_note": "settings.js"
+    },
+    "v2_sy_disp_theme_literal": {
+      "zh": "產品的主題標籤是硬寫的字面字串「Theme」（settings.js:448，沒有 data-i18n）；這裡用的是既有的 gui_theme。",
+      "en": "The product's theme label is the hardcoded literal \"Theme\" (settings.js:448, no data-i18n); this page uses the existing gui_theme key.",
+      "_note": "Phase-2 i18n backlog"
+    },
+    "v2_sy_disp_theme_live": {
+      "zh": "這裡切換會立刻套用到整個介面，不需要儲存。",
+      "en": "Switching here applies to the whole interface immediately; no save needed.",
+      "_note": "XC-05"
+    },
+    "v2_sy_disp_tz_local": {
+      "zh": "local 代表使用瀏覽器所在時區。",
+      "en": "local means \"use the browser's own zone\".",
+      "_note": "settings.js:407-436"
+    },
+    "v2_sy_disp_ui_lang": {
+      "zh": "設備回報的 UI 語言",
+      "en": "UI language reported by the appliance",
+      "_note": "status.language"
+    },
+    "v2_sy_disp_ui_tz": {
+      "zh": "設備回報的時區",
+      "en": "Timezone reported by the appliance",
+      "_note": "status.timezone"
+    },
+    "v2_sy_dlq_export_mock": {
+      "zh": "匯出會下載目前條件下的 DLQ（JSON）；此 mockup 沒有資料可匯出。",
+      "en": "Export downloads the DLQ under the current filter as JSON; this mockup has nothing to export.",
+      "_note": "toast"
+    },
+    "v2_sy_dlq_f_at": {
+      "zh": "進入 DLQ 的時間",
+      "en": "when it entered the DLQ",
+      "_note": "field row"
+    },
+    "v2_sy_dlq_f_dest": {
+      "zh": "目的地名稱",
+      "en": "destination name",
+      "_note": "field row"
+    },
+    "v2_sy_dlq_f_err": {
+      "zh": "最後一次失敗的原因",
+      "en": "the last failure reason",
+      "_note": "field row"
+    },
+    "v2_sy_dlq_f_id": {
+      "zh": "來源事件 id",
+      "en": "source event id",
+      "_note": "field row"
+    },
+    "v2_sy_dlq_f_payload": {
+      "zh": "原始 payload",
+      "en": "the original payload",
+      "_note": "field row"
+    },
+    "v2_sy_dlq_f_retries": {
+      "zh": "已重試次數",
+      "en": "retries so far",
+      "_note": "field row"
+    },
+    "v2_sy_dlq_f_src": {
+      "zh": "payload 的來源資料表",
+      "en": "the source table the payload came from",
+      "_note": "field row"
+    },
+    "v2_sy_dlq_fields": {
+      "zh": "這個端點會回傳的欄位",
+      "en": "The fields this endpoint returns",
+      "_note": "section head"
+    },
+    "v2_sy_dlq_i_all": {
+      "zh": "實際清除的是整個目的地的 DLQ，不是你勾選的那幾筆",
+      "en": "It purges the destination's ENTIRE DLQ, not the rows you ticked",
+      "_note": "impact line"
+    },
+    "v2_sy_dlq_i_body": {
+      "zh": "送出的 body 是 {dest, older_than_days: 0}，完全不帶被選取的 id",
+      "en": "The body is {dest, older_than_days: 0} and carries none of the selected ids",
+      "_note": "impact line"
+    },
+    "v2_sy_dlq_i_norecover": {
+      "zh": "被清除的事件無法復原，也不會重新投遞",
+      "en": "Purged events cannot be recovered and will not be re-delivered",
+      "_note": "impact line"
+    },
+    "v2_sy_dlq_i_typed": {
+      "zh": "確認訊息卻寫「清除 N 筆」——訊息與行為不一致",
+      "en": "The confirm text still says \"purge N entries\" — the wording and the behaviour disagree",
+      "_note": "impact line"
+    },
+    "v2_sy_dlq_paging": {
+      "zh": "DLQ 清單在後端分頁；此快照沒有任何項目可以翻頁。",
+      "en": "The DLQ list is paged server-side; this snapshot has no entries to page through.",
+      "_note": "siem/web.py"
+    },
+    "v2_sy_dlq_reason_client": {
+      "zh": "原因欄的過濾是前端在當前頁面上做的子字串比對，不是後端查詢——換頁後條件不會跟著走。",
+      "en": "The reason filter is a client-side substring match over the current page, not a server query, so it does not follow you across pages.",
+      "_note": "integrations.js dlq filter"
+    },
+    "v2_sy_dlq_replay_mock": {
+      "zh": "回放會把事件重新排入投遞佇列；此 mockup 不會送出。",
+      "en": "Replay puts the event back on the dispatch queue; this mockup sends nothing.",
+      "_note": "toast"
+    },
+    "v2_sy_dlq_search_mock": {
+      "zh": "此 mockup 沒有 DLQ 資料可查詢。",
+      "en": "This mockup has no DLQ data to query.",
+      "_note": "toast"
+    },
+    "v2_sy_dlq_src_dropped": {
+      "zh": "這台設備的 DLQ 是空的（每個目的地都在正常投遞），所以這裡列出端點會回傳的欄位，而不是捏造一筆被隔離的事件來看。",
+      "en": "This appliance's DLQ is empty — every destination is delivering — so the fields the endpoint returns are listed instead of a fabricated quarantined record.",
+      "_note": "siem_dlq.json: entries=[]"
+    },
+    "v2_sy_dlq_title": {
+      "zh": "死信佇列（DLQ）",
+      "en": "Dead-letter queue (DLQ)",
+      "_note": "SY-10 panel title; gui_ov_dlq_total is a KPI label, not a section name"
+    },
+    "v2_sy_log_all": {
+      "zh": "全部層級",
+      "en": "All levels",
+      "_note": "level filter option"
+    },
+    "v2_sy_log_cap": {
+      "zh": "端點預設回傳最後 200 行、上限 500（?n= 參數，admin.py:37-41），新的在最上面。模組清單的計數是 500，但這份快照拿到的是預設的 200——兩個數字量的不是同一件事。",
+      "en": "The endpoint returns the last 200 lines by default and caps at 500 (?n=, admin.py:37-41), newest first. The module list reports 500 while this snapshot holds the default 200 — the two numbers count different things.",
+      "_note": "admin.py:37-41; logs_index count vs the captured page size"
+    },
+    "v2_sy_log_filters_new": {
+      "zh": "DESIGN-ADDED：層級過濾、搜尋與逐筆詳情都是 v2 新增的。產品只有一個模組選單和一塊純文字，500 行裡要找一則 ERROR 只能用瀏覽器的 Ctrl+F。",
+      "en": "DESIGN-ADDED: the level filter, the search box and the per-entry detail are all new. The product offers a module select and one block of plain text, so finding an ERROR among 500 lines means the browser's own Ctrl+F.",
+      "_note": "module-log.js"
+    },
+    "v2_sy_log_i18n_gap": {
+      "zh": "模組清單的後兩項在產品字典裡沒有 i18n_key，所以顯示的是英文原名——快照的 logs_index 也是這樣回傳的。",
+      "en": "The last modules in the list carry no i18n_key, so their English names show through — that is exactly what the captured logs_index returns.",
+      "_note": "logs_index.json"
+    },
+    "v2_sy_log_level": {
+      "zh": "層級",
+      "en": "Level",
+      "_note": "log entry field"
+    },
+    "v2_sy_log_meta": {
+      "zh": "{n} 筆",
+      "en": "{n} lines",
+      "_note": "SY-15 panel meta"
+    },
+    "v2_sy_log_module": {
+      "zh": "模組",
+      "en": "Module",
+      "_note": "log entry field"
+    },
+    "v2_sy_log_msg": {
+      "zh": "訊息",
+      "en": "Message",
+      "_note": "log entry field"
+    },
+    "v2_sy_log_nosnap": {
+      "zh": "此快照只擷取了「{module}」模組的日誌（endpoints.yaml:103-108 取 modules[0]）。",
+      "en": "This snapshot only captured the \"{module}\" module (endpoints.yaml:103-108 takes modules[0]).",
+      "_note": "snapshot scope"
+    },
+    "v2_sy_log_raw": {
+      "zh": "原始輸出",
+      "en": "Raw output",
+      "_note": "the product's own flat rendering"
+    },
+    "v2_sy_log_raw_note": {
+      "zh": "這一行就是產品對一筆日誌的全部呈現：時間、層級、訊息串成一行純文字。",
+      "en": "That single line is the product's entire rendering of a log entry: timestamp, level and message concatenated as plain text.",
+      "_note": "module-log.js:84"
+    },
+    "v2_sy_log_ts": {
+      "zh": "時間",
+      "en": "Time",
+      "_note": "log entry field"
+    },
+    "v2_sy_mock_save": {
+      "zh": "此 mockup 不會寫入任何設定。「儲存」只把基準值更新為畫面上的值，並把上方 request 印出來。",
+      "en": "This mockup writes nothing. Save only moves the baseline to what is on screen and prints the request above.",
+      "_note": "mockup honesty"
+    },
+    "v2_sy_more": {
+      "zh": "…另外 {n} 項",
+      "en": "…and {n} more",
+      "_note": "dirty ledger overflow"
+    },
+    "v2_sy_payload": {
+      "zh": "送出內容",
+      "en": "Request body",
+      "_note": "the live payload pane every settings page ends with"
+    },
+    "v2_sy_pce_active_field": {
+      "zh": "作用中的 profile id；沒有 profile 時為 null",
+      "en": "the active profile id; null when there are no profiles",
+      "_note": "pce_profiles.active_pce_id"
+    },
+    "v2_sy_pce_add_src": {
+      "zh": "轉錄自 settings.js:370-383（表單）與 :753-773（addPceProfile，送出 action:'add'）。",
+      "en": "Transcribed from settings.js:370-383 (the form) and :753-773 (addPceProfile, which sends action:'add').",
+      "_note": "provenance"
+    },
+    "v2_sy_pce_i_cache": {
+      "zh": "本地快取仍是舊 PCE 的資料，直到重新輪詢為止",
+      "en": "The local cache still holds the old PCE's data until it re-polls",
+      "_note": "impact line"
+    },
+    "v2_sy_pce_i_del": {
+      "zh": "刪除 profile「{name}」",
+      "en": "Deletes the profile \"{name}\"",
+      "_note": "impact line"
+    },
+    "v2_sy_pce_i_nocfm": {
+      "zh": "DESIGN-ADDED：產品的切換沒有任何確認（settings.js:775-783）",
+      "en": "DESIGN-ADDED: the product switches with no confirmation at all (settings.js:775-783)",
+      "_note": "impact line"
+    },
+    "v2_sy_pce_i_queries": {
+      "zh": "之後所有查詢、報表與告警都改打新的 PCE",
+      "en": "Every query, report and alert then targets the new PCE",
+      "_note": "impact line"
+    },
+    "v2_sy_pce_i_switch": {
+      "zh": "將作用中的 PCE 切換為「{name}」",
+      "en": "Switches the active PCE to \"{name}\"",
+      "_note": "impact line"
+    },
+    "v2_sy_pce_meta": {
+      "zh": "{n} 組 profile",
+      "en": "{n} profiles",
+      "_note": "SY-01 panel meta"
+    },
+    "v2_sy_pce_none": {
+      "zh": "尚未建立 PCE profile",
+      "en": "No PCE profile yet",
+      "_note": "pce_profiles.profiles === []"
+    },
+    "v2_sy_pce_none_body": {
+      "zh": "這台設備目前直接使用下方的 api.* 連線設定，沒有具名 profile。建立 profile 後才能在多台 PCE 之間切換。",
+      "en": "This appliance uses the api.* connection below directly; there are no named profiles. Profiles are what makes switching between PCEs possible.",
+      "_note": "pce_profiles.json: profiles=[], active_pce_id=null"
+    },
+    "v2_sy_pce_payload_src": {
+      "zh": "送出：POST /api/settings，body 只帶被改動的區段（settings.js:689-698）。",
+      "en": "Sends POST /api/settings whose body carries only the touched sections (settings.js:689-698).",
+      "_note": "provenance"
+    },
+    "v2_sy_pce_profile_field": {
+      "zh": "設定檔名稱，只作標記用；不影響連線",
+      "en": "a label on the stored config; it does not affect the connection",
+      "_note": "settings.json api.profile"
+    },
+    "v2_sy_pce_save_note": {
+      "zh": "這一區存的是 settings.api，與上方的 profile 清單是兩份資料：沒有 profile 時，這裡就是唯一的連線設定。",
+      "en": "This block writes settings.api, which is separate from the profile list above: with no profiles it is the only connection there is.",
+      "_note": "config.py"
+    },
+    "v2_sy_pce_switch_bug": {
+      "zh": "切換成功的訊息用的是 gui_pce_switched，訊息裡的 {name} 由前端填入所選 profile 名稱——後端不回傳名稱，所以刪除後再切換會顯示空白。",
+      "en": "The success message uses gui_pce_switched with {name} filled in by the client from the selected profile; the backend returns no name, so a switch after a delete shows a blank.",
+      "_note": "settings.js:775-783"
+    },
+    "v2_sy_pce_url_rule": {
+      "zh": "必須是完整 URL，含 scheme 與 port。",
+      "en": "Must be a full URL including scheme and port.",
+      "_note": "gui_url_help"
+    },
+    "v2_sy_restart_i_409": {
+      "zh": "若 daemon 由 systemd／NSSM 等外部管理，後端會回 409，需從服務管理器重啟",
+      "en": "If the daemon is managed externally (systemd, NSSM…) the backend answers 409 and the restart must come from the service manager",
+      "_note": "impact line"
+    },
+    "v2_sy_restart_i_poll": {
+      "zh": "重新載入輪詢間隔與排程",
+      "en": "Reloads the poll intervals and schedules",
+      "_note": "impact line"
+    },
+    "v2_sy_restart_i_rate": {
+      "zh": "重置速率限制計數與進行中的批次",
+      "en": "Resets the rate-limit counters and any in-flight batch",
+      "_note": "impact line"
+    },
+    "v2_sy_ret_counters": {
+      "zh": "回報的計數只涵蓋事件與流量兩類，後端實際還會清理其他資料表。",
+      "en": "The reported counters cover events and flows only; the worker also sweeps other tables.",
+      "_note": "integrations.js:437-452"
+    },
+    "v2_sy_ret_i_409": {
+      "zh": "刪除後不可復原；已封存的資料不受影響",
+      "en": "Deleted rows cannot be recovered; archived data is untouched",
+      "_note": "impact line"
+    },
+    "v2_sy_ret_i_agg": {
+      "zh": "刪除超過 {n} 天的彙總流量",
+      "en": "Deletes aggregated flows older than {n} days",
+      "_note": "impact line"
+    },
+    "v2_sy_ret_i_events": {
+      "zh": "刪除超過 {n} 天的事件",
+      "en": "Deletes events older than {n} days",
+      "_note": "impact line"
+    },
+    "v2_sy_ret_i_nobody": {
+      "zh": "請求不帶 body，天數一律以伺服器端目前的設定為準",
+      "en": "The request carries no body; the day counts come from the server's current config",
+      "_note": "impact line"
+    },
+    "v2_sy_ret_i_raw": {
+      "zh": "刪除超過 {n} 天的原始流量",
+      "en": "Deletes raw flows older than {n} days",
+      "_note": "impact line"
+    },
+    "v2_sy_saved": {
+      "zh": "已提交 {n} 項變更（{endpoint}）——此 mockup 不會真的送出。",
+      "en": "Committed {n} changes ({endpoint}) — this mockup sends nothing.",
+      "_note": "toast"
+    },
+    "v2_sy_sec_authsetup": {
+      "zh": "true 表示已經離開初始密碼；GET /api/security 有回傳，但產品的表單不顯示它",
+      "en": "true means the bootstrap password is no longer in use; GET /api/security returns it and the product's form shows it nowhere",
+      "_note": "field-contract row"
+    },
+    "v2_sy_sec_lockout": {
+      "zh": "留空＝不限制來源。填錯會把自己鎖在外面，改動前請先確認你目前的來源位址在清單內。",
+      "en": "Blank means no restriction. Getting this wrong locks you out — check that your own address is in the list before you save.",
+      "_note": "hint"
+    },
+    "v2_sy_sec_oldpw": {
+      "zh": "這個表單不需要舊密碼——已登入的 session 就是授權",
+      "en": "this form takes no old password; the authenticated session is the authorisation",
+      "_note": "field-contract row"
+    },
+    "v2_sy_sec_payload_src": {
+      "zh": "送出：POST /api/security {username, new_password, allowed_ips}。確認欄只在前端比對，不會送出。",
+      "en": "Sends POST /api/security {username, new_password, allowed_ips}. The confirm box is compared on the client and never sent.",
+      "_note": "settings.js:675-680"
+    },
+    "v2_sy_sec_pw_rule": {
+      "zh": "至少 12 個字元；留空表示不變更密碼。",
+      "en": "At least 12 characters; leave blank to keep the current password.",
+      "_note": "config.py:108-111"
+    },
+    "v2_sy_sec_rotate": {
+      "zh": "改密碼會讓其他既有 session 失效，你自己這一個也會需要重新登入。",
+      "en": "Changing the password invalidates other sessions, and you will have to sign in again yourself.",
+      "_note": "hint"
+    },
+    "v2_sy_sec_state": {
+      "zh": "目前狀態",
+      "en": "Current state",
+      "_note": "section head"
+    },
+    "v2_sy_sec_user_default": {
+      "zh": "預設帳號是 illumio。",
+      "en": "The default account is illumio.",
+      "_note": "hint"
+    },
+    "v2_sy_secret_hint": {
+      "zh": "留空表示沿用既有值。",
+      "en": "Leave blank to keep the stored value.",
+      "_note": "the product's own convention"
+    },
+    "v2_sy_secret_keep": {
+      "zh": "留空＝不變更",
+      "en": "blank = unchanged",
+      "_note": "password input placeholder"
+    },
+    "v2_sy_secret_note": {
+      "zh": "DESIGN-ADDED：後端把機密換成遮罩並附上 __set／__length（config.py:428-431），產品把遮罩直接塞回密碼框、丟掉這兩個旁欄。這裡改成陳述狀態，永遠不重建值。",
+      "en": "DESIGN-ADDED: the backend replaces secrets with a mask and adds __set/__length siblings (config.py:428-431); the product puts the mask back in the password box and drops both siblings. Here the state is stated and the value is never reconstructed.",
+      "_note": "config.py:428-431"
+    },
+    "v2_sy_secret_set": {
+      "zh": "已設定（{n} 字元）",
+      "en": "Set ({n} characters)",
+      "_note": "from <field>__set / <field>__length"
+    },
+    "v2_sy_secret_short": {
+      "zh": "由伺服器的 __set／__length 旁欄推得，不是值本身",
+      "en": "derived from the server's __set/__length siblings, never from the value",
+      "_note": "terse per-field provenance"
+    },
+    "v2_sy_secret_state": {
+      "zh": "機密欄位狀態",
+      "en": "Secret state",
+      "_note": "section head"
+    },
+    "v2_sy_secret_unset": {
+      "zh": "尚未設定",
+      "en": "Not set",
+      "_note": "<field>__set === false"
+    },
+    "v2_sy_siem_dest_meta": {
+      "zh": "{n} 個目的地",
+      "en": "{n} destinations",
+      "_note": "SY-08 panel meta"
+    },
+    "v2_sy_siem_dest_src": {
+      "zh": "轉錄自 buildDestModal（integrations.js:819-904）與 siemToggleCondFields（:906-923）。",
+      "en": "Transcribed from buildDestModal (integrations.js:819-904) and siemToggleCondFields (:906-923).",
+      "_note": "provenance"
+    },
+    "v2_sy_siem_fw_src": {
+      "zh": "轉錄自 integrations.js 的 forwarder 設定區；送出 PUT /api/siem/forwarder {enabled, dispatch_tick_seconds, dlq_max_per_dest}。",
+      "en": "Transcribed from the forwarder block of integrations.js; sends PUT /api/siem/forwarder {enabled, dispatch_tick_seconds, dlq_max_per_dest}.",
+      "_note": "provenance"
+    },
+    "v2_sy_siem_i_del": {
+      "zh": "刪除目的地「{name}」",
+      "en": "Deletes the destination \"{name}\"",
+      "_note": "impact line"
+    },
+    "v2_sy_siem_i_dlq": {
+      "zh": "該目的地累積的 DLQ 一併消失",
+      "en": "Its accumulated DLQ entries go with it",
+      "_note": "impact line"
+    },
+    "v2_sy_siem_maskpii_note": {
+      "zh": "PII 遮罩開關，同樣沒有 UI 入口——預設 false 代表不遮罩",
+      "en": "the PII masking switch, also unreachable from the UI; the default false means no masking",
+      "_note": "field-contract row"
+    },
+    "v2_sy_siem_name_new": {
+      "zh": "建立後不可變更；名稱同時是 API 路徑。",
+      "en": "Fixed once created; the name is also the API path.",
+      "_note": "hint"
+    },
+    "v2_sy_siem_name_ro": {
+      "zh": "名稱是這個目的地的位址，編輯時不可改。",
+      "en": "The name is this destination's address and cannot be changed while editing.",
+      "_note": "hint"
+    },
+    "v2_sy_siem_noack": {
+      "zh": "無 ACK",
+      "en": "no ACK",
+      "_note": "UDP has no delivery confirmation"
+    },
+    "v2_sy_siem_noack_help": {
+      "zh": "UDP 沒有傳送確認，送出即視為成功，因此這個目的地不會產生 DLQ。",
+      "en": "UDP has no delivery confirmation: a send counts as success, so this destination can never produce DLQ entries.",
+      "_note": "integrations.js:736-737"
+    },
+    "v2_sy_siem_nomodal": {
+      "zh": "目的地有、但 modal 不顯示的欄位",
+      "en": "Stored on the destination, absent from the modal",
+      "_note": "field-contract section"
+    },
+    "v2_sy_siem_payload_src": {
+      "zh": "送出：PUT /api/siem/forwarder。目的地的建立／更新是各自的請求，見目的地 drawer 內的 request 區塊。",
+      "en": "Sends PUT /api/siem/forwarder. Destination create/update are separate requests — see the request block inside the destination drawer.",
+      "_note": "provenance"
+    },
+    "v2_sy_siem_port_auto": {
+      "zh": "切換傳輸方式時，只有當目前的 port 仍是預設值（514/6514/8088）才會自動改寫。",
+      "en": "Switching transport rewrites the port only while it is still one of the defaults (514/6514/8088).",
+      "_note": "integrations.js:914-922"
+    },
+    "v2_sy_siem_profile_note": {
+      "zh": "建立時採預設值，UI 沒有任何入口可以設定",
+      "en": "takes its default on create; no UI reaches it",
+      "_note": "field-contract row"
+    },
+    "v2_sy_siem_sent": {
+      "zh": "已送出（累計）",
+      "en": "Sent (cumulative)",
+      "_note": "siem_status.sent is a lifetime total; gui_ov_sent words it as a 7-day figure"
+    },
+    "v2_sy_siem_st_audit": {
+      "zh": "稽核事件",
+      "en": "Audit events",
+      "_note": "source_types option"
+    },
+    "v2_sy_siem_st_fallback": {
+      "zh": "兩個都不勾時後端會退回 [audit, traffic]（等於全開），不是「都不送」。",
+      "en": "With neither ticked the backend falls back to [audit, traffic] — that is everything, not nothing.",
+      "_note": "config_models"
+    },
+    "v2_sy_siem_st_traffic": {
+      "zh": "流量",
+      "en": "Traffic",
+      "_note": "source_types option"
+    },
+    "v2_sy_siem_test_body": {
+      "zh": "測試送出打的是「已儲存」的那份目的地設定，不是畫面上還沒存的值。",
+      "en": "The test posts to the SAVED destination, not to whatever is unsaved on screen.",
+      "_note": "integrations.js:976-990"
+    },
+    "v2_sy_siem_test_err": {
+      "zh": "失敗時的原因字串",
+      "en": "the failure reason when ok is false",
+      "_note": "response key"
+    },
+    "v2_sy_siem_test_latency": {
+      "zh": "往返時間（毫秒）",
+      "en": "round-trip time in milliseconds",
+      "_note": "response key"
+    },
+    "v2_sy_siem_test_mock": {
+      "zh": "此 mockup 沒有可連線的目的地，測試不會送出。",
+      "en": "This mockup has no reachable destination; nothing is sent.",
+      "_note": "toast"
+    },
+    "v2_sy_siem_test_ok": {
+      "zh": "是否成功連線並送出一筆測試事件",
+      "en": "whether a test event connected and was sent",
+      "_note": "response key"
+    },
+    "v2_sy_siem_test_req": {
+      "zh": "POST /api/siem/destinations/{name}/test — 此 mockup 不會送出。",
+      "en": "POST /api/siem/destinations/{name}/test — this mockup sends nothing.",
+      "_note": "toast"
+    },
+    "v2_sy_siem_test_saved": {
+      "zh": "因此新建或改設定後要先儲存，測試才有意義。",
+      "en": "So a new or edited destination has to be saved before a test means anything.",
+      "_note": "hint"
+    },
+    "v2_sy_siem_tls_prod": {
+      "zh": "正式環境請保持開啟。",
+      "en": "Keep this on in production.",
+      "_note": "hint"
+    },
+    "v2_sy_stop_btn": {
+      "zh": "停止 Web GUI",
+      "en": "Stop the web GUI",
+      "_note": "the imperative the button, the palette command and the confirm all share; gui_action_gui_stopped_title is the resulting state and stays on the strip"
+    },
+    "v2_sy_stop_i_cli": {
+      "zh": "恢復必須回到主機命令列，網頁上沒有任何入口",
+      "en": "Recovery is from the host command line; there is no way back from the browser",
+      "_note": "impact line"
+    },
+    "v2_sy_stop_i_persistent": {
+      "zh": "以服務方式常駐時後端會回 403 並拒絕停止——但產品的按鈕不會告訴你",
+      "en": "In persistent/service mode the backend answers 403 and refuses — which the product's button never tells you",
+      "_note": "impact line"
+    },
+    "v2_sy_stop_i_sigint": {
+      "zh": "對 GUI 行程送出停止訊號，網頁介面立即無法連線",
+      "en": "Signals the GUI process to stop; the web interface becomes unreachable immediately",
+      "_note": "impact line"
+    },
+    "v2_sy_stop_mock": {
+      "zh": "此 mockup 不會停止任何行程。",
+      "en": "This mockup stops no process.",
+      "_note": "toast"
+    },
+    "v2_sy_stop_swallow": {
+      "zh": "產品的停止動作把回應吞掉，所以 403（拒絕停止）與 200（已停止）在畫面上長得一模一樣。",
+      "en": "The product's stop action swallows the response, so a 403 (refused) and a 200 (stopped) look identical on screen.",
+      "_note": "actions.js:118-127 + admin.py:49-50"
+    },
+    "v2_sy_tf_cidr_bug": {
+      "zh": "欄位說明寫「CIDR 或精確 IP」，但前端的 validateIp 沒有接受 / 的分支（integrations.js:521-526），後端 config_models 也一樣拒絕——CIDR 實際上是無效輸入。IPv6 分支只檢查十六進位與冒號，所以「::::」會通過。",
+      "en": "The field help promises \"CIDR or exact IP\", but validateIp has no branch that accepts a slash (integrations.js:521-526) and config_models rejects it too — CIDR is not actually valid input. The IPv6 branch only checks hex and colons, so \"::::\" passes.",
+      "_note": "confirmed bug, worth filing"
+    },
+    "v2_sy_tf_presave": {
+      "zh": "這些提示只是提示：產品在儲存前不會擋下無效的 IP 或 Port，錯誤要等後端回應才會出現。",
+      "en": "These are hints only: the product does not block a save on an invalid IP or port; the error arrives with the backend response.",
+      "_note": "integrations.js:528-541"
+    },
+    "v2_sy_tls_cn_required": {
+      "zh": "CN 必填。",
+      "en": "CN is required.",
+      "_note": "settings.js:609-632"
+    },
+    "v2_sy_tls_csr_mock": {
+      "zh": "CSR 由伺服器產生並回傳 PEM；此 mockup 沒有後端，因此沒有可複製或下載的內容。",
+      "en": "The CSR is generated server-side and returned as PEM; with no backend here there is nothing to copy or download.",
+      "_note": "toast"
+    },
+    "v2_sy_tls_i_rate": {
+      "zh": "舊憑證會被就地覆寫，沒有備份",
+      "en": "The old certificate is overwritten in place, with no backup",
+      "_note": "impact line"
+    },
+    "v2_sy_tls_i_restart": {
+      "zh": "續期後必須重啟伺服器才會套用新憑證",
+      "en": "The server must be restarted before the new certificate is served",
+      "_note": "impact line"
+    },
+    "v2_sy_tls_i_selfonly": {
+      "zh": "只適用自簽憑證；CA 簽發的憑證後端會拒絕",
+      "en": "Self-signed only; the backend rejects this for a CA-signed certificate",
+      "_note": "impact line"
+    },
+    "v2_sy_tls_import_mock": {
+      "zh": "此 mockup 不會匯入憑證。",
+      "en": "This mockup imports nothing.",
+      "_note": "toast"
+    },
+    "v2_sy_tls_import_paste": {
+      "zh": "匯入是貼上 PEM 文字，不是上傳檔案；憑證鏈請一併貼上。",
+      "en": "Import takes pasted PEM text, not a file upload; paste the chain along with the leaf.",
+      "_note": "settings.js:652-671"
+    },
+    "v2_sy_tls_no_renew": {
+      "zh": "目前是 CA 簽發的憑證，續期不適用——請改用下方的 CSR 與匯入流程。",
+      "en": "This is a CA-signed certificate, so renew does not apply — use the CSR and import flow below.",
+      "_note": "config.py:339-340"
+    },
+    "v2_sy_tls_ou_note": {
+      "zh": "後端接受 ou 欄位，但產品沒有任何輸入框會產生它",
+      "en": "the backend accepts an ou field that no input in the product produces",
+      "_note": "field-contract row"
+    },
+    "v2_sy_tls_path": {
+      "zh": "憑證路徑",
+      "en": "Certificate path",
+      "_note": "cert_info.path"
+    },
+    "v2_sy_tls_payload_src": {
+      "zh": "送出：POST /api/tls/config。CSR 與匯入各自是獨立端點。",
+      "en": "Sends POST /api/tls/config. The CSR and the import are separate endpoints.",
+      "_note": "provenance"
+    },
+    "v2_sy_tls_subject": {
+      "zh": "憑證主體",
+      "en": "Subject",
+      "_note": "cert_info.subject"
+    },
+    "v2_sy_tls_subject_literal": {
+      "zh": "主體字串直接來自 openssl 輸出，未經解析；產品也是原樣顯示。",
+      "en": "The subject string comes straight from openssl and is shown unparsed, exactly as the product shows it.",
+      "_note": "settings.js:558-591"
+    },
+    "v2_sy_tls_validity": {
+      "zh": "預設有效天數",
+      "en": "Default validity (days)",
+      "_note": "tls_status.default_validity_days"
+    },
+    "v2_sy_ts_note": {
+      "zh": "取樣只作用在 Allowed 流量，Blocked 與 Potentially Blocked 全數保留；比例採確定性雜湊，同一條連線每次結果一致。",
+      "en": "Sampling applies to allowed flows only; blocked and potentially-blocked are always kept in full. The ratio is a deterministic hash, so a given flow always lands the same way.",
+      "_note": "gui_cache_ts_ratio_help"
+    },
+    "v2_table_page": {
+      "zh": "第 {page}／{pages} 頁",
+      "en": "Page {page} of {pages}"
+    },
+    "v2_table_resize": {
+      "zh": "拖曳調整欄寬",
+      "en": "Drag to resize column"
+    },
+    "v2_table_rows": {
+      "zh": "共 {total} 筆",
+      "en": "{total} rows"
+    },
+    "v2_user_menu": {
+      "zh": "使用者選單",
+      "en": "User menu"
+    },
+    "v2_user_pce": {
+      "zh": "PCE",
+      "en": "PCE"
+    },
+    "v2_user_timezone": {
+      "zh": "時區",
+      "en": "Timezone"
+    },
+    "v2_user_version": {
+      "zh": "版本",
+      "en": "Version"
+    },
+    "v2_verify_pane": {
+      "zh": "驗證面板｜僅樣本，實作不出現",
+      "en": "Verification pane · sample only, not in the product",
+      "_note": "badge on every payload/stored-fields preview pane (verifypane.mjs)"
+    }
+  }
+}

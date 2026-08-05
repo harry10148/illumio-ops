@@ -12,7 +12,7 @@
 
 - 本階段 **禁改 `src/`**；所有新檔在 `design/v2/`、`tests/design_v2/`、`docs/`
 - mockup JS **禁止內嵌手寫資料物件**（lint 強制，Task 5）；畫面資料一律 fetch `design/v2/snapshots/`
-- 快照落地前必須遮罩（key 名含 password/token/secret/key/hec/credential → `***MASKED***`）；**遮罩前的原始回應絕不寫入任何檔案**
+- 快照落地前必須遮罩（**語意式**，2026-08-03 使用者裁決修訂：明確機密欄位清單——password/passwd/secret/token/credential(s)/hec 為獨立 token，加 api_key/apikey/private_key/ssh_key/signing_key/encryption_key/session_key/access_key/secret_key/auth_token/hec_token 等複合詞→`***MASKED***`；`ui_translations`、`event_catalog` 等靜態目錄型端點可在 manifest 標 `mask: catalog` 免鍵名遮罩但仍套用長 hex 值掃描；原「子字串即遮」規則作廢，因實測毀掉 9 檔 70+ 非機密資料點）；**遮罩前的原始回應絕不寫入任何檔案**
 - PCE 術語保留英文原文（ruleset、enforcement、draft、provision、label、workload、VEN…）
 - 不引入 npm/build；vendor 檔只能放 `design/v2/mockup/vendor/`
 - 測試機連線一律走環境變數 `ILLUMIO_OPS_E2E_BASE_URL` / `ILLUMIO_OPS_E2E_USER` / `ILLUMIO_OPS_E2E_PASSWORD`（沿用 tests/test_gui_e2e_playwright.py 慣例）；憑證值不落檔、不印出

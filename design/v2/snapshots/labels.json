@@ -1,0 +1,23 @@
+{
+ "labels": [
+  "Calico",
+  "CoreServices",
+  "Default",
+  "DemoApp",
+  "ERP",
+  "Endpoint",
+  "FakeApp",
+  "HR",
+  "Illumio",
+  "Infrastructure",
+  "Jumpdesk",
+  "K8sNode",
+  "Kube-Prom-Stack",
+  "KubeSystem",
+  "Security",
+  "Traffic",
+  "nginx-test",
+  "onlineboutique"
+ ],
+ "ok": true
+}

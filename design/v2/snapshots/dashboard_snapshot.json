@@ -1,0 +1,836 @@
+{
+ "ok": true,
+ "snapshot": {
+  "action_matrix": [
+   {
+    "action": "Move scoped workloads from visibility/testing into selective or full enforcement.",
+    "action_code": "MOVE_TO_ENFORCEMENT",
+    "apps": [
+     "coreservices (vmware)",
+     "demoapp (vmware)",
+     "endpoint (physical)",
+     "illumio (kubernetes)",
+     "illumio (vmware)"
+    ],
+    "count": 15,
+    "flow_total": 401550,
+    "severity": "CRITICAL"
+   },
+   {
+    "action": "Onboard unmanaged assets or explicitly isolate their access paths.",
+    "action_code": "ONBOARD_UNMANAGED",
+    "apps": [
+     "coreservices (vmware)",
+     "demoapp (vmware)",
+     "endpoint (physical)",
+     "illumio (vmware)",
+     "infrastructure (vmware)"
+    ],
+    "count": 16,
+    "flow_total": 401126,
+    "severity": "HIGH"
+   },
+   {
+    "action": "Tighten ringfence scope so only required app-to-app paths are permitted.",
+    "action_code": "DEFINE_RINGFENCE_SCOPE",
+    "apps": [
+     "coreservices (vmware)",
+     "demoapp (vmware)",
+     "endpoint (physical)"
+    ],
+    "count": 3,
+    "flow_total": 21065,
+    "severity": "HIGH"
+   },
+   {
+    "action": "Restrict cross-boundary ports to explicit allowlists and remove broad access.",
+    "action_code": "LOCK_BOUNDARY_PORTS",
+    "apps": [
+     "coreservices (vmware)",
+     "endpoint (physical)"
+    ],
+    "count": 2,
+    "flow_total": 22,
+    "severity": "HIGH"
+   },
+   {
+    "action": "This workload acts as a network hub (high reachability or articulation point). Apply stricter east-west policy boundaries to limit lateral movement.",
+    "action_code": "RESTRICT_TRANSIT_NODE_ACCESS",
+    "apps": [
+     "coreservices (vmware) · 172.16.15.100, 172.16.15.106, 172.16.15.102",
+     "172.16.15.100, 172.16.15.101, 192.168.20.32, 20.27.177.113 +1"
+    ],
+    "count": 2,
+    "flow_total": 0,
+    "severity": "HIGH"
+   }
+  ],
+  "allowed_flows": 228,
+  "blast_radius": [
+   {
+    "action": "Reduce traversable lateral paths and segment high-reachability nodes.",
+    "action_code": "TIGHTEN_LATERAL_POLICY",
+    "app_env_key": "endpoint|physical",
+    "evidence": {
+     "max_depth": 4,
+     "reachability_count": 4
+    },
+    "finding": "endpoint (physical) · 192.168.20.103, 172.16.9.26, 10.10.0.3 · 192.168.20.103, 172.16.9.26, 10.10.0.3: High blast-radius posture detected — reachable nodes 4; max path depth 4",
+    "severity": "HIGH"
+   },
+   {
+    "action": "Reduce traversable lateral paths and segment high-reachability nodes.",
+    "action_code": "TIGHTEN_LATERAL_POLICY",
+    "app_env_key": "jumpdesk|vmware",
+    "evidence": {
+     "max_depth": 4,
+     "reachability_count": 4
+    },
+    "finding": "jumpdesk (vmware) · 172.16.15.150 · 172.16.15.150: High blast-radius posture detected — reachable nodes 4; max path depth 4",
+    "severity": "HIGH"
+   }
+  ],
+  "blind_spots": [
+   {
+    "action": "Move scoped workloads from visibility/testing into selective or full enforcement.",
+    "action_code": "MOVE_TO_ENFORCEMENT",
+    "app_env_key": "coreservices|vmware",
+    "evidence": {
+     "allowed_ratio": 0.0143,
+     "blocked_or_pb_flow_count": 2219,
+     "flow_count": 9274,
+     "mixed_traffic_ratio": 0.9641,
+     "unmanaged_traversable_flows": 2
+    },
+    "finding": "coreservices (vmware) · 172.16.15.100, 172.16.15.106, 172.16.15.102: Enforcement gap detected / Visibility/enforcement blind spot detected — flows 9274; blocked/PB flows 2219",
+    "severity": "CRITICAL"
+   },
+   {
+    "action": "Move scoped workloads from visibility/testing into selective or full enforcement.",
+    "action_code": "MOVE_TO_ENFORCEMENT",
+    "app_env_key": "demoapp|vmware",
+    "evidence": {
+     "allowed_ratio": 0.0879,
+     "blocked_or_pb_flow_count": 98,
+     "flow_count": 182,
+     "mixed_traffic_ratio": 0.8214
+    },
+    "finding": "demoapp (vmware): Enforcement gap detected / Visibility/enforcement blind spot detected — flows 182; blocked/PB flows 98",
+    "severity": "CRITICAL"
+   },
+   {
+    "action": "Move scoped workloads from visibility/testing into selective or full enforcement.",
+    "action_code": "MOVE_TO_ENFORCEMENT",
+    "app_env_key": "endpoint|physical",
+    "evidence": {
+     "allowed_ratio": 0.0056,
+     "blocked_or_pb_flow_count": 6359,
+     "flow_count": 11609,
+     "mixed_traffic_ratio": 0.9822,
+     "unmanaged_traversable_flows": 13
+    },
+    "finding": "endpoint (physical) · 192.168.20.103, 172.16.9.26, 10.10.0.3: Enforcement gap detected / Visibility/enforcement blind spot detected — flows 11609; blocked/PB flows 6359",
+    "severity": "CRITICAL"
+   },
+   {
+    "action": "Move scoped workloads from visibility/testing into selective or full enforcement.",
+    "action_code": "MOVE_TO_ENFORCEMENT",
+    "app_env_key": "illumio|kubernetes",
+    "evidence": {
+     "allowed_ratio": 0.0,
+     "blocked_or_pb_flow_count": 9,
+     "flow_count": 9
+    },
+    "finding": "illumio (kubernetes): Enforcement gap detected — flows 9; blocked/PB flows 9",
+    "severity": "CRITICAL"
+   },
+   {
+    "action": "Move scoped workloads from visibility/testing into selective or full enforcement.",
+    "action_code": "MOVE_TO_ENFORCEMENT",
+    "app_env_key": "illumio|vmware",
+    "evidence": {
+     "allowed_ratio": 0.0645,
+     "blocked_or_pb_flow_count": 18,
+     "flow_count": 31,
+     "mixed_traffic_ratio": 0.8387
+    },
+    "finding": "illumio (vmware): Enforcement gap detected / Visibility/enforcement blind spot detected — flows 31; blocked/PB flows 18",
+    "severity": "CRITICAL"
+   }
+  ],
+  "blocked_flows": 0,
+  "boundary_breaches": [
+   {
+    "action": "Tighten ringfence scope so only required app-to-app paths are permitted.",
+    "action_code": "DEFINE_RINGFENCE_SCOPE",
+    "app_env_key": "coreservices|vmware",
+    "evidence": {
+     "flow_count": 9274,
+     "remote_allowed_ratio": 0.0,
+     "remote_flow_count": 12,
+     "ringfence_ratio": 0.0009
+    },
+    "finding": "coreservices (vmware) · 172.16.15.100, 172.16.15.106, 172.16.15.102: Boundary control weakness detected — flows 9274; remote-access flows 12",
+    "severity": "HIGH"
+   },
+   {
+    "action": "Tighten ringfence scope so only required app-to-app paths are permitted.",
+    "action_code": "DEFINE_RINGFENCE_SCOPE",
+    "app_env_key": "demoapp|vmware",
+    "evidence": {
+     "flow_count": 182,
+     "ringfence_ratio": 0.0769
+    },
+    "finding": "demoapp (vmware): Boundary control weakness detected — flows 182; ringfence ratio 0.08",
+    "severity": "HIGH"
+   },
+   {
+    "action": "Tighten ringfence scope so only required app-to-app paths are permitted.",
+    "action_code": "DEFINE_RINGFENCE_SCOPE",
+    "app_env_key": "endpoint|physical",
+    "evidence": {
+     "flow_count": 11609,
+     "remote_allowed_ratio": 0.0,
+     "remote_flow_count": 10,
+     "ringfence_ratio": 0.004
+    },
+    "finding": "endpoint (physical) · 192.168.20.103, 172.16.9.26, 10.10.0.3: Boundary control weakness detected — flows 11609; remote-access flows 10",
+    "severity": "HIGH"
+   }
+  ],
+  "bw_data_available": true,
+  "date_range": "N/A",
+  "generated_at": "2026-07-24 14:41:22 (UTC+8)",
+  "hero": {
+   "high_risk_count": 3,
+   "score": 0.0,
+   "score_grade": "?",
+   "sentence_key": "gui_hero_sentence",
+   "sentence_params": {
+    "grade": "?",
+    "high_risk": "3",
+    "score": "0"
+   }
+  },
+  "key_findings": [
+   {
+    "action": "Create segmentation rules for the top uncovered flows.",
+    "finding": "Only 0% of flows are covered by allow policies — true gap is 95%.",
+    "severity": "HIGH"
+   },
+   {
+    "action": "Review ransomware-port exposure and remove non-essential paths.",
+    "finding": "1,738 flows on ransomware-associated ports detected.",
+    "severity": "HIGH"
+   },
+   {
+    "action": "Apply micro-segmentation controls for RDP/SSH/SMB lateral paths.",
+    "finding": "68 remote access / lateral movement flows found.",
+    "severity": "HIGH"
+   },
+   {
+    "action": "Onboard unmanaged hosts or isolate their access paths.",
+    "finding": "2,507 unique unmanaged source hosts.",
+    "severity": "MEDIUM"
+   },
+   {
+    "action": "Review high-volume flows for data exfiltration patterns.",
+    "finding": "Total data volume: 86.71 TB across the analysis period.",
+    "severity": "INFO"
+   }
+  ],
+  "kpis": [
+   {
+    "label": "微分段成熟度",
+    "label_key": "mod12_kpi_maturity_score",
+    "value": "25.6/100 (F)"
+   },
+   {
+    "label": "流量總數",
+    "label_key": "mod12_kpi_total_flows",
+    "value": "200,975"
+   },
+   {
+    "label": "連線總數",
+    "label_key": "mod12_kpi_total_connections",
+    "value": "7,799,284"
+   },
+   {
+    "label": "唯一來源 IP",
+    "label_key": "mod12_kpi_unique_src_ips",
+    "value": "2,856"
+   },
+   {
+    "label": "唯一目的端 IP",
+    "label_key": "mod12_kpi_unique_dst_ips",
+    "value": "5,096"
+   },
+   {
+    "label": "已強制覆蓋率",
+    "label_key": "mod12_kpi_enforced_coverage",
+    "value": "0.1%"
+   },
+   {
+    "label": "已就位待強制覆蓋率",
+    "label_key": "mod12_kpi_staged_coverage",
+    "value": "4.7%"
+   },
+   {
+    "label": "真實缺口",
+    "label_key": "mod12_kpi_true_gap",
+    "value": "95.2%"
+   },
+   {
+    "label": "Blocked 流量",
+    "label_key": "mod12_kpi_blocked_flows",
+    "value": "0"
+   },
+   {
+    "label": "PB 未覆蓋暴露",
+    "label_key": "mod12_kpi_pb_uncovered",
+    "value": "9,396"
+   },
+   {
+    "label": "Unmanaged 來源比率",
+    "label_key": "mod12_kpi_unmanaged_src_pct",
+    "value": "88.2%"
+   },
+   {
+    "label": "資料總量",
+    "label_key": "mod12_kpi_total_data_volume",
+    "value": "86.71 TB"
+   },
+   {
+    "label": "日期範圍",
+    "label_key": "mod12_kpi_date_range",
+    "value": "N/A"
+   }
+  ],
+  "maturity_dimensions": {
+   "enforcement_coverage": {
+    "ratio": 0.0245,
+    "score": 1.0,
+    "weight": 40
+   },
+   "lateral_movement_control": {
+    "ratio": 1.0,
+    "score": 15.0,
+    "weight": 15
+   },
+   "managed_asset_ratio": {
+    "ratio": 0.0,
+    "score": 0.0,
+    "weight": 10
+   },
+   "policy_coverage": {
+    "ratio": 0.001,
+    "score": 0.0,
+    "weight": 25
+   },
+   "risk_port_control": {
+    "ratio": 0.9568,
+    "score": 9.6,
+    "weight": 10
+   }
+  },
+  "maturity_grade": "F",
+  "maturity_score": 25.6,
+  "policy_coverage_pct": 0.1,
+  "policy_summary": [
+   {
+    "% of Total": 0.1,
+    "Decision": "allowed",
+    "Flows": 228,
+    "Inbound": 141,
+    "Outbound": 87
+   },
+   {
+    "% of Total": 0.0,
+    "Decision": "blocked",
+    "Flows": 0,
+    "Inbound": 0,
+    "Outbound": 0
+   },
+   {
+    "% of Total": 4.7,
+    "Decision": "potentially_blocked",
+    "Flows": 9396,
+    "Inbound": 2401,
+    "Outbound": 6995
+   },
+   {
+    "% of Total": 95.2,
+    "Decision": "unknown",
+    "Flows": 191351,
+    "Inbound": 175241,
+    "Outbound": 16110
+   }
+  ],
+  "potentially_blocked": 9396,
+  "ransomware_risk_total": 1738,
+  "suspicious_pivot_behavior": [
+   {
+    "action": "This workload acts as a network hub (high reachability or articulation point). Apply stricter east-west policy boundaries to limit lateral movement.",
+    "action_code": "RESTRICT_TRANSIT_NODE_ACCESS",
+    "app_env_key": "coreservices|vmware",
+    "evidence": {
+     "bridge_score": 90.0,
+     "reachability_count": 3
+    },
+    "finding": "coreservices (vmware) · 172.16.15.100, 172.16.15.106, 172.16.15.102 · 172.16.15.100, 172.16.15.106, 172.16.15.102: Suspicious pivot behavior detected — reachable nodes 3; bridge score 90.0",
+    "severity": "HIGH"
+   },
+   {
+    "action": "This workload acts as a network hub (high reachability or articulation point). Apply stricter east-west policy boundaries to limit lateral movement.",
+    "action_code": "RESTRICT_TRANSIT_NODE_ACCESS",
+    "app_env_key": "unlabeled|unlabeled",
+    "evidence": {
+     "bridge_score": 90.0,
+     "reachability_count": 3
+    },
+    "finding": "172.16.15.100, 172.16.15.101, 192.168.20.32, 20.27.177.113 +1 · 172.16.15.100, 172.16.15.101, 192.168.20.32, 20.27.177.113 +1: Suspicious pivot behavior detected — reachable nodes 3; bridge score 90.0",
+    "severity": "HIGH"
+   }
+  ],
+  "top_bandwidth": [
+   {
+    "Bandwidth (Mbps)": 258059.37141488,
+    "Bytes Total": 19354452856116,
+    "Dst IP": "172.16.15.120",
+    "Port": 10250,
+    "Proto": "TCP",
+    "Src IP": "10.85.58.206"
+   },
+   {
+    "Bandwidth (Mbps)": 229310.57624585333,
+    "Bytes Total": 17198293218439,
+    "Dst IP": "172.16.15.121",
+    "Port": 10250,
+    "Proto": "TCP",
+    "Src IP": "10.85.58.206"
+   },
+   {
+    "Bandwidth (Mbps)": 221668.55398668,
+    "Bytes Total": 16625141549001,
+    "Dst IP": "10.85.58.252",
+    "Port": 8080,
+    "Proto": "TCP",
+    "Src IP": "10.85.58.206"
+   },
+   {
+    "Bandwidth (Mbps)": 131735.24967054665,
+    "Bytes Total": 9880143725291,
+    "Dst IP": "10.96.242.54",
+    "Port": 80,
+    "Proto": "TCP",
+    "Src IP": "10.85.85.224"
+   },
+   {
+    "Bandwidth (Mbps)": 130355.08781304,
+    "Bytes Total": 9776631585978,
+    "Dst IP": "10.85.58.211",
+    "Port": 8080,
+    "Proto": "TCP",
+    "Src IP": "10.85.85.224"
+   },
+   {
+    "Bandwidth (Mbps)": 32201.509882933333,
+    "Bytes Total": 2415113241220,
+    "Dst IP": "10.85.85.244",
+    "Port": 3550,
+    "Proto": "TCP",
+    "Src IP": "10.85.58.211"
+   },
+   {
+    "Bandwidth (Mbps)": 29968.62337108,
+    "Bytes Total": 2247646752831,
+    "Dst IP": "10.85.58.252",
+    "Port": 41514,
+    "Proto": "TCP",
+    "Src IP": "10.96.0.1"
+   },
+   {
+    "Bandwidth (Mbps)": 28232.955790986667,
+    "Bytes Total": 2117471684324,
+    "Dst IP": "172.16.15.122",
+    "Port": 10250,
+    "Proto": "TCP",
+    "Src IP": "10.85.58.206"
+   },
+   {
+    "Bandwidth (Mbps)": 24176.34369965333,
+    "Bytes Total": 1813225777474,
+    "Dst IP": "10.109.206.35",
+    "Port": 3550,
+    "Proto": "TCP",
+    "Src IP": "10.85.58.211"
+   },
+   {
+    "Bandwidth (Mbps)": 23425.899428080003,
+    "Bytes Total": 1756942457106,
+    "Dst IP": "10.85.85.244",
+    "Port": 3550,
+    "Proto": "TCP",
+    "Src IP": "10.85.58.245"
+   }
+  ],
+  "top_blocked_flows": [],
+  "top_by_bytes": [
+   {
+    "Bandwidth (Mbps)": 258059.37141488,
+    "Bytes Total": 19354452856116,
+    "Decision": "potentially_blocked",
+    "Dst Host": "k8s-master",
+    "Dst IP": "172.16.15.120",
+    "Port": 10250,
+    "Proto": "TCP",
+    "Src Host": null,
+    "Src IP": "10.85.58.206"
+   },
+   {
+    "Bandwidth (Mbps)": 229310.57624585333,
+    "Bytes Total": 17198293218439,
+    "Decision": "potentially_blocked",
+    "Dst Host": "k8s-node01",
+    "Dst IP": "172.16.15.121",
+    "Port": 10250,
+    "Proto": "TCP",
+    "Src Host": null,
+    "Src IP": "10.85.58.206"
+   },
+   {
+    "Bandwidth (Mbps)": 221668.55398668,
+    "Bytes Total": 16625141549001,
+    "Decision": "potentially_blocked",
+    "Dst Host": "k8s-node02",
+    "Dst IP": "10.85.58.252",
+    "Port": 8080,
+    "Proto": "TCP",
+    "Src Host": null,
+    "Src IP": "10.85.58.206"
+   },
+   {
+    "Bandwidth (Mbps)": 131735.24967054665,
+    "Bytes Total": 9880143725291,
+    "Decision": "potentially_blocked",
+    "Dst Host": "10.96.242.54",
+    "Dst IP": "10.96.242.54",
+    "Port": 80,
+    "Proto": "TCP",
+    "Src Host": null,
+    "Src IP": "10.85.85.224"
+   },
+   {
+    "Bandwidth (Mbps)": 130355.08781304,
+    "Bytes Total": 9776631585978,
+    "Decision": "potentially_blocked",
+    "Dst Host": "k8s-node02",
+    "Dst IP": "10.85.58.211",
+    "Port": 8080,
+    "Proto": "TCP",
+    "Src Host": null,
+    "Src IP": "10.85.85.224"
+   },
+   {
+    "Bandwidth (Mbps)": 32201.509882933333,
+    "Bytes Total": 2415113241220,
+    "Decision": "potentially_blocked",
+    "Dst Host": null,
+    "Dst IP": "10.85.85.244",
+    "Port": 3550,
+    "Proto": "TCP",
+    "Src Host": "10.85.58.211",
+    "Src IP": "10.85.58.211"
+   },
+   {
+    "Bandwidth (Mbps)": 29968.62337108,
+    "Bytes Total": 2247646752831,
+    "Decision": "potentially_blocked",
+    "Dst Host": "k8s-node02",
+    "Dst IP": "10.85.58.252",
+    "Port": 41514,
+    "Proto": "TCP",
+    "Src Host": "10.96.0.1",
+    "Src IP": "10.96.0.1"
+   },
+   {
+    "Bandwidth (Mbps)": 28232.955790986667,
+    "Bytes Total": 2117471684324,
+    "Decision": "potentially_blocked",
+    "Dst Host": "k8s-node02",
+    "Dst IP": "172.16.15.122",
+    "Port": 10250,
+    "Proto": "TCP",
+    "Src Host": null,
+    "Src IP": "10.85.58.206"
+   },
+   {
+    "Bandwidth (Mbps)": 24176.34369965333,
+    "Bytes Total": 1813225777474,
+    "Decision": "potentially_blocked",
+    "Dst Host": "10.109.206.35",
+    "Dst IP": "10.109.206.35",
+    "Port": 3550,
+    "Proto": "TCP",
+    "Src Host": "k8s-node02",
+    "Src IP": "10.85.58.211"
+   },
+   {
+    "Bandwidth (Mbps)": 23425.899428080003,
+    "Bytes Total": 1756942457106,
+    "Decision": "potentially_blocked",
+    "Dst Host": null,
+    "Dst IP": "10.85.85.244",
+    "Port": 3550,
+    "Proto": "TCP",
+    "Src Host": "10.85.58.245",
+    "Src IP": "10.85.58.245"
+   }
+  ],
+  "top_ports": [
+   {
+    "Flow Count": 10658,
+    "Port": 443,
+    "Proto": "TCP"
+   },
+   {
+    "Flow Count": 1545,
+    "Port": 443,
+    "Proto": "UDP"
+   },
+   {
+    "Flow Count": 1433,
+    "Port": 80,
+    "Proto": "TCP"
+   },
+   {
+    "Flow Count": 551,
+    "Port": 53,
+    "Proto": "UDP"
+   },
+   {
+    "Flow Count": 251,
+    "Port": 5353,
+    "Proto": "UDP"
+   },
+   {
+    "Flow Count": 207,
+    "Port": 123,
+    "Proto": "UDP"
+   },
+   {
+    "Flow Count": 96,
+    "Port": 5223,
+    "Proto": "TCP"
+   },
+   {
+    "Flow Count": 79,
+    "Port": 5228,
+    "Proto": "TCP"
+   },
+   {
+    "Flow Count": 71,
+    "Port": 7000,
+    "Proto": "TCP"
+   },
+   {
+    "Flow Count": 67,
+    "Port": 2022,
+    "Proto": "TCP"
+   }
+  ],
+  "top_protocols": [
+   {
+    "Flow Count": 173979,
+    "Protocol": "UDP"
+   },
+   {
+    "Flow Count": 26023,
+    "Protocol": "TCP"
+   },
+   {
+    "Flow Count": 689,
+    "Protocol": "ICMP"
+   },
+   {
+    "Flow Count": 256,
+    "Protocol": "ICMPv6"
+   },
+   {
+    "Flow Count": 28,
+    "Protocol": "2"
+   }
+  ],
+  "top_uncovered": [
+   {
+    "Connections": 883856,
+    "Decision": "unknown",
+    "Flow": "Infrastructure → :53/UDP",
+    "Recommendation": "Cross-app flow: add a rule-set entry for this src_app → dst_app communication.",
+    "Unique Dst": 326,
+    "Unique Src": 1
+   },
+   {
+    "Connections": 754234,
+    "Decision": "potentially_blocked",
+    "Flow": " → KubeSystem:53/UDP",
+    "Recommendation": "Unmanaged source host: onboard to PCE or apply explicit deny / allow rule.",
+    "Unique Dst": 2,
+    "Unique Src": 4
+   },
+   {
+    "Connections": 433759,
+    "Decision": "potentially_blocked",
+    "Flow": "Illumio → :53/UDP",
+    "Recommendation": "Cross-app flow: add a rule-set entry for this src_app → dst_app communication.",
+    "Unique Dst": 1,
+    "Unique Src": 1
+   },
+   {
+    "Connections": 393160,
+    "Decision": "potentially_blocked",
+    "Flow": "K8sNode → onlineboutique:8080/TCP",
+    "Recommendation": "Cross-app flow: add a rule-set entry for this src_app → dst_app communication.",
+    "Unique Dst": 3,
+    "Unique Src": 2
+   },
+   {
+    "Connections": 343250,
+    "Decision": "potentially_blocked",
+    "Flow": "K8sNode → K8sNode:6443/TCP",
+    "Recommendation": "Intra-app flow: add an intra-scope rule to allow traffic within the same application.",
+    "Unique Dst": 1,
+    "Unique Src": 3
+   },
+   {
+    "Connections": 296290,
+    "Decision": "potentially_blocked",
+    "Flow": "onlineboutique → :53/UDP",
+    "Recommendation": "Cross-app flow: add a rule-set entry for this src_app → dst_app communication.",
+    "Unique Dst": 1,
+    "Unique Src": 2
+   },
+   {
+    "Connections": 250568,
+    "Decision": "potentially_blocked",
+    "Flow": "Kube-Prom-Stack → :443/TCP",
+    "Recommendation": "Cross-app flow: add a rule-set entry for this src_app → dst_app communication.",
+    "Unique Dst": 3,
+    "Unique Src": 3
+   },
+   {
+    "Connections": 235500,
+    "Decision": "potentially_blocked",
+    "Flow": "K8sNode → Kube-Prom-Stack:3000/TCP",
+    "Recommendation": "Cross-app flow: add a rule-set entry for this src_app → dst_app communication.",
+    "Unique Dst": 1,
+    "Unique Src": 2
+   },
+   {
+    "Connections": 192011,
+    "Decision": "potentially_blocked",
+    "Flow": "DemoApp → DemoApp:5001/TCP",
+    "Recommendation": "Intra-app flow: add an intra-scope rule to allow traffic within the same application.",
+    "Unique Dst": 1,
+    "Unique Src": 1
+   },
+   {
+    "Connections": 157276,
+    "Decision": "potentially_blocked",
+    "Flow": "K8sNode → onlineboutique:6379/TCP",
+    "Recommendation": "Cross-app flow: add a rule-set entry for this src_app → dst_app communication.",
+    "Unique Dst": 1,
+    "Unique Src": 1
+   }
+  ],
+  "top_unmanaged_src": [
+   {
+    "Bytes": 285857101954,
+    "Connections": 451727,
+    "Network": "internal",
+    "Unique Dst": 3,
+    "Unique Ports": 2,
+    "Unmanaged Source IP": "10.85.58.201"
+   },
+   {
+    "Bytes": 3794488027252,
+    "Connections": 264767,
+    "Network": "internal",
+    "Unique Dst": 8,
+    "Unique Ports": 7,
+    "Unmanaged Source IP": "10.85.58.211"
+   },
+   {
+    "Bytes": 260740528033,
+    "Connections": 42935,
+    "Network": "internal",
+    "Unique Dst": 6,
+    "Unique Ports": 5,
+    "Unmanaged Source IP": "10.85.58.208"
+   },
+   {
+    "Bytes": 10420140,
+    "Connections": 37515,
+    "Network": "internal",
+    "Unique Dst": 11,
+    "Unique Ports": 15,
+    "Unmanaged Source IP": "192.168.20.32"
+   },
+   {
+    "Bytes": 6955032,
+    "Connections": 30643,
+    "Network": "internal",
+    "Unique Dst": 7,
+    "Unique Ports": 5,
+    "Unmanaged Source IP": "192.168.20.30"
+   },
+   {
+    "Bytes": 0,
+    "Connections": 22811,
+    "Network": "external",
+    "Unique Dst": 1,
+    "Unique Ports": 14849,
+    "Unmanaged Source IP": "54.194.179.173"
+   },
+   {
+    "Bytes": 0,
+    "Connections": 22464,
+    "Network": "external",
+    "Unique Dst": 1,
+    "Unique Ports": 14822,
+    "Unmanaged Source IP": "146.112.255.68"
+   },
+   {
+    "Bytes": 5333999,
+    "Connections": 21734,
+    "Network": "internal",
+    "Unique Dst": 1,
+    "Unique Ports": 1,
+    "Unmanaged Source IP": "172.16.15.131"
+   },
+   {
+    "Bytes": 0,
+    "Connections": 19927,
+    "Network": "external",
+    "Unique Dst": 1,
+    "Unique Ports": 13529,
+    "Unmanaged Source IP": "54.77.99.92"
+   },
+   {
+    "Bytes": 0,
+    "Connections": 13178,
+    "Network": "internal",
+    "Unique Dst": 3,
+    "Unique Ports": 2,
+    "Unmanaged Source IP": "10.85.58.217"
+   }
+  ],
+  "total_connections": 7799284,
+  "total_flows": 200975,
+  "total_mb": 90925509.57,
+  "total_mb_bw": 90925509.57,
+  "total_uncovered": 200747,
+  "uncovered_pct": 99.9,
+  "unique_unmanaged_src": 2507
+ }
+}

@@ -1,0 +1,41 @@
+{
+ "rules": [
+  {
+   "description": "",
+   "dest": "Quarantine:Severe",
+   "enabled": true,
+   "href": "/orgs/1/sec_policy/draft/rule_sets/100/deny_rules/293",
+   "id": "293",
+   "is_scheduled": false,
+   "no": 1,
+   "provision_state": "ACTIVE",
+   "rule_type": "override_deny",
+   "service": "All Services",
+   "source": "app:Jumpdesk, [IPList] PrivateIP",
+   "type": "rule"
+  },
+  {
+   "description": "",
+   "dest": "All Workloads, [IPList] Any (0.0.0.0/0 and ::/0)",
+   "enabled": true,
+   "href": "/orgs/1/sec_policy/draft/rule_sets/100/deny_rules/237",
+   "id": "237",
+   "is_scheduled": false,
+   "no": 2,
+   "provision_state": "ACTIVE",
+   "rule_type": "override_deny",
+   "service": "All Services",
+   "source": "Quarantine:Severe",
+   "type": "rule"
+  }
+ ],
+ "ruleset": {
+  "enabled": true,
+  "href": "/orgs/1/sec_policy/draft/rule_sets/100",
+  "id": "100",
+  "is_scheduled": false,
+  "name": "Quarantine",
+  "provision_state": "ACTIVE",
+  "type": "ruleset"
+ }
+}

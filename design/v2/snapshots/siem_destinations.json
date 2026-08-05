@@ -1,0 +1,25 @@
+{
+ "destinations": [
+  {
+   "batch_size": 100,
+   "enabled": true,
+   "format": "cef",
+   "hec_token": "***MASKED***",
+   "hec_token__length": 0,
+   "hec_token__set": false,
+   "host": "172.16.15.105",
+   "mask_pii": false,
+   "max_retries": 10,
+   "name": "graylog",
+   "port": 5514,
+   "profile": "production",
+   "source_types": [
+    "audit",
+    "traffic"
+   ],
+   "tls_ca_bundle": null,
+   "tls_verify": true,
+   "transport": "tcp"
+  }
+ ]
+}

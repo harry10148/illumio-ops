@@ -1,0 +1,1006 @@
+{
+ "entries": [
+  {
+   "level": "INFO",
+   "msg": "Starting monitor cycle",
+   "ts": "2026-08-03 05:37:30"
+  },
+  {
+   "level": "INFO",
+   "msg": "Monitor cycle complete",
+   "ts": "2026-08-03 05:37:31"
+  },
+  {
+   "level": "INFO",
+   "msg": "Starting monitor cycle",
+   "ts": "2026-08-03 05:38:00"
+  },
+  {
+   "level": "INFO",
+   "msg": "Monitor cycle complete",
+   "ts": "2026-08-03 05:38:01"
+  },
+  {
+   "level": "INFO",
+   "msg": "Starting monitor cycle",
+   "ts": "2026-08-03 05:38:30"
+  },
+  {
+   "level": "INFO",
+   "msg": "Monitor cycle complete",
+   "ts": "2026-08-03 05:38:31"
+  },
+  {
+   "level": "INFO",
+   "msg": "Starting monitor cycle",
+   "ts": "2026-08-03 05:39:00"
+  },
+  {
+   "level": "INFO",
+   "msg": "Monitor cycle complete",
+   "ts": "2026-08-03 05:39:01"
+  },
+  {
+   "level": "INFO",
+   "msg": "Starting monitor cycle",
+   "ts": "2026-08-03 05:39:30"
+  },
+  {
+   "level": "INFO",
+   "msg": "Monitor cycle complete",
+   "ts": "2026-08-03 05:39:31"
+  },
+  {
+   "level": "INFO",
+   "msg": "Starting monitor cycle",
+   "ts": "2026-08-03 05:40:00"
+  },
+  {
+   "level": "INFO",
+   "msg": "Monitor cycle complete",
+   "ts": "2026-08-03 05:40:01"
+  },
+  {
+   "level": "INFO",
+   "msg": "Starting monitor cycle",
+   "ts": "2026-08-03 05:40:30"
+  },
+  {
+   "level": "INFO",
+   "msg": "Monitor cycle complete",
+   "ts": "2026-08-03 05:40:31"
+  },
+  {
+   "level": "INFO",
+   "msg": "Starting monitor cycle",
+   "ts": "2026-08-03 05:41:00"
+  },
+  {
+   "level": "INFO",
+   "msg": "Monitor cycle complete",
+   "ts": "2026-08-03 05:41:01"
+  },
+  {
+   "level": "INFO",
+   "msg": "Starting monitor cycle",
+   "ts": "2026-08-03 05:41:30"
+  },
+  {
+   "level": "INFO",
+   "msg": "Monitor cycle complete",
+   "ts": "2026-08-03 05:41:31"
+  },
+  {
+   "level": "INFO",
+   "msg": "Starting monitor cycle",
+   "ts": "2026-08-03 05:42:00"
+  },
+  {
+   "level": "INFO",
+   "msg": "Monitor cycle complete",
+   "ts": "2026-08-03 05:42:01"
+  },
+  {
+   "level": "INFO",
+   "msg": "Starting monitor cycle",
+   "ts": "2026-08-03 05:42:30"
+  },
+  {
+   "level": "INFO",
+   "msg": "Monitor cycle complete",
+   "ts": "2026-08-03 05:42:31"
+  },
+  {
+   "level": "INFO",
+   "msg": "Starting monitor cycle",
+   "ts": "2026-08-03 05:43:00"
+  },
+  {
+   "level": "INFO",
+   "msg": "Monitor cycle complete",
+   "ts": "2026-08-03 05:43:01"
+  },
+  {
+   "level": "INFO",
+   "msg": "Starting monitor cycle",
+   "ts": "2026-08-03 05:43:30"
+  },
+  {
+   "level": "INFO",
+   "msg": "Monitor cycle complete",
+   "ts": "2026-08-03 05:43:31"
+  },
+  {
+   "level": "INFO",
+   "msg": "Starting monitor cycle",
+   "ts": "2026-08-03 05:44:00"
+  },
+  {
+   "level": "INFO",
+   "msg": "Monitor cycle complete",
+   "ts": "2026-08-03 05:44:01"
+  },
+  {
+   "level": "INFO",
+   "msg": "Starting monitor cycle",
+   "ts": "2026-08-03 05:44:30"
+  },
+  {
+   "level": "INFO",
+   "msg": "Monitor cycle complete",
+   "ts": "2026-08-03 05:44:31"
+  },
+  {
+   "level": "INFO",
+   "msg": "Starting monitor cycle",
+   "ts": "2026-08-03 05:45:00"
+  },
+  {
+   "level": "INFO",
+   "msg": "Monitor cycle complete",
+   "ts": "2026-08-03 05:45:01"
+  },
+  {
+   "level": "INFO",
+   "msg": "Starting monitor cycle",
+   "ts": "2026-08-03 05:45:30"
+  },
+  {
+   "level": "INFO",
+   "msg": "Monitor cycle complete",
+   "ts": "2026-08-03 05:45:31"
+  },
+  {
+   "level": "INFO",
+   "msg": "Starting monitor cycle",
+   "ts": "2026-08-03 05:46:00"
+  },
+  {
+   "level": "INFO",
+   "msg": "Monitor cycle complete",
+   "ts": "2026-08-03 05:46:01"
+  },
+  {
+   "level": "INFO",
+   "msg": "Starting monitor cycle",
+   "ts": "2026-08-03 05:46:30"
+  },
+  {
+   "level": "INFO",
+   "msg": "Monitor cycle complete",
+   "ts": "2026-08-03 05:46:31"
+  },
+  {
+   "level": "INFO",
+   "msg": "Starting monitor cycle",
+   "ts": "2026-08-03 05:47:00"
+  },
+  {
+   "level": "INFO",
+   "msg": "Monitor cycle complete",
+   "ts": "2026-08-03 05:47:01"
+  },
+  {
+   "level": "INFO",
+   "msg": "Starting monitor cycle",
+   "ts": "2026-08-03 05:47:30"
+  },
+  {
+   "level": "INFO",
+   "msg": "Monitor cycle complete",
+   "ts": "2026-08-03 05:47:31"
+  },
+  {
+   "level": "INFO",
+   "msg": "Starting monitor cycle",
+   "ts": "2026-08-03 05:48:00"
+  },
+  {
+   "level": "INFO",
+   "msg": "Monitor cycle complete",
+   "ts": "2026-08-03 05:48:01"
+  },
+  {
+   "level": "INFO",
+   "msg": "Starting monitor cycle",
+   "ts": "2026-08-03 05:48:30"
+  },
+  {
+   "level": "INFO",
+   "msg": "Monitor cycle complete",
+   "ts": "2026-08-03 05:48:31"
+  },
+  {
+   "level": "INFO",
+   "msg": "Starting monitor cycle",
+   "ts": "2026-08-03 05:49:00"
+  },
+  {
+   "level": "INFO",
+   "msg": "Monitor cycle complete",
+   "ts": "2026-08-03 05:49:01"
+  },
+  {
+   "level": "INFO",
+   "msg": "Starting monitor cycle",
+   "ts": "2026-08-03 05:49:30"
+  },
+  {
+   "level": "INFO",
+   "msg": "Monitor cycle complete",
+   "ts": "2026-08-03 05:49:31"
+  },
+  {
+   "level": "INFO",
+   "msg": "Starting monitor cycle",
+   "ts": "2026-08-03 05:50:00"
+  },
+  {
+   "level": "INFO",
+   "msg": "Monitor cycle complete",
+   "ts": "2026-08-03 05:50:01"
+  },
+  {
+   "level": "INFO",
+   "msg": "Starting monitor cycle",
+   "ts": "2026-08-03 05:50:30"
+  },
+  {
+   "level": "INFO",
+   "msg": "Monitor cycle complete",
+   "ts": "2026-08-03 05:50:31"
+  },
+  {
+   "level": "INFO",
+   "msg": "Starting monitor cycle",
+   "ts": "2026-08-03 05:51:00"
+  },
+  {
+   "level": "INFO",
+   "msg": "Monitor cycle complete",
+   "ts": "2026-08-03 05:51:01"
+  },
+  {
+   "level": "INFO",
+   "msg": "Starting monitor cycle",
+   "ts": "2026-08-03 05:51:30"
+  },
+  {
+   "level": "INFO",
+   "msg": "Monitor cycle complete",
+   "ts": "2026-08-03 05:51:31"
+  },
+  {
+   "level": "INFO",
+   "msg": "Starting monitor cycle",
+   "ts": "2026-08-03 05:52:00"
+  },
+  {
+   "level": "INFO",
+   "msg": "Monitor cycle complete",
+   "ts": "2026-08-03 05:52:01"
+  },
+  {
+   "level": "INFO",
+   "msg": "Starting monitor cycle",
+   "ts": "2026-08-03 05:52:30"
+  },
+  {
+   "level": "INFO",
+   "msg": "Monitor cycle complete",
+   "ts": "2026-08-03 05:52:31"
+  },
+  {
+   "level": "INFO",
+   "msg": "Starting monitor cycle",
+   "ts": "2026-08-03 05:53:00"
+  },
+  {
+   "level": "INFO",
+   "msg": "Monitor cycle complete",
+   "ts": "2026-08-03 05:53:01"
+  },
+  {
+   "level": "INFO",
+   "msg": "Starting monitor cycle",
+   "ts": "2026-08-03 05:53:30"
+  },
+  {
+   "level": "INFO",
+   "msg": "Monitor cycle complete",
+   "ts": "2026-08-03 05:53:31"
+  },
+  {
+   "level": "INFO",
+   "msg": "Starting monitor cycle",
+   "ts": "2026-08-03 05:54:00"
+  },
+  {
+   "level": "INFO",
+   "msg": "Monitor cycle complete",
+   "ts": "2026-08-03 05:54:01"
+  },
+  {
+   "level": "INFO",
+   "msg": "Starting monitor cycle",
+   "ts": "2026-08-03 05:54:30"
+  },
+  {
+   "level": "INFO",
+   "msg": "Monitor cycle complete",
+   "ts": "2026-08-03 05:54:31"
+  },
+  {
+   "level": "INFO",
+   "msg": "Starting monitor cycle",
+   "ts": "2026-08-03 05:55:00"
+  },
+  {
+   "level": "INFO",
+   "msg": "Monitor cycle complete",
+   "ts": "2026-08-03 05:55:01"
+  },
+  {
+   "level": "INFO",
+   "msg": "Starting monitor cycle",
+   "ts": "2026-08-03 05:55:30"
+  },
+  {
+   "level": "INFO",
+   "msg": "Monitor cycle complete",
+   "ts": "2026-08-03 05:55:31"
+  },
+  {
+   "level": "INFO",
+   "msg": "Starting monitor cycle",
+   "ts": "2026-08-03 05:56:00"
+  },
+  {
+   "level": "INFO",
+   "msg": "Monitor cycle complete",
+   "ts": "2026-08-03 05:56:01"
+  },
+  {
+   "level": "INFO",
+   "msg": "Starting monitor cycle",
+   "ts": "2026-08-03 05:56:30"
+  },
+  {
+   "level": "INFO",
+   "msg": "Monitor cycle complete",
+   "ts": "2026-08-03 05:56:31"
+  },
+  {
+   "level": "INFO",
+   "msg": "Starting monitor cycle",
+   "ts": "2026-08-03 05:57:00"
+  },
+  {
+   "level": "INFO",
+   "msg": "Monitor cycle complete",
+   "ts": "2026-08-03 05:57:01"
+  },
+  {
+   "level": "INFO",
+   "msg": "Starting monitor cycle",
+   "ts": "2026-08-03 05:57:30"
+  },
+  {
+   "level": "INFO",
+   "msg": "Monitor cycle complete",
+   "ts": "2026-08-03 05:57:31"
+  },
+  {
+   "level": "INFO",
+   "msg": "Starting monitor cycle",
+   "ts": "2026-08-03 05:58:00"
+  },
+  {
+   "level": "INFO",
+   "msg": "Monitor cycle complete",
+   "ts": "2026-08-03 05:58:01"
+  },
+  {
+   "level": "INFO",
+   "msg": "Starting monitor cycle",
+   "ts": "2026-08-03 05:58:30"
+  },
+  {
+   "level": "INFO",
+   "msg": "Monitor cycle complete",
+   "ts": "2026-08-03 05:58:31"
+  },
+  {
+   "level": "INFO",
+   "msg": "Starting monitor cycle",
+   "ts": "2026-08-03 05:59:00"
+  },
+  {
+   "level": "INFO",
+   "msg": "Monitor cycle complete",
+   "ts": "2026-08-03 05:59:01"
+  },
+  {
+   "level": "INFO",
+   "msg": "Starting monitor cycle",
+   "ts": "2026-08-03 05:59:30"
+  },
+  {
+   "level": "INFO",
+   "msg": "Monitor cycle complete",
+   "ts": "2026-08-03 05:59:31"
+  },
+  {
+   "level": "INFO",
+   "msg": "Starting monitor cycle",
+   "ts": "2026-08-03 06:00:00"
+  },
+  {
+   "level": "INFO",
+   "msg": "Monitor cycle complete",
+   "ts": "2026-08-03 06:00:01"
+  },
+  {
+   "level": "INFO",
+   "msg": "Starting monitor cycle",
+   "ts": "2026-08-03 06:00:30"
+  },
+  {
+   "level": "INFO",
+   "msg": "Monitor cycle complete",
+   "ts": "2026-08-03 06:00:31"
+  },
+  {
+   "level": "INFO",
+   "msg": "Starting monitor cycle",
+   "ts": "2026-08-03 06:01:00"
+  },
+  {
+   "level": "INFO",
+   "msg": "Monitor cycle complete",
+   "ts": "2026-08-03 06:01:01"
+  },
+  {
+   "level": "INFO",
+   "msg": "Starting monitor cycle",
+   "ts": "2026-08-03 06:01:30"
+  },
+  {
+   "level": "INFO",
+   "msg": "Monitor cycle complete",
+   "ts": "2026-08-03 06:01:31"
+  },
+  {
+   "level": "INFO",
+   "msg": "Starting monitor cycle",
+   "ts": "2026-08-03 06:02:00"
+  },
+  {
+   "level": "INFO",
+   "msg": "Monitor cycle complete",
+   "ts": "2026-08-03 06:02:01"
+  },
+  {
+   "level": "INFO",
+   "msg": "Starting monitor cycle",
+   "ts": "2026-08-03 06:02:30"
+  },
+  {
+   "level": "INFO",
+   "msg": "Monitor cycle complete",
+   "ts": "2026-08-03 06:02:31"
+  },
+  {
+   "level": "INFO",
+   "msg": "Starting monitor cycle",
+   "ts": "2026-08-03 06:03:00"
+  },
+  {
+   "level": "INFO",
+   "msg": "Monitor cycle complete",
+   "ts": "2026-08-03 06:03:01"
+  },
+  {
+   "level": "INFO",
+   "msg": "Starting monitor cycle",
+   "ts": "2026-08-03 06:03:30"
+  },
+  {
+   "level": "INFO",
+   "msg": "Monitor cycle complete",
+   "ts": "2026-08-03 06:03:31"
+  },
+  {
+   "level": "INFO",
+   "msg": "Starting monitor cycle",
+   "ts": "2026-08-03 06:04:00"
+  },
+  {
+   "level": "INFO",
+   "msg": "Monitor cycle complete",
+   "ts": "2026-08-03 06:04:01"
+  },
+  {
+   "level": "INFO",
+   "msg": "Starting monitor cycle",
+   "ts": "2026-08-03 06:04:30"
+  },
+  {
+   "level": "INFO",
+   "msg": "Monitor cycle complete",
+   "ts": "2026-08-03 06:04:31"
+  },
+  {
+   "level": "INFO",
+   "msg": "Starting monitor cycle",
+   "ts": "2026-08-03 06:05:00"
+  },
+  {
+   "level": "INFO",
+   "msg": "Monitor cycle complete",
+   "ts": "2026-08-03 06:05:01"
+  },
+  {
+   "level": "INFO",
+   "msg": "Starting monitor cycle",
+   "ts": "2026-08-03 06:05:30"
+  },
+  {
+   "level": "INFO",
+   "msg": "Monitor cycle complete",
+   "ts": "2026-08-03 06:05:31"
+  },
+  {
+   "level": "INFO",
+   "msg": "Starting monitor cycle",
+   "ts": "2026-08-03 06:06:00"
+  },
+  {
+   "level": "INFO",
+   "msg": "Monitor cycle complete",
+   "ts": "2026-08-03 06:06:01"
+  },
+  {
+   "level": "INFO",
+   "msg": "Starting monitor cycle",
+   "ts": "2026-08-03 06:06:30"
+  },
+  {
+   "level": "INFO",
+   "msg": "Monitor cycle complete",
+   "ts": "2026-08-03 06:06:31"
+  },
+  {
+   "level": "INFO",
+   "msg": "Starting monitor cycle",
+   "ts": "2026-08-03 06:07:00"
+  },
+  {
+   "level": "INFO",
+   "msg": "Monitor cycle complete",
+   "ts": "2026-08-03 06:07:01"
+  },
+  {
+   "level": "INFO",
+   "msg": "Starting monitor cycle",
+   "ts": "2026-08-03 06:07:30"
+  },
+  {
+   "level": "INFO",
+   "msg": "Monitor cycle complete",
+   "ts": "2026-08-03 06:07:31"
+  },
+  {
+   "level": "INFO",
+   "msg": "Starting monitor cycle",
+   "ts": "2026-08-03 06:08:00"
+  },
+  {
+   "level": "INFO",
+   "msg": "Monitor cycle complete",
+   "ts": "2026-08-03 06:08:01"
+  },
+  {
+   "level": "INFO",
+   "msg": "Starting monitor cycle",
+   "ts": "2026-08-03 06:08:30"
+  },
+  {
+   "level": "INFO",
+   "msg": "Monitor cycle complete",
+   "ts": "2026-08-03 06:08:31"
+  },
+  {
+   "level": "INFO",
+   "msg": "Starting monitor cycle",
+   "ts": "2026-08-03 06:09:00"
+  },
+  {
+   "level": "INFO",
+   "msg": "Monitor cycle complete",
+   "ts": "2026-08-03 06:09:01"
+  },
+  {
+   "level": "INFO",
+   "msg": "Starting monitor cycle",
+   "ts": "2026-08-03 06:09:30"
+  },
+  {
+   "level": "INFO",
+   "msg": "Monitor cycle complete",
+   "ts": "2026-08-03 06:09:31"
+  },
+  {
+   "level": "INFO",
+   "msg": "Starting monitor cycle",
+   "ts": "2026-08-03 06:10:00"
+  },
+  {
+   "level": "INFO",
+   "msg": "Monitor cycle complete",
+   "ts": "2026-08-03 06:10:01"
+  },
+  {
+   "level": "INFO",
+   "msg": "Starting monitor cycle",
+   "ts": "2026-08-03 06:10:30"
+  },
+  {
+   "level": "INFO",
+   "msg": "Monitor cycle complete",
+   "ts": "2026-08-03 06:10:31"
+  },
+  {
+   "level": "INFO",
+   "msg": "Starting monitor cycle",
+   "ts": "2026-08-03 06:11:00"
+  },
+  {
+   "level": "INFO",
+   "msg": "Monitor cycle complete",
+   "ts": "2026-08-03 06:11:01"
+  },
+  {
+   "level": "INFO",
+   "msg": "Starting monitor cycle",
+   "ts": "2026-08-03 06:11:30"
+  },
+  {
+   "level": "INFO",
+   "msg": "Monitor cycle complete",
+   "ts": "2026-08-03 06:11:31"
+  },
+  {
+   "level": "INFO",
+   "msg": "Starting monitor cycle",
+   "ts": "2026-08-03 06:12:00"
+  },
+  {
+   "level": "INFO",
+   "msg": "Monitor cycle complete",
+   "ts": "2026-08-03 06:12:01"
+  },
+  {
+   "level": "INFO",
+   "msg": "Starting monitor cycle",
+   "ts": "2026-08-03 06:12:30"
+  },
+  {
+   "level": "INFO",
+   "msg": "Monitor cycle complete",
+   "ts": "2026-08-03 06:12:31"
+  },
+  {
+   "level": "INFO",
+   "msg": "Starting monitor cycle",
+   "ts": "2026-08-03 06:13:00"
+  },
+  {
+   "level": "INFO",
+   "msg": "Monitor cycle complete",
+   "ts": "2026-08-03 06:13:01"
+  },
+  {
+   "level": "INFO",
+   "msg": "Starting monitor cycle",
+   "ts": "2026-08-03 06:13:30"
+  },
+  {
+   "level": "INFO",
+   "msg": "Monitor cycle complete",
+   "ts": "2026-08-03 06:13:31"
+  },
+  {
+   "level": "INFO",
+   "msg": "Starting monitor cycle",
+   "ts": "2026-08-03 06:14:00"
+  },
+  {
+   "level": "INFO",
+   "msg": "Monitor cycle complete",
+   "ts": "2026-08-03 06:14:01"
+  },
+  {
+   "level": "INFO",
+   "msg": "Starting monitor cycle",
+   "ts": "2026-08-03 06:14:30"
+  },
+  {
+   "level": "INFO",
+   "msg": "Monitor cycle complete",
+   "ts": "2026-08-03 06:14:31"
+  },
+  {
+   "level": "INFO",
+   "msg": "Starting monitor cycle",
+   "ts": "2026-08-03 06:15:00"
+  },
+  {
+   "level": "INFO",
+   "msg": "Monitor cycle complete",
+   "ts": "2026-08-03 06:15:01"
+  },
+  {
+   "level": "INFO",
+   "msg": "Starting monitor cycle",
+   "ts": "2026-08-03 06:15:30"
+  },
+  {
+   "level": "INFO",
+   "msg": "Monitor cycle complete",
+   "ts": "2026-08-03 06:15:31"
+  },
+  {
+   "level": "INFO",
+   "msg": "Starting monitor cycle",
+   "ts": "2026-08-03 06:16:00"
+  },
+  {
+   "level": "INFO",
+   "msg": "Monitor cycle complete",
+   "ts": "2026-08-03 06:16:01"
+  },
+  {
+   "level": "INFO",
+   "msg": "Starting monitor cycle",
+   "ts": "2026-08-03 06:16:30"
+  },
+  {
+   "level": "INFO",
+   "msg": "Monitor cycle complete",
+   "ts": "2026-08-03 06:16:31"
+  },
+  {
+   "level": "INFO",
+   "msg": "Starting monitor cycle",
+   "ts": "2026-08-03 06:17:00"
+  },
+  {
+   "level": "INFO",
+   "msg": "Monitor cycle complete",
+   "ts": "2026-08-03 06:17:01"
+  },
+  {
+   "level": "INFO",
+   "msg": "Starting monitor cycle",
+   "ts": "2026-08-03 06:17:30"
+  },
+  {
+   "level": "INFO",
+   "msg": "Monitor cycle complete",
+   "ts": "2026-08-03 06:17:31"
+  },
+  {
+   "level": "INFO",
+   "msg": "Starting monitor cycle",
+   "ts": "2026-08-03 06:18:00"
+  },
+  {
+   "level": "INFO",
+   "msg": "Monitor cycle complete",
+   "ts": "2026-08-03 06:18:01"
+  },
+  {
+   "level": "INFO",
+   "msg": "Starting monitor cycle",
+   "ts": "2026-08-03 06:18:30"
+  },
+  {
+   "level": "INFO",
+   "msg": "Monitor cycle complete",
+   "ts": "2026-08-03 06:18:31"
+  },
+  {
+   "level": "INFO",
+   "msg": "Starting monitor cycle",
+   "ts": "2026-08-03 06:19:00"
+  },
+  {
+   "level": "INFO",
+   "msg": "Monitor cycle complete",
+   "ts": "2026-08-03 06:19:01"
+  },
+  {
+   "level": "INFO",
+   "msg": "Starting monitor cycle",
+   "ts": "2026-08-03 06:19:30"
+  },
+  {
+   "level": "INFO",
+   "msg": "Monitor cycle complete",
+   "ts": "2026-08-03 06:19:34"
+  },
+  {
+   "level": "INFO",
+   "msg": "Starting monitor cycle",
+   "ts": "2026-08-03 06:20:00"
+  },
+  {
+   "level": "INFO",
+   "msg": "Monitor cycle complete",
+   "ts": "2026-08-03 06:20:01"
+  },
+  {
+   "level": "INFO",
+   "msg": "Starting monitor cycle",
+   "ts": "2026-08-03 06:20:30"
+  },
+  {
+   "level": "INFO",
+   "msg": "Monitor cycle complete",
+   "ts": "2026-08-03 06:20:31"
+  },
+  {
+   "level": "INFO",
+   "msg": "Starting monitor cycle",
+   "ts": "2026-08-03 06:21:00"
+  },
+  {
+   "level": "INFO",
+   "msg": "Monitor cycle complete",
+   "ts": "2026-08-03 06:21:01"
+  },
+  {
+   "level": "INFO",
+   "msg": "Starting monitor cycle",
+   "ts": "2026-08-03 06:21:30"
+  },
+  {
+   "level": "INFO",
+   "msg": "Monitor cycle complete",
+   "ts": "2026-08-03 06:21:31"
+  },
+  {
+   "level": "INFO",
+   "msg": "Starting monitor cycle",
+   "ts": "2026-08-03 06:22:00"
+  },
+  {
+   "level": "INFO",
+   "msg": "Monitor cycle complete",
+   "ts": "2026-08-03 06:22:01"
+  },
+  {
+   "level": "INFO",
+   "msg": "Starting monitor cycle",
+   "ts": "2026-08-03 06:22:30"
+  },
+  {
+   "level": "INFO",
+   "msg": "Monitor cycle complete",
+   "ts": "2026-08-03 06:22:31"
+  },
+  {
+   "level": "INFO",
+   "msg": "Starting monitor cycle",
+   "ts": "2026-08-03 06:23:00"
+  },
+  {
+   "level": "INFO",
+   "msg": "Monitor cycle complete",
+   "ts": "2026-08-03 06:23:01"
+  },
+  {
+   "level": "INFO",
+   "msg": "Starting monitor cycle",
+   "ts": "2026-08-03 06:23:30"
+  },
+  {
+   "level": "INFO",
+   "msg": "Monitor cycle complete",
+   "ts": "2026-08-03 06:23:31"
+  },
+  {
+   "level": "INFO",
+   "msg": "Starting monitor cycle",
+   "ts": "2026-08-03 06:24:00"
+  },
+  {
+   "level": "INFO",
+   "msg": "Monitor cycle complete",
+   "ts": "2026-08-03 06:24:01"
+  },
+  {
+   "level": "INFO",
+   "msg": "Starting monitor cycle",
+   "ts": "2026-08-03 06:24:30"
+  },
+  {
+   "level": "INFO",
+   "msg": "Monitor cycle complete",
+   "ts": "2026-08-03 06:24:31"
+  },
+  {
+   "level": "INFO",
+   "msg": "Starting monitor cycle",
+   "ts": "2026-08-03 06:25:00"
+  },
+  {
+   "level": "INFO",
+   "msg": "Monitor cycle complete",
+   "ts": "2026-08-03 06:25:01"
+  },
+  {
+   "level": "INFO",
+   "msg": "Starting monitor cycle",
+   "ts": "2026-08-03 06:25:30"
+  },
+  {
+   "level": "INFO",
+   "msg": "Monitor cycle complete",
+   "ts": "2026-08-03 06:25:31"
+  },
+  {
+   "level": "INFO",
+   "msg": "Starting monitor cycle",
+   "ts": "2026-08-03 06:26:00"
+  },
+  {
+   "level": "INFO",
+   "msg": "Monitor cycle complete",
+   "ts": "2026-08-03 06:26:01"
+  },
+  {
+   "level": "INFO",
+   "msg": "Starting monitor cycle",
+   "ts": "2026-08-03 06:26:30"
+  },
+  {
+   "level": "INFO",
+   "msg": "Monitor cycle complete",
+   "ts": "2026-08-03 06:26:31"
+  },
+  {
+   "level": "INFO",
+   "msg": "Starting monitor cycle",
+   "ts": "2026-08-03 06:27:00"
+  },
+  {
+   "level": "INFO",
+   "msg": "Monitor cycle complete",
+   "ts": "2026-08-03 06:27:01"
+  }
+ ],
+ "module": "monitor",
+ "ok": true
+}

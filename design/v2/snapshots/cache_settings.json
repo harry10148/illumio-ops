@@ -1,0 +1,37 @@
+{
+ "archive_dir": "data/archive",
+ "archive_enabled": true,
+ "archive_gzip_after_days": 7,
+ "archive_interval_hours": 24,
+ "archive_retention_days": 365,
+ "archive_review_max_days": 31,
+ "async_threshold_events": 10000,
+ "cache_read_max_rows": 500000,
+ "db_path": "data/pce_cache.sqlite",
+ "disk_free_warn_gb": 10,
+ "enabled": true,
+ "events_poll_interval_seconds": 300,
+ "events_retention_days": 90,
+ "flow_delta_enabled": true,
+ "flow_obs_retention_hours": 6,
+ "rate_limit_per_minute": 400,
+ "siem_pending_warn_rows": 50000,
+ "traffic_agg_retention_days": 90,
+ "traffic_filter": {
+  "actions": [
+   "blocked",
+   "potentially_blocked",
+   "allowed"
+  ],
+  "exclude_src_ips": [],
+  "ports": [],
+  "protocols": [],
+  "workload_label_env": []
+ },
+ "traffic_poll_interval_seconds": 120,
+ "traffic_raw_retention_days": 7,
+ "traffic_sampling": {
+  "max_rows_per_batch": 200000,
+  "sample_ratio_allowed": 1
+ }
+}

@@ -1,0 +1,28 @@
+{
+ "ok": true,
+ "schedules": [
+  {
+   "cron_expr": null,
+   "day_of_month": 1,
+   "day_of_week": "mon",
+   "email_recipients": [],
+   "email_report": false,
+   "enabled": true,
+   "format": [
+    "html"
+   ],
+   "hour": 8,
+   "id": 1785735229014,
+   "last_error": "",
+   "last_run": null,
+   "last_status": null,
+   "lookback_days": 7,
+   "max_reports": 30,
+   "minute": 0,
+   "name": "UI Redesign Snapshot Demo",
+   "report_type": "audit_summary",
+   "schedule_type": "weekly",
+   "timezone": "local"
+  }
+ ]
+}

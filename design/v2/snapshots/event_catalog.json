@@ -1,0 +1,5938 @@
+{
+ "action_events": [
+  "request.authentication_failed",
+  "request.authorization_failed",
+  "request.internal_server_error",
+  "request.service_unavailable",
+  "request.unknown_server_error",
+  "user.authenticate",
+  "user.login",
+  "user.logout",
+  "user.sign_in",
+  "user.sign_out",
+  "user.verify_mfa"
+ ],
+ "catalog": {
+  "Agent 健康": {
+   "agent.goodbye": "Agent 主動 Offline",
+   "agent.refresh_policy": "Agent Policy 重新整理",
+   "agent.service_not_available": "Agent Service 無法使用",
+   "agent.suspend": "Agent 已暫停",
+   "agent.upgrade_successful": "Agent 升級成功",
+   "lost_agent.found": "已找回 Lost Agent"
+  },
+  "Agent 安全": {
+   "agent.activate_clone": "啟用複製Agent",
+   "agent.clone_detected": "偵測到 Agent 複製",
+   "agent.tampering": "Agent 遭竄改"
+  },
+  "Agent 操作": {
+   "agent.activate": "Agent 已啟用",
+   "agent.deactivate": "Agent 已停用",
+   "agent.generate_maintenance_token": "Agent產生維護權杖",
+   "agent.machine_identifier": "Agent主機識別碼",
+   "agent.refresh_token": "更新Agent權杖",
+   "agent.request_policy": "請求Policy",
+   "agent.request_upgrade": "請求升級Agent",
+   "agent.unsuspend": "解除暫停Agent",
+   "agent.update": "更新Agent",
+   "agent.update_interactive_users": "更新互動使用者",
+   "agent.update_iptables_href": "更新iptables連結",
+   "agent.update_running_containers": "更新執行中容器",
+   "agent.upload_existing_ip_table_rules": "上傳現有iptables",
+   "agent.upload_support_report": "上傳支援報告",
+   "agents.clear_conditions": "清除Agent條件",
+   "agents.unpair": "解除配對Agent"
+  },
+  "Policy": {
+   "access_restriction.create": "建立存取限制",
+   "access_restriction.delete": "刪除存取限制",
+   "access_restriction.update": "更新存取限制",
+   "enforcement_boundary.create": "Enforcement邊界建立",
+   "enforcement_boundary.delete": "Enforcement邊界刪除",
+   "enforcement_boundary.update": "Enforcement邊界更新",
+   "firewall_settings.update": "防火牆設定更新",
+   "ip_list.create": "IP清單建立",
+   "ip_list.delete": "IP清單刪除",
+   "ip_list.update": "IP清單更新",
+   "ip_lists.delete": "批次IP清單刪除",
+   "ip_tables_rule.create": "IP表規則建立",
+   "ip_tables_rule.delete": "IP表規則刪除",
+   "ip_tables_rule.update": "IP表規則更新",
+   "label.create": "Label建立",
+   "label.delete": "Label刪除",
+   "label.update": "Label更新",
+   "label_group.create": "Label群組建立",
+   "label_group.delete": "Label群組刪除",
+   "label_group.update": "Label群組更新",
+   "labels.delete": "刪除Labels",
+   "pairing_profile.create": "建立配對設定檔",
+   "pairing_profile.create_pairing_key": "建立配對金鑰",
+   "pairing_profile.delete": "刪除配對設定檔",
+   "pairing_profile.delete_all_pairing_keys": "刪除所有配對金鑰",
+   "pairing_profile.update": "更新配對設定檔",
+   "pairing_profiles.delete": "批次刪除配對設定",
+   "permission.create": "建立權限",
+   "permission.delete": "刪除權限",
+   "permission.update": "更新權限",
+   "rule_set.create": "Ruleset 已建立",
+   "rule_set.delete": "Ruleset 已刪除",
+   "rule_set.update": "Ruleset 已更新",
+   "rule_sets.delete": "刪除Rule Set",
+   "sec_policy.create": "Policy Provision 已執行",
+   "sec_policy.restore": "Policy還原",
+   "sec_policy_pending.delete": "待處理Policy刪除",
+   "sec_rule.create": "Security 規則已建立",
+   "sec_rule.delete": "Security 規則已刪除",
+   "sec_rule.update": "Security 規則已更新",
+   "service.create": "Service建立",
+   "service.delete": "Service刪除",
+   "service.update": "Service更新",
+   "service_account.create": "Service Account建立",
+   "service_account.delete": "Service Account刪除",
+   "service_account.update": "Service Account更新",
+   "service_binding.create": "Service綁定建立",
+   "service_binding.delete": "Service綁定刪除",
+   "service_bindings.delete": "批次Service綁定刪除",
+   "services.delete": "批次Services刪除",
+   "trusted_proxy_ips.update": "更新Trusted Proxy"
+  },
+  "一般": {
+   "*": "全部事件（系統範圍）",
+   "deny_rule.create": "Deny規則建立",
+   "deny_rule.delete": "Deny規則刪除",
+   "deny_rule.update": "Deny規則更新",
+   "label_dimension.create": "Label維度建立",
+   "label_dimension.delete": "Label維度刪除",
+   "label_dimension.update": "Label維度更新",
+   "label_mapping_rule.create": "Label對應建立",
+   "label_mapping_rule.delete": "Label對應刪除",
+   "label_mapping_rule.update": "Label對應更新",
+   "logout_from_jwt": "使用者登出（JWT）",
+   "support_report_request.create": "建立支援報告請求",
+   "support_report_request.delete": "刪除支援報告請求",
+   "support_reports": "支援報告已產生"
+  },
+  "使用者存取": {
+   "user.accept_invitation": "使用者接受邀請",
+   "user.authenticate": "使用者驗證",
+   "user.create": "建立使用者",
+   "user.create_session": "建立Session",
+   "user.delete": "刪除使用者",
+   "user.invite": "邀請使用者",
+   "user.login": "使用者登入",
+   "user.login_session_terminated": "使用者登入工作階段已終止",
+   "user.logout": "使用者登出",
+   "user.pce_session_terminated": "使用者 PCE 工作階段已終止",
+   "user.reset_password": "重設密碼",
+   "user.sign_in": "使用者登入",
+   "user.sign_out": "使用者登出",
+   "user.update": "更新使用者",
+   "user.update_password": "更新密碼",
+   "user.use_expired_password": "使用過期密碼",
+   "user.verify_mfa": "驗證MFA",
+   "user_local_profile.create": "建立本機設定檔",
+   "user_local_profile.delete": "刪除本機設定檔",
+   "user_local_profile.reinvite": "重新邀請",
+   "user_local_profile.update_password": "更新本機密碼",
+   "users.auth_token": "認證Token"
+  },
+  "容器與 Workloads": {
+   "container_cluster.create": "容器叢集建立",
+   "container_cluster.delete": "容器叢集刪除",
+   "container_cluster.kubernetes_workloads_bulk_create": "批次建立Workloads",
+   "container_cluster.kubernetes_workloads_bulk_update": "批次更新Workloads",
+   "container_cluster.security_policy_acks": "容器Policy確認",
+   "container_cluster.security_policy_applied": "容器Policy套用",
+   "container_cluster.update": "容器叢集更新",
+   "container_cluster.update_label_map": "Label映射更新",
+   "container_cluster.update_services": "容器Services更新",
+   "container_workload.update": "容器Workload更新",
+   "container_workload_profile.create": "Workload配置建立",
+   "container_workload_profile.delete": "Workload配置刪除",
+   "container_workload_profile.update": "Workload配置更新",
+   "ven_settings.update": "更新VEN設定",
+   "ven_software.upgrade": "升級VEN",
+   "ven_software_release.create": "建立VEN版本",
+   "ven_software_release.delete": "刪除VEN版本",
+   "ven_software_release.deploy": "部署VEN版本",
+   "ven_software_release.update": "更新VEN版本",
+   "ven_software_releases.set_default_version": "預設VEN版本",
+   "workload.create": "建立Workload",
+   "workload.delete": "刪除Workload",
+   "workload.online": "Workload Online",
+   "workload.recalc_rules": "重算Workload Policy",
+   "workload.redetect_network": "重偵測Workload網路",
+   "workload.undelete": "復原Workload",
+   "workload.update": "更新Workload",
+   "workload.upgrade": "升級Workload",
+   "workload_interface.create": "建立Workload介面",
+   "workload_interface.delete": "刪除Workload介面",
+   "workload_interface.update": "更新Workload介面",
+   "workload_interfaces.update": "批次更新Workload介面",
+   "workload_service_report.update": "更新Workload Service報告",
+   "workload_settings.update": "更新Workload設定",
+   "workloads.apply_policy": "Workloads套用Policy",
+   "workloads.bulk_create": "批次建立Workloads",
+   "workloads.bulk_delete": "批次刪除Workloads",
+   "workloads.bulk_update": "批次更新Workloads",
+   "workloads.remove_labels": "Workloads移除Labels",
+   "workloads.set_flow_reporting_frequency": "Workloads流量回報頻率",
+   "workloads.set_labels": "Workloads設定Labels",
+   "workloads.unpair": "Workloads解除配對",
+   "workloads.update": "Workloads更新"
+  },
+  "平台與系統": {
+   "cluster.create": "PCE叢集建立",
+   "cluster.delete": "PCE叢集刪除",
+   "cluster.update": "Cluster 已更新",
+   "database.temp_table_autocleanup_completed": "暫存表清理完成",
+   "database.temp_table_autocleanup_started": "暫存表清理開始",
+   "event_settings.update": "事件設定更新",
+   "job.delete": "任務刪除",
+   "license.delete": "刪除授權",
+   "license.update": "更新授權",
+   "org.create": "建立組織",
+   "org.recalc_rules": "重算組織規則",
+   "org.update": "更新組織",
+   "settings.update": "設定更新",
+   "system_task.agent_missed_heartbeats_check": "Agent 心跳遺失",
+   "system_task.agent_missing_heartbeats_after_upgrade": "Agent升級後失聯",
+   "system_task.agent_offline_check": "Agent Offline",
+   "system_task.agent_self_signed_certs_check": "Agent自簽憑證檢查",
+   "system_task.agent_settings_invalidation_error_state_check": "Agent設定失效檢查",
+   "system_task.agent_uninstall_timeout": "Agent卸載逾時",
+   "system_task.clear_auth_recover_condition": "清除Agent認證復原",
+   "system_task.compute_policy_for_unmanaged_workloads": "計算Unmanaged Workloads Policy",
+   "system_task.delete_expired_service_account_api_keys": "刪除過期Service Account API金鑰",
+   "system_task.delete_old_cached_perspectives": "刪除舊快取視角",
+   "system_task.endpoint_offline_check": "Endpoint Offline檢查",
+   "system_task.event_pruning_completed": "系統任務 事件清理完成",
+   "system_task.hard_limit_recovery_completed": "系統任務 硬上限恢復完成",
+   "system_task.provision_container_cluster_services": "佈建容器叢集Services",
+   "system_task.prune_old_log_events": "修剪舊日誌事件",
+   "system_task.remove_stale_zone_subsets": "移除過期區域子網",
+   "system_task.set_server_sync_check": "SetServer同步檢查",
+   "system_task.vacuum_deactivated_agent_and_deleted_workloads": "清理Agent與已刪除Workloads"
+  },
+  "網路與整合": {
+   "network.create": "建立網路",
+   "network.delete": "刪除網路",
+   "network.update": "更新網路",
+   "network_device.ack_enforcement_instructions_applied": "設備確認Enforcement指令",
+   "network_device.assign_workload": "指派Workload",
+   "network_device.create": "建立網路設備",
+   "network_device.delete": "刪除網路設備",
+   "network_device.update": "更新網路設備",
+   "network_devices.ack_multi_enforcement_instructions_applied": "多設備Enforcement指令確認",
+   "network_endpoint.create": "建立網路端點",
+   "network_endpoint.delete": "刪除網路端點",
+   "network_endpoint.update": "更新網路端點",
+   "network_enforcement_node.activate": "Network Enforcement Node啟用",
+   "network_enforcement_node.clear_conditions": "Network Enforcement Node清除條件",
+   "network_enforcement_node.deactivate": "Network Enforcement Node停用",
+   "network_enforcement_node.degraded": "Network Enforcement Node降級",
+   "network_enforcement_node.missed_heartbeats": "Network Enforcement Node遺失心跳",
+   "network_enforcement_node.missed_heartbeats_check": "Network Enforcement Node心跳檢查",
+   "network_enforcement_node.network_devices_network_endpoints_workloads": "Network Enforcement Node端點新增Workloads",
+   "network_enforcement_node.policy_ack": "Network Enforcement Node確認Policy",
+   "network_enforcement_node.request_policy": "Network Enforcement Node請求Policy",
+   "network_enforcement_node.update_status": "更新Network Enforcement Node狀態",
+   "network_enforcement_nodes.clear_conditions": "Network Enforcement Nodes清除條件",
+   "nfc.activate": "啟用NFC",
+   "nfc.delete": "刪除NFC",
+   "nfc.update_discovered_virtual_servers": "發現虛擬伺服器",
+   "nfc.update_policy_status": "更新NFC Policy",
+   "nfc.update_slb_state": "更新SLB狀態",
+   "secure_connect_gateway.create": "安全連線閘道建立",
+   "secure_connect_gateway.delete": "安全連線閘道刪除",
+   "secure_connect_gateway.update": "安全連線閘道更新",
+   "slb.create": "SLB建立",
+   "slb.delete": "刪除SLB",
+   "slb.update": "更新SLB",
+   "syslog_destination.create": "建立Syslog目標",
+   "syslog_destination.delete": "刪除Syslog目標",
+   "syslog_destination.update": "更新Syslog目標",
+   "traffic_collector_setting.create": "建立流量收集設定",
+   "traffic_collector_setting.delete": "刪除流量收集設定",
+   "traffic_collector_setting.update": "更新流量收集設定",
+   "virtual_server.create": "建立虛擬伺服器",
+   "virtual_server.delete": "刪除虛擬伺服器",
+   "virtual_server.update": "更新Virtual Server",
+   "virtual_service.create": "建立Virtual Service",
+   "virtual_service.delete": "刪除Virtual Service",
+   "virtual_service.update": "更新Virtual Service",
+   "virtual_services.bulk_create": "批次建立Virtual Services",
+   "virtual_services.bulk_update": "批次更新Virtual Services"
+  },
+  "資產與身分": {
+   "agent_support_report_request.create": "建立報告請求",
+   "agent_support_report_request.delete": "刪除報告請求",
+   "domain.create": "網域建立",
+   "domain.delete": "網域刪除",
+   "domain.update": "網域更新",
+   "group.create": "群組建立",
+   "group.update": "群組更新",
+   "resource.create": "建立登入資源",
+   "resource.delete": "刪除登入資源",
+   "resource.update": "更新登入資源",
+   "security_principal.create": "安全主體建立",
+   "security_principal.delete": "批次刪除安全主體",
+   "security_principal.update": "批次更新安全主體",
+   "security_principals.bulk_create": "安全主體批次建立",
+   "support_report.upload": "上傳Support Report",
+   "vulnerability.create": "建立漏洞紀錄",
+   "vulnerability.delete": "刪除漏洞紀錄",
+   "vulnerability.update": "更新漏洞紀錄",
+   "vulnerability_report.delete": "刪除漏洞報告",
+   "vulnerability_report.update": "更新漏洞報告"
+  },
+  "驗證與 API": {
+   "api_key.create": "API Key 已建立",
+   "api_key.delete": "API Key 已刪除",
+   "api_key.update": "更新API金鑰",
+   "auth_security_principal.create": "建立安全主體",
+   "auth_security_principal.delete": "刪除安全主體",
+   "auth_security_principal.update": "更新安全主體",
+   "authentication_settings.update": "更新驗證設定",
+   "ldap_config.create": "建立LDAP設定",
+   "ldap_config.delete": "刪除LDAP設定",
+   "ldap_config.update": "更新LDAP設定",
+   "ldap_config.verify_connection": "驗證LDAP連線",
+   "login_proxy_ldap_config.create": "建立代理LDAP",
+   "login_proxy_ldap_config.delete": "刪除代理LDAP",
+   "login_proxy_ldap_config.update": "更新代理LDAP",
+   "login_proxy_ldap_config.verify_connection": "驗證代理LDAP",
+   "login_proxy_msp_tenants.create": "建立MSP租戶",
+   "login_proxy_msp_tenants.delete": "刪除MSP租戶",
+   "login_proxy_msp_tenants.update": "更新MSP租戶",
+   "login_proxy_orgs.create": "建立代理組織",
+   "login_proxy_orgs.delete": "刪除代理組織",
+   "login_proxy_orgs.update": "更新代理組織",
+   "password_policy.create": "建立密碼Policy",
+   "password_policy.delete": "刪除密碼Policy",
+   "password_policy.update": "更新密碼Policy",
+   "radius_config.create": "建立RADIUS設定",
+   "radius_config.delete": "刪除RADIUS設定",
+   "radius_config.update": "更新RADIUS設定",
+   "radius_config.verify_shared_secret": "驗證RADIUS密鑰",
+   "request.authentication_failed": "API 驗證失敗",
+   "request.authorization_failed": "API 授權失敗",
+   "request.internal_server_error": "內部伺服器錯誤",
+   "request.service_unavailable": "Request Service無法使用",
+   "request.unknown_server_error": "未知伺服器錯誤",
+   "saml_acs.update": "更新SAML ACS",
+   "saml_config.create": "建立SAML設定",
+   "saml_config.delete": "刪除SAML設定",
+   "saml_config.pce_signing_cert": "PCE SAML簽名憑證",
+   "saml_config.update": "SAML設定更新",
+   "saml_sp_config.create": "SAML SP建立",
+   "saml_sp_config.delete": "SAML SP刪除",
+   "saml_sp_config.update": "SAML SP更新"
+  }
+ },
+ "categories": [
+  {
+   "events": [
+    {
+     "description": "",
+     "group_id": "*",
+     "group_label": "全部群組",
+     "id": "*",
+     "label": "全部事件（系統範圍）",
+     "related_events": [],
+     "source": "vendor_baseline",
+     "supports_severity": true,
+     "supports_status": false,
+     "tips": "匹配所有類型的事件，適合用作全覆蓋監控或測試。建議改用特定事件類型以減少雜訊；可透過分類或操作者進行更精確的篩選。"
+    },
+    {
+     "description": "當建立新的 deny rule 時觸發。",
+     "group_id": "deny_rule",
+     "group_label": "Deny Rule (deny_rule.*)",
+     "id": "deny_rule.create",
+     "label": "Deny規則建立",
+     "related_events": [
+      "deny_rule.delete",
+      "deny_rule.update"
+     ],
+     "source": "local_extension",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當刪除現有的 deny rule 時觸發。",
+     "group_id": "deny_rule",
+     "group_label": "Deny Rule (deny_rule.*)",
+     "id": "deny_rule.delete",
+     "label": "Deny規則刪除",
+     "related_events": [
+      "deny_rule.create",
+      "deny_rule.update"
+     ],
+     "source": "local_extension",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當更新現有的 deny rule 時觸發。",
+     "group_id": "deny_rule",
+     "group_label": "Deny Rule (deny_rule.*)",
+     "id": "deny_rule.update",
+     "label": "Deny規則更新",
+     "related_events": [
+      "deny_rule.create",
+      "deny_rule.delete"
+     ],
+     "source": "local_extension",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當 label dimension 被建立時觸發。",
+     "group_id": "label_dimension",
+     "group_label": "Label Dimension (label_dimension.*)",
+     "id": "label_dimension.create",
+     "label": "Label維度建立",
+     "related_events": [
+      "label_dimension.delete",
+      "label_dimension.update"
+     ],
+     "source": "local_extension",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當 label dimension 被刪除時觸發。",
+     "group_id": "label_dimension",
+     "group_label": "Label Dimension (label_dimension.*)",
+     "id": "label_dimension.delete",
+     "label": "Label維度刪除",
+     "related_events": [
+      "label_dimension.create",
+      "label_dimension.update"
+     ],
+     "source": "local_extension",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當 label dimension 被更新時觸發。",
+     "group_id": "label_dimension",
+     "group_label": "Label Dimension (label_dimension.*)",
+     "id": "label_dimension.update",
+     "label": "Label維度更新",
+     "related_events": [
+      "label_dimension.create",
+      "label_dimension.delete"
+     ],
+     "source": "local_extension",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當 label mapping rule 被建立時觸發。",
+     "group_id": "label_mapping_rule",
+     "group_label": "Label Mapping Rule (label_mapping_rule.*)",
+     "id": "label_mapping_rule.create",
+     "label": "Label對應建立",
+     "related_events": [
+      "label_mapping_rule.delete",
+      "label_mapping_rule.update"
+     ],
+     "source": "local_extension",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當 label mapping rule 被大量刪除時觸發。",
+     "group_id": "label_mapping_rule",
+     "group_label": "Label Mapping Rule (label_mapping_rule.*)",
+     "id": "label_mapping_rule.delete",
+     "label": "Label對應刪除",
+     "related_events": [
+      "label_mapping_rule.create",
+      "label_mapping_rule.update"
+     ],
+     "source": "local_extension",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當 label mapping rule 被大量更新時觸發。",
+     "group_id": "label_mapping_rule",
+     "group_label": "Label Mapping Rule (label_mapping_rule.*)",
+     "id": "label_mapping_rule.update",
+     "label": "Label對應更新",
+     "related_events": [
+      "label_mapping_rule.create",
+      "label_mapping_rule.delete"
+     ],
+     "source": "local_extension",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當使用者登出（JWT session）時觸發。",
+     "group_id": "logout_from_jwt",
+     "group_label": "Logout From Jwt (logout_from_jwt.*)",
+     "id": "logout_from_jwt",
+     "label": "使用者登出（JWT）",
+     "related_events": [],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當有人請求技術支援報告時觸發。",
+     "group_id": "support_report_request",
+     "group_label": "Support Report Request (support_report_request.*)",
+     "id": "support_report_request.create",
+     "label": "建立支援報告請求",
+     "related_events": [
+      "support_report_request.delete"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當技術支援報告請求被刪除時觸發。",
+     "group_id": "support_report_request",
+     "group_label": "Support Report Request (support_report_request.*)",
+     "id": "support_report_request.delete",
+     "label": "刪除支援報告請求",
+     "related_events": [
+      "support_report_request.create"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當技術支援報告產生時觸發。",
+     "group_id": "support_reports",
+     "group_label": "Support Reports (support_reports.*)",
+     "id": "support_reports",
+     "label": "支援報告已產生",
+     "related_events": [],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    }
+   ],
+   "id": "General",
+   "label": "一般"
+  },
+  {
+   "events": [
+    {
+     "description": "當 VEN 正常關閉或中斷連線時觸發。",
+     "group_id": "agent",
+     "group_label": "VEN Agent (agent.*)",
+     "id": "agent.goodbye",
+     "label": "Agent 主動 Offline",
+     "related_events": [
+      "agent.refresh_policy",
+      "agent.service_not_available",
+      "agent.suspend",
+      "agent.upgrade_successful",
+      "agent.activate",
+      "agent.deactivate",
+      "agent.generate_maintenance_token",
+      "agent.machine_identifier",
+      "agent.refresh_token",
+      "agent.request_policy",
+      "agent.request_upgrade",
+      "agent.unsuspend",
+      "agent.update",
+      "agent.update_interactive_users",
+      "agent.update_iptables_href",
+      "agent.update_running_containers",
+      "agent.upload_existing_ip_table_rules",
+      "agent.upload_support_report",
+      "agent.activate_clone",
+      "agent.clone_detected",
+      "agent.tampering"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": "VEN 在關機或重啟前主動發送的斷線通知。搭配 agent.service_not_available 可區分正常關機與異常中斷——若此事件前未出現 goodbye，表示發生異常中斷。"
+    },
+    {
+     "description": "當 VEN 套用政策成功或失敗時觸發。",
+     "group_id": "agent",
+     "group_label": "VEN Agent (agent.*)",
+     "id": "agent.refresh_policy",
+     "label": "Agent Policy 重新整理",
+     "related_events": [
+      "agent.goodbye",
+      "agent.service_not_available",
+      "agent.suspend",
+      "agent.upgrade_successful",
+      "agent.activate",
+      "agent.deactivate",
+      "agent.generate_maintenance_token",
+      "agent.machine_identifier",
+      "agent.refresh_token",
+      "agent.request_policy",
+      "agent.request_upgrade",
+      "agent.unsuspend",
+      "agent.update",
+      "agent.update_interactive_users",
+      "agent.update_iptables_href",
+      "agent.update_running_containers",
+      "agent.upload_existing_ip_table_rules",
+      "agent.upload_support_report",
+      "agent.activate_clone",
+      "agent.clone_detected",
+      "agent.tampering"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": "VEN 從 PCE 拉取最新 Policy。佈建期間觸發頻率較高，正常狀態下可用嚴重性過濾器降噪。無子事件。"
+    },
+    {
+     "description": "當 VEN 回報有服務未能正常執行時觸發。",
+     "group_id": "agent",
+     "group_label": "VEN Agent (agent.*)",
+     "id": "agent.service_not_available",
+     "label": "Agent Service 無法使用",
+     "related_events": [
+      "agent.goodbye",
+      "agent.refresh_policy",
+      "agent.suspend",
+      "agent.upgrade_successful",
+      "agent.activate",
+      "agent.deactivate",
+      "agent.generate_maintenance_token",
+      "agent.machine_identifier",
+      "agent.refresh_token",
+      "agent.request_policy",
+      "agent.request_upgrade",
+      "agent.unsuspend",
+      "agent.update",
+      "agent.update_interactive_users",
+      "agent.update_iptables_href",
+      "agent.update_running_containers",
+      "agent.upload_existing_ip_table_rules",
+      "agent.upload_support_report",
+      "agent.activate_clone",
+      "agent.clone_detected",
+      "agent.tampering"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": "VEN 無法連線（崩潰、主機關閉、網路中斷）。搭配 agent.goodbye 觀察——若此事件前未出現 goodbye，表示發生異常中斷。無子事件。"
+    },
+    {
+     "description": "當 VEN 進入 suspend 狀態時觸發。",
+     "group_id": "agent",
+     "group_label": "VEN Agent (agent.*)",
+     "id": "agent.suspend",
+     "label": "Agent 已暫停",
+     "related_events": [
+      "agent.goodbye",
+      "agent.refresh_policy",
+      "agent.service_not_available",
+      "agent.upgrade_successful",
+      "agent.activate",
+      "agent.deactivate",
+      "agent.generate_maintenance_token",
+      "agent.machine_identifier",
+      "agent.refresh_token",
+      "agent.request_policy",
+      "agent.request_upgrade",
+      "agent.unsuspend",
+      "agent.update",
+      "agent.update_interactive_users",
+      "agent.update_iptables_href",
+      "agent.update_running_containers",
+      "agent.upload_existing_ip_table_rules",
+      "agent.upload_support_report",
+      "agent.activate_clone",
+      "agent.clone_detected",
+      "agent.tampering"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": "Workload 的 Enforcement 已暫停，Policy 規則不再套用。處於暫停狀態的 Workload 接受所有流量，建議設定警示。可搭配 agent.activate 及 agent.deactivate 了解生命週期。"
+    },
+    {
+     "description": "當 VEN 軟體升級成功時觸發。",
+     "group_id": "agent",
+     "group_label": "VEN Agent (agent.*)",
+     "id": "agent.upgrade_successful",
+     "label": "Agent 升級成功",
+     "related_events": [
+      "agent.goodbye",
+      "agent.refresh_policy",
+      "agent.service_not_available",
+      "agent.suspend",
+      "agent.activate",
+      "agent.deactivate",
+      "agent.generate_maintenance_token",
+      "agent.machine_identifier",
+      "agent.refresh_token",
+      "agent.request_policy",
+      "agent.request_upgrade",
+      "agent.unsuspend",
+      "agent.update",
+      "agent.update_interactive_users",
+      "agent.update_iptables_href",
+      "agent.update_running_containers",
+      "agent.upload_existing_ip_table_rules",
+      "agent.upload_support_report",
+      "agent.activate_clone",
+      "agent.clone_detected",
+      "agent.tampering"
+     ],
+     "source": "local_extension",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當尋獲失去連線的 VEN 時觸發",
+     "group_id": "lost_agent",
+     "group_label": "失聯 Agent (lost_agent.*)",
+     "id": "lost_agent.found",
+     "label": "已找回 Lost Agent",
+     "related_events": [],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": "先前無法連線的 VEN 已重新連線，通常在 agent.service_not_available 之後出現。可用於關閉事件告警。嚴重性為資訊級（復原事件），無子事件。"
+    }
+   ],
+   "id": "Agent Health",
+   "label": "Agent 健康"
+  },
+  {
+   "events": [
+    {
+     "description": "當 VEN 與 PCE 成功配對時觸發。",
+     "group_id": "agent",
+     "group_label": "VEN Agent (agent.*)",
+     "id": "agent.activate",
+     "label": "Agent 已啟用",
+     "related_events": [
+      "agent.goodbye",
+      "agent.refresh_policy",
+      "agent.service_not_available",
+      "agent.suspend",
+      "agent.upgrade_successful",
+      "agent.deactivate",
+      "agent.generate_maintenance_token",
+      "agent.machine_identifier",
+      "agent.refresh_token",
+      "agent.request_policy",
+      "agent.request_upgrade",
+      "agent.unsuspend",
+      "agent.update",
+      "agent.update_interactive_users",
+      "agent.update_iptables_href",
+      "agent.update_running_containers",
+      "agent.upload_existing_ip_table_rules",
+      "agent.upload_support_report",
+      "agent.activate_clone",
+      "agent.clone_detected",
+      "agent.tampering"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": "VEN 成功配對至 PCE 並納入 Manage。搭配 agent.deactivate 追蹤 Workload 生命週期；使用 status=success 或 status=failure 可偵測配對失敗。"
+    },
+    {
+     "description": "當 VEN 解除配對時觸發。",
+     "group_id": "agent",
+     "group_label": "VEN Agent (agent.*)",
+     "id": "agent.deactivate",
+     "label": "Agent 已停用",
+     "related_events": [
+      "agent.goodbye",
+      "agent.refresh_policy",
+      "agent.service_not_available",
+      "agent.suspend",
+      "agent.upgrade_successful",
+      "agent.activate",
+      "agent.generate_maintenance_token",
+      "agent.machine_identifier",
+      "agent.refresh_token",
+      "agent.request_policy",
+      "agent.request_upgrade",
+      "agent.unsuspend",
+      "agent.update",
+      "agent.update_interactive_users",
+      "agent.update_iptables_href",
+      "agent.update_running_containers",
+      "agent.upload_existing_ip_table_rules",
+      "agent.upload_support_report",
+      "agent.activate_clone",
+      "agent.clone_detected",
+      "agent.tampering"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": "VEN 從 PCE Manage 中移除（解除配對或下線）。搭配 agent.activate 追蹤生命週期，並搭配 workloads.unpair 觀察 Workload 層級的對應事件。"
+    },
+    {
+     "description": "當為 VEN 產生 maintenance token 時觸發。",
+     "group_id": "agent",
+     "group_label": "VEN Agent (agent.*)",
+     "id": "agent.generate_maintenance_token",
+     "label": "Agent產生維護權杖",
+     "related_events": [
+      "agent.goodbye",
+      "agent.refresh_policy",
+      "agent.service_not_available",
+      "agent.suspend",
+      "agent.upgrade_successful",
+      "agent.activate",
+      "agent.deactivate",
+      "agent.machine_identifier",
+      "agent.refresh_token",
+      "agent.request_policy",
+      "agent.request_upgrade",
+      "agent.unsuspend",
+      "agent.update",
+      "agent.update_interactive_users",
+      "agent.update_iptables_href",
+      "agent.update_running_containers",
+      "agent.upload_existing_ip_table_rules",
+      "agent.upload_support_report",
+      "agent.activate_clone",
+      "agent.clone_detected",
+      "agent.tampering"
+     ],
+     "source": "local_extension",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當 VEN 的機器識別碼更新時觸發。",
+     "group_id": "agent",
+     "group_label": "VEN Agent (agent.*)",
+     "id": "agent.machine_identifier",
+     "label": "Agent主機識別碼",
+     "related_events": [
+      "agent.goodbye",
+      "agent.refresh_policy",
+      "agent.service_not_available",
+      "agent.suspend",
+      "agent.upgrade_successful",
+      "agent.activate",
+      "agent.deactivate",
+      "agent.generate_maintenance_token",
+      "agent.refresh_token",
+      "agent.request_policy",
+      "agent.request_upgrade",
+      "agent.unsuspend",
+      "agent.update",
+      "agent.update_interactive_users",
+      "agent.update_iptables_href",
+      "agent.update_running_containers",
+      "agent.upload_existing_ip_table_rules",
+      "agent.upload_support_report",
+      "agent.activate_clone",
+      "agent.clone_detected",
+      "agent.tampering"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當 VEN 重新整理驗證 token 時觸發。",
+     "group_id": "agent",
+     "group_label": "VEN Agent (agent.*)",
+     "id": "agent.refresh_token",
+     "label": "更新Agent權杖",
+     "related_events": [
+      "agent.goodbye",
+      "agent.refresh_policy",
+      "agent.service_not_available",
+      "agent.suspend",
+      "agent.upgrade_successful",
+      "agent.activate",
+      "agent.deactivate",
+      "agent.generate_maintenance_token",
+      "agent.machine_identifier",
+      "agent.request_policy",
+      "agent.request_upgrade",
+      "agent.unsuspend",
+      "agent.update",
+      "agent.update_interactive_users",
+      "agent.update_iptables_href",
+      "agent.update_running_containers",
+      "agent.upload_existing_ip_table_rules",
+      "agent.upload_support_report",
+      "agent.activate_clone",
+      "agent.clone_detected",
+      "agent.tampering"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當 VEN 向 PCE 請求 policy 時觸發。",
+     "group_id": "agent",
+     "group_label": "VEN Agent (agent.*)",
+     "id": "agent.request_policy",
+     "label": "請求Policy",
+     "related_events": [
+      "agent.goodbye",
+      "agent.refresh_policy",
+      "agent.service_not_available",
+      "agent.suspend",
+      "agent.upgrade_successful",
+      "agent.activate",
+      "agent.deactivate",
+      "agent.generate_maintenance_token",
+      "agent.machine_identifier",
+      "agent.refresh_token",
+      "agent.request_upgrade",
+      "agent.unsuspend",
+      "agent.update",
+      "agent.update_interactive_users",
+      "agent.update_iptables_href",
+      "agent.update_running_containers",
+      "agent.upload_existing_ip_table_rules",
+      "agent.upload_support_report",
+      "agent.activate_clone",
+      "agent.clone_detected",
+      "agent.tampering"
+     ],
+     "source": "local_extension",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當發出 VEN 升級請求時觸發。",
+     "group_id": "agent",
+     "group_label": "VEN Agent (agent.*)",
+     "id": "agent.request_upgrade",
+     "label": "請求升級Agent",
+     "related_events": [
+      "agent.goodbye",
+      "agent.refresh_policy",
+      "agent.service_not_available",
+      "agent.suspend",
+      "agent.upgrade_successful",
+      "agent.activate",
+      "agent.deactivate",
+      "agent.generate_maintenance_token",
+      "agent.machine_identifier",
+      "agent.refresh_token",
+      "agent.request_policy",
+      "agent.unsuspend",
+      "agent.update",
+      "agent.update_interactive_users",
+      "agent.update_iptables_href",
+      "agent.update_running_containers",
+      "agent.upload_existing_ip_table_rules",
+      "agent.upload_support_report",
+      "agent.activate_clone",
+      "agent.clone_detected",
+      "agent.tampering"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當 VEN 解除 suspend 狀態時觸發。",
+     "group_id": "agent",
+     "group_label": "VEN Agent (agent.*)",
+     "id": "agent.unsuspend",
+     "label": "解除暫停Agent",
+     "related_events": [
+      "agent.goodbye",
+      "agent.refresh_policy",
+      "agent.service_not_available",
+      "agent.suspend",
+      "agent.upgrade_successful",
+      "agent.activate",
+      "agent.deactivate",
+      "agent.generate_maintenance_token",
+      "agent.machine_identifier",
+      "agent.refresh_token",
+      "agent.request_policy",
+      "agent.request_upgrade",
+      "agent.update",
+      "agent.update_interactive_users",
+      "agent.update_iptables_href",
+      "agent.update_running_containers",
+      "agent.upload_existing_ip_table_rules",
+      "agent.upload_support_report",
+      "agent.activate_clone",
+      "agent.clone_detected",
+      "agent.tampering"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當 VEN 的屬性更新時觸發。",
+     "group_id": "agent",
+     "group_label": "VEN Agent (agent.*)",
+     "id": "agent.update",
+     "label": "更新Agent",
+     "related_events": [
+      "agent.goodbye",
+      "agent.refresh_policy",
+      "agent.service_not_available",
+      "agent.suspend",
+      "agent.upgrade_successful",
+      "agent.activate",
+      "agent.deactivate",
+      "agent.generate_maintenance_token",
+      "agent.machine_identifier",
+      "agent.refresh_token",
+      "agent.request_policy",
+      "agent.request_upgrade",
+      "agent.unsuspend",
+      "agent.update_interactive_users",
+      "agent.update_iptables_href",
+      "agent.update_running_containers",
+      "agent.upload_existing_ip_table_rules",
+      "agent.upload_support_report",
+      "agent.activate_clone",
+      "agent.clone_detected",
+      "agent.tampering"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當 VEN 更新互動式登入使用者資訊時觸發。",
+     "group_id": "agent",
+     "group_label": "VEN Agent (agent.*)",
+     "id": "agent.update_interactive_users",
+     "label": "更新互動使用者",
+     "related_events": [
+      "agent.goodbye",
+      "agent.refresh_policy",
+      "agent.service_not_available",
+      "agent.suspend",
+      "agent.upgrade_successful",
+      "agent.activate",
+      "agent.deactivate",
+      "agent.generate_maintenance_token",
+      "agent.machine_identifier",
+      "agent.refresh_token",
+      "agent.request_policy",
+      "agent.request_upgrade",
+      "agent.unsuspend",
+      "agent.update",
+      "agent.update_iptables_href",
+      "agent.update_running_containers",
+      "agent.upload_existing_ip_table_rules",
+      "agent.upload_support_report",
+      "agent.activate_clone",
+      "agent.clone_detected",
+      "agent.tampering"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當 VEN 更新現有的 iptables 參照時觸發。",
+     "group_id": "agent",
+     "group_label": "VEN Agent (agent.*)",
+     "id": "agent.update_iptables_href",
+     "label": "更新iptables連結",
+     "related_events": [
+      "agent.goodbye",
+      "agent.refresh_policy",
+      "agent.service_not_available",
+      "agent.suspend",
+      "agent.upgrade_successful",
+      "agent.activate",
+      "agent.deactivate",
+      "agent.generate_maintenance_token",
+      "agent.machine_identifier",
+      "agent.refresh_token",
+      "agent.request_policy",
+      "agent.request_upgrade",
+      "agent.unsuspend",
+      "agent.update",
+      "agent.update_interactive_users",
+      "agent.update_running_containers",
+      "agent.upload_existing_ip_table_rules",
+      "agent.upload_support_report",
+      "agent.activate_clone",
+      "agent.clone_detected",
+      "agent.tampering"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當 VEN 更新正在執行的 container 狀態時觸發。",
+     "group_id": "agent",
+     "group_label": "VEN Agent (agent.*)",
+     "id": "agent.update_running_containers",
+     "label": "更新執行中容器",
+     "related_events": [
+      "agent.goodbye",
+      "agent.refresh_policy",
+      "agent.service_not_available",
+      "agent.suspend",
+      "agent.upgrade_successful",
+      "agent.activate",
+      "agent.deactivate",
+      "agent.generate_maintenance_token",
+      "agent.machine_identifier",
+      "agent.refresh_token",
+      "agent.request_policy",
+      "agent.request_upgrade",
+      "agent.unsuspend",
+      "agent.update",
+      "agent.update_interactive_users",
+      "agent.update_iptables_href",
+      "agent.upload_existing_ip_table_rules",
+      "agent.upload_support_report",
+      "agent.activate_clone",
+      "agent.clone_detected",
+      "agent.tampering"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當 VEN 上傳現有的 IP tables 規則時觸發。",
+     "group_id": "agent",
+     "group_label": "VEN Agent (agent.*)",
+     "id": "agent.upload_existing_ip_table_rules",
+     "label": "上傳現有iptables",
+     "related_events": [
+      "agent.goodbye",
+      "agent.refresh_policy",
+      "agent.service_not_available",
+      "agent.suspend",
+      "agent.upgrade_successful",
+      "agent.activate",
+      "agent.deactivate",
+      "agent.generate_maintenance_token",
+      "agent.machine_identifier",
+      "agent.refresh_token",
+      "agent.request_policy",
+      "agent.request_upgrade",
+      "agent.unsuspend",
+      "agent.update",
+      "agent.update_interactive_users",
+      "agent.update_iptables_href",
+      "agent.update_running_containers",
+      "agent.upload_support_report",
+      "agent.activate_clone",
+      "agent.clone_detected",
+      "agent.tampering"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當 VEN 成功上傳 support report 時觸發。",
+     "group_id": "agent",
+     "group_label": "VEN Agent (agent.*)",
+     "id": "agent.upload_support_report",
+     "label": "上傳支援報告",
+     "related_events": [
+      "agent.goodbye",
+      "agent.refresh_policy",
+      "agent.service_not_available",
+      "agent.suspend",
+      "agent.upgrade_successful",
+      "agent.activate",
+      "agent.deactivate",
+      "agent.generate_maintenance_token",
+      "agent.machine_identifier",
+      "agent.refresh_token",
+      "agent.request_policy",
+      "agent.request_upgrade",
+      "agent.unsuspend",
+      "agent.update",
+      "agent.update_interactive_users",
+      "agent.update_iptables_href",
+      "agent.update_running_containers",
+      "agent.upload_existing_ip_table_rules",
+      "agent.activate_clone",
+      "agent.clone_detected",
+      "agent.tampering"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "清除多個 VEN 的狀態條件時被觸發",
+     "group_id": "agents",
+     "group_label": "VEN Agents (agents.*)",
+     "id": "agents.clear_conditions",
+     "label": "清除Agent條件",
+     "related_events": [
+      "agents.unpair"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "批次取消配對多個 VEN 時被觸發",
+     "group_id": "agents",
+     "group_label": "VEN Agents (agents.*)",
+     "id": "agents.unpair",
+     "label": "解除配對Agent",
+     "related_events": [
+      "agents.clear_conditions"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    }
+   ],
+   "id": "Agent Operations",
+   "label": "Agent 操作"
+  },
+  {
+   "events": [
+    {
+     "description": "當被複製的 VEN 啟動時觸發。",
+     "group_id": "agent",
+     "group_label": "VEN Agent (agent.*)",
+     "id": "agent.activate_clone",
+     "label": "啟用複製Agent",
+     "related_events": [
+      "agent.goodbye",
+      "agent.refresh_policy",
+      "agent.service_not_available",
+      "agent.suspend",
+      "agent.upgrade_successful",
+      "agent.activate",
+      "agent.deactivate",
+      "agent.generate_maintenance_token",
+      "agent.machine_identifier",
+      "agent.refresh_token",
+      "agent.request_policy",
+      "agent.request_upgrade",
+      "agent.unsuspend",
+      "agent.update",
+      "agent.update_interactive_users",
+      "agent.update_iptables_href",
+      "agent.update_running_containers",
+      "agent.upload_existing_ip_table_rules",
+      "agent.upload_support_report",
+      "agent.clone_detected",
+      "agent.tampering"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當 PCE 偵測到 VEN 遭到複製時觸發。",
+     "group_id": "agent",
+     "group_label": "VEN Agent (agent.*)",
+     "id": "agent.clone_detected",
+     "label": "偵測到 Agent 複製",
+     "related_events": [
+      "agent.goodbye",
+      "agent.refresh_policy",
+      "agent.service_not_available",
+      "agent.suspend",
+      "agent.upgrade_successful",
+      "agent.activate",
+      "agent.deactivate",
+      "agent.generate_maintenance_token",
+      "agent.machine_identifier",
+      "agent.refresh_token",
+      "agent.request_policy",
+      "agent.request_upgrade",
+      "agent.unsuspend",
+      "agent.update",
+      "agent.update_interactive_users",
+      "agent.update_iptables_href",
+      "agent.update_running_containers",
+      "agent.upload_existing_ip_table_rules",
+      "agent.upload_support_report",
+      "agent.activate_clone",
+      "agent.tampering"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": "PCE 偵測到具有重複身份的 VEN（主機複製場景）。需立即調查——可能代表未授權複製。搭配 agent.activate_clone 可查看複製體啟動情形。"
+    },
+    {
+     "description": "當偵測到 VEN 主機的防火牆規則遭到竄改時觸發。",
+     "group_id": "agent",
+     "group_label": "VEN Agent (agent.*)",
+     "id": "agent.tampering",
+     "label": "Agent 遭竄改",
+     "related_events": [
+      "agent.goodbye",
+      "agent.refresh_policy",
+      "agent.service_not_available",
+      "agent.suspend",
+      "agent.upgrade_successful",
+      "agent.activate",
+      "agent.deactivate",
+      "agent.generate_maintenance_token",
+      "agent.machine_identifier",
+      "agent.refresh_token",
+      "agent.request_policy",
+      "agent.request_upgrade",
+      "agent.unsuspend",
+      "agent.update",
+      "agent.update_interactive_users",
+      "agent.update_iptables_href",
+      "agent.update_running_containers",
+      "agent.upload_existing_ip_table_rules",
+      "agent.upload_support_report",
+      "agent.activate_clone",
+      "agent.clone_detected"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": "VEN 二進位檔或設定檔在未授權情況下被修改（完整性違規）。建議設為高優先警示——此事件為資安事件的指標。無子事件，無需狀態／嚴重性過濾器。"
+    }
+   ],
+   "id": "Agent Security",
+   "label": "Agent 安全"
+  },
+  {
+   "events": [
+    {
+     "description": "當使用者接受系統邀請時觸發",
+     "group_id": "user",
+     "group_label": "使用者 (user.*)",
+     "id": "user.accept_invitation",
+     "label": "使用者接受邀請",
+     "related_events": [
+      "user.authenticate",
+      "user.create",
+      "user.create_session",
+      "user.delete",
+      "user.invite",
+      "user.login",
+      "user.login_session_terminated",
+      "user.logout",
+      "user.pce_session_terminated",
+      "user.reset_password",
+      "user.sign_in",
+      "user.sign_out",
+      "user.update",
+      "user.update_password",
+      "user.use_expired_password",
+      "user.verify_mfa"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當使用者成功通過驗證登入時觸發",
+     "group_id": "user",
+     "group_label": "使用者 (user.*)",
+     "id": "user.authenticate",
+     "label": "使用者驗證",
+     "related_events": [
+      "user.accept_invitation",
+      "user.create",
+      "user.create_session",
+      "user.delete",
+      "user.invite",
+      "user.login",
+      "user.login_session_terminated",
+      "user.logout",
+      "user.pce_session_terminated",
+      "user.reset_password",
+      "user.sign_in",
+      "user.sign_out",
+      "user.update",
+      "user.update_password",
+      "user.use_expired_password",
+      "user.verify_mfa"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": true,
+     "supports_status": true,
+     "tips": "涵蓋所有身份驗證嘗試（成功與失敗）。透過 status=failure 篩選可偵測暴力破解。搭配 user.sign_in（僅在成功時觸發）和 request.authentication_failed（API 層級失敗）使用。"
+    },
+    {
+     "description": "當建立新使用者帳號時觸發",
+     "group_id": "user",
+     "group_label": "使用者 (user.*)",
+     "id": "user.create",
+     "label": "建立使用者",
+     "related_events": [
+      "user.accept_invitation",
+      "user.authenticate",
+      "user.create_session",
+      "user.delete",
+      "user.invite",
+      "user.login",
+      "user.login_session_terminated",
+      "user.logout",
+      "user.pce_session_terminated",
+      "user.reset_password",
+      "user.sign_in",
+      "user.sign_out",
+      "user.update",
+      "user.update_password",
+      "user.use_expired_password",
+      "user.verify_mfa"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當建立使用者 session 時觸發",
+     "group_id": "user",
+     "group_label": "使用者 (user.*)",
+     "id": "user.create_session",
+     "label": "建立Session",
+     "related_events": [
+      "user.accept_invitation",
+      "user.authenticate",
+      "user.create",
+      "user.delete",
+      "user.invite",
+      "user.login",
+      "user.login_session_terminated",
+      "user.logout",
+      "user.pce_session_terminated",
+      "user.reset_password",
+      "user.sign_in",
+      "user.sign_out",
+      "user.update",
+      "user.update_password",
+      "user.use_expired_password",
+      "user.verify_mfa"
+     ],
+     "source": "local_extension",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當刪除使用者時觸發",
+     "group_id": "user",
+     "group_label": "使用者 (user.*)",
+     "id": "user.delete",
+     "label": "刪除使用者",
+     "related_events": [
+      "user.accept_invitation",
+      "user.authenticate",
+      "user.create",
+      "user.create_session",
+      "user.invite",
+      "user.login",
+      "user.login_session_terminated",
+      "user.logout",
+      "user.pce_session_terminated",
+      "user.reset_password",
+      "user.sign_in",
+      "user.sign_out",
+      "user.update",
+      "user.update_password",
+      "user.use_expired_password",
+      "user.verify_mfa"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當邀請使用者時觸發",
+     "group_id": "user",
+     "group_label": "使用者 (user.*)",
+     "id": "user.invite",
+     "label": "邀請使用者",
+     "related_events": [
+      "user.accept_invitation",
+      "user.authenticate",
+      "user.create",
+      "user.create_session",
+      "user.delete",
+      "user.login",
+      "user.login_session_terminated",
+      "user.logout",
+      "user.pce_session_terminated",
+      "user.reset_password",
+      "user.sign_in",
+      "user.sign_out",
+      "user.update",
+      "user.update_password",
+      "user.use_expired_password",
+      "user.verify_mfa"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當使用者登入 PCE 時觸發",
+     "group_id": "user",
+     "group_label": "使用者 (user.*)",
+     "id": "user.login",
+     "label": "使用者登入",
+     "related_events": [
+      "user.accept_invitation",
+      "user.authenticate",
+      "user.create",
+      "user.create_session",
+      "user.delete",
+      "user.invite",
+      "user.login_session_terminated",
+      "user.logout",
+      "user.pce_session_terminated",
+      "user.reset_password",
+      "user.sign_in",
+      "user.sign_out",
+      "user.update",
+      "user.update_password",
+      "user.use_expired_password",
+      "user.verify_mfa"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": true,
+     "supports_status": true,
+     "tips": ""
+    },
+    {
+     "description": "當使用者的登入 session 被終止時觸發",
+     "group_id": "user",
+     "group_label": "使用者 (user.*)",
+     "id": "user.login_session_terminated",
+     "label": "使用者登入工作階段已終止",
+     "related_events": [
+      "user.accept_invitation",
+      "user.authenticate",
+      "user.create",
+      "user.create_session",
+      "user.delete",
+      "user.invite",
+      "user.login",
+      "user.logout",
+      "user.pce_session_terminated",
+      "user.reset_password",
+      "user.sign_in",
+      "user.sign_out",
+      "user.update",
+      "user.update_password",
+      "user.use_expired_password",
+      "user.verify_mfa"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": "工作階段因逾時或管理員撤銷而結束，並非主動登出。對管理員撤銷的工作階段設定警示以提高安全可見性。搭配 user.sign_out 區分主動與強制終止。"
+    },
+    {
+     "description": "當使用者登出 PCE 時觸發",
+     "group_id": "user",
+     "group_label": "使用者 (user.*)",
+     "id": "user.logout",
+     "label": "使用者登出",
+     "related_events": [
+      "user.accept_invitation",
+      "user.authenticate",
+      "user.create",
+      "user.create_session",
+      "user.delete",
+      "user.invite",
+      "user.login",
+      "user.login_session_terminated",
+      "user.pce_session_terminated",
+      "user.reset_password",
+      "user.sign_in",
+      "user.sign_out",
+      "user.update",
+      "user.update_password",
+      "user.use_expired_password",
+      "user.verify_mfa"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": true,
+     "supports_status": true,
+     "tips": ""
+    },
+    {
+     "description": "當使用者的 PCE session 被終止時觸發",
+     "group_id": "user",
+     "group_label": "使用者 (user.*)",
+     "id": "user.pce_session_terminated",
+     "label": "使用者 PCE 工作階段已終止",
+     "related_events": [
+      "user.accept_invitation",
+      "user.authenticate",
+      "user.create",
+      "user.create_session",
+      "user.delete",
+      "user.invite",
+      "user.login",
+      "user.login_session_terminated",
+      "user.logout",
+      "user.reset_password",
+      "user.sign_in",
+      "user.sign_out",
+      "user.update",
+      "user.update_password",
+      "user.use_expired_password",
+      "user.verify_mfa"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": "PCE 伺服器終止了工作階段（如 PCE 重啟、維護）。與使用者主動登出不同，無子事件。在維護期間或 PCE 意外重啟時監控。"
+    },
+    {
+     "description": "當重設使用者密碼時觸發",
+     "group_id": "user",
+     "group_label": "使用者 (user.*)",
+     "id": "user.reset_password",
+     "label": "重設密碼",
+     "related_events": [
+      "user.accept_invitation",
+      "user.authenticate",
+      "user.create",
+      "user.create_session",
+      "user.delete",
+      "user.invite",
+      "user.login",
+      "user.login_session_terminated",
+      "user.logout",
+      "user.pce_session_terminated",
+      "user.sign_in",
+      "user.sign_out",
+      "user.update",
+      "user.update_password",
+      "user.use_expired_password",
+      "user.verify_mfa"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當使用者登入並建立 session 時觸發",
+     "group_id": "user",
+     "group_label": "使用者 (user.*)",
+     "id": "user.sign_in",
+     "label": "使用者登入",
+     "related_events": [
+      "user.accept_invitation",
+      "user.authenticate",
+      "user.create",
+      "user.create_session",
+      "user.delete",
+      "user.invite",
+      "user.login",
+      "user.login_session_terminated",
+      "user.logout",
+      "user.pce_session_terminated",
+      "user.reset_password",
+      "user.sign_out",
+      "user.update",
+      "user.update_password",
+      "user.use_expired_password",
+      "user.verify_mfa"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": true,
+     "supports_status": true,
+     "tips": "僅在主控台或 API 成功登入時觸發。失敗嘗試請使用帶 status=failure 的 user.authenticate 或 request.authentication_failed。搭配 user.sign_out 和 user.login_session_terminated 追蹤完整工作階段。"
+    },
+    {
+     "description": "當使用者登出並終止 session 時觸發",
+     "group_id": "user",
+     "group_label": "使用者 (user.*)",
+     "id": "user.sign_out",
+     "label": "使用者登出",
+     "related_events": [
+      "user.accept_invitation",
+      "user.authenticate",
+      "user.create",
+      "user.create_session",
+      "user.delete",
+      "user.invite",
+      "user.login",
+      "user.login_session_terminated",
+      "user.logout",
+      "user.pce_session_terminated",
+      "user.reset_password",
+      "user.sign_in",
+      "user.update",
+      "user.update_password",
+      "user.use_expired_password",
+      "user.verify_mfa"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": true,
+     "supports_status": true,
+     "tips": "使用者主動登出 PCE。搭配 user.sign_in 追蹤工作階段生命週期。可與 user.login_session_terminated（逾時或管理員撤銷）和 user.pce_session_terminated（伺服器端終止）區分。"
+    },
+    {
+     "description": "當更新使用者資訊時觸發",
+     "group_id": "user",
+     "group_label": "使用者 (user.*)",
+     "id": "user.update",
+     "label": "更新使用者",
+     "related_events": [
+      "user.accept_invitation",
+      "user.authenticate",
+      "user.create",
+      "user.create_session",
+      "user.delete",
+      "user.invite",
+      "user.login",
+      "user.login_session_terminated",
+      "user.logout",
+      "user.pce_session_terminated",
+      "user.reset_password",
+      "user.sign_in",
+      "user.sign_out",
+      "user.update_password",
+      "user.use_expired_password",
+      "user.verify_mfa"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當變更或更新使用者密碼時觸發",
+     "group_id": "user",
+     "group_label": "使用者 (user.*)",
+     "id": "user.update_password",
+     "label": "更新密碼",
+     "related_events": [
+      "user.accept_invitation",
+      "user.authenticate",
+      "user.create",
+      "user.create_session",
+      "user.delete",
+      "user.invite",
+      "user.login",
+      "user.login_session_terminated",
+      "user.logout",
+      "user.pce_session_terminated",
+      "user.reset_password",
+      "user.sign_in",
+      "user.sign_out",
+      "user.update",
+      "user.use_expired_password",
+      "user.verify_mfa"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當使用者輸入已過期的密碼時觸發",
+     "group_id": "user",
+     "group_label": "使用者 (user.*)",
+     "id": "user.use_expired_password",
+     "label": "使用過期密碼",
+     "related_events": [
+      "user.accept_invitation",
+      "user.authenticate",
+      "user.create",
+      "user.create_session",
+      "user.delete",
+      "user.invite",
+      "user.login",
+      "user.login_session_terminated",
+      "user.logout",
+      "user.pce_session_terminated",
+      "user.reset_password",
+      "user.sign_in",
+      "user.sign_out",
+      "user.update",
+      "user.update_password",
+      "user.verify_mfa"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當使用者完成多因素驗證 (MFA) 時觸發",
+     "group_id": "user",
+     "group_label": "使用者 (user.*)",
+     "id": "user.verify_mfa",
+     "label": "驗證MFA",
+     "related_events": [
+      "user.accept_invitation",
+      "user.authenticate",
+      "user.create",
+      "user.create_session",
+      "user.delete",
+      "user.invite",
+      "user.login",
+      "user.login_session_terminated",
+      "user.logout",
+      "user.pce_session_terminated",
+      "user.reset_password",
+      "user.sign_in",
+      "user.sign_out",
+      "user.update",
+      "user.update_password",
+      "user.use_expired_password"
+     ],
+     "source": "local_extension",
+     "supports_severity": true,
+     "supports_status": true,
+     "tips": ""
+    },
+    {
+     "description": "當建立本機使用者設定檔時觸發",
+     "group_id": "user_local_profile",
+     "group_label": "使用者本機 Profile (user_local_profile.*)",
+     "id": "user_local_profile.create",
+     "label": "建立本機設定檔",
+     "related_events": [
+      "user_local_profile.delete",
+      "user_local_profile.reinvite",
+      "user_local_profile.update_password"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當刪除本機使用者設定檔時觸發",
+     "group_id": "user_local_profile",
+     "group_label": "使用者本機 Profile (user_local_profile.*)",
+     "id": "user_local_profile.delete",
+     "label": "刪除本機設定檔",
+     "related_events": [
+      "user_local_profile.create",
+      "user_local_profile.reinvite",
+      "user_local_profile.update_password"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當重新發送邀請電子郵件給本機使用者時觸發",
+     "group_id": "user_local_profile",
+     "group_label": "使用者本機 Profile (user_local_profile.*)",
+     "id": "user_local_profile.reinvite",
+     "label": "重新邀請",
+     "related_events": [
+      "user_local_profile.create",
+      "user_local_profile.delete",
+      "user_local_profile.update_password"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當更新本機使用者密碼時觸發",
+     "group_id": "user_local_profile",
+     "group_label": "使用者本機 Profile (user_local_profile.*)",
+     "id": "user_local_profile.update_password",
+     "label": "更新本機密碼",
+     "related_events": [
+      "user_local_profile.create",
+      "user_local_profile.delete",
+      "user_local_profile.reinvite"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當傳回用於 PCE 驗證的 auth token 時觸發",
+     "group_id": "users",
+     "group_label": "使用者 (users.*)",
+     "id": "users.auth_token",
+     "label": "認證Token",
+     "related_events": [],
+     "source": "local_extension",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    }
+   ],
+   "id": "User Access",
+   "label": "使用者存取"
+  },
+  {
+   "events": [
+    {
+     "description": "建立新的 API key 時被觸發",
+     "group_id": "api_key",
+     "group_label": "API 金鑰 (api_key.*)",
+     "id": "api_key.create",
+     "label": "API Key 已建立",
+     "related_events": [
+      "api_key.delete",
+      "api_key.update"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": "已發出新的 API 金鑰。高敏感性事件——未授權的金鑰建立將賦予持久性 API 存取權。搭配 api_key.delete 追蹤金鑰生命週期；按操作者過濾可追蹤發出金鑰的人員。"
+    },
+    {
+     "description": "刪除 API key 時被觸發",
+     "group_id": "api_key",
+     "group_label": "API 金鑰 (api_key.*)",
+     "id": "api_key.delete",
+     "label": "API Key 已刪除",
+     "related_events": [
+      "api_key.create",
+      "api_key.update"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": "已撤銷 API 金鑰。搭配 api_key.create 追蹤完整金鑰生命週期。意外刪除（尤其是 Service 帳號金鑰）可能表示帳號被接管或蓄意破壞。"
+    },
+    {
+     "description": "更新 API key 資訊時被觸發",
+     "group_id": "api_key",
+     "group_label": "API 金鑰 (api_key.*)",
+     "id": "api_key.update",
+     "label": "更新API金鑰",
+     "related_events": [
+      "api_key.create",
+      "api_key.delete"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "建立 RBAC 認證的 auth security principal時被觸發",
+     "group_id": "auth_security_principal",
+     "group_label": "驗證安全主體 (auth_security_principal.*)",
+     "id": "auth_security_principal.create",
+     "label": "建立安全主體",
+     "related_events": [
+      "auth_security_principal.delete",
+      "auth_security_principal.update"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "刪除 RBAC 認證的 auth security principal時被觸發",
+     "group_id": "auth_security_principal",
+     "group_label": "驗證安全主體 (auth_security_principal.*)",
+     "id": "auth_security_principal.delete",
+     "label": "刪除安全主體",
+     "related_events": [
+      "auth_security_principal.create",
+      "auth_security_principal.update"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "更新 RBAC 認證的 auth security principal資訊時被觸發",
+     "group_id": "auth_security_principal",
+     "group_label": "驗證安全主體 (auth_security_principal.*)",
+     "id": "auth_security_principal.update",
+     "label": "更新安全主體",
+     "related_events": [
+      "auth_security_principal.create",
+      "auth_security_principal.delete"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "更新 PCE 認證設定時被觸發",
+     "group_id": "authentication_settings",
+     "group_label": "驗證設定 (authentication_settings.*)",
+     "id": "authentication_settings.update",
+     "label": "更新驗證設定",
+     "related_events": [],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當 LDAP 組態設定被建立時觸發。",
+     "group_id": "ldap_config",
+     "group_label": "LDAP 設定 (ldap_config.*)",
+     "id": "ldap_config.create",
+     "label": "建立LDAP設定",
+     "related_events": [
+      "ldap_config.delete",
+      "ldap_config.update",
+      "ldap_config.verify_connection"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當 LDAP 組態設定被刪除時觸發。",
+     "group_id": "ldap_config",
+     "group_label": "LDAP 設定 (ldap_config.*)",
+     "id": "ldap_config.delete",
+     "label": "刪除LDAP設定",
+     "related_events": [
+      "ldap_config.create",
+      "ldap_config.update",
+      "ldap_config.verify_connection"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當 LDAP 組態設定被更新時觸發。",
+     "group_id": "ldap_config",
+     "group_label": "LDAP 設定 (ldap_config.*)",
+     "id": "ldap_config.update",
+     "label": "更新LDAP設定",
+     "related_events": [
+      "ldap_config.create",
+      "ldap_config.delete",
+      "ldap_config.verify_connection"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當驗證 LDAP 伺服器連線時觸發。",
+     "group_id": "ldap_config",
+     "group_label": "LDAP 設定 (ldap_config.*)",
+     "id": "ldap_config.verify_connection",
+     "label": "驗證LDAP連線",
+     "related_events": [
+      "ldap_config.create",
+      "ldap_config.delete",
+      "ldap_config.update"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當跨服務呼叫 Login 服務以建立 LDAP組態設定時觸發。",
+     "group_id": "login_proxy_ldap_config",
+     "group_label": "LDAP 登入代理設定 (login_proxy_ldap_config.*)",
+     "id": "login_proxy_ldap_config.create",
+     "label": "建立代理LDAP",
+     "related_events": [
+      "login_proxy_ldap_config.delete",
+      "login_proxy_ldap_config.update",
+      "login_proxy_ldap_config.verify_connection"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當跨服務呼叫 Login 服務以刪除 LDAP組態設定時觸發。",
+     "group_id": "login_proxy_ldap_config",
+     "group_label": "LDAP 登入代理設定 (login_proxy_ldap_config.*)",
+     "id": "login_proxy_ldap_config.delete",
+     "label": "刪除代理LDAP",
+     "related_events": [
+      "login_proxy_ldap_config.create",
+      "login_proxy_ldap_config.update",
+      "login_proxy_ldap_config.verify_connection"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當跨服務呼叫 Login 服務以更新 LDAP組態設定時觸發。",
+     "group_id": "login_proxy_ldap_config",
+     "group_label": "LDAP 登入代理設定 (login_proxy_ldap_config.*)",
+     "id": "login_proxy_ldap_config.update",
+     "label": "更新代理LDAP",
+     "related_events": [
+      "login_proxy_ldap_config.create",
+      "login_proxy_ldap_config.delete",
+      "login_proxy_ldap_config.verify_connection"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當跨服務呼叫 Login 服務以驗證 LDAP伺服器連線時觸發。",
+     "group_id": "login_proxy_ldap_config",
+     "group_label": "LDAP 登入代理設定 (login_proxy_ldap_config.*)",
+     "id": "login_proxy_ldap_config.verify_connection",
+     "label": "驗證代理LDAP",
+     "related_events": [
+      "login_proxy_ldap_config.create",
+      "login_proxy_ldap_config.delete",
+      "login_proxy_ldap_config.update"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當跨服務呼叫 Login 服務以建立 MSP租戶時觸發。",
+     "group_id": "login_proxy_msp_tenants",
+     "group_label": "MSP 租戶登入代理 (login_proxy_msp_tenants.*)",
+     "id": "login_proxy_msp_tenants.create",
+     "label": "建立MSP租戶",
+     "related_events": [
+      "login_proxy_msp_tenants.delete",
+      "login_proxy_msp_tenants.update"
+     ],
+     "source": "local_extension",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當跨服務呼叫 Login 服務以刪除 MSP租戶時觸發。",
+     "group_id": "login_proxy_msp_tenants",
+     "group_label": "MSP 租戶登入代理 (login_proxy_msp_tenants.*)",
+     "id": "login_proxy_msp_tenants.delete",
+     "label": "刪除MSP租戶",
+     "related_events": [
+      "login_proxy_msp_tenants.create",
+      "login_proxy_msp_tenants.update"
+     ],
+     "source": "local_extension",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當跨服務呼叫 Login 服務以更新 MSP租戶時觸發。",
+     "group_id": "login_proxy_msp_tenants",
+     "group_label": "MSP 租戶登入代理 (login_proxy_msp_tenants.*)",
+     "id": "login_proxy_msp_tenants.update",
+     "label": "更新MSP租戶",
+     "related_events": [
+      "login_proxy_msp_tenants.create",
+      "login_proxy_msp_tenants.delete"
+     ],
+     "source": "local_extension",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當登入代理服務建立組織時觸發",
+     "group_id": "login_proxy_orgs",
+     "group_label": "登入代理組織 (login_proxy_orgs.*)",
+     "id": "login_proxy_orgs.create",
+     "label": "建立代理組織",
+     "related_events": [
+      "login_proxy_orgs.delete",
+      "login_proxy_orgs.update"
+     ],
+     "source": "local_extension",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當登入代理服務刪除組織時觸發",
+     "group_id": "login_proxy_orgs",
+     "group_label": "登入代理組織 (login_proxy_orgs.*)",
+     "id": "login_proxy_orgs.delete",
+     "label": "刪除代理組織",
+     "related_events": [
+      "login_proxy_orgs.create",
+      "login_proxy_orgs.update"
+     ],
+     "source": "local_extension",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當登入代理服務更新組織時觸發",
+     "group_id": "login_proxy_orgs",
+     "group_label": "登入代理組織 (login_proxy_orgs.*)",
+     "id": "login_proxy_orgs.update",
+     "label": "更新代理組織",
+     "related_events": [
+      "login_proxy_orgs.create",
+      "login_proxy_orgs.delete"
+     ],
+     "source": "local_extension",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當建立 password policy 時觸發。",
+     "group_id": "password_policy",
+     "group_label": "密碼 Policy (password_policy.*)",
+     "id": "password_policy.create",
+     "label": "建立密碼Policy",
+     "related_events": [
+      "password_policy.delete",
+      "password_policy.update"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當刪除 password policy 時觸發。",
+     "group_id": "password_policy",
+     "group_label": "密碼 Policy (password_policy.*)",
+     "id": "password_policy.delete",
+     "label": "刪除密碼Policy",
+     "related_events": [
+      "password_policy.create",
+      "password_policy.update"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當更新 password policy 時觸發。",
+     "group_id": "password_policy",
+     "group_label": "密碼 Policy (password_policy.*)",
+     "id": "password_policy.update",
+     "label": "更新密碼Policy",
+     "related_events": [
+      "password_policy.create",
+      "password_policy.delete"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當建立 RADIUS 設定時觸發。",
+     "group_id": "radius_config",
+     "group_label": "RADIUS 設定 (radius_config.*)",
+     "id": "radius_config.create",
+     "label": "建立RADIUS設定",
+     "related_events": [
+      "radius_config.delete",
+      "radius_config.update",
+      "radius_config.verify_shared_secret"
+     ],
+     "source": "local_extension",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當刪除 RADIUS 設定時觸發。",
+     "group_id": "radius_config",
+     "group_label": "RADIUS 設定 (radius_config.*)",
+     "id": "radius_config.delete",
+     "label": "刪除RADIUS設定",
+     "related_events": [
+      "radius_config.create",
+      "radius_config.update",
+      "radius_config.verify_shared_secret"
+     ],
+     "source": "local_extension",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當更新 RADIUS 設定時觸發。",
+     "group_id": "radius_config",
+     "group_label": "RADIUS 設定 (radius_config.*)",
+     "id": "radius_config.update",
+     "label": "更新RADIUS設定",
+     "related_events": [
+      "radius_config.create",
+      "radius_config.delete",
+      "radius_config.verify_shared_secret"
+     ],
+     "source": "local_extension",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當驗證 RADIUS 設定的共用密碼時觸發。",
+     "group_id": "radius_config",
+     "group_label": "RADIUS 設定 (radius_config.*)",
+     "id": "radius_config.verify_shared_secret",
+     "label": "驗證RADIUS密鑰",
+     "related_events": [
+      "radius_config.create",
+      "radius_config.delete",
+      "radius_config.update"
+     ],
+     "source": "local_extension",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當 API 請求的身分驗證失敗時觸發。",
+     "group_id": "request",
+     "group_label": "API 請求 (request.*)",
+     "id": "request.authentication_failed",
+     "label": "API 驗證失敗",
+     "related_events": [
+      "request.authorization_failed",
+      "request.internal_server_error",
+      "request.service_unavailable",
+      "request.unknown_server_error"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": true,
+     "supports_status": true,
+     "tips": "API 或 UI 身份驗證嘗試被拒絕（憑證無效、Token 過期、API 金鑰遺失）。按操作者 IP 過濾可偵測暴力破解。搭配 user.authenticate 取得完整身份驗證狀況。"
+    },
+    {
+     "description": "當 API 請求的權限授權失敗時觸發。",
+     "group_id": "request",
+     "group_label": "API 請求 (request.*)",
+     "id": "request.authorization_failed",
+     "label": "API 授權失敗",
+     "related_events": [
+      "request.authentication_failed",
+      "request.internal_server_error",
+      "request.service_unavailable",
+      "request.unknown_server_error"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": true,
+     "supports_status": true,
+     "tips": "已驗證身份的使用者嘗試存取超出其角色權限的資源或執行操作。對反覆失敗設定警示——可能表示權限提升嘗試。無子事件。"
+    },
+    {
+     "description": "當 API 請求因 PCE 內部伺服器錯誤而失敗時觸發。",
+     "group_id": "request",
+     "group_label": "API 請求 (request.*)",
+     "id": "request.internal_server_error",
+     "label": "內部伺服器錯誤",
+     "related_events": [
+      "request.authentication_failed",
+      "request.authorization_failed",
+      "request.service_unavailable",
+      "request.unknown_server_error"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": true,
+     "supports_status": true,
+     "tips": ""
+    },
+    {
+     "description": "當 API 請求因 PCE 服務無法使用而失敗時觸發。",
+     "group_id": "request",
+     "group_label": "API 請求 (request.*)",
+     "id": "request.service_unavailable",
+     "label": "Request Service無法使用",
+     "related_events": [
+      "request.authentication_failed",
+      "request.authorization_failed",
+      "request.internal_server_error",
+      "request.unknown_server_error"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": true,
+     "supports_status": true,
+     "tips": ""
+    },
+    {
+     "description": "當 API 請求因未知的伺服器錯誤而失敗時觸發。",
+     "group_id": "request",
+     "group_label": "API 請求 (request.*)",
+     "id": "request.unknown_server_error",
+     "label": "未知伺服器錯誤",
+     "related_events": [
+      "request.authentication_failed",
+      "request.authorization_failed",
+      "request.internal_server_error",
+      "request.service_unavailable"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": true,
+     "supports_status": true,
+     "tips": ""
+    },
+    {
+     "description": "當更新 SAML 斷言取用服務目的地時觸發。",
+     "group_id": "saml_acs",
+     "group_label": "SAML ACS (saml_acs.*)",
+     "id": "saml_acs.update",
+     "label": "更新SAML ACS",
+     "related_events": [],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當建立 SAML 設定時觸發。",
+     "group_id": "saml_config",
+     "group_label": "SAML 設定 (saml_config.*)",
+     "id": "saml_config.create",
+     "label": "建立SAML設定",
+     "related_events": [
+      "saml_config.delete",
+      "saml_config.pce_signing_cert",
+      "saml_config.update"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當刪除 SAML 設定時觸發。",
+     "group_id": "saml_config",
+     "group_label": "SAML 設定 (saml_config.*)",
+     "id": "saml_config.delete",
+     "label": "刪除SAML設定",
+     "related_events": [
+      "saml_config.create",
+      "saml_config.pce_signing_cert",
+      "saml_config.update"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當產生用於簽署 SAML 驗證請求的新 PCE 憑證時觸發。",
+     "group_id": "saml_config",
+     "group_label": "SAML 設定 (saml_config.*)",
+     "id": "saml_config.pce_signing_cert",
+     "label": "PCE SAML簽名憑證",
+     "related_events": [
+      "saml_config.create",
+      "saml_config.delete",
+      "saml_config.update"
+     ],
+     "source": "local_extension",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當更新 SAML 設定時觸發。",
+     "group_id": "saml_config",
+     "group_label": "SAML 設定 (saml_config.*)",
+     "id": "saml_config.update",
+     "label": "SAML設定更新",
+     "related_events": [
+      "saml_config.create",
+      "saml_config.delete",
+      "saml_config.pce_signing_cert"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當建立 SAML Service Provider 設定時觸發",
+     "group_id": "saml_sp_config",
+     "group_label": "SAML SP 設定 (saml_sp_config.*)",
+     "id": "saml_sp_config.create",
+     "label": "SAML SP建立",
+     "related_events": [
+      "saml_sp_config.delete",
+      "saml_sp_config.update"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當刪除 SAML Service Provider 設定時觸發",
+     "group_id": "saml_sp_config",
+     "group_label": "SAML SP 設定 (saml_sp_config.*)",
+     "id": "saml_sp_config.delete",
+     "label": "SAML SP刪除",
+     "related_events": [
+      "saml_sp_config.create",
+      "saml_sp_config.update"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當更新 SAML Service Provider 設定時觸發",
+     "group_id": "saml_sp_config",
+     "group_label": "SAML SP 設定 (saml_sp_config.*)",
+     "id": "saml_sp_config.update",
+     "label": "SAML SP更新",
+     "related_events": [
+      "saml_sp_config.create",
+      "saml_sp_config.delete"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    }
+   ],
+   "id": "Auth & API",
+   "label": "驗證與 API"
+  },
+  {
+   "events": [
+    {
+     "description": "當建立 access restriction 時觸發。",
+     "group_id": "access_restriction",
+     "group_label": "存取限制 (access_restriction.*)",
+     "id": "access_restriction.create",
+     "label": "建立存取限制",
+     "related_events": [
+      "access_restriction.delete",
+      "access_restriction.update"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當刪除 access restriction 時觸發。",
+     "group_id": "access_restriction",
+     "group_label": "存取限制 (access_restriction.*)",
+     "id": "access_restriction.delete",
+     "label": "刪除存取限制",
+     "related_events": [
+      "access_restriction.create",
+      "access_restriction.update"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當更新 access restriction 時觸發。",
+     "group_id": "access_restriction",
+     "group_label": "存取限制 (access_restriction.*)",
+     "id": "access_restriction.update",
+     "label": "更新存取限制",
+     "related_events": [
+      "access_restriction.create",
+      "access_restriction.delete"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當建立新的 enforcement boundary 時觸發。",
+     "group_id": "enforcement_boundary",
+     "group_label": "Enforcement Boundary (enforcement_boundary.*)",
+     "id": "enforcement_boundary.create",
+     "label": "Enforcement邊界建立",
+     "related_events": [
+      "enforcement_boundary.delete",
+      "enforcement_boundary.update"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": "已建立 Enforcement Boundary（選擇性 Enforcement 的拒絕規則）。佈建後影響範圍內的所有 Workload。對意外建立設定警示；搭配 enforcement_boundary.delete 追蹤生命週期。"
+    },
+    {
+     "description": "當刪除現有的 enforcement boundary 時觸發。",
+     "group_id": "enforcement_boundary",
+     "group_label": "Enforcement Boundary (enforcement_boundary.*)",
+     "id": "enforcement_boundary.delete",
+     "label": "Enforcement邊界刪除",
+     "related_events": [
+      "enforcement_boundary.create",
+      "enforcement_boundary.update"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": "Enforcement Boundary 已被移除——移除後會擴展選擇性執行的覆蓋範圍。對生產環境中的刪除設定警示；搭配 enforcement_boundary.create 追蹤生命週期。"
+    },
+    {
+     "description": "當更新現有的 enforcement boundary 時觸發。",
+     "group_id": "enforcement_boundary",
+     "group_label": "Enforcement Boundary (enforcement_boundary.*)",
+     "id": "enforcement_boundary.update",
+     "label": "Enforcement邊界更新",
+     "related_events": [
+      "enforcement_boundary.create",
+      "enforcement_boundary.delete"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當全域防火牆設定被更新時觸發。",
+     "group_id": "firewall_settings",
+     "group_label": "防火牆設定 (firewall_settings.*)",
+     "id": "firewall_settings.update",
+     "label": "防火牆設定更新",
+     "related_events": [],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": "PCE 全域防火牆設定已變更（如記錄模式、預設拒絕規則）。高影響性事件，變更套用至整個系統。無子事件及相關生命週期事件。對任何意外變更設定警示。"
+    },
+    {
+     "description": "當建立新的 IP list 時觸發。",
+     "group_id": "ip_list",
+     "group_label": "IP List (ip_list.*)",
+     "id": "ip_list.create",
+     "label": "IP清單建立",
+     "related_events": [
+      "ip_list.delete",
+      "ip_list.update"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當刪除現有的單一 IP list 時觸發。",
+     "group_id": "ip_list",
+     "group_label": "IP List (ip_list.*)",
+     "id": "ip_list.delete",
+     "label": "IP清單刪除",
+     "related_events": [
+      "ip_list.create",
+      "ip_list.update"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當更新現有的 IP list 時觸發。",
+     "group_id": "ip_list",
+     "group_label": "IP List (ip_list.*)",
+     "id": "ip_list.update",
+     "label": "IP清單更新",
+     "related_events": [
+      "ip_list.create",
+      "ip_list.delete"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當批量刪除多個 IP list 時觸發。",
+     "group_id": "ip_lists",
+     "group_label": "IP Lists (ip_lists.*)",
+     "id": "ip_lists.delete",
+     "label": "批次IP清單刪除",
+     "related_events": [],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當建立自訂的 IP tables 規則時觸發。",
+     "group_id": "ip_tables_rule",
+     "group_label": "IP Tables 規則 (ip_tables_rule.*)",
+     "id": "ip_tables_rule.create",
+     "label": "IP表規則建立",
+     "related_events": [
+      "ip_tables_rule.delete",
+      "ip_tables_rule.update"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當刪除自訂的 IP tables 規則時觸發。",
+     "group_id": "ip_tables_rule",
+     "group_label": "IP Tables 規則 (ip_tables_rule.*)",
+     "id": "ip_tables_rule.delete",
+     "label": "IP表規則刪除",
+     "related_events": [
+      "ip_tables_rule.create",
+      "ip_tables_rule.update"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當更新自訂的 IP tables 規則時觸發。",
+     "group_id": "ip_tables_rule",
+     "group_label": "IP Tables 規則 (ip_tables_rule.*)",
+     "id": "ip_tables_rule.update",
+     "label": "IP表規則更新",
+     "related_events": [
+      "ip_tables_rule.create",
+      "ip_tables_rule.delete"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當建立新的 label 時觸發。",
+     "group_id": "label",
+     "group_label": "Label (label.*)",
+     "id": "label.create",
+     "label": "Label建立",
+     "related_events": [
+      "label.delete",
+      "label.update"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當單一 label 被刪除時觸發。",
+     "group_id": "label",
+     "group_label": "Label (label.*)",
+     "id": "label.delete",
+     "label": "Label刪除",
+     "related_events": [
+      "label.create",
+      "label.update"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當單一 label 被更新時觸發。",
+     "group_id": "label",
+     "group_label": "Label (label.*)",
+     "id": "label.update",
+     "label": "Label更新",
+     "related_events": [
+      "label.create",
+      "label.delete"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當 label group 被建立時觸發。",
+     "group_id": "label_group",
+     "group_label": "Label 群組 (label_group.*)",
+     "id": "label_group.create",
+     "label": "Label群組建立",
+     "related_events": [
+      "label_group.delete",
+      "label_group.update"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當 label group 被刪除時觸發。",
+     "group_id": "label_group",
+     "group_label": "Label 群組 (label_group.*)",
+     "id": "label_group.delete",
+     "label": "Label群組刪除",
+     "related_events": [
+      "label_group.create",
+      "label_group.update"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當 label group 被更新時觸發。",
+     "group_id": "label_group",
+     "group_label": "Label 群組 (label_group.*)",
+     "id": "label_group.update",
+     "label": "Label群組更新",
+     "related_events": [
+      "label_group.create",
+      "label_group.delete"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當多個 label 被刪除時觸發。",
+     "group_id": "labels",
+     "group_label": "Labels (labels.*)",
+     "id": "labels.delete",
+     "label": "刪除Labels",
+     "related_events": [],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當建立 pairing profile 時觸發。",
+     "group_id": "pairing_profile",
+     "group_label": "配對 Profile (pairing_profile.*)",
+     "id": "pairing_profile.create",
+     "label": "建立配對設定檔",
+     "related_events": [
+      "pairing_profile.create_pairing_key",
+      "pairing_profile.delete",
+      "pairing_profile.delete_all_pairing_keys",
+      "pairing_profile.update"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當 pairing profile 產生 pairing key 時觸發。",
+     "group_id": "pairing_profile",
+     "group_label": "配對 Profile (pairing_profile.*)",
+     "id": "pairing_profile.create_pairing_key",
+     "label": "建立配對金鑰",
+     "related_events": [
+      "pairing_profile.create",
+      "pairing_profile.delete",
+      "pairing_profile.delete_all_pairing_keys",
+      "pairing_profile.update"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當刪除 pairing profile 時觸發。",
+     "group_id": "pairing_profile",
+     "group_label": "配對 Profile (pairing_profile.*)",
+     "id": "pairing_profile.delete",
+     "label": "刪除配對設定檔",
+     "related_events": [
+      "pairing_profile.create",
+      "pairing_profile.create_pairing_key",
+      "pairing_profile.delete_all_pairing_keys",
+      "pairing_profile.update"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當刪除 pairing profile 中的所有 pairingkeys 時觸發。",
+     "group_id": "pairing_profile",
+     "group_label": "配對 Profile (pairing_profile.*)",
+     "id": "pairing_profile.delete_all_pairing_keys",
+     "label": "刪除所有配對金鑰",
+     "related_events": [
+      "pairing_profile.create",
+      "pairing_profile.create_pairing_key",
+      "pairing_profile.delete",
+      "pairing_profile.update"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當更新 pairing profile 時觸發。",
+     "group_id": "pairing_profile",
+     "group_label": "配對 Profile (pairing_profile.*)",
+     "id": "pairing_profile.update",
+     "label": "更新配對設定檔",
+     "related_events": [
+      "pairing_profile.create",
+      "pairing_profile.create_pairing_key",
+      "pairing_profile.delete",
+      "pairing_profile.delete_all_pairing_keys"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當刪除多個 pairing profile 時觸發。",
+     "group_id": "pairing_profiles",
+     "group_label": "配對 Profiles (pairing_profiles.*)",
+     "id": "pairing_profiles.delete",
+     "label": "批次刪除配對設定",
+     "related_events": [],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當建立 RBAC 權限時觸發。",
+     "group_id": "permission",
+     "group_label": "權限 (permission.*)",
+     "id": "permission.create",
+     "label": "建立權限",
+     "related_events": [
+      "permission.delete",
+      "permission.update"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當刪除 RBAC 權限時觸發。",
+     "group_id": "permission",
+     "group_label": "權限 (permission.*)",
+     "id": "permission.delete",
+     "label": "刪除權限",
+     "related_events": [
+      "permission.create",
+      "permission.update"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當更新 RBAC 權限時觸發。",
+     "group_id": "permission",
+     "group_label": "權限 (permission.*)",
+     "id": "permission.update",
+     "label": "更新權限",
+     "related_events": [
+      "permission.create",
+      "permission.delete"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當建立新的 rule set 時觸發。",
+     "group_id": "rule_set",
+     "group_label": "Ruleset (rule_set.*)",
+     "id": "rule_set.create",
+     "label": "Ruleset 已建立",
+     "related_events": [
+      "rule_set.delete",
+      "rule_set.update"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": "已建立新的 Rule Set。變更只有在 sec_policy.create（佈建）後才生效。搭配 rule_set.update 和 rule_set.delete 追蹤完整 Policy 生命週期；監控操作者以防未授權的 Policy 編寫。"
+    },
+    {
+     "description": "當刪除單一 rule set 時觸發。",
+     "group_id": "rule_set",
+     "group_label": "Ruleset (rule_set.*)",
+     "id": "rule_set.delete",
+     "label": "Ruleset 已刪除",
+     "related_events": [
+      "rule_set.create",
+      "rule_set.update"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": "Rule Set 已被刪除，佈建後無法復原。對意外刪除設定警示——此操作會移除安全規則的邏輯分組。搭配 rule_set.create 和 rule_set.update 追蹤完整生命週期。"
+    },
+    {
+     "description": "當更新已存在的 rule set 時觸發。",
+     "group_id": "rule_set",
+     "group_label": "Ruleset (rule_set.*)",
+     "id": "rule_set.update",
+     "label": "Ruleset 已更新",
+     "related_events": [
+      "rule_set.create",
+      "rule_set.delete"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": "現有 Rule Set 已被修改。變更為草稿狀態，需透過 sec_policy.create 佈建後才生效。搭配 rule_set.create 和 rule_set.delete；使用 status=failure 捕捉失敗的更新。"
+    },
+    {
+     "description": "當批次刪除多個 rule set 時觸發。",
+     "group_id": "rule_sets",
+     "group_label": "Rulesets (rule_sets.*)",
+     "id": "rule_sets.delete",
+     "label": "刪除Rule Set",
+     "related_events": [],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當建立與佈署安全政策時觸發。",
+     "group_id": "sec_policy",
+     "group_label": "Security Policy (sec_policy.*)",
+     "id": "sec_policy.create",
+     "label": "Policy Provision 已執行",
+     "related_events": [
+      "sec_policy.restore"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": "新 Policy 版本已佈建——即「提交」事件：PCE 為受影響的 workloads 重新計算 OS 層防火牆規則並通知其 VEN 取用更新，所有先前的規則及 Rule Set 變更在此生效。對意外佈建（非工作時間、未知操作者）設定警示。無子事件。"
+    },
+    {
+     "description": "當還原安全政策至先前版本時觸發。",
+     "group_id": "sec_policy",
+     "group_label": "Security Policy (sec_policy.*)",
+     "id": "sec_policy.restore",
+     "label": "Policy還原",
+     "related_events": [
+      "sec_policy.create"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當刪除尚未佈署的待處理安全政策時觸發。",
+     "group_id": "sec_policy_pending",
+     "group_label": "待生效 Security Policy (sec_policy_pending.*)",
+     "id": "sec_policy_pending.delete",
+     "label": "待處理Policy刪除",
+     "related_events": [],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當建立安全政策規則時觸發。",
+     "group_id": "sec_rule",
+     "group_label": "Security Rule (sec_rule.*)",
+     "id": "sec_rule.create",
+     "label": "Security 規則已建立",
+     "related_events": [
+      "sec_rule.delete",
+      "sec_rule.update"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": "在 Rule Set 中建立了個別安全規則，為草稿狀態，需佈建後才生效。搭配 sec_rule.update、sec_rule.delete，以及 sec_policy.create 佈建觸發器使用。"
+    },
+    {
+     "description": "當安全策略規則被刪除時觸發。",
+     "group_id": "sec_rule",
+     "group_label": "Security Rule (sec_rule.*)",
+     "id": "sec_rule.delete",
+     "label": "Security 規則已刪除",
+     "related_events": [
+      "sec_rule.create",
+      "sec_rule.update"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": "個別安全規則已被刪除——刪除規則會在佈建後擴展 Allow 的流量。請同時監控對應的 sec_policy.create 以掌握刪除何時生效。"
+    },
+    {
+     "description": "當安全策略規則被更新時觸發。",
+     "group_id": "sec_rule",
+     "group_label": "Security Rule (sec_rule.*)",
+     "id": "sec_rule.update",
+     "label": "Security 規則已更新",
+     "related_events": [
+      "sec_rule.create",
+      "sec_rule.delete"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": "現有安全規則已被修改，為草稿狀態，需佈建後才生效。搭配 sec_rule.create 和 sec_rule.delete；使用 status=failure 偵測編寫錯誤或權限問題。"
+    },
+    {
+     "description": "當 Service 被建立時觸發",
+     "group_id": "service",
+     "group_label": "Service (service.*)",
+     "id": "service.create",
+     "label": "Service建立",
+     "related_events": [
+      "service.delete",
+      "service.update"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當 Service 被刪除時觸發",
+     "group_id": "service",
+     "group_label": "Service (service.*)",
+     "id": "service.delete",
+     "label": "Service刪除",
+     "related_events": [
+      "service.create",
+      "service.update"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當 Service 被更新時觸發",
+     "group_id": "service",
+     "group_label": "Service (service.*)",
+     "id": "service.update",
+     "label": "Service更新",
+     "related_events": [
+      "service.create",
+      "service.delete"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當 Service 帳號被建立時觸發",
+     "group_id": "service_account",
+     "group_label": "Service 帳號 (service_account.*)",
+     "id": "service_account.create",
+     "label": "Service Account建立",
+     "related_events": [
+      "service_account.delete",
+      "service_account.update"
+     ],
+     "source": "local_extension",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當 Service 帳號被刪除時觸發",
+     "group_id": "service_account",
+     "group_label": "Service 帳號 (service_account.*)",
+     "id": "service_account.delete",
+     "label": "Service Account刪除",
+     "related_events": [
+      "service_account.create",
+      "service_account.update"
+     ],
+     "source": "local_extension",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當 Service 帳號被更新時觸發",
+     "group_id": "service_account",
+     "group_label": "Service 帳號 (service_account.*)",
+     "id": "service_account.update",
+     "label": "Service Account更新",
+     "related_events": [
+      "service_account.create",
+      "service_account.delete"
+     ],
+     "source": "local_extension",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當 Service binding 被建立時觸發",
+     "group_id": "service_binding",
+     "group_label": "Service 繫結 (service_binding.*)",
+     "id": "service_binding.create",
+     "label": "Service綁定建立",
+     "related_events": [
+      "service_binding.delete"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當單一 Service binding 被刪除時觸發",
+     "group_id": "service_binding",
+     "group_label": "Service 繫結 (service_binding.*)",
+     "id": "service_binding.delete",
+     "label": "Service綁定刪除",
+     "related_events": [
+      "service_binding.create"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當多個 Service binding 被刪除時觸發",
+     "group_id": "service_bindings",
+     "group_label": "Service 繫結 (service_bindings.*)",
+     "id": "service_bindings.delete",
+     "label": "批次Service綁定刪除",
+     "related_events": [],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當多個 Services 被刪除時觸發",
+     "group_id": "services",
+     "group_label": "Services (services.*)",
+     "id": "services.delete",
+     "label": "批次Services刪除",
+     "related_events": [],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當建立或更新受信任的 Proxy IP 時觸發",
+     "group_id": "trusted_proxy_ips",
+     "group_label": "受信任 Proxy IP (trusted_proxy_ips.*)",
+     "id": "trusted_proxy_ips.update",
+     "label": "更新Trusted Proxy",
+     "related_events": [],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    }
+   ],
+   "id": "Policy",
+   "label": "Policy"
+  },
+  {
+   "events": [
+    {
+     "description": "建立 container cluster 時被觸發",
+     "group_id": "container_cluster",
+     "group_label": "容器叢集 (container_cluster.*)",
+     "id": "container_cluster.create",
+     "label": "容器叢集建立",
+     "related_events": [
+      "container_cluster.delete",
+      "container_cluster.kubernetes_workloads_bulk_create",
+      "container_cluster.kubernetes_workloads_bulk_update",
+      "container_cluster.security_policy_acks",
+      "container_cluster.security_policy_applied",
+      "container_cluster.update",
+      "container_cluster.update_label_map",
+      "container_cluster.update_services"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "刪除 container cluster 時被觸發",
+     "group_id": "container_cluster",
+     "group_label": "容器叢集 (container_cluster.*)",
+     "id": "container_cluster.delete",
+     "label": "容器叢集刪除",
+     "related_events": [
+      "container_cluster.create",
+      "container_cluster.kubernetes_workloads_bulk_create",
+      "container_cluster.kubernetes_workloads_bulk_update",
+      "container_cluster.security_policy_acks",
+      "container_cluster.security_policy_applied",
+      "container_cluster.update",
+      "container_cluster.update_label_map",
+      "container_cluster.update_services"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "於 container cluster中批次建立 Kubernetes workload 時被觸發",
+     "group_id": "container_cluster",
+     "group_label": "容器叢集 (container_cluster.*)",
+     "id": "container_cluster.kubernetes_workloads_bulk_create",
+     "label": "批次建立Workloads",
+     "related_events": [
+      "container_cluster.create",
+      "container_cluster.delete",
+      "container_cluster.kubernetes_workloads_bulk_update",
+      "container_cluster.security_policy_acks",
+      "container_cluster.security_policy_applied",
+      "container_cluster.update",
+      "container_cluster.update_label_map",
+      "container_cluster.update_services"
+     ],
+     "source": "local_extension",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "於 container cluster中批次更新 Kubernetes workload 資訊時被觸發",
+     "group_id": "container_cluster",
+     "group_label": "容器叢集 (container_cluster.*)",
+     "id": "container_cluster.kubernetes_workloads_bulk_update",
+     "label": "批次更新Workloads",
+     "related_events": [
+      "container_cluster.create",
+      "container_cluster.delete",
+      "container_cluster.kubernetes_workloads_bulk_create",
+      "container_cluster.security_policy_acks",
+      "container_cluster.security_policy_applied",
+      "container_cluster.update",
+      "container_cluster.update_label_map",
+      "container_cluster.update_services"
+     ],
+     "source": "local_extension",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "container cluster 確認接收 (ACK)security policy 時被觸發",
+     "group_id": "container_cluster",
+     "group_label": "容器叢集 (container_cluster.*)",
+     "id": "container_cluster.security_policy_acks",
+     "label": "容器Policy確認",
+     "related_events": [
+      "container_cluster.create",
+      "container_cluster.delete",
+      "container_cluster.kubernetes_workloads_bulk_create",
+      "container_cluster.kubernetes_workloads_bulk_update",
+      "container_cluster.security_policy_applied",
+      "container_cluster.update",
+      "container_cluster.update_label_map",
+      "container_cluster.update_services"
+     ],
+     "source": "local_extension",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "container cluster 成功套用 securitypolicy 時被觸發",
+     "group_id": "container_cluster",
+     "group_label": "容器叢集 (container_cluster.*)",
+     "id": "container_cluster.security_policy_applied",
+     "label": "容器Policy套用",
+     "related_events": [
+      "container_cluster.create",
+      "container_cluster.delete",
+      "container_cluster.kubernetes_workloads_bulk_create",
+      "container_cluster.kubernetes_workloads_bulk_update",
+      "container_cluster.security_policy_acks",
+      "container_cluster.update",
+      "container_cluster.update_label_map",
+      "container_cluster.update_services"
+     ],
+     "source": "local_extension",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "更新 container cluster 資訊時被觸發",
+     "group_id": "container_cluster",
+     "group_label": "容器叢集 (container_cluster.*)",
+     "id": "container_cluster.update",
+     "label": "容器叢集更新",
+     "related_events": [
+      "container_cluster.create",
+      "container_cluster.delete",
+      "container_cluster.kubernetes_workloads_bulk_create",
+      "container_cluster.kubernetes_workloads_bulk_update",
+      "container_cluster.security_policy_acks",
+      "container_cluster.security_policy_applied",
+      "container_cluster.update_label_map",
+      "container_cluster.update_services"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "更新 container cluster 的 label對應規則時被觸發",
+     "group_id": "container_cluster",
+     "group_label": "容器叢集 (container_cluster.*)",
+     "id": "container_cluster.update_label_map",
+     "label": "Label映射更新",
+     "related_events": [
+      "container_cluster.create",
+      "container_cluster.delete",
+      "container_cluster.kubernetes_workloads_bulk_create",
+      "container_cluster.kubernetes_workloads_bulk_update",
+      "container_cluster.security_policy_acks",
+      "container_cluster.security_policy_applied",
+      "container_cluster.update",
+      "container_cluster.update_services"
+     ],
+     "source": "local_extension",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "透過 Kubelink 更新 container cluster 的services 資訊時被觸發",
+     "group_id": "container_cluster",
+     "group_label": "容器叢集 (container_cluster.*)",
+     "id": "container_cluster.update_services",
+     "label": "容器Services更新",
+     "related_events": [
+      "container_cluster.create",
+      "container_cluster.delete",
+      "container_cluster.kubernetes_workloads_bulk_create",
+      "container_cluster.kubernetes_workloads_bulk_update",
+      "container_cluster.security_policy_acks",
+      "container_cluster.security_policy_applied",
+      "container_cluster.update",
+      "container_cluster.update_label_map"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "更新 container workload 資訊時被觸發",
+     "group_id": "container_workload",
+     "group_label": "容器 Workload (container_workload.*)",
+     "id": "container_workload.update",
+     "label": "容器Workload更新",
+     "related_events": [],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "建立 container workload profile 時被觸發",
+     "group_id": "container_workload_profile",
+     "group_label": "容器 Workload Profile (container_workload_profile.*)",
+     "id": "container_workload_profile.create",
+     "label": "Workload配置建立",
+     "related_events": [
+      "container_workload_profile.delete",
+      "container_workload_profile.update"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "刪除 container workload profile 時被觸發",
+     "group_id": "container_workload_profile",
+     "group_label": "容器 Workload Profile (container_workload_profile.*)",
+     "id": "container_workload_profile.delete",
+     "label": "Workload配置刪除",
+     "related_events": [
+      "container_workload_profile.create",
+      "container_workload_profile.update"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當 container workload profile 被更新時觸發。",
+     "group_id": "container_workload_profile",
+     "group_label": "容器 Workload Profile (container_workload_profile.*)",
+     "id": "container_workload_profile.update",
+     "label": "Workload配置更新",
+     "related_events": [
+      "container_workload_profile.create",
+      "container_workload_profile.delete"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當 Virtual Enforcement Node (VEN) 設定被更新時觸發",
+     "group_id": "ven_settings",
+     "group_label": "VEN 設定 (ven_settings.*)",
+     "id": "ven_settings.update",
+     "label": "更新VEN設定",
+     "related_events": [],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當 Virtual Enforcement Node (VEN) 軟體版本升級時觸發",
+     "group_id": "ven_software",
+     "group_label": "VEN 軟體 (ven_software.*)",
+     "id": "ven_software.upgrade",
+     "label": "升級VEN",
+     "related_events": [],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當新增 Virtual Enforcement Node (VEN) 軟體發行版本時觸發",
+     "group_id": "ven_software_release",
+     "group_label": "VEN 軟體版本 (ven_software_release.*)",
+     "id": "ven_software_release.create",
+     "label": "建立VEN版本",
+     "related_events": [
+      "ven_software_release.delete",
+      "ven_software_release.deploy",
+      "ven_software_release.update"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當刪除 Virtual Enforcement Node (VEN) 軟體發行版本時觸發",
+     "group_id": "ven_software_release",
+     "group_label": "VEN 軟體版本 (ven_software_release.*)",
+     "id": "ven_software_release.delete",
+     "label": "刪除VEN版本",
+     "related_events": [
+      "ven_software_release.create",
+      "ven_software_release.deploy",
+      "ven_software_release.update"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當部署 Virtual Enforcement Node (VEN) 軟體發行版本時觸發",
+     "group_id": "ven_software_release",
+     "group_label": "VEN 軟體版本 (ven_software_release.*)",
+     "id": "ven_software_release.deploy",
+     "label": "部署VEN版本",
+     "related_events": [
+      "ven_software_release.create",
+      "ven_software_release.delete",
+      "ven_software_release.update"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當更新 Virtual Enforcement Node (VEN) 軟體發行版本時觸發",
+     "group_id": "ven_software_release",
+     "group_label": "VEN 軟體版本 (ven_software_release.*)",
+     "id": "ven_software_release.update",
+     "label": "更新VEN版本",
+     "related_events": [
+      "ven_software_release.create",
+      "ven_software_release.delete",
+      "ven_software_release.deploy"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "設定預設的 VEN 軟體版本",
+     "group_id": "ven_software_releases",
+     "group_label": "VEN 軟體版本 (ven_software_releases.*)",
+     "id": "ven_software_releases.set_default_version",
+     "label": "預設VEN版本",
+     "related_events": [],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當 Workload 被建立時觸發",
+     "group_id": "workload",
+     "group_label": "Workload (workload.*)",
+     "id": "workload.create",
+     "label": "建立Workload",
+     "related_events": [
+      "workload.delete",
+      "workload.online",
+      "workload.recalc_rules",
+      "workload.redetect_network",
+      "workload.undelete",
+      "workload.update",
+      "workload.upgrade"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當 Workload 被刪除時觸發",
+     "group_id": "workload",
+     "group_label": "Workload (workload.*)",
+     "id": "workload.delete",
+     "label": "刪除Workload",
+     "related_events": [
+      "workload.create",
+      "workload.online",
+      "workload.recalc_rules",
+      "workload.redetect_network",
+      "workload.undelete",
+      "workload.update",
+      "workload.upgrade"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當 Workload 上線時觸發",
+     "group_id": "workload",
+     "group_label": "Workload (workload.*)",
+     "id": "workload.online",
+     "label": "Workload Online",
+     "related_events": [
+      "workload.create",
+      "workload.delete",
+      "workload.recalc_rules",
+      "workload.redetect_network",
+      "workload.undelete",
+      "workload.update",
+      "workload.upgrade"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當重新計算 Workload 的安全原則時觸發",
+     "group_id": "workload",
+     "group_label": "Workload (workload.*)",
+     "id": "workload.recalc_rules",
+     "label": "重算Workload Policy",
+     "related_events": [
+      "workload.create",
+      "workload.delete",
+      "workload.online",
+      "workload.redetect_network",
+      "workload.undelete",
+      "workload.update",
+      "workload.upgrade"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當重新偵測 Workload 網路時觸發",
+     "group_id": "workload",
+     "group_label": "Workload (workload.*)",
+     "id": "workload.redetect_network",
+     "label": "重偵測Workload網路",
+     "related_events": [
+      "workload.create",
+      "workload.delete",
+      "workload.online",
+      "workload.recalc_rules",
+      "workload.undelete",
+      "workload.update",
+      "workload.upgrade"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當復原已刪除的 Workload 時觸發",
+     "group_id": "workload",
+     "group_label": "Workload (workload.*)",
+     "id": "workload.undelete",
+     "label": "復原Workload",
+     "related_events": [
+      "workload.create",
+      "workload.delete",
+      "workload.online",
+      "workload.recalc_rules",
+      "workload.redetect_network",
+      "workload.update",
+      "workload.upgrade"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當更新 Workload 設定時觸發",
+     "group_id": "workload",
+     "group_label": "Workload (workload.*)",
+     "id": "workload.update",
+     "label": "更新Workload",
+     "related_events": [
+      "workload.create",
+      "workload.delete",
+      "workload.online",
+      "workload.recalc_rules",
+      "workload.redetect_network",
+      "workload.undelete",
+      "workload.upgrade"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當 Workload 升級時觸發",
+     "group_id": "workload",
+     "group_label": "Workload (workload.*)",
+     "id": "workload.upgrade",
+     "label": "升級Workload",
+     "related_events": [
+      "workload.create",
+      "workload.delete",
+      "workload.online",
+      "workload.recalc_rules",
+      "workload.redetect_network",
+      "workload.undelete",
+      "workload.update"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當 Workload interface 被建立時觸發",
+     "group_id": "workload_interface",
+     "group_label": "Workload 介面 (workload_interface.*)",
+     "id": "workload_interface.create",
+     "label": "建立Workload介面",
+     "related_events": [
+      "workload_interface.delete",
+      "workload_interface.update"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當 Workload interface 被刪除時觸發",
+     "group_id": "workload_interface",
+     "group_label": "Workload 介面 (workload_interface.*)",
+     "id": "workload_interface.delete",
+     "label": "刪除Workload介面",
+     "related_events": [
+      "workload_interface.create",
+      "workload_interface.update"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當 Workload interface 被更新時觸發",
+     "group_id": "workload_interface",
+     "group_label": "Workload 介面 (workload_interface.*)",
+     "id": "workload_interface.update",
+     "label": "更新Workload介面",
+     "related_events": [
+      "workload_interface.create",
+      "workload_interface.delete"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當 workload 的網路介面被更新（例如 IP位址變更、新增或關閉介面）時觸發。",
+     "group_id": "workload_interfaces",
+     "group_label": "Workload 介面 (workload_interfaces.*)",
+     "id": "workload_interfaces.update",
+     "label": "批次更新Workload介面",
+     "related_events": [],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當 workload 的服務報告被更新時觸發。",
+     "group_id": "workload_service_report",
+     "group_label": "Workload Service 報告 (workload_service_report.*)",
+     "id": "workload_service_report.update",
+     "label": "更新Workload Service報告",
+     "related_events": [],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當 workload 的設定被更新時觸發。",
+     "group_id": "workload_settings",
+     "group_label": "Workload 設定 (workload_settings.*)",
+     "id": "workload_settings.update",
+     "label": "更新Workload設定",
+     "related_events": [],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當安全性政策被套用至多個 workload 時觸發。",
+     "group_id": "workloads",
+     "group_label": "Workloads (workloads.*)",
+     "id": "workloads.apply_policy",
+     "label": "Workloads套用Policy",
+     "related_events": [
+      "workloads.bulk_create",
+      "workloads.bulk_delete",
+      "workloads.bulk_update",
+      "workloads.remove_labels",
+      "workloads.set_flow_reporting_frequency",
+      "workloads.set_labels",
+      "workloads.unpair",
+      "workloads.update"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當以批次方式建立多個 workload 時觸發。",
+     "group_id": "workloads",
+     "group_label": "Workloads (workloads.*)",
+     "id": "workloads.bulk_create",
+     "label": "批次建立Workloads",
+     "related_events": [
+      "workloads.apply_policy",
+      "workloads.bulk_delete",
+      "workloads.bulk_update",
+      "workloads.remove_labels",
+      "workloads.set_flow_reporting_frequency",
+      "workloads.set_labels",
+      "workloads.unpair",
+      "workloads.update"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當以批次方式刪除多個 workload 時觸發。",
+     "group_id": "workloads",
+     "group_label": "Workloads (workloads.*)",
+     "id": "workloads.bulk_delete",
+     "label": "批次刪除Workloads",
+     "related_events": [
+      "workloads.apply_policy",
+      "workloads.bulk_create",
+      "workloads.bulk_update",
+      "workloads.remove_labels",
+      "workloads.set_flow_reporting_frequency",
+      "workloads.set_labels",
+      "workloads.unpair",
+      "workloads.update"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當以批次方式更新多個 workload 時觸發。",
+     "group_id": "workloads",
+     "group_label": "Workloads (workloads.*)",
+     "id": "workloads.bulk_update",
+     "label": "批次更新Workloads",
+     "related_events": [
+      "workloads.apply_policy",
+      "workloads.bulk_create",
+      "workloads.bulk_delete",
+      "workloads.remove_labels",
+      "workloads.set_flow_reporting_frequency",
+      "workloads.set_labels",
+      "workloads.unpair",
+      "workloads.update"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當從多個 workload 上移除 label 時觸發。",
+     "group_id": "workloads",
+     "group_label": "Workloads (workloads.*)",
+     "id": "workloads.remove_labels",
+     "label": "Workloads移除Labels",
+     "related_events": [
+      "workloads.apply_policy",
+      "workloads.bulk_create",
+      "workloads.bulk_delete",
+      "workloads.bulk_update",
+      "workloads.set_flow_reporting_frequency",
+      "workloads.set_labels",
+      "workloads.unpair",
+      "workloads.update"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當變更 workload 的流量回報頻率時觸發。",
+     "group_id": "workloads",
+     "group_label": "Workloads (workloads.*)",
+     "id": "workloads.set_flow_reporting_frequency",
+     "label": "Workloads流量回報頻率",
+     "related_events": [
+      "workloads.apply_policy",
+      "workloads.bulk_create",
+      "workloads.bulk_delete",
+      "workloads.bulk_update",
+      "workloads.remove_labels",
+      "workloads.set_labels",
+      "workloads.unpair",
+      "workloads.update"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當套用 label 至多個 workload 時觸發。",
+     "group_id": "workloads",
+     "group_label": "Workloads (workloads.*)",
+     "id": "workloads.set_labels",
+     "label": "Workloads設定Labels",
+     "related_events": [
+      "workloads.apply_policy",
+      "workloads.bulk_create",
+      "workloads.bulk_delete",
+      "workloads.bulk_update",
+      "workloads.remove_labels",
+      "workloads.set_flow_reporting_frequency",
+      "workloads.unpair",
+      "workloads.update"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當多個 workload 被解除配對時觸發。",
+     "group_id": "workloads",
+     "group_label": "Workloads (workloads.*)",
+     "id": "workloads.unpair",
+     "label": "Workloads解除配對",
+     "related_events": [
+      "workloads.apply_policy",
+      "workloads.bulk_create",
+      "workloads.bulk_delete",
+      "workloads.bulk_update",
+      "workloads.remove_labels",
+      "workloads.set_flow_reporting_frequency",
+      "workloads.set_labels",
+      "workloads.update"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": "一個或多個 Workload 已從 PCE 取消 Manage（VEN 已移除），通常伴隨 agent.deactivate。對批量解除配對設定警示（高數量）——可能表示設定錯誤或未授權下線。"
+    },
+    {
+     "description": "當多個 workload 被更新時觸發。",
+     "group_id": "workloads",
+     "group_label": "Workloads (workloads.*)",
+     "id": "workloads.update",
+     "label": "Workloads更新",
+     "related_events": [
+      "workloads.apply_policy",
+      "workloads.bulk_create",
+      "workloads.bulk_delete",
+      "workloads.bulk_update",
+      "workloads.remove_labels",
+      "workloads.set_flow_reporting_frequency",
+      "workloads.set_labels",
+      "workloads.unpair"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    }
+   ],
+   "id": "Containers & Workloads",
+   "label": "容器與 Workloads"
+  },
+  {
+   "events": [
+    {
+     "description": "當建立 network 時觸發",
+     "group_id": "network",
+     "group_label": "網路 (network.*)",
+     "id": "network.create",
+     "label": "建立網路",
+     "related_events": [
+      "network.delete",
+      "network.update"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當刪除 network 時觸發",
+     "group_id": "network",
+     "group_label": "網路 (network.*)",
+     "id": "network.delete",
+     "label": "刪除網路",
+     "related_events": [
+      "network.create",
+      "network.update"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當更新 network 時觸發",
+     "group_id": "network",
+     "group_label": "網路 (network.*)",
+     "id": "network.update",
+     "label": "更新網路",
+     "related_events": [
+      "network.create",
+      "network.delete"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當 network device確認已套用強制執行指示時觸發",
+     "group_id": "network_device",
+     "group_label": "網路裝置 (network_device.*)",
+     "id": "network_device.ack_enforcement_instructions_applied",
+     "label": "設備確認Enforcement指令",
+     "related_events": [
+      "network_device.assign_workload",
+      "network_device.create",
+      "network_device.delete",
+      "network_device.update"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當現有或新增的非受管 workload 指派給 networkdevice 時觸發",
+     "group_id": "network_device",
+     "group_label": "網路裝置 (network_device.*)",
+     "id": "network_device.assign_workload",
+     "label": "指派Workload",
+     "related_events": [
+      "network_device.ack_enforcement_instructions_applied",
+      "network_device.create",
+      "network_device.delete",
+      "network_device.update"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當建立 network device 時觸發",
+     "group_id": "network_device",
+     "group_label": "網路裝置 (network_device.*)",
+     "id": "network_device.create",
+     "label": "建立網路設備",
+     "related_events": [
+      "network_device.ack_enforcement_instructions_applied",
+      "network_device.assign_workload",
+      "network_device.delete",
+      "network_device.update"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當刪除 network device 時觸發",
+     "group_id": "network_device",
+     "group_label": "網路裝置 (network_device.*)",
+     "id": "network_device.delete",
+     "label": "刪除網路設備",
+     "related_events": [
+      "network_device.ack_enforcement_instructions_applied",
+      "network_device.assign_workload",
+      "network_device.create",
+      "network_device.update"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當更新 network device 時觸發",
+     "group_id": "network_device",
+     "group_label": "網路裝置 (network_device.*)",
+     "id": "network_device.update",
+     "label": "更新網路設備",
+     "related_events": [
+      "network_device.ack_enforcement_instructions_applied",
+      "network_device.assign_workload",
+      "network_device.create",
+      "network_device.delete"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當多個 network device 確認已套用 Enforcement 指示時觸發",
+     "group_id": "network_devices",
+     "group_label": "網路裝置 (network_devices.*)",
+     "id": "network_devices.ack_multi_enforcement_instructions_applied",
+     "label": "多設備Enforcement指令確認",
+     "related_events": [],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當建立 network endpoint 時觸發",
+     "group_id": "network_endpoint",
+     "group_label": "網路端點 (network_endpoint.*)",
+     "id": "network_endpoint.create",
+     "label": "建立網路端點",
+     "related_events": [
+      "network_endpoint.delete",
+      "network_endpoint.update"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當刪除 network endpoint 時觸發",
+     "group_id": "network_endpoint",
+     "group_label": "網路端點 (network_endpoint.*)",
+     "id": "network_endpoint.delete",
+     "label": "刪除網路端點",
+     "related_events": [
+      "network_endpoint.create",
+      "network_endpoint.update"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當更新 network endpoint 時觸發",
+     "group_id": "network_endpoint",
+     "group_label": "網路端點 (network_endpoint.*)",
+     "id": "network_endpoint.update",
+     "label": "更新網路端點",
+     "related_events": [
+      "network_endpoint.create",
+      "network_endpoint.delete"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當啟動 network enforcement node (NEN) 時觸發",
+     "group_id": "network_enforcement_node",
+     "group_label": "網路 Enforcement 節點 (network_enforcement_node.*)",
+     "id": "network_enforcement_node.activate",
+     "label": "Network Enforcement Node啟用",
+     "related_events": [
+      "network_enforcement_node.clear_conditions",
+      "network_enforcement_node.deactivate",
+      "network_enforcement_node.degraded",
+      "network_enforcement_node.missed_heartbeats",
+      "network_enforcement_node.missed_heartbeats_check",
+      "network_enforcement_node.network_devices_network_endpoints_workloads",
+      "network_enforcement_node.policy_ack",
+      "network_enforcement_node.request_policy",
+      "network_enforcement_node.update_status"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當清除 network enforcement node (NEN)的異常條件狀態時觸發",
+     "group_id": "network_enforcement_node",
+     "group_label": "網路 Enforcement 節點 (network_enforcement_node.*)",
+     "id": "network_enforcement_node.clear_conditions",
+     "label": "Network Enforcement Node清除條件",
+     "related_events": [
+      "network_enforcement_node.activate",
+      "network_enforcement_node.deactivate",
+      "network_enforcement_node.degraded",
+      "network_enforcement_node.missed_heartbeats",
+      "network_enforcement_node.missed_heartbeats_check",
+      "network_enforcement_node.network_devices_network_endpoints_workloads",
+      "network_enforcement_node.policy_ack",
+      "network_enforcement_node.request_policy",
+      "network_enforcement_node.update_status"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當停用 network enforcement node (NEN)時觸發",
+     "group_id": "network_enforcement_node",
+     "group_label": "網路 Enforcement 節點 (network_enforcement_node.*)",
+     "id": "network_enforcement_node.deactivate",
+     "label": "Network Enforcement Node停用",
+     "related_events": [
+      "network_enforcement_node.activate",
+      "network_enforcement_node.clear_conditions",
+      "network_enforcement_node.degraded",
+      "network_enforcement_node.missed_heartbeats",
+      "network_enforcement_node.missed_heartbeats_check",
+      "network_enforcement_node.network_devices_network_endpoints_workloads",
+      "network_enforcement_node.policy_ack",
+      "network_enforcement_node.request_policy",
+      "network_enforcement_node.update_status"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當 network enforcement node (NEN)進入降級狀態時觸發",
+     "group_id": "network_enforcement_node",
+     "group_label": "網路 Enforcement 節點 (network_enforcement_node.*)",
+     "id": "network_enforcement_node.degraded",
+     "label": "Network Enforcement Node降級",
+     "related_events": [
+      "network_enforcement_node.activate",
+      "network_enforcement_node.clear_conditions",
+      "network_enforcement_node.deactivate",
+      "network_enforcement_node.missed_heartbeats",
+      "network_enforcement_node.missed_heartbeats_check",
+      "network_enforcement_node.network_devices_network_endpoints_workloads",
+      "network_enforcement_node.policy_ack",
+      "network_enforcement_node.request_policy",
+      "network_enforcement_node.update_status"
+     ],
+     "source": "local_extension",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": "NEN 處於降級狀態，可能無法正確執行 Policy，為 network_enforcement_node.missed_heartbeats 的升級事件。需立即採取行動——網路裝置可能在未套用最新 Policy 的情況下運作。（此事件型別未見於官方事件清單，語意為實測觀察推定。）"
+    },
+    {
+     "description": "當 network enforcement node (NEN)錯失 heartbeats 時觸發",
+     "group_id": "network_enforcement_node",
+     "group_label": "網路 Enforcement 節點 (network_enforcement_node.*)",
+     "id": "network_enforcement_node.missed_heartbeats",
+     "label": "Network Enforcement Node遺失心跳",
+     "related_events": [
+      "network_enforcement_node.activate",
+      "network_enforcement_node.clear_conditions",
+      "network_enforcement_node.deactivate",
+      "network_enforcement_node.degraded",
+      "network_enforcement_node.missed_heartbeats_check",
+      "network_enforcement_node.network_devices_network_endpoints_workloads",
+      "network_enforcement_node.policy_ack",
+      "network_enforcement_node.request_policy",
+      "network_enforcement_node.update_status"
+     ],
+     "source": "local_extension",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": "NEN 遺漏了預期的心跳信號，是完全降級前的早期預警。搭配 network_enforcement_node.degraded 追蹤進程；提早警示以預防網路裝置上的 Policy 執行失敗。（此事件型別未見於官方事件清單，語意為實測觀察推定。）"
+    },
+    {
+     "description": "當系統檢查 network enforcementnode (NEN) 是否錯失 heartbeats 時觸發",
+     "group_id": "network_enforcement_node",
+     "group_label": "網路 Enforcement 節點 (network_enforcement_node.*)",
+     "id": "network_enforcement_node.missed_heartbeats_check",
+     "label": "Network Enforcement Node心跳檢查",
+     "related_events": [
+      "network_enforcement_node.activate",
+      "network_enforcement_node.clear_conditions",
+      "network_enforcement_node.deactivate",
+      "network_enforcement_node.degraded",
+      "network_enforcement_node.missed_heartbeats",
+      "network_enforcement_node.network_devices_network_endpoints_workloads",
+      "network_enforcement_node.policy_ack",
+      "network_enforcement_node.request_policy",
+      "network_enforcement_node.update_status"
+     ],
+     "source": "local_extension",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當workload 被加入到 network endpoint 時觸發",
+     "group_id": "network_enforcement_node",
+     "group_label": "網路 Enforcement 節點 (network_enforcement_node.*)",
+     "id": "network_enforcement_node.network_devices_network_endpoints_workloads",
+     "label": "Network Enforcement Node端點新增Workloads",
+     "related_events": [
+      "network_enforcement_node.activate",
+      "network_enforcement_node.clear_conditions",
+      "network_enforcement_node.deactivate",
+      "network_enforcement_node.degraded",
+      "network_enforcement_node.missed_heartbeats",
+      "network_enforcement_node.missed_heartbeats_check",
+      "network_enforcement_node.policy_ack",
+      "network_enforcement_node.request_policy",
+      "network_enforcement_node.update_status"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當 network enforcement node (NEN) 確認收到policy 時觸發",
+     "group_id": "network_enforcement_node",
+     "group_label": "網路 Enforcement 節點 (network_enforcement_node.*)",
+     "id": "network_enforcement_node.policy_ack",
+     "label": "Network Enforcement Node確認Policy",
+     "related_events": [
+      "network_enforcement_node.activate",
+      "network_enforcement_node.clear_conditions",
+      "network_enforcement_node.deactivate",
+      "network_enforcement_node.degraded",
+      "network_enforcement_node.missed_heartbeats",
+      "network_enforcement_node.missed_heartbeats_check",
+      "network_enforcement_node.network_devices_network_endpoints_workloads",
+      "network_enforcement_node.request_policy",
+      "network_enforcement_node.update_status"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當 network enforcement node (NEN) 請求policy 時觸發",
+     "group_id": "network_enforcement_node",
+     "group_label": "網路 Enforcement 節點 (network_enforcement_node.*)",
+     "id": "network_enforcement_node.request_policy",
+     "label": "Network Enforcement Node請求Policy",
+     "related_events": [
+      "network_enforcement_node.activate",
+      "network_enforcement_node.clear_conditions",
+      "network_enforcement_node.deactivate",
+      "network_enforcement_node.degraded",
+      "network_enforcement_node.missed_heartbeats",
+      "network_enforcement_node.missed_heartbeats_check",
+      "network_enforcement_node.network_devices_network_endpoints_workloads",
+      "network_enforcement_node.policy_ack",
+      "network_enforcement_node.update_status"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當 Network Enforcement Node回報無法連線到 switch 時觸發。",
+     "group_id": "network_enforcement_node",
+     "group_label": "網路 Enforcement 節點 (network_enforcement_node.*)",
+     "id": "network_enforcement_node.update_status",
+     "label": "更新Network Enforcement Node狀態",
+     "related_events": [
+      "network_enforcement_node.activate",
+      "network_enforcement_node.clear_conditions",
+      "network_enforcement_node.deactivate",
+      "network_enforcement_node.degraded",
+      "network_enforcement_node.missed_heartbeats",
+      "network_enforcement_node.missed_heartbeats_check",
+      "network_enforcement_node.network_devices_network_endpoints_workloads",
+      "network_enforcement_node.policy_ack",
+      "network_enforcement_node.request_policy"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當多個 Network Enforcement Node的狀態條件被清除時觸發。",
+     "group_id": "network_enforcement_nodes",
+     "group_label": "網路 Enforcement 節點 (network_enforcement_nodes.*)",
+     "id": "network_enforcement_nodes.clear_conditions",
+     "label": "Network Enforcement Nodes清除條件",
+     "related_events": [],
+     "source": "local_extension",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當建立 Network Function Controller 時觸發。",
+     "group_id": "nfc",
+     "group_label": "NFC (nfc.*)",
+     "id": "nfc.activate",
+     "label": "啟用NFC",
+     "related_events": [
+      "nfc.delete",
+      "nfc.update_discovered_virtual_servers",
+      "nfc.update_policy_status",
+      "nfc.update_slb_state"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當刪除 Network Function Controller 時觸發。",
+     "group_id": "nfc",
+     "group_label": "NFC (nfc.*)",
+     "id": "nfc.delete",
+     "label": "刪除NFC",
+     "related_events": [
+      "nfc.activate",
+      "nfc.update_discovered_virtual_servers",
+      "nfc.update_policy_status",
+      "nfc.update_slb_state"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當 Network Function Controller 發現virtual server 時觸發。",
+     "group_id": "nfc",
+     "group_label": "NFC (nfc.*)",
+     "id": "nfc.update_discovered_virtual_servers",
+     "label": "發現虛擬伺服器",
+     "related_events": [
+      "nfc.activate",
+      "nfc.delete",
+      "nfc.update_policy_status",
+      "nfc.update_slb_state"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當 Network Function Controller 的 policy狀態更新時觸發。",
+     "group_id": "nfc",
+     "group_label": "NFC (nfc.*)",
+     "id": "nfc.update_policy_status",
+     "label": "更新NFC Policy",
+     "related_events": [
+      "nfc.activate",
+      "nfc.delete",
+      "nfc.update_discovered_virtual_servers",
+      "nfc.update_slb_state"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當 Network Function Controller 的 Server Load Balancer(SLB) 狀態更新時觸發。",
+     "group_id": "nfc",
+     "group_label": "NFC (nfc.*)",
+     "id": "nfc.update_slb_state",
+     "label": "更新SLB狀態",
+     "related_events": [
+      "nfc.activate",
+      "nfc.delete",
+      "nfc.update_discovered_virtual_servers",
+      "nfc.update_policy_status"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當 SecureConnect 閘道器被建立時觸發。",
+     "group_id": "secure_connect_gateway",
+     "group_label": "Secure Connect Gateway (secure_connect_gateway.*)",
+     "id": "secure_connect_gateway.create",
+     "label": "安全連線閘道建立",
+     "related_events": [
+      "secure_connect_gateway.delete",
+      "secure_connect_gateway.update"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當 SecureConnect 閘道器被刪除時觸發。",
+     "group_id": "secure_connect_gateway",
+     "group_label": "Secure Connect Gateway (secure_connect_gateway.*)",
+     "id": "secure_connect_gateway.delete",
+     "label": "安全連線閘道刪除",
+     "related_events": [
+      "secure_connect_gateway.create",
+      "secure_connect_gateway.update"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當 SecureConnect 閘道器被更新時觸發。",
+     "group_id": "secure_connect_gateway",
+     "group_label": "Secure Connect Gateway (secure_connect_gateway.*)",
+     "id": "secure_connect_gateway.update",
+     "label": "安全連線閘道更新",
+     "related_events": [
+      "secure_connect_gateway.create",
+      "secure_connect_gateway.delete"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當伺服器負載平衡器（SLB）被建立時觸發。",
+     "group_id": "slb",
+     "group_label": "SLB (slb.*)",
+     "id": "slb.create",
+     "label": "SLB建立",
+     "related_events": [
+      "slb.delete",
+      "slb.update"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當伺服器負載平衡器（SLB）被刪除時觸發。",
+     "group_id": "slb",
+     "group_label": "SLB (slb.*)",
+     "id": "slb.delete",
+     "label": "刪除SLB",
+     "related_events": [
+      "slb.create",
+      "slb.update"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當伺服器負載平衡器（SLB）被更新時觸發。",
+     "group_id": "slb",
+     "group_label": "SLB (slb.*)",
+     "id": "slb.update",
+     "label": "更新SLB",
+     "related_events": [
+      "slb.create",
+      "slb.delete"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當遠端 syslog 目的地被建立時觸發。",
+     "group_id": "syslog_destination",
+     "group_label": "Syslog 目的端 (syslog_destination.*)",
+     "id": "syslog_destination.create",
+     "label": "建立Syslog目標",
+     "related_events": [
+      "syslog_destination.delete",
+      "syslog_destination.update"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當刪除 syslog 遠端目的地時觸發",
+     "group_id": "syslog_destination",
+     "group_label": "Syslog 目的端 (syslog_destination.*)",
+     "id": "syslog_destination.delete",
+     "label": "刪除Syslog目標",
+     "related_events": [
+      "syslog_destination.create",
+      "syslog_destination.update"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當更新 syslog 遠端目的地設定時觸發",
+     "group_id": "syslog_destination",
+     "group_label": "Syslog 目的端 (syslog_destination.*)",
+     "id": "syslog_destination.update",
+     "label": "更新Syslog目標",
+     "related_events": [
+      "syslog_destination.create",
+      "syslog_destination.delete"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當建立 traffic collector 設定時觸發",
+     "group_id": "traffic_collector_setting",
+     "group_label": "流量收集器設定 (traffic_collector_setting.*)",
+     "id": "traffic_collector_setting.create",
+     "label": "建立流量收集設定",
+     "related_events": [
+      "traffic_collector_setting.delete",
+      "traffic_collector_setting.update"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當刪除 traffic collector 設定時觸發",
+     "group_id": "traffic_collector_setting",
+     "group_label": "流量收集器設定 (traffic_collector_setting.*)",
+     "id": "traffic_collector_setting.delete",
+     "label": "刪除流量收集設定",
+     "related_events": [
+      "traffic_collector_setting.create",
+      "traffic_collector_setting.update"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當更新 traffic collector 設定時觸發",
+     "group_id": "traffic_collector_setting",
+     "group_label": "流量收集器設定 (traffic_collector_setting.*)",
+     "id": "traffic_collector_setting.update",
+     "label": "更新流量收集設定",
+     "related_events": [
+      "traffic_collector_setting.create",
+      "traffic_collector_setting.delete"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "建立 virtual server",
+     "group_id": "virtual_server",
+     "group_label": "虛擬伺服器 (virtual_server.*)",
+     "id": "virtual_server.create",
+     "label": "建立虛擬伺服器",
+     "related_events": [
+      "virtual_server.delete",
+      "virtual_server.update"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "刪除 virtual server",
+     "group_id": "virtual_server",
+     "group_label": "虛擬伺服器 (virtual_server.*)",
+     "id": "virtual_server.delete",
+     "label": "刪除虛擬伺服器",
+     "related_events": [
+      "virtual_server.create",
+      "virtual_server.update"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "更新 virtual server",
+     "group_id": "virtual_server",
+     "group_label": "虛擬伺服器 (virtual_server.*)",
+     "id": "virtual_server.update",
+     "label": "更新Virtual Server",
+     "related_events": [
+      "virtual_server.create",
+      "virtual_server.delete"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "建立 virtual service",
+     "group_id": "virtual_service",
+     "group_label": "Virtual Service (virtual_service.*)",
+     "id": "virtual_service.create",
+     "label": "建立Virtual Service",
+     "related_events": [
+      "virtual_service.delete",
+      "virtual_service.update"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "刪除 virtual service",
+     "group_id": "virtual_service",
+     "group_label": "Virtual Service (virtual_service.*)",
+     "id": "virtual_service.delete",
+     "label": "刪除Virtual Service",
+     "related_events": [
+      "virtual_service.create",
+      "virtual_service.update"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "更新 virtual service",
+     "group_id": "virtual_service",
+     "group_label": "Virtual Service (virtual_service.*)",
+     "id": "virtual_service.update",
+     "label": "更新Virtual Service",
+     "related_events": [
+      "virtual_service.create",
+      "virtual_service.delete"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "批次建立 virtual services",
+     "group_id": "virtual_services",
+     "group_label": "Virtual Services (virtual_services.*)",
+     "id": "virtual_services.bulk_create",
+     "label": "批次建立Virtual Services",
+     "related_events": [
+      "virtual_services.bulk_update"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "批次更新 virtual services",
+     "group_id": "virtual_services",
+     "group_label": "Virtual Services (virtual_services.*)",
+     "id": "virtual_services.bulk_update",
+     "label": "批次更新Virtual Services",
+     "related_events": [
+      "virtual_services.bulk_create"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    }
+   ],
+   "id": "Network & Integrations",
+   "label": "網路與整合"
+  },
+  {
+   "events": [
+    {
+     "description": "建立 PCE cluster 時被觸發",
+     "group_id": "cluster",
+     "group_label": "叢集 (cluster.*)",
+     "id": "cluster.create",
+     "label": "PCE叢集建立",
+     "related_events": [
+      "cluster.delete",
+      "cluster.update"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "刪除 PCE cluster 時被觸發",
+     "group_id": "cluster",
+     "group_label": "叢集 (cluster.*)",
+     "id": "cluster.delete",
+     "label": "PCE叢集刪除",
+     "related_events": [
+      "cluster.create",
+      "cluster.update"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "更新 PCE cluster 資訊時被觸發",
+     "group_id": "cluster",
+     "group_label": "叢集 (cluster.*)",
+     "id": "cluster.update",
+     "label": "Cluster 已更新",
+     "related_events": [
+      "cluster.create",
+      "cluster.delete"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": "PCE 叢集設定已修改，在正常狀態下不常見。對意外變更設定警示；無子事件。使用進階條件的操作者欄位追蹤變更者。"
+    },
+    {
+     "description": "當 PCE資料庫的暫存資料表自動清理作業完成時觸發。",
+     "group_id": "database",
+     "group_label": "資料庫 (database.*)",
+     "id": "database.temp_table_autocleanup_completed",
+     "label": "暫存表清理完成",
+     "related_events": [
+      "database.temp_table_autocleanup_started"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當 PCE資料庫的暫存資料表自動清理作業開始時觸發。",
+     "group_id": "database",
+     "group_label": "資料庫 (database.*)",
+     "id": "database.temp_table_autocleanup_started",
+     "label": "暫存表清理開始",
+     "related_events": [
+      "database.temp_table_autocleanup_completed"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當 PCE 的事件設定被更新時觸發。",
+     "group_id": "event_settings",
+     "group_label": "事件設定 (event_settings.*)",
+     "id": "event_settings.update",
+     "label": "事件設定更新",
+     "related_events": [],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當系統工作任務被刪除時觸發。",
+     "group_id": "job",
+     "group_label": "工作 (job.*)",
+     "id": "job.delete",
+     "label": "任務刪除",
+     "related_events": [],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當 license 被刪除時觸發。",
+     "group_id": "license",
+     "group_label": "授權 (license.*)",
+     "id": "license.delete",
+     "label": "刪除授權",
+     "related_events": [
+      "license.update"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當 license 被建立或更新時觸發。",
+     "group_id": "license",
+     "group_label": "授權 (license.*)",
+     "id": "license.update",
+     "label": "更新授權",
+     "related_events": [
+      "license.delete"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當建立 organization 時觸發。",
+     "group_id": "org",
+     "group_label": "組織 (org.*)",
+     "id": "org.create",
+     "label": "建立組織",
+     "related_events": [
+      "org.recalc_rules",
+      "org.update"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當重新計算 organization 的 rules 時觸發。",
+     "group_id": "org",
+     "group_label": "組織 (org.*)",
+     "id": "org.recalc_rules",
+     "label": "重算組織規則",
+     "related_events": [
+      "org.create",
+      "org.update"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當更新 organization 資訊時觸發。",
+     "group_id": "org",
+     "group_label": "組織 (org.*)",
+     "id": "org.update",
+     "label": "更新組織",
+     "related_events": [
+      "org.create",
+      "org.recalc_rules"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當系統或組織的設定被更新時觸發。",
+     "group_id": "settings",
+     "group_label": "設定 (settings.*)",
+     "id": "settings.update",
+     "label": "設定更新",
+     "related_events": [],
+     "source": "local_extension",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當系統檢查發現 VEN 錯過 heartbeat時觸發",
+     "group_id": "system_task",
+     "group_label": "系統工作 (system_task.*)",
+     "id": "system_task.agent_missed_heartbeats_check",
+     "label": "Agent 心跳遺失",
+     "related_events": [
+      "system_task.agent_missing_heartbeats_after_upgrade",
+      "system_task.agent_offline_check",
+      "system_task.agent_self_signed_certs_check",
+      "system_task.agent_settings_invalidation_error_state_check",
+      "system_task.agent_uninstall_timeout",
+      "system_task.clear_auth_recover_condition",
+      "system_task.compute_policy_for_unmanaged_workloads",
+      "system_task.delete_expired_service_account_api_keys",
+      "system_task.delete_old_cached_perspectives",
+      "system_task.endpoint_offline_check",
+      "system_task.event_pruning_completed",
+      "system_task.hard_limit_recovery_completed",
+      "system_task.provision_container_cluster_services",
+      "system_task.prune_old_log_events",
+      "system_task.remove_stale_zone_subsets",
+      "system_task.set_server_sync_check",
+      "system_task.vacuum_deactivated_agent_and_deleted_workloads"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": "PCE 排程檢查發現 VEN 遺漏了預期的心跳信號，是完全斷線的前兆指標。搭配 system_task.agent_offline_check 追蹤從遺漏心跳到 Offline 的進程。"
+    },
+    {
+     "description": "當系統檢查發現 VEN於升級後錯過 heartbeat 時觸發",
+     "group_id": "system_task",
+     "group_label": "系統工作 (system_task.*)",
+     "id": "system_task.agent_missing_heartbeats_after_upgrade",
+     "label": "Agent升級後失聯",
+     "related_events": [
+      "system_task.agent_missed_heartbeats_check",
+      "system_task.agent_offline_check",
+      "system_task.agent_self_signed_certs_check",
+      "system_task.agent_settings_invalidation_error_state_check",
+      "system_task.agent_uninstall_timeout",
+      "system_task.clear_auth_recover_condition",
+      "system_task.compute_policy_for_unmanaged_workloads",
+      "system_task.delete_expired_service_account_api_keys",
+      "system_task.delete_old_cached_perspectives",
+      "system_task.endpoint_offline_check",
+      "system_task.event_pruning_completed",
+      "system_task.hard_limit_recovery_completed",
+      "system_task.provision_container_cluster_services",
+      "system_task.prune_old_log_events",
+      "system_task.remove_stale_zone_subsets",
+      "system_task.set_server_sync_check",
+      "system_task.vacuum_deactivated_agent_and_deleted_workloads"
+     ],
+     "source": "local_extension",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當系統將長時間未連線的 VEN 標記為離線時觸發",
+     "group_id": "system_task",
+     "group_label": "系統工作 (system_task.*)",
+     "id": "system_task.agent_offline_check",
+     "label": "Agent Offline",
+     "related_events": [
+      "system_task.agent_missed_heartbeats_check",
+      "system_task.agent_missing_heartbeats_after_upgrade",
+      "system_task.agent_self_signed_certs_check",
+      "system_task.agent_settings_invalidation_error_state_check",
+      "system_task.agent_uninstall_timeout",
+      "system_task.clear_auth_recover_condition",
+      "system_task.compute_policy_for_unmanaged_workloads",
+      "system_task.delete_expired_service_account_api_keys",
+      "system_task.delete_old_cached_perspectives",
+      "system_task.endpoint_offline_check",
+      "system_task.event_pruning_completed",
+      "system_task.hard_limit_recovery_completed",
+      "system_task.provision_container_cluster_services",
+      "system_task.prune_old_log_events",
+      "system_task.remove_stale_zone_subsets",
+      "system_task.set_server_sync_check",
+      "system_task.vacuum_deactivated_agent_and_deleted_workloads"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": "PCE 排程檢查確認 VEN 已 Offline，比 system_task.agent_missed_heartbeats_check 更具確定性。在此設定 SLA 影響的警示，並用 missed_heartbeats 作為早期預警。"
+    },
+    {
+     "description": "當系統執行 VEN自簽憑證的清理與檢查工作時觸發",
+     "group_id": "system_task",
+     "group_label": "系統工作 (system_task.*)",
+     "id": "system_task.agent_self_signed_certs_check",
+     "label": "Agent自簽憑證檢查",
+     "related_events": [
+      "system_task.agent_missed_heartbeats_check",
+      "system_task.agent_missing_heartbeats_after_upgrade",
+      "system_task.agent_offline_check",
+      "system_task.agent_settings_invalidation_error_state_check",
+      "system_task.agent_uninstall_timeout",
+      "system_task.clear_auth_recover_condition",
+      "system_task.compute_policy_for_unmanaged_workloads",
+      "system_task.delete_expired_service_account_api_keys",
+      "system_task.delete_old_cached_perspectives",
+      "system_task.endpoint_offline_check",
+      "system_task.event_pruning_completed",
+      "system_task.hard_limit_recovery_completed",
+      "system_task.provision_container_cluster_services",
+      "system_task.prune_old_log_events",
+      "system_task.remove_stale_zone_subsets",
+      "system_task.set_server_sync_check",
+      "system_task.vacuum_deactivated_agent_and_deleted_workloads"
+     ],
+     "source": "local_extension",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當系統檢查 VEN設定失效的錯誤狀態時觸發",
+     "group_id": "system_task",
+     "group_label": "系統工作 (system_task.*)",
+     "id": "system_task.agent_settings_invalidation_error_state_check",
+     "label": "Agent設定失效檢查",
+     "related_events": [
+      "system_task.agent_missed_heartbeats_check",
+      "system_task.agent_missing_heartbeats_after_upgrade",
+      "system_task.agent_offline_check",
+      "system_task.agent_self_signed_certs_check",
+      "system_task.agent_uninstall_timeout",
+      "system_task.clear_auth_recover_condition",
+      "system_task.compute_policy_for_unmanaged_workloads",
+      "system_task.delete_expired_service_account_api_keys",
+      "system_task.delete_old_cached_perspectives",
+      "system_task.endpoint_offline_check",
+      "system_task.event_pruning_completed",
+      "system_task.hard_limit_recovery_completed",
+      "system_task.provision_container_cluster_services",
+      "system_task.prune_old_log_events",
+      "system_task.remove_stale_zone_subsets",
+      "system_task.set_server_sync_check",
+      "system_task.vacuum_deactivated_agent_and_deleted_workloads"
+     ],
+     "source": "local_extension",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當 VEN 解除安裝程序發生逾時時觸發",
+     "group_id": "system_task",
+     "group_label": "系統工作 (system_task.*)",
+     "id": "system_task.agent_uninstall_timeout",
+     "label": "Agent卸載逾時",
+     "related_events": [
+      "system_task.agent_missed_heartbeats_check",
+      "system_task.agent_missing_heartbeats_after_upgrade",
+      "system_task.agent_offline_check",
+      "system_task.agent_self_signed_certs_check",
+      "system_task.agent_settings_invalidation_error_state_check",
+      "system_task.clear_auth_recover_condition",
+      "system_task.compute_policy_for_unmanaged_workloads",
+      "system_task.delete_expired_service_account_api_keys",
+      "system_task.delete_old_cached_perspectives",
+      "system_task.endpoint_offline_check",
+      "system_task.event_pruning_completed",
+      "system_task.hard_limit_recovery_completed",
+      "system_task.provision_container_cluster_services",
+      "system_task.prune_old_log_events",
+      "system_task.remove_stale_zone_subsets",
+      "system_task.set_server_sync_check",
+      "system_task.vacuum_deactivated_agent_and_deleted_workloads"
+     ],
+     "source": "local_extension",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當系統清除 VEN 的驗證還原條件時觸發",
+     "group_id": "system_task",
+     "group_label": "系統工作 (system_task.*)",
+     "id": "system_task.clear_auth_recover_condition",
+     "label": "清除Agent認證復原",
+     "related_events": [
+      "system_task.agent_missed_heartbeats_check",
+      "system_task.agent_missing_heartbeats_after_upgrade",
+      "system_task.agent_offline_check",
+      "system_task.agent_self_signed_certs_check",
+      "system_task.agent_settings_invalidation_error_state_check",
+      "system_task.agent_uninstall_timeout",
+      "system_task.compute_policy_for_unmanaged_workloads",
+      "system_task.delete_expired_service_account_api_keys",
+      "system_task.delete_old_cached_perspectives",
+      "system_task.endpoint_offline_check",
+      "system_task.event_pruning_completed",
+      "system_task.hard_limit_recovery_completed",
+      "system_task.provision_container_cluster_services",
+      "system_task.prune_old_log_events",
+      "system_task.remove_stale_zone_subsets",
+      "system_task.set_server_sync_check",
+      "system_task.vacuum_deactivated_agent_and_deleted_workloads"
+     ],
+     "source": "local_extension",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當系統為未受管的 workload計算 policy 時觸發",
+     "group_id": "system_task",
+     "group_label": "系統工作 (system_task.*)",
+     "id": "system_task.compute_policy_for_unmanaged_workloads",
+     "label": "計算Unmanaged Workloads Policy",
+     "related_events": [
+      "system_task.agent_missed_heartbeats_check",
+      "system_task.agent_missing_heartbeats_after_upgrade",
+      "system_task.agent_offline_check",
+      "system_task.agent_self_signed_certs_check",
+      "system_task.agent_settings_invalidation_error_state_check",
+      "system_task.agent_uninstall_timeout",
+      "system_task.clear_auth_recover_condition",
+      "system_task.delete_expired_service_account_api_keys",
+      "system_task.delete_old_cached_perspectives",
+      "system_task.endpoint_offline_check",
+      "system_task.event_pruning_completed",
+      "system_task.hard_limit_recovery_completed",
+      "system_task.provision_container_cluster_services",
+      "system_task.prune_old_log_events",
+      "system_task.remove_stale_zone_subsets",
+      "system_task.set_server_sync_check",
+      "system_task.vacuum_deactivated_agent_and_deleted_workloads"
+     ],
+     "source": "local_extension",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當系統執行刪除過期的service account API key 工作時觸發",
+     "group_id": "system_task",
+     "group_label": "系統工作 (system_task.*)",
+     "id": "system_task.delete_expired_service_account_api_keys",
+     "label": "刪除過期Service Account API金鑰",
+     "related_events": [
+      "system_task.agent_missed_heartbeats_check",
+      "system_task.agent_missing_heartbeats_after_upgrade",
+      "system_task.agent_offline_check",
+      "system_task.agent_self_signed_certs_check",
+      "system_task.agent_settings_invalidation_error_state_check",
+      "system_task.agent_uninstall_timeout",
+      "system_task.clear_auth_recover_condition",
+      "system_task.compute_policy_for_unmanaged_workloads",
+      "system_task.delete_old_cached_perspectives",
+      "system_task.endpoint_offline_check",
+      "system_task.event_pruning_completed",
+      "system_task.hard_limit_recovery_completed",
+      "system_task.provision_container_cluster_services",
+      "system_task.prune_old_log_events",
+      "system_task.remove_stale_zone_subsets",
+      "system_task.set_server_sync_check",
+      "system_task.vacuum_deactivated_agent_and_deleted_workloads"
+     ],
+     "source": "local_extension",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當系統刪除舊的快取視角資料時觸發",
+     "group_id": "system_task",
+     "group_label": "系統工作 (system_task.*)",
+     "id": "system_task.delete_old_cached_perspectives",
+     "label": "刪除舊快取視角",
+     "related_events": [
+      "system_task.agent_missed_heartbeats_check",
+      "system_task.agent_missing_heartbeats_after_upgrade",
+      "system_task.agent_offline_check",
+      "system_task.agent_self_signed_certs_check",
+      "system_task.agent_settings_invalidation_error_state_check",
+      "system_task.agent_uninstall_timeout",
+      "system_task.clear_auth_recover_condition",
+      "system_task.compute_policy_for_unmanaged_workloads",
+      "system_task.delete_expired_service_account_api_keys",
+      "system_task.endpoint_offline_check",
+      "system_task.event_pruning_completed",
+      "system_task.hard_limit_recovery_completed",
+      "system_task.provision_container_cluster_services",
+      "system_task.prune_old_log_events",
+      "system_task.remove_stale_zone_subsets",
+      "system_task.set_server_sync_check",
+      "system_task.vacuum_deactivated_agent_and_deleted_workloads"
+     ],
+     "source": "local_extension",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當系統執行檢查離線 endpoint 的工作時觸發",
+     "group_id": "system_task",
+     "group_label": "系統工作 (system_task.*)",
+     "id": "system_task.endpoint_offline_check",
+     "label": "Endpoint Offline檢查",
+     "related_events": [
+      "system_task.agent_missed_heartbeats_check",
+      "system_task.agent_missing_heartbeats_after_upgrade",
+      "system_task.agent_offline_check",
+      "system_task.agent_self_signed_certs_check",
+      "system_task.agent_settings_invalidation_error_state_check",
+      "system_task.agent_uninstall_timeout",
+      "system_task.clear_auth_recover_condition",
+      "system_task.compute_policy_for_unmanaged_workloads",
+      "system_task.delete_expired_service_account_api_keys",
+      "system_task.delete_old_cached_perspectives",
+      "system_task.event_pruning_completed",
+      "system_task.hard_limit_recovery_completed",
+      "system_task.provision_container_cluster_services",
+      "system_task.prune_old_log_events",
+      "system_task.remove_stale_zone_subsets",
+      "system_task.set_server_sync_check",
+      "system_task.vacuum_deactivated_agent_and_deleted_workloads"
+     ],
+     "source": "local_extension",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "事件資料庫的舊記錄例行清理已完成。",
+     "group_id": "system_task",
+     "group_label": "系統工作 (system_task.*)",
+     "id": "system_task.event_pruning_completed",
+     "label": "系統任務 事件清理完成",
+     "related_events": [
+      "system_task.agent_missed_heartbeats_check",
+      "system_task.agent_missing_heartbeats_after_upgrade",
+      "system_task.agent_offline_check",
+      "system_task.agent_self_signed_certs_check",
+      "system_task.agent_settings_invalidation_error_state_check",
+      "system_task.agent_uninstall_timeout",
+      "system_task.clear_auth_recover_condition",
+      "system_task.compute_policy_for_unmanaged_workloads",
+      "system_task.delete_expired_service_account_api_keys",
+      "system_task.delete_old_cached_perspectives",
+      "system_task.endpoint_offline_check",
+      "system_task.hard_limit_recovery_completed",
+      "system_task.provision_container_cluster_services",
+      "system_task.prune_old_log_events",
+      "system_task.remove_stale_zone_subsets",
+      "system_task.set_server_sync_check",
+      "system_task.vacuum_deactivated_agent_and_deleted_workloads"
+     ],
+     "source": "local_extension",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "事件資料庫達到硬儲存上限後的恢復已完成。",
+     "group_id": "system_task",
+     "group_label": "系統工作 (system_task.*)",
+     "id": "system_task.hard_limit_recovery_completed",
+     "label": "系統任務 硬上限恢復完成",
+     "related_events": [
+      "system_task.agent_missed_heartbeats_check",
+      "system_task.agent_missing_heartbeats_after_upgrade",
+      "system_task.agent_offline_check",
+      "system_task.agent_self_signed_certs_check",
+      "system_task.agent_settings_invalidation_error_state_check",
+      "system_task.agent_uninstall_timeout",
+      "system_task.clear_auth_recover_condition",
+      "system_task.compute_policy_for_unmanaged_workloads",
+      "system_task.delete_expired_service_account_api_keys",
+      "system_task.delete_old_cached_perspectives",
+      "system_task.endpoint_offline_check",
+      "system_task.event_pruning_completed",
+      "system_task.provision_container_cluster_services",
+      "system_task.prune_old_log_events",
+      "system_task.remove_stale_zone_subsets",
+      "system_task.set_server_sync_check",
+      "system_task.vacuum_deactivated_agent_and_deleted_workloads"
+     ],
+     "source": "local_extension",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當系統佈建 container cluster服務時觸發",
+     "group_id": "system_task",
+     "group_label": "系統工作 (system_task.*)",
+     "id": "system_task.provision_container_cluster_services",
+     "label": "佈建容器叢集Services",
+     "related_events": [
+      "system_task.agent_missed_heartbeats_check",
+      "system_task.agent_missing_heartbeats_after_upgrade",
+      "system_task.agent_offline_check",
+      "system_task.agent_self_signed_certs_check",
+      "system_task.agent_settings_invalidation_error_state_check",
+      "system_task.agent_uninstall_timeout",
+      "system_task.clear_auth_recover_condition",
+      "system_task.compute_policy_for_unmanaged_workloads",
+      "system_task.delete_expired_service_account_api_keys",
+      "system_task.delete_old_cached_perspectives",
+      "system_task.endpoint_offline_check",
+      "system_task.event_pruning_completed",
+      "system_task.hard_limit_recovery_completed",
+      "system_task.prune_old_log_events",
+      "system_task.remove_stale_zone_subsets",
+      "system_task.set_server_sync_check",
+      "system_task.vacuum_deactivated_agent_and_deleted_workloads"
+     ],
+     "source": "local_extension",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當系統完成舊事件日誌修剪工作時觸發",
+     "group_id": "system_task",
+     "group_label": "系統工作 (system_task.*)",
+     "id": "system_task.prune_old_log_events",
+     "label": "修剪舊日誌事件",
+     "related_events": [
+      "system_task.agent_missed_heartbeats_check",
+      "system_task.agent_missing_heartbeats_after_upgrade",
+      "system_task.agent_offline_check",
+      "system_task.agent_self_signed_certs_check",
+      "system_task.agent_settings_invalidation_error_state_check",
+      "system_task.agent_uninstall_timeout",
+      "system_task.clear_auth_recover_condition",
+      "system_task.compute_policy_for_unmanaged_workloads",
+      "system_task.delete_expired_service_account_api_keys",
+      "system_task.delete_old_cached_perspectives",
+      "system_task.endpoint_offline_check",
+      "system_task.event_pruning_completed",
+      "system_task.hard_limit_recovery_completed",
+      "system_task.provision_container_cluster_services",
+      "system_task.remove_stale_zone_subsets",
+      "system_task.set_server_sync_check",
+      "system_task.vacuum_deactivated_agent_and_deleted_workloads"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當系統移除過時的 zone subnets 時觸發",
+     "group_id": "system_task",
+     "group_label": "系統工作 (system_task.*)",
+     "id": "system_task.remove_stale_zone_subsets",
+     "label": "移除過期區域子網",
+     "related_events": [
+      "system_task.agent_missed_heartbeats_check",
+      "system_task.agent_missing_heartbeats_after_upgrade",
+      "system_task.agent_offline_check",
+      "system_task.agent_self_signed_certs_check",
+      "system_task.agent_settings_invalidation_error_state_check",
+      "system_task.agent_uninstall_timeout",
+      "system_task.clear_auth_recover_condition",
+      "system_task.compute_policy_for_unmanaged_workloads",
+      "system_task.delete_expired_service_account_api_keys",
+      "system_task.delete_old_cached_perspectives",
+      "system_task.endpoint_offline_check",
+      "system_task.event_pruning_completed",
+      "system_task.hard_limit_recovery_completed",
+      "system_task.provision_container_cluster_services",
+      "system_task.prune_old_log_events",
+      "system_task.set_server_sync_check",
+      "system_task.vacuum_deactivated_agent_and_deleted_workloads"
+     ],
+     "source": "local_extension",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當系統執行 SetServer 同步檢查工作時觸發",
+     "group_id": "system_task",
+     "group_label": "系統工作 (system_task.*)",
+     "id": "system_task.set_server_sync_check",
+     "label": "SetServer同步檢查",
+     "related_events": [
+      "system_task.agent_missed_heartbeats_check",
+      "system_task.agent_missing_heartbeats_after_upgrade",
+      "system_task.agent_offline_check",
+      "system_task.agent_self_signed_certs_check",
+      "system_task.agent_settings_invalidation_error_state_check",
+      "system_task.agent_uninstall_timeout",
+      "system_task.clear_auth_recover_condition",
+      "system_task.compute_policy_for_unmanaged_workloads",
+      "system_task.delete_expired_service_account_api_keys",
+      "system_task.delete_old_cached_perspectives",
+      "system_task.endpoint_offline_check",
+      "system_task.event_pruning_completed",
+      "system_task.hard_limit_recovery_completed",
+      "system_task.provision_container_cluster_services",
+      "system_task.prune_old_log_events",
+      "system_task.remove_stale_zone_subsets",
+      "system_task.vacuum_deactivated_agent_and_deleted_workloads"
+     ],
+     "source": "local_extension",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當系統執行清理已停用VEN 與已刪除 workload 的工作時觸發",
+     "group_id": "system_task",
+     "group_label": "系統工作 (system_task.*)",
+     "id": "system_task.vacuum_deactivated_agent_and_deleted_workloads",
+     "label": "清理Agent與已刪除Workloads",
+     "related_events": [
+      "system_task.agent_missed_heartbeats_check",
+      "system_task.agent_missing_heartbeats_after_upgrade",
+      "system_task.agent_offline_check",
+      "system_task.agent_self_signed_certs_check",
+      "system_task.agent_settings_invalidation_error_state_check",
+      "system_task.agent_uninstall_timeout",
+      "system_task.clear_auth_recover_condition",
+      "system_task.compute_policy_for_unmanaged_workloads",
+      "system_task.delete_expired_service_account_api_keys",
+      "system_task.delete_old_cached_perspectives",
+      "system_task.endpoint_offline_check",
+      "system_task.event_pruning_completed",
+      "system_task.hard_limit_recovery_completed",
+      "system_task.provision_container_cluster_services",
+      "system_task.prune_old_log_events",
+      "system_task.remove_stale_zone_subsets",
+      "system_task.set_server_sync_check"
+     ],
+     "source": "local_extension",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    }
+   ],
+   "id": "Platform & System",
+   "label": "平台與系統"
+  },
+  {
+   "events": [
+    {
+     "description": "當建立要求 VEN 產生 support report的請求時觸發。",
+     "group_id": "agent_support_report_request",
+     "group_label": "Agent 支援報告請求 (agent_support_report_request.*)",
+     "id": "agent_support_report_request.create",
+     "label": "建立報告請求",
+     "related_events": [
+      "agent_support_report_request.delete"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "刪除對 VEN 產生 support report的請求時被觸發",
+     "group_id": "agent_support_report_request",
+     "group_label": "Agent 支援報告請求 (agent_support_report_request.*)",
+     "id": "agent_support_report_request.delete",
+     "label": "刪除報告請求",
+     "related_events": [
+      "agent_support_report_request.create"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當建立新的 domain 時觸發。",
+     "group_id": "domain",
+     "group_label": "網域 (domain.*)",
+     "id": "domain.create",
+     "label": "網域建立",
+     "related_events": [
+      "domain.delete",
+      "domain.update"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當刪除現有的 domain 時觸發。",
+     "group_id": "domain",
+     "group_label": "網域 (domain.*)",
+     "id": "domain.delete",
+     "label": "網域刪除",
+     "related_events": [
+      "domain.create",
+      "domain.update"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當更新現有的 domain 時觸發。",
+     "group_id": "domain",
+     "group_label": "網域 (domain.*)",
+     "id": "domain.update",
+     "label": "網域更新",
+     "related_events": [
+      "domain.create",
+      "domain.delete"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當建立新的使用者或授權群組時觸發。",
+     "group_id": "group",
+     "group_label": "群組 (group.*)",
+     "id": "group.create",
+     "label": "群組建立",
+     "related_events": [
+      "group.update"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當更新現有的群組時觸發。",
+     "group_id": "group",
+     "group_label": "群組 (group.*)",
+     "id": "group.update",
+     "label": "群組更新",
+     "related_events": [
+      "group.create"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當建立登入資源時觸發。",
+     "group_id": "resource",
+     "group_label": "資源 (resource.*)",
+     "id": "resource.create",
+     "label": "建立登入資源",
+     "related_events": [
+      "resource.delete",
+      "resource.update"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當刪除登入資源時觸發。",
+     "group_id": "resource",
+     "group_label": "資源 (resource.*)",
+     "id": "resource.delete",
+     "label": "刪除登入資源",
+     "related_events": [
+      "resource.create",
+      "resource.update"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當更新登入資源時觸發。",
+     "group_id": "resource",
+     "group_label": "資源 (resource.*)",
+     "id": "resource.update",
+     "label": "更新登入資源",
+     "related_events": [
+      "resource.create",
+      "resource.delete"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當 RBAC 安全主體被建立時觸發。",
+     "group_id": "security_principal",
+     "group_label": "安全主體 (security_principal.*)",
+     "id": "security_principal.create",
+     "label": "安全主體建立",
+     "related_events": [
+      "security_principal.delete",
+      "security_principal.update"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當 RBAC 安全主體被大量刪除時觸發。",
+     "group_id": "security_principal",
+     "group_label": "安全主體 (security_principal.*)",
+     "id": "security_principal.delete",
+     "label": "批次刪除安全主體",
+     "related_events": [
+      "security_principal.create",
+      "security_principal.update"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當 RBAC 安全主體被大量更新時觸發。",
+     "group_id": "security_principal",
+     "group_label": "安全主體 (security_principal.*)",
+     "id": "security_principal.update",
+     "label": "批次更新安全主體",
+     "related_events": [
+      "security_principal.create",
+      "security_principal.delete"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當大量建立 RBAC 安全主體時觸發。",
+     "group_id": "security_principals",
+     "group_label": "安全主體 (security_principals.*)",
+     "id": "security_principals.bulk_create",
+     "label": "安全主體批次建立",
+     "related_events": [],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "當技術支援報告被上傳時觸發。",
+     "group_id": "support_report",
+     "group_label": "支援報告 (support_report.*)",
+     "id": "support_report.upload",
+     "label": "上傳Support Report",
+     "related_events": [],
+     "source": "local_extension",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "建立 vulnerability 紀錄",
+     "group_id": "vulnerability",
+     "group_label": "弱點 (vulnerability.*)",
+     "id": "vulnerability.create",
+     "label": "建立漏洞紀錄",
+     "related_events": [
+      "vulnerability.delete",
+      "vulnerability.update"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "刪除 vulnerability 紀錄",
+     "group_id": "vulnerability",
+     "group_label": "弱點 (vulnerability.*)",
+     "id": "vulnerability.delete",
+     "label": "刪除漏洞紀錄",
+     "related_events": [
+      "vulnerability.create",
+      "vulnerability.update"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "更新 vulnerability 紀錄",
+     "group_id": "vulnerability",
+     "group_label": "弱點 (vulnerability.*)",
+     "id": "vulnerability.update",
+     "label": "更新漏洞紀錄",
+     "related_events": [
+      "vulnerability.create",
+      "vulnerability.delete"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "刪除 vulnerability report",
+     "group_id": "vulnerability_report",
+     "group_label": "弱點報告 (vulnerability_report.*)",
+     "id": "vulnerability_report.delete",
+     "label": "刪除漏洞報告",
+     "related_events": [
+      "vulnerability_report.update"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    },
+    {
+     "description": "建立或更新 vulnerability report",
+     "group_id": "vulnerability_report",
+     "group_label": "弱點報告 (vulnerability_report.*)",
+     "id": "vulnerability_report.update",
+     "label": "更新漏洞報告",
+     "related_events": [
+      "vulnerability_report.delete"
+     ],
+     "source": "vendor_baseline",
+     "supports_severity": false,
+     "supports_status": false,
+     "tips": ""
+    }
+   ],
+   "id": "Inventory & Identity",
+   "label": "資產與身分"
+  }
+ ],
+ "severity_filter_events": [
+  "request.authentication_failed",
+  "request.authorization_failed",
+  "request.internal_server_error",
+  "request.service_unavailable",
+  "request.unknown_server_error",
+  "user.authenticate",
+  "user.login",
+  "user.logout",
+  "user.sign_in",
+  "user.sign_out",
+  "user.verify_mfa"
+ ]
+}

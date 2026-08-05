@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="zh-Hant" data-theme="dark" data-density="cozy">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>illumio-ops · design v2 mockup · login</title>
+<link rel="stylesheet" href="assets/tokens.css">
+<link rel="stylesheet" href="assets/components.css">
+<link rel="stylesheet" href="assets/app.css">
+<script>
+/* Same pre-paint bootstrap as index.html: the login page is the first surface a
+   user sees, so it must not flash the wrong theme either. theme.mjs owns every
+   change after this point. */
+(function () {
+  try {
+    var th = localStorage.getItem("ov2.theme");
+    var de = localStorage.getItem("ov2.density");
+    if (th === "light" || th === "dark") document.documentElement.dataset.theme = th;
+    if (de === "cozy" || de === "compact") document.documentElement.dataset.density = de;
+  } catch (e) { /* private mode: fall back to the markup defaults */ }
+})();
+</script>
+</head>
+<body class="loginpage">
+<div id="login-root"></div>
+<script type="module" src="js/areas/login.mjs"></script>
+</body>
+</html>

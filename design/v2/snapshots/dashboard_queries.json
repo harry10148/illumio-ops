@@ -1,0 +1,31 @@
+[
+ {
+  "dst_labels": [
+   "CoreServices"
+  ],
+  "ex_port": null,
+  "name": "Design-v2 AND sample",
+  "pd": 3,
+  "port": null,
+  "ports": [
+   "443"
+  ],
+  "proto": null,
+  "rank_by": "count",
+  "src_labels": [
+   "DemoApp"
+  ]
+ },
+ {
+  "any_label": "DemoApp",
+  "ex_port": null,
+  "name": "Design-v2 OR sample",
+  "pd": 3,
+  "port": null,
+  "ports": [
+   "3389"
+  ],
+  "proto": null,
+  "rank_by": "count"
+ }
+]

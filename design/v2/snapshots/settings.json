@@ -1,0 +1,91 @@
+{
+ "active_pce_id": null,
+ "alerts": {
+  "active": [
+   "line",
+   "mail"
+  ],
+  "line_channel_access_token": "***MASKED***",
+  "line_channel_access_token__length": 172,
+  "line_channel_access_token__set": true,
+  "line_target_id": "***MASKED***",
+  "teams_webhook_url": "",
+  "teams_webhook_url__length": 0,
+  "teams_webhook_url__set": false,
+  "telegram_bot_token": "***MASKED***",
+  "telegram_bot_token__length": 0,
+  "telegram_bot_token__set": false,
+  "telegram_chat_id": "",
+  "webhook_url": "",
+  "webhook_url__length": 0,
+  "webhook_url__set": false
+ },
+ "api": {
+  "key": "********",
+  "key__length": 21,
+  "key__set": true,
+  "org_id": "1",
+  "profile": "dev",
+  "secret": "***MASKED***",
+  "secret__length": 64,
+  "secret__set": true,
+  "url": "https://pce.lab.local:8443",
+  "verify_ssl": false
+ },
+ "email": {
+  "recipients": "***MASKED***",
+  "sender": "***MASKED***"
+ },
+ "pce_profiles": [],
+ "report": {
+  "output_dir": "reports/",
+  "retention_days": 30
+ },
+ "settings": {
+  "dashboard_queries": [
+   {
+    "dst_labels": [
+     "CoreServices"
+    ],
+    "ex_port": null,
+    "name": "Design-v2 AND sample",
+    "pd": 3,
+    "port": null,
+    "ports": [
+     "443"
+    ],
+    "proto": null,
+    "rank_by": "count",
+    "src_labels": [
+     "DemoApp"
+    ]
+   },
+   {
+    "any_label": "DemoApp",
+    "ex_port": null,
+    "name": "Design-v2 OR sample",
+    "pd": 3,
+    "port": null,
+    "ports": [
+     "3389"
+    ],
+    "proto": null,
+    "rank_by": "count"
+   }
+  ],
+  "enable_health_check": true,
+  "language": "zh_TW",
+  "theme": "light",
+  "timezone": "UTC+8"
+ },
+ "smtp": {
+  "enable_auth": true,
+  "enable_tls": true,
+  "host": "***MASKED***",
+  "password": "***MASKED***",
+  "password__length": 8,
+  "password__set": true,
+  "port": 587,
+  "user": "***MASKED***"
+ }
+}

@@ -1,0 +1,70 @@
+{
+ "items": [
+  {
+   "enabled": true,
+   "href": "/orgs/1/sec_policy/draft/rule_sets/100",
+   "id": "100",
+   "name": "Quarantine",
+   "provision_state": "ACTIVE",
+   "rules_count": 2,
+   "schedule_type": 0
+  },
+  {
+   "enabled": false,
+   "href": "/orgs/1/sec_policy/draft/rule_sets/646",
+   "id": "646",
+   "name": "out_test",
+   "provision_state": "ACTIVE",
+   "rules_count": 1,
+   "schedule_type": 0
+  },
+  {
+   "enabled": true,
+   "href": "/orgs/1/sec_policy/draft/rule_sets/624",
+   "id": "624",
+   "name": "Kube-Prom-Stack | Kubernetes",
+   "provision_state": "ACTIVE",
+   "rules_count": 2,
+   "schedule_type": 2
+  },
+  {
+   "enabled": true,
+   "href": "/orgs/1/sec_policy/draft/rule_sets/619",
+   "id": "619",
+   "name": "test",
+   "provision_state": "DRAFT",
+   "rules_count": 2,
+   "schedule_type": 1
+  },
+  {
+   "enabled": true,
+   "href": "/orgs/1/sec_policy/draft/rule_sets/622",
+   "id": "622",
+   "name": "CoreServices | VMware",
+   "provision_state": "DRAFT",
+   "rules_count": 2,
+   "schedule_type": 1
+  },
+  {
+   "enabled": true,
+   "href": "/orgs/1/sec_policy/draft/rule_sets/657",
+   "id": "657",
+   "name": "test1",
+   "provision_state": "DRAFT",
+   "rules_count": 1,
+   "schedule_type": 0
+  },
+  {
+   "enabled": true,
+   "href": "/orgs/1/sec_policy/draft/rule_sets/660",
+   "id": "660",
+   "name": "DemoApp | VMware",
+   "provision_state": "DRAFT",
+   "rules_count": 2,
+   "schedule_type": 0
+  }
+ ],
+ "page": 1,
+ "size": 50,
+ "total": 7
+}

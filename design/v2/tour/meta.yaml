@@ -1,0 +1,105 @@
+alerting-ops:
+  area: 告警
+  opened: 5
+  tab: 動作
+  title: illumio-ops · design v2 mockup
+alerting-rules:
+  area: 告警
+  opened: 7
+  tab: 規則
+  title: illumio-ops · design v2 mockup
+automation-jobs:
+  area: 自動化
+  opened: 3
+  tab: Job 健康
+  title: illumio-ops · design v2 mockup
+automation-reports:
+  area: 自動化
+  opened: 5
+  tab: 報表排程
+  title: illumio-ops · design v2 mockup
+automation-rules:
+  area: 自動化
+  opened: 6
+  tab: 規則排程
+  title: illumio-ops · design v2 mockup
+investigate-events:
+  area: 調查
+  opened: 3
+  tab: 事件檢視
+  title: illumio-ops · design v2 mockup
+investigate-traffic:
+  area: 調查
+  opened: 8
+  tab: 流量分析
+  title: illumio-ops · design v2 mockup
+investigate-workloads:
+  area: 調查
+  opened: 8
+  tab: Workload 搜尋
+  title: illumio-ops · design v2 mockup
+login:
+  area: ''
+  opened: 3
+  tab: ''
+  title: illumio-ops · design v2 mockup · login
+login-first-login:
+  area: ''
+  opened: 3
+  tab: ''
+  title: illumio-ops · design v2 mockup · login
+login-signed-out:
+  area: ''
+  opened: 3
+  tab: ''
+  title: illumio-ops · design v2 mockup · login
+overview:
+  area: 總覽
+  opened: 7
+  tab: ''
+  title: illumio-ops · design v2 mockup
+reports:
+  area: 報表
+  opened: 7
+  tab: ''
+  title: illumio-ops · design v2 mockup
+system-cache:
+  area: 系統
+  opened: 5
+  tab: 快取
+  title: illumio-ops · design v2 mockup
+system-channels:
+  area: 系統
+  opened: 3
+  tab: 通知通道
+  title: illumio-ops · design v2 mockup
+system-display:
+  area: 系統
+  opened: 3
+  tab: 介面與報表
+  title: illumio-ops · design v2 mockup
+system-logs:
+  area: 系統
+  opened: 4
+  tab: 模組日誌
+  title: illumio-ops · design v2 mockup
+system-pce:
+  area: 系統
+  opened: 5
+  tab: PCE 連線
+  title: illumio-ops · design v2 mockup
+system-security:
+  area: 系統
+  opened: 4
+  tab: 安全
+  title: illumio-ops · design v2 mockup
+system-siem:
+  area: 系統
+  opened: 6
+  tab: 轉發器
+  title: illumio-ops · design v2 mockup
+system-tls:
+  area: 系統
+  opened: 4
+  tab: TLS / HTTPS
+  title: illumio-ops · design v2 mockup

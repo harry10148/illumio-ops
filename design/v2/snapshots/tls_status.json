@@ -1,0 +1,19 @@
+{
+ "auto_renew": true,
+ "auto_renew_days": 30,
+ "cert_file": "",
+ "cert_info": {
+  "exists": true,
+  "expired": false,
+  "expiring_soon": false,
+  "not_after": "Apr 23 06:26:48 2031 GMT",
+  "not_before": "Apr 24 06:26:48 2026 GMT",
+  "path": "/root/illumio-ops/config/tls/self_signed.pem",
+  "subject": "CN = localhost, O = IllumioPCEOps, C = TW"
+ },
+ "days_remaining": 1723,
+ "default_validity_days": 397,
+ "enabled": true,
+ "key_file": "",
+ "self_signed": true
+}

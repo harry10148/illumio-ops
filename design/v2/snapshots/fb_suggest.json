@@ -1,0 +1,16 @@
+{
+ "ok": true,
+ "results": {
+  "label": {
+   "items": [
+    {
+     "href": "/orgs/1/labels/1",
+     "key": "role",
+     "name": "role=Web",
+     "value": "Web"
+    }
+   ],
+   "truncated": false
+  }
+ }
+}

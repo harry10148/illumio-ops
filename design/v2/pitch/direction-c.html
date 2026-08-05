@@ -1,0 +1,628 @@
+<!doctype html>
+<html lang="zh-Hant" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Direction C — Editorial Light · Overview</title>
+<style>
+/* ============================================================
+   DIRECTION C — Editorial light ("the briefing sheet")
+   Thesis: no boxes, no brand accent. The page is hairline rules
+   and type; the ONLY colour on it is semantic status colour, so
+   any hue a reader sees is carrying meaning.
+   Display: Noto Serif Display · Text: Noto Sans · achromatic
+   graphite ordinal ramp for all chart marks.
+   ============================================================ */
+:root{--font-display:"Noto Serif Display","Noto Serif",Georgia,serif}
+:root{--font-text:"Noto Sans","Noto Sans CJK TC",sans-serif}
+:root{
+  color-scheme:light;
+  --paper:#FBFBFD;
+  --paper-2:#F3F4F7;
+  --rule:#DFE1E6;
+  --rule-2:#ECEDF1;
+  --ink:#16181D;
+  --ink-2:#494F59;
+  --ink-3:#7C838E;
+  --ok:#1F7A4D;
+  --warn:#A66A00;
+  --crit:#B3261E;
+  --info:#2F5B92;
+  --neutral:#6C727C;
+  --ok-fill:#E7F1EC;
+  --warn-fill:#F6EEE1;
+  --crit-fill:#F7E7E5;
+  --info-fill:#E8EEF6;
+  --neutral-fill:#EDEEF1;
+  --bar:#2E343D;
+  --r1:#AEB3BB;
+  --r2:#868D97;
+  --r3:#5C636E;
+  --r4:#2E343D;
+  --grid:#E7E9ED;
+  --track:#E7E9ED;
+}
+:root[data-theme="dark"]{
+  color-scheme:dark;
+  --paper:#16181D;
+  --paper-2:#1D2027;
+  --rule:#2E323A;
+  --rule-2:#24272E;
+  --ink:#EEF0F3;
+  --ink-2:#B4BAC3;
+  --ink-3:#868D98;
+  --ok:#4FB183;
+  --warn:#E0A33A;
+  --crit:#F0736A;
+  --info:#7FA9DC;
+  --neutral:#9AA1AC;
+  --ok-fill:#1B2C25;
+  --warn-fill:#2E2718;
+  --crit-fill:#2E1F1E;
+  --info-fill:#1C242F;
+  --neutral-fill:#23262C;
+  --bar:#C9CFD8;
+  --r1:#4A505A;
+  --r2:#767D88;
+  --r3:#A6ADB7;
+  --r4:#D7DBE1;
+  --grid:#282C33;
+  --track:#282C33;
+}
+@media (prefers-color-scheme:dark){
+  :root:where(:not([data-theme="light"])){
+    color-scheme:dark;
+    --paper:#16181D;
+    --paper-2:#1D2027;
+    --rule:#2E323A;
+    --rule-2:#24272E;
+    --ink:#EEF0F3;
+    --ink-2:#B4BAC3;
+    --ink-3:#868D98;
+    --ok:#4FB183;
+    --warn:#E0A33A;
+    --crit:#F0736A;
+    --info:#7FA9DC;
+    --neutral:#9AA1AC;
+    --ok-fill:#1B2C25;
+    --warn-fill:#2E2718;
+    --crit-fill:#2E1F1E;
+    --info-fill:#1C242F;
+    --neutral-fill:#23262C;
+    --bar:#C9CFD8;
+    --r1:#4A505A;
+    --r2:#767D88;
+    --r3:#A6ADB7;
+    --r4:#D7DBE1;
+    --grid:#282C33;
+    --track:#282C33;
+  }
+}
+*{box-sizing:border-box}
+[hidden]{display:none !important}
+html,body{margin:0;padding:0}
+body{background:var(--paper);color:var(--ink);font-family:var(--font-text);font-size:13.5px;line-height:1.55;-webkit-font-smoothing:antialiased}
+:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
+@media (prefers-reduced-motion:reduce){*{transition:none !important}}
+.tab-num{font-variant-numeric:tabular-nums}
+
+/* ---------- micro type ---------- */
+.lbl{font-size:9.5px;font-weight:700;letter-spacing:.2em;text-transform:uppercase;color:var(--ink-3);display:block}
+.fact .v s{font-family:var(--font-text);font-size:14px;color:var(--ink-3);letter-spacing:0}
+.hero .num s{font-family:var(--font-text);font-size:26px;color:var(--ink-3);letter-spacing:0}
+.lg-cell .v s{font-family:var(--font-text);font-size:15px;color:var(--ink-3);letter-spacing:0}
+.crow .cv s{font-family:var(--font-text);font-size:12px;color:var(--ink-3);letter-spacing:0}
+.serif{font-family:var(--font-display);font-weight:400;letter-spacing:-.015em}
+
+/* ---------- masthead ---------- */
+.mast{border-bottom:1px solid var(--ink);padding:0 64px}
+.mast-in{max-width:1312px;margin:0 auto;display:flex;align-items:flex-end;gap:44px;padding:24px 0 14px}
+.wm{font-family:var(--font-display);font-size:23px;letter-spacing:-.02em;text-decoration:none;color:var(--ink);line-height:1}
+.wm span{font-family:var(--font-text);font-size:9.5px;font-weight:700;letter-spacing:.24em;text-transform:uppercase;color:var(--ink-3);margin-left:10px}
+.nav{display:flex;gap:26px;flex:1;padding-bottom:2px}
+.nav a{text-decoration:none;color:var(--ink-2);font-size:13.5px;line-height:1.2;padding-bottom:5px;border-bottom:2px solid transparent}
+.nav a small{display:block;font-size:9px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:var(--ink-3);margin-top:3px}
+.nav a:hover{color:var(--ink)}
+.nav a[aria-current]{color:var(--ink);border-bottom-color:var(--ink)}
+.mr{display:flex;align-items:center;gap:18px;padding-bottom:4px}
+.mr .bt{background:transparent;border:0;border-bottom:1px solid var(--ink-3);color:var(--ink-2);font-family:inherit;font-size:9.5px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;padding:0 0 3px;cursor:pointer}
+.mr .bt:hover{color:var(--ink);border-bottom-color:var(--ink)}
+.mr .id{text-align:right;line-height:1.35}
+.mr .id b{display:block;font-size:12px;font-weight:600}
+.mr .id small{display:block;font-size:10px;color:var(--ink-3)}
+
+/* ---------- status ledger ---------- */
+.ledger{border-bottom:1px solid var(--rule);padding:0 64px}
+.ledger-in{max-width:1312px;margin:0 auto;display:grid;grid-template-columns:repeat(5,1fr) 210px}
+.lg-cell{padding:18px 26px 20px;border-left:1px solid var(--rule-2);min-width:0}
+.lg-cell:first-child{border-left:0;padding-left:0}
+.lg-cell .k{display:flex;align-items:center;gap:8px}
+.lg-cell .v{font-family:var(--font-display);font-size:27px;line-height:1.1;margin-top:9px;letter-spacing:-.02em}
+.lg-cell .d{font-size:11px;color:var(--ink-3);margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--dotc);flex:none}
+.t-ok{--dotc:var(--ok);--dotf:var(--ok-fill)}
+.t-warn{--dotc:var(--warn);--dotf:var(--warn-fill)}
+.t-crit{--dotc:var(--crit);--dotf:var(--crit-fill)}
+.t-info{--dotc:var(--info);--dotf:var(--info-fill)}
+.t-neutral{--dotc:var(--neutral);--dotf:var(--neutral-fill)}
+.lg-meta{padding:18px 0 20px 26px;border-left:1px solid var(--rule-2);font-size:11px;color:var(--ink-3);line-height:1.7}
+.lg-meta b{display:block;color:var(--ink-2);font-weight:600;font-variant-numeric:tabular-nums}
+
+/* ---------- page ---------- */
+.page{max-width:1312px;margin:0 auto;padding:0 64px 84px}
+.band{padding:52px 0;border-bottom:1px solid var(--rule)}
+.band:last-child{border-bottom:0}
+.bh{display:flex;align-items:baseline;gap:16px;margin-bottom:26px}
+.bh h2{margin:0;font-family:var(--font-display);font-size:21px;font-weight:400;letter-spacing:-.015em}
+.bh .m{margin-left:auto;font-size:11px;color:var(--ink-3);font-variant-numeric:tabular-nums}
+
+/* hero — posture */
+.hero{display:grid;grid-template-columns:7fr 5fr;gap:64px}
+.hero .num{font-family:var(--font-display);font-size:132px;line-height:.82;letter-spacing:-.05em;color:var(--dotc);display:block;margin:6px 0 0 -8px}
+.hero .formula{font-size:12px;color:var(--ink-3);margin:20px 0 0;font-variant-numeric:tabular-nums}
+.hero .sub{font-size:14.5px;color:var(--ink-2);margin:14px 0 0;max-width:42ch;line-height:1.6}
+.comp{margin-top:30px;border-top:1px solid var(--ink)}
+.crow{display:grid;grid-template-columns:1fr 92px 62px;gap:0 18px;align-items:baseline;padding:13px 0 11px;border-bottom:1px solid var(--rule-2)}
+.crow .cn{font-size:14px}
+.crow .cv{font-family:var(--font-display);font-size:19px;text-align:right;font-variant-numeric:tabular-nums}
+.crow .cw{font-size:11px;color:var(--ink-3);text-align:right;font-variant-numeric:tabular-nums}
+.crow .cb{grid-column:1/4;height:3px;background:var(--track);margin-top:9px}
+.crow .cb i{display:block;height:100%;background:var(--r3)}
+.rmd{list-style:none;margin:0;padding:0;border-top:1px solid var(--ink)}
+.rmd li{display:grid;grid-template-columns:38px 1fr 62px;gap:14px;padding:15px 0;border-bottom:1px solid var(--rule-2);align-items:baseline}
+.rmd .rn{font-family:var(--font-display);font-size:17px;color:var(--ink-3);font-variant-numeric:tabular-nums}
+.rmd .rt{font-size:13.5px;color:var(--ink-2);line-height:1.55}
+.rmd .rp{font-family:var(--font-display);font-size:17px;text-align:right;font-variant-numeric:tabular-nums}
+
+/* fact rows */
+.facts{display:grid;grid-template-columns:repeat(6,1fr)}
+.fact{padding:0 24px;border-left:1px solid var(--rule-2);min-width:0}
+.fact:first-child{border-left:0;padding-left:0}
+.fact .v{font-family:var(--font-display);font-size:34px;line-height:1;margin:12px 0 0;letter-spacing:-.03em;font-variant-numeric:tabular-nums}
+.fact ul{list-style:none;margin:14px 0 0;padding:0}
+.fact li{display:flex;justify-content:space-between;gap:10px;font-size:11.5px;color:var(--ink-3);padding:4px 0;border-top:1px solid var(--rule-2)}
+.fact li b{color:var(--ink-2);font-weight:500;font-variant-numeric:tabular-nums}
+.fact .st{display:inline-flex;align-items:center;gap:6px;font-size:10px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--dotc);margin-top:10px}
+.stack-lg{display:flex;flex-wrap:wrap;gap:3px 14px;margin-top:11px;font-size:11px;color:var(--ink-3)}
+.stack-lg span{display:flex;align-items:center;gap:6px}
+.stack-lg i{width:9px;height:9px;display:inline-block}
+.stack-lg b{color:var(--ink-2);font-weight:500}
+.sw1{background:var(--r1)}
+.sw2{background:var(--r2)}
+.sw3{background:var(--r3)}
+.sw4{background:var(--r4)}
+
+/* two-column lower band */
+.two{display:grid;grid-template-columns:7fr 5fr;gap:64px}
+.kpi{display:grid;grid-template-columns:repeat(4,1fr);border-top:1px solid var(--ink)}
+.kpi div{padding:13px 16px 15px;border-bottom:1px solid var(--rule-2);border-left:1px solid var(--rule-2)}
+.kpi div:nth-child(4n+1){border-left:0;padding-left:0}
+.kpi dt{font-size:10px;color:var(--ink-3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.kpi dd{margin:6px 0 0;font-family:var(--font-display);font-size:26px;line-height:1;font-variant-numeric:tabular-nums}
+.att{list-style:none;margin:26px 0 0;padding:0;border-top:1px solid var(--ink)}
+.att li{padding:15px 0;border-bottom:1px solid var(--rule-2);display:grid;grid-template-columns:auto 1fr auto;gap:5px 14px;align-items:baseline}
+.att .tg{font-size:9.5px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--dotc);background:var(--dotf);padding:3px 8px}
+.att .s{font-size:14px;color:var(--ink)}
+.att .c{font-size:12px;color:var(--ink-3);font-variant-numeric:tabular-nums}
+.att .r{grid-column:2/4;font-size:11.5px;color:var(--ink-3);line-height:1.5}
+.note{border:0;border-top:1px solid var(--rule);border-bottom:1px solid var(--rule);padding:34px 0;text-align:center}
+.note .lbl{margin-bottom:12px}
+.note p{margin:0 auto;max-width:30ch;font-size:14px;color:var(--ink-2);line-height:1.6}
+.note button{margin-top:18px;background:transparent;border:1px solid var(--ink);color:var(--ink);font-family:inherit;font-size:10px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;padding:9px 18px;cursor:pointer}
+.note button:hover{background:var(--ink);color:var(--paper)}
+table.led{width:100%;border-collapse:collapse;font-size:12.5px}
+table.led th{text-align:left;font-size:9.5px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:var(--ink-3);padding:0 14px 9px 0;border-bottom:1px solid var(--ink)}
+table.led td{padding:10px 14px 10px 0;border-bottom:1px solid var(--rule-2);color:var(--ink-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:0}
+table.led td.n{text-align:right;padding-right:0;color:var(--ink);font-variant-numeric:tabular-nums}
+table.led th.n{text-align:right;padding-right:0}
+table.led td.k{color:var(--ink)}
+.colophon{padding-top:30px;display:flex;gap:34px;flex-wrap:wrap;font-size:11px;color:var(--ink-3)}
+.colophon b{color:var(--ink-2);font-weight:600;font-variant-numeric:tabular-nums}
+.errbox{max-width:680px;margin:96px auto;border-top:2px solid var(--crit);border-bottom:1px solid var(--rule);padding:26px 0;color:var(--ink)}
+.errbox h2{margin:0 0 10px;font-family:var(--font-display);font-size:20px;font-weight:400;color:var(--crit)}
+.errbox pre{margin:0;white-space:pre-wrap;font-size:12px;color:var(--ink-2);font-family:var(--font-text)}
+s{text-decoration:none}
+.cnote{display:block;font-size:11px;color:var(--ink-3);line-height:1.5;margin-top:3px;grid-column:1/2}
+svg text{font-family:var(--font-text)}
+svg text.rk{font-family:var(--font-display)}
+.c-ink{fill:var(--ink)}
+.c-ink2{fill:var(--ink-2)}
+.c-ink3{fill:var(--ink-3)}
+.c-bar{fill:var(--bar)}
+.c-grid{stroke:var(--grid)}
+.c-r1{fill:var(--r1)}
+.c-r2{fill:var(--r2)}
+.c-r3{fill:var(--r3)}
+.c-r4{fill:var(--r4)}
+</style>
+</head>
+<body>
+<div id="app" hidden>
+  <header class="mast">
+    <div class="mast-in">
+      <a class="wm" href="#">illumio<span>ops</span></a>
+      <nav class="nav">
+        <a href="#" aria-current="page">總覽<small>Overview</small></a>
+        <a href="#">調查<small>Investigate</small></a>
+        <a href="#">告警<small>Alerting</small></a>
+        <a href="#">自動化<small>Automation</small></a>
+        <a href="#">報表<small>Reports</small></a>
+        <a href="#">系統<small>System</small></a>
+      </nav>
+      <div class="mr">
+        <button class="bt" id="themeBtn" type="button">Theme</button>
+        <div class="id"><b id="whoHost"></b><small id="whoMeta"></small></div>
+      </div>
+    </div>
+  </header>
+
+  <div class="ledger"><div class="ledger-in" id="ledger"></div></div>
+
+  <main class="page">
+    <section class="band">
+      <div class="bh"><h2 id="hSec"></h2><span class="m" id="mSec"></span></div>
+      <div class="hero">
+        <div id="posture"></div>
+        <div id="remedy"></div>
+      </div>
+    </section>
+
+    <section class="band">
+      <div class="bh"><h2 id="hTop"></h2><span class="m" id="mTop"></span></div>
+      <div id="topChart"></div>
+    </section>
+
+    <section class="band">
+      <div class="bh"><h2 id="hOps"></h2><span class="m" id="mOps"></span></div>
+      <div class="facts" id="facts"></div>
+    </section>
+
+    <section class="band">
+      <div class="two">
+        <div>
+          <div class="bh"><h2 id="hAudit"></h2><span class="m" id="mAudit"></span></div>
+          <div id="audit"></div>
+        </div>
+        <div>
+          <div class="bh"><h2 id="hPu"></h2></div>
+          <div id="pu"></div>
+          <div style="margin-top:44px"><div class="bh"><h2 id="hRep"></h2><span class="m" id="mRep"></span></div><div id="reports"></div></div>
+        </div>
+      </div>
+    </section>
+
+    <footer class="colophon" id="colophon"></footer>
+  </main>
+</div>
+
+<div id="err" class="errbox" hidden><h2>無法載入總覽資料</h2><pre id="errMsg"></pre></div>
+
+<script>
+/* ---------- snapshot plumbing (no hand-written data) ---------- */
+const SNAP = "../snapshots/";
+const FILES = ["status.json","dashboard_overview.json","dashboard_audit.json","dashboard_pu.json","top10.json","reports_list.json","ui_translations.json"];
+const NF = new Intl.NumberFormat("en-US");
+let TR = null;
+
+async function grab(name){
+  const res = await fetch(SNAP + name);
+  if (!res.ok) throw new Error(name + " → HTTP " + res.status);
+  return res.json();
+}
+function t(key, fb){
+  const v = TR && TR[key];
+  if (typeof v === "string" && v.length) return v;
+  return fb === undefined ? key : fb;
+}
+function fill(str, vals){
+  let i = 0;
+  return String(str).replace(/\{[a-z_]+\}/g, function(){ return vals[i++]; });
+}
+function esc(s){
+  return String(s === null || s === undefined ? "" : s)
+    .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+}
+function num(v){ return NF.format(Number(v) || 0); }
+function firstLine(s){
+  const one = String(s || "").split("\n")[0].trim();
+  return one.length > 62 ? one.slice(0,62) + "…" : one;
+}
+function stamp(iso){
+  return String(iso || "").replace("T"," ").replace(/\.\d+/,"").replace("Z","").replace(/\+00:00$/,"").trim();
+}
+function dur(sec){
+  const s = Math.max(0, Math.round(Number(sec) || 0));
+  if (s < 90) return s + "s";
+  if (s < 5400) return Math.round(s/60) + "m";
+  if (s < 172800) return Math.round(s/3600) + "h";
+  return Math.round(s/86400) + "d";
+}
+function since(iso, refIso){
+  const a = Date.parse(iso), b = Date.parse(refIso);
+  if (!isFinite(a) || !isFinite(b)) return "—";
+  return dur((b - a) / 1000);
+}
+function tone(level){
+  const s = String(level || "").toLowerCase();
+  if (s === "ok" || s === "success" || s === "online" || s === "pass") return "ok";
+  if (s === "warn" || s === "warning" || s === "degraded" || s === "medium") return "warn";
+  if (s === "crit" || s === "critical" || s === "error" || s === "fail" || s === "failed" || s === "offline" || s === "high") return "crit";
+  if (s === "info" || s === "low") return "info";
+  return "neutral";
+}
+function toneWord(tn){
+  if (tn === "ok") return t("gui_status_pill_label_success");
+  if (tn === "warn") return t("gui_status_pill_label_warning");
+  if (tn === "crit") return t("gui_status_pill_label_danger");
+  if (tn === "info") return t("gui_status_pill_label_info");
+  return t("gui_status_pill_label_neutral");
+}
+function worst(levels){
+  const rank = ["ok","info","neutral","warn","crit"];
+  let out = "ok";
+  levels.forEach(function(l){ const tn = tone(l); if (rank.indexOf(tn) > rank.indexOf(out)) out = tn; });
+  return out;
+}
+const CHART_FONT = '"Noto Sans", "Noto Sans CJK TC", sans-serif';
+let _ctx = null;
+function textw(str, px){
+  if (!_ctx) _ctx = document.createElement("canvas").getContext("2d");
+  _ctx.font = px + "px " + CHART_FONT;
+  return _ctx.measureText(String(str)).width;
+}
+function clipText(str, maxw, px){
+  let s = String(str);
+  if (textw(s, px) <= maxw) return s;
+  while (s.length > 1 && textw(s + "…", px) > maxw) s = s.slice(0, -1);
+  return s + "…";
+}
+
+/* ---------- SVG primitives ---------- */
+function capPath(x, y, w, h, r){
+  const rr = Math.max(0, Math.min(r, w, h/2));
+  return "M" + x + "," + y + " H" + (x + w - rr) +
+    " A" + rr + "," + rr + " 0 0 1 " + (x + w) + "," + (y + rr) +
+    " V" + (y + h - rr) +
+    " A" + rr + "," + rr + " 0 0 1 " + (x + w - rr) + "," + (y + h) +
+    " H" + x + " Z";
+}
+/* Editorial ranked ledger: rank numeral, pair, service, thin ink bar, value. */
+function rankedLedger(host, rows){
+  if (!host) return;
+  const W = Math.max(560, host.clientWidth);
+  const rowH = 46, barH = 8;
+  const H = rows.length * rowH + 26;
+  const rankW = 46, nameW = Math.round(W * 0.30), valueW = 116;
+  const x0 = rankW + nameW + 24, span = Math.max(60, W - valueW - x0);
+  const max = rows.reduce(function(m, r){ return Math.max(m, r[2]); }, 0) || 1;
+  let s = '<svg width="' + W + '" height="' + H + '" viewBox="0 0 ' + W + ' ' + H + '" role="img">';
+  s += '<line class="c-grid" x1="0" y1="18" x2="' + W + '" y2="18" stroke-width="1"/>';
+  s += '<text class="c-ink3" x="0" y="11" font-size="9.5" font-weight="700" letter-spacing="1.8">' + esc(rows.hdr[0]) + '</text>';
+  s += '<text class="c-ink3" x="' + x0 + '" y="11" font-size="9.5" font-weight="700" letter-spacing="1.8">' + esc(rows.hdr[1]) + '</text>';
+  s += '<text class="c-ink3" x="' + W + '" y="11" font-size="9.5" font-weight="700" letter-spacing="1.8" text-anchor="end">' + esc(rows.hdr[2]) + '</text>';
+  rows.forEach(function(r, i){
+    const y = 26 + i * rowH;
+    const bw = Math.max(2, Math.round(span * (r[2] / max)));
+    s += '<text class="rk c-ink3" x="0" y="' + (y + 21) + '" font-size="17">' + (i + 1 < 10 ? "0" : "") + (i + 1) + '</text>';
+    s += '<text class="c-ink" x="' + rankW + '" y="' + (y + 16) + '" font-size="14">' + esc(clipText(r[0], nameW, 14)) + '</text>';
+    s += '<text class="c-ink3" x="' + rankW + '" y="' + (y + 31) + '" font-size="11">' + esc(clipText(r[1], nameW, 11)) + '</text>';
+    s += '<path class="c-bar" d="' + capPath(x0, y + 12, bw, barH, 4) + '"/>';
+    s += '<text class="c-ink2" x="' + W + '" y="' + (y + 20) + '" font-size="12.5" text-anchor="end">' + esc(r[3]) + '</text>';
+    s += '<line class="c-grid" x1="0" y1="' + (y + rowH - 6) + '" x2="' + W + '" y2="' + (y + rowH - 6) + '" stroke-width="1"/>';
+  });
+  s += "</svg>";
+  host.innerHTML = s;
+}
+/* Ordinal composition — one achromatic ramp, ordered steps, 2px paper gaps. */
+function ordinalStack(host, segs){
+  if (!host) return;
+  const W = Math.max(90, host.clientWidth), H = 7, gap = 2;
+  const total = segs.reduce(function(a, s){ return a + s[1]; }, 0) || 1;
+  const live = segs.filter(function(s){ return s[1] > 0; });
+  const usable = W - gap * Math.max(0, live.length - 1);
+  let x = 0, s = '<svg width="' + W + '" height="' + H + '" viewBox="0 0 ' + W + ' ' + H + '" role="img">';
+  segs.forEach(function(seg, i){
+    if (seg[1] <= 0) return;
+    const w = Math.max(4, Math.round(usable * (seg[1] / total)));
+    s += '<rect class="c-r' + (i + 1) + '" x="' + x + '" y="0" width="' + w + '" height="' + H + '"/>';
+    x += w + gap;
+  });
+  s += "</svg>";
+  host.innerHTML = s;
+}
+
+/* ---------- render ---------- */
+function paint(st, ov, au, pu, top, rl){
+  const ref = ov.as_of;
+  const ven = ov.ven || {}, enf = ov.enforcement || {}, blk = ov.blocked || {}, pipe = ov.pipeline || {}, tls = ov.tls || {}, po = ov.posture || {}, al = ov.alerts || {};
+  const jobs = ov.job_health || [];
+  const chans = st.alert_channels || [];
+  const pce = st.pce_stats || {};
+  const su = au.summary || {};
+
+  document.getElementById("whoHost").textContent = String(st.api_url || "").replace(/^https?:\/\//, "");
+  document.getElementById("whoMeta").textContent = "v" + st.version + " · " + st.timezone + " · " + st.language;
+
+  /* --- status ledger: 5 semantic lights --- */
+  const badJobs = jobs.filter(function(j){ return j.level !== "ok"; });
+  const lags = pipe.cache_lag || [];
+  const maxLag = lags.reduce(function(m, l){ return Math.max(m, l.lag_s || 0); }, 0);
+  const liveCh = chans.filter(function(c){ return c.enabled && c.configured; });
+  const failCh = liveCh.filter(function(c){ return c.last_status && c.last_status !== "success"; });
+  const lights = [];
+  lights.push([t("gui_ov_job_health"), badJobs.length ? worst(badJobs.map(function(j){ return j.level; })) : "ok",
+    (jobs.length - badJobs.length), t("gui_jh_overdue") + " " + badJobs.length, "/" + jobs.length]);
+  lights.push([t("gui_dashboard_pce_health"),
+    pce.consecutive_failures > 0 ? "crit" : (pce.last_error ? "warn" : tone(pce.health_status)),
+    String(pce.health_status || "").toUpperCase(),
+    pce.last_error ? (pce.last_error_stage + " · " + firstLine(pce.last_error)) : (t("gui_ov_as_of") + " " + since(pce.last_success, ref)), ""]);
+  lights.push([t("gui_ov_cache_lag_label"), worst(lags.map(function(l){ return l.level; })), dur(maxLag),
+    lags.map(function(l){ return l.source + " " + dur(l.lag_s); }).join(" · "), ""]);
+  lights.push([t("gui_ov_pipeline_title"), tone(pipe.verdict), pipe.siem_success_1h,
+    t("gui_ov_dlq") + " " + num(pipe.dlq), "%"]);
+  lights.push([t("gui_ov_alert_channels"), failCh.length ? "crit" : (liveCh.length ? "info" : "neutral"),
+    liveCh.length, liveCh.map(function(c){ return c.name; }).join(" · "), "/" + chans.length]);
+
+  document.getElementById("ledger").innerHTML = lights.map(function(l){
+    return '<div class="lg-cell t-' + l[1] + '"><span class="k"><span class="dot"></span><span class="lbl">' + esc(l[0]) + '</span></span>' +
+      '<div class="v">' + esc(l[2]) + '<s>' + esc(l[4]) + '</s></div><div class="d" title="' + esc(l[3]) + '">' + esc(l[3]) + '</div></div>';
+  }).join("") +
+  '<div class="lg-meta"><span class="lbl">' + esc(t("gui_ov_as_of")) + '</span><b>' + esc(stamp(ref)) + ' ' + esc(st.timezone) + '</b>' +
+  esc(t("gui_ov_autorefresh")) + '</div>';
+
+  /* --- band 1: posture as the lede --- */
+  const score = Number(po.score) || 0;
+  const pT = score >= 75 ? "ok" : (score >= 50 ? "warn" : "crit");
+  document.getElementById("hSec").textContent = t("gui_ov_eyebrow_security");
+  document.getElementById("mSec").textContent = t("gui_ov_as_of") + " " + stamp(po.source_date);
+  document.getElementById("posture").innerHTML =
+    '<div class="t-' + pT + '"><span class="lbl">' + esc(t("gui_ov_posture_score_label")) + ' · ' + esc(toneWord(pT)) + '</span>' +
+    '<span class="num">' + score + '<s>/100</s></span></div>' +
+    '<p class="formula">' + esc(po.formula) + '</p>' +
+    '<div class="comp">' + (po.components || []).map(function(c){
+      const pct = Math.max(0, Math.min(100, Number(c.value) || 0));
+      return '<div class="crow"><span class="cn">' + esc(t(c.label_key)) +
+        '<span class="cnote">' + esc(t(c.note_key)) + '</span></span>' +
+        '<span class="cv">' + c.value + '<s>' + esc(c.unit) + '</s></span>' +
+        '<span class="cw">w ' + c.weight + ' · ' + c.points + '</span>' +
+        '<span class="cb"><i style="width:' + pct + '%"></i></span></div>';
+    }).join("") + '</div>';
+  document.getElementById("remedy").innerHTML =
+    '<span class="lbl">' + esc(t("gui_posture_rmd_title")) + '</span>' +
+    '<ul class="rmd" style="margin-top:22px">' + (po.remediation || []).map(function(r, i){
+      return '<li><span class="rn">' + (i + 1 < 10 ? "0" : "") + (i + 1) + '</span>' +
+        '<span class="rt">' + esc(t(r.recommendation_key)) + '</span>' +
+        '<span class="rp">+' + r.recoverable_points + '</span></li>';
+    }).join("") + '</ul>' +
+    '<div class="colophon" style="padding-top:16px"><span>' + esc(t("gui_posture_rmd_points")) + '</span>' +
+    '<span>' + esc(t("gui_posture_modal_col_weight")) + ' · ' + esc(t("gui_posture_modal_col_points")) + '</span></div>';
+
+  /* --- band 2: top 10 traffic ledger --- */
+  const rows = (top.data || []).map(function(r){
+    return [r.s_name + "  " + r.dir + "  " + r.d_name, r.svc + " · " + r.s_ip + " → " + r.d_ip, parseFloat(r.val_fmt) || 0, r.val_fmt];
+  });
+  rows.hdr = [t("gui_ov_drill_workloads"), t("gui_flows"), t("gui_ov_traffic")];
+  const trunc = top.truncated ? fill(t("gui_ov_truncated_fmt"), [t("gui_ov_drill_traffic"), top.data.length, top.total]) : (num(top.total) + " " + t("gui_ov_rows"));
+  document.getElementById("hTop").textContent = "Top 10 · " + t("gui_ov_traffic");
+  document.getElementById("mTop").textContent = top.source + " · cap " + top.cap + " · " + trunc;
+
+  /* --- band 3: operations facts --- */
+  const modes = enf.by_mode || {};
+  const order = ["idle","visibility_only","selective","full"];
+  const segs = order.map(function(k){ return [k, Number(modes[k]) || 0]; });
+  const venT = tone(ven.verdict), blkT = tone(blk.verdict), pipeT = tone(pipe.verdict), alT = tone(al.verdict);
+  const tlsT = tls.check_failed ? "crit" : (tls.expiring_soon ? "warn" : "ok");
+  document.getElementById("hOps").textContent = t("gui_ov_eyebrow_ops");
+  document.getElementById("mOps").textContent = t("gui_dashboard_rules") + " " + num(st.rules_count) + " · " + t("gui_ov_events") + " " + num(pce.last_batch_total);
+  document.getElementById("facts").innerHTML =
+    '<div class="fact t-' + venT + '"><span class="lbl">' + esc(t("gui_ov_ven_title")) + '</span>' +
+    '<div class="v">' + ven.online + '<s>/' + ven.total + '</s></div>' +
+    '<ul><li><span>' + esc(t("gui_ov_offline")) + '</span><b>' + ven.offline + '</b></li>' +
+    '<li><span>degraded</span><b>' + ven.degraded + '</b></li>' +
+    '<li><span>' + esc(t("gui_ov_oldest_hb")) + '</span><b>' + dur(ven.oldest_heartbeat_age_s) + '</b></li></ul>' +
+    '<span class="st"><span class="dot"></span>' + esc(toneWord(venT)) + '</span></div>' +
+
+    '<div class="fact"><span class="lbl">' + esc(t("gui_ov_enforcement_modes")) + '</span>' +
+    '<div class="v">' + enf.total + '<s> ' + esc(t("gui_ov_total")) + '</s></div>' +
+    '<div id="enfChart" style="margin-top:14px"></div>' +
+    '<div class="stack-lg">' + segs.map(function(s, i){
+      return '<span><i class="sw' + (i + 1) + '"></i>' + esc(s[0]) + ' <b>' + s[1] + '</b></span>';
+    }).join("") + '</div></div>' +
+
+    '<div class="fact t-' + blkT + '"><span class="lbl">' + esc(t("gui_ov_blocked_title")) + '</span>' +
+    '<div class="v">' + num(blk.blocked) + '<s> ' + esc(t("gui_pd_blocked")) + '</s></div>' +
+    '<ul><li><span>' + esc(t("gui_pd_potential")) + '</span><b>' + num(blk.potential) + '</b></li>' +
+    '<li><span>' + esc(t("gui_pd_allowed")) + '</span><b>' + num(blk.allowed) + '</b></li>' +
+    '<li><span>' + esc(t("gui_ov_vs_prev")) + ' (' + blk.window_days + 'd)</span><b>' + blk.vs_prev_pct + '%</b></li></ul></div>' +
+
+    '<div class="fact t-' + tlsT + '"><span class="lbl">' + esc(t("gui_ov_tls_cert")) + '</span>' +
+    '<div class="v">' + num(tls.days_remaining) + '<s> ' + esc(t("gui_ov_tls_days")) + '</s></div>' +
+    '<ul><li><span>enabled</span><b>' + (tls.enabled ? "true" : "false") + '</b></li>' +
+    '<li><span>expiring_soon</span><b>' + (tls.expiring_soon ? "true" : "false") + '</b></li>' +
+    '<li><span>' + esc(t("gui_health_check")) + '</span><b>' + (st.health_check ? t("gui_status_ok") : t("gui_status_fail")) + '</b></li></ul>' +
+    '<span class="st"><span class="dot"></span>' + esc(toneWord(tlsT)) + '</span></div>' +
+
+    '<div class="fact t-' + pipeT + '"><span class="lbl">' + esc(t("gui_ov_pipeline_title")) + '</span>' +
+    '<div class="v">' + pipe.siem_success_1h + '<s>%</s></div>' +
+    '<ul><li><span>' + esc(t("gui_ov_dlq_total")) + '</span><b>' + num(pipe.dlq) + '</b></li>' +
+    lags.map(function(l){ return '<li><span>' + esc(t("gui_ov_cache_lag_label")) + ' ' + esc(l.source) + '</span><b>' + dur(l.lag_s) + '</b></li>'; }).join("") +
+    '</ul><span class="st"><span class="dot"></span>' + esc(toneWord(pipeT)) + '</span></div>' +
+
+    '<div class="fact t-' + alT + '"><span class="lbl">' + esc(t("gui_ov_alerts_title")) + '</span>' +
+    '<div class="v">' + num(al.fired_24h) + '<s> 24h</s></div>' +
+    '<ul><li><span>' + esc(t("gui_ov_failed")) + '</span><b>' + num(al.failed) + '</b></li>' +
+    '<li><span>' + esc(t("gui_ov_suppressed")) + '</span><b>' + num(al.suppressed) + '</b></li>' +
+    '<li><span>' + esc(t("gui_ov_alert_channels")) + '</span><b>' + liveCh.length + '/' + chans.length + '</b></li></ul>' +
+    '<span class="st"><span class="dot"></span>' + esc(toneWord(alT)) + '</span></div>';
+
+  /* --- band 4: audit + policy usage + reports --- */
+  document.getElementById("hAudit").textContent = t("gui_dashboard_audit_summary");
+  document.getElementById("mAudit").textContent = (su.date_range || []).join(" → ") + " · " + num(su.record_count) + " " + t("gui_ov_rows");
+  document.getElementById("audit").innerHTML =
+    '<dl class="kpi">' + (su.kpis || []).map(function(k){
+      return '<div><dt title="' + esc(k.label) + '">' + esc(k.label) + '</dt><dd>' + esc(k.value) + '</dd></div>';
+    }).join("") + '</dl>' +
+    '<span class="lbl" style="margin-top:26px">' + esc(t("gui_dashboard_audit_attention")) + '</span>' +
+    '<ul class="att" style="margin-top:10px">' + (su.attention_items || []).map(function(a){
+      const tn = tone(a.risk);
+      return '<li class="t-' + tn + '"><span class="tg">' + esc(a.risk) + '</span><span class="s">' + esc(a.summary) + '</span>' +
+        '<span class="c">×' + a.count + '</span><span class="r">' + esc(a.event_type) + ' — ' + esc(a.recommendation) + '</span></li>';
+    }).join("") + '</ul>';
+
+  document.getElementById("hPu").textContent = t("gui_dashboard_policy_usage_summary");
+  document.getElementById("pu").innerHTML =
+    '<div class="note"><span class="lbl">' + esc(t("gui_reports_empty_title")) + '</span>' +
+    '<p>' + esc(pu.error || t("gui_dashboard_no_policy_usage_summary")) + '</p>' +
+    '<button type="button">' + esc(t("gui_ov_posture_run_now")) + '</button></div>';
+
+  const reps = (rl.reports || []).slice().sort(function(a, b){ return b.mtime - a.mtime; });
+  document.getElementById("hRep").textContent = t("gui_tab_reports");
+  document.getElementById("mRep").textContent = reps.length + " " + t("gui_ov_rows");
+  document.getElementById("reports").innerHTML =
+    '<table class="led"><thead><tr><th>' + esc(t("gui_report_output")) + '</th><th class="n">' + esc(t("gui_jh_th_last_run")) + '</th></tr></thead><tbody>' +
+    reps.slice(0, 5).map(function(r){
+      return '<tr><td class="k" title="' + esc(r.filename) + '">' + esc(r.report_type || "—") + ' — ' + esc(r.filename) + '</td>' +
+        '<td class="n">' + dur(Date.parse(ref) / 1000 - r.mtime) + '</td></tr>';
+    }).join("") + '</tbody></table>';
+
+  document.getElementById("colophon").innerHTML =
+    '<span>PCE <b>' + esc(st.api_url) + '</b></span>' +
+    '<span>' + esc(t("gui_ov_job_health")) + ' <b>' + (jobs.length - badJobs.length) + '/' + jobs.length + '</b></span>' +
+    '<span>' + esc(t("gui_dashboard_rules")) + ' <b>' + num(st.rules_count) + '</b></span>' +
+    '<span>' + esc(t("gui_ov_as_of")) + ' <b>' + esc(stamp(ref)) + ' ' + esc(st.timezone) + '</b></span>' +
+    '<span>illumio-ops <b>v' + esc(st.version) + '</b></span>';
+
+  window.__redraw = function(){
+    rankedLedger(document.getElementById("topChart"), rows);
+    ordinalStack(document.getElementById("enfChart"), segs);
+  };
+  window.__redraw();
+}
+
+async function boot(){
+  try{
+    try{ TR = await grab("ui_translations.json"); }catch(err){ TR = null; }
+    const all = await Promise.all(FILES.map(grab));
+    TR = all[6];
+    document.getElementById("app").hidden = false;
+    paint(all[0], all[1], all[2], all[3], all[4], all[5]);
+  }catch(e){
+    document.getElementById("err").hidden = false;
+    document.getElementById("errMsg").textContent = fill(t("gui_ov_load_error","Overview load failed: {err}"), [String(e && e.message || e)]) +
+      "\n\nfetch base: " + SNAP + "  (以 http.server 提供，勿用 file://)";
+  }
+}
+document.getElementById("themeBtn").addEventListener("click", function(){
+  const root = document.documentElement;
+  root.dataset.theme = root.dataset.theme === "dark" ? "light" : "dark";
+  if (window.__redraw) window.__redraw();
+});
+let rt = 0;
+window.addEventListener("resize", function(){
+  clearTimeout(rt);
+  rt = setTimeout(function(){ if (window.__redraw) window.__redraw(); }, 120);
+});
+boot();
+</script>
+</body>
+</html>
