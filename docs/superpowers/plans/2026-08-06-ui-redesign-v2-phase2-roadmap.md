@@ -9,10 +9,12 @@
 | # | 計畫 | 內容 | 前置 | 預估額度視窗 |
 |---|---|---|---|---|
 | 2A | `2026-08-06-phase2a-gui.md`（本輪撰寫） | 六區前端＋登入＋切換上線：port mockup core/components/areas 到 `src/static/js/v2/`、模板拆分、真 API 接線、i18n 鍵入庫、legacy e2e 遷移、102 項覆蓋 gate 改打真 app、測試機部署驗證 | — | 4–6 |
-| 2B | phase2b-reports | `report_css.py` 依 `design/v2/reports/shell.css` 重寫；11 型 exporter 逐一套統一殼（reskin_report.py 的章節模型為原型）；測試機真資料重產全 11 型、雙寬度＋PDF 逐頁親驗（CLAUDE.md 硬規則） | 2A 合併（token 來源） | 2–3 |
-| 2C | phase2c-cli | 互動選單依 `design/v2/cli-flows.md`（63 項對照、36 畫面）重組；click 子指令不動 | 無硬前置，排 2B 後 | 1–2 |
-| 2D | phase2d-product-bugs | Phase 1 挖出的 15+ 產品 bug（清單見下）；與 2A-2C 解耦、可穿插 | — | 1–2 |
-| 2E | phase2e-final-verification | 全案收斂：離線 bundle 打包驗證（Linux+Windows parity）、真機全遍歷驗證報告、docs 更新（gui-tour 等）、CHANGELOG | 2A–2D | 1 |
+| 2B | `2026-08-07-phase2b-reports.md`（已撰寫） | 新殼 CSS＋`report_shell.py` renderer；HTML 報表逐一套統一殼（reskin_report.py 的章節模型為原型）；測試機真資料重產、雙寬度＋PDF 逐頁親驗（CLAUDE.md 硬規則） | 無硬前置（實查 shell.css 自帶列印 token 子集，不依賴 2A 檔案；仍建議照序） | 2–3 |
+| 2C | `2026-08-07-phase2c-cli.md`（已撰寫） | 互動選單依 `design/v2/cli-flows.md`（63 項對照、41 畫面）重組；click 子指令不動 | 無硬前置，排 2B 後 | 1–2 |
+| 2D | `2026-08-07-phase2d-product-bugs.md`（已撰寫） | backlog 18 條已逐條對源碼重驗（14 仍在、2 描述有誤但有殘缺口、#10 已修、#12 需裁決）；與 2A-2C 解耦、可穿插 | — | 1–2 |
+| 2E | `2026-08-07-phase2e-final-verification.md`（已撰寫） | 全案收斂：離線 bundle 打包驗證（Linux+Windows parity）、真機 102 項遍歷驗證報告、docs 更新（gui-tour 全檔重寫等）、CHANGELOG＋版本號（建議 5.0.0，待使用者裁決） | 2A–2D | 1 |
+
+> **2026-08-08 撰寫時勘誤**（各計畫內有完整依據，執行時以計畫為準）：HTML 殼實為 **10 型**（policy_resolver 僅 JSON/CSV）；cli-flows 畫面稿實為 **41 張**（非 36）；產品無伺服端 PDF，PDF 驗收＝print CSS＋Playwright print-to-PDF；雙寬度慣例 1280/800；backlog #11 由 2C T7（移除 `_root.py` 重複入口）解決，2D Task 13 為條件式（grep 無命中即跳過）；#14 豁免移交 2C。
 
 ## 產品 bug backlog（2D 素材，出處=Phase 1 各任務報告）
 
