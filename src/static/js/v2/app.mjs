@@ -79,9 +79,10 @@ async function mountPlaceholder(root, ctx) {
 // (docs/superpowers/plans/2026-08-06-phase2a-gui.md Tasks 4-9). Each area's
 // own task registers its real sub-routes (e.g. #/investigate/traffic); the
 // fallback mount below covers any of those before that task lands, and any
-// unknown hash after.
+// unknown hash after. #/overview is registered separately below (Task 4 —
+// the first area with a real implementation) and left out of this list so
+// the placeholder loop does not overwrite it.
 const AREA_ROUTES = [
-  "#/overview",
   "#/investigate",
   "#/alerting",
   "#/automation",
@@ -103,6 +104,12 @@ async function boot() {
     syncRail(railHost, path);
   });
 
+  // Lazy per-route import (router.mjs's documented pattern): nothing but
+  // this shell fetches until #/overview is actually visited.
+  router.register("#/overview", async function (el2, ctx) {
+    const { mountOverview } = await import("./areas/overview.mjs");
+    return mountOverview(el2, ctx);
+  });
   AREA_ROUTES.forEach(function (route) { router.register(route, mountPlaceholder); });
   router.setFallback(mountPlaceholder);
 

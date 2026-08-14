@@ -231,6 +231,13 @@ def test_table_column_resize_drag_changes_width(v2_page):
     )
     grip = page.locator("#test-table .tbl-grip").first
     grip.wait_for(state="visible")
+    # Task 4: #/overview now mounts the real 16-card board (previously a
+    # 2-line placeholder), so #test-table — appended straight to
+    # document.body, after the board — lands far below the 720px viewport
+    # (verified: page scrollHeight ~1844px). bounding_box() does not
+    # auto-scroll (only actions like .click() do), so the raw coordinate
+    # drag below would silently miss the grip without this.
+    grip.scroll_into_view_if_needed()
     box = grip.bounding_box()
     before_width = page.evaluate(
         "document.querySelector('#test-table col').style.width"
