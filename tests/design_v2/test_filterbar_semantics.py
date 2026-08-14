@@ -5,12 +5,24 @@ serialized a merged-column query differently from the shipping one, so the same
 saved query returned different flows. This test makes that class of divergence a
 test failure instead of a field report.
 
-Method: load the SHIPPING file (src/static/js/filter-bar.js) and the MOCKUP file
-(design/v2/mockup/js/components/filter-bar.mjs) into the same headless browser,
-one per blank page, and drive BOTH through the identical call sequence over the
-queries actually stored on the appliance (design/v2/snapshots/dashboard_queries.json,
-which carries one AND query — src_labels + dst_labels — and one OR query —
-any_label). Outputs must be equal, key for key.
+Method: load the SHIPPING file (src/static/js/filter-bar.js), the MOCKUP file
+(design/v2/mockup/js/components/filter-bar.mjs) and the ported V2 PRODUCT file
+(src/static/js/v2/components/filter-bar.mjs) into the same headless browser,
+one per blank page, and drive all three through the identical call sequence
+over the queries actually stored on the appliance
+(design/v2/snapshots/dashboard_queries.json, which carries one AND query —
+src_labels + dst_labels — and one OR query — any_label). Outputs must be
+equal, key for key, across all three.
+
+THREE-WAY, not two-way, and why: Phase 2A Task 3 ported the mockup file into
+the production tree (verbatim except a single i18n key rename outside the
+serialization core — see that file's header). This test now guards the port
+itself, not just the original mockup, by parameterizing `_sources()` over all
+three paths below. Task 11 deletes the legacy `filter-bar.js` once the v2 GUI
+replaces it in production, at which point this drops back to a two-way
+comparison (mockup vs v2) — that cleanup is Task 11's job, not this one's.
+
+Paths compared (PROD/MOCK/V2 constants below, `_sources()` iterates the list):
 
 Departures from the task brief's sketch, and why:
   * `_objfbDeserialize(state, dict)` takes the state as its FIRST argument and
@@ -38,6 +50,13 @@ import pytest
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 PROD = ROOT / "src" / "static" / "js" / "filter-bar.js"
 MOCK = ROOT / "design" / "v2" / "mockup" / "js" / "components" / "filter-bar.mjs"
+V2 = ROOT / "src" / "static" / "js" / "v2" / "components" / "filter-bar.mjs"
+# Ordered (name, path) pairs — the "parameterized paths" the three-way
+# comparison iterates. PROD is the reference every other name is compared
+# against; the .mjs sources have "export " stripped so a classic <script> tag
+# sees the same global function names as PROD (both mockup and v2 files are
+# written import-free for exactly this reason — see their own headers).
+SOURCE_PATHS = [("prod", PROD), ("mock", MOCK), ("v2", V2)]
 CASES_FILE = ROOT / "design" / "v2" / "snapshots" / "dashboard_queries.json"
 
 # filter-bar.js:104 calls window.debounce at construction; the mockup resolves
@@ -89,7 +108,10 @@ def _cases():
 
 
 def _sources():
-    return {"prod": PROD.read_text(), "mock": MOCK.read_text().replace("export ", "")}
+    return {
+        name: (path.read_text() if name == "prod" else path.read_text().replace("export ", ""))
+        for name, path in SOURCE_PATHS
+    }
 
 
 @pytest.fixture(scope="module")
@@ -131,9 +153,11 @@ def test_snapshot_carries_one_and_query_and_one_or_query():
 
 
 def test_deserialize_then_serialize_matches_production(page):
-    """The serialization core: same pills, same inferred mode, same dict."""
+    """The serialization core: same pills, same inferred mode, same dict —
+    for BOTH the mockup and the ported v2 product file, against PROD."""
     results = _run(page, CORE_JS, [_cases()])
     assert results["mock"] == results["prod"]
+    assert results["v2"] == results["prod"]
 
 
 @pytest.mark.parametrize("mode", ["and", "or"])
@@ -143,10 +167,12 @@ def test_serialize_matches_production_in_both_modes(page, mode):
     In AND mode a label pill serializes to {src,dst}_labels; in OR mode every
     pill collapses onto the single-value any_* keys (filter-bar.js:130-142), and
     several pills of one category keep only the last. That lossy collapse is the
-    behaviour the product ships, so the mockup has to lose exactly as much.
+    behaviour the product ships, so the mockup — and the ported v2 file — have
+    to lose exactly as much.
     """
     results = _run(page, API_JS, [_cases(), mode])
     assert results["mock"] == results["prod"]
+    assert results["v2"] == results["prod"]
 
 
 @pytest.mark.parametrize("mode", ["and", "or"])

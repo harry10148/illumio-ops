@@ -106,3 +106,55 @@ export function dismissible(node, onDismiss) {
   document.addEventListener("mousedown", onDown, true);
   return dispose;
 }
+
+const FOCUSABLE_SELECTOR = [
+  "a[href]", "button:not([disabled])", "textarea:not([disabled])",
+  "input:not([disabled])", "select:not([disabled])",
+  '[tabindex]:not([tabindex="-1"])',
+].join(",");
+
+function focusableIn(root) {
+  return Array.from(root.querySelectorAll(FOCUSABLE_SELECTOR)).filter(function (n) {
+    return n.offsetWidth > 0 || n.offsetHeight > 0 || n === document.activeElement;
+  });
+}
+
+/**
+ * trapFocus(el) -> dispose()
+ * Confines Tab / Shift+Tab to `el`'s focusable descendants (wrapping at both
+ * ends) and moves focus onto the first one immediately. Shared by drawer.mjs
+ * and modal.mjs so both dialogs implement exactly one focus trap.
+ *
+ * dispose() only removes the keydown listener — it does NOT restore focus.
+ * Only the caller knows what "the opener" was (it captured
+ * document.activeElement before building the dialog), so restoring focus is
+ * the caller's job, done from its own close().
+ */
+export function trapFocus(el) {
+  function onKey(e) {
+    if (e.key !== "Tab") return;
+    const items = focusableIn(el);
+    if (!items.length) { e.preventDefault(); return; }
+    const first = items[0];
+    const last = items[items.length - 1];
+    const active = document.activeElement;
+    if (e.shiftKey) {
+      if (active === first || !el.contains(active)) {
+        e.preventDefault();
+        last.focus();
+      }
+    } else {
+      if (active === last || !el.contains(active)) {
+        e.preventDefault();
+        first.focus();
+      }
+    }
+  }
+  el.addEventListener("keydown", onKey);
+  const items = focusableIn(el);
+  if (items.length) items[0].focus();
+  else if (typeof el.focus === "function") el.focus();
+  return function dispose() {
+    el.removeEventListener("keydown", onKey);
+  };
+}
