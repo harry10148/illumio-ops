@@ -185,9 +185,11 @@ CJK_RE = re.compile(r"[\u4e00-\u9fff]")
 GUI_KEY_PATTERNS = [
     re.compile(r'data-i18n=["\']([A-Za-z0-9_&]+)["\']'),
     re.compile(r"""_translations\[['"]([A-Za-z0-9_&]+)['"]\]"""),
-    # Require a non-identifier character before _?t(, otherwise .get("x"),
-    # set("x"), assert("x") would all falsely match the "t(" suffix.
-    re.compile(r"""(?<![A-Za-z0-9_])_?t\(\s*["\']([A-Za-z0-9_&]+)["\']"""),
+    # Require a non-identifier character before _?t(/_?tf(, otherwise .get("x"),
+    # set("x"), assert("x") would all falsely match the "t(" suffix. The
+    # optional "f" also covers core/i18n.mjs's tf(key, values, fallback?)
+    # helper used throughout src/static/js/v2/.
+    re.compile(r"""(?<![A-Za-z0-9_])_?tf?\(\s*["\']([A-Za-z0-9_&]+)["\']"""),
 ]
 
 PLACEHOLDER_PREFIX_RE = re.compile(r"^(?:Rpt|GUI|Gui|Sched)\b")
@@ -216,7 +218,15 @@ def _iter_files(exts: tuple[str, ...]) -> list[Path]:
             continue
         if path.suffix not in exts:
             continue
-        if any(part in SKIP_DIRS for part in path.parts):
+        # Check SKIP_DIRS against the path *relative to SRC*, not the
+        # absolute path. ROOT is frequently a git worktree checked out under
+        # a directory literally named ".claude" (e.g.
+        # .claude/worktrees/<name>/), which is itself one of SKIP_DIRS. Using
+        # absolute path.parts there means every single file's ancestor chain
+        # contains ".claude", so `any(part in SKIP_DIRS ...)` matches on the
+        # checkout location and silently skips the entire tree — the audit
+        # then "passes" with 0 findings because it scanned nothing.
+        if any(part in SKIP_DIRS for part in path.relative_to(SRC).parts):
             continue
         out.append(path)
     return out
@@ -242,7 +252,7 @@ def _rel(path: Path) -> str:
 def collect_referenced_keys() -> dict[str, list[tuple[str, int]]]:
     """Return {key: [(file, line), ...]} for every i18n key referenced in code."""
     refs: dict[str, list[tuple[str, int]]] = {}
-    for path in _iter_files((".py", ".html", ".js")):
+    for path in _iter_files((".py", ".html", ".js", ".mjs")):
         if path in I18N_SOURCE_FILES:
             continue
         text = _read(path)
@@ -433,7 +443,7 @@ def audit_hardcoded_cjk() -> list[Finding]:
                 key="—",
                 detail=snippet,
             ))
-    for path in _iter_files((".js", ".html")):
+    for path in _iter_files((".js", ".mjs", ".html")):
         if path in I18N_SOURCE_FILES or path in BILINGUAL_DATA_FILES:
             continue
         rel = _rel(path)
@@ -625,7 +635,7 @@ def audit_js_translation_fallback_literals() -> list[Finding]:
     pattern = re.compile(
         r"_translations\[[^\]]+\]\s*\|\|\s*(['\"])(?P<text>[^'\"]*[A-Za-z][^'\"]*)\1"
     )
-    for path in _iter_files((".js", ".html")):
+    for path in _iter_files((".js", ".mjs", ".html")):
         if path in I18N_SOURCE_FILES:
             continue
         rel = _rel(path)

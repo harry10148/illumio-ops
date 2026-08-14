@@ -39,6 +39,18 @@ jobs:
       - name: Install dev dependencies
         run: pip install -r requirements-dev.txt
 
+      - name: Install Playwright Chromium (v2 GUI e2e)
+        # Chromium only, headless — the v2 e2e suite (tests/test_v2_*_e2e.py)
+        # never opens a headed browser or touches firefox/webkit. Without
+        # this step the browser binary is missing: the package install above
+        # already makes every v2 e2e test's
+        # `pytest.importorskip("playwright.sync_api")` guard pass (the
+        # *package* is present), so the tests would no longer skip — they
+        # would instead fail with "Executable doesn't exist" from
+        # `_v2_browser`'s `chromium.launch()` in tests/v2_e2e_utils.py. This
+        # step is what makes them actually pass instead.
+        run: python -m playwright install --with-deps chromium
+
       - name: Security audit (pip-audit)
         run: |
           pip install pip-audit

@@ -69,9 +69,7 @@ async function mountPlaceholder(root, ctx) {
     el("code", { text: ctx.route })
   ));
   root.appendChild(el("section", { class: "wip", "data-tone": "info" },
-    el("p", { text: tf(
-      "gui_shell_wip_body",
-      { route: ctx.route },
+    el("p", { text: tf("gui_shell_wip_body", { route: ctx.route },
       "This area has not been built yet. Route: {route}"
     ) })
   ));

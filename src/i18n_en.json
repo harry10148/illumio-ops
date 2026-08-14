@@ -4665,5 +4665,9 @@
   "gui_health_chan_live": "{live}/{total} channels live",
   "gui_health_reasons": "Reasons",
   "gui_health_goto": "Go to",
-  "gui_fb_browse_captured": "{0} / {1} shown"
+  "gui_fb_browse_captured": "{0} / {1} shown",
+  "gui_shell_wip_title": "Coming soon",
+  "gui_shell_wip_body": "This area has not been built yet. Route: {route}",
+  "gui_status_version": "Version",
+  "gui_status_rules_count": "Rules"
 }

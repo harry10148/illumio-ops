@@ -4665,5 +4665,9 @@
   "gui_health_chan_live": "{live}/{total} 個管道正常",
   "gui_health_reasons": "原因",
   "gui_health_goto": "前往",
-  "gui_fb_browse_captured": "已顯示 {0} / {1} 筆"
+  "gui_fb_browse_captured": "已顯示 {0} / {1} 筆",
+  "gui_shell_wip_title": "即將推出",
+  "gui_shell_wip_body": "此區域尚未建置完成。路由：{route}",
+  "gui_status_version": "版本",
+  "gui_status_rules_count": "規則數"
 }
