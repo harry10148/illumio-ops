@@ -25,8 +25,20 @@ re-implement this pattern per file.
     plain-HTTP local server can carry the session cookie), and
     `app.testing = True` (so Talisman's forced-HTTPS redirect is disabled —
     see src/gui/__init__.py:461-476, `_force_https_unless_testing`).
-  - Serves it with `werkzeug.serving.make_server("127.0.0.1", 0, app)` on a
-    background thread, using an OS-assigned port so tests never collide.
+  - Serves it with `werkzeug.serving.make_server("127.0.0.1", 0, app,
+    threaded=True)` on a background thread, using an OS-assigned port so
+    tests never collide. `threaded=True` (Task 4 fix — the real production
+    server runs cheroot's multi-thread pool, see
+    src/gui/routes/dashboard.py:560-562's own comment) matters once a test
+    drives two genuinely concurrent requests: a page that fires a slow
+    PCE-backed background fetch (verified: label/IP-list/service resolution
+    against an unreachable PCE can chain several ~6s DNS-retry failures
+    before the request itself even starts, 30s+ total) and then, moments
+    later, a fast foreground POST/GET — without `threaded=True` the dev
+    server's single worker queues the fast request behind the slow one,
+    which read as the fast request hanging (reproduced and confirmed: the
+    save button's own request never even started listening until the slow
+    one finished).
   - Logs in through the REAL `/api/login` endpoint via Playwright's
     `BrowserContext.request` (an APIRequestContext bound to the same browser
     context, so the session cookie it receives is sent by subsequent `page`
@@ -122,7 +134,11 @@ class _LiveServer:
     """A real werkzeug HTTP server for `app`, running on a background thread."""
 
     def __init__(self, app):
-        self._server = make_server("127.0.0.1", 0, app)
+        # threaded=True — see this module's docstring ("What it does") for
+        # why a single-threaded dev server produces spurious hangs once a
+        # test drives a slow background fetch concurrently with a fast
+        # foreground one; the real production server is multi-threaded too.
+        self._server = make_server("127.0.0.1", 0, app, threaded=True)
         self._thread = threading.Thread(target=self._server.serve_forever, daemon=True)
 
     @property

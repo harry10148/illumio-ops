@@ -141,16 +141,52 @@ const FIELD_LABELS = [
   ["proto", "gui_protocol"],
   ["ex_port", "gui_ex_port"],
 ];
-const LIST_FIELDS = ["src_labels", "dst_labels", "ports"];
+// src_label/dst_label/ex_src_label/ex_dst_label are the pre-Phase-4b legacy
+// singular label fields (dashboard.py:548-558's `else` branch) — a query
+// saved before that migration carries these instead of src_labels/dst_labels.
+// Rendered as comma-separated list inputs, same as their plural siblings
+// (fieldLabel() below gives them the same composed label), so editing one is
+// no different from editing a new-format query — and so buildSavePayload's
+// LEGACY_LABEL_KEYS wrap below always receives an array, never a bare string.
+const LIST_FIELDS = [
+  "src_labels", "dst_labels", "ports",
+  "src_label", "dst_label", "ex_src_label", "ex_dst_label",
+];
 
 // dashboard.py:539-546 (api_save_dashboard_query) — top-level scalar keys the
 // save endpoint reads straight off the body, plus the `filters` dict it
 // flattens through a fixed whitelist (fb_keys). FILTER_SAVE_KEYS are the
-// members of that whitelist this form actually edits (src_labels/dst_labels/
-// any_label/ports); the whitelist has more members than this form exposes,
-// which is fine — a key this form never writes never appears in the body.
+// members of that whitelist this form's own (post-Phase-4b) fields write
+// directly (src_labels/dst_labels/any_label/ports); the whitelist has more
+// members than this form exposes, which is fine — a key this form never
+// writes never appears in the body.
+//
+// LEGACY_SCALAR_FILTER_KEYS and LEGACY_LABEL_KEYS exist for one reason: a
+// query saved before Phase 4b (dashboard.py:548-558's `else` branch) has
+// NONE of the FILTER_SAVE_KEYS above — it carries src_label/dst_label
+// (singular) and src_ip_in/dst_ip_in/ex_src_ip/ex_dst_ip instead. Without
+// forwarding those too, editing a legacy query — even just renaming it —
+// would save an empty filters dict and silently unscope it (review finding,
+// Important 1: this is a real defect this port introduces by ALWAYS sending
+// `filters` now — see the comment on that below — combined with never
+// reading these keys back out).
+//   - src_ip_in/dst_ip_in/ex_src_ip/ex_dst_ip whitelist verbatim under their
+//     legacy name (dashboard.py's _fb_keys tuple), so they need no renaming.
+//   - src_label/dst_label/ex_src_label/ex_dst_label wrap into the plural
+//     whitelisted name as a list — the exact transform
+//     filter-bar.js:187-200's _objfbDeserialize already performs when
+//     reading a legacy query back into pills (a singular label spec is
+//     `.concat`ed onto the plural list, i.e. treated as one more element of
+//     it, not a structurally different value).
 const TOP_LEVEL_SAVE_KEYS = ["name", "rank_by", "pd", "port", "proto", "ex_port"];
 const FILTER_SAVE_KEYS = ["src_labels", "dst_labels", "any_label", "ports"];
+const LEGACY_SCALAR_FILTER_KEYS = ["src_ip_in", "dst_ip_in", "ex_src_ip", "ex_dst_ip"];
+const LEGACY_LABEL_KEYS = [
+  ["src_label", "src_labels"],
+  ["dst_label", "dst_labels"],
+  ["ex_src_label", "ex_src_labels"],
+  ["ex_dst_label", "ex_dst_labels"],
+];
 
 function lookup(pairs, key, fallback) {
   let hit = fallback;
@@ -662,8 +698,21 @@ function fieldKeys(queries) {
 }
 
 function fieldLabel(key) {
-  if (key === "src_labels") return t("gui_fb_dir_src") + " " + t("gui_fb_cat_label");
-  if (key === "dst_labels") return t("gui_fb_dir_dst") + " " + t("gui_fb_cat_label");
+  if (key === "src_labels" || key === "src_label") return t("gui_fb_dir_src") + " " + t("gui_fb_cat_label");
+  if (key === "dst_labels" || key === "dst_label") return t("gui_fb_dir_dst") + " " + t("gui_fb_cat_label");
+  // Legacy-only fields (pre-Phase-4b; see LIST_FIELDS/LEGACY_* above) reuse
+  // existing catalogue keys rather than minting new ones — same composed
+  // pattern as src_labels/dst_labels just above, "not"-flavoured for the
+  // ex_ (exclude) fields and IP-flavoured for the ip_in fields. Falling
+  // through to t(key) here (a raw field name, never a catalogue key) would
+  // land "src_label" et al. in i18n.missing() every time a legacy query's
+  // edit drawer opens.
+  if (key === "ex_src_label" || key === "ex_src_labels") return t("gui_fb_col_src_not") + " " + t("gui_fb_cat_label");
+  if (key === "ex_dst_label" || key === "ex_dst_labels") return t("gui_fb_col_dst_not") + " " + t("gui_fb_cat_label");
+  if (key === "src_ip_in") return t("gui_fb_dir_src") + " " + t("gui_fb_cat_ip");
+  if (key === "dst_ip_in") return t("gui_fb_dir_dst") + " " + t("gui_fb_cat_ip");
+  if (key === "ex_src_ip") return t("gui_fb_col_src_not") + " " + t("gui_fb_cat_ip");
+  if (key === "ex_dst_ip") return t("gui_fb_col_dst_not") + " " + t("gui_fb_cat_ip");
   return t(lookup(FIELD_LABELS, key, key));
 }
 
@@ -1216,7 +1265,21 @@ function buildBoard(host, d, state) {
   // list, "add query" must keep offering the full schema, not shrink to
   // nothing (see fieldKeys()'s empty-input fallback above).
   async function refreshQueries() {
-    const queries = await api.reload("dashboard_queries");
+    // api.reload() throws on a non-2xx GET (core/api.mjs's load()/fetchJson()
+    // contract). The POST/DELETE this always follows has already succeeded
+    // by the time refreshQueries() runs — only the re-read can fail here —
+    // but drawer.mjs's Save button has no catch around `await o.onSave()`
+    // (only a `finally`), so letting this throw would escape as an
+    // unhandled rejection: the drawer stays open, no toast fires, and the
+    // user has no way to tell the write actually went through (review
+    // finding, promoted from Minor). Caught and surfaced distinctly instead.
+    let queries;
+    try {
+      queries = await api.reload("dashboard_queries");
+    } catch (e) {
+      toast.crit(tf("error_generic", { error: (e && e.message) || String(e) }));
+      return;
+    }
     // A save/delete can still be in flight when the user navigates away;
     // state.torn (set by mountOverview's teardown callback) stops a late
     // resolution from repainting a torn-down board — same reasoning as
@@ -1336,7 +1399,29 @@ function buildSavePayload(def, idx) {
     if (Array.isArray(v) && !v.length) return;
     filters[k] = v;
   });
-  if (Object.keys(filters).length) body.filters = filters;
+  LEGACY_SCALAR_FILTER_KEYS.forEach(function (k) {
+    const v = def[k];
+    if (v === undefined || v === null || v === "") return;
+    filters[k] = v;
+  });
+  LEGACY_LABEL_KEYS.forEach(function (pair) {
+    const src = pair[0], dest = pair[1];
+    const v = def[src];
+    if (v === undefined || v === null) return;
+    const vals = (Array.isArray(v) ? v : [v]).filter(function (s) { return s !== "" && s !== null && s !== undefined; });
+    if (!vals.length) return;
+    const existing = filters[dest] || [];
+    vals.forEach(function (item) { if (existing.indexOf(item) < 0) existing.push(item); });
+    filters[dest] = existing;
+  });
+  // ALWAYS send `filters`, even {}: dashboard.py:519-546 only takes the
+  // flat-whitelist dict branch when `d.get('filters')` is a dict at all
+  // (isinstance check) — omitting the key for a filter-less query would
+  // fall through to dashboard.py:547-558's legacy branch, which rebuilds
+  // query_def from combined `src`/`dst`/`ex_src`/`ex_dst` strings this form
+  // never sends, blanking every filter field (not just the legacy ones the
+  // LEGACY_* forwarding above targets) — the exact bug this fix closes.
+  body.filters = filters;
   if (idx !== undefined && idx !== null) body.idx = idx;
   return body;
 }

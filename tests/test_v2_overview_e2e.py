@@ -44,6 +44,12 @@ pytest.importorskip("playwright.sync_api", exc_type=ImportError)
 # order) are required.
 pytest_plugins = ["tests.v2_e2e_utils"]
 
+# Plain functions/classes (not fixtures) from the shared harness, imported
+# directly so the legacy-query regression test below can seed
+# settings.dashboard_queries BEFORE the server starts — v2_page/v2_server
+# give no hook for that.
+from tests.v2_e2e_utils import build_v2_app, _LiveServer, v2_login  # noqa: E402
+
 
 def _goto_overview(page, base_url):
     page.goto(base_url + "/v2#/overview")
@@ -130,6 +136,107 @@ def test_custom_query_create_appears_edit_delete_round_trip(v2_page):
     page.wait_for_selector('body[data-booted="true"]')
     panel = page.locator('section[data-cov="OV-04"]')
     assert panel.locator("li").filter(has_text=query_name).count() == 0
+
+
+def test_legacy_scalar_query_edit_preserves_filters_on_save(v2_context, temp_config_file):
+    """Review finding (Important 1): a query saved before Phase 4b
+    (dashboard.py:548-558's `else` branch — src_label/dst_label/src_ip_in/
+    dst_ip_in singular/scalar keys, not the post-Phase-4b
+    src_labels/dst_labels/... plural whitelist) had its filters silently
+    dropped by the FIRST Save through this drawer, even a Save that only
+    renamed the query — buildSavePayload() forwarded none of the legacy
+    keys, so an empty `filters` dict reached the backend.
+
+    This does not use the v2_page fixture: it needs to seed
+    settings.dashboard_queries with a legacy-shaped entry BEFORE the server
+    starts, which v2_page (already logged in, already serving) has no hook
+    for.
+    """
+    app, cm = build_v2_app(temp_config_file)
+    with cm.write_lock:
+        cm.load()
+        cm.config.setdefault("settings", {})["dashboard_queries"] = [{
+            "name": "legacy-e2e-query",
+            "rank_by": "count",
+            "pd": 3,
+            "port": None, "proto": None, "ex_port": None,
+            "src_label": "role=web",
+            "dst_label": "role=db",
+            "src_ip_in": "10.0.0.0/8",
+            "dst_ip_in": None,
+            "ex_src_label": None, "ex_dst_label": None,
+            "ex_src_ip": None, "ex_dst_ip": None,
+        }]
+        cm.save()
+
+    server = _LiveServer(app)
+    server.start()
+    try:
+        base_url = server.base_url
+        v2_login(v2_context, base_url)
+        labels = None
+        page = v2_context.new_page()
+        page.set_default_timeout(10_000)
+        try:
+            page.goto(base_url + "/v2#/overview")
+            page.wait_for_selector('body[data-booted="true"]')
+
+            panel = page.locator('section[data-cov="OV-04"]')
+            row = panel.locator("li").filter(has_text="legacy-e2e-query")
+            assert row.count() == 1
+
+            labels = _labels(page)
+            row.get_by_role("button", name=labels["edit"], exact=True).click()
+            drawer = page.locator("aside.drawer")
+            drawer.wait_for(state="visible")
+
+            # Rename only — every other field left exactly as loaded. The
+            # legacy fields render as plain inputs (no i18n key of their own
+            # before this fix's fieldLabel() extension, which is itself
+            # covered by the i18n.missing() check further down).
+            drawer.locator('input[data-field="name"]').fill("legacy-e2e-query-renamed")
+            drawer.locator(".drawer-f button.btn.primary").click()
+            page.wait_for_selector("aside.drawer", state="detached")
+
+            # i18n.missing() must stay empty even after opening a legacy
+            # query's edit drawer (brief S4) — fieldLabel()'s raw t(key)
+            # fallback for an untranslated field name would have added
+            # "src_label" etc. to it.
+            missing = page.evaluate(
+                "async () => { const { i18n } = await import('/static/js/v2/core/i18n.mjs'); "
+                "return i18n.missing(); }"
+            )
+            assert missing == [], missing
+        finally:
+            page.close()
+
+        # Re-read from the real backend (not the DOM) — the regression is
+        # server-side data loss, so the proof has to be server-side too.
+        page2 = v2_context.new_page()
+        page2.set_default_timeout(10_000)
+        try:
+            page2.goto(base_url + "/v2#/overview")
+            page2.wait_for_selector('body[data-booted="true"]')
+            queries = page2.evaluate(
+                "async () => { const { api } = await import('/static/js/v2/core/api.mjs'); "
+                "return api.load('dashboard_queries'); }"
+            )
+        finally:
+            page2.close()
+    finally:
+        server.stop()
+
+    match = [q for q in queries if q.get("name") == "legacy-e2e-query-renamed"]
+    assert len(match) == 1, queries
+    saved = match[0]
+    # The legacy singular keys migrate to their plural whitelisted name (the
+    # backend's dict-branch always writes back in that shape once `filters`
+    # is a dict at all) — the point is that the VALUES survive a save that
+    # only touched the name, in whichever shape, not that the old key names
+    # persist unchanged.
+    assert saved.get("src_labels") == ["role=web"], saved
+    assert saved.get("dst_labels") == ["role=db"], saved
+    assert saved.get("src_ip_in") == "10.0.0.0/8", saved
 
 
 def test_posture_drawer_opens_and_closes(v2_page):

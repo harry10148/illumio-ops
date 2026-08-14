@@ -45,9 +45,13 @@ def _goto_overview(page, base_url):
 
 def test_v2_boots_with_no_console_errors(v2_page):
     page, base_url = v2_page
-    errors = []
-    page.on("pageerror", lambda exc: errors.append(str(exc)))
-    page.on("console", lambda msg: errors.append(msg.text) if msg.type == "error" else None)
+    errors = []  # (text, location_url) pairs
+    page.on("pageerror", lambda exc: errors.append((str(exc), "")))
+    page.on(
+        "console",
+        lambda msg: errors.append((msg.text, (msg.location or {}).get("url", "")))
+        if msg.type == "error" else None,
+    )
 
     _goto_overview(page, base_url)
 
@@ -58,11 +62,33 @@ def test_v2_boots_with_no_console_errors(v2_page):
     # resolves) — an ordinary operational condition, not a bug; the area is
     # specifically built to survive exactly this and still render the other
     # 15 cards (areas/overview.mjs's loadOne()/loadAll()). The unavoidable
-    # byproduct is two console entries neither this fixture nor overview.mjs
-    # can suppress: the browser's own network-failure log for the 502, and
-    # overview.mjs's own diagnostic console.error() for the same failure.
-    # Anything else is still a real failure this test must catch.
-    unexpected = [e for e in errors if "events/viewer" not in e and "502" not in e]
+    # byproduct is exactly two known console entries neither this fixture
+    # nor overview.mjs can suppress:
+    #   1. The browser's OWN network-failure log. Its .text is a generic
+    #      "Failed to load resource: ... 502 (BAD GATEWAY)" with NO endpoint
+    #      named at all (verified directly) — the failed request's URL only
+    #      shows up in the console message's .location.url, not its .text.
+    #   2. overview.mjs's own loadOne() diagnostic console.error(), whose
+    #      .text DOES name the endpoint ("[overview] events_viewer failed to
+    #      load ... /api/events/viewer ..."), but whose .location points at
+    #      the overview.mjs source line that logged it, not at the failed
+    #      resource.
+    #
+    # Review finding (Important 2): an earlier version of this filter
+    # excluded "events/viewer" OR "502" independently, freestanding, in
+    # .text alone — by De Morgan that tolerates ANY error containing "502"
+    # regardless of endpoint, and ANY error mentioning "events/viewer"
+    # regardless of status. A same-message co-occurrence check (both
+    # substrings in .text) was the suggested tightening, but .text alone
+    # can't express it for entry 1 (no endpoint in its text at all) — hence
+    # checking .location.url for that one and .text for the other, matching
+    # exactly the two known messages and nothing broader.
+    def is_expected(text, location_url):
+        if "events/viewer" in location_url and "502" in text:
+            return True
+        return "events/viewer" in text and "502" in text
+
+    unexpected = [t for t, u in errors if not is_expected(t, u)]
     assert unexpected == [], errors
 
 
