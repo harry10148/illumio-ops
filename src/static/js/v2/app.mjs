@@ -79,9 +79,11 @@ async function mountPlaceholder(root, ctx) {
 // (docs/superpowers/plans/2026-08-06-phase2a-gui.md Tasks 4-9). Each area's
 // own task registers its real sub-routes (e.g. #/investigate/traffic); the
 // fallback mount below covers any of those before that task lands, and any
-// unknown hash after. #/overview is registered separately below (Task 4 —
-// the first area with a real implementation) and left out of this list so
-// the placeholder loop does not overwrite it.
+// unknown hash after. #/overview and #/investigate/* are registered
+// separately below (Tasks 4 and 5 — the areas with a real implementation)
+// and left out of this list so the placeholder loop does not overwrite them.
+// "#/investigate" itself keeps its placeholder: the area has no landing page
+// of its own, only the three sub-routes its own sub-nav links to.
 const AREA_ROUTES = [
   "#/investigate",
   "#/alerting",
@@ -109,6 +111,22 @@ async function boot() {
   router.register("#/overview", async function (el2, ctx) {
     const { mountOverview } = await import("./areas/overview.mjs");
     return mountOverview(el2, ctx);
+  });
+  // Task 5 — the investigate area's three sub-routes, each lazily importing
+  // the one module they share. Registered before the placeholder loop would
+  // be harmless either way (the loop only registers "#/investigate" itself),
+  // but they are grouped with #/overview because they are real areas.
+  router.register("#/investigate/traffic", async function (el2, ctx) {
+    const { mountTraffic } = await import("./areas/investigate.mjs");
+    return mountTraffic(el2, ctx);
+  });
+  router.register("#/investigate/workloads", async function (el2, ctx) {
+    const { mountWorkloads } = await import("./areas/investigate.mjs");
+    return mountWorkloads(el2, ctx);
+  });
+  router.register("#/investigate/events", async function (el2, ctx) {
+    const { mountEvents } = await import("./areas/investigate.mjs");
+    return mountEvents(el2, ctx);
   });
   AREA_ROUTES.forEach(function (route) { router.register(route, mountPlaceholder); });
   router.setFallback(mountPlaceholder);

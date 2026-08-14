@@ -47,6 +47,45 @@
 // are transcribed here verbatim anyway, per the global instruction to
 // transcribe every GET entry including its query string and invent nothing
 // beyond what the yaml states.
+//
+// ── Task 5 (investigate area): two of those fixed example query strings
+//    become parameterised ────────────────────────────────────────────────
+// The sentence above predicted this exactly ("when built, will almost
+// certainly issue its own dynamic query string"). #/investigate/workloads
+// searches by name/ip_address/hostname and #/investigate/events runs a real
+// three-level catalogue cascade plus offset paging, so `workload_search` and
+// `events_viewer` are now `(params) => path` functions of the same shape the
+// three `path_from` entries already use.
+//
+// Neither the endpoint nor the yaml's captured example changes: called with
+// no params each function returns its yaml path byte for byte
+// ("/api/workloads?name=&ip_address=&hostname=" and
+// "/api/events/viewer?limit=100"), so the id -> endpoint mapping this file
+// transcribes is untouched — only the query string a CALLER may now vary is
+// new. The parameter names are the Flask route's own request.args names
+// (actions.py:218-263 api_search_workloads reads name/hostname/ip_address/
+// max_results; events.py:24-52 api_events_viewer reads mins/limit/offset/
+// search/category/type_group/event_type), so a caller reading this file sees
+// which value each query wants without cross-referencing the route.
+// fb_suggest/fb_browse stay literal: components/filter-bar.mjs is fed by
+// injected snapshots by design (it imports nothing and issues no fetch of
+// its own), so no caller has a dynamic query string for them.
+
+/**
+ * qs(params, keys) -> query string over `keys`, in the order given.
+ * A key whose value is null/undefined is emitted as an empty value (the
+ * shipping GUI does the same: quarantine.js:518-534 always sends all three
+ * workload fields, empty or not, and both routes treat "" as "no filter").
+ */
+function qs(params, keys) {
+  const p = new URLSearchParams();
+  const src = params || {};
+  keys.forEach(function (k) {
+    const v = src[k];
+    p.set(k, v === null || v === undefined ? "" : String(v));
+  });
+  return p.toString();
+}
 
 export const GET_MAP = {
   // ── plain GET, no payload ──────────────────────────────────────────────
@@ -61,7 +100,13 @@ export const GET_MAP = {
   rhc_enablement: "/api/rule_hit_count/enablement",
   rules: "/api/rules",
   event_catalog: "/api/event-catalog",
-  events_viewer: "/api/events/viewer?limit=100",
+  // Parameterised — see the "Task 5" note in the header. No params reproduces
+  // the yaml's captured path exactly: "/api/events/viewer?limit=100".
+  events_viewer(params) {
+    if (!params) return "/api/events/viewer?limit=100";
+    return "/api/events/viewer?" + qs(params,
+      ["mins", "limit", "offset", "search", "category", "type_group", "event_type"]);
+  },
   rs_status: "/api/rule_scheduler/status",
   rs_rulesets: "/api/rule_scheduler/rulesets",
   rs_schedules: "/api/rule_scheduler/schedules",
@@ -99,7 +144,34 @@ export const GET_MAP = {
   },
 
   // ── GET entries filed under the yaml's POST banner — see header comment ─
-  workload_search: "/api/workloads?name=&ip_address=&hostname=",
+  // Parameterised — see the "Task 5" note in the header. No params reproduces
+  // the yaml's captured path exactly: "/api/workloads?name=&ip_address=&hostname=".
+  workload_search(params) {
+    return "/api/workloads?" + qs(params, ["name", "ip_address", "hostname"]);
+  },
   fb_suggest: "/api/filter-objects/suggest?q=web&types=label&limit=10",
   fb_browse: "/api/filter-objects/browse?type=label&offset=0&limit=20",
+
+  // ── The one entry that is NOT in endpoints.yaml ────────────────────────
+  // shadow_compare has no yaml entry because that file lists SNAPSHOT ids,
+  // and this endpoint was never snapshotted: it has no shipping UI at all
+  // (grep src/static + src/templates for shadow_compare — nothing), so
+  // design/v2's capture pass had no page to capture it from, and the mockup
+  // says so in as many words (areas/investigate.mjs's shadowPanel comment:
+  // "there is no shadow_compare snapshot to render"). Phase 2A Task 5's
+  // brief assigns IV-15 to it explicitly, so it is a real, read-only GET
+  // route (src/gui/routes/events.py:150-201, which clamps mins to [5,10080]
+  // and limit to [1,500] and answers {ok, summary, items[]}) that this map
+  // has to name for api.load() to reach it. Called with no params it uses
+  // the same defaults that route applies to a bare request.
+  //
+  // It is listed here, rather than reached through some raw-path escape
+  // hatch on api.mjs, so that "every GET this frontend makes is named in
+  // GET_MAP" stays true — the reason the do-not-add rule above exists is to
+  // stop SILENT drift from the yaml, and an entry that states it is not
+  // from the yaml, and why, is not silent.
+  shadow_compare(params) {
+    if (!params) return "/api/events/shadow_compare";
+    return "/api/events/shadow_compare?" + qs(params, ["mins", "limit"]);
+  },
 };
