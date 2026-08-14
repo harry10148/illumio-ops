@@ -91,19 +91,65 @@ export function closeButton(label, onClick) {
   return b;
 }
 
-/** Close on Escape / outside click. Returns a dispose() that is safe to re-run. */
+// Stack of live dismissible() entries, oldest first. Only the LAST entry
+// (the most recently opened, still-open dialog) is "topmost" and allowed to
+// react to Escape / an outside click — see dismissible()'s own doc comment
+// for why this has to be stack-aware, not just per-instance.
+const dismissStack = [];
+
+/**
+ * Close on Escape / outside click. Returns a dispose() that is safe to re-run.
+ *
+ * Stack-aware: every open dialog (drawer.mjs, modal.mjs, palette.mjs,
+ * healthbar.mjs's popovers) calls this once. Dialogs nest — Tasks 4-9 open a
+ * confirm modal on top of a drawer immediately (rule editing, destructive
+ * actions) — and two bugs showed up as soon as that happens:
+ *
+ *   1. Escape closed BOTH layers. Each call adds its own capture-phase
+ *      `keydown` listener on `document`; `stopPropagation()` does not stop
+ *      sibling listeners registered on the *same* node, only
+ *      `stopImmediatePropagation()` does. With two listeners live, one
+ *      Escape press ran both handlers — and since the drawer registered
+ *      first, IT closed first, which is backwards (the top layer should
+ *      close first).
+ *   2. A mousedown inside the modal closed the drawer underneath it. The
+ *      modal is mounted on `document.body`, not inside the drawer's
+ *      `<aside>`, so `!node.contains(e.target)` was true for the drawer's
+ *      own outside-click check on every click inside the modal.
+ *
+ * Fix: a shared stack of entries. Only the topmost entry's handlers act;
+ * everyone else no-ops until they become topmost again. `dispose()` removes
+ * ITS OWN entry wherever it is in the stack (not just the top), so a drawer
+ * closed programmatically while its modal is still open does not leave a
+ * stale reference at the top — the modal (or whatever is now newest) simply
+ * becomes topmost.
+ */
 export function dismissible(node, onDismiss) {
   let live = true;
-  function onKey(e) { if (e.key === "Escape") { e.stopPropagation(); dispose(); onDismiss(); } }
-  function onDown(e) { if (live && !node.contains(e.target)) { dispose(); onDismiss(); } }
+  const entry = {};
+  function isTop() { return live && dismissStack[dismissStack.length - 1] === entry; }
+  function onKey(e) {
+    if (e.key !== "Escape" || !isTop()) return;
+    e.stopImmediatePropagation();
+    dispose();
+    onDismiss();
+  }
+  function onDown(e) {
+    if (!isTop() || node.contains(e.target)) return;
+    dispose();
+    onDismiss();
+  }
   function dispose() {
     if (!live) return;
     live = false;
+    const i = dismissStack.indexOf(entry);
+    if (i >= 0) dismissStack.splice(i, 1);
     document.removeEventListener("keydown", onKey, true);
     document.removeEventListener("mousedown", onDown, true);
   }
   document.addEventListener("keydown", onKey, true);
   document.addEventListener("mousedown", onDown, true);
+  dismissStack.push(entry);
   return dispose;
 }
 

@@ -6,11 +6,15 @@
 // PORT OF design/v2/mockup/js/components/palette.mjs, verbatim except i18n
 // keys renamed v2_cmd_* -> gui_cmd_*.
 //
-// No destroy() here, deliberately: palette is a shell-level singleton (one
-// dialog for the whole session, like toast.mjs's single host), not something
-// an area mounts and later tears down. Its own open()/close() already form a
-// complete show/hide cycle for the one dialog instance; a destroy() would
-// have nothing more to release and nowhere shorter-lived to be called from.
+// palette.destroy() is a no-op, deliberately: palette is a shell-level
+// singleton (one dialog for the whole session, like toast.mjs's single
+// host), not something an area mounts and later tears down. Its own
+// open()/close() already form a complete show/hide cycle for the one dialog
+// instance, so there is nothing a per-instance teardown could release. The
+// method still exists (review finding, Task 3 follow-up) so a caller that
+// trusts the universal "every component exposes destroy()" contract gets a
+// harmless no-op instead of `TypeError: destroy is not a function` — the
+// brief's contract has no carve-out, even where the implementation is empty.
 
 import { el, clear, dismissible } from "../core/dom.mjs";
 import { t } from "../core/i18n.mjs";
@@ -162,6 +166,9 @@ export const palette = {
   open() { openPalette(); },
   close() { close(); },
   toggle() { if (wrap && !wrap.hidden) close(); else openPalette(); },
+  /** destroy() — no-op; see the header note. Exists so callers that trust
+   * the universal teardown contract don't have to special-case palette. */
+  destroy() {},
 
   /** Binds Cmd/Ctrl+K and creates the (hidden) dialog so XC-02 exists from boot. */
   install() {

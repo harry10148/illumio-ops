@@ -7,12 +7,22 @@
 // catalogue; err_ alone collided with the unrelated gui_err_* HTTP-error
 // strings already in src/i18n_en.json, hence errcard_ instead of just err_).
 //
-// No destroy() here, deliberately: errorCard() returns a bare HTMLElement —
-// same contract as the mockup — with no subscription, timer or document-level
-// listener outside the card's own retry button (which is garbage-collected
-// with the card when its host clears/replaces it). There is nothing for a
-// destroy() to release, so adding a stub one would violate this task's own
-// self-review bar ("a working destroy(), or just a stub?").
+// No destroy() here, deliberately — and this is the one asymmetry left in
+// the component layer after the Task 3 review (palette.mjs's equivalent
+// no-resource case got a no-op destroy() instead; this one didn't). The
+// difference: palette is a module object (`export const palette = {...}`),
+// so adding a no-op method costs nothing. errorCard() returns a bare
+// HTMLElement — same contract as the mockup — and the only way to hang a
+// destroy() off that return value would be to change its return type (an
+// object wrapping the element, or a function property bolted onto the
+// element like healthbar.mjs's `rail.destroy`). That would break every
+// caller that currently does `host.appendChild(errorCard(opts))` expecting
+// a plain node, for a component with no subscription, timer or
+// document-level listener outside its own retry button (garbage-collected
+// with the card when its host clears/replaces it) — i.e. nothing to
+// release. Not worth the API change. A caller that wants the universal
+// contract should not call destroy() on what errorCard() returns; nothing
+// in this component ever asked to be torn down.
 
 import { el, spacer } from "../core/dom.mjs";
 import { t, tf } from "../core/i18n.mjs";

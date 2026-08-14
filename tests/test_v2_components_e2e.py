@@ -14,6 +14,12 @@ Covers exactly the brief's Step 2 acceptance list:
   - modal.confirm({onOk: undefined}) does not throw a TypeError when its OK
     button is clicked — a real defect in design/v2/mockup/js/components/
     modal.mjs's `await o.onOk()` call, ported forward and only fixed here.
+
+Also covers the Task 3 review's Fix 1: dom.mjs's dismissible() had to become
+stack-aware once dialogs nest (a confirm modal opened on top of a drawer —
+the shape Tasks 6 and 9 use immediately). test_nested_dialogs_* below are
+genuine regressions: both fail against the pre-fix dismissible() (see that
+function's own doc comment in dom.mjs for the two concrete bugs).
 """
 from __future__ import annotations
 
@@ -151,6 +157,62 @@ def test_drawer_destroy_and_onclose_hook_run_on_any_close_path(v2_page):
     assert result["hasDestroy"] is True
     assert result["stillInDom"] is False
     assert result["closed"] == 1
+
+
+def _open_nested_drawer_and_modal(page):
+    """Drawer opened first (bottom layer), a confirm modal opened on top of
+    it — the nesting shape Task 6 (rule editing) and Task 9 (destructive
+    confirms) use immediately: a modal over a drawer that is still open."""
+    _open_test_drawer(page)
+    page.evaluate(
+        "async () => {"
+        "  const { modal } = await import('/static/js/v2/components/modal.mjs');"
+        "  const handle = modal.confirm({ title: 'Delete?', impact: ['1 thing'] });"
+        "  handle.el.id = 'test-modal-nested';"
+        "}"
+    )
+
+
+def test_nested_dialogs_escape_closes_topmost_first(v2_page):
+    """Regression (Task 3 review Fix 1): dismissible() used to be purely
+    per-instance, so every open dialog's own document-level Escape handler
+    ran on a single press — stopPropagation() does not stop sibling
+    listeners on the same node, only stopImmediatePropagation() does — and
+    since the drawer registered its listener first, it closed BEFORE the
+    modal on top of it: both layers gone, in the wrong order. This test
+    fails against the pre-fix dismissible() (both dialogs would already be
+    gone after the first Escape below)."""
+    page, base_url = v2_page
+    _goto_overview(page, base_url)
+    _open_nested_drawer_and_modal(page)
+
+    assert page.evaluate("document.getElementById('test-drawer') !== null")
+    assert page.evaluate("document.getElementById('test-modal-nested') !== null")
+
+    page.keyboard.press("Escape")
+    # Topmost (the modal) closes first; the drawer underneath survives.
+    assert page.evaluate("document.getElementById('test-modal-nested') === null")
+    assert page.evaluate("document.getElementById('test-drawer') !== null")
+
+    page.keyboard.press("Escape")
+    assert page.evaluate("document.getElementById('test-drawer') === null")
+
+
+def test_nested_dialogs_click_inside_modal_does_not_close_drawer(v2_page):
+    """Regression (Task 3 review Fix 1): dismissible()'s outside-click check
+    only ever compared against its OWN node, so a mousedown anywhere inside
+    the modal — which is mounted on document.body, not inside the drawer's
+    <aside> — satisfied the drawer's "outside" test and tore the drawer down
+    underneath the still-open modal. This test fails against the pre-fix
+    dismissible() (the drawer would be gone after the click below)."""
+    page, base_url = v2_page
+    _goto_overview(page, base_url)
+    _open_nested_drawer_and_modal(page)
+
+    page.locator("#test-modal-nested h2").click()
+
+    assert page.evaluate("document.getElementById('test-modal-nested') !== null")
+    assert page.evaluate("document.getElementById('test-drawer') !== null")
 
 
 def test_table_column_resize_drag_changes_width(v2_page):
