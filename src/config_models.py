@@ -182,6 +182,7 @@ class WebGuiSettings(_Base):
     allowed_ips: list[str] = Field(default_factory=list)
     tls: WebGuiTls = Field(default_factory=WebGuiTls)
     must_change_password: bool = False
+    enable_v2_preview: bool = False
 
 class PceProfile(_Base):
     """Extra=allow since PCE profile shape may evolve; only require id + url."""

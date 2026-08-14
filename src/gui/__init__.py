@@ -515,6 +515,13 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False, use_https: boo
     from src.gui.routes.admin import make_admin_blueprint
     app.register_blueprint(make_admin_blueprint(cm, limiter, login_required, persistent_mode))
 
+    # ── V2 Preview Blueprint (flag-gated, default off) ────────────────────────
+    # Registered only when the flag is on so /v2 404s naturally while it's off,
+    # rather than needing an explicit gate inside the view.
+    if cm.config.get("web_gui", {}).get("enable_v2_preview", False):
+        from src.gui.routes.v2 import make_v2_blueprint
+        app.register_blueprint(make_v2_blueprint(cm, login_required))
+
     @app.errorhandler(_RstDrop)
     def handle_rst_drop(e):
         # Socket is already closed with RST ??return an empty Response object
