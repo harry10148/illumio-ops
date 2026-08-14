@@ -9,14 +9,17 @@ Covers exactly the brief's Step 2 acceptance list:
   - #/overview shows the health rail; #/reports does not (XC-01 scope, T2's
     syncRail wiring in app.mjs).
   - hash routing switches the mounted area without a page reload.
-  - theme persists across a reload (theme.mjs + app.mjs's initDisplay()).
+  - theme AND density persist across a reload (theme.mjs + app.mjs's
+    initDisplay()).
   - api.load("status") reaches the DOM with a real daemon field (the running
     app's own version string, not a fixture literal).
   - the CSRF-aware POST/GET/DELETE round trip against a real endpoint
     (/api/dashboard/queries): create -> list shows it -> delete -> list
     doesn't.
-  - i18n.missing() runs without throwing (the bridge is allowed a non-empty
-    backlog at this stage — keys land per area in Tasks 4-9).
+  - i18n's real backend contract: a real catalogue key (one of the ~1400
+    gui_/sched_/status_/error_/pd_ keys already in src/i18n_en.json /
+    src/i18n_zh_TW.json, served through GET /api/ui_translations) actually
+    resolves through t(), and a known-absent key lands in i18n.missing().
 """
 from __future__ import annotations
 
@@ -66,27 +69,38 @@ def test_health_rail_only_on_overview(v2_page):
     page.wait_for_selector("code:text-is('#/reports')")
     assert page.locator("#health-rail").count() == 0
 
+    # The placeholder body must degrade through tf()'s fallback, not leak
+    # the raw, unresolved i18n key onto the screen (review finding: tf() had
+    # no fallback path, so every placeholder area rendered the literal
+    # string "gui_shell_wip_body" until this task's key lands in Tasks 4-9).
+    wip_text = page.locator("section.wip").inner_text()
+    assert "gui_shell_wip_body" not in wip_text
+    assert "#/reports" in wip_text
+
     # And switching back re-attaches it (detach-not-destroy semantics).
     page.evaluate("location.hash = '#/overview'")
     page.wait_for_selector("#health-rail")
     assert __version__ in page.locator("#health-rail").inner_text()
 
 
-def test_theme_persists_across_reload(v2_page):
+def test_theme_and_density_persist_across_reload(v2_page):
     page, base_url = v2_page
     _goto_overview(page, base_url)
 
     assert page.evaluate("document.documentElement.dataset.theme") == "dark"
+    assert page.evaluate("document.documentElement.dataset.density") == "cozy"
 
     page.evaluate(
-        "async () => { const { theme } = await import('/static/js/v2/core/theme.mjs'); "
-        "theme.set('light'); }"
+        "async () => { const { theme, density } = await import('/static/js/v2/core/theme.mjs'); "
+        "theme.set('light'); density.set('compact'); }"
     )
     assert page.evaluate("document.documentElement.dataset.theme") == "light"
+    assert page.evaluate("document.documentElement.dataset.density") == "compact"
 
     page.reload()
     page.wait_for_selector('body[data-booted="true"]')
     assert page.evaluate("document.documentElement.dataset.theme") == "light"
+    assert page.evaluate("document.documentElement.dataset.density") == "compact"
 
 
 def test_dashboard_query_post_get_delete_round_trip(v2_page):
@@ -128,15 +142,62 @@ def test_dashboard_query_post_get_delete_round_trip(v2_page):
     assert all(q.get("name") != "e2e-core-query" for q in after_delete)
 
 
-def test_i18n_missing_mechanism_does_not_throw(v2_page):
+def test_i18n_resolves_real_catalogue_key_and_tracks_missing_keys(v2_page):
+    """The one thing this task actually changed in i18n: t()/tf() now read
+    from GET /api/ui_translations instead of a captured snapshot. Assert
+    that against the real endpoint, not just that the plumbing doesn't
+    throw — a 404'd/reshaped/missing route must fail this test.
+    """
     page, base_url = v2_page
     _goto_overview(page, base_url)
 
-    missing = page.evaluate(
-        "async () => { const { i18n } = await import('/static/js/v2/core/i18n.mjs'); "
-        "return i18n.missing(); }"
+    result = page.evaluate(
+        "async () => { const { t, i18n } = await import('/static/js/v2/core/i18n.mjs'); "
+        "return { "
+        "resolved: t('gui_err_unauthorized'), "
+        "fallback: t('gui_this_key_does_not_exist_anywhere', 'fallback-text'), "
+        "missing: i18n.missing() "
+        "}; }"
     )
-    # T2 only builds the bridge — keys land per area in Tasks 4-9, so a
-    # non-empty backlog is expected. The mechanism must simply not throw and
-    # must produce a real array.
-    assert isinstance(missing, list)
+    # gui_err_unauthorized is the live 401 error string (src/gui/__init__.py's
+    # security_check hook uses it directly) — a real key already in
+    # src/i18n_en.json, served through _ui_translation_dict's gui_ whitelist.
+    # Asserting the exact product text (not just "is truthy") catches a
+    # reshaped response (e.g. {ok, data: {...}} instead of a flat map) that a
+    # weaker assertion would miss.
+    assert result["resolved"] == "Unauthorized."
+    # A key that will never exist must degrade to its fallback...
+    assert result["fallback"] == "fallback-text"
+    # ...and be recorded as backlog, not swallowed.
+    assert "gui_this_key_does_not_exist_anywhere" in result["missing"]
+
+
+def test_i18n_init_failure_is_logged_not_silent(v2_page):
+    """initI18n() swallows a catalogue load failure into catalogue=null so
+    the app can still boot with fallbacks — but that must be loud, not
+    silent. Simulates the failure directly (no route to break) and asserts
+    the console.warn this review requested actually fires.
+    """
+    page, base_url = v2_page
+    _goto_overview(page, base_url)
+
+    warned = page.evaluate(
+        "async () => { "
+        "const mod = await import('/static/js/v2/core/i18n.mjs'); "
+        "const { api } = await import('/static/js/v2/core/api.mjs'); "
+        # api.load() caches successes — the page's own boot already loaded
+        # ui_translations once, so it must be invalidated or this call would
+        # just return the cached success and never see the simulated failure.
+        "api.invalidate('ui_translations'); "
+        "let warned = false; "
+        "const orig = console.warn; "
+        "console.warn = (...args) => { warned = true; orig(...args); }; "
+        "const origFetch = window.fetch; "
+        "window.fetch = () => Promise.reject(new Error('simulated network failure')); "
+        "try { await mod.initI18n(); } finally { "
+        "window.fetch = origFetch; console.warn = orig; "
+        "} "
+        "return warned; "
+        "}"
+    )
+    assert warned is True

@@ -1,6 +1,11 @@
 // theme.mjs — data-theme / data-density on <html>, persisted in localStorage.
-// The shell writes data-theme before first paint (inline bootstrap in index.html);
-// this module owns every change after that.
+// The shell writes data-theme/data-density before first paint. In the mockup
+// that is an inline <script> in index.html; in production (src/templates/
+// v2/base.html) it is core/theme-bootstrap.js, loaded as an external classic
+// <script src="...">, because this app's CSP (script-src 'self', no
+// 'unsafe-inline', no nonce injection) blocks inline scripts — see that
+// file's header comment for the full reasoning. This module owns every
+// change after that point, in both environments.
 
 const KEY_THEME = "ov2.theme";
 const KEY_DENSITY = "ov2.density";

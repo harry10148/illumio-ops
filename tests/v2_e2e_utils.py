@@ -42,7 +42,10 @@ re-implement this pattern per file.
 `from tests.v2_e2e_utils import v2_page` is NOT enough, because pytest only
 resolves a fixture's own dependencies via conftest.py or the requesting
 module's own plugin registration, not via a second module's globals. Register
-the whole chain at once instead:
+the whole chain at once with `pytest_plugins`:
+
+    import pytest
+    pytest.importorskip("playwright.sync_api", exc_type=ImportError)
 
     pytest_plugins = ["tests.v2_e2e_utils"]
 
@@ -50,8 +53,26 @@ the whole chain at once instead:
         page, base_url = v2_page
         ...
 
-`pytest_plugins` at test-module scope (as opposed to a non-rootdir
-conftest.py) is fully supported by pytest 9.x.
+Both lines are required, IN THIS ORDER — this is not optional boilerplate:
+
+  1. `pytest.importorskip(...)` MUST come first, in the consuming module
+     itself, even though this file already guards its own import with the
+     same call. If playwright is not installed and this module is loaded
+     only via the `pytest_plugins` line below, pytest 9.0.3 raises
+     `Skipped` while importing it as a plugin, and pytest silently swallows
+     that into its internal `skipped_plugins` list *without registering any
+     of this module's fixtures* — the consuming test module then fails with
+     a confusing `fixture 'v2_page' not found` instead of skipping cleanly.
+     Calling `importorskip` directly in the consuming module first makes
+     pytest skip that whole module during collection, before it ever tries
+     to load this one as a plugin, which is the clean outcome CI without
+     browsers needs.
+  2. `pytest_plugins = ["tests.v2_e2e_utils"]` — at test-module scope (as
+     opposed to a non-rootdir conftest.py) this is fully supported by
+     pytest 9.x, and is what actually registers `v2_page`'s dependency
+     chain so it resolves.
+
+`tests/test_v2_core_e2e.py` is the reference implementation of this pattern.
 """
 from __future__ import annotations
 

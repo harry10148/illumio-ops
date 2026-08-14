@@ -32,6 +32,10 @@ export async function initI18n() {
     catalogue = await api.load("ui_translations");
   } catch (e) {
     catalogue = null;
+    // A boot-time catalogue failure must be visible — every t() call falls
+    // back to its `fallback` argument (or the raw key) until the next
+    // successful init(), which is silent unless something logs it here.
+    console.warn("[i18n] failed to load ui_translations catalogue; every t() call will use its fallback:", e);
   }
   return { catalogue: !!catalogue };
 }
@@ -55,11 +59,17 @@ export function t(name, fallback) {
 }
 
 /**
- * tf(name, values) -> string with {placeholders} substituted.
+ * tf(name, values, fallback?) -> string with {placeholders} substituted.
  * values: object ({source: "traffic"}) or array (positional, in appearance order).
+ * fallback, when the key is unresolved, is used exactly like t()'s own
+ * `fallback` argument (and may itself contain {placeholder} tokens — they
+ * are substituted the same as a resolved catalogue string). Without this,
+ * an unresolved key renders as the literal key text on screen instead of
+ * degrading gracefully, which is what happened before this parameter
+ * existed (a Task 2 review finding).
  */
-export function tf(name, values) {
-  const raw = t(name);
+export function tf(name, values, fallback) {
+  const raw = t(name, fallback);
   let i = 0;
   return String(raw).replace(/\{([a-zA-Z_][a-zA-Z0-9_]*)\}/g, function (whole, token) {
     if (Array.isArray(values)) return values[i++] === undefined ? whole : String(values[i - 1]);

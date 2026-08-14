@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en" data-theme="dark">
+<html lang="en" data-theme="dark" data-density="cozy">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -8,6 +8,11 @@
 <link rel="stylesheet" href="{{ url_for('static', filename='css/v2/tokens.css') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/v2/components.css') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/v2/app.css') }}">
+<!-- Paints the persisted theme/density before first paint (see
+     core/theme-bootstrap.js for why this is an external classic script,
+     not the mockup's inline block: this app's CSP has no 'unsafe-inline'
+     and injects no nonce). theme.mjs owns every change after this point. -->
+<script src="{{ url_for('static', filename='js/v2/core/theme-bootstrap.js') }}"></script>
 </head>
 <body>
 <header id="topbar"></header>
