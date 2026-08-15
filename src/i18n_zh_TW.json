@@ -4870,7 +4870,7 @@
   "gui_au_job_warn_note": "從未執行或已逾期",
   "gui_au_jobs_intro": "這是排程與整台機器的心跳：上面兩個子頁的排程都靠這些背景 job 觸發。總覽只給一個燈，這一頁給每一個 job 的間隔、上次執行，以及離下一拍還有多久。",
   "gui_au_kind_mismatch": "型態與 href 不一致",
-  "gui_au_kind_note": "目標欄同時標示型態與位址。型態取自 href：ruleset 是 /rule_sets/<id>，rule 則在後面再多一段 /sec_rules/、/rules/ 或 /deny_rules/（三種規則集合，rule_scheduler.py:160-166）。欄位 is_ruleset 是表單當時的宣告，而它並非裝飾——api_client.py:1325 用它決定要 provision 的範圍（is_ruleset 為真就 provision 這個 href，否則往上取到父 ruleset）。兩者不一致代表切換打在這個物件、卻 provision 了另一個範圍，所以就地標紅，不靜默取其一。",
+  "gui_au_kind_note": "目標欄同時標示型態與位址。型態取自 href：ruleset 是 /rule_sets/<id>，rule 則在後面再多一段 /sec_rules/、/rules/ 或 /deny_rules/（PCE 的三種規則集合，rule_scheduler.py:160-166）。欄位 is_ruleset 是表單當時的宣告，而它並非裝飾——api_client.py:1325 用它決定要 provision 的範圍（is_ruleset 為真就 provision 這個 href，否則往上取到父 ruleset）。兩者不一致代表切換打在這個物件、卻 provision 了另一個範圍，所以就地標紅，不靜默取其一。",
   "gui_au_log_cap": "紀錄是行程內的環狀緩衝，上限 200 筆，最舊的自動淘汰（src/gui/__init__.py:103）；快照剛好抓滿 200 筆。「清除」只清畫面，伺服器那份不動（rule-scheduler.js:640-643）——這是產品行為，不是本頁的簡化。",
   "gui_au_log_clear_note": "只清掉畫面上的輸出；伺服器的紀錄環沒有被動到。",
   "gui_au_log_meta": "{n} 筆執行紀錄",
