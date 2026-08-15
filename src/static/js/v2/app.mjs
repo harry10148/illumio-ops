@@ -128,6 +128,14 @@ async function boot() {
     const { mountEvents } = await import("./areas/investigate.mjs");
     return mountEvents(el2, ctx);
   });
+  router.register("#/alerting/rules", async function (el2, ctx) {
+    const { mountRules } = await import("./areas/alerting.mjs");
+    return mountRules(el2, ctx);
+  });
+  router.register("#/alerting/ops", async function (el2, ctx) {
+    const { mountOps } = await import("./areas/alerting.mjs");
+    return mountOps(el2, ctx);
+  });
   AREA_ROUTES.forEach(function (route) { router.register(route, mountPlaceholder); });
   router.setFallback(mountPlaceholder);
 
