@@ -227,13 +227,51 @@ def _v2_browser(_v2_playwright):
         browser.close()
 
 
+def _bounded_close(label: str, close_fn, timeout_s: float = 15.0) -> None:
+    """Run a Playwright close() off-thread and cap how long teardown waits on it.
+
+    Neither BrowserContext.close() nor Page.close() accept a `timeout`
+    argument (verified against this venv's installed API — both signatures
+    are `(self, *, reason=None)`), unlike _LiveServer.stop()'s
+    thread.join(timeout=5) above, which IS bounded. Full-suite investigation
+    (2026-08-16: tests/test_v2_alerting_e2e.py's first test failing, then
+    hanging in fixture teardown, ~3600 tests into a full run) could not pin
+    an exact root cause within a practical time budget here — thread count
+    and RSS stayed flat through every reproduction slice that actually
+    completed, ruling out simple accumulation, but reproducing the full
+    preceding suite in this environment projected to hours, not the minutes
+    the coordinator's own machine needed (see task-6-report.md for the full
+    trail of what was ruled out). This is a defensive hardening, not a
+    proven fix: it turns an unbounded close() into a bounded one so a single
+    bad teardown can no longer stall the rest of the suite, whatever its
+    root cause. The close still runs (nothing here cancels it) — a daemon
+    thread just stops the *test* from waiting on it past `timeout_s`.
+    """
+    result: list[BaseException] = []
+
+    def _run():
+        try:
+            close_fn()
+        except BaseException as exc:  # noqa: BLE001 — reported, not raised, from teardown
+            result.append(exc)
+
+    t = threading.Thread(target=_run, name="v2_e2e_utils %s.close" % label, daemon=True)
+    t.start()
+    t.join(timeout=timeout_s)
+    if t.is_alive():
+        print(f"[v2_e2e_utils] {label}.close() did not complete within {timeout_s}s; "
+              "abandoning the wait so the suite can continue.")
+    elif result:
+        print(f"[v2_e2e_utils] {label}.close() raised: {result[0]!r}")
+
+
 @pytest.fixture
 def v2_context(_v2_browser):
     ctx = _v2_browser.new_context(ignore_https_errors=True)
     try:
         yield ctx
     finally:
-        ctx.close()
+        _bounded_close("v2_context", ctx.close)
 
 
 def v2_login(context, base_url: str, username: str = V2_USERNAME, password: str = V2_PASSWORD) -> None:
@@ -267,4 +305,8 @@ def v2_page(v2_context, v2_server):
     try:
         yield page, v2_server
     finally:
-        page.close()
+        # Bounded for the same reason as v2_context's ctx.close() above —
+        # see _bounded_close's docstring. Fixture teardown is LIFO (this
+        # page.close() runs before v2_context's ctx.close()), so an
+        # unbounded hang here would block that one too.
+        _bounded_close("v2_page", page.close)
