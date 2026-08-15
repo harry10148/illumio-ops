@@ -173,6 +173,11 @@ export const api = {
     cache.delete(cacheKey(id, params));
   },
 
+  /** get(path) -> Promise<any>. Generic uncached GET using shared plumbing. */
+  get(path) {
+    return fetchJson(path);
+  },
+
   /** Test/dev hook: forget every cached load(). */
   clear() {
     cache.clear();

@@ -104,8 +104,17 @@
 //  11. Teardown (S2): each of the three mounts registers a self-unsubscribing
 //      router.onChange that destroys this mount's table handles, clears the
 //      accelerate timers and the cell popover, closes any drawer/modal it
-//      left open and drops its route-scoped palette commands. See
-//      installTeardown() at the bottom.
+//      left open, clears the injected FilterBar browser callback and drops
+//      its route-scoped palette commands. See installTeardown() at the bottom.
+//
+//  12. The object browser captures each selected item's category at selection
+//      time, rather than reading the currently active tab when saving. The
+//      frozen mockup only exposed label rows, so its late-tab switch could not
+//      reveal that category mismatch.
+//
+//  13. The workloads action column uses a flex row and 260px width. The
+//      shipping three-button action set otherwise wraps inside the table's
+//      fixed-height cell and makes the lift action unreachable.
 
 import { el, clear } from "../core/dom.mjs";
 import { t, tf } from "../core/i18n.mjs";
@@ -645,7 +654,9 @@ function trafficColumns(onIsolate, sel) {
     )),
     col("metric", t("gui_metric"), widthCell(185, function (r) { return el("b", { class: "mono", text: r.metric }); })),
     col("seen", t("gui_first_last_seen"), widthCell(150, function (r) {
-      return el("span", { class: "idc" }, el("small", { text: "F " + r.first }), el("small", { text: "L " + r.last }));
+      return el("span", { class: "idc" },
+        el("small", { text: tf("gui_iv_first_seen", { value: r.first }) }),
+        el("small", { text: tf("gui_iv_last_seen", { value: r.last }) }));
     })),
     col("src", t("gui_source_identity"), buildCell(function (r) { return actorCell(r.src); })),
     col("dst", t("gui_destination_identity"), buildCell(function (r) { return actorCell(r.dst); })),
@@ -966,7 +977,7 @@ function backfillDrawer(state) {
 
   const quick = el("div", { class: "qrow" });
   BACKFILL_RANGES.forEach(function (days) {
-    quick.appendChild(el("button", { class: "btn ghost", type: "button", text: days + "d", onClick: function () {
+    quick.appendChild(el("button", { class: "btn ghost", type: "button", text: tf("gui_iv_days_short", { n: days }), onClick: function () {
       // index.html:2566-2569 setDateRange("cb", days) — end today, start N days back
       const now = new Date();
       const from = new Date(now.getTime() - Number(days) * 86400000);
@@ -1019,11 +1030,13 @@ function prefetchFilterCorpus(state) {
  *   {mins, sort_by, search, source, policy_decision} + draft_policy_decision
  *   only when one is chosen + the FilterBar dict spread on top.
  * Backend contract (actions.py:79-216) checked key by key before writing this:
- *   - every key is read with a default, so an ABSENT key is identical to an
- *     empty one (mins -> 30, source -> "live", policy_decision -> "-1" = all,
- *     every filter list -> []). That is why the FilterBar's dict is spread
- *     as-is: it omits a key entirely when no pill sets it, and omission is
- *     the documented "no filter" state, not a fall-through to some other
+ *   - most keys are read with defaults, so an ABSENT key is identical to an
+ *     empty one (source -> "live", policy_decision -> "-1" = all, every
+ *     filter list -> []). `mins` is the exception: absent defaults to 30, but
+ *     an explicit empty value fails integer parsing (actions.py:113). The
+ *     runtime always sends a number. That is why the FilterBar's dict is
+ *     spread as-is: it omits a key entirely when no pill sets it, and omission
+ *     is the documented "no filter" state, not a fall-through to another
  *     branch. (The one place in this codebase where that assumption did NOT
  *     hold is dashboard.py's save endpoint — see areas/overview.mjs — so it
  *     was verified here rather than assumed.)
@@ -1516,14 +1529,21 @@ function accelerateDrawer(areaState, selected, rowsByHref, onStart) {
 
   return drawerSpec(t("gui_accel_modal_title"), body, async function () {
     const minutes = Number(view.duration);
-    const hrefs = selected.slice();
+    // The summary is deliberately explicit about skipped unmanaged rows;
+    // submit only the same managed hrefs, or the backend would receive rows
+    // the operator was told would be skipped.
+    const hrefs = managed.map(function (w) { return w.href; }).filter(Boolean);
     const r = await fireAccelerate(hrefs, minutes);
     if (areaState.torn) return true;
     if (!r.ok) {
       toast.crit(errText(r));
       return false;
     }
-    toast.ok(tf("gui_accel_started", { n: Number(r.success || hrefs.length) }));
+    const success = Number(r.success || 0);
+    const failed = Number(r.failed || 0);
+    if (failed) toast.warn(tf("gui_accel_failed", { n: failed }));
+    if (!success) return false;
+    toast.ok(tf("gui_accel_started", { n: success }));
     onStart(hrefs, minutes);
     return true;
   });
@@ -1900,9 +1920,17 @@ async function mountWorkloads(root, ctx) {
         return;
       }
       const out = res.results || {};
-      if (Number(out.success || 0)) toast.ok(t("gui_lift_done"));
-      else toast.warn(t("gui_q_no_targets"));
-      if (state.onQuarantined) state.onQuarantined();
+      const success = Number(out.success || 0);
+      const failed = Array.isArray(out.failed) ? out.failed.length : Number(out.failed || 0);
+      const notQuarantined = Number(out.not_quarantined || 0);
+      if (failed) toast.warn(tf("gui_lift_failed", { n: failed }));
+      if (notQuarantined) toast.warn(tf("gui_lift_not_quarantined", { n: notQuarantined }));
+      if (success) {
+        toast.ok(t("gui_lift_done"));
+        if (state.onQuarantined) state.onQuarantined();
+      } else if (!failed && !notQuarantined) {
+        toast.warn(t("gui_q_no_targets"));
+      }
     }));
     h.el.setAttribute("data-cov", "XC-08");
     const inner = h.el.querySelector(".modal-b");
@@ -2054,7 +2082,12 @@ function shadowPanel(areaState) {
     paint(null, null, null);
     let r = null;
     try {
-      r = await api.reload("shadow_compare", { mins: view.mins, limit: view.limit });
+      // Task 5 brief authorises this live read-only endpoint; it is deliberately
+      // reached through the generic GET path because frozen endpoints.yaml has
+      // no snapshot entry for shadow_compare and GET_MAP must match it exactly.
+      const path = "/api/events/shadow_compare?mins=" + encodeURIComponent(view.mins)
+        + "&limit=" + encodeURIComponent(view.limit);
+      r = await api.get(path);
     } catch (e) {
       r = { ok: false, error: String((e && e.message) || e) };
     }
@@ -2467,6 +2500,7 @@ function installTeardown(state) {
     }
     cancelAccel(state);
     closePopover();
+    setFilterBarBrowser(null);
     drawer.closeAll();
     modal.closeAll();
     palette.setRoute(path);

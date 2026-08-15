@@ -107,6 +107,14 @@ export function setFilterBarBrowser(fn) {
   _openBrowser = typeof fn === "function" ? fn : null;
 }
 
+// Test/debug accessor only — mirrors window._objfbGetInstance below. Lets an
+// e2e test prove a departed area actually cleared its injected browser
+// callback rather than merely destroying the FilterBar instance it happened
+// to leave open (those are two different pieces of state).
+export function _objfbHasBrowser() {
+  return _openBrowser !== null;
+}
+
 // ── instance registry (src:10-11) ───────────────────────────────────────────
 const _objfbInstances = {};
 let _objfbSeq = 0;

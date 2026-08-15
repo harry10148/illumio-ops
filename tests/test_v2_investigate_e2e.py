@@ -13,7 +13,8 @@ Covers, per the task brief's T5 row:
     real loading state to the figures of the result.
   - key flow 2: the event catalogue's three-level cascade (category -> group
     -> event type, all from the real GET /api/event-catalog) and load-more
-    (real offset paging against GET /api/events/viewer).
+    (real Flask offset paging against GET /api/events/viewer; only the PCE
+    fetch is replaced with deterministic in-process data).
   - the destructive endpoints, wired and exercised WITHOUT performing the
     destructive act — see "Destructive-operation discipline" below.
   - S2 teardown across all three sub-routes.
@@ -37,25 +38,24 @@ Exactly what each destructive endpoint sees:
       and before touching the cache DB.
   POST /api/quarantine/bulk_apply — never called by this file.
 
-## The one place this file stubs a response, and why
+## The deterministic seams in this file, and why
 
-`_stub_workload_list` intercepts GET /api/workloads only. Nothing else is
-stubbed: the quarantine apply/lift POSTs under test go to the real backend and
-really fail there. The workload LIST is a precondition, not the thing under
-test, and it cannot be satisfied here — workloads come from the PCE, which
-this environment deliberately cannot reach, so the table is empty and the
-row-level Isolate / Lift buttons (the only real UI path to those POSTs) never
-render. Stubbing the read is what makes the write path clickable; the write
-stays real. `test_event_load_more_pages_by_offset` makes the same trade for
-GET /api/events/viewer, whose two-request paging behaviour cannot be observed
-against a viewer that returns nothing. Those three tests are the only ones in
-this file that stub anything; every other test — including the whole event
-catalogue cascade and IV-15 shadow compare — runs against the unmodified
-backend.
+`_stub_workload_list` intercepts GET /api/workloads only. The workload LIST is
+a precondition, not the thing under test, and it cannot be satisfied here —
+workloads come from the unreachable PCE — so the table is empty and the
+row-level Isolate / Lift buttons never render. The destructive POSTs remain
+real in the error-path tests. The acceleration and lift result-shape tests
+intercept those POSTs with synthetic responses, so no PCE write is possible;
+they test frontend accounting only. The pagination test keeps the HTTP call
+on the real Flask route and monkeypatches only ApiClient.fetch_events_strict
+inside that live app, so the route's filtering, sorting, offset slicing and
+has_more calculation all execute. IV-15 still runs against the unmodified
+backend and observes its deliberate 502.
 """
 from __future__ import annotations
 
 import json
+from urllib.parse import parse_qs, urlparse
 
 import pytest
 
@@ -114,6 +114,7 @@ def _labels(page):
         "gui_save", "gui_confirm", "gui_btn_isolate", "gui_lift_quarantine",
         "gui_accel_modal_title", "gui_q_title", "gui_category", "gui_ev_type_group",
         "gui_event_type", "gui_refresh", "gui_load_more", "gui_search",
+        "gui_accel_bulk_btn",
     ]
     return page.evaluate(
         "async (keys) => { const { t } = await import('/static/js/v2/core/i18n.mjs'); "
@@ -140,9 +141,11 @@ def _palette_routes(page):
     )
 
 
-def _stub_workload_list(page, workloads):
+def _stub_workload_list(page, workloads, calls=None):
     """Fulfil GET /api/workloads locally. See this module's docstring."""
     def handler(route):
+        if calls is not None:
+            calls.append(route.request.url)
         route.fulfill(
             status=200,
             content_type="application/json",
@@ -152,11 +155,11 @@ def _stub_workload_list(page, workloads):
     page.route("**/api/workloads?*", handler)
 
 
-def _fake_workload(quarantined=False, managed=True):
+def _fake_workload(quarantined=False, managed=True, href=FAKE_HREF, name="e2e-fake-workload"):
     labels = [{"key": "Quarantine", "value": "Mild"}] if quarantined else []
     return {
-        "href": FAKE_HREF,
-        "name": "e2e-fake-workload",
+        "href": href,
+        "name": name,
         "hostname": "e2e-fake-host",
         "online": True,
         "managed": managed,
@@ -293,55 +296,62 @@ def test_event_catalog_three_level_cascade(v2_page):
     assert 1 < groups_cat < groups_all, (groups_cat, groups_all)
     assert 1 < types_cat < types_all, (types_cat, types_all)
 
-    # Pick the second group — the type list narrows again, the category does not.
+    # Pick the second group — the type list must narrow strictly, the category
+    # does not. A <= assertion would pass even if this change repopulated the
+    # same list and therefore would not prove the cascade.
     grp_value = grp.locator("option").nth(1).get_attribute("value")
+    assert grp_value
     with page.expect_request(lambda r: "/api/events/viewer" in r.url) as info2:
         grp.select_option(grp_value)
     assert "type_group=" + grp_value in info2.value.url, info2.value.url
 
     typ = panel.locator('select[aria-label="%s"]' % labels["gui_event_type"])
     types_grp = typ.locator("option").count()
-    assert types_grp <= types_cat
+    assert 1 < types_grp < types_cat, (types_grp, types_cat)
     assert page.locator('select[aria-label="%s"]' % labels["gui_category"]).input_value() == cat_value
 
+    # Select one concrete event type as the final tier and prove that the
+    # viewer request carries event_type=, not just the category/group filters.
+    type_value = typ.locator("option").nth(1).get_attribute("value")
+    assert type_value
+    with page.expect_request(lambda r: "/api/events/viewer" in r.url) as info3:
+        typ.select_option(type_value)
+    query = parse_qs(urlparse(info3.value.url).query)
+    assert query.get("event_type") == [type_value], info3.value.url
 
-def test_event_load_more_pages_by_offset(v2_page):
-    """IV-14 load-more: the button exists exactly while the server says
-    has_more, and it asks for the NEXT offset rather than revealing rows it
-    already had. Stubs GET /api/events/viewer — see this module's docstring."""
+
+def test_event_load_more_pages_by_offset(v2_page, v2_app, monkeypatch):
+    """IV-14 load-more through the real Flask handler: the button exists
+    exactly while the handler says has_more, and it asks for the NEXT offset
+    rather than revealing rows it already had. Only the PCE fetch is replaced
+    with deterministic data; the route itself is real."""
     page, base_url = v2_page
     seen = []
 
-    def item(i):
-        return {
-            "event_id": "ev-%d" % i,
-            "timestamp": "2026-08-14T10:0%d:00Z" % i,
-            "event_type": "user.login",
-            "status": "success",
-            "severity": "info",
-            "category": "User Access",
-            "type_group": "user",
-            "normalized": {"actor": "admin", "action": "login"},
-            "raw": {},
-        }
+    def fake_fetch_events_strict(self, start_time_str, end_time_str=None, max_results=5000, event_type=None):
+        return [
+            {
+                "href": "/orgs/1/events/%d" % i,
+                "timestamp": "2026-08-14T10:00:%02dZ" % i,
+                "event_type": "user.login",
+                "status": "success",
+                "severity": "info",
+                "created_by": {"user": {"username": "admin"}},
+                "action": {"api_method": "POST", "api_endpoint": "/api/v2/login"},
+            }
+            for i in range(30)
+        ]
 
-    def handler(route):
-        url = route.request.url
-        offset = 0
-        for part in url.split("?")[-1].split("&"):
-            if part.startswith("offset="):
-                offset = int(part.split("=")[1] or 0)
-        seen.append(offset)
-        items = [item(i) for i in range(offset, min(offset + 3, 5))]
-        route.fulfill(status=200, content_type="application/json", body=json.dumps({
-            "ok": True,
-            "items": items,
-            "summary": {"matched_count": 5, "returned_count": len(items),
-                        "offset": offset, "limit": 3, "has_more": (offset + 3) < 5,
-                        "query_since": "2026-08-14T09:00:00Z", "query_until": "2026-08-14T10:00:00Z"},
-        }))
+    # This is the real Flask route in the in-process app; replace only its
+    # external PCE fetch so the route can deterministically produce 25 + 5.
+    monkeypatch.setattr("src.api_client.ApiClient.fetch_events_strict", fake_fetch_events_strict)
 
-    page.route("**/api/events/viewer?*", handler)
+    def on_request(request):
+        if "/api/events/viewer" in request.url:
+            query = parse_qs(urlparse(request.url).query)
+            seen.append(int(query.get("offset", ["0"])[0]))
+
+    page.on("request", on_request)
     _goto(page, base_url, R_EVENTS)
     labels = _labels(page)
 
@@ -349,14 +359,14 @@ def test_event_load_more_pages_by_offset(v2_page):
         "button", name=labels["gui_refresh"], exact=True
     ).click()
     rows = page.locator('.evl tbody tr')
-    page.wait_for_function("() => document.querySelectorAll('.evl tbody tr').length === 3")
+    page.wait_for_function("() => document.querySelectorAll('.evl tbody tr').length === 25")
 
     more = page.locator('button[data-role="load-more"]')
     assert more.count() == 1
     more.click()
-    page.wait_for_function("() => document.querySelectorAll('.evl tbody tr').length === 5")
-    assert rows.count() == 5
-    assert seen == [0, 3], seen
+    page.wait_for_function("() => document.querySelectorAll('.evl tbody tr').length === 30")
+    assert rows.count() == 30
+    assert seen == [0, 25], seen
     # The server said there is no more, so the control is gone — it is driven
     # by summary.has_more, not by a local row count.
     assert page.locator('button[data-role="load-more"]').count() == 0
@@ -432,6 +442,58 @@ def test_quarantine_lift_surfaces_backend_error_for_nonexistent_workload(v2_page
     page.wait_for_selector('.toast[data-tone="crit"]', timeout=SLOW)
 
 
+def test_quarantine_lift_reports_partial_results_without_refresh(v2_page):
+    """An HTTP-successful lift response can still contain failed and
+    not-quarantined targets; those counts are reported separately and the
+    stale workload list is not refreshed when success is zero. The POST is
+    fulfilled locally, so this never performs a destructive PCE call."""
+    page, base_url = v2_page
+    workload_calls = []
+    _stub_workload_list(page, [_fake_workload(quarantined=True)], workload_calls)
+    page.route(
+        "**/api/quarantine/lift",
+        lambda route: route.fulfill(
+            status=200,
+            content_type="application/json",
+            body=json.dumps({
+                "ok": True,
+                "results": {"success": 0, "failed": [FAKE_HREF], "not_quarantined": 2},
+            }),
+        ),
+    )
+    _goto(page, base_url, R_WORKLOADS)
+    labels = _labels(page)
+
+    page.locator('section[data-cov="IV-08"]').get_by_role(
+        "button", name=labels["gui_find"], exact=True
+    ).click()
+    row = page.locator("tbody tr").filter(has_text="e2e-fake-workload")
+    row.wait_for(state="visible")
+    row.locator('button[data-cov="IV-11"]').click()
+    confirm = page.locator('.modal[data-cov="XC-08"]')
+    confirm.wait_for(state="visible")
+    with page.expect_response(lambda r: "/api/quarantine/lift" in r.url) as response:
+        confirm.get_by_role("button", name=labels["gui_confirm"], exact=True).click()
+    assert response.value.json()["results"] == {
+        "success": 0, "failed": [FAKE_HREF], "not_quarantined": 2,
+    }
+
+    failed_text = page.evaluate(
+        "async () => { const { t } = await import('/static/js/v2/core/i18n.mjs'); "
+        "return t('gui_lift_failed').replace('{n}', '1'); }"
+    )
+    not_quarantined_text = page.evaluate(
+        "async () => { const { t } = await import('/static/js/v2/core/i18n.mjs'); "
+        "return t('gui_lift_not_quarantined').replace('{n}', '2'); }"
+    )
+    page.wait_for_function("() => document.querySelectorAll('.toast[data-tone=warn]').length === 2")
+    warnings = page.locator('.toast[data-tone="warn"]').all_inner_texts()
+    assert failed_text in warnings
+    assert not_quarantined_text in warnings
+    page.wait_for_timeout(200)
+    assert len(workload_calls) == 1, workload_calls
+
+
 def test_accelerate_submission_is_rejected_by_backend_validation(v2_page):
     """IV-12 wiring: the form really posts, and the backend really refuses it
     (actions.py:479-483) before any PCE call, because nothing is selected."""
@@ -465,6 +527,47 @@ def test_accelerate_submission_is_rejected_by_backend_validation(v2_page):
     assert drawer.count() == 1
 
 
+def test_accelerate_submits_only_managed_targets_and_stops_on_all_failures(v2_page):
+    """Acceleration excludes unmanaged selections and does not start a
+    persistent countdown when the backend reports success=0/failed=1. The
+    destructive POST is fulfilled locally, so no PCE write occurs."""
+    page, base_url = v2_page
+    managed_href = "/orgs/1/workloads/e2e-managed-0000"
+    unmanaged_href = "/orgs/1/workloads/e2e-unmanaged-0000"
+    _stub_workload_list(page, [
+        _fake_workload(href=managed_href, name="e2e-managed", managed=True),
+        _fake_workload(href=unmanaged_href, name="e2e-unmanaged", managed=False),
+    ])
+    requests = []
+
+    def accelerate(route):
+        requests.append(route.request.post_data_json)
+        route.fulfill(
+            status=200,
+            content_type="application/json",
+            body=json.dumps({"ok": True, "success": 0, "failed": 1, "skipped_invalid": 0}),
+        )
+
+    page.route("**/api/workloads/accelerate", accelerate)
+    _goto(page, base_url, R_WORKLOADS)
+    labels = _labels(page)
+    page.locator('section[data-cov="IV-08"]').get_by_role(
+        "button", name=labels["gui_find"], exact=True
+    ).click()
+    page.locator('input[type="checkbox"][aria-label="e2e-managed"]').check()
+    page.locator('input[type="checkbox"][aria-label="e2e-unmanaged"]').check()
+    bar = page.locator('.floatbar[data-tone="crit"]')
+    bar.get_by_role("button", name=labels["gui_accel_bulk_btn"], exact=True).click()
+    drawer = page.locator('aside.drawer[aria-label="%s"]' % labels["gui_accel_modal_title"])
+    drawer.wait_for(state="visible")
+    drawer.locator('input[name="iv-accel"][value="30"]').check()
+    drawer.locator(".drawer-f button.btn.primary").click()
+
+    page.wait_for_function("() => document.querySelectorAll('.toast[data-tone=warn]').length >= 1")
+    assert requests == [{"hrefs": [managed_href], "duration_minutes": 30}], requests
+    assert page.locator('.floatbar[data-tone="ok"]').count() == 0
+
+
 def test_backfill_submission_is_rejected_by_backend_validation(v2_page):
     """IV-07 wiring: an empty date range really posts and the route really
     answers 400 "missing since" (pce_cache/web.py:57-58) — no backfill runs."""
@@ -491,10 +594,9 @@ def test_backfill_submission_is_rejected_by_backend_validation(v2_page):
 # ── S2 teardown ─────────────────────────────────────────────────────────────
 
 def test_teardown_across_all_three_subroutes(v2_page):
-    """Leaving any of the three sub-routes must strand no dialog and leave no
-    route-scoped palette command behind. Fails against a mount with no
-    router.onChange teardown: drawer.mjs/modal.mjs are page-global singletons
-    with no per-area scoping, so nothing else would close them."""
+    """Leaving any sub-route must destroy mounted components, strand no
+    dialog, leave no route-scoped palette command, and clear traffic-only
+    audit surfaces before the next route can invoke them."""
     page, base_url = v2_page
 
     # traffic -> workloads
@@ -504,12 +606,35 @@ def test_teardown_across_all_three_subroutes(v2_page):
     page.locator('section[data-cov="IV-01"]').get_by_role(
         "button", name=labels["gui_filter_settings"], exact=True
     ).click()
-    page.locator("aside.drawer").wait_for(state="visible")
+    traffic_drawer = page.locator("aside.drawer")
+    traffic_drawer.wait_for(state="visible")
+    traffic_fb = traffic_drawer.locator('[data-cov="XC-03"]')
+    traffic_fb_id = traffic_fb.get_attribute("data-objfb-id")
+    assert traffic_fb_id
 
     _navigate(page, R_WORKLOADS)
     assert page.locator("aside.drawer").count() == 0
     assert R_TRAFFIC not in _palette_routes(page)
     assert R_WORKLOADS in _palette_routes(page)
+    assert page.evaluate(
+        "id => window._objfbGetInstance(id)", traffic_fb_id
+    ) is None
+    # The FilterBar instance being gone is drawer.closeAll()'s doing, not
+    # teardown's — a separate module-global callback that filter-bar.mjs calls
+    # to open the object browser (setFilterBarBrowser) must also be cleared,
+    # or a later area could invoke a closure over this torn-down traffic
+    # mount's state.
+    assert page.evaluate(
+        "async () => { const fb = await import('/static/js/v2/components/filter-bar.mjs'); "
+        "return fb._objfbHasBrowser(); }"
+    ) is False
+
+    # The audit hook is a page-global entry point, but its route registry must
+    # contain only the current mount. Calling it after leaving traffic must not
+    # resurrect the departed traffic FilterBar/browser surfaces.
+    page.evaluate("window.__openAllForAudit()")
+    assert page.locator('[data-cov="XC-03"]').count() == 0
+    assert page.locator('[data-cov="XC-04"]').count() == 0
 
     # workloads -> events, with both a drawer AND a modal left open
     page.evaluate("window.__openAllForAudit()")

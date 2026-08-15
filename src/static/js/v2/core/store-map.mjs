@@ -152,26 +152,4 @@ export const GET_MAP = {
   fb_suggest: "/api/filter-objects/suggest?q=web&types=label&limit=10",
   fb_browse: "/api/filter-objects/browse?type=label&offset=0&limit=20",
 
-  // ── The one entry that is NOT in endpoints.yaml ────────────────────────
-  // shadow_compare has no yaml entry because that file lists SNAPSHOT ids,
-  // and this endpoint was never snapshotted: it has no shipping UI at all
-  // (grep src/static + src/templates for shadow_compare — nothing), so
-  // design/v2's capture pass had no page to capture it from, and the mockup
-  // says so in as many words (areas/investigate.mjs's shadowPanel comment:
-  // "there is no shadow_compare snapshot to render"). Phase 2A Task 5's
-  // brief assigns IV-15 to it explicitly, so it is a real, read-only GET
-  // route (src/gui/routes/events.py:150-201, which clamps mins to [5,10080]
-  // and limit to [1,500] and answers {ok, summary, items[]}) that this map
-  // has to name for api.load() to reach it. Called with no params it uses
-  // the same defaults that route applies to a bare request.
-  //
-  // It is listed here, rather than reached through some raw-path escape
-  // hatch on api.mjs, so that "every GET this frontend makes is named in
-  // GET_MAP" stays true — the reason the do-not-add rule above exists is to
-  // stop SILENT drift from the yaml, and an entry that states it is not
-  // from the yaml, and why, is not silent.
-  shadow_compare(params) {
-    if (!params) return "/api/events/shadow_compare";
-    return "/api/events/shadow_compare?" + qs(params, ["mins", "limit"]);
-  },
 };
