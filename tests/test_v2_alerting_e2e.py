@@ -73,6 +73,37 @@ def _open_all(page):
     page.wait_for_timeout(250)
 
 
+# The three helpers below drive the app's own core/api.mjs (dynamic import,
+# same module the production UI uses) rather than a bare page.request.post,
+# because POST/DELETE /api/rules/* is CSRF-protected
+# (WTF_CSRF_CHECK_DEFAULT=True, src/gui/__init__.py:239-247) and api.mjs is
+# what actually attaches/refreshes the X-CSRF-Token header (api.mjs:10-16).
+# A page must already be on the app's origin for the dynamic import to
+# resolve, so these are only called after a real _goto().
+def _api_post(page, path, body):
+    return page.evaluate(
+        "async (args) => { const { api } = await import('/static/js/v2/core/api.mjs'); "
+        "return api.post(args[0], args[1]); }",
+        [path, body],
+    )
+
+
+def _api_get(page, path):
+    return page.evaluate(
+        "async (path) => { const { api } = await import('/static/js/v2/core/api.mjs'); "
+        "return api.get(path); }",
+        path,
+    )
+
+
+def _api_del(page, path):
+    return page.evaluate(
+        "async (path) => { const { api } = await import('/static/js/v2/core/api.mjs'); "
+        "return api.del(path); }",
+        path,
+    )
+
+
 def test_rules_coverage_anchors_and_i18n(v2_page):
     page, base_url = v2_page
     _goto(page, base_url, R_RULES)
@@ -168,16 +199,38 @@ def test_rule_test_uses_real_endpoint(v2_page):
     page, base_url = v2_page
     _goto(page, base_url, R_RULES)
     labels = _labels(page)
-    panel = page.locator('section[data-cov="AL-07"]')
-    button = panel.get_by_role("button", name=labels["gui_run_btn"], exact=True)
-    if panel.locator("select option").count() == 0:
-        pytest.skip("fixture has no event-rule test action")
 
-    with page.expect_request(
-        lambda r: "/api/events/rule_test?idx=" in r.url and r.method == "GET"
-    ):
-        button.click()
-    page.wait_for_selector('[data-cov="AL-07"] [data-role="rule-test-result"]')
+    # AL-07's select is populated from event-type rules in state.rules
+    # (alerting.mjs's eventRules filter), and the shared fixture seeds
+    # "rules": [] — so without a rule of its own this test always took the
+    # skip branch and the round trip never ran for real. Task-owned setup
+    # through the real POST /api/rules/event handler (same shape as the
+    # traffic-rule CRUD test's own fixture rule above), cleaned up after.
+    name = "e2e-alerting-event-ruletest"
+    created = _api_post(page, "/api/rules/event", {"name": name})
+    assert created and created.get("ok") is True, created
+    try:
+        page.reload()
+        page.wait_for_selector('body[data-booted="true"]')
+        page.wait_for_selector("code:text-is('%s')" % R_RULES)
+        page.wait_for_selector('[data-cov="AL-01"]')
+
+        panel = page.locator('section[data-cov="AL-07"]')
+        button = panel.get_by_role("button", name=labels["gui_run_btn"], exact=True)
+        assert panel.locator("select option").count() > 0, (
+            "the event rule created above should populate AL-07's select"
+        )
+
+        with page.expect_request(
+            lambda r: "/api/events/rule_test?idx=" in r.url and r.method == "GET"
+        ):
+            button.click()
+        page.wait_for_selector('[data-cov="AL-07"] [data-role="rule-test-result"]')
+    finally:
+        rules = _api_get(page, "/api/rules")
+        for r in rules or []:
+            if r.get("name") == name:
+                _api_del(page, "/api/rules/" + str(r["index"]))
 
 
 def test_debug_round_trip_renders_real_response(v2_page):

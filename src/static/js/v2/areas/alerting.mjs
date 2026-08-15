@@ -689,7 +689,7 @@ function systemDrawer(rule, onSaved) {
  * (filter-bar.mjs _objfbDeserialize :247-279) and writes the plural v2 keys back
  * (_objfbSerialize :179-212), which rules.py:66-77 whitelists. Both halves are
  * shown in the drawer because both halves exist in real stored rules. */
-const TRAFFIC_FILTER_KEYS = ["src_label", "dst_label", "port", "proto"];
+const TRAFFIC_FILTER_KEYS = ["src_label", "dst_label", "port", "proto", "ex_port"];
 const BW_FILTER_KEYS = ["src_label", "dst_label", "src_ip_in", "dst_ip_in", "port", "proto",
   "ex_src_label", "ex_dst_label", "ex_src_ip", "ex_dst_ip", "ex_port"];
 
