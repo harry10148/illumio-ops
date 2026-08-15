@@ -79,11 +79,12 @@ async function mountPlaceholder(root, ctx) {
 // (docs/superpowers/plans/2026-08-06-phase2a-gui.md Tasks 4-9). Each area's
 // own task registers its real sub-routes (e.g. #/investigate/traffic); the
 // fallback mount below covers any of those before that task lands, and any
-// unknown hash after. #/overview and #/investigate/* are registered
-// separately below (Tasks 4 and 5 — the areas with a real implementation)
-// and left out of this list so the placeholder loop does not overwrite them.
-// "#/investigate" itself keeps its placeholder: the area has no landing page
-// of its own, only the three sub-routes its own sub-nav links to.
+// unknown hash after. #/overview, #/investigate/*, #/alerting/* and
+// #/automation/* are registered separately below (Tasks 4, 5, 6 and 7 — the
+// areas with a real implementation) and left out of this list so the
+// placeholder loop does not overwrite them. "#/investigate" and
+// "#/automation" themselves keep their placeholder: neither area has a
+// landing page of its own, only the sub-routes their own sub-nav links to.
 const AREA_ROUTES = [
   "#/investigate",
   "#/alerting",
@@ -135,6 +136,22 @@ async function boot() {
   router.register("#/alerting/ops", async function (el2, ctx) {
     const { mountOps } = await import("./areas/alerting.mjs");
     return mountOps(el2, ctx);
+  });
+  // Task 7 — the automation area's three sub-routes, each lazily importing the
+  // one module they share (same pattern as investigate/alerting above).
+  // "#/automation" itself keeps its placeholder, same reasoning as
+  // "#/investigate": no landing page of its own, only the sub-nav's targets.
+  router.register("#/automation/rules", async function (el2, ctx) {
+    const { mountAutoRules } = await import("./areas/automation.mjs");
+    return mountAutoRules(el2, ctx);
+  });
+  router.register("#/automation/reports", async function (el2, ctx) {
+    const { mountAutoReports } = await import("./areas/automation.mjs");
+    return mountAutoReports(el2, ctx);
+  });
+  router.register("#/automation/jobs", async function (el2, ctx) {
+    const { mountAutoJobs } = await import("./areas/automation.mjs");
+    return mountAutoJobs(el2, ctx);
   });
   AREA_ROUTES.forEach(function (route) { router.register(route, mountPlaceholder); });
   router.setFallback(mountPlaceholder);
