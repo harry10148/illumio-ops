@@ -348,18 +348,65 @@ def test_rule_schedule_crud_reconciles_list_and_timeline(v2_page, monkeypatch):
     """AU-08/AU-02 key flow: create three real one-time 2027 schedules
     (one ruleset-level, two rule-level — the dual-target model), reconcile
     them against the real GET list, watch the timeline render three real
-    lanes, then delete all three through the real UI confirm flow."""
+    lanes, then delete all three through the real UI confirm flow.
+
+    The ruleset-level schedule (the flagship two-level-drawer flow) is
+    created through the real UI form — opened via the same `au:sched-rs`
+    palette command as test_ruleset_drawer_precheck_is_real_backend_error,
+    fields filled, Save clicked — and the request scheduleBody() actually
+    emits is asserted against the real outgoing POST body, so a wrong key
+    name or a dropped field in that mapping goes red. `_patch_fake_ruleset`
+    gives the ruleset browser one real row so the drawer's target is a
+    genuine href instead of the empty-target fallback the precheck test
+    deliberately exercises. The two rule-level schedules are still created
+    directly through the real endpoint (same as before) — this task's row
+    only requires one drawer-driven success case, and duplicating the UI
+    path three times would not cover anything new."""
     _patch_pce_gates(monkeypatch)
+    _patch_fake_ruleset(monkeypatch)
     page, base_url = v2_page
     _goto(page, base_url, R_RULES, "AU-01")
 
-    base_href = "/orgs/1/sec_policy/draft/rule_sets/900001"
+    base_href = "/orgs/1/sec_policy/draft/rule_sets/900099"  # the fake ruleset's own href
+    created = []
+
+    # ── the drawer-driven ruleset-level schedule ────────────────────────
+    ruleset_name = "e2e-au-ruleset-ui"
+    page.evaluate(
+        "async () => { const { palette } = await import('/static/js/v2/components/palette.mjs'); "
+        "palette.list().find(c => c.id === 'au:sched-rs').run(); }"
+    )
+    drawer = page.locator("aside.drawer")
+    drawer.wait_for(state="visible")
+    drawer.locator('input[data-field="detail_name"]').fill(ruleset_name)
+    drawer.locator('input[type="radio"][value="one_time"]').check()
+    drawer.locator('input[data-field="expire_at"]').fill("2027-06-01T08:00")
+
+    with page.expect_request(
+        lambda r: r.url.endswith("/api/rule_scheduler/schedules") and r.method == "POST"
+    ) as create_req:
+        drawer.locator(".drawer-f button.btn.primary").click()
+    body = create_req.value.post_data_json
+    assert body == {
+        "href": base_href,
+        "type": "one_time",
+        "name": ruleset_name,
+        "detail_name": ruleset_name,
+        "is_ruleset": True,
+        "detail_rs": "e2e-au-coverage-ruleset",
+        "detail_src": "All",
+        "detail_dst": "All",
+        "detail_svc": "All",
+        "expire_at": "2027-06-01T08:00",
+        "timezone": "local",
+    }, body
+    page.wait_for_selector("aside.drawer", state="detached")
+    created.append(base_href)
+
     targets = [
-        (base_href, True, "e2e-au-ruleset", "2027-06-01T08:00"),
         (base_href + "/sec_rules/1", False, "e2e-au-rule-allow", "2027-06-02T08:00"),
         (base_href + "/deny_rules/1", False, "e2e-au-rule-deny", "2027-06-03T08:00"),
     ]
-    created = []
     try:
         for href, is_ruleset, name, expire_at in targets:
             result = _api_post(page, "/api/rule_scheduler/schedules", {
@@ -376,7 +423,7 @@ def test_rule_schedule_crud_reconciles_list_and_timeline(v2_page, monkeypatch):
 
         sched_panel = page.locator('section[data-cov="AU-08"]')
         assert sched_panel.locator("tbody tr").count() == 3
-        for href, _is_ruleset, _name, _exp in targets:
+        for href in created:
             assert sched_panel.locator('[data-sched-id="%s"]' % href).count() == 1
 
         tl_panel = page.locator('section[data-cov="AU-02"]')
