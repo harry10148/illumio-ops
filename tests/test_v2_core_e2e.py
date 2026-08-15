@@ -58,8 +58,10 @@ def test_v2_boots_with_no_console_errors(v2_page):
     # Task 4: #/overview now mounts the real board (areas/overview.mjs),
     # which loads 14 live endpoints. One of them, GET /api/events/viewer,
     # genuinely reaches the PCE and 502s under this fixture's config
-    # (temp_config_file seeds pce.url=https://pce.test, which never
-    # resolves) — an ordinary operational condition, not a bug; the area is
+    # (build_v2_app points api.url at a closed local port — see
+    # tests/v2_e2e_utils.py's _closed_local_port docstring, Task 5b — so the
+    # connection is refused instantly and always) — an ordinary operational
+    # condition, not a bug; the area is
     # specifically built to survive exactly this and still render the other
     # 15 cards (areas/overview.mjs's loadOne()/loadAll()). The unavoidable
     # byproduct is exactly two known console entries neither this fixture

@@ -74,9 +74,14 @@ R_EVENTS = "#/investigate/events"
 # looks for "/workloads/") but cannot exist on any PCE.
 FAKE_HREF = "/orgs/1/workloads/e2e-nonexistent-0000-0000-000000000000"
 
-# Several endpoints on these routes reach the unreachable PCE and take ~6s to
-# fail (measured against this exact fixture: DNS resolution of pce.test), so
-# the harness's 10s default is too tight for anything that waits on one.
+# Several endpoints on these routes reach the unreachable PCE (build_v2_app
+# points api.url at a closed local port — see tests/v2_e2e_utils.py's
+# _closed_local_port docstring, Task 5b) and some chain multiple PCE round
+# trips (e.g. quarantine label-map lookup before the actual write) before
+# giving up, so the harness's 10s default is still too tight for anything
+# that waits on one. Kept generous rather than tuned to the fast-fail path's
+# now-small measured latency, on purpose — this budget also has to cover
+# real browser/CI scheduling jitter, not just the PCE round trip itself.
 SLOW = 45_000
 
 

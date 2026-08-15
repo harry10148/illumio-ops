@@ -89,6 +89,7 @@ Both lines are required, IN THIS ORDER — this is not optional boilerplate:
 from __future__ import annotations
 
 import json
+import socket
 import threading
 
 import pytest
@@ -105,6 +106,39 @@ V2_USERNAME = "admin"
 V2_PASSWORD = "testpass"
 
 
+def _closed_local_port() -> int:
+    """Return a 127.0.0.1 TCP port nothing is listening on.
+
+    Task 5b (hang fix): `temp_config_file` (tests/conftest.py) seeds
+    `api.url = https://pce.test` — a hostname that fails *DNS resolution*,
+    not a refused connection. A DNS lookup against an unresolvable name can
+    take several seconds per attempt (resolver retries/timeouts are OS- and
+    environment-dependent), and every PCE-bound call in this app goes through
+    ApiClient's urllib3 `Retry(total=3, backoff_factor=1.0, ...)` — whose
+    *connect*-error retry bucket applies regardless of HTTP method (unlike
+    its read/status-forcelist retries, which respect `allowed_methods` and
+    exclude POST). So a single POST submit to an unresolvable host can retry
+    3 times, each preceded by a slow DNS timeout, before finally failing.
+    Reproduced: run the four v2 e2e files together with a slice of the rest
+    of the suite that also drives `/api/dashboard/top10` against this same
+    `pce.test` config, and the combined DNS-resolution load turns "slow but
+    bounded" into a multi-hour hang (see task-5b-report.md).
+    A closed local port sidesteps DNS entirely (127.0.0.1 needs no lookup)
+    and fails with an immediate, in-kernel "connection refused" — the same
+    urllib3 connect-retry path still runs (production retry/backoff
+    behaviour is unchanged and unexercised-differently), it just no longer
+    depends on slow, environment-variable name resolution. Binding to port 0
+    asks the OS for a free ephemeral port; closing the socket immediately
+    frees it while leaving nothing listening there.
+    """
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    try:
+        s.bind(("127.0.0.1", 0))
+        return s.getsockname()[1]
+    finally:
+        s.close()
+
+
 def build_v2_app(temp_config_file: str, **web_gui_overrides):
     """Build a real Flask app with the v2 preview flag on, ready for a plain-HTTP server.
 
@@ -114,6 +148,12 @@ def build_v2_app(temp_config_file: str, **web_gui_overrides):
     """
     cm = ConfigManager(config_file=temp_config_file)
     cm.load()
+    # Task 5b: repoint the PCE target from temp_config_file's DNS-unresolvable
+    # `https://pce.test` at a closed local port — see _closed_local_port's
+    # docstring. Every v2 e2e test relies on the PCE being unreachable (they
+    # assert the resulting 502/error paths); this keeps that property while
+    # making the failure instant instead of DNS-timeout-bound.
+    cm.config["api"]["url"] = f"http://127.0.0.1:{_closed_local_port()}"
     cm.config["web_gui"] = {
         "username": V2_USERNAME,
         "password": hash_password(V2_PASSWORD),

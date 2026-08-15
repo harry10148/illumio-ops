@@ -24,8 +24,10 @@ Covers:
     that mountOverview()'s router.onChange teardown actually ran.
 
 Not covered here: OV-05's chart.rankedBars() ResizeObserver teardown. This
-test environment's PCE is unconfigured/unreachable, and dashboard.py's
-api_dashboard_top10 lets query_flows() run its real (slow, ~6s here) DNS
+test environment's PCE is unreachable by construction (build_v2_app points
+api.url at a closed local port — see tests/v2_e2e_utils.py's
+_closed_local_port docstring, Task 5b), and dashboard.py's
+api_dashboard_top10 lets query_flows() run its real (fast, connection-refused)
 failure before returning {ok:false}, so a created query's top10 refresh
 resolves with an empty result and OV-05 never actually renders a chart to
 observe teardown of (see cardTop10()'s `if (!top.ok || !data.length)` empty
