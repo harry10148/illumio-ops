@@ -47,6 +47,19 @@ import pathlib
 
 import pytest
 
+pytest.importorskip("playwright.sync_api", exc_type=ImportError)
+
+# One Playwright Sync API driver per pytest session: sync_playwright() opens a
+# background asyncio loop (playwright/_impl/_transport) that a *second*,
+# independent sync_playwright() call cannot coexist with in the same process —
+# it raises "Please use the Async API instead." tests/design_v2/ is collected
+# alongside tests/v2_e2e_utils.py's session-scoped `_v2_playwright`/
+# `_v2_browser` fixtures (registered here via pytest_plugins, matching every
+# test_v2_*_e2e.py module), so this file shares that one browser instead of
+# opening its own. See tests/v2_e2e_utils.py's module docstring for the
+# required two-line import order this mirrors.
+pytest_plugins = ["tests.v2_e2e_utils"]
+
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 PROD = ROOT / "src" / "static" / "js" / "filter-bar.js"
 MOCK = ROOT / "design" / "v2" / "mockup" / "js" / "components" / "filter-bar.mjs"
@@ -115,16 +128,16 @@ def _sources():
 
 
 @pytest.fixture(scope="module")
-def page():
-    playwright = pytest.importorskip("playwright.sync_api", exc_type=ImportError)
-    with playwright.sync_playwright() as p:
-        browser = p.chromium.launch()
-        pg = browser.new_page()
-        errors = []
-        pg.on("pageerror", lambda e: errors.append(str(e)))
-        pg.errors = errors
-        yield pg
-        browser.close()
+def page(_v2_browser):
+    # _v2_browser is the session-scoped browser from tests/v2_e2e_utils.py —
+    # only the page (not the browser, and not sync_playwright() itself) is
+    # this fixture's own to open and close.
+    pg = _v2_browser.new_page()
+    errors = []
+    pg.on("pageerror", lambda e: errors.append(str(e)))
+    pg.errors = errors
+    yield pg
+    pg.close()
 
 
 def _run(page, expression, argument):

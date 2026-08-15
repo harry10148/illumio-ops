@@ -29,6 +29,15 @@ import time
 
 import pytest
 
+pytest.importorskip("playwright.sync_api", exc_type=ImportError)
+
+# One Playwright Sync API driver per pytest session — see
+# tests/design_v2/test_filterbar_semantics.py's identical comment for why:
+# a second independent sync_playwright() call in the same process raises
+# "Please use the Async API instead." This file shares the session-scoped
+# `_v2_browser` fixture from tests/v2_e2e_utils.py instead of opening its own.
+pytest_plugins = ["tests.v2_e2e_utils"]
+
 ROOT = pathlib.Path(__file__).resolve().parents[2] / "design" / "v2"
 SNAP = ROOT / "snapshots" / "rs_schedules.json"
 PORT = 8380
@@ -77,26 +86,25 @@ def _kind(entry):
 
 
 @pytest.fixture(scope="module")
-def page():
-    pytest.importorskip("playwright.sync_api", exc_type=ImportError)
-    from playwright.sync_api import sync_playwright
-
+def page(_v2_browser):
+    # _v2_browser is the session-scoped browser from tests/v2_e2e_utils.py —
+    # only the static http.server and the page (not the browser, and not
+    # sync_playwright() itself) are this fixture's own to start/open and
+    # stop/close.
     srv = subprocess.Popen(
         [sys.executable, "-m", "http.server", str(PORT), "-d", str(ROOT / "mockup")],
         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
     )
     time.sleep(0.8)
     try:
-        with sync_playwright() as p:
-            browser = p.chromium.launch()
-            pg = browser.new_page()
-            errors = []
-            pg.on("pageerror", lambda e: errors.append(str(e)))
-            pg.errors = errors
-            pg.goto(ROUTE)
-            pg.wait_for_selector("[data-cov='AU-08'] [data-sched-target-kind]", timeout=10000)
-            yield pg
-            browser.close()
+        pg = _v2_browser.new_page()
+        errors = []
+        pg.on("pageerror", lambda e: errors.append(str(e)))
+        pg.errors = errors
+        pg.goto(ROUTE)
+        pg.wait_for_selector("[data-cov='AU-08'] [data-sched-target-kind]", timeout=10000)
+        yield pg
+        pg.close()
     finally:
         srv.terminate()
         srv.wait(timeout=10)
