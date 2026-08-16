@@ -14,8 +14,6 @@ os.environ.setdefault("ILLUMIO_OPS_RATELIMIT_URI", "memory://")
 import pytest
 from loguru import logger
 
-from src.loguru_config import _StdLibInterceptHandler
-
 
 ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if ROOT_DIR not in sys.path:
@@ -87,6 +85,8 @@ def _loguru_caplog_bridge(caplog, _stdlib_root_logger_baseline):
     fixture's own footprint, not a general reset, so it can't mask a real
     logging misconfiguration in the code under test.
     """
+    from src.loguru_config import _StdLibInterceptHandler
+
     before_ids = set(logger._core.handlers.keys())
     handler_id = logger.add(_PropagateHandler(), format="{message}", level="DEBUG")
     with caplog.at_level(logging.DEBUG):
