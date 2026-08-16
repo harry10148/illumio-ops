@@ -80,11 +80,12 @@ async function mountPlaceholder(root, ctx) {
 // own task registers its real sub-routes (e.g. #/investigate/traffic); the
 // fallback mount below covers any of those before that task lands, and any
 // unknown hash after. #/overview, #/investigate/*, #/alerting/*,
-// #/automation/* and #/reports are registered separately below (Tasks 4, 5,
-// 6, 7 and 8 — the areas with a real implementation) and left out of this
-// list so the placeholder loop does not overwrite them. "#/investigate" and
-// "#/automation" themselves keep their placeholder: neither area has a
-// landing page of its own, only the sub-routes their own sub-nav links to.
+// #/automation/*, #/reports and #/system/* are registered separately below
+// (Tasks 4, 5, 6, 7, 8 and 9 — every area now has a real implementation) and
+// left out of this list so the placeholder loop does not overwrite them.
+// "#/investigate", "#/automation" and "#/system" themselves keep their
+// placeholder: none of the three has a landing page of its own, only the
+// sub-routes their own sub-nav links to.
 const AREA_ROUTES = [
   "#/investigate",
   "#/alerting",
@@ -156,6 +157,43 @@ async function boot() {
   router.register("#/reports", async function (el2, ctx) {
     const { mountReports } = await import("./areas/reports.mjs");
     return mountReports(el2, ctx);
+  });
+  // Task 9 — the system area's eight sub-routes, each lazily importing the
+  // one module they share (same pattern as investigate/alerting/automation
+  // above). "#/system" itself keeps its placeholder, same reasoning as
+  // "#/investigate"/"#/automation": no landing page of its own, only the
+  // sub-nav's eight targets.
+  router.register("#/system/pce", async function (el2, ctx) {
+    const { mountPce } = await import("./areas/system.mjs");
+    return mountPce(el2, ctx);
+  });
+  router.register("#/system/cache", async function (el2, ctx) {
+    const { mountCache } = await import("./areas/system.mjs");
+    return mountCache(el2, ctx);
+  });
+  router.register("#/system/siem", async function (el2, ctx) {
+    const { mountSiem } = await import("./areas/system.mjs");
+    return mountSiem(el2, ctx);
+  });
+  router.register("#/system/tls", async function (el2, ctx) {
+    const { mountTls } = await import("./areas/system.mjs");
+    return mountTls(el2, ctx);
+  });
+  router.register("#/system/security", async function (el2, ctx) {
+    const { mountSecurity } = await import("./areas/system.mjs");
+    return mountSecurity(el2, ctx);
+  });
+  router.register("#/system/display", async function (el2, ctx) {
+    const { mountDisplay } = await import("./areas/system.mjs");
+    return mountDisplay(el2, ctx);
+  });
+  router.register("#/system/channels", async function (el2, ctx) {
+    const { mountChannels } = await import("./areas/system.mjs");
+    return mountChannels(el2, ctx);
+  });
+  router.register("#/system/logs", async function (el2, ctx) {
+    const { mountLogs } = await import("./areas/system.mjs");
+    return mountLogs(el2, ctx);
   });
   AREA_ROUTES.forEach(function (route) { router.register(route, mountPlaceholder); });
   router.setFallback(mountPlaceholder);
