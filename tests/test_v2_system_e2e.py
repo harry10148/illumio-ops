@@ -615,6 +615,124 @@ def test_destructive_confirms_render_cancel_sends_nothing(v2_page):
         _api_post(page, "/api/pce-profiles", {"action": "delete", "id": created["profile"]["id"]})
 
 
+# ══════════════════════════════════ secrets must not reach the preview ══════
+
+# A value no seeded config, catalogue string or endpoint path can produce, so
+# finding it anywhere in a preview is unambiguous evidence of a leak.
+SENTINEL = "E2E-SECRET-SENTINEL-9137"
+# system.mjs's SECRET_MASK — what the preview must show INSTEAD of the value.
+MASK = "•" * 8
+
+
+def _preview_text(scope):
+    """The concatenated text of every request-preview <pre> inside `scope`."""
+    panes = scope.locator("pre.codepane")
+    return "\n".join(panes.nth(i).inner_text() for i in range(panes.count()))
+
+
+def test_pce_secrets_never_reach_the_request_preview(v2_page):
+    """Finding 1 (security): the docked save row's request preview is a
+    VISIBLE <pre> in the DOM, and it used to serialize the raw request body —
+    so an operator typing a PCE API key had that key sitting in plaintext on
+    screen (and in any screenshot, screen share or DOM dump) until the page
+    was left. Covers both PCE forms: the connection panel's docked preview
+    and the add-profile drawer's own preview.
+
+    RED against the pre-fix system.mjs: the sentinel appears verbatim in both
+    previews. The mask assertions keep this from being a vacuous
+    "not-in-string" check (B1) — they prove the key is genuinely IN the body
+    being previewed, just redacted, rather than the whole panel having
+    disappeared."""
+    page, base_url = v2_page
+    _goto(page, base_url, R_PCE, "SY-01")
+
+    board = page.locator(".board")
+    page.locator('.board input[data-field="key"]').fill(SENTINEL)
+    page.locator('.board input[data-field="secret"]').fill(SENTINEL)
+    preview = _preview_text(board)
+    assert SENTINEL not in preview, preview
+    assert '"key": "%s"' % MASK in preview, preview
+    assert '"secret": "%s"' % MASK in preview, preview
+
+    page.get_by_role("button", name=_labels(page)["gui_pce_add"], exact=True).first.click()
+    drawer = page.locator("aside.drawer")
+    drawer.wait_for(state="visible")
+    drawer.locator('input[data-field="name"]').fill("e2e-sy-preview")
+    drawer.locator('input[data-field="key"]').fill(SENTINEL)
+    drawer.locator('input[data-field="secret"]').fill(SENTINEL)
+    drawer_preview = _preview_text(drawer)
+    assert SENTINEL not in drawer_preview, drawer_preview
+    assert '"key": "%s"' % MASK in drawer_preview, drawer_preview
+    assert '"secret": "%s"' % MASK in drawer_preview, drawer_preview
+
+    # The dirty ledger has always masked; assert it stays that way so a fix
+    # applied in the wrong place cannot regress it.
+    assert SENTINEL not in page.locator(".savebar").inner_text()
+    # Nothing is saved: the drawer is dismissed without touching the backend.
+    page.keyboard.press("Escape")
+    page.wait_for_selector("aside.drawer", state="detached")
+
+
+def test_siem_hec_token_never_reaches_the_request_preview(v2_page):
+    """Finding 1, the SIEM destination drawer's hec_token (system.mjs's
+    destDrawer). transport=hec is selected first because the HEC section —
+    and therefore the token in the body — only exists for that transport.
+    Nothing is saved: the drawer is dismissed with Escape."""
+    page, base_url = v2_page
+    _goto(page, base_url, R_SIEM, "SY-08")
+
+    page.get_by_role("button", name=_labels(page)["gui_siem_add"], exact=True).first.click()
+    drawer = page.locator("aside.drawer")
+    drawer.wait_for(state="visible")
+    drawer.locator('input[data-field="name"]').fill("e2e-sy-preview-hec")
+    drawer.locator('select[data-field="transport"]').select_option("hec")
+    drawer.locator('input[data-field="hec_token"]').fill(SENTINEL)
+
+    preview = _preview_text(drawer)
+    assert SENTINEL not in preview, preview
+    assert '"hec_token": "%s"' % MASK in preview, preview
+
+    page.keyboard.press("Escape")
+    page.wait_for_selector("aside.drawer", state="detached")
+
+
+def test_security_new_password_never_reaches_the_request_preview(v2_page):
+    """Finding 1, SY-12's new-password boxes. A typed replacement password is
+    the most sensitive value this area handles and it was serialized straight
+    into the visible preview. Never saved — the form is only typed into."""
+    page, base_url = v2_page
+    _goto(page, base_url, R_SECURITY, "SY-12")
+
+    page.locator('input[data-field="new_password"]').fill(SENTINEL)
+    page.locator('input[data-field="confirm_password"]').fill(SENTINEL)
+
+    preview = _preview_text(page.locator(".board"))
+    assert SENTINEL not in preview, preview
+    assert '"new_password": "%s"' % MASK in preview, preview
+    assert SENTINEL not in page.locator(".savebar").inner_text()
+
+
+def test_alert_channel_secrets_never_reach_the_request_preview(v2_page):
+    """Finding 1, SY-14's alert-plugin secret fields (SMTP password, bot
+    tokens — whichever the real plugin catalogue declares). Every declared
+    secret box is filled, so this covers the catalogue as it actually is
+    rather than one hardcoded plugin; the count assertion keeps the test from
+    passing vacuously if the catalogue ever stops declaring any secret."""
+    page, base_url = v2_page
+    _goto(page, base_url, R_CHANNELS, "SY-14")
+
+    boxes = page.locator('section[data-cov="SY-14"] input[type="password"]')
+    total = boxes.count()
+    assert total >= 1, "no secret field rendered — nothing to prove"
+    for i in range(total):
+        boxes.nth(i).fill(SENTINEL)
+
+    preview = _preview_text(page.locator(".board"))
+    assert SENTINEL not in preview, preview
+    assert preview.count(MASK) >= total, preview
+    assert SENTINEL not in page.locator(".savebar").inner_text()
+
+
 # ══════════════════════════════════════════ real, harmless DLQ wiring ════════
 
 def test_dlq_replay_and_purge_are_wired_for_real(v2_page):

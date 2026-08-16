@@ -19,7 +19,9 @@
 //      established (that component's own header says it is mockup-only). The
 //      payload `<pre>` is appended directly and is now the operator's REAL
 //      preview of the request the save row is about to send, not a labelled
-//      mockup device.
+//      mockup device — with every typed secret redacted to SECRET_MASK first
+//      (redactSecrets(), below): the pane is visible DOM, so serialising the
+//      raw body left credentials in plaintext on screen.
 //   3. makeForm's returned object is renamed `fapi` (was `api`, mockup-only —
 //      it never needed to coexist with a real network layer). fapi.save() now
 //      performs the real POST/PUT and inspects the parsed response before
@@ -446,9 +448,9 @@ function writeCtl(c, v) {
   else c.value = v === null || v === undefined ? "" : String(v);
 }
 
-// The mask a secret wears on SCREEN — the dirty ledger, never the request
-// body (see header point 4: coerce() below sends the raw value; only
-// ledgerValue() ever shows this mask).
+// The mask a secret wears on SCREEN — the dirty ledger and the request
+// preview, never the request body (see header point 4: coerce() below sends
+// the raw value; only ledgerValue() and redactSecrets() show this mask).
 const SECRET_MASK = "••••••••";
 
 function coerce(item) {
@@ -457,7 +459,8 @@ function coerce(item) {
   // non-empty secret with SECRET_MASK before it ever reached bodyFn — safe
   // there (nothing was sent), fatal here (it would ship 8 bullet characters
   // as the real credential). The raw typed value must reach the body; the
-  // mask stays confined to ledgerValue()'s on-screen ledger below.
+  // mask stays confined to what is drawn on SCREEN — ledgerValue()'s ledger
+  // and redactSecrets()'s copy of the body for the preview pane.
   if (item.kind === "secret") return raw;
   if (item.kind === "number") return raw === "" ? null : Number(raw);
   if (item.kind === "bool") return !!raw;
@@ -480,6 +483,27 @@ function coerce(item) {
 function ledgerValue(item, raw) {
   if (item.kind !== "secret") return showValue(raw);
   return String(raw === null || raw === undefined ? "" : raw).length ? SECRET_MASK : "—";
+}
+
+/** Deep copy of `body` with every string equal to a currently-typed secret
+ *  replaced by SECRET_MASK. Matching on the VALUE, not on the key name, is
+ *  what makes this correct for every form here: the body key a secret ends up
+ *  under is not its tracked key (mountPce nests it under `api`, mountChannels
+ *  writes it to the plugin's own config_path leaf, destDrawer renames
+ *  nothing but omits it when blank), so a key-name allowlist would silently
+ *  miss a form the next person adds. Equality only — nothing in these bodies
+ *  ever embeds a secret inside a longer string, and a substring rule would
+ *  mangle unrelated values. Used ONLY for the on-screen preview; fapi.save()
+ *  keeps building the real body from bodyFn (see fapi.sync/fapi.save). */
+function redactSecrets(value, secrets) {
+  if (typeof value === "string") return secrets.indexOf(value) >= 0 ? SECRET_MASK : value;
+  if (Array.isArray(value)) return value.map(function (v) { return redactSecrets(v, secrets); });
+  if (value && typeof value === "object") {
+    const out = {};
+    Object.keys(value).forEach(function (k) { out[k] = redactSecrets(value[k], secrets); });
+    return out;
+  }
+  return value;
 }
 
 function makeForm(method, endpoint) {
@@ -528,6 +552,17 @@ function makeForm(method, endpoint) {
     return out;
   };
 
+  /** Every non-empty value currently typed into a secret-kind control — what
+   *  redactSecrets() looks for when it builds the preview. */
+  fapi.secretValues = function () {
+    return items.filter(function (i) { return i.kind === "secret"; })
+      .map(function (i) {
+        const raw = readCtl(i.c);
+        return raw === null || raw === undefined ? "" : String(raw);
+      })
+      .filter(function (v) { return v.length > 0; });
+  };
+
   fapi.setBody = function (fn) { bodyFn = fn; return fapi; };
   fapi.onSync = function (fn) { syncFn = fn; return fapi; };
 
@@ -548,7 +583,15 @@ function makeForm(method, endpoint) {
     });
     if (changes.length > 5) diff.appendChild(el("span", { class: "chg", text: tf("gui_sy_more", { n: changes.length - 5 }) }));
     const body = bodyFn ? bodyFn(fapi.values()) : fapi.values();
-    payload.textContent = method + " " + endpoint + "\n" + JSON.stringify(body, null, 2);
+    // The preview <pre> is a VISIBLE element: serialising the real body here
+    // put every typed PCE key/secret, HEC token, alert-plugin secret and new
+    // password on screen in plaintext (and into any screenshot or DOM dump)
+    // for as long as the page was open. It is built from a separately
+    // redacted copy instead — the ledger above has always masked, and now the
+    // preview matches it. The REQUEST still carries the raw value: fapi.save()
+    // rebuilds the body from bodyFn and never reads this string.
+    payload.textContent = method + " " + endpoint + "\n"
+      + JSON.stringify(redactSecrets(body, fapi.secretValues()), null, 2);
     if (syncFn) syncFn(changes);
   };
 
