@@ -134,10 +134,12 @@ def test_the_general_invariant_is_still_backlog():
     translated = {k for k in used if str(ZH.get(k, "")).strip()}
     missing = {k for k in translated if k not in ZH_EXPLICIT}
 
-    # Measured at 1022 when this guard was restored (Task 11 review).
-    assert len(missing) <= 1022, (
+    # Measured at 1022 when this guard was restored (Task 11 review); lowered to
+    # 1021 after pinning gui_card_unknown and gui_errcard_retry, the two keys the
+    # system.mjs/api.mjs/shell.mjs switchover started rendering.
+    assert len(missing) <= 1021, (
         f"{len(missing)} gui_* keys rendered by src/ have a zh_TW value but no "
-        "zh_explicit entry, up from the 1022 recorded in task-11-report.md — "
+        "zh_explicit entry, up from the 1021 ceiling — "
         "new hand-written Chinese is being added without a zh_explicit entry, "
         "so precompute_zh_translations.py will revert it"
     )
