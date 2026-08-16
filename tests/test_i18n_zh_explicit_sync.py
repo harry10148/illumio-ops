@@ -139,8 +139,10 @@ def test_the_general_invariant_is_still_backlog():
     # system.mjs/api.mjs/shell.mjs switchover started rendering. Lowered to 1004
     # after task 12b removed 17 keys that carried mockup design commentary
     # (DESIGN-ADDED notes and citations of deleted source files) out of
-    # operator-facing copy.
-    assert len(missing) <= 1004, (
+    # operator-facing copy. Lowered to 928 after task 12c pinned 76 keys whose
+    # reviewer-facing copy (source citations, internal paths, product-vs-mockup
+    # framing) was rewritten for operators and hand-translated into zh_explicit.
+    assert len(missing) <= 928, (
         f"{len(missing)} gui_* keys rendered by src/ have a zh_TW value but no "
         "zh_explicit entry, up from the 1021 ceiling — "
         "new hand-written Chinese is being added without a zh_explicit entry, "

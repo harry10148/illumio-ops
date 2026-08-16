@@ -1256,6 +1256,24 @@ async function mountReports(root, ctx) {
       rhcPanel.body.appendChild(rhcBody);
       aside.appendChild(rhcPanel);
 
+      // check_enablement() (rule_hit_count_enablement.py) returns a fixed
+      // English sentence for each of these four outcomes; map the ones that
+      // are always the same string to real i18n keys instead of printing
+      // the backend's English verbatim. The "unsupported" detail carries a
+      // live PCE version number the backend interpolated in, so it has no
+      // fixed string to map and is shown as-is.
+      const RHC_DETAIL_KEYS = {
+        "PCE report template and VEN scopes both enabled": "gui_rp_rhc_detail_enabled",
+        "PCE report template and VEN scopes both disabled": "gui_rp_rhc_detail_disabled",
+        "missing: VEN firewall_settings scopes": "gui_rp_rhc_detail_missing_ven",
+        "missing: PCE report template": "gui_rp_rhc_detail_missing_pce",
+      };
+      function rhcDetailText(rhc) {
+        const raw = String((rhc && rhc.detail) || "");
+        const key = RHC_DETAIL_KEYS[raw];
+        return key ? t(key) : raw;
+      }
+
       function paintRhc() {
         const rhc = state.rhc || {};
         // Real GET, real failure (header, point 12) — e.g. the PCE is down.
@@ -1291,7 +1309,7 @@ async function mountReports(root, ctx) {
             el("span", { class: "dot" }),
             el("span", { class: "s", text: t("gui_rp_rhc_ven") }),
             el("span", { class: "c", text: String(!!rhc.ven_scopes_enabled) }))));
-        rhcBody.appendChild(note(String(rhc.detail || "")));
+        rhcBody.appendChild(note(rhcDetailText(rhc)));
         rhcBody.appendChild(btn(rhcOn ? "btn ghost" : "btn danger", t("gui_rp_rhc_enable"), function () { handles.enableRhc(); }));
         if (rhcOn) rhcBody.appendChild(note(t("gui_rhc_enabled_ok")));
         else rhcBody.appendChild(note(t("gui_rhc_use_pu_hint")));
