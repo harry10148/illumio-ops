@@ -1,10 +1,10 @@
 <!doctype html>
-<html lang="en" data-theme="dark" data-density="cozy">
+<html lang="{{ html_lang }}" data-theme="dark" data-density="cozy">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="csrf-token" content="{{ csrf_token() }}">
-<title>illumio-ops · v2 preview</title>
+<title>illumio-ops</title>
 <link rel="stylesheet" href="{{ url_for('static', filename='css/v2/tokens.css') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/v2/components.css') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/v2/app.css') }}">
@@ -15,7 +15,10 @@
 <script src="{{ url_for('static', filename='js/v2/core/theme-bootstrap.js') }}"></script>
 </head>
 <body>
-<header id="topbar"></header>
+<!-- shell.mjs builds the whole <header class="chrome"> in here (brand,
+     area nav, palette button, user menu, rail host); area-root is the only
+     thing the router ever writes into. -->
+<div id="shell"></div>
 <main id="area-root"></main>
 <script type="module" src="{{ url_for('static', filename='js/v2/app.mjs') }}"></script>
 </body>

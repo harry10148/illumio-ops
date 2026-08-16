@@ -39,7 +39,7 @@ pytest_plugins = ["tests.v2_e2e_utils"]
 
 
 def _goto_overview(page, base_url):
-    page.goto(base_url + "/v2#/overview")
+    page.goto(base_url + "/#/overview")
     page.wait_for_selector('body[data-booted="true"]')
 
 
@@ -95,21 +95,46 @@ def test_v2_boots_with_no_console_errors(v2_page):
 
 
 def test_health_rail_only_on_overview(v2_page):
+    """XC-01's route scoping, against the REAL five-light healthbar.
+
+    Task 11 replaced app.mjs's Task-2 stand-in rail (a #health-rail div
+    holding two /api/status fields) with components/healthbar.mjs, so the
+    selector moved from `#health-rail` to the component's own XC-01 anchor
+    and the "real daemon field reaches the DOM" assertion moved to the user
+    menu, which applyStatus() fills from the same /api/status payload. The
+    attach/detach behaviour under test is unchanged, and so is the number of
+    things asserted — see task-11-report.md.
+    """
     page, base_url = v2_page
     _goto_overview(page, base_url)
 
-    # #/overview: health rail present, carrying a REAL daemon field.
-    rail = page.locator("#health-rail")
+    # #/overview: the real rail is present, with all five lights.
+    rail = page.locator('.rail-host [data-cov="XC-01"]')
     assert rail.count() == 1
-    rail_text = rail.inner_text()
-    assert __version__ in rail_text
+    assert rail.locator(".rail-slot").count() == 5
+
+    # ...and the same /api/status snapshot that fed it reached the user menu,
+    # carrying a REAL daemon field (the running app's own version string, not
+    # a fixture literal). This is where the Task-2 rail's __version__ check
+    # lives now. The menu's <dl> only exists while the popover is open, so
+    # open it the way an operator would.
+    page.click(".userchip")
+    assert __version__ in page.locator(".usermenu-pop dd").nth(1).inner_text()
+    page.keyboard.press("Escape")
+
+    # Mark the live rail node so the re-attach assertion below can prove it is
+    # the SAME node coming back, not a rebuilt one.
+    page.evaluate(
+        "document.querySelector('.rail-host [data-cov=\"XC-01\"]')"
+        ".setAttribute('data-e2e-marker', 'rail-1')"
+    )
 
     # Client-side hash switch (no reload) to #/system: rail must detach.
-    # (Task 8 report: was #/reports until that area got a real mount — #/system
-    # is the last route still on mountPlaceholder, Task 9's job.)
+    # (#/system is the last route still on mountPlaceholder — it is an area
+    # landing path with no page of its own, by design.)
     page.evaluate("location.hash = '#/system'")
     page.wait_for_selector("code:text-is('#/system')")
-    assert page.locator("#health-rail").count() == 0
+    assert page.locator('.rail-host [data-cov="XC-01"]').count() == 0
 
     # The placeholder body must degrade through tf()'s fallback, not leak
     # the raw, unresolved i18n key onto the screen (review finding: tf() had
@@ -119,10 +144,14 @@ def test_health_rail_only_on_overview(v2_page):
     assert "gui_shell_wip_body" not in wip_text
     assert "#/system" in wip_text
 
-    # And switching back re-attaches it (detach-not-destroy semantics).
+    # And switching back re-attaches THE SAME node (detach-not-destroy
+    # semantics): healthbar.render() runs once at boot off one pair of
+    # snapshot loads, so a marker that survived the round trip is the proof
+    # the rail is moved rather than rebuilt (a rebuild would also refetch).
     page.evaluate("location.hash = '#/overview'")
-    page.wait_for_selector("#health-rail")
-    assert __version__ in page.locator("#health-rail").inner_text()
+    page.wait_for_selector('.rail-host [data-cov="XC-01"]')
+    assert page.locator('.rail-host [data-cov="XC-01"]').get_attribute("data-e2e-marker") == "rail-1"
+    assert page.locator('.rail-host [data-cov="XC-01"] .rail-slot').count() == 5
 
 
 def test_theme_and_density_persist_across_reload(v2_page):

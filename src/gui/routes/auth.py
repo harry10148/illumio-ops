@@ -13,7 +13,7 @@ from loguru import logger
 
 from src.config import ConfigManager, verify_password
 from src.gui._helpers import (
-    _get_active_pce_url, _ui_translation_dict, _ok, _err, _safe_log,
+    _ui_translation_dict, _ok, _err, _safe_log,
 )
 from src.i18n import t
 
@@ -33,49 +33,47 @@ def make_auth_blueprint(
     @bp.route("/")
     @login_required
     def index():
-        import datetime as _dt
-        import json as _json
+        """The GUI. Serves the v2 shell — the only frontend this app has.
+
+        Task 11 (switchover) folded the flag-gated `/v2` route into this one
+        and deleted src/gui/routes/v2.py. The v2 shell fetches everything it
+        renders through /api/* (core/api.mjs), so unlike the legacy
+        index.html this template needs no server-rendered dashboard context —
+        only the document language, which has to be on <html lang> before any
+        script runs.
+        """
         cm.load()
-        pce_url = _get_active_pce_url(cm)
-        rules_count = len(cm.config.get("rules", []))
-        schedules_count = len(cm.config.get("report_schedules", []))
-        # cm.load() above guarantees last_loaded_at is set; reflect the real
-        # load time (not render time) so the header's relative display works.
-        config_loaded_at = _dt.datetime.fromtimestamp(cm.last_loaded_at)
         lang = cm.config.get("settings", {}).get("language", "en")
-        ui_translations = _ui_translation_dict(lang)
-        from src.report.cache_support import cache_available
-        return render_template(
-            "index.html",
-            pce_url=pce_url,
-            rules_count=rules_count,
-            schedules_count=schedules_count,
-            config_loaded_at=config_loaded_at,
-            html_lang=lang.replace("_", "-"),
-            cache_available=cache_available(cm),
-            ui_translations_json=_json.dumps(
-                ui_translations, ensure_ascii=False
-            ).replace("</", "<\\/"),
-        )
+        return render_template("v2/base.html", html_lang=lang.replace("_", "-"))
 
     @bp.route("/login", methods=["GET"])
     def login_page():
+        """The v2 login page (LG-01/LG-02), at the canonical /login path.
+
+        Task 11 replaced the legacy login.html with the v2 one and removed
+        the separate /v2/login route; src/gui/__init__.py's security_check
+        bypass list lost its /v2/login entry in the same change.
+
+        areas/login.mjs's own i18n.init() call (GET /api/ui_translations)
+        401s for an anonymous visitor — every /api/* route sits behind
+        security_check's auth gate, and this task does not change that
+        ("Backend API zero changes"). _ui_translation_dict() is the exact
+        same function that route calls for an authenticated request; calling
+        it here, server-side, and embedding the result as this page's own
+        template data (not a new API surface) gives login.mjs a real,
+        correctly-localized catalogue to seed from before any request can
+        succeed. That replaces the legacy page's hand-picked `login_i18n`
+        dict, which had to be kept in sync with the JS by hand.
+        """
         import json as _json
-        login_i18n = {
-            "signing_in": t("login_btn_signing_in"),
-            "success": t("login_btn_success"),
-            "btn_default": t("login_btn"),
-            "invalid_auth": t("gui_err_invalid_auth"),
-            "network_error": t("gui_err_network"),
-            "changing": t("login_btn_changing"),
-            "change_btn_default": t("login_change_pw_btn"),
-            "mismatch": t("login_err_pw_mismatch"),
-            "pw_too_short": t("login_err_pw_short"),
-        }
+        cm.load()
+        lang = cm.config.get("settings", {}).get("language", "en")
+        translations = _ui_translation_dict(lang)
         return render_template(
             "login.html",
+            html_lang=lang.replace("_", "-"),
             login_i18n_json=_json.dumps(
-                login_i18n, ensure_ascii=False
+                translations, ensure_ascii=False
             ).replace("</", "<\\/"),
         )
 

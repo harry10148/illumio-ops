@@ -7,20 +7,29 @@ from src.exceptions import TrafficQueryError
 from tests._helpers import _csrf
 
 
-def test_index_initial_translations_include_schedule_keys(client):
+def test_ui_translations_include_schedule_keys(client):
+    """The schedule strings must reach the browser's catalogue.
+
+    Phase 2A Task 11: the legacy `/` embedded the whole catalogue as a JSON
+    <script> block, so this used to scrape the rendered page. The v2 shell
+    fetches it from GET /api/ui_translations instead (core/i18n.mjs), so the
+    same invariant is asserted against that response — and now against the
+    parsed keys rather than a substring of HTML, which also rules out a key
+    that only appears inside some unrelated value.
+    """
     login = client.post('/api/login', json={
         "username": "admin",
         "password": "testpass"
     })
     assert login.status_code == 200
 
-    response = client.get('/')
+    response = client.get('/api/ui_translations')
 
     assert response.status_code == 200
-    body = response.get_data(as_text=True)
-    assert "sched_enabled_short" in body
-    assert "sched_disabled_short" in body
-    assert "sched_running" in body
+    catalogue = response.get_json()
+    for key in ("sched_enabled_short", "sched_disabled_short", "sched_running"):
+        assert key in catalogue, key
+        assert catalogue[key], key
 
 
 def test_report_schedule_run_marks_schedule_running(client, app_persistent, monkeypatch, tmp_path):

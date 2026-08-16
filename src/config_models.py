@@ -182,7 +182,11 @@ class WebGuiSettings(_Base):
     allowed_ips: list[str] = Field(default_factory=list)
     tls: WebGuiTls = Field(default_factory=WebGuiTls)
     must_change_password: bool = False
-    enable_v2_preview: bool = False
+    # NOTE: `enable_v2_preview` used to live here (Task 1..10, default False).
+    # Task 11 made v2 the only GUI, so the flag has no meaning any more. It is
+    # deleted rather than deprecated-in-place: model_config is extra="allow"
+    # above, so an installed config.json that still carries the key round-trips
+    # untouched instead of failing validation.
 
 class PceProfile(_Base):
     """Extra=allow since PCE profile shape may evolve; only require id + url."""

@@ -7,9 +7,9 @@ for the harness itself.
 
 Covers exactly the brief's three scenarios:
   - wrong password -> the real 401's error message renders inline, no
-    navigation away from /v2/login.
-  - correct password -> lands on the real /v2 shell (not just "some URL
-    starting with /v2" — asserted via a shell-only DOM marker).
+    navigation away from /login.
+  - correct password -> lands on the real GUI shell at `/` (not just "some
+    URL" — asserted via a shell-only DOM marker).
   - the first-login branch: a fixture sets a REAL must_change_password=True
     in the backend config (not a stubbed response), the inline
     change-password form that appears submits for real to POST
@@ -85,7 +85,7 @@ def v2_first_login_app(temp_config_file):
     the test below can prove LG-01 *and* LG-02 both render in the real
     configured language throughout the whole first-login flow, including
     while must_change_password is still gating every other /api/* call —
-    login.html's server-rendered i18n seed (v2.py's v2_login(), login.mjs
+    login.html's server-rendered i18n seed (auth.py's login_page(), login.mjs
     header note 5) is what makes that possible without login.mjs ever
     re-querying GET /api/ui_translations after the operator authenticates.
     """
@@ -150,7 +150,7 @@ def v2_zh_tw_login_page(_v2_browser, v2_zh_tw_app):
 
 
 def _goto_login(page, base_url):
-    page.goto(base_url + "/v2/login")
+    page.goto(base_url + "/login")
     page.wait_for_selector('body[data-booted="true"]')
 
 
@@ -173,12 +173,12 @@ def test_wrong_password_shows_error_and_stays_on_login(v2_login_page):
     # this red.
     assert err.inner_text() == "Invalid username or password."
     # Real production behaviour: no navigation on a failed login.
-    assert "/v2/login" in page.url
+    assert page.url == base_url + "/login"
 
 
 # ── LG-01: correct password ─────────────────────────────────────────────────
 
-def test_correct_password_lands_on_v2_shell(v2_login_page):
+def test_correct_password_lands_on_the_gui_shell(v2_login_page):
     page, base_url = v2_login_page
     _goto_login(page, base_url)
 
@@ -186,11 +186,11 @@ def test_correct_password_lands_on_v2_shell(v2_login_page):
     page.fill('[data-cov="LG-01"] input[data-field="password"]', V2_PASSWORD)
     page.click('[data-cov="LG-01"] button.btn.primary')
 
-    page.wait_for_url(base_url + "/v2*")
+    page.wait_for_url(base_url + "/")
     page.wait_for_selector('body[data-booted="true"]')
-    # Prove this is the real /v2 SPA shell (base.html's #area-root), not just
-    # a URL that happens to start with /v2 — e.g. a broken redirect back to
-    # this same login page would also satisfy a bare URL-prefix check.
+    # Prove this is the real SPA shell (base.html's #shell/#area-root), not
+    # just some URL on this origin — a broken redirect back to this same
+    # login page would also satisfy a bare URL check.
     assert page.locator("#area-root").count() == 1
     assert page.locator("#login-root").count() == 0
 
@@ -203,8 +203,8 @@ def test_first_login_change_password_flow_hits_real_backend(v2_first_login_page)
 
     # Pre-auth: GET /api/ui_translations 401s for an anonymous request (same
     # before_request gate as every other /api/* route), but login.mjs seeds
-    # its catalogue from login.html's server-rendered translations (v2.py's
-    # v2_login(), login.mjs header note 5), so LG-01 is already correctly
+    # its catalogue from login.html's server-rendered translations (auth.py's
+    # login_page(), login.mjs header note 5), so LG-01 is already correctly
     # localized to this fixture's zh_TW — not the English t()-fallback. If
     # that seed were ever dropped, this would read "PCE Ops" instead.
     assert page.locator('[data-cov="LG-01"] h1').inner_text() == "登入 PCE Ops"
@@ -229,14 +229,25 @@ def test_first_login_change_password_flow_hits_real_backend(v2_first_login_page)
     # read the English fallback "PCE Ops" or never get here at all.
     assert page.locator('[data-cov="LG-02"] h1').inner_text() == "登入 PCE Ops"
 
+    # The two password inputs really carry the backend's 12-character floor
+    # (config.py's 12-512 rule). Before Task 11 this was asserted against the
+    # legacy login.html's server-rendered minlength attributes
+    # (tests/test_d2_misc_hardening.py); the v2 page builds the fields in JS,
+    # so the DOM-level proof belongs here, on the real inputs.
+    for field in ("new_password", "confirm_password"):
+        assert page.get_attribute(
+            '[data-cov="LG-02"] input[data-field="%s"]' % field, "minlength"
+        ) == "12", field
+
     new_password = "a genuinely new v2 login password"
     page.fill('[data-cov="LG-02"] input[data-field="new_password"]', new_password)
     page.fill('[data-cov="LG-02"] input[data-field="confirm_password"]', new_password)
     page.click('[data-cov="LG-02"] button.btn.primary')
 
-    page.wait_for_url(base_url + "/v2*")
+    page.wait_for_url(base_url + "/")
     page.wait_for_selector('body[data-booted="true"]')
     assert page.locator("#area-root").count() == 1
+    assert page.locator("#login-root").count() == 0
 
     # The real backend state changed via the real POST /api/security handler
     # (src/gui/routes/config.py:api_security_post) — not a stubbed 200. A
@@ -257,7 +268,7 @@ def test_first_login_change_password_flow_hits_real_backend(v2_first_login_page)
 # pre-auth so every t() fell back to its English literal) — a real
 # regression for every zh_TW install, since the LEGACY /login page IS
 # correctly localized for logged-out visitors (auth.py's login_page() is
-# server-rendered Jinja). Fixed by having v2.py's v2_login() embed the real
+# server-rendered Jinja). Fixed by having auth.py's login_page() embed the real
 # catalogue (the same _ui_translation_dict(lang) /api/ui_translations
 # itself calls) into login.html for login.mjs to seed from, and by deriving
 # <html lang> from the same settings.language read. This test targets that

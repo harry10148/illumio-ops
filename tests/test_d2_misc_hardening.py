@@ -48,6 +48,16 @@ def test_session_cookie_not_secure_when_https_disabled(tmp_path):
 # ── 子項 2：login.html 密碼欄位必須符合後端的 12 字元下限 ──────────────────
 
 def test_login_page_password_minlength_matches_backend(tmp_path):
+    """Phase 2A Task 11: /login is now the v2 page, which BUILDS its fields in
+    JS (src/static/js/v2/areas/login.mjs) instead of server-rendering them —
+    so the served HTML no longer carries `minlength="12"` to scrape. The
+    invariant is unchanged and still checked here, one layer down, against
+    the module that sets it; the DOM-level proof (the real inputs really
+    carry minLength 12) lives in tests/test_v2_login_e2e.py's first-login
+    test, which drives LG-02 for real in a browser.
+    """
+    from pathlib import Path
+
     from src.config import ConfigManager
     from src.gui import build_app
 
@@ -55,9 +65,18 @@ def test_login_page_password_minlength_matches_backend(tmp_path):
     app = build_app(cm, use_https=False)
     app.config["TESTING"] = True
     body = app.test_client().get("/login").get_data(as_text=True)
-    assert 'id="new-password"' in body
-    assert body.count('minlength="12"') >= 2, "兩個密碼欄位都必須要求 12 字元（對齊 config.py 的 12-512 規則）"
-    assert 'minlength="8"' not in body
+    # /login really serves the v2 login module (and nothing else builds those
+    # password fields), so the source assertions below are about the code the
+    # page actually runs.
+    assert "js/v2/areas/login.mjs" in body
+
+    js = Path("src/static/js/v2/areas/login.mjs").read_text(encoding="utf-8")
+    # 兩個密碼欄位都必須要求 12 字元（對齊 config.py 的 12-512 規則）
+    assert js.count(".input.minLength = 12;") == 2, js.count(".input.minLength = 12;")
+    # ...and the client-side guard that rejects a short password before the
+    # POST agrees with it.
+    assert "newPw.length < 12" in js
+    assert "minLength = 8" not in js and "length < 8" not in js
 
 
 # ── 子項 5：/api/security 與 /api/tls/config 必須序列化存檔 ────────────────

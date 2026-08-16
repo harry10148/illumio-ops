@@ -27,7 +27,7 @@
 //     authenticated. The optional `seedCatalogue` argument is used ONLY when
 //     the live fetch fails — it lets a caller that already has a real,
 //     server-rendered catalogue in hand (login.html embeds one via Jinja,
-//     see v2.py's v2_login()) hand it over instead of falling back to
+//     see auth.py's login_page()) hand it over instead of falling back to
 //     English literals. Every other caller (app.mjs boots after the operator
 //     is authenticated, so its own fetch always succeeds) passes nothing,
 //     which is exactly the old no-argument behaviour.

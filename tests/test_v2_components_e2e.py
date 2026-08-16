@@ -34,7 +34,7 @@ pytest_plugins = ["tests.v2_e2e_utils"]
 
 
 def _goto_overview(page, base_url):
-    page.goto(base_url + "/v2#/overview")
+    page.goto(base_url + "/#/overview")
     page.wait_for_selector('body[data-booted="true"]')
 
 

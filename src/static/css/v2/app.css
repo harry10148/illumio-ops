@@ -137,6 +137,10 @@ body {
 .usermenu-pop dl div { display: flex; justify-content: space-between; gap: var(--space-5); padding: var(--space-1) 0; }
 .usermenu-pop dt { font-size: var(--fs-mini); color: var(--text-3); }
 .usermenu-pop dd { margin: 0; font-family: var(--font-mono); font-size: var(--fs-mini); color: var(--text-2); }
+/* sign-out (LG-03) — a real <form method="post" action="/logout">, so it needs
+   the same top rule the <dl> above it gets, and its button spans the popover. */
+.usermenu-pop .signout { margin: var(--space-3) 0 0; padding: var(--space-3) var(--space-4) var(--space-1); border-top: 1px solid var(--line-soft); }
+.usermenu-pop .signout .btn { width: 100%; }
 
 /* --------------------------------------------------- instrument rail ------ */
 .rail {

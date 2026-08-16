@@ -1,268 +1,29 @@
-<!DOCTYPE html>
-<html lang="en">
+<!doctype html>
+<html lang="{{ html_lang }}" data-theme="dark" data-density="cozy">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{{ t('login_title') }}</title>
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%23FF5500' d='M12 2l8 4v6c0 5-3.5 8.5-8 10-4.5-1.5-8-5-8-10V6z'/%3E%3C/svg%3E">
-  <style nonce="{{ csp_nonce() }}">
-    @font-face {
-      font-family: 'Space Grotesk';
-      font-style: normal;
-      font-weight: 400 700;
-      font-display: swap;
-      src: url('/static/fonts/SpaceGrotesk-VF.woff2') format('woff2');
-    }
-    @font-face {
-      font-family: 'Inter';
-      font-style: normal;
-      font-weight: 100 900;
-      font-display: swap;
-      src: url('/static/fonts/Inter-VF.woff2') format('woff2');
-    }
-
-    *, *::before, *::after { box-sizing: border-box; }
-
-    :root {
-      --bg:        #fafafa;
-      --surface:   #ffffff;
-      --text:      #0a0a0a;
-      --text-muted: #6f6f6f;
-      --text-faint: #a8a8a8;
-      --border:    #e5e5e5;
-      --border-strong: #d4d4d4;
-      --accent:    #FF5500;
-      --danger:    #dc2626;
-      --shadow-1:  0 1px 2px rgba(0,0,0,0.04);
-      --shadow-2:  0 4px 16px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.04);
-      --radius-sm: 6px;
-      --radius:    8px;
-      --radius-lg: 12px;
-      --font: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    }
-
-    body {
-      margin: 0;
-      padding: 0;
-      background: var(--bg);
-      color: var(--text);
-      font-family: var(--font);
-      font-size: 14px;
-      line-height: 1.5;
-      min-height: 100dvh;
-      display: grid;
-      place-items: center;
-      -webkit-font-smoothing: antialiased;
-    }
-
-    .card {
-      width: 100%;
-      max-width: 380px;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: var(--radius-lg);
-      box-shadow: var(--shadow-2);
-      padding: 32px;
-      margin: 24px;
-    }
-
-    .brand {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      margin-bottom: 24px;
-    }
-
-    .brand-dot {
-      width: 10px;
-      height: 10px;
-      background: var(--accent);
-      border-radius: 3px;
-      flex-shrink: 0;
-    }
-
-    .brand-name {
-      font-size: 14px;
-      font-weight: 600;
-      letter-spacing: -0.01em;
-    }
-
-    h1 {
-      font-size: 22px;
-      font-weight: 600;
-      margin: 0 0 6px;
-      letter-spacing: -0.015em;
-      font-family: var(--font);
-    }
-
-    .sub {
-      color: var(--text-muted);
-      font-size: 13px;
-      margin: 0 0 24px;
-    }
-
-    form {
-      display: grid;
-      gap: 14px;
-    }
-
-    label {
-      display: block;
-      font-size: 13px;
-      font-weight: 500;
-      margin-bottom: 6px;
-    }
-
-    .input {
-      width: 100%;
-      padding: 9px 12px;
-      font-size: 14px;
-      font-family: var(--font);
-      color: var(--text);
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: var(--radius-sm);
-      transition: border-color 120ms ease, box-shadow 120ms ease;
-    }
-
-    .input:hover { border-color: var(--border-strong); }
-
-    .input:focus {
-      outline: none;
-      border-color: var(--text);
-      box-shadow: 0 0 0 3px rgba(10,10,10,0.06);
-    }
-
-    .input.error {
-      border-color: var(--danger);
-      box-shadow: 0 0 0 3px rgba(220,38,38,0.08);
-    }
-
-    .input.error:focus {
-      border-color: var(--danger);
-      box-shadow: 0 0 0 3px rgba(220,38,38,0.12);
-    }
-
-    .err {
-      margin-top: 6px;
-      font-size: 12px;
-      color: var(--danger);
-      display: none;
-      align-items: center;
-      gap: 6px;
-    }
-
-    .err.visible {
-      display: flex;
-    }
-
-    .err::before {
-      content: '!';
-      display: inline-grid;
-      place-items: center;
-      width: 14px;
-      height: 14px;
-      background: var(--danger);
-      color: #fff;
-      border-radius: 50%;
-      font-size: 10px;
-      font-weight: 700;
-      flex-shrink: 0;
-    }
-
-    .submit {
-      margin-top: 8px;
-      width: 100%;
-      padding: 10px 16px;
-      font-size: 14px;
-      font-weight: 500;
-      font-family: var(--font);
-      color: #fff;
-      background: var(--accent);
-      border: 1px solid var(--accent);
-      border-radius: var(--radius-sm);
-      cursor: pointer;
-      box-shadow: var(--shadow-1);
-      transition: transform 120ms ease, box-shadow 120ms ease;
-    }
-
-    .submit:hover {
-      transform: translateY(-1px);
-      box-shadow: 0 4px 12px rgba(255,85,0,0.20), 0 1px 2px rgba(0,0,0,0.05);
-    }
-
-    .submit:active { transform: translateY(0); }
-
-    .submit:disabled {
-      opacity: 0.7;
-      cursor: not-allowed;
-      transform: none;
-    }
-
-    /* Change-password form banner */
-    .change-pw-banner {
-      margin: 0 0 12px 0;
-      padding: 10px 12px;
-      background: rgba(255,162,47,.15);
-      border-left: 3px solid var(--accent);
-      border-radius: 4px;
-      color: var(--text);
-      font-size: 13px;
-    }
-
-    .footer {
-      margin-top: 24px;
-      padding-top: 16px;
-      border-top: 1px solid var(--border);
-      font-size: 12px;
-      color: var(--text-faint);
-      text-align: center;
-    }
-  </style>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="csrf-token" content="{{ csrf_token() }}">
+<title>illumio-ops · login</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/v2/tokens.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/v2/components.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/v2/app.css') }}">
+<!-- Same pre-paint bootstrap as base.html: an anonymous visitor's very
+     first paint on this page must not flash the wrong theme either. See
+     core/theme-bootstrap.js for why this is an external classic script,
+     not the mockup's inline block (this app's CSP has no 'unsafe-inline'
+     and injects no nonce). theme.mjs owns every change after this point. -->
+<script src="{{ url_for('static', filename='js/v2/core/theme-bootstrap.js') }}"></script>
 </head>
-<body>
-  <div class="card">
-    <div class="brand">
-      <span class="brand-dot"></span>
-      <span class="brand-name">Illumio PCE Ops</span>
-    </div>
-
-    <h1>{{ t('login_header') }}</h1>
-    <p class="sub">{{ t('login_subheader') }}</p>
-
-    <form id="login-form" autocomplete="on">
-      <div>
-        <label for="username">{{ t('login_username') }}</label>
-        <input class="input" type="text" id="username" name="username" required autocomplete="username" placeholder="{{ t('login_username_placeholder') }}">
-        <div class="err" role="alert" aria-live="assertive" id="err-username"></div>
-      </div>
-      <div>
-        <label for="password">{{ t('login_password') }}</label>
-        <input class="input" type="password" id="password" name="password" required autocomplete="current-password" placeholder="{{ t('login_password_placeholder') }}">
-        <div class="err" role="alert" aria-live="assertive" id="err-password"></div>
-      </div>
-      <button type="submit" class="submit" id="login-btn">{{ t('login_btn') }}</button>
-    </form>
-
-    <form id="change-pw-form" autocomplete="off" style="display:none;">
-      <p class="change-pw-banner" id="change-pw-banner">{{ t('login_must_change_banner') }}</p>
-      <div>
-        <label for="new-password">{{ t('login_new_password') }}</label>
-        <input class="input" type="password" id="new-password" name="new-password" required autocomplete="new-password" minlength="12">
-        <div class="err" role="alert" aria-live="assertive" id="err-new-password"></div>
-      </div>
-      <div>
-        <label for="confirm-password">{{ t('login_confirm_password') }}</label>
-        <input class="input" type="password" id="confirm-password" name="confirm-password" required autocomplete="new-password" minlength="12">
-        <div class="err" role="alert" aria-live="assertive" id="err-confirm-password"></div>
-      </div>
-      <button type="submit" class="submit" id="change-pw-btn">{{ t('login_change_pw_btn') }}</button>
-    </form>
-
-    <div class="footer">{{ t('login_footer') }}</div>
-  </div>
-
-  <script id="login-i18n-data" type="application/json">{{ login_i18n_json | safe }}</script>
-  <script defer src="{{ url_for('static', filename='js/login.js') }}"></script>
+<body class="loginpage">
+<div id="login-root"></div>
+<!-- login.mjs's i18n seed: the real gui_/sched_/status_/error_/pd_
+     catalogue in the operator's configured language, rendered server-side
+     (src/gui/routes/auth.py's login_page()) because GET /api/ui_translations
+     itself 401s for this page's anonymous visitors. Same pattern as the
+     legacy login.html's #login-i18n-data it replaced, applied to the full
+     catalogue instead of a hand-picked key list. -->
+<script id="login-i18n-seed" type="application/json">{{ login_i18n_json | safe }}</script>
+<script type="module" src="{{ url_for('static', filename='js/v2/areas/login.mjs') }}"></script>
 </body>
 </html>

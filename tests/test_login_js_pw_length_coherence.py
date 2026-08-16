@@ -12,22 +12,36 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
 
+# Phase 2A Task 11 note: the three surfaces are the same three, one layer
+# over. src/static/js/login.js and the server-rendered src/templates/
+# login.html were replaced by the single v2 login module, which builds the
+# fields AND validates them; the i18n key it reads is gui_login_err_pw_short
+# (the login_* prefix cannot resolve through /api/ui_translations, see
+# src/static/js/v2/areas/login.mjs's header note 6). Nothing was dropped:
+# the JS floor, the input constraint and the message all still have to say
+# 12, and tests/test_v2_login_e2e.py proves the rendered inputs really carry
+# minlength=12 in a browser.
+LOGIN_MJS = REPO_ROOT / "src" / "static" / "js" / "v2" / "areas" / "login.mjs"
+
+
 def test_login_js_uses_12_char_minimum_matching_server():
-    js = (REPO_ROOT / "src" / "static" / "js" / "login.js").read_text(encoding="utf-8")
+    js = LOGIN_MJS.read_text(encoding="utf-8")
     assert "newPw.length < 12" in js
     assert "newPw.length < 8" not in js
 
 
-def test_login_html_minlength_matches_server():
-    html = (REPO_ROOT / "src" / "templates" / "login.html").read_text(encoding="utf-8")
-    assert 'id="new-password"' in html and 'minlength="12"' in html
+def test_login_input_minlength_matches_server():
+    js = LOGIN_MJS.read_text(encoding="utf-8")
+    # Both password inputs (new + confirm), built by login.mjs's field().
+    assert js.count(".input.minLength = 12;") == 2
+    assert "minLength = 8" not in js
 
 
 def test_login_err_pw_short_i18n_says_12_in_both_locales():
     import json
     en = json.loads((REPO_ROOT / "src" / "i18n_en.json").read_text(encoding="utf-8"))
     zh = json.loads((REPO_ROOT / "src" / "i18n_zh_TW.json").read_text(encoding="utf-8"))
-    assert "12" in en["login_err_pw_short"]
-    assert "8" not in en["login_err_pw_short"]
-    assert "12" in zh["login_err_pw_short"]
-    assert "8" not in zh["login_err_pw_short"]
+    assert "12" in en["gui_login_err_pw_short"]
+    assert "8" not in en["gui_login_err_pw_short"]
+    assert "12" in zh["gui_login_err_pw_short"]
+    assert "8" not in zh["gui_login_err_pw_short"]

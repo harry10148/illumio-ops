@@ -45,7 +45,7 @@
 //      t() call on its English `fallback` for an anonymous visitor — a real
 //      regression a review caught: every zh_TW install would see the
 //      product's front door permanently in English — login.html embeds the
-//      real catalogue server-side (v2.py's v2_login() calls the exact same
+//      real catalogue server-side (auth.py's login_page() calls the exact same
 //      _ui_translation_dict(lang) /api/ui_translations itself calls, in
 //      Jinja, mirroring auth.py's login_i18n_json for the legacy page) and
 //      boot() below passes it to i18n.init() as a seed
@@ -134,7 +134,7 @@ function segmented(labelText, options, get, set) {
 
 function build(root) {
   // ── chrome: brand + theme/density, same as every other v2 page ──
-  const brand = el("a", { class: "brand", href: "/v2/login" },
+  const brand = el("a", { class: "brand", href: "/login" },
     el("b", { text: "illumio" }), el("i"), el("span", { text: "ops" }));
   const skin = el("div", { class: "topright" },
     segmented(t("gui_theme", "Theme"),
@@ -223,7 +223,7 @@ function build(root) {
         return;
       }
       signIn.textContent = t("gui_login_btn_success", "Signed in");
-      window.location.href = "/v2";
+      window.location.href = "/";
       return;
     }
 
@@ -271,7 +271,7 @@ function build(root) {
 
     if (r && r.ok === true) {
       changeBtn.textContent = t("gui_login_btn_success", "Signed in");
-      window.location.href = "/v2";
+      window.location.href = "/";
       return;
     }
 
@@ -282,7 +282,7 @@ function build(root) {
 }
 
 /**
- * Read login.html's embedded #login-i18n-seed (v2.py's v2_login(), see
+ * Read login.html's embedded #login-i18n-seed (auth.py's login_page(), see
  * header note 5) — the real catalogue, server-rendered in the operator's
  * configured language, for i18n.init() to fall back to when its own
  * anonymous GET /api/ui_translations 401s. Returns null on anything

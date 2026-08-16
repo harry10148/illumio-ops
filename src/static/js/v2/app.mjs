@@ -1,19 +1,27 @@
-// app.mjs — v2 boot order: display prefs -> audit hook -> i18n -> router
-// (six-area placeholder routes) -> health rail (#/overview only).
+// app.mjs — v2 boot order: display prefs -> audit hook -> i18n -> chrome ->
+// palette -> health rail (#/overview only) -> router.
 //
-// Task 2 builds only the core-layer plumbing — api/router/i18n/theme/toast/
-// dom/fmt/audit and this file's boot sequence. The chrome (topbar nav, user
-// menu, command palette) and every area's real content are later tasks (T3
-// components, T4-T9 areas). This file's placeholder mount and inline
-// health-rail rendering are deliberately minimal stand-ins that those tasks
-// replace — see the comments on each below.
+// Task 11 (switchover) replaced this file's two Task-2 stand-ins with the
+// real things, now that v2 is the only GUI:
+//   - the chrome. Task 2 mounted nothing but a bare rail host into #topbar;
+//     shell.mjs now builds the brand, the six-area nav (XC-14), the palette
+//     button, the user menu (XC-13) and the sign-out form (LG-03).
+//   - the health rail. Task 2 rendered two /api/status fields inline as
+//     proof of wiring; components/healthbar.mjs (XC-01, ported in Task 3)
+//     now renders the real five lights from the same two snapshots that
+//     fill the user menu, with an XC-10 error card on failure.
+// The attach/detach mechanism around the rail (syncRail) is unchanged.
 
-import { el } from "./core/dom.mjs";
 import { api } from "./core/api.mjs";
 import { t, tf, i18n } from "./core/i18n.mjs";
 import { initDisplay } from "./core/theme.mjs";
 import { installAuditHook } from "./core/audit.mjs";
 import { router } from "./core/router.mjs";
+import { el } from "./core/dom.mjs";
+import { healthbar } from "./components/healthbar.mjs";
+import { palette } from "./components/palette.mjs";
+import { errorCard } from "./components/errorcard.mjs";
+import { buildShell, applyStatus, seedPalette } from "./shell.mjs";
 
 // XC-01 (health rail) lives on the overview only (spec §1.1, amended at Gate
 // 2). Detach, not hide: `hidden` loses to any `display` rule, and a merely
@@ -35,22 +43,30 @@ function syncRail(railHost, path) {
 }
 
 /**
- * A minimal, real-data health readout — NOT the mockup's five-light
- * healthbar (design/v2/mockup/js/components/healthbar.mjs), which is Task
- * 3's job to port as a real component. This just proves the wiring: real
- * /api/status fields reach the DOM, attached/detached by route exactly like
- * the eventual component will be (same syncRail mechanism, same railHost).
+ * Build the five-light rail (XC-01) from the two live snapshots, and fill the
+ * user menu from the same status payload — one pair of loads, two consumers,
+ * exactly as design/v2/mockup/js/app.mjs does it.
+ *
+ * On failure the rail slot carries an XC-10 error card whose retry re-runs
+ * this same function, so a transient /api/status or
+ * /api/dashboard/overview_summary failure is recoverable without a reload.
  */
-async function mountHealth(railHost) {
+async function mountHealth(railHost, menu) {
+  // A retry re-enters here: drop whatever the previous attempt left attached
+  // (rail or error card) before building the replacement, or the two stack up.
+  if (railNode && railNode.parentNode === railHost) railHost.removeChild(railNode);
+  if (railNode && typeof railNode.destroy === "function") railNode.destroy();
   railNode = null;
   try {
-    const status = await api.load("status");
-    railNode = el("div", { id: "health-rail", class: "rail" },
-      el("span", { class: "rail-cell", "data-field": "version", text: t("gui_status_version", "Version") + ": " + status.version }),
-      el("span", { class: "rail-cell", "data-field": "rules_count", text: t("gui_status_rules_count", "Rules") + ": " + status.rules_count })
-    );
+    const snaps = await Promise.all([api.load("status"), api.load("dashboard_overview")]);
+    applyStatus(menu, snaps[0]);
+    railNode = healthbar.render(snaps[0], snaps[1]);
   } catch (e) {
-    railNode = el("div", { class: "rail-error", text: String((e && e.message) || e) });
+    railNode = el("div", { class: "rail-error" }, errorCard({
+      id: "status / dashboard_overview",
+      error: e,
+      onRetry: function () { return mountHealth(railHost, menu); },
+    }));
   }
   // The load races the first route mount, so ask the router where we ended
   // up rather than assuming we are still on the route that started the fetch.
@@ -61,7 +77,8 @@ async function mountHealth(railHost) {
  * Every route this task has not built real content for yet. Names the route
  * so a reviewer walking the nav can tell a gap from a bug — same intent as
  * the mockup's areas/placeholder.mjs, rebuilt without its shell.mjs
- * dependency (the shell/nav chrome is Task 3).
+ * dependency. The four routes still on it (AREA_ROUTES below) are area
+ * landing paths that have no page of their own by design, not gaps.
  */
 async function mountPlaceholder(root, ctx) {
   root.appendChild(el("div", { class: "area-head" },
@@ -98,13 +115,19 @@ async function boot() {
   installAuditHook();
   await i18n.init();
 
-  const topbar = document.getElementById("topbar");
+  const shellHost = document.getElementById("shell");
   const areaRoot = document.getElementById("area-root");
-  const railHost = el("div", { class: "rail-host" });
-  topbar.appendChild(railHost);
+  const shell = buildShell(shellHost);
+
+  // The palette dialog (XC-02) and its Cmd/Ctrl+K binding exist from boot, on
+  // every route — the six area jumps and the two display toggles are global
+  // commands; each area adds its own route-scoped ones and drops them again
+  // in its own teardown (areas/*.mjs installTeardown -> palette.setRoute).
+  palette.install();
+  seedPalette();
 
   router.onChange(function (path) {
-    syncRail(railHost, path);
+    syncRail(shell.railHost, path);
   });
 
   // Lazy per-route import (router.mjs's documented pattern): nothing but
@@ -198,7 +221,7 @@ async function boot() {
   AREA_ROUTES.forEach(function (route) { router.register(route, mountPlaceholder); });
   router.setFallback(mountPlaceholder);
 
-  await Promise.all([mountHealth(railHost), router.start(areaRoot)]);
+  await Promise.all([mountHealth(shell.railHost, shell.menu), router.start(areaRoot)]);
   document.body.dataset.booted = "true";
 }
 

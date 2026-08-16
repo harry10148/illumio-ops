@@ -103,7 +103,7 @@ def test_snapshot_has_all_four_rule_types():
 
 def _goto_rules(page, base_url):
     page.set_default_timeout(15_000)
-    page.goto(base_url + "/v2" + R_RULES)
+    page.goto(base_url + "/" + R_RULES)
     page.wait_for_selector('body[data-booted="true"]')
     page.wait_for_selector("[data-cov='AL-01'] table")
 

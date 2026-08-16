@@ -18,7 +18,6 @@
 
 import { el, clear, dismissible } from "../core/dom.mjs";
 import { t } from "../core/i18n.mjs";
-import { audit } from "../core/audit.mjs";
 
 const commands = new Map();   // id -> cmd
 
@@ -179,6 +178,17 @@ export const palette = {
         palette.toggle();
       }
     });
-    audit.registerGlobal("palette", openPalette);
+    // No audit.registerGlobal() here, unlike the mockup (Task 11 change).
+    // The gate collects [data-cov] with querySelectorAll, which does not
+    // care about visibility, and build() puts the XC-02 wrap in the document
+    // right here at install() time — so opening the palette adds no anchor
+    // the gate would otherwise miss. What it DOES add is a full-screen
+    // .scrim at z-index 100, above the drawer's 90 and the modal's, over an
+    // app that is now the real GUI: every e2e test that calls
+    // __openAllForAudit() and then clicks something was blocked by it
+    // (reproduced in tests/test_v2_investigate_e2e.py and
+    // tests/test_v2_system_e2e.py). The open/close behaviour itself is
+    // covered directly, by tests/test_v2_shell_e2e.py, rather than as a
+    // side effect of the audit hook.
   },
 };

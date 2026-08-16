@@ -515,12 +515,10 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False, use_https: boo
     from src.gui.routes.admin import make_admin_blueprint
     app.register_blueprint(make_admin_blueprint(cm, limiter, login_required, persistent_mode))
 
-    # ── V2 Preview Blueprint (flag-gated, default off) ────────────────────────
-    # Registered only when the flag is on so /v2 404s naturally while it's off,
-    # rather than needing an explicit gate inside the view.
-    if cm.config.get("web_gui", {}).get("enable_v2_preview", False):
-        from src.gui.routes.v2 import make_v2_blueprint
-        app.register_blueprint(make_v2_blueprint(cm, login_required))
+    # NOTE: there is no separate v2 blueprint any more. Task 11 made v2 the
+    # only GUI: `/` (auth.py's index) serves the shell and `/login` serves
+    # the v2 login page, so the flag-gated `/v2` + `/v2/login` pair and the
+    # `web_gui.enable_v2_preview` flag that guarded them are both gone.
 
     @app.errorhandler(_RstDrop)
     def handle_rst_drop(e):
@@ -549,12 +547,18 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False, use_https: boo
             return
 
         # Auth check (always enforced for all GUI modes)
-        # Bypass login routes. /v2/login (Task 10, src/gui/routes/v2.py) is
-        # the v2-preview counterpart of /login and needs the exact same
-        # pre-auth treatment — without it an anonymous visitor would be
-        # redirected straight back to the legacy /login before the v2 login
-        # page's own template ever renders.
-        if request.path in ['/login', '/api/login', '/logout', '/api/csrf-token', '/v2/login']:
+        #
+        # Exactly four paths are reachable without a session, and this list
+        # is an EXACT-match membership test (not a prefix test), so it grants
+        # nothing beyond these four:
+        #   /login           GET  — the login page itself (v2, auth.py's
+        #                           login_page; Task 11 removed the separate
+        #                           /v2/login entry that used to sit here
+        #                           when the v2 preview had its own route)
+        #   /api/login       POST — the credential check
+        #   /logout          POST — clearing a session must not need one
+        #   /api/csrf-token  GET  — the token the login form posts with
+        if request.path in ['/login', '/api/login', '/logout', '/api/csrf-token']:
             return
         if not current_user.is_authenticated:
             if request.path.startswith('/api/'):

@@ -54,7 +54,7 @@ from tests.v2_e2e_utils import build_v2_app, _LiveServer, v2_login  # noqa: E402
 
 
 def _goto_overview(page, base_url):
-    page.goto(base_url + "/v2#/overview")
+    page.goto(base_url + "/#/overview")
     page.wait_for_selector('body[data-booted="true"]')
 
 
@@ -180,7 +180,7 @@ def test_legacy_scalar_query_edit_preserves_filters_on_save(v2_context, temp_con
         page = v2_context.new_page()
         page.set_default_timeout(10_000)
         try:
-            page.goto(base_url + "/v2#/overview")
+            page.goto(base_url + "/#/overview")
             page.wait_for_selector('body[data-booted="true"]')
 
             panel = page.locator('section[data-cov="OV-04"]')
@@ -217,7 +217,7 @@ def test_legacy_scalar_query_edit_preserves_filters_on_save(v2_context, temp_con
         page2 = v2_context.new_page()
         page2.set_default_timeout(10_000)
         try:
-            page2.goto(base_url + "/v2#/overview")
+            page2.goto(base_url + "/#/overview")
             page2.wait_for_selector('body[data-booted="true"]')
             queries = page2.evaluate(
                 "async () => { const { api } = await import('/static/js/v2/core/api.mjs'); "

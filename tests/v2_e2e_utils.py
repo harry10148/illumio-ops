@@ -1,4 +1,4 @@
-"""Shared in-process Playwright harness for Phase 2A `/v2` end-to-end tests.
+"""Shared in-process Playwright harness for the Phase 2A v2 end-to-end tests.
 
 ## Why this file exists
 
@@ -20,7 +20,7 @@ re-implement this pattern per file.
 ## What it does
 
   - Builds a real Flask app via `src.gui.build_app` with
-    `web_gui.enable_v2_preview = True`, `use_https=False` (so
+    `use_https=False` (so
     `SESSION_COOKIE_SECURE` stays False — see src/gui/__init__.py:179 — and a
     plain-HTTP local server can carry the session cookie), and
     `app.testing = True` (so Talisman's forced-HTTPS redirect is disabled —
@@ -140,11 +140,11 @@ def _closed_local_port() -> int:
 
 
 def build_v2_app(temp_config_file: str, **web_gui_overrides):
-    """Build a real Flask app with the v2 preview flag on, ready for a plain-HTTP server.
+    """Build a real Flask app serving the v2 GUI, ready for a plain-HTTP server.
 
-    Mirrors tests/conftest.py's app_persistent fixture (and
-    tests/test_v2_scaffold.py's app_v2_enabled), only adding
-    `enable_v2_preview: True` and building with `use_https=False`.
+    Mirrors tests/conftest.py's app_persistent fixture, only building with
+    `use_https=False`. Task 11 made v2 the only GUI, so there is no longer a
+    flag to turn on: `/` serves the shell and `/login` the login page.
     """
     cm = ConfigManager(config_file=temp_config_file)
     cm.load()
@@ -159,7 +159,6 @@ def build_v2_app(temp_config_file: str, **web_gui_overrides):
         "password": hash_password(V2_PASSWORD),
         "allowed_ips": ["127.0.0.1", "192.168.1.0/24"],
         "secret_key": "x" * 64,
-        "enable_v2_preview": True,
         **web_gui_overrides,
     }
     cm.save()
@@ -196,7 +195,7 @@ class _LiveServer:
 
 @pytest.fixture
 def v2_app(temp_config_file):
-    """A real Flask app with the v2 preview flag on. Not served — see v2_server."""
+    """A real Flask app serving the v2 GUI. Not served — see v2_server."""
     app, _cm = build_v2_app(temp_config_file)
     return app
 
@@ -295,9 +294,9 @@ def v2_login(context, base_url: str, username: str = V2_USERNAME, password: str 
 
 @pytest.fixture
 def v2_page(v2_context, v2_server):
-    """A logged-in Playwright page, plus the server's base_url, ready to visit /v2.
+    """A logged-in Playwright page, plus the server's base_url, ready to visit the GUI.
 
-    Yields (page, base_url) so tests can `page.goto(base_url + "/v2#/overview")`.
+    Yields (page, base_url) so tests can `page.goto(base_url + "/#/overview")`.
     """
     v2_login(v2_context, v2_server)
     page = v2_context.new_page()
