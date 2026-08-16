@@ -4929,7 +4929,7 @@
   "gui_au_rules_intro": "Everything on this page acts on its own: when a window opens, a PCE rule is switched on or off. So every row states first whether its target is a whole ruleset or one single rule.",
   "gui_au_sched_meta": "{total} rows · {rulesets} ruleset · {rules} rule",
   "gui_au_search_hits": "{hits} of {total} rules match",
-  "gui_au_search_note": "The predicate: ID is an exact match, description is a case-insensitive substring. It runs over every ruleset on the PCE and returns hits across the whole policy.",
+  "gui_au_search_note": "The predicate: ID is an exact match, description is a case-insensitive substring. It filters the rules of the ruleset selected above, and nothing outside it.",
   "gui_au_search_scope": "Search scope",
   "gui_au_status_meta": "checks every {every} · {rows} stored",
   "gui_au_stored_fields": "Fields the backend stores",

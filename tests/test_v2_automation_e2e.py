@@ -83,6 +83,8 @@ import pytest
 
 pytest.importorskip("playwright.sync_api", exc_type=ImportError)
 
+from playwright.sync_api import expect  # noqa: E402
+
 # Registers v2_page and its fixture chain — see tests/v2_e2e_utils.py's
 # docstring for why both this line and the importorskip above (in that exact
 # order) are required.
@@ -518,6 +520,48 @@ def test_report_schedule_crud_round_trip(v2_page):
         confirm.get_by_role("button", name=labels["gui_confirm"], exact=True).click()
     page.wait_for_selector(".modal", state="detached")
     assert panel.locator("tbody tr").filter(has_text=name).count() == 0
+
+
+def test_rule_search_note_describes_this_screens_own_search(v2_page, monkeypatch):
+    """Task 12d F3: AU-04's note has to describe what AU-04 does.
+
+    It had been rewritten to promise that the search "runs over every ruleset
+    on the PCE and returns hits across the whole policy" — the behaviour of
+    GET /api/rule_scheduler/rules/search, an endpoint this screen never calls.
+    paintRules() filters state.detail.rules, i.e. the rules of the ONE ruleset
+    selected in AU-03 (automation.mjs, ruleMatches()).
+
+    Lesson C4 — the copy is checked against the layer that actually produces
+    the behaviour: the search box is driven for real below and asserted to
+    issue no search request at all, while the hit line changes. RED against
+    the pre-fix catalogue on the forbidden-phrase assertions."""
+    from src.i18n import get_messages
+
+    _patch_fake_ruleset(monkeypatch)
+    page, base_url = v2_page
+    _goto(page, base_url, R_RULES, "AU-01")
+    page.locator('section[data-cov="AU-03"] table.tbl tbody tr').first.click()
+    page.wait_for_selector('[data-cov="AU-04"]')
+
+    panel = page.locator('[data-cov="AU-04"]')
+    # Two p.note in this panel: the live hit line first, the static note last.
+    note_text = panel.locator("p.note").last.inner_text()
+    for lie in ("every ruleset", "across", "whole policy", "PCE"):
+        assert lie.lower() not in note_text.lower(), note_text
+    zh_note = get_messages("zh_TW")["gui_au_search_note"]
+    for lie in ("全量", "跨", "整個"):
+        assert lie not in zh_note, zh_note
+
+    searched = []
+    page.on("request", lambda r: searched.append(r.url) if "search" in r.url else None)
+    hits = panel.locator("p.note").first
+    box = panel.locator("input.field")
+
+    box.fill("zzz-no-such-rule")
+    expect(hits).to_contain_text("0 of 1")
+    box.fill("1")  # the fake ruleset's only rule id — scope defaults to "id"
+    expect(hits).to_contain_text("1 of 1")
+    assert searched == [], searched
 
 
 def test_teardown_closes_surfaces_clears_callbacks_and_palette(v2_page):

@@ -4929,7 +4929,7 @@
   "gui_au_rules_intro": "這一頁的東西會自己動手：排程時間一到，PCE 上的規則就被打開或關掉。所以每一列都先講清楚它動的是「整個 ruleset」還是「單一條 rule」。",
   "gui_au_sched_meta": "{total} 筆 · ruleset {rulesets} · rule {rules}",
   "gui_au_search_hits": "{hits} / {total} 條規則符合",
-  "gui_au_search_note": "搜尋條件：ID 為完全相符、描述為不分大小寫的子字串。搜尋會套用在 PCE 全量 ruleset 上，回傳跨 ruleset 的命中。",
+  "gui_au_search_note": "搜尋條件：ID 為完全相符、描述為不分大小寫的子字串。只在上方選取的那一個 ruleset 內過濾規則，不會查到它以外的規則。",
   "gui_au_search_scope": "搜尋範圍",
   "gui_au_status_meta": "每 {every} 檢查 · 已存 {rows} 筆排程",
   "gui_au_stored_fields": "後端另外儲存的欄位",

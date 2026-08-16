@@ -1614,7 +1614,7 @@
   "gui_au_recon_note": "對帳有三種狀態：抓 ruleset 失敗＝未知（維持原狀，不會把排程標成已刪除）；href 找得到＝顯示 PCE 上的 enabled 並清掉舊的 deleted 旗標；href 找不到＝標成已刪除。這裡分開講，因為「未知」和「已刪除」要處理的問題不一樣。",
   "gui_au_rep_hist_note": "GET /api/report-schedules/<id>/history 讀的是狀態檔裡該排程「目前狀態」那一筆，有就回一筆、沒有就回空陣列——它不是一份逐次執行的歷史。",
   "gui_au_ro_recon": "與 PCE 對帳的結果，每次列出排程時重算。",
-  "gui_au_search_note": "搜尋條件：ID 為完全相符、描述為不分大小寫的子字串。搜尋會套用在 PCE 全量 ruleset 上，回傳跨 ruleset 的命中。",
+  "gui_au_search_note": "搜尋條件：ID 為完全相符、描述為不分大小寫的子字串。只在上方選取的那一個 ruleset 內過濾規則，不會查到它以外的規則。",
   "gui_au_target_note_rule": "目標是單一條規則：href 在 ruleset 後面再帶一段 /sec_rules/、/rules/ 或 /deny_rules/，排程只切換這一條，同 ruleset 的其他規則不受影響（provision 仍然是整個父 ruleset）。來源／目的／服務是這條規則自己的內容，會一起存進排程紀錄供日後辨識。",
   "gui_au_tz_hint": "每筆排程各自帶時區，引擎逐筆換算；留 local 代表跟著系統設定。",
   "gui_au_wrap_hint": "結束時間可以早於開始時間：引擎把它當跨午夜視窗處理。",
