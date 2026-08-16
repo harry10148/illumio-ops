@@ -7,15 +7,21 @@ The phase2a-gui plan's Global Constraints (and this task's own brief) said to
 tests/test_gui_e2e_playwright.py's app fixture and an auth bypass
 (`login_manager.session_protection=None` + `sess["_user_id"]`). Verified
 before writing this file: that pattern does not exist anywhere in this repo.
-All five existing Playwright test files (test_gui_e2e_playwright.py,
+All five Playwright test files that existed then (test_gui_e2e_playwright.py,
 test_gui_e2e_filterbar_playwright.py, test_e2e_header_menu.py,
-test_gui_settings_subtab_e2e.py, test_e2e_dashboard_story.py) are gated on
-`ILLUMIO_OPS_E2E_BASE_URL` and skip the whole module when it's unset — none
-of them contains an app fixture, and the cited auth bypass does not appear in
-the codebase. So this module builds the harness the plan assumed already
-existed, as a *shared* module — Tasks 3-10 each add their own
+test_gui_settings_subtab_e2e.py, test_e2e_dashboard_story.py) were gated on
+`ILLUMIO_OPS_E2E_BASE_URL` and skipped the whole module when it was unset —
+none of them contained an app fixture, and the cited auth bypass did not
+appear in the codebase. So this module builds the harness the plan assumed
+already existed, as a *shared* module — Tasks 3-10 each add their own
 `test_v2_<area>_e2e.py` and must import fixtures from here rather than
 re-implement this pattern per file.
+
+Task 11 migrated four of those five onto this harness
+(tests/test_v2_filterbar_e2e.py, tests/test_v2_shell_flows_e2e.py) and
+deleted them; test_e2e_dashboard_story.py keeps its one env-gated test, which
+targets a REAL deployed appliance and is the one thing this in-process
+harness cannot stand in for.
 
 ## What it does
 

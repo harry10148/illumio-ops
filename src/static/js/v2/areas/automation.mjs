@@ -94,6 +94,7 @@ import { drawer } from "../components/drawer.mjs";
 import { modal } from "../components/modal.mjs";
 import { table, col } from "../components/table.mjs";
 import { palette } from "../components/palette.mjs";
+import { audit } from "../core/audit.mjs";
 
 const R_RULES = "#/automation/rules";
 const R_REPORTS = "#/automation/reports";
@@ -989,6 +990,17 @@ async function mountRules(root, ctx) {
     search: "", scope: "id", picked: [], logShown: 20,
   };
   installTeardown(state);
+  // AU-04 (the per-rule search panel) is plain page content, not a drawer —
+  // but it only renders once a ruleset row has been SELECTED, so a DOM sweep
+  // never sees it either. audit.mjs's contract is "every anchor is reachable
+  // after __openAllForAudit()", and Task 11's live coverage gate
+  // (tools/gate_coverage_live.py) is what found this one not honouring it.
+  // Idempotent, per that contract: no-op once something is selected, and a
+  // no-op when the browser is empty (no PCE, no rulesets).
+  audit.register("au-rule-search", function () {
+    if (state.selected || !state.rulesets.length) return;
+    selectRuleset(state.rulesets[0].id);
+  });
   drawer.registerAudit("au-sched-ruleset", function () { return handles.openRuleset ? handles.openRuleset() : null; });
   drawer.registerAudit("au-sched-rule", function () { return handles.openRule ? handles.openRule() : null; });
   modal.registerAudit("au-sched-delete", function () { return handles.confirmDelete ? handles.confirmDelete() : null; });
