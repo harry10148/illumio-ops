@@ -103,7 +103,6 @@ pytest_plugins = ["tests.v2_e2e_utils"]
 # The per-file app fixture below needs the harness's own building blocks,
 # same as tests/test_v2_login_e2e.py does for its logged-out page.
 from tests.v2_e2e_utils import (  # noqa: E402
-    _bounded_close,
     _LiveServer,
     build_v2_app,
     v2_login,
@@ -540,9 +539,14 @@ def v2_reports_dir_page(_v2_browser, v2_reports_dir_app):
         try:
             yield page, server.base_url
         finally:
-            _bounded_close("v2_reports_dir_page", page.close)
+            # See v2_e2e_utils.py's v2_page fixture for why this is a plain
+            # close() rather than the thread-bounded one Task 6 added and
+            # Task 12a removed: the hang it defended against was fixed at
+            # its actual root cause (97af78c8), and running Playwright's
+            # sync API off-thread is itself invalid.
+            page.close()
     finally:
-        _bounded_close("v2_reports_dir_ctx", ctx.close)
+        ctx.close()
         server.stop()
 
 

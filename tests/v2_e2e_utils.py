@@ -95,6 +95,7 @@ Both lines are required, IN THIS ORDER — this is not optional boilerplate:
 from __future__ import annotations
 
 import json
+import os
 import socket
 import threading
 
@@ -167,6 +168,31 @@ def build_v2_app(temp_config_file: str, **web_gui_overrides):
         "secret_key": "x" * 64,
         **web_gui_overrides,
     }
+    # Task 12a: give pce_cache (and siem — src/siem/web.py's _get_sf() reads
+    # this same `models.pce_cache.db_path`; the two share one SQLite file) a
+    # database location that is private to this test, the same way the line
+    # above already gives web_gui a private one. ConfigSchema's own default,
+    # "data/pce_cache.sqlite" (src/config_models.py), is a relative path that
+    # src/gui/_helpers.py's `_get_cache_engine` hands straight to
+    # `create_engine(f"sqlite:///{db_path}")` without ever creating missing
+    # parent directories — so it resolves against the test process's CWD,
+    # and only works at all if a writable `data/` happens to already exist
+    # there. On a dev machine that runs the suite from a long-lived checkout
+    # it usually does; a clean CI runner has neither the directory nor
+    # permission to create one, so sqlite3 raises "unable to open database
+    # file" and every /api/cache/* and /api/siem/* route that touches the DB
+    # 500s/503s (see docs/superpowers/sdd/2026-08-06-phase2a-gui/task-12a-report.md).
+    # Pointing it at temp_config_file's own tmpdir (tests/conftest.py's
+    # `temp_config_file`, already fresh and writable per test) fixes that
+    # unconditionally, and also gives every test a distinct db_path — which
+    # matters because `_get_cache_engine` process-wide-caches one Engine per
+    # db_path for the whole pytest run, so two tests sharing a path would
+    # share cached schema/state across otherwise-independent tests.
+    cm.config["pce_cache"] = {
+        "db_path": os.path.join(
+            os.path.dirname(os.path.abspath(temp_config_file)), "pce_cache.sqlite"
+        ),
+    }
     cm.save()
 
     app = build_app(cm, persistent_mode=True, use_https=False)
@@ -232,51 +258,13 @@ def _v2_browser(_v2_playwright):
         browser.close()
 
 
-def _bounded_close(label: str, close_fn, timeout_s: float = 15.0) -> None:
-    """Run a Playwright close() off-thread and cap how long teardown waits on it.
-
-    Neither BrowserContext.close() nor Page.close() accept a `timeout`
-    argument (verified against this venv's installed API — both signatures
-    are `(self, *, reason=None)`), unlike _LiveServer.stop()'s
-    thread.join(timeout=5) above, which IS bounded. Full-suite investigation
-    (2026-08-16: tests/test_v2_alerting_e2e.py's first test failing, then
-    hanging in fixture teardown, ~3600 tests into a full run) could not pin
-    an exact root cause within a practical time budget here — thread count
-    and RSS stayed flat through every reproduction slice that actually
-    completed, ruling out simple accumulation, but reproducing the full
-    preceding suite in this environment projected to hours, not the minutes
-    the coordinator's own machine needed (see task-6-report.md for the full
-    trail of what was ruled out). This is a defensive hardening, not a
-    proven fix: it turns an unbounded close() into a bounded one so a single
-    bad teardown can no longer stall the rest of the suite, whatever its
-    root cause. The close still runs (nothing here cancels it) — a daemon
-    thread just stops the *test* from waiting on it past `timeout_s`.
-    """
-    result: list[BaseException] = []
-
-    def _run():
-        try:
-            close_fn()
-        except BaseException as exc:  # noqa: BLE001 — reported, not raised, from teardown
-            result.append(exc)
-
-    t = threading.Thread(target=_run, name="v2_e2e_utils %s.close" % label, daemon=True)
-    t.start()
-    t.join(timeout=timeout_s)
-    if t.is_alive():
-        print(f"[v2_e2e_utils] {label}.close() did not complete within {timeout_s}s; "
-              "abandoning the wait so the suite can continue.")
-    elif result:
-        print(f"[v2_e2e_utils] {label}.close() raised: {result[0]!r}")
-
-
 @pytest.fixture
 def v2_context(_v2_browser):
     ctx = _v2_browser.new_context(ignore_https_errors=True)
     try:
         yield ctx
     finally:
-        _bounded_close("v2_context", ctx.close)
+        ctx.close()
 
 
 def v2_login(context, base_url: str, username: str = V2_USERNAME, password: str = V2_PASSWORD) -> None:
@@ -310,8 +298,24 @@ def v2_page(v2_context, v2_server):
     try:
         yield page, v2_server
     finally:
-        # Bounded for the same reason as v2_context's ctx.close() above —
-        # see _bounded_close's docstring. Fixture teardown is LIFO (this
-        # page.close() runs before v2_context's ctx.close()), so an
-        # unbounded hang here would block that one too.
-        _bounded_close("v2_page", page.close)
+        # Task 6 (2026-08-16) added a thread-bounded close() here as
+        # defensive hardening against a full-suite teardown hang whose root
+        # cause it couldn't pin down in budget (see task-6-report.md). That
+        # bounding ran Playwright's *sync* API (page.close()/ctx.close())
+        # from a background thread — invalid on its own terms, since the
+        # sync API is only ever safe to call from the thread that created
+        # `_v2_playwright`, and running it off-thread is exactly what CI's
+        # `greenlet.error: cannot switch to a different thread (which
+        # happens to have exited)` was: the daemon thread's own greenlet
+        # dying before/while close() ran on it. Task 12a's own commit
+        # (97af78c8, already on this branch) fixed the actual hang cause —
+        # a loguru-installed root-logger handler pair that outlived its test
+        # and formed a stdlib-logging/loguru feedback loop under concurrent
+        # request threads — by having conftest.py's autouse
+        # `_loguru_caplog_bridge` fixture restore loguru/root-logger state
+        # after every test. With that fixed, the bounding this was defending
+        # against no longer has a reason to exist, so it is removed rather
+        # than patched to use a non-thread timeout mechanism: close() now
+        # just runs on this fixture's own thread, the only thread Playwright
+        # ever promises to support.
+        page.close()

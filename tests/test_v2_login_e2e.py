@@ -38,7 +38,6 @@ pytest_plugins = ["tests.v2_e2e_utils"]
 from tests.v2_e2e_utils import (  # noqa: E402
     V2_PASSWORD,
     V2_USERNAME,
-    _bounded_close,
     _LiveServer,
     build_v2_app,
 )
@@ -61,7 +60,9 @@ def v2_login_page(v2_context, v2_server):
     try:
         yield page, v2_server
     finally:
-        _bounded_close("v2_login_page", page.close)
+        # See v2_e2e_utils.py's v2_page fixture for why this is a plain
+        # close(), not a thread-bounded one.
+        page.close()
 
 
 @pytest.fixture
@@ -109,8 +110,10 @@ def _serve_and_open(label, browser, app):
     page.set_default_timeout(10_000)
 
     def stop():
-        _bounded_close(label + ".page", page.close)
-        _bounded_close(label + ".ctx", ctx.close)
+        # See v2_e2e_utils.py's v2_page fixture for why these are plain
+        # close() calls, not thread-bounded ones.
+        page.close()
+        ctx.close()
         server.stop()
 
     return page, server.base_url, stop
