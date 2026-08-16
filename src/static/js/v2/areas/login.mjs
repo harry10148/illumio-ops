@@ -39,27 +39,33 @@
 //      never clears session['csrf_token']), so the immediate follow-up
 //      POST /api/security for the first-login branch needs no special
 //      token handling either.
-//   5. i18n: the runtime catalogue (GET /api/ui_translations) is itself an
-//      authenticated /api/* route (same gate as #3), so the one, anonymous
-//      i18n.init() call this page ever makes (at boot, before login) is
-//      EXPECTED to fail and every t() call below falls back to its own
-//      English `fallback` argument for the page's entire lifetime,
-//      including LG-02 — core/i18n.mjs's own documented degrade path (see
-//      its initI18n() comment), not a bug here. A second, post-login
-//      i18n.init() call was tried and reverted: while must_change_password
-//      is still true, /api/ui_translations sits behind
+//   5. i18n: GET /api/ui_translations is itself an authenticated /api/*
+//      route (same gate as #3), so this page's own i18n.init() call (at
+//      boot, before login) is EXPECTED to fail. Rather than leave every
+//      t() call on its English `fallback` for an anonymous visitor — a real
+//      regression a review caught: every zh_TW install would see the
+//      product's front door permanently in English — login.html embeds the
+//      real catalogue server-side (v2.py's v2_login() calls the exact same
+//      _ui_translation_dict(lang) /api/ui_translations itself calls, in
+//      Jinja, mirroring auth.py's login_i18n_json for the legacy page) and
+//      boot() below passes it to i18n.init() as a seed
+//      (core/i18n.mjs:initI18n(seedCatalogue) — used only when the live
+//      fetch fails). That seed is the FULL real catalogue, captured once at
+//      page load, so LG-02 is correctly localized from the very first
+//      paint — no second, post-login i18n.init() call is needed or made. A
+//      second call WAS tried during development and reverted: while
+//      must_change_password is still true, /api/ui_translations sits behind
 //      src/gui/__init__.py's SEPARATE must_change_password 423 gate (not
 //      just the anonymous-401 one), whose exemption list is
 //      config.api_security_get/post + auth.logout/api_csrf_token only — and
 //      api.mjs's own rawRequest() treats ANY 423 must_change_password
-//      response as "navigate the whole page to /login" (core/api.mjs's
-//      documented 423 handling). Verified directly: calling i18n.init()
-//      here mid-first-login does not just fail to localize LG-02, it
-//      force-navigates the browser away to the legacy /login page before
-//      the operator ever sees the change-password form. So this module
-//      calls api.* for exactly two things — POST /api/login and POST
-//      /api/security — and nothing else while must_change_password could be
-//      pending.
+//      response as "navigate the whole page to /login". Verified directly:
+//      a second i18n.init() call mid-first-login does not just fail to
+//      localize LG-02, it force-navigates the browser away to the legacy
+//      /login page before the operator ever sees the change-password form.
+//      So this module calls api.* for exactly two things — POST /api/login
+//      and POST /api/security — and nothing else while must_change_password
+//      could be pending.
 //   6. i18n keys: the mockup's login_* fallback keys are the product's own
 //      SPA-facing keys, rendered server-side by src/gui/routes/auth.py's
 //      Jinja login.html — but src/gui/_helpers.py:_ui_translation_dict only
@@ -275,9 +281,29 @@ function build(root) {
   }
 }
 
+/**
+ * Read login.html's embedded #login-i18n-seed (v2.py's v2_login(), see
+ * header note 5) — the real catalogue, server-rendered in the operator's
+ * configured language, for i18n.init() to fall back to when its own
+ * anonymous GET /api/ui_translations 401s. Returns null on anything
+ * unexpected (missing/malformed node) so initI18n()'s own seed check just
+ * treats it as "no seed" and degrades to plain English fallbacks, same as
+ * before this existed.
+ */
+function readSeedCatalogue() {
+  const node = document.getElementById("login-i18n-seed");
+  if (!node) return null;
+  try {
+    const data = JSON.parse(node.textContent);
+    return (data && typeof data === "object") ? data : null;
+  } catch (e) {
+    return null;
+  }
+}
+
 async function boot() {
   initDisplay();
-  await i18n.init(); // best-effort pre-auth; see header note 5
+  await i18n.init(readSeedCatalogue()); // see header note 5
   const root = document.getElementById("login-root");
   build(root);
   document.body.dataset.booted = "true";

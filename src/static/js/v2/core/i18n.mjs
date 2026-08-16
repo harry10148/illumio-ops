@@ -21,21 +21,36 @@
 //     `api.invalidate("ui_translations")` + `init()` + a remount — not a
 //     client-side toggle. There is nothing today for it to control, so it is
 //     left out rather than shipped unused.
+//   - initI18n(seedCatalogue?) (Task 10): GET /api/ui_translations sits
+//     behind the same auth gate as every other /api/* route, which the v2
+//     login page (areas/login.mjs) hits before the operator has
+//     authenticated. The optional `seedCatalogue` argument is used ONLY when
+//     the live fetch fails — it lets a caller that already has a real,
+//     server-rendered catalogue in hand (login.html embeds one via Jinja,
+//     see v2.py's v2_login()) hand it over instead of falling back to
+//     English literals. Every other caller (app.mjs boots after the operator
+//     is authenticated, so its own fetch always succeeds) passes nothing,
+//     which is exactly the old no-argument behaviour.
 
 import { api } from "./api.mjs";
 
 let catalogue = null; // ui_translations response: key -> string
 const missing = new Set();
 
-export async function initI18n() {
+export async function initI18n(seedCatalogue) {
   try {
     catalogue = await api.load("ui_translations");
   } catch (e) {
-    catalogue = null;
+    catalogue = (seedCatalogue && typeof seedCatalogue === "object") ? seedCatalogue : null;
     // A boot-time catalogue failure must be visible — every t() call falls
     // back to its `fallback` argument (or the raw key) until the next
     // successful init(), which is silent unless something logs it here.
-    console.warn("[i18n] failed to load ui_translations catalogue; every t() call will use its fallback:", e);
+    console.warn(
+      catalogue
+        ? "[i18n] failed to load ui_translations catalogue; using the caller-supplied seed catalogue instead:"
+        : "[i18n] failed to load ui_translations catalogue; every t() call will use its fallback:",
+      e,
+    );
   }
   return { catalogue: !!catalogue };
 }
@@ -81,7 +96,7 @@ export function tf(name, values, fallback) {
 export const i18n = {
   t,
   tf,
-  init() { return initI18n(); },
+  init(seedCatalogue) { return initI18n(seedCatalogue); },
   /** Keys that fell through the catalogue — the live i18n backlog. */
   missing() { return Array.from(missing).sort(); },
 };

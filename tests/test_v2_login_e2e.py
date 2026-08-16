@@ -81,13 +81,13 @@ def v2_first_login_app(temp_config_file):
     test or leave a real account unusable, whether or not the test that used
     it passes.
 
-    settings.language is pinned to zh_TW (not left at the "en" default) to
-    prove login.mjs's fallback behaviour holds regardless of the configured
-    install language — LG-02 must still read the plain English t()-fallback
-    text (see login.mjs header note 5: it deliberately never re-queries the
-    catalogue while must_change_password is pending), not a raw/unresolved
-    key literal, and not some accidental match that only happens to work
-    because "en" was already the configured language.
+    settings.language is pinned to zh_TW (not left at the "en" default) so
+    the test below can prove LG-01 *and* LG-02 both render in the real
+    configured language throughout the whole first-login flow, including
+    while must_change_password is still gating every other /api/* call —
+    login.html's server-rendered i18n seed (v2.py's v2_login(), login.mjs
+    header note 5) is what makes that possible without login.mjs ever
+    re-querying GET /api/ui_translations after the operator authenticates.
     """
     app, cm = build_v2_app(temp_config_file, must_change_password=True)
     cm.config["settings"] = {"language": "zh_TW"}
@@ -95,20 +95,58 @@ def v2_first_login_app(temp_config_file):
     return app, cm
 
 
+def _serve_and_open(label, browser, app):
+    """Start a live server for `app` and open a fresh logged-out page on it.
+
+    Shared by every fixture below that needs its own app (a different
+    web_gui/settings config than the shared v2_app/v2_server the harness
+    already provides) rather than the one build_v2_app() builds by default.
+    """
+    server = _LiveServer(app)
+    server.start()
+    ctx = browser.new_context(ignore_https_errors=True)
+    page = ctx.new_page()
+    page.set_default_timeout(10_000)
+
+    def stop():
+        _bounded_close(label + ".page", page.close)
+        _bounded_close(label + ".ctx", ctx.close)
+        server.stop()
+
+    return page, server.base_url, stop
+
+
 @pytest.fixture
 def v2_first_login_page(_v2_browser, v2_first_login_app):
     app, cm = v2_first_login_app
-    server = _LiveServer(app)
-    server.start()
-    ctx = _v2_browser.new_context(ignore_https_errors=True)
-    page = ctx.new_page()
-    page.set_default_timeout(10_000)
+    page, base_url, stop = _serve_and_open("v2_first_login_page", _v2_browser, app)
     try:
-        yield page, server.base_url, cm
+        yield page, base_url, cm
     finally:
-        _bounded_close("v2_first_login_page.page", page.close)
-        _bounded_close("v2_first_login_page.ctx", ctx.close)
-        server.stop()
+        stop()
+
+
+@pytest.fixture
+def v2_zh_tw_app(temp_config_file):
+    """A plain (not must_change_password) app with settings.language=zh_TW.
+
+    Isolation: same as v2_first_login_app above — temp_config_file's
+    per-test tmpdir is torn down unconditionally by tests/conftest.py.
+    """
+    app, cm = build_v2_app(temp_config_file)
+    cm.config["settings"] = {"language": "zh_TW"}
+    cm.save()
+    return app, cm
+
+
+@pytest.fixture
+def v2_zh_tw_login_page(_v2_browser, v2_zh_tw_app):
+    app, _cm = v2_zh_tw_app
+    page, base_url, stop = _serve_and_open("v2_zh_tw_login_page", _v2_browser, app)
+    try:
+        yield page, base_url
+    finally:
+        stop()
 
 
 def _goto_login(page, base_url):
@@ -163,13 +201,13 @@ def test_first_login_change_password_flow_hits_real_backend(v2_first_login_page)
     page, base_url, cm = v2_first_login_page
     _goto_login(page, base_url)
 
-    # Pre-auth: the catalogue fetch (GET /api/ui_translations) 401s for an
-    # anonymous request (same before_request gate as every other /api/*
-    # route), so LG-01 renders in its English t()-fallback text regardless of
-    # settings.language=zh_TW — see login.mjs header note 5. Asserted here so
-    # the later post-auth assertion below is a real before/after contrast,
-    # not a coincidence.
-    assert page.locator('[data-cov="LG-01"] h1').inner_text() == "PCE Ops"
+    # Pre-auth: GET /api/ui_translations 401s for an anonymous request (same
+    # before_request gate as every other /api/* route), but login.mjs seeds
+    # its catalogue from login.html's server-rendered translations (v2.py's
+    # v2_login(), login.mjs header note 5), so LG-01 is already correctly
+    # localized to this fixture's zh_TW — not the English t()-fallback. If
+    # that seed were ever dropped, this would read "PCE Ops" instead.
+    assert page.locator('[data-cov="LG-01"] h1').inner_text() == "登入 PCE Ops"
 
     page.fill('[data-cov="LG-01"] input[data-field="username"]', V2_USERNAME)
     page.fill('[data-cov="LG-01"] input[data-field="password"]', V2_PASSWORD)
@@ -181,15 +219,15 @@ def test_first_login_change_password_flow_hits_real_backend(v2_first_login_page)
     page.wait_for_selector('[data-cov="LG-02"]:not([hidden])')
     assert page.get_attribute('[data-cov="LG-01"]', "hidden") is not None
 
-    # LG-02 stays on the same t()-fallback text as LG-01, even though this
-    # fixture configures settings.language=zh_TW: login.mjs deliberately
-    # never re-queries GET /api/ui_translations once authenticated but still
-    # must_change_password-gated (header note 5 — that call would 423 and
-    # api.mjs would navigate the whole page away to /login). If a future
-    # change ever raced the catalogue fetch back in and something derailed
-    # the fallback (e.g. a raw, unresolved key literal leaking to the
-    # screen), this would stop reading "PCE Ops".
-    assert page.locator('[data-cov="LG-02"] h1').inner_text() == "PCE Ops"
+    # LG-02 is ALSO correctly localized, from the very first paint — it was
+    # built from the same page-load-time seed as LG-01, so it needs no
+    # post-login catalogue re-fetch at all (login.mjs header note 5 explains
+    # why one was tried and reverted: /api/ui_translations 423s and
+    # api.mjs's rawRequest() would navigate the whole page away to /login
+    # while must_change_password is still true). If the seed were ever
+    # dropped, or a second i18n.init() call crept back in, this would either
+    # read the English fallback "PCE Ops" or never get here at all.
+    assert page.locator('[data-cov="LG-02"] h1').inner_text() == "登入 PCE Ops"
 
     new_password = "a genuinely new v2 login password"
     page.fill('[data-cov="LG-02"] input[data-field="new_password"]', new_password)
@@ -209,3 +247,32 @@ def test_first_login_change_password_flow_hits_real_backend(v2_first_login_page)
     assert not gui_cfg.get("must_change_password")
     assert verify_password(new_password, gui_cfg.get("password", ""))
     assert not verify_password(V2_PASSWORD, gui_cfg.get("password", ""))
+
+
+# ── review finding: pre-auth localization ───────────────────────────────────
+#
+# A first version of this page rendered in English regardless of
+# settings.language for every logged-out visitor (login.html's <html lang>
+# was hardcoded "en", and login.mjs's only i18n.init() call always 401s
+# pre-auth so every t() fell back to its English literal) — a real
+# regression for every zh_TW install, since the LEGACY /login page IS
+# correctly localized for logged-out visitors (auth.py's login_page() is
+# server-rendered Jinja). Fixed by having v2.py's v2_login() embed the real
+# catalogue (the same _ui_translation_dict(lang) /api/ui_translations
+# itself calls) into login.html for login.mjs to seed from, and by deriving
+# <html lang> from the same settings.language read. This test targets that
+# fix in isolation, deliberately NOT tangled up with the first-login flow
+# above: a plain zh_TW-configured app, a logged-out page, nothing else.
+
+def test_login_page_renders_in_configured_language_when_logged_out(v2_zh_tw_login_page):
+    page, base_url = v2_zh_tw_login_page
+    _goto_login(page, base_url)
+
+    # <html lang> must reflect settings.language, not a hardcoded literal —
+    # index.html's own existing pattern (auth.py:index(), html_lang=lang.
+    # replace("_", "-")), applied here too.
+    assert page.evaluate("document.documentElement.lang") == "zh-TW"
+    # A known product string, in Chinese, on the very first paint of a
+    # logged-out visit — not after any login attempt.
+    assert page.locator('[data-cov="LG-01"] h1').inner_text() == "登入 PCE Ops"
+    assert page.locator('[data-cov="LG-01"] .sub').inner_text() == "請輸入帳號與密碼以繼續。"

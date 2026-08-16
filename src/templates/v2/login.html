@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en" data-theme="dark" data-density="cozy">
+<html lang="{{ html_lang }}" data-theme="dark" data-density="cozy">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -17,6 +17,13 @@
 </head>
 <body class="loginpage">
 <div id="login-root"></div>
+<!-- login.mjs's i18n seed: the real gui_/sched_/status_/error_/pd_
+     catalogue in the operator's configured language, rendered server-side
+     (src/gui/routes/v2.py's v2_login()) because GET /api/ui_translations
+     itself 401s for this page's anonymous visitors. Same pattern as the
+     legacy login.html's #login-i18n-data, applied to the full catalogue
+     instead of a hand-picked key list. -->
+<script id="login-i18n-seed" type="application/json">{{ login_i18n_json | safe }}</script>
 <script type="module" src="{{ url_for('static', filename='js/v2/areas/login.mjs') }}"></script>
 </body>
 </html>
