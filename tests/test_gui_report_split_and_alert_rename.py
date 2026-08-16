@@ -57,8 +57,19 @@ def test_tab_alerts_label():
 #
 #   ad-hoc report cards + generate drawer   tests/test_v2_reports_e2e.py (RP-01/RP-02)
 #   report schedules and their type list    tests/test_v2_automation_e2e.py (#/automation/reports)
-#   "last run" per report family            tests/test_v2_reports_e2e.py (RP-07 float host)
 #   the Alerts area label                   tests/test_v2_shell_e2e.py (XC-14 nav, gui_nav_alerting)
+#
+# CORRECTION (Task 11 review, Important 1). This block originally also claimed
+# that "\"last run\" per report family" was owned by test_v2_reports_e2e.py's
+# RP-07 float host. It was not — that file asserted neither filename prefix,
+# and the behaviour (src/static/js/v2/areas/reports.mjs's derivedType(): the
+# SecurityRisk_ / NetworkInventory_ prefixes taking priority over a sidecar
+# that hardcodes report_type="traffic") was left with no guard at all. It has
+# one again, as a truth test rather than the string grep deleted here:
+#
+#   traffic-family split by filename        tests/test_v2_reports_e2e.py::
+#                                           test_traffic_family_is_split_by_filename_not_by_the_sidecar
+#                                           test_specific_traffic_prefixes_are_matched_before_the_bare_dated_one
 #
 # What survives here is the part with no browser equivalent and no other
 # owner: the catalogue contract for the keys that split introduced, across

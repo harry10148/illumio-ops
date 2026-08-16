@@ -43,47 +43,90 @@ ENDPOINTS_YAML = ROOT / "design" / "v2" / "tools" / "endpoints.yaml"
 STORE_MAP = ROOT / "src" / "static" / "js" / "v2" / "core" / "store-map.mjs"
 
 
+# The anchors every SPA route sees because they live in the chrome, not in any
+# area: the command palette, the user menu, the six-area nav and the sign-out
+# form inside that menu. Used below to separate "this route mounted the shell"
+# from "this route mounted its own content".
+SHELL_ANCHORS = {"XC-02", "XC-13", "XC-14", "LG-03"}
+
+
+@pytest.fixture(scope="module")
+def gate_result(_v2_browser):
+    """One real sweep, shared by every test below.
+
+    Module-scoped deliberately: the sweep visits 19 routes against a real
+    backend and takes minutes, and every test here asks a different question
+    of the SAME run. `run()` owns its own app, server, temp config, browser
+    context and page and releases all of them on every path (see
+    tools/gate_coverage_live.py's "Teardown" section). The BROWSER is the one
+    exception: it is the suite's session-scoped one, passed in and
+    deliberately not closed by the gate.
+    """
+    return gate.run(browser=_v2_browser)
+
+
 # ── the gate ────────────────────────────────────────────────────────────────
 
-def test_live_coverage_is_complete(_v2_browser):
-    """Every anchor in design/v2/coverage.yaml is reachable in the real app.
-
-    `run()` owns its own app, server, temp config, browser context and page,
-    and releases all of them on every path (see tools/gate_coverage_live.py's
-    "Teardown" section) — nothing here leaks into the rest of the suite. The
-    BROWSER is the one exception: it is the suite's session-scoped one, passed
-    in and deliberately not closed by the gate.
-    """
-    result = gate.run(browser=_v2_browser)
-
-    assert result["missing"] == [], (
+def test_live_coverage_is_complete(gate_result):
+    """Every anchor in design/v2/coverage.yaml is reachable in the real app."""
+    assert gate_result["missing"] == [], (
         "%d/%d coverage anchors reachable; missing: %s"
-        % (result["covered"], result["total"], result["missing"])
+        % (gate_result["covered"], gate_result["total"], gate_result["missing"])
     )
-    assert result["extra"] == [], (
+    assert gate_result["extra"] == [], (
         "the app renders data-cov values that coverage.yaml does not list: %s"
-        % result["extra"]
+        % gate_result["extra"]
     )
-    assert result["covered"] == result["total"] == 102, result
+    assert gate_result["covered"] == gate_result["total"] == 102, gate_result
 
 
-def test_every_route_contributed_something():
-    """Guard the guard.
+def test_every_route_contributed_something(gate_result):
+    """Guard the guard, against the REAL per-route result.
 
-    The gate matches a flat set-union across routes, so a route that failed
-    to mount at all could contribute nothing and still leave the total at
-    102 if every one of its anchors happened to appear elsewhere. That would
-    be a broken page reported as green. Each visited route must carry at
-    least the shell's own anchors plus something of its own.
+    The gate matches a flat set-union across routes, so a route that failed to
+    mount at all could contribute nothing and still leave the total at 102 —
+    every one of its anchors having been seen somewhere else. That is a broken
+    page reported as green, and it is the gate's one structural blind spot.
+
+    An earlier version of this test asserted only the SHAPE of the route list
+    (its length, and that login.html is in it) and never touched
+    `result["routes"]`, so a route that mounted nothing passed it — an
+    assertion that could not fail, in the test whose whole job was to make
+    this one fail. `run()` already returns per-route anchors; this reads them.
     """
-    exp = gate.expected()
-    routes = gate.routes_from(exp)
+    routes = gate_result["routes"]
+    assert set(routes) == set(gate.routes_from(gate.expected())), routes
+
+    empty = sorted(r for r, found in routes.items() if not found)
+    assert not empty, f"these routes rendered no coverage anchor at all: {empty}"
+
+    for route, found in sorted(routes.items()):
+        anchors = set(found)
+        if route == "login.html":
+            # The one page outside the SPA: its own anchors, and none of the
+            # chrome (there is no shell on the login page to render it).
+            assert {"LG-01", "LG-02"} <= anchors, (route, sorted(anchors))
+            assert not (anchors & {"XC-02", "XC-13", "XC-14"}), (route, sorted(anchors))
+            continue
+
+        # Every SPA route mounts the shell...
+        assert SHELL_ANCHORS <= anchors, (
+            route, "missing shell anchors", sorted(SHELL_ANCHORS - anchors)
+        )
+        # ...and must ALSO have mounted an area. Without this, a route whose
+        # mount threw would still show four anchors and look healthy.
+        own = anchors - SHELL_ANCHORS
+        assert own, f"{route} mounted the shell but no area content"
+
+
+def test_the_route_list_matches_the_coverage_map(gate_result):
+    """The shape assertions the previous test used to stand on, kept as their
+    own (honestly named) check rather than passed off as the blind-spot guard."""
+    routes = gate.routes_from(gate.expected())
     assert len(routes) == 19, routes
-    # Every hash route is inside the SPA shell, so it always sees the chrome:
-    # XC-02 (palette), XC-13 (user menu), XC-14 (nav) and LG-03 (sign-out).
-    # login.html is the one page outside the shell.
     assert "login.html" in routes
     assert sum(1 for r in routes if r.startswith("#")) == 18
+    assert set(routes) == set(gate_result["routes"])
 
 
 # ── the correspondence the gate rests on ────────────────────────────────────

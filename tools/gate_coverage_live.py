@@ -346,26 +346,41 @@ def _sweep(page) -> set:
 
 
 class _InFlight:
-    """Counts requests in flight on a page, from Playwright's own events.
+    """Tracks the requests in flight on a page, from Playwright's own events.
 
     Registered once per page; reset() before each navigation. See the module
     constants for why Playwright's networkidle load state cannot be used.
+
+    A SET of request objects, not a counter. A counter looks equivalent and is
+    not: `reset()` zeroes it at navigation time, but the `requestfailed`
+    events for requests the PREVIOUS navigation aborted arrive afterwards and
+    decrement it below zero — and `_wait_until_quiet` reads `n <= 0` as quiet,
+    so it can sweep while requests are genuinely outstanding. That cannot
+    produce a false green (an early sweep only collects FEWER anchors, and a
+    missing anchor is still reported missing), but it can produce intermittent
+    false reds, and a gate that goes red at random is a gate people learn to
+    ignore. Discarding an unknown request object is a no-op, so a stale event
+    from a previous navigation cannot move this count at all.
     """
 
     def __init__(self, page):
-        self.n = 0
+        self._live = set()
         page.on("request", self._start)
         page.on("requestfinished", self._end)
         page.on("requestfailed", self._end)
 
-    def _start(self, _request):
-        self.n += 1
+    @property
+    def n(self) -> int:
+        return len(self._live)
 
-    def _end(self, _request):
-        self.n -= 1
+    def _start(self, request):
+        self._live.add(request)
+
+    def _end(self, request):
+        self._live.discard(request)
 
     def reset(self) -> None:
-        self.n = 0
+        self._live.clear()
 
 
 def _wait_until_quiet(page, inflight: "_InFlight | None") -> None:
@@ -379,7 +394,7 @@ def _wait_until_quiet(page, inflight: "_InFlight | None") -> None:
         # are up to date by the time it returns.
         page.wait_for_timeout(POLL_MS)
         waited += POLL_MS
-        quiet = quiet + 1 if inflight.n <= 0 else 0
+        quiet = quiet + 1 if inflight.n == 0 else 0
         if quiet >= QUIET_POLLS:
             return
 

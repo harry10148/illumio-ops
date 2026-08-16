@@ -78,6 +78,7 @@ backend before writing this file:
 from __future__ import annotations
 
 import json
+import os
 import time
 from datetime import datetime, timedelta, timezone
 
@@ -89,6 +90,15 @@ pytest.importorskip("playwright.sync_api", exc_type=ImportError)
 # docstring for why both this line and the importorskip above (in that exact
 # order) are required.
 pytest_plugins = ["tests.v2_e2e_utils"]
+
+# The per-file app fixture below needs the harness's own building blocks,
+# same as tests/test_v2_login_e2e.py does for its logged-out page.
+from tests.v2_e2e_utils import (  # noqa: E402
+    _bounded_close,
+    _LiveServer,
+    build_v2_app,
+    v2_login,
+)
 
 ROUTE = "#/reports"
 SLOW = 45_000
@@ -380,3 +390,140 @@ def test_async_job_polling_stops_on_navigation_away(v2_page):
 
     page.unroute("**/api/reports/generate", handle_generate)
     page.unroute("**/api/reports/jobs/**", handle_job_status)
+
+
+# ── the traffic-family filename disambiguation ──────────────────────────────
+#
+# RESTORED GUARD (Task 11 review, Important 1). The legacy owner of this
+# behaviour was tests/test_gui_report_split_and_alert_rename.py::
+# test_last_run_map_disambiguates_traffic_family_by_filename, which grepped
+# src/static/js/dashboard.js for the two filename prefixes. That file was
+# deleted with the legacy frontend, and Task 11's first pass claimed the v2
+# owner was this module — it was not: nothing here asserted either prefix.
+#
+# The behaviour is very much alive, at src/static/js/v2/areas/reports.mjs's
+# derivedType(). It matters because the metadata sidecar hardcodes
+# report_type="traffic" for ALL THREE traffic-family reports
+# (report_generator.py), so security_risk / network_inventory / traffic are
+# separable ONLY by their filename prefix — and the two specific prefixes
+# must be tested BEFORE the bare dated pattern, since
+# "Illumio_Traffic_Report_" is a strict prefix of both. A regression there
+# silently collapses three report families into one on the RP-01 catalogue.
+#
+# This replacement is a truth test, not a string grep: it seeds three REAL
+# report files with REAL sidecars that all say "traffic" into a real output
+# directory, loads the real page, and reads the three cards' own counts and
+# timestamps back out of the DOM. If derivedType() stopped honouring the
+# prefixes, traffic would show 3 files and the other two would show 0.
+
+TRAFFIC_FAMILY_FILES = [
+    # (filename, expected data-rtype, mtime)
+    # mtimes a whole DAY apart, not seconds: lastStamp() renders
+    # stamp(...).slice(0, 16), i.e. minute resolution in local time, so
+    # closely-spaced fixtures could collapse to the same string and make the
+    # "three distinct stamps" assertion below pass or fail on the clock.
+    ("Illumio_Traffic_Report_SecurityRisk_2026-08-01.html", "security_risk", 1_760_000_000),
+    ("Illumio_Traffic_Report_NetworkInventory_2026-08-02.html", "network_inventory", 1_760_086_400),
+    ("Illumio_Traffic_Report_2026-08-03.html", "traffic", 1_760_172_800),
+]
+
+
+@pytest.fixture
+def v2_reports_dir_app(temp_config_file, tmp_path):
+    """A real app whose report.output_dir is a private directory seeded with
+    the three traffic-family files, each with a sidecar hardcoding "traffic".
+
+    Its own app rather than the shared v2_app because report.output_dir
+    defaults to the repository's `reports/` directory — writing fixtures
+    there would not be isolated. Same shape as test_v2_login_e2e.py's
+    per-file app fixtures.
+    """
+    out = tmp_path / "reports-out"
+    out.mkdir()
+    for name, _rtype, mtime in TRAFFIC_FAMILY_FILES:
+        report = out / name
+        report.write_text("<html><body>e2e fixture</body></html>", encoding="utf-8")
+        # The sidecar the real generator writes: report_type is "traffic" for
+        # every member of the family. This is the whole point of the test.
+        (out / (name + ".metadata.json")).write_text(
+            json.dumps({"report_type": "traffic"}), encoding="utf-8"
+        )
+        os.utime(report, (mtime, mtime))
+
+    app, cm = build_v2_app(temp_config_file)
+    cm.config["report"] = dict(cm.config.get("report", {}))
+    cm.config["report"]["output_dir"] = str(out)
+    cm.save()
+    return app
+
+
+@pytest.fixture
+def v2_reports_dir_page(_v2_browser, v2_reports_dir_app):
+    server = _LiveServer(v2_reports_dir_app)
+    server.start()
+    ctx = _v2_browser.new_context(ignore_https_errors=True)
+    try:
+        v2_login(ctx, server.base_url)
+        page = ctx.new_page()
+        page.set_default_timeout(SLOW)
+        try:
+            yield page, server.base_url
+        finally:
+            _bounded_close("v2_reports_dir_page", page.close)
+    finally:
+        _bounded_close("v2_reports_dir_ctx", ctx.close)
+        server.stop()
+
+
+def test_traffic_family_is_split_by_filename_not_by_the_sidecar(v2_reports_dir_page):
+    page, base_url = v2_reports_dir_page
+    _goto(page, base_url, ROUTE, "RP-01")
+
+    def card(rtype):
+        return page.locator('article.rpcard[data-rtype="%s"]' % rtype)
+
+    # Every family member is counted under ITS OWN card, not lumped under
+    # traffic — even though all three sidecars say "traffic".
+    for _name, rtype, _mtime in TRAFFIC_FAMILY_FILES:
+        c = card(rtype)
+        assert c.count() == 1, rtype
+        assert "1" in c.locator(".rpcard-last .n").inner_text(), (
+            rtype, c.locator(".rpcard-last .n").inner_text()
+        )
+
+    # ...and each card's "last produced" stamp is its OWN file's mtime, so a
+    # rule that merely counted correctly but mapped the newest file to every
+    # card would still fail here.
+    stamps = {
+        rtype: card(rtype).locator(".rpcard-last .v").inner_text()
+        for _n, rtype, _m in TRAFFIC_FAMILY_FILES
+    }
+    assert len(set(stamps.values())) == 3, stamps
+    # The bare dated file is the newest of the three (mtime ...300), so the
+    # traffic card must hold the latest of the three stamps.
+    assert stamps["traffic"] == max(stamps.values()), stamps
+
+
+def test_specific_traffic_prefixes_are_matched_before_the_bare_dated_one(v2_reports_dir_page):
+    """The ordering half of derivedType(), on its own.
+
+    "Illumio_Traffic_Report_" is a strict prefix of both
+    "Illumio_Traffic_Report_SecurityRisk_" and
+    "..._NetworkInventory_". If the bare dated pattern were tested first, or
+    if the specific tests were dropped, both specific families would land on
+    the traffic card and this count would be 3.
+    """
+    page, base_url = v2_reports_dir_page
+    _goto(page, base_url, ROUTE, "RP-01")
+
+    traffic_files = page.locator(
+        'article.rpcard[data-rtype="traffic"] .rpcard-last .n'
+    ).inner_text()
+    assert "3" not in traffic_files, (
+        "all three traffic-family reports collapsed onto the traffic card — "
+        "derivedType() stopped honouring the filename prefixes: %s" % traffic_files
+    )
+    for rtype in ("security_risk", "network_inventory"):
+        assert page.locator(
+            'article.rpcard[data-rtype="%s"] .rpcard-last .v' % rtype
+        ).inner_text() != "\u2014", rtype
