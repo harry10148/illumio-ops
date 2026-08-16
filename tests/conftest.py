@@ -14,6 +14,8 @@ os.environ.setdefault("ILLUMIO_OPS_RATELIMIT_URI", "memory://")
 import pytest
 from loguru import logger
 
+from src.loguru_config import _StdLibInterceptHandler
+
 
 ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if ROOT_DIR not in sys.path:
@@ -27,16 +29,83 @@ class _PropagateHandler(logging.Handler):
         logging.getLogger(record.name).handle(record)
 
 
+@pytest.fixture(scope="session")
+def _stdlib_root_logger_baseline():
+    """Snapshot of the stdlib root logger's handlers/level, taken once
+    before the first test runs (this is a dependency of the autouse,
+    function-scoped fixture below, so pytest instantiates it on first use —
+    i.e. before any test body, including its own logging setup, executes).
+
+    Exists only so `_loguru_caplog_bridge` can restore this baseline after
+    any test whose call to setup_loguru() clobbers it — see that fixture's
+    docstring for why this specific restoration is required, not optional.
+    """
+    root_logger = logging.getLogger()
+    return list(root_logger.handlers), root_logger.level
+
+
 @pytest.fixture(autouse=True)
-def _loguru_caplog_bridge(caplog):
-    """Route loguru → stdlib logging → caplog for test assertion compatibility."""
+def _loguru_caplog_bridge(caplog, _stdlib_root_logger_baseline):
+    """Route loguru → stdlib logging → caplog for test assertion compatibility.
+
+    Also guards, session-wide, against any test leaking global loguru/stdlib
+    logging state. setup_loguru() (src/loguru_config.py) does two things
+    that outlive a single test unless undone:
+
+    1. It installs enqueue=True sinks, each backed by a real
+       multiprocessing.SimpleQueue/Lock/Event plus a background feeder
+       thread (verified against loguru's Handler.__init__/Handler.stop()).
+       A test that calls setup_loguru() without teardown leaves that thread
+       running for the rest of the pytest session, writing to a tmp_path
+       file pytest has since deleted.
+    2. It calls `logging.basicConfig(handlers=[_StdLibInterceptHandler()],
+       level=0, force=True)` — force=True unconditionally REPLACES the
+       stdlib root logger's entire handler list, process-wide. Nothing
+       restores pytest's own root-logger setup afterward, so
+       _StdLibInterceptHandler (which forwards every stdlib log call into
+       loguru) is still installed root-wide in every later test.
+
+    (2) is the sharper hazard: this fixture re-adds its own _PropagateHandler
+    (loguru → stdlib logging.getLogger(...).handle(...)) for every test, so
+    once _StdLibInterceptHandler (stdlib → loguru) is stuck on the root
+    logger from an earlier test, the two form a closed loop — any later
+    stdlib log call (e.g. urllib3's DEBUG/WARNING retry logging under the
+    concurrent request threads a Playwright-driven Flask e2e test produces)
+    bounces between stdlib logging and loguru indefinitely. Confirmed by
+    direct inspection: running tests/test_logging.py's two setup_loguru()
+    tests followed by tests/test_v2_alerting_e2e.py, the root logger's
+    handlers still contained _StdLibInterceptHandler at the start of the
+    e2e test, and the run produced a storm of loguru's own re-entrancy
+    guard firing ("RuntimeError: Could not acquire internal lock ...
+    deadlock avoided") immediately before hanging — cleaning up loguru's
+    own handler registry alone (point 1) did not stop the hang; only
+    additionally undoing (2) did.
+
+    Both cleanups here only touch state added since this fixture's own
+    setup ran (or, for (2), only fire when _StdLibInterceptHandler is
+    actually present) — this is pure teardown of a specific, named test
+    fixture's own footprint, not a general reset, so it can't mask a real
+    logging misconfiguration in the code under test.
+    """
+    before_ids = set(logger._core.handlers.keys())
     handler_id = logger.add(_PropagateHandler(), format="{message}", level="DEBUG")
     with caplog.at_level(logging.DEBUG):
         yield
-    try:
-        logger.remove(handler_id)
-    except ValueError:
-        pass  # setup_loguru() may have already removed all handlers
+    leaked_ids = set(logger._core.handlers.keys()) - before_ids
+    for hid in leaked_ids:
+        try:
+            logger.remove(hid)
+        except ValueError:
+            pass  # already removed (e.g. by another setup_loguru() call)
+
+    root_logger = logging.getLogger()
+    if any(isinstance(h, _StdLibInterceptHandler) for h in root_logger.handlers):
+        # A test called setup_loguru()/setup_logger() and its force=True
+        # basicConfig() call is still in effect — restore pytest's original
+        # root-logger handlers/level (captured once, pre-session, above).
+        baseline_handlers, baseline_level = _stdlib_root_logger_baseline
+        root_logger.handlers = list(baseline_handlers)
+        root_logger.setLevel(baseline_level)
 
 
 @pytest.fixture(autouse=True)
