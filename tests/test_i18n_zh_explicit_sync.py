@@ -136,8 +136,11 @@ def test_the_general_invariant_is_still_backlog():
 
     # Measured at 1022 when this guard was restored (Task 11 review); lowered to
     # 1021 after pinning gui_card_unknown and gui_errcard_retry, the two keys the
-    # system.mjs/api.mjs/shell.mjs switchover started rendering.
-    assert len(missing) <= 1021, (
+    # system.mjs/api.mjs/shell.mjs switchover started rendering. Lowered to 1004
+    # after task 12b removed 17 keys that carried mockup design commentary
+    # (DESIGN-ADDED notes and citations of deleted source files) out of
+    # operator-facing copy.
+    assert len(missing) <= 1004, (
         f"{len(missing)} gui_* keys rendered by src/ have a zh_TW value but no "
         "zh_explicit entry, up from the 1021 ceiling — "
         "new hand-written Chinese is being added without a zh_explicit entry, "

@@ -561,7 +561,6 @@ function eventDrawer(rule, catalog, onSaved) {
       + JSON.stringify(d, null, 2);
   }
 
-  body.appendChild(note(t("gui_al_src_event")));
   body.appendChild(sectionHead(t("gui_al_form_section")));
   body.appendChild(labelled(t("gui_category"), catSel));
   body.appendChild(editField("filter_value", t("gui_event_type"), evSel));
@@ -649,7 +648,6 @@ function systemDrawer(rule, onSaved) {
       + JSON.stringify(d, null, 2);
   }
 
-  body.appendChild(note(t("gui_al_src_system")));
   body.appendChild(sectionHead(t("gui_al_form_section")));
   body.appendChild(editField("name", t("gui_rule_name"), nameInput));
   body.appendChild(editField("filter_value", t("gui_system_health_type"), typeSel, t("gui_system_health_desc")));
@@ -764,7 +762,6 @@ function flowDrawer(kind, rule, snaps, onSaved) {
   bar.onChange(repaint);
 
   body.appendChild(note(isBw ? t("gui_bw_rule_desc") : t("gui_traffic_rule_desc")));
-  body.appendChild(note(isBw ? t("gui_al_src_bw") : t("gui_al_src_traffic")));
   body.appendChild(sectionHead(t("gui_al_form_section")));
   body.appendChild(editField("name", t("gui_rule_name"), nameInput));
   if (isBw) {

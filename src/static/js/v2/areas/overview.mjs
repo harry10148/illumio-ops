@@ -583,7 +583,6 @@ function cardTopActions(snap) {
     ));
   });
   p.body.appendChild(list);
-  p.body.appendChild(note(t("gui_ov_dead_panel")));
   return p;
 }
 

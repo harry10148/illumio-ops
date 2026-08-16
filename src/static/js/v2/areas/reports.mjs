@@ -194,15 +194,13 @@ class RType {
     this.sections = sections;
     this.genKey = "gui_gen_fallback_title";
     this.dateFmt = "raw";
-    this.srcNote = null;
     this.async = false;
     this.formatNote = null;
   }
   has(s) { return this.sections.indexOf(s) >= 0; }
-  meta(genKey, dateFmt, srcNote) {
+  meta(genKey, dateFmt) {
     this.genKey = genKey;
     this.dateFmt = dateFmt;
-    this.srcNote = srcNote;
     return this;
   }
   flags(isAsync, formatNote) {
@@ -221,27 +219,27 @@ const TRAFFIC_PROFILE = ["source", "dates", "filters", "ds"];
 
 const RTYPES = [
   new RType("traffic", "gui_btn_traffic_report", "gui_rcard_traffic_desc", "/api/reports/generate", TRAFFIC_PROFILE)
-    .meta("gui_gen_traffic_title", "iso", "gui_rp_src_traffic").flags(true, null),
+    .meta("gui_gen_traffic_title", "iso").flags(true, null),
   new RType("security_risk", "gui_rcard_security_title", "gui_rcard_security_desc", "/api/reports/generate", TRAFFIC_PROFILE)
-    .meta("gui_gen_security_title", "iso", "gui_rp_src_traffic").flags(true, null),
+    .meta("gui_gen_security_title", "iso").flags(true, null),
   new RType("network_inventory", "gui_rcard_inventory_title", "gui_rcard_inventory_desc", "/api/reports/generate", TRAFFIC_PROFILE)
-    .meta("gui_gen_inventory_title", "iso", "gui_rp_src_traffic").flags(true, null),
+    .meta("gui_gen_inventory_title", "iso").flags(true, null),
   new RType("audit", "gui_btn_audit_report", "gui_rcard_audit_desc", "/api/audit_report/generate", ["dates"])
-    .meta("gui_gen_audit_title", "iso", "gui_rp_src_audit").flags(false, null),
+    .meta("gui_gen_audit_title", "iso").flags(false, null),
   new RType("ven", "gui_btn_ven_report", "gui_rcard_ven_desc", "/api/ven_status_report/generate", ["snapshot"])
-    .meta("gui_gen_ven_title", "raw", "gui_rp_src_ven").flags(false, null),
+    .meta("gui_gen_ven_title", "raw").flags(false, null),
   new RType("policy_usage", "gui_btn_pu_report", "gui_rcard_pu_desc", "/api/policy_usage_report/generate", ["source", "dates"])
-    .meta("gui_gen_pu_title", "raw", "gui_rp_src_pu").flags(false, null),
+    .meta("gui_gen_pu_title", "raw").flags(false, null),
   new RType("rule_hit_count", "gui_btn_rhc_report", "gui_rcard_rhc_desc", "/api/rule_hit_count_report/generate", ["source", "dates"])
-    .meta("gui_gen_rhc_title", "raw", "gui_rp_src_rhc").flags(false, null),
+    .meta("gui_gen_rhc_title", "raw").flags(false, null),
   new RType("readiness", "gui_rcard_readiness_title", "gui_rcard_readiness_desc", "/api/readiness_report/generate", ["dates", "ds"])
-    .meta("gui_gen_readiness_title", "raw", "gui_rp_src_readiness").flags(false, null),
+    .meta("gui_gen_readiness_title", "raw").flags(false, null),
   new RType("policy_diff", "gui_rcard_policy_diff_title", "gui_rcard_policy_diff_desc", "/api/policy_diff_report/generate", ["snapshot"])
-    .meta("gui_gen_policy_diff_title", "raw", "gui_rp_src_pd").flags(false, "gui_rp_fmt_pd"),
+    .meta("gui_gen_policy_diff_title", "raw").flags(false, "gui_rp_fmt_pd"),
   new RType("policy_resolver", "gui_rcard_policy_resolver_title", "gui_rcard_policy_resolver_desc", "/api/policy_resolver_report/generate", ["snapshot"])
-    .meta("gui_gen_policy_resolver_title", "raw", "gui_rp_src_pr").flags(false, "gui_rp_fmt_pr"),
+    .meta("gui_gen_policy_resolver_title", "raw").flags(false, "gui_rp_fmt_pr"),
   new RType("app_summary", "gui_rcard_app_title", "gui_rcard_app_desc", "/api/app_report/generate", ["dates", "app", "ds"])
-    .meta("gui_gen_app_title", "raw", "gui_rp_src_app").flags(true, null),
+    .meta("gui_gen_app_title", "raw").flags(true, null),
 ];
 
 // The card meta strip's schedule chip (dashboard.js:264-271).
@@ -634,7 +632,6 @@ function genDrawer(rt, d, lang, hooks) {
   fileInput.addEventListener("change", repaint);
 
   body.appendChild(note(t(rt.descKey)));
-  body.appendChild(note(t(rt.srcNote)));
   body.appendChild(sectionHead(t("gui_rp_form_section")));
   if (rt.has("source")) {
     body.appendChild(srcBox);

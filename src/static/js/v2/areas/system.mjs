@@ -760,7 +760,6 @@ function pceDrawer() {
     return b;
   });
 
-  body.appendChild(note(t("gui_sy_pce_add_src")));
   body.appendChild(sectionHead(t("gui_pce_add")));
   body.appendChild(labelled(t("gui_pce_name"), form.track("name", name)));
   body.appendChild(labelled(t("gui_url"), form.track("url", url), t("gui_sy_pce_url_rule")));
@@ -820,7 +819,6 @@ async function mountPce(root, ctx) {
         tf("gui_sy_pce_i_switch", { name: nameText }),
         t("gui_sy_pce_i_queries"),
         t("gui_sy_pce_i_cache"),
-        t("gui_sy_pce_i_nocfm"),
       ], function () {
         if (!target) return false;
         return api.post("/api/pce-profiles", { action: "activate", id: target.id }).then(function (res) {
@@ -2131,9 +2129,8 @@ async function mountDisplay(root, ctx) {
     skinPanel.body.appendChild(labelled(t("gui_theme"), themeCtl, t("gui_sy_disp_theme_live")));
     skinPanel.body.appendChild(labelled(t("gui_density"), densityCtl, t("gui_sy_disp_density_new")));
     skinPanel.body.appendChild(kvRow(t("gui_sy_disp_stored_theme"), st.theme));
-    // settings.js:448 renders this label as a raw literal "Theme" with no
+    // settings.js:448 rendered this label as a raw literal "Theme" with no
     // data-i18n; the density control has no product counterpart at all.
-    skinPanel.body.appendChild(note(t("gui_sy_disp_theme_literal")));
     skinPanel.body.appendChild(note(t("gui_sy_disp_theme_apply")));
 
     // ── XC-06 timezone + language ────────────────────────────────────
