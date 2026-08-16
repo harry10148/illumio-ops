@@ -549,8 +549,12 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False, use_https: boo
             return
 
         # Auth check (always enforced for all GUI modes)
-        # Bypass login routes
-        if request.path in ['/login', '/api/login', '/logout', '/api/csrf-token']:
+        # Bypass login routes. /v2/login (Task 10, src/gui/routes/v2.py) is
+        # the v2-preview counterpart of /login and needs the exact same
+        # pre-auth treatment — without it an anonymous visitor would be
+        # redirected straight back to the legacy /login before the v2 login
+        # page's own template ever renders.
+        if request.path in ['/login', '/api/login', '/logout', '/api/csrf-token', '/v2/login']:
             return
         if not current_user.is_authenticated:
             if request.path.startswith('/api/'):

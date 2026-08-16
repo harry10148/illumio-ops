@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en" data-theme="dark" data-density="cozy">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="csrf-token" content="{{ csrf_token() }}">
+<title>illumio-ops · v2 · login</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/v2/tokens.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/v2/components.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/v2/app.css') }}">
+<!-- Same pre-paint bootstrap as base.html: an anonymous visitor's very
+     first paint on this page must not flash the wrong theme either. See
+     core/theme-bootstrap.js for why this is an external classic script,
+     not the mockup's inline block (this app's CSP has no 'unsafe-inline'
+     and injects no nonce). theme.mjs owns every change after this point. -->
+<script src="{{ url_for('static', filename='js/v2/core/theme-bootstrap.js') }}"></script>
+</head>
+<body class="loginpage">
+<div id="login-root"></div>
+<script type="module" src="{{ url_for('static', filename='js/v2/areas/login.mjs') }}"></script>
+</body>
+</html>

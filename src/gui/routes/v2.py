@@ -19,4 +19,12 @@ def make_v2_blueprint(cm: ConfigManager, login_required) -> Blueprint:
     def v2_shell():
         return render_template("v2/base.html")
 
+    # Deliberately NOT @login_required: this is the page an unauthenticated
+    # visitor lands on. src/gui/__init__.py's security_check before_request
+    # hook must also know this path is reachable pre-auth (same treatment as
+    # the existing /login) — see that file's bypass list.
+    @bp.route("/v2/login")
+    def v2_login():
+        return render_template("v2/login.html")
+
     return bp
