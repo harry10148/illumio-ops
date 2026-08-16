@@ -37,6 +37,36 @@ a plain `<major>.<minor>.<patch>` scheme. (Tags through v4.0.0 carried a
   gates were green throughout, because the strings were structurally legal i18n;
   the defect was only visible by looking at the deployed screens. A guard test
   with an empty allowlist now rejects the whole class.
+- The system area's "restart monitor" control never called the server. It showed
+  "the daemon is managed externally, restart it from your service manager" no
+  matter what, on the strength of a code comment asserting that no such route
+  existed. `POST /api/daemon/restart` does exist, and under the standard
+  `--monitor-gui` deployment it really does rebuild the scheduler — confirmed
+  against a deployed appliance, which answered 200. Operators were told a
+  falsehood and their restart never happened. The control now calls the route
+  and tells 200, 409 (genuinely externally managed — the one case the old
+  message was true), 429 (five per hour, reachable while tuning) and any other
+  failure apart.
+- The SIEM dead-letter queue's replay and purge controls reported success
+  regardless of what the server said, and replay printed `[object Object]` where
+  a count belonged: that endpoint answers with a per-item result list, and an
+  entry that was already gone comes back as a failure inside an HTTP 200. Both
+  now read the response, count what actually moved, and surface per-item errors.
+  Stopping the GUI likewise now inspects its response instead of assuming it
+  worked.
+- `api`'s "these calls never throw" contract held only for HTTP statuses, not for
+  the transport: a connection dropped mid-request rejected out of `fetch` and
+  escaped, most visibly leaving a report generation's progress card on "running"
+  forever, neither finished nor failed. Transport failures now fold into the same
+  `{ok:false}` shape an HTTP failure produces.
+- Area teardowns are registered before their mount awaits anything, so a mount
+  that ends on an error card no longer leaves its command-palette entries behind
+  for every other area; ten areas were affected. A static test now enforces the
+  placement.
+- Detaching the health rail releases its popover, instead of leaving a stale
+  entry on the dismiss stack that swallowed the next Escape anywhere in the app.
+- The rule-search note claimed the search covered every ruleset on the PCE. It
+  filters the one ruleset selected above it.
 - The live-appliance end-to-end test waited, after submitting the login form,
   for a condition the login page already satisfied, so it raced the login POST
   and failed on the page it never left. It now waits for the redirect.
