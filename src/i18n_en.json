@@ -5178,5 +5178,8 @@
   "gui_rp_rhc_detail_enabled": "PCE report template and VEN scopes both enabled",
   "gui_rp_rhc_detail_disabled": "PCE report template and VEN scopes both disabled",
   "gui_rp_rhc_detail_missing_ven": "Missing: VEN firewall_settings scopes",
-  "gui_rp_rhc_detail_missing_pce": "Missing: PCE report template"
+  "gui_rp_rhc_detail_missing_pce": "Missing: PCE report template",
+  "gui_rp_rhc_detail_unsupported_no_evidence": "Report template not found — PCE below version floor (SaaS 24.2.0 / on-prem 23.5.10) or feature absent",
+  "gui_rp_rhc_detail_below_floor": "PCE version {version} is below the floor (SaaS >= {saas_floor} / on-prem >= {onprem_floor})",
+  "gui_rp_rhc_detail_meets_floor": "PCE version {version} meets the conservative floor (on-prem >= {onprem_floor}), but the report template was not found — feature absent or permissions"
 }

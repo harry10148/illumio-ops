@@ -1256,22 +1256,45 @@ async function mountReports(root, ctx) {
       rhcPanel.body.appendChild(rhcBody);
       aside.appendChild(rhcPanel);
 
-      // check_enablement() (rule_hit_count_enablement.py) returns a fixed
-      // English sentence for each of these four outcomes; map the ones that
-      // are always the same string to real i18n keys instead of printing
-      // the backend's English verbatim. The "unsupported" detail carries a
-      // live PCE version number the backend interpolated in, so it has no
-      // fixed string to map and is shown as-is.
+      // check_enablement() (rule_hit_count_enablement.py) returns one of
+      // seven English `detail` shapes: five fixed strings (the two "both
+      // X" states, the two "missing: X" partial states, and the unsupported
+      // branch's no-version-evidence message) and two more from that same
+      // unsupported branch that interpolate a live PCE version string (and,
+      // for one of them, the two version-floor constants) — those can't be
+      // a literal-string match. Fixed strings map straight to an i18n key;
+      // the two interpolated ones are matched by a stable `^PCE version `
+      // prefix regex (no trailing `$` anchor) rather than a full-sentence
+      // equality check, so a wording tweak after the captured groups
+      // doesn't silently fall back to raw English — only a changed PREFIX
+      // does, and tests/test_rhc_detail_matches_backend_shapes.py fails the
+      // build if the backend's possible shapes and this map/regex pair ever
+      // drift apart.
       const RHC_DETAIL_KEYS = {
         "PCE report template and VEN scopes both enabled": "gui_rp_rhc_detail_enabled",
         "PCE report template and VEN scopes both disabled": "gui_rp_rhc_detail_disabled",
         "missing: VEN firewall_settings scopes": "gui_rp_rhc_detail_missing_ven",
         "missing: PCE report template": "gui_rp_rhc_detail_missing_pce",
+        "report template not found — PCE below version floor (SaaS 24.2.0 / on-prem 23.5.10) or feature absent":
+          "gui_rp_rhc_detail_unsupported_no_evidence",
       };
+      const RHC_BELOW_FLOOR_RE = /^PCE version (\S+) below floor \(SaaS >= (\S+) \/ on-prem >= (\S+)\)/;
+      const RHC_MEETS_FLOOR_RE = /^PCE version (\S+) meets conservative floor \(on-prem >= (\S+)\)/;
       function rhcDetailText(rhc) {
         const raw = String((rhc && rhc.detail) || "");
-        const key = RHC_DETAIL_KEYS[raw];
-        return key ? t(key) : raw;
+        const direct = RHC_DETAIL_KEYS[raw];
+        if (direct) return t(direct);
+        const belowFloor = RHC_BELOW_FLOOR_RE.exec(raw);
+        if (belowFloor) {
+          return tf("gui_rp_rhc_detail_below_floor", {
+            version: belowFloor[1], saas_floor: belowFloor[2], onprem_floor: belowFloor[3],
+          });
+        }
+        const meetsFloor = RHC_MEETS_FLOOR_RE.exec(raw);
+        if (meetsFloor) {
+          return tf("gui_rp_rhc_detail_meets_floor", { version: meetsFloor[1], onprem_floor: meetsFloor[2] });
+        }
+        return raw;
       }
 
       function paintRhc() {

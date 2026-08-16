@@ -5178,5 +5178,8 @@
   "gui_rp_rhc_detail_enabled": "PCE 報表範本與 VEN 範圍皆已啟用",
   "gui_rp_rhc_detail_disabled": "PCE 報表範本與 VEN 範圍皆未啟用",
   "gui_rp_rhc_detail_missing_ven": "缺少：VEN firewall_settings 範圍",
-  "gui_rp_rhc_detail_missing_pce": "缺少：PCE 報表範本"
+  "gui_rp_rhc_detail_missing_pce": "缺少：PCE 報表範本",
+  "gui_rp_rhc_detail_unsupported_no_evidence": "找不到報表範本——PCE 版本低於門檻（SaaS 24.2.0 / on-prem 23.5.10）或功能不存在",
+  "gui_rp_rhc_detail_below_floor": "PCE 版本 {version} 低於門檻（SaaS >= {saas_floor} / on-prem >= {onprem_floor}）",
+  "gui_rp_rhc_detail_meets_floor": "PCE 版本 {version} 已達保守門檻（on-prem >= {onprem_floor}），但找不到報表範本——功能不存在或權限不足"
 }
