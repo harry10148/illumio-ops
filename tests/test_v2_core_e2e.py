@@ -272,3 +272,87 @@ def test_i18n_init_failure_is_logged_not_silent(v2_page):
         "}"
     )
     assert warned is True
+
+
+# ══════════════════════════ Task 12d — leaks the core layer used to allow ════
+
+def test_detaching_the_health_rail_releases_its_popover(v2_page):
+    """F5: syncRail detaches the rail without calling its destroy().
+
+    An open light popover holds two capture-phase document listeners and an
+    entry on core/dom.mjs's shared dismiss stack (dismissible()). Detaching
+    the rail hides the popover but keeps both: the stale entry stays TOPMOST
+    of the stack, so the next Escape anywhere in the app is eaten by its
+    stopImmediatePropagation() before any live surface can see it.
+
+    RED against the pre-fix app.mjs: the popover is still open when the rail
+    comes back (aria-expanded="true", .rail-pop still in it), and the Escape
+    probe below never fires."""
+    page, base_url = v2_page
+    _goto_overview(page, base_url)
+
+    cell = page.locator('.rail-host [data-cov="XC-01"] .rail-cell').first
+    cell.click()
+    assert cell.get_attribute("aria-expanded") == "true"
+    assert page.locator(".rail-host .rail-pop").count() == 1
+
+    # Away and back: the rail is detached, then re-attached (the same node —
+    # test_health_rail_only_on_overview proves the identity).
+    page.evaluate("location.hash = '#/reports'")
+    page.wait_for_selector("code:text-is('#/reports')")
+    page.evaluate("location.hash = '#/overview'")
+    page.wait_for_selector('.rail-host [data-cov="XC-01"]')
+
+    assert page.locator('.rail-host .rail-cell[aria-expanded="true"]').count() == 0
+    assert page.locator(".rail-host .rail-pop").count() == 0
+
+    # ...and the dismiss stack is clear: a listener registered NOW, i.e. after
+    # any stale one, still sees Escape. Same node (document), same capture
+    # phase, later registration — exactly what stopImmediatePropagation()
+    # would block.
+    page.evaluate(
+        "() => { window.__escSeen = 0; document.addEventListener('keydown', "
+        "e => { if (e.key === 'Escape') window.__escSeen++; }, true); }"
+    )
+    page.keyboard.press("Escape")
+    assert page.evaluate("() => window.__escSeen") == 1
+
+
+def test_api_does_not_throw_on_a_transport_failure(v2_page):
+    """F7: api.mjs's "post/put/del never throw" contract has to hold for the
+    transport layer too, not just for HTTP statuses.
+
+    A connection dropped mid-flight (or DNS failure, or an aborted request)
+    made fetch() itself reject, and rawRequest() let that reject straight
+    through — so every caller written to the documented contract (nobody but
+    login.mjs wraps these in try/catch) got an unhandled rejection instead of
+    a result, and any progress state it was holding was never cleared.
+
+    RED against the pre-fix api.mjs: post() rejects, so `threw` is True."""
+    page, base_url = v2_page
+    _goto_overview(page, base_url)
+
+    def kill(route):
+        route.abort("connectionfailed")
+
+    page.route("**/api/dashboard/queries", kill)
+    try:
+        result = page.evaluate(
+            "async () => { const { api } = await import('/static/js/v2/core/api.mjs'); "
+            "const out = {}; "
+            "try { out.post = await api.post('/api/dashboard/queries', {}); } "
+            "catch (e) { out.threw = String(e); } "
+            # load()/get() keep their own contract (throw, so the error-card
+            # retry path still works) — a transport failure must land there
+            # too, not escape as some other shape.
+            "try { await api.get('/api/dashboard/queries'); out.getThrew = false; } "
+            "catch (e) { out.getThrew = true; } "
+            "return out; }"
+        )
+    finally:
+        page.unroute("**/api/dashboard/queries", kill)
+
+    assert "threw" not in result, result
+    assert result["post"]["ok"] is False, result
+    assert result["post"]["error"], result
+    assert result["getThrew"] is True, result

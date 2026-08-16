@@ -1280,7 +1280,7 @@ function buildBoard(host, d, state) {
       return;
     }
     // A save/delete can still be in flight when the user navigates away;
-    // state.torn (set by mountOverview's teardown callback) stops a late
+    // state.torn (set by installTeardown's callback) stops a late
     // resolution from repainting a torn-down board — same reasoning as
     // refreshTop10()'s guard above.
     if (state.torn) return;
@@ -1465,7 +1465,16 @@ export async function mountOverview(root, ctx) {
   // after an await would attach to whichever route the user has moved to by then.
   // The openers close over `handles`, which the board fills in once the data is
   // there; until then they no-op and stay retryable.
+  //
+  // The teardown that DROPS those registrations again has to obey the same
+  // rule, and used to be registered inside the render callback instead — so a
+  // mount that ended on the XC-10 error card never registered one, and its two
+  // ov:* palette commands followed the operator out of this area, where
+  // running them does nothing at all. Registered here, next to what it
+  // undoes, exactly like installTeardown() in investigate/alerting/automation.
   const handles = {};
+  const state = { torn: false };
+  installTeardown(state);
 
   const probe = el("div", { class: "ov-error-probe" });
   audit.register("overview-error-card", function () {
@@ -1498,41 +1507,46 @@ export async function mountOverview(root, ctx) {
 
   await withErrorCard(board, "overview (" + SNAPS.length + ")", loadAll, function (d) {
     if (ctx.stale()) return;
-    const state = {};
-    state.torn = false;
     state.queries = (d.dashboard_queries || []).slice();
     state.fields = fieldKeys(state.queries);
     const built = buildBoard(board, d, state);
     handles.openPostureDetail = built.openPostureDetail;
     handles.openQuery = built.openQuery;
 
-    // S2 teardown — self-unsubscribing: the first navigation away from
-    // #/overview destroys this mount's OV-05 chart handle(s) (a real
-    // ResizeObserver leak otherwise), closes any drawer/modal this area left
-    // open (drawer.mjs/modal.mjs are page-global singletons with no
-    // per-area scoping, so closeAll() is the only way to guarantee nothing
-    // this mount opened survives the navigation), and drops the two
-    // route-scoped palette commands registered above. Registered only once
-    // real board state exists (inside this render callback, after the
-    // ctx.stale() guard) so a mount that lost the race to a fast subsequent
-    // navigation never registers a teardown that would fire on some later,
-    // unrelated area's navigation. state.torn also guards refreshTop10()'s
-    // background repaint (buildBoard, above) against firing after teardown.
-    const unsubscribe = router.onChange(function (path) {
-      if (state.torn) return;
-      state.torn = true;
-      unsubscribe();
-      (state.chartHandles || []).forEach(function (h) {
-        try { h.destroy(); } catch (e) { console.error("[overview] chart teardown failed", e); }
-      });
-      drawer.closeAll();
-      modal.closeAll();
-      palette.setRoute(path);
-    });
-
     // Kick off the real top10 fetch now that the rest of the board has
     // already painted (see loadAll()'s comment above).
     built.refreshTop10();
+  });
+}
+
+/** S2 teardown — self-unsubscribing: the first navigation away from
+ *  #/overview destroys this mount's OV-05 chart handle(s) (a real
+ *  ResizeObserver leak otherwise), closes any drawer/modal this area left open
+ *  (drawer.mjs/modal.mjs are page-global singletons with no per-area scoping,
+ *  so closeAll() is the only way to guarantee nothing this mount opened
+ *  survives the navigation), and drops this route's palette commands.
+ *
+ *  Called from mountOverview BEFORE its first await, together with the
+ *  registrations it undoes — the shape investigate/alerting/automation's own
+ *  installTeardown() already had. It used to run inside the render callback,
+ *  on the argument that a mount which lost the race to a fast navigation
+ *  should not register a teardown at all; the price was that a mount ending on
+ *  the error card registered none either, and leaked its palette commands into
+ *  every other area. Nothing here needs board state to exist: chartHandles is
+ *  read defensively, and closeAll()/setRoute() are safe on an empty area.
+ *  state.torn also guards refreshTop10()'s background repaint (buildBoard)
+ *  against firing after teardown. */
+function installTeardown(state) {
+  const unsubscribe = router.onChange(function (path) {
+    if (state.torn) return;
+    state.torn = true;
+    unsubscribe();
+    (state.chartHandles || []).forEach(function (h) {
+      try { h.destroy(); } catch (e) { console.error("[overview] chart teardown failed", e); }
+    });
+    drawer.closeAll();
+    modal.closeAll();
+    palette.setRoute(path);
   });
 }
 

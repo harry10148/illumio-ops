@@ -36,6 +36,15 @@
 //     production JS file already treats them. postForm(path, formData) is
 //     post()'s multipart/form-data sibling (added for reports.mjs's CSV
 //     upload path) — same CSRF-refresh-and-retry, via the same rawRequest().
+//
+// Those two contracts hold for BOTH failure layers. A transport failure —
+// fetch() itself rejecting, which is what a dropped connection, a DNS failure
+// or an aborted request produces — is folded by send() into a non-ok response
+// plus an {ok:false, code:"network_error", error} body, so post/put/del/
+// postForm still resolve rather than reject, and load()/get() still throw the
+// same way they do for a 500. Before that, "never throws" was true only of the
+// HTTP layer, and the one place it mattered most (reports.mjs's generate ->
+// poll flow) stranded its progress card on "running" for good. See send().
 
 import { GET_MAP } from "./store-map.mjs";
 
@@ -84,17 +93,65 @@ async function parseJson(response) {
   }
 }
 
+/**
+ * fetch + parse, with a TRANSPORT failure folded into the same shape an HTTP
+ * failure produces.
+ *
+ * fetch() rejects — it does not resolve with a bad status — when the request
+ * never completes at all: connection dropped mid-flight, DNS failure, the
+ * server going away, an aborted request. Letting that reject escape made this
+ * module's "post/put/del never throw" contract true only of the HTTP layer,
+ * and nothing outside login.mjs wraps these calls in try/catch: a report
+ * generation whose connection dropped left reports.mjs's liveProgress card
+ * stuck on "running" forever, neither succeeded nor failed.
+ *
+ * So a transport failure answers with a synthetic non-ok response (status 0,
+ * the same value fetch's own opaque/failed responses carry) and an
+ * {ok:false, error} body. Both layers then behave identically for every
+ * caller: mutate()/postStatus() resolve with {ok:false, ...}, fetchJson()
+ * throws (its own documented contract, which the error-card retry path
+ * depends on), and the CSRF-retry / 423 checks below see a status that
+ * matches neither, so neither fires on a request that never arrived.
+ *
+ * `error` carries the browser's own message rather than a catalogue string:
+ * core/i18n.mjs imports THIS module (its catalogue is an api.load()), so a
+ * t() here would close an import cycle in the two most fundamental modules of
+ * the app. `code` is there so a caller that wants a localised sentence can
+ * recognise the case without matching on message text — parseJson()'s
+ * fallback below is unlocalised for the same reason.
+ */
+async function send(url, opt) {
+  let res;
+  try {
+    res = await fetch(url, withCsrf(opt));
+  } catch (e) {
+    const message = String((e && e.message) || e);
+    return {
+      res: { ok: false, status: 0, statusText: message },
+      data: { ok: false, code: "network_error", error: message },
+    };
+  }
+  return { res: res, data: await parseJson(res) };
+}
+
 /** Shared request core: CSRF retry + 423 redirect. Never throws on its own. */
 async function rawRequest(url, opt) {
   const method = (opt.method || "GET").toUpperCase();
-  let res = await fetch(url, withCsrf(opt));
-  let data = await parseJson(res);
+  let { res, data } = await send(url, opt);
 
   if (res.status === 400 && data && data.code === "csrf_error" && method !== "GET") {
     if (data.csrf_token) setCsrfToken(data.csrf_token);
-    else await refreshCsrfToken();
-    res = await fetch(url, withCsrf(opt));
-    data = await parseJson(res);
+    else {
+      // The refresh is a fetch too. If IT cannot reach the server, the
+      // original 400 stays the answer: retrying with a token we failed to
+      // renew would fail the same way, and letting the rejection out would
+      // reopen the very hole send() above exists to close.
+      const token = await refreshCsrfToken().catch(function () { return null; });
+      if (!token) return { res, data };
+    }
+    const retried = await send(url, opt);
+    res = retried.res;
+    data = retried.data;
   }
 
   if (res.status === 423 && data && data.error === "must_change_password") {

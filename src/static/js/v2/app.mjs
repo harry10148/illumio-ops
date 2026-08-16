@@ -39,7 +39,20 @@ function syncRail(railHost, path) {
   if (!railNode) return;
   const on = path === HEALTH_ROUTE;
   if (on && railNode.parentNode !== railHost) railHost.appendChild(railNode);
-  else if (!on && railNode.parentNode === railHost) railHost.removeChild(railNode);
+  else if (!on && railNode.parentNode === railHost) {
+    railHost.removeChild(railNode);
+    // Detaching is not enough. An open light popover holds two capture-phase
+    // document listeners and an entry on core/dom.mjs's shared dismiss stack;
+    // out of the document that entry is invisible but still TOPMOST, so the
+    // next Escape anywhere in the app is eaten by its
+    // stopImmediatePropagation() before any live surface sees it. destroy()
+    // closes any open popover, is idempotent, and leaves the rail fully
+    // usable when it comes back (healthbar.mjs's teardown contract, header
+    // note 2) — the node is still reused, not rebuilt. The guard is for
+    // mountHealth's OTHER railNode: the XC-10 error card, which has no
+    // destroy().
+    if (typeof railNode.destroy === "function") railNode.destroy();
+  }
 }
 
 /**

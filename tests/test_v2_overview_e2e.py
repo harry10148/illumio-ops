@@ -300,3 +300,41 @@ def test_teardown_closes_drawer_on_navigate_away(v2_page):
     page.wait_for_selector("code:text-is('#/reports')")
 
     assert page.locator("aside.drawer").count() == 0
+
+
+def test_error_card_mount_still_drops_its_palette_commands(v2_page):
+    """Task 12d F6: mountOverview registers two route-scoped palette commands
+    (ov:query-new, ov:posture) before its first await, but registered the
+    teardown that drops them again only inside the success callback. A mount
+    that ends on the XC-10 error card therefore leaked both commands into
+    every other area, where running them does nothing at all.
+
+    The failure is injected by answering GET /api/dashboard/queries with a
+    payload the board cannot build from. Note this is NOT the "loadAll()
+    rejects" path the review assumed: loadOne() catches every source
+    independently, so loadAll() cannot reject — the reachable failure is the
+    render throwing, which lands in the same withErrorCard catch and left the
+    same teardown unregistered.
+
+    RED against the pre-fix overview.mjs: both commands are still in
+    palette.list() after navigating away."""
+    page, base_url = v2_page
+
+    def bad_payload(route):
+        route.fulfill(status=200, content_type="application/json", body="123")
+
+    page.route("**/api/dashboard/queries", bad_payload)
+    try:
+        _goto_overview(page, base_url)
+        page.wait_for_selector(".board .errcard")
+
+        page.evaluate("location.hash = '#/reports'")
+        page.wait_for_selector("code:text-is('#/reports')")
+        ids = page.evaluate(
+            "async () => { const { palette } = await import('/static/js/v2/components/palette.mjs'); "
+            "return palette.list().map(c => c.id); }"
+        )
+    finally:
+        page.unroute("**/api/dashboard/queries", bad_payload)
+
+    assert [i for i in ids if i.startswith("ov:")] == [], ids
