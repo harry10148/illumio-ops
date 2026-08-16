@@ -36,9 +36,20 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 EN_PATH = ROOT / "src" / "i18n_en.json"
 ZH_PATH = ROOT / "src" / "i18n_zh_TW.json"
-INDEX_HTML = ROOT / "src" / "templates" / "index.html"
-DASHBOARD_JS = ROOT / "src" / "static" / "js" / "dashboard.js"
-DASHBOARD_V2_JS = ROOT / "src" / "static" / "js" / "dashboard_v2.js"
+# Phase 2A Task 11: the dashboard surface moved. It used to be
+# <div id="p-dashboard"> in src/templates/index.html plus _t() calls in
+# src/static/js/dashboard.js — both deleted with the legacy frontend. The v2
+# equivalent is the overview area module and the chrome it sits in, which
+# call t()/tf() from core/i18n.mjs. NOTE the previous version of this file
+# guarded both reads with `.exists()`; left unchanged, deleting those files
+# would have silently narrowed the audited scope to zero keys and made this
+# gate pass by auditing nothing (_load_dashboard_scope_keys now refuses an
+# empty scope for exactly that reason).
+DASHBOARD_SOURCES = (
+    ROOT / "src" / "static" / "js" / "v2" / "areas" / "overview.mjs",
+    ROOT / "src" / "static" / "js" / "v2" / "components" / "healthbar.mjs",
+    ROOT / "src" / "static" / "js" / "v2" / "shell.mjs",
+)
 MOD12_PY = ROOT / "src" / "report" / "analysis" / "mod12_executive_summary.py"
 GLOSSARY = ROOT / "src" / "i18n" / "data" / "glossary.json"
 REPORT_OUT = ROOT / "docs" / "ux-review-2026-05-14" / "dashboard_i18n_flagged.md"
@@ -81,31 +92,32 @@ class Finding:
 # ---------------------------------------------------------------------------
 
 def _load_dashboard_scope_keys() -> set[str]:
-    """Collect i18n keys reachable from the dashboard surface."""
+    """Collect i18n keys reachable from the dashboard (v2 overview) surface.
+
+    t('key') / tf('key', ...) calls in the overview area, the health rail it
+    carries, and the shell around it — the v2 counterpart of the legacy
+    `data-i18n=` attributes plus `_t()` calls this used to scan.
+    """
     keys: set[str] = set()
+    seen_any_file = False
 
-    # 1. <div id="p-dashboard"> ... </div> block in index.html
-    if INDEX_HTML.exists():
-        html = INDEX_HTML.read_text(encoding="utf-8")
-        start = html.find('id="p-dashboard"')
-        if start >= 0:
-            rest = html[start:]
-            # Find the next sibling panel block.
-            next_panel = re.search(r'id="p-(?!dashboard)[a-z\-]+"', rest[40:])
-            block = rest[: 40 + next_panel.start()] if next_panel else rest
-            for m in re.finditer(
-                r'data-i18n(?:-placeholder|-title)?="([a-z0-9_]+)"', block
-            ):
-                keys.add(m.group(1))
-
-    # 2. _t('...') / _t("...") calls in dashboard JS files
-    for js_path in (DASHBOARD_JS, DASHBOARD_V2_JS):
-        if not js_path.exists():
+    for src_path in DASHBOARD_SOURCES:
+        if not src_path.exists():
             continue
-        js = js_path.read_text(encoding="utf-8")
-        for m in re.finditer(r"_t\(\s*['\"]([a-z0-9_]+)['\"]", js):
+        seen_any_file = True
+        js = src_path.read_text(encoding="utf-8")
+        for m in re.finditer(r"\btf?\(\s*['\"]([a-z0-9_]+)['\"]", js):
             keys.add(m.group(1))
 
+    # An empty scope means this audit is checking nothing while reporting
+    # success. Fail loudly instead — the dashboard surface moving again is a
+    # reason to update DASHBOARD_SOURCES, not to quietly stop auditing.
+    if not seen_any_file or not keys:
+        raise SystemExit(
+            "audit_dashboard_i18n: no dashboard source found (looked in "
+            + ", ".join(str(p) for p in DASHBOARD_SOURCES)
+            + ") — update DASHBOARD_SOURCES."
+        )
     return keys
 
 

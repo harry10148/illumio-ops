@@ -1,10 +1,13 @@
-"""Lint: semantic-meaning hex colors MUST live inside :root / [data-theme=...]
-token blocks of app.css and MUST NOT leak into inline styles of index.html.
+"""Lint: colour literals MUST live in css/v2/tokens.css and nowhere else.
 
-Allowed exceptions:
- - .rs-badge-* legacy badges in index.html (will be migrated separately)
- - login.html (standalone styling — separate token scope)
- - dashboard.js inline badge rendering (Phase 2 component extraction)
+Phase 2A Task 11 retargeted this file. It used to police the LEGACY
+src/static/css/app.css + src/templates/index.html, allowing a list of
+exceptions ("dashboard.js inline badge rendering", ".rs-badge-* legacy
+badges", ...). Both of those files are gone, and the v2 frontend's rule is
+stricter with no exceptions: `tokens.css` is the only file in the product
+that may name a colour, every other stylesheet and every .mjs uses
+`var(--token)`. Measured against the tree at the time of writing, that rule
+already held everywhere — this file is what stops it drifting back.
 """
 from __future__ import annotations
 
@@ -13,53 +16,60 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).parent.parent
-CSS = ROOT / "src" / "static" / "css" / "app.css"
-INDEX = ROOT / "src" / "templates" / "index.html"
+CSS_DIR = ROOT / "src" / "static" / "css" / "v2"
+JS_DIR = ROOT / "src" / "static" / "js" / "v2"
+TOKENS = CSS_DIR / "tokens.css"
 
-# Hex values that carry semantic meaning under the new token system.
-SEMANTIC_HEX = {
-    "#16A34A": "--color-success",
-    "#DCFCE7": "--color-success-bg",
-    "#F59E0B": "--color-warning",
-    "#FEF3C7": "--color-warning-bg",
-    "#BE122F": "--color-danger",
-    "#FEE2E2": "--color-danger-bg",
-    "#2563EB": "--color-info",
-    "#DBEAFE": "--color-info-bg",
-}
+# #abc, #aabbcc, #aabbccdd — and the functional colour notations, which are
+# the obvious way to smuggle a literal past a hex-only check.
+_HEX_RE = re.compile(r"#[0-9a-fA-F]{3,8}\b")
+_FUNC_RE = re.compile(r"\b(?:rgba?|hsla?|color|lab|lch|oklab|oklch)\s*\(")
 
 
-def _strip_token_blocks(css: str) -> str:
-    """Remove :root { ... } and [data-theme="..."] { ... } blocks; what remains
-    is 'consumer' CSS where semantic hex MUST NOT appear (use var() instead)."""
-    css = re.sub(r":root\s*\{[^}]*\}", "", css, flags=re.DOTALL)
-    css = re.sub(r'\[data-theme="[^"]+"\]\s*\{[^}]*\}', "", css, flags=re.DOTALL)
-    return css
+def _consumer_css() -> list[tuple[Path, str]]:
+    return [(p, p.read_text(encoding="utf-8"))
+            for p in sorted(CSS_DIR.glob("*.css")) if p != TOKENS]
 
 
-def test_no_semantic_hex_in_css_consumers():
-    css = CSS.read_text(encoding="utf-8")
-    consumers = _strip_token_blocks(css)
-    for hex_val, token in SEMANTIC_HEX.items():
-        # case-insensitive search
-        if re.search(re.escape(hex_val), consumers, re.IGNORECASE):
-            raise AssertionError(
-                f"Hard-coded semantic hex {hex_val!r} found in app.css outside "
-                f"token blocks — use var({token}) instead."
-            )
+def test_tokens_file_is_the_one_that_names_colours():
+    """Sanity: the file this lint exempts must actually hold the palette.
+
+    Without this, deleting every colour from tokens.css would leave the
+    assertions below trivially satisfied.
+    """
+    assert TOKENS.exists(), TOKENS
+    assert len(_HEX_RE.findall(TOKENS.read_text(encoding="utf-8"))) >= 40
 
 
-def test_no_semantic_hex_in_index_html_inline():
-    """Inline style attrs in index.html MUST NOT contain semantic hex values.
-    Only check style="..." occurrences; <style> tags handled by app.css test."""
-    html = INDEX.read_text(encoding="utf-8")
-    # Strip <style>...</style> blocks
-    html_no_style = re.sub(r"<style[^>]*>.*?</style>", "", html, flags=re.DOTALL | re.IGNORECASE)
-    inline_styles = re.findall(r'style="([^"]*)"', html_no_style)
-    blob = " ".join(inline_styles)
-    for hex_val, token in SEMANTIC_HEX.items():
-        if re.search(re.escape(hex_val), blob, re.IGNORECASE):
-            raise AssertionError(
-                f"Hard-coded {hex_val!r} found in inline style of index.html — "
-                f"use var({token}) instead."
-            )
+def test_no_colour_literals_in_consumer_stylesheets():
+    offenders = []
+    for path, css in _consumer_css():
+        for m in _HEX_RE.finditer(css):
+            offenders.append(f"{path.name}: {m.group(0)}")
+        for m in _FUNC_RE.finditer(css):
+            offenders.append(f"{path.name}: {m.group(0)}...")
+    assert not offenders, (
+        "colour literals outside css/v2/tokens.css — use var(--token):\n  "
+        + "\n  ".join(offenders)
+    )
+
+
+def test_no_colour_literals_in_v2_javascript():
+    """The same rule for JS: no component may hardcode a colour.
+
+    charts and tone chips read their colours from CSS custom properties, so
+    a literal here is always a bug (and always invisible in the other theme).
+    """
+    offenders = []
+    for path in sorted(JS_DIR.rglob("*.mjs")) + sorted(JS_DIR.rglob("*.js")):
+        text = path.read_text(encoding="utf-8")
+        # Strip // and /* */ comments — several modules quote the legacy
+        # palette in their porting notes, which is documentation, not style.
+        stripped = re.sub(r"/\*.*?\*/", "", text, flags=re.DOTALL)
+        stripped = re.sub(r"^\s*//.*$", "", stripped, flags=re.MULTILINE)
+        for m in _HEX_RE.finditer(stripped):
+            offenders.append(f"{path.relative_to(JS_DIR)}: {m.group(0)}")
+    assert not offenders, (
+        "colour literals in v2 JavaScript — read the token instead:\n  "
+        + "\n  ".join(offenders)
+    )

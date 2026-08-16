@@ -49,7 +49,29 @@ class TestRuleHighlightEndpoint:
         assert resp.status_code == 200
         assert b"highlight" in resp.data or b".hll" in resp.data or b"background" in resp.data
 
-    def test_index_html_links_pygments_css(self):
+    def test_v2_renders_the_highlight_response_as_text_not_markup(self):
+        """Task 11, a CHANGED consumer recorded rather than dropped.
+
+        The legacy assertion was that src/templates/index.html links
+        /static/pygments.css, because the legacy rule editor injected this
+        endpoint's `html` field as markup. The v2 rules view
+        (src/static/js/v2/areas/alerting.mjs, AL-06) assigns it to
+        `code.textContent` instead — a deliberate consequence of the v2
+        no-innerHTML rule (tests/test_csp_compliance.py) — so the operator
+        sees the highlighter's tags as literal text and pygments.css is not
+        loaded by any template. The endpoint and its stylesheet still work
+        (the two tests above), the v2 consumer does not use them for
+        styling. Logged in task-11-report.md as a product-bug backlog item.
+        """
         from pathlib import Path
-        html = Path("src/templates/index.html").read_text(encoding="utf-8")
-        assert "pygments.css" in html
+        alerting = Path("src/static/js/v2/areas/alerting.mjs").read_text(encoding="utf-8")
+        assert "/highlight" in alerting, "AL-06 no longer calls the endpoint"
+        assert "code.textContent = result.html" in alerting, (
+            "AL-06's rendering changed — if it now renders the markup, this "
+            "test's premise (and the missing pygments.css link) must be revisited"
+        )
+        templates = "".join(
+            p.read_text(encoding="utf-8")
+            for p in sorted(Path("src/templates").glob("*.html"))
+        )
+        assert "pygments.css" not in templates

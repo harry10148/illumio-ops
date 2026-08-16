@@ -5,7 +5,7 @@ through tests.v2_e2e_utils's shared harness — see that module's docstring for
 the harness itself.
 
 The shell is what Task 11 added: src/static/js/v2/shell.mjs, mounted by
-app.mjs into src/templates/v2/base.html's `#shell`. Before this task the
+app.mjs into src/templates/index.html's `#shell`. Before this task the
 whole chrome was a bare rail host, so nothing here had any coverage at all.
 It owns the four cross-cutting coverage anchors that live outside every area
 (design/v2/coverage.yaml):

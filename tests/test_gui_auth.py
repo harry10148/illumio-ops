@@ -47,12 +47,16 @@ def test_api_csrf_failure_returns_refreshable_json(client):
     assert body["csrf_token"]
 
 def test_frontend_api_helper_refreshes_expired_csrf_token():
-    with open("src/static/js/utils.js", encoding="utf-8") as f:
+    """Task 11: the one CSRF-refresh implementation moved from the legacy
+    src/static/js/utils.js `api()` helper to src/static/js/v2/core/api.mjs's
+    rawRequest(), which every v2 module goes through. Same three things
+    asserted, on the file that now does it."""
+    with open("src/static/js/v2/core/api.mjs", encoding="utf-8") as f:
         js = f.read()
 
     assert "csrf_error" in js
     assert "/api/csrf-token" in js
-    assert "_setCsrfToken" in js
+    assert "setCsrfToken" in js
 
 
 def test_login_default_install_does_not_force_change():

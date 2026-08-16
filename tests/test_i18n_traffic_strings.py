@@ -9,10 +9,9 @@ from pathlib import Path
 ROOT = Path(__file__).parent.parent
 EN = ROOT / "src" / "i18n_en.json"
 ZH = ROOT / "src" / "i18n_zh_TW.json"
-INDEX = ROOT / "src" / "templates" / "index.html"
 
 REQUIRED_KEYS = {
-    # New empty-state for traffic table at index.html:340
+    # The traffic table's empty state (v2: areas/investigate.mjs, XC-09)
     "gui_traffic_run_query_empty": "Run a query to view real-time traffic anomalies.",
     # Existing key but mis-valued — should describe a section toggle, not action
     "rpt_filter_toggle": "Traffic Filters (optional)",
@@ -40,11 +39,33 @@ def test_rpt_filter_toggle_value_in_en():
     assert en["rpt_filter_toggle"] == REQUIRED_KEYS["rpt_filter_toggle"]
 
 
-def test_index_html_uses_data_i18n_on_traffic_empty_state():
-    html = INDEX.read_text(encoding="utf-8")
-    # The "Run a query..." cell must carry data-i18n now
-    assert 'data-i18n="gui_traffic_run_query_empty"' in html, (
-        "Traffic empty-state <td> should have data-i18n=\"gui_traffic_run_query_empty\""
+def test_traffic_empty_state_is_rendered_by_the_v2_cause_hints():
+    """Task 11, a REPLACED string recorded rather than dropped.
+
+    The legacy assertion was that `data-i18n="gui_traffic_run_query_empty"`
+    ("Run a query to view real-time traffic anomalies.") appears on the
+    traffic table's empty <td> in src/templates/index.html. That file is
+    gone, and v2 does not reuse the key: areas/investigate.mjs's XC-09 empty
+    state explains WHY the result set is empty (window / source / archive
+    range / filter) through the gui_iv_cause_* family instead of showing one
+    static sentence. gui_traffic_run_query_empty is therefore an orphaned
+    catalogue entry — still translated (asserted above), no longer read.
+
+    What replaced it is asserted here, so the empty state keeps a gate.
+    """
+    js = (ROOT / "src" / "static" / "js" / "v2" / "areas" / "investigate.mjs").read_text(
+        encoding="utf-8"
+    )
+    assert 'data-cov": "XC-09"' in js, "the traffic empty state lost its anchor"
+    assert js.count("gui_iv_cause_") >= 3, "XC-09 no longer explains the cause"
+
+    v2 = "".join(
+        p.read_text(encoding="utf-8")
+        for p in sorted((ROOT / "src" / "static" / "js" / "v2").rglob("*.mjs"))
+    )
+    assert "gui_traffic_run_query_empty" not in v2, (
+        "gui_traffic_run_query_empty gained a v2 consumer — update this test, "
+        "it is documented above as orphaned"
     )
 
 

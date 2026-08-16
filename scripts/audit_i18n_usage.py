@@ -97,8 +97,6 @@ BILINGUAL_DATA_LINES: set[tuple[str, str]] = {
     ("src/cli/menus/_helpers.py", '"是"'),
     # Column-name match keyword, not a display string.
     ("src/report/exporters/html_exporter.py", "_INT_COL_KEYWORDS"),
-    # JS lang selector shows native names ("English" / "繁體中文") in both modes.
-    ("src/static/js/settings.js", "gui_lang_zh"),
     # Injected CSS/JS literal that happens to contain CJK code points for
     # pattern matching — not a display string.
     ("src/report/exporters/report_css.py", "normalizeCellValue"),

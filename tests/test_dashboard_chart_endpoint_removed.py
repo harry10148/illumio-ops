@@ -45,22 +45,22 @@ def test_helpers_module_imports_without_plotly_and_drops_chart_builders():
         assert not hasattr(helpers, name), f"{name} should have been removed"
 
 
-def test_dashboard_js_has_no_plotly_references():
-    js_path = os.path.join(
-        os.path.dirname(__file__), "..", "src", "static", "js", "dashboard.js"
-    )
-    with open(js_path, "r", encoding="utf-8") as f:
-        content = f.read()
-    assert "Plotly" not in content
-    assert "loadDashboardCharts" not in content
-    assert "/api/dashboard/chart/" not in content
+def test_frontend_has_no_plotly_references():
+    """Task 11: the two files this used to scan (src/static/js/dashboard.js,
+    src/templates/index.html) were deleted with the legacy frontend, so the
+    same scan runs over what replaced them — the whole v2 tree and both
+    remaining templates. Broader than the original, not narrower."""
+    from pathlib import Path
 
-
-def test_index_html_has_no_dead_chart_divs():
-    html_path = os.path.join(
-        os.path.dirname(__file__), "..", "src", "templates", "index.html"
+    root = Path(__file__).resolve().parents[1]
+    blob = "".join(
+        p.read_text(encoding="utf-8")
+        for p in sorted((root / "src" / "static" / "js" / "v2").rglob("*.mjs"))
+        + sorted((root / "src" / "static" / "js" / "v2").rglob("*.js"))
+        + sorted((root / "src" / "templates").glob("*.html"))
     )
-    with open(html_path, "r", encoding="utf-8") as f:
-        content = f.read()
-    assert "dashboard-charts" not in content
-    assert "chart-traffic-timeline" not in content
+    assert "Plotly" not in blob
+    assert "loadDashboardCharts" not in blob
+    assert "/api/dashboard/chart/" not in blob
+    assert "dashboard-charts" not in blob
+    assert "chart-traffic-timeline" not in blob

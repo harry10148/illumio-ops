@@ -44,7 +44,7 @@ def make_auth_blueprint(
         """
         cm.load()
         lang = cm.config.get("settings", {}).get("language", "en")
-        return render_template("v2/base.html", html_lang=lang.replace("_", "-"))
+        return render_template("index.html", html_lang=lang.replace("_", "-"))
 
     @bp.route("/login", methods=["GET"])
     def login_page():

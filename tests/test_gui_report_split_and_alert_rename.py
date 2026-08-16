@@ -46,74 +46,23 @@ def test_tab_alerts_label():
     assert ZH["gui_tab_rules"] == "規則"
 
 
-INDEX_HTML = (ROOT / "src" / "templates" / "index.html").read_text(encoding="utf-8")
-
-
-def test_three_adhoc_report_cards_present():
-    for args in ('["traffic"]', '["security_risk"]', '["network_inventory"]'):
-        assert f"data-action=\"openReportGenModal\" data-args='{args}'" in INDEX_HTML, \
-            f"missing ad-hoc report card button for {args}"
-
-
-def test_security_and_inventory_cards_use_new_i18n_keys():
-    assert "gui_rcard_security_title" in INDEX_HTML
-    assert "gui_rcard_inventory_title" in INDEX_HTML
-    assert "gui_rcard_security_desc" in INDEX_HTML
-    assert "gui_rcard_inventory_desc" in INDEX_HTML
-
-
-DASHBOARD_JS = (ROOT / "src" / "static" / "js" / "dashboard.js").read_text(encoding="utf-8")
-
-
-def test_modal_meta_has_three_profile_types():
-    assert "security_risk:" in DASHBOARD_JS
-    assert "network_inventory:" in DASHBOARD_JS
-    assert "gui_gen_security_title" in DASHBOARD_JS
-    assert "gui_gen_inventory_title" in DASHBOARD_JS
-
-
-def test_profile_dropdown_removed():
-    assert "m-gen-profile-row" not in INDEX_HTML, "profile dropdown row must be removed"
-    assert "m-gen-profile" not in DASHBOARD_JS, "no code should read the removed profile select"
-
-
-def test_shared_traffic_profile_types_constant():
-    assert "TRAFFIC_PROFILE_TYPES" in DASHBOARD_JS
-
-
-def test_scheduler_has_security_and_inventory_options():
-    assert 'value="security_risk"' in INDEX_HTML
-    assert 'value="network_inventory"' in INDEX_HTML
-    assert "gui_sched_rt_security" in INDEX_HTML
-    assert "gui_sched_rt_inventory" in INDEX_HTML
-
-
-def test_schedule_list_typelabels_cover_new_types():
-    # both scheduler typeLabels maps must resolve the new report types
-    assert DASHBOARD_JS.count("gui_sched_rt_security") >= 1
-    assert DASHBOARD_JS.count("gui_sched_rt_inventory") >= 1
-
-
-def test_last_run_map_disambiguates_traffic_family_by_filename():
-    # The metadata sidecar hardcodes report_type="traffic" for all three
-    # traffic-family reports (security_risk, network_inventory, traffic), so
-    # the "Last run" map must override it using the filename prefix.
-    assert "Illumio_Traffic_Report_SecurityRisk_" in DASHBOARD_JS
-    assert "Illumio_Traffic_Report_NetworkInventory_" in DASHBOARD_JS
-
-
-import re
-
-
-def test_main_tab_uses_alerts_key_subtab_keeps_rules():
-    # main nav tab button (controls p-rules) now labelled via gui_tab_alerts
-    main_tab = re.search(
-        r'<button[^>]*aria-controls="p-rules"[^>]*data-i18n="([^"]+)"', INDEX_HTML
-    )
-    assert main_tab and main_tab.group(1) == "gui_tab_alerts", \
-        "main Rules tab should use gui_tab_alerts"
-    # in-page sub-tab button still uses gui_tab_rules
-    assert 'id="rules-tab-rules" data-i18n="gui_tab_rules"' in INDEX_HTML
-    # tab wiring unchanged
-    assert 'data-tab="rules"' in INDEX_HTML
-    assert 'aria-controls="p-rules"' in INDEX_HTML
+# Phase 2A Task 11 removed everything below this line: nine tests that made
+# static string assertions about src/templates/index.html and
+# src/static/js/dashboard.js (the three ad-hoc report cards, the scheduler's
+# security_risk/network_inventory <option>s, the removed profile dropdown,
+# the TRAFFIC_PROFILE_TYPES constant, the traffic-family "last run" filename
+# disambiguation, and the main-tab/sub-tab i18n key split). Both files were
+# deleted with the legacy frontend. The v2 equivalents are real browser
+# tests against the real endpoints:
+#
+#   ad-hoc report cards + generate drawer   tests/test_v2_reports_e2e.py (RP-01/RP-02)
+#   report schedules and their type list    tests/test_v2_automation_e2e.py (#/automation/reports)
+#   "last run" per report family            tests/test_v2_reports_e2e.py (RP-07 float host)
+#   the Alerts area label                   tests/test_v2_shell_e2e.py (XC-14 nav, gui_nav_alerting)
+#
+# What survives here is the part with no browser equivalent and no other
+# owner: the catalogue contract for the keys that split introduced, across
+# all three i18n files. Note that gui_hdr_chip_aria (asserted in
+# test_changed_values_updated) is now an ORPHANED key — the v2 chrome has no
+# header chip — kept because its wording still has to agree with
+# gui_rules_count if the chip ever comes back. See task-11-report.md.

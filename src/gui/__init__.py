@@ -404,14 +404,14 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False, use_https: boo
 
     # CSP: script-src is locked to 'self' — no 'unsafe-inline'.
     #
-    # The M1 data-action/data-on-change dispatcher sweep (task D1) removed
-    # every inline `onclick=`/`onchange=`/... handler, including the ones
-    # dynamically built inside JS template strings (the actual XSS surface —
-    # PCE-sourced fields like href/event_id were reaching inline handlers
-    # unescaped). Inline <script> blocks in index.html were externalized to
-    # static/js/_init_bootstrap.js and _i18n_apply.js for the same reason.
-    # All dynamic HTML insertions still go through escapeHtml/escapeAttr
-    # (utils.js:66 + integrations.js:7) as a second layer of defense.
+    # Nothing in the v2 frontend can produce an inline handler: every node is
+    # built through core/dom.mjs's el()/svg() with addEventListener, and there
+    # is no innerHTML / string-built markup anywhere in src/static/js/v2
+    # (asserted by tests/test_csp_compliance.py). The one inline <script> the
+    # templates still carry is login.html's `type="application/json"` i18n
+    # seed, which the browser never executes and CSP therefore never blocks;
+    # the pre-paint theme write is an external classic script
+    # (js/v2/core/theme-bootstrap.js) for exactly this policy.
     #
     # style-src keeps 'unsafe-inline' — out of scope for this task (inline
     # style="" attributes are pervasive and not part of the XSS surface

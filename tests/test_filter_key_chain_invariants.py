@@ -93,7 +93,7 @@ def test_serialize_expansion_matches_js_source():
     """展開表的每個家族片段必須出現在 _objfbSerialize 原始碼中——JS 改了
     組字規則（family 更名等）時這裡要醒。方向性 key 是 template literal
     （`${ex}${d}_labels`），故比對片段而非完整 key。"""
-    src = (_ROOT / "src/static/js/filter-bar.js").read_text(encoding="utf-8")
+    src = (_ROOT / "src/static/js/v2/components/filter-bar.mjs").read_text(encoding="utf-8")
     body = _slice(src, r"function _objfbSerialize\(", r"\nfunction ")
     fragments = {"_labels", "_label_groups", "_iplists", "_workloads", "_ip_in",
                  "services", "ports", "process_name", "windows_service_name",

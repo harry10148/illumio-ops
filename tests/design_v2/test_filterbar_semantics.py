@@ -5,35 +5,37 @@ serialized a merged-column query differently from the shipping one, so the same
 saved query returned different flows. This test makes that class of divergence a
 test failure instead of a field report.
 
-Method: load the SHIPPING file (src/static/js/filter-bar.js), the MOCKUP file
+Method: load the frozen MOCKUP file
 (design/v2/mockup/js/components/filter-bar.mjs) and the ported V2 PRODUCT file
 (src/static/js/v2/components/filter-bar.mjs) into the same headless browser,
-one per blank page, and drive all three through the identical call sequence
-over the queries actually stored on the appliance
+one per blank page, and drive both through the identical call sequence over
+the queries actually stored on the appliance
 (design/v2/snapshots/dashboard_queries.json, which carries one AND query —
 src_labels + dst_labels — and one OR query — any_label). Outputs must be
-equal, key for key, across all three.
+equal, key for key.
 
-THREE-WAY, not two-way, and why: Phase 2A Task 3 ported the mockup file into
-the production tree (verbatim except a single i18n key rename outside the
-serialization core — see that file's header). This test now guards the port
-itself, not just the original mockup, by parameterizing `_sources()` over all
-three paths below. Task 11 deletes the legacy `filter-bar.js` once the v2 GUI
-replaces it in production, at which point this drops back to a two-way
-comparison (mockup vs v2) — that cleanup is Task 11's job, not this one's.
+TWO-WAY as of Phase 2A Task 11, three-way before it. The third leg was the
+LEGACY shipping file, src/static/js/filter-bar.js, which Task 3's port was
+originally verified against; Task 11 deleted the whole legacy frontend, so
+that leg went with it in the same commit rather than being left pointing at a
+missing path. The reference is now `mock` — the frozen mockup, which is the
+artefact the AND/OR semantics were signed off on and which nothing may
+change — and `v2` is the file under test. Note what this costs and what it
+does not: the mockup itself was proven equal to the legacy production file
+by this very test through Tasks 3-10, so mock-vs-v2 still transitively
+pins v2 to the behaviour that shipped.
 
-Paths compared (PROD/MOCK/V2 constants below, `_sources()` iterates the list):
+Paths compared (MOCK/V2 constants below, `_sources()` iterates the list):
 
 Departures from the task brief's sketch, and why:
   * `_objfbDeserialize(state, dict)` takes the state as its FIRST argument and
-    mutates it (filter-bar.js:155); it does not return a state, so the sketch's
+    mutates it (the serialization core); it does not return a state, so the sketch's
     `_objfbSerialize(_objfbDeserialize({...}))` could never have run. The tests
     build the state explicitly.
   * `mode` is not a filter key — it is inferred from the pills during
-    deserialization (filter-bar.js:205-217) and changed by _objfbToggleMode
-    (:1055-1081). Parametrising over the mode therefore means "force the bar into
+    deserialization and changed by _objfbToggleMode. Parametrising over the mode therefore means "force the bar into
     this mode through its own toggle, then serialize", which is what
-    test_serialize_matches_production_in_both_modes does. Re-implementing the
+    test_serialize_matches_the_frozen_mockup_in_both_modes does. Re-implementing the
     toggle inside the test would have tested the test.
   * The snapshot is a flat list of query_def dicts (dashboard.py:539-546 stores
     them flattened), not {"queries": [...]} with a `filters` member.
@@ -61,20 +63,19 @@ pytest.importorskip("playwright.sync_api", exc_type=ImportError)
 pytest_plugins = ["tests.v2_e2e_utils"]
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
-PROD = ROOT / "src" / "static" / "js" / "filter-bar.js"
 MOCK = ROOT / "design" / "v2" / "mockup" / "js" / "components" / "filter-bar.mjs"
 V2 = ROOT / "src" / "static" / "js" / "v2" / "components" / "filter-bar.mjs"
-# Ordered (name, path) pairs — the "parameterized paths" the three-way
-# comparison iterates. PROD is the reference every other name is compared
-# against; the .mjs sources have "export " stripped so a classic <script> tag
-# sees the same global function names as PROD (both mockup and v2 files are
-# written import-free for exactly this reason — see their own headers).
-SOURCE_PATHS = [("prod", PROD), ("mock", MOCK), ("v2", V2)]
+# Ordered (name, path) pairs — the "parameterized paths" the comparison
+# iterates. `mock` is the reference `v2` is compared against; both sources
+# have "export " stripped so a classic <script> tag sees the same global
+# function names (both files are written import-free for exactly this
+# reason — see their own headers).
+SOURCE_PATHS = [("mock", MOCK), ("v2", V2)]
 CASES_FILE = ROOT / "design" / "v2" / "snapshots" / "dashboard_queries.json"
 
-# filter-bar.js:104 calls window.debounce at construction; the mockup resolves
-# candidates synchronously and never needs it. Stubbing it is the only thing the
-# production file needs that a blank page does not already provide.
+# The bar calls window.debounce at construction; a blank page does not provide
+# it, so stub it. (Both files resolve candidates synchronously in this
+# harness, so pass-through is the right stub.)
 STUB = "window.debounce = function (fn) { return fn; };"
 
 # Deserialize into a bare state, then serialize. This is the pure core: no DOM,
@@ -121,10 +122,7 @@ def _cases():
 
 
 def _sources():
-    return {
-        name: (path.read_text() if name == "prod" else path.read_text().replace("export ", ""))
-        for name, path in SOURCE_PATHS
-    }
+    return {name: path.read_text().replace("export ", "") for name, path in SOURCE_PATHS}
 
 
 @pytest.fixture(scope="module")
@@ -165,27 +163,24 @@ def test_snapshot_carries_one_and_query_and_one_or_query():
     assert has_or, "dashboard_queries.json has no merged-column (OR) query"
 
 
-def test_deserialize_then_serialize_matches_production(page):
-    """The serialization core: same pills, same inferred mode, same dict —
-    for BOTH the mockup and the ported v2 product file, against PROD."""
+def test_deserialize_then_serialize_matches_the_frozen_mockup(page):
+    """The serialization core: same pills, same inferred mode, same dict."""
     results = _run(page, CORE_JS, [_cases()])
-    assert results["mock"] == results["prod"]
-    assert results["v2"] == results["prod"]
+    assert results["v2"] == results["mock"]
 
 
 @pytest.mark.parametrize("mode", ["and", "or"])
-def test_serialize_matches_production_in_both_modes(page, mode):
+def test_serialize_matches_the_frozen_mockup_in_both_modes(page, mode):
     """Whole-bar parity, including the mode toggle and a re-import round trip.
 
     In AND mode a label pill serializes to {src,dst}_labels; in OR mode every
-    pill collapses onto the single-value any_* keys (filter-bar.js:130-142), and
+    pill collapses onto the single-value any_* keys, and
     several pills of one category keep only the last. That lossy collapse is the
     behaviour the product ships, so the mockup — and the ported v2 file — have
     to lose exactly as much.
     """
     results = _run(page, API_JS, [_cases(), mode])
-    assert results["mock"] == results["prod"]
-    assert results["v2"] == results["prod"]
+    assert results["v2"] == results["mock"]
 
 
 @pytest.mark.parametrize("mode", ["and", "or"])
@@ -193,7 +188,7 @@ def test_modes_actually_differ(page, mode):
     """Guard the guard: if both modes produced the same dict, the parity tests
     above would pass without ever exercising the AND/OR split."""
     results = _run(page, API_JS, [_cases(), mode])
-    keys = sorted({k for row in results["prod"] for k in row["out"]})
+    keys = sorted({k for row in results["v2"] for k in row["out"]})
     if mode == "or":
         assert any(k.startswith("any_") for k in keys), keys
         assert not any(k.startswith("src_") or k.startswith("dst_") for k in keys), keys
