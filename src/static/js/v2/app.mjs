@@ -79,17 +79,16 @@ async function mountPlaceholder(root, ctx) {
 // (docs/superpowers/plans/2026-08-06-phase2a-gui.md Tasks 4-9). Each area's
 // own task registers its real sub-routes (e.g. #/investigate/traffic); the
 // fallback mount below covers any of those before that task lands, and any
-// unknown hash after. #/overview, #/investigate/*, #/alerting/* and
-// #/automation/* are registered separately below (Tasks 4, 5, 6 and 7 — the
-// areas with a real implementation) and left out of this list so the
-// placeholder loop does not overwrite them. "#/investigate" and
+// unknown hash after. #/overview, #/investigate/*, #/alerting/*,
+// #/automation/* and #/reports are registered separately below (Tasks 4, 5,
+// 6, 7 and 8 — the areas with a real implementation) and left out of this
+// list so the placeholder loop does not overwrite them. "#/investigate" and
 // "#/automation" themselves keep their placeholder: neither area has a
 // landing page of its own, only the sub-routes their own sub-nav links to.
 const AREA_ROUTES = [
   "#/investigate",
   "#/alerting",
   "#/automation",
-  "#/reports",
   "#/system",
 ];
 
@@ -152,6 +151,11 @@ async function boot() {
   router.register("#/automation/jobs", async function (el2, ctx) {
     const { mountAutoJobs } = await import("./areas/automation.mjs");
     return mountAutoJobs(el2, ctx);
+  });
+  // Task 8 — the reports area's single route.
+  router.register("#/reports", async function (el2, ctx) {
+    const { mountReports } = await import("./areas/reports.mjs");
+    return mountReports(el2, ctx);
   });
   AREA_ROUTES.forEach(function (route) { router.register(route, mountPlaceholder); });
   router.setFallback(mountPlaceholder);

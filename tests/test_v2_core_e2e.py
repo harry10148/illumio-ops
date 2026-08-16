@@ -104,9 +104,11 @@ def test_health_rail_only_on_overview(v2_page):
     rail_text = rail.inner_text()
     assert __version__ in rail_text
 
-    # Client-side hash switch (no reload) to #/reports: rail must detach.
-    page.evaluate("location.hash = '#/reports'")
-    page.wait_for_selector("code:text-is('#/reports')")
+    # Client-side hash switch (no reload) to #/system: rail must detach.
+    # (Task 8 report: was #/reports until that area got a real mount — #/system
+    # is the last route still on mountPlaceholder, Task 9's job.)
+    page.evaluate("location.hash = '#/system'")
+    page.wait_for_selector("code:text-is('#/system')")
     assert page.locator("#health-rail").count() == 0
 
     # The placeholder body must degrade through tf()'s fallback, not leak
@@ -115,7 +117,7 @@ def test_health_rail_only_on_overview(v2_page):
     # string "gui_shell_wip_body" until this task's key lands in Tasks 4-9).
     wip_text = page.locator("section.wip").inner_text()
     assert "gui_shell_wip_body" not in wip_text
-    assert "#/reports" in wip_text
+    assert "#/system" in wip_text
 
     # And switching back re-attaches it (detach-not-destroy semantics).
     page.evaluate("location.hash = '#/overview'")
