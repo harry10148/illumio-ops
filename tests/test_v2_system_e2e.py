@@ -139,7 +139,7 @@ def _labels(page):
         "gui_retention_now", "gui_it_restart_monitor", "gui_tls_renew",
         "gui_tls_import_btn", "gui_dlq_purge_selected", "gui_sy_stop_btn",
         "gui_siem_add", "gui_siem_delete", "gui_confirm_delete",
-        "gui_tls_csr_generate", "gui_sy_discard",
+        "gui_tls_csr_generate", "gui_sy_discard", "gui_errcard_retry",
     ]
     return page.evaluate(
         "async (keys) => { const { t } = await import('/static/js/v2/core/i18n.mjs'); "
@@ -613,6 +613,143 @@ def test_destructive_confirms_render_cancel_sends_nothing(v2_page):
             page.unroute("**/*", handler)
     finally:
         _api_post(page, "/api/pce-profiles", {"action": "delete", "id": created["profile"]["id"]})
+
+
+# ═════════════════════════════ degraded telemetry keeps the controls ════════
+
+def _fail_with_503(page, pattern, message):
+    """Answer `pattern` with the real 503 shape these endpoints already use.
+
+    The failure is injected at the network boundary rather than by breaking
+    the cache DB, because the FRONTEND's degradation is what is under test:
+    GET /api/cache/{status,lag,throughput,health} really do answer 503 with
+    {"ok": false, "error": ...} whenever _get_sf() cannot open the cache
+    (src/pce_cache/web.py) — an ordinary operational condition. Everything
+    else on the page keeps talking to the real backend."""
+    def handler(route):
+        route.fulfill(
+            status=503,
+            content_type="application/json",
+            body='{"ok": false, "error": "%s"}' % message,
+        )
+    page.route(pattern, handler)
+    return handler
+
+
+def test_cache_telemetry_failure_keeps_the_configuration_panels(v2_page):
+    """Finding 3: a routine telemetry failure must not take away the controls
+    an operator needs to fix it.
+
+    Every #/system/cache snapshot used to load in one strict Promise.all, so a
+    503 from GET /api/cache/status — the cache DB being unreachable, i.e. the
+    exact condition this page exists to correct — replaced the whole mixed
+    configuration/telemetry page with an error card: no settings form, no
+    retention control, no restart banner.
+
+    RED against the pre-fix system.mjs: `.errcard` is the only thing on the
+    board and every SY-02..SY-06 assertion below fails. The panel-level
+    assertions keep it honest in the other direction too — the fix must still
+    SHOW the real failure (the server's own error text) and offer a retry,
+    not swallow the 503 into a page that looks healthy."""
+    page, base_url = v2_page
+    message = "e2e-cache-status-unavailable"
+    handler = _fail_with_503(page, "**/api/cache/status", message)
+    try:
+        _goto(page, base_url, R_CACHE, "SY-02")
+
+        # The page is NOT an error card: every configuration anchor is here.
+        assert page.locator(".board .errcard").count() == 0
+        assert {"SY-02", "SY-03", "SY-04", "SY-05", "SY-06"} - _covs(page) == set()
+        assert page.locator('input[data-field="db_path"]').count() == 1
+        assert page.get_by_role(
+            "button", name=_labels(page)["gui_retention_now"], exact=True
+        ).count() >= 1
+        # ...and the docked save row is still usable.
+        assert page.locator(".savebar").count() == 1
+
+        # The failure is reported where it happened, with the server's own
+        # text, and a real retry sits next to it.
+        stat = page.locator('section[data-cov="SY-17"]')
+        assert stat.count() == 1
+        assert message in stat.inner_text(), stat.inner_text()
+        assert stat.get_attribute("data-tone") == "crit"
+        retry = stat.get_by_role("button", name=_labels(page)["gui_errcard_retry"], exact=True)
+        assert retry.count() == 1
+    finally:
+        page.unroute("**/api/cache/status", handler)
+
+    # The retry really re-fetches: with the interception gone the panel
+    # recovers in place, without a remount (the settings form's own state is
+    # untouched — a full page remount would discard unsaved edits).
+    page.locator('input[data-field="db_path"]').fill("/e2e/unsaved-edit.db")
+    stat = page.locator('section[data-cov="SY-17"]')
+    retry = stat.get_by_role("button", name=_labels(page)["gui_errcard_retry"], exact=True)
+    retry.click()
+    # The repaint is asynchronous (a real re-fetch of all four telemetry ids),
+    # so wait for the panel to leave its failed state rather than reading it
+    # straight after the click.
+    expect(retry).to_have_count(0)
+    assert message not in stat.inner_text()
+    # The healthy content is really back — the lag strip only renders on the
+    # success branch.
+    assert stat.locator(".strip").count() == 1
+    assert page.locator('input[data-field="db_path"]').input_value() == "/e2e/unsaved-edit.db"
+
+
+def test_siem_status_failure_keeps_the_forwarder_and_destination_controls(v2_page):
+    """Finding 3, the same shape on #/system/siem: GET /api/siem/status is
+    telemetry (per-destination counters); the forwarder form and the
+    destination list are configuration. A 503 from the former must not remove
+    the latter, and the per-destination status badge must say "unknown"
+    rather than reporting healthy on counters it never received."""
+    page, base_url = v2_page
+    message = "e2e-siem-status-unavailable"
+    handler = _fail_with_503(page, "**/api/siem/status", message)
+    try:
+        _goto(page, base_url, R_SIEM, "SY-07")
+
+        assert page.locator(".board .errcard").count() == 0
+        assert {"SY-07", "SY-08", "SY-09", "SY-10"} - _covs(page) == set()
+        assert page.locator('input[data-field="dispatch_tick_seconds"]').count() == 1
+        assert page.get_by_role(
+            "button", name=_labels(page)["gui_siem_add"], exact=True
+        ).count() >= 1
+
+        strip = page.locator(".sy-siem-telemetry")
+        assert strip.count() == 1
+        assert message in strip.inner_text(), strip.inner_text()
+        assert strip.get_by_role(
+            "button", name=_labels(page)["gui_errcard_retry"], exact=True
+        ).count() == 1
+    finally:
+        page.unroute("**/api/siem/status", handler)
+
+
+def test_status_snapshot_failure_keeps_the_display_settings(v2_page):
+    """Finding 3, /api/status on #/system/display. It is the only snapshot on
+    that page that is not configuration, and its failure used to blank the
+    whole page. The language radio must fall back to the SAVED language from
+    the settings snapshot rather than defaulting to "en" — a wrong default
+    here would enter the dirty ledger and let Save switch the appliance's
+    language as a side effect of a status outage."""
+    page, base_url = v2_page
+    handler = _fail_with_503(page, "**/api/status", "e2e-status-unavailable")
+    try:
+        _goto(page, base_url, R_DISPLAY, "SY-13")
+
+        assert page.locator(".board .errcard").count() == 0
+        assert {"SY-13", "XC-05", "XC-06"} - _covs(page) == set()
+        assert page.locator('select[data-field="settings.timezone"]').count() == 1
+
+        saved = _api_get(page, "/api/settings")["settings"].get("language", "en")
+        checked = page.locator(
+            'input[type="radio"][name="sy-lang"]:checked'
+        ).get_attribute("value")
+        assert checked == saved, (checked, saved)
+        # Nothing is dirty, so nothing can be saved by accident.
+        assert page.locator(".savebar").get_attribute("data-tone") == "neutral"
+    finally:
+        page.unroute("**/api/status", handler)
 
 
 # ══════════════════════════════════ secrets must not reach the preview ══════

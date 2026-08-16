@@ -136,6 +136,23 @@
 //      mirrors reports.mjs's refreshReportsList ("the server's own listing is
 //      the only source of truth") without needing per-page incremental-repaint
 //      plumbing none of these eight simple settings pages otherwise needs.
+//  16. Snapshot loading is split into STRICT and SOFT ids (see loadAll's own
+//      comment). Each of these eight pages mixes CONFIGURATION with
+//      TELEMETRY, and the telemetry fails on ordinary operational conditions
+//      — GET /api/cache/{status,lag,throughput,health} answer 503 the moment
+//      the cache DB is unreachable (src/pce_cache/web.py's _get_sf() guard),
+//      which is precisely what an operator opens #/system/cache to fix. One
+//      strict Promise.all made that failure replace every configuration
+//      control with an error card. The telemetry ids (CACHE_SOFT, SIEM_SOFT,
+//      and `status` in PCE/SECURITY/DISPLAY/CHANNELS_SOFT) now degrade to
+//      `{_error}`; their own panel states the server's real error and offers
+//      a real retry that repaints that panel alone, so unsaved edits in the
+//      configuration panels survive. This is the resolution overview.mjs
+//      (loadOne), investigate.mjs (loadAll) and reports.mjs
+//      (loadRhc/paintRhc) already reached — reports.mjs is the shape followed
+//      here. The strict ids stay strict: cache_settings, siem_forwarder,
+//      siem_destinations, settings, security, tls_status, pce_profiles,
+//      alert_plugins and logs_index are what each page is FOR.
 
 import { el, clear, spacer } from "../core/dom.mjs";
 import { t, tf, i18n } from "../core/i18n.mjs";
@@ -356,12 +373,65 @@ function pageSpec(index, size, total) {
   return p;
 }
 
-function loadAll(ids) {
-  return Promise.all(ids.map(function (id) { return api.load(id); })).then(function (list) {
+/**
+ * loadAll(ids, soft) — `ids` keeps the strict Promise.all contract (any
+ * failure error-cards the page, because without that snapshot the page has
+ * nothing to draw), while every id ALSO listed in `soft` degrades to
+ * `{_error: "…"}` instead of rejecting.
+ *
+ * Header point 16. Each of these eight pages mixes CONFIGURATION (the
+ * settings this area exists to edit) with TELEMETRY (counters, lag, health,
+ * appliance status). Telemetry here fails on ordinary operational
+ * conditions — GET /api/cache/{status,lag,throughput,health} answer 503
+ * whenever _get_sf() cannot open the cache DB (src/pce_cache/web.py) — and a
+ * bare Promise.all made that failure replace the whole page with an error
+ * card, taking away the very controls an operator needs to fix it. Exactly
+ * the resolution areas/overview.mjs (loadOne), areas/investigate.mjs
+ * (loadAll) and areas/reports.mjs (loadRhc/paintRhc) already reached; the
+ * `_error` shape and the real-error-plus-retry rendering follow reports.mjs,
+ * which is the closest match (a named panel rather than a whole board of
+ * independent cards).
+ */
+function loadAll(ids, soft) {
+  const tolerated = soft || [];
+  return Promise.all(ids.map(function (id) {
+    const p = api.load(id);
+    if (tolerated.indexOf(id) < 0) return p;
+    return p.catch(function (e) {
+      console.error("[system] " + id + " failed to load", e);
+      return { _error: errText(e && e.data ? e.data : e) };
+    });
+  })).then(function (list) {
     const out = {};
     ids.forEach(function (id, i) { out[id] = list[i]; });
     return out;
   });
+}
+
+/** Re-fetch a set of soft ids (cache-fresh), same `_error` degradation as
+ *  loadAll's — what a degraded panel's own retry button calls. Deliberately
+ *  NOT refreshAndRemount(): a remount would discard whatever the operator has
+ *  typed into the configuration panels this fix exists to keep usable. */
+function reloadSoft(ids) {
+  return Promise.all(ids.map(function (id) {
+    return api.reload(id).catch(function (e) {
+      return { _error: errText(e && e.data ? e.data : e) };
+    });
+  })).then(function (list) {
+    const out = {};
+    ids.forEach(function (id, i) { out[id] = list[i]; });
+    return out;
+  });
+}
+
+/** The ids of `set` whose soft load failed, in order. */
+function failedSoft(d, set) {
+  return set.filter(function (id) { return d[id] && d[id]._error; });
+}
+
+/** One line naming each failed snapshot and the server's own error text. */
+function softErrorText(d, set) {
+  return failedSoft(d, set).map(function (id) { return id + ": " + d[id]._error; }).join(" · ");
 }
 
 /** Drop the cached copy of every id this route loaded, then remount from the
@@ -638,12 +708,12 @@ function payloadPanel(form, srcNote) {
   return p;
 }
 
-async function sysPage(root, ctx, route, snaps, build) {
+async function sysPage(root, ctx, route, snaps, build, soft) {
   root.appendChild(sysTop(route));
   const board = el("div", { class: "board" });
   root.appendChild(board);
   await withErrorCard(board, route + " (" + snaps.length + ")",
-    function () { return loadAll(snaps); },
+    function () { return loadAll(snaps, soft); },
     function (d) {
       if (ctx.stale()) return;
       build(board, d, root);
@@ -653,6 +723,13 @@ async function sysPage(root, ctx, route, snaps, build) {
 // ══════════════════════════════════════════════════ SY-01 / SY-18  PCE ═══════
 
 const PCE_SNAPS = ["settings", "pce_profiles", "status"];
+/* Header point 16. `status` (GET /api/status) is the appliance's live status,
+ * not configuration — and this mount reads nothing out of it (only
+ * mountDisplay does), so its failure has no business replacing the PCE
+ * profile list and connection form with an error card. Soft-loaded here (and
+ * in SECURITY/CHANNELS/DISPLAY below) rather than dropped from the list: the
+ * request is pre-existing and removing it is not this fix's business. */
+const PCE_SOFT = ["status"];
 
 /* settings.js:370-383 — the add form. addPceProfile (:753-773) posts
  * {action:'add', name, url, org_id, key, secret, verify_ssl}; the backend also
@@ -843,7 +920,7 @@ async function mountPce(root, ctx) {
     board.appendChild(payloadPanel(form, t("gui_sy_pce_payload_src")));
     host.appendChild(form.dock);
     form.sync();
-  });
+  }, PCE_SOFT);
 }
 
 /** config.py:428-431 — <field>__set / <field>__length are what the redactor
@@ -858,6 +935,14 @@ function secretState(obj, key) {
 // ══════════════════════════════════════════ SY-02…06 / SY-17  cache ══════════
 
 const CACHE_SNAPS = ["cache_settings", "cache_status", "cache_lag", "cache_throughput", "cache_health"];
+/* Header point 16: cache_settings is the CONFIGURATION this page exists to
+ * edit (SY-02/03/04/05/06, plus the docked save row) and stays strict — with
+ * no settings there is no form to draw. The other four are TELEMETRY feeding
+ * SY-17 alone, and each answers 503 the moment the cache DB is unreachable
+ * (src/pce_cache/web.py's _get_sf() guard) — the very condition an operator
+ * opens this page to fix. They degrade to `{_error}` so that failure costs
+ * SY-17 and nothing else. */
+const CACHE_SOFT = ["cache_status", "cache_lag", "cache_throughput", "cache_health"];
 
 // integrations.js:460-461 — the two fixed checkbox sets of the traffic filter.
 const TF_ACTIONS = ["blocked", "potentially_blocked", "allowed"];
@@ -909,52 +994,81 @@ async function mountCache(root, ctx) {
   await sysPage(root, ctx, R_CACHE, CACHE_SNAPS,
     function (board, d, host) {
       const s = d.cache_settings || {};
-      const st = d.cache_status || {};
-      const tp = d.cache_throughput || {};
       const tf0 = s.traffic_filter || {};
       const ts = s.traffic_sampling || {};
       const form = makeForm("PUT", "/api/cache/settings");
       installTeardown(state);
 
       // ── SY-17 status cards + lag row ─────────────────────────────────
+      /* The only telemetry on this page (CACHE_SOFT). paintStatus() is
+       * re-runnable so its own retry can repair THIS panel in place, leaving
+       * every configuration panel below — and anything already typed into
+       * them — exactly as it was. Same real-error-plus-retry shape as
+       * reports.mjs's paintRhc(). */
       const statPanel = panel("SY-17", t("gui_cache_status"));
-      const cards = el("div", { class: "kpirow" });
-      /* integrations.js:117 — only card 1 changes tone (enabled/disabled);
-       * cards 2-4 are hardcoded card-ok, so no threshold is invented here. */
-      cards.appendChild(kpiCell(t("gui_cache_status"), s.enabled ? t("gui_cache_enabled") : t("gui_cache_disabled"), null, s.enabled ? "ok" : "crit"));
-      cards.appendChild(kpiCell(t("gui_ov_events"), num(st.events), oneHour(tp.events_1h), null));
-      cards.appendChild(kpiCell(t("gui_cache_card_traffic_raw"), num(st.traffic_raw), oneHour(tp.traffic_raw_1h), null));
-      cards.appendChild(kpiCell(t("gui_cache_card_traffic_agg"), num(st.traffic_agg), oneHour(tp.traffic_agg_1h), null));
-      statPanel.body.appendChild(cards);
-      statPanel.body.appendChild(note(t("gui_sy_cache_1h_bug")));
+      function paintStatus() {
+        clear(statPanel.body);
+        const st = d.cache_status && !d.cache_status._error ? d.cache_status : {};
+        const tp = d.cache_throughput && !d.cache_throughput._error ? d.cache_throughput : {};
+        const failed = failedSoft(d, CACHE_SOFT);
+        const cards = el("div", { class: "kpirow" });
+        /* integrations.js:117 — only card 1 changes tone (enabled/disabled);
+         * cards 2-4 are hardcoded card-ok, so no threshold is invented here.
+         * Card 1 reads cache_settings (configuration), so it stays truthful
+         * even when every counter below it is unavailable. */
+        cards.appendChild(kpiCell(t("gui_cache_status"), s.enabled ? t("gui_cache_enabled") : t("gui_cache_disabled"), null, s.enabled ? "ok" : "crit"));
+        cards.appendChild(kpiCell(t("gui_ov_events"), num(st.events), oneHour(tp.events_1h), null));
+        cards.appendChild(kpiCell(t("gui_cache_card_traffic_raw"), num(st.traffic_raw), oneHour(tp.traffic_raw_1h), null));
+        cards.appendChild(kpiCell(t("gui_cache_card_traffic_agg"), num(st.traffic_agg), oneHour(tp.traffic_agg_1h), null));
+        statPanel.body.appendChild(cards);
 
-      // integrations.js:157-180 — one entry per source; last_status="error"
-      // overrides the level colour and appends ⚠, because a failed ingest still
-      // bumps last_sync_at and would otherwise read as healthy (:168-169).
-      const lag = (d.cache_lag && d.cache_lag.sources) || [];
-      const lagRow = el("div", { class: "strip", "data-tone": "info" },
-        el("span", { text: t("gui_cache_ingest_lag") }));
-      lag.forEach(function (row) {
-        const bad = row.last_status === "error";
-        const tn = bad ? "crit" : (row.level === "warning" ? "warn" : (row.level === "ok" ? "ok" : "neutral"));
-        const item = el("span", { class: "lagitem", "data-tone": tn, title: row.last_error || "" },
-          el("span", { text: row.source }),
-          el("b", { text: fmtLag(row.lag_seconds) + (bad ? " ⚠" : "") }));
-        lagRow.appendChild(item);
-      });
-      if (!lag.length) lagRow.appendChild(el("span", { text: t("gui_it_none") }));
-      statPanel.body.appendChild(lagRow);
-      statPanel.body.appendChild(note(t("gui_sy_cache_lag_note")));
-      // The capacity figures the retention and disk-free thresholds below are
-      // judged against (/api/cache/health, cache_health.json). They are the
-      // reading that makes disk_free_warn_gb a number worth setting.
-      const cap = (d.cache_health && d.cache_health.capacity) || {};
-      statPanel.body.appendChild(sectionHead(t("gui_sy_cache_capacity")));
-      statPanel.body.appendChild(kvRow(t("gui_sy_cache_db_bytes"), mib(cap.db_bytes)));
-      statPanel.body.appendChild(kvRow(t("gui_sy_cache_disk_free"), mib(cap.disk_free_bytes),
-        Number(cap.disk_free_bytes || 0) / 1073741824 < Number(s.disk_free_warn_gb || 0) ? "warn" : "ok"));
-      statPanel.body.appendChild(kvRow(t("gui_sy_cache_siem_pending"), num(cap.siem_pending),
-        Number(cap.siem_pending || 0) > Number(s.siem_pending_warn_rows || 0) ? "warn" : "ok"));
+        if (failed.length) {
+          // The failure is stated where it happened, in the server's own
+          // words, with a real retry — never hidden behind a healthy-looking
+          // zero (num(undefined) already renders "—" in the cards above).
+          statPanel.dataset.tone = "crit";
+          statPanel.body.appendChild(note(softErrorText(d, CACHE_SOFT)));
+          statPanel.body.appendChild(btn("btn primary", t("gui_errcard_retry"), function () {
+            return reloadSoft(CACHE_SOFT).then(function (fresh) {
+              if (state.torn) return;
+              Object.keys(fresh).forEach(function (k) { d[k] = fresh[k]; });
+              paintStatus();
+            });
+          }));
+          return;
+        }
+        statPanel.dataset.tone = null;
+        statPanel.body.appendChild(note(t("gui_sy_cache_1h_bug")));
+
+        // integrations.js:157-180 — one entry per source; last_status="error"
+        // overrides the level colour and appends ⚠, because a failed ingest still
+        // bumps last_sync_at and would otherwise read as healthy (:168-169).
+        const lag = (d.cache_lag && d.cache_lag.sources) || [];
+        const lagRow = el("div", { class: "strip", "data-tone": "info" },
+          el("span", { text: t("gui_cache_ingest_lag") }));
+        lag.forEach(function (row) {
+          const bad = row.last_status === "error";
+          const tn = bad ? "crit" : (row.level === "warning" ? "warn" : (row.level === "ok" ? "ok" : "neutral"));
+          const item = el("span", { class: "lagitem", "data-tone": tn, title: row.last_error || "" },
+            el("span", { text: row.source }),
+            el("b", { text: fmtLag(row.lag_seconds) + (bad ? " ⚠" : "") }));
+          lagRow.appendChild(item);
+        });
+        if (!lag.length) lagRow.appendChild(el("span", { text: t("gui_it_none") }));
+        statPanel.body.appendChild(lagRow);
+        statPanel.body.appendChild(note(t("gui_sy_cache_lag_note")));
+        // The capacity figures the retention and disk-free thresholds below are
+        // judged against (/api/cache/health, cache_health.json). They are the
+        // reading that makes disk_free_warn_gb a number worth setting.
+        const cap = (d.cache_health && d.cache_health.capacity) || {};
+        statPanel.body.appendChild(sectionHead(t("gui_sy_cache_capacity")));
+        statPanel.body.appendChild(kvRow(t("gui_sy_cache_db_bytes"), mib(cap.db_bytes)));
+        statPanel.body.appendChild(kvRow(t("gui_sy_cache_disk_free"), mib(cap.disk_free_bytes),
+          Number(cap.disk_free_bytes || 0) / 1073741824 < Number(s.disk_free_warn_gb || 0) ? "warn" : "ok"));
+        statPanel.body.appendChild(kvRow(t("gui_sy_cache_siem_pending"), num(cap.siem_pending),
+          Number(cap.siem_pending || 0) > Number(s.siem_pending_warn_rows || 0) ? "warn" : "ok"));
+      }
+      paintStatus();
       board.appendChild(statPanel);
 
       // ── SY-03 restart banner + SY-04 retention ───────────────────────
@@ -1154,7 +1268,7 @@ async function mountCache(root, ctx) {
       board.appendChild(payloadPanel(form, t("gui_sy_cache_payload_src")));
       host.appendChild(form.dock);
       form.sync();
-    });
+    }, CACHE_SOFT);
 }
 
 /** Bytes as GiB — the unit disk_free_warn_gb is expressed in. */
@@ -1180,6 +1294,12 @@ function kpiCell(k, v, d, tn) {
 // ══════════════════════════════════════════ SY-07…10  SIEM forwarder ═════════
 
 const SIEM_SNAPS = ["siem_forwarder", "siem_destinations", "siem_status", "siem_dlq"];
+/* Header point 16, same split as CACHE_SOFT: siem_forwarder and
+ * siem_destinations are the configuration (SY-07/SY-08's form, table and CRUD
+ * buttons) and stay strict; siem_status (per-destination counters) and
+ * siem_dlq (the queue's own rows) are telemetry read out of the cache DB, so
+ * they carry the same 503 as the cache endpoints do. */
+const SIEM_SOFT = ["siem_status", "siem_dlq"];
 
 // integrations.js:858 (select#md-transport) / :861 (select#md-format).
 const SIEM_TRANSPORTS = [["udp", "udp"], ["tcp", "tcp"], ["tls", "tls"], ["hec", "hec"]];
@@ -1400,34 +1520,65 @@ async function mountSiem(root, ctx) {
     function (board, d, host) {
       const fw = d.siem_forwarder || {};
       const dests = (d.siem_destinations && d.siem_destinations.destinations) || [];
-      const statuses = (d.siem_status && d.siem_status.status) || [];
+      /* byName is refilled in place by applyStatuses() so the destination
+       * table's own status cell (rendered once, below) reads whatever the
+       * latest successful siem_status load produced — including after the
+       * telemetry strip's retry. statusUnknown() is what stops a failed load
+       * from being read as "no failures recorded, therefore healthy". */
       const byName = {};
-      statuses.forEach(function (s) { byName[s.destination] = s; });
+      function statusUnknown() { return !!(d.siem_status && d.siem_status._error); }
+      function applyStatuses() {
+        Object.keys(byName).forEach(function (k) { delete byName[k]; });
+        const list = statusUnknown() ? [] : ((d.siem_status && d.siem_status.status) || []);
+        list.forEach(function (s) { byName[s.destination] = s; });
+        return list;
+      }
       const form = makeForm("PUT", "/api/siem/forwarder");
       installTeardown(state);
 
-      // KPI strip — integrations.js:607-652
-      let sent = 0;
-      let dlq = 0;
-      let sent1h = 0;
-      let failed1h = 0;
-      let latencyNum = 0;
-      let latencyDen = 0;
-      statuses.forEach(function (s) {
-        sent += Number(s.sent || 0);
-        dlq += Number(s.dlq || 0);
-        sent1h += Number(s.sent_1h || 0);
-        failed1h += Number(s.failed_1h || 0);
-        latencyNum += Number(s.avg_latency_ms || 0) * Number(s.sent_1h || 0);
-        latencyDen += Number(s.sent_1h || 0);
-      });
-      const rate1h = sent1h + failed1h > 0 ? (sent1h / (sent1h + failed1h) * 100).toFixed(1) + "%" : "—";
-      const avgMs = latencyDen > 0 ? Math.round(latencyNum / latencyDen) : null;
-      const kpis = el("div", { class: "kpirow" },
-        kpiCell(t("gui_sy_siem_sent"), num(sent), null, null),
-        kpiCell(t("gui_ov_siem_success_1h"), rate1h, null, failed1h > 0 ? "crit" : "ok"),
-        kpiCell(t("gui_ov_dlq_total"), num(dlq), null, dlq > 0 ? "warn" : null),
-        kpiCell(t("gui_ov_siem_latency"), avgMs === null ? "—" : (avgMs < 1000 ? avgMs + "ms" : (avgMs / 1000).toFixed(1) + "s"), null, null));
+      // KPI strip — integrations.js:607-652. Telemetry (SIEM_SOFT): repainted
+      // in place by its own retry, exactly like #/system/cache's SY-17.
+      const kpis = el("div", { class: "kpirow sy-siem-telemetry" });
+      function paintKpis() {
+        clear(kpis);
+        const statuses = applyStatuses();
+        if (statusUnknown()) {
+          kpis.dataset.tone = "crit";
+          kpis.appendChild(note(softErrorText(d, ["siem_status"])));
+          kpis.appendChild(btn("btn primary", t("gui_errcard_retry"), function () {
+            return reloadSoft(["siem_status"]).then(function (fresh) {
+              if (state.torn) return;
+              d.siem_status = fresh.siem_status;
+              paintKpis();
+              applyStatuses();
+              state.tableHandles.dests = table.render(destHost, buildTable(columns, dests));
+            });
+          }));
+          return;
+        }
+        kpis.dataset.tone = null;
+        let sent = 0;
+        let dlq = 0;
+        let sent1h = 0;
+        let failed1h = 0;
+        let latencyNum = 0;
+        let latencyDen = 0;
+        statuses.forEach(function (s) {
+          sent += Number(s.sent || 0);
+          dlq += Number(s.dlq || 0);
+          sent1h += Number(s.sent_1h || 0);
+          failed1h += Number(s.failed_1h || 0);
+          latencyNum += Number(s.avg_latency_ms || 0) * Number(s.sent_1h || 0);
+          latencyDen += Number(s.sent_1h || 0);
+        });
+        const rate1h = sent1h + failed1h > 0 ? (sent1h / (sent1h + failed1h) * 100).toFixed(1) + "%" : "—";
+        const avgMs = latencyDen > 0 ? Math.round(latencyNum / latencyDen) : null;
+        kpis.appendChild(kpiCell(t("gui_sy_siem_sent"), num(sent), null, null));
+        kpis.appendChild(kpiCell(t("gui_ov_siem_success_1h"), rate1h, null, failed1h > 0 ? "crit" : "ok"));
+        kpis.appendChild(kpiCell(t("gui_ov_dlq_total"), num(dlq), null, dlq > 0 ? "warn" : null));
+        kpis.appendChild(kpiCell(t("gui_ov_siem_latency"), avgMs === null ? "—" : (avgMs < 1000 ? avgMs + "ms" : (avgMs / 1000).toFixed(1) + "s"), null, null));
+      }
+      paintKpis();
       board.appendChild(kpis);
 
       // ── SY-07 forwarder ──────────────────────────────────────────────
@@ -1469,6 +1620,11 @@ async function mountSiem(root, ctx) {
         col("host", t("gui_siem_th_host"), widthCell(160)),
         col("port", t("gui_siem_th_port"), widthCell(70)),
         col("status", t("gui_siem_th_status"), widthCell(120, function (p) {
+          // An unavailable siem_status is NOT "no failures recorded": with no
+          // counters, destTone()'s `failed > 0` test is unanswerable, so the
+          // cell says unknown rather than reporting a healthy destination the
+          // page has heard nothing about.
+          if (statusUnknown()) return badge(t("gui_card_unknown"), "neutral");
           return badge(destStatusText(p, byName[p.name]), destTone(p, byName[p.name]));
         })),
         col("act", t("gui_siem_th_actions"), widthCell(200, function (p) {
@@ -1542,15 +1698,28 @@ async function mountSiem(root, ctx) {
           const needle = reason.value.toLowerCase().trim();
           if (needle) entries = entries.filter(function (e) { return String(e.last_error || "").toLowerCase().indexOf(needle) >= 0; });
           state.tableHandles.dlq = table.render(dlqHost, buildTable(dlqCols, entries));
+        }).catch(function (e) {
+          // Same source as the soft-loaded siem_dlq snapshot, same treatment:
+          // this is the DLQ's own live query, so its failure states itself
+          // here instead of rejecting into nothing.
+          if (state.torn) return;
+          paintDlqError(errText(e && e.data ? e.data : e));
         });
+      }
+
+      /** The DLQ table area, replaced by the real error and a real retry. */
+      function paintDlqError(message) {
+        clear(dlqHost);
+        dlqHost.appendChild(note(message));
+        dlqHost.appendChild(btn("btn primary", t("gui_errcard_retry"), function () { paintDlq(); }));
       }
       dlqPanel.body.appendChild(el("div", { class: "qrow" },
         el("div", { class: "qf" }, el("label", { text: t("gui_dlq_filter_dest") }), destSel),
         el("div", { class: "qf grow" }, el("label", { text: t("gui_dlq_filter_reason") }), reason),
         el("div", { class: "qf" }, el("label", { text: " " }), btn("btn", t("gui_dlq_search"), function () { paintDlq(); }))));
       dlqPanel.body.appendChild(dlqHost);
-      const initialEntries = (d.siem_dlq && d.siem_dlq.entries) || [];
-      state.tableHandles.dlq = table.render(dlqHost, buildTable(dlqCols, initialEntries));
+      if (d.siem_dlq && d.siem_dlq._error) paintDlqError(d.siem_dlq._error);
+      else state.tableHandles.dlq = table.render(dlqHost, buildTable(dlqCols, (d.siem_dlq && d.siem_dlq.entries) || []));
       /* dlqPurgeSelected (integrations.js:1245-1259) does NOT send the selected
        * ids: its body is {dest, older_than_days:0}, which purges the WHOLE
        * destination while the confirm says "Purge N entries". The impact list
@@ -1580,7 +1749,7 @@ async function mountSiem(root, ctx) {
       board.appendChild(payloadPanel(form, t("gui_sy_siem_payload_src")));
       host.appendChild(form.dock);
       form.sync();
-    });
+    }, SIEM_SOFT);
 }
 
 // ══════════════════════════════════════════════════════ SY-11  TLS ═══════════
@@ -1822,6 +1991,8 @@ async function mountTls(root, ctx) {
 // ═══════════════════════════════════════════ SY-12 / SY-16  security ═════════
 
 const SECURITY_SNAPS = ["security", "status"];
+// Header point 16 (see PCE_SOFT): `status` is telemetry this mount does not read.
+const SECURITY_SOFT = ["status"];
 
 async function mountSecurity(root, ctx) {
   const handles = {};
@@ -1919,12 +2090,16 @@ async function mountSecurity(root, ctx) {
     board.appendChild(payloadPanel(form, t("gui_sy_sec_payload_src")));
     host.appendChild(form.dock);
     form.sync();
-  });
+  }, SECURITY_SOFT);
 }
 
 // ═════════════════════════════════════ SY-13 / XC-05 / XC-06  display ════════
 
 const DISPLAY_SNAPS = ["settings", "status"];
+/* Header point 16 (see PCE_SOFT). This is the ONE mount that reads `status`
+ * (the live UI language/timezone readouts), so its degraded branch is handled
+ * explicitly below rather than just tolerated. */
+const DISPLAY_SOFT = ["status"];
 
 /* settings.js:407-436 — the timezone list, in the product's own order. `local`
  * means "use the browser's zone" and is what an unset value falls back to. */
@@ -1974,12 +2149,24 @@ async function mountDisplay(root, ctx) {
      * matter what the radio showed, so the dirty ledger could show
      * "settings.language changed" while Save silently re-saved the OLD
      * language. */
-    const currentLang = (d.status && d.status.language) === "zh_TW" ? "zh_TW" : "en";
+    /* Header point 16: `status` is soft-loaded, so it can be absent. Falling
+     * back to a literal "en" would be actively dangerous here — a wrong seed
+     * enters the dirty ledger the moment the page paints, and the next Save
+     * would switch the appliance's language as a side effect of a status
+     * outage. `st.language` is the SAVED setting the status payload derives
+     * from (dashboard.py:439), which makes it the correct fallback, not a
+     * guess. */
+    const liveStatus = d.status && !d.status._error ? d.status : null;
+    const langSource = liveStatus ? liveStatus.language : st.language;
+    const currentLang = langSource === "zh_TW" ? "zh_TW" : "en";
     const langCtl = trackedRadioGroup("sy-lang", LANG_OPTS, currentLang, null);
     localePanel.body.appendChild(labelled(t("gui_timezone"), form.track("settings.timezone", tz), t("gui_sy_disp_tz_local")));
     localePanel.body.appendChild(labelled(t("gui_language"), form.track("settings.language", langCtl), t("gui_sy_disp_lang_reload")));
-    localePanel.body.appendChild(kvRow(t("gui_sy_disp_ui_lang"), (d.status && d.status.language) || "—"));
-    localePanel.body.appendChild(kvRow(t("gui_sy_disp_ui_tz"), (d.status && d.status.timezone) || "—"));
+    localePanel.body.appendChild(kvRow(t("gui_sy_disp_ui_lang"), (liveStatus && liveStatus.language) || "—"));
+    localePanel.body.appendChild(kvRow(t("gui_sy_disp_ui_tz"), (liveStatus && liveStatus.timezone) || "—"));
+    // The two readouts above are the only thing on this page that needs the
+    // live status; state its failure rather than showing a bare em dash.
+    if (d.status && d.status._error) localePanel.body.appendChild(note(softErrorText(d, DISPLAY_SOFT)));
     board.appendChild(el("div", { class: "brow c2" }, skinPanel, localePanel));
 
     // ── SY-13 the rest of the display section ────────────────────────
@@ -2034,12 +2221,14 @@ async function mountDisplay(root, ctx) {
     board.appendChild(payloadPanel(form, t("gui_sy_disp_payload_src")));
     host.appendChild(form.dock);
     form.sync();
-  });
+  }, DISPLAY_SOFT);
 }
 
 // ═══════════════════════════════════════════════ SY-14  alert channels ═══════
 
 const CHANNELS_SNAPS = ["alert_plugins", "settings", "status"];
+// Header point 16 (see PCE_SOFT): `status` is telemetry this mount does not read.
+const CHANNELS_SOFT = ["status"];
 
 /* _renderPluginField, settings.js:180-226. input_type drives the control;
  * value_type drives the coercion at collect time (:274-287). A `secret` field
@@ -2188,7 +2377,7 @@ async function mountChannels(root, ctx) {
     board.appendChild(payloadPanel(form, t("gui_sy_ch_payload_src")));
     host.appendChild(form.dock);
     form.sync();
-  });
+  }, CHANNELS_SOFT);
 }
 
 // ══════════════════════════════════════════════════ SY-15  module logs ═══════
