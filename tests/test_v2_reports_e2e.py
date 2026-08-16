@@ -69,11 +69,18 @@ backend before writing this file:
       them for real on every visit).
   GET  /api/reports/jobs/<id> — called for real against a real (nonexistent)
       job id (404 path only); never against a real, still-running job.
-  POST /api/reports/generate, /api/rule_hit_count/enable, POST/DELETE
-      /api/reports/bulk-delete — never called for real in this file. The
-      polling test intercepts /api/reports/generate at the network boundary
-      (page.route) precisely so it never reaches the real backend — see that
-      test's own docstring.
+  POST /api/reports/generate, /api/rule_hit_count/enable — never reach the
+      real backend. The polling test intercepts /api/reports/generate at the
+      network boundary (page.route) precisely so it never runs; the
+      rule-hit-count enable path is exercised the same way, for its payload
+      and the panel's repaint only (enabling rule-hit counting really does
+      mutate the connected PCE's configuration). Both tests' own docstrings
+      state what they do and do not prove.
+  POST /api/reports/bulk-delete — called FOR REAL, exactly once, and only
+      ever against the three fixture files this file's own
+      v2_reports_dir_app fixture wrote into a private tmp_path output
+      directory. Nothing outside that directory is reachable, and it dies
+      with the test (test_bulk_delete_really_removes_the_selected_files).
 """
 from __future__ import annotations
 
@@ -85,6 +92,8 @@ from datetime import datetime, timedelta, timezone
 import pytest
 
 pytest.importorskip("playwright.sync_api", exc_type=ImportError)
+
+from playwright.sync_api import expect  # noqa: E402
 
 # Registers v2_page and its fixture chain — see tests/v2_e2e_utils.py's
 # docstring for why both this line and the importorskip above (in that exact
@@ -392,6 +401,68 @@ def test_async_job_polling_stops_on_navigation_away(v2_page):
     page.unroute("**/api/reports/jobs/**", handle_job_status)
 
 
+def test_rule_hit_count_enable_sends_lang_and_repaints_from_a_stubbed_success(v2_page):
+    """RP-05's enable path, which no test had ever invoked.
+
+    WHAT THIS PROVES: the confirm's OK really issues POST
+    /api/rule_hit_count/enable carrying the area's report language, and a 200
+    makes the panel RE-READ /api/rule_hit_count/enablement and repaint itself
+    from that response (rather than assuming the new state or leaving the
+    stale one on screen).
+
+    WHAT THIS DOES NOT PROVE: anything about the PCE. Both the POST and the
+    enablement GET are fulfilled at the network boundary, so reports.py never
+    runs and no PCE-side reporting setting is changed — enabling rule-hit
+    counting really does mutate the connected PCE's configuration, so it stays
+    on this file's never-for-real list. The two response shapes used here are
+    the ones the real endpoints document; nothing here asserts they are
+    correct.
+    """
+    page, base_url = v2_page
+    enablement_state = {"value": "disabled"}
+    posted: list[dict] = []
+
+    def enablement(route):
+        route.fulfill(status=200, content_type="application/json", body=json.dumps({
+            "ok": True,
+            "state": enablement_state["value"],
+            "pce_report_enabled": enablement_state["value"] == "enabled",
+            "ven_scopes_enabled": enablement_state["value"] == "enabled",
+            "detail": "e2e-rhc-%s" % enablement_state["value"],
+        }))
+
+    def enable(route):
+        posted.append(route.request.post_data_json)
+        enablement_state["value"] = "enabled"
+        route.fulfill(status=200, content_type="application/json", body=json.dumps({"ok": True}))
+
+    page.route("**/api/rule_hit_count/enablement", enablement)
+    page.route("**/api/rule_hit_count/enable", enable)
+    try:
+        _goto(page, base_url, ROUTE, "RP-05")
+        panel = page.locator('section[data-cov="RP-05"]')
+        # The stub puts the panel in its real "disabled" rendering, which is
+        # the only state that offers the enable control.
+        assert panel.locator("li .c").first.inner_text() == "disabled"
+
+        lang = page.locator('select[data-field="lang"]').input_value()
+        panel.locator("button.btn.danger").click()
+        modal = page.locator('div.modal[role="dialog"]')
+        modal.wait_for(state="visible")
+        modal.locator("button.btn.danger").click()
+
+        page.wait_for_function(
+            "() => document.querySelector('section[data-cov=RP-05] li .c')"
+            ".textContent === 'enabled'",
+            timeout=SLOW,
+        )
+        assert posted == [{"lang": lang}], posted
+        assert "e2e-rhc-enabled" in panel.inner_text()
+    finally:
+        page.unroute("**/api/rule_hit_count/enable", enable)
+        page.unroute("**/api/rule_hit_count/enablement", enablement)
+
+
 # ── the traffic-family filename disambiguation ──────────────────────────────
 #
 # RESTORED GUARD (Task 11 review, Important 1). The legacy owner of this
@@ -502,6 +573,63 @@ def test_traffic_family_is_split_by_filename_not_by_the_sidecar(v2_reports_dir_p
     # The bare dated file is the newest of the three (mtime ...300), so the
     # traffic card must hold the latest of the three stamps.
     assert stamps["traffic"] == max(stamps.values()), stamps
+
+
+def test_bulk_delete_really_removes_the_selected_files(v2_reports_dir_page):
+    """RP-06/RP-07's bulk delete, end to end against the real backend — no
+    interception anywhere in this test.
+
+    Safe to run for real because every file it deletes is one this test's own
+    fixture created, in a private tmp_path output directory
+    (v2_reports_dir_app): nothing outside the fixture can be reached, and the
+    directory dies with the test.
+
+    WHAT THIS PROVES: selecting rows really fills the bulk bar, its confirm's
+    OK really issues ONE POST /api/reports/bulk-delete carrying every selected
+    filename, the real handler really removes the real files (they stop being
+    servable), and the UI really re-reads the list from the server afterwards
+    instead of patching rows out locally.
+    """
+    page, base_url = v2_reports_dir_page
+    _goto(page, base_url, ROUTE, "RP-06")
+
+    names = [name for name, _rtype, _mtime in TRAFFIC_FAMILY_FILES]
+    for name in names:
+        # Each file really is servable before the delete — otherwise the
+        # 404 assertions below would prove nothing.
+        assert page.request.get(base_url + "/reports/" + name).status == 200, name
+
+    rows = page.locator('section[data-cov="RP-06"] table.tbl tbody tr')
+    expect(rows).to_have_count(len(names))
+    boxes = page.locator('section[data-cov="RP-06"] table.tbl tbody input[type="checkbox"]')
+    for i in range(boxes.count()):
+        boxes.nth(i).check()
+
+    bar = page.locator(".floatbar")
+    bar.wait_for(state="visible")
+    assert bar.locator("b").inner_text() == str(len(names))
+
+    with page.expect_response(
+        lambda r: r.url.endswith("/api/reports/bulk-delete") and r.request.method == "POST"
+    ) as info:
+        bar.locator("button.btn.danger").click()
+        modal = page.locator('div.modal[role="dialog"]')
+        modal.wait_for(state="visible")
+        modal.locator("button.btn.danger").click()
+
+    body = info.value.json()
+    assert body.get("ok") is True, body
+    assert body.get("deleted") == len(names), body
+    assert not (body.get("errors") or []), body
+    sent = info.value.request.post_data_json
+    assert sorted(sent["filenames"]) == sorted(names), sent
+
+    # Both halves: the files really left disk, and the real refreshed list
+    # really no longer shows them (a local-only row removal would still pass
+    # the second check on its own — hence the first).
+    for name in names:
+        assert page.request.get(base_url + "/reports/" + name).status == 404, name
+    expect(page.locator('section[data-cov="RP-06"] table.tbl tbody tr')).to_have_count(0)
 
 
 def test_specific_traffic_prefixes_are_matched_before_the_bare_dated_one(v2_reports_dir_page):

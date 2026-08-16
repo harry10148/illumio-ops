@@ -36,7 +36,12 @@ Exactly what each destructive endpoint sees:
   POST /api/cache/backfill       — called once with no start date, so
       pce_cache/web.py:57-58 answers 400 "missing since" before any PCE call
       and before touching the cache DB.
-  POST /api/quarantine/bulk_apply — never called by this file.
+  POST /api/quarantine/bulk_apply — never reaches the backend. Exercised for
+      its payload and the UI's success reaction ONLY, against a success
+      response fulfilled at the network boundary (page.route), so actions.py
+      never runs and no workload is quarantined —
+      test_bulk_quarantine_sends_the_right_payload_and_reacts_to_a_stubbed_success,
+      whose docstring states exactly what it does and does not prove.
 
 ## The deterministic seams in this file, and why
 
@@ -119,7 +124,7 @@ def _labels(page):
         "gui_save", "gui_confirm", "gui_btn_isolate", "gui_lift_quarantine",
         "gui_accel_modal_title", "gui_q_title", "gui_category", "gui_ev_type_group",
         "gui_event_type", "gui_refresh", "gui_load_more", "gui_search",
-        "gui_accel_bulk_btn",
+        "gui_accel_bulk_btn", "gui_q_apply",
     ]
     return page.evaluate(
         "async (keys) => { const { t } = await import('/static/js/v2/core/i18n.mjs'); "
@@ -594,6 +599,86 @@ def test_backfill_submission_is_rejected_by_backend_validation(v2_page):
 
     page.wait_for_selector('.toast[data-tone="crit"]')
     assert drawer.count() == 1
+
+
+# ── successful write paths, asserted at the service boundary ────────────────
+
+def test_bulk_quarantine_sends_the_right_payload_and_reacts_to_a_stubbed_success(v2_page):
+    """IV-10's bulk quarantine, the one write path in this area no test had
+    ever exercised at all (it was neither called nor stubbed).
+
+    WHAT THIS PROVES: with two workloads selected, the drawer's Save ->
+    confirm -> OK chain really issues POST /api/quarantine/bulk_apply with
+    exactly {hrefs: [both selected], level: "Mild"} — the many-target route,
+    not the single-target one — and the UI reacts to a 200 success by
+    reporting the applied count and refreshing the workload list from the
+    server (the stale list is not patched locally).
+
+    WHAT THIS DOES NOT PROVE: nothing about the backend. The POST is
+    fulfilled at the network boundary, so actions.py's bulk_apply never runs,
+    no PCE is contacted and no workload is quarantined anywhere — this is the
+    destructive-operation discipline in this file's module docstring, kept
+    intact. The response shape used here is transcribed from actions.py's
+    documented contract ({ok, results:{success, failed[], skipped_invalid}}),
+    not invented, but that contract is asserted nowhere here.
+    """
+    page, base_url = v2_page
+    href_a = "/orgs/1/workloads/e2e-bulk-a-0000"
+    href_b = "/orgs/1/workloads/e2e-bulk-b-0000"
+    list_calls: list[str] = []
+    _stub_workload_list(page, [
+        _fake_workload(href=href_a, name="e2e-bulk-a"),
+        _fake_workload(href=href_b, name="e2e-bulk-b"),
+    ], calls=list_calls)
+
+    posted: list[dict] = []
+
+    def bulk(route):
+        posted.append(route.request.post_data_json)
+        route.fulfill(
+            status=200,
+            content_type="application/json",
+            body=json.dumps({"ok": True, "results": {"success": 2, "failed": [], "skipped_invalid": 0}}),
+        )
+
+    page.route("**/api/quarantine/bulk_apply", bulk)
+    try:
+        _goto(page, base_url, R_WORKLOADS)
+        labels = _labels(page)
+        page.locator('section[data-cov="IV-08"]').get_by_role(
+            "button", name=labels["gui_find"], exact=True
+        ).click()
+        page.locator('input[type="checkbox"][aria-label="e2e-bulk-a"]').check()
+        page.locator('input[type="checkbox"][aria-label="e2e-bulk-b"]').check()
+        searches_before = len(list_calls)
+
+        page.locator(".floatbar").get_by_role(
+            "button", name=labels["gui_q_apply"], exact=True
+        ).click()
+        drawer = page.locator("aside.drawer")
+        drawer.wait_for(state="visible")
+        assert drawer.locator('[data-cov="IV-10"]').count() == 1
+
+        drawer.locator(".drawer-f button.btn.primary").click()
+        confirm = page.locator(".modal")
+        confirm.wait_for(state="visible")
+        assert confirm.locator("ul.impact li").count() >= 2
+        confirm.get_by_role("button", name=labels["gui_confirm"], exact=True).click()
+
+        page.wait_for_function("() => document.querySelectorAll('.toast[data-tone=warn]').length >= 1")
+        assert posted == [{"hrefs": [href_a, href_b], "level": "Mild"}], posted
+        # The success reaction: the applied count is reported...
+        assert any("2" in text for text in page.locator('.toast[data-tone="warn"]').all_inner_texts())
+        # ...and the list is re-read from the server rather than patched.
+        # onQuarantined() -> runSearch() issues a fresh GET /api/workloads;
+        # deleting that call from the success path turns this red.
+        for _ in range(100):
+            if len(list_calls) > searches_before:
+                break
+            page.wait_for_timeout(100)
+        assert len(list_calls) > searches_before, list_calls
+    finally:
+        page.unroute("**/api/quarantine/bulk_apply", bulk)
 
 
 # ── S2 teardown ─────────────────────────────────────────────────────────────

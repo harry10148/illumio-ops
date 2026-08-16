@@ -5,11 +5,23 @@ AL-01..AL-14 anchor, traffic-rule CRUD, the real rule highlight and rule-test
 requests, the debug round-trip, backend error rendering, confirmation-only
 paths for destructive operations, and teardown of both alerting sub-routes.
 
+Destructive-operation discipline: AL-11 (reset watermark) and AL-12 (load
+best practices) really mutate alert state and monitoring rules, so their
+Confirm is never allowed to reach the backend. Both are covered twice: once
+Cancel-only against the real app
+(test_backend_error_and_confirmation_paths_do_not_fire_destructive_calls),
+and once through Confirm against a success response fulfilled at the network
+boundary (the two *_confirm_ok_* tests), which proves the request the UI
+builds and how it renders success — and nothing about what the handler would
+have done. Each of those tests says so in its own docstring.
+
 The sandbox used by the implementation worker cannot launch Chromium or open
 the live test server.  The file is still collected here so the Claude worker
 can run it in the browser-capable environment and provide RED/GREEN evidence.
 """
 from __future__ import annotations
+
+import json
 
 import pytest
 
@@ -281,6 +293,91 @@ def test_backend_error_and_confirmation_paths_do_not_fire_destructive_calls(v2_p
         # The e2e never clicks Confirm for these destructive endpoints.
         modal.get_by_role("button", name=labels["gui_cancel"], exact=True).click()
         page.wait_for_selector(".modal", state="detached")
+
+
+def _stub_ok(page, pattern, body):
+    """Fulfil `pattern` with a success response at the network boundary."""
+    posted: list[dict] = []
+
+    def handler(route):
+        posted.append(route.request.post_data_json)
+        route.fulfill(status=200, content_type="application/json", body=json.dumps(body))
+
+    page.route(pattern, handler)
+    return posted, handler
+
+
+def test_reset_watermark_confirm_ok_sends_the_call_and_prints_the_stubbed_result(v2_page):
+    """AL-11's OK path, which every existing test cancels out of.
+
+    WHAT THIS PROVES: clicking Confirm really issues POST
+    /api/actions/reset-watermark (an empty JSON body — the route takes none),
+    and AL-13's console reacts to a 200 by printing the request line and the
+    backend's own `output` string.
+
+    WHAT THIS DOES NOT PROVE: anything about resetting a watermark. The POST
+    is fulfilled at the network boundary, so actions.py never runs and no
+    alert state, cooldown or event watermark is touched anywhere — this file's
+    destructive-operation discipline is unchanged. Only the frontend's
+    request-building and its rendering of a success are under test."""
+    page, base_url = v2_page
+    _goto(page, base_url, R_OPS)
+    labels = _labels(page)
+    posted, handler = _stub_ok(page, "**/api/actions/reset-watermark",
+                               {"ok": True, "output": "e2e-watermark-reset-output"})
+    try:
+        panel = page.locator('section[data-cov="AL-11"]')
+        panel.get_by_role("button", name=labels["gui_reset_watermark_label"], exact=True).click()
+        modal = page.locator(".modal")
+        modal.wait_for(state="visible")
+        modal.get_by_role("button", name=labels["gui_confirm"], exact=True).click()
+
+        console = page.locator('[data-cov="AL-13"] pre.console')
+        page.wait_for_function(
+            "() => document.querySelector('[data-cov=AL-13] pre.console')"
+            ".textContent.includes('e2e-watermark-reset-output')",
+            timeout=SLOW,
+        )
+        assert posted == [{}], posted
+        assert "/api/actions/reset-watermark" in console.inner_text()
+    finally:
+        page.unroute("**/api/actions/reset-watermark", handler)
+
+
+def test_best_practices_confirm_ok_sends_the_selected_mode_and_prints_the_stubbed_result(v2_page):
+    """AL-12's OK path, also only ever cancelled until now.
+
+    WHAT THIS PROVES: the mode radio really reaches the request — the
+    non-default `replace` is selected here, so a build that hardcoded
+    append_missing (or dropped the body entirely) goes red — and AL-13's
+    console renders the backend's `output` on success.
+
+    WHAT THIS DOES NOT PROVE: anything about the rules that would be written.
+    The POST is fulfilled at the network boundary; config.py's
+    apply_best_practices never runs and no monitoring rule is created,
+    replaced or backed up."""
+    page, base_url = v2_page
+    _goto(page, base_url, R_OPS)
+    labels = _labels(page)
+    posted, handler = _stub_ok(page, "**/api/actions/best-practices",
+                               {"ok": True, "output": "e2e-best-practices-output"})
+    try:
+        panel = page.locator('section[data-cov="AL-12"]')
+        panel.locator('input[type="radio"][name="al-bp-mode"][value="replace"]').check()
+        panel.get_by_role("button", name=labels["gui_load"], exact=True).click()
+        modal = page.locator(".modal")
+        modal.wait_for(state="visible")
+        assert modal.locator("ul.impact li").count() >= 1
+        modal.get_by_role("button", name=labels["gui_confirm"], exact=True).click()
+
+        page.wait_for_function(
+            "() => document.querySelector('[data-cov=AL-13] pre.console')"
+            ".textContent.includes('e2e-best-practices-output')",
+            timeout=SLOW,
+        )
+        assert posted == [{"mode": "replace"}], posted
+    finally:
+        page.unroute("**/api/actions/best-practices", handler)
 
 
 def test_teardown_closes_surfaces_clears_callbacks_and_palette(v2_page):
