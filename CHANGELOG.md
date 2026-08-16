@@ -9,7 +9,41 @@ a plain `<major>.<minor>.<patch>` scheme. (Tags through v4.0.0 carried a
 
 ## [Unreleased]
 
+### Changed
+
+- **GUI redesign v2, phase 2A — the web interface is rebuilt.** The eight-tab
+  layout is replaced by six areas (overview, investigate, alerting, automation,
+  reports, system) reached through a hash router, with 18 routes in total. The
+  frontend is now ES modules under `src/static/js/v2/` with no build step, a
+  design-token stylesheet, a command palette, and a light/dark theme that
+  applies immediately instead of on the next page load. Every legacy page
+  script (`dashboard.js`, `settings.js`, `integrations.js`, `rule-scheduler.js`,
+  `actions.js`, `alerts.js`) and the old `index.html` are deleted.
+  The agreed version number for the release that ships this is 5.0.0; the
+  string in `src/__init__.py` is bumped when the release is actually cut,
+  not here, because phases 2B-2E are still ahead of it and the user guide
+  still describes the eight-tab GUI.
+- Coverage of the redesign is enforced by `tools/gate_coverage_live.py`, which
+  drives a running instance (local or a deployed appliance, with `--base-url`)
+  and requires all 102 `data-cov` anchors to be present.
+
 ### Fixed
+
+- Operator-facing copy no longer carries the design prototype's reviewer notes.
+  The v2 areas were ported from a mockup whose strings documented their own
+  provenance — source file and line citations (`rules.py:515-525`), comparisons
+  between the prototype and the previous interface, and `DESIGN-ADDED` markers —
+  and those strings shipped verbatim into the production dictionaries. All three
+  gates were green throughout, because the strings were structurally legal i18n;
+  the defect was only visible by looking at the deployed screens. A guard test
+  with an empty allowlist now rejects the whole class.
+- The live-appliance end-to-end test waited, after submitting the login form,
+  for a condition the login page already satisfied, so it raced the login POST
+  and failed on the page it never left. It now waits for the redirect.
+- The v2 end-to-end harness provisions its own writable database location
+  instead of depending on one that happened to exist on a developer machine,
+  and `tests/conftest.py` no longer imports `src.*` at module scope, which
+  worked under `python -m pytest` locally but not under CI's bare `pytest`.
 
 - Frontend review remediation (2026-07-24 audit, all JS modules + SPA shell +
   CSS): 32 verified findings plus 7 defensive follow-ups. Correctness/silent
