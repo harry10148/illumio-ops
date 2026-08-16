@@ -209,6 +209,52 @@ def test_job_status_endpoint_is_real_for_unknown_job(v2_page):
     assert body.get("error")
 
 
+def test_postform_recovers_from_a_stale_csrf_token(v2_page):
+    """Task 8 review, Important finding: reports.mjs's CSV-source generate
+    sends its multipart body through api.mjs's `api.postForm()`, which must
+    share `rawRequest()`'s real CSRF-refresh-and-retry — the same recovery
+    every post()/put()/del() write in the app already gets. The first cut of
+    postForm() was a hand-rolled duplicate with NO retry: a stale token was a
+    dead end (an opaque `{ok:false, error:"Bad Request"}` the operator could
+    not recover from short of reloading).
+
+    Proven directly against api.mjs (not through the UI's file-input widget,
+    which would only add Playwright mechanics without changing what's being
+    tested): deliberately corrupt the page's CSRF token, then call
+    api.postForm() against the real rule_hit_count CSV endpoint. A CSV with
+    a header row and no data rows is real, cheap, and produces no artifact —
+    reports.py's generate_from_csv path never reaches gen.export() (so never
+    writes a file) whether it answers a clean "no data" or a caught internal
+    error; either way this test only cares that the REQUEST recovered from
+    the stale token and reached the real backend for real, not that the
+    business logic succeeded.
+    """
+    page, base_url = v2_page
+    _goto(page, base_url, ROUTE, "RP-01")
+
+    page.evaluate(
+        "document.querySelector('meta[name=\"csrf-token\"]').setAttribute('content', 'e2e-stale-token')"
+    )
+
+    result = page.evaluate(
+        "async () => {"
+        "  const { api } = await import('/static/js/v2/core/api.mjs');"
+        "  const fd = new FormData();"
+        "  fd.append('source', 'csv');"
+        "  fd.append('format', 'html');"
+        "  fd.append('lang', 'en');"
+        "  fd.append('file', new File(['col_a,col_b\\n'], 'e2e-stale-token.csv', {type: 'text/csv'}));"
+        "  return api.postForm('/api/rule_hit_count_report/generate', fd);"
+        "}"
+    )
+    assert result is not None
+    # B1: this is exactly what the pre-fix duplicate returned verbatim — the
+    # server's real 400 {code:"csrf_error", ...} body, un-retried. A retry
+    # that actually ran lands on a real (non-CSRF) answer instead.
+    assert result.get("code") != "csrf_error", result
+    assert "ok" in result, result
+
+
 def test_generate_audit_report_progress_complete_list_delete(v2_page, monkeypatch):
     _patch_audit_events(monkeypatch)
     page, base_url = v2_page

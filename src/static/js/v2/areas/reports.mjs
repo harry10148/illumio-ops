@@ -107,6 +107,16 @@
 //      (same degrade investigate.mjs's prefetchFilterCorpus already ships).
 //      Neither failure can hide report generation, the output list, or any
 //      of the other seven RP-* panels.
+//  13. CSV-source generation (toFormData/runGenerate) sends its
+//      multipart/form-data body through `api.postForm()` — post()'s sibling
+//      for the one request shape it cannot express, added to core/api.mjs
+//      alongside this task. First cut here duplicated api.mjs's fetch+CSRF
+//      logic by hand with no refresh-and-retry on a stale token (Task 8
+//      review, Important finding: every other write in the app recovers
+//      from that automatically, this one silently failed instead). Fixed by
+//      moving the shared logic into api.mjs's own rawRequest() once, not by
+//      re-copying it here.
+
 
 import { el, clear } from "../core/dom.mjs";
 import { t, tf } from "../core/i18n.mjs";
@@ -742,7 +752,7 @@ function runGenerate(rt, source, body, file, hooks) {
       if (!settled && liveProgress === p) p.step(1);
     }, 3000);
   }
-  const req = file ? postForm(rt.endpoint, toFormData(body, file)) : api.post(rt.endpoint, body);
+  const req = file ? api.postForm(rt.endpoint, toFormData(body, file)) : api.post(rt.endpoint, body);
   req.then(function (res) {
     settled = true;
     if (analysingTimer) window.clearTimeout(analysingTimer);
@@ -871,8 +881,9 @@ function settleGenerate(rt, res, p, hooks) {
 
 /** Builds the multipart body for a CSV-source generate from the same `b` that
  * repaint() built for the JSON path — same key set, `file` swapped for the
- * real Blob. api.mjs's post() only sends JSON (see its own header), so CSV
- * upload cannot go through it. */
+ * real Blob. Sent through api.postForm() (header, point 13): api.mjs's
+ * post() only sends JSON, so CSV upload needs the multipart sibling —
+ * same CSRF-refresh-and-retry as every other write in this app. */
 function toFormData(b, file) {
   const fd = new FormData();
   Object.keys(b || {}).forEach(function (k) {
@@ -883,22 +894,6 @@ function toFormData(b, file) {
   });
   fd.append("file", file);
   return fd;
-}
-
-/** postForm(path, formData) -> Promise<parsed body>. A narrow copy of
- * api.mjs's mutate()'s CSRF-header + never-throws contract for the one
- * request shape it does not support (multipart). No CSRF-refresh retry
- * (rawRequest's) — acceptable: CSV upload is not this area's e2e path, per
- * the task's destructive-operation discipline (the tested flow generates the
- * small `audit` type only, which never takes this branch). */
-function postForm(path, formData) {
-  const meta = document.querySelector('meta[name="csrf-token"]');
-  const headers = meta ? { "X-CSRF-Token": meta.getAttribute("content") } : {};
-  return fetch(path, { method: "POST", headers: headers, body: formData })
-    .then(function (res) {
-      return res.json().catch(function () { return { ok: false, error: res.statusText || ("HTTP " + res.status) }; });
-    })
-    .catch(function (e) { return { ok: false, error: String((e && e.message) || e) }; });
 }
 
 // ══════════════════════════════════════════════════════════ mount ════════════

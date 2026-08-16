@@ -30,10 +30,12 @@
 //   - load(id) mirrors store.mjs: throws on a non-2xx response, so callers
 //     written against the mockup's error-card retry pattern (`catch(e) {...
 //     onRetry }`) keep working unchanged.
-//   - post/del mirror utils.js's api(): never throw, always resolve with the
-//     parsed JSON body (typically `{ok: true|false, ...}`), leaving the
-//     ok/error check to the caller — exactly how every existing production
-//     JS file already treats them.
+//   - post/put/del/postForm mirror utils.js's api(): never throw, always
+//     resolve with the parsed JSON body (typically `{ok: true|false, ...}`),
+//     leaving the ok/error check to the caller — exactly how every existing
+//     production JS file already treats them. postForm(path, formData) is
+//     post()'s multipart/form-data sibling (added for reports.mjs's CSV
+//     upload path) — same CSRF-refresh-and-retry, via the same rawRequest().
 
 import { GET_MAP } from "./store-map.mjs";
 
@@ -168,6 +170,23 @@ export const api = {
   /** del(path) -> Promise<any parsed body>. Same contract as post(). */
   del(path) {
     return mutate("DELETE", path, undefined);
+  },
+
+  /**
+   * postForm(path, formData) -> Promise<any parsed body>. Same contract as
+   * post() (never throws, resolves with the parsed body) and the SAME
+   * CSRF-refresh-and-retry + 423 redirect as every other write here — it
+   * calls rawRequest() directly rather than mutate(), skipping only the
+   * JSON.stringify step mutate() does (a FormData body must reach fetch()
+   * as-is: the browser sets its own multipart Content-Type/boundary, and
+   * JSON.stringify would corrupt a File). This is for the one request shape
+   * post()/put() cannot express — multipart/form-data (CSV-source report
+   * generation) — added after a review flagged that a hand-rolled duplicate
+   * of this fetch+CSRF logic in reports.mjs had no retry-on-stale-token path
+   * at all (Task 8 review, Important finding).
+   */
+  postForm(path, formData) {
+    return rawRequest(path, { method: "POST", body: formData }).then(function (r) { return r.data; });
   },
 
   /** Drop a cached load() entry without refetching. */
