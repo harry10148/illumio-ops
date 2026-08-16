@@ -353,6 +353,75 @@ def test_sign_out_ends_the_session_for_real(v2_context, v2_server):
         page.close()
 
 
+def test_sign_out_survives_a_csrf_token_refresh_before_submit(v2_context, v2_server):
+    """Finding 2 (security): sign-out must not silently fail after the app's
+    CSRF token moves on.
+
+    The form used to snapshot the token into its hidden field when the user
+    menu was BUILT. core/api.mjs refreshes that token whenever the server
+    rejects one (rawRequest()'s csrf_error refresh-and-retry), so the form
+    could be left carrying a value the server no longer accepts. POST /logout
+    then answers a JSON 400 — src/gui/__init__.py's CSRFError handler treats
+    /logout like /api/*, so there is no redirect and no flash — and
+    `logout_user()`/`session.clear()` NEVER RUN. The operator sees a JSON blob
+    (or, with the menu closing over it, nothing at all) and believes they have
+    signed out while the session is still live.
+
+    Reproduced the way the real failure arrives — the hidden field holding a
+    token the server rejects while api.mjs's own token is current:
+
+      1. the page's meta token is corrupted (the state a tab left open across
+         a server restart, or any token the server has stopped accepting, is
+         in);
+      2. the user menu is opened, so the form snapshots THAT value;
+      3. a real api.post() runs and drives api.mjs's genuine
+         refresh-and-retry, which repairs the meta tag — and only the meta tag.
+
+    The POST chosen for step 3 is a DLQ replay against a destination name no
+    configuration contains, so the request is real (it must be, or api.mjs's
+    refresh path never runs) and its effect is a proven no-op: {requeued: 0}.
+
+    What goes red without the fix: step 5's assertion that the browser reached
+    /login, and step 6's — the session is still alive and /api/status still
+    serves. Its own context, so a dead session cannot affect other tests.
+    """
+    v2_login(v2_context, v2_server)
+    page = v2_context.new_page()
+    page.set_default_timeout(10_000)
+    try:
+        _boot(page, v2_server)
+
+        page.evaluate(
+            "document.querySelector('meta[name=\"csrf-token\"]')"
+            ".setAttribute('content', 'e2e-stale-logout-token')"
+        )
+        page.click(".userchip")
+        page.wait_for_selector(".usermenu-pop")
+        stale = page.locator('[data-cov="LG-03"] input[name="csrf_token"]').input_value()
+        assert stale == "e2e-stale-logout-token", stale
+
+        replayed = page.evaluate(
+            "async () => { const { api } = await import('/static/js/v2/core/api.mjs'); "
+            "return api.post('/api/siem/dlq/replay', "
+            "{dest: 'e2e-shell-no-such-dest', limit: 1}); }"
+        )
+        assert replayed == {"status": "ok", "requeued": 0}, replayed
+        # api.mjs really did refresh: the meta tag no longer holds the corrupt
+        # value. Without this the test could pass for the wrong reason.
+        assert page.evaluate(
+            "document.querySelector('meta[name=\"csrf-token\"]').getAttribute('content')"
+        ) != "e2e-stale-logout-token"
+
+        page.click('[data-cov="LG-03"] button[type="submit"]')
+        page.wait_for_url(v2_server + "/login")
+        assert page.locator("#login-root").count() == 1
+
+        resp = v2_context.request.get(v2_server + "/api/status")
+        assert resp.status == 401, resp.text()
+    finally:
+        page.close()
+
+
 def test_sign_out_button_carries_the_real_product_label(v2_page):
     """C1: the control is localized through the catalogue, not hardcoded."""
     page, base_url = v2_page

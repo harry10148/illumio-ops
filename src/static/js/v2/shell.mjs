@@ -15,15 +15,17 @@
 //      not a fetch(): src/gui/routes/auth.py's logout() answers with a 302
 //      to /login, which a normal form submit follows and an XHR would not.
 //      The hidden csrf_token field is what flask-wtf's CSRFProtect reads for
-//      a form post (WTF_CSRF_FIELD_NAME default); its value comes from the
-//      same meta[name=csrf-token] tag core/api.mjs uses as its own token
-//      source, so both paths stay on one token.
+//      a form post (WTF_CSRF_FIELD_NAME default); it is filled at submit
+//      time from core/api.mjs's own token refresh (api.csrf()), so the form
+//      and every XHR write stay on ONE token even after api.mjs refreshes it
+//      mid-session — see signOutForm() below for what a stale field costs.
 //   3. The mockup's own header comment called the rail host "the chrome";
 //      here the health rail is still owned by app.mjs (it attaches/detaches
 //      per route) — this module only creates the host element.
 
 import { el, dismissible } from "./core/dom.mjs";
 import { t } from "./core/i18n.mjs";
+import { api } from "./core/api.mjs";
 import { router } from "./core/router.mjs";
 import { theme, density, onDisplayChange } from "./core/theme.mjs";
 import { palette } from "./components/palette.mjs";
@@ -79,12 +81,35 @@ function segmented(labelText, options, get, set) {
 /**
  * The real sign-out control (LG-03). See this file's header note 2 for why
  * this is a form submit rather than an api.post().
+ *
+ * The hidden field is filled at SUBMIT time, not at build time. A token
+ * snapshotted when the menu opened can be one the server has since stopped
+ * accepting (core/api.mjs refreshes the app's token on any csrf_error, and
+ * this form never hears about it) — and a rejected POST /logout does not
+ * fail loudly: src/gui/__init__.py's CSRFError handler answers /logout with
+ * a JSON 400 exactly like /api/*, so logout_user()/session.clear() never
+ * run and the session the operator believes they ended is still live.
+ * api.csrf() is core/api.mjs's own refresh (this module adds no second CSRF
+ * implementation); form.submit() then submits WITHOUT re-firing this
+ * handler, so the native 302-following post still happens exactly once.
  */
 function signOutForm() {
-  return el("form", { class: "signout", method: "post", action: "/logout", "data-cov": "LG-03" },
-    el("input", { type: "hidden", name: "csrf_token", value: csrfToken() }),
-    el("button", { class: "btn", type: "submit", text: t("gui_logout") })
-  );
+  const token = el("input", { type: "hidden", name: "csrf_token", value: csrfToken() });
+  const submit = el("button", { class: "btn", type: "submit", text: t("gui_logout") });
+  const form = el("form", { class: "signout", method: "post", action: "/logout", "data-cov": "LG-03" },
+    token, submit);
+  let submitting = false;
+  form.addEventListener("submit", function (event) {
+    event.preventDefault();
+    if (submitting) return;
+    submitting = true;
+    submit.disabled = true;
+    api.csrf().then(function (fresh) {
+      token.value = fresh || csrfToken();
+      form.submit();
+    });
+  });
+  return form;
 }
 
 function userMenu() {

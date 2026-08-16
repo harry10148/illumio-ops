@@ -199,6 +199,28 @@ export const api = {
     return fetchJson(path);
   },
 
+  /**
+   * csrf() -> Promise<string>. The current CSRF token, refreshed from the
+   * server (GET /api/csrf-token) and written back to the meta tag first.
+   *
+   * This module owns the token for the whole app — it is the only place that
+   * reads, writes and refreshes it — so the ONE caller that cannot go through
+   * post()/put()/del() has to be able to ask for it rather than grow a second
+   * implementation: shell.mjs's sign-out is a real <form method="post">
+   * (auth.py's logout() answers a 302 that a form follows and an XHR would
+   * not), and a form carries the token in a hidden field, not a header. Its
+   * submit handler calls this so the field is filled at SUBMIT time from a
+   * server-issued token, instead of whatever the meta tag happened to hold
+   * when the user menu was built.
+   *
+   * A failed refresh falls back to the token already on the page rather than
+   * rejecting: the caller's job is to submit a form, and no token at all is
+   * strictly worse than a possibly-stale one.
+   */
+  csrf() {
+    return refreshCsrfToken().catch(function () { return csrfToken(); });
+  },
+
   /** Test/dev hook: forget every cached load(). */
   clear() {
     cache.clear();
