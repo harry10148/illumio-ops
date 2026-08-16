@@ -36,6 +36,14 @@ Covers, per the task brief's T9 row:
     destination filter that matches nothing so the call is a real, harmless
     no-op (test_dlq_replay_and_purge_are_wired_for_real).
 
+Task 12d added two more, for defects that survived because no test read a
+write's answer:
+  - SY-03 really POSTs /api/daemon/restart and tells 200/409/429/other apart
+    (test_restart_monitor_posts_and_branches_on_the_status).
+  - SY-10 replay/purge report what the server said, including the per-item
+    failures replay's `ids` branch hides inside an HTTP 200
+    (test_dlq_replay_and_purge_read_their_response).
+
 ## Destructive-operation discipline
 
 This area can stop the GUI, regenerate TLS material and purge queued data.
@@ -46,18 +54,26 @@ Nothing here is triggered destructively:
       clicked, Confirm never is.
   POST /api/cache/retention/run   — NEVER called for real. Purges cache rows;
       confirm renders + Cancel only.
-  The "restart monitor" confirm    — has no backend route to call in the
-      first place (verified while writing the port — no daemon-restart
-      endpoint exists anywhere in this repo); still confirm renders + Cancel
-      only, matching the task brief's explicit list.
+  POST /api/daemon/restart        — the "restart monitor" confirm. Reached in
+      exactly two safe ways: Cancel-only in the destructive sweep, and in
+      test_restart_monitor_posts_and_branches_on_the_status, where the one
+      unmocked Confirm hits this harness's own app — which never installed a
+      restart hook, so the route answers 409 and restarts nothing. The 200 /
+      429 / 500 branches are fulfilled responses, never a real restart.
+      (An earlier version of this file claimed no such route existed at all;
+      it does — src/gui/__init__.py:607.)
   POST /api/tls/renew             — NEVER called. Overwrites the serving
       self-signed cert in place with no backup; confirm renders + Cancel only.
   POST /api/tls/import-cert       — NEVER called. Overwrites the serving
       cert's config; confirm renders + Cancel only.
-  POST /api/siem/dlq/purge        — NEVER called through the UI's confirm
-      (Cancel only). Exercised directly through api.post with a `dest` that
-      matches no destination, so the real call is a genuine, harmless no-op
-      (asserts {removed: 0}) — proves the wiring without deleting anything.
+  POST /api/siem/dlq/purge        — NEVER reaches the backend through the
+      UI's confirm. Cancel only in the destructive sweep; in
+      test_dlq_replay_and_purge_read_their_response the Confirm IS clicked,
+      but against a page.route-fulfilled response, so no request leaves the
+      browser. Also exercised for real directly through api.post with a
+      `dest` that matches no destination, so that call is a genuine, harmless
+      no-op (asserts {removed: 0}) — proves the wiring without deleting
+      anything.
   POST /api/shutdown              — NEVER called through the UI (Cancel
       only). This harness's app runs with persistent_mode=True regardless
       (tests/v2_e2e_utils.py), so even a real call would 403 rather than
@@ -84,6 +100,9 @@ external effect) or explicitly required by the task brief:
       a `dest` matching nothing.
 """
 from __future__ import annotations
+
+import json
+import re
 
 import pytest
 
@@ -140,6 +159,7 @@ def _labels(page):
         "gui_tls_import_btn", "gui_dlq_purge_selected", "gui_sy_stop_btn",
         "gui_siem_add", "gui_siem_delete", "gui_confirm_delete",
         "gui_tls_csr_generate", "gui_sy_discard", "gui_errcard_retry",
+        "gui_dlq_replay", "gui_restart_success", "gui_daemon_external_restart_hint",
     ]
     return page.evaluate(
         "async (keys) => { const { t } = await import('/static/js/v2/core/i18n.mjs'); "
@@ -536,11 +556,11 @@ def test_destructive_confirms_render_cancel_sends_nothing(v2_page):
         return _handler
 
     def _confirm_cancel_only(route, cov, open_button_name, watch_url):
-        """watch_url=None (the "restart monitor" case): there is no backend
-        route to watch at all (verified while writing the port — no
-        daemon-restart endpoint exists anywhere in this repo), so only
-        render + Cancel-dismiss is asserted there; every other case also
-        asserts its own real endpoint was never called."""
+        """Every case asserts its own real endpoint was never called.
+        (watch_url used to be None for "restart monitor", on the mistaken
+        premise that no daemon-restart route existed; POST /api/daemon/restart
+        does exist — src/gui/__init__.py:607 — and Task 12d wired the confirm
+        to it, so Cancel now has a real endpoint to stay silent about.)"""
         page.evaluate("location.hash = '%s'" % route)
         page.wait_for_selector('[data-cov="%s"]' % cov)
         handler = _watch(watch_url or "/__never__")
@@ -564,7 +584,7 @@ def test_destructive_confirms_render_cancel_sends_nothing(v2_page):
             page.unroute("**/*", handler)
 
     _confirm_cancel_only(R_CACHE, "SY-04", labels["gui_retention_now"], "/api/cache/retention/run")
-    _confirm_cancel_only(R_CACHE, "SY-03", labels["gui_it_restart_monitor"], None)
+    _confirm_cancel_only(R_CACHE, "SY-03", labels["gui_it_restart_monitor"], "/api/daemon/restart")
     _confirm_cancel_only(R_TLS, "SY-11", labels["gui_tls_renew"], "/api/tls/renew")
     _confirm_cancel_only(R_SECURITY, "SY-16", labels["gui_sy_stop_btn"], "/api/shutdown")
 
@@ -884,6 +904,242 @@ def test_dlq_replay_and_purge_are_wired_for_real(v2_page):
 
     purged = _api_post(page, "/api/siem/dlq/purge", {"dest": "e2e-sy-no-such-dest", "older_than_days": 999})
     assert purged == {"status": "ok", "removed": 0}, purged
+
+
+# ═══════════════════════════ responses the UI has to read, not assume ════════
+#
+# Task 12d F1/F2. Both defects survived because nothing here ever inspected a
+# write's answer: SY-03's confirm sent no request at all, and SY-10's
+# replay/purge painted a green toast whatever came back.
+
+def _fulfill(page, pattern, status, body):
+    """Answer `pattern` with a fixed status+JSON body. Returns the handler so
+    the caller can page.unroute() it again.
+
+    The failure/rate-limit/success branches under test are ordinary HTTP
+    statuses this app really produces (409/429 from src/gui/__init__.py's
+    api_daemon_restart and its 429 errorhandler; the {status:"ok"} /
+    {ok:false,error} pair from src/siem/web.py) — injecting them at the
+    network boundary is how the other v2 e2e files exercise a response shape
+    without needing the real precondition, and for the DLQ it is also what
+    keeps this file's destructive-operation discipline: the purge Confirm is
+    clicked against a fulfilled response, so no real purge is ever issued."""
+    def handler(route):
+        route.fulfill(status=status, content_type="application/json", body=body)
+    page.route(pattern, handler)
+    return handler
+
+
+def _toast_text(page, tone):
+    node = page.locator('.toast[data-tone="%s"]' % tone).first
+    node.wait_for(state="visible")
+    return node.inner_text()
+
+
+def _clear_toasts(page):
+    """Toasts live ~4s and stack; drop them so the next step reads its own."""
+    page.evaluate("() => document.querySelectorAll('.toast').forEach(n => n.remove())")
+
+
+def _confirm_restart(page, labels):
+    """Open the SY-03 restart confirm and click Confirm.
+
+    `.last` for the reason test_destructive_confirms_render_cancel_sends_nothing
+    already documents: the label is shared by the (initially hidden) banner
+    button and the standalone one below it."""
+    page.get_by_role("button", name=labels["gui_it_restart_monitor"], exact=True).last.click()
+    box = page.locator(".modal")
+    box.wait_for(state="visible")
+    box.get_by_role("button", name=labels["gui_confirm"], exact=True).click()
+    return box
+
+
+def test_restart_monitor_posts_and_branches_on_the_status(v2_page):
+    """F1: SY-03 must actually call POST /api/daemon/restart and tell the four
+    outcomes apart.
+
+    RED against the pre-fix system.mjs: the confirm performed no request at
+    all, so `expect_request` below times out — it only ever showed the
+    "managed externally" line, which is a lie under the standard
+    systemd/`--monitor-gui` deployment where the restart really works."""
+    page, base_url = v2_page
+    _goto(page, base_url, R_CACHE, "SY-03")
+    labels = _labels(page)
+
+    # 409, against the REAL backend: this harness builds the app through
+    # build_app() without src/cli/_runtime.py's run_daemon_with_gui, so
+    # _GUI_OWNS_DAEMON stays False and api_daemon_restart really answers
+    # 409 {ok:false, error:<localised>} — the one case the old
+    # acknowledgment-only confirm happened to describe correctly.
+    with page.expect_request(
+        lambda r: r.url.endswith("/api/daemon/restart") and r.method == "POST"
+    ) as info:
+        _confirm_restart(page, labels)
+    assert info.value.response().status == 409
+    assert _toast_text(page, "info") == labels["gui_daemon_external_restart_hint"]
+    page.wait_for_selector(".modal", state="detached")
+    _clear_toasts(page)
+
+    # 200 — the standard deployment's outcome.
+    handler = _fulfill(page, "**/api/daemon/restart", 200, '{"ok": true}')
+    try:
+        _confirm_restart(page, labels)
+        assert _toast_text(page, "ok") == labels["gui_restart_success"]
+        page.wait_for_selector(".modal", state="detached")
+    finally:
+        page.unroute("**/api/daemon/restart", handler)
+    _clear_toasts(page)
+
+    # 429 — five per hour is a limit an operator can genuinely reach while
+    # tuning cache settings, so it gets its own sentence rather than the raw
+    # error code, and its own (transient) tone.
+    handler = _fulfill(
+        page, "**/api/daemon/restart", 429,
+        '{"ok": false, "error": "rate_limit_exceeded", "description": "5 per 1 hour"}',
+    )
+    try:
+        _confirm_restart(page, labels)
+        text = _toast_text(page, "warn")
+        assert "5 per 1 hour" in text, text
+        assert "rate_limit_exceeded" not in text, text
+        # A failure keeps the confirm open (SY-04 retention's own shape), so
+        # the operator can retry without reopening it.
+        page.locator(".modal").get_by_role("button", name=labels["gui_cancel"], exact=True).click()
+        page.wait_for_selector(".modal", state="detached")
+    finally:
+        page.unroute("**/api/daemon/restart", handler)
+    _clear_toasts(page)
+
+    # anything else — the server's own error text, never a success toast.
+    handler = _fulfill(page, "**/api/daemon/restart", 500, '{"ok": false, "error": "e2e-restart-boom"}')
+    try:
+        _confirm_restart(page, labels)
+        assert "e2e-restart-boom" in _toast_text(page, "crit")
+        assert page.locator('.toast[data-tone="ok"]').count() == 0
+        page.locator(".modal").get_by_role("button", name=labels["gui_cancel"], exact=True).click()
+        page.wait_for_selector(".modal", state="detached")
+    finally:
+        page.unroute("**/api/daemon/restart", handler)
+
+    # Every branch's message came out of the real catalogue.
+    assert _missing_i18n(page) == []
+
+
+DLQ_ENTRY = {
+    "id": 4242,
+    "destination": "e2e-sy-dlq-dest",
+    "source_id": "evt-e2e-1",
+    "last_error": "e2e-dlq-reason",
+    "quarantined_at": "2026-08-14T00:00:00Z",
+    "retries": 2,
+}
+
+
+def _stub_dlq_list(page):
+    """One DLQ row to act on. GET /api/siem/dlq is answered from a real,
+    empty cache DB in this harness, and a row is the precondition for the
+    replay button existing at all — so only the listing is stubbed; the
+    replay/purge calls under test still travel the app's real api.post()."""
+    body = json.dumps({"entries": [DLQ_ENTRY], "total": 1})
+
+    def handler(route):
+        route.fulfill(status=200, content_type="application/json", body=body)
+    # Only the listing itself: /dlq and /dlq?..., never /dlq/replay|purge.
+    page.route(re.compile(r"/api/siem/dlq(\?|$)"), handler)
+    return handler
+
+
+def test_dlq_replay_and_purge_read_their_response(v2_page):
+    """F2: SY-10's replay and purge must report what the server actually said.
+
+    The trap this guards (lesson A3): these two endpoints carry NO `ok` field
+    when they succeed — src/siem/web.py answers {"status":"ok","requeued":N} /
+    {"status":"ok","removed":N}, and only a FAILURE produces {ok:false,error}.
+    A `res.ok !== true` check would therefore call every success a failure;
+    `res.error` is the field that separates them.
+
+    RED against the pre-fix system.mjs, which inspected neither: the failure
+    halves below saw a green toast reporting 0, and purge additionally
+    returned true so the confirm closed as if it had worked."""
+    page, base_url = v2_page
+    listing = _stub_dlq_list(page)
+    try:
+        _goto(page, base_url, R_SIEM, "SY-10")
+        labels = _labels(page)
+        row_replay = page.get_by_role("button", name=labels["gui_dlq_replay"], exact=True).first
+        row_replay.wait_for(state="visible")
+
+        # replay, success. The row button posts {ids:[...]}, and THAT branch of
+        # replay_dlq answers `requeued` as replay_ids' per-item result list
+        # (src/siem/dlq.py:52-74), not a count — transcribed here rather than
+        # assumed, because the pre-fix code printed the list straight into the
+        # toast's {n} ("[object Object] requeued for delivery").
+        handler = _fulfill(page, "**/api/siem/dlq/replay", 200,
+                           '{"status": "ok", "requeued": [{"id": 4242, "ok": true}]}')
+        try:
+            row_replay.click()
+            text = _toast_text(page, "ok")
+            assert "1" in text, text
+            assert "object" not in text, text
+        finally:
+            page.unroute("**/api/siem/dlq/replay", handler)
+        _clear_toasts(page)
+
+        # replay, per-item failure inside an HTTP 200: an id already gone comes
+        # back {ok:false,error} in that same list, with nothing wrong at the
+        # top level. It is still not a success.
+        handler = _fulfill(page, "**/api/siem/dlq/replay", 200,
+                           '{"status": "ok", "requeued": [{"id": 4242, "ok": false, "error": "e2e-gone"}]}')
+        try:
+            row_replay.click()
+            assert "e2e-gone" in _toast_text(page, "crit")
+            assert page.locator('.toast[data-tone="ok"]').count() == 0
+        finally:
+            page.unroute("**/api/siem/dlq/replay", handler)
+        _clear_toasts(page)
+
+        # replay, transport/HTTP failure: the server's error, no success toast.
+        handler = _fulfill(page, "**/api/siem/dlq/replay", 500,
+                           '{"ok": false, "error": "e2e-replay-boom"}')
+        try:
+            row_replay.click()
+            assert "e2e-replay-boom" in _toast_text(page, "crit")
+            assert page.locator('.toast[data-tone="ok"]').count() == 0
+        finally:
+            page.unroute("**/api/siem/dlq/replay", handler)
+        _clear_toasts(page)
+
+        # purge, success: the real removed count.
+        purge_btn = page.get_by_role("button", name=labels["gui_dlq_purge_selected"], exact=True)
+        handler = _fulfill(page, "**/api/siem/dlq/purge", 200, '{"status": "ok", "removed": 7}')
+        try:
+            purge_btn.click()
+            box = page.locator(".modal")
+            box.wait_for(state="visible")
+            box.get_by_role("button", name=labels["gui_confirm"], exact=True).click()
+            assert "7" in _toast_text(page, "ok")
+            page.wait_for_selector(".modal", state="detached")
+        finally:
+            page.unroute("**/api/siem/dlq/purge", handler)
+        _clear_toasts(page)
+
+        # purge, failure: the confirm stays open and says so.
+        handler = _fulfill(page, "**/api/siem/dlq/purge", 500,
+                           '{"ok": false, "error": "e2e-purge-boom"}')
+        try:
+            purge_btn.click()
+            box = page.locator(".modal")
+            box.wait_for(state="visible")
+            box.get_by_role("button", name=labels["gui_confirm"], exact=True).click()
+            assert "e2e-purge-boom" in _toast_text(page, "crit")
+            assert page.locator('.toast[data-tone="ok"]').count() == 0
+            expect(box).to_be_visible()
+            box.get_by_role("button", name=labels["gui_cancel"], exact=True).click()
+            page.wait_for_selector(".modal", state="detached")
+        finally:
+            page.unroute("**/api/siem/dlq/purge", handler)
+    finally:
+        page.unroute(re.compile(r"/api/siem/dlq(\?|$)"), listing)
 
 
 # ══════════════════════════════════════════════════════════════ teardown ═════

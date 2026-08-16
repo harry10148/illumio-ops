@@ -81,14 +81,20 @@
 //      gui_pce_switched carries no {name} placeholder to fill. The "activate"
 //      affordance is removed from the empty-profiles state entirely (the
 //      mockup showed one there with nothing to activate).
-//   7. The "restart monitor" banner's confirm performs no POST: there is no
-//      backend route for a daemon restart (verified — src/pce_cache/web.py and
-//      src/gui/routes/admin.py define no such endpoint; the daemon is
-//      externally managed, exactly what gui_daemon_external_restart_hint
-//      already says). handles.restart is acknowledgment only. Still gated
-//      behind modal.confirm/XC-08 like every other destructive control here,
-//      and still on this task's own destructive-discipline list — the e2e
-//      never clicks its Confirm.
+//   7. The "restart monitor" banner's confirm POSTs /api/daemon/restart for
+//      real (src/gui/__init__.py:607-621, @limiter.limit("5 per hour")) and
+//      branches on the four outcomes that route produces: 200 (the standard
+//      deployment — `illumio-ops.py --monitor-gui` goes through
+//      src/cli/_runtime.py's run_daemon_with_gui, which sets _GUI_OWNS_DAEMON
+//      and installs a hook that really rebuilds the scheduler), 409 (the
+//      daemon IS externally managed — the only case where
+//      gui_daemon_external_restart_hint is the truth), 429 (the hourly limit,
+//      reachable while retuning cache settings) and anything else (the
+//      server's own error). This corrects an earlier header claim that no
+//      such route existed: it does, and looking only at
+//      src/pce_cache/web.py + src/gui/routes/admin.py was what missed it — the
+//      route is defined inline in the app factory. Still gated behind
+//      modal.confirm/XC-08 like every other destructive control here.
 //   8. GUI stop now inspects the real POST /api/shutdown response instead of
 //      assuming success: a 200 shows the real "stopped" strip, a 403
 //      (persistent mode) shows the backend's own localised error via
@@ -1082,22 +1088,51 @@ async function mountCache(root, ctx) {
        * (gui/settings_helpers.py:23) — there is no per-field restart detection,
        * so the banner cannot tell you whether YOUR change needs one. */
       opsPanel.body.appendChild(note(t("gui_sy_cache_restart_always")));
-      /* No backend route restarts the daemon (verified — header point 7): the
-       * daemon is externally managed. This confirm performs no POST; it is
-       * acknowledgment only, and the e2e never clicks past it. */
+      /* Real endpoint: POST /api/daemon/restart (gui/__init__.py:607-621,
+       * rate-limited to 5/hour). It rebuilds the scheduler for real whenever
+       * the GUI owns the daemon — which is the standard deployment, since
+       * `--monitor-gui` (cli/_runtime.py's run_daemon_with_gui) is what the
+       * systemd/NSSM unit runs and what installs the restart hook. Its own
+       * 409 is the ONE case where "restart it from your service manager" is
+       * the truth, so that line is shown on 409 and nowhere else. 429 is
+       * reachable by an operator retuning cache settings, so it gets a
+       * sentence of its own instead of the raw error code. api.post() does
+       * NOT throw on a non-2xx (see core/api.mjs), and the 409 body carries a
+       * localised message rather than a code — hence postStatus(), which
+       * hands back the status these branches are actually keyed on. */
       handles.restart = function () {
         return modal.confirm(confirmSpec(t("gui_it_restart_monitor"), [
           t("gui_sy_restart_i_poll"),
           t("gui_sy_restart_i_rate"),
           t("gui_sy_restart_i_409"),
         ], function () {
-          toast.info(t("gui_daemon_external_restart_hint"));
-          banner.hidden = true;
-          return true;
+          return api.postStatus("/api/daemon/restart", {}).then(function (r) {
+            const res = r.data || {};
+            if (r.status === 409) {
+              toast.info(t("gui_daemon_external_restart_hint"));
+              banner.hidden = true;
+              return true;
+            }
+            if (r.status === 429) {
+              toast.warn(tf("gui_err_rate_limited", { description: res.description || "" }));
+              return false;
+            }
+            if (r.status !== 200 || res.ok !== true) {
+              toast.crit(errText(res));
+              return false;
+            }
+            toast.ok(t("gui_restart_success"));
+            banner.hidden = true;
+            return true;
+          });
         }));
       };
       opsPanel.body.appendChild(btn("btn primary", t("gui_it_restart_monitor"), function () { handles.restart(); }));
-      opsPanel.body.appendChild(note(t("gui_daemon_external_restart_hint")));
+      /* The standing "managed externally" note that used to sit here is gone
+       * with the acknowledgment-only confirm it belonged to: it is true only
+       * when the backend answers 409, and that is exactly when the confirm
+       * now says it. Under the standard `--monitor-gui` deployment it was a
+       * flat contradiction of the button above it. */
 
       const retPanel = panel("SY-04", t("gui_retention_now"));
       retPanel.body.appendChild(note(t("gui_it_retention_confirm")));
@@ -1674,9 +1709,33 @@ async function mountSiem(root, ctx) {
         col("act", "", widthCell(150, function (e) {
           const box = el("div", { class: "rowacts" });
           box.appendChild(btn("btn ghost", t("gui_dlq_view"), function () { drawer.open(dlqDrawer(e)); }));
+          /* A3, with the twist this endpoint carries: replay_dlq
+           * (src/siem/web.py:289-306) answers {status:"ok", requeued:N} on
+           * success — no `ok` field at all — and only _err_with_log's
+           * {ok:false, error, description} on failure. So `error` is the field
+           * that separates them; `res.ok !== true` would call every success a
+           * failure. Same shape as SY-04 retention's check above. */
           box.appendChild(btn("btn ghost", t("gui_dlq_replay"), function () {
             api.post("/api/siem/dlq/replay", { ids: [e.id] }).then(function (res) {
-              toast.ok(tf("gui_sy_dlq_replayed", { n: (res && res.requeued) || 0 }));
+              if (!res || res.error) {
+                toast.crit(errText(res));
+                return;
+              }
+              /* The `ids` branch answers `requeued` as replay_ids' per-item
+               * result LIST (src/siem/dlq.py:52-74), not a count — and an id
+               * that is already gone comes back {ok:false, error:"not found"}
+               * inside an HTTP 200, which no top-level check can see. Count
+               * what really requeued; let a per-item failure speak. (The
+               * dest/limit branch of the same route does answer a plain
+               * count, hence the shape check rather than an assumption.) */
+              const items = Array.isArray(res.requeued) ? res.requeued : null;
+              const failed = items ? items.filter(function (r) { return r && r.ok === false; }) : [];
+              if (failed.length) {
+                toast.crit(errText(failed[0]));
+                paintDlq();
+                return;
+              }
+              toast.ok(tf("gui_sy_dlq_replayed", { n: num(items ? items.length : res.requeued) }));
               paintDlq();
             });
           }));
@@ -1731,7 +1790,16 @@ async function mountSiem(root, ctx) {
           t("gui_sy_dlq_i_norecover"),
         ], function () {
           return api.post("/api/siem/dlq/purge", { dest: destSel.value, older_than_days: 0 }).then(function (res) {
-            toast.ok(tf("gui_sy_dlq_purged", { n: (res && res.removed) || 0 }));
+            /* Same A3 twist as replay above: purge_dlq (src/siem/web.py:308-322)
+             * answers {status:"ok", removed:N} on success — no `ok` field —
+             * and {ok:false, error, description} on failure. Returning false
+             * keeps the confirm open so the operator sees the failure next to
+             * the control that caused it (SY-04 retention's shape). */
+            if (!res || res.error) {
+              toast.crit(errText(res));
+              return false;
+            }
+            toast.ok(tf("gui_sy_dlq_purged", { n: num(res.removed) }));
             paintDlq();
             return true;
           });

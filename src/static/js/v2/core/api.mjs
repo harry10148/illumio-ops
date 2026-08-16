@@ -118,14 +118,18 @@ async function fetchJson(url) {
   return data;
 }
 
-/** POST/PUT/DELETE a path and always resolve with the parsed body — the utils.js api() contract. */
-async function mutate(method, url, body) {
+function jsonOpt(method, body) {
   const opt = { method };
   if (body !== undefined) {
     opt.headers = { "Content-Type": "application/json" };
     opt.body = JSON.stringify(body);
   }
-  const { data } = await rawRequest(url, opt);
+  return opt;
+}
+
+/** POST/PUT/DELETE a path and always resolve with the parsed body — the utils.js api() contract. */
+async function mutate(method, url, body) {
+  const { data } = await rawRequest(url, jsonOpt(method, body));
   return data;
 }
 
@@ -163,6 +167,26 @@ export const api = {
   /** post(path, body) -> Promise<any parsed body>. Never throws; see header. */
   post(path, body) {
     return mutate("POST", path, body === undefined ? {} : body);
+  },
+
+  /**
+   * postStatus(path, body) -> Promise<{status, data}>. post() plus the HTTP
+   * status code, through the same rawRequest() (same CSRF refresh-and-retry,
+   * same 423 redirect, same never-throws contract).
+   *
+   * For the caller whose branches the body alone cannot separate: system.mjs's
+   * SY-03 daemon restart has to tell 409 (the daemon is managed externally —
+   * the ONLY case where "restart it from your service manager" is true) from
+   * 429 (five per hour, reachable while tuning) from any other failure, and
+   * src/gui/__init__.py's api_daemon_restart answers 409 with a localised
+   * message carrying no machine-readable code. Matching on that message text
+   * would be a translation away from breaking; the status is what the backend
+   * actually distinguishes on. post() stays the default — this is the
+   * exception, not a replacement for it.
+   */
+  postStatus(path, body) {
+    return rawRequest(path, jsonOpt("POST", body === undefined ? {} : body))
+      .then(function (r) { return { status: r.res.status, data: r.data }; });
   },
 
   put(path, body) { return mutate("PUT", path, body === undefined ? {} : body); },
