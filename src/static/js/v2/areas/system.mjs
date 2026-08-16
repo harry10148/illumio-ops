@@ -131,11 +131,17 @@
 //      not yet).
 //  14. Each of the 8 mounts registers its audit openers/palette commands
 //      synchronously (before sysPage's first await) and calls
-//      installTeardown(state) once its board is built: it destroys every
-//      table this mount created (the PCE profile table, the two SIEM tables,
-//      the logs table), closes any drawer/modal it left open, and drops this
-//      route's palette commands — same shape as automation.mjs's
-//      installTeardown, shared here across all 8 sub-routes.
+//      installTeardown(state) in the same breath, on the line after `state`
+//      itself: it destroys every table this mount created (the PCE profile
+//      table, the two SIEM tables, the logs table), closes any drawer/modal
+//      it left open, and drops this route's palette commands — same shape as
+//      automation.mjs's installTeardown, shared here across all 8
+//      sub-routes. It used to be called inside each build callback instead,
+//      i.e. only once a board was successfully built; Task 12d moved all 8
+//      up, because a mount that ends on sysPage's error card registers its
+//      commands and then has nothing to drop them (the overview had the same
+//      defect, found in review). tests/test_v2_teardown_registration.py is
+//      the static gate that keeps them here.
 //  15. Every mutating action (save, PCE/SIEM CRUD) reloads by invalidating
 //      this route's snapshot ids and calling router.go(ROUTE) — a full,
 //      cache-fresh remount, rather than patching the DOM in place. This
@@ -790,6 +796,7 @@ function pceDrawer() {
 async function mountPce(root, ctx) {
   const handles = {};
   const state = { torn: false, tableHandles: {} };
+  installTeardown(state);
   drawer.registerAudit("sy-pce-add", function () { return drawer.open(pceDrawer()); });
   modal.registerAudit("sy-pce-activate", function () { return handles.activate ? handles.activate() : null; });
   palette.registerFor(R_PCE, cmdSpec("sy:pce-add", t("gui_pce_add"), function () { drawer.open(pceDrawer()); }));
@@ -799,7 +806,6 @@ async function mountPce(root, ctx) {
     const api_ = s.api || {};
     const profiles = (d.pce_profiles && d.pce_profiles.profiles) || [];
     const activeId = (d.pce_profiles && d.pce_profiles.active_pce_id) || null;
-    installTeardown(state);
 
     const form = makeForm("POST", "/api/settings");
     form.bar.dataset.cov = "SY-18";
@@ -991,6 +997,7 @@ function fmtLag(sec) {
 async function mountCache(root, ctx) {
   const handles = {};
   const state = { torn: false, tableHandles: {} };
+  installTeardown(state);
   modal.registerAudit("sy-cache-retention", function () { return handles.retention ? handles.retention() : null; });
   modal.registerAudit("sy-cache-restart", function () { return handles.restart ? handles.restart() : null; });
   palette.registerFor(R_CACHE, cmdSpec("sy:retention", t("gui_retention_now"), function () { if (handles.retention) handles.retention(); }));
@@ -1001,7 +1008,6 @@ async function mountCache(root, ctx) {
       const tf0 = s.traffic_filter || {};
       const ts = s.traffic_sampling || {};
       const form = makeForm("PUT", "/api/cache/settings");
-      installTeardown(state);
 
       // ── SY-17 status cards + lag row ─────────────────────────────────
       /* The only telemetry on this page (CACHE_SOFT). paintStatus() is
@@ -1544,6 +1550,7 @@ function dlqDrawer(entry) {
 async function mountSiem(root, ctx) {
   const handles = {};
   const state = { torn: false, tableHandles: {} };
+  installTeardown(state);
   drawer.registerAudit("sy-siem-dest", function () { return handles.editDest ? handles.editDest() : null; });
   drawer.registerAudit("sy-siem-dlq", function () { return drawer.open(dlqDrawer(null)); });
   modal.registerAudit("sy-siem-purge", function () { return handles.purge ? handles.purge() : null; });
@@ -1567,7 +1574,6 @@ async function mountSiem(root, ctx) {
         return list;
       }
       const form = makeForm("PUT", "/api/siem/forwarder");
-      installTeardown(state);
 
       // KPI strip — integrations.js:607-652. Telemetry (SIEM_SOFT): repainted
       // in place by its own retry, exactly like #/system/cache's SY-17.
@@ -1840,6 +1846,7 @@ function humanizeDays(n) {
 async function mountTls(root, ctx) {
   const handles = {};
   const state = { torn: false, tableHandles: {} };
+  installTeardown(state);
   modal.registerAudit("sy-tls-renew", function () { return handles.renew ? handles.renew() : null; });
   // No audit opener for the import confirm: it only opens once the PEM box
   // has text (handles.importConfirm's own guard), which a cold audit sweep
@@ -1851,7 +1858,6 @@ async function mountTls(root, ctx) {
     const s = d.tls_status || {};
     const info = s.cert_info || {};
     const form = makeForm("POST", "/api/tls/config");
-    installTeardown(state);
 
     // ── status card (settings.js:558-591) ────────────────────────────
     const statPanel = panel("SY-11", t("gui_tls_cert_info"));
@@ -2063,13 +2069,13 @@ const SECURITY_SOFT = ["status"];
 async function mountSecurity(root, ctx) {
   const handles = {};
   const state = { torn: false, tableHandles: {} };
+  installTeardown(state);
   modal.registerAudit("sy-stop-gui", function () { return handles.stop ? handles.stop() : null; });
   palette.registerFor(R_SECURITY, cmdSpec("sy:stop-gui", t("gui_sy_stop_btn"), function () { if (handles.stop) handles.stop(); }));
 
   await sysPage(root, ctx, R_SECURITY, SECURITY_SNAPS, function (board, d, host) {
     const sec = d.security || {};
     const form = makeForm("POST", "/api/security");
-    installTeardown(state);
 
     const secPanel = panel("SY-12", t("gui_web_security"));
     const user = textField(sec.username || "illumio");
@@ -2179,6 +2185,7 @@ const DENSITY_OPTS = [["cozy", "gui_density_cozy"], ["compact", "gui_density_com
 
 async function mountDisplay(root, ctx) {
   const state = { torn: false, tableHandles: {} };
+  installTeardown(state);
   palette.registerFor(R_DISPLAY, cmdSpec("sy:theme", t("gui_sy_theme_toggle"), function () { theme.toggle(); }));
 
   await sysPage(root, ctx, R_DISPLAY, DISPLAY_SNAPS, function (board, d, host) {
@@ -2186,7 +2193,6 @@ async function mountDisplay(root, ctx) {
     const st = s.settings || {};
     const rpt = s.report || {};
     const form = makeForm("POST", "/api/settings");
-    installTeardown(state);
 
     // ── XC-05 theme + density: these two switch the page for real ────
     const skinPanel = panel("XC-05", t("gui_theme"));
@@ -2341,6 +2347,7 @@ function nestedValue(root, path) {
 
 async function mountChannels(root, ctx) {
   const state = { torn: false, tableHandles: {} };
+  installTeardown(state);
   // DEVIATION: the mockup registered a page-level "test all channels" palette
   // command wired to a toast stub. The only real endpoint shape that matches
   // "test all" is POST /api/actions/test-alert with no `channel` — which
@@ -2356,7 +2363,6 @@ async function mountChannels(root, ctx) {
     const s = d.settings || {};
     const active = (s.alerts && s.alerts.active) || [];
     const form = makeForm("POST", "/api/settings");
-    installTeardown(state);
     const names = Object.keys(plugins).sort();
     const toggles = [];
     const fieldItems = [];
@@ -2478,11 +2484,11 @@ function logDrawer(entry, moduleName) {
 async function mountLogs(root, ctx) {
   const handles = {};
   const state = { torn: false, tableHandles: {} };
+  installTeardown(state);
   drawer.registerAudit("sy-log-detail", function () { return handles.first ? handles.first() : null; });
 
   await sysPage(root, ctx, R_LOGS, LOGS_SNAPS, function (board, d, host) {
     const modules = (d.logs_index && d.logs_index.modules) || [];
-    installTeardown(state);
     // DEVIATION (header point 11): module_log_sample is a parameterised
     // GET_MAP entry (store-map.mjs) fetched per selected module — real, not
     // one static captured snapshot — so switching modules loads that

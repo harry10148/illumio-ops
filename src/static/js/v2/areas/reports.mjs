@@ -93,7 +93,10 @@
 //      the output table handle, closes any drawer/modal, and drops this
 //      route's palette commands; the poll timer/progress card are cancelled
 //      by the pre-existing module-level stopProgress(), reachable from
-//      either teardown path.
+//      either teardown path. Registered at the top of mountReports, before
+//      its first await (Task 12d): it used to run inside the render callback,
+//      so a mount that ended on the XC-10 error card registered none at all
+//      and leaked its three rp:* palette commands into every other area.
 //  12. rhc_enablement and fb_browse are real GETs that reach the live PCE
 //      (rule_hit_count_enablement.check_enablement's two `_api_get` calls;
 //      filter_object_cache's module-level TTL cache, which raises on a cold
@@ -897,7 +900,16 @@ function toFormData(b, file) {
 
 async function mountReports(root, ctx) {
   const handles = {};
-  // Registered synchronously, before the first await (Task 7 report §9.6).
+  // Registered synchronously, before the first await (Task 7 report §9.6) —
+  // and so is the teardown that drops them again (Task 12d). The state object
+  // itself never needed the load: only its FIELDS come from `d`, and they are
+  // filled in by the render callback below. Registering the teardown down
+  // there meant a mount that ended on the XC-10 error card registered none at
+  // all, and its three rp:* palette commands followed the operator out of the
+  // area. installTeardown only reads state.torn/state.tableHandle, both of
+  // which are safe to find absent.
+  const state = { torn: false };
+  installTeardown(state);
   drawer.registerAudit("rp-gen", function () { return handles.open ? handles.open("traffic") : null; });
   // Seeds a selection first: the bulk bar and its confirm only exist when rows
   // are picked, so an opener that skipped the selection would show the gate an
@@ -939,7 +951,6 @@ async function mountReports(root, ctx) {
     function (d) {
       if (ctx.stale()) return;
 
-      const state = {};
       state.reports = ((d.reports_list && d.reports_list.reports) || []).map(function (r) {
         const c = {};
         Object.keys(r).forEach(function (k) { c[k] = r[k]; });
@@ -954,7 +965,10 @@ async function mountReports(root, ctx) {
       // the UI language, and anything that is not zh_TW becomes en.
       state.lang = (d.status && d.status.language) === "zh_TW" ? "zh_TW" : "en";
       state.rhc = d.rhc_enablement || {};
-      state.torn = false;
+      // state.torn is NOT reset here: the teardown above may already have
+      // fired (a navigation while this load was in flight), and clearing the
+      // flag would let this mount's background fb_browse resolution repaint a
+      // board that is gone.
 
       // fb_browse (header, point 12): real GET, fetched in the background so
       // a cold-cache PCE outage never blocks the rest of the page. genDrawer
@@ -965,9 +979,6 @@ async function mountReports(root, ctx) {
       api.load("fb_browse").catch(function () { return null; }).then(function (browse) {
         if (!state.torn) d.fb_browse = browse;
       });
-
-      // S2 teardown — see header, point 11.
-      installTeardown(state);
 
       const schedules = (d.report_schedules && d.report_schedules.schedules) || [];
       const schedByType = {};
