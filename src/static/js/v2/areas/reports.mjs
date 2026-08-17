@@ -1479,7 +1479,12 @@ async function mountReports(root, ctx) {
       // (the strip below is an example, not a live "partial" result), so its
       // whole body is explanation and collapses together.
       const partPanel = panel("RP-04", t("gui_rp_partial_title"));
-      partPanel.dataset.tone = "warn";
+      /* No panel-level warn tone. It was arguably defensible while the example
+       * was open on the page; now that the body is collapsed, all that survives
+       * is an alert-coloured border around a closed section — an operator would
+       * read that as "something here needs attention" when nothing does.
+       * Colour is reserved for real state (density spec R3). The example strip
+       * inside keeps its own warn tone, because there it IS depicting a warning. */
       partPanel.body.appendChild(disclosure(t("gui_gen_explain"),
         el("div", { class: "strip", "data-tone": "warn" },
           el("span", { text: tf("gui_toast_report_partial", { formats: "csv, xlsx" }) })),
