@@ -41,12 +41,9 @@
 // interactive-panel endpoints, not because they share a method). Per the
 // yaml's own comments these three were captured with one fixed example query
 // string apiece (an empty workload search, "q=web" for suggest, "type=label"
-// for browse) — real interactivity in these panels is out of scope for this
-// task (T5/investigate area) and, when built, will almost certainly issue
-// its own dynamic query string rather than replay this fixed example. They
-// are transcribed here verbatim anyway, per the global instruction to
-// transcribe every GET entry including its query string and invent nothing
-// beyond what the yaml states.
+// for browse) — a capture-time example, not a runtime path. Only
+// workload_search survives here, as a function of its caller's parameters;
+// the two fb_* ids are gone (see the note below).
 //
 // ── Task 5 (investigate area): two of those fixed example query strings
 //    become parameterised ────────────────────────────────────────────────
@@ -67,9 +64,19 @@
 // max_results; events.py:24-52 api_events_viewer reads mins/limit/offset/
 // search/category/type_group/event_type), so a caller reading this file sees
 // which value each query wants without cross-referencing the route.
-// fb_suggest/fb_browse stay literal: components/filter-bar.mjs is fed by
-// injected snapshots by design (it imports nothing and issues no fetch of
-// its own), so no caller has a dynamic query string for them.
+// ── fb_suggest / fb_browse: removed outright (2026-08-17) ───────────────
+// Those two entries were the captured example query strings —
+// "?q=web&types=label&limit=10" and "?type=label&offset=0&limit=20" — and
+// the object filter selector was wired to them literally, which is how the
+// shipped bar came to search one captured page of labels for every category
+// and every keystroke. The bar now issues its own query strings (one per
+// keystroke, per category opened, plus type=_totals), built in
+// core/filter-objects.mjs, so there is no id-keyed path left to map: an
+// entry here can only carry ONE query string, and these endpoints need a
+// different one on every call. They remain in endpoints.yaml because that
+// file is the frozen snapshot-capture manifest and the captures were real;
+// tests/test_v2_coverage_live.py records this as the one deliberate
+// asymmetry between the two files.
 
 /**
  * qs(params, keys) -> query string over `keys`, in the order given.
@@ -149,7 +156,5 @@ export const GET_MAP = {
   workload_search(params) {
     return "/api/workloads?" + qs(params, ["name", "ip_address", "hostname"]);
   },
-  fb_suggest: "/api/filter-objects/suggest?q=web&types=label&limit=10",
-  fb_browse: "/api/filter-objects/browse?type=label&offset=0&limit=20",
 
 };

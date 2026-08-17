@@ -10,9 +10,10 @@ become two separate, separately-failing questions.
 
 Also guards the correspondence the gate rests on: src/static/js/v2/core/
 store-map.mjs's GET_MAP is a line-by-line transcription of the GET entries in
-design/v2/tools/endpoints.yaml (that file's own header says so). If an entry
-is added on one side only, an area silently loads the wrong path — or nothing
-— and the anchors it should have rendered go missing with no other signal.
+design/v2/tools/endpoints.yaml (that file's own header says so), with one
+documented exception (FB_CAPTURE_ONLY below). If an entry is added on one side
+only, an area silently loads the wrong path — or nothing — and the anchors it
+should have rendered go missing with no other signal.
 
 Runtime: the gate visits 19 routes against a real backend and waits for each
 to go quiet, so this is a slow test (minutes, not seconds) by construction —
@@ -148,18 +149,37 @@ def _yaml_get_ids() -> set[str]:
     return {e["id"] for e in entries if str(e.get("method", "GET")).upper() == "GET"}
 
 
+# The one deliberate asymmetry. endpoints.yaml captured these two with a single
+# fixed example query string apiece ("?q=web&types=label&limit=10",
+# "?type=label&offset=0&limit=20"), and GET_MAP transcribed them literally —
+# which is how the object filter selector shipped searching one captured page of
+# labels for every category and every keystroke. The bar now builds a query
+# string per keystroke and per category (src/static/js/v2/core/
+# filter-objects.mjs), so no single path can stand for these endpoints and the
+# two ids were removed from GET_MAP. They stay in the yaml because that file is
+# the frozen capture manifest and those captures were real. Anything OTHER than
+# these two appearing on one side only is still the silent-divergence bug the
+# test below exists to catch.
+FB_CAPTURE_ONLY = {"fb_suggest", "fb_browse"}
+
+
 def test_get_map_is_an_exact_transcription_of_the_frozen_endpoint_list():
     ids = _get_map_ids()
-    assert ids == _yaml_get_ids(), {
+    assert _yaml_get_ids() - ids == FB_CAPTURE_ONLY, {
         "in endpoints.yaml but not GET_MAP": sorted(_yaml_get_ids() - ids),
+        "expected only": sorted(FB_CAPTURE_ONLY),
+    }
+    assert ids - _yaml_get_ids() == set(), {
         "in GET_MAP but not endpoints.yaml": sorted(ids - _yaml_get_ids()),
     }
 
 
-def test_get_map_has_the_forty_entries_the_gate_expects():
+def test_get_map_has_the_thirty_eight_entries_the_gate_expects():
     """A count, on top of the set comparison, so that adding an entry to BOTH
-    files without deciding it belongs still has to be a deliberate edit here."""
-    assert len(_get_map_ids()) == 40, sorted(_get_map_ids())
+    files without deciding it belongs still has to be a deliberate edit here.
+    38 = the yaml's 40 GET entries minus the two capture-only fb_* ids."""
+    assert len(_get_map_ids()) == 38, sorted(_get_map_ids())
+    assert len(_yaml_get_ids()) == 40, sorted(_yaml_get_ids())
 
 
 def test_post_entries_are_deliberately_absent_from_get_map():

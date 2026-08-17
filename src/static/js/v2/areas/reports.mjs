@@ -9,11 +9,12 @@
 // task brief's T8 row. Deviations from the mockup, each at its precise
 // location below:
 //
-//   1. Every `store.load(id)` -> `api.load(id)`. All seven ids — reports_list,
-//      report_schedules, rhc_enablement, labels, status, fb_suggest, fb_browse
-//      — are already exact entries in store-map.mjs's GET_MAP (nothing needed
-//      api.get()), but SNAPS itself now carries only five: rhc_enablement and
-//      fb_browse are loaded separately — see point 12.
+//   1. Every `store.load(id)` -> `api.load(id)`. Five of the mockup's ids —
+//      reports_list, report_schedules, rhc_enablement, labels, status — are
+//      exact entries in store-map.mjs's GET_MAP, and SNAPS carries four of
+//      them: rhc_enablement is loaded separately (point 12). The mockup's two
+//      FilterBar ids are gone entirely: the bar queries the object endpoints
+//      itself now, with its own query strings (core/filter-objects.mjs).
 //   2. RP-02's eleven generate drawers now issue a REAL POST to their real
 //      endpoint (read from src/gui/routes/reports.py for every one of them).
 //      traffic/security_risk/network_inventory and app_summary always answer
@@ -97,19 +98,16 @@
 //      its first await (Task 12d): it used to run inside the render callback,
 //      so a mount that ended on the XC-10 error card registered none at all
 //      and leaked its three rp:* palette commands into every other area.
-//  12. rhc_enablement and fb_browse are real GETs that reach the live PCE
-//      (rule_hit_count_enablement.check_enablement's two `_api_get` calls;
-//      filter_object_cache's module-level TTL cache, which raises on a cold
-//      miss against an unreachable PCE) and can genuinely fail — something
-//      store.load() never did. Both are now loaded OUTSIDE loadAll(SNAPS)'s
-//      strict Promise.all (whose contract, same as overview.mjs/
-//      investigate.mjs, is "any failure here error-cards the whole area"),
-//      each with its own fallback: a failed rhc_enablement renders RP-05 as
-//      a real error with a real retry button (loadRhc()); a failed fb_browse
-//      just leaves the FilterBar's browse tab empty until a retry succeeds
-//      (same degrade investigate.mjs's prefetchFilterCorpus already ships).
-//      Neither failure can hide report generation, the output list, or any
-//      of the other seven RP-* panels.
+//  12. rhc_enablement is a real GET that reaches the live PCE
+//      (rule_hit_count_enablement.check_enablement's two `_api_get` calls) and
+//      can genuinely fail — something store.load() never did. It is loaded
+//      OUTSIDE loadAll(SNAPS)'s strict Promise.all (whose contract, same as
+//      overview.mjs/investigate.mjs, is "any failure here error-cards the
+//      whole area") with its own fallback: a failure renders RP-05 as a real
+//      error with a real retry button (loadRhc()), and cannot hide report
+//      generation, the output list, or any of the other seven RP-* panels.
+//      The object filter's own PCE reads are on the same principle and are
+//      handled inside the bar (loading, retry, per-category outage).
 //  13. CSV-source generation (toFormData/runGenerate) sends its
 //      multipart/form-data body through `api.postForm()` — post()'s sibling
 //      for the one request shape it cannot express, added to core/api.mjs
@@ -134,21 +132,21 @@ import { modal } from "../components/modal.mjs";
 import { table, col } from "../components/table.mjs";
 import { palette } from "../components/palette.mjs";
 import { progress } from "../components/progress.mjs";
-import { createFilterBar, setFilterBarText, setFilterBarSnapshots } from "../components/filter-bar.mjs";
+import { createFilterBar, setFilterBarText, setFilterBarQuery } from "../components/filter-bar.mjs";
+import { filterObjectQuery } from "../core/filter-objects.mjs";
 
 const ROUTE = "#/reports";
 
-/* rhc_enablement and fb_browse are deliberately NOT in this list — see
- * header point 12. Both are real GETs that reach the live PCE
- * (rule_hit_count_enablement.check_enablement / filter_object_cache's cold
- * module cache) and can genuinely fail with a real PCE outage; loadAll()
- * below feeds withErrorCard's Promise.all, whose contract is "any failure
- * here error-cards the WHOLE area" (overview.mjs/investigate.mjs keep the
- * same PCE-touching ids out of their own strict lists for the same reason).
- * Both are still loaded for real — just individually, with their own
- * fallback, so one optional panel's outage never hides report generation or
- * the output list. */
-const SNAPS = ["reports_list", "report_schedules", "labels", "status", "fb_suggest"];
+/* rhc_enablement is deliberately NOT in this list — see header point 12. It
+ * is a real GET that reaches the live PCE
+ * (rule_hit_count_enablement.check_enablement) and can genuinely fail with a
+ * real PCE outage; loadAll() below feeds withErrorCard's Promise.all, whose
+ * contract is "any failure here error-cards the WHOLE area" (overview.mjs/
+ * investigate.mjs keep the same PCE-touching ids out of their own strict
+ * lists for the same reason). It is still loaded for real — just individually,
+ * with its own fallback, so one optional panel's outage never hides report
+ * generation or the output list. */
+const SNAPS = ["reports_list", "report_schedules", "labels", "status"];
 
 /** Minimal area-head: title + route breadcrumb. Same local copy every
  * single-route area keeps (overview.mjs's own comment explains why: small
@@ -557,7 +555,10 @@ function genDrawer(rt, d, lang, hooks) {
   let bar = null;
   if (rt.has("filters")) {
     setFilterBarText(t);
-    setFilterBarSnapshots(d.fb_suggest, d.fb_browse);
+    // The bar queries /api/filter-objects itself, per keystroke and per
+    // category opened (core/filter-objects.mjs), so nothing PCE-backed is
+    // fetched unless a generation drawer with an object filter is opened.
+    setFilterBarQuery(filterObjectQuery);
     bar = createFilterBar(barHost, {});
     bar.onChange(repaint);
   }
@@ -966,7 +967,6 @@ async function mountReports(root, ctx) {
       return Promise.all([loadAll(SNAPS), loadRhc()]).then(function (pair) {
         const d = pair[0];
         d.rhc_enablement = pair[1];
-        d.fb_browse = null; // filled in by the background fetch below, once it lands
         return d;
       });
     },
@@ -989,18 +989,7 @@ async function mountReports(root, ctx) {
       state.rhc = d.rhc_enablement || {};
       // state.torn is NOT reset here: the teardown above may already have
       // fired (a navigation while this load was in flight), and clearing the
-      // flag would let this mount's background fb_browse resolution repaint a
-      // board that is gone.
-
-      // fb_browse (header, point 12): real GET, fetched in the background so
-      // a cold-cache PCE outage never blocks the rest of the page. genDrawer
-      // reads d.fb_browse at the moment a filters-drawer actually opens, by
-      // which point this has almost always resolved — and if it has not,
-      // FilterBar's own "type to search" state is what shows meanwhile
-      // (same degrade investigate.mjs's prefetchFilterCorpus documents).
-      api.load("fb_browse").catch(function () { return null; }).then(function (browse) {
-        if (!state.torn) d.fb_browse = browse;
-      });
+      // flag would let a late async resolution repaint a board that is gone.
 
       const schedules = (d.report_schedules && d.report_schedules.schedules) || [];
       const schedByType = {};

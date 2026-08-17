@@ -88,9 +88,9 @@
 //   9. The mockup's verification pane (components/verifypane.mjs) is dropped.
 //      That component's own header says it is a mockup verification device
 //      and "Phase 2 will NOT build them into the product". The serialized
-//      FilterBar dict it wrapped is still shown in the filters drawer — it is
-//      the operator's only view of what the query actually sends — just
-//      without the sample-only badge.
+//      FilterBar dict it wrapped is not shown at all any more: the filters
+//      drawer states the query in pills, and the request format is not
+//      operator-facing copy (density spec R4).
 //
 //  10. i18n keys renamed v2_* -> gui_*. gui_health_goto and gui_table_rows
 //      reuse the keys earlier tasks already minted for the same text; every
@@ -128,8 +128,9 @@ import { drawer } from "../components/drawer.mjs";
 import { modal } from "../components/modal.mjs";
 import { table, col } from "../components/table.mjs";
 import { palette } from "../components/palette.mjs";
-import { createFilterBar, setFilterBarText, setFilterBarSnapshots } from "../components/filter-bar.mjs";
-import { setFilterBarBrowser, addPillFromBrowser, _objfbCorpus } from "../components/filter-bar.mjs";
+import { createFilterBar, setFilterBarText, setFilterBarQuery } from "../components/filter-bar.mjs";
+import { setFilterBarBrowser, addPillFromBrowser } from "../components/filter-bar.mjs";
+import { filterObjectQuery, OBJECT_CATS } from "../core/filter-objects.mjs";
 
 const R_TRAFFIC = "#/investigate/traffic";
 const R_WORKLOADS = "#/investigate/workloads";
@@ -211,24 +212,11 @@ const EV_LIMITS = ["25", "50", "100", "200"];
 const SHADOW_MINS = ["60", "360", "1440", "10080"];
 const SHADOW_LIMITS = ["50", "200", "500"];
 
-// The object browser's category tabs. Written out as pairs rather than
-// composing the catalogue key from the category id at the call site:
-// scripts/audit_i18n_usage.py's key scanner reads the string literal inside
-// t(...), so a concatenated key makes it record the bare prefix as a
-// referenced — and therefore missing — key. Same treatment
-// components/filter-bar.mjs:351-360 already uses.
-const OB_CATS = [
-  ["label", "gui_fb_cat_label"],
-  ["label_group", "gui_fb_cat_label_group"],
-  ["iplist", "gui_fb_cat_iplist"],
-  ["workload", "gui_fb_cat_workload"],
-  ["service", "gui_fb_cat_service"],
-];
-
 // The three fast, non-PCE GETs the traffic view needs before it can render its
 // controls and its empty-state reasoning. Everything PCE-backed on this route
-// (the flow search itself, the FilterBar corpus) is fetched separately —
-// on click for the search, in the background for the corpus.
+// is fetched separately, on demand: the flow search on click, and the filter
+// objects only once a filters drawer or the object browser is opened (the bar
+// issues those itself — core/filter-objects.mjs).
 const TRAFFIC_SNAPS = ["archive_status", "cache_status", "cache_settings"];
 
 function lookup(pairs, key, fallback) {
@@ -845,10 +833,10 @@ function guideRail() {
 /* IV-03 + XC-03 + XC-04 — the advanced filter drawer: the ported FilterBar plus
  * the two policy-decision radio groups (index.html:2417-2455, modal-qt-filters).
  * The FilterBar's serialized dict is what goes into the POST body
- * (quarantine.js:293, Object.assign into the payload), so the drawer shows that
- * dict verbatim underneath — it is the operator's only view of what the query
- * actually sends. Returns {spec, bar} so the opener can destroy the bar on
- * close (components/drawer.mjs's documented onClose contract). */
+ * (quarantine.js:293, Object.assign into the payload); the drawer does NOT show
+ * that dict — the pills are what the operator reads (see refresh() below).
+ * Returns {spec, bar} so the opener can destroy the bar on close
+ * (components/drawer.mjs's documented onClose contract). */
 function filtersDrawer(state, onApply) {
   const body = el("div", { "data-cov": "IV-03" });
   const barHost = el("div", { "data-cov": "XC-03" });
@@ -897,24 +885,69 @@ function filterBarOpts(initial) {
  * object-browser.js) with category tabs, a search box, a paged checkbox list and
  * an Add button; the mockup's modal component is reserved for destructive
  * confirmation, so the picker uses the drawer — same job, same Add-on-save
- * contract. Rows come from the real /api/filter-objects/browse and /suggest
- * responses injected into filter-bar.mjs by prefetchFilterCorpus(); a category
- * the backend could not answer for says so instead of showing an empty tab that
- * looks broken. Returns {spec, destroy} so the opener can drop the table. */
+ * contract. Returns {spec, destroy} so the opener can drop the table.
+ *
+ * It reads the same two endpoints the filter bar does, through the same query
+ * module (core/filter-objects.mjs), and keeps the same distinction the bar
+ * keeps: an empty box BROWSES the category (paged, with a load-more), typed
+ * text SEARCHES it server-side (debounced), a category the backend cannot list
+ * at all — workload — says "search only" instead of showing an empty table,
+ * and a failed lookup says so with a retry rather than rendering as zero rows.
+ * Searching goes to the server rather than filtering the loaded page, because
+ * the loaded page is one page: filtering it locally would silently answer "no
+ * such object" for everything past the first sixty. */
+const OB_PAGE = 60;
+const OB_SEARCH_LIMIT = 25;
+// Same 250 ms as the bar's own typing debounce — one box, one feel.
+const OB_DEBOUNCE_MS = 250;
+
+function obRec(cat, browseable) {
+  const r = {};
+  r.cat = cat;
+  r.items = [];
+  r.total = null;
+  r.browseable = browseable;
+  r.loading = false;
+  r.error = null;
+  return r;
+}
+
+function obFound(cat, query, items, loading, error) {
+  const f = {};
+  f.cat = cat;
+  f.q = query;
+  f.items = items;
+  f.loading = loading;
+  f.error = error;
+  return f;
+}
+
+function obCanBrowse(cat) {
+  let hit = true;
+  OBJECT_CATS.forEach(function (row) { if (row[0] === cat) hit = row[2]; });
+  return hit;
+}
+
 function objectBrowser(fbState) {
   const body = el("div", { "data-cov": "XC-04" });
   const chosen = {};
+  const browsed = {};        // cat -> obRec, so switching tabs back re-reads nothing
   let cat = "label";
   let q = "";
+  let found = null;          // the current search's obFound, or null while browsing
   let handle = null;
+  let torn = false;
+  let timer = null;
+  let searchSeq = 0;
 
   const tabs = el("div", { class: "chips" });
   const listHost = el("div");
   const meta = el("p", { class: "note" });
+  const statusHost = el("div");
 
   const search = el("input", { class: "field", placeholder: t("gui_ob_search_ph") });
   search.setAttribute("aria-label", t("gui_ob_search_ph"));
-  search.addEventListener("input", function () { q = search.value.trim(); paint(); });
+  search.addEventListener("input", function () { onSearchInput(); });
 
   function pick(item, category) {
     const o = {};
@@ -923,24 +956,148 @@ function objectBrowser(fbState) {
     return o;
   }
 
+  function rec(c) {
+    if (!browsed[c]) browsed[c] = obRec(c, obCanBrowse(c));
+    return browsed[c];
+  }
+
+  function loadBrowse(c) {
+    const r = rec(c);
+    if (r.loading || !r.browseable) return;
+    r.loading = true;
+    r.error = null;
+    const offset = r.items.length;
+    filterObjectQuery.browse(c, offset, OB_PAGE).then(function (b) {
+      if (torn) return;
+      r.loading = false;
+      if (b && b.browseable === false) {
+        r.browseable = false;
+        r.total = null;
+      } else {
+        r.items = r.items.concat((b && b.items) || []);
+        r.total = typeof (b || {}).total === "number" ? b.total : r.items.length;
+      }
+      if (cat === c && !q) paint();
+    }, function () {
+      if (torn) return;
+      r.loading = false;
+      r.error = "pce_unreachable";
+      if (cat === c && !q) paint();
+    });
+    paint();
+  }
+
+  function runSearch(c, query) {
+    const mySeq = ++searchSeq;
+    filterObjectQuery.suggest(query, [c], OB_SEARCH_LIMIT).then(function (b) {
+      if (torn || mySeq !== searchSeq) return;
+      const r = ((b && b.results) || {})[c] || {};
+      found = obFound(c, query, r.items || [], false, r.error || null);
+      paint();
+    }, function () {
+      if (torn || mySeq !== searchSeq) return;
+      found = obFound(c, query, [], false, "pce_unreachable");
+      paint();
+    });
+  }
+
+  function onSearchInput() {
+    q = search.value.trim();
+    if (timer) { clearTimeout(timer); timer = null; }
+    searchSeq++;                       // any answer still in flight is stale now
+    if (!q) {
+      found = null;
+      if (!rec(cat).items.length && rec(cat).browseable) loadBrowse(cat);
+      else paint();
+      return;
+    }
+    found = obFound(cat, q, [], true, null);
+    paint();
+    timer = setTimeout(function () { timer = null; runSearch(cat, q); }, OB_DEBOUNCE_MS);
+  }
+
+  function selectCat(c) {
+    if (c === cat) return;
+    cat = c;
+    q = "";
+    search.value = "";
+    found = null;
+    if (timer) { clearTimeout(timer); timer = null; }
+    searchSeq++;
+    if (obCanBrowse(c) && !rec(c).items.length && !rec(c).error) loadBrowse(c);
+    else paint();
+  }
+
+  function retry() {
+    if (q) { found = obFound(cat, q, [], true, null); paint(); runSearch(cat, q); return; }
+    rec(cat).error = null;
+    loadBrowse(cat);
+  }
+
+  /** The rows on screen, plus the one-line status above them. */
+  function view() {
+    const v = {};
+    v.rows = [];
+    v.status = "";
+    v.error = null;
+    v.more = false;
+    if (q) {
+      const f = found;
+      v.rows = (f && !f.loading) ? f.items : [];
+      if (f && f.loading) v.status = t("gui_fb_searching");
+      else if (f && f.error) v.error = tf("gui_fb_offline_cats", { cats: t(catKey(cat)) });
+      else v.status = v.rows.length ? tf("gui_table_rows", { total: v.rows.length }) : t("gui_fb_no_match");
+      return v;
+    }
+    const r = rec(cat);
+    if (!r.browseable) {
+      v.status = t("gui_fb_search_only");
+      return v;
+    }
+    v.rows = r.items;
+    if (r.error) v.error = t("gui_fb_browse_error");
+    else if (r.loading) v.status = t("gui_fb_loading");
+    else if (typeof r.total === "number" && r.items.length < r.total) {
+      v.status = tf("gui_fb_shown_of", { shown: r.items.length, total: r.total });
+      v.more = true;
+    } else {
+      v.status = r.items.length ? tf("gui_table_rows", { total: r.items.length }) : t("gui_fb_no_match");
+    }
+    return v;
+  }
+
+  function catKey(c) {
+    let key = "gui_fb_cat_label";
+    OBJECT_CATS.forEach(function (row) { if (row[0] === c) key = row[1]; });
+    return key;
+  }
+
+  function detailOf(r) {
+    if (r.summary) return String(r.summary);
+    const parts = [];
+    if (r.hostname && r.hostname !== r.name) parts.push(r.hostname);
+    if (r.ip) parts.push(r.ip);
+    return parts.length ? parts.join(" · ") : "";
+  }
+
   function paint() {
-    if (handle) handle.destroy();
+    if (handle) { handle.destroy(); handle = null; }
     clear(tabs);
-    OB_CATS.forEach(function (pair) {
-      const items = _objfbCorpus(pair[0]);
-      const b = btn("btn ghost", t(pair[1]), function () { cat = pair[0]; paint(); });
-      b.setAttribute("aria-pressed", pair[0] === cat ? "true" : "false");
-      if (!items) b.disabled = true;
+    clear(statusHost);
+    OBJECT_CATS.forEach(function (row) {
+      const b = btn("btn ghost", t(row[1]), function () { selectCat(row[0]); });
+      b.setAttribute("aria-pressed", row[0] === cat ? "true" : "false");
       tabs.appendChild(b);
     });
 
-    const all = _objfbCorpus(cat) || [];
-    const rows = all.filter(function (it) {
-      return !q || String(it.name || "").toLowerCase().indexOf(q.toLowerCase()) >= 0;
-    });
-    meta.textContent = rows.length
-      ? tf("gui_table_rows", { total: rows.length })
-      : t("gui_fb_type_to_search");
+    const v = view();
+    meta.textContent = v.status;
+    if (v.error) {
+      const box = el("div", { class: "fb-dd-err", "data-tone": "warn" },
+        el("span", { class: "fb-dd-err-txt", text: v.error }));
+      box.appendChild(btn("fb-dd-retry", t("gui_fb_retry"), retry));
+      statusHost.appendChild(box);
+    }
 
     const cols = [
       col("pick", "", widthCell(34, function (r) {
@@ -957,19 +1114,32 @@ function objectBrowser(fbState) {
         return cb;
       })),
       col("key", t("gui_col_type"), widthCell(90, function (r) { return el("span", { class: "mono", text: r.key || cat }); })),
-      col("name", t("gui_col_name"), buildCell(function (r) { return r.name; })),
+      col("name", t("gui_col_name"), buildCell(function (r) {
+        const detail = detailOf(r);
+        if (!detail) return r.name;
+        return el("span", null, el("span", { text: String(r.name || "") }),
+          el("span", { class: "s mono", text: " " + detail }));
+      })),
     ];
-    handle = table.render(listHost, buildTable(cols, rows.slice(0, 60)));
+    handle = table.render(listHost, buildTable(cols, v.rows));
+    if (v.more) statusHost.appendChild(btn("btn ghost", t("gui_fb_load_more"), function () { loadBrowse(cat); }));
   }
 
   body.appendChild(tabs);
   body.appendChild(el("div", { class: "fld" }, search));
   body.appendChild(meta);
+  body.appendChild(statusHost);
   body.appendChild(listHost);
-  paint();
+  if (obCanBrowse(cat)) loadBrowse(cat);
+  else paint();
 
   const out = {};
-  out.destroy = function () { if (handle) handle.destroy(); handle = null; };
+  out.destroy = function () {
+    torn = true;
+    if (timer) { clearTimeout(timer); timer = null; }
+    if (handle) handle.destroy();
+    handle = null;
+  };
   out.spec = drawerSpec(t("gui_ob_title"), body, function () {
     const picked = Object.keys(chosen);
     picked.forEach(function (k) {
@@ -1042,20 +1212,6 @@ function backfillDrawer(state) {
   });
 }
 
-/* Background prefetch of the FilterBar's object corpus. /api/filter-objects/
- * {suggest,browse} both reach the PCE (verified: ~6s and a 502 when it is
- * unreachable), and only the filters drawer and the object browser read them —
- * so the traffic view must not wait on them to paint. Injected into
- * components/filter-bar.mjs the moment they land; until then that component's
- * own "type to search" state is what shows, which is exactly what it is for. */
-function prefetchFilterCorpus(state) {
-  const one = function (id) { return api.load(id).catch(function () { return null; }); };
-  Promise.all([one("fb_suggest"), one("fb_browse")]).then(function (pair) {
-    if (state.torn) return;
-    setFilterBarSnapshots(pair[0], pair[1]);
-  });
-}
-
 /**
  * IV-01/IV-02/IV-05 — the real flow search.
  * Payload transcribed from quarantine.js:271-296 runTrafficAnalyzer:
@@ -1119,6 +1275,11 @@ async function mountTraffic(root, ctx) {
     function (d) {
       if (ctx.stale()) return;
       setFilterBarText(t);
+      // The bar asks the server itself, per keystroke and per category opened
+      // (core/filter-objects.mjs) — nothing PCE-backed is fetched until a
+      // filters drawer is actually opened, so the traffic view still paints
+      // without waiting on the PCE.
+      setFilterBarQuery(filterObjectQuery);
 
       state.mins = "60";
       state.sort = "bandwidth";
@@ -1137,8 +1298,6 @@ async function mountTraffic(root, ctx) {
       // contributes PAIRS here (quarantine.js:66-68, .qt-chk -> addPair), not
       // standalone hrefs the way the workloads table's .qw-chk does (:69-71).
       state.selected = [];
-
-      prefetchFilterCorpus(state);
 
       const search = el("input", { class: "field", placeholder: t("gui_quick_search_placeholder") });
       search.setAttribute("aria-label", t("gui_filter_details"));

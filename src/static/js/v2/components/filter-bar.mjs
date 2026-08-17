@@ -38,33 +38,39 @@
 //      script (add_script_tag with "export " stripped) so it can call the same
 //      function names as the production file in the same page; an import
 //      statement would make that impossible. Strings therefore arrive through
-//      setFilterBarText() and data through setFilterBarSnapshots() /
-//      setFilterBarBrowser(), injected by the area at mount time. Defaults are
-//      the production file's own English fallbacks, so the module is usable —
-//      and testable — with nothing injected at all.
+//      setFilterBarText(), the object queries through setFilterBarQuery() and
+//      the object-browser surface through setFilterBarBrowser(), all injected
+//      by the area at mount time. Defaults are the production file's own
+//      English fallbacks, so the module is usable — and testable — with
+//      nothing injected at all (nothing injected = no candidates, which is
+//      what the parity harness runs on).
 //   2. No innerHTML, same as the rest of the mockup: createElement/textContent
 //      only, including in destroy().
 //
-// NOT PORTED, and why: the 250 ms debounce, the AbortController race guard and
-// the /api/filter-objects/{suggest,browse} fetches (src:537-591, 640-671,
-// 744-774). All three exist to manage network latency; a snapshot-fed mockup
-// has none, and faking it would make the mockup slower than the product for
-// show. Candidates resolve synchronously from the injected snapshots.
+// LIVE QUERIES (2026-08-17). The mockup was fed two captured payloads through
+// setFilterBarSnapshots(), which shipped into production as-is: one category
+// (label) had rows, the other four said "type to search" forever, typing
+// filtered the captured label page instead of asking the server, and the
+// category counts were the captured page's own total. That injection point is
+// gone; setFilterBarQuery() replaces it with three functions the area
+// implements over the real endpoints (see core/filter-objects.mjs), so the
+// three things the mockup deliberately did not port — the 250 ms typing
+// debounce, a race guard for out-of-order responses, and paging — are ported
+// here now. The race guard is a per-instance sequence number rather than
+// production's AbortController: the injected function returns a plain promise
+// with no signal to abort, so a superseded response is DISCARDED on arrival
+// instead of cancelled in flight (same visible effect, one fewer request
+// aborted mid-DNS).
 //
-// v2 PORT (Phase 2A Task 3) — this is design/v2/mockup/js/components/
-// filter-bar.mjs copied into the production tree with exactly one line
-// changed outside a comment: the i18n key on the "N / total shown" browse
-// note is "gui_fb_browse_captured" here (it was "v2_iv_browse_captured" in
-// the mockup — this task renames every v2_-prefixed key to gui_ across the
-// component layer, since v2_ never ships in the real catalogue; every other
-// key in this file already used gui_fb_* and needed no change). That line is
-// inside _objfbAddDdNote's browse-result note, not the serialization core,
-// so it does not touch what the parity test asserts. Everything else —
-// including the SERIALIZATION CORE above — is byte-for-byte the mockup file.
-// tests/design_v2/test_filterbar_semantics.py now runs a THREE-way
-// comparison (production src/static/js/filter-bar.js, this file, and the
-// mockup) so this file's own drift from either ancestor becomes a test
-// failure too, not just the mockup's.
+// v2 PORT (Phase 2A Task 3) — this file started as design/v2/mockup/js/
+// components/filter-bar.mjs copied into the production tree. The mockup
+// remains the reference for the SERIALIZATION CORE and the zone model:
+// tests/design_v2/test_filterbar_semantics.py drives both files through the
+// identical call sequence and compares key for key, so a change to what that
+// test asserts is a test failure by design. Everything the live-query work
+// above touches (the injection point, the dropdown's data sources, the
+// loading/error states, the paging) sits OUTSIDE that core — the parity test
+// runs with nothing injected, exactly as the mockup does.
 //
 // Teardown contract (see drawer.mjs / modal.mjs headers for the full
 // pattern): createFilterBar() below already returns `api.destroy()` — this
@@ -86,17 +92,34 @@ export function setFilterBarText(fn) {
   _t = typeof fn === "function" ? fn : _t;
 }
 
-// The two captured payloads that stand in for the suggest/browse endpoints:
-//   suggest — snapshots/fb_suggest.json  {ok, results: {<cat>: {items, truncated}}}
-//   browse  — snapshots/fb_browse.json   {groups: [{key, count}], items: [...]}
-// Only `label` was capturable (the other categories need a live PCE), so every
-// other scope honestly reports "type to search" instead of inventing rows.
-let _suggestSnap = null;
-let _browseSnap = null;
+/* How the bar asks the server for objects. The area injects the three calls
+ * (it owns the HTTP; this module imports nothing — see constraint 1), each
+ * resolving with the endpoint's own parsed body and REJECTING when the request
+ * failed as a whole:
+ *
+ *   suggest(q, cats, limit) -> {results: {<cat>: {items: [...], error?}}}
+ *   browse(cat, offset, limit) -> {items: [...], total, browseable?}
+ *   totals() -> {totals: {<cat>: n}}
+ *
+ * Both endpoints have TWO failure shapes and this module handles them
+ * separately: a whole-request failure (rejection — a 502 body, or the
+ * transport) and a per-category failure inside an otherwise fine 200
+ * (`error` on that category, which is what an unreachable PCE produces for a
+ * cached category whose cache is cold). Neither is ever rendered as an empty
+ * result: "nothing found" and "could not look" are different sentences.
+ *
+ * Nothing injected (the parity harness, and any area that has not wired it
+ * up) means no server-backed candidates at all — the bar still takes manual
+ * IP/CIDR, port and key=value input, which is the whole point of its
+ * synchronous candidate path. */
+let _query = null;
 
-export function setFilterBarSnapshots(suggestSnap, browseSnap) {
-  _suggestSnap = suggestSnap || null;
-  _browseSnap = browseSnap || null;
+export function setFilterBarQuery(q) {
+  _query = (q && typeof q === "object") ? q : null;
+}
+
+function _objfbCan(name) {
+  return !!(_query && typeof _query[name] === "function");
 }
 
 // openBrowser(state) — the area supplies the object-browser surface (XC-04);
@@ -461,6 +484,197 @@ function _objfbZone(col, neg) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
+//  REQUESTS — debounce, per-(cat, q) cache, paging, race guard
+// ═══════════════════════════════════════════════════════════════════════════
+
+/* 250 ms, the same value the shipping bar used (window.debounce(fn, 250) at
+ * filter-bar.js:104). Kept rather than re-tuned: it is short enough that the
+ * list feels like it answers the keystroke and long enough that typing a
+ * six-letter label name costs one request instead of six, and an operator
+ * moving from the old GUI to this one should not have to relearn the feel of
+ * the box. */
+const _OBJFB_DEBOUNCE_MS = 250;
+// The suggest endpoint clamps limit to 1..25 and the dropdown shows one screen
+// of candidates per category, so 10 (its own default) is what is asked for.
+const _OBJFB_SUGGEST_LIMIT = 10;
+// One browse page. The endpoint's own default; the list pages with `offset`.
+const _OBJFB_BROWSE_PAGE = 20;
+
+/* Which categories a suggest for the CURRENT zone should ask about: the scope
+ * when one is picked (and only if the backend can suggest for it — process /
+ * winservice / transmission have no suggest, their candidate IS the typed
+ * text), otherwise every suggestable category this bar allows (state.cats)
+ * that the active zone offers. Asking wider would put label rows under the
+ * Service column; asking narrower would hide categories the user can see. */
+function _objfbQueryCats(state) {
+  const scope = state.scopeCat;
+  if (scope) return _OBJFB_SUGGEST_CATS.includes(scope) ? [scope] : [];
+  const zoneCats = state.zone ? _objfbZoneCats(state, state.zone.col) : state.cats;
+  return _OBJFB_SUGGEST_CATS.filter(function (c) {
+    return state.cats.includes(c) && zoneCats.includes(c);
+  });
+}
+
+// Suggest results are cached per (category, query) for the life of the
+// instance — retyping a query the bar already asked about costs no request.
+// The separator is NUL because a query may contain any printable character
+// (including whatever separator would otherwise look safe).
+function _objfbSugKey(cat, q) {
+  return cat + "\u0000" + q;
+}
+
+function _objfbSugEntry(items, error) {
+  const e = {};
+  e.items = items;
+  e.error = error || null;
+  return e;
+}
+
+function _objfbCachedSuggest(state, cat, q) {
+  const key = _objfbSugKey(cat, q);
+  return Object.prototype.hasOwnProperty.call(state._sug, key) ? state._sug[key] : null;
+}
+
+/* Typing: (re)arm the debounce for whatever this query still needs answered.
+ * Every keystroke replaces the pending timer, so a burst of them costs ONE
+ * request; a (category, query) pair already answered costs none at all. Sets
+ * state._sugWait, which is what tells the dropdown to say "searching" instead
+ * of "no match". */
+function _objfbScheduleSuggest(state, q) {
+  if (state._debTimer) {
+    clearTimeout(state._debTimer);
+    state._debTimer = null;
+  }
+  const cats = _objfbQueryCats(state).filter(function (c) { return !_objfbCachedSuggest(state, c, q); });
+  if (!cats.length || !_objfbCan("suggest")) {
+    state._sugWait = null;
+    return;
+  }
+  state._sugWait = q;
+  state._debTimer = setTimeout(function () {
+    state._debTimer = null;
+    _objfbRunSuggest(state, q, cats);
+  }, _OBJFB_DEBOUNCE_MS);
+}
+
+function _objfbRunSuggest(state, q, cats) {
+  const seq = ++state._sugSeq;
+  const store = function (error, results) {
+    cats.forEach(function (c) {
+      const r = (results && results[c]) || null;
+      const items = (r && Array.isArray(r.items)) ? r.items : [];
+      state._sug[_objfbSugKey(c, q)] = _objfbSugEntry(items, error || (r && r.error) || null);
+    });
+  };
+  Promise.resolve(_query.suggest(q, cats, _OBJFB_SUGGEST_LIMIT)).then(function (body) {
+    if (seq !== state._sugSeq) return;   // a later keystroke owns the dropdown now
+    store(null, (body && body.results) || {});
+    _objfbAfterSuggest(state, q);
+  }, function () {
+    if (seq !== state._sugSeq) return;
+    // The request itself failed. Recorded as an error per category, NOT as an
+    // empty list: an empty list would read as "there is no such object".
+    store("pce_unreachable", null);
+    _objfbAfterSuggest(state, q);
+  });
+}
+
+function _objfbAfterSuggest(state, q) {
+  // Only this query's own wait is over: a later keystroke may already have
+  // scheduled another one, and clearing that would make the dropdown claim
+  // "no match" while a request is still coming.
+  if (state._sugWait === q) state._sugWait = null;
+  // The answer is only allowed to repaint the dropdown it was asked for: the
+  // zone may have changed, the bar may have been repainted, or the box may
+  // already hold different text.
+  if (!state.els || state.els.input.value.trim() !== q) return;
+  _objfbRenderDropdown(state, q);
+}
+
+/* Retry after a failed suggest: forget what failed for this query and ask
+ * again straight away (no debounce — the user just clicked a button). */
+function _objfbRetrySuggest(state, q) {
+  _objfbQueryCats(state).forEach(function (c) {
+    const hit = _objfbCachedSuggest(state, c, q);
+    if (hit && hit.error) delete state._sug[_objfbSugKey(c, q)];
+  });
+  const cats = _objfbQueryCats(state).filter(function (c) { return !_objfbCachedSuggest(state, c, q); });
+  if (!cats.length || !_objfbCan("suggest")) return;
+  state._sugWait = q;
+  _objfbRenderDropdown(state, q);
+  _objfbRunSuggest(state, q, cats);
+}
+
+// One category's browse state, kept per category for the life of the instance
+// so switching scopes back and forth re-reads nothing.
+function _objfbBrowseRec(cat) {
+  const b = {};
+  b.cat = cat;
+  b.items = [];
+  b.total = null;
+  b.browseable = true;
+  b.loading = false;
+  b.error = null;
+  return b;
+}
+
+function _objfbBrowseRecFor(state, cat) {
+  if (!state._browse[cat]) state._browse[cat] = _objfbBrowseRec(cat);
+  return state._browse[cat];
+}
+
+/* Load one browse page for `cat` (offset = what is already held, so this both
+ * opens a category and extends it). The response repaints only if the user is
+ * still looking at that category's browse list. */
+function _objfbLoadBrowse(state, cat) {
+  const b = _objfbBrowseRecFor(state, cat);
+  if (b.loading || !_objfbCan("browse")) return;
+  b.loading = true;
+  b.error = null;
+  const offset = b.items.length;
+  const seq = ++state._browseSeq;
+  const done = function () {
+    b.loading = false;
+    if (seq === state._browseSeq && state.scopeCat === cat && state.els
+      && !state.els.input.value.trim()) _objfbPaintBrowse(state, b);
+  };
+  Promise.resolve(_query.browse(cat, offset, _OBJFB_BROWSE_PAGE)).then(function (body) {
+    const r = body || {};
+    if (r.browseable === false) {
+      // workload: no browse endpoint at all, only search. Said so in words —
+      // an empty list here is the one thing this must not look like.
+      b.browseable = false;
+      b.total = null;
+    } else {
+      b.items = b.items.concat(Array.isArray(r.items) ? r.items : []);
+      b.total = typeof r.total === "number" ? r.total : b.items.length;
+    }
+    done();
+  }, function () {
+    b.error = "pce_unreachable";
+    done();
+  });
+}
+
+/* Category counts for the scope pane: one request per instance, fired the
+ * first time a dropdown opens. A failure leaves the counts ABSENT rather than
+ * zero — a zero would claim the category is empty, and the browse list itself
+ * is where the outage gets stated. */
+function _objfbEnsureTotals(state) {
+  if (state._totals || state._totalsPending || !_objfbCan("totals")) return;
+  state._totalsPending = true;
+  Promise.resolve(_query.totals()).then(function (body) {
+    state._totalsPending = false;
+    const totals = body && body.totals;
+    if (!totals || typeof totals !== "object") return;
+    state._totals = totals;
+    if (state.els && !state.els.dd.hidden) _objfbRenderCatPane(state);
+  }, function () {
+    state._totalsPending = false;
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
 //  VIEW
 // ═══════════════════════════════════════════════════════════════════════════
 
@@ -673,9 +887,9 @@ function _objfbBuildPill(state, p, idx) {
 
 /* Dropdown update (src:537-591). Right pane: the zone's category scopes,
  * rebuilt each open. Left pane: empty input and no scope -> a hint; empty input
- * with a scope -> that category's browse list; non-empty input -> the synchronous
- * candidates (IP/CIDR first, manual key=value) merged with the snapshot's
- * suggest results. */
+ * with a scope -> that category's browse list (loaded on demand); non-empty
+ * input -> the synchronous candidates (IP/CIDR first, manual key=value) plus
+ * whatever suggest has answered for this query, with the request debounced. */
 function _objfbUpdateDropdown(state) {
   const dd = state.els.dd;
   const main = state.els.ddMain;
@@ -683,10 +897,16 @@ function _objfbUpdateDropdown(state) {
   _fbClear(main);
   state.ddItems = [];
 
+  _objfbEnsureTotals(state);
   _objfbRenderCatPane(state);
   dd.hidden = false;
 
   if (!q) {
+    // Nothing typed: any scheduled or in-flight suggest is for text that is no
+    // longer on screen, so drop it (and its response, via the sequence bump).
+    if (state._debTimer) { clearTimeout(state._debTimer); state._debTimer = null; }
+    state._sugSeq++;
+    state._sugWait = null;
     if (state.scopeCat === "transmission") {
       // fixed value domain, no backend query
       _objfbAddDdGroup(state, _objfbTxCandidates(""), "gui_fb_cat_transmission", "Transmission");
@@ -708,6 +928,7 @@ function _objfbUpdateDropdown(state) {
     return;
   }
 
+  _objfbScheduleSuggest(state, q);
   _objfbRenderDropdown(state, q);
 }
 
@@ -721,7 +942,7 @@ function _objfbRenderCatPane(state) {
     _t("gui_fb_cat_all", "Search All Categories"), function () { _objfbClearScope(state); });
   pane.appendChild(all);
 
-  const totals = _objfbBrowseTotals();
+  const totals = state._totals || {};
   _objfbZoneCats(state, col).forEach(function (c) {
     const meta = _objfbCatMeta(c);
     if (!meta) return;
@@ -739,33 +960,49 @@ function _objfbRenderCatPane(state) {
   }));
 }
 
-// Production reads /api/filter-objects/browse?type=_totals (src:550). The
-// snapshot carries the same figure for the one category it could capture.
-function _objfbBrowseTotals() {
-  const out = {};
-  if (_browseSnap && typeof _browseSnap.total === "number") out.label = _browseSnap.total;
-  return out;
-}
-
-// src:640-671 + 686-737 — the browse list, grouped by label key with a load-more.
-function _objfbRenderBrowse(state, append) {
+/* Browse one whole category (src:640-671 + 686-737): the list is grouped by
+ * label key, pages with a load-more, and states what it cannot do rather than
+ * showing an empty list. Called with the input empty and a category scope set;
+ * the first call for a category kicks off its first page. */
+function _objfbRenderBrowse(state) {
   const cat = state.scopeCat;
   const main = state.els.ddMain;
-  _fbClear(main);
-  state.ddItems = [];
-  const rows = _objfbCorpus(cat);
-  if (!rows) {
-    // workload/process/winservice have no browse endpoint (src:644-650); the other
-    // categories simply were not capturable without a live PCE.
+  if (!_objfbCan("browse")) {
+    // Nothing injected: no browse is possible, so say what does work.
+    _fbClear(main);
+    state.ddItems = [];
     _objfbAddDdNote(main, "gui_fb_type_to_search", "Type to search");
     _objfbFinishDd(state);
     return;
   }
-  const shown = append ? Math.min(rows.length, (state._browseN || 20) + 20) : Math.min(rows.length, 20);
-  state._browseN = shown;
+  const b = _objfbBrowseRecFor(state, cat);
+  if (!b.items.length && !b.loading && !b.error && b.browseable) _objfbLoadBrowse(state, cat);
+  _objfbPaintBrowse(state, b);
+}
 
+function _objfbPaintBrowse(state, b) {
+  const main = state.els.ddMain;
+  const cat = b.cat;
+  _fbClear(main);
+  state.ddItems = [];
+
+  if (!b.browseable) {
+    // The endpoint answered browseable:false (workload). Search-only is a
+    // property of the category, not an outage, and not an empty collection.
+    _objfbAddDdNote(main, "gui_fb_search_only", "This category can only be searched — type a name");
+    _objfbFinishDd(state);
+    return;
+  }
+
+  // Labels group under their key (which is the only sensible order for
+  // hundreds of key=value rows); every other category states its own name once,
+  // so a browse list is never a column of bare names with no type on it.
+  if (cat !== "label" && b.items.length) {
+    const meta = _objfbCatMeta(cat);
+    main.appendChild(_fbEl("div", "fb-dd-hdr", meta ? _t(meta[1], meta[3]) : cat));
+  }
   let prevKey = null;
-  rows.slice(0, shown).forEach(function (it) {
+  b.items.forEach(function (it) {
     const k = cat === "label" ? (it.key || "") : null;
     if (cat === "label" && k !== prevKey) {
       main.appendChild(_fbEl("div", "fb-dd-hdr", k));
@@ -773,47 +1010,30 @@ function _objfbRenderBrowse(state, append) {
     }
     _objfbAddDdGroupItems(state, [_objfbSuggestItem(cat, it)]);
   });
-  if (shown < rows.length) {
-    const more = _fbBtn("fb-dd-more", _t("gui_fb_load_more", "Load more") + " (" + shown + "/" + rows.length + ")",
-      function () { _objfbRenderBrowse(state, true); });
-    main.appendChild(more);
-  } else if (_browseSnap && _browseSnap.total > rows.length) {
-    // the capture holds one page; the rest of the collection needs the endpoint
-    _objfbAddDdNote(main, "gui_fb_browse_captured", rows.length + " / " + _browseSnap.total);
+
+  if (b.error) {
+    _objfbAddDdError(state, "gui_fb_browse_error", "Browse unavailable; type to search instead",
+      function () { _objfbLoadBrowse(state, cat); _objfbPaintBrowse(state, b); });
+  } else if (b.loading) {
+    _objfbAddDdNote(main, "gui_fb_loading", "Loading…");
+  } else if (typeof b.total === "number" && b.items.length < b.total) {
+    const shown = _fbSub(_fbSub(_t("gui_fb_shown_of", "Showing {shown} of {total}"),
+      "shown", b.items.length), "total", b.total);
+    main.appendChild(_fbBtn("fb-dd-more", _t("gui_fb_load_more", "Load more") + " · " + shown,
+      function () { _objfbLoadBrowse(state, cat); _objfbPaintBrowse(state, b); }));
+  } else if (!b.items.length) {
+    _objfbAddDdNote(main, "gui_fb_no_match", "No match");
   }
+
   main.appendChild(_fbBtn("fb-dd-more", _t("gui_fb_browse_all", "Browse all…"),
     function () { _objfbOpenBrowser(state); }));
   _objfbFinishDd(state);
 }
 
-/** The captured browse page for a category, or null when there is nothing to
- *  browse. fb_browse.json is ONE page (the endpoint's own limit=20) of a
- *  collection whose `total` is 96 — _objfbRenderBrowse says so rather than
- *  padding the list out to the total. */
-export function _objfbBrowseItems(cat) {
-  if (cat === "label" && _browseSnap && Array.isArray(_browseSnap.items)) return _browseSnap.items;
-  return null;
-}
-
-/** Everything captured for a category: the browse page plus the suggest
- *  response (fb_suggest was captured for q=web, so role=Web only exists there).
- *  Deduped by href, browse order first. */
-export function _objfbCorpus(cat) {
-  const browse = _objfbBrowseItems(cat) || [];
-  const snap = (_suggestSnap && _suggestSnap.results && _suggestSnap.results[cat]) || null;
-  const extra = (snap && snap.items) || [];
-  if (!browse.length && !extra.length) return null;
-  const seen = {};
-  const out = [];
-  browse.concat(extra).forEach(function (it) {
-    const k = it.href || it.name;
-    if (seen[k]) return;
-    seen[k] = true;
-    out.push(it);
-  });
-  return out;
-}
-
+/* A candidate row, from either endpoint. `summary` is the backend's own short
+ * description of the object (an IP list's ranges, a service's ports) and
+ * hostname/ip are what a workload carries instead — carried through so the
+ * five categories do not all render as a bare name (see _objfbAddDdGroupItems). */
 function _objfbSuggestItem(cat, it) {
   const o = {};
   o.cat = cat;
@@ -821,7 +1041,19 @@ function _objfbSuggestItem(cat, it) {
   o.href = it.href || null;
   o.key = it.key || null;
   o.value = it.value || null;
+  o.detail = _objfbItemDetail(cat, it);
   return o;
+}
+
+function _objfbItemDetail(cat, it) {
+  if (it.summary) return String(it.summary);
+  if (cat === "workload") {
+    const parts = [];
+    if (it.hostname && it.hostname !== it.name) parts.push(it.hostname);
+    if (it.ip) parts.push(it.ip);
+    return parts.length ? parts.join(" · ") : null;
+  }
+  return null;
 }
 
 /* Full dropdown repaint for a non-empty input (src:782-865): IP/CIDR on top,
@@ -830,7 +1062,6 @@ function _objfbRenderDropdown(state, q) {
   const main = state.els.ddMain;
   _fbClear(main);
   state.ddItems = [];
-  const zoneCats = state.zone ? _objfbZoneCats(state, state.zone.col) : state.cats;
   // a bare number/range in the svc column already produces the three-way choice,
   // so the manual "Add Port" row must not be drawn twice
   const svcGroups = (state.zone && state.zone.col === "svc" && !state.scopeCat) ? _objfbSvcCandidates(q) : [];
@@ -877,32 +1108,36 @@ function _objfbRenderDropdown(state, q) {
     });
   }
 
-  // suggest groups, filtered to state.cats ∩ this zone's categories (src:838-839)
-  _OBJFB_SUGGEST_CATS.filter(function (c) { return state.cats.includes(c) && zoneCats.includes(c); })
-    .forEach(function (cat) {
-      const items = _objfbSuggest(cat, q);
-      if (!items.length) return;
-      const meta = _objfbCatMeta(cat);
-      _objfbAddDdGroup(state, items.map(function (it) { return _objfbSuggestItem(cat, it); }), meta[1], meta[3]);
-    });
+  // suggest groups: what the server has answered for THIS query, per category,
+  // filtered to state.cats ∩ this zone's categories (src:838-839).
+  const failed = [];
+  _objfbQueryCats(state).forEach(function (cat) {
+    const hit = _objfbCachedSuggest(state, cat, q);
+    if (!hit) return;                       // still on the way, or never asked
+    if (hit.error) { failed.push(_objfbCatLabel(cat)); return; }
+    if (!hit.items.length) return;
+    const meta = _objfbCatMeta(cat);
+    _objfbAddDdGroup(state, hit.items.map(function (it) { return _objfbSuggestItem(cat, it); }), meta[1], meta[3]);
+  });
 
-  if (!state.ddItems.length) {
+  const waiting = state._sugWait === q;
+  if (failed.length) {
+    // Named categories, not a blanket "unavailable": with a cold object cache
+    // an unreachable PCE fails the cached categories while a live one still
+    // answers, and the operator needs to know WHICH list is not to be trusted.
+    _objfbAddDdError(state, "gui_fb_offline_cats",
+      "{cats}: search unavailable right now (PCE unreachable). Manual input still works.",
+      function () { _objfbRetrySuggest(state, q); }, failed.join(", "));
+  }
+  if (waiting) _objfbAddDdNote(main, "gui_fb_searching", "Searching…");
+
+  // "No match" is only true once every category has answered without an error:
+  // saying it while a request is in flight, or while one failed, would report a
+  // failure as an empty result.
+  if (!state.ddItems.length && !waiting && !failed.length) {
     main.appendChild(_fbEl("div", "fb-dd-empty", _t("gui_fb_no_match", "No match")));
   }
   _objfbFinishDd(state);
-}
-
-/** Suggest results for a category, resolved from the captured snapshots.
- *  fb_suggest.json is one captured response (label only); fb_browse.json is the
- *  label corpus the substring match runs over, so typing behaves like the
- *  product without any row being invented. */
-export function _objfbSuggest(cat, q) {
-  const needle = String(q || "").trim().toLowerCase();
-  if (!needle) return [];
-  const corpus = _objfbCorpus(cat) || [];
-  return corpus.filter(function (it) {
-    return String(it.name || "").toLowerCase().indexOf(needle) >= 0;
-  }).slice(0, 10);
 }
 
 function _objfbFinishDd(state) {
@@ -915,19 +1150,55 @@ function _objfbAddDdNote(target, key, fallback) {
   target.appendChild(_fbEl("div", "fb-dd-note", _t(key, fallback)));
 }
 
+/* {placeholder} substitution. core/i18n.mjs has tf() for this, but the bar is
+ * injected with t() alone (constraint 1: no imports), so the same {token}
+ * syntax is substituted here — a catalogue string therefore reads the same
+ * whichever function renders it. */
+function _fbSub(text, token, value) {
+  return String(text).split("{" + token + "}").join(String(value));
+}
+
+/* A failure the user can act on: the sentence plus a retry button. Deliberately
+ * NOT an empty list — this project has shipped "failure rendered as a healthy
+ * zero" more than once, so the two states are drawn differently on purpose.
+ * Tone is warn, not crit: the object lookup is degraded, the bar still works. */
+function _objfbAddDdError(state, key, fallback, onRetry, cats) {
+  const box = _fbEl("div", "fb-dd-err");
+  box.setAttribute("data-tone", "warn");
+  const text = cats === undefined ? _t(key, fallback) : _fbSub(_t(key, fallback), "cats", cats);
+  box.appendChild(_fbEl("span", "fb-dd-err-txt", text));
+  box.appendChild(_fbBtn("fb-dd-retry", _t("gui_fb_retry", "Retry"), onRetry));
+  state.els.ddMain.appendChild(box);
+}
+
 function _objfbAddDdGroup(state, items, headerKey, headerFallback) {
   state.els.ddMain.appendChild(_fbEl("div", "fb-dd-hdr", _t(headerKey, headerFallback)));
   _objfbAddDdGroupItems(state, items);
 }
 
+/* One candidate row. Three things make the ten categories tell themselves
+ * apart at a glance, in the order the eye reads them:
+ *   - the type code chip (LBL / LGR / IPL / WKL / SVC …), fixed width so a
+ *     column of them scans vertically, and `data-cat` so the stylesheet can
+ *     mark the chip without inventing ten hues outside the token contract
+ *     (see the header note on why production's ten dots are not ported);
+ *   - the name;
+ *   - what that TYPE carries and the others do not — an IP list's ranges, a
+ *     service's ports, a workload's hostname/address (o.detail).
+ * The category is also spoken through aria-label, since a three-letter code
+ * is not a word. */
 function _objfbAddDdGroupItems(state, items) {
   const main = state.els.ddMain;
   items.forEach(function (o) {
     const el = _fbEl("div", "fb-dd-item");
     el.setAttribute("role", "option");
     const meta = _objfbCatMeta(o.cat);
+    el.dataset.cat = o.cat;
+    el.setAttribute("aria-label", _objfbCatLabel(o.cat) + " " + _objfbPillLabel(o)
+      + (o.detail ? " (" + o.detail + ")" : ""));
     el.appendChild(_fbEl("span", "fb-cat", meta ? meta[2] : "?"));
-    el.appendChild(_fbEl("span", "fb-dd-txt", o.summary ? o.name + " — " + o.summary : _objfbPillLabel(o)));
+    el.appendChild(_fbEl("span", "fb-dd-txt", _objfbPillLabel(o)));
+    if (o.detail) el.appendChild(_fbEl("span", "fb-dd-sub", o.detail));
     if (o.tagI18n) el.appendChild(_fbEl("span", "fb-dd-tag" + (o.dflt ? " on" : ""), _t(o.tagI18n, "")));
     el.addEventListener("mousedown", function (e) { e.preventDefault(); });
     el.addEventListener("click", function () { _objfbPickItem(state, o); });
@@ -1005,7 +1276,6 @@ function _objfbFocusZone(state, col, neg) {
   const changed = !state.zone || state.zone.col !== col || state.zone.neg !== neg;
   if (changed) {
     state.scopeCat = null;
-    state._browseN = 0;
     Object.keys(state.zoneEls).forEach(function (k) { state.zoneEls[k].dd.hidden = true; });
   }
   state.zone = _objfbZone(col, neg);
@@ -1121,7 +1391,6 @@ function _fbSwapCols(state) {
 function _objfbSetScope(state, cat) {
   if (!state.zone) return;
   state.scopeCat = cat;
-  state._browseN = 0;
   const z = state.zone;
   _objfbRender(state);
   _objfbFocusZone(state, z.col, z.neg);
@@ -1130,7 +1399,6 @@ function _objfbSetScope(state, cat) {
 function _objfbClearScope(state) {
   if (!state.zone) return;
   state.scopeCat = null;
-  state._browseN = 0;
   const z = state.zone;
   _objfbRender(state);
   _objfbFocusZone(state, z.col, z.neg);
@@ -1174,6 +1442,15 @@ function _objfbNewState(id, container, cats) {
   s.exclOpen = false;
   s.scopeCat = null;
   s.changeCb = null;
+  // request state (see the REQUESTS section):
+  s._sug = {};            // "<cat> <q>" -> {items, error} — one entry per answered pair
+  s._sugSeq = 0;          // race guard: only the newest suggest may repaint
+  s._sugWait = null;      // the query a scheduled/in-flight suggest is for
+  s._debTimer = null;     // pending debounce timer, cleared by destroy()
+  s._browse = {};         // cat -> {items, total, browseable, loading, error}
+  s._browseSeq = 0;
+  s._totals = null;       // cat -> count, once /browse?type=_totals answers
+  s._totalsPending = false;
   return s;
 }
 
@@ -1191,7 +1468,17 @@ export function createFilterBar(container, options) {
   api.getFilters = function () { return _objfbSerialize(state); };
   api.setFilters = function (dict) { _objfbDeserialize(state, dict); _objfbRender(state); };
   api.onChange = function (cb) { state.changeCb = cb; };
-  api.destroy = function () { delete _objfbInstances[id]; _fbClear(container); };
+  api.destroy = function () {
+    // A pending debounce would fire into a detached DOM, and its response
+    // would repaint a dropdown that no longer exists; the sequence bump makes
+    // any request already in flight discard itself on arrival.
+    if (state._debTimer) { clearTimeout(state._debTimer); state._debTimer = null; }
+    state._sugSeq++;
+    state._browseSeq++;
+    state.els = null;
+    delete _objfbInstances[id];
+    _fbClear(container);
+  };
   return api;
 }
 
@@ -1223,6 +1510,6 @@ if (typeof window !== "undefined") {
 export const filterBar = {
   create: createFilterBar,
   setText: setFilterBarText,
-  setSnapshots: setFilterBarSnapshots,
+  setQuery: setFilterBarQuery,
   setBrowser: setFilterBarBrowser,
 };

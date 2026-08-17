@@ -26,19 +26,27 @@ exist. The legacy file `pytest.skip`ped those when the target appliance's
 object cache was empty. This harness's PCE is deliberately unreachable, so
 they would skip every time — which is the same as deleting them.
 
-Instead, GET /api/filter-objects/browse is fulfilled locally with a small
+Instead, both /api/filter-objects routes are fulfilled locally with a small
 fixture corpus (Playwright's page.route, the same "stub only the network
 boundary" pattern tests/test_v2_investigate_e2e.py already uses for
-GET /api/workloads). Named honestly, per Phase 2A finding B2: what is stubbed
-is the OBJECT SOURCE. Everything downstream is real — the corpus load, the
-category column, the browse list, the object-browser drawer, pill creation,
-the zone model, _objfbSerialize, and the real POST /api/quarantine/search
-that carries the result. A test that says it verifies the backend's browse
-pagination would be overclaiming; none of these do.
+GET /api/workloads). See _stub_object_corpus below for exactly what that stub
+does and does not stand in for.
+
+## The live-query scenarios (2026-08-17)
+
+The bar was wired to two captured payloads: one category had rows, the other
+four said "type to search" forever, typing filtered the captured page instead
+of asking the server, and the category counts came from that page's own total.
+It now queries the endpoints per keystroke and per category. The scenarios
+below the original ten cover that wiring at the network boundary — the request
+that goes out, the debounce that keeps it to one per burst, the states for
+"cannot browse this category" and "could not reach the PCE" — because a
+screen that renders is not evidence that anything was asked.
 """
 from __future__ import annotations
 
 import json
+from urllib.parse import parse_qs, urlparse
 
 import pytest
 
@@ -72,56 +80,129 @@ def _labels(page):
 # ── fixture corpus ──────────────────────────────────────────────────────────
 
 FIXTURE_SERVICES = [
-    {"name": "HTTP-8080", "href": "/orgs/1/sec_policy/active/services/1", "detail": "8080/tcp"},
-    {"name": "HTTPS-8443", "href": "/orgs/1/sec_policy/active/services/2", "detail": "8443/tcp"},
+    {"name": "HTTP-8080", "href": "/orgs/1/sec_policy/active/services/1", "summary": "8080/tcp"},
+    {"name": "HTTPS-8443", "href": "/orgs/1/sec_policy/active/services/2", "summary": "8443/tcp"},
 ]
 FIXTURE_LABELS = [
-    {"name": "role=web", "href": "/orgs/1/labels/1", "detail": "role"},
-    {"name": "role=db", "href": "/orgs/1/labels/2", "detail": "role"},
-    {"name": "env=prod", "href": "/orgs/1/labels/3", "detail": "env"},
+    {"name": "role=web", "href": "/orgs/1/labels/1", "key": "role", "value": "web"},
+    {"name": "role=db", "href": "/orgs/1/labels/2", "key": "role", "value": "db"},
+    {"name": "env=prod", "href": "/orgs/1/labels/3", "key": "env", "value": "prod"},
 ]
+FIXTURE_LABEL_GROUPS = [
+    {"name": "WebTier-Group", "href": "/orgs/1/sec_policy/active/label_groups/1"},
+    {"name": "DBTier-Group", "href": "/orgs/1/sec_policy/active/label_groups/2"},
+]
+FIXTURE_IPLISTS = [
+    {"name": "Corp-Networks", "href": "/orgs/1/sec_policy/active/ip_lists/1",
+     "summary": "10.0.0.0/8, 192.168.0.0/16"},
+]
+# workloads have NO browse endpoint at all — suggest is their only access path
+# (filter_objects.py:66-67 answers type=workload with browseable:false), so this
+# corpus is deliberately reachable by search only.
+FIXTURE_WORKLOADS = [
+    {"name": "web-01", "href": "/orgs/1/workloads/w1", "hostname": "web-01.corp", "ip": "10.1.1.4"},
+    {"name": "web-02", "href": "/orgs/1/workloads/w2", "hostname": "web-02.corp", "ip": "10.1.1.5"},
+]
+FIXTURE = {
+    "label": FIXTURE_LABELS,
+    "label_group": FIXTURE_LABEL_GROUPS,
+    "iplist": FIXTURE_IPLISTS,
+    "service": FIXTURE_SERVICES,
+    "workload": FIXTURE_WORKLOADS,
+}
+BROWSEABLE = ("label", "label_group", "iplist", "service")
 
 
 def _stub_object_corpus(page):
-    """Fulfil the two object-source reads locally.
+    """Fulfil the two object-source reads locally, per request.
 
-    The bar's corpus is loaded ONCE per mount from two snapshots, not per
-    category on demand (filter-bar.mjs's setFilterBarSnapshots):
+    The bar asks the server for what it needs, when it needs it
+    (filter-bar.mjs's setFilterBarQuery, over core/filter-objects.mjs):
 
-      fb_browse   GET /api/filter-objects/browse   {groups, items}
-      fb_suggest  GET /api/filter-objects/suggest  {ok, results: {<cat>: {items}}}
+      GET /api/filter-objects/suggest?q=&types=&limit=   per keystroke, debounced
+      GET /api/filter-objects/browse?type=&offset=&limit= per category opened
+      GET /api/filter-objects/browse?type=_totals        once per bar
 
-    Note what this makes possible that the shipped app cannot do without a
-    live PCE, and why the legacy scenarios needed a real appliance:
-    filter-bar.mjs's own header records that only `label` was ever capturable,
-    so a serviceless install genuinely reports "type to search" for the
-    Service column. The suggest half below is what puts services in reach —
-    which is exactly the object source this module's docstring says is
-    stubbed, and nothing more.
+    So the stub answers per request rather than handing over one fixed page,
+    and it reproduces the shapes the real route actually returns — including
+    the two that are easy to mistake for data: `type=workload` answers
+    browseable:false with an empty list, and a category the PCE could not
+    reach answers `error: "pce_unreachable"` INSIDE a 200.
+
+    Named honestly, per Phase 2A finding B2: what is stubbed is the OBJECT
+    SOURCE — the PCE side of these two routes. Everything downstream is real:
+    the debounce, the per-(category, query) cache, the paging, the category
+    counts, the loading/error/retry states, the object-browser drawer, pill
+    creation, the zone model, _objfbSerialize and the real POST
+    /api/quarantine/search that carries the result. A test that claimed to
+    verify the backend's own browse pagination would be overclaiming; none do.
+
+    Returns a control dict the caller can mutate and read:
+      fail_browse   {cat, ...}  -> answer those browse calls with a 502
+      fail_suggest  {cat, ...}  -> mark those categories `error` inside a 200
+      fail_totals   bool        -> answer type=_totals with a 502
+      browse_calls / suggest_calls -> the requests that actually arrived
     """
+    ctl = {
+        "fail_browse": set(),
+        "fail_suggest": set(),
+        "fail_totals": False,
+        "browse_calls": [],
+        "suggest_calls": [],
+    }
+
+    def _args(route):
+        return parse_qs(urlparse(route.request.url).query)
+
+    def _json(route, body, status=200):
+        route.fulfill(status=status, content_type="application/json", body=json.dumps(body))
+
     def browse(route):
-        route.fulfill(
-            status=200,
-            content_type="application/json",
-            body=json.dumps({
-                "groups": [{"key": "role", "count": 2}, {"key": "env", "count": 1}],
-                "items": FIXTURE_LABELS,
-                "total": len(FIXTURE_LABELS),
-            }),
-        )
+        args = _args(route)
+        btype = (args.get("type") or [""])[0]
+        offset = int((args.get("offset") or ["0"])[0])
+        limit = int((args.get("limit") or ["20"])[0])
+        ctl["browse_calls"].append((btype, offset, limit))
+        if btype == "_totals":
+            if ctl["fail_totals"]:
+                _json(route, {"ok": False, "error": "pce_unreachable"}, status=502)
+                return
+            _json(route, {"ok": True, "totals": {c: len(FIXTURE[c]) for c in BROWSEABLE}})
+            return
+        if btype == "workload":
+            _json(route, {"ok": True, "browseable": False, "items": [], "total": None})
+            return
+        if btype not in BROWSEABLE:
+            _json(route, {"ok": False, "error": "unknown_type"}, status=400)
+            return
+        if btype in ctl["fail_browse"]:
+            _json(route, {"ok": False, "error": "pce_unreachable"}, status=502)
+            return
+        rows = FIXTURE[btype]
+        page_rows = rows[offset:offset + limit]
+        body = {"ok": True, "items": page_rows, "total": len(rows),
+                "truncated": offset + limit < len(rows)}
+        if btype == "label":
+            body["groups"] = [{"key": "role", "count": 2}, {"key": "env", "count": 1}]
+        _json(route, body)
 
     def suggest(route):
-        route.fulfill(
-            status=200,
-            content_type="application/json",
-            body=json.dumps({"ok": True, "results": {
-                "label": {"items": FIXTURE_LABELS, "truncated": False},
-                "service": {"items": FIXTURE_SERVICES, "truncated": False},
-            }}),
-        )
+        args = _args(route)
+        q = (args.get("q") or [""])[0].lower()
+        types = [ty for ty in (args.get("types") or [""])[0].split(",") if ty]
+        ctl["suggest_calls"].append((q, tuple(types)))
+        results = {}
+        for ty in types:
+            if ty in ctl["fail_suggest"]:
+                results[ty] = {"items": [], "truncated": False, "error": "pce_unreachable"}
+                continue
+            hits = [r for r in FIXTURE.get(ty, []) if q in r["name"].lower()]
+            results[ty] = {"items": hits, "truncated": False}
+        _json(route, {"ok": True, "results": results})
 
     page.route("**/api/filter-objects/browse*", browse)
     page.route("**/api/filter-objects/suggest*", suggest)
+    return ctl
 
 
 # ── navigation ──────────────────────────────────────────────────────────────
@@ -166,7 +247,10 @@ def test_filter_drawer_service_browse_to_pill(v2_page):
     page.wait_for_selector(f"{_zone('svc')} .fb-dd-item")
 
     first = page.locator(f"{_zone('svc')} .fb-dd-item").first
-    name = first.inner_text().split("\n")[0].strip()
+    # .fb-dd-txt is the object's NAME; the row also carries a type code chip and
+    # (for a service) its ports, and reading the row's whole text would let the
+    # assertion below pass on the type code alone.
+    name = first.locator(".fb-dd-txt").inner_text().strip()
     first.click()
 
     pill = page.locator(f"{_zone('svc')} .fb-pill").first

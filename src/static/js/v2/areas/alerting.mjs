@@ -34,7 +34,8 @@ import { drawer } from "../components/drawer.mjs";
 import { modal } from "../components/modal.mjs";
 import { table, col } from "../components/table.mjs";
 import { palette } from "../components/palette.mjs";
-import { createFilterBar, setFilterBarText, setFilterBarSnapshots, setFilterBarBrowser } from "../components/filter-bar.mjs";
+import { createFilterBar, setFilterBarText, setFilterBarQuery, setFilterBarBrowser } from "../components/filter-bar.mjs";
+import { filterObjectQuery } from "../core/filter-objects.mjs";
 
 const R_RULES = "#/alerting/rules";
 const R_OPS = "#/alerting/ops";
@@ -43,7 +44,7 @@ const R_OPS = "#/alerting/ops";
 // "rules" and "actions"; the v2 area keeps that split as two routes.
 const SUB_ROUTES = [[R_RULES, "gui_tab_rules"], [R_OPS, "gui_actions"]];
 
-const RULE_SNAPS = ["rules", "event_catalog", "events_viewer", "fb_suggest", "fb_browse"];
+const RULE_SNAPS = ["rules", "event_catalog", "events_viewer"];
 const OPS_SNAPS = ["status", "alert_plugins", "rules"];
 
 // rules.js:85 — the unit suffix the condition column appends, by rule type.
@@ -702,7 +703,7 @@ function filterFieldRows(keys, rule, noteText) {
  *                                   cooldown_minutes, filters}
  *   saveBW       rules.js:572-583  adds rule_type; the PUT path also sends
  *                                   type: rule_type (rules.js:578) */
-function flowDrawer(kind, rule, snaps, onSaved) {
+function flowDrawer(kind, rule, onSaved) {
   const isBw = kind === "bandwidth";
   const body = el("div", { "data-cov": isBw ? "AL-05" : "AL-04" });
   const r = rule || {};
@@ -720,7 +721,6 @@ function flowDrawer(kind, rule, snaps, onSaved) {
   if (isBw) cntBox.appendChild(cntHelp);
 
   const barHost = el("div", { "data-role": "filter-bar" });
-  setFilterBarSnapshots(snaps.fb_suggest, snaps.fb_browse);
   const bar = createFilterBar(barHost, filterBarOpts(r));
   const serialized = el("ul", { class: "stack" });
 
@@ -850,7 +850,6 @@ function installTeardown(state) {
     });
     state.filterBars = [];
     setFilterBarBrowser(null);
-    setFilterBarSnapshots(null, null);
     drawer.closeAll();
     modal.closeAll();
     palette.setRoute(path);
@@ -890,7 +889,10 @@ async function mountRules(root, ctx) {
     function (d) {
       if (ctx.stale()) return;
       setFilterBarText(t);
-      setFilterBarSnapshots(d.fb_suggest, d.fb_browse);
+      // The bar queries /api/filter-objects itself, per keystroke and per
+      // category opened (core/filter-objects.mjs) — nothing is fetched until a
+      // rule drawer with a FilterBar is actually opened.
+      setFilterBarQuery(filterObjectQuery);
 
       // The live list is refreshed from the backend after every mutation.
       state.rules = (Array.isArray(d.rules) ? d.rules : []).map(function (r) {
@@ -1177,7 +1179,7 @@ async function mountRules(root, ctx) {
         if (ty === "system") return drawer.open(systemDrawer(r, refreshRules));
         // The flow drawers carry the FilterBar, whose three zones do not fit the
         // standard drawer width (investigate.mjs:982 widens it for the same bar).
-        const spec = flowDrawer(ty === "traffic" ? "traffic" : "bandwidth", r, d, refreshRules);
+        const spec = flowDrawer(ty === "traffic" ? "traffic" : "bandwidth", r, refreshRules);
         const h = drawer.open(spec);
         h.onClose(function () { spec.filterBar.destroy(); });
         state.filterBars.push(spec.filterBar);
