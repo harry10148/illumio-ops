@@ -2623,8 +2623,15 @@ async function mountLogs(root, ctx) {
     p.body.appendChild(note(t("gui_sy_log_filters_new")));
     p.body.appendChild(sectionHead(t("gui_sy_log_raw")));
     p.body.appendChild(raw);
-    p.body.appendChild(note(t("gui_sy_log_cap")));
-    p.body.appendChild(note(t("gui_sy_log_i18n_gap")));
+    /* Density spec R5 — these two caveats (why the raw view's count can read
+     * lower than the module list's own count; why two module names show up
+     * in English) both explain a real discrepancy an operator might
+     * otherwise read as a bug. Folded into one explanation rather than left
+     * standing under the raw console, R4's own remedy for the "?n=" and
+     * "logs_index" implementation detail gui_sy_log_cap still names. */
+    p.body.appendChild(disclosure(t("gui_gen_explain"),
+      note(t("gui_sy_log_cap")),
+      note(t("gui_sy_log_i18n_gap"))));
     board.appendChild(p);
     paint();
   });
