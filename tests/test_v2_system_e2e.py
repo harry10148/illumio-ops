@@ -384,25 +384,38 @@ def test_display_language_reaches_the_request_body(v2_page):
     other = "zh_TW" if current == "en" else "en"
     locale.locator('input[type="radio"][name="sy-lang"][value="%s"]' % other).check()
 
-    sent = {}
+    # The flip has to have registered before Save is worth clicking. Without
+    # this the wait below could be satisfied by a form that was never dirty,
+    # and the test would prove nothing (finding B1).
+    expect(page.locator(".savebar")).to_have_attribute("data-tone", "warn")
 
     def _capture(route):
-        sent["body"] = route.request.post_data
+        # POST only. This page GETs /api/settings too, and page.route matches
+        # every method: fulfilling that GET with a canned save response both
+        # corrupted the form's snapshot and set the captured body to None (a
+        # GET has no post_data), which is exactly how this test passed locally
+        # and failed in CI — there, a GET landed inside the routed window.
+        if route.request.method != "POST":
+            route.continue_()
+            return
         route.fulfill(status=200, content_type="application/json",
                       body='{"ok": true, "requires_restart": false}')
 
     page.route("**/api/settings", _capture)
     try:
-        page.get_by_role("button", name=_labels(page)["gui_save"], exact=True).last.click()
-        expect(page.locator(".savebar")).to_have_attribute("data-tone", "neutral")
+        with page.expect_request(
+            lambda r: "/api/settings" in r.url and r.method == "POST"
+        ) as info:
+            page.get_by_role("button", name=_labels(page)["gui_save"], exact=True).last.click()
+        # expect_request fails loudly if the click sends nothing, so "no request"
+        # can no longer look like a passing assertion.
+        body = info.value.post_data_json
     finally:
         page.unroute("**/api/settings", _capture)
 
-    assert sent.get("body"), "Save sent no request"
     # Parsed rather than substring-matched: the assertion this replaces was
     # written against the preview's pretty-printed JSON and would have failed
     # on the real request's compact form for a formatting reason, not a real one.
-    body = json.loads(sent["body"])
     assert body["settings"]["language"] == other, body
 
     page.reload()
