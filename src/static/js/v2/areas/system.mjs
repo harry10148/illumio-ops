@@ -1927,7 +1927,11 @@ async function mountTls(root, ctx) {
     };
     if (s.self_signed) statPanel.body.appendChild(btn("btn primary", t("gui_tls_renew"), handles.renew));
     else statPanel.body.appendChild(note(t("gui_sy_tls_no_renew")));
-    statPanel.body.appendChild(note(t("gui_sy_tls_subject_literal")));
+    /* Density spec R5 — this is the page's status card (SY-11, read at a
+     * glance for expiry), same shape as #/system/cache's SY-17: the one
+     * caveat about the subject string not being reliably formatted is worth
+     * keeping but not worth sitting permanently under the status card. */
+    statPanel.body.appendChild(disclosure(t("gui_gen_explain"), note(t("gui_sy_tls_subject_literal"))));
     board.appendChild(statPanel);
 
     // ── TLS config form ──────────────────────────────────────────────
