@@ -495,7 +495,6 @@ function genDrawer(rt, d, lang, hooks) {
   const fileInput = el("input", { class: "field", type: "file", accept: ".csv" });
   const appSel = el("select", { class: "field" });
   const envSel = el("select", { class: "field" });
-  const payload = el("pre", { class: "codepane tall" });
 
   const srcBox = editField("source", t("gui_gen_data_source"),
     radioGroup("rp-src-" + rt.id, SOURCES, state.source, function (v) { state.source = v; onSource(); repaint(); }));
@@ -624,8 +623,6 @@ function genDrawer(rt, d, lang, hooks) {
       const f = collectFilters();
       if (f) b.filters = f;
     }
-    const verb = csv ? "POST (multipart/form-data) " : "POST ";
-    payload.textContent = verb + rt.endpoint + "\n" + JSON.stringify(b, null, 2);
     return b;
   }
 
@@ -683,9 +680,11 @@ function genDrawer(rt, d, lang, hooks) {
     body.appendChild(sectionHead(t("gui_rp_ro_section")));
     body.appendChild(roList([roField("traffic_report_profile", rt.id, t("gui_rp_fn_profile"))]));
   }
-  body.appendChild(sectionHead(t("gui_rp_payload")));
-  body.appendChild(payload);
-
+  /* The outgoing-request preview is gone from this drawer too, for the same
+   * reason as the settings pages: it described the API on a surface whose job
+   * is to generate a report. The form's own fields already say what will be
+   * asked for, and repaint() still returns the body that onSave sends — only
+   * the <pre> that echoed it is gone. */
   onSource();
   repaint();
   return drawerSpec(t(rt.genKey), body, function () {

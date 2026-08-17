@@ -601,14 +601,12 @@ function makeForm(method, endpoint) {
   const save = btn("btn primary", t("gui_save"), function () { fapi.save(); });
   const bar = el("div", { class: "savebar", "data-tone": "neutral" },
     el("span", { class: "dot" }), label, count, diff, spacer(), discard, save);
-  const payload = el("pre", { class: "codepane tall" });
 
   // The bar is fixed to the viewport bottom, so it would sit on top of the last
   // panel; `dock` is the in-flow placeholder that reserves its height.
   const dock = el("div", { class: "savedock" }, bar);
   fapi.bar = bar;
   fapi.dock = dock;
-  fapi.payload = payload;
 
   /** track(key, control, kind) — kind: text|number|bool|list|ports|secret */
   fapi.track = function (key, control, kind) {
@@ -664,16 +662,17 @@ function makeForm(method, endpoint) {
         el("b", { text: ledgerValue(i, readCtl(i.c)) })));
     });
     if (changes.length > 5) diff.appendChild(el("span", { class: "chg", text: tf("gui_sy_more", { n: changes.length - 5 }) }));
-    const body = bodyFn ? bodyFn(fapi.values()) : fapi.values();
-    // The preview <pre> is a VISIBLE element: serialising the real body here
-    // put every typed PCE key/secret, HEC token, alert-plugin secret and new
-    // password on screen in plaintext (and into any screenshot or DOM dump)
-    // for as long as the page was open. It is built from a separately
-    // redacted copy instead — the ledger above has always masked, and now the
-    // preview matches it. The REQUEST still carries the raw value: fapi.save()
-    // rebuilds the body from bodyFn and never reads this string.
-    payload.textContent = method + " " + endpoint + "\n"
-      + JSON.stringify(redactSecrets(body, fapi.secretValues()), null, 2);
+    /* The outgoing-request preview is gone. It showed the method, the endpoint
+     * and the whole JSON body under every settings form — a description of the
+     * API, on a page whose job is to change a setting. The docked bar above
+     * already reports what changed, field by field, in the form's own labels,
+     * which is the part an operator acts on.
+     *
+     * Its redaction (redactSecrets, still used by the ledger) existed because
+     * that pane was visible DOM and would otherwise have printed typed keys,
+     * HEC tokens and new passwords in plaintext. Removing the pane removes that
+     * exposure outright rather than masking it. The request itself is unchanged:
+     * fapi.save() builds the body from bodyFn and never read this string. */
     if (syncFn) syncFn(changes);
   };
 
@@ -709,15 +708,6 @@ function makeForm(method, endpoint) {
   };
 
   return fapi;
-}
-
-/** The 送出內容 pane every settings page ends with — the REAL outgoing
- *  request preview (header point 2: verifyPane dropped). */
-function payloadPanel(form, srcNote) {
-  const p = panel(null, t("gui_sy_payload"));
-  p.body.appendChild(form.payload);
-  if (srcNote) p.body.appendChild(note(srcNote));
-  return p;
 }
 
 async function sysPage(root, ctx, route, snaps, build, soft) {
@@ -779,11 +769,9 @@ function pceDrawer() {
   body.appendChild(labelled(t("gui_api_key"), form.track("key", key, "secret")));
   body.appendChild(labelled(t("gui_api_secret"), form.track("secret", secret, "secret"), t("gui_sy_secret_hint")));
   body.appendChild(checkRow(t("gui_verify_ssl"), form.track("verify_ssl", ssl, "bool")));
-  body.appendChild(sectionHead(t("gui_sy_payload")));
-  body.appendChild(form.payload);
   form.sync();
-  // fapi.save() already POSTs exactly the body the pane above is previewing
-  // and resolves true/false — drawerSpec's onSave contract needs nothing
+  // fapi.save() POSTs the body this form builds and resolves true/false —
+  // drawerSpec's onSave contract needs nothing
   // more; a successful add reloads the whole page from the server.
   return drawerSpec(t("gui_pce_add"), body, function () {
     return form.save().then(function (ok) {
@@ -899,12 +887,18 @@ async function mountPce(root, ctx) {
     // The captured settings snapshot carries the server's redaction, not values:
     // config.py:428-431 replaces every secret with asterisks and adds __set /
     // __length siblings. The form states set/not-set instead of pretending.
+    /* Rows are labelled the way the form above labels the same fields, not by
+     * their config path (api.key / active_pce_id). And the per-row note that
+     * said "derived from the server's set-flag and length, not the secret
+     * itself" is gone from both secret rows: the section note below already
+     * says exactly that, once, for the whole group. Three statements of one
+     * fact is how this page read before. */
     connPanel.body.appendChild(sectionHead(t("gui_sy_secret_state")));
     connPanel.body.appendChild(roList([
-      roField("api.key", secretState(api_, "key"), t("gui_sy_secret_short")),
-      roField("api.secret", secretState(api_, "secret"), t("gui_sy_secret_short")),
-      roField("api.profile", api_.profile, t("gui_sy_pce_profile_field")),
-      roField("active_pce_id", activeId, t("gui_sy_pce_active_field")),
+      roField(t("gui_api_key"), secretState(api_, "key"), null),
+      roField(t("gui_api_secret"), secretState(api_, "secret"), null),
+      roField(t("gui_sy_pce_profile_name"), api_.profile, t("gui_sy_pce_profile_field")),
+      roField(t("gui_sy_pce_active"), activeId, t("gui_sy_pce_active_field")),
     ]));
     connPanel.body.appendChild(note(t("gui_sy_secret_note")));
     connPanel.body.appendChild(note(t("gui_sy_pce_save_note")));
@@ -927,7 +921,6 @@ async function mountPce(root, ctx) {
     });
     form.afterSave = function () { refreshAndRemount(R_PCE, PCE_SNAPS); };
 
-    board.appendChild(payloadPanel(form, t("gui_sy_pce_payload_src")));
     host.appendChild(form.dock);
     form.sync();
   }, PCE_SOFT);
@@ -1314,7 +1307,6 @@ async function mountCache(root, ctx) {
       });
       form.afterSave = function () { banner.hidden = false; };
 
-      board.appendChild(payloadPanel(form, t("gui_sy_cache_payload_src")));
       host.appendChild(form.dock);
       form.sync();
     }, CACHE_SOFT);
@@ -1468,8 +1460,6 @@ function destDrawer(dest, isEdit) {
     roField("profile", dst.profile, t("gui_sy_siem_profile_note")),
     roField("mask_pii", dst.mask_pii, t("gui_sy_siem_maskpii_note")),
   ]));
-  body.appendChild(sectionHead(t("gui_sy_payload")));
-  body.appendChild(form.payload);
   body.appendChild(el("div", { class: "typechips" },
     btn("btn", t("gui_siem_test_inline"), function () {
       if (!isEdit) { toast.info(t("gui_sy_siem_test_saved")); return; }
@@ -1842,7 +1832,6 @@ async function mountSiem(root, ctx) {
       dlqPanel.body.appendChild(note(t("gui_sy_dlq_reason_client")));
       board.appendChild(dlqPanel);
 
-      board.appendChild(payloadPanel(form, t("gui_sy_siem_payload_src")));
       host.appendChild(form.dock);
       form.sync();
     }, SIEM_SOFT);
@@ -2082,7 +2071,6 @@ async function mountTls(root, ctx) {
     impPanel.body.appendChild(note(t("gui_sy_tls_import_paste")));
 
     board.appendChild(el("div", { class: "brow c2 top" }, cfgPanel, el("div", { class: "board" }, csrPanel, impPanel)));
-    board.appendChild(payloadPanel(form, t("gui_sy_tls_payload_src")));
     host.appendChild(form.dock);
     form.sync();
   });
@@ -2187,7 +2175,6 @@ async function mountSecurity(root, ctx) {
     stopPanel.body.appendChild(stopped);
     board.appendChild(stopPanel);
 
-    board.appendChild(payloadPanel(form, t("gui_sy_sec_payload_src")));
     host.appendChild(form.dock);
     form.sync();
   }, SECURITY_SOFT);
@@ -2317,7 +2304,6 @@ async function mountDisplay(root, ctx) {
       return i18n.init().then(function () { refreshAndRemount(R_DISPLAY, DISPLAY_SNAPS); });
     };
 
-    board.appendChild(payloadPanel(form, t("gui_sy_disp_payload_src")));
     host.appendChild(form.dock);
     form.sync();
   }, DISPLAY_SOFT);
@@ -2477,7 +2463,6 @@ async function mountChannels(root, ctx) {
     });
     form.afterSave = function () { refreshAndRemount(R_CHANNELS, CHANNELS_SNAPS); };
 
-    board.appendChild(payloadPanel(form, t("gui_sy_ch_payload_src")));
     host.appendChild(form.dock);
     form.sync();
   }, CHANNELS_SOFT);

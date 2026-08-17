@@ -215,15 +215,18 @@ def test_reports_coverage_anchors_and_i18n(v2_page):
         assert (rhc.get("error") or "") in panel.inner_text()
 
 
-def test_gen_drawer_explanation_collapses_but_payload_preview_stays_visible(v2_page):
+def test_gen_drawer_explanation_collapses_and_shows_no_request_preview(v2_page):
     """Density spec R2/R5 (docs/superpowers/specs/2026-08-17-ui-density-spec.md):
     the drawer's per-field explanations (date format/reset, label source, the
-    data-source gate, ...) fold into one closed <details.disclose>. The "what
-    actually gets sent" section (RO fields + the raw payload preview)
-    deliberately does NOT — same call investigate.mjs's filtersDrawer already
-    made for its own payload preview: the drawer only opens on demand, so
-    this is already one click off the page's default screen, and it is the
-    one place an operator can see exactly what 產生 is about to send.
+    data-source gate, ...) fold into one closed <details.disclose>.
+
+    This test previously pinned the opposite of its second assertion: that the
+    raw request-preview pane stayed visible, on the argument that a drawer is
+    already one click off the default screen. The user overruled that — an
+    endpoint and a JSON body are a description of the API on a surface whose
+    job is to generate a report — so the pane is gone everywhere, and the test
+    now pins its absence. The request itself is unchanged; repaint() still
+    builds the body runGenerate() posts, it just no longer echoes it.
 
     A closed <details> still renders its own <summary> (that's the toggle) —
     the proof of real collapse is that every OTHER child stays empty until
@@ -238,10 +241,9 @@ def test_gen_drawer_explanation_collapses_but_payload_preview_stays_visible(v2_p
     drawer_body = page.locator('[data-cov="RP-02"]')
     drawer_body.wait_for()
 
-    # The payload preview is real and visible without opening anything —
-    # repaint() is the single function that builds both this preview and the
-    # request body runGenerate() actually POSTs, so it cannot drift.
-    assert "/api/audit_report/generate" in drawer_body.locator(".codepane").inner_text()
+    # No request preview, and no endpoint on screen anywhere in the drawer.
+    assert drawer_body.locator("pre.codepane").count() == 0
+    assert "/api/audit_report/generate" not in drawer_body.inner_text()
 
     details_all = drawer_body.locator("details.disclose")
     assert details_all.count() == 1, details_all.count()

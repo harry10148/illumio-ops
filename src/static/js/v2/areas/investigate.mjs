@@ -855,12 +855,15 @@ function filtersDrawer(state, onApply) {
   body.appendChild(el("h4", { class: "eyebrow", text: t("gui_qt_object_filters") }));
   body.appendChild(barHost);
 
-  const preview = el("pre", { class: "codepane" });
   const bar = createFilterBar(barHost, filterBarOpts(state.filters));
 
+  /* The JSON echo of state.filters below the bar is gone, along with the note
+   * that explained FilterBar's own key scheme (side-specific keys in AND mode,
+   * any_* in OR mode). That was a description of the request format on a
+   * surface whose job is to build a query — and the FilterBar above already
+   * shows the operator what they picked, in the terms they picked it. */
   function refresh() {
     state.filters = bar.getFilters();
-    preview.textContent = JSON.stringify(state.filters, null, 2);
   }
   bar.onChange(refresh);
   refresh();
@@ -873,9 +876,6 @@ function filtersDrawer(state, onApply) {
     el("label", null, el("span", { text: t("gui_pd_draft_label") })),
     radioGroup("iv-dpd", PD_DRAFT, state.draftPd, function (v) { state.draftPd = v; })));
 
-  body.appendChild(el("h4", { class: "eyebrow", text: t("gui_iv_payload") }));
-  body.appendChild(preview);
-  body.appendChild(note(t("gui_iv_payload_note")));
 
   const out = {};
   out.bar = bar;

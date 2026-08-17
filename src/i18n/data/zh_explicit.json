@@ -1622,7 +1622,6 @@
   "gui_ov_no_truncation": "近 7 天沒有偵測到集合截斷。清單為空時這張卡仍會顯示，因為「沒有問題」也是一種結果。",
   "gui_rp_labels_src": "選項來自不帶 key 篩選的 /api/labels，所以 App 與 Env 兩個選單餵的是同一份清單，而非分別以 key 篩選抓取。",
   "gui_sy_cache_nogui_note": "這個鍵沒有對應的表單控制項；它之所以沒有遺失，是因為儲存時是覆蓋既有設定物件。",
-  "gui_sy_cache_payload_src": "送出：PUT /api/cache/settings，body 是「既有設定物件 + 本表單覆寫」。",
   "gui_sy_disp_dashq": "自訂查詢另外存在設定檔中；那是總覽頁儲存查詢卡片的資料，不在這一頁編輯。",
   "gui_sy_disp_theme_apply": "切換後立即套用。",
   "gui_sy_dlq_paging": "DLQ 清單在後端分頁。",
@@ -1666,5 +1665,7 @@
   "gui_ov_group_system": "系統詳情",
   "gui_ov_group_activity": "近期活動",
   "gui_action_plugin_last_prefix": "上次傳送：",
-  "gui_action_plugin_missing_prefix": "缺少："
+  "gui_action_plugin_missing_prefix": "缺少：",
+  "gui_sy_pce_profile_name": "設定檔名稱",
+  "gui_sy_pce_active": "作用中的設定檔"
 }

@@ -13,8 +13,12 @@ Covers, per the task brief's T9 row:
     it reports no errors, exercising every audit opener for real.
   - key flow 1 (dirty tracking / the Phase 1 defect fix): toggling the
     language radio on #/system/display marks the docked form dirty AND the
-    live payload preview carries the NEW language, not the stale settings
-    snapshot (test_display_language_change_enters_form_track).
+    request the form actually sends carries the NEW language, not the stale
+    settings snapshot (test_display_language_change_enters_form_track).
+    That second half used to be read off a visible request-preview pane; the
+    density redesign removed those panes (they described the API on a page
+    whose job is to change a setting), so the test asserts the sent body
+    directly, through a fulfilled route that persists nothing.
   - key flow 2 (the required save-flow e2e): change ONE display setting
     (settings.timezone) -> Save -> reload -> re-GET /api/settings and verify
     it persisted -> change it back, confined to a `finally` so a failed
@@ -344,14 +348,69 @@ def test_display_language_change_enters_form_track(v2_page):
     assert bar.get_attribute("data-tone") == "warn"
     assert bar.locator(".chg code", has_text="settings.language").count() == 1
 
-    payload = page.locator(".codepane.tall").last.inner_text()
-    assert ('"language": "%s"' % other) in payload, payload
+    # The other half of that fix — setBody reading the tracked control rather
+    # than the stale snapshot — used to be read off the visible request preview
+    # here. That pane is gone, and asserting it from the body actually sent
+    # needs a save, which changes what Discard below can restore; it lives in
+    # test_display_language_reaches_the_request_body instead.
 
     # Restore without saving — discard reverts the whole ledger, including
     # the radio's own checked state (writeCtl's __setValue branch).
     page.get_by_role("button", name=_labels(page)["gui_sy_discard"], exact=True).click()
     assert bar.get_attribute("data-tone") == "neutral"
     assert locale.locator('input[type="radio"][name="sy-lang"]:checked').get_attribute("value") == current
+
+
+def test_display_language_reaches_the_request_body(v2_page):
+    """The second half of the Phase 1 language fix: the body the form SENDS
+    carries the newly picked language, not the stale settings snapshot.
+
+    This used to be read off the docked request-preview pane. The density
+    redesign removed those panes — an endpoint and a JSON dump are a
+    description of the API on a page whose job is to change a setting — so the
+    property is asserted where it actually matters, on the request itself.
+
+    The route is fulfilled, so the appliance's settings are never written. That
+    does leave the CLIENT believing it saved (fapi.save commits its ledger
+    baseline on ok:true), which is why this is its own test and ends with a
+    reload: the fresh mount re-reads the real, unchanged settings, so nothing
+    is carried into the next test.
+    """
+    page, base_url = v2_page
+    _goto(page, base_url, R_DISPLAY, "XC-06")
+
+    locale = page.locator('section[data-cov="XC-06"]')
+    current = locale.locator('input[type="radio"][name="sy-lang"]:checked').get_attribute("value")
+    other = "zh_TW" if current == "en" else "en"
+    locale.locator('input[type="radio"][name="sy-lang"][value="%s"]' % other).check()
+
+    sent = {}
+
+    def _capture(route):
+        sent["body"] = route.request.post_data
+        route.fulfill(status=200, content_type="application/json",
+                      body='{"ok": true, "requires_restart": false}')
+
+    page.route("**/api/settings", _capture)
+    try:
+        page.get_by_role("button", name=_labels(page)["gui_save"], exact=True).last.click()
+        expect(page.locator(".savebar")).to_have_attribute("data-tone", "neutral")
+    finally:
+        page.unroute("**/api/settings", _capture)
+
+    assert sent.get("body"), "Save sent no request"
+    # Parsed rather than substring-matched: the assertion this replaces was
+    # written against the preview's pretty-printed JSON and would have failed
+    # on the real request's compact form for a formatting reason, not a real one.
+    body = json.loads(sent["body"])
+    assert body["settings"]["language"] == other, body
+
+    page.reload()
+    page.wait_for_selector('body[data-booted="true"]')
+    _navigate(page, R_DISPLAY, "XC-06")
+    assert page.locator(
+        'section[data-cov="XC-06"] input[type="radio"][name="sy-lang"]:checked'
+    ).get_attribute("value") == current, "the fulfilled save must not have persisted"
 
 
 # ══════════════════════════════════════════ key flow: required save-flow e2e ═
@@ -781,13 +840,19 @@ SENTINEL = "E2E-SECRET-SENTINEL-9137"
 MASK = "•" * 8
 
 
-def _preview_text(scope):
-    """The concatenated text of every request-preview <pre> inside `scope`."""
-    panes = scope.locator("pre.codepane")
-    return "\n".join(panes.nth(i).inner_text() for i in range(panes.count()))
+def _dom_text(page):
+    """Every text node in the document, hidden ones included.
+
+    textContent, not innerText, on purpose: a secret folded inside a closed
+    <details> is one click from being read and would still land in a DOM dump,
+    so "not rendered right now" is not the property worth asserting. Input
+    *values* are not text nodes, so typing into a password box does not itself
+    trip this — which is the distinction these tests are about.
+    """
+    return page.evaluate("() => document.body.textContent || ''")
 
 
-def test_pce_secrets_never_reach_the_request_preview(v2_page):
+def test_pce_secrets_never_reach_the_dom(v2_page):
     """Finding 1 (security): the docked save row's request preview is a
     VISIBLE <pre> in the DOM, and it used to serialize the raw request body —
     so an operator typing a PCE API key had that key sitting in plaintext on
@@ -803,13 +868,21 @@ def test_pce_secrets_never_reach_the_request_preview(v2_page):
     page, base_url = v2_page
     _goto(page, base_url, R_PCE, "SY-01")
 
-    board = page.locator(".board")
-    page.locator('.board input[data-field="key"]').fill(SENTINEL)
-    page.locator('.board input[data-field="secret"]').fill(SENTINEL)
-    preview = _preview_text(board)
-    assert SENTINEL not in preview, preview
-    assert '"key": "%s"' % MASK in preview, preview
-    assert '"secret": "%s"' % MASK in preview, preview
+    key = page.locator('.board input[data-field="key"]')
+    secret = page.locator('.board input[data-field="secret"]')
+    key.fill(SENTINEL)
+    secret.fill(SENTINEL)
+
+    # Non-vacuity: the value really is in the form, and the form really
+    # registered it as a change — masked. Without these two the assertion
+    # below would pass just as happily against an empty page.
+    assert key.input_value() == SENTINEL
+    assert secret.input_value() == SENTINEL
+    ledger = page.locator(".savebar").inner_text()
+    assert MASK in ledger, ledger
+    assert SENTINEL not in ledger, ledger
+
+    assert SENTINEL not in _dom_text(page)
 
     page.get_by_role("button", name=_labels(page)["gui_pce_add"], exact=True).first.click()
     drawer = page.locator("aside.drawer")
@@ -817,20 +890,15 @@ def test_pce_secrets_never_reach_the_request_preview(v2_page):
     drawer.locator('input[data-field="name"]').fill("e2e-sy-preview")
     drawer.locator('input[data-field="key"]').fill(SENTINEL)
     drawer.locator('input[data-field="secret"]').fill(SENTINEL)
-    drawer_preview = _preview_text(drawer)
-    assert SENTINEL not in drawer_preview, drawer_preview
-    assert '"key": "%s"' % MASK in drawer_preview, drawer_preview
-    assert '"secret": "%s"' % MASK in drawer_preview, drawer_preview
+    assert drawer.locator('input[data-field="key"]').input_value() == SENTINEL
+    assert SENTINEL not in _dom_text(page)
 
-    # The dirty ledger has always masked; assert it stays that way so a fix
-    # applied in the wrong place cannot regress it.
-    assert SENTINEL not in page.locator(".savebar").inner_text()
     # Nothing is saved: the drawer is dismissed without touching the backend.
     page.keyboard.press("Escape")
     page.wait_for_selector("aside.drawer", state="detached")
 
 
-def test_siem_hec_token_never_reaches_the_request_preview(v2_page):
+def test_siem_hec_token_never_reaches_the_dom(v2_page):
     """Finding 1, the SIEM destination drawer's hec_token (system.mjs's
     destDrawer). transport=hec is selected first because the HEC section —
     and therefore the token in the body — only exists for that transport.
@@ -843,33 +911,35 @@ def test_siem_hec_token_never_reaches_the_request_preview(v2_page):
     drawer.wait_for(state="visible")
     drawer.locator('input[data-field="name"]').fill("e2e-sy-preview-hec")
     drawer.locator('select[data-field="transport"]').select_option("hec")
-    drawer.locator('input[data-field="hec_token"]').fill(SENTINEL)
+    token = drawer.locator('input[data-field="hec_token"]')
+    token.fill(SENTINEL)
 
-    preview = _preview_text(drawer)
-    assert SENTINEL not in preview, preview
-    assert '"hec_token": "%s"' % MASK in preview, preview
+    assert token.input_value() == SENTINEL, "token box did not take the value"
+    assert SENTINEL not in _dom_text(page)
 
     page.keyboard.press("Escape")
     page.wait_for_selector("aside.drawer", state="detached")
 
 
-def test_security_new_password_never_reaches_the_request_preview(v2_page):
+def test_security_new_password_never_reaches_the_dom(v2_page):
     """Finding 1, SY-12's new-password boxes. A typed replacement password is
     the most sensitive value this area handles and it was serialized straight
     into the visible preview. Never saved — the form is only typed into."""
     page, base_url = v2_page
     _goto(page, base_url, R_SECURITY, "SY-12")
 
-    page.locator('input[data-field="new_password"]').fill(SENTINEL)
+    pw = page.locator('input[data-field="new_password"]')
+    pw.fill(SENTINEL)
     page.locator('input[data-field="confirm_password"]').fill(SENTINEL)
 
-    preview = _preview_text(page.locator(".board"))
-    assert SENTINEL not in preview, preview
-    assert '"new_password": "%s"' % MASK in preview, preview
-    assert SENTINEL not in page.locator(".savebar").inner_text()
+    assert pw.input_value() == SENTINEL
+    ledger = page.locator(".savebar").inner_text()
+    assert MASK in ledger, ledger
+    assert SENTINEL not in ledger, ledger
+    assert SENTINEL not in _dom_text(page)
 
 
-def test_alert_channel_secrets_never_reach_the_request_preview(v2_page):
+def test_alert_channel_secrets_never_reach_the_dom(v2_page):
     """Finding 1, SY-14's alert-plugin secret fields (SMTP password, bot
     tokens — whichever the real plugin catalogue declares). Every declared
     secret box is filled, so this covers the catalogue as it actually is
@@ -884,10 +954,14 @@ def test_alert_channel_secrets_never_reach_the_request_preview(v2_page):
     for i in range(total):
         boxes.nth(i).fill(SENTINEL)
 
-    preview = _preview_text(page.locator(".board"))
-    assert SENTINEL not in preview, preview
-    assert preview.count(MASK) >= total, preview
-    assert SENTINEL not in page.locator(".savebar").inner_text()
+    # Every declared secret box really holds the sentinel, and the ledger shows
+    # that many masked changes — so the DOM assertion below is about real values.
+    for i in range(total):
+        assert boxes.nth(i).input_value() == SENTINEL
+    ledger = page.locator(".savebar").inner_text()
+    assert ledger.count(MASK) >= total, ledger
+    assert SENTINEL not in ledger, ledger
+    assert SENTINEL not in _dom_text(page)
 
 
 # ══════════════════════════════════════════ real, harmless DLQ wiring ════════
