@@ -73,7 +73,11 @@ def _labels(page):
         "async () => { const { t } = await import('/static/js/v2/core/i18n.mjs'); "
         "return { filters: t('gui_filter_settings'), browse_all: t('gui_fb_browse_all'), "
         "services: t('gui_fb_cat_service'), labels: t('gui_fb_cat_label'), "
-        "transmission: t('gui_fb_cat_transmission'), add: t('gui_add') }; }"
+        "transmission: t('gui_fb_cat_transmission'), add: t('gui_add'), "
+        "iplists: t('gui_fb_cat_iplist'), workloads: t('gui_fb_cat_workload'), "
+        "label_groups: t('gui_fb_cat_label_group'), search_only: t('gui_fb_search_only'), "
+        "retry: t('gui_fb_retry'), no_match: t('gui_fb_no_match'), "
+        "loading: t('gui_fb_loading') }; }"
     )
 
 
@@ -112,6 +116,14 @@ FIXTURE = {
 }
 BROWSEABLE = ("label", "label_group", "iplist", "service")
 
+# A collection longer than one browse page, for the paging scenario. Named so it
+# matches none of the search queries the other scenarios type, so switching it
+# on cannot change what they see.
+BIG_LABELS = [
+    {"name": f"tier{n:02d}=z", "href": f"/orgs/1/labels/b{n}", "key": f"tier{n:02d}", "value": "z"}
+    for n in range(45)
+]
+
 
 def _stub_object_corpus(page):
     """Fulfil the two object-source reads locally, per request.
@@ -141,12 +153,21 @@ def _stub_object_corpus(page):
       fail_browse   {cat, ...}  -> answer those browse calls with a 502
       fail_suggest  {cat, ...}  -> mark those categories `error` inside a 200
       fail_totals   bool        -> answer type=_totals with a 502
+      big_label_corpus bool     -> serve BIG_LABELS from browse, for paging
+      hold_browse   {cat, ...}  -> do not answer those browse calls yet; the
+                                   answer is parked in `held` for the test to
+                                   release, which is how the in-flight state
+                                   becomes observable instead of a race
+      held         [callable]   -> release a parked answer by calling it
       browse_calls / suggest_calls -> the requests that actually arrived
     """
     ctl = {
         "fail_browse": set(),
         "fail_suggest": set(),
         "fail_totals": False,
+        "big_label_corpus": False,
+        "hold_browse": set(),
+        "held": [],
         "browse_calls": [],
         "suggest_calls": [],
     }
@@ -163,28 +184,35 @@ def _stub_object_corpus(page):
         offset = int((args.get("offset") or ["0"])[0])
         limit = int((args.get("limit") or ["20"])[0])
         ctl["browse_calls"].append((btype, offset, limit))
-        if btype == "_totals":
-            if ctl["fail_totals"]:
+
+        def answer():
+            if btype == "_totals":
+                if ctl["fail_totals"]:
+                    _json(route, {"ok": False, "error": "pce_unreachable"}, status=502)
+                    return
+                _json(route, {"ok": True, "totals": {c: len(FIXTURE[c]) for c in BROWSEABLE}})
+                return
+            if btype == "workload":
+                _json(route, {"ok": True, "browseable": False, "items": [], "total": None})
+                return
+            if btype not in BROWSEABLE:
+                _json(route, {"ok": False, "error": "unknown_type"}, status=400)
+                return
+            if btype in ctl["fail_browse"]:
                 _json(route, {"ok": False, "error": "pce_unreachable"}, status=502)
                 return
-            _json(route, {"ok": True, "totals": {c: len(FIXTURE[c]) for c in BROWSEABLE}})
+            rows = BIG_LABELS if (btype == "label" and ctl["big_label_corpus"]) else FIXTURE[btype]
+            page_rows = rows[offset:offset + limit]
+            body = {"ok": True, "items": page_rows, "total": len(rows),
+                    "truncated": offset + limit < len(rows)}
+            if btype == "label":
+                body["groups"] = [{"key": "role", "count": 2}, {"key": "env", "count": 1}]
+            _json(route, body)
+
+        if btype in ctl["hold_browse"]:
+            ctl["held"].append(answer)
             return
-        if btype == "workload":
-            _json(route, {"ok": True, "browseable": False, "items": [], "total": None})
-            return
-        if btype not in BROWSEABLE:
-            _json(route, {"ok": False, "error": "unknown_type"}, status=400)
-            return
-        if btype in ctl["fail_browse"]:
-            _json(route, {"ok": False, "error": "pce_unreachable"}, status=502)
-            return
-        rows = FIXTURE[btype]
-        page_rows = rows[offset:offset + limit]
-        body = {"ok": True, "items": page_rows, "total": len(rows),
-                "truncated": offset + limit < len(rows)}
-        if btype == "label":
-            body["groups"] = [{"key": "role", "count": 2}, {"key": "env", "count": 1}]
-        _json(route, body)
+        answer()
 
     def suggest(route):
         args = _args(route)
@@ -459,3 +487,295 @@ def test_transmission_category_is_destination_only(v2_page):
     page.wait_for_selector(f"{_zone('src')} .fb-cat-item")
     src_cats = " | ".join(page.locator(f"{_zone('src')} .fb-cat-item").all_inner_texts())
     assert labels["transmission"] not in src_cats, src_cats
+
+
+# ── live queries · the wiring itself ────────────────────────────────────────
+#
+# Everything below asserts at the network boundary — WHICH request went out,
+# with which parameters, and how many. A dropdown full of rows proves nothing
+# about that: the bug these cover shipped with a full dropdown (one captured
+# page of labels, filtered in the browser, for every category and every
+# keystroke).
+
+def _query_args(request):
+    return parse_qs(urlparse(request.url).query)
+
+
+def test_typing_issues_a_suggest_request_for_this_zones_categories(v2_page):
+    page, base_url = v2_page
+    _stub_object_corpus(page)
+    _open_filter_drawer(page, base_url)
+
+    inp = _zone_input(page, "src")
+    inp.click()
+    with page.expect_request(
+        lambda r: "/api/filter-objects/suggest" in r.url and r.method == "GET"
+    ) as info:
+        inp.fill("role")
+    args = _query_args(info.value)
+
+    assert args.get("q") == ["role"], args
+    # The Source zone's suggestable categories, and only those: `service` lives
+    # in the Service column and `ip` has no suggest endpoint at all
+    # (_objfbZoneCats ∩ _OBJFB_SUGGEST_CATS). A wider request would put service
+    # rows under Source; a narrower one would hide a category the pane offers.
+    assert set(args["types"][0].split(",")) == {"label", "label_group", "iplist", "workload"}, args
+
+    # ...and the answer is what the list shows: two of the three fixture labels
+    # match "role", and nothing in the other three categories does.
+    page.wait_for_selector(f'{FB} .fb-dd-item[data-cat="label"]')
+    assert page.locator(f'{FB} .fb-dd-item[data-cat="label"]').count() == 2
+    assert page.locator(f"{FB} .fb-dd-item:not([data-cat='label'])").count() == 0
+
+
+def test_typing_a_burst_costs_one_suggest_request(v2_page):
+    """The debounce. Four characters inside the 250 ms window = one request."""
+    page, base_url = v2_page
+    ctl = _stub_object_corpus(page)
+    _open_filter_drawer(page, base_url)
+
+    inp = _zone_input(page, "src")
+    inp.click()
+    inp.press_sequentially("role", delay=40)
+    page.wait_for_selector(f'{FB} .fb-dd-item[data-cat="label"]')
+    # Wait past the debounce window again before counting, so this cannot pass
+    # merely by looking before a per-character burst finished arriving.
+    page.wait_for_timeout(600)
+
+    assert [call[0] for call in ctl["suggest_calls"]] == ["role"], ctl["suggest_calls"]
+
+    # Retyping the same query asks nothing more: the (category, query) answers
+    # are cached for the life of the bar.
+    inp.fill("")
+    inp.fill("role")
+    page.wait_for_timeout(600)
+    assert [call[0] for call in ctl["suggest_calls"]] == ["role"], ctl["suggest_calls"]
+
+
+def test_selecting_a_non_label_category_browses_it_from_the_server(v2_page):
+    page, base_url = v2_page
+    _stub_object_corpus(page)
+    labels = _open_filter_drawer(page, base_url)
+
+    inp = _zone_input(page, "src")
+    inp.click()
+    page.wait_for_selector(f"{_zone('src')} .fb-cat-item")
+    with page.expect_request(
+        lambda r: "/api/filter-objects/browse" in r.url and "type=iplist" in r.url
+    ):
+        page.locator(f"{_zone('src')} .fb-cat-item").filter(
+            has_text=labels["iplists"]
+        ).first.click()
+
+    row = page.locator(f'{_zone("src")} .fb-dd-item[data-cat="iplist"]').first
+    row.wait_for(state="visible")
+    assert "Corp-Networks" in row.inner_text()
+    # The row carries what only an IP list carries — its ranges. Before this
+    # wiring every scope but Labels could only ever say "type to search",
+    # because the one captured payload held labels.
+    assert "10.0.0.0/8" in row.locator(".fb-dd-sub").inner_text()
+
+    row.click()
+    pill = page.locator(f"{_zone('src')} .fb-pill").first
+    pill.wait_for(state="visible")
+    assert "Corp-Networks" in pill.inner_text()
+
+
+def test_workload_category_says_search_only_instead_of_an_empty_list(v2_page):
+    """browseable:false is a property of the category, not an outage — and not
+    zero rows. Workloads have no browse endpoint (filter_objects.py:66-67)."""
+    page, base_url = v2_page
+    _stub_object_corpus(page)
+    labels = _open_filter_drawer(page, base_url)
+
+    inp = _zone_input(page, "src")
+    inp.click()
+    page.wait_for_selector(f"{_zone('src')} .fb-cat-item")
+    page.locator(f"{_zone('src')} .fb-cat-item").filter(
+        has_text=labels["workloads"]
+    ).first.click()
+
+    note = page.locator(f"{_zone('src')} .fb-dd-note").filter(
+        has_text=labels["search_only"]
+    ).first
+    note.wait_for(state="visible")
+    assert page.locator(f"{_zone('src')} .fb-dd-item").count() == 0
+    assert page.locator(f"{_zone('src')} .fb-dd-empty").count() == 0
+
+    # ...and the category IS reachable — by searching it.
+    inp.fill("web")
+    row = page.locator(f'{_zone("src")} .fb-dd-item[data-cat="workload"]').first
+    row.wait_for(state="visible")
+    assert "web-01" in row.inner_text()
+    # a workload states its hostname/address, which is its own kind of detail
+    assert "10.1.1.4" in row.locator(".fb-dd-sub").inner_text()
+
+
+def test_a_category_being_loaded_says_so_while_the_request_is_in_flight(v2_page):
+    """The in-flight state, made observable by parking the response: opening a
+    category must not look like an empty category while its page is on the way."""
+    page, base_url = v2_page
+    ctl = _stub_object_corpus(page)
+    ctl["hold_browse"].add("service")
+    labels = _open_filter_drawer(page, base_url)
+
+    svc = _zone_input(page, "svc")
+    svc.click()
+    page.wait_for_selector(f"{_zone('svc')} .fb-cat-item")
+    page.locator(f"{_zone('svc')} .fb-cat-item").filter(
+        has_text=labels["services"]
+    ).first.click()
+
+    loading = page.locator(f"{_zone('svc')} .fb-dd-note").filter(has_text=labels["loading"]).first
+    loading.wait_for(state="visible")
+    assert page.locator(f"{_zone('svc')} .fb-dd-item").count() == 0
+    assert page.locator(f"{_zone('svc')} .fb-dd-empty").count() == 0
+
+    assert ctl["held"], "the browse request never arrived"
+    ctl["held"].pop()()
+    page.wait_for_selector(f'{_zone("svc")} .fb-dd-item[data-cat="service"]')
+    assert page.locator(f"{_zone('svc')} .fb-dd-note").filter(
+        has_text=labels["loading"]
+    ).count() == 0
+
+
+def test_a_category_the_pce_could_not_answer_shows_an_error_and_a_retry(v2_page):
+    """The 200-with-per-category-error shape: an unreachable PCE fails the
+    cached categories while the live workload lookup still answers. The failing
+    one must be NAMED, offer a retry, and never be reported as "no match"."""
+    page, base_url = v2_page
+    ctl = _stub_object_corpus(page)
+    ctl["fail_suggest"].add("label")
+    labels = _open_filter_drawer(page, base_url)
+
+    inp = _zone_input(page, "src")
+    inp.click()
+    inp.fill("role")
+
+    err = page.locator(f"{FB} .fb-dd-err").first
+    err.wait_for(state="visible")
+    assert labels["labels"] in err.inner_text(), err.inner_text()
+    assert page.locator(f'{FB} .fb-dd-item[data-cat="label"]').count() == 0
+    # the failure is NOT dressed up as an empty result
+    assert page.locator(f"{FB} .fb-dd-empty").count() == 0
+
+    ctl["fail_suggest"].clear()
+    with page.expect_request(lambda r: "/api/filter-objects/suggest" in r.url):
+        err.locator(".fb-dd-retry").click()
+    page.wait_for_selector(f'{FB} .fb-dd-item[data-cat="label"]')
+    assert page.locator(f"{FB} .fb-dd-err").count() == 0
+
+
+def test_a_failed_browse_shows_an_error_and_a_retry(v2_page):
+    """The other failure shape: a 502 {ok:false} for the whole request."""
+    page, base_url = v2_page
+    ctl = _stub_object_corpus(page)
+    ctl["fail_browse"].add("iplist")
+    labels = _open_filter_drawer(page, base_url)
+
+    inp = _zone_input(page, "src")
+    inp.click()
+    page.wait_for_selector(f"{_zone('src')} .fb-cat-item")
+    page.locator(f"{_zone('src')} .fb-cat-item").filter(
+        has_text=labels["iplists"]
+    ).first.click()
+
+    err = page.locator(f"{_zone('src')} .fb-dd-err").first
+    err.wait_for(state="visible")
+    assert page.locator(f'{_zone("src")} .fb-dd-item').count() == 0
+    assert labels["no_match"] not in page.locator(f"{_zone('src')} .fb-dd-body").inner_text()
+
+    ctl["fail_browse"].clear()
+    with page.expect_request(
+        lambda r: "/api/filter-objects/browse" in r.url and "type=iplist" in r.url
+    ):
+        err.locator(".fb-dd-retry").click()
+    page.wait_for_selector(f'{_zone("src")} .fb-dd-item[data-cat="iplist"]')
+    assert page.locator(f"{_zone('src')} .fb-dd-err").count() == 0
+
+
+def test_category_counts_come_from_the_totals_query(v2_page):
+    page, base_url = v2_page
+    _stub_object_corpus(page)
+    labels = _open_filter_drawer(page, base_url)
+
+    with page.expect_request(lambda r: "type=_totals" in r.url):
+        _zone_input(page, "src").click()
+
+    row = page.locator(f"{_zone('src')} .fb-cat-item").filter(has_text=labels["iplists"]).first
+    count = row.locator(".fb-cnt")
+    count.wait_for(state="visible")
+    assert count.inner_text().strip() == "1", row.inner_text()
+    label_row = page.locator(f"{_zone('src')} .fb-cat-item").filter(has_text=labels["labels"]).first
+    assert label_row.locator(".fb-cnt").inner_text().strip() == "3", label_row.inner_text()
+
+
+def test_a_failed_totals_query_shows_no_count_rather_than_zero(v2_page):
+    """A count is decoration; a WRONG count is a claim. "Failure rendered as a
+    healthy zero" is a mistake this project has shipped more than once."""
+    page, base_url = v2_page
+    ctl = _stub_object_corpus(page)
+    ctl["fail_totals"] = True
+    labels = _open_filter_drawer(page, base_url)
+
+    inp = _zone_input(page, "src")
+    inp.click()
+    page.wait_for_selector(f"{_zone('src')} .fb-cat-item")
+    page.wait_for_timeout(400)   # let the failed totals response land
+    assert page.locator(f"{_zone('src')} .fb-cat-item .fb-cnt").count() == 0
+    # the categories themselves are still offered, and still work
+    page.locator(f"{_zone('src')} .fb-cat-item").filter(
+        has_text=labels["labels"]
+    ).first.click()
+    page.wait_for_selector(f'{_zone("src")} .fb-dd-item[data-cat="label"]')
+
+
+def test_each_candidate_row_states_its_own_type(v2_page):
+    """Reported symptom 4: the object types all looked the same. Every candidate
+    row carries its category as a data attribute AND a distinct type code."""
+    page, base_url = v2_page
+    _stub_object_corpus(page)
+    _open_filter_drawer(page, base_url)
+
+    inp = _zone_input(page, "src")
+    inp.click()
+    inp.fill("e")            # matches every fixture category in this zone
+    page.wait_for_selector(f'{FB} .fb-dd-item[data-cat="workload"]')
+
+    codes = page.eval_on_selector_all(
+        f"{FB} .fb-dd-item",
+        "els => els.map(e => [e.dataset.cat, e.querySelector('.fb-cat').textContent])",
+    )
+    by_cat = dict(codes)
+    assert by_cat.get("label") == "LBL", codes
+    assert by_cat.get("label_group") == "LGR", codes
+    assert by_cat.get("iplist") == "IPL", codes
+    assert by_cat.get("workload") == "WKL", codes
+    assert len(set(by_cat.values())) == 4, codes
+
+
+def test_browse_pages_with_load_more(v2_page):
+    """`total` greater than what is held offers a load-more, and it asks for the
+    NEXT offset rather than re-reading page one."""
+    page, base_url = v2_page
+    ctl = _stub_object_corpus(page)
+    ctl["big_label_corpus"] = True
+    labels = _open_filter_drawer(page, base_url)
+
+    inp = _zone_input(page, "src")
+    inp.click()
+    page.locator(f"{_zone('src')} .fb-cat-item").filter(has_text=labels["labels"]).first.click()
+    page.wait_for_selector(f'{_zone("src")} .fb-dd-item[data-cat="label"]')
+    assert [c for c in ctl["browse_calls"] if c[0] == "label"] == [("label", 0, 20)]
+    assert page.locator(f'{_zone("src")} .fb-dd-item[data-cat="label"]').count() == 20
+
+    more = page.locator(f"{_zone('src')} .fb-dd-more").first
+    assert "20" in more.inner_text() and "45" in more.inner_text(), more.inner_text()
+    with page.expect_request(
+        lambda r: "type=label" in r.url and "offset=20" in r.url
+    ):
+        more.click()
+    page.wait_for_function(
+        "() => document.querySelectorAll('[data-cov=\"XC-03\"] .fb-dd-item[data-cat=\"label\"]').length === 40"
+    )
+    assert [c for c in ctl["browse_calls"] if c[0] == "label"] == [("label", 0, 20), ("label", 20, 20)]
