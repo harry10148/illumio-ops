@@ -121,7 +121,7 @@
 //      re-copying it here.
 
 
-import { el, clear } from "../core/dom.mjs";
+import { el, clear, disclosure } from "../core/dom.mjs";
 import { t, tf } from "../core/i18n.mjs";
 import { stamp } from "../core/fmt.mjs";
 import { api } from "../core/api.mjs";
@@ -511,10 +511,13 @@ function genDrawer(rt, d, lang, hooks) {
       repaint();
     }));
   });
+  // R5: what these fields send (ISO vs raw date strings, and that they reset
+  // to today−7..today on every open) is real but is not a decision you make
+  // while picking dates — it moves into the drawer's one "說明" disclosure
+  // below, alongside every other secondary explanation this drawer used to
+  // scatter across its sections.
   const dateBox = el("div", null,
-    sectionHead(t("gui_quick_range")), quickRow, dateRow,
-    note(t(rt.dateFmt === "iso" ? "gui_rp_date_iso" : "gui_rp_date_raw")),
-    note(t("gui_rp_date_sticky")));
+    sectionHead(t("gui_quick_range")), quickRow, dateRow);
   startInput.dataset.field = "start_date";
   endInput.dataset.field = "end_date";
 
@@ -530,8 +533,7 @@ function genDrawer(rt, d, lang, hooks) {
   envSel.addEventListener("change", repaint);
   const appBox = el("div", null,
     editField("app", t("gui_app_label_field"), appSel, t("gui_rp_app_required")),
-    editField("env", t("gui_env_label_field"), envSel),
-    note(t("gui_rp_labels_src")));
+    editField("env", t("gui_env_label_field"), envSel));
 
   // RP-02's filter block: three pd checkboxes + the shared FilterBar.
   const pdRow = el("div", { class: "typechips" });
@@ -639,29 +641,47 @@ function genDrawer(rt, d, lang, hooks) {
   if (rt.has("source")) {
     body.appendChild(srcBox);
     body.appendChild(fileBox);
-    if (rt.id === "rule_hit_count") body.appendChild(note(t("gui_rp_rhc_native")));
   }
-  if (rt.has("snapshot")) body.appendChild(note(t("gui_gen_snapshot_note")));
   if (rt.has("dates")) body.appendChild(dateBox);
   if (rt.has("app")) body.appendChild(appBox);
   if (rt.has("filters")) body.appendChild(filterBox);
-  if (rt.has("ds")) {
-    body.appendChild(dsBox);
-    body.appendChild(note(t("gui_rp_ds_gate")));
-  }
+  if (rt.has("ds")) body.appendChild(dsBox);
   body.appendChild(sectionHead(t("gui_rp_out_section")));
   body.appendChild(editField("format", t("gui_sched_format"), fmtSel, rt.formatNote ? t(rt.formatNote) : null));
   body.appendChild(editField("lang", t("gui_report_lang_label"), langSel, t("gui_rp_lang_field_hint")));
-  // Body keys the form does not expose as controls. traffic_report_profile is
-  // the card's own identity (dashboard.js:962-967 reads it from the button that
-  // opened the modal, never from an input) — it still reaches the backend, so it
-  // is stated rather than left to be discovered in the payload pane.
-  if (rt.has("filters")) {
-    body.appendChild(sectionHead(t("gui_rp_ro_section")));
-    body.appendChild(roList([roField("traffic_report_profile", rt.id, t("gui_rp_fn_profile"))]));
+
+  // R5 — every secondary explanation this drawer used to scatter across its
+  // sections (RHC's source quirk, the snapshot type's missing dates, date
+  // format/reset behaviour, where the app/env options come from, the data-
+  // source gate) collects into one disclosure instead of one note per field.
+  const explainNotes = [];
+  if (rt.id === "rule_hit_count") explainNotes.push(note(t("gui_rp_rhc_native")));
+  if (rt.has("snapshot")) explainNotes.push(note(t("gui_gen_snapshot_note")));
+  if (rt.has("dates")) {
+    explainNotes.push(note(t(rt.dateFmt === "iso" ? "gui_rp_date_iso" : "gui_rp_date_raw")));
+    explainNotes.push(note(t("gui_rp_date_sticky")));
   }
-  body.appendChild(sectionHead(t("gui_rp_payload")));
-  body.appendChild(payload);
+  if (rt.has("app")) explainNotes.push(note(t("gui_rp_labels_src")));
+  if (rt.has("ds")) explainNotes.push(note(t("gui_rp_ds_gate")));
+  // disclosure()'s rest-param children go through dom.mjs's append(), which
+  // flattens arrays — so the whole dynamically-sized list can be passed as
+  // one argument instead of needing spread syntax this codebase avoids.
+  if (explainNotes.length) body.appendChild(disclosure(t("gui_gen_explain"), explainNotes));
+
+  // Body keys the form does not expose as controls, and the exact request
+  // this drawer is about to send — real evidence (RP-02's header point 4),
+  // not decoration, but not something you need open on every visit either.
+  // traffic_report_profile is the card's own identity (dashboard.js:962-967
+  // reads it from the button that opened the modal, never from an input) —
+  // it still reaches the backend, so it is stated rather than left to be
+  // discovered only in the payload pane.
+  const sentExtra = [];
+  if (rt.has("filters")) {
+    sentExtra.push(sectionHead(t("gui_rp_ro_section")));
+    sentExtra.push(roList([roField("traffic_report_profile", rt.id, t("gui_rp_fn_profile"))]));
+  }
+  sentExtra.push(payload);
+  body.appendChild(disclosure(t("gui_rp_payload"), sentExtra));
 
   onSource();
   repaint();
@@ -1028,8 +1048,11 @@ async function mountReports(root, ctx) {
       const grid = el("div", { class: "rpgrid" });
       const untypedNoteHost = el("div");
       catPanel.body.appendChild(grid);
-      catPanel.body.appendChild(note(t("gui_rp_cat_note")));
-      catPanel.body.appendChild(untypedNoteHost);
+      // R5 — the UTC-timestamp convention and the untyped-file recovery rule
+      // are both explanation, not the catalogue itself; one disclosure, kept
+      // live because untypedNoteHost is repainted (with real, current counts)
+      // by paintCatalogue() below every time the report list changes.
+      catPanel.body.appendChild(disclosure(t("gui_gen_explain"), note(t("gui_rp_cat_note")), untypedNoteHost));
       main.appendChild(catPanel);
 
       function paintCatalogue() {
@@ -1085,7 +1108,7 @@ async function mountReports(root, ctx) {
       outPanel.body.appendChild(el("div", { class: "qrow" },
         el("div", { class: "qf grow" }, el("label", { text: t("gui_search") }), search)));
       outPanel.body.appendChild(outHost);
-      outPanel.body.appendChild(note(t("gui_rp_out_note")));
+      outPanel.body.appendChild(disclosure(t("gui_gen_explain"), note(t("gui_rp_out_note"))));
       main.appendChild(outPanel);
       main.appendChild(floatHost);
       handles.focusOutputs = function () { search.focus(); };
@@ -1343,11 +1366,16 @@ async function mountReports(root, ctx) {
             el("span", { class: "dot" }),
             el("span", { class: "s", text: t("gui_rp_rhc_ven") }),
             el("span", { class: "c", text: String(!!rhc.ven_scopes_enabled) }))));
+        // R1/R5: the status rows above and this detail line are the
+        // conclusion — real state, real reason. What to do about it (the
+        // button) stays visible too; the secondary guidance below it (what
+        // "enabled" gets you, why this panel can tell you before you even
+        // press 產生) is explanation and collapses into one disclosure.
         rhcBody.appendChild(note(rhcDetailText(rhc)));
         rhcBody.appendChild(btn(rhcOn ? "btn ghost" : "btn danger", t("gui_rp_rhc_enable"), function () { handles.enableRhc(); }));
-        if (rhcOn) rhcBody.appendChild(note(t("gui_rhc_enabled_ok")));
-        else rhcBody.appendChild(note(t("gui_rhc_use_pu_hint")));
-        rhcBody.appendChild(note(t("gui_rp_rhc_reactive")));
+        rhcBody.appendChild(disclosure(t("gui_gen_explain"),
+          note(t(rhcOn ? "gui_rhc_enabled_ok" : "gui_rhc_use_pu_hint")),
+          note(t("gui_rp_rhc_reactive"))));
       }
 
       /* dashboard.js:1295-1306 — the confirm is a window.confirm carrying the
@@ -1390,7 +1418,7 @@ async function mountReports(root, ctx) {
       });
       langSel.dataset.field = "lang";
       langPanel.body.appendChild(labelled(t("gui_report_lang_label"), langSel));
-      langPanel.body.appendChild(note(t("gui_rp_lang_note")));
+      langPanel.body.appendChild(disclosure(t("gui_gen_explain"), note(t("gui_rp_lang_note"))));
       aside.appendChild(langPanel);
 
       // ── RP-09 label lookup ─────────────────────────────────────────────
@@ -1418,13 +1446,16 @@ async function mountReports(root, ctx) {
       labelSearch.addEventListener("input", paintLabels);
       labelPanel.body.appendChild(labelSearch);
       labelPanel.body.appendChild(labelChips);
-      labelPanel.body.appendChild(note(t("gui_rp_labels_note")));
+      labelPanel.body.appendChild(disclosure(t("gui_gen_explain"), note(t("gui_rp_labels_note"))));
       aside.appendChild(labelPanel);
       paintLabels();
 
-      // ── RP-03 progress + async polling ─────────────────────────────────
+      // ── RP-03 progress + async polling ──────────────────────────────────
+      // Entirely documentation — no live state to lead with, so R1 has
+      // nothing to put first. R5 applies to the whole panel: it collapses
+      // behind one disclosure, the coverage anchor stays on the section
+      // itself (panel() sets data-cov regardless of what's open).
       const progPanel = panel("RP-03", t("gui_rp_progress_title"));
-      progPanel.body.appendChild(note(t("gui_rp_progress_body")));
       const stepList = el("ol", { class: "steplist" });
       [["gui_rp_path_api", "gui_gen_step_fetching"], ["gui_rp_path_csv", "gui_gen_step_parsing"],
         ["gui_rp_path_audit", "gui_gen_step_analysing"], ["gui_rp_path_async", "gui_gen_step_running_bg"],
@@ -1433,22 +1464,28 @@ async function mountReports(root, ctx) {
             el("span", { class: "s", text: t(pair[1]) }),
             el("span", { class: "r", text: t(pair[0]) })));
         });
-      progPanel.body.appendChild(stepList);
-      progPanel.body.appendChild(note(tf("gui_rp_poll_note", { interval: 2, deadline: 30 })));
-      progPanel.body.appendChild(note(t("gui_rp_async_types")));
+      progPanel.body.appendChild(disclosure(t("gui_gen_explain"),
+        note(t("gui_rp_progress_body")),
+        stepList,
+        note(tf("gui_rp_poll_note", { interval: 2, deadline: 30 })),
+        note(t("gui_rp_async_types"))));
       aside.appendChild(progPanel);
 
-      // ── RP-04 partial results ──────────────────────────────────────────
+      // ── RP-04 partial results ───────────────────────────────────────────
+      // Same call: this panel illustrates a scenario, it does not report one
+      // (the strip below is an example, not a live "partial" result), so its
+      // whole body is explanation and collapses together.
       const partPanel = panel("RP-04", t("gui_rp_partial_title"));
       partPanel.dataset.tone = "warn";
-      partPanel.body.appendChild(el("div", { class: "strip", "data-tone": "warn" },
-        el("span", { text: tf("gui_toast_report_partial", { formats: "csv, xlsx" }) })));
-      partPanel.body.appendChild(note(t("gui_rp_partial_body")));
-      partPanel.body.appendChild(el("ul", { class: "stack" },
-        el("li", null, el("code", { class: "c", text: "partial" }), el("span", { class: "s", text: t("gui_rp_partial_k1") })),
-        el("li", null, el("code", { class: "c", text: "failed_formats" }), el("span", { class: "s", text: t("gui_rp_partial_k2") })),
-        el("li", null, el("code", { class: "c", text: "files" }), el("span", { class: "s", text: t("gui_rp_partial_k3") }))));
-      partPanel.body.appendChild(note(t("gui_rp_partial_where")));
+      partPanel.body.appendChild(disclosure(t("gui_gen_explain"),
+        el("div", { class: "strip", "data-tone": "warn" },
+          el("span", { text: tf("gui_toast_report_partial", { formats: "csv, xlsx" }) })),
+        note(t("gui_rp_partial_body")),
+        el("ul", { class: "stack" },
+          el("li", null, el("code", { class: "c", text: "partial" }), el("span", { class: "s", text: t("gui_rp_partial_k1") })),
+          el("li", null, el("code", { class: "c", text: "failed_formats" }), el("span", { class: "s", text: t("gui_rp_partial_k2") })),
+          el("li", null, el("code", { class: "c", text: "files" }), el("span", { class: "s", text: t("gui_rp_partial_k3") }))),
+        note(t("gui_rp_partial_where"))));
       aside.appendChild(partPanel);
     });
 }

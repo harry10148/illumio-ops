@@ -215,6 +215,73 @@ def test_reports_coverage_anchors_and_i18n(v2_page):
         assert (rhc.get("error") or "") in panel.inner_text()
 
 
+def test_gen_drawer_explanations_and_payload_collapse_by_default(v2_page):
+    """Density spec R2/R5 (docs/superpowers/specs/2026-08-17-ui-density-spec.md):
+    the drawer's per-field explanations (date format/reset, label source, the
+    data-source gate, ...) and its "what actually gets sent" section (the RO
+    field list plus the raw payload preview) both fold into one <details.disclose>
+    each, closed by default. A closed <details> still renders its own
+    <summary> (that's the toggle) — the proof of real collapse is that every
+    OTHER child stays empty until opened, same idea as
+    test_v2_automation_e2e.py's table-disclosure assertion, adapted for a
+    disclosure whose content isn't a single nested locator. Opening the real
+    <summary> then reveals the real content: for the payload one that's the
+    exact endpoint runGenerate() is about to POST to — repaint() is the
+    single function that builds both the preview and the request body, so
+    this also proves the preview cannot drift from reality.
+    """
+    page, base_url = v2_page
+    _goto(page, base_url, ROUTE, "RP-01")
+
+    page.locator('article[data-rtype="audit"] button.btn.primary').click()
+    drawer_body = page.locator('[data-cov="RP-02"]')
+    drawer_body.wait_for()
+
+    details_all = drawer_body.locator("details.disclose")
+    assert details_all.count() == 2, details_all.count()
+    for i in range(details_all.count()):
+        d = details_all.nth(i)
+        assert d.get_attribute("open") is None
+        assert d.evaluate(
+            "el => Array.from(el.children)"
+            ".filter(c => c.tagName !== 'SUMMARY')"
+            ".every(c => c.innerText.trim() === '')"
+        ), d.inner_text()
+
+    # Built in this order by genDrawer(): the "說明" (gui_gen_explain) notes
+    # first, then "送出內容" (gui_rp_payload)'s RO fields + raw payload.
+    payload_details = details_all.last
+    payload_details.locator("summary").click()
+    assert "/api/audit_report/generate" in payload_details.inner_text()
+
+
+def test_aside_documentation_panels_collapse_by_default(v2_page):
+    """RP-03/RP-04 are pure documentation — no live status to lead with, so
+    R1 has nothing to put first — so each panel's ENTIRE body is one
+    disclosure rather than one note per paragraph. Same collapse proof as
+    above (every non-<summary> child is empty while closed); opening RP-03's
+    reveals the real poll interval/deadline (transcribed from dashboard.js's
+    _pollReportJob, reports.mjs's POLL_MS/POLL_DEADLINE_MS)."""
+    page, base_url = v2_page
+    _goto(page, base_url, ROUTE, "RP-01")
+
+    for cov in ("RP-03", "RP-04"):
+        panel = page.locator('section[data-cov="%s"]' % cov)
+        details = panel.locator("details.disclose")
+        assert details.count() == 1, cov
+        assert details.get_attribute("open") is None
+        assert details.evaluate(
+            "el => Array.from(el.children)"
+            ".filter(c => c.tagName !== 'SUMMARY')"
+            ".every(c => c.innerText.trim() === '')"
+        ), (cov, details.inner_text())
+
+    prog_details = page.locator('section[data-cov="RP-03"] details.disclose')
+    prog_details.locator("summary").click()
+    body = prog_details.inner_text()
+    assert "2" in body and "30" in body, body
+
+
 def test_job_status_endpoint_is_real_for_unknown_job(v2_page):
     # No job of this id was ever created — the real handler's 404 "unknown
     # job" path (reports.py:540-546), hit directly, no mock in the loop.
