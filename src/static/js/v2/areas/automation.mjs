@@ -83,7 +83,7 @@
 // fields remain read-only with their provenance in the "stored fields" list,
 // so a new backend key cannot be silently dropped by this port.
 
-import { el, clear, spacer } from "../core/dom.mjs";
+import { el, clear, spacer, disclosure } from "../core/dom.mjs";
 import { t, tf } from "../core/i18n.mjs";
 import { num, dur, stamp, since, tone } from "../core/fmt.mjs";
 import { api } from "../core/api.mjs";
@@ -421,10 +421,10 @@ function showValue(v) {
   return String(v);
 }
 
+/* Route as a data attribute, not visible chrome — see overview.mjs's areaHead. */
 function areaHead(title, route) {
-  return el("div", { class: "area-head" },
-    el("h1", { text: title }),
-    el("code", { text: route })
+  return el("div", { class: "area-head", "data-route": route },
+    el("h1", { text: title })
   );
 }
 
@@ -1965,6 +1965,19 @@ function jobAge(job, asOf) {
   return (b - a) / 1000;
 }
 
+/* One line saying what is actually wrong with a job, for the page's headline.
+ * `level` is the backend's own verdict (dashboard.py's _overview_job_health):
+ * error = the last run failed, warn = never ran or is past
+ * max(2 x interval, 600s). This only has to name that verdict in words — it
+ * must not re-derive it, or the page and the API would drift apart. */
+function jobReason(job) {
+  if (job.level === "error") return t("gui_au_job_reason_failed");
+  if (!job.last_run) return t("gui_au_job_reason_never");
+  return Number(job.interval_seconds)
+    ? tf("gui_au_job_reason_overdue", { interval: dur(job.interval_seconds) })
+    : t("gui_jh_overdue");
+}
+
 function beatMeter(ratio) {
   const box = el("div", { class: "beat" });
   const clamped = Math.max(0, Math.min(ratio === null ? 0 : ratio, 1.6));
@@ -1992,29 +2005,54 @@ async function mountJobs(root, ctx) {
       const localState = {};
       localState.onlyBad = false;
 
-      board.appendChild(el("p", { class: "note", text: t("gui_au_jobs_intro") }));
       const row1 = el("div", { class: "brow" });
-      const row2 = el("div", { class: "brow" });
       board.appendChild(row1);
-      board.appendChild(row2);
 
       const okCount = jobs.filter(function (j) { return j.level === "ok"; }).length;
-      const warnCount = jobs.filter(function (j) { return j.level === "warn"; }).length;
+      const bad = jobs.filter(function (j) { return j.level !== "ok"; });
       const errCount = jobs.filter(function (j) { return j.level === "error"; }).length;
 
       const head = panel("AU-13", t("gui_ov_job_health"));
-      withMeta(head, tf("gui_health_jobs_ok", { ok: okCount, total: jobs.length }));
-      withTone(head, errCount ? "crit" : (warnCount ? "warn" : "ok"));
+      withTone(head, errCount ? "crit" : (bad.length ? "warn" : "ok"));
+      withMeta(head, bad.length
+        ? tf("gui_au_jobs_attention", { n: num(bad.length) })
+        : tf("gui_health_jobs_ok", { ok: okCount, total: jobs.length }));
 
-      const kpi = el("div", { class: "kpirow" });
-      kpi.appendChild(kpiCell(t("gui_au_job_total"), num(jobs.length), null, t("gui_au_job_total_note")));
-      kpi.appendChild(kpiCell(t("gui_status_ok"), num(okCount), "/" + jobs.length, t("gui_au_job_ok_note")));
-      kpi.appendChild(kpiCell(t("gui_jh_overdue"), num(warnCount), null, t("gui_au_job_warn_note")));
-      kpi.appendChild(kpiCell(t("gui_rs_error_prefix"), num(errCount), null, t("gui_au_job_err_note")));
-      head.body.appendChild(kpi);
+      /* Density spec R1/R3 — this page answers "is anything wrong with the
+       * schedules". When nothing is, that answer is one line; the four KPI
+       * cells it replaces spent a whole screen restating "14, 14, 0, 0".
+       * When something IS wrong, the answer is the offending jobs themselves,
+       * so they lead instead of being one filter click away inside a 14-row
+       * table. */
+      if (!bad.length) {
+        head.body.appendChild(note(t("gui_au_jobs_all_ok")));
+      } else {
+        /* Cap the headline. With 10 of 11 jobs unhealthy the "conclusion"
+         * grows back into the table it replaced, which defeats the point; the
+         * overflow line hands off to the full list right below. */
+        const HEADLINE_MAX = 5;
+        const list = el("div", { class: "badlist" });
+        bad.slice(0, HEADLINE_MAX).forEach(function (j) {
+          const line = el("div", { class: "idc", "data-tone": tone(j.level) });
+          line.appendChild(el("b", { text: j.job_id }));
+          line.appendChild(el("small", { text: jobReason(j) }));
+          if (j.last_run) {
+            line.appendChild(el("small", {
+              class: "mono", text: since(j.last_run, ov.as_of) + " " + t("gui_au_job_ago"),
+            }));
+          }
+          list.appendChild(line);
+        });
+        head.body.appendChild(list);
+        if (bad.length > HEADLINE_MAX) {
+          head.body.appendChild(note(tf("gui_au_jobs_more", { n: num(bad.length - HEADLINE_MAX) })));
+        }
+      }
       head.body.appendChild(note(tf("gui_au_job_asof", { at: stamp(ov.as_of) })));
-      head.body.appendChild(note(t("gui_au_job_level_note")));
 
+      /* R2's third layer: the full table is evidence, not the headline, so it
+       * ships collapsed. The only-failures filter moves in here with it — it
+       * has nothing to do once the failures are what the page opens with. */
       const filterRow = el("div", { class: "qrow" });
       const toggleBtn = btn("btn", t("gui_au_job_only_bad"), function () {
         localState.onlyBad = !localState.onlyBad;
@@ -2024,21 +2062,32 @@ async function mountJobs(root, ctx) {
       });
       toggleBtn.setAttribute("aria-pressed", "false");
       filterRow.appendChild(toggleBtn);
-      filterRow.appendChild(spacer());
-      filterRow.appendChild(el("span", { class: "mono", text: "GET /api/dashboard/overview → job_health[]" }));
-      head.body.appendChild(filterRow);
-      row1.appendChild(head);
-      handles.onlyBad = function () { toggleBtn.click(); };
-
       const tableHost = el("div");
-      row2.appendChild(tableHost);
+      const allWrap = disclosure(
+        tf("gui_au_jobs_show_all", { n: num(jobs.length) }), filterRow, tableHost);
+      head.body.appendChild(allWrap);
+
+      /* R5 — the three explanations are kept, not deleted. They answer real
+       * questions (what makes a job "warn", what the beat bar measures, why
+       * there is no run history); they just stop being the first thing on the
+       * page. */
+      head.body.appendChild(disclosure(t("gui_gen_explain"),
+        note(t("gui_au_job_level_note")),
+        note(t("gui_au_job_beat_note")),
+        note(t("gui_au_job_hist_note"))));
+
+      row1.appendChild(head);
+      /* The palette command opens the disclosure it now lives inside, so
+       * "show only failures" still reaches a visible control. */
+      handles.onlyBad = function () { allWrap.open = true; toggleBtn.click(); };
 
       function paintJobs() {
         clear(tableHost);
-        const p = panel(null, t("gui_jh_th_job"));
-        p.body.classList.add("flush");
+        /* No inner panel: the table sits inside a disclosure whose summary
+         * already names it and counts it ("show all 14 jobs"), so a nested
+         * header repeating "Job / 14 rows" is chrome about chrome — and it put
+         * a second .meta inside AU-13, which is how it was noticed. */
         const shown = localState.onlyBad ? jobs.filter(function (j) { return j.level !== "ok"; }) : jobs;
-        withMeta(p, tf("gui_table_rows", { total: num(shown.length) }));
 
         const rows = shown.map(function (j) {
           const r = copyOf(j);
@@ -2080,12 +2129,10 @@ async function mountJobs(root, ctx) {
           })),
         ];
         if (state.tableHandles.jobs) { try { state.tableHandles.jobs.destroy(); } catch (e) { /* already gone */ } }
-        state.tableHandles.jobs = table.render(p.body, buildTable(cols, rows));
-        const foot = el("div", { class: "panel-b" });
-        foot.appendChild(note(t("gui_au_job_beat_note")));
-        foot.appendChild(note(t("gui_au_job_hist_note")));
-        p.body.appendChild(foot);
-        tableHost.appendChild(p);
+        /* The beat-meter and run-history notes that used to sit under this
+         * table now live in the page's one "說明" disclosure (R5) rather than
+         * being repeated at the foot of the evidence. */
+        state.tableHandles.jobs = table.render(tableHost, buildTable(cols, rows));
       }
 
       paintJobs();

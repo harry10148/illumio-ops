@@ -1621,7 +1621,6 @@
   "gui_ov_hero_recomputed": "標題分數改用 snapshot.maturity_score/maturity_grade。這裡的 hero 以英文字串比對本地化後的 KPI 標籤，中文環境永遠比不中，於是回報 0/?。",
   "gui_ov_no_truncation": "近 7 天沒有偵測到集合截斷。清單為空時這張卡仍會顯示，因為「沒有問題」也是一種結果。",
   "gui_rp_labels_src": "選項來自不帶 key 篩選的 /api/labels，所以 App 與 Env 兩個選單餵的是同一份清單，而非分別以 key 篩選抓取。",
-  "gui_sy_cache_label_fix": "這四個欄位在這裡有正式的 i18n 標籤，鍵名仍保留在右側 <code> 欄可供對照。",
   "gui_sy_cache_nogui_note": "這個鍵沒有對應的表單控制項；它之所以沒有遺失，是因為儲存時是覆蓋既有設定物件。",
   "gui_sy_cache_payload_src": "送出：PUT /api/cache/settings，body 是「既有設定物件 + 本表單覆寫」。",
   "gui_sy_disp_dashq": "自訂查詢另外存在設定檔中；那是總覽頁儲存查詢卡片的資料，不在這一頁編輯。",
@@ -1635,7 +1634,6 @@
   "gui_sy_tf_cidr_bug": "欄位說明寫「CIDR 或精確 IP」，但前端驗證沒有接受 / 的分支，後端也一樣拒絕——CIDR 實際上是無效輸入。IPv6 檢查只看十六進位與冒號，所以「::::」會通過。",
   "gui_sy_tf_presave": "這些提示只是提示：儲存前不會擋下無效的 IP 或 Port，錯誤要等後端回應才會出現。",
   "gui_sy_tls_ou_note": "後端接受 ou 欄位，但這份表單沒有任何輸入框會產生它",
-  "gui_au_job_total_note": "本頁追蹤的所有 job",
   "gui_sy_secret_short": "由伺服器回報的「是否設定」與字元數推得，不是機密本身",
   "gui_au_reports_intro": "報表排程不改政策，只產檔案並寄信。這裡逐一列出每一筆排程的欄位：表單管得到的可以改，其餘標為後端寫入並註明來歷。",
   "gui_au_dow_off_list": "不在目前支援的星期清單內",
@@ -1654,5 +1652,15 @@
   "gui_rp_rhc_detail_missing_pce": "缺少：PCE 報表範本",
   "gui_rp_rhc_detail_unsupported_no_evidence": "找不到報表範本——PCE 版本低於門檻（SaaS 24.2.0 / on-prem 23.5.10）或功能不存在",
   "gui_rp_rhc_detail_below_floor": "PCE 版本 {version} 低於門檻（SaaS >= {saas_floor} / on-prem >= {onprem_floor}）",
-  "gui_rp_rhc_detail_meets_floor": "PCE 版本 {version} 已達保守門檻（on-prem >= {onprem_floor}），但找不到報表範本——功能不存在或權限不足"
+  "gui_rp_rhc_detail_meets_floor": "PCE 版本 {version} 已達保守門檻（on-prem >= {onprem_floor}），但找不到報表範本——功能不存在或權限不足",
+  "gui_gen_explain": "說明",
+  "gui_au_jobs_all_ok": "全部排程運作正常。",
+  "gui_au_jobs_attention": "{n} 個需要注意",
+  "gui_au_jobs_show_all": "查看全部 {n} 個排程",
+  "gui_au_job_reason_failed": "上次執行失敗",
+  "gui_au_job_reason_overdue": "已逾期（每 {interval} 執行一次）",
+  "gui_au_job_reason_never": "從未執行",
+  "gui_au_jobs_more": "…另外還有 {n} 個",
+  "gui_al_wm_label_watermark": "事件處理進度",
+  "gui_al_wm_label_history": "告警冷卻紀錄"
 }

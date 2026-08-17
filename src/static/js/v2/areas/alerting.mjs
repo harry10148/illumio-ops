@@ -23,7 +23,7 @@
 // fields remain read-only with their provenance, so a new backend key cannot be
 // silently dropped by this port.
 
-import { el, clear, spacer } from "../core/dom.mjs";
+import { el, clear, spacer, disclosure } from "../core/dom.mjs";
 import { t, tf } from "../core/i18n.mjs";
 import { stamp } from "../core/fmt.mjs";
 import { api } from "../core/api.mjs";
@@ -164,10 +164,10 @@ function badge(text, tn) {
   return el("span", { class: "badge", "data-tone": tn }, el("i", { class: "dot" }), el("span", { text: text }));
 }
 
+/* Route as a data attribute, not visible chrome — see overview.mjs's areaHead. */
 function areaHead(title, route) {
-  return el("div", { class: "area-head" },
-    el("h1", { text: title }),
-    el("code", { text: route })
+  return el("div", { class: "area-head", "data-route": route },
+    el("h1", { text: title })
   );
 }
 
@@ -1355,7 +1355,11 @@ async function mountOps(root, ctx) {
       const row1 = el("div", { class: "brow c3" });
       const row2 = el("div", { class: "brow c2" });
       const row3 = el("div", { class: "brow" });
-      board.appendChild(el("p", { class: "note", text: t("gui_al_ops_intro_live") }));
+      /* Density spec R1/R5: the page-level preamble is gone. Each panel below
+       * already says what its own button does, in one line; a paragraph
+       * restating "these buttons call real endpoints" before you reach any of
+       * them is a cost paid on every visit. Its text moves into the one
+       * page-level explanation at the foot. */
       board.appendChild(row1);
       board.appendChild(row2);
       board.appendChild(row3);
@@ -1363,9 +1367,12 @@ async function mountOps(root, ctx) {
       // ── AL-08 run once (index.html:1300-1304, actions.py:506-531) ──────
       const runPanel = panel("AL-08", t("gui_run_once"));
       runPanel.body.appendChild(note(t("gui_run_once_desc")));
-      runPanel.body.appendChild(note(t("gui_al_run_note")));
       handles.run = function () { consoleBox.request("POST", "/api/actions/run", null); };
       runPanel.body.appendChild(btn("btn primary", t("gui_run_btn"), handles.run));
+      /* R5: what the button does stays above it; how it behaves under
+       * contention (file lock, 409 on a concurrent analysis) is real but is
+       * not what you read on the way to pressing it. */
+      runPanel.body.appendChild(disclosure(t("gui_gen_explain"), note(t("gui_al_run_note"))));
       row1.appendChild(runPanel);
 
       // ── AL-09 debug (index.html:1306-1318, actions.py:533-566) ─────────
@@ -1377,26 +1384,35 @@ async function mountOps(root, ctx) {
         el("div", { class: "qf" }, el("label", { text: t("gui_window_min") }), minsInput),
         el("div", { class: "qf" }, el("label", { text: t("gui_policy_dec") }), pdSel));
       dbgPanel.body.appendChild(dbgRow);
-      dbgPanel.body.appendChild(note(t("gui_al_debug_note")));
       dbgPanel.body.appendChild(btn("btn primary", t("gui_run_debug"), function () {
         const body = {};
         body.mins = minsInput.value;
         body.pd_sel = pdSel.value;
         consoleBox.request("POST", "/api/actions/debug", body);
       }));
+      /* The Policy Dec. numbering differs from the rule editor's, and the
+       * window is clamped — both matter once you are reading the output, not
+       * while you are choosing the two values above. */
+      dbgPanel.body.appendChild(disclosure(t("gui_gen_explain"), note(t("gui_al_debug_note"))));
       row1.appendChild(dbgPanel);
 
       // ── AL-11 watermark (index.html:1318, actions.py:597-633) ──────────
       const wmPanel = panel("AL-11", t("gui_reset_watermark_label"));
       wmPanel.body.appendChild(note(t("gui_reset_watermark_confirm")));
       const wm = d.status && d.status.event_watermark;
+      /* R4/R6: these rows used to be labelled with the three storage keys the
+       * reset clears (`event_watermark`, `alert_history`, `event_seen`). The
+       * operator needs to know WHAT gets cleared, and the panel title already
+       * establishes that the subject is the watermark; the key names told them
+       * nothing they could act on. */
       wmPanel.body.appendChild(el("ul", { class: "stack" },
-        el("li", null, el("code", { class: "c", text: "event_watermark" }),
+        el("li", null, el("span", { class: "c", text: t("gui_al_wm_label_watermark") }),
           el("span", { class: "s", text: showValue(wm) })),
-        el("li", null, el("code", { class: "c", text: "alert_history" }),
+        el("li", null, el("span", { class: "c", text: t("gui_al_wm_label_history") }),
           el("span", { class: "s", text: tf("gui_al_wm_cooldowns", { n: Object.keys((d.status && d.status.cooldowns) || {}).length }) })),
-        el("li", null, el("code", { class: "c", text: "event_seen" }),
-          el("span", { class: "s", text: t("gui_al_wm_seen") }))));
+        /* gui_al_wm_seen already reads as a name rather than a value, so it
+         * IS the label here; this row has no separate state to report. */
+        el("li", null, el("span", { class: "c", text: t("gui_al_wm_seen") }))));
       handles.watermark = function () {
         return modal.confirm(confirmSpec(t("gui_reset_watermark_label"), [
           t("gui_al_wm_i1"), t("gui_al_wm_i2"), t("gui_al_wm_i3"), t("gui_al_wm_i4"),
@@ -1425,7 +1441,7 @@ async function mountOps(root, ctx) {
         btnRow.appendChild(b);
       });
       testPanel.body.appendChild(btnRow);
-      testPanel.body.appendChild(note(t("gui_al_test_alert_note")));
+      testPanel.body.appendChild(disclosure(t("gui_gen_explain"), note(t("gui_al_test_alert_note"))));
       row2.appendChild(testPanel);
 
       // ── AL-12 best practices (rules.js:584-608, config.py:845-896) ─────
@@ -1471,7 +1487,7 @@ async function mountOps(root, ctx) {
         }));
       };
       bpPanel.body.appendChild(btn("btn danger", t("gui_load"), handles.bestPractices));
-      bpPanel.body.appendChild(note(t("gui_al_bp_note")));
+      bpPanel.body.appendChild(disclosure(t("gui_gen_explain"), note(t("gui_al_bp_note"))));
       row2.appendChild(bpPanel);
 
       // ── AL-14 channel status, read-only (actions.js:10-33) ─────────────
@@ -1498,8 +1514,14 @@ async function mountOps(root, ctx) {
         });
         chPanel.body.appendChild(list);
       }
-      chPanel.body.appendChild(note(t("gui_al_ch_note")));
+      chPanel.body.appendChild(disclosure(t("gui_gen_explain"), note(t("gui_al_ch_note"))));
       row3.appendChild(chPanel);
+
+      /* The page-level preamble removed from the top lands here: it is true and
+       * worth having (every control on this page hits a real endpoint and some
+       * have side effects), but it is orientation, not something you re-read on
+       * each visit. */
+      board.appendChild(disclosure(t("gui_gen_explain"), note(t("gui_al_ops_intro_live"))));
 
       // ── AL-13 console ──────────────────────────────────────────────────
       const logPanel = panel("AL-13", t("gui_output"));

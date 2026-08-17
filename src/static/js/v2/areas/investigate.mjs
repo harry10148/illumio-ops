@@ -251,10 +251,10 @@ function errText(r) {
 /** Minimal area-head: title + route breadcrumb. Same local copy areas/
  *  overview.mjs keeps, for the same reason (the mockup's placeholder.mjs
  *  pulls in a shell.mjs that does not exist here). */
+/* Route as a data attribute, not visible chrome — see overview.mjs's areaHead. */
 function areaHead(title, route) {
-  return el("div", { class: "area-head" },
-    el("h1", { text: title }),
-    el("code", { text: route })
+  return el("div", { class: "area-head", "data-route": route },
+    el("h1", { text: title })
   );
 }
 

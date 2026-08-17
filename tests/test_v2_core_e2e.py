@@ -133,7 +133,7 @@ def test_health_rail_only_on_overview(v2_page):
     # (#/system is the last route still on mountPlaceholder — it is an area
     # landing path with no page of its own, by design.)
     page.evaluate("location.hash = '#/system'")
-    page.wait_for_selector("code:text-is('#/system')")
+    page.wait_for_selector('[data-route="#/system"]')
     assert page.locator('.rail-host [data-cov="XC-01"]').count() == 0
 
     # The placeholder body must degrade through tf()'s fallback, not leak
@@ -299,7 +299,7 @@ def test_detaching_the_health_rail_releases_its_popover(v2_page):
     # Away and back: the rail is detached, then re-attached (the same node —
     # test_health_rail_only_on_overview proves the identity).
     page.evaluate("location.hash = '#/reports'")
-    page.wait_for_selector("code:text-is('#/reports')")
+    page.wait_for_selector('[data-route="#/reports"]')
     page.evaluate("location.hash = '#/overview'")
     page.wait_for_selector('.rail-host [data-cov="XC-01"]')
 

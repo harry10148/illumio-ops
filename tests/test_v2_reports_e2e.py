@@ -116,7 +116,7 @@ def _goto(page, base_url, route, cov):
     page.set_default_timeout(SLOW)
     page.goto(base_url + "/" + route)
     page.wait_for_selector('body[data-booted="true"]')
-    page.wait_for_selector("code:text-is('%s')" % route)
+    page.wait_for_selector('[data-route="%s"]' % route)
     page.wait_for_selector('[data-cov="%s"]' % cov)
 
 
@@ -386,7 +386,7 @@ def test_async_job_polling_stops_on_navigation_away(v2_page):
     # Navigate away — module-level stopProgress() (path !== ROUTE) must
     # cancel the pending setTimeout, and the docked card must detach.
     page.evaluate("location.hash = '#/overview'")
-    page.wait_for_selector("code:text-is('#/overview')")
+    page.wait_for_selector('[data-route="#/overview"]')
     assert page.locator('[data-cov="XC-07"]').count() == 0
 
     # B1: wait past another full poll interval. If stopProgress() failed to

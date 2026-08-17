@@ -166,7 +166,7 @@
 //      siem_destinations, settings, security, tls_status, pce_profiles,
 //      alert_plugins and logs_index are what each page is FOR.
 
-import { el, clear, spacer } from "../core/dom.mjs";
+import { el, clear, spacer, disclosure } from "../core/dom.mjs";
 import { t, tf, i18n } from "../core/i18n.mjs";
 import { num } from "../core/fmt.mjs";
 import { api } from "../core/api.mjs";
@@ -206,10 +206,10 @@ const SUB_ROUTES = [
  *  single-route/sub-nav area keeps — shell.mjs does not exist in this app
  *  (reports.mjs/automation.mjs's own comment explains why duplicating this
  *  small a helper beats depending on one). */
+/* Route as a data attribute, not visible chrome — see overview.mjs's areaHead. */
 function areaHead(title, route) {
-  return el("div", { class: "area-head" },
-    el("h1", { text: title }),
-    el("code", { text: route })
+  return el("div", { class: "area-head", "data-route": route },
+    el("h1", { text: title })
   );
 }
 
@@ -1048,7 +1048,6 @@ async function mountCache(root, ctx) {
           return;
         }
         statPanel.dataset.tone = null;
-        statPanel.body.appendChild(note(t("gui_sy_cache_1h_bug")));
 
         // integrations.js:157-180 — one entry per source; last_status="error"
         // overrides the level colour and appends ⚠, because a failed ingest still
@@ -1066,7 +1065,13 @@ async function mountCache(root, ctx) {
         });
         if (!lag.length) lagRow.appendChild(el("span", { text: t("gui_it_none") }));
         statPanel.body.appendChild(lagRow);
-        statPanel.body.appendChild(note(t("gui_sy_cache_lag_note")));
+        /* Density spec R5 — this panel's two caveats (what the (1h) deltas are
+         * measured against; why a red lag figure is not the same as a stale
+         * one) are worth keeping and are not worth reading twice a day. They
+         * fold into one explanation instead of sitting between the numbers. */
+        statPanel.body.appendChild(disclosure(t("gui_gen_explain"),
+          note(t("gui_sy_cache_1h_bug")),
+          note(t("gui_sy_cache_lag_note"))));
         // The capacity figures the retention and disk-free thresholds below are
         // judged against (/api/cache/health, cache_health.json). They are the
         // reading that makes disk_free_warn_gb a number worth setting.
@@ -1093,7 +1098,9 @@ async function mountCache(root, ctx) {
        * and the backend hardcodes requires_restart:true
        * (gui/settings_helpers.py:23) — there is no per-field restart detection,
        * so the banner cannot tell you whether YOUR change needs one. */
-      opsPanel.body.appendChild(note(t("gui_sy_cache_restart_always")));
+      /* The caveat is appended after the button below, not here: an
+       * explanation belongs under the control it explains, and putting the
+       * disclosure first left the button sitting alone under a link. */
       /* Real endpoint: POST /api/daemon/restart (gui/__init__.py:607-621,
        * rate-limited to 5/hour). It rebuilds the scheduler for real whenever
        * the GUI owns the daemon — which is the standard deployment, since
@@ -1134,6 +1141,8 @@ async function mountCache(root, ctx) {
         }));
       };
       opsPanel.body.appendChild(btn("btn primary", t("gui_it_restart_monitor"), function () { handles.restart(); }));
+      opsPanel.body.appendChild(disclosure(t("gui_gen_explain"),
+        note(t("gui_sy_cache_restart_always"))));
       /* The standing "managed externally" note that used to sit here is gone
        * with the acknowledgment-only confirm it belonged to: it is true only
        * when the backend answers 409, and that is exactly when the confirm
@@ -1203,15 +1212,16 @@ async function mountCache(root, ctx) {
       cfgPanel.body.appendChild(labelled(t("gui_cache_archive_gzip_after_days"), form.track("archive_gzip_after_days", arcGzip, "number"), t("gui_cache_archive_gzip_after_days_help")));
       cfgPanel.body.appendChild(labelled(t("gui_cache_archive_retention_days"), form.track("archive_retention_days", arcRet, "number"), t("gui_cache_archive_retention_days_help")));
       cfgPanel.body.appendChild(sectionHead(t("gui_cache_sec_polling")));
-      // integrations.js:237/240/248/251 print these four labels as raw snake_case
-      // with no data-i18n. v2 gives them proper keys (see the supplement) and
-      // keeps the stored key visible in the <code> slot, which is where it belongs.
       cfgPanel.body.appendChild(labelled(t("gui_sy_cache_ev_poll"), form.track("events_poll_interval_seconds", evPoll, "number"), t("gui_cache_events_poll_interval_seconds_help")));
       cfgPanel.body.appendChild(labelled(t("gui_sy_cache_tr_poll"), form.track("traffic_poll_interval_seconds", trPoll, "number"), t("gui_cache_traffic_poll_interval_seconds_help")));
       cfgPanel.body.appendChild(sectionHead(t("gui_cache_sec_throughput")));
       cfgPanel.body.appendChild(labelled(t("gui_sy_cache_rate"), form.track("rate_limit_per_minute", rate, "number"), t("gui_cache_rate_limit_per_minute_help")));
       cfgPanel.body.appendChild(labelled(t("gui_sy_cache_async"), form.track("async_threshold_events", asyncTh, "number"), t("gui_cache_async_threshold_events_help")));
-      cfgPanel.body.appendChild(note(t("gui_sy_cache_label_fix")));
+      /* The note that used to close this section ("these four fields have real
+       * labels here, the stored key is still in the <code> column") is deleted
+       * rather than collapsed: it described a decision about the interface, not
+       * anything an operator can act on. R5 protects explanations that answer a
+       * question — not every sentence. */
 
       // ── SY-05 traffic filter ─────────────────────────────────────────
       const tfPanel = panel("SY-05", t("gui_cache_sec_traffic_filter"));

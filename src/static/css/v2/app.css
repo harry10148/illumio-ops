@@ -204,9 +204,28 @@ body {
 
 .area-head { display: flex; align-items: baseline; gap: var(--space-5); margin-bottom: var(--space-5); }
 .area-head h1 { margin: 0; font-size: var(--fs-lead); font-weight: 700; letter-spacing: -.01em; }
-.area-head code {
-  font-family: var(--font-mono); font-size: var(--fs-mini); color: var(--text-3);
+/* .area-head code is gone with the route readout it styled (density spec R4);
+   the route now rides on .area-head[data-route] and is not rendered. */
+
+/* Collapsed detail — density spec R2/R5. Evidence (tables) and explanations
+   ship folded so a page opens on its conclusion; nothing is deleted, it is
+   one click away. */
+.disclose { margin-top: var(--space-5); }
+.disclose > summary {
+  cursor: pointer; user-select: none;
+  font-size: var(--fs-mini); color: var(--text-2);
+  padding: var(--space-3) 0;
 }
+.disclose > summary:hover { color: var(--text-1); }
+.disclose > summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.disclose[open] > summary { margin-bottom: var(--space-4); }
+
+/* The failing-jobs headline: one row each, name / what is wrong / how long. */
+.badlist { display: grid; gap: var(--space-4); }
+.badlist > .idc { display: flex; align-items: baseline; gap: var(--space-5); }
+.badlist > .idc b { flex: 0 0 auto; }
+.badlist > .idc small { flex: 1 1 auto; font-family: inherit; }
+.badlist > .idc small.mono { flex: 0 0 auto; font-family: var(--font-mono); }
 
 /* under-construction placeholder */
 .wip {

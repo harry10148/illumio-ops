@@ -154,10 +154,10 @@ const SNAPS = ["reports_list", "report_schedules", "labels", "status", "fb_sugge
  * single-route area keeps (overview.mjs's own comment explains why: small
  * enough that duplicating it beats pulling in a shell.mjs that does not
  * exist in this app). */
+/* Route as a data attribute, not visible chrome — see overview.mjs's areaHead. */
 function areaHead(title, route) {
-  return el("div", { class: "area-head" },
-    el("h1", { text: title }),
-    el("code", { text: route })
+  return el("div", { class: "area-head", "data-route": route },
+    el("h1", { text: title })
   );
 }
 

@@ -94,9 +94,11 @@ async function mountHealth(railHost, menu) {
  * landing paths that have no page of their own by design, not gaps.
  */
 async function mountPlaceholder(root, ctx) {
-  root.appendChild(el("div", { class: "area-head" },
-    el("h1", { text: t("gui_shell_wip_title", "Coming soon") }),
-    el("code", { text: ctx.route })
+  /* Same head shape as the six real areas: the route is a data attribute, not
+   * chrome (density spec R4). The placeholder's body still names the route in
+   * prose — here that IS the information, since the page has nothing else. */
+  root.appendChild(el("div", { class: "area-head", "data-route": ctx.route },
+    el("h1", { text: t("gui_shell_wip_title", "Coming soon") })
   ));
   root.appendChild(el("section", { class: "wip", "data-tone": "info" },
     el("p", { text: tf("gui_shell_wip_body", { route: ctx.route },

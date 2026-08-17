@@ -84,6 +84,25 @@ export function spacer() {
   return el("span", { class: "spacer" });
 }
 
+/**
+ * A collapsed section — the density spec's R2/R5 in one call.
+ *
+ * The redesign moves two kinds of content off the first screen without
+ * deleting either: the evidence behind a conclusion (a full table), and the
+ * prose explaining how something works. Both become one of these, so a page
+ * opens on its answer and everything else is one click away.
+ *
+ * Native <details> on purpose: it is keyboard- and screen-reader-operable with
+ * no script, it survives a teardown with nothing to unregister, and a closed
+ * one reports empty innerText — which is what lets a test prove the content is
+ * genuinely collapsed rather than merely styled small.
+ */
+export function disclosure(summaryText, ...children) {
+  const root = el("details", { class: "disclose" }, el("summary", { text: summaryText }));
+  append(root, children);
+  return root;
+}
+
 /** The × affordance shared by drawer and modal headers. */
 export function closeButton(label, onClick) {
   const b = el("button", { class: "iconbtn", type: "button", "aria-label": label, text: "×" });

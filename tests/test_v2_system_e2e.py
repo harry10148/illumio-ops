@@ -130,13 +130,13 @@ def _goto(page, base_url, route, cov):
     page.set_default_timeout(SLOW)
     page.goto(base_url + "/" + route)
     page.wait_for_selector('body[data-booted="true"]')
-    page.wait_for_selector("code:text-is('%s')" % route)
+    page.wait_for_selector('[data-route="%s"]' % route)
     page.wait_for_selector('[data-cov="%s"]' % cov)
 
 
 def _navigate(page, route, cov):
     page.evaluate("location.hash = '%s'" % route)
-    page.wait_for_selector("code:text-is('%s')" % route)
+    page.wait_for_selector('[data-route="%s"]' % route)
     page.wait_for_selector('[data-cov="%s"]' % cov)
 
 
@@ -384,7 +384,7 @@ def test_display_save_flow_timezone_persists_and_reverts(v2_page):
 
         page.reload()
         page.wait_for_selector('body[data-booted="true"]')
-        page.wait_for_selector("code:text-is('%s')" % R_DISPLAY)
+        page.wait_for_selector('[data-route="%s"]' % R_DISPLAY)
         page.wait_for_selector('[data-cov="XC-06"]')
         reread = _api_get(page, "/api/settings")
         assert reread["settings"]["timezone"] == new_value, reread["settings"]

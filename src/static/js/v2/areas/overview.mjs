@@ -76,10 +76,13 @@ const ROUTE = "#/overview";
 /** Minimal area-head: title + route breadcrumb. Small enough (mockup's
  * areas/placeholder.mjs, 5 lines) that duplicating it locally beats pulling
  * in that module's own shell.mjs dependency, which does not exist here. */
+/* The route used to be printed next to the title as `<code>#/overview</code>`.
+ * It is plumbing, not information an operator acts on (UI density spec R4), so
+ * it now rides as a data attribute: still a stable hook for the e2e suite's
+ * "has this area finished mounting" wait, no longer chrome on the screen. */
 function areaHead(title, route) {
-  return el("div", { class: "area-head" },
-    el("h1", { text: title }),
-    el("code", { text: route })
+  return el("div", { class: "area-head", "data-route": route },
+    el("h1", { text: title })
   );
 }
 

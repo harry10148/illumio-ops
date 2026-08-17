@@ -104,14 +104,14 @@ def _goto(page, base_url, route):
     page.set_default_timeout(SLOW)
     page.goto(base_url + "/" + route)
     page.wait_for_selector('body[data-booted="true"]')
-    page.wait_for_selector("code:text-is('%s')" % route)
+    page.wait_for_selector('[data-route="%s"]' % route)
     page.wait_for_selector(MOUNTED[route])
 
 
 def _navigate(page, route):
     """Hash-navigate within the SPA and wait for the new mount to finish."""
     page.evaluate("location.hash = '%s'" % route)
-    page.wait_for_selector("code:text-is('%s')" % route)
+    page.wait_for_selector('[data-route="%s"]' % route)
     page.wait_for_selector(MOUNTED[route])
 
 

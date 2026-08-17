@@ -277,7 +277,7 @@ def test_goto_link_navigates_to_another_area(v2_page):
     # OV-01's header carries exactly one "go to" button (withGoto, no
     # withAction on that card), pointing at #/system/pce.
     page.locator('section[data-cov="OV-01"] .hact button.goto').click()
-    page.wait_for_selector("code:text-is('#/system/pce')")
+    page.wait_for_selector('[data-route="#/system/pce"]')
     assert page.evaluate("location.hash") == "#/system/pce"
 
 
@@ -297,7 +297,7 @@ def test_teardown_closes_drawer_on_navigate_away(v2_page):
     assert drawer.count() == 1
 
     page.evaluate("location.hash = '#/reports'")
-    page.wait_for_selector("code:text-is('#/reports')")
+    page.wait_for_selector('[data-route="#/reports"]')
 
     assert page.locator("aside.drawer").count() == 0
 
@@ -329,7 +329,7 @@ def test_error_card_mount_still_drops_its_palette_commands(v2_page):
         page.wait_for_selector(".board .errcard")
 
         page.evaluate("location.hash = '#/reports'")
-        page.wait_for_selector("code:text-is('#/reports')")
+        page.wait_for_selector('[data-route="#/reports"]')
         ids = page.evaluate(
             "async () => { const { palette } = await import('/static/js/v2/components/palette.mjs'); "
             "return palette.list().map(c => c.id); }"

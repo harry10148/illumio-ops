@@ -100,13 +100,13 @@ def _goto(page, base_url, route, cov):
     page.set_default_timeout(SLOW)
     page.goto(base_url + "/" + route)
     page.wait_for_selector('body[data-booted="true"]')
-    page.wait_for_selector("code:text-is('%s')" % route)
+    page.wait_for_selector('[data-route="%s"]' % route)
     page.wait_for_selector('[data-cov="%s"]' % cov)
 
 
 def _navigate(page, route, cov):
     page.evaluate("location.hash = '%s'" % route)
-    page.wait_for_selector("code:text-is('%s')" % route)
+    page.wait_for_selector('[data-route="%s"]' % route)
     page.wait_for_selector('[data-cov="%s"]' % cov)
 
 
@@ -264,7 +264,7 @@ def test_reports_coverage_anchors_and_i18n(v2_page):
     try:
         page.reload()
         page.wait_for_selector('body[data-booted="true"]')
-        page.wait_for_selector("code:text-is('%s')" % R_REPORTS)
+        page.wait_for_selector('[data-route="%s"]' % R_REPORTS)
         page.wait_for_selector('[data-cov="AU-11"]')
         _open_all(page)
 
@@ -283,25 +283,66 @@ def test_jobs_coverage_anchors_and_i18n(v2_page):
 
 
 def test_jobs_view_binds_to_dashboard_overview(v2_page):
+    """AU-13 binds to the real payload, and opens on its conclusion.
+
+    The density spec (R1/R3) makes this page answer "is anything wrong with the
+    schedules" before it shows any evidence: the headline names the failing
+    jobs, and the 14-row table ships collapsed. Both halves are asserted here —
+    the binding, so the numbers stay real, and the collapse, so a later change
+    that re-expands the table by default cannot pass unnoticed.
+    """
     page, base_url = v2_page
     _goto(page, base_url, R_JOBS, "AU-13")
 
     overview = _api_get(page, "/api/dashboard/overview")
     jobs = overview.get("job_health") or []
+    bad = [j for j in jobs if j.get("level") != "ok"]
+    ok_count = len(jobs) - len(bad)
 
     panel = page.locator('section[data-cov="AU-13"]')
-    ok_count = sum(1 for j in jobs if j.get("level") == "ok")
     expected = page.evaluate(
         "async (args) => { const { tf } = await import('/static/js/v2/core/i18n.mjs'); "
-        "return tf('gui_health_jobs_ok', { ok: args[0], total: args[1] }); }",
-        [ok_count, len(jobs)],
+        "return args[2] ? tf('gui_au_jobs_attention', { n: args[2] }) "
+        "               : tf('gui_health_jobs_ok', { ok: args[0], total: args[1] }); }",
+        [ok_count, len(jobs), len(bad)],
     )
     assert panel.locator(".meta").inner_text() == expected
 
+    # The conclusion: failing jobs are named without opening anything, capped
+    # so that a mostly-broken fleet does not regrow the table this replaced.
+    # The cap is mirrored from automation.mjs's HEADLINE_MAX.
+    headline_max = 5
+    headline = panel.locator(".badlist")
+    if bad:
+        assert headline.count() == 1
+        shown = headline.inner_text()
+        for j in bad[:headline_max]:
+            assert j["job_id"] in shown, (j["job_id"], shown)
+        assert len(headline.locator(".idc").all()) == min(len(bad), headline_max)
+        if len(bad) > headline_max:
+            overflow = page.evaluate(
+                "async (n) => { const { tf } = await import('/static/js/v2/core/i18n.mjs'); "
+                "return tf('gui_au_jobs_more', { n }); }",
+                len(bad) - headline_max,
+            )
+            assert overflow in panel.inner_text()
+    else:
+        assert headline.count() == 0
+
+    # The evidence: present and complete, but folded away. inner_text() on a
+    # closed <details> is "" — which is itself the proof that it really is
+    # collapsed rather than merely styled small.
+    details = panel.locator("details.disclose").first
+    assert details.get_attribute("open") is None
     rows = page.locator("table.tbl tbody tr")
     assert rows.count() == len(jobs)
+    assert page.locator("table.tbl tbody").inner_text() == ""
+
+    # ...and opening it the way an operator would reveals the real rows.
+    details.locator("summary").click()
     if jobs:
-        assert page.locator("table.tbl tbody").inner_text().find(jobs[0]["job_id"]) >= 0
+        body = page.locator("table.tbl tbody").inner_text()
+        assert jobs[0]["job_id"] in body, body
 
 
 def test_ruleset_drawer_precheck_is_real_backend_error(v2_page):
@@ -420,7 +461,7 @@ def test_rule_schedule_crud_reconciles_list_and_timeline(v2_page, monkeypatch):
 
         page.reload()
         page.wait_for_selector('body[data-booted="true"]')
-        page.wait_for_selector("code:text-is('%s')" % R_RULES)
+        page.wait_for_selector('[data-route="%s"]' % R_RULES)
         page.wait_for_selector('[data-cov="AU-01"]')
 
         sched_panel = page.locator('section[data-cov="AU-08"]')
