@@ -1556,6 +1556,7 @@
   "gui_ev_failed_to_load": "Failed to load events",
   "gui_ev_field_matchers": "Field Matchers",
   "gui_ev_field_matchers_hint": "Most rules do not need this. Use one matcher per line in the format field.path=pattern (e.g. created_by.user.username=admin@example.com); use * as a wildcard. Only needed to target a specific actor, source IP, or nested field.",
+  "gui_al_matchers_dropped": "These matcher lines are not key=value and were not saved: {lines}",
   "gui_ev_load_failed": "Load failed",
   "gui_ev_load_prompt": "Load events to inspect parsed and raw event data.",
   "gui_ev_loading": "Loading events from PCE...",

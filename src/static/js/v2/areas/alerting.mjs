@@ -382,10 +382,14 @@ function typeCell(r) {
 
 /** An editable field: the control carries data-field so the guard sees it. */
 function editField(key, labelText, control, hint) {
+  /* data-field is the contract tests/design_v2/test_alert_rule_fields.py
+   * enforces (every backend key must be present and named in the drawer, so a
+   * silently-dropped field is a test failure). The key was ALSO printed beside
+   * the human label as <code>name</code>, which is the density spec's R4: the
+   * attribute satisfies the contract, the visible copy did not add anything an
+   * operator acts on. */
   control.dataset.field = key;
-  const box = labelled(labelText, control, hint || null);
-  box.lab.appendChild(el("code", { text: key }));
-  return box;
+  return labelled(labelText, control, hint || null);
 }
 
 /** A read-only backend field: value + why it is not editable here. */
@@ -558,8 +562,18 @@ function eventDrawer(rule, catalog, onSaved) {
   body.appendChild(winBox);
   body.appendChild(editField("cooldown_minutes", t("gui_cooldown"), cdInput));
 
-  body.appendChild(sectionHead(t("gui_al_ro_section")));
-  body.appendChild(roList([
+  /* Collapsed, not deleted — and the distinction matters here more than
+   * anywhere else in this redesign. This list reads as API documentation
+   * ("backend fields the form does not collect", each row labelled by its raw
+   * key), which is exactly what R4 removes. But it is also the mechanism that
+   * satisfies tests/design_v2/test_alert_rule_fields.py: every key a rule
+   * carries must appear in the drawer as data-field="<key>", because a previous
+   * redesign shipped drawers that silently dropped fields and sent rules back
+   * with fewer keys than they arrived with.
+   *
+   * A closed <details> keeps its children in the DOM, so the contract still
+   * holds while the documentation stops being the first thing under the form. */
+  body.appendChild(disclosure(t("gui_al_ro_section"), roList([
     roField("type", r.type || "event", t("gui_al_fn_type")),
     roField("filter_key", r.filter_key || "event_type", t("gui_al_fn_filter_key")),
     roField("name_key", r.name_key, t("gui_al_fn_i18n_key")),
@@ -570,7 +584,7 @@ function eventDrawer(rule, catalog, onSaved) {
     roField("throttle", r.throttle, t("gui_al_fn_throttle")),
     roField("throttle_state", r.throttle_state, t("gui_al_fn_throttle_state")),
     roField("cooldown_remaining", r.cooldown_remaining, t("gui_al_fn_cooldown_remaining")),
-  ]));
+  ])));
 
   paintEvents();
   onTtChange();
@@ -581,7 +595,16 @@ function eventDrawer(rule, catalog, onSaved) {
     bodyData.filter_value = state.filter_value;
     bodyData.filter_status = statusSel.value || "all";
     bodyData.filter_severity = sevSel.value || "all";
-    bodyData.match_fields = parseMatchers(matchArea.value);
+    /* Refuse to save silently-truncated matchers. Dropping a malformed line
+     * and saving the rest is how an operator ends up with a rule that does
+     * less than they wrote; the toast names the offending lines so the mistake
+     * is fixable rather than mysterious. */
+    const matchers = parseMatchers(matchArea.value);
+    if (matchers.dropped.length) {
+      toast.crit(tf("gui_al_matchers_dropped", { lines: matchers.dropped.join(" · ") }));
+      return false;
+    }
+    bodyData.match_fields = matchers.fields;
     bodyData.threshold_type = state.threshold_type;
     bodyData.threshold_count = state.threshold_count;
     bodyData.threshold_window = state.threshold_window;
@@ -595,18 +618,34 @@ function eventDrawer(rule, catalog, onSaved) {
  * matcher cannot block the save. Nothing tells the operator which line was
  * dropped — a real divergence, recorded in the task report rather than papered
  * over here (the request-body preview used to expose it indirectly). */
+/**
+ * parseMatchers(text) -> {fields, dropped}
+ *
+ * `dropped` is the point. This used to return only the parsed object and throw
+ * away anything it could not read — a line with no "=", an "=value" with no
+ * key, a "key=" with no value — so an operator who typed `event_type` instead
+ * of `event_type=agent.clone` saved a rule with one matcher fewer than they
+ * wrote, and nothing said so. The only place that discrepancy was even
+ * indirectly visible was the drawer's request preview, and removing that pane
+ * (density spec R4) would have made this silent swallow completely invisible.
+ * So the rejects come back with the fields, and the caller shows them.
+ */
 function parseMatchers(text) {
-  const out = {};
+  const fields = {};
+  const dropped = [];
   String(text || "").split(/\r?\n/).forEach(function (raw) {
     const line = raw.trim();
     if (!line) return;
     const at = line.indexOf("=");
-    if (at <= 0) return;
-    const key = line.slice(0, at).trim();
-    const value = line.slice(at + 1).trim();
-    if (key && value) out[key] = value;
+    const key = at > 0 ? line.slice(0, at).trim() : "";
+    const value = at > 0 ? line.slice(at + 1).trim() : "";
+    if (key && value) {
+      fields[key] = value;
+      return;
+    }
+    dropped.push(line);
   });
-  return out;
+  return { fields: fields, dropped: dropped };
 }
 
 /* AL-03 — system health drawer. saveSystemRule (rules.js:545-560) sends exactly
@@ -630,8 +669,8 @@ function systemDrawer(rule, onSaved) {
   body.appendChild(note(t("gui_system_health_threshold_hint")));
   body.appendChild(editField("cooldown_minutes", t("gui_cooldown"), cdInput));
 
-  body.appendChild(sectionHead(t("gui_al_ro_section")));
-  body.appendChild(roList([
+  // Collapsed for the same reason as the event drawer's — see there.
+  body.appendChild(disclosure(t("gui_al_ro_section"), roList([
     roField("type", r.type || "system", t("gui_al_fn_type")),
     roField("threshold_type", r.threshold_type || "immediate", t("gui_al_fn_sys_threshold")),
     roField("threshold_count", r.threshold_count === undefined ? 1 : r.threshold_count, t("gui_al_fn_sys_threshold")),
@@ -642,7 +681,7 @@ function systemDrawer(rule, onSaved) {
     roField("throttle", r.throttle, t("gui_al_fn_throttle")),
     roField("throttle_state", r.throttle_state, t("gui_al_fn_throttle_state")),
     roField("cooldown_remaining", r.cooldown_remaining, t("gui_al_fn_cooldown_remaining")),
-  ]));
+  ])));
   const title = r.index === undefined ? t("gui_add_system_health_rule") : t("gui_edit_system_health_rule");
   return drawerSpec(title, body, function () {
     const bodyData = {};
@@ -731,8 +770,8 @@ function flowDrawer(kind, rule, onSaved) {
   ro.push(roField("throttle", r.throttle, t("gui_al_fn_throttle")));
   ro.push(roField("throttle_state", r.throttle_state, t("gui_al_fn_throttle_state")));
   ro.push(roField("cooldown_remaining", r.cooldown_remaining, t("gui_al_fn_cooldown_remaining")));
-  body.appendChild(sectionHead(t("gui_al_ro_section")));
-  body.appendChild(roList(ro));
+  // Collapsed for the same reason as the event drawer's — see there.
+  body.appendChild(disclosure(t("gui_al_ro_section"), roList(ro)));
 
   body.appendChild(sectionHead(t("gui_al_stored_filters")));
   const storedKeys = isBw ? BW_FILTER_KEYS : TRAFFIC_FILTER_KEYS;
@@ -1156,7 +1195,13 @@ async function mountRules(root, ctx) {
             legacy: summary.legacy_count || 0,
             delta: summary.delta || 0,
           }) }));
-          out.appendChild(el("pre", { class: "codepane", text: JSON.stringify(result, null, 2) }));
+          /* The full response is EVIDENCE for the sentence above it, not a
+           * description of the API — someone comparing the current matcher
+           * against the legacy one needs to see which events each matched. So
+           * it is collapsed (R2) rather than removed: the answer leads, the
+           * raw comparison is one click behind it. */
+          out.appendChild(disclosure(t("gui_errcard_detail"),
+            el("pre", { class: "codepane", text: JSON.stringify(result, null, 2) })));
           resultHost.appendChild(out);
         } catch (e) {
           resultHost.appendChild(el("p", {

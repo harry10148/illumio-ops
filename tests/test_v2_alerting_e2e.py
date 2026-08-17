@@ -455,6 +455,49 @@ def test_event_drawer_saves_the_values_typed_into_its_threshold_fields(v2_page):
     assert body["match_fields"] == {"severity": "err"}, body
 
 
+def test_event_drawer_refuses_malformed_matcher_lines(v2_page):
+    """A matcher line that is not key=value must stop the save, not vanish.
+
+    parseMatchers used to drop anything it could not read and hand back the
+    rest, so `event_type` typed without its `=agent.clone` produced a rule with
+    one matcher fewer than the operator wrote — and the only place that
+    discrepancy was even indirectly visible was the drawer's request preview,
+    which this redesign removed. That made a pre-existing silent swallow
+    invisible, so it is now refused outright.
+
+    Asserts all three halves: no request leaves the browser, the toast names
+    the offending lines (so the mistake is fixable rather than mysterious), and
+    the drawer stays open with the typed text intact.
+    """
+    page, base_url = v2_page
+    _goto(page, base_url, R_RULES)
+
+    sent = []
+    page.route("**/api/rules/event", lambda route: (
+        sent.append(route.request.post_data),
+        route.fulfill(status=200, content_type="application/json",
+                      body=json.dumps({"ok": True})),
+    )[-1])
+    page.evaluate("() => window.__openRuleDrawer('event')")
+    drawer = page.locator("aside.drawer").last
+    drawer.wait_for(state="visible")
+    page.wait_for_selector('aside.drawer textarea[data-field="match_fields"]')
+
+    typed = "created_by.user.username=admin\nevent_type\nrole="
+    drawer.locator('textarea[data-field="match_fields"]').fill(typed)
+    drawer.locator(".drawer-f button.btn.primary").click()
+    page.wait_for_selector('.toast[data-tone="crit"]')
+
+    assert sent == [], sent
+    toast = page.locator('.toast[data-tone="crit"]').last.inner_text()
+    assert "event_type" in toast, toast
+    assert "role=" in toast, toast
+    # The well-formed line must NOT be reported as dropped.
+    assert "created_by.user.username" not in toast, toast
+    assert drawer.count() == 1, "the drawer must stay open so the typo is fixable"
+    assert drawer.locator('textarea[data-field="match_fields"]').input_value() == typed
+
+
 @pytest.mark.parametrize("rtype", ["event", "system", "traffic", "bandwidth"])
 def test_rule_drawers_do_not_describe_the_request_to_the_operator(v2_page, rtype):
     """Density spec R4: no endpoint paths, no raw JSON, no request-body preview.
