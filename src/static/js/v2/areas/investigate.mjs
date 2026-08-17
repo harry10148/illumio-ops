@@ -1121,7 +1121,12 @@ function objectBrowser(fbState) {
           el("span", { class: "s mono", text: " " + detail }));
       })),
     ];
-    handle = table.render(listHost, buildTable(cols, v.rows));
+    // No rows means one of four things — search-only category, still loading,
+    // a lookup that failed, or genuinely nothing found — and the line above
+    // says which. Rendering the table's own "no data" card underneath any of
+    // them would state the one thing that is not known to be true.
+    clear(listHost);
+    if (v.rows.length) handle = table.render(listHost, buildTable(cols, v.rows));
     if (v.more) statusHost.appendChild(btn("btn ghost", t("gui_fb_load_more"), function () { loadBrowse(cat); }));
   }
 

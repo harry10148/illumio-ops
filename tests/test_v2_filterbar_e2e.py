@@ -611,6 +611,38 @@ def test_workload_category_says_search_only_instead_of_an_empty_list(v2_page):
     assert "10.1.1.4" in row.locator(".fb-dd-sub").inner_text()
 
 
+def test_the_object_browser_says_search_only_without_an_empty_table(v2_page):
+    """XC-04 reads the same two endpoints, so it inherits the same rule: a
+    category that cannot be listed says so, and does NOT get the table's own
+    "no data available" card underneath saying the opposite."""
+    page, base_url = v2_page
+    _stub_object_corpus(page)
+    labels = _open_filter_drawer(page, base_url)
+
+    inp = _zone_input(page, "src")
+    inp.click()
+    page.wait_for_selector(f"{_zone('src')} .fb-cat-item")
+    page.locator(f"{_zone('src')} .fb-cat-item").filter(
+        has_text=labels["browse_all"]
+    ).first.click()
+    browser = page.locator('[data-cov="XC-04"]')
+    browser.wait_for(state="visible")
+    page.wait_for_selector('[data-cov="XC-04"] input[type="checkbox"]')
+
+    browser.locator(".chips button").filter(has_text=labels["workloads"]).first.click()
+    page.locator('[data-cov="XC-04"] .note').filter(
+        has_text=labels["search_only"]
+    ).first.wait_for(state="visible")
+    assert browser.locator("table.tbl").count() == 0
+    assert browser.locator(".empty").count() == 0
+
+    # ...and searching the category does reach it
+    browser.locator("input.field").fill("web")
+    page.wait_for_selector('[data-cov="XC-04"] tbody tr')
+    assert browser.locator("tbody tr").count() == 2
+    assert "10.1.1.4" in browser.locator("tbody tr").first.inner_text()
+
+
 def test_a_category_being_loaded_says_so_while_the_request_is_in_flight(v2_page):
     """The in-flight state, made observable by parking the response: opening a
     category must not look like an empty category while its page is on the way."""

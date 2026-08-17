@@ -601,7 +601,11 @@ select.field { appearance: none; }
 /* dropdown: candidates left, category scopes right */
 .fb-dd {
   position: absolute; z-index: 70; top: calc(100% + 2px); left: -1px; right: -1px;
-  min-width: 330px;
+  /* 400, not the mockup's 330: the left pane is what is left after the 175px
+     scope pane, and at 330 a row carrying a name AND that type's own detail
+     (an IP list's ranges) had both squeezed to two characters and an ellipsis.
+     Capped against the viewport so a narrow window cannot be overflowed. */
+  min-width: 400px; max-width: 92vw;
   background: var(--surface-1); border: 1px solid var(--line);
   border-radius: var(--radius-m); box-shadow: var(--shadow-2);
   overflow: hidden;
@@ -634,11 +638,12 @@ select.field { appearance: none; }
   border: 1px solid var(--line-soft); border-radius: var(--radius-s);
   background: var(--surface-2); color: var(--text-3); text-align: center;
 }
-.fb-dd-txt { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fb-dd-txt { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* what only THAT type carries: an IP list's ranges, a service's ports, a
-   workload's hostname/address */
+   workload's hostname/address. It yields to the name when space runs out —
+   the name is what the operator is picking. */
 .fb-dd-sub {
-  margin-left: auto; flex: none; max-width: 45%;
+  margin-left: auto; flex: 0 1 auto; min-width: 0; max-width: 40%;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   font-family: var(--font-mono); font-size: var(--fs-micro); color: var(--text-3);
 }
@@ -650,14 +655,14 @@ select.field { appearance: none; }
 /* a lookup that could not be made, with the retry next to the sentence — never
    an empty list (see _objfbAddDdError) */
 .fb-dd-err {
-  display: flex; align-items: baseline; gap: var(--space-3);
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-3);
   margin: var(--space-2) 0; padding: var(--space-4);
   background: var(--fill); border: 1px solid var(--mark); border-radius: var(--radius-s);
   font-size: var(--fs-mini); color: var(--text-1);
 }
 .fb-dd-err-txt { min-width: 0; }
 .fb-dd-retry {
-  flex: none; padding: 0; background: none; border: 0;
+  flex: none; margin-left: auto; padding: 0; background: none; border: 0;
   color: var(--accent-fg); cursor: pointer;
   font-family: var(--font-ui); font-size: var(--fs-mini);
   text-decoration: underline; text-underline-offset: 2px;
