@@ -1627,9 +1627,8 @@
   "gui_sy_disp_theme_apply": "切換後立即套用。",
   "gui_sy_dlq_paging": "DLQ 清單在後端分頁。",
   "gui_sy_log_cap": "端點預設回傳最後 200 行、上限 500（?n= 參數），新的在最上面。模組清單的計數是 500，但這裡顯示的是預設的 200——兩個數字量的不是同一件事。",
-  "gui_sy_sec_authsetup": "true 表示已經離開初始密碼；GET /api/security 有回傳，但沒有任何表單欄位會顯示它。",
+  "gui_sy_sec_authsetup": "已經離開初始密碼。",
   "gui_sy_siem_dest_src": "上方的 TLS 與 HEC 區塊會依傳輸方式的選擇而隱藏，但其中的值仍然會送出——即使在這裡被隱藏，也可以在下方的送出內容看到。",
-  "gui_sy_siem_fw_src": "送出 PUT /api/siem/forwarder {enabled, dispatch_tick_seconds, dlq_max_per_dest}。",
   "gui_sy_stop_i_persistent": "以服務方式常駐時後端會回 403 並拒絕停止——按鈕本身不會事先警告。",
   "gui_sy_tf_cidr_bug": "欄位說明寫「CIDR 或精確 IP」，但前端驗證沒有接受 / 的分支，後端也一樣拒絕——CIDR 實際上是無效輸入。IPv6 檢查只看十六進位與冒號，所以「::::」會通過。",
   "gui_sy_tf_presave": "這些提示只是提示：儲存前不會擋下無效的 IP 或 Port，錯誤要等後端回應才會出現。",
@@ -1662,5 +1661,8 @@
   "gui_au_job_reason_never": "從未執行",
   "gui_au_jobs_more": "…另外還有 {n} 個",
   "gui_al_wm_label_watermark": "事件處理進度",
-  "gui_al_wm_label_history": "告警冷卻紀錄"
+  "gui_al_wm_label_history": "告警冷卻紀錄",
+  "gui_gen_idle": "閒置",
+  "gui_ov_group_system": "系統詳情",
+  "gui_ov_group_activity": "近期活動"
 }

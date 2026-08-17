@@ -57,7 +57,7 @@
 //      resolution (state.top10Seq) and against repainting a torn-down area
 //      (state.torn).
 
-import { el, clear } from "../core/dom.mjs";
+import { el, clear, disclosure } from "../core/dom.mjs";
 import { t, tf } from "../core/i18n.mjs";
 import { num, dur, stamp, since, tone, atLeast, firstLine } from "../core/fmt.mjs";
 import { api } from "../core/api.mjs";
@@ -1340,12 +1340,20 @@ function buildBoard(host, d, state) {
   };
 
   clear(host);
-  host.appendChild(brow("c4", [
-    cardSystem(st, ov),
-    cardIntegrations(d),
-    cardPipeline(ov),
-    cardTls(d.tls_status || {}, ov.tls),
-  ]));
+
+  /* Density spec R1/R2 on the one page an operator lands on.
+   *
+   * This board used to open with sixteen cards in six rows, led by four status
+   * cards that restate what the health rail directly above them already shows
+   * (PCE, pipeline, cache, alert channels). The question someone opens the
+   * overview with is "how are we doing, and what should I do next" — so the
+   * posture score and the ranked actions lead, the traffic ranking they are
+   * usually chasing stays with them, and the remaining eleven cards become two
+   * named groups, present and one click away.
+   *
+   * Every data-cov anchor still renders: a closed <details> keeps its children
+   * in the DOM, so the coverage gate's 102 are all still there and the cards
+   * are still built from the same data. Nothing was dropped to make this fit. */
   host.appendChild(brow("c75", [
     cardPosture(ov, openPostureDetail),
     cardTopActions((d.dashboard_snapshot && d.dashboard_snapshot.snapshot) || {}),
@@ -1354,22 +1362,34 @@ function buildBoard(host, d, state) {
     cardTop10(d.top10 || {}, state.chartHandles),
     cardQueries(state, openQuery, function () { openQuery(-1); }),
   ]));
-  host.appendChild(brow("c3", [
-    cardAudit(d.dashboard_audit || {}),
-    cardSnapshot(d.dashboard_snapshot || {}),
-    cardPolicyUsage(d.dashboard_pu || {}),
-  ]));
-  // Both of these are four-column tables; three to a row squeezed job names and
-  // event targets to ellipses, so they get half the board each.
-  host.appendChild(brow("c2", [
-    cardJobs(ov),
-    cardEvents(d.events_viewer || {}),
-  ]));
-  host.appendChild(brow("c543", [
-    cardReports(d.reports_list || {}, ov),
-    cardChannels(st, d.alert_plugins || {}),
-    cardIntegrity(ov),
-  ]));
+
+  host.appendChild(disclosure(t("gui_ov_group_system"),
+    brow("c4", [
+      cardSystem(st, ov),
+      cardIntegrations(d),
+      cardPipeline(ov),
+      cardTls(d.tls_status || {}, ov.tls),
+    ]),
+    brow("c2", [
+      cardChannels(st, d.alert_plugins || {}),
+      cardIntegrity(ov),
+    ])));
+
+  host.appendChild(disclosure(t("gui_ov_group_activity"),
+    brow("c3", [
+      cardAudit(d.dashboard_audit || {}),
+      cardSnapshot(d.dashboard_snapshot || {}),
+      cardPolicyUsage(d.dashboard_pu || {}),
+    ]),
+    // Both of these are four-column tables; three to a row squeezed job names
+    // and event targets to ellipses, so they get half the board each.
+    brow("c2", [
+      cardJobs(ov),
+      cardEvents(d.events_viewer || {}),
+    ]),
+    brow("c2", [
+      cardReports(d.reports_list || {}, ov),
+    ])));
 
   return { openPostureDetail: openPostureDetail, openQuery: openQuery, refreshTop10: refreshTop10 };
 }

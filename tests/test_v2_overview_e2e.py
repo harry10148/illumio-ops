@@ -271,8 +271,21 @@ def test_posture_drawer_opens_and_closes(v2_page):
 
 
 def test_goto_link_navigates_to_another_area(v2_page):
+    """OV-01's go-to link still works — from inside the group it now lives in.
+
+    The board leads with the posture score and the ranked actions; the status
+    cards that restate the health rail moved into the "system detail" group
+    (density spec R1/R2). Both halves are asserted: that the group really does
+    ship collapsed, and that the link inside it works once opened, which is the
+    path an operator now takes.
+    """
     page, base_url = v2_page
     _goto_overview(page, base_url)
+
+    group = page.locator("details.disclose").first
+    assert group.get_attribute("open") is None
+    assert page.locator('section[data-cov="OV-01"]').count() == 1, "card must still render"
+    group.locator("summary").click()
 
     # OV-01's header carries exactly one "go to" button (withGoto, no
     # withAction on that card), pointing at #/system/pce.

@@ -762,7 +762,12 @@ function archiveLoadLabel(state) {
   if (state === "running") return t("gui_app_loading");
   if (state === "done") return t("gui_gen_done");
   if (state === "error") return t("alert_status_error");
-  return t("gui_health_queue_idle");
+  /* gui_gen_idle, not gui_health_queue_idle: this badge sits beside Done and
+   * Error, and the queue key's English value is lower-case "idle", which read
+   * as a typo next to them. The Chinese is identical either way, which is
+   * exactly why reusing a key across contexts hides this until someone looks
+   * at the other language. */
+  return t("gui_gen_idle");
 }
 
 /* IV-06 — archive status strip, from the real GET /api/cache/archive/status.
