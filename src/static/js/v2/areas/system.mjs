@@ -1638,7 +1638,12 @@ async function mountSiem(root, ctx) {
       fwPanel.body.appendChild(checkRow(t("gui_siem_enabled"), form.track("enabled", fwOn, "bool")));
       fwPanel.body.appendChild(labelled(t("gui_siem_dispatch_tick"), form.track("dispatch_tick_seconds", tick, "number"), t("gui_siem_dispatch_tick_help")));
       fwPanel.body.appendChild(labelled(t("gui_siem_dlq_max"), form.track("dlq_max_per_dest", dlqMax, "number"), t("gui_siem_dlq_max_help")));
-      fwPanel.body.appendChild(note(t("gui_sy_siem_fw_src")));
+      // R4: gui_sy_siem_fw_src just restated the raw PUT /api/siem/forwarder
+      // body as prose — the payload panel at the foot of this page already
+      // shows the real outgoing request, so this was a second, decorative
+      // copy of the same technical detail. Dropped rather than collapsed:
+      // there is nothing here an operator needs that the payload panel does
+      // not already give them on demand.
       form.setBody(function (v) {
         const b = {};
         b.enabled = v.enabled;
@@ -1698,14 +1703,23 @@ async function mountSiem(root, ctx) {
         })),
       ];
       state.tableHandles.dests = table.render(destHost, buildTable(columns, dests));
+      /* R4 — this panel used to lay the raw test endpoint and its response
+       * field names (ok/latency_ms/error) flat on the page: a developer-mode
+       * reference, not something an operator reads to decide anything. Each
+       * per-destination "Test" button (SY-08's row actions) already toasts a
+       * localised result built from those exact fields, so the panel now
+       * states what a test click does in one line and folds the field-by-
+       * field breakdown into the explanation for whoever wants to verify a
+       * toast against the raw response shape. */
       const testPanel = panel("SY-09", t("gui_siem_test"));
       testPanel.body.appendChild(note(t("gui_sy_siem_test_body")));
-      testPanel.body.appendChild(el("ul", { class: "stack" },
-        el("li", null, el("code", { class: "c", text: "POST" }), el("span", { class: "s", text: "/api/siem/destinations/<name>/test" })),
-        el("li", null, el("code", { class: "c", text: "ok" }), el("span", { class: "s", text: t("gui_sy_siem_test_ok") })),
-        el("li", null, el("code", { class: "c", text: "latency_ms" }), el("span", { class: "s", text: t("gui_sy_siem_test_latency") })),
-        el("li", null, el("code", { class: "c", text: "error" }), el("span", { class: "s", text: t("gui_sy_siem_test_err") }))));
-      testPanel.body.appendChild(note(t("gui_sy_siem_test_saved")));
+      testPanel.body.appendChild(disclosure(t("gui_gen_explain"),
+        el("ul", { class: "stack" },
+          el("li", null, el("code", { class: "c", text: "POST" }), el("span", { class: "s", text: "/api/siem/destinations/<name>/test" })),
+          el("li", null, el("code", { class: "c", text: "ok" }), el("span", { class: "s", text: t("gui_sy_siem_test_ok") })),
+          el("li", null, el("code", { class: "c", text: "latency_ms" }), el("span", { class: "s", text: t("gui_sy_siem_test_latency") })),
+          el("li", null, el("code", { class: "c", text: "error" }), el("span", { class: "s", text: t("gui_sy_siem_test_err") }))),
+        note(t("gui_sy_siem_test_saved"))));
 
       board.appendChild(el("div", { class: "brow c2" }, fwPanel, testPanel));
       board.appendChild(destPanel);
