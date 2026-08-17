@@ -83,7 +83,7 @@
 // fields remain read-only with their provenance in the "stored fields" list,
 // so a new backend key cannot be silently dropped by this port.
 
-import { el, clear, spacer, disclosure } from "../core/dom.mjs";
+import { el, clear, disclosure } from "../core/dom.mjs";
 import { t, tf } from "../core/i18n.mjs";
 import { num, dur, stamp, since, tone } from "../core/fmt.mjs";
 import { api } from "../core/api.mjs";
@@ -537,8 +537,9 @@ function rulesStatus(rsStatus, history, schedules) {
     el("b", { text: String(st.next_trigger_at || "—").replace("T", " ") })));
   strip.appendChild(el("span", null, el("span", { text: t("gui_rs_schedules") + " " }),
     el("b", { text: num(count) })));
-  strip.appendChild(spacer());
-  strip.appendChild(el("span", { class: "mono", text: "GET /api/rule_scheduler/status" }));
+  // Density spec R4: the "GET /api/rule_scheduler/status" endpoint label that
+  // used to close this strip is gone — the three real values above it are
+  // the content, and this page's disclosure covers where they come from.
   p.body.appendChild(strip);
 
   const midnight = new Date();
@@ -673,9 +674,10 @@ function timelinePanel(rsStatus, schedules) {
   wrap.appendChild(ruler);
 
   const toggles = el("div", { class: "tl-lane" });
+  // Density spec R4: this lane's name used to carry "timeline_24h" as a
+  // sub-label — the backend field, not anything an operator reads for.
   toggles.appendChild(el("span", { class: "tl-name" },
-    el("b", { text: t("gui_au_tl_toggle_row") }),
-    el("small", { text: "timeline_24h" })));
+    el("b", { text: t("gui_au_tl_toggle_row") })));
   toggles.appendChild(b.track);
   toggles.appendChild(el("span", { class: "tl-when", text: b.has ? num(b.total) : "0" }));
   wrap.appendChild(toggles);
@@ -683,8 +685,12 @@ function timelinePanel(rsStatus, schedules) {
   schedules.forEach(function (s) { wrap.appendChild(scheduleLane(s)); });
   p.body.appendChild(wrap);
 
-  if (!b.has) p.body.appendChild(note(t("gui_au_tl_empty_why")));
-  p.body.appendChild(note(t("gui_au_tl_lane_note")));
+  // Density spec R5: an empty ruler's "why" (when it applies) and how the
+  // armed-schedule lanes read fold into one explanation instead of one or
+  // two standing paragraphs under the ruler.
+  p.body.appendChild(disclosure(t("gui_gen_explain"),
+    b.has ? null : note(t("gui_au_tl_empty_why")),
+    note(t("gui_au_tl_lane_note"))));
   return p;
 }
 
@@ -1059,7 +1065,10 @@ async function mountRules(root, ctx) {
     if (state.torn) return;
     destroyTables();
     clear(board);
-    board.appendChild(el("p", { class: "note", text: t("gui_au_rules_intro") }));
+    // Density spec R5: the two-sentence framing note (this page acts for
+    // real; the target column below states ruleset vs. rule for that reason)
+    // collapses instead of standing open on every visit.
+    board.appendChild(disclosure(t("gui_gen_explain"), note(t("gui_au_rules_intro"))));
 
     const row1 = el("div", { class: "brow c75" });
     const row2 = el("div", { class: "brow" });
@@ -1350,10 +1359,11 @@ async function mountRules(root, ctx) {
       });
       if (!rows.length) p.body.appendChild(emptyState(t("gui_empty_state_no_data_title"), null));
       state.tableHandles.scheduleList = table.render(p.body, buildTable(cols, rows));
-      const foot = el("div", { class: "panel-b" });
-      foot.appendChild(note(t("gui_au_recon_note")));
-      foot.appendChild(note(t("gui_au_kind_note")));
-      p.body.appendChild(foot);
+      // Density spec R5: the two standing paragraphs that used to sit under
+      // this table (the three reconciliation states, and how a rule href is
+      // told apart from a ruleset href) merge into one explanation.
+      p.body.appendChild(disclosure(t("gui_gen_explain"),
+        note(t("gui_au_recon_note")), note(t("gui_au_kind_note"))));
       schedHost.appendChild(p);
     }
 
@@ -1382,8 +1392,11 @@ async function mountRules(root, ctx) {
 
     // ── AU-09 立即檢查 + AU-10 執行紀錄 ────────────────────────────────
     const checkPanel = panel("AU-09", t("gui_rs_run_check"));
-    checkPanel.body.appendChild(el("span", { class: "mono", text: "POST /api/rule_scheduler/check" }));
-    checkPanel.body.appendChild(note(t("gui_au_check_real")));
+    // Density spec R4/R5: the raw "POST /api/rule_scheduler/check" label is
+    // gone, and what the button really does (lock, engine.check, log append)
+    // is several sentences — it now lives in the shared explanation instead
+    // of standing open above the button on every visit.
+    checkPanel.body.appendChild(disclosure(t("gui_gen_explain"), note(t("gui_au_check_real"))));
     const checkResultHost = el("div");
     checkPanel.body.appendChild(checkResultHost);
 
@@ -1430,10 +1443,11 @@ async function mountRules(root, ctx) {
       state.logShown += 20;
       paintLog();
     }));
-    logFoot.appendChild(spacer());
-    logFoot.appendChild(el("span", { class: "mono", text: "GET /api/rule_scheduler/logs" }));
     logPanel.body.appendChild(logFoot);
-    logPanel.body.appendChild(note(t("gui_au_log_cap")));
+    // Density spec R4/R5: the raw "GET /api/rule_scheduler/logs" label is
+    // gone; the ring-buffer cap and what Clear does/does not touch fold into
+    // the shared explanation.
+    logPanel.body.appendChild(disclosure(t("gui_gen_explain"), note(t("gui_au_log_cap"))));
     row4.appendChild(logPanel);
     paintLog();
 
@@ -1877,7 +1891,10 @@ async function mountReports(root, ctx) {
       p.body.appendChild(kv(t("gui_sched_col_name"), s.name || "—"));
       p.body.appendChild(kv(t("gui_sched_col_last"), s.last_run ? stamp(s.last_run) : t("gui_sched_status_never")));
       p.body.appendChild(kv(t("gui_sched_col_status"), s.last_status || t("gui_sched_status_never")));
-      p.body.appendChild(kv("last_error", s.last_error || "—"));
+      // Density spec R4/R6: this row used to be labelled with the raw
+      // "last_error" field name. gui_rs_error_prefix is the same "Error"
+      // label the rule-scheduler side of this file already carries.
+      p.body.appendChild(kv(t("gui_rs_error_prefix"), s.last_error || "—"));
     }
     if (!entries.length) {
       p.body.appendChild(emptyState(t("gui_empty_state_no_data_title"), t("gui_au_rep_hist_empty")));
@@ -1892,7 +1909,10 @@ async function mountReports(root, ctx) {
       });
       p.body.appendChild(list);
     }
-    p.body.appendChild(note(t("gui_au_rep_hist_note")));
+    // Density spec R4/R5: the raw "GET /api/report-schedules/<id>/history"
+    // endpoint and what it actually returns (one state row, not per-run
+    // history) fold into the shared explanation.
+    p.body.appendChild(disclosure(t("gui_gen_explain"), note(t("gui_au_rep_hist_note"))));
     histHost.appendChild(p);
   }
 
@@ -1900,7 +1920,10 @@ async function mountReports(root, ctx) {
     if (state.torn) return;
     destroyTables();
     clear(board);
-    board.appendChild(el("p", { class: "note", text: t("gui_au_reports_intro") }));
+    // Density spec R5: the two-sentence "this changes no policy, every field
+    // below is either yours or backend-written" framing collapses instead of
+    // standing open on every visit.
+    board.appendChild(disclosure(t("gui_gen_explain"), note(t("gui_au_reports_intro"))));
     const row1 = el("div", { class: "brow" });
     const row2 = el("div", { class: "brow c2" });
     board.appendChild(row1);
@@ -1912,8 +1935,10 @@ async function mountReports(root, ctx) {
     row2.appendChild(histHost);
 
     const tickPanel = panel(null, t("gui_au_rep_tick"));
-    tickPanel.body.appendChild(note(t("gui_au_rep_tick_note")));
-    tickPanel.body.appendChild(kv("tick_report_schedules", "60s"));
+    // Density spec R4/R5: the raw "tick_report_schedules" / "60s" row is
+    // gone as a standing kv — the note already names the job and its
+    // interval in prose, and now lives in the shared explanation.
+    tickPanel.body.appendChild(disclosure(t("gui_gen_explain"), note(t("gui_au_rep_tick_note"))));
     const tickRow = el("div", { class: "qrow" });
     tickRow.appendChild(btn("btn", t("gui_health_goto") + " " + R_JOBS, function () { router.go(R_JOBS); }));
     tickPanel.body.appendChild(tickRow);
