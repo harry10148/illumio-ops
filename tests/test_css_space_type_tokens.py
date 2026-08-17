@@ -34,10 +34,16 @@ EXPECTED_SPACE = {
     "--space-1": "2px", "--space-2": "4px", "--space-3": "6px", "--space-4": "8px",
     "--space-5": "12px", "--space-6": "16px", "--space-7": "24px", "--space-8": "32px",
 }
+# Raised by the density redesign (docs/superpowers/specs/2026-08-17-ui-density-spec.md)
+# from 9.5 / 10.5 / 11.5 / 13 / 15 / 19 / 30. Users reported the GUI as too
+# dense, and 11.5px table cells with 10.5px captions were a large part of that.
+# The ratios between steps are preserved — this table is one deliberate shift of
+# the whole scale, which is exactly the kind of change this test exists to make
+# someone state out loud rather than let drift in a stylesheet edit.
 EXPECTED_FS = {
-    "--fs-micro": "9.5px", "--fs-mini": "10.5px", "--fs-body": "11.5px",
-    "--fs-ui": "13px", "--fs-lead": "15px", "--fs-num": "19px",
-    "--fs-display": "30px",
+    "--fs-micro": "11px", "--fs-mini": "12px", "--fs-body": "13px",
+    "--fs-ui": "14px", "--fs-lead": "17px", "--fs-num": "21px",
+    "--fs-display": "32px",
 }
 EXPECTED_RADIUS = {"--radius-s": "2px", "--radius-m": "3px", "--radius-l": "6px"}
 EXPECTED_SHADOW = ["--shadow-1", "--shadow-2"]
