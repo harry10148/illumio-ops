@@ -2442,7 +2442,11 @@ async function mountChannels(root, ctx) {
       grid.appendChild(card);
     });
     wrap.body.appendChild(grid);
-    wrap.body.appendChild(note(t("gui_sy_ch_schema_src")));
+    // R5: gui_sy_ch_schema_src described how THIS PAGE builds its own form
+    // (input_type/value_type/config_path are the plugin schema's field
+    // names, not anything an operator acts on) — a decision about the
+    // interface, not an answer to an operator's question. Dropped rather
+    // than collapsed, same call as cache's gui_sy_cache_label_fix.
     wrap.body.appendChild(note(t("gui_sy_ch_secret_fix")));
     wrap.body.appendChild(note(t("gui_sy_ch_test_skipped")));
     board.appendChild(wrap);
