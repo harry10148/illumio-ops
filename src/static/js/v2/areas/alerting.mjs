@@ -1051,7 +1051,12 @@ async function mountRules(root, ctx) {
       const jsonPanel = panel("AL-06", t("gui_al_hl_title"));
       const jsonBox = el("div");
       jsonPanel.body.appendChild(jsonBox);
-      jsonPanel.body.appendChild(note(t("gui_al_hl_note")));
+      /* Density spec R4/R5: the raw "GET /api/rules/<idx>/highlight" line that
+       * used to sit above the code pane is gone — it named an endpoint, which
+       * the panel already calls for real. What the call does is one sentence,
+       * so it collapses into the shared explanation instead of a standing
+       * line every visit re-reads. */
+      jsonPanel.body.appendChild(disclosure(t("gui_gen_explain"), note(t("gui_al_hl_note"))));
 
       async function paintHighlight() {
         clear(jsonBox);
@@ -1062,7 +1067,6 @@ async function mountRules(root, ctx) {
             el("p", { text: t("gui_al_hl_empty") })));
           return;
         }
-        jsonBox.appendChild(el("p", { class: "note", text: "GET /api/rules/" + hit.index + "/highlight" }));
         const code = el("pre", { class: "codepane tall" });
         jsonBox.appendChild(code);
         jsonBox.appendChild(btn("btn ghost", t("gui_al_hl_clear"), function () { router.go(R_RULES); }));
@@ -1235,8 +1239,9 @@ async function mountRules(root, ctx) {
       // The guide rail's second card explains what this page does NOT do, which
       // on a page full of switches is the most important thing on it.
       const scope = panel(null, t("gui_al_scope_title"));
-      scope.body.appendChild(note(t("gui_al_scope_body")));
-      scope.body.appendChild(note(t("gui_al_scope_ops")));
+      // Density spec R5: the two-sentence "what this page does / does not do"
+      // caveat merges into one explanation rather than sitting as two notes.
+      scope.body.appendChild(disclosure(t("gui_gen_explain"), note(t("gui_al_scope_body")), note(t("gui_al_scope_ops"))));
       scope.body.appendChild(btn("btn ghost", t("gui_health_goto") + " " + R_OPS, function () { router.go(R_OPS); }));
       aside.appendChild(scope);
 
