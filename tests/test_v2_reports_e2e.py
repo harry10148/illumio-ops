@@ -215,20 +215,21 @@ def test_reports_coverage_anchors_and_i18n(v2_page):
         assert (rhc.get("error") or "") in panel.inner_text()
 
 
-def test_gen_drawer_explanations_and_payload_collapse_by_default(v2_page):
+def test_gen_drawer_explanation_collapses_but_payload_preview_stays_visible(v2_page):
     """Density spec R2/R5 (docs/superpowers/specs/2026-08-17-ui-density-spec.md):
     the drawer's per-field explanations (date format/reset, label source, the
-    data-source gate, ...) and its "what actually gets sent" section (the RO
-    field list plus the raw payload preview) both fold into one <details.disclose>
-    each, closed by default. A closed <details> still renders its own
-    <summary> (that's the toggle) — the proof of real collapse is that every
-    OTHER child stays empty until opened, same idea as
-    test_v2_automation_e2e.py's table-disclosure assertion, adapted for a
-    disclosure whose content isn't a single nested locator. Opening the real
-    <summary> then reveals the real content: for the payload one that's the
-    exact endpoint runGenerate() is about to POST to — repaint() is the
-    single function that builds both the preview and the request body, so
-    this also proves the preview cannot drift from reality.
+    data-source gate, ...) fold into one closed <details.disclose>. The "what
+    actually gets sent" section (RO fields + the raw payload preview)
+    deliberately does NOT — same call investigate.mjs's filtersDrawer already
+    made for its own payload preview: the drawer only opens on demand, so
+    this is already one click off the page's default screen, and it is the
+    one place an operator can see exactly what 產生 is about to send.
+
+    A closed <details> still renders its own <summary> (that's the toggle) —
+    the proof of real collapse is that every OTHER child stays empty until
+    opened, same idea as test_v2_automation_e2e.py's table-disclosure
+    assertion, adapted for a disclosure whose content isn't a single nested
+    locator. Opening the real <summary> then reveals the real content.
     """
     page, base_url = v2_page
     _goto(page, base_url, ROUTE, "RP-01")
@@ -237,22 +238,24 @@ def test_gen_drawer_explanations_and_payload_collapse_by_default(v2_page):
     drawer_body = page.locator('[data-cov="RP-02"]')
     drawer_body.wait_for()
 
-    details_all = drawer_body.locator("details.disclose")
-    assert details_all.count() == 2, details_all.count()
-    for i in range(details_all.count()):
-        d = details_all.nth(i)
-        assert d.get_attribute("open") is None
-        assert d.evaluate(
-            "el => Array.from(el.children)"
-            ".filter(c => c.tagName !== 'SUMMARY')"
-            ".every(c => c.innerText.trim() === '')"
-        ), d.inner_text()
+    # The payload preview is real and visible without opening anything —
+    # repaint() is the single function that builds both this preview and the
+    # request body runGenerate() actually POSTs, so it cannot drift.
+    assert "/api/audit_report/generate" in drawer_body.locator(".codepane").inner_text()
 
-    # Built in this order by genDrawer(): the "說明" (gui_gen_explain) notes
-    # first, then "送出內容" (gui_rp_payload)'s RO fields + raw payload.
-    payload_details = details_all.last
-    payload_details.locator("summary").click()
-    assert "/api/audit_report/generate" in payload_details.inner_text()
+    details_all = drawer_body.locator("details.disclose")
+    assert details_all.count() == 1, details_all.count()
+    explain_details = details_all.first
+    assert explain_details.get_attribute("open") is None
+    assert explain_details.evaluate(
+        "el => Array.from(el.children)"
+        ".filter(c => c.tagName !== 'SUMMARY')"
+        ".every(c => c.innerText.trim() === '')"
+    ), explain_details.inner_text()
+    explain_details.locator("summary").click()
+    # audit's own two explanations: the ISO/raw date-format note and the
+    # sticky-defaults note (gui_rp_date_iso|raw / gui_rp_date_sticky).
+    assert explain_details.inner_text().strip() != ""
 
 
 def test_aside_documentation_panels_collapse_by_default(v2_page):

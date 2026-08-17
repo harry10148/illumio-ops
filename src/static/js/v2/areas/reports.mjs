@@ -670,18 +670,21 @@ function genDrawer(rt, d, lang, hooks) {
 
   // Body keys the form does not expose as controls, and the exact request
   // this drawer is about to send — real evidence (RP-02's header point 4),
-  // not decoration, but not something you need open on every visit either.
-  // traffic_report_profile is the card's own identity (dashboard.js:962-967
-  // reads it from the button that opened the modal, never from an input) —
-  // it still reaches the backend, so it is stated rather than left to be
-  // discovered only in the payload pane.
-  const sentExtra = [];
+  // not decoration. Left visible rather than folded into a disclosure: the
+  // drawer itself only opens on demand (investigate.mjs's filtersDrawer
+  // makes the identical call for its own payload preview, same reasoning —
+  // this is the one place an operator can see what a click on 產生 actually
+  // sends, and it is already one click away from the catalogue, not on the
+  // page's default screen). traffic_report_profile is the card's own
+  // identity (dashboard.js:962-967 reads it from the button that opened the
+  // modal, never from an input) — it still reaches the backend, so it is
+  // stated rather than left to be discovered only in the payload pane.
   if (rt.has("filters")) {
-    sentExtra.push(sectionHead(t("gui_rp_ro_section")));
-    sentExtra.push(roList([roField("traffic_report_profile", rt.id, t("gui_rp_fn_profile"))]));
+    body.appendChild(sectionHead(t("gui_rp_ro_section")));
+    body.appendChild(roList([roField("traffic_report_profile", rt.id, t("gui_rp_fn_profile"))]));
   }
-  sentExtra.push(payload);
-  body.appendChild(disclosure(t("gui_rp_payload"), sentExtra));
+  body.appendChild(sectionHead(t("gui_rp_payload")));
+  body.appendChild(payload);
 
   onSource();
   repaint();
