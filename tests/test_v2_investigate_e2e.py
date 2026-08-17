@@ -193,6 +193,40 @@ def test_traffic_coverage_anchors_present(v2_page):
     assert expected - found == set(), sorted(expected - found)
 
 
+def test_traffic_empty_state_is_quiet_before_first_query(v2_page):
+    """Density spec R1/R3 for a work page: before any query has run, XC-09
+    is the honest "you have not asked yet" prompt, not the full
+    why-is-this-empty diagnostic (cache on? window? filter count?) — that
+    diagnostic only means something once a query actually ran and matched
+    nothing. Pinned separately from the post-query 3-`<li>` assertion in
+    test_filter_pill_reaches_query_and_kpis_update, or a later change could
+    make the causes list the idle default again with nothing to catch it."""
+    page, base_url = v2_page
+    _goto(page, base_url, R_TRAFFIC)
+
+    xc09 = page.locator('[data-cov="XC-09"]')
+    assert xc09.count() == 1
+    assert xc09.locator("li").count() == 0
+    labels = _labels(page)
+    assert labels["gui_query_flow"]  # sanity: catalogue resolved
+    prompt = page.evaluate(
+        "async () => { const { t } = await import('/static/js/v2/core/i18n.mjs'); "
+        "return t('gui_iv_search_prompt'); }"
+    )
+    assert xc09.inner_text().strip() == prompt.strip() or prompt in xc09.inner_text()
+
+    # The audit probe (handles.probeEmpty) still exercises the real
+    # causes-diagnostic renderer even while the page itself is idle — it
+    # forces its own copy of the state to phase "done" precisely so an
+    # audit pass proves the empty-causes branch works without requiring a
+    # real query first.
+    page.evaluate("window.__openAllForAudit()")
+    page.wait_for_timeout(300)
+    all_xc09 = page.locator('[data-cov="XC-09"]')
+    assert all_xc09.count() == 2
+    assert sum(all_xc09.nth(i).locator("li").count() for i in range(2)) == 3
+
+
 def test_workloads_coverage_anchors_present(v2_page):
     page, base_url = v2_page
     _goto(page, base_url, R_WORKLOADS)

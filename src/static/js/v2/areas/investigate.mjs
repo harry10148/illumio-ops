@@ -723,7 +723,20 @@ function emptyCauses(state, d) {
   return list;
 }
 
+/* Density spec R1/R3 for a work page: the causes list below answers "why did
+ * my query come back empty", which only means something once a query has
+ * actually run. Before that, the honest answer is "you have not asked yet" —
+ * showing the same diagnostic (cache on? window? filter count?) at page load,
+ * with nothing queried, reads as a wall of caveats in front of an empty form.
+ * workloads and events already draw this idle/empty distinction (their own
+ * phase === "idle" checks below); this brings traffic in line with them. */
 function emptyState(state, d) {
+  if (state.phase === "idle") {
+    return el("div", { class: "empty", "data-cov": "XC-09" },
+      el("span", { class: "et", text: t("gui_empty_state_no_data_title") }),
+      el("p", { text: t("gui_iv_search_prompt") })
+    );
+  }
   // actions.py:102-108 — an archive query with no review DB loaded answers
   // {ok:true, data:[], not_loaded:true}. That flag is the authority on why
   // this result is empty (quarantine.js:402-404 makes the same distinction);
@@ -736,6 +749,20 @@ function emptyState(state, d) {
     el("p", { text: archiveMiss ? t("gui_archive_not_loaded") : t("gui_no_traffic") }),
     emptyCauses(state, d)
   );
+}
+
+/* R4/R6 — archive_import.py's _PROGRESS dict (src/pce_cache/archive_import.py)
+ * only ever writes state to "idle" | "running" | "done" | "error"; those are
+ * the backend's own internal codes, not words an operator reads elsewhere in
+ * this product, so the badge below maps each to a catalogue label instead of
+ * printing the code. Reuses labels already minted for the same words
+ * elsewhere (overview.mjs's queue-idle badge, the app-level loading text) —
+ * no new key needed for a badge this generic. */
+function archiveLoadLabel(state) {
+  if (state === "running") return t("gui_app_loading");
+  if (state === "done") return t("gui_gen_done");
+  if (state === "error") return t("alert_status_error");
+  return t("gui_health_queue_idle");
 }
 
 /* IV-06 — archive status strip, from the real GET /api/cache/archive/status.
@@ -757,7 +784,7 @@ function archiveStrip(d) {
     : t("gui_traffic_archive_none") }));
   strip.appendChild(el("span", { text: tf("gui_iv_archive_files", { files: num(a.files), skipped: num(a.skipped) }) }));
   strip.appendChild(el("span", { class: "spacer" }));
-  strip.appendChild(badge(String(load.state || "idle"), tone(load.state === "error" ? "error" : "ok")));
+  strip.appendChild(badge(archiveLoadLabel(load.state), tone(load.state === "error" ? "error" : "ok")));
   // PORT (header note 7): archive LOADING needs a date range and belongs to the
   // cache management page, so this is a jump, not a fake action.
   strip.appendChild(el("button", { class: "btn link goto", type: "button",
@@ -1299,6 +1326,13 @@ async function mountTraffic(root, ctx) {
         if (probe.firstChild) return;                     // idempotent
         const probeState = Object.assign({}, state);
         probeState.search = "__no_such_flow__";
+        // The idle/empty split above reads phase, and this probe runs
+        // whenever the audit is triggered — including before any real query,
+        // when state.phase is still "idle". The probe's whole point is to
+        // exercise the real causes-diagnostic renderer, so it always presents
+        // as a query that ran and matched nothing, regardless of what has
+        // actually happened on screen yet.
+        probeState.phase = "done";
         const p = panel(null, t("gui_traffic_analyzer"));
         withMeta(p, tf("gui_total_found", { count: 0 }));
         p.body.appendChild(emptyState(probeState, d));
@@ -2039,8 +2073,11 @@ function statusTone(value) {
  * columns are the ones events/shadow.py:78-104 returns. Loaded on demand —
  * each call fetches up to `limit` events from the PCE (header note 6). */
 function shadowPanel(areaState) {
+  // R4 — this used to carry the endpoint path (/api/events/shadow_compare)
+  // as the panel's meta caption. The description note right below already
+  // says what the panel does in one sentence; the route it hits is not
+  // something an operator acts on.
   const p = panel("IV-15", t("gui_iv_shadow_title"));
-  withMeta(p, "/api/events/shadow_compare");
   const view = {};
   view.mins = "60";
   view.limit = "200";
@@ -2417,7 +2454,9 @@ async function mountEvents(root, ctx) {
           dl.appendChild(el("dt", { text: label }));
           dl.appendChild(el("dd", { title: String(value), text: value }));
         }
-        meta("event_id", item.event_id);
+        // R4/R6 — the raw field name used to be the label text itself; the
+        // DLQ table already minted a human label for the same field.
+        meta(t("gui_dlq_th_event_id"), item.event_id);
         meta(t("gui_ev_detail_time"), stamp(item.timestamp));
         meta(t("gui_ev_detail_sev"), item.severity || "—");
         meta(t("gui_ev_detail_user_ip"), username + ip);
