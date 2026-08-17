@@ -410,6 +410,101 @@ def test_teardown_closes_surfaces_clears_callbacks_and_palette(v2_page):
     assert all(route != R_OPS for route in _palette_routes(page))
 
 
+def test_event_drawer_saves_the_values_typed_into_its_threshold_fields(v2_page):
+    """The event drawer's save reads `state`, not the inputs.
+
+    Its number fields' onChange handlers are the ONLY thing that writes
+    state.threshold_count / threshold_window / cooldown_minutes, so they are
+    load-bearing in a way the system and flow drawers' are not (those read their
+    controls directly at save time). Removing the request-body preview meant
+    touching every one of those handlers, and a careless deletion would have
+    silently saved the defaults while the form showed the typed values. This is
+    the assertion that would have caught it.
+
+    The POST is fulfilled at the network boundary, so this proves what the UI
+    sends and nothing about what the handler would have stored — and it creates
+    no rule the rest of the suite would have to clean up.
+    """
+    page, base_url = v2_page
+    _goto(page, base_url, R_RULES)
+    page.route(
+        "**/api/rules/event",
+        lambda route: route.fulfill(status=200, content_type="application/json",
+                                    body=json.dumps({"ok": True})),
+    )
+    page.evaluate("() => window.__openRuleDrawer('event')")
+    drawer = page.locator("aside.drawer").last
+    drawer.wait_for(state="visible")
+    page.wait_for_selector('aside.drawer input[data-field="cooldown_minutes"]')
+
+    drawer.locator('input[data-field="cooldown_minutes"]').fill("47")
+    # cumulative exposes count/window; immediate hides them (onTtChange)
+    drawer.locator('[data-field="threshold_type"] input[type="radio"]').last.check()
+    drawer.locator('input[data-field="threshold_count"]').fill("9")
+    drawer.locator('input[data-field="threshold_window"]').fill("33")
+    drawer.locator('textarea[data-field="match_fields"]').fill("severity=err")
+
+    with page.expect_request(
+        lambda r: "/api/rules/event" in r.url and r.method == "POST"
+    ) as info:
+        drawer.locator(".drawer-f button.btn.primary").click()
+    body = info.value.post_data_json
+    assert str(body["cooldown_minutes"]) == "47", body
+    assert str(body["threshold_count"]) == "9", body
+    assert str(body["threshold_window"]) == "33", body
+    assert body["match_fields"] == {"severity": "err"}, body
+
+
+@pytest.mark.parametrize("rtype", ["event", "system", "traffic", "bandwidth"])
+def test_rule_drawers_do_not_describe_the_request_to_the_operator(v2_page, rtype):
+    """Density spec R4: no endpoint paths, no raw JSON, no request-body preview.
+
+    All four rule drawers used to end in a `POST /api/rules/... · PUT ...` pane
+    holding the request body as JSON, and the two flow drawers additionally
+    echoed the FilterBar's serialized keys with their values as JSON. Both are
+    gone; this is what keeps them gone.
+
+    The three anti-vacuity anchors matter as much as the absences: a drawer that
+    failed to mount would satisfy every "not in" assertion below, so each drawer
+    must also prove it rendered its form (editable fields with their save keys),
+    that the fields carry real values, and — for the flow drawers — that the
+    FilterBar itself is there, since it is what replaced the JSON echo.
+    """
+    page, base_url = v2_page
+    _goto(page, base_url, R_RULES)
+    page.evaluate("(ty) => window.__openRuleDrawer(ty)", rtype)
+    drawer = page.locator("aside.drawer").last
+    drawer.wait_for(state="visible")
+    body = drawer.locator(".drawer-b")
+    page.wait_for_selector("aside.drawer [data-field]")
+
+    # anchors: the drawer really is the rule form, populated
+    fields = body.locator("[data-field]")
+    assert fields.count() >= 4, fields.count()
+    filled = page.eval_on_selector_all(
+        "aside.drawer .drawer-b input.field[data-field]",
+        "els => els.map(e => e.value).filter(v => v && v.trim())",
+    )
+    assert filled, "the drawer rendered no populated field — the absences below would be vacuous"
+    if rtype in ("traffic", "bandwidth"):
+        assert body.locator('[data-role="filter-bar"] .fb-grid').count() == 1
+
+    text = body.inner_text()
+    assert "pre.codepane" not in text
+    assert body.locator("pre.codepane").count() == 0, text
+    # the endpoint the save posts to is not the operator's business...
+    assert "/api/rules" not in text, text
+    assert "POST" not in text and "PUT" not in text, text
+    # ...and neither is the body it sends: these two keys appeared in every one
+    # of those JSON dumps, as `"cooldown_minutes": 10` / `"threshold_type": ...`
+    assert '"cooldown_minutes"' not in text, text
+    assert '"threshold_type"' not in text, text
+    # the flow drawers' serialized-filters echo printed the plural keys the bar
+    # emits (src_labels); the stored-filters mirror shows the singular ones, so
+    # the plural spelling is specific to the echo that was removed
+    assert "src_labels" not in text, text
+
+
 def test_rule_debug_error_console_keeps_backend_text(v2_page):
     page, base_url = v2_page
     _goto(page, base_url, R_OPS)

@@ -1582,7 +1582,6 @@
   "gui_al_ch_note": "唯讀：管道的啟用與設定在系統區的告警管道設定；這裡只呈現各管道的最後一次派送結果。",
   "gui_al_debug_note": "Debug 的 Policy Dec. 編號與規則的 pd 不同：1=Blocked、2=Allowed、3=All。時間窗會被夾在 5–10080 分鐘。",
   "gui_al_del_norecover": "刪除沒有復原路徑：只有「載入最佳實務」會先建立 rule_backups 備份。",
-  "gui_al_fb_note": "儲存時送出的是這些複數鍵；規則裡既有的單數欄位由 FilterBar 讀入，存回時會被複數鍵取代。label_group 不開放：後端直接回 400。",
   "gui_al_fmt_bp": "best-practices：{ok, output, summary}，summary 帶 mode/added/replaced/skipped/total 與 backup_id。",
   "gui_al_fmt_debug": "debug：output 是 run_debug_mode 期間擷取並去除 ANSI 的 stdout，通常有數十行。",
   "gui_al_fmt_err": "失敗一律是 {ok:false, error, description}，前端不會把它當成完成；429 rate_limit_exceeded 也走這條。",

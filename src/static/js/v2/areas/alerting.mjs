@@ -451,8 +451,8 @@ function eventDrawer(rule, catalog, onSaved) {
   const evSel = el("select", { class: "field" });
   const nameOut = el("span", { class: "field ro" });
   const infoBox = el("div", { class: "evinfo", "data-tone": "info", hidden: true });
-  const statusSel = selectField(EV_STATUS, state.filter_status, function (v) { state.filter_status = v; repaintPayload(); });
-  const sevSel = selectField(EV_SEVERITY, state.filter_severity, function (v) { state.filter_severity = v; repaintPayload(); });
+  const statusSel = selectField(EV_STATUS, state.filter_status, function (v) { state.filter_status = v; });
+  const sevSel = selectField(EV_SEVERITY, state.filter_severity, function (v) { state.filter_severity = v; });
   const filterRow = el("div", { class: "qrow" });
   const statusBox = editField("filter_status", t("gui_ev_status_filter"), statusSel);
   const sevBox = editField("filter_severity", t("gui_ev_severity_filter"), sevSel);
@@ -461,15 +461,14 @@ function eventDrawer(rule, catalog, onSaved) {
 
   const matchArea = el("textarea", { class: "field ta", rows: "4", placeholder: t("gui_ev_matchers_placeholder") });
   matchArea.value = Object.keys(state.match_fields).map(function (k) { return k + "=" + state.match_fields[k]; }).join("\n");
-  matchArea.addEventListener("input", function () { repaintPayload(); });
 
-  const cntInput = numberField(state.threshold_count, function (v) { state.threshold_count = v; repaintPayload(); });
-  const winInput = numberField(state.threshold_window, function (v) { state.threshold_window = v; repaintPayload(); });
-  const cdInput = numberField(state.cooldown_minutes, function (v) { state.cooldown_minutes = v; repaintPayload(); });
+  const cntInput = numberField(state.threshold_count, function (v) { state.threshold_count = v; });
+  const winInput = numberField(state.threshold_window, function (v) { state.threshold_window = v; });
+  const cdInput = numberField(state.cooldown_minutes, function (v) { state.cooldown_minutes = v; });
   const cntBox = editField("threshold_count", t("gui_count"), cntInput);
   const winBox = editField("threshold_window", t("gui_window_min"), winInput);
   const ttBox = editField("threshold_type", t("gui_type"),
-    radioGroup("al-ev-tt", EV_TT, state.threshold_type, function (v) { state.threshold_type = v; onTtChange(); repaintPayload(); }));
+    radioGroup("al-ev-tt", EV_TT, state.threshold_type, function (v) { state.threshold_type = v; onTtChange(); }));
 
   // rules.js:341-345 (onEvTtChange) — count/window only exist for cumulative.
   function onTtChange() {
@@ -543,24 +542,8 @@ function eventDrawer(rule, catalog, onSaved) {
     if (cat.id === category) opt.selected = true;
     catSel.appendChild(opt);
   });
-  catSel.addEventListener("change", function () { category = catSel.value; paintEvents(); repaintPayload(); });
-  evSel.addEventListener("change", function () { state.filter_value = evSel.value; paintInfo(); repaintPayload(); });
-
-  const payload = el("pre", { class: "codepane" });
-  function repaintPayload() {
-    const d = {};
-    d.name = nameOut.textContent === "—" ? "" : nameOut.textContent;
-    d.filter_value = state.filter_value;
-    d.filter_status = statusSel.value || "all";
-    d.filter_severity = sevSel.value || "all";
-    d.match_fields = parseMatchers(matchArea.value);
-    d.threshold_type = state.threshold_type;
-    d.threshold_count = state.threshold_count;
-    d.threshold_window = state.threshold_window;
-    d.cooldown_minutes = state.cooldown_minutes;
-    payload.textContent = "POST /api/rules/event · PUT /api/rules/" + (r.index === undefined ? "<idx>" : r.index) + "\n"
-      + JSON.stringify(d, null, 2);
-  }
+  catSel.addEventListener("change", function () { category = catSel.value; paintEvents(); });
+  evSel.addEventListener("change", function () { state.filter_value = evSel.value; paintInfo(); });
 
   body.appendChild(sectionHead(t("gui_al_form_section")));
   body.appendChild(labelled(t("gui_category"), catSel));
@@ -589,12 +572,8 @@ function eventDrawer(rule, catalog, onSaved) {
     roField("cooldown_remaining", r.cooldown_remaining, t("gui_al_fn_cooldown_remaining")),
   ]));
 
-  body.appendChild(sectionHead(t("gui_al_payload")));
-  body.appendChild(payload);
-
   paintEvents();
   onTtChange();
-  repaintPayload();
   const title = r.index === undefined ? t("gui_add_event_rule") : t("gui_edit_event_rule");
   return drawerSpec(title, body, function () {
     const bodyData = {};
@@ -612,8 +591,10 @@ function eventDrawer(rule, catalog, onSaved) {
 }
 
 /* rules.js:387-407 (_parseMatchFields) — one `field.path=pattern` per line. The
- * product throws on a malformed line; here the offending line is reported and
- * skipped so the payload preview stays live while typing. */
+ * product raises on a malformed line; this silently skips it, so a half-written
+ * matcher cannot block the save. Nothing tells the operator which line was
+ * dropped — a real divergence, recorded in the task report rather than papered
+ * over here (the request-body preview used to expose it indirectly). */
 function parseMatchers(text) {
   const out = {};
   String(text || "").split(/\r?\n/).forEach(function (raw) {
@@ -634,20 +615,13 @@ function parseMatchers(text) {
 function systemDrawer(rule, onSaved) {
   const body = el("div", { "data-cov": "AL-03" });
   const r = rule || {};
-  const nameInput = textField(r.name || t("rule_pce_health"), function () { repaint(); });
-  const typeSel = selectField(SYS_TYPES, r.filter_value || "pce_health", function () { repaint(); });
+  // No onChange callbacks: the three controls are read at save time
+  // (drawerSpec's onSave below), and nothing else on the drawer derives from
+  // them now that the request-body preview is gone.
+  const nameInput = textField(r.name || t("rule_pce_health"));
+  const typeSel = selectField(SYS_TYPES, r.filter_value || "pce_health");
   typeSel.disabled = true;
-  const cdInput = numberField(r.cooldown_minutes === undefined ? 30 : r.cooldown_minutes, function () { repaint(); });
-  const payload = el("pre", { class: "codepane" });
-
-  function repaint() {
-    const d = {};
-    d.name = nameInput.value.trim() || t("rule_pce_health");
-    d.filter_value = typeSel.value || "pce_health";
-    d.cooldown_minutes = cdInput.value || 30;
-    payload.textContent = "POST /api/rules/system · PUT /api/rules/" + (r.index === undefined ? "<idx>" : r.index) + "\n"
-      + JSON.stringify(d, null, 2);
-  }
+  const cdInput = numberField(r.cooldown_minutes === undefined ? 30 : r.cooldown_minutes);
 
   body.appendChild(sectionHead(t("gui_al_form_section")));
   body.appendChild(editField("name", t("gui_rule_name"), nameInput));
@@ -669,10 +643,6 @@ function systemDrawer(rule, onSaved) {
     roField("throttle_state", r.throttle_state, t("gui_al_fn_throttle_state")),
     roField("cooldown_remaining", r.cooldown_remaining, t("gui_al_fn_cooldown_remaining")),
   ]));
-  body.appendChild(sectionHead(t("gui_al_payload")));
-  body.appendChild(payload);
-
-  repaint();
   const title = r.index === undefined ? t("gui_add_system_health_rule") : t("gui_edit_system_health_rule");
   return drawerSpec(title, body, function () {
     const bodyData = {};
@@ -712,17 +682,19 @@ function flowDrawer(kind, rule, onSaved) {
   state.metric = metric;
   state.pd = r.pd === undefined || r.pd === null ? (isBw ? "-1" : "2") : String(r.pd);
 
-  const nameInput = textField(r.name || "", function () { repaint(); });
-  const cntInput = numberField(r.threshold_count === undefined ? (isBw ? 100 : 10) : r.threshold_count, function () { repaint(); });
-  const winInput = numberField(r.threshold_window === undefined ? 10 : r.threshold_window, function () { repaint(); });
-  const cdInput = numberField(r.cooldown_minutes === undefined ? (isBw ? 30 : 10) : r.cooldown_minutes, function () { repaint(); });
+  // No onChange callbacks: every one of these is read at save time (onSave
+  // below), and nothing on the drawer derives from them now that the
+  // request-body preview and the serialized-filters echo are gone.
+  const nameInput = textField(r.name || "");
+  const cntInput = numberField(r.threshold_count === undefined ? (isBw ? 100 : 10) : r.threshold_count);
+  const winInput = numberField(r.threshold_window === undefined ? 10 : r.threshold_window);
+  const cdInput = numberField(r.cooldown_minutes === undefined ? (isBw ? 30 : 10) : r.cooldown_minutes);
   const cntBox = editField("threshold_count", isBw ? t("gui_bw_value_bandwidth") : t("gui_count"), cntInput);
   const cntHelp = el("small", { class: "hint", text: isBw ? t("gui_bw_help_bandwidth") : "" });
   if (isBw) cntBox.appendChild(cntHelp);
 
   const barHost = el("div", { "data-role": "filter-bar" });
   const bar = createFilterBar(barHost, filterBarOpts(r));
-  const serialized = el("ul", { class: "stack" });
 
   // rules.js:346-364 (onBwMetricTypeChange) — the threshold label/help swap with
   // the metric, and the metric IS the stored `type`.
@@ -734,48 +706,18 @@ function flowDrawer(kind, rule, onSaved) {
     cntHelp.textContent = volume ? t("gui_bw_help_volume") : t("gui_bw_help_bandwidth");
   }
 
-  const payload = el("pre", { class: "codepane" });
-  function repaint() {
-    const filters = bar.getFilters();
-    clear(serialized);
-    const keys = Object.keys(filters).sort();
-    if (!keys.length) serialized.appendChild(el("li", null, el("span", { class: "s", text: t("gui_al_fb_none") })));
-    keys.forEach(function (k) {
-      const li = el("li");
-      li.appendChild(el("code", { class: "c", text: k }));
-      li.appendChild(el("span", { class: "s", text: JSON.stringify(filters[k]) }));
-      serialized.appendChild(li);
-    });
-
-    const d = {};
-    d.name = nameInput.value.trim();
-    if (isBw) d.rule_type = state.metric;
-    d.pd = state.pd;
-    d.threshold_count = cntInput.value;
-    d.threshold_window = winInput.value;
-    d.cooldown_minutes = cdInput.value;
-    d.filters = filters;
-    const path = isBw ? "/api/rules/bandwidth" : "/api/rules/traffic";
-    payload.textContent = "POST " + path + " · PUT /api/rules/" + (r.index === undefined ? "<idx>" : r.index) + "\n"
-      + JSON.stringify(d, null, 2);
-  }
-  bar.onChange(repaint);
-
   body.appendChild(note(isBw ? t("gui_bw_rule_desc") : t("gui_traffic_rule_desc")));
   body.appendChild(sectionHead(t("gui_al_form_section")));
   body.appendChild(editField("name", t("gui_rule_name"), nameInput));
   if (isBw) {
     body.appendChild(editField("type", t("gui_metric_type"),
-      radioGroup("al-bw-mt", BW_METRICS, state.metric, function (v) { state.metric = v; onMetricChange(); repaint(); }),
+      radioGroup("al-bw-mt", BW_METRICS, state.metric, function (v) { state.metric = v; onMetricChange(); }),
       t("gui_al_fn_bw_metric")));
   }
   body.appendChild(editField("pd", t("gui_policy_dec"),
-    radioGroup(isBw ? "al-bw-pd" : "al-tr-pd", PD_OPTS, state.pd, function (v) { state.pd = v; repaint(); })));
+    radioGroup(isBw ? "al-bw-pd" : "al-tr-pd", PD_OPTS, state.pd, function (v) { state.pd = v; })));
   body.appendChild(sectionHead(t("gui_col_filters")));
   body.appendChild(barHost);
-  body.appendChild(sectionHead(t("gui_al_fb_serialized")));
-  body.appendChild(serialized);
-  body.appendChild(note(t("gui_al_fb_note")));
   body.appendChild(sectionHead(t("gui_threshold")));
   body.appendChild(cntBox);
   body.appendChild(editField("threshold_window", t("gui_window_min"), winInput));
@@ -797,11 +739,7 @@ function flowDrawer(kind, rule, onSaved) {
   body.appendChild(roList(filterFieldRows(storedKeys, r, t("gui_al_fn_filter_scalar"))));
   if (isBw) body.appendChild(note(t("gui_al_fn_proto_bw")));
 
-  body.appendChild(sectionHead(t("gui_al_payload")));
-  body.appendChild(payload);
-
   onMetricChange();
-  repaint();
   const addKey = isBw ? "gui_add_bw_rule" : "gui_add_traffic_rule";
   const editKey = isBw ? "gui_edit_bw_rule" : "gui_edit_traffic_rule";
   const spec = drawerSpec(t(r.index === undefined ? addKey : editKey), body, function () {
