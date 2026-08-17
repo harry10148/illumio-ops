@@ -1664,5 +1664,7 @@
   "gui_al_wm_label_history": "告警冷卻紀錄",
   "gui_gen_idle": "閒置",
   "gui_ov_group_system": "系統詳情",
-  "gui_ov_group_activity": "近期活動"
+  "gui_ov_group_activity": "近期活動",
+  "gui_action_plugin_last_prefix": "上次傳送：",
+  "gui_action_plugin_missing_prefix": "缺少："
 }

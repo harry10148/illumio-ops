@@ -620,8 +620,14 @@ function cardTop10(top, chartHandles) {
   const rankBy = parsed.length ? parsed[0].rankBy : "bandwidth";
   const rankLabel = lookup(RANK_KEYS, rankBy, "gui_rank_bw");
   const p = panel("OV-05", t("gui_top10_title") + " · " + t(rankLabel));
+  /* `cap` is absent from the response whenever the query has not run (no saved
+   * query, or the PCE call failed), and went to the screen as the literal word
+   * "undefined". Every other field on this card already has an em-dash
+   * fallback; this one did not. */
   withMeta(p, tf("gui_ov_top10_meta_fmt", {
-    source: top.source || "—", cap: top.cap, rows: tf("gui_table_rows", { total: num(top.total) }),
+    source: top.source || "—",
+    cap: (top.cap === null || top.cap === undefined) ? "—" : top.cap,
+    rows: tf("gui_table_rows", { total: num(top.total) }),
   }));
   withGoto(p, GO_TRAFFIC);
   withTone(p, "info");

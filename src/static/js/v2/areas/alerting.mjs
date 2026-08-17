@@ -1319,10 +1319,17 @@ function channelDetail(ch, labels) {
   const issues = [];
   if (!ch.enabled) issues.push(t("gui_action_plugin_disabled"));
   if (!ch.configured && ch.missing_required && ch.missing_required.length) {
-    const named = ch.missing_required.map(function (k) { return labels[k] ? labels[k] + " (" + k + ")" : k; });
+    /* The settings key used to trail its own label — "Webhook URL
+     * (alerts.webhook_url)". The label is what the settings form calls the
+     * field, so it is already the thing to go and fill in; the key was there
+     * for whoever wrote this page. Fall back to the key only when there is no
+     * label to use. */
+    const named = ch.missing_required.map(function (k) { return labels[k] || k; });
     issues.push(t("gui_action_plugin_missing_prefix") + " " + named.join(", "));
   }
-  if (ch.last_status) issues.push(t("gui_action_plugin_last_prefix") + "=" + ch.last_status);
+  /* "last=success" was a key=value dump; the prefix already reads as a
+   * sentence opener in both catalogues. */
+  if (ch.last_status) issues.push(t("gui_action_plugin_last_prefix") + " " + ch.last_status);
   if (ch.last_error) issues.push(ch.last_error);
   return issues.length ? issues.join(" | ") : t("gui_action_plugin_ready");
 }
@@ -1509,7 +1516,12 @@ async function mountOps(root, ctx) {
         channels.forEach(function (ch) {
           const li = el("li", { "data-tone": channelTone(ch) });
           li.appendChild(el("span", { class: "dot" }));
-          const head = el("span", { class: "s" }, el("b", { text: ch.display_name || ch.name }), el("code", { text: ch.name }));
+          /* The internal channel id no longer trails the display name
+           * ("Email (SMTP) mail"): the row is identified by the name the
+           * settings page uses, and the id added nothing an operator acts on.
+           * It stays as the title attribute for anyone cross-referencing a log
+           * line, where it is available but not in the way. */
+          const head = el("span", { class: "s", title: ch.name }, el("b", { text: ch.display_name || ch.name }));
           li.appendChild(head);
           li.appendChild(el("span", { class: "c", text: ch.last_timestamp ? stamp(ch.last_timestamp) : "—" }));
           const detail = [channelDetail(ch, fieldLabels(d.alert_plugins, ch.name))];
