@@ -40,18 +40,26 @@
   --space-7: 24px;
   --space-8: 32px;
 
-  /* type scale — cozy (default) */
-  --fs-micro: 9.5px;   /* uppercase eyebrows, column heads */
-  --fs-mini: 10.5px;   /* meta, captions */
-  --fs-body: 11.5px;   /* table cells, list rows */
-  --fs-ui: 13px;       /* base body */
-  --fs-lead: 15px;     /* panel lead numbers */
-  --fs-num: 19px;      /* instrument readouts */
-  --fs-display: 30px;  /* headline figures */
-  --lead: 1.35;
+  /* type scale — cozy (default)
+   *
+   * Raised across the board (density spec). The previous cozy scale put table
+   * cells at 11.5px and captions at 10.5px, which is what "too dense" mostly
+   * was: no amount of restructuring makes 10px prose comfortable to read all
+   * day. The steps between sizes are preserved, so the hierarchy is unchanged —
+   * everything simply starts from a legible base. Anyone who wants the old
+   * information-per-screen back has the compact density, which is what that
+   * setting is for. */
+  --fs-micro: 11px;    /* uppercase eyebrows, column heads */
+  --fs-mini: 12px;     /* meta, captions */
+  --fs-body: 13px;     /* table cells, list rows */
+  --fs-ui: 14px;       /* base body */
+  --fs-lead: 17px;     /* panel lead numbers */
+  --fs-num: 21px;      /* instrument readouts */
+  --fs-display: 32px;  /* headline figures */
+  --lead: 1.45;
 
-  --row-h: 26px;       /* dense table row */
-  --ctl-h: 28px;       /* buttons / inputs */
+  --row-h: 30px;       /* table row — follows --fs-body up */
+  --ctl-h: 32px;       /* buttons / inputs */
   --chrome-h: 46px;    /* top bar height */
   --nav-pad-y: 15px;   /* area nav vertical padding (sets the tab hit area) */
 }
@@ -66,17 +74,20 @@
   --space-7: 18px;
   --space-8: 24px;
 
-  --fs-micro: 9px;
-  --fs-mini: 10px;
-  --fs-body: 11px;
-  --fs-ui: 12px;
-  --fs-lead: 14px;
-  --fs-num: 17px;
-  --fs-display: 26px;
-  --lead: 1.28;
+  /* Compact keeps its job — more on screen — but is pulled up with the cozy
+   * scale so that it is "tighter", not "unreadable". It now lands roughly
+   * where cozy used to be. */
+  --fs-micro: 10px;
+  --fs-mini: 11px;
+  --fs-body: 12px;
+  --fs-ui: 13px;
+  --fs-lead: 15px;
+  --fs-num: 19px;
+  --fs-display: 28px;
+  --lead: 1.32;
 
-  --row-h: 21px;
-  --ctl-h: 24px;
+  --row-h: 25px;
+  --ctl-h: 28px;
   --chrome-h: 40px;
   --nav-pad-y: 12px;
 }

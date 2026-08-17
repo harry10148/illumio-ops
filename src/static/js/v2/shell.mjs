@@ -181,9 +181,18 @@ export function buildShell(mountPoint) {
   const nav = el("nav", { class: "areanav", "data-cov": "XC-14", "aria-label": t("gui_cmd_group_area") });
   const links = [];
   AREAS.forEach(function (area) {
+    /* The English eyebrow is a bilingual device: "OVERVIEW 總覽" reads well.
+     * In English it printed the same word twice — OVERVIEW OVERVIEW — and once
+     * the type scale went up that doubled nav overflowed 1280px, cutting
+     * Reports in half and pushing System off the bar entirely. So it is shown
+     * only when it actually adds something. */
+    const label = t(area.key);
+    const eyebrow = label.toLowerCase() === area.id.toLowerCase()
+      ? null
+      : el("span", { text: area.id });
     const a = el("a", { href: area.route },
-      el("span", { text: area.id }),
-      el("u", { text: t(area.key) })
+      eyebrow,
+      el("u", { text: label })
     );
     links.push([area, a]);
     nav.appendChild(a);
