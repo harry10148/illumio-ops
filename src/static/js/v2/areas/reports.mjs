@@ -1476,10 +1476,6 @@ async function mountReports(root, ctx) {
         el("div", { class: "strip", "data-tone": "warn" },
           el("span", { text: tf("gui_toast_report_partial", { formats: "csv, xlsx" }) })),
         note(t("gui_rp_partial_body")),
-        el("ul", { class: "stack" },
-          el("li", null, el("code", { class: "c", text: "partial" }), el("span", { class: "s", text: t("gui_rp_partial_k1") })),
-          el("li", null, el("code", { class: "c", text: "failed_formats" }), el("span", { class: "s", text: t("gui_rp_partial_k2") })),
-          el("li", null, el("code", { class: "c", text: "files" }), el("span", { class: "s", text: t("gui_rp_partial_k3") }))),
         note(t("gui_rp_partial_where"))));
       aside.appendChild(partPanel);
     });

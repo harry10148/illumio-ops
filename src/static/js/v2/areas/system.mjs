@@ -1701,13 +1701,7 @@ async function mountSiem(root, ctx) {
        * toast against the raw response shape. */
       const testPanel = panel("SY-09", t("gui_siem_test"));
       testPanel.body.appendChild(note(t("gui_sy_siem_test_body")));
-      testPanel.body.appendChild(disclosure(t("gui_gen_explain"),
-        el("ul", { class: "stack" },
-          el("li", null, el("code", { class: "c", text: "POST" }), el("span", { class: "s", text: "/api/siem/destinations/<name>/test" })),
-          el("li", null, el("code", { class: "c", text: "ok" }), el("span", { class: "s", text: t("gui_sy_siem_test_ok") })),
-          el("li", null, el("code", { class: "c", text: "latency_ms" }), el("span", { class: "s", text: t("gui_sy_siem_test_latency") })),
-          el("li", null, el("code", { class: "c", text: "error" }), el("span", { class: "s", text: t("gui_sy_siem_test_err") }))),
-        note(t("gui_sy_siem_test_saved"))));
+      testPanel.body.appendChild(note(t("gui_sy_siem_test_saved")));
 
       board.appendChild(el("div", { class: "brow c2" }, fwPanel, testPanel));
       board.appendChild(destPanel);

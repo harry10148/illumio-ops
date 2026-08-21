@@ -1522,13 +1522,6 @@ async function mountOps(root, ctx) {
       logPanel.head.appendChild(spacer());
       logPanel.head.appendChild(btn("btn ghost", t("gui_al_console_clear"), function () { consoleBox.reset(); }));
       logPanel.body.appendChild(consoleBox.el);
-      const fmt = el("details", { class: "guide" });
-      fmt.appendChild(el("summary", { text: t("gui_al_fmt_title") }));
-      const ul = el("ul");
-      ["gui_al_fmt_run", "gui_al_fmt_debug", "gui_al_fmt_test", "gui_al_fmt_wm", "gui_al_fmt_bp", "gui_al_fmt_err"]
-        .forEach(function (k) { ul.appendChild(el("li", { text: t(k) })); });
-      fmt.appendChild(ul);
-      logPanel.body.appendChild(fmt);
       row3.appendChild(logPanel);
     });
 }
