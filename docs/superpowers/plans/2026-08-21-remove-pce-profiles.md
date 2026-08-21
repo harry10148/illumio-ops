@@ -93,7 +93,9 @@ git commit -m "chore(config): retire the pce_profiles keys ahead of removing the
 ### Task 2: 移除 ConfigManager 的 profile CRUD 與 schema 欄位
 
 **Files:**
-- Modify: `src/config.py`（`DEFAULT_CONFIG` 的 `"pce_profiles"` / `"active_pce_id"` 兩行；`get_pce_profiles` / `get_active_pce_id` / `add_pce_profile` / `update_pce_profile` / `remove_pce_profile` / `activate_pce_profile` 六個方法）
+- Modify: `src/config.py`（`DEFAULT_CONFIG` 的 `"pce_profiles"` / `"active_pce_id"` 兩行；`get_pce_profiles` / `get_active_pce_id` / `add_pce_profile` / `update_pce_profile` / `remove_pce_profile` / `activate_pce_profile` / **`sync_api_to_active_profile`** 七個方法）
+- Modify: `src/gui/routes/config.py`（`cm.sync_api_to_active_profile()` 呼叫，約 line 272）
+- Modify: `src/cli/menus/_root.py`（兩處 `cm.sync_api_to_active_profile()` 呼叫與其上方註解，約 line 92-93 與 105）
 - Modify: `src/config_models.py`（`class PceProfile`；`ConfigSchema` 的 `pce_profiles` 與 `active_pce_id` 兩個欄位）
 - Test: `tests/test_config_models.py`
 
@@ -115,8 +117,11 @@ def test_config_schema_has_no_pce_profile_fields():
 
 
 def test_config_manager_has_no_profile_methods():
+    """`sync_api_to_active_profile` 也要被抓到——它的名字裡沒有 `pce_profile`，
+    第一版盤點就是這樣把它整個漏掉的。"""
     from src.config import ConfigManager
-    leftovers = [n for n in dir(ConfigManager) if "pce_profile" in n]
+    leftovers = [n for n in dir(ConfigManager)
+                 if "pce_profile" in n or "active_profile" in n]
     assert leftovers == [], f"still present: {leftovers}"
 ```
 
@@ -134,7 +139,15 @@ Expected: FAIL 兩條
     active_pce_id: Optional[int] = None
 ```
 
-2. `src/config.py`：從 `DEFAULT_CONFIG` 刪掉 `"pce_profiles": [],` 與 `"active_pce_id": None,` 兩行；刪除 `get_pce_profiles` / `get_active_pce_id` / `add_pce_profile` / `update_pce_profile` / `remove_pce_profile` / `activate_pce_profile` 六個方法（約 line 631-698，整段連同其間的註解）。
+2. `src/config.py`：從 `DEFAULT_CONFIG` 刪掉 `"pce_profiles": [],` 與 `"active_pce_id": None,` 兩行；刪除 `get_pce_profiles` / `get_active_pce_id` / `add_pce_profile` / `update_pce_profile` / `remove_pce_profile` / `activate_pce_profile` 六個方法（整段連同其間的註解）。
+
+2b. **第七個方法：`sync_api_to_active_profile()`（約 line 709-720）也要刪，連同它的三個呼叫端。**（orchestrator 預檢補入：初稿的盤點用 `grep "def .*pce_profile"`，這個方法名裡沒有 `pce_profile` 所以整個漏掉。）它把 `config.api` 的值抄回作用中的 profile——沒有 profile 之後就沒有抄的對象。三個呼叫端都是「改完 `config.api` 之後、`cm.save()` 之前」呼叫它，刪掉呼叫即可，周圍的邏輯完全不動：
+
+   - `src/gui/routes/config.py` 約 line 272：刪掉 `cm.sync_api_to_active_profile()` 一行。
+   - `src/cli/menus/_root.py` 約 line 92-93：刪掉 `# Sync changes back to active PCE profile (if any)` 註解與其下的呼叫，兩行一起。
+   - `src/cli/menus/_root.py` 約 line 105：刪掉 `cm.sync_api_to_active_profile()` 一行。
+
+   刪完用 `grep -rn "sync_api_to_active_profile" src/ tests/` 確認為空。
 
 3. 若 `import time` 只被 `add_pce_profile` 用到，一併移除；用 `grep -n "time\." src/config.py` 確認後再動。既有的 dead code 不要順手清。
 
