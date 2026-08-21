@@ -102,3 +102,7 @@ docs/ux-review-2026-05-14/
 # 上面這條，新增的 requirements-offline.lock 沒有這道豁免，漏了就會靜靜地不進
 # repo，CI 與離線建置都拿不到鎖檔。
 !requirements*.lock
+
+# Local tool caches — CodeGraph index and Playwright MCP scratch output.
+.codegraph/
+.playwright-mcp/
