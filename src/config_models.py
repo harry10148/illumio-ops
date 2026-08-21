@@ -188,16 +188,6 @@ class WebGuiSettings(_Base):
     # above, so an installed config.json that still carries the key round-trips
     # untouched instead of failing validation.
 
-class PceProfile(_Base):
-    """Extra=allow since PCE profile shape may evolve; only require id + url."""
-    model_config = ConfigDict(extra="allow")
-    id: int = Field(ge=1)
-    url: str
-    org_id: str = "1"
-    key: str = ""
-    secret: str = ""
-    name: str = ""
-
 class ReportSchedule(_Base):
     """Report schedule entries; extra=allow because schedule shape
     may evolve during Phase 6 APScheduler migration."""
@@ -358,8 +348,6 @@ class ConfigSchema(_Base):
     rules: list[Rule] = Field(default_factory=list)
     report: ReportSettings = Field(default_factory=ReportSettings)
     report_schedules: list[ReportSchedule] = Field(default_factory=list)
-    pce_profiles: list[PceProfile] = Field(default_factory=list)
-    active_pce_id: Optional[int] = None
     rule_scheduler: RuleSchedulerSettings = Field(default_factory=RuleSchedulerSettings)
     scheduler: SchedulerSettings = Field(default_factory=SchedulerSettings)
     web_gui: WebGuiSettings = Field(default_factory=WebGuiSettings)

@@ -269,7 +269,6 @@ def make_config_blueprint(
                 else:
                     scratch[root] = incoming
             cm.config = scratch
-            cm.sync_api_to_active_profile()
             cm.save()
         return jsonify({"ok": True})
 

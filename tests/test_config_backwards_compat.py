@@ -63,7 +63,3 @@ def test_nested_web_gui_tls_defaults_applied(fresh_config):
 
 def test_rules_is_a_list(fresh_config):
     assert isinstance(fresh_config.config["rules"], list)
-
-
-def test_pce_profiles_is_a_list(fresh_config):
-    assert isinstance(fresh_config.config["pce_profiles"], list)

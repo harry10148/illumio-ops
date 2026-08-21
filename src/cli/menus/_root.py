@@ -89,8 +89,6 @@ def settings_menu(cm: ConfigManager) -> None:
             new_sec = safe_input(t("lbl_api_secret"), str, allow_cancel=True, hint="******", hidden=True)
             if new_sec:
                 cm.config["api"]["secret"] = new_sec
-            # Sync changes back to active PCE profile (if any)
-            cm.sync_api_to_active_profile()
             cm.save()
         elif sel == 2:
             alert_settings_menu(cm)
@@ -102,7 +100,6 @@ def settings_menu(cm: ConfigManager) -> None:
             choice = safe_input(t("change_verify_to"), int, range(1, 3))
             if choice:
                 cm.config["api"]["verify_ssl"] = choice == 1
-                cm.sync_api_to_active_profile()
                 cm.save()
         elif sel == 4:
             c = cm.config.get("smtp", {})

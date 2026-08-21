@@ -83,8 +83,8 @@ def test_dumped_model_has_all_legacy_dict_keys():
     })
     dumped = cfg.model_dump()
     for top_level in ("api", "alerts", "email", "smtp", "settings", "rules",
-                      "report", "report_schedules", "pce_profiles",
-                      "active_pce_id", "rule_scheduler", "web_gui"):
+                      "report", "report_schedules",
+                      "rule_scheduler", "web_gui"):
         assert top_level in dumped, f"missing {top_level} in model_dump()"
 
 
@@ -126,3 +126,20 @@ def test_report_snapshot_retention_validates_range():
         ReportSettings(snapshot_retention_days=0)
     with pytest.raises(ValidationError):
         ReportSettings(snapshot_retention_days=3651)
+
+
+def test_config_schema_has_no_pce_profile_fields():
+    """Profile 概念已移除：schema 不得再宣告它，否則舊資料會被當成合法設定留著。"""
+    from src.config_models import ConfigSchema
+    fields = set(ConfigSchema.model_fields)
+    assert "pce_profiles" not in fields
+    assert "active_pce_id" not in fields
+
+
+def test_config_manager_has_no_profile_methods():
+    """`sync_api_to_active_profile` 也要被抓到——它的名字裡沒有 `pce_profile`，
+    第一版盤點就是這樣把它整個漏掉的。"""
+    from src.config import ConfigManager
+    leftovers = [n for n in dir(ConfigManager)
+                 if "pce_profile" in n or "active_profile" in n]
+    assert leftovers == [], f"still present: {leftovers}"
