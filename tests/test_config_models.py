@@ -137,9 +137,10 @@ def test_config_schema_has_no_pce_profile_fields():
 
 
 def test_config_manager_has_no_profile_methods():
-    """`sync_api_to_active_profile` 也要被抓到——它的名字裡沒有 `pce_profile`，
-    第一版盤點就是這樣把它整個漏掉的。"""
+    """Case-insensitive match on `pce` or `profile` anywhere in the name——原本只比對
+    `pce_profile`/`active_profile` 這兩個子字串會漏掉 `get_active_pce_id`（沒有底線相接
+    的 `pce_profile`），而 `sync_api_to_active_profile` 正是這樣從第一版盤點裡漏網的。"""
     from src.config import ConfigManager
     leftovers = [n for n in dir(ConfigManager)
-                 if "pce_profile" in n or "active_profile" in n]
+                 if "pce" in n.lower() or "profile" in n.lower()]
     assert leftovers == [], f"still present: {leftovers}"
