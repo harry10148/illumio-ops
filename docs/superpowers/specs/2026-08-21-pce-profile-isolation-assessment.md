@@ -90,6 +90,32 @@ GUI 帳密與 TLS、logging、語言／佈景／時區、告警管道與 SMTP、
 
 **先於實作要補的守門**：一條「PCE 衍生狀態的路徑一律經過 profile resolver」的不變量測試（AST 或 grep 式），否則第 N 個新讀取點會再度直接讀 `cfg.db_path`。這正是 §3(i) 風險欄裡「漏一個就等於沒隔離」的機器化版本。
 
+## 4.5 先決問題：這個產品到底要不要 PCE profile？
+
+使用者 2026-08-21 追問：「按照目前設計是不是其實完全不適合走 profile PCE 概念？」
+
+**是。目前的「profile」不是租戶概念，是一組已存的連線設定加一個 active 指標。** 全 repo 對 profile 的使用只有三類：
+
+1. **設定 CRUD 與啟用**——`get/add/update/delete_pce_profile`、`activate_pce_profile`（`src/config.py`）、對應的 REST 端點（`src/gui/routes/config.py`）與 System 頁的清單（`src/static/js/v2/areas/system.mjs`）。
+2. **啟用時把憑證複製進全域 `config.api`**——見 §2.2。
+3. **兩處只為了顯示 URL**：`_get_active_pce_url()`（`src/gui/_helpers.py`）與 `Reporter._active_pce_url()`（`src/reporter.py`）。
+
+**沒有任何第四類。** ingest、analyzer、排程、報表、cache、archive、告警——沒有一個知道 profile 存在。所以這不是「架構不適合」，而是**這個概念從來沒有被實作到憑證層以外**。
+
+這比「沒有這個功能」更糟：UI 上有一份 profile 清單、有「啟用」按鈕，看起來像多 PCE 支援，實際切下去會靜默污染資料。使用者按了一個承諾了它做不到的事的按鈕。
+
+因此三條路：
+
+| | 做法 | 成本 | 結果 |
+|---|---|---|---|
+| **A. 縮回誠實範圍** | 一台設備＝一台 PCE。profile 降級為「已存的連線設定」，切換改成**明示的破壞性操作**：跳確認、講清楚「這會捨棄目前的快取、封存與歷史」，執行時實際清乾淨（含 watermark／cursor／queue）並停掉背景工作。多 PCE ＝多套部署。 | 低 | 消除靜默污染，UI 不再承諾做不到的事。今天能動的功能一樣都不少 |
+| **B. 真的做租戶化** | §4 的分階段計畫 | 中高 | 單一設備服務多台 PCE |
+| **C. 維持現狀** | — | 0 | 最差：功能看起來存在，代價是資料靜默錯亂且無徵兆 |
+
+**建議 A，除非「一台設備同時服務多台 PCE」是真實需求。** 兩個理由：(1) 目前沒有任何程式碼往 B 的方向鋪過路，B 等於從零建租戶層；(2) **A 是 B 的前置**——B 的遷移一定要有一個「切換 profile」的明示流程當掛載點，那正是 A 要建的東西。先做 A 不會浪費。
+
+這一題需要使用者裁決，因為它是產品定位問題，不是實作選擇。
+
 ## 5. 尚未評估
 
 - PCE profile 刪除時的資料生命週期（保留／封存／刪除）的 UI 與 CLI 流程
