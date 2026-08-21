@@ -124,9 +124,17 @@ def _deep_merge(base: dict, override: dict) -> dict:
 #   - report.attack_surface: removed with mod16 (Open-Ports Attack Surface).
 #   - web_gui.tls.http_redirect_port: removed with the HTTP→HTTPS auto-redirect
 #     server (commit 24fe5ff); the GUI is HTTPS-only now.
+#   - pce_profiles / active_pce_id: PCE profiles were only ever a credential
+#     switcher; switching one silently re-pointed the appliance at a second PCE
+#     while keeping the first one's cache. No downstream code knew they existed.
 _DEPRECATED_KEY_PATHS: tuple[str, ...] = (
     "report.attack_surface",
     "web_gui.tls.http_redirect_port",
+    # PCE profiles were only ever a credential switcher: nothing downstream of
+    # config["api"] knew they existed, and switching one silently re-pointed
+    # the appliance at a second PCE while keeping the first one's cache.
+    "pce_profiles",
+    "active_pce_id",
 )
 
 
