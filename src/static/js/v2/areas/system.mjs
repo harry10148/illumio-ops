@@ -881,22 +881,18 @@ async function mountPce(root, ctx) {
     const ssl = checkField(api_.verify_ssl);
     connPanel.body.appendChild(labelled(t("gui_url"), form.track("url", url), t("gui_url_help")));
     connPanel.body.appendChild(labelled(t("gui_org_id"), form.track("org_id", org), t("gui_org_id_help")));
-    connPanel.body.appendChild(labelled(t("gui_api_key"), form.track("key", key, "secret"), t("gui_api_key_help")));
-    connPanel.body.appendChild(labelled(t("gui_api_secret"), form.track("secret", secret, "secret"), t("gui_api_secret_help")));
+    connPanel.body.appendChild(labelled(t("gui_api_key"), form.track("key", key, "secret"),
+      t("gui_api_key_help") + " · " + secretState(api_, "key")));
+    connPanel.body.appendChild(labelled(t("gui_api_secret"), form.track("secret", secret, "secret"),
+      t("gui_api_secret_help") + " · " + secretState(api_, "secret")));
     connPanel.body.appendChild(checkRow(t("gui_verify_ssl"), form.track("verify_ssl", ssl, "bool")));
-    // The captured settings snapshot carries the server's redaction, not
-    // values: every secret comes back as asterisks plus a set/not-set flag.
-    // The form states which of the two it is instead of pretending.
-    /* Rows are labelled the way the form above labels the same fields, not by
-     * their config path (api.key / active_pce_id). And the per-row note that
-     * said "derived from the server's set-flag and length, not the secret
-     * itself" is gone from both secret rows: the section note below already
-     * says exactly that, once, for the whole group. Three statements of one
-     * fact is how this page read before. */
+    /* What is left here is the connection's own identity. The "secret field
+     * state" readout that used to stand above it — one row per credential,
+     * each stating set/not-set and the stored length — is gone: the length
+     * was never ours to publish, and set/not-set now rides on the field it
+     * describes instead of being restated in a section of its own. */
     connPanel.body.appendChild(sectionHead(t("gui_sy_secret_state")));
     connPanel.body.appendChild(roList([
-      roField(t("gui_api_key"), secretState(api_, "key"), null),
-      roField(t("gui_api_secret"), secretState(api_, "secret"), null),
       roField(t("gui_sy_pce_profile_name"), api_.profile, t("gui_sy_pce_profile_field")),
       roField(t("gui_sy_pce_active"), activeId, t("gui_sy_pce_active_field")),
     ]));

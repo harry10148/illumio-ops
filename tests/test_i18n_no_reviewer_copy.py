@@ -106,6 +106,18 @@ ENDPOINT_WORD = re.compile(r"端點|\bendpoints?\b", re.IGNORECASE)
 #     Chinese half, which shipped in five keys the port left behind.
 MOCKUP_ZH = re.compile(r"設計稿")
 
+# 11b. Which tier of our own architecture did the thing. An operator acts on
+#     what the appliance does, not on which half of it did it; "the backend
+#     answers 400" is a sentence about us, and it is usually covering for
+#     behaviour that should have been fixed rather than described.
+TIER_NARRATION = re.compile(r"後端|前端|\bthe (?:backend|frontend|server side)\b", re.IGNORECASE)
+
+# 11c. HTTP status codes quoted at the operator.
+STATUS_CODE = re.compile(r"回\s*[45]\d\d|\b(?:returns?|answers?|responds? with)\s+(?:an?\s+)?[45]\d\d\b", re.IGNORECASE)
+
+# 11d. A request/response body pasted into the copy.
+JSON_LITERAL = re.compile(r'\{\s*"')
+
 # 11. Internal machinery named in prose: the state file behind a response, the
 #     write lock a handler takes, ANSI stripping, and function-call syntax.
 INTERNALS = re.compile(r"狀態檔|寫入鎖|ANSI|\b[a-z_]+\.[a-z_]+\(|\brun_debug_mode\b|\?[a-z]+=")
@@ -153,6 +165,12 @@ def _violations(key: str, value: str) -> list[str]:
         hits.append("mockup-zh")
     if INTERNALS.search(text):
         hits.append("internals")
+    if TIER_NARRATION.search(text):
+        hits.append("tier-narration")
+    if STATUS_CODE.search(text):
+        hits.append("status-code")
+    if JSON_LITERAL.search(text):
+        hits.append("json-literal")
     return hits
 
 

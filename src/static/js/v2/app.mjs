@@ -13,7 +13,7 @@
 // The attach/detach mechanism around the rail (syncRail) is unchanged.
 
 import { api } from "./core/api.mjs";
-import { t, tf, i18n } from "./core/i18n.mjs";
+import { t, i18n } from "./core/i18n.mjs";
 import { initDisplay } from "./core/theme.mjs";
 import { installAuditHook } from "./core/audit.mjs";
 import { router } from "./core/router.mjs";
@@ -87,22 +87,21 @@ async function mountHealth(railHost, menu) {
 }
 
 /**
- * Every route this task has not built real content for yet. Names the route
- * so a reviewer walking the nav can tell a gap from a bug — same intent as
- * the mockup's areas/placeholder.mjs, rebuilt without its shell.mjs
- * dependency. The four routes still on it (AREA_ROUTES below) are area
- * landing paths that have no page of their own by design, not gaps.
+ * The fallback mount: the four area landing paths that have no page of their
+ * own (AREA_ROUTES below — the nav links straight to their sub-routes), plus
+ * any hash that matches nothing. Every area IS built, so this says the address
+ * has no page rather than claiming the feature is missing, and it no longer
+ * prints the raw hash back at whoever mistyped it.
  */
 async function mountPlaceholder(root, ctx) {
-  /* Same head shape as the six real areas: the route is a data attribute, not
-   * chrome (density spec R4). The placeholder's body still names the route in
-   * prose — here that IS the information, since the page has nothing else. */
+  /* The route stays a data attribute for the e2e suite and for anyone reading
+   * the DOM; it is not chrome (density spec R4). */
   root.appendChild(el("div", { class: "area-head", "data-route": ctx.route },
-    el("h1", { text: t("gui_shell_wip_title", "Coming soon") })
+    el("h1", { text: t("gui_shell_wip_title", "Page not found") })
   ));
   root.appendChild(el("section", { class: "wip", "data-tone": "info" },
-    el("p", { text: tf("gui_shell_wip_body", { route: ctx.route },
-      "This area has not been built yet. Route: {route}"
+    el("p", { text: t("gui_shell_wip_body",
+      "There is no page at this address. Pick an area from the menu on the left."
     ) })
   ));
 }
