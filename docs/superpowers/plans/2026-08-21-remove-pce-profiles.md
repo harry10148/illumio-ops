@@ -152,6 +152,10 @@ git commit -m "refactor(config): drop the PCE profile store and its CRUD"
 
 ---
 
+> **執行順序裁決（orchestrator，預檢）**：本任務在 Task 2 **之前**執行。Task 2 移除
+> `ConfigManager` 的 profile 方法，而本任務的 `api_get_settings` 仍在呼叫它們——先做 2
+> 會留下一段 `AttributeError` 的破碎狀態。先移除呼叫端再移除方法就沒有這個窗口。
+
 ### Task 3: 移除 REST 端點與設定回應中的 profile 欄位
 
 **Files:**
@@ -320,10 +324,24 @@ for p in ("src/i18n_zh_TW.json", "src/i18n_en.json", "src/i18n/data/zh_explicit.
 
 8. 文件：`docs/guide/gui-tour.md` 的 PCE profile 段落、`docs/guide/configuration.md` 的 `pce_profiles` 設定說明、`docs/reference/rest-api.md` 的 `/api/pce-profiles` 兩個端點條目全部刪除。用 `grep -n "pce.profile\|pce-profiles" docs/guide/*.md docs/reference/*.md` 逐處定位。`docs/superpowers/` 底下的舊計畫與 spec **不要改**——那是歷史紀錄。
 
+9. **覆蓋率錨點 SY-01 必須一起退場**（orchestrator 預檢補入，計畫初稿漏了這一段）。
+   `tests/test_v2_coverage_live.py` 斷言 `covered == total == 102`、且 app 不得渲染
+   `coverage.yaml` 沒列的錨點、也不得少列。移除 SY-01 面板會同時打破這三條。要動的是：
+
+   - `design/v2/coverage.yaml`：刪除 `SY-01: {item: PCE profiles CRUD/切換, route: "#/system/pce"}` 一行。
+   - `tests/test_v2_coverage_live.py`：`== 102` 改為 `== 101`。
+   - `tests/test_v2_system_e2e.py`：
+     - `test_pce_coverage_and_i18n`：`_goto(page, base_url, R_PCE, "SY-01")` 的錨點參數改為 `"SY-18"`；`assert {"SY-01", "SY-18"} - _covs(page) == set()` 改為 `assert {"SY-18"} - _covs(page) == set()`。
+     - 整個 `test_pce_profile_crud_add_then_delete` 刪除。
+     - 「PCE activate」那段守衛（建立 throwaway profile → 開 confirm → 按取消）整段刪除，含其 `_api_post("/api/pce-profiles", …)` 呼叫與清理程式碼。刪除後檢查外層測試函式是否還有其他區段；若只剩這一段，連函式一起刪。
+     - 其餘所有 `_goto(page, base_url, R_PCE, "SY-01")` 與 `page.wait_for_selector('[data-cov="SY-01"]')` 改成 `"SY-18"` / `'[data-cov="SY-18"]'`。最後 `grep -n 'SY-01' tests/test_v2_system_e2e.py` 必須為空。
+
+   `#/system/pce` 移除後只剩 SY-18 一個錨點，`test_every_route_contributed_something`（該路由至少貢獻一個錨點）仍會通過。
+
 - [ ] **Step 4: 測試與閘門通過**
 
 ```bash
-timeout 900 ./venv/bin/python -m pytest tests/test_v2_system_e2e.py -q
+timeout 1800 ./venv/bin/python -m pytest tests/test_v2_system_e2e.py tests/test_v2_coverage_live.py -q
 timeout 300 ./venv/bin/python scripts/audit_i18n_usage.py
 timeout 300 ./venv/bin/python -m pytest tests/test_i18n_no_reviewer_copy.py tests/test_i18n_zh_explicit_sync.py -q
 ```
@@ -343,7 +361,7 @@ git commit -m "refactor(gui-v2): remove the PCE profile page, its keys and its d
 **Files:**
 - Modify: `src/gui/routes/config.py`（`api_save_settings`，`if 'api' in d:` 區塊內，url scheme 驗證之後、`for k in api_allowlist` 之前）
 - Modify: `src/i18n_zh_TW.json`、`src/i18n_en.json`、`src/i18n/data/zh_explicit.json`
-- Test: `tests/test_pce_target_change.py`（新建）
+- Test: `tests/test_api_settings.py`（**加在既有檔案末尾，不要新建檔案**——見下方說明）
 
 **Interfaces:**
 - Consumes: Task 3 之後的 `api_save_settings`
@@ -351,22 +369,16 @@ git commit -m "refactor(gui-v2): remove the PCE profile page, its keys and its d
 
 - [ ] **Step 1: 寫失敗測試**
 
-新建 `tests/test_pce_target_change.py`：
+**測試加在 `tests/test_api_settings.py` 的末尾，不要新建測試檔。** 原因（orchestrator 預檢查證）：`authed_client` 是 `tests/test_api_settings.py:66` 的**檔案內** fixture，它依賴同檔 `:61` 的 `client` 與 `:40` 附近的 `app`——`tests/conftest.py:192` 的同名 `client` 是不同的東西（走 `app_persistent`）。新建檔案會拿不到這條 fixture 鏈，或拿到錯的那條。這些測試的主題本來就是 `POST /api/settings` 的行為，放在這個檔案是對的位置。
+
+在 `tests/test_api_settings.py` 末尾加入（`import pytest`、`_csrf` 該檔已有，不要重複 import）：
 
 ```python
-"""改動 PCE 連線目標必須是一個明示的決定。
-
-這台設備的快取、擷取位置、封存與排程都沒有 PCE 維度（見
-docs/superpowers/specs/2026-08-21-pce-profile-isolation-assessment.md）。把
-api.url 或 api.org_id 指向另一台 PCE 而不處理既有資料，兩台的資料會靜默混合，
-而且沒有任何徵兆。所以這裡不猜、也不自動清——直接擋下來要求操作者選。
-"""
-from __future__ import annotations
-
-import pytest
-
-from tests._helpers import _csrf  # noqa: F401  (fixture 由 conftest 提供)
-
+# ── PCE 連線目標變更必須是明示的決定 ──────────────────────────────────────────
+# 這台設備的快取、擷取位置、封存與排程都沒有 PCE 維度（見
+# docs/superpowers/specs/2026-08-21-pce-profile-isolation-assessment.md）。把
+# api.url 或 api.org_id 指向另一台 PCE 而不處理既有資料，兩台的資料會靜默混合，
+# 而且沒有任何徵兆。所以這裡不猜、也不自動清——直接擋下來要求操作者選。
 
 def _save(client, csrf, api_block, choice=None):
     body = {"api": api_block}
@@ -494,6 +506,7 @@ git commit -m "feat(gui): refuse a silent PCE re-point, ask what happens to the 
 from __future__ import annotations
 
 import json
+from datetime import datetime, timezone
 
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import sessionmaker
@@ -505,14 +518,21 @@ from src.pce_cache.flush import flush_pce_derived_state
 
 
 def _seed(db_path):
+    """欄位取自 src/pce_cache/models.py：PceEvent 與 SiemDispatch 幾乎全欄位
+    NOT NULL，少一個就是 IntegrityError 而不是測試失敗。"""
+    now = datetime(2026, 1, 1, tzinfo=timezone.utc)
     engine = create_engine(f"sqlite:///{db_path}")
     Base.metadata.create_all(engine)
     sf = sessionmaker(bind=engine)
     with sf() as s:
-        s.add(PceEvent(pce_href="/orgs/1/events/a", event_type="x",
-                       timestamp_utc=__import__("datetime").datetime(2026, 1, 1)))
+        s.add(PceEvent(pce_href="/orgs/1/events/a", pce_event_id="a",
+                       timestamp=now, event_type="x", severity="info",
+                       status="success", pce_fqdn="pce.example.com",
+                       raw_json="{}", ingested_at=now))
         s.add(IngestionWatermark(source="events", last_href="/orgs/1/events/a"))
-        s.add(SiemDispatch(source_table="pce_events", source_id=1, dest="splunk"))
+        s.add(SiemDispatch(source_table="pce_events", source_id=1,
+                           destination="splunk", status="pending",
+                           queued_at=now))
         s.commit()
     return engine, sf
 
@@ -693,29 +713,102 @@ Expected: FAIL（沒有 modal）
 
 - [ ] **Step 3: 實作**
 
-在 PCE 連線表單的儲存回呼裡，攔截 `pce_target_changed` 並改成兩段式：
+> 以下三個介面 orchestrator 已查證，照抄即可，不必再自行探索：
+> `modal.confirm({title, impact, onOk})` 只有確定／取消兩顆按鈕（`components/modal.mjs`）；
+> `confirmSpec(title, impact, onOk)` 是每個 area 各自複製的三參數小工具（`system.mjs:351`）；
+> `makeForm()` 回傳的 `fapi.save()` 在 `res.ok !== true` 時只會 `toast.crit` 後回 false（`system.mjs` 約 690-706）。
+
+**(a) `components/modal.mjs`：`confirm()` 增加選用的次要動作。** 這個決定是三向的（清除／同一台／取消），兩顆按鈕表達不了；`alt` 未給時行為與現在完全相同，既有呼叫端不受影響。
+
+在 `confirm()` 內、OK 按鈕建立處的旁邊加入：
 
 ```javascript
-  /* A 409 with pce_target_changed is not a failure — it is the appliance
-   * refusing to guess. Ask, then re-send the same body with the answer. */
-  form.onRefused = function (res, body) {
-    if (!res || res.pce_target_changed !== true) return false;
-    return modal.confirm(confirmSpec(t("gui_sy_pce_target_title"), [
-      tf("gui_sy_pce_target_from", { url: res.old.url, org: res.old.org_id }),
-      tf("gui_sy_pce_target_to", { url: res.new.url, org: res.new.org_id }),
-      t("gui_sy_pce_target_flush_body"),
-    ], function () {
-      return form.saveWith(Object.assign({}, body, { pce_target_change: "flush" }));
-    }, {
-      altLabel: t("gui_sy_pce_target_same"),
-      onAlt: function () {
-        return form.saveWith(Object.assign({}, body, { pce_target_change: "same-pce" }));
-      },
-    }));
-  };
+  /* Optional third choice. Omitted by every existing caller, and absent from
+   * the DOM when omitted — a confirm stays two buttons unless the decision
+   * genuinely has a third answer. */
+  if (o.alt && o.alt.label) {
+    const altBtn = el("button", { class: "btn", text: o.alt.label });
+    altBtn.addEventListener("click", async function () {
+      const r = o.alt.onAlt ? await o.alt.onAlt() : undefined;
+      if (r !== false) handle.close();
+    });
+    foot.insertBefore(altBtn, okBtn);
+  }
 ```
 
-> `form.onRefused` / `form.saveWith` / `confirmSpec` 的第四個參數是否存在，**實作前先讀 `makeForm()`（`system.mjs`）與 `confirmSpec()`（`components/modal.mjs`）**。若 `confirmSpec` 不支援次要動作，就改成兩個獨立的 `modal.confirm`：先問「是不是同一台 PCE 換了位址？」是→`same-pce`，否→再問一次確認清除→`flush`。不要為此擴充 modal 元件。
+> `foot` 與 `okBtn` 是該函式內既有的區域變數；實作前讀一次 `confirm()` 確認它們的真實名稱，名稱不同就照當地的名稱用，不要改名。
+
+同時更新 `confirm()` 上方的 JSDoc，把 `alt` 列進去。
+
+**(b) `system.mjs` 的 `confirmSpec()` 加第四個選用參數**：
+
+```javascript
+function confirmSpec(title, impact, onOk, alt) {
+  return { title: title, impact: impact, onOk: onOk, alt: alt };
+}
+```
+
+> 只改 `system.mjs` 這一份。其他 area 的同名複本不在本任務範圍，不要順手改。
+
+**(c) `makeForm()` 增加兩個掛勾**（`system.mjs`）：
+
+在 `fapi.save` 內，取得 `body` 之後、送出之前：
+
+```javascript
+    if (fapi.extraBody) { Object.assign(body, fapi.extraBody); fapi.extraBody = null; }
+```
+
+在同一個函式的失敗分支，把
+
+```javascript
+      if (!res || res.ok !== true) {
+        toast.crit(errorText(res));
+        return false;
+      }
+```
+
+改成
+
+```javascript
+      if (!res || res.ok !== true) {
+        /* A refusal the caller knows how to turn into a question is not an
+         * error to shout about — it asks, then re-sends the same body with
+         * the answer. Anything else still surfaces as a toast. */
+        if (fapi.onRefused) {
+          const handled = fapi.onRefused(res, body);
+          if (handled) return Promise.resolve(handled);
+        }
+        toast.crit(errorText(res));
+        return false;
+      }
+```
+
+**(d) PCE 連線表單掛上處理**（`system.mjs` 的 `mountPce`，`form.setBody(...)` 之後）：
+
+```javascript
+    /* 409 + pce_target_changed is the appliance refusing to guess what should
+     * happen to a previous PCE's cache. Ask, then re-send with the answer. */
+    form.onRefused = function (res) {
+      if (!res || res.pce_target_changed !== true) return false;
+      return new Promise(function (resolve) {
+        const m = modal.confirm(confirmSpec(t("gui_sy_pce_target_title"), [
+          tf("gui_sy_pce_target_from", { url: res.old.url, org: res.old.org_id }),
+          tf("gui_sy_pce_target_to", { url: res.new.url, org: res.new.org_id }),
+          t("gui_sy_pce_target_flush_body"),
+        ], function () {
+          form.extraBody = { pce_target_change: "flush" };
+          return form.save().then(resolve);
+        }, {
+          label: t("gui_sy_pce_target_same"),
+          onAlt: function () {
+            form.extraBody = { pce_target_change: "same-pce" };
+            return form.save().then(resolve);
+          },
+        }));
+        m.onClose(function () { resolve(false); });
+      });
+    };
+```
 
 新增 i18n 鍵（三份字典）：
 
