@@ -240,3 +240,16 @@ def test_settings_post_accepts_verify_ssl_false_with_explicit_dev_profile(authed
     assert res.status_code == 200
     cm.load()
     assert cm.config["api"]["verify_ssl"] is False
+
+
+def test_settings_response_has_no_profile_fields(authed_client):
+    """Profile 概念已移除：設定回應不得再帶 profile 清單或 active id。"""
+    client, _csrf = authed_client
+    body = client.get("/api/settings").get_json()
+    assert "pce_profiles" not in body
+    assert "active_pce_id" not in body
+
+
+def test_pce_profiles_endpoint_is_gone(authed_client):
+    client, _csrf = authed_client
+    assert client.get("/api/pce-profiles").status_code == 404

@@ -456,12 +456,7 @@ def _get_cache_engine(db_path: str):
 # ---------------------------------------------------------------------------
 
 def _get_active_pce_url(cm: 'ConfigManager') -> str:
-    """Return the active PCE profile URL, falling back to config['api']['url']."""
-    active_id = cm.config.get('active_pce_id')
-    if active_id is not None:
-        for p in cm.config.get('pce_profiles', []):
-            if p.get('id') == active_id:
-                return p.get('url', '') or cm.config.get('api', {}).get('url', '')
+    """Return the PCE URL this appliance is configured against."""
     return cm.config.get('api', {}).get('url', '')
 
 

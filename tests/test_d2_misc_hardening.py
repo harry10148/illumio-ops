@@ -86,7 +86,7 @@ def test_api_security_post_holds_write_lock_across_load_mutate_save():
     src = inspect.getsource(config_routes.make_config_blueprint)
     # 粗略的結構檢查：api_security_post 本體（以下一個 @bp.route 為界）
     # 必須包含 write_lock context manager，比照既有的
-    # api_save_settings / api_pce_profiles_action 慣例。
+    # api_save_settings 慣例。
     start = src.index("def api_security_post")
     end = src.index("# ── API: Settings")
     body = src[start:end]

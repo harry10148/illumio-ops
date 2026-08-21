@@ -175,11 +175,6 @@ class Reporter:
         return plugin
 
     def _active_pce_url(self) -> str:
-        active_id = self.cm.config.get("active_pce_id")
-        if active_id is not None:
-            for profile in self.cm.config.get("pce_profiles", []):
-                if profile.get("id") == active_id and profile.get("url"):
-                    return str(profile.get("url")).strip()
         return str(self.cm.config.get("api", {}).get("url", "")).strip()
 
     @staticmethod

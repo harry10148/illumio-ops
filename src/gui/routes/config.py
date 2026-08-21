@@ -57,7 +57,7 @@ def make_config_blueprint(
         d = request.json or {}
         # 以共用 config 鎖序列化整段 load→mutate→save，避免併發存檔
         # （cheroot 多執行緒 pool）互相交錯而丟失更新
-        # （比照下方 api_save_settings / api_pce_profiles_action 的既有做法）。
+        # （比照下方 api_save_settings 的既有做法）。
         with cm.write_lock:
             cm.load()
             lang = d.get('lang') or cm.config.get('settings', {}).get('language', 'en')
@@ -141,8 +141,6 @@ def make_config_blueprint(
                 "output_dir":      rpt.get("output_dir", "reports/"),
                 "retention_days":  rpt.get("retention_days", 30),
             },
-            "pce_profiles":   cm.get_pce_profiles(),
-            "active_pce_id":  cm.get_active_pce_id(),
         }
         for root in _plugin_config_roots():
             payload.setdefault(root, cm.config.get(root, {}))
@@ -261,7 +259,7 @@ def make_config_blueprint(
                         rpt_cfg['retention_days'] = max(0, int(rpt_in['retention_days']))
                     except (TypeError, ValueError):
                         pass  # intentional fallback: keep existing retention_days if new value is not numeric
-            known_roots = {'api', 'email', 'smtp', 'alerts', 'settings', 'report', 'pce_profiles', 'active_pce_id'}
+            known_roots = {'api', 'email', 'smtp', 'alerts', 'settings', 'report'}
             for root in _plugin_config_roots():
                 if root in known_roots or root not in d:
                     continue
@@ -309,7 +307,7 @@ def make_config_blueprint(
         d = request.json or {}
         # 以共用 config 鎖序列化整段 load→mutate→save，避免併發存檔
         # （cheroot 多執行緒 pool）互相交錯而丟失更新
-        # （比照上方 api_save_settings / api_pce_profiles_action 的既有做法）。
+        # （比照上方 api_save_settings 的既有做法）。
         with cm.write_lock:
             cm.load()
             lang = d.get('lang') or cm.config.get('settings', {}).get('language', 'en')
@@ -420,79 +418,5 @@ def make_config_blueprint(
             return jsonify({"ok": False, "error": str(e)}), 400
         except Exception as e:
             return _err_with_log("cert_import", e, lang=lang)
-
-    # ── API: PCE Profiles ──────────────────────────────────────────────────────
-
-    @bp.route('/api/pce-profiles', methods=['GET'])
-    def api_list_pce_profiles():
-        cm.load()
-        return jsonify(_redact_secrets({
-            "profiles": cm.get_pce_profiles(),
-            "active_pce_id": cm.get_active_pce_id(),
-        }))
-
-    @bp.route('/api/pce-profiles', methods=['POST'])
-    def api_pce_profiles_action():
-        # GET /api/pce-profiles 以 _redact_secrets 遮罩 key/secret；round-trip
-        # 回來的 "********" 必須剝掉（同 api_save_settings），否則 update/add
-        # 會用遮罩值靜默覆蓋真憑證。
-        d = _strip_redaction_placeholders(request.json or {})
-        action = d.get("action")
-        lang = d.get('lang') or cm.config.get('settings', {}).get('language', 'en')
-        # Serialize load→mutate→save under the shared config lock (profile CRUD
-        # helpers each call cm.save()) so concurrent writers don't lose updates.
-        with cm.write_lock:
-            cm.load()
-            if action == "add":
-                profile = {
-                    "name":       d.get("name", "").strip(),
-                    "url":        d.get("url", "").strip(),
-                    "org_id":     d.get("org_id", "1"),
-                    "key":        d.get("key", ""),
-                    "secret":     d.get("secret", ""),
-                    "verify_ssl": bool(d.get("verify_ssl", True)),
-                }
-                if not profile["name"] or not profile["url"]:
-                    return _err(t("gui_err_pce_name_url_required", lang=lang))
-                p = cm.add_pce_profile(profile)
-                # 憑證輸出一律遮罩（同 GET /api/pce-profiles）——明文 secret
-                # 不得殘留在瀏覽器 devtools/HAR 的回應紀錄裡。
-                return jsonify({"ok": True, "profile": _redact_secrets(p)})
-            elif action == "update":
-                pid = d.get("id")
-                if not pid:
-                    return _err(t("gui_err_pce_id_required", lang=lang))
-                try:
-                    pid = int(pid)
-                except (TypeError, ValueError):
-                    return _err(t("gui_err_invalid_number", lang=lang))
-                updates = {k: d[k] for k in ("name", "url", "org_id", "key", "secret", "verify_ssl") if k in d}
-                if not cm.update_pce_profile(pid, updates):
-                    return _err(t("gui_err_pce_profile_not_found", lang=lang))
-                return jsonify({"ok": True})
-            elif action == "activate":
-                pid = d.get("id")
-                if not pid:
-                    return _err(t("gui_err_pce_id_required", lang=lang))
-                try:
-                    pid = int(pid)
-                except (TypeError, ValueError):
-                    return _err(t("gui_err_invalid_number", lang=lang))
-                if not cm.activate_pce_profile(pid):
-                    return _err(t("gui_err_pce_profile_not_found", lang=lang))
-                return jsonify({"ok": True})
-            elif action == "delete":
-                pid = d.get("id")
-                if not pid:
-                    return _err(t("gui_err_pce_id_required", lang=lang))
-                try:
-                    pid = int(pid)
-                except (TypeError, ValueError):
-                    return _err(t("gui_err_invalid_number", lang=lang))
-                if not cm.remove_pce_profile(pid):
-                    return _err(t("gui_err_pce_profile_not_found", lang=lang))
-                return jsonify({"ok": True})
-            else:
-                return _err(t("gui_err_unknown_action", lang=lang))
 
     return bp
