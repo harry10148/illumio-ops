@@ -258,7 +258,7 @@ git commit -m "refactor(gui): remove the PCE profile endpoints and payload field
 - Modify: `src/static/js/v2/core/store-map.mjs`（`pce_profiles: "/api/pce-profiles",`，約 line 125）
 - Modify: `src/i18n_zh_TW.json`、`src/i18n_en.json`、`src/i18n/data/zh_explicit.json`
 - Modify: `docs/guide/gui-tour.md`、`docs/guide/configuration.md`、`docs/reference/rest-api.md`
-- Test: `tests/test_v2_system_e2e.py`
+- Test: `tests/test_v2_system_e2e.py`、`tests/test_v2_shell_flows_e2e.py`、`tests/test_v2_coverage_live.py`
 
 **Interfaces:**
 - Consumes: Task 3 移除後的端點
@@ -342,7 +342,8 @@ for p in ("src/i18n_zh_TW.json", "src/i18n_en.json", "src/i18n/data/zh_explicit.
    `coverage.yaml` 沒列的錨點、也不得少列。移除 SY-01 面板會同時打破這三條。要動的是：
 
    - `design/v2/coverage.yaml`：刪除 `SY-01: {item: PCE profiles CRUD/切換, route: "#/system/pce"}` 一行。
-   - `tests/test_v2_coverage_live.py`：`== 102` 改為 `== 101`。
+   - `tests/test_v2_coverage_live.py`：`102` 出現在**三個地方**——檔案 docstring 第 1 行、`:81` 的 `assert gate_result["covered"] == gate_result["total"] == 102`、`:88` 的註解——全部改成 `101`。（`design/v2/coverage.yaml` 目前正好 102 個錨點，刪一個後是 101。）
+   - `tests/test_v2_shell_flows_e2e.py`（orchestrator 二次盤點補入，brief 初稿沒列這個檔）：`test_system_subroutes_switch` 用 `SY-01` 當「`#/system/pce` 這個區確實掛上了／離開後確實卸載」的標記，`:294` 是 `count() >= 1`、`:298` 是 `count() == 0`。兩處都改成 `SY-18`（該路由移除 SY-01 後唯一剩下的錨點），語意不變。
    - `tests/test_v2_system_e2e.py`：
      - `test_pce_coverage_and_i18n`：`_goto(page, base_url, R_PCE, "SY-01")` 的錨點參數改為 `"SY-18"`；`assert {"SY-01", "SY-18"} - _covs(page) == set()` 改為 `assert {"SY-18"} - _covs(page) == set()`。
      - 整個 `test_pce_profile_crud_add_then_delete` 刪除。
@@ -697,7 +698,7 @@ git commit -m "feat(pce-cache): clear every PCE-derived row when the target chan
 **Files:**
 - Modify: `src/static/js/v2/areas/system.mjs`（PCE 連線表單的 `form.afterSave` / 儲存流程）
 - Modify: `src/i18n_zh_TW.json`、`src/i18n_en.json`、`src/i18n/data/zh_explicit.json`
-- Test: `tests/test_v2_system_e2e.py`
+- Test: `tests/test_v2_system_e2e.py`、`tests/test_v2_shell_flows_e2e.py`、`tests/test_v2_coverage_live.py`
 
 **Interfaces:**
 - Consumes: Task 5 的 409 回應形狀 `{ok:false, pce_target_changed:true, old:{url,org_id}, new:{url,org_id}, error}`
