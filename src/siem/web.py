@@ -34,8 +34,8 @@ def list_destinations():
     try:
         cfg = _get_siem_cfg()
         # Credentials must be masked in any output: hec_token becomes
-        # asterisks plus hec_token__set/__length (same convention as
-        # /api/settings). The write paths strip the placeholder back out.
+        # asterisks plus hec_token__set (same convention as /api/settings).
+        # The write paths strip the placeholder back out.
         dests = [_redact_secrets(d.model_dump()) for d in cfg.destinations]
         return jsonify({"destinations": dests})
     except Exception as exc:

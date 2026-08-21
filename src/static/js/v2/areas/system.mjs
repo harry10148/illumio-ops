@@ -701,7 +701,7 @@ function makeForm(method, endpoint) {
       }
       items.forEach(function (i) { i.base = readCtl(i.c); });
       fapi.sync();
-      toast.ok(tf("gui_sy_saved", { n: n, endpoint: endpoint }));
+      toast.ok(tf("gui_sy_saved", { n: n }));
       if (!fapi.afterSave) return true;
       return Promise.resolve(fapi.afterSave(changedKeys, res)).then(function () { return true; });
     });
@@ -884,9 +884,9 @@ async function mountPce(root, ctx) {
     connPanel.body.appendChild(labelled(t("gui_api_key"), form.track("key", key, "secret"), t("gui_api_key_help")));
     connPanel.body.appendChild(labelled(t("gui_api_secret"), form.track("secret", secret, "secret"), t("gui_api_secret_help")));
     connPanel.body.appendChild(checkRow(t("gui_verify_ssl"), form.track("verify_ssl", ssl, "bool")));
-    // The captured settings snapshot carries the server's redaction, not values:
-    // config.py:428-431 replaces every secret with asterisks and adds __set /
-    // __length siblings. The form states set/not-set instead of pretending.
+    // The captured settings snapshot carries the server's redaction, not
+    // values: every secret comes back as asterisks plus a set/not-set flag.
+    // The form states which of the two it is instead of pretending.
     /* Rows are labelled the way the form above labels the same fields, not by
      * their config path (api.key / active_pce_id). And the per-row note that
      * said "derived from the server's set-flag and length, not the secret
@@ -926,12 +926,10 @@ async function mountPce(root, ctx) {
   }, PCE_SOFT);
 }
 
-/** config.py:428-431 — <field>__set / <field>__length are what the redactor
- *  leaves behind. The product's forms ignore them and put the mask in the box. */
+/** <field>__set is what the redactor leaves behind alongside the mask: whether
+ *  a credential is stored, never how long it is. */
 function secretState(obj, key) {
-  const set = obj[key + "__set"];
-  const len = obj[key + "__length"];
-  if (set) return tf("gui_sy_secret_set", { n: Number(len || 0) });
+  if (obj[key + "__set"]) return t("gui_sy_secret_set");
   return t("gui_sy_secret_unset");
 }
 

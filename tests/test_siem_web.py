@@ -65,7 +65,7 @@ def test_siem_add_destination_udp_returns_warning(client):
 
 def test_siem_destinations_get_masks_hec_token(client, monkeypatch):
     """GET /api/siem/destinations 不得回傳明文 hec_token（同 /api/settings
-    的 _redact_secrets 慣例：星號 + __set/__length）。"""
+    的 _redact_secrets 慣例：星號 + __set）。"""
     resp = client.post(
         "/api/siem/destinations",
         json={"name": "sp", "transport": "hec", "host": "splunk.corp", "port": 8088,

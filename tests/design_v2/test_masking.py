@@ -80,23 +80,18 @@ def test_mask_values_only_skips_key_based_masking_but_still_catches_hex_values()
 
 
 def test_does_not_mask_backend_redaction_metadata_suffixes():
-    # src/gui/_helpers.py:126-140 _redact_secrets() 已經把真正的機密值換成
-    # 星號，另外自己合成 <key>__set（bool）/<key>__length（int）這兩個安全的
-    # 衍生 metadata 供前端顯示「是否已設定 / 幾個字元」。這兩個尾綴本身
-    # 不可能還原出機密，語意式規則不該把它們也打光。
+    # _redact_secrets() 已經把真正的機密值換成星號，另外合成
+    # <key>__set（bool）這個安全的衍生 metadata 供前端顯示「是否已設定」。
+    # 這個尾綴本身不可能還原出機密，語意式規則不該把它也打光。
     src = {
         "line_channel_access_token": "********",
         "line_channel_access_token__set": True,
-        "line_channel_access_token__length": 32,
         "smtp_password__set": False,
-        "smtp_password__length": 0,
     }
     out = mask_payload(src)
     assert out["line_channel_access_token"] == "***MASKED***"  # 本尊仍遮
     assert out["line_channel_access_token__set"] is True
-    assert out["line_channel_access_token__length"] == 32
     assert out["smtp_password__set"] is False
-    assert out["smtp_password__length"] == 0
 
 
 def test_masks_camelcase_compound_secret_names():

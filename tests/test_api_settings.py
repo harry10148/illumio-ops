@@ -102,6 +102,25 @@ def test_redaction_response(authed_client):
     assert smtp.get("host") == "smtp.example.com"
 
 
+def test_redaction_never_reports_secret_length(authed_client):
+    """The redactor may say a secret IS set; it must not say how long it is.
+
+    `<key>__length` used to ride along with `<key>__set` and was rendered
+    verbatim in the settings form ("Configured (32 characters)"), handing the
+    exact size of a stored credential to anyone who could read the response.
+    `__set` stays — it is how the UI tells configured from not.
+    """
+    client, _csrf = authed_client
+    body = client.get("/api/settings").get_json()
+    flat = json.dumps(body)
+    assert "__length" not in flat, (
+        "GET /api/settings still exposes a secret's length: "
+        + ", ".join(sorted(k for section in body.values()
+                           if isinstance(section, dict)
+                           for k in section if k.endswith("__length")))
+    )
+
+
 # ── Test 1b: the contract the Integrations → Overview channel cards depend on ──
 # Regression guard for the "LINE configured but displayed as Not configured" bug.
 # The overview detects a configured channel via the redacted-secret companion flag

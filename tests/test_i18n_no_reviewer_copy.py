@@ -89,6 +89,27 @@ REPORT_SCHEDULES_BARE = re.compile(r"(?<!tick_)report_schedules")
 # 7. Dev-retrospective / self-congratulatory asides about our own past work.
 DEV_RETROSPECTIVE = re.compile(r"重構|refactor", re.IGNORECASE)
 
+# 8. HTTP plumbing narrated at the operator: "Calls GET /api/rules/<idx>/
+#    highlight, which returns ...". Which endpoint the button hits is ours to
+#    know, not theirs to read. Catches the method+path form; a bare /api/ path
+#    is caught too, since gui_url_help's example URL is already allowlisted.
+HTTP_PLUMBING = re.compile(r"(?:GET|POST|PUT|DELETE|PATCH)\s+/\S*|/api/")
+
+# 9. The word "endpoint" in operator copy. Every legitimate use in the
+#    dictionary today (network-endpoint event labels, report prose) sits on a
+#    key the v2 GUI never reads, and this test only ever looks at live keys —
+#    so a hit here means plumbing narration. A future live key that genuinely
+#    means a network endpoint goes in ALLOWLIST.
+ENDPOINT_WORD = re.compile(r"端點|\bendpoints?\b", re.IGNORECASE)
+
+# 10. Mockup-era copy. "mockup" is already in FORBIDDEN_LITERAL; this is its
+#     Chinese half, which shipped in five keys the port left behind.
+MOCKUP_ZH = re.compile(r"設計稿")
+
+# 11. Internal machinery named in prose: the state file behind a response, the
+#     write lock a handler takes, ANSI stripping, and function-call syntax.
+INTERNALS = re.compile(r"狀態檔|寫入鎖|ANSI|\b[a-z_]+\.[a-z_]+\(|\brun_debug_mode\b|\?[a-z]+=")
+
 # Known-legitimate substrings that would otherwise false-positive; stripped
 # before pattern matching (not string-replaced in the actual copy).
 ALLOWLIST = {
@@ -124,6 +145,14 @@ def _violations(key: str, value: str) -> list[str]:
         hits.append("internal-path:report_schedules")
     if DEV_RETROSPECTIVE.search(text):
         hits.append("dev-retrospective")
+    if HTTP_PLUMBING.search(text):
+        hits.append("http-plumbing")
+    if ENDPOINT_WORD.search(text):
+        hits.append("endpoint-word")
+    if MOCKUP_ZH.search(text):
+        hits.append("mockup-zh")
+    if INTERNALS.search(text):
+        hits.append("internals")
     return hits
 
 

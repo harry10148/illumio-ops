@@ -1011,7 +1011,6 @@ async function mountRules(root, ctx) {
           .map(function (r) { return r.type + " · " + r.name; });
         const impact = [tf("gui_al_del_count", { n: ids.length })].concat(names.slice(0, 6));
         if (names.length > 6) impact.push(tf("gui_al_del_more", { n: names.length - 6 }));
-        impact.push(t("gui_al_del_order"));
         impact.push(t("gui_al_del_norecover"));
         return modal.confirm(confirmSpec(t("gui_msg_confirm_delete"), impact, async function () {
           for (let i = 0; i < ids.length; i++) {
@@ -1030,12 +1029,6 @@ async function mountRules(root, ctx) {
       const jsonPanel = panel("AL-06", t("gui_al_hl_title"));
       const jsonBox = el("div");
       jsonPanel.body.appendChild(jsonBox);
-      /* Density spec R4/R5: the raw "GET /api/rules/<idx>/highlight" line that
-       * used to sit above the code pane is gone — it named an endpoint, which
-       * the panel already calls for real. What the call does is one sentence,
-       * so it collapses into the shared explanation instead of a standing
-       * line every visit re-reads. */
-      jsonPanel.body.appendChild(disclosure(t("gui_gen_explain"), note(t("gui_al_hl_note"))));
 
       async function paintHighlight() {
         clear(jsonBox);
@@ -1135,7 +1128,6 @@ async function mountRules(root, ctx) {
       }
 
       listPanel.body.appendChild(tableHost);
-      listPanel.body.appendChild(note(t("gui_al_list_note")));
 
       // ── AL-02…AL-05 openers ────────────────────────────────────────────
       // firstOf() is a seed for window.__openRuleDrawer(ty) only — the audit

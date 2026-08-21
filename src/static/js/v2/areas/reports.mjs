@@ -659,7 +659,6 @@ function genDrawer(rt, d, lang, hooks) {
     explainNotes.push(note(t(rt.dateFmt === "iso" ? "gui_rp_date_iso" : "gui_rp_date_raw")));
     explainNotes.push(note(t("gui_rp_date_sticky")));
   }
-  if (rt.has("app")) explainNotes.push(note(t("gui_rp_labels_src")));
   if (rt.has("ds")) explainNotes.push(note(t("gui_rp_ds_gate")));
   // disclosure()'s rest-param children go through dom.mjs's append(), which
   // flattens arrays — so the whole dynamically-sized list can be passed as

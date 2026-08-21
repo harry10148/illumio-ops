@@ -130,8 +130,10 @@ def _redact_secrets(obj):
         for k, v in obj.items():
             if _SECRET_PATTERN.search(k.lower()):
                 out[k] = "*" * min(len(str(v)), 8) if v else ""
+                # __set only. The exact length of a stored credential is not
+                # something an API response should hand out, and nothing in the
+                # UI needs it: the forms state configured / not configured.
                 out[f"{k}__set"] = bool(v)
-                out[f"{k}__length"] = len(str(v)) if v else 0
             else:
                 out[k] = _redact_secrets(v)
         return out
