@@ -59,7 +59,6 @@ illumio-ops config login --url ... --key ... --secret ... [--org-id ...]  # 設�
 | 頂層鍵 | 對應 pydantic model | 用途一句話 |
 |---|---|---|
 | `api` | `ApiSettings` | 目前生效中的單一 PCE 連線資訊 |
-| `pce_profiles` / `active_pce_id` | `list[PceProfile]` / `Optional[int]` | 多 PCE 設定檔清單與目前啟用的 id |
 | `alerts` | `AlertsSettings` | 告警通道清單與各通道憑證 |
 | `email` / `smtp` | `EmailSettings` / `SmtpSettings` | 郵件寄件人/收件人；SMTP 連線設定 |
 | `settings` | `GeneralSettings` | 語言、主題、時區、健康檢查、儀表板查詢 |
@@ -94,27 +93,6 @@ illumio-ops config login --url ... --key ... --secret ... [--org-id ...]  # 設�
 
 > **安全護欄**：`profile="production"` 時 `verify_ssl=false` 會直接拒絕載入（`ValueError`）。
 > 要在 lab 環境跳過憑證驗證，須先把 `profile` 明確改成 `"dev"`。
-
-## pce_profiles ／ active_pce_id（多 PCE）
-
-| 鍵 | 型別 | 預設 | 說明 |
-|---|---|---|---|
-| `pce_profiles[].id` | int（≥1） | 必填 | 設定檔內部識別碼 |
-| `pce_profiles[].url` | str | 必填 | 該 PCE 的 URL |
-| `pce_profiles[].org_id` | str | `"1"` | organization id |
-| `pce_profiles[].key` | str | `""` | API key |
-| `pce_profiles[].secret` | str | `""` | API secret |
-| `pce_profiles[].name` | str | `""` | 顯示名稱 |
-| `active_pce_id` | Optional[int] | `null` | 目前生效中的 profile id |
-
-`PceProfile` 為 `extra="allow"`，只強制要求 `id`／`url`，其餘欄位形狀可能隨版本擴充。
-同一時間只有一個 profile 生效，監控/報表/規則/cache 一律指向 `active_pce_id` 對應的
-profile。切換方式：
-
-- **Web GUI**：Settings → PCE，點該 profile 的 **Activate**（不是 Save）。`activate_pce_profile()`
-  會把該 profile 的 `url`/`org_id`/`key`/`secret`/`verify_ssl` 複製進 `api` 區塊並立即存檔，
-  同一進程下次輪詢即生效，不需重啟（`src/config.py` `activate_pce_profile`）。
-- **手動編輯**：改 `active_pce_id` 後需重啟行程，`api` 區塊不會自動同步。
 
 ## alerts（告警通道）
 

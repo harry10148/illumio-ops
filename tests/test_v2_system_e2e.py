@@ -5,8 +5,8 @@ through tests.v2_e2e_utils's shared harness — see that module's docstring for
 the harness itself.
 
 Covers, per the task brief's T9 row:
-  - every SY-01..SY-18 coverage anchor (design/v2/coverage.yaml's system
-    subset), split across the eight sub-routes that own them. All 18 anchors
+  - every SY-02..SY-18 coverage anchor (design/v2/coverage.yaml's system
+    subset), split across the eight sub-routes that own them. All 17 anchors
     are rendered STATICALLY on their page (no drawer/modal has to be opened
     to see them) — verified while writing src/static/js/v2/areas/system.mjs —
     so each coverage test also calls window.__openAllForAudit() and asserts
@@ -24,11 +24,8 @@ Covers, per the task brief's T9 row:
     it persisted -> change it back, confined to a `finally` so a failed
     assertion cannot leave the app's settings changed
     (test_display_save_flow_timezone_persists_and_reverts).
-  - PCE profile CRUD: create a throwaway profile through the real drawer,
-    verify it appears in the real list, delete it through the real confirm
-    flow (test_pce_profile_crud_add_then_delete). `activate` is never
-    clicked — see "Destructive-operation discipline" below.
-  - SIEM destination CRUD: same shape, for a throwaway UDP destination
+  - SIEM destination CRUD: create a throwaway UDP destination through the
+    real drawer, delete it through the real confirm flow
     (test_siem_destination_crud_add_then_delete).
   - TLS CSR generation: real and non-destructive (never touches the serving
     cert) — exercised for real (test_tls_csr_generation_is_real).
@@ -53,9 +50,6 @@ write's answer:
 This area can stop the GUI, regenerate TLS material and purge queued data.
 Nothing here is triggered destructively:
 
-  POST /api/pce-profiles {action:"activate", ...}  — NEVER called. Re-points
-      the whole appliance's PCE target; the confirm renders, Cancel is
-      clicked, Confirm never is.
   POST /api/cache/retention/run   — NEVER called for real. Purges cache rows;
       confirm renders + Cancel only.
   POST /api/daemon/restart        — the "restart monitor" confirm. Reached in
@@ -86,15 +80,13 @@ Nothing here is triggered destructively:
   POST /api/actions/test-alert    — NEVER called (per-channel test-send
       button on #/system/channels). A real external side effect (dispatches
       through the configured plugin), same caution as alerting.mjs's own
-      run-once/test-alert; not one of this area's 18 coverage anchors'
+      run-once/test-alert; not one of this area's 17 coverage anchors'
       required interactions, so it is left unclicked entirely.
   POST /api/siem/destinations/<name>/test — NEVER called (dials the
       destination's real host:port).
 
 Genuinely exercised for real, because they are either safe (no lasting/
 external effect) or explicitly required by the task brief:
-  POST /api/pce-profiles {action:"add"|"delete"}      — a throwaway, never-
-      activated profile.
   POST/PUT/DELETE /api/siem/destinations[/<name>]     — a throwaway
       destination.
   POST /api/tls/generate-csr                          — writes a CSR+key
@@ -157,8 +149,8 @@ def _missing_i18n(page):
 
 def _labels(page):
     keys = [
-        "gui_save", "gui_cancel", "gui_confirm", "gui_close", "gui_pce_add",
-        "gui_pce_activate", "gui_pce_delete_profile", "gui_msg_confirm_delete",
+        "gui_save", "gui_cancel", "gui_confirm", "gui_close",
+        "gui_msg_confirm_delete",
         "gui_retention_now", "gui_it_restart_monitor", "gui_tls_renew",
         "gui_tls_import_btn", "gui_dlq_purge_selected", "gui_sy_stop_btn",
         "gui_siem_add", "gui_siem_delete", "gui_confirm_delete",
@@ -217,10 +209,10 @@ def _api_del(page, path):
 
 def test_pce_coverage_and_i18n(v2_page):
     page, base_url = v2_page
-    _goto(page, base_url, R_PCE, "SY-01")
+    _goto(page, base_url, R_PCE, "SY-18")
     result = _open_all(page)
     assert result["errors"] == [], result
-    assert {"SY-01", "SY-18"} - _covs(page) == set()
+    assert {"SY-18"} - _covs(page) == set()
     assert _missing_i18n(page) == []
 
 
@@ -488,47 +480,6 @@ def test_display_save_flow_timezone_persists_and_reverts(v2_page):
 
 # ══════════════════════════════════════════════════════ real CRUD flows ══════
 
-def test_pce_profile_crud_add_then_delete(v2_page):
-    """SY-01: create a throwaway profile through the real drawer, verify it
-    reconciles against the real list, delete it through the real confirm
-    flow. `activate` is never clicked (header + module docstring)."""
-    page, base_url = v2_page
-    _goto(page, base_url, R_PCE, "SY-01")
-    name = "e2e-sy-pce"
-    labels = _labels(page)
-
-    page.get_by_role("button", name=labels["gui_pce_add"], exact=True).first.click()
-    drawer = page.locator("aside.drawer")
-    drawer.wait_for(state="visible")
-    drawer.locator('input[data-field="name"]').fill(name)
-    drawer.locator('input[data-field="url"]').fill("https://pce.e2e.example:8443")
-    drawer.locator('input[data-field="org_id"]').fill("1")
-
-    with page.expect_request(
-        lambda r: r.url.endswith("/api/pce-profiles") and r.method == "POST"
-    ) as info:
-        drawer.locator(".drawer-f button.btn.primary").click()
-    body = info.value.post_data_json
-    assert body["action"] == "add"
-    assert body["name"] == name
-    # expect_request only waits for the request to be SENT, not for the
-    # response + refreshAndRemount() that follows (router.go() does not
-    # await the new mount) — a bare .count() right after would race the
-    # remount. expect(...).to_have_count() auto-retries until it settles.
-    row = page.locator('section[data-cov="SY-01"] table.tbl tbody tr').filter(has_text=name)
-    expect(row).to_have_count(1)
-
-    row.get_by_role("button", name=labels["gui_pce_delete_profile"], exact=True).click()
-    confirm = page.locator(".modal")
-    confirm.wait_for(state="visible")
-    with page.expect_request(
-        lambda r: r.url.endswith("/api/pce-profiles") and r.method == "POST"
-    ) as del_info:
-        confirm.get_by_role("button", name=labels["gui_confirm"], exact=True).click()
-    assert del_info.value.post_data_json["action"] == "delete"
-    expect(page.locator('section[data-cov="SY-01"] table.tbl tbody tr').filter(has_text=name)).to_have_count(0)
-
-
 def test_siem_destination_crud_add_then_delete(v2_page):
     """SY-08: same shape, for a throwaway UDP destination — UDP so there is
     no TLS/HEC section to fill and no real network probe is ever dialled
@@ -675,36 +626,6 @@ def test_destructive_confirms_render_cancel_sends_nothing(v2_page):
         assert sent["hit"] is False
     finally:
         page.unroute("**/*", handler)
-
-    # PCE activate — needs a real profile row (activate is hidden for the
-    # active one and absent from the empty state), so this creates and
-    # cleans up a throwaway profile around the confirm/Cancel check.
-    page.evaluate("location.hash = '%s'" % R_PCE)
-    page.wait_for_selector('[data-cov="SY-01"]')
-    created = _api_post(page, "/api/pce-profiles", {
-        "action": "add", "name": "e2e-sy-pce-activate-guard", "url": "https://pce.e2e.example:8443",
-        "org_id": "1", "key": "", "secret": "", "verify_ssl": True,
-    })
-    assert created.get("ok") is True, created
-    try:
-        page.evaluate("location.hash = '%s'" % R_PCE)
-        page.reload()
-        page.wait_for_selector('body[data-booted="true"]')
-        page.wait_for_selector('[data-cov="SY-01"]')
-        handler = _watch("/api/pce-profiles")
-        page.route("**/*", handler)
-        try:
-            page.get_by_role("button", name=labels["gui_pce_activate"], exact=True).first.click()
-            modal = page.locator(".modal")
-            modal.wait_for(state="visible")
-            modal.get_by_role("button", name=labels["gui_cancel"], exact=True).click()
-            page.wait_for_selector(".modal", state="detached")
-            page.wait_for_timeout(200)
-            assert sent["hit"] is False
-        finally:
-            page.unroute("**/*", handler)
-    finally:
-        _api_post(page, "/api/pce-profiles", {"action": "delete", "id": created["profile"]["id"]})
 
 
 # ═════════════════════════════ degraded telemetry keeps the controls ════════
@@ -870,16 +791,16 @@ def test_pce_secrets_never_reach_the_dom(v2_page):
     VISIBLE <pre> in the DOM, and it used to serialize the raw request body —
     so an operator typing a PCE API key had that key sitting in plaintext on
     screen (and in any screenshot, screen share or DOM dump) until the page
-    was left. Covers both PCE forms: the connection panel's docked preview
-    and the add-profile drawer's own preview.
+    was left. Covers the connection panel's docked preview — the only PCE
+    form left on this page since the profile add drawer was removed.
 
-    RED against the pre-fix system.mjs: the sentinel appears verbatim in both
-    previews. The mask assertions keep this from being a vacuous
+    RED against the pre-fix system.mjs: the sentinel appears verbatim in the
+    preview. The mask assertions keep this from being a vacuous
     "not-in-string" check (B1) — they prove the key is genuinely IN the body
     being previewed, just redacted, rather than the whole panel having
     disappeared."""
     page, base_url = v2_page
-    _goto(page, base_url, R_PCE, "SY-01")
+    _goto(page, base_url, R_PCE, "SY-18")
 
     key = page.locator('.board input[data-field="key"]')
     secret = page.locator('.board input[data-field="secret"]')
@@ -896,19 +817,6 @@ def test_pce_secrets_never_reach_the_dom(v2_page):
     assert SENTINEL not in ledger, ledger
 
     assert SENTINEL not in _dom_text(page)
-
-    page.get_by_role("button", name=_labels(page)["gui_pce_add"], exact=True).first.click()
-    drawer = page.locator("aside.drawer")
-    drawer.wait_for(state="visible")
-    drawer.locator('input[data-field="name"]').fill("e2e-sy-preview")
-    drawer.locator('input[data-field="key"]').fill(SENTINEL)
-    drawer.locator('input[data-field="secret"]').fill(SENTINEL)
-    assert drawer.locator('input[data-field="key"]').input_value() == SENTINEL
-    assert SENTINEL not in _dom_text(page)
-
-    # Nothing is saved: the drawer is dismissed without touching the backend.
-    page.keyboard.press("Escape")
-    page.wait_for_selector("aside.drawer", state="detached")
 
 
 def test_siem_hec_token_never_reaches_the_dom(v2_page):
@@ -1233,22 +1141,34 @@ def test_dlq_replay_and_purge_read_their_response(v2_page):
 
 def test_teardown_closes_surfaces_and_palette(v2_page):
     page, base_url = v2_page
-    _goto(page, base_url, R_PCE, "SY-01")
+    _goto(page, base_url, R_SIEM, "SY-07")
 
     page.evaluate(
         "async () => { const { drawer } = await import('/static/js/v2/components/drawer.mjs'); "
         "const { palette } = await import('/static/js/v2/components/palette.mjs'); "
-        "palette.list().find(c => c.id === 'sy:pce-add').run(); }"
+        "palette.list().find(c => c.id === 'sy:siem-add').run(); }"
     )
     page.locator("aside.drawer").wait_for(state="visible")
-    assert R_PCE in _palette_routes(page)
+    assert R_SIEM in _palette_routes(page)
 
     _navigate(page, R_CACHE, "SY-02")
     assert page.locator("aside.drawer").count() == 0
-    assert R_PCE not in _palette_routes(page)
+    assert R_SIEM not in _palette_routes(page)
 
     _open_all(page)
     assert page.locator(".modal").count() >= 1
-    _navigate(page, R_SIEM, "SY-07")
+    _navigate(page, R_TLS, "SY-11")
     assert page.locator(".modal").count() == 0
     assert all(route != R_CACHE for route in _palette_routes(page))
+
+
+def test_pce_page_has_no_profile_ui(v2_page):
+    """Profile 概念已移除：PCE 頁不得再出現清單、新增或切換的入口。"""
+    page, base_url = v2_page
+    page.goto(base_url + "/" + R_PCE)
+    page.wait_for_selector('body[data-booted="true"]')
+    page.wait_for_selector('[data-route="%s"]' % R_PCE)
+    page.wait_for_selector('[data-cov="SY-18"]')
+    html = page.content()
+    for gone in ("sy-pce-add", "sy-pce-activate", "SY-01"):
+        assert gone not in html, f"{gone} still rendered"

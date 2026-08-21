@@ -52,7 +52,6 @@
 - {id: alert_plugins,       method: GET,  path: /api/alert-plugins, mask: catalog}
 - {id: security,            method: GET,  path: /api/security}
 - {id: tls_status,          method: GET,  path: /api/tls/status}
-- {id: pce_profiles,        method: GET,  path: /api/pce-profiles}
 - {id: labels,              method: GET,  path: /api/labels}
 - {id: logs_index,          method: GET,  path: /api/logs}
 - {id: ui_translations,     method: GET,  path: /api/ui_translations, mask: catalog}

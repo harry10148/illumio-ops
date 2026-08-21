@@ -10,7 +10,7 @@
 //
 //   1. store.load(id) -> api.load(id, params?); loadAll() uses api.load. Every
 //      snapshot id this area needs — settings, security, tls_status,
-//      pce_profiles, cache_settings/status/lag/health/throughput,
+//      cache_settings/status/lag/health/throughput,
 //      siem_status/destinations/forwarder/dlq, alert_plugins, logs_index,
 //      module_log_sample(params), status — is already an exact GET_MAP entry
 //      (store-map.mjs); nothing here needed api.get().
@@ -29,7 +29,7 @@
 //      errorText() below reads BOTH response shapes this area's endpoints use
 //      — config.py's `{error: "string"}` and settings_helpers.save_section's
 //      `{errors: {field: msg}}` dict (cache/siem writes go through
-//      save_section; settings/security/tls/pce-profiles do not).
+//      save_section; settings/security/tls do not).
 //   4. A1 — a secret box's value must reach the backend as typed, and must be
 //      OMITTED (not sent as "") when left blank, or a re-save silently wipes a
 //      stored credential. The mockup's own coerce() replaced any non-empty
@@ -52,10 +52,9 @@
 //          destination's token on every edit that did not retype it.
 //        - mountChannels' secret plugin fields (SMTP password, bot tokens) —
 //          same shape, same fix.
-//      pceDrawer's ADD flow and mountSecurity's new_password are left
-//      unconditional: a brand-new profile has nothing to preserve, and
-//      config.py's `if d.get("new_password")` gate already no-ops on an empty
-//      string server-side.
+//      mountSecurity's new_password is left unconditional: config.py's
+//      `if d.get("new_password")` gate already no-ops on an empty string
+//      server-side.
 //   5. Phase 1 defect (this task's own brief): settings.language now goes
 //      through fapi.track(), via a small write-back-capable radioGroup (see
 //      trackedRadioGroup below) instead of mutating a client-side `i18n.lang`
@@ -73,14 +72,6 @@
 //      happened to carry; production's /api/ui_translations serves the FULL
 //      catalogue for whichever language settings.language names, so a real
 //      switch is complete, not partial.
-//   6. PCE profile activate reads the CLICKED row's own profile object, not
-//      always profiles[0] (the mockup's only option, since it had no live
-//      per-row handler). This incidentally drops the legacy bug
-//      v2_sy_pce_switch_bug documented (blank {name} after a delete then
-//      switch) — moot anyway, since the real product catalogue's
-//      gui_pce_switched carries no {name} placeholder to fill. The "activate"
-//      affordance is removed from the empty-profiles state entirely (the
-//      mockup showed one there with nothing to activate).
 //   7. The "restart monitor" banner's confirm POSTs /api/daemon/restart for
 //      real (src/gui/__init__.py:607-621, @limiter.limit("5 per hour")) and
 //      branches on the four outcomes that route produces: 200 (the standard
@@ -163,7 +154,7 @@
 //      (loadOne), investigate.mjs (loadAll) and reports.mjs
 //      (loadRhc/paintRhc) already reached — reports.mjs is the shape followed
 //      here. The strict ids stay strict: cache_settings, siem_forwarder,
-//      siem_destinations, settings, security, tls_status, pce_profiles,
+//      siem_destinations, settings, security, tls_status,
 //      alert_plugins and logs_index are what each page is FOR.
 
 import { el, clear, spacer, disclosure } from "../core/dom.mjs";
@@ -459,7 +450,7 @@ function errText(value) {
 }
 
 /** Both response shapes this area's write endpoints use: config.py's
- *  {error: "string"} (settings/security/tls/pce-profiles) and
+ *  {error: "string"} (settings/security/tls) and
  *  settings_helpers.save_section's {errors: {field: msg}} dict (cache/siem
  *  writes go through save_section) — A3: inspect the real fields, not just ok. */
 function errorText(res) {
@@ -724,7 +715,7 @@ async function sysPage(root, ctx, route, snaps, build, soft) {
 
 // ══════════════════════════════════════════════════ SY-01 / SY-18  PCE ═══════
 
-const PCE_SNAPS = ["settings", "pce_profiles", "status"];
+const PCE_SNAPS = ["settings", "status"];
 /* Header point 16. `status` (GET /api/status) is the appliance's live status,
  * not configuration — and this mount reads nothing out of it (only
  * mountDisplay does), so its failure has no business replacing the PCE
@@ -733,141 +724,16 @@ const PCE_SNAPS = ["settings", "pce_profiles", "status"];
  * request is pre-existing and removing it is not this fix's business. */
 const PCE_SOFT = ["status"];
 
-/* settings.js:370-383 — the add form. addPceProfile (:753-773) posts
- * {action:'add', name, url, org_id, key, secret, verify_ssl}; the backend also
- * supports 'update' (config.py:459-471) but no UI reaches it. Real endpoint:
- * POST /api/pce-profiles (config.py:434). */
-function pceDrawer() {
-  const body = el("div");
-  const form = makeForm("POST", "/api/pce-profiles");
-  const name = textField("");
-  const url = textField("");
-  const org = textField("1");
-  const key = passwordField("");
-  const secret = passwordField("");
-  const ssl = checkField(true);
-
-  form.setBody(function (v) {
-    const b = {};
-    b.action = "add";
-    b.name = v.name;
-    b.url = v.url;
-    b.org_id = v.org_id || "1";
-    // A brand-new profile has no stored secret to preserve, so these two stay
-    // unconditional (header point 4's omit-when-empty rule is for edits of an
-    // EXISTING credential, not a fresh add).
-    b.key = v.key;
-    b.secret = v.secret;
-    b.verify_ssl = v.verify_ssl;
-    return b;
-  });
-
-  body.appendChild(sectionHead(t("gui_pce_add")));
-  body.appendChild(labelled(t("gui_pce_name"), form.track("name", name)));
-  body.appendChild(labelled(t("gui_url"), form.track("url", url), t("gui_sy_pce_url_rule")));
-  body.appendChild(labelled(t("gui_org_id"), form.track("org_id", org)));
-  body.appendChild(labelled(t("gui_api_key"), form.track("key", key, "secret")));
-  body.appendChild(labelled(t("gui_api_secret"), form.track("secret", secret, "secret"), t("gui_sy_secret_hint")));
-  body.appendChild(checkRow(t("gui_verify_ssl"), form.track("verify_ssl", ssl, "bool")));
-  form.sync();
-  // fapi.save() POSTs the body this form builds and resolves true/false —
-  // drawerSpec's onSave contract needs nothing
-  // more; a successful add reloads the whole page from the server.
-  return drawerSpec(t("gui_pce_add"), body, function () {
-    return form.save().then(function (ok) {
-      if (ok) refreshAndRemount(R_PCE, PCE_SNAPS);
-      return ok;
-    });
-  });
-}
-
 async function mountPce(root, ctx) {
-  const handles = {};
   const state = { torn: false, tableHandles: {} };
   installTeardown(state);
-  drawer.registerAudit("sy-pce-add", function () { return drawer.open(pceDrawer()); });
-  modal.registerAudit("sy-pce-activate", function () { return handles.activate ? handles.activate() : null; });
-  palette.registerFor(R_PCE, cmdSpec("sy:pce-add", t("gui_pce_add"), function () { drawer.open(pceDrawer()); }));
 
   await sysPage(root, ctx, R_PCE, PCE_SNAPS, function (board, d, host) {
     const s = d.settings || {};
     const api_ = s.api || {};
-    const profiles = (d.pce_profiles && d.pce_profiles.profiles) || [];
-    const activeId = (d.pce_profiles && d.pce_profiles.active_pce_id) || null;
 
     const form = makeForm("POST", "/api/settings");
     form.bar.dataset.cov = "SY-18";
-
-    // ── SY-01 profiles ─────────────────────────────────────────────────
-    const profPanel = panel("SY-01", t("gui_settings_tab_pce"));
-    withMeta(profPanel, tf("gui_sy_pce_meta", { n: profiles.length }));
-    const profHost = el("div");
-    profPanel.body.appendChild(profHost);
-    profPanel.head.appendChild(btn("btn", t("gui_pce_add"), function () { drawer.open(pceDrawer()); }));
-
-    /* settings.js:775-783 activatePceProfile fires with NO confirmation.
-     * DESIGN-ADDED: switching the active PCE re-points every query, report and
-     * alert on the appliance, so v2 states the blast radius first. Reads the
-     * CLICKED row's own profile (header point 6) — real POST
-     * /api/pce-profiles {action:'activate', id}. This is genuinely
-     * destructive (re-points the whole appliance's PCE target); the e2e never
-     * clicks Confirm here. */
-    handles.activate = function (p) {
-      const target = p || null;
-      const nameText = target ? target.name : t("gui_sy_pce_none");
-      return modal.confirm(confirmSpec(t("gui_pce_activate"), [
-        tf("gui_sy_pce_i_switch", { name: nameText }),
-        t("gui_sy_pce_i_queries"),
-        t("gui_sy_pce_i_cache"),
-      ], function () {
-        if (!target) return false;
-        return api.post("/api/pce-profiles", { action: "activate", id: target.id }).then(function (res) {
-          if (!res || res.ok !== true) {
-            toast.crit(errorText(res));
-            return false;
-          }
-          toast.ok(t("gui_pce_switched"));
-          refreshAndRemount(R_PCE, PCE_SNAPS);
-          return true;
-        });
-      }));
-    };
-
-    if (!profiles.length) {
-      // DEVIATION: the mockup offered an "activate" button here with nothing
-      // to activate (header point 6) — dropped; there is genuinely no target.
-      profHost.appendChild(el("div", { class: "empty" },
-        el("span", { class: "et", text: t("gui_sy_pce_none") }),
-        el("p", { text: t("gui_sy_pce_none_body") })));
-    } else {
-      const columns = [
-        col("name", t("gui_pce_name"), widthCell(160)),
-        col("url", t("gui_url"), buildCell(function (p) { return el("span", { title: p.url, text: p.url }); })),
-        col("org_id", t("gui_org_id"), widthCell(80)),
-        col("act", t("gui_actions"), widthCell(190, function (p) {
-          const box = el("div", { class: "rowacts" });
-          if (p.id !== activeId) box.appendChild(btn("btn", t("gui_pce_activate"), function () { handles.activate(p); }));
-          else box.appendChild(badge(t("gui_pce_active"), "ok"));
-          box.appendChild(btn("btn danger", t("gui_pce_delete_profile"), function () {
-            modal.confirm(confirmSpec(t("gui_msg_confirm_delete"),
-              [tf("gui_sy_pce_i_del", { name: p.name })], function () {
-                return api.post("/api/pce-profiles", { action: "delete", id: p.id }).then(function (res) {
-                  if (!res || res.ok !== true) {
-                    toast.crit(errorText(res));
-                    return false;
-                  }
-                  toast.ok(tf("gui_deleted_ok", { filename: p.name }));
-                  refreshAndRemount(R_PCE, PCE_SNAPS);
-                  return true;
-                });
-              }));
-          }));
-          return box;
-        })),
-      ];
-      state.tableHandles.profiles = table.render(profHost, buildTable(columns, profiles));
-    }
-    board.appendChild(profPanel);
 
     // ── API connection (settings.js:386-390) ───────────────────────────
     const connPanel = panel(null, t("gui_api_conn"));
@@ -891,13 +757,7 @@ async function mountPce(root, ctx) {
      * each stating set/not-set and the stored length — is gone: the length
      * was never ours to publish, and set/not-set now rides on the field it
      * describes instead of being restated in a section of its own. */
-    connPanel.body.appendChild(sectionHead(t("gui_sy_secret_state")));
-    connPanel.body.appendChild(roList([
-      roField(t("gui_sy_pce_profile_name"), api_.profile, t("gui_sy_pce_profile_field")),
-      roField(t("gui_sy_pce_active"), activeId, t("gui_sy_pce_active_field")),
-    ]));
     connPanel.body.appendChild(note(t("gui_sy_secret_note")));
-    connPanel.body.appendChild(note(t("gui_sy_pce_save_note")));
     board.appendChild(connPanel);
 
     // A1 fix (header point 4): key/secret are sent ONLY when the operator

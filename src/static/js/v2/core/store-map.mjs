@@ -122,7 +122,6 @@ export const GET_MAP = {
   alert_plugins: "/api/alert-plugins",
   security: "/api/security",
   tls_status: "/api/tls/status",
-  pce_profiles: "/api/pce-profiles",
   labels: "/api/labels",
   logs_index: "/api/logs",
   ui_translations: "/api/ui_translations",
