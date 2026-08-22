@@ -49,6 +49,17 @@ CONFIG_FILE = os.path.join(ROOT_DIR, "config", "config.json")
 # In-memory access via cm.config["rules"] / cm.config["alerts"] unchanged.
 ALERTS_FILE = os.path.join(ROOT_DIR, "config", "alerts.json")
 
+
+def resolve_state_file() -> str:
+    """Path to logs/state.json, the ingestion/schedule state store.
+
+    Lives here (Flask-free) rather than only in src.gui._helpers, so CLI
+    paths that need it (e.g. flushing PCE-derived state on re-point) don't
+    have to import the GUI package to get it. src.gui._helpers._resolve_state_file
+    delegates to this so existing callers/monkeypatches there are unaffected.
+    """
+    return os.path.join(ROOT_DIR, "logs", "state.json")
+
 # Default configuration template
 _DEFAULT_CONFIG = {
     "api": {"url": "https://pce.example.com:8443", "org_id": "1", "key": "", "secret": "", "verify_ssl": True},
@@ -82,8 +93,6 @@ _DEFAULT_CONFIG = {
         }
     },
     "report_schedules": [],
-    "pce_profiles": [],
-    "active_pce_id": None,
     "rule_scheduler": {
         "enabled": True,
         "check_interval_seconds": 300
@@ -124,9 +133,17 @@ def _deep_merge(base: dict, override: dict) -> dict:
 #   - report.attack_surface: removed with mod16 (Open-Ports Attack Surface).
 #   - web_gui.tls.http_redirect_port: removed with the HTTP→HTTPS auto-redirect
 #     server (commit 24fe5ff); the GUI is HTTPS-only now.
+#   - pce_profiles / active_pce_id: PCE profiles were only ever a credential
+#     switcher; switching one silently re-pointed the appliance at a second PCE
+#     while keeping the first one's cache. No downstream code knew they existed.
 _DEPRECATED_KEY_PATHS: tuple[str, ...] = (
     "report.attack_surface",
     "web_gui.tls.http_redirect_port",
+    # PCE profiles were only ever a credential switcher: nothing downstream of
+    # config["api"] knew they existed, and switching one silently re-pointed
+    # the appliance at a second PCE while keeping the first one's cache.
+    "pce_profiles",
+    "active_pce_id",
 )
 
 
@@ -625,91 +642,6 @@ class ConfigManager:
                 count = count + 1
         if count > 0:
             self.save()
-
-    # ─── PCE Profile CRUD ─────────────────────────────────────────────────────
-
-    def get_pce_profiles(self) -> list:
-        return self.config.get("pce_profiles", [])
-
-    def get_active_pce_id(self):
-        return self.config.get("active_pce_id")
-
-    def add_pce_profile(self, profile: dict) -> dict:
-        if not profile.get("id"):
-            profile["id"] = int(time.time() * 1000)
-        self.config.setdefault("pce_profiles", []).append(profile)
-        self.save()
-        return profile
-
-    def update_pce_profile(self, profile_id: int, updates: dict) -> bool:
-        for i, p in enumerate(self.config.get("pce_profiles", [])):
-            if p.get("id") == profile_id:
-                self.config["pce_profiles"][i].update(updates)
-                if self.config.get("active_pce_id") == profile_id:
-                    # Editing the ACTIVE profile must propagate profile→api (the
-                    # direction activate uses) and re-validate. The old
-                    # sync_api_to_active_profile() copied api→profile, clobbering
-                    # the updates just applied above.
-                    return self.activate_pce_profile(profile_id)
-                self.save()
-                return True
-        return False
-
-    def remove_pce_profile(self, profile_id: int) -> bool:
-        before = len(self.config.get("pce_profiles", []))
-        self.config["pce_profiles"] = [
-            p for p in self.config.get("pce_profiles", [])
-            if p.get("id") != profile_id
-        ]
-        if len(self.config["pce_profiles"]) < before:
-            if self.config.get("active_pce_id") == profile_id:
-                self.config["active_pce_id"] = None
-            self.save()
-            return True
-        return False
-
-    def activate_pce_profile(self, profile_id: int) -> bool:
-        from pydantic import ValidationError
-        from src.config_models import ApiSettings
-
-        for p in self.config.get("pce_profiles", []):
-            if p.get("id") == profile_id:
-                api = dict(self.config.get("api", {}))
-                for k in ("url", "org_id", "key", "secret", "verify_ssl"):
-                    if k in p:
-                        api[k] = p[k]
-                # Derive the profile mode so a verify_ssl=False profile validates
-                # as 'dev' instead of tripping the production TLS guard (which
-                # activate previously ignored, then persisted an api block that
-                # bricked the next load()). Validate BEFORE saving; reject on
-                # failure so we never write an unloadable config.
-                api["profile"] = "dev" if api.get("verify_ssl") is False else "production"
-                try:
-                    ApiSettings.model_validate(api)
-                except ValidationError as e:
-                    logger.error(
-                        "Refusing to activate PCE profile {}: resulting api block "
-                        "is invalid ({} error(s))", profile_id, e.error_count()
-                    )
-                    return False
-                self.config["active_pce_id"] = profile_id
-                self.config["api"] = api
-                self.save()
-                return True
-        return False
-
-    def sync_api_to_active_profile(self):
-        """Copy current config.api values back into the active profile."""
-        active_id = self.config.get("active_pce_id")
-        if active_id is None:
-            return
-        api = self.config.get("api", {})
-        for i, p in enumerate(self.config.get("pce_profiles", [])):
-            if p.get("id") == active_id:
-                for k in ("url", "org_id", "key", "secret", "verify_ssl"):
-                    if k in api:
-                        self.config["pce_profiles"][i][k] = api[k]
-                return
 
     # ─── Report Schedule CRUD ─────────────────────────────────────────────────
 

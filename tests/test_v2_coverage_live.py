@@ -1,4 +1,4 @@
-"""The feature-coverage gate, against the real app: 102/102 or red.
+"""The feature-coverage gate, against the real app: 101/101 or red.
 
 tests/design_v2/test_final_gate.py::test_coverage_gate_green runs
 design/v2/tools/gate_coverage.py, which proves the FROZEN MOCKUP renders every
@@ -78,14 +78,14 @@ def test_live_coverage_is_complete(gate_result):
         "the app renders data-cov values that coverage.yaml does not list: %s"
         % gate_result["extra"]
     )
-    assert gate_result["covered"] == gate_result["total"] == 102, gate_result
+    assert gate_result["covered"] == gate_result["total"] == 101, gate_result
 
 
 def test_every_route_contributed_something(gate_result):
     """Guard the guard, against the REAL per-route result.
 
     The gate matches a flat set-union across routes, so a route that failed to
-    mount at all could contribute nothing and still leave the total at 102 —
+    mount at all could contribute nothing and still leave the total at 101 —
     every one of its anchors having been seen somewhere else. That is a broken
     page reported as green, and it is the gate's one structural blind spot.
 
@@ -174,12 +174,12 @@ def test_get_map_is_an_exact_transcription_of_the_frozen_endpoint_list():
     }
 
 
-def test_get_map_has_the_thirty_eight_entries_the_gate_expects():
+def test_get_map_has_the_thirty_seven_entries_the_gate_expects():
     """A count, on top of the set comparison, so that adding an entry to BOTH
     files without deciding it belongs still has to be a deliberate edit here.
-    38 = the yaml's 40 GET entries minus the two capture-only fb_* ids."""
-    assert len(_get_map_ids()) == 38, sorted(_get_map_ids())
-    assert len(_yaml_get_ids()) == 40, sorted(_yaml_get_ids())
+    37 = the yaml's 39 GET entries minus the two capture-only fb_* ids."""
+    assert len(_get_map_ids()) == 37, sorted(_get_map_ids())
+    assert len(_yaml_get_ids()) == 39, sorted(_yaml_get_ids())
 
 
 def test_post_entries_are_deliberately_absent_from_get_map():

@@ -334,8 +334,6 @@ destination／格式／佇列與重試、三個 DLQ CLI 對應指令見 [siem.md
 | GET | `/api/security` | Web GUI 安全設定（帳號、允許 IP、是否已設密碼） | — |
 | POST | `/api/security` | 更新帳號／密碼／IP 允許清單 | **10/hour** |
 | GET | `/api/alert-plugins` | 各告警通道外掛的欄位定義（動態表單用） | `lang` |
-| GET | `/api/pce-profiles` | 列出 PCE profile（機密遮蔽） | — |
-| POST | `/api/pce-profiles` | 新增／更新／切換／刪除 PCE profile | `action`(add/update/activate/delete) |
 | GET | `/api/tls/status` | TLS 憑證狀態（含剩餘天數） | — |
 | POST | `/api/tls/config` | 設定 TLS 啟用／停用與憑證來源 | **10/hour** |
 | POST | `/api/tls/renew` | **真實副作用**：續期自簽憑證（僅 `self_signed=true` 可用） | **10/hour** |

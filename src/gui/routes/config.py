@@ -11,6 +11,7 @@ from loguru import logger
 from src.config import ConfigManager, hash_password, verify_password
 from src.alerts import PLUGIN_METADATA, plugin_config_path
 from src.i18n import t
+from src.pce_target import normalize_org_id, normalize_pce_url, pce_target_changed
 from src.gui._helpers import (
     _err,
     _err_with_log,
@@ -28,6 +29,7 @@ from src.gui._helpers import (
     _import_signed_cert,
     _get_cert_info,
     _cert_days_remaining,
+    _resolve_state_file,
 )
 
 
@@ -57,7 +59,7 @@ def make_config_blueprint(
         d = request.json or {}
         # 以共用 config 鎖序列化整段 load→mutate→save，避免併發存檔
         # （cheroot 多執行緒 pool）互相交錯而丟失更新
-        # （比照下方 api_save_settings / api_pce_profiles_action 的既有做法）。
+        # （比照下方 api_save_settings 的既有做法）。
         with cm.write_lock:
             cm.load()
             lang = d.get('lang') or cm.config.get('settings', {}).get('language', 'en')
@@ -141,8 +143,6 @@ def make_config_blueprint(
                 "output_dir":      rpt.get("output_dir", "reports/"),
                 "retention_days":  rpt.get("retention_days", 30),
             },
-            "pce_profiles":   cm.get_pce_profiles(),
-            "active_pce_id":  cm.get_active_pce_id(),
         }
         for root in _plugin_config_roots():
             payload.setdefault(root, cm.config.get(root, {}))
@@ -196,17 +196,59 @@ def make_config_blueprint(
             # 整批寫回 cm.config + save；任何一個 400 都讓 cm.config 維持
             # load() 剛讀回的原狀，不會有欄位被併發 GET 看到或誤存。
             scratch = json.loads(json.dumps(cm.config))
+            # Set when the operator chose "flush" — carried down to just
+            # before the save below rather than run here, because the rest
+            # of this handler can still reject the request (invalid api
+            # block, forbidden report dir, ...) after this point. Flushing
+            # eagerly would empty a cache that still belongs to the PCE the
+            # appliance stays pointed at once the save fails.
+            _do_pce_flush = False
             if 'api' in d:
                 api_in = d['api']
                 api_allowlist = _SETTINGS_ALLOWLISTS["api"]
+                # Normalize before anything reads these: the comparison below,
+                # the echo in the 409 body and the value stored further down
+                # must all be the same string, or the next edit compares what
+                # was typed against what was stored and the guard misfires
+                # (src/pce_target.py's module docstring).
+                if 'url' in api_in:
+                    api_in['url'] = normalize_pce_url(api_in['url'])
+                if 'org_id' in api_in:
+                    api_in['org_id'] = normalize_org_id(api_in['org_id'])
                 # Validate url scheme before accepting it
                 if 'url' in api_in:
-                    _url_val = str(api_in['url']).strip()
+                    _url_val = api_in['url']
                     _scheme = urllib.parse.urlparse(_url_val).scheme.lower()
                     if _scheme not in ('http', 'https'):
                         return jsonify({"ok": False, "error": t("gui_err_api_url_scheme", lang=lang)}), 400
                     if _scheme == 'http':
                         logger.warning("api.url uses plain HTTP — TLS verification cannot be performed")
+                # Changing which PCE this appliance talks to is not an edit —
+                # the cache, the ingestion positions, the archive files and the
+                # schedules all carry the previous PCE's data with no marker
+                # saying so. Make the operator say what should happen to it.
+                _old_api = scratch.get('api', {})
+                _target_changed = pce_target_changed(
+                    _old_api,
+                    api_in['url'] if 'url' in api_in else None,
+                    api_in['org_id'] if 'org_id' in api_in else None,
+                )
+                _choice = d.get('pce_target_change')
+                if _target_changed:
+                    if _choice is None:
+                        return jsonify({
+                            "ok": False,
+                            "pce_target_changed": True,
+                            "old": {"url": _old_api.get('url', ''), "org_id": _old_api.get('org_id', '')},
+                            "new": {"url": api_in.get('url', _old_api.get('url', '')),
+                                    "org_id": api_in.get('org_id', _old_api.get('org_id', ''))},
+                            "error": t("gui_err_pce_target_needs_choice", lang=lang),
+                        }), 409
+                    if _choice not in ("flush", "same-pce"):
+                        return jsonify({"ok": False,
+                                        "error": t("gui_err_pce_target_bad_choice", lang=lang)}), 400
+                    if _choice == "flush":
+                        _do_pce_flush = True
                 for k in api_allowlist:
                     if k in api_in:
                         scratch['api'][k] = api_in[k]
@@ -261,7 +303,7 @@ def make_config_blueprint(
                         rpt_cfg['retention_days'] = max(0, int(rpt_in['retention_days']))
                     except (TypeError, ValueError):
                         pass  # intentional fallback: keep existing retention_days if new value is not numeric
-            known_roots = {'api', 'email', 'smtp', 'alerts', 'settings', 'report', 'pce_profiles', 'active_pce_id'}
+            known_roots = {'api', 'email', 'smtp', 'alerts', 'settings', 'report'}
             for root in _plugin_config_roots():
                 if root in known_roots or root not in d:
                     continue
@@ -270,8 +312,31 @@ def make_config_blueprint(
                     scratch.setdefault(root, {}).update(incoming)
                 else:
                     scratch[root] = incoming
+            # Every 400 return above this point has already exited the
+            # handler, so reaching here means the save is going through.
+            # Only now is it safe to flush — before that, the PCE this
+            # appliance is still pointed at (on save failure) would lose its
+            # own cache and ingestion position.
+            #
+            # And still BEFORE the save, which is the order both CLI paths
+            # follow too (src/cli/config.py, src/cli/menus/_root.py): past the
+            # save the stored connection names the new PCE, the guard never
+            # fires for this edit again, and nothing would ever come back to
+            # finish an interrupted clear — the old PCE's cache and fetch
+            # positions would stay for good. Failing here costs a retry, whose
+            # clear is idempotent.
+            if _do_pce_flush:
+                from src.pce_cache.flush import flush_pce_derived_state
+                _cache_cfg = cm.models.pce_cache
+                try:
+                    flush_pce_derived_state(_cache_cfg.db_path, _resolve_state_file())
+                except Exception as exc:
+                    logger.exception("PCE cache flush failed, settings not saved: {}", exc)
+                    return jsonify({
+                        "ok": False,
+                        "error": t("gui_err_pce_flush_failed", lang=lang),
+                    }), 500
             cm.config = scratch
-            cm.sync_api_to_active_profile()
             cm.save()
         return jsonify({"ok": True})
 
@@ -309,7 +374,7 @@ def make_config_blueprint(
         d = request.json or {}
         # 以共用 config 鎖序列化整段 load→mutate→save，避免併發存檔
         # （cheroot 多執行緒 pool）互相交錯而丟失更新
-        # （比照上方 api_save_settings / api_pce_profiles_action 的既有做法）。
+        # （比照上方 api_save_settings 的既有做法）。
         with cm.write_lock:
             cm.load()
             lang = d.get('lang') or cm.config.get('settings', {}).get('language', 'en')
@@ -420,79 +485,5 @@ def make_config_blueprint(
             return jsonify({"ok": False, "error": str(e)}), 400
         except Exception as e:
             return _err_with_log("cert_import", e, lang=lang)
-
-    # ── API: PCE Profiles ──────────────────────────────────────────────────────
-
-    @bp.route('/api/pce-profiles', methods=['GET'])
-    def api_list_pce_profiles():
-        cm.load()
-        return jsonify(_redact_secrets({
-            "profiles": cm.get_pce_profiles(),
-            "active_pce_id": cm.get_active_pce_id(),
-        }))
-
-    @bp.route('/api/pce-profiles', methods=['POST'])
-    def api_pce_profiles_action():
-        # GET /api/pce-profiles 以 _redact_secrets 遮罩 key/secret；round-trip
-        # 回來的 "********" 必須剝掉（同 api_save_settings），否則 update/add
-        # 會用遮罩值靜默覆蓋真憑證。
-        d = _strip_redaction_placeholders(request.json or {})
-        action = d.get("action")
-        lang = d.get('lang') or cm.config.get('settings', {}).get('language', 'en')
-        # Serialize load→mutate→save under the shared config lock (profile CRUD
-        # helpers each call cm.save()) so concurrent writers don't lose updates.
-        with cm.write_lock:
-            cm.load()
-            if action == "add":
-                profile = {
-                    "name":       d.get("name", "").strip(),
-                    "url":        d.get("url", "").strip(),
-                    "org_id":     d.get("org_id", "1"),
-                    "key":        d.get("key", ""),
-                    "secret":     d.get("secret", ""),
-                    "verify_ssl": bool(d.get("verify_ssl", True)),
-                }
-                if not profile["name"] or not profile["url"]:
-                    return _err(t("gui_err_pce_name_url_required", lang=lang))
-                p = cm.add_pce_profile(profile)
-                # 憑證輸出一律遮罩（同 GET /api/pce-profiles）——明文 secret
-                # 不得殘留在瀏覽器 devtools/HAR 的回應紀錄裡。
-                return jsonify({"ok": True, "profile": _redact_secrets(p)})
-            elif action == "update":
-                pid = d.get("id")
-                if not pid:
-                    return _err(t("gui_err_pce_id_required", lang=lang))
-                try:
-                    pid = int(pid)
-                except (TypeError, ValueError):
-                    return _err(t("gui_err_invalid_number", lang=lang))
-                updates = {k: d[k] for k in ("name", "url", "org_id", "key", "secret", "verify_ssl") if k in d}
-                if not cm.update_pce_profile(pid, updates):
-                    return _err(t("gui_err_pce_profile_not_found", lang=lang))
-                return jsonify({"ok": True})
-            elif action == "activate":
-                pid = d.get("id")
-                if not pid:
-                    return _err(t("gui_err_pce_id_required", lang=lang))
-                try:
-                    pid = int(pid)
-                except (TypeError, ValueError):
-                    return _err(t("gui_err_invalid_number", lang=lang))
-                if not cm.activate_pce_profile(pid):
-                    return _err(t("gui_err_pce_profile_not_found", lang=lang))
-                return jsonify({"ok": True})
-            elif action == "delete":
-                pid = d.get("id")
-                if not pid:
-                    return _err(t("gui_err_pce_id_required", lang=lang))
-                try:
-                    pid = int(pid)
-                except (TypeError, ValueError):
-                    return _err(t("gui_err_invalid_number", lang=lang))
-                if not cm.remove_pce_profile(pid):
-                    return _err(t("gui_err_pce_profile_not_found", lang=lang))
-                return jsonify({"ok": True})
-            else:
-                return _err(t("gui_err_unknown_action", lang=lang))
 
     return bp

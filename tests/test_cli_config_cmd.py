@@ -208,6 +208,7 @@ def test_config_login_non_interactive_sets_all_fields(runner):
             "--secret", "mysecret",
             "--org-id", "3",
             "--no-interactive",
+            "--pce-target-change", "same-pce",
         ])
     assert result.exit_code == 0
     assert cm.config["api"]["url"] == "https://pce.prod:8443"
@@ -228,6 +229,7 @@ def test_config_login_invalid_url_exits_config(runner):
             "--key", "k",
             "--secret", "s",
             "--no-interactive",
+            "--pce-target-change", "same-pce",
         ])
     assert result.exit_code == EXIT_CONFIG
 
@@ -279,6 +281,7 @@ def test_config_login_interactive_blank_secret_keeps_existing(runner):
             "--url", "https://pce.prod:8443",
             "--key", "mykey",
             "--org-id", "3",
+            "--pce-target-change", "same-pce",
         ], input="\n")
     assert result.exit_code == 0, result.output
     assert cm.config["api"]["secret"] == "existing-secret"
@@ -296,6 +299,7 @@ def test_config_login_interactive_new_secret_overrides(runner):
             "--url", "https://pce.prod:8443",
             "--key", "mykey",
             "--org-id", "1",
+            "--pce-target-change", "same-pce",
         ], input="brand-new-secret\n")
     assert result.exit_code == 0, result.output
     assert cm.config["api"]["secret"] == "brand-new-secret"

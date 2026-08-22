@@ -337,9 +337,7 @@ last-run 狀態）、**Logs**。
 
 四個子頁，`pce`／`channels`／`display`／`security`：
 
-- **PCE**：PCE profile 清單與 **Activate**（切換作用中 profile，立即對
-  daemon 生效，無需重啟；只按 Save 不會切換）、以及 API 連線欄位。多
-  PCE 設定細節見 [configuration.md](configuration.md) 的「pce_profiles／active_pce_id」節。
+- **PCE**：API 連線欄位（URL／org id／key／secret／verify SSL）。
 - **Channels**：各告警通道（mail、LINE、webhook、Telegram、Teams）的
   啟用開關與欄位。每張通道卡片有獨立的 **Send test** 按鈕（全庫未記錄
   過的功能，`src/static/js/settings.js` `testAlertChannel()`）：呼叫與

@@ -40,8 +40,6 @@ def _create_default_config(rules=None):
             }
         },
         "report_schedules": [],
-        "pce_profiles": [],
-        "active_pce_id": None,
         "rule_scheduler": {
             "enabled": True,
             "check_interval_seconds": 300

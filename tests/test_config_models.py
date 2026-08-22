@@ -83,8 +83,8 @@ def test_dumped_model_has_all_legacy_dict_keys():
     })
     dumped = cfg.model_dump()
     for top_level in ("api", "alerts", "email", "smtp", "settings", "rules",
-                      "report", "report_schedules", "pce_profiles",
-                      "active_pce_id", "rule_scheduler", "web_gui"):
+                      "report", "report_schedules",
+                      "rule_scheduler", "web_gui"):
         assert top_level in dumped, f"missing {top_level} in model_dump()"
 
 
@@ -126,3 +126,21 @@ def test_report_snapshot_retention_validates_range():
         ReportSettings(snapshot_retention_days=0)
     with pytest.raises(ValidationError):
         ReportSettings(snapshot_retention_days=3651)
+
+
+def test_config_schema_has_no_pce_profile_fields():
+    """Profile 概念已移除：schema 不得再宣告它，否則舊資料會被當成合法設定留著。"""
+    from src.config_models import ConfigSchema
+    fields = set(ConfigSchema.model_fields)
+    assert "pce_profiles" not in fields
+    assert "active_pce_id" not in fields
+
+
+def test_config_manager_has_no_profile_methods():
+    """Case-insensitive match on `pce` or `profile` anywhere in the name——原本只比對
+    `pce_profile`/`active_profile` 這兩個子字串會漏掉 `get_active_pce_id`（沒有底線相接
+    的 `pce_profile`），而 `sync_api_to_active_profile` 正是這樣從第一版盤點裡漏網的。"""
+    from src.config import ConfigManager
+    leftovers = [n for n in dir(ConfigManager)
+                 if "pce" in n.lower() or "profile" in n.lower()]
+    assert leftovers == [], f"still present: {leftovers}"

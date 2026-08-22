@@ -71,7 +71,6 @@ RP-06: {item: 產出清單 下載/瀏覽, route: "#/reports"}
 RP-07: {item: 產出清單 單刪/批刪, route: "#/reports"}
 RP-08: {item: 報表語言切換, route: "#/reports"}
 RP-09: {item: Labels 查詢輔助, route: "#/reports"}
-SY-01: {item: PCE profiles CRUD/切換, route: "#/system/pce"}
 SY-02: {item: cache 設定表單, route: "#/system/cache"}
 SY-03: {item: cache 重啟 banner+daemon restart, route: "#/system/cache"}
 SY-04: {item: retention 立即執行, route: "#/system/cache"}

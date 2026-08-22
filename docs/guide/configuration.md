@@ -59,7 +59,6 @@ illumio-ops config login --url ... --key ... --secret ... [--org-id ...]  # 設�
 | 頂層鍵 | 對應 pydantic model | 用途一句話 |
 |---|---|---|
 | `api` | `ApiSettings` | 目前生效中的單一 PCE 連線資訊 |
-| `pce_profiles` / `active_pce_id` | `list[PceProfile]` / `Optional[int]` | 多 PCE 設定檔清單與目前啟用的 id |
 | `alerts` | `AlertsSettings` | 告警通道清單與各通道憑證 |
 | `email` / `smtp` | `EmailSettings` / `SmtpSettings` | 郵件寄件人/收件人；SMTP 連線設定 |
 | `settings` | `GeneralSettings` | 語言、主題、時區、健康檢查、儀表板查詢 |
@@ -95,26 +94,36 @@ illumio-ops config login --url ... --key ... --secret ... [--org-id ...]  # 設�
 > **安全護欄**：`profile="production"` 時 `verify_ssl=false` 會直接拒絕載入（`ValueError`）。
 > 要在 lab 環境跳過憑證驗證，須先把 `profile` 明確改成 `"dev"`。
 
-## pce_profiles ／ active_pce_id（多 PCE）
-
-| 鍵 | 型別 | 預設 | 說明 |
-|---|---|---|---|
-| `pce_profiles[].id` | int（≥1） | 必填 | 設定檔內部識別碼 |
-| `pce_profiles[].url` | str | 必填 | 該 PCE 的 URL |
-| `pce_profiles[].org_id` | str | `"1"` | organization id |
-| `pce_profiles[].key` | str | `""` | API key |
-| `pce_profiles[].secret` | str | `""` | API secret |
-| `pce_profiles[].name` | str | `""` | 顯示名稱 |
-| `active_pce_id` | Optional[int] | `null` | 目前生效中的 profile id |
-
-`PceProfile` 為 `extra="allow"`，只強制要求 `id`／`url`，其餘欄位形狀可能隨版本擴充。
-同一時間只有一個 profile 生效，監控/報表/規則/cache 一律指向 `active_pce_id` 對應的
-profile。切換方式：
-
-- **Web GUI**：Settings → PCE，點該 profile 的 **Activate**（不是 Save）。`activate_pce_profile()`
-  會把該 profile 的 `url`/`org_id`/`key`/`secret`/`verify_ssl` 複製進 `api` 區塊並立即存檔，
-  同一進程下次輪詢即生效，不需重啟（`src/config.py` `activate_pce_profile`）。
-- **手動編輯**：改 `active_pce_id` 後需重啟行程，`api` 區塊不會自動同步。
+> **升級提醒（PCE profiles 已移除）**：舊版可在 `config.json` 裡設定多組
+> `pce_profiles` 並用 `active_pce_id` 切換要連的 PCE，這個機制已經拿掉。
+> 若你的 `config.json` 還留著這兩個鍵，載入時會被直接丟棄（log 會出現
+> `Ignoring deprecated config key(s)`），appliance 會照常用 `api` 底下現有
+> 的連線設定啟動，不會因此起不來。**但只有目前生效中的那組憑證留在
+> `api` 裡——如果你設定過第二組（或更多）PCE profile，那些憑證不會被
+> 遷移到任何地方，升級前請自行把它們抄出來，否則就直接遺失。**
+>
+> 升級之後，只要從 GUI 系統設定頁、互動式設定選單或 `config login` 改掉
+> `url` 或 `org_id`，都會先要求你做選擇：
+> 選「清除」會把 PCE 相關的快取、擷取水位、告警冷卻與 SIEM 佇列一併清空；
+> 選「同一台 PCE，只是換了位址」則保留這些狀態不動。只改 `key`／`secret`
+> （輪替憑證）或 `verify_ssl` 不受影響，一樣直接存檔。
+>
+> GUI 的系統設定頁與 `illumio-ops` 的互動式設定選單都會當場詢問。
+> `illumio-ops config login --no-interactive` 則會**直接拒絕並以非零狀態
+> 結束**，除非你用 `--pce-target-change flush` 或 `--pce-target-change
+> same-pce` 明講——自動化腳本沒有人在旁邊看著，預設放行等於讓它有機會在
+> 無人察覺下把設備指到另一台 PCE。
+>
+> **從 CLI 改完之後一定要重啟監控服務。** 常駐的 `--monitor` / `--monitor-gui`
+> 行程在啟動時讀一次設定就一直用到行程結束，`config login` 或設定選單改掉
+> `url`／`org_id` 完全不會傳達給它。改完不重啟的話，它會在 30 秒內用**舊的**
+> 位址與憑證再跑一次 cycle，把剛清空的表重新灌回舊 PCE 的事件與流量、並改寫
+> `IngestionWatermark`——這不是競態，是必然。兩支 CLI 都會在改完後印出提醒。
+> （GUI 的系統設定頁不受影響：它與排程器同一個行程，設定會被重新載入。）
+>
+> **仍然沒有防護的是 `illumio-ops config set api.url` / `config set api.org_id`
+> 這條單鍵寫入路徑，以及直接手動編輯 `config.json`**：兩者都不會問，
+> 舊 PCE 的快取與擷取水位會原封不動留著，需要清除的話請自行處理。
 
 ## alerts（告警通道）
 

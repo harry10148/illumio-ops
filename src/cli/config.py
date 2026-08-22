@@ -229,8 +229,14 @@ def set_cmd(ctx: click.Context, key: str, value: str) -> None:
 @click.option("--org-id", "org_id", default=None, help="Organisation ID (default: 1)")
 @click.option("--no-interactive", "no_interactive", is_flag=True, default=False,
               help="Skip prompts; require --url, --key, --secret via options.")
+@click.option("--pce-target-change", "pce_target_change",
+              type=click.Choice(["flush", "same-pce"]), default=None,
+              help="Required (with --no-interactive) when --url/--org-id name a "
+                   "different PCE than the one currently configured: 'flush' "
+                   "clears the cached data that belonged to the old one, "
+                   "'same-pce' keeps it (same PCE, new address).")
 @click.pass_context
-def login_cmd(ctx: click.Context, url, key, secret, org_id, no_interactive) -> None:
+def login_cmd(ctx: click.Context, url, key, secret, org_id, no_interactive, pce_target_change) -> None:
     """Set PCE API credentials (url, key, secret, org-id).
 
     Without --no-interactive, prompts for any value not supplied via options.
@@ -239,11 +245,19 @@ def login_cmd(ctx: click.Context, url, key, secret, org_id, no_interactive) -> N
     from pydantic import ValidationError
     from src.config import ConfigManager
     from src import config_models
+    from src.pce_target import normalize_org_id, normalize_pce_url, pce_target_changed
 
     if secret is not None and not is_json(ctx):
         # --secret on the command line lands in `ps` output and shell history.
         # Suppress in --json mode so machine-readable stdout stays clean.
         echo_warning(ctx, t("cli_config_secret_cli_warning"))
+
+    # Read the current api block before anything below can mutate it — this
+    # is the baseline the "did the target change" decision compares against,
+    # and (for --no-interactive with no decision made) config must come out
+    # of this command exactly as it went in.
+    cm = ConfigManager()
+    old_api = dict(cm.config.get("api", {}))
 
     if no_interactive:
         missing = [f for f, v in [("--url", url), ("--key", key), ("--secret", secret)]
@@ -253,8 +267,7 @@ def login_cmd(ctx: click.Context, url, key, secret, org_id, no_interactive) -> N
             ctx.exit(EXIT_USAGE)
             return
     else:
-        cm = ConfigManager()
-        current = cm.config.get("api", {})
+        current = old_api
         if url is None:
             url = click.prompt("PCE URL", default=current.get("url", "https://pce.example.com:8443"))
         if key is None:
@@ -267,15 +280,40 @@ def login_cmd(ctx: click.Context, url, key, secret, org_id, no_interactive) -> N
         if org_id is None:
             org_id = click.prompt("Org ID", default=current.get("org_id", "1"))
 
-    if org_id is None:
-        org_id = "1"
+    # An absent --org-id means "unchanged", exactly as it does on the other two
+    # paths: the GUI passes None for a field the request omitted and the
+    # settings menu keeps the stored value. This used to manufacture "1" and
+    # hand it to the predicate, which turned a plain credential rotation on an
+    # org-5 appliance into a target change; answering "same-pce" — the honest
+    # answer for a rotation — then silently moved the appliance onto org 1
+    # while keeping org 5's cache.
+    stored_url = normalize_pce_url(url) if url is not None else old_api.get("url", "")
+    stored_org_id = (normalize_org_id(org_id) if org_id is not None
+                     else normalize_org_id(old_api.get("org_id", "1")))
 
-    if no_interactive:
-        cm = ConfigManager()
-    cm.config["api"]["url"] = url
+    # Changing which PCE this appliance talks to is not an edit — the cache,
+    # the ingestion positions, the archive files and the alert cooldowns all
+    # carry the previous PCE's data with no marker saying so. Same predicate
+    # POST /api/settings uses (src/pce_target.py), so the two paths agree.
+    target_changed = pce_target_changed(old_api, url, org_id)
+    if target_changed and pce_target_change is None:
+        if no_interactive:
+            # This is the path automation calls with nobody watching — default
+            # to proceeding would be the same silent contamination the whole
+            # guard exists to prevent, just with extra steps. Fail loud, write
+            # nothing.
+            echo_error(ctx, t("cli_config_login_pce_target_needs_choice"))
+            ctx.exit(EXIT_USAGE)
+            return
+        pce_target_change = click.prompt(
+            t("cli_config_login_pce_target_change_prompt"),
+            type=click.Choice(["flush", "same-pce"]),
+        )
+
+    cm.config["api"]["url"] = stored_url
     cm.config["api"]["key"] = key
     cm.config["api"]["secret"] = secret
-    cm.config["api"]["org_id"] = str(org_id)
+    cm.config["api"]["org_id"] = stored_org_id
 
     try:
         config_models.ApiSettings.model_validate(cm.config["api"])
@@ -286,9 +324,34 @@ def login_cmd(ctx: click.Context, url, key, secret, org_id, no_interactive) -> N
         ctx.exit(EXIT_CONFIG)
         return
 
+    if target_changed and pce_target_change == "flush":
+        # Before cm.save(), the same order POST /api/settings uses: past this
+        # line the stored connection names the new PCE, so the guard never
+        # fires for this edit again and nothing would ever come back to finish
+        # an interrupted clear — the old PCE's cache and fetch positions would
+        # stay, permanently and silently, exactly the contamination this
+        # guard exists to prevent. Failing here instead costs a re-run, whose
+        # clear is idempotent.
+        from src.pce_cache.flush import flush_pce_derived_state
+        from src.config import resolve_state_file
+        try:
+            flush_pce_derived_state(cm.models.pce_cache.db_path, resolve_state_file())
+        except Exception as exc:
+            echo_error(ctx, t("cli_config_login_pce_flush_failed", error=str(exc)[:200]))
+            ctx.exit(EXIT_CONFIG)
+            return
+
     cm.save()
 
+    if target_changed and not is_json(ctx) and not is_quiet(ctx):
+        # Nothing here reaches a running monitor service: it holds its own
+        # ConfigManager for the life of the process and never reloads it, so
+        # it keeps polling the previous PCE and refilling what was just
+        # cleared. There is no way to detect one from here, so say it plainly.
+        echo_warning(ctx, t("cli_config_login_pce_restart_required"))
+
     if is_json(ctx):
-        echo_json(ctx, {"url": url, "org_id": str(org_id), "saved": True})
+        echo_json(ctx, {"url": stored_url, "org_id": stored_org_id, "saved": True,
+                        "restart_required": bool(target_changed)})
     elif not is_quiet(ctx):
-        click.echo(t("cli_config_login_saved", url=url, org_id=org_id))
+        click.echo(t("cli_config_login_saved", url=stored_url, org_id=stored_org_id))

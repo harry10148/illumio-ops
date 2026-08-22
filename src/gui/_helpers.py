@@ -22,7 +22,7 @@ import threading
 
 from loguru import logger
 
-from src.config import ConfigManager
+from src.config import ConfigManager, resolve_state_file as _resolve_state_file_impl
 from src.i18n import t, get_messages
 from src.alerts import PLUGIN_METADATA, plugin_config_path, plugin_config_value
 from src.report.dashboard_summaries import (
@@ -316,7 +316,7 @@ def _resolve_config_dir() -> str:
     return os.path.join(_ROOT_DIR, 'config')
 
 def _resolve_state_file() -> str:
-    return os.path.join(_ROOT_DIR, 'logs', 'state.json')
+    return _resolve_state_file_impl()
 
 
 # ---------------------------------------------------------------------------
@@ -456,12 +456,7 @@ def _get_cache_engine(db_path: str):
 # ---------------------------------------------------------------------------
 
 def _get_active_pce_url(cm: 'ConfigManager') -> str:
-    """Return the active PCE profile URL, falling back to config['api']['url']."""
-    active_id = cm.config.get('active_pce_id')
-    if active_id is not None:
-        for p in cm.config.get('pce_profiles', []):
-            if p.get('id') == active_id:
-                return p.get('url', '') or cm.config.get('api', {}).get('url', '')
+    """Return the PCE URL this appliance is configured against."""
     return cm.config.get('api', {}).get('url', '')
 
 

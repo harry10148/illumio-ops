@@ -240,3 +240,207 @@ def test_settings_post_accepts_verify_ssl_false_with_explicit_dev_profile(authed
     assert res.status_code == 200
     cm.load()
     assert cm.config["api"]["verify_ssl"] is False
+
+
+def test_settings_response_has_no_profile_fields(authed_client):
+    """Profile 概念已移除：設定回應不得再帶 profile 清單或 active id。"""
+    client, _csrf = authed_client
+    body = client.get("/api/settings").get_json()
+    assert "pce_profiles" not in body
+    assert "active_pce_id" not in body
+
+
+def test_pce_profiles_endpoint_is_gone(authed_client):
+    client, _csrf = authed_client
+    assert client.get("/api/pce-profiles").status_code == 404
+
+
+# ── PCE 連線目標變更必須是明示的決定 ──────────────────────────────────────────
+# 這台設備的快取、擷取位置、封存與排程都沒有 PCE 維度（見
+# docs/superpowers/specs/2026-08-21-pce-profile-isolation-assessment.md）。把
+# api.url 或 api.org_id 指向另一台 PCE 而不處理既有資料，兩台的資料會靜默混合，
+# 而且沒有任何徵兆。所以這裡不猜、也不自動清——直接擋下來要求操作者選。
+
+def _save(client, csrf, api_block, choice=None):
+    body = {"api": api_block}
+    if choice is not None:
+        body["pce_target_change"] = choice
+    return client.post("/api/settings", json=body,
+                       headers={"X-CSRFToken": csrf},
+                       environ_overrides={"REMOTE_ADDR": "127.0.0.1"})
+
+
+def test_changing_url_without_a_choice_is_refused(authed_client):
+    client, csrf = authed_client
+    res = _save(client, csrf, {"url": "https://other-pce.example.com:8443"})
+    assert res.status_code == 409
+    body = res.get_json()
+    assert body["ok"] is False
+    assert body["pce_target_changed"] is True
+    assert body["old"]["url"] == "https://pce.example.com:8443"
+    assert body["new"]["url"] == "https://other-pce.example.com:8443"
+
+
+def test_changing_org_id_without_a_choice_is_refused(authed_client):
+    client, csrf = authed_client
+    res = _save(client, csrf, {"org_id": "7"})
+    assert res.status_code == 409
+    assert res.get_json()["pce_target_changed"] is True
+
+
+def test_rotating_credentials_is_not_a_target_change(authed_client):
+    """換 key/secret 只是輪替憑證，不該擋。"""
+    client, csrf = authed_client
+    res = _save(client, csrf, {"key": "newkey", "secret": "newsecret"})
+    assert res.status_code == 200
+    assert res.get_json()["ok"] is True
+
+
+def test_same_pce_choice_saves_without_touching_data(tmp_path, monkeypatch):
+    """"same-pce" is the answer that must leave the data alone, so 200 on its
+    own proves nothing — the seeded row is the assertion that matters."""
+    client, csrf, cache_db = _flush_test_app(tmp_path, monkeypatch)
+    _seed_one_event(cache_db)
+    assert _count_events(cache_db) == 1
+
+    res = _save(client, csrf, {"url": "https://renamed.example.com:8443"},
+                choice="same-pce")
+    assert res.status_code == 200
+    assert res.get_json()["ok"] is True
+    assert _count_events(cache_db) == 1, "same-pce must not touch the cache"
+
+
+def test_unknown_choice_is_rejected(authed_client):
+    client, csrf = authed_client
+    res = _save(client, csrf, {"url": "https://other.example.com:8443"},
+                choice="whatever")
+    assert res.status_code == 400
+
+
+# ── choice="flush" 端到端：真的清掉快取；而且只在整個 save 都通過驗證之後 ──
+# 才動手（見 src/gui/routes/config.py 的 _do_pce_flush）——handler 在 api
+# 區塊驗證之後還有 email/smtp/alerts/settings/report/外掛區塊各自能 400，
+# flush 提早跑，遇到後面才炸的 400 就會把還連著的 PCE 的快取清光。
+
+def _isolate_flush_side_files(tmp_path, monkeypatch):
+    """flush_pce_derived_state() reaches three files this app never names:
+    logs/state.json (via config.py's _resolve_state_file), logs/analysis.lock
+    (the cross-process analysis lock it takes) and logs/dashboard_summary.json
+    (ven_summary). All three resolve relative to the REPO, not to tmp_path —
+    so without this, running the suite on a checkout where the appliance
+    actually runs deleted its event_watermark / alert_history / event_seen
+    (history re-fetched from zero, suppressed alerts re-fired) and blocked on
+    a live monitor cycle.
+
+    _resolve_state_file is patched where it is looked up (imported into
+    src.gui.routes.config's namespace), not where it is defined."""
+    import src.gui.routes.config as _config_routes
+    import src.main as _main
+    from src import dashboard_store
+
+    state_file = tmp_path / "state.json"
+    state_file.write_text("{}", encoding="utf-8")
+    monkeypatch.setattr(_config_routes, "_resolve_state_file", lambda: str(state_file))
+    monkeypatch.setattr(_main, "analysis_lock_path",
+                        lambda: str(tmp_path / "analysis.lock"))
+    monkeypatch.setattr(dashboard_store, "_dashboard_file",
+                        lambda: str(tmp_path / "dashboard_summary.json"))
+    return state_file
+
+
+def _flush_test_app(tmp_path, monkeypatch):
+    """獨立 app（不共用模組層的 temp_config_file/app fixture）：需要一個
+    真實、可讀寫的 pce_cache.db_path 才能驗證 flush 對快取檔案的實際效果。"""
+    _isolate_flush_side_files(tmp_path, monkeypatch)
+    cache_db = tmp_path / "cache.sqlite"
+    config_path = tmp_path / "config.json"
+    config_path.write_text(json.dumps({
+        "api": {
+            "url": "https://pce.example.com:8443",
+            "key": "myapikey",
+            "secret": "mysecret",
+            "org_id": "1",
+        },
+        "pce_cache": {"db_path": str(cache_db)},
+        "web_gui": {
+            "username": "admin",
+            "password": hash_password("testpass"),
+            "allowed_ips": [],
+            "secret_key": "test-secret",
+        },
+    }), encoding="utf-8")
+
+    cm = ConfigManager(config_file=str(config_path))
+    cm.load()
+    application = _create_app(cm, persistent_mode=True)
+    application.config.update({"TESTING": True})
+    client = application.test_client()
+    login = client.post("/api/login", json={"username": "admin", "password": "testpass"})
+    assert login.status_code == 200
+    csrf = _csrf(login)
+    return client, csrf, cache_db
+
+
+def _seed_one_event(db_path):
+    from datetime import datetime, timezone
+
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import sessionmaker
+
+    from src.pce_cache.models import Base, PceEvent
+
+    now = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    engine = create_engine(f"sqlite:///{db_path}")
+    Base.metadata.create_all(engine)
+    sf = sessionmaker(bind=engine)
+    with sf() as s:
+        s.add(PceEvent(pce_href="/orgs/1/events/a", pce_event_id="a",
+                       timestamp=now, event_type="x", severity="info",
+                       status="success", pce_fqdn="pce.example.com",
+                       raw_json="{}", ingested_at=now))
+        s.commit()
+    engine.dispose()
+
+
+def _count_events(db_path):
+    from sqlalchemy import create_engine, func, select
+    from sqlalchemy.orm import sessionmaker
+
+    from src.pce_cache.models import Base, PceEvent
+
+    engine = create_engine(f"sqlite:///{db_path}")
+    Base.metadata.create_all(engine)
+    sf = sessionmaker(bind=engine)
+    with sf() as s:
+        n = s.execute(select(func.count()).select_from(PceEvent)).scalar_one()
+    engine.dispose()
+    return n
+
+
+def test_flush_choice_empties_the_seeded_cache(tmp_path, monkeypatch):
+    client, csrf, cache_db = _flush_test_app(tmp_path, monkeypatch)
+    _seed_one_event(cache_db)
+    assert _count_events(cache_db) == 1
+
+    res = _save(client, csrf, {"url": "https://other-pce.example.com:8443"}, choice="flush")
+    assert res.status_code == 200
+    assert res.get_json()["ok"] is True
+    assert _count_events(cache_db) == 0
+
+
+def test_a_save_rejected_by_later_validation_leaves_a_flush_cache_intact(tmp_path, monkeypatch):
+    """Pins the ordering fix: verify_ssl=False stays rejected (profile is
+    still 'production') by ApiSettings.model_validate — a check that runs
+    AFTER the pce_target_change guard accepts choice="flush". If the flush
+    ran inside that guard (as it originally did) this 400 would still have
+    wiped the cache of the PCE the appliance remains pointed at."""
+    client, csrf, cache_db = _flush_test_app(tmp_path, monkeypatch)
+    _seed_one_event(cache_db)
+    assert _count_events(cache_db) == 1
+
+    res = _save(client, csrf,
+                {"url": "https://other-pce.example.com:8443", "verify_ssl": False},
+                choice="flush")
+    assert res.status_code == 400
+    assert res.get_json()["ok"] is False
+    assert _count_events(cache_db) == 1, "a rejected save must not flush the cache"

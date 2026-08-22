@@ -44,3 +44,17 @@ def test_config_manager_loads_legacy_attack_surface(tmp_path):
     assert cm.models.report.schedule == "daily"
     # The deprecated key was dropped from the loaded config.
     assert "attack_surface" not in cm.config.get("report", {})
+
+
+def test_strip_removes_pce_profile_keys_in_place():
+    """設備曾支援多組 PCE profile；欄位已移除，舊 config.json 仍須能載入。"""
+    merged = {
+        "api": {"url": "https://pce.example.com:8443"},
+        "pce_profiles": [{"id": 1, "name": "lab", "url": "https://a:8443"}],
+        "active_pce_id": 1,
+    }
+    dropped = _strip_deprecated_keys(merged)
+    assert sorted(dropped) == ["active_pce_id", "pce_profiles"]
+    assert "pce_profiles" not in merged
+    assert "active_pce_id" not in merged
+    assert merged["api"]["url"] == "https://pce.example.com:8443"

@@ -291,11 +291,11 @@ def test_user_menu_closes_on_an_outside_click(v2_page):
 def test_system_subroutes_switch(v2_page):
     page, base_url = v2_page
     _boot(page, base_url, "#/system/pce")
-    assert page.locator('[data-cov="SY-01"]').count() >= 1
+    assert page.locator('[data-cov="SY-18"]').count() >= 1
 
     page.evaluate("location.hash = '#/system/security'")
     page.wait_for_selector('[data-cov="SY-12"]')
-    assert page.locator('[data-cov="SY-01"]').count() == 0
+    assert page.locator('[data-cov="SY-18"]').count() == 0
     assert "#/system/security" in page.url
 
 

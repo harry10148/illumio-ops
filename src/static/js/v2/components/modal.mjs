@@ -24,10 +24,14 @@ import { audit } from "../core/audit.mjs";
 const open_ = new Set();
 
 /**
- * modal.confirm({title, impact, onOk}) -> handle
+ * modal.confirm({title, impact, onOk, alt}) -> handle
  *   title  — string
  *   impact — string[]: one line per consequence ("18 台 workload 進入隔離")
  *   onOk   — optional async () => void|false; false keeps the modal open
+ *   alt    — optional {label, onAlt}: a third choice, rendered as a button
+ *            between cancel and OK; onAlt behaves like onOk (async, false
+ *            keeps the modal open). Omitted whenever the decision is a plain
+ *            two-way confirm — the footer is then unchanged from today.
  * handle: {el, close(), destroy(), onClose(fn)}
  */
 function confirm(opts) {
@@ -74,9 +78,27 @@ function confirm(opts) {
   box.appendChild(el("div", { class: "modal-b" },
     el("ul", { class: "impact" }, impact.map(function (line) { return el("li", { text: line }); }))
   ));
+  /* Optional third choice, built before the footer so it can be dropped into
+   * the same call. Omitted by every existing caller, and absent from the DOM
+   * when omitted — a confirm stays two buttons unless the decision genuinely
+   * has a third answer. */
+  const alt = o.alt && o.alt.label
+    ? el("button", { class: "btn", type: "button", text: o.alt.label })
+    : null;
+  if (alt) {
+    alt.addEventListener("click", async function () {
+      alt.disabled = true;
+      try {
+        const r = o.alt.onAlt ? await o.alt.onAlt() : undefined;
+        if (r !== false) close();
+      } finally { alt.disabled = false; }
+    });
+  }
+
   box.appendChild(el("footer", { class: "modal-f" },
     spacer(),
     el("button", { class: "btn ghost", type: "button", text: t("gui_cancel"), onClick: close }),
+    alt,
     ok
   ));
 

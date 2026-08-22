@@ -3,12 +3,13 @@ from __future__ import annotations
 import os
 
 from src import __version__
-from src.config import ConfigManager
+from src.config import ConfigManager, resolve_state_file
 from src.i18n import t
 from src.utils import Colors, safe_input, draw_panel
 from src.cli.menus._helpers import _menu_hints, _wizard_step
 from src.cli.menus.alert import alert_settings_menu
 from src.cli.menus.web_gui import web_gui_security_menu
+from src.pce_target import normalize_org_id, normalize_pce_url, pce_target_changed
 
 
 def settings_menu(cm: ConfigManager) -> None:
@@ -70,28 +71,76 @@ def settings_menu(cm: ConfigManager) -> None:
         if sel is None:
             break
         if sel == 1:
-            new_url = safe_input(
-                t("lbl_api_url"), str, allow_cancel=True, hint=cm.config["api"]["url"]
+            # Collect into locals first, don't touch cm.config yet: if the
+            # target-change question below gets cancelled, the whole edit
+            # must be abandoned rather than half-saved.
+            old_api = dict(cm.config["api"])
+            new_url_raw = safe_input(
+                t("lbl_api_url"), str, allow_cancel=True, hint=old_api["url"]
             )
-            if new_url:
-                cm.config["api"]["url"] = new_url.strip('"').strip("'")
-
-            cm.config["api"]["org_id"] = (
-                safe_input(
-                    t("lbl_org_id"), str, allow_cancel=True, hint=cm.config["api"]["org_id"]
-                )
-                or cm.config["api"]["org_id"]
+            # Normalized before it is compared or stored, same as the other
+            # two paths (src/pce_target.py) — otherwise a retyped trailing
+            # slash reads as a different PCE and offers to destroy a cache
+            # that was fine.
+            new_url = normalize_pce_url(
+                new_url_raw.strip('"').strip("'") if new_url_raw else old_api["url"])
+            new_org_id = normalize_org_id(
+                safe_input(t("lbl_org_id"), str, allow_cancel=True, hint=old_api["org_id"])
+                or old_api["org_id"]
             )
-            cm.config["api"]["key"] = (
+            new_key = (
                 safe_input(t("lbl_api_key"), str, allow_cancel=True, hint=masked_key)
-                or cm.config["api"]["key"]
+                or old_api["key"]
             )
             new_sec = safe_input(t("lbl_api_secret"), str, allow_cancel=True, hint="******", hidden=True)
-            if new_sec:
-                cm.config["api"]["secret"] = new_sec
-            # Sync changes back to active PCE profile (if any)
-            cm.sync_api_to_active_profile()
-            cm.save()
+            new_secret = new_sec if new_sec else old_api["secret"]
+
+            # Changing which PCE this appliance talks to is not an edit — the
+            # cache, the ingestion positions, the archive files and the alert
+            # cooldowns all carry the previous PCE's data with no marker
+            # saying so. There's an operator watching this menu, so ask now
+            # rather than defaulting to either behaviour.
+            do_flush = False
+            cancelled = False
+            if pce_target_changed(old_api, new_url, new_org_id):
+                choice = safe_input(t("cli_pce_target_change_prompt_menu"), int, range(1, 3))
+                if choice is None:
+                    cancelled = True
+                else:
+                    do_flush = choice == 1
+
+            if not cancelled:
+                saved = True
+                if do_flush:
+                    # Before cm.save(), the same order the other two paths use:
+                    # past the save the stored connection names the new PCE, so
+                    # the guard never fires for this edit again and the old
+                    # PCE's cache would stay for good. A clear that fails here
+                    # costs a re-run, whose clear is idempotent.
+                    from src.pce_cache.flush import flush_pce_derived_state
+                    try:
+                        flush_pce_derived_state(cm.models.pce_cache.db_path,
+                                                resolve_state_file())
+                    except Exception as exc:
+                        saved = False
+                        print(f"{Colors.FAIL}"
+                              f"{t('cli_pce_flush_failed_menu', error=str(exc)[:200])}"
+                              f"{Colors.ENDC}")
+                        safe_input(t("press_enter_to_continue"), str, allow_cancel=True)
+                if saved:
+                    cm.config["api"]["url"] = new_url
+                    cm.config["api"]["org_id"] = new_org_id
+                    cm.config["api"]["key"] = new_key
+                    cm.config["api"]["secret"] = new_secret
+                    cm.save()
+                    if pce_target_changed(old_api, new_url, new_org_id):
+                        # A running monitor service holds its own
+                        # ConfigManager for the life of the process and never
+                        # reloads it, so it keeps polling the previous PCE and
+                        # refilling what was just cleared.
+                        print(f"{Colors.WARNING}"
+                              f"{t('cli_pce_restart_required_menu')}{Colors.ENDC}")
+                        safe_input(t("press_enter_to_continue"), str, allow_cancel=True)
         elif sel == 2:
             alert_settings_menu(cm)
         elif sel == 3:
@@ -102,7 +151,6 @@ def settings_menu(cm: ConfigManager) -> None:
             choice = safe_input(t("change_verify_to"), int, range(1, 3))
             if choice:
                 cm.config["api"]["verify_ssl"] = choice == 1
-                cm.sync_api_to_active_profile()
                 cm.save()
         elif sel == 4:
             c = cm.config.get("smtp", {})

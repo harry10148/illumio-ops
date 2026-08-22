@@ -1,16 +1,4 @@
 {
-    "pce_profiles": [
-        {
-            "id": 1000000000000,
-            "name": "Production PCE",
-            "url": "https://pce.example.com:8443",
-            "org_id": "1",
-            "key": "api_xxxxxxxxxxxxxx",
-            "secret": "your-api-secret-here",
-            "verify_ssl": true
-        }
-    ],
-    "active_pce_id": 1000000000000,
     "api": {
         "url": "https://pce.example.com:8443",
         "org_id": "1",

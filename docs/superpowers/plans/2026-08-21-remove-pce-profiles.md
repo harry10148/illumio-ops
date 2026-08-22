@@ -93,7 +93,9 @@ git commit -m "chore(config): retire the pce_profiles keys ahead of removing the
 ### Task 2: 移除 ConfigManager 的 profile CRUD 與 schema 欄位
 
 **Files:**
-- Modify: `src/config.py`（`DEFAULT_CONFIG` 的 `"pce_profiles"` / `"active_pce_id"` 兩行；`get_pce_profiles` / `get_active_pce_id` / `add_pce_profile` / `update_pce_profile` / `remove_pce_profile` / `activate_pce_profile` 六個方法）
+- Modify: `src/config.py`（`DEFAULT_CONFIG` 的 `"pce_profiles"` / `"active_pce_id"` 兩行；`get_pce_profiles` / `get_active_pce_id` / `add_pce_profile` / `update_pce_profile` / `remove_pce_profile` / `activate_pce_profile` / **`sync_api_to_active_profile`** 七個方法）
+- Modify: `src/gui/routes/config.py`（`cm.sync_api_to_active_profile()` 呼叫，約 line 272）
+- Modify: `src/cli/menus/_root.py`（兩處 `cm.sync_api_to_active_profile()` 呼叫與其上方註解，約 line 92-93 與 105）
 - Modify: `src/config_models.py`（`class PceProfile`；`ConfigSchema` 的 `pce_profiles` 與 `active_pce_id` 兩個欄位）
 - Test: `tests/test_config_models.py`
 
@@ -115,8 +117,11 @@ def test_config_schema_has_no_pce_profile_fields():
 
 
 def test_config_manager_has_no_profile_methods():
+    """`sync_api_to_active_profile` 也要被抓到——它的名字裡沒有 `pce_profile`，
+    第一版盤點就是這樣把它整個漏掉的。"""
     from src.config import ConfigManager
-    leftovers = [n for n in dir(ConfigManager) if "pce_profile" in n]
+    leftovers = [n for n in dir(ConfigManager)
+                 if "pce_profile" in n or "active_profile" in n]
     assert leftovers == [], f"still present: {leftovers}"
 ```
 
@@ -134,7 +139,15 @@ Expected: FAIL 兩條
     active_pce_id: Optional[int] = None
 ```
 
-2. `src/config.py`：從 `DEFAULT_CONFIG` 刪掉 `"pce_profiles": [],` 與 `"active_pce_id": None,` 兩行；刪除 `get_pce_profiles` / `get_active_pce_id` / `add_pce_profile` / `update_pce_profile` / `remove_pce_profile` / `activate_pce_profile` 六個方法（約 line 631-698，整段連同其間的註解）。
+2. `src/config.py`：從 `DEFAULT_CONFIG` 刪掉 `"pce_profiles": [],` 與 `"active_pce_id": None,` 兩行；刪除 `get_pce_profiles` / `get_active_pce_id` / `add_pce_profile` / `update_pce_profile` / `remove_pce_profile` / `activate_pce_profile` 六個方法（整段連同其間的註解）。
+
+2b. **第七個方法：`sync_api_to_active_profile()`（約 line 709-720）也要刪，連同它的三個呼叫端。**（orchestrator 預檢補入：初稿的盤點用 `grep "def .*pce_profile"`，這個方法名裡沒有 `pce_profile` 所以整個漏掉。）它把 `config.api` 的值抄回作用中的 profile——沒有 profile 之後就沒有抄的對象。三個呼叫端都是「改完 `config.api` 之後、`cm.save()` 之前」呼叫它，刪掉呼叫即可，周圍的邏輯完全不動：
+
+   - `src/gui/routes/config.py` 約 line 272：刪掉 `cm.sync_api_to_active_profile()` 一行。
+   - `src/cli/menus/_root.py` 約 line 92-93：刪掉 `# Sync changes back to active PCE profile (if any)` 註解與其下的呼叫，兩行一起。
+   - `src/cli/menus/_root.py` 約 line 105：刪掉 `cm.sync_api_to_active_profile()` 一行。
+
+   刪完用 `grep -rn "sync_api_to_active_profile" src/ tests/` 確認為空。
 
 3. 若 `import time` 只被 `add_pce_profile` 用到，一併移除；用 `grep -n "time\." src/config.py` 確認後再動。既有的 dead code 不要順手清。
 
@@ -151,6 +164,10 @@ git commit -m "refactor(config): drop the PCE profile store and its CRUD"
 ```
 
 ---
+
+> **執行順序裁決（orchestrator，預檢）**：本任務在 Task 2 **之前**執行。Task 2 移除
+> `ConfigManager` 的 profile 方法，而本任務的 `api_get_settings` 仍在呼叫它們——先做 2
+> 會留下一段 `AttributeError` 的破碎狀態。先移除呼叫端再移除方法就沒有這個窗口。
 
 ### Task 3: 移除 REST 端點與設定回應中的 profile 欄位
 
@@ -241,7 +258,7 @@ git commit -m "refactor(gui): remove the PCE profile endpoints and payload field
 - Modify: `src/static/js/v2/core/store-map.mjs`（`pce_profiles: "/api/pce-profiles",`，約 line 125）
 - Modify: `src/i18n_zh_TW.json`、`src/i18n_en.json`、`src/i18n/data/zh_explicit.json`
 - Modify: `docs/guide/gui-tour.md`、`docs/guide/configuration.md`、`docs/reference/rest-api.md`
-- Test: `tests/test_v2_system_e2e.py`
+- Test: `tests/test_v2_system_e2e.py`、`tests/test_v2_shell_flows_e2e.py`、`tests/test_v2_coverage_live.py`
 
 **Interfaces:**
 - Consumes: Task 3 移除後的端點
@@ -320,10 +337,25 @@ for p in ("src/i18n_zh_TW.json", "src/i18n_en.json", "src/i18n/data/zh_explicit.
 
 8. 文件：`docs/guide/gui-tour.md` 的 PCE profile 段落、`docs/guide/configuration.md` 的 `pce_profiles` 設定說明、`docs/reference/rest-api.md` 的 `/api/pce-profiles` 兩個端點條目全部刪除。用 `grep -n "pce.profile\|pce-profiles" docs/guide/*.md docs/reference/*.md` 逐處定位。`docs/superpowers/` 底下的舊計畫與 spec **不要改**——那是歷史紀錄。
 
+9. **覆蓋率錨點 SY-01 必須一起退場**（orchestrator 預檢補入，計畫初稿漏了這一段）。
+   `tests/test_v2_coverage_live.py` 斷言 `covered == total == 102`、且 app 不得渲染
+   `coverage.yaml` 沒列的錨點、也不得少列。移除 SY-01 面板會同時打破這三條。要動的是：
+
+   - `design/v2/coverage.yaml`：刪除 `SY-01: {item: PCE profiles CRUD/切換, route: "#/system/pce"}` 一行。
+   - `tests/test_v2_coverage_live.py`：`102` 出現在**三個地方**——檔案 docstring 第 1 行、`:81` 的 `assert gate_result["covered"] == gate_result["total"] == 102`、`:88` 的註解——全部改成 `101`。（`design/v2/coverage.yaml` 目前正好 102 個錨點，刪一個後是 101。）
+   - `tests/test_v2_shell_flows_e2e.py`（orchestrator 二次盤點補入，brief 初稿沒列這個檔）：`test_system_subroutes_switch` 用 `SY-01` 當「`#/system/pce` 這個區確實掛上了／離開後確實卸載」的標記，`:294` 是 `count() >= 1`、`:298` 是 `count() == 0`。兩處都改成 `SY-18`（該路由移除 SY-01 後唯一剩下的錨點），語意不變。
+   - `tests/test_v2_system_e2e.py`：
+     - `test_pce_coverage_and_i18n`：`_goto(page, base_url, R_PCE, "SY-01")` 的錨點參數改為 `"SY-18"`；`assert {"SY-01", "SY-18"} - _covs(page) == set()` 改為 `assert {"SY-18"} - _covs(page) == set()`。
+     - 整個 `test_pce_profile_crud_add_then_delete` 刪除。
+     - 「PCE activate」那段守衛（建立 throwaway profile → 開 confirm → 按取消）整段刪除，含其 `_api_post("/api/pce-profiles", …)` 呼叫與清理程式碼。刪除後檢查外層測試函式是否還有其他區段；若只剩這一段，連函式一起刪。
+     - 其餘所有 `_goto(page, base_url, R_PCE, "SY-01")` 與 `page.wait_for_selector('[data-cov="SY-01"]')` 改成 `"SY-18"` / `'[data-cov="SY-18"]'`。最後 `grep -n 'SY-01' tests/test_v2_system_e2e.py` 必須為空。
+
+   `#/system/pce` 移除後只剩 SY-18 一個錨點，`test_every_route_contributed_something`（該路由至少貢獻一個錨點）仍會通過。
+
 - [ ] **Step 4: 測試與閘門通過**
 
 ```bash
-timeout 900 ./venv/bin/python -m pytest tests/test_v2_system_e2e.py -q
+timeout 1800 ./venv/bin/python -m pytest tests/test_v2_system_e2e.py tests/test_v2_coverage_live.py -q
 timeout 300 ./venv/bin/python scripts/audit_i18n_usage.py
 timeout 300 ./venv/bin/python -m pytest tests/test_i18n_no_reviewer_copy.py tests/test_i18n_zh_explicit_sync.py -q
 ```
@@ -343,7 +375,7 @@ git commit -m "refactor(gui-v2): remove the PCE profile page, its keys and its d
 **Files:**
 - Modify: `src/gui/routes/config.py`（`api_save_settings`，`if 'api' in d:` 區塊內，url scheme 驗證之後、`for k in api_allowlist` 之前）
 - Modify: `src/i18n_zh_TW.json`、`src/i18n_en.json`、`src/i18n/data/zh_explicit.json`
-- Test: `tests/test_pce_target_change.py`（新建）
+- Test: `tests/test_api_settings.py`（**加在既有檔案末尾，不要新建檔案**——見下方說明）
 
 **Interfaces:**
 - Consumes: Task 3 之後的 `api_save_settings`
@@ -351,22 +383,16 @@ git commit -m "refactor(gui-v2): remove the PCE profile page, its keys and its d
 
 - [ ] **Step 1: 寫失敗測試**
 
-新建 `tests/test_pce_target_change.py`：
+**測試加在 `tests/test_api_settings.py` 的末尾，不要新建測試檔。** 原因（orchestrator 預檢查證）：`authed_client` 是 `tests/test_api_settings.py:66` 的**檔案內** fixture，它依賴同檔 `:61` 的 `client` 與 `:40` 附近的 `app`——`tests/conftest.py:192` 的同名 `client` 是不同的東西（走 `app_persistent`）。新建檔案會拿不到這條 fixture 鏈，或拿到錯的那條。這些測試的主題本來就是 `POST /api/settings` 的行為，放在這個檔案是對的位置。
+
+在 `tests/test_api_settings.py` 末尾加入（`import pytest`、`_csrf` 該檔已有，不要重複 import）：
 
 ```python
-"""改動 PCE 連線目標必須是一個明示的決定。
-
-這台設備的快取、擷取位置、封存與排程都沒有 PCE 維度（見
-docs/superpowers/specs/2026-08-21-pce-profile-isolation-assessment.md）。把
-api.url 或 api.org_id 指向另一台 PCE 而不處理既有資料，兩台的資料會靜默混合，
-而且沒有任何徵兆。所以這裡不猜、也不自動清——直接擋下來要求操作者選。
-"""
-from __future__ import annotations
-
-import pytest
-
-from tests._helpers import _csrf  # noqa: F401  (fixture 由 conftest 提供)
-
+# ── PCE 連線目標變更必須是明示的決定 ──────────────────────────────────────────
+# 這台設備的快取、擷取位置、封存與排程都沒有 PCE 維度（見
+# docs/superpowers/specs/2026-08-21-pce-profile-isolation-assessment.md）。把
+# api.url 或 api.org_id 指向另一台 PCE 而不處理既有資料，兩台的資料會靜默混合，
+# 而且沒有任何徵兆。所以這裡不猜、也不自動清——直接擋下來要求操作者選。
 
 def _save(client, csrf, api_block, choice=None):
     body = {"api": api_block}
@@ -420,7 +446,7 @@ def test_unknown_choice_is_rejected(authed_client):
 
 - [ ] **Step 2: 跑測試確認失敗**
 
-Run: `timeout 600 ./venv/bin/python -m pytest tests/test_pce_target_change.py -q`
+Run: `timeout 600 ./venv/bin/python -m pytest tests/test_api_settings.py -q -k "choice or target_change"`（orchestrator 已用 `--collect-only` 驗證此 filter 恰好選中五條新測試）
 Expected: 除 `test_rotating_credentials_is_not_a_target_change` 外全部 FAIL（目前一律 200）
 
 - [ ] **Step 3: 實作**
@@ -462,7 +488,7 @@ Expected: 除 `test_rotating_credentials_is_not_a_target_change` 外全部 FAIL�
 
 - [ ] **Step 4: 測試通過**
 
-Run: `timeout 900 ./venv/bin/python -m pytest tests/test_pce_target_change.py tests/test_api_settings.py -q`
+Run: `timeout 900 ./venv/bin/python -m pytest tests/test_api_settings.py -q`
 Expected: PASS（`flush` 此時只是被接受，尚未真的清——Task 6 補）
 
 - [ ] **Step 5: Commit**
@@ -494,6 +520,7 @@ git commit -m "feat(gui): refuse a silent PCE re-point, ask what happens to the 
 from __future__ import annotations
 
 import json
+from datetime import datetime, timezone
 
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import sessionmaker
@@ -505,14 +532,21 @@ from src.pce_cache.flush import flush_pce_derived_state
 
 
 def _seed(db_path):
+    """欄位取自 src/pce_cache/models.py：PceEvent 與 SiemDispatch 幾乎全欄位
+    NOT NULL，少一個就是 IntegrityError 而不是測試失敗。"""
+    now = datetime(2026, 1, 1, tzinfo=timezone.utc)
     engine = create_engine(f"sqlite:///{db_path}")
     Base.metadata.create_all(engine)
     sf = sessionmaker(bind=engine)
     with sf() as s:
-        s.add(PceEvent(pce_href="/orgs/1/events/a", event_type="x",
-                       timestamp_utc=__import__("datetime").datetime(2026, 1, 1)))
+        s.add(PceEvent(pce_href="/orgs/1/events/a", pce_event_id="a",
+                       timestamp=now, event_type="x", severity="info",
+                       status="success", pce_fqdn="pce.example.com",
+                       raw_json="{}", ingested_at=now))
         s.add(IngestionWatermark(source="events", last_href="/orgs/1/events/a"))
-        s.add(SiemDispatch(source_table="pce_events", source_id=1, dest="splunk"))
+        s.add(SiemDispatch(source_table="pce_events", source_id=1,
+                           destination="splunk", status="pending",
+                           queued_at=now))
         s.commit()
     return engine, sf
 
@@ -525,6 +559,9 @@ def test_flush_empties_every_table_including_watermarks(tmp_path):
         "event_watermark": "2026-01-01T00:00:00Z",
         "alert_history": {"r1": "2026-01-01T00:00:00Z"},
         "event_seen": ["a"],
+        "event_parser_stats": {"n": 1},
+        "posture_summary": {"x": 1},
+        "rule_schedule_states": {"s1": "keep"},
         "settings_backup": {"keep": "me"},
     }), encoding="utf-8")
 
@@ -538,9 +575,11 @@ def test_flush_empties_every_table_including_watermarks(tmp_path):
     assert counts["ingestion_watermarks"] == 1
 
     left = json.loads(state.read_text(encoding="utf-8"))
-    assert "event_watermark" not in left
-    assert "alert_history" not in left
-    assert "event_seen" not in left
+    for gone in ("event_watermark", "alert_history", "event_seen",
+                 "event_parser_stats", "posture_summary"):
+        assert gone not in left, gone
+    # 排程是操作者自己建的，不隨 PCE 的資料一起清掉。
+    assert left["rule_schedule_states"] == {"s1": "keep"}
     assert left["settings_backup"] == {"keep": "me"}, "非 PCE 衍生的鍵不可被動到"
 
 
@@ -591,11 +630,18 @@ _MODELS = (
 
 # The state.json keys that describe one PCE's history. Everything else in that
 # file (schedules, GUI state, backups) survives.
-_STATE_KEYS = (
-    "event_watermark", "alert_history", "event_seen", "history",
-    "event_timeline", "pce_stats", "posture_summary", "parser_stats",
-    "throttle_state", "overflow_state", "basis_mismatch",
-)
+#
+# The analyzer already owns an authoritative list of the keys it writes, so
+# take it from there rather than restating it — a restated copy drifts, and a
+# key this misses is a key the next PCE inherits.
+from src.analyzer import _ANALYZER_OWNED_STATE_KEYS
+
+# Written by other subsystems but derived from the same PCE all the same.
+# Deliberately NOT here: rule_schedule_states / report_schedule_states, which
+# belong to schedules the operator authored, not to the PCE's data.
+_EXTRA_PCE_DERIVED = ("event_timeline", "pce_stats", "posture_summary")
+
+_STATE_KEYS = tuple(_ANALYZER_OWNED_STATE_KEYS) + _EXTRA_PCE_DERIVED
 
 
 def flush_pce_derived_state(db_path: str, state_path: str) -> dict[str, int]:
@@ -647,7 +693,7 @@ def flush_pce_derived_state(db_path: str, state_path: str) -> dict[str, int]:
 
 - [ ] **Step 4: 測試通過**
 
-Run: `timeout 900 ./venv/bin/python -m pytest tests/test_pce_flush.py tests/test_pce_target_change.py -q`
+Run: `timeout 900 ./venv/bin/python -m pytest tests/test_pce_flush.py tests/test_api_settings.py -q`
 Expected: PASS
 
 - [ ] **Step 5: Commit**
@@ -664,7 +710,7 @@ git commit -m "feat(pce-cache): clear every PCE-derived row when the target chan
 **Files:**
 - Modify: `src/static/js/v2/areas/system.mjs`（PCE 連線表單的 `form.afterSave` / 儲存流程）
 - Modify: `src/i18n_zh_TW.json`、`src/i18n_en.json`、`src/i18n/data/zh_explicit.json`
-- Test: `tests/test_v2_system_e2e.py`
+- Test: `tests/test_v2_system_e2e.py`、`tests/test_v2_shell_flows_e2e.py`、`tests/test_v2_coverage_live.py`
 
 **Interfaces:**
 - Consumes: Task 5 的 409 回應形狀 `{ok:false, pce_target_changed:true, old:{url,org_id}, new:{url,org_id}, error}`
@@ -677,14 +723,31 @@ git commit -m "feat(pce-cache): clear every PCE-derived row when the target chan
 ```python
 def test_pce_target_change_asks_before_saving(v2_page):
     """改掉 URL 後按儲存，必須先跳出選擇，而不是直接存下去。"""
-    v2_page.goto_route("#/system/pce")
-    v2_page.fill_field("url", "https://another-pce.example.com:8443")
-    v2_page.click_save()
-    modal = v2_page.wait_for_modal()
-    assert "another-pce.example.com" in modal.inner_text()
+    page, base_url = v2_page
+    _goto(page, base_url, R_PCE, "SY-18")
+
+    url = page.locator('.board input[data-field="url"]')
+    url.fill("https://another-pce.example.com:8443")
+    assert url.input_value() == "https://another-pce.example.com:8443"
+
+    page.get_by_role("button", name=_labels(page)["gui_save"], exact=True).first.click()
+
+    modal = page.locator(".modal").first
+    modal.wait_for(state="visible")
+    text = modal.inner_text()
+    assert "another-pce.example.com" in text, text
+    assert "pce.example.com:8443" in text, text
+
+    # 取消不得留下任何已儲存的痕跡：關掉後表單仍是改過但未存的狀態。
+    modal.get_by_role("button", name=_labels(page)["gui_cancel"], exact=True).click()
+    assert page.locator(".modal").count() == 0
 ```
 
-> 這三個 helper（`goto_route` / `fill_field` / `click_save` / `wait_for_modal`）以 `tests/v2_e2e_utils.py` 當下提供的為準——**實作前先讀該檔**，照抄鄰近測試的寫法，不要沿用本計畫的假想名稱。
+> 以下四點 orchestrator 已在原始碼查證，照抄即可，**不要再自行探索**：
+> `v2_page` fixture 產出的是 tuple `(page, base_url)`（`tests/v2_e2e_utils.py:290`），不是帶方法的物件；
+> 導航用 `_goto(page, base_url, route, cov)`（`tests/test_v2_system_e2e.py:125`）；
+> 按鈕名稱查表用 `_labels(page)`（`:150`），**`gui_save` 已在該表的 keys 清單裡**，新的按鈕文案若要在測試裡點，必須把鍵加進那份清單；
+> 表單欄位定位用 `page.locator('.board input[data-field="url"]')`（既有測試 `:805` 就是這樣抓 key/secret 的）。
 
 - [ ] **Step 2: 跑測試確認失敗**
 
@@ -693,29 +756,116 @@ Expected: FAIL（沒有 modal）
 
 - [ ] **Step 3: 實作**
 
-在 PCE 連線表單的儲存回呼裡，攔截 `pce_target_changed` 並改成兩段式：
+> 以下三個介面 orchestrator 已查證，照抄即可，不必再自行探索：
+> `modal.confirm({title, impact, onOk})` 只有確定／取消兩顆按鈕（`components/modal.mjs`）；
+> `confirmSpec(title, impact, onOk)` 是每個 area 各自複製的三參數小工具（`system.mjs:351`）；
+> `makeForm()` 回傳的 `fapi.save()` 在 `res.ok !== true` 時只會 `toast.crit` 後回 false（`system.mjs` 約 690-706）。
+
+**(a) `components/modal.mjs`：`confirm()` 增加選用的次要動作。** 這個決定是三向的（清除／同一台／取消），兩顆按鈕表達不了；`alt` 未給時行為與現在完全相同，既有呼叫端不受影響。
+
+`confirm()` 沒有 `foot` 或 `okBtn` 這種區域變數（orchestrator 已讀過 `src/static/js/v2/components/modal.mjs:55-81` 查證）：OK 鈕是 `const ok`（`:59`），footer 是在 `box.appendChild(el("footer", …))` 的呼叫裡就地建構（`:77-81`），子節點依序是 `spacer()`、cancel 鈕、`ok`。所以次要動作要插進那個就地建構的參數串裡，位置在 cancel 與 `ok` 之間。
+
+把 footer 那段改成：
 
 ```javascript
-  /* A 409 with pce_target_changed is not a failure — it is the appliance
-   * refusing to guess. Ask, then re-send the same body with the answer. */
-  form.onRefused = function (res, body) {
-    if (!res || res.pce_target_changed !== true) return false;
-    return modal.confirm(confirmSpec(t("gui_sy_pce_target_title"), [
-      tf("gui_sy_pce_target_from", { url: res.old.url, org: res.old.org_id }),
-      tf("gui_sy_pce_target_to", { url: res.new.url, org: res.new.org_id }),
-      t("gui_sy_pce_target_flush_body"),
-    ], function () {
-      return form.saveWith(Object.assign({}, body, { pce_target_change: "flush" }));
-    }, {
-      altLabel: t("gui_sy_pce_target_same"),
-      onAlt: function () {
-        return form.saveWith(Object.assign({}, body, { pce_target_change: "same-pce" }));
-      },
-    }));
-  };
+  /* Optional third choice, built before the footer so it can be dropped into
+   * the same call. Omitted by every existing caller, and absent from the DOM
+   * when omitted — a confirm stays two buttons unless the decision genuinely
+   * has a third answer. */
+  const alt = o.alt && o.alt.label
+    ? el("button", { class: "btn", type: "button", text: o.alt.label })
+    : null;
+  if (alt) {
+    alt.addEventListener("click", async function () {
+      alt.disabled = true;
+      try {
+        const r = o.alt.onAlt ? await o.alt.onAlt() : undefined;
+        if (r !== false) close();
+      } finally { alt.disabled = false; }
+    });
+  }
+
+  box.appendChild(el("footer", { class: "modal-f" },
+    spacer(),
+    el("button", { class: "btn ghost", type: "button", text: t("gui_cancel"), onClick: close }),
+    alt,
+    ok
+  ));
 ```
 
-> `form.onRefused` / `form.saveWith` / `confirmSpec` 的第四個參數是否存在，**實作前先讀 `makeForm()`（`system.mjs`）與 `confirmSpec()`（`components/modal.mjs`）**。若 `confirmSpec` 不支援次要動作，就改成兩個獨立的 `modal.confirm`：先問「是不是同一台 PCE 換了位址？」是→`same-pce`，否→再問一次確認清除→`flush`。不要為此擴充 modal 元件。
+> `el()` 忽略 null 子節點——orchestrator 已查證（`src/static/js/v2/core/dom.mjs:12,58`：`children: … | null (nullish skipped)`），所以 `alt` 為 null 時 footer 就是原本的兩顆按鈕，DOM 完全不變。
+
+同時更新 `confirm()` 上方的 JSDoc，把 `alt` 列進去。
+
+**(b) `system.mjs` 的 `confirmSpec()` 加第四個選用參數**：
+
+```javascript
+function confirmSpec(title, impact, onOk, alt) {
+  return { title: title, impact: impact, onOk: onOk, alt: alt };
+}
+```
+
+> 只改 `system.mjs` 這一份。其他 area 的同名複本不在本任務範圍，不要順手改。
+
+**(c) `makeForm()` 增加兩個掛勾**（`system.mjs`）：
+
+在 `fapi.save` 內，取得 `body` 之後、送出之前：
+
+```javascript
+    if (fapi.extraBody) { Object.assign(body, fapi.extraBody); fapi.extraBody = null; }
+```
+
+在同一個函式的失敗分支，把
+
+```javascript
+      if (!res || res.ok !== true) {
+        toast.crit(errorText(res));
+        return false;
+      }
+```
+
+改成
+
+```javascript
+      if (!res || res.ok !== true) {
+        /* A refusal the caller knows how to turn into a question is not an
+         * error to shout about — it asks, then re-sends the same body with
+         * the answer. Anything else still surfaces as a toast. */
+        if (fapi.onRefused) {
+          const handled = fapi.onRefused(res, body);
+          if (handled) return Promise.resolve(handled);
+        }
+        toast.crit(errorText(res));
+        return false;
+      }
+```
+
+**(d) PCE 連線表單掛上處理**（`system.mjs` 的 `mountPce`，`form.setBody(...)` 之後）：
+
+```javascript
+    /* 409 + pce_target_changed is the appliance refusing to guess what should
+     * happen to a previous PCE's cache. Ask, then re-send with the answer. */
+    form.onRefused = function (res) {
+      if (!res || res.pce_target_changed !== true) return false;
+      return new Promise(function (resolve) {
+        const m = modal.confirm(confirmSpec(t("gui_sy_pce_target_title"), [
+          tf("gui_sy_pce_target_from", { url: res.old.url, org: res.old.org_id }),
+          tf("gui_sy_pce_target_to", { url: res.new.url, org: res.new.org_id }),
+          t("gui_sy_pce_target_flush_body"),
+        ], function () {
+          form.extraBody = { pce_target_change: "flush" };
+          return form.save().then(resolve);
+        }, {
+          label: t("gui_sy_pce_target_same"),
+          onAlt: function () {
+            form.extraBody = { pce_target_change: "same-pce" };
+            return form.save().then(resolve);
+          },
+        }));
+        m.onClose(function () { resolve(false); });
+      });
+    };
+```
 
 新增 i18n 鍵（三份字典）：
 
@@ -746,6 +896,10 @@ git commit -m "feat(gui-v2): ask before re-pointing the appliance at another PCE
 ---
 
 ### Task 8: 全套測試、CHANGELOG 與真機驗證
+
+> **分工（orchestrator 補註）**：Step 1（全套測試）、Step 4（部署與真機驗證）由 orchestrator 自己執行——前者是本計畫 Global Constraints 既有的規定，後者會動到真實設備 `172.16.15.106` 的服務與設定檔，不派子代理。**Step 4 的第 5 項（在測試機上塞一份帶 `pce_profiles` 的舊 config 重啟）屬破壞性操作，執行前須取得使用者同意。** 可派工的只有 Step 2（CHANGELOG）與 Step 3（升級說明），兩者都在 `docs/`。
+>
+> `docs/guide/configuration.md` 的 `## api（PCE 連線）` 段（約 `:83`）是升級說明的正確位置——該檔已無任何 `pce_profiles` 殘留，升級說明是要補上「舊鍵會被丟棄、第二組以後的憑證不遷移」這件事。
 
 **Files:**
 - Modify: `CHANGELOG.md`
@@ -816,3 +970,91 @@ git commit -m "docs(changelog): record the PCE profile removal and the re-point 
 
 - archive 目錄、報表輸出與 KPI history、`dashboard_summary.json`、`async_query_jobs.json` 的跨 PCE 殘留——移除 profile 之後這些只會在「操作者手動改連線目標」時被觸及，且刪除不可逆，需另案決定保留政策。
 - 背景工作與連線變更的競態：目前沒有屏障阻止「清除當下正在跑的 ingest 把舊 PCE 的資料寫回去」。實務上視窗很短（清除是同步的、下一輪 ingest 才會重讀設定），但這是已知缺口，spec §2.2 有記錄。
+
+---
+
+### Task 9: 把改指向的守門延伸到 CLI（追加任務）
+
+> **為什麼追加**：Task 5-7 的守門只掛在 `POST /api/settings`。Task 8 的文件實作者查證後指出 CHANGELOG 只能寫成 GUI-only，orchestrator 查證屬實——CLI 有兩條路直接寫 `config["api"]["url"]` 後 `cm.save()`，完全繞過。走 CLI runbook 的操作者仍會踩到這整個計畫設法防止的靜默污染。使用者裁決：現在補。
+
+**Files:**
+- Create: `src/pce_target.py`
+- Modify: `src/cli/menus/_root.py`（設定選單第 1 項，約 line 73-92）
+- Modify: `src/cli/config.py`（`login_cmd`，約 line 226-280）
+- Test: `tests/test_pce_target_cli.py`（新建）
+
+**Interfaces:**
+- Consumes: `src/pce_cache/flush.py` 的 `flush_pce_derived_state(db_path, state_path)`（Task 6）
+- Produces: `pce_target_changed(old_api: dict, new_url: str | None, new_org_id: str | None) -> bool` — 供 GUI 與兩條 CLI 路徑共用的單一判準。
+
+- [ ] **Step 1: 寫失敗測試**
+
+新建 `tests/test_pce_target_cli.py`。要涵蓋三件事：判準函式本身（換 url 為真、換 org_id 為真、只換 key/secret 為假、值相同為假、`None` 表示未提供故為假）；`login_cmd` 在 `--no-interactive` 且目標改變、又未帶決定旗標時**必須非零退出且不得寫入設定**；以及帶了決定旗標時會走對應路徑。
+
+用 `click.testing.CliRunner` 驅動 `login_cmd`——照 `tests/` 既有測 click 指令的寫法，實作前先 `grep -rn "CliRunner" tests/` 找一個最近的範例照抄其 fixture 與 `ConfigManager` 隔離手法（**不要讓測試寫到真實的 `config/config.json`**）。
+
+- [ ] **Step 2: 跑測試確認失敗**
+
+Run: `timeout 600 ./venv/bin/python -m pytest tests/test_pce_target_cli.py -q`
+Expected: FAIL —`ModuleNotFoundError: src.pce_target`
+
+- [ ] **Step 3: 實作**
+
+新建 `src/pce_target.py`，把判準從 `src/gui/routes/config.py` 抽出來成為唯一定義：
+
+```python
+"""Is this edit re-pointing the appliance at a different PCE?
+
+The cache, the ingestion watermarks, the archive files and the alert cooldowns
+all carry one PCE's data with nothing marking them as such, so this question
+has to be asked wherever the connection can be edited — the GUI and both CLI
+paths. One definition, so the three cannot drift apart.
+
+Only url and org_id answer it. Rotating the key or the secret is still the
+same PCE.
+"""
+from __future__ import annotations
+
+
+def pce_target_changed(old_api: dict, new_url: str | None, new_org_id: str | None) -> bool:
+    """True when *new_url* or *new_org_id* names a different PCE than *old_api*.
+
+    A None means "not being changed", not "changed to empty".
+    """
+    if new_url is not None and str(new_url).strip() != str(old_api.get("url", "")).strip():
+        return True
+    if new_org_id is not None and str(new_org_id).strip() != str(old_api.get("org_id", "")).strip():
+        return True
+    return False
+```
+
+改 `src/gui/routes/config.py` 的 `_target_changed` 改為呼叫它，行為不變（既有測試就是這一步的守門）。
+
+**`src/cli/menus/_root.py`**（互動式，約 line 73-92）：收集完 url/org_id 之後、`cm.save()` 之前，若 `pce_target_changed(...)` 為真就**先問**。互動式選單有人在看著，所以在此處問，不要用旗標。照該檔既有的 `safe_input` 慣例提問，兩個選項：清除既有快取與歷史／同一台 PCE 只是換位址；選前者才呼叫 `flush_pce_derived_state`。取消（`safe_input` 回 `None`）就整筆放棄，不存檔。
+
+**`src/cli/config.py` 的 `login_cmd`**（約 line 226-280）：新增 `--pce-target-change` 選項，接受 `flush` 與 `same-pce`。
+- `--no-interactive` 且目標改變且未帶此選項 → 用該檔既有的 `echo_error(ctx, ...)` 慣例報錯並以非零狀態結束，**不得寫入設定**。自動化腳本必須明確表態，這正是這條路徑風險最高的原因。
+- 互動模式且未帶此選項 → 用 `click.confirm` 之類的既有慣例當場問，語意與互動選單一致。
+- `flush` → 在 `cm.save()` **之後**呼叫 `flush_pce_derived_state`（CLI 沒有 GUI 那種「後續驗證還會失敗」的問題，但仍以存檔成功為前提才清）。
+
+清除所需的兩個路徑：`cm.models.pce_cache.db_path` 與 `src/gui/_helpers.py` 的 `_resolve_state_file()`。**若 `_resolve_state_file` 從 CLI 匯入會拖進 Flask 相依，就把它搬到不依賴 Flask 的模組再由兩邊共用**——實作前先確認 import 鏈，並在報告說明你的處置。
+
+新增的 CLI 提示文案要進 i18n（三份字典），且不得帶端點、狀態碼或內部欄位名。
+
+- [ ] **Step 4: 測試通過**
+
+```bash
+timeout 600 ./venv/bin/python -m pytest tests/test_pce_target_cli.py tests/test_api_settings.py -q
+timeout 300 ./venv/bin/python -m pytest tests/test_i18n_no_reviewer_copy.py tests/test_i18n_zh_explicit_sync.py -q
+timeout 300 ./venv/bin/python scripts/audit_i18n_usage.py
+```
+Expected: 全綠；audit `Total: 0 finding(s)`
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add src/pce_target.py src/cli/menus/_root.py src/cli/config.py src/gui/routes/config.py tests/test_pce_target_cli.py src/i18n_zh_TW.json src/i18n_en.json src/i18n/data/zh_explicit.json
+git commit -m "feat(cli): ask before re-pointing the appliance from the command line"
+```
+
+> Task 8 的 CHANGELOG 與升級說明在本任務之後要回頭把「僅 GUI」的限縮拿掉——orchestrator 負責。
