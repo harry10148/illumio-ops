@@ -723,14 +723,31 @@ git commit -m "feat(pce-cache): clear every PCE-derived row when the target chan
 ```python
 def test_pce_target_change_asks_before_saving(v2_page):
     """改掉 URL 後按儲存，必須先跳出選擇，而不是直接存下去。"""
-    v2_page.goto_route("#/system/pce")
-    v2_page.fill_field("url", "https://another-pce.example.com:8443")
-    v2_page.click_save()
-    modal = v2_page.wait_for_modal()
-    assert "another-pce.example.com" in modal.inner_text()
+    page, base_url = v2_page
+    _goto(page, base_url, R_PCE, "SY-18")
+
+    url = page.locator('.board input[data-field="url"]')
+    url.fill("https://another-pce.example.com:8443")
+    assert url.input_value() == "https://another-pce.example.com:8443"
+
+    page.get_by_role("button", name=_labels(page)["gui_save"], exact=True).first.click()
+
+    modal = page.locator(".modal").first
+    modal.wait_for(state="visible")
+    text = modal.inner_text()
+    assert "another-pce.example.com" in text, text
+    assert "pce.example.com:8443" in text, text
+
+    # 取消不得留下任何已儲存的痕跡：關掉後表單仍是改過但未存的狀態。
+    modal.get_by_role("button", name=_labels(page)["gui_cancel"], exact=True).click()
+    assert page.locator(".modal").count() == 0
 ```
 
-> 這三個 helper（`goto_route` / `fill_field` / `click_save` / `wait_for_modal`）以 `tests/v2_e2e_utils.py` 當下提供的為準——**實作前先讀該檔**，照抄鄰近測試的寫法，不要沿用本計畫的假想名稱。
+> 以下四點 orchestrator 已在原始碼查證，照抄即可，**不要再自行探索**：
+> `v2_page` fixture 產出的是 tuple `(page, base_url)`（`tests/v2_e2e_utils.py:290`），不是帶方法的物件；
+> 導航用 `_goto(page, base_url, route, cov)`（`tests/test_v2_system_e2e.py:125`）；
+> 按鈕名稱查表用 `_labels(page)`（`:150`），**`gui_save` 已在該表的 keys 清單裡**，新的按鈕文案若要在測試裡點，必須把鍵加進那份清單；
+> 表單欄位定位用 `page.locator('.board input[data-field="url"]')`（既有測試 `:805` 就是這樣抓 key/secret 的）。
 
 - [ ] **Step 2: 跑測試確認失敗**
 
