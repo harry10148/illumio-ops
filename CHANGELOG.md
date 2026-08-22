@@ -23,12 +23,16 @@ a plain `<major>.<minor>.<patch>` scheme. (Tags through v4.0.0 carried a
 
 ### Changed
 
-- Saving `api.url` or `api.org_id` from the GUI's system settings now asks
-  first: clear the PCE-derived cache, ingestion watermarks, alert cooldowns
-  and SIEM queue, or declare it the same PCE reachable at a new address and
-  keep them. Rotating the key or secret alone still saves without asking.
-  Editing `config.json` directly or `illumio-ops config login` bypass the
-  prompt; the old PCE's cache and watermarks are left in place either way.
+- Changing `api.url` or `api.org_id` now asks first, wherever you change it:
+  clear the PCE-derived cache, ingestion watermarks, alert cooldowns and SIEM
+  queue, or declare it the same PCE reachable at a new address and keep them.
+  Rotating the key or secret alone still saves without asking. The GUI's system
+  settings page and the interactive `illumio-ops` settings menu both prompt;
+  `illumio-ops config login --no-interactive` refuses the change outright
+  unless `--pce-target-change flush` or `--pce-target-change same-pce` says
+  which, so an automated run cannot re-point the appliance by accident. Editing
+  `config.json` by hand is still unguarded — nothing watches that file — and
+  leaves the old PCE's cache and watermarks in place.
 - **GUI redesign v2, phase 2A — the web interface is rebuilt.** The eight-tab
   layout is replaced by six areas (overview, investigate, alerting, automation,
   reports, system) reached through a hash router, with 18 routes in total. The
