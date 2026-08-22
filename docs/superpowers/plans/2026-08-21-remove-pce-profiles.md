@@ -897,6 +897,10 @@ git commit -m "feat(gui-v2): ask before re-pointing the appliance at another PCE
 
 ### Task 8: 全套測試、CHANGELOG 與真機驗證
 
+> **分工（orchestrator 補註）**：Step 1（全套測試）、Step 4（部署與真機驗證）由 orchestrator 自己執行——前者是本計畫 Global Constraints 既有的規定，後者會動到真實設備 `172.16.15.106` 的服務與設定檔，不派子代理。**Step 4 的第 5 項（在測試機上塞一份帶 `pce_profiles` 的舊 config 重啟）屬破壞性操作，執行前須取得使用者同意。** 可派工的只有 Step 2（CHANGELOG）與 Step 3（升級說明），兩者都在 `docs/`。
+>
+> `docs/guide/configuration.md` 的 `## api（PCE 連線）` 段（約 `:83`）是升級說明的正確位置——該檔已無任何 `pce_profiles` 殘留，升級說明是要補上「舊鍵會被丟棄、第二組以後的憑證不遷移」這件事。
+
 **Files:**
 - Modify: `CHANGELOG.md`
 - Modify: `docs/guide/configuration.md`（升級說明段落）
