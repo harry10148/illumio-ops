@@ -559,6 +559,9 @@ def test_flush_empties_every_table_including_watermarks(tmp_path):
         "event_watermark": "2026-01-01T00:00:00Z",
         "alert_history": {"r1": "2026-01-01T00:00:00Z"},
         "event_seen": ["a"],
+        "event_parser_stats": {"n": 1},
+        "posture_summary": {"x": 1},
+        "rule_schedule_states": {"s1": "keep"},
         "settings_backup": {"keep": "me"},
     }), encoding="utf-8")
 
@@ -572,9 +575,11 @@ def test_flush_empties_every_table_including_watermarks(tmp_path):
     assert counts["ingestion_watermarks"] == 1
 
     left = json.loads(state.read_text(encoding="utf-8"))
-    assert "event_watermark" not in left
-    assert "alert_history" not in left
-    assert "event_seen" not in left
+    for gone in ("event_watermark", "alert_history", "event_seen",
+                 "event_parser_stats", "posture_summary"):
+        assert gone not in left, gone
+    # 排程是操作者自己建的，不隨 PCE 的資料一起清掉。
+    assert left["rule_schedule_states"] == {"s1": "keep"}
     assert left["settings_backup"] == {"keep": "me"}, "非 PCE 衍生的鍵不可被動到"
 
 
@@ -625,11 +630,18 @@ _MODELS = (
 
 # The state.json keys that describe one PCE's history. Everything else in that
 # file (schedules, GUI state, backups) survives.
-_STATE_KEYS = (
-    "event_watermark", "alert_history", "event_seen", "history",
-    "event_timeline", "pce_stats", "posture_summary", "parser_stats",
-    "throttle_state", "overflow_state", "basis_mismatch",
-)
+#
+# The analyzer already owns an authoritative list of the keys it writes, so
+# take it from there rather than restating it — a restated copy drifts, and a
+# key this misses is a key the next PCE inherits.
+from src.analyzer import _ANALYZER_OWNED_STATE_KEYS
+
+# Written by other subsystems but derived from the same PCE all the same.
+# Deliberately NOT here: rule_schedule_states / report_schedule_states, which
+# belong to schedules the operator authored, not to the PCE's data.
+_EXTRA_PCE_DERIVED = ("event_timeline", "pce_stats", "posture_summary")
+
+_STATE_KEYS = tuple(_ANALYZER_OWNED_STATE_KEYS) + _EXTRA_PCE_DERIVED
 
 
 def flush_pce_derived_state(db_path: str, state_path: str) -> dict[str, int]:
