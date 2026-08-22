@@ -49,6 +49,17 @@ CONFIG_FILE = os.path.join(ROOT_DIR, "config", "config.json")
 # In-memory access via cm.config["rules"] / cm.config["alerts"] unchanged.
 ALERTS_FILE = os.path.join(ROOT_DIR, "config", "alerts.json")
 
+
+def resolve_state_file() -> str:
+    """Path to logs/state.json, the ingestion/schedule state store.
+
+    Lives here (Flask-free) rather than only in src.gui._helpers, so CLI
+    paths that need it (e.g. flushing PCE-derived state on re-point) don't
+    have to import the GUI package to get it. src.gui._helpers._resolve_state_file
+    delegates to this so existing callers/monkeypatches there are unaffected.
+    """
+    return os.path.join(ROOT_DIR, "logs", "state.json")
+
 # Default configuration template
 _DEFAULT_CONFIG = {
     "api": {"url": "https://pce.example.com:8443", "org_id": "1", "key": "", "secret": "", "verify_ssl": True},

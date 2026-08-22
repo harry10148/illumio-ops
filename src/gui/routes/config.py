@@ -11,6 +11,7 @@ from loguru import logger
 from src.config import ConfigManager, hash_password, verify_password
 from src.alerts import PLUGIN_METADATA, plugin_config_path
 from src.i18n import t
+from src.pce_target import pce_target_changed
 from src.gui._helpers import (
     _err,
     _err_with_log,
@@ -218,9 +219,10 @@ def make_config_blueprint(
                 # schedules all carry the previous PCE's data with no marker
                 # saying so. Make the operator say what should happen to it.
                 _old_api = scratch.get('api', {})
-                _target_changed = (
-                    ('url' in api_in and str(api_in['url']).strip() != str(_old_api.get('url', '')).strip())
-                    or ('org_id' in api_in and str(api_in['org_id']).strip() != str(_old_api.get('org_id', '')).strip())
+                _target_changed = pce_target_changed(
+                    _old_api,
+                    api_in['url'] if 'url' in api_in else None,
+                    api_in['org_id'] if 'org_id' in api_in else None,
                 )
                 _choice = d.get('pce_target_change')
                 if _target_changed:

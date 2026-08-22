@@ -1660,5 +1660,8 @@
   "gui_sy_pce_target_from": "目前：{url}（org {org}）",
   "gui_sy_pce_target_to": "改為：{url}（org {org}）",
   "gui_sy_pce_target_flush_body": "現有的快取、擷取位置與告警冷卻都是前一台 PCE 的資料，沒有任何標記說明這件事。清除後會從新的 PCE 重新擷取。",
-  "gui_sy_pce_target_same": "同一台 PCE，只是換了位址"
+  "gui_sy_pce_target_same": "同一台 PCE，只是換了位址",
+  "cli_config_login_pce_target_needs_choice": "這會把設備指向另一台 PCE。請加上 --pce-target-change flush（清除既有快取與歷史）或 --pce-target-change same-pce（同一台 PCE，只是換了位址）後再試一次。",
+  "cli_config_login_pce_target_change_prompt": "這會把設備指向另一台 PCE。既有的快取與歷史資料要如何處理？",
+  "cli_pce_target_change_prompt_menu": "這會把設備指向另一台 PCE。既有的快取與歷史資料要如何處理？（1. 清除快取與歷史，2. 同一台 PCE，只是換了位址）"
 }

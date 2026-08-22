@@ -22,7 +22,7 @@ import threading
 
 from loguru import logger
 
-from src.config import ConfigManager
+from src.config import ConfigManager, resolve_state_file as _resolve_state_file_impl
 from src.i18n import t, get_messages
 from src.alerts import PLUGIN_METADATA, plugin_config_path, plugin_config_value
 from src.report.dashboard_summaries import (
@@ -316,7 +316,7 @@ def _resolve_config_dir() -> str:
     return os.path.join(_ROOT_DIR, 'config')
 
 def _resolve_state_file() -> str:
-    return os.path.join(_ROOT_DIR, 'logs', 'state.json')
+    return _resolve_state_file_impl()
 
 
 # ---------------------------------------------------------------------------
