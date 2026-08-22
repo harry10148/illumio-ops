@@ -62,8 +62,12 @@ def test_rejected_settings_post_does_not_leave_partial_api_mutation_in_memory(au
     cm.load()
     original_org_id = cm.config["api"]["org_id"]
 
+    # "same-pce" only gets the request past the re-point guard (org_id is a
+    # target field now); what this test is about is still the ApiSettings
+    # validation that runs after it, and the 400 it must produce.
     res = _post(client, csrf, "/api/settings", {
         "api": {"org_id": "999-poisoned", "verify_ssl": False},
+        "pce_target_change": "same-pce",
     })
     assert res.status_code == 400
 

@@ -1656,6 +1656,7 @@
   "gui_al_matchers_dropped": "這些條件不是 key=value 格式，未被儲存：{lines}",
   "gui_err_pce_target_needs_choice": "這會把設備指向另一台 PCE。請先選擇如何處理現有的快取與歷史資料。",
   "gui_err_pce_target_bad_choice": "無法識別的處理方式。",
+  "gui_err_pce_flush_failed": "清除前一台 PCE 的快取資料與歷史沒有完成，連線設定因此沒有變更，設備仍指向前一台 PCE。請查看日誌後再試一次。",
   "gui_sy_pce_target_title": "這會指向另一台 PCE",
   "gui_sy_pce_target_from": "目前：{url}（org {org}）",
   "gui_sy_pce_target_to": "改為：{url}（org {org}）",
@@ -1663,5 +1664,9 @@
   "gui_sy_pce_target_same": "同一台 PCE，只是換了位址",
   "cli_config_login_pce_target_needs_choice": "這會把設備指向另一台 PCE。請加上 --pce-target-change flush（清除既有快取與歷史）或 --pce-target-change same-pce（同一台 PCE，只是換了位址）後再試一次。",
   "cli_config_login_pce_target_change_prompt": "這會把設備指向另一台 PCE。既有的快取與歷史資料要如何處理？",
-  "cli_pce_target_change_prompt_menu": "這會把設備指向另一台 PCE。既有的快取與歷史資料要如何處理？（1. 清除快取與歷史，2. 同一台 PCE，只是換了位址）"
+  "cli_pce_target_change_prompt_menu": "這會把設備指向另一台 PCE。既有的快取與歷史資料要如何處理？（1. 清除快取與歷史，2. 同一台 PCE，只是換了位址）",
+  "cli_config_login_pce_flush_failed": "清除前一台 PCE 的快取資料與歷史沒有完成（{error}），連線設定因此沒有變更，設備仍指向前一台 PCE。排除原因後請重新執行一次。",
+  "cli_pce_flush_failed_menu": "清除前一台 PCE 的快取資料與歷史沒有完成（{error}），連線設定因此沒有變更，設備仍指向前一台 PCE。",
+  "cli_config_login_pce_restart_required": "請立即重新啟動監控服務。已經在執行的服務在重啟之前仍會沿用舊的連線設定，並且會把剛清掉的資料重新填回去。",
+  "cli_pce_restart_required_menu": "請立即重新啟動監控服務。已經在執行的服務在重啟之前仍會沿用舊的連線設定，並且會把剛清掉的資料重新填回去。"
 }

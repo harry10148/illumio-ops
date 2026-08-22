@@ -55,6 +55,56 @@ def test_none_means_not_provided_not_changed_to_empty():
 
 
 # ---------------------------------------------------------------------------
+# normalization — the guard has to compare like with like (review M4)
+# ---------------------------------------------------------------------------
+
+def test_a_retyped_trailing_slash_is_not_a_target_change():
+    """The stored value carries a trailing slash (nothing writes the validated
+    model back, so config holds whatever was typed). Retyping the same PCE
+    without it must not offer to destroy a cache that was fine."""
+    from src.pce_target import pce_target_changed
+    old = {"url": "https://pce.example.com:8443/", "org_id": "1"}
+    assert pce_target_changed(old, "https://pce.example.com:8443", None) is False
+
+
+def test_case_only_differences_in_scheme_and_host_are_not_a_target_change():
+    from src.pce_target import pce_target_changed
+    old = {"url": "https://pce.example.com:8443", "org_id": "1"}
+    assert pce_target_changed(old, "HTTPS://PCE.Example.COM:8443", None) is False
+
+
+def test_surrounding_whitespace_is_not_a_target_change():
+    from src.pce_target import pce_target_changed
+    old = {"url": "https://pce.example.com:8443", "org_id": "5"}
+    assert pce_target_changed(old, "  https://pce.example.com:8443  ", " 5 ") is False
+
+
+def test_normalization_leaves_the_path_and_a_real_host_change_alone():
+    """Only the scheme and the host fold case — a path is case-sensitive to
+    the server, and a different host is still a different PCE."""
+    from src.pce_target import normalize_pce_url, pce_target_changed
+    assert normalize_pce_url("HTTPS://Pce.Example.com:8443/API/v2/") == \
+        "https://pce.example.com:8443/API/v2"
+    old = {"url": "https://pce.example.com:8443", "org_id": "1"}
+    assert pce_target_changed(old, "https://other.example.com:8443", None) is True
+
+
+def test_login_stores_the_normalized_url_not_what_was_typed(runner):
+    """Storing the raw string is what leaves the NEXT comparison wrong."""
+    from src.cli.config import config_group
+    cm = _make_cm()
+    with patch("src.config.ConfigManager", return_value=cm):
+        result = runner.invoke(config_group, [
+            "login",
+            "--url", "  HTTPS://PCE.Example.COM:8443/  ",
+            "--key", "k", "--secret", "s",
+            "--no-interactive",
+        ])
+    assert result.exit_code == 0, result.output
+    assert cm.config["api"]["url"] == "https://pce.example.com:8443"
+
+
+# ---------------------------------------------------------------------------
 # login_cmd — CLI plumbing
 # ---------------------------------------------------------------------------
 
@@ -146,6 +196,66 @@ def test_no_interactive_rotating_credentials_only_needs_no_flag(runner):
     assert cm.config["api"]["key"] == "newkey"
 
 
+def test_no_interactive_rotation_without_org_id_leaves_org_id_alone(runner):
+    """An absent --org-id means "unchanged", not "1" (review H3). On an org-5
+    appliance a plain credential rotation used to be refused as a target
+    change, and answering "same-pce" — the honest answer for a rotation —
+    then silently moved it onto org 1 while keeping org 5's cache."""
+    from src.cli.config import config_group
+    cm = _make_cm(org_id="5")
+    with patch("src.config.ConfigManager", return_value=cm):
+        result = runner.invoke(config_group, [
+            "login",
+            "--url", "https://pce.example.com:8443",
+            "--key", "rotated", "--secret", "rotated",
+            "--no-interactive",
+        ])
+    assert result.exit_code == 0, result.output
+    cm.save.assert_called_once()
+    assert cm.config["api"]["org_id"] == "5"
+    assert cm.config["api"]["key"] == "rotated"
+
+
+def test_no_interactive_flush_tells_the_operator_to_restart_the_service(runner):
+    """A headless --monitor daemon never reloads config, so it refills the
+    tables that were just emptied. Nothing here can detect one — the
+    instruction has to be in the output (review H2)."""
+    from src.cli.config import config_group
+    cm = _make_cm()
+    with patch("src.config.ConfigManager", return_value=cm):
+        with patch("src.pce_cache.flush.flush_pce_derived_state"):
+            result = runner.invoke(config_group, [
+                "login",
+                "--url", "https://other-pce.example.com:8443",
+                "--key", "k", "--secret", "s",
+                "--no-interactive",
+                "--pce-target-change", "flush",
+            ])
+    assert result.exit_code == 0, result.output
+    from src.i18n import t
+    assert t("cli_config_login_pce_restart_required") in result.output
+
+
+def test_no_interactive_flush_failure_leaves_the_connection_unchanged(runner):
+    """Flush before save (review M2): past the save the guard never fires for
+    this edit again, so a clear that failed after it could never be
+    completed. Failing before it costs a re-run instead."""
+    from src.cli.config import config_group
+    cm = _make_cm()
+    with patch("src.config.ConfigManager", return_value=cm):
+        with patch("src.pce_cache.flush.flush_pce_derived_state",
+                   side_effect=RuntimeError("cache is locked")):
+            result = runner.invoke(config_group, [
+                "login",
+                "--url", "https://other-pce.example.com:8443",
+                "--key", "k", "--secret", "s",
+                "--no-interactive",
+                "--pce-target-change", "flush",
+            ])
+    assert result.exit_code != 0
+    cm.save.assert_not_called()
+
+
 def test_no_interactive_unknown_choice_is_rejected(runner):
     from src.cli.config import config_group
     cm = _make_cm()
@@ -230,6 +340,7 @@ def test_menu_target_change_same_pce_saves_without_flush(monkeypatch):
     answers = [
         1, "https://other-pce.example.com:8443", None, None, None,
         2,      # same-pce
+        None,   # dismiss the "restart the monitoring service" notice
         None,
     ]
     with patch("src.pce_cache.flush.flush_pce_derived_state") as mock_flush:
@@ -244,6 +355,7 @@ def test_menu_target_change_flush_clears_cache(monkeypatch):
     answers = [
         1, "https://other-pce.example.com:8443", None, None, None,
         1,      # flush
+        None,   # dismiss the "restart the monitoring service" notice
         None,
     ]
     with patch("src.pce_cache.flush.flush_pce_derived_state") as mock_flush:
@@ -252,6 +364,47 @@ def test_menu_target_change_flush_clears_cache(monkeypatch):
     mock_flush.assert_called_once()
     args = mock_flush.call_args[0]
     assert args[0] == cm.models.pce_cache.db_path
+
+
+def test_menu_target_change_warns_to_restart_the_monitoring_service(monkeypatch, capsys):
+    cm = _make_menu_cm()
+    answers = [
+        1, "https://other-pce.example.com:8443", None, None, None,
+        1, None, None,
+    ]
+    with patch("src.pce_cache.flush.flush_pce_derived_state"):
+        _run_menu(monkeypatch, cm, answers)
+    from src.i18n import t
+    assert t("cli_pce_restart_required_menu") in capsys.readouterr().out
+
+
+def test_menu_flush_failure_leaves_the_connection_unchanged(monkeypatch):
+    """Same ordering rule as the other two paths (review M2)."""
+    cm = _make_menu_cm()
+    answers = [
+        1, "https://other-pce.example.com:8443", None, None, None,
+        1, None, None,
+    ]
+    with patch("src.pce_cache.flush.flush_pce_derived_state",
+               side_effect=RuntimeError("cache is locked")):
+        _run_menu(monkeypatch, cm, answers)
+    cm.save.assert_not_called()
+    assert cm.config["api"]["url"] == "https://pce.example.com:8443"
+
+
+def test_menu_stores_the_normalized_url(monkeypatch):
+    cm = _make_menu_cm()
+    answers = [
+        1, "  HTTPS://PCE.Example.COM:8443/  ", None, None, None,
+        None,
+    ]
+    with patch("src.pce_cache.flush.flush_pce_derived_state") as mock_flush:
+        _run_menu(monkeypatch, cm, answers)
+    # Same PCE once normalized — no question, no flush, and the stored value
+    # is the normalized one so the NEXT comparison is right too.
+    mock_flush.assert_not_called()
+    cm.save.assert_called_once()
+    assert cm.config["api"]["url"] == "https://pce.example.com:8443"
 
 
 def test_menu_rotating_credentials_only_saves_without_asking(monkeypatch):

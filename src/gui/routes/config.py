@@ -11,7 +11,7 @@ from loguru import logger
 from src.config import ConfigManager, hash_password, verify_password
 from src.alerts import PLUGIN_METADATA, plugin_config_path
 from src.i18n import t
-from src.pce_target import pce_target_changed
+from src.pce_target import normalize_org_id, normalize_pce_url, pce_target_changed
 from src.gui._helpers import (
     _err,
     _err_with_log,
@@ -206,9 +206,18 @@ def make_config_blueprint(
             if 'api' in d:
                 api_in = d['api']
                 api_allowlist = _SETTINGS_ALLOWLISTS["api"]
+                # Normalize before anything reads these: the comparison below,
+                # the echo in the 409 body and the value stored further down
+                # must all be the same string, or the next edit compares what
+                # was typed against what was stored and the guard misfires
+                # (src/pce_target.py's module docstring).
+                if 'url' in api_in:
+                    api_in['url'] = normalize_pce_url(api_in['url'])
+                if 'org_id' in api_in:
+                    api_in['org_id'] = normalize_org_id(api_in['org_id'])
                 # Validate url scheme before accepting it
                 if 'url' in api_in:
-                    _url_val = str(api_in['url']).strip()
+                    _url_val = api_in['url']
                     _scheme = urllib.parse.urlparse(_url_val).scheme.lower()
                     if _scheme not in ('http', 'https'):
                         return jsonify({"ok": False, "error": t("gui_err_api_url_scheme", lang=lang)}), 400
@@ -231,8 +240,8 @@ def make_config_blueprint(
                             "ok": False,
                             "pce_target_changed": True,
                             "old": {"url": _old_api.get('url', ''), "org_id": _old_api.get('org_id', '')},
-                            "new": {"url": str(api_in.get('url', _old_api.get('url', ''))).strip(),
-                                    "org_id": str(api_in.get('org_id', _old_api.get('org_id', ''))).strip()},
+                            "new": {"url": api_in.get('url', _old_api.get('url', '')),
+                                    "org_id": api_in.get('org_id', _old_api.get('org_id', ''))},
                             "error": t("gui_err_pce_target_needs_choice", lang=lang),
                         }), 409
                     if _choice not in ("flush", "same-pce"):
@@ -308,10 +317,25 @@ def make_config_blueprint(
             # Only now is it safe to flush — before that, the PCE this
             # appliance is still pointed at (on save failure) would lose its
             # own cache and ingestion position.
+            #
+            # And still BEFORE the save, which is the order both CLI paths
+            # follow too (src/cli/config.py, src/cli/menus/_root.py): past the
+            # save the stored connection names the new PCE, the guard never
+            # fires for this edit again, and nothing would ever come back to
+            # finish an interrupted clear — the old PCE's cache and fetch
+            # positions would stay for good. Failing here costs a retry, whose
+            # clear is idempotent.
             if _do_pce_flush:
                 from src.pce_cache.flush import flush_pce_derived_state
                 _cache_cfg = cm.models.pce_cache
-                flush_pce_derived_state(_cache_cfg.db_path, _resolve_state_file())
+                try:
+                    flush_pce_derived_state(_cache_cfg.db_path, _resolve_state_file())
+                except Exception as exc:
+                    logger.exception("PCE cache flush failed, settings not saved: {}", exc)
+                    return jsonify({
+                        "ok": False,
+                        "error": t("gui_err_pce_flush_failed", lang=lang),
+                    }), 500
             cm.config = scratch
             cm.save()
         return jsonify({"ok": True})

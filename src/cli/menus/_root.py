@@ -9,7 +9,7 @@ from src.utils import Colors, safe_input, draw_panel
 from src.cli.menus._helpers import _menu_hints, _wizard_step
 from src.cli.menus.alert import alert_settings_menu
 from src.cli.menus.web_gui import web_gui_security_menu
-from src.pce_target import pce_target_changed
+from src.pce_target import normalize_org_id, normalize_pce_url, pce_target_changed
 
 
 def settings_menu(cm: ConfigManager) -> None:
@@ -78,8 +78,13 @@ def settings_menu(cm: ConfigManager) -> None:
             new_url_raw = safe_input(
                 t("lbl_api_url"), str, allow_cancel=True, hint=old_api["url"]
             )
-            new_url = new_url_raw.strip('"').strip("'") if new_url_raw else old_api["url"]
-            new_org_id = (
+            # Normalized before it is compared or stored, same as the other
+            # two paths (src/pce_target.py) — otherwise a retyped trailing
+            # slash reads as a different PCE and offers to destroy a cache
+            # that was fine.
+            new_url = normalize_pce_url(
+                new_url_raw.strip('"').strip("'") if new_url_raw else old_api["url"])
+            new_org_id = normalize_org_id(
                 safe_input(t("lbl_org_id"), str, allow_cancel=True, hint=old_api["org_id"])
                 or old_api["org_id"]
             )
@@ -105,14 +110,37 @@ def settings_menu(cm: ConfigManager) -> None:
                     do_flush = choice == 1
 
             if not cancelled:
-                cm.config["api"]["url"] = new_url
-                cm.config["api"]["org_id"] = new_org_id
-                cm.config["api"]["key"] = new_key
-                cm.config["api"]["secret"] = new_secret
-                cm.save()
+                saved = True
                 if do_flush:
+                    # Before cm.save(), the same order the other two paths use:
+                    # past the save the stored connection names the new PCE, so
+                    # the guard never fires for this edit again and the old
+                    # PCE's cache would stay for good. A clear that fails here
+                    # costs a re-run, whose clear is idempotent.
                     from src.pce_cache.flush import flush_pce_derived_state
-                    flush_pce_derived_state(cm.models.pce_cache.db_path, resolve_state_file())
+                    try:
+                        flush_pce_derived_state(cm.models.pce_cache.db_path,
+                                                resolve_state_file())
+                    except Exception as exc:
+                        saved = False
+                        print(f"{Colors.FAIL}"
+                              f"{t('cli_pce_flush_failed_menu', error=str(exc)[:200])}"
+                              f"{Colors.ENDC}")
+                        safe_input(t("press_enter_to_continue"), str, allow_cancel=True)
+                if saved:
+                    cm.config["api"]["url"] = new_url
+                    cm.config["api"]["org_id"] = new_org_id
+                    cm.config["api"]["key"] = new_key
+                    cm.config["api"]["secret"] = new_secret
+                    cm.save()
+                    if pce_target_changed(old_api, new_url, new_org_id):
+                        # A running monitor service holds its own
+                        # ConfigManager for the life of the process and never
+                        # reloads it, so it keeps polling the previous PCE and
+                        # refilling what was just cleared.
+                        print(f"{Colors.WARNING}"
+                              f"{t('cli_pce_restart_required_menu')}{Colors.ENDC}")
+                        safe_input(t("press_enter_to_continue"), str, allow_cancel=True)
         elif sel == 2:
             alert_settings_menu(cm)
         elif sel == 3:
