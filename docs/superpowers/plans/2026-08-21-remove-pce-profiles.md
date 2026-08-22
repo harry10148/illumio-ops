@@ -970,3 +970,91 @@ git commit -m "docs(changelog): record the PCE profile removal and the re-point 
 
 - archive 目錄、報表輸出與 KPI history、`dashboard_summary.json`、`async_query_jobs.json` 的跨 PCE 殘留——移除 profile 之後這些只會在「操作者手動改連線目標」時被觸及，且刪除不可逆，需另案決定保留政策。
 - 背景工作與連線變更的競態：目前沒有屏障阻止「清除當下正在跑的 ingest 把舊 PCE 的資料寫回去」。實務上視窗很短（清除是同步的、下一輪 ingest 才會重讀設定），但這是已知缺口，spec §2.2 有記錄。
+
+---
+
+### Task 9: 把改指向的守門延伸到 CLI（追加任務）
+
+> **為什麼追加**：Task 5-7 的守門只掛在 `POST /api/settings`。Task 8 的文件實作者查證後指出 CHANGELOG 只能寫成 GUI-only，orchestrator 查證屬實——CLI 有兩條路直接寫 `config["api"]["url"]` 後 `cm.save()`，完全繞過。走 CLI runbook 的操作者仍會踩到這整個計畫設法防止的靜默污染。使用者裁決：現在補。
+
+**Files:**
+- Create: `src/pce_target.py`
+- Modify: `src/cli/menus/_root.py`（設定選單第 1 項，約 line 73-92）
+- Modify: `src/cli/config.py`（`login_cmd`，約 line 226-280）
+- Test: `tests/test_pce_target_cli.py`（新建）
+
+**Interfaces:**
+- Consumes: `src/pce_cache/flush.py` 的 `flush_pce_derived_state(db_path, state_path)`（Task 6）
+- Produces: `pce_target_changed(old_api: dict, new_url: str | None, new_org_id: str | None) -> bool` — 供 GUI 與兩條 CLI 路徑共用的單一判準。
+
+- [ ] **Step 1: 寫失敗測試**
+
+新建 `tests/test_pce_target_cli.py`。要涵蓋三件事：判準函式本身（換 url 為真、換 org_id 為真、只換 key/secret 為假、值相同為假、`None` 表示未提供故為假）；`login_cmd` 在 `--no-interactive` 且目標改變、又未帶決定旗標時**必須非零退出且不得寫入設定**；以及帶了決定旗標時會走對應路徑。
+
+用 `click.testing.CliRunner` 驅動 `login_cmd`——照 `tests/` 既有測 click 指令的寫法，實作前先 `grep -rn "CliRunner" tests/` 找一個最近的範例照抄其 fixture 與 `ConfigManager` 隔離手法（**不要讓測試寫到真實的 `config/config.json`**）。
+
+- [ ] **Step 2: 跑測試確認失敗**
+
+Run: `timeout 600 ./venv/bin/python -m pytest tests/test_pce_target_cli.py -q`
+Expected: FAIL —`ModuleNotFoundError: src.pce_target`
+
+- [ ] **Step 3: 實作**
+
+新建 `src/pce_target.py`，把判準從 `src/gui/routes/config.py` 抽出來成為唯一定義：
+
+```python
+"""Is this edit re-pointing the appliance at a different PCE?
+
+The cache, the ingestion watermarks, the archive files and the alert cooldowns
+all carry one PCE's data with nothing marking them as such, so this question
+has to be asked wherever the connection can be edited — the GUI and both CLI
+paths. One definition, so the three cannot drift apart.
+
+Only url and org_id answer it. Rotating the key or the secret is still the
+same PCE.
+"""
+from __future__ import annotations
+
+
+def pce_target_changed(old_api: dict, new_url: str | None, new_org_id: str | None) -> bool:
+    """True when *new_url* or *new_org_id* names a different PCE than *old_api*.
+
+    A None means "not being changed", not "changed to empty".
+    """
+    if new_url is not None and str(new_url).strip() != str(old_api.get("url", "")).strip():
+        return True
+    if new_org_id is not None and str(new_org_id).strip() != str(old_api.get("org_id", "")).strip():
+        return True
+    return False
+```
+
+改 `src/gui/routes/config.py` 的 `_target_changed` 改為呼叫它，行為不變（既有測試就是這一步的守門）。
+
+**`src/cli/menus/_root.py`**（互動式，約 line 73-92）：收集完 url/org_id 之後、`cm.save()` 之前，若 `pce_target_changed(...)` 為真就**先問**。互動式選單有人在看著，所以在此處問，不要用旗標。照該檔既有的 `safe_input` 慣例提問，兩個選項：清除既有快取與歷史／同一台 PCE 只是換位址；選前者才呼叫 `flush_pce_derived_state`。取消（`safe_input` 回 `None`）就整筆放棄，不存檔。
+
+**`src/cli/config.py` 的 `login_cmd`**（約 line 226-280）：新增 `--pce-target-change` 選項，接受 `flush` 與 `same-pce`。
+- `--no-interactive` 且目標改變且未帶此選項 → 用該檔既有的 `echo_error(ctx, ...)` 慣例報錯並以非零狀態結束，**不得寫入設定**。自動化腳本必須明確表態，這正是這條路徑風險最高的原因。
+- 互動模式且未帶此選項 → 用 `click.confirm` 之類的既有慣例當場問，語意與互動選單一致。
+- `flush` → 在 `cm.save()` **之後**呼叫 `flush_pce_derived_state`（CLI 沒有 GUI 那種「後續驗證還會失敗」的問題，但仍以存檔成功為前提才清）。
+
+清除所需的兩個路徑：`cm.models.pce_cache.db_path` 與 `src/gui/_helpers.py` 的 `_resolve_state_file()`。**若 `_resolve_state_file` 從 CLI 匯入會拖進 Flask 相依，就把它搬到不依賴 Flask 的模組再由兩邊共用**——實作前先確認 import 鏈，並在報告說明你的處置。
+
+新增的 CLI 提示文案要進 i18n（三份字典），且不得帶端點、狀態碼或內部欄位名。
+
+- [ ] **Step 4: 測試通過**
+
+```bash
+timeout 600 ./venv/bin/python -m pytest tests/test_pce_target_cli.py tests/test_api_settings.py -q
+timeout 300 ./venv/bin/python -m pytest tests/test_i18n_no_reviewer_copy.py tests/test_i18n_zh_explicit_sync.py -q
+timeout 300 ./venv/bin/python scripts/audit_i18n_usage.py
+```
+Expected: 全綠；audit `Total: 0 finding(s)`
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add src/pce_target.py src/cli/menus/_root.py src/cli/config.py src/gui/routes/config.py tests/test_pce_target_cli.py src/i18n_zh_TW.json src/i18n_en.json src/i18n/data/zh_explicit.json
+git commit -m "feat(cli): ask before re-pointing the appliance from the command line"
+```
+
+> Task 8 的 CHANGELOG 與升級說明在本任務之後要回頭把「僅 GUI」的限縮拿掉——orchestrator 負責。
