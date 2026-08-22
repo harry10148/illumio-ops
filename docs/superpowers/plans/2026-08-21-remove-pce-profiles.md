@@ -763,23 +763,37 @@ Expected: FAIL（沒有 modal）
 
 **(a) `components/modal.mjs`：`confirm()` 增加選用的次要動作。** 這個決定是三向的（清除／同一台／取消），兩顆按鈕表達不了；`alt` 未給時行為與現在完全相同，既有呼叫端不受影響。
 
-在 `confirm()` 內、OK 按鈕建立處的旁邊加入：
+`confirm()` 沒有 `foot` 或 `okBtn` 這種區域變數（orchestrator 已讀過 `src/static/js/v2/components/modal.mjs:55-81` 查證）：OK 鈕是 `const ok`（`:59`），footer 是在 `box.appendChild(el("footer", …))` 的呼叫裡就地建構（`:77-81`），子節點依序是 `spacer()`、cancel 鈕、`ok`。所以次要動作要插進那個就地建構的參數串裡，位置在 cancel 與 `ok` 之間。
+
+把 footer 那段改成：
 
 ```javascript
-  /* Optional third choice. Omitted by every existing caller, and absent from
-   * the DOM when omitted — a confirm stays two buttons unless the decision
-   * genuinely has a third answer. */
-  if (o.alt && o.alt.label) {
-    const altBtn = el("button", { class: "btn", text: o.alt.label });
-    altBtn.addEventListener("click", async function () {
-      const r = o.alt.onAlt ? await o.alt.onAlt() : undefined;
-      if (r !== false) handle.close();
+  /* Optional third choice, built before the footer so it can be dropped into
+   * the same call. Omitted by every existing caller, and absent from the DOM
+   * when omitted — a confirm stays two buttons unless the decision genuinely
+   * has a third answer. */
+  const alt = o.alt && o.alt.label
+    ? el("button", { class: "btn", type: "button", text: o.alt.label })
+    : null;
+  if (alt) {
+    alt.addEventListener("click", async function () {
+      alt.disabled = true;
+      try {
+        const r = o.alt.onAlt ? await o.alt.onAlt() : undefined;
+        if (r !== false) close();
+      } finally { alt.disabled = false; }
     });
-    foot.insertBefore(altBtn, okBtn);
   }
+
+  box.appendChild(el("footer", { class: "modal-f" },
+    spacer(),
+    el("button", { class: "btn ghost", type: "button", text: t("gui_cancel"), onClick: close }),
+    alt,
+    ok
+  ));
 ```
 
-> `foot` 與 `okBtn` 是該函式內既有的區域變數；實作前讀一次 `confirm()` 確認它們的真實名稱，名稱不同就照當地的名稱用，不要改名。
+> `el()` 忽略 null 子節點——orchestrator 已查證（`src/static/js/v2/core/dom.mjs:12,58`：`children: … | null (nullish skipped)`），所以 `alt` 為 null 時 footer 就是原本的兩顆按鈕，DOM 完全不變。
 
 同時更新 `confirm()` 上方的 JSDoc，把 `alt` 列進去。
 
