@@ -46,7 +46,30 @@ def _seed(db_path):
     return engine, sf
 
 
+# 獨立於 flush.py 之外，逐字寫死 src/pce_cache/models.py 目前的八個
+# __tablename__——不可從 _MODELS 反推，否則從 _MODELS 拿掉一個模型時，
+# 兩個斷言迴圈只是少跑一輪、測試照樣綠燈，重演了原本的漏洞（只是從
+# seed 端搬到 assert 端）。這裡用集合相等（而非子集）比對，才能同時
+# 抓到「少一個表」和「多一個不該在的表」。
+_EXPECTED_TABLENAMES = {
+    "pce_events",
+    "pce_traffic_flows_raw",
+    "pce_traffic_flow_obs",
+    "pce_traffic_flows_agg",
+    "ingestion_cursors",
+    "ingestion_watermarks",
+    "siem_dispatch",
+    "dead_letter",
+}
+
+
 def test_flush_empties_every_table_including_watermarks(tmp_path):
+    _actual = {model.__tablename__ for model in _MODELS}
+    assert _actual == _EXPECTED_TABLENAMES, (
+        f"_MODELS drifted from src/pce_cache/models.py: "
+        f"missing={_EXPECTED_TABLENAMES - _actual}, extra={_actual - _EXPECTED_TABLENAMES}"
+    )
+
     db = tmp_path / "cache.db"
     engine, sf = _seed(str(db))
     state = tmp_path / "state.json"
