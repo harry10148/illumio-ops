@@ -446,7 +446,7 @@ def test_unknown_choice_is_rejected(authed_client):
 
 - [ ] **Step 2: 跑測試確認失敗**
 
-Run: `timeout 600 ./venv/bin/python -m pytest tests/test_api_settings.py -q -k "target_change or credentials_is_not"`
+Run: `timeout 600 ./venv/bin/python -m pytest tests/test_api_settings.py -q -k "choice or target_change"`（orchestrator 已用 `--collect-only` 驗證此 filter 恰好選中五條新測試）
 Expected: 除 `test_rotating_credentials_is_not_a_target_change` 外全部 FAIL（目前一律 200）
 
 - [ ] **Step 3: 實作**
