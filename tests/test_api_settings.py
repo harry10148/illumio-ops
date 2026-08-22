@@ -253,3 +253,59 @@ def test_settings_response_has_no_profile_fields(authed_client):
 def test_pce_profiles_endpoint_is_gone(authed_client):
     client, _csrf = authed_client
     assert client.get("/api/pce-profiles").status_code == 404
+
+
+# ── PCE 連線目標變更必須是明示的決定 ──────────────────────────────────────────
+# 這台設備的快取、擷取位置、封存與排程都沒有 PCE 維度（見
+# docs/superpowers/specs/2026-08-21-pce-profile-isolation-assessment.md）。把
+# api.url 或 api.org_id 指向另一台 PCE 而不處理既有資料，兩台的資料會靜默混合，
+# 而且沒有任何徵兆。所以這裡不猜、也不自動清——直接擋下來要求操作者選。
+
+def _save(client, csrf, api_block, choice=None):
+    body = {"api": api_block}
+    if choice is not None:
+        body["pce_target_change"] = choice
+    return client.post("/api/settings", json=body,
+                       headers={"X-CSRFToken": csrf},
+                       environ_overrides={"REMOTE_ADDR": "127.0.0.1"})
+
+
+def test_changing_url_without_a_choice_is_refused(authed_client):
+    client, csrf = authed_client
+    res = _save(client, csrf, {"url": "https://other-pce.example.com:8443"})
+    assert res.status_code == 409
+    body = res.get_json()
+    assert body["ok"] is False
+    assert body["pce_target_changed"] is True
+    assert body["old"]["url"] == "https://pce.example.com:8443"
+    assert body["new"]["url"] == "https://other-pce.example.com:8443"
+
+
+def test_changing_org_id_without_a_choice_is_refused(authed_client):
+    client, csrf = authed_client
+    res = _save(client, csrf, {"org_id": "7"})
+    assert res.status_code == 409
+    assert res.get_json()["pce_target_changed"] is True
+
+
+def test_rotating_credentials_is_not_a_target_change(authed_client):
+    """換 key/secret 只是輪替憑證，不該擋。"""
+    client, csrf = authed_client
+    res = _save(client, csrf, {"key": "newkey", "secret": "newsecret"})
+    assert res.status_code == 200
+    assert res.get_json()["ok"] is True
+
+
+def test_same_pce_choice_saves_without_touching_data(authed_client):
+    client, csrf = authed_client
+    res = _save(client, csrf, {"url": "https://renamed.example.com:8443"},
+                choice="same-pce")
+    assert res.status_code == 200
+    assert res.get_json()["ok"] is True
+
+
+def test_unknown_choice_is_rejected(authed_client):
+    client, csrf = authed_client
+    res = _save(client, csrf, {"url": "https://other.example.com:8443"},
+                choice="whatever")
+    assert res.status_code == 400

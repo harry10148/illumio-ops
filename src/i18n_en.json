@@ -412,6 +412,8 @@
   "gui_field_required": "required",
   "gui_err_api_invalid_config": "Invalid API configuration: {reason}",
   "gui_err_api_url_scheme": "API URL must use http:// or https://",
+  "gui_err_pce_target_needs_choice": "This points the appliance at a different PCE. Choose what happens to the existing cache and history first.",
+  "gui_err_pce_target_bad_choice": "Unrecognised choice.",
   "gui_err_cert_pem_required": "Certificate PEM is required.",
   "gui_err_cn_required": "Common Name (CN) is required.",
   "gui_err_invalid_allowlist_entries": "Invalid allowlist entries: {entries}",

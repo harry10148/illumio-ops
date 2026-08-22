@@ -205,6 +205,29 @@ def make_config_blueprint(
                         return jsonify({"ok": False, "error": t("gui_err_api_url_scheme", lang=lang)}), 400
                     if _scheme == 'http':
                         logger.warning("api.url uses plain HTTP — TLS verification cannot be performed")
+                # Changing which PCE this appliance talks to is not an edit —
+                # the cache, the ingestion positions, the archive files and the
+                # schedules all carry the previous PCE's data with no marker
+                # saying so. Make the operator say what should happen to it.
+                _old_api = scratch.get('api', {})
+                _target_changed = (
+                    ('url' in api_in and str(api_in['url']).strip() != str(_old_api.get('url', '')).strip())
+                    or ('org_id' in api_in and str(api_in['org_id']).strip() != str(_old_api.get('org_id', '')).strip())
+                )
+                _choice = d.get('pce_target_change')
+                if _target_changed:
+                    if _choice is None:
+                        return jsonify({
+                            "ok": False,
+                            "pce_target_changed": True,
+                            "old": {"url": _old_api.get('url', ''), "org_id": _old_api.get('org_id', '')},
+                            "new": {"url": str(api_in.get('url', _old_api.get('url', ''))).strip(),
+                                    "org_id": str(api_in.get('org_id', _old_api.get('org_id', ''))).strip()},
+                            "error": t("gui_err_pce_target_needs_choice", lang=lang),
+                        }), 409
+                    if _choice not in ("flush", "same-pce"):
+                        return jsonify({"ok": False,
+                                        "error": t("gui_err_pce_target_bad_choice", lang=lang)}), 400
                 for k in api_allowlist:
                     if k in api_in:
                         scratch['api'][k] = api_in[k]

@@ -1653,5 +1653,7 @@
   "gui_ov_group_activity": "近期活動",
   "gui_action_plugin_last_prefix": "上次傳送：",
   "gui_action_plugin_missing_prefix": "缺少：",
-  "gui_al_matchers_dropped": "這些條件不是 key=value 格式，未被儲存：{lines}"
+  "gui_al_matchers_dropped": "這些條件不是 key=value 格式，未被儲存：{lines}",
+  "gui_err_pce_target_needs_choice": "這會把設備指向另一台 PCE。請先選擇如何處理現有的快取與歷史資料。",
+  "gui_err_pce_target_bad_choice": "無法識別的處理方式。"
 }

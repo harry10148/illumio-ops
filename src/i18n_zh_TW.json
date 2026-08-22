@@ -412,6 +412,8 @@
   "gui_field_required": "必填",
   "gui_err_api_invalid_config": "無效的 API 設定：{reason}",
   "gui_err_api_url_scheme": "API 網址必須使用 http:// 或 https://",
+  "gui_err_pce_target_needs_choice": "這會把設備指向另一台 PCE。請先選擇如何處理現有的快取與歷史資料。",
+  "gui_err_pce_target_bad_choice": "無法識別的處理方式。",
   "gui_err_cert_pem_required": "必須提供憑證 PEM。",
   "gui_err_cn_required": "必須提供一般名稱（CN）。",
   "gui_err_invalid_allowlist_entries": "無效的允許清單項目：{entries}",
