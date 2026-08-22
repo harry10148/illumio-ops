@@ -18,8 +18,12 @@ a plain `<major>.<minor>.<patch>` scheme. (Tags through v4.0.0 carried a
   `active_pce_id` entries in `config.json` are dropped on load and the
   appliance keeps running on whatever is already under `api`, which held
   the active profile's values. **If you had more than one profile, its
-  credentials are not migrated anywhere — copy them out before upgrading,
-  or they're gone.**
+  credentials are not migrated anywhere — copy them out before upgrading.**
+  Verified on a live appliance: the two keys are dropped when the config is
+  read, but the file on disk keeps them until the next save rewrites it. So an
+  operator who upgraded without copying first can still recover the other
+  profile's credentials out of `config/config.json` — right up until the first
+  settings save.
 
 ### Changed
 

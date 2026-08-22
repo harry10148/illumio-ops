@@ -100,7 +100,11 @@ illumio-ops config login --url ... --key ... --secret ... [--org-id ...]  # 設�
 > `Ignoring deprecated config key(s)`），appliance 會照常用 `api` 底下現有
 > 的連線設定啟動，不會因此起不來。**但只有目前生效中的那組憑證留在
 > `api` 裡——如果你設定過第二組（或更多）PCE profile，那些憑證不會被
-> 遷移到任何地方，升級前請自行把它們抄出來，否則就直接遺失。**
+> 遷移到任何地方，升級前請自行把它們抄出來。**
+>
+> 已在真機驗證：這兩個鍵是在**讀取設定時**被丟棄，磁碟上的 `config.json` 要到
+> 下一次存檔才會被改寫。所以升級後沒抄的人還來得及從 `config/config.json`
+> 把另一組憑證撈出來——但只到第一次儲存設定為止。
 >
 > 升級之後，只要從 GUI 系統設定頁、互動式設定選單或 `config login` 改掉
 > `url` 或 `org_id`，都會先要求你做選擇：
