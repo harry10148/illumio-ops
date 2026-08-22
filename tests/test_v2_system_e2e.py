@@ -1163,12 +1163,29 @@ def test_teardown_closes_surfaces_and_palette(v2_page):
 
 
 def test_pce_page_has_no_profile_ui(v2_page):
-    """Profile 概念已移除：PCE 頁不得再出現清單、新增或切換的入口。"""
+    """Profile 概念已移除：#/system/pce 不得再渲染 SY-01 面板，載入這條路由也
+    永遠不該打已刪除的 /api/pce-profiles——面板被誤復原，或有人把
+    pce_profiles 誤加回 PCE_SNAPS，這裡都會抓到（前者只影響 DOM，後者則會
+    讓已 404 的端點被真的呼叫一次）。"""
     page, base_url = v2_page
-    page.goto(base_url + "/" + R_PCE)
-    page.wait_for_selector('body[data-booted="true"]')
-    page.wait_for_selector('[data-route="%s"]' % R_PCE)
-    page.wait_for_selector('[data-cov="SY-18"]')
-    html = page.content()
-    for gone in ("sy-pce-add", "sy-pce-activate", "SY-01"):
-        assert gone not in html, f"{gone} still rendered"
+    sent = {"hit": False}
+
+    def _watch(pattern):
+        sent["hit"] = False
+        def _handler(route):
+            if pattern in route.request.url:
+                sent["hit"] = True
+            route.continue_()
+        return _handler
+
+    handler = _watch("/api/pce-profiles")
+    page.route("**/*", handler)
+    try:
+        page.goto(base_url + "/" + R_PCE)
+        page.wait_for_selector('body[data-booted="true"]')
+        page.wait_for_selector('[data-route="%s"]' % R_PCE)
+        assert sent["hit"] is False, "/api/pce-profiles must never be called"
+        page.wait_for_selector('[data-cov="SY-18"]')
+        assert page.locator('[data-cov="SY-01"]').count() == 0
+    finally:
+        page.unroute("**/*", handler)

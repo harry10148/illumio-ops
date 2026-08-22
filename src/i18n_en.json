@@ -5059,7 +5059,6 @@
   "gui_sy_log_raw_note": "That single line is the entire rendering of a log entry: timestamp, level and message concatenated as plain text.",
   "gui_sy_log_ts": "Time",
   "gui_sy_more": "…and {n} more",
-  "gui_sy_pce_url_rule": "Must be a full URL including scheme and port.",
   "gui_sy_restart_i_409": "If the daemon is managed externally (systemd, NSSM…) it cannot be restarted here; use the service manager",
   "gui_sy_restart_i_poll": "Reloads the poll intervals and schedules",
   "gui_sy_restart_i_rate": "Resets the rate-limit counters and any in-flight batch",

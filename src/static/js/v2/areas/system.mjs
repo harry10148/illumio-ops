@@ -123,9 +123,9 @@
 //  14. Each of the 8 mounts registers its audit openers/palette commands
 //      synchronously (before sysPage's first await) and calls
 //      installTeardown(state) in the same breath, on the line after `state`
-//      itself: it destroys every table this mount created (the PCE profile
-//      table, the two SIEM tables, the logs table), closes any drawer/modal
-//      it left open, and drops this route's palette commands — same shape as
+//      itself: it destroys every table this mount created (the two SIEM
+//      tables, the logs table), closes any drawer/modal it left open, and
+//      drops this route's palette commands — same shape as
 //      automation.mjs's installTeardown, shared here across all 8
 //      sub-routes. It used to be called inside each build callback instead,
 //      i.e. only once a board was successfully built; Task 12d moved all 8
@@ -133,7 +133,7 @@
 //      commands and then has nothing to drop them (the overview had the same
 //      defect, found in review). tests/test_v2_teardown_registration.py is
 //      the static gate that keeps them here.
-//  15. Every mutating action (save, PCE/SIEM CRUD) reloads by invalidating
+//  15. Every mutating action (save, SIEM CRUD) reloads by invalidating
 //      this route's snapshot ids and calling router.go(ROUTE) — a full,
 //      cache-fresh remount, rather than patching the DOM in place. This
 //      mirrors reports.mjs's refreshReportsList ("the server's own listing is
@@ -719,8 +719,8 @@ const PCE_SNAPS = ["settings", "status"];
 /* Header point 16. `status` (GET /api/status) is the appliance's live status,
  * not configuration — and this mount reads nothing out of it (only
  * mountDisplay does), so its failure has no business replacing the PCE
- * profile list and connection form with an error card. Soft-loaded here (and
- * in SECURITY/CHANNELS/DISPLAY below) rather than dropped from the list: the
+ * connection form with an error card. Soft-loaded here (and in
+ * SECURITY/CHANNELS/DISPLAY below) rather than dropped from the list: the
  * request is pre-existing and removing it is not this fix's business. */
 const PCE_SOFT = ["status"];
 
