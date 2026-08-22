@@ -195,6 +195,13 @@ def make_config_blueprint(
             # 整批寫回 cm.config + save；任何一個 400 都讓 cm.config 維持
             # load() 剛讀回的原狀，不會有欄位被併發 GET 看到或誤存。
             scratch = json.loads(json.dumps(cm.config))
+            # Set when the operator chose "flush" — carried down to just
+            # before the save below rather than run here, because the rest
+            # of this handler can still reject the request (invalid api
+            # block, forbidden report dir, ...) after this point. Flushing
+            # eagerly would empty a cache that still belongs to the PCE the
+            # appliance stays pointed at once the save fails.
+            _do_pce_flush = False
             if 'api' in d:
                 api_in = d['api']
                 api_allowlist = _SETTINGS_ALLOWLISTS["api"]
@@ -230,9 +237,7 @@ def make_config_blueprint(
                         return jsonify({"ok": False,
                                         "error": t("gui_err_pce_target_bad_choice", lang=lang)}), 400
                     if _choice == "flush":
-                        from src.pce_cache.flush import flush_pce_derived_state
-                        _cache_cfg = cm.models.pce_cache
-                        flush_pce_derived_state(_cache_cfg.db_path, _resolve_state_file())
+                        _do_pce_flush = True
                 for k in api_allowlist:
                     if k in api_in:
                         scratch['api'][k] = api_in[k]
@@ -296,6 +301,15 @@ def make_config_blueprint(
                     scratch.setdefault(root, {}).update(incoming)
                 else:
                     scratch[root] = incoming
+            # Every 400 return above this point has already exited the
+            # handler, so reaching here means the save is going through.
+            # Only now is it safe to flush — before that, the PCE this
+            # appliance is still pointed at (on save failure) would lose its
+            # own cache and ingestion position.
+            if _do_pce_flush:
+                from src.pce_cache.flush import flush_pce_derived_state
+                _cache_cfg = cm.models.pce_cache
+                flush_pce_derived_state(_cache_cfg.db_path, _resolve_state_file())
             cm.config = scratch
             cm.save()
         return jsonify({"ok": True})

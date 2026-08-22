@@ -8,7 +8,6 @@ together or the state is worse than before the flush.
 """
 from __future__ import annotations
 
-import json
 import os
 
 from loguru import logger
@@ -19,6 +18,7 @@ from src.pce_cache.models import (
     Base, DeadLetter, IngestionCursor, IngestionWatermark, PceEvent,
     PceTrafficFlowAgg, PceTrafficFlowObs, PceTrafficFlowRaw, SiemDispatch,
 )
+from src.state_store import update_state_file
 
 # Order matters: SiemDispatch and DeadLetter reference rows in the data tables
 # by (source_table, source_id), so they go first.
@@ -65,15 +65,29 @@ def flush_pce_derived_state(db_path: str, state_path: str) -> dict[str, int]:
         engine.dispose()
         logger.warning("PCE cache flushed: {}", counts)
 
+    # No state file means nothing of the old PCE was ever recorded there —
+    # same reading as the missing-DB case above. Skip touching it entirely
+    # rather than calling update_state_file() unconditionally: that would
+    # create a fresh logs/state.json out of nothing (e.g. before the
+    # appliance has ever run), which isn't ours to originate here.
     if os.path.exists(state_path):
-        with open(state_path, "r", encoding="utf-8") as fh:
-            state = json.load(fh)
-        removed = [k for k in _STATE_KEYS if k in state]
-        for k in removed:
-            state.pop(k, None)
+        removed: list[str] = []
+
+        def _pop_pce_keys(state: dict) -> dict:
+            for k in _STATE_KEYS:
+                if k in state:
+                    state.pop(k, None)
+                    removed.append(k)
+            return state
+
+        # state.json has 8+ concurrent writers (analyzer cycle, schedulers,
+        # ingest jobs, GUI adhoc jobs). update_state_file() takes the shared
+        # .lock and writes via tmp + os.replace, so this can't race a
+        # concurrent writer into reintroducing the keys just cleared, and a
+        # crash mid-write can't truncate state.json and take
+        # rule_schedule_states / report_schedule_states down with it.
+        update_state_file(state_path, _pop_pce_keys)
         if removed:
-            with open(state_path, "w", encoding="utf-8") as fh:
-                json.dump(state, fh, ensure_ascii=False, indent=2)
             logger.warning("PCE-derived state keys cleared: {}", removed)
         counts["state_keys"] = len(removed)
 

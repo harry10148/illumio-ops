@@ -8,13 +8,16 @@ from sqlalchemy import create_engine, select
 from sqlalchemy.orm import sessionmaker
 
 from src.pce_cache.models import (
-    Base, PceEvent, IngestionWatermark, SiemDispatch,
+    Base, DeadLetter, IngestionCursor, IngestionWatermark, PceEvent,
+    PceTrafficFlowAgg, PceTrafficFlowObs, PceTrafficFlowRaw, SiemDispatch,
 )
-from src.pce_cache.flush import flush_pce_derived_state
+from src.pce_cache.flush import _MODELS, flush_pce_derived_state
 
 
 def _seed(db_path):
-    """欄位取自 src/pce_cache/models.py：PceEvent 與 SiemDispatch 幾乎全欄位
+    """一個模型一列，覆蓋全部八個表——只種其中三個曾經讓拿掉
+    IngestionCursor/DeadLetter/PceTrafficFlow* 之一而不掉 _MODELS 的
+    回歸沒有任何測試會發現。欄位取自 src/pce_cache/models.py：多數欄位
     NOT NULL，少一個就是 IntegrityError 而不是測試失敗。"""
     now = datetime(2026, 1, 1, tzinfo=timezone.utc)
     engine = create_engine(f"sqlite:///{db_path}")
@@ -25,10 +28,20 @@ def _seed(db_path):
                        timestamp=now, event_type="x", severity="info",
                        status="success", pce_fqdn="pce.example.com",
                        raw_json="{}", ingested_at=now))
+        s.add(PceTrafficFlowRaw(flow_hash="h1", first_detected=now, last_detected=now,
+                                src_ip="10.0.0.1", dst_ip="10.0.0.2", port=443,
+                                protocol="tcp", action="allowed", raw_json="{}",
+                                ingested_at=now))
+        s.add(PceTrafficFlowObs(flow_hash="h1", observed_at=now))
+        s.add(PceTrafficFlowAgg(bucket_day=now, port=443, protocol="tcp", action="allowed"))
+        s.add(IngestionCursor(consumer="analyzer", source_table="pce_events", updated_at=now))
         s.add(IngestionWatermark(source="events", last_href="/orgs/1/events/a"))
         s.add(SiemDispatch(source_table="pce_events", source_id=1,
                            destination="splunk", status="pending",
                            queued_at=now))
+        s.add(DeadLetter(source_table="pce_events", source_id=1, destination="splunk",
+                         retries=3, last_error="boom", payload_preview="{}",
+                         quarantined_at=now))
         s.commit()
     return engine, sf
 
@@ -50,11 +63,10 @@ def test_flush_empties_every_table_including_watermarks(tmp_path):
     counts = flush_pce_derived_state(str(db), str(state))
 
     with sf() as s:
-        assert s.execute(select(PceEvent)).all() == []
-        assert s.execute(select(IngestionWatermark)).all() == []
-        assert s.execute(select(SiemDispatch)).all() == []
-    assert counts["pce_events"] == 1
-    assert counts["ingestion_watermarks"] == 1
+        for model in _MODELS:
+            assert s.execute(select(model)).all() == [], model.__tablename__
+    for model in _MODELS:
+        assert counts[model.__tablename__] == 1, model.__tablename__
 
     left = json.loads(state.read_text(encoding="utf-8"))
     for gone in ("event_watermark", "alert_history", "event_seen",

@@ -309,3 +309,105 @@ def test_unknown_choice_is_rejected(authed_client):
     res = _save(client, csrf, {"url": "https://other.example.com:8443"},
                 choice="whatever")
     assert res.status_code == 400
+
+
+# ── choice="flush" 端到端：真的清掉快取；而且只在整個 save 都通過驗證之後 ──
+# 才動手（見 src/gui/routes/config.py 的 _do_pce_flush）——handler 在 api
+# 區塊驗證之後還有 email/smtp/alerts/settings/report/外掛區塊各自能 400，
+# flush 提早跑，遇到後面才炸的 400 就會把還連著的 PCE 的快取清光。
+
+def _flush_test_app(tmp_path):
+    """獨立 app（不共用模組層的 temp_config_file/app fixture）：需要一個
+    真實、可讀寫的 pce_cache.db_path 才能驗證 flush 對快取檔案的實際效果。"""
+    cache_db = tmp_path / "cache.sqlite"
+    config_path = tmp_path / "config.json"
+    config_path.write_text(json.dumps({
+        "api": {
+            "url": "https://pce.example.com:8443",
+            "key": "myapikey",
+            "secret": "mysecret",
+            "org_id": "1",
+        },
+        "pce_cache": {"db_path": str(cache_db)},
+        "web_gui": {
+            "username": "admin",
+            "password": hash_password("testpass"),
+            "allowed_ips": [],
+            "secret_key": "test-secret",
+        },
+    }), encoding="utf-8")
+
+    cm = ConfigManager(config_file=str(config_path))
+    cm.load()
+    application = _create_app(cm, persistent_mode=True)
+    application.config.update({"TESTING": True})
+    client = application.test_client()
+    login = client.post("/api/login", json={"username": "admin", "password": "testpass"})
+    assert login.status_code == 200
+    csrf = _csrf(login)
+    return client, csrf, cache_db
+
+
+def _seed_one_event(db_path):
+    from datetime import datetime, timezone
+
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import sessionmaker
+
+    from src.pce_cache.models import Base, PceEvent
+
+    now = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    engine = create_engine(f"sqlite:///{db_path}")
+    Base.metadata.create_all(engine)
+    sf = sessionmaker(bind=engine)
+    with sf() as s:
+        s.add(PceEvent(pce_href="/orgs/1/events/a", pce_event_id="a",
+                       timestamp=now, event_type="x", severity="info",
+                       status="success", pce_fqdn="pce.example.com",
+                       raw_json="{}", ingested_at=now))
+        s.commit()
+    engine.dispose()
+
+
+def _count_events(db_path):
+    from sqlalchemy import create_engine, func, select
+    from sqlalchemy.orm import sessionmaker
+
+    from src.pce_cache.models import Base, PceEvent
+
+    engine = create_engine(f"sqlite:///{db_path}")
+    Base.metadata.create_all(engine)
+    sf = sessionmaker(bind=engine)
+    with sf() as s:
+        n = s.execute(select(func.count()).select_from(PceEvent)).scalar_one()
+    engine.dispose()
+    return n
+
+
+def test_flush_choice_empties_the_seeded_cache(tmp_path):
+    client, csrf, cache_db = _flush_test_app(tmp_path)
+    _seed_one_event(cache_db)
+    assert _count_events(cache_db) == 1
+
+    res = _save(client, csrf, {"url": "https://other-pce.example.com:8443"}, choice="flush")
+    assert res.status_code == 200
+    assert res.get_json()["ok"] is True
+    assert _count_events(cache_db) == 0
+
+
+def test_a_save_rejected_by_later_validation_leaves_a_flush_cache_intact(tmp_path):
+    """Pins the ordering fix: verify_ssl=False stays rejected (profile is
+    still 'production') by ApiSettings.model_validate — a check that runs
+    AFTER the pce_target_change guard accepts choice="flush". If the flush
+    ran inside that guard (as it originally did) this 400 would still have
+    wiped the cache of the PCE the appliance remains pointed at."""
+    client, csrf, cache_db = _flush_test_app(tmp_path)
+    _seed_one_event(cache_db)
+    assert _count_events(cache_db) == 1
+
+    res = _save(client, csrf,
+                {"url": "https://other-pce.example.com:8443", "verify_ssl": False},
+                choice="flush")
+    assert res.status_code == 400
+    assert res.get_json()["ok"] is False
+    assert _count_events(cache_db) == 1, "a rejected save must not flush the cache"
