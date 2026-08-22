@@ -156,6 +156,7 @@ def _labels(page):
         "gui_siem_add", "gui_siem_delete", "gui_confirm_delete",
         "gui_tls_csr_generate", "gui_sy_discard", "gui_errcard_retry",
         "gui_dlq_replay", "gui_restart_success", "gui_daemon_external_restart_hint",
+        "gui_sy_pce_target_same",
     ]
     return page.evaluate(
         "async (keys) => { const { t } = await import('/static/js/v2/core/i18n.mjs'); "
@@ -1164,9 +1165,14 @@ def test_teardown_closes_surfaces_and_palette(v2_page):
 
 def test_pce_page_has_no_profile_ui(v2_page):
     """Profile 概念已移除：#/system/pce 不得再渲染 SY-01 面板，載入這條路由也
-    永遠不該打已刪除的 /api/pce-profiles——面板被誤復原，或有人把
-    pce_profiles 誤加回 PCE_SNAPS，這裡都會抓到（前者只影響 DOM，後者則會
-    讓已 404 的端點被真的呼叫一次）。"""
+    永遠不該打已刪除的 /api/pce-profiles。
+
+    面板被誤復原只影響 DOM，最後一行會抓到。網路那一行守的是另一件事：
+    pce_profiles 被誤加回 PCE_SNAPS 本身**不會**讓這個端點被呼叫——
+    store-map.mjs 的 GET_MAP 已經沒有這個條目，loadAll 會在送出任何請求之前
+    就先在瀏覽器端拋錯，整頁變成錯誤卡，後面的 data-cov 斷言先失敗。真正會
+    讓 /api/pce-profiles 重新被呼叫的，是有人把 GET_MAP 條目也一起加回來
+    （或在別處硬寫這個路徑）——那才是這一行要抓的回歸。"""
     page, base_url = v2_page
     sent = {"hit": False}
 
@@ -1189,6 +1195,70 @@ def test_pce_page_has_no_profile_ui(v2_page):
         assert page.locator('[data-cov="SY-01"]').count() == 0
     finally:
         page.unroute("**/*", handler)
+
+
+def _answer_pce_target_modal(page, base_url, button_key):
+    """Open the re-point question for real, then answer it with `button_name`
+    and return the payload the answer actually carried.
+
+    The 409 that opens the modal is a genuine POST (it changes nothing — the
+    appliance refuses before touching anything). The ANSWER is intercepted and
+    fulfilled locally: one of these two buttons irreversibly empties eight
+    cache tables and the state file, and that is not something a browser test
+    may do to the checkout it runs in. What is under test here is the payload
+    the button sends — the one thing the backend tests cannot see, because
+    they post the field themselves."""
+    _goto(page, base_url, R_PCE, "SY-18")
+    # _labels() needs the page already on the app's origin for its dynamic
+    # import to resolve — resolve the key here, not in the caller.
+    labels = _labels(page)
+    button_name = labels[button_key]
+    url = page.locator('.board input[data-field="url"]')
+    url.fill("https://other-appliance.example.org:9443")
+
+    page.get_by_role("button", name=labels["gui_save"], exact=True).first.click()
+    modal = page.locator(".modal").first
+    modal.wait_for(state="visible")
+
+    captured = {"body": None}
+
+    def _handler(route):
+        req = route.request
+        if "/api/settings" in req.url and req.method == "POST":
+            captured["body"] = json.loads(req.post_data or "{}")
+            route.fulfill(status=200, content_type="application/json",
+                          body='{"ok": true}')
+            return
+        route.continue_()
+
+    page.route("**/*", _handler)
+    try:
+        modal.get_by_role("button", name=button_name, exact=True).click()
+        page.wait_for_function("() => document.querySelectorAll('.modal').length === 0")
+    finally:
+        page.unroute("**/*", _handler)
+    return captured["body"]
+
+
+def test_pce_target_flush_button_sends_flush(v2_page):
+    """system.mjs's confirm button resends with pce_target_change:"flush".
+    Nothing else in the suite exercises it in a browser — the backend tests
+    post the field directly, so a typo in either the key or the value here
+    would pass everything."""
+    page, base_url = v2_page
+    body = _answer_pce_target_modal(page, base_url, "gui_confirm")
+    assert body is not None, "the confirm button sent nothing"
+    assert body.get("pce_target_change") == "flush", body
+    # The answer must ride on the body that was refused, not on a fresh read
+    # of the form (fapi.resend's contract).
+    assert body["api"]["url"] == "https://other-appliance.example.org:9443", body
+
+
+def test_pce_target_same_pce_button_sends_same_pce(v2_page):
+    page, base_url = v2_page
+    body = _answer_pce_target_modal(page, base_url, "gui_sy_pce_target_same")
+    assert body is not None, "the same-PCE button sent nothing"
+    assert body.get("pce_target_change") == "same-pce", body
 
 
 def test_pce_target_change_asks_before_saving(v2_page):
