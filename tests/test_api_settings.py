@@ -296,12 +296,18 @@ def test_rotating_credentials_is_not_a_target_change(authed_client):
     assert res.get_json()["ok"] is True
 
 
-def test_same_pce_choice_saves_without_touching_data(authed_client):
-    client, csrf = authed_client
+def test_same_pce_choice_saves_without_touching_data(tmp_path, monkeypatch):
+    """"same-pce" is the answer that must leave the data alone, so 200 on its
+    own proves nothing — the seeded row is the assertion that matters."""
+    client, csrf, cache_db = _flush_test_app(tmp_path, monkeypatch)
+    _seed_one_event(cache_db)
+    assert _count_events(cache_db) == 1
+
     res = _save(client, csrf, {"url": "https://renamed.example.com:8443"},
                 choice="same-pce")
     assert res.status_code == 200
     assert res.get_json()["ok"] is True
+    assert _count_events(cache_db) == 1, "same-pce must not touch the cache"
 
 
 def test_unknown_choice_is_rejected(authed_client):
@@ -316,9 +322,36 @@ def test_unknown_choice_is_rejected(authed_client):
 # 區塊驗證之後還有 email/smtp/alerts/settings/report/外掛區塊各自能 400，
 # flush 提早跑，遇到後面才炸的 400 就會把還連著的 PCE 的快取清光。
 
-def _flush_test_app(tmp_path):
+def _isolate_flush_side_files(tmp_path, monkeypatch):
+    """flush_pce_derived_state() reaches three files this app never names:
+    logs/state.json (via config.py's _resolve_state_file), logs/analysis.lock
+    (the cross-process analysis lock it takes) and logs/dashboard_summary.json
+    (ven_summary). All three resolve relative to the REPO, not to tmp_path —
+    so without this, running the suite on a checkout where the appliance
+    actually runs deleted its event_watermark / alert_history / event_seen
+    (history re-fetched from zero, suppressed alerts re-fired) and blocked on
+    a live monitor cycle.
+
+    _resolve_state_file is patched where it is looked up (imported into
+    src.gui.routes.config's namespace), not where it is defined."""
+    import src.gui.routes.config as _config_routes
+    import src.main as _main
+    from src import dashboard_store
+
+    state_file = tmp_path / "state.json"
+    state_file.write_text("{}", encoding="utf-8")
+    monkeypatch.setattr(_config_routes, "_resolve_state_file", lambda: str(state_file))
+    monkeypatch.setattr(_main, "analysis_lock_path",
+                        lambda: str(tmp_path / "analysis.lock"))
+    monkeypatch.setattr(dashboard_store, "_dashboard_file",
+                        lambda: str(tmp_path / "dashboard_summary.json"))
+    return state_file
+
+
+def _flush_test_app(tmp_path, monkeypatch):
     """獨立 app（不共用模組層的 temp_config_file/app fixture）：需要一個
     真實、可讀寫的 pce_cache.db_path 才能驗證 flush 對快取檔案的實際效果。"""
+    _isolate_flush_side_files(tmp_path, monkeypatch)
     cache_db = tmp_path / "cache.sqlite"
     config_path = tmp_path / "config.json"
     config_path.write_text(json.dumps({
@@ -384,8 +417,8 @@ def _count_events(db_path):
     return n
 
 
-def test_flush_choice_empties_the_seeded_cache(tmp_path):
-    client, csrf, cache_db = _flush_test_app(tmp_path)
+def test_flush_choice_empties_the_seeded_cache(tmp_path, monkeypatch):
+    client, csrf, cache_db = _flush_test_app(tmp_path, monkeypatch)
     _seed_one_event(cache_db)
     assert _count_events(cache_db) == 1
 
@@ -395,13 +428,13 @@ def test_flush_choice_empties_the_seeded_cache(tmp_path):
     assert _count_events(cache_db) == 0
 
 
-def test_a_save_rejected_by_later_validation_leaves_a_flush_cache_intact(tmp_path):
+def test_a_save_rejected_by_later_validation_leaves_a_flush_cache_intact(tmp_path, monkeypatch):
     """Pins the ordering fix: verify_ssl=False stays rejected (profile is
     still 'production') by ApiSettings.model_validate — a check that runs
     AFTER the pce_target_change guard accepts choice="flush". If the flush
     ran inside that guard (as it originally did) this 400 would still have
     wiped the cache of the PCE the appliance remains pointed at."""
-    client, csrf, cache_db = _flush_test_app(tmp_path)
+    client, csrf, cache_db = _flush_test_app(tmp_path, monkeypatch)
     _seed_one_event(cache_db)
     assert _count_events(cache_db) == 1
 
