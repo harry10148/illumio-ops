@@ -28,6 +28,7 @@ from src.gui._helpers import (
     _import_signed_cert,
     _get_cert_info,
     _cert_days_remaining,
+    _resolve_state_file,
 )
 
 
@@ -228,6 +229,10 @@ def make_config_blueprint(
                     if _choice not in ("flush", "same-pce"):
                         return jsonify({"ok": False,
                                         "error": t("gui_err_pce_target_bad_choice", lang=lang)}), 400
+                    if _choice == "flush":
+                        from src.pce_cache.flush import flush_pce_derived_state
+                        _cache_cfg = cm.models.pce_cache
+                        flush_pce_derived_state(_cache_cfg.db_path, _resolve_state_file())
                 for k in api_allowlist:
                     if k in api_in:
                         scratch['api'][k] = api_in[k]
