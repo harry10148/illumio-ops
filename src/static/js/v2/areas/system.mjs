@@ -674,16 +674,16 @@ function makeForm(method, endpoint) {
     toast.info(t("gui_sy_discarded"));
   };
 
-  /** Real save: POST/PUT the body sysPage's docked bar has been previewing,
-   *  inspect the parsed response (A3), commit the ledger baseline only on a
-   *  real ok:true, and run afterSave(changedKeys, res) — the hook mountDisplay
-   *  uses to detect a language change and remount (header point 5). */
-  fapi.save = function () {
+  /** Shared by save()/resend(): POST/PUT `body` as-is, inspect the parsed
+   *  response (A3), commit the ledger baseline only on a real ok:true, and
+   *  run afterSave(changedKeys, res) — the hook mountDisplay uses to detect a
+   *  language change and remount (header point 5). Neither caller mutates
+   *  `body` after this point, so both get the same response handling without
+   *  either recomputing it. */
+  function sendBody(body) {
     const changed = fapi.changed();
     const changedKeys = changed.map(function (i) { return i.key; });
     const n = changed.length;
-    const body = bodyFn ? bodyFn(fapi.values()) : fapi.values();
-    if (fapi.extraBody) { Object.assign(body, fapi.extraBody); fapi.extraBody = null; }
     save.disabled = true;
     const req = method === "PUT" ? api.put(endpoint, body) : api.post(endpoint, body);
     return req.then(function (res) {
@@ -705,6 +705,24 @@ function makeForm(method, endpoint) {
       if (!fapi.afterSave) return true;
       return Promise.resolve(fapi.afterSave(changedKeys, res)).then(function () { return true; });
     });
+  }
+
+  /** Real save: build the body from bodyFn/the tracked fields, as before. */
+  fapi.save = function () {
+    const body = bodyFn ? bodyFn(fapi.values()) : fapi.values();
+    return sendBody(body);
+  };
+
+  /** resend(body, extra) — re-POST/PUT exactly the body a caller was handed
+   *  (via onRefused's second argument), merged with `extra`, WITHOUT
+   *  recomputing it from the form's current values through bodyFn. For a
+   *  caller answering a refusal (mountPce's pce_target_changed prompt) this
+   *  is provably the same request the appliance refused, plus the answer —
+   *  not a fresh snapshot of the form that merely happens to still match
+   *  today (the modal's scrim/focus-trap keep the form from being edited
+   *  meanwhile, but that is an assumption elsewhere, not an invariant here). */
+  fapi.resend = function (body, extra) {
+    return sendBody(Object.assign({}, body, extra));
   };
 
   return fapi;
@@ -786,7 +804,7 @@ async function mountPce(root, ctx) {
     });
     /* 409 + pce_target_changed is the appliance refusing to guess what should
      * happen to a previous PCE's cache. Ask, then re-send with the answer. */
-    form.onRefused = function (res) {
+    form.onRefused = function (res, body) {
       if (!res || res.pce_target_changed !== true) return false;
       return new Promise(function (resolve) {
         const m = modal.confirm(confirmSpec(t("gui_sy_pce_target_title"), [
@@ -794,13 +812,11 @@ async function mountPce(root, ctx) {
           tf("gui_sy_pce_target_to", { url: res.new.url, org: res.new.org_id }),
           t("gui_sy_pce_target_flush_body"),
         ], function () {
-          form.extraBody = { pce_target_change: "flush" };
-          return form.save().then(resolve);
+          return form.resend(body, { pce_target_change: "flush" }).then(resolve);
         }, {
           label: t("gui_sy_pce_target_same"),
           onAlt: function () {
-            form.extraBody = { pce_target_change: "same-pce" };
-            return form.save().then(resolve);
+            return form.resend(body, { pce_target_change: "same-pce" }).then(resolve);
           },
         }));
         m.onClose(function () { resolve(false); });

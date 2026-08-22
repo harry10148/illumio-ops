@@ -1192,22 +1192,53 @@ def test_pce_page_has_no_profile_ui(v2_page):
 
 
 def test_pce_target_change_asks_before_saving(v2_page):
-    """改掉 URL 後按儲存，必須先跳出選擇，而不是直接存下去。"""
+    """改掉 URL 後按儲存，必須先跳出選擇，而不是直接存下去。
+
+    OLD_URL is read off the form (v2_e2e_utils.py's build_v2_app seeds it to
+    `http://127.0.0.1:<a random closed port>`, not a fixed hostname) rather
+    than hardcoded, and NEW_URL is a host that shares no substring with it on
+    purpose (review finding 1): the original version of this test typed
+    "another-pce.example.com" against an assumed-fixed old value of
+    "pce.example.com:8443" — a literal substring of the new URL — so the "old"
+    assertion was satisfiable by the "new" line alone, and a bug that dropped
+    the from-line entirely would still have passed. With unrelated hosts, each
+    assertion can only be satisfied by its own line."""
     page, base_url = v2_page
     _goto(page, base_url, R_PCE, "SY-18")
 
     url = page.locator('.board input[data-field="url"]')
-    url.fill("https://another-pce.example.com:8443")
-    assert url.input_value() == "https://another-pce.example.com:8443"
+    OLD_URL = url.input_value()
+    NEW_URL = "https://other-appliance.example.org:9443"
+    assert NEW_URL != OLD_URL and "other-appliance.example.org" not in OLD_URL
+    url.fill(NEW_URL)
+    assert url.input_value() == NEW_URL
 
-    page.get_by_role("button", name=_labels(page)["gui_save"], exact=True).first.click()
+    sent = {"hit": False}
 
-    modal = page.locator(".modal").first
-    modal.wait_for(state="visible")
-    text = modal.inner_text()
-    assert "another-pce.example.com" in text, text
-    assert "pce.example.com:8443" in text, text
+    def _handler(route):
+        if "/api/settings" in route.request.url and route.request.method == "POST":
+            sent["hit"] = True
+        route.continue_()
 
-    # 取消不得留下任何已儲存的痕跡：關掉後表單仍是改過但未存的狀態。
-    modal.get_by_role("button", name=_labels(page)["gui_cancel"], exact=True).click()
-    assert page.locator(".modal").count() == 0
+    page.route("**/*", _handler)
+    try:
+        page.get_by_role("button", name=_labels(page)["gui_save"], exact=True).first.click()
+
+        modal = page.locator(".modal").first
+        modal.wait_for(state="visible")
+        text = modal.inner_text()
+        assert "other-appliance.example.org:9443" in text, text
+        assert OLD_URL.split("//", 1)[-1] in text, text
+
+        # The 409 that opened the modal is itself a real POST — reset the
+        # watch so what follows only covers what Cancel does.
+        sent["hit"] = False
+
+        # 取消不得留下任何已儲存的痕跡：關掉後表單仍是改過但未存的狀態，且
+        # 對話期間不得再送出任何 /api/settings 請求（review finding 2）。
+        modal.get_by_role("button", name=_labels(page)["gui_cancel"], exact=True).click()
+        assert page.locator(".modal").count() == 0
+        assert sent["hit"] is False, "Cancel must not send /api/settings"
+        assert url.input_value() == NEW_URL, "Cancel must leave the unsaved edit in place"
+    finally:
+        page.unroute("**/*", _handler)
