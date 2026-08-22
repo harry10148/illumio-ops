@@ -136,13 +136,18 @@ def test_health_rail_only_on_overview(v2_page):
     page.wait_for_selector('[data-route="#/system"]')
     assert page.locator('.rail-host [data-cov="XC-01"]').count() == 0
 
-    # The placeholder body must degrade through tf()'s fallback, not leak
-    # the raw, unresolved i18n key onto the screen (review finding: tf() had
-    # no fallback path, so every placeholder area rendered the literal
-    # string "gui_shell_wip_body" until this task's key lands in Tasks 4-9).
+    # The placeholder body must degrade through the i18n fallback, not leak the
+    # raw, unresolved key onto the screen (review finding: tf() had no fallback
+    # path, so every placeholder area rendered the literal string
+    # "gui_shell_wip_body").
     wip_text = page.locator("section.wip").inner_text()
     assert "gui_shell_wip_body" not in wip_text
-    assert "#/system" in wip_text
+    # The route is no longer read back to the operator. The body used to name it
+    # while claiming the area had not been built — untrue of every area — so it
+    # now says the address has no page. The route itself survives as the data
+    # attribute asserted above, which is where a DOM reader wants it anyway.
+    assert "#/system" not in wip_text
+    assert page.locator('[data-route="#/system"]').count() == 1
 
     # And switching back re-attaches THE SAME node (detach-not-destroy
     # semantics): healthbar.render() runs once at boot off one pair of
