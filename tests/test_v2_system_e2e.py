@@ -1189,3 +1189,25 @@ def test_pce_page_has_no_profile_ui(v2_page):
         assert page.locator('[data-cov="SY-01"]').count() == 0
     finally:
         page.unroute("**/*", handler)
+
+
+def test_pce_target_change_asks_before_saving(v2_page):
+    """改掉 URL 後按儲存，必須先跳出選擇，而不是直接存下去。"""
+    page, base_url = v2_page
+    _goto(page, base_url, R_PCE, "SY-18")
+
+    url = page.locator('.board input[data-field="url"]')
+    url.fill("https://another-pce.example.com:8443")
+    assert url.input_value() == "https://another-pce.example.com:8443"
+
+    page.get_by_role("button", name=_labels(page)["gui_save"], exact=True).first.click()
+
+    modal = page.locator(".modal").first
+    modal.wait_for(state="visible")
+    text = modal.inner_text()
+    assert "another-pce.example.com" in text, text
+    assert "pce.example.com:8443" in text, text
+
+    # 取消不得留下任何已儲存的痕跡：關掉後表單仍是改過但未存的狀態。
+    modal.get_by_role("button", name=_labels(page)["gui_cancel"], exact=True).click()
+    assert page.locator(".modal").count() == 0

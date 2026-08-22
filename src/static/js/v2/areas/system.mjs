@@ -339,11 +339,12 @@ function drawerSpec(title, body, onSave) {
   return spec;
 }
 
-function confirmSpec(title, impact, onOk) {
+function confirmSpec(title, impact, onOk, alt) {
   const spec = {};
   spec.title = title;
   spec.impact = impact;
   spec.onOk = onOk;
+  spec.alt = alt;
   return spec;
 }
 
@@ -682,11 +683,19 @@ function makeForm(method, endpoint) {
     const changedKeys = changed.map(function (i) { return i.key; });
     const n = changed.length;
     const body = bodyFn ? bodyFn(fapi.values()) : fapi.values();
+    if (fapi.extraBody) { Object.assign(body, fapi.extraBody); fapi.extraBody = null; }
     save.disabled = true;
     const req = method === "PUT" ? api.put(endpoint, body) : api.post(endpoint, body);
     return req.then(function (res) {
       save.disabled = !fapi.changed().length;
       if (!res || res.ok !== true) {
+        /* A refusal the caller knows how to turn into a question is not an
+         * error to shout about — it asks, then re-sends the same body with
+         * the answer. Anything else still surfaces as a toast. */
+        if (fapi.onRefused) {
+          const handled = fapi.onRefused(res, body);
+          if (handled) return Promise.resolve(handled);
+        }
         toast.crit(errorText(res));
         return false;
       }
@@ -775,6 +784,28 @@ async function mountPce(root, ctx) {
       b.api = apiPart;
       return b;
     });
+    /* 409 + pce_target_changed is the appliance refusing to guess what should
+     * happen to a previous PCE's cache. Ask, then re-send with the answer. */
+    form.onRefused = function (res) {
+      if (!res || res.pce_target_changed !== true) return false;
+      return new Promise(function (resolve) {
+        const m = modal.confirm(confirmSpec(t("gui_sy_pce_target_title"), [
+          tf("gui_sy_pce_target_from", { url: res.old.url, org: res.old.org_id }),
+          tf("gui_sy_pce_target_to", { url: res.new.url, org: res.new.org_id }),
+          t("gui_sy_pce_target_flush_body"),
+        ], function () {
+          form.extraBody = { pce_target_change: "flush" };
+          return form.save().then(resolve);
+        }, {
+          label: t("gui_sy_pce_target_same"),
+          onAlt: function () {
+            form.extraBody = { pce_target_change: "same-pce" };
+            return form.save().then(resolve);
+          },
+        }));
+        m.onClose(function () { resolve(false); });
+      });
+    };
     form.afterSave = function () { refreshAndRemount(R_PCE, PCE_SNAPS); };
 
     host.appendChild(form.dock);
