@@ -9,8 +9,26 @@ a plain `<major>.<minor>.<patch>` scheme. (Tags through v4.0.0 carried a
 
 ## [Unreleased]
 
+### Removed
+
+- **PCE profiles.** They were only ever a credential switcher — nothing
+  downstream of `config.api` knew a profile existed — while the cache,
+  ingestion watermarks, archive files and schedules all carried one PCE's
+  data with no marker saying which. Existing `pce_profiles` /
+  `active_pce_id` entries in `config.json` are dropped on load and the
+  appliance keeps running on whatever is already under `api`, which held
+  the active profile's values. **If you had more than one profile, its
+  credentials are not migrated anywhere — copy them out before upgrading,
+  or they're gone.**
+
 ### Changed
 
+- Saving `api.url` or `api.org_id` from the GUI's system settings now asks
+  first: clear the PCE-derived cache, ingestion watermarks, alert cooldowns
+  and SIEM queue, or declare it the same PCE reachable at a new address and
+  keep them. Rotating the key or secret alone still saves without asking.
+  Editing `config.json` directly or `illumio-ops config login` bypass the
+  prompt; the old PCE's cache and watermarks are left in place either way.
 - **GUI redesign v2, phase 2A — the web interface is rebuilt.** The eight-tab
   layout is replaced by six areas (overview, investigate, alerting, automation,
   reports, system) reached through a hash router, with 18 routes in total. The

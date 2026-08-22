@@ -94,6 +94,22 @@ illumio-ops config login --url ... --key ... --secret ... [--org-id ...]  # 設�
 > **安全護欄**：`profile="production"` 時 `verify_ssl=false` 會直接拒絕載入（`ValueError`）。
 > 要在 lab 環境跳過憑證驗證，須先把 `profile` 明確改成 `"dev"`。
 
+> **升級提醒（PCE profiles 已移除）**：舊版可在 `config.json` 裡設定多組
+> `pce_profiles` 並用 `active_pce_id` 切換要連的 PCE，這個機制已經拿掉。
+> 若你的 `config.json` 還留著這兩個鍵，載入時會被直接丟棄（log 會出現
+> `Ignoring deprecated config key(s)`），appliance 會照常用 `api` 底下現有
+> 的連線設定啟動，不會因此起不來。**但只有目前生效中的那組憑證留在
+> `api` 裡——如果你設定過第二組（或更多）PCE profile，那些憑證不會被
+> 遷移到任何地方，升級前請自行把它們抄出來，否則就直接遺失。**
+>
+> 升級之後，在 GUI 的系統設定頁儲存連線設定時，若改掉了 `url` 或 `org_id`，
+> 會先跳出選擇而不是直接存檔：選「清除」會把 PCE 相關的快取、擷取水位、
+> 告警冷卻與 SIEM 佇列一併清空；選「同一台 PCE，只是換了位址」則保留這些
+> 狀態不動。只改 `key`／`secret`（輪替憑證）或 `verify_ssl` 不受影響，一樣
+> 直接存檔。**這個選擇只在 GUI 存檔時出現**：直接手動編輯 `config.json`
+> 或用 `illumio-ops config login` 改掉 `url`／`org_id` 不會跳出提示，舊
+> PCE 的快取與擷取水位會原封不動留著，需要清除的話請自行處理。
+
 ## alerts（告警通道）
 
 | 鍵 | 型別 | 預設 | 說明 |
