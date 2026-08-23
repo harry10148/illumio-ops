@@ -9,8 +9,35 @@ a plain `<major>.<minor>.<patch>` scheme. (Tags through v4.0.0 carried a
 
 ## [Unreleased]
 
+### Added
+
+- Traffic search on the Traffic & Workloads tab now offers three honest
+  data sources instead of two mislabeled ones: cache-first (the default —
+  reads the local cache and only queries the PCE for whatever the cache
+  doesn't cover), a direct PCE query that never touches the cache, and
+  archive, which streams the daily archive files for an operator-picked
+  date range straight off disk. Every response now says which source
+  actually answered — a plain cache read, a live PCE query, a merge of
+  the two, or the archive — so a result stitched from cache plus a
+  gap-filling PCE query no longer looks identical to a pure cache read,
+  and it flags when a result list was capped or an archive summary is a
+  bounded top-N rather than a complete count. The archive path can't
+  evaluate every condition a live query can (label groups, actor groups
+  and the free-text search among them, since those only ever ran against
+  the live cache); asking it to try now fails with a plain list of which
+  conditions it can't check, instead of silently ignoring them.
+
 ### Removed
 
+- **The archive review database.** Investigating archived traffic used to
+  mean loading a chosen date range into a separate review database before
+  you could search it. That load step, its backing database, and the
+  `pce_cache.archive_review_max_days` setting that bounded its size are
+  gone — archive search now streams the daily archive files directly, no
+  load required. **Any review database loaded under the old flow is now
+  invalid: nothing reads it any more, and it can be deleted.**
+  `archive_review_max_days` entries in an existing config are dropped on
+  load, the same as the PCE-profile keys below.
 - **PCE profiles.** They were only ever a credential switcher — nothing
   downstream of `config.api` knew a profile existed — while the cache,
   ingestion watermarks, archive files and schedules all carried one PCE's

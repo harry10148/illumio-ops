@@ -2,7 +2,7 @@
 title: REST API 參考
 audience: [developer, operator]
 version: 4.1.0
-last_verified: 2026-07-17
+last_verified: 2026-08-23
 verified_against:
   - src/gui/__init__.py
   - src/gui/routes/__init__.py
@@ -159,7 +159,7 @@ never-ran／overdue）見 [gui-tour.md](../guide/gui-tour.md) 「7) Integrations
 | 方法 | 路徑 | 用途 | 關鍵參數 |
 |---|---|---|---|
 | POST | `/api/init_quarantine` | 確保 PCE 上已建立三個 severity 的 Quarantine label | — |
-| POST | `/api/quarantine/search` | 查詢可隔離的流量（依 policy decision＋FilterBar 篩選） | `source`(live/archive), `mins`, `policy_decision`, 完整篩選鍵 |
+| POST | `/api/quarantine/search` | 查詢可隔離的流量（依 policy decision＋FilterBar 篩選）；即時來源與封存分兩條路徑，見下方說明 | `data_source`(hybrid/live), `mins`, `policy_decision`, 完整篩選鍵；改用 `source=archive` 時另帶 `archive_start`／`archive_end`（必填日期區間） |
 | GET/POST | `/api/workloads` | 搜尋 Workload（name／hostname／ip_address；IP 可逗號或 CIDR 多值） | `name`, `hostname`, `ip_address`, `max_results` |
 | POST | `/api/quarantine/apply` | **真實副作用**：隔離單一 Workload（依 severity 套用 Quarantine label，覆蓋既有） | `href`, `level`(Mild/Moderate/Severe) |
 | POST | `/api/quarantine/bulk_apply` | **真實副作用**：批次隔離（最多 5 個平行 worker） | `hrefs[]`, `level` |
@@ -167,6 +167,20 @@ never-ran／overdue）見 [gui-tour.md](../guide/gui-tour.md) 「7) Integrations
 | POST | `/api/workloads/accelerate` | **真實副作用**：提高受管 Workload 的流量回報頻率 | `hrefs[]`, `duration_minutes` |
 | GET | `/api/filter-objects/suggest` | FilterBar pill 輸入即時建議；label／label_group／iplist／service 走快取，workload 即時查 PCE | `q`, `types`, `limit`(≤25)；**240/hour** |
 | GET | `/api/filter-objects/browse` | FilterBar pill 分頁瀏覽（不支援 `type=workload`） | `type`, `offset`, `limit`(≤100)；**240/hour** |
+
+`/api/quarantine/search` 的即時來源用 `data_source` 挑：`hybrid`（預設，先讀本機
+cache、只為 cache 沒有的區段補打 PCE）或 `live`（別名 `no-cache`／`api`，完全略過
+cache、直接查 PCE）；`cache-only` 不接受，避免操作者的選擇被悄悄降級成 hybrid。
+帶 `source=archive` 則換走另一條路徑，直接依 `archive_start`／`archive_end` 掃描封存
+日檔，不再需要先載入任何資料庫；它評估不了 label group／actor group（AMS）／草稿
+policy decision 等即時才算得出的條件，以及全文 `search`，帶了會回 `400`
+`{ok:false, unsupported:[...], error}`。回應一律帶 `actual_source`
+（`cache`／`api`／`mixed`／`archive`，代表這次真正由誰回答；`mixed` 表示 cache 缺口
+另外補打了 PCE）與 `truncated`（結果被上限截斷）；即時來源另帶 `cap`／
+`total_matches`，archive 則另帶 `matched`／`scanned`（涵蓋的日檔掃了多少列、
+其中多少列符合條件）、`summary_omitted`（有界 top-N 摘要被捨棄的分組數）與
+`sort_by_substituted`（archive 沒有 `bandwidth` 排序、改用 `volume` 時為真）；
+`mins` 只有即時來源會用，archive 分支不理會。
 
 隔離／解除隔離的雙重確認流程、`Accelerate` 的持續模式，見
 [gui-tour.md](../guide/gui-tour.md) 「2) Traffic & Workloads」節。

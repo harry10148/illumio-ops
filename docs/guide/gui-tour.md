@@ -2,7 +2,7 @@
 title: Web GUI 導覽
 audience: [operator]
 version: 4.1.0
-last_verified: 2026-07-17
+last_verified: 2026-08-23
 verified_against:
   - src/templates/index.html
   - src/gui/__init__.py
@@ -181,9 +181,18 @@ stale 灰化邏輯，僅在資料不可用（`verdict === 'unknown'` 或 `no_cac
 - **Traffic Analyzer**：依 Policy Decision（Blocked／Potentially
   Blocked／Allowed／All，含 unknown 語意）、以及 FilterBar 物件選擇器
   （見上節）篩選流量，KPI 條顯示 flows／connections／目的 IP 數／尖峰頻
-  寬。查詢工具列的「Data source」
-  下拉可切換至 Archive 模式，輸入日期區間並點擊「Load archive」按鈕即可
-  載入已從主 cache 清除但仍保存在歸檔 JSONL 中的舊流量記錄，詳見 
+  寬。查詢工具列的「資料來源」下拉三選一：**快取優先**（預設，先讀本機
+  cache、只為 cache 沒涵蓋到的區段補打 PCE）、**直接查 PCE**（完全略過
+  cache，較慢但保證即時）、**封存 (Archive)**（直接掃描封存日檔，不再
+  需要先「載入」到另一個資料庫）。切到封存時，時間窗控制換成一組起訖
+  日期欄位；查詢一定要帶至少一個縮小範圍的條件，且 label group／actor
+  group（AMS）／草稿 policy decision／全文搜尋等即時才算得出的條件在
+  封存下無法評估，帶了會直接回錯誤並列出哪些條件不支援，不會靜默忽
+  略。結果上方會顯示這次實際由誰回答——由快取回答、直接向 PCE 查詢回
+  答、由快取回答＋另向 PCE 補查缺口，或由封存回答；結果被上限截斷時另
+  有提示；封存查詢的彙總統計是有界的 top-N，被捨棄的分組數也會標出
+  來。archive 檔案概況（涵蓋
+  的最早／最晚日期、檔案數）見查詢區旁的狀態列，細節見
   [cache-maintenance.md](cache-maintenance.md) §3.4。
 - **Workload Search**：依名稱／IP／hostname 查 Workload，顯示線上狀態、
   介面、labels、管理狀態。
