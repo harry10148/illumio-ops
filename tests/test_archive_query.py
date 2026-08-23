@@ -177,15 +177,30 @@ def test_a_query_with_no_filters_is_refused(tmp_path):
 
 
 def test_an_empty_string_filter_value_does_not_count_as_used(tmp_path):
-    """Analyzer.query_flows（src/analyzer.py:2276-2289）建 filter dict 時是
-    整組 key 都塞、沒填的欄位預設 ""/[]，不是省略 key。guard 若用
+    """Analyzer.query_flows（src/analyzer.py 內 query_filters dict）建 filter
+    dict 時是整組 key 都塞、沒填的欄位預設 ""/[]，不是省略 key。guard 若用
     `is not None` 判斷會把這種預設空值誤判成「有指定 filter」而放行
-    無限制掃描；必須跟 unsupported_filters() 一樣用 truthy 語意。"""
+    無限制掃描；必須跟 unsupported_filters() 一樣用 truthy 語意。"這裡用
+    "search"——真的在 _NARROWING_FILTER_KEYS 白名單裡的 key，而不是舊版
+    測試用的 "src_ip"（那個 key 從沒在白名單裡，改用它會讓這條測試測不到
+    「有在白名單裡但值是空字串」這件事）。"""
     import pytest
     with pytest.raises(ValueError):
         stream_query(str(tmp_path), "traffic", date(2026, 5, 1), date(2026, 5, 1),
-                     {"src_ip": ""}, cap=10, sort_by="connections",
+                     {"search": ""}, cap=10, sort_by="connections",
                      matcher=lambda r: True)
+
+
+def test_only_control_fields_is_refused(tmp_path):
+    """finding #3：filters 若只帶 sort_by 跟預設塞滿四值的 policy_decisions
+    這類控制欄位、沒有任何真正窄化資料的 key，guard 必須拒絕——即使
+    dict 裡每個 key 都有非空值。這兩個 key 都不在 _NARROWING_FILTER_KEYS。"""
+    import pytest
+    with pytest.raises(ValueError):
+        stream_query(str(tmp_path), "traffic", date(2026, 5, 1), date(2026, 5, 1),
+                     {"sort_by": "connections",
+                      "policy_decisions": ["blocked", "potentially_blocked", "allowed", "unknown"]},
+                     cap=10, sort_by="connections", matcher=lambda r: True)
 
 
 def test_bandwidth_sort_is_refused_because_the_archive_has_no_rate_inputs(tmp_path):
@@ -198,3 +213,78 @@ def test_bandwidth_sort_is_refused_because_the_archive_has_no_rate_inputs(tmp_pa
         stream_query(str(tmp_path), "traffic", date(2026, 5, 1), date(2026, 5, 1),
                      {"port": 443}, cap=10, sort_by="bandwidth",
                      matcher=lambda r: True)
+
+
+def test_reads_both_gz_and_plain_when_a_day_has_both(tmp_path):
+    """finding #1：_gzip_old_files（src/pce_cache/archive.py:204-232）在既有
+    .gz 存在時是用 "ab" 把新內容當一個新 gzip member 附加進去、寫完才刪
+    .jsonl——遲到的匯出可能在已經 gzip 過的舊日期又建一個新的 .jsonl，
+    於是同一天可能長期同時存在「.gz 裝著先前所有內容、.jsonl 只裝這次
+    輪替後的新一批」。只開其中一個會把另一個裡的資料整批漏掉。"""
+    _write(tmp_path, "traffic-2026-05-01.jsonl.gz", [_row("in-gz")], gz=True)
+    _write(tmp_path, "traffic-2026-05-01.jsonl", [_row("in-plain")])
+    res = stream_query(str(tmp_path), "traffic", date(2026, 5, 1), date(2026, 5, 1),
+                       {"port": 443}, cap=10, sort_by="connections",
+                       matcher=lambda r: True)
+    assert {r["flow_hash"] for r in res.rows} == {"in-gz", "in-plain"}
+
+
+def test_matching_runs_after_merge_not_before(tmp_path):
+    """finding #2：flow_hash（src_ip/dst_ip/port/proto/first_detected，
+    ingestor_traffic._flow_hash）不含 filter 常測的欄位。若照 row-by-row
+    先比對再合併，一個「較舊時符合、現在已經不符合」的 flow 會被誤判成
+    命中，回報過期答案。
+
+    這裡刻意用 bytes_in（MAX 語意）而不是 action／policy_decision 來測：
+    merge_row 對非 volatile 欄位（如 action）本來就凍結在第一筆看到的列
+    （比照 ArchiveImporter 的 upsert：這些欄位不在 `set_` 裡，維持初次
+    插入值，見 merge_row 的 docstring 與上一輪 field-by-field 比對）。拿
+    action 測「先合併再比對」得靠把檔案內兩筆的先後順序倒過來寫才會過，
+    脆弱又容易誤導成「合併會更新 action」；bytes_in 是 MAX 語意、跟寫入
+    順序無關，能乾淨、確定地證明「先合併再比對」這個機制本身，不牽連
+    merge_row 對非 volatile 欄位的既有（已審過的）凍結行為。"""
+    _write(tmp_path, "traffic-2026-05-01.jsonl", [
+        _row("h", bytes_in=10),    # 較舊快照：10 bytes，符合 <=20 的過濾
+        _row("h", bytes_in=100),   # 較新快照：長大到 100 bytes，不再符合
+    ])
+    res = stream_query(str(tmp_path), "traffic", date(2026, 5, 1), date(2026, 5, 1),
+                       {"port": 443}, cap=10, sort_by="connections",
+                       matcher=lambda r: (r.get("bytes_in") or 0) <= 20)
+    assert res.rows == []
+    assert res.matched == 0
+
+
+def test_a_deadline_stops_the_scan_and_reports_incomplete_after(tmp_path):
+    """finding #4：正式環境的封存可能有幾十 GB，filter 再精準也得逐列走
+    過去，可能長時間卡住同步的 web worker。deadline_s=0 保證第一天日檔
+    掃完後、還沒開始第二天之前就跳出——只在日檔之間量時鐘、不逐列量，
+    所以第一天一定完整掃完，不會被腰斬到一半。"""
+    _write(tmp_path, "traffic-2026-05-01.jsonl", [_row("day1")])
+    _write(tmp_path, "traffic-2026-05-02.jsonl", [_row("day2")])
+    _write(tmp_path, "traffic-2026-05-03.jsonl", [_row("day3")])
+    res = stream_query(str(tmp_path), "traffic", date(2026, 5, 1), date(2026, 5, 3),
+                       {"port": 443}, cap=10, sort_by="connections",
+                       matcher=lambda r: True, deadline_s=0)
+    assert res.incomplete_after == date(2026, 5, 1)
+    assert [r["flow_hash"] for r in res.rows] == ["day1"]
+
+
+def test_structurally_invalid_rows_are_skipped_and_counted(tmp_path):
+    """finding #5：語法合法的 JSON 不保證是一筆 flow——`[]`、裸字串、
+    counters 是字串的物件都能通過 orjson.loads，但會在合併時的數值比較
+    或摘要加總炸出 AttributeError/TypeError，讓整趟 [start, end] 掃描失敗。
+    這三種都要被擋下並計數，掃描本身不能失敗。"""
+    p = tmp_path / "traffic-2026-05-01.jsonl"
+    lines = [
+        json.dumps(_row("ok")),
+        json.dumps([]),
+        json.dumps("not a flow"),
+        json.dumps({**_row("bad-counters"), "bytes_in": "abc"}),
+    ]
+    p.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    res = stream_query(str(tmp_path), "traffic", date(2026, 5, 1), date(2026, 5, 1),
+                       {"port": 443}, cap=10, sort_by="connections",
+                       matcher=lambda r: True)
+    assert [r["flow_hash"] for r in res.rows] == ["ok"]
+    assert res.scanned == 4
+    assert res.skipped == 3
