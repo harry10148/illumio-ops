@@ -106,9 +106,16 @@ SUMMARY_TOP_K = 500
 _VOLATILE_MAX = ("flow_count", "bytes_in", "bytes_out", "event_time", "ingested_at")
 
 _SORT_FIELD = {
-    "bandwidth": lambda r: (r.get("bytes_in") or 0) + (r.get("bytes_out") or 0),
     "volume": lambda r: (r.get("bytes_in") or 0) + (r.get("bytes_out") or 0),
     "connections": lambda r: r.get("flow_count") or 0,
+    # "bandwidth" 刻意不在這裡：analyzer 的 bandwidth 是速率
+    # (calculate_mbps，bytes 除以時間區間，src/analyzer.py:285-325)，
+    # 跟 volume（總量，calculate_volume_mb，:327-342）是兩個不同的量——
+    # 同樣的 bytes，一秒內傳完跟一天內傳完，volume 相同、bandwidth 天差
+    # 地遠。封存列沒有 calculate_mbps 需要算速率的欄位（ddms/tdms 從沒
+    # 經過 _traffic_record 寫進封存），硬湊出來的數字會叫「bandwidth」
+    # 卻不是那個意思——正是這個功能要防的「看似合理但錯」。stream_query
+    # 對不在這份表裡的 sort_by 一律拒絕；不要把 bandwidth alias 回來。
 }
 
 
@@ -149,10 +156,22 @@ def stream_query(archive_dir: str, source: str, start, end, filters: dict,
     matcher 由呼叫端提供（GUI 路徑傳 Analyzer._match_flow_filters 的包裝），
     這樣封存與快取共用同一套比對語意，不會長出第二套比對器。
     """
-    if not any(v is not None for v in filters.values()):
+    # 0 是合法的 filter 值（例如 port=0）必須算「有在用」；"" 和 [] 是
+    # 這個模組與呼叫端（Analyzer.query_flows，src/analyzer.py:2276-2289）
+    # 預設塞滿、沒被使用者填的空值 key，不算「有在用」——跟上面
+    # unsupported_filters() 的 truthy 判斷（「空值代表沒在用這個條件」）
+    # 是同一套語意，這裡故意不用更寬鬆的 is not None。
+    if not any(v not in (None, "", []) for v in filters.values()):
         raise ValueError("archive query needs at least one filter")
 
-    key = _SORT_FIELD.get(sort_by, _SORT_FIELD["connections"])
+    if sort_by not in _SORT_FIELD:
+        raise ValueError(
+            f"archive query does not support sort_by={sort_by!r}: the archive "
+            "does not carry the per-flow interval fields (ddms/tdms) a rate "
+            "is computed from, so only 'volume' and 'connections' are "
+            "supported here"
+        )
+    key = _SORT_FIELD[sort_by]
     merged: dict[str, dict] = {}
     scanned = 0
     for row in iter_archive_rows(archive_dir, source, start, end):

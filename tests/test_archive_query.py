@@ -174,3 +174,27 @@ def test_a_query_with_no_filters_is_refused(tmp_path):
     with pytest.raises(ValueError):
         stream_query(str(tmp_path), "traffic", date(2026, 5, 1), date(2026, 5, 1),
                      {}, cap=10, sort_by="connections", matcher=lambda r: True)
+
+
+def test_an_empty_string_filter_value_does_not_count_as_used(tmp_path):
+    """Analyzer.query_flows（src/analyzer.py:2276-2289）建 filter dict 時是
+    整組 key 都塞、沒填的欄位預設 ""/[]，不是省略 key。guard 若用
+    `is not None` 判斷會把這種預設空值誤判成「有指定 filter」而放行
+    無限制掃描；必須跟 unsupported_filters() 一樣用 truthy 語意。"""
+    import pytest
+    with pytest.raises(ValueError):
+        stream_query(str(tmp_path), "traffic", date(2026, 5, 1), date(2026, 5, 1),
+                     {"src_ip": ""}, cap=10, sort_by="connections",
+                     matcher=lambda r: True)
+
+
+def test_bandwidth_sort_is_refused_because_the_archive_has_no_rate_inputs(tmp_path):
+    """bandwidth（calculate_mbps，src/analyzer.py:285-325）是速率，跟 volume
+    （calculate_volume_mb，:327-342）這個總量是兩回事；封存列沒有算速率
+    要用的 ddms/tdms。近似出一個叫 bandwidth 的數字會是這個功能要防的
+    「看似合理但錯」，所以直接拒絕而不是悄悄退回別的排序。"""
+    import pytest
+    with pytest.raises(ValueError, match="ddms/tdms|rate"):
+        stream_query(str(tmp_path), "traffic", date(2026, 5, 1), date(2026, 5, 1),
+                     {"port": 443}, cap=10, sort_by="bandwidth",
+                     matcher=lambda r: True)
