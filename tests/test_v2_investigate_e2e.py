@@ -125,7 +125,7 @@ def _labels(page):
         "gui_accel_modal_title", "gui_q_title", "gui_category", "gui_ev_type_group",
         "gui_event_type", "gui_refresh", "gui_load_more", "gui_search",
         "gui_accel_bulk_btn", "gui_q_apply", "gui_traffic_source", "gui_sort_by",
-        "gui_gen_start_date", "gui_gen_end_date",
+        "gui_gen_start_date", "gui_gen_end_date", "gui_window",
     ]
     return page.evaluate(
         "async (keys) => { const { t } = await import('/static/js/v2/core/i18n.mjs'); "
@@ -959,3 +959,164 @@ def test_unsupported_archive_filters_never_show_raw_backend_keys(v2_page):
     text = page.locator('section[data-cov="IV-05"]').inner_text()
     assert "src_label_group" not in text, text
     assert "draft_policy_decision" not in text, text
+
+
+# ── Task 6 fix round 1 ──────────────────────────────────────────────────────
+
+def test_time_window_control_is_hidden_in_archive_mode(v2_page):
+    """actions.py reads `mins` only after the archive branch's early return
+    (actions.py:293 vs. the archive branch's returns around :202-279), so a
+    window/mins select that still renders in archive mode lets an operator
+    pick a value that is silently thrown away — the exact defect class this
+    feature exists to remove. The control must not render at all once the
+    date range has taken over its job, and it must come back — holding
+    whatever was selected before — when the source switches back to a live
+    one."""
+    page, base_url = v2_page
+    _goto(page, base_url, R_TRAFFIC)
+    labels = _labels(page)
+    query = page.locator('section[data-cov="IV-01"]')
+    src_select = query.locator('select[aria-label="%s"]' % labels["gui_traffic_source"])
+
+    window_select = query.locator('select[aria-label="%s"]' % labels["gui_window"])
+    assert window_select.count() == 1
+    window_select.select_option("1440")
+
+    src_select.select_option("archive")
+    assert query.locator('select[aria-label="%s"]' % labels["gui_window"]).count() == 0
+
+    src_select.select_option("hybrid")
+    window_select = query.locator('select[aria-label="%s"]' % labels["gui_window"])
+    assert window_select.count() == 1
+    assert window_select.input_value() == "1440", "the operator's prior pick must survive the round trip"
+
+
+def test_archive_empty_result_reason_reflects_scanned_and_matched_not_review_db_status(v2_page):
+    """An empty archive result must explain itself from Task 4's own
+    `scanned`/`matched` counts (archive_query.py's ArchiveQueryResult), not
+    the unrelated review-DB `archive_status`/`not_loaded` fields the old
+    load-archive flow used. The new direct date-range scan never sets
+    `not_loaded` and does not depend on any review DB being "loaded", so
+    falling back to that status always reads as "archive not loaded" even
+    when the query genuinely ran — sitting on top of, or instead of, a real
+    answer. `scanned == 0` (no files cover the range) and `scanned > 0`
+    with `matched == 0` (files read, nothing matched) are different facts
+    and must read differently."""
+    page, base_url = v2_page
+    _goto(page, base_url, R_TRAFFIC)
+    labels = _labels(page)
+    query = page.locator('section[data-cov="IV-01"]')
+    query.locator('select[aria-label="%s"]' % labels["gui_traffic_source"]).select_option("archive")
+    query.locator('input[aria-label="%s"]' % labels["gui_gen_start_date"]).fill("2026-08-01")
+    query.locator('input[aria-label="%s"]' % labels["gui_gen_end_date"]).fill("2026-08-07")
+    run_btn = query.get_by_role("button", name=labels["gui_query_flow"], exact=True)
+
+    not_loaded_text = page.evaluate(
+        "async () => { const { t } = await import('/static/js/v2/core/i18n.mjs'); "
+        "return t('gui_archive_not_loaded'); }"
+    )
+
+    # case 1: no archive files at all cover this date range.
+    page.route(
+        "**/api/quarantine/search",
+        lambda route: route.fulfill(
+            status=200, content_type="application/json",
+            body=json.dumps({"ok": True, "rows": [], "actual_source": "archive", "matched": 0, "scanned": 0}),
+        ),
+    )
+    with page.expect_response(lambda r: "/api/quarantine/search" in r.url):
+        run_btn.click()
+    text1 = page.locator('[data-cov="XC-09"]').inner_text()
+    assert not_loaded_text not in text1, text1
+    page.unroute("**/api/quarantine/search")
+
+    # case 2: files were read; nothing matched the query's conditions.
+    page.route(
+        "**/api/quarantine/search",
+        lambda route: route.fulfill(
+            status=200, content_type="application/json",
+            body=json.dumps({"ok": True, "rows": [], "actual_source": "archive", "matched": 0, "scanned": 7}),
+        ),
+    )
+    with page.expect_response(lambda r: "/api/quarantine/search" in r.url):
+        run_btn.click()
+    text2 = page.locator('[data-cov="XC-09"]').inner_text()
+    assert not_loaded_text not in text2, text2
+    assert text1 != text2, "scanned==0 and scanned>0/matched==0 must not read the same"
+
+
+def test_unsupported_label_map_has_no_drift_against_the_archive_blacklist(v2_page):
+    """archive_query.py's UNSUPPORTED_ARCHIVE_FILTER_KEYS is the backend's
+    own authority on which filter keys the archive cannot evaluate (Task
+    4/5). Mirrors test_archive_query.py's
+    test_the_blacklist_covers_every_analyzer_unevaluable_key drift test —
+    same shape, applied to the frontend's translation instead of the
+    backend's blacklist: if a key is ever added there without teaching
+    unsupportedLabel() to translate it, this fails red instead of a raw
+    internal parameter name silently reaching the operator."""
+    from src.pce_cache.archive_query import UNSUPPORTED_ARCHIVE_FILTER_KEYS
+
+    page, base_url = v2_page
+    _goto(page, base_url, R_TRAFFIC)
+    labels = page.evaluate(
+        "async (keys) => { const { unsupportedLabel } = "
+        "await import('/static/js/v2/areas/investigate.mjs'); "
+        "return keys.map(k => unsupportedLabel(k)); }",
+        list(UNSUPPORTED_ARCHIVE_FILTER_KEYS),
+    )
+    for key, label in zip(UNSUPPORTED_ARCHIVE_FILTER_KEYS, labels):
+        assert label != key, "unsupportedLabel() fell through to the raw key for %r" % key
+
+
+def test_actual_source_renders_for_every_backend_value(v2_page):
+    """actual_source is one of exactly four values (Task 4/5's live
+    cache/api/mixed, plus the archive branch's fixed "archive"). Only
+    "mixed" had a direct assertion before this; pin all four render paths,
+    each reading as one consistent set of sentences (Minor 5)."""
+    page, base_url = v2_page
+    _goto(page, base_url, R_TRAFFIC)
+    labels = _labels(page)
+    query = page.locator('section[data-cov="IV-01"]')
+    run_btn = query.get_by_role("button", name=labels["gui_query_flow"], exact=True)
+
+    catalogue = page.evaluate(
+        "async () => { const { t } = await import('/static/js/v2/core/i18n.mjs'); "
+        "return { cache: t('gui_traffic_actual_source_cache'), "
+        "api: t('gui_traffic_actual_source_api'), "
+        "archive: t('gui_traffic_actual_source_archive') }; }"
+    )
+
+    def _stub_actual_source(v):
+        # Playwright calls a route handler as handler(route, request) —
+        # a lambda's `v=value` default-arg trick gets clobbered by that
+        # positional `request` argument, so `v` must come from an outer
+        # closure instead (this factory), not a default parameter.
+        def handler(route, request):
+            route.fulfill(
+                status=200, content_type="application/json",
+                body=json.dumps({"ok": True, "data": [], "actual_source": v}),
+            )
+        return handler
+
+    for value in ("cache", "api"):
+        page.route("**/api/quarantine/search", _stub_actual_source(value))
+        with page.expect_response(lambda r: "/api/quarantine/search" in r.url):
+            run_btn.click()
+        text = page.locator('section[data-cov="IV-05"]').inner_text()
+        assert catalogue[value] in text, (value, text)
+        page.unroute("**/api/quarantine/search")
+
+    page.route(
+        "**/api/quarantine/search",
+        lambda route: route.fulfill(
+            status=200, content_type="application/json",
+            body=json.dumps({"ok": True, "rows": [], "actual_source": "archive", "matched": 0, "scanned": 3}),
+        ),
+    )
+    query.locator('select[aria-label="%s"]' % labels["gui_traffic_source"]).select_option("archive")
+    query.locator('input[aria-label="%s"]' % labels["gui_gen_start_date"]).fill("2026-08-01")
+    query.locator('input[aria-label="%s"]' % labels["gui_gen_end_date"]).fill("2026-08-07")
+    with page.expect_response(lambda r: "/api/quarantine/search" in r.url):
+        run_btn.click()
+    text = page.locator('section[data-cov="IV-05"]').inner_text()
+    assert catalogue["archive"] in text, text

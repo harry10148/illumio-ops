@@ -274,23 +274,25 @@ function unsupportedLabel(key) {
   return key;
 }
 
-// actual_source (Task 4/5 contract) -> catalogue key, "archive" excluded —
-// it reuses the source-select's own archive label (gui_traffic_source_archive)
-// below rather than a fourth minted key, since an archive query's
-// actual_source is always "archive". Looked up via `lookup()`, not by
-// building the key with string concatenation directly inside a translate
-// call: scripts/audit_i18n_usage.py's category G regex matches a literal
-// quoted first argument to the translate helper, and a concatenated literal
-// prefix there trips it into treating the bare prefix as a
-// referenced-but-missing key.
+// actual_source (Task 4/5 contract) -> catalogue key, all four values.
+// Fix round 1, Minor 5: "archive" used to reuse the source-select's own
+// short label (gui_traffic_source_archive, "Archive"/"封存 (Archive)"), which
+// read as a category name sitting next to three full sentences ("Answered
+// from the cache", ...) — an inconsistent voice for what is supposed to be
+// one set of four readouts. It now has its own sentence-shaped key like the
+// other three. Looked up via `lookup()`, not by building the key with string
+// concatenation directly inside a translate call: scripts/audit_i18n_usage.py's
+// category G regex matches a literal quoted first argument to the translate
+// helper, and a concatenated literal prefix there trips it into treating the
+// bare prefix as a referenced-but-missing key.
 const ACTUAL_SOURCE_LABELS = [
   ["cache", "gui_traffic_actual_source_cache"],
   ["api", "gui_traffic_actual_source_api"],
   ["mixed", "gui_traffic_actual_source_mixed"],
+  ["archive", "gui_traffic_actual_source_archive"],
 ];
 
 function actualSourceText(v) {
-  if (v === "archive") return t("gui_traffic_source_archive");
   return t(lookup(ACTUAL_SOURCE_LABELS, v, v), v);
 }
 
@@ -722,11 +724,35 @@ function trafficColumns(onIsolate, sel) {
   ];
 }
 
+/* Fix round 1, Important 2 — the archive branch's OWN scanned/matched counts
+ * (Task 4's ArchiveQueryResult, surfaced on the response as `scanned`/
+ * `matched`) are the true reason an empty archive query came back empty, not
+ * the old review-DB `archive_status`/`not_loaded` flags: the new direct
+ * date-range scan never sets `not_loaded` and does not depend on any review
+ * DB being "loaded" at all, so reasoning from that status always reads as
+ * "archive not loaded" even when the query genuinely ran. Two distinct facts,
+ * both currently collapsed into that one wrong claim:
+ *   scanned == 0            -> no archive files cover this date range at all
+ *   scanned > 0, matched == 0 -> files were read; nothing matched the query
+ * Before any archive query has run in this session (`scanned` still
+ * undefined — e.g. XC-09's audit probe forcing phase "done" without a real
+ * query), neither fact is known yet, so this reads neutrally rather than
+ * guessing. Shared by emptyCauses() and emptyState() so both read the same
+ * three-way distinction the same way. */
+function archiveEmptyReason(state) {
+  const scanned = (state.meta || {}).scanned;
+  if (typeof scanned !== "number") return { tone: "neutral", key: "gui_traffic_archive_scan_pending" };
+  if (scanned === 0) return { tone: "crit", key: "gui_traffic_archive_scan_empty" };
+  return { tone: "warn", key: "gui_traffic_archive_scan_no_match" };
+}
+
 /* XC-09 — an empty result is a question, not a shrug. Each candidate cause is
  * paired with the reading that supports or rules it out, taken from the real
  * endpoints the appliance answers with:
  *   cache enabled?  cache_settings.enabled + cache_status row counts
- *   inside the window? traffic_raw_retention_days / the loaded archive range
+ *   inside the window? traffic_raw_retention_days, or (archive) the real
+ *     scanned/matched counts from the query that just ran — see
+ *     archiveEmptyReason() above
  *   filters too tight? the live pill count and the quick-search string
  * quarantine.js:402-404 already distinguishes "archive not loaded" from "no
  * traffic"; this generalises that one distinction into the three the operator
@@ -734,7 +760,6 @@ function trafficColumns(onIsolate, sel) {
 function emptyCauses(state, d) {
   const settings = d.cache_settings || {};
   const cstat = d.cache_status || {};
-  const arch = d.archive_status || {};
   const list = el("ul", { class: "causes" });
 
   function cause(qKey, answer, tn, reason) {
@@ -750,10 +775,9 @@ function emptyCauses(state, d) {
     tf("gui_iv_cause_cache_r", { raw: num(cstat.traffic_raw), agg: num(cstat.traffic_agg) }));
 
   if (state.source === "archive") {
-    const loaded = arch.loaded === true && Number(arch.rows) > 0;
-    cause("gui_iv_cause_window", loaded ? arch.start + " → " + arch.end : t("gui_traffic_archive_none"),
-      loaded ? "info" : "crit",
-      loaded ? tf("gui_iv_cause_archive_r", { rows: num(arch.rows), files: num(arch.files) }) : t("gui_archive_not_loaded"));
+    const range = (state.archiveStart || "—") + " → " + (state.archiveEnd || "—");
+    const reason = archiveEmptyReason(state);
+    cause("gui_iv_cause_window", range, reason.tone, t(reason.key));
   } else {
     const days = settings.traffic_raw_retention_days;
     cause("gui_iv_cause_window", tf("gui_iv_days", { n: days === undefined ? "—" : days }), "info",
@@ -785,16 +809,10 @@ function emptyState(state, d) {
       el("p", { text: t("gui_iv_search_prompt") })
     );
   }
-  // actions.py:102-108 — an archive query with no review DB loaded answers
-  // {ok:true, data:[], not_loaded:true}. That flag is the authority on why
-  // this result is empty (quarantine.js:402-404 makes the same distinction);
-  // archive_status is the fallback before any query has run.
-  const meta = state.meta || {};
-  const archiveMiss = state.source === "archive"
-    && (meta.notLoaded === true || !(d.archive_status || {}).loaded);
+  const archiveReason = state.source === "archive" ? archiveEmptyReason(state) : null;
   return el("div", { class: "empty", "data-cov": "XC-09" },
     el("span", { class: "et", text: t("gui_empty_state_no_data_title") }),
-    el("p", { text: archiveMiss ? t("gui_archive_not_loaded") : t("gui_no_traffic") }),
+    el("p", { text: archiveReason ? t(archiveReason.key) : t("gui_no_traffic") }),
     emptyCauses(state, d)
   );
 }
@@ -822,10 +840,19 @@ function archiveLoadLabel(state) {
  * quarantine.js:783-793 (refreshArchiveStatus) chooses between
  * gui_traffic_archive_loaded_fmt {start}/{end}/{n} and gui_traffic_archive_none;
  * the load state (idle/running/error) comes from the same payload's `load`
- * object (:817-826). Always rendered, not only in archive mode: knowing an
- * archive exists is what makes the source switch meaningful.
+ * object (:817-826).
  * DESIGN-ADDED: rendering `load.state` as a tone-coloured badge is new — the
- * product surfaces it as plain text only. */
+ * product surfaces it as plain text only.
+ * Fix round 1, Important 2 — this strip's sole input is the old review-DB
+ * "loaded" flag, which Task 4/5's direct date-range archive query does not
+ * read and never sets: a real archive query can return real rows while this
+ * strip still claims "No archive loaded", sitting right above the answer it
+ * contradicts. That flag's meaning ("is there a review DB to switch to") no
+ * longer applies once the source select is actually on "archive" — so the
+ * call site (repaint(), below) stops rendering this strip for that source.
+ * It is UNCHANGED, and still rendered, for hybrid/live — this file's own
+ * `state` is not even passed to it, by design, to keep this function itself
+ * blind to source and the gating decision entirely at the call site. */
 function archiveStrip(d) {
   const a = d.archive_status || {};
   const loaded = a.loaded === true && Number(a.rows) > 0;
@@ -1437,7 +1464,10 @@ async function mountTraffic(root, ctx) {
         clear(host);
         host.appendChild(kpiRow(state.rows, state.phase));
         host.appendChild(query);
-        host.appendChild(archiveStrip(d));
+        // Fix round 1, Important 2 — see archiveStrip()'s own header: its
+        // "loaded review DB" reading is meaningless (and actively
+        // contradicts real results) once the source really is "archive".
+        if (state.source !== "archive") host.appendChild(archiveStrip(d));
         host.appendChild(results());
         paintFloatTraffic();
       }
@@ -1478,14 +1508,21 @@ async function mountTraffic(root, ctx) {
           return;
         }
         // live answers {data, total_matches, cap}; archive answers {rows,
-        // matched} (actions.py:266-279) — neither field name exists on the
-        // other branch's response.
+        // matched, scanned} (actions.py:266-279) — neither field name exists
+        // on the other branch's response.
         state.rows = r.data || r.rows || [];
         state.meta = {};
         state.meta.truncated = !!r.truncated;
         state.meta.summaryOmitted = r.summary_omitted || 0;
         state.meta.actualSource = r.actual_source || "";
-        state.meta.notLoaded = !!r.not_loaded;
+        // Fix round 1, Important 2 — `scanned`/`matched` (archive only; both
+        // undefined on a live response) are the real reason an archive query
+        // came back empty: how many daily files covered the date range, and
+        // how many of their rows matched. Replaces the old `not_loaded`
+        // reading, which the new direct date-range scan never sends —
+        // archiveEmptyReason() below is the sole consumer.
+        state.meta.scanned = r.scanned;
+        state.meta.matched = r.matched;
         repaint();
         toast.ok(tf("gui_iv_query_done", { n: num(state.rows.length) }));
       }
@@ -1517,7 +1554,18 @@ async function mountTraffic(root, ctx) {
       let queryRow = null;
       function buildQueryRow() {
         const row = el("div", { class: "qrow" });
-        row.appendChild(selectField(t("gui_window"), WINDOWS, state.mins, function (v) { state.mins = v; }));
+        // Fix round 1, Important 1 — actions.py reads `mins` only after the
+        // archive branch's own early return (actions.py:~293 vs. the archive
+        // branch's returns around :202-279), so it is never honoured for an
+        // archive query. The archive's date range has taken over the window
+        // control's job; a control that does nothing when used is worse than
+        // an absent one, so it is not rendered at all in archive mode.
+        // `state.mins` itself is untouched by this — only the DOM node is
+        // omitted — so the operator's prior pick is still there, selected,
+        // the moment the source switches back to a live one.
+        if (state.source !== "archive") {
+          row.appendChild(selectField(t("gui_window"), WINDOWS, state.mins, function (v) { state.mins = v; }));
+        }
         const src = selectField(t("gui_traffic_source"), SOURCES, state.source, function (v) {
           state.source = v;
           if (state.source === "archive" && state.sort === "bandwidth") state.sort = "volume";
@@ -2871,4 +2919,9 @@ function installTeardown(state) {
   });
 }
 
-export { mountTraffic, mountWorkloads, mountEvents };
+// unsupportedLabel is exported test-only, for the drift guard in
+// tests/test_v2_investigate_e2e.py (Fix round 1, Minor 3) that ties it to
+// archive_query.py's UNSUPPORTED_ARCHIVE_FILTER_KEYS the same way
+// test_archive_query.py's own drift test ties that constant to the
+// analyzer's — nothing else in this module imports it.
+export { mountTraffic, mountWorkloads, mountEvents, unsupportedLabel };
