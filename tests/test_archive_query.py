@@ -61,3 +61,32 @@ def test_a_bad_line_is_skipped_not_fatal(tmp_path):
 def test_missing_directory_yields_nothing(tmp_path):
     assert list(iter_archive_rows(
         str(tmp_path / "nope"), "traffic", date(2026, 5, 1), date(2026, 5, 1))) == []
+
+
+from src.pce_cache.archive_query import unsupported_filters
+
+
+def test_label_group_and_ams_filters_are_rejected():
+    got = unsupported_filters({"src_label_groups": ["x"], "dst_ams": ["y"], "port": 443})
+    assert got == ["dst_ams", "src_label_groups"]
+
+
+def test_draft_policy_decision_is_rejected():
+    assert unsupported_filters({"draft_policy_decision": "allowed"}) == ["draft_policy_decision"]
+
+
+def test_empty_values_do_not_count_as_used():
+    assert unsupported_filters({"src_label_groups": [], "dst_ams": None}) == []
+
+
+def test_evaluable_filters_pass():
+    assert unsupported_filters({"port": 443, "src_ip": "10.0.0.1"}) == []
+
+
+def test_the_blacklist_covers_every_analyzer_unevaluable_key():
+    """analyzer 已經維護了一份『cache 端無法評估』的清單；封存是更嚴格的
+    離線情境，不得比它寬鬆。這條在 analyzer 新增 key 時會紅。"""
+    from src.analyzer import _CACHE_UNEVALUABLE_FILTER_KEYS
+    from src.pce_cache.archive_query import UNSUPPORTED_ARCHIVE_FILTER_KEYS
+    missing = set(_CACHE_UNEVALUABLE_FILTER_KEYS) - set(UNSUPPORTED_ARCHIVE_FILTER_KEYS)
+    assert missing == set(), f"archive blacklist is looser than the cache's: {sorted(missing)}"
