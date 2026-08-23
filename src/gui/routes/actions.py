@@ -263,19 +263,61 @@ def make_actions_blueprint(
                         # 是守門條件：query_filters 裡沒有任何縮小範圍的條件。
                         return _err(t("gui_err_archive_filter_required", lang=lang), 400)
 
+                    # 終審 F1：封存列是攤平的封存紀錄（src_ip/dst_ip/port/...），
+                    # 前端 trafficRows() 讀的是 live 形狀（item.source/
+                    # destination/service/formatted_*/timestamp_range）——原樣
+                    # 回傳會讓表格每一格都是空白、KPI 把 0 當成量測值呈現。
+                    # `raw` 就是原始 PCE flow payload（ingestor_traffic.py
+                    # 存進 raw_json 時未經改動），跟 live 的 `f` 是同一種形狀，
+                    # 所以投影用 Analyzer._shape_traffic_row 這同一份、不另建
+                    # 第二套。
+                    #
+                    # 指標必須來自 merge_row() 合併後的頂層計數器（MAX across
+                    # 重複快照），不能用 raw 自己的 byte 欄位重算——raw 只是
+                    # 較新那次快照，用它算會悄悄把合併撤銷掉，重現合併原本
+                    # 要防的低估（終審 F1/F6）。bandwidth 傳 None：封存從不
+                    # 記錄 ddms/tdms，沒有速率可言，讓下游（KPI 尖峰頻寬、
+                    # fmtBw）維持既有的「—」呈現，不要印出一個看似量測到、
+                    # 其實是 0 的頻寬。
+                    shaped_rows = [
+                        base_ana._shape_traffic_row(
+                            row.get("raw") or {},
+                            bw_val=None, bw_note="",
+                            vol_val=((row.get("bytes_in") or 0)
+                                     + (row.get("bytes_out") or 0)) / 1024 / 1024,
+                            vol_note="(Total)",
+                            conn_val=row.get("flow_count") or 0,
+                        )
+                        for row in result.rows
+                    ]
+
                     return jsonify({
                         "ok": True,
-                        "rows": result.rows,
+                        "rows": shaped_rows,
                         "summary": result.summary,
                         "summary_omitted": result.summary_omitted,
                         "truncated": result.truncated,
                         "matched": result.matched,
                         "scanned": result.scanned,
+                        # 終審 F3：略過的列數（結構不合法或 JSON 語法壞掉）
+                        # 與整個檔案（片段）讀不到的次數，分開回傳——單位
+                        # 不同，混在一起是另一種不誠實。
+                        "skipped": result.skipped,
+                        "files_incomplete": result.files_incomplete,
                         "actual_source": "archive",
                         "sort_by": archive_sort_by,
+                        # 終審 F7：GUI 已經到不了「送 bandwidth 給封存」這個
+                        # 狀態（切到 archive 時前端自己把 sort 從 bandwidth
+                        # 挪開），所以這個旗標目前沒有 GUI 消費端——但直接打
+                        # API 的呼叫端還是可能送 bandwidth，這個欄位仍要誠實
+                        # 回報「你要的排序被換掉了」。保留欄位，不要為它加
+                        # UI。
                         "sort_by_substituted": sort_by_substituted,
                         "incomplete_after": (result.incomplete_after.isoformat()
                                               if result.incomplete_after else None),
+                        # 終審 F5：incomplete_after 為真時，是被 deadline 還是
+                        # size cap 打斷的——兩個不同的事實，前端得分開講。
+                        "stop_reason": result.stop_reason,
                     })
 
                 raw_data_source = d.get("data_source")

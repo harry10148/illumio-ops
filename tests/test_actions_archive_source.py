@@ -86,6 +86,27 @@ def test_quarantine_search_archive_source_streams_matching_rows(client):
     assert "10.0.0.9" in resp.get_data(as_text=True)
 
 
+def test_quarantine_search_archive_reports_skipped_rows_and_stop_reason(client, tmp_path):
+    """終審 F3：略過的列數要到得了端點回應，不能只留在伺服器 log 裡。
+    這裡在既有 fixture 的封存檔多加一行壞掉的 JSON，斷言 body["skipped"]
+    真的反映出來；掃描本身完整跑完（沒有逾時或撞到大小上限），
+    stop_reason 應為 None（終審 F5）。"""
+    c, cm = client
+    arch_dir = cm.models.pce_cache.archive_dir
+    with open(os.path.join(arch_dir, "traffic-2026-06-20.jsonl"), "a") as fh:
+        fh.write("not json at all\n")
+    resp = c.post("/api/quarantine/search",
+                  json={"source": "archive", "port": 443,
+                        "archive_start": "2026-06-20", "archive_end": "2026-06-20"},
+                  environ_overrides={"REMOTE_ADDR": "127.0.0.1"})
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert body["ok"] is True
+    assert body["skipped"] == 1
+    assert body["files_incomplete"] == 0
+    assert body["stop_reason"] is None
+
+
 def test_quarantine_search_archive_empty_outside_range(client):
     """沒有 review DB 這個概念了：查一個封存裡沒有日檔的日期區間就是回空
     （ok=True, rows=[]），不是特別的 not_loaded 狀態。"""
@@ -110,6 +131,129 @@ def test_archive_source_rejects_filters_it_cannot_evaluate(client):
     body = resp.get_json()
     assert body["ok"] is False
     assert "src_label_groups" in body["unsupported"]
+
+
+@pytest.fixture
+def client_with_duplicate_exports(tmp_path):
+    """同一個 flow_hash 的兩次匯出：較新那次快照的 bytes/連線數刻意比較
+    舊那次低——長壽 flow 若真的先長大再萎縮，或只是重拉時碰上取樣抖動，
+    merge_row() 的 MAX 語意都要留住較大值；若渲染時偷懶去 `raw`（單一、
+    最新那次快照）自己的欄位重算，會算出這裡刻意做小的新值而不是合併後
+    的正確值——這是終審 F1/F6 那個接縫的判別測試。"""
+    fd, path = tempfile.mkstemp(suffix=".json")
+    os.close(fd)
+    arch = tmp_path / "arch"
+    arch.mkdir()
+    older = orjson.dumps({
+        "event_time": "2026-06-20T10:00:00+00:00",
+        "ingested_at": "2026-06-20T10:00:00+00:00",
+        "first_detected": "2026-06-20T09:00:00+00:00",
+        "flow_hash": "dup1", "src_ip": "10.0.0.20", "src_workload": None,
+        "dst_ip": "10.0.0.21", "dst_workload": None,
+        "port": 443, "protocol": "tcp", "action": "allowed",
+        "flow_count": 50, "bytes_in": 9000, "bytes_out": 9000,
+        "raw": {
+            "src": {"ip": "10.0.0.20"}, "dst": {"ip": "10.0.0.21"},
+            "service": {"port": 443, "proto": 6},
+            "dst_port": 443, "proto": 6, "policy_decision": "allowed",
+            "num_connections": 50,
+            "timestamp_range": {"first_detected": "2026-06-20T09:00:00+00:00",
+                                 "last_detected": "2026-06-20T10:00:00+00:00"},
+        },
+    })
+    newer = orjson.dumps({
+        "event_time": "2026-06-20T14:00:00+00:00",
+        "ingested_at": "2026-06-20T14:00:00+00:00",
+        "first_detected": "2026-06-20T09:00:00+00:00",
+        "flow_hash": "dup1", "src_ip": "10.0.0.20", "src_workload": None,
+        "dst_ip": "10.0.0.21", "dst_workload": None,
+        "port": 443, "protocol": "tcp", "action": "blocked",
+        "flow_count": 3, "bytes_in": 100, "bytes_out": 100,
+        "raw": {
+            "src": {"ip": "10.0.0.20"}, "dst": {"ip": "10.0.0.21"},
+            "service": {"port": 443, "proto": 6},
+            "dst_port": 443, "proto": 6, "policy_decision": "blocked",
+            "num_connections": 3,
+            "timestamp_range": {"first_detected": "2026-06-20T09:00:00+00:00",
+                                 "last_detected": "2026-06-20T14:00:00+00:00"},
+        },
+    })
+    with open(arch / "traffic-2026-06-20.jsonl", "wb") as fh:
+        fh.write(older + b"\n")
+        fh.write(newer + b"\n")
+    with open(path, "w") as f:
+        json.dump({
+            "web_gui": {"username": "admin", "password": "pw", "secret_key": "s",
+                        "allowed_ips": ["127.0.0.1"]},
+            "pce_cache": {"enabled": True, "db_path": str(tmp_path / "cache.sqlite"),
+                          "archive_dir": str(arch)},
+        }, f)
+    cm = ConfigManager(config_file=path)
+    from src.gui import _create_app
+    app = _create_app(cm, persistent_mode=True)
+    app.config["TESTING"] = True
+    app.config["WTF_CSRF_ENABLED"] = False
+    with app.test_client() as c:
+        c.post("/api/login", json={"username": "admin", "password": "pw"},
+               environ_overrides={"REMOTE_ADDR": "127.0.0.1"})
+        yield c, cm
+    os.unlink(path)
+
+
+def test_archive_row_is_shaped_like_a_live_row_and_metrics_come_from_the_merge_not_raw(
+        client_with_duplicate_exports):
+    """終審 F1：端點必須把封存列投影成前端讀的 live 形狀（item.source/
+    destination/service/formatted_volume/num_connections/policy_decision），
+    不能原樣回傳攤平的封存欄位——否則整張表格每一格都是空白（這條測試
+    對照修復前的程式碼必須是紅的）。
+
+    同時是終審 F6/F1 那個接縫的判別測試：指標必須來自 merge_row() 合併後
+    的頂層計數器（MAX across 重複快照），不能從 `raw`（單一、最新那次
+    快照）自己的欄位重算——fixture 讓「較新」那筆 bytes/flow_count 刻意
+    比「較舊」那筆低，用 raw 重算會得到錯的小值。"""
+    c, _cm = client_with_duplicate_exports
+    resp = c.post("/api/quarantine/search",
+                  json={"source": "archive", "port": 443,
+                        "archive_start": "2026-06-20", "archive_end": "2026-06-20"},
+                  environ_overrides={"REMOTE_ADDR": "127.0.0.1"})
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert body["ok"] is True
+    assert len(body["rows"]) == 1
+    row = body["rows"][0]
+
+    # shaped like a live row: identity/service objects, not flat archive fields
+    assert row["source"]["ip"] == "10.0.0.20"
+    assert row["destination"]["ip"] == "10.0.0.21"
+    assert row["service"]["port"] == 443
+    assert row["service"]["proto"] == "TCP"
+    assert row["timestamp_range"]["last_detected"] == "2026-06-20T14:00:00+00:00"
+
+    # metrics come from the merge (MAX), not from raw's own (newer, smaller) snapshot
+    assert row["num_connections"] == 50
+    assert row["total_connections"] == 50
+    assert row["total_volume_mb"] == pytest.approx((9000 + 9000) / 1024 / 1024)
+
+    # policy decision reads the newest raw snapshot (F6): the fresher one is "blocked"
+    assert row["policy_decision"] == "blocked"
+
+
+def test_archive_source_rejects_port_range_filters(client):
+    """Final review F4: port_range/ex_port_range are PCE-native (execution
+    "native" in _TRAFFIC_FILTER_CAPABILITIES) — the archive has no PCE to
+    fall back to and neither client-side matcher evaluates them. Both are
+    also in _NARROWING_FILTER_KEYS, so without this rejection the request
+    would pass the "needs a narrowing filter" guard and silently return the
+    whole unfiltered range."""
+    c, _cm = client
+    resp = c.post("/api/quarantine/search",
+                  json={"source": "archive", "port_range": "8000-9000",
+                        "archive_start": "2026-06-20", "archive_end": "2026-06-20"},
+                  environ_overrides={"REMOTE_ADDR": "127.0.0.1"})
+    assert resp.status_code == 400
+    body = resp.get_json()
+    assert body["ok"] is False
+    assert "port_range" in body["unsupported"]
 
 
 def test_archive_source_requires_a_date_range(client):

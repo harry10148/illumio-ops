@@ -2221,6 +2221,113 @@ class Analyzer:
             if err:
                 raise TrafficQueryError(str(err))
 
+    def _shape_traffic_row(self, f: dict[str, Any], *,
+                            bw_val: float | None, bw_note: str,
+                            vol_val: float, vol_note: str,
+                            conn_val: int) -> dict[str, Any]:
+        """把一筆原始 PCE flow payload（或形狀相同的封存 `raw` 快照）投影成
+        流量表格要渲染的列：來源/目的身分、服務、通訊協定名稱、首見/末見
+        時間、政策判定。`query_flows`（live/cache）與封存端點
+        （actions.py 的 source=="archive" 分支）共用這一份投影，不另建
+        第二套（終審 F1）。
+
+        指標值由呼叫端算好傳進來，這裡不重新計算：live flow 帶
+        ddms/tdms，走 calculate_mbps／calculate_volume_mb／
+        f.get('num_connections')；封存列沒有逐列的速率遙測，byte/連線
+        計數器必須來自 merge_row() 對重複快照取 MAX 後的合併值，不能用
+        這裡的 `f`（單一、最新快照）自己的欄位重算——那樣會悄悄把合併
+        撤銷掉，重現合併原本要防的低估（終審 F1/F6）。
+
+        `bw_val=None` 代表這筆列沒有頻寬資料可言（封存從不記錄
+        ddms/tdms）：不寫入 max_bandwidth_mbps／formatted_bandwidth，讓
+        下游（trafficKpis 的尖峰頻寬、fmtBw）維持它們既有對「沒有這個
+        量測」的呈現方式（「—」），而不是印出一個看似量測到、其實是 0
+        的頻寬。
+        """
+        src = f.get('src', {})
+        dst = f.get('dst', {})
+        svc = f.get('service', {})
+
+        s_name = src.get('workload', {}).get('name') or src.get('ip', 'N/A')
+        d_name = dst.get('workload', {}).get('name') or dst.get('ip', 'N/A')
+        port = svc.get('port', 'All') or f.get('dst_port', 'All')
+
+        f_copy = f.copy()
+
+        # Format Protocol Name
+        proto = f.get('proto') or svc.get('proto', '')
+        try:
+            p_int = int(proto)
+            if p_int == 6: proto = "TCP"
+            elif p_int == 17: proto = "UDP"
+            elif p_int == 1: proto = "ICMP"
+        except (ValueError, TypeError): pass  # intentional fallback: leave proto as raw string if not parseable
+
+        # Determine process/user attribution via flow_direction:
+        # - "inbound"  → captured by dst VEN → belongs to dst
+        # - "outbound" → captured by src VEN → belongs to src
+        svc_proc = svc.get('process_name') or ""
+        svc_user = svc.get('user_name') or ""
+        flow_dir = (f.get('flow_direction') or "").lower()
+        if flow_dir == "inbound":
+            src_proc, src_user = "", ""
+            dst_proc, dst_user = svc_proc, svc_user
+        elif flow_dir == "outbound":
+            src_proc, src_user = svc_proc, svc_user
+            dst_proc, dst_user = "", ""
+        else:
+            # Unknown direction: surface in service cell as fallback
+            src_proc, src_user = "", ""
+            dst_proc, dst_user = "", ""
+
+        f_copy['source'] = {
+            "name": s_name,
+            "ip": src.get('ip'),
+            "href": src.get('workload', {}).get('href'),
+            "labels": src.get('workload', {}).get('labels', []),
+            "process": src_proc,
+            "user": src_user,
+        }
+        f_copy['destination'] = {
+            "name": d_name,
+            "ip": dst.get('ip'),
+            "href": dst.get('workload', {}).get('href'),
+            "labels": dst.get('workload', {}).get('labels', []),
+            "process": dst_proc,
+            "user": dst_user,
+        }
+        f_copy['service'] = {
+            "port": port,
+            "proto": proto,
+            "name": svc.get("name") or getattr(svc, 'name', '') or f.get("sn") or "",
+            # Fallback: surface process/user in service cell when direction unknown
+            "process": svc_proc if not flow_dir else "",
+            "user": svc_user if not flow_dir else "",
+        }
+
+        if bw_val is not None:
+            f_copy["max_bandwidth_mbps"] = bw_val
+            f_copy["formatted_bandwidth"] = f"{format_unit(bw_val, 'bandwidth')} {bw_note}".strip()
+        f_copy["total_volume_mb"] = vol_val
+        f_copy["total_connections"] = conn_val
+        # trafficKpis (investigate.mjs) reads num_connections straight off the
+        # row for the connection-count KPI — live rows get it incidentally
+        # via f.copy() (the raw PCE flow already carries it), but an archive
+        # row's `raw` is a single snapshot and may not; setting it explicitly
+        # from the caller-supplied (already-merged, for archive) conn_val
+        # keeps the KPI honest for both callers instead of relying on an
+        # accident of what live's f.copy() happened to preserve.
+        f_copy["num_connections"] = conn_val
+
+        f_copy["formatted_volume"] = f"{format_unit(vol_val, 'volume')} {vol_note}".strip()
+        f_copy["formatted_connections"] = f"{conn_val}"
+
+        ts = f.get('timestamp_range', {})
+        f_copy["first_seen"] = ts.get('first_detected')
+        f_copy["last_seen"] = ts.get('last_detected')
+        f_copy["policy_decision"] = f.get("policy_decision")
+        return f_copy
+
     def query_flows(self, params: dict) -> list[dict[str, Any]]:
         """
         Generic traffic flow query utilizing identical metrics logic to run_debug_mode.
@@ -2418,62 +2525,13 @@ class Analyzer:
                 if not matches_search:
                     continue
 
-            f_copy = f.copy()
-            
-            # Format Protocol Name
-            proto = f.get('proto') or svc.get('proto', '')
-            try:
-                p_int = int(proto)
-                if p_int == 6: proto = "TCP"
-                elif p_int == 17: proto = "UDP"
-                elif p_int == 1: proto = "ICMP"
-            except (ValueError, TypeError): pass  # intentional fallback: leave proto as raw string if not parseable
-
-            # Determine process/user attribution via flow_direction:
-            # - "inbound"  → captured by dst VEN → belongs to dst
-            # - "outbound" → captured by src VEN → belongs to src
-            svc_proc = svc.get('process_name') or ""
-            svc_user = svc.get('user_name') or ""
-            flow_dir = (f.get('flow_direction') or "").lower()
-            if flow_dir == "inbound":
-                src_proc, src_user = "", ""
-                dst_proc, dst_user = svc_proc, svc_user
-            elif flow_dir == "outbound":
-                src_proc, src_user = svc_proc, svc_user
-                dst_proc, dst_user = "", ""
-            else:
-                # Unknown direction: surface in service cell as fallback
-                src_proc, src_user = "", ""
-                dst_proc, dst_user = "", ""
-
-            f_copy['source'] = {
-                "name": s_name,
-                "ip": src.get('ip'),
-                "href": src.get('workload', {}).get('href'),
-                "labels": src.get('workload', {}).get('labels', []),
-                "process": src_proc,
-                "user": src_user,
-            }
-            f_copy['destination'] = {
-                "name": d_name,
-                "ip": dst.get('ip'),
-                "href": dst.get('workload', {}).get('href'),
-                "labels": dst.get('workload', {}).get('labels', []),
-                "process": dst_proc,
-                "user": dst_user,
-            }
-            f_copy['service'] = {
-                "port": port,
-                "proto": proto,
-                "name": svc.get("name") or getattr(svc, 'name', '') or f.get("sn") or "",
-                # Fallback: surface process/user in service cell when direction unknown
-                "process": svc_proc if not flow_dir else "",
-                "user": svc_user if not flow_dir else "",
-            }
-
             bw_val, bw_note, _, _ = self.calculate_mbps(f)
             vol_val, vol_note = self.calculate_volume_mb(f)
             conn_val = _safe_int(f.get("num_connections") or f.get("count", 1))
+
+            f_copy = self._shape_traffic_row(
+                f, bw_val=bw_val, bw_note=bw_note,
+                vol_val=vol_val, vol_note=vol_note, conn_val=conn_val)
 
             if rule["type"] == "bandwidth":
                 f_copy['_metric_val'] = bw_val
@@ -2481,19 +2539,6 @@ class Analyzer:
                 f_copy['_metric_val'] = vol_val
             else:
                 f_copy['_metric_val'] = conn_val
-                
-            f_copy["max_bandwidth_mbps"] = bw_val
-            f_copy["total_volume_mb"] = vol_val
-            f_copy["total_connections"] = conn_val
-            
-            f_copy["formatted_bandwidth"] = f"{format_unit(bw_val, 'bandwidth')} {bw_note}".strip()
-            f_copy["formatted_volume"] = f"{format_unit(vol_val, 'volume')} {vol_note}".strip()
-            f_copy["formatted_connections"] = f"{conn_val}"
-            
-            ts = f.get('timestamp_range', {})
-            f_copy["first_seen"] = ts.get('first_detected')
-            f_copy["last_seen"] = ts.get('last_detected')
-            f_copy["policy_decision"] = f.get("policy_decision")
 
             matches.append(f_copy)
 
