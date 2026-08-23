@@ -84,40 +84,178 @@ def make_actions_blueprint(
             from src.api_client import ApiClient
             from src.analyzer import Analyzer
             from src.exceptions import TrafficQueryError
+            from src.pce_cache.archive_query import stream_query, unsupported_filters
             from src.reporter import Reporter
             import datetime
 
             with ApiClient(cm) as api:
-                from src.main import _make_cache_reader
-                # 資料來源：live（即時快取）預設，archive 則查已載入的 review DB。
+                # 資料來源：live（即時快取）預設；archive 直接串流封存日檔
+                # （Task 4 起不再經 review DB／cache_reader）。
                 source = d.get("source", "live")
-                reader_db = None
+
                 if source == "archive":
-                    from src.pce_cache.archive_import import review_db_path
-                    reader_db = review_db_path(cm.models.pce_cache)
-                cache_reader = _make_cache_reader(cm, db_path=reader_db)
+                    try:
+                        archive_start = datetime.date.fromisoformat(str(d.get("archive_start") or ""))
+                        archive_end = datetime.date.fromisoformat(str(d.get("archive_end") or ""))
+                    except ValueError:
+                        return _err(t("gui_err_archive_range_required", lang=lang), 400)
+
+                    # 與 query_flows 的 query_filters 白名單同一份 key 集合
+                    # （analyzer.py 約 :2219-2289），值改讀 d——archive 跟 live
+                    # 共用 Analyzer._match_flow_filters 同一套比對器，不另建
+                    # 第二套；照抄這份白名單才能保證兩邊對「filter 是什麼意思」
+                    # 的認知一致。
+                    query_filters = {
+                        "port": d.get("port"),
+                        "proto": d.get("proto"),
+                        "port_range": d.get("port_range"),
+                        "ex_port": d.get("ex_port"),
+                        "ex_port_range": d.get("ex_port_range"),
+                        "services": d.get("services", []),
+                        "ex_services": d.get("ex_services", []),
+                        "ports": d.get("ports", []),
+                        "ex_ports": d.get("ex_ports", []),
+                        "process_name": d.get("process_name"),
+                        "ex_process_name": d.get("ex_process_name"),
+                        "windows_service_name": d.get("windows_service_name"),
+                        "ex_windows_service_name": d.get("ex_windows_service_name"),
+                        "src_label": d.get("src_label"),
+                        "src_label_group": d.get("src_label_group"),
+                        "src_label_groups": d.get("src_label_groups"),
+                        "dst_label": d.get("dst_label"),
+                        "dst_label_group": d.get("dst_label_group"),
+                        "dst_label_groups": d.get("dst_label_groups"),
+                        "src_ip_in": d.get("src_ip_in"),
+                        "dst_ip_in": d.get("dst_ip_in"),
+                        "ex_src_label": d.get("ex_src_label"),
+                        "ex_src_label_group": d.get("ex_src_label_group"),
+                        "ex_src_label_groups": d.get("ex_src_label_groups"),
+                        "ex_dst_label": d.get("ex_dst_label"),
+                        "ex_dst_label_group": d.get("ex_dst_label_group"),
+                        "ex_dst_label_groups": d.get("ex_dst_label_groups"),
+                        "ex_src_ip": d.get("ex_src_ip"),
+                        "ex_dst_ip": d.get("ex_dst_ip"),
+                        "any_label": d.get("any_label"),
+                        "any_ip": d.get("any_ip"),
+                        "ex_any_label": d.get("ex_any_label"),
+                        "ex_any_ip": d.get("ex_any_ip"),
+                        "src_ams": d.get("src_ams"),
+                        "dst_ams": d.get("dst_ams"),
+                        "ex_src_ams": d.get("ex_src_ams"),
+                        "ex_dst_ams": d.get("ex_dst_ams"),
+                        "transmission_excludes": d.get("transmission_excludes") or d.get("ex_transmission"),
+                        "transmission": d.get("transmission"),
+                        "src_include_groups": d.get("src_include_groups"),
+                        "dst_include_groups": d.get("dst_include_groups"),
+                        "search": d.get("search"),
+                        "draft_policy_decision": d.get("draft_policy_decision"),
+                        "src_labels": d.get("src_labels", []),
+                        "dst_labels": d.get("dst_labels", []),
+                        "ex_src_labels": d.get("ex_src_labels", []),
+                        "ex_dst_labels": d.get("ex_dst_labels", []),
+                        "src_iplist": d.get("src_iplist", ""),
+                        "src_iplists": d.get("src_iplists", []),
+                        "dst_iplist": d.get("dst_iplist", ""),
+                        "dst_iplists": d.get("dst_iplists", []),
+                        "ex_src_iplists": d.get("ex_src_iplists", []),
+                        "ex_dst_iplists": d.get("ex_dst_iplists", []),
+                        "src_workloads": d.get("src_workloads", []),
+                        "dst_workloads": d.get("dst_workloads", []),
+                        "ex_src_workloads": d.get("ex_src_workloads", []),
+                        "ex_dst_workloads": d.get("ex_dst_workloads", []),
+                        "any_iplist": d.get("any_iplist", ""),
+                        "any_workload": d.get("any_workload", ""),
+                        "ex_any_iplist": d.get("ex_any_iplist", ""),
+                        "ex_any_workload": d.get("ex_any_workload", ""),
+                    }
+
+                    unsupported = unsupported_filters(query_filters)
+                    if unsupported:
+                        return jsonify({
+                            "ok": False,
+                            "unsupported": unsupported,
+                            "error": t("gui_err_archive_filter_unsupported", lang=lang,
+                                       keys=", ".join(unsupported)),
+                        }), 400
+
+                    base_ana = Analyzer(cm, api, Reporter(cm))
+                    query_spec = api.build_traffic_query_spec(query_filters)
+                    requested_sort_by = d.get("sort_by", "bandwidth")
+                    # 封存列沒有算速率(bandwidth)需要的 ddms/tdms（見
+                    # archive_query.py 的 _SORT_FIELD 註解，真機驗證過）：
+                    # bandwidth 轉譯成 volume。其餘未知值比照下面 rule["type"]
+                    # 那行 live 分支的既有 fallback 退到 connections——兩者都是
+                    # stream_query 認得的排序鍵，這樣它就不會再因為 sort_by
+                    # 拋 ValueError，唯一還可能冒出的 ValueError 只剩「沒給
+                    # 縮小範圍條件」那個。
+                    if requested_sort_by == "bandwidth":
+                        archive_sort_by = "volume"
+                    elif requested_sort_by in ("volume", "connections"):
+                        archive_sort_by = requested_sort_by
+                    else:
+                        archive_sort_by = "connections"
+                    sort_by_substituted = archive_sort_by != requested_sort_by
+
+                    # rule 組法照抄 query_flows（analyzer.py 約 :2328）；rule["pd"]
+                    # 固定 -1 代表這裡不做 policy-decision 過濾（archive 沒有
+                    # 對應 live 那套「依 pds 先縮小 API 查詢範圍」的機制）。
+                    rule = {**query_spec.native_filters, **query_spec.fallback_filters}
+                    rule["type"] = requested_sort_by if requested_sort_by in ["bandwidth", "volume"] else "connections"
+                    rule["pd"] = -1
+
+                    start_dt = datetime.datetime.combine(
+                        archive_start, datetime.time.min, tzinfo=datetime.timezone.utc)
+                    matcher = lambda row: base_ana._match_flow_filters(
+                        rule, row.get("raw") or {}, start_dt)
+
+                    # search 的全文子字串比對只存在於 query_flows 事後那道手動
+                    # 掃描（不在 _match_flow_filters 裡），archive 這裡評估不了
+                    # 它——若讓它單獨滿足 stream_query 的「有沒有縮小範圍」守門，
+                    # 一個只給 search 的查詢會通過守門卻拿到完全未過濾的結果，
+                    # 比直接拒絕還危險。從送進守門的 filters 拿掉，讓「只給
+                    # search」跟「什麼都沒給」同樣被拒絕。
+                    guard_filters = {k: v for k, v in query_filters.items() if k != "search"}
+
+                    try:
+                        result = stream_query(
+                            cm.models.pce_cache.archive_dir, "traffic",
+                            archive_start, archive_end, guard_filters,
+                            QUERY_RESULT_CAP, archive_sort_by, matcher)
+                    except ValueError:
+                        # sort_by 已在上面被強制成 stream_query 認得的兩個值
+                        # 之一，這裡唯一還能冒出的 ValueError 是守門條件：
+                        # guard_filters 裡沒有任何縮小範圍的條件。
+                        return _err(t("gui_err_archive_filter_required", lang=lang), 400)
+
+                    return jsonify({
+                        "ok": True,
+                        "rows": result.rows,
+                        "summary": result.summary,
+                        "summary_omitted": result.summary_omitted,
+                        "truncated": result.truncated,
+                        "matched": result.matched,
+                        "scanned": result.scanned,
+                        "actual_source": "archive",
+                        "sort_by": archive_sort_by,
+                        "sort_by_substituted": sort_by_substituted,
+                        "incomplete_after": (result.incomplete_after.isoformat()
+                                              if result.incomplete_after else None),
+                    })
+
+                from src.main import _make_cache_reader
+                cache_reader = _make_cache_reader(cm)
                 base_ana = Analyzer(cm, api, Reporter(cm), cache_reader=cache_reader)
 
                 now = datetime.datetime.now(datetime.timezone.utc)
-                if source == "archive":
-                    # archive 查閱：查詢窗設為 [review 最早資料, now]，讓 cover_state 判 full、
-                    # 只讀 review DB，不 fallback 打即時 PCE API。review 空則直接回空。
-                    earliest = cache_reader.earliest_data_timestamp("traffic") if cache_reader else None
-                    if earliest is None:
-                        # not_loaded 旗標讓前端區分「未載入 review DB」與「查無流量」
-                        return jsonify({"ok": True, "data": [], "not_loaded": True})
-                    start_time = earliest.strftime("%Y-%m-%dT%H:%M:%SZ")
-                    end_time = now.strftime("%Y-%m-%dT%H:%M:%SZ")
-                else:
-                    try:
-                        mins = int(d.get("mins", 30))
-                    except (TypeError, ValueError):
-                        return _err(t("gui_err_invalid_number", lang=lang), 400)
-                    # 同 debug/events 端點基線夾限：避免超大/負數 mins 觸發
-                    # 超大 PCE 查詢或時間窗反轉（2026-07-24 審查 F1）
-                    mins = max(5, min(mins, 10080))
-                    start_time = (now - datetime.timedelta(minutes=mins)).strftime("%Y-%m-%dT%H:%M:%SZ")
-                    end_time = now.strftime("%Y-%m-%dT%H:%M:%SZ")
+                try:
+                    mins = int(d.get("mins", 30))
+                except (TypeError, ValueError):
+                    return _err(t("gui_err_invalid_number", lang=lang), 400)
+                # 同 debug/events 端點基線夾限：避免超大/負數 mins 觸發
+                # 超大 PCE 查詢或時間窗反轉（2026-07-24 審查 F1）
+                mins = max(5, min(mins, 10080))
+                start_time = (now - datetime.timedelta(minutes=mins)).strftime("%Y-%m-%dT%H:%M:%SZ")
+                end_time = now.strftime("%Y-%m-%dT%H:%M:%SZ")
 
                 # policy_decision now accepts string values: "blocked", "potentially_blocked", "allowed", or "-1"/""=all
                 pd_val = str(d.get("policy_decision", "-1")).strip()

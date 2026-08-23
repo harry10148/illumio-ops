@@ -50,7 +50,11 @@ def actions_params_keys() -> set:
     src = (_ROOT / "src/gui/routes/actions.py").read_text(encoding="utf-8")
     body = _slice(src, r"def api_quarantine_search\(", r"\n    @bp\.route")
     keys = set(re.findall(r'd\.get\("([a-z_]+)"', body))
-    return keys - {"source", "mins", "policy_decision", "lang"}
+    # archive_start/archive_end 是 archive 分支專用的日期區間控制 key
+    # （Task 4：source=="archive" 直接串流封存日檔並提早 return，從不
+    # 走到 query_flows），跟 mins/policy_decision 同一類，不是 filter key。
+    return keys - {"source", "mins", "policy_decision", "lang",
+                   "archive_start", "archive_end"}
 
 
 def query_flows_whitelist() -> set:
