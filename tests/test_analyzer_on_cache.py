@@ -8,7 +8,7 @@ Covered invariants:
   4. _run_event_analysis() processes events from cache through the normalizer/matcher pipeline
 
 Also covers _fetch_query_flows hybrid (partial) path:
-  5. Empty API stream on hybrid → source='cache'
+  5. Empty API stream on hybrid → source='mixed' (gap PCE call was made; fix round 2)
   6. API stream exception on hybrid → falls back to full API path → source='api'
 """
 import datetime
@@ -196,10 +196,13 @@ class TestAnalyzerOnCache(unittest.TestCase):
 
     # ─── _fetch_query_flows hybrid (partial) ──────────────────────────────────
 
-    def test_query_flows_partial_with_empty_api_stream_tags_as_cache(self):
+    def test_query_flows_partial_with_empty_api_stream_tags_as_mixed(self):
         """Analyzer hybrid: when execute_traffic_query_stream yields zero items
-        (success but empty), source must be 'cache' — the effective result is
-        entirely from the cache, so 'mixed' would be misleading."""
+        (success but empty), source must still be 'mixed' — the PCE gap query
+        was genuinely called and answered cleanly (0 rows is a real answer,
+        not a skip); labelling that 'cache' would be a false statement about
+        which path ran (Task 5 fix round 2, see tests/test_traffic_data_source.py
+        for the sub-second case that legitimately stays 'cache')."""
         az = _make_analyzer()
         az._cache_reader = _make_cache_reader_for_flows(
             cover_state="partial", cache_start=_CACHE_START,
@@ -214,7 +217,8 @@ class TestAnalyzerOnCache(unittest.TestCase):
             _START, _END, ["allowed"], az.api.build_traffic_query_spec({}), False,
         )
 
-        self.assertEqual(source, "cache")
+        self.assertEqual(source, "mixed")
+        az.api.execute_traffic_query_stream.assert_called_once()
         # The cached flows should still be returned.
         self.assertGreater(len(flows), 0)
 

@@ -2137,6 +2137,11 @@ class Analyzer:
                     "query_flows: hybrid fetch — API gap [{} → {}], cache [{} → {}]",
                     start_dt, gap_end_dt, cache_start, end_dt,
                 )
+                # gap_api_called 記的是「PCE 真的被打過」，跟 gap_list 的
+                # 內容（有沒有 row）是兩件事——0 筆但真的查過 PCE 仍是
+                # mixed，不是 cache（審查 fix round 2）。次秒級 gap（下面
+                # else 分支）從不呼叫 API，才是唯一合法的 cache 標法。
+                gap_api_called = False
                 try:
                     if gap_end_dt >= start_dt:
                         gap_end = gap_end_dt.strftime('%Y-%m-%dT%H:%M:%SZ')
@@ -2144,6 +2149,7 @@ class Analyzer:
                             start_time, gap_end, query_pds,
                             filters=query_spec, compute_draft=needs_draft,
                         )
+                        gap_api_called = True
                         gap_list: list | None = list(gap_stream) if gap_stream is not None else []
                         # gap API 靜默失敗（yield 0 + last_fetch_error）不可標成
                         # cache 成功吞掉歷史段遺失（審查 H2）——退 full API，其
@@ -2157,7 +2163,7 @@ class Analyzer:
                             gap_list = None
                     else:
                         # 次秒級 gap：回退 1 秒後已無有意義的窗口
-                        # 可向 API 查詢。
+                        # 可向 API 查詢——gap_api_called 維持 False。
                         gap_list = []
                 except Exception as exc:
                     logger.warning(
@@ -2171,7 +2177,10 @@ class Analyzer:
                         logger.warning(
                             "query_flows hybrid: {} — falling back to full API path", exc)
                     else:
-                        source = "mixed" if gap_list else "cache"
+                        # 標法看「PCE 有沒有真的被打過」，不是看 gap_list 是
+                        # 否非空：gap API 呼叫成功但回 0 筆，仍是 mixed——說
+                        # 「cache」就是在講一句關於路徑的假話（審查 fix round 2）。
+                        source = "mixed" if gap_api_called else "cache"
                         # 跨界 flow（first_detected<cache_start<=last_detected）若
                         # PCE 以 overlap 語意回，會同時落在 gap 與 cache——按 flow
                         # 身分去重，cache 端優先保留（審查 M3）

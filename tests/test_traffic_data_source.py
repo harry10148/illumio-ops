@@ -10,8 +10,12 @@ Covered invariants:
   2. data_source='hybrid' (and unspecified, the default) leave today's
      automatic behaviour untouched: full coverage → cache, actual_source
      == 'cache'.
-  3. Partial coverage + hybrid, with the API gap contributing rows, still
-     produces actual_source == 'mixed' (both sides genuinely contributed).
+  3. Partial coverage + hybrid: the label reflects whether the PCE gap
+     query was actually CALLED, not whether it returned rows or what
+     cover_state said — a clean gap call that returns zero rows is still
+     'mixed' (fix round 2). The one case that legitimately stays 'cache'
+     is when the gap window collapses to sub-second and the PCE is never
+     called at all.
   4. query_flows() forwards params['data_source'] into _fetch_query_flows
      and surfaces the resulting source as last_query_stats['actual_source'].
 """
@@ -135,10 +139,12 @@ class TestHybridDefaultUnchanged(unittest.TestCase):
         cr.read_flows_raw.assert_called_once()
         az.api.execute_traffic_query_stream.assert_called_once()
 
-    def test_partial_with_empty_gap_is_still_cache_not_mixed(self):
-        """Partial coverage where the gap query comes back empty must stay
-        'cache' — labelling an effectively pure-cache result 'mixed' would
-        be misleading."""
+    def test_partial_with_gap_api_called_but_empty_is_still_mixed(self):
+        """Fix round 2: the label must reflect whether the PCE gap query was
+        actually CALLED, not whether it returned rows. A clean gap fetch
+        that comes back with zero rows still means the PCE genuinely
+        answered — labelling that 'cache' would be a false statement about
+        which path ran, exactly what this feature exists to prevent."""
         az = _make_analyzer()
         cr = _make_cache_reader(cover_state="partial", cache_start=_CACHE_START)
         az._cache_reader = cr
@@ -149,6 +155,27 @@ class TestHybridDefaultUnchanged(unittest.TestCase):
             data_source="hybrid",
         )
 
+        self.assertEqual(source, "mixed")
+        az.api.execute_traffic_query_stream.assert_called_once()
+
+    def test_partial_with_subsecond_gap_never_calls_api_and_stays_cache(self):
+        """When the gap window collapses to sub-second (cache_start is less
+        than 1s after start_dt, so gap_end_dt < start_dt), the code takes
+        the 'no meaningful window' branch and never calls the PCE at all —
+        that case is genuinely pure cache and must stay 'cache'."""
+        az = _make_analyzer()
+        start_dt = datetime.datetime.strptime(_START, '%Y-%m-%dT%H:%M:%SZ').replace(
+            tzinfo=datetime.timezone.utc)
+        subsecond_cache_start = start_dt + datetime.timedelta(milliseconds=500)
+        cr = _make_cache_reader(cover_state="partial", cache_start=subsecond_cache_start)
+        az._cache_reader = cr
+
+        _, source = az._fetch_query_flows(
+            _START, _END, ["allowed"], MagicMock(), False,
+            data_source="hybrid",
+        )
+
+        az.api.execute_traffic_query_stream.assert_not_called()
         self.assertEqual(source, "cache")
 
 
