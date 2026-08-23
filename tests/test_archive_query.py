@@ -83,13 +83,22 @@ def test_evaluable_filters_pass():
     assert unsupported_filters({"port": 443, "src_ip": "10.0.0.1"}) == []
 
 
-def test_the_blacklist_covers_every_analyzer_unevaluable_key():
-    """analyzer 已經維護了一份『cache 端無法評估』的清單；封存是更嚴格的
-    離線情境，不得比它寬鬆。這條在 analyzer 新增 key 時會紅。"""
+def test_the_blacklist_is_a_superset_of_the_analyzer_list_plus_exactly_the_archive_specific_keys():
+    """analyzer 維護了一份『cache 端無法評估』的清單；封存是更嚴格的離線
+    情境，archive 清單不得比它寬鬆（超集），且多出來的部分必須恰好是封存
+    專屬的 key（draft_policy_decision：即時查詢才算得出來；port_range／
+    ex_port_range：PCE-native 執行、封存永遠沒有 PCE 可以回退——見
+    archive_query.py 的清單註解，終審 F4）。任一方向的 drift 都要紅：
+    analyzer 新增 key 沒同步進來 → 超集斷了；archive 多加了不在這份說明
+    裡的 key → 差集多出未預期的東西。"""
     from src.analyzer import _CACHE_UNEVALUABLE_FILTER_KEYS
     from src.pce_cache.archive_query import UNSUPPORTED_ARCHIVE_FILTER_KEYS
-    missing = set(_CACHE_UNEVALUABLE_FILTER_KEYS) - set(UNSUPPORTED_ARCHIVE_FILTER_KEYS)
+    analyzer_set = set(_CACHE_UNEVALUABLE_FILTER_KEYS)
+    archive_set = set(UNSUPPORTED_ARCHIVE_FILTER_KEYS)
+    missing = analyzer_set - archive_set
     assert missing == set(), f"archive blacklist is looser than the cache's: {sorted(missing)}"
+    archive_specific = {"draft_policy_decision", "port_range", "ex_port_range"}
+    assert archive_set - analyzer_set == archive_specific
 
 
 from src.pce_cache.archive_query import merge_row, stream_query
@@ -120,6 +129,22 @@ def test_merge_takes_max_of_volatile_fields_and_min_of_first_detected():
     assert m["bytes_out"] == 90
     assert m["first_detected"] == "2026-05-01T02:00:00+00:00"
     assert m["event_time"] == "2026-05-01T09:00:00+00:00"
+
+
+def test_merge_takes_action_from_the_same_side_as_raw():
+    """終審 F6：action（policy decision）不在 flow_hash 裡，可以在同一個
+    flow 的兩次快照之間改變。matcher 與投影都讀較新那側的 raw；頂層
+    action 若凍結在較舊快照，兩者會不一致。這裡刻意讓「舊」那筆先餵進
+    merge_row（較舊 event_time、action=allowed），「新」那筆後餵（較新
+    event_time、action=blocked、raw 也標記 blocked）——只有頂層 action
+    跟著 raw 换邊，這條測試才會過。"""
+    older = _row("h", action="allowed", event_time="2026-05-01T01:00:00+00:00",
+                 raw={"policy_decision": "allowed"})
+    newer = _row("h", action="blocked", event_time="2026-05-01T09:00:00+00:00",
+                 raw={"policy_decision": "blocked"})
+    m = merge_row(merge_row(None, older), newer)
+    assert m["action"] == "blocked"
+    assert m["raw"]["policy_decision"] == "blocked"
 
 
 def test_duplicate_exports_do_not_inflate_the_summary(tmp_path):
@@ -288,6 +313,60 @@ def test_structurally_invalid_rows_are_skipped_and_counted(tmp_path):
     assert [r["flow_hash"] for r in res.rows] == ["ok"]
     assert res.scanned == 4
     assert res.skipped == 3
+
+
+def test_unparsable_json_lines_are_counted_not_just_logged(tmp_path):
+    """終審 F3：JSON 語法本身就壞掉的行（連 orjson.loads 都過不了）以前
+    只進 log，回應裡完全看不到——跟上一條測試（語法對、結構不合法）是
+    不同的失敗點，`iter_archive_rows` 裡就攔下來，得靠 `on_skip` 才能讓
+    stream_query 算到。"""
+    p = tmp_path / "traffic-2026-05-01.jsonl"
+    p.write_text(json.dumps(_row("ok")) + "\nnot json at all\n", encoding="utf-8")
+    res = stream_query(str(tmp_path), "traffic", date(2026, 5, 1), date(2026, 5, 1),
+                       {"port": 443}, cap=10, sort_by="connections",
+                       matcher=lambda r: True)
+    assert [r["flow_hash"] for r in res.rows] == ["ok"]
+    assert res.scanned == 2
+    assert res.skipped == 1
+    assert res.files_incomplete == 0
+
+
+def test_a_truncated_file_is_counted_separately_from_skipped_rows(tmp_path):
+    """終審 F3：截斷/損壞的 .gz 檔案放棄剩餘部分以前也只進 log。
+    files_incomplete 讓這件事到得了回應——跟 skipped（列數）分開計數，
+    因為這不是特定一列，是一整個檔案（片段）讀不到，混在一起算的話，
+    「略過 N 列」這句話會變成另一種不誠實（單位不是列）。"""
+    (tmp_path / "traffic-2026-05-01.jsonl.gz").write_bytes(b"not actually gzip")
+    _write(tmp_path, "traffic-2026-05-02.jsonl", [_row("survivor")])
+    res = stream_query(str(tmp_path), "traffic", date(2026, 5, 1), date(2026, 5, 2),
+                       {"port": 443}, cap=10, sort_by="connections",
+                       matcher=lambda r: True)
+    assert [r["flow_hash"] for r in res.rows] == ["survivor"]
+    assert res.files_incomplete == 1
+    assert res.skipped == 0
+
+
+def test_intermediate_merge_state_is_bounded_across_days(tmp_path):
+    """終審 F5：規格 §4.2 要求的是「聚合摘要必須有界」，理由是無界
+    group-by 狀態是 O(命中列數)——舊的守門測試
+    （test_summary_cardinality_is_bounded_and_reports_what_it_dropped）
+    只斷言輸出長度（len(res.summary)==10），對「中間狀態有界」這個真正
+    的要求不可能變紅：就算 merged 長到吃光記憶體，只要最後 nlargest
+    切出前 10 筆，那條測試一樣是綠的。
+
+    這裡直接斷言中間狀態（tracked_flows，merge 完的 distinct flow_hash
+    數）本身有界，不透過輸出長度繞路。cap 只在日檔之間檢查（跟 deadline
+    同一種「不砍斷單日檔案」設計），所以用 5 天、每天 5 個 distinct flow
+    （不是單日塞 50 個），讓 cap 剛好在第 2 天結束時被跨過。"""
+    for d in range(1, 6):
+        _write(tmp_path, f"traffic-2026-05-0{d}.jsonl",
+               [_row(f"d{d}h{i}", port=1000 + i) for i in range(5)])
+    res = stream_query(str(tmp_path), "traffic", date(2026, 5, 1), date(2026, 5, 5),
+                       {"port": 0}, cap=100, sort_by="connections",
+                       matcher=lambda r: True, max_tracked_flows=10)
+    assert res.tracked_flows <= 10
+    assert res.incomplete_after == date(2026, 5, 2)
+    assert res.stop_reason == "size_cap"
 
 
 def test_the_review_db_load_path_is_gone():

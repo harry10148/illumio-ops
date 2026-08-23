@@ -93,7 +93,7 @@ def archive_file_range(archive_dir: str, source: str = "traffic") -> dict:
     }
 
 
-def _iter_lines(path: str) -> Iterator[bytes]:
+def _iter_lines(path: str, on_skip=None) -> Iterator[bytes]:
     opener = gzip.open if path.endswith(".gz") else open
     try:
         with opener(path, "rb") as fh:
@@ -103,34 +103,54 @@ def _iter_lines(path: str) -> Iterator[bytes]:
                     yield line
     except (OSError, EOFError, gzip.BadGzipFile) as exc:
         # 截斷/損壞的封存檔：已讀出的行照常處理，放棄該檔剩餘部分，
-        # 讓呼叫端繼續下一檔。
+        # 讓呼叫端繼續下一檔。終審 F3：這件事以前只進 log，回應裡沒有
+        # 任何痕跡——那一天的後半段資料靜默消失。on_skip 讓呼叫端
+        # （stream_query）把它算進回應，不再只留在伺服器 log 裡。
         logger.warning("archive_query: corrupt/truncated file {}: {}", path, exc)
+        if on_skip is not None:
+            on_skip("truncated_file")
 
 
 def iter_archive_rows(archive_dir: str, source: str,
-                      start: date, end: date) -> Iterator[dict]:
+                      start: date, end: date, on_skip=None) -> Iterator[dict]:
     """依序產出 [start, end] 內該 source 每個日檔的每一列。
 
-    無法解析的單列跳過並記 warning——一列壞掉不該讓整趟查詢失敗。
+    無法解析的單列跳過並記 warning——一列壞掉不該讓整趟查詢失敗。終審
+    F3：以前這裡也只有 log，JSON 壞掉的行完全不計數；`on_skip`（可選）
+    讓呼叫端在每次跳過時收到通知（`"bad_json"` 或 `_iter_lines` 轉傳的
+    `"truncated_file"`），藉此把「略過幾列」帶進回應而不是丟在 log 裡。
+    不傳 `on_skip` 時行為與之前完全一樣（純 generator，不計數），
+    tests/test_archive_query.py 既有的呼叫方式不受影響。
     """
     for path in _matching_files(archive_dir, source, start, end):
-        for line in _iter_lines(path):
+        for line in _iter_lines(path, on_skip=on_skip):
             try:
                 yield orjson.loads(line)
             except orjson.JSONDecodeError as exc:
                 logger.warning("archive_query: unparsable line in {}: {}", path, exc)
+                if on_skip is not None:
+                    on_skip("bad_json")
 
 
 # 封存是離線資料：沒有 PCE 可問，所以任何需要向 PCE 展開或即時計算的條件
 # 都判不了。這份清單必須涵蓋 analyzer 的 _CACHE_UNEVALUABLE_FILTER_KEYS
-# （label group / AMS），額外多一個 draft_policy_decision——那是即時查詢才
-# 算得出來的欄位，封存列裡根本不存在。
+# （label group / AMS），額外多出的部分是封存專屬、cache 那邊不成立的洞：
+#   - draft_policy_decision：即時查詢才算得出來的欄位，封存列裡根本不存在。
+#   - port_range / ex_port_range：_TRAFFIC_FILTER_CAPABILITIES
+#     （src/api/traffic_query.py）把兩者標成 execution="native"——PCE 端
+#     評估。cache 路徑至少在 cover_state != full 時會補一次 PCE 查詢；封存
+#     路徑永遠沒有 PCE 可以回退，而兩套 client 端比對器
+#     （Analyzer.check_flow_match／_flow_matches_filters）都不認得這兩個
+#     key。兩者都在 _NARROWING_FILTER_KEYS 裡，會通過「至少一個窄化條件」
+#     的守門，若不擋在這裡就會靜默回傳整個區間未過濾的結果（終審 F4，
+#     2026-07-24 審查 M4 的同型復發）。
 #
 # 帶著這些條件靜默回未過濾的結果，正是 2026-07-24 審查 M4 抓到的缺陷；
 # 這裡明確拒絕。清單刻意逐字列出而不 import analyzer：pce_cache 是 analyzer
 # 的下層（analyzer 自己 import src.pce_cache.reader）。反向 import 今天雖不
 # 循環，卻把整個 analyzer 拖進這個小模組，也讓分層倒過來。
-# tests/test_archive_query.py 的 drift 測試負責擋住兩者脫節。
+# tests/test_archive_query.py 的 drift 測試負責擋住兩者脫節（archive 清單
+# 須為 analyzer 清單的超集，且差集恰好是上面列出的封存專屬 key）。
 UNSUPPORTED_ARCHIVE_FILTER_KEYS: tuple[str, ...] = (
     "src_label_group", "src_label_groups", "dst_label_group", "dst_label_groups",
     "ex_src_label_group", "ex_src_label_groups",
@@ -138,6 +158,7 @@ UNSUPPORTED_ARCHIVE_FILTER_KEYS: tuple[str, ...] = (
     "src_include_groups", "dst_include_groups",
     "src_ams", "dst_ams", "ex_src_ams", "ex_dst_ams",
     "draft_policy_decision",
+    "port_range", "ex_port_range",
 )
 
 
@@ -209,6 +230,19 @@ _NARROWING_FILTER_KEYS: tuple[str, ...] = (
 # 預設值——deadline_s 是參數，呼叫端可覆寫。
 _DEFAULT_DEADLINE_S = 25.0
 
+# 規格 §4.2：「聚合摘要必須有界……無界 group-by 的狀態是 O(命中列數)，
+# 正好重現本案要消除的大量載入問題」。輸出（rows/summary）本來就有界
+# （nlargest(cap)/nlargest(summary_top_k)），但過程不是：`merged` 在比對
+# 之前就把 [start, end] 內每一個 distinct flow_hash 的整列留在記憶體裡，
+# 這比 group-by 狀態更大——是 O(掃到的 distinct flow 數)，不是
+# O(命中列數)。這個上限直接鎖住 `merged` 的基數；`groups`（摘要的
+# group-by）是從 matched_rows 建的子集（groups ⊆ matched ⊆ merged），
+# `merged` 有界則 `groups` 跟著有界，不需要為它另外設一個上限或做第二次
+# 通過／近似（終審 F5）。逾此上限就停止掃描、用既有的 incomplete_after
+# 管道回報不完整——換取記憶體上限是**可見的**取捨，不是靜默截斷。這個
+# 數字是本次新訂、非查證得來的預設值（同 _DEFAULT_DEADLINE_S 的性質）。
+MAX_TRACKED_FLOWS = 200_000
+
 
 def _is_valid_row(row) -> bool:
     """封存列的最低限度結構驗證：語法合法的 JSON 不保證是一筆 flow——
@@ -238,13 +272,43 @@ class ArchiveQueryResult:
     matched: int = 0
     scanned: int = 0
     skipped: int = 0
+    # 終審 F3：整個檔案（或其被截斷放棄的剩餘部分）因損毀而讀不到的次數。
+    # 跟 `skipped`（無法解析的單列數）分開計數，因為單位不同——一個是
+    # 「列數」，這個是「檔案（片段）事件數」，混在一起算會製造另一種
+    # 不誠實。
+    files_incomplete: int = 0
     incomplete_after: date | None = None
+    # 終審 F5：incomplete_after 為真時，掃描是被什麼打斷的——deadline_s
+    # 逾時，還是 MAX_TRACKED_FLOWS 這個大小上限先到。兩者是不同的事實，
+    # 操作者要能分辨（deadline 可能只是這次剛好慢；size cap 代表這個查詢
+    # 本身命中的資料量就大，換個時段重跑也一樣會被截）。None 代表掃描
+    # 完整跑到 `end`，incomplete_after 也會是 None。
+    stop_reason: str | None = None
     unsupported: list = field(default_factory=list)
+    # 掃描停下那一刻，`merged`（比對前，每個 distinct flow_hash 一列）的
+    # 基數——直接暴露中間狀態的大小，而不是只能從輸出長度側面猜。守門
+    # 測試用它斷言「中間狀態真的有界」，不是斷言「輸出剛好被切成 top-K」
+    # 這種即使中間狀態無界也會通過的弱斷言（終審 F5）。
+    tracked_flows: int = 0
+
+
+# 頂層欄位裡，flow_hash 沒有涵蓋（只涵蓋 src/dst ip、port、proto、
+# first_detected，見 ingestor_traffic._flow_hash）、卻仍可能在同一個
+# flow_hash 的不同快照之間改變的欄位——目前只有 action（policy decision
+# 可以在兩次匯出之間變化）。這些欄位必須跟 raw 取同一側：matcher 與投影
+# 都讀較新那一側的 raw（見 stream_query 的「先合併後比對」與 actions.py
+# 的投影邏輯），若頂層欄位凍結在較舊快照，會跟 raw 內的最新狀態不一致
+# （終審 F6）。src_workload/dst_workload 理論上也可能因重新指派而改變，
+# 一併納入，反正 flow_hash 相同時多數情況下兩側本來就一致，不會改變既有
+# 行為。
+_NONVOLATILE_FROM_NEWER_RAW_SIDE = ("action", "src_workload", "dst_workload")
 
 
 def merge_row(acc: dict | None, row: dict) -> dict:
     """同 flow_hash 的兩列合併，沿用 ArchiveImporter 的 upsert 取值規則：
-    volatile 欄位取 MAX、first_detected 取 MIN、raw 取較新 event_time 那一側。"""
+    volatile 欄位取 MAX、first_detected 取 MIN、raw 與其餘可變的非 volatile
+    頂層欄位取較新 event_time 那一側（一起取，確保兩者不會各自來自不同
+    快照——終審 F6）。"""
     if acc is None:
         return dict(row)
     out = dict(acc)
@@ -257,13 +321,16 @@ def merge_row(acc: dict | None, row: dict) -> dict:
         out["first_detected"] = b_fd
     if (row.get("event_time") or "") >= (acc.get("event_time") or ""):
         out["raw"] = row.get("raw")
+        for k in _NONVOLATILE_FROM_NEWER_RAW_SIDE:
+            out[k] = row.get(k)
     return out
 
 
 def stream_query(archive_dir: str, source: str, start, end, filters: dict,
                  cap: int, sort_by: str, matcher,
                  summary_top_k: int = SUMMARY_TOP_K,
-                 deadline_s: float | None = _DEFAULT_DEADLINE_S) -> ArchiveQueryResult:
+                 deadline_s: float | None = _DEFAULT_DEADLINE_S,
+                 max_tracked_flows: int = MAX_TRACKED_FLOWS) -> ArchiveQueryResult:
     """掃描 [start, end] 的封存日檔，回傳有界的列與有界的摘要。
 
     matcher 由呼叫端提供（GUI 路徑傳 Analyzer._match_flow_filters 的包裝），
@@ -294,12 +361,32 @@ def stream_query(archive_dir: str, source: str, start, end, filters: dict,
     merged: dict[str, dict] = {}
     scanned = 0
     skipped = 0
+    files_incomplete = 0
+
+    def _on_skip(reason: str) -> None:
+        nonlocal scanned, skipped, files_incomplete
+        if reason == "bad_json":
+            # 語法錯的一行：連 orjson.loads 都過不了，從沒真正變成一列，
+            # 但它確實是我們試著讀過的一行——算進 scanned（見終審 F3 對
+            # archiveEmptyReason 的要求：scanned>0 必須代表「檔案真的被
+            # 打開讀過」，不能因為每一行都壞掉就讓 scanned 停在 0，讓
+            # 前端誤判成「這個範圍根本沒有封存檔」），也算進 skipped
+            # （§4.3 的「略過 N 列無法解析」）。
+            scanned += 1
+            skipped += 1
+        elif reason == "truncated_file":
+            # 整個檔案（或其被截斷放棄的剩餘部分）讀不到：不是特定一列，
+            # 不該混進「列數」的 skipped 裡；同樣算進 scanned，理由同上。
+            scanned += 1
+            files_incomplete += 1
+
     clock = time.monotonic
     t0 = clock()
     day = start
     last_completed: date | None = None
+    stop_reason: str | None = None
     while day <= end:
-        for row in iter_archive_rows(archive_dir, source, day, day):
+        for row in iter_archive_rows(archive_dir, source, day, day, on_skip=_on_skip):
             scanned += 1
             if not _is_valid_row(row):
                 skipped += 1
@@ -307,15 +394,23 @@ def stream_query(archive_dir: str, source: str, start, end, filters: dict,
             fh = row["flow_hash"]
             merged[fh] = merge_row(merged.get(fh), row)
         last_completed = day
-        # 只在日檔之間檢查時鐘（不逐列檢查）——便宜，且不會把一天的檔案
-        # 掃到一半就砍斷。
+        # 只在日檔之間檢查時鐘／基數（不逐列檢查）——便宜，且不會把一天
+        # 的檔案掃到一半就砍斷，保留 incomplete_after 既有的「以天為單位」
+        # 語意（deadline 與 size cap 共用同一種「日界才檢查」設計，見
+        # MAX_TRACKED_FLOWS 註解——終審 F5）。
         if deadline_s is not None and (clock() - t0) >= deadline_s:
+            stop_reason = "deadline"
+            break
+        if len(merged) >= max_tracked_flows:
+            stop_reason = "size_cap"
             break
         day += timedelta(days=1)
 
-    res = ArchiveQueryResult(scanned=scanned, skipped=skipped)
+    res = ArchiveQueryResult(scanned=scanned, skipped=skipped, files_incomplete=files_incomplete,
+                             tracked_flows=len(merged))
     if last_completed is not None and last_completed < end:
         res.incomplete_after = last_completed
+        res.stop_reason = stop_reason
 
     # 先合併完才比對：matcher 看到的是每個 flow_hash 的最終狀態
     matched_rows = {fh: r for fh, r in merged.items() if matcher(r)}
