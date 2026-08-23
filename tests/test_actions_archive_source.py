@@ -102,6 +102,18 @@ def test_archive_source_requires_a_date_range(client):
     assert resp.status_code == 400
 
 
+def test_archive_source_rejects_a_reversed_date_range(client):
+    """archive_end < archive_start：day-file 迴圈（stream_query 的
+    `while day <= end`）一次都不會跑，會靜默回 200 空結果——跟審查 F1
+    （2026-07-24，live mins 反轉那個窗）同一類缺陷，這裡在解析後就擋掉。"""
+    c, _cm = client
+    resp = c.post("/api/quarantine/search",
+                  json={"source": "archive", "port": 443,
+                        "archive_start": "2026-06-30", "archive_end": "2026-06-01"},
+                  environ_overrides={"REMOTE_ADDR": "127.0.0.1"})
+    assert resp.status_code == 400
+
+
 def test_archive_source_search_only_is_not_a_narrowing_filter(client):
     """search 的全文比對只存在於 query_flows 事後那道手動子字串掃描，不在
     _match_flow_filters 裡——archive 只共用 _match_flow_filters，不另建

@@ -99,6 +99,11 @@ def make_actions_blueprint(
                         archive_end = datetime.date.fromisoformat(str(d.get("archive_end") or ""))
                     except ValueError:
                         return _err(t("gui_err_archive_range_required", lang=lang), 400)
+                    if archive_end < archive_start:
+                        # 反轉的窗：stream_query 的 `while day <= end` 一次都不會
+                        # 跑，會靜默回 200 空結果——同一類缺陷 2026-07-24 審查
+                        # F1 在 live mins 分支抓過一次，這裡在解析後就擋掉。
+                        return _err(t("gui_err_archive_range_required", lang=lang), 400)
 
                     # 與 query_flows 的 query_filters 白名單同一份 key 集合
                     # （analyzer.py 約 :2219-2289），值改讀 d——archive 跟 live
