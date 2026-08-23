@@ -288,8 +288,7 @@ never-ran／overdue）見 [gui-tour.md](../guide/gui-tour.md) 「7) Integrations
 | PUT | `/api/cache/settings` | 更新 cache 設定（存檔後需 Restart Monitor 才生效） | — |
 | POST | `/api/cache/backfill` | **真實副作用**：手動回補歷史資料（events 或 traffic），同步執行 | `source`, `since`, `until` |
 | POST | `/api/cache/retention/run` | **真實副作用**：立即執行一次 retention 清除（依設定保留天數，會永久刪除過期列） | — |
-| POST | `/api/cache/archive/load` | 載入指定日期區間的歸檔 JSONL 到 review DB，背景執行、回 `202` | `start_date`, `end_date`（受 `archive_review_max_days` 上限，超過回 422；已有 load 進行中回 409） |
-| GET | `/api/cache/archive/status` | 查詢 archive review DB 狀態與載入進度 | — |
+| GET | `/api/cache/archive/status` | archive 檔案概況（目錄是否存在、檔案數、涵蓋的最早/最晚日期） | — |
 
 `/api/cache/*` 在 pce_cache DB 不可用時回 `503`。cache 架構、backfill／archive 操作見
 [cache-maintenance.md](../guide/cache-maintenance.md)。
@@ -428,14 +427,13 @@ TLS 相關端點存檔後都需要**重啟服務**才會套用；自簽憑證每
 | 代碼 | 意義 |
 |---|---|
 | `200` | 成功 |
-| `202` | 已接受，背景執行中（`POST /api/cache/archive/load`） |
 | `400` | 請求格式錯誤／驗證失敗／CSRF 錯誤 |
 | `401` | 未登入 |
 | `403` | 禁止（例如 persistent mode 下呼叫 shutdown、報表路徑穿越） |
 | `404` | 找不到資源 |
-| `409` | 衝突（SIEM destination 重名、daemon 由外部管理、archive load 已在進行中） |
+| `409` | 衝突（SIEM destination 重名、daemon 由外部管理、backfill 已在進行中） |
 | `415` | 不支援的檔案類型（CSV 上傳副檔名／mimetype 不符） |
-| `422` | 驗證失敗但語意上是可處理的請求（例如 archive 區間超過上限、SIEM／cache 設定驗證失敗） |
+| `422` | 驗證失敗但語意上是可處理的請求（例如 SIEM／cache 設定驗證失敗） |
 | `423` | 鎖定——must-change-password 閘門 |
 | `429` | 超出限流 |
 | `500` | 內部錯誤 |

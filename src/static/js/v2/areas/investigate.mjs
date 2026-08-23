@@ -67,14 +67,17 @@
 //      rows, or the backend's real error.
 //
 //   7. IV-06's archive strip keeps its real status readout
-//      (GET /api/cache/archive/status) and its real effect on the query —
-//      choosing "archive" as the source makes /api/quarantine/search read
-//      the loaded review DB (actions.py:92-110), which is what IV-02 is.
-//      The mockup's "load archive" button is now a jump to #/system/cache:
-//      POST /api/cache/archive/load needs a date range and is a cache
-//      management operation that the System area owns, so pretending to
-//      offer it from a read-only status strip would be the same lie the
-//      mockup's toast was.
+//      (GET /api/cache/archive/status). Task 7 repurposed that endpoint:
+//      choosing "archive" as the source makes /api/quarantine/search stream
+//      the daily archive files directly (Task 4/5's actions.py:92-110), not
+//      a review DB, so the endpoint — and this strip — now report the
+//      archive FILES themselves (directory exists?, file count, earliest/
+//      latest date covered), which is what an operator needs before picking
+//      a date range. The mockup's "load archive" button is now a jump to
+//      #/system/cache: archive collection settings (archive_dir,
+//      archive_enabled, ...) are a cache management operation that the
+//      System area owns, so pretending to offer a load action from a
+//      read-only status strip would be the same lie the mockup's toast was.
 //
 //   8. IV-12's persistent mode is now real. The backend is explicitly
 //      stateless about it ("Persistent mode (re-issue every 10 min) is
@@ -817,56 +820,31 @@ function emptyState(state, d) {
   );
 }
 
-/* R4/R6 — archive_import.py's _PROGRESS dict (src/pce_cache/archive_import.py)
- * only ever writes state to "idle" | "running" | "done" | "error"; those are
- * the backend's own internal codes, not words an operator reads elsewhere in
- * this product, so the badge below maps each to a catalogue label instead of
- * printing the code. Reuses labels already minted for the same words
- * elsewhere (overview.mjs's queue-idle badge, the app-level loading text) —
- * no new key needed for a badge this generic. */
-function archiveLoadLabel(state) {
-  if (state === "running") return t("gui_app_loading");
-  if (state === "done") return t("gui_gen_done");
-  if (state === "error") return t("alert_status_error");
-  /* gui_gen_idle, not gui_health_queue_idle: this badge sits beside Done and
-   * Error, and the queue key's English value is lower-case "idle", which read
-   * as a typo next to them. The Chinese is identical either way, which is
-   * exactly why reusing a key across contexts hides this until someone looks
-   * at the other language. */
-  return t("gui_gen_idle");
-}
-
 /* IV-06 — archive status strip, from the real GET /api/cache/archive/status.
- * quarantine.js:783-793 (refreshArchiveStatus) chooses between
- * gui_traffic_archive_loaded_fmt {start}/{end}/{n} and gui_traffic_archive_none;
- * the load state (idle/running/error) comes from the same payload's `load`
- * object (:817-826).
- * DESIGN-ADDED: rendering `load.state` as a tone-coloured badge is new — the
- * product surfaces it as plain text only.
- * Fix round 1, Important 2 — this strip's sole input is the old review-DB
- * "loaded" flag, which Task 4/5's direct date-range archive query does not
- * read and never sets: a real archive query can return real rows while this
- * strip still claims "No archive loaded", sitting right above the answer it
- * contradicts. That flag's meaning ("is there a review DB to switch to") no
- * longer applies once the source select is actually on "archive" — so the
- * call site (repaint(), below) stops rendering this strip for that source.
- * It is UNCHANGED, and still rendered, for hybrid/live — this file's own
- * `state` is not even passed to it, by design, to keep this function itself
- * blind to source and the gating decision entirely at the call site. */
+ * Task 7: that endpoint no longer reports a review-DB "loaded" flag or a
+ * background load's progress — there is no more review DB and no more load
+ * to report progress on (archive queries stream the daily archive files
+ * directly, Task 4/5). It now reports the archive FILES themselves:
+ * `exists` (does the configured archive_dir exist), `files` (how many day
+ * files are in it), and `earliest`/`latest` (the date range they cover).
+ * Fix round 1, Important 2 previously hid this strip for source==="archive"
+ * because the old "loaded review DB" reading was meaningless there (and
+ * could contradict a real archive query's own results); that reading is
+ * gone along with the review DB, so repaint() below renders this strip for
+ * every source now — file coverage is exactly what an operator wants to see
+ * before picking a date range on the archive source. */
 function archiveStrip(d) {
   const a = d.archive_status || {};
-  const loaded = a.loaded === true && Number(a.rows) > 0;
-  const load = a.load || {};
-  const strip = el("div", { class: "strip", "data-cov": "IV-06", "data-tone": loaded ? "ok" : "neutral" });
+  const has = a.exists === true && Number(a.files) > 0;
+  const strip = el("div", { class: "strip", "data-cov": "IV-06", "data-tone": has ? "ok" : "neutral" });
   strip.appendChild(el("span", { text: t("gui_traffic_archive_range") }));
-  strip.appendChild(el("b", { text: loaded
-    ? tf("gui_traffic_archive_loaded_fmt", { start: a.start, end: a.end, n: num(a.rows) })
+  strip.appendChild(el("b", { text: has
+    ? tf("gui_traffic_archive_loaded_fmt", { start: a.earliest, end: a.latest, n: num(a.files) })
     : t("gui_traffic_archive_none") }));
-  strip.appendChild(el("span", { text: tf("gui_iv_archive_files", { files: num(a.files), skipped: num(a.skipped) }) }));
   strip.appendChild(el("span", { class: "spacer" }));
-  strip.appendChild(badge(archiveLoadLabel(load.state), tone(load.state === "error" ? "error" : "ok")));
-  // PORT (header note 7): archive LOADING needs a date range and belongs to the
-  // cache management page, so this is a jump, not a fake action.
+  // PORT (header note 7): archive collection settings (archive_dir,
+  // archive_enabled, ...) belong to the cache management page, so this is a
+  // jump, not a fake action.
   strip.appendChild(el("button", { class: "btn link goto", type: "button",
     text: t("gui_health_goto") + " " + GO_CACHE, onClick: function () { router.go(GO_CACHE); } }));
   return strip;
@@ -1464,10 +1442,10 @@ async function mountTraffic(root, ctx) {
         clear(host);
         host.appendChild(kpiRow(state.rows, state.phase));
         host.appendChild(query);
-        // Fix round 1, Important 2 — see archiveStrip()'s own header: its
-        // "loaded review DB" reading is meaningless (and actively
-        // contradicts real results) once the source really is "archive".
-        if (state.source !== "archive") host.appendChild(archiveStrip(d));
+        // Task 7 — see archiveStrip()'s own header: it now reports real
+        // archive-file coverage, not a review-DB "loaded" flag, so it is
+        // useful (and rendered) for every source, including "archive".
+        host.appendChild(archiveStrip(d));
         host.appendChild(results());
         paintFloatTraffic();
       }

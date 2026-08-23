@@ -90,18 +90,18 @@ class ArchiveExporter:
       - 因此一筆 flow 即使先前已被匯出過（游標已越過它舊的 ingested_at），
         只要之後在 live cache 端又被 re-pull 而成長，bump 過的 ingested_at
         會讓它重新落在游標之後，下一輪 export 會再次撿到它、寫出成長後的值。
-      - import 端（archive_import.py 的 ArchiveImporter._flush）同步改成
-        upsert（取代舊版 on_conflict_do_nothing）：同 flow_hash 的後續匯出以
-        MAX 合併 last_detected/bytes_in/bytes_out/flow_count（first_detected
-        取 MIN；raw_json/report_json 取較新 last_detected 那一側），而不是把
-        後到的成長值整批丟棄。兩端缺一則修復無效：只 bump 不改 import 端，
-        後到的列在匯入時仍會被丟棄；只改 import 端不 bump，archiver 游標根本
-        不會重新撿到該列讓它有機會被再次匯出。
+      - 查詢端（archive_query.py 的 merge_row，原本是 import 端
+        ArchiveImporter._flush 的職責，該匯入路徑已隨 review DB 一併移除）
+        同一套 upsert 語意：同 flow_hash 的多筆快照以 MAX 合併
+        last_detected/bytes_in/bytes_out/flow_count（first_detected 取 MIN；
+        raw 取較新 event_time 那一側），而不是只留第一筆舊快照。兩端缺一則
+        修復無效：只 bump 不合併，查詢仍只看得到某一筆快照；只合併不 bump，
+        archiver 游標根本不會重新撿到該列讓它有機會被再次匯出。
       - 歷史遺留：F6 修復前產生的 archive 檔案，其中長壽 flow 可能仍停在
         「首次匯出當下的快照值」；只要該 flow 之後（在修復後的 ingestor 下）
-        再被 re-pull 一次並匯出，import 端的 MAX 合併會自然把 review DB 的值
-        追上最新累積值，不需要手動 backfill。短命 flow（一次性、匯出後不再
-        被 upsert）本就不受影響。
+        再被 re-pull 一次並匯出，merge_row 的 MAX 合併會自然讓查詢結果追上
+        最新累積值，不需要手動 backfill。短命 flow（一次性、匯出後不再被
+        upsert）本就不受影響。
     """
 
     def __init__(self, session_factory: sessionmaker, archive_dir: str,

@@ -10,7 +10,7 @@ verified_against:
   - src/pce_cache/aggregator.py
   - src/pce_cache/retention.py
   - src/pce_cache/archive.py
-  - src/pce_cache/archive_import.py
+  - src/pce_cache/archive_query.py
   - src/pce_cache/backfill.py
   - src/pce_cache/reader.py
   - src/pce_cache/capacity.py
@@ -66,9 +66,9 @@ PCE（events API／traffic flows API）
                                                                     │
                                                           gzip 輪替／archive_retention_days
                                                                     │
-                                                          ArchiveImporter（隨選匯入回
-                                                          archive_review.sqlite 供 GUI
-                                                          查閱已被 retention 清掉的舊資料）
+                                                          stream_query（依日期範圍直接掃
+                                                          描日檔，查閱已被 retention 清掉
+                                                          的舊資料，不另建 DB）
 
   另有 CacheSubscriber（siem_dispatch 佇列的來源）、LagMonitor（60s 偵測 ingest 落後）、
   capacity_snapshot（30 分鐘記錄 DB 大小／磁碟／SIEM 積壓／archiver 落後）三條旁支，
@@ -174,21 +174,23 @@ Analyzer 的 overflow 告警會據此發出提醒（見 [monitoring-alerts.md](m
 **長壽 flow 的成長會被重新匯出**（承接舊版 §8.1 的已知限制、現已修復——轉寫並比對現行 `archive.py`
 docstring 一致）：ingestor 的 upsert 在 conflict 時會把 `ingested_at` bump 到本次 ingest 時間（只要
 re-pull 到的 flow 有 volatile 欄位——`last_detected`／`bytes_in`／`bytes_out`／`flow_count`——發生變化），
-所以一筆持續成長的長壽 flow 會被下一輪 archive 匯出重新撿到；`ArchiveImporter._flush`（import 端）以
-`flow_hash` 為 key upsert，`last_detected`／`bytes_in`／`bytes_out`／`flow_count` 取 **MAX** 合併
-（`first_detected` 取 MIN，`raw_json`／`report_json` 取較新 `last_detected` 那一側），因此重複匯入同一 flow
-較晚的 export，只會讓 Archive Review DB 的計數往上補齊，不會被凍結或縮小。
+所以一筆持續成長的長壽 flow 會被下一輪 archive 匯出重新撿到，同一天的日檔裡因此可能出現同一
+`flow_hash` 的多筆快照。查詢端（`archive_query.merge_row`）在讀取時合併：`last_detected`／
+`bytes_in`／`bytes_out`／`flow_count` 取 **MAX**（`first_detected` 取 MIN，`raw` 取較新 `event_time`
+那一側），所以同一 flow 的較新快照只會讓查得的計數往上補齊，不會被凍結或縮小。
 
 **容量規劃註記**：每一筆活躍成長中的長壽 flow，現在每次變化被撿到時都會重寫進當日的 archive 檔，繁忙 PCE 上
 archive 目錄的增長率會明顯高於「每 flow 一行」——見第 4 節容量規劃。
 
-### 3.4 Archive Review（查閱已被 retention 清掉的舊資料）
+### 3.4 Archive 查閱（查詢已被 retention 清掉的舊資料）
 
-`archive_review.sqlite`（獨立於主 cache DB）由 `ArchiveImporter.import_range()` 隨選建置：GUI／API 呼叫
-`POST /api/cache/archive/load`（body 帶 `start_date`／`end_date`，範圍上限 `archive_review_max_days`，預設
-31 天）觸發背景匯入，`GET /api/cache/archive/status` 查進度。建置採「build-to-temp + 原子 `os.replace`」，
-同時只允許一個 load 在跑（第二個請求立即回 409，不排隊）。用途：查主 cache 已因 `traffic_raw_retention_days`
-（預設僅 7 天）被刪除、但仍留在 archive JSONL 裡的舊流量。
+查主 cache 已因 `traffic_raw_retention_days`（預設僅 7 天）被刪除、但仍留在 archive JSONL 裡的舊流量，
+不再需要先「匯入」到另一個 DB 才能查：`src/pce_cache/archive_query.py` 的 `stream_query` 直接依日期範圍
+掃描 `traffic-YYYY-MM-DD.jsonl[.gz]` 日檔（GUI 走 `POST /api/quarantine/search` 帶 `source=archive`），
+逐日合併同 `flow_hash` 的多筆快照（見上一節）、比對條件，回傳有界的列與摘要（`SUMMARY_TOP_K`）。查詢一定要
+帶至少一個縮小範圍的條件，且對 label group／AMS／draft policy decision 等即時才算得出的欄位明講拒絕
+（`unsupported_filters`），不會靜默回未過濾的結果。`GET /api/cache/archive/status` 回報 archive 檔本身的
+概況（目錄是否存在、涵蓋的最早/最晚日期、檔案數），供操作者在查詢前先掌握範圍。
 
 ### 3.5 首跑錨定（2026-07-14 archive 事故修復）
 

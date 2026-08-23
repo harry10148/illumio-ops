@@ -209,7 +209,7 @@ def test_schema_normalizes_agg_bucket_day_merges_on_collision(tmp_path):
 def test_schema_agg_bucket_day_migration_guard_skips_completed_migration(tmp_path):
     """守衛：bucket_day 正規化的 NOT LIKE '%.%' 掃描無法用索引（leading
     wildcard），而 init_schema 被 per-request/per-query 呼叫
-    （_make_cache_reader、review_session_factory），所以遷移完成後必須以
+    （_make_cache_reader），所以遷移完成後必須以
     PRAGMA user_version 標記、後續呼叫 O(1) 直接跳過。驗證：全新 DB 跑過
     init_schema 後 user_version 已設；此時塞一筆舊格式列再跑 init_schema，
     該列保持原樣（證明掃描被守衛跳過，而非又執行了一次）。"""

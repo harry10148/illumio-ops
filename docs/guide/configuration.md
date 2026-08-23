@@ -252,7 +252,6 @@ Rule Scheduler 的排程建立、時窗語意與安全約束見 [automation.md](
 | `archive_interval_hours` | int（≥1） | `24` | archive 執行間隔（小時） |
 | `archive_gzip_after_days` | int（≥1） | `7` | 超過幾天的 archive 檔要壓縮 |
 | `archive_retention_days` | int（≥0） | `0` | archive 檔保留天數，`0` 表示永久保留（不刪） |
-| `archive_review_max_days` | int（≥1） | `31` | archive 查閱介面單次載入的日期範圍上限 |
 | `disk_free_warn_gb` | int（≥1） | `10` | 磁碟剩餘低於此 GB 數時告警 |
 | `siem_pending_warn_rows` | int（≥1000） | `50000` | SIEM 佇列積壓筆數告警門檻 |
 | `cache_read_max_rows` | int（≥10000） | `500000` | cache 讀取單次視窗列數護欄 |

@@ -310,8 +310,8 @@ def enqueue(
             ))
 
 
-# 補登 insert 的 chunk 大小，比照 repo 既有慣例（ingestor_events/traffic、
-# archive_import 皆用 500）。
+# 補登 insert 的 chunk 大小，比照 repo 既有慣例（ingestor_events/traffic
+# 皆用 500）。
 _ENQUEUE_CHUNK = 500
 
 

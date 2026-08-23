@@ -1161,14 +1161,13 @@ async function mountCache(root, ctx) {
 
       board.appendChild(el("div", { class: "brow c2 top" }, cfgPanel, el("div", { class: "board" }, tfPanel, tsPanel)));
 
-      /* Six keys of PceCacheSettings have no control anywhere in buildCacheForm
+      /* Five keys of PceCacheSettings have no control anywhere in buildCacheForm
        * (integrations.js:182-262). They survive only because cacheSave merges
        * over the cached settings object (:269). Dropping a backend field on the
        * floor is exactly how the previous redesign lost data, so they are listed
        * here with their values and the reason they are read-only. */
       const gapPanel = panel(null, t("gui_sy_cache_nogui"));
       gapPanel.body.appendChild(roList([
-        roField("archive_review_max_days", s.archive_review_max_days, t("gui_sy_cache_nogui_note")),
         roField("cache_read_max_rows", s.cache_read_max_rows, t("gui_sy_cache_nogui_note")),
         roField("disk_free_warn_gb", s.disk_free_warn_gb, t("gui_sy_cache_nogui_note")),
         roField("flow_delta_enabled", s.flow_delta_enabled, t("gui_sy_cache_nogui_note")),

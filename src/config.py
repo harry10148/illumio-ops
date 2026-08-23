@@ -136,6 +136,11 @@ def _deep_merge(base: dict, override: dict) -> dict:
 #   - pce_profiles / active_pce_id: PCE profiles were only ever a credential
 #     switcher; switching one silently re-pointed the appliance at a second PCE
 #     while keeping the first one's cache. No downstream code knew they existed.
+#   - pce_cache.archive_review_max_days: capped the date range for the old
+#     "import archive into a review DB, then query the review DB" path. That
+#     path is gone — archive queries now stream the daily archive files
+#     directly (src/pce_cache/archive_query.py), with no separate DB or range
+#     cap to load into.
 _DEPRECATED_KEY_PATHS: tuple[str, ...] = (
     "report.attack_surface",
     "web_gui.tls.http_redirect_port",
@@ -144,6 +149,7 @@ _DEPRECATED_KEY_PATHS: tuple[str, ...] = (
     # the appliance at a second PCE while keeping the first one's cache.
     "pce_profiles",
     "active_pce_id",
+    "pce_cache.archive_review_max_days",
 )
 
 

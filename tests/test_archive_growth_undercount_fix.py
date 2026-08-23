@@ -12,11 +12,11 @@ export 端沒有新記錄可匯。
 """
 from datetime import date, datetime, timezone
 
-from sqlalchemy import create_engine, select
+from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from src.pce_cache.schema import init_schema
-from src.pce_cache.models import PceTrafficFlowRaw
+from src.pce_cache.archive_query import iter_archive_rows, merge_row
 
 
 _FIRST = datetime(2026, 6, 1, 12, 0, 0, tzinfo=timezone.utc).isoformat()
@@ -48,7 +48,6 @@ def test_ingest_bump_plus_import_upsert_fixes_long_lived_flow_undercount(tmp_pat
     from src.pce_cache.ingestor_traffic import TrafficIngestor
     from src.pce_cache.watermark import WatermarkStore
     from src.pce_cache.archive import ArchiveExporter
-    from src.pce_cache.archive_import import ArchiveImporter
 
     cache_engine = create_engine(f"sqlite:///{tmp_path / 'cache.sqlite'}")
     init_schema(cache_engine)
@@ -77,18 +76,17 @@ def test_ingest_bump_plus_import_upsert_fixes_long_lived_flow_undercount(tmp_pat
     #    游標會重新看到該列並匯出成長後的值。
     exporter.run_once()
 
-    review_engine = create_engine(f"sqlite:///{tmp_path / 'review.sqlite'}")
-    init_schema(review_engine)
-    review_sf = sessionmaker(review_engine)
-    ArchiveImporter(archive_dir, review_sf).import_range(date(2026, 6, 1), date(2026, 6, 30))
-
-    with review_sf() as s:
-        row = s.execute(select(PceTrafficFlowRaw)).scalar_one()
+    # 封存查閱不再匯入 review DB（Task 7）；驗證改讀封存日檔本身，用
+    # archive_query.py 的 merge_row 重現同一套 upsert 語意（volatile 欄位
+    # 取 MAX）——這正是原本 ArchiveImporter._flush 的查詢時等價版本。
+    merged = None
+    for row in iter_archive_rows(archive_dir, "traffic", date(2026, 6, 1), date(2026, 6, 30)):
+        merged = merge_row(merged, row)
+    assert merged is not None
     # 曾經的 bug：這裡會停在第一次匯出的舊值（bi=100/bo=200/fc=1），
     # 因為第二次 export 沒撿到該列（ingested_at 沒 bump），或即使撿到了，
-    # import 端 on_conflict_do_nothing 也會把它丟掉。
-    assert row.bytes_in == 900
-    assert row.bytes_out == 1200
-    assert row.flow_count == 5
-    assert row.last_detected.replace(tzinfo=timezone.utc) == \
-        datetime(2026, 6, 1, 12, 30, 0, tzinfo=timezone.utc)
+    # 舊 import 端的 on_conflict_do_nothing 也會把它丟掉。
+    assert merged["bytes_in"] == 900
+    assert merged["bytes_out"] == 1200
+    assert merged["flow_count"] == 5
+    assert merged["event_time"] == datetime(2026, 6, 1, 12, 30, 0, tzinfo=timezone.utc).isoformat()

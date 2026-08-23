@@ -12,9 +12,9 @@ from src.gui._helpers import _err_with_log
 
 bp = Blueprint("pce_cache", __name__, url_prefix="/api/cache")
 
-# 同時只允許一個 backfill 在跑（non-blocking，同 archive_import._LOAD_LOCK
-# 模式）：backfill + 全量 aggregator 重算是長跑寫入，兩個併發 POST 會互搶
-# SQLite 寫鎖並重複灌同一批列。第二個請求立即回 409，不排隊。
+# 同時只允許一個 backfill 在跑（non-blocking lock）：backfill + 全量
+# aggregator 重算是長跑寫入，兩個併發 POST 會互搶 SQLite 寫鎖並重複灌
+# 同一批列。第二個請求立即回 409，不排隊。
 _BACKFILL_LOCK = threading.Lock()
 
 # 同時只允許一個手動 retention purge（同 _BACKFILL_LOCK 模式）：purge 是一連串
@@ -295,47 +295,17 @@ def put_cache_settings():
     return jsonify(result), (200 if result["ok"] else 422)
 
 
-@bp.route("/archive/load", methods=["POST"])
-@login_required
-def load_archive():
-    from datetime import date
-    from src.pce_cache.archive_import import ArchiveLoadBusy, start_archive_load
-    cm = current_app.config['CM']
-    cfg = cm.models.pce_cache
-    lang = cm.config.get('settings', {}).get('language', 'en')
-    body = request.get_json(silent=True) or {}
-    try:
-        start = date.fromisoformat(body.get("start_date", ""))
-        end = date.fromisoformat(body.get("end_date", ""))
-    except (ValueError, TypeError):
-        # ValueError=格式錯；TypeError=傳入 null/非字串（fromisoformat(None)）。兩者都回 400。
-        return jsonify({"ok": False, "error": "invalid date (YYYY-MM-DD)"}), 400
-    if end < start:
-        return jsonify({"ok": False, "error": "end before start"}), 400
-    span = (end - start).days + 1
-    if span > int(cfg.archive_review_max_days):
-        return jsonify({"ok": False,
-                        "error": f"range {span}d exceeds max {cfg.archive_review_max_days}d"}), 422
-    try:
-        res = start_archive_load(cfg, start, end)
-    except ArchiveLoadBusy:
-        # 另一個 load 正在進行中（non-blocking lock 取得失敗）：立即回 409，不排隊。
-        return jsonify({"ok": False,
-                        "error": t("gui_traffic_archive_load_busy", lang=lang)}), 409
-    except Exception as exc:  # noqa: BLE001
-        return _err_with_log("cache_archive_load", exc, lang=lang)
-    return jsonify({"ok": True, **res}), 202
-
-
 @bp.route("/archive/status", methods=["GET"])
 @login_required
 def archive_status():
-    from src.pce_cache.archive_import import review_status, load_progress
+    """archive 檔案本身的概況（目錄是否存在、檔案數、涵蓋的最早/最晚日期）
+    ——不是某次匯入的結果。封存查閱（POST /api/quarantine/search 的
+    source=archive 分支）自 Task 4 起直接串流封存日檔，不再有 review DB
+    可回報「已載入」；這裡改回報 archive_dir 底下真的有什麼。"""
+    from src.pce_cache.archive_query import archive_file_range
     cm = current_app.config['CM']
     lang = cm.config.get('settings', {}).get('language', 'en')
     try:
-        st = review_status(cm.models.pce_cache)
-        st["load"] = load_progress()
-        return jsonify(st)
+        return jsonify(archive_file_range(cm.models.pce_cache.archive_dir))
     except Exception as exc:  # noqa: BLE001
         return _err_with_log("cache_archive_status", exc, lang=lang)

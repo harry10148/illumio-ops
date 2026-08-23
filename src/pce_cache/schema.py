@@ -21,10 +21,10 @@ def init_schema(engine: Engine) -> None:
 
 # init_schema 本身雖然冪等，但每次呼叫仍要跑完整套 PRAGMA + create_all 反射
 # + table_info + 3 CREATE INDEX + 5 DROP INDEX 等十幾條 DDL/metadata 語句。
-# src/main.py 的 _make_cache_reader、_make_subscribers 與 archive_import.py
-# 的 review_session_factory 都是 per-request/per-query 熱路徑呼叫點，這筆
-# 開銷不該每次重付——用 db_path 記錄「這個 db 這個 process 生命週期內已
-# 確保過 schema」，之後同一個 db_path 直接略過，即使是不同 engine 物件。
+# src/main.py 的 _make_cache_reader、_make_subscribers 都是 per-request/
+# per-query 熱路徑呼叫點，這筆開銷不該每次重付——用 db_path 記錄「這個 db
+# 這個 process 生命週期內已確保過 schema」，之後同一個 db_path 直接略過，
+# 即使是不同 engine 物件。
 _schema_ensured_paths: set[str] = set()
 _schema_ensured_lock = threading.Lock()
 
@@ -138,8 +138,8 @@ def _drop_deprecated_indexes(engine: Engine) -> None:
 
 
 # 一次性資料遷移的完成標記。init_schema 被 per-request/per-query 呼叫
-# （src/main.py 的 _make_cache_reader、archive_import 的 review_session_factory），
-# 升級鏈裡其他步驟都是便宜的 metadata 檢查，但 bucket_day 正規化的
+# （src/main.py 的 _make_cache_reader），升級鏈裡其他步驟都是便宜的
+# metadata 檢查，但 bucket_day 正規化的
 # NOT LIKE '%.%' 是 leading-wildcard、無法用索引，會全表掃描 agg 表——
 # 用 PRAGMA user_version 守衛，遷移完成後穩態成本降回 O(1)。
 # （repo 內 user_version 無其他用途；日後要加新的一次性遷移時新增一個常數

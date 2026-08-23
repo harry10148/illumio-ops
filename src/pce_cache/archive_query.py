@@ -60,6 +60,39 @@ def _matching_files(archive_dir: str, source: str, start: date, end: date) -> li
     return result
 
 
+def archive_file_range(archive_dir: str, source: str = "traffic") -> dict:
+    """archive_dir 下該 source 的檔案概況：目錄是否存在、檔案數、涵蓋的
+    最早/最晚日期——供 GET /api/cache/archive/status 使用，讓操作者在選
+    查詢範圍前，先看到 archive 檔本身涵蓋到哪裡（不是某次 review DB 匯入
+    的結果，那條路徑已隨 review DB 一起移除）。
+
+    沿用 `_matching_files` 同一份 `_DAY_FILE` 檔名解析，不另建第二套。
+    目錄不存在/不可讀 → exists=False；存在但沒有該 source 的檔 →
+    exists=True 但 files=0、earliest/latest 皆 None。
+    """
+    try:
+        names = sorted(os.listdir(archive_dir))
+    except OSError:
+        return {"exists": False, "files": 0, "earliest": None, "latest": None}
+    days: list[date] = []
+    files = 0
+    for name in names:
+        m = _DAY_FILE.match(name)
+        if not m or m.group("source") != source:
+            continue
+        try:
+            days.append(date.fromisoformat(m.group("day")))
+        except ValueError:
+            continue
+        files += 1
+    return {
+        "exists": True,
+        "files": files,
+        "earliest": min(days).isoformat() if days else None,
+        "latest": max(days).isoformat() if days else None,
+    }
+
+
 def _iter_lines(path: str) -> Iterator[bytes]:
     opener = gzip.open if path.endswith(".gz") else open
     try:
@@ -70,7 +103,7 @@ def _iter_lines(path: str) -> Iterator[bytes]:
                     yield line
     except (OSError, EOFError, gzip.BadGzipFile) as exc:
         # 截斷/損壞的封存檔：已讀出的行照常處理，放棄該檔剩餘部分，
-        # 讓呼叫端繼續下一檔。與 archive_import 的既有行為一致。
+        # 讓呼叫端繼續下一檔。
         logger.warning("archive_query: corrupt/truncated file {}: {}", path, exc)
 
 

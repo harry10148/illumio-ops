@@ -90,14 +90,8 @@ def _make_flow_delta_reader(cm):
         return None
 
 
-def _make_cache_reader(cm, db_path: str | None = None):
-    """Return a CacheReader for the pce_cache DB (or an explicit db_path).
-
-    db_path=None: use cm.models.pce_cache.db_path and honor the `enabled` gate
-    (existing behavior). An explicit db_path (e.g. the archive review DB) builds
-    a reader unconditionally — archive review does not depend on live cache being
-    enabled.
-    """
+def _make_cache_reader(cm):
+    """Return a CacheReader for the pce_cache DB, honoring the `enabled` gate."""
     try:
         from sqlalchemy import create_engine
         from sqlalchemy.orm import sessionmaker
@@ -105,10 +99,9 @@ def _make_cache_reader(cm, db_path: str | None = None):
         from src.pce_cache.reader import CacheReader
         from src.pce_cache.schema import _ensure_schema_once
         cfg = cm.models.pce_cache
-        if db_path is None:
-            if not cfg.enabled:
-                return None
-            db_path = cfg.db_path
+        if not cfg.enabled:
+            return None
+        db_path = cfg.db_path
         engine = create_engine(f"sqlite:///{db_path}", poolclass=NullPool)
         _ensure_schema_once(engine, db_path)
         sf = sessionmaker(engine)

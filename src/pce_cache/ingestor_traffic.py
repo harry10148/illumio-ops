@@ -286,7 +286,7 @@ class TrafficIngestor:
                 base = sqlite_insert(PceTrafficFlowRaw).values(chunk)
                 set_ = {c: func.max(raw_cols[c], base.excluded[c]) for c in self._VOLATILE}
                 # raw_json/report_json 取「last_detected 較新的那一側」（與
-                # archive_import._flush 同一套語意）——亂序重拉不得把新快照蓋回舊的。
+                # archive_query.merge_row 同一套語意）——亂序重拉不得把新快照蓋回舊的。
                 newer = base.excluded.last_detected >= raw_cols.last_detected
                 set_["raw_json"] = case((newer, base.excluded.raw_json), else_=raw_cols.raw_json)
                 set_["report_json"] = case(

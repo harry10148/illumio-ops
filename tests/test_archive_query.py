@@ -288,3 +288,28 @@ def test_structurally_invalid_rows_are_skipped_and_counted(tmp_path):
     assert [r["flow_hash"] for r in res.rows] == ["ok"]
     assert res.scanned == 4
     assert res.skipped == 3
+
+
+def test_the_review_db_load_path_is_gone():
+    """封存查閱不再匯入 review DB；殘留的符號代表某條路徑還在用它。
+
+    只列這條路徑自己的符號，不含那個「單次載入範圍上限」的 config 鍵——
+    它仍必須留在 `src/config.py` 的 `_DEPRECATED_KEY_PATHS`（讓帶著它的舊
+    config.json 還能載入），且 `tests/test_config_deprecated_keys.py` 必須
+    提到它才能斷言它被丟棄；兩處都合法留著，見該檔的另一條守門測試（不在
+    這裡逐字寫出鍵名，以免這條測試自己的字串把守門的集合相等判斷弄髒）。"""
+    import pathlib
+    import re
+    root = pathlib.Path(__file__).resolve().parents[1]
+    pat = re.compile(
+        r"load_archive_review|start_archive_load|ArchiveLoadBusy|"
+        r"review_db_path|review_status|load_progress"
+    )
+    hits = []
+    for sub in ("src", "tests"):
+        for p in (root / sub).rglob("*.py"):
+            if p.name == pathlib.Path(__file__).name:
+                continue
+            if pat.search(p.read_text(encoding="utf-8", errors="ignore")):
+                hits.append(str(p.relative_to(root)))
+    assert hits == [], f"still referencing the removed archive-load path: {hits}"

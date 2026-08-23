@@ -15,6 +15,7 @@ verified_against:
   - src/pce_cache/rate_limiter.py
   - src/pce_cache/reader.py
   - src/pce_cache/archive.py
+  - src/pce_cache/archive_query.py
   - src/pce_cache/capacity.py
   - src/events/__init__.py
   - src/report/report_generator.py
@@ -89,7 +90,7 @@ illumio-ops 是一個**單一 Python 進程**的 Illumio PCE 維運工具：agen
 - **監控路徑**：`scheduler/jobs.py:run_monitor_cycle` 觸發 `src/analyzer.py` 的分析循環。pce_cache 啟用時，analyzer 透過 cache subscriber 游標消費本地資料（`src/main.py:_make_subscribers`、`src/pce_cache/models.py:IngestionCursor`），30 秒一輪；未啟用時直接打 PCE API，依設定的分鐘級間隔輪詢。命中規則交給 `src/reporter.py` 渲染並派送到 `src/alerts/` 外掛。
 - **報表路徑**：GUI（`src/gui/routes/reports.py`）、CLI（`src/cli/report.py`）、排程（`src/report_scheduler.py`）三個入口共用 `src/report/` 下的產生器；traffic 家族的資料來源（live API 或 cache）由 `src/report/cache_support.py` 統一裁決。
 - **SIEM 路徑**：ingestor 寫入 cache 的同一個交易內 enqueue（`src/siem/dispatcher.py:enqueue`），`siem_dispatch` job 逐目的地派送，失敗進 DLQ。
-- **封存路徑**：`pce_cache_archive` job 把 cache 的 traffic/audit 列增量匯出成分日 JSONL（`src/pce_cache/archive.py:ArchiveExporter`，at-least-once 語意），之後可用 `src/pce_cache/archive_import.py` 還原成 review DB 供歷史查詢。
+- **封存路徑**：`pce_cache_archive` job 把 cache 的 traffic/audit 列增量匯出成分日 JSONL（`src/pce_cache/archive.py:ArchiveExporter`，at-least-once 語意），之後 `src/pce_cache/archive_query.py` 直接依日期範圍串流掃描這些日檔供歷史查詢，不另建 DB。
 
 ## 3. 模組地圖
 
