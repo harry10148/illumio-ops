@@ -90,3 +90,87 @@ def test_the_blacklist_covers_every_analyzer_unevaluable_key():
     from src.pce_cache.archive_query import UNSUPPORTED_ARCHIVE_FILTER_KEYS
     missing = set(_CACHE_UNEVALUABLE_FILTER_KEYS) - set(UNSUPPORTED_ARCHIVE_FILTER_KEYS)
     assert missing == set(), f"archive blacklist is looser than the cache's: {sorted(missing)}"
+
+
+from src.pce_cache.archive_query import merge_row, stream_query
+
+
+def _row(fh, **kw):
+    base = {"flow_hash": fh, "src_ip": "10.0.0.1", "dst_ip": "10.0.0.2",
+            "port": 443, "protocol": "tcp", "action": "allowed",
+            "flow_count": 1, "bytes_in": 100, "bytes_out": 200,
+            "first_detected": "2026-05-01T00:00:00+00:00",
+            "event_time": "2026-05-01T01:00:00+00:00", "raw": {}}
+    base.update(kw)
+    return base
+
+
+def test_merge_takes_max_of_volatile_fields_and_min_of_first_detected():
+    """封存檔不是唯一列集合：長壽 flow 更新時會再次匯出，崩潰重跑也會重寫
+    整批。ArchiveImporter 因此用 MAX/MIN upsert；串流不合併就會重複計數。"""
+    a = _row("h", flow_count=3, bytes_in=10, bytes_out=20,
+             first_detected="2026-05-01T05:00:00+00:00",
+             event_time="2026-05-01T05:00:00+00:00")
+    b = _row("h", flow_count=7, bytes_in=5, bytes_out=90,
+             first_detected="2026-05-01T02:00:00+00:00",
+             event_time="2026-05-01T09:00:00+00:00")
+    m = merge_row(merge_row(None, a), b)
+    assert m["flow_count"] == 7
+    assert m["bytes_in"] == 10
+    assert m["bytes_out"] == 90
+    assert m["first_detected"] == "2026-05-01T02:00:00+00:00"
+    assert m["event_time"] == "2026-05-01T09:00:00+00:00"
+
+
+def test_duplicate_exports_do_not_inflate_the_summary(tmp_path):
+    _write(tmp_path, "traffic-2026-05-01.jsonl", [
+        _row("h", flow_count=3, bytes_in=10, bytes_out=20),
+        _row("h", flow_count=7, bytes_in=10, bytes_out=20),
+    ])
+    res = stream_query(str(tmp_path), "traffic", date(2026, 5, 1), date(2026, 5, 1),
+                       {"port": 443}, cap=10, sort_by="connections",
+                       matcher=lambda r: True)
+    assert res.matched == 1
+    assert len(res.rows) == 1
+    assert res.summary[0]["flow_count"] == 7
+
+
+def test_cap_keeps_the_globally_heaviest_not_the_first_seen(tmp_path):
+    """現行 query_flows 是排序全部命中再取前 N。用檔案順序取前 N 會漏掉
+    後面日期檔裡的大流量——這條測試就是為了讓那種實作失敗。"""
+    _write(tmp_path, "traffic-2026-05-01.jsonl",
+           [_row(f"small{i}", flow_count=1) for i in range(5)])
+    _write(tmp_path, "traffic-2026-05-02.jsonl", [_row("huge", flow_count=999)])
+    res = stream_query(str(tmp_path), "traffic", date(2026, 5, 1), date(2026, 5, 2),
+                       {"port": 443}, cap=2, sort_by="connections",
+                       matcher=lambda r: True)
+    assert res.truncated is True
+    assert res.rows[0]["flow_hash"] == "huge"
+    assert len(res.rows) == 2
+
+
+def test_summary_cardinality_is_bounded_and_reports_what_it_dropped(tmp_path):
+    _write(tmp_path, "traffic-2026-05-01.jsonl",
+           [_row(f"h{i}", port=1000 + i) for i in range(50)])
+    res = stream_query(str(tmp_path), "traffic", date(2026, 5, 1), date(2026, 5, 1),
+                       {"port": 0}, cap=100, sort_by="connections",
+                       matcher=lambda r: True, summary_top_k=10)
+    assert len(res.summary) == 10
+    assert res.summary_omitted == 40
+
+
+def test_matcher_decides_what_counts_as_a_hit(tmp_path):
+    _write(tmp_path, "traffic-2026-05-01.jsonl",
+           [_row("keep", port=443), _row("drop", port=80)])
+    res = stream_query(str(tmp_path), "traffic", date(2026, 5, 1), date(2026, 5, 1),
+                       {"port": 443}, cap=10, sort_by="connections",
+                       matcher=lambda r: r.get("port") == 443)
+    assert [r["flow_hash"] for r in res.rows] == ["keep"]
+    assert res.scanned == 2
+
+
+def test_a_query_with_no_filters_is_refused(tmp_path):
+    import pytest
+    with pytest.raises(ValueError):
+        stream_query(str(tmp_path), "traffic", date(2026, 5, 1), date(2026, 5, 1),
+                     {}, cap=10, sort_by="connections", matcher=lambda r: True)

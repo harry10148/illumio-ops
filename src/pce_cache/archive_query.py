@@ -7,8 +7,10 @@
 from __future__ import annotations
 
 import gzip
+import heapq
 import os
 import re
+from dataclasses import dataclass, field
 from datetime import date
 from typing import Iterator
 
@@ -97,3 +99,87 @@ UNSUPPORTED_ARCHIVE_FILTER_KEYS: tuple[str, ...] = (
 def unsupported_filters(filters: dict) -> list[str]:
     """請求中命中黑名單且**有值**的 key（排序）。空值代表沒在用這個條件。"""
     return sorted(k for k in UNSUPPORTED_ARCHIVE_FILTER_KEYS if filters.get(k))
+
+
+SUMMARY_TOP_K = 500
+
+_VOLATILE_MAX = ("flow_count", "bytes_in", "bytes_out", "event_time", "ingested_at")
+
+_SORT_FIELD = {
+    "bandwidth": lambda r: (r.get("bytes_in") or 0) + (r.get("bytes_out") or 0),
+    "volume": lambda r: (r.get("bytes_in") or 0) + (r.get("bytes_out") or 0),
+    "connections": lambda r: r.get("flow_count") or 0,
+}
+
+
+@dataclass
+class ArchiveQueryResult:
+    rows: list = field(default_factory=list)
+    summary: list = field(default_factory=list)
+    summary_omitted: int = 0
+    truncated: bool = False
+    matched: int = 0
+    scanned: int = 0
+    unsupported: list = field(default_factory=list)
+
+
+def merge_row(acc: dict | None, row: dict) -> dict:
+    """同 flow_hash 的兩列合併，沿用 ArchiveImporter 的 upsert 取值規則：
+    volatile 欄位取 MAX、first_detected 取 MIN、raw 取較新 event_time 那一側。"""
+    if acc is None:
+        return dict(row)
+    out = dict(acc)
+    for k in _VOLATILE_MAX:
+        a, b = acc.get(k), row.get(k)
+        if b is not None and (a is None or b > a):
+            out[k] = b
+    a_fd, b_fd = acc.get("first_detected"), row.get("first_detected")
+    if b_fd is not None and (a_fd is None or b_fd < a_fd):
+        out["first_detected"] = b_fd
+    if (row.get("event_time") or "") >= (acc.get("event_time") or ""):
+        out["raw"] = row.get("raw")
+    return out
+
+
+def stream_query(archive_dir: str, source: str, start, end, filters: dict,
+                 cap: int, sort_by: str, matcher,
+                 summary_top_k: int = SUMMARY_TOP_K) -> ArchiveQueryResult:
+    """掃描 [start, end] 的封存日檔，回傳有界的列與有界的摘要。
+
+    matcher 由呼叫端提供（GUI 路徑傳 Analyzer._match_flow_filters 的包裝），
+    這樣封存與快取共用同一套比對語意，不會長出第二套比對器。
+    """
+    if not any(v is not None for v in filters.values()):
+        raise ValueError("archive query needs at least one filter")
+
+    key = _SORT_FIELD.get(sort_by, _SORT_FIELD["connections"])
+    merged: dict[str, dict] = {}
+    scanned = 0
+    for row in iter_archive_rows(archive_dir, source, start, end):
+        scanned += 1
+        if not matcher(row):
+            continue
+        fh = row.get("flow_hash")
+        if fh is None:
+            continue
+        merged[fh] = merge_row(merged.get(fh), row)
+
+    res = ArchiveQueryResult(scanned=scanned, matched=len(merged))
+
+    # 列：全域排序後取前 cap（heapq.nlargest 內部就是 cap 大小的 heap）
+    res.rows = heapq.nlargest(cap, merged.values(), key=key)
+    res.truncated = len(merged) > cap
+
+    # 摘要：group by src/dst/port/proto，同樣取有界的 top-K
+    groups: dict[tuple, dict] = {}
+    for r in merged.values():
+        gk = (r.get("src_ip"), r.get("dst_ip"), r.get("port"), r.get("protocol"))
+        g = groups.setdefault(gk, {"src_ip": gk[0], "dst_ip": gk[1], "port": gk[2],
+                                   "protocol": gk[3], "flow_count": 0,
+                                   "bytes_in": 0, "bytes_out": 0})
+        g["flow_count"] += r.get("flow_count") or 0
+        g["bytes_in"] += r.get("bytes_in") or 0
+        g["bytes_out"] += r.get("bytes_out") or 0
+    res.summary = heapq.nlargest(summary_top_k, groups.values(), key=key)
+    res.summary_omitted = max(0, len(groups) - summary_top_k)
+    return res
