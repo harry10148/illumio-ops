@@ -269,6 +269,11 @@ function errText(r) {
 function unsupportedLabel(key) {
   const bare = key.replace(/^ex_/, "");
   if (bare === "draft_policy_decision") return t("gui_pd_draft_label");
+  // port_range / ex_port_range (Final review F4): PCE-native execution, no
+  // archive fallback — reuse the FilterBar's own "Port" category label
+  // (gui_fb_cat_port) rather than inventing new prose, same pattern as the
+  // label_group/AMS branch below.
+  if (bare === "port_range") return t("gui_fb_cat_port");
   const dir = bare.indexOf("src_") === 0 ? t("gui_fb_dir_src") + " "
     : bare.indexOf("dst_") === 0 ? t("gui_fb_dir_dst") + " " : "";
   if (/label_group/.test(bare) || /_ams$/.test(bare) || /include_groups$/.test(bare)) {
@@ -733,20 +738,42 @@ function trafficColumns(onIsolate, sel) {
  * the old review-DB `archive_status`/`not_loaded` flags: the new direct
  * date-range scan never sets `not_loaded` and does not depend on any review
  * DB being "loaded" at all, so reasoning from that status always reads as
- * "archive not loaded" even when the query genuinely ran. Two distinct facts,
- * both currently collapsed into that one wrong claim:
- *   scanned == 0            -> no archive files cover this date range at all
- *   scanned > 0, matched == 0 -> files were read; nothing matched the query
+ * "archive not loaded" even when the query genuinely ran. Distinct facts,
+ * previously collapsed into that one wrong claim:
+ *   scanned == 0               -> no archive files cover this date range at all
+ *   scanned > 0, matched == 0  -> files were read; nothing matched the query
  * Before any archive query has run in this session (`scanned` still
  * undefined — e.g. XC-09's audit probe forcing phase "done" without a real
  * query), neither fact is known yet, so this reads neutrally rather than
  * guessing. Shared by emptyCauses() and emptyState() so both read the same
- * three-way distinction the same way. */
+ * distinction the same way.
+ *
+ * Final review F2 — a FOURTH fact, checked first: the scan may have stopped
+ * partway through the range (deadline or the memory-bound size cap,
+ * actions.py's `incomplete_after`/`stop_reason`) before it ever got to
+ * "nothing matched". Without this check, a 90-day query that only managed to
+ * scan the first day before timing out told the operator the same sentence
+ * as a query that genuinely read all 90 days and found nothing — a real
+ * false claim ("files for this range were read; none matched"), not just an
+ * omission. */
 function archiveEmptyReason(state) {
-  const scanned = (state.meta || {}).scanned;
+  const meta = state.meta || {};
+  const scanned = meta.scanned;
   if (typeof scanned !== "number") return { tone: "neutral", key: "gui_traffic_archive_scan_pending" };
+  if (meta.incompleteAfter) {
+    const key = meta.stopReason === "size_cap"
+      ? "gui_traffic_archive_scan_incomplete_size_cap"
+      : "gui_traffic_archive_scan_incomplete_deadline";
+    return { tone: "warn", key: key, date: meta.incompleteAfter };
+  }
   if (scanned === 0) return { tone: "crit", key: "gui_traffic_archive_scan_empty" };
   return { tone: "warn", key: "gui_traffic_archive_scan_no_match" };
+}
+
+/** archiveEmptyReason()'s key, translated — with the {date} param when the
+ * reason carries one (the two "stopped partway" reasons). */
+function archiveReasonText(reason) {
+  return reason.date ? tf(reason.key, { date: reason.date }) : t(reason.key);
 }
 
 /* XC-09 — an empty result is a question, not a shrug. Each candidate cause is
@@ -780,7 +807,7 @@ function emptyCauses(state, d) {
   if (state.source === "archive") {
     const range = (state.archiveStart || "—") + " → " + (state.archiveEnd || "—");
     const reason = archiveEmptyReason(state);
-    cause("gui_iv_cause_window", range, reason.tone, t(reason.key));
+    cause("gui_iv_cause_window", range, reason.tone, archiveReasonText(reason));
   } else {
     const days = settings.traffic_raw_retention_days;
     cause("gui_iv_cause_window", tf("gui_iv_days", { n: days === undefined ? "—" : days }), "info",
@@ -815,7 +842,7 @@ function emptyState(state, d) {
   const archiveReason = state.source === "archive" ? archiveEmptyReason(state) : null;
   return el("div", { class: "empty", "data-cov": "XC-09" },
     el("span", { class: "et", text: t("gui_empty_state_no_data_title") }),
-    el("p", { text: archiveReason ? t(archiveReason.key) : t("gui_no_traffic") }),
+    el("p", { text: archiveReason ? archiveReasonText(archiveReason) : t("gui_no_traffic") }),
     emptyCauses(state, d)
   );
 }
@@ -1491,7 +1518,6 @@ async function mountTraffic(root, ctx) {
         state.rows = r.data || r.rows || [];
         state.meta = {};
         state.meta.truncated = !!r.truncated;
-        state.meta.summaryOmitted = r.summary_omitted || 0;
         state.meta.actualSource = r.actual_source || "";
         // Fix round 1, Important 2 — `scanned`/`matched` (archive only; both
         // undefined on a live response) are the real reason an archive query
@@ -1501,6 +1527,18 @@ async function mountTraffic(root, ctx) {
         // archiveEmptyReason() below is the sole consumer.
         state.meta.scanned = r.scanned;
         state.meta.matched = r.matched;
+        // Final review F3 — how many rows/files the scan itself discarded
+        // (archive_query.py's ArchiveQueryResult.skipped/files_incomplete):
+        // a result computed after quietly dropping rows must say so.
+        state.meta.skipped = r.skipped || 0;
+        state.meta.filesIncomplete = r.files_incomplete || 0;
+        // Final review F2/F5 — the scan gave up partway through the date
+        // range (deadline or the memory-bound size cap, actions.py's
+        // stop_reason): before this, the backend computed and returned
+        // `incomplete_after` but nothing here ever read it, so a 27-day
+        // truncated scan and a genuinely complete one rendered identically.
+        state.meta.incompleteAfter = r.incomplete_after || null;
+        state.meta.stopReason = r.stop_reason || null;
         repaint();
         toast.ok(tf("gui_iv_query_done", { n: num(state.rows.length) }));
       }
@@ -1605,13 +1643,44 @@ async function mountTraffic(root, ctx) {
           p.body.appendChild(el("div", { class: "strip", "data-tone": "warn" },
             el("i", { class: "dot" }), el("span", { text: t("gui_traffic_truncated") })));
         }
-        // summary_omitted (archive only — Task 4's SUMMARY_TOP_K bound): how
-        // many aggregate groups were dropped from the bounded top-K summary.
-        if (state.meta.summaryOmitted) {
+        // Final review F2/F5 — the scan stopped before reaching the end of
+        // the requested date range (deadline, or the memory-bound size cap
+        // — archive_query.py's MAX_TRACKED_FLOWS). A partial result must not
+        // look identical to a complete one, and which reason it stopped for
+        // is itself a different fact from how far it got: a size cap means
+        // this query's own result set is large — a narrower range would
+        // help; a deadline may just mean this run was slow.
+        if (state.meta.incompleteAfter) {
+          const stopKey = state.meta.stopReason === "size_cap"
+            ? "gui_traffic_archive_incomplete_size_cap"
+            : "gui_traffic_archive_incomplete_deadline";
           p.body.appendChild(el("div", { class: "strip", "data-tone": "warn" },
             el("i", { class: "dot" }),
-            el("span", { text: tf("gui_traffic_summary_omitted", { n: num(state.meta.summaryOmitted) }) })));
+            el("span", { text: tf(stopKey, { date: state.meta.incompleteAfter }) })));
         }
+        // Final review F3 — rows the scan could not parse, and archive files
+        // (or the truncated remainder of one) it could not read at all,
+        // while producing this result (archive_query.py's skipped /
+        // files_incomplete). Spec §4.3: a result computed after discarding
+        // rows must say so — these were silently dropped before, visible
+        // only in a server log the operator never sees.
+        if (state.meta.skipped) {
+          p.body.appendChild(el("div", { class: "strip", "data-tone": "warn" },
+            el("i", { class: "dot" }),
+            el("span", { text: tf("gui_traffic_archive_skipped_rows", { n: num(state.meta.skipped) }) })));
+        }
+        if (state.meta.filesIncomplete) {
+          p.body.appendChild(el("div", { class: "strip", "data-tone": "warn" },
+            el("i", { class: "dot" }),
+            el("span", { text: tf("gui_traffic_archive_files_incomplete", { n: num(state.meta.filesIncomplete) }) })));
+        }
+        // Final review F8 — summary_omitted (Task 4's SUMMARY_TOP_K bound)
+        // used to be announced here even though the aggregate summary it
+        // refers to is never rendered (spec §5 defers that to a later
+        // phase): telling the operator "N groups were left out" of a
+        // summary they cannot see is a notice about nothing they can act
+        // on. The response still carries `summary_omitted` for whenever
+        // that summary view lands; this view just does not narrate it yet.
         // The table host carries XC-12 — the skeleton while a query runs, the
         // column resize grips, the service popover and the query toast all
         // live in it. It is created unconditionally, including for the empty

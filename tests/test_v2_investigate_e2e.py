@@ -889,10 +889,19 @@ def test_traffic_query_sends_data_source_then_archive_range(v2_page):
     assert "data_source" not in body2, body2
 
 
-def test_truncated_and_summary_omitted_notices_render_from_response_flags(v2_page):
-    """The results panel's truncation/summary-omission notices are driven
-    solely by the response's own `truncated` / `summary_omitted` flags, and
-    `actual_source` renders regardless of which of the three sources ran."""
+def test_truncated_notice_renders_from_response_flags(v2_page):
+    """The results panel's truncation notice is driven solely by the
+    response's own `truncated` flag, and `actual_source` renders regardless
+    of which of the three sources ran.
+
+    Final review F8: this test used to also assert a `summary_omitted`
+    notice ("N summary rows were left out"), but the aggregate summary that
+    count refers to is never rendered by this view (spec §5 defers its
+    presentation to a later phase) — telling the operator N groups were
+    omitted from a summary they cannot see is a notice about nothing they
+    can act on, so it was removed from the view. The backend still returns
+    `summary_omitted` on the response (see test_actions_archive_source.py /
+    test_archive_query.py) for whenever that summary view lands."""
     page, base_url = v2_page
     page.route(
         "**/api/quarantine/search",
@@ -923,8 +932,8 @@ def test_truncated_and_summary_omitted_notices_render_from_response_flags(v2_pag
     )
     text = page.locator('section[data-cov="IV-05"]').inner_text()
     assert catalogue["truncated"] in text
-    assert catalogue["omitted"] in text
     assert catalogue["mixed"] in text
+    assert catalogue["omitted"] not in text, text
 
 
 def test_unsupported_archive_filters_never_show_raw_backend_keys(v2_page):
@@ -1045,6 +1054,69 @@ def test_archive_empty_result_reason_reflects_scanned_and_matched_not_review_db_
     assert text1 != text2, "scanned==0 and scanned>0/matched==0 must not read the same"
 
 
+def test_archive_incomplete_scan_is_distinguished_from_a_complete_empty_result(v2_page):
+    """Final review F2: before this, `incomplete_after`/`stop_reason` were
+    computed by the backend and returned on the response, but nothing in the
+    frontend ever read them — a scan that gave up after 1 day out of 90 and
+    a scan that genuinely read all 90 days and found nothing rendered the
+    exact same empty-state sentence ("files for this range were read; none
+    of the rows matched"), which is false in the first case. This pins that
+    the empty-state now reads differently for: (1) a genuinely complete
+    empty result, (2) a scan that stopped on its deadline, (3) a scan that
+    stopped on its size cap — and that deadline vs. size-cap read as
+    different sentences too, since they are different facts for the
+    operator (size cap: this query's own result set is large; deadline: this
+    run was just slow)."""
+    page, base_url = v2_page
+    _goto(page, base_url, R_TRAFFIC)
+    labels = _labels(page)
+    query = page.locator('section[data-cov="IV-01"]')
+    query.locator('select[aria-label="%s"]' % labels["gui_traffic_source"]).select_option("archive")
+    query.locator('input[aria-label="%s"]' % labels["gui_gen_start_date"]).fill("2026-08-01")
+    query.locator('input[aria-label="%s"]' % labels["gui_gen_end_date"]).fill("2026-08-07")
+    run_btn = query.get_by_role("button", name=labels["gui_query_flow"], exact=True)
+
+    def _stub(body):
+        def handler(route, request):
+            route.fulfill(status=200, content_type="application/json", body=json.dumps(body))
+        return handler
+
+    # case 1: a genuinely complete empty result — no incomplete_after at all.
+    page.route("**/api/quarantine/search", _stub({
+        "ok": True, "rows": [], "actual_source": "archive", "matched": 0, "scanned": 7,
+        "incomplete_after": None, "stop_reason": None,
+    }))
+    with page.expect_response(lambda r: "/api/quarantine/search" in r.url):
+        run_btn.click()
+    text_complete = page.locator('[data-cov="XC-09"]').inner_text()
+    page.unroute("**/api/quarantine/search")
+
+    # case 2: the scan stopped on its deadline after day 1 of a 7-day range.
+    page.route("**/api/quarantine/search", _stub({
+        "ok": True, "rows": [], "actual_source": "archive", "matched": 0, "scanned": 3,
+        "incomplete_after": "2026-08-01", "stop_reason": "deadline",
+    }))
+    with page.expect_response(lambda r: "/api/quarantine/search" in r.url):
+        run_btn.click()
+    text_deadline = page.locator('[data-cov="XC-09"]').inner_text()
+    page.unroute("**/api/quarantine/search")
+
+    # case 3: the scan stopped on its size cap after day 1.
+    page.route("**/api/quarantine/search", _stub({
+        "ok": True, "rows": [], "actual_source": "archive", "matched": 0, "scanned": 3,
+        "incomplete_after": "2026-08-01", "stop_reason": "size_cap",
+    }))
+    with page.expect_response(lambda r: "/api/quarantine/search" in r.url):
+        run_btn.click()
+    text_size_cap = page.locator('[data-cov="XC-09"]').inner_text()
+
+    assert text_complete != text_deadline, (text_complete, text_deadline)
+    assert text_complete != text_size_cap, (text_complete, text_size_cap)
+    assert text_deadline != text_size_cap, (text_deadline, text_size_cap)
+    assert "2026-08-01" in text_deadline
+    assert "2026-08-01" in text_size_cap
+
+
 def test_unsupported_label_map_has_no_drift_against_the_archive_blacklist(v2_page):
     """archive_query.py's UNSUPPORTED_ARCHIVE_FILTER_KEYS is the backend's
     own authority on which filter keys the archive cannot evaluate (Task
@@ -1120,3 +1192,70 @@ def test_actual_source_renders_for_every_backend_value(v2_page):
         run_btn.click()
     text = page.locator('section[data-cov="IV-05"]').inner_text()
     assert catalogue["archive"] in text, text
+
+
+def test_archive_rows_render_real_values_not_blank_cells(v2_page):
+    """Final review F1: every archive e2e before this one stubbed `rows: []`
+    (test_archive_empty_result_reason_..., test_actual_source_renders_...
+    above), so this suite had never once rendered a non-empty archive row —
+    exactly the hole F1 fell through. trafficRows()/actorCell()/serviceCell()
+    read item.source/destination/service/formatted_volume — a flat archive
+    record (src_ip/dst_ip/port/...) has none of those keys and every cell
+    comes out blank.
+
+    Caveat, by design: `page.route` intercepts the network call before it
+    reaches Flask, so this test exercises only the CONSUMER side (does the
+    already-shaped JSON render correctly), not the production of that shape.
+    The shaping itself lives in the endpoint (actions.py's source=="archive"
+    branch calling Analyzer._shape_traffic_row) and is proven red-then-green
+    at the Flask level by
+    tests/test_actions_archive_source.py::test_archive_row_is_shaped_like_a_live_row_and_metrics_come_from_the_merge_not_raw
+    — stubbing a PRE-fix flat row here would not fail against pre-fix code
+    (the frontend's reader never changed) and would prove nothing about the
+    real regression. This test instead pins the consumer contract: given a
+    correctly-shaped archive row, the table must show it, not blank cells.
+    """
+    page, base_url = v2_page
+    _goto(page, base_url, R_TRAFFIC)
+    labels = _labels(page)
+    query = page.locator('section[data-cov="IV-01"]')
+    run_btn = query.get_by_role("button", name=labels["gui_query_flow"], exact=True)
+
+    shaped_row = {
+        "source": {"name": "web-01", "ip": "10.0.0.30", "href": "/orgs/1/workloads/w1",
+                   "labels": [], "process": "", "user": ""},
+        "destination": {"name": "db-01", "ip": "10.0.0.31", "href": "/orgs/1/workloads/w2",
+                        "labels": [], "process": "", "user": ""},
+        "service": {"port": 8080, "proto": "TCP", "name": "", "process": "", "user": ""},
+        "policy_decision": "blocked",
+        "timestamp_range": {"first_detected": "2026-08-01T09:00:00+00:00",
+                            "last_detected": "2026-08-01T10:00:00+00:00"},
+        "formatted_volume": "17.19 MB (Total)",
+        "formatted_connections": "42",
+        "total_volume_mb": 17.19,
+        "total_connections": 42,
+        "num_connections": 42,
+    }
+    page.route(
+        "**/api/quarantine/search",
+        lambda route: route.fulfill(
+            status=200, content_type="application/json",
+            body=json.dumps({"ok": True, "rows": [shaped_row], "actual_source": "archive",
+                             "matched": 1, "scanned": 1, "truncated": False,
+                             "sort_by": "volume", "sort_by_substituted": True}),
+        ),
+    )
+    query.locator('select[aria-label="%s"]' % labels["gui_traffic_source"]).select_option("archive")
+    query.locator('input[aria-label="%s"]' % labels["gui_gen_start_date"]).fill("2026-08-01")
+    query.locator('input[aria-label="%s"]' % labels["gui_gen_end_date"]).fill("2026-08-01")
+    with page.expect_response(lambda r: "/api/quarantine/search" in r.url):
+        run_btn.click()
+
+    table_text = page.locator('[data-cov="XC-12"]').inner_text()
+    assert "web-01" in table_text
+    assert "10.0.0.30" in table_text
+    assert "db-01" in table_text
+    assert "10.0.0.31" in table_text
+    assert "8080" in table_text
+    assert "17.19" in table_text
+    assert "2026-08-01 10:00:00" in table_text
