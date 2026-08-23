@@ -21,6 +21,11 @@
 - **調查頁的來源控制項目前只有兩個值**：`live`（實為本機 cache）與 `archive`（實為已載入的 review DB）。名稱本身就有誤導。
 - **封存載入是有成本的匯入動作**。`load_archive_review` / `start_archive_load` 把 JSONL 匯進獨立的 review DB 並跑 `TrafficAggregator`。現有唯一的閘門是 `pce_cache.archive_review_max_days`（預設 31），**只限制天數，不限制資料量**。測試機 31 天約 0.1 GB，高流量正式環境可能是數十 GB。
 - **封存檔的形狀對串流查詢有利**：一天一個檔（`<source>-<YYYY-MM-DD>.jsonl`），每列已攤平且欄位齊全——traffic 有 `action / bytes_in / bytes_out / dst_ip / dst_workload / event_time / first_detected / flow_count / flow_hash / ingested_at / port / protocol / raw / src_ip / src_workload`。日期區間等於「開哪幾個檔」。
+- **但封存檔集合本身有四個性質，初稿全部漏掉**（2026-08-23 Codex 對抗式審查指出，逐項對原始碼查證屬實）：
+  1. **舊檔是壓縮的**。`pce_cache.archive_gzip_after_days` 預設 7，`ArchiveExporter._gzip_old_files()` 每次匯出時把超過天數的檔轉為 `.jsonl.gz`。**本案的核心情境（三個月前）的資料必然只以 `.gz` 存在**。
+  2. **同一 `flow_hash` 會重複出現**。`src/pce_cache/archive.py` 的註解明寫「下次會重寫同批，JSONL 可能含重複列」——長壽 flow 更新時會再次匯出，fsync 後、游標推進前崩潰也會重寫整批。`ArchiveImporter` 因此使用 `on_conflict_do_update`（`archive_import.py:176-196`）：`last_detected / bytes_in / bytes_out / flow_count / ingested_at` 取 MAX、`first_detected` 取 MIN、`raw_json` 取較新 `last_detected` 那一側。
+  3. **現行查詢是全域排序後截斷**。`QUERY_RESULT_CAP = 500`，`query_flows` 依 `sort_by`（bandwidth／volume／connections）排序**全部命中**再取前 500，且註解明訂「截斷需回報，不可無聲」。
+  4. **有一類 filter 無法離線評估**。`_CACHE_UNEVALUABLE_FILTER_KEYS`（`analyzer.py:139-147`）列出 label group 與 AMS 系列，註解記載「帶這些 key 時 cache 命中會靜默回未過濾資料（2026-07-24 審查 M4）」；`draft_policy_decision` 也由即時查詢計算，不存在於封存列中。
 
 ## 3. 決策
 
@@ -59,10 +64,14 @@ def stream_query(archive_dir: str, source: str, start: date, end: date,
 
 回傳 `rows`（最多 `cap` 筆）、`summary`（聚合）、`truncated`、`scanned`、`skipped`、`incomplete_after`。
 
-- 日期區間決定開哪些 `<source>-<YYYY-MM-DD>.jsonl`
+- 日期區間決定開哪些檔，**`.jsonl` 與 `.jsonl.gz` 都要開**（同一天兩者都存在時以 `.jsonl` 為準，壓縮是原地取代）
 - 逐列解析、逐列比對；**至少要有一個篩選條件**，否則拒絕並說明原因
-- 命中的列累加進聚合摘要（group by `src_ip` / `dst_ip` / `port` / `protocol`），但只保留前 `cap` 列
-- `truncated=True` 時前端明說「列表已截斷，摘要涵蓋掃到的全部資料」
+- **在截斷與聚合之前，先依 `flow_hash` 合併重複列**，沿用 `ArchiveImporter` 既有的取值規則（volatile 欄位取 MAX、`first_detected` 取 MIN、`raw` 取較新 `last_detected` 那一側）。不合併就會重複計數並灌水 `flow_count` 與 bytes
+- **保留現行的全域排序語意**：依 `sort_by` 維護一個 `cap` 大小的 top-N heap，而不是取檔案順序的前 N 筆——否則後面日期檔裡的高流量結果會被漏掉
+- 聚合摘要**必須有界**：維護固定基數的 top-K（K 與 `cap` 同量級）加上「其餘 N 組已省略」的計數。無界 group-by 的狀態是 O(命中列數)，正好重現本案要消除的大量載入問題
+- `truncated=True` 時前端明說「列表已截斷」，並標明摘要是 top-K 而非全量
+
+**篩選條件的白名單**：封存來源只接受能逐列離線評估的 key。帶到 `_CACHE_UNEVALUABLE_FILTER_KEYS` 裡的 label group／AMS 條件，或 `draft_policy_decision` 時，**明確拒絕並說明「這個條件需要即時查詢 PCE 才能判定，封存查不到」**——不得靜默回未過濾資料，那正是 2026-07-24 審查抓過的坑。
 
 **移除**（使用者已確認接受既有 review DB 失效）：`load_archive_review`、`start_archive_load`、`ArchiveLoadBusy`、review DB 與 `review_db_path`、`POST /api/cache/archive/load`、System→Cache 的載入 UI、`pce_cache.archive_review_max_days` 設定鍵（走既有的 deprecated-key 退場路徑）。
 
@@ -76,7 +85,9 @@ def stream_query(archive_dir: str, source: str, start: date, end: date,
 
 ### 4.4 測試
 
-- `archive_query` 單元測試：篩選正確性、`cap` 截斷、**摘要涵蓋全量而非只涵蓋回傳的列**、壞列跳過、無篩選被拒、無檔案與逾時路徑
+- `archive_query` 單元測試：篩選正確性、`cap` 截斷、壞列跳過、無篩選被拒、無檔案與逾時路徑
+- **針對上述四個性質各一條**：`.jsonl.gz` 查得到；同 `flow_hash` 的成長快照與 at-least-once 重複列合併後不灌水；高基數壓力測試確認摘要記憶體有界且省略計數正確；後面日期檔裡的高流量列會進 top-N（用檔案順序取前 N 的實作必須失敗）
+- 白名單測試：帶 label group／AMS／`draft_policy_decision` 時回明確錯誤而非未過濾結果
 - e2e：三個來源選項各查一次，斷言請求帶的 `data_source` 與結果標示的實際路徑相符
 - 移除路徑的守門測試：`load_archive_review` / `start_archive_load` / `review_db_path` / `archive_review_max_days` 在 `src/` 與 `tests/` 歸零（比照本專案既有的 `test_config_models.py` 命名守門寫法，用集合相等而非子字串）
 
