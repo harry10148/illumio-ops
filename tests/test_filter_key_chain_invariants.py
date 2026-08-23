@@ -54,7 +54,10 @@ def actions_params_keys() -> set:
     # （Task 4：source=="archive" 直接串流封存日檔並提早 return，從不
     # 走到 query_flows），跟 mins/policy_decision 同一類，不是 filter key。
     return keys - {"source", "mins", "policy_decision", "lang",
-                   "archive_start", "archive_end"}
+                   "archive_start", "archive_end",
+                   # data_source 是資料來源偏好（live/hybrid）這個控制 key，
+                   # 跟 mins/policy_decision 同一類，不是 filter key（Task 5）。
+                   "data_source"}
 
 
 def query_flows_whitelist() -> set:

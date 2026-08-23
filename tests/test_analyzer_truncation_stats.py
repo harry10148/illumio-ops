@@ -41,7 +41,7 @@ def test_under_cap_not_truncated(monkeypatch):
     out = ana.query_flows(_params())
     assert len(out) == 3
     assert ana.last_query_stats == {"total_matches": 3, "cap": QUERY_RESULT_CAP,
-                                    "truncated": False}
+                                    "truncated": False, "actual_source": "api"}
 
 
 def test_over_cap_truncated_and_counted(monkeypatch):
@@ -71,4 +71,5 @@ def test_empty_result_resets_stale_stats(monkeypatch):
         "total_matches": 0,
         "cap": QUERY_RESULT_CAP,
         "truncated": False,
+        "actual_source": "api",
     }

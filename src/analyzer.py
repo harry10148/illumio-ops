@@ -2049,6 +2049,13 @@ class Analyzer:
             )
             return stream, "api"
 
+        # cache_ok=True (not cache_available(cm)) is correct here, not a
+        # shortcut: we already know self._cache_reader is not None (checked
+        # just above), so the cache genuinely is usable at this call site;
+        # a fresh reachability probe would be redundant. _warning is unused
+        # either way — it only fires when cache_ok is False, which endpoint-
+        # level validation (see actions.py) never lets reach this function
+        # in the first place (cache-only is rejected before query_flows).
         use_cache, _clip_to_cache, _warning = resolve_data_source(data_source, cache_ok=True)
         if not use_cache:
             # 操作者明示 live：直接走 API，連 cover_state 都不查，

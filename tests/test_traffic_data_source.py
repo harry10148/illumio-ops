@@ -195,5 +195,66 @@ class TestQueryFlowsSurfacesActualSource(unittest.TestCase):
         self.assertEqual(az.last_query_stats["actual_source"], "mixed")
 
 
+class TestQuarantineSearchDataSourceValidation:
+    """/api/quarantine/search's live branch (fix round 1): 'cache-only' is
+    not implemented by this path (analyzer has no clip-to-cache behaviour),
+    so it must be rejected at the endpoint rather than silently downgraded
+    to hybrid by resolve_data_source. Uses the same app_persistent +
+    Analyzer.query_flows monkeypatch pattern as tests/test_gui_quarantine.py.
+    """
+
+    def _login(self, app_persistent):
+        from tests._helpers import _csrf
+        c = app_persistent.test_client()
+        login = c.post('/api/login', json={"username": "admin", "password": "testpass"},
+                       environ_overrides={'REMOTE_ADDR': '127.0.0.1'})
+        return c, _csrf(login)
+
+    def test_cache_only_data_source_is_rejected(self, app_persistent, monkeypatch):
+        c, csrf_token = self._login(app_persistent)
+
+        from src.analyzer import Analyzer
+        called = {"n": 0}
+
+        def fake_query(self, params):
+            called["n"] += 1
+            return []
+
+        monkeypatch.setattr(Analyzer, "query_flows", fake_query)
+
+        r = c.post('/api/quarantine/search', json={"mins": 60, "data_source": "cache-only"},
+                   environ_overrides={'REMOTE_ADDR': '127.0.0.1'},
+                   headers={'X-CSRF-Token': csrf_token})
+
+        assert r.status_code == 400
+        assert r.json["ok"] is False
+        # rejected before query_flows is ever reached — not silently
+        # downgraded to hybrid and forwarded.
+        assert called["n"] == 0
+
+    def test_live_data_source_is_accepted_and_forwarded(self, app_persistent, monkeypatch):
+        c, csrf_token = self._login(app_persistent)
+
+        from src.analyzer import Analyzer
+        captured = {}
+
+        def fake_query(self, params):
+            captured.update(params)
+            self.last_query_stats = {"total_matches": 0, "cap": 500,
+                                     "truncated": False, "actual_source": "api"}
+            return []
+
+        monkeypatch.setattr(Analyzer, "query_flows", fake_query)
+
+        r = c.post('/api/quarantine/search', json={"mins": 60, "data_source": "live"},
+                   environ_overrides={'REMOTE_ADDR': '127.0.0.1'},
+                   headers={'X-CSRF-Token': csrf_token})
+
+        assert r.status_code == 200
+        assert r.json["ok"] is True
+        assert captured.get("data_source") == "live"
+        assert r.json["actual_source"] == "api"
+
+
 if __name__ == "__main__":
     unittest.main()

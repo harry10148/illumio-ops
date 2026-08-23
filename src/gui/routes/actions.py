@@ -32,6 +32,15 @@ from src.state_store import update_state_file
 # 被抹掉 → 同一則告警重寄）。取鎖順序固定為 file_lock → _analysis_lock。
 _ANALYSIS_LOCK_WAIT_S = 600.0
 
+# /api/quarantine/search 的 data_source 白名單（live 分支專用；archive 分支
+# 有自己的 source=="archive" 早退，data_source 從不影響它）。只列這條路徑
+# 真的實作的值：未帶／空字串（=自動判斷），以及 resolve_data_source 會對應
+# 到 hybrid 或 live 的字串（含別名）。刻意不含 "cache-only"——analyzer 端
+# 沒有實作 clip-to-cache 語意，讓它悄悄降級成 hybrid 正是這個功能要防的
+# 「操作者偏好被默默改寫」缺陷，所以在端點就擋掉，不要往下傳給
+# resolve_data_source 自己吸收成 hybrid。
+_TRAFFIC_DATA_SOURCE_VALUES = {"hybrid", "cache", "live", "no-cache", "api"}
+
 
 def make_actions_blueprint(
     cm: ConfigManager,
@@ -268,6 +277,12 @@ def make_actions_blueprint(
                         "incomplete_after": (result.incomplete_after.isoformat()
                                               if result.incomplete_after else None),
                     })
+
+                raw_data_source = d.get("data_source")
+                if raw_data_source not in (None, ""):
+                    norm_data_source = str(raw_data_source).strip().lower()
+                    if norm_data_source not in _TRAFFIC_DATA_SOURCE_VALUES:
+                        return _err(t("gui_err_traffic_data_source_invalid", lang=lang), 400)
 
                 from src.main import _make_cache_reader
                 cache_reader = _make_cache_reader(cm)
