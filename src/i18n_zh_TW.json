@@ -4481,6 +4481,7 @@
   "gui_err_archive_range_required": "查詢封存需要指定日期區間。",
   "gui_err_archive_filter_unsupported": "這些條件需要即時向 PCE 查詢才能判定，封存裡查不到：{keys}",
   "gui_err_archive_filter_required": "查詢封存至少需要一個縮小範圍的條件。",
+  "gui_err_archive_search_unsupported": "封存無法搜尋自由文字，請改用位址、工作負載、連接埠或通訊協定等條件過濾。",
   "gui_fb_any_label_group_unsupported": "S/D（any）方向不支援 Label Group，請分別加入來源與目的 Label Group 條件。",
   "gui_gen_readiness_title": "產生 Enforcement 就緒度報表",
   "gui_rcard_readiness_desc": "哪個 App（Env）可以安全推進到下一階段 Enforcement——就緒分數、卡關因素與改善佇列。",

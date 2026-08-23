@@ -31,8 +31,25 @@ def client(tmp_path):
             "dst_port": 443, "proto": 6, "policy_decision": "blocked",
         },
     })
+    # 第二筆：同一天、同 proto，但 port 與 policy_decision 都跟第一筆不同
+    # ——port 8443 避免影響既有 port=443 斷言，proto=6 給 policy_decision
+    # 過濾測試一個兩筆都會命中的窄化條件，好驗證 rule["pd"] 真的有把
+    # allowed 那筆濾掉。
+    rec2 = orjson.dumps({
+        "event_time": "2026-06-20T12:05:00+00:00",
+        "ingested_at": "2026-06-20T12:05:00+00:00",
+        "flow_hash": "src2", "src_ip": "10.0.0.5", "src_workload": "/w/c",
+        "dst_ip": "10.0.0.4", "dst_workload": "/w/d",
+        "port": 8443, "protocol": "tcp", "action": "allowed", "flow_count": 1,
+        "bytes_in": 1, "bytes_out": 1,
+        "raw": {
+            "src": {"ip": "10.0.0.5"}, "dst": {"ip": "10.0.0.4"},
+            "dst_port": 8443, "proto": 6, "policy_decision": "allowed",
+        },
+    })
     with open(arch / "traffic-2026-06-20.jsonl", "wb") as fh:
         fh.write(rec + b"\n")
+        fh.write(rec2 + b"\n")
     with open(path, "w") as f:
         json.dump({
             "web_gui": {"username": "admin", "password": "pw", "secret_key": "s",
@@ -117,15 +134,53 @@ def test_archive_source_rejects_a_reversed_date_range(client):
 def test_archive_source_search_only_is_not_a_narrowing_filter(client):
     """search 的全文比對只存在於 query_flows 事後那道手動子字串掃描，不在
     _match_flow_filters 裡——archive 只共用 _match_flow_filters，不另建
-    第二套比對器，所以評估不了 search。若讓它單獨滿足「有縮小範圍」的
-    守門，一個只給 search 的查詢會通過守門卻拿到完全未過濾的結果，比
-    直接拒絕還危險，所以這裡連同其他條件一起判定為「沒給窄化條件」。"""
+    第二套比對器，所以評估不了 search，比照 unsupported filter 明講拒絕
+    （而不是靜默忽略掉 search 條件、回一個看似有過濾但其實沒有的結果）。"""
     c, _cm = client
     resp = c.post("/api/quarantine/search",
                   json={"source": "archive", "search": "10.0.0.9",
                         "archive_start": "2026-06-20", "archive_end": "2026-06-20"},
                   environ_overrides={"REMOTE_ADDR": "127.0.0.1"})
     assert resp.status_code == 400
+    body = resp.get_json()
+    assert body["ok"] is False
+    assert "search" in body["unsupported"]
+
+
+def test_archive_source_rejects_search_combined_with_another_filter(client):
+    """search 跟一個真的能評估的條件（port）一起送——這裡曾經是個洞：
+    只有 search-only 被擋，search 搭別的條件時會悄悄回 port 過濾過、
+    但 search 被忽略的結果（ok:true），操作者以為文字有搜到，其實根本
+    沒搜。任何非空 search 都要拒絕，不只 search-only。"""
+    c, _cm = client
+    resp = c.post("/api/quarantine/search",
+                  json={"source": "archive", "port": 443, "search": "foo",
+                        "archive_start": "2026-06-20", "archive_end": "2026-06-20"},
+                  environ_overrides={"REMOTE_ADDR": "127.0.0.1"})
+    assert resp.status_code == 400
+    body = resp.get_json()
+    assert body["ok"] is False
+    assert "search" in body["unsupported"]
+
+
+def test_archive_source_filters_by_policy_decision(client):
+    """rule["pd"] 曾經照抄 query_flows 固定成 -1（等於不過濾）——那份
+    照抄少了 query_flows 自己在送 API 查詢前先按 pds 縮小範圍那個階段，
+    archive 沒有這個階段，於是 policy_decision 被靜默丟在地上。兩筆
+    fixture 資料同 proto，一筆 blocked 一筆 allowed；只挑 blocked 時
+    allowed 那筆不該出現。"""
+    c, _cm = client
+    resp = c.post("/api/quarantine/search",
+                  json={"source": "archive", "proto": 6, "policy_decision": "blocked",
+                        "archive_start": "2026-06-20", "archive_end": "2026-06-20"},
+                  environ_overrides={"REMOTE_ADDR": "127.0.0.1"})
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert body["ok"] is True
+    assert len(body["rows"]) == 1
+    text = resp.get_data(as_text=True)
+    assert "10.0.0.9" in text
+    assert "10.0.0.5" not in text
 
 
 def test_archive_source_translates_bandwidth_sort_to_volume(client):

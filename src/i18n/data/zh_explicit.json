@@ -390,6 +390,7 @@
   "gui_err_archive_range_required": "查詢封存需要指定日期區間。",
   "gui_err_archive_filter_unsupported": "這些條件需要即時向 PCE 查詢才能判定，封存裡查不到：{keys}",
   "gui_err_archive_filter_required": "查詢封存至少需要一個縮小範圍的條件。",
+  "gui_err_archive_search_unsupported": "封存無法搜尋自由文字，請改用位址、工作負載、連接埠或通訊協定等條件過濾。",
   "gui_err_unauthorized": "未授權。",
   "gui_errcard_retry": "重試",
   "gui_ev_advanced_filters": "進階條件（選填）",

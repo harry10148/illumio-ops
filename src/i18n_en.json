@@ -435,6 +435,7 @@
   "gui_err_archive_range_required": "Searching the archive needs a date range.",
   "gui_err_archive_filter_unsupported": "These conditions can only be resolved by asking the PCE directly, so the archive cannot answer them: {keys}",
   "gui_err_archive_filter_required": "Searching the archive needs at least one filter to narrow it down.",
+  "gui_err_archive_search_unsupported": "The archive cannot search free text; filter by address, workload, port, or protocol instead.",
   "gui_err_unknown_job": "Unknown job.",
   "gui_err_unsupported_system_rule_type": "Unsupported system rule type.",
   "gui_it_load_failed_cache": "Failed to load cache status: ",

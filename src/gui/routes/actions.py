@@ -175,12 +175,25 @@ def make_actions_blueprint(
                     }
 
                     unsupported = unsupported_filters(query_filters)
+                    # search 的全文子字串比對只存在於 query_flows 事後那道手動
+                    # 掃描（比對 s_name/d_name/s_ip/d_ip/port/svc_proc/svc_user/
+                    # svc_name，見 analyzer.py 的 search_query 那段），不在
+                    # _match_flow_filters 裡——archive 只共用 _match_flow_filters，
+                    # 不另建第二套比對器，所以評估不了 search。放著不管會靜默
+                    # 忽略操作者打的字，回一個看似有搜尋、其實沒有的結果，正是
+                    # 這整個功能要防的那種缺陷，所以比照 unsupported filter 明講
+                    # 拒絕（不論是不是跟其他能評估的條件一起送）。
+                    if query_filters.get("search") not in (None, "", []):
+                        unsupported = sorted(set(unsupported) | {"search"})
                     if unsupported:
+                        error = (t("gui_err_archive_search_unsupported", lang=lang)
+                                 if "search" in unsupported else
+                                 t("gui_err_archive_filter_unsupported", lang=lang,
+                                   keys=", ".join(unsupported)))
                         return jsonify({
                             "ok": False,
                             "unsupported": unsupported,
-                            "error": t("gui_err_archive_filter_unsupported", lang=lang,
-                                       keys=", ".join(unsupported)),
+                            "error": error,
                         }), 400
 
                     base_ana = Analyzer(cm, api, Reporter(cm))
@@ -201,35 +214,44 @@ def make_actions_blueprint(
                         archive_sort_by = "connections"
                     sort_by_substituted = archive_sort_by != requested_sort_by
 
-                    # rule 組法照抄 query_flows（analyzer.py 約 :2328）；rule["pd"]
-                    # 固定 -1 代表這裡不做 policy-decision 過濾（archive 沒有
-                    # 對應 live 那套「依 pds 先縮小 API 查詢範圍」的機制）。
+                    # policy_decision → rule["pd"]：跟下面 live 分支（本檔
+                    # :288 附近）的 pd_val 轉換同一個形狀，UI 只送單一 scalar
+                    # policy_decision（investigate.mjs），不是 query_flows
+                    # 內部才會展開的四值 policy_decisions 清單，所以不會重開
+                    # 「守門吃到預設全選」那個洞。check_flow_match 直接讀
+                    # raw 的 policy_decision 字串做 blocked/potentially_
+                    # blocked/allowed 判斷（analyzer.py :697-704），不需要
+                    # 額外轉換。
+                    pd_val = str(d.get("policy_decision", "-1")).strip()
+                    if pd_val in ("blocked", "2"):
+                        archive_pd = 2
+                    elif pd_val in ("potentially_blocked", "1"):
+                        archive_pd = 1
+                    elif pd_val in ("allowed", "0"):
+                        archive_pd = 0
+                    else:
+                        archive_pd = -1
+
+                    # rule 組法照抄 query_flows（analyzer.py 約 :2328）。
                     rule = {**query_spec.native_filters, **query_spec.fallback_filters}
                     rule["type"] = requested_sort_by if requested_sort_by in ["bandwidth", "volume"] else "connections"
-                    rule["pd"] = -1
+                    rule["pd"] = archive_pd
 
                     start_dt = datetime.datetime.combine(
                         archive_start, datetime.time.min, tzinfo=datetime.timezone.utc)
                     matcher = lambda row: base_ana._match_flow_filters(
                         rule, row.get("raw") or {}, start_dt)
 
-                    # search 的全文子字串比對只存在於 query_flows 事後那道手動
-                    # 掃描（不在 _match_flow_filters 裡），archive 這裡評估不了
-                    # 它——若讓它單獨滿足 stream_query 的「有沒有縮小範圍」守門，
-                    # 一個只給 search 的查詢會通過守門卻拿到完全未過濾的結果，
-                    # 比直接拒絕還危險。從送進守門的 filters 拿掉，讓「只給
-                    # search」跟「什麼都沒給」同樣被拒絕。
-                    guard_filters = {k: v for k, v in query_filters.items() if k != "search"}
-
                     try:
                         result = stream_query(
                             cm.models.pce_cache.archive_dir, "traffic",
-                            archive_start, archive_end, guard_filters,
+                            archive_start, archive_end, query_filters,
                             QUERY_RESULT_CAP, archive_sort_by, matcher)
                     except ValueError:
                         # sort_by 已在上面被強制成 stream_query 認得的兩個值
-                        # 之一，這裡唯一還能冒出的 ValueError 是守門條件：
-                        # guard_filters 裡沒有任何縮小範圍的條件。
+                        # 之一，search 已在上面被明講拒絕、不會再靠「沒給窄化
+                        # 條件」這條路混過去——這裡唯一還能冒出的 ValueError
+                        # 是守門條件：query_filters 裡沒有任何縮小範圍的條件。
                         return _err(t("gui_err_archive_filter_required", lang=lang), 400)
 
                     return jsonify({
