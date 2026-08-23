@@ -81,6 +81,16 @@ def test_traffic_ringfence_html_is_escaped():
     assert ESCAPED_MARK in html
 
 
+def test_traffic_module_error_is_escaped():
+    # A module-level exception message (e.g. carrying a PCE-supplied value)
+    # must not be interpolated raw into the "<p class=note>" error stub.
+    from src.report.exporters.html_exporter import SecurityRiskHtmlExporter
+    exporter = SecurityRiskHtmlExporter({"mod13": {"error": PAYLOAD}}, lang="en")
+    html = exporter._mod13_html()
+    assert PAYLOAD not in html
+    assert ESCAPED_MARK in html
+
+
 def test_traffic_key_findings_html_is_escaped():
     # key_findings_html is built inline inside _build(); exercise the full render.
     from src.report.exporters.html_exporter import SecurityRiskHtmlExporter
@@ -118,6 +128,15 @@ def test_audit_high_impact_provisions_is_escaped():
         "status": PAYLOAD,
     }]
     html = exporter._high_impact_provisions_html(items, threshold=50)
+    assert PAYLOAD not in html
+    assert ESCAPED_MARK in html
+
+
+def test_audit_module_error_is_escaped():
+    # Same class of hole as test_traffic_module_error_is_escaped, on the audit side.
+    from src.report.exporters.audit_html_exporter import AuditHtmlExporter
+    exporter = AuditHtmlExporter({"mod01": {"error": PAYLOAD}}, lang="en")
+    html = exporter._mod01_html()
     assert PAYLOAD not in html
     assert ESCAPED_MARK in html
 

@@ -1068,7 +1068,7 @@ class _TrafficReportBase:
         _lang = self._lang
         m = self._r.get('mod04', {})
         if 'error' in m:
-            return f'<p class="note">{m["error"]}</p>'
+            return f'<p class="note">{html.escape(str(m["error"]))}</p>'
 
         out = f'<p>{_s("rpt_tr_risk_flows")} <b>{m.get("risk_flows_total", 0)}</b></p>'
 
@@ -1458,9 +1458,10 @@ class _TrafficReportBase:
         return sev_html + cards_html
 
     def _mod13_html(self):
+        import html as _html
         m = self._r.get('mod13', {})
         if 'error' in m:
-            return f'<p class="note">{m["error"]}</p>'
+            return f'<p class="note">{_html.escape(str(m["error"]))}</p>'
         score = m.get('total_score', 0)
         grade = m.get('grade', '?')
         grade_color = _grade_to_color(grade)
@@ -1590,9 +1591,10 @@ class _TrafficReportBase:
         return html
 
     def _mod14_html(self):
+        import html as _html
         m = self._r.get('mod14', {})
         if 'error' in m:
-            return f'<p class="note">{m["error"]}</p>'
+            return f'<p class="note">{_html.escape(str(m["error"]))}</p>'
         _s = self._s
         _lang = self._lang
         html = self._subnote('rpt_tr_infrastructure_subnote') + (
@@ -1663,9 +1665,10 @@ class _TrafficReportBase:
         return html
 
     def _mod15_html(self):
+        import html as _html
         m = self._r.get('mod15', {})
         if 'error' in m:
-            return f'<p class="note">{m["error"]}</p>'
+            return f'<p class="note">{_html.escape(str(m["error"]))}</p>'
         _s = self._s
         _lang = self._lang
         total = m.get('total_lateral_flows', 0)

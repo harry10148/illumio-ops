@@ -350,9 +350,10 @@ class AuditHtmlExporter:
         return html
 
     def _mod01_html(self) -> str:
+        import html as _html
         m = self._r.get("mod01", {})
         if "error" in m:
-            return f'<p class="note">{m["error"]}</p>'
+            return f'<p class="note">{_html.escape(str(m["error"]))}</p>'
 
         _s = self._s
         _lang = self._lang
@@ -392,9 +393,10 @@ class AuditHtmlExporter:
         return "".join(html_parts) + html
 
     def _mod02_html(self) -> str:
+        import html as _html
         m = self._r.get("mod02", {})
         if "error" in m:
-            return f'<p class="note">{m["error"]}</p>'
+            return f'<p class="note">{_html.escape(str(m["error"]))}</p>'
 
         _s = self._s
         _lang = self._lang
@@ -435,9 +437,10 @@ class AuditHtmlExporter:
         return "".join(html_parts) + html
 
     def _mod03_html(self) -> str:
+        import html as _html
         m = self._r.get("mod03", {})
         if "error" in m:
-            return f'<p class="note">{m["error"]}</p>'
+            return f'<p class="note">{_html.escape(str(m["error"]))}</p>'
 
         _s = self._s
         _lang = self._lang
@@ -497,9 +500,10 @@ class AuditHtmlExporter:
         return "".join(html_parts) + html
 
     def _mod04_html(self) -> str:
+        import html as _html
         m = self._r.get("mod04", {})
         if "error" in m:
-            return f'<p class="note">{m["error"]}</p>'
+            return f'<p class="note">{_html.escape(str(m["error"]))}</p>'
 
         _s = self._s
         _lang = self._lang
