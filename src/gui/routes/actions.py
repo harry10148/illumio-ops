@@ -301,6 +301,7 @@ def make_actions_blueprint(
                     "start_time": start_time,
                     "end_time": end_time,
                     "policy_decisions": pds,
+                    "data_source": d.get("data_source"),
                     "draft_policy_decision": d.get("draft_policy_decision", ""),
                     "sort_by": d.get("sort_by", "bandwidth"),
                     "search": d.get("search", ""),
@@ -372,6 +373,7 @@ def make_actions_blueprint(
                     "total_matches": int(stats.get("total_matches", len(results))),
                     "truncated": bool(stats.get("truncated")),
                     "cap": int(stats.get("cap", QUERY_RESULT_CAP)),
+                    "actual_source": stats.get("actual_source", base_ana.last_query_source),
                 })
         except TrafficQueryError as e:
             return jsonify({"ok": False, "error": t(

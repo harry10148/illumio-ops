@@ -34,6 +34,7 @@ from src.state_store import load_state_file, update_state_file
 from src.interfaces import IApiClient, IReporter
 from src.api.traffic_query import TrafficQueryBuilder
 from src.pce_cache.reader import CacheReadTooLarge
+from src.report.cache_support import resolve_data_source
 # flow 上的三個累計計數器 (bytes_out, bytes_in, conn_count)。ingest 端存進
 # 觀測表的值必須與 analyzer 算出的當下值取自同一組欄位，否則相減毫無意義
 # ——因此只准有一份實作。
@@ -2019,6 +2020,7 @@ class Analyzer:
         query_spec: Any,
         needs_draft: bool,
         cache_bypass_keys: list[str] | None = None,
+        data_source: str | None = None,
     ) -> tuple[Any, str]:
         """Cache-aware fetch for query_flows. Returns (flow_iterable, source).
 
@@ -2031,9 +2033,27 @@ class Analyzer:
         so cache returning unfiltered flows is safe——前提是 filters 全部可在
         client 端評估；無法評估的 key（label_groups 類）由 caller 透過
         cache_bypass_keys 要求跳過 cache、改走 API（PCE native 過濾）。
+
+        data_source: operator-facing preference ('live' | 'hybrid' | None),
+        resolved through the same resolve_data_source() the report path uses
+        so the two paths cannot drift on what each mode means. An explicit
+        'live' bypasses the cache entirely — not even cover_state is checked
+        — regardless of coverage. None/'hybrid' leaves today's automatic
+        cache/API/hybrid decision untouched.
         """
         # Without a cache reader, behaviour is identical to the pre-cache path.
         if self._cache_reader is None:
+            stream = self.api.execute_traffic_query_stream(
+                start_time, end_time, query_pds,
+                filters=query_spec, compute_draft=needs_draft,
+            )
+            return stream, "api"
+
+        use_cache, _clip_to_cache, _warning = resolve_data_source(data_source, cache_ok=True)
+        if not use_cache:
+            # 操作者明示 live：直接走 API，連 cover_state 都不查，
+            # 即使該視窗其實 cache 全覆蓋。
+            logger.info("query_flows: live data source requested — bypassing cache")
             stream = self.api.execute_traffic_query_stream(
                 start_time, end_time, query_pds,
                 filters=query_spec, compute_draft=needs_draft,
@@ -2311,7 +2331,11 @@ class Analyzer:
         traffic_stream, self.last_query_source = self._fetch_query_flows(
             start_time, end_time, query_pds, query_spec, needs_draft,
             cache_bypass_keys=cache_bypass_keys,
+            data_source=params.get("data_source"),
         )
+        # 記到 stats 上讓端點能回傳——即使下面 early-return（空結果）也要有；
+        # 底下的完整分支會在收尾時把整份 dict 重建、一併帶上這欄。
+        self.last_query_stats["actual_source"] = self.last_query_source
         if not traffic_stream:
             self._raise_if_query_fetch_failed()
             return []
@@ -2467,6 +2491,7 @@ class Analyzer:
             "total_matches": total,
             "cap": QUERY_RESULT_CAP,
             "truncated": total > QUERY_RESULT_CAP,
+            "actual_source": self.last_query_source,
         }
         return matches[:QUERY_RESULT_CAP]
 
