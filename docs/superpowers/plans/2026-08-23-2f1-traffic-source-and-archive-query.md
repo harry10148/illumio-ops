@@ -276,18 +276,26 @@ Expected: FAIL —`ImportError: cannot import name 'unsupported_filters'`
 在 `src/pce_cache/archive_query.py` 加入：
 
 ```python
-from src.analyzer import _CACHE_UNEVALUABLE_FILTER_KEYS
-
 # 封存是離線資料：沒有 PCE 可問，所以任何需要向 PCE 展開或即時計算的條件
-# 都判不了。analyzer 已維護一份 cache 端無法評估的清單（label group / AMS），
-# 封存至少要涵蓋它；額外多一個 draft_policy_decision——那是即時查詢才算得出
-# 來的欄位，封存列裡根本不存在。
+# 都判不了。這份清單必須涵蓋 analyzer 的 _CACHE_UNEVALUABLE_FILTER_KEYS
+# （label group / AMS），額外多一個 draft_policy_decision——那是即時查詢才
+# 算得出來的欄位，封存列裡根本不存在。
 #
 # 帶著這些條件靜默回未過濾的結果，正是 2026-07-24 審查 M4 抓到的缺陷；
-# 這裡明確拒絕。
+# 這裡明確拒絕。清單刻意逐字列出而不 import analyzer：pce_cache 是 analyzer
+# 的下層（analyzer 自己 import src.pce_cache.reader）。反向 import 今天雖不
+# 循環，卻把整個 analyzer 拖進這個小模組，也讓分層倒過來。
+# tests/test_archive_query.py 的 drift 測試負責擋住兩者脫節。
 UNSUPPORTED_ARCHIVE_FILTER_KEYS: tuple[str, ...] = (
-    tuple(_CACHE_UNEVALUABLE_FILTER_KEYS) + ("draft_policy_decision",)
+    "src_label_group", "src_label_groups", "dst_label_group", "dst_label_groups",
+    "ex_src_label_group", "ex_src_label_groups",
+    "ex_dst_label_group", "ex_dst_label_groups",
+    "src_include_groups", "dst_include_groups",
+    "src_ams", "dst_ams", "ex_src_ams", "ex_dst_ams",
+    "draft_policy_decision",
 )
+
+> 上面十四個 key 抄自 `src/analyzer.py:139-147` 的 `_CACHE_UNEVALUABLE_FILTER_KEYS`（實作前讀一次核對；若該處已增減，以它為準並讓 drift 測試通過）。
 
 
 def unsupported_filters(filters: dict) -> list[str]:
