@@ -149,11 +149,24 @@ const SUB_ROUTES = [
 const WINDOWS = [["60", "gui_win_1h"], ["1440", "gui_win_24h"], ["10080", "gui_win_1w"], ["43200", "gui_win_1m"]];
 // index.html:859-863 (select#qt-sort)
 const SORTS = [["bandwidth", "gui_opt_bandwidth"], ["volume", "gui_opt_volume"], ["connections", "gui_opt_connections"]];
-// index.html:868-871 (select#traffic-source) — the product's two sources are the
-// live cache and the loaded archive review DB (actions.py:92-107). coverage.yaml
-// calls IV-02 "cache/PCE"; the shipping control is cache/archive and inventing a
-// third option to match the wording would be inventing UI.
-const SOURCES = [["live", "gui_traffic_source_live"], ["archive", "gui_traffic_source_archive"]];
+// Task 4's archive_query.py deliberately has no "bandwidth" sort: bandwidth is
+// a RATE (bytes / time window, calculate_mbps) and archive rows carry nothing
+// to compute one from — see archive_query.py's _SORT_FIELD comment. Offering
+// it here and translating on submit would be the same "looks right but isn't"
+// number this whole task exists to remove, so the control itself narrows.
+const ARCHIVE_SORTS = SORTS.filter(function (p) { return p[0] !== "bandwidth"; });
+// index.html:868-871 (select#traffic-source) — three request-honest choices,
+// replacing the old two ("live"/"archive") whose "live" value actually meant
+// the local cache and whose label said so ("Live cache"), not the PCE. Task 4
+// gave the backend an explicit data_source preference
+// (hybrid|cache|live|no-cache|api, actions.py's _TRAFFIC_DATA_SOURCE_VALUES)
+// and an `actual_source` readout of which path really answered; this control
+// exposes the two the GUI supports — hybrid (cache first, PCE for the gap;
+// resolve_data_source's own default when unset) and live (skip the cache,
+// query the PCE directly) — plus the real archive, backed by Task 4/5's
+// direct date-range scan of the archive's daily files (no more separately
+// loaded review DB).
+const SOURCES = [["hybrid", "gui_traffic_source_hybrid"], ["live", "gui_traffic_source_api"], ["archive", "gui_traffic_source_archive"]];
 // index.html:932-934 / :996-997
 const PAGE_SIZES = ["50", "100"];
 // index.html:2433-2436 (input[name=qt-pd-radio])
@@ -232,6 +245,53 @@ const emptySel = { isChecked: function () { return false; }, toggle: function ()
 function errText(r) {
   const msg = r && (r.error || r.message);
   return msg ? String(msg) : t("gui_err_generic");
+}
+
+/* Task 6 constraint 2 — archive_query.py's UNSUPPORTED_ARCHIVE_FILTER_KEYS
+ * (and actions.py's own `search` addition) are internal API parameter names
+ * ("src_ams", "ex_dst_label_group") and must never reach an operator as-is.
+ * Rather than hand-write new prose per key, each is composed from catalogue
+ * text the FilterBar already shows for the same condition: the zone label
+ * (gui_fb_dir_src/dst — components/filter-bar.mjs's _OBJFB_ZONES) plus the
+ * category label (gui_fb_cat_label_group — its _OBJFB_CATS). The AMS and
+ * include_groups families have no FilterBar pill of their own (the v2 bar
+ * never emits those keys — grep confirms), but archive_query.py's own
+ * comment groups them with label_group as one "actor groups / ams" PCE-only
+ * concept, so they compose the same way. draft_policy_decision reuses the
+ * label this same file already shows beside the draft-decision radios
+ * (gui_pd_draft_label). The map is exhaustive against
+ * UNSUPPORTED_ARCHIVE_FILTER_KEYS; the `key` fallback is defensive only — it
+ * would mean archive_query.py's list and this one drifted apart, which
+ * tests/test_archive_query.py's drift test guards against independently. */
+function unsupportedLabel(key) {
+  const bare = key.replace(/^ex_/, "");
+  if (bare === "draft_policy_decision") return t("gui_pd_draft_label");
+  const dir = bare.indexOf("src_") === 0 ? t("gui_fb_dir_src") + " "
+    : bare.indexOf("dst_") === 0 ? t("gui_fb_dir_dst") + " " : "";
+  if (/label_group/.test(bare) || /_ams$/.test(bare) || /include_groups$/.test(bare)) {
+    return dir + t("gui_fb_cat_label_group");
+  }
+  return key;
+}
+
+// actual_source (Task 4/5 contract) -> catalogue key, "archive" excluded —
+// it reuses the source-select's own archive label (gui_traffic_source_archive)
+// below rather than a fourth minted key, since an archive query's
+// actual_source is always "archive". Looked up via `lookup()`, not by
+// building the key with string concatenation directly inside a translate
+// call: scripts/audit_i18n_usage.py's category G regex matches a literal
+// quoted first argument to the translate helper, and a concatenated literal
+// prefix there trips it into treating the bare prefix as a
+// referenced-but-missing key.
+const ACTUAL_SOURCE_LABELS = [
+  ["cache", "gui_traffic_actual_source_cache"],
+  ["api", "gui_traffic_actual_source_api"],
+  ["mixed", "gui_traffic_actual_source_mixed"],
+];
+
+function actualSourceText(v) {
+  if (v === "archive") return t("gui_traffic_source_archive");
+  return t(lookup(ACTUAL_SOURCE_LABELS, v, v), v);
 }
 
 // ── shared chrome ───────────────────────────────────────────────────────────
@@ -1220,31 +1280,50 @@ function backfillDrawer(state) {
 /**
  * IV-01/IV-02/IV-05 — the real flow search.
  * Payload transcribed from quarantine.js:271-296 runTrafficAnalyzer:
- *   {mins, sort_by, search, source, policy_decision} + draft_policy_decision
- *   only when one is chosen + the FilterBar dict spread on top.
- * Backend contract (actions.py:79-216) checked key by key before writing this:
+ *   {mins, sort_by, search, source|data_source, policy_decision} +
+ *   draft_policy_decision only when one is chosen + the FilterBar dict spread
+ *   on top.
+ * Backend contract (actions.py:79-320, Task 4/5) checked key by key before
+ * writing this:
  *   - most keys are read with defaults, so an ABSENT key is identical to an
- *     empty one (source -> "live", policy_decision -> "-1" = all, every
- *     filter list -> []). `mins` is the exception: absent defaults to 30, but
- *     an explicit empty value fails integer parsing (actions.py:113). The
- *     runtime always sends a number. That is why the FilterBar's dict is
- *     spread as-is: it omits a key entirely when no pill sets it, and omission
- *     is the documented "no filter" state, not a fall-through to another
- *     branch. (The one place in this codebase where that assumption did NOT
- *     hold is dashboard.py's save endpoint — see areas/overview.mjs — so it
- *     was verified here rather than assumed.)
+ *     empty one (data_source -> resolve_data_source's own "hybrid" default,
+ *     policy_decision -> "-1" = all, every filter list -> []). `mins` is the
+ *     exception: absent defaults to 30, but an explicit empty value fails
+ *     integer parsing (actions.py:113). The runtime always sends a number.
+ *     That is why the FilterBar's dict is spread as-is: it omits a key
+ *     entirely when no pill sets it, and omission is the documented "no
+ *     filter" state, not a fall-through to another branch. (The one place in
+ *     this codebase where that assumption did NOT hold is dashboard.py's save
+ *     endpoint — see areas/overview.mjs — so it was verified here rather than
+ *     assumed.)
  *   - policy_decision "" would fall into the else branch = all four decisions,
  *     the same as "-1"; "-1" is sent anyway because that is what the shipping
  *     GUI sends.
+ *   - `source` selects the backend BRANCH: "archive" streams the archive's
+ *     daily files for [archive_start, archive_end]; anything else (this GUI
+ *     never sends "source" for hybrid/live — see header note) is the live
+ *     branch, which reads the separate `data_source` field
+ *     (hybrid|cache|live|no-cache|api, actions.py's
+ *     _TRAFFIC_DATA_SOURCE_VALUES — this control only ever sends "hybrid" or
+ *     "live") to decide cache vs. PCE. Task 6's SOURCES control conflates
+ *     both under one operator-facing choice; this function is where they
+ *     split back apart.
  *   - a live-source failure answers 502 {ok:false,error}; an archive source
- *     with no review DB answers 200 {ok:true,data:[],not_loaded:true}.
+ *     with unsupported filter keys answers 400 {ok:false,unsupported,error}
+ *     (see runQuery's translation of `unsupported` — Task 6 constraint 2).
  */
 function trafficPayload(state) {
   const payload = {};
   payload.mins = Number(state.mins);
   payload.sort_by = state.sort;
   payload.search = state.search;
-  payload.source = state.source;
+  if (state.source === "archive") {
+    payload.source = "archive";
+    payload.archive_start = state.archiveStart;
+    payload.archive_end = state.archiveEnd;
+  } else {
+    payload.data_source = state.source; // "hybrid" | "live"
+  }
   payload.policy_decision = state.pd || "-1";
   if (state.draftPd) payload.draft_policy_decision = state.draftPd;
   return Object.assign(payload, state.filters || {});
@@ -1288,7 +1367,12 @@ async function mountTraffic(root, ctx) {
 
       state.mins = "60";
       state.sort = "bandwidth";
-      state.source = "live";
+      // "hybrid" — cache first, PCE for the gap — is resolve_data_source's
+      // own default when data_source is absent, so this default preserves
+      // the old unlabelled behaviour; it is just named honestly now.
+      state.source = "hybrid";
+      state.archiveStart = "";
+      state.archiveEnd = "";
       state.search = "";
       state.size = 50;
       state.page = 0;
@@ -1371,16 +1455,36 @@ async function mountTraffic(root, ctx) {
         state.phase = "done";
         if (!r || r.ok !== true) {
           state.rows = [];
-          state.meta = { error: errText(r) };
+          // Task 6 constraint 2: an archive query rejected for unsupported
+          // filter keys carries those RAW keys in both r.unsupported and
+          // (interpolated) r.error — actions.py:197-206. errText(r) must
+          // never be used for this branch; the message is rebuilt from
+          // translated display names instead, mirroring the backend's own
+          // search-vs-other-keys branch (actions.py:197-201) so the wording
+          // still distinguishes "can't search archived text" from "can't
+          // evaluate these conditions" without ever printing a field name.
+          const unsupported = (r && Array.isArray(r.unsupported)) ? r.unsupported : [];
+          if (unsupported.indexOf("search") >= 0) {
+            state.meta = { error: t("gui_err_archive_search_unsupported") };
+          } else if (unsupported.length) {
+            state.meta = { error: tf("gui_err_archive_filter_unsupported", {
+              keys: unsupported.map(unsupportedLabel).join(", "),
+            }) };
+          } else {
+            state.meta = { error: errText(r) };
+          }
           repaint();
-          toast.crit(errText(r));
+          toast.crit(state.meta.error);
           return;
         }
-        state.rows = r.data || [];
+        // live answers {data, total_matches, cap}; archive answers {rows,
+        // matched} (actions.py:266-279) — neither field name exists on the
+        // other branch's response.
+        state.rows = r.data || r.rows || [];
         state.meta = {};
         state.meta.truncated = !!r.truncated;
-        state.meta.cap = r.cap || 0;
-        state.meta.total = r.total_matches || state.rows.length;
+        state.meta.summaryOmitted = r.summary_omitted || 0;
+        state.meta.actualSource = r.actual_source || "";
         state.meta.notLoaded = !!r.not_loaded;
         repaint();
         toast.ok(tf("gui_iv_query_done", { n: num(state.rows.length) }));
@@ -1390,24 +1494,60 @@ async function mountTraffic(root, ctx) {
       const query = panel("IV-01", t("gui_ta_query"));
       withAction(query, t("gui_cb_title"), function () { if (handles.openBackfill) handles.openBackfill(); });
       withAction(query, t("gui_filter_settings"), function () { if (handles.openFilters) handles.openFilters(); });
-      const row = el("div", { class: "qrow" });
-      row.appendChild(selectField(t("gui_window"), WINDOWS, state.mins, function (v) { state.mins = v; }));
-      const src = selectField(t("gui_traffic_source"), SOURCES, state.source, function (v) { state.source = v; });
-      src.setAttribute("data-cov", "IV-02");
-      row.appendChild(src);
-      row.appendChild(selectField(t("gui_sort_by"), SORTS, state.sort, function (v) { state.sort = v; }));
       const searchField = field(t("gui_filter_details"), search);
       searchField.className = "qf grow";
-      row.appendChild(searchField);
       // PORT: `search` is a request field (actions.py:141), not a local filter,
       // so it takes effect on the next run — Enter runs it, like any query box.
       search.addEventListener("input", function () { state.search = search.value.trim(); });
       search.addEventListener("keydown", function (e) { if (e.key === "Enter") runQuery(); });
-      row.appendChild(el("span", { class: "spacer" }));
       const runBtn = el("button", { class: "btn primary", type: "button", text: t("gui_query_flow"),
         onClick: function () { runQuery(); } });
-      row.appendChild(runBtn);
-      query.body.appendChild(row);
+
+      /* Task 6 constraint 1 — the row is REBUILT (not just mutated) whenever
+       * the source changes, because two things depend on it: the sort options
+       * (archive drops "bandwidth" — ARCHIVE_SORTS) and the archive date
+       * inputs. Switching TO archive while the pending sort is still
+       * "bandwidth" (the page's default) moves it to the archive's first
+       * supported option BEFORE the row is rebuilt, so the dropdown never
+       * shows — and runQuery() never sends — a value the archive endpoint
+       * would reject with sort_by_substituted or a 400. searchField/runBtn
+       * are built once above and re-appended (not recreated) on each rebuild,
+       * so their listeners and the search box's typed value survive a
+       * source switch. */
+      let queryRow = null;
+      function buildQueryRow() {
+        const row = el("div", { class: "qrow" });
+        row.appendChild(selectField(t("gui_window"), WINDOWS, state.mins, function (v) { state.mins = v; }));
+        const src = selectField(t("gui_traffic_source"), SOURCES, state.source, function (v) {
+          state.source = v;
+          if (state.source === "archive" && state.sort === "bandwidth") state.sort = "volume";
+          const next = buildQueryRow();
+          query.body.replaceChild(next, queryRow);
+          queryRow = next;
+        });
+        src.setAttribute("data-cov", "IV-02");
+        row.appendChild(src);
+        const sortOpts = state.source === "archive" ? ARCHIVE_SORTS : SORTS;
+        row.appendChild(selectField(t("gui_sort_by"), sortOpts, state.sort, function (v) { state.sort = v; }));
+        if (state.source === "archive") {
+          const start = el("input", { class: "field", type: "date" });
+          start.setAttribute("aria-label", t("gui_gen_start_date"));
+          start.value = state.archiveStart;
+          start.addEventListener("change", function () { state.archiveStart = start.value; });
+          const end = el("input", { class: "field", type: "date" });
+          end.setAttribute("aria-label", t("gui_gen_end_date"));
+          end.value = state.archiveEnd;
+          end.addEventListener("change", function () { state.archiveEnd = end.value; });
+          row.appendChild(field(t("gui_gen_start_date"), start));
+          row.appendChild(field(t("gui_gen_end_date"), end));
+        }
+        row.appendChild(searchField);
+        row.appendChild(el("span", { class: "spacer" }));
+        row.appendChild(runBtn);
+        return row;
+      }
+      queryRow = buildQueryRow();
+      query.body.appendChild(queryRow);
 
       // ── results (IV-05 + XC-12) ──
       function results() {
@@ -1423,12 +1563,28 @@ async function mountTraffic(root, ctx) {
           p.body.appendChild(el("div", { class: "strip", "data-tone": "crit" },
             el("i", { class: "dot" }), el("span", { text: state.meta.error })));
         }
+        // actual_source (Task 4/5): which path really answered — cache, a
+        // live PCE query, a mix of the two, or the archive. Rendered
+        // whenever the field is present, independent of source/tone above.
+        if (state.meta.actualSource) {
+          p.body.appendChild(el("div", { class: "strip", "data-tone": "info" },
+            el("i", { class: "dot" }), el("span", { text: actualSourceText(state.meta.actualSource) })));
+        }
         // quarantine.js:391-394 — a truncated result is warned about ONCE, in
         // words, because every figure above it is a floor and not a total.
+        // Kept param-free (unlike gui_results_truncated, used elsewhere in
+        // this file): live returns {cap,total_matches}, archive returns
+        // {matched,scanned} — no single pair of numbers exists on both.
         if (state.meta.truncated) {
           p.body.appendChild(el("div", { class: "strip", "data-tone": "warn" },
+            el("i", { class: "dot" }), el("span", { text: t("gui_traffic_truncated") })));
+        }
+        // summary_omitted (archive only — Task 4's SUMMARY_TOP_K bound): how
+        // many aggregate groups were dropped from the bounded top-K summary.
+        if (state.meta.summaryOmitted) {
+          p.body.appendChild(el("div", { class: "strip", "data-tone": "warn" },
             el("i", { class: "dot" }),
-            el("span", { text: tf("gui_results_truncated", { cap: state.meta.cap, total: num(state.meta.total) }) })));
+            el("span", { text: tf("gui_traffic_summary_omitted", { n: num(state.meta.summaryOmitted) }) })));
         }
         // The table host carries XC-12 — the skeleton while a query runs, the
         // column resize grips, the service popover and the query toast all

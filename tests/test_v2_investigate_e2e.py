@@ -124,7 +124,8 @@ def _labels(page):
         "gui_save", "gui_confirm", "gui_btn_isolate", "gui_lift_quarantine",
         "gui_accel_modal_title", "gui_q_title", "gui_category", "gui_ev_type_group",
         "gui_event_type", "gui_refresh", "gui_load_more", "gui_search",
-        "gui_accel_bulk_btn", "gui_q_apply",
+        "gui_accel_bulk_btn", "gui_q_apply", "gui_traffic_source", "gui_sort_by",
+        "gui_gen_start_date", "gui_gen_end_date",
     ]
     return page.evaluate(
         "async (keys) => { const { t } = await import('/static/js/v2/core/i18n.mjs'); "
@@ -293,7 +294,10 @@ def test_filter_pill_reaches_query_and_kpis_update(v2_page):
     assert body["src_labels"] == ["role=web"], body
     assert body["mins"] == 60, body
     assert body["sort_by"] == "bandwidth", body
-    assert body["source"] == "live", body
+    # Task 6: the default source is now the honestly-named "hybrid" (cache
+    # first, PCE for the gap) sent as data_source, not the old source:"live".
+    assert body["data_source"] == "hybrid", body
+    assert "source" not in body, body
     assert body["policy_decision"] == "-1", body
 
     # Real loading state while the PCE search runs, then the figures of the
@@ -822,3 +826,136 @@ def test_shadow_compare_binds_to_its_real_endpoint(v2_page):
     assert "mins=60" in info.value.url and "limit=200" in info.value.url, info.value.url
 
     page.wait_for_selector('section[data-cov="IV-15"] .strip[data-tone="crit"]', timeout=SLOW)
+
+
+# ── Task 6: three-way source, archive date range, truncation ───────────────
+
+def test_selecting_archive_source_shows_date_range_fields(v2_page):
+    """Picking "archive" in the IV-02 source select reveals the start/end
+    date inputs the archive query needs; they are absent for hybrid/live."""
+    page, base_url = v2_page
+    _goto(page, base_url, R_TRAFFIC)
+    labels = _labels(page)
+
+    query = page.locator('section[data-cov="IV-01"]')
+    assert query.locator('input[aria-label="%s"]' % labels["gui_gen_start_date"]).count() == 0
+    assert query.locator('input[aria-label="%s"]' % labels["gui_gen_end_date"]).count() == 0
+
+    src_select = query.locator('select[aria-label="%s"]' % labels["gui_traffic_source"])
+    src_select.select_option("archive")
+
+    assert query.locator('input[aria-label="%s"]' % labels["gui_gen_start_date"]).count() == 1
+    assert query.locator('input[aria-label="%s"]' % labels["gui_gen_end_date"]).count() == 1
+
+
+def test_traffic_query_sends_data_source_then_archive_range(v2_page):
+    """The default (hybrid) source sends data_source, not the old bare
+    source:"live". Switching to archive sends source:"archive" plus the
+    archive_start/archive_end dates instead — and forces the sort selection
+    off "bandwidth" (the archive only supports volume/connections), matching
+    the default page state without the operator touching the sort control."""
+    page, base_url = v2_page
+    _goto(page, base_url, R_TRAFFIC)
+    labels = _labels(page)
+    query = page.locator('section[data-cov="IV-01"]')
+    run_btn = query.get_by_role("button", name=labels["gui_query_flow"], exact=True)
+
+    with page.expect_request(
+        lambda r: "/api/quarantine/search" in r.url and r.method == "POST"
+    ) as info:
+        run_btn.click()
+    body = info.value.post_data_json
+    assert body["data_source"] == "hybrid", body
+    assert "source" not in body, body
+    assert "archive_start" not in body, body
+
+    src_select = query.locator('select[aria-label="%s"]' % labels["gui_traffic_source"])
+    src_select.select_option("archive")
+    sort_select = query.locator('select[aria-label="%s"]' % labels["gui_sort_by"])
+    assert sort_select.input_value() != "bandwidth", sort_select.input_value()
+
+    query.locator('input[aria-label="%s"]' % labels["gui_gen_start_date"]).fill("2026-08-01")
+    query.locator('input[aria-label="%s"]' % labels["gui_gen_end_date"]).fill("2026-08-07")
+
+    with page.expect_request(
+        lambda r: "/api/quarantine/search" in r.url and r.method == "POST"
+    ) as info2:
+        run_btn.click()
+    body2 = info2.value.post_data_json
+    assert body2["source"] == "archive", body2
+    assert body2["archive_start"] == "2026-08-01", body2
+    assert body2["archive_end"] == "2026-08-07", body2
+    assert body2["sort_by"] != "bandwidth", body2
+    assert "data_source" not in body2, body2
+
+
+def test_truncated_and_summary_omitted_notices_render_from_response_flags(v2_page):
+    """The results panel's truncation/summary-omission notices are driven
+    solely by the response's own `truncated` / `summary_omitted` flags, and
+    `actual_source` renders regardless of which of the three sources ran."""
+    page, base_url = v2_page
+    page.route(
+        "**/api/quarantine/search",
+        lambda route: route.fulfill(
+            status=200,
+            content_type="application/json",
+            body=json.dumps({
+                "ok": True,
+                "data": [],
+                "actual_source": "mixed",
+                "truncated": True,
+                "summary_omitted": 4,
+            }),
+        ),
+    )
+    _goto(page, base_url, R_TRAFFIC)
+    labels = _labels(page)
+    with page.expect_response(lambda r: "/api/quarantine/search" in r.url):
+        page.locator('section[data-cov="IV-01"]').get_by_role(
+            "button", name=labels["gui_query_flow"], exact=True
+        ).click()
+
+    catalogue = page.evaluate(
+        "async () => { const { t, tf } = await import('/static/js/v2/core/i18n.mjs'); "
+        "return { truncated: t('gui_traffic_truncated'), "
+        "omitted: tf('gui_traffic_summary_omitted', {n: '4'}), "
+        "mixed: t('gui_traffic_actual_source_mixed') }; }"
+    )
+    text = page.locator('section[data-cov="IV-05"]').inner_text()
+    assert catalogue["truncated"] in text
+    assert catalogue["omitted"] in text
+    assert catalogue["mixed"] in text
+
+
+def test_unsupported_archive_filters_never_show_raw_backend_keys(v2_page):
+    """A 400 naming unsupported archive filter keys must reach the operator
+    as catalogue display names — never the raw internal parameter names the
+    backend used in its own `unsupported` list or `error` string."""
+    page, base_url = v2_page
+    page.route(
+        "**/api/quarantine/search",
+        lambda route: route.fulfill(
+            status=400,
+            content_type="application/json",
+            body=json.dumps({
+                "ok": False,
+                "unsupported": ["src_label_group", "draft_policy_decision"],
+                "error": ("These conditions can only be resolved by asking the PCE "
+                          "directly, so the archive cannot answer them: "
+                          "src_label_group, draft_policy_decision"),
+            }),
+        ),
+    )
+    _goto(page, base_url, R_TRAFFIC)
+    labels = _labels(page)
+    query = page.locator('section[data-cov="IV-01"]')
+    query.locator('select[aria-label="%s"]' % labels["gui_traffic_source"]).select_option("archive")
+    query.locator('input[aria-label="%s"]' % labels["gui_gen_start_date"]).fill("2026-08-01")
+    query.locator('input[aria-label="%s"]' % labels["gui_gen_end_date"]).fill("2026-08-07")
+
+    with page.expect_response(lambda r: "/api/quarantine/search" in r.url):
+        query.get_by_role("button", name=labels["gui_query_flow"], exact=True).click()
+
+    text = page.locator('section[data-cov="IV-05"]').inner_text()
+    assert "src_label_group" not in text, text
+    assert "draft_policy_decision" not in text, text
