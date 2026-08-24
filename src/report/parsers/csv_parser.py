@@ -299,11 +299,23 @@ class CSVParser:
         return df
 
     def _estimate_bandwidth(self, df: pd.DataFrame) -> pd.Series:
-        """Estimate bandwidth from timestamp delta when ddms is not available."""
+        """Estimate bandwidth from the flow's own timestamp span — a PCE CSV
+        export never carries ddms/tdms, so this is always the same "no
+        sampling interval" case src.analyzer.calculate_mbps handles in its
+        Priority-3 branch, and must use the same formula (span + 1 seconds
+        as the denominator: a provable lower bound, since PCE timestamps are
+        second-resolution) so the two parsers agree on the same flow instead
+        of disagreeing by orders of magnitude.
+
+        Unavailable (no bytes, or first/last_detected missing/unparsable/
+        reversed) → NaN, not 0 — `_fmt_bw` (html_exporter.py) already
+        renders NaN as "—" rather than a measured-looking "0.00 Mbps".
+        """
+        n = len(df)
         if 'first_detected' not in df.columns or 'last_detected' not in df.columns:
-            return pd.Series([0.0] * len(df))
-        delta_sec = (df['last_detected'] - df['first_detected']).dt.total_seconds().fillna(0)
-        # Clamp minimum to 1 second to avoid division by zero
-        delta_sec = delta_sec.clip(lower=1)
-        bytes_total = df.get('bytes_total', pd.Series([0] * len(df)))
-        return (bytes_total * 8.0) / delta_sec / 1_000_000.0  # → Mbps
+            return pd.Series([float('nan')] * n, index=df.index)
+        span_sec = (df['last_detected'] - df['first_detected']).dt.total_seconds()
+        denom_sec = span_sec + 1.0
+        bytes_total = df.get('bytes_total', pd.Series([0] * n, index=df.index)).astype(float)
+        mbps = (bytes_total * 8.0) / denom_sec / 1_000_000.0
+        return mbps.where((bytes_total > 0) & (denom_sec > 0), float('nan'))

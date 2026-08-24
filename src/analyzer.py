@@ -2504,7 +2504,16 @@ class Analyzer:
 
         if bw_val is not None:
             f_copy["max_bandwidth_mbps"] = bw_val
-            f_copy["formatted_bandwidth"] = f"{format_unit(bw_val, 'bandwidth')} {bw_note}".strip()
+            bw_str = format_unit(bw_val, 'bandwidth')
+            if bw_note == BOUND_BASIS_NOTE:
+                # The rate is a provable lower bound (no ddms/tdms; computed
+                # against the flow's own span+1), not a point value -- must
+                # read differently on screen from a point value of the same
+                # magnitude, so a "≥ 493.30 Mbps" row is never mistaken for
+                # a measured "493.30 Mbps".
+                f_copy["formatted_bandwidth"] = f"≥ {bw_str}"
+            else:
+                f_copy["formatted_bandwidth"] = f"{bw_str} {bw_note}".strip()
         f_copy["total_volume_mb"] = vol_val
         f_copy["total_connections"] = conn_val
         # trafficKpis (investigate.mjs) reads num_connections straight off the

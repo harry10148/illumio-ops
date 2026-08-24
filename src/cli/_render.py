@@ -324,10 +324,18 @@ def get_terminal_width(default: int = 80) -> int:
 
 
 def format_unit(value, unit_type="volume") -> str:
+    if value is None:
+        # No rate/volume to report (e.g. calculate_mbps's "unavailable"
+        # state) -- render as unavailable, not "0.00 Mbps". Same glyph
+        # _fmt_bw already uses for this in html_exporter.py; don't invent
+        # a second convention.
+        return "—"
     try:
         val = float(value)
     except (ValueError, TypeError):
         return str(value)
+    if val != val:  # NaN (e.g. a malformed byte field poisoning the rate)
+        return "—"
 
     if unit_type == "volume":
         if val >= 1024 * 1024:
