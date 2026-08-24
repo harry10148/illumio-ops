@@ -519,6 +519,63 @@ def test_debug_mode_unavailable_bandwidth_is_guarded_not_treated_as_zero(capsys)
     assert "no_measurement=1" in out
 
 
+# ─── bandwidth-basis Task 2 fix round 1: rule-level suppression parity ─────
+#
+# The engine's basis_mismatch check (_dispatch_alerts) is a RULE-level gate,
+# checked before top_matches is ever consulted: one guarded flow suppresses
+# the entire rule for the cycle, even if a different matched flow would have
+# independently cleared the threshold. The simulation must reach the same
+# verdict by the same rule, not a per-flow OR that never looks at `guarded`.
+
+def test_run_rule_engine_suppresses_the_whole_rule_when_one_flow_is_guarded_and_another_would_clear():
+    """一筆點值 flow 單獨就能觸發，另一筆 flow 掛在 no_measurement 守門——
+    basis_mismatch 檢查在 _dispatch_alerts 發生於 top_matches 之前，整條規則
+    本 cycle 仍不評估、不告警（引擎既有行為，這裡當 parity 錨點）。"""
+    rule = _rule("tr1", "bandwidth", window=10, threshold=0, name="bw mixed")
+    az = _analyzer([rule])
+    az.stats = MagicMock()
+
+    triggers = az._run_rule_engine(
+        iter([_interval_flow(first_detected=RECENT_FIRST), _unavailable_bw_flow()]),
+        [rule], NOW)
+    _, res = triggers[0]
+    assert res.get("basis_mismatch")
+    assert "no_measurement" in res["basis_mismatch"]["reasons"]
+
+    az._dispatch_alerts(triggers, [rule])
+    az.reporter.add_metric_alert.assert_not_called()
+    az.stats.record_suppression.assert_called_once()
+
+
+def test_debug_mode_suppresses_the_whole_rule_when_one_flow_is_guarded_and_another_would_clear(capsys):
+    """同一情境在模擬端：一筆下界 flow 單獨就 >= 門檻（確定觸發），另一筆
+    flow 值不可得——模擬不可以只看會觸發的那筆就宣告 WOULD TRIGGER，必須
+    跟引擎一樣，整條規則因為有 flow 掛在守門而不評估。"""
+    rule = _rule("tr1", "bandwidth", window=10, threshold=50, name="bw mixed")
+    now = datetime.datetime.now(datetime.timezone.utc)
+    clears_flow = _now_relative_bound_flow(9, 125_000_000)  # bound = 100.0 >= 50
+    unavailable_flow = {
+        "timestamp_range": {
+            "first_detected": (now - datetime.timedelta(seconds=11)).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "last_detected": (now - datetime.timedelta(seconds=2)).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        },
+        "policy_decision": "blocked",
+        "pd": 2,
+        "num_connections": 1,
+        "src": {},
+        "dst": {},
+        "service": {},
+    }
+    az = _debug_analyzer([rule], [clears_flow, unavailable_flow])
+
+    az.run_debug_mode(mins=12, pd_sel=3, interactive=False)
+    out = capsys.readouterr().out
+
+    assert "WOULD TRIGGER" not in out.upper()
+    assert "no_measurement=1" in out
+    assert "NOT evaluated" in out
+
+
 # ─── 6: no evidence is not evidence ─────────────────────────────────────────
 
 def test_flow_without_first_detected_is_not_guarded():

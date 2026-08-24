@@ -1873,10 +1873,13 @@ class Analyzer:
                         self._record_basis_mismatch(
                             basis_mismatch, rid, rule, r_win, span_min, "bound_below_threshold")
                         continue
-                    # 點值，或下界已 >= 門檻（真值嚴格更大，確定觸發）。
+                    # 點值，或下界已 >= 門檻。上面兩個 guard 分支已經把「下界
+                    # < 門檻」的情況攔截並 continue，能落到這裡的下界必然
+                    # >= 門檻（真值嚴格更大，確定觸發）——不必再比一次，比了
+                    # 也恆真。
                     if m_bw > res['max_val']:
                         res['max_val'] = m_bw
-                    clears = m_bw >= threshold_bw if m_bw_note == BOUND_BASIS_NOTE else m_bw > threshold_bw
+                    clears = m_bw_note == BOUND_BASIS_NOTE or m_bw > threshold_bw
                     if clears:
                         f_copy = f.copy()
                         f_copy['_metric_val'] = m_bw
@@ -2815,7 +2818,6 @@ class Analyzer:
                             continue
                         if delta is not None:
                             delta_used += 1
-                        f_copy = f.copy()
                         if rtype == "bandwidth":
                             if delta is not None:
                                 v = delta.mbps
@@ -2834,23 +2836,27 @@ class Analyzer:
                                 guarded["bound_below_threshold"] += 1
                                 continue
                             else:
-                                # 點值，或下界已 >= 門檻（真值嚴格更大，確定
-                                # 觸發）。
+                                # 點值，或下界已 >= 門檻。上面兩個 elif 已經把
+                                # 「下界 < 門檻」的情況攔截並 continue，能落到
+                                # 這裡的下界必然 >= 門檻（真值嚴格更大，確定
+                                # 觸發）——不必再比一次，比了也恆真。
                                 v = bw_v
                                 note = bw_n
-                                clears = v >= threshold if bw_n == BOUND_BASIS_NOTE else v > threshold
-                                if clears:
+                                if bw_n == BOUND_BASIS_NOTE or v > threshold:
                                     bw_trigger = True
+                            f_copy = f.copy()
                             f_copy['_metric_val'] = v
                             f_copy['_metric_fmt'] = f"{format_unit(v, 'bandwidth')} {note}"
                         elif rtype == "volume":
                             v = delta.volume_mb if delta is not None else vol_v
                             note = DELTA_BASIS_NOTE if delta is not None else vol_n
+                            f_copy = f.copy()
                             f_copy['_metric_val'] = v
                             f_copy['_metric_fmt'] = f"{format_unit(v, 'volume')} {note}"
                         else:
                             c = (delta.conn if delta is not None
                                  else _safe_int(f.get("num_connections") or f.get("count", 1)))
+                            f_copy = f.copy()
                             f_copy['_metric_val'] = c
                             f_copy['_metric_fmt'] = str(c)
                         matches.append(f_copy)
@@ -2863,7 +2869,11 @@ class Analyzer:
                                 "({n} flow(s)) — the same basis the rule engine uses.",
                         n=delta_used))
                 if guarded:
-                    # 引擎會因此**完全不評估**這條規則；模擬不可以照樣印
+                    # 引擎的 basis_mismatch 檢查是規則層級的閘門，發生在
+                    # top_matches 被查閱之前（見 _dispatch_alerts）：本規則只
+                    # 要有一筆 flow 掛在守門，整條規則本 cycle 就完全不評估
+                    # ——即使其他 flow 各自看都能觸發。模擬必須用同一條規則
+                    # 判出同一個結論，不可以因為 matches 裡還有東西就照樣印
                     # "Would Trigger"，否則操作者會以為規則有在保護他。
                     print("  -> " + t(
                         'debug_basis_guard_suppressed',
@@ -2873,12 +2883,11 @@ class Analyzer:
                                 "could be derived, so the rule engine SUPPRESSES this rule "
                                 "instead of alerting.",
                         n=sum(guarded.values()), reasons=_format_delta_reasons(guarded)))
-                    if not matches:
-                        print("  -> " + t(
-                            'debug_basis_rule_not_evaluated',
-                            default="Rule NOT evaluated this cycle — the result below is "
-                                    "what the engine would report (no alert), not a "
-                                    "measurement of the traffic."))
+                    print("  -> " + t(
+                        'debug_basis_rule_not_evaluated',
+                        default="Rule NOT evaluated this cycle — the result below is "
+                                "what the engine would report (no alert), not a "
+                                "measurement of the traffic."))
                 val = 0.0
                 if rtype == "bandwidth":
                     # matches 只含建立得了基準的 flow（無證據／下界不足以判定
@@ -2894,12 +2903,22 @@ class Analyzer:
                     val = sum([m['_metric_val'] for m in matches])
                     print(t('calc_sum_count', val=int(val)))
 
+                # 規則層級的守門優先於任何觸發判定：引擎的 basis_mismatch
+                # 檢查在 _dispatch_alerts 發生於 top_matches 之前，本規則只要
+                # 有一筆 flow 掛在守門就整條不評估——不管其他 flow 各自看是否
+                # 會觸發。guarded 非空時模擬必須得出同一個「不評估」結論。
+                #
                 # bandwidth 的觸發判定不是「聚合 val 再比一次門檻」——聚合值
                 # 可能來自下界（已在迴圈內確認 >= 門檻）與點值（需要嚴格 >）
                 # 混合的集合，事後用單一運算子重比會把其中一種語意套用到另一
                 # 種上。bw_trigger 是迴圈內逐筆用各自正確的運算子判定後的
                 # 「是否至少一筆確定觸發」，與引擎的 top_matches 邏輯同基準。
-                is_trigger = bw_trigger if rtype == "bandwidth" else val >= threshold
+                if guarded:
+                    is_trigger = False
+                elif rtype == "bandwidth":
+                    is_trigger = bw_trigger
+                else:
+                    is_trigger = val >= threshold
 
                 status = f"{Colors.FAIL}{t('would_trigger')}{Colors.ENDC}" if is_trigger else f"{Colors.GREEN}{t('pass')}{Colors.ENDC}"
                 print(t('eval_result', status=status, threshold=threshold))
