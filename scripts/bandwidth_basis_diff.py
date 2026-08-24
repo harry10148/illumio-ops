@@ -332,23 +332,38 @@ def main():
         else:
             # Human-readable table
             print(f"Rules compared: {result['rules_compared']}")
-            print(f"Flows evaluated: {result['flows_evaluated']}")
-            print(f"Flows unevaluable: {result['flows_unevaluable']}")
+
+            # Show flows with denominator and percentage
+            total_flows = result['flows_evaluated'] + result['flows_unevaluable']
+            eval_pct = (result['flows_evaluated'] / total_flows * 100) if total_flows > 0 else 0
+            uneval_pct = (result['flows_unevaluable'] / total_flows * 100) if total_flows > 0 else 0
+
+            print(
+                f"Flows: {total_flows:,} total | "
+                f"{result['flows_evaluated']:,} evaluated ({eval_pct:.1f}%) | "
+                f"{result['flows_unevaluable']:,} unevaluable ({uneval_pct:.1f}%)"
+            )
             print()
 
             if result["results"]:
                 print("Rule Threshold Comparison:")
                 print("-" * 100)
                 print(
-                    f"{'Rule ID':<10} {'Rule Name':<30} {'Threshold':<12} "
+                    f"{'Rule ID':<12} {'Rule Name':<30} {'Threshold':<12} "
                     f"{'Old Max':<12} {'New Max':<12} {'Trigger Change':<20}"
                 )
                 print("-" * 100)
 
                 for r in result["results"]:
                     change_str = "YES" if r["trigger_state_change"] else "NO"
+
+                    # Truncate long rule IDs (32-char UUIDs) to fit column
+                    rule_id_str = str(r['rule_id'])
+                    if len(rule_id_str) > 9:
+                        rule_id_str = rule_id_str[:6] + "..."
+
                     print(
-                        f"{str(r['rule_id']):<10} {r['rule_name']:<30} "
+                        f"{rule_id_str:<12} {r['rule_name']:<30} "
                         f"{r['threshold_mbps']:<12.2f} "
                         f"{r['old_max_mbps']:<12.2f} {r['new_max_mbps']:<12.2f} "
                         f"{change_str:<20}"
