@@ -43,7 +43,7 @@ def flatten_flow_record(r: dict) -> dict:
     verbatim (report_json) and reports can rebuild their DataFrame without
     re-running this per row. Single source of truth for the flatten mapping.
     """
-    from src.analyzer import calculate_mbps, calculate_volume_mb
+    from src.analyzer import calculate_mbps, calculate_volume_mb, _safe_float
 
     src = r.get('src') or {}
     dst = r.get('dst') or {}
@@ -103,10 +103,21 @@ def flatten_flow_record(r: dict) -> dict:
         'bytes_out':    int(_f('dst_dbo') or _f('dst_tbo')),
         'bytes_total':  bytes_total,
         'bandwidth_mbps': mbps,
-        'raw_dst_dbi': _f('dst_dbi'),
-        'raw_dst_dbo': _f('dst_dbo'),
-        'raw_dst_tbi': _f('dst_tbi'),
-        'raw_dst_tbo': _f('dst_tbo'),
+        # Mirrors calculate_mbps's own numerator expressions exactly
+        # (alias fallback chain and the "OR on the raw value, then
+        # _safe_float" order -- not "_f() then OR", which would treat a
+        # literal "0" string as falsy-after-conversion and wrongly fall
+        # through to the next alias) so _lower_bound_mask's replay of
+        # calculate_mbps's priority order sees the same evidence
+        # calculate_mbps itself used (final-review LOW 8): a flow using
+        # the short `dbo`/`dbi` alias or the `dst_bo`/`dst_bi` alias for
+        # total bytes must not be misclassified as a lower bound just
+        # because these columns only ever looked at the canonical
+        # `dst_d*`/`dst_t*` names.
+        'raw_dst_dbi': _safe_float(r.get('dst_dbi') or r.get('dbi') or 0),
+        'raw_dst_dbo': _safe_float(r.get('dst_dbo') or r.get('dbo') or 0),
+        'raw_dst_tbi': _safe_float(r.get('dst_tbi') or r.get('tbi') or r.get('dst_bi') or 0),
+        'raw_dst_tbo': _safe_float(r.get('dst_tbo') or r.get('tbo') or r.get('dst_bo') or 0),
         'raw_ddms':    _f('ddms'),
         'raw_tdms':    _f('tdms'),
     }

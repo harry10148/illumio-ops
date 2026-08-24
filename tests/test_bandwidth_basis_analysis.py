@@ -211,6 +211,43 @@ class TestLowerBoundMaskAgreesWithCalculateMbps:
                 f"calculate_mbps note={note!r}"
             )
 
+    def test_agrees_with_calculate_mbps_note_for_the_short_alias_field_names(self):
+        """LOW 8 (final-review): calculate_mbps accepts alias numerator
+        fields -- `dbo`/`dbi` for delta bytes, `tbo`/`tbi`/`dst_bo` for
+        total bytes -- as fallbacks when the canonical `dst_*` names are
+        absent. api_parser.flatten_flow_record's raw_dst_* columns used to
+        capture only the canonical names, so a flow using an alias computed
+        a real point value via calculate_mbps but _lower_bound_mask (reading
+        only raw_dst_dbo/dbi/tbo/tbi) saw all-zero raw counters and
+        misclassified it as a bound. Direction was conservative (overstates
+        uncertainty, never understates it) but still a mismatch this task's
+        own drift-guard exists to catch."""
+        from src.analyzer import calculate_mbps, BOUND_BASIS_NOTE
+        from src.report.parsers.api_parser import flatten_flow_record
+
+        alias_interval_flow = {
+            'src': {'ip': '10.0.0.4'}, 'dst': {'ip': '10.0.1.4'},
+            'service': {'port': 443, 'proto': 6},
+            'dbo': 500, 'dbi': 500, 'ddms': 80,
+        }
+        alias_avg_flow = {
+            'src': {'ip': '10.0.0.5'}, 'dst': {'ip': '10.0.1.5'},
+            'service': {'port': 443, 'proto': 6},
+            'dst_bo': 200, 'dst_bi': 0, 'tdms': 32000,
+        }
+
+        rows = [flatten_flow_record(f) for f in (alias_interval_flow, alias_avg_flow)]
+        df = pd.DataFrame(rows)
+        mask = _lower_bound_mask(df)
+
+        for i, flow in enumerate((alias_interval_flow, alias_avg_flow)):
+            _val, note, _b, _d = calculate_mbps(flow)
+            assert note != BOUND_BASIS_NOTE, f"fixture row {i} must be a point value"
+            assert bool(mask.iloc[i]) is False, (
+                f"row {i} ({flow}): mask says bound=True but calculate_mbps "
+                f"computed a point value via the alias field"
+            )
+
     def test_defaults_to_bound_when_raw_columns_are_entirely_absent(self):
         """A caller-built frame with no raw_* columns at all (e.g. a minimal
         test fixture) carries no evidence of a point-value path. Default to
