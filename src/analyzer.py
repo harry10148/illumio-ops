@@ -1736,6 +1736,38 @@ class Analyzer:
         span = max((now_utc - base.observed_at).total_seconds(), 1.0)
         return WindowDelta(float(d_out + d_in), int(d_conn), span, base.observed_at), ""
 
+    @staticmethod
+    def _record_basis_mismatch(
+        basis_mismatch: dict[Any, dict[str, Any]],
+        rid: Any,
+        rule: dict,
+        r_win: float,
+        span_min: float,
+        reason: str,
+    ) -> None:
+        """累積一筆「本規則本 cycle 有 flow 未能建立量測基準」的計數。
+
+        共用累積路徑：bucket-basis 視窗守門（_basis_decision 的 reason，
+        no_cache/no_baseline/stale_baseline/counter_reset）與 bandwidth-basis
+        值守門（值不可得，或下界小於門檻而無法判定）都經由這裡計數——不建
+        第二套。呼叫端仍須自行 `continue`，本函式只負責記帳。
+        """
+        info = basis_mismatch.get(rid)
+        if info is None:
+            basis_mismatch[rid] = {
+                "rule_id": rid,
+                "rule_name": rule.get("name", str(rid)),
+                "window_minutes": r_win,
+                "span_minutes": span_min,
+                "flows": 1,
+                "reasons": Counter([reason]),
+            }
+        else:
+            info["flows"] += 1
+            info["reasons"][reason] += 1
+            if span_min > info["span_minutes"]:
+                info["span_minutes"] = span_min
+
     def _run_rule_engine(self, traffic_stream: Any, tr_rules: list, now_utc: datetime.datetime) -> list:
         """Iterate over traffic flows and accumulate per-rule match results.
 
@@ -1809,21 +1841,7 @@ class Analyzer:
                     # 型別檢查器的保底，實際不會走到。
                     span_min = (0.0 if f_span_start is None
                                 else (now_utc - f_span_start).total_seconds() / 60.0)
-                    info = basis_mismatch.get(rid)
-                    if info is None:
-                        basis_mismatch[rid] = {
-                            "rule_id": rid,
-                            "rule_name": rule.get("name", str(rid)),
-                            "window_minutes": r_win,
-                            "span_minutes": span_min,
-                            "flows": 1,
-                            "reasons": Counter([reason]),
-                        }
-                    else:
-                        info["flows"] += 1
-                        info["reasons"][reason] += 1
-                        if span_min > info["span_minutes"]:
-                            info["span_minutes"] = span_min
+                    self._record_basis_mismatch(basis_mismatch, rid, rule, r_win, span_min, reason)
                     continue
                 if delta is not None:
                     delta_applied += 1
@@ -1838,17 +1856,32 @@ class Analyzer:
                 heap = top_heaps[rid]
 
                 if rule["type"] == "bandwidth":
-                    # m_bw 可能是 None（calculate_mbps 三態：無 bytes 或時間戳
-                    # 不可解析）——沒有證據不可以當成證據，這筆 flow 不參與
-                    # max_val／top_matches（比照本檔既有的「無證據＝放行」原則）。
-                    if m_bw is not None:
-                        if m_bw > res['max_val']:
-                            res['max_val'] = m_bw
-                        if m_bw > float(rule.get("threshold_count", 0)):
-                            f_copy = f.copy()
-                            f_copy['_metric_val'] = m_bw
-                            f_copy['_metric_fmt'] = f"{format_unit(m_bw, 'bandwidth')} {m_bw_note}"
-                            self._push_bounded_top_match(heap, m_bw, count_processed, f_copy, TOP_MATCHES_LIMIT)
+                    threshold_bw = float(rule.get("threshold_count", 0))
+                    span_min = (0.0 if f_span_start is None
+                                else (now_utc - f_span_start).total_seconds() / 60.0)
+                    if m_bw is None:
+                        # calculate_mbps 三態之一：無 bytes 或時間戳不可解析——
+                        # 連下界都算不出來。不可當 0（0 輸給任何正門檻＝規則
+                        # 悄悄失去保護卻仍回報「已評估、未觸發」），並入同一套
+                        # 守門計數／回報機制。
+                        self._record_basis_mismatch(
+                            basis_mismatch, rid, rule, r_win, span_min, "no_measurement")
+                        continue
+                    if m_bw_note == BOUND_BASIS_NOTE and m_bw < threshold_bw:
+                        # 下界小於門檻：真值只保證嚴格大於下界，仍可能高於或
+                        # 低於門檻——無法判定，不得當成「評估後未達標」。
+                        self._record_basis_mismatch(
+                            basis_mismatch, rid, rule, r_win, span_min, "bound_below_threshold")
+                        continue
+                    # 點值，或下界已 >= 門檻（真值嚴格更大，確定觸發）。
+                    if m_bw > res['max_val']:
+                        res['max_val'] = m_bw
+                    clears = m_bw >= threshold_bw if m_bw_note == BOUND_BASIS_NOTE else m_bw > threshold_bw
+                    if clears:
+                        f_copy = f.copy()
+                        f_copy['_metric_val'] = m_bw
+                        f_copy['_metric_fmt'] = f"{format_unit(m_bw, 'bandwidth')} {m_bw_note}"
+                        self._push_bounded_top_match(heap, m_bw, count_processed, f_copy, TOP_MATCHES_LIMIT)
 
                 elif rule["type"] == "volume":
                     res['max_val'] += m_vol
@@ -2766,6 +2799,8 @@ class Analyzer:
                 # 那條規則——畫面對操作者說謊。
                 guarded: Counter = Counter()
                 delta_used = 0
+                threshold = float(rule.get("threshold_count", 0))
+                bw_trigger = False
                 for f in traffic:
                     if self._match_flow_filters(rule, f, rule_start):
                         f_key = flow_key_by_id.get(id(f))
@@ -2782,8 +2817,30 @@ class Analyzer:
                             delta_used += 1
                         f_copy = f.copy()
                         if rtype == "bandwidth":
-                            v = delta.mbps if delta is not None else bw_v
-                            note = DELTA_BASIS_NOTE if delta is not None else bw_n
+                            if delta is not None:
+                                v = delta.mbps
+                                note = DELTA_BASIS_NOTE
+                                if v > threshold:
+                                    bw_trigger = True
+                            elif bw_v is None:
+                                # 無 bytes 或時間戳不可解析：連下界都算不出來。
+                                # 不可當 0——與引擎同一套守門計數，模擬不可以
+                                # 悄悄照樣宣告 Pass。
+                                guarded["no_measurement"] += 1
+                                continue
+                            elif bw_n == BOUND_BASIS_NOTE and bw_v < threshold:
+                                # 下界小於門檻：真值只保證嚴格大於下界，仍可能
+                                # 高於或低於門檻——無法判定，並入同一套守門。
+                                guarded["bound_below_threshold"] += 1
+                                continue
+                            else:
+                                # 點值，或下界已 >= 門檻（真值嚴格更大，確定
+                                # 觸發）。
+                                v = bw_v
+                                note = bw_n
+                                clears = v >= threshold if bw_n == BOUND_BASIS_NOTE else v > threshold
+                                if clears:
+                                    bw_trigger = True
                             f_copy['_metric_val'] = v
                             f_copy['_metric_fmt'] = f"{format_unit(v, 'bandwidth')} {note}"
                         elif rtype == "volume":
@@ -2824,6 +2881,10 @@ class Analyzer:
                                     "measurement of the traffic."))
                 val = 0.0
                 if rtype == "bandwidth":
+                    # matches 只含建立得了基準的 flow（無證據／下界不足以判定
+                    # 的已被上面的守門排除並計數），所以這裡的 max 是「可判定
+                    # 子集的最大值」，不是「全體的最大值」——guarded 的訊息
+                    # 已經讓操作者知道有多少筆被排除在外。
                     val = max([m['_metric_val'] for m in matches]) if matches else 0.0
                     print(t('calc_max_bw', val=val))
                 elif rtype == "volume":
@@ -2833,8 +2894,12 @@ class Analyzer:
                     val = sum([m['_metric_val'] for m in matches])
                     print(t('calc_sum_count', val=int(val)))
 
-                threshold = float(rule.get("threshold_count", 0))
-                is_trigger = val > threshold if rtype == "bandwidth" else val >= threshold
+                # bandwidth 的觸發判定不是「聚合 val 再比一次門檻」——聚合值
+                # 可能來自下界（已在迴圈內確認 >= 門檻）與點值（需要嚴格 >）
+                # 混合的集合，事後用單一運算子重比會把其中一種語意套用到另一
+                # 種上。bw_trigger 是迴圈內逐筆用各自正確的運算子判定後的
+                # 「是否至少一筆確定觸發」，與引擎的 top_matches 邏輯同基準。
+                is_trigger = bw_trigger if rtype == "bandwidth" else val >= threshold
 
                 status = f"{Colors.FAIL}{t('would_trigger')}{Colors.ENDC}" if is_trigger else f"{Colors.GREEN}{t('pass')}{Colors.ENDC}"
                 print(t('eval_result', status=status, threshold=threshold))

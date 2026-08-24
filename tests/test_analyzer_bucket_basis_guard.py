@@ -306,6 +306,219 @@ def test_run_rule_engine_bandwidth_tolerates_unavailable_flows():
     assert all(m['_metric_val'] is not None for m in res["top_matches"])
 
 
+# ─── bandwidth-basis Task 2: the three-way branch on the alert engine ──────
+#
+# calculate_mbps() (Task 1) can now return a POINT value ((Interval)/(Avg)),
+# a provable LOWER BOUND (BOUND_BASIS_NOTE "(>=)", true rate is strictly
+# greater), or None (unavailable). Spec:
+#   - point value            -> compare against threshold as before (>)
+#   - lower bound >= threshold -> certain trigger (true value is higher)
+#   - lower bound <  threshold -> cannot be determined -> guard + count
+#   - None (unavailable)       -> guard + count, never treated as 0
+
+def _bound_flow(first_detected, last_detected, dst_bo, dst_bi=0, **over):
+    """No ddms/tdms -- calculate_mbps falls through to the span-based lower
+    bound (BOUND_BASIS_NOTE). Numbers are chosen so span_seconds+1 divides
+    total_bytes*8 evenly, giving an exact Mbps value for boundary tests."""
+    flow = {
+        "timestamp_range": {
+            "first_detected": first_detected,
+            "last_detected": last_detected,
+        },
+        "policy_decision": "blocked",
+        "pd": 2,
+        "num_connections": 1,
+        "dst_bo": dst_bo,
+        "dst_bi": dst_bi,
+        "src": {},
+        "dst": {},
+        "service": {},
+    }
+    flow.update(over)
+    return flow
+
+
+# first/last 9 秒間距（denom = span+1 = 10s）；dst_bo 選成 125,000,000 bytes
+# 使 val = 125,000,000 * 8 / 10 / 1e6 = 100.0 Mbps 整數，可精確對齊門檻。
+_BOUND_FIRST = "2026-07-25T08:26:50Z"
+_BOUND_LAST = "2026-07-25T08:26:59Z"
+_BOUND_VAL_MBPS = 100.0
+
+
+def test_lower_bound_equal_to_threshold_triggers():
+    """真值嚴格大於下界，所以下界 >= 門檻即可確定觸發——若把比較寫成
+    `>`，這個案例會被錯誤地判定成未達標（漏報）。"""
+    rule = _rule("tr1", "bandwidth", window=10, threshold=_BOUND_VAL_MBPS, name="bw bound eq")
+    az = _analyzer([rule])
+
+    triggers = az._run_rule_engine(
+        iter([_bound_flow(_BOUND_FIRST, _BOUND_LAST, 125_000_000)]), [rule], NOW)
+    _, res = triggers[0]
+
+    assert "basis_mismatch" not in res
+    assert res["max_val"] == pytest.approx(_BOUND_VAL_MBPS)
+    assert len(res["top_matches"]) == 1
+
+    az._dispatch_alerts(triggers, [rule])
+    az.reporter.add_metric_alert.assert_called_once()
+
+
+def test_lower_bound_below_threshold_is_guarded_not_a_silent_miss():
+    """下界小於門檻時真值仍可能超過門檻（下界只是下限）——不可當成
+    「評估後未達標」而悄悄放行，必須進守門並計數。"""
+    rule = _rule("tr1", "bandwidth", window=10, threshold=_BOUND_VAL_MBPS + 1, name="bw bound lt")
+    az = _analyzer([rule])
+    az.stats = MagicMock()
+
+    triggers = az._run_rule_engine(
+        iter([_bound_flow(_BOUND_FIRST, _BOUND_LAST, 125_000_000)]), [rule], NOW)
+    _, res = triggers[0]
+
+    assert res.get("basis_mismatch"), "an inconclusive lower bound must guard the rule"
+    assert "bound_below_threshold" in res["basis_mismatch"]["reasons"]
+
+    az._dispatch_alerts(triggers, [rule])
+    az.reporter.add_metric_alert.assert_not_called()
+    az.stats.record_suppression.assert_called_once()
+    az.stats.record_rule_trigger.assert_not_called()
+
+
+def test_unavailable_bandwidth_is_guarded_never_treated_as_zero():
+    """val is None（無 bytes 或時間戳不可解析）不得當成 0 評估——0 輸給任何
+    正數門檻，會讓規則悄悄失去保護卻仍回報「已評估、未觸發」。必須進守門
+    並計數，讓操作者看得到。"""
+    rule = _rule("tr1", "bandwidth", window=10, threshold=1, name="bw none")
+    az = _analyzer([rule])
+    az.stats = MagicMock()
+
+    triggers = az._run_rule_engine(iter([_unavailable_bw_flow()]), [rule], NOW)
+    _, res = triggers[0]
+
+    assert res.get("basis_mismatch"), "an unavailable value must guard the rule"
+    assert "no_measurement" in res["basis_mismatch"]["reasons"]
+    assert res["max_val"] == 0.0
+    assert res["top_matches"] == []
+
+    az._dispatch_alerts(triggers, [rule])
+    az.reporter.add_metric_alert.assert_not_called()
+    az.stats.record_suppression.assert_called_once()
+    az.stats.record_rule_trigger.assert_not_called()
+
+
+def test_point_value_exactly_at_threshold_still_uses_strict_greater_than():
+    """回歸鎖：下界的 `>=` 規則不可外溢到點值分支——點值等於門檻沿用既有
+    嚴格 `>` 語意，不觸發。"""
+    rule = _rule("tr1", "bandwidth", window=10, threshold=100, name="bw point eq")
+    az = _analyzer([rule])
+    # dst_dbo=12,500,000 bytes, ddms=1000ms -> 12,500,000*8/1/1e6 = 100.0 Mbps
+    flow = _interval_flow(first_detected=RECENT_FIRST,
+                           dst_dbo=12_500_000, dst_dbi=0, ddms=1000)
+
+    triggers = az._run_rule_engine(iter([flow]), [rule], NOW)
+    _, res = triggers[0]
+
+    assert "basis_mismatch" not in res
+    assert res["max_val"] == pytest.approx(100.0)
+    assert res["top_matches"] == []
+
+    az._dispatch_alerts(triggers, [rule])
+    az.reporter.add_metric_alert.assert_not_called()
+
+
+# ─── bandwidth-basis Task 2: run_debug_mode must not diverge from the engine
+
+class _DebugApi:
+    """run_debug_mode 只需要這兩個方法（不會派送任何東西）。"""
+
+    def __init__(self, flows):
+        self._flows = flows
+
+    def fetch_events(self, since):
+        return []
+
+    def execute_traffic_query_stream(self, start, end, pds):
+        return iter(self._flows)
+
+
+def _debug_analyzer(rules, flows):
+    cm = MagicMock()
+    cm.config = {"rules": rules}
+    az = Analyzer(cm, _DebugApi(flows), MagicMock())
+    az.save_state = MagicMock()
+    az.load_state = MagicMock()
+    return az
+
+
+def _now_relative_bound_flow(span_seconds, dst_bo, dst_bi=0):
+    """debug 模式用真實時鐘，flow 時戳必須跟著真實時間走。span_seconds 秒的
+    first/last 間距 -> denom = span_seconds + 1。"""
+    now = datetime.datetime.now(datetime.timezone.utc)
+    last = now - datetime.timedelta(seconds=2)
+    first = last - datetime.timedelta(seconds=span_seconds)
+    return {
+        "timestamp_range": {
+            "first_detected": first.strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "last_detected": last.strftime("%Y-%m-%dT%H:%M:%SZ"),
+        },
+        "policy_decision": "blocked",
+        "pd": 2,
+        "num_connections": 1,
+        "dst_bo": dst_bo,
+        "dst_bi": dst_bi,
+        "src": {},
+        "dst": {},
+        "service": {},
+    }
+
+
+def test_debug_mode_lower_bound_equal_to_threshold_would_trigger(capsys):
+    rule = _rule("tr1", "bandwidth", window=10, threshold=100, name="bw bound eq")
+    flow = _now_relative_bound_flow(9, 125_000_000)  # span=9 -> denom=10 -> 100.0 Mbps
+    az = _debug_analyzer([rule], [flow])
+
+    az.run_debug_mode(mins=12, pd_sel=3, interactive=False)
+    out = capsys.readouterr().out
+
+    assert "WOULD TRIGGER" in out.upper()
+    assert "Aggregation-basis guard" not in out
+
+
+def test_debug_mode_lower_bound_below_threshold_is_guarded_not_a_silent_pass(capsys):
+    rule = _rule("tr1", "bandwidth", window=10, threshold=101, name="bw bound lt")
+    flow = _now_relative_bound_flow(9, 125_000_000)  # bound = 100.0 < 101
+    az = _debug_analyzer([rule], [flow])
+
+    az.run_debug_mode(mins=12, pd_sel=3, interactive=False)
+    out = capsys.readouterr().out
+
+    assert "WOULD TRIGGER" not in out.upper()
+    assert "bound_below_threshold=1" in out
+
+
+def test_debug_mode_unavailable_bandwidth_is_guarded_not_treated_as_zero(capsys):
+    rule = _rule("tr1", "bandwidth", window=10, threshold=1, name="bw none")
+    now = datetime.datetime.now(datetime.timezone.utc)
+    flow = {
+        "timestamp_range": {
+            "first_detected": (now - datetime.timedelta(seconds=11)).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "last_detected": (now - datetime.timedelta(seconds=2)).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        },
+        "policy_decision": "blocked",
+        "pd": 2,
+        "num_connections": 1,
+        "src": {},
+        "dst": {},
+        "service": {},
+    }
+    az = _debug_analyzer([rule], [flow])
+
+    az.run_debug_mode(mins=12, pd_sel=3, interactive=False)
+    out = capsys.readouterr().out
+
+    assert "WOULD TRIGGER" not in out.upper()
+    assert "no_measurement=1" in out
+
+
 # ─── 6: no evidence is not evidence ─────────────────────────────────────────
 
 def test_flow_without_first_detected_is_not_guarded():
