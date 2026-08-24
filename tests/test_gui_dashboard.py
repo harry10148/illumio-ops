@@ -384,6 +384,71 @@ def test_top10_forwards_object_and_plural_filters(app_persistent, monkeypatch):
     assert captured.get("src_label") == "role=db"    # 舊 scalar key 不回歸
 
 
+# ── final-review Finding 1: top10 must not print "unavailable" as 0.00,
+# and must not flatten every lower bound into a point value. Spec's
+# call-site table names dashboard.py's top10 sort/format explicitly -- it
+# had zero hunks in the whole branch until this fix.
+
+def test_top10_bandwidth_excludes_unmeasurable_rows_and_uses_the_ge_prefixed_string(
+        app_persistent, monkeypatch):
+    """max_bandwidth_mbps is absent (not None) on a row calculate_mbps could
+    not evaluate -- `.get("max_bandwidth_mbps", 0)` used to substitute 0 and
+    sort/print it as a measured zero. And the widget re-derived val_fmt with
+    its own `:.2f} Mbps`, discarding the "≥ " prefix formatted_bandwidth
+    already carries for a lower bound."""
+    client = app_persistent.test_client()
+    login = client.post('/api/login', json={"username": "admin", "password": "testpass"},
+                        environ_overrides={'REMOTE_ADDR': '127.0.0.1'})
+    csrf_token = _csrf(login)
+
+    from src.analyzer import Analyzer
+
+    def fake_query(self, params):
+        return [
+            # unmeasurable: no rate key at all (calculate_mbps returned None)
+            {"policy_decision": "allowed", "source": {}, "destination": {}, "service": {}},
+            # a provable lower bound -- must render with "≥", not a bare number
+            {"policy_decision": "allowed", "source": {}, "destination": {}, "service": {},
+             "max_bandwidth_mbps": 493.30, "formatted_bandwidth": "≥ 493.30 Mbps"},
+        ]
+
+    monkeypatch.setattr(Analyzer, "query_flows", fake_query)
+    r = client.post('/api/dashboard/top10', json={"mins": 30, "rank_by": "bandwidth"},
+                    environ_overrides={'REMOTE_ADDR': '127.0.0.1'},
+                    headers={'X-CSRF-Token': csrf_token})
+    assert r.status_code == 200
+    rows = r.json["data"]
+    # the unmeasurable row must not appear at all (spec: "算不出來的列不參與")
+    assert len(rows) == 1
+    assert rows[0]["val_fmt"] == "≥ 493.30 Mbps"
+
+
+def test_top10_volume_excludes_unmeasurable_rows(app_persistent, monkeypatch):
+    """Same absence-vs-zero bug on the volume ranking: total_volume_mb is
+    absent on a row calculate_volume_mb could not evaluate."""
+    client = app_persistent.test_client()
+    login = client.post('/api/login', json={"username": "admin", "password": "testpass"},
+                        environ_overrides={'REMOTE_ADDR': '127.0.0.1'})
+    csrf_token = _csrf(login)
+
+    from src.analyzer import Analyzer
+
+    def fake_query(self, params):
+        return [
+            {"policy_decision": "allowed", "source": {}, "destination": {}, "service": {}},
+            {"policy_decision": "allowed", "source": {}, "destination": {}, "service": {},
+             "total_volume_mb": 2.0},
+        ]
+
+    monkeypatch.setattr(Analyzer, "query_flows", fake_query)
+    r = client.post('/api/dashboard/top10', json={"mins": 30, "rank_by": "volume"},
+                    environ_overrides={'REMOTE_ADDR': '127.0.0.1'},
+                    headers={'X-CSRF-Token': csrf_token})
+    assert r.status_code == 200
+    rows = r.json["data"]
+    assert len(rows) == 1
+
+
 # ── Task 2 (deferred minors hardening): PCE-side query failure must
 # surface as 502, matching the quarantine search endpoint's behaviour.
 

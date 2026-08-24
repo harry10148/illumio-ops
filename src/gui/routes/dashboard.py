@@ -732,11 +732,19 @@ def make_dashboard_blueprint(
                 }
                 results = base_ana.query_flows(params)
 
-                # Sort and get top 10
+                # Sort and get top 10. max_bandwidth_mbps/total_volume_mb are
+                # KEYS THAT ARE ABSENT (not None) on a row whose rate/volume
+                # calculate_mbps/calculate_volume_mb could not establish --
+                # `.get(key, 0)` used to substitute a measured 0 for "unavailable"
+                # and let it win the ranking (final-review Finding 1). Spec: a
+                # row with no rate does not participate in the bandwidth/volume
+                # ranking at all.
                 if rank_by == "bandwidth":
-                    sorted_v = sorted(results, key=lambda x: x.get("max_bandwidth_mbps", 0), reverse=True)
+                    ranked = [r for r in results if "max_bandwidth_mbps" in r]
+                    sorted_v = sorted(ranked, key=lambda x: x["max_bandwidth_mbps"], reverse=True)
                 elif rank_by == "volume":
-                    sorted_v = sorted(results, key=lambda x: x.get("total_volume_mb", 0), reverse=True)
+                    ranked = [r for r in results if "total_volume_mb" in r]
+                    sorted_v = sorted(ranked, key=lambda x: x["total_volume_mb"], reverse=True)
                 else: # count
                     sorted_v = sorted(results, key=lambda x: x.get("total_connections", 0), reverse=True)
 
@@ -761,7 +769,17 @@ def make_dashboard_blueprint(
                     elif flow_pd == "potentially_blocked": pd_int = 1
                     else: pd_int = 2 # default to Blocked if unknown or explicitly blocked
 
-                    if rank_by == "bandwidth": val_fmt = f"{item.get('max_bandwidth_mbps', 0):.2f} Mbps"
+                    if rank_by == "bandwidth":
+                        # formatted_bandwidth is already resolved by
+                        # _shape_traffic_row (Mbps/Gbps unit, and the "≥ "
+                        # lower-bound prefix when the rate is a provable
+                        # bound rather than a point value) -- reformatting
+                        # max_bandwidth_mbps here from scratch silently
+                        # dropped that prefix and printed every bound as a
+                        # point value (final-review Finding 1). Present rows
+                        # are guaranteed to carry it (written in lockstep
+                        # with max_bandwidth_mbps, see _shape_traffic_row).
+                        val_fmt = item.get("formatted_bandwidth", "—")
                     elif rank_by == "volume":
                         vol_bytes = (item.get('total_volume_mb', 0) or 0) * 1024 * 1024
                         if vol_bytes >= 1024 ** 4:
