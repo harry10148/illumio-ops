@@ -91,6 +91,8 @@ _EXPECTED_STATE_KEYS = {
     "window_truncation_last_alert_at",
     "basis_mismatch",
     "basis_mismatch_last_alert_at",
+    "basis_value_mismatch",
+    "basis_value_mismatch_last_alert_at",
     # _EXTRA_PCE_DERIVED
     "event_timeline",
     "pce_stats",

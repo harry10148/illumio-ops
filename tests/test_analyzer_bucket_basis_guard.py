@@ -425,6 +425,75 @@ def test_point_value_exactly_at_threshold_still_uses_strict_greater_than():
     az.reporter.add_metric_alert.assert_not_called()
 
 
+# ─── bandwidth-basis Task 2 fix round 2: adversarial review findings ───────
+
+def test_nan_bytes_do_not_slip_past_the_bound_guard_as_a_certain_trigger():
+    """審查驗證過的具體 repro：byte 欄位是字面值 "nan" 時 _safe_float 產出
+    NaN，NaN 在兩個方向的比較都是 False，`bw_v < threshold` 因此不會成立
+    ——若沒有額外的 isfinite 檢查，這筆 flow 會被誤判成「下界已 >= 門檻」
+    而確定觸發，對垃圾資料發出告警。必須跟不可得同一套守門計數。"""
+    rule = _rule("tr1", "bandwidth", window=10, threshold=50, name="bw nan")
+    az = _analyzer([rule])
+    az.stats = MagicMock()
+    flow = _bound_flow(_BOUND_FIRST, _BOUND_LAST, dst_bo="nan")
+
+    triggers = az._run_rule_engine(iter([flow]), [rule], NOW)
+    _, res = triggers[0]
+
+    assert res.get("basis_mismatch"), "a non-finite measurement must guard the rule"
+    assert "no_measurement" in res["basis_mismatch"]["reasons"]
+
+    az._dispatch_alerts(triggers, [rule])
+    az.reporter.add_metric_alert.assert_not_called()
+    az.stats.record_suppression.assert_called_once()
+
+
+def test_missing_telemetry_guard_reason_gets_its_own_message_not_the_window_one(warnings):
+    """no_measurement 是「flow 沒有可用的位元組/時間戳資料」，跟
+    threshold_window 設多短完全無關——不得借用 aggregation-basis guard 那則
+    「視窗 X 分鐘對上聚合 Y 分鐘」的敘事，那個敘事對這個成因是反過來的假
+    建議（叫操作者去調一個從頭到尾不是問題的旋鈕）。"""
+    rule = _rule("tr1", "bandwidth", window=10, threshold=1, name="bw notelemetry")
+    az = _analyzer([rule])
+
+    az._run_rule_engine(iter([_unavailable_bw_flow()]), [rule], NOW)
+
+    hits = [m for m in warnings if "bw notelemetry" in m]
+    assert hits, "expected a warning naming the rule"
+    combined = " ".join(hits)
+    assert "bandwidth-basis guard" in combined
+    assert "aggregation-basis guard" not in combined
+    # the old window-narrative's specific claim/advice must not appear: this
+    # rule's cause has nothing to do with window vs. aggregation-span sizing
+    assert "carry aggregate totals reaching back" not in combined
+    assert "Widen threshold_window" not in combined
+    assert "aggregation span" not in combined
+
+    # 舊訊號（window-basis）必須維持乾淨——這條規則的成因跟視窗/聚合區間
+    # 無關，不可以出現在那個 meta-alert 裡。
+    assert az.state.get("basis_mismatch", {}) == {}
+    assert az.state.get("basis_value_mismatch", {}).get("rule_names") == "bw notelemetry"
+
+
+def test_lower_bound_equal_alert_criteria_is_consistent_with_its_own_value():
+    """通知沒有原始快照可看——Line/email 只看得到 criteria 字串跟 count。
+    若 criteria 硬寫死 bandwidth 用 `>`，一則由下界 100.00 >= 100 觸發的告警
+    會印成「Metric Value: 100.00」配「Threshold: > 100」，數學上互相矛盾，
+    操作者會以為告警系統壞了。"""
+    rule = _rule("tr1", "bandwidth", window=10, threshold=_BOUND_VAL_MBPS, name="bw bound crit")
+    az = _analyzer([rule])
+
+    triggers = az._run_rule_engine(
+        iter([_bound_flow(_BOUND_FIRST, _BOUND_LAST, 125_000_000)]), [rule], NOW)
+    az._dispatch_alerts(triggers, [rule])
+
+    az.reporter.add_metric_alert.assert_called_once()
+    alert_data = az.reporter.add_metric_alert.call_args.args[0]
+    assert alert_data["count"] == f"{_BOUND_VAL_MBPS:.2f}"
+    assert ">= 100" in alert_data["criteria"]
+    assert "> 100" not in alert_data["criteria"]
+
+
 # ─── bandwidth-basis Task 2: run_debug_mode must not diverge from the engine
 
 class _DebugApi:

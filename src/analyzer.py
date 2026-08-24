@@ -6,6 +6,7 @@ import heapq
 import ipaddress
 import json
 import gc
+import math
 import os
 import sys
 import threading
@@ -99,6 +100,8 @@ _ANALYZER_OWNED_STATE_KEYS = (
     "window_truncation_last_alert_at",
     "basis_mismatch",
     "basis_mismatch_last_alert_at",
+    "basis_value_mismatch",
+    "basis_value_mismatch_last_alert_at",
 )
 
 # record_local_read()/record_event_batch() 在純 cache-read cycle 寫入的
@@ -238,6 +241,17 @@ DELTA_BASIS_NOTE = "(Window)"
 # 因此 bytes ÷ (span+1) 是可證明為真的下限。呼叫端據此以「≥」呈現，
 # 告警則在「下界 >= 門檻」時即可確定觸發（真值嚴格更大）。
 BOUND_BASIS_NOTE = "(>=)"
+
+# basis_mismatch 的 reason 分兩類，決定操作者看到哪一則診斷：
+#   - _WINDOW_BASIS_REASONS：flow 的聚合區間跟規則視窗對不上（見模組頂端
+#     「Bucket-basis guard」），問題在視窗/取樣設定。
+#   - _VALUE_BASIS_REASONS：量測本身不可得或不足以判定（見上方 bandwidth
+#     三態），問題在 flow 的位元組/時間戳資料，跟 threshold_window 無關。
+# 同一條規則若混到兩類 reason，兩則診斷都會發——各自只挑自己那類的 reason
+# 來描述，不把對方的成因說成自己的。
+_WINDOW_BASIS_REASONS = frozenset({"no_cache", "no_baseline", "stale_baseline", "counter_reset"})
+_VALUE_BASIS_REASONS = frozenset({"no_measurement", "bound_below_threshold"})
+
 
 def _metric_val_sort_key(x: dict[str, Any]) -> float:
     """_metric_val 的排序鍵：值可能是 None（calculate_mbps 三態之一，見
@@ -1255,6 +1269,17 @@ class Analyzer:
             details_key="alert_aggregation_basis_details",
             log_label="Traffic aggregation basis mismatch",
         )
+        # value-basis 守門觸發＝有規則的量測本身不可得或不足以判定（跟上面
+        # window-basis 的視窗/取樣設定問題無關）——獨立的 signal/cooldown，
+        # 不可借用 basis_mismatch 那則「視窗太短」的敘事，操作者會去調一個
+        # 從頭到尾都不是問題的旋鈕。
+        self._maybe_alert_single_overflow(
+            state_key="basis_value_mismatch",
+            cooldown_key="basis_value_mismatch_last_alert_at",
+            rule_key="alert_bandwidth_basis_rule",
+            details_key="alert_bandwidth_basis_details",
+            log_label="Bandwidth measurement unavailable",
+        )
 
     def _maybe_alert_single_overflow(
         self, *, state_key: str, cooldown_key: str, rule_key: str, details_key: str, log_label: str
@@ -1524,8 +1549,11 @@ class Analyzer:
         # 規則全部停用或改走 legacy 路徑後，舊訊號會永遠留著每小時重發一次。
         self.state["window_truncation"] = {}
         # 同理歸零 bucket-basis 守門訊號：它由 _run_rule_engine 在本 cycle
-        # 重新寫入；規則停用或不再命中時訊號必須自癒，不可永久黏著。
+        # 重新寫入；規則停用或不再命中時訊號必須自癒，不可永久黏著。兩個
+        # signal 各自歸零——window-basis 與 value-basis 是兩類獨立成因，一個
+        # 解除不代表另一個也解除。
         self.state["basis_mismatch"] = {}
+        self.state["basis_value_mismatch"] = {}
         tr_rules = self._select_rules(
             lambda r: r.get("type") in ("traffic", "bandwidth", "volume"))
         if not tr_rules:
@@ -1859,11 +1887,15 @@ class Analyzer:
                     threshold_bw = float(rule.get("threshold_count", 0))
                     span_min = (0.0 if f_span_start is None
                                 else (now_utc - f_span_start).total_seconds() / 60.0)
-                    if m_bw is None:
+                    if m_bw is None or not math.isfinite(m_bw) or not math.isfinite(threshold_bw):
                         # calculate_mbps 三態之一：無 bytes 或時間戳不可解析——
                         # 連下界都算不出來。不可當 0（0 輸給任何正門檻＝規則
                         # 悄悄失去保護卻仍回報「已評估、未觸發」），並入同一套
-                        # 守門計數／回報機制。
+                        # 守門計數／回報機制。同一分支也接住髒資料算出的非有限
+                        # 值（例如欄位字面值 "nan"）：NaN 在兩個方向的比較都是
+                        # False，若放行到下面的 `< threshold_bw` 判斷式會誤判
+                        # 成 False，被當成「下界已 >= 門檻」而確定觸發——非有限
+                        # 值不是任何東西的下界，一律視為無法得知。
                         self._record_basis_mismatch(
                             basis_mismatch, rid, rule, r_win, span_min, "no_measurement")
                         continue
@@ -1925,26 +1957,53 @@ class Analyzer:
                 "(cache observations differenced across each rule's window)",
                 delta_applied,
             )
+        # 兩類 reason 各自的診斷：window-basis（視窗/取樣設定的問題）與
+        # value-basis（flow 本身的位元組/時間戳資料不可得或不足以判定）成因
+        # 完全不同，混在同一則訊息裡會讓操作者拿錯旋鈕去調（審查已驗證：
+        # no_measurement 被套進「視窗太短」的敘事，操作者會去放大一個從頭到
+        # 尾都不是問題的 threshold_window）。同一條規則若兩類都中，兩則訊息
+        # 都發——各自只挑自己那類的 reason 來描述。
+        window_mismatch: dict[Any, dict[str, Any]] = {}
+        value_mismatch: dict[Any, dict[str, Any]] = {}
         for rid, info in basis_mismatch.items():
             info["reason_summary"] = _format_delta_reasons(info["reasons"])
             rule_results[rid]['basis_mismatch'] = info
-            logger.warning(
-                "Rule '{}' NOT evaluated this cycle (aggregation-basis guard): {} matched "
-                "flow(s) carry aggregate totals reaching back {:.0f} min, but the rule's "
-                "threshold_window is only {} min. This PCE returns whole-bucket byte and "
-                "connection totals that are NOT clipped to the query window, so evaluating "
-                "the rule would compare bucket-wide traffic against a short-window threshold "
-                "and raise a false alert. The per-window delta could not be derived from "
-                "cache observations either ({}). Fix by: keeping pce_cache enabled with "
-                "flow_delta_enabled=true, setting traffic_poll_interval_seconds well below "
-                "this rule's threshold_window, widening threshold_window to cover the "
-                "aggregation span, or enabling Enhanced Data Collection so the PCE reports "
-                "interval deltas.",
-                info["rule_name"], info["flows"], info["span_minutes"], info["window_minutes"],
-                info["reason_summary"],
-            )
-        if basis_mismatch:
-            worst = max(basis_mismatch.values(), key=lambda i: i["span_minutes"])
+            window_reasons = Counter({k: v for k, v in info["reasons"].items()
+                                       if k in _WINDOW_BASIS_REASONS})
+            value_reasons = Counter({k: v for k, v in info["reasons"].items()
+                                      if k in _VALUE_BASIS_REASONS})
+            if window_reasons:
+                window_mismatch[rid] = info
+                logger.warning(
+                    "Rule '{}' NOT evaluated this cycle (aggregation-basis guard): {} matched "
+                    "flow(s) carry aggregate totals reaching back {:.0f} min, but the rule's "
+                    "threshold_window is only {} min. This PCE returns whole-bucket byte and "
+                    "connection totals that are NOT clipped to the query window, so evaluating "
+                    "the rule would compare bucket-wide traffic against a short-window threshold "
+                    "and raise a false alert. The per-window delta could not be derived from "
+                    "cache observations either ({}). Fix by: keeping pce_cache enabled with "
+                    "flow_delta_enabled=true, setting traffic_poll_interval_seconds well below "
+                    "this rule's threshold_window, widening threshold_window to cover the "
+                    "aggregation span, or enabling Enhanced Data Collection so the PCE reports "
+                    "interval deltas.",
+                    info["rule_name"], sum(window_reasons.values()), info["span_minutes"],
+                    info["window_minutes"], _format_delta_reasons(window_reasons),
+                )
+            if value_reasons:
+                value_mismatch[rid] = info
+                logger.warning(
+                    "Rule '{}' NOT evaluated this cycle (bandwidth-basis guard): {} matched "
+                    "flow(s) could not be used as evidence — no usable byte/duration telemetry, "
+                    "or only a provable lower bound that fell short of the threshold (so whether "
+                    "the true rate clears it is unknown, not settled). This is UNRELATED to "
+                    "threshold_window sizing. Check that the matched flows report byte counters "
+                    "(dst_bo/dst_bi or dst_tb*/dst_db*) and valid first_detected/last_detected "
+                    "timestamps ({}).",
+                    info["rule_name"], sum(value_reasons.values()),
+                    _format_delta_reasons(value_reasons),
+                )
+        if window_mismatch:
+            worst = max(window_mismatch.values(), key=lambda i: i["span_minutes"])
             self.state["basis_mismatch"] = {
                 "detected_at": format_utc(now_utc),
                 "rules": [
@@ -1953,21 +2012,43 @@ class Analyzer:
                         "name": i["rule_name"],
                         "window_minutes": i["window_minutes"],
                         "span_minutes": round(i["span_minutes"], 1),
-                        "flows": i["flows"],
-                        "reasons": i["reason_summary"],
+                        "flows": sum(v for k, v in i["reasons"].items() if k in _WINDOW_BASIS_REASONS),
+                        "reasons": _format_delta_reasons(Counter(
+                            {k: v for k, v in i["reasons"].items() if k in _WINDOW_BASIS_REASONS})),
                     }
-                    for i in basis_mismatch.values()
+                    for i in window_mismatch.values()
                 ],
                 # 以下純量欄位供 meta-alert 的 details 模板取用（見
                 # _maybe_alert_single_overflow：state 內的純量會成為 placeholder）
-                "rule_count": len(basis_mismatch),
-                "rule_names": ", ".join(i["rule_name"] for i in basis_mismatch.values()),
+                "rule_count": len(window_mismatch),
+                "rule_names": ", ".join(i["rule_name"] for i in window_mismatch.values()),
                 "worst_window_minutes": worst["window_minutes"],
                 "worst_span_minutes": round(worst["span_minutes"], 1),
                 # 為何推導不出視窗增量（no_cache / no_baseline / stale_baseline /
                 # counter_reset）——決定操作者該調哪一個旋鈕
                 "delta_reasons": _format_delta_reasons(
-                    sum((i["reasons"] for i in basis_mismatch.values()), Counter())),
+                    sum((Counter({k: v for k, v in i["reasons"].items() if k in _WINDOW_BASIS_REASONS})
+                         for i in window_mismatch.values()), Counter())),
+            }
+        if value_mismatch:
+            self.state["basis_value_mismatch"] = {
+                "detected_at": format_utc(now_utc),
+                "rules": [
+                    {
+                        "id": i["rule_id"],
+                        "name": i["rule_name"],
+                        "flows": sum(v for k, v in i["reasons"].items() if k in _VALUE_BASIS_REASONS),
+                        "reasons": _format_delta_reasons(Counter(
+                            {k: v for k, v in i["reasons"].items() if k in _VALUE_BASIS_REASONS})),
+                    }
+                    for i in value_mismatch.values()
+                ],
+                "rule_count": len(value_mismatch),
+                "rule_names": ", ".join(i["rule_name"] for i in value_mismatch.values()),
+                # 為何 flow 不能當量測證據（no_measurement / bound_below_threshold）
+                "reasons": _format_delta_reasons(
+                    sum((Counter({k: v for k, v in i["reasons"].items() if k in _VALUE_BASIS_REASONS})
+                         for i in value_mismatch.values()), Counter())),
             }
 
         # 將每條規則的有界集合還原為原始 append 順序（idx 升冪），
@@ -2027,10 +2108,21 @@ class Analyzer:
                 ctr = Counter([self.get_traffic_details_key(m) for m in top_10])
                 details = "<br>".join([f"{k}: {v}" for k, v in ctr.most_common(10)])
 
+                # top_10 is sorted desc just above, so top_10[0] is the flow
+                # that produced `val` (max_val) — for bandwidth, any flow
+                # already in top_matches individually cleared the threshold,
+                # so the maximum-value flow is always the same flow max_val
+                # came from. Its note tells us whether THIS alert fired via
+                # the strict '>' point-value path or the '>=' lower-bound
+                # path — _build_criteria_str must match that, not guess from
+                # the rule type alone (see its docstring).
+                is_bound = (rule["type"] == "bandwidth" and bool(top_10)
+                            and BOUND_BASIS_NOTE in (top_10[0].get('_metric_fmt') or ""))
+
                 alert_data = {
                     "rule": rule["name"],
                     "count": f"{val:.2f}" if rule['type'] != 'traffic' else str(int(val)),
-                    "criteria": self._build_criteria_str(rule),
+                    "criteria": self._build_criteria_str(rule, bound=is_bound),
                     "details": details,
                     "raw_data": top_10
                 }
@@ -2093,12 +2185,26 @@ class Analyzer:
         self.state["alert_history"][rid] = now_utc.strftime('%Y-%m-%dT%H:%M:%SZ')
         return True
 
-    def _build_criteria_str(self, rule: dict[str, Any], *, lang: str | None = None) -> str:
-        # Bandwidth fires on a strict '>' threshold; traffic/volume fire on '>='
-        # (see _dispatch_alerts), so the advertised operator must match the type.
-        op = ">" if rule.get("type") == "bandwidth" else ">="
+    def _build_criteria_str(self, rule: dict[str, Any], *, lang: str | None = None,
+                             bound: bool = False) -> str:
+        # Traffic/volume always fire on '>=' (see _dispatch_alerts). Bandwidth
+        # normally fires on a strict '>', EXCEPT when the alert was raised by
+        # a provable lower bound (calculate_mbps's BOUND_BASIS_NOTE, Task 1/2:
+        # no ddms/tdms, so the true rate can only be proven >= what was
+        # measured) — that case fires on '>=' instead, and `bound` (set by the
+        # caller from the actual triggering match, not a rule-level guess)
+        # tells us which one actually fired. Getting this wrong makes a
+        # notification self-contradictory on channels that don't carry the
+        # raw snapshot's "(>=)" qualifier — e.g. "Value: 100.00, Threshold:
+        # > 100" reads as a bug, not an alert.
+        if rule.get("type") == "bandwidth":
+            op = ">=" if bound else ">"
+        else:
+            op = ">="
         _lang = lang or self._lang
         crit = [t('alert_criteria_threshold', lang=_lang, op=op, n=rule['threshold_count'])]
+        if bound:
+            crit.append(t('alert_criteria_lower_bound_note', lang=_lang))
         if rule.get('port'):
             crit.append(t('alert_criteria_port', lang=_lang, p=rule['port']))
         return ", ".join(crit)
@@ -2824,10 +2930,12 @@ class Analyzer:
                                 note = DELTA_BASIS_NOTE
                                 if v > threshold:
                                     bw_trigger = True
-                            elif bw_v is None:
-                                # 無 bytes 或時間戳不可解析：連下界都算不出來。
-                                # 不可當 0——與引擎同一套守門計數，模擬不可以
-                                # 悄悄照樣宣告 Pass。
+                            elif bw_v is None or not math.isfinite(bw_v) or not math.isfinite(threshold):
+                                # 無 bytes 或時間戳不可解析，或髒資料算出非有限
+                                # 值（例如欄位字面值 "nan"，NaN 在兩個方向的比較
+                                # 都是 False，會讓下面的 `< threshold` 判斷式誤判
+                                # 成 False、被當成確定觸發）——與引擎同一套守門
+                                # 計數，模擬不可以悄悄照樣宣告 Pass 或 Would Trigger。
                                 guarded["no_measurement"] += 1
                                 continue
                             elif bw_n == BOUND_BASIS_NOTE and bw_v < threshold:
