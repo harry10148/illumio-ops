@@ -81,6 +81,25 @@ class TestShapeTrafficRowBandwidthDisplay(unittest.TestCase):
             vol_val=1.0, vol_note="(Interval)", conn_val=1)
         self.assertNotEqual(bound_row["formatted_bandwidth"], point_row["formatted_bandwidth"])
 
+    def test_nonfinite_bound_value_cannot_compose_ge_dash(self):
+        """Fix round 1: dst_tbo="nan" used to slip past calculate_mbps's
+        `total_bytes <= 0` guard (NaN compares False in both directions) and
+        come out as (nan, BOUND_BASIS_NOTE, ...) -- which _shape_traffic_row
+        then rendered as the content-free "≥ —" composite (bound prefix +
+        unavailable dash). calculate_mbps now catches non-finite values at
+        the source, so bw_val is None here and neither field is written --
+        same as any other "unavailable" flow, not a bound-shaped dash."""
+        flow = dict(_flow())
+        flow["dst_tbo"] = "nan"
+        flow["dst_tbi"] = 0
+        bw_val, bw_note, _, _ = self.analyzer.calculate_mbps(flow)
+        self.assertIsNone(bw_val)
+        row = self.analyzer._shape_traffic_row(
+            flow, bw_val=bw_val, bw_note=bw_note, vol_val=0.0, vol_note="(Interval)",
+            conn_val=1)
+        self.assertNotIn("formatted_bandwidth", row)
+        self.assertNotIn("max_bandwidth_mbps", row)
+
 
 class TestFormatUnitUnavailable(unittest.TestCase):
     def test_none_bandwidth_is_dash(self):

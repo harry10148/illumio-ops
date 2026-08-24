@@ -107,6 +107,26 @@ class TestAnalyzer(unittest.TestCase):
         self.assertIsNone(val)
         self.assertEqual(note, "")
 
+    def test_calculate_mbps_nonfinite_bound_value_is_unavailable_not_a_bound(self):
+        """A byte field arriving as the literal string "nan" makes _safe_float
+        produce NaN. NaN compares False in both directions, so `total_bytes <= 0`
+        never catches it and (pre-fix) the Priority-3 branch computed
+        val=NaN and still attached BOUND_BASIS_NOTE -- "at least NaN Mbps",
+        a bound claim with no content. A non-finite value is not a lower
+        bound of anything; must fall through to the unavailable state, same
+        as zero bytes or missing timestamps (Task 3 fix round 1)."""
+        flow = {
+            "dst_tbo": "nan",
+            "dst_tbi": 0,
+            "timestamp_range": {
+                "first_detected": "2026-07-01T00:00:00Z",
+                "last_detected": "2026-07-01T01:00:00Z",
+            },
+        }
+        val, note, _, _ = self.analyzer.calculate_mbps(flow)
+        self.assertIsNone(val)
+        self.assertEqual(note, "")
+
     def test_calculate_mbps_no_longer_assumes_a_sampling_interval(self):
         """600 秒是 PCE interval_sec 的文件預設值，但該欄位不在 async query 的回傳裡，
         所以它曾是唯一會用到的分母。任何一個重新出現都代表假分母回來了。"""

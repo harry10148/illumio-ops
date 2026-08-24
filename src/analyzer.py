@@ -388,6 +388,14 @@ def calculate_mbps(flow: dict[str, Any]) -> tuple[float | None, str, float, floa
         # 髒欄位（malformed byte fields）的容錯方式，回「不可得」。
         return None, "", 0.0, 0.0
     val = (total_bytes * 8.0) / denom_seconds / 1000000.0
+    if not math.isfinite(val):
+        # total_bytes 沒有被 `<= 0` 擋下但本身是 NaN（例如 dst_tbo/tbi 欄位字面值
+        # "nan"）：NaN 與任何數比較（含 <=、>）恆為 False，所以上面的
+        # `total_bytes <= 0` 守門攔不到它，會算出 val=NaN 卻仍貼上
+        # BOUND_BASIS_NOTE——一個「至少是 NaN」的下界宣稱，沒有內容，且會讓下游
+        # 每個消費端（顯示層、報表 parser、未來新增的呼叫端）各自重新發明同一個
+        # isfinite 守門。非有限值不是任何東西的下界，源頭就近檔下，不留給下游。
+        return None, "", 0.0, 0.0
     return val, BOUND_BASIS_NOTE, total_bytes, denom_seconds * 1000.0
 
 def calculate_volume_mb(flow: dict[str, Any]) -> tuple[float, str]:
