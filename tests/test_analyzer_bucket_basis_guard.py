@@ -259,6 +259,53 @@ def test_edc_interval_flow_still_guards_the_connection_count_rule():
     assert res.get("basis_mismatch")
 
 
+# ─── bandwidth-basis Task 1 fix round 1: unavailable bw_val must not crash ──
+#
+# calculate_mbps() can now return val=None (no byte fields, or no usable
+# duration/timestamps — bandwidth-basis Task 1). The per-flow bandwidth
+# comparison in _run_rule_engine used to assume calculate_mbps always
+# returned a float; a None flowing into `m_bw > res['max_val']` raises
+# TypeError and aborts the whole monitor cycle.
+
+def _unavailable_bw_flow(first_detected=RECENT_FIRST, **over):
+    """No byte telemetry at all: calculate_mbps returns val=None. Recent
+    first_detected keeps the bucket-basis guard from swallowing it first --
+    this flow must reach the bandwidth comparison itself, not get filtered
+    out upstream by an unrelated mechanism."""
+    flow = {
+        "timestamp_range": {
+            "first_detected": first_detected,
+            "last_detected": "2026-07-25T08:26:30Z",
+        },
+        "policy_decision": "blocked",
+        "pd": 2,
+        "num_connections": 12,
+        "src": {},
+        "dst": {},
+        "service": {},
+    }
+    flow.update(over)
+    return flow
+
+
+def test_run_rule_engine_bandwidth_tolerates_unavailable_flows():
+    """A mixed stream (one measured flow, one with no byte fields) must not
+    raise. The unavailable flow carries no evidence, so it must never become
+    the rule's max_val or enter top_matches -- same "no evidence is not
+    evidence" doctrine this guard already applies to missing timestamps --
+    while the real measured flow still triggers normally."""
+    rule = _rule("tr1", "bandwidth", window=10, threshold=0)
+    az = _analyzer([rule])
+
+    triggers = az._run_rule_engine(
+        iter([_interval_flow(first_detected=RECENT_FIRST), _unavailable_bw_flow()]),
+        [rule], NOW)
+    _, res = triggers[0]
+
+    assert res["max_val"] > 0
+    assert all(m['_metric_val'] is not None for m in res["top_matches"])
+
+
 # ─── 6: no evidence is not evidence ─────────────────────────────────────────
 
 def test_flow_without_first_detected_is_not_guarded():

@@ -214,6 +214,49 @@ class TestAnalyzer(unittest.TestCase):
         self.assertEqual(kwargs["filters"].native_filters["dst_ip_in"], "10.0.0.5")
         self.assertEqual(kwargs["filters"].native_filters["port"], 443)
 
+    def test_query_flows_sort_is_none_safe_for_unavailable_bandwidth(self):
+        """A flow with no ddms/tdms/bytes has bw_val=None (Task 1 contract).
+        Sorting query_flows results by bandwidth must not raise TypeError
+        from comparing None to a float, and the unavailable flow must sort
+        last -- not get silently conflated with a real zero-Mbps flow."""
+        self.mock_api.build_traffic_query_spec.side_effect = lambda filters: TrafficQuerySpec(
+            raw_filters=dict(filters),
+            native_filters={},
+            fallback_filters={},
+            report_only_filters={},
+        )
+        measured_flow = {
+            "src": {"ip": "10.0.0.1", "workload": {}},
+            "dst": {"ip": "10.0.0.2", "workload": {}},
+            "service": {"port": 443, "proto": 6},
+            "policy_decision": "allowed",
+            "num_connections": 1,
+            "dst_dbo": 1_000_000, "dst_dbi": 0, "ddms": 1000,
+            "timestamp_range": {"first_detected": "2026-07-01T00:00:00Z",
+                                 "last_detected": "2026-07-01T00:00:01Z"},
+        }
+        unavailable_flow = {
+            "src": {"ip": "10.0.0.3", "workload": {}},
+            "dst": {"ip": "10.0.0.4", "workload": {}},
+            "service": {"port": 443, "proto": 6},
+            "policy_decision": "allowed",
+            "num_connections": 1,
+            # no byte fields at all -> calculate_mbps returns val=None
+            "timestamp_range": {"first_detected": "2026-07-01T00:00:00Z",
+                                 "last_detected": "2026-07-01T00:00:01Z"},
+        }
+        self.mock_api.execute_traffic_query_stream.return_value = iter(
+            [unavailable_flow, measured_flow])
+
+        out = self.analyzer.query_flows({
+            "start_time": "2026-07-01T00:00:00Z",
+            "end_time": "2026-07-01T01:00:00Z",
+        })
+
+        self.assertEqual(len(out), 2)
+        self.assertEqual(out[0]['_metric_val'], 8.0)
+        self.assertIsNone(out[-1]['_metric_val'])
+
     def test_check_flow_match_non_numeric_pd_does_not_raise(self):
         """A malformed (non-numeric) 'pd' field must not raise; the matcher
         degrades gracefully instead of aborting the monitor cycle."""

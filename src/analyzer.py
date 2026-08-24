@@ -1827,13 +1827,17 @@ class Analyzer:
                 heap = top_heaps[rid]
 
                 if rule["type"] == "bandwidth":
-                    if m_bw > res['max_val']:
-                        res['max_val'] = m_bw
-                    if m_bw > float(rule.get("threshold_count", 0)):
-                        f_copy = f.copy()
-                        f_copy['_metric_val'] = m_bw
-                        f_copy['_metric_fmt'] = f"{format_unit(m_bw, 'bandwidth')} {m_bw_note}"
-                        self._push_bounded_top_match(heap, m_bw, count_processed, f_copy, TOP_MATCHES_LIMIT)
+                    # m_bw 可能是 None（calculate_mbps 三態：無 bytes 或時間戳
+                    # 不可解析）——沒有證據不可以當成證據，這筆 flow 不參與
+                    # max_val／top_matches（比照本檔既有的「無證據＝放行」原則）。
+                    if m_bw is not None:
+                        if m_bw > res['max_val']:
+                            res['max_val'] = m_bw
+                        if m_bw > float(rule.get("threshold_count", 0)):
+                            f_copy = f.copy()
+                            f_copy['_metric_val'] = m_bw
+                            f_copy['_metric_fmt'] = f"{format_unit(m_bw, 'bandwidth')} {m_bw_note}"
+                            self._push_bounded_top_match(heap, m_bw, count_processed, f_copy, TOP_MATCHES_LIMIT)
 
                 elif rule["type"] == "volume":
                     res['max_val'] += m_vol
@@ -1969,7 +1973,11 @@ class Analyzer:
                     is_trigger = True
 
             if is_trigger and self._check_cooldown(rule):
-                res['top_matches'].sort(key=lambda x: x.get('_metric_val', 0), reverse=True)
+                # bw_val 現在可能是 None（無法計算，見 calculate_mbps 三態）；
+                # -inf 讓「不可得」排到最後，不可與真實測到的 0 混為一談。
+                res['top_matches'].sort(
+                    key=lambda x: (x.get('_metric_val') if x.get('_metric_val') is not None else float('-inf')),
+                    reverse=True)
                 top_10 = res['top_matches'][:TOP_MATCHES_LIMIT]
                 self.stats.record_rule_trigger(rule, match_count=len(top_10), metric_value=val)
 
@@ -2584,7 +2592,11 @@ class Analyzer:
 
         self._raise_if_query_fetch_failed()
 
-        matches.sort(key=lambda x: x.get('_metric_val', 0), reverse=True)
+        # bw_val 現在可能是 None（無法計算，見 calculate_mbps 三態）；-inf
+        # 讓「不可得」排到最後，不可與真實測到的 0 混為一談。
+        matches.sort(
+            key=lambda x: (x.get('_metric_val') if x.get('_metric_val') is not None else float('-inf')),
+            reverse=True)
         total = len(matches)
         # 截斷統計：仿 ApiClient.last_traffic_query_diagnostics 的屬性樣式，
         # 回傳型別不變、既有呼叫者零影響（spec §11.3）
@@ -2827,7 +2839,11 @@ class Analyzer:
                 if matches:
                     print(t('samples_top10'))
                     if rtype in ["bandwidth", "volume"]:
-                        matches.sort(key=lambda x: x.get('_metric_val', 0), reverse=True)
+                        # bw_val 現在可能是 None（見 calculate_mbps 三態）；-inf
+                        # 讓「不可得」排到最後，不可與真實測到的 0 混為一談。
+                        matches.sort(
+                            key=lambda x: (x.get('_metric_val') if x.get('_metric_val') is not None else float('-inf')),
+                            reverse=True)
                     for i, m in enumerate(matches[:10]):
                         key = self.get_traffic_details_key(m)
                         print(f"     [{i+1}] {key} {t('alert_field_metric_value')}: {m.get('_metric_fmt')} (PD:{m.get('policy_decision')})")
