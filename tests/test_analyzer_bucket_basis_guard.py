@@ -383,6 +383,29 @@ def test_lower_bound_below_threshold_is_guarded_not_a_silent_miss():
     az.stats.record_rule_trigger.assert_not_called()
 
 
+def test_value_basis_suppression_is_labelled_distinctly_from_aggregation_basis():
+    """LOW 7: a value-basis-only non-trigger must not be tagged
+    "aggregation_basis" in the operator-facing stats timeline -- that label
+    is window-basis's own (see test_suppression_is_recorded_for_the_
+    operator_facing_stats above), and it carries a window/span narrative
+    that has nothing to do with why this rule didn't fire."""
+    rule = _rule("tr1", "bandwidth", window=10, threshold=_BOUND_VAL_MBPS + 1, name="bw bound lt")
+    az = _analyzer([rule])
+    az.stats = MagicMock()
+
+    triggers = az._run_rule_engine(
+        iter([_bound_flow(_BOUND_FIRST, _BOUND_LAST, 125_000_000)]), [rule], NOW)
+    az._dispatch_alerts(triggers, [rule])
+
+    az.stats.record_suppression.assert_called_once()
+    args, kwargs = az.stats.record_suppression.call_args
+    assert args[1] == "value_basis"
+    assert "window_minutes" not in kwargs
+    assert "span_minutes" not in kwargs
+    assert kwargs["flows"] == 1
+    assert "bound_below_threshold" in kwargs["reasons"]
+
+
 def test_unavailable_bandwidth_is_guarded_never_treated_as_zero():
     """val is None（無 bytes 或時間戳不可解析）不得當成 0 評估——0 輸給任何
     正數門檻，會讓規則悄悄失去保護卻仍回報「已評估、未觸發」。必須進守門
@@ -473,6 +496,12 @@ def test_missing_telemetry_guard_reason_gets_its_own_message_not_the_window_one(
     # 無關，不可以出現在那個 meta-alert 裡。
     assert az.state.get("basis_mismatch", {}) == {}
     assert az.state.get("basis_value_mismatch", {}).get("rule_names") == "bw notelemetry"
+
+    # 終審 Finding 3：value-basis 訊息不得再宣稱整條規則「不評估」——那不再
+    # 是真的（另一筆已確定達標的 flow 仍會照常告警），訊息只承諾這一筆被
+    # 排除，且明講不會單獨消音規則。
+    assert "NOT evaluated" not in combined
+    assert "does not by itself suppress" in combined
 
 
 def test_lower_bound_equal_alert_criteria_is_consistent_with_its_own_value():
@@ -651,18 +680,29 @@ def test_debug_mode_unavailable_volume_is_guarded_not_a_crash(capsys):
     assert "no_measurement=1" in out
 
 
-# ─── bandwidth-basis Task 2 fix round 1: rule-level suppression parity ─────
+# ─── bandwidth-basis Task 2 fix round 1 / final-review Finding 3 ──────────
 #
 # The engine's basis_mismatch check (_dispatch_alerts) is a RULE-level gate,
-# checked before top_matches is ever consulted: one guarded flow suppresses
-# the entire rule for the cycle, even if a different matched flow would have
-# independently cleared the threshold. The simulation must reach the same
-# verdict by the same rule, not a per-flow OR that never looks at `guarded`.
+# checked before top_matches is ever consulted -- but window-basis and
+# value-basis reasons no longer share one verdict (Finding 3, correcting an
+# earlier ruling that treated the engine's whole-rule suppression as a
+# single deliberate design uniformly applicable to both reason classes).
+# Window-basis (the rule's aggregate provably overstates) still suppresses
+# the whole rule even if a different matched flow would have independently
+# cleared the threshold -- that class is covered by the window-basis tests
+# above (test_short_window_rule_is_suppressed_and_warns et al.), unaffected
+# by this fix. Value-basis (a flow's byte/duration telemetry is missing or
+# inconclusive) must NOT suppress a trigger some other flow already
+# confirmed -- one unmeasurable flow doesn't make a different flow's
+# confirmed exceedance untrustworthy. The simulation must reach the same
+# verdict as the engine in both cases (they are paired, per this module's
+# earlier parity work).
 
-def test_run_rule_engine_suppresses_the_whole_rule_when_one_flow_is_guarded_and_another_would_clear():
+def test_run_rule_engine_does_not_suppress_a_confirmed_trigger_when_a_different_flow_is_unmeasurable():
     """一筆點值 flow 單獨就能觸發，另一筆 flow 掛在 no_measurement 守門——
-    basis_mismatch 檢查在 _dispatch_alerts 發生於 top_matches 之前，整條規則
-    本 cycle 仍不評估、不告警（引擎既有行為，這裡當 parity 錨點）。"""
+    value-basis 原因不得消音已由其他 flow 確認的觸發；診斷仍然保留
+    （basis_mismatch/no_measurement 仍在，供操作者看得到那筆 flow 被排除），
+    但整條規則本 cycle 必須照常告警。"""
     rule = _rule("tr1", "bandwidth", window=10, threshold=0, name="bw mixed")
     az = _analyzer([rule])
     az.stats = MagicMock()
@@ -671,18 +711,22 @@ def test_run_rule_engine_suppresses_the_whole_rule_when_one_flow_is_guarded_and_
         iter([_interval_flow(first_detected=RECENT_FIRST), _unavailable_bw_flow()]),
         [rule], NOW)
     _, res = triggers[0]
-    assert res.get("basis_mismatch")
+    assert res.get("basis_mismatch"), "diagnostic must survive even though the rule still fires"
     assert "no_measurement" in res["basis_mismatch"]["reasons"]
 
     az._dispatch_alerts(triggers, [rule])
-    az.reporter.add_metric_alert.assert_not_called()
-    az.stats.record_suppression.assert_called_once()
+    az.reporter.add_metric_alert.assert_called_once()
+    # the rule dispatched normally -- no suppression record for a rule that
+    # did not, in fact, get suppressed (cooldown's own bookkeeping is the
+    # only other reason record_suppression could fire here, and it didn't).
+    az.stats.record_suppression.assert_not_called()
 
 
-def test_debug_mode_suppresses_the_whole_rule_when_one_flow_is_guarded_and_another_would_clear(capsys):
+def test_debug_mode_does_not_suppress_a_confirmed_trigger_when_a_different_flow_is_unmeasurable(capsys):
     """同一情境在模擬端：一筆下界 flow 單獨就 >= 門檻（確定觸發），另一筆
-    flow 值不可得——模擬不可以只看會觸發的那筆就宣告 WOULD TRIGGER，必須
-    跟引擎一樣，整條規則因為有 flow 掛在守門而不評估。"""
+    flow 值不可得——模擬必須跟引擎一樣照常宣告 WOULD TRIGGER，只是仍然
+    報告那一筆被排除的 flow（no_measurement=1），不印「NOT evaluated」
+    （那個字樣專屬 window-basis 整條規則不評估的情境）。"""
     rule = _rule("tr1", "bandwidth", window=10, threshold=50, name="bw mixed")
     now = datetime.datetime.now(datetime.timezone.utc)
     clears_flow = _now_relative_bound_flow(9, 125_000_000)  # bound = 100.0 >= 50
@@ -703,9 +747,9 @@ def test_debug_mode_suppresses_the_whole_rule_when_one_flow_is_guarded_and_anoth
     az.run_debug_mode(mins=12, pd_sel=3, interactive=False)
     out = capsys.readouterr().out
 
-    assert "WOULD TRIGGER" not in out.upper()
+    assert "WOULD TRIGGER" in out.upper()
     assert "no_measurement=1" in out
-    assert "NOT evaluated" in out
+    assert "NOT evaluated" not in out
 
 
 # ─── 6: no evidence is not evidence ─────────────────────────────────────────

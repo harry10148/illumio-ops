@@ -2023,12 +2023,14 @@ class Analyzer:
             if value_reasons:
                 value_mismatch[rid] = info
                 logger.warning(
-                    "Rule '{}' NOT evaluated this cycle (bandwidth-basis guard): {} matched "
-                    "flow(s) could not be used as evidence — no usable byte/duration telemetry, "
-                    "or only a provable lower bound that fell short of the threshold (so whether "
-                    "the true rate clears it is unknown, not settled). This is UNRELATED to "
-                    "threshold_window sizing. Check that the matched flows report byte counters "
-                    "(dst_bo/dst_bi or dst_tb*/dst_db*) and valid first_detected/last_detected "
+                    "Rule '{}' (bandwidth-basis guard): {} matched flow(s) excluded from "
+                    "evidence this cycle — no usable byte/duration telemetry, or only a "
+                    "provable lower bound that fell short of the threshold (so whether "
+                    "the true rate clears it is unknown, not settled). This is UNRELATED "
+                    "to threshold_window sizing and does not by itself suppress the rule "
+                    "-- any other matched flow is still evaluated normally. Check that "
+                    "the excluded flow(s) report byte counters (dst_bo/dst_bi or "
+                    "dst_tb*/dst_db*) and valid first_detected/last_detected "
                     "timestamps ({}).",
                     info["rule_name"], sum(value_reasons.values()),
                     _format_delta_reasons(value_reasons),
@@ -2102,17 +2104,31 @@ class Analyzer:
                       (used only for type information; mirrors the rules in triggers).
         """
         for rule, res in triggers:
-            # bucket-basis 守門（見 _run_rule_engine）：本 cycle 這條規則的加總
-            # 涵蓋視窗外的流量、已知會高估——寧可漏發，也不送一則已知錯誤的
-            # 告警。WARNING 與 meta-alert 已在規則引擎/overflow 路徑發出。
-            if res.get('basis_mismatch'):
-                mismatch = res['basis_mismatch']
+            # 兩類 basis_mismatch reason 分開處理（終審 Finding 3，修正一則
+            # 先前的裁決）：window-basis（視窗/聚合跨距對不上）整條規則本
+            # cycle 不評估——這是 window-basis 守門原本的設計目的，本 cycle
+            # 這條規則的加總涵蓋視窗外的流量、已知會高估，寧可漏發也不送一
+            # 則已知錯誤的告警，WARNING 與 meta-alert 已在規則引擎/overflow
+            # 路徑發出。value-basis（單筆 flow 的位元組/時間戳不可得，或
+            # 下界不足以判定）只代表「那一筆」flow 不能當證據——不代表整條
+            # 規則不可信：另一筆已確定達標的 flow 不會因為第三筆 flow 量不
+            # 到而被消音，這個理由不適用於 window-basis 才成立的整條抑制。
+            mismatch = res.get('basis_mismatch')
+            window_reasons: Counter = Counter()
+            value_reasons: Counter = Counter()
+            if mismatch:
+                window_reasons = Counter({k: v for k, v in mismatch["reasons"].items()
+                                           if k in _WINDOW_BASIS_REASONS})
+                value_reasons = Counter({k: v for k, v in mismatch["reasons"].items()
+                                          if k in _VALUE_BASIS_REASONS})
+
+            if window_reasons:
                 self.stats.record_suppression(
                     rule,
                     "aggregation_basis",
                     window_minutes=mismatch["window_minutes"],
                     span_minutes=round(mismatch["span_minutes"], 1),
-                    flows=mismatch["flows"],
+                    flows=sum(window_reasons.values()),
                 )
                 continue
 
@@ -2130,6 +2146,20 @@ class Analyzer:
                 # 舊版每個冷卻週期就送出一則 count=0、details 空白的空殼告警。
                 if val >= threshold and res['top_matches']:
                     is_trigger = True
+
+            if not is_trigger and value_reasons:
+                # 規則本 cycle 確實沒有觸發（不是被 value-basis 消音，是真的
+                # 沒有其他 flow 能確定達標）——診斷（logger.warning）與
+                # meta-alert（state["basis_value_mismatch"]）已在
+                # _run_rule_engine 為 value-basis 獨立處理；這裡只補一筆給
+                # 操作者看的 stats 記錄，用專屬標籤，不可借用只屬於
+                # window-basis 的 "aggregation_basis"（LOW 7）。
+                self.stats.record_suppression(
+                    rule,
+                    "value_basis",
+                    flows=sum(value_reasons.values()),
+                    reasons=_format_delta_reasons(value_reasons),
+                )
 
             if is_trigger and self._check_cooldown(rule):
                 res['top_matches'].sort(key=_metric_val_sort_key, reverse=True)
@@ -3030,13 +3060,17 @@ class Analyzer:
                         default="Basis: per-window delta derived from cache observations "
                                 "({n} flow(s)) — the same basis the rule engine uses.",
                         n=delta_used))
-                if guarded:
-                    # 引擎的 basis_mismatch 檢查是規則層級的閘門，發生在
-                    # top_matches 被查閱之前（見 _dispatch_alerts）：本規則只
-                    # 要有一筆 flow 掛在守門，整條規則本 cycle 就完全不評估
-                    # ——即使其他 flow 各自看都能觸發。模擬必須用同一條規則
-                    # 判出同一個結論，不可以因為 matches 裡還有東西就照樣印
-                    # "Would Trigger"，否則操作者會以為規則有在保護他。
+                # 兩類 reason 分開處理（終審 Finding 3）：window-basis（視窗/
+                # 聚合跨距對不上）整條規則本 cycle 不評估，跟引擎
+                # _dispatch_alerts 的整條規則守門同構；value-basis（單筆
+                # flow 的位元組/時間戳不可得或下界不足以判定）只把「那一
+                # 筆」排除在證據之外，不代表整條規則不可信——另一筆已確定
+                # 達標的 flow 不會因為第三筆 flow 量不到而被消音。
+                window_guarded = Counter({k: v for k, v in guarded.items()
+                                           if k in _WINDOW_BASIS_REASONS})
+                value_guarded = Counter({k: v for k, v in guarded.items()
+                                          if k in _VALUE_BASIS_REASONS})
+                if window_guarded:
                     print("  -> " + t(
                         'debug_basis_guard_suppressed',
                         default="Aggregation-basis guard: {n} matched flow(s) excluded "
@@ -3044,12 +3078,21 @@ class Analyzer:
                                 "NOT clipped to the query window and no per-window delta "
                                 "could be derived, so the rule engine SUPPRESSES this rule "
                                 "instead of alerting.",
-                        n=sum(guarded.values()), reasons=_format_delta_reasons(guarded)))
+                        n=sum(window_guarded.values()), reasons=_format_delta_reasons(window_guarded)))
                     print("  -> " + t(
                         'debug_basis_rule_not_evaluated',
                         default="Rule NOT evaluated this cycle — the result below is "
                                 "what the engine would report (no alert), not a "
                                 "measurement of the traffic."))
+                if value_guarded:
+                    print("  -> " + t(
+                        'debug_basis_value_guard_excluded',
+                        default="Bandwidth-basis guard: {n} matched flow(s) excluded "
+                                "({reasons}) — no usable byte/duration telemetry, or a "
+                                "lower bound that fell short of the threshold. This is "
+                                "UNRELATED to threshold_window sizing; other matched "
+                                "flows are still evaluated normally.",
+                        n=sum(value_guarded.values()), reasons=_format_delta_reasons(value_guarded)))
                 val = 0.0
                 if rtype == "bandwidth":
                     # matches 只含建立得了基準的 flow（無證據／下界不足以判定
@@ -3065,17 +3108,18 @@ class Analyzer:
                     val = sum([m['_metric_val'] for m in matches])
                     print(t('calc_sum_count', val=int(val)))
 
-                # 規則層級的守門優先於任何觸發判定：引擎的 basis_mismatch
+                # window-basis 守門優先於任何觸發判定：引擎的 basis_mismatch
                 # 檢查在 _dispatch_alerts 發生於 top_matches 之前，本規則只要
-                # 有一筆 flow 掛在守門就整條不評估——不管其他 flow 各自看是否
-                # 會觸發。guarded 非空時模擬必須得出同一個「不評估」結論。
+                # 有一筆 flow 掛在 window-basis 守門就整條不評估——不管其他
+                # flow 各自看是否會觸發。value-basis 守門不佔用這條路徑（見
+                # 上方的訊息分流），只影響 matches 本身少了哪些 flow。
                 #
                 # bandwidth 的觸發判定不是「聚合 val 再比一次門檻」——聚合值
                 # 可能來自下界（已在迴圈內確認 >= 門檻）與點值（需要嚴格 >）
                 # 混合的集合，事後用單一運算子重比會把其中一種語意套用到另一
                 # 種上。bw_trigger 是迴圈內逐筆用各自正確的運算子判定後的
                 # 「是否至少一筆確定觸發」，與引擎的 top_matches 邏輯同基準。
-                if guarded:
+                if window_guarded:
                     is_trigger = False
                 elif rtype == "bandwidth":
                     is_trigger = bw_trigger
