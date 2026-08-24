@@ -1,7 +1,7 @@
 import unittest
 from datetime import datetime, timezone, timedelta
 from unittest.mock import MagicMock
-from src.analyzer import Analyzer
+from src.analyzer import Analyzer, BOUND_BASIS_NOTE
 from src.api_client import TrafficQuerySpec
 from src.config import ConfigManager
 
@@ -23,12 +23,99 @@ class TestAnalyzer(unittest.TestCase):
         self.assertEqual(note, "(Interval)")
 
     def test_calculate_mbps_fallback(self):
-        # No tdms → the denominator is an assumed sampling interval, so the
-        # basis must say so ('(Avg est.)') rather than pass as a measured avg.
+        # No tdms and no usable timestamps → unavailable. `interval_sec` is a
+        # leftover PCE syslog/fluentd field the async query this tool uses
+        # never sends; it must not be read as a fallback denominator anymore.
         flow = {"dst_dbo": 0, "dst_tbo": 500000, "dst_tbi": 500000, "interval_sec": 1}
         val, note, _, _ = self.analyzer.calculate_mbps(flow)
-        self.assertAlmostEqual(val, 8.0)
-        self.assertEqual(note, "(Avg est.)")
+        self.assertIsNone(val)
+        self.assertEqual(note, "")
+
+    def test_calculate_mbps_bound_from_timestamp_span(self):
+        """No ddms/tdms: fall back to bytes / (span+1) as a provable lower
+        bound. 12.05 TB over ~2.5 days (214848s) is ~493 Mbps — not the
+        176,640 Mbps the old 600s-assumed-interval code reported."""
+        flow = {
+            "dst_tbo": 13248009806581,
+            "dst_tbi": 0,
+            "timestamp_range": {
+                "first_detected": "2026-07-01T00:00:00Z",
+                "last_detected": "2026-07-03T11:40:48Z",
+            },
+        }
+        val, note, byts, _ = self.analyzer.calculate_mbps(flow)
+        span_seconds = 214848  # 2026-07-01T00:00:00Z .. 2026-07-03T11:40:48Z
+        expected = (13248009806581 * 8.0) / (span_seconds + 1) / 1_000_000.0
+        self.assertAlmostEqual(val, expected)
+        self.assertAlmostEqual(val, 493.3, places=1)
+        self.assertNotAlmostEqual(val, 176640.13, places=0)
+        self.assertEqual(note, BOUND_BASIS_NOTE)
+        self.assertAlmostEqual(byts, 13248009806581)
+
+    def test_calculate_mbps_bound_zero_span_uses_one_second_denom(self):
+        """first_detected == last_detected → span is 0s, but timestamps are
+        only second-resolution, so the true duration could still be up to
+        ~1s either side. span+1 is the same formula as any other span, not
+        a special-cased divide-by-zero guard."""
+        flow = {
+            "dst_tbo": 1_000_000,
+            "first_detected": "2026-07-01T00:00:00Z",
+            "last_detected": "2026-07-01T00:00:00Z",
+        }
+        val, note, _, _ = self.analyzer.calculate_mbps(flow)
+        self.assertAlmostEqual(val, (1_000_000 * 8.0) / 1.0 / 1_000_000.0)
+        self.assertEqual(note, BOUND_BASIS_NOTE)
+
+    def test_calculate_mbps_zero_bytes_is_unavailable(self):
+        flow = {
+            "timestamp_range": {
+                "first_detected": "2026-07-01T00:00:00Z",
+                "last_detected": "2026-07-01T01:00:00Z",
+            },
+        }
+        val, note, _, _ = self.analyzer.calculate_mbps(flow)
+        self.assertIsNone(val)
+        self.assertEqual(note, "")
+
+    def test_calculate_mbps_missing_timestamps_is_unavailable(self):
+        flow = {"dst_tbo": 500000, "dst_tbi": 500000}
+        val, note, _, _ = self.analyzer.calculate_mbps(flow)
+        self.assertIsNone(val)
+        self.assertEqual(note, "")
+
+    def test_calculate_mbps_unparsable_timestamps_is_unavailable(self):
+        flow = {
+            "dst_tbo": 500000,
+            "timestamp_range": {"first_detected": "not-a-timestamp",
+                                 "last_detected": "also-not-a-timestamp"},
+        }
+        val, note, _, _ = self.analyzer.calculate_mbps(flow)
+        self.assertIsNone(val)
+        self.assertEqual(note, "")
+
+    def test_calculate_mbps_reversed_timestamps_is_unavailable_not_a_crash(self):
+        """last_detected before first_detected is corrupt data (or a
+        1-second-resolution rounding edge), not evidence of a negative
+        duration. Must not raise (ZeroDivisionError/negative rate) out of
+        the per-flow hot loop -- same no-crash contract as malformed bytes."""
+        flow = {
+            "dst_tbo": 1000,
+            "first_detected": "2026-07-01T00:00:01Z",
+            "last_detected": "2026-07-01T00:00:00Z",
+        }
+        val, note, _, _ = self.analyzer.calculate_mbps(flow)
+        self.assertIsNone(val)
+        self.assertEqual(note, "")
+
+    def test_calculate_mbps_no_longer_assumes_a_sampling_interval(self):
+        """600 秒是 PCE interval_sec 的文件預設值，但該欄位不在 async query 的回傳裡，
+        所以它曾是唯一會用到的分母。任何一個重新出現都代表假分母回來了。"""
+        import inspect, re
+        from src import analyzer
+        src = inspect.getsource(analyzer.calculate_mbps)
+        banned = {"interval_sec", "600"}
+        found = {b for b in banned if re.search(r"\b%s\b" % re.escape(b), src)}
+        assert found == set(), f"assumed-denominator tokens are back: {found}"
 
     def test_calculate_mbps_uses_real_tdms(self):
         """A real tdms is a measured duration → basis is '(Avg)'."""
@@ -53,7 +140,7 @@ class TestAnalyzer(unittest.TestCase):
         (it would abort the whole monitor cycle)."""
         flow = {"dst_tbo": "1,234", "dst_tbi": None, "tdms": "abc"}
         val, _note, _, _ = self.analyzer.calculate_mbps(flow)
-        self.assertEqual(val, 0.0)
+        self.assertIsNone(val)
         vol, _ = self.analyzer.calculate_volume_mb(flow)
         self.assertEqual(vol, 0.0)
 

@@ -234,6 +234,11 @@ def flow_has_byte_fields(flow: dict[str, Any]) -> bool:
 # "(Interval)"/"(Total)"/"(Avg)"）：值來自兩次 cache 觀測相減。
 DELTA_BASIS_NOTE = "(Window)"
 
+# 速率為下界而非點值：時間戳只有秒解析度，真實時距 ∈ (span−1, span+1)，
+# 因此 bytes ÷ (span+1) 是可證明為真的下限。呼叫端據此以「≥」呈現，
+# 告警則在「下界 >= 門檻」時即可確定觸發（真值嚴格更大）。
+BOUND_BASIS_NOTE = "(>=)"
+
 # 基準時間可以早於視窗起點多久：取 max(視窗長度 × 比例, 下限秒數)。
 # 超過就代表增量涵蓋的區間比視窗長太多、失去「短視窗」的意義。
 DELTA_BASELINE_TOLERANCE_RATIO = 0.25
@@ -283,14 +288,34 @@ def flow_aggregation_start(flow: dict[str, Any]) -> datetime.datetime | None:
     return parse_event_timestamp(str(ts))
 
 
+def _flow_aggregation_end(flow: dict[str, Any]) -> datetime.datetime | None:
+    """flow 聚合區間的終點（PCE ``timestamp_range.last_detected``）。
+
+    讀法比照 ``flow_aggregation_start``：頂層與巢狀 timestamp_range 兩處都認，
+    缺漏或無法解析時回 None。
+    """
+    ts = flow.get("last_detected")
+    if not ts:
+        tr = flow.get("timestamp_range")
+        ts = tr.get("last_detected") if isinstance(tr, dict) else None
+    if not ts:
+        return None
+    return parse_event_timestamp(str(ts))
+
+
 def calculate_mbps(flow: dict[str, Any]) -> tuple[float, str, float, float]:
     """
     Compute bandwidth in Mbps from a PCE traffic flow record.
-    Priority 1: delta bytes (dst_dbo+dst_dbi) / ddms  → Mbps (Interval)
+    Priority 1: delta bytes (dst_dbo+dst_dbi) / ddms   → Mbps (Interval)
     Priority 2: total bytes (dst_tbo+dst_tbi) / tdms   → Mbps (Avg)
-                — when tdms is absent the denominator is an assumed sampling
-                  interval, so the basis is reported as (Avg est.)
-    Fallback:   returns (0.0, '', 0.0, 0.0)
+    Priority 3: no ddms/tdms — total bytes / the flow's own timestamp span
+                → a provable *lower bound*, since the numerator accumulates
+                  over the whole span while timestamps are second-resolution
+                  (true duration ∈ (span-1, span+1), so span+1 as the
+                  denominator can only under-state the true rate). Mbps
+                  BOUND_BASIS_NOTE.
+    Unavailable: no bytes, or timestamps missing/unparsable
+                 → (None, '', 0.0, 0.0)
 
     Importable independently:
         from src.analyzer import calculate_mbps
@@ -309,21 +334,36 @@ def calculate_mbps(flow: dict[str, Any]) -> tuple[float, str, float, float]:
     tbi = _safe_float(flow.get("dst_tbi") or flow.get("tbi") or flow.get("dst_bi") or 0)
     total_bytes = tbo + tbi
     tdms = _safe_float(flow.get("tdms") or 0)
-    note = "(Avg)"
-    if tdms <= 0:
-        # 缺 tdms：只能用 PCE 提供的取樣間隔（無則假設 600s）當分母。分子是
-        # 「flow 存活至今的累積量」、分母是「一個取樣間隔」，算出來的速率並非
-        # 真實發生過的速率——note 標為 (Avg est.) 讓操作者看得出分母是推估的。
-        tdms = _safe_float(flow.get("interval_sec", 600)) * 1000
-        note = "(Avg est.)"
-    elif tdms < 1000:
-        # 真實但不足 1 秒的持續時間：比照 delta 分支往上夾到 1000ms，不可
-        # 換成 600 秒——那會把 80 Mbps 的短連線報成 0.07 Mbps（1200 倍低估）
-        tdms = 1000.0
-    if total_bytes > 0 and tdms > 0:
-        val = (total_bytes * 8.0) / (tdms / 1000.0) / 1000000.0
-        return val, note, total_bytes, tdms
-    return 0.0, "", 0.0, 0.0
+    if tdms > 0:
+        if tdms < 1000:
+            # 真實但不足 1 秒的持續時間：比照 delta 分支往上夾到 1000ms，不可
+            # 換算成秒級分母——那會把 80 Mbps 的短連線報成 0.07 Mbps（1200 倍低估）
+            tdms = 1000.0
+        if total_bytes > 0:
+            val = (total_bytes * 8.0) / (tdms / 1000.0) / 1000000.0
+            return val, "(Avg)", total_bytes, tdms
+        return None, "", 0.0, 0.0
+
+    if total_bytes <= 0:
+        return None, "", 0.0, 0.0
+
+    # 沒有 tdms：PCE 的 async query（本工具實際使用的路徑）不帶取樣間隔欄位，
+    # 假設一個固定分母等於把「flow 存活至今的累積量」除以「一次取樣」，算出
+    # 的速率與真實速率無關。改用 flow 自己的時間戳跨距當分母：分子涵蓋整個
+    # 跨距，分母也是同一個跨距，這才是同一件事相除。
+    start = flow_aggregation_start(flow)
+    end = _flow_aggregation_end(flow)
+    if start is None or end is None:
+        return None, "", 0.0, 0.0
+    span_seconds = (end - start).total_seconds()
+    denom_seconds = span_seconds + 1.0
+    if denom_seconds <= 0:
+        # 時間戳倒置（last_detected 早於 first_detected 一秒以上）：資料本身
+        # 不可信，不可猜也不可讓除以零把整個 monitor cycle 炸掉——比照其他
+        # 髒欄位（malformed byte fields）的容錯方式，回「不可得」。
+        return None, "", 0.0, 0.0
+    val = (total_bytes * 8.0) / denom_seconds / 1000000.0
+    return val, BOUND_BASIS_NOTE, total_bytes, denom_seconds * 1000.0
 
 def calculate_volume_mb(flow: dict[str, Any]) -> tuple[float, str]:
     """
