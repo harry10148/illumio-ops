@@ -11,14 +11,15 @@ verified_against:
   - src/pce_cache/archive_query.py
   - src/report/parsers/api_parser.py
   - src/report/parsers/csv_parser.py
+  - src/report/analysis/mod11_bandwidth.py
   - src/siem/formatters/cef.py
 ---
 
 # 流量指標與 PCE API 的取值邏輯
 
-本文說明「一條 flow 的頻寬／流量／連線數是怎麼來的」，以及為什麼**頻寬目前算出來的數字
-不能當真**。給未來要動這塊的人：先讀 §6，那裡有可以自己重跑一次的查證指令——不要相信
-本文，去驗。
+本文說明「一條 flow 的頻寬／流量／連線數是怎麼來的」，以及頻寬數字**現在有三種狀態**——
+點值、下界、算不出來——為什麼會有這三種狀態、以及畫面上怎麼分辨它們（§5.2）。給未來要
+動這塊的人：先讀 §6，那裡有可以自己重跑一次的查證指令——不要相信本文，去驗。
 
 ## 1. 流量資料的三個來源
 
@@ -94,28 +95,48 @@ syslog 輸出證實其語意（查證方法見 §6.2）：
   指標必須取自 `merge_row` 的合併值，不可從 `raw` 重算**——`raw` 只是最新的單一快照，
   用它會悄悄把合併撤銷、重現低估。
 
-### 5.2 頻寬：目前的數字沒有物理意義
+### 5.2 頻寬：三種狀態，不再假設一個分母
 
-`calculate_mbps`（`src/analyzer.py`）有兩條路：
+舊版 `calculate_mbps` 有個從未被踩過的分支：`(dst_bo + dst_bi) / tdms`，`tdms` 缺時分母
+改用 `flow.get("interval_sec", 600)`。因為 §2 的欄位清單裡 `ddms`/`tdms`/`interval_sec`
+一個都沒有，這條路徑上分子永遠是「整段 `timestamp_range` 的累計量」、分母永遠是硬編的
+600 秒——兩個不同時間尺度相除。實測後果：最大單筆（Prometheus → kubelet(10250/tcp)、
+`num_connections=2406`、跨 2.5 天、`dst_bi+dst_bo = 12.05 TB`）算出 176,640 Mbps
+（176 Gbps），該實驗室物理不可能；因為分母對每一列都是同一個常數，依 bandwidth 排序與
+依 volume 排序的順序完全相同。這條路徑已移除。
 
-1. `(dst_dbo + dst_dbi) / ddms` → 真實區間速率，標 `(Interval)`
-2. `(dst_bo + dst_bi) / tdms` → 平均速率；**`tdms` 缺時分母改用
-   `flow.get("interval_sec", 600)`**，標 `(Avg est.)`
+`calculate_mbps`（`src/analyzer.py`）現在回傳三種狀態之一，仍以既有的 `note` 欄位承載：
 
-因為 §2 的欄位清單裡 `ddms`/`tdms`/`interval_sec` 一個都沒有，**第一條永遠走不到，
-第二條的 600 秒是唯一會用到的分母**。
+| 狀態 | 何時發生 | 分母 | `note` | 畫面呈現 |
+|---|---|---|---|---|
+| **點值** | 真的有 `ddms`（Priority-1）或 `tdms`（Priority-2）——本工具實際使用的 async query 路徑目前不會出現，但欄位存在時仍照官方公式走 | `ddms` 或 `tdms` | `(Interval)` / `(Avg)` | `493.30 Mbps (Avg)` |
+| **下界** | 無 `ddms`/`tdms`，改用 flow 自己的 `timestamp_range`（Priority-3，本工具實際會走到的路） | `span + 1` 秒——時間戳是秒解析度，真實時距落在 `(span-1, span+1)`，`span+1` 保證**真實速率只會更高，不會更低** | `BOUND_BASIS_NOTE = "(>=)"` | `≥ 493.30 Mbps` |
+| **算不出來** | 沒有位元組，或時間戳缺漏／不可解析／倒置，或算出非有限值（例如欄位字面值 `"nan"` 污染了分子） | — | `""` | `—`，絕不是 `0.00 Mbps` |
 
-於是分子是「整段 `timestamp_range` 的累計量」，分母是「一個取樣區間」——兩個不同時間尺度
-相除。實測後果：
+「下界」不是估計、是可證明的陳述：分子是那段時距內的累計量，分母取這段時距的上界
+（`span + 1`），所以算出來的值**不可能大於真實速率，只可能等於或小於它**。
 
-- 最大單筆：Prometheus → kubelet(10250/tcp)、`num_connections=2406`、跨 2.5 天、
-  `dst_bi+dst_bo = 12.05 TB` → 算出 **176,640 Mbps（176 Gbps）**，該實驗室物理不可能
-- 全庫 4,618 筆有位元組的列中，11 筆超過 10 Gbps；改以 `timestamp_range` 時距為分母則 0 筆，
-  最大 493 Mbps
-- 因為分母對每一列都是同一個常數，**依 bandwidth 排序與依 volume 排序的順序完全相同**
-  （2,000 筆全量比對一致）
+告警引擎、規則模擬與 `query_flows` 三個呼叫端共用同一套三分支：
 
-**修法設計見** `docs/superpowers/specs/2026-08-23-bandwidth-basis-design.md`，尚未實作。
+- 點值：照常與門檻比較
+- 下界，且下界 **`>=` 門檻**：觸發——真實速率必定更高，不可能因此誤報
+- 下界，且下界 `<` 門檻：**無法判定**，規則不評估，計入守門計數並在輸出說明原因
+  （`reason` 之一，比照本工具既有的守門回報機制）
+- 算不出來：一律進守門計數，**絕不當成 0** 評估——0 會被任何正門檻判定為「未觸發」，
+  等於規則悄悄失效
+
+`report/parsers/api_parser.py` 與 `report/parsers/csv_parser.py`（原本各自定義、互不相容，
+見舊版 §5.5）現在共用同一條公式：`bytes_total × 8 ÷ (span + 1)`，`span == 0` 時視為下界，
+不再是 `csv_parser` 原本的 `clip(lower=1)` 把下界說成點值。`mod11_bandwidth.bandwidth_analysis`
+的統計量（max/mean/P95）在其輸入族群含有任何一筆下界時，統計量本身也標記為下界——
+order statistics 保序，含下界的族群其統計量同樣只會被低估，不會被高估。
+
+**真機量測（2026-08-24，appliance 快取，1 條 bandwidth 規則、22,478 筆 flow）**：
+舊分母（600 秒）算出的 Max 為 138,792.52 Mbps；新分母（span+1）算出的 Max 為
+1,025.56 Mbps——差 135 倍。同一次量測也曝露一個與本案改動無關、但操作者需要知道的
+事實：22,478 筆裡只有 1,239 筆（5.5%）算得出速率，其餘 21,239 筆（94.5%）沒有位元組
+counter，從第一天就不可得——不是本次改動造成的覆蓋率下降，而是舊分母把「無法量測」
+偽裝成一個看似合理的數字，掩蓋了這個缺口。查證方法見 §6.3。
 
 ### 5.3 「沒有 counter」是正常狀態，而且分辨不出來
 
@@ -155,16 +176,17 @@ managed workload 的流量）差異很大：
 `pce_traffic_flow_obs` 有帶位元組的連續觀測——若該表的列位元組皆為 0（環境未開 EDC，
 或當下流量都是 `snapshot`），它算不出東西，規則會退回原始值或守門。
 
-### 5.5 報表 parser 的兩套定義
+### 5.5 報表 parser：現在共用一個定義
 
-`bandwidth_mbps` 欄在報表裡的來源依 parser 而異：
+`bandwidth_mbps` 欄過去依 parser 而異——`api_parser.py` 呼叫 `calculate_mbps`（600 秒假
+分母），`csv_parser.py` 自己的 `_estimate_bandwidth` 用 `bytes_total × 8 ÷ (last - first)`
+且 `clip(lower=1)`。同一條 flow 換個資料來源就換一個數字，差距可達數百倍——這是舊有的
+不一致，不是本案造成的。
 
-- `src/report/parsers/api_parser.py` → 呼叫 `calculate_mbps`（600 秒假分母）
-- `src/report/parsers/csv_parser.py` → `_estimate_bandwidth`：`bytes_total × 8 ÷ (last - first)`，
-  且 `clip(lower=1)`
-
-**同一條 flow 換個資料來源就換一個數字**，差距可達數百倍。`mod11_bandwidth` 與
-`_fmt_bw` 一視同仁地顯示兩者。這是待修的既有不一致。
+現在兩者用同一條公式（§5.2 的下界公式：`bytes_total × 8 ÷ (span + 1)`）。
+`csv_parser._estimate_bandwidth` 的 docstring 明載這個約束——PCE CSV 匯出從不帶
+`ddms`/`tdms`，因此永遠是 §5.2 表格裡的「下界」狀態；`span == 0` 或時間戳不可解析時回
+NaN，render 為 `—`，不再是捏造的 1 秒分母。
 
 ## 6. 自己驗一次
 
@@ -207,32 +229,22 @@ cn1=601 cn1Label=interval_sec
 23:50:57  累計=595,340,500  區間增量=150,840   差值 150,840 == 增量
 ```
 
-### 6.3 目前的頻寬數字有多離譜
+### 6.3 舊分母 vs 新分母：差多少
+
+`scripts/bandwidth_basis_diff.py` 把已退役的舊公式（bytes × 8 ÷ 600 秒，逐字內嵌在
+腳本裡，因為 `analyzer.py` 已不再含有它）與現行公式（bytes × 8 ÷ (span+1)）對同一批
+快取資料各跑一次，逐條 bandwidth 規則列出兩者的 Max、是否改變觸發狀態，以及有多少筆
+flow 因下界未達門檻而進守門、多少筆因時間戳缺漏完全無法評估：
 
 ```bash
-./venv/bin/python - <<'PY'
-import sqlite3, json, datetime, sys
-sys.path.insert(0, ".")
-from src.analyzer import calculate_mbps
-c = sqlite3.connect("file:data/pce_cache.sqlite?mode=ro", uri=True)
-p = lambda s: datetime.datetime.strptime(s, "%Y-%m-%dT%H:%M:%SZ")
-rows = []
-for (r,) in c.execute("select raw_json from pce_traffic_flows_raw"):
-    d = json.loads(r)
-    tr = d.get("timestamp_range") or {}
-    b = float(d.get("dst_bo") or 0) + float(d.get("dst_bi") or 0)
-    if b <= 0 or not tr.get("first_detected"):
-        continue
-    span = (p(tr["last_detected"]) - p(tr["first_detected"])).total_seconds()
-    rows.append((b, span, calculate_mbps(d)[0]))
-over = [x for x in rows if x[2] > 10000]
-print("列數 %d；現行算法 >10 Gbps 的有 %d 筆，最大 %.0f Mbps"
-      % (len(rows), len(over), max(x[2] for x in rows)))
-ok = [b * 8 / s / 1e6 for b, s, _ in rows if s > 0]
-print("改用 timestamp_range 時距：>10 Gbps 有 %d 筆，最大 %.0f Mbps"
-      % (sum(1 for x in ok if x > 10000), max(ok)))
-PY
+./venv/bin/python scripts/bandwidth_basis_diff.py --db data/pce_cache.sqlite
 ```
+
+輸出的數字取決於你當下快取裡有什麼資料——`data/pce_cache.sqlite` 是本機開發快取，
+內容會隨排程同步而變。§5.2 引用的「135 倍、94.5% 不可得」是 2026-08-24 對一份有
+22,478 筆 flow 的 appliance 快取跑出來的結果；拿自己的快取重跑，方向（新 Max 遠小於
+舊 Max、且相當比例的 flow 沒有可算的速率）應該一致，絕對數字不會相同。門檻怎麼重設，
+見腳本輸出的比對表——這是本案交給操作者的交付物，不是附帶產物。
 
 ### 6.4 counter 覆蓋率（依 `state`）
 
@@ -256,6 +268,8 @@ PY
 
 ## 7. 一句話總結
 
-**連線數與流量可信；頻寬不可信。** 頻寬的分子是整段累計量、分母是硬編的 600 秒，
-兩者尺度不同，算出來的數字沒有物理意義，且排序結果與 volume 完全相同。
-在 `2026-08-23-bandwidth-basis-design.md` 實作之前，看到 Mbps 請當作「未知」。
+**連線數與流量可信；頻寬看 note。** `(Interval)`/`(Avg)` 是點值，`(>=)`（畫面上顯示為
+`≥`）是可證明的下界、真值只會更高，`—` 是算不出來、不是零。三者不可混為一談——尤其
+不要把下界或算不出來當成點值拿去比大小或算平均，`mod11_bandwidth` 的統計量已示範怎麼
+把這個區分帶到聚合層。門檻怎麼重設見 `scripts/bandwidth_basis_diff.py`
+（§6.3）；設計全文見 `docs/superpowers/specs/2026-08-23-bandwidth-basis-design.md`。

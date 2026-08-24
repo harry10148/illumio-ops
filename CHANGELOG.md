@@ -82,6 +82,30 @@ a plain `<major>.<minor>.<patch>` scheme. (Tags through v4.0.0 carried a
 
 ### Fixed
 
+- Bandwidth (Mbps) figures were computed as bytes × 8 ÷ 600 seconds — 600 being
+  PCE's documented default for a field, `interval_sec`, that only ships on
+  syslog/fluentd output and never on the REST query this tool actually reads,
+  so that default was the only branch that ever ran. It divided a flow's
+  entire byte total, often accumulated over days, by one 600-second sample;
+  one real flow reported 176,640 Mbps. A bandwidth figure now reports one of
+  three states: a point value when a genuine duration field is present, a
+  lower bound (shown as "≥ N Mbps") computed against the flow's own observed
+  span when it isn't — provably true, since PCE timestamps are
+  second-resolution — or unavailable ("—", never "0.00 Mbps") when there are
+  no bytes or no usable timestamps. Alerts and rule simulation now trigger on
+  a lower bound that already reaches the threshold, and decline to evaluate —
+  counting and reporting it, not silently skipping it — when the rate can't
+  be established either way. The two report parsers, which previously
+  disagreed by orders of magnitude on the same flow, now share one formula,
+  and report statistics computed over a population that includes any bound
+  are themselves flagged as bounds rather than presented as exact. On real
+  appliance data the old and new maximums differ by roughly 135×, and,
+  visible for the first time instead of hidden behind a plausible-looking
+  number, about 94.5% of flows carry no byte counters at all and so have no
+  computable rate. **Existing bandwidth alert thresholds were tuned against
+  the old, inflated numbers and need to be re-tuned** — `scripts/bandwidth_basis_diff.py`
+  compares each configured rule's old vs. new maximum against your own cache
+  to help pick new ones.
 - Operator-facing copy no longer carries the design prototype's reviewer notes.
   The v2 areas were ported from a mockup whose strings documented their own
   provenance — source file and line citations (`rules.py:515-525`), comparisons
