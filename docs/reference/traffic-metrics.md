@@ -233,12 +233,29 @@ cn1=601 cn1Label=interval_sec
 
 `scripts/bandwidth_basis_diff.py` 把已退役的舊公式（bytes × 8 ÷ 600 秒，逐字內嵌在
 腳本裡，因為 `analyzer.py` 已不再含有它）與現行公式（bytes × 8 ÷ (span+1)）對同一批
-快取資料各跑一次，逐條 bandwidth 規則列出兩者的 Max、是否改變觸發狀態，以及有多少筆
-flow 因下界未達門檻而進守門、多少筆因時間戳缺漏完全無法評估：
+快取資料各跑一次：
 
 ```bash
 ./venv/bin/python scripts/bandwidth_basis_diff.py --db data/pce_cache.sqlite
 ```
+
+規則的挑選與 flow 的比對重用即時規則引擎本身的邏輯（`Analyzer.rule_enabled()` /
+`_match_flow_filters`）——停用的規則不比對，每條規則只吃它自己的 port／來源目的／
+policy decision 會命中的 flow，不是整個快取庫。逐條 bandwidth 規則印出：兩種分母各
+自的 Max、是否改變觸發狀態、以及 §4.4 要求的兩個獨立計數——多少筆 flow 因新分母算出
+的下界未達門檻而進守門（`Bound<Thr`）、多少筆因時間戳缺漏或位元組不可得而完全無法評
+估（`NoMeasure`）。觸發判定比照引擎：舊分母只曾產生點值，用嚴格 `>`；新分母對點值同
+樣用 `>`，只有可證明的下界才用 `>=`——不會對兩種分母都用 `>=` 而聲稱一個引擎不會真的
+觸發的結果。舊分母能算但新分母算不出來的 flow（例如時間戳倒置）不會被悄悄丟出兩邊的
+Max，會被計進 `flows_regressed_to_unevaluable`。
+
+**這個工具不模擬的東西**：即時引擎的 window-basis 抑制（bucket-basis guard）需要連續
+的 cache 觀測才能推導出視窗增量，這份離線、單一快照的比對沒有那個歷史可用。腳本改為
+針對每條規則回報「命中的 flow 裡有多少筆自己的時間跨距已經超過該規則的
+`threshold_window`」，當作一則警示（`flows_span_exceeds_window`）——命中數非零時，即
+時引擎當下可能推導出視窗增量而正常評估，也可能整條規則整個 cycle 被抑制，這份比對表
+無法區分是哪一種，「觸發改變：否」不能當作保證，須另外核對即時行為或監控系統自己的
+日誌／meta-alert。
 
 輸出的數字取決於你當下快取裡有什麼資料——`data/pce_cache.sqlite` 是本機開發快取，
 內容會隨排程同步而變。§5.2 引用的「135 倍、94.5% 不可得」是 2026-08-24 對一份有

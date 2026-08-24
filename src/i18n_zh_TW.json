@@ -5164,5 +5164,19 @@
   "gui_rp_rhc_detail_unsupported_no_evidence": "找不到報表範本——PCE 版本低於門檻（SaaS 24.2.0 / on-prem 23.5.10）或功能不存在",
   "gui_rp_rhc_detail_below_floor": "PCE 版本 {version} 低於門檻（SaaS >= {saas_floor} / on-prem >= {onprem_floor}）",
   "gui_rp_rhc_detail_meets_floor": "PCE 版本 {version} 已達保守門檻（on-prem >= {onprem_floor}），但找不到報表範本——功能不存在或權限不足",
-  "debug_basis_value_guard_excluded": "頻寬基準守門：排除 {n} 筆命中的 flow（{reasons}）——沒有可用的位元組/時間資訊，或算出的下界沒過門檻。這跟 threshold_window 設多寬無關；其他命中的 flow 仍照常評估。"
+  "debug_basis_value_guard_excluded": "頻寬基準守門：排除 {n} 筆命中的 flow（{reasons}）——沒有可用的位元組/時間資訊，或算出的下界沒過門檻。這跟 threshold_window 設多寬無關；其他命中的 flow 仍照常評估。",
+  "bwdiff_rules_summary": "已比對 {compared} 條已啟用的頻寬規則（{skipped} 條已停用規則被跳過）",
+  "bwdiff_flows_summary": "快取中的 flow：共 {total:,} 筆 | 舊分母可算：{old:,} 筆（{old_pct:.1f}%）| 新分母可算：{new:,} 筆（{new_pct:.1f}%）",
+  "bwdiff_table_title": "規則門檻比對表：",
+  "bwdiff_col_rule_id": "規則 ID",
+  "bwdiff_col_rule_name": "規則名稱",
+  "bwdiff_col_threshold": "門檻",
+  "bwdiff_col_old_max": "舊 Max",
+  "bwdiff_col_new_max": "新 Max",
+  "bwdiff_col_trigger_change": "觸發改變",
+  "bwdiff_col_bound_below_threshold": "下界未達",
+  "bwdiff_col_no_measurement": "無法量測",
+  "bwdiff_window_caveat": "註：以下未模擬，依規則列出（括號內為命中的 flow 數）：{rules}。這些 flow 本身的跨距已超過該規則的 threshold_window。即時引擎可能從 cache 觀測為它們推導出視窗增量而正常評估，也可能整條規則本 cycle 直接抑制——這份 offline 比對沒有 cache 歷史可判斷是哪一種。請對這些規則核對即時行為（或監控系統自己的日誌／meta-alert），不要只憑這裡的「觸發改變：否」就下結論。",
+  "bwdiff_no_rules": "沒有已啟用的頻寬規則可比對。",
+  "bwdiff_error_generic": "錯誤：{error}"
 }
