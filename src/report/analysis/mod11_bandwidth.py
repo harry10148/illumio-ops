@@ -3,12 +3,46 @@ from __future__ import annotations
 import pandas as pd
 from src.i18n import t, get_language
 
+
+def _lower_bound_mask(df: pd.DataFrame) -> pd.Series:
+    """True where a row's bandwidth_mbps is calculate_mbps's Priority-3
+    lower bound rather than a point value.
+
+    The unified DataFrame doesn't carry calculate_mbps's `note` directly, but
+    both parsers already carry the raw counters it prioritizes on: delta
+    bytes + ddms for Priority-1 ("(Interval)"), total bytes + tdms for
+    Priority-2 ("(Avg)"). Neither pairing present means calculate_mbps fell
+    through to Priority-3 (bytes ÷ the flow's own span+1) -- a bound, not a
+    point value. Replaying that same priority order here, against columns
+    both parsers already produce, avoids a new parser-side column for this
+    task's scope.
+
+    A caller-built frame missing these columns entirely (e.g. a minimal test
+    fixture) carries no evidence of a point-value path -- default to
+    "bound", the direction that only overstates uncertainty, never
+    understates it.
+    """
+    idx = df.index
+
+    def _col(name: str) -> pd.Series:
+        if name in df.columns:
+            return pd.to_numeric(df[name], errors='coerce').fillna(0.0)
+        return pd.Series(0.0, index=idx)
+
+    delta_bytes = _col('raw_dst_dbo') + _col('raw_dst_dbi')
+    ddms = _col('raw_ddms')
+    total_bytes = _col('raw_dst_tbo') + _col('raw_dst_tbi')
+    tdms = _col('raw_tdms')
+    is_point = ((delta_bytes > 0) & (ddms > 0)) | ((total_bytes > 0) & (tdms > 0))
+    return ~is_point
+
+
 def bandwidth_analysis(df: pd.DataFrame, top_n: int = 20, *, lang: str = "en") -> dict:
     """
     Volume and bandwidth analysis:
     - Top connections by bytes
     - Top by application, environment, port
-    - Bandwidth anomalies (high bytes-per-connection ratio)
+    - Data-volume anomalies (high bytes-per-connection ratio)
     """
     if df.empty:
         return {'error': 'No data'}
@@ -24,6 +58,17 @@ def bandwidth_analysis(df: pd.DataFrame, top_n: int = 20, *, lang: str = "en") -
 
     result: dict = {'bytes_data_available': True}
 
+    # Rows with byte data but no computed rate (calculate_mbps's third
+    # state, NaN in this column) don't participate in any bandwidth
+    # statistic below -- that's correct arithmetic, but the count is
+    # reported so the operator knows the statistics didn't cover everyone,
+    # not just that they cover whoever happened to have a rate.
+    if 'bandwidth_mbps' in has_bytes.columns:
+        result['bandwidth_unavailable_count'] = int(has_bytes['bandwidth_mbps'].isna().sum())
+    else:
+        result['bandwidth_unavailable_count'] = len(has_bytes)
+    result['bandwidth_candidate_count'] = len(has_bytes)
+
     # Top connections by total bytes (include bandwidth_mbps if available)
     _bw_cols = ['src_ip', 'src_hostname', 'dst_ip', 'dst_hostname',
                 'port', 'proto', 'bytes_total', 'policy_decision']
@@ -32,8 +77,16 @@ def bandwidth_analysis(df: pd.DataFrame, top_n: int = 20, *, lang: str = "en") -
                   'port': 'Port', 'proto': 'Proto',
                   'bytes_total': 'Bytes Total', 'policy_decision': 'Decision'}
     if 'bandwidth_mbps' in has_bytes.columns:
+        _measured_label = t('rpt_bw_basis_measured', lang=lang)
+        _bound_label = t('rpt_bw_basis_bound', lang=lang)
+        _rate_basis = pd.Series(_measured_label, index=has_bytes.index)
+        _rate_basis = _rate_basis.mask(_lower_bound_mask(has_bytes), _bound_label)
+        _rate_basis = _rate_basis.mask(has_bytes['bandwidth_mbps'].isna(), '—')
+        has_bytes['rate_basis'] = _rate_basis
         _bw_cols.insert(-1, 'bandwidth_mbps')
         _bw_rename['bandwidth_mbps'] = 'Bandwidth (Mbps)'
+        _bw_cols.insert(-1, 'rate_basis')
+        _bw_rename['rate_basis'] = 'Rate Basis'
     top_by_bytes = (has_bytes.nlargest(top_n, 'bytes_total')[_bw_cols]
                     .rename(columns=_bw_rename))
     result['top_by_bytes'] = top_by_bytes
@@ -64,18 +117,35 @@ def bandwidth_analysis(df: pd.DataFrame, top_n: int = 20, *, lang: str = "en") -
 
     # Bandwidth stats
     if not has_bw.empty:
-        top_bw = (has_bw.nlargest(top_n, 'bandwidth_mbps')
-                  [['src_ip', 'dst_ip', 'port', 'proto', 'bandwidth_mbps', 'bytes_total']]
+        bound_mask = _lower_bound_mask(has_bw)
+        n_bound = int(bound_mask.sum())
+        n_point = len(has_bw) - n_bound
+        # Every row's true rate is >= what's stored (bound rows can only be
+        # understated), so a max/mean/quantile taken over a population that
+        # includes any bound row is itself provably >= what's computed here
+        # (order statistics preserve pointwise domination) -- the aggregate
+        # is a lower bound too, not a point value, whenever any input was.
+        result['bandwidth_stats_is_bound'] = n_bound > 0
+        result['bandwidth_bound_flow_count'] = n_bound
+        result['bandwidth_point_flow_count'] = n_point
+
+        top_bw_rows = has_bw.nlargest(top_n, 'bandwidth_mbps')
+        _measured_label = t('rpt_bw_basis_measured', lang=lang)
+        _bound_label = t('rpt_bw_basis_bound', lang=lang)
+        top_bw_basis = _lower_bound_mask(top_bw_rows).map(
+            {True: _bound_label, False: _measured_label})
+        top_bw = (top_bw_rows[['src_ip', 'dst_ip', 'port', 'proto', 'bandwidth_mbps', 'bytes_total']]
                   .rename(columns={'src_ip': 'Src IP', 'dst_ip': 'Dst IP',
                                    'port': 'Port', 'proto': 'Proto',
                                    'bandwidth_mbps': 'Bandwidth (Mbps)',
                                    'bytes_total': 'Bytes Total'}))
+        top_bw['Rate Basis'] = top_bw_basis.values
         result['top_bandwidth'] = top_bw
         result['max_bandwidth_mbps'] = round(float(has_bw['bandwidth_mbps'].max()), 3)
         result['avg_bandwidth_mbps'] = round(float(has_bw['bandwidth_mbps'].mean()), 3)
         result['p95_bandwidth_mbps'] = round(float(has_bw['bandwidth_mbps'].quantile(0.95)), 3)
 
-    # Anomaly: bytes-per-connection ratio (potential exfiltration indicator)
+    # Volume anomaly: bytes-per-connection ratio (potential exfiltration indicator)
     # Only flag rows with > 1 connection to avoid single-connection noise
     has_bytes['bytes_per_conn'] = has_bytes['bytes_total'] / has_bytes['num_connections'].clip(lower=1)
     multi_conn = has_bytes[has_bytes['num_connections'] > 1]

@@ -28,7 +28,7 @@ RULE_TECHNIQUES: dict[str, tuple[tuple[str, str], ...]] = {
     # B007 Single User High Destinations — one account reaching abnormally many
     # hosts = valid-account abuse.
     "B007": (("T1078", "Valid Accounts"),),
-    # B008 High Bandwidth Anomaly — outsized data volume on flows.
+    # B008 High Data Volume Per Flow — outsized data volume on flows.
     "B008": (("T1048", "Exfiltration Over Alternative Protocol"),),
     # B009 Cross-Env Flow Volume — INFO/Policy informational metric, unmapped.
 

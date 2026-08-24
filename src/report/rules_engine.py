@@ -548,7 +548,7 @@ class RulesEngine:
             total_anomaly_bytes = anomalies['bytes_total'].sum()
             top_ports = anomalies['port'].value_counts().head(5).to_dict()
             return Finding(
-                rule_id='B008', rule_name='High Bandwidth Anomaly',
+                rule_id='B008', rule_name='High Data Volume Per Flow',
                 severity='MEDIUM', category='Bandwidth',
                 description=t(
                     "rpt_rule_B008_desc", lang=self._lang,

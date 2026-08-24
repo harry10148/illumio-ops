@@ -301,7 +301,7 @@ _RULE_DESCRIPTIONS = {
              'Detects source IPs that connect to an abnormally high number of distinct destinations on lateral movement ports. This fan-out pattern (one source → many destinations) is the hallmark of worm propagation and attacker pivoting after initial compromise.'),
     'B007': ('User Account Reaching Many Destinations',
              'Detects individual user accounts connecting to unusually many unique destination IPs. This may indicate a compromised account being used for automated reconnaissance, credential stuffing, or data staging before exfiltration.'),
-    'B008': ('High Bandwidth Anomaly',
+    'B008': ('High Data Volume Per Flow',
              'Flags individual flows exceeding the 95th percentile of byte volume in the dataset. Sudden high-volume transfers from unexpected sources are a key indicator of data staging, exfiltration, or unsanctioned large-scale backups.'),
     # ── Lateral movement — cleartext & legacy protocols ────────────────────────
     'L001': ('Cleartext Protocol in Use (Telnet / FTP)',
@@ -1283,18 +1283,32 @@ class _TrafficReportBase:
         max_bw = m.get('max_bandwidth_mbps')
         avg_bw = m.get('avg_bandwidth_mbps')
         p95_bw = m.get('p95_bandwidth_mbps')
+        # Population included any lower-bound row: max/mean/P95 taken over it
+        # are themselves lower bounds (order statistics preserve pointwise
+        # domination), not point values — mark every value the same way
+        # _shape_traffic_row already marks a single bound row's rate.
+        bw_is_bound = m.get('bandwidth_stats_is_bound', False)
+        bw_prefix = '≥ ' if bw_is_bound else ''
 
         _s = self._s
         _lang = self._lang
         out = '<div class="coverage-grid">'
         out += _cov_stat(_s('rpt_tr_total_volume'), _fmt_bytes(m.get('total_bytes', 0)))
         if max_bw is not None:
-            out += _cov_stat(_s('rpt_tr_max_bw'), _fmt_bw(max_bw))
+            out += _cov_stat(_s('rpt_tr_max_bw'), bw_prefix + _fmt_bw(max_bw))
         if avg_bw is not None:
-            out += _cov_stat(_s('rpt_tr_avg_bw'), _fmt_bw(avg_bw))
+            out += _cov_stat(_s('rpt_tr_avg_bw'), bw_prefix + _fmt_bw(avg_bw))
         if p95_bw is not None:
-            out += _cov_stat(_s('rpt_tr_p95_bw'), _fmt_bw(p95_bw))
+            out += _cov_stat(_s('rpt_tr_p95_bw'), bw_prefix + _fmt_bw(p95_bw))
         out += '</div>'
+
+        if bw_is_bound:
+            out += f'<p class="note" style="font-size:11px">{t("alert_criteria_lower_bound_note", lang=_lang)}</p>'
+        bw_unavailable = m.get('bandwidth_unavailable_count', 0)
+        if bw_unavailable:
+            out += (f'<p class="note" style="font-size:11px">'
+                     f'{t("rpt_tr_bandwidth_unavailable_note", lang=_lang, unavailable=bw_unavailable, total=m.get("bandwidth_candidate_count", 0))}'
+                     f'</p>')
 
         out += self._subnote('rpt_tr_bandwidth_subnote')
         out += f'<h3>{_s("rpt_tr_top_by_bytes")}</h3>' + _df_to_html(m.get('top_by_bytes'), lang=_lang)

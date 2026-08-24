@@ -1693,5 +1693,12 @@
   "cli_config_login_pce_flush_failed": "清除前一台 PCE 的快取資料與歷史沒有完成（{error}），連線設定因此沒有變更，設備仍指向前一台 PCE。**部分資料可能已經被清掉**——排除原因後重新執行一次會把剩下的清完，不會造成額外損失。",
   "cli_pce_flush_failed_menu": "清除前一台 PCE 的快取資料與歷史沒有完成（{error}），連線設定因此沒有變更，設備仍指向前一台 PCE。",
   "cli_config_login_pce_restart_required": "請立即重新啟動監控服務。已經在執行的服務在重啟之前仍會沿用舊的連線設定，並且會把剛清掉的資料重新填回去。",
-  "cli_pce_restart_required_menu": "請立即重新啟動監控服務。已經在執行的服務在重啟之前仍會沿用舊的連線設定，並且會把剛清掉的資料重新填回去。"
+  "cli_pce_restart_required_menu": "請立即重新啟動監控服務。已經在執行的服務在重啟之前仍會沿用舊的連線設定，並且會把剛清掉的資料重新填回去。",
+  "rpt_bw_basis_bound": "≥ 下界",
+  "rpt_bw_basis_measured": "量測值",
+  "rpt_cat_bandwidth_name": "資料量異常",
+  "rpt_rule_B008_name": "單筆流量資料量偏高",
+  "rpt_rule_B008_how": "依單筆流量的資料傳輸量百分位數，找出傳輸量顯著偏高的流量。",
+  "rule_b008_rec": "1) 驗證這筆異常流量的來源——是備份伺服器、複寫還是資料庫同步？記錄預期的高流量。2) 對無法解釋的傳輸，檢查來源是否為正在向外部或橫向目的地洩漏資料的被入侵 Workload。3) 考慮為已知高流量 Service 實施依傳輸量分級的規則或 QoS Policy。4) 設定 Illumio 監控警報以偵測持續異常的流量。",
+  "rpt_tr_bandwidth_unavailable_note": "{total} 筆有位元組資料的流量中，{unavailable} 筆沒有可用的速率資料。"
 }
