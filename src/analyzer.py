@@ -239,6 +239,17 @@ DELTA_BASIS_NOTE = "(Window)"
 # 告警則在「下界 >= 門檻」時即可確定觸發（真值嚴格更大）。
 BOUND_BASIS_NOTE = "(>=)"
 
+def _metric_val_sort_key(x: dict[str, Any]) -> float:
+    """_metric_val 的排序鍵：值可能是 None（calculate_mbps 三態之一，見
+    BOUND_BASIS_NOTE），排序時視為最低（-inf），不可與真實測到的 0 混為一談
+    （即不可寫成 `x.get('_metric_val', 0)` 或 `x.get('_metric_val') or 0`）。
+    獨立成具名函式、把值先轉成 float 再比較，讓 mypy 能確認鍵永遠是 float——
+    inline 的條件式在型別上仍是 Any | float | None，過不了 CI 的 strict 檢查。
+    """
+    v = x.get('_metric_val')
+    return float(v) if v is not None else float('-inf')
+
+
 # 基準時間可以早於視窗起點多久：取 max(視窗長度 × 比例, 下限秒數)。
 # 超過就代表增量涵蓋的區間比視窗長太多、失去「短視窗」的意義。
 DELTA_BASELINE_TOLERANCE_RATIO = 0.25
@@ -303,7 +314,7 @@ def _flow_aggregation_end(flow: dict[str, Any]) -> datetime.datetime | None:
     return parse_event_timestamp(str(ts))
 
 
-def calculate_mbps(flow: dict[str, Any]) -> tuple[float, str, float, float]:
+def calculate_mbps(flow: dict[str, Any]) -> tuple[float | None, str, float, float]:
     """
     Compute bandwidth in Mbps from a PCE traffic flow record.
     Priority 1: delta bytes (dst_dbo+dst_dbi) / ddms   → Mbps (Interval)
@@ -703,7 +714,7 @@ class Analyzer:
             logger.error(f"Error saving state: {e}")
             raise
 
-    def calculate_mbps(self, flow: dict[str, Any]) -> tuple[float, str, float, float]:
+    def calculate_mbps(self, flow: dict[str, Any]) -> tuple[float | None, str, float, float]:
         """Delegate to module-level calculate_mbps(). See src.analyzer.calculate_mbps."""
         return calculate_mbps(flow)
 
@@ -1973,11 +1984,7 @@ class Analyzer:
                     is_trigger = True
 
             if is_trigger and self._check_cooldown(rule):
-                # bw_val 現在可能是 None（無法計算，見 calculate_mbps 三態）；
-                # -inf 讓「不可得」排到最後，不可與真實測到的 0 混為一談。
-                res['top_matches'].sort(
-                    key=lambda x: (x.get('_metric_val') if x.get('_metric_val') is not None else float('-inf')),
-                    reverse=True)
+                res['top_matches'].sort(key=_metric_val_sort_key, reverse=True)
                 top_10 = res['top_matches'][:TOP_MATCHES_LIMIT]
                 self.stats.record_rule_trigger(rule, match_count=len(top_10), metric_value=val)
 
@@ -2592,11 +2599,7 @@ class Analyzer:
 
         self._raise_if_query_fetch_failed()
 
-        # bw_val 現在可能是 None（無法計算，見 calculate_mbps 三態）；-inf
-        # 讓「不可得」排到最後，不可與真實測到的 0 混為一談。
-        matches.sort(
-            key=lambda x: (x.get('_metric_val') if x.get('_metric_val') is not None else float('-inf')),
-            reverse=True)
+        matches.sort(key=_metric_val_sort_key, reverse=True)
         total = len(matches)
         # 截斷統計：仿 ApiClient.last_traffic_query_diagnostics 的屬性樣式，
         # 回傳型別不變、既有呼叫者零影響（spec §11.3）
@@ -2839,11 +2842,7 @@ class Analyzer:
                 if matches:
                     print(t('samples_top10'))
                     if rtype in ["bandwidth", "volume"]:
-                        # bw_val 現在可能是 None（見 calculate_mbps 三態）；-inf
-                        # 讓「不可得」排到最後，不可與真實測到的 0 混為一談。
-                        matches.sort(
-                            key=lambda x: (x.get('_metric_val') if x.get('_metric_val') is not None else float('-inf')),
-                            reverse=True)
+                        matches.sort(key=_metric_val_sort_key, reverse=True)
                     for i, m in enumerate(matches[:10]):
                         key = self.get_traffic_details_key(m)
                         print(f"     [{i+1}] {key} {t('alert_field_metric_value')}: {m.get('_metric_fmt')} (PD:{m.get('policy_decision')})")
