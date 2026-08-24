@@ -117,7 +117,7 @@ syslog 輸出證實其語意（查證方法見 §6.2）：
 
 **修法設計見** `docs/superpowers/specs/2026-08-23-bandwidth-basis-design.md`，尚未實作。
 
-### 5.3 「沒有 counter」是正常狀態，且要靠 `state` 判斷
+### 5.3 「沒有 counter」是正常狀態，而且分辨不出來
 
 不是每條連線都有位元組 counter，這是 PCE 的正常行為（需 `Enhanced Data Collection`；
 `dst_dbo` 另需 `Byte Count Premium Feature`）。
