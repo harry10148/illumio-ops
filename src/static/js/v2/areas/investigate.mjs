@@ -650,8 +650,8 @@ function trafficRows(rows, sort) {
   return rows.map(function (item) {
     const r = {};
     // :427-431 — the metric column shows whichever figure the sort ranked by
-    if (sort === "bandwidth") r.metric = item.formatted_bandwidth;
-    else if (sort === "volume") r.metric = item.formatted_volume;
+    if (sort === "bandwidth") r.metric = item.formatted_bandwidth || "—";
+    else if (sort === "volume") r.metric = item.formatted_volume || "—";
     else r.metric = item.formatted_connections + " " + t("gui_flows");
     const range = item.timestamp_range || {};
     r.first = stamp(range.first_detected || "");
