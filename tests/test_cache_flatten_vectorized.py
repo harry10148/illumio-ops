@@ -5,6 +5,7 @@ from __future__ import annotations
 import datetime
 import orjson
 import pandas as pd
+import pytest
 
 from src.report.parsers.api_parser import (
     APIParser, flatten_flow_record, build_unified_df,
@@ -77,6 +78,63 @@ def test_read_flows_df_uses_report_json_and_falls_back(tmp_path):
     assert set(df["src_app"]) == {"DB", "Web"}
     assert set(df["proto"]) == {"TCP"}
     assert df["data_source"].unique().tolist() == ["cache"]
+
+
+def test_read_flows_df_recomputes_bandwidth_for_a_stale_cached_report_json(tmp_path):
+    """final-review Medium 5: report_json cached before the bandwidth-basis
+    change keeps the old bytes/600s bandwidth_mbps (e.g. 176,640 Mbps for a
+    real flow) -- and _lower_bound_mask would label that stale, wrong number
+    "≥" because raw_ddms/raw_tdms are 0 (Priority-3), upgrading a wrong
+    number into a wrong number with a provability claim, worse than before.
+    read_flows_df must not serve a stale bandwidth_mbps verbatim: it
+    recomputes it from the row's own raw_* counters + timestamps (cheap --
+    no re-parse of raw_json, keeps the report_json cache's transfer-size
+    win), so a stale row is corrected (or, when the stale row's raw_dst_tbo/
+    tbi genuinely carry no evidence -- e.g. an alias-shaped flow ingested
+    before LOW 8's fix -- becomes "unavailable" rather than a number wearing
+    an unearned "≥")."""
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import sessionmaker
+    from src.pce_cache.schema import init_schema
+    from src.pce_cache.models import PceTrafficFlowRaw
+    from src.pce_cache.reader import CacheReader
+    from src.analyzer import calculate_mbps
+
+    eng = create_engine(f"sqlite:///{tmp_path/'c.sqlite'}")
+    init_schema(eng); sf = sessionmaker(eng)
+    now = datetime.datetime.now(datetime.timezone.utc)
+
+    flow = _flow("DB", "DB", 3306, "allowed")
+    flow["dst_dbi"] = 0
+    flow["dst_dbo"] = 0
+    flow["dst_tbo"] = 13248009806581
+    flow["dst_tbi"] = 0
+    flow["first_detected"] = "2026-07-01T00:00:00Z"
+    flow["last_detected"] = "2026-07-03T11:40:48Z"
+
+    fresh_row = flatten_flow_record(flow)
+    correct_mbps, _note, _b, _d = calculate_mbps(flow)
+    assert correct_mbps == pytest.approx(493.3, abs=0.1)
+
+    stale_row = dict(fresh_row)
+    old_denominator_seconds = 600.0
+    stale_row["bandwidth_mbps"] = (13248009806581 * 8.0) / old_denominator_seconds / 1_000_000.0
+    assert stale_row["bandwidth_mbps"] == pytest.approx(176640.1, abs=1.0)
+
+    with sf.begin() as s:
+        s.add(PceTrafficFlowRaw(
+            flow_hash="stale1", first_detected=now, last_detected=now,
+            src_ip="10.0.0.1", src_workload="/w/1", dst_ip="10.0.0.2", dst_workload="/w/2",
+            port=3306, protocol="TCP", action="allowed", flow_count=5, bytes_in=0, bytes_out=0,
+            raw_json=orjson.dumps(flow).decode(),
+            report_json=orjson.dumps(stale_row).decode(), ingested_at=now))
+
+    rd = CacheReader(sf, 30, 30)
+    start = now - datetime.timedelta(hours=1); end = now + datetime.timedelta(hours=1)
+    df = rd.read_flows_df(start, end)
+    assert len(df) == 1
+    assert df.iloc[0]["bandwidth_mbps"] == pytest.approx(493.3, abs=0.1)
+    assert df.iloc[0]["bandwidth_mbps"] != pytest.approx(176640.1, abs=1.0)
 
 
 def test_read_flows_df_policy_decision_pushdown(tmp_path):

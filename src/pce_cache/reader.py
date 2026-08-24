@@ -188,6 +188,7 @@ class CacheReader:
         """
         self._guard_window(start, end, workload_hrefs, policy_decisions)
         from src.report.parsers.api_parser import flatten_flow_record, build_unified_df
+        from src.analyzer import calculate_mbps
 
         def _window(*cols):
             q = select(*cols).where(
@@ -219,7 +220,45 @@ class CacheReader:
                 if payload is None:
                     continue
                 record = orjson.loads(payload)
-                rows.append(flatten_flow_record(record) if needs_flatten else record)
+                if needs_flatten:
+                    rows.append(flatten_flow_record(record))
+                    continue
+                # final-review Medium 5: report_json cached before the
+                # bandwidth-basis change (bytes / 600s) keeps that stale
+                # bandwidth_mbps forever -- upsert only overwrites a row when
+                # a newer snapshot arrives, and traffic_raw_retention_days
+                # defaults to 7, so a row with no new snapshot in that
+                # window would otherwise serve a stale, wrong number.
+                # Worse: _lower_bound_mask would then label that stale
+                # number "≥" (raw_ddms/raw_tdms are 0, so it replays as
+                # Priority-3) -- upgrading a wrong number into a wrong
+                # number with a provability claim attached.
+                #
+                # bandwidth_mbps is recomputed here from the row's own
+                # already-flattened raw_* counters + timestamps -- cheap
+                # (six-field arithmetic on a dict already in hand), not a
+                # re-flatten of raw_json, so this keeps report_json's
+                # transfer-size win while making bandwidth_mbps immediately
+                # correct on every read instead of waiting out the 7-day
+                # retention window. Self-heals on read; no migration.
+                #
+                # Known gap (documented, not fixed here): a row ingested
+                # before LOW 8's alias fix (api_parser.py) has its
+                # raw_dst_tbo/tbi at 0 for a dst_bo/dst_bi-shaped flow even
+                # though calculate_mbps could see the alias at ingest time
+                # -- recomputing from raw_dst_tbo/tbi alone then yields
+                # "unavailable" rather than the (stale but nonzero) old
+                # value. That is the conservative direction (never labels
+                # a wrong number as a bound) and self-heals the same way.
+                record["bandwidth_mbps"], _note, _bytes, _denom = calculate_mbps({
+                    "dst_dbo": record.get("raw_dst_dbo"), "dst_dbi": record.get("raw_dst_dbi"),
+                    "ddms": record.get("raw_ddms"),
+                    "dst_tbo": record.get("raw_dst_tbo"), "dst_tbi": record.get("raw_dst_tbi"),
+                    "tdms": record.get("raw_tdms"),
+                    "first_detected": record.get("first_detected"),
+                    "last_detected": record.get("last_detected"),
+                })
+                rows.append(record)
         return build_unified_df(rows, "cache")
 
     def read_flows_agg(self, start: datetime, end: datetime) -> list[dict]:
