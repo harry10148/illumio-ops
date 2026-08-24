@@ -1,7 +1,7 @@
 {
   "advanced_filters": "--- 進階篩選 ---",
   "alert_bandwidth_basis_rule": "頻寬量測不可得",
-  "alert_bandwidth_basis_details": "本次循環有 {rule_count} 條頻寬規則（{rule_names}）命中的 flow 無法確認是否達標：有些完全沒有可用的流量或時間資訊，有些只能算出一個沒過門檻的下界（代表真實速率是否超過門檻無法確定，不是確定沒有）。這些規則本次循環未被評估、不會告警。這跟規則的時間視窗設多寬無關——請檢查相關 flow 是否有回報流量與有效的偵測時間戳。",
+  "alert_bandwidth_basis_details": "本次循環有 {rule_count} 條頻寬規則（{rule_names}）命中的 flow 無法確認是否達標：有些完全沒有可用的流量或時間資訊，有些只能算出一個沒過門檻的下界（代表真實速率是否超過門檻無法確定，不是確定沒有）。這些規則本次循環未被評估、不會告警。這跟規則的時間視窗設多寬無關——請確認 PCE 是否有為相關 flow 回報流量與有效的偵測時間戳。",
   "alert_cache_lag_error": "快取擷取器停止響應：來源={source} 延遲={lag}秒",
   "alert_cache_lag_warning": "快取擷取器延遲警告：來源={source} 延遲={lag}秒",
   "alert_cat_authentication_settings": "認證設定",
