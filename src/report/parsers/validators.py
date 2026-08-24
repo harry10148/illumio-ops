@@ -115,7 +115,11 @@ def coerce(df: pd.DataFrame) -> pd.DataFrame:
         'num_connections': 1, 'state': '', 'policy_decision': 'unknown',
         'first_detected': pd.NaT, 'last_detected': pd.NaT,
         'bytes_in': 0, 'bytes_out': 0, 'bytes_total': 0,
-        'bandwidth_mbps': 0.0,
+        # bandwidth_mbps is derived (calculate_mbps's three-state contract),
+        # not a raw counter -- a wholly missing column means "no rate could
+        # be computed for any row here", the same claim as any other
+        # unavailable measurement, not a measured 0. NaN, not 0.0.
+        'bandwidth_mbps': float('nan'),
         'raw_dst_dbi': 0.0, 'raw_dst_dbo': 0.0,
         'raw_dst_tbi': 0.0, 'raw_dst_tbo': 0.0,
         'raw_ddms': 0.0, 'raw_tdms': 0.0,
@@ -133,9 +137,20 @@ def coerce(df: pd.DataFrame) -> pd.DataFrame:
     for col in ('port', 'num_connections', 'bytes_in', 'bytes_out', 'bytes_total'):
         if col in df.columns:
             df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0).astype(int)
-    for col in ('bandwidth_mbps', 'raw_dst_dbi', 'raw_dst_dbo',
+    for col in ('raw_dst_dbi', 'raw_dst_dbo',
                 'raw_dst_tbi', 'raw_dst_tbo', 'raw_ddms', 'raw_tdms'):
         if col in df.columns:
             df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0.0)
+    # bandwidth_mbps is a derived value (calculate_mbps's three-state
+    # contract via api_parser/csv_parser), not a raw telemetry counter like
+    # its siblings above -- its absence means "the rate could not be
+    # computed", not "the PCE reported zero". Coerce dtype only; do not
+    # fillna(0.0) it back into a number that reads as a measurement.
+    # Every exporter/consumer on this column already treats NaN correctly
+    # (_fmt_bw renders it as "—"; mod11_bandwidth's `> 0` filter already
+    # excludes it) -- filling it here would be re-inventing the "unavailable"
+    # lie this task exists to remove.
+    if 'bandwidth_mbps' in df.columns:
+        df['bandwidth_mbps'] = pd.to_numeric(df['bandwidth_mbps'], errors='coerce')
 
     return df
