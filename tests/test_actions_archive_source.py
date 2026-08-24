@@ -238,6 +238,67 @@ def test_archive_row_is_shaped_like_a_live_row_and_metrics_come_from_the_merge_n
     assert row["policy_decision"] == "blocked"
 
 
+@pytest.fixture
+def client_with_zero_byte_row(tmp_path):
+    """終審 Finding 2 的原始重現場景（appendix C.3(2)）：封存查詢對沒有
+    byte counter 的 flow 印出 '0.00 MB (Total)'，把『沒量』講成『量到零』。"""
+    fd, path = tempfile.mkstemp(suffix=".json")
+    os.close(fd)
+    arch = tmp_path / "arch"
+    arch.mkdir()
+    rec = orjson.dumps({
+        "event_time": "2026-06-20T12:00:00+00:00",
+        "ingested_at": "2026-06-20T12:00:00+00:00",
+        "flow_hash": "src1", "src_ip": "10.0.0.9", "src_workload": "/w/a",
+        "dst_ip": "10.0.0.8", "dst_workload": "/w/b",
+        "port": 443, "protocol": "tcp", "action": "blocked", "flow_count": 1,
+        "bytes_in": 0, "bytes_out": 0,
+        "raw": {
+            "src": {"ip": "10.0.0.9"}, "dst": {"ip": "10.0.0.8"},
+            "dst_port": 443, "proto": 6, "policy_decision": "blocked",
+        },
+    })
+    with open(arch / "traffic-2026-06-20.jsonl", "wb") as fh:
+        fh.write(rec + b"\n")
+    with open(path, "w") as f:
+        json.dump({
+            "web_gui": {"username": "admin", "password": "pw", "secret_key": "s",
+                        "allowed_ips": ["127.0.0.1"]},
+            "pce_cache": {"enabled": True, "db_path": str(tmp_path / "cache.sqlite"),
+                          "archive_dir": str(arch)},
+        }, f)
+    cm = ConfigManager(config_file=path)
+    from src.gui import _create_app
+    app = _create_app(cm, persistent_mode=True)
+    app.config["TESTING"] = True
+    app.config["WTF_CSRF_ENABLED"] = False
+    with app.test_client() as c:
+        c.post("/api/login", json={"username": "admin", "password": "pw"},
+               environ_overrides={"REMOTE_ADDR": "127.0.0.1"})
+        yield c, cm
+    os.unlink(path)
+
+
+def test_archive_row_with_no_bytes_omits_volume_instead_of_reporting_zero(
+        client_with_zero_byte_row):
+    """終審 Finding 2：merge_row() 合併後的 bytes_in+bytes_out 為 0 時，
+    actions.py 的 archive 分支必須跟 calculate_volume_mb 同一套規則——不寫
+    total_volume_mb／formatted_volume，而不是把 0 傳給 _shape_traffic_row
+    印成 '0.00 MB (Total)'。"""
+    c, _cm = client_with_zero_byte_row
+    resp = c.post("/api/quarantine/search",
+                  json={"source": "archive", "port": 443,
+                        "archive_start": "2026-06-20", "archive_end": "2026-06-20"},
+                  environ_overrides={"REMOTE_ADDR": "127.0.0.1"})
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert body["ok"] is True
+    assert len(body["rows"]) == 1
+    row = body["rows"][0]
+    assert "total_volume_mb" not in row
+    assert "formatted_volume" not in row
+
+
 def test_archive_source_rejects_port_range_filters(client):
     """Final review F4: port_range/ex_port_range are PCE-native (execution
     "native" in _TRAFFIC_FILTER_CAPABILITIES) — the archive has no PCE to

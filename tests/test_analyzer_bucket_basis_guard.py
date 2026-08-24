@@ -494,6 +494,40 @@ def test_lower_bound_equal_alert_criteria_is_consistent_with_its_own_value():
     assert "> 100" not in alert_data["criteria"]
 
 
+# ─── final-review Finding 2: volume gets the same zero-vs-unavailable guard
+# as bandwidth. calculate_volume_mb now returns None for a flow with no byte
+# counters (was 0.0) -- the volume rule-type branch summed straight into
+# res['max_val'] with no None-guard, which would raise TypeError the moment
+# a matched flow had no bytes at all.
+
+def test_run_rule_engine_volume_unavailable_flow_is_guarded_not_a_crash_or_zero():
+    rule = _rule("tr1", "volume", window=10, threshold=1, name="vol none")
+    az = _analyzer([rule])
+    az.stats = MagicMock()
+
+    triggers = az._run_rule_engine(iter([_unavailable_bw_flow()]), [rule], NOW)
+    _, res = triggers[0]
+
+    assert res.get("basis_mismatch"), "an unavailable volume must guard the rule"
+    assert "no_measurement" in res["basis_mismatch"]["reasons"]
+    assert res["max_val"] == 0.0
+    assert res["top_matches"] == []
+
+    az._dispatch_alerts(triggers, [rule])
+    az.reporter.add_metric_alert.assert_not_called()
+
+
+def test_run_rule_engine_volume_still_sums_measured_flows():
+    rule = _rule("tr1", "volume", window=10, threshold=1, name="vol ok")
+    az = _analyzer([rule])
+    triggers = az._run_rule_engine(
+        iter([_bucket_flow(first_detected=RECENT_FIRST)]), [rule], NOW)
+    _, res = triggers[0]
+    assert "basis_mismatch" not in res
+    expected_mb = (3710468 + 4504322) / 1024 / 1024
+    assert res["max_val"] == pytest.approx(expected_mb)
+
+
 # ─── bandwidth-basis Task 2: run_debug_mode must not diverge from the engine
 
 class _DebugApi:
@@ -566,6 +600,35 @@ def test_debug_mode_lower_bound_below_threshold_is_guarded_not_a_silent_pass(cap
 
 def test_debug_mode_unavailable_bandwidth_is_guarded_not_treated_as_zero(capsys):
     rule = _rule("tr1", "bandwidth", window=10, threshold=1, name="bw none")
+    now = datetime.datetime.now(datetime.timezone.utc)
+    flow = {
+        "timestamp_range": {
+            "first_detected": (now - datetime.timedelta(seconds=11)).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "last_detected": (now - datetime.timedelta(seconds=2)).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        },
+        "policy_decision": "blocked",
+        "pd": 2,
+        "num_connections": 1,
+        "src": {},
+        "dst": {},
+        "service": {},
+    }
+    az = _debug_analyzer([rule], [flow])
+
+    az.run_debug_mode(mins=12, pd_sel=3, interactive=False)
+    out = capsys.readouterr().out
+
+    assert "WOULD TRIGGER" not in out.upper()
+    assert "no_measurement=1" in out
+
+
+def test_debug_mode_unavailable_volume_is_guarded_not_a_crash(capsys):
+    """final-review Finding 2: run_debug_mode's volume branch used
+    `vol_v` straight into `sum([m['_metric_val'] for m in matches])` --
+    with calculate_volume_mb now returning None for a byte-less flow, an
+    unguarded append would poison the sum with TypeError instead of
+    reporting the same no_measurement guard bandwidth already gets."""
+    rule = _rule("tr1", "volume", window=10, threshold=1, name="vol none")
     now = datetime.datetime.now(datetime.timezone.utc)
     flow = {
         "timestamp_range": {

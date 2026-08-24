@@ -278,18 +278,21 @@ def make_actions_blueprint(
                     # 要防的低估（終審 F1/F6）。bandwidth 傳 None：封存從不
                     # 記錄 ddms/tdms，沒有速率可言，讓下游（KPI 尖峰頻寬、
                     # fmtBw）維持既有的「—」呈現，不要印出一個看似量測到、
-                    # 其實是 0 的頻寬。
-                    shaped_rows = [
-                        base_ana._shape_traffic_row(
+                    # 其實是 0 的頻寬。volume 同理（終審 Finding 2）：合併後
+                    # 的位元組合計為 0 代表這筆 flow 完全沒有 byte counter
+                    # （而不是量到零位元組——async query 從不省略 byte
+                    # 欄位，兩者在數值上不可分），傳 None 讓 _shape_traffic_row
+                    # 略過寫入，不印「0.00 MB (Total)」。
+                    def _shape_archive_row(row: dict) -> dict:
+                        merged_bytes = (row.get("bytes_in") or 0) + (row.get("bytes_out") or 0)
+                        return base_ana._shape_traffic_row(
                             row.get("raw") or {},
                             bw_val=None, bw_note="",
-                            vol_val=((row.get("bytes_in") or 0)
-                                     + (row.get("bytes_out") or 0)) / 1024 / 1024,
+                            vol_val=(merged_bytes / 1024 / 1024 if merged_bytes > 0 else None),
                             vol_note="(Total)",
                             conn_val=row.get("flow_count") or 0,
                         )
-                        for row in result.rows
-                    ]
+                    shaped_rows = [_shape_archive_row(row) for row in result.rows]
 
                     return jsonify({
                         "ok": True,

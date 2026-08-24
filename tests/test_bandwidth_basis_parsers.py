@@ -110,6 +110,30 @@ class TestShapeTrafficRowBandwidthDisplay(unittest.TestCase):
         self.assertNotIn("max_bandwidth_mbps", row)
 
 
+class TestShapeTrafficRowVolumeDisplay(unittest.TestCase):
+    """Final-review Finding 2 (appendix C.3(2)): volume must get the same
+    zero-vs-unavailable treatment as bandwidth -- calculate_volume_mb's
+    None must not be silently turned back into "0.00 MB (Total)" here,
+    twenty lines below the bandwidth guard this class mirrors."""
+
+    def setUp(self):
+        self.analyzer = _analyzer()
+
+    def test_omits_volume_fields_when_val_is_none(self):
+        row = self.analyzer._shape_traffic_row(
+            _flow(), bw_val=None, bw_note="", vol_val=None, vol_note="",
+            conn_val=1)
+        self.assertNotIn("total_volume_mb", row)
+        self.assertNotIn("formatted_volume", row)
+
+    def test_measured_volume_is_still_written(self):
+        row = self.analyzer._shape_traffic_row(
+            _flow(), bw_val=None, bw_note="", vol_val=2.0, vol_note="(Total)",
+            conn_val=1)
+        self.assertEqual(row["total_volume_mb"], 2.0)
+        self.assertIn("2.00 MB", row["formatted_volume"])
+
+
 class TestFormatUnitUnavailable(unittest.TestCase):
     def test_none_bandwidth_is_dash(self):
         self.assertEqual(format_unit(None, "bandwidth"), DASH)

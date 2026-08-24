@@ -55,8 +55,14 @@ def flatten_flow_record(r: dict) -> dict:
     dst_labels = _extract_labels(dst_wl.get('labels', []))
 
     mbps, _, _, _ = calculate_mbps(r)
+    # calculate_volume_mb's unavailable state (None, final-review Finding 2)
+    # has no byte count to report -- bytes_total joins bytes_in/bytes_out
+    # (below) as a raw counter that's 0 when nothing was measured, same as
+    # those siblings already are for an empty flow; unlike bandwidth_mbps
+    # it isn't carried through the unified DataFrame as a derived
+    # unavailable-vs-zero signal (out of this task's scope).
     vol_mb, _ = calculate_volume_mb(r)
-    bytes_total = int(vol_mb * 1024 * 1024)
+    bytes_total = int(vol_mb * 1024 * 1024) if vol_mb is not None else 0
 
     def _f(key): return float(r.get(key) or 0)
 

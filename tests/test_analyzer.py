@@ -161,8 +161,12 @@ class TestAnalyzer(unittest.TestCase):
         flow = {"dst_tbo": "1,234", "dst_tbi": None, "tdms": "abc"}
         val, _note, _, _ = self.analyzer.calculate_mbps(flow)
         self.assertIsNone(val)
-        vol, _ = self.analyzer.calculate_volume_mb(flow)
-        self.assertEqual(vol, 0.0)
+        # Task final-review Finding 2: an unparsable byte field yields no
+        # real byte count, same as an absent one -- unavailable, not a
+        # measured zero.
+        vol, vol_note = self.analyzer.calculate_volume_mb(flow)
+        self.assertIsNone(vol)
+        self.assertEqual(vol_note, "")
 
 
     def test_calculate_volume_mb(self):
@@ -170,11 +174,33 @@ class TestAnalyzer(unittest.TestCase):
         val, note = self.analyzer.calculate_volume_mb(flow)
         self.assertAlmostEqual(val, 2.0)
         self.assertEqual(note, "(Interval)")
-        
+
         flow_total = {"dst_tbo": 2097152, "dst_tbi": 0} # 2 MB total
         val_total, note_total = self.analyzer.calculate_volume_mb(flow_total)
         self.assertAlmostEqual(val_total, 2.0)
         self.assertEqual(note_total, "(Total)")
+
+    def test_calculate_volume_mb_zero_bytes_is_unavailable(self):
+        """Appendix C.3(2): a flow with no byte counters must not report
+        0.0 MB -- that reads as "measured zero bytes" when nothing was
+        measured at all. Async query never omits dst_bi/dst_bo (always
+        sends 0), so a true zero and an unmeasured flow are indistinguishable
+        -- same reasoning as calculate_mbps's own zero-bytes guard."""
+        val, note = self.analyzer.calculate_volume_mb({})
+        self.assertIsNone(val)
+        self.assertEqual(note, "")
+
+    def test_calculate_volume_mb_nonfinite_value_is_unavailable_not_a_measured_zero(self):
+        """A byte field arriving as the literal string "nan" makes
+        _safe_float produce NaN. NaN compares False in both directions, so
+        `total_bytes <= 0` alone would not catch it and the function would
+        return (nan, "(Total)") -- "nan MB (Total)" downstream. Must fall
+        through to unavailable, mirroring calculate_mbps's own isfinite
+        guard (Task 2 fix round 1)."""
+        flow = {"dst_tbo": "nan", "dst_tbi": 0}
+        val, note = self.analyzer.calculate_volume_mb(flow)
+        self.assertIsNone(val)
+        self.assertEqual(note, "")
 
     def test_sliding_window_filter(self):
         rule = {"type": "traffic", "threshold_window": 10, "pd": -1, "name": "test rule"}

@@ -398,11 +398,20 @@ def calculate_mbps(flow: dict[str, Any]) -> tuple[float | None, str, float, floa
         return None, "", 0.0, 0.0
     return val, BOUND_BASIS_NOTE, total_bytes, denom_seconds * 1000.0
 
-def calculate_volume_mb(flow: dict[str, Any]) -> tuple[float, str]:
+def calculate_volume_mb(flow: dict[str, Any]) -> tuple[float | None, str]:
     """
     Compute data volume in MB from a PCE traffic flow record.
     Priority 1: delta bytes (dst_dbo+dst_dbi)  → MB (Interval)
     Priority 2: total bytes (dst_tbo+dst_tbi)  → MB (Total)
+    Unavailable: no bytes (zero, missing, or a non-finite literal such as
+                 the field value "nan") → (None, '')
+
+    Volume has no denominator to be a lower bound of -- a byte total is
+    either known or not (appendix C.3(2)): unlike calculate_mbps this
+    function has exactly two states, not three. Async query never omits
+    dst_bi/dst_bo (always sends 0), so a genuine zero and an unmeasured
+    flow are indistinguishable -- "0.00 MB (Total)" would tell the operator
+    zero bytes were measured when nothing was measured at all.
 
     Importable independently:
         from src.analyzer import calculate_volume_mb
@@ -413,7 +422,10 @@ def calculate_volume_mb(flow: dict[str, Any]) -> tuple[float, str]:
         return delta_bytes / 1024 / 1024, "(Interval)"
     tbo = _safe_float(flow.get("dst_tbo") or flow.get("tbo") or flow.get("dst_bo") or 0)
     tbi = _safe_float(flow.get("dst_tbi") or flow.get("tbi") or flow.get("dst_bi") or 0)
-    return (tbo + tbi) / 1024 / 1024, "(Total)"
+    total_bytes = tbo + tbi
+    if total_bytes <= 0 or not math.isfinite(total_bytes):
+        return None, ""
+    return total_bytes / 1024 / 1024, "(Total)"
 
 QUERY_RESULT_CAP = 500  # query_flows 單次回傳上限（截斷需回報，不可無聲）
 
@@ -740,7 +752,7 @@ class Analyzer:
         """Delegate to module-level calculate_mbps(). See src.analyzer.calculate_mbps."""
         return calculate_mbps(flow)
 
-    def calculate_volume_mb(self, flow: dict[str, Any]) -> tuple[float, str]:
+    def calculate_volume_mb(self, flow: dict[str, Any]) -> tuple[float | None, str]:
         """Delegate to module-level calculate_volume_mb(). See src.analyzer.calculate_volume_mb."""
         return calculate_volume_mb(flow)
 
@@ -1927,6 +1939,17 @@ class Analyzer:
                         self._push_bounded_top_match(heap, m_bw, count_processed, f_copy, TOP_MATCHES_LIMIT)
 
                 elif rule["type"] == "volume":
+                    if m_vol is None:
+                        # calculate_volume_mb 的不可得狀態（終審 Finding 2，
+                        # 比照上面 bandwidth 的 no_measurement 守門）：沒有
+                        # byte counter 可言，不可當 0 加進 res['max_val']
+                        # ——0 對加總沒有影響，看似「安全」，但這筆 flow
+                        # 從未被納入證據，操作者理當看得到。
+                        span_min = (0.0 if f_span_start is None
+                                    else (now_utc - f_span_start).total_seconds() / 60.0)
+                        self._record_basis_mismatch(
+                            basis_mismatch, rid, rule, r_win, span_min, "no_measurement")
+                        continue
                     res['max_val'] += m_vol
                     f_copy = f.copy()
                     f_copy['_metric_val'] = m_vol
@@ -2428,7 +2451,7 @@ class Analyzer:
 
     def _shape_traffic_row(self, f: dict[str, Any], *,
                             bw_val: float | None, bw_note: str,
-                            vol_val: float, vol_note: str,
+                            vol_val: float | None, vol_note: str,
                             conn_val: int) -> dict[str, Any]:
         """把一筆原始 PCE flow payload（或形狀相同的封存 `raw` 快照）投影成
         流量表格要渲染的列：來源/目的身分、服務、通訊協定名稱、首見/末見
@@ -2447,7 +2470,10 @@ class Analyzer:
         ddms/tdms）：不寫入 max_bandwidth_mbps／formatted_bandwidth，讓
         下游（trafficKpis 的尖峰頻寬、fmtBw）維持它們既有對「沒有這個
         量測」的呈現方式（「—」），而不是印出一個看似量測到、其實是 0
-        的頻寬。
+        的頻寬。`vol_val=None`（calculate_volume_mb 的不可得狀態，終審
+        Finding 2）比照同一套規則：不寫入 total_volume_mb／
+        formatted_volume——volume 沒有分母、不是推測值，「零」與「不可得」
+        同樣不可混為一談。
         """
         src = f.get('src', {})
         dst = f.get('dst', {})
@@ -2522,7 +2548,9 @@ class Analyzer:
                 f_copy["formatted_bandwidth"] = f"≥ {bw_str}"
             else:
                 f_copy["formatted_bandwidth"] = f"{bw_str} {bw_note}".strip()
-        f_copy["total_volume_mb"] = vol_val
+        if vol_val is not None:
+            f_copy["total_volume_mb"] = vol_val
+            f_copy["formatted_volume"] = f"{format_unit(vol_val, 'volume')} {vol_note}".strip()
         f_copy["total_connections"] = conn_val
         # trafficKpis (investigate.mjs) reads num_connections straight off the
         # row for the connection-count KPI — live rows get it incidentally
@@ -2533,7 +2561,6 @@ class Analyzer:
         # accident of what live's f.copy() happened to preserve.
         f_copy["num_connections"] = conn_val
 
-        f_copy["formatted_volume"] = f"{format_unit(vol_val, 'volume')} {vol_note}".strip()
         f_copy["formatted_connections"] = f"{conn_val}"
 
         ts = f.get('timestamp_range', {})
@@ -2973,8 +3000,18 @@ class Analyzer:
                             f_copy['_metric_val'] = v
                             f_copy['_metric_fmt'] = f"{format_unit(v, 'bandwidth')} {note}"
                         elif rtype == "volume":
-                            v = delta.volume_mb if delta is not None else vol_v
-                            note = DELTA_BASIS_NOTE if delta is not None else vol_n
+                            if delta is not None:
+                                v = delta.volume_mb
+                                note = DELTA_BASIS_NOTE
+                            elif vol_v is None:
+                                # calculate_volume_mb 的不可得狀態（終審
+                                # Finding 2）：與引擎同一套守門計數，模擬
+                                # 不可以把 None 悄悄併入下面的 sum()。
+                                guarded["no_measurement"] += 1
+                                continue
+                            else:
+                                v = vol_v
+                                note = vol_n
                             f_copy = f.copy()
                             f_copy['_metric_val'] = v
                             f_copy['_metric_fmt'] = f"{format_unit(v, 'volume')} {note}"
