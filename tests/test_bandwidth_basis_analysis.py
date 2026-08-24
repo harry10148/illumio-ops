@@ -49,6 +49,7 @@ import pandas as pd
 import pytest
 
 from src.report.analysis.mod11_bandwidth import bandwidth_analysis, _lower_bound_mask
+from src.report.exporters.html_exporter import TrafficFlowsHtmlExporter
 from src.report.rules_engine import RulesEngine
 from src.report.rules import Finding
 
@@ -261,3 +262,86 @@ class TestB008RenamedToVolumeAnomaly:
              'bytes_total': 0, 'num_connections': 1}
         ])
         assert engine._b008_bandwidth_anomaly(df) is None
+
+
+def _traffic_report_results(mod11: dict) -> dict:
+    """Minimal results dict TrafficFlowsHtmlExporter needs to build without
+    crashing -- mirrors tests/test_traffic_flows_html_exporter.py's _results()
+    helper, customized to inject the mod11 dict under test."""
+    df = pd.DataFrame([{"Port": 443, "Protocol": "TCP", "Flow Count": 10}])
+    return {
+        "findings": [],
+        "mod01": {"total_flows": 10, "total_connections": 100,
+                  "unique_src_ips": 2, "unique_dst_ips": 3,
+                  "allowed_flows": 4, "blocked_flows": 1,
+                  "potentially_blocked_flows": 5, "unknown_flows": 0,
+                  "total_bytes": 0, "total_mb": 1.0,
+                  "policy_coverage_pct": 40.0,
+                  "src_managed_pct": 100.0, "dst_managed_pct": 50.0,
+                  "date_range": "2026-04-27 ~ 2026-05-04",
+                  "top_ports": df, "top_protocols": df},
+        "mod02": {"summary": df, "chart_spec": None},
+        "mod08": {"unmanaged_flow_count": 3, "unmanaged_pct": 30.0,
+                  "unique_unmanaged_src": 1, "unique_unmanaged_dst": 1,
+                  "top_unmanaged_src": df},
+        "mod09": {"label_distribution": {"src_app": df, "dst_app": df,
+                                         "src_env": df, "dst_env": df,
+                                         "src_role": df, "dst_role": df},
+                  "port_distribution": df, "proto_distribution": df},
+        "mod11": mod11,
+        "mod12": {"generated_at": "2026-07-02 12:00:00", "kpis": [],
+                  "findings_summary": {}, "total_findings": 0,
+                  "key_findings": [], "findings": [],
+                  "boundary_breaches": [], "suspicious_pivot_behavior": [],
+                  "blast_radius": [], "blind_spots": [], "action_matrix": []},
+    }
+
+
+class TestMod11HtmlRendersTheBoundLabel:
+    """The analysis-module fields are only honest if the rendered HTML
+    actually shows them -- `bandwidth_analysis()` labelling a statistic as a
+    bound and the exporter silently dropping that label on the floor is the
+    same class of lie this task exists to close, one layer further down."""
+
+    def _export_html(self, tmp_path, mod11: dict) -> str:
+        results = _traffic_report_results(mod11)
+        exp = TrafficFlowsHtmlExporter(results, data_source="api", lang="en")
+        path = exp.export(str(tmp_path))
+        return open(path, encoding="utf-8").read()
+
+    def test_bound_stats_get_the_ge_prefix_and_both_notes(self, tmp_path):
+        df = pd.DataFrame([{"Port": 443, "Protocol": "TCP", "Flow Count": 10}])
+        mod11 = {
+            "bytes_data_available": True, "total_bytes": 1000, "total_mb": 1.0,
+            "top_by_bytes": df, "top_bandwidth": df,
+            "max_bandwidth_mbps": 500.0, "avg_bandwidth_mbps": 170.0,
+            "p95_bandwidth_mbps": 480.0,
+            "bandwidth_stats_is_bound": True,
+            "bandwidth_bound_flow_count": 2, "bandwidth_point_flow_count": 2,
+            "bandwidth_unavailable_count": 2, "bandwidth_candidate_count": 5,
+        }
+        html = self._export_html(tmp_path, mod11)
+
+        assert "≥ 500.00 Mbps" in html
+        assert "≥ 170.00 Mbps" in html
+        assert "≥ 480.00 Mbps" in html
+        # The explanatory notes must both be present, not just the glyph.
+        assert "lower bound" in html.lower()
+        assert "2 of 5" in html
+
+    def test_point_only_stats_get_no_ge_prefix(self, tmp_path):
+        df = pd.DataFrame([{"Port": 443, "Protocol": "TCP", "Flow Count": 10}])
+        mod11 = {
+            "bytes_data_available": True, "total_bytes": 1000, "total_mb": 1.0,
+            "top_by_bytes": df, "top_bandwidth": df,
+            "max_bandwidth_mbps": 100.0, "avg_bandwidth_mbps": 75.0,
+            "p95_bandwidth_mbps": 95.0,
+            "bandwidth_stats_is_bound": False,
+            "bandwidth_bound_flow_count": 0, "bandwidth_point_flow_count": 3,
+            "bandwidth_unavailable_count": 0, "bandwidth_candidate_count": 3,
+        }
+        html = self._export_html(tmp_path, mod11)
+
+        assert "≥ 100.00 Mbps" not in html
+        assert "100.00 Mbps" in html
+        assert "lower bound" not in html.lower()
