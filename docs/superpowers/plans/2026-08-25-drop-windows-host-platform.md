@@ -679,7 +679,8 @@ timeout 300 /home/harry/rd/illumio-ops/venv/bin/python -m pytest tests/ -q -k "g
 - [ ] **Step 8: Commit**
 
 ```bash
-git add -u docs README_zh.md illumio-ops.py design/v2/mockup/i18n-supplement.json CHANGELOG.md
+git add -u docs README_zh.md illumio-ops.py design/v2/mockup/i18n-supplement.json CHANGELOG.md \
+        src/i18n_en.json src/i18n_zh_TW.json src/static/js/v2/areas/system.mjs
 git commit -m "docs: drop the Windows host installation path
 
 The CHANGELOG entry says explicitly that managing Windows workloads is
