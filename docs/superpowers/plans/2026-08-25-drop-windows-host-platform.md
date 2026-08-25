@@ -502,6 +502,8 @@ printf '# requirements-offline.txt sha256: %s\n' \
 ```
 
 `pip-compile` **不在本機環境中**（已查證）：先 `pip install pip-tools`。
+鎖檔的目標直譯器是 **Python 3.12**（bundle 內嵌的版本），盡量在 3.12 下重產；
+若用了別的版本，Step 5b 的 diff 範圍檢查會把因此產生的版本漂移擋下來。
 
 **不要加 `--upgrade`。** pip-compile 預設會沿用 output file 裡既有的釘選版本，
 只重解受影響的部分；加了 `--upgrade` 就會把每個套件重解成最新版，等於把一次
@@ -628,8 +630,11 @@ NSSM 服務註冊說明、以及提到 Windows bundle 自動取用 NSSM 的段�
 
 - `src/i18n_en.json:5098` — "If the daemon is managed externally (systemd, NSSM…) …"
 - `src/i18n_zh_TW.json:5097` — 「若 daemon 由 systemd／NSSM 等外部管理…」
-- `src/i18n/data/zh_explicit.json` 的對應條目（繁中正本；只改 zh_TW 沒改這裡，
-  下次 `precompute_zh_translations` 會蓋回去）
+**`src/i18n/data/zh_explicit.json` 不需要動——已查證該檔沒有這個 key**
+（1720 條中不含 `gui_sy_restart_i_409`），所以這個鍵的繁中值是獨立維護的，
+直接改 `i18n_zh_TW.json` 即可。改完仍要跑
+`python3 scripts/precompute_zh_translations.py --dry-run` 確認 `would update 0 keys`；
+**若它回報要更新，代表這個 key 其實是衍生的，那就得改 zh_explicit 而不是 zh_TW**。
 
 另外兩處：
 
@@ -775,15 +780,23 @@ second platform this tool no longer has."
 而且用 grep 掃 "windows" 會同時命中兩類。
 """
 import json
+import subprocess
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 
 
 def test_no_powershell_files_remain():
-    found = sorted(p.relative_to(ROOT).as_posix()
-                   for p in ROOT.rglob("*.ps1")
-                   if ".git" not in p.parts)
+    """只看 git 追蹤的檔案。
+
+    這台機器上有 20 個 .ps1，其中 17 個在 venv/（`venv/bin/Activate.ps1`）與
+    gitignore 掉的 build/ staging tree 裡。用 rglob 掃檔案系統的守門會在每一台
+    有 venv 的開發機和 appliance 上永遠假紅——那比沒有守門更糟，因為紅燈會被
+    學會忽略。
+    """
+    out = subprocess.run(["git", "ls-files", "*.ps1"], cwd=ROOT,
+                         capture_output=True, text=True, check=True)
+    found = sorted(l for l in out.stdout.splitlines() if l)
     assert found == [], f"Windows is no longer a host platform: {found}"
 
 
@@ -816,6 +829,8 @@ def test_no_nssm_in_shipped_copy():
     這條守的是本案最容易漏的一項：mockup 改了、正式字典沒改，任何閘門都不會紅，
     但使用者在 GUI 上還是看得到 NSSM。
     """
+    # zh_explicit 目前就沒有 NSSM（該 key 不在其中），一併納入是為了擋住
+    # 「未來有人把這句加進正本」。
     for rel in ("src/i18n_en.json", "src/i18n_zh_TW.json",
                 "src/i18n/data/zh_explicit.json"):
         text = (ROOT / rel).read_text(encoding="utf-8")
