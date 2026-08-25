@@ -303,7 +303,7 @@
   "cli_cache_err_no_db": "無法連線至快取資料庫，請確認 pce_cache.db_path 是否已設定。",
   "cli_cache_flush_busy": "清除快取未能及時完成（{error}）——有一個監控週期正持有鎖。沒有任何資料被清除；等它結束後再試一次。",
   "cli_cache_flush_needs_confirm": "這會清除每一筆快取的 PCE 資料以及由它衍生的狀態。請加上 --confirm 再試一次。",
-  "cli_cache_flush_restart_required": "請立即重新啟動監控服務。已經在執行的服務在重啟之前仍會沿用舊的連線設定，並且會把剛清掉的資料重新填回去。",
+  "cli_cache_flush_restart_required": "請立即重新啟動監控服務。已經在執行的服務仍會沿用清除前載入的狀態，不會自行察覺已被清空；重新啟動後才會把剛清掉的資料重新填回去。",
   "cli_cache_invalid_since_date": "--since 日期無效：{since}",
   "cli_cache_invalid_until_date": "--until 日期無效：{until}",
   "cli_cache_retention": "Cache 保留 Policy",

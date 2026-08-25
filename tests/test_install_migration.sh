@@ -64,7 +64,7 @@ fi
 
 PASS_COUNT=0
 FAIL_COUNT=0
-TOTAL=17
+TOTAL=21
 
 pass() {
     echo "PASS: $1"
@@ -305,6 +305,19 @@ cleanup_contamination_env() {
 
 MARKER_REL="config/.pce-profile-migration.json"
 
+# Stages a real copy of src/pce_target.py (+ its package __init__.py) under
+# CFG_ROOT/src, so `from src.pce_target import ...` inside the heredoc
+# succeeds via the function's own `sys.path.insert(0, root)` — deliberately,
+# not by accident. check_pce_profile_contamination invokes python with -P
+# (no cwd on sys.path), so without this staging there is no other way for
+# the real module to be found: any test that needs real-normalizer behavior
+# (case-folding, or urlsplit raising on a malformed url) must call this.
+stage_real_pce_target() {
+    mkdir -p "$CFG_ROOT/src"
+    cp "$REPO_ROOT/src/pce_target.py" "$CFG_ROOT/src/pce_target.py"
+    cp "$REPO_ROOT/src/__init__.py" "$CFG_ROOT/src/__init__.py"
+}
+
 # --- T7: two distinct (url, org_id) profiles -> contamination warning ------
 
 t7_two_distinct_profiles() {
@@ -522,17 +535,18 @@ JSON
 }
 
 # --- T12: exercises the real src.pce_target import, not the fallback -------
-# T7-T10 all run in a CFG_ROOT with no src/ tree, so they only ever exercise
-# the inline fallback normalizers. This test stages a real src/pce_target.py
-# under CFG_ROOT so `from src.pce_target import ...` actually succeeds, and
+# check_pce_profile_contamination invokes python with -P (no cwd on
+# sys.path), so the only way `from src.pce_target import ...` succeeds is a
+# real src/ tree under CFG_ROOT itself — never incidentally, via wherever
+# this suite happens to be invoked from. T7-T11, T13-T15, T17, T20 and T21
+# don't stage one, so they deterministically exercise the inline fallback
+# normalizers. This test stages a real src/pce_target.py under CFG_ROOT and
 # uses a behavior only the real normalize_pce_url has (scheme/host case
 # folding) to prove the import path — not the fallback — ran.
 
 t12_real_normalizer_import() {
     new_contamination_env
-    mkdir -p "$CFG_ROOT/src"
-    cp "$REPO_ROOT/src/pce_target.py" "$CFG_ROOT/src/pce_target.py"
-    cp "$REPO_ROOT/src/__init__.py" "$CFG_ROOT/src/__init__.py"
+    stage_real_pce_target
     cat > "$CFG_ROOT/config/config.json" <<'JSON'
 {
   "api": {"url": "https://pce1.example.com", "org_id": "1"},
@@ -702,9 +716,14 @@ JSON
 # normalize_pce_url. The old code let that exception propagate out of the
 # per-entry loop, so the ONLY thing that ran was the outer `|| true` guard —
 # no warning, no marker, for a config that has two perfectly good profiles.
+# Needs the REAL normalizer staged: the fallback never calls urlsplit, so it
+# would treat "https://[broken" as just another opaque string and never
+# raise at all — the test would misreport this fix as working when only the
+# fallback ran (this depended on cwd, incidentally, before the -P fix).
 
 t16_one_bad_url_does_not_blank_the_check() {
     new_contamination_env
+    stage_real_pce_target
     cat > "$CFG_ROOT/config/config.json" <<'JSON'
 {
   "api": {"url": "https://pce1.example.com", "org_id": "1"},
@@ -788,6 +807,208 @@ JSON
     cleanup_contamination_env
 }
 
+# --- T18: F1 — two profiles, one unparseable url, degraded marker ----------
+# Regression: with the surviving readable count at exactly one, the marker
+# used to record `distinct_pce_targets: 1` as if that were a confirmed fact.
+# Since this appliance's pce_profiles had TWO entries, the dropped one could
+# just as easily have been a second distinct PCE — the marker must not claim
+# otherwise, and this run must not print the false "were removed" NOTE
+# either. Needs the real normalizer staged (see T16's comment) so the broken
+# url actually raises instead of being silently accepted by the fallback.
+
+t18_two_profiles_one_bad_degrades_not_confirms() {
+    new_contamination_env
+    stage_real_pce_target
+    cat > "$CFG_ROOT/config/config.json" <<'JSON'
+{
+  "api": {"url": "https://pce1.example.com", "org_id": "1"},
+  "pce_profiles": [
+    {"url": "https://pce1.example.com", "org_id": "1"},
+    {"url": "https://[broken", "org_id": "9"}
+  ]
+}
+JSON
+
+    local out exit_code
+    out="$(check_pce_profile_contamination "$CFG_ROOT" "$PY_BIN" 2>&1)"
+    exit_code=$?
+
+    if [[ $exit_code -ne 0 ]]; then
+        fail "T18 two-profile-one-bad degrades" "non-zero exit ($exit_code)" "$out"
+    fi
+    if grep -q "Traceback" <<< "$out"; then
+        fail "T18 two-profile-one-bad degrades" "python raised instead of skipping the bad entry" "$out"
+    fi
+    # This run must not claim the profiles were removed — they are present,
+    # just partly unreadable, and there genuinely were two of them.
+    if grep -qi "were removed in a newer version" <<< "$out"; then
+        fail "T18 two-profile-one-bad degrades" "false claim: profiles are present and there were two of them" "$out"
+    fi
+    if ! grep -qi "WARNING" <<< "$out"; then
+        fail "T18 two-profile-one-bad degrades" "expected a warning this run — two profiles, one unreadable, is not confirmed-safe" "$out"
+    fi
+    if ! grep -q "pce1.example.com" <<< "$out"; then
+        fail "T18 two-profile-one-bad degrades" "expected the one readable PCE in output" "$out"
+    fi
+    if [[ ! -f "$CFG_ROOT/$MARKER_REL" ]]; then
+        fail "T18 two-profile-one-bad degrades" "marker file not created" "$out"
+    fi
+    if ! "$PY_BIN" -m json.tool "$CFG_ROOT/$MARKER_REL" > /dev/null 2>&1; then
+        fail "T18 two-profile-one-bad degrades" "marker file is not valid JSON" "$out"
+    fi
+    # The bug: this used to write `"distinct_pce_targets": 1`, which a later
+    # run (once pce_profiles is stripped by a routine save) reads as
+    # confirmed-safe and goes silent forever.
+    if grep -q '"distinct_pce_targets": 1' "$CFG_ROOT/$MARKER_REL"; then
+        fail "T18 two-profile-one-bad degrades" "marker recorded a confirmed count of 1 — that was never confirmed" "$out"
+    fi
+
+    # Phase 2: simulate a routine ConfigManager.save() stripping pce_profiles
+    # after this. A later upgrade must still say SOMETHING — never silence.
+    cat > "$CFG_ROOT/config/config.json" <<'JSON'
+{
+  "api": {"url": "https://pce1.example.com", "org_id": "1"}
+}
+JSON
+    local out2 exit_code2
+    out2="$(check_pce_profile_contamination "$CFG_ROOT" "$PY_BIN" 2>&1)"
+    exit_code2=$?
+    if [[ $exit_code2 -ne 0 ]]; then
+        fail "T18 two-profile-one-bad degrades" "phase 2: non-zero exit ($exit_code2)" "$out2"
+    fi
+    if [[ -z "$out2" ]]; then
+        fail "T18 two-profile-one-bad degrades" "phase 2: went silent after pce_profiles was stripped — the degraded marker was read as safe" "$out2"
+    fi
+
+    pass "T18 two-profile-one-bad degrades"
+    cleanup_contamination_env
+}
+
+# --- T19: F1 variant — a wholly malformed pce_profiles shape degrades too --
+# Same defect, different path: `pce_profiles` not shaped as a list at all
+# used to record `distinct_pce_targets: 0` — also a confirmed-safe claim
+# that was never actually confirmed.
+
+t19_malformed_shape_degrades_not_confirms() {
+    new_contamination_env
+    cat > "$CFG_ROOT/config/config.json" <<'JSON'
+{
+  "api": {"url": "https://pce1.example.com", "org_id": "1"},
+  "pce_profiles": "not-a-list"
+}
+JSON
+
+    local out exit_code
+    out="$(check_pce_profile_contamination "$CFG_ROOT" "$PY_BIN" 2>&1)"
+    exit_code=$?
+
+    if [[ $exit_code -ne 0 ]]; then
+        fail "T19 malformed shape degrades" "non-zero exit ($exit_code)" "$out"
+    fi
+    if [[ ! -f "$CFG_ROOT/$MARKER_REL" ]]; then
+        fail "T19 malformed shape degrades" "marker file not created" "$out"
+    fi
+    if ! "$PY_BIN" -m json.tool "$CFG_ROOT/$MARKER_REL" > /dev/null 2>&1; then
+        fail "T19 malformed shape degrades" "marker file is not valid JSON" "$out"
+    fi
+    if grep -q '"distinct_pce_targets": 0' "$CFG_ROOT/$MARKER_REL"; then
+        fail "T19 malformed shape degrades" "marker recorded a confirmed count of 0 — nothing was actually readable" "$out"
+    fi
+
+    # Phase 2: pce_profiles stripped afterward — must not go silent.
+    cat > "$CFG_ROOT/config/config.json" <<'JSON'
+{
+  "api": {"url": "https://pce1.example.com", "org_id": "1"}
+}
+JSON
+    local out2 exit_code2
+    out2="$(check_pce_profile_contamination "$CFG_ROOT" "$PY_BIN" 2>&1)"
+    exit_code2=$?
+    if [[ $exit_code2 -ne 0 ]]; then
+        fail "T19 malformed shape degrades" "phase 2: non-zero exit ($exit_code2)" "$out2"
+    fi
+    if [[ -z "$out2" ]]; then
+        fail "T19 malformed shape degrades" "phase 2: went silent after pce_profiles was stripped — the degraded marker was read as safe" "$out2"
+    fi
+
+    pass "T19 malformed shape degrades"
+    cleanup_contamination_env
+}
+
+# --- T20: F2 — masked-collapse ambiguity resolved by an ordinal ------------
+# Two distinct profiles that both mask to the same placeholder (no scheme,
+# and nothing left to show once any '@'-prefixed userinfo is stripped) used
+# to render as two textually identical lines — the operator couldn't tell
+# there even are two PCEs, let alone which. Same org on both so the org
+# field doesn't accidentally disambiguate them either.
+
+t20_masked_collapse_stays_distinguishable() {
+    new_contamination_env
+    cat > "$CFG_ROOT/config/config.json" <<'JSON'
+{
+  "api": {"url": "https://real-pce.example.com", "org_id": "9"},
+  "pce_profiles": [
+    {"url": "userA@", "org_id": "1"},
+    {"url": "userB@", "org_id": "1"}
+  ]
+}
+JSON
+
+    local out exit_code
+    out="$(check_pce_profile_contamination "$CFG_ROOT" "$PY_BIN" 2>&1)"
+    exit_code=$?
+
+    if [[ $exit_code -ne 0 ]]; then
+        fail "T20 masked collapse distinguishable" "non-zero exit ($exit_code)" "$out"
+    fi
+    if ! grep -qi "WARNING" <<< "$out"; then
+        fail "T20 masked collapse distinguishable" "expected the contamination warning to fire" "$out"
+    fi
+    if ! grep -q "1) <url unavailable> (org 1)" <<< "$out"; then
+        fail "T20 masked collapse distinguishable" "expected an ordinal-numbered first entry" "$out"
+    fi
+    if ! grep -q "2) <url unavailable> (org 1)" <<< "$out"; then
+        fail "T20 masked collapse distinguishable" "expected an ordinal-numbered second, distinguishable entry" "$out"
+    fi
+
+    pass "T20 masked collapse distinguishable"
+    cleanup_contamination_env
+}
+
+# --- T21: F3 — a boolean marker value must not pass as a safe int count ----
+# bool is a subclass of int in Python: isinstance(True, int) is True, and
+# True <= 1 is also True. A marker with `"distinct_pce_targets": true` used
+# to silence the check exactly like a legitimately recorded 0 or 1 would.
+
+t21_bool_marker_value_rejected() {
+    new_contamination_env
+    cat > "$CFG_ROOT/config/config.json" <<'JSON'
+{
+  "api": {"url": "https://pce1.example.com", "org_id": "1"}
+}
+JSON
+    cat > "$CFG_ROOT/$MARKER_REL" <<'JSON'
+{
+  "checked_at": "2026-08-18T00:00:00+00:00",
+  "distinct_pce_targets": true
+}
+JSON
+
+    local out exit_code
+    out="$(check_pce_profile_contamination "$CFG_ROOT" "$PY_BIN" 2>&1)"
+    exit_code=$?
+
+    if [[ $exit_code -ne 0 ]]; then
+        fail "T21 bool marker rejected" "non-zero exit ($exit_code)" "$out"
+    fi
+    if [[ -z "$out" ]]; then
+        fail "T21 bool marker rejected" "went silent — a boolean marker value was accepted as a safe int count" "$out"
+    fi
+
+    pass "T21 bool marker rejected"
+    cleanup_contamination_env
+}
+
 # --- Run all ---------------------------------------------------------------
 
 t1_happy_path
@@ -807,6 +1028,10 @@ t14_marker_recorded_contamination_not_silenced
 t15_credential_url_is_masked_in_output
 t16_one_bad_url_does_not_blank_the_check
 t17_archive_advice_is_actionable
+t18_two_profiles_one_bad_degrades_not_confirms
+t19_malformed_shape_degrades_not_confirms
+t20_masked_collapse_stays_distinguishable
+t21_bool_marker_value_rejected
 
 echo
 echo "$PASS_COUNT/$TOTAL passed"

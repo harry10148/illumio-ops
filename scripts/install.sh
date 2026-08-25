@@ -129,7 +129,13 @@ check_pce_profile_contamination() {
     # runs under install.sh's `set -euo pipefail`). Layer 1 is inside the
     # heredoc itself — every dict access on config-supplied data is guarded
     # before this point is ever reached.
-    "$py" - "$root" <<'PYEOF' || true
+    # -P: don't prepend cwd to sys.path. Only the explicit sys.path.insert(0,
+    # root) below may decide whether the real src.pce_target import succeeds
+    # — without it, running this from a directory that happens to have its
+    # own top-level src/ package (e.g. this repo's checkout) silently uses
+    # THAT module instead of root's, making the except/fallback branch below
+    # untestably dependent on the caller's cwd.
+    "$py" -P - "$root" <<'PYEOF' || true
 import json, os, sys, datetime
 from urllib.parse import urlsplit
 root = sys.argv[1]
@@ -148,16 +154,25 @@ def mask_pce_url(v):
     # arrangement), and this text can land in a terminal or an installer log.
     # The full, unmasked value is still used for comparison — only display
     # goes through this.
+    s = str(v or "")
     try:
-        parts = urlsplit(str(v or ""))
+        parts = urlsplit(s)
     except Exception:
-        return "<url unavailable>"
-    if not parts.scheme or not parts.netloc:
-        return "<url unavailable>"
-    netloc = parts.netloc
-    at = netloc.rfind("@")
-    hostport = netloc[at + 1:] if at >= 0 else netloc
-    return "%s://%s" % (parts.scheme, hostport)
+        parts = None
+    if parts and parts.scheme and parts.netloc:
+        netloc = parts.netloc
+        at = netloc.rfind("@")
+        hostport = netloc[at + 1:] if at >= 0 else netloc
+        return "%s://%s" % (parts.scheme, hostport)
+    # urlsplit found no scheme/netloc to mask (e.g. a bare hostname a typo
+    # left without "https://"). Still strip anything that looks like
+    # embedded userinfo (up to the last '@') before showing what's left —
+    # this branch never returns the raw value unmodified when an '@' is
+    # present. The caller also numbers each PCE it lists, so two entries
+    # that both end up here (or both end up empty) stay distinguishable.
+    at = s.rfind("@")
+    tail = s[at + 1:] if at >= 0 else s
+    return tail if tail else "<url unavailable>"
 
 try:
     with open(cfg_path) as fh:
@@ -228,7 +243,10 @@ if profiles is None:
             with open(marker_path) as mf:
                 marker_data = json.load(mf)
             mt = marker_data.get("distinct_pce_targets")
-            if isinstance(mt, int):
+            # bool is a subclass of int in Python — reject it explicitly, or
+            # a marker with `"distinct_pce_targets": true` would pass this
+            # check and silence the very next branch (True <= 1 is True).
+            if isinstance(mt, int) and not isinstance(mt, bool):
                 marker_targets = mt
                 marker_checked_at = marker_data.get("checked_at", "unknown time")
         except Exception:
@@ -274,9 +292,42 @@ else:
         print("    alerts and searches built on that cache span both environments.")
         print("")
         print("    PCEs found in this config:")
+        # Numbered: mask_pce_url can legitimately return the same placeholder
+        # for two different (unmaskable) urls, and without an ordinal those
+        # two lines would be textually identical — the operator couldn't
+        # tell there even are two.
+        for i, (url, org) in enumerate(sorted(targets), start=1):
+            mark = "  <- api currently points here" if (url, org) == api_t else ""
+            print("      %d) %s (org %s)%s" % (i, mask_pce_url(url), org, mark))
+        print("")
+        print_remediation_commands()
+        print_archive_advice()
+        print("")
+        print("    The other profiles' API credentials are still in config.json")
+        print("    under 'pce_profiles' and stay there until the next save.")
+        print("    ============================================================")
+        print("")
+    elif malformed and len(targets) == 1:
+        # malformed here can only mean an entry beyond the one that parsed —
+        # a single-entry list can't set malformed and still leave targets
+        # non-empty. So this appliance's pce_profiles has more than one row;
+        # the surviving count of 1 is not a finding of fact ("only one PCE
+        # ever configured") — it's missing information, and must not read as
+        # safe here or (via the marker written below) on any later run.
+        print("")
+        print("    ============================================================")
+        print("    WARNING: this appliance's pce_profiles has more than one entry,")
+        print("    but not all of them could be read (a malformed shape or an")
+        print("    unparseable url). Only one PCE could be positively identified —")
+        print("    that does NOT mean there was only one. Treat this the same as")
+        print("    a confirmed multi-PCE appliance: the cache may hold rows from")
+        print("    more than one, with nothing marking which came from which.")
+        print("")
+        print("    PCE positively identified in this config:")
         for url, org in sorted(targets):
             mark = "  <- api currently points here" if (url, org) == api_t else ""
             print("      %s (org %s)%s" % (mask_pce_url(url), org, mark))
+        print("    (one or more other pce_profiles entries could not be parsed)")
         print("")
         print_remediation_commands()
         print_archive_advice()
@@ -304,10 +355,25 @@ if profiles is not None:
     # Nothing new to observe once the key is gone — leave any existing marker
     # (and the history it carries) untouched rather than overwriting it with
     # an empty-looking "0 targets" that was never actually checked.
+    #
+    # If any entry was skipped or malformed AND that left the surviving
+    # count at or below the "safe" threshold (<=1), that count is not a
+    # finding of fact — dropped entries could just as easily have been
+    # additional distinct PCEs. Record "degraded" (no usable count) instead
+    # of a number a later run's "profiles is None" branch would read as
+    # confirmed-safe. A malformed run that already found >1 targets doesn't
+    # need this: more findings can only raise a true count, never lower it,
+    # so a confirmed >1 is still a valid lower bound and stays a plain int.
+    degraded = malformed and len(targets) <= 1
+    payload = {"checked_at": datetime.datetime.now(datetime.timezone.utc).isoformat()}
+    if degraded:
+        payload["distinct_pce_targets"] = None
+        payload["degraded"] = True
+    else:
+        payload["distinct_pce_targets"] = len(targets)
     try:
         with open(marker_path, "w") as fh:
-            json.dump({"checked_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
-                       "distinct_pce_targets": len(targets)}, fh, indent=2)
+            json.dump(payload, fh, indent=2)
     except Exception:
         pass
 PYEOF
