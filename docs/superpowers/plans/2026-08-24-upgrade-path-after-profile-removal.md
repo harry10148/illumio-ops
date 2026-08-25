@@ -270,82 +270,34 @@ git commit -m "feat(install): warn on upgrade when the cache may span two PCEs"
 
 ---
 
-### Task 3: `install.ps1` parity
+### Task 3: ~~`install.ps1` parity~~ — **已取消（2026-08-25）**
 
-**Files:**
-- Modify: `scripts/install.ps1`（`$IsUpgrade` 於 `:241`，升級守門區塊 `:244-303`）
-- Test: `tests/test_windows_install_contract.py`（既有；以原始碼子字串斷言，見 `test_install_ps1_has_upgrade_guards`）
+使用者裁決放棄 Windows 作為執行平台（採「直接移除，下個版本生效」）。本任務的全部內容是替
+`scripts/install.ps1` 補上偵測函式與 deprecated 欄位遷移，而該檔即將整個刪除——做了是廢工。
 
-**Interfaces:**
-- Consumes: Task 2 的行為（同一份判準與同一組輸出元素）
-- Produces: Task 4 的 parity 守門比對其鍵集合
-
-- [ ] **Step 1: 寫失敗測試**
-
-在 `tests/test_windows_install_contract.py` 加測試，照該檔既有 `test_install_ps1_has_upgrade_guards` 的子字串斷言風格：`install.ps1` 必須含 `archive_review_max_days`、`http_redirect_port`、`pce_profiles`、`cache flush --confirm`、`.pce-profile-migration.json`。
-
-- [ ] **Step 2: 跑測試確認失敗**
-
-Run: `timeout 300 ./venv/bin/python -m pytest tests/test_windows_install_contract.py -q -p no:randomly`
-Expected: FAIL — 這些字串都不在 `install.ps1` 裡
-
-- [ ] **Step 3: 實作**
-
-在 `$IsUpgrade` 區塊內加入：(a) deprecated 欄位遷移（Windows 端目前**完全沒有**，要同時涵蓋 `web_gui.tls.http_redirect_port` 與 `pce_cache.archive_review_max_days`）；(b) Task 2 那段偵測。兩者都以 `& $BundlePy -c` 執行（比照 `:286` 讀 `PRAGMA user_version` 的既有寫法）。
-
-提示指令改為 Windows 形式：服務以 NSSM 管理，停/起用 `nssm stop IllumioOps` / `nssm start IllumioOps`；CLI 以 bundle 內的 python 執行並先 `Set-Location $InstallRoot`（Windows 沒有 `/usr/local/bin` wrapper——**這一點與 Linux 不同，不可照抄**）。
-
-- [ ] **Step 4: 測試通過**
-
-```bash
-timeout 300 ./venv/bin/python -m pytest tests/test_windows_install_contract.py tests/test_packaging_security_contract.py -q -p no:randomly
-```
-
-- [ ] **Step 5: Commit**
-
-```bash
-git add scripts/install.ps1 tests/test_windows_install_contract.py
-git commit -m "feat(install): bring the Windows installer's config migration to parity"
-```
+Windows 執行平台的移除另立計畫。**注意該計畫必須釘住的區分**：放棄的是「這支工具跑在 Windows 上」，
+**不是**「管理 Windows workload 的能力」（`windows_service_name` 篩選鍵、estate inventory 的
+`by_family_windows`／`os_type` 分類、報表的 Windows workload 統計皆須保留）。
 
 ---
 
-### Task 4: parity 守門與文件
+### Task 4: 文件與 CHANGELOG
 
 **Files:**
-- Test: `tests/test_windows_install_contract.py`（新增守門）
 - Modify: `docs/guide/configuration.md`、`docs/reference/cli.md`、`CHANGELOG.md`
 
-**Interfaces:**
-- Consumes: Task 2、3 的兩支腳本
+> **2026-08-25 變更**：本任務原含「兩支安裝腳本的 deprecated 遷移鍵集合必須相等」的 parity 守門測試。
+> Windows 執行平台已裁決移除，該守門失去對象，一併取消。文件內容改以 Linux-only 語境撰寫。
 
-- [ ] **Step 1: 寫失敗測試**
+- [ ] **Step 1: 文件**
 
-守門：兩支腳本處理的 deprecated 設定鍵集合必須**相等**。用集合相等而非子字串——子字串通過不代表兩邊一致，那正是 parity 漂移的成因。
+`docs/reference/cli.md` 的 `cache` 子命令表加入 `flush`（照該表既有列的格式）。
+`docs/guide/configuration.md` 說明升級時可能出現的污染警告與兩條處理路徑（`cache flush --confirm`
+與 `config login --pce-target-change flush`），並說明何時該用哪一條。
+`CHANGELOG.md` 的 `### Added` 記 `cache flush` 與升級偵測，照既有條目的散文語氣，說明它解決的是
+「切換 PCE 沒沖 cache」留下的歷史問題。
 
-```python
-_DEPRECATED_KEYS = {"http_redirect_port", "archive_review_max_days"}
-
-def _keys_in(path: str) -> set:
-    src = (ROOT / path).read_text(encoding="utf-8")
-    return {k for k in _DEPRECATED_KEYS if k in src}
-
-def test_both_installers_migrate_the_same_deprecated_keys():
-    sh, ps1 = _keys_in("scripts/install.sh"), _keys_in("scripts/install.ps1")
-    assert sh == ps1 == _DEPRECATED_KEYS, {"install.sh": sh, "install.ps1": ps1}
-```
-
-**驗證這條守門能變紅**：暫時從其中一支腳本移除一個鍵，確認測試失敗並指名該腳本，再還原。RED 輸出留進報告。
-
-- [ ] **Step 2: 跑測試確認**
-
-Run: `timeout 300 ./venv/bin/python -m pytest tests/test_windows_install_contract.py -q -p no:randomly`
-
-- [ ] **Step 3: 文件**
-
-`docs/reference/cli.md` 的 `cache` 子命令表加入 `flush`（照該表既有列的格式）。`docs/guide/configuration.md` 說明升級時可能出現的污染警告與兩條處理路徑。`CHANGELOG.md` 的 `### Added` 記 `cache flush` 與升級偵測，照既有條目的散文語氣，說明它解決的是「切換 PCE 沒沖 cache」留下的歷史問題。
-
-- [ ] **Step 4: 閘門通過**
+- [ ] **Step 2: 閘門通過**
 
 ```bash
 timeout 300 ./venv/bin/python -m pytest tests/test_docs_check.py -q -p no:randomly
@@ -353,10 +305,10 @@ timeout 300 ./venv/bin/python scripts/docs_check.py --all
 timeout 300 ./venv/bin/python scripts/check_doc_links.py
 ```
 
-- [ ] **Step 5: Commit**
+- [ ] **Step 3: Commit**
 
 ```bash
-git add tests/test_windows_install_contract.py docs/reference/cli.md docs/guide/configuration.md CHANGELOG.md
+git add docs/reference/cli.md docs/guide/configuration.md CHANGELOG.md
 git commit -m "docs: record the upgrade contamination check and cache flush"
 ```
 
