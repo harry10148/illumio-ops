@@ -4,7 +4,7 @@
 
 **Goal:** 把「這支工具跑在 Windows 主機上」的所有安裝、打包、服務包裝與平台分支從 repo 移除，同時完整保留「管理 Windows workload」的能力。
 
-**Architecture:** 六個 task，每個 task 的邊界都是「被移除的東西 ＋ 所有斷言它的測試 ＋ 所有指向它的閘門設定」——三者必須同一個 commit，否則測試套件會在計畫中途變紅，而那個紅燈與任何真實缺陷無關。最後一個 task 加上雙向守門（移除守門＋反向守門），並以突變驗證證明兩者真的會紅。
+**Architecture:** 七個 task，每個 task 的邊界都是「被移除的東西 ＋ 所有斷言它的測試 ＋ 所有指向它的閘門設定」——三者必須同一個 commit，否則測試套件會在計畫中途變紅，而那個紅燈與任何真實缺陷無關。最後一個 task 加上雙向守門（移除守門＋反向守門），並以突變驗證證明兩者真的會紅。
 
 **Tech Stack:** bash、PowerShell（僅移除）、Python 3.10/3.11、pytest、pip-compile
 
@@ -33,7 +33,7 @@
 - Consumes: 無
 - Produces: `src.file_lock.has_os_backend()` 語意不變（回傳 bool），實作簡化為 `_fcntl is not None`；模組不再有 `_msvcrt` 屬性。
 
-**這個 task 為什麼不能只是刪除：** `tests/test_config_concurrency.py:448` 的
+**這個 task 為什麼不能只是刪除：** `tests/test_config_concurrency.py:449` 的
 `test_no_lock_backend_degrades_instead_of_crashing` 測的是「兩種 backend 都不可用時退化成行程內鎖」。
 這在純 POSIX 下**仍然要測**（`fcntl` 匯入失敗的機器是存在的）。但它用
 `monkeypatch.setattr(fl, "_msvcrt", None)` 關掉第二個 backend；`_msvcrt` 一旦從模組移除，
@@ -117,6 +117,28 @@ def has_os_backend() -> bool:
 `_warn_degraded` 的訊息從 `"neither fcntl nor msvcrt is available"` 改為
 `"fcntl is not available"`。
 
+**同時移除 placeholder byte 的寫入**（`:158-160`）：
+
+```python
+            if os.fstat(fd).st_size == 0:
+                # Windows 的 byte-range lock 需要實際存在的位元組可鎖。
+                os.write(fd, b"0")
+```
+
+整段刪除。已實測 POSIX `flock` 對零長度檔完全可用：
+
+```bash
+python3 -c "
+import fcntl, os, tempfile
+p = tempfile.mktemp(); fd = os.open(p, os.O_CREAT|os.O_RDWR, 0o600)
+assert os.fstat(fd).st_size == 0
+fcntl.flock(fd, fcntl.LOCK_EX|fcntl.LOCK_NB); print('OK')
+"
+```
+
+那個位元組的唯一理由是 Windows byte-range lock。**代價若判斷錯：鎖檔變成零長度，
+`flock` 行為不變。**
+
 - [ ] **Step 6: 改寫模組 docstring**
 
 `src/file_lock.py:12` 目前寫：
@@ -127,6 +149,16 @@ def has_os_backend() -> bool:
 per-(process, open-file-description)，因此擋不住同一行程的第二個 thread，
 行程內 RLock 因此仍然必要——**這個理由在純 POSIX 下獨立成立**，不需要靠
 Windows 那半段撐著。不得留下任何指涉 Windows 或 msvcrt 的字句。
+
+同一輪要處理的還有：
+
+- `src/file_lock.py:51-53` 的 `_registry` 註解：「Windows 的 byte-range lock 則會自我死鎖」那半句
+- `tests/test_config_concurrency.py:100` 與 `:185` 的 skip 訊息
+  `"no OS-level lock backend (fcntl/msvcrt) on this platform"` → 去掉 `/msvcrt`
+- `tests/test_config_concurrency.py:125` 一帶的 byte-range 註解（若有）
+- `.gitignore:95-97` 的說明：「Content is a single placeholder byte — Windows byte-range
+  locks need a lockable byte」——**忽略規則本身保留**，只改說明；因為 Step 5 已移除該位元組，
+  這段說明現在兩處都不成立
 
 - [ ] **Step 7: 跑覆蓋測試**
 
@@ -149,7 +181,7 @@ grep -rn -i msvcrt src/ tests/ || echo "no msvcrt left in src/ or tests/"
 - [ ] **Step 9: Commit**
 
 ```bash
-git add src/file_lock.py tests/test_config_concurrency.py
+git add src/file_lock.py tests/test_config_concurrency.py .gitignore
 git commit -m "refactor(lock): drop the msvcrt backend
 
 Windows is no longer a host platform, so the branch was dead code on
@@ -328,13 +360,37 @@ git rm tests/test_windows_install_contract.py tests/test_ps1_bom_contract.py
 
 其餘項目與 `last_verified` 暫不動（Task 5 改正文時再更新 `last_verified`）。
 
+- [ ] **Step 5b: 更新 `scripts/check_doc_coverage.sh`**
+
+`:31-32` 的必備 term 清單包含 `preflight.ps1` 與 `install.ps1`：
+
+```bash
+for s in build_offline_bundle.sh preflight.sh install.sh uninstall.sh \
+         preflight.ps1 install.ps1; do
+```
+
+刪掉那兩個 term（保留其餘四個）。**不做這步，Task 5 清掉 installation.md 正文時
+這道 gate 會紅**，而它不在 CI 裡、只有人工跑，紅了不一定有人發現。
+
 - [ ] **Step 6: 跑覆蓋測試與文件閘門**
 
 ```bash
 timeout 300 python3 -m pytest tests/test_packaging_security_contract.py tests/test_docs_contracts.py -q
-python3 scripts/docs_check.py
+python3 scripts/docs_check.py --frontmatter
 python3 scripts/check_doc_links.py
+bash scripts/check_doc_coverage.sh
 ```
+
+**`docs_check.py` 不帶參數等於什麼都不檢查，而且無論如何都 exit 0**——
+必須帶 `--frontmatter`，並且用**輸出內容**判斷，不能看 exit code。
+既有基準是 6 條 dangling（全部指向早已移除的 JS 檔，與本案無關）：
+
+```
+docs/guide/gui-tour.md: src/static/js/{filter-bar,dashboard,integrations,settings,quarantine}.js
+docs/handover/development.md: src/static/js/dashboard.js
+```
+
+預期：**仍然是這 6 條，不多不少**。若出現任何 `.ps1` 的 dangling，代表 frontmatter 沒改乾淨。
 
 預期：測試全綠、兩個文件閘門通過。**這是確定的，不是希望**：
 `scripts/docs_check.py` 的 `check_verified_against_paths`（`:134-153`）只檢查
@@ -384,7 +440,28 @@ that CI never executed, on a platform CI never ran."
 - `PBS_SHA256_WIN_X86_64`（`:33`）
 - `slim_python` 中的 `else  # windows` 分支（`:171` 起）與 `:152-155` 註解裡描述 Windows 的句子
 - 整個 `build_windows()` 函式（`:230-292` 附近，含 `# ── Windows bundle ──` 區段標題）
-- 頂層的 `build_windows` 呼叫（`:296`）
+- 頂層的 `build_windows` 呼叫（`:298`）
+- `:139` 註解「install.sh / install.ps1 就是拿它配 --require-hashes 安裝」→ 只留 `install.sh`
+- `:300` 收尾的 `ls ... illumio-ops-"${VERSION}"-offline-*.{tar.gz,zip}` → 去掉 `,zip`
+  （`{tar.gz}` 單一元素的 brace 不展開，寫成 `*-offline-*.tar.gz`）
+- `:300` 上一行的 `==> All bundles ready in dist/:` → 改為單數
+
+- [ ] **Step 1b: 改寫 `test_build_script_downloads_wheels_from_the_lock`**
+
+`tests/test_packaging_security_contract.py:330`：
+
+```python
+    for fn in ("build_linux", "build_windows"):
+```
+
+改為：
+
+```python
+    for fn in ("build_linux",):
+```
+
+**這是改寫不是刪除**——該測試驗證的是「build 函式從鎖檔下載 wheel」，那條規則對
+Linux 仍然成立。整個刪掉會少掉一條仍然有效的供應鏈斷言。
 
 `slim_python "$BUILD" windows` 的第二個參數若在移除後只剩一種取值，
 **保留該參數不動**（外科手術式改動：不重構沒壞的東西）。
@@ -510,6 +587,17 @@ NSSM 服務註冊說明、以及提到 Windows bundle 自動取用 NSSM 的段�
 
 **保留**所有 Linux 內容。把 frontmatter 的 `last_verified` 更新為 `2026-08-25`。
 
+**`:34` 那一列要外科手術，不能整列刪。** 它現在是：
+
+```
+| **作業系統** | RHEL / Rocky Linux 8+、Ubuntu 22.04+、Debian 12+（glibc >= 2.28）；Windows Server 2019+ / Windows 11（PowerShell 5.1+）。 |
+```
+
+同一列同時載著 Linux glibc 下限與 Windows 版本，而
+`tests/test_packaging_security_contract.py` 的
+`test_installation_doc_states_the_same_glibc_floor` 斷言的正是這一列的 glibc 部分。
+**只刪分號後的 Windows 半句**，`glibc >= 2.28` 一字不動。
+
 - [ ] **Step 2: 其餘文件的單點命中**
 
 逐檔處理（每檔 1-2 行）：`troubleshooting.md`、`configuration.md`、`INDEX.md`、`README_zh.md`。
@@ -525,11 +613,30 @@ NSSM 服務註冊說明、以及提到 Windows bundle 自動取用 NSSM 的段�
 該行說明文字提到 `journal 與 NSSM 的 logs/service_stderr.log`。
 改寫為只提 journal。
 
-- [ ] **Step 5: mockup 文案**
+- [ ] **Step 4b: `docs/handover/development.md:312`**
 
-`design/v2/mockup/i18n-supplement.json:2656-2657` 的 zh/en 兩句
-提到「systemd／NSSM」/「systemd, NSSM…」。改為只提 systemd（spec §3.5）。
-**兩句都要改，且 zh 與 en 的語意必須一致。**
+該行宣告 build 腳本「輸出 `dist/...-offline-linux-x86_64.tar.gz` 與對應的 Windows zip」。
+改為只描述 Linux 產物。**這是現行開發文件，不是歷史紀錄**，要改。
+同句提到 `PBS_TAG`／`PBS_PYTHON`／`PBS_SHA256_*`「四個欄位要一起改」——
+移除 `PBS_SHA256_WIN_X86_64` 後實際剩幾個，依 Task 4 的結果據實改寫。
+
+- [ ] **Step 5: 正式產品的 NSSM 文案（不只 mockup）**
+
+**這是本 task 最容易漏的一項**：正式字典裡就有同一句，而那才是使用者看得到的。
+
+`gui_sy_restart_i_409` 三本字典都要改，**鍵名不動，只改值**：
+
+- `src/i18n_en.json:5098` — "If the daemon is managed externally (systemd, NSSM…) …"
+- `src/i18n_zh_TW.json:5097` — 「若 daemon 由 systemd／NSSM 等外部管理…」
+- `src/i18n/data/zh_explicit.json` 的對應條目（繁中正本；只改 zh_TW 沒改這裡，
+  下次 `precompute_zh_translations` 會蓋回去）
+
+另外兩處：
+
+- `src/static/js/v2/areas/system.mjs:1002` 的註解「systemd/NSSM unit runs…」
+- `design/v2/mockup/i18n-supplement.json:2656-2657` 的 zh/en 兩句
+
+五處改完後 zh 與 en 語意必須一致。**JS 檔內不得出現行尾中文註解**（本 repo 既有規則）。
 
 - [ ] **Step 6: CHANGELOG**
 
@@ -567,7 +674,86 @@ Windows servers."
 
 ---
 
-### Task 6: 雙向守門與突變驗證
+### Task 6: 改寫散落各處的 Windows 理由（功能全部保留）
+
+**Files:**
+- Modify: `src/cli/_runtime.py:70`
+- Modify: `src/config.py:515`
+- Modify: `src/gui/_helpers.py:801`
+- Modify: `src/alerts/plugins.py:41`
+
+**Interfaces:**
+- Consumes: 無
+- Produces: 無（純註解／docstring）
+
+**這個 task 一行程式碼都不改。** 四處都是「某段程式碼存在的理由是 Windows」的說明，
+而那些程式碼在純 POSIX 下**仍然正確、仍然需要**。刪掉程式碼會是真的迴歸；
+留著錯誤的理由則會讓下一個讀者以為還有第二個平台。所以只改理由。
+
+- [ ] **Step 1: `src/cli/_runtime.py:70`**
+
+```python
+    except (AttributeError, ValueError):
+        # SIGTERM not available on Windows for non-console handlers; skip silently
+        pass
+```
+
+`except` 本身**保留**——`signal.signal` 在非主執行緒被呼叫時會拋 `ValueError`，
+那在 Linux 上就會發生。註解改寫成描述這個 POSIX 上真實存在的情況。
+
+- [ ] **Step 2: `src/config.py:515`**
+
+```python
+                # On Windows, os.replace handles atomic rename
+                os.replace(tmp_file, self.config_file)
+```
+
+`os.replace` 在 POSIX 上同樣是原子的。**程式碼不動**，註解改寫為說明為何用
+`os.replace` 而非 `os.rename`（同名覆蓋的原子性），或直接刪除該註解。
+
+- [ ] **Step 3: `src/gui/_helpers.py:801`**
+
+docstring 中「falls back to openssl's enddate field so hosts without the openssl CLI
+(e.g. Windows service installs) still get …」——**fallback 保留**（沒裝 openssl CLI 的
+Linux 主機是存在的），只把括號裡的舉例換掉或刪掉。
+
+- [ ] **Step 4: `src/alerts/plugins.py:41`**
+
+「Returns the ASCII marker … for cross-platform (Windows console) safety.」
+——ASCII marker 保留，理由改寫（非 UTF-8 終端／log pipeline 仍然存在）。
+
+- [ ] **Step 5: 確認沒有動到程式碼**
+
+```bash
+git diff -U0 src/ | grep -E "^[+-]" | grep -vE "^[+-]{3}" | grep -vE "^[+-][[:space:]]*#"
+```
+
+預期：只剩 docstring 內的純文字行。**若出現任何真正的程式碼行，代表改過頭了**，
+還原後只改註解。
+
+- [ ] **Step 6: 跑相關測試**
+
+```bash
+timeout 900 python3 -m pytest tests/ -q -k "runtime or config or helper or plugin or alert"
+```
+
+預期：全綠。
+
+- [ ] **Step 7: Commit**
+
+```bash
+git add src/cli/_runtime.py src/config.py src/gui/_helpers.py src/alerts/plugins.py
+git commit -m "docs(src): reword the comments that justify code by Windows
+
+Every one of these guards is still correct and still needed on POSIX;
+only the stated reason was platform-specific. Removing the code would
+have been a real regression, leaving the reason would have implied a
+second platform this tool no longer has."
+```
+
+---
+
+### Task 7: 雙向守門與突變驗證
 
 **Files:**
 - Create: `tests/test_windows_host_removed.py`
@@ -622,6 +808,24 @@ def test_no_vendored_windows_assets():
 def test_file_lock_has_no_msvcrt_backend():
     import src.file_lock as fl
     assert not hasattr(fl, "_msvcrt")
+
+
+def test_no_nssm_in_shipped_copy():
+    """NSSM 是 Windows 服務管理器；產品文案不該再提它。
+
+    這條守的是本案最容易漏的一項：mockup 改了、正式字典沒改，任何閘門都不會紅，
+    但使用者在 GUI 上還是看得到 NSSM。
+    """
+    for rel in ("src/i18n_en.json", "src/i18n_zh_TW.json",
+                "src/i18n/data/zh_explicit.json"):
+        text = (ROOT / rel).read_text(encoding="utf-8")
+        assert "NSSM" not in text, f"{rel} still mentions NSSM"
+
+
+def test_doc_coverage_no_longer_requires_the_powershell_scripts():
+    text = (ROOT / "scripts" / "check_doc_coverage.sh").read_text(encoding="utf-8")
+    assert "install.ps1" not in text
+    assert "preflight.ps1" not in text
 ```
 
 - [ ] **Step 2: 寫反向守門**
@@ -717,5 +921,7 @@ verified by mutation, not by reading green."
 - [ ] 六道 CI 硬閘門：`pip-audit`、`check_no_naive_datetime`、`check_doc_links`、`audit_i18n_usage`、`mypy`（三個 entry 檔）、`pytest`
 - [ ] 詞彙表閘門
 - [ ] `precompute_zh_translations.py --dry-run` → `would update 0 keys`
+- [ ] 清掉本機的 Windows 產物（未進版控，但留著會誤導下一個人）：
+      `rm -rf dist/illumio-ops-*-offline-windows-x86_64.zip build/illumio-ops-*-offline-windows-x86_64/`
 - [ ] 確認 `git status` 乾淨、主 checkout 未被污染
 - [ ] 合 main → push → `gh run watch` → 部署測試機
