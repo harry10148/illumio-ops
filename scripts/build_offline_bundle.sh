@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Build illumio-ops offline bundles for Linux.
-# Requires: curl, tar, zip, git, any Linux x86_64 with Python 3.10+.
+# Requires: curl, tar, git, any Linux x86_64 with Python 3.10+.
 # Output:
 #   dist/illumio-ops-<version>-offline-linux-x86_64.tar.gz
 set -euo pipefail
@@ -12,9 +12,9 @@ DIST_DIR="$REPO_ROOT/dist"
 VERSION="$("$SCRIPT_DIR/resolve_version.sh")"
 
 # python-build-standalone release — update these lines when upgrading Python.
-# After bumping PBS_TAG / PBS_PYTHON, refresh the SHA256 pins below from a
+# After bumping PBS_TAG / PBS_PYTHON, refresh the SHA256 pin below from a
 # GPG / Sigstore-verified source (NOT the same release origin) and commit
-# all four fields together in the same patch.
+# PBS_TAG, PBS_PYTHON, and PBS_SHA256_LINUX_X86_64 together in the same patch.
 PBS_TAG="20241016"
 PBS_PYTHON="3.12.7"
 

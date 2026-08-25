@@ -2,7 +2,7 @@
 pinning defect found later).
 
 1. scripts/build_offline_bundle.sh staged the BUILD HOST's runtime-generated
-   TLS material into the shipped tar.gz/zip, so every install made from one
+   TLS material into the shipped tar.gz, so every install made from one
    bundle served HTTPS with the same private key (and anyone holding a copy of
    the bundle could impersonate any installation). The bundle must ship config
    templates only; each install mints its own cert on first start via
@@ -13,7 +13,7 @@ pinning defect found later).
    builds of the same source shipped different dependency sets, and a
    substituted wheel would have installed silently on every offline host. The
    bundle now downloads and installs requirements-offline.lock (pip-compile
-   --generate-hashes) with --require-hashes on both platforms.
+   --generate-hashes) with --require-hashes.
 """
 import hashlib
 import re
@@ -240,7 +240,7 @@ def test_build_script_downloads_wheels_from_the_lock():
 def test_build_script_stages_the_lock_into_the_bundle():
     stage = _extract_fn(_bash_text(BUILD_SCRIPT), "stage_app")
     assert '"$LOCK_FILE" "$dest/app/"' in stage, (
-        "the lock must ship inside the bundle — install.sh/install.ps1 install "
+        "the lock must ship inside the bundle — install.sh installs "
         "from it at the customer site"
     )
 

@@ -67,7 +67,8 @@ def _register_signals():
     try:
         _signal.signal(_signal.SIGTERM, _signal_handler)
     except (AttributeError, ValueError):
-        # SIGTERM not available on Windows for non-console handlers; skip silently
+        # signal.signal() raises ValueError when called outside the main thread;
+        # skip silently in that case rather than crashing the caller.
         pass
 
 

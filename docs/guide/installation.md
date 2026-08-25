@@ -205,7 +205,7 @@ sudo systemctl start illumio-ops
 - `logs/`
 - `data/pce_cache.sqlite`（cache DB；schema 於服務下次啟動時自動遷移）
 
-Linux 版另外只更新 `*.example` 範本檔（`config.json.example` 等），方便操作者用
+另外只更新 `*.example` 範本檔（`config.json.example` 等），方便操作者用
 `diff` 比對新版有無新增設定鍵；不會動到操作者自己的 `config.json`。
 
 ## 部署安全注意事項

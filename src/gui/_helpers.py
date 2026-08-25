@@ -803,8 +803,8 @@ def _cert_days_remaining(cert_path: str) -> int | None:
 
     Negative values mean the cert is already expired. Prefers the
     ``cryptography`` package; falls back to openssl's enddate field so hosts
-    without the openssl CLI (e.g. Windows service installs) still get
-    auto-renew and the days-remaining startup message.
+    without the openssl CLI installed still get auto-renew and the
+    days-remaining startup message.
     """
     import subprocess
     from datetime import datetime, timezone

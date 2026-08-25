@@ -38,7 +38,8 @@ def redact_webhook_url(url: str) -> str:
     Per README L-12 (Telegram token leaked via proxy access logs), channel
     secrets must never reach logs, debug output, or persisted dispatch results.
     Keeps only ``scheme://host[:port]`` (userinfo stripped) and elides the rest.
-    Returns the ASCII marker ``...`` for cross-platform (Windows console) safety.
+    Returns the ASCII marker ``...`` so it renders safely in non-UTF-8 terminals
+    and log pipelines.
     """
     if not url:
         return ""

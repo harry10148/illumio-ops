@@ -512,7 +512,8 @@ class ConfigManager:
                     # （比照 state_store.py 既有做法）。
                     f.flush()
                     os.fsync(f.fileno())
-                # On Windows, os.replace handles atomic rename
+                # os.replace() atomically overwrites the destination even when it
+                # already exists (unlike os.rename(), which is not guaranteed to).
                 os.replace(tmp_file, self.config_file)
             except Exception:
                 try:
