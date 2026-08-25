@@ -424,7 +424,23 @@ printf '# requirements-offline.txt sha256: %s\n' \
     "$(sha256sum requirements-offline.txt | cut -d' ' -f1)" >> requirements-offline.lock
 ```
 
-若 `pip-compile` 不在環境中：`pip install pip-tools`。
+`pip-compile` **不在本機環境中**（已查證）：先 `pip install pip-tools`。
+
+**不要加 `--upgrade`。** pip-compile 預設會沿用 output file 裡既有的釘選版本，
+只重解受影響的部分；加了 `--upgrade` 就會把每個套件重解成最新版，等於把一次
+依賴升級偷渡進一個移除案，並且讓 `pip-audit` 的結論失效。
+
+- [ ] **Step 5b: 檢查鎖檔 diff 的範圍**
+
+```bash
+git diff --stat requirements-offline.lock
+git diff requirements-offline.lock | grep -E '^[+-][a-zA-Z]' | head -40
+```
+
+預期：只有 `colorama`、`win32-setctime` 相關行消失，加上尾端 marker 那一行改變。
+
+**若 diff 動到其他套件的版本，停下來回報。** 那不是本案要做的事——移除兩個
+Windows-only wheel 不應該改變任何 Linux 套件的版本。
 
 - [ ] **Step 6: 驗證鎖檔新鮮度閘門**
 
