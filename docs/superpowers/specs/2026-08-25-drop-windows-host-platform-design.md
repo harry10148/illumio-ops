@@ -41,16 +41,56 @@ syslog 中可見。**用 grep 掃 "windows" 會同時命中兩類，這是本案
 
 使用者確認：**目前沒有任何 Windows 部署**，因此不需考慮相容或保留。
 
-| 對象 | 行數／規模 |
+> **本表於 2026-08-25 依原始碼逐面重新盤點後修訂。** 初版是照概念列的，漏了三個測試檔、
+> 一支 preflight 腳本、`vendor/windows/`，以及一道會擋住 CI 的文件閘門。漏失原因與
+> 2026-08-21 那次相同：用一個識別字 grep，而不是走過每個「表面」。下表按表面分組。
+
+**A. 腳本與資產**
+
+| 對象 | 規模 | 備註 |
+|---|---|---|
+| `scripts/install.ps1` | 450 行 | |
+| `scripts/preflight.ps1` | 4.7 KB | **初版漏列**；Linux 對應 `preflight.sh` 保留 |
+| `deploy/install_service.ps1` | 213 行 | NSSM 服務包裝 |
+| `vendor/windows/nssm-2.24.zip` ＋ `README.md` | 二進位 vendor 目錄 | **初版漏列**；bundle 於 `build_offline_bundle.sh:284` 由此解出 `nssm.exe` |
+
+**B. 打包**
+
+| 對象 | 備註 |
 |---|---|
-| `scripts/install.ps1` | 450 行 |
-| `deploy/install_service.ps1` ＋ NSSM 服務包裝 | 213 行 |
-| `tests/test_windows_install_contract.py`、`tests/test_ps1_bom_contract.py` | 79 ＋ 約 40 行 |
-| `scripts/build_offline_bundle.sh` 的 Windows 分支與 `*-offline-windows-x86_64.zip` 產物 | 26 處 |
-| Windows-only wheels（`colorama`、`win32-setctime`） | requirements-offline |
-| `src/file_lock.py` 的 `msvcrt` 分支 | 約 6 行 |
-| CLI 的 `os.system("cls" if os.name == "nt" else "clear")` | 9 檔 |
-| `docs/guide/installation.md` 等的 Windows 安裝章節 | 6 份文件 |
+| `build_offline_bundle.sh` 的 `build_windows()`、`PBS_WIN_URL`、`PBS_SHA256_WIN_X86_64`、`slim_python … windows` 分支 | 26 處 |
+| `*-offline-windows-x86_64.zip` 產物 | |
+| `requirements-offline.txt:73-78`（`colorama`、`win32-setctime` ＋ 其上的說明段） | |
+| `requirements-offline.lock:268,1507` | 鎖檔由 txt 衍生，**必須重產而非手改**；重產後 `test_offline_lock_records_the_sha256_of_its_source_spec` 的 marker 才會對上 |
+| `rsync -a "$REPO_ROOT/scripts/"`（`:137`）目前把 `*.ps1` 一併塞進 **Linux** bundle | 移除 ps1 後 Linux bundle 內容會變，屬預期 |
+
+**C. 原始碼**
+
+| 對象 | 備註 |
+|---|---|
+| `src/file_lock.py` 的 `msvcrt` 分支（`:44,46,64-65,104-111,122-125`） | `has_os_backend()` 簡化為 `_fcntl is not None` |
+| `src/file_lock.py:12` 的 docstring：「本專案有 Windows 安裝路徑，兩邊都必須能跑」 | 該句在移除後為假，必須改寫 |
+| CLI 的 `os.system("cls" if os.name == "nt" else "clear")` | **12 處、9 檔**（初版列 9 檔正確，處數為 12：`report_schedule.py` 與 `web_gui.py` 各有多處）|
+| `illumio-ops.py:61` 說明文字提到 NSSM 的 `logs/service_stderr.log` | **初版漏列** |
+
+**D. 測試**（初版只列 2 檔，實為 5 檔）
+
+| 對象 | 備註 |
+|---|---|
+| `tests/test_windows_install_contract.py`（79 行） | 整檔刪除 |
+| `tests/test_ps1_bom_contract.py` | 整檔刪除 |
+| `tests/test_packaging_security_contract.py` 的 7 個 Windows 測試 | **初版漏列**：`:130,152,161,181,197,315` ＋ §2 標題；`test_install_sh_installs_the_lock_with_require_hashes` 等 Linux 測試**保留** |
+| `tests/test_docs_contracts.py:130`（斷言 `preflight.ps1` 內含 `alerts.json`） | **初版漏列** |
+| `tests/test_build_offline_bundle_doc.py:15` `test_vendor_windows_readme_exists` | **初版漏列**；隨 `vendor/windows/` 一起移除 |
+| `tests/test_config_concurrency.py:414-449` msvcrt 群 | **初版漏列，且不是單純刪除**——見下方 §3.4 |
+
+**E. 文件**
+
+| 對象 | 備註 |
+|---|---|
+| `docs/guide/installation.md` | 35 行命中；**frontmatter `verified_against` 列有 3 支 ps1**，不同步更新 `docs_check` 會紅 |
+| `docs/guide/troubleshooting.md`(2)、`configuration.md`(1)、`INDEX.md`(1)、`reference/glossary.md`(1，NSSM 詞條)、`README_zh.md`(1) | glossary 詞條移除須過 glossary 閘門 |
+| `CHANGELOG.md` 的 `## [Unreleased] ### Removed` | 新增條目；**歷史條目（`:486-492` 等）不得改動** |
 
 **初稿曾主張保留 `msvcrt` 守衛與 `cls` 分支**，理由是它們在 Linux 上 inert、且 `msvcrt` 的存在
 說明了行程內 RLock 為何必要。重新檢視後**撤回該主張**：`file_lock.py` 的 RLock 在 POSIX 上本來
@@ -59,6 +99,26 @@ syslog 中可見。**用 grep 掃 "windows" 會同時命中兩類，這是本案
 留著只是讓讀者以為還有第二個平台。
 
 `has_os_backend()` 相應簡化為 `_fcntl is not None`。
+### 3.4 `msvcrt` 測試群不是單純刪除
+
+`tests/test_config_concurrency.py` 有兩個測試碰 `_msvcrt`：
+
+- `:414 test_windows_msvcrt_branch_locks_and_unlocks` —— 只為讓 msvcrt 分支是活碼而存在，**整個刪除**。
+- `:448 test_no_lock_backend_degrades_instead_of_crashing` —— 測的是「兩種 backend 都不可用時退化成
+  行程內鎖」，這在純 POSIX 下**仍然要測**（`fcntl` 匯入失敗的機器存在）。但它用
+  `monkeypatch.setattr(fl, "_msvcrt", None)` 把第二個 backend 關掉；`_msvcrt` 一旦從模組移除，
+  `monkeypatch.setattr` 會直接 `AttributeError`。**必須在移除 `file_lock.py` 的 msvcrt 分支的同一個
+  task 內改寫成只關 `_fcntl`**，否則整套測試在計畫中途變紅，而那個紅燈與任何真實缺陷無關。
+
+### 3.5 兩個邊界的裁決
+
+- **`tests/test_cli_signal.py:56` 的 `skipif(sys.platform == 'win32')`：保留。** 它描述的是 POSIX signal
+  測試在非 POSIX 上該跳過，是測試本身的可攜性條件，不是產品的 Windows 支援。刪掉沒有好處，
+  且會讓任何人在非 Linux 開發機上跑測試時吃到一個無關的失敗。
+- **`design/v2/mockup/i18n-supplement.json:2656-2657` 提到「systemd／NSSM」的字串：改寫為只提 systemd。**
+  那是 Phase 2 mockup 的文案，描述「daemon 由外部管理時後端回 409」。NSSM 在移除後不再是本工具會
+  遇到的外部管理器，留著會在 2A 落地時被原樣搬進產品文案。
+
 ### 3.2 CHANGELOG 仍要明說，但不需遷移指引
 
 使用者確認目前無 Windows 部署，故**不需要**為既有使用者提供搬移步驟。
@@ -102,6 +162,11 @@ syslog 中可見。**用 grep 掃 "windows" 會同時命中兩類，這是本案
 
 - `docs/` 中描述 Windows **workload** 的段落
 - `pyproject.toml` / `requirements.lock` 中同時被 Linux 使用的套件
+- **歷史紀錄一律不動**：`docs/superpowers/plans/` 與 `specs/` 下的既有文件、
+  `docs/_meta/migration-audit.json`、`CHANGELOG.md` 既有版本的條目、
+  `reports/audit/` 下的稽核產物。它們記載的是當時為真的事，不是現況宣告。
+  實作者最常在此處「順手修正」——明文禁止。
+- `tests/test_cli_signal.py:56` 的 `skipif`（見 §3.5）
 
 ## 5. 測試
 
