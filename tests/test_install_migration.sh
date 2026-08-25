@@ -64,7 +64,7 @@ fi
 
 PASS_COUNT=0
 FAIL_COUNT=0
-TOTAL=10
+TOTAL=13
 
 pass() {
     echo "PASS: $1"
@@ -378,6 +378,15 @@ JSON
     if [[ -z "$out" ]]; then
         fail "T8 single profile" "expected a notice, got no output" "$out"
     fi
+    # Pin the exact branch: this must be the single-profile NOTE, not the
+    # "cannot be determined" (no pce_profiles key) branch or the malformed-
+    # shape branch — all three satisfy "no WARNING, non-empty output" alone.
+    if ! grep -q "credentials stay in config.json until the next save" <<< "$out"; then
+        fail "T8 single profile" "expected the single-profile NOTE text" "$out"
+    fi
+    if grep -qi "cannot be determined" <<< "$out"; then
+        fail "T8 single profile" "unexpectedly hit the 'cannot be determined' branch" "$out"
+    fi
     if [[ ! -f "$CFG_ROOT/$MARKER_REL" ]]; then
         fail "T8 single profile" "marker file not created" "$out"
     fi
@@ -455,6 +464,150 @@ JSON
     cleanup_contamination_env
 }
 
+# --- T11: malformed `api` must not abort the caller under set -e -----------
+# Regression test: check_pce_profile_contamination runs under install.sh's
+# `set -euo pipefail`. A `pce_profiles` list combined with a non-dict `api`
+# value used to raise AttributeError from the heredoc's python, which killed
+# the calling script before its own `return 0` was reached. This must fail
+# against d2b1b321 (the AttributeError propagates and the subshell below
+# exits non-zero, "AFTER_CALL_MARKER" is never printed).
+
+t11_malformed_api_survives_set_e() {
+    new_contamination_env
+    cat > "$CFG_ROOT/config/config.json" <<'JSON'
+{
+  "api": "not-a-dict",
+  "pce_profiles": [
+    {"url": "https://pce1.example.com", "org_id": "1"},
+    {"url": "https://pce2.example.com", "org_id": "2"}
+  ]
+}
+JSON
+
+    # Reproduce install.sh's own `set -euo pipefail` context: an exception in
+    # the heredoc must not kill this subshell before AFTER_CALL_MARKER prints,
+    # and the subshell itself must exit 0 (real caller relies on that).
+    local out exit_code
+    out="$(bash -c '
+        set -euo pipefail
+        source <(sed -n "/^check_pce_profile_contamination()/,/^}/p" "$1")
+        check_pce_profile_contamination "$2" "$3"
+        echo "AFTER_CALL_MARKER"
+    ' _ "$INSTALL_SH" "$CFG_ROOT" "$PY_BIN" 2>&1)"
+    exit_code=$?
+
+    if [[ $exit_code -ne 0 ]]; then
+        fail "T11 malformed api survives set -e" "non-zero exit ($exit_code) — the caller was aborted" "$out"
+    fi
+    if ! grep -q "AFTER_CALL_MARKER" <<< "$out"; then
+        fail "T11 malformed api survives set -e" "caller never reached the line after the call" "$out"
+    fi
+    if grep -q "Traceback" <<< "$out"; then
+        fail "T11 malformed api survives set -e" "python raised instead of falling through" "$out"
+    fi
+    if ! grep -qi "WARNING" <<< "$out"; then
+        fail "T11 malformed api survives set -e" "expected the contamination warning to still fire" "$out"
+    fi
+    if [[ ! -f "$CFG_ROOT/$MARKER_REL" ]]; then
+        fail "T11 malformed api survives set -e" "marker file not created" "$out"
+    fi
+    if ! "$PY_BIN" -m json.tool "$CFG_ROOT/$MARKER_REL" > /dev/null 2>&1; then
+        fail "T11 malformed api survives set -e" "marker file is not valid JSON" "$out"
+    fi
+
+    pass "T11 malformed api survives set -e"
+    cleanup_contamination_env
+}
+
+# --- T12: exercises the real src.pce_target import, not the fallback -------
+# T7-T10 all run in a CFG_ROOT with no src/ tree, so they only ever exercise
+# the inline fallback normalizers. This test stages a real src/pce_target.py
+# under CFG_ROOT so `from src.pce_target import ...` actually succeeds, and
+# uses a behavior only the real normalize_pce_url has (scheme/host case
+# folding) to prove the import path — not the fallback — ran.
+
+t12_real_normalizer_import() {
+    new_contamination_env
+    mkdir -p "$CFG_ROOT/src"
+    cp "$REPO_ROOT/src/pce_target.py" "$CFG_ROOT/src/pce_target.py"
+    cp "$REPO_ROOT/src/__init__.py" "$CFG_ROOT/src/__init__.py"
+    cat > "$CFG_ROOT/config/config.json" <<'JSON'
+{
+  "api": {"url": "https://pce1.example.com", "org_id": "1"},
+  "pce_profiles": [
+    {"url": "HTTPS://PCE1.EXAMPLE.COM", "org_id": "1"},
+    {"url": "https://pce1.example.com", "org_id": "1"}
+  ]
+}
+JSON
+
+    local out exit_code
+    out="$(check_pce_profile_contamination "$CFG_ROOT" "$PY_BIN" 2>&1)"
+    exit_code=$?
+
+    if [[ $exit_code -ne 0 ]]; then
+        fail "T12 real normalizer import" "non-zero exit ($exit_code)" "$out"
+    fi
+    # The fallback's normalize_pce_url does NOT lowercase scheme/host, so if
+    # the import silently fell back, these two URLs would stay distinct and
+    # WARNING would fire. Its absence pins that the real import ran.
+    if grep -qi "WARNING" <<< "$out"; then
+        fail "T12 real normalizer import" "scheme/host case was not folded — real src.pce_target import did not run" "$out"
+    fi
+    if ! grep -q "credentials stay in config.json until the next save" <<< "$out"; then
+        fail "T12 real normalizer import" "expected the single-profile NOTE (URLs should have normalized to one target)" "$out"
+    fi
+    if [[ ! -f "$CFG_ROOT/$MARKER_REL" ]]; then
+        fail "T12 real normalizer import" "marker file not created" "$out"
+    fi
+    if ! "$PY_BIN" -m json.tool "$CFG_ROOT/$MARKER_REL" > /dev/null 2>&1; then
+        fail "T12 real normalizer import" "marker file is not valid JSON" "$out"
+    fi
+    if ! grep -q '"distinct_pce_targets": 1' "$CFG_ROOT/$MARKER_REL"; then
+        fail "T12 real normalizer import" "expected distinct_pce_targets=1 in marker" "$out"
+    fi
+
+    pass "T12 real normalizer import"
+    cleanup_contamination_env
+}
+
+# --- T13: pce_profiles present but not a list -> "could not be read" -------
+# Regression test: this used to fall through to the "were removed in a newer
+# version" text, which is false when the key is right there, just unreadable.
+
+t13_malformed_profiles_not_a_list() {
+    new_contamination_env
+    cat > "$CFG_ROOT/config/config.json" <<'JSON'
+{
+  "api": {"url": "https://pce1.example.com", "org_id": "1"},
+  "pce_profiles": "not-a-list"
+}
+JSON
+
+    local out exit_code
+    out="$(check_pce_profile_contamination "$CFG_ROOT" "$PY_BIN" 2>&1)"
+    exit_code=$?
+
+    if [[ $exit_code -ne 0 ]]; then
+        fail "T13 malformed pce_profiles" "non-zero exit ($exit_code)" "$out"
+    fi
+    if grep -qi "were removed in a newer version" <<< "$out"; then
+        fail "T13 malformed pce_profiles" "false claim: profiles are present, not removed" "$out"
+    fi
+    if ! grep -qi "could not be read" <<< "$out"; then
+        fail "T13 malformed pce_profiles" "expected an unreadable-shape notice" "$out"
+    fi
+    if [[ ! -f "$CFG_ROOT/$MARKER_REL" ]]; then
+        fail "T13 malformed pce_profiles" "marker file not created" "$out"
+    fi
+    if ! "$PY_BIN" -m json.tool "$CFG_ROOT/$MARKER_REL" > /dev/null 2>&1; then
+        fail "T13 malformed pce_profiles" "marker file is not valid JSON" "$out"
+    fi
+
+    pass "T13 malformed pce_profiles"
+    cleanup_contamination_env
+}
+
 # --- Run all ---------------------------------------------------------------
 
 t1_happy_path
@@ -467,6 +620,9 @@ t7_two_distinct_profiles
 t8_single_profile
 t9_no_profiles_no_marker
 t10_trailing_slash_same_pce
+t11_malformed_api_survives_set_e
+t12_real_normalizer_import
+t13_malformed_profiles_not_a_list
 
 echo
 echo "$PASS_COUNT/$TOTAL passed"

@@ -125,7 +125,11 @@ migrate_from_underscore_root() {
 check_pce_profile_contamination() {
     local root="$1" py="$2"
     [ -f "$root/config/config.json" ] || return 0
-    "$py" - "$root" <<'PYEOF'
+    # Layer 2 of 2: no malformed config.json content may abort the caller (it
+    # runs under install.sh's `set -euo pipefail`). Layer 1 is inside the
+    # heredoc itself — every dict access on config-supplied data is guarded
+    # before this point is ever reached.
+    "$py" - "$root" <<'PYEOF' || true
 import json, os, sys, datetime
 root = sys.argv[1]
 cfg_path = os.path.join(root, "config", "config.json")
@@ -135,20 +139,27 @@ try:
     from src.pce_target import normalize_pce_url, normalize_org_id
 except Exception:
     def normalize_pce_url(v): return str(v or "").rstrip("/")
-    def normalize_org_id(v): return str(v or "1")
+    def normalize_org_id(v): return str(v if v is not None else "").strip()
 try:
     with open(cfg_path) as fh:
         cfg = json.load(fh)
+    if not isinstance(cfg, dict):
+        raise ValueError("config.json top level is not an object")
 except Exception as exc:
     print("    PCE profile check skipped (config unreadable): %s" % exc)
     sys.exit(0)
 
 profiles = cfg.get("pce_profiles")
 targets = set()
+malformed = False
 if isinstance(profiles, list):
     for p in profiles:
         if isinstance(p, dict):
             targets.add((normalize_pce_url(p.get("url")), normalize_org_id(p.get("org_id"))))
+        else:
+            malformed = True
+elif profiles is not None:
+    malformed = True
 
 if profiles is None and os.path.exists(marker_path):
     sys.exit(0)                      # 先前已檢查過且無風險
@@ -158,8 +169,10 @@ if profiles is None:
     print("          PCEs cannot be determined here. If it did, its cache may hold")
     print("          rows from both. Check with: illumio-ops cache status")
 else:
-    api_t = (normalize_pce_url(cfg.get("api", {}).get("url")),
-             normalize_org_id(cfg.get("api", {}).get("org_id")))
+    api_cfg = cfg.get("api")
+    if not isinstance(api_cfg, dict):
+        api_cfg = {}
+    api_t = (normalize_pce_url(api_cfg.get("url")), normalize_org_id(api_cfg.get("org_id")))
     if len(targets) > 1:
         print("")
         print("    ============================================================")
@@ -194,6 +207,11 @@ else:
         print("    under 'pce_profiles' and stay there until the next save.")
         print("    ============================================================")
         print("")
+    elif malformed and not targets:
+        print("    NOTE: pce_profiles is present in config.json but not in the")
+        print("          expected shape (a list of {url, org_id} objects), so it")
+        print("          could not be read. If this appliance ever switched PCEs,")
+        print("          its cache may hold rows from more than one.")
     else:
         print("    NOTE: PCE profiles were removed in a newer version; the stored")
         print("          credentials stay in config.json until the next save.")
