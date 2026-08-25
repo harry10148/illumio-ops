@@ -2,7 +2,7 @@
 title: CLI 參考手冊
 audience: [operator, developer]
 version: 4.1.0
-last_verified: 2026-07-17
+last_verified: 2026-08-25
 verified_against:
   - src/cli/root.py
   - src/cli/_global_flags.py
@@ -122,6 +122,21 @@ illumio-ops --json cache status
 ```bash
 illumio-ops cache retention
 illumio-ops cache retention --run
+```
+
+#### cache flush
+
+清除快取中所有的 PCE 衍生資料（包括事件、流量記錄和擷取位置），以及產生它們的相關狀態。適用於同一台機器曾連線至多個 PCE 的情形；若要只清除快取而保持連線不變，需用此命令，因為 `config login --pce-target-change` 只在 PCE 同時改變時才清除。
+
+| 選項 | 型別 | 預設 | 說明 |
+|------|------|------|------|
+| `--confirm` | flag | `false` | 必填。確認執行清除動作。 |
+| `--json` | flag | `false` | 以 JSON 輸出各表的刪除筆數。 |
+| `-h, --help` | | | 顯示說明並退出。 |
+
+```bash
+illumio-ops cache flush --confirm
+illumio-ops cache flush --confirm --json
 ```
 
 ---

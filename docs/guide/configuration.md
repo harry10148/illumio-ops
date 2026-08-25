@@ -2,13 +2,14 @@
 title: 設定參照
 audience: [operator]
 version: 4.1.0
-last_verified: 2026-07-17
+last_verified: 2026-08-25
 verified_against:
   - src/config_models.py
   - src/config.py
   - config/config.json.example
   - config/report_config.yaml
   - src/cli/config.py
+  - src/cli/cache.py
   - src/cli/gui_cmd.py
   - src/scheduler/__init__.py
   - src/scheduler/jobs.py
@@ -128,6 +129,43 @@ illumio-ops config login --url ... --key ... --secret ... [--org-id ...]  # 設�
 > **仍然沒有防護的是 `illumio-ops config set api.url` / `config set api.org_id`
 > 這條單鍵寫入路徑，以及直接手動編輯 `config.json`**：兩者都不會問，
 > 舊 PCE 的快取與擷取水位會原封不動留著，需要清除的話請自行處理。
+
+### 升級時若檢測到快取污染
+
+升級時，若 appliance 的設定檔曾經連過多個 PCE（`pce_profiles` 中有兩個以上的相異目標），安裝腳本會印出一份警告。這表示本機的快取（事件表、流量表等）和擷取水位可能混合了多個 PCE 的資料，並且目前沒有任何標記指出各筆資料來自哪個 PCE。以報表、告警與搜尋為基礎的狀態跨越了兩個環境。
+
+警告會列出在設定中找到的所有 PCE（標出 `api` 目前指向的那一個），以及兩條修復路徑：
+
+**路徑 A：保留目前連的 PCE，只清除另一個 PCE 留下的快取**
+
+你的整套工作（報表排程、監控規則等）都在目前這個 PCE 上，只是以前試過另一台，現在要清乾淨。操作順序：
+
+```bash
+sudo systemctl stop illumio-ops
+sudo -u illumio-ops illumio-ops cache flush --confirm
+sudo systemctl start illumio-ops
+```
+
+`cache flush` 清除所有的快取表行、擷取水位（告訴 PCE API 下一次要拉從哪個時刻開始的資料）、以及告警的冷卻狀態。**執行後一定要重啟監控服務**，否則常駐行程會把剛清掉的資料重新灌進去（見上方「從 CLI 改完之後一定要重啟監控服務」）。
+
+**路徑 B：切換到一個不同的 PCE**
+
+你決定要改指向另一個 PCE（比如實驗環境正式化了）。操作順序：
+
+```bash
+sudo systemctl stop illumio-ops
+sudo -u illumio-ops illumio-ops config login \
+    --url <新PCE的URL> --org-id <新org_id> --pce-target-change flush
+sudo systemctl start illumio-ops
+```
+
+`config login --pce-target-change flush` 會同時更新連線設定**和**清除舊 PCE 的快取與狀態，讓 appliance 在新 PCE 上乾淨地啟動。
+
+**重要：如果你留在原本的 PCE（URL 和 org_id 都沒變），千萬不要誤用路徑 B 的指令。** 若你執行 `config login --pce-target-change flush`（但 URL 和 org_id 完全沒動），存檔會成功但**什麼都不會被清除**。系統判斷是「PCE 沒變」就不會走清除邏輯；清除快取一律用路徑 A 的 `cache flush` 命令。
+
+**關於封存檔案**
+
+快取清除不會動到已產生的封存檔案（`data/archive/` 下）。這些檔案可能來自兩個 PCE，清快取不會標記它們。若要徹底隔離，請把現有的封存目錄**移動**（不是刪除）到另一個地方保存——PCE 只保留約三個月的資料，更舊的檔案無處重取。
 
 ## alerts（告警通道）
 

@@ -27,6 +27,22 @@ a plain `<major>.<minor>.<patch>` scheme. (Tags through v4.0.0 carried a
   the live cache); asking it to try now fails with a plain list of which
   conditions it can't check, instead of silently ignoring them.
 
+- **`illumio-ops cache flush --confirm`** — a new CLI command to clear the
+  cached PCE data and the state derived from it (events, traffic records,
+  ingestion watermarks, alert cooldowns, SIEM queue) without re-pointing the
+  appliance. When an appliance ever connected to multiple PCEs, switching
+  between them never cleared the cache, leaving it a mix of data from both
+  environments with nothing marking which came from which. For appliances
+  staying on their current PCE (which is most of them), this command is now
+  the way to clean up: `config login --pce-target-change flush` clears only
+  when the PCE also changes, so it doesn't apply here. At upgrade time, if the
+  appliance's config carries two or more distinct PCE targets in `pce_profiles`,
+  the installer prints a warning and offers both remediation paths: keep
+  the current PCE and run `cache flush`, or switch to a different one using
+  `config login --pce-target-change flush`. The warning also reminds you that
+  archived day files may span both PCEs and should be moved (not deleted) aside
+  if you want to start fresh on the new one.
+
 ### Removed
 
 - **The archive review database.** Investigating archived traffic used to
