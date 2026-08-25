@@ -336,9 +336,11 @@ python3 scripts/docs_check.py
 python3 scripts/check_doc_links.py
 ```
 
-預期：測試全綠；兩個文件閘門通過（正文此時仍提到 ps1，但那是 prose，
-`docs_check` 檢的是 `verified_against` 指向的檔案是否存在——**若此步驟因正文
-連結而失敗，把該連結的修正提前到本 task 並在報告中記錄**）。
+預期：測試全綠、兩個文件閘門通過。**這是確定的，不是希望**：
+`scripts/docs_check.py` 的 `check_verified_against_paths`（`:134-153`）只檢查
+frontmatter 列出的路徑是否存在，而 `check_links`（`:156`）只檢查 md→md 連結；
+全 repo 沒有任何 markdown 連結指向 `.ps1`（已查證），正文裡的 ps1 都是 code span，
+不構成連結。所以正文留到 Task 5 處理不會讓本 task 的閘門變紅。
 
 - [ ] **Step 7: 確認 repo 已無 ps1**
 
