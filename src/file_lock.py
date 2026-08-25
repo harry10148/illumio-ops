@@ -38,7 +38,7 @@ from loguru import logger
 
 try:  # POSIX
     import fcntl as _fcntl
-except ImportError:  # pragma: no cover - Windows
+except ImportError:  # pragma: no cover - 只在裁剪過的 Python 發生；降級不 crash
     _fcntl = None
 
 DEFAULT_TIMEOUT = 10.0

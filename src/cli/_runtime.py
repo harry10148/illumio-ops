@@ -69,6 +69,9 @@ def _register_signals():
     except (AttributeError, ValueError):
         # signal.signal() raises ValueError when called outside the main thread;
         # skip silently in that case rather than crashing the caller.
+        # AttributeError is defensive only: it used to cover Windows, which has
+        # no SIGTERM. Every platform we still support defines it, but signal
+        # registration is best-effort here, so keep swallowing it.
         pass
 
 
