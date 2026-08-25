@@ -28,7 +28,9 @@
 
 - `windows_service_name` / `ex_windows_service_name` 篩選鍵（七層白名單全鏈）
 - `tests/test_filter_process_winservice.py`
-- estate inventory 的 `by_family_windows` 與 `os_type` 分類（`tests/test_estate_inventory.py`）
+- estate inventory 的 OS family 分類：`src/report/analysis/estate_inventory.py:18` 回傳 `"Windows"` 的那條分支
+  （**注意：`by_family_windows` 是 `tests/test_estate_inventory.py:79` 的測試方法名，不是產品符號**——
+  在 `src/` 裡 grep 它會一無所獲，別因此以為分類已不存在）
 - 報表中的 Windows workload 統計、VEN OS 分佈
 - 快取攤平時保留的 `windows_service_name` 欄位（`tests/test_cache_flatten_vectorized.py:80`）
 
@@ -155,7 +157,9 @@ syslog 中可見。**用 grep 掃 "windows" 會同時命中兩類，這是本案
 - `requirements-offline.txt` 不含 `colorama` / `win32-setctime`
 
 **同時必須有一條「反向守門」**，確保 Windows **workload** 支援未被誤刪：
-`windows_service_name` 仍在七層白名單、`by_family_windows` 仍在 estate inventory。
+estate inventory 的 `"Windows"` family 分支仍在、i18n 的 workload 文案仍在。
+**七層白名單的 `windows_service_name` 已由既有的 `tests/test_filter_key_chain_invariants.py` 守著**
+（`:38`、`:106`），不要重複造一個——新守門只補它沒蓋到的面。
 本案最可能的失誤是連帶刪掉這些，守門要能抓到。
 
 ### 4.3 不動的東西
