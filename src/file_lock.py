@@ -8,9 +8,10 @@
 行程內的鎖對這種情境完全無效：後存檔的一方會用自己的過期快照整檔蓋掉前者
 （密碼/secret_key 輪替被還原、併發新增的排程憑空消失）。
 
-這裡提供 OS 層 advisory lock：POSIX 用 `fcntl.flock`、Windows 用
-`msvcrt.locking`（本專案有 Windows 安裝路徑，兩邊都必須能跑）。兩者皆不可用
-時退化成「只剩行程內鎖」並記一次警告——不因為缺少 backend 就 crash。
+這裡提供 OS 層 advisory lock：POSIX 用 `fcntl.flock`。`flock` 是
+per-(process, open-file-description)：同一行程用另一個 fd 再取一次會直接
+成功，完全擋不住自家的第二個 thread，行程內 RLock 因此仍然必要。fcntl
+不可用時退化成「只剩行程內鎖」並記一次警告——不因為缺少 backend 就 crash。
 
 用法：
 
@@ -22,7 +23,7 @@
 這是既有行程內鎖的**外層額外一圈**，不是替代品：thread-vs-thread 仍然要靠
 原本的 Lock/RLock（例如 ConfigManager._rw_lock、rule_scheduler._rs_db_lock）。
 
-鎖檔不刪除：flock/byte-range lock 由 OS 在行程結束時自動釋放，留著空檔案比
+鎖檔不刪除：flock 由 OS 在行程結束時自動釋放，留著空檔案比
 「unlink 後另一個等待者拿到已被刪除的 inode」安全（state_store.py 的 O_EXCL
 方案必須靠 stale 逾時強拆，這裡不需要）。
 """
@@ -40,17 +41,12 @@ try:  # POSIX
 except ImportError:  # pragma: no cover - Windows
     _fcntl = None
 
-try:  # Windows
-    import msvcrt as _msvcrt
-except ImportError:  # pragma: no cover - POSIX
-    _msvcrt = None
-
 DEFAULT_TIMEOUT = 10.0
 _RETRY_SECONDS = 0.02
 
 # path → 行程內 RLock。POSIX flock 是 per-(process, open-file-description)：
-# 同一行程用另一個 fd 再取一次會直接成功，完全擋不住自家的第二個 thread；
-# Windows 的 byte-range lock 則會自我死鎖。兩種情況都要靠這層行程內鎖補上。
+# 同一行程用另一個 fd 再取一次會直接成功，完全擋不住自家的第二個 thread。
+# 這種情況要靠這層行程內鎖補上。
 _registry: dict[str, threading.RLock] = {}
 _registry_guard = threading.Lock()
 
@@ -61,8 +57,8 @@ _warned_degraded = False
 
 
 def has_os_backend() -> bool:
-    """True 表示這台機器有可用的 OS 層鎖（fcntl 或 msvcrt）。"""
-    return _fcntl is not None or _msvcrt is not None
+    """True 表示這台機器有可用的 OS 層鎖（fcntl）。"""
+    return _fcntl is not None
 
 
 def _warn_degraded(reason: str) -> None:
@@ -101,14 +97,7 @@ def _os_acquire(fd: int) -> bool:
             return True
         except OSError:
             return False
-    if _msvcrt is not None:  # pragma: no cover - Windows only
-        try:
-            os.lseek(fd, 0, os.SEEK_SET)
-            _msvcrt.locking(fd, _msvcrt.LK_NBLCK, 1)
-            return True
-        except OSError:
-            return False
-    _warn_degraded("neither fcntl nor msvcrt is available")
+    _warn_degraded("fcntl is not available")
     return True
 
 
@@ -116,13 +105,6 @@ def _os_release(fd: int) -> None:
     if _fcntl is not None:
         try:
             _fcntl.flock(fd, _fcntl.LOCK_UN)
-        except OSError:
-            pass
-        return
-    if _msvcrt is not None:  # pragma: no cover - Windows only
-        try:
-            os.lseek(fd, 0, os.SEEK_SET)
-            _msvcrt.locking(fd, _msvcrt.LK_UNLCK, 1)
         except OSError:
             pass
 
@@ -155,9 +137,6 @@ def file_lock(lock_path: str, timeout: float = DEFAULT_TIMEOUT):
         try:
             os.makedirs(os.path.dirname(key) or ".", exist_ok=True)
             fd = os.open(key, os.O_CREAT | os.O_RDWR, 0o600)
-            if os.fstat(fd).st_size == 0:
-                # Windows 的 byte-range lock 需要實際存在的位元組可鎖。
-                os.write(fd, b"0")
         except OSError as exc:
             # 鎖檔本身開不起來（唯讀掛載、權限）不該讓整個寫入路徑爆掉：
             # 退化成行程內鎖並警告一次。

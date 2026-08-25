@@ -97,7 +97,7 @@ def test_file_lock_is_exclusive_across_processes(tmp_path):
     from src.file_lock import file_lock, has_os_backend
 
     if not has_os_backend():
-        pytest.skip("no OS-level lock backend (fcntl/msvcrt) on this platform")
+        pytest.skip("no OS-level lock backend (fcntl) on this platform")
 
     lock_path = tmp_path / "x.lock"
     ready = tmp_path / "ready"
@@ -122,7 +122,7 @@ def test_file_lock_is_exclusive_across_processes(tmp_path):
         child.kill()
         child.wait(timeout=10)
 
-    # 子行程結束後鎖必須自動釋放（flock/byte-range lock 由 OS 回收）。
+    # 子行程結束後鎖必須自動釋放（flock 由 OS 回收）。
     with file_lock(str(lock_path), timeout=5):
         pass
 
@@ -182,7 +182,7 @@ def test_config_save_takes_a_cross_process_lock(tmp_path):
     from src.file_lock import file_lock, has_os_backend
 
     if not has_os_backend():
-        pytest.skip("no OS-level lock backend (fcntl/msvcrt) on this platform")
+        pytest.skip("no OS-level lock backend (fcntl) on this platform")
 
     cm = _make_cm(tmp_path)
     assert os.path.basename(cm._lock_path) == "config.json.lock"
@@ -409,44 +409,13 @@ def test_gui_daemon_restart_shuts_down_the_previously_running_scheduler(monkeypa
         _runtime._publish_scheduler(None)
 
 
-# ── Windows / degraded backends（Linux CI 上只能以代理方式驗證）─────────────
-
-def test_windows_msvcrt_branch_locks_and_unlocks(monkeypatch, tmp_path):
-    """本專案有 Windows 安裝路徑，msvcrt 分支必須是可執行的程式碼。
-
-    Linux CI 上沒有 msvcrt，只能把 fcntl 關掉並注入一個記錄呼叫的假 msvcrt，
-    確認 file_lock 走的是 LK_NBLCK 取鎖 / LK_UNLCK 釋放、且鎖檔內有可鎖位元組
-    （Windows 的 byte-range lock 需要）。
-    """
-    import src.file_lock as fl
-
-    calls = []
-
-    class _FakeMsvcrt:
-        LK_NBLCK = 1
-        LK_UNLCK = 0
-
-        @staticmethod
-        def locking(fd, mode, nbytes):
-            calls.append((mode, nbytes, os.lseek(fd, 0, os.SEEK_CUR)))
-
-    monkeypatch.setattr(fl, "_fcntl", None)
-    monkeypatch.setattr(fl, "_msvcrt", _FakeMsvcrt)
-
-    lock_path = tmp_path / "win.lock"
-    with fl.file_lock(str(lock_path), timeout=1):
-        pass
-
-    assert calls == [(_FakeMsvcrt.LK_NBLCK, 1, 0), (_FakeMsvcrt.LK_UNLCK, 1, 0)], calls
-    assert lock_path.stat().st_size >= 1, "鎖檔沒有可鎖的位元組"
-
+# ── Degraded backend（fcntl 不可用時的退化路徑）────────────────────────────
 
 def test_no_lock_backend_degrades_instead_of_crashing(monkeypatch, tmp_path):
-    """兩種 backend 都不可用時退化成行程內鎖，不得讓寫入路徑整個爆掉。"""
+    """唯一的 backend（fcntl）不可用時退化成行程內鎖，不得讓寫入路徑整個爆掉。"""
     import src.file_lock as fl
 
     monkeypatch.setattr(fl, "_fcntl", None)
-    monkeypatch.setattr(fl, "_msvcrt", None)
     monkeypatch.setattr(fl, "_warned_degraded", False, raising=False)
 
     with fl.file_lock(str(tmp_path / "none.lock"), timeout=1):
