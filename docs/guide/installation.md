@@ -5,13 +5,10 @@ version: 4.1.0
 last_verified: 2026-07-25
 verified_against:
   - scripts/install.sh
-  - scripts/install.ps1
   - scripts/preflight.sh
-  - scripts/preflight.ps1
   - scripts/uninstall.sh
   - scripts/build_offline_bundle.sh
   - deploy/illumio-ops.service
-  - deploy/install_service.ps1
   - requirements.txt
   - src/__init__.py
   - src/cli/gui_cmd.py

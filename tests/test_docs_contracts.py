@@ -127,7 +127,6 @@ def test_siem_docs_do_not_list_nonexistent_flush_command():
 
 def test_preflight_upgrade_warnings_include_alerts_json():
     assert "alerts.json" in _read("scripts/preflight.sh")
-    assert "alerts.json" in _read("scripts/preflight.ps1")
 
 
 def test_legacy_argparse_examples_use_actual_entrypoint_name():

@@ -28,8 +28,7 @@ for sub in cache monitor gui report rule siem workload config status version; do
 done
 
 doc=${DOC_FOR_FAMILY[script]}
-for s in build_offline_bundle.sh preflight.sh install.sh uninstall.sh \
-         preflight.ps1 install.ps1; do
+for s in build_offline_bundle.sh preflight.sh install.sh uninstall.sh; do
   grep -q -- "$s" "$doc" || missing+=("script:$s (in $doc)")
 done
 
