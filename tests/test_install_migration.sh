@@ -64,7 +64,7 @@ fi
 
 PASS_COUNT=0
 FAIL_COUNT=0
-TOTAL=13
+TOTAL=17
 
 pass() {
     echo "PASS: $1"
@@ -418,11 +418,13 @@ JSON
     if ! grep -qi "cannot be determined" <<< "$out"; then
         fail "T9 no profiles, no marker" "expected 'cannot be determined' notice" "$out"
     fi
-    if [[ ! -f "$CFG_ROOT/$MARKER_REL" ]]; then
-        fail "T9 no profiles, no marker" "marker file not created" "$out"
-    fi
-    if ! "$PY_BIN" -m json.tool "$CFG_ROOT/$MARKER_REL" > /dev/null 2>&1; then
-        fail "T9 no profiles, no marker" "marker file is not valid JSON" "$out"
+    # No marker is written here (round 2 / P1-1 fix): there was nothing
+    # readable to observe, so recording "0 targets" would be a false
+    # negative that silences every future upgrade on this appliance forever.
+    # Leaving no marker means the next upgrade honestly says "cannot be
+    # determined" again instead of going silent.
+    if [[ -f "$CFG_ROOT/$MARKER_REL" ]]; then
+        fail "T9 no profiles, no marker" "marker file was created despite nothing observable — future upgrades would go silent" "$out"
     fi
 
     pass "T9 no profiles, no marker"
@@ -608,6 +610,184 @@ JSON
     cleanup_contamination_env
 }
 
+# --- T14: marker recording >1 targets must NOT be silenced once the key ----
+# vanishes. Regression for P1-1: `if profiles is None and marker exists: exit
+# silently` ignored what the marker actually recorded. An appliance warned
+# about two PCEs, never cleaned, then had pce_profiles stripped by a routine
+# ConfigManager.save() must still warn on every subsequent upgrade.
+
+t14_marker_recorded_contamination_not_silenced() {
+    new_contamination_env
+    cat > "$CFG_ROOT/config/config.json" <<'JSON'
+{
+  "api": {"url": "https://pce1.example.com", "org_id": "1"}
+}
+JSON
+    cat > "$CFG_ROOT/$MARKER_REL" <<'JSON'
+{
+  "checked_at": "2026-08-18T00:00:00+00:00",
+  "distinct_pce_targets": 2
+}
+JSON
+
+    local out exit_code
+    out="$(check_pce_profile_contamination "$CFG_ROOT" "$PY_BIN" 2>&1)"
+    exit_code=$?
+
+    if [[ $exit_code -ne 0 ]]; then
+        fail "T14 marker contamination not silenced" "non-zero exit ($exit_code)" "$out"
+    fi
+    if [[ -z "$out" ]]; then
+        fail "T14 marker contamination not silenced" "check went silent despite a marker recording 2 distinct PCE targets" "$out"
+    fi
+    if ! grep -qi "WARNING" <<< "$out"; then
+        fail "T14 marker contamination not silenced" "expected a warning to still fire" "$out"
+    fi
+    if ! grep -q "cache flush --confirm" <<< "$out"; then
+        fail "T14 marker contamination not silenced" "expected the cache-flush remediation command" "$out"
+    fi
+
+    pass "T14 marker contamination not silenced"
+    cleanup_contamination_env
+}
+
+# --- T15: a PCE URL carrying credentials must never reach the terminal -----
+# Regression for P1-2: normalize_pce_url deliberately preserves userinfo (a
+# legacy https://user:pass@host profile is possible from a reverse-proxy
+# arrangement). The comparison must still use the full value; the printed
+# value must be masked to scheme + host + port only.
+
+t15_credential_url_is_masked_in_output() {
+    new_contamination_env
+    cat > "$CFG_ROOT/config/config.json" <<'JSON'
+{
+  "api": {"url": "https://someuser:supersecretpw@pce1.example.com:8443", "org_id": "1"},
+  "pce_profiles": [
+    {"url": "https://someuser:supersecretpw@pce1.example.com:8443", "org_id": "1"},
+    {"url": "https://pce2.example.com", "org_id": "2"}
+  ]
+}
+JSON
+
+    local out exit_code
+    out="$(check_pce_profile_contamination "$CFG_ROOT" "$PY_BIN" 2>&1)"
+    exit_code=$?
+
+    if [[ $exit_code -ne 0 ]]; then
+        fail "T15 credential URL masked" "non-zero exit ($exit_code)" "$out"
+    fi
+    if ! grep -qi "WARNING" <<< "$out"; then
+        fail "T15 credential URL masked" "expected the contamination warning to fire" "$out"
+    fi
+    # This is the assertion that matters: the password must never appear.
+    if grep -q "supersecretpw" <<< "$out"; then
+        fail "T15 credential URL masked" "password leaked into installer output" "$out"
+    fi
+    if grep -q "someuser" <<< "$out"; then
+        fail "T15 credential URL masked" "username leaked into installer output" "$out"
+    fi
+    if ! grep -q "https://pce1.example.com:8443" <<< "$out"; then
+        fail "T15 credential URL masked" "expected the masked scheme+host+port form in output" "$out"
+    fi
+    if ! grep -q "pce2.example.com" <<< "$out"; then
+        fail "T15 credential URL masked" "expected the second PCE's url in output" "$out"
+    fi
+
+    pass "T15 credential URL masked"
+    cleanup_contamination_env
+}
+
+# --- T16: one unparseable profile URL must not blank out the whole check ---
+# Regression for P2-3: urlsplit('https://[broken') raises ValueError inside
+# normalize_pce_url. The old code let that exception propagate out of the
+# per-entry loop, so the ONLY thing that ran was the outer `|| true` guard —
+# no warning, no marker, for a config that has two perfectly good profiles.
+
+t16_one_bad_url_does_not_blank_the_check() {
+    new_contamination_env
+    cat > "$CFG_ROOT/config/config.json" <<'JSON'
+{
+  "api": {"url": "https://pce1.example.com", "org_id": "1"},
+  "pce_profiles": [
+    {"url": "https://pce1.example.com", "org_id": "1"},
+    {"url": "https://pce2.example.com", "org_id": "2"},
+    {"url": "https://[broken", "org_id": "3"}
+  ]
+}
+JSON
+
+    local out exit_code
+    out="$(check_pce_profile_contamination "$CFG_ROOT" "$PY_BIN" 2>&1)"
+    exit_code=$?
+
+    if [[ $exit_code -ne 0 ]]; then
+        fail "T16 one bad url does not blank check" "non-zero exit ($exit_code)" "$out"
+    fi
+    if grep -q "Traceback" <<< "$out"; then
+        fail "T16 one bad url does not blank check" "python raised instead of skipping the bad entry" "$out"
+    fi
+    if ! grep -qi "WARNING" <<< "$out"; then
+        fail "T16 one bad url does not blank check" "expected the two good profiles to still trigger a warning" "$out"
+    fi
+    if ! grep -q "pce1.example.com" <<< "$out"; then
+        fail "T16 one bad url does not blank check" "expected pce1 in output" "$out"
+    fi
+    if ! grep -q "pce2.example.com" <<< "$out"; then
+        fail "T16 one bad url does not blank check" "expected pce2 in output" "$out"
+    fi
+    if [[ ! -f "$CFG_ROOT/$MARKER_REL" ]]; then
+        fail "T16 one bad url does not blank check" "marker file not created" "$out"
+    fi
+    if ! "$PY_BIN" -m json.tool "$CFG_ROOT/$MARKER_REL" > /dev/null 2>&1; then
+        fail "T16 one bad url does not blank check" "marker file is not valid JSON" "$out"
+    fi
+    if ! grep -q '"distinct_pce_targets": 2' "$CFG_ROOT/$MARKER_REL"; then
+        fail "T16 one bad url does not blank check" "expected distinct_pce_targets=2 (only the readable entries)" "$out"
+    fi
+
+    pass "T16 one bad url does not blank check"
+    cleanup_contamination_env
+}
+
+# --- T17: archive advice must be an actual, pasteable command --------------
+# Regression for P2-4: the old text said "MOVE (do not delete)" with no path
+# and no command, leaving an operator with a non-default archive_dir unable
+# to act on it.
+
+t17_archive_advice_is_actionable() {
+    new_contamination_env
+    cat > "$CFG_ROOT/config/config.json" <<'JSON'
+{
+  "api": {"url": "https://pce1.example.com", "org_id": "1"},
+  "pce_cache": {"archive_dir": "custom/archive/path"},
+  "pce_profiles": [
+    {"url": "https://pce1.example.com", "org_id": "1"},
+    {"url": "https://pce2.example.com", "org_id": "2"}
+  ]
+}
+JSON
+
+    local out exit_code
+    out="$(check_pce_profile_contamination "$CFG_ROOT" "$PY_BIN" 2>&1)"
+    exit_code=$?
+
+    if [[ $exit_code -ne 0 ]]; then
+        fail "T17 archive advice actionable" "non-zero exit ($exit_code)" "$out"
+    fi
+    if ! grep -qi "WARNING" <<< "$out"; then
+        fail "T17 archive advice actionable" "expected the contamination warning to fire" "$out"
+    fi
+    if ! grep -q "do not delete" <<< "$out"; then
+        fail "T17 archive advice actionable" "expected the move-not-delete reasoning to survive" "$out"
+    fi
+    if ! grep -q "mv $CFG_ROOT/custom/archive/path" <<< "$out"; then
+        fail "T17 archive advice actionable" "expected a pasteable mv command with the configured archive_dir resolved" "$out"
+    fi
+
+    pass "T17 archive advice actionable"
+    cleanup_contamination_env
+}
+
 # --- Run all ---------------------------------------------------------------
 
 t1_happy_path
@@ -623,6 +803,10 @@ t10_trailing_slash_same_pce
 t11_malformed_api_survives_set_e
 t12_real_normalizer_import
 t13_malformed_profiles_not_a_list
+t14_marker_recorded_contamination_not_silenced
+t15_credential_url_is_masked_in_output
+t16_one_bad_url_does_not_blank_the_check
+t17_archive_advice_is_actionable
 
 echo
 echo "$PASS_COUNT/$TOTAL passed"

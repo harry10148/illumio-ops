@@ -131,6 +131,7 @@ check_pce_profile_contamination() {
     # before this point is ever reached.
     "$py" - "$root" <<'PYEOF' || true
 import json, os, sys, datetime
+from urllib.parse import urlsplit
 root = sys.argv[1]
 cfg_path = os.path.join(root, "config", "config.json")
 marker_path = os.path.join(root, "config", ".pce-profile-migration.json")
@@ -140,6 +141,24 @@ try:
 except Exception:
     def normalize_pce_url(v): return str(v or "").rstrip("/")
     def normalize_org_id(v): return str(v if v is not None else "").strip()
+
+def mask_pce_url(v):
+    # Never print userinfo: normalize_pce_url deliberately preserves it (a
+    # legacy profile URL can be https://user:pass@host, e.g. a reverse-proxy
+    # arrangement), and this text can land in a terminal or an installer log.
+    # The full, unmasked value is still used for comparison — only display
+    # goes through this.
+    try:
+        parts = urlsplit(str(v or ""))
+    except Exception:
+        return "<url unavailable>"
+    if not parts.scheme or not parts.netloc:
+        return "<url unavailable>"
+    netloc = parts.netloc
+    at = netloc.rfind("@")
+    hostport = netloc[at + 1:] if at >= 0 else netloc
+    return "%s://%s" % (parts.scheme, hostport)
+
 try:
     with open(cfg_path) as fh:
         cfg = json.load(fh)
@@ -154,25 +173,97 @@ targets = set()
 malformed = False
 if isinstance(profiles, list):
     for p in profiles:
-        if isinstance(p, dict):
+        if not isinstance(p, dict):
+            malformed = True
+            continue
+        # One unparseable url (normalize_pce_url calls urlsplit, which can
+        # raise on a genuinely broken value) must not blank the whole check —
+        # skip that entry, still analyze the rest.
+        try:
             targets.add((normalize_pce_url(p.get("url")), normalize_org_id(p.get("org_id"))))
-        else:
+        except Exception:
             malformed = True
 elif profiles is not None:
     malformed = True
 
-if profiles is None and os.path.exists(marker_path):
-    sys.exit(0)                      # 先前已檢查過且無風險
+pc_cfg = cfg.get("pce_cache")
+archive_dir = pc_cfg.get("archive_dir") if isinstance(pc_cfg, dict) else None
+if not isinstance(archive_dir, str) or not archive_dir.strip():
+    archive_dir = "data/archive"
+archive_dir = archive_dir.strip()
+archive_path = archive_dir if os.path.isabs(archive_dir) else os.path.join(root, archive_dir)
+_ts = datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+
+def print_remediation_commands():
+    print("    To keep the current PCE and clear what the others left behind:")
+    print("      sudo systemctl stop illumio-ops")
+    print("      sudo -u illumio-ops illumio-ops cache flush --confirm")
+    print("      sudo systemctl start illumio-ops")
+    print("")
+    print("    To move to a different PCE instead (clears as part of the switch):")
+    print("      sudo systemctl stop illumio-ops")
+    print("      sudo -u illumio-ops illumio-ops config login \\")
+    print("          --url <PCE URL> --org-id <org> --pce-target-change flush")
+    print("      sudo systemctl start illumio-ops")
+
+def print_archive_advice():
+    print("")
+    print("    Archive day files may span both PCEs too; clearing the cache does")
+    print("    not touch them. The PCE keeps only about three months, so anything")
+    print("    older than that has no other copy — MOVE the existing archive")
+    print("    directory aside (do not delete) so a clean one starts accumulating:")
+    print("      sudo mv %s %s.pre-pce-check-%s" % (archive_path, archive_path, _ts))
+
 if profiles is None:
-    print("    NOTE: PCE profiles were removed in a newer version. This config no")
-    print("          longer carries them, so whether this appliance ever switched")
-    print("          PCEs cannot be determined here. If it did, its cache may hold")
-    print("          rows from both. Check with: illumio-ops cache status")
+    # "The key is gone" is not "it's safe": a routine ConfigManager.save()
+    # strips pce_profiles from disk without ever touching the cache it may
+    # have contaminated. Only a marker that itself recorded 0-1 targets while
+    # the key still existed may silence this — anything else (no marker, an
+    # unreadable/unparseable marker, or a marker recording >1) must still say
+    # something.
+    marker_targets = None
+    marker_checked_at = None
+    if os.path.exists(marker_path):
+        try:
+            with open(marker_path) as mf:
+                marker_data = json.load(mf)
+            mt = marker_data.get("distinct_pce_targets")
+            if isinstance(mt, int):
+                marker_targets = mt
+                marker_checked_at = marker_data.get("checked_at", "unknown time")
+        except Exception:
+            marker_targets = None
+    if marker_targets is not None and marker_targets <= 1:
+        sys.exit(0)               # recorded while readable, 0-1 target: low risk
+    elif marker_targets is not None and marker_targets > 1:
+        print("")
+        print("    ============================================================")
+        print("    WARNING: this appliance was previously recorded with more")
+        print("    than one PCE configured (%d distinct targets, last checked" % marker_targets)
+        print("    %s)." % marker_checked_at)
+        print("    The pce_profiles key has since been removed from config.json")
+        print("    (a routine save does this even without an operator noticing),")
+        print("    so the individual PCE URLs can no longer be listed here — but")
+        print("    nothing has confirmed the cache was ever cleaned. Treat it as")
+        print("    still possibly holding rows from more than one PCE.")
+        print("")
+        print_remediation_commands()
+        print_archive_advice()
+        print("    ============================================================")
+        print("")
+    else:
+        print("    NOTE: PCE profiles were removed in a newer version. This config no")
+        print("          longer carries them, so whether this appliance ever switched")
+        print("          PCEs cannot be determined here. If it did, its cache may hold")
+        print("          rows from both. Check with: illumio-ops cache status")
 else:
     api_cfg = cfg.get("api")
     if not isinstance(api_cfg, dict):
         api_cfg = {}
-    api_t = (normalize_pce_url(api_cfg.get("url")), normalize_org_id(api_cfg.get("org_id")))
+    try:
+        api_t = (normalize_pce_url(api_cfg.get("url")), normalize_org_id(api_cfg.get("org_id")))
+    except Exception:
+        api_t = (None, None)
     if len(targets) > 1:
         print("")
         print("    ============================================================")
@@ -185,23 +276,10 @@ else:
         print("    PCEs found in this config:")
         for url, org in sorted(targets):
             mark = "  <- api currently points here" if (url, org) == api_t else ""
-            print("      %s (org %s)%s" % (url, org, mark))
+            print("      %s (org %s)%s" % (mask_pce_url(url), org, mark))
         print("")
-        print("    To keep the current PCE and clear what the others left behind:")
-        print("      sudo systemctl stop illumio-ops")
-        print("      sudo -u illumio-ops illumio-ops cache flush --confirm")
-        print("      sudo systemctl start illumio-ops")
-        print("")
-        print("    To move to a different PCE instead (clears as part of the switch):")
-        print("      sudo systemctl stop illumio-ops")
-        print("      sudo -u illumio-ops illumio-ops config login \\")
-        print("          --url <PCE URL> --org-id <org> --pce-target-change flush")
-        print("      sudo systemctl start illumio-ops")
-        print("")
-        print("    Archive day files may span both PCEs too; clearing the cache")
-        print("    does not touch them. To start a clean archive, MOVE (do not")
-        print("    delete) the existing archive directory aside — the PCE keeps")
-        print("    only about three months, so older archives have no other copy.")
+        print_remediation_commands()
+        print_archive_advice()
         print("")
         print("    The other profiles' API credentials are still in config.json")
         print("    under 'pce_profiles' and stay there until the next save.")
@@ -222,12 +300,16 @@ if os.path.exists(review_db):
     print("    NOTE: %s (%.1f MB) is no longer read by any code and can be deleted."
           % (review_db, mb))
 
-try:
-    with open(marker_path, "w") as fh:
-        json.dump({"checked_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
-                   "distinct_pce_targets": len(targets)}, fh, indent=2)
-except Exception:
-    pass
+if profiles is not None:
+    # Nothing new to observe once the key is gone — leave any existing marker
+    # (and the history it carries) untouched rather than overwriting it with
+    # an empty-looking "0 targets" that was never actually checked.
+    try:
+        with open(marker_path, "w") as fh:
+            json.dump({"checked_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+                       "distinct_pce_targets": len(targets)}, fh, indent=2)
+    except Exception:
+        pass
 PYEOF
     return 0
 }
