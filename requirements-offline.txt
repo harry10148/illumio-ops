@@ -3,7 +3,7 @@
 #
 # 這個檔案只寫版本「範圍」。實際下載與安裝一律走 requirements-offline.lock
 # （pip-compile --generate-hashes 產生，逐檔 SHA256 釘選），bundle 內的
-# install.sh / install.ps1 以 --require-hashes 安裝，雜湊不符即中止安裝。
+# install.sh 以 --require-hashes 安裝，雜湊不符即中止安裝。
 #
 # 改動本檔後必須重新產生鎖檔，否則 scripts/build_offline_bundle.sh 的新鮮度
 # 閘門會擋下建置（鎖檔尾端的 sha256 標記與本檔內容不符）：
@@ -18,14 +18,9 @@
 #       --platform manylinux_2_28_x86_64 --python-version 3.12 \
 #       --only-binary=:all: -d dist/wheels/linux/
 #
-#   pip download -r requirements-offline.lock --require-hashes \
-#       --platform win_amd64 --python-version 3.12 \
-#       --only-binary=:all: -d dist/wheels/windows/
-#
 # Note: transitive binary dependencies (numpy, pillow, contourpy, etc.) are
 # resolved and pinned into the lock by pip-compile — do not list them here
-# unless an environment marker hides them from the Linux build host (see the
-# Windows-only section at the bottom).
+# unless an environment marker hides them from the Linux build host.
 
 # ── Existing core (Web GUI + reports) ────────────────────────────────────────
 flask>=3.0,<4.0
@@ -67,12 +62,3 @@ SQLAlchemy>=2.0,<3.0
 
 # ── Phase 7: Logging ─────────────────────────────────────────────────────────
 loguru>=0.7,<0.8
-
-# ── Windows-only transitive deps (explicit) ──────────────────────────────────
-# pip download evaluates environment markers on the BUILD host (Linux), so
-# wheels guarded by platform_system == "Windows" / sys_platform == "win32"
-# markers (click/loguru -> colorama, loguru -> win32-setctime) are silently
-# skipped unless pinned unconditionally here. Both are tiny pure-python
-# wheels; harmless no-ops on Linux installs.
-colorama>=0.4,<1.0
-win32-setctime>=1.0,<2.0

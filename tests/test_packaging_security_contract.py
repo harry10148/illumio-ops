@@ -226,7 +226,7 @@ def test_install_sh_installs_the_lock_with_require_hashes():
 
 def test_build_script_downloads_wheels_from_the_lock():
     src = _bash_text(BUILD_SCRIPT)
-    for fn in ("build_linux", "build_windows"):
+    for fn in ("build_linux",):
         body = _extract_fn(src, fn)
         assert '-r "$LOCK_FILE"' in body, (
             f"{fn}() must download wheels from requirements-offline.lock"
