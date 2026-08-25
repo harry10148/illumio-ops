@@ -20,6 +20,11 @@
 - **每個 task 結束前必須自己跑過該 task 的覆蓋測試並附上指令與輸出**，再 commit。全套由 orchestrator 在 task 之間跑。
 - **提交訊息用英文 conventional commits**（本 repo 慣例）。
 - **不得 `git add -A`**；一律用明確路徑。
+- **一律用 venv 直譯器跑測試與腳本，不要用系統 `python3`。**
+  系統 python 的 click 是 8.1.6，`requirements.lock` 釘的是 8.3.3；Click 8.2 起
+  `CliRunner` 才分離 stdout/stderr，所以 `tests/test_cache_cli.py::test_cache_flush_json_output`
+  在系統 python 下**必然假紅**。worktree 內沒有 venv，用主 checkout 的絕對路徑：
+  `/home/harry/rd/illumio-ops/venv/bin/python`（已驗證它在 worktree 下載入的是本 worktree 的 `src/`）。
 
 ---
 
@@ -42,7 +47,7 @@
 - [ ] **Step 1: 先確認現況——兩個測試現在都是綠的**
 
 ```bash
-timeout 300 python3 -m pytest tests/test_config_concurrency.py -q -k "msvcrt or no_lock_backend"
+timeout 300 /home/harry/rd/illumio-ops/venv/bin/python -m pytest tests/test_config_concurrency.py -q -k "msvcrt or no_lock_backend"
 ```
 
 預期：2 passed。
@@ -80,7 +85,7 @@ timeout 300 python3 -m pytest tests/test_config_concurrency.py -q -k "msvcrt or 
 - [ ] **Step 4: 執行測試，確認改寫後的退化測試仍然綠、msvcrt 測試已不存在**
 
 ```bash
-timeout 300 python3 -m pytest tests/test_config_concurrency.py -q -k "msvcrt or no_lock_backend" -v
+timeout 300 /home/harry/rd/illumio-ops/venv/bin/python -m pytest tests/test_config_concurrency.py -q -k "msvcrt or no_lock_backend" -v
 ```
 
 預期：1 passed（`test_no_lock_backend_degrades_instead_of_crashing`），
@@ -163,8 +168,8 @@ Windows 那半段撐著。不得留下任何指涉 Windows 或 msvcrt 的字句�
 - [ ] **Step 7: 跑覆蓋測試**
 
 ```bash
-timeout 600 python3 -m pytest tests/test_config_concurrency.py -q
-timeout 300 python3 -m pytest tests/ -q -k "file_lock or lock"
+timeout 600 /home/harry/rd/illumio-ops/venv/bin/python -m pytest tests/test_config_concurrency.py -q
+timeout 300 /home/harry/rd/illumio-ops/venv/bin/python -m pytest tests/ -q -k "file_lock or lock"
 ```
 
 預期：全綠。
@@ -253,15 +258,16 @@ done
 - [ ] **Step 4: 確認沒有殘留**
 
 ```bash
-git grep -n 'os.name' -- src/ && echo "STILL PRESENT" || echo "clean"
+git grep -nE 'os\.name' -- src/ && echo "STILL PRESENT" || echo "clean"
 ```
 
-預期：`clean`。
+預期：`clean`。**`.` 必須跳脫**——`os.name` 當 regex 會命中 `hostname`
+（`os` + 任一字元 + `tname`... 實際是 `.` 吃掉 `t`），未跳脫的版本永遠回報 STILL PRESENT。
 
 - [ ] **Step 5: 跑 CLI 測試**
 
 ```bash
-timeout 900 python3 -m pytest tests/ -q -k "cli or menu"
+timeout 900 /home/harry/rd/illumio-ops/venv/bin/python -m pytest tests/ -q -k "cli or menu"
 ```
 
 預期：全綠。
@@ -303,7 +309,7 @@ longer supports."
 
 ```bash
 git ls-files | grep -Ei '\.ps1$'
-timeout 300 python3 -m pytest tests/test_packaging_security_contract.py tests/test_docs_contracts.py -q
+timeout 300 /home/harry/rd/illumio-ops/venv/bin/python -m pytest tests/test_packaging_security_contract.py tests/test_docs_contracts.py -q
 ```
 
 預期：三支 ps1、測試全綠。
@@ -333,10 +339,15 @@ git rm tests/test_windows_install_contract.py tests/test_ps1_bom_contract.py
 `test_uninstall_sh_does_not_orphan_secrets_to_a_reusable_uid`、
 `test_install_sh_installs_the_lock_with_require_hashes`。
 
-同時刪除檔頭模組 docstring 中僅描述 Windows ACL 的段落（`:11-15`）與
-常數 `INSTALL_PS1 = ROOT / "scripts" / "install.ps1"`（`:34`），
-以及 `:45` 註解 `# PowerShell files in this repo are UTF-8 with BOM (Windows-sensitive).`
-所屬的 helper 若已無呼叫者則一併移除（**先確認無呼叫者再刪**）。
+同時刪除：
+
+- 檔頭模組 docstring 中僅描述 Windows ACL 的段落（`:11-15`）
+- 常數 `INSTALL_PS1 = ROOT / "scripts" / "install.ps1"`（`:34`）
+- helper `_ps_text()`（`:44-46`，含其 `# PowerShell files … UTF-8 with BOM` 註解）
+
+`_ps_text` 與 `INSTALL_PS1` 的呼叫者已查證，**全部**是上述 6 個要刪的測試
+（`:131,153,162,182,198,316`，每處都是 `_ps_text(INSTALL_PS1)`），刪完必然是孤兒。
+`_bash_text()` 與 `_extract_fn()` **保留**——Linux 測試仍在用。
 
 - [ ] **Step 4: 移除 `test_docs_contracts.py:130` 的 preflight.ps1 斷言**
 
@@ -375,9 +386,9 @@ for s in build_offline_bundle.sh preflight.sh install.sh uninstall.sh \
 - [ ] **Step 6: 跑覆蓋測試與文件閘門**
 
 ```bash
-timeout 300 python3 -m pytest tests/test_packaging_security_contract.py tests/test_docs_contracts.py -q
-python3 scripts/docs_check.py --frontmatter
-python3 scripts/check_doc_links.py
+timeout 300 /home/harry/rd/illumio-ops/venv/bin/python -m pytest tests/test_packaging_security_contract.py tests/test_docs_contracts.py -q
+/home/harry/rd/illumio-ops/venv/bin/python scripts/docs_check.py --frontmatter
+/home/harry/rd/illumio-ops/venv/bin/python scripts/check_doc_links.py
 bash scripts/check_doc_coverage.sh
 ```
 
@@ -524,7 +535,7 @@ Windows-only wheel 不應該改變任何 Linux 套件的版本。
 - [ ] **Step 6: 驗證鎖檔新鮮度閘門**
 
 ```bash
-timeout 300 python3 -m pytest tests/test_packaging_security_contract.py -q -k "lock"
+timeout 300 /home/harry/rd/illumio-ops/venv/bin/python -m pytest tests/test_packaging_security_contract.py -q -k "lock"
 ```
 
 預期：全綠，特別是 `test_offline_lock_records_the_sha256_of_its_source_spec`
@@ -544,7 +555,7 @@ marker 隔離的 Windows-only 相依——記進報告後繼續，不要手改�
 ```bash
 grep -n 'build_linux' scripts/build_offline_bundle.sh
 bash -n scripts/build_offline_bundle.sh && echo "syntax ok"
-timeout 300 python3 -m pytest tests/test_build_offline_bundle_doc.py tests/test_packaging_security_contract.py -q
+timeout 300 /home/harry/rd/illumio-ops/venv/bin/python -m pytest tests/test_build_offline_bundle_doc.py tests/test_packaging_security_contract.py -q
 ```
 
 預期：語法正確、測試全綠。（**不要**實際跑一次完整 bundle 建置——它會下載
@@ -633,7 +644,7 @@ NSSM 服務註冊說明、以及提到 Windows bundle 自動取用 NSSM 的段�
 **`src/i18n/data/zh_explicit.json` 不需要動——已查證該檔沒有這個 key**
 （1720 條中不含 `gui_sy_restart_i_409`），所以這個鍵的繁中值是獨立維護的，
 直接改 `i18n_zh_TW.json` 即可。改完仍要跑
-`python3 scripts/precompute_zh_translations.py --dry-run` 確認 `would update 0 keys`；
+`/home/harry/rd/illumio-ops/venv/bin/python scripts/precompute_zh_translations.py --dry-run` 確認 `would update 0 keys`；
 **若它回報要更新，代表這個 key 其實是衍生的，那就得改 zh_explicit 而不是 zh_TW**。
 
 另外兩處：
@@ -654,12 +665,12 @@ NSSM 服務註冊說明、以及提到 Windows bundle 自動取用 NSSM 的段�
 - [ ] **Step 7: 跑所有文件與 i18n 閘門**
 
 ```bash
-python3 scripts/docs_check.py
-python3 scripts/check_doc_links.py
-timeout 300 python3 -m pytest tests/test_docs_check.py tests/test_docs_contracts.py -q
-timeout 300 python3 -m pytest tests/ -q -k "glossary"
-python3 scripts/audit_i18n_usage.py
-python3 scripts/precompute_zh_translations.py --dry-run
+/home/harry/rd/illumio-ops/venv/bin/python scripts/docs_check.py
+/home/harry/rd/illumio-ops/venv/bin/python scripts/check_doc_links.py
+timeout 300 /home/harry/rd/illumio-ops/venv/bin/python -m pytest tests/test_docs_check.py tests/test_docs_contracts.py -q
+timeout 300 /home/harry/rd/illumio-ops/venv/bin/python -m pytest tests/ -q -k "glossary"
+/home/harry/rd/illumio-ops/venv/bin/python scripts/audit_i18n_usage.py
+/home/harry/rd/illumio-ops/venv/bin/python scripts/precompute_zh_translations.py --dry-run
 ```
 
 預期：文件閘門全過；glossary 測試全綠；i18n audit `Total: 0 finding(s)`；
@@ -739,7 +750,7 @@ git diff -U0 src/ | grep -E "^[+-]" | grep -vE "^[+-]{3}" | grep -vE "^[+-][[:sp
 - [ ] **Step 6: 跑相關測試**
 
 ```bash
-timeout 900 python3 -m pytest tests/ -q -k "runtime or config or helper or plugin or alert"
+timeout 900 /home/harry/rd/illumio-ops/venv/bin/python -m pytest tests/ -q -k "runtime or config or helper or plugin or alert"
 ```
 
 預期：全綠。
@@ -871,7 +882,7 @@ def test_windows_workload_copy_survives_in_i18n():
 - [ ] **Step 3: 確認既有的白名單守門仍然綠**
 
 ```bash
-timeout 300 python3 -m pytest tests/test_filter_key_chain_invariants.py tests/test_filter_process_winservice.py tests/test_estate_inventory.py -q
+timeout 300 /home/harry/rd/illumio-ops/venv/bin/python -m pytest tests/test_filter_key_chain_invariants.py tests/test_filter_process_winservice.py tests/test_estate_inventory.py -q
 ```
 
 預期：全綠。這三個檔案本案**一行都不該改**；若它們紅了，代表 workload
@@ -880,7 +891,7 @@ timeout 300 python3 -m pytest tests/test_filter_key_chain_invariants.py tests/te
 - [ ] **Step 4: 跑守門**
 
 ```bash
-timeout 300 python3 -m pytest tests/test_windows_host_removed.py -q -v
+timeout 300 /home/harry/rd/illumio-ops/venv/bin/python -m pytest tests/test_windows_host_removed.py -q -v
 ```
 
 預期：全綠。
@@ -891,7 +902,7 @@ timeout 300 python3 -m pytest tests/test_windows_host_removed.py -q -v
 
 ```bash
 printf '# mutation probe\n' > scripts/_probe.ps1
-timeout 120 python3 -m pytest tests/test_windows_host_removed.py -q -k "powershell"
+timeout 120 /home/harry/rd/illumio-ops/venv/bin/python -m pytest tests/test_windows_host_removed.py -q -k "powershell"
 rm scripts/_probe.ps1
 ```
 
@@ -910,7 +921,7 @@ rm scripts/_probe.ps1
 ```bash
 cp src/report/analysis/estate_inventory.py /tmp/ei.bak
 sed -i 's/return "Windows"/return "Redacted"/' src/report/analysis/estate_inventory.py
-timeout 120 python3 -m pytest tests/test_windows_host_removed.py -q -k "estate_inventory"
+timeout 120 /home/harry/rd/illumio-ops/venv/bin/python -m pytest tests/test_windows_host_removed.py -q -k "estate_inventory"
 cp /tmp/ei.bak src/report/analysis/estate_inventory.py
 ```
 
@@ -932,7 +943,7 @@ verified by mutation, not by reading green."
 
 ## 收尾（orchestrator 執行，不是 task）
 
-- [ ] 全套：`timeout 2400 python3 -m pytest tests/ -q`
+- [ ] 全套：`timeout 2400 /home/harry/rd/illumio-ops/venv/bin/python -m pytest tests/ -q`
 - [ ] 六道 CI 硬閘門：`pip-audit`、`check_no_naive_datetime`、`check_doc_links`、`audit_i18n_usage`、`mypy`（三個 entry 檔）、`pytest`
 - [ ] 詞彙表閘門
 - [ ] `precompute_zh_translations.py --dry-run` → `would update 0 keys`
