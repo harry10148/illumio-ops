@@ -10,7 +10,7 @@ from src.cli.menus._helpers import _menu_hints, _wizard_step
 
 def alert_settings_menu(cm: ConfigManager) -> None:
     while True:
-        os.system("cls" if os.name == "nt" else "clear")
+        os.system("clear")
         draw_panel(
             t("settings_alert_title"), _menu_hints("Settings > Alerts")
         )

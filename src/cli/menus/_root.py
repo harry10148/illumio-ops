@@ -14,7 +14,7 @@ from src.pce_target import normalize_org_id, normalize_pce_url, pce_target_chang
 
 def settings_menu(cm: ConfigManager) -> None:
     while True:
-        os.system("cls" if os.name == "nt" else "clear")
+        os.system("clear")
         draw_panel(
             t("menu_settings_title", version=__version__),
             _menu_hints("Settings"),

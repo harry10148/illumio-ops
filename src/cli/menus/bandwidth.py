@@ -46,7 +46,7 @@ def _fmt_picked(picked):
 
 
 def add_bandwidth_volume_menu(cm: ConfigManager, edit_rule=None) -> None:
-    os.system("cls" if os.name == "nt" else "clear")
+    os.system("clear")
 
     def should_restart_flow():
         return get_last_input_action() == "cancel"

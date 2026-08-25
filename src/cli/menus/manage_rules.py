@@ -39,7 +39,7 @@ def _parse_manage_rules_command(raw: str):
 
 def manage_rules_menu(cm: ConfigManager):
     while True:
-        os.system("cls" if os.name == "nt" else "clear")
+        os.system("clear")
         draw_panel(
             t("menu_manage_rules_title"), _menu_hints("Rules > Manage")
         )

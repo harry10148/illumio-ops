@@ -10,12 +10,12 @@ from src.cli.menus._helpers import _menu_hints
 
 def _clear_screen() -> None:
     """Centralised screen-clear so callers don't each invoke os.system."""
-    os.system("cls" if os.name == "nt" else "clear")
+    os.system("clear")
 
 
 def web_gui_security_menu(cm: ConfigManager) -> None:
     while True:
-        os.system("cls" if os.name == "nt" else "clear")
+        os.system("clear")
         draw_panel(
             t("wgs_menu_title", default="=== Web GUI Security ==="),
             _menu_hints("Web GUI Security"),
@@ -79,7 +79,7 @@ def web_gui_security_menu(cm: ConfigManager) -> None:
 
         elif sel == 2:
             while True:
-                os.system("cls" if os.name == "nt" else "clear")
+                os.system("clear")
                 curr_ips = cm.config.get("web_gui", {}).get("allowed_ips", [])
                 print(f"=== {t('wgs_manage_ips', default='Manage Allowed IPs')} ===")
                 if not curr_ips:

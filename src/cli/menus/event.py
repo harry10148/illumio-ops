@@ -17,7 +17,7 @@ from src.cli.menus._helpers import _menu_hints, _wizard_step, _wizard_confirm
 
 def add_event_menu(cm: ConfigManager, edit_rule=None):
     while True:
-        os.system("cls" if os.name == "nt" else "clear")
+        os.system("clear")
         title = (
             t("menu_add_event_title")
             if not edit_rule

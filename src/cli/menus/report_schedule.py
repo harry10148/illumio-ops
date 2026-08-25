@@ -24,7 +24,7 @@ _PROJECT_ROOT = Path(__file__).resolve().parents[3]
 def manage_report_schedules_menu(cm: ConfigManager) -> None:
     """Main menu for listing and managing report schedules."""
     while True:
-        os.system("cls" if os.name == "nt" else "clear")
+        os.system("clear")
         schedules = cm.get_report_schedules()
 
         # Load last-run states from state.json
@@ -131,7 +131,7 @@ def _add_report_schedule_wizard(cm: ConfigManager, edit_sched: dict = None) -> N
     """Wizard for adding or editing a report schedule."""
     is_edit = edit_sched is not None
     title = t("sched_edit") if is_edit else t("sched_add")
-    os.system("cls" if os.name == "nt" else "clear")
+    os.system("clear")
     draw_panel(title, [])
 
     def _ask(prompt, default="", cast=str):

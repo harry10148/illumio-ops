@@ -11,7 +11,7 @@ from src.cli.menus._helpers import _menu_hints, _wizard_step, _wizard_confirm, _
 
 
 def add_system_health_menu(cm: ConfigManager, edit_rule=None) -> None:
-    os.system("cls" if os.name == "nt" else "clear")
+    os.system("clear")
     title = (
         t("menu_add_system_health_title", default="=== Add System Health Rule ===")
         if not edit_rule
