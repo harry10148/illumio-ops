@@ -32,7 +32,8 @@
   （**注意：`by_family_windows` 是 `tests/test_estate_inventory.py:79` 的測試方法名，不是產品符號**——
   在 `src/` 裡 grep 它會一無所獲，別因此以為分類已不存在）
 - 報表中的 Windows workload 統計、VEN OS 分佈
-- 快取攤平時保留的 `windows_service_name` 欄位（`tests/test_cache_flatten_vectorized.py:80`）
+- 篩選鏈對 `windows_service_name` 的契約（`tests/test_filter_process_winservice.py:80`）
+  （**初版誤寫成 `tests/test_cache_flatten_vectorized.py:80`；該檔完全沒有這個欄位**）
 
 這些是客戶環境的真實需求：測試機 PCE 上就有 `win10-jd` 這台 Windows workload，其 flow 在
 syslog 中可見。**用 grep 掃 "windows" 會同時命中兩類，這是本案最容易出錯的地方。**
@@ -84,7 +85,7 @@ syslog 中可見。**用 grep 掃 "windows" 會同時命中兩類，這是本案
 | `tests/test_packaging_security_contract.py` 的 7 個 Windows 測試 | **初版漏列**：`:130,152,161,181,197,315` ＋ §2 標題；`test_install_sh_installs_the_lock_with_require_hashes` 等 Linux 測試**保留** |
 | `tests/test_docs_contracts.py:130`（斷言 `preflight.ps1` 內含 `alerts.json`） | **初版漏列** |
 | `tests/test_build_offline_bundle_doc.py:15` `test_vendor_windows_readme_exists` | **初版漏列**；隨 `vendor/windows/` 一起移除 |
-| `tests/test_config_concurrency.py:414-449` msvcrt 群 | **初版漏列，且不是單純刪除**——見下方 §3.4 |
+| `tests/test_config_concurrency.py:414-449` msvcrt 群（AttributeError 的實際觸發點是 `:449`） | **初版漏列，且不是單純刪除**——見下方 §3.4 |
 
 **E. 文件**
 
@@ -117,9 +118,15 @@ syslog 中可見。**用 grep 掃 "windows" 會同時命中兩類，這是本案
 - **`tests/test_cli_signal.py:56` 的 `skipif(sys.platform == 'win32')`：保留。** 它描述的是 POSIX signal
   測試在非 POSIX 上該跳過，是測試本身的可攜性條件，不是產品的 Windows 支援。刪掉沒有好處，
   且會讓任何人在非 Linux 開發機上跑測試時吃到一個無關的失敗。
-- **`design/v2/mockup/i18n-supplement.json:2656-2657` 提到「systemd／NSSM」的字串：改寫為只提 systemd。**
-  那是 Phase 2 mockup 的文案，描述「daemon 由外部管理時後端回 409」。NSSM 在移除後不再是本工具會
-  遇到的外部管理器，留著會在 2A 落地時被原樣搬進產品文案。
+- **所有提到「systemd／NSSM」的文案：改寫為只提 systemd。** 這條初版只裁決了 mockup，
+  但第二輪盤點發現**正式產品的字典裡就有同一句**，而且那才是使用者現在看得到的：
+  - `src/i18n_en.json:5098` 與 `src/i18n_zh_TW.json:5097` 的 `gui_sy_restart_i_409`
+    （以及 `src/i18n/data/zh_explicit.json` 的對應條目——三本字典必須同步）
+  - `src/static/js/v2/areas/system.mjs:1002` 的註解
+  - `design/v2/mockup/i18n-supplement.json:2656-2657`
+
+  只改 mockup 而不改 live catalog 不會讓任何閘門變紅，卻會讓產品繼續顯示 NSSM。
+  **鍵名 `gui_sy_restart_i_409` 不得更動**，只改值。
 
 ### 3.2 CHANGELOG 仍要明說，但不需遷移指引
 
@@ -133,6 +140,49 @@ syslog 中可見。**用 grep 掃 "windows" 會同時命中兩類，這是本案
 
 移除受支援平台是 breaking change。版本號調整不在本案決定，但 CHANGELOG 條目須放在能讓
 版本決策者看見的位置（`## [Unreleased]` 的 `### Removed`）。
+
+## 3.6 第二輪盤點（Codex 對抗式掃描，2026-08-25）
+
+第一輪修訂後又派了一次獨立掃描，明確要求「用你自己的搜尋策略，不要跟著 spec 的」。
+它再找出 15 個漏面，逐條查證後**全部屬實**。這是同一個失效模式的第三次證據：
+按概念列表無法窮舉，只有逐面掃描可以。
+
+**F. 真的是分支或設定的（要改行為或設定）**
+
+| 對象 | 性質 |
+|---|---|
+| `scripts/check_doc_coverage.sh:31-32` | **閘門**：明文要求 installation guide 必須提到 `preflight.ps1`、`install.ps1`。清掉文件卻不改它，這道 gate 會紅 |
+| `tests/test_packaging_security_contract.py:330` | `for fn in ("build_linux", "build_windows")` ——**必須改寫，不能刪**，否則 `_extract_fn` 找不到函式 |
+| `docs/guide/installation.md:34` | OS 需求表格的**同一列**同時寫著 Linux glibc 下限與 Windows 版本；`test_installation_doc_states_the_same_glibc_floor` 斷言那一列。**整列刪掉會誤傷 Linux 閘門**，只能改該列的 Windows 部分 |
+| `src/file_lock.py:158-160` | `if os.fstat(fd).st_size == 0: os.write(fd, b"0")` ——寫入 placeholder byte，註解寫明是給 Windows byte-range lock 用的。已實測 POSIX `flock` 對零長度檔完全可用，因此**連同寫入一起移除**；代價若判斷錯，只是鎖檔變成零長度，`flock` 行為不變 |
+| `scripts/build_offline_bundle.sh:300` | 收尾的 `ls ... *.{tar.gz,zip}` glob |
+| `docs/handover/development.md:312` | **現行**開發文件宣告同時產出 Linux tar.gz 與 Windows zip，不是歷史文件 |
+
+**G. 只是註解／文案（功能保留，理由改寫）**
+
+| 對象 | 保留什麼 |
+|---|---|
+| `src/cli/_runtime.py:70` | `except (AttributeError, ValueError)` 仍然正確（非主執行緒會拋 ValueError），只改註解 |
+| `src/config.py:515` 「On Windows, os.replace handles atomic rename」 | `os.replace` 在 POSIX 上同樣是原子的，程式碼不動，註解改寫或刪除 |
+| `src/gui/_helpers.py:801` 「hosts without the openssl CLI (e.g. Windows service installs)」 | openssl fallback 仍要保留（沒裝 openssl CLI 的 Linux 主機是存在的），只改舉例 |
+| `src/alerts/plugins.py:41` 「ASCII marker … for cross-platform (Windows console) safety」 | ASCII marker 保留，理由改寫 |
+| `.gitignore:95-97` | 忽略規則保留，說明中的 Windows byte-range lock 理由改寫 |
+| `src/file_lock.py:25`、`:51-53` | docstring 與 registry 註解中的 Windows 半句 |
+| `tests/test_config_concurrency.py:100,125,185` | skip 訊息 `"no OS-level lock backend (fcntl/msvcrt)"` 與 byte-range 註解 |
+| `scripts/build_offline_bundle.sh:2,139` | 檔頭雙平台宣告、共用 staging 段落提到 `install.ps1` 的註解 |
+| `requirements-offline.txt:6,21-23,27,71` | 檔頭的 `install.ps1`、Windows wheel download 範例、Windows-only section 指涉 |
+
+**H. 本機產物（未進版控，只需本機清理）**
+
+`dist/illumio-ops-*-offline-windows-x86_64.zip`（約 83 MB）與
+`build/illumio-ops-*-offline-windows-x86_64/` staging tree。兩者都在 `.gitignore` 內，
+不影響任何 commit，但留著會讓下一個人以為 Windows bundle 還在產。
+
+**Codex 有一條說錯：** 它稱 `docs_check` 目前有 11 個既存問題。實測
+`python3 scripts/docs_check.py` 回 `OK — no issues`；要帶 `--frontmatter` 才會顯示
+既存的 6 條 dangling 路徑（都指向早已移除的 JS 檔，與本案無關），而且**該腳本無論如何都 exit 0**。
+它也不在 CI workflow 裡——CI 只跑 `check_doc_links.py`。所以「docs_check 會擋住 CI」是錯的，
+但「frontmatter 必須同步」仍然成立（否則會多出三條 dangling）。
 
 ## 4. 設計
 
@@ -165,7 +215,7 @@ estate inventory 的 `"Windows"` family 分支仍在、i18n 的 workload 文案�
 ### 4.3 不動的東西
 
 - `docs/` 中描述 Windows **workload** 的段落
-- `pyproject.toml` / `requirements.lock` 中同時被 Linux 使用的套件
+- `requirements.lock` 中同時被 Linux 使用的套件（**本 repo 沒有 `pyproject.toml`**，初版誤列）
 - **歷史紀錄一律不動**：`docs/superpowers/plans/` 與 `specs/` 下的既有文件、
   `docs/_meta/migration-audit.json`、`CHANGELOG.md` 既有版本的條目、
   `reports/audit/` 下的稽核產物。它們記載的是當時為真的事，不是現況宣告。
