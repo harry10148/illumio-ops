@@ -91,3 +91,70 @@ def test_cache_retention_json_output():
     data = json.loads(result.output)
     assert data["events_retention_days"] == 30
     assert data["traffic_raw_retention_days"] == 3
+
+
+def _mock_config_manager(db_path="data/pce_cache.sqlite"):
+    cm = MagicMock()
+    cm.models.pce_cache.db_path = db_path
+    return cm
+
+
+def test_cache_flush_without_confirm_refuses():
+    """A bare `cache flush` must not touch anything: no --confirm means no call."""
+    from src.cli.cache import cache_group
+    runner = CliRunner()
+    with patch("src.pce_cache.flush.flush_pce_derived_state") as mock_flush:
+        result = runner.invoke(cache_group, ["flush"])
+    assert result.exit_code != 0
+    mock_flush.assert_not_called()
+    # Language-independent: both the EN and ZH strings for this key contain
+    # the literal flag name, so this holds regardless of configured locale.
+    assert "--confirm" in result.output
+
+
+def test_cache_flush_with_confirm_calls_flush_with_expected_args():
+    from src.cli.cache import cache_group
+    runner = CliRunner()
+    cm = _mock_config_manager(db_path="data/pce_cache.sqlite")
+    with patch("src.config.ConfigManager", return_value=cm):
+        with patch("src.config.resolve_state_file", return_value="logs/state.json"):
+            with patch("src.pce_cache.flush.flush_pce_derived_state", return_value={}) as mock_flush:
+                result = runner.invoke(cache_group, ["flush", "--confirm"])
+    assert result.exit_code == 0
+    mock_flush.assert_called_once_with("data/pce_cache.sqlite", "logs/state.json")
+
+
+def test_cache_flush_json_output():
+    import json
+    from src.cli.cache import cache_group
+    runner = CliRunner()
+    cm = _mock_config_manager()
+    counts = {"pce_events": 12, "pce_traffic_flow_raw": 34, "state_keys": 5, "dashboard_keys": 1}
+    with patch("src.config.ConfigManager", return_value=cm):
+        with patch("src.config.resolve_state_file", return_value="logs/state.json"):
+            with patch("src.pce_cache.flush.flush_pce_derived_state", return_value=counts):
+                result = runner.invoke(cache_group, ["flush", "--confirm", "--json"])
+    assert result.exit_code == 0
+    # stdout only: the restart-required note goes to stderr precisely so it
+    # never lands inside a --json consumer's parsed payload.
+    data = json.loads(result.stdout)
+    assert data == counts
+    assert "restart" in result.stderr.lower() or result.stderr.strip() != ""
+
+
+def test_cache_flush_lock_timeout_is_distinguishable_failure():
+    """flush_pce_derived_state raising TimeoutError must not crash and must not
+    be reported as success — the operator needs to know to retry, not see a
+    traceback or a silent 0."""
+    from src.cli.cache import cache_group
+    runner = CliRunner()
+    cm = _mock_config_manager()
+    with patch("src.config.ConfigManager", return_value=cm):
+        with patch("src.config.resolve_state_file", return_value="logs/state.json"):
+            with patch("src.pce_cache.flush.flush_pce_derived_state",
+                       side_effect=TimeoutError("lock busy")) as mock_flush:
+                result = runner.invoke(cache_group, ["flush", "--confirm"])
+    assert result.exit_code != 0
+    assert result.exception is None or not isinstance(result.exception, TimeoutError)
+    mock_flush.assert_called_once()
+    assert result.output.strip() != ""

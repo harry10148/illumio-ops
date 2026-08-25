@@ -85,8 +85,8 @@ def flush_pce_derived_state(db_path: str, state_path: str) -> dict[str, int]:
     point takes them (scheduler/jobs.py's run_monitor_cycle, the GUI's
     /api/actions/run): the cross-process ``file_lock(analysis_lock_path())``
     outside, the in-process ``analysis_lock`` inside. Taking them here rather
-    than at the three call sites means no caller can forget, and a caller in a
-    different process (both CLI paths) still gets the one that works across
+    than at the call sites means no caller can forget, and a caller in a
+    different process (the CLI paths) still gets the one that works across
     processes — the in-process lock is inert there.
 
     Raises TimeoutError when a cycle in flight does not finish inside

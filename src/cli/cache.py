@@ -1,4 +1,4 @@
-"""illumio-ops cache subcommands — backfill, status, retention."""
+"""illumio-ops cache subcommands — backfill, status, retention, flush."""
 from __future__ import annotations
 
 import click
@@ -18,6 +18,7 @@ from src.cli._output import (
 )
 from src.cli._exit_codes import (
     EXIT_OK,
+    EXIT_USAGE,
     EXIT_DATAERR,
     EXIT_NOINPUT,
     EXIT_UNAVAILABLE,
@@ -57,7 +58,7 @@ def _get_db_session_factory():
 
 @click.group("cache")
 def cache_group():
-    """PCE cache management — backfill, status, retention."""
+    """PCE cache management — backfill, status, retention, flush."""
 
 
 @cache_group.command("backfill")
@@ -208,3 +209,43 @@ def cache_retention(ctx: click.Context, do_run: bool, json_output: bool):
         echo_error(ctx, t("cli_cache_retention_failed", exc=exc))
         ctx.exit(EXIT_SOFTWARE)
         return
+
+
+@cache_group.command("flush")
+@click.option("--confirm", is_flag=True, default=False,
+              help="Required. Clears every cached PCE row and the PCE-derived state.")
+@click.option("--json", "json_output", is_flag=True, default=False,
+              help="Emit the per-table counts as JSON.")
+@click.pass_context
+def cache_flush(ctx: click.Context, confirm: bool, json_output: bool):
+    """Clear the cached PCE data and the state derived from it.
+
+    For an appliance whose cache accumulated rows from more than one PCE:
+    `config login --pce-target-change flush` only clears when the PCE also
+    changes, so staying on the current PCE needs this instead.
+    """
+    if not confirm:
+        echo_error(ctx, t("cli_cache_flush_needs_confirm"))
+        ctx.exit(EXIT_USAGE)
+        return
+    from src.config import ConfigManager, resolve_state_file
+    from src.pce_cache.flush import flush_pce_derived_state
+    cm = ConfigManager()
+    try:
+        counts = flush_pce_derived_state(cm.models.pce_cache.db_path, resolve_state_file())
+    except TimeoutError as exc:
+        echo_error(ctx, t("cli_cache_flush_busy", error=str(exc)[:200]))
+        ctx.exit(EXIT_UNAVAILABLE)
+        return
+    # Always shown, json or not: it goes to stderr (echo_warning), so it
+    # never lands in a --json consumer's stdout, but a running monitor holds
+    # its own ConfigManager for the life of the process and will refill what
+    # was just cleared regardless of which output format the operator chose.
+    echo_warning(ctx, t("cli_cache_flush_restart_required"))
+    if json_output or is_json(ctx):
+        echo_json(ctx, counts)
+    elif not is_quiet(ctx):
+        table = Table(t("cli_cache_col_setting"), t("cli_cache_col_rows_deleted"))
+        for key, val in sorted(counts.items()):
+            table.add_row(key, str(val))
+        console.print(table)
