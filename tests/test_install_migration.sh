@@ -40,12 +40,31 @@ if ! declare -f migrate_from_underscore_root > /dev/null; then
     exit 1
 fi
 
+# Source only the check_pce_profile_contamination function body. Self-contained
+# per the same convention as migrate_from_underscore_root above.
+# shellcheck disable=SC1090
+source <(sed -n '/^check_pce_profile_contamination()/,/^}/p' "$INSTALL_SH")
+
+if ! declare -f check_pce_profile_contamination > /dev/null; then
+    echo "ERROR: failed to source check_pce_profile_contamination from $INSTALL_SH" >&2
+    exit 1
+fi
+
 # Prepend stubs to PATH so `id`, `systemctl`, `chown` are intercepted.
 export PATH="$STUBS_DIR:$PATH"
 
+# Python interpreter for check_pce_profile_contamination's inline script.
+# Test config roots have no src/ tree, so the function's `from src.pce_target
+# import ...` always falls back to the local normalize functions — that's
+# intentional and exercised by T10 below.
+PY_BIN="$REPO_ROOT/venv/bin/python3"
+if [[ ! -x "$PY_BIN" ]]; then
+    PY_BIN="$(command -v python3)"
+fi
+
 PASS_COUNT=0
 FAIL_COUNT=0
-TOTAL=6
+TOTAL=10
 
 pass() {
     echo "PASS: $1"
@@ -265,6 +284,177 @@ t6_partial_migration_ordering() {
     cleanup_test_env
 }
 
+# --- check_pce_profile_contamination() integration tests (T7-T10) ---------
+
+echo
+echo "==> Running check_pce_profile_contamination() integration tests (T7-T10)"
+echo
+
+new_contamination_env() {
+    CTEST_DIR="$(mktemp -d)"
+    export CFG_ROOT="$CTEST_DIR/root"
+    mkdir -p "$CFG_ROOT/config"
+}
+
+cleanup_contamination_env() {
+    if [[ -n "${CTEST_DIR-}" && -d "$CTEST_DIR" ]]; then
+        rm -rf "$CTEST_DIR"
+    fi
+    unset CTEST_DIR CFG_ROOT
+}
+
+MARKER_REL="config/.pce-profile-migration.json"
+
+# --- T7: two distinct (url, org_id) profiles -> contamination warning ------
+
+t7_two_distinct_profiles() {
+    new_contamination_env
+    cat > "$CFG_ROOT/config/config.json" <<'JSON'
+{
+  "api": {"url": "https://pce1.example.com", "org_id": "1"},
+  "pce_profiles": [
+    {"url": "https://pce1.example.com", "org_id": "1"},
+    {"url": "https://pce2.example.com", "org_id": "2"}
+  ]
+}
+JSON
+
+    local out exit_code
+    out="$(check_pce_profile_contamination "$CFG_ROOT" "$PY_BIN" 2>&1)"
+    exit_code=$?
+
+    if [[ $exit_code -ne 0 ]]; then
+        fail "T7 two distinct profiles" "non-zero exit ($exit_code)" "$out"
+    fi
+    if ! grep -qi "WARNING" <<< "$out"; then
+        fail "T7 two distinct profiles" "expected WARNING keyword" "$out"
+    fi
+    if ! grep -q "pce1.example.com" <<< "$out"; then
+        fail "T7 two distinct profiles" "expected pce1 url in output" "$out"
+    fi
+    if ! grep -q "pce2.example.com" <<< "$out"; then
+        fail "T7 two distinct profiles" "expected pce2 url in output" "$out"
+    fi
+    if ! grep -q "cache flush" <<< "$out"; then
+        fail "T7 two distinct profiles" "expected 'cache flush' remediation command" "$out"
+    fi
+    if ! grep -q "sudo -u illumio-ops" <<< "$out"; then
+        fail "T7 two distinct profiles" "expected 'sudo -u illumio-ops' in output" "$out"
+    fi
+    if [[ ! -f "$CFG_ROOT/$MARKER_REL" ]]; then
+        fail "T7 two distinct profiles" "marker file not created" "$out"
+    fi
+    if ! "$PY_BIN" -m json.tool "$CFG_ROOT/$MARKER_REL" > /dev/null 2>&1; then
+        fail "T7 two distinct profiles" "marker file is not valid JSON" "$out"
+    fi
+
+    pass "T7 two distinct profiles"
+    cleanup_contamination_env
+}
+
+# --- T8: a single profile -> plain notice, no warning ----------------------
+
+t8_single_profile() {
+    new_contamination_env
+    cat > "$CFG_ROOT/config/config.json" <<'JSON'
+{
+  "api": {"url": "https://pce1.example.com", "org_id": "1"},
+  "pce_profiles": [
+    {"url": "https://pce1.example.com", "org_id": "1"}
+  ]
+}
+JSON
+
+    local out exit_code
+    out="$(check_pce_profile_contamination "$CFG_ROOT" "$PY_BIN" 2>&1)"
+    exit_code=$?
+
+    if [[ $exit_code -ne 0 ]]; then
+        fail "T8 single profile" "non-zero exit ($exit_code)" "$out"
+    fi
+    if grep -qi "WARNING" <<< "$out"; then
+        fail "T8 single profile" "did not expect WARNING keyword" "$out"
+    fi
+    if [[ -z "$out" ]]; then
+        fail "T8 single profile" "expected a notice, got no output" "$out"
+    fi
+    if [[ ! -f "$CFG_ROOT/$MARKER_REL" ]]; then
+        fail "T8 single profile" "marker file not created" "$out"
+    fi
+    if ! "$PY_BIN" -m json.tool "$CFG_ROOT/$MARKER_REL" > /dev/null 2>&1; then
+        fail "T8 single profile" "marker file is not valid JSON" "$out"
+    fi
+
+    pass "T8 single profile"
+    cleanup_contamination_env
+}
+
+# --- T9: no pce_profiles key and no prior marker -> "cannot determine" -----
+
+t9_no_profiles_no_marker() {
+    new_contamination_env
+    cat > "$CFG_ROOT/config/config.json" <<'JSON'
+{
+  "api": {"url": "https://pce1.example.com", "org_id": "1"}
+}
+JSON
+
+    local out exit_code
+    out="$(check_pce_profile_contamination "$CFG_ROOT" "$PY_BIN" 2>&1)"
+    exit_code=$?
+
+    if [[ $exit_code -ne 0 ]]; then
+        fail "T9 no profiles, no marker" "non-zero exit ($exit_code)" "$out"
+    fi
+    if ! grep -qi "cannot be determined" <<< "$out"; then
+        fail "T9 no profiles, no marker" "expected 'cannot be determined' notice" "$out"
+    fi
+    if [[ ! -f "$CFG_ROOT/$MARKER_REL" ]]; then
+        fail "T9 no profiles, no marker" "marker file not created" "$out"
+    fi
+    if ! "$PY_BIN" -m json.tool "$CFG_ROOT/$MARKER_REL" > /dev/null 2>&1; then
+        fail "T9 no profiles, no marker" "marker file is not valid JSON" "$out"
+    fi
+
+    pass "T9 no profiles, no marker"
+    cleanup_contamination_env
+}
+
+# --- T10: two profile urls differing only by trailing slash -> same PCE ----
+
+t10_trailing_slash_same_pce() {
+    new_contamination_env
+    cat > "$CFG_ROOT/config/config.json" <<'JSON'
+{
+  "api": {"url": "https://pce1.example.com", "org_id": "1"},
+  "pce_profiles": [
+    {"url": "https://pce1.example.com", "org_id": "1"},
+    {"url": "https://pce1.example.com/", "org_id": "1"}
+  ]
+}
+JSON
+
+    local out exit_code
+    out="$(check_pce_profile_contamination "$CFG_ROOT" "$PY_BIN" 2>&1)"
+    exit_code=$?
+
+    if [[ $exit_code -ne 0 ]]; then
+        fail "T10 trailing-slash-only difference" "non-zero exit ($exit_code)" "$out"
+    fi
+    if grep -qi "WARNING" <<< "$out"; then
+        fail "T10 trailing-slash-only difference" "url differing only by trailing slash treated as distinct PCE" "$out"
+    fi
+    if [[ ! -f "$CFG_ROOT/$MARKER_REL" ]]; then
+        fail "T10 trailing-slash-only difference" "marker file not created" "$out"
+    fi
+    if ! "$PY_BIN" -m json.tool "$CFG_ROOT/$MARKER_REL" > /dev/null 2>&1; then
+        fail "T10 trailing-slash-only difference" "marker file is not valid JSON" "$out"
+    fi
+
+    pass "T10 trailing-slash-only difference"
+    cleanup_contamination_env
+}
+
 # --- Run all ---------------------------------------------------------------
 
 t1_happy_path
@@ -273,6 +463,10 @@ t3_old_root_absent
 t4_dual_existence_no_marker
 t5_already_migrated_marker
 t6_partial_migration_ordering
+t7_two_distinct_profiles
+t8_single_profile
+t9_no_profiles_no_marker
+t10_trailing_slash_same_pce
 
 echo
 echo "$PASS_COUNT/$TOTAL passed"

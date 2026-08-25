@@ -118,6 +118,102 @@ migrate_from_underscore_root() {
     echo "    finish the upgrade flow; restart with 'sudo systemctl start illumio-ops' afterwards."
 }
 
+# Warn when this appliance's cache may hold rows from more than one PCE.
+# Named + self-contained so tests/test_install_migration.sh can source just
+# this function, the same way it sources migrate_from_underscore_root.
+# $1 = INSTALL_ROOT, $2 = python interpreter
+check_pce_profile_contamination() {
+    local root="$1" py="$2"
+    [ -f "$root/config/config.json" ] || return 0
+    "$py" - "$root" <<'PYEOF'
+import json, os, sys, datetime
+root = sys.argv[1]
+cfg_path = os.path.join(root, "config", "config.json")
+marker_path = os.path.join(root, "config", ".pce-profile-migration.json")
+sys.path.insert(0, root)
+try:
+    from src.pce_target import normalize_pce_url, normalize_org_id
+except Exception:
+    def normalize_pce_url(v): return str(v or "").rstrip("/")
+    def normalize_org_id(v): return str(v or "1")
+try:
+    with open(cfg_path) as fh:
+        cfg = json.load(fh)
+except Exception as exc:
+    print("    PCE profile check skipped (config unreadable): %s" % exc)
+    sys.exit(0)
+
+profiles = cfg.get("pce_profiles")
+targets = set()
+if isinstance(profiles, list):
+    for p in profiles:
+        if isinstance(p, dict):
+            targets.add((normalize_pce_url(p.get("url")), normalize_org_id(p.get("org_id"))))
+
+if profiles is None and os.path.exists(marker_path):
+    sys.exit(0)                      # 先前已檢查過且無風險
+if profiles is None:
+    print("    NOTE: PCE profiles were removed in a newer version. This config no")
+    print("          longer carries them, so whether this appliance ever switched")
+    print("          PCEs cannot be determined here. If it did, its cache may hold")
+    print("          rows from both. Check with: illumio-ops cache status")
+else:
+    api_t = (normalize_pce_url(cfg.get("api", {}).get("url")),
+             normalize_org_id(cfg.get("api", {}).get("org_id")))
+    if len(targets) > 1:
+        print("")
+        print("    ============================================================")
+        print("    WARNING: this appliance was configured with more than one PCE.")
+        print("    Switching between them did NOT clear the cache, so the cached")
+        print("    traffic, events and ingestion positions may hold rows from")
+        print("    both, with nothing marking which came from which. Reports,")
+        print("    alerts and searches built on that cache span both environments.")
+        print("")
+        print("    PCEs found in this config:")
+        for url, org in sorted(targets):
+            mark = "  <- api currently points here" if (url, org) == api_t else ""
+            print("      %s (org %s)%s" % (url, org, mark))
+        print("")
+        print("    To keep the current PCE and clear what the others left behind:")
+        print("      sudo systemctl stop illumio-ops")
+        print("      sudo -u illumio-ops illumio-ops cache flush --confirm")
+        print("      sudo systemctl start illumio-ops")
+        print("")
+        print("    To move to a different PCE instead (clears as part of the switch):")
+        print("      sudo systemctl stop illumio-ops")
+        print("      sudo -u illumio-ops illumio-ops config login \\")
+        print("          --url <PCE URL> --org-id <org> --pce-target-change flush")
+        print("      sudo systemctl start illumio-ops")
+        print("")
+        print("    Archive day files may span both PCEs too; clearing the cache")
+        print("    does not touch them. To start a clean archive, MOVE (do not")
+        print("    delete) the existing archive directory aside — the PCE keeps")
+        print("    only about three months, so older archives have no other copy.")
+        print("")
+        print("    The other profiles' API credentials are still in config.json")
+        print("    under 'pce_profiles' and stay there until the next save.")
+        print("    ============================================================")
+        print("")
+    else:
+        print("    NOTE: PCE profiles were removed in a newer version; the stored")
+        print("          credentials stay in config.json until the next save.")
+
+review_db = os.path.join(root, "data", "archive_review.sqlite")
+if os.path.exists(review_db):
+    mb = os.path.getsize(review_db) / (1024 * 1024)
+    print("    NOTE: %s (%.1f MB) is no longer read by any code and can be deleted."
+          % (review_db, mb))
+
+try:
+    with open(marker_path, "w") as fh:
+        json.dump({"checked_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+                   "distinct_pce_targets": len(targets)}, fh, indent=2)
+except Exception:
+    pass
+PYEOF
+    return 0
+}
+
 # Run migration only for the default install root (custom paths bypass migration).
 if [[ "$INSTALL_ROOT" == "/opt/illumio-ops" ]]; then
     migrate_from_underscore_root
@@ -238,12 +334,20 @@ try:
     if 'http_redirect_port' in tls:
         del tls['http_redirect_port']
         changed.append('web_gui.tls.http_redirect_port')
+    pc = cfg.get('pce_cache', {})
+    if 'archive_review_max_days' in pc:
+        del pc['archive_review_max_days']
+        changed.append('pce_cache.archive_review_max_days')
     if changed:
         with open(p, 'w') as f: json.dump(cfg, f, indent=2)
         print('    Config migration: removed deprecated field(s):', ', '.join(changed))
 except Exception as e:
     print('    Config migration warning:', e, file=sys.stderr)
 " "$INSTALL_ROOT/config/config.json" || true
+fi
+
+if [ "$IS_UPGRADE" = true ]; then
+    check_pce_profile_contamination "$INSTALL_ROOT" "$INSTALL_ROOT/python/bin/python3"
 fi
 
 # --- Post-install verification -----------------------------------------------
