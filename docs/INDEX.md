@@ -36,7 +36,7 @@ verified_against:
 
 | 文件 | 一句話說明 |
 |---|---|
-| [安裝與部署](guide/installation.md) | 從原始碼或離線安裝包安裝、systemd／NSSM 服務化部署、升級與解除安裝。 |
+| [安裝與部署](guide/installation.md) | 從原始碼或離線安裝包安裝、systemd 服務化部署、升級與解除安裝。 |
 | [設定參照](guide/configuration.md) | `config/config.json` 每個鍵的權威參照，以 pydantic schema 為 ground truth。 |
 | [Web GUI 導覽](guide/gui-tour.md) | 8 個分頁的 SPA 導覽：登入、Dashboard、Reports、Rules、Events 等。 |
 | [監控規則、告警與事件規則](guide/monitoring-alerts.md) | 即時監控規則引擎、B/L/R 報表安全規則引擎與事件處理管線的差異與設定方式。 |

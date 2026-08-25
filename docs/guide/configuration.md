@@ -371,7 +371,7 @@ cache 架構、容量規劃與 archive 排程細節見 [cache-maintenance.md](ca
 
 > GUI 監聽埠**不是** `config.json` 鍵；由 CLI 選項決定，`illumio-ops gui --port`
 > 預設埠為 `5001`（`src/cli/gui_cmd.py`），服務化安裝時同一預設值也會寫進
-> systemd/NSSM 服務定義（見 [installation.md](installation.md)）。
+> systemd 服務定義（見 [installation.md](installation.md)）。
 
 ### TLS：self-signed 憑證每日續期 job
 

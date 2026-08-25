@@ -5095,7 +5095,7 @@
   "gui_sy_pce_target_same": "Same PCE, new address",
   "gui_sy_pce_target_title": "This points at a different PCE",
   "gui_sy_pce_target_to": "Changing to: {url} (org {org})",
-  "gui_sy_restart_i_409": "If the daemon is managed externally (systemd, NSSM…) it cannot be restarted here; use the service manager",
+  "gui_sy_restart_i_409": "If the daemon is managed externally (systemd) it cannot be restarted here; use the service manager",
   "gui_sy_restart_i_poll": "Reloads the poll intervals and schedules",
   "gui_sy_restart_i_rate": "Resets the rate-limit counters and any in-flight batch",
   "gui_sy_ret_counters": "The reported counters cover events and flows only; the sweep also covers other data.",

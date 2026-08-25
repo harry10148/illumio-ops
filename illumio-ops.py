@@ -58,7 +58,7 @@ def _bootstrap_logging() -> None:
     （monitor / monitor-gui / gui / report ...）以前完全沒做，後果是：
       - loguru 內建的 stderr sink（DEBUG、**無 redaction filter**）留著，
         api_key / password / token / Authorization / PCE href 原文直接進
-        journal 與 NSSM 的 logs/service_stderr.log；
+        journal；
       - logs/illumio_ops.log（疑難排解文件叫操作者看的那個檔）從不建立，
         0640 權限與輪替壓縮也全部沒套用；
       - config.json 的 logging.level / json_sink 被無聲忽略；

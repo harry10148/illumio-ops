@@ -45,6 +45,19 @@ a plain `<major>.<minor>.<patch>` scheme. (Tags through v4.0.0 carried a
 
 ### Removed
 
+- **Windows as a host platform for the appliance itself.** illumio-ops now
+  installs and runs on Linux only: the PowerShell installer, preflight and
+  service-registration scripts, the NSSM service wrapper it bundled, and the
+  Windows offline bundle (`...-offline-windows-x86_64.zip`) are all gone, and
+  the build script no longer cross-downloads `win_amd64` wheels. **This does
+  not change which workloads illumio-ops can manage.** Segmenting Windows
+  servers is unaffected — Windows workload inventory, the Windows Service and
+  process filters, the Windows admin-traffic rules, and the VEN OS breakdown
+  in reports all work exactly as before. What changed is only where the
+  appliance is installed, not what it can see or govern. Existing Windows
+  installations are not migrated: stand up a Linux host and copy
+  `config/config.json` and `data/` across. This makes the next release a major
+  version (5.0.0).
 - **The archive review database.** Investigating archived traffic used to
   mean loading a chosen date range into a separate review database before
   you could search it. That load step, its backing database, and the

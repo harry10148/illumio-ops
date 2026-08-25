@@ -999,7 +999,7 @@ async function mountCache(root, ctx) {
        * rate-limited to 5/hour). It rebuilds the scheduler for real whenever
        * the GUI owns the daemon — which is the standard deployment, since
        * `--monitor-gui` (cli/_runtime.py's run_daemon_with_gui) is what the
-       * systemd/NSSM unit runs and what installs the restart hook. Its own
+       * systemd unit runs and what installs the restart hook. Its own
        * 409 is the ONE case where "restart it from your service manager" is
        * the truth, so that line is shown on 409 and nowhere else. 429 is
        * reachable by an operator retuning cache settings, so it gets a

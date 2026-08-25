@@ -113,7 +113,7 @@ html`、`illumio-ops status`），同時保留 **legacy argparse** 路徑以支�
 
 | 文件 | 內容 |
 |---|---|
-| [docs/guide/installation.md](docs/guide/installation.md) | 安裝與部署（systemd／NSSM／離線安裝包） |
+| [docs/guide/installation.md](docs/guide/installation.md) | 安裝與部署（systemd／離線安裝包） |
 | [docs/guide/configuration.md](docs/guide/configuration.md) | 設定檔完整參照 |
 | [docs/guide/gui-tour.md](docs/guide/gui-tour.md) | Web GUI 導覽 |
 | [docs/guide/reports.md](docs/guide/reports.md) | 9 報表家族逐一說明 |

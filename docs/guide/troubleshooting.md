@@ -83,9 +83,6 @@ sudo journalctl -u illumio-ops -n 100 --no-pager
 > 修正：舊文件曾提到可改 `settings.port` 設定鍵讓服務換埠，該鍵**不存在**——埠只能透過 `--port` 旗標（或
 > systemd 啟動參數）控制，見 `src/cli/gui_cmd.py`。
 
-Windows（NSSM 服務）對應檢查：`Get-Service IllumioOps` 應顯示 `Running`；停在 `Stopped`／`StartPending` 時查
-Windows 事件檢視器（應用程式記錄，來源為服務行程），成因與上列 Linux 三項相同（設定檔、目錄權限、埠衝突）。
-
 ---
 
 ## 2. PCE 連不上／憑證

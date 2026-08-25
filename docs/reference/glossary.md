@@ -110,7 +110,6 @@ verified_against:
 | CSV | Comma-Separated Values。illumio-ops 報表模組產出的匯出格式之一，用於工作負載清單、流量摘要與 policy 缺口報表。 | [報表家族](../guide/reports.md) |
 | DLQ | 見上方「illumio-ops 專用術語 → DLQ」。 | [SIEM 轉送](../guide/siem.md) |
 | HEC | HTTP Event Collector。illumio-ops SIEM 轉發器支援的 Splunk HTTPS 資料匯入端點（`transport: hec`）。 | [SIEM 轉送](../guide/siem.md) |
-| NSSM | Non-Sucking Service Manager。在 Windows 主機上以背景服務方式執行 illumio-ops 所使用的 Windows 服務包裝器。 | [安裝與部署](../guide/installation.md) |
 | PCE | Policy Compute Engine（政策運算引擎）。見上方「Illumio 核心術語 → PCE」。 | [架構導覽](../handover/architecture.md) |
 | REST | Representational State Transfer（表現層狀態轉換）。Illumio PCE API 採用的架構風格，illumio-ops 使用 PCE REST API（v2）進行所有資料擷取與 policy 讀取。 | [REST API 參考](rest-api.md) |
 | RFC 5424 | 定義 syslog 訊息格式的協定標準（PRI、VERSION、TIMESTAMP、HOSTNAME、APP-NAME、MSGID、STRUCTURED-DATA）。illumio-ops 的 `syslog_cef`／`syslog_json` 傳輸格式在外層包一層 RFC 5424 header。 | [SIEM 轉送](../guide/siem.md) |
