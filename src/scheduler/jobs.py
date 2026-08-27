@@ -264,8 +264,14 @@ def run_traffic_ingest(cm) -> None:
         sf = sessionmaker(_get_cache_engine(cfg.db_path))
         wm = WatermarkStore(sf)
         with ApiClient(cm) as api:
+            from src.pce_cache.traffic_filter import TrafficFilter
+            # 這兩個參數在 TrafficIngestor 都是 Optional 且有無害的預設，所以漏傳
+            # 不會壞任何東西——只會讓使用者在 GUI/CLI 設定的過濾與抽樣被靜默忽略。
+            # tests/test_traffic_ingest_wiring.py 守住這條線。
             ing = TrafficIngestor(api=api, session_factory=sf,
                                    watermark=wm,
+                                   traffic_filter=TrafficFilter(**cfg.traffic_filter.model_dump()),
+                                   sample_ratio_allowed=cfg.traffic_sampling.sample_ratio_allowed,
                                    max_results=cfg.traffic_sampling.max_rows_per_batch,
                                    siem_destinations=_enabled_siem_destinations(cm, "traffic"),
                                    record_observations=getattr(cfg, "flow_delta_enabled", True),

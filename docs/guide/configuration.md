@@ -300,7 +300,7 @@ cache 架構、容量規劃與 archive 排程細節見 [cache-maintenance.md](ca
 
 | 鍵 | 型別 | 預設 | 說明 |
 |---|---|---|---|
-| `actions` | list[str] | `["blocked", "potentially_blocked"]` | 要 ingest 的 policy_decision 值 |
+| `actions` | list[str] | `[]` | 要 ingest 的 policy_decision 值；**空＝不過濾（全收）**。此設定於 2026-08-27 才真正接進 ingest 流程，在那之前無論填什麼都不生效 |
 | `workload_label_env` | list[str] | `[]` | 依 workload env label 過濾 |
 | `ports` | list[int]（1–65535） | `[]` | 只 ingest 指定連接埠 |
 | `protocols` | list[str] | `[]` | 只 ingest 指定通訊協定 |

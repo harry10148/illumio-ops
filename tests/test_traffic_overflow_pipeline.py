@@ -22,6 +22,8 @@ from __future__ import annotations
 import datetime
 from unittest.mock import MagicMock, patch
 
+from src.config_models import TrafficFilterSettings
+
 import pytest
 
 
@@ -90,6 +92,11 @@ def _cm(tmp_path):
     cfg = cm.models.pce_cache
     cfg.db_path = str(tmp_path / "cache.sqlite")
     cfg.traffic_sampling.max_rows_per_batch = 200000
+    # run_traffic_ingest 自 2026-08-27 起也讀這兩項（先前從未接上，見
+    # tests/test_traffic_ingest_wiring.py）。MagicMock 的預設值會讓
+    # TrafficSampler 拿 Mock 去和 int 比較而爆，所以要給真值。
+    cfg.traffic_sampling.sample_ratio_allowed = 1
+    cfg.traffic_filter = TrafficFilterSettings()
     cm.models.siem.enabled = False
     return cm
 

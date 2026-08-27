@@ -205,7 +205,13 @@ class Rule(_Base):
 
 class TrafficFilterSettings(_Base):
     model_config = ConfigDict(extra="ignore")
-    actions: list[str] = Field(default_factory=lambda: ["blocked", "potentially_blocked"])
+    # 空＝不過濾，與本類別其餘四個欄位一致（TrafficFilter 對 falsy 值即關閉該條件）。
+    # 不寫死 decision 清單的兩個理由：(1) 這條設定在 2026-08-27 之前從未接進
+    # run_traffic_ingest，production 一直是「全收」，寫死清單會在 wiring 修好的
+    # 那一刻讓每台未動過設定的機器開始丟棄 allowed 流量；(2) 清單也不是全集——
+    # dashboard 用的是 ["blocked","potentially_blocked","allowed","unknown"]，
+    # 另有 "potentially_blocked_by_boundary"，寫死註定隨 PCE 新增值而漂移。
+    actions: list[str] = Field(default_factory=list)
     workload_label_env: list[str] = Field(default_factory=list)
     ports: list[int] = Field(default_factory=list)
     protocols: list[str] = Field(default_factory=list)
