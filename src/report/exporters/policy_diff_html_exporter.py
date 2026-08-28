@@ -25,6 +25,7 @@ from src.report.exporters._output_paths import (
 )
 from src.report.exporters.cover_page import build_cover_page as _build_cover_page
 from src.report.exporters.report_css import TABLE_JS, build_css
+from src.report.report_metadata import write_metadata_sidecar
 
 _CSS = build_css("policy_diff")
 
@@ -188,4 +189,25 @@ class PolicyDiffHtmlExporter:
         except BaseException:
             discard_reserved(path)
             raise
+        self._write_report_metadata(path)
         return path
+
+    def _write_report_metadata(self, report_path: str) -> None:
+        """Sidecar for /api/reports (report_type / summary). Merges — see
+        write_metadata_sidecar; the scheduler owns schedule_id in the same file."""
+        s = self._r.get("summary") or {}
+        # Language-neutral, like the audit/traffic sidecars ("audit events N").
+        summary = (
+            f"rulesets +{s.get('rulesets_added', 0)} "
+            f"-{s.get('rulesets_removed', 0)} ~{s.get('rulesets_modified', 0)} | "
+            f"rules +{s.get('rules_added', 0)} "
+            f"-{s.get('rules_removed', 0)} ~{s.get('rules_modified', 0)}"
+        )
+        write_metadata_sidecar(report_path, {
+            "report_type": "policy_diff",
+            "file_format": "html",
+            "generated_at": datetime.datetime.now().isoformat(),
+            "record_count": int(s.get("total_changes", 0) or 0),
+            "execution_stats": dict(s),
+            "summary": summary,
+        })

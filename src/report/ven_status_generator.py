@@ -26,6 +26,7 @@ import pandas as pd
 from dataclasses import dataclass, field
 
 from src.i18n import t
+from src.report.report_metadata import write_metadata_sidecar
 from src.report.tz_utils import parse_tz, fmt_tz_str as _fmt_tz_str
 
 _REPORT_DETAIL_LEVEL = "full"
@@ -189,6 +190,7 @@ class VenStatusGenerator:
             path = VenHtmlExporter(result.module_results, df=result.dataframe, lang=lang,
                                    pce_url=pce_url, org_name=org_name).export(output_dir)
             paths.append(path)
+            self._write_report_metadata(path, result, file_format='html')
             print(t("rpt_ven_html_saved", path=path, lang=lang))
 
         if fmt in ('xlsx', 'all'):
@@ -202,6 +204,9 @@ class VenStatusGenerator:
                     os.path.join(output_dir, f'Illumio_VEN_Report_{ts_str}.xlsx'))
                 generate_ven_xlsx(result.module_results or {}, xlsx_path, lang=lang)
                 paths.append(xlsx_path)
+                # Inside the try, after the workbook succeeds: a failed XLSX is
+                # discarded below, and an orphan sidecar would keep listing it.
+                self._write_report_metadata(xlsx_path, result, file_format='xlsx')
                 print(t("rpt_xlsx_saved", path=xlsx_path, default=f"XLSX saved: {xlsx_path}", lang=lang))
             except Exception as exc:
                 logger.exception('XLSX export failed: {}', exc)
@@ -214,8 +219,30 @@ class VenStatusGenerator:
         if fmt in ('csv', 'all'):
             path = CsvExporter(result.module_results, report_label='VEN_Status').export(output_dir)
             paths.append(path)
+            self._write_report_metadata(path, result, file_format='csv')
             print(t("rpt_ven_csv_saved", path=path, lang=lang))
         return paths
+
+    @staticmethod
+    def _write_report_metadata(report_path: str, result: VenStatusResult,
+                               file_format: str) -> None:
+        """Sidecar for /api/reports (report_type / summary). Merges — see
+        write_metadata_sidecar; the scheduler owns schedule_id in the same file."""
+        kpis = (result.module_results or {}).get('kpis', []) or []
+        by_key = {k.get('i18n_key'): k.get('value') for k in kpis if isinstance(k, dict)}
+        # Language-neutral, like the audit/traffic sidecars ("audit events N").
+        summary = (f"VEN total {by_key.get('rpt_ven_kpi_total', result.record_count)} | "
+                   f"online {by_key.get('rpt_ven_kpi_online', 0)} | "
+                   f"offline {by_key.get('rpt_ven_kpi_offline', 0)} | "
+                   f"sync issues {by_key.get('rpt_ven_kpi_sync_issues', 0)}")
+        write_metadata_sidecar(report_path, {
+            "report_type": "ven_status",
+            "file_format": file_format,
+            "generated_at": result.generated_at.isoformat(),
+            "record_count": int(result.record_count or 0),
+            "kpis": kpis,
+            "summary": summary,
+        })
 
     # ── private ──────────────────────────────────────────────────────────────
 

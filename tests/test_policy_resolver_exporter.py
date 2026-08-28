@@ -58,4 +58,7 @@ def test_export_fmt_csv_only(tmp_path):
     assert len(paths) == 1
     assert paths[0].endswith(".zip")
     assert os.path.exists(paths[0])
-    assert not any(f.endswith(".json") for f in os.listdir(str(tmp_path)))
+    # The metadata sidecar is named "<report>.zip.metadata.json" — it is not a
+    # JSON *report*, so exclude it; the assertion still pins "csv only".
+    assert not any(f.endswith(".json") and not f.endswith(".metadata.json")
+                   for f in os.listdir(str(tmp_path)))

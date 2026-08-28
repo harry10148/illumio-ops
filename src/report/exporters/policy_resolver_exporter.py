@@ -17,6 +17,7 @@ from src.report.exporters._output_paths import (
     write_text_atomic,
 )
 from src.report.exporters.csv_exporter import CsvExporter
+from src.report.report_metadata import write_metadata_sidecar
 
 
 class PolicyResolverExporter:
@@ -40,6 +41,7 @@ class PolicyResolverExporter:
         except BaseException:
             discard_reserved(path)
             raise
+        self._write_report_metadata(path, file_format="json")
         logger.info(f"[PolicyResolverExporter] Wrote JSON -> {path}")
         return path
 
@@ -48,7 +50,33 @@ class PolicyResolverExporter:
         # _iter_dataframes handles list-of-dicts and writes one CSV per key
         # into a ZIP.
         rulesets = self._r.get("rulesets") or {}
-        return CsvExporter(rulesets, report_label="Policy_Resolver").export(output_dir)
+        path = CsvExporter(rulesets, report_label="Policy_Resolver").export(output_dir)
+        self._write_report_metadata(path, file_format="csv")
+        return path
+
+    def _write_report_metadata(self, report_path: str, file_format: str) -> None:
+        """Sidecar for /api/reports (report_type / summary). Merges — see
+        write_metadata_sidecar; the scheduler owns schedule_id in the same file."""
+        record_count = int(self._r.get("record_count", 0) or 0)
+        rulesets = self._r.get("rulesets") or {}
+        # Language-neutral, like the audit/traffic sidecars ("audit events N").
+        summary = f"resolved rows {record_count} across {len(rulesets)} ruleset(s)"
+        payload = {
+            "report_type": "policy_resolver",
+            "file_format": file_format,
+            "generated_at": datetime.datetime.now().isoformat(),
+            "record_count": record_count,
+            "summary": summary,
+        }
+        if self._r.get("truncated"):
+            # Row-cap truncation must never be silent (see resolve()'s row cap).
+            omitted = int(self._r.get("rows_omitted", 0) or 0)
+            payload["truncated"] = True
+            payload["rows_omitted"] = omitted
+            payload["row_cap"] = self._r.get("row_cap")
+            payload["truncated_rulesets"] = list(self._r.get("truncated_rulesets") or [])
+            payload["summary"] = f"{summary} (truncated: {omitted} rows omitted)"
+        write_metadata_sidecar(report_path, payload)
 
     def export(self, output_dir: str = "reports", fmt: str = "all") -> list[str]:
         """Write outputs selected by fmt; return the list of written paths.

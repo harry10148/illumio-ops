@@ -26,6 +26,7 @@ from src.report.exporters._output_paths import (
 from src.report.exporters.cover_page import build_cover_page as _build_cover_page
 from src.report.exporters.report_css import TABLE_JS, build_css
 from src.report.exporters.table_renderer import render_df_table
+from src.report.report_metadata import write_metadata_sidecar
 
 _CSS = build_css("app_summary")
 
@@ -201,4 +202,23 @@ class AppSummaryHtmlExporter:
         except BaseException:
             discard_reserved(path)
             raise
+        self._write_report_metadata(path)
         return path
+
+    def _write_report_metadata(self, report_path: str) -> None:
+        """Sidecar for /api/reports (report_type / summary). Merges — see
+        write_metadata_sidecar; the scheduler owns schedule_id in the same file."""
+        app = str(self._r.get("app", "") or "")
+        env = str(self._r.get("env", "") or "")
+        mod01 = self._r.get("mod01") if isinstance(self._r.get("mod01"), dict) else {}
+        flows = int(mod01.get("total_flows", 0) or 0)
+        # Language-neutral, like the audit/traffic sidecars ("audit events N").
+        summary = f"app {app}" + (f" / env {env}" if env else "")
+        summary += " | no flows in window" if self._r.get("empty") else f" | flows {flows}"
+        write_metadata_sidecar(report_path, {
+            "report_type": "app_summary",
+            "file_format": "html",
+            "generated_at": datetime.datetime.now().isoformat(),
+            "record_count": flows,
+            "summary": summary,
+        })

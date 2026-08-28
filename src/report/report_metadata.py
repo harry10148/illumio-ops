@@ -1,7 +1,11 @@
 """Shared deterministic metadata helpers for report artifacts."""
 from __future__ import annotations
 
+import json
+import os
 from typing import Any
+
+from loguru import logger
 
 ATTACK_SECTION_KEYS = (
     "boundary_breaches",
@@ -67,3 +71,37 @@ def build_attack_summary_brief(counts: dict[str, int]) -> str:
         f"actions {counts.get('action_matrix', 0)}"
     )
 
+
+def write_metadata_sidecar(report_path: str, payload: dict[str, Any]) -> None:
+    """Merge ``payload`` into ``<report_path>.metadata.json``.
+
+    Two independent producers own keys in this file: the generator/exporter
+    (report_type / summary / execution stats, read by ``/api/reports``) and
+    ``report_scheduler._stamp_schedule_id`` (``schedule_id``, which the
+    per-schedule retention sweep prunes by). A wholesale write by either would
+    drop the other's keys, so both merge.
+
+    Best-effort by design: the sidecar is written AFTER the report artifact is
+    already committed to disk (outside the reserve/discard cleanup), so raising
+    here would leave a real report on disk while the caller sees a failed
+    export. Same contract as ``_stamp_schedule_id``. Note this deviates from
+    ReportGenerator._write_report_metadata, which is unguarded — the existing
+    writers are left alone.
+    """
+    side = report_path + ".metadata.json"
+    data: dict[str, Any] = {}
+    try:
+        if os.path.isfile(side):
+            with open(side, encoding="utf-8") as fh:
+                loaded = json.load(fh)
+            if isinstance(loaded, dict):
+                data = loaded
+    except Exception as exc:  # noqa: BLE001
+        logger.warning(f"[ReportMetadata] unreadable sidecar {side}, rewriting: {exc}")
+        data = {}
+    data.update(payload)
+    try:
+        with open(side, "w", encoding="utf-8") as fh:
+            json.dump(data, fh, indent=2, ensure_ascii=False)
+    except Exception as exc:  # noqa: BLE001
+        logger.warning(f"[ReportMetadata] could not write sidecar {side}: {exc}")
