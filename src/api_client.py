@@ -1301,11 +1301,13 @@ class ApiClient:
         status, data = self._api_get(draft_href)
         if status == 200 and data and bool(data.get('update_type')):
             return True
-        if "/sec_rules/" in draft_href:
-            parent_href = draft_href.split("/sec_rules/")[0]
-            status_p, data_p = self._api_get(parent_href)
-            if status_p == 200 and data_p and bool(data_p.get('update_type')):
-                return True
+        for collection in ("/sec_rules/", "/deny_rules/", "/rules/"):
+            if collection in draft_href:
+                parent_href = draft_href.split(collection)[0]
+                status_p, data_p = self._api_get(parent_href)
+                if status_p == 200 and data_p and bool(data_p.get('update_type')):
+                    return True
+                break
         return False
 
     def toggle_and_provision(self, href: str, target_enabled: bool, is_ruleset: bool = False) -> bool:
