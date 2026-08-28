@@ -65,6 +65,34 @@ _CRON_CATCHUP_WINDOW_SECONDS = 90
 # Sentinel for "not provided" — distinguishes None (never run) from missing arg
 _UNSET = object()
 
+# The report types a schedule can actually produce — the single source of truth
+# for every entry point that accepts a report_type (the GUI API validator in
+# src/gui/routes/reports.py and the CLI wizard in
+# src/cli/menus/report_schedule.py both read THIS, they do not keep their own
+# lists any more).
+#
+# This mirrors the dispatch chain in ReportScheduler._generate_report below.
+# ADDING A REPORT TYPE MEANS CHANGING BOTH: a branch in _generate_report AND an
+# entry here. tests/test_report_type_registry.py fails if the CLI table drifts
+# from this set, and tests/test_report_schedule_validation.py fails if any type
+# in this set is rejected by the API.
+#
+# A type that is missing here is not merely undocumented: the API rejects it
+# with a 400, so leaving it out takes a working report away from operators.
+VALID_REPORT_TYPES: frozenset[str] = frozenset({
+    "traffic",
+    "security_risk",
+    "network_inventory",
+    "audit",
+    "ven_status",
+    "policy_usage",
+    "policy_diff",
+    "policy_resolver",
+    "app_summary",
+    "rule_hit_count",
+    "readiness",
+})
+
 class ReportScheduler:
     def __init__(self, config_manager, reporter):
         self.cm = config_manager

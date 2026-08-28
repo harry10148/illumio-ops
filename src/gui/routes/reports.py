@@ -130,6 +130,14 @@ def _save_adhoc_job(job_id: str, record: dict) -> None:
 def _validate_report_schedule(d: dict, lang: str) -> None:
     """報表排程輸入驗證（2026-07-24 審查 BUG-2）。畸形值原本 verbatim 存下、
     tick 靜默不跑無 operator 訊號。raise ValueError（已 i18n）供端點轉 400。"""
+    # report_type is checked FIRST, before the cron_expr branch below returns
+    # early — a cron schedule carrying an unknown type is the same silent
+    # never-fires bug as a daily one, so it must not skip this.
+    from src.report_scheduler import VALID_REPORT_TYPES
+    rtype = d.get("report_type")
+    if rtype not in VALID_REPORT_TYPES:
+        raise ValueError(t("gui_err_invalid_report_type", lang=lang,
+                           allowed=", ".join(sorted(VALID_REPORT_TYPES))))
     cron_expr = d.get("cron_expr")
     if cron_expr:
         # 有 cron_expr 時它主導觸發；試解析，畸形即拒

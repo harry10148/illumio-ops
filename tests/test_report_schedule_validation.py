@@ -76,3 +76,36 @@ def test_valid_daily_accepted(client):
 def test_valid_cron_accepted(client):
     r = _post(client, {"name": "x", "report_type": "traffic", "cron_expr": "0 8 * * MON-FRI"})
     assert r.status_code == 200
+
+
+# ── report_type whitelist (2026-08-28 backlog #2) ───────────────────────────
+# The validator checked every field about *when* a schedule fires and nothing
+# about *what* it produces, so an unknown report_type was stored verbatim and
+# surfaced only as a logger.error + skip on every tick.
+
+def test_unknown_report_type_rejected(client):
+    r = _post(client, {"name": "x", "report_type": "not_a_real_type",
+                       "schedule_type": "daily", "hour": 1, "minute": 0})
+    assert r.status_code == 400
+    assert "report_type" in r.get_json().get("error", "").lower()
+
+
+def test_unknown_report_type_rejected_on_cron_schedules_too(client):
+    """The cron branch returns early; report_type must be checked before it."""
+    r = _post(client, {"name": "x", "report_type": "not_a_real_type",
+                       "cron_expr": "0 8 * * MON-FRI"})
+    assert r.status_code == 400
+    assert "report_type" in r.get_json().get("error", "").lower()
+
+
+def test_every_valid_report_type_accepted(client):
+    """More important than the rejection test: a whitelist that is too strict
+    blocks operators from creating legitimate schedules."""
+    from src.report_scheduler import VALID_REPORT_TYPES
+    for rtype in sorted(VALID_REPORT_TYPES):
+        body = {"name": f"s-{rtype}", "report_type": rtype,
+                "schedule_type": "daily", "hour": 1, "minute": 0}
+        if rtype == "app_summary":
+            body["app"] = "SomeApp"
+        r = _post(client, body)
+        assert r.status_code in (200, 201), (rtype, r.status_code, r.get_data(as_text=True))

@@ -6,6 +6,7 @@ from pathlib import Path
 
 from src.config import ConfigManager
 from src.i18n import t
+from src.report_scheduler import VALID_REPORT_TYPES
 from src.utils import Colors, safe_input, draw_panel, draw_table
 from src.cli.menus._helpers import (
     _menu_hints,
@@ -19,6 +20,40 @@ from src.cli.menus._helpers import (
 # This file lives at src/cli/menus/report_schedule.py.
 # parents[0]=menus  parents[1]=cli  parents[2]=src  parents[3]=project_root
 _PROJECT_ROOT = Path(__file__).resolve().parents[3]
+
+# Menu number -> report type, derived from the backend's single source of truth
+# so the wizard cannot know a different set of types than the scheduler does.
+# It was hard-coded to three of the eleven, so editing e.g. a `readiness`
+# schedule found no matching default, fell through to "1", and one Enter
+# silently rewrote it to `traffic`.
+#
+# This deliberately lives at MODULE level rather than inside the wizard:
+# docs/superpowers/plans/2026-08-07-phase2c-cli.md Task 13 restyles this
+# wizard's chrome, and tests/test_report_type_registry.py pins this constant
+# against src.report_scheduler.VALID_REPORT_TYPES. A check buried in the prompt
+# flow could be dropped by a restyling pass without anything going red.
+type_map: dict[str, str] = {
+    str(i): rtype for i, rtype in enumerate(sorted(VALID_REPORT_TYPES), 1)
+}
+_TYPE_MAP_REV: dict[str, str] = {v: k for k, v in type_map.items()}
+
+# Display label per type. These are the same i18n keys src/report_scheduler.py
+# uses for the same types in scheduled-report email subjects, so a new type
+# needs no new CLI copy; one with no entry here falls back to its raw name
+# rather than showing a blank row.
+_TYPE_LABEL_KEYS: dict[str, str] = {
+    "traffic": "rpt_email_traffic_subject",
+    "audit": "rpt_email_audit_subject",
+    "security_risk": "rpt_security_report_title",
+    "network_inventory": "rpt_inventory_report_title",
+    "ven_status": "rpt_email_ven_subject",
+    "policy_usage": "rpt_email_pu_subject",
+    "policy_diff": "rpt_policy_diff_report_title",
+    "policy_resolver": "rpt_policy_resolver_title",
+    "app_summary": "rpt_app_title",
+    "rule_hit_count": "rpt_rhc_report_title",
+    "readiness": "rpt_readiness_report_title",
+}
 
 
 def manage_report_schedules_menu(cm: ConfigManager) -> None:
@@ -64,8 +99,12 @@ def manage_report_schedules_menu(cm: ConfigManager) -> None:
                             "monthly": t("freq_monthly", day=s.get('day_of_month', 1))}
                 freq = freq_map.get(s.get("schedule_type", "weekly"), s.get("schedule_type", "?"))
 
-                type_map = {"traffic": t("type_traffic"), "audit": t("type_audit"), "ven_status": t("type_ven")}
-                rtype = type_map.get(s.get("report_type", ""), s.get("report_type", "?"))
+                # Display-only labels; an unlisted type falls back to its raw
+                # name, so this column never rewrites anything. Renamed off
+                # `type_map` so it no longer shadows the module-level constant
+                # of that name, which tests/test_report_type_registry.py pins.
+                type_labels = {"traffic": t("type_traffic"), "audit": t("type_audit"), "ven_status": t("type_ven")}
+                rtype = type_labels.get(s.get("report_type", ""), s.get("report_type", "?"))
                 rows.append([f"[{i+1}] {s.get('name','')}", rtype, freq, last_run, status, enabled])
 
             draw_table(headers, rows)
@@ -160,14 +199,39 @@ def _add_report_schedule_wizard(cm: ConfigManager, edit_sched: dict = None) -> N
 
     # Step 2: Report type
     _wizard_step(2, 7, t("sched_report_type"))
-    type_map = {"1": "traffic", "2": "audit", "3": "ven_status"}
-    default_type_k = {"traffic": "1", "audit": "2", "ven_status": "3"}.get(
-        edit_sched.get("report_type", "traffic") if is_edit else "traffic", "1")
-    print(f"  {t('opt_traffic_report')}\n  {t('opt_audit_report')}\n  {t('opt_ven_report')}")
-    type_sel = _ask(t("sched_report_type"), default=default_type_k)
-    if type_sel is None:
-        return
-    report_type = type_map.get(str(type_sel), "traffic")
+    # A stored type that is not in the table gets NO default, so the operator
+    # has to choose one — silently defaulting is how the old code rewrote
+    # unknown types to traffic.
+    current_type = (edit_sched.get("report_type") or "") if is_edit else "traffic"
+    default_type_k = _TYPE_MAP_REV.get(current_type, "")
+    for k in sorted(type_map, key=int):
+        rtype = type_map[k]
+        label_key = _TYPE_LABEL_KEYS.get(rtype)
+        print(f"  {k}. {t(label_key) if label_key else rtype}")
+    while True:
+        type_sel = _ask(t("sched_report_type"), default=default_type_k)
+        if type_sel is None:
+            return
+        report_type = type_map.get(str(type_sel).strip())
+        if report_type:
+            break
+        # Re-ask instead of falling back to a default: an unrecognised entry
+        # must never decide which report the schedule produces.
+        print(f"{Colors.FAIL}{t('invalid_selection')}{Colors.ENDC}")
+
+    # app_summary carries an extra required field: report_scheduler.py's
+    # dispatch raises ValueError("app_summary schedule requires an 'app' value")
+    # on EVERY tick without it, so the wizard must not be able to create one.
+    app = (edit_sched.get("app") or "") if is_edit else ""
+    env = (edit_sched.get("env") or "") if is_edit else ""
+    if report_type == "app_summary":
+        # _ask() returns None for blank input, so `app` cannot come back empty.
+        app_val = _ask(t("sched_app_label"), default=app)
+        if app_val is None:
+            print(f"{Colors.FAIL}{t('sched_app_required')}{Colors.ENDC}")
+            input(f"\n{Colors.CYAN}[?]{Colors.ENDC} {t('press_enter_to_continue')} ")
+            return
+        app = app_val.strip()
 
     # Step 3: Frequency
     _wizard_step(3, 7, t("sched_schedule_type"))
@@ -280,6 +344,12 @@ def _add_report_schedule_wizard(cm: ConfigManager, edit_sched: dict = None) -> N
         "enabled": True,
         "output_dir": cm.config.get("report", {}).get("output_dir", "reports/"),
     }
+    if report_type == "app_summary":
+        sched["app"] = app
+        # env is optional for app_summary but the wizard rebuilds the schedule
+        # from scratch, so carry a stored value through instead of dropping it.
+        if env:
+            sched["env"] = env
 
     if is_edit:
         sched["id"] = edit_sched["id"]
