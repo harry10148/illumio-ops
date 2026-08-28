@@ -18,6 +18,24 @@ from src.gui._helpers import (
 from src.href_utils import extract_id as _extract_id_href
 from src.i18n import t
 
+# 三個 PCE rule collection：sec_rules（allow）、rules（legacy allow list）、
+# deny_rules（deny/override_deny）——與 src/api_client.py 的 has_draft_changes
+# （Task 4, 6a6f8e83）及 automation.mjs 的 RULE_HREF 認的是同一組形狀。href
+# 含這三者之一即為 rule href；其餘視為 ruleset 本身的 href。
+_RULE_COLLECTIONS = ("/sec_rules/", "/deny_rules/", "/rules/")
+
+
+def _href_is_ruleset(href: str) -> bool:
+    """Whether href addresses a ruleset itself, not one of its rules.
+
+    toggle_and_provision picks its provisioning scope (the href itself vs. its
+    parent ruleset) from the stored is_ruleset flag — a caller-supplied flag
+    that disagrees with the href would make it provision the wrong object. The
+    href is the one thing the server can check independently of the caller's
+    claim.
+    """
+    return not any(c in (href or "") for c in _RULE_COLLECTIONS)
+
 # ScheduleDB 寫入序列化的鎖與 helper 住在 src/rule_scheduler.py（ScheduleDB
 # 所在模組）：`--monitor-gui` 下 APScheduler tick 與 Flask 在同一行程的不同
 # thread，排程器側的 engine.check 與這裡的 GUI route 是真正的併發寫入者，
@@ -343,10 +361,19 @@ def make_rule_scheduler_blueprint(
                 except (ValueError, KeyError):
                     return _err(t("gui_err_invalid_expire_fmt", lang=lang), 400)
 
+            href_is_ruleset = _href_is_ruleset(href)
+            claimed_is_ruleset = bool(data.get('is_ruleset', False))
+            if claimed_is_ruleset != href_is_ruleset:
+                logger.warning(
+                    f"[GUI:rs_schedule_create] caller's is_ruleset={claimed_is_ruleset} "
+                    f"disagrees with href-derived is_ruleset={href_is_ruleset} for {href}; "
+                    "using the href-derived value"
+                )
+
             db_entry = {
                 "type": data.get('type', 'recurring'),
                 "name": data.get('name', ''),
-                "is_ruleset": data.get('is_ruleset', False),
+                "is_ruleset": href_is_ruleset,
                 "action": data.get('action', 'allow'),
                 "detail_rs": data.get('detail_rs', ''),
                 "detail_src": data.get('detail_src', 'All'),

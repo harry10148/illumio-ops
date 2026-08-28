@@ -149,3 +149,43 @@ def test_rs_schedule_create_unknown_type_rejected(client):
             environ_overrides={"REMOTE_ADDR": "127.0.0.1"},
         )
     assert r.status_code == 400
+
+
+# ── #13: server must derive is_ruleset from the href, not trust the caller ────
+
+def test_rs_schedule_create_derives_is_ruleset_from_href(client, monkeypatch, tmp_path, caplog):
+    """toggle_and_provision picks its provisioning scope (the object itself vs.
+    its parent ruleset) from the stored is_ruleset flag. Today's v2 front end
+    derives it correctly from the href (automation.mjs RULE_HREF), but the
+    endpoint accepted any caller's claim verbatim — a direct API call or a
+    tampered request could desync it from the href. Send a href that is a rule
+    (matches one of the three PCE rule collections api_client.py's
+    has_draft_changes checks, Task 4 6a6f8e83: sec_rules/deny_rules/rules)
+    together with a claim of is_ruleset=True, and assert the stored value is
+    the href-derived False, with a warning logged about the disagreement."""
+    import json
+    config_dir = tmp_path / "config"
+    config_dir.mkdir()
+    monkeypatch.setattr("src.gui.routes.rule_scheduler._resolve_config_dir",
+                        lambda: str(config_dir))
+
+    csrf = _login(client)
+    href = "/orgs/1/sec_policy/active/rule_sets/1/sec_rules/7"
+    with patch("src.api_client.ApiClient.has_draft_changes", lambda self, h: False), \
+         patch("src.api_client.ApiClient.get_provision_state", lambda self, h: 'active'), \
+         patch("src.api_client.ApiClient.update_rule_note", lambda self, h, n: True):
+        r = client.post(
+            "/api/rule_scheduler/schedules",
+            json={
+                "href": href, "name": "x", "type": "recurring",
+                "is_ruleset": True,  # WRONG on purpose: href is a rule
+                "days": ["mon"], "start": "00:00", "end": "01:00",
+            },
+            headers={"X-CSRF-Token": csrf},
+            environ_overrides={"REMOTE_ADDR": "127.0.0.1"},
+        )
+    assert r.status_code == 200
+
+    stored = json.loads((config_dir / "rule_schedules.json").read_text(encoding="utf-8"))
+    assert stored[href]["is_ruleset"] is False
+    assert "is_ruleset" in caplog.text
