@@ -1639,6 +1639,8 @@
   "gui_sy_disp_dashq": "自訂查詢另外存在設定檔中；那是總覽頁儲存查詢卡片的資料，不在這一頁編輯。",
   "gui_sy_disp_theme_apply": "切換後立即套用。",
   "gui_sy_dlq_paging": "DLQ 清單分頁載入。",
+  "gui_sy_dlq_purge_pick_dest": "請先選定單一目的地——過濾器停在「全部」時無法清除。",
+  "gui_sy_dlq_purge_pick_rows": "請至少勾選一筆 DLQ 項目再清除。",
   "gui_sy_log_cap": "預設顯示最後 200 行，上限 500，新的在最上面。模組清單的計數是 500，但這裡顯示的是預設的 200——兩個數字量的不是同一件事。",
   "gui_sy_sec_authsetup": "已經離開初始密碼。",
   "gui_sy_siem_dest_src": "上方的 TLS 與 HEC 區塊會依傳輸方式的選擇而隱藏，但其中的值仍然會送出——即使在這裡被隱藏，也可以在下方的送出內容看到。",

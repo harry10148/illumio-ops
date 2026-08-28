@@ -249,8 +249,11 @@ def test_siem_coverage_and_i18n(v2_page):
     assert expected - _covs(page) == set()
     assert _missing_i18n(page) == []
     # Escape, not a Cancel click — same reason as test_cache_coverage_and_i18n:
-    # the audit sweep here stacks two drawers (sy-siem-dest, sy-siem-dlq) plus
-    # the purge modal, and only dismissible()'s topmost entry reacts to Escape.
+    # the audit sweep here stacks two drawers (sy-siem-dest, sy-siem-dlq), and
+    # only dismissible()'s topmost entry reacts to Escape. sy-siem-purge no
+    # longer contributes a modal: purge is refused (a toast, no dialog) until
+    # a named destination and at least one ticked entry exist, and this fresh
+    # harness has neither — the loop below is written for whatever is open.
     while page.locator(".modal").count() or page.locator("aside.drawer").count():
         page.keyboard.press("Escape")
         page.wait_for_timeout(50)
@@ -612,21 +615,33 @@ def test_destructive_confirms_render_cancel_sends_nothing(v2_page):
     _confirm_cancel_only(R_TLS, "SY-11", labels["gui_tls_renew"], "/api/tls/renew")
     _confirm_cancel_only(R_SECURITY, "SY-16", labels["gui_sy_stop_btn"], "/api/shutdown")
 
-    # SIEM DLQ purge — needs a destination filter selected first, same shape.
-    page.evaluate("location.hash = '%s'" % R_SIEM)
-    page.wait_for_selector('[data-cov="SY-10"]')
-    handler = _watch("/api/siem/dlq/purge")
-    page.route("**/*", handler)
+    # SIEM DLQ purge — same shape, but the confirm can only be reached from a
+    # named destination with something ticked, so both stubs go on BEFORE the
+    # navigation that loads them (the destination list and the DLQ rows are
+    # fetched on entering the route). Playwright matches routes newest-first,
+    # so the "**/*" watcher registered afterwards still sees every request.
+    dests_stub = _stub_dests(page)
+    listing_stub = _stub_dlq_list(page)
     try:
-        page.get_by_role("button", name=labels["gui_dlq_purge_selected"], exact=True).click()
-        modal = page.locator(".modal")
-        modal.wait_for(state="visible")
-        modal.get_by_role("button", name=labels["gui_cancel"], exact=True).click()
-        page.wait_for_selector(".modal", state="detached")
-        page.wait_for_timeout(200)
-        assert sent["hit"] is False
+        page.evaluate("location.hash = '%s'" % R_SIEM)
+        page.wait_for_selector('[data-cov="SY-10"]')
+        purge_btn = _purge_ready(page, labels)
+        handler = _watch("/api/siem/dlq/purge")
+        page.route("**/*", handler)
+        try:
+            purge_btn.click()
+            modal = page.locator(".modal")
+            modal.wait_for(state="visible")
+            assert modal.locator("ul.impact li").count() >= 1
+            modal.get_by_role("button", name=labels["gui_cancel"], exact=True).click()
+            page.wait_for_selector(".modal", state="detached")
+            page.wait_for_timeout(200)
+            assert sent["hit"] is False
+        finally:
+            page.unroute("**/*", handler)
     finally:
-        page.unroute("**/*", handler)
+        page.unroute(re.compile(r"/api/siem/dlq(\?|$)"), listing_stub)
+        page.unroute(re.compile(r"/api/siem/destinations$"), dests_stub)
 
 
 # ═════════════════════════════ degraded telemetry keeps the controls ════════
@@ -1030,6 +1045,46 @@ DLQ_ENTRY = {
     "retries": 2,
 }
 
+DLQ_DEST = DLQ_ENTRY["destination"]
+
+
+def _stub_dests(page):
+    """One SIEM destination, so SY-10's filter offers something other than
+    "All". Stubbed rather than created for real because GET
+    /api/siem/destinations cannot see anything this harness adds — it reads
+    through a bare ConfigManager() (the production config path), the
+    pre-existing defect documented at length in
+    test_siem_destination_create_and_delete_is_real. Purging requires a named
+    destination (see _purge_ready below), so the option has to exist."""
+    body = json.dumps({"destinations": [{
+        "name": DLQ_DEST, "enabled": True, "transport": "udp",
+        "format": "cef", "host": "127.0.0.1", "port": 514,
+    }]})
+
+    def handler(route):
+        route.fulfill(status=200, content_type="application/json", body=body)
+    page.route(re.compile(r"/api/siem/destinations$"), handler)
+    return handler
+
+
+def _purge_ready(page, labels):
+    """Bring SY-10 to the only state that can issue a purge: one named
+    destination in the filter, and at least one entry ticked.
+
+    Both are deliberate gates, not incidental setup. "Purge Selected" now
+    purges the ticked ids and nothing else, so with nothing ticked there is
+    nothing to purge; and "All" is refused for purging because a purge cannot
+    be undone and must name the destination it is aimed at (Task 12, #8).
+    Selection is cleared on every repaint, so the tick comes last."""
+    page.select_option('section[data-cov="SY-10"] select.field', DLQ_DEST)
+    page.wait_for_timeout(300)  # the change handler repaints the table
+    row_box = page.locator('section[data-cov="SY-10"] tbody input[type="checkbox"]').first
+    row_box.wait_for(state="visible")
+    row_box.check()
+    purge_btn = page.get_by_role("button", name=labels["gui_dlq_purge_selected"], exact=True)
+    expect(purge_btn).to_be_enabled()
+    return purge_btn
+
 
 def _stub_dlq_list(page):
     """One DLQ row to act on. GET /api/siem/dlq is answered from a real,
@@ -1059,6 +1114,7 @@ def test_dlq_replay_and_purge_read_their_response(v2_page):
     returned true so the confirm closed as if it had worked."""
     page, base_url = v2_page
     listing = _stub_dlq_list(page)
+    dests = _stub_dests(page)
     try:
         _goto(page, base_url, R_SIEM, "SY-10")
         labels = _labels(page)
@@ -1105,21 +1161,65 @@ def test_dlq_replay_and_purge_read_their_response(v2_page):
             page.unroute("**/api/siem/dlq/replay", handler)
         _clear_toasts(page)
 
-        # purge, success: the real removed count.
+        # Both purge gates, before any purge is issued. "All" is refused
+        # because a purge cannot be undone and has to name the destination it
+        # is aimed at; an empty selection is refused because "Purge Selected"
+        # now means exactly that. Neither is decoration: the old button was
+        # live in both states and posted a whole-destination purge.
         purge_btn = page.get_by_role("button", name=labels["gui_dlq_purge_selected"], exact=True)
-        handler = _fulfill(page, "**/api/siem/dlq/purge", 200, '{"status": "ok", "removed": 7}')
+        expect(purge_btn).to_be_disabled()                 # filter still on "All"
+        page.select_option('section[data-cov="SY-10"] select.field', DLQ_DEST)
+        page.wait_for_timeout(300)
+        expect(purge_btn).to_be_disabled()                 # named dest, nothing ticked
+
+        # purge sends the ids it says it sends. The button used to post
+        # {dest, older_than_days: 0} — the whole destination — while calling
+        # itself "Purge Selected"; the request body is now part of what this
+        # test pins, not just the response reading.
+        purge_btn = _purge_ready(page, labels)
+        with page.expect_request("**/api/siem/dlq/purge") as info:
+            handler = _fulfill(page, "**/api/siem/dlq/purge", 200,
+                               '{"status": "ok", "removed": [{"id": 4242, "ok": true}]}')
+            try:
+                purge_btn.click()
+                box = page.locator(".modal")
+                box.wait_for(state="visible")
+                box.get_by_role("button", name=labels["gui_confirm"], exact=True).click()
+                # The ids branch answers `removed` as purge_ids' per-item result
+                # LIST (src/siem/dlq.py), not a count — the same polymorphism
+                # replay carries above, so the toast counts instead of printing.
+                text = _toast_text(page, "ok")
+                assert "1" in text, text
+                assert "object" not in text, text
+                page.wait_for_selector(".modal", state="detached")
+            finally:
+                page.unroute("**/api/siem/dlq/purge", handler)
+        body = info.value.post_data_json
+        assert body == {"ids": [DLQ_ENTRY["id"]]}, body
+        _clear_toasts(page)
+
+        # purge, per-item failure inside an HTTP 200: an id already gone comes
+        # back {ok:false,error} in that list with nothing wrong at the top
+        # level. Still not a success, and the confirm stays open.
+        purge_btn = _purge_ready(page, labels)
+        handler = _fulfill(page, "**/api/siem/dlq/purge", 200,
+                           '{"status": "ok", "removed": [{"id": 4242, "ok": false, "error": "e2e-gone"}]}')
         try:
             purge_btn.click()
             box = page.locator(".modal")
             box.wait_for(state="visible")
             box.get_by_role("button", name=labels["gui_confirm"], exact=True).click()
-            assert "7" in _toast_text(page, "ok")
+            assert "e2e-gone" in _toast_text(page, "crit")
+            assert page.locator('.toast[data-tone="ok"]').count() == 0
+            expect(box).to_be_visible()
+            box.get_by_role("button", name=labels["gui_cancel"], exact=True).click()
             page.wait_for_selector(".modal", state="detached")
         finally:
             page.unroute("**/api/siem/dlq/purge", handler)
         _clear_toasts(page)
 
         # purge, failure: the confirm stays open and says so.
+        purge_btn = _purge_ready(page, labels)
         handler = _fulfill(page, "**/api/siem/dlq/purge", 500,
                            '{"ok": false, "error": "e2e-purge-boom"}')
         try:
@@ -1135,6 +1235,7 @@ def test_dlq_replay_and_purge_read_their_response(v2_page):
         finally:
             page.unroute("**/api/siem/dlq/purge", handler)
     finally:
+        page.unroute(re.compile(r"/api/siem/destinations$"), dests)
         page.unroute(re.compile(r"/api/siem/dlq(\?|$)"), listing)
 
 

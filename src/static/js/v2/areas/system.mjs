@@ -358,6 +358,9 @@ function cmdSpec(id, label, run) {
 
 function buildCell(fn) { const o = {}; o.cell = fn; return o; }
 function widthCell(width, fn) { const o = {}; o.width = width; if (fn) o.cell = fn; return o; }
+/** A checkbox column: header (de)selects every row on the page, body cell
+ *  picks one row. Same shape investigate.mjs's traffic table uses. */
+function pickCell(headFn, cellFn) { const o = {}; o.width = 34; o.head = headFn; o.cell = cellFn; return o; }
 function buildTable(columns, rows) { const spec = {}; spec.columns = columns; spec.rows = rows; return spec; }
 
 function pagedTable(columns, rows, page, onPage) {
@@ -1632,7 +1635,44 @@ async function mountSiem(root, ctx) {
       const destSel = selectField(destPairs, "", false);
       const reason = el("input", { class: "field", placeholder: t("gui_dlq_filter_reason") });
       const dlqHost = el("div");
-      const dlqCols = [
+      /* The ids the operator has ticked. "Purge Selected" used to be a lie:
+       * the table had no selection column at all and the button posted
+       * {dest, older_than_days: 0}, purging the WHOLE destination. Selection
+       * is cleared on every repaint and on every destination change, so the
+       * set can never carry an id the operator can no longer see. */
+      const dlqSel = new Set();
+      /** Rebuilt per render: the header checkbox has to own the boxes of the
+       *  page it is actually heading, not of every page rendered so far. */
+      function dlqColumns() {
+        const pageBoxes = [];
+        return [
+        col("pick", "", pickCell(
+          function () {
+            const all = el("input", { type: "checkbox" });
+            all.setAttribute("aria-label", t("gui_selected"));
+            all.addEventListener("change", function () {
+              pageBoxes.forEach(function (entry) {
+                entry.cb.checked = all.checked;
+                if (all.checked) dlqSel.add(entry.id);
+                else dlqSel.delete(entry.id);
+              });
+              syncPurge();
+            });
+            return all;
+          },
+          function (e) {
+            const cb = el("input", { type: "checkbox" });
+            cb.setAttribute("aria-label", t("gui_selected"));
+            cb.checked = dlqSel.has(e.id);
+            cb.addEventListener("change", function () {
+              if (cb.checked) dlqSel.add(e.id);
+              else dlqSel.delete(e.id);
+              syncPurge();
+            });
+            pageBoxes.push({ id: e.id, cb: cb });
+            return cb;
+          }
+        )),
         col("destination", t("gui_dlq_th_dest"), widthCell(140)),
         col("source_id", t("gui_dlq_th_event_id"), widthCell(160)),
         col("last_error", t("gui_dlq_th_reason")),
@@ -1673,7 +1713,8 @@ async function mountSiem(root, ctx) {
           }));
           return box;
         })),
-      ];
+        ];
+      }
       /** Real GET /api/siem/dlq?dest=&limit= — a dynamic query on an id
        *  GET_MAP only carries with its default params, so this calls api.get()
        *  directly per store-map.mjs's own documented escape hatch. `reason` is
@@ -1681,12 +1722,16 @@ async function mountSiem(root, ctx) {
        *  gui_sy_dlq_reason_client's documented real behaviour. */
       function paintDlq() {
         const q = "dest=" + encodeURIComponent(destSel.value) + "&limit=50";
+        // A repaint replaces the rows, so any earlier tick refers to a row
+        // the operator is no longer looking at — start the new page empty.
+        dlqSel.clear();
+        syncPurge();
         return api.get("/api/siem/dlq?" + q).then(function (res) {
           if (state.torn) return;
           let entries = (res && res.entries) || [];
           const needle = reason.value.toLowerCase().trim();
           if (needle) entries = entries.filter(function (e) { return String(e.last_error || "").toLowerCase().indexOf(needle) >= 0; });
-          state.tableHandles.dlq = table.render(dlqHost, buildTable(dlqCols, entries));
+          state.tableHandles.dlq = table.render(dlqHost, buildTable(dlqColumns(), entries));
         }).catch(function (e) {
           // Same source as the soft-loaded siem_dlq snapshot, same treatment:
           // this is the DLQ's own live query, so its failure states itself
@@ -1702,28 +1747,46 @@ async function mountSiem(root, ctx) {
         dlqHost.appendChild(note(message));
         dlqHost.appendChild(btn("btn primary", t("gui_errcard_retry"), function () { paintDlq(); }));
       }
+      /* Changing the destination repaints instead of leaving the previous
+       * destination's rows on screen: the purge confirm names the selected
+       * destination, so the filter and the rows under it have to agree. */
+      destSel.addEventListener("change", function () { paintDlq(); });
       dlqPanel.body.appendChild(el("div", { class: "qrow" },
         el("div", { class: "qf" }, el("label", { text: t("gui_dlq_filter_dest") }), destSel),
         el("div", { class: "qf grow" }, el("label", { text: t("gui_dlq_filter_reason") }), reason),
         el("div", { class: "qf" }, el("label", { text: " " }), btn("btn", t("gui_dlq_search"), function () { paintDlq(); }))));
       dlqPanel.body.appendChild(dlqHost);
       if (d.siem_dlq && d.siem_dlq._error) paintDlqError(d.siem_dlq._error);
-      else state.tableHandles.dlq = table.render(dlqHost, buildTable(dlqCols, (d.siem_dlq && d.siem_dlq.entries) || []));
-      /* dlqPurgeSelected (integrations.js:1245-1259) does NOT send the selected
-       * ids: its body is {dest, older_than_days:0}, which purges the WHOLE
-       * destination while the confirm says "Purge N entries". The impact list
-       * states what actually happens — real backend, still true. Genuinely
-       * destructive; the e2e never clicks past this confirm. */
+      else state.tableHandles.dlq = table.render(dlqHost, buildTable(dlqColumns(), (d.siem_dlq && d.siem_dlq.entries) || []));
+      /* Purge is now what its label always claimed: the ticked entries, by id,
+       * and nothing else. It used to post {dest, older_than_days: 0} with no
+       * ids at all — the whole destination — and with "All" selected that
+       * body purged destination "" instead, i.e. nothing, so the operator was
+       * told "0 entries removed" whatever the queue held.
+       *
+       * "All" stays unavailable for purging on purpose (Task 12 Step 1): a
+       * purge cannot be undone, so it is issued against one named destination
+       * the operator has actually chosen, never against a mixed view. The
+       * guard lives here rather than only on the button because
+       * modal.registerAudit calls this handler directly. */
+      function syncPurge() {
+        const why = !destSel.value ? t("gui_sy_dlq_purge_pick_dest")
+          : (!dlqSel.size ? t("gui_sy_dlq_purge_pick_rows") : "");
+        purgeBtn.disabled = !!why;
+        purgeBtn.title = why || t("gui_dlq_purge_selected");
+      }
       handles.purge = function () {
+        if (!destSel.value) { toast.warn(t("gui_sy_dlq_purge_pick_dest")); return null; }
+        if (!dlqSel.size) { toast.warn(t("gui_sy_dlq_purge_pick_rows")); return null; }
+        const ids = Array.from(dlqSel);
         return modal.confirm(confirmSpec(t("gui_dlq_purge_selected"), [
-          t("gui_sy_dlq_i_all"),
+          tf("gui_sy_dlq_i_all", { n: num(ids.length), dest: destSel.value }),
           t("gui_sy_dlq_i_body"),
-          t("gui_sy_dlq_i_typed"),
           t("gui_sy_dlq_i_norecover"),
         ], function () {
-          return api.post("/api/siem/dlq/purge", { dest: destSel.value, older_than_days: 0 }).then(function (res) {
-            /* Same A3 twist as replay above: purge_dlq (src/siem/web.py:308-322)
-             * answers {status:"ok", removed:N} on success — no `ok` field —
+          return api.post("/api/siem/dlq/purge", { ids: ids }).then(function (res) {
+            /* Same A3 twist as replay above: purge_dlq (src/siem/web.py)
+             * answers {status:"ok", removed:...} on success — no `ok` field —
              * and {ok:false, error, description} on failure. Returning false
              * keeps the confirm open so the operator sees the failure next to
              * the control that caused it (SY-04 retention's shape). */
@@ -1731,14 +1794,28 @@ async function mountSiem(root, ctx) {
               toast.crit(errText(res));
               return false;
             }
-            toast.ok(tf("gui_sy_dlq_purged", { n: num(res.removed) }));
+            /* And the same polymorphism the replay handler documents: the ids
+             * branch answers `removed` as purge_ids' per-item result LIST
+             * (src/siem/dlq.py), while the dest branch answers a plain count.
+             * An id another operator already purged comes back
+             * {ok:false, error:"not found"} inside an HTTP 200. */
+            const items = Array.isArray(res.removed) ? res.removed : null;
+            const failed = items ? items.filter(function (r) { return r && r.ok === false; }) : [];
+            if (failed.length) {
+              toast.crit(errText(failed[0]));
+              paintDlq();
+              return false;
+            }
+            toast.ok(tf("gui_sy_dlq_purged", { n: num(items ? items.length : res.removed) }));
             paintDlq();
             return true;
           });
         }));
       };
+      const purgeBtn = btn("btn", t("gui_dlq_purge_selected"), handles.purge);
+      syncPurge();
       dlqPanel.body.appendChild(el("div", { class: "typechips" },
-        btn("btn", t("gui_dlq_purge_selected"), handles.purge),
+        purgeBtn,
         el("a", { class: "btn ghost", href: "/api/siem/dlq/export?dest=" + encodeURIComponent(destSel.value), text: t("gui_dlq_export") })));
       dlqPanel.body.appendChild(note(t("gui_sy_dlq_paging")));
       dlqPanel.body.appendChild(note(t("gui_sy_dlq_reason_client")));

@@ -313,6 +313,12 @@ def purge_dlq():
     try:
         from src.siem.dlq import DeadLetterQueue
         data = request.get_json(force=True) or {}
+        # Same two-branch shape as replay_dlq above: `ids` purges exactly the
+        # entries the caller listed (per-item results), while the dest branch
+        # stays the destination-wide, age-scoped purge the CLI uses.
+        if data.get("ids"):
+            results = DeadLetterQueue(_get_sf()).purge_ids(data["ids"])
+            return jsonify({"status": "ok", "removed": results})
         dest = data.get("dest", "")
         older_than_days = int(data.get("older_than_days", 30))
         sf = _get_sf()
