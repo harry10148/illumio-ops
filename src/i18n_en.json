@@ -5142,7 +5142,6 @@
   "gui_sy_stop_i_cli": "Recovery is from the host command line; there is no way back from the browser",
   "gui_sy_stop_i_persistent": "In persistent/service mode it cannot be stopped from here — the button gives no warning before you press it.",
   "gui_sy_stop_i_sigint": "Signals the GUI process to stop; the web interface becomes unreachable immediately",
-  "gui_sy_tf_cidr_bug": "The field help promises “CIDR or exact IP”, but CIDR is actually rejected — only an exact IP works. The IPv6 check only looks at hex and colons, so “::::” passes.",
   "gui_sy_tf_presave": "These are hints only: an invalid IP or port does not block the save; the error arrives after saving.",
   "gui_sy_theme_toggle": "Toggle theme",
   "gui_sy_tls_cn_required": "CN is required.",

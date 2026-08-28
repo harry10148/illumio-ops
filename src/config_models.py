@@ -220,11 +220,20 @@ class TrafficFilterSettings(_Base):
     @field_validator("exclude_src_ips")
     @classmethod
     def _validate_ips(cls, v: list[str]) -> list[str]:
+        # 混合語意：含 "/" 視為 CIDR 網段，否則視為精確 IP。這條分類規則必須與
+        # src/pce_cache/traffic_filter.py 的 TrafficFilter.__init__ 完全一致，
+        # 否則驗證器放行的字串會在 filter 端被當成另一種東西。
         for ip in v:
-            try:
-                ipaddress.ip_address(ip)
-            except ValueError as e:
-                raise ValueError(f"exclude_src_ips: {ip!r} is not a valid IP address") from e
+            if "/" in ip:
+                try:
+                    ipaddress.ip_network(ip, strict=False)
+                except ValueError as e:
+                    raise ValueError(f"exclude_src_ips: {ip!r} is not a valid CIDR network") from e
+            else:
+                try:
+                    ipaddress.ip_address(ip)
+                except ValueError as e:
+                    raise ValueError(f"exclude_src_ips: {ip!r} is not a valid IP address") from e
         return v
 
     @field_validator("ports")

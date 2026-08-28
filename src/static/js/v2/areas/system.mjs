@@ -852,17 +852,36 @@ const CACHE_SOFT = ["cache_status", "cache_lag", "cache_throughput", "cache_heal
 const TF_ACTIONS = ["blocked", "potentially_blocked", "allowed"];
 const TF_PROTOCOLS = ["TCP", "UDP", "ICMP"];
 
-/* validateIp, integrations.js:521-526, transcribed exactly — including the two
- * things it gets wrong, which the hint under the field now says out loud:
- *   · CIDR is REJECTED (there is no "/" in either character class) even though
- *     gui_cache_exclude_src_ips_help promises "CIDR or exact", and
- *     config_models.py:219-227 rejects it server-side too.
- *   · The IPv6 branch accepts any hex-and-colon string, so "::::" passes. */
+/* At most one "::", every group 1-4 hex digits, and exactly 8 groups unless "::"
+ * elides some. The old check was /^[\da-fA-F:]+$/ plus "has a colon", which let
+ * "::::" through. Dotted IPv4-mapped forms ("::ffff:10.0.0.1") are not accepted
+ * here; the old check rejected them too, and pydantic still takes them. */
+function validateIpv6(s) {
+  const parts = s.split("::");
+  if (parts.length > 2) return false;
+  const elided = parts.length === 2;
+  const head = parts[0] ? parts[0].split(":") : [];
+  const tail = elided && parts[1] ? parts[1].split(":") : [];
+  const groups = head.concat(tail);
+  if (!groups.every(function (g) { return /^[\da-fA-F]{1,4}$/.test(g); })) return false;
+  return elided ? groups.length <= 7 : groups.length === 8;
+}
+
+/* Accepts an exact IP or a CIDR network, matching what
+ * gui_cache_exclude_src_ips_help promises and what TrafficFilterSettings
+ * accepts. This is an early hint only — pydantic's ipaddress in
+ * config_models.py is the authoritative validation. */
 function validateIp(s) {
-  if (/^(\d{1,3}\.){3}\d{1,3}$/.test(s)) {
-    return s.split(".").every(function (o) { return Number(o) <= 255; });
+  const slash = s.indexOf("/");
+  const host = slash >= 0 ? s.slice(0, slash) : s;
+  const prefix = slash >= 0 ? s.slice(slash + 1) : null;
+  if (prefix !== null && !/^\d{1,3}$/.test(prefix)) return false;
+  if (/^(\d{1,3}\.){3}\d{1,3}$/.test(host)) {
+    if (!host.split(".").every(function (o) { return Number(o) <= 255; })) return false;
+    return prefix === null || Number(prefix) <= 32;
   }
-  return /^[\da-fA-F:]+$/.test(s) && s.indexOf(":") >= 0;
+  if (!validateIpv6(host)) return false;
+  return prefix === null || Number(prefix) <= 128;
 }
 
 /** integrations.js:528-541 — hints joined with " · ", one per offending token. */
@@ -1148,7 +1167,6 @@ async function mountCache(root, ctx) {
       tfPanel.body.appendChild(labelled(t("gui_cache_tf_ports"), form.track("traffic_filter.ports", tfPorts, "ports"), t("gui_cache_ports_help")));
       tfPanel.body.appendChild(labelled(t("gui_cache_tf_exclude_ips"), form.track("traffic_filter.exclude_src_ips", tfIps, "list"), t("gui_cache_exclude_src_ips_help")));
       tfPanel.body.appendChild(hintBox);
-      tfPanel.body.appendChild(note(t("gui_sy_tf_cidr_bug")));
       tfPanel.body.appendChild(note(t("gui_sy_tf_presave")));
 
       // ── SY-06 sampling ───────────────────────────────────────────────

@@ -1643,7 +1643,6 @@
   "gui_sy_sec_authsetup": "已經離開初始密碼。",
   "gui_sy_siem_dest_src": "上方的 TLS 與 HEC 區塊會依傳輸方式的選擇而隱藏，但其中的值仍然會送出——即使在這裡被隱藏，也可以在下方的送出內容看到。",
   "gui_sy_stop_i_persistent": "以服務方式常駐時無法從這裡停止——按鈕本身不會事先警告。",
-  "gui_sy_tf_cidr_bug": "欄位說明寫「CIDR 或精確 IP」，但實際上 CIDR 會被拒絕，只有精確 IP 有效。IPv6 檢查只看十六進位與冒號，所以「::::」會通過。",
   "gui_sy_tf_presave": "這些提示只是提示：儲存前不會擋下無效的 IP 或 Port，錯誤要等儲存後才會出現。",
   "gui_sy_tls_ou_note": "ou 欄位可被接受，但這份表單沒有任何輸入框會產生它",
   "gui_sy_secret_short": "由伺服器回報的「是否設定」與字元數推得，不是機密本身",
