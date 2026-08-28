@@ -29,14 +29,28 @@
 
 1. **T4 Step 1**（部署測試機到當前 main）——**必須先跑**，因為 T1 的 gui-tour 改寫是對著
    實機寫的。原計畫把 T1 排在 T4 之前，那是假設 2A T12 剛部署過。
-2. **T1**，扣掉 `cli.md` 選單那一列（那列要等 2C）。這是價值最高且幾乎無依賴的一塊——
-   它會把目前**紅著**的 `docs_check` 轉綠。
-3. **T3 改寫成 Linux-only**（見下）＋ **T4 Step 2** bundle smoke。完全獨立。
-4. **T5 的自動化層**——v2 e2e 套件 ＋ `tools/gate_coverage_live.py` 跑到 101/101，
+2. **T1，但要扣掉兩列不是一列**（Codex 2026-08-28 指出）：
+   - `docs/reference/cli.md` 的選單那列 → 等 **2C**
+   - **`docs/guide/reports.md`** → 等 **2B**。T1 明寫該文件要「對照 2B 實際產出核對外觀／
+     章節敘述」；先跑只會記錄舊殼，2B 換殼後文件會**靜默過期**——而 `docs_check` 的
+     freshness 檢查抓不到「內容描述的是舊外觀」這種過期。
+   其餘部分價值最高且幾乎無依賴，會把目前**紅著**的 `docs_check` 轉綠。
+3. **T2 的版本號 bump 必須包含在 2E-now 裡**（Codex 指出的依賴錯誤）：
+   T3 的 body 明寫 `Consumes: T2 的版本號`（bundle 檔名要用），而我原本把 T2 排在
+   2E-final。**修正：T2 只做「cut 5.0.0」這件事**（數字已定於 CHANGELOG，見下），
+   它的**內容撰寫**（Fixed 條列哪些 bug）才留給 2E-final，屆時 backlog-v2／2B／2C 才有東西可寫。
+4. **T3 改寫成 Linux-only**（見下）＋ **T4 Step 2** bundle smoke。依賴 T2 的版本號，不依賴其他計畫。
+5. **T5 的自動化層**——v2 e2e 套件 ＋ `tools/gate_coverage_live.py` 跑到 101/101，
    當作記錄下來的基準。
 
-**2E-final（真的要等）**：T5 的人工遍歷當作**驗收閘門**（目前有 13 條已知缺陷，會產生
-預期中的 FAIL——當成盤點可以，當成驗收不行）、RP-02 的參數交叉檢查（要等 2B）、以及整個 T6。
+**2E-final（真的要等）**：T1 的 `cli.md`（等 2C）與 `reports.md`（等 2B）兩列、
+T2 的 CHANGELOG **內容**撰寫（版本號本身已在 2E-now cut）、T5 的人工遍歷當作**驗收閘門**
+（目前有 13 條已知缺陷，會產生預期中的 FAIL——當成盤點可以，當成驗收不行）、
+RP-02 的參數交叉檢查（要等 2B）、以及整個 T6。
+
+**T6 的殘項來源要更正**（Codex 指出）：T6 目前要求把 `analysis.lock`（#17）與
+venv shebang（#18）當成「2D 的 18 條之外」重新加進 backlog——**它們就是那 18 條裡的 #17 與 #18**。
+#17 已由 backlog-v2 T8 承接，#18 已於 2026-08-28 以環境操作交付。T6 不得重複列入。
 
 ### T3 改寫：Windows parity 已死
 
