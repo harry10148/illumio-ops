@@ -912,11 +912,6 @@ function cardAudit(au) {
 }
 
 // ── OV-08 dashboard snapshot ← dashboard_snapshot.json ─────────────────────
-// snapshot.hero.score/score_grade are NOT used: dashboard_hero.py matches the
-// English word "maturity" against kpi["label"], which /api/dashboard/snapshot
-// has already localised (_retranslate_kpi_labels), so a zh appliance always
-// falls through to 0.0/"?". The card reads maturity_score/maturity_grade, the
-// authoritative fields on the same payload, and says so.
 function cardSnapshot(ds) {
   const snap = ds.snapshot || {};
   const p = panel("OV-08", t("gui_snap_title"));

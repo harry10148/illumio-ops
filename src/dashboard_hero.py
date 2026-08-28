@@ -42,8 +42,11 @@ def build_hero(snapshot: Optional[Dict[str, Any]], status: Optional[Dict[str, An
     for kpi in kpis:
         if not isinstance(kpi, dict):
             continue
-        label = str(kpi.get("label", "")).lower()
-        if "maturity" not in label:
+        if kpi.get("label_key") == "mod12_kpi_maturity_score":
+            pass
+        elif "maturity" not in str(kpi.get("label", "")).lower():
+            # Fallback for legacy snapshots without a label_key (see
+            # _retranslate_kpi_labels in src/gui/routes/dashboard.py).
             continue
         value = str(kpi.get("value", ""))
         m = _MATURITY_PATTERN.match(value)
