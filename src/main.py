@@ -37,7 +37,15 @@ def analysis_lock_path() -> str:
     會把對方剛寫的 alert_history（告警冷卻）、event_seen、event_watermark 整組
     還原——結果是同一則告警重寄、已處理過的事件再次觸發。凡是會跑完整分析
     cycle 的進入點都要在這把鎖內執行。
+
+    ``ILLUMIO_OPS_ANALYSIS_LOCK`` 可把鎖檔改指到別處。這是給測試用的：測試
+    跑在開發機的工作 checkout 上，而同一個 checkout 上可能同時有跑著的
+    ``--monitor-gui`` 服務或開發者的第二個 pytest——測試會在那把**真**鎖上
+    等滿 5 秒逾時。env 未設（或設成空字串）時行為與過去完全相同。
     """
+    override = os.environ.get("ILLUMIO_OPS_ANALYSIS_LOCK")
+    if override:
+        return override
     root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     return os.path.join(root, "logs", "analysis.lock")
 

@@ -124,6 +124,37 @@ def _reset_i18n_language():
     set_language(saved)
 
 
+@pytest.fixture(scope="session")
+def _analysis_lock_file(tmp_path_factory):
+    """One session-private path for the cross-process analysis lock.
+
+    Deliberately NOT under the per-test ``tmp_path``: a lock file appearing in
+    a test's own tmp directory would show up in any test that enumerates it.
+    """
+    return str(tmp_path_factory.mktemp("analysis_lock") / "analysis.lock")
+
+
+@pytest.fixture(autouse=True)
+def _isolate_analysis_lock(_analysis_lock_file, monkeypatch):
+    """Keep the whole suite off ``<repo>/logs/analysis.lock``.
+
+    src/main.py's analysis_lock_path() anchors that file off ``__file__``, so
+    every entry point that runs a full analysis cycle (the CLI menu's options
+    6/7, the scheduler's monitor job, the GUI's run/debug actions) takes a REAL
+    cross-process flock on the working checkout. A developer box routinely has
+    a second process on that same checkout — a running ``--monitor-gui``
+    service, or a second pytest — and the test then blocks for the full
+    _ANALYSIS_LOCK_WAIT_S (5s) timeout and takes the TimeoutError branch
+    instead of the code it meant to exercise.
+
+    tests/test_api_settings.py and tests/test_pce_flush.py each already
+    monkeypatch analysis_lock_path per-test for exactly this reason; this
+    fixture generalises that to the suite so no new test has to remember.
+    Tests that need the production path back can monkeypatch.delenv it.
+    """
+    monkeypatch.setenv("ILLUMIO_OPS_ANALYSIS_LOCK", _analysis_lock_file)
+
+
 @pytest.fixture
 def header_client(tmp_path):
     """Minimal Flask test client for security-header contract tests.

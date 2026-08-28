@@ -1,9 +1,33 @@
+import os
 from types import SimpleNamespace
 
 import pytest
 
 from src import i18n
 from src import main as main_module
+
+ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+
+def _spy_on_file_lock(monkeypatch):
+    """Record the path option 6/7 hands to the cross-process lock.
+
+    The call site imports ``file_lock`` inside the ``elif`` branch, so there is
+    no module-level ``main_module.file_lock`` to patch — patching the attribute
+    on src.file_lock is what actually reaches it, because a function-local
+    import resolves the module attribute at call time.
+    """
+    import src.file_lock as file_lock_mod
+
+    seen = {}
+    real = file_lock_mod.file_lock
+
+    def _spy(path, *args, **kwargs):
+        seen["path"] = path
+        return real(path, *args, **kwargs)
+
+    monkeypatch.setattr(file_lock_mod, "file_lock", _spy)
+    return seen
 
 
 def _prepare_menu(monkeypatch, selection):
@@ -50,6 +74,7 @@ def test_rule_management_menu_option_7_runs_analysis_and_sends_alerts(monkeypatc
     cm = SimpleNamespace(load=lambda: None, load_best_practices=lambda: None)
 
     _prepare_menu(monkeypatch, 7)
+    seen = _spy_on_file_lock(monkeypatch)
 
     class FakeApiClient:
         def __init__(self, _cm):
@@ -81,6 +106,30 @@ def test_rule_management_menu_option_7_runs_analysis_and_sends_alerts(monkeypatc
     assert "run_analysis" in calls
     assert "run_debug_mode" not in calls
     assert ("send_alerts", False) in calls
+
+    # Option 7 takes a REAL cross-process flock. Without tests/conftest.py's
+    # _isolate_analysis_lock fixture that lock lands on <repo>/logs/analysis.lock,
+    # i.e. on the working checkout, where a running --monitor-gui service or a
+    # second pytest holds it and this test blocks for the full 5s timeout and
+    # then silently takes the TimeoutError branch.
+    assert seen.get("path") == main_module.analysis_lock_path()
+    assert not os.path.abspath(seen["path"]).startswith(ROOT_DIR + os.sep), \
+        f"option 7 locked inside the working checkout: {seen['path']}"
+
+
+def test_analysis_lock_path_defaults_to_the_repo_logs_dir(monkeypatch):
+    """Production behaviour is unchanged when the override env is absent/empty."""
+    monkeypatch.delenv("ILLUMIO_OPS_ANALYSIS_LOCK", raising=False)
+    assert main_module.analysis_lock_path() == os.path.join(ROOT_DIR, "logs", "analysis.lock")
+
+    monkeypatch.setenv("ILLUMIO_OPS_ANALYSIS_LOCK", "")
+    assert main_module.analysis_lock_path() == os.path.join(ROOT_DIR, "logs", "analysis.lock")
+
+
+def test_analysis_lock_path_honours_the_env_override(monkeypatch, tmp_path):
+    override = str(tmp_path / "elsewhere.lock")
+    monkeypatch.setenv("ILLUMIO_OPS_ANALYSIS_LOCK", override)
+    assert main_module.analysis_lock_path() == override
 
 
 def test_rule_management_menu_option_8_runs_debug_mode(monkeypatch):

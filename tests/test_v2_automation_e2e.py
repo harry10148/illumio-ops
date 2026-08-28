@@ -46,11 +46,14 @@ in the whitelist REPORT_TYPES already carries.
       to flag.
   POST /api/rule_scheduler/check             — called for real exactly once
       (test_immediate_check_runs_real_endpoint_when_no_schedules_exist),
-      and ONLY in a test that creates no schedule of its own — `temp_config_
-      file` is function-scoped (tests/conftest.py), so every test starts
-      with an empty rule_schedules.json. engine.check() therefore iterates
-      zero stored entries and issues no PCE write regardless of whether the
-      PCE gates below happen to be reachable.
+      and ONLY in a test that creates no schedule of its own — and that test
+      takes `schedule_free_db` (below), which truncates the real
+      rule_schedules.json to `{}` for its duration and restores it after.
+      (The store is resolved from the source tree via _resolve_config_dir(),
+      NOT from the function-scoped `temp_config_file`, so "every test starts
+      empty" was never true.) engine.check() therefore iterates zero stored
+      entries and issues no PCE write regardless of whether the PCE gates
+      below happen to be reachable.
   POST /api/report-schedules/<id>/run        — NEVER called. The button is
       wired to the real endpoint (AU-12 requires it to exist), but no test
       here clicks it — it starts a real background thread that runs a real
@@ -79,6 +82,8 @@ overview) runs against the real, un-patched app.
 """
 from __future__ import annotations
 
+import os
+
 import pytest
 
 pytest.importorskip("playwright.sync_api", exc_type=ImportError)
@@ -94,6 +99,46 @@ R_RULES = "#/automation/rules"
 R_REPORTS = "#/automation/reports"
 R_JOBS = "#/automation/jobs"
 SLOW = 45_000
+
+
+@pytest.fixture
+def schedule_free_db():
+    """Give the test an empty ScheduleDB it owns, then put the file back.
+
+    The rule-scheduler routes resolve their store as
+    ``_resolve_config_dir()/rule_schedules.json`` — anchored off the source
+    tree, NOT off the function-scoped ``temp_config_file``. Tests that need a
+    schedule-free store therefore cannot just assert they got one: on any
+    checkout where a real (or previously leaked) schedule is sitting in that
+    file they go red through no fault of the code under test. Reproduced
+    2026-08-28: 3 leftover entries in the main checkout, both dependent tests
+    red there, green in a clean worktree.
+
+    So create the condition instead of hoping for it: truncate the store to
+    ``{}`` on setup and restore the byte-for-byte original on teardown (a
+    developer's own schedules are real data, not test scratch).
+    """
+    from src.gui._helpers import _resolve_config_dir
+
+    db_path = os.path.join(_resolve_config_dir(), "rule_schedules.json")
+    saved = None
+    if os.path.exists(db_path):
+        with open(db_path, "r", encoding="utf-8") as f:
+            saved = f.read()
+    os.makedirs(os.path.dirname(db_path), exist_ok=True)
+    with open(db_path, "w", encoding="utf-8") as f:
+        f.write("{}")
+    try:
+        yield db_path
+    finally:
+        if saved is None:
+            try:
+                os.remove(db_path)
+            except OSError:
+                pass
+        else:
+            with open(db_path, "w", encoding="utf-8") as f:
+                f.write(saved)
 
 
 def _goto(page, base_url, route, cov):
@@ -387,7 +432,7 @@ def test_ruleset_drawer_precheck_is_real_backend_error(v2_page):
     assert err.inner_text() == "href required"
 
 
-def test_rule_schedule_crud_reconciles_list_and_timeline(v2_page, monkeypatch):
+def test_rule_schedule_crud_reconciles_list_and_timeline(v2_page, monkeypatch, schedule_free_db):
     """AU-08/AU-02 key flow: create three real one-time 2027 schedules
     (one ruleset-level, two rule-level — the dual-target model), reconcile
     them against the real GET list, watch the timeline render three real
@@ -404,7 +449,11 @@ def test_rule_schedule_crud_reconciles_list_and_timeline(v2_page, monkeypatch):
     deliberately exercises. The two rule-level schedules are still created
     directly through the real endpoint (same as before) — this task's row
     only requires one drawer-driven success case, and duplicating the UI
-    path three times would not cover anything new."""
+    path three times would not cover anything new.
+
+    `schedule_free_db` is what makes the row counts below (3, then 0) mean
+    "the three this test created" rather than "whatever the checkout's
+    rule_schedules.json happened to hold plus three"."""
     _patch_pce_gates(monkeypatch)
     _patch_fake_ruleset(monkeypatch)
     page, base_url = v2_page
@@ -494,11 +543,13 @@ def test_rule_schedule_crud_reconciles_list_and_timeline(v2_page, monkeypatch):
             _api_post(page, "/api/rule_scheduler/schedules/delete", {"hrefs": [href]})
 
 
-def test_immediate_check_runs_real_endpoint_when_no_schedules_exist(v2_page):
+def test_immediate_check_runs_real_endpoint_when_no_schedules_exist(v2_page, schedule_free_db):
     """AU-09: the button POSTs the real /api/rule_scheduler/check. Safe here
-    because temp_config_file is function-scoped (tests/conftest.py) — this
-    test creates no schedule of its own, so the ScheduleDB is empty and
-    engine.check() has nothing to toggle regardless of PCE reachability."""
+    because `schedule_free_db` truncates the real store to `{}` for the
+    duration of this test and this test creates no schedule of its own — so
+    engine.check() has nothing to toggle regardless of PCE reachability.
+    (The store is NOT derived from the function-scoped temp_config_file; it is
+    resolved from the source tree, which is why the fixture has to exist.)"""
     page, base_url = v2_page
     _goto(page, base_url, R_RULES, "AU-01")
 
