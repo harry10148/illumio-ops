@@ -2032,7 +2032,7 @@ async function mountSecurity(root, ctx) {
       const short = pw.value.length > 0 && pw.value.length < 12;
       const bad = pw2.value.length > 0 && pw.value !== pw2.value;
       pwHint.hidden = !(short || bad);
-      pwHint.textContent = short ? t("login_err_pw_short") : (bad ? t("gui_password_mismatch") : "");
+      pwHint.textContent = short ? t("gui_login_err_pw_short") : (bad ? t("gui_password_mismatch") : "");
     });
 
     // ── SY-16 stop the GUI ───────────────────────────────────────────

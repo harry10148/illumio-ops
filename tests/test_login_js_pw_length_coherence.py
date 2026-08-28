@@ -7,6 +7,7 @@ server 端 /api/security 的實際門檻（12，見 src/gui/routes/config.py 的
 """
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -45,3 +46,45 @@ def test_login_err_pw_short_i18n_says_12_in_both_locales():
     assert "8" not in en["gui_login_err_pw_short"]
     assert "12" in zh["gui_login_err_pw_short"]
     assert "8" not in zh["gui_login_err_pw_short"]
+
+
+# #10: login_err_pw_short shipped in system.mjs's password-change form
+# without the gui_ prefix, so it never reached /api/ui_translations
+# (src/gui/_helpers.py's _ui_translation_dict whitelists by prefix) and t()
+# rendered the bare key name to the user. login.mjs already had this right
+# (see the note above); the coherence test above only scanned login.mjs,
+# which is why nothing caught the system.mjs twin. This test scans every
+# v2 area module and calls the real _ui_translation_dict filter — not a
+# copy of its prefix list, which would silently drift from the real one —
+# so any literal t() key that the endpoint would actually drop is caught
+# regardless of which area file it lives in.
+AREAS_DIR = REPO_ROOT / "src" / "static" / "js" / "v2" / "areas"
+
+# Matches only a bare `t("key")` call: \b keeps this from matching the tail
+# of unrelated identifiers/calls that happen to end in "t(" followed by a
+# quote (e.g. `.split("_")`, `new Event("change")`, `.get("hl")`,
+# `.request("POST", ...)`) — those are real strings in this codebase and,
+# without the \b, are indistinguishable from a call to t() by this regex.
+T_CALL_RE = re.compile(r'\bt\(\s*"([a-zA-Z0-9_]+)"')
+
+
+def test_all_area_modules_only_call_t_with_whitelisted_keys():
+    from src.gui._helpers import _ui_translation_dict
+
+    # en/zh_TW carry the same key set (see the locale-parity test elsewhere
+    # in this suite); either locale exercises the same prefix/extra-key
+    # filter, which is what this test is actually checking.
+    allowed = _ui_translation_dict("en")
+
+    offenders: dict[str, set[str]] = {}
+    for mjs in sorted(AREAS_DIR.glob("*.mjs")):
+        text = mjs.read_text(encoding="utf-8")
+        for key in T_CALL_RE.findall(text):
+            if key not in allowed:
+                offenders.setdefault(mjs.name, set()).add(key)
+
+    assert not offenders, (
+        "t() called with key(s) that _ui_translation_dict() filters out, "
+        "so they can never resolve through /api/ui_translations and will "
+        f"render as the literal key name: {offenders}"
+    )
