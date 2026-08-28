@@ -37,6 +37,18 @@ type_map: dict[str, str] = {
 }
 _TYPE_MAP_REV: dict[str, str] = {v: k for k, v in type_map.items()}
 
+# src/report_scheduler.py compares a weekly schedule's stored day_of_week
+# against strftime("%A").lower() — i.e. exactly these seven lowercase full
+# names. Anything else (e.g. "mon") stores happily and the schedule never
+# fires, with no signal at all.
+#
+# Deliberately module level, same reason as type_map above: Task 13 restyles
+# this wizard's chrome, and a check buried in the prompt flow could be
+# dropped by that pass without anything going red.
+VALID_DAYS_OF_WEEK: frozenset[str] = frozenset({
+    "monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday",
+})
+
 # Display label per type. These are the same i18n keys src/report_scheduler.py
 # uses for the same types in scheduled-report email subjects, so a new type
 # needs no new CLI copy; one with no entry here falls back to its raw name
@@ -247,9 +259,17 @@ def _add_report_schedule_wizard(cm: ConfigManager, edit_sched: dict = None) -> N
     day_of_week = edit_sched.get("day_of_week", "monday") if is_edit else "monday"
     day_of_month = edit_sched.get("day_of_month", 1) if is_edit else 1
     if schedule_type == "weekly":
-        dow = _ask(t("sched_day_of_week"), default=day_of_week)
-        if dow is None:
-            return
+        while True:
+            dow = _ask(t("sched_day_of_week"), default=day_of_week)
+            if dow is None:
+                return
+            dow = dow.strip().lower()
+            if dow in VALID_DAYS_OF_WEEK:
+                break
+            # Re-ask instead of storing verbatim: report_scheduler.py compares
+            # this against strftime("%A").lower() exactly, so anything else
+            # never matches and the schedule never fires.
+            print(f"{Colors.FAIL}{t('invalid_selection')}{Colors.ENDC}")
         day_of_week = dow
     elif schedule_type == "monthly":
         dom = _ask(t("sched_day_of_month"), default=str(day_of_month), cast=int)

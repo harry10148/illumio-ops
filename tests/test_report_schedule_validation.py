@@ -109,3 +109,35 @@ def test_every_valid_report_type_accepted(client):
             body["app"] = "SomeApp"
         r = _post(client, body)
         assert r.status_code in (200, 201), (rtype, r.status_code, r.get_data(as_text=True))
+
+
+# ── day_of_week whitelist (2026-08-28 backlog #1) ───────────────────────────
+# report_scheduler.py compares a weekly schedule's day_of_week against
+# strftime("%A").lower() — i.e. monday..sunday exactly. Anything else (e.g.
+# an abbreviation like "mon") stored verbatim and the schedule never fired,
+# with no signal at all.
+
+def test_abbreviated_day_of_week_rejected(client):
+    r = _post(client, {"name": "x", "report_type": "traffic",
+                       "schedule_type": "weekly", "day_of_week": "mon",
+                       "hour": 8, "minute": 0})
+    assert r.status_code == 400
+    assert "day_of_week" in r.get_json().get("error", "").lower()
+
+
+def test_every_valid_day_of_week_accepted(client):
+    for day in ("monday", "tuesday", "wednesday", "thursday", "friday",
+                "saturday", "sunday"):
+        r = _post(client, {"name": f"s-{day}", "report_type": "traffic",
+                           "schedule_type": "weekly", "day_of_week": day,
+                           "hour": 8, "minute": 0})
+        assert r.status_code in (200, 201), (day, r.status_code, r.get_data(as_text=True))
+
+
+def test_day_of_week_not_checked_for_daily_schedules(client):
+    """day_of_week only means anything for schedule_type == weekly; a daily
+    schedule must not be rejected for carrying a leftover bad value."""
+    r = _post(client, {"name": "x", "report_type": "traffic",
+                       "schedule_type": "daily", "day_of_week": "mon",
+                       "hour": 8, "minute": 0})
+    assert r.status_code == 200

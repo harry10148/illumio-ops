@@ -127,6 +127,14 @@ def _save_adhoc_job(job_id: str, record: dict) -> None:
     update_state_file(_resolve_state_file(), _merge)
 
 
+# src/report_scheduler.py compares a weekly schedule's day_of_week against
+# strftime("%A").lower() — i.e. exactly these seven lowercase full names.
+# A schedule stored with e.g. "mon" never matches and never fires, silently.
+_VALID_DAYS_OF_WEEK = (
+    "monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday",
+)
+
+
 def _validate_report_schedule(d: dict, lang: str) -> None:
     """報表排程輸入驗證（2026-07-24 審查 BUG-2）。畸形值原本 verbatim 存下、
     tick 靜默不跑無 operator 訊號。raise ValueError（已 i18n）供端點轉 400。"""
@@ -164,6 +172,13 @@ def _validate_report_schedule(d: dict, lang: str) -> None:
             raise ValueError(t("gui_err_invalid_schedule_time", lang=lang))
         if not (1 <= dom <= 31):
             raise ValueError(t("gui_err_invalid_schedule_time", lang=lang))
+    elif stype == "weekly":
+        # cron_expr already returned above, so a plain "weekly" schedule is
+        # the only case where day_of_week decides whether the tick ever fires.
+        dow = str(d.get("day_of_week", "monday")).strip().lower()
+        if dow not in _VALID_DAYS_OF_WEEK:
+            raise ValueError(t("gui_err_invalid_day_of_week", lang=lang,
+                               allowed=", ".join(_VALID_DAYS_OF_WEEK)))
 
 
 def make_reports_blueprint(

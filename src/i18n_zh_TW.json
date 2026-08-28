@@ -1519,6 +1519,7 @@
   "gui_err_internal": "內部伺服器錯誤",
   "gui_err_invalid_auth": "帳號或密碼錯誤。",
   "gui_err_invalid_cron": "cron 運算式不合法",
+  "gui_err_invalid_day_of_week": "day_of_week 不合法，須為下列其中之一：{allowed}",
   "gui_err_invalid_expire_fmt": "失效時間格式不合法",
   "gui_err_invalid_report_type": "report_type 不合法，須為下列其中之一：{allowed}",
   "gui_err_invalid_rule_sched_type": "規則排程類型須為 recurring 或 one_time",

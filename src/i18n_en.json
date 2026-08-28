@@ -1526,6 +1526,7 @@
   "gui_err_internal": "Internal server error",
   "gui_err_invalid_auth": "Invalid username or password.",
   "gui_err_invalid_cron": "Invalid cron expression",
+  "gui_err_invalid_day_of_week": "Invalid day_of_week; must be one of: {allowed}",
   "gui_err_invalid_expire_fmt": "Invalid expiration format",
   "gui_err_invalid_report_type": "Unknown report_type; must be one of: {allowed}",
   "gui_err_invalid_rule_sched_type": "Rule schedule type must be recurring or one_time",
