@@ -327,7 +327,7 @@ policy decision 等即時才算得出的條件，以及全文 `search`，帶了�
 | GET | `/api/siem/dlq` | 死信佇列清單 | `dest`, `limit`(≤500) |
 | GET | `/api/siem/dlq/<id>` | 單筆 DLQ 詳情（原始事件已被清除時退回 preview） | — |
 | POST | `/api/siem/dlq/replay` | **真實副作用**：重送 DLQ 條目（依 `ids[]` 或 `dest`+`limit`） | `ids[]` 或 `dest`, `limit`(≤1000) |
-| POST | `/api/siem/dlq/purge` | **真實副作用**：清除 DLQ（永久刪除，依保留天數） | `dest`, `older_than_days` |
+| POST | `/api/siem/dlq/purge` | **真實副作用**：清除 DLQ（永久刪除，依 `ids[]` 或 `dest`+保留天數） | `ids[]` 或 `dest`, `older_than_days` |
 | GET | `/api/siem/dlq/export` | 匯出 DLQ 為 CSV | `dest`, `reason` |
 
 destination／格式／佇列與重試、三個 DLQ CLI 對應指令見 [siem.md](../guide/siem.md)。
