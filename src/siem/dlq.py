@@ -16,10 +16,13 @@ class DeadLetterQueue:
         """Entries for one destination — or for every destination when
         `destination` is blank.
 
-        The GUI's destination filter and the CLI both carry "" for "all", and
-        dlq_export (src/siem/web.py) already reads a blank dest that way. This
-        used to filter on `destination == ""` instead, which matches no real
-        row, so the DLQ page's DEFAULT "All" view showed nothing at all.
+        The GUI's destination filter carries "" for "all", and dlq_export
+        (src/siem/web.py) already reads a blank dest that way. The CLI never
+        sends a blank one: `siem dlq` and `siem replay` both declare
+        `--dest` as `required=True` (src/cli/siem.py), so every CLI read is
+        destination-scoped. This used to filter on `destination == ""`
+        instead, which matches no real row, so the DLQ page's DEFAULT "All"
+        view showed nothing at all.
         """
         q = select(DeadLetter)
         if destination:

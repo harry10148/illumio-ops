@@ -108,6 +108,23 @@ a plain `<major>.<minor>.<patch>` scheme. (Tags through v4.0.0 carried a
 - Coverage of the redesign is enforced by `tools/gate_coverage_live.py`, which
   drives a running instance (local or a deployed appliance, with `--base-url`)
   and requires all 102 `data-cov` anchors to be present.
+- `PUT /api/report-schedules/<id>` now requires a valid `report_type` in the
+  request body, the same as `POST` always did. The storage layer merges a PUT
+  body into the stored schedule field by field, so a partial update was
+  possible before: a third-party script sending only `{"hour": 9}` used to get
+  a 200 and now gets a 400. The shipped UI always sends the whole schedule
+  body, so it is unaffected — this only reaches hand-written API callers.
+- Report schedules of type `app_summary` are now rejected without a non-empty
+  `app`, on both `POST` and `PUT`. Such a schedule could never produce a
+  report: every tick raised `app_summary schedule requires an 'app' value` and
+  logged an error. The interactive CLI wizard already refused to create one;
+  the API did not.
+- The interactive CLI's report-schedule wizard now lists every valid report
+  type, numbered from a sorted list, instead of the three it used to offer.
+  The numbers therefore moved: option 1 is `app_summary` and option 3 is
+  `network_inventory`, where they used to be `traffic` and `ven_status`.
+  Editing an existing schedule prefills its current type, so pressing Enter
+  keeps what is already stored; typing a remembered number does not.
 
 ### Fixed
 

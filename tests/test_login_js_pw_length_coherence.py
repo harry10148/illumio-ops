@@ -54,21 +54,29 @@ def test_login_err_pw_short_i18n_says_12_in_both_locales():
 # rendered the bare key name to the user. login.mjs already had this right
 # (see the note above); the coherence test above only scanned login.mjs,
 # which is why nothing caught the system.mjs twin. This test scans every
-# v2 area module and calls the real _ui_translation_dict filter — not a
+# v2 module and calls the real _ui_translation_dict filter — not a
 # copy of its prefix list, which would silently drift from the real one —
 # so any literal t() key that the endpoint would actually drop is caught
-# regardless of which area file it lives in.
-AREAS_DIR = REPO_ROOT / "src" / "static" / "js" / "v2" / "areas"
+# regardless of which file it lives in.
+#
+# 2026-08-28 review: the first version of this scan covered `areas/*.mjs`
+# and the bare `t(` spelling only. That left two holes of exactly the same
+# shape as the one it was written to close: `tf(` (the formatting twin —
+# same lookup, same whitelist, ~169 call sites) went unchecked, and so did
+# every module under `components/` and `core/`. Both are clean today, which
+# is precisely why widening now is free.
+V2_JS_DIR = REPO_ROOT / "src" / "static" / "js" / "v2"
 
-# Matches only a bare `t("key")` call: \b keeps this from matching the tail
-# of unrelated identifiers/calls that happen to end in "t(" followed by a
-# quote (e.g. `.split("_")`, `new Event("change")`, `.get("hl")`,
+# Matches a bare `t("key")` or `tf("key", ...)` call: \b keeps this from
+# matching the tail of unrelated identifiers/calls that happen to end in "t("
+# followed by a quote (e.g. `.split("_")`, `new Event("change")`, `.get("hl")`,
 # `.request("POST", ...)`) — those are real strings in this codebase and,
 # without the \b, are indistinguishable from a call to t() by this regex.
-T_CALL_RE = re.compile(r'\bt\(\s*"([a-zA-Z0-9_]+)"')
+# tf()'s further arguments do not affect the captured key.
+T_CALL_RE = re.compile(r'\btf?\(\s*"([a-zA-Z0-9_]+)"')
 
 
-def test_all_area_modules_only_call_t_with_whitelisted_keys():
+def test_all_v2_modules_only_call_t_with_whitelisted_keys():
     from src.gui._helpers import _ui_translation_dict
 
     # en/zh_TW carry the same key set (see the locale-parity test elsewhere
@@ -76,15 +84,18 @@ def test_all_area_modules_only_call_t_with_whitelisted_keys():
     # filter, which is what this test is actually checking.
     allowed = _ui_translation_dict("en")
 
+    scanned = sorted(V2_JS_DIR.rglob("*.mjs"))
+    assert scanned, f"no .mjs files found under {V2_JS_DIR} — the scan is not looking at anything"
+
     offenders: dict[str, set[str]] = {}
-    for mjs in sorted(AREAS_DIR.glob("*.mjs")):
+    for mjs in scanned:
         text = mjs.read_text(encoding="utf-8")
         for key in T_CALL_RE.findall(text):
             if key not in allowed:
-                offenders.setdefault(mjs.name, set()).add(key)
+                offenders.setdefault(str(mjs.relative_to(V2_JS_DIR)), set()).add(key)
 
     assert not offenders, (
-        "t() called with key(s) that _ui_translation_dict() filters out, "
+        "t()/tf() called with key(s) that _ui_translation_dict() filters out, "
         "so they can never resolve through /api/ui_translations and will "
         f"render as the literal key name: {offenders}"
     )

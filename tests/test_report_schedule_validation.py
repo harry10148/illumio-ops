@@ -111,6 +111,25 @@ def test_every_valid_report_type_accepted(client):
         assert r.status_code in (200, 201), (rtype, r.status_code, r.get_data(as_text=True))
 
 
+def test_app_summary_schedule_without_app_rejected(client):
+    """_generate_report raises ValueError("app_summary schedule requires an
+    'app' value") on every tick of an app_summary schedule that has no app, so
+    such a schedule can only ever log errors. The CLI wizard already refuses to
+    create one; the API used to accept it."""
+    r = _post(client, {"name": "x", "report_type": "app_summary",
+                       "schedule_type": "daily", "hour": 8, "minute": 0})
+    assert r.status_code == 400
+    assert "app" in r.get_json().get("error", "").lower()
+
+
+def test_app_summary_schedule_with_blank_app_rejected(client):
+    """A whitespace-only app is the same never-fires schedule as no app."""
+    r = _post(client, {"name": "x", "report_type": "app_summary", "app": "   ",
+                       "cron_expr": "0 8 * * MON-FRI"})
+    assert r.status_code == 400
+    assert "app" in r.get_json().get("error", "").lower()
+
+
 # ── day_of_week whitelist (2026-08-28 backlog #1) ───────────────────────────
 # report_scheduler.py compares a weekly schedule's day_of_week against
 # strftime("%A").lower() — i.e. monday..sunday exactly. Anything else (e.g.

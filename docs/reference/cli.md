@@ -883,6 +883,7 @@ esac
 | `TERM=dumb` | 輸出渲染 | 終端不支援色彩時同樣停用色彩輸出。 |
 | `ILLUMIO_SMTP_PASSWORD` | 告警／SMTP（`src/alerts/plugins.py`） | 覆寫 `config.json` 中的 `smtp.password`。可避免在設定檔中存放明文密碼。 |
 | `ILLUMIO_OPS_I18N_STRICT` | 報表 i18n | 設定後，若報表 i18n 層找不到翻譯鍵，將拋出錯誤而非靜默降回英文。用於 CI 翻譯覆蓋率檢查。 |
+| `ILLUMIO_OPS_ANALYSIS_LOCK` | 分析週期跨行程鎖（`src/main.py` 的 `analysis_lock_path()`） | 覆寫分析鎖檔路徑；未設定或設為空字串時使用預設的 `<專案根>/logs/analysis.lock`。主要供測試使用——測試若跑在同時有 `--monitor-gui` 或另一個 pytest 執行的 checkout 上，會卡在那把**真**鎖上直到逾時。 |
 
 > **PCE 連線提示：** `EXIT_UNAVAILABLE`（69）的錯誤訊息建議檢查 `PCE_HOST` 與 `PCE_PORT`。
 > 這些是**錯誤訊息中的標籤名稱**，而非環境變數——實際值來自 `config.json → api.url`。

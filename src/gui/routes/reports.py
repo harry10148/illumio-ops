@@ -146,6 +146,15 @@ def _validate_report_schedule(d: dict, lang: str) -> None:
     if rtype not in VALID_REPORT_TYPES:
         raise ValueError(t("gui_err_invalid_report_type", lang=lang,
                            allowed=", ".join(sorted(VALID_REPORT_TYPES))))
+    # app_summary needs a target app: _generate_report (src/report_scheduler.py)
+    # raises ValueError("app_summary schedule requires an 'app' value") on EVERY
+    # tick without one, so a schedule stored without it is born dead and only
+    # ever produces error log lines. The CLI wizard already demands it
+    # (src/cli/menus/report_schedule.py); this is the same gate for the API.
+    # Checked before the cron_expr early-return below for the same reason
+    # report_type is — a cron app_summary schedule fails identically.
+    if rtype == "app_summary" and not str(d.get("app") or "").strip():
+        raise ValueError(t("sched_app_required", lang=lang))
     cron_expr = d.get("cron_expr")
     if cron_expr:
         # 有 cron_expr 時它主導觸發；試解析，畸形即拒

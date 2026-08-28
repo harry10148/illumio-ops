@@ -47,11 +47,11 @@ in the whitelist REPORT_TYPES already carries.
   POST /api/rule_scheduler/check             — called for real exactly once
       (test_immediate_check_runs_real_endpoint_when_no_schedules_exist),
       and ONLY in a test that creates no schedule of its own — and that test
-      takes `schedule_free_db` (below), which truncates the real
-      rule_schedules.json to `{}` for its duration and restores it after.
-      (The store is resolved from the source tree via _resolve_config_dir(),
-      NOT from the function-scoped `temp_config_file`, so "every test starts
-      empty" was never true.) engine.check() therefore iterates zero stored
+      takes `schedule_free_db` (below), which redirects the store to an
+      empty tmp_path dir for its duration. (The store is otherwise resolved
+      from the source tree via _resolve_config_dir(), NOT from the
+      function-scoped `temp_config_file`, so "every test starts empty" was
+      never true.) engine.check() therefore iterates zero stored
       entries and issues no PCE write regardless of whether the PCE gates
       below happen to be reachable.
   POST /api/report-schedules/<id>/run        — NEVER called. The button is
@@ -82,8 +82,6 @@ overview) runs against the real, un-patched app.
 """
 from __future__ import annotations
 
-import os
-
 import pytest
 
 pytest.importorskip("playwright.sync_api", exc_type=ImportError)
@@ -102,8 +100,8 @@ SLOW = 45_000
 
 
 @pytest.fixture
-def schedule_free_db():
-    """Give the test an empty ScheduleDB it owns, then put the file back.
+def schedule_free_db(tmp_path, monkeypatch):
+    """Point the rule-scheduler routes at an empty ScheduleDB this test owns.
 
     The rule-scheduler routes resolve their store as
     ``_resolve_config_dir()/rule_schedules.json`` — anchored off the source
@@ -114,31 +112,31 @@ def schedule_free_db():
     2026-08-28: 3 leftover entries in the main checkout, both dependent tests
     red there, green in a clean worktree.
 
-    So create the condition instead of hoping for it: truncate the store to
-    ``{}`` on setup and restore the byte-for-byte original on teardown (a
-    developer's own schedules are real data, not test scratch).
-    """
-    from src.gui._helpers import _resolve_config_dir
+    So create the condition instead of hoping for it — by *redirecting* the
+    path, not by rewriting the file sitting at it. An earlier version of this
+    fixture truncated the real store to ``{}`` and restored it in ``finally``;
+    a Ctrl-C, a SIGKILL or a crashed pytest anywhere inside that window
+    destroyed a developer's real schedules with no backup, and a
+    ``--monitor-gui`` running against the same checkout — the very scenario
+    Task 8 names as its motivation — would read the emptied store mid-test.
+    Monkeypatching ``src.gui.routes.rule_scheduler._resolve_config_dir`` (the
+    namespace both of its call sites resolve through, rule_scheduler.py:62 and
+    :73 — the same pattern tests/test_gui_routes_robustness.py already uses)
+    reaches the e2e server as well, because that server is an in-process
+    thread (tests/v2_e2e_utils.py's make_server + threading.Thread). The real
+    config/rule_schedules.json is never opened at all, so there is no window
+    in which a crash can lose it.
 
-    db_path = os.path.join(_resolve_config_dir(), "rule_schedules.json")
-    saved = None
-    if os.path.exists(db_path):
-        with open(db_path, "r", encoding="utf-8") as f:
-            saved = f.read()
-    os.makedirs(os.path.dirname(db_path), exist_ok=True)
-    with open(db_path, "w", encoding="utf-8") as f:
-        f.write("{}")
-    try:
-        yield db_path
-    finally:
-        if saved is None:
-            try:
-                os.remove(db_path)
-            except OSError:
-                pass
-        else:
-            with open(db_path, "w", encoding="utf-8") as f:
-                f.write(saved)
+    ScheduleDB.load() treats a missing file as ``{}`` (src/rule_scheduler.py),
+    so the empty store needs no pre-creation; the yielded path is where the
+    routes will write if the test creates a schedule.
+    """
+    config_dir = tmp_path / "config"
+    config_dir.mkdir()
+    monkeypatch.setattr(
+        "src.gui.routes.rule_scheduler._resolve_config_dir", lambda: str(config_dir)
+    )
+    yield str(config_dir / "rule_schedules.json")
 
 
 def _goto(page, base_url, route, cov):
@@ -545,7 +543,7 @@ def test_rule_schedule_crud_reconciles_list_and_timeline(v2_page, monkeypatch, s
 
 def test_immediate_check_runs_real_endpoint_when_no_schedules_exist(v2_page, schedule_free_db):
     """AU-09: the button POSTs the real /api/rule_scheduler/check. Safe here
-    because `schedule_free_db` truncates the real store to `{}` for the
+    because `schedule_free_db` redirects the store to an empty tmp dir for the
     duration of this test and this test creates no schedule of its own — so
     engine.check() has nothing to toggle regardless of PCE reachability.
     (The store is NOT derived from the function-scoped temp_config_file; it is
