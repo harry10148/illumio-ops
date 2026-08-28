@@ -38,6 +38,55 @@
 4. **TOC 頁碼不回填**：原型的頁碼靠 Playwright+pdftotext 兩趟出圖；exporter 產出時無瀏覽器，`.toc-page` 維持空（螢幕本來就 `display:none`，列印無頁碼引導點線）。
 5. **`lang` 屬性維持 `zh-TW`**（原型用 `zh-Hant`）；`data-report-title` 保留，且順手補齊 readiness/rule_hit_count 現況缺 `lang`/`data-report-title` 的不一致。
 
+
+## 2026-08-28 執行前必讀（過期稽核結論）
+
+本計畫寫於 2026-08-07，2026-08-28 經獨立稽核。**約 95% 完好，7 個 task 有 6 個可照原樣執行。**
+與同日撰寫的 2D 計畫（半數過期）形成對比，原因是結構性的：2B 依賴報表 exporter 與
+`design/v2` 原型，而 `design/v2/` 自 2A 合併以來 diff 為空，exporter 的改動全落在本計畫
+明文宣告不碰的 `_modNN_html` 內容函式裡。
+
+### 三處必修（約五行）
+
+1. **T2 Step 1 的測試片段缺參數**：`render_df_table(df, lang="en")` 會 `TypeError`——
+   `col_i18n` 是 KEYWORD_ONLY 且無預設（`src/report/exporters/table_renderer.py:52`）。
+   加 `col_i18n={}`。**這是撰寫時就錯的，不是過期。**
+2. **T7 Step 2 的 sidecar 斷言對 4/11 型為假**：只有 7 型寫 sidecar。
+   `ven_status` / `policy_diff` / `policy_resolver` / `app_summary` 不寫，而
+   `_stamp_schedule_id`（`src/report_scheduler.py:726`）只在**排程**執行時建立，
+   T7 的手動 CLI 重產不會觸發。改為「確認有寫的 7 型成對產出；四型為已知缺漏，
+   由 backlog-v2 T7 補上」。**這條寫的當下就是錯的。**
+3. **T7 Step 4 的視覺檢查表要補 bandwidth 顯示**：`_mod11_html` 現在會在 max/avg/P95 前
+   加 `≥` 前綴（下界值），並在無法計算時印兩則 `note` 說明。逐頁檢查時要把這些列入。
+
+### 一個計畫未裁決的設計缺口（實作前必須先定）
+
+**grade chip 的顏色誰說了算？** 現況 exporter 走 `src/report/exporters/grade_colors.py`
+的 inline hex（`html_exporter.py:607`、`cover_page.py:45-46`），而
+`design/v2/reports/shell.css:569-580` 用 `var(--ink)/var(--fill)/var(--mark)` tone token。
+兩套都在，計畫沒說遷移後哪一套贏。**T1 或 T3 開工前必須裁決並寫進報告**，否則兩個實作者
+會做出不同答案。
+
+### 一個遺漏
+
+T6 的既知消費者清單漏了 `tests/test_report_engine_upgrade.py:98`（它 import
+`build_cover_page`）。該檔在本計畫撰寫前就存在（`d317ec4c`），是計畫的漏列而非漂移。
+
+### 行號漂移（Global Constraint 已涵蓋，列出以省時）
+
+- `_REPORT_PREFIXES`：`src/report_scheduler.py:679-691`（計畫寫 678-690），11 個鍵未變
+- `HtmlExporter` shim：`html_exporter.py:1813`（計畫寫 1796）
+- `test_report_css_embeds_fonts_as_data_uri`：`tests/test_trend_meta.py:166-170`
+
+### 與 `2026-08-28-product-bug-backlog-v2.md` 的關係
+
+**同檔不同方法，不會重工**——backlog T7 動的是 `export()`，本計畫 T5 動的是 `_render_html()`。
+真正的互動是反向的：**本計畫 T7 Step 2 斷言 sidecar 齊全，而只有 backlog-v2 T7 能讓它成真**
+（4 型中的 3 型；`policy_resolver` 仍是 JSON-only，且 `/api/reports` 不列 `.json`）。
+
+→ **執行順序：backlog-v2 → 本計畫。** 這樣本計畫 T7 的 sidecar 檢查會從「寫錯的斷言」
+變成「10/11 通過，一個有記錄的例外」。
+
 ## Global Constraints（每任務隱含適用）
 
 1. **執行時以當下原始碼為準**：本計畫引用的檔案結構、行號、函式簽名皆為撰寫日快照，動工前逐項重驗（`grep`/實際開檔），**禁止盲信行號**；發現漂移以現碼為準並記入任務回報。

@@ -4,7 +4,7 @@
 
 **Goal:** 修完 2026-08-07 那份 2D backlog 在 2026-08-27 重驗後仍然成立的 13 條產品缺陷。
 
-**Architecture:** 12 個 task，由小到大排列——先做一字之差與純後端的，最後做需要新 UI 的。每個 task 的邊界都是「一個可獨立驗證的行為改變」。
+**Architecture:** 10 個 task（原 12 個，其中兩個於 2026-08-28 移交 2C——見下方 Task 9/10 段落），由小到大排列——先做一字之差與純後端的，最後做需要新 UI 的。每個 task 的邊界都是「一個可獨立驗證的行為改變」。
 
 **Tech Stack:** Python 3.12、Flask、pytest、原生 ES modules（`src/static/js/v2/`）
 
@@ -33,6 +33,11 @@
 - **絕不移除 Windows workload 支援**（`windows_service_name` 全鏈、estate inventory 的 `"Windows"` 分支、相關 i18n 文案）。
 - **歷史紀錄不動**：既有的 plans/specs、`docs/_meta/migration-audit.json`、CHANGELOG 既有版本條目、`reports/audit/`。
 - 提交訊息用英文 conventional commits；`git add` 只用明確路徑，**永不 `git add -A`**。
+- **本計畫必須先於 2C 執行。** Task 2/3 動的 `src/cli/menus/report_schedule.py` 正是
+  2C T13 要重寫 chrome 的那支精靈。順序正確時 2C 只需五分鐘 rebase；反過來則本計畫要
+  重讀 2C 剛改寫的 `_ask` helper。**且 2C T13 的驗收條件已寫明：本計畫加的驗證
+  （型別白名單、`day_of_week` 重問）在它重寫後必須仍然存在且仍然有效**——
+  先跑的計畫加的修復被後跑的計畫默默弄丟，是本次合併最要防的失敗模式。
 
 ---
 
@@ -338,51 +343,23 @@ KPI 帶有 `label_key: "mod12_kpi_maturity_score"`（`mod12_executive_summary.py
 
 ---
 
-### Task 9: rule scheduler 設定選單去重（#11）
+### Task 9 與 Task 10：已移除，改由 2C 承接（2026-08-28 裁決）
 
-**Files:**
-- Modify: `src/cli/menus/_root.py:213-236`
-- Modify: `src/rule_scheduler_cli.py:668-699`
+原本這裡有兩個 task：**#11 rule scheduler 設定選單去重**與 **#14 三支 standalone CLI
+補 `draw_panel` 外框**。使用者裁決 2C（CLI 選單重組）要做，兩者因此移交
+`docs/superpowers/plans/2026-08-07-phase2c-cli.md`：
 
-同樣兩個 config 鍵（`rule_scheduler.enabled` / `check_interval_seconds`）有兩套手繪選單，連框線繪製都複製，且行為不同：`rule_scheduler_cli` 改完會印 `rsc_toggle_result` / `rsc_interval_result`，`_root` 版**改完沒有任何回饋**就 `cm.save()`。
+- **#11 → 2C T7。** 兩份計畫的方向**互斥**，不是可以合併的重疊：本計畫原本要保留
+  `_root.py` 與 `rule_scheduler_cli.py` 兩個入口並抽出共用 helper，而 2C T7 直接**刪掉**
+  `_root.py:212-236` 那個入口（守門測試斷言 `"settings_6" not in ...system_menu` 的原始碼），
+  以移除的方式讓 #11 消失。先做這裡的版本，等於寫一堆 2C 會刪的程式碼。
+- **#14 → 2C T8/T9/T10。** 也不是子集關係：本計畫用 `draw_panel`，2C 用 `menu_screen`
+  （含麵包屑與健康列，由 2C T1 產出、目前不存在）。兩者共通的難處是拆
+  `pcc_menu`／`sic_menu` 單體字串並過七層 i18n 鏈——那部分哪個順序都得做；會被重做的是
+  呼叫點。而 2C 那三個 task 另含本計畫完全沒有的東西：retention 執行確認、
+  destination 刪除與 DLQ purge 確認、Rule Scheduler 狀態列。
 
-**必須先解決的差異：** `_root` 用 `safe_input`，`rule_scheduler_cli` 用裸 `clean_input(input(...))`。共用 helper 只能挑一種輸入契約——**挑 `safe_input`**（它是本專案較新的、有處理中斷的那個），並在報告中說明。
-
-- [ ] **Step 1: 讀兩處，列出行為差異表**（輸入契約、回饋訊息、驗證範圍）
-- [ ] **Step 2: 寫測試**——斷言兩個入口對同一組輸入產生相同的 config 結果**且都有回饋訊息**
-- [ ] **Step 3: 跑，確認 `_root` 那條因缺回饋而紅**
-- [ ] **Step 4: 抽出共用 helper，兩處都改為呼叫它**
-- [ ] **Step 5: 跑測試 ＋ 突變驗證 ＋ Commit**
-
----
-
-### Task 10: 三支 standalone CLI 補 `draw_panel` 外框（#14）
-
-**Files:**
-- Modify: `src/pce_cache_cli.py:10-14`
-- Modify: `src/siem_cli.py:9-14`
-- Modify: `src/rule_scheduler_cli.py:645-650, 674-681`
-- Modify: 三本 i18n 字典
-
-**豁免已過期。** 這條原本豁免的理由是「2C 會依 `design/v2/cli-flows.md` 重組全部互動選單」——但 **2C 從未執行**（0 commit、0 checkbox），所以前提不成立。
-
-**這條為什麼自成一個 task：** `pcc_menu` / `sic_menu` 是**單一大塊字串**（`1. …\n  2. …` 純文字），要用 `draw_panel(title, lines)` 就得先拆成逐行的 i18n 鍵或依 `\n` 切開——那會動到三本字典，必須過 glossary 與 parity 閘門。`rule_scheduler_cli` 是手繪 `╭──│╰`，相對機械。
-
-- [ ] **Step 1: 讀 `draw_panel` 契約**（`src/cli/_render.py:398`）與其他選單模組的呼叫樣式
-- [ ] **Step 2: 決定 `pcc_menu` / `sic_menu` 的拆法並在報告中說明**（拆成逐行鍵 vs 依 `\n` 切）——**兩者都可，但要說出取捨**
-- [ ] **Step 3: 三支各自改為 `draw_panel`**
-- [ ] **Step 4: 跑 i18n 全鏈閘門**
-
-```bash
-venv/bin/python scripts/audit_i18n_usage.py 2>&1 | grep Total
-venv/bin/python scripts/precompute_zh_translations.py --dry-run 2>&1 | tail -1
-venv/bin/pytest tests/ -q -k "glossary or i18n" > /tmp/t.txt 2>&1; echo "exit=$?"; tail -3 /tmp/t.txt
-```
-
-預期：`Total: 0 finding(s)`、`would update 0 keys`、全綠。
-
-- [ ] **Step 5: 真機視覺確認**——三支選單各截一次輸出貼進報告（本專案 CLI 改動有欄寬 overflow 的前科）
-- [ ] **Step 6: Commit**
+**若 2C 日後取消，這兩條要回收成獨立 task**——它們是真實缺陷，不是外觀偏好。
 
 ---
 

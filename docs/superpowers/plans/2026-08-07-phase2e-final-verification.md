@@ -16,6 +16,97 @@
 - [ ] 全套測試本機綠：`pytest -q` 0 failed（記下總數作為本計畫基線）
 - [ ] 2A T12 的真機驗證報告存在（`tmp/phase2a-verification.md` 或其 CHANGELOG 摘要）——2E 是跨階段總驗，不重複 2A 自身驗收，但要能引用它
 
+
+## 2026-08-28 執行前必讀（過期稽核結論 ＋ 拆分建議）
+
+本計畫寫於 2026-08-07，前提是「2A–2D 完成」。**實際上 2A 已出貨，2B/2C/2D 從未執行**
+（2D 已由 `docs/superpowers/plans/2026-08-28-product-bug-backlog-v2.md` 取代）。
+照原樣整份等下去，等的是三個不會以現狀執行的計畫。
+
+### ★ 建議拆成兩半
+
+**2E-now（今天就能跑，不依賴任何未執行的計畫）**
+
+1. **T4 Step 1**（部署測試機到當前 main）——**必須先跑**，因為 T1 的 gui-tour 改寫是對著
+   實機寫的。原計畫把 T1 排在 T4 之前，那是假設 2A T12 剛部署過。
+2. **T1**，扣掉 `cli.md` 選單那一列（那列要等 2C）。這是價值最高且幾乎無依賴的一塊——
+   它會把目前**紅著**的 `docs_check` 轉綠。
+3. **T3 改寫成 Linux-only**（見下）＋ **T4 Step 2** bundle smoke。完全獨立。
+4. **T5 的自動化層**——v2 e2e 套件 ＋ `tools/gate_coverage_live.py` 跑到 101/101，
+   當作記錄下來的基準。
+
+**2E-final（真的要等）**：T5 的人工遍歷當作**驗收閘門**（目前有 13 條已知缺陷，會產生
+預期中的 FAIL——當成盤點可以，當成驗收不行）、RP-02 的參數交叉檢查（要等 2B）、以及整個 T6。
+
+### T3 改寫：Windows parity 已死
+
+`scripts/build_offline_bundle.sh` 今天**零 Windows 參照**，只產出一個產物。
+
+**照原樣存活**：Step 1 的 pre-flight grep；Step 2 建置；檢查 (3) design/ 洩漏、
+(4) 金鑰材料、(5) 鎖檔存在、(6) `cryptography-50.*`。
+
+**要更正**：
+- **(1)** `app/src/static/js/v2/` 的預期數量是 **29**（`git ls-files src/static/js/v2 | wc -l`），
+  不是「≥26」。`templates/v2/` **從未存在過**——v2 是走 `src/templates/index.html` ＋ `login.html`。
+- **(2) 必須反轉。** `src/templates/index.html` **現在就是 v2 shell**（載入 `css/v2/*` ＋
+  `js/v2/app.mjs`，已查證 4 處引用）。斷言它不存在會**誤報洩漏**。改成：斷言
+  `app/src/templates/{index,login}.html` **存在**；斷言
+  `app/src/static/js/{dashboard,settings,integrations,quarantine,rule-scheduler,filter-bar}.js`
+  與 `app/src/static/css/app.css` **不存在**（這些確實已隨 2A 刪除）。
+- **Step 2 的日誌預期**：`OK (<sha256>)` 只會出現**一次**不是兩次；
+  `"ERROR: missing Windows-only wheel"` 已不存在，刪掉這條預期。
+
+**已死、必須替換**：ZIP 產出、`$ZIP`/`win.lst`、檢查 (7) app/ parity diff、
+檢查 (8) wheel 集合差集 `{colorama, win32_setctime}`、以及 T4 Step 3。
+
+**替換成同等強度的兩條 Linux-only 不變量**：
+1. **app/ 子樹完整性**——`app/src/**` 等於 `git ls-files src/`（扣掉腳本自身的 exclude），
+   加上三個已知的額外 staged 項（`app/scripts/` 整個目錄、
+   `app/docs/_meta/illumio-event-reference.json`、`app/requirements-offline.lock`）。
+   這守的正是 (7) 原本在守的東西：「staged 的比 repo 裡的少」。
+2. **wheels ↔ lock 對帳**——`wheels/` 下的套件名集合等於 `requirements-offline.lock` 的套件集合。
+   這是 (8) 在沒有第二個平台可比之後的殘值。
+3. **新增一條反向閘門**（比照 `tests/test_windows_host_removed.py`）：tarball 內任何地方
+   都不得出現 `win_amd64`、`.ps1`、`nssm`。
+
+### T2 版本號：只剩時機問題，數字已定
+
+**5.0.0 已經寫進 `CHANGELOG.md`** 的 `### Removed`（Windows 移除那段明寫
+「This makes the next release a major version (5.0.0)」）。所以 T2 Step 1 的
+「向使用者確認 5.0.0 vs 4.2.0」要改成**時機**問題：現在就 cut，還是等
+backlog-v2／2B／2C 落地。Step 3 的「Fixed：2D 的 18 條」要改成 backlog-v2 的 13 條。
+
+**另外注意**：`## [Unreleased]` 已累積到 **704 行、15 個重複小標**
+（4 個 `### Added`、3 個 `### Changed`、6 個 `### Fixed`、2 個 `### Removed`）。
+T2 要先整併這些小標，否則發版說明會有四個 Added 區塊。
+
+### 其他已查證的事實更正
+
+- **`design/v2/coverage.yaml` 是 101 項不是 102**（OV16/IV15/AL14/AU13/RP9/SY17/LG3/XC14）。
+  `SY-01: PCE profiles CRUD/切換` 已隨 profile 移除刪除（`baac0908`）。
+- **`tests/test_gui_e2e*.py` 不存在**（2A 的 `df67e358` 刪除），T5 Step 1 的 pytest 選擇器
+  收集不到東西。Global Constraints 引用的 `tests/test_gui_e2e_playwright.py:14-41` 也是死參照，
+  慣例現在在 `tests/v2_e2e_utils.py`。
+- **`tests/test_v2_*.py` 是 in-process 的**，自建 Flask app——**它們不是真機測試**，
+  把 `ILLUMIO_OPS_E2E_BASE_URL` 指到測試機不會讓它們變成真機測試。
+  只有 `tests/test_e2e_dashboard_story.py` 打真實 appliance。
+- **`tools/gate_coverage_live.py` 吃的是 `--base-url` / `--username` / `--password` 旗標**，
+  不是 `ILLUMIO_OPS_E2E_*` 環境變數；不給 `--base-url` 它會自建臨時 app，
+  所以覆蓋率閘門今天就能跑，不需要測試機。
+- **報表型別 11 種，但 HTML 殼只有 10 種**（`policy_resolver` 只有 JSON/CSV）。
+  且**產品沒有伺服端 PDF**——PDF 驗收＝print CSS ＋ Playwright print-to-PDF。
+- **`docs_check.py` 不是 CI 閘門**（CI 只跑 `check_doc_links.py`）。用計畫指定的
+  `--all --exclude 'superpowers/**' --exclude 'ux-review*'` 跑，目前是 **19 findings**
+  （11 freshness／1 frontmatter／7 verified_against），exit 1。
+
+### coverage.yaml 的潛在陳舊（閘門抓不到）
+
+- **SY-18**（設定 dirty 追蹤）仍指向 `#/system/pce`——**那個頁面已不存在**。
+  它之所以通過，是因為 anchor 是跨路由 set-union 比對。人工檢查表必須改在一個still存在的頁面上驗 dirty 追蹤。
+- **IV-02** 仍寫「流量來源切換 即時快取/Archive」——2F-1 已改成**三種**來源
+  （cache-first／direct PCE／archive streaming），行號引用也已失效。
+- **IV-06** 的「ssh 抽查 sqlite」已死——review DB 已移除，archive 現在直接串流每日檔案。
+
 ## Global Constraints（每任務隱含適用）
 
 - **執行時以當下原始碼為準**：本計畫撰於 2A–2D 執行前，引用的行號／檔名（尤其 2A T11 切換後的 v2 檔案路徑、2B/2C 的產出）一律先 `git grep` / `ls` 實測再用，不盲信本文
