@@ -178,6 +178,42 @@ def test_get_events_rate_limit_true_reaches_request(api_client):
     assert calls == [True]
 
 
+@pytest.mark.parametrize(("deployment_type", "expected_timeout"), [
+    ("saas", 60),
+    ("on_prem", 30),
+    (None, 30),
+])
+def test_fetch_events_strict_uses_deployment_specific_timeout(
+    api_client, deployment_type, expected_timeout,
+):
+    """Events keep their query contract while SaaS receives a larger budget."""
+    if deployment_type is None:
+        api_client.api_cfg.pop("deployment_type", None)
+    else:
+        api_client.api_cfg["deployment_type"] = deployment_type
+
+    calls = []
+
+    def fake_request(url, **kwargs):
+        calls.append((url, kwargs))
+        return 200, b'[{"id":"event-1"}]'
+
+    api_client._request = fake_request
+
+    assert api_client.fetch_events_strict(
+        "2026-08-30T01:02:03Z",
+        end_time_str="2026-08-30T04:05:06Z",
+        max_results=321,
+        rate_limit=True,
+    ) == [{"id": "event-1"}]
+    assert calls == [(
+        "https://pce.example.com:8443/api/v2/orgs/1/events?"
+        "timestamp%5Bgte%5D=2026-08-30T01%3A02%3A03Z&"
+        "max_results=321&timestamp%5Blte%5D=2026-08-30T04%3A05%3A06Z",
+        {"timeout": expected_timeout, "rate_limit": True},
+    )]
+
+
 def test_get_traffic_flows_async_enforces_max_results(api_client):
     """get_traffic_flows_async(max_results=N) must actually cap the returned
     flows, since fetch_traffic_for_report has no max_results parameter of

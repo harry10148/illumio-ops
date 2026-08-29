@@ -363,7 +363,8 @@ class ApiClient:
                             rate_limit: bool = False) -> list[dict[str, Any]]:
         url = self._build_events_url(start_time_str, end_time_str=end_time_str,
                                      max_results=max_results, event_type=event_type)
-        status, body = self._request(url, timeout=30, rate_limit=rate_limit)
+        timeout = 60 if self.api_cfg.get("deployment_type") == "saas" else 30
+        status, body = self._request(url, timeout=timeout, rate_limit=rate_limit)
         if status != 200:
             err_msg = body.decode('utf-8', errors='replace') if isinstance(body, bytes) else str(body)
             raise EventFetchError(status, err_msg[:1000])
