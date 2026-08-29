@@ -66,6 +66,9 @@ def test_analyzer_records_pce_error_and_suppression(monkeypatch, tmp_path):
     }
 
     class Api:
+        def check_connectivity(self):
+            return 200, ""
+
         def check_health(self):
             return 503, "cluster degraded"
 

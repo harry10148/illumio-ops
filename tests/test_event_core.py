@@ -539,6 +539,9 @@ def test_run_debug_mode_system_rule_uses_health_check_not_traffic(monkeypatch, t
                 "timestamp_range": {"last_detected": "2026-04-08T12:00:00Z"},
             }]
 
+        def check_connectivity(self):
+            return 200, ""
+
         def check_health(self):
             return 503, "upstream timeout"
 
