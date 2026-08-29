@@ -99,6 +99,39 @@ def test_build_telegram_message_truncation_cuts_on_line_boundary_no_tag_split(mo
     assert body.count("<code>") == body.count("</code>")
 
 
+def test_build_telegram_message_keeps_normal_saas_console_event_link():
+    from src.config import ConfigManager
+    from src.reporter import Reporter
+
+    cm = MagicMock(spec=ConfigManager)
+    cm.config = {
+        "alerts": {"active": ["telegram"], "telegram_bot_token": "T", "telegram_chat_id": "C"},
+        "settings": {"language": "en"},
+        "api": {
+            "url": "https://ap-scp45.illum.io/api/v2",
+            "deployment_type": "saas",
+            "console_url": "",
+        },
+    }
+    reporter = Reporter(cm)
+    reporter.add_event_alert({
+        "rule": "Suspicious",
+        "desc": "d",
+        "severity": "info",
+        "count": 1,
+        "time": "t",
+        "raw_data": [{
+            "href": "/orgs/7/events/evt-normal",
+            "event_type": "agent.tampering",
+            "timestamp": "t",
+        }],
+    })
+
+    body = reporter._build_telegram_message("Event alert")
+
+    assert '<a href="https://console.illum.io/#/events/evt-normal">PCE</a>' in body
+
+
 def test_telegram_digest_template_renders_sections():
     rendered = render_alert_template(
         "telegram_digest.html.tmpl",

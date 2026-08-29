@@ -139,10 +139,14 @@ def test_reporter_persists_dispatch_history(monkeypatch, tmp_path):
     assert state["dispatch_history"][-1]["status"] == "success"
 
 
-def test_reporter_builds_vendor_event_payload():
+def test_reporter_builds_vendor_event_payload_with_shared_console_link():
     cm = SimpleNamespace(
         config={
-            "api": {"url": "https://pce.example.com:8443/api/v2"},
+            "api": {
+                "url": "https://poc3.illum.io/api/v2",
+                "deployment_type": "saas",
+                "console_url": "https://tenant.illumio.ai",
+            },
             "alerts": {},
             "settings": {"timezone": "UTC"},
         }
@@ -181,7 +185,7 @@ def test_reporter_builds_vendor_event_payload():
     assert payload["resource_changes"][0]["resource_type"] == "sec_policy"
     assert payload["notifications_count"] == 1
     assert payload["notifications"][0]["notification_type"] == "email"
-    assert payload["pce_link"] == "https://pce.example.com:8443/#/events/evt-1"
+    assert payload["pce_link"] == "https://tenant.illumio.ai/#/events/evt-1"
 
 
 def test_send_webhook_includes_vendor_event_payloads(monkeypatch):

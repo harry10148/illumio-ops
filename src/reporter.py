@@ -17,6 +17,7 @@ from src.alerts import build_output_plugin, get_output_registry, render_alert_te
 from src.events import normalize_event, persist_dispatch_results
 from src.events.poller import format_utc
 from src.i18n import t
+from src.pce_target import resolve_pce_console_url
 from src.state_store import update_state_file
 
 PKG_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -266,35 +267,14 @@ class Reporter:
 
     def _event_console_link(self, event: dict) -> str:
         href = str((event or {}).get("href", "") or "").strip()
-        base = self._active_pce_url().rstrip("/")
-        if not href or not base:
+        base = resolve_pce_console_url(self.cm.config["api"]).rstrip("/")
+        if not base:
             return ""
-        for suffix in ("/api/v2", "/api/v1", "/api"):
-            if base.endswith(suffix):
-                base = base[: -len(suffix)]
-                break
-        base = self._console_base(base)
         if "/orgs/" in href:
             _, _, tail = href.partition("/orgs/")
             _, _, href = tail.partition("/")
             href = "/" + href if href else ""
         return f"{base}/#{href}" if href else base
-
-    @staticmethod
-    def _console_base(api_base: str) -> str:
-        """Web-console base for the event deep-link.
-
-        On-prem the API host also serves the web console, so the API base is
-        correct. Illumio SaaS serves the API from a regional SCP cluster
-        (e.g. *.ap-scp1.illumio.com) but the web console is the region-agnostic
-        console.illum.io — a different host — so the API base would 404. Map any
-        SaaS SCP API host to console.illum.io.
-        """
-        from urllib.parse import urlparse
-        host = (urlparse(api_base).hostname or "").lower()
-        if host.endswith("illumio.com") and "scp" in host:
-            return "https://console.illum.io"
-        return api_base
 
     @staticmethod
     def _summarize_notification_info(info: Any) -> str:
