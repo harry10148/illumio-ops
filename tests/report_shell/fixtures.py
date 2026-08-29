@@ -13,6 +13,42 @@ builder. Where a test builds its input through a generator rather than by
 constructing the exporter directly, the minimal *exporter-level* construction
 from ``tests/test_print_button_all_exporters.py`` is used instead and the
 divergence is noted.
+
+HOW THE SAMPLE VALUES ARE CHOSEN — this is load-bearing, not cosmetic
+=====================================================================
+``conservation_diff``'s protection strength is set by this file, not by the
+harness. It asks whether each old text node is findable *anywhere* in the new
+document, so a value that is duplicated elsewhere, or shorter than
+``MIN_LEAF_CHARS`` (4), is invisible to it. Measured on the first version of
+these fixtures: deleting a column's cell values went unreported for **116 of
+137 columns (85%)** — the guard was running and seeing almost nothing.
+
+Two rules follow, and every value here obeys them:
+
+1. **Every cell value is at least 4 characters.** ``443``, ``TCP``, ``5``,
+   ``d``, ``act``, ``A`` do not exist as far as the guard is concerned. Numeric
+   columns therefore use four- and five-digit values.
+2. **No value repeats inside one document.** Reusing one DataFrame across
+   several tables (the first version fed the same ``df`` to thirteen traffic
+   tables and the same row to three VEN tables) makes each copy a hiding place
+   for the others.
+
+A third, weaker hazard is unavoidable and merely minimised: ``flat`` strips all
+whitespace before matching, so adjacent cells concatenate and a short value can
+be found inside that concatenation. Values here are kept long and dissimilar to
+keep that unlikely.
+
+Determinism matters too, because T3 captures a baseline from one call and
+compares a later call against it. Never derive fixture values from a counter,
+clock, or hash iteration order.
+
+The output is NOT byte-stable, and does not need to be: matplotlib mints a
+fresh random ``clip-path`` id on every SVG render, so ``ven_status`` differs by
+about 165 bytes between two calls of the same builder. What the baselines
+record — the leaf set and the table/chart counts — is stable, because ``svg``
+subtrees are removed before the text is collected. That distinction is pinned
+by ``test_builders_are_deterministic_in_everything_the_baselines_record``; do
+not "fix" it by comparing whole documents.
 """
 from __future__ import annotations
 
@@ -25,10 +61,12 @@ __all__ = ["BUILDERS", "REPORT_TYPES"]
 _LANG = "en"
 
 # A minimal but real chart_spec. The baselines record ``chart_count`` as a
-# conservation signal, so at least one fixture must actually render a chart —
-# otherwise a migration that dropped every chart would still match a baseline
-# of zero. ``tests/test_report_shell_conservation_unit.py`` asserts the totals
-# across BUILDERS are non-zero so this cannot silently regress.
+# conservation signal, so a fixture that renders no chart would let a migration
+# drop every chart and still match a baseline of zero.
+# ``test_builders_render_enough_tables_and_charts_for_the_count_baselines``
+# pins the exact SET of chart-bearing types (not a total, which one type's
+# charts could prop up while another's vanished), so adding or removing a
+# chart_spec here must be a deliberate edit to that test as well.
 _CHART_SPEC = {
     "type": "pie",
     "title": "Policy Decision Breakdown",
@@ -37,10 +75,29 @@ _CHART_SPEC = {
 }
 
 
+def _flow_df(tag: str, base: int) -> pd.DataFrame:
+    """Two flow rows unique to ``tag``/``base``, every cell >= 4 characters.
+
+    ``tag`` must be unique per table within a document and ``base`` must be
+    spaced far enough apart that no port or count is a substring of another.
+    """
+    return pd.DataFrame([
+        {"Port": base + 11, "Protocol": f"tcp-{tag}-alfa",
+         "Flow Count": base * 7 + 1234},
+        {"Port": base + 23, "Protocol": f"udp-{tag}-bravo",
+         "Flow Count": base * 9 + 5678},
+    ])
+
+
 # --------------------------------------------------------- traffic family --
 def _traffic_results() -> dict:
-    """Transcribed from tests/test_traffic_flows_html_exporter.py::_results."""
-    df = pd.DataFrame([{"Port": 443, "Protocol": "TCP", "Flow Count": 10}])
+    """Based on tests/test_traffic_flows_html_exporter.py::_results.
+
+    That fixture feeds ONE ``df`` to every module slot, so the same three cells
+    appear in thirteen rendered tables and the conservation check can never see
+    any of them go missing. Each slot gets its own table here — see the module
+    docstring.
+    """
     return {
         "findings": [],
         "mod01": {"total_flows": 10, "total_connections": 100,
@@ -51,18 +108,27 @@ def _traffic_results() -> dict:
                   "policy_coverage_pct": 40.0,
                   "src_managed_pct": 100.0, "dst_managed_pct": 50.0,
                   "date_range": "2026-04-27 ~ 2026-05-04",
-                  "top_ports": df, "top_protocols": df},
-        "mod02": {"summary": df, "chart_spec": dict(_CHART_SPEC)},
+                  "top_ports": _flow_df("prts", 1100),
+                  "top_protocols": _flow_df("prot", 1300)},
+        "mod02": {"summary": _flow_df("summ", 1500),
+                  "chart_spec": dict(_CHART_SPEC)},
         "mod08": {"unmanaged_flow_count": 3, "unmanaged_pct": 30.0,
                   "unique_unmanaged_src": 1, "unique_unmanaged_dst": 1,
-                  "top_unmanaged_src": df},
-        "mod09": {"label_distribution": {"src_app": df, "dst_app": df,
-                                         "src_env": df, "dst_env": df,
-                                         "src_role": df, "dst_role": df},
-                  "port_distribution": df, "proto_distribution": df},
+                  "top_unmanaged_src": _flow_df("unmg", 1700)},
+        "mod09": {"label_distribution": {
+                      "src_app": _flow_df("sapp", 1900),
+                      "dst_app": _flow_df("dapp", 2100),
+                      "src_env": _flow_df("senv", 2300),
+                      "dst_env": _flow_df("denv", 2500),
+                      "src_role": _flow_df("srol", 2700),
+                      "dst_role": _flow_df("drol", 2900)},
+                  "port_distribution": _flow_df("pdis", 3100),
+                  "proto_distribution": _flow_df("qdis", 3300)},
         "mod11": {"bytes_data_available": True, "total_mb": 1.0,
-                  "top_by_bytes": df, "top_bandwidth": df,
-                  "byte_ratio_anomalies": df, "anomaly_threshold": 1.0},
+                  "top_by_bytes": _flow_df("byts", 3500),
+                  "top_bandwidth": _flow_df("bwid", 3700),
+                  "byte_ratio_anomalies": _flow_df("anom", 3900),
+                  "anomaly_threshold": 1.0},
         "mod12": {"generated_at": "2026-07-02 12:00:00", "kpis": [],
                   "findings_summary": {}, "total_findings": 0,
                   "key_findings": [], "findings": [],
@@ -131,18 +197,29 @@ def _build_audit() -> str:
     and a migration that dropped every table and chart would still match it.
     """
     from src.report.exporters.audit_html_exporter import AuditHtmlExporter
-    events = pd.DataFrame([
-        {"event_type": "sec_policy.create", "severity": "info",
-         "count": 3, "last_seen": "2026-07-23T09:14:23Z"},
-        {"event_type": "user.login_failed", "severity": "warning",
-         "count": 1, "last_seen": "2026-07-23T10:02:00Z"},
-    ])
+
+    def _events(tag: str, base: int, day: int) -> pd.DataFrame:
+        # Each COLUMN gets its own token, not just each table: the exporter
+        # splits event_type on ``_``/``.`` with <wbr/>, so ``...create.zulu``
+        # becomes four separate leaves, and a bare ``zulu`` would still be
+        # found in this row's severity cell after event_type was deleted.
+        return pd.DataFrame([
+            {"event_type": f"sec_policy.create.evt{tag}",
+             "severity": f"informational-sev{tag}",
+             "count": base + 1234, "last_seen": f"2026-07-{day:02d}T09:14:23Z"},
+            {"event_type": f"user.login_failed.evt{tag}",
+             "severity": f"warning-high-sev{tag}",
+             "count": base + 5678, "last_seen": f"2026-07-{day:02d}T21:02:47Z"},
+        ])
+
     results = {
         "mod00": {"generated_at": "2026-07-23 12:00:00", "attention_items": [],
-                  "chart_spec": dict(_CHART_SPEC), "top_events_overall": events},
-        "mod01": {"summary": events, "severity_breakdown": events,
-                  "recent": events},
-        "mod02": {"summary": events},
+                  "chart_spec": dict(_CHART_SPEC),
+                  "top_events_overall": _events("zulu", 10000, 11)},
+        "mod01": {"summary": _events("yankee", 20000, 13),
+                  "severity_breakdown": _events("xray", 30000, 15),
+                  "recent": _events("whiskey", 40000, 17)},
+        "mod02": {"summary": _events("victor", 50000, 19)},
     }
     return AuditHtmlExporter(results, date_range=("2026-07-16", "2026-07-23"),
                              lang=_LANG)._build()
@@ -156,14 +233,20 @@ def _build_ven_status() -> str:
     workload dict, not the ``{status: DataFrame}`` shape the exporter takes; the
     column names below are the generator's display columns."""
     from src.report.exporters.ven_html_exporter import VenHtmlExporter
-    rows = pd.DataFrame([{
-        "Hostname": "k8s-node01", "IP": "192.168.10.20, 10.0.0.5",
-        "VEN Version": "21.5.35", "Status": "active",
-        "Last Heartbeat": "0.2h", "policy_sync": "synced",
-        "Paired At": "2024-07-03",
-    }])
-    return VenHtmlExporter({"online": rows, "sync_issues": rows,
-                            "offline": rows}, lang=_LANG)._build()
+
+    def _vens(tag: str, octet: int, ver: str, hours: str) -> pd.DataFrame:
+        return pd.DataFrame([{
+            "Hostname": f"k8s-node-{tag}-01", "IP": f"192.168.{octet}.20",
+            "VEN Version": ver, "Status": f"active-paired-{tag}",
+            "Last Heartbeat": hours, "policy_sync": f"synced-{tag}",
+            "Paired At": f"2024-0{octet % 9 + 1}-03",
+        }])
+
+    return VenHtmlExporter({
+        "online": _vens("online", 11, "21.5.35-1042", "0.21 hours"),
+        "sync_issues": _vens("syncissue", 22, "22.3.17-2053", "1.34 hours"),
+        "offline": _vens("offline", 33, "23.1.09-3064", "9.87 hours"),
+    }, lang=_LANG)._build()
 
 
 # ----------------------------------------------------------- policy usage --
@@ -172,18 +255,25 @@ def _build_policy_usage() -> str:
     tests/test_policy_usage_report.py exercises the generator and the executive
     summary, not the exporter's own construction."""
     from src.report.exporters.policy_usage_html_exporter import PolicyUsageHtmlExporter
-    summary_df = pd.DataFrame([{"Category": "Hit", "Rules": 5, "Share %": 41.7},
-                               {"Category": "Unused", "Rules": 7, "Share %": 58.3}])
-    rules_df = pd.DataFrame([{"ruleset": "RS-A", "rule_id": "1",
-                              "consumers": "c", "providers": "p",
-                              "services": "s", "hit_count": 5,
-                              "last_hit_at": "2026-06-28T09:14:23Z"}])
+    summary_df = pd.DataFrame([
+        {"Category": "Category-tango", "Rules": 5041, "Share %": 41.73},
+        {"Category": "Category-sierra", "Rules": 7062, "Share %": 58.27},
+    ])
+
+    def _rules(tag: str, base: int, day: int) -> pd.DataFrame:
+        return pd.DataFrame([{
+            "ruleset": f"RS-{tag}-alfa", "rule_id": f"{base + 11}",
+            "consumers": f"consumer-{tag}", "providers": f"provider-{tag}",
+            "services": f"service-{tag}", "hit_count": base + 1234,
+            "last_hit_at": f"2026-06-{day:02d}T09:14:23Z",
+        }])
+
     results = {
         "mod00": {"generated_at": "2026-07-02 12:00:00", "kpis": []},
-        "mod01": {"total_rules": 12, "hit_count": 5, "unused_count": 7,
-                  "hit_rate_pct": 41.7, "summary_df": summary_df},
-        "mod02": {"hit_df": rules_df},
-        "mod03": {"unused_df": rules_df},
+        "mod01": {"total_rules": 12103, "hit_count": 5041, "unused_count": 7062,
+                  "hit_rate_pct": 41.73, "summary_df": summary_df},
+        "mod02": {"hit_df": _rules("hit", 60000, 11)},
+        "mod03": {"unused_df": _rules("unused", 70000, 13)},
     }
     return PolicyUsageHtmlExporter(results, lang=_LANG)._build()
 
@@ -193,9 +283,11 @@ def _build_policy_diff() -> str:
     """Transcribed from tests/test_policy_diff_html_exporter.py::_diff."""
     from src.report.exporters.policy_diff_html_exporter import PolicyDiffHtmlExporter
     rs = pd.DataFrame([{
-        "change_type": "modified", "ruleset_name": "RS-A", "ruleset_id": "1",
-        "field": "enabled", "draft_value": "False", "active_value": "True",
-        "last_actor": "bob", "last_changed": "2026-06-05T12:00:00Z",
+        "change_type": "modified", "ruleset_name": "RS-alfa-1042",
+        "ruleset_id": "10471", "field": "enabled",
+        "draft_value": "False", "active_value": "True",
+        "last_actor": "bob.chen@lab.local",
+        "last_changed": "2026-06-05T12:00:00Z",
         "last_event": "rule_set.update",
     }])
     rule = pd.DataFrame(columns=["change_type", "ruleset_name", "rule_id", "field",
@@ -215,14 +307,24 @@ def _build_app_summary() -> str:
     tests/test_app_summary_report.py drives the facade (fetch → scope → export)
     with mocked API clients, so it has no exporter-level results dict."""
     from src.report.exporters.app_summary_html_exporter import AppSummaryHtmlExporter
-    flows = pd.DataFrame([{"src_app": "web", "dst_app": "DB", "port": 3306,
-                           "proto": "TCP", "policy_decision": "allowed",
-                           "num_connections": 12,
-                           "last_detected": "2026-01-02T08:30:00Z"}])
+    def _flows(tag: str, port: int, base: int, day: int, decision: str) -> pd.DataFrame:
+        # inbound and outbound carry DIFFERENT decisions: with the same enum in
+        # both, deleting either column leaves the value sitting in the other.
+        return pd.DataFrame([{
+            "src_app": f"web-tier-{tag}", "dst_app": f"data-tier-{tag}",
+            "port": port, "proto": f"tcp-{tag}",
+            "policy_decision": decision, "num_connections": base + 1234,
+            "last_detected": f"2026-01-{day:02d}T08:30:00Z",
+        }])
+
     # ``empty: True`` (the print-button test's fixture) short-circuits the whole
-    # body to a single note and renders no table at all.
+    # body to a single note and renders no table at all. Inbound and outbound
+    # must also be DIFFERENT tables — one shared frame hides both from the check.
     results = {"app": "DB", "env": "Prod", "empty": False,
-               "baseline": {"inbound": flows, "outbound": flows,
+               "baseline": {"inbound": _flows("inbound", 33061, 80000, 11,
+                                              "allowed"),
+                            "outbound": _flows("outbound", 54321, 90000, 13,
+                                               "potentially_blocked"),
                             "inbound_count": 1, "outbound_count": 1},
                "mod03": {}, "policy_impact": {}, "enforcement": {}, "findings": []}
     return AppSummaryHtmlExporter(results, lang=_LANG)._render_html()
@@ -233,13 +335,27 @@ def _build_rule_hit_count() -> str:
     """Transcribed from tests/test_rule_hit_count_html_exporter.py::_row/_result."""
     from src.report.rule_hit_count_generator import RuleHitCountResult
     from src.report.exporters.rule_hit_count_html_exporter import RuleHitCountHtmlExporter
-    rows = [{"rule_href": "/r/1", "ruleset": "RS-A", "rule_no": 1, "rule_id": "1",
-             "rule_type": "Allow", "description": "d", "consumers": "c",
-             "providers": "p", "services": "s", "enabled": True,
-             "hit_count": 5, "days_since_last_hit": "3",
+    rows = [{"rule_href": "/rules/10471", "ruleset": "RS-alfa-1042",
+             "rule_no": 2085, "rule_id": "10471",
+             "rule_type": "Allow", "description": "web tier to database tier",
+             "consumers": "consumer-alfa", "providers": "provider-bravo",
+             "services": "service-charlie", "enabled": True,
+             "hit_count": 5063, "days_since_last_hit": "3074",
              "last_hit_at": "2026-06-28T09:14:23Z",
              "last_updated_by": "admin@lab.local",
-             "last_updated_at": "2026-05-01T00:00:00Z"}]
+             "last_updated_at": "2026-05-01T21:47:09Z"},
+            # Second row so the KPI total (the sum) differs from either cell —
+            # with one row the sum IS the cell, and deleting the Hit Count
+            # column leaves the same digits sitting in the KPI block.
+            {"rule_href": "/rules/20583", "ruleset": "RS-bravo-2096",
+             "rule_no": 4176, "rule_id": "20583",
+             "rule_type": "Deny", "description": "cache tier to queue tier",
+             "consumers": "consumer-delta", "providers": "provider-echo",
+             "services": "service-foxtrot", "enabled": False,
+             "hit_count": 7094, "days_since_last_hit": "6108",
+             "last_hit_at": "2026-06-14T17:38:52Z",
+             "last_updated_by": "operator@lab.local",
+             "last_updated_at": "2026-04-19T06:25:31Z"}]
     df = pd.DataFrame(rows)
     hit_df = df[df["hit_count"] > 0]
     unused_df = df[df["hit_count"] == 0]
@@ -265,20 +381,25 @@ def _build_readiness() -> str:
     from src.report.readiness_report import ReadinessResult
     from src.report.exporters.readiness_html_exporter import ReadinessHtmlExporter
     queue_df = pd.DataFrame([{
-        "app_display": "appA (prod)", "app_env_key": "appa|prod",
-        "readiness_score": 91.0, "grade": "A", "current_mode": "full×2",
-        "blocking_factor": "Ringfence Maturity",
+        "app_display": "app-alfa (production)", "app_env_key": "appalfa|production",
+        "readiness_score": 91.42, "grade": "A", "current_mode": "full enforcement ×2",
+        "blocking_factor": "Ringfence Maturity romeo",
         "blocking_factor_key": "ringfence_maturity",
-        "recommended_action": "act", "flow_count": 6, "pb_uncovered_count": 0,
+        "recommended_action": "tighten ringfence rules first",
+        "flow_count": 6083, "pb_uncovered_count": 1094,
     }])
-    factor_table = pd.DataFrame([{"Factor": "Policy Coverage", "Weight": 35,
-                                  "Score": 30.0, "Ratio %": 85.0}])
-    recs = pd.DataFrame([{"Priority": "P2", "App (Env)": "appB (prod)",
-                          "App Env Key": "appb|prod", "Issue": "Enforcement Gap",
-                          "Action": "Move to enforcement",
+    factor_table = pd.DataFrame([{"Factor": "Policy Coverage quebec", "Weight": 3521,
+                                  "Score": 3067.0, "Ratio %": 85.31}])
+    recs = pd.DataFrame([{"Priority": "P2-medium", "App (Env)": "app-bravo (production)",
+                          "App Env Key": "appbravo|production",
+                          "Issue": "Enforcement Gap",
+                          "Action": "Move to enforcement papa",
                           "Action Code": "MOVE_TO_ENFORCEMENT",
-                          "Severity": "HIGH"}])
-    readiness = {"total_score": 78.5, "grade": "B",
+                          # not bare "HIGH": the narrative below this table
+                          # contains "higher", and the match is a substring
+                          # match over whitespace-stripped text.
+                          "Severity": "HIGH-oscar"}])
+    readiness = {"total_score": 78.54, "grade": "B",
                  "factor_table": factor_table, "recommendations": recs,
                  "enforcement_mode_distribution": {"full": 2}}
     result = ReadinessResult(

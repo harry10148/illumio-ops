@@ -23,6 +23,7 @@ import pytest
 from bs4 import BeautifulSoup
 
 from tests.report_shell.conservation import (
+    MIN_LEAF_CHARS,
     conservation_diff,
     conservation_text,
     label_value_preserved,
@@ -37,6 +38,10 @@ REPORT_TYPES = {
     "traffic", "security_risk", "network_inventory", "audit", "ven_status",
     "policy_usage", "policy_diff", "app_summary", "rule_hit_count", "readiness",
 }
+
+# The five types whose minimal input renders at least one static chart.
+TYPES_WITH_CHARTS = {"traffic", "network_inventory", "audit", "ven_status",
+                     "policy_usage"}
 
 
 def test_mechanism_catches_a_dropped_heading():
@@ -95,20 +100,120 @@ def test_every_builder_renders_a_document(report_type):
 
 def test_builders_render_enough_tables_and_charts_for_the_count_baselines():
     """The baseline files record ``table_count``/``chart_count``, so those
-    counts must be non-zero somewhere — a fixture set that renders nothing but
+    counts must be non-zero — a fixture set that renders nothing but
     empty-state panels would let a migration drop every table and chart and
     still match its baseline. Per type: at least one real ``.report-table``
     (empty-state panels carry ``.report-table-panel--empty`` instead, so they do
-    not count). Charts are reported in aggregate because several report types
-    legitimately render none."""
+    not count).
+
+    The chart side pins the exact set rather than a total: with a total, one
+    type's chart could disappear while another type's kept the sum positive.
+    The five types that render none do so because their minimal input has no
+    chart to draw, not because charts were dropped.
+    """
     tables = {}
-    charts = 0
+    charts = {}
     for report_type in sorted(REPORT_TYPES):
         soup = BeautifulSoup(BUILDERS[report_type](), "html.parser")
         tables[report_type] = len(soup.select(".report-table"))
-        charts += len(soup.select("figure.chart-static"))
+        charts[report_type] = len(soup.select("figure.chart-static"))
     assert all(n > 0 for n in tables.values()), f"types with no real table: {tables}"
-    assert charts > 0, "no BUILDERS fixture renders a static chart"
+    assert {rt for rt, n in charts.items() if n > 0} == TYPES_WITH_CHARTS, \
+        f"chart-bearing types changed: {charts}"
+
+
+# Column-data deletions that conservation genuinely cannot see, each verified
+# against the rendered document rather than assumed. These are NOT fixture
+# defects — no choice of sample value fixes them:
+#   * the value is an enum the exporter also prints outside the table
+#     (``modified`` appears in policy_diff's own change counters);
+#   * the value is a derived count or a grade letter and is therefore shorter
+#     than MIN_LEAF_CHARS (``A``, ``1``);
+#   * the exporter renders one frame in two places (readiness' Action/Affected
+#     Apps rollup is built from the recommendations table below it).
+_UNPROTECTED_COLUMNS = {
+    ("policy_diff", "Change"),
+    ("readiness", "Grade"),
+    ("readiness", "Action"),
+    ("readiness", "Affected Apps"),
+    ("ven_status", "Count"),
+}
+
+
+def test_deleting_a_columns_data_is_caught_for_every_table_column():
+    """The guard's real strength test, and the reason fixtures.py looks the way
+    it does.
+
+    Measured on the first version of these fixtures, this mutation went
+    unreported for 116 of 137 columns — the harness was green because the
+    sample data hid everything from it (values under four characters, and one
+    DataFrame reused across a dozen tables). Sample values are now distinct and
+    long enough; anything that regresses that will fail here rather than
+    silently weakening every migration check in T3-T5.
+    """
+    missed = []
+    for report_type in sorted(REPORT_TYPES):
+        html = BUILDERS[report_type]()
+        for ti, ncols in enumerate(_table_shapes(html)):
+            for ci in range(ncols):
+                name, mutated = _blank_column(html, ti, ci)
+                if mutated is None:
+                    continue
+                if not conservation_diff(html, mutated):
+                    missed.append((report_type, name))
+
+    unexpected = [m for m in missed if m not in _UNPROTECTED_COLUMNS]
+    assert not unexpected, (
+        "conservation cannot see these column deletions; make the sample "
+        f"values distinct and >= {MIN_LEAF_CHARS} characters: {unexpected}")
+
+    stale = _UNPROTECTED_COLUMNS - set(missed)
+    assert not stale, (
+        f"these are now protected — drop them from _UNPROTECTED_COLUMNS: {stale}")
+
+
+def _table_shapes(html: str) -> list[int]:
+    soup = BeautifulSoup(html, "html.parser")
+    return [len(t.select("thead th")) for t in _real_tables(soup)]
+
+
+def _real_tables(soup):
+    return [t for t in soup.select("table.report-table")
+            if t.select("thead th") and t.select("tbody tr")]
+
+
+def _blank_column(html: str, ti: int, ci: int):
+    """Empty column ``ci`` of table ``ti``, keeping its header. Returns
+    ``(column name, mutated html)``, or ``(name, None)`` if the column held no
+    text to begin with."""
+    soup = BeautifulSoup(html, "html.parser")
+    table = _real_tables(soup)[ti]
+    name = table.select("thead th")[ci].get_text(" ", strip=True)
+    had_text = False
+    for tr in table.select("tbody tr"):
+        cells = tr.find_all("td", recursive=False)
+        if len(cells) > ci:
+            had_text = had_text or bool(cells[ci].get_text(" ", strip=True))
+            cells[ci].clear()
+    return name, (str(soup) if had_text else None)
+
+
+@pytest.mark.parametrize("report_type", sorted(REPORT_TYPES))
+def test_builders_are_deterministic_in_everything_the_baselines_record(report_type):
+    """T3 captures a baseline from one call and compares a later call to it, so
+    anything a baseline records must not vary between calls.
+
+    Deliberately NOT a whole-document comparison: matplotlib mints a random
+    ``clip-path`` id per SVG render, so ``ven_status`` differs by ~165 bytes
+    between two calls. That is invisible to the baselines because ``svg``
+    subtrees are stripped before text collection. Asserting byte equality here
+    would fail for a reason that cannot affect a single migration check.
+    """
+    first, second = BUILDERS[report_type](), BUILDERS[report_type]()
+    assert conservation_text(first)[0] == conservation_text(second)[0]
+    for markup in (".report-table", "figure.chart-static"):
+        assert len(BeautifulSoup(first, "html.parser").select(markup)) == \
+               len(BeautifulSoup(second, "html.parser").select(markup))
 
 
 @pytest.mark.parametrize("report_type", sorted(REPORT_TYPES))
@@ -138,6 +243,40 @@ def test_harness_catches_narrative_text_deleted_from_a_real_report(report_type):
     assert diff, f"{report_type}: harness reported nothing after deleting {lost[:60]!r}"
     assert lost[:90] in diff, \
         f"{report_type}: deleted {lost[:60]!r} but harness reported {diff}"
+
+
+def test_transposed_values_are_a_known_blind_spot():
+    """Documented limitation, pinned so it cannot change unnoticed — and the
+    more dangerous of the two.
+
+    ``conservation_diff`` asks whether ``old_leaves`` is a subset of the new
+    document's flattened text. Subset membership is invariant under every
+    permutation, so moving a value under the wrong label — two KPI values
+    swapped, two table rows' figures exchanged, a timestamp attached to the
+    wrong event — passes silently. The duplicate-text blind spot below is
+    "something vanished and nobody noticed"; this one is "the report now states
+    something false and nobody noticed", and a report's worth rests on its
+    values being paired with the right labels.
+
+    Nothing in this harness can close that. It needs per-type assertions in the
+    exporters' own tests and T7's page-by-page check on real output.
+    """
+    old = ("<dl><dt>Hit rate percentage</dt><dd>41.73</dd>"
+           "<dt>Unused rate percentage</dt><dd>58.27</dd></dl>")
+    swapped = ("<dl><dt>Hit rate percentage</dt><dd>58.27</dd>"
+               "<dt>Unused rate percentage</dt><dd>41.73</dd></dl>")
+    assert conservation_diff(old, swapped) == []
+
+    # Same at table-row level, on a real report: exchange two body rows' cells
+    # and the check still reports nothing.
+    html = BUILDERS["policy_usage"]()
+    soup = BeautifulSoup(html, "html.parser")
+    rows = _real_tables(soup)[0].select("tbody tr")
+    a = rows[0].find_all("td", recursive=False)
+    b = rows[1].find_all("td", recursive=False)
+    for ca, cb in zip(a, b):
+        ca.string, cb.string = cb.get_text(" ", strip=True), ca.get_text(" ", strip=True)
+    assert conservation_diff(html, str(soup)) == []
 
 
 def test_duplicated_text_is_a_known_blind_spot():

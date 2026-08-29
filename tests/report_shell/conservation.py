@@ -24,15 +24,60 @@ chrome rather than report content and legitimately has no successor (the
 prototype's only entry was the ``.print-btn`` "列印 / PDF" control, which lives
 outside ``main.report-main`` and is re-provided by the new shell itself).
 
-Known blind spot, inherited from the prototype and deliberately kept: the test
-is "is this string findable anywhere in the new document", so losing ONE of two
-identical occurrences is invisible. A report title appears in ``<title>``, on
-the cover and in the TOC simultaneously; dropping the TOC copy alone would not
-be reported here. That is the right default — the reader still sees the text —
-but it is why the baseline files also record ``table_count``/``chart_count``:
-counts are what catch a whole duplicated block disappearing.
-``tests/test_report_shell_conservation_unit.py`` pins this behaviour explicitly
-so it cannot drift silently.
+WHAT A GREEN RESULT DOES AND DOES NOT PROVE — READ BEFORE RELYING ON IT
+========================================================================
+An empty result from ``conservation_diff(old_html, new_html)`` proves exactly
+one thing:
+
+    every text node of at least MIN_LEAF_CHARS (4) characters in the old
+    document is findable SOMEWHERE in the new document's flattened text.
+
+It is a set-level existence check (``old_leaves ⊆ new_flat``). Everything below
+is outside that guarantee — green does not mean these did not happen:
+
+* **Data correctness.** A value changed into another value is caught only if
+  the old value was >= 4 characters AND unique in the document. Nothing else
+  covers this; each type's own exporter tests do.
+* **Pairing — the biggest hole.** Subset membership is invariant under every
+  permutation, so swapped KPI values, exchanged table-row figures, or a value
+  moved under the wrong label all pass silently. Nothing covers this. See
+  ``test_transposed_values_are_a_known_blind_spot``.
+* **Position and order.** Two sections whose entire contents are exchanged are
+  not reported. If a migration moves content between chapters, assert that
+  separately.
+* **Structural integrity.** A whole column, row, or table can go missing and
+  stay unreported if its text survives elsewhere in the document. The
+  baselines' ``table_count`` catches a whole table vanishing; a lost column or
+  row is covered only to the extent that the fixture's values are unique —
+  which is why ``fixtures.py`` is written the way it is.
+* **Chart content.** ``svg`` subtrees are removed wholesale, so chart titles,
+  legends, axis labels and data labels are 100% out of scope. The baselines'
+  ``chart_count`` counts figures, not what is inside them.
+* **Short strings.** Values under 4 characters (``TCP``, ``443``, ``5``, a
+  grade letter) never enter the comparison at all. This is a skip, not a pass.
+* **Duplicated text.** Losing one of two identical occurrences is invisible —
+  a report title lives in ``<title>``, on the cover and in the TOC at once.
+  See ``test_duplicated_text_is_a_known_blind_spot``.
+* **Exact matching.** ``flat`` has ALL whitespace stripped and matching is by
+  substring, so ``alpha`` is satisfied by ``alphabetic``, and adjacent cells
+  concatenate into strings that can satisfy a value that really did vanish.
+  Short leaves are the dangerous ones.
+
+The one thing it does prove is still worth having: it is the only check that
+catches a whole block of narrative text disappearing during re-chaptering. On
+2026-08-03 ``.report-hero-top`` was decomposed wholesale, both reports lost
+their real titles, and not one test went red. Treat it as "the rearrangement
+did not drop a block", never as "the migration is correct".
+
+**Its strength is set by the fixtures, not by this module.** If sample data
+repeats across tables or uses values under 4 characters, the holes above widen
+at once: measured on the first version of ``fixtures.py``, deleting a column's
+cell values went unreported for 116 of 137 columns. Before trusting a green
+run on a new report type, look at what its fixture actually contains.
+
+After a green run you still owe: the per-type ``table_count``/``chart_count``
+comparison, that type's existing exporter tests, and T7's page-by-page check on
+real output. Drop any of the three and a whole row above has nobody covering it.
 """
 from __future__ import annotations
 
@@ -107,9 +152,14 @@ def label_value_preserved(text: str, flat: str) -> bool:
     them into separate ``dt``/``dd`` nodes. Not one character is lost — the
     string simply is not contiguous any more.
 
-    This is NOT relaxed to "any part matches": the label and the value must BOTH
-    be found. If the value were replaced (``（無資料）``) the label alone would
-    still match, and that must stay a failure.
+    It is not relaxed to "any part matches" — both halves must be found — but do
+    not read that as protecting the PAIRING. Each half is looked up
+    independently, anywhere in the document; nothing checks that they are still
+    attached to each other, or to each other's neighbours. The exemption only
+    fails when a half is replaced by a string that appears NOWHERE in the new
+    document (``（無資料）``). Swap two labels' values and both halves are still
+    present, so this returns True and ``conservation_diff`` stays silent — see
+    the pairing entry in the module docstring.
     """
     if text in flat:
         return True

@@ -25,6 +25,17 @@ def test_wide_table_font_size_in_print():
     assert 'font-size: 7.5pt' in print_block
 
 
+def test_wide_table_hint_is_hidden_in_print():
+    """``render_df_table`` emits a ``.table-hint`` paragraph on every wide table,
+    but it is an on-screen scroll affordance, not report content — it tells the
+    reader the table scrolls sideways, which is meaningless on paper. SHELL_CSS
+    hides it in print; the nine types still rendering with BASE_CSS need the
+    same rule or the note is printed into the PDF."""
+    screen_block, print_block = BASE_CSS.split('@media print')[0:2]
+    assert '.table-hint { display: none; }' in print_block
+    assert '.table-hint { display: none; }' not in screen_block
+
+
 def test_cover_page_css_present():
     assert '.report-cover {' in BASE_CSS
 

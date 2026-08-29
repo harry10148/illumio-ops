@@ -309,6 +309,10 @@ BASE_CSS = """\
     .print-only { display: block; }
     nav { display: none; }
     .print-btn { display: none; }
+    /* Wide-table hint is an on-screen scroll affordance, never report content
+       (SHELL_CSS hides it in print for the same reason). Without this the nine
+       types still on this stylesheet print the navigation note into the PDF. */
+    .table-hint { display: none; }
     main { margin-left: 0; padding: 0; }
     body { font-size: 10pt; }
     * { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
