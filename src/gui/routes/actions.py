@@ -897,17 +897,22 @@ def make_actions_blueprint(
         except Exception:
             pass  # intentional: audit-log best-effort, must not block primary action
         try:
-            from src.api_client import ApiClient
+            from src.api_client import ApiClient, pce_probe_category
             with ApiClient(cm) as api:
-                status, body = api.check_health()
-                body_text = str(body)
-                clean_body = _strip_ansi(body_text)
+                status, _body = api.check_connectivity()
+                category = pce_probe_category(status)
                 try:
                     from src.module_log import ModuleLog as _ML
                     _ML.get("actions").info(f"Connection result: status={status}")
                 except Exception:
                     pass  # intentional: audit-log best-effort, must not block primary action
-                return jsonify({"ok": status == 200, "status": status, "body": clean_body[:500]})
+                return jsonify({
+                    "ok": category == "ok",
+                    "reachable": status != 0,
+                    "status": status,
+                    "category": category,
+                    "probe": "noop",
+                })
         except Exception as e:
             try:
                 from src.module_log import ModuleLog as _ML

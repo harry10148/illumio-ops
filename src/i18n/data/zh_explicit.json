@@ -1004,6 +1004,7 @@
   "gui_ws_search": "Workload 搜尋",
   "health_alerts_header": "健康告警",
   "health_details": "詳細資訊",
+  "health_probe_failed_details": "PCE /{probe} 探測失敗，分類為 {category}（HTTP {status}）。",
   "health_status": "狀態",
   "health_time": "時間",
   "help_manage_rules_command": "可用指令：m <編號> 修改單筆規則；d <編號> 或 d <編號1,編號2> 刪除規則。範例：m 3、d 5、d 1,2,4。按 Enter 或輸入 0 返回。",

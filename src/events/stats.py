@@ -26,6 +26,9 @@ def ensure_monitoring_state(state: dict) -> dict:
     pce_stats.setdefault("last_error_status", "")
     pce_stats.setdefault("last_error_stage", "")
     pce_stats.setdefault("consecutive_failures", 0)
+    pce_stats.setdefault("health_probe", "")
+    pce_stats.setdefault("deployment_type", "")
+    pce_stats.setdefault("health_category", "unknown")
     pce_stats.setdefault("last_batch_total", 0)
     pce_stats.setdefault("last_batch_unknown", 0)
     pce_stats.setdefault("last_batch_notes", 0)
@@ -62,7 +65,16 @@ class StatsTracker:
         self.state["event_timeline"] = timeline[-self.timeline_limit:]
         return entry
 
-    def record_pce_success(self, stage: str, *, status=200, message: str = "") -> None:
+    def record_pce_success(
+        self,
+        stage: str,
+        *,
+        status=200,
+        message: str = "",
+        probe: str | None = None,
+        deployment_type: str | None = None,
+        category: str | None = None,
+    ) -> None:
         now_str = format_utc(datetime.datetime.now(datetime.timezone.utc))
         pce_stats = self.state.setdefault("pce_stats", {})
         pce_stats["last_success"] = now_str
@@ -81,6 +93,11 @@ class StatsTracker:
         if stage == "health":
             pce_stats["health_status"] = "ok"
             pce_stats["last_health_check"] = now_str
+            pce_stats["health_category"] = "ok"
+            if probe is not None:
+                pce_stats["health_probe"] = probe
+            if deployment_type is not None:
+                pce_stats["deployment_type"] = deployment_type
         else:
             pce_stats["event_poll_status"] = "ok"
             pce_stats["last_event_poll"] = now_str
@@ -111,7 +128,16 @@ class StatsTracker:
             pce_stats["last_error_stage"] = stage
             self.record_timeline("pce_error", f"{stage} failed", status=None, error=error[:300])
 
-    def record_pce_error(self, stage: str, error: str, *, status=None) -> None:
+    def record_pce_error(
+        self,
+        stage: str,
+        error: str,
+        *,
+        status=None,
+        probe: str | None = None,
+        deployment_type: str | None = None,
+        category: str | None = None,
+    ) -> None:
         now_str = format_utc(datetime.datetime.now(datetime.timezone.utc))
         pce_stats = self.state.setdefault("pce_stats", {})
         pce_stats["last_error"] = error[:300]
@@ -121,6 +147,12 @@ class StatsTracker:
         if stage == "health":
             pce_stats["health_status"] = "error"
             pce_stats["last_health_check"] = now_str
+            if category is not None:
+                pce_stats["health_category"] = category
+            if probe is not None:
+                pce_stats["health_probe"] = probe
+            if deployment_type is not None:
+                pce_stats["deployment_type"] = deployment_type
         else:
             pce_stats["event_poll_status"] = "error"
             pce_stats["last_event_poll"] = now_str

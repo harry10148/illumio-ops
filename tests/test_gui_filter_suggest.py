@@ -49,9 +49,13 @@ def test_suggest_workload_offline_degrades(app_persistent, monkeypatch):
     monkeypatch.setattr("src.api_client.ApiClient.get_ip_lists", lambda self, **kw: [])
     monkeypatch.setattr("src.api_client.ApiClient.get_label_groups", lambda self, **kw: [])
     # 真實生產路徑：ApiClient.search_workloads 失敗時吞例外回 []（不 raise），
-    # 必須靠 check_health 才能區分「PCE 不通」vs「真的無符合」。
+    # 必須靠 deployment-safe connectivity probe 才能區分「PCE 不通」vs「真的無符合」。
     monkeypatch.setattr("src.api_client.ApiClient.search_workloads", lambda self, params: [])
-    monkeypatch.setattr("src.api_client.ApiClient.check_health", lambda self: (0, "unreachable"))
+    monkeypatch.setattr("src.api_client.ApiClient.check_connectivity", lambda self: (0, "unreachable"))
+
+    def _health_must_not_run(self):
+        raise AssertionError("workload suggest must not call /health")
+    monkeypatch.setattr("src.api_client.ApiClient.check_health", _health_must_not_run)
 
     r = client.get('/api/filter-objects/suggest?q=prod&types=label,workload&limit=10',
                    environ_overrides={'REMOTE_ADDR': '127.0.0.1'})
@@ -70,9 +74,13 @@ def test_suggest_workload_empty_but_pce_up(app_persistent, monkeypatch):
                         lambda self, **kw: [{"key": "env", "value": "Prod", "href": "/orgs/1/labels/3"}])
     monkeypatch.setattr("src.api_client.ApiClient.get_ip_lists", lambda self, **kw: [])
     monkeypatch.setattr("src.api_client.ApiClient.get_label_groups", lambda self, **kw: [])
-    # 真的沒有符合的 workload（PCE 正常）：search_workloads 回 []，check_health 回 200
+    # 真的沒有符合的 workload（PCE 正常）：search_workloads 回 []，/noop 回 2xx
     monkeypatch.setattr("src.api_client.ApiClient.search_workloads", lambda self, params: [])
-    monkeypatch.setattr("src.api_client.ApiClient.check_health", lambda self: (200, "ok"))
+    monkeypatch.setattr("src.api_client.ApiClient.check_connectivity", lambda self: (204, ""))
+
+    def _health_must_not_run(self):
+        raise AssertionError("workload suggest must not call /health")
+    monkeypatch.setattr("src.api_client.ApiClient.check_health", _health_must_not_run)
 
     r = client.get('/api/filter-objects/suggest?q=zzz-no-match&types=workload&limit=10',
                    environ_overrides={'REMOTE_ADDR': '127.0.0.1'})
