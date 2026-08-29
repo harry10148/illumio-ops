@@ -1272,12 +1272,12 @@ class Analyzer:
         self,
         rules: list[dict],
         *,
-        status,
+        status: int | str,
         details: str,
         probe: str,
         deployment: str,
         category: str,
-        stats_status=None,
+        stats_status: int | None = None,
     ) -> None:
         """Record one failed probe and dispatch its cooldown-controlled alerts."""
         self.stats.record_pce_error(
