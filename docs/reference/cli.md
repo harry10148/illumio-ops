@@ -2,7 +2,7 @@
 title: CLI 參考手冊
 audience: [operator, developer]
 version: 4.1.0
-last_verified: 2026-08-25
+last_verified: 2026-08-30
 verified_against:
   - src/cli/root.py
   - src/cli/_global_flags.py
@@ -232,22 +232,32 @@ illumio-ops config set smtp.password s3cr3t   # 輸出會顯示 [REDACTED]
 
 #### config login
 
-互動式（或非互動式）設定 PCE API 憑證（`url`／`key`／`secret`／`org-id`）。不加
-`--no-interactive` 時，未提供的欄位會逐一提示輸入；secret 輸入時終端不回顯。
+互動式（或非互動式）設定 PCE API 憑證與 deployment／Console metadata。不加
+`--no-interactive` 時，未提供的 URL／憑證／org 欄位會逐一提示輸入；secret 輸入時終端不回顯。
+`--deployment-type` 與 `--console-url` 省略時保留目前值。
 
 | 選項 | 型別 | 預設 | 說明 |
 |------|------|------|------|
 | `--url` | TEXT | 互動提示 | PCE URL（如 `https://pce.example.com:8443`）。 |
 | `--key` | TEXT | 互動提示 | API key。 |
 | `--secret` | TEXT | 互動提示（隱藏輸入） | API secret。 |
-| `--org-id` | TEXT | `1` | 組織 ID。 |
+| `--org-id` | TEXT | 保留目前值（新設定預設 `1`） | 組織 ID。 |
+| `--deployment-type` | `[saas\|on_prem]` | 保留目前值 | PCE 部署型態；文件值寫作 `saas` / `on_prem`。 |
+| `--console-url` | TEXT | 保留目前值 | 完整 HTTP(S) Console URL；SaaS 可留空使用預設 Console。 |
 | `--no-interactive` | flag | `false` | 跳過互動提示；此時 `--url`／`--key`／`--secret` 皆為必填。 |
+| `--pce-target-change` | `[flush\|same-pce]` | 無 | 非互動模式改變 `--url`／`--org-id` 時必須明選：`flush` 清除舊 target 的衍生狀態；`same-pce` 表示同一 PCE 換位址並保留狀態。 |
 | `-h, --help` | | | 顯示說明並退出。 |
 
 ```bash
 illumio-ops config login
-illumio-ops config login --no-interactive --url https://pce.example.com:8443 --key K --secret S --org-id 1
+illumio-ops config login --deployment-type saas --console-url https://console.illum.io
+illumio-ops config login --deployment-type on_prem --console-url https://pce.example.com:8443
+illumio-ops config login --no-interactive --url <目前API-URL> --key <API-key> --secret <API-secret> --org-id <目前org-id>
 ```
+
+若最後一個非互動式範例要改成不同 PCE，另加 `--pce-target-change flush`；若只是同一台
+PCE 換位址則加 `--pce-target-change same-pce`。只改 deployment／Console metadata 不需這個
+target decision，也不會清 cache，但 CLI 修改後仍須重啟常駐服務才會載入新值。
 
 ---
 

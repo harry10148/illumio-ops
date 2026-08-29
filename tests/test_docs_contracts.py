@@ -133,3 +133,61 @@ def test_legacy_argparse_examples_use_actual_entrypoint_name():
     main_text = _read("src/main.py")
     assert "illumio_ops.py" not in main_text
     assert "illumio-ops.py --gui" in main_text
+
+
+def test_saas_pce_monitoring_and_console_link_contracts_are_documented():
+    docs = {
+        "docs/guide/configuration.md": _read("docs/guide/configuration.md"),
+        "docs/guide/monitoring-alerts.md": _read("docs/guide/monitoring-alerts.md"),
+        "docs/guide/troubleshooting.md": _read("docs/guide/troubleshooting.md"),
+        "docs/reference/cli.md": _read("docs/reference/cli.md"),
+    }
+    required_fragments = {
+        "docs/guide/configuration.md": (
+            "`deployment_type`",
+            "`saas` / `on_prem`",
+            "`api.url` 是 API 傳輸端點",
+            "`api.console_url`",
+            "SaaS 留空時預設為 `https://console.illum.io`",
+            "不算 PCE target change",
+            "不需要清除 cache",
+        ),
+        "docs/guide/monitoring-alerts.md": (
+            "`/api/v2/noop`",
+            "僅限 on-prem",
+            "`/api/v2/health`",
+            "`/api/v2/node_available`",
+            "https://status.illumio.com/posts/dashboard",
+            "只供人工",
+            "不會被 scrape",
+            "不參與 watchdog verdict",
+            "API 存取",
+            "`last_status`",
+            "擷取 lag",
+            "事件告警連結使用解析後的 Console URL",
+        ),
+        "docs/guide/troubleshooting.md": (
+            "`401` 是憑證／身分驗證失敗",
+            "不代表 SaaS PCE outage",
+            "`403`",
+            "`429`",
+            "`5xx`",
+            "transport failure",
+            "`/api/v2/noop`",
+        ),
+        "docs/reference/cli.md": (
+            "`--deployment-type`",
+            "`saas` / `on_prem`",
+            "`--console-url`",
+            "`--pce-target-change`",
+            "--deployment-type saas --console-url https://console.illum.io",
+        ),
+    }
+
+    missing = [
+        f"{path}: {fragment}"
+        for path, fragments in required_fragments.items()
+        for fragment in fragments
+        if fragment not in docs[path]
+    ]
+    assert not missing, "Missing SaaS PCE docs contracts:\n" + "\n".join(missing)

@@ -2,7 +2,7 @@
 title: 故障排除
 audience: [operator]
 version: 4.1.0
-last_verified: 2026-07-17
+last_verified: 2026-08-30
 verified_against:
   - src/job_health.py
   - src/module_log.py
@@ -87,23 +87,42 @@ sudo journalctl -u illumio-ops -n 100 --no-pager
 
 ## 2. PCE 連不上／憑證
 
-### 2.1 401 / 403（認證失敗）
+### 2.1 401 / 403 / 429 / 5xx 分類
 
-`api.key`／`api.secret` 錯誤或金鑰已在 PCE 撤銷。於 PCE Console 重發一組 API 金鑰，更新
-`config/config.json` 後重啟服務（`sudo systemctl restart illumio-ops`）。
+`401` 是憑證／身分驗證失敗，通常代表 `api.key`／`api.secret` 錯誤或金鑰已在 PCE 撤銷；
+不代表 SaaS PCE outage。於 PCE Console 重發 API 金鑰、更新設定後重啟服務
+（`sudo systemctl restart illumio-ops`）。其他類別需分開處理：
+
+| 狀態 | 判讀 |
+|---|---|
+| `403` | 憑證有效但缺少操作所需權限（authorization failure） |
+| `429` | PCE 正在 rate limit；降低請求頻率並等待重試 |
+| `5xx` | PCE API server error；再用官方 status 頁人工關聯 provider incident |
+| `0`／無 HTTP 回應 | DNS、TLS、逾時或連線中斷等 transport failure |
+
+SaaS provider 狀態只到 `https://status.illumio.com/posts/dashboard` 人工查看；它不會推翻上述
+實際 probe 分類，也不是 watchdog 的資料來源。
 
 ### 2.2 Connection refused／逾時
 
-先確認網路可達與 PCE 自身健康狀態；本專案內部也是打同一個端點做健康檢查（`ApiClient.check_health()`）：
+先確認 `api.deployment_type` 是否正確：SaaS 以已設定憑證呼叫 authenticated `/api/v2/noop`；
+on-prem 才會在 `/noop` 通過後繼續 `/api/v2/health` 與 `/api/v2/node_available`。不要用
+SaaS 的 `/health` 缺失來判定 outage。以下手動 `/health` 範例僅適用 on-prem：
 
 ```bash
 curl -v --max-time 5 https://pce.example.com:8443/api/v2/health
 ```
 
-GUI 頁首的 **PCE 狀態晶片**（綠 ok／琥珀 warn／紅 err／灰 unknown）即時反映這支健康檢查的結果，是比逐條看
-日誌更快的第一手判讀入口。
+GUI 頁首的 **PCE 狀態晶片**（綠 ok／琥珀 warn／紅 err／灰 unknown）即時反映 deployment-aware
+control-plane probe，是比逐條看日誌更快的第一手判讀入口。
 
-### 2.3 lab PCE 的 `SSLCertVerificationError`
+### 2.3 `/noop` 綠色但事件／流量仍過期
+
+這不是矛盾：`/noop` 只證明 API 存取；events／traffic ingestion 另以各來源的 `last_status`
+與擷取 lag 判定。到 GUI 的 pipeline freshness 列檢查是哪個來源上次擷取失敗或超過容許延遲；
+不要因 PCE control plane 綠色就忽略紅色 ingestion 訊號。
+
+### 2.4 lab PCE 的 `SSLCertVerificationError`
 
 lab／測試 PCE 常用自簽憑證，預設 `verify_ssl: true` 會驗證失敗。**安全護欄**：`profile="production"` 時把
 `verify_ssl` 設為 `false` 會在設定載入階段直接被拒絕（`ValueError: verify_ssl=False is not allowed when
