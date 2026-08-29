@@ -5191,5 +5191,6 @@
   "rpt_shell_kind_exec": "Executive summary",
   "rpt_shell_kind_finding": "Findings",
   "rpt_shell_kind_detail": "Details",
-  "rpt_shell_table_hint_wide": "{cols}-column wide table · scroll horizontally on screen · prints in A4 landscape"
+  "rpt_shell_table_hint_wide": "{cols}-column wide table · scroll horizontally on screen · prints in A4 landscape",
+  "rpt_shell_table_hint_wide_portrait": "{cols}-column wide table · scroll horizontally on screen · prints in A4 portrait, scaled down"
 }

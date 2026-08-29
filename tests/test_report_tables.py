@@ -1,4 +1,5 @@
 import pandas as pd
+from bs4 import BeautifulSoup
 
 from src.report.exporters.table_renderer import WIDE_COL_THRESHOLD, render_df_table
 
@@ -71,3 +72,87 @@ def test_i18n_column_headers_rendered_at_build_time():
     assert 'data-i18n=' not in out
     # Column header text must be inside a .th-label span
     assert 'class="th-label"' in out
+
+
+def test_numeric_and_ts_columns_get_semantic_classes():
+    df = pd.DataFrame({"Flows": [1, 2],
+                       "Last Seen Timestamp": ["2026-01-01 10:00", "2026-01-02 11:00"]})
+    html = render_df_table(df, col_i18n={}, lang="en")
+    soup = BeautifulSoup(html, "html.parser")
+    assert "num" in soup.select("thead th")[0].get("class", [])
+    assert "col-ts" in soup.select("thead th")[1].get("class", [])
+    assert "<wbr/>" in html or "<wbr>" in html
+
+
+def test_ten_plus_columns_get_landscape_and_hint():
+    df = pd.DataFrame({f"c{i}": [1] for i in range(11)})
+    html = render_df_table(df, col_i18n={}, lang="zh_TW")
+    assert "report-table-panel--landscape" in html and 'class="table-hint"' in html
+
+
+def test_eight_column_wide_table_gets_a_hint_but_stays_portrait():
+    """A7 ruling: the hint follows ``--wide``, matching the design prototype
+    (``design/v2/tools/reskin_report.py:_wide_table_hint``), which emits a hint
+    for every ``.report-table-panel--wide`` panel and adds ``--landscape`` only
+    at >= 10 columns. An 8-column table scrolls horizontally on screen and must
+    say so; it just prints portrait rather than landscape."""
+    df = pd.DataFrame({f"c{i}": [1] for i in range(WIDE_COL_THRESHOLD)})
+    html = render_df_table(df, col_i18n={}, lang="zh_TW")
+    assert 'class="table-hint"' in html
+    assert "report-table-panel--wide" in html
+    assert "report-table-panel--landscape" not in html
+
+
+def test_char_width_triggered_wide_table_also_gets_a_hint():
+    """``--wide`` also fires on estimated row width, not only on column count —
+    those panels scroll too, so they get the same affordance."""
+    df = pd.DataFrame({c: [c * 90] for c in "ABCD"})   # 4 cols, far under 8
+    html = render_df_table(df, col_i18n={}, lang="en")
+    assert "report-table-panel--wide" in html
+    assert 'class="table-hint"' in html
+    assert "4" in html.split('class="table-hint"')[1].split("</p>")[0]
+
+
+def test_narrow_table_gets_no_hint():
+    df = pd.DataFrame([{"A": 1, "B": 2}])
+    html = render_df_table(df, col_i18n={}, lang="en")
+    assert "table-hint" not in html
+
+
+def test_boolean_column_is_not_treated_as_numeric():
+    """``is_numeric_dtype`` is True for bool, but a right-aligned monospace
+    nowrap "True" is not a measurement — bools stay plain text cells."""
+    df = pd.DataFrame({"enabled": [True, False], "hits": [3, 4]})
+    soup = BeautifulSoup(render_df_table(df, col_i18n={}, lang="en"), "html.parser")
+    heads = soup.select("thead th")
+    assert "num" not in heads[0].get("class", [])
+    assert "num" in heads[1].get("class", [])
+
+
+def test_timestamp_cell_wbr_splits_date_from_time_without_losing_text():
+    """CLAUDE.md report rule: the <wbr/> is a break opportunity, never a
+    truncation — every character of the timestamp survives."""
+    df = pd.DataFrame({"last_seen_at": ["2026-01-01T10:00:00Z"], "n": [1]})
+    html = render_df_table(df, col_i18n={}, lang="en")
+    soup = BeautifulSoup(html, "html.parser")
+    cell = soup.select("tbody td")[0]
+    assert cell.find("wbr") is not None
+    assert cell.get_text("") == "2026-01-01T10:00:00Z"
+
+
+def test_custom_render_cell_output_is_not_rewritten_by_the_ts_split():
+    """Exporters that pass ``render_cell`` already emit HTML; the <wbr/> pass
+    must not re-parse or re-escape it."""
+    df = pd.DataFrame({"created_at": ["2026-01-01T10:00:00Z"], "n": [1]})
+    html = render_df_table(
+        df, col_i18n={}, lang="en",
+        render_cell=lambda col, val, row: f"<code>{val}</code>")
+    assert "<code>2026-01-01T10:00:00Z</code>" in html
+
+
+def test_numeric_and_ts_classes_land_on_body_cells_too():
+    df = pd.DataFrame({"hits": [1], "seen_at": ["2026-01-01T10:00:00Z"]})
+    soup = BeautifulSoup(render_df_table(df, col_i18n={}, lang="en"), "html.parser")
+    cells = soup.select("tbody td")
+    assert "num" in cells[0].get("class", [])
+    assert "col-ts" in cells[1].get("class", [])

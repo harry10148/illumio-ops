@@ -5191,5 +5191,6 @@
   "rpt_shell_kind_exec": "執行摘要",
   "rpt_shell_kind_finding": "發現",
   "rpt_shell_kind_detail": "明細",
-  "rpt_shell_table_hint_wide": "{cols} 欄寬表 · 螢幕可左右捲動檢視全部欄位 · 列印自動轉為 A4 橫式頁"
+  "rpt_shell_table_hint_wide": "{cols} 欄寬表 · 螢幕可左右捲動檢視全部欄位 · 列印自動轉為 A4 橫式頁",
+  "rpt_shell_table_hint_wide_portrait": "{cols} 欄寬表 · 螢幕可左右捲動檢視全部欄位 · 列印為 A4 直式縮排版"
 }
