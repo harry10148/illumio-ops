@@ -148,7 +148,12 @@ def test_saas_pce_monitoring_and_console_link_contracts_are_documented():
             "`saas` / `on_prem`",
             "`api.url` 是 API 傳輸端點",
             "`api.console_url`",
+            "事件告警連結不使用 API host",
             "SaaS 留空時預設為 `https://console.illum.io`",
+            "自訂 SaaS tenant 可填完整 Console URL",
+            "on-prem 留空時則沿用",
+            "CLI、互動式設定選單與 GUI 修改後都必須依提示重啟",
+            "metadata-only 變更仍須重啟",
             "不算 PCE target change",
             "不需要清除 cache",
         ),
@@ -183,6 +188,15 @@ def test_saas_pce_monitoring_and_console_link_contracts_are_documented():
             "--deployment-type saas --console-url https://console.illum.io",
         ),
     }
+    forbidden_fragments = {
+        "docs/guide/configuration.md": (
+            "事件告警連結使用 API host",
+            "並使用 API host",
+            "GUI 的系統設定頁不受影響",
+            "不必重啟",
+            "不需要重啟",
+        ),
+    }
 
     missing = [
         f"{path}: {fragment}"
@@ -190,4 +204,12 @@ def test_saas_pce_monitoring_and_console_link_contracts_are_documented():
         for fragment in fragments
         if fragment not in docs[path]
     ]
-    assert not missing, "Missing SaaS PCE docs contracts:\n" + "\n".join(missing)
+    forbidden = [
+        f"{path}: {fragment}"
+        for path, fragments in forbidden_fragments.items()
+        for fragment in fragments
+        if fragment in docs[path]
+    ]
+    problems = [*(f"missing: {item}" for item in missing),
+                *(f"forbidden: {item}" for item in forbidden)]
+    assert not problems, "Invalid SaaS PCE docs contracts:\n" + "\n".join(problems)
