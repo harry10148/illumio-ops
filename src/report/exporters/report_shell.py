@@ -1331,7 +1331,8 @@ KINDS: tuple[str, ...] = tuple(_KIND_LABEL_KEY)
 # tests/test_report_shell_renderer.py asserts it is still there.
 SHELL_CSS_PORT_MARKER = "shell-css-port-v2"
 
-# The section id the appendix occupies. Callers must not reuse it for a chapter.
+# The section id the appendix element carries (see _render_appendix). A
+# ShellSection must not reuse it or the in-page anchors collide.
 APPENDIX_SECTION_ID = "appendix"
 
 
@@ -1525,7 +1526,8 @@ def _render_appendix(*, lang: str, cover: ShellCover,
         rules = (f'<h3>{_esc(t("rpt_shell_appendix_rules", lang=lang))}</h3>'
                  f'<ol class="rule-index">{items}</ol>')
     return (
-        '<section class="appendix" data-shell="appendix" id="appendix">'
+        f'<section class="appendix" data-shell="appendix"'
+        f' id="{APPENDIX_SECTION_ID}">'
         f'<h2>{_esc(t("rpt_shell_appendix_title", lang=lang))}</h2>'
         '<div class="appendix-grid">'
         f'<div><h3>{_esc(t("rpt_shell_appendix_params", lang=lang))}</h3>'

@@ -5,8 +5,8 @@ from bs4 import BeautifulSoup
 
 from src.report.exporters.grade_colors import grade_tone
 from src.report.exporters.report_shell import (
-    SHELL_CSS, SHELL_CSS_PORT_MARKER, ShellCover, ShellSection,
-    build_shell_document, wide_table_attrs)
+    APPENDIX_SECTION_ID, SHELL_CSS, SHELL_CSS_PORT_MARKER, ShellCover,
+    ShellSection, build_shell_document, wide_table_attrs)
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 DESIGN_SHELL_CSS = REPO_ROOT / "design" / "v2" / "reports" / "shell.css"
@@ -295,6 +295,14 @@ def test_empty_appendix_html_emits_no_empty_colophon():
         sections=[ShellSection(id="s", title="s", html="")])
     assert 'class="colophon"' not in out
     assert 'class="colophon"' in _doc()
+
+
+def test_appendix_uses_the_exported_section_id():
+    # APPENDIX_SECTION_ID is the reserved id callers are told to avoid; it has
+    # to be the one the renderer actually emits, not a second copy that can
+    # drift away from the hardcoded string.
+    soup = BeautifulSoup(_doc(), "html.parser")
+    assert soup.select_one("section.appendix")["id"] == APPENDIX_SECTION_ID
 
 
 def test_rule_index_renders_with_severity_tone():
