@@ -37,19 +37,15 @@
 //                 comment 1502-1503: level error = 上次失敗, warn = 從未跑或逾期,
 //                 ok = 正常; 1508-1510 maps level -> danger/warning/success;
 //                 1513-1515 appends "overdue" for warn rows that did run.
-//  2 PCE          src/static/js/dashboard.js:1338-1346 — event_poll_status:
-//                 'ok' -> ok, 'warn'|'degraded' -> warn, any other non-empty and
-//                 non-'unknown' -> err, else unknown. One escalation, also
-//                 source-backed: pce_stats.consecutive_failures > 0 is the
-//                 watchdog's failure counter (src/analyzer.py:602, 1137) -> crit.
-//                 pce_stats.last_error must NOT drive the tone: src/events/stats.py
-//                 record_pce_success (65-88) never clears it, so it is a sticky
-//                 field with no timestamp — a probe that succeeded a second ago
-//                 still carries last week's error. It is shown as a reason, and
-//                 labelled as sticky, so nobody reads it as "now".
-//  3 Cache lag    integrations.js:1391-1398 (_pipelineReasons) — cache_lag rows
-//                 with level 'error'|'warning' produce gui_pl_reason_lag, hours =
-//                 round(lag_s/3600). Worst row wins.
+//  2 PCE          pce_stats.health_status/health_category are the control-plane
+//                 signal. event_poll_status and ingestion failures belong to the
+//                 pipeline lights below, so a successful /noop remains green when
+//                 a fresh events/traffic watermark reports last_status=error.
+//                 Raw/sticky last_error text is deliberately not rendered; the
+//                 normalized category supplies the operator-facing reason.
+//  3 Cache lag    cache_lag rows use both time-based level and the latest ingest
+//                 status. last_status=error wins even when the failure just bumped
+//                 the watermark and the measured lag is still small.
 //  4 SIEM         integrations.js:1406-1410 (_buildOvPipelineHealth) — verdict
 //                 ok/warn/error -> card-ok/card-warn/card-err; 1427-1428
 //                 (_buildOvCards) — dlq > 0 renders card-warn. v2 PRODUCT
@@ -67,7 +63,7 @@
 
 import { el, spacer, dismissible } from "../core/dom.mjs";
 import { t, tf } from "../core/i18n.mjs";
-import { dur, since, stamp, tone, worst, atLeast, firstLine } from "../core/fmt.mjs";
+import { dur, since, stamp, tone, worst, atLeast } from "../core/fmt.mjs";
 import { router } from "../core/router.mjs";
 import { audit } from "../core/audit.mjs";
 
@@ -116,26 +112,57 @@ function jobsLight(ov) {
 }
 
 // ── 2 · PCE ─────────────────────────────────────────────────────────────────
+function deploymentLabel(value) {
+  return value === "saas" ? t("gui_deployment_saas") : t("gui_deployment_on_prem");
+}
+
+function pceCategoryReason(p) {
+  const category = String((p && p.health_category) || "unknown").toLowerCase();
+  if (category === "auth_failed") return t("gui_health_pce_auth_failed");
+  if (category === "authorization_failed") return t("gui_health_pce_authorization_failed");
+  if (category === "transport_error") return t("gui_health_pce_unreachable");
+  if (category === "rate_limited") return t("gui_health_pce_rate_limited");
+  if (category === "server_error") return t("gui_health_pce_server_error");
+  if (category !== "ok" && category !== "unknown") {
+    return tf("gui_health_pce_http_error", { status: p.last_error_status || "—" });
+  }
+  return "";
+}
+
+function pceControlTone(p) {
+  const category = String((p && p.health_category) || "unknown").toLowerCase();
+  const health = String((p && p.health_status) || "unknown").toLowerCase();
+  if (["auth_failed", "authorization_failed", "transport_error", "server_error"].indexOf(category) >= 0) return "crit";
+  if (["rate_limited", "http_error"].indexOf(category) >= 0) return "warn";
+  if (health === "error" || health === "critical") return "crit";
+  if (health === "warning" || health === "degraded") return "warn";
+  if (category === "ok" || health === "ok") return "ok";
+  return "neutral";
+}
+
 function pceLight(st, ov) {
   const light = new Light("pce", t("gui_dashboard_pce_health"), "#/system/pce");
   const p = (st && st.pce_stats) || {};
-  const polled = String(p.event_poll_status || "unknown").toLowerCase();
+  const health = String(p.health_status || "unknown").toLowerCase();
   const failures = Number(p.consecutive_failures) || 0;
+  const healthFailure = failures > 0 && (p.last_error_stage === "health" || health !== "ok");
+  const deployment = (st && st.deployment_type) || p.deployment_type || "on_prem";
+  const probe = (st && st.health_probe) || p.health_probe || "—";
+  const probeLine = tf("gui_health_pce_probe", {
+    deployment: deploymentLabel(deployment),
+    probe: probe,
+  });
+  const categoryLine = pceCategoryReason(p);
+  const tn = pceControlTone(p);
+  const readout = healthFailure ? "×" + failures : health.toUpperCase();
+  let summary = probeLine;
 
-  let tn = "neutral";
-  if (polled === "ok") tn = "ok";
-  else if (polled === "warn" || polled === "degraded") tn = "warn";
-  else if (polled && polled !== "unknown") tn = "crit";
-  if (failures > 0) tn = "crit";
-
-  // The readout must state whatever drove the LED. A health-stage failure leaves
-  // event_poll_status at "ok" while raising consecutive_failures (stats.py
-  // record_pce_error, 113-126), so showing "OK" next to a red LED would be a lie:
-  // the failure count takes the readout whenever it is what escalated the tone.
-  const readout = failures > 0 ? "×" + failures : polled.toUpperCase();
-  let summary = t("gui_jh_th_last_run") + " " + since(p.last_success, ov && ov.as_of);
-
-  if (failures > 0) {
+  light.reasons.push(probeLine);
+  if (categoryLine) {
+    light.reasons.push(categoryLine);
+    summary = categoryLine;
+  }
+  if (healthFailure) {
     const line = tf("gui_health_pce_failures", { n: failures, stage: p.last_error_stage || "—" });
     light.reasons.push(line);
     summary = line;
@@ -143,15 +170,6 @@ function pceLight(st, ov) {
   if (p.last_success) {
     light.reasons.push(tf("gui_health_pce_last_success", { age: since(p.last_success, ov && ov.as_of) }));
   }
-  if (p.last_error) {
-    light.reasons.push(tf("gui_health_pce_last_error", {
-      stage: p.last_error_stage || "—",
-      message: firstLine(p.last_error, 120),
-    }));
-    light.reasons.push(t("gui_health_pce_sticky"));
-  }
-  if (!light.reasons.length) light.reasons.push(t("gui_health_clear"));
-
   return light.set(tn, readout, summary);
 }
 
@@ -162,15 +180,20 @@ function lagLight(ov) {
   const maxLag = lags.reduce(function (m, l) { return Math.max(m, Number(l.lag_s) || 0); }, 0);
 
   lags.forEach(function (l) {
-    if (l.level === "error" || l.level === "warning") {
+    if (l.last_status === "error") {
+      light.reasons.push(tf("gui_health_source_failed", { source: l.source }));
+    } else if (l.level === "error" || l.level === "warning") {
       light.reasons.push(tf("gui_pl_reason_lag", { source: l.source, hours: Math.round((Number(l.lag_s) || 0) / 3600) }));
     } else {
-      light.reasons.push(tf("gui_health_lag_line", { source: l.source, age: dur(l.lag_s) }));
+      light.reasons.push(tf("gui_health_source_freshness", {
+        source: l.source, status: l.last_status || "—", age: dur(l.lag_s),
+      }));
     }
   });
   if (!lags.length) light.reasons.push(t("gui_health_clear"));
 
-  return light.set(lags.length ? worst(lags.map(function (l) { return l.level; })) : "neutral",
+  const lagTones = lags.map(function (l) { return l.last_status === "error" ? "crit" : l.level; });
+  return light.set(lags.length ? worst(lagTones) : "neutral",
     dur(maxLag),
     lags.map(function (l) { return l.source + " " + dur(l.lag_s); }).join(" · "));
 }

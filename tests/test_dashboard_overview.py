@@ -73,6 +73,76 @@ def test_overview_pipeline_present(client, monkeypatch):
     assert "verdict" in pl   # ok/warn/error/unknown depending on cache availability
 
 
+def test_pipeline_endpoints_preserve_ingestor_status_and_fail_fresh_error(client):
+    """A just-updated failed watermark is still an error on both health paths."""
+    import datetime as dt
+    from sqlalchemy.orm import sessionmaker
+    from src.gui._helpers import _get_cache_engine
+    from src.pce_cache.models import IngestionWatermark
+    from src.pce_cache.schema import init_schema
+
+    cm = client.application.config["CM"]
+    engine = _get_cache_engine(cm.models.pce_cache.db_path)
+    init_schema(engine)
+    now = dt.datetime.now(dt.timezone.utc)
+    with sessionmaker(engine)() as session:
+        session.add_all([
+            IngestionWatermark(
+                source="events", last_sync_at=now, last_status="error",
+                last_error="controlled-test-error",
+            ),
+            IngestionWatermark(
+                source="traffic", last_sync_at=now, last_status="ok",
+                last_error=None,
+            ),
+        ])
+        session.commit()
+
+    overview = client.get(
+        "/api/dashboard/overview",
+        environ_overrides={"REMOTE_ADDR": "127.0.0.1"},
+    ).get_json()["pipeline"]
+    cache_health = client.get(
+        "/api/cache/health",
+        environ_overrides={"REMOTE_ADDR": "127.0.0.1"},
+    ).get_json()
+
+    for result in (overview, cache_health):
+        statuses = {row["source"]: row["last_status"] for row in result["cache_lag"]}
+        assert statuses == {"events": "error", "traffic": "ok"}
+        assert all(row["level"] == "ok" for row in result["cache_lag"])
+        assert result["verdict"] == "error"
+
+
+def test_status_exposes_saas_probe_and_official_provider_url(client):
+    cm = client.application.config["CM"]
+    cm.config["api"]["deployment_type"] = "saas"
+    cm.save()
+
+    body = client.get(
+        "/api/status", environ_overrides={"REMOTE_ADDR": "127.0.0.1"}
+    ).get_json()
+
+    assert body["deployment_type"] == "saas"
+    assert body["health_probe"] == "noop"
+    assert body["provider_status_url"] == "https://status.illumio.com/posts/dashboard"
+
+
+def test_status_defaults_legacy_config_to_on_prem_probe_without_provider(client):
+    cm = client.application.config["CM"]
+    cm.config["api"].pop("deployment_type", None)
+    cm.config["api"].pop("console_url", None)
+    cm.save()
+
+    body = client.get(
+        "/api/status", environ_overrides={"REMOTE_ADDR": "127.0.0.1"}
+    ).get_json()
+
+    assert body["deployment_type"] == "on_prem"
+    assert body["health_probe"] == "noop+health+node_available"
+    assert "provider_status_url" not in body
+
+
 def test_overview_blocked_from_agg(client, tmp_path):
     import datetime as dt
     from sqlalchemy import create_engine

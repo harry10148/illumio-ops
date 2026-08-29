@@ -291,29 +291,59 @@ function chips(items) {
 // ── OV-01 系統狀態總覽 ← status.json ────────────────────────────────────────
 // status.pce_stats is the appliance's own view of its PCE loop; the rail (XC-01)
 // shows only the resulting light, so this card carries the readings behind it.
+function deploymentLabel(value) {
+  return value === "saas" ? t("gui_deployment_saas") : t("gui_deployment_on_prem");
+}
+
+function pceCategoryState(pce) {
+  const category = String(pce.health_category || "unknown").toLowerCase();
+  const health = String(pce.health_status || "unknown").toLowerCase();
+  if (category === "auth_failed") return ["crit", t("gui_health_pce_auth_failed")];
+  if (category === "authorization_failed") return ["crit", t("gui_health_pce_authorization_failed")];
+  if (category === "transport_error") return ["crit", t("gui_health_pce_unreachable")];
+  if (category === "server_error") return ["crit", t("gui_health_pce_server_error")];
+  if (category === "rate_limited") return ["warn", t("gui_health_pce_rate_limited")];
+  if (category !== "ok" && category !== "unknown") {
+    return ["warn", tf("gui_health_pce_http_error", { status: pce.last_error_status || "—" })];
+  }
+  if (health === "error" || health === "critical") return ["crit", t("gui_status_fail")];
+  if (health === "warning" || health === "degraded") return ["warn", health.toUpperCase()];
+  if (category === "ok" || health === "ok") return ["ok", t("gui_status_ok")];
+  return ["neutral", "—"];
+}
+
 function cardSystem(st, ov) {
   const pce = st.pce_stats || {};
-  const poll = String(pce.event_poll_status || "");
   const fails = Number(pce.consecutive_failures) || 0;
-  let tn = tone(poll);
-  if (st.health_check === false) tn = atLeast(tn, "crit");
-  if (fails > 0) tn = "crit";
+  const control = pceCategoryState(pce);
+  const deployment = st.deployment_type || pce.deployment_type || "on_prem";
+  const probe = st.health_probe || pce.health_probe || "—";
 
   const p = panel("OV-01", t("gui_ov_system_status"));
   withMeta(p, String(st.api_url || "").replace(/^https?:\/\//, ""));
   withGoto(p, GO_PCE);
-  withTone(p, tn);
+  withTone(p, control[0]);
 
-  const ok = st.health_check !== false;
-  p.body.appendChild(lead(poll ? poll.toUpperCase() : "—", t("gui_card_event_poll"),
-    badge(ok ? t("gui_status_ok") : t("gui_status_fail"), ok ? "ok" : "crit")));
-  p.body.appendChild(kv(t("gui_ov_pce_failures"), String(fails), fails > 0 ? "crit" : null));
+  p.body.appendChild(lead(control[1], t("gui_health_pce_api_access"),
+    badge(deploymentLabel(deployment) + " · /" + probe, control[0])));
+  p.body.appendChild(kv(t("gui_deployment_type"), deploymentLabel(deployment)));
+  p.body.appendChild(kv(t("gui_health_check"), "/" + probe));
+  p.body.appendChild(kv(t("gui_ov_pce_failures"), String(fails),
+    pce.last_error_stage === "health" && fails > 0 ? "crit" : null));
   p.body.appendChild(kv(t("gui_ov_last_poll"), since(pce.last_event_poll, ov.as_of)));
   p.body.appendChild(kv(t("gui_ov_last_batch"),
     tf("gui_ov_last_batch_fmt", { total: num(pce.last_batch_total), unknown: num(pce.last_batch_unknown) })));
   p.body.appendChild(kv(t("gui_dashboard_rules"), num(st.rules_count)));
   p.body.appendChild(kv(t("gui_status_version"), "v" + (st.version || "—")));
   p.body.appendChild(kv(t("gui_ov_watermark"), stamp(st.event_watermark) || "—"));
+  if (String(st.provider_status_url || "").startsWith("https://")) {
+    p.body.appendChild(el("p", { class: "note" }, el("a", {
+      href: st.provider_status_url,
+      target: "_blank",
+      rel: "noopener noreferrer",
+      text: t("gui_saas_status_link"),
+    })));
+  }
   return p;
 }
 
@@ -360,7 +390,9 @@ function cardIntegrations(d) {
 function pipelineReasons(pipe) {
   const out = [];
   (pipe.cache_lag || []).forEach(function (l) {
-    if (l.level === "error" || l.level === "warning") {
+    if (l.last_status === "error") {
+      out.push(tf("gui_health_source_failed", { source: l.source }));
+    } else if (l.level === "error" || l.level === "warning") {
       out.push(tf("gui_pl_reason_lag", { source: l.source, hours: Math.round(l.lag_s / 3600) }));
     }
   });
@@ -382,7 +414,11 @@ function cardPipeline(ov) {
 
   p.body.appendChild(lead(verdict.toUpperCase(), null,
     badge(pipe.siem_idle ? t("gui_health_queue_idle") : t("gui_health_queue_active"), "neutral")));
-  const lag = (pipe.cache_lag || []).map(function (c) { return c.source + " " + dur(c.lag_s); }).join(" · ");
+  const lag = (pipe.cache_lag || []).map(function (c) {
+    return tf("gui_health_source_freshness", {
+      source: c.source, status: c.last_status || "—", age: dur(c.lag_s),
+    });
+  }).join(" · ");
   p.body.appendChild(kv(t("gui_ov_cache_lag_label"), lag || "—"));
   p.body.appendChild(kv(t("gui_ov_siem_success_1h"),
     pipe.siem_success_1h === null || pipe.siem_success_1h === undefined ? "—" : pipe.siem_success_1h + "%"));

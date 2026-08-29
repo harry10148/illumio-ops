@@ -37,6 +37,8 @@ both in areas/overview.mjs) — verified by code reading, not by this suite.
 """
 from __future__ import annotations
 
+import json
+
 import pytest
 
 pytest.importorskip("playwright.sync_api", exc_type=ImportError)
@@ -73,6 +75,97 @@ def _labels(page):
     )
 
 
+def _health_labels(page):
+    return page.evaluate(
+        "async () => { const { t } = await import('/static/js/v2/core/i18n.mjs'); "
+        "return { auth: t('gui_health_pce_auth_failed'), "
+        "unreachable: t('gui_health_pce_unreachable'), "
+        "provider: t('gui_saas_status_link') }; }"
+    )
+
+
+def _route_health_snapshots(page, *, pce_stats, pipeline):
+    """Serve complete, controlled health snapshots through the real UI loads."""
+    status = {
+        "version": "e2e",
+        "api_url": "https://api.e2e.invalid",
+        "rules_count": 1,
+        "health_check": True,
+        "language": "en",
+        "theme": "dark",
+        "timezone": "UTC",
+        "cooldowns": [],
+        "event_watermark": "2026-08-30T00:00:00Z",
+        "event_overflow": {},
+        "unknown_events": {},
+        "event_parser_stats": {},
+        "event_parser_samples": [],
+        "pce_stats": pce_stats,
+        "throttle_state": {},
+        "dispatch_history": [],
+        "alert_channels": [],
+        "event_timeline": [],
+        "deployment_type": "saas",
+        "health_probe": "noop",
+        "provider_status_url": "https://status.illumio.com/posts/dashboard",
+    }
+    overview = {
+        "as_of": "2026-08-30T00:05:00Z",
+        "ven": {"verdict": "unknown"},
+        "blocked": {"verdict": "unknown"},
+        "pipeline": pipeline,
+        "alerts": {"verdict": "ok", "recent": []},
+        "os_dist": [],
+        "enforcement": {},
+        "posture": {"verdict": "unknown"},
+        "job_health": [],
+        "data_integrity": [],
+        "tls": {"enabled": False, "days_remaining": None, "expiring_soon": False},
+    }
+
+    def serve_status(route):
+        route.fulfill(status=200, content_type="application/json", body=json.dumps(status))
+
+    def serve_overview(route):
+        route.fulfill(status=200, content_type="application/json", body=json.dumps(overview))
+
+    page.route("**/api/status", serve_status)
+    page.route("**/api/dashboard/overview", serve_overview)
+
+
+def _pce_stats(*, health_status="ok", health_category="ok", failures=0,
+               event_poll_status="ok", last_error=""):
+    return {
+        "health_status": health_status,
+        "health_category": health_category,
+        "health_probe": "noop",
+        "deployment_type": "saas",
+        "event_poll_status": event_poll_status,
+        "consecutive_failures": failures,
+        "last_health_check": "2026-08-30T00:04:00Z",
+        "last_success": "2026-08-30T00:04:00Z",
+        "last_event_poll": "2026-08-30T00:03:00Z",
+        "last_error": last_error,
+        "last_error_status": "401" if health_category == "auth_failed" else "",
+        "last_error_stage": "health" if health_category != "ok" else "",
+        "last_batch_total": 12,
+        "last_batch_unknown": 0,
+    }
+
+
+def _pipeline(*, verdict="ok", event_status="ok", traffic_status="ok"):
+    return {
+        "verdict": verdict,
+        "cache_lag": [
+            {"source": "events", "lag_s": 30, "level": "ok", "last_status": event_status},
+            {"source": "traffic", "lag_s": 45, "level": "ok", "last_status": traffic_status},
+        ],
+        "siem_success_1h": 100.0,
+        "dlq": 0,
+        "siem_idle": False,
+    }
+
+
 def test_overview_coverage_anchors_present(v2_page):
     page, base_url = v2_page
     _goto_overview(page, base_url)
@@ -84,6 +177,86 @@ def test_overview_coverage_anchors_present(v2_page):
     expected = {"OV-%02d" % i for i in range(1, 17)}
     missing = expected - found
     assert missing == set(), f"missing coverage anchors: {sorted(missing)}"
+
+
+def test_auth_failure_is_credentials_reason_not_generic_unreachable(v2_page):
+    page, base_url = v2_page
+    _route_health_snapshots(
+        page,
+        pce_stats=_pce_stats(
+            health_status="error",
+            health_category="auth_failed",
+            failures=1,
+            last_error="sensitive-response-body-must-not-render",
+        ),
+        pipeline=_pipeline(),
+    )
+    _goto_overview(page, base_url)
+    labels = _health_labels(page)
+
+    pce_cell = page.locator('.rail-host [data-cov="XC-01"] .rail-cell').nth(1)
+    assert pce_cell.get_attribute("data-tone") == "crit"
+    pce_cell.click()
+    reasons = page.locator(".rail-host .rail-pop").inner_text()
+    assert labels["auth"] in reasons
+    assert labels["unreachable"] not in reasons
+    assert "sensitive-response-body-must-not-render" not in reasons
+
+    system_text = page.locator('section[data-cov="OV-01"]').text_content()
+    assert labels["auth"] in system_text
+    assert labels["unreachable"] not in system_text
+    assert "sensitive-response-body-must-not-render" not in system_text
+
+
+def test_noop_success_keeps_api_green_while_failed_ingestor_keeps_pipeline_red(v2_page):
+    page, base_url = v2_page
+    _route_health_snapshots(
+        page,
+        pce_stats=_pce_stats(event_poll_status="error"),
+        pipeline=_pipeline(verdict="error", event_status="error"),
+    )
+    _goto_overview(page, base_url)
+
+    cells = page.locator('.rail-host [data-cov="XC-01"] .rail-cell')
+    assert cells.nth(1).get_attribute("data-tone") == "ok"
+    assert cells.nth(3).get_attribute("data-tone") == "crit"
+    assert page.locator('section[data-cov="OV-01"]').get_attribute("data-tone") == "ok"
+    assert page.locator('section[data-cov="OV-10"]').get_attribute("data-tone") == "crit"
+
+    pipeline_text = page.locator('section[data-cov="OV-10"]').text_content()
+    assert "events" in pipeline_text and "error" in pipeline_text
+    assert "traffic" in pipeline_text and "ok" in pipeline_text
+
+
+def test_healthy_saas_identifies_noop_provider_and_both_ingest_freshness_rows(v2_page):
+    page, base_url = v2_page
+    _route_health_snapshots(
+        page,
+        pce_stats=_pce_stats(),
+        pipeline=_pipeline(),
+    )
+    _goto_overview(page, base_url)
+    labels = _health_labels(page)
+
+    pce_cell = page.locator('.rail-host [data-cov="XC-01"] .rail-cell').nth(1)
+    assert pce_cell.get_attribute("data-tone") == "ok"
+    pce_cell.click()
+    reasons = page.locator(".rail-host .rail-pop").inner_text()
+    assert "SaaS" in reasons
+    assert "noop" in reasons
+
+    system = page.locator('section[data-cov="OV-01"]')
+    assert "SaaS" in system.text_content()
+    assert "noop" in system.text_content()
+    provider = system.locator('a[href="https://status.illumio.com/posts/dashboard"]')
+    assert provider.text_content() == labels["provider"]
+    assert provider.get_attribute("href") == "https://status.illumio.com/posts/dashboard"
+    assert provider.get_attribute("target") == "_blank"
+    assert provider.get_attribute("rel") == "noopener noreferrer"
+
+    pipeline_text = page.locator('section[data-cov="OV-10"]').text_content()
+    assert "events" in pipeline_text and "ok" in pipeline_text
+    assert "traffic" in pipeline_text and "ok" in pipeline_text
 
 
 def test_custom_query_create_appears_edit_delete_round_trip(v2_page):

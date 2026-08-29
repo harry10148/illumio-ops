@@ -1734,5 +1734,15 @@
   "bwdiff_col_no_measurement": "無法量測",
   "bwdiff_window_caveat": "註：以下未模擬，依規則列出（括號內為命中的 flow 數）：{rules}。這些 flow 本身的跨距已超過該規則的 threshold_window。即時引擎可能從 cache 觀測為它們推導出視窗增量而正常評估，也可能整條規則本 cycle 直接抑制——這份 offline 比對沒有 cache 歷史可判斷是哪一種。請對這些規則核對即時行為（或監控系統自己的日誌／meta-alert），不要只憑這裡的「觸發改變：否」就下結論。",
   "bwdiff_no_rules": "沒有已啟用的頻寬規則可比對。",
-  "bwdiff_error_generic": "錯誤：{error}"
+  "bwdiff_error_generic": "錯誤：{error}",
+  "gui_health_pce_api_access": "API 存取",
+  "gui_health_pce_auth_failed": "PCE 拒絕憑證（身分驗證失敗）。",
+  "gui_health_pce_authorization_failed": "PCE 憑證缺少必要權限。",
+  "gui_health_pce_http_error": "PCE API 回傳 HTTP {status}。",
+  "gui_health_pce_probe": "{deployment} · /{probe} 探測",
+  "gui_health_pce_rate_limited": "PCE API 正在限制請求速率。",
+  "gui_health_pce_server_error": "PCE API 回傳伺服器錯誤。",
+  "gui_health_pce_unreachable": "PCE API 無法連線。",
+  "gui_health_source_failed": "{source} 擷取失敗",
+  "gui_health_source_freshness": "{source}：{status} · 資料新鮮度 {age}"
 }

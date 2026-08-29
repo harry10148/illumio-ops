@@ -24,6 +24,9 @@ from src.i18n import t
 from src.dashboard_store import read_dashboard_summary
 
 
+_SAAS_PROVIDER_STATUS_URL = "https://status.illumio.com/posts/dashboard"
+
+
 def _retranslate_kpi_labels(data: dict, lang: str) -> None:
     """Re-render KPI labels in `data` using the current language.
 
@@ -128,7 +131,8 @@ def _overview_pipeline(cm):
             _max_lag = 300
         lag = check_cache_lag(sf, max_lag_seconds=_max_lag)
         cache_lag = [{"source": r["source"], "lag_s": int(r["lag_seconds"]),
-                      "level": r["level"]} for r in lag]
+                      "level": r["level"], "last_status": r.get("last_status")}
+                     for r in lag]
         now = dt.datetime.now(dt.timezone.utc)
         hr_ago = now - dt.timedelta(hours=1)
         with sf() as s:
@@ -160,8 +164,10 @@ def _overview_pipeline(cm):
         denom = sent + failed
         success_1h = round(sent / denom * 100, 1) if denom else 100.0
         lag_levels = [c["level"] for c in cache_lag]
+        source_statuses = [c["last_status"] for c in cache_lag]
         verdict = pipeline_verdict(lag_levels=lag_levels, siem_success_1h=success_1h,
-                                   denom=denom, dlq=int(dlq), siem_idle=siem_idle)
+                                   denom=denom, dlq=int(dlq), siem_idle=siem_idle,
+                                   source_statuses=source_statuses)
         return {"cache_lag": cache_lag, "siem_success_1h": success_1h,
                 "dlq": int(dlq), "verdict": verdict, "siem_idle": siem_idle}
     except Exception as e:
@@ -431,7 +437,12 @@ def make_dashboard_blueprint(
             for r in cm.config.get("rules", [])
         )
         lang = cm.config.get('settings', {}).get('language', 'en') or 'en'
-        return jsonify({
+        deployment_type = cm.models.api.deployment_type
+        health_probe = (
+            "noop" if deployment_type == "saas"
+            else "noop+health+node_available"
+        )
+        response = {
             "version": __version__,
             "api_url": _get_active_pce_url(cm),
             "rules_count": len(cm.config['rules']),
@@ -450,7 +461,12 @@ def make_dashboard_blueprint(
             "dispatch_history": state.get("dispatch_history", []),
             "alert_channels": _summarize_alert_channels(cm.config, state.get("dispatch_history", []), lang=lang),
             "event_timeline": state.get("event_timeline", []),
-        })
+            "deployment_type": deployment_type,
+            "health_probe": health_probe,
+        }
+        if deployment_type == "saas":
+            response["provider_status_url"] = _SAAS_PROVIDER_STATUS_URL
+        return jsonify(response)
 
     @bp.route('/api/dashboard/overview', methods=['GET'])
     def api_dashboard_overview():
