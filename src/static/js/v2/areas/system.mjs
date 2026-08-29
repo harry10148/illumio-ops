@@ -800,8 +800,9 @@ async function mountPce(root, ctx) {
       consoleHelpText.textContent = t(saas ? "gui_console_url_help_saas" : "gui_console_url_help_on_prem");
       statusLinkWrap.hidden = !saas;
     }
-    deployment.addEventListener("change", syncConsoleHelp);
-    syncConsoleHelp();
+    // Use the form's one synchronization path: it runs for native input/change
+    // events and after programmatic writeCtl() calls such as Discard.
+    form.onSync(syncConsoleHelp);
     connPanel.body.appendChild(consoleBox);
     connPanel.body.appendChild(labelled(t("gui_api_key"), form.track("key", key, "secret"),
       t("gui_api_key_help") + " · " + secretState(api_, "key")));
@@ -854,7 +855,7 @@ async function mountPce(root, ctx) {
       });
     };
     form.afterSave = function (_changedKeys, res) {
-      if (res && res.restart_required) toast.info(t("gui_restart_required_banner"));
+      if (res && res.restart_required) toast.info(t("gui_pce_connection_restart_required"));
       refreshAndRemount(R_PCE, PCE_SNAPS);
     };
 

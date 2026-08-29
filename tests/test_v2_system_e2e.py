@@ -157,7 +157,7 @@ def _labels(page):
         "gui_tls_csr_generate", "gui_sy_discard", "gui_errcard_retry",
         "gui_dlq_replay", "gui_restart_success", "gui_daemon_external_restart_hint",
         "gui_sy_pce_target_same",
-        "gui_restart_required_banner", "gui_console_url_help_on_prem",
+        "gui_pce_connection_restart_required", "gui_console_url_help_on_prem",
         "gui_console_url_help_saas",
     ]
     return page.evaluate(
@@ -877,7 +877,13 @@ def test_pce_runtime_connection_fields_load_save_and_show_safe_saas_status_link(
             'input[data-field="console_url"]'
         ).locator("xpath=..").inner_text()
 
-        deployment.select_option("saas")
+        page.get_by_role("button", name=_labels(page)["gui_sy_discard"], exact=True).click()
+        assert deployment.input_value() == "saas"
+        expect(status_link).to_be_visible()
+        assert _labels(page)["gui_console_url_help_saas"] in console.locator(
+            "xpath=.."
+        ).inner_text()
+
         console.fill("https://new-tenant.illumio.example")
         assert _labels(page)["gui_console_url_help_saas"] in console.locator(
             "xpath=.."
@@ -906,14 +912,38 @@ def test_pce_runtime_connection_fields_load_save_and_show_safe_saas_status_link(
         assert "key" not in captured["body"]["api"]
         assert "secret" not in captured["body"]["api"]
         assert page.locator(".modal").count() == 0
-        expect(page.locator('.toast[data-tone="info"]')).to_contain_text(
-            _labels(page)["gui_restart_required_banner"]
-        )
+        restart_message = _labels(page)["gui_pce_connection_restart_required"]
+        expect(
+            page.locator('.toast[data-tone="info"]').filter(has_text=restart_message)
+        ).to_contain_text(restart_message)
     finally:
         _api_post(page, "/api/settings", {"api": {
             "deployment_type": original.get("deployment_type", "on_prem"),
             "console_url": original.get("console_url", ""),
         }})
+
+
+def test_pce_discard_restores_on_prem_help_and_hides_saas_status_link(v2_page):
+    page, base_url = v2_page
+    _goto(page, base_url, R_PCE, "SY-18")
+    deployment = page.locator('select[data-field="deployment_type"]')
+    status_link = page.locator(
+        'a[href="https://status.illumio.com/posts/dashboard"]'
+    )
+    console_box = page.locator('input[data-field="console_url"]').locator("xpath=..")
+
+    assert deployment.input_value() == "on_prem"
+    expect(status_link).to_be_hidden()
+    assert _labels(page)["gui_console_url_help_on_prem"] in console_box.inner_text()
+
+    deployment.select_option("saas")
+    expect(status_link).to_be_visible()
+    assert _labels(page)["gui_console_url_help_saas"] in console_box.inner_text()
+
+    page.get_by_role("button", name=_labels(page)["gui_sy_discard"], exact=True).click()
+    assert deployment.input_value() == "on_prem"
+    expect(status_link).to_be_hidden()
+    assert _labels(page)["gui_console_url_help_on_prem"] in console_box.inner_text()
 
 
 def test_siem_hec_token_never_reaches_the_dom(v2_page):

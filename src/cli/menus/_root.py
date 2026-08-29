@@ -181,10 +181,12 @@ def settings_menu(cm: ConfigManager) -> None:
                     if target_changed or runtime_connection_changed:
                         # A running monitor service holds its own
                         # ConfigManager for the life of the process and never
-                        # reloads it, so it keeps polling the previous PCE and
-                        # refilling what was just cleared.
+                        # reloads it. Only a target change can also involve a
+                        # flush; metadata-only edits get accurate guidance.
+                        restart_key = ("cli_pce_restart_required_menu" if target_changed
+                                       else "cli_connection_restart_required_menu")
                         print(f"{Colors.WARNING}"
-                              f"{t('cli_pce_restart_required_menu')}{Colors.ENDC}")
+                              f"{t(restart_key)}{Colors.ENDC}")
                         safe_input(t("press_enter_to_continue"), str, allow_cancel=True)
         elif sel == 2:
             alert_settings_menu(cm)

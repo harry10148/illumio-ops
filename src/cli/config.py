@@ -368,10 +368,10 @@ def login_cmd(ctx: click.Context, url, key, secret, org_id, deployment_type,
 
     if restart_required and not is_json(ctx) and not is_quiet(ctx):
         # Nothing here reaches a running monitor service: it holds its own
-        # ConfigManager for the life of the process and never reloads it, so
-        # it keeps polling the previous PCE and refilling what was just
-        # cleared. There is no way to detect one from here, so say it plainly.
-        echo_warning(ctx, t("cli_config_login_pce_restart_required"))
+        # ConfigManager for the life of the process and never reloads it.
+        warning_key = ("cli_config_login_pce_restart_required" if target_changed
+                       else "cli_config_login_connection_restart_required")
+        echo_warning(ctx, t(warning_key))
 
     if is_json(ctx):
         echo_json(ctx, {"url": stored_url, "org_id": stored_org_id, "saved": True,
