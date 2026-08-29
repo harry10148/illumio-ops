@@ -126,7 +126,10 @@ def test_html_exporter_cover_page():
         date_range=("2026-01-01", "2026-05-01"), lang="en",
     )
     html = exp.build()
-    assert 'class="report-cover' in html
+    # v2 shell cover; the legacy .report-cover pair is gone (it would print a
+    # second cover page).
+    assert '<header class="cover" data-shell="cover"' in html
+    assert 'class="report-cover' not in html
     assert "pce.test" in html
     assert "TestOrg" in html
 

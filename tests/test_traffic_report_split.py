@@ -34,9 +34,13 @@ def test_security_renders_maturity_and_readiness():
 def test_inventory_omits_maturity_and_readiness():
     html = NetworkInventoryHtmlExporter(_results()).build()
     assert 'id="readiness"' not in html     # deduped: security-only
-    # maturity hero deduped: the rendered block emits <div class="score-hero"><span class="score-num"...
-    # (bare ".score-hero" also lives in the embedded CSS, so match the live markup fragment).
-    assert '<div class="score-hero">' not in html
+    # Maturity hero deduped. The old form matched '<div class="score-hero">'
+    # verbatim; the v2 shell writes '<div class="score-hero" data-tone="...">',
+    # so that literal can never appear again and the guard would have stayed
+    # green forever while checking nothing. .score-num is the score element
+    # itself — and the bare class name is useless here because it also appears
+    # in the embedded stylesheet, so the opening tag is what gets matched.
+    assert '<span class="score-num"' not in html
     assert 'id="unmanaged"' in html
     assert 'id="distribution"' not in html  # spec C1: traffic chapters removed from inventory
     # inventory keeps policy; overview/bandwidth moved to traffic report:
@@ -111,10 +115,11 @@ def test_scheduler_routes_network_inventory(monkeypatch, tmp_path):
 def test_reports_have_distinct_h1_titles():
     sec = SecurityRiskHtmlExporter(_results()).build()
     inv = NetworkInventoryHtmlExporter(_results()).build()
-    # Each report's H1 uses its own title key (English default lang).
-    # _s() renders the literal "&" (no HTML-escaping) in the live markup.
-    assert "<h1>Illumio Security & Risk Report</h1>" in sec
-    assert "<h1>Illumio Network & Traffic Inventory Report</h1>" in inv
+    # Each report's H1 uses its own title key (English default lang). The v2
+    # shell escapes every cover scalar, so the ampersand arrives as &amp; —
+    # matching the raw "&" would silently stop matching anything.
+    assert "<h1>Illumio Security &amp; Risk Report</h1>" in sec
+    assert "<h1>Illumio Network &amp; Traffic Inventory Report</h1>" in inv
     # The shared generic title must no longer be the H1 of either.
     assert "<h1>Illumio Traffic Flow Report</h1>" not in sec
     assert "<h1>Illumio Traffic Flow Report</h1>" not in inv

@@ -25,12 +25,18 @@ def _resolve_label(k: dict, lang: str) -> str:
     return key or ''
 
 
-def render_exec_summary_html(mod00: dict, report_name: str, lang: str = 'en') -> str:
+def render_exec_summary_html(mod00: dict, report_name: str, lang: str = 'en',
+                             include_heading: bool = True) -> str:
     """Return a <section> HTML block for the report header.
 
     mod00 is the executive-summary dict produced by analysis.{report}_mod00.
     Output target: ≤200 words, standalone (no need to read further sections).
     All inserted values are escape()-ed.
+
+    ``include_heading=False`` omits the block's own ``<h2>``: the v2 report
+    shell prints the section heading itself, and leaving this one in would print
+    the same title twice. The caller is then responsible for carrying the
+    heading text (``rpt_exec_summary_label`` + report name) into the shell.
     """
     if not mod00:
         return ''
@@ -60,6 +66,13 @@ def render_exec_summary_html(mod00: dict, report_name: str, lang: str = 'en') ->
     if notes:
         items = ''.join(f'<li>{escape(str(n))}</li>' for n in notes[:2])
         notes_html = f'<ul class="notes">{items}</ul>'
+
+    if not include_heading:
+        # No heading means no element for aria-labelledby to point at; a
+        # dangling reference is worse than none.
+        return (f'<section class="exec-summary">'
+                f'{verdict_html}{kpi_html}{summary_html}{notes_html}'
+                f'</section>')
 
     label = t('rpt_exec_summary_label', lang=lang, default='Executive Summary')
     heading = f'{escape(label)} — {escape(report_name)}' if report_name else escape(label)

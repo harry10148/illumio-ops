@@ -166,7 +166,9 @@ def test_html_exporter_renders_attack_summary_sections():
     }
     html = HtmlExporter(results)._build()
     # spec B1：三層攻擊摘要章併入單一「發現與行動」章
-    assert STRINGS["rpt_tr_findings_actions"]["en"] in html
+    # v2 殼會 escape 章節標題，"Findings & Actions" 的 & 變成 &amp;
+    from html import escape as _escape
+    assert _escape(STRINGS["rpt_tr_findings_actions"]["en"]) in html
     assert "Boundary Breaches" not in html
 
 

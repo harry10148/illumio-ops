@@ -15,6 +15,7 @@ from __future__ import annotations
 import datetime
 import html
 import os
+import re
 from loguru import logger
 import pandas as pd
 
@@ -28,7 +29,13 @@ from .report_i18n import (
     SEVERITY_VALUE_I18N,
     MOD01_METRIC_VALUE_I18N,
 )
-from .report_css import build_css, TABLE_JS
+from .report_shell import (
+    SEVERITY_RANK,
+    SEVERITY_TONE,
+    ShellCover,
+    ShellSection,
+    build_shell_document,
+)
 from ._output_paths import discard_reserved, reserve_unique_path, write_text_atomic
 from src.report.exporters._exec_summary import render_exec_summary_html
 from .table_renderer import render_df_table
@@ -37,16 +44,61 @@ from .code_highlighter import get_highlight_css
 from src.humanize_ext import human_number
 from src.report.section_guidance import get_guidance, visible_in
 from src.i18n import t, get_language
-from src.report.exporters.cover_page import build_cover_page as _build_cover_page
 
 # Grade → semantic color mapping. Mirrors --color-success / --color-warning /
 # --color-danger from the WebUI CSS token system (Improvement_Plan §A 1.3).
 # A/B = green (success), C = orange (warning), D/F = red (danger).
-from src.report.exporters.grade_colors import GRADE_COLOR as _GRADE_COLORS, grade_color as _grade_to_color  # noqa: E402,F401
+# The v2 shell colours grades through ``data-tone`` instead; the hex table is
+# kept as a re-export for the exporters Tasks 4/5 still have to migrate and for
+# tests/test_report_grade_color.py, and Task 6 removes it.
+from src.report.exporters.grade_colors import GRADE_COLOR as _GRADE_COLORS, grade_color as _grade_to_color, grade_tone as _grade_to_tone  # noqa: E402,F401
 
 
-_CSS = build_css('traffic')
 _HIGHLIGHT_CSS = f'<style>\n{get_highlight_css()}\n</style>'
+
+# Severity markers the shell can tone. Chapter marks are counted off the
+# ``data-sev`` attributes the badges below carry, exactly the way the design
+# prototype's ``severity_counts()`` did — one counting rule for every chapter
+# rather than a bespoke tally per module.
+_SEV_ATTR_RE = re.compile(r'data-sev="([A-Z]+)"')
+
+
+def _sev_attrs(severity: str, *, mark: bool = True) -> str:
+    """``data-tone``/``data-sev`` pair for a severity-carrying element.
+
+    SHELL_CSS's ``.badge`` rule reads ``var(--mark)``/``var(--fill)``/
+    ``var(--ink)`` with no fallback, so a badge without ``data-tone`` silently
+    inherits its chapter's tone and every severity renders identically. The
+    ``badge-<SEV>`` class is kept alongside for the exporters that still ship
+    the legacy stylesheet.
+
+    ``mark=False`` emits the tone but not ``data-sev``: the severity-summary
+    boxes print one badge per level including the zero ones, so counting them
+    would give every findings chapter the same full set of chapter marks
+    regardless of what it actually found.
+    """
+    sev = str(severity or "").upper()
+    tone = SEVERITY_TONE.get(sev, "neutral")
+    if not mark:
+        return f' data-tone="{tone}"'
+    return f' data-tone="{tone}" data-sev="{html.escape(sev, quote=True)}"'
+
+
+def _severity_marks(section_html: str) -> dict[str, int]:
+    """Count the severity markers a rendered chapter body carries."""
+    counts: dict[str, int] = {}
+    for sev in _SEV_ATTR_RE.findall(section_html):
+        if sev in SEVERITY_TONE:
+            counts[sev] = counts.get(sev, 0) + 1
+    return counts
+
+
+def _marks_tone(marks: dict[str, int]) -> str:
+    """Chapter tone = the tone of the most severe marker present."""
+    for sev in SEVERITY_RANK:
+        if marks.get(sev):
+            return SEVERITY_TONE[sev]
+    return "neutral"
 
 
 _REPORT_DETAIL_LEVEL = "full"
@@ -151,7 +203,7 @@ def _cov_stat(label: str, value: str) -> str:
 
 def _progress_bar(pct: float) -> str:
     pct = max(0.0, min(100.0, float(pct or 0)))
-    color = 'var(--green-80)' if pct >= 80 else ('var(--gold-110)' if pct >= 50 else 'var(--red-80)')
+    color = 'var(--tone-ok-fg)' if pct >= 80 else ('var(--tone-warn-fg)' if pct >= 50 else 'var(--tone-crit-fg)')
     return (
         f'<div class="progress-bar">'
         f'<div class="progress-fill" style="width:{pct}%;background:{color};"></div>'
@@ -213,9 +265,14 @@ def _trend_chip(direction: str, delta: float, delta_pct: float | None, metric: s
     else:
         chip_cls = f'trend-chip trend-chip--{direction}'
 
+    # Only "good-up" carries a semantic tone: up/down on a raw count is neither
+    # good nor bad (more traffic is not worse), so the shell leaves those
+    # neutral — same call the design prototype made.
+    tone_attr = ' data-tone="ok"' if inverted and direction == 'up' else ''
+
     pct_str = f' ({delta_pct:+.1f}%)' if delta_pct is not None else ''
     return (
-        f'<span class="{chip_cls}">'
+        f'<span class="{chip_cls}"{tone_attr}>'
         f'<span class="trend-arrow">{arrow}</span>{delta:+,.1f}{pct_str}'
         f'</span>'
     )
@@ -431,7 +488,8 @@ def _df_to_html(df: pd.DataFrame | None, severity_col: str | None = None,
                 _orig = val
             _orig_up = str(_orig).upper()
             if _orig_up in _SEVERITY_TOKENS:
-                return f'<span class="badge badge-{_orig_up}">{html.escape(str(val))}</span>'
+                return (f'<span class="badge badge-{_orig_up}"{_sev_attrs(_orig_up)}>'
+                        f'{html.escape(str(val))}</span>')
         if col in byte_cols:
             return _fmt_bytes(val)
         if col in bw_cols:
@@ -519,8 +577,6 @@ class _TrafficReportBase:
         findings = self._r.get('findings', [])
         n_findings = str(len(findings))
 
-        # nav_html is built after block flags are known (see below)
-
         # Pre-compute nested blocks to avoid f-string quote conflicts
         _raw_kpis = mod12.get('kpis', [])
         if isinstance(_raw_kpis, dict):
@@ -537,7 +593,8 @@ class _TrafficReportBase:
         trend_html = self._trend_deltas_html()
         key_findings_html = ''.join(
             '<p style="margin-bottom:8px"><span class="badge badge-' +
-            kf.get('severity', 'INFO') + '">' + kf.get('severity', '') + '</span>&nbsp;' +
+            kf.get('severity', 'INFO') + '"' + _sev_attrs(kf.get('severity', 'INFO')) +
+            '>' + kf.get('severity', '') + '</span>&nbsp;' +
             html.escape(kf.get('finding', '')) + ' <em style="color:#718096">&rarr; ' +
             html.escape(kf.get('action', '')) + '</em></p>'
             for kf in mod12.get('key_findings', [])
@@ -569,15 +626,14 @@ class _TrafficReportBase:
             )
             summary_pills = summary_pills.replace('</div>', data_source_pill + '</div>', 1)
 
-        if self._compute_draft:
-            draft_pill = f'<span class="report-draft-pill">{t("rpt_hdr_draft_enabled", lang=self._lang)}</span>'
-            summary_pills = summary_pills.replace('</div>', draft_pill + '</div>', 1)
+        # The draft pill is a document-level qualifier, so it moved onto the
+        # shell cover's badge row (see the ShellCover construction below).
 
         # Maturity score gauge
         m_score = mod12.get('maturity_score', 0)
         m_grade = mod12.get('maturity_grade', '?')
         m_dims = mod12.get('maturity_dimensions', {})
-        m_grade_color = _grade_to_color(m_grade)
+        m_grade_tone = _grade_to_tone(m_grade)
         m_dim_labels = {
             'enforcement_coverage': _s('rpt_mat_enforcement_coverage'),
             'policy_coverage': _s('rpt_mat_policy_coverage'),
@@ -600,11 +656,13 @@ class _TrafficReportBase:
                 f'</div>'
             )
 
+        # A1: the grade colour rides on data-tone at the .score-hero wrapper so
+        # both the number and the chip inherit it; no inline colour anywhere.
         maturity_html = (
-            '<div class="score-hero">'
-            f'<span class="score-num" style="color:{m_grade_color}">{m_score}</span>'
+            f'<div class="score-hero" data-tone="{m_grade_tone}">'
+            f'<span class="score-num">{m_score}</span>'
             f'<span class="score-denom">/100</span>'
-            f'<span class="grade-chip" style="color:{m_grade_color};border-color:{m_grade_color}">{m_grade}</span>'
+            f'<span class="grade-chip">{m_grade}</span>'
             '</div>'
             f'<div>{maturity_bars}</div>'
         )
@@ -615,85 +673,44 @@ class _TrafficReportBase:
         _mod06_block = (self._section(
             'user', 'rpt_tr_sec_user', 'User & Process',
             render_section_guidance('mod06', profile=profile, detail_level=detail_level, lang=self._lang) + self._mod06_html(),
-        ) if (_mod06_has_data and profile == 'security_risk') else '') + '\n'
+        ) if (_mod06_has_data and profile == 'security_risk') else None)
 
         # T7: mod07 — profile-aware rendering
         if visible_in('mod07_cross_label_matrix', profile, detail_level):
             _mod07_body = (render_section_guidance('mod07', profile=profile, detail_level=detail_level, lang=self._lang) +
                            self._mod07_html())
-            if profile == 'security_risk':
-                _mod07_block = (
-                    self._section('matrix', 'rpt_tr_sec_matrix', 'Cross-Label Matrix',
-                                  _mod07_body,
-                                  'rpt_tr_sec_matrix_intro', 'Observe cross-group communication by Label dimension, useful for surfacing segments that should not interact frequently.') + '\n'
-                )
-            else:  # network_inventory — full matrix in main
-                _mod07_block = (
-                    self._section('matrix', 'rpt_tr_sec_matrix', 'Cross-Label Matrix',
-                                  _mod07_body,
-                                  'rpt_tr_sec_matrix_intro', 'Observe cross-group communication by Label dimension, useful for surfacing segments that should not interact frequently.') + '\n'
-                )
+            # security_risk and network_inventory render the same matrix section;
+            # the profile split lives in _mod07_html(), not here.
+            _mod07_block = self._section(
+                'matrix', 'rpt_tr_sec_matrix', 'Cross-Label Matrix',
+                _mod07_body,
+                'rpt_tr_sec_matrix_intro', 'Observe cross-group communication by Label dimension, useful for surfacing segments that should not interact frequently.')
         else:
-            _mod07_block = ''
+            _mod07_block = None
 
-        # Build profile-aware nav after all block flags are known
-        def _nav_link(anchor: str, i18n_key: str, fallback: str, badge: str = '') -> str:
-            label = _s(i18n_key) if i18n_key in STRINGS else fallback
-            return (f'<a href="#{anchor}">{label}'
-                    + (f'<span class="nav-badge">{badge}</span>' if badge else '') + '</a>')
-
-        # All possible nav links keyed by section id; subclasses pick the order.
-        _findings_badge = n_findings
-        _nav_spec = {
-            'summary':        _nav_link('summary', 'rpt_tr_nav_summary', 'Executive Summary'),
-            'overview':       _nav_link('overview', 'rpt_tr_nav_overview', '1 Traffic Overview'),
-            'policy':         _nav_link('policy', 'rpt_tr_nav_policy', '2 Policy Decisions'),
-            'uncovered':      _nav_link('uncovered', 'rpt_tr_nav_uncovered', '3 Uncovered Flows'),
-            'drift':          _nav_link('drift', 'rpt_tr_nav_drift', 'Baseline Drift'),
-            'vuln':           (_nav_link('vuln', 'rpt_tr_nav_vuln', 'Vuln Exposure')
-                               if (self._r.get('mod_vuln') or {}).get('available') else ''),
-            'labels':         _nav_link('labels', 'rpt_tr_nav_labels', 'Label Hygiene'),
-            'ransomware':     _nav_link('ransomware', 'rpt_tr_nav_ransomware', '4 Ransomware Exposure'),
-            'user':           (_nav_link('user', 'rpt_tr_nav_user', '6 User & Process') if _mod06_has_data else ''),
-            'matrix':         (_nav_link('matrix', 'rpt_tr_nav_matrix', '7 Cross-Label Matrix') if _mod07_block else ''),
-            'unmanaged':      _nav_link('unmanaged', 'rpt_tr_nav_unmanaged', '8 Unmanaged Hosts'),
-            'distribution':   _nav_link('distribution', 'rpt_tr_nav_distribution', '9 Traffic Distribution'),
-            'bandwidth':      _nav_link('bandwidth', 'rpt_tr_nav_bandwidth', '11 Bandwidth & Volume'),
-            'readiness':      _nav_link('readiness', 'rpt_tr_nav_readiness', '13 Enforcement Readiness'),
-            'infrastructure': _nav_link('infrastructure', 'rpt_tr_nav_infrastructure', '14 Infrastructure Scoring'),
-            'lateral':        _nav_link('lateral', 'rpt_tr_nav_lateral', '15 Lateral Movement'),
-            'ringfence':      (_nav_link('ringfence', 'rpt_tr_nav_ringfence', 'Application Ringfence') if visible_in('mod_ringfence', profile, detail_level) else ''),
-            'change_impact':  (_nav_link('change_impact', 'rpt_tr_nav_change_impact', 'Change Impact') if visible_in('mod_change_impact', profile, detail_level) else ''),
-            'findings':       _nav_link('findings', 'rpt_tr_nav_findings', 'Findings', badge=_findings_badge),
-        }
-        _nav_links = [_nav_spec.get(k, '') for k in self._ordered_section_keys()]
-        _toc_items = ''.join(
-            f'<li><a href="#{_link_anchor}">{_link_label}</a></li>'
-            for _link_anchor, _link_label in [
-                (lnk.split('href="#')[1].split('"')[0],
-                 lnk.split('>')[1].split('<')[0].strip())
-                for lnk in _nav_links if lnk and 'href="#' in lnk
-            ]
-        )
-        nav_html = (
-            '<aside class="report-toc screen-only">'
-            f'<h3>{_s("rpt_nav_contents")}</h3>'
-            f'<ol>{_toc_items}</ol>'
-            f'<button class="print-btn" onclick="window.print()">{_s("rpt_nav_print_pdf")}</button>'
-            '</aside>'
-        )
-
-        exec_html = render_exec_summary_html(_traffic_mod00, report_name=t('gui_btn_traffic_report', lang=self._lang), lang=self._lang)
+        # The v2 shell builds its own table of contents from the section list,
+        # so the old aside.report-toc / _nav_spec link table is gone. Section
+        # titles come from each chapter's own heading key (rpt_tr_sec_*) rather
+        # than the sidebar abbreviations (rpt_tr_nav_*): the two are the same
+        # string everywhere except `vuln`, where the sidebar said "Vuln
+        # Exposure" and the heading says "Vulnerability Exposure (V-E lite)".
+        _report_name = t('gui_btn_traffic_report', lang=self._lang)
+        _exec_title = f'{t("rpt_exec_summary_label", lang=self._lang)} — {_report_name}'
+        exec_html = render_exec_summary_html(
+            _traffic_mod00, report_name=_report_name, lang=self._lang,
+            include_heading=False)
 
         # The summary hero: maturity block included only when the subclass opts in.
         _maturity_block = ((f'<h2>{_s("rpt_tr_maturity_heading")}</h2>'
                             + self._subnote('rpt_tr_maturity_subnote')
                             + maturity_html)
                            if self._include_maturity() else '')
-        _badge_html = {
-            "SecurityRisk": f'<div class="report-profile-badge report-profile-badge--security">{_s("rpt_kicker_security_risk")}</div>',
-            "NetworkInventory": f'<div class="report-profile-badge report-profile-badge--inventory">{_s("rpt_kicker_network_inventory")}</div>',
-            "Traffic": f'<div class="report-profile-badge report-profile-badge--traffic">{_s("rpt_kicker_traffic_flows")}</div>',
+        # The profile badge moves onto the shell cover (ShellCover escapes it),
+        # so this is the label text now, not a rendered div.
+        _profile_badge_text = {
+            "SecurityRisk": _s("rpt_kicker_security_risk"),
+            "NetworkInventory": _s("rpt_kicker_network_inventory"),
+            "Traffic": _s("rpt_kicker_traffic_flows"),
         }[self.REPORT_KIND or "SecurityRisk"]
         _title_key = {
             "SecurityRisk": "rpt_security_report_title",
@@ -726,118 +743,152 @@ class _TrafficReportBase:
                                         "in the affected sections are incomplete and must "
                                         "not be read as zero. Failed modules:"))
                 + ' ' + html.escape(_moderr_names) + '</p>')
-        _hero = (
-            '<section id="summary" class="card report-hero">'
-            '<div class="report-hero-top">'
-            f'<div class="report-kicker">{_s("rpt_kicker_traffic")}</div>'
-            + _badge_html
-            + f'<h1>{_s(_title_key)}</h1>'
-            f'<p class="report-subtitle">{_s("rpt_generated")} ' + generated_at + '</p></div>'
-            + _cap_banner + _moderr_banner
+        # The hero's title block (kicker / h1 / "Generated:" subtitle) is now the
+        # shell cover; everything else it carried stays here and opens the first
+        # chapter, in the same order it had inside the hero card.
+        _summary_body = (
+            _cap_banner + _moderr_banner
             + summary_pills + _maturity_block + trend_html
-            + _findings_block + '</section>\n'
+            + _findings_block
         )
 
-        _sec = {
-            'summary': _hero,
+        _sec: dict[str, ShellSection | None] = {
+            'summary': self._section('summary', 'rpt_tr_nav_summary', 'Executive Summary',
+                          _summary_body),
             'overview': self._section('overview', 'rpt_tr_sec_overview', 'Traffic Overview',
                           render_section_guidance('mod01', profile=profile, detail_level=detail_level, lang=self._lang) + self._mod01_html(),
-                          'rpt_tr_sec_overview_intro', 'Start from overall traffic scale, Policy coverage, and top Ports to set a baseline for reading the rest of the report.') + '\n',
+                          'rpt_tr_sec_overview_intro', 'Start from overall traffic scale, Policy coverage, and top Ports to set a baseline for reading the rest of the report.'),
             'policy': self._section('policy', 'rpt_tr_sec_policy', 'Policy Decisions',
-                          render_section_guidance('mod02', profile=profile, detail_level=detail_level, lang=self._lang) + self._mod02_html(),
-                          layout='layout-b') + '\n',
+                          render_section_guidance('mod02', profile=profile, detail_level=detail_level, lang=self._lang) + self._mod02_html()),
             'uncovered': self._section('uncovered', 'rpt_tr_sec_uncovered', 'Uncovered Flows',
                           render_section_guidance('mod03', profile=profile, detail_level=detail_level, lang=self._lang) + self._mod03_html(),
-                          'rpt_tr_sec_uncovered_intro', 'Focus on traffic not yet covered by effective Policy, helping prioritise which Services and directions to tighten first.') + '\n',
+                          'rpt_tr_sec_uncovered_intro', 'Focus on traffic not yet covered by effective Policy, helping prioritise which Services and directions to tighten first.'),
             'labels': self._section('labels', 'rpt_tr_sec_labels', 'Label Hygiene',
                           render_section_guidance('mod_labels', profile=profile, detail_level=detail_level, lang=self._lang) + self._mod_labels_html(),
-                          'rpt_tr_sec_labels_intro', 'Measure Label coverage and conflicts — labeling quality determines Policy quality.') + '\n',
+                          'rpt_tr_sec_labels_intro', 'Measure Label coverage and conflicts — labeling quality determines Policy quality.'),
             'drift': self._section('drift', 'rpt_tr_sec_drift', 'Baseline Drift',
                           render_section_guidance('mod_drift', profile=profile, detail_level=detail_level, lang=self._lang) + self._mod_drift_html(),
-                          'rpt_tr_sec_drift_intro', 'Compare this period\'s app-to-app connections against the previous report to spot new paths and disappeared baselines.') + '\n',
+                          'rpt_tr_sec_drift_intro', 'Compare this period\'s app-to-app connections against the previous report to spot new paths and disappeared baselines.'),
             'ransomware': self._section('ransomware', 'rpt_tr_sec_ransomware', 'Ransomware Exposure',
                           render_section_guidance('mod04', profile=profile, detail_level=detail_level, lang=self._lang) + self._mod04_html(),
-                          'rpt_tr_sec_ransomware_intro', 'Check high-risk Ports, Allowed flows, and host exposure commonly tied to ransomware attack chains.') + '\n',
-            'vuln': ('' if not (self._r.get('mod_vuln') or {}).get('available') else
+                          'rpt_tr_sec_ransomware_intro', 'Check high-risk Ports, Allowed flows, and host exposure commonly tied to ransomware attack chains.'),
+            'vuln': (None if not (self._r.get('mod_vuln') or {}).get('available') else
                      self._section('vuln', 'rpt_tr_sec_vuln', 'Vulnerability Exposure (V-E lite)',
                           render_section_guidance('mod_vuln', profile=profile, detail_level=detail_level, lang=self._lang) + self._mod_vuln_html(),
-                          'rpt_tr_sec_vuln_intro', 'Rank patching by real east-west reachability: which scanned vulnerabilities sit on hosts that non-blocked traffic can actually reach.') + '\n'),
+                          'rpt_tr_sec_vuln_intro', 'Rank patching by real east-west reachability: which scanned vulnerabilities sit on hosts that non-blocked traffic can actually reach.')),
             'user': _mod06_block,
             'matrix': _mod07_block,
             'unmanaged': self._section('unmanaged', 'rpt_tr_sec_unmanaged', 'Unmanaged Hosts',
                           render_section_guidance('mod08', profile=profile, detail_level=detail_level, lang=self._lang) + self._mod08_html(),
-                          'rpt_tr_sec_unmanaged_intro', 'Inventory traffic involving hosts not managed by VEN; these typically sit outside the visibility and control boundary.') + '\n',
+                          'rpt_tr_sec_unmanaged_intro', 'Inventory traffic involving hosts not managed by VEN; these typically sit outside the visibility and control boundary.'),
             'distribution': self._section('distribution', 'rpt_tr_sec_distribution', 'Traffic Distribution',
-                          render_section_guidance('mod09', profile=profile, detail_level=detail_level, lang=self._lang) + self._mod09_html()) + '\n',
+                          render_section_guidance('mod09', profile=profile, detail_level=detail_level, lang=self._lang) + self._mod09_html()),
             'bandwidth': self._section('bandwidth', 'rpt_tr_sec_bandwidth', 'Bandwidth &amp; Volume',
                           render_section_guidance('mod11', profile=profile, detail_level=detail_level, lang=self._lang) + self._mod11_html(),
-                          'rpt_tr_sec_bandwidth_intro', 'Review high-volume flows by bandwidth and data volume to identify large backups, batch jobs, or suspected exfiltration.') + '\n',
+                          'rpt_tr_sec_bandwidth_intro', 'Review high-volume flows by bandwidth and data volume to identify large backups, batch jobs, or suspected exfiltration.'),
             'readiness': self._section('readiness', 'rpt_tr_sec_readiness', 'Enforcement Readiness',
                           render_section_guidance('mod13', profile=profile, detail_level=detail_level, lang=self._lang) + self._mod13_html(),
-                          'rpt_tr_sec_readiness_intro', 'Aggregate multiple signals into a readiness score to help assess whether it is safe to tighten Enforcement.') + '\n',
+                          'rpt_tr_sec_readiness_intro', 'Aggregate multiple signals into a readiness score to help assess whether it is safe to tighten Enforcement.'),
             'infrastructure': self._section('infrastructure', 'rpt_tr_sec_infrastructure', 'Infrastructure Scoring',
                           render_section_guidance('mod14', profile=profile, detail_level=detail_level, lang=self._lang) + self._mod14_html(),
-                          'rpt_tr_sec_infrastructure_intro', 'Identify critical nodes and infrastructure roles with large blast radius from application communication patterns.') + '\n',
+                          'rpt_tr_sec_infrastructure_intro', 'Identify critical nodes and infrastructure roles with large blast radius from application communication patterns.'),
             'lateral': self._section('lateral', 'rpt_tr_sec_lateral', 'Lateral Movement',
                           render_section_guidance('mod15', profile=profile, detail_level=detail_level, lang=self._lang) + self._mod15_html(),
-                          'rpt_tr_sec_lateral_intro', 'Focus on paths, Services, and sources tied to lateral movement to surface spread risk.') + '\n',
-            'ringfence': (self._section('ringfence', 'rpt_mod_ringfence_title', 'Application Ringfence',
-                          render_section_guidance('mod_ringfence', profile, detail_level, lang=self._lang) + self._mod_ringfence_html(), '', '') + '\n'),
-            'change_impact': (self._section('change_impact', 'rpt_mod_change_impact_title', 'Change Impact',
-                          render_section_guidance('mod_change_impact', profile, detail_level, lang=self._lang) + self._mod_change_impact_html(), '', '') + '\n'),
-            'findings': (
-                '<section id="findings" class="card">'
-                f'<h2>{_s("rpt_tr_findings_actions")} ({n_findings})</h2>'
-                + self._findings_actions_html() + '</section>\n'),
+                          'rpt_tr_sec_lateral_intro', 'Focus on paths, Services, and sources tied to lateral movement to surface spread risk.'),
+            'ringfence': self._section('ringfence', 'rpt_mod_ringfence_title', 'Application Ringfence',
+                          render_section_guidance('mod_ringfence', profile, detail_level, lang=self._lang) + self._mod_ringfence_html()),
+            'change_impact': self._section('change_impact', 'rpt_mod_change_impact_title', 'Change Impact',
+                          render_section_guidance('mod_change_impact', profile, detail_level, lang=self._lang) + self._mod_change_impact_html()),
+            # The findings chapter keeps its count in the heading — the old <h2>
+            # read "Findings & Actions (12)" and that number is content.
+            'findings': self._section('findings',
+                          '', f'{_s("rpt_tr_findings_actions")} ({n_findings})',
+                          self._findings_actions_html(), kind='finding'),
         }
 
-        body = exec_html + "".join(_sec.get(k, '') for k in self._ordered_section_keys())
-        body += f'<footer>{_s("rpt_tr_footer")} &middot; {today_str}</footer>'
-        if self._profile == "network_inventory":
-            _report_title = t("rpt_cover_type_inventory", lang=self._lang)
-            cover_html = _build_cover_page(
-                title=_report_title,
-                report_type=_report_title,
-                date_range=self._date_range,
-                pce_url=self._pce_url,
-                org_name=self._org_name,
-                lang=self._lang,
-            )
-        elif self._profile == "traffic":
-            _report_title = t("rpt_cover_type_traffic", lang=self._lang)
-            cover_html = _build_cover_page(
-                title=_report_title,
-                report_type=_report_title,
-                date_range=self._date_range,
-                pce_url=self._pce_url,
-                org_name=self._org_name,
-                lang=self._lang,
-            )
-        else:
-            _report_title = t("rpt_cover_type_security", lang=self._lang)
-            cover_html = _build_cover_page(
-                title=_report_title,
-                report_type=_report_title,
-                date_range=self._date_range,
-                pce_url=self._pce_url,
-                org_name=self._org_name,
-                lang=self._lang,
-                maturity_grade=mod12.get("maturity_grade"),
-                maturity_score=mod12.get("maturity_score"),
-            )
-        html_lang = "zh-TW" if self._lang == "zh_TW" else "en"
-        return (
-            f'<!DOCTYPE html><html lang="{html_lang}"><head>\n'
-            '<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">\n'
-            f"<title>{t('rpt_page_title_traffic', lang=self._lang)}</title>" + _CSS + _HIGHLIGHT_CSS + '</head>\n'
-            f'<body data-report-title="{_report_title}">'
-            + cover_html
-            + '<div class="report-shell">'
-            + nav_html
-            + '<main class="report-main">'
-            + body
-            + '</main></div>'
-            + TABLE_JS + '</body></html>'
+        sections: list[ShellSection] = []
+        if exec_html:
+            sections.append(ShellSection(id='exec-summary', title=_exec_title,
+                                         html=exec_html, kind='exec'))
+        for _key in self._ordered_section_keys():
+            _entry = _sec.get(_key)
+            if _entry is not None:
+                sections.append(_entry)
+
+        # 報表類型標籤（rpt_cover_type_*）——同一個來源同時當封面 eyebrow 與
+        # body[data-report-title]；封面標題 h1 與 <title> 各有自己的鍵，三者
+        # 不互相推導（原型 C1 事故）。
+        _report_title = {
+            "network_inventory": "rpt_cover_type_inventory",
+            "traffic": "rpt_cover_type_traffic",
+        }.get(self._profile, "rpt_cover_type_security")
+        _report_title = t(_report_title, lang=self._lang)
+
+        _badges: list[tuple[str, str]] = [(_profile_badge_text, 'info')]
+        if self._compute_draft:
+            _badges.append((t("rpt_hdr_draft_enabled", lang=self._lang), 'warn'))
+
+        _meta: dict[str, str] = {}
+        if self._pce_url:
+            _meta[_s("rpt_cover_pce")] = self._pce_url
+        if self._org_name:
+            _meta[_s("rpt_cover_org")] = self._org_name
+        _date_str = " – ".join(d for d in self._date_range if d)
+        if _date_str:
+            _meta[_s("rpt_cover_date_range")] = _date_str
+        if generated_at:
+            _meta[_s("rpt_cover_generated")] = str(generated_at)
+
+        # The maturity grade rides on the cover only where the legacy cover put
+        # it: the security profile, and only when a real grade was computed.
+        _cover_grade = ''
+        _cover_score = ''
+        if self._include_maturity() and m_grade and m_grade != '?':
+            _cover_grade = str(m_grade)
+            # Parenthesised to match the legacy cover's "D (52/100)".
+            _cover_score = f'({m_score}/100)'
+
+        cover = ShellCover(
+            title=_s(_title_key),
+            doc_title=t('rpt_page_title_traffic', lang=self._lang),
+            type_label=_report_title,
+            eyebrow=_report_title,
+            kicker=_s("rpt_kicker_traffic"),
+            grade=_cover_grade,
+            score=_cover_score,
+            badges=tuple(_badges),
+            meta=_meta,
+        )
+        return build_shell_document(
+            lang=self._lang,
+            cover=cover,
+            sections=sections,
+            appendix_html=f'{_s("rpt_tr_footer")} &middot; {today_str}',
+            rule_index=self._rule_index(),
+            extra_head=_HIGHLIGHT_CSS,
+        )
+
+    def _rule_index(self) -> list[tuple[str, str, str]]:
+        """(rule id, rule name, severity) for the appendix rule index.
+
+        Deduplicated by rule id and ordered by severity — SecurityRisk is the
+        only traffic-family type that produces findings, so the other two get an
+        empty list and the shell omits the block.
+        """
+        seen: dict[str, tuple[str, str, str]] = {}
+        for finding in self._r.get('findings', []) or []:
+            rule_id = str(getattr(finding, 'rule_id', '') or '')
+            if not rule_id or rule_id in seen:
+                continue
+            name_key = f'rpt_rule_{rule_id}_name'
+            name = (self._s(name_key) if name_key in STRINGS
+                    else str(getattr(finding, 'rule_name', '') or ''))
+            seen[rule_id] = (rule_id, name, str(getattr(finding, 'severity', '') or ''))
+        return sorted(
+            seen.values(),
+            key=lambda row: (SEVERITY_RANK.index(row[2].upper())
+                             if row[2].upper() in SEVERITY_RANK else len(SEVERITY_RANK),
+                             row[0]),
         )
 
     def _section(
@@ -848,9 +899,15 @@ class _TrafficReportBase:
         content: str,
         intro_key: str = '',
         intro_en: str = '',
-        layout: str = '',
-    ) -> str:
-        h2_text = self._s(i18n_key)
+        kind: str = 'detail',
+    ) -> ShellSection:
+        """One chapter for the v2 shell.
+
+        The heading is no longer rendered here — ``build_shell_document`` prints
+        it in the chapter head — so this returns the section's body plus the
+        metadata the shell needs, not a ``<section>`` element.
+        """
+        h2_text = self._s(i18n_key) if i18n_key else title
         if h2_text == i18n_key:
             h2_text = title
         intro_html = ''
@@ -859,12 +916,10 @@ class _TrafficReportBase:
             if intro_text == intro_key:
                 intro_text = intro_en
             intro_html = f'<p class="section-intro">{intro_text}</p>'
-        card_class = f'card {layout}'.strip() if layout else 'card'
-        return (
-            f'<section id="{id_}" class="{card_class}">'
-            f'<h2>{h2_text}</h2>'
-            f'{intro_html}{content}</section>'
-        )
+        body = f'{intro_html}{content}'
+        marks = _severity_marks(body)
+        return ShellSection(id=id_, title=h2_text, html=body, kind=kind,
+                            tone=_marks_tone(marks), marks=marks)
 
     def _trend_deltas_html(self) -> str:
         return _trend_deltas_section(
@@ -1075,7 +1130,7 @@ class _TrafficReportBase:
         part_e = m.get('part_e_investigation')
         if part_e is not None and hasattr(part_e, 'empty') and not part_e.empty:
             out += (
-                '<div style="background:#fff3cd;border-left:4px solid var(--gold);'
+                '<div style="background:#fff3cd;border-left:4px solid var(--tone-warn-border);'
                 'padding:12px 16px;margin:12px 0;border-radius:4px">'
                 f'<b>{_s("rpt_tr_investigation_title")}</b><br>'
                 f'<span style="font-size:12px">{_s("rpt_tr_investigation_desc")}</span>'
@@ -1085,7 +1140,7 @@ class _TrafficReportBase:
             )
         else:
             out += (
-                '<div style="background:#d4edda;border-left:4px solid var(--green-80);'
+                '<div style="background:#d4edda;border-left:4px solid var(--tone-ok-fg);'
                 'padding:12px 16px;margin:12px 0;border-radius:4px">'
                 f'<b>{_s("rpt_tr_no_investigation")}</b>'
                 '</div>'
@@ -1320,7 +1375,7 @@ class _TrafficReportBase:
         anom = m.get('byte_ratio_anomalies')
         if anom is not None and hasattr(anom, 'empty') and not anom.empty:
             threshold = m.get('anomaly_threshold_bytes_per_conn')
-            thresh_str = (f' &nbsp;<span style="font-weight:400;font-size:11px;color:var(--slate-50)">'
+            thresh_str = (f' &nbsp;<span style="font-weight:400;font-size:11px;color:var(--text-3)">'
                           f'P95 ≥ {_fmt_bytes(threshold)}/conn</span>'
                           if threshold else '')
             out += (
@@ -1348,7 +1403,7 @@ class _TrafficReportBase:
                 evidence_bits.append(f"{human_number(flow_total)} {_s('rpt_fa_flows_unit')}")
             rows_html += (
                 '<tr>'
-                f'<td><span class="badge badge-{sev}">{sev}</span></td>'
+                f'<td><span class="badge badge-{sev}"{_sev_attrs(sev)}>{sev}</span></td>'
                 f'<td><b>{html.escape(str(item.get("action_code", "")))}</b><br>'
                 f'{html.escape(str(item.get("action", "")))}</td>'
                 f'<td>{" · ".join(evidence_bits)}</td>'
@@ -1360,7 +1415,7 @@ class _TrafficReportBase:
             sev = str(kf.get('severity', 'INFO')).upper()
             rows_html += (
                 '<tr>'
-                f'<td><span class="badge badge-{sev}">{sev}</span></td>'
+                f'<td><span class="badge badge-{sev}"{_sev_attrs(sev)}>{sev}</span></td>'
                 f'<td>{html.escape(kf.get("action", ""))}</td>'
                 f'<td>{html.escape(kf.get("finding", ""))}</td>'
                 f'<td></td>'
@@ -1397,7 +1452,8 @@ class _TrafficReportBase:
             n = counts.get(sev, 0)
             sev_html += (
                 f'<div class="sev-box">'
-                f'<div><span class="badge badge-{sev}">{sev}</span></div>'
+                f'<div><span class="badge badge-{sev}"{_sev_attrs(sev, mark=False)}>'
+                f'{sev}</span></div>'
                 f'<div class="sev-count">{n}</div>'
                 f'</div>'
             )
@@ -1421,7 +1477,7 @@ class _TrafficReportBase:
             cards_html += (
                 f'<div class="cat-group">'
                 f'<h3 style="margin-bottom:6px;">{cat_name}</h3>'
-                f'<p style="font-size:12px;color:var(--slate-50);margin-bottom:14px;">{cat_desc}</p>'
+                f'<p style="font-size:12px;color:var(--text-3);margin-bottom:14px;">{cat_desc}</p>'
             )
             for f in cat_findings:
                 _rule_title, rule_how = _RULE_DESCRIPTIONS.get(f.rule_id, (f.rule_name, ''))
@@ -1439,7 +1495,8 @@ class _TrafficReportBase:
                 cards_html += (
                     f'<div class="finding-card sev-{f.severity}">'
                     f'<div class="finding-header">'
-                    f'<span class="badge badge-{f.severity}">{f.severity}</span>'
+                    f'<span class="badge badge-{f.severity}"{_sev_attrs(f.severity)}>'
+                    f'{f.severity}</span>'
                     f'<span class="finding-rule-id">{html.escape(str(f.rule_id))}</span>'
                     f'<span class="finding-title">{html.escape(str(rule_name))}</span>'
                     f'{tech_html}'
@@ -1455,7 +1512,7 @@ class _TrafficReportBase:
                     else:
                         how_text = _s(how_key) if how_key in _S else rule_how
                     cards_html += (
-                        f'<p style="font-size:11px;color:var(--slate-50);margin-bottom:8px;">'
+                        f'<p style="font-size:11px;color:var(--text-3);margin-bottom:8px;">'
                         f'<b>{_s("rpt_rule_check_label")}</b>'
                         f' <span>{how_text}</span></p>'
                     )
@@ -1478,7 +1535,7 @@ class _TrafficReportBase:
             return f'<p class="note">{_html.escape(str(m["error"]))}</p>'
         score = m.get('total_score', 0)
         grade = m.get('grade', '?')
-        grade_color = _grade_to_color(grade)
+        grade_tone = _grade_to_tone(grade)
         factor_table = m.get('factor_table')
         recommendations = m.get('recommendations')
         app_env_scores = m.get('app_env_scores')
@@ -1519,7 +1576,7 @@ class _TrafficReportBase:
 
         _s_local = self._s
         _factor_legend = (
-            '<div style="background:var(--card-bg);border:1px solid var(--border);border-radius:8px;'
+            '<div style="background:var(--surface-1);border:1px solid var(--line);border-radius:8px;'
             'padding:12px 16px;margin-bottom:12px;font-size:13px;line-height:1.6">'
             f'<b>{_s_local("rpt_mod13_col_guide_title")}</b>'
             '<ul style="margin:6px 0 0 0;padding-left:18px">'
@@ -1529,17 +1586,17 @@ class _TrafficReportBase:
             f'<li>{_s_local("rpt_mod13_col_guide_score")}</li>'
             '</ul>'
             '<table style="margin-top:10px;font-size:12px;border-collapse:collapse;width:100%">'
-            '<tr style="border-bottom:1px solid var(--border)">'
+            '<tr style="border-bottom:1px solid var(--line)">'
             f'<th style="text-align:left;padding:4px 8px">{_s_local("rpt_col_factor")}</th>'
             f'<th style="text-align:left;padding:4px 8px">{_s_local("rpt_tr_what_it_measures")}</th>'
             '</tr>'
             f'<tr><td style="padding:4px 8px">{_s_local("rpt_factor_policy_coverage")}</td>'
             f'<td style="padding:4px 8px">{_s_local("rpt_mod13_col_guide_policy")}</td></tr>'
-            f'<tr style="background:var(--row-alt)"><td style="padding:4px 8px">{_s_local("rpt_factor_ringfence_maturity")}</td>'
+            f'<tr style="background:var(--surface-2)"><td style="padding:4px 8px">{_s_local("rpt_factor_ringfence_maturity")}</td>'
             f'<td style="padding:4px 8px">{_s_local("rpt_mod13_col_guide_ringfence")}</td></tr>'
             f'<tr><td style="padding:4px 8px">{_s_local("rpt_factor_enforcement_mode")}</td>'
             f'<td style="padding:4px 8px">{_s_local("rpt_mod13_col_guide_enforcement")}</td></tr>'
-            f'<tr style="background:var(--row-alt)"><td style="padding:4px 8px">{_s_local("rpt_factor_staged_readiness")}</td>'
+            f'<tr style="background:var(--surface-2)"><td style="padding:4px 8px">{_s_local("rpt_factor_staged_readiness")}</td>'
             f'<td style="padding:4px 8px">{_s_local("rpt_mod13_col_guide_staged")}</td></tr>'
             f'<tr><td style="padding:4px 8px">{_s_local("rpt_factor_remote_app_coverage")}</td>'
             f'<td style="padding:4px 8px">{_s_local("rpt_mod13_col_guide_remote")}</td></tr>'
@@ -1550,10 +1607,13 @@ class _TrafficReportBase:
         _lang = self._lang
         html = (
             self._subnote('rpt_tr_readiness_subnote') +
-            f'<div style="display:flex;align-items:center;gap:24px;margin-bottom:16px;">'
-            f'<div style="font-size:48px;font-weight:700;color:{grade_color};">{grade}</div>'
+            # A1 site 3: the readiness grade used to be a class-less div with an
+            # inline colour. It reuses the shell's score presentation now, so the
+            # tone comes from data-tone like every other grade in the document.
+            f'<div class="score-hero" data-tone="{grade_tone}" style="margin-bottom:16px;">'
+            f'<span class="score-num">{grade}</span>'
             f'<div style="flex:1;">'
-            f'<div style="font-size:13px;color:var(--slate-50);margin-bottom:4px;">{_s("rpt_tr_readiness_score")} <b>{score}/100</b></div>'
+            f'<div style="font-size:13px;color:var(--text-3);margin-bottom:4px;">{_s("rpt_tr_readiness_score")} <b>{score}/100</b></div>'
             f'{score_bar}'
             f'</div></div>'
             + dist_html
