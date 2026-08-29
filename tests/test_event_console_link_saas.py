@@ -65,6 +65,14 @@ def test_event_console_link_without_href_returns_resolved_console_landing_page()
     assert r._event_console_link({}) == "https://tenant.illumio.ai"
 
 
+def test_event_console_link_without_api_config_returns_empty():
+    cm = MagicMock()
+    cm.config = {"email": {}, "alerts": {"active": []}}
+    reporter = Reporter(cm)
+
+    assert reporter._event_console_link({"href": "/orgs/1/events/evt-legacy"}) == ""
+
+
 @pytest.mark.parametrize("href", [
     "https://fake-user:fake-pass@evil.invalid/events/evt-hostile",
     "//fake-user:fake-pass@evil.invalid/events/evt-hostile",

@@ -267,7 +267,7 @@ class Reporter:
 
     def _event_console_link(self, event: dict) -> str:
         href = str((event or {}).get("href", "") or "").strip()
-        base = resolve_pce_console_url(self.cm.config["api"]).rstrip("/")
+        base = resolve_pce_console_url(self.cm.config.get("api", {})).rstrip("/")
         if not base:
             return ""
         if "/orgs/" in href:
