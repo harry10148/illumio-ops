@@ -295,6 +295,14 @@ function deploymentLabel(value) {
   return value === "saas" ? t("gui_deployment_saas") : t("gui_deployment_on_prem");
 }
 
+function healthProbeLabel(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return "—";
+  return raw.split("+").filter(Boolean).map(function (part) {
+    return "/" + part.replace(/^\/+/, "");
+  }).join(" + ");
+}
+
 function pceCategoryState(pce) {
   const category = String(pce.health_category || "unknown").toLowerCase();
   const health = String(pce.health_status || "unknown").toLowerCase();
@@ -303,6 +311,12 @@ function pceCategoryState(pce) {
   if (category === "transport_error") return ["crit", t("gui_health_pce_unreachable")];
   if (category === "server_error") return ["crit", t("gui_health_pce_server_error")];
   if (category === "rate_limited") return ["warn", t("gui_health_pce_rate_limited")];
+  if (category === "error" || category === "critical") {
+    return ["crit", tf("gui_health_pce_reported_status", { status: category })];
+  }
+  if (category === "warning" || category === "degraded") {
+    return ["warn", tf("gui_health_pce_reported_status", { status: category })];
+  }
   if (category !== "ok" && category !== "unknown") {
     return ["warn", tf("gui_health_pce_http_error", { status: pce.last_error_status || "—" })];
   }
@@ -317,7 +331,7 @@ function cardSystem(st, ov) {
   const fails = Number(pce.consecutive_failures) || 0;
   const control = pceCategoryState(pce);
   const deployment = st.deployment_type || pce.deployment_type || "on_prem";
-  const probe = st.health_probe || pce.health_probe || "—";
+  const probe = healthProbeLabel(st.health_probe || pce.health_probe);
 
   const p = panel("OV-01", t("gui_ov_system_status"));
   withMeta(p, String(st.api_url || "").replace(/^https?:\/\//, ""));
@@ -325,9 +339,9 @@ function cardSystem(st, ov) {
   withTone(p, control[0]);
 
   p.body.appendChild(lead(control[1], t("gui_health_pce_api_access"),
-    badge(deploymentLabel(deployment) + " · /" + probe, control[0])));
+    badge(deploymentLabel(deployment) + " · " + probe, control[0])));
   p.body.appendChild(kv(t("gui_deployment_type"), deploymentLabel(deployment)));
-  p.body.appendChild(kv(t("gui_health_check"), "/" + probe));
+  p.body.appendChild(kv(t("gui_health_check"), probe));
   p.body.appendChild(kv(t("gui_ov_pce_failures"), String(fails),
     pce.last_error_stage === "health" && fails > 0 ? "crit" : null));
   p.body.appendChild(kv(t("gui_ov_last_poll"), since(pce.last_event_poll, ov.as_of)));

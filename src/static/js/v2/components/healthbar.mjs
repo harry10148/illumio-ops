@@ -116,6 +116,14 @@ function deploymentLabel(value) {
   return value === "saas" ? t("gui_deployment_saas") : t("gui_deployment_on_prem");
 }
 
+function healthProbeLabel(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return "—";
+  return raw.split("+").filter(Boolean).map(function (part) {
+    return "/" + part.replace(/^\/+/, "");
+  }).join(" + ");
+}
+
 function pceCategoryReason(p) {
   const category = String((p && p.health_category) || "unknown").toLowerCase();
   if (category === "auth_failed") return t("gui_health_pce_auth_failed");
@@ -123,6 +131,9 @@ function pceCategoryReason(p) {
   if (category === "transport_error") return t("gui_health_pce_unreachable");
   if (category === "rate_limited") return t("gui_health_pce_rate_limited");
   if (category === "server_error") return t("gui_health_pce_server_error");
+  if (["warning", "degraded", "error", "critical"].indexOf(category) >= 0) {
+    return tf("gui_health_pce_reported_status", { status: category });
+  }
   if (category !== "ok" && category !== "unknown") {
     return tf("gui_health_pce_http_error", { status: p.last_error_status || "—" });
   }
@@ -134,6 +145,8 @@ function pceControlTone(p) {
   const health = String((p && p.health_status) || "unknown").toLowerCase();
   if (["auth_failed", "authorization_failed", "transport_error", "server_error"].indexOf(category) >= 0) return "crit";
   if (["rate_limited", "http_error"].indexOf(category) >= 0) return "warn";
+  if (["error", "critical"].indexOf(category) >= 0) return "crit";
+  if (["warning", "degraded"].indexOf(category) >= 0) return "warn";
   if (health === "error" || health === "critical") return "crit";
   if (health === "warning" || health === "degraded") return "warn";
   if (category === "ok" || health === "ok") return "ok";
@@ -147,7 +160,7 @@ function pceLight(st, ov) {
   const failures = Number(p.consecutive_failures) || 0;
   const healthFailure = failures > 0 && (p.last_error_stage === "health" || health !== "ok");
   const deployment = (st && st.deployment_type) || p.deployment_type || "on_prem";
-  const probe = (st && st.health_probe) || p.health_probe || "—";
+  const probe = healthProbeLabel((st && st.health_probe) || p.health_probe);
   const probeLine = tf("gui_health_pce_probe", {
     deployment: deploymentLabel(deployment),
     probe: probe,

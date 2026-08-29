@@ -77,14 +77,17 @@ def _labels(page):
 
 def _health_labels(page):
     return page.evaluate(
-        "async () => { const { t } = await import('/static/js/v2/core/i18n.mjs'); "
+        "async () => { const { t, tf } = await import('/static/js/v2/core/i18n.mjs'); "
         "return { auth: t('gui_health_pce_auth_failed'), "
         "unreachable: t('gui_health_pce_unreachable'), "
+        "degraded: tf('gui_health_pce_reported_status', { status: 'degraded' }), "
+        "critical: tf('gui_health_pce_reported_status', { status: 'critical' }), "
         "provider: t('gui_saas_status_link') }; }"
     )
 
 
-def _route_health_snapshots(page, *, pce_stats, pipeline):
+def _route_health_snapshots(page, *, pce_stats, pipeline,
+                            deployment_type="saas", health_probe="noop"):
     """Serve complete, controlled health snapshots through the real UI loads."""
     status = {
         "version": "e2e",
@@ -105,10 +108,11 @@ def _route_health_snapshots(page, *, pce_stats, pipeline):
         "dispatch_history": [],
         "alert_channels": [],
         "event_timeline": [],
-        "deployment_type": "saas",
-        "health_probe": "noop",
-        "provider_status_url": "https://status.illumio.com/posts/dashboard",
+        "deployment_type": deployment_type,
+        "health_probe": health_probe,
     }
+    if deployment_type == "saas":
+        status["provider_status_url"] = "https://status.illumio.com/posts/dashboard"
     overview = {
         "as_of": "2026-08-30T00:05:00Z",
         "ven": {"verdict": "unknown"},
@@ -134,7 +138,7 @@ def _route_health_snapshots(page, *, pce_stats, pipeline):
 
 
 def _pce_stats(*, health_status="ok", health_category="ok", failures=0,
-               event_poll_status="ok", last_error=""):
+               event_poll_status="ok", last_error="", last_error_status=None):
     return {
         "health_status": health_status,
         "health_category": health_category,
@@ -146,7 +150,9 @@ def _pce_stats(*, health_status="ok", health_category="ok", failures=0,
         "last_success": "2026-08-30T00:04:00Z",
         "last_event_poll": "2026-08-30T00:03:00Z",
         "last_error": last_error,
-        "last_error_status": "401" if health_category == "auth_failed" else "",
+        "last_error_status": (
+            "401" if health_category == "auth_failed" else ""
+        ) if last_error_status is None else last_error_status,
         "last_error_stage": "health" if health_category != "ok" else "",
         "last_batch_total": 12,
         "last_batch_unknown": 0,
@@ -257,6 +263,47 @@ def test_healthy_saas_identifies_noop_provider_and_both_ingest_freshness_rows(v2
     pipeline_text = page.locator('section[data-cov="OV-10"]').text_content()
     assert "events" in pipeline_text and "ok" in pipeline_text
     assert "traffic" in pipeline_text and "ok" in pipeline_text
+
+
+@pytest.mark.parametrize(
+    ("category", "expected_tone"),
+    [("degraded", "warn"), ("critical", "crit")],
+)
+def test_on_prem_health_body_category_and_probe_chain_render_consistently(
+    v2_page, category, expected_tone,
+):
+    page, base_url = v2_page
+    _route_health_snapshots(
+        page,
+        pce_stats=_pce_stats(
+            health_status="error",
+            health_category=category,
+            failures=1,
+            last_error_status="200",
+        ),
+        pipeline=_pipeline(),
+        deployment_type="on_prem",
+        health_probe="noop+health+node_available",
+    )
+    _goto_overview(page, base_url)
+    labels = _health_labels(page)
+    expected_reason = labels[category]
+    expected_probe = "/noop + /health + /node_available"
+
+    pce_cell = page.locator('.rail-host [data-cov="XC-01"] .rail-cell').nth(1)
+    assert pce_cell.get_attribute("data-tone") == expected_tone
+    pce_cell.click()
+    reasons = page.locator(".rail-host .rail-pop").inner_text()
+    assert expected_reason in reasons
+    assert expected_probe in reasons
+    assert "HTTP 200" not in reasons
+
+    system = page.locator('section[data-cov="OV-01"]')
+    system_text = system.text_content()
+    assert system.get_attribute("data-tone") == expected_tone
+    assert expected_reason in system_text
+    assert expected_probe in system_text
+    assert "HTTP 200" not in system_text
 
 
 def test_custom_query_create_appears_edit_delete_round_trip(v2_page):
