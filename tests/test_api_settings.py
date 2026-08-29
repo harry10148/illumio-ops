@@ -328,6 +328,31 @@ def test_settings_rejects_userinfo_urls_without_partial_mutation(
     assert "sentinel-org" not in stored
 
 
+def test_settings_rejects_userinfo_url_before_target_change_response(
+    authed_client, app,
+):
+    client, csrf = authed_client
+    cm = app.config["CM"]
+    cm.load()
+    before = dict(cm.config["api"])
+
+    res = _save(client, csrf, {
+        "url": "https://fake-user:fake-pass@other-pce.example.com:8443",
+        "org_id": "sentinel-org",
+    })
+
+    assert res.status_code == 400
+    body = res.get_json()
+    assert body["ok"] is False
+    assert "pce_target_changed" not in body
+    serialized_body = json.dumps(body)
+    assert "fake-user" not in serialized_body
+    assert "fake-pass" not in serialized_body
+    assert "sentinel-org" not in serialized_body
+    cm.load()
+    assert cm.config["api"] == before
+
+
 def test_runtime_connection_metadata_neither_flushes_nor_changes_target(
     tmp_path, monkeypatch,
 ):
@@ -525,10 +550,9 @@ def test_flush_choice_empties_the_seeded_cache(tmp_path, monkeypatch):
 
 def test_a_save_rejected_by_later_validation_leaves_a_flush_cache_intact(tmp_path, monkeypatch):
     """Pins the ordering fix: verify_ssl=False stays rejected (profile is
-    still 'production') by ApiSettings.model_validate — a check that runs
-    AFTER the pce_target_change guard accepts choice="flush". If the flush
-    ran inside that guard (as it originally did) this 400 would still have
-    wiped the cache of the PCE the appliance remains pointed at."""
+    still 'production') by ApiSettings.model_validate before the target-change
+    choice. If the flush ran before complete validation, this 400 would still
+    have wiped the cache of the PCE the appliance remains pointed at."""
     client, csrf, cache_db = _flush_test_app(tmp_path, monkeypatch)
     _seed_one_event(cache_db)
     assert _count_events(cache_db) == 1

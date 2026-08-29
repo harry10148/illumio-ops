@@ -1200,9 +1200,13 @@ class Reporter:
         message = render_message(event_section_lines)
 
         if cap is not None and len(message) > cap:
+            footer = t("line_message_truncated")
+            if cap <= 0:
+                return ""
+            if cap <= len(footer):
+                return footer[:cap]
             if event_priority_section_lines != event_section_lines:
                 message = render_message(event_priority_section_lines)
-            footer = t("line_message_truncated")
             cut = message[: cap - len(footer) - 1]
             newline = cut.rfind("\n")
             cut = cut[:newline] if newline != -1 else ""

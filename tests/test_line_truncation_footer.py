@@ -14,6 +14,9 @@ import pytest
 from src.reporter import Reporter
 
 
+_TRUNCATION_FOOTER = "[Message truncated - see mail or dashboard for full details]"
+
+
 @pytest.fixture
 def rep():
     from src.config import ConfigManager
@@ -48,7 +51,24 @@ def test_total_length_capped_with_truncation_footer(rep):
         rep.add_health_alert(alert)
     msg = rep._build_line_message("subj", lang="en")
     assert len(msg) <= 4500
-    assert msg.endswith("[Message truncated - see mail or dashboard for full details]")
+    assert msg.endswith(_TRUNCATION_FOOTER)
+
+
+@pytest.mark.parametrize("cap", [-10, 0])
+def test_non_positive_cap_returns_empty_message(rep, cap):
+    rep.add_health_alert(_mk_health_alert(0))
+
+    assert rep._build_line_message("subj", lang="en", cap=cap) == ""
+
+
+@pytest.mark.parametrize("cap", [1, 10, 30, 60])  # 60 == len(_TRUNCATION_FOOTER)
+def test_cap_no_larger_than_footer_returns_footer_prefix(rep, cap):
+    rep.add_health_alert(_mk_health_alert(0))
+
+    msg = rep._build_line_message("subj", lang="en", cap=cap)
+
+    assert msg == _TRUNCATION_FOOTER[:cap]
+    assert len(msg) <= cap
 
 
 def test_normal_length_message_unchanged_byte_for_byte(rep):
@@ -60,7 +80,7 @@ def test_normal_length_message_unchanged_byte_for_byte(rep):
     uncapped = rep._build_line_message("subj", lang="en", cap=None)
     assert len(msg) <= 4500
     assert msg == uncapped
-    assert not msg.endswith("[Message truncated - see mail or dashboard for full details]")
+    assert not msg.endswith(_TRUNCATION_FOOTER)
     assert "rule-0" in msg and "rule-1" in msg
 
 
@@ -86,7 +106,7 @@ def test_long_event_description_preserves_complete_console_link(rep):
     msg = rep._build_line_message("Event alert", lang="en")
 
     assert len(msg) <= 4500
-    assert msg.endswith("[Message truncated - see mail or dashboard for full details]")
+    assert msg.endswith(_TRUNCATION_FOOTER)
     assert "https://console.illum.io/#/events/evt-normal" in msg
     assert "PCE：https://console.illum.io/\n" not in msg
 
