@@ -5182,5 +5182,14 @@
   "bwdiff_col_no_measurement": "無法量測",
   "bwdiff_window_caveat": "註：以下未模擬，依規則列出（括號內為命中的 flow 數）：{rules}。這些 flow 本身的跨距已超過該規則的 threshold_window。即時引擎可能從 cache 觀測為它們推導出視窗增量而正常評估，也可能整條規則本 cycle 直接抑制——這份 offline 比對沒有 cache 歷史可判斷是哪一種。請對這些規則核對即時行為（或監控系統自己的日誌／meta-alert），不要只憑這裡的「觸發改變：否」就下結論。",
   "bwdiff_no_rules": "沒有已啟用的頻寬規則可比對。",
-  "bwdiff_error_generic": "錯誤：{error}"
+  "bwdiff_error_generic": "錯誤：{error}",
+  "rpt_shell_toc_title": "目錄",
+  "rpt_shell_appendix_title": "附錄",
+  "rpt_shell_appendix_params": "產出參數",
+  "rpt_shell_appendix_chapters": "章節索引",
+  "rpt_shell_appendix_rules": "規則索引",
+  "rpt_shell_kind_exec": "執行摘要",
+  "rpt_shell_kind_finding": "發現",
+  "rpt_shell_kind_detail": "明細",
+  "rpt_shell_table_hint_wide": "{cols} 欄寬表 · 螢幕可左右捲動檢視全部欄位 · 列印自動轉為 A4 橫式頁"
 }

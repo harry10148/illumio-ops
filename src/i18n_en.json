@@ -5182,5 +5182,14 @@
   "bwdiff_col_no_measurement": "NoMeasure",
   "bwdiff_window_caveat": "Caveat -- not simulated above, per rule (matched flow count in parentheses): {rules}. Those flows' own span already exceeds the rule's threshold_window. The live engine may derive a per-window delta from cache observations for them, or suppress the rule entirely for the cycle -- this offline comparison has no cache history to tell which. Verify these rules against live behavior (or the monitor's own logs/meta-alerts) before relying on \"trigger changed: No\" for them.",
   "bwdiff_no_rules": "No enabled bandwidth rules to compare.",
-  "bwdiff_error_generic": "Error: {error}"
+  "bwdiff_error_generic": "Error: {error}",
+  "rpt_shell_toc_title": "Contents",
+  "rpt_shell_appendix_title": "Appendix",
+  "rpt_shell_appendix_params": "Generation parameters",
+  "rpt_shell_appendix_chapters": "Chapter index",
+  "rpt_shell_appendix_rules": "Rule index",
+  "rpt_shell_kind_exec": "Executive summary",
+  "rpt_shell_kind_finding": "Findings",
+  "rpt_shell_kind_detail": "Details",
+  "rpt_shell_table_hint_wide": "{cols}-column wide table · scroll horizontally on screen · prints in A4 landscape"
 }

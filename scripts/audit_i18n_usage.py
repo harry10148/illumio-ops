@@ -109,6 +109,13 @@ BILINGUAL_DATA_LINES: set[tuple[str, str]] = {
     # Box-drawing chars (U+2500 ─) in the injected CSS shell are decorative
     # rule dividers, not CJK display text (same as normalizeCellValue).
     ("src/report/exporters/report_css.py", "Modern SaaS report shell"),
+    # SHELL_CSS in report_shell.py is a verbatim port of
+    # design/v2/reports/shell.css; its CJK is that file's own design and
+    # print-layout commentary carried over unchanged, not display text.
+    # Same status as the CSS literals in report_css.py above, but scoped to
+    # the one literal (the needle is the provenance header inside it) so any
+    # other hardcoded CJK in report_shell.py is still a finding.
+    ("src/report/exporters/report_shell.py", "design/v2/reports/shell.css"),
 }
 
 # Files skipped entirely (tests, caches, third-party).

@@ -28,3 +28,22 @@ def grade_color(grade: str | None) -> str:
     if not grade:
         return _FALLBACK
     return GRADE_COLOR.get(str(grade).upper(), _FALLBACK)
+
+
+# design/v2 shell tones. The hex table above stays for exporters that have not
+# migrated to the v2 shell yet; the shell itself colours the grade chip through
+# a [data-tone] attribute instead of an inline colour.
+GRADE_TONE: dict[str, str] = {
+    "A": "ok",
+    "B": "ok",
+    "C": "warn",
+    "D": "crit",
+    "F": "crit",
+}
+
+
+def grade_tone(grade: str | None) -> str:
+    """Return the shell tone token for a maturity grade letter (A/B/C/D/F)."""
+    if not grade:
+        return "neutral"
+    return GRADE_TONE.get(str(grade).upper(), "neutral")
