@@ -920,6 +920,16 @@ def make_actions_blueprint(
             except Exception:
                 pass  # intentional: audit-log best-effort, must not block primary action
             lang = (request.get_json(silent=True) or {}).get('lang') or cm.config.get('settings', {}).get('language', 'en')
-            return _err_with_log("pce_test_connection", e, lang=lang)
+            error_response, error_status = _err_with_log(
+                "pce_test_connection", e, lang=lang)
+            error_body = error_response.get_json()
+            error_body.update({
+                "ok": False,
+                "reachable": False,
+                "status": 0,
+                "category": "transport_error",
+                "probe": "noop",
+            })
+            return jsonify(error_body), error_status
 
     return bp

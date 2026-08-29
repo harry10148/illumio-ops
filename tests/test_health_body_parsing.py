@@ -104,6 +104,8 @@ def test_saas_rate_limit_is_classified(tmp_path, monkeypatch):
 
     alert = rep.add_health_alert.call_args[0][0]
     assert "rate_limited" in alert["details"]
+    api.check_health.assert_not_called()
+    api.check_node_available.assert_not_called()
     assert ana.state["pce_stats"]["health_category"] == "rate_limited"
 
 
@@ -111,7 +113,8 @@ def test_connectivity_transport_error_stops_probes_and_counts_watchdog_failure(
         tmp_path, monkeypatch):
     api = MagicMock()
     api.check_connectivity.return_value = (0, "connectivity/noop probe failed")
-    ana, rep = _mk_health_analyzer(tmp_path, monkeypatch, api)
+    ana, rep = _mk_health_analyzer(
+        tmp_path, monkeypatch, api, deployment_type="saas")
 
     ana._run_health_check()
 
@@ -119,7 +122,39 @@ def test_connectivity_transport_error_stops_probes_and_counts_watchdog_failure(
     api.check_health.assert_not_called()
     api.check_node_available.assert_not_called()
     assert ana.state["pce_stats"]["consecutive_failures"] == 1
+    assert ana.state["pce_stats"]["deployment_type"] == "saas"
     assert ana.state["pce_stats"]["health_category"] == "transport_error"
+
+
+def test_health_unsupported_2xx_is_not_recorded_as_ok(tmp_path, monkeypatch):
+    """`/health` 僅接受 200；其他 2xx 必須維持 failure category。"""
+    api = MagicMock()
+    api.check_connectivity.return_value = (200, "")
+    api.check_health.return_value = (202, "accepted but not health")
+    ana, rep = _mk_health_analyzer(tmp_path, monkeypatch, api)
+
+    ana._run_health_check()
+
+    rep.add_health_alert.assert_called_once()
+    alert = rep.add_health_alert.call_args[0][0]
+    assert "category=http_error" in alert["details"]
+    assert ana.state["pce_stats"]["health_status"] == "error"
+    assert ana.state["pce_stats"]["health_category"] == "http_error"
+
+
+def test_node_unsupported_2xx_is_not_recorded_as_ok(tmp_path, monkeypatch):
+    """`/node_available` 僅接受 200/202；204 不得留下 health_category=ok。"""
+    api = MagicMock()
+    api.check_connectivity.return_value = (200, "")
+    api.check_health.return_value = (200, '{"status": "normal"}')
+    api.check_node_available.return_value = (204, "")
+    ana, rep = _mk_health_analyzer(tmp_path, monkeypatch, api)
+
+    ana._run_health_check()
+
+    rep.add_health_alert.assert_called_once()
+    assert ana.state["pce_stats"]["health_status"] == "error"
+    assert ana.state["pce_stats"]["health_category"] == "http_error"
 
 
 def test_node_unavailable_fires_health_alert(tmp_path, monkeypatch):
@@ -175,3 +210,20 @@ def test_saas_system_rule_simulator_uses_connectivity_probe(tmp_path, monkeypatc
     assert "PASS" in capsys.readouterr().out
     api.check_connectivity.assert_called_once()
     api.check_health.assert_not_called()
+
+
+def test_on_prem_system_rule_simulator_checks_node_availability(
+        tmp_path, monkeypatch, capsys):
+    api = MagicMock()
+    api.check_connectivity.return_value = (200, "")
+    api.check_health.return_value = (200, '{"status": "normal"}')
+    api.check_node_available.return_value = (404, "")
+    api.fetch_events.return_value = []
+    api.execute_traffic_query_stream.return_value = []
+    ana, _rep = _mk_health_analyzer(tmp_path, monkeypatch, api)
+
+    ana.run_debug_mode(mins=1, pd_sel=3, interactive=False)
+
+    assert "WOULD TRIGGER" in capsys.readouterr().out
+    assert api.method_calls[-3:] == [
+        call.check_connectivity(), call.check_health(), call.check_node_available()]

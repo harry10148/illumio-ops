@@ -65,6 +65,38 @@ def test_connection_reports_transport_failure_as_unreachable(client, monkeypatch
     assert body["probe"] == "noop"
 
 
+def test_connection_exception_keeps_probe_contract_without_leaking_details(
+        client, monkeypatch, caplog):
+    csrf = _login_for_action(client)
+    sentinel = "CONSTRUCTOR_SECRET_SENTINEL"
+
+    def _raise_during_construction(_cm):
+        raise RuntimeError(sentinel)
+
+    monkeypatch.setattr("src.api_client.ApiClient", _raise_during_construction)
+
+    response = client.post(
+        "/api/actions/test-connection",
+        json={},
+        headers={"X-CSRF-Token": csrf},
+        environ_overrides={"REMOTE_ADDR": "127.0.0.1"},
+    )
+
+    assert response.status_code == 500
+    body = response.get_json()
+    assert {key: body[key] for key in ("ok", "reachable", "status", "category", "probe")} == {
+        "ok": False,
+        "reachable": False,
+        "status": 0,
+        "category": "transport_error",
+        "probe": "noop",
+    }
+    assert body["error"]
+    assert body["request_id"]
+    assert sentinel not in response.get_data(as_text=True)
+    assert sentinel in caplog.text
+
+
 def test_allowed_report_formats_constant_exists():
     """Phase 5 hardening: format allowlist constant must be defined in gui module."""
     from src import gui

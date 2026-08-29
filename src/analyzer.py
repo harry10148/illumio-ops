@@ -75,6 +75,17 @@ OVERFLOW_ALERT_COOLDOWN_MINUTES = 60
 # event_overflow / traffic_overflow 的處理方式）。
 TRAFFIC_WINDOW_ROW_LIMIT = 10000
 
+
+def _endpoint_probe_category(status: int, accepted_statuses: tuple[int, ...]) -> str:
+    """Classify a probe without treating an endpoint-invalid 2xx as success."""
+    from src.api_client import pce_probe_category
+
+    category = pce_probe_category(status)
+    if category == "ok" and status not in accepted_statuses:
+        return "http_error"
+    return category
+
+
 # save_state() 的白名單：只有這些 key 由 Analyzer 自己的 cycle 擁有，才可以
 # 用 self.state（cycle 起始時的快照）覆蓋磁碟。state.json 是多寫入者共用的
 # 單一檔案（report_scheduler / rule_scheduler / GUI adhoc jobs / async_query
@@ -1192,7 +1203,7 @@ class Analyzer:
             self._watchdog_dirty = True
         else:
             h_status, h_msg = self.api.check_health()
-            category = pce_probe_category(h_status)
+            category = _endpoint_probe_category(h_status, (200,))
             if h_status != 200:
                 logger.error(t('status_error'))
                 logger.warning(f"PCE health check failed: HTTP {h_status}, category={category}")
@@ -1240,7 +1251,7 @@ class Analyzer:
                         details=t('health_node_unavailable_details', status=na_status),
                         probe="node_available",
                         deployment=deployment,
-                        category=pce_probe_category(na_status),
+                        category=_endpoint_probe_category(na_status, (200, 202)),
                     )
                 else:
                     logger.info(t('status_ok'))
@@ -3045,11 +3056,18 @@ class Analyzer:
                     health_category = pce_probe_category(h_status)
                     if health_category == "ok" and deployment == "on_prem":
                         h_status, h_msg = self.api.check_health()
-                        health_category = pce_probe_category(h_status)
-                        body_status = health_status_from_body(h_msg)
-                        if h_status == 200 and body_status in {
-                                "warning", "degraded", "error", "critical"}:
-                            health_category = body_status
+                        health_category = _endpoint_probe_category(h_status, (200,))
+                        if health_category == "ok":
+                            body_status = health_status_from_body(h_msg)
+                            if body_status in {
+                                    "warning", "degraded", "error", "critical"}:
+                                health_category = body_status
+                            else:
+                                na_check = getattr(self.api, "check_node_available", None)
+                                if callable(na_check):
+                                    h_status, h_msg = na_check()
+                                    health_category = _endpoint_probe_category(
+                                        h_status, (200, 202))
                 is_trigger = health_category != "ok"
                 threshold = float(rule.get("threshold_count", 1))
                 status = f"{Colors.FAIL}{t('would_trigger')}{Colors.ENDC}" if is_trigger else f"{Colors.GREEN}{t('pass')}{Colors.ENDC}"
