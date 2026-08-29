@@ -227,6 +227,11 @@ def set_cmd(ctx: click.Context, key: str, value: str) -> None:
 @click.option("--key", default=None, help="API key")
 @click.option("--secret", default=None, help="API secret", hide_input=True)
 @click.option("--org-id", "org_id", default=None, help="Organisation ID (default: 1)")
+@click.option("--deployment-type", "deployment_type",
+              type=click.Choice(["saas", "on_prem"]), default=None,
+              help=t("cli_config_login_deployment_type_help"))
+@click.option("--console-url", "console_url", default=None,
+              help=t("cli_config_login_console_url_help"))
 @click.option("--no-interactive", "no_interactive", is_flag=True, default=False,
               help="Skip prompts; require --url, --key, --secret via options.")
 @click.option("--pce-target-change", "pce_target_change",
@@ -236,7 +241,8 @@ def set_cmd(ctx: click.Context, key: str, value: str) -> None:
                    "clears the cached data that belonged to the old one, "
                    "'same-pce' keeps it (same PCE, new address).")
 @click.pass_context
-def login_cmd(ctx: click.Context, url, key, secret, org_id, no_interactive, pce_target_change) -> None:
+def login_cmd(ctx: click.Context, url, key, secret, org_id, deployment_type,
+              console_url, no_interactive, pce_target_change) -> None:
     """Set PCE API credentials (url, key, secret, org-id).
 
     Without --no-interactive, prompts for any value not supplied via options.
@@ -310,19 +316,35 @@ def login_cmd(ctx: click.Context, url, key, secret, org_id, no_interactive, pce_
             type=click.Choice(["flush", "same-pce"]),
         )
 
-    cm.config["api"]["url"] = stored_url
-    cm.config["api"]["key"] = key
-    cm.config["api"]["secret"] = secret
-    cm.config["api"]["org_id"] = stored_org_id
+    new_api = dict(old_api)
+    new_api["url"] = stored_url
+    new_api["key"] = key
+    new_api["secret"] = secret
+    new_api["org_id"] = stored_org_id
+    if deployment_type is not None:
+        new_api["deployment_type"] = deployment_type
+    if console_url is not None:
+        new_api["console_url"] = console_url
 
     try:
-        config_models.ApiSettings.model_validate(cm.config["api"])
+        validated_api = config_models.ApiSettings.model_validate(new_api)
     except ValidationError as e:
         errors = [f"{'.'.join(str(p) for p in err['loc'])}: {err['msg']}"
                   for err in e.errors()]
         echo_error(ctx, t("cli_config_validation_failed", errors='; '.join(errors)))
         ctx.exit(EXIT_CONFIG)
         return
+
+    validated_api_dict = validated_api.model_dump()
+    runtime_connection_changed = any(
+        value is not None
+        and old_api.get(field, validated_api_dict[field]) != validated_api_dict[field]
+        for field, value in (
+            ("deployment_type", deployment_type),
+            ("console_url", console_url),
+        )
+    )
+    restart_required = target_changed or runtime_connection_changed
 
     if target_changed and pce_target_change == "flush":
         # Before cm.save(), the same order POST /api/settings uses: past this
@@ -341,9 +363,10 @@ def login_cmd(ctx: click.Context, url, key, secret, org_id, no_interactive, pce_
             ctx.exit(EXIT_CONFIG)
             return
 
+    cm.config["api"] = validated_api_dict
     cm.save()
 
-    if target_changed and not is_json(ctx) and not is_quiet(ctx):
+    if restart_required and not is_json(ctx) and not is_quiet(ctx):
         # Nothing here reaches a running monitor service: it holds its own
         # ConfigManager for the life of the process and never reloads it, so
         # it keeps polling the previous PCE and refilling what was just
@@ -352,6 +375,6 @@ def login_cmd(ctx: click.Context, url, key, secret, org_id, no_interactive, pce_
 
     if is_json(ctx):
         echo_json(ctx, {"url": stored_url, "org_id": stored_org_id, "saved": True,
-                        "restart_required": bool(target_changed)})
+                        "restart_required": restart_required})
     elif not is_quiet(ctx):
         click.echo(t("cli_config_login_saved", url=stored_url, org_id=stored_org_id))

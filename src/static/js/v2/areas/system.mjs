@@ -767,16 +767,42 @@ async function mountPce(root, ctx) {
 
     // ── API connection (settings.js:386-390) ───────────────────────────
     const connPanel = panel(null, t("gui_api_conn"));
+    const deployment = selectField([
+      ["saas", "gui_deployment_saas"],
+      ["on_prem", "gui_deployment_on_prem"],
+    ], api_.deployment_type || "on_prem");
     const url = textField(api_.url);
     const org = textField(api_.org_id);
+    const consoleUrl = textField(api_.console_url || "");
     // Never re-displayed: the snapshot's api.key is already the server's mask
     // (config.py:428-431). An empty box plus the state row below says more and
     // leaks nothing.
     const key = passwordField(t("gui_sy_secret_keep"));
     const secret = passwordField(t("gui_sy_secret_keep"));
     const ssl = checkField(api_.verify_ssl);
+    connPanel.body.appendChild(labelled(t("gui_deployment_type"),
+      form.track("deployment_type", deployment)));
     connPanel.body.appendChild(labelled(t("gui_url"), form.track("url", url), t("gui_url_help")));
     connPanel.body.appendChild(labelled(t("gui_org_id"), form.track("org_id", org), t("gui_org_id_help")));
+    const consoleBox = labelled(t("gui_console_url"), form.track("console_url", consoleUrl));
+    const consoleHelpText = el("span");
+    const statusLink = el("a", {
+      href: "https://status.illumio.com/posts/dashboard",
+      target: "_blank",
+      rel: "noopener noreferrer",
+      text: t("gui_saas_status_link"),
+    });
+    const statusLinkWrap = el("span", null, " · ", statusLink);
+    const consoleHelp = el("small", { class: "hint" }, consoleHelpText, statusLinkWrap);
+    consoleBox.appendChild(consoleHelp);
+    function syncConsoleHelp() {
+      const saas = deployment.value === "saas";
+      consoleHelpText.textContent = t(saas ? "gui_console_url_help_saas" : "gui_console_url_help_on_prem");
+      statusLinkWrap.hidden = !saas;
+    }
+    deployment.addEventListener("change", syncConsoleHelp);
+    syncConsoleHelp();
+    connPanel.body.appendChild(consoleBox);
     connPanel.body.appendChild(labelled(t("gui_api_key"), form.track("key", key, "secret"),
       t("gui_api_key_help") + " · " + secretState(api_, "key")));
     connPanel.body.appendChild(labelled(t("gui_api_secret"), form.track("secret", secret, "secret"),
@@ -797,8 +823,10 @@ async function mountPce(root, ctx) {
     form.setBody(function (v) {
       const b = {};
       const apiPart = {};
+      apiPart.deployment_type = v.deployment_type;
       apiPart.url = v.url;
       apiPart.org_id = v.org_id;
+      apiPart.console_url = v.console_url;
       if (v.key) apiPart.key = v.key;
       if (v.secret) apiPart.secret = v.secret;
       apiPart.verify_ssl = v.verify_ssl;
@@ -825,7 +853,10 @@ async function mountPce(root, ctx) {
         m.onClose(function () { resolve(false); });
       });
     };
-    form.afterSave = function () { refreshAndRemount(R_PCE, PCE_SNAPS); };
+    form.afterSave = function (_changedKeys, res) {
+      if (res && res.restart_required) toast.info(t("gui_restart_required_banner"));
+      refreshAndRemount(R_PCE, PCE_SNAPS);
+    };
 
     host.appendChild(form.dock);
     form.sync();

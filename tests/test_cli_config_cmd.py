@@ -100,7 +100,8 @@ def _make_cm(api_url="https://pce.test:8443"):
     cm = MagicMock()
     cm.config = {
         "api": {"url": api_url, "org_id": "1", "key": "", "secret": "",
-                "profile": "production", "verify_ssl": True},
+                "profile": "production", "verify_ssl": True,
+                "deployment_type": "on_prem", "console_url": ""},
         "smtp": {"host": "localhost", "port": 25, "user": "", "password": "",
                  "enable_auth": False, "enable_tls": False},
         "settings": {"language": "en", "theme": "light", "timezone": "local",
@@ -303,3 +304,90 @@ def test_config_login_interactive_new_secret_overrides(runner):
         ], input="brand-new-secret\n")
     assert result.exit_code == 0, result.output
     assert cm.config["api"]["secret"] == "brand-new-secret"
+
+
+def test_config_login_sets_runtime_connection_options_and_reports_restart(runner):
+    """The new options are persisted without pretending they identify a new
+    PCE; JSON output still tells automation that the monitor must restart."""
+    from unittest.mock import patch
+    from src.cli.root import cli
+
+    cm = _make_cm()
+    with patch("src.config.ConfigManager", return_value=cm):
+        result = runner.invoke(cli, [
+            "--json", "config", "login",
+            "--url", "https://pce.test:8443",
+            "--key", "k",
+            "--secret", "s",
+            "--deployment-type", "saas",
+            "--console-url", "https://tenant.illumio.example/",
+            "--no-interactive",
+        ])
+
+    assert result.exit_code == 0, result.output
+    assert cm.config["api"]["deployment_type"] == "saas"
+    assert cm.config["api"]["console_url"] == "https://tenant.illumio.example"
+    assert json.loads(result.output)["restart_required"] is True
+    cm.save.assert_called_once()
+
+
+def test_config_login_omitted_runtime_options_preserve_existing_values(runner):
+    from unittest.mock import patch
+    from src.cli.root import cli
+
+    cm = _make_cm()
+    cm.config["api"].update({
+        "deployment_type": "saas",
+        "console_url": "https://existing.illumio.example",
+    })
+    with patch("src.config.ConfigManager", return_value=cm):
+        result = runner.invoke(cli, [
+            "--json", "config", "login",
+            "--url", "https://pce.test:8443",
+            "--key", "rotated",
+            "--secret", "rotated",
+            "--no-interactive",
+        ])
+
+    assert result.exit_code == 0, result.output
+    assert cm.config["api"]["deployment_type"] == "saas"
+    assert cm.config["api"]["console_url"] == "https://existing.illumio.example"
+    assert json.loads(result.output)["restart_required"] is False
+
+
+def test_config_login_rejects_unknown_deployment_choice(runner):
+    from unittest.mock import patch
+
+    cm = _make_cm()
+    with patch("src.config.ConfigManager", return_value=cm):
+        result = runner.invoke(config_group, [
+            "login",
+            "--url", "https://pce.test:8443",
+            "--key", "k",
+            "--secret", "s",
+            "--deployment-type", "cloud",
+            "--no-interactive",
+        ])
+
+    assert result.exit_code != 0
+    cm.save.assert_not_called()
+
+
+def test_config_login_rejects_invalid_console_url_without_saving(runner):
+    from unittest.mock import patch
+
+    cm = _make_cm()
+    before = dict(cm.config["api"])
+    with patch("src.config.ConfigManager", return_value=cm):
+        result = runner.invoke(config_group, [
+            "login",
+            "--url", "https://pce.test:8443",
+            "--key", "k",
+            "--secret", "s",
+            "--console-url", "ftp://tenant.example.com",
+            "--no-interactive",
+        ])
+
+    assert result.exit_code == EXIT_CONFIG
+    cm.save.assert_not_called()
+    assert cm.config["api"] == before

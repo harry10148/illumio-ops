@@ -177,7 +177,8 @@ _SETTINGS_ALLOWLISTS = {
     "settings": {
         "language", "theme", "timezone", "enable_health_check", "dashboard_queries",
     },
-    "api": {"url", "org_id", "key", "secret", "verify_ssl"},
+    "api": {"url", "org_id", "key", "secret", "verify_ssl",
+            "deployment_type", "console_url"},
     "email": {"sender", "recipients"},
     "report": {"output_dir", "retention_days"},
 }

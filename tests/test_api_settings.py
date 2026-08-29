@@ -250,6 +250,72 @@ def test_settings_response_has_no_profile_fields(authed_client):
     assert "active_pce_id" not in body
 
 
+def test_settings_round_trips_runtime_connection_metadata_without_target_change(
+    authed_client, app,
+):
+    """Deployment/Console metadata changes runtime connection behaviour, but
+    does not identify a different PCE or require a cache decision."""
+    client, csrf = authed_client
+
+    before = client.get("/api/settings").get_json()["api"]
+    assert before["deployment_type"] == "on_prem"
+    assert before["console_url"] == ""
+
+    res = _save(client, csrf, {
+        "deployment_type": "saas",
+        "console_url": "https://tenant.illumio.example/",
+    })
+
+    assert res.status_code == 200
+    assert res.get_json() == {"ok": True, "restart_required": True}
+    cm = app.config["CM"]
+    cm.load()
+    assert cm.config["api"]["deployment_type"] == "saas"
+    assert cm.config["api"]["console_url"] == "https://tenant.illumio.example"
+    reread = client.get("/api/settings").get_json()["api"]
+    assert reread["deployment_type"] == "saas"
+    assert reread["console_url"] == "https://tenant.illumio.example"
+
+
+@pytest.mark.parametrize("api_block", [
+    {"deployment_type": "cloud", "console_url": "https://tenant.example.com"},
+    {"deployment_type": "saas", "console_url": "ftp://tenant.example.com"},
+])
+def test_settings_rejects_invalid_runtime_connection_metadata_atomically(
+    authed_client, app, api_block,
+):
+    """A bad value in either new field rejects the complete API block; the
+    other valid value must not be partially persisted."""
+    client, csrf = authed_client
+    cm = app.config["CM"]
+    cm.load()
+    before = dict(cm.config["api"])
+
+    res = _save(client, csrf, api_block)
+
+    assert res.status_code == 400
+    assert res.get_json()["ok"] is False
+    cm.load()
+    assert cm.config["api"] == before
+
+
+def test_runtime_connection_metadata_neither_flushes_nor_changes_target(
+    tmp_path, monkeypatch,
+):
+    client, csrf, cache_db = _flush_test_app(tmp_path, monkeypatch)
+    _seed_one_event(cache_db)
+
+    res = _save(client, csrf, {
+        "deployment_type": "saas",
+        "console_url": "https://console.illum.io",
+    })
+
+    assert res.status_code == 200
+    assert res.get_json()["restart_required"] is True
+    assert "pce_target_changed" not in res.get_json()
+    assert _count_events(cache_db) == 1
+
+
 def test_pce_profiles_endpoint_is_gone(authed_client):
     client, _csrf = authed_client
     assert client.get("/api/pce-profiles").status_code == 404
