@@ -549,17 +549,35 @@ def test_flush_choice_empties_the_seeded_cache(tmp_path, monkeypatch):
 
 
 def test_a_save_rejected_by_later_validation_leaves_a_flush_cache_intact(tmp_path, monkeypatch):
-    """Pins the ordering fix: verify_ssl=False stays rejected (profile is
-    still 'production') by ApiSettings.model_validate before the target-change
-    choice. If the flush ran before complete validation, this 400 would still
-    have wiped the cache of the PCE the appliance remains pointed at."""
+    """PCE choice 通過後若較晚的 report 驗證失敗，不得先清除舊 PCE 快取。"""
     client, csrf, cache_db = _flush_test_app(tmp_path, monkeypatch)
     _seed_one_event(cache_db)
     assert _count_events(cache_db) == 1
 
-    res = _save(client, csrf,
-                {"url": "https://other-pce.example.com:8443", "verify_ssl": False},
-                choice="flush")
+    cm = client.application.config["CM"]
+    cm.load()
+    before_api = dict(cm.config["api"])
+    before_report = dict(cm.config["report"])
+
+    res = client.post(
+        "/api/settings",
+        json={
+            "api": {"url": "https://other-pce.example.com:8443"},
+            "pce_target_change": "flush",
+            "report": {"output_dir": "/etc/evil"},
+        },
+        headers={"X-CSRFToken": csrf},
+        environ_overrides={"REMOTE_ADDR": "127.0.0.1"},
+    )
+
     assert res.status_code == 400
-    assert res.get_json()["ok"] is False
-    assert _count_events(cache_db) == 1, "a rejected save must not flush the cache"
+    body = res.get_json()
+    assert body["ok"] is False
+    assert "Report output directory" in body["error"]
+    assert _count_events(cache_db) == 1, "被拒絕的 save 不得清除快取"
+    assert cm.config["api"] == before_api
+    assert cm.config["report"] == before_report
+
+    cm.load()
+    assert cm.config["api"] == before_api
+    assert cm.config["report"] == before_report
