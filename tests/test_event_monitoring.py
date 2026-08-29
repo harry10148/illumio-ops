@@ -143,7 +143,7 @@ def test_reporter_builds_vendor_event_payload_with_shared_console_link():
     cm = SimpleNamespace(
         config={
             "api": {
-                "url": "https://poc3.illum.io/api/v2",
+                "url": "https://custom-api.example.invalid/api/v2",
                 "deployment_type": "saas",
                 "console_url": "https://tenant.illumio.ai",
             },

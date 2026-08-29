@@ -86,7 +86,7 @@ def test_normal_length_message_unchanged_byte_for_byte(rep):
 
 def test_long_event_description_preserves_complete_console_link(rep):
     rep.cm.config["api"] = {
-        "url": "https://ap-scp45.illum.io/api/v2",
+        "url": "https://saas-api.example.invalid/api/v2",
         "deployment_type": "saas",
         "console_url": "",
     }
@@ -113,7 +113,7 @@ def test_long_event_description_preserves_complete_console_link(rep):
 
 def test_line_event_link_drops_fake_userinfo_from_hostile_href(rep):
     rep.cm.config["api"] = {
-        "url": "https://ap-scp45.illum.io/api/v2",
+        "url": "https://saas-api.example.invalid/api/v2",
         "deployment_type": "saas",
         "console_url": "",
     }

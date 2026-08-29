@@ -108,7 +108,7 @@ def test_build_telegram_message_keeps_normal_saas_console_event_link():
         "alerts": {"active": ["telegram"], "telegram_bot_token": "T", "telegram_chat_id": "C"},
         "settings": {"language": "en"},
         "api": {
-            "url": "https://ap-scp45.illum.io/api/v2",
+            "url": "https://saas-api.example.invalid/api/v2",
             "deployment_type": "saas",
             "console_url": "",
         },

@@ -22,9 +22,9 @@ from click.testing import CliRunner
 # ---------------------------------------------------------------------------
 
 @pytest.mark.parametrize(("api_cfg", "expected"), [
-    ({"deployment_type": "saas", "url": "https://ap-scp45.illum.io", "console_url": ""},
+    ({"deployment_type": "saas", "url": "https://saas-api.example.invalid", "console_url": ""},
      "https://console.illum.io"),
-    ({"deployment_type": "saas", "url": "https://poc3.illum.io:443",
+    ({"deployment_type": "saas", "url": "https://custom-api.example.invalid:443",
       "console_url": "https://acme.illumio.ai/"}, "https://acme.illumio.ai"),
     ({"deployment_type": "on_prem", "url": "https://pce.lab:8443/api/v2", "console_url": ""},
      "https://pce.lab:8443"),

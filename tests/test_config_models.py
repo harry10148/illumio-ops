@@ -25,7 +25,7 @@ def test_api_settings_supports_explicit_deployment_and_console_url(deployment_ty
     from src.config_models import ApiSettings
     cfg = ApiSettings(
         deployment_type=deployment_type,
-        url="https://ap-scp45.illum.io",
+        url="https://saas-api.example.invalid",
         console_url="https://console.illum.io/",
     )
     assert cfg.deployment_type == deployment_type

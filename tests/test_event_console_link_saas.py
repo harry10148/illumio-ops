@@ -28,7 +28,7 @@ def _reporter_with_api(
 
 def test_event_console_link_saas_uses_default_console_for_real_api_host():
     r = _reporter_with_api(
-        "https://ap-scp45.illum.io/api/v2",
+        "https://saas-api.example.invalid/api/v2",
         deployment_type="saas",
         console_url="",
     )
@@ -38,7 +38,7 @@ def test_event_console_link_saas_uses_default_console_for_real_api_host():
 
 def test_event_console_link_saas_uses_custom_console_url():
     r = _reporter_with_api(
-        "https://poc3.illum.io/api/v2",
+        "https://custom-api.example.invalid/api/v2",
         deployment_type="saas",
         console_url="https://tenant.illumio.ai/",
     )
@@ -58,7 +58,7 @@ def test_event_console_link_onprem_uses_api_origin_when_console_url_empty():
 
 def test_event_console_link_without_href_returns_resolved_console_landing_page():
     r = _reporter_with_api(
-        "https://poc3.illum.io/api/v2",
+        "https://custom-api.example.invalid/api/v2",
         deployment_type="saas",
         console_url="https://tenant.illumio.ai/",
     )
@@ -80,7 +80,7 @@ def test_event_console_link_without_api_config_returns_empty():
 ])
 def test_hostile_event_href_cannot_change_console_authority(href):
     r = _reporter_with_api(
-        "https://ap-scp45.illum.io/api/v2",
+        "https://saas-api.example.invalid/api/v2",
         deployment_type="saas",
         console_url="",
     )
