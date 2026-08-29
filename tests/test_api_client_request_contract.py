@@ -11,6 +11,31 @@ import pytest
 import responses
 
 
+def test_check_connectivity_uses_authenticated_noop_endpoint(api_client):
+    """Connectivity probe must use the non-org-scoped authenticated /noop API."""
+    calls = []
+
+    def fake_request(url, **kwargs):
+        calls.append((url, kwargs))
+        return 204, b""
+
+    api_client._request = fake_request
+
+    assert api_client.check_connectivity() == (204, "")
+    assert calls == [("https://pce.example.com:8443/api/v2/noop", {"timeout": 10})]
+
+
+@pytest.mark.parametrize(("status", "expected"), [
+    (200, "ok"), (204, "ok"), (401, "auth_failed"),
+    (403, "authorization_failed"), (429, "rate_limited"),
+    (500, "server_error"), (0, "transport_error"), (404, "http_error"),
+])
+def test_pce_probe_category(status, expected):
+    from src.api_client import pce_probe_category
+
+    assert pce_probe_category(status) == expected
+
+
 @pytest.fixture
 def api_client():
     from src.api_client import ApiClient

@@ -67,6 +67,17 @@ _ASYNC_JOB_PRUNE_INTERVAL_SECONDS = 3600
 _TLS_VERIFY_DISABLED_WARNED = False
 
 
+def pce_probe_category(status: int) -> str:
+    if 200 <= status < 300:
+        return "ok"
+    return {
+        0: "transport_error",
+        401: "auth_failed",
+        403: "authorization_failed",
+        429: "rate_limited",
+    }.get(status, "server_error" if 500 <= status < 600 else "http_error")
+
+
 def _warn_tls_verification_disabled_once() -> None:
     """Emit the TLS-verification-disabled warning once per process.
 
@@ -302,6 +313,17 @@ class ApiClient:
         except Exception as e:
             logger.error(f"Health check failed: {e}")
             return 0, str(e)
+
+    def check_connectivity(self) -> tuple[int, str]:
+        """GET the authenticated, non-org-scoped PCE connectivity endpoint."""
+        url = f"{self.api_cfg['url']}/api/v2/noop"
+        try:
+            status, body = self._request(url, timeout=10)
+            text = body.decode('utf-8', errors='replace') if isinstance(body, bytes) else str(body)
+            return status, text
+        except Exception as exc:
+            logger.error("connectivity/noop probe failed: {}", type(exc).__name__)
+            return 0, "connectivity/noop probe failed"
 
     def check_node_available(self) -> tuple[int, str]:
         """GET /api/v2/node_available（官方 SLB 健康檢查端點，免驗證）。
