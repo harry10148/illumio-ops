@@ -19,6 +19,40 @@ def test_api_settings_rejects_non_http_url():
     assert "http or https" in str(exc.value).lower()
 
 
+@pytest.mark.parametrize("deployment_type", ["saas", "on_prem"])
+def test_api_settings_supports_explicit_deployment_and_console_url(deployment_type):
+    """Deployment type and explicit console URLs are configuration contracts."""
+    from src.config_models import ApiSettings
+    cfg = ApiSettings(
+        deployment_type=deployment_type,
+        url="https://ap-scp45.illum.io",
+        console_url="https://console.illum.io/",
+    )
+    assert cfg.deployment_type == deployment_type
+    assert cfg.console_url == "https://console.illum.io"
+
+
+def test_api_settings_rejects_unknown_deployment_type():
+    from src.config_models import ApiSettings
+    with pytest.raises(ValidationError, match="deployment_type"):
+        ApiSettings(deployment_type="cloud")
+
+
+def test_api_settings_accepts_empty_console_url_and_rejects_non_http_url():
+    from src.config_models import ApiSettings
+    assert ApiSettings(console_url="").console_url == ""
+    with pytest.raises(ValidationError, match="console_url"):
+        ApiSettings(console_url="ftp://console.illum.io")
+
+
+def test_web_gui_public_url_is_declared_and_validated():
+    from src.config_models import WebGuiSettings
+    assert WebGuiSettings(public_url="https://gui.example/").public_url == "https://gui.example"
+    assert WebGuiSettings(public_url="").public_url == ""
+    with pytest.raises(ValidationError, match="public_url"):
+        WebGuiSettings(public_url="ftp://gui.example")
+
+
 def test_smtp_settings_port_range():
     from src.config_models import SmtpSettings
     # Valid

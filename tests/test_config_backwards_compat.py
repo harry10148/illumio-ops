@@ -48,6 +48,11 @@ def test_api_url_accessible_via_dict(fresh_config):
     assert fresh_config.config["api"]["org_id"] == "1"
 
 
+def test_legacy_api_config_gets_deployment_and_console_defaults(fresh_config):
+    assert fresh_config.config["api"]["deployment_type"] == "on_prem"
+    assert fresh_config.config["api"]["console_url"] == ""
+
+
 def test_settings_dict_get_with_default(fresh_config):
     """Pattern: cm.config.get('settings', {}).get('language', 'en')"""
     lang = fresh_config.config.get("settings", {}).get("language", "en")

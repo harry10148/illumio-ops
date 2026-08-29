@@ -62,7 +62,8 @@ def resolve_state_file() -> str:
 
 # Default configuration template
 _DEFAULT_CONFIG = {
-    "api": {"url": "https://pce.example.com:8443", "org_id": "1", "key": "", "secret": "", "verify_ssl": True},
+    "api": {"url": "https://pce.example.com:8443", "org_id": "1", "key": "", "secret": "", "verify_ssl": True,
+            "deployment_type": "on_prem", "console_url": ""},
     "alerts": {
         "active": ["mail"],
         "line_channel_access_token": "",

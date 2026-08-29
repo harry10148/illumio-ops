@@ -21,6 +21,31 @@ from click.testing import CliRunner
 # pce_target_changed()
 # ---------------------------------------------------------------------------
 
+@pytest.mark.parametrize(("api_cfg", "expected"), [
+    ({"deployment_type": "saas", "url": "https://ap-scp45.illum.io", "console_url": ""},
+     "https://console.illum.io"),
+    ({"deployment_type": "saas", "url": "https://poc3.illum.io:443",
+      "console_url": "https://acme.illumio.ai/"}, "https://acme.illumio.ai"),
+    ({"deployment_type": "on_prem", "url": "https://pce.lab:8443/api/v2", "console_url": ""},
+     "https://pce.lab:8443"),
+])
+def test_resolve_pce_console_url(api_cfg, expected):
+    from src.pce_target import resolve_pce_console_url
+    assert resolve_pce_console_url(api_cfg) == expected
+
+
+def test_deployment_and_console_url_are_not_pce_target_changes():
+    from src.pce_target import pce_target_changed
+    old = {
+        "deployment_type": "on_prem",
+        "console_url": "",
+        "url": "https://pce.example.com:8443",
+        "org_id": "1",
+    }
+    updated = {**old, "deployment_type": "saas", "console_url": "https://console.illum.io"}
+    assert pce_target_changed(old, updated["url"], updated["org_id"]) is False
+
+
 def test_changing_url_is_a_target_change():
     from src.pce_target import pce_target_changed
     old = {"url": "https://pce.example.com:8443", "org_id": "1"}
