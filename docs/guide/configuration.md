@@ -100,8 +100,8 @@ illumio-ops config login --url ... --key ... --secret ... [--org-id ...] \
 
 - `api.url` 是 API 傳輸端點，所有 REST 請求與健康探測都送往這裡。
 - `api.console_url` 是操作者開啟 Console 與事件告警連結的入口；事件告警連結不使用 API host。
-  SaaS 留空時預設為 `https://console.illum.io`；自訂 SaaS tenant 可填完整 Console URL。on-prem 留空時則沿用
-  `api.url` 的 origin（並去除尾端 `/api`、`/api/v1` 或 `/api/v2`）。
+  SaaS 留空時預設為 `https://console.illum.io`；自訂 SaaS tenant 可填完整 Console URL。
+  on-prem 留空時則沿用 `api.url` 的 origin（並去除尾端 `/api`、`/api/v1` 或 `/api/v2`）。
 - `https://status.illumio.com/posts/dashboard` 是 provider incident 的人工參考頁，不是 API 或
   Console URL；監控語意見 [monitoring-alerts.md](monitoring-alerts.md)。
 
@@ -132,7 +132,7 @@ illumio-ops config login --url ... --key ... --secret ... [--org-id ...] \
 > same-pce` 明講——自動化腳本沒有人在旁邊看著，預設放行等於讓它有機會在
 > 無人察覺下把設備指到另一台 PCE。
 >
-> **修改設定後一定要重啟監控服務。** CLI、互動式設定選單與 GUI 修改後都必須依提示重啟。
+> **修改設定後一定要重啟監控服務。** CLI、互動式設定選單與 GUI 修改 PCE API 設定後都必須依提示重啟。
 > 常駐的 `--monitor` / `--monitor-gui` 行程在啟動時讀取設定；`config login`、`config set`、
 > 設定選單或 GUI 改掉
 > `url`／`org_id`／`key`／`secret`／`verify_ssl`／`deployment_type`／`console_url` 完全不會傳達給它。
@@ -165,7 +165,7 @@ sudo -u illumio-ops illumio-ops cache flush --confirm
 sudo systemctl start illumio-ops
 ```
 
-`cache flush` 清除所有的快取表行、擷取水位（告訴 PCE API 下一次要拉從哪個時刻開始的資料）、以及告警的冷卻狀態。**執行後一定要重啟監控服務**，否則常駐行程會把剛清掉的資料重新灌進去（見上方「從 CLI 改完之後一定要重啟監控服務」）。
+`cache flush` 清除所有的快取表行、擷取水位（告訴 PCE API 下一次要拉從哪個時刻開始的資料）、以及告警的冷卻狀態。**執行後一定要重啟監控服務**，否則常駐行程會把剛清掉的資料重新灌進去（見上方「修改設定後一定要重啟監控服務」）。
 
 **路徑 B：切換到一個不同的 PCE**
 

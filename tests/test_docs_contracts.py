@@ -151,11 +151,12 @@ def test_saas_pce_monitoring_and_console_link_contracts_are_documented():
             "事件告警連結不使用 API host",
             "SaaS 留空時預設為 `https://console.illum.io`",
             "自訂 SaaS tenant 可填完整 Console URL",
-            "on-prem 留空時則沿用",
-            "CLI、互動式設定選單與 GUI 修改後都必須依提示重啟",
+            "on-prem 留空時則沿用 `api.url` 的 origin",
+            "CLI、互動式設定選單與 GUI 修改 PCE API 設定後都必須依提示重啟",
             "metadata-only 變更仍須重啟",
             "不算 PCE target change",
             "不需要清除 cache",
+            "見上方「修改設定後一定要重啟監控服務」",
         ),
         "docs/guide/monitoring-alerts.md": (
             "`/api/v2/noop`",
@@ -192,9 +193,11 @@ def test_saas_pce_monitoring_and_console_link_contracts_are_documented():
         "docs/guide/configuration.md": (
             "事件告警連結使用 API host",
             "並使用 API host",
+            "on-prem 留空時則沿用 `https://console.illum.io`",
             "GUI 的系統設定頁不受影響",
-            "不必重啟",
-            "不需要重啟",
+            "CLI、互動式設定選單與 GUI 修改 PCE API 設定後都不必重啟",
+            "metadata-only 變更不必重啟",
+            "metadata-only 變更不需要重啟",
         ),
     }
 
