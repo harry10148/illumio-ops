@@ -9,12 +9,21 @@ the design authority for the report shell: it is what the prototype renderer
 product side must be annotated back into ``design/v2/reports/shell.css`` so the
 two do not silently drift apart.
 
-Deliberate deltas from the design file (everything else is a verbatim port):
+Deliberate deltas from the design file (everything else is a verbatim port).
+``tests/test_report_shell_renderer.py`` rebuilds SHELL_CSS from the design file
+by applying exactly this list and asserts equality, so the list below and that
+test are the drift guard — prose alone is not:
+  * a provenance header carrying ``SHELL_CSS_PORT_MARKER``;
   * the "hide the old print cover" rule is dropped — the product no longer
-    emits a second cover, so there is nothing to defend against;
+    emits a second cover, so there is nothing to defend against. The screen
+    half of the ``.print-only`` / ``.screen-only`` pair is kept;
   * ``.print-btn`` is added (screen-only; hidden in the print block);
   * ``.score-num`` gains ``color: var(--ink)`` so the maturity score picks up
-    the grade tone from the ``data-tone`` on its wrapper.
+    the grade tone from the ``data-tone`` on its wrapper;
+  * the print block gains the wide-table release rules carried over from the
+    old product shell (``report_css.py``) plus ``!important`` on the four
+    column-width floors that must survive them — see the comment on the
+    release block itself for why both halves are required.
 
 ``src`` must never import from ``design/`` — the design tree is not shipped in
 the offline bundle — so the severity/tone tables below are copies of
@@ -44,6 +53,10 @@ SHELL_CSS = """\
    PORTED FROM design/v2/reports/shell.css — that file stays the design
    authority for the report shell. Any product-side edit must be annotated
    back into it; see report_shell.py's module docstring for the deltas.
+   port-marker: shell-css-port-v2
+   (Do not remove or reword the marker: scripts/audit_i18n_usage.py scopes its
+   Cat C exemption to the literal containing this exact token, and the design
+   commentary below is CJK.)
    =========================================================================== */
 
 /* ============================================================================
@@ -1185,6 +1198,24 @@ figure.chart-static figcaption {
   .th-label { overflow-wrap: break-word; }
   .table-hint { display: none; }
 
+  /* 寬表列印保命（自舊殼 report_css.py 移植，勿刪）。
+     TABLE_JS 的 measureColumnWidths() 在**螢幕**載入時量測後，把結果寫成
+     inline style：table.style.width / table.style.minWidth、每個 th 的
+     style.width、以及 col 的 style.width。inline style 不分 media，會原封
+     不動帶進列印，把表格撐成螢幕自動寬度，再被 .report-table-panel 整段裁掉。
+       · 2026-07-23 視覺實檢：發現與行動表近半內容消失（舊殼因此有這一段）；
+       · 2026-08-30 於新殼重現：11 欄寬表在 A4 橫式量到 table 2479px / panel
+         1014px，直式 2479px / 674px。
+     只有 !important 蓋得過 inline style，所以這裡用 !important 把 JS 寫進去的
+     寬度全部釋放掉。代價是下面那些欄寬下限也必須是 !important，否則它們會輸
+     給這裡的釋放，表格就從「整張被切掉」變成「擠回去再逐字切」——換一種無聲
+     截斷而已。版面政策（直式 auto、橫式 fixed）仍由 --wide / --landscape 決定，
+     這裡不碰 table-layout。 */
+  .report-table { width: 100% !important; min-width: 0 !important; }
+  .report-table col { width: auto !important; min-width: 0 !important; }
+  .report-table thead th { width: auto !important; min-width: 0 !important; }
+  .report-table-panel { overflow: visible; }
+
   /* 寬表：8–9 欄留在直式縮排版；≥10 欄才切橫式命名頁（每切一次就多一個
      分頁，audit 全切會多出 5 頁近乎空白的紙）。橫式頁改 table-layout: fixed
      ——auto 佈局會被 change_detail 長文吃掉版面，把欄名壓成「SE VE RIT Y」。 */
@@ -1210,18 +1241,18 @@ figure.chart-static figcaption {
      版面全被同列另一個長值欄的 max-content 吃走），em 才是硬底線。
      橫式頁是 table-layout: fixed，改吃 width 百分比切欄。 */
   .report-table-panel--wide .report-table td.col-long,
-  .report-table-panel--wide .report-table th.col-long { min-width: 14em; }
+  .report-table-panel--wide .report-table th.col-long { min-width: 14em !important; }
   .report-table-panel--landscape .report-table td.col-long,
-  .report-table-panel--landscape .report-table th.col-long { width: 30%; }
+  .report-table-panel--landscape .report-table th.col-long { width: 30% !important; }
   /* meta 欄的可讀下限（6.5pt 下 5.5em ≈ 48px，放得下 SEVERITY／success）；
      時間戳欄放寬到 7.5em，讓「T…Z」那半段整段留在一行。 */
   .report-table-panel--wide .report-table tbody td:not(.num):not(.col-long),
   .report-table-panel--wide .report-table thead th:not(.num):not(.col-long) {
-    min-width: 5.5em;
-    max-width: 12em;
+    min-width: 5.5em !important;
+    max-width: 12em !important;
   }
   .report-table-panel--wide .report-table td.col-ts,
-  .report-table-panel--wide .report-table th.col-ts { min-width: 7.5em; }
+  .report-table-panel--wide .report-table th.col-ts { min-width: 7.5em !important; }
   .report-table td.num, .report-table th.num { overflow-wrap: normal; }
 
   .report-table-panel--landscape { page: wide; }
@@ -1292,6 +1323,17 @@ _KIND_LABEL_KEY: dict[str, str] = {
     "detail": "rpt_shell_kind_detail",
 }
 
+# Section kinds the shell knows. Anything else degrades to "detail".
+KINDS: tuple[str, ...] = tuple(_KIND_LABEL_KEY)
+
+# Marker token embedded in SHELL_CSS. scripts/audit_i18n_usage.py scopes its
+# Cat C exemption to the literal containing it, so it must not be edited away;
+# tests/test_report_shell_renderer.py asserts it is still there.
+SHELL_CSS_PORT_MARKER = "shell-css-port-v2"
+
+# The section id the appendix occupies. Callers must not reuse it for a chapter.
+APPENDIX_SECTION_ID = "appendix"
+
 
 def _esc(value: object) -> str:
     """Escape an untrusted scalar for HTML text or attribute context."""
@@ -1300,6 +1342,16 @@ def _esc(value: object) -> str:
 
 def _tone(value: str) -> str:
     return value if value in TONES else "neutral"
+
+
+def _kind(value: str) -> str:
+    """Whitelist a section kind the way ``_tone()`` whitelists a tone.
+
+    Without this a typo would emit an unknown ``data-shell`` value and an
+    empty ``.chapter-eyebrow`` — the kind label would silently disappear
+    instead of failing loudly.
+    """
+    return value if value in KINDS else "detail"
 
 
 def _kind_label(kind: str, lang: str) -> str:
@@ -1339,6 +1391,16 @@ def wide_table_attrs(n_cols: int, lang: str) -> tuple[str, str]:
 
     Returns ``("", "")`` below the landscape threshold so callers can splice
     the result in unconditionally.
+
+    This returns ``--landscape`` ONLY. It is not self-sufficient: every print
+    column-width guarantee in SHELL_CSS (the long-text column's share, the
+    readable floor for meta columns, the timestamp floor, the reduced font)
+    hangs off ``--wide``, and ``--landscape`` on its own gets ``page: wide`` and
+    ``table-layout: fixed`` with none of those floors. The prototype never
+    emits ``--landscape`` without ``--wide``
+    (``design/v2/tools/reskin_report.py:323``), and today
+    ``table_renderer.py``'s threshold of 8 means every >=10 column table is
+    already ``--wide``. Callers must keep it that way.
     """
     if n_cols < WIDE_TABLE_LANDSCAPE_COLS:
         return ("", "")
@@ -1348,12 +1410,18 @@ def wide_table_attrs(n_cols: int, lang: str) -> tuple[str, str]:
 
 
 def _mark_chips(marks: dict[str, int]) -> str:
-    """Every mark gets a chip — no cap, no silent drop.
+    """Every mark with a non-zero count gets a chip — no cap, no silent drop.
 
     ``.chapter-marks`` is flex-wrap, so there is no layout reason to truncate,
     and ``chips[:3]`` silently lost the lower severities in the prototype.
     Ranked severities come first in severity order; anything the rank list does
     not know about is appended rather than dropped.
+
+    Zero counts are deliberately NOT rendered: ``{"CRITICAL": 0}`` means "no
+    CRITICAL marks in this chapter", and a chip reading "CRITICAL 0" would read
+    as a finding rather than the absence of one. This is a decision, not the
+    truncation bug above — the number of chips varies with what is present, but
+    nothing that is present is ever dropped.
     """
     if not marks:
         return ""
@@ -1393,6 +1461,14 @@ def _render_cover(cover: ShellCover, doc_tone: str) -> str:
             f'<span class="grade-chip" data-tone="{grade_tone(cover.grade)}">'
             f"{_esc(cover.grade)}{score}</span>"
         )
+    elif cover.score:
+        # A score with no grade still has to reach the page. Nesting it inside
+        # the `if cover.grade:` branch dropped it from the document entirely —
+        # no chip, no text, no warning (the silent-truncation class this repo
+        # keeps re-hitting). No chip is drawn because there is no grade to
+        # colour it by, so the tone is neutral.
+        badges += (f'<span class="score-denom" data-tone="neutral">'
+                   f"{_esc(cover.score)}</span>")
     meta = "".join(f"<dt>{_esc(k)}</dt><dd>{_esc(v)}</dd>"
                    for k, v in cover.meta.items())
     return (
@@ -1427,14 +1503,16 @@ def _render_toc(entries: Sequence[ShellSection], lang: str) -> str:
 
 
 def _render_appendix(*, lang: str, cover: ShellCover,
-                     chapters: Sequence[ShellSection],
+                     numbered: Sequence[ShellSection],
                      rule_index: Sequence[tuple[str, str, str]],
                      appendix_html: str) -> str:
     meta = "".join(f"<dt>{_esc(k)}</dt><dd>{_esc(v)}</dd>"
                    for k, v in cover.meta.items())
+    # Same sequence and same numbers as the TOC — the index covers every
+    # section (brief: "章節索引(自 sections)"), exec chapters included.
     chapter_dl = "".join(
         f"<dt>{index:02d}</dt><dd>{_esc(section.title)}</dd>"
-        for index, section in enumerate(chapters, 1)
+        for index, section in enumerate(numbered)
     )
     rules = ""
     if rule_index:
@@ -1456,7 +1534,8 @@ def _render_appendix(*, lang: str, cover: ShellCover,
         f"<dl>{chapter_dl}</dl></div>"
         "</div>"
         + rules
-        + f'<div class="colophon">{appendix_html}</div></section>'
+        + (f'<div class="colophon">{appendix_html}</div>' if appendix_html else "")
+        + "</section>"
     )
 
 
@@ -1472,10 +1551,22 @@ def build_shell_document(*, lang: str, cover: ShellCover,
     ``ShellSection.html`` and ``appendix_html``/``extra_head`` are trusted as
     already-escaped rendered markup; every scalar on ``ShellCover`` and
     ``ShellSection`` is escaped here.
+
+    Numbering: there is exactly one sequence — ``exec`` sections first, then
+    the chapters, both in caller order — and all three places a number is
+    shown read from it. The TOC prints ``{i:02d}`` from 00 (brief), the chapter
+    header prints the same digits with an ``S`` prefix, and the appendix index
+    lists every section under the same digits. Numbering each of the three
+    independently only looks consistent when there is exactly one exec section.
+
+    ``id="appendix"`` is reserved for the appendix element; a ``ShellSection``
+    must not use it or the in-page anchors collide.
     """
     ordered = list(sections)
-    execs = [s for s in ordered if s.kind == "exec"]
-    chapters = [s for s in ordered if s.kind != "exec"]
+    execs = [s for s in ordered if _kind(s.kind) == "exec"]
+    chapters = [s for s in ordered if _kind(s.kind) != "exec"]
+    # The single numbering sequence. Chapters start at len(execs).
+    numbered = execs + chapters
 
     # Document tone: critical wins outright, else the first chapter's tone.
     doc_tone = next(
@@ -1490,23 +1581,24 @@ def build_shell_document(*, lang: str, cover: ShellCover,
             f' data-tone="{_tone(section.tone)}">'
             f"<h2>{_esc(section.title)}</h2>{section.html}</section>"
         )
-    parts.append(_render_toc(execs + chapters, lang))
+    parts.append(_render_toc(numbered, lang))
 
     chapter_html = "".join(
         f'<section class="chapter" id="{_esc(section.id)}"'
-        f' data-shell="{_esc(section.kind)}" data-tone="{_tone(section.tone)}">'
+        f' data-shell="{_kind(section.kind)}" data-tone="{_tone(section.tone)}">'
         '<div class="chapter-head">'
         # ASCII chapter number: CJK gets split and re-spaced in the PDF text
-        # layer, so the two-pass page-number probe anchors on S01/S02/...
-        f'<span class="chapter-index">S{index:02d}</span>'
-        f'<span class="chapter-eyebrow">{_esc(_kind_label(section.kind, lang))}</span>'
+        # layer, so the two-pass page-number probe anchors on S00/S01/...
+        f'<span class="chapter-index">S{len(execs) + offset:02d}</span>'
+        f'<span class="chapter-eyebrow">'
+        f'{_esc(_kind_label(_kind(section.kind), lang))}</span>'
         f'<h2 class="chapter-title">{_esc(section.title)}</h2>'
         f'<span class="chapter-marks">{_mark_chips(section.marks)}</span>'
         f"</div>{section.html}</section>"
-        for index, section in enumerate(chapters, 1)
+        for offset, section in enumerate(chapters)
     )
     parts.append(f'<div class="chapters">{chapter_html}</div>')
-    parts.append(_render_appendix(lang=lang, cover=cover, chapters=chapters,
+    parts.append(_render_appendix(lang=lang, cover=cover, numbered=numbered,
                                   rule_index=rule_index,
                                   appendix_html=appendix_html))
 

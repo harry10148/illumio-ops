@@ -113,9 +113,14 @@ BILINGUAL_DATA_LINES: set[tuple[str, str]] = {
     # design/v2/reports/shell.css; its CJK is that file's own design and
     # print-layout commentary carried over unchanged, not display text.
     # Same status as the CSS literals in report_css.py above, but scoped to
-    # the one literal (the needle is the provenance header inside it) so any
-    # other hardcoded CJK in report_shell.py is still a finding.
-    ("src/report/exporters/report_shell.py", "design/v2/reports/shell.css"),
+    # that one literal, so any other hardcoded CJK in report_shell.py is
+    # still a finding.
+    #
+    # The needle is a dedicated marker token, NOT prose: it is exported as
+    # report_shell.SHELL_CSS_PORT_MARKER and asserted present by
+    # tests/test_report_shell_renderer.py. Keying the exemption off a sentence
+    # would mean rewording a comment silently turns 1200 lines red.
+    ("src/report/exporters/report_shell.py", "shell-css-port-v2"),
 }
 
 # Files skipped entirely (tests, caches, third-party).
