@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import ipaddress
 from typing import Literal, Optional
+from urllib.parse import urlsplit
 
 from pydantic import AliasChoices, BaseModel, ConfigDict, Field, HttpUrl, field_validator, model_validator
 
@@ -36,6 +37,8 @@ def _validate_optional_http_url(value: object, field_name: str) -> str:
         raise ValueError(
             f"{field_name} must use http or https scheme (e.g. https://console.example.com)"
         ) from None
+    if "@" in urlsplit(raw).netloc:
+        raise ValueError(f"{field_name} must not include userinfo")
     return raw
 
 
@@ -75,6 +78,8 @@ class ApiSettings(_Base):
             raise ValueError(
                 "url must use http or https scheme (e.g. https://pce.example.com:8443)"
             ) from None
+        if "@" in urlsplit(raw).netloc:
+            raise ValueError("url must not include userinfo")
         return raw
 
     @field_validator("console_url", mode="before")

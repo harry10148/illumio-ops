@@ -1,5 +1,8 @@
 """Event deep links use the deployment's resolved PCE Console URL."""
+from urllib.parse import urlsplit
 from unittest.mock import MagicMock
+
+import pytest
 
 from src.reporter import Reporter
 
@@ -60,3 +63,23 @@ def test_event_console_link_without_href_returns_resolved_console_landing_page()
         console_url="https://tenant.illumio.ai/",
     )
     assert r._event_console_link({}) == "https://tenant.illumio.ai"
+
+
+@pytest.mark.parametrize("href", [
+    "https://fake-user:fake-pass@evil.invalid/events/evt-hostile",
+    "//fake-user:fake-pass@evil.invalid/events/evt-hostile",
+    "javascript:alert('evt-hostile')",
+])
+def test_hostile_event_href_cannot_change_console_authority(href):
+    r = _reporter_with_api(
+        "https://ap-scp45.illum.io/api/v2",
+        deployment_type="saas",
+        console_url="",
+    )
+
+    parts = urlsplit(r._event_console_link({"href": href}))
+
+    assert parts.scheme == "https"
+    assert parts.hostname == "console.illum.io"
+    assert parts.username is None
+    assert parts.password is None

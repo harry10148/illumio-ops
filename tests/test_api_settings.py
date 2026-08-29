@@ -299,6 +299,35 @@ def test_settings_rejects_invalid_runtime_connection_metadata_atomically(
     assert cm.config["api"] == before
 
 
+@pytest.mark.parametrize(("api_block", "choice"), [
+    ({
+        "deployment_type": "saas",
+        "console_url": "https://fake-user:fake-pass@tenant.illumio.example",
+    }, None),
+    ({
+        "url": "https://fake-user:fake-pass@pce.example.com:8443",
+        "org_id": "sentinel-org",
+    }, "same-pce"),
+])
+def test_settings_rejects_userinfo_urls_without_partial_mutation(
+    authed_client, app, api_block, choice,
+):
+    client, csrf = authed_client
+    cm = app.config["CM"]
+    cm.load()
+    before = dict(cm.config["api"])
+
+    res = _save(client, csrf, api_block, choice=choice)
+
+    assert res.status_code == 400
+    assert res.get_json()["ok"] is False
+    cm.load()
+    assert cm.config["api"] == before
+    stored = json.dumps(cm.config["api"])
+    assert "fake-user" not in stored
+    assert "sentinel-org" not in stored
+
+
 def test_runtime_connection_metadata_neither_flushes_nor_changes_target(
     tmp_path, monkeypatch,
 ):

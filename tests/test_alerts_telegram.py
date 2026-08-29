@@ -121,7 +121,7 @@ def test_build_telegram_message_keeps_normal_saas_console_event_link():
         "count": 1,
         "time": "t",
         "raw_data": [{
-            "href": "/orgs/7/events/evt-normal",
+            "href": "https://fake-user:fake-pass@evil.invalid/orgs/7/events/evt-normal",
             "event_type": "agent.tampering",
             "timestamp": "t",
         }],
@@ -130,6 +130,7 @@ def test_build_telegram_message_keeps_normal_saas_console_event_link():
     body = reporter._build_telegram_message("Event alert")
 
     assert '<a href="https://console.illum.io/#/events/evt-normal">PCE</a>' in body
+    assert "fake-user" not in body
 
 
 def test_telegram_digest_template_renders_sections():

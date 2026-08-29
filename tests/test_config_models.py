@@ -45,6 +45,29 @@ def test_api_settings_accepts_empty_console_url_and_rejects_non_http_url():
         ApiSettings(console_url="ftp://console.illum.io")
 
 
+@pytest.mark.parametrize(("field", "value"), [
+    ("url", "https://fake-user:fake-pass@pce.example.com:8443"),
+    ("console_url", "https://fake-user:fake-pass@console.illum.io"),
+])
+def test_api_settings_rejects_userinfo_in_pce_urls(field, value):
+    from src.config_models import ApiSettings
+
+    with pytest.raises(ValidationError, match=field):
+        ApiSettings(**{field: value})
+
+
+def test_api_settings_keeps_valid_ipv6_pce_urls():
+    from src.config_models import ApiSettings
+
+    cfg = ApiSettings(
+        url="http://[2001:db8::1]:8443",
+        console_url="https://[2001:db8::2]",
+    )
+
+    assert cfg.url == "http://[2001:db8::1]:8443"
+    assert cfg.console_url == "https://[2001:db8::2]"
+
+
 def test_web_gui_public_url_is_declared_and_validated():
     from src.config_models import WebGuiSettings
     assert WebGuiSettings(public_url="https://gui.example/").public_url == "https://gui.example"

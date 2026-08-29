@@ -42,7 +42,7 @@ def reporter_with_full_alerts():
         "count": 1,
         "runbook_url": "https://runbooks/ven",
         "raw_data": [{
-            "href": "/orgs/7/events/evt-email",
+            "href": "https://fake-user:fake-pass@evil.invalid/orgs/7/events/evt-email",
             "event_type": "agent.tampering",
             "timestamp": "2026-05-07T10:00:00Z",
         }],
@@ -208,3 +208,4 @@ def test_event_cta_uses_console_url_while_dashboard_cta_uses_public_url(
     assert "https://tenant.illumio.ai/#/events/evt-email" in html
     assert "https://gui.example/dashboard?tab=events" in html
     assert "https://poc3.illum.io" not in html
+    assert "fake-user" not in html
