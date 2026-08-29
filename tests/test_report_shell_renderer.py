@@ -404,17 +404,24 @@ _DELTA_RELEASE_JS_WIDTHS = (_TABLE_HINT_HIDDEN, _TABLE_HINT_HIDDEN + """
        · 2026-08-30 於新殼重現：11 欄寬表在 A4 橫式量到 table 2479px / panel
          1014px，直式 2479px / 674px。
      只有 !important 蓋得過 inline style，所以這裡用 !important 把 JS 寫進去的
-     寬度全部釋放掉。代價是下面那些欄寬下限也必須是 !important，否則它們會輸
-     給這裡的釋放，表格就從「整張被切掉」變成「擠回去再逐字切」——換一種無聲
-     截斷而已。版面政策（直式 auto、橫式 fixed）仍由 --wide / --landscape 決定，
-     這裡不碰 table-layout。 */
+     寬度釋放掉。釋放規則只要 table / col / thead th 三條就是全部覆蓋：
+     report_css.py 裡 12 個 .style.width / .style.minWidth 寫入點全落在
+     table、th、col，沒有一個碰 td，所以 td 上無事可放。
+     下面四組欄寬下限跟著升成 !important，是為了整組對稱一致；實測只有
+     --landscape 的 .col-long { width: 30% } 真的 load-bearing——拿掉 !important
+     之後 9 欄直式的欄寬逐欄與出貨版相同、PDF 缺漏 0，11 欄橫式也只有 col-long
+     的份額從 305px 掉到 93px、缺漏 0。
+     這裡刻意不碰 table-layout。版面政策（直式 auto、橫式 fixed）是設計檔明文
+     的裁決（.report-table-panel--landscape .report-table { table-layout: fixed }），
+     一條為了相容 JS 而移植進來的規則不該把它靜默翻掉。 */
   .report-table { width: 100% !important; min-width: 0 !important; }
   .report-table col { width: auto !important; min-width: 0 !important; }
   .report-table thead th { width: auto !important; min-width: 0 !important; }
   .report-table-panel { overflow: visible; }
 """)
 
-# F1 的另一半：釋放規則之後，這四組欄寬下限必須贏回來（見上面的註解）。
+# F1 的另一半：釋放規則之後，這四組欄寬下限一併升成 !important 保持對稱
+# （只有 --landscape 的 col-long width 有實測必要性，見上面的註解）。
 _DELTA_FLOOR_LONG = (
     "  .report-table-panel--wide .report-table td.col-long,\n"
     "  .report-table-panel--wide .report-table th.col-long { min-width: 14em; }\n",
