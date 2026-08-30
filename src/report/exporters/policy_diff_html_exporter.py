@@ -1,13 +1,23 @@
 """Policy Diff HTML exporter — renders DRAFT-vs-ACTIVE diff + attribution.
 
-Uses the SHARED report styling (report_css.build_css + cover_page) so it matches
-the other standalone reports (audit/ven/policy_usage/app_summary): shared fonts,
-cover page, and the .report-shell / .report-main / .card layout.
+Renders into the design/v2 report shell (``report_shell.build_shell_document``)
+like every other HTML report: the shell owns the cover, the table of contents,
+the chapter frames and the appendix.
 
-Self-contained (no chart deps): KPI cards + a Ruleset-changes table + a
-Rule-changes table, each row colour-coded by change_type and showing the
+Self-contained (no chart deps): a KPI strip that becomes the executive chapter,
+a Ruleset-changes chapter, a Rule-changes chapter and one chapter per changed
+object kind, each table row colour-coded by change_type and showing the
 attributed operator. Mirrors the facade exporter contract: __init__(results,
 lang) + export(output_dir) -> path.
+
+The diff table is hand-written rather than rendered through
+``render_df_table``: the row background encodes the change type, the risk cell
+carries its own class, and blank attribution renders an em dash whose ``title``
+explains why. ``render_df_table``'s ``render_cell`` hook only supplies a cell's
+INNER html, so none of those three can be expressed through it. What the panel
+gives — the wide-table print treatment — is added with
+``table_renderer.wrap_table_panel`` instead, so this table gets the same verdict
+as the seven that do go through the renderer.
 """
 from __future__ import annotations
 
@@ -23,11 +33,37 @@ from src.report.exporters._output_paths import (
     reserve_unique_path,
     write_text_atomic,
 )
-from src.report.exporters.cover_page import build_cover_page as _build_cover_page
-from src.report.exporters.report_css import TABLE_JS, build_css
+from src.report.exporters.report_shell import (
+    ShellCover,
+    ShellSection,
+    build_shell_document,
+)
+from src.report.exporters.table_renderer import wrap_table_panel
 from src.report.report_metadata import write_metadata_sidecar
 
-_CSS = build_css("policy_diff")
+# Ported from report_css.py:470-483, which Task 6 deletes. These are this one
+# report type's own components, so they travel in the document's extra_head
+# rather than in the shared SHELL_CSS (the same call Task 4 made for policy
+# usage's rule cards). Every colour is re-expressed as a shell tone token: the
+# old palette variables (--green-10 / --red-10 / --gold-110 / --slate-50) do not
+# exist once build_css() is gone, and a declaration referring to an undefined
+# variable drops out silently — the row would simply stop being coloured.
+_COMPONENT_CSS = """<style>
+.report-table tbody tr.pd-added td    { background: var(--tone-ok-bg); }
+.report-table tbody tr.pd-removed td  { background: var(--tone-crit-bg); }
+.report-table tbody tr.pd-modified td { background: var(--tone-warn-bg); }
+/* Hover keeps report_css.py:473-475's literals: they are self-contained hex
+   values that never depended on a build_css() variable, so porting them is a
+   copy, and inventing a replacement would change a shipped colour for no
+   reason. Screen-only by nature — nothing hovers on paper. */
+.report-table tbody tr.pd-added:hover td    { background: #cdf3df; }
+.report-table tbody tr.pd-removed:hover td  { background: #fbd5d5; }
+.report-table tbody tr.pd-modified:hover td { background: #FBF1C7; }
+.pd-risk-critical, .pd-risk-high { color: var(--tone-crit-fg); font-weight: 700; }
+.pd-risk-medium { color: var(--tone-warn-fg); font-weight: 600; }
+.pd-risk-low    { color: var(--tone-ok-fg); font-weight: 600; }
+.pd-risk-info   { color: var(--text-3); font-weight: 600; }
+</style>"""
 
 _ROW_CLASS = {"added": "pd-added", "removed": "pd-removed", "modified": "pd-modified"}
 
@@ -37,10 +73,13 @@ def _esc(v) -> str:
 
 
 def _kpi(value, label) -> str:
+    # .kpi / .kpi-strip is the v2 shell's KPI vocabulary; .kpi-card / .kpi-grid
+    # were report_css.py's and have no rule in SHELL_CSS, so keeping them would
+    # leave the numbers as unstyled stacked divs.
     return (
-        '<div class="kpi-card">'
-        f'<div class="kpi-label">{_esc(label)}</div>'
-        f'<div class="kpi-value">{_esc(value)}</div></div>'
+        '<div class="kpi">'
+        f'<span class="kpi-label">{_esc(label)}</span>'
+        f'<span class="kpi-value">{_esc(value)}</span></div>'
     )
 
 
@@ -49,8 +88,15 @@ class PolicyDiffHtmlExporter:
         self._r = results
         self._lang = lang
 
-    def _section(self, id_: str, title: str, content: str) -> str:
-        return f'<section id="{id_}" class="card"><h2>{title}</h2>{content}</section>'
+    def _section(self, id_: str, title: str, content: str) -> ShellSection:
+        """One chapter for the v2 shell.
+
+        The heading is printed by ``build_shell_document`` now, so this returns
+        the body plus the metadata the shell needs. No ``marks``: this report
+        has no findings list, and the risk column is table data, which B10/C6
+        keep out of the mark tally.
+        """
+        return ShellSection(id=id_, title=title, html=content)
 
     # DataFrame column name -> i18n key for the localized <th> header.
     _COL_I18N = {
@@ -98,82 +144,89 @@ class PolicyDiffHtmlExporter:
                 else:
                     cells.append(f"<td>{_esc(v)}</td>")
             body.append(f'<tr class="{cls}">{"".join(cells)}</tr>')
-        return (
+        table_html = (
             '<div class="report-table-wrap"><table class="report-table"><thead><tr>'
             f"{head}</tr></thead><tbody>{''.join(body)}</tbody></table></div>"
         )
+        # The panel is what carries the wide-table print treatment in SHELL_CSS
+        # (reduced font, tighter padding, the column-width floors). Without it a
+        # nine-column diff prints at full body size and the release rules are all
+        # that stand between it and the page edge.
+        return wrap_table_panel(table_html, df, cols, self._lang)
 
     def _kpi_row(self) -> str:
         s = self._r.get("summary", {})
         _rs = t("rpt_pd_unit_rs", lang=self._lang)
         _rule = t("rpt_pd_unit_rule", lang=self._lang)
-        return (
+        return '<div class="kpi-strip">' + (
             _kpi(s.get("rulesets_added", 0), t("rpt_policy_diff_added", lang=self._lang) + " " + _rs)
             + _kpi(s.get("rulesets_removed", 0), t("rpt_policy_diff_removed", lang=self._lang) + " " + _rs)
             + _kpi(s.get("rulesets_modified", 0), t("rpt_policy_diff_modified", lang=self._lang) + " " + _rs)
             + _kpi(s.get("rules_added", 0), t("rpt_policy_diff_added", lang=self._lang) + " " + _rule)
             + _kpi(s.get("rules_removed", 0), t("rpt_policy_diff_removed", lang=self._lang) + " " + _rule)
             + _kpi(s.get("rules_modified", 0), t("rpt_policy_diff_modified", lang=self._lang) + " " + _rule)
-        )
+        ) + "</div>"
 
     def _render_html(self) -> str:
         lang = self._lang
         title = t("rpt_policy_diff_report_title", lang=lang)
-        # Pass raw title — build_cover_page escapes its args (avoid double-escape).
-        cover_html = _build_cover_page(
-            title=title,
-            report_type=title,
-            lang=lang,
-        )
+        report_type = t("rpt_cover_type_diff", lang=lang)
 
-        object_sections = ""
+        sections: list[ShellSection] = [
+            # The KPI row had no heading of its own before (a bare
+            # <section class="card"> holding a .kpi-grid), so naming it here
+            # takes nothing away, and it is the heading the other nine types
+            # print above their own headline numbers.
+            ShellSection(
+                id="exec-summary",
+                title=(f'{t("rpt_exec_summary_label", lang=lang)} '
+                       f'— {report_type}'),
+                html=self._kpi_row(),
+                kind="exec"),
+            self._section(
+                "ruleset-changes",
+                t("rpt_policy_diff_ruleset_changes", lang=lang),
+                self._table(self._r.get("ruleset_changes"), "ruleset_id"),
+            ),
+            self._section(
+                "rule-changes",
+                t("rpt_policy_diff_rule_changes", lang=lang),
+                self._table(self._r.get("rule_changes"), "rule_id"),
+            ),
+        ]
         for section_id, title_key, df_key in (
             ("ip-list-changes", "rpt_policy_diff_ip_list_changes", "ip_list_changes"),
             ("service-changes", "rpt_policy_diff_service_changes", "service_changes"),
-            ("label-group-changes", "rpt_policy_diff_label_group_changes", "label_group_changes"),
+            ("label-group-changes", "rpt_policy_diff_label_group_changes",
+             "label_group_changes"),
         ):
-            object_sections += self._section(
+            sections.append(self._section(
                 section_id, t(title_key, lang=lang),
-                self._table(self._r.get(df_key), "object_id", name_col="name"))
+                self._table(self._r.get(df_key), "object_id", name_col="name")))
 
-        sections = (
-            f'<section class="card"><div class="kpi-grid">{self._kpi_row()}</div></section>'
-            + self._section(
-                "ruleset-changes",
-                _esc(t("rpt_policy_diff_ruleset_changes", lang=lang)),
-                self._table(self._r.get("ruleset_changes"), "ruleset_id"),
-            )
-            + self._section(
-                "rule-changes",
-                _esc(t("rpt_policy_diff_rule_changes", lang=lang)),
-                self._table(self._r.get("rule_changes"), "rule_id"),
-            )
-            + object_sections
-            + f'<p class="note">{_esc(t("rpt_policy_diff_attribution_note", lang=lang))}</p>'
+        # Raw strings: build_shell_document escapes every ShellCover scalar
+        # itself, so escaping here would double-escape. The eyebrow carries the
+        # type label because ``type_label`` alone only reaches an attribute
+        # (body[data-report-title]) and would leave the text layer.
+        cover = ShellCover(
+            title=title,
+            doc_title=title,
+            type_label=report_type,
+            eyebrow=report_type,
         )
-
-        nav_html = (
-            '<aside class="report-toc screen-only">'
-            f'<button class="print-btn" onclick="window.print()">{t("rpt_nav_print_pdf", lang=lang)}</button>'
-            '</aside>'
-        )
-
-        lang_attr = "zh-TW" if lang == "zh_TW" else "en"
-        return (
-            f'<!DOCTYPE html><html lang="{lang_attr}"><head>\n'
-            '<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">\n'
-            f"<title>{_esc(title)}</title>"
-            + _CSS
-            + "</head>\n"
-            + f'<body data-report-title="{_esc(title)}">'
-            + cover_html
-            + '<div class="report-shell">'
-            + nav_html
-            + '<main class="report-main">'
-            + sections
-            + "</main></div>"
-            + TABLE_JS
-            + "</body></html>"
+        return build_shell_document(
+            lang=lang,
+            cover=cover,
+            sections=sections,
+            # The attribution caveat used to sit as a <p class="note"> after the
+            # last section. It qualifies the whole document rather than any one
+            # chapter, so it goes to the appendix colophon instead of into a
+            # chapter that would appear to own it.
+            appendix_html=(
+                '<p class="note">'
+                + _esc(t("rpt_policy_diff_attribution_note", lang=lang))
+                + "</p>"),
+            extra_head=_COMPONENT_CSS,
         )
 
     def export(self, output_dir: str = "reports") -> str:

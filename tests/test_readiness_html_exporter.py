@@ -43,9 +43,14 @@ def _render(tmp_path, result, lang="en"):
 def test_export_writes_prefixed_file_with_sections(tmp_path):
     path, html = _render(tmp_path, _result())
     assert os.path.basename(path).startswith("Illumio_Readiness_Report_")
-    for anchor in ("readiness-summary", "readiness-queue", "readiness-factors",
+    # "readiness-summary" became "exec-summary" in Phase 2B: that chapter is
+    # this report's executive summary (its heading was already
+    # rpt_readiness_sec_summary = "Executive Summary") and now anchors the way
+    # the other nine types do.
+    for anchor in ("exec-summary", "readiness-queue", "readiness-factors",
                    "readiness-recommendations", "readiness-trend"):
         assert f'id="{anchor}"' in html
+    assert "readiness-summary" not in html
 
 
 def test_print_button_present(tmp_path):

@@ -1,12 +1,13 @@
 """App Summary HTML exporter — standalone single-app report.
 
-Uses the SHARED report styling (report_css.build_css + cover_page) so it matches
-the other standalone reports (audit/ven/policy_usage): shared fonts, cover page,
-and the .report-shell / .report-main / .card layout.
+Renders into the design/v2 report shell (``report_shell.build_shell_document``)
+like every other HTML report: the shell owns the cover, the table of contents,
+the chapter frames and the appendix.
 
-Six sections: cover, KPI row, inbound baseline, outbound dependencies, policy
-coverage (this app), findings. Empty App Labels render a valid single-page
-report carrying the rpt_app_empty note rather than raising.
+Chapters: a KPI strip as the executive chapter, then inbound baseline, outbound
+dependencies, policy coverage (this app), policy impact, enforcement and
+findings. Empty App Labels still render a valid report — cover plus one chapter
+carrying the rpt_app_empty note — rather than raising.
 
 Contract: __init__(results, lang) + export(output_dir) -> path.
 """
@@ -23,12 +24,14 @@ from src.report.exporters._output_paths import (
     reserve_unique_path,
     write_text_atomic,
 )
-from src.report.exporters.cover_page import build_cover_page as _build_cover_page
-from src.report.exporters.report_css import TABLE_JS, build_css
-from src.report.exporters.table_renderer import render_df_table
+from src.report.exporters.html_exporter import _sev_attrs
+from src.report.exporters.report_shell import (
+    ShellCover,
+    ShellSection,
+    build_shell_document,
+)
+from src.report.exporters.table_renderer import render_df_table, wrap_table_panel
 from src.report.report_metadata import write_metadata_sidecar
-
-_CSS = build_css("app_summary")
 
 
 def _esc(v) -> str:
@@ -36,11 +39,18 @@ def _esc(v) -> str:
 
 
 def _kpi(value, label) -> str:
+    # .kpi / .kpi-strip is the v2 shell's KPI vocabulary; .kpi-card / .kpi-grid
+    # were report_css.py's and have no rule in SHELL_CSS, so keeping them would
+    # leave the numbers as unstyled stacked divs.
     return (
-        '<div class="kpi-card">'
-        f'<div class="kpi-label">{_esc(label)}</div>'
-        f'<div class="kpi-value">{_esc(value)}</div></div>'
+        '<div class="kpi">'
+        f'<span class="kpi-label">{_esc(label)}</span>'
+        f'<span class="kpi-value">{_esc(value)}</span></div>'
     )
+
+
+def _kpi_strip(cards: str) -> str:
+    return f'<div class="kpi-strip">{cards}</div>'
 
 
 class AppSummaryHtmlExporter:
@@ -48,8 +58,15 @@ class AppSummaryHtmlExporter:
         self._r = results
         self._lang = lang
 
-    def _section(self, id_: str, title: str, content: str) -> str:
-        return f'<section id="{id_}" class="card"><h2>{title}</h2>{content}</section>'
+    def _section(self, id_: str, title: str, content: str) -> ShellSection:
+        """One chapter for the v2 shell.
+
+        The heading is printed by ``build_shell_document`` now, so this returns
+        the body plus the metadata the shell needs. No ``marks``: this report
+        has no findings tally to chip the chapter head with, and the severity
+        badges in the findings table are table data (B10/C6).
+        """
+        return ShellSection(id=id_, title=title, html=content)
 
     def _trunc_note(self, shown_df, total: int) -> str:
         """Disclose truncation when a KPI counts the full set but the table shows
@@ -84,7 +101,7 @@ class AppSummaryHtmlExporter:
         caption = (f'<h3>{_esc(t("rpt_app_top_uncovered", lang=self._lang))}</h3>'
                    if top_df is not None and not getattr(top_df, "empty", True) else "")
         top = caption + render_df_table(top_df, col_i18n={}, lang=self._lang)
-        return f'<div class="kpi-grid">{cards}</div>{top}'
+        return _kpi_strip(cards) + top
 
     def _policy_impact_section(self) -> str:
         pi = self._r.get("policy_impact") or {}
@@ -97,7 +114,7 @@ class AppSummaryHtmlExporter:
             + _kpi(str(pi["blocked"]), t("rpt_app_pi_blocked", lang=self._lang))
         )
         note = _esc(t("rpt_app_pi_note", lang=self._lang)).replace("{n}", str(pi["would_be_blocked"]))
-        return f'<div class="kpi-grid">{cards}</div><p class="note">{note}</p>'
+        return _kpi_strip(cards) + f'<p class="note">{note}</p>'
 
     def _enforcement_section(self) -> str:
         en = self._r.get("enforcement") or {}
@@ -115,78 +132,90 @@ class AppSummaryHtmlExporter:
         rows = []
         for f in findings:
             sev = _esc(getattr(f, "severity", ""))
-            badge = f'<span class="badge badge-{sev}">{sev}</span>' if sev else ""
+            # data-tone/data-sev, not the badge-<SEV> class alone: SHELL_CSS's
+            # .badge reads var(--mark)/var(--fill)/var(--ink) with no fallback,
+            # so a badge without a tone of its own inherits the chapter's and
+            # every severity in the table ends up looking identical. data-sev is
+            # what keeps CRITICAL (solid) apart from HIGH (outlined) — they
+            # share a tone. The legacy badge-<SEV> class is kept alongside.
+            badge = (f'<span class="badge badge-{sev}"{_sev_attrs(sev)}>{sev}</span>'
+                     if sev else "")
             rows.append(
                 f"<tr><td>{badge}</td>"
                 f"<td>{_esc(getattr(f, 'rule_id', ''))}</td>"
                 f"<td>{_esc(getattr(f, 'description', ''))}</td></tr>"
             )
-        return (
+        table_html = (
             "<div class='report-table-wrap'><table class='report-table'><thead><tr>"
             f"<th>{_esc(t('rpt_col_severity', lang=self._lang))}</th>"
             f"<th>{_esc(t('rpt_col_rule_name', lang=self._lang))}</th>"
             f"<th>{_esc(t('rpt_col_description', lang=self._lang))}</th>"
             f"</tr></thead><tbody>{''.join(rows)}</tbody></table></div>"
         )
+        # Three columns: the panel's job here is the compact modifier and the
+        # break-inside rule in print, not the wide treatment.
+        return wrap_table_panel(table_html, None, ["severity", "rule", "desc"],
+                                self._lang)
 
     def _render_html(self) -> str:
         lang = self._lang
         title = t("rpt_app_title", lang=lang)
+        report_type = t("rpt_cover_type_app_summary", lang=lang)
         app = self._r.get("app", "")
         env = self._r.get("env", "")
-        # Pass raw app/env — build_cover_page escapes its args (avoid double-escape).
         sub = app + (f" / {env}" if env else "")
 
-        cover_html = _build_cover_page(
-            title=title,
-            report_type=sub or title,
-            lang=lang,
-        )
-
         if self._r.get("empty"):
-            sections = self._section(
-                "findings", _esc(t("rpt_app_findings", lang=lang)),
+            # Still a real document: cover, table of contents, one chapter
+            # carrying the narrative, appendix. The note text is unchanged.
+            sections = [self._section(
+                "findings", t("rpt_app_findings", lang=lang),
                 f'<p class="note">{_esc(t("rpt_app_empty", lang=lang))}</p>',
-            )
+            )]
         else:
             base = self._r.get("baseline", {})
             inbound_df = base.get("inbound")
             outbound_df = base.get("outbound")
+            # _trunc_note stays exactly as it was: it is this report's explicit
+            # disclosure that a KPI counts the full set while the table shows
+            # only the top N (CLAUDE.md's no-silent-truncation rule).
             inbound = render_df_table(inbound_df, col_i18n={}, lang=lang) + self._trunc_note(inbound_df, base.get("inbound_count", 0))
             outbound = render_df_table(outbound_df, col_i18n={}, lang=lang) + self._trunc_note(outbound_df, base.get("outbound_count", 0))
-            sections = (
-                f'<section class="card"><div class="kpi-grid">{self._kpi_row()}</div></section>'
-                + self._section("inbound", _esc(t("rpt_app_inbound", lang=lang)), inbound)
-                + self._section("outbound", _esc(t("rpt_app_outbound", lang=lang)), outbound)
-                + self._section("coverage", _esc(t("rpt_app_coverage", lang=lang)), self._coverage_section())
-                + self._section("policy-impact", _esc(t("rpt_app_policy_impact", lang=lang)), self._policy_impact_section())
-                + self._section("enforcement", _esc(t("rpt_app_enforcement", lang=lang)), self._enforcement_section())
-                + self._section("findings", _esc(t("rpt_app_findings", lang=lang)), self._findings_section())
-            )
+            sections = [
+                # The KPI row had no heading of its own before (a bare
+                # <section class="card"> holding a .kpi-grid), so naming it here
+                # takes nothing away.
+                ShellSection(
+                    id="exec-summary",
+                    title=(f'{t("rpt_exec_summary_label", lang=lang)} '
+                           f'— {report_type}'),
+                    html=self._kpi_row(),
+                    kind="exec"),
+                self._section("inbound", t("rpt_app_inbound", lang=lang), inbound),
+                self._section("outbound", t("rpt_app_outbound", lang=lang), outbound),
+                self._section("coverage", t("rpt_app_coverage", lang=lang),
+                              self._coverage_section()),
+                self._section("policy-impact", t("rpt_app_policy_impact", lang=lang),
+                              self._policy_impact_section()),
+                self._section("enforcement", t("rpt_app_enforcement", lang=lang),
+                              self._enforcement_section()),
+                self._section("findings", t("rpt_app_findings", lang=lang),
+                              self._findings_section()),
+            ]
 
-        nav_html = (
-            '<aside class="report-toc screen-only">'
-            f'<button class="print-btn" onclick="window.print()">{t("rpt_nav_print_pdf", lang=lang)}</button>'
-            '</aside>'
+        # Raw strings: build_shell_document escapes every ShellCover scalar.
+        # The app/env line is real data, not a label, so it rides in the kicker
+        # slot; the eyebrow keeps the report type, which the legacy cover showed
+        # in .cover-type and which would otherwise leave the text layer (
+        # type_label alone only reaches body[data-report-title]).
+        cover = ShellCover(
+            title=title,
+            doc_title=title,
+            type_label=report_type,
+            eyebrow=report_type,
+            kicker=sub,
         )
-
-        lang_attr = "zh-TW" if lang == "zh_TW" else "en"
-        return (
-            f'<!DOCTYPE html><html lang="{lang_attr}"><head>\n'
-            '<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">\n'
-            f"<title>{_esc(title)}</title>"
-            + _CSS
-            + "</head>\n"
-            + f'<body data-report-title="{_esc(title)}">'
-            + cover_html
-            + '<div class="report-shell">'
-            + nav_html
-            + '<main class="report-main">'
-            + sections
-            + "</main></div>"
-            + TABLE_JS
-            + "</body></html>"
-        )
+        return build_shell_document(lang=lang, cover=cover, sections=sections)
 
     def export(self, output_dir: str = "reports") -> str:
         os.makedirs(output_dir, exist_ok=True)

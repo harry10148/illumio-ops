@@ -177,7 +177,11 @@ def test_export_renders_policy_impact_and_enforcement_sections(tmp_path):
     html = AppSummaryHtmlExporter(res, lang="en")._render_html()
     assert 'id="policy-impact"' in html and 'id="enforcement"' in html
     assert "db1" in html
-    assert "report-shell" in html
+    # Phase 2B: the legacy .report-shell container is gone. Assert the v2
+    # skeleton positively — "report-shell is absent" would also hold for a
+    # report with no shell at all.
+    assert '<div class="sheet"><div class="doc">' in html
+    assert '<header class="cover" data-shell="cover"' in html
 
 
 # --- CLI subcommand tests (mirror tests/test_cli_report_policy_diff.py) -------

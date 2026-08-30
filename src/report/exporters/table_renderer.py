@@ -125,6 +125,48 @@ def _wide_hint(n_cols: int, lang: str) -> tuple[str, str]:
     hint = html.escape(_t("rpt_shell_table_hint_wide_portrait", lang=lang, cols=n_cols))
     return "", f'<p class="table-hint">{hint}</p>'
 
+def _panel_attrs(df, columns, lang: str) -> tuple[str, str]:
+    """``(panel class, hint paragraph)`` for a table of ``columns`` over ``df``.
+
+    Extracted verbatim from ``render_df_table`` so the hand-written tables in
+    policy_diff / rule_hit_count / readiness get exactly the same wide-table
+    verdict. Those three build their own ``<tr>``/``<td>`` markup (row colouring
+    by change type, per-cell truncation with the full value in ``title``,
+    timestamps that must stay one unbroken token) which ``render_df_table``
+    cannot express, but the panel is where every print-survival rule in
+    SHELL_CSS hangs off — ``--wide`` alone carries the reduced font, the tighter
+    padding and the four column-width floors. Duplicating the predicate in each
+    exporter would let the three drift away from the other seven the first time
+    the threshold moves.
+    """
+    n_cols = len(columns)
+    wide = (
+        n_cols >= WIDE_COL_THRESHOLD
+        or _estimate_row_max_chars(df, columns) > WIDE_CHARS_THRESHOLD
+    )
+    parts = ["report-table-panel"]
+    if n_cols <= 3:
+        parts.append("report-table-panel--compact")
+    hint_html = ""
+    if wide:
+        parts.append("report-table-panel--wide")
+        landscape_cls, hint_html = _wide_hint(n_cols, lang)
+        if landscape_cls:
+            parts.append(landscape_cls.strip())
+    return " ".join(parts), hint_html
+
+
+def wrap_table_panel(table_html: str, df, columns, lang: str = "en") -> str:
+    """Put a hand-written ``.report-table-wrap`` block inside a shell panel.
+
+    ``table_html`` must already be the ``<div class="report-table-wrap">…</div>``
+    the exporter renders; this only adds the panel and the screen-only wide-table
+    hint around it, so the caller's cell markup is untouched.
+    """
+    panel_class, hint_html = _panel_attrs(df, columns, lang)
+    return f'<div class="{panel_class}">{hint_html}{table_html}</div>'
+
+
 def _empty_panel(no_data_key: str, lang: str = "en") -> str:
     """Render the empty-state tombstone panel."""
     msg = html.escape(_STRINGS[no_data_key].get(lang) or _STRINGS[no_data_key]["en"])
@@ -151,11 +193,6 @@ def render_df_table(
     columns = list(df.columns)
     n_cols = len(columns)
     interactive = n_cols >= 2
-    compact = n_cols <= 3
-    wide = (
-        n_cols >= WIDE_COL_THRESHOLD
-        or _estimate_row_max_chars(df, columns) > WIDE_CHARS_THRESHOLD
-    )
 
     table_cls_parts = ["report-table"]
     if interactive:
@@ -166,16 +203,7 @@ def render_df_table(
     ts_cols = {col for col in columns
                if col not in numeric_cols and _TS_COL_RE.search(str(col))}
 
-    panel_cls_parts = ["report-table-panel"]
-    if compact:
-        panel_cls_parts.append("report-table-panel--compact")
-    hint_html = ""
-    if wide:
-        panel_cls_parts.append("report-table-panel--wide")
-        landscape_cls, hint_html = _wide_hint(n_cols, lang)
-        if landscape_cls:
-            panel_cls_parts.append(landscape_cls.strip())
-    panel_class = " ".join(panel_cls_parts)
+    panel_class, hint_html = _panel_attrs(df, columns, lang)
 
     html_parts = [
         f'<div class="{panel_class}">',

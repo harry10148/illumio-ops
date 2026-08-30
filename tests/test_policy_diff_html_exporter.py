@@ -57,18 +57,29 @@ def test_table_headers_are_localized(tmp_path):
     assert "[MISSING" not in html
 
 
-def test_shell_has_print_only_aside_and_main(tmp_path):
-    """spec N1: policy_diff now carries a print-only aside (button, no nav list)
-    alongside the other exporters, so the shell has two children: the
-    .report-toc aside and .report-main. The shared CSS still carries the
-    :only-child full-span rule (for any TOC-less exporter), which remains
-    present in the embedded stylesheet regardless."""
+def test_shell_skeleton_and_navigation(tmp_path):
+    """spec N1, restated for the v2 shell (Phase 2B).
+
+    The old assertions pinned ``.report-shell`` / ``aside.report-toc`` /
+    ``main.report-main`` and one rule of the legacy stylesheet. All four are
+    gone with ``build_cover_page`` and ``build_css``, and — this is the point —
+    a report rendered with NO shell at all would satisfy "those strings are
+    absent" just as well, so they are replaced by the positive form: the v2
+    skeleton, a generated table of contents that lists every chapter, and the
+    print button that is this product's only route to a PDF.
+    """
+    from bs4 import BeautifulSoup
     html = open(PolicyDiffHtmlExporter(_diff(), lang="en").export(str(tmp_path)),
                 encoding="utf-8").read()
-    assert '<div class="report-shell">' in html
-    assert '<aside class="report-toc screen-only">' in html
-    assert '<main class="report-main">' in html
-    assert ".report-shell > .report-main:only-child { grid-column: 1 / -1; }" in html
+    soup = BeautifulSoup(html, "html.parser")
+    assert soup.select_one("div.sheet > div.doc") is not None
+    assert soup.select_one("header.cover h1") is not None
+    toc = [a["href"].lstrip("#") for a in soup.select("nav.toc ol a")]
+    body_ids = [s["id"] for s in soup.select(
+        "section.exec[id], div.chapters > section.chapter")]
+    assert toc == body_ids and body_ids, body_ids
+    assert soup.select_one("nav.toc button.print-btn") is not None
+    assert "window.print()" in html
 
 
 def test_wide_table_wrapped_for_horizontal_scroll(tmp_path):

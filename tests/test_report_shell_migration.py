@@ -42,7 +42,11 @@ from tests.report_shell.fixtures import BUILDERS
 
 BASELINES = pathlib.Path(__file__).parent / "report_shell" / "baselines"
 
-# Tasks 4 and 5 append their report types here. Adding one needs, at minimum:
+# All ten HTML report types are on the v2 shell as of Task 5; the list is
+# complete. It stays a list rather than being folded into ``REPORT_TYPES``
+# because the two mean different things — that one is "every type a fixture can
+# render", this one is "every type the shell owns", and Task 6 still has to be
+# able to tell them apart. Adding an eleventh type needs, at minimum:
 #   1. the string below;
 #   2. `tests/report_shell/baselines/<type>.json`, captured on PRE-migration
 #      code (scripts/capture_report_baselines.py);
@@ -60,7 +64,8 @@ BASELINES = pathlib.Path(__file__).parent / "report_shell" / "baselines"
 #      pairs with that type's dated footer exemption.
 # Nothing here needs restructuring; every test is parametrised over MIGRATED.
 MIGRATED = ["traffic", "security_risk", "network_inventory",
-            "audit", "ven_status", "policy_usage"]
+            "audit", "ven_status", "policy_usage",
+            "policy_diff", "app_summary", "rule_hit_count", "readiness"]
 
 # Old-side text with no successor in the v2 shell. Every entry carries its own
 # reason; batch-adding entries to make a red run green is what this list exists
@@ -168,6 +173,49 @@ _VEN_LEGACY_COVER_GENERATED_LABEL = norm("Generated")
 # halves: audit and policy_usage DO get the label back because they have a real
 # timestamp, and ven_status must not print it while it has none.
 
+# --------------------------------------------------------------------------
+# Task 5's own exemptions (policy_diff / app_summary / rule_hit_count /
+# readiness). The wall-clock string below is the minute THIS batch's baselines
+# were captured; Task 3's and Task 4's are different minutes and none of the
+# three sets is reusable. Capture your own, write your own reasons.
+#
+# What is structurally different about this batch: none of these four types
+# ever had a footer, so "Illumio PCE Ops" — the screen cover's brand eyebrow —
+# is a leaf in its own right here instead of surviving as a substring of the
+# footer text the way it did for Tasks 3 and 4. It needs an exemption of its
+# own, and that is why _LEGACY_COVER_BRAND is not simply reused.
+# --------------------------------------------------------------------------
+_T5_WALL_CLOCK_COVER = norm("2026-08-30 15:17")
+# The legacy build_cover_page() stamped datetime.now() into both the screen and
+# the print cover. The call is gone (B4/C6) and the value was unreachable in any
+# case: the baseline froze the minute it was captured. Where a type has a real
+# generation timestamp it travels to the cover meta instead — none of these four
+# carries one, which is itself asserted by
+# test_cover_meta_carries_the_generation_timestamp_and_period.
+
+_LEGACY_SCREEN_COVER_BRAND = norm("Illumio PCE Ops")
+# The screen cover block's eyebrow — vendor branding chrome, not report content,
+# and the direct counterpart of _LEGACY_COVER_BRAND ("Illumio Operations") on
+# the print cover. Tasks 3 and 4 needed no entry for it because their types all
+# print a footer that starts with the same words; these four print no footer at
+# all, so here it really does have no successor. The report TYPE label, which
+# the legacy cover showed in .cover-type, survives on the v2 cover eyebrow.
+
+_LEGACY_COVER_GENERATED_LABEL = norm("Generated")
+# The label of the print cover's datetime.now() stamp. The value is exempted
+# above as a wall clock; the label has nothing left to introduce, because none
+# of these four types has a real generation timestamp to put on the v2 cover.
+# The paired positive assertion is in
+# test_cover_meta_carries_the_generation_timestamp_and_period, which requires
+# the label to be ABSENT for exactly these four.
+
+_T5_ALLOWLIST = frozenset({
+    _T5_WALL_CLOCK_COVER,
+    _LEGACY_COVER_BRAND,
+    _LEGACY_SCREEN_COVER_BRAND,
+    _LEGACY_COVER_GENERATED_LABEL,
+})
+
 ALLOWLIST: dict[str, frozenset[str]] = {
     "traffic": _COMMON_ALLOWLIST,
     "security_risk": _COMMON_ALLOWLIST | {_WRONG_EXEC_SUFFIX},
@@ -180,18 +228,39 @@ ALLOWLIST: dict[str, frozenset[str]] = {
                              _VEN_LEGACY_COVER_GENERATED_LABEL}) | _VEN_NAV_ABBREVS,
     "policy_usage": frozenset({_T4_WALL_CLOCK_COVER, _LEGACY_COVER_BRAND,
                                _PU_FOOTER_WITH_DATE}) | _PU_NAV_ABBREVS,
+    # All four need exactly the same four entries and no more: none of them had
+    # a footer, a sidebar with its own wording, or a hero that glued a label to
+    # a value, so the three shapes Tasks 3 and 4 had to exempt do not arise here.
+    "policy_diff": _T5_ALLOWLIST,
+    "app_summary": _T5_ALLOWLIST,
+    "rule_hit_count": _T5_ALLOWLIST,
+    "readiness": _T5_ALLOWLIST,
 }
 
 # The i18n key each type's footer text comes from. It moves into the appendix
 # colophon; the dated leaf is exempted above, so this is what keeps the
 # exemption from also covering the footer text itself disappearing.
-FOOTER_KEY: dict[str, str] = {
+#
+# Four of the ten types never printed a footer at all, so there is no dated leaf
+# to exempt and nothing for this assertion to look for. Declaring them ``None``
+# rather than leaving them out flips the check instead of skipping it: the
+# appendix must then carry NO colophon, so a stray one — or a footer quietly
+# invented during the migration — is a failure too. Leaving them out of the dict
+# would raise KeyError, and "skip when absent" is the vacuous form this file
+# keeps having to unlearn. policy_diff's entry is not a footer: it is the
+# document-level attribution caveat that used to sit as a <p class="note"> after
+# the last section and now rides in the same colophon slot.
+FOOTER_KEY: dict[str, str | None] = {
     "traffic": "rpt_tr_footer",
     "security_risk": "rpt_tr_footer",
     "network_inventory": "rpt_tr_footer",
     "audit": "rpt_au_footer",
     "ven_status": "rpt_ven_footer",
     "policy_usage": "rpt_pu_footer",
+    "policy_diff": "rpt_policy_diff_attribution_note",
+    "app_summary": None,
+    "rule_hit_count": None,
+    "readiness": None,
 }
 
 # The chapters each fixture must render, in order. ``test_new_shell_structure``
@@ -212,6 +281,16 @@ EXPECTED_SECTION_IDS: dict[str, tuple[str, ...]] = {
                    "offline", "lost-today", "lost-yest"),
     "policy_usage": ("exec-summary", "summary", "overview", "hit-rules",
                      "unused-rules", "deny-rules", "draft-pd"),
+    "policy_diff": ("exec-summary", "ruleset-changes", "rule-changes",
+                    "ip-list-changes", "service-changes", "label-group-changes"),
+    "app_summary": ("exec-summary", "inbound", "outbound", "coverage",
+                    "policy-impact", "enforcement", "findings"),
+    "rule_hit_count": ("exec-summary", "rhc-hit", "rhc-unused", "rhc-cleanup"),
+    # readiness-summary becomes the exec chapter and therefore takes the shared
+    # exec-summary id; its own heading text ("Executive Summary") is a prefix of
+    # the new one, so nothing leaves the document.
+    "readiness": ("exec-summary", "readiness-queue", "readiness-factors",
+                  "readiness-recommendations", "readiness-trend"),
 }
 
 # The report-type label each type's executive summary must name (F5).
@@ -225,6 +304,13 @@ EXEC_SUFFIX: dict[str, str] = {
     "audit": "Audit Report",
     "ven_status": "VEN Status Report",
     "policy_usage": "Policy Usage Report",
+    # None of these four had an executive summary block at all; their KPI row
+    # becomes the exec chapter and the suffix is the type label the v2 cover
+    # eyebrow shows, so the two agree by construction.
+    "policy_diff": "Policy Diff Report",
+    "app_summary": "App Summary Report",
+    "rule_hit_count": "Rule Hit Count (VEN-measured)",
+    "readiness": "Enforcement Readiness",
 }
 
 # One cell value per type that must still sit under its own column heading.
@@ -241,6 +327,17 @@ KNOWN_CELLS: dict[str, tuple[str, str]] = {
     # summary, and the per-host columns only exist in sync-issues/offline.
     "ven_status": ("k8s-node-syncissue-01", "Hostname"),
     "policy_usage": ("Category-tango", "Category"),
+    # The three hand-written tables keep their own markup (see the task report);
+    # the invariant is the same either way — walk from the cell back to the <th>
+    # at its own index.
+    "policy_diff": ("bob.chen@lab.local", "Operator"),
+    # app_summary's baseline tables go through render_df_table with col_i18n={},
+    # so the heading is the raw column name.
+    "app_summary": ("web-tier-inbound", "src_app"),
+    "rule_hit_count": ("consumer-alfa", "Consumers (Source)"),
+    # Only the advancement queue carries this value; the recommendations table
+    # has its own "app-bravo (production)" under the same heading text.
+    "readiness": ("app-alfa (production)", "App (Env)"),
 }
 
 
@@ -302,7 +399,23 @@ def test_footer_text_survives_into_the_appendix(rtype):
 
     The exempted leaf is the footer *plus that day's date*. Without this the
     exemption would also cover the footer text itself disappearing.
+
+    ``FOOTER_KEY[rtype] is None`` means the type never printed one; the check
+    then flips to "the appendix carries no colophon at all" rather than being
+    skipped, so a footer appearing out of nowhere is caught too.
     """
+    if FOOTER_KEY[rtype] is None:
+        soup = BeautifulSoup(BUILDERS[rtype](), "html.parser")
+        # Assert the appendix itself is there first: "no colophon" is trivially
+        # true in a document with no appendix, which is exactly the vacuous
+        # shape C5b forbids.
+        appendix = soup.select_one("section.appendix")
+        assert appendix is not None, f"{rtype}: 沒有附錄，這條守門就是空轉"
+        colophon = appendix.select_one(".colophon")
+        assert colophon is None, (
+            f"{rtype} 沒有 footer，附錄不該有 colophon："
+            f"{colophon.get_text(strip=True)[:80]!r}")
+        return
     _, flat = conservation_text(BUILDERS[rtype]())
     assert norm(t(FOOTER_KEY[rtype], lang="en")) in flat
 
@@ -350,10 +463,26 @@ def test_cover_meta_carries_the_generation_timestamp_and_period(rtype):
         # The VEN fixture has no generated_at at all — that is exactly why its
         # old "Generated: " node is exempted. Nothing to assert but the absence.
         "ven_status": {},
+        # Task 5's four never carried a generation timestamp: the only thing the
+        # legacy cover stamped was datetime.now() at render time, which is what
+        # _T5_WALL_CLOCK_COVER exempts. Two of them do carry a report window, and
+        # that value has to reach the new cover.
+        "rule_hit_count": {t("rpt_cover_date_range", lang="en"):
+                           "2026-06-01 – 2026-07-01"},
+        "readiness": {t("rpt_cover_date_range", lang="en"):
+                      "2026-07-01 – 2026-07-08"},
+        # These two exporters are constructed with results + lang only: no
+        # pce_url, no org_name, no date_range, no generated_at. There is nothing
+        # to put on the cover meta, and inventing a row would be a lie.
+        "policy_diff": {},
+        "app_summary": {},
     }[rtype]
     for label, value in expected.items():
         assert pairs.get(label) == value, f"{rtype}: 封面 meta 缺 {label}={value!r}：{pairs}"
-    if rtype == "ven_status":
+    # The types with no real generation timestamp must not print the label
+    # either — this is the positive half of the "Generated" label exemptions.
+    if rtype in ("ven_status", "policy_diff", "app_summary", "rule_hit_count",
+                 "readiness"):
         assert t("rpt_cover_generated", lang="en") not in pairs
 
 
@@ -428,8 +557,16 @@ def inline_colour_literals(style: str) -> list[str]:
 # score hero). Written out rather than computed from grade_tone(): a test that
 # re-derives its expected answer from the table the product uses cannot notice
 # that table changing underneath it.
+#
+# readiness joins with a single element: its cover carries the readiness grade
+# (the legacy cover passed ``maturity_grade=readiness["grade"]``), and this
+# fixture's grade is "B" -> ok. Like security_risk's third element this is
+# FIXTURE-DEPENDENT: change the fixture's grade and the literal below must
+# change with it. That is the intended behaviour of writing the answer out
+# instead of re-deriving it from grade_tone().
 GRADE_TONES: dict[str, tuple[str, ...]] = {
     "security_risk": ("crit", "crit", "neutral"),
+    "readiness": ("ok",),
 }
 _GRADE_SELECTOR = ".score-hero, .score-num, .grade-chip, .grade-hero"
 
@@ -674,6 +811,125 @@ def test_cover_does_not_print_the_same_label_twice(rtype):
     if kicker is not None:
         assert kicker.get_text(strip=True) != eyebrow, (
             f"{rtype}: eyebrow 與 kicker 是同一句話，封面印了兩次")
+
+
+@pytest.mark.parametrize("rtype", MIGRATED)
+def test_every_table_sits_inside_a_report_table_panel(rtype):
+    """Every print-survival rule in SHELL_CSS hangs off the panel, not the table.
+
+    ``render_df_table`` builds the panel itself, but policy_diff, rule_hit_count
+    and readiness hand-write their tables (row colouring by change type, a
+    truncated cell whose full value lives in ``title``, a timestamp that must
+    stay one token — none of which ``render_cell`` can express, since it only
+    supplies a cell's inner html). They call ``wrap_table_panel`` instead. A
+    table outside a panel is not clipped — the global release rules in the print
+    block still apply — but it silently loses the reduced print font, the
+    tighter padding, the long-text column's share and the readable floor for the
+    meta columns, which is how a wide table turns into unreadable vertical
+    lettering. Nothing else in this file can see that: every character is still
+    on the page.
+    """
+    soup = BeautifulSoup(BUILDERS[rtype](), "html.parser")
+    tables = soup.select("table.report-table")
+    assert tables, f"{rtype}: 沒有表格，這條守門就是空轉"
+    orphans = [str(tb)[:90] for tb in tables
+               if tb.find_parent(class_="report-table-panel") is None]
+    assert orphans == [], (
+        f"{rtype}: {len(orphans)} 個表格不在 .report-table-panel 裡，"
+        f"寬表列印處理整組失效：{orphans}")
+
+
+# The widest table each type renders, and whether the shared predicate in
+# table_renderer calls it wide. Written out rather than recomputed from the
+# rendered column count: a test that asks the product for the answer cannot
+# notice the product changing its mind. rule_hit_count is the one that matters
+# most — eleven columns from _COLS, more from a real PCE.
+WIDEST_TABLE_IS_WIDE: dict[str, bool] = {
+    "traffic": False, "security_risk": False, "network_inventory": False,
+    "audit": False, "ven_status": False, "policy_usage": False,
+    # 9 columns: over table_renderer's threshold of 8, so it takes the reduced
+    # print font and the column floors but stays in A4 portrait (landscape
+    # starts at 10). The task plan guessed "too few columns for the wide hint";
+    # the shared predicate disagrees and the PDF evidence backed the predicate.
+    "policy_diff": True,
+    "app_summary": False,
+    "rule_hit_count": True,
+    "readiness": True,
+}
+
+
+@pytest.mark.parametrize("rtype", MIGRATED)
+def test_the_widest_table_gets_the_wide_verdict_it_should(rtype):
+    """Pairs with the panel check: being in a panel is not the same as --wide."""
+    soup = BeautifulSoup(BUILDERS[rtype](), "html.parser")
+    panels = soup.select(".report-table-panel")
+    assert panels, f"{rtype}: 沒有表格面板，這條守門就是空轉"
+    got = any("report-table-panel--wide" in (p.get("class") or []) for p in panels)
+    assert got == WIDEST_TABLE_IS_WIDE[rtype], (
+        f"{rtype}: 寬表判定為 {got}，宣告為 {WIDEST_TABLE_IS_WIDE[rtype]}")
+
+
+def test_policy_diff_ships_its_own_component_stylesheet():
+    """The pd-* row and risk colours have no rule in SHELL_CSS, by design.
+
+    They are this one report type's components, and report_css.py — where they
+    used to live (470-483) — is deleted in Task 6, so the exporter carries them
+    in extra_head. This is the loss conservation is structurally blind to:
+    without the stylesheet every row loses the added/removed/modified colour and
+    the risk column loses its emphasis, while every character of text survives,
+    so nothing else in this file would go red.
+    """
+    html = BUILDERS["policy_diff"]()
+    assert 'class="pd-modified"' in html, "fixture rendered no colour-coded row"
+    for rule in (".pd-added td", ".pd-removed td", ".pd-modified td",
+                 ".pd-risk-critical", ".pd-risk-medium", ".pd-risk-low",
+                 ".pd-risk-info"):
+        assert rule in html, f"policy diff 的元件樣式缺 {rule!r}"
+    # The colours have to come from shell tone tokens: the old palette variables
+    # (--green-10 / --red-10 / --gold-110) do not exist once build_css is gone,
+    # and a declaration reading an undefined variable is dropped silently. Read
+    # from the constant, not from the whole document — SHELL_CSS's own comments
+    # name the old tokens while explaining why they were replaced.
+    from src.report.exporters.policy_diff_html_exporter import _COMPONENT_CSS
+    assert _COMPONENT_CSS in html, "元件樣式沒有進到文件裡"
+    for token in ("var(--tone-ok-bg)", "var(--tone-crit-bg)", "var(--tone-warn-bg)",
+                  "var(--tone-crit-fg)", "var(--tone-warn-fg)", "var(--tone-ok-fg)"):
+        assert token in _COMPONENT_CSS, f"policy diff 的元件樣式沒有用 {token}"
+    for dead in ("--green-10", "--red-10", "--gold-110", "--slate-50",
+                 "var(--red)", "var(--green)"):
+        assert dead not in _COMPONENT_CSS, (
+            f"policy diff 仍引用 build_css 刪除後不存在的舊 token {dead!r}")
+    # …and it must reach the document through the shell's extra_head, not by
+    # having been pasted into SHELL_CSS (which the drift guard would reject).
+    from src.report.exporters.report_shell import SHELL_CSS
+    assert ".pd-risk-critical" not in SHELL_CSS
+
+
+def test_app_summary_renders_a_whole_document_when_the_app_has_no_flows():
+    """The empty branch is a separate code path and no fixture covers it.
+
+    It used to short-circuit to one <section class="card"> inside the old shell.
+    It must still be a complete document — cover, table of contents, chapter,
+    appendix — carrying the same rpt_app_empty narrative, not a bare note.
+    """
+    from src.report.exporters.app_summary_html_exporter import AppSummaryHtmlExporter
+    results = {"app": "DB", "env": "Prod", "empty": True, "baseline": {},
+               "mod03": {}, "policy_impact": {}, "enforcement": {}, "findings": []}
+    html = AppSummaryHtmlExporter(results, lang="en")._render_html()
+    soup = BeautifulSoup(html, "html.parser")
+    assert soup.select_one("div.sheet > div.doc") is not None
+    assert soup.select_one("header.cover h1").get_text(strip=True) == \
+        t("rpt_app_title", lang="en")
+    chapters = [s["id"] for s in soup.select("div.chapters > section.chapter")]
+    assert chapters == ["findings"], chapters
+    assert t("rpt_app_empty", lang="en") in soup.select_one(
+        "section.chapter#findings").get_text()
+    assert soup.select_one("nav.toc ol li") is not None
+    assert soup.select_one("section.appendix") is not None
+    # The app/env line is the only place the report says WHICH app has no flows.
+    kicker = soup.select_one("header.cover .cover-kicker")
+    assert kicker is not None, "封面沒有 kicker，看不出是哪個 app 沒有流量"
+    assert kicker.get_text(strip=True) == "DB / Prod"
 
 
 def test_policy_usage_ships_its_own_component_stylesheet():

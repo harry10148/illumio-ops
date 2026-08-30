@@ -1,9 +1,22 @@
 """Enforcement Readiness HTML exporter.
 
-Facade contract: __init__(result, lang, pce_url, org_name) + export(output_dir).
+Renders into the design/v2 report shell (``report_shell.build_shell_document``);
+facade contract: __init__(result, lang, pce_url, org_name) + export(output_dir).
+
 Long-cell policy (CLAUDE.md): cells in _TRUNC_COLS longer than _CELL_MAX chars
 are truncated to _CELL_MAX-1 chars + ellipsis; the FULL value is preserved in
-the cell's title attribute and in the CSV export. Never silent.
+the cell's title attribute and in the CSV export. Never silent. The ``title``
+half is a screen affordance: a printed PDF shows the ellipsis but not the hover
+text, so on paper the CSV export is the recoverable copy. Unchanged by the v2
+shell; recorded rather than quietly altered.
+
+The tables are hand-written rather than rendered through ``render_df_table``:
+each carries its own column order, its own header lookup and the truncated
+cell's full value in ``<td title="...">``, which ``render_df_table``'s
+``render_cell`` hook cannot express (it supplies a cell's INNER html only).
+What the panel gives — the wide-table print treatment — is added with
+``table_renderer.wrap_table_panel`` instead, so these tables get the same wide
+verdict as the seven that do go through the renderer.
 """
 from __future__ import annotations
 
@@ -17,10 +30,13 @@ from src.report.exporters._output_paths import (
     reserve_unique_path,
     write_text_atomic,
 )
-from src.report.exporters.cover_page import build_cover_page as _build_cover_page
-from src.report.exporters.report_css import TABLE_JS, build_css
+from src.report.exporters.report_shell import (
+    ShellCover,
+    ShellSection,
+    build_shell_document,
+)
+from src.report.exporters.table_renderer import wrap_table_panel
 
-_CSS = build_css("readiness")  # unknown type -> base styling (incl. @media print)
 _CELL_MAX = 160
 
 _QUEUE_COLS = ["app_display", "readiness_score", "grade", "current_mode",
@@ -58,9 +74,12 @@ def _esc(v) -> str:
 
 
 def _kpi(value, label) -> str:
-    return ('<div class="kpi-card">'
-            f'<div class="kpi-label">{_esc(label)}</div>'
-            f'<div class="kpi-value">{_esc(value)}</div></div>')
+    # .kpi / .kpi-strip is the v2 shell's KPI vocabulary; .kpi-card / .kpi-row
+    # were report_css.py's and have no rule in SHELL_CSS, so keeping them would
+    # leave the numbers as unstyled stacked divs.
+    return ('<div class="kpi">'
+            f'<span class="kpi-label">{_esc(label)}</span>'
+            f'<span class="kpi-value">{_esc(value)}</span></div>')
 
 
 class ReadinessHtmlExporter:
@@ -86,13 +105,19 @@ class ReadinessHtmlExporter:
         body = "".join(
             "<tr>" + "".join(self._cell(c, row.get(c, "")) for c in use) + "</tr>"
             for _, row in df.iterrows())
-        return ('<div class="report-table-wrap"><table class="report-table sortable">'
-                f'<thead><tr>{head}</tr></thead><tbody>{body}</tbody></table></div>')
+        table_html = ('<div class="report-table-wrap">'
+                      '<table class="report-table sortable">'
+                      f'<thead><tr>{head}</tr></thead>'
+                      f'<tbody>{body}</tbody></table></div>')
+        # The panel is what carries the wide-table print treatment in SHELL_CSS
+        # (reduced font, tighter padding, the column-width floors); the queue
+        # table is eight columns wide.
+        return wrap_table_panel(table_html, df, use, self._lang)
 
     # ── sections ──────────────────────────────────────────────────────
     def _summary(self, readiness, kpis) -> str:
         lang = self._lang
-        kpi_row = '<div class="kpi-row">' + "".join(
+        kpi_row = '<div class="kpi-strip">' + "".join(
             _kpi(k.get("value", ""), k.get("label", k.get("i18n_key", ""))) for k in kpis
         ) + "</div>"
         return (f'<p class="note">{_esc(t("rpt_readiness_subnote", lang=lang))}</p>'
@@ -138,50 +163,76 @@ class ReadinessHtmlExporter:
             f"<td>{_esc(d.get('previous', ''))}</td>"
             f"<td>{_DIR_ARROW.get(d.get('direction', 'flat'), '→')} {_esc(d.get('delta', ''))}</td>"
             "</tr>" for d in deltas)
-        return ('<div class="report-table-wrap"><table class="report-table">'
-                f'<thead><tr>{head}</tr></thead><tbody>{body}</tbody></table></div>')
+        table_html = ('<div class="report-table-wrap"><table class="report-table">'
+                      f'<thead><tr>{head}</tr></thead>'
+                      f'<tbody>{body}</tbody></table></div>')
+        return wrap_table_panel(table_html, None,
+                                ["metric", "current", "previous", "delta"], lang)
 
     # ── document ──────────────────────────────────────────────────────
     def _render_html(self) -> str:
         lang = self._lang
         mr = self._result.module_results or {}
         readiness = mr.get("readiness", {})
-        cover = _build_cover_page(
-            t("rpt_readiness_report_title", lang=lang),
-            t("rpt_readiness_cover_type", lang=lang),
-            date_range=self._result.date_range,
-            pce_url=self._pce_url, org_name=self._org_name, lang=lang,
-            maturity_grade=readiness.get("grade"))
-        sections = [
-            ("readiness-summary", t("rpt_readiness_sec_summary", lang=lang),
-             self._summary(readiness, mr.get("kpis", []))),
-            ("readiness-queue", t("rpt_readiness_sec_queue", lang=lang),
-             self._table(mr.get("queue_df"), _QUEUE_COLS,
-                         lambda c: t(_QUEUE_COL_I18N.get(c, c), lang=lang))),
-            ("readiness-factors", t("rpt_readiness_sec_factors", lang=lang),
-             self._factor_legend()
-             + self._table(readiness.get("factor_table"),
-                           list(getattr(readiness.get("factor_table"), "columns", [])),
-                           lambda c: t(_FACTOR_COL_I18N.get(c, c), lang=lang))),
-            ("readiness-recommendations", t("rpt_readiness_sec_recommendations", lang=lang),
-             self._recommendations(readiness.get("recommendations"))),
-            ("readiness-trend", t("rpt_readiness_sec_trend", lang=lang),
-             self._trend(mr.get("_trend_deltas", []))),
+        report_type = t("rpt_readiness_cover_type", lang=lang)
+        factor_table = readiness.get("factor_table")
+        sections: list[ShellSection] = [
+            # readiness-summary becomes the exec chapter: it is already titled
+            # rpt_readiness_sec_summary ("Executive Summary"), so the shared
+            # "Executive Summary — <type>" heading only adds the qualifier and
+            # the old string survives inside the new one. Its id becomes the
+            # shared exec-summary so the whole family anchors the same way.
+            ShellSection(
+                id="exec-summary",
+                title=(f'{t("rpt_readiness_sec_summary", lang=lang)} '
+                       f'— {report_type}'),
+                html=self._summary(readiness, mr.get("kpis", [])),
+                kind="exec"),
+            ShellSection(
+                id="readiness-queue", title=t("rpt_readiness_sec_queue", lang=lang),
+                html=self._table(mr.get("queue_df"), _QUEUE_COLS,
+                                 lambda c: t(_QUEUE_COL_I18N.get(c, c), lang=lang))),
+            ShellSection(
+                id="readiness-factors",
+                title=t("rpt_readiness_sec_factors", lang=lang),
+                html=self._factor_legend()
+                + self._table(factor_table,
+                              list(getattr(factor_table, "columns", [])),
+                              lambda c: t(_FACTOR_COL_I18N.get(c, c), lang=lang))),
+            ShellSection(
+                id="readiness-recommendations",
+                title=t("rpt_readiness_sec_recommendations", lang=lang),
+                html=self._recommendations(readiness.get("recommendations"))),
+            ShellSection(
+                id="readiness-trend", title=t("rpt_readiness_sec_trend", lang=lang),
+                html=self._trend(mr.get("_trend_deltas", []))),
         ]
-        toc = ("<aside class=\"report-toc screen-only\">"
-               f"<h3>{_esc(t('rpt_nav_contents', lang=lang))}</h3><ol>"
-               + "".join(f'<li><a href="#{sid}">{_esc(title)}</a></li>'
-                         for sid, title, _ in sections)
-               + "</ol>"
-               f"<button class=\"print-btn\" onclick=\"window.print()\">"
-               f"{_esc(t('rpt_nav_print_pdf', lang=lang))}</button></aside>")
-        body = "".join(
-            f'<section id="{sid}" class="card"><h2>{_esc(title)}</h2>{content}</section>'
-            for sid, title, content in sections)
-        return ("<!DOCTYPE html><html><head><meta charset='utf-8'>"
-                f"<title>{_esc(t('rpt_readiness_report_title', lang=lang))}</title>{_CSS}</head>"
-                f"<body>{cover}<div class='report-shell'>{toc}"
-                f"<main class='report-main'>{body}</main></div>{TABLE_JS}</body></html>")
+
+        # Raw strings: build_shell_document escapes every ShellCover scalar. The
+        # eyebrow carries the type label because type_label alone only reaches
+        # body[data-report-title] — which this report did not have at all before
+        # (nor a lang attribute); the shell supplies both.
+        meta: dict[str, str] = {}
+        if self._pce_url:
+            meta[t("rpt_cover_pce", lang=lang)] = self._pce_url
+        if self._org_name:
+            meta[t("rpt_cover_org", lang=lang)] = self._org_name
+        date_range = " – ".join(d for d in (self._result.date_range or ()) if d)
+        if date_range:
+            meta[t("rpt_cover_date_range", lang=lang)] = date_range
+        # The legacy cover suppressed the grade block for a missing or "?"
+        # grade; the same guard, or the cover would print an empty chip whose
+        # tone says "neutral" as if that were a measured result.
+        grade = str(readiness.get("grade") or "")
+        cover = ShellCover(
+            title=t("rpt_readiness_report_title", lang=lang),
+            doc_title=t("rpt_readiness_report_title", lang=lang),
+            type_label=report_type,
+            eyebrow=report_type,
+            grade="" if grade in ("", "?") else grade,
+            meta=meta,
+        )
+        return build_shell_document(lang=lang, cover=cover, sections=sections)
 
     def export(self, output_dir: str = "reports") -> str:
         os.makedirs(output_dir, exist_ok=True)
