@@ -1,4 +1,5 @@
 import datetime
+import re
 
 import pandas as pd
 
@@ -7,7 +8,7 @@ from src.report.analysis.audit.audit_mod00_executive import audit_executive_summ
 from src.report.analysis.policy_usage.pu_mod00_executive import pu_executive_summary
 from src.report.exporters.audit_html_exporter import AuditHtmlExporter
 from src.report.exporters.policy_usage_html_exporter import PolicyUsageHtmlExporter
-from src.report.exporters.report_css import build_css
+from src.report.exporters.report_shell import SHELL_CSS
 
 
 def _audit_df():
@@ -203,11 +204,42 @@ def test_dashboard_summaries_include_attack_sections():
         assert key in pu_summary
 
 
-def test_all_report_hero_css_uses_light_header_style():
-    expected_gradient = "linear-gradient(135deg, #FFFFFF, #FAFAFA)"
-    legacy_dark_gradient = "linear-gradient(135deg, rgba(26,44,50,.98), rgba(45,69,76,.96))"
+def test_all_report_headers_sit_on_the_light_sheet():
+    """The report header must stay light — restated for the v2 shell.
 
-    for exporter_type in ("traffic", "audit", "policy_usage", "ven"):
-        css = build_css(exporter_type)
-        assert expected_gradient in css
-        assert legacy_dark_gradient not in css
+    The original form compared two gradient literals out of ``build_css()``.
+    Both literals disappear with ``report_css.py``, and an absence check on a
+    string that no longer exists anywhere would be permanently true, so the
+    requirement is re-anchored on what makes the header light now: the shell
+    paints nothing behind the cover, so it inherits ``.sheet``'s paper, and the
+    paper token is a near-white. Either half going dark fails this.
+    """
+    from bs4 import BeautifulSoup
+
+    from tests.report_shell.fixtures import BUILDERS
+
+    def _luminance(hex_colour: str) -> float:
+        h = hex_colour.lstrip("#")
+        ch = []
+        for i in (0, 2, 4):
+            c = int(h[i:i + 2], 16) / 255
+            ch.append(c / 12.92 if c <= 0.03928 else ((c + 0.055) / 1.055) ** 2.4)
+        return 0.2126 * ch[0] + 0.7152 * ch[1] + 0.0722 * ch[2]
+
+    screen_css = SHELL_CSS.split("@media print")[0]
+    paper = re.search(r"--paper:\s*(#[0-9A-Fa-f]{6});", screen_css).group(1)
+    ink = re.search(r"--text-1:\s*(#[0-9A-Fa-f]{6});", screen_css).group(1)
+    assert _luminance(paper) > 0.8, f"--paper {paper} is not a light sheet"
+    assert _luminance(ink) < 0.1, f"--text-1 {ink} is not dark ink"
+
+    sheet = re.search(r"^\.sheet \{[^}]*\}", screen_css, re.MULTILINE).group(0)
+    assert "background: var(--paper);" in sheet
+
+    cover = re.search(r"^\.cover \{[^}]*\}", screen_css, re.MULTILINE).group(0)
+    assert "background" not in cover, f".cover paints its own header: {cover!r}"
+
+    for report_type in ("traffic", "audit", "policy_usage", "ven_status"):
+        header = BeautifulSoup(BUILDERS[report_type](), "html.parser").select_one(
+            'header.cover[data-shell="cover"]')
+        assert header is not None, report_type
+        assert "background" not in (header.get("style") or ""), report_type

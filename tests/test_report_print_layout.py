@@ -1,115 +1,222 @@
-import pandas as pd
+"""Print-layout invariants, restated against the v2 shell.
 
-from src.report.exporters.report_css import BASE_CSS
-from src.report.exporters.cover_page import build_cover_page
+These used to read ``report_css.BASE_CSS`` and ``cover_page.build_cover_page()``.
+Both are gone (Task 6 of the Phase 2B reskin); the requirements they encoded are
+not, so each one is re-anchored on ``report_shell.SHELL_CSS`` and on the cover
+``build_shell_document()`` actually renders. Where a requirement genuinely
+stopped existing — the legacy print-only second cover — the case is deleted with
+the reason stated on the replacement, not silently dropped.
+"""
+from __future__ import annotations
+
+import re
+
+from bs4 import BeautifulSoup
+
 from src.report.exporters.html_exporter import HtmlExporter
+from src.report.exporters.report_shell import (
+    SHELL_CSS, ShellCover, ShellSection, build_shell_document)
+
+SCREEN_CSS, PRINT_CSS = SHELL_CSS.split("@media print")[0:2]
+
+# Containers a whole page (or more) tall. If any of them ever says
+# "do not break inside me", the printer pushes it whole to the next sheet and
+# leaves the previous one mostly blank.
+PAGE_SIZED_CONTAINERS = (".sheet", ".doc", ".chapter", ".exec", ".appendix")
 
 
-def test_card_no_longer_has_page_break_inside_avoid():
-    lines = [l.strip() for l in BASE_CSS.split('\n') if 'page-break-inside: avoid' in l]
-    card_lines = [l for l in lines if l.startswith('.card')]
-    assert card_lines == [], f"Found: {card_lines}"
+def _rules_for(css: str, selector: str) -> list[str]:
+    """Every rule block whose selector list contains ``selector`` exactly."""
+    out = []
+    for m in re.finditer(r"([^{}/]+)\{([^}]*)\}", css):
+        parts = [s.strip() for s in m.group(1).split(",")]
+        if selector in parts:
+            out.append(m.group(2))
+    return out
 
 
-def test_thead_display_table_header_group():
-    assert 'thead { display: table-header-group' in BASE_CSS
+# --------------------------------------------------------------------------
+# Pagination
+# --------------------------------------------------------------------------
+
+def test_page_sized_containers_do_not_forbid_breaking():
+    """Was ``test_card_no_longer_has_page_break_inside_avoid``.
+
+    The old shell had learned this on ``.card``; the v2 shell has no ``.card``,
+    so the invariant is restated on the containers that are actually page-sized.
+    ``break-inside: avoid`` is legitimate and present on the small units
+    (``.finding-card``, ``.report-table-panel``, ``.mat-row``, ``.sev-box``,
+    ``figure.chart-static``, ``.toc li``, table rows) — the defect is putting it
+    on something a page tall.
+    """
+    offenders = {
+        sel: body
+        for sel in PAGE_SIZED_CONTAINERS
+        for body in _rules_for(PRINT_CSS, sel) + _rules_for(SCREEN_CSS, sel)
+        if "break-inside: avoid" in body or "page-break-inside: avoid" in body
+    }
+    assert offenders == {}, f"page-sized containers refusing to break: {offenders}"
 
 
-def test_tr_page_break_inside_avoid():
-    assert 'tr { page-break-inside: avoid' in BASE_CSS
+def test_chapters_start_on_a_new_page():
+    assert "break-before: page" in "".join(_rules_for(PRINT_CSS, ".chapter"))
 
 
-def test_wide_table_font_size_in_print():
-    print_block = BASE_CSS.split('@media print')[1]
-    assert '.report-table-panel--wide .report-table {' in print_block
-    assert 'font-size: 7.5pt' in print_block
+def test_cover_and_exec_and_toc_each_own_their_page():
+    """The v2 replacement for the legacy ``.report-cover`` print-only block.
+
+    The old shell emitted a second, full-page ``<section class="report-cover">``
+    that was ``display: none`` on screen and ``display: flex`` in print — three
+    of the deleted cases (``test_cover_page_css_present``,
+    ``test_cover_hidden_in_screen``, ``test_cover_visible_in_print``) only
+    described that mechanism. The v2 shell has one cover, shown in both media,
+    and it claims its page with ``break-after`` instead.
+    """
+    for sel in (".cover", ".exec", ".toc"):
+        assert "break-after: page" in "".join(_rules_for(PRINT_CSS, sel)), sel
+
+
+def test_chapter_headings_are_not_orphaned_at_the_foot_of_a_page():
+    assert "break-after: avoid" in "".join(_rules_for(PRINT_CSS, ".chapter-head"))
+
+
+# --------------------------------------------------------------------------
+# Tables in print
+# --------------------------------------------------------------------------
+
+def test_thead_repeats_on_every_printed_page():
+    assert "display: table-header-group" in \
+        "".join(_rules_for(PRINT_CSS, ".report-table thead"))
+
+
+def test_table_rows_are_not_split_across_pages():
+    assert "break-inside: avoid" in \
+        "".join(_rules_for(PRINT_CSS, ".report-table tbody tr"))
+
+
+def test_wide_tables_shrink_their_type_in_print():
+    """Was ``font-size: 7.5pt`` on ``.report-table-panel--wide``; the v2 shell
+    ships 6.5pt. The requirement is that wide tables get *smaller* type than
+    body copy, not one particular value."""
+    body = "".join(_rules_for(PRINT_CSS, ".report-table-panel--wide .report-table"))
+    m = re.search(r"font-size:\s*([\d.]+)pt", body)
+    assert m, f"wide tables declare no print font-size: {body!r}"
+    assert float(m.group(1)) < 9.0, (
+        f"wide-table print type {m.group(1)}pt is not smaller than 9pt body copy")
 
 
 def test_wide_table_hint_is_hidden_in_print():
-    """``render_df_table`` emits a ``.table-hint`` paragraph on every wide table,
-    but it is an on-screen scroll affordance, not report content — it tells the
-    reader the table scrolls sideways, which is meaningless on paper. SHELL_CSS
-    hides it in print; the nine types still rendering with BASE_CSS need the
-    same rule or the note is printed into the PDF."""
-    screen_block, print_block = BASE_CSS.split('@media print')[0:2]
-    assert '.table-hint { display: none; }' in print_block
-    assert '.table-hint { display: none; }' not in screen_block
+    """``wide_table_attrs`` emits a ``.table-hint`` paragraph on every wide
+    table, but it is an on-screen scroll affordance, not report content — it
+    tells the reader the table scrolls sideways, which is meaningless on paper.
+    """
+    assert ".table-hint { display: none; }" in PRINT_CSS
+    assert ".table-hint { display: none; }" not in SCREEN_CSS
 
 
-def test_cover_page_css_present():
-    assert '.report-cover {' in BASE_CSS
+def test_print_table_cells_break_words_rather_than_clip():
+    """Ordinary cells use ``break-word`` (``anywhere`` splits numbers), and the
+    long-text column inside a wide table is the one allowed ``anywhere``."""
+    assert "overflow-wrap: break-word" in \
+        "".join(_rules_for(PRINT_CSS, ".report-table tbody td"))
+    assert "overflow-wrap: anywhere" in \
+        "".join(_rules_for(PRINT_CSS,
+                           ".report-table-panel--wide .report-table td.col-long"))
 
 
-def test_cover_hidden_in_screen():
-    # Cover page must be hidden in browser (display: none in base CSS)
-    # so it doesn't show as a dark block when viewing the HTML report.
-    assert 'display: none' in BASE_CSS.split('@media print')[0].split('.report-cover')[1]
+def test_collapsed_long_cells_still_print_their_full_text():
+    """CLAUDE.md's silent-truncation rule, in its print form: a collapsed
+    ``<details>`` hides its content through ``::details-content``, so without
+    this the full text never reaches the PDF text layer at all."""
+    assert ".cell-long::details-content { content-visibility: visible; }" in PRINT_CSS
+    assert "display: block" in \
+        "".join(_rules_for(PRINT_CSS, ".cell-long > .cell-long-full"))
 
 
-def test_cover_visible_in_print():
-    # Cover page must reappear in print mode with flex layout and 100vh height.
-    print_block = BASE_CSS.split('@media print')[1]
-    assert 'display: flex' in print_block
-    assert '100vh' in print_block
+def test_three_column_layout_drops_to_two_in_print():
+    """A4 portrait leaves the third column too narrow for its table's
+    min-content, and the panel clips the overflow — measured: "966,315" printed
+    as "966,31"."""
+    body = "".join(_rules_for(PRINT_CSS, ".tri-grid"))
+    assert "grid-template-columns: repeat(2, minmax(0, 1fr))" in body
 
 
-def test_print_table_overflow_wrap():
-    # Tables must use overflow-wrap:break-word (not anywhere) to preserve min-content-width for
-    # proportional column distribution while still breaking long unbreakable strings.
-    print_block = BASE_CSS.split('@media print')[1]
-    assert 'overflow-wrap: break-word' in print_block
+# --------------------------------------------------------------------------
+# Charts
+# --------------------------------------------------------------------------
+
+def test_chart_frames_neither_split_nor_overflow_their_column():
+    """Was ``.chart-container { page-break-inside: avoid; overflow: hidden }``.
+
+    The v2 charts are server-rendered SVG rather than a JS canvas, so the
+    bleeding is prevented by constraining the SVG instead of clipping the box;
+    the "do not split a chart across a page break" half is unchanged.
+    """
+    assert "break-inside: avoid" in \
+        "".join(_rules_for(PRINT_CSS, "figure.chart-static") +
+                _rules_for(SCREEN_CSS, "figure.chart-static"))
+    svg = "".join(_rules_for(SCREEN_CSS, "figure.chart-static svg"))
+    assert "max-width: 100%" in svg and "width: 100%" in svg
 
 
-def test_chart_container_overflow_hidden_in_print():
-    # Chart containers must clip overflow to prevent legend/axis bleeding into adjacent content.
-    print_block = BASE_CSS.split('@media print')[1]
-    assert '.chart-container { page-break-inside: avoid; overflow: hidden' in print_block
+def test_screen_td_breaks_long_words():
+    """Screen layout must break long words in table cells to prevent horizontal
+    scrolling on narrow viewports (URLs, hostnames, etc.)."""
+    assert "overflow-wrap: break-word" in \
+        "".join(_rules_for(SCREEN_CSS, ".report-table tbody td"))
 
 
-def test_page_counter_present():
-    assert 'counter(page)' in BASE_CSS
+# --------------------------------------------------------------------------
+# The cover the shell renders
+# --------------------------------------------------------------------------
 
-
-def test_cover_page_contains_title():
-    html = build_cover_page(
-        title="Traffic Security Report",
-        report_type="Security Risk",
-        date_range=("2026-04-01", "2026-05-11"),
-        pce_url="pce.example.com",
-        org_name="Acme Corp",
-        lang="en",
+def _cover_doc(**kw) -> str:
+    return build_shell_document(
+        lang=kw.pop("lang", "en"),
+        cover=ShellCover(**kw),
+        sections=[ShellSection(id="s", title="S", html="<p>body</p>")],
     )
-    assert "Traffic Security Report" in html
-    assert "pce.example.com" in html
-    assert "Acme Corp" in html
-    assert "report-cover" in html
 
 
-def test_cover_page_zh_tw():
-    html = build_cover_page(
-        title="流量安全報告",
-        report_type="",
-        date_range=("", ""),
-        pce_url="",
-        org_name="",
-        lang="zh_TW",
+def test_cover_carries_title_pce_and_org():
+    html = _cover_doc(
+        title="Traffic Security Report", doc_title="Traffic Security Report",
+        type_label="Security Risk",
+        meta={"Date range": "2026-04-01 – 2026-05-11",
+              "PCE": "pce.example.com", "Organization": "Acme Corp"},
     )
-    assert "流量安全報告" in html
-    assert "產生時間" in html
+    cover = BeautifulSoup(html, "html.parser").select_one('header.cover[data-shell="cover"]')
+    assert cover is not None
+    assert cover.select_one("h1").get_text() == "Traffic Security Report"
+    text = cover.get_text(" ", strip=True)
+    for expected in ("pce.example.com", "Acme Corp", "2026-04-01 – 2026-05-11"):
+        assert expected in text, expected
 
 
-def test_cover_page_empty_optional_fields():
-    html = build_cover_page(
-        title="Test",
-        report_type="",
-        date_range=("", ""),
-        pce_url="",
-        org_name="",
-        lang="en",
-    )
-    assert "📅" not in html
-    assert "🖥" not in html
+def test_cover_renders_zh_tw():
+    html = _cover_doc(lang="zh_TW", title="流量安全報告", doc_title="流量安全報告",
+                      type_label="", meta={"產生時間": "2026-05-11 09:00"})
+    cover = BeautifulSoup(html, "html.parser").select_one("header.cover")
+    text = cover.get_text(" ", strip=True)
+    assert "流量安全報告" in text and "產生時間" in text
 
+
+def test_cover_omits_the_blocks_it_has_no_data_for():
+    """The legacy cover emitted 📅 / 🖥 rows for empty values; the shell drops the
+    whole element instead of printing an empty label."""
+    soup = BeautifulSoup(
+        _cover_doc(title="Test", doc_title="Test", type_label=""), "html.parser")
+    cover = soup.select_one("header.cover")
+    assert cover.select_one(".cover-meta") is None
+    assert cover.select_one(".cover-badges") is None
+    assert cover.select_one(".cover-eyebrow") is None
+    assert cover.select_one(".cover-kicker") is None
+    assert cover.select_one("h1") is not None
+
+
+# --------------------------------------------------------------------------
+# End to end through a real exporter
+# --------------------------------------------------------------------------
 
 def _minimal_results() -> dict:
     return {k: {} for k in [
@@ -119,17 +226,23 @@ def _minimal_results() -> dict:
     ]}
 
 
-def test_html_exporter_cover_page():
+def test_html_exporter_renders_exactly_one_cover():
+    """The old assertion here was ``'class="report-cover' not in html``. That
+    string cannot appear anywhere now that ``cover_page.py`` is deleted, so it
+    would be permanently true and guard nothing. The requirement it stood for —
+    the reader gets one cover page, not two — is counted directly instead.
+    """
     exp = HtmlExporter(
         _minimal_results(),
         pce_url="pce.test", org_name="TestOrg",
         date_range=("2026-01-01", "2026-05-01"), lang="en",
     )
     html = exp.build()
-    # v2 shell cover; the legacy .report-cover pair is gone (it would print a
-    # second cover page).
-    assert '<header class="cover" data-shell="cover"' in html
-    assert 'class="report-cover' not in html
+    soup = BeautifulSoup(html, "html.parser")
+    covers = soup.select('header.cover[data-shell="cover"]')
+    assert len(covers) == 1, f"expected exactly one cover, found {len(covers)}"
+    # Nothing else in the document may claim a full page ahead of the content.
+    assert len(soup.select("h1")) == 1
     assert "pce.test" in html
     assert "TestOrg" in html
 
@@ -139,11 +252,3 @@ def test_html_exporter_data_report_title():
     html = exp.build()
     assert 'data-report-title="' in html
     assert 'data-report-title=""' not in html
-
-
-def test_screen_td_breaks_long_words():
-    # Screen layout must break long words in table cells to prevent
-    # horizontal scrolling on narrow viewports (URLs, hostnames, etc.).
-    screen_part = BASE_CSS.split('@media print')[0]
-    td_rule = [ln for ln in screen_part.splitlines() if '.report-table tbody td' in ln]
-    assert td_rule and 'overflow-wrap: break-word' in td_rule[0]

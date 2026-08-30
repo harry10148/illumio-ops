@@ -92,11 +92,42 @@ def test_ven_generate_produces_trend_deltas(tmp_path):
     assert isinstance(r2.module_results["_trend_deltas"], list)
 
 
-def test_network_inventory_cover_distinct_and_no_grade(monkeypatch):
-    # Build the traffic report with profile=network_inventory and assert the cover
-    # title differs from security and no maturity grade block is emitted.
-    from src.report.exporters.cover_page import build_cover_page
-    inv = build_cover_page(title="Network Inventory", report_type="Network Inventory",
-                           lang="en")   # no maturity_grade kwarg
-    assert "Network Inventory" in inv
-    assert "report-cover-grade" not in inv   # grade block suppressed when no grade passed
+def test_network_inventory_cover_distinct_and_no_grade():
+    """The inventory profile gets its own cover title and prints no maturity grade.
+
+    This used to call ``cover_page.build_cover_page()`` directly — deleted in
+    Task 6 — and its second assertion (``"report-cover-grade" not in inv``) was
+    vacuous: the class that function emitted was ``cover-grade``, so the needle
+    had never matched anything in either direction.
+
+    Rebuilt on the real exporter, and with maturity data deliberately present in
+    the input: the inventory report has no maturity concept, so the suppression
+    has to come from the profile rather than from there being nothing to show.
+    The security profile on the *same* input is asserted alongside it, so the
+    test fails if the chip stops rendering everywhere.
+    """
+    from bs4 import BeautifulSoup
+    from src.report.exporters.html_exporter import HtmlExporter
+
+    def _results():
+        return {"mod01": {"total_flows": 100, "total_mb": 6062},
+                "mod12": {"kpis": [{"label": "Total Flows", "value": "1000"}],
+                          "maturity_score": 52, "maturity_grade": "D",
+                          "maturity_dimensions": {}, "key_findings": [],
+                          "generated_at": "2026-05-15 09:00"},
+                "findings": []}
+
+    def _cover(profile):
+        html = HtmlExporter(_results(), lang="en", profile=profile).build()
+        return BeautifulSoup(html, "html.parser").select_one(
+            'header.cover[data-shell="cover"]')
+
+    inv, sec = _cover("network_inventory"), _cover("security_risk")
+    inv_title = inv.select_one("h1").get_text()
+    assert "Inventory" in inv_title
+    assert inv_title != sec.select_one("h1").get_text()
+    assert inv.select(".grade-chip") == []
+    # The separator is a NON-BREAKING space, written as an escape here on
+    # purpose: .grade-chip is inline-flex and collapses a plain space
+    # between its children, which rendered "D52.4/100".
+    assert [c.get_text() for c in sec.select(".grade-chip")] == ["D\u00a0(52/100)"]

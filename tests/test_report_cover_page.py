@@ -26,15 +26,19 @@ def _make_results():
 _COVER = 'header.cover[data-shell="cover"]'
 
 
-def test_traffic_report_has_cover_page_block():
+def test_traffic_report_has_exactly_one_cover_page_block():
     html = HtmlExporter(_make_results())._build(profile="security_risk")
     soup = BeautifulSoup(html, "html.parser")
-    cover = soup.select_one(_COVER)
-    assert cover is not None, "Traffic report must include a cover-page block"
-    # The legacy cover must be gone entirely, not merely unreferenced: its
-    # .print-only half becomes display:block in print and would add a second
-    # cover page to every PDF.
-    assert "report-cover" not in html
+    covers = soup.select(_COVER)
+    assert len(covers) == 1, (
+        f"Traffic report must include exactly one cover-page block, "
+        f"found {len(covers)}")
+    # This used to assert ``"report-cover" not in html``. With cover_page.py
+    # deleted (Task 6) that string cannot appear from anywhere, so the guard
+    # would be permanently true. What it protected against — a second cover
+    # page appearing in the PDF because something still emits one — is counted
+    # above instead, which stays able to fail.
+    assert covers[0].select_one("h1") is not None, "cover has no title"
 
 
 def test_cover_does_not_duplicate_kpi_strip():

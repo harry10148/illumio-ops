@@ -163,8 +163,30 @@ def test_delta_table_formats_integer_counts_without_decimal():
     assert "2.5" in html
 
 
-def test_report_css_embeds_fonts_as_data_uri():
-    """報表是獨立交付物：字型須內嵌 base64，不得依賴 /static 相對路徑。"""
-    from src.report.exporters.report_css import REPORT_FONT_FACE_CSS
-    assert "data:font/woff2;base64," in REPORT_FONT_FACE_CSS
-    assert "url('/static/fonts/" not in REPORT_FONT_FACE_CSS
+def test_report_carries_no_font_dependency_of_any_kind():
+    """報表是獨立交付物：寄送／另存之後 /static 路徑不存在。
+
+    舊殼的作法是把三支變數字型 base64 內嵌（``REPORT_FONT_FACE_CSS``），這條
+    測試因此斷言「有 data:font、沒有 /static」。v2 殼改用系統字體堆疊，兩種
+    來源都不再需要——所以斷言換成上位的那一條：**成品裡不得有任何字型外部
+    相依，也不得有內嵌字型**（後者是 T3 把 traffic HTML 縮小的原因）。
+
+    同時檢查殼的兩個字族 token 都以泛型字族收尾，否則在缺字型的機器上會退回
+    瀏覽器預設而不是可預期的 sans/mono。
+    """
+    from src.report.exporters.report_shell import SHELL_CSS
+    from tests.report_shell.fixtures import BUILDERS
+
+    assert "@font-face" not in SHELL_CSS
+    assert "data:font" not in SHELL_CSS
+    assert "/static/fonts/" not in SHELL_CSS
+    assert '"Noto Sans"' in SHELL_CSS          # 系統字體堆疊
+
+    for token, generic in (("--font-ui", "sans-serif"), ("--font-mono", "monospace")):
+        line = next(ln for ln in SHELL_CSS.splitlines() if ln.strip().startswith(token))
+        assert line.rstrip().rstrip(";").endswith(generic), line
+
+    # 殼乾淨不代表成品乾淨：任何一型的 exporter 都可能自己再加一個字型連結。
+    html = BUILDERS["traffic"]()
+    for needle in ("@font-face", "data:font", "/static/fonts/", "fonts.googleapis.com"):
+        assert needle not in html, needle
