@@ -847,10 +847,12 @@ def test_every_table_sits_inside_a_report_table_panel(rtype):
 WIDEST_TABLE_IS_WIDE: dict[str, bool] = {
     "traffic": False, "security_risk": False, "network_inventory": False,
     "audit": False, "ven_status": False, "policy_usage": False,
-    # 9 columns: over table_renderer's threshold of 8, so it takes the reduced
-    # print font and the column floors but stays in A4 portrait (landscape
-    # starts at 10). The task plan guessed "too few columns for the wide hint";
-    # the shared predicate disagrees and the PDF evidence backed the predicate.
+    # 8 columns as this fixture renders it (its frame has no risk column; the
+    # column set reaches eleven with one). Eight is exactly table_renderer's
+    # threshold, so it takes the reduced print font and the column floors but
+    # stays in A4 portrait (landscape starts at 10). The task plan guessed "too
+    # few columns for the wide hint"; the shared predicate disagrees and the PDF
+    # evidence backed the predicate.
     "policy_diff": True,
     "app_summary": False,
     "rule_hit_count": True,
@@ -936,6 +938,190 @@ def test_app_summary_renders_a_whole_document_when_the_app_has_no_flows():
     kicker = soup.select_one("header.cover .cover-kicker")
     assert kicker is not None, "封面沒有 kicker，看不出是哪個 app 沒有流量"
     assert kicker.get_text(strip=True) == "DB / Prod"
+
+
+# ---------------------------------------------------------------------------
+# Fix round 1 — H1/H2/F1. Every one of these is the SAME defect shape: the
+# fixture's state sat outside the branch, so the branch had no guard and could
+# not have one. Two independent reviewers hit it in the same round. Each test
+# below therefore starts by proving the sample actually reaches the branch —
+# "the assertion passed" is worth nothing if the code never ran.
+# ---------------------------------------------------------------------------
+
+def test_the_executive_summary_says_when_it_has_dropped_kpis_or_notes():
+    """H1: the caps in _exec_summary are allowed; eliding in silence is not.
+
+    ``kpis[:8]`` and ``notes[:2]`` dropped the surplus with no mark on the page,
+    and the traffic exporter's other KPI renderer is dead code, so those KPIs
+    left the document entirely. The cap was already raised once (6 -> 8) for
+    exactly this defect and the producers grew past the new number, which is why
+    the fix is disclosure rather than a third threshold.
+
+    security_risk carries 11 KPIs and audit 4 execution notes precisely so this
+    branch is reached; both assertions below check the branch ran first.
+    """
+    from src.report.exporters._exec_summary import KPI_LIMIT, NOTE_LIMIT
+
+    kpi_soup = BeautifulSoup(BUILDERS["security_risk"](), "html.parser")
+    strip = kpi_soup.select("section.exec .kpi-strip .kpi")
+    assert len(strip) == KPI_LIMIT, (
+        f"fixture 沒有超過上限，這條守門不成立：渲染了 {len(strip)} 個 KPI")
+    kpi_note = kpi_soup.select_one("section.exec p.exec-elided")
+    assert kpi_note is not None, "KPI 被裁掉了卻沒有任何省略指示"
+    assert kpi_note.get_text(strip=True) == t(
+        "rpt_exec_kpi_elided", lang="en", shown=KPI_LIMIT, total=11)
+
+    note_soup = BeautifulSoup(BUILDERS["audit"](), "html.parser")
+    listed = note_soup.select("section.exec ul.notes li")
+    assert len(listed) == NOTE_LIMIT, (
+        f"fixture 沒有超過上限，這條守門不成立：渲染了 {len(listed)} 條註記")
+    elided = note_soup.select_one("section.exec p.exec-elided")
+    assert elided is not None, "執行註記被裁掉了卻沒有任何省略指示"
+    assert elided.get_text(strip=True) == t(
+        "rpt_exec_note_elided", lang="en", shown=NOTE_LIMIT, total=4)
+
+
+@pytest.mark.parametrize("rtype", ["traffic", "audit"])
+def test_the_data_source_pill_is_a_sibling_not_a_child(rtype):
+    """H2: ``replace('</div>', pill + '</div>', 1)`` matched the wrong </div>.
+
+    The first closing tag in the row's markup belongs to the FIRST PILL, so the
+    data-source pill was rendered inside its neighbour. Asserting on the direct
+    parent rather than on "a .summary-pill-row ancestor" is the point: the
+    nested pill had one of those too, which is why nothing noticed.
+    """
+    soup = BeautifulSoup(BUILDERS[rtype](), "html.parser")
+    row = soup.select_one(".summary-pill-row")
+    assert row is not None, f"{rtype}: 沒有 pill row，這條守門就是空轉"
+    all_pills = row.select(".summary-pill")
+    direct = [p for p in all_pills if p.parent is row]
+    assert len(all_pills) == len(direct), (
+        f"{rtype}: {len(all_pills)} 顆 pill 只有 {len(direct)} 顆是 row 的直接子節點——"
+        f"有 pill 被塞進另一顆 pill 裡面")
+    # …and the data-source pill really is one of them, or the sample never
+    # reached the branch this test exists for.
+    labels = [p.get_text(strip=True) for p in direct]
+    expected = t("rpt_data_source_api", lang="en")
+    assert any(expected in label for label in labels), (
+        f"{rtype}: 樣本沒有渲染資料來源 pill（data_source 未設定？）：{labels}")
+
+
+def _app_summary_with_findings(severities):
+    """An app_summary report whose findings carry exactly ``severities``.
+
+    The shared fixture passes ``findings: []``, so the whole non-empty branch —
+    including the severity badges this batch added ``_sev_attrs`` to — had no
+    coverage at all. The review measured the consequence: deleting that call
+    left the suite green while all five severities collapsed onto one grey.
+    Reproduced here as a mutation, which now reports every badge carrying no
+    data-tone at all.
+    """
+    from dataclasses import dataclass
+
+    from src.report.exporters.app_summary_html_exporter import AppSummaryHtmlExporter
+
+    @dataclass
+    class _F:
+        rule_id: str
+        severity: str
+        description: str
+
+    flows = pd.DataFrame([{
+        "src_app": "web-tier-alfa", "dst_app": "data-tier-alfa", "port": 33061,
+        "proto": "tcp-alfa", "policy_decision": "allowed",
+        "num_connections": 81234, "last_detected": "2026-01-11T08:30:00Z"}])
+    results = {
+        "app": "DB", "env": "Prod", "empty": False,
+        "baseline": {"inbound": flows, "outbound": flows,
+                     "inbound_count": 1, "outbound_count": 1},
+        "mod03": {}, "policy_impact": {}, "enforcement": {},
+        "findings": [_F(f"R{i:03d}", sev, f"finding description {sev.lower()}")
+                     for i, sev in enumerate(severities)],
+    }
+    return AppSummaryHtmlExporter(results, lang="en")._render_html()
+
+
+def test_app_summary_finding_badges_carry_their_own_severity_tone():
+    """F1: five severities, five looks — not one grey repeated five times."""
+    soup = BeautifulSoup(
+        _app_summary_with_findings(
+            ["CRITICAL", "HIGH", "MEDIUM", "LOW", "INFO"]), "html.parser")
+    badges = soup.select("section.chapter#findings .badge")
+    assert len(badges) == 5, f"樣本沒有渲染五顆徽章：{len(badges)}"
+    # Own value, exact mapping — written out rather than read from
+    # SEVERITY_TONE (see GRADE_TONES). "has some data-tone" is compatible with
+    # every badge carrying the WRONG one.
+    by_sev = {b.get("data-sev"): b.get("data-tone") for b in badges}
+    assert by_sev == {"CRITICAL": "crit", "HIGH": "crit", "MEDIUM": "warn",
+                      "LOW": "info", "INFO": "neutral"}, (
+        f"發現徽章沒有依自己的嚴重度上色：{by_sev}")
+    for badge in badges:
+        assert not inline_colour_literals(badge.get("style", "")), badge
+
+
+def _policy_diff_every_change_and_risk():
+    """A policy_diff report covering every change type and every risk level.
+
+    The shared fixture has one ``modified`` row and no ``risk`` column at all.
+    Swept across the whole test suite, six of the eight classes the component
+    stylesheet defines had no coverage: ``pd-added``, ``pd-removed`` and four of
+    the five ``pd-risk-*`` (``pd-risk-high`` alone is asserted, by
+    tests/test_policy_diff_html_exporter.py). A stylesheet nothing asks for looks
+    the same as a stylesheet that is not there — the same fixture-shaped blind
+    spot as H1 and F1, found by sweeping this batch's own guards for it.
+    """
+    from src.report.exporters.policy_diff_html_exporter import PolicyDiffHtmlExporter
+
+    rows = [{"risk": risk, "change_type": change,
+             "ruleset_name": f"RS-{risk.lower()}-{change}",
+             "ruleset_id": f"id-{risk.lower()}", "field": "enabled",
+             "draft_value": "False", "active_value": "True",
+             "last_actor": f"{risk.lower()}@lab.local",
+             "last_changed": "2026-06-05T12:00:00Z"}
+            for change, risk in (("added", "CRITICAL"), ("removed", "HIGH"),
+                                 ("modified", "MEDIUM"), ("added", "LOW"),
+                                 ("modified", "INFO"))]
+    results = {"ruleset_changes": pd.DataFrame(rows),
+               "rule_changes": pd.DataFrame(),
+               "summary": {"rulesets_added": 2, "rulesets_removed": 1,
+                           "rulesets_modified": 2, "rules_added": 0,
+                           "rules_removed": 0, "rules_modified": 0,
+                           "total_changes": 5}}
+    return PolicyDiffHtmlExporter(results, lang="en")._render_html()
+
+
+def test_policy_diff_marks_every_change_type_and_risk_level():
+    """The component stylesheet is only worth anything if the classes are used.
+
+    ``test_policy_diff_ships_its_own_component_stylesheet`` proves the rules
+    ship; this proves the markup asks for them. Both halves are needed — the
+    fixture exercises exactly one of the eight classes.
+    """
+    soup = BeautifulSoup(_policy_diff_every_change_and_risk(), "html.parser")
+    rows = soup.select("table.report-table tbody tr")
+    assert len(rows) == 5, f"樣本沒有渲染五列：{len(rows)}"
+    # Each row paired with its OWN risk cell, so the assertion is a mapping
+    # rather than a sequence: _table() sorts by _RISK_RANK, and a positional
+    # expectation would be checking the sort, not the marking.
+    marked = {}
+    for row in rows:
+        risk_cell = row.select_one("td[class^='pd-risk-']")
+        assert risk_cell is not None, f"這一列的風險欄沒有標記：{row}"
+        marked[risk_cell.get_text(strip=True)] = (
+            " ".join(row.get("class", [])), " ".join(risk_cell.get("class", [])))
+    assert marked == {
+        "CRITICAL": ("pd-added", "pd-risk-critical"),
+        "HIGH": ("pd-removed", "pd-risk-high"),
+        "MEDIUM": ("pd-modified", "pd-risk-medium"),
+        "LOW": ("pd-added", "pd-risk-low"),
+        "INFO": ("pd-modified", "pd-risk-info"),
+    }, f"列／風險欄沒有依自己的值標記：{marked}"
+    # The risk sort is product behaviour (_RISK_RANK ranks HIGH then MEDIUM,
+    # everything else last, stable), so pin it here rather than leave the order
+    # free to change unnoticed.
+    order = [row.select_one("td[class^='pd-risk-']").get_text(strip=True)
+             for row in rows]
+    assert order == ["HIGH", "MEDIUM", "CRITICAL", "LOW", "INFO"], order
 
 
 def test_policy_usage_ships_its_own_component_stylesheet():

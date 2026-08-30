@@ -138,11 +138,29 @@ def _traffic_results() -> dict:
 
 
 def _security_risk_results() -> dict:
-    """Transcribed from tests/test_e2e_report_html_redesign.py::_make_traffic."""
+    """Transcribed from tests/test_e2e_report_html_redesign.py::_make_traffic.
+
+    The KPI list deliberately exceeds ``_exec_summary.KPI_LIMIT`` (8). It used
+    to hold exactly one, and EVERY fixture in this file was likewise under the
+    cap — traffic's is an empty list, audit has none, policy usage's is empty —
+    so the executive summary's elision branch was never executed by any test
+    while the real producers go well past it (counted from their literal lists:
+    10 for traffic, 16 plus conditionals for security risk / network inventory,
+    10 plus up to 4 for audit). That is precisely how the silent truncation
+    survived two rounds of migration review. One fixture now sits over the line
+    so the branch is exercised by every parametrised guard here.
+    """
     return {
         "mod01": {"total_flows": 100, "total_mb": 6062},
         "mod12": {
-            "kpis": [{"label": "Total Data Volume", "value": "5.92 GB"}],
+            # 11 > KPI_LIMIT. Labels and values obey this module's rules: at
+            # least four characters, and no value repeated in the document.
+            "kpis": [{"label": "Total Data Volume", "value": "5.92 GB"}] + [
+                {"label": f"Exec KPI {name}", "value": f"{20000 + index * 137} {name}"}
+                for index, name in enumerate(
+                    ["alfa", "bravo", "charlie", "delta", "echo",
+                     "foxtrot", "golf", "hotel", "india", "juliett"])
+            ],
             "maturity_score": 52, "maturity_grade": "D",
             "maturity_dimensions": {}, "key_findings": [],
             "generated_at": "2026-05-15 09:00",
@@ -213,16 +231,27 @@ def _build_audit() -> str:
         ])
 
     results = {
+        # Four execution notes, over _exec_summary.NOTE_LIMIT (2). The traffic
+        # family cannot exercise that branch at all — its exporter passes only
+        # ``{"kpis": …}`` into render_exec_summary_html — so audit is where the
+        # note cap has to be covered. See _security_risk_results for the KPI
+        # half of the same gap.
         "mod00": {"generated_at": "2026-07-23 12:00:00", "attention_items": [],
                   "chart_spec": dict(_CHART_SPEC),
+                  "execution_notes": [f"execution note {name} for the audit run"
+                                      for name in ("uniform", "tango", "sierra",
+                                                   "romeo")],
                   "top_events_overall": _events("zulu", 10000, 11)},
         "mod01": {"summary": _events("yankee", 20000, 13),
                   "severity_breakdown": _events("xray", 30000, 15),
                   "recent": _events("whiskey", 40000, 17)},
         "mod02": {"summary": _events("victor", 50000, 19)},
     }
+    # ``data_source`` was unset, so the data-source pill branch in
+    # audit_html_exporter._build() had never been executed by a test — which is
+    # how a nesting defect identical to the traffic exporter's went unseen there.
     return AuditHtmlExporter(results, date_range=("2026-07-16", "2026-07-23"),
-                             lang=_LANG)._build()
+                             data_source="api", lang=_LANG)._build()
 
 
 # ------------------------------------------------------------- ven status --

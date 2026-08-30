@@ -3264,6 +3264,8 @@
   "rpt_enforce_mode_selective": "Selective（選擇性）",
   "rpt_enforce_mode_visibility_only": "Visibility Only（僅監控）",
   "rpt_enforced": "已強制",
+  "rpt_exec_kpi_elided": "顯示 {total} 項指標中的 {shown} 項。",
+  "rpt_exec_note_elided": "顯示 {total} 條執行註記中的 {shown} 條。",
   "rpt_exec_summary_label": "執行摘要",
   "rpt_fa_col_action": "行動",
   "rpt_fa_col_evidence": "量化證據",

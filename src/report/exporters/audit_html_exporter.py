@@ -224,13 +224,17 @@ class AuditHtmlExporter:
         # silently delete them from the document.
         date_str = " ~ ".join(self._date_range) if any(self._date_range) else ""
         today_str = str(datetime.date.today())
-        summary_pills = (
-            '<div class="summary-pill-row">'
-            f'<div class="summary-pill"><span class="summary-pill-label">{_s("rpt_pill_period")}</span><span class="summary-pill-value">{date_str or "N/A"}</span></div>'
-            f'<div class="summary-pill"><span class="summary-pill-label">{_s("rpt_pill_attention")}</span><span class="summary-pill-value">{human_number(len(mod00.get("attention_items", [])))}</span></div>'
-            f'<div class="summary-pill"><span class="summary-pill-label">{_s("rpt_pill_focus")}</span><span class="summary-pill-value">{_s("rpt_focus_audit")}</span></div>'
-            "</div>"
-        )
+        # Built as a list of pills and closed once at the end — see the same
+        # correction in html_exporter. ``replace("</div>", …, 1)`` matched the
+        # first PILL's closing tag, not the row's, and nested the data-source
+        # pill inside its neighbour. This branch had never been executed by any
+        # test (the audit fixture set no ``data_source``), which is why the
+        # defect outlived the migration; the fixture now sets one.
+        _pills = [
+            f'<div class="summary-pill"><span class="summary-pill-label">{_s("rpt_pill_period")}</span><span class="summary-pill-value">{date_str or "N/A"}</span></div>',
+            f'<div class="summary-pill"><span class="summary-pill-label">{_s("rpt_pill_attention")}</span><span class="summary-pill-value">{human_number(len(mod00.get("attention_items", [])))}</span></div>',
+            f'<div class="summary-pill"><span class="summary-pill-label">{_s("rpt_pill_focus")}</span><span class="summary-pill-value">{_s("rpt_focus_audit")}</span></div>',
+        ]
 
         if self._data_source:
             ds_key = {
@@ -239,12 +243,13 @@ class AuditHtmlExporter:
             }.get(self._data_source, "rpt_data_source_mixed")
             ds_label = _s(ds_key)
             ds_color = {"cache": "#22C55E", "api": "#60A5FA"}.get(self._data_source, "#EAB308")
-            data_source_pill = (
+            _pills.append(
                 f'<div class="summary-pill" style="border-left: 3px solid {ds_color};">'
                 f'<span class="summary-pill-label">{ds_label}</span>'
                 f'</div>'
             )
-            summary_pills = summary_pills.replace("</div>", data_source_pill + "</div>", 1)
+
+        summary_pills = f'<div class="summary-pill-row">{"".join(_pills)}</div>'
 
         _report_type = _s("rpt_cover_type_audit")
         # The exec block no longer prints its own <h2>; the shell prints the

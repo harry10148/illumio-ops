@@ -157,9 +157,12 @@ class PolicyDiffHtmlExporter:
             f"{head}</tr></thead><tbody>{''.join(body)}</tbody></table></div>"
         )
         # The panel is what carries the wide-table print treatment in SHELL_CSS
-        # (reduced font, tighter padding, the column-width floors). Without it a
-        # nine-column diff prints at full body size and the release rules are all
-        # that stand between it and the page edge.
+        # (reduced font, tighter padding, the column-width floors). Without it
+        # the diff prints at full body size and the release rules are all that
+        # stand between it and the page edge. Column count is data-dependent:
+        # _COL_I18N covers up to eleven, the shared fixture renders eight (no
+        # risk column in its frame), and eight already crosses the wide
+        # threshold.
         return wrap_table_panel(table_html, df, cols, self._lang)
 
     def _kpi_row(self) -> str:

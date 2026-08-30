@@ -3291,6 +3291,8 @@
   "rpt_enforce_mode_selective": "Selective",
   "rpt_enforce_mode_visibility_only": "Visibility Only",
   "rpt_enforced": "Enforced",
+  "rpt_exec_kpi_elided": "Showing {shown} of {total} metrics.",
+  "rpt_exec_note_elided": "Showing {shown} of {total} execution notes.",
   "rpt_exec_summary_label": "Executive Summary",
   "rpt_fa_col_action": "Action",
   "rpt_fa_col_evidence": "Evidence",

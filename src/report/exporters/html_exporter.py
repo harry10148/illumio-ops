@@ -621,13 +621,17 @@ class _TrafficReportBase:
         today_str = str(datetime.date.today())
         _traffic_mod00 = {"kpis": _kpi_items}
         total_flows = self._r.get('mod01', {}).get('total_flows', 0)
-        summary_pills = (
-            '<div class="summary-pill-row">'
-            f'<div class="summary-pill"><span class="summary-pill-label">{_s("rpt_pill_flows")}</span><span class="summary-pill-value">{human_number(total_flows)}</span></div>'
-            f'<div class="summary-pill"><span class="summary-pill-label">{_s("rpt_pill_findings")}</span><span class="summary-pill-value">{human_number(int(n_findings))}</span></div>'
-            f'<div class="summary-pill"><span class="summary-pill-label">{_s("rpt_pill_focus")}</span><span class="summary-pill-value">{_s("rpt_focus_traffic")}</span></div>'
-            '</div>'
-        )
+        # Built as a list of pills and closed once at the end. The old code
+        # appended the data-source pill with
+        # ``summary_pills.replace('</div>', pill + '</div>', 1)``, and the FIRST
+        # </div> in that string closes the first PILL, not the row — so the pill
+        # was rendered nested inside its neighbour. Reproduced by putting the old
+        # line back: 4 pills in the row, only 3 of them direct children.
+        _pills = [
+            f'<div class="summary-pill"><span class="summary-pill-label">{_s("rpt_pill_flows")}</span><span class="summary-pill-value">{human_number(total_flows)}</span></div>',
+            f'<div class="summary-pill"><span class="summary-pill-label">{_s("rpt_pill_findings")}</span><span class="summary-pill-value">{human_number(int(n_findings))}</span></div>',
+            f'<div class="summary-pill"><span class="summary-pill-label">{_s("rpt_pill_focus")}</span><span class="summary-pill-value">{_s("rpt_focus_traffic")}</span></div>',
+        ]
 
         if self._data_source:
             ds_key = {
@@ -636,12 +640,13 @@ class _TrafficReportBase:
             }.get(self._data_source, "rpt_data_source_mixed")
             ds_label = _s(ds_key)
             ds_color = {"cache": "#22C55E", "api": "#60A5FA"}.get(self._data_source, "#EAB308")
-            data_source_pill = (
+            _pills.append(
                 f'<div class="summary-pill" style="border-left: 3px solid {ds_color};">'
                 f'<span class="summary-pill-label">{ds_label}</span>'
                 f'</div>'
             )
-            summary_pills = summary_pills.replace('</div>', data_source_pill + '</div>', 1)
+
+        summary_pills = f'<div class="summary-pill-row">{"".join(_pills)}</div>'
 
         # The draft pill is a document-level qualifier, so it moved onto the
         # shell cover's badge row (see the ShellCover construction below).

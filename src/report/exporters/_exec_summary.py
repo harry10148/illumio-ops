@@ -9,6 +9,41 @@ from html import escape
 from src.i18n import t
 
 
+# How much of the executive summary fits its ≤200-word, standalone brief.
+#
+# These caps have a history worth reading before touching them. The KPI cap was
+# 6, and on 2026-07-23 a visual check found it silently dropping traffic's
+# potentially_blocked and unknown decision buckets; the fix at the time was to
+# raise the cap to 8. The producers then grew past 8 as well. Counted from the
+# literal lists, not assumed: mod12_executive_summary.py's _traffic_flows_summary
+# builds 10, its executive_summary (security risk / network inventory) builds 16
+# plus one conditional insert and one append per enforcement mode, and
+# audit_mod00_executive.py builds 10 with up to 4 more appended. So the same
+# defect came back on the new threshold, and the surplus KPIs left the document
+# entirely — the traffic exporter's other KPI renderer, `kpi_cards`, is assigned
+# and never used, so this strip is their only outlet.
+#
+# Raising the cap a second time would only move the cliff again. CLAUDE.md's
+# report rule allows eliding — it forbids doing it SILENTLY — so the caps stay
+# and what they drop is now stated on the page. Do not raise them; if the brief
+# changes, change the brief.
+KPI_LIMIT = 8
+NOTE_LIMIT = 2
+
+
+def _elision_note(i18n_key: str, total: int, limit: int, lang: str) -> str:
+    """Disclose that the cap dropped items, or '' when it did not.
+
+    Phrased as "showing X of Y" rather than "N more are hidden" so it reads
+    correctly at N=1 and so the reader learns the real total, which is the
+    number they need in order to know what they are missing.
+    """
+    if total <= limit:
+        return ''
+    return (f'<p class="note exec-elided">'
+            f'{escape(t(i18n_key, lang=lang, shown=limit, total=total))}</p>')
+
+
 def _resolve_label(k: dict, lang: str) -> str:
     # Prefer resolving the i18n key ('label_key' or 'i18n_key') at render time
     # so reports render in `lang` even when the generator baked in an English
@@ -48,24 +83,25 @@ def render_exec_summary_html(mod00: dict, report_name: str, lang: str = 'en',
     kpi_html = ''
     if kpis:
         items = []
-        # 8 桶：traffic 檔案的四個判定桶（allowed/blocked/pb/unknown）都要
-        # 進執行摘要——[:6] 曾把 pb/unknown 裁掉（2026-07-23 視覺實檢）
-        for k in kpis[:8]:
+        for k in kpis[:KPI_LIMIT]:
             label = escape(_resolve_label(k, lang))
             value = escape(str(k.get('value', '')))
             items.append(
                 f'<div class="kpi"><span class="kpi-label">{label}</span>'
                 f'<span class="kpi-value">{value}</span></div>'
             )
-        kpi_html = f'<div class="kpi-strip">{"".join(items)}</div>'
+        kpi_html = (f'<div class="kpi-strip">{"".join(items)}</div>'
+                    + _elision_note('rpt_exec_kpi_elided', len(kpis), KPI_LIMIT, lang))
 
     verdict_html = f'<p class="verdict">{escape(str(verdict))}</p>' if verdict else ''
     summary_html = f'<p class="summary-text">{escape(str(summary_text))}</p>' if summary_text else ''
 
     notes_html = ''
     if notes:
-        items = ''.join(f'<li>{escape(str(n))}</li>' for n in notes[:2])
-        notes_html = f'<ul class="notes">{items}</ul>'
+        items = ''.join(f'<li>{escape(str(n))}</li>' for n in notes[:NOTE_LIMIT])
+        notes_html = (f'<ul class="notes">{items}</ul>'
+                      + _elision_note('rpt_exec_note_elided', len(notes),
+                                      NOTE_LIMIT, lang))
 
     if not include_heading:
         # No heading means no element for aria-labelledby to point at; a
