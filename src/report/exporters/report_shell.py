@@ -1585,10 +1585,23 @@ def build_shell_document(*, lang: str, cover: ShellCover,
     # The single numbering sequence. Chapters start at len(execs).
     numbered = execs + chapters
 
-    # Document tone: critical wins outright, else the first chapter's tone.
+    # Document tone — read from the FINDING chapters only, never from every
+    # chapter (G1). The cover's tone is a claim about what the report found, and
+    # a detail chapter's tint is not that claim: while this looked at all
+    # chapters, a single CRITICAL cell in an unrelated table (unmanaged hosts,
+    # vulnerability exposure, infrastructure scoring) tinted its chapter and,
+    # because critical wins outright, dyed the cover of a report with zero
+    # findings. Restricting the source decouples the two: a chapter is free to
+    # colour itself from its own content without speaking for the document.
+    #
+    # No finding chapter at all -> neutral, not "the first chapter's tone". A
+    # report that never looks for findings (traffic, network inventory) has made
+    # no finding to report, and neutral says exactly that; borrowing chapter 1's
+    # tint would make the cover assert a severity nothing measured.
+    finding_chapters = [s for s in chapters if _kind(s.kind) == "finding"]
     doc_tone = next(
-        (_tone(s.tone) for s in chapters if _tone(s.tone) == "crit"),
-        _tone(chapters[0].tone) if chapters else "neutral",
+        (_tone(s.tone) for s in finding_chapters if _tone(s.tone) == "crit"),
+        _tone(finding_chapters[0].tone) if finding_chapters else "neutral",
     )
 
     parts = [_render_cover(cover, doc_tone)]

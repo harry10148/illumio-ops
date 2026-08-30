@@ -26,6 +26,7 @@ from __future__ import annotations
 import json
 import pathlib
 
+import pandas as pd
 import pytest
 from bs4 import BeautifulSoup
 
@@ -254,9 +255,13 @@ def _findings_results(severities):
     }
 
 
-def _security_html(severities):
+def _build_security(results):
     from src.report.exporters.html_exporter import SecurityRiskHtmlExporter
-    return SecurityRiskHtmlExporter(_findings_results(severities), lang="en").build()
+    return SecurityRiskHtmlExporter(results, lang="en").build()
+
+
+def _security_html(severities):
+    return _build_security(_findings_results(severities))
 
 
 def test_finding_cards_carry_their_own_tone():
@@ -323,15 +328,40 @@ def test_chapter_marks_agree_with_the_count_in_the_chapter_heading(severities):
 def test_a_severity_table_cell_does_not_tone_the_whole_document():
     """F4, second half: one CRITICAL cell must not dye the cover.
 
-    ``doc_tone`` is "crit if any chapter is crit"; when marks came from the
-    rendered markup a single severity cell in an unrelated table reached it.
+    The findings chapter's tone follows its own tally, so zero findings reads as
+    neutral even though the action matrix printed a CRITICAL badge.
     """
     soup = BeautifulSoup(_security_html([]), "html.parser")
     # The action matrix (CRITICAL) and its badge are rendered, but there are no
-    # findings, so nothing may claim a critical tone.
+    # findings, so the findings chapter and the cover must both stay quiet.
     assert soup.select_one('td .badge[data-sev="CRITICAL"]') is not None
+    assert soup.select_one("section.chapter#findings")["data-tone"] == "neutral"
     assert soup.select_one("header.cover")["data-tone"] != "crit"
-    assert [s["data-tone"] for s in soup.select("section.chapter")].count("crit") == 0
+
+
+def test_a_critical_detail_chapter_does_not_reach_the_cover():
+    """G1: chapters may colour themselves; only findings speak for the document.
+
+    ``ransomware`` carries a per-port table with a severity column, so a single
+    CRITICAL row tints that chapter — correctly. The cover must not follow it:
+    this report found nothing.
+    """
+    results = _findings_results([])
+    results["mod04"] = {
+        "risk_flows_total": 2,
+        # part_a_summary is rendered with severity_col="Risk Level", so these
+        # rows become CRITICAL/LOW severity badges inside the chapter.
+        "part_a_summary": pd.DataFrame([
+            {"Risk Level": "CRITICAL", "Flow Count": 1234, "Detail": "smb exposure"},
+            {"Risk Level": "LOW", "Flow Count": 2345, "Detail": "ssh admin path"},
+        ]),
+    }
+    soup = BeautifulSoup(_build_security(results), "html.parser")
+    ransomware = soup.select_one("section.chapter#ransomware")
+    assert ransomware["data-tone"] == "crit", "有 CRITICAL 列的章本來就該染色"
+    assert soup.select_one("section.chapter#findings")["data-tone"] == "neutral"
+    assert soup.select_one("header.cover")["data-tone"] == "neutral", (
+        "非 findings 章的 tone 不得傳到封面")
 
 
 @pytest.mark.parametrize("rtype", MIGRATED)

@@ -243,16 +243,47 @@ def test_score_survives_when_grade_is_empty():
     assert soup.select_one("header.cover .grade-chip") is None   # 無 grade 不畫 chip
 
 
-def test_document_tone_is_critical_when_any_chapter_is_critical():
-    soup = BeautifulSoup(_doc(), "html.parser")
-    assert soup.select_one("header.cover")["data-tone"] == "crit"
+def _cover_tone(*sections):
     out = build_shell_document(
         lang="en",
         cover=ShellCover(title="t", doc_title="d", type_label="x"),
-        sections=[ShellSection(id="a", title="a", html="", tone="warn"),
-                  ShellSection(id="b", title="b", html="", tone="info")],
+        sections=list(sections),
     )
-    assert BeautifulSoup(out, "html.parser").select_one("header.cover")["data-tone"] == "warn"
+    return BeautifulSoup(out, "html.parser").select_one("header.cover")["data-tone"]
+
+
+def _chapter(id_, tone, kind="detail"):
+    return ShellSection(id=id_, title=id_, html="", kind=kind, tone=tone)
+
+
+def test_document_tone_is_critical_when_a_finding_chapter_is_critical():
+    assert BeautifulSoup(_doc(), "html.parser").select_one("header.cover")["data-tone"] == "crit"
+    # Critical wins outright over an earlier, milder finding chapter.
+    assert _cover_tone(_chapter("a", "warn", "finding"),
+                       _chapter("b", "crit", "finding")) == "crit"
+    # No critical: the first FINDING chapter's tone carries.
+    assert _cover_tone(_chapter("a", "warn", "finding"),
+                       _chapter("b", "info", "finding")) == "warn"
+
+
+def test_document_tone_ignores_chapters_that_are_not_findings():
+    """G1: a detail chapter's tint must not speak for the whole document.
+
+    A single critical row in an unmanaged-hosts or vulnerability table tints
+    that chapter; it is not a finding, and it used to dye the cover of a report
+    that found nothing.
+    """
+    assert _cover_tone(_chapter("a", "crit"), _chapter("b", "warn")) == "neutral"
+    assert _cover_tone(_chapter("a", "crit"),
+                       _chapter("b", "warn", "finding")) == "warn"
+    # Exec sections have never counted, and still do not.
+    assert _cover_tone(_chapter("e", "crit", "exec"), _chapter("a", "info")) == "neutral"
+
+
+def test_document_tone_is_neutral_when_there_is_no_finding_chapter():
+    """A report that never looks for findings has made no claim to colour."""
+    assert _cover_tone(_chapter("a", "info"), _chapter("b", "ok")) == "neutral"
+    assert _cover_tone() == "neutral"
 
 
 def test_chapter_index_is_ascii():

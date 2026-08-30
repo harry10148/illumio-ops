@@ -15,6 +15,7 @@ from __future__ import annotations
 import datetime
 import html
 import os
+import re
 from loguru import logger
 import pandas as pd
 
@@ -86,6 +87,31 @@ def _marks_tone(marks: dict[str, int]) -> str:
     """Chapter tone = the tone of the most severe marker present."""
     for sev in SEVERITY_RANK:
         if marks.get(sev):
+            return SEVERITY_TONE[sev]
+    return "neutral"
+
+
+_SEV_ATTR_RE = re.compile(r'data-sev="([A-Z]+)"')
+
+
+def _body_tone(section_html: str) -> str:
+    """Tone a chapter claims from its own rendered content.
+
+    Presence-based, like the design prototype's ``tone_of()``: the most severe
+    marker anywhere in the chapter wins, and a ``note-warn`` banner counts as
+    MEDIUM. This is deliberately NOT the mark tally — a chapter may be tinted by
+    one critical row without that row being a finding.
+
+    Safe to be this loose only because ``build_shell_document`` now derives the
+    cover's tone from the finding chapters alone (G1). While the cover read
+    every chapter, one CRITICAL cell in an unmanaged-hosts table dyed the cover
+    of a report with no findings at all.
+    """
+    sevs = set(_SEV_ATTR_RE.findall(section_html))
+    if "note-warn" in section_html:
+        sevs.add("MEDIUM")
+    for sev in SEVERITY_RANK:
+        if sev in sevs:
             return SEVERITY_TONE[sev]
     return "neutral"
 
@@ -255,9 +281,11 @@ def _trend_chip(direction: str, delta: float, delta_pct: float | None, metric: s
         chip_cls = f'trend-chip trend-chip--{direction}'
 
     # Only "good-up" carries a semantic tone: up/down on a raw count is neither
-    # good nor bad (more traffic is not worse), so the shell leaves those
-    # neutral — same call the design prototype made.
-    tone_attr = ' data-tone="ok"' if inverted and direction == 'up' else ''
+    # good nor bad (more traffic is not worse), so everything else is pinned to
+    # neutral. Pinned, not omitted — .trend-chip reads var(--mark)/var(--fill)/
+    # var(--ink) with no fallback, so an untoned chip inherits its chapter's
+    # tone and a flat trend inside a critical chapter would read as an alarm.
+    tone_attr = ' data-tone="ok"' if inverted and direction == 'up' else ' data-tone="neutral"'
 
     pct_str = f' ({delta_pct:+.1f}%)' if delta_pct is not None else ''
     return (
@@ -278,7 +306,7 @@ def _trend_deltas_section(deltas: list | None, lang: str = "en", mismatch: list 
     warning_html = ''
     if mismatch:
         fields = ", ".join(m.get("field", "") for m in mismatch)
-        warning_html = f'<p class="note note-warn">{t("rpt_trend_mismatch_warning", fields=fields, lang=lang)}</p>'
+        warning_html = f'<p class="note note-warn" data-tone="warn">{t("rpt_trend_mismatch_warning", fields=fields, lang=lang)}</p>'
     if not deltas:
         return (
             heading + warning_html
@@ -723,7 +751,7 @@ class _TrafficReportBase:
         _cap = self._r.get('_analysis_truncation') or {}
         _cap_banner = ''
         if _cap.get('from') and _cap.get('to') and _cap['from'] > _cap['to']:
-            _cap_banner = ('<p class="note note-warn">' + html.escape(
+            _cap_banner = ('<p class="note note-warn" data-tone="warn">' + html.escape(
                 t("rpt_analysis_truncated", lang=_sl)
                 .replace("{shown}", f"{_cap['to']:,}").replace("{total}", f"{_cap['from']:,}")) + '</p>')
         # Disclose analysis modules that threw: without this the sections below
@@ -736,7 +764,7 @@ class _TrafficReportBase:
             # 模組清單放在翻譯字串之外，缺翻譯時仍看得到是哪幾個模組失敗。
             _moderr_names = ", ".join(sorted(str(e['module']) for e in _mod_errs))
             _moderr_banner = (
-                '<p class="note note-warn">'
+                '<p class="note note-warn" data-tone="warn">'
                 + html.escape(t("rpt_module_errors_warning", lang=_sl,
                                 default="Some analysis modules failed to run; the figures "
                                         "in the affected sections are incomplete and must "
@@ -914,9 +942,23 @@ class _TrafficReportBase:
         ``marks`` is passed in, never derived from the rendered markup. Counting
         ``data-sev`` attributes in the body meant every severity cell of every
         table became a chapter mark, so a chapter headed "Findings & Actions
-        (2)" could print "CRITICAL 4" beside it, and a single CRITICAL cell in
-        an unrelated table dyed the whole document's cover tone. Chapter marks
-        are a finding-level statement; see ``_findings_marks``.
+        (2)" could print "CRITICAL 4" beside it. Chapter marks are a
+        finding-level statement; see ``_findings_marks``.
+
+        ``marks`` also selects where the chapter's TONE comes from, and the
+        distinction is ``None`` vs ``{}``, not truthiness:
+
+        * ``marks=None`` — no authoritative tally. The tone is read from the
+          rendered body (``_body_tone``), so a chapter with a critical row in
+          one of its tables still tints itself.
+        * ``marks={...}`` (including empty) — this chapter's severity tally is
+          known exactly, and the tone follows it. The findings chapter passes
+          ``_findings_marks()`` even when it is empty: zero findings must read
+          as neutral no matter what severities the action matrix printed.
+
+        The cover no longer reads any of this except through the finding
+        chapters (G1 in ``build_shell_document``), so a tinted detail chapter
+        cannot speak for the document.
         """
         h2_text = self._s(i18n_key) if i18n_key else title
         if h2_text == i18n_key:
@@ -928,9 +970,9 @@ class _TrafficReportBase:
                 intro_text = intro_en
             intro_html = f'<p class="section-intro">{intro_text}</p>'
         body = f'{intro_html}{content}'
-        marks = dict(marks or {})
+        tone = _body_tone(body) if marks is None else _marks_tone(marks)
         return ShellSection(id=id_, title=h2_text, html=body, kind=kind,
-                            tone=_marks_tone(marks), marks=marks)
+                            tone=tone, marks=dict(marks or {}))
 
     def _findings_marks(self) -> dict[str, int]:
         """Severity histogram of ``findings`` — the chapter marks' only source.
@@ -1280,7 +1322,7 @@ class _TrafficReportBase:
             prev_days = _window_span_days(win_mis.get('previous') or {})
             curr_days = _window_span_days(win_mis.get('current') or {})
             return (
-                f'<p class="note note-warn">'
+                f'<p class="note note-warn" data-tone="warn">'
                 f'{t("rpt_drift_incomparable", prev=prev_days, curr=curr_days, lang=_lang)}</p>'
             )
         head = (
@@ -1292,7 +1334,7 @@ class _TrafficReportBase:
         mismatch = m.get('mismatch') or []
         if mismatch:
             fields = ", ".join(x.get("field", "") for x in mismatch)
-            head += f'<p class="note note-warn">{t("rpt_trend_mismatch_warning", fields=fields, lang=_lang)}</p>'
+            head += f'<p class="note note-warn" data-tone="warn">{t("rpt_trend_mismatch_warning", fields=fields, lang=_lang)}</p>'
         new_unlabeled = m.get('new_unlabeled_collapsed', 0)
         disappeared_unlabeled = m.get('disappeared_unlabeled_collapsed', 0)
         new_collapsed_note = (
