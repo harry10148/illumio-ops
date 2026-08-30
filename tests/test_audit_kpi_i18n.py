@@ -91,8 +91,15 @@ def test_audit_xlsx_attention_sheet_shows_chinese_label(tmp_path):
     assert "Total Events" not in flat
 
 
-def test_audit_html_exporter_no_dead_kpi_cards_reference():
-    """順手清理回歸：_kpi_label/kpi_cards 死碼已移除，_build() 仍正常輸出。"""
+def test_audit_html_exporter_renders_its_kpis_through_the_shell():
+    """順手清理回歸：_kpi_label/kpi_cards 死碼已移除，_build() 仍正常輸出。
+
+    原本的斷言是 ``'<div class="kpi-card">' not in html``。Task 6 刪掉舊殼
+    ``report_css.py`` 之後，全 repo 已經沒有任何地方定義或產出 ``.kpi-card``
+    （只剩 ``design/v2/reports/original/`` 的封存副本），這條斷言因此永遠為真、
+    什麼都守不住——連 KPI 整個不見都照樣綠。改成正面形式：KPI 必須以 v2 殼的
+    ``.kpi`` / ``.kpi-label`` / ``.kpi-value`` 詞彙渲染，而且值要真的到得了紙上。
+    """
     from src.report.exporters.audit_html_exporter import AuditHtmlExporter
 
     results = {
@@ -105,7 +112,13 @@ def test_audit_html_exporter_no_dead_kpi_cards_reference():
         },
         "mod01": {}, "mod02": {}, "findings": [],
     }
+    from bs4 import BeautifulSoup
+
     html = AuditHtmlExporter(results, pd.DataFrame())._build()
-    # The shared stylesheet still defines .kpi-card (used by other exporters),
-    # but AuditHtmlExporter must not emit any <div class="kpi-card"> markup.
-    assert '<div class="kpi-card">' not in html
+    soup = BeautifulSoup(html, "html.parser")
+    kpis = soup.select(".kpi-strip .kpi")
+    assert kpis, "audit report rendered no KPI at all"
+    labels = [k.select_one(".kpi-label").get_text() for k in kpis]
+    values = [k.select_one(".kpi-value").get_text() for k in kpis]
+    assert "事件總數" in labels or "Total Events" in labels, labels
+    assert "42" in values, values

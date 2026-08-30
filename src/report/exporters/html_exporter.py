@@ -45,13 +45,11 @@ from src.humanize_ext import human_number
 from src.report.section_guidance import get_guidance, visible_in
 from src.i18n import t, get_language
 
-# Grade → semantic color mapping. Mirrors --color-success / --color-warning /
-# --color-danger from the WebUI CSS token system (Improvement_Plan §A 1.3).
-# A/B = green (success), C = orange (warning), D/F = red (danger).
-# The v2 shell colours grades through ``data-tone`` instead; the hex table is
-# kept as a re-export for the exporters Tasks 4/5 still have to migrate and for
-# tests/test_report_grade_color.py, and Task 6 removes it.
-from src.report.exporters.grade_colors import GRADE_COLOR as _GRADE_COLORS, grade_color as _grade_to_color, grade_tone as _grade_to_tone  # noqa: E402,F401
+# Grade → shell tone. The hex re-exports (_GRADE_COLORS / _grade_to_color) that
+# sat here for the not-yet-migrated exporters were removed in Task 6 along with
+# grade_colors.GRADE_COLOR itself: every type now colours a grade by putting
+# ``data-tone`` on the element and letting SHELL_CSS resolve it.
+from src.report.exporters.grade_colors import grade_tone as _grade_to_tone  # noqa: E402,F401
 
 
 _HIGHLIGHT_CSS = f'<style>\n{get_highlight_css()}\n</style>'

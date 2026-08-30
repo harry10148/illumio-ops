@@ -71,11 +71,12 @@ BILINGUAL_DATA_FILES = {
     # Bilingual key-finding templates keyed by template name; consumers pick
     # the right lang via `_kf(key, lang, ...)`.
     SRC / "report" / "analysis" / "mod12_executive_summary.py",
-    # CSS module: CJK is developer commentary inside `/* */` embedded in
-    # triple-quoted CSS string literals (visual-review notes on print/layout
-    # behavior), not user-facing UI text — same status as CJK in `#` comments
-    # elsewhere, which the scanner only misses because those aren't literals.
-    SRC / "report" / "exporters" / "report_css.py",
+    # report_css.py used to sit here (whole-file exemption: its CJK was
+    # developer commentary inside `/* */` in triple-quoted CSS literals). It was
+    # deleted in Task 6 of the Phase 2B reskin. Its successor, report_shell.py,
+    # is deliberately NOT exempted as a whole file — only the two literals that
+    # carry ported commentary are, by needle below, so any other hardcoded CJK
+    # in it is still a finding.
 }
 
 # (file_relpath, needle) pairs — specific intentional CJK spots that
@@ -97,18 +98,19 @@ BILINGUAL_DATA_LINES: set[tuple[str, str]] = {
     ("src/cli/menus/_helpers.py", '"是"'),
     # Column-name match keyword, not a display string.
     ("src/report/exporters/html_exporter.py", "_INT_COL_KEYWORDS"),
-    # Injected CSS/JS literal that happens to contain CJK code points for
-    # pattern matching — not a display string.
-    ("src/report/exporters/report_css.py", "normalizeCellValue"),
+    # TABLE_JS: injected JS literal whose one CJK token is a column-name match
+    # keyword in a code comment, not a display string. Moved from report_css.py
+    # to report_shell.py with the literal in Task 6.
+    ("src/report/exporters/report_shell.py", "normalizeCellValue"),
     # Policy usage overview: hit/unused labels resolved via col_i18n; kept
     # as zh so the pandas column name maps to the HTML header translation.
     ("src/report/analysis/policy_usage/pu_mod01_overview.py", "已命中"),
     ("src/report/analysis/policy_usage/pu_mod01_overview.py", "未使用"),
     # Port column-name match keyword, not a display string (same as _INT_COL_KEYWORDS).
     ("src/report/exporters/html_exporter.py", "_PORT_EXACT_COLS"),
-    # Box-drawing chars (U+2500 ─) in the injected CSS shell are decorative
-    # rule dividers, not CJK display text (same as normalizeCellValue).
-    ("src/report/exporters/report_css.py", "Modern SaaS report shell"),
+    # (The MODERN_SHELL_CSS entry that used to sit here went with report_css.py
+    # in Task 6; SHELL_CSS's own box-drawing dividers are covered by the marker
+    # needle below.)
     # SHELL_CSS in report_shell.py is a verbatim port of
     # design/v2/reports/shell.css; its CJK is that file's own design and
     # print-layout commentary carried over unchanged, not display text.

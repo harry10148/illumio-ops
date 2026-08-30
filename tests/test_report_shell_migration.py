@@ -375,22 +375,33 @@ def test_new_shell_structure(rtype):
     # A chapter that quietly stops rendering blows up here rather than just
     # disappearing from the document (prototype lesson, reskin_report 417-424).
     assert toc == body_ids
-    assert soup.select_one("div.report-shell") is None    # old shell container
-    assert soup.select_one("aside.report-toc") is None    # old sidebar nav
+    # ``div.report-shell is None`` / ``aside.report-toc is None`` used to sit
+    # here. Task 6 deleted the only code that could emit either, so they became
+    # permanently true — and the ban on re-introducing them is enforced at the
+    # source level now, by
+    # test_report_shell_renderer.test_the_legacy_shell_leaves_no_residue_in_src,
+    # which is where an absence check of that kind can actually fail.
     assert 'class="print-btn"' in str(soup)
 
 
 @pytest.mark.parametrize("rtype", MIGRATED)
-def test_legacy_cover_page_is_not_emitted(rtype):
-    """A9: the call to build_cover_page() is gone, not merely unrendered.
+def test_exactly_one_cover_page_is_emitted(rtype):
+    """A9, restated so it can still fail.
 
-    ``.report-cover.print-only`` becomes ``display: block`` in print, so a
-    leftover call would add a second cover page to every PDF while the screen
-    view looked fine.
+    The original form asserted ``'class="report-cover' not in html``, which
+    caught a leftover ``build_cover_page()`` call: its ``.print-only`` half went
+    ``display: block`` in print and put a second cover page in every PDF while
+    the screen view looked fine. With ``cover_page.py`` deleted that string
+    cannot appear from anywhere, so the assertion would be green forever.
+
+    The requirement — the reader gets exactly one cover — is counted directly
+    instead. It fails on zero covers as well as on two, which the absence form
+    never did.
     """
-    html = BUILDERS[rtype]()
-    assert 'class="report-cover' not in html
-    assert 'report-cover-block' not in html
+    soup = BeautifulSoup(BUILDERS[rtype](), "html.parser")
+    covers = soup.select('header.cover[data-shell="cover"]')
+    assert len(covers) == 1, f"{rtype}: expected 1 cover, found {len(covers)}"
+    assert covers[0].select_one("h1") is not None, f"{rtype}: cover has no title"
 
 
 @pytest.mark.parametrize("rtype", MIGRATED)

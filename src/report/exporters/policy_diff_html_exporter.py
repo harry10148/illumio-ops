@@ -41,20 +41,21 @@ from src.report.exporters.report_shell import (
 from src.report.exporters.table_renderer import wrap_table_panel
 from src.report.report_metadata import write_metadata_sidecar
 
-# Ported from report_css.py:470-483, which Task 6 deletes. These are this one
-# report type's own components, so they travel in the document's extra_head
-# rather than in the shared SHELL_CSS (the same call Task 4 made for policy
-# usage's rule cards). Every colour is re-expressed as a shell tone token: the
-# old palette variables (--green-10 / --red-10 / --gold-110 / --slate-50) do not
-# exist once build_css() is gone, and a declaration referring to an undefined
-# variable drops out silently — the row would simply stop being coloured.
+# Ported from the old shell's report_css.py:470-483, deleted in Task 6 (last
+# present at b6917c37). These are this one report type's own components, so
+# they travel in the document's extra_head rather than in the shared SHELL_CSS
+# (the same call Task 4 made for policy usage's rule cards). Every colour is
+# re-expressed as a shell tone token: the old palette variables (--green-10 /
+# --red-10 / --gold-110 / --slate-50) no longer exist, and a declaration
+# referring to an undefined variable drops out silently — the row would simply
+# stop being coloured.
 _COMPONENT_CSS = """<style>
 .report-table tbody tr.pd-added td    { background: var(--tone-ok-bg); }
 .report-table tbody tr.pd-removed td  { background: var(--tone-crit-bg); }
 .report-table tbody tr.pd-modified td { background: var(--tone-warn-bg); }
 /* Hover keeps report_css.py:473-475's literals: they are self-contained hex
-   values that never depended on a build_css() variable, so porting them is a
-   copy, and inventing a replacement would change a shipped colour for no
+   values that never depended on an old-shell palette variable, so porting them
+   is a copy, and inventing a replacement would change a shipped colour for no
    reason. Screen-only by nature — nothing hovers on paper. */
 .report-table tbody tr.pd-added:hover td    { background: #cdf3df; }
 .report-table tbody tr.pd-removed:hover td  { background: #fbd5d5; }

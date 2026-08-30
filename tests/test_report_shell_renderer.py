@@ -227,7 +227,11 @@ def test_grade_chip_uses_tone_token_not_inline_colour():
     assert chip is not None
     assert chip["data-tone"] == "crit"                    # grade D
     assert not chip.get("style")
-    assert "color: var(--ink)" in SHELL_CSS               # .score-num 吃 tone
+    # .score-num 吃 tone。錨在 .score-num 自己的規則上，不是整份 SHELL_CSS：
+    # `color: var(--ink)` 在殼裡出現不只一次，只查子字串時把這一條從 .score-num
+    # 拿掉照樣綠——分數會退回本文墨色、等級訊號整個消失（Task 6 以突變抓到）。
+    score_num = SHELL_CSS.split("\n.score-num {")[1].split("}")[0]
+    assert "color: var(--ink)" in score_num, score_num
 
 
 def test_score_survives_when_grade_is_empty():
@@ -548,11 +552,20 @@ def test_empty_table_panel_and_sort_indicator_survive_the_port():
     這裡直接斷言渲染用的 SHELL_CSS 真的有這兩組規則，而不是只斷言它與設計檔
     的差異等於清單。
     """
-    assert ".report-table-panel--empty {" in SHELL_CSS
-    assert ".report-table-panel--empty .empty-marker {" in SHELL_CSS
-    assert ".report-table-panel--empty .empty-text {" in SHELL_CSS
-    assert (".report-table--interactive thead th { cursor: pointer; user-select: none; padding-right: var(--space-7); }") in SHELL_CSS
-    assert ".sort-indicator {" in SHELL_CSS
+    screen_block = SHELL_CSS.split("@media print")[0]
+    assert ".report-table-panel--empty {" in screen_block
+    assert ".report-table-panel--empty .empty-marker {" in screen_block
+    assert ".report-table-panel--empty .empty-text {" in screen_block
+    assert (".report-table--interactive thead th { cursor: pointer; user-select: none; padding-right: var(--space-7); }") in screen_block
+    # Anchored on the SCREEN block and on the rule's own body. Asserting
+    # ``".sort-indicator {" in SHELL_CSS`` was blind: the print block's
+    # ``.sort-indicator { display: none; }`` satisfied it, so renaming the
+    # screen rule away left the guard green while the arrow lost its
+    # positioning entirely (found by mutation, Task 6).
+    indicator = screen_block.split(".sort-indicator {")[1].split("}")[0]
+    assert "position: absolute" in indicator
+    assert "right: var(--space-5)" in indicator
+    assert "translateY(-50%)" in indicator
 
 
 # T4/F2: 列印區塊裡 th 是 position: static，絕對定位的 .sort-indicator 會失去定位祖先
@@ -681,3 +694,65 @@ def test_shell_css_matches_the_design_file_modulo_authorised_deltas():
 def test_shell_css_port_marker_is_present():
     # The Cat C exemption in scripts/audit_i18n_usage.py keys off this token.
     assert SHELL_CSS_PORT_MARKER in SHELL_CSS
+
+
+# ---------------------------------------------------------------------------
+# Task 6: the old shell is deleted. These two keep it deleted.
+# ---------------------------------------------------------------------------
+
+#: Identifiers, not prose. Several src comments still name ``report_css.py`` on
+#: purpose — they record where a ported rule came from, and that history is the
+#: only place the old baseline still exists. What must never come back is a
+#: *call* or a *class name*, so every needle here is one of those.
+LEGACY_SHELL_NEEDLES = (
+    r'class="report-shell',        # old shell container
+    r'class="report-toc',          # old sidebar nav
+    r'class="report-cover',        # old dual cover (both halves)
+    r"report-cover-block",
+    r"build_css\(",                # old stylesheet builder
+    r"build_cover_page\(",         # old cover builder
+    r"grade_color\(",              # inline grade hex; the shell uses data-tone
+    r"import report_css",
+    r"report_css import",
+    r"import cover_page",
+    r"cover_page import",
+)
+
+
+def _git_grep(pattern: str, *paths: str) -> str:
+    import subprocess
+    return subprocess.run(
+        ["git", "grep", "-l", "-E", pattern, "--", *paths],
+        cwd=REPO_ROOT, capture_output=True, text=True).stdout
+
+
+def test_the_legacy_shell_leaves_no_residue_in_src():
+    """No file under ``src/`` may call into, or emit the markup of, the shell
+    ``report_css.py`` / ``cover_page.py`` used to provide.
+
+    The control assertion below is not ceremony: this repo has shipped a gate
+    that reported zero findings because it was scanning nothing at all, and an
+    absence check run through a subprocess is exactly that shape of risk.
+    """
+    control = _git_grep(r"SHELL_CSS", "src/")
+    assert control.strip(), (
+        "git grep found no SHELL_CSS under src/ — the search itself is broken, "
+        "so the absence result below would mean nothing")
+
+    hits = _git_grep("|".join(LEGACY_SHELL_NEEDLES), "src/")
+    assert hits.strip() == "", f"legacy shell residue in src/: {hits}"
+
+
+def test_the_deleted_modules_are_really_gone():
+    """A residue grep is satisfied by an unreferenced file sitting on disk."""
+    exporters = REPO_ROOT / "src" / "report" / "exporters"
+    assert not (exporters / "report_css.py").exists()
+    assert not (exporters / "cover_page.py").exists()
+    # ...and TABLE_JS came with them rather than being dropped: all ten types
+    # render tables that sort, auto-fit and scroll through it.
+    from src.report.exporters.report_shell import TABLE_JS
+    assert "function sortTable(" in TABLE_JS
+    assert "function autoFitColumns(" in TABLE_JS
+    assert TABLE_JS in build_shell_document(
+        lang="en", cover=ShellCover(title="t", doc_title="d", type_label="x"),
+        sections=[ShellSection(id="s", title="s", html="")])
