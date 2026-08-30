@@ -243,8 +243,18 @@ def test_html_exporter_renders_exactly_one_cover():
     assert len(covers) == 1, f"expected exactly one cover, found {len(covers)}"
     # Nothing else in the document may claim a full page ahead of the content.
     assert len(soup.select("h1")) == 1
-    assert "pce.test" in html
-    assert "TestOrg" in html
+    # PCE and organisation are asserted per PLACE, not once against the whole
+    # document. The cover and the appendix's "Generation parameters" render the
+    # same ``ShellCover.meta`` dict, so `"pce.test" in html` cannot tell the two
+    # apart: measured, with the appendix emitting no meta block and the cover
+    # keeping its own, the document-wide form is GREEN and the two below are
+    # RED. (The reverse direction is NOT a hole -- one source, so dropping it
+    # takes both renderings with it and the document-wide form does go red.)
+    cover_meta = covers[0].select_one("dl.cover-meta").get_text(" ", strip=True)
+    assert "pce.test" in cover_meta, cover_meta
+    assert "TestOrg" in cover_meta, cover_meta
+    appendix = soup.select_one("section.appendix").get_text(" ", strip=True)
+    assert "pce.test" in appendix and "TestOrg" in appendix, appendix
 
 
 def test_html_exporter_data_report_title():
