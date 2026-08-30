@@ -574,3 +574,31 @@ def test_cover_does_not_print_the_same_label_twice(rtype):
     eyebrow = cover.select_one(".cover-eyebrow").get_text(strip=True)
     badges = [b.get_text(strip=True) for b in cover.select(".cover-badges .badge")]
     assert eyebrow not in badges, f"{rtype}: 封面把 {eyebrow!r} 印了兩次"
+    # The same collision in the OTHER slot: policy usage's rpt_kicker_policy and
+    # rpt_cover_type_policy are both "Policy Usage Report", so the eyebrow and
+    # the kicker stack one line on top of an identical one. The badge assertion
+    # above cannot see it — policy usage has no badges at all.
+    kicker = cover.select_one(".cover-kicker")
+    if kicker is not None:
+        assert kicker.get_text(strip=True) != eyebrow, (
+            f"{rtype}: eyebrow 與 kicker 是同一句話，封面印了兩次")
+
+
+def test_policy_usage_ships_its_own_component_stylesheet():
+    """The .pu-* rule-card layout has no rule in SHELL_CSS, by design.
+
+    It is this one report type's component, and report_css.py — where it used to
+    live — is deleted in Task 6, so the exporter carries it in extra_head. This
+    is the loss conservation is structurally blind to: without the stylesheet the
+    three-column rule cards collapse into stacked unstyled divs while every
+    character of text survives, so nothing else in this file would go red.
+    """
+    html = BUILDERS["policy_usage"]()
+    assert '<div class="pu-cards">' in html, "fixture rendered no rule cards"
+    for rule in (".pu-cards {", ".pu-card {", ".pu-col {", ".pu-badge-deny {",
+                 ".attention-box {", ".caveat-box {"):
+        assert rule in html, f"policy usage 的元件樣式缺 {rule!r}"
+    # …and it must be reaching the document through the shell's extra_head, not
+    # by having been pasted into SHELL_CSS (which the drift guard would reject).
+    from src.report.exporters.report_shell import SHELL_CSS
+    assert ".pu-card {" not in SHELL_CSS
