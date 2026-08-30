@@ -711,9 +711,12 @@ class _TrafficReportBase:
         # The v2 shell builds its own table of contents from the section list,
         # so the old aside.report-toc / _nav_spec link table is gone. Section
         # titles come from each chapter's own heading key (rpt_tr_sec_*) rather
-        # than the sidebar abbreviations (rpt_tr_nav_*): the two are the same
-        # string everywhere except `vuln`, where the sidebar said "Vuln
+        # than the sidebar abbreviations the old shell used: the two were the
+        # same string everywhere except `vuln`, where the sidebar said "Vuln
         # Exposure" and the heading says "Vulnerability Exposure (V-E lite)".
+        # Those 21 rpt_tr_nav_* keys had no reader left and were deleted in
+        # Task 6; they are in git history at 97c3bef3~1 if the wording is
+        # ever wanted back.
         # 報表類型標籤（rpt_cover_type_*）。同一個來源同時當封面 eyebrow、
         # body[data-report-title] 與執行摘要章的後綴；封面標題 h1 與 <title>
         # 各有自己的鍵，三者不互相推導（原型 C1 事故）。
@@ -783,10 +786,12 @@ class _TrafficReportBase:
         )
 
         _sec: dict[str, ShellSection | None] = {
-            # F5: 不能沿用 rpt_tr_nav_summary（"Executive Summary"）——那樣目錄
-            # 會連著出現兩個同名章節。這一章的內容是規模 pills、成熟度分數、
-            # 趨勢與關鍵發現，命名為「關鍵指標」。
-            'summary': self._section('summary', 'rpt_tr_sec_snapshot', 'Key Metrics',
+            # F5: 這一章不能叫「Executive Summary」（舊側欄 rpt_tr_nav_summary
+            # 的值，Task 6 已隨其他 20 個孤兒鍵刪除）——那樣目錄會連著出現兩個
+            # 同名章節。內容是規模 pills、成熟度分數、趨勢與關鍵發現，命名為
+            # 「關鍵指標」。這個鍵六個型別共用，所以住在共用的 rpt_shell_ 命名
+            # 空間，不再掛 traffic 專屬的 rpt_tr_ 前綴。
+            'summary': self._section('summary', 'rpt_shell_sec_key_metrics', 'Key Metrics',
                           _summary_body),
             'overview': self._section('overview', 'rpt_tr_sec_overview', 'Traffic Overview',
                           render_section_guidance('mod01', profile=profile, detail_level=detail_level, lang=self._lang) + self._mod01_html(),

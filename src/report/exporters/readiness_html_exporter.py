@@ -105,8 +105,13 @@ class ReadinessHtmlExporter:
         body = "".join(
             "<tr>" + "".join(self._cell(c, row.get(c, "")) for c in use) + "</tr>"
             for _, row in df.iterrows())
+        # No `sortable` class: nothing has ever styled or read one. TABLE_JS
+        # keys interactive sorting off `report-table--interactive` plus
+        # `data-interactive`, both emitted by table_renderer.py, and this table
+        # is hand-built. Carrying the word implied an affordance this report has
+        # never had (removed in Task 6 with the old shell it came from).
         table_html = ('<div class="report-table-wrap">'
-                      '<table class="report-table sortable">'
+                      '<table class="report-table">'
                       f'<thead><tr>{head}</tr></thead>'
                       f'<tbody>{body}</tbody></table></div>')
         # The panel is what carries the wide-table print treatment in SHELL_CSS

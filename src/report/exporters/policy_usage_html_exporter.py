@@ -262,7 +262,7 @@ class PolicyUsageHtmlExporter:
                                          html=_exec_body, kind="exec"))
         # Not rpt_pu_nav_summary ("Executive Summary") — the table of contents
         # would then list two chapters under the same name.
-        sections.append(self._section("summary", "rpt_tr_sec_snapshot", _summary_body))
+        sections.append(self._section("summary", "rpt_shell_sec_key_metrics", _summary_body))
         sections.append(self._section("overview", "rpt_pu_sec_overview", self._mod01_html()))
         sections.append(self._section("hit-rules", "rpt_pu_sec_hit", self._mod02_html()))
         if visible_in('pu_mod03_unused_detail', profile, detail_level):

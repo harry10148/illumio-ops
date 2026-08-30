@@ -290,7 +290,7 @@ class AuditHtmlExporter:
         # and its marks come from those items alone (B10): zero attention items
         # must read as neutral even though the event tables print risk badges.
         sections.append(self._section(
-            "summary", "rpt_tr_sec_snapshot", _summary_body,
+            "summary", "rpt_shell_sec_key_metrics", _summary_body,
             kind="finding", marks=self._attention_marks(_attention_items)))
         sections.append(self._section("health", "rpt_au_sec_health", self._mod01_html()))
         sections.append(self._section("users", "rpt_au_sec_users", self._mod02_html()))

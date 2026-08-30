@@ -255,7 +255,7 @@ class VenHtmlExporter:
                                          html=exec_html, kind="exec"))
         # Not rpt_ven_nav_summary ("Executive Summary") — that would put two
         # chapters of the same name in the table of contents.
-        sections.append(self._section("summary", "rpt_tr_sec_snapshot", None,
+        sections.append(self._section("summary", "rpt_shell_sec_key_metrics", None,
                                       _summary_body))
         sections.append(self._section(
             "online", "rpt_ven_sec_online_title", online_count,
