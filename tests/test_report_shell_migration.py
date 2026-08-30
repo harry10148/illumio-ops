@@ -876,8 +876,14 @@ def test_policy_diff_ships_its_own_component_stylesheet():
     used to live (470-483) — is deleted in Task 6, so the exporter carries them
     in extra_head. This is the loss conservation is structurally blind to:
     without the stylesheet every row loses the added/removed/modified colour and
-    the risk column loses its emphasis, while every character of text survives,
-    so nothing else in this file would go red.
+    the risk column loses its bold weight, while every character of text
+    survives, so nothing else in this file would go red.
+
+    Note the ``.pd-risk-*`` colour declarations do NOT render in either shell —
+    measured, not assumed: they are specificity (0,1,0) against
+    ``.report-table tbody td``'s (0,2,1). Only the font-weight takes effect.
+    They are ported unchanged anyway; correcting that would put a new colour on
+    the page rather than restore one (see the comment on _COMPONENT_CSS).
     """
     html = BUILDERS["policy_diff"]()
     assert 'class="pd-modified"' in html, "fixture rendered no colour-coded row"

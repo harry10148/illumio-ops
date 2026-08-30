@@ -59,6 +59,14 @@ _COMPONENT_CSS = """<style>
 .report-table tbody tr.pd-added:hover td    { background: #cdf3df; }
 .report-table tbody tr.pd-removed:hover td  { background: #fbd5d5; }
 .report-table tbody tr.pd-modified:hover td { background: #FBF1C7; }
+/* Measured on both shells, not assumed: only the font-weight half of these
+   five rules has ever rendered. `.pd-risk-high` is specificity (0,1,0) and
+   loses to `.report-table tbody td { color: ... }` at (0,2,1) — old shell
+   rgb(10,10,10), new shell rgb(18,22,28), i.e. body ink in both. The port is
+   deliberately faithful rather than corrected: making the colour win would be
+   a new colour on the page, not the restoration of one. Recorded for T7 to
+   decide with real data; the change-type row background is what actually
+   carries the signal today. */
 .pd-risk-critical, .pd-risk-high { color: var(--tone-crit-fg); font-weight: 700; }
 .pd-risk-medium { color: var(--tone-warn-fg); font-weight: 600; }
 .pd-risk-low    { color: var(--tone-ok-fg); font-weight: 600; }

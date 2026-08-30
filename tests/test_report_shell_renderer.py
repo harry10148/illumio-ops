@@ -581,8 +581,66 @@ def test_the_sort_indicator_is_not_printed():
             < print_block.index(".sort-indicator { display: none; }"))
 
 
+# T5: 舊殼 report_css.py:288-295 在 @page 的 @bottom-right margin box 印
+# 「頁碼 / 總頁數」，design/v2/reports/shell.css 沒有這一段。前六型遷移時一起
+# 掉了、沒有人發現（實測 620f7a52：未遷移的 policy_diff/readiness 每頁都有頁碼，
+# 已遷移的 traffic/audit/policy_usage 一頁都沒有）。一份 8-10 頁的報表 PDF 沒有
+# 頁碼就無法標頁、無法引用、散頁後無法還原順序——與 .mat-fill.warn 同一個判準：
+# 設計檔也漏只代表設計檔有洞，基準是產品舊殼的輸出。
+# 具名頁（@page wide）不繼承預設 @page 的 margin box，所以兩處都要宣告，否則
+# rule_hit_count 那種直橫混排的 PDF 會有幾頁沒有頁碼。
+# 字級/顏色/字族沿用舊殼的字面值：margin box 不繼承 :root 的自訂屬性。
+_PAGE_FOOTER = """  @bottom-right {
+    content: counter(page) " / " counter(pages);
+    font-family: sans-serif;
+    font-size: 8pt;
+    color: #888;
+  }
+"""
+_DELTA_PAGE_NUMBER = (
+    "@page {\n  size: A4 portrait;\n  margin: 15mm 13mm 14mm;\n}\n"
+    "\n"
+    "@page wide {\n  size: A4 landscape;\n  margin: 12mm 11mm 12mm;\n}\n",
+    "@page {\n  size: A4 portrait;\n  margin: 15mm 13mm 14mm;\n"
+    "  /* 頁碼頁尾自舊殼 report_css.py:288-295 移植（T5）。設計檔沒有這一段，但舊殼\n"
+    "     十型全部都印，Chromium 支援 @page 的 margin box，實測舊 policy_diff PDF 每頁\n"
+    "     右下角都有「1 / 7」。少了它，一份 8-10 頁的 PDF 印出來無法標頁、無法引用、\n"
+    "     散頁之後無法還原順序——這是移植回歸，不是新設計。\n"
+    "     字級/顏色/字族沿用舊殼的字面值：margin box 不繼承 :root 的自訂屬性，\n"
+    "     var(--…) 在這裡不解析（實測顏色會退回黑色）。 */\n"
+    + _PAGE_FOOTER +
+    "}\n"
+    "\n"
+    "@page wide {\n  size: A4 landscape;\n  margin: 12mm 11mm 12mm;\n"
+    "  /* 具名頁不繼承預設 @page 的 margin box，寬表橫式頁要自己再宣告一次，\n"
+    "     否則同一份 PDF 會有幾頁無頁碼（rule_hit_count 就是這種混排）。 */\n"
+    + _PAGE_FOOTER +
+    "}\n",
+)
+
+
+def test_every_printed_page_is_numbered():
+    """T5: drift guard 守不住它——規則連同 delta 一起被刪掉它照樣綠。
+
+    直接斷言渲染用的 SHELL_CSS 兩個 @page 區塊都有頁碼 margin box。橫式那一半
+    是分開的一條：具名頁不繼承預設 @page 的 margin box，只補一邊會讓直橫混排的
+    PDF（rule_hit_count）有幾頁沒有頁碼。
+    """
+    assert SHELL_CSS.count('content: counter(page) " / " counter(pages);') == 2
+    # Split on the at-rule itself, not on the bare words: a prose comment
+    # further up names "@page wide" too, and splitting there cut the portrait
+    # block off before its own margin box.
+    portrait, _, rest = SHELL_CSS.partition("\n@page wide {")
+    portrait = portrait[portrait.index("\n@page {"):]
+    landscape = rest.split("@media print")[0]
+    for block, name in ((portrait, "@page"), (landscape, "@page wide")):
+        assert "@bottom-right {" in block, f"{name} 沒有頁碼 margin box"
+        assert 'counter(page) " / " counter(pages)' in block, name
+
+
 AUTHORISED_DELTAS = (
     _DELTA_DROP_OLD_COVER,
+    _DELTA_PAGE_NUMBER,
     _DELTA_SORT_INDICATOR_PRINT,
     _DELTA_PRINT_BTN,
     _DELTA_SCORE_INK,
