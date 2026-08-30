@@ -15,7 +15,6 @@ from __future__ import annotations
 import datetime
 import html
 import os
-import re
 from loguru import logger
 import pandas as pd
 
@@ -56,41 +55,31 @@ from src.report.exporters.grade_colors import GRADE_COLOR as _GRADE_COLORS, grad
 
 _HIGHLIGHT_CSS = f'<style>\n{get_highlight_css()}\n</style>'
 
-# Severity markers the shell can tone. Chapter marks are counted off the
-# ``data-sev`` attributes the badges below carry, exactly the way the design
-# prototype's ``severity_counts()`` did — one counting rule for every chapter
-# rather than a bespoke tally per module.
-_SEV_ATTR_RE = re.compile(r'data-sev="([A-Z]+)"')
-
-
-def _sev_attrs(severity: str, *, mark: bool = True) -> str:
+def _sev_attrs(severity: str) -> str:
     """``data-tone``/``data-sev`` pair for a severity-carrying element.
 
-    SHELL_CSS's ``.badge`` rule reads ``var(--mark)``/``var(--fill)``/
-    ``var(--ink)`` with no fallback, so a badge without ``data-tone`` silently
-    inherits its chapter's tone and every severity renders identically. The
-    ``badge-<SEV>`` class is kept alongside for the exporters that still ship
-    the legacy stylesheet.
+    PURELY PRESENTATIONAL. It used to double as the chapter-mark counting
+    source and the two purposes fought each other (F2/F3/F4): the elements that
+    need the tone are not the elements worth counting. Marks now come from the
+    findings list itself (``_TrafficReportBase._findings_marks``), so every
+    severity-bearing element can carry both attributes without inflating any
+    tally.
 
-    ``mark=False`` emits the tone but not ``data-sev``: the severity-summary
-    boxes print one badge per level including the zero ones, so counting them
-    would give every findings chapter the same full set of chapter marks
-    regardless of what it actually found.
+    Both halves are load-bearing:
+      * ``data-tone`` — SHELL_CSS's ``.badge`` reads ``var(--mark)``/
+        ``var(--fill)``/``var(--ink)`` with NO fallback, so an element without
+        it inherits its chapter's tone. That is how a LOW finding card inside a
+        critical chapter ended up with a danger-red rule.
+      * ``data-sev`` — ``[data-tone="crit"][data-sev="CRITICAL"]`` is the only
+        rule that keeps CRITICAL (solid) apart from HIGH (outlined); they share
+        a tone. Drop it and the two levels become indistinguishable.
+
+    The ``badge-<SEV>`` / ``sev-<SEV>`` classes are kept alongside for the
+    exporters that still ship the legacy stylesheet.
     """
     sev = str(severity or "").upper()
     tone = SEVERITY_TONE.get(sev, "neutral")
-    if not mark:
-        return f' data-tone="{tone}"'
     return f' data-tone="{tone}" data-sev="{html.escape(sev, quote=True)}"'
-
-
-def _severity_marks(section_html: str) -> dict[str, int]:
-    """Count the severity markers a rendered chapter body carries."""
-    counts: dict[str, int] = {}
-    for sev in _SEV_ATTR_RE.findall(section_html):
-        if sev in SEVERITY_TONE:
-            counts[sev] = counts.get(sev, 0) + 1
-    return counts
 
 
 def _marks_tone(marks: dict[str, int]) -> str:
@@ -694,10 +683,20 @@ class _TrafficReportBase:
         # than the sidebar abbreviations (rpt_tr_nav_*): the two are the same
         # string everywhere except `vuln`, where the sidebar said "Vuln
         # Exposure" and the heading says "Vulnerability Exposure (V-E lite)".
-        _report_name = t('gui_btn_traffic_report', lang=self._lang)
-        _exec_title = f'{t("rpt_exec_summary_label", lang=self._lang)} — {_report_name}'
+        # 報表類型標籤（rpt_cover_type_*）。同一個來源同時當封面 eyebrow、
+        # body[data-report-title] 與執行摘要章的後綴；封面標題 h1 與 <title>
+        # 各有自己的鍵，三者不互相推導（原型 C1 事故）。
+        _report_title = t({
+            "network_inventory": "rpt_cover_type_inventory",
+            "traffic": "rpt_cover_type_traffic",
+        }.get(self._profile, "rpt_cover_type_security"), lang=self._lang)
+
+        # F5: 舊碼對三型一律寫死 t('gui_btn_traffic_report')（"Traffic Report"），
+        # 所以資安與盤點兩型的執行摘要標題都自稱流量報表——那是錯的，不是風格
+        # 問題。後綴改用該型自己的類型標籤。
+        _exec_title = f'{t("rpt_exec_summary_label", lang=self._lang)} — {_report_title}'
         exec_html = render_exec_summary_html(
-            _traffic_mod00, report_name=_report_name, lang=self._lang,
+            _traffic_mod00, report_name=_report_title, lang=self._lang,
             include_heading=False)
 
         # The summary hero: maturity block included only when the subclass opts in.
@@ -753,7 +752,10 @@ class _TrafficReportBase:
         )
 
         _sec: dict[str, ShellSection | None] = {
-            'summary': self._section('summary', 'rpt_tr_nav_summary', 'Executive Summary',
+            # F5: 不能沿用 rpt_tr_nav_summary（"Executive Summary"）——那樣目錄
+            # 會連著出現兩個同名章節。這一章的內容是規模 pills、成熟度分數、
+            # 趨勢與關鍵發現，命名為「關鍵指標」。
+            'summary': self._section('summary', 'rpt_tr_sec_snapshot', 'Key Metrics',
                           _summary_body),
             'overview': self._section('overview', 'rpt_tr_sec_overview', 'Traffic Overview',
                           render_section_guidance('mod01', profile=profile, detail_level=detail_level, lang=self._lang) + self._mod01_html(),
@@ -800,10 +802,14 @@ class _TrafficReportBase:
             'change_impact': self._section('change_impact', 'rpt_mod_change_impact_title', 'Change Impact',
                           render_section_guidance('mod_change_impact', profile, detail_level, lang=self._lang) + self._mod_change_impact_html()),
             # The findings chapter keeps its count in the heading — the old <h2>
-            # read "Findings & Actions (12)" and that number is content.
+            # read "Findings & Actions (12)" and that number is content. It is
+            # also the only chapter that carries marks, and they are the same
+            # tally: sum(_findings_marks()) == n_findings, so the number in the
+            # heading and the numbers on the chips can never disagree.
             'findings': self._section('findings',
                           '', f'{_s("rpt_tr_findings_actions")} ({n_findings})',
-                          self._findings_actions_html(), kind='finding'),
+                          self._findings_actions_html(), kind='finding',
+                          marks=self._findings_marks()),
         }
 
         sections: list[ShellSection] = []
@@ -815,16 +821,13 @@ class _TrafficReportBase:
             if _entry is not None:
                 sections.append(_entry)
 
-        # 報表類型標籤（rpt_cover_type_*）——同一個來源同時當封面 eyebrow 與
-        # body[data-report-title]；封面標題 h1 與 <title> 各有自己的鍵，三者
-        # 不互相推導（原型 C1 事故）。
-        _report_title = {
-            "network_inventory": "rpt_cover_type_inventory",
-            "traffic": "rpt_cover_type_traffic",
-        }.get(self._profile, "rpt_cover_type_security")
-        _report_title = t(_report_title, lang=self._lang)
-
-        _badges: list[tuple[str, str]] = [(_profile_badge_text, 'info')]
+        # F6: traffic 與 network_inventory 兩型的 rpt_kicker_* 與 rpt_cover_type_*
+        # 是同一句話，封面會把同一個字串上下相疊印兩次。相同就只留 eyebrow——
+        # 徽章此時是重複，不是資訊。設計原型同樣有這個抑制
+        # （reskin_report.py:474 `cover["profile"] != cover["title"]`）。
+        _badges: list[tuple[str, str]] = []
+        if _profile_badge_text != _report_title:
+            _badges.append((_profile_badge_text, 'info'))
         if self._compute_draft:
             _badges.append((t("rpt_hdr_draft_enabled", lang=self._lang), 'warn'))
 
@@ -900,12 +903,20 @@ class _TrafficReportBase:
         intro_key: str = '',
         intro_en: str = '',
         kind: str = 'detail',
+        marks: dict[str, int] | None = None,
     ) -> ShellSection:
         """One chapter for the v2 shell.
 
         The heading is no longer rendered here — ``build_shell_document`` prints
         it in the chapter head — so this returns the section's body plus the
         metadata the shell needs, not a ``<section>`` element.
+
+        ``marks`` is passed in, never derived from the rendered markup. Counting
+        ``data-sev`` attributes in the body meant every severity cell of every
+        table became a chapter mark, so a chapter headed "Findings & Actions
+        (2)" could print "CRITICAL 4" beside it, and a single CRITICAL cell in
+        an unrelated table dyed the whole document's cover tone. Chapter marks
+        are a finding-level statement; see ``_findings_marks``.
         """
         h2_text = self._s(i18n_key) if i18n_key else title
         if h2_text == i18n_key:
@@ -917,9 +928,23 @@ class _TrafficReportBase:
                 intro_text = intro_en
             intro_html = f'<p class="section-intro">{intro_text}</p>'
         body = f'{intro_html}{content}'
-        marks = _severity_marks(body)
+        marks = dict(marks or {})
         return ShellSection(id=id_, title=h2_text, html=body, kind=kind,
                             tone=_marks_tone(marks), marks=marks)
+
+    def _findings_marks(self) -> dict[str, int]:
+        """Severity histogram of ``findings`` — the chapter marks' only source.
+
+        ``sum(...values())`` equals ``len(findings)`` by construction, which is
+        the number the findings chapter prints in its own heading. A finding
+        with no severity is counted as INFO rather than dropped, so the two
+        numbers cannot drift apart.
+        """
+        counts: dict[str, int] = {}
+        for finding in self._r.get('findings', []) or []:
+            sev = str(getattr(finding, 'severity', '') or '').upper() or 'INFO'
+            counts[sev] = counts.get(sev, 0) + 1
+        return counts
 
     def _trend_deltas_html(self) -> str:
         return _trend_deltas_section(
@@ -1452,7 +1477,7 @@ class _TrafficReportBase:
             n = counts.get(sev, 0)
             sev_html += (
                 f'<div class="sev-box">'
-                f'<div><span class="badge badge-{sev}"{_sev_attrs(sev, mark=False)}>'
+                f'<div><span class="badge badge-{sev}"{_sev_attrs(sev)}>'
                 f'{sev}</span></div>'
                 f'<div class="sev-count">{n}</div>'
                 f'</div>'
@@ -1492,8 +1517,14 @@ class _TrafficReportBase:
                     f'title="{html.escape(name, quote=True)}">{tid}</a>'
                     for tid, name in getattr(f, "technique_ids", ()) or ()
                 )
+                # F2: .finding-card's left rule is `solid var(--mark)`, which
+                # reads the nearest [data-tone] ancestor. Without its own tone a
+                # LOW card sitting in a critical chapter is painted danger-red.
+                # The design prototype's _annotate_tones() matched `sev-*` for
+                # exactly this reason; the port had dropped it.
                 cards_html += (
-                    f'<div class="finding-card sev-{f.severity}">'
+                    f'<div class="finding-card sev-{f.severity}"'
+                    f'{_sev_attrs(f.severity)}>'
                     f'<div class="finding-header">'
                     f'<span class="badge badge-{f.severity}"{_sev_attrs(f.severity)}>'
                     f'{f.severity}</span>'

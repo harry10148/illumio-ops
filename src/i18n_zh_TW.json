@@ -3860,6 +3860,7 @@
   "rpt_tr_sec_ransomware_intro": "檢查與勒索軟體常見攻擊鏈相關的高風險 Ports、Allowed 流量與主機曝露情況。",
   "rpt_tr_sec_readiness": "Enforcement 就緒度",
   "rpt_tr_sec_readiness_intro": "將多個訊號彙整成 readiness 分數，協助評估是否適合提高 Enforcement 強度。",
+  "rpt_tr_sec_snapshot": "關鍵指標",
   "rpt_tr_sec_uncovered": "未覆蓋流量",
   "rpt_tr_sec_uncovered_intro": "聚焦尚未被有效 Policy 覆蓋的流量，協助找出應優先補強的 Services 與通訊方向。",
   "rpt_tr_sec_unmanaged": "Unmanaged 主機",

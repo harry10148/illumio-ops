@@ -20,6 +20,11 @@ test are the drift guard — prose alone is not:
   * ``.print-btn`` is added (screen-only; hidden in the print block);
   * ``.score-num`` gains ``color: var(--ink)`` so the maturity score picks up
     the grade tone from the ``data-tone`` on its wrapper;
+  * ``.mat-fill.warn`` / ``.progress-fill.warn`` is restored from the old
+    product shell (``report_css.py:529``). The design file never had it, but
+    the old shell did; without it the 40-70% band falls back to the info blue
+    and the three-level semantic colour collapses to two. A gap the design file
+    shares is still a regression against the shipped output;
   * the print block gains the wide-table release rules carried over from the
     old product shell (``report_css.py``) plus ``!important`` on the four
     column-width floors that must survive them — see the comment on the
@@ -760,6 +765,10 @@ h2.chapter-title {
 
 .mat-fill.bad, .progress-fill.bad { background: var(--tone-crit-border); }
 .mat-fill.good, .progress-fill.good { background: var(--tone-ok-border); }
+/* 舊殼 report_css.py:529 有 .mat-fill.warn（var(--gold-110)），設計檔漏了這一條。
+   缺它會讓 40-70% 的中段長條退回 .mat-fill 的預設 info 藍，語意色從三級塌成兩級
+   ——這是移植回歸，不是新設計，所以補回來並登記成授權 delta。 */
+.mat-fill.warn, .progress-fill.warn { background: var(--tone-warn-border); }
 
 .mat-val {
   font-family: var(--font-mono);

@@ -3966,6 +3966,7 @@
   "rpt_tr_sec_ransomware_intro": "Check high-risk Ports, Allowed flows, and host exposure commonly tied to ransomware attack chains.",
   "rpt_tr_sec_readiness": "Enforcement Readiness",
   "rpt_tr_sec_readiness_intro": "Aggregate multiple signals into a readiness score to help assess whether it is safe to tighten Enforcement.",
+  "rpt_tr_sec_snapshot": "Key Metrics",
   "rpt_tr_sec_uncovered": "Uncovered Flows",
   "rpt_tr_sec_uncovered_intro": "Focus on traffic not yet covered by effective Policy, helping prioritise which Services and directions to tighten first.",
   "rpt_tr_sec_unmanaged": "Unmanaged Hosts",

@@ -445,6 +445,17 @@ _DELTA_FLOOR_TS = (
     "  .report-table-panel--wide .report-table th.col-ts { min-width: 7.5em !important; }\n",
 )
 
+# T3/F1: 舊殼 report_css.py:529 有 `.report-shell .mat-fill.warn`
+# (var(--gold-110))；design/v2/reports/shell.css 只移植了 .bad 與 .good。缺這條
+# 時 40-70% 的中段長條吃 .mat-fill 的預設 var(--tone-info-border)，語意色從
+# 三級塌成兩級。設計檔也漏只代表設計檔有洞——判斷退化的基準是產品舊殼的輸出。
+_MAT_FILL_GOOD = ".mat-fill.good, .progress-fill.good { background: var(--tone-ok-border); }\n"
+_DELTA_MAT_FILL_WARN = (_MAT_FILL_GOOD, _MAT_FILL_GOOD + """/* 舊殼 report_css.py:529 有 .mat-fill.warn（var(--gold-110)），設計檔漏了這一條。
+   缺它會讓 40-70% 的中段長條退回 .mat-fill 的預設 info 藍，語意色從三級塌成兩級
+   ——這是移植回歸，不是新設計，所以補回來並登記成授權 delta。 */
+.mat-fill.warn, .progress-fill.warn { background: var(--tone-warn-border); }
+""")
+
 AUTHORISED_DELTAS = (
     _DELTA_DROP_OLD_COVER,
     _DELTA_PRINT_BTN,
@@ -455,7 +466,20 @@ AUTHORISED_DELTAS = (
     _DELTA_FLOOR_LANDSCAPE_LONG,
     _DELTA_FLOOR_META,
     _DELTA_FLOOR_TS,
+    _DELTA_MAT_FILL_WARN,
 )
+
+
+def test_mat_fill_warn_survives_the_port_from_the_old_shell():
+    """T3/F1: 三級語意色不得塌成兩級。
+
+    這條不是靠 drift guard 守的——drift guard 只保證「SHELL_CSS == 設計檔 +
+    授權清單」，如果有人把 delta 連同規則一起刪掉，它照樣是綠的。這裡直接斷言
+    渲染出來的 CSS 有這條規則，且三個等級各自吃不同的 token。
+    """
+    assert ".mat-fill.warn, .progress-fill.warn { background: var(--tone-warn-border); }" in SHELL_CSS
+    assert ".mat-fill.bad, .progress-fill.bad { background: var(--tone-crit-border); }" in SHELL_CSS
+    assert ".mat-fill.good, .progress-fill.good { background: var(--tone-ok-border); }" in SHELL_CSS
 
 
 def build_expected_shell_css() -> str:
