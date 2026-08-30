@@ -815,6 +815,44 @@ async function mountPce(root, ctx) {
      * was never ours to publish, and set/not-set now rides on the field it
      * describes instead of being restated in a section of its own. */
     connPanel.body.appendChild(note(t("gui_sy_secret_note")));
+
+    const healthRow = el("div", { class: "strip", "data-role": "pce-health-status" });
+    function paintHealth(stats) {
+      clear(healthRow);
+      const category = String((stats && stats.health_category) || "unknown");
+      const status = String((stats && stats.health_status) || "unknown");
+      const ok = category === "ok" && status === "ok";
+      const unknown = category === "unknown" || status === "unknown";
+      healthRow.dataset.tone = ok ? "ok" : (unknown ? "neutral" : "crit");
+      healthRow.appendChild(el("span", { text: t("gui_health_check") }));
+      healthRow.appendChild(badge(
+        ok ? t("gui_status_ok") : t(unknown ? "gui_card_unknown" : "gui_pce_health_status_failed"),
+        ok ? "ok" : (unknown ? "neutral" : "crit")
+      ));
+    }
+    paintHealth((d.status && d.status.pce_stats) || {});
+    connPanel.body.appendChild(healthRow);
+
+    const healthButton = btn("btn", t("gui_pce_health_check_now"), function () {
+      healthButton.disabled = true;
+      return api.postStatus("/api/pce/health-check", {}).then(function (reply) {
+        const res = reply.data || {};
+        if (reply.status !== 200 || !res.pce_stats) {
+          toast.crit(errorText(res));
+          return false;
+        }
+        paintHealth(res.pce_stats);
+        if (res.ok === true) {
+          toast.ok(t("gui_pce_health_check_passed"));
+          return true;
+        }
+        toast.crit(t("gui_pce_health_check_failed"));
+        return false;
+      }).finally(function () {
+        healthButton.disabled = false;
+      });
+    });
+    connPanel.head.appendChild(healthButton);
     board.appendChild(connPanel);
 
     // A1 fix (header point 4): key/secret are sent ONLY when the operator

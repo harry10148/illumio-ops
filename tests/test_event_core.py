@@ -255,7 +255,10 @@ def test_analyzer_preserves_event_watermark_on_fetch_failure(monkeypatch, tmp_pa
         def execute_traffic_query_stream(self, *args, **kwargs):
             return []
 
-    cm = SimpleNamespace(config={"rules": []})
+    cm = SimpleNamespace(config={
+        "rules": [],
+        "settings": {"enable_health_check": False},
+    })
     analyzer = Analyzer(cm, FailingApi(), DummyReporter())
     original_watermark = analyzer.state["event_watermark"]
 
@@ -428,7 +431,10 @@ def test_analyzer_tracks_unknown_events_and_parser_samples(monkeypatch, tmp_path
         def execute_traffic_query_stream(self, *args, **kwargs):
             return []
 
-    cm = SimpleNamespace(config={"rules": []})
+    cm = SimpleNamespace(config={
+        "rules": [],
+        "settings": {"enable_health_check": False},
+    })
     analyzer = Analyzer(cm, Api(), DummyReporter())
     analyzer.state["event_watermark"] = "2026-04-08T11:00:00Z"
 

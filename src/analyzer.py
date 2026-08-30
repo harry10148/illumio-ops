@@ -63,6 +63,12 @@ MAX_THRESHOLD_WINDOW_MINUTES = 1440
 WATCHDOG_FAILURE_THRESHOLD = 3
 WATCHDOG_COOLDOWN_MINUTES = 60
 
+# The monitor cycle can run every 10 seconds, but an authenticated PCE probe
+# at that cadence is unnecessary and can consume SaaS rate limits. Automatic
+# telemetry is fresh enough at one probe per minute; operator-triggered probes
+# use force=True and bypass this interval.
+HEALTH_CHECK_INTERVAL_SECONDS = 60
+
 # Meta-alert cooldown for event polling overflow: when the sync events API
 # hits max_results it returns only the newest rows, so older events in the
 # window are permanently lost. Own cooldown keeps a persistent burst source
@@ -524,7 +530,7 @@ class Analyzer:
         # this cycle (record_pce_success clearing it to None on recovery, or
         # _check_watchdog setting a fresh cooldown timestamp). Deliberately a
         # separate flag from _pce_stats_dirty: on a cache-only deployment with
-        # no health-check rule, _check_watchdog can fire (and write this key)
+        # automatic health checking disabled, _check_watchdog can fire (and write this key)
         # in a cycle where _pce_stats_dirty stays False (no real PCE probe ran
         # here) — sharing the flag would make save_state()'s _merge defer to
         # disk and immediately erase the timestamp this cycle just wrote,
@@ -1149,22 +1155,51 @@ class Analyzer:
             )
         return selected
 
-    def _run_health_check(self) -> bool:
-        """Run the PCE health check if any system/pce_health rules are configured.
+    def _run_health_check(
+        self,
+        *,
+        force: bool = False,
+        dispatch_alerts: bool = True,
+    ) -> bool:
+        """Run the PCE health probe independently of health-alert rules.
 
-        Records stats and fires health alerts as needed. The analysis cycle
-        always continues regardless of PCE health status; health failure is
-        informational, not a gate.
+        Automatic cycles honour ``settings.enable_health_check``. A manual
+        operator request uses ``force=True`` so it can diagnose connectivity
+        even when scheduled probing is disabled. Alert dispatch remains a
+        separate concern: ``dispatch_alerts=False`` records fresh telemetry
+        without unexpectedly sending notifications from a button click.
 
         Returns:
-            True always — no health-check rules configured (skipped) or check
-            completed (passed or failed). False is reserved for future use.
+            True always — disabled (skipped) or check completed (passed or
+            failed). False is reserved for future use.
         """
-        pce_health_rules = self._select_rules(
-            lambda r: r.get("type") == "system" and r.get("filter_value") == "pce_health")
-
-        if not pce_health_rules:
+        enabled = bool(
+            (self.cm.config.get("settings", {}) or {}).get("enable_health_check", True)
+        )
+        if not force and not enabled:
             return True
+
+        if not force:
+            last_check = parse_event_timestamp(
+                self.state.get("pce_stats", {}).get("last_health_check")
+            )
+            if last_check is not None:
+                age_seconds = (
+                    datetime.datetime.now(datetime.timezone.utc) - last_check
+                ).total_seconds()
+                if 0 <= age_seconds < HEALTH_CHECK_INTERVAL_SECONDS:
+                    logger.debug(
+                        "Skipping PCE health check; last probe was {:.1f}s ago",
+                        age_seconds,
+                    )
+                    return True
+
+        pce_health_rules = []
+        if dispatch_alerts:
+            pce_health_rules = self._select_rules(
+                lambda r: r.get("type") == "system"
+                and r.get("filter_value") == "pce_health"
+            )
 
         from src.api_client import pce_probe_category
 
@@ -1426,7 +1461,7 @@ class Analyzer:
 
     def run_analysis(self) -> None:
         logger.info("Starting analysis cycle.")
-        # 1. Health Check (only runs when a system rule with filter_value=pce_health is configured)
+        # 1. Health Check (telemetry is independent of optional alert rules)
         self._run_health_check()
 
         # 2. Events pipeline

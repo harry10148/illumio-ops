@@ -143,6 +143,31 @@ def test_status_defaults_legacy_config_to_on_prem_probe_without_provider(client)
     assert "provider_status_url" not in body
 
 
+def test_status_health_check_reflects_setting_not_alert_rule(client):
+    cm = client.application.config["CM"]
+    cm.config["rules"] = [{
+        "id": "health-off",
+        "name": "disabled alert",
+        "type": "system",
+        "filter_value": "pce_health",
+        "enabled": False,
+    }]
+    cm.config["settings"]["enable_health_check"] = False
+    cm.save()
+    disabled = client.get(
+        "/api/status", environ_overrides={"REMOTE_ADDR": "127.0.0.1"}
+    ).get_json()
+    assert disabled["health_check"] is False
+
+    cm.config["rules"] = []
+    cm.config["settings"]["enable_health_check"] = True
+    cm.save()
+    enabled = client.get(
+        "/api/status", environ_overrides={"REMOTE_ADDR": "127.0.0.1"}
+    ).get_json()
+    assert enabled["health_check"] is True
+
+
 def test_overview_blocked_from_agg(client, tmp_path):
     import datetime as dt
     from sqlalchemy import create_engine

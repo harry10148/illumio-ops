@@ -1,6 +1,7 @@
 """HTTP 200 from /api/v2/health does NOT mean healthy: parse body status."""
 from __future__ import annotations
 
+import datetime
 from unittest.mock import MagicMock, call
 
 from src.api_client import health_status_from_body
@@ -81,6 +82,68 @@ def test_saas_connectivity_success_skips_on_prem_health_probes(tmp_path, monkeyp
     assert ana.state["pce_stats"]["health_probe"] == "noop"
     assert ana.state["pce_stats"]["deployment_type"] == "saas"
     assert ana.state["pce_stats"]["health_category"] == "ok"
+
+
+def test_enabled_health_check_runs_without_an_alert_rule(tmp_path, monkeypatch):
+    """Health telemetry must not depend on configuring an alert rule."""
+    api = MagicMock()
+    api.check_connectivity.return_value = (200, "")
+    api.check_health.return_value = (200, '{"status": "normal"}')
+    api.check_node_available.return_value = (200, "")
+    ana, rep = _mk_health_analyzer(tmp_path, monkeypatch, api)
+    ana.cm.config["settings"]["enable_health_check"] = True
+    ana.cm.config["rules"] = []
+
+    ana._run_health_check()
+
+    assert ana.state["pce_stats"]["health_status"] == "ok"
+    assert ana.state["pce_stats"]["health_category"] == "ok"
+    assert ana.state["pce_stats"]["health_probe"] == "health"
+    rep.add_health_alert.assert_not_called()
+
+
+def test_disabled_automatic_health_check_does_not_probe(tmp_path, monkeypatch):
+    api = MagicMock()
+    ana, _rep = _mk_health_analyzer(tmp_path, monkeypatch, api)
+    ana.cm.config["settings"]["enable_health_check"] = False
+
+    ana._run_health_check()
+
+    api.check_connectivity.assert_not_called()
+
+
+def test_automatic_health_check_skips_a_recent_probe(tmp_path, monkeypatch):
+    from src.events.poller import format_utc
+
+    api = MagicMock()
+    ana, _rep = _mk_health_analyzer(tmp_path, monkeypatch, api)
+    ana.state["pce_stats"]["last_health_check"] = format_utc(
+        datetime.datetime.now(datetime.timezone.utc)
+    )
+
+    ana._run_health_check()
+
+    api.check_connectivity.assert_not_called()
+
+
+def test_forced_health_check_bypasses_disable_and_recent_probe(tmp_path, monkeypatch):
+    from src.events.poller import format_utc
+
+    api = MagicMock()
+    api.check_connectivity.return_value = (200, "")
+    api.check_health.return_value = (200, '{"status": "normal"}')
+    api.check_node_available.return_value = (200, "")
+    ana, rep = _mk_health_analyzer(tmp_path, monkeypatch, api)
+    ana.cm.config["settings"]["enable_health_check"] = False
+    ana.state["pce_stats"]["last_health_check"] = format_utc(
+        datetime.datetime.now(datetime.timezone.utc)
+    )
+
+    ana._run_health_check(force=True, dispatch_alerts=False)
+
+    api.check_connectivity.assert_called_once()
+    assert ana.state["pce_stats"]["health_status"] == "ok"
+    rep.add_health_alert.assert_not_called()
 
 
 def test_saas_auth_failure_is_reachable_and_classified(tmp_path, monkeypatch):

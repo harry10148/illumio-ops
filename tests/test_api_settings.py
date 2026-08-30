@@ -121,6 +121,55 @@ def test_redaction_never_reports_secret_length(authed_client):
     )
 
 
+def test_manual_pce_health_check_persists_fresh_status(
+        authed_client, monkeypatch, tmp_path):
+    """The operator control must run real Analyzer health state handling."""
+    import src.analyzer as analyzer_mod
+    import src.api_client as api_client_mod
+
+    class FakeApiClient:
+        def __init__(self, _cm):
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return False
+
+        def check_connectivity(self):
+            return 200, ""
+
+        def check_health(self):
+            return 200, '{"status": "normal"}'
+
+        def check_node_available(self):
+            return 200, ""
+
+        def close(self):
+            pass
+
+    state_file = tmp_path / "state.json"
+    monkeypatch.setattr(analyzer_mod, "STATE_FILE", str(state_file))
+    monkeypatch.setattr(api_client_mod, "ApiClient", FakeApiClient)
+    client, csrf = authed_client
+
+    response = client.post(
+        "/api/pce/health-check",
+        json={},
+        headers={"X-CSRF-Token": csrf},
+    )
+
+    assert response.status_code == 200
+    body = response.get_json()
+    assert body["ok"] is True
+    assert body["pce_stats"]["health_status"] == "ok"
+    assert body["pce_stats"]["health_category"] == "ok"
+    assert body["pce_stats"]["health_probe"] == "health"
+    persisted = json.loads(state_file.read_text(encoding="utf-8"))
+    assert persisted["pce_stats"]["health_status"] == "ok"
+
+
 # ── Test 1b: the contract the Integrations → Overview channel cards depend on ──
 # Regression guard for the "LINE configured but displayed as Not configured" bug.
 # The overview detects a configured channel via the redacted-secret companion flag

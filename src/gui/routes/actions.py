@@ -31,6 +31,7 @@ from src.state_store import update_state_file
 # **另一個行程**，也會跑完整分析 cycle，兩邊的 state 快照會互相覆寫（告警冷卻
 # 被抹掉 → 同一則告警重寄）。取鎖順序固定為 file_lock → _analysis_lock。
 _ANALYSIS_LOCK_WAIT_S = 600.0
+_HEALTH_LOCK_WAIT_S = 30.0
 
 # /api/quarantine/search 的 data_source 白名單（live 分支專用；archive 分支
 # 有自己的 source=="archive" 早退，data_source 從不影響它）。只列這條路徑
@@ -756,6 +757,35 @@ def make_actions_blueprint(
             except TimeoutError:
                 return _err(t("gui_err_analysis_in_progress", lang=lang), 409)
             return jsonify({"ok": True, "output": t("gui_action_run_completed", lang=lang)})
+
+    @bp.route('/api/pce/health-check', methods=['POST'])
+    @limiter.limit("12 per hour")
+    @login_required
+    def api_pce_health_check():
+        """Run one probe, persist its telemetry, and never dispatch alerts."""
+        cm.load()
+        lang = cm.config.get('settings', {}).get('language', 'en') or 'en'
+        from src.api_client import ApiClient
+        from src.reporter import Reporter
+        from src.analyzer import Analyzer
+        from src.main import analysis_lock_path
+
+        try:
+            with _file_lock(analysis_lock_path(), timeout=_HEALTH_LOCK_WAIT_S):
+                with _analysis_lock:
+                    with ApiClient(cm) as api:
+                        analyzer = Analyzer(cm, api, Reporter(cm))
+                        analyzer._run_health_check(force=True, dispatch_alerts=False)
+                        analyzer.save_state()
+                        stats = dict(analyzer.state.get("pce_stats", {}))
+            return jsonify({
+                "ok": stats.get("health_category") == "ok",
+                "pce_stats": stats,
+            })
+        except TimeoutError:
+            return _err(t("gui_err_analysis_in_progress", lang=lang), 409)
+        except Exception as exc:
+            return _err_with_log("pce_health_check", exc, lang=lang)
 
     @bp.route('/api/actions/debug', methods=['POST'])
     @limiter.limit("10 per hour")

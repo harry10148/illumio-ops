@@ -487,15 +487,20 @@ class TestDispatchAlerts(unittest.TestCase):
 # ─── Integration: run_analysis orchestrates the 4 methods ─────────────────────
 
 class TestRunAnalysisOrchestration(unittest.TestCase):
-    """Verify that run_analysis() delegates to the four extracted methods."""
+    """Verify that run_analysis() delegates to its extracted methods."""
 
     def setUp(self):
         self.az = _make_analyzer(rules=[])
+        self.az._run_health_check = MagicMock(return_value=True)
         self.az._run_event_analysis = MagicMock(return_value=[])
         self.az._fetch_traffic = MagicMock(return_value=(None, [], datetime.datetime.now(datetime.timezone.utc)))
         self.az._run_rule_engine = MagicMock(return_value=[])
         self.az._dispatch_alerts = MagicMock()
         self.az.save_state = MagicMock()
+
+    def test_run_analysis_calls_health_check(self):
+        self.az.run_analysis()
+        self.az._run_health_check.assert_called_once()
 
     def test_run_analysis_calls_event_pipeline(self):
         self.az.run_analysis()

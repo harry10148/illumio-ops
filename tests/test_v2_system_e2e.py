@@ -159,6 +159,8 @@ def _labels(page):
         "gui_sy_pce_target_same",
         "gui_pce_connection_restart_required", "gui_console_url_help_on_prem",
         "gui_console_url_help_saas",
+        "gui_pce_health_check_now", "gui_pce_health_check_passed",
+        "gui_status_ok",
     ]
     return page.evaluate(
         "async (keys) => { const { t } = await import('/static/js/v2/core/i18n.mjs'); "
@@ -921,6 +923,40 @@ def test_pce_runtime_connection_fields_load_save_and_show_safe_saas_status_link(
             "deployment_type": original.get("deployment_type", "on_prem"),
             "console_url": original.get("console_url", ""),
         }})
+
+
+def test_pce_manual_health_check_posts_and_paints_fresh_status(v2_page):
+    page, base_url = v2_page
+    _goto(page, base_url, R_PCE, "SY-18")
+    labels = _labels(page)
+    handler = _fulfill(
+        page,
+        "**/api/pce/health-check",
+        200,
+        json.dumps({
+            "ok": True,
+            "pce_stats": {
+                "health_status": "ok",
+                "health_category": "ok",
+                "health_probe": "health",
+                "deployment_type": "on_prem",
+            },
+        }),
+    )
+    try:
+        with page.expect_request(
+            lambda req: req.method == "POST" and req.url.endswith("/api/pce/health-check")
+        ):
+            page.get_by_role(
+                "button", name=labels["gui_pce_health_check_now"], exact=True
+            ).click()
+
+        health = page.locator('[data-role="pce-health-status"]')
+        expect(health).to_contain_text(labels["gui_status_ok"])
+        expect(health.locator('.badge[data-tone="ok"]')).to_be_visible()
+        assert _toast_text(page, "ok") == labels["gui_pce_health_check_passed"]
+    finally:
+        page.unroute("**/api/pce/health-check", handler)
 
 
 def test_pce_discard_restores_on_prem_help_and_hides_saas_status_link(v2_page):
