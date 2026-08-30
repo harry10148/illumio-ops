@@ -30,7 +30,23 @@ test are the drift guard — prose alone is not:
     elements that ``table_renderer.py`` / ``TABLE_JS`` still emit for all ten
     report types; the design file never covered the JS-driven affordances, so
     without them "no data" looks identical to a rendered table and the sort
-    arrow becomes loose text beside the column name;
+    arrow becomes loose text beside the column name. Three parts of that port
+    are deliberate decisions rather than oversights, recorded here so the next
+    reader can tell them apart from omissions:
+      - the sorted-column HIGHLIGHT (``report_css.py:177``, a background
+        gradient on ``th.is-sorted-asc/desc``) is NOT ported. The shell's table
+        header already carries a surface fill and a hairline; a second gradient
+        on top of it is the "shadow theatre" the design brief rules out. The
+        sorted column still reads from the indicator's full opacity and accent
+        colour, so the signal survives in a quieter form;
+      - the indicator's accent colour replaces the old ``--gold``: this is an
+        interaction state, and the shell's tone-* colours are reserved for
+        severity;
+      - the print block hides the indicator outright and gives the reserved
+        right padding back. Paper cannot be sorted, and ``th`` becomes
+        ``position: static`` in print, which detaches the absolutely positioned
+        arrow from its column and scatters it down the chapter's right edge
+        (measured: 20 stray "↕" in one audit PDF).
   * the print block gains the wide-table release rules carried over from the
     old product shell (``report_css.py``) plus ``!important`` on the four
     column-width floors that must survive them — see the comment on the
@@ -1002,7 +1018,12 @@ figure.chart-static figcaption {
   vertical-align: middle;
 }
 .report-table-panel--empty .empty-text { font-style: italic; letter-spacing: 0.02em; }
-.report-table--interactive thead th { cursor: pointer; user-select: none; }
+/* 舊殼 th 是 padding: 10px 28px 10px 12px，那 28px 右內距在 report_css.py:157-159
+   有註解寫明是「為絕對定位的 .sort-indicator 保留的空間」。移植被定位的元素就必須
+   一起移植它的保留區：新殼 th 只有 8px 右內距而箭頭在 12px，實測 audit 的 count 欄
+   欄名與箭頭重疊 +14.5px（舊殼同欄是 −12.6px 有餘裕）。只加在可排序的表格上，
+   不可排序的表格沒有箭頭、不該平白損失 16px 欄寬。 */
+.report-table--interactive thead th { cursor: pointer; user-select: none; padding-right: var(--space-7); }
 .sort-indicator {
   position: absolute;
   right: var(--space-5);
@@ -1245,6 +1266,12 @@ figure.chart-static figcaption {
   .report-table { table-layout: auto; width: 100%; }
   .report-table thead { display: table-header-group; }
   .report-table thead th { position: static; }
+  /* 列印時 th 變成 position: static，絕對定位的 .sort-indicator 因此失去定位祖先、
+     改對 section.chapter 定位，整排箭頭飄到表格之後的章右緣（實測 audit PDF 出現 20 個
+     游離「↕」，pdftotext -bbox 只解析出 3 個可分辨的 word、全部疊在 x=543.5）。
+     紙本不能排序，這個提示在列印時沒有意義——直接不印，順便把它的保留區還給欄寬。 */
+  .sort-indicator { display: none; }
+  .report-table--interactive thead th { padding-right: var(--space-4); }
   .report-table tbody tr { break-inside: avoid; }
   /* 一般表格用 break-word：anywhere 會連數字都拆（tri-grid 裡實測把
      「1,132,920」折成兩行），只有寬表為了保證塞得下才放寬成 anywhere。 */

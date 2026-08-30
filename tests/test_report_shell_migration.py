@@ -377,11 +377,23 @@ def test_known_cell_still_sits_under_its_own_column(rtype):
     pytest.fail(f"{rtype}: 找不到儲存格 {value!r}，欄位對齊不變量無法驗證")
 
 
+# Which types put a maturity grade on the page at all. Only security_risk does;
+# the loop below matched nothing for the other five and passed without ever
+# running its body, so this states the expectation instead of leaving it to a
+# possibly-empty selection (F7). A type that stops emitting its grade, or one
+# that starts emitting an unexpected one, now fails here.
+GRADE_ELEMENT_TYPES: frozenset[str] = frozenset({"security_risk"})
+
+
 @pytest.mark.parametrize("rtype", MIGRATED)
 def test_grade_colour_comes_from_data_tone_not_inline_style(rtype):
     """A1: no grade-coloured element carries an inline colour any more."""
     soup = BeautifulSoup(BUILDERS[rtype](), "html.parser")
-    for element in soup.select(".score-hero, .score-num, .grade-chip, .grade-hero"):
+    elements = soup.select(".score-hero, .score-num, .grade-chip, .grade-hero")
+    assert bool(elements) == (rtype in GRADE_ELEMENT_TYPES), (
+        f"{rtype}: 預期 {'有' if rtype in GRADE_ELEMENT_TYPES else '沒有'} grade 元素，"
+        f"實際找到 {len(elements)} 個——迴圈本體會空轉")
+    for element in elements:
         style = element.get("style", "")
         assert "color" not in style, f"{rtype}: {element.name} 仍帶 inline 色碼 {style!r}"
         toned = element if element.get("data-tone") else element.find_parent(
@@ -602,3 +614,84 @@ def test_policy_usage_ships_its_own_component_stylesheet():
     # by having been pasted into SHELL_CSS (which the drift guard would reject).
     from src.report.exporters.report_shell import SHELL_CSS
     assert ".pu-card {" not in SHELL_CSS
+
+
+# ---------------------------------------------------------------------------
+# Fix round 1 — F4/F5. Both are user-visible colour, so both are asserted on the
+# rendered document rather than on a helper's return value.
+# ---------------------------------------------------------------------------
+
+def _audit_with_attention(risks):
+    """An audit report whose attention block carries exactly ``risks``."""
+    import pandas as pd
+    from src.report.exporters.audit_html_exporter import AuditHtmlExporter
+
+    events = pd.DataFrame([{"event_type": "agent.tampering",
+                            "severity": "error-lima", "count": 3,
+                            "last_seen": "2026-07-11T09:14:23Z"}])
+    items = [{"risk": r, "event_type": f"user.login_{i}", "count": 1,
+              "summary": f"summary text {i}", "recommendation": f"do thing {i}",
+              "actors": [f"actor{i}@lab.local"]}
+             for i, r in enumerate(risks)]
+    results = {"mod00": {"generated_at": "2026-07-23 12:00:00",
+                         "attention_items": items,
+                         "top_events_overall": events},
+               "mod01": {"recent": events}, "mod02": {}, "mod03": {}, "mod04": {}}
+    return AuditHtmlExporter(results, date_range=("2026-07-16", "2026-07-23"),
+                             lang="en")._build()
+
+
+def test_the_attention_block_still_flags_itself():
+    """F4: the heading used to be red and the migration left it in default ink.
+
+    ``--red`` was declared on report_css.py's ``:root``, so the old
+    ``style="color:var(--red)"`` really rendered (measured on 730dbd8f:
+    rgb(220,38,38)). Judging it dead code was reasoning about the
+    implementation instead of the shipped output. The signal has to survive a
+    list of nothing but LOW items, which is exactly when the per-card badges
+    cannot stand in for it.
+    """
+    soup = BeautifulSoup(_audit_with_attention(["LOW"]), "html.parser")
+    heading = soup.find("h2", string=lambda s: s and "Attention" in s)
+    assert heading is not None, "找不到「需要注意」標題"
+    # The tone has to be on the block's OWN wrapper. Asking only for "some
+    # [data-tone] ancestor" is not a gate: every chapter carries one, so the
+    # first version of this assertion passed even with the wrapper's tone
+    # deleted — it was reading the chapter's tone and calling it a signal.
+    block = heading.parent
+    assert block.name == "div" and block.get("data-tone") not in (None, "neutral"), (
+        f"警示區塊自己沒有 tone，只有 LOW 項目時整段就沒有任何警示訊號："
+        f"{block.name} data-tone={block.get('data-tone')!r}")
+    # The colour comes from that tone, not from a hex frozen into the markup.
+    assert "var(--ink)" in heading.get("style", "")
+    assert "#" not in heading.get("style", "")
+
+
+def test_one_severity_has_one_look_across_the_whole_report():
+    """F5: concern cards and event tables must not use two palettes.
+
+    concern_card kept writing RISK_COLOR/RISK_BG into a style attribute, which
+    beats the stylesheet: one MEDIUM was rgb(212,160,23) on a card and
+    rgb(138,93,0) in a table, and CRITICAL was outlined in one place and solid
+    in the other. Same severity, same document, two looks.
+    """
+    soup = BeautifulSoup(_audit_with_attention(["CRITICAL", "MEDIUM"]),
+                         "html.parser")
+    badges = soup.select(".risk-badge")
+    assert len(badges) >= 3, f"樣本不足以比較兩處徽章：{len(badges)}"
+    for badge in badges:
+        assert "color" not in badge.get("style", ""), (
+            f"風險徽章仍帶 inline 色碼，會蓋過殼的 tone：{badge}")
+        assert badge.get("data-tone") and badge.get("data-sev"), (
+            f"風險徽章缺 data-tone/data-sev：{badge}")
+    # Every occurrence of one severity carries identical tone attributes.
+    by_sev: dict[str, set] = {}
+    for badge in badges:
+        by_sev.setdefault(badge["data-sev"], set()).add(badge["data-tone"])
+    for sev, tones in by_sev.items():
+        assert len(tones) == 1, f"{sev} 在同一份報表裡有兩種 tone：{tones}"
+    # And the cards themselves are toned, or a LOW card inside the crit-toned
+    # attention block would take the block's red left rule (the T3/F2 lesson).
+    cards = soup.select(".concern-card")
+    assert cards and all(c.get("data-tone") for c in cards), (
+        f"發現卡沒有自己的 tone：{[c.get('data-tone') for c in cards]}")

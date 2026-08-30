@@ -521,7 +521,12 @@ _DELTA_TABLE_JS_AFFORDANCES = (_PANEL_COMPACT, _PANEL_COMPACT + """\
   vertical-align: middle;
 }
 .report-table-panel--empty .empty-text { font-style: italic; letter-spacing: 0.02em; }
-.report-table--interactive thead th { cursor: pointer; user-select: none; }
+/* 舊殼 th 是 padding: 10px 28px 10px 12px，那 28px 右內距在 report_css.py:157-159
+   有註解寫明是「為絕對定位的 .sort-indicator 保留的空間」。移植被定位的元素就必須
+   一起移植它的保留區：新殼 th 只有 8px 右內距而箭頭在 12px，實測 audit 的 count 欄
+   欄名與箭頭重疊 +14.5px（舊殼同欄是 −12.6px 有餘裕）。只加在可排序的表格上，
+   不可排序的表格沒有箭頭、不該平白損失 16px 欄寬。 */
+.report-table--interactive thead th { cursor: pointer; user-select: none; padding-right: var(--space-7); }
 .sort-indicator {
   position: absolute;
   right: var(--space-5);
@@ -546,12 +551,39 @@ def test_empty_table_panel_and_sort_indicator_survive_the_port():
     assert ".report-table-panel--empty {" in SHELL_CSS
     assert ".report-table-panel--empty .empty-marker {" in SHELL_CSS
     assert ".report-table-panel--empty .empty-text {" in SHELL_CSS
-    assert ".report-table--interactive thead th { cursor: pointer; user-select: none; }" in SHELL_CSS
+    assert (".report-table--interactive thead th { cursor: pointer; user-select: none; padding-right: var(--space-7); }") in SHELL_CSS
     assert ".sort-indicator {" in SHELL_CSS
+
+
+# T4/F2: 列印區塊裡 th 是 position: static，絕對定位的 .sort-indicator 會失去定位祖先
+# 而飄到章右緣（實測 audit PDF 20 個游離箭頭）。紙本不能排序，列印時直接不印，並把
+# 螢幕上為它保留的右內距還回去。與 _DELTA_TABLE_JS_AFFORDANCES 是同一個移植的兩半。
+_PRINT_TH_STATIC = "  .report-table thead th { position: static; }\n"
+_DELTA_SORT_INDICATOR_PRINT = (_PRINT_TH_STATIC, _PRINT_TH_STATIC + """\
+  /* 列印時 th 變成 position: static，絕對定位的 .sort-indicator 因此失去定位祖先、
+     改對 section.chapter 定位，整排箭頭飄到表格之後的章右緣（實測 audit PDF 出現 20 個
+     游離「↕」，pdftotext -bbox 只解析出 3 個可分辨的 word、全部疊在 x=543.5）。
+     紙本不能排序，這個提示在列印時沒有意義——直接不印，順便把它的保留區還給欄寬。 */
+  .sort-indicator { display: none; }
+  .report-table--interactive thead th { padding-right: var(--space-4); }
+""")
+
+
+def test_the_sort_indicator_is_not_printed():
+    """F2: 沒有這一條，箭頭在 PDF 裡會脫離欄頭，六型（T5 後十型）全中。
+
+    drift guard 守不住它——把規則連同 delta 一起刪掉它照樣綠——所以直接斷言
+    列印區塊裡有這條規則，且它排在 th 變成 static 之後。
+    """
+    print_block = SHELL_CSS.split("@media print")[1]
+    assert ".sort-indicator { display: none; }" in print_block
+    assert (print_block.index(".report-table thead th { position: static; }")
+            < print_block.index(".sort-indicator { display: none; }"))
 
 
 AUTHORISED_DELTAS = (
     _DELTA_DROP_OLD_COVER,
+    _DELTA_SORT_INDICATOR_PRINT,
     _DELTA_PRINT_BTN,
     _DELTA_SCORE_INK,
     _DELTA_PRINT_BTN_HIDDEN,

@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import html
 
-from src.report.analysis.audit.audit_risk import RISK_BG, RISK_COLOR
+from src.report.exporters.html_exporter import _sev_attrs
 from src.report.exporters.report_i18n import STRINGS
 
 # RISK_ORDER as a list for sort-key lookup (CRITICAL first)
@@ -16,12 +16,15 @@ def _s(key: str, lang: str) -> str:
 
 
 def _risk_badge(risk: str) -> str:
-    color = RISK_COLOR.get(risk, "#989A9B")
-    bg = RISK_BG.get(risk, "#F9FAFB")
-    return (
-        f"<span class='risk-badge' style='background:{bg};color:{color};border-color:{color}'>"
-        f"{risk}</span>"
-    )
+    """The v2 shell colours .risk-badge from data-tone/data-sev.
+
+    This used to write RISK_COLOR/RISK_BG straight into a style attribute. The
+    hexes are literals so nothing broke, but an inline colour beats the
+    stylesheet: the same MEDIUM level rendered rgb(212,160,23) here and
+    rgb(138,93,0) in the event tables, and a CRITICAL card was outlined while a
+    CRITICAL table cell was solid — two looks for one severity in one document.
+    """
+    return f'<span class="risk-badge"{_sev_attrs(risk)}>{risk}</span>'
 
 
 def render_concern_cards(items: list, lang: str = "en") -> str:
@@ -57,7 +60,8 @@ def render_concern_cards(items: list, lang: str = "en") -> str:
         src_ips_str = ", ".join(html.escape(str(ip)) for ip in item.get("src_ips", [])[:3])
 
         row = (
-            f'<div class="concern-card audit-attn-item risk-{risk}">'
+            f'<div class="concern-card audit-attn-item risk-{risk}"'
+            f'{_sev_attrs(risk)}>'
             f'<div class="concern-header audit-attn-header">'
             f'{badge}'
             f'<code class="concern-event audit-attn-event-code">{event_type}</code>'

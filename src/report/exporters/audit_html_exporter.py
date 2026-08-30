@@ -159,13 +159,20 @@ class AuditHtmlExporter:
             return ""
         _s = self._s
         items_html = render_concern_cards(attention_items, self._lang)
-        # The old heading was `style="color:var(--red)"`. --red was a build_css
-        # token and does not exist in the v2 shell, so the declaration would be
-        # dead markup rather than a red heading; each card below carries its own
-        # risk badge, which is where the severity signal belongs now.
+        # The old heading was `style="color:var(--red)"`, and --red was declared
+        # on report_css.py's :root, so it really did render red — measured on a
+        # 730dbd8f checkout: rgb(220,38,38). My first pass dropped the colour on
+        # the theory that the token disappears with build_css. That reasoned
+        # about the implementation instead of the shipped output, which is the
+        # same mistake as judging against the design file, and the heading came
+        # out in default ink. The block's whole reason to exist is to flag the
+        # section, and the per-card badges only compensate when a card is HIGH
+        # or worse — a list of LOW items lost every warning signal.
+        # data-tone drives it now: the heading takes var(--ink), which the tone
+        # sets, so no colour is frozen into the markup.
         return (
-            '<div style="margin-bottom:20px">'
-            f'<h2>{_s("rpt_au_attention_title")}</h2>'
+            '<div style="margin-bottom:20px" data-tone="crit">'
+            f'<h2 style="color:var(--ink)">{_s("rpt_au_attention_title")}</h2>'
             + items_html
             + '</div>'
         )
