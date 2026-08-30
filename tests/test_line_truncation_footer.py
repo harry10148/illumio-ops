@@ -20,7 +20,11 @@ _TRUNCATION_FOOTER = "[Message truncated - see mail or dashboard for full detail
 @pytest.fixture
 def rep():
     from src.config import ConfigManager
-    return Reporter(ConfigManager())
+    from src.i18n import set_language
+    cm = ConfigManager()
+    cm.config.setdefault("settings", {})["language"] = "en"
+    set_language("en")
+    return Reporter(cm)
 
 
 def _mk_health_alert(i):
