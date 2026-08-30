@@ -54,12 +54,14 @@ test are the drift guard — prose alone is not:
     ``620f7a52``: the still-unmigrated policy_diff and readiness numbered every
     page, the already-migrated traffic / audit / policy_usage numbered none, and
     nobody noticed for two batches. An 8-10 page PDF with no page numbers cannot
-    be cited or re-collated once the sheets separate. Both the default page and
-    the named ``wide`` page declare it: a named page does not inherit the
-    default page's margin boxes, so a portrait/landscape document (rule hit
-    count) would otherwise have unnumbered pages in the middle. The font, size
-    and colour are the old shell's literals because a margin box does not
-    inherit the custom properties declared on ``:root``;
+    be cited or re-collated once the sheets separate. Only the DEFAULT page
+    declares it — measured, not assumed: the named ``wide`` page inherits the
+    margin box (removing a second copy from ``@page wide`` leaves rule hit
+    count's mixed portrait/landscape document with all 8 pages numbered). The
+    font, size and colour are the old shell's literals because the point is to
+    reproduce the shipped footer, not because a token would fail: a margin box
+    does resolve ``:root``'s custom properties (a ``var()`` build and a
+    same-colour literal build rasterise to identical footer pixels);
   * the print block gains the wide-table release rules carried over from the
     old product shell (``report_css.py``) plus ``!important`` on the four
     column-width floors that must survive them — see the comment on the
@@ -1196,8 +1198,11 @@ figure.chart-static figcaption {
      十型全部都印，Chromium 支援 @page 的 margin box，實測舊 policy_diff PDF 每頁
      右下角都有「1 / 7」。少了它，一份 8-10 頁的 PDF 印出來無法標頁、無法引用、
      散頁之後無法還原順序——這是移植回歸，不是新設計。
-     字級/顏色/字族沿用舊殼的字面值：margin box 不繼承 :root 的自訂屬性，
-     var(--…) 在這裡不解析（實測顏色會退回黑色）。 */
+     只宣告在預設 @page：實測具名頁 @page wide 會繼承它（把這一段從 wide 拿掉，
+     rule_hit_count 直橫混排的 8 頁仍然 8 頁都有頁碼），所以不需要第二份。
+     字級/顏色/字族沿用舊殼的字面值是為了照抄已出貨的樣子，不是技術限制——
+     實測 margin box 解析得了 :root 的自訂屬性（var() 版與同色字面值版的 PDF
+     footer 像素完全相同）。 */
   @bottom-right {
     content: counter(page) " / " counter(pages);
     font-family: sans-serif;
@@ -1209,14 +1214,6 @@ figure.chart-static figcaption {
 @page wide {
   size: A4 landscape;
   margin: 12mm 11mm 12mm;
-  /* 具名頁不繼承預設 @page 的 margin box，寬表橫式頁要自己再宣告一次，
-     否則同一份 PDF 會有幾頁無頁碼（rule_hit_count 就是這種混排）。 */
-  @bottom-right {
-    content: counter(page) " / " counter(pages);
-    font-family: sans-serif;
-    font-size: 8pt;
-    color: #888;
-  }
 }
 
 @media print {

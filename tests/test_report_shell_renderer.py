@@ -587,34 +587,30 @@ def test_the_sort_indicator_is_not_printed():
 # 已遷移的 traffic/audit/policy_usage 一頁都沒有）。一份 8-10 頁的報表 PDF 沒有
 # 頁碼就無法標頁、無法引用、散頁後無法還原順序——與 .mat-fill.warn 同一個判準：
 # 設計檔也漏只代表設計檔有洞，基準是產品舊殼的輸出。
-# 具名頁（@page wide）不繼承預設 @page 的 margin box，所以兩處都要宣告，否則
-# rule_hit_count 那種直橫混排的 PDF 會有幾頁沒有頁碼。
-# 字級/顏色/字族沿用舊殼的字面值：margin box 不繼承 :root 的自訂屬性。
-_PAGE_FOOTER = """  @bottom-right {
-    content: counter(page) " / " counter(pages);
-    font-family: sans-serif;
-    font-size: 8pt;
-    color: #888;
-  }
-"""
+# 只宣告在預設 @page：具名頁 @page wide 會繼承它。這是量出來的，不是假設的——
+# 把 wide 那一份拿掉之後重新渲染 rule_hit_count（直橫混排 8 頁），8 頁仍然全部
+# 有頁碼，所以第二份是多餘的。
+# 字級/顏色/字族沿用舊殼的字面值是為了照抄已出貨的樣子，不是技術限制：實測
+# margin box 解析得了 :root 的自訂屬性（var() 版與同色字面值版的 PDF footer
+# 像素完全相同）。
 _DELTA_PAGE_NUMBER = (
-    "@page {\n  size: A4 portrait;\n  margin: 15mm 13mm 14mm;\n}\n"
-    "\n"
-    "@page wide {\n  size: A4 landscape;\n  margin: 12mm 11mm 12mm;\n}\n",
+    "@page {\n  size: A4 portrait;\n  margin: 15mm 13mm 14mm;\n}\n",
     "@page {\n  size: A4 portrait;\n  margin: 15mm 13mm 14mm;\n"
     "  /* 頁碼頁尾自舊殼 report_css.py:288-295 移植（T5）。設計檔沒有這一段，但舊殼\n"
     "     十型全部都印，Chromium 支援 @page 的 margin box，實測舊 policy_diff PDF 每頁\n"
     "     右下角都有「1 / 7」。少了它，一份 8-10 頁的 PDF 印出來無法標頁、無法引用、\n"
     "     散頁之後無法還原順序——這是移植回歸，不是新設計。\n"
-    "     字級/顏色/字族沿用舊殼的字面值：margin box 不繼承 :root 的自訂屬性，\n"
-    "     var(--…) 在這裡不解析（實測顏色會退回黑色）。 */\n"
-    + _PAGE_FOOTER +
-    "}\n"
-    "\n"
-    "@page wide {\n  size: A4 landscape;\n  margin: 12mm 11mm 12mm;\n"
-    "  /* 具名頁不繼承預設 @page 的 margin box，寬表橫式頁要自己再宣告一次，\n"
-    "     否則同一份 PDF 會有幾頁無頁碼（rule_hit_count 就是這種混排）。 */\n"
-    + _PAGE_FOOTER +
+    "     只宣告在預設 @page：實測具名頁 @page wide 會繼承它（把這一段從 wide 拿掉，\n"
+    "     rule_hit_count 直橫混排的 8 頁仍然 8 頁都有頁碼），所以不需要第二份。\n"
+    "     字級/顏色/字族沿用舊殼的字面值是為了照抄已出貨的樣子，不是技術限制——\n"
+    "     實測 margin box 解析得了 :root 的自訂屬性（var() 版與同色字面值版的 PDF\n"
+    "     footer 像素完全相同）。 */\n"
+    "  @bottom-right {\n"
+    '    content: counter(page) " / " counter(pages);\n'
+    "    font-family: sans-serif;\n"
+    "    font-size: 8pt;\n"
+    "    color: #888;\n"
+    "  }\n"
     "}\n",
 )
 
@@ -622,20 +618,19 @@ _DELTA_PAGE_NUMBER = (
 def test_every_printed_page_is_numbered():
     """T5: drift guard 守不住它——規則連同 delta 一起被刪掉它照樣綠。
 
-    直接斷言渲染用的 SHELL_CSS 兩個 @page 區塊都有頁碼 margin box。橫式那一半
-    是分開的一條：具名頁不繼承預設 @page 的 margin box，只補一邊會讓直橫混排的
-    PDF（rule_hit_count）有幾頁沒有頁碼。
+    直接斷言渲染用的 SHELL_CSS 在**預設** ``@page`` 裡有頁碼 margin box。只查
+    預設頁是因為量過了：具名頁 ``@page wide`` 會繼承它（拿掉 wide 自己那一份，
+    rule_hit_count 直橫混排的 8 頁仍然 8 頁都有頁碼），所以第二份是多餘的、不該
+    被這條守門要求。
     """
-    assert SHELL_CSS.count('content: counter(page) " / " counter(pages);') == 2
+    assert SHELL_CSS.count('content: counter(page) " / " counter(pages);') == 1
     # Split on the at-rule itself, not on the bare words: a prose comment
     # further up names "@page wide" too, and splitting there cut the portrait
     # block off before its own margin box.
-    portrait, _, rest = SHELL_CSS.partition("\n@page wide {")
+    portrait, _, _rest = SHELL_CSS.partition("\n@page wide {")
     portrait = portrait[portrait.index("\n@page {"):]
-    landscape = rest.split("@media print")[0]
-    for block, name in ((portrait, "@page"), (landscape, "@page wide")):
-        assert "@bottom-right {" in block, f"{name} 沒有頁碼 margin box"
-        assert 'counter(page) " / " counter(pages)' in block, name
+    assert "@bottom-right {" in portrait, "@page 沒有頁碼 margin box"
+    assert 'counter(page) " / " counter(pages)' in portrait
 
 
 AUTHORISED_DELTAS = (
