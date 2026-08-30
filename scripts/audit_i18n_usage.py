@@ -79,6 +79,18 @@ BILINGUAL_DATA_FILES = {
     # in it is still a finding.
 }
 
+# (file_relpath, needle) pairs whose exemption covers the CJK *inside code
+# comments only*. The pairs below in BILINGUAL_DATA_LINES exempt a whole
+# matched literal; for a 1200-line ported stylesheet that is far wider than the
+# stated intent ("the design file's own commentary"), because a hardcoded CJK
+# UI string added anywhere inside the same literal would inherit the exemption.
+# For these, every CJK line in the literal must sit in a `/* */` or `//`
+# comment; CJK outside one is still a finding.
+COMMENT_SCOPED_CJK: set[tuple[str, str]] = {
+    ("src/report/exporters/report_shell.py", "shell-css-port-v2"),
+    ("src/report/exporters/report_shell.py", "normalizeCellValue"),
+}
+
 # (file_relpath, needle) pairs — specific intentional CJK spots that
 # should not count as findings. `needle` is a substring we expect on the line.
 BILINGUAL_DATA_LINES: set[tuple[str, str]] = {
@@ -98,10 +110,8 @@ BILINGUAL_DATA_LINES: set[tuple[str, str]] = {
     ("src/cli/menus/_helpers.py", '"是"'),
     # Column-name match keyword, not a display string.
     ("src/report/exporters/html_exporter.py", "_INT_COL_KEYWORDS"),
-    # TABLE_JS: injected JS literal whose one CJK token is a column-name match
-    # keyword in a code comment, not a display string. Moved from report_css.py
-    # to report_shell.py with the literal in Task 6.
-    ("src/report/exporters/report_shell.py", "normalizeCellValue"),
+    # TABLE_JS and SHELL_CSS live in COMMENT_SCOPED_CJK above, not here: their
+    # exemption is limited to CJK inside code comments (C4).
     # Policy usage overview: hit/unused labels resolved via col_i18n; kept
     # as zh so the pandas column name maps to the HTML header translation.
     ("src/report/analysis/policy_usage/pu_mod01_overview.py", "已命中"),
@@ -122,7 +132,6 @@ BILINGUAL_DATA_LINES: set[tuple[str, str]] = {
     # report_shell.SHELL_CSS_PORT_MARKER and asserted present by
     # tests/test_report_shell_renderer.py. Keying the exemption off a sentence
     # would mean rewording a comment silently turns 1200 lines red.
-    ("src/report/exporters/report_shell.py", "shell-css-port-v2"),
 }
 
 # Files skipped entirely (tests, caches, third-party).
@@ -421,6 +430,31 @@ def _js_html_cjk_literals(path: Path) -> list[tuple[int, str]]:
     return out
 
 
+def _cjk_outside_comments(value: str) -> list[str]:
+    """CJK lines in `value` that are NOT inside a `/* */` or `//` comment.
+
+    Used to keep a whole-literal exemption from covering display text that
+    someone adds to the same literal later. Only ever used to decide whether to
+    report; it never rewrites source.
+    """
+    stripped = re.sub(r"/\*.*?\*/", "", value, flags=re.S)
+    stripped = re.sub(r"(?m)//.*$", "", stripped)
+    return [ln.strip() for ln in stripped.splitlines() if CJK_RE.search(ln)]
+
+
+def _comment_scoped_violations(rel: str, haystack: str, value: str) -> list[str]:
+    """For a comment-scoped exemption, the CJK it does NOT cover."""
+    for wh_rel, needle in COMMENT_SCOPED_CJK:
+        if rel == wh_rel and needle in haystack:
+            return _cjk_outside_comments(value)
+    return []
+
+
+def _is_comment_scoped(rel: str, haystack: str) -> bool:
+    return any(rel == wh_rel and needle in haystack
+               for wh_rel, needle in COMMENT_SCOPED_CJK)
+
+
 def _is_bilingual_allowed(rel: str, full_line: str) -> bool:
     """True if this CJK hit is an intentional bilingual data/tooltip/etc.
 
@@ -446,7 +480,17 @@ def audit_hardcoded_cjk() -> list[Finding]:
             range_text = "\n".join(
                 src_lines[(start_line - 1):min(end_line, len(src_lines))]
             )
-            if _is_bilingual_allowed(rel, range_text + "\n" + full_value):
+            haystack = range_text + "\n" + full_value
+            if _is_comment_scoped(rel, haystack):
+                # Exemption applies to this literal's comments only.
+                leaked = _comment_scoped_violations(rel, haystack, full_value)
+                for line in leaked:
+                    findings.append(Finding(
+                        category="C", file=rel, line=start_line, key="—",
+                        detail=(line[:97] + "...") if len(line) > 100 else line,
+                    ))
+                continue
+            if _is_bilingual_allowed(rel, haystack):
                 continue
             findings.append(Finding(
                 category="C",

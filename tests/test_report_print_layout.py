@@ -97,12 +97,32 @@ def test_table_rows_are_not_split_across_pages():
 def test_wide_tables_shrink_their_type_in_print():
     """Was ``font-size: 7.5pt`` on ``.report-table-panel--wide``; the v2 shell
     ships 6.5pt. The requirement is that wide tables get *smaller* type than
-    body copy, not one particular value."""
+    body copy, not one particular value.
+
+    C2: the first rewrite compared against a hardcoded ``9.0``, which is the
+    body size only for as long as nobody edits ``--fs-ui``. Measured: setting
+    ``--fs-ui`` to ``5pt`` makes the 6.5pt wide table *larger* than body copy
+    and the hardcoded form still passed. Both sides are read out of the print
+    block now, so the comparison is between the two values that actually meet
+    on the page.
+    """
     body = "".join(_rules_for(PRINT_CSS, ".report-table-panel--wide .report-table"))
     m = re.search(r"font-size:\s*([\d.]+)pt", body)
     assert m, f"wide tables declare no print font-size: {body!r}"
-    assert float(m.group(1)) < 9.0, (
-        f"wide-table print type {m.group(1)}pt is not smaller than 9pt body copy")
+    wide_pt = float(m.group(1))
+
+    # Read straight out of the print block rather than through _rules_for:
+    # PRINT_CSS still carries @media's own opening brace, so a rule splitter
+    # swallows the :root override that redeclares the size tokens in pt.
+    body_sizes = re.findall(r"--fs-ui:\s*([\d.]+)pt", PRINT_CSS)
+    assert len(body_sizes) == 1, (
+        f"expected exactly one print --fs-ui declaration, found {body_sizes}")
+    body_pt = float(body_sizes[0])
+
+    assert wide_pt < body_pt, (
+        f"wide-table print type {wide_pt}pt is not smaller than body copy "
+        f"({body_pt}pt) — a wide table set larger than the text around it is "
+        f"the opposite of the fit-more-columns intent")
 
 
 def test_wide_table_hint_is_hidden_in_print():

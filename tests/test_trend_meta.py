@@ -8,6 +8,8 @@ from src.report.trend_store import (
     snapshot_mismatch,
 )
 from src.report.exporters.html_exporter import _trend_deltas_section
+import pytest
+from tests.report_shell.fixtures import BUILDERS as _BUILDERS
 
 
 # ── (a) save→load roundtrip 含 _meta ────────────────────────────────────────
@@ -163,30 +165,51 @@ def test_delta_table_formats_integer_counts_without_decimal():
     assert "2.5" in html
 
 
-def test_report_carries_no_font_dependency_of_any_kind():
+def test_shell_font_stack_needs_no_font_file_at_all():
     """報表是獨立交付物：寄送／另存之後 /static 路徑不存在。
 
     舊殼的作法是把三支變數字型 base64 內嵌（``REPORT_FONT_FACE_CSS``），這條
     測試因此斷言「有 data:font、沒有 /static」。v2 殼改用系統字體堆疊，兩種
     來源都不再需要——所以斷言換成上位的那一條：**成品裡不得有任何字型外部
     相依，也不得有內嵌字型**（後者是 T3 把 traffic HTML 縮小的原因）。
-
-    同時檢查殼的兩個字族 token 都以泛型字族收尾，否則在缺字型的機器上會退回
-    瀏覽器預設而不是可預期的 sans/mono。
     """
     from src.report.exporters.report_shell import SHELL_CSS
-    from tests.report_shell.fixtures import BUILDERS
 
     assert "@font-face" not in SHELL_CSS
     assert "data:font" not in SHELL_CSS
     assert "/static/fonts/" not in SHELL_CSS
     assert '"Noto Sans"' in SHELL_CSS          # 系統字體堆疊
 
+    # 兩個字族 token 都要以泛型字族收尾，否則缺字型的機器會退回瀏覽器預設，
+    # 而不是可預期的 sans / mono。
     for token, generic in (("--font-ui", "sans-serif"), ("--font-mono", "monospace")):
         line = next(ln for ln in SHELL_CSS.splitlines() if ln.strip().startswith(token))
         assert line.rstrip().rstrip(";").endswith(generic), line
 
-    # 殼乾淨不代表成品乾淨：任何一型的 exporter 都可能自己再加一個字型連結。
-    html = BUILDERS["traffic"]()
-    for needle in ("@font-face", "data:font", "/static/fonts/", "fonts.googleapis.com"):
-        assert needle not in html, needle
+
+#: 任何會讓瀏覽器去抓字型的東西。殼本身乾淨不代表成品乾淨。
+_FONT_DEPENDENCY_NEEDLES = (
+    "@font-face", "data:font", "/static/fonts/",
+    "fonts.googleapis.com", "fonts.gstatic.com", "use.typekit", "cdn.jsdelivr",
+)
+
+
+@pytest.mark.parametrize("report_type", sorted(_BUILDERS))
+def test_report_carries_no_font_dependency_of_any_kind(report_type):
+    """十型全查，而且查的是最終文件，不是殼。
+
+    C3：Task 5 那四型會透過殼的 ``extra_head`` 夾帶自己的 CSS 與資源，所以只
+    render traffic 一型、或只查 ``SHELL_CSS``，都看不見某一型自己加回來的字型
+    連結。這裡對每一型的成品掃字型相依，並額外檢查沒有指向外部主機的 ``<link>``
+    ——離線 bundle 裡那種請求只會靜默失敗成系統預設字型。
+    """
+    from bs4 import BeautifulSoup
+
+    html = _BUILDERS[report_type]()
+    for needle in _FONT_DEPENDENCY_NEEDLES:
+        assert needle not in html, f"{report_type}: {needle}"
+
+    soup = BeautifulSoup(html, "html.parser")
+    remote = [str(link) for link in soup.select("link[href]")
+              if not link["href"].startswith(("#", "data:"))]
+    assert remote == [], f"{report_type}: 報表引用了外部資源: {remote}"

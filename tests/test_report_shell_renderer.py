@@ -12,6 +12,81 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 DESIGN_SHELL_CSS = REPO_ROOT / "design" / "v2" / "reports" / "shell.css"
 
 
+# ---------------------------------------------------------------------------
+# C2: effective value, not "the declaration exists somewhere".
+#
+# Every guard below used to grep SHELL_CSS for a declaration. That is blind to
+# the cascade: appending `@page { @bottom-right { content: none; } }` cancels
+# the page number while leaving the original declaration in place, and the
+# guard stays green. Today the drift guard happens to reject any SHELL_CSS
+# edit, so the attack is caught -- but by the wrong test, and only until the
+# override is itself added to the design file or registered as an authorised
+# delta. The page-number guard exists because six report types shipped with no
+# page numbers at all for two tasks and nobody noticed; defence in depth that
+# does not defend is not defence.
+#
+# So these resolve the LAST declaration that applies, which is what the browser
+# uses when specificity ties.
+# ---------------------------------------------------------------------------
+
+def _decomment(css: str) -> str:
+    """Strip ``/* ... */`` before parsing.
+
+    Not cosmetic: a comment sitting between ``}`` and the next selector is
+    glued onto that selector by any regex-based rule splitter, so ``.cover``
+    silently stops matching its own rule and the guard reports "no declaration"
+    instead of the value.
+    """
+    return re.sub(r"/\*.*?\*/", "", css, flags=re.S)
+
+
+def _blocks(css: str, opener: str):
+    """Yield the body of every ``opener``-introduced block, brace-matched.
+
+    ``re`` cannot do this: ``@page`` bodies nest ``@bottom-right`` blocks, so a
+    non-greedy ``[^}]*`` stops at the inner closing brace.
+    """
+    i = 0
+    while True:
+        i = css.find(opener, i)
+        if i < 0:
+            return
+        j = css.index("{", i + len(opener) - 1)
+        depth, k = 1, j + 1
+        while depth:
+            if css[k] == "{":
+                depth += 1
+            elif css[k] == "}":
+                depth -= 1
+            k += 1
+        yield css[j + 1:k - 1]
+        i = k
+
+
+def _effective_margin_box_content(css: str, page: str, box: str) -> str | None:
+    """The content the LAST matching ``@page`` block gives ``box``."""
+    value = None
+    for body in _blocks(_decomment(css), page):
+        for inner in _blocks(body, box):
+            m = re.search(r"content:\s*([^;]+);", inner)
+            if m:
+                value = m.group(1).strip()
+    return value
+
+
+def _effective_declaration(css: str, selector: str, prop: str) -> str | None:
+    """The last value ``prop`` is given by any rule whose selector list contains
+    ``selector`` -- i.e. what wins when specificity ties."""
+    value = None
+    for m in re.finditer(r"([^{}@]+)\{([^{}]*)\}", _decomment(css)):
+        if selector not in {s.strip() for s in m.group(1).split(",")}:
+            continue
+        d = re.search(rf"(?<![\w-]){re.escape(prop)}:\s*([^;]+);", m.group(2))
+        if d:
+            value = d.group(1).strip()
+    return value
+
+
 def _doc(**kw):
     cover = ShellCover(title="Illumio 資安與風險報表", doc_title="Illumio 流量報告",
                        type_label="安全風險分析", eyebrow="Illumio Ops",
@@ -631,20 +706,38 @@ _DELTA_PAGE_NUMBER = (
 def test_every_printed_page_is_numbered():
     """T5: drift guard 守不住它——規則連同 delta 一起被刪掉它照樣綠。
 
-    直接斷言渲染用的 SHELL_CSS 在**預設** ``@page`` 裡有頁碼 margin box。只查
-    預設頁是因為量過了：具名頁 ``@page wide`` 會繼承它（拿掉 wide 自己那一份，
+    C2 之後改為解析**最終生效值**：把所有預設 ``@page`` 區塊依序走過，取最後一次
+    對 ``@bottom-right`` 的 ``content`` 宣告。這樣「保留原宣告、在後面追加一條
+    ``content: none`` 取消掉」也會紅——那正是 drift guard 一旦放行（覆寫被寫進
+    設計檔或登記成授權 delta）就再也沒人擋得住的攻擊面。
+
+    只查預設頁是因為量過了：具名頁 ``@page wide`` 會繼承它（拿掉 wide 自己那一份，
     rule_hit_count 直橫混排的 8 頁仍然 8 頁都有頁碼），所以第二份是多餘的、不該
     被這條守門要求。
     """
-    assert SHELL_CSS.count('content: counter(page) " / " counter(pages);') == 1
-    # Split on the at-rule itself, not on the bare words: a prose comment
-    # further up names "@page wide" too, and splitting there cut the portrait
-    # block off before its own margin box.
-    portrait, _, _rest = SHELL_CSS.partition("\n@page wide {")
-    portrait = portrait[portrait.index("\n@page {"):]
-    assert "@bottom-right {" in portrait, "@page 沒有頁碼 margin box"
-    assert 'counter(page) " / " counter(pages)' in portrait
+    expected = 'counter(page) " / " counter(pages)'
+    effective = _effective_margin_box_content(SHELL_CSS, "@page {", "@bottom-right")
+    assert effective == expected, (
+        f"@page 的 @bottom-right 最終生效內容是 {effective!r}，不是頁碼。"
+        f"（宣告可能還在，但被後面的規則覆寫掉了）")
+    # 具名頁不得把它取消掉——繼承來的頁碼被 wide 頁覆寫成 none 一樣是全書缺頁碼。
+    named = _effective_margin_box_content(SHELL_CSS, "@page wide {", "@bottom-right")
+    assert named in (None, expected), (
+        f"@page wide 覆寫了頁碼 margin box：{named!r}")
 
+
+def test_the_cover_exec_and_toc_still_each_own_a_page():
+    """C2, same shape: ``break-after: page`` must be the value that WINS.
+
+    A later ``.cover { break-after: auto; }`` in the print block collapses the
+    cover onto the first chapter's page while the original declaration sits
+    there satisfying a substring check.
+    """
+    print_block = SHELL_CSS.split("@media print")[1]
+    for selector in (".cover", ".exec", ".toc"):
+        value = _effective_declaration(print_block, selector, "break-after")
+        assert value == "page", (
+            f"{selector} 的 break-after 最終生效值是 {value!r}，不是 page")
 
 AUTHORISED_DELTAS = (
     _DELTA_DROP_OLD_COVER,
@@ -704,10 +797,13 @@ def test_shell_css_port_marker_is_present():
 #: purpose — they record where a ported rule came from, and that history is the
 #: only place the old baseline still exists. What must never come back is a
 #: *call* or a *class name*, so every needle here is one of those.
+#: Quote-agnostic: the exporters mix ``'...'`` and ``"..."`` f-strings freely,
+#: so anchoring on one quote character lets ``class='report-shell'`` through
+#: (C1). ``[\"']`` covers both; the class name itself is what is banned.
 LEGACY_SHELL_NEEDLES = (
-    r'class="report-shell',        # old shell container
-    r'class="report-toc',          # old sidebar nav
-    r'class="report-cover',        # old dual cover (both halves)
+    r'class=[\"\']report-shell',   # old shell container
+    r'class=[\"\']report-toc',     # old sidebar nav
+    r'class=[\"\']report-cover',   # old dual cover (both halves)
     r"report-cover-block",
     r"build_css\(",                # old stylesheet builder
     r"build_cover_page\(",         # old cover builder
@@ -753,6 +849,18 @@ def test_the_deleted_modules_are_really_gone():
     from src.report.exporters.report_shell import TABLE_JS
     assert "function sortTable(" in TABLE_JS
     assert "function autoFitColumns(" in TABLE_JS
+    # C1: the function bodies being present is not the same as them running.
+    # Without the boot chain every table ships inert -- no sorting, no
+    # auto-fit, no wide-scroll state -- and a guard that only greps for the
+    # definitions stays green through it.
+    boot = TABLE_JS.split("DOMContentLoaded")
+    assert len(boot) == 2, "TABLE_JS has no DOMContentLoaded boot hook"
+    assert "initReportTable" in boot[1], (
+        "the DOMContentLoaded handler never calls initReportTable — every "
+        "table would render inert")
+    assert ".report-table" in boot[1], (
+        "the boot handler selects nothing to initialise")
+    assert "function initReportTable(" in TABLE_JS
     assert TABLE_JS in build_shell_document(
         lang="en", cover=ShellCover(title="t", doc_title="d", type_label="x"),
         sections=[ShellSection(id="s", title="s", html="")])

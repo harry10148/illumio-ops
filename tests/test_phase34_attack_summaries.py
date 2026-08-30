@@ -2,6 +2,9 @@ import datetime
 import re
 
 import pandas as pd
+import pytest
+
+from tests.report_shell.fixtures import BUILDERS
 
 from src.gui import _build_audit_dashboard_summary, _build_policy_usage_dashboard_summary
 from src.report.analysis.audit.audit_mod00_executive import audit_executive_summary
@@ -204,42 +207,92 @@ def test_dashboard_summaries_include_attack_sections():
         assert key in pu_summary
 
 
-def test_all_report_headers_sit_on_the_light_sheet():
-    """The report header must stay light — restated for the v2 shell.
+def _luminance(hex_colour: str) -> float:
+    h = hex_colour.lstrip("#")
+    if len(h) == 3:
+        h = "".join(c * 2 for c in h)
+    ch = []
+    for i in (0, 2, 4):
+        c = int(h[i:i + 2], 16) / 255
+        ch.append(c / 12.92 if c <= 0.03928 else ((c + 0.055) / 1.055) ** 2.4)
+    return 0.2126 * ch[0] + 0.7152 * ch[1] + 0.0722 * ch[2]
 
-    The original form compared two gradient literals out of ``build_css()``.
-    Both literals disappear with ``report_css.py``, and an absence check on a
-    string that no longer exists anywhere would be permanently true, so the
-    requirement is re-anchored on what makes the header light now: the shell
-    paints nothing behind the cover, so it inherits ``.sheet``'s paper, and the
-    paper token is a near-white. Either half going dark fails this.
+
+# Selectors that paint the surface the report header sits on. A dark value on
+# any of them turns the cover back into the legacy dark block.
+_SURFACE_SELECTORS = {".cover", "header.cover", "body", ".sheet", ".doc"}
+
+
+def _stylesheet_text(soup) -> str:
+    """Every rule that reaches the reader, not just SHELL_CSS.
+
+    C3: the four types migrated in Task 5 carry their own component CSS through
+    the shell's ``extra_head``, so a rule that repaints the cover need never
+    touch SHELL_CSS. Checking the shell alone cannot see it.
     """
-    from bs4 import BeautifulSoup
+    return "\n".join(st.get_text() for st in soup.select("style"))
 
-    from tests.report_shell.fixtures import BUILDERS
 
-    def _luminance(hex_colour: str) -> float:
-        h = hex_colour.lstrip("#")
-        ch = []
-        for i in (0, 2, 4):
-            c = int(h[i:i + 2], 16) / 255
-            ch.append(c / 12.92 if c <= 0.03928 else ((c + 0.055) / 1.055) ** 2.4)
-        return 0.2126 * ch[0] + 0.7152 * ch[1] + 0.0722 * ch[2]
+def _background_offenders(css: str) -> list[str]:
+    """Rules on a surface selector whose background is not a light colour."""
+    tokens = dict(re.findall(r"(--[\w-]+):\s*(#[0-9A-Fa-f]{3,6})\s*;", css))
+    out = []
+    for m in re.finditer(r"([^{}@]+)\{([^}]*)\}", css):
+        selectors = {x.strip() for x in m.group(1).split(",")}
+        if not (selectors & _SURFACE_SELECTORS):
+            continue
+        decl = re.search(r"(?<![\w-])background(?:-color)?:\s*([^;]+)", m.group(2))
+        if not decl:
+            continue
+        value = decl.group(1).strip()
+        if value in ("none", "transparent", "inherit", "initial", "unset"):
+            continue
+        colour = None
+        var = re.fullmatch(r"var\((--[\w-]+)\)", value)
+        if var:
+            colour = tokens.get(var.group(1))
+        elif re.fullmatch(r"#[0-9A-Fa-f]{3,6}", value):
+            colour = value
+        if colour is None:
+            # An unresolvable background on a surface selector (a gradient, an
+            # rgba(), an unknown token) is exactly what the legacy dark header
+            # was. Fail loudly rather than skipping what cannot be measured.
+            out.append(f"{sorted(selectors)} -> {value!r} (unresolvable)")
+        elif _luminance(colour) <= 0.5:
+            out.append(f"{sorted(selectors)} -> {value!r} = {colour} "
+                       f"(luminance {_luminance(colour):.3f})")
+    return out
 
+
+def test_shell_tokens_define_a_light_sheet_and_dark_ink():
+    """The tokens the whole family inherits."""
     screen_css = SHELL_CSS.split("@media print")[0]
     paper = re.search(r"--paper:\s*(#[0-9A-Fa-f]{6});", screen_css).group(1)
     ink = re.search(r"--text-1:\s*(#[0-9A-Fa-f]{6});", screen_css).group(1)
     assert _luminance(paper) > 0.8, f"--paper {paper} is not a light sheet"
     assert _luminance(ink) < 0.1, f"--text-1 {ink} is not dark ink"
-
     sheet = re.search(r"^\.sheet \{[^}]*\}", screen_css, re.MULTILINE).group(0)
     assert "background: var(--paper);" in sheet
 
-    cover = re.search(r"^\.cover \{[^}]*\}", screen_css, re.MULTILINE).group(0)
-    assert "background" not in cover, f".cover paints its own header: {cover!r}"
 
-    for report_type in ("traffic", "audit", "policy_usage", "ven_status"):
-        header = BeautifulSoup(BUILDERS[report_type](), "html.parser").select_one(
-            'header.cover[data-shell="cover"]')
-        assert header is not None, report_type
-        assert "background" not in (header.get("style") or ""), report_type
+@pytest.mark.parametrize("report_type", sorted(BUILDERS))
+def test_report_header_sits_on_the_light_sheet(report_type):
+    """The report header must stay light — every type, on the final document.
+
+    The original form compared two gradient literals out of ``build_css()``;
+    both disappear with ``report_css.py``, and an absence check on a string
+    that no longer exists anywhere is permanently true. The first rewrite
+    covered four types against ``SHELL_CSS``, which C3 showed is still not
+    enough: a type can repaint ``.cover`` from its own ``extra_head`` without
+    ever touching the shell. So this reads every stylesheet in the rendered
+    document, for all ten types.
+    """
+    from bs4 import BeautifulSoup
+
+    soup = BeautifulSoup(BUILDERS[report_type](), "html.parser")
+    header = soup.select_one('header.cover[data-shell="cover"]')
+    assert header is not None, report_type
+    assert "background" not in (header.get("style") or ""), report_type
+
+    offenders = _background_offenders(_stylesheet_text(soup))
+    assert offenders == [], f"{report_type}: dark/opaque report surface: {offenders}"
