@@ -377,28 +377,60 @@ def test_known_cell_still_sits_under_its_own_column(rtype):
     pytest.fail(f"{rtype}: 找不到儲存格 {value!r}，欄位對齊不變量無法驗證")
 
 
-# Which types put a maturity grade on the page at all. Only security_risk does;
-# the loop below matched nothing for the other five and passed without ever
-# running its body, so this states the expectation instead of leaving it to a
-# possibly-empty selection (F7). A type that stops emitting its grade, or one
-# that starts emitting an unexpected one, now fails here.
-GRADE_ELEMENT_TYPES: frozenset[str] = frozenset({"security_risk"})
+# The tones the grade-carrying elements must DECLARE, in document order. Only
+# security_risk shows a grade at all, and it shows two: the maturity grade "D"
+# (on the cover chip and on the score hero) and the readiness grade "?" (its own
+# score hero). Written out rather than computed from grade_tone(): a test that
+# re-derives its expected answer from the table the product uses cannot notice
+# that table changing underneath it.
+GRADE_TONES: dict[str, tuple[str, ...]] = {
+    "security_risk": ("crit", "crit", "neutral"),
+}
+_GRADE_SELECTOR = ".score-hero, .score-num, .grade-chip, .grade-hero"
 
 
 @pytest.mark.parametrize("rtype", MIGRATED)
 def test_grade_colour_comes_from_data_tone_not_inline_style(rtype):
-    """A1: no grade-coloured element carries an inline colour any more."""
+    """A1: the grade's colour arrives through a tone, and through ITS OWN tone.
+
+    Three ways this assertion used to hold without checking anything:
+
+    * the loop matched nothing for five of six types and never ran (F7);
+    * ``"color" not in style`` is a substring test, so ``background:#FEFCE8``
+      and ``border:1px solid #D4A017`` walked straight past it;
+    * it asked only whether SOME ``[data-tone]`` ancestor existed. Every chapter
+      carries one, so deleting the grade elements' own tone kept it green while
+      the cover chip went rgb(194,47,47) -> rgb(92,100,114) and the score number
+      went red -> grey. A D-grade report lost its entire grade signal and the
+      guard did not notice — which is precisely what report_shell.py's comment on
+      ``.score-num { color: var(--ink) }`` warns about.
+
+    So: the tone a grade element resolves to must be OWNED by a grade element
+    (inheriting from ``.score-hero`` stays legal — that is how the wrapper is
+    meant to colour its children — but inheriting from the chapter is the bug),
+    and the declared tones must be the expected ones.
+    """
     soup = BeautifulSoup(BUILDERS[rtype](), "html.parser")
-    elements = soup.select(".score-hero, .score-num, .grade-chip, .grade-hero")
-    assert bool(elements) == (rtype in GRADE_ELEMENT_TYPES), (
-        f"{rtype}: 預期 {'有' if rtype in GRADE_ELEMENT_TYPES else '沒有'} grade 元素，"
+    elements = soup.select(_GRADE_SELECTOR)
+    assert bool(elements) == (rtype in GRADE_TONES), (
+        f"{rtype}: 預期 {'有' if rtype in GRADE_TONES else '沒有'} grade 元素，"
         f"實際找到 {len(elements)} 個——迴圈本體會空轉")
+    declared: list[str] = []
     for element in elements:
         style = element.get("style", "")
-        assert "color" not in style, f"{rtype}: {element.name} 仍帶 inline 色碼 {style!r}"
-        toned = element if element.get("data-tone") else element.find_parent(
+        assert "#" not in style, f"{rtype}: {element.name} 仍帶 inline 色碼 {style!r}"
+        owner = element if element.get("data-tone") else element.find_parent(
             attrs={"data-tone": True})
-        assert toned is not None, f"{rtype}: {element} 沒有任何 data-tone 祖先"
+        assert owner is not None, f"{rtype}: {element} 沒有任何 data-tone 祖先"
+        assert owner in soup.select(_GRADE_SELECTOR), (
+            f"{rtype}: {element.get('class')} 的 tone 來自 <{owner.name} "
+            f"class={owner.get('class')}>，那不是 grade 元素——等級訊號其實是"
+            f"章節的顏色，grade 自己的訊號已經消失")
+        if element.get("data-tone"):
+            declared.append(element["data-tone"])
+    assert tuple(declared) == GRADE_TONES.get(rtype, ()), (
+        f"{rtype}: grade 元素宣告的 tone 是 {tuple(declared)}，"
+        f"應為 {GRADE_TONES.get(rtype, ())}")
 
 
 # ---------------------------------------------------------------------------
@@ -480,11 +512,12 @@ def test_severity_summary_boxes_distinguish_critical_from_high():
     boxes = soup.select(".sev-summary .sev-box .badge")
     assert boxes, "severity summary rendered no badges"
     by_sev = {b.get("data-sev"): b.get("data-tone") for b in boxes}
-    assert by_sev.get("CRITICAL") == "crit"
-    assert by_sev.get("HIGH") == "crit"
-    # Both tones are crit; only data-sev can separate them, so it must be on
-    # every box, not just those two.
-    assert all(b.get("data-sev") for b in boxes)
+    # Every box, not just the two the docstring is about: "data-sev is present"
+    # was existence-only, so the other three could have carried any tone at all.
+    # Written out rather than read from SEVERITY_TONE — see GRADE_ELEMENT_TYPES.
+    assert by_sev == {"CRITICAL": "crit", "HIGH": "crit", "MEDIUM": "warn",
+                      "LOW": "info", "INFO": "neutral"}, (
+        f"嚴重度分布方塊的 tone 對映不對：{by_sev}")
 
 
 @pytest.mark.parametrize("severities", [
@@ -659,7 +692,7 @@ def test_the_attention_block_still_flags_itself():
     # first version of this assertion passed even with the wrapper's tone
     # deleted — it was reading the chapter's tone and calling it a signal.
     block = heading.parent
-    assert block.name == "div" and block.get("data-tone") not in (None, "neutral"), (
+    assert block.name == "div" and block.get("data-tone") == "crit", (
         f"警示區塊自己沒有 tone，只有 LOW 項目時整段就沒有任何警示訊號："
         f"{block.name} data-tone={block.get('data-tone')!r}")
     # The colour comes from that tone, not from a hex frozen into the markup.
@@ -677,21 +710,36 @@ def test_one_severity_has_one_look_across_the_whole_report():
     """
     soup = BeautifulSoup(_audit_with_attention(["CRITICAL", "MEDIUM"]),
                          "html.parser")
+    # The tone each severity must resolve to. Written out, not read from
+    # SEVERITY_TONE — see GRADE_ELEMENT_TYPES for why.
+    expected = {"CRITICAL": "crit", "MEDIUM": "warn"}
     badges = soup.select(".risk-badge")
     assert len(badges) >= 3, f"樣本不足以比較兩處徽章：{len(badges)}"
     for badge in badges:
-        assert "color" not in badge.get("style", ""), (
+        # Any hex is a colour frozen out of the tone system; the old check was
+        # the substring "color", which `background:#FEFCE8` walks straight past.
+        assert "#" not in badge.get("style", ""), (
             f"風險徽章仍帶 inline 色碼，會蓋過殼的 tone：{badge}")
-        assert badge.get("data-tone") and badge.get("data-sev"), (
-            f"風險徽章缺 data-tone/data-sev：{badge}")
-    # Every occurrence of one severity carries identical tone attributes.
+        sev = badge.get("data-sev")
+        assert sev in expected, f"未預期的嚴重度 {sev!r}：{badge}"
+        # Not "has a data-tone" — every badge having SOME tone is compatible
+        # with all of them having the WRONG one (a LOW card painted crit red is
+        # exactly the T3/F2 defect this file already learned once).
+        assert badge.get("data-tone") == expected[sev], (
+            f"{sev} 徽章的 tone 是 {badge.get('data-tone')!r}，應為 {expected[sev]!r}")
+    # Both places one severity appears must agree, which the per-badge check
+    # above already implies; this states it so a future expected-map edit that
+    # loses a severity cannot quietly stop comparing the two sites.
     by_sev: dict[str, set] = {}
     for badge in badges:
         by_sev.setdefault(badge["data-sev"], set()).add(badge["data-tone"])
+    assert set(by_sev) == set(expected), f"兩處徽章的嚴重度集合不一致：{by_sev}"
     for sev, tones in by_sev.items():
         assert len(tones) == 1, f"{sev} 在同一份報表裡有兩種 tone：{tones}"
-    # And the cards themselves are toned, or a LOW card inside the crit-toned
-    # attention block would take the block's red left rule (the T3/F2 lesson).
-    cards = soup.select(".concern-card")
-    assert cards and all(c.get("data-tone") for c in cards), (
-        f"發現卡沒有自己的 tone：{[c.get('data-tone') for c in cards]}")
+    # And the cards carry the tone of their OWN risk: inside the crit-toned
+    # attention block an untoned — or uniformly toned — card takes the block's
+    # red left rule (the T3/F2 lesson this assertion's comment already cited
+    # while only checking that a tone existed).
+    cards = {c["class"][2]: c.get("data-tone") for c in soup.select(".concern-card")}
+    assert cards == {"risk-CRITICAL": "crit", "risk-MEDIUM": "warn"}, (
+        f"發現卡沒有依自己的風險等級上色：{cards}")
