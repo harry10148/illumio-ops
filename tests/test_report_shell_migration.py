@@ -959,8 +959,26 @@ def test_the_executive_summary_says_when_it_has_dropped_kpis_or_notes():
 
     security_risk carries 11 KPIs and audit 4 execution notes precisely so this
     branch is reached; both assertions below check the branch ran first.
+
+    Two separate things are asserted and they should not be confused. The
+    literal cap check is what notices a cap being raised. The "the branch was
+    reached" checks are relative to the fixture's counts, so they only notice a
+    raise that crosses 11 or 4 — the values below the fixture's counts sail
+    through, and the historical mistake (6 -> 8) was exactly that size.
     """
     from src.report.exporters._exec_summary import KPI_LIMIT, NOTE_LIMIT
+
+    # The caps themselves, pinned. Everything below is written against the
+    # fixture's own counts (11 KPIs, 4 notes), so it only goes red once a raised
+    # cap passes those — a value sweep showed KPI_LIMIT 9 and 10 staying green,
+    # and the historical mistake was 6 -> 8, exactly that size. Raising a cap is
+    # no longer silent (the disclosure below fires for any total over the limit),
+    # but it is still a change to the report's brief and has to be a deliberate
+    # edit here rather than a number nudged in passing.
+    assert (KPI_LIMIT, NOTE_LIMIT) == (8, 2), (
+        f"執行摘要的上限被改成 {(KPI_LIMIT, NOTE_LIMIT)}——上一次的修法就是把上限"
+        f"從 6 調到 8，然後 producer 又長過去了。要改請連同 _exec_summary 的說明"
+        f"一起改，不要只動數字")
 
     kpi_soup = BeautifulSoup(BUILDERS["security_risk"](), "html.parser")
     strip = kpi_soup.select("section.exec .kpi-strip .kpi")
@@ -1057,6 +1075,107 @@ def test_app_summary_finding_badges_carry_their_own_severity_tone():
         f"發現徽章沒有依自己的嚴重度上色：{by_sev}")
     for badge in badges:
         assert not inline_colour_literals(badge.get("style", "")), badge
+
+
+def _app_summary_with_a_capped_table():
+    """An app_summary whose KPI counts the full set while the table shows one row.
+
+    The shared fixture sets ``inbound_count``/``outbound_count`` equal to the
+    number of rows it renders, so ``_trunc_note`` — the function whose entire
+    job is to say "this table is not everything" — returned '' every time and
+    had no coverage anywhere in tests/. That is the H1 shape again: the
+    disclosure of a truncation, itself never exercised.
+    """
+    from src.report.exporters.app_summary_html_exporter import AppSummaryHtmlExporter
+
+    flows = pd.DataFrame([{
+        "src_app": "web-tier-capped", "dst_app": "data-tier-capped",
+        "port": 33061, "proto": "tcp-capped", "policy_decision": "allowed",
+        "num_connections": 81234, "last_detected": "2026-01-11T08:30:00Z"}])
+    results = {
+        "app": "DB", "env": "Prod", "empty": False,
+        # one row shown, 4207/5308 counted — the top-N cap the note exists for
+        "baseline": {"inbound": flows, "outbound": flows,
+                     "inbound_count": 4207, "outbound_count": 5308},
+        "mod03": {}, "policy_impact": {}, "enforcement": {}, "findings": [],
+    }
+    return AppSummaryHtmlExporter(results, lang="en")._render_html()
+
+
+def test_app_summary_says_when_a_table_shows_only_the_top_rows():
+    """S1: the truncation disclosure has to be reachable, or it is decoration.
+
+    CLAUDE.md's report rule is that eliding is fine and eliding in silence is
+    not; a disclosure with no test proving it renders is indistinguishable from
+    no disclosure at all.
+    """
+    soup = BeautifulSoup(_app_summary_with_a_capped_table(), "html.parser")
+    notes = [n.get_text(strip=True) for n in soup.select("p.note")]
+    expected = [
+        t("rpt_table_truncated_note", lang="en")
+        .replace("{shown}", "1").replace("{total}", str(total))
+        for total in (4207, 5308)
+    ]
+    for want in expected:
+        assert want in notes, f"缺少截斷揭露 {want!r}：{notes}"
+    # …and it must not appear when nothing was capped, or it is noise rather
+    # than a signal (the shared fixture is exactly that case).
+    plain = BeautifulSoup(BUILDERS["app_summary"](), "html.parser")
+    assert not [n for n in plain.select("p.note")
+                if "Showing top" in n.get_text()], "沒有截斷卻印了截斷揭露"
+
+
+def _readiness_with_trend():
+    """A readiness report whose trend chapter has deltas to render.
+
+    The shared fixture passes ``_trend_deltas: []``, so ``_trend()`` always took
+    its first-run branch — and the non-empty branch is where THIS BATCH added
+    ``wrap_table_panel``. New code, new guard
+    (``test_every_table_sits_inside_a_report_table_panel``), and a fixture that
+    guarantees neither is executed.
+    """
+    from src.report.readiness_report import ReadinessResult
+    from src.report.exporters.readiness_html_exporter import ReadinessHtmlExporter
+
+    queue = pd.DataFrame([{
+        "app_display": "app-alfa (production)", "app_env_key": "appalfa|production",
+        "readiness_score": 91.42, "grade": "A", "current_mode": "full enforcement",
+        "blocking_factor": "Ringfence Maturity romeo",
+        "blocking_factor_key": "ringfence_maturity",
+        "recommended_action": "tighten ringfence rules first",
+        "flow_count": 6083, "pb_uncovered_count": 1094}])
+    result = ReadinessResult(
+        record_count=1,
+        module_results={
+            "readiness": {"total_score": 78.54, "grade": "B",
+                          "factor_table": None, "recommendations": None},
+            "queue_df": queue,
+            "kpis": [{"i18n_key": "rpt_readiness_kpi_score",
+                      "label": "Readiness Score", "value": 78.5}],
+            "_trend_deltas": [
+                {"metric": "rpt_readiness_kpi_score", "current": "78.54",
+                 "previous": "70.13", "direction": "up", "delta": "+8.41"},
+                {"metric": "rpt_readiness_kpi_ready", "current": "3172",
+                 "previous": "4183", "direction": "down", "delta": "-1011"},
+            ]},
+        date_range=("2026-07-01", "2026-07-08"))
+    return ReadinessHtmlExporter(result, lang="en")._render_html()
+
+
+def test_readiness_trend_table_is_panelled_like_every_other_table():
+    """S2: the batch's own panel invariant, applied to the branch it skipped."""
+    soup = BeautifulSoup(_readiness_with_trend(), "html.parser")
+    chapter = soup.select_one("section.chapter#readiness-trend")
+    assert chapter is not None, "找不到趨勢章"
+    table = chapter.select_one("table.report-table")
+    assert table is not None, (
+        "趨勢章沒有渲染表格——樣本沒有走到非空分支，這條守門就是空轉")
+    assert table.find_parent(class_="report-table-panel") is not None, (
+        "趨勢表不在 .report-table-panel 裡，寬表列印處理整組失效")
+    # The rows really are the deltas, not an empty shell.
+    assert len(table.select("tbody tr")) == 2
+    assert "\u2191 +8.41" in table.get_text()
+    assert "\u2193 -1011" in table.get_text()
 
 
 def _policy_diff_every_change_and_risk():

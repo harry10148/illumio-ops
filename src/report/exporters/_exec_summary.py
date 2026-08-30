@@ -14,14 +14,21 @@ from src.i18n import t
 # These caps have a history worth reading before touching them. The KPI cap was
 # 6, and on 2026-07-23 a visual check found it silently dropping traffic's
 # potentially_blocked and unknown decision buckets; the fix at the time was to
-# raise the cap to 8. The producers then grew past 8 as well. Counted from the
-# literal lists, not assumed: mod12_executive_summary.py's _traffic_flows_summary
-# builds 10, its executive_summary (security risk / network inventory) builds 16
-# plus one conditional insert and one append per enforcement mode, and
-# audit_mod00_executive.py builds 10 with up to 4 more appended. So the same
-# defect came back on the new threshold, and the surplus KPIs left the document
-# entirely — the traffic exporter's other KPI renderer, `kpi_cards`, is assigned
-# and never used, so this strip is their only outlet.
+# raise the cap to 8. The producers then grew past 8 as well. Counted by walking
+# their AST (an earlier hand count of these same numbers was wrong — brace
+# counting trips over the f-strings inside the elements):
+#
+#   mod12_executive_summary._traffic_flows_summary   10, fixed
+#   mod12_executive_summary.executive_summary        12 literal
+#     (security risk / network inventory)            + 1 UNCONDITIONAL insert
+#                                                    + 1 per enforcement mode
+#                                                    = 13-17
+#   audit_mod00_executive                            8 literal + up to 4  = 8-12
+#   pu_mod00_executive                               8 KPIs; notes 0-5
+#
+# So the same defect came back on the new threshold, and the surplus KPIs left
+# the document entirely — the traffic exporter's other KPI renderer,
+# `kpi_cards`, is assigned and never read, so this strip is their only outlet.
 #
 # Raising the cap a second time would only move the cliff again. CLAUDE.md's
 # report rule allows eliding — it forbids doing it SILENTLY — so the caps stay
