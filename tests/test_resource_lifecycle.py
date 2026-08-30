@@ -43,6 +43,18 @@ def test_api_client_close_releases_session():
     assert client._session is None or len(client._session.adapters) == 0
 
 
+def test_api_client_close_releases_bounded_session():
+    """The event deadline transport owns a second pool and must close it too."""
+    from src.api_client import ApiClient
+    client = ApiClient(_make_cm())
+    sess = client._bounded_session
+    assert sess is not None
+
+    client.close()
+
+    assert client._bounded_session is None or len(sess.adapters) == 0
+
+
 def test_api_client_close_is_idempotent():
     from src.api_client import ApiClient
     client = ApiClient(_make_cm())

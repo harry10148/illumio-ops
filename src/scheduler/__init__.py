@@ -46,8 +46,12 @@ def build_scheduler(cm, interval_minutes: int = 10) -> BackgroundScheduler:
 
     executors = {
         "default": ThreadPoolExecutor(max_workers=5),
+        # Events spend most of their time waiting on SaaS network I/O.  Keep
+        # that wait off the SQLite writer lane; jobs.py takes the shared write
+        # lock only for the short event persistence phase.
+        "event_reader": ThreadPoolExecutor(max_workers=1),
         # 單一 writer：SQLite 本就序列化寫者，強制這些 cache 批次 job 共用一個
-        # worker → 消除 traffic/events ingest vs aggregate/retention/archive 的
+        # worker → 消除 traffic ingest vs aggregate/retention/archive 的
         # 破壞性寫鎖競爭。慢 I/O 的 monitor_cycle/siem_dispatch 留在 default，
         # 避免反向阻塞 ingest。
         "cache_writer": ThreadPoolExecutor(max_workers=1),
@@ -199,7 +203,7 @@ def build_scheduler(cm, interval_minutes: int = 10) -> BackgroundScheduler:
             sched.add_job(_instrument("pce_cache_ingest_events", run_events_ingest, cache_cfg.events_poll_interval_seconds),
                           _IT(seconds=cache_cfg.events_poll_interval_seconds),
                           args=[cm], id="pce_cache_ingest_events", replace_existing=True,
-                          next_run_time=_kick, executor="cache_writer")
+                          next_run_time=_kick, executor="event_reader")
             sched.add_job(_instrument("pce_cache_ingest_traffic", run_traffic_ingest, cache_cfg.traffic_poll_interval_seconds),
                           _IT(seconds=cache_cfg.traffic_poll_interval_seconds),
                           args=[cm], id="pce_cache_ingest_traffic", replace_existing=True,

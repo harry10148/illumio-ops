@@ -184,9 +184,9 @@ def test_get_events_rate_limit_true_reaches_request(api_client):
     (None, 30),
 ])
 def test_fetch_events_strict_uses_deployment_specific_timeout(
-    api_client, deployment_type, expected_timeout,
+    api_client, deployment_type, expected_timeout, monkeypatch,
 ):
-    """Events keep their query contract while SaaS receives a larger budget."""
+    """Events keep their per-attempt timeout but bypass the global retry adapter."""
     if deployment_type is None:
         api_client.api_cfg.pop("deployment_type", None)
     else:
@@ -199,6 +199,7 @@ def test_fetch_events_strict_uses_deployment_specific_timeout(
         return 200, b'[{"id":"event-1"}]'
 
     api_client._request = fake_request
+    monkeypatch.setattr("src.api_client.time.monotonic", lambda: 0.0)
 
     assert api_client.fetch_events_strict(
         "2026-08-30T01:02:03Z",
@@ -210,8 +211,41 @@ def test_fetch_events_strict_uses_deployment_specific_timeout(
         "https://pce.example.com:8443/api/v2/orgs/1/events?"
         "timestamp%5Bgte%5D=2026-08-30T01%3A02%3A03Z&"
         "max_results=321&timestamp%5Blte%5D=2026-08-30T04%3A05%3A06Z",
-        {"timeout": expected_timeout, "rate_limit": True},
+        {
+            "timeout": expected_timeout,
+            "rate_limit": True,
+            "transport_retries": False,
+            "deadline": 65.0 if deployment_type == "saas" else 35.0,
+        },
     )]
+
+
+def test_fetch_events_retry_stays_inside_total_deadline(api_client, monkeypatch):
+    """A full first timeout may use only the small remainder, never 4x timeout."""
+    api_client.api_cfg["deployment_type"] = "saas"
+    now = {"value": 0.0}
+    calls = []
+
+    monkeypatch.setattr("src.api_client.time.monotonic", lambda: now["value"])
+    monkeypatch.setattr(
+        "src.api_client.time.sleep",
+        lambda seconds: now.__setitem__("value", now["value"] + seconds),
+    )
+
+    def fake_request(url, **kwargs):
+        calls.append(kwargs)
+        now["value"] += kwargs["timeout"]
+        return 0, b"read timed out"
+
+    api_client._request = fake_request
+
+    from src.api_client import EventFetchError
+    with pytest.raises(EventFetchError):
+        api_client.fetch_events_strict("2026-08-30T01:02:03Z")
+
+    assert [call["timeout"] for call in calls] == [60, 4.0]
+    assert all(call["transport_retries"] is False for call in calls)
+    assert now["value"] == 65.0
 
 
 def test_get_traffic_flows_async_enforces_max_results(api_client):
