@@ -26,6 +26,7 @@ from __future__ import annotations
 
 import json
 import pathlib
+import re
 
 import pandas as pd
 import pytest
@@ -377,6 +378,50 @@ def test_known_cell_still_sits_under_its_own_column(rtype):
     pytest.fail(f"{rtype}: 找不到儲存格 {value!r}，欄位對齊不變量無法驗證")
 
 
+# R1: "no inline colour" needs a predicate that is neither of the two we had.
+# ``"color" not in style`` catches ``color:red`` and ``color:rgb(...)`` but
+# walks past ``background:#FEFCE8``; ``"#" not in style`` is exactly the other
+# way round. Simply re-adding the old one is not the fix — 20 legal
+# ``color:var(--token)`` declarations across the exporters would fail it, and
+# one of them is this task's own ``<h2 style="color:var(--ink)">``.
+#
+# So the rule is anchored on the token, not on the word "color": a value that
+# names a colour literally is a colour frozen out of the tone system, and a
+# property that can hold NOTHING BUT a colour has to go through ``var()``.
+# Shorthands (``border``, ``background``, ``box-shadow``) are deliberately not
+# subject to the second half — most of their declarations are not colours at
+# all (``border-radius:6px``, ``border-collapse:collapse``), and demanding
+# ``var()`` there flagged five legitimate elements when this predicate was
+# first written. A NAMED colour inside a shorthand (``border:1px solid red``)
+# is the one form neither half sees; no exporter writes it today.
+#
+# Verified against every styled element of all six fixtures before adoption:
+# zero hits inside the guarded selectors. That check is the point — a guard
+# that goes red on correct output is the F1 defect, not a stricter guard.
+_LITERAL_COLOUR = re.compile(r"#[0-9a-fA-F]{3,8}\b|\brgba?\(|\bhsla?\(", re.I)
+_COLOUR_ONLY_PROP = re.compile(r"(^|-)colou?r$|^fill$|^stroke$", re.I)
+_COLOURLESS = frozenset({"none", "transparent", "inherit", "initial", "unset",
+                         "currentcolor", "revert"})
+
+
+def inline_colour_literals(style: str) -> list[str]:
+    """Declarations in ``style`` that name a colour without going through a token."""
+    found = []
+    for declaration in style.split(";"):
+        if ":" not in declaration:
+            continue
+        prop, _, value = declaration.partition(":")
+        prop, value = prop.strip().lower(), value.strip()
+        if not value:
+            continue
+        if _LITERAL_COLOUR.search(value):
+            found.append(declaration.strip())
+        elif (_COLOUR_ONLY_PROP.search(prop) and "var(" not in value
+                and value.lower() not in _COLOURLESS):
+            found.append(declaration.strip())
+    return found
+
+
 # The tones the grade-carrying elements must DECLARE, in document order. Only
 # security_risk shows a grade at all, and it shows two: the maturity grade "D"
 # (on the cover chip and on the score hero) and the readiness grade "?" (its own
@@ -418,7 +463,9 @@ def test_grade_colour_comes_from_data_tone_not_inline_style(rtype):
     declared: list[str] = []
     for element in elements:
         style = element.get("style", "")
-        assert "#" not in style, f"{rtype}: {element.name} 仍帶 inline 色碼 {style!r}"
+        assert not inline_colour_literals(style), (
+            f"{rtype}: {element.name} 仍帶 inline 色碼 "
+            f"{inline_colour_literals(style)}——顏色沒有走 tone")
         owner = element if element.get("data-tone") else element.find_parent(
             attrs={"data-tone": True})
         assert owner is not None, f"{rtype}: {element} 沒有任何 data-tone 祖先"
@@ -514,7 +561,7 @@ def test_severity_summary_boxes_distinguish_critical_from_high():
     by_sev = {b.get("data-sev"): b.get("data-tone") for b in boxes}
     # Every box, not just the two the docstring is about: "data-sev is present"
     # was existence-only, so the other three could have carried any tone at all.
-    # Written out rather than read from SEVERITY_TONE — see GRADE_ELEMENT_TYPES.
+    # Written out rather than read from SEVERITY_TONE — see GRADE_TONES.
     assert by_sev == {"CRITICAL": "crit", "HIGH": "crit", "MEDIUM": "warn",
                       "LOW": "info", "INFO": "neutral"}, (
         f"嚴重度分布方塊的 tone 對映不對：{by_sev}")
@@ -711,15 +758,14 @@ def test_one_severity_has_one_look_across_the_whole_report():
     soup = BeautifulSoup(_audit_with_attention(["CRITICAL", "MEDIUM"]),
                          "html.parser")
     # The tone each severity must resolve to. Written out, not read from
-    # SEVERITY_TONE — see GRADE_ELEMENT_TYPES for why.
+    # SEVERITY_TONE — see GRADE_TONES for why.
     expected = {"CRITICAL": "crit", "MEDIUM": "warn"}
     badges = soup.select(".risk-badge")
     assert len(badges) >= 3, f"樣本不足以比較兩處徽章：{len(badges)}"
     for badge in badges:
-        # Any hex is a colour frozen out of the tone system; the old check was
-        # the substring "color", which `background:#FEFCE8` walks straight past.
-        assert "#" not in badge.get("style", ""), (
-            f"風險徽章仍帶 inline 色碼，會蓋過殼的 tone：{badge}")
+        literals = inline_colour_literals(badge.get("style", ""))
+        assert not literals, (
+            f"風險徽章仍帶 inline 色碼 {literals}，會蓋過殼的 tone：{badge}")
         sev = badge.get("data-sev")
         assert sev in expected, f"未預期的嚴重度 {sev!r}：{badge}"
         # Not "has a data-tone" — every badge having SOME tone is compatible
