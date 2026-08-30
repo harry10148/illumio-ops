@@ -10,10 +10,10 @@ import os
 import pandas as pd
 
 from ._output_paths import discard_reserved, reserve_unique_path, write_text_atomic
-from .report_css import TABLE_JS, build_css
 from .report_i18n import COL_I18N as _COL_I18N
 from .report_i18n import STRINGS
 from .report_i18n import RISK_TYPE_VALUE_I18N
+from .report_shell import ShellCover, ShellSection, build_shell_document
 from .table_renderer import render_df_table
 from .chart_renderer import render_matplotlib_svg
 from .code_highlighter import get_highlight_css
@@ -23,10 +23,63 @@ from src.report.analysis.policy_usage.pu_mod01_overview import build_summary_df
 from src.report.section_guidance import visible_in
 from src.humanize_ext import human_number
 from src.report.exporters._exec_summary import render_exec_summary_html
-from src.report.exporters.cover_page import build_cover_page as _build_cover_page
+# _body_tone is the v2 shell's tone helper, kept next to the traffic exporter
+# that first needed it.
+from src.report.exporters.html_exporter import _body_tone
 
-_CSS = build_css("policy_usage")
 _HIGHLIGHT_CSS = f'<style>\n{get_highlight_css()}\n</style>'
+
+# This report's own components, ported from report_css.py (the attention box at
+# 242-246, the caveat box at 252 and POLICY_USAGE_CSS's .pu-* card layout) with
+# the old build_css tokens remapped onto the v2 shell's. They are NOT in
+# SHELL_CSS: they belong to this one report type, and the shared shell has to
+# stay comparable against design/v2/reports/shell.css. Without them the rule
+# cards collapse into unstyled stacked divs — a layout loss conservation cannot
+# see, because every character of text survives.
+# Token remap: --border -> --line, --slate -> --text-1, --slate-50 -> --text-3,
+# --cyan-120 -> --text-1, --green/--green-10 -> --tone-ok-fg/bg,
+# --red/--red-10 -> --tone-crit-fg/bg, --gold-110 -> --tone-warn-fg,
+# --tan/--tan-120 -> --surface-2/--line, --slate-10 -> --tone-neutral-bg.
+_COMPONENT_CSS = """<style>
+.attention-box { background: var(--surface-2); border: 1px solid var(--line); border-radius: var(--radius-m); padding: var(--space-6) var(--space-6); margin: var(--space-5) 0 var(--space-6); }
+.attention-box h4 { margin: 0 0 var(--space-5); color: var(--text-1); }
+.attention-row { display: flex; justify-content: space-between; align-items: center; gap: var(--space-5); padding: var(--space-3) 0; border-bottom: 1px solid var(--line-soft); font-size: var(--fs-body); }
+.attention-row:last-child { border-bottom: none; }
+.attention-row > span:first-child { color: var(--text-1); font-weight: 500; }
+.caveat-box { background: var(--tone-warn-bg); border-left: 3px solid var(--tone-warn-border); padding: var(--space-5) var(--space-6); border-radius: var(--radius-s); margin: var(--space-5) 0; font-size: var(--fs-body); line-height: var(--lead); }
+
+.pu-cards { display: flex; flex-direction: column; gap: var(--space-4); margin-top: var(--space-5); }
+.pu-card { display: grid; grid-template-columns: minmax(180px,22%) 1fr minmax(140px,18%); border: 1px solid var(--line); border-radius: var(--radius-m); overflow: hidden; background: var(--surface-1); font-size: var(--fs-body); }
+.pu-card:nth-child(even) { background: var(--surface-2); }
+.pu-col { padding: var(--space-5) var(--space-6); border-right: 1px solid var(--line); }
+.pu-col:last-child { border-right: none; }
+.pu-ruleset { font-weight: 700; color: var(--text-1); line-height: 1.35; overflow-wrap: anywhere; }
+.pu-meta { color: var(--text-3); font-size: var(--fs-mini); margin-top: var(--space-1); }
+.pu-badges { margin-top: var(--space-3); display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.pu-badge { display: inline-block; padding: 1px var(--space-3); border-radius: 10px; font-size: var(--fs-mini); font-weight: 600; }
+.pu-badge-allow { background: var(--tone-ok-bg); color: var(--tone-ok-fg); }
+.pu-badge-deny { background: var(--tone-crit-bg); color: var(--tone-crit-fg); }
+.pu-badge-enabled { background: var(--tone-info-bg); color: var(--tone-info-fg); }
+.pu-badge-disabled { background: var(--tone-neutral-bg); color: var(--tone-neutral-fg); }
+.pu-flow-block { display: flex; flex-direction: column; gap: var(--space-3); }
+.pu-flow-row { display: flex; align-items: flex-start; gap: var(--space-3); line-height: 1.4; }
+.pu-flow-label { color: var(--text-3); font-size: var(--fs-mini); min-width: 50px; flex-shrink: 0; padding-top: 1px; }
+.pu-flow-val { color: var(--text-1); overflow-wrap: anywhere; flex: 1; }
+.pu-services { margin-top: var(--space-3); padding-top: var(--space-3); border-top: 1px dashed var(--line); }
+.pu-desc { margin-top: var(--space-3); color: var(--text-3); font-size: var(--fs-mini); font-style: italic; }
+.pu-stat-block { display: flex; flex-direction: column; gap: var(--space-2); }
+.pu-stat-label { color: var(--text-3); font-size: var(--fs-mini); }
+.pu-stat-val { font-weight: 700; color: var(--text-1); }
+.pu-stat-ports { margin-top: var(--space-2); color: var(--text-3); font-size: var(--fs-mini); overflow-wrap: anywhere; }
+.pu-hit-count { font-family: var(--font-mono); font-size: var(--fs-num); font-weight: 700; color: var(--text-1); }
+.pu-unused-label { font-weight: 700; color: var(--tone-warn-fg); }
+@media (max-width: 700px) {
+  .pu-card { grid-template-columns: 1fr; }
+  .pu-col { border-right: none; border-bottom: 1px solid var(--line); }
+  .pu-col:last-child { border-bottom: none; }
+}
+</style>"""
+
 _REPORT_DETAIL_LEVEL = "full"
 
 def _e(val) -> str:
@@ -116,8 +169,8 @@ def _df_to_html(
         val_str = str(val) if val is not None else ""
         if str(col).strip().lower() == "enabled":
             if val_str.lower() in ("true", "1", "yes"):
-                return f'<span class="badge-hit">{_s("rpt_yes")}</span>'
-            return f'<span class="badge-unused">{_s("rpt_no")}</span>'
+                return f'<span class="badge badge-hit" data-tone="ok">{_s("rpt_yes")}</span>'
+            return f'<span class="badge badge-unused" data-tone="crit">{_s("rpt_no")}</span>'
         return _e(val_str)
 
     return render_df_table(
@@ -177,112 +230,91 @@ class PolicyUsageHtmlExporter:
         self._s = _s
 
         mod00 = self._r.get("mod00", {})
-        date_str = " ~ ".join(self._date_range) if any(self._date_range) else ""
-        period_part = (
-            ' &nbsp;|&nbsp; ' + _s("rpt_period") + ' ' + date_str
-            if date_str
-            else ""
-        )
         today_str = str(datetime.date.today())
 
-        nav_html = (
-            '<aside class="report-toc screen-only">'
-            f'<h3>{_s("rpt_nav_contents")}</h3>'
-            '<ol>'
-            f'<li><a href="#summary">{_s("rpt_pu_nav_summary")}</a></li>'
-            f'<li><a href="#overview">{_s("rpt_pu_nav_overview")}</a></li>'
-            f'<li><a href="#hit-rules">{_s("rpt_pu_nav_hit")}</a></li>'
-            f'<li><a href="#unused-rules">{_s("rpt_pu_nav_unused")}</a></li>'
-            f'<li><a href="#deny-rules">{_s("rpt_pu_nav_deny")}</a></li>'
-            f'<li><a href="#draft-pd">{_s("rpt_pu_nav_draft_pd")}</a></li>'
-            '</ol>'
-            f'<button class="print-btn" onclick="window.print()">{_s("rpt_nav_print_pdf")}</button>'
-            '</aside>'
-        )
-
-        exec_html = render_exec_summary_html(self._reconciled_mod00(mod00),
-                                             report_name=t('gui_btn_pu_report', lang=self._lang),
-                                             lang=self._lang)
-        body = (
-            exec_html
-            + '<section id="summary" class="card report-hero">'
-            '<div class="report-hero-top">'
-            f'<div class="report-kicker">{_s("rpt_kicker_policy")}</div>'
-            f'<h1>{_s("rpt_pu_title")}</h1>'
-            f'<p class="report-subtitle">{_s("rpt_generated")} '
-            + mod00.get("generated_at", "")
-            + period_part
-            + "</p></div>"
+        # The v2 shell builds the table of contents from the section list, so
+        # the hard-coded aside.report-toc is gone. Chapter titles come from the
+        # headings (rpt_pu_sec_*), not the sidebar abbreviations
+        # (rpt_pu_nav_*): "Hit Rules" would drop the heading's "Detail".
+        _exec_title = f'{t("rpt_exec_summary_label", lang=self._lang)} — ' \
+                      f'{t("gui_btn_pu_report", lang=self._lang)}'
+        _exec_body = (
+            render_exec_summary_html(self._reconciled_mod00(mod00),
+                                     report_name=t('gui_btn_pu_report', lang=self._lang),
+                                     lang=self._lang, include_heading=False)
             + render_section_guidance("pu_mod00_executive",
                                       profile="security_risk",
                                       detail_level="full",
                                       lang=self._lang)
-            + self._summary_pills(mod00)
+        )
+        # The hero's title block becomes the shell cover; the pills, the query
+        # execution box and the attention box open the first chapter in the
+        # order they had inside the hero card.
+        _summary_body = (
+            self._summary_pills(mod00)
             + self._execution_html(mod00)
             + self._attention_html(mod00.get("attention_items", []))
-            + "</section>\n"
-            + self._section(
-                "overview",
-                "rpt_pu_sec_overview",
-                self._mod01_html(),
-            )
-            + "\n"
-            + self._section(
-                "hit-rules",
-                "rpt_pu_sec_hit",
-                self._mod02_html(),
-            )
-            + "\n"
-            + (self._section(
-                "unused-rules",
-                "rpt_pu_sec_unused",
-                self._mod03_html(),
-            )
-            + "\n"
-            if visible_in('pu_mod03_unused_detail', profile, detail_level) else '')
-            + (self._section(
-                "deny-rules",
-                "rpt_pu_sec_deny",
-                self._mod04_html(),
-            )
-            + "\n"
-            if visible_in('pu_mod04_deny_effectiveness', profile, detail_level) else '')
-            + self._section("draft-pd", "rpt_pu_sec_draft_pd", self._mod05_html())
-            + "\n"
-            + f'<footer>{_s("rpt_pu_footer")} &middot; {today_str}</footer>'
-        )
-        _cover_title = _s("rpt_cover_type_policy")
-        cover_html = _build_cover_page(
-            title=_cover_title,
-            report_type=_cover_title,
-            date_range=self._date_range,
-            pce_url=self._pce_url,
-            org_name=self._org_name,
-            lang=self._lang,
-        )
-        html_lang = "zh-TW" if self._lang == "zh_TW" else "en"
-        return (
-            f'<!DOCTYPE html><html lang="{html_lang}"><head>\n'
-            '<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">\n'
-            f"<title>{t('rpt_page_title_policy_usage', lang=self._lang)}</title>"
-            + _CSS + _HIGHLIGHT_CSS
-            + f'</head>\n<body data-report-title="{_cover_title}">'
-            + cover_html
-            + '<div class="report-shell">'
-            + nav_html
-            + '<main class="report-main">'
-            + body
-            + "</main></div>"
-            + TABLE_JS
-            + "</body></html>"
         )
 
-    def _section(self, id_: str, i18n_key: str, content: str) -> str:
-        return (
-            f'<section id="{id_}" class="card">'
-            f'<h2>{self._s(i18n_key)}</h2>'
-            f"{content}</section>"
+        sections: list[ShellSection] = []
+        if _exec_body:
+            sections.append(ShellSection(id="exec-summary", title=_exec_title,
+                                         html=_exec_body, kind="exec"))
+        # Not rpt_pu_nav_summary ("Executive Summary") — the table of contents
+        # would then list two chapters under the same name.
+        sections.append(self._section("summary", "rpt_tr_sec_snapshot", _summary_body))
+        sections.append(self._section("overview", "rpt_pu_sec_overview", self._mod01_html()))
+        sections.append(self._section("hit-rules", "rpt_pu_sec_hit", self._mod02_html()))
+        if visible_in('pu_mod03_unused_detail', profile, detail_level):
+            sections.append(self._section("unused-rules", "rpt_pu_sec_unused",
+                                          self._mod03_html()))
+        if visible_in('pu_mod04_deny_effectiveness', profile, detail_level):
+            sections.append(self._section("deny-rules", "rpt_pu_sec_deny",
+                                          self._mod04_html()))
+        sections.append(self._section("draft-pd", "rpt_pu_sec_draft_pd", self._mod05_html()))
+
+        _report_type = _s("rpt_cover_type_policy")
+        _meta: dict[str, str] = {}
+        if self._pce_url:
+            _meta[_s("rpt_cover_pce")] = self._pce_url
+        if self._org_name:
+            _meta[_s("rpt_cover_org")] = self._org_name
+        _cover_range = " – ".join(d for d in self._date_range if d)
+        if _cover_range:
+            _meta[_s("rpt_cover_date_range")] = _cover_range
+        if mod00.get("generated_at"):
+            _meta[_s("rpt_cover_generated")] = str(mod00["generated_at"])
+
+        # rpt_kicker_policy and rpt_cover_type_policy are the same string
+        # ("Policy Usage Report"), so printing both would stack one line on top
+        # of an identical one (T3/F6, different slot).
+        _kicker = _s("rpt_kicker_policy")
+        cover = ShellCover(
+            title=_s("rpt_pu_title"),
+            doc_title=t('rpt_page_title_policy_usage', lang=self._lang),
+            type_label=_report_type,
+            eyebrow=_report_type,
+            kicker='' if _kicker == _report_type else _kicker,
+            meta=_meta,
         )
+        return build_shell_document(
+            lang=self._lang,
+            cover=cover,
+            sections=sections,
+            appendix_html=f'{_s("rpt_pu_footer")} &middot; {today_str}',
+            extra_head=_HIGHLIGHT_CSS + _COMPONENT_CSS,
+        )
+
+    def _section(self, id_: str, i18n_key: str, content: str) -> ShellSection:
+        """One chapter for the v2 shell.
+
+        The heading is printed by ``build_shell_document`` now, so this returns
+        the body plus the metadata the shell needs. The tone is read from the
+        chapter's own rendered content; policy usage has no findings list, so no
+        chapter carries marks and the cover stays neutral (G1).
+        """
+        return ShellSection(id=id_, title=self._s(i18n_key), html=content,
+                            tone=_body_tone(content))
 
     def _unused_split(self) -> tuple[int, int]:
         """Return (confirmed_unused, indeterminate) for this run.
@@ -350,7 +382,7 @@ class PolicyUsageHtmlExporter:
             warn = t("rpt_pu_draft_pd_failed", lang=self._lang)
             if reason:
                 warn += f" ({_e(reason)})"
-            return intro + f'<p class="note note-warn">{warn}</p>'
+            return intro + f'<p class="note note-warn" data-tone="warn">{warn}</p>'
         if m.get("skipped") or m.get("total", 0) == 0:
             return intro + f'<p class="note">{_s("rpt_pu_draft_pd_empty")}</p>'
 
@@ -358,7 +390,7 @@ class PolicyUsageHtmlExporter:
         if m.get("truncated_at"):
             _cap = t("rpt_pu_draft_pd_truncated", lang=self._lang).replace(
                 "{n}", str(m["truncated_at"]))
-            html += f'<p class="note note-warn">{_cap}</p>'
+            html += f'<p class="note note-warn" data-tone="warn">{_cap}</p>'
 
         vis = m.get("visibility_risk", {})
         if vis.get("total", 0):
@@ -429,7 +461,7 @@ class PolicyUsageHtmlExporter:
         rows = "".join(
             '<div class="attention-row">'
             f'<span>{_e(item.get("ruleset", ""))}</span>'
-            f'<span class="badge-unused">{item.get("unused_count", 0)}</span>'
+            f'<span class="badge badge-unused" data-tone="crit">{item.get("unused_count", 0)}</span>'
             "</div>"
             for item in attention_items
         )
@@ -455,7 +487,7 @@ class PolicyUsageHtmlExporter:
         ]
         metrics_html = "".join(
             '<div class="attention-row">'
-            f'<span>{label}</span><span class="badge-hit">{value}</span>'
+            f'<span>{label}</span><span class="badge badge-hit" data-tone="ok">{value}</span>'
             "</div>"
             for label, value in rows
         )
@@ -491,14 +523,14 @@ class PolicyUsageHtmlExporter:
         stats = (
             "<p>"
             f'{_s("rpt_pu_total_rules")}: <strong>{human_number(total)}</strong> &nbsp;|&nbsp; '
-            f'<span class="badge-hit">{_s("rpt_pu_hit_rules")}</span> {human_number(hit)} &nbsp;|&nbsp; '
-            f'<span class="badge-unused">{_s("rpt_pu_unused_rules")}</span> {human_number(unused)} &nbsp;|&nbsp; '
+            f'<span class="badge badge-hit" data-tone="ok">{_s("rpt_pu_hit_rules")}</span> {human_number(hit)} &nbsp;|&nbsp; '
+            f'<span class="badge badge-unused" data-tone="crit">{_s("rpt_pu_unused_rules")}</span> {human_number(unused)} &nbsp;|&nbsp; '
             f'{_s("rpt_pu_hit_rate")}: <strong>{rate}%</strong>'
             "</p>"
         )
         if indeterminate:
             stats += (
-                '<p class="note note-warn">'
+                '<p class="note note-warn" data-tone="warn">'
                 + t("rpt_pu_overview_indeterminate", lang=self._lang, n=indeterminate)
                 + "</p>"
             )
@@ -619,15 +651,15 @@ class PolicyUsageHtmlExporter:
             "<p>"
             f'{_s("rpt_pu_deny_total")}: <strong>{total_deny}</strong> '
             f'({deny_ratio}% of all rules) &nbsp;|&nbsp; '
-            f'<span class="badge-hit">{_s("rpt_pu_deny_hit")}</span> {deny_hit} &nbsp;|&nbsp; '
-            f'<span class="badge-unused">{_s("rpt_pu_deny_unused")}</span> {deny_unused} &nbsp;|&nbsp; '
+            f'<span class="badge badge-hit" data-tone="ok">{_s("rpt_pu_deny_hit")}</span> {deny_hit} &nbsp;|&nbsp; '
+            f'<span class="badge badge-unused" data-tone="crit">{_s("rpt_pu_deny_unused")}</span> {deny_unused} &nbsp;|&nbsp; '
             f'{_s("rpt_pu_deny_hit_rate")}: <strong>{deny_hit_rate}%</strong>'
             "</p>"
         )
 
         if override_count > 0:
             stats += (
-                '<p class="note note-warn">'
+                '<p class="note note-warn" data-tone="warn">'
                 f'<strong>{_s("rpt_pu_override_deny")}</strong> {override_count} '
                 f'— {_s("rpt_pu_override_deny_note")}</p>'
             )

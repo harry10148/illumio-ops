@@ -3,9 +3,10 @@
 Every report type that has been moved onto ``build_shell_document`` is listed in
 ``MIGRATED``; the whole module is parametrised over it, so Tasks 4 and 5 extend
 it in place — nothing here needs restructuring. The checklist for adding a type
-is on ``MIGRATED`` itself: it is four items, not one, and the two that are easy
-to miss are the per-type ``KNOWN_CELLS`` entry and the per-type ``ALLOWLIST``
-entry for whatever render-time clock values that type's baseline froze.
+is on ``MIGRATED`` itself: it is six items, not one, and the ones that are easy
+to miss are the per-type ``KNOWN_CELLS`` entry, the per-type
+``EXPECTED_SECTION_IDS`` entry, and the per-type ``ALLOWLIST`` entry for
+whatever render-time clock values that type's baseline froze.
 
 WHAT THIS FILE CAN AND CANNOT SEE
 =================================
@@ -51,8 +52,14 @@ BASELINES = pathlib.Path(__file__).parent / "report_shell" / "baselines"
 #      its baseline froze. The cover/footer timestamps below are Task 3's
 #      capture date and are NOT reusable — capture yours, write your own
 #      reasons.
+#   5. an entry in `EXPECTED_SECTION_IDS` — `test_new_shell_structure` only
+#      proves the TOC agrees with the body, which stays true when a whole
+#      chapter stops rendering; the static list is what notices.
+#   6. an entry in `FOOTER_KEY` — the appendix-colophon check is per type and
+#      pairs with that type's dated footer exemption.
 # Nothing here needs restructuring; every test is parametrised over MIGRATED.
-MIGRATED = ["traffic", "security_risk", "network_inventory"]
+MIGRATED = ["traffic", "security_risk", "network_inventory",
+            "audit", "ven_status", "policy_usage"]
 
 # Old-side text with no successor in the v2 shell. Every entry carries its own
 # reason; batch-adding entries to make a red run green is what this list exists
@@ -95,10 +102,115 @@ _COMMON_ALLOWLIST = frozenset({
     _LEGACY_COVER_BRAND,
 })
 
+# --------------------------------------------------------------------------
+# Task 4's own exemptions. The wall-clock strings below are the minute and the
+# day Task 4's baselines were captured; they are NOT Task 3's and neither set is
+# reusable by Task 5 — capture your own and write your own reasons.
+# --------------------------------------------------------------------------
+_T4_WALL_CLOCK_COVER = norm("2026-08-30 08:48")
+# Same mechanism as _WALL_CLOCK_COVER above, different capture minute: the
+# legacy build_cover_page() stamped datetime.now() into both the screen and the
+# print cover. The call is gone (A9/B4) and the value was unreachable anyway —
+# it froze the minute the baseline was taken. Each report's real generation
+# timestamp (mod00.generated_at) travels to the cover meta and is asserted by
+# test_cover_meta_carries_the_generation_timestamp_and_period.
+
+_AUDIT_FOOTER_WITH_DATE = norm("Illumio PCE Ops Audit Report · 2026-08-30")
+_VEN_FOOTER_WITH_DATE = norm("Illumio PCE Ops VEN Status Report · 2026-08-30")
+_PU_FOOTER_WITH_DATE = norm("Illumio PCE Ops Policy Usage Report · 2026-08-30")
+# Each footer is ``rpt_<type>_footer + " · " + date.today()``. The i18n half
+# moves into the appendix colophon and is asserted per type by
+# test_footer_text_survives_into_the_appendix (see FOOTER_KEY); only the date
+# half follows the calendar, so these leaves go red the day after capture no
+# matter what the migration did.
+
+_AUDIT_HERO_SUBTITLE = norm(
+    "Generated: 2026-07-23 12:00:00  |  Period: 2026-07-16 ~ 2026-07-23")
+# The audit hero glued four things into ONE text node: the "Generated" label,
+# the generation timestamp, the "Period" label and the date range. The v2 cover
+# splits them into separate dt/dd rows, and label_value_preserved() only
+# tolerates ONE label:value split (it partitions on the first colon), so the
+# glued form cannot be matched even though every part of it survives. Both
+# values are asserted individually by
+# test_cover_meta_carries_the_generation_timestamp_and_period; the tilde-joined
+# range itself is separately conserved by the summary chapter's period pill.
+
+# The deleted sidebar's own labels (rpt_*_nav_*). Most of them are prefixes of
+# the chapter heading they linked to ("1 System Health" -> "1 System Health &
+# Agent"), so they survive as substrings and need no entry; the ones below chose
+# different words from their own heading and therefore have no successor. The
+# heading is the fuller of the two in every case, and it is what the v2 table of
+# contents shows, so keeping the sidebar wording instead would delete the
+# qualifier ("Detail", "Decision", "Rule", "Connection") from the document. What
+# these exemptions must not be allowed to cover is the CHAPTER going missing —
+# EXPECTED_SECTION_IDS pins every id for that.
+#   audit  "3 Policy Changes"    -> heading "3 Policy Modifications"
+#   ven    "Lost Today (<24h)"   -> heading "Lost Connection in Last 24h"
+#   ven    "Lost Yesterday"      -> heading "Lost Connection 24-48h Ago"
+#   pu     "Deny Effectiveness"  -> heading "Deny Rule Effectiveness"
+#   pu     "Draft Policy Risk"   -> heading "Draft Policy Decision Risk"
+_AUDIT_NAV_ABBREVS = frozenset({norm("3 Policy Changes")})
+_VEN_NAV_ABBREVS = frozenset({norm("Lost Today (<24h)"), norm("Lost Yesterday")})
+_PU_NAV_ABBREVS = frozenset({norm("Deny Effectiveness"), norm("Draft Policy Risk")})
+
+_VEN_EMPTY_GENERATED_LABEL = norm("Generated: ")
+_VEN_LEGACY_COVER_GENERATED_LABEL = norm("Generated")
+# Two labels with nothing behind them, both specific to the VEN fixture:
+#   * the hero printed ``rpt_generated`` even when the report carried no
+#     generation timestamp (this fixture's ``generated_at`` is empty), so the
+#     node was a bare label and a trailing colon;
+#   * the deleted print cover printed ``rpt_cover_generated`` as the label of
+#     its ``datetime.now()`` stamp — the value is exempted above as a wall
+#     clock, and the label has nothing left to introduce.
+# The v2 cover emits a meta row only when there is a value to show.
+# test_cover_meta_carries_the_generation_timestamp_and_period asserts both
+# halves: audit and policy_usage DO get the label back because they have a real
+# timestamp, and ven_status must not print it while it has none.
+
 ALLOWLIST: dict[str, frozenset[str]] = {
     "traffic": _COMMON_ALLOWLIST,
     "security_risk": _COMMON_ALLOWLIST | {_WRONG_EXEC_SUFFIX},
     "network_inventory": _COMMON_ALLOWLIST | {_WRONG_EXEC_SUFFIX},
+    "audit": frozenset({_T4_WALL_CLOCK_COVER, _LEGACY_COVER_BRAND,
+                        _AUDIT_FOOTER_WITH_DATE,
+                        _AUDIT_HERO_SUBTITLE}) | _AUDIT_NAV_ABBREVS,
+    "ven_status": frozenset({_T4_WALL_CLOCK_COVER, _LEGACY_COVER_BRAND,
+                             _VEN_FOOTER_WITH_DATE, _VEN_EMPTY_GENERATED_LABEL,
+                             _VEN_LEGACY_COVER_GENERATED_LABEL}) | _VEN_NAV_ABBREVS,
+    "policy_usage": frozenset({_T4_WALL_CLOCK_COVER, _LEGACY_COVER_BRAND,
+                               _PU_FOOTER_WITH_DATE}) | _PU_NAV_ABBREVS,
+}
+
+# The i18n key each type's footer text comes from. It moves into the appendix
+# colophon; the dated leaf is exempted above, so this is what keeps the
+# exemption from also covering the footer text itself disappearing.
+FOOTER_KEY: dict[str, str] = {
+    "traffic": "rpt_tr_footer",
+    "security_risk": "rpt_tr_footer",
+    "network_inventory": "rpt_tr_footer",
+    "audit": "rpt_au_footer",
+    "ven_status": "rpt_ven_footer",
+    "policy_usage": "rpt_pu_footer",
+}
+
+# The chapters each fixture must render, in order. ``test_new_shell_structure``
+# only proves the TOC and the body agree with each other, which stays true when
+# a chapter silently stops rendering (the whole point of the prototype's
+# reskin_report 417-424 lesson) — this is the static half of that pair.
+EXPECTED_SECTION_IDS: dict[str, tuple[str, ...]] = {
+    "traffic": ("exec-summary", "summary", "overview", "policy",
+                "distribution", "bandwidth", "unmanaged"),
+    "security_risk": ("exec-summary", "summary", "drift", "overview", "policy",
+                      "uncovered", "ransomware", "readiness", "infrastructure",
+                      "lateral", "findings"),
+    "network_inventory": ("exec-summary", "summary", "labels", "policy",
+                          "matrix", "unmanaged", "ringfence", "change_impact"),
+    "audit": ("exec-summary", "summary", "health", "users", "policy",
+              "correlation"),
+    "ven_status": ("exec-summary", "summary", "online", "sync-issues",
+                   "offline", "lost-today", "lost-yest"),
+    "policy_usage": ("exec-summary", "summary", "overview", "hit-rules",
+                     "unused-rules", "deny-rules", "draft-pd"),
 }
 
 # The report-type label each type's executive summary must name (F5).
@@ -106,6 +218,12 @@ EXEC_SUFFIX: dict[str, str] = {
     "traffic": "Traffic Report",
     "security_risk": "Security Risk Profile",
     "network_inventory": "Network Inventory",
+    # These three already named their own report type before the migration
+    # (t('gui_btn_audit_report') and friends), so unlike the traffic family they
+    # need no _WRONG_EXEC_SUFFIX exemption and the suffix keeps its old value.
+    "audit": "Audit Report",
+    "ven_status": "VEN Status Report",
+    "policy_usage": "Policy Usage Report",
 }
 
 # One cell value per type that must still sit under its own column heading.
@@ -114,6 +232,14 @@ KNOWN_CELLS: dict[str, tuple[str, str]] = {
     "traffic": ("tcp-prts-alfa", "Protocol"),
     "security_risk": ("Policy Coverage", "Metric"),
     "network_inventory": ("tcp-unmg-alfa", "Protocol"),
+    # Not the audit event_type column: its cells carry a risk badge and <wbr>
+    # breaks, so get_text() returns "INFOsec_policy.create.evtzulu" and the
+    # invariant would be checking the badge as much as the cell.
+    "audit": ("informational-sevzulu", "severity"),
+    # Not the online chapter: since spec K2 that chapter is a version-count
+    # summary, and the per-host columns only exist in sync-issues/offline.
+    "ven_status": ("k8s-node-syncissue-01", "Hostname"),
+    "policy_usage": ("Category-tango", "Category"),
 }
 
 
@@ -177,7 +303,57 @@ def test_footer_text_survives_into_the_appendix(rtype):
     exemption would also cover the footer text itself disappearing.
     """
     _, flat = conservation_text(BUILDERS[rtype]())
-    assert norm(t("rpt_tr_footer", lang="en")) in flat
+    assert norm(t(FOOTER_KEY[rtype], lang="en")) in flat
+
+
+@pytest.mark.parametrize("rtype", MIGRATED)
+def test_the_expected_chapters_are_all_there_in_the_expected_order(rtype):
+    """``toc == body_ids`` is self-consistency; this is the external check.
+
+    A chapter that stops rendering disappears from both sides at once and
+    leaves that assertion green, and conservation cannot see it either as long
+    as the chapter's text survives anywhere else (e.g. in a guidance block that
+    other chapters share). Order matters too: two chapters whose contents are
+    exchanged is a documented conservation blind spot.
+    """
+    soup = BeautifulSoup(BUILDERS[rtype](), "html.parser")
+    ids = tuple(s["id"] for s in soup.select(
+        "section.exec[id], div.chapters > section.chapter"))
+    assert ids == EXPECTED_SECTION_IDS[rtype]
+
+
+@pytest.mark.parametrize("rtype", MIGRATED)
+def test_cover_meta_carries_the_generation_timestamp_and_period(rtype):
+    """Pairs with the hero-subtitle and empty-"Generated:" exemptions.
+
+    Those two exemptions drop old text nodes that mixed a label with a value;
+    this is what proves the values themselves reached the new cover instead of
+    vanishing with the node. The label is asserted by key, not by literal, so a
+    translation change cannot quietly turn this green.
+    """
+    soup = BeautifulSoup(BUILDERS[rtype](), "html.parser")
+    meta = soup.select_one("header.cover dl.cover-meta")
+    # No skip when the element is missing: "the cover has no meta list at all"
+    # is a failure for every type that expects a row, and the assertion below
+    # says so. Only the VEN fixture legitimately has nothing to show.
+    pairs = {} if meta is None else dict(
+        zip([dt.get_text(strip=True) for dt in meta.select("dt")],
+            [dd.get_text(strip=True) for dd in meta.select("dd")]))
+    expected = {
+        "audit": {t("rpt_cover_generated", lang="en"): "2026-07-23 12:00:00",
+                  t("rpt_cover_date_range", lang="en"): "2026-07-16 – 2026-07-23"},
+        "policy_usage": {t("rpt_cover_generated", lang="en"): "2026-07-02 12:00:00"},
+        "traffic": {t("rpt_cover_generated", lang="en"): "2026-07-02 12:00:00"},
+        "security_risk": {t("rpt_cover_generated", lang="en"): "2026-05-15 09:00"},
+        "network_inventory": {t("rpt_cover_generated", lang="en"): "2026-07-02 12:00:00"},
+        # The VEN fixture has no generated_at at all — that is exactly why its
+        # old "Generated: " node is exempted. Nothing to assert but the absence.
+        "ven_status": {},
+    }[rtype]
+    for label, value in expected.items():
+        assert pairs.get(label) == value, f"{rtype}: 封面 meta 缺 {label}={value!r}：{pairs}"
+    if rtype == "ven_status":
+        assert t("rpt_cover_generated", lang="en") not in pairs
 
 
 @pytest.mark.parametrize("rtype", MIGRATED)

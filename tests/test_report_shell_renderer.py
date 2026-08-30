@@ -487,6 +487,69 @@ _DELTA_MAT_FILL_WARN = (_MAT_FILL_GOOD, _MAT_FILL_GOOD + """/* 舊殼 report_css
 .mat-fill.warn, .progress-fill.warn { background: var(--tone-warn-border); }
 """)
 
+# T4: 舊殼 report_css.py 有空資料面板（205-207）與排序指示器（161-163,178）兩組
+# 規則，design/v2/reports/shell.css 兩組都沒有。它們樣式化的是
+# table_renderer.py / TABLE_JS 產出的元素，10 型報表共用——缺了之後「查無資料」
+# 的面板與正常表格長得一樣，TABLE_JS 建立的 .sort-indicator 也失去定位。
+# 同 F1 的判準：設計檔也漏只代表設計檔有洞，基準是產品舊殼的輸出。
+_PANEL_COMPACT = ".report-table-panel--compact { max-width: 640px; }\n"
+_DELTA_TABLE_JS_AFFORDANCES = (_PANEL_COMPACT, _PANEL_COMPACT + """\
+/* 自舊殼 report_css.py 移植的兩組「表格 JS 附屬樣式」，設計檔沒有涵蓋（T4）。
+   兩者都是 table_renderer.py / TABLE_JS 產出的元素，10 型報表共用：
+     · 空資料面板（report_css.py:205-207）——缺這一段，「無資料」與「有資料」
+       兩種面板長得一模一樣，讀者分不出是查無資料還是渲染壞掉；
+     · 排序指示器（report_css.py:161-163,178）——TABLE_JS 仍會建立
+       .sort-indicator 元素，沒有規則時它會變成擠在欄名後面的裸文字，
+       游標也不再提示欄頭可點。
+   顏色改吃殼的 token；已排序欄的強調色用 --accent 而非舊殼的 --gold：
+   那是互動狀態，殼的語意色（tone-*）保留給嚴重度。 */
+.report-table-panel--empty {
+  padding: var(--space-8) var(--space-7);
+  border-style: dashed;
+  background: var(--surface-2);
+  text-align: center;
+  color: var(--text-3);
+  font-size: var(--fs-body);
+}
+.report-table-panel--empty .empty-marker {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--line);
+  margin-right: var(--space-4);
+  vertical-align: middle;
+}
+.report-table-panel--empty .empty-text { font-style: italic; letter-spacing: 0.02em; }
+.report-table--interactive thead th { cursor: pointer; user-select: none; }
+.sort-indicator {
+  position: absolute;
+  right: var(--space-5);
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: var(--fs-mini);
+  opacity: 0.55;
+  pointer-events: none;
+}
+.report-table thead th:hover .sort-indicator { opacity: 0.85; }
+.report-table thead th.is-sorted-asc .sort-indicator,
+.report-table thead th.is-sorted-desc .sort-indicator { opacity: 1; color: var(--accent); }
+""")
+
+
+def test_empty_table_panel_and_sort_indicator_survive_the_port():
+    """T4: 與 F1 同型——drift guard 單獨守不住「規則連同 delta 一起被刪」。
+
+    這裡直接斷言渲染用的 SHELL_CSS 真的有這兩組規則，而不是只斷言它與設計檔
+    的差異等於清單。
+    """
+    assert ".report-table-panel--empty {" in SHELL_CSS
+    assert ".report-table-panel--empty .empty-marker {" in SHELL_CSS
+    assert ".report-table-panel--empty .empty-text {" in SHELL_CSS
+    assert ".report-table--interactive thead th { cursor: pointer; user-select: none; }" in SHELL_CSS
+    assert ".sort-indicator {" in SHELL_CSS
+
+
 AUTHORISED_DELTAS = (
     _DELTA_DROP_OLD_COVER,
     _DELTA_PRINT_BTN,
@@ -498,6 +561,7 @@ AUTHORISED_DELTAS = (
     _DELTA_FLOOR_META,
     _DELTA_FLOOR_TS,
     _DELTA_MAT_FILL_WARN,
+    _DELTA_TABLE_JS_AFFORDANCES,
 )
 
 

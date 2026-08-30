@@ -11,9 +11,9 @@ import os
 import pandas as pd
 
 from ._output_paths import discard_reserved, reserve_unique_path, write_text_atomic
-from .report_css import TABLE_JS, build_css
 from .report_i18n import COL_I18N as _COL_I18N
 from .report_i18n import STRINGS
+from .report_shell import ShellCover, ShellSection, build_shell_document
 from .table_renderer import render_df_table
 from .chart_renderer import render_matplotlib_svg
 from .code_highlighter import get_highlight_css
@@ -22,10 +22,14 @@ from src.i18n import t
 from src.report.section_guidance import visible_in
 from src.humanize_ext import human_number
 from src.report.exporters._exec_summary import render_exec_summary_html
-from src.report.exporters.cover_page import build_cover_page as _build_cover_page
-from src.report.exporters.html_exporter import _trend_deltas_section
+# _body_tone / _sev_attrs are the v2 shell's tone helpers, kept next to the
+# traffic exporter that first needed them.
+from src.report.exporters.html_exporter import (
+    _body_tone,
+    _sev_attrs,
+    _trend_deltas_section,
+)
 
-_CSS = build_css("ven")
 _HIGHLIGHT_CSS = f'<style>\n{get_highlight_css()}\n</style>'
 _REPORT_DETAIL_LEVEL = "full"
 
@@ -34,35 +38,51 @@ def _policy_sync_badge(val: str) -> str:
     # syncing/staged＝未收斂（黃），其他未知值才視為異常（紅）。
     v = str(val).lower().strip()
     safe = html.escape(str(val))  # PCE-derived value — escape before embedding
+    # The v2 shell styles .badge from data-tone; the badge-* classes carried the
+    # colour themselves in the old stylesheet and are kept because
+    # tests/test_ven_policy_sync_tracking.py identifies the three states by
+    # them. Without a tone of its own each badge would inherit the chapter's.
     if v in ("applied", "synced"):
-        return f'<span class="badge-synced">{safe}</span>'
+        return f'<span class="badge badge-synced" data-tone="ok">{safe}</span>'
     if v in ("syncing", "staged"):
-        return f'<span class="badge-staged">{safe}</span>'
+        return f'<span class="badge badge-staged" data-tone="warn">{safe}</span>'
     if v and v not in ("none", "nan"):
-        return f'<span class="badge-unsynced">{safe}</span>'
+        return f'<span class="badge badge-unsynced" data-tone="crit">{safe}</span>'
     return ""
 
 
 # Ransomware-posture cell styling (reuse the report's shared badge palette).
 _RWP_SEV_BADGE = {"critical": "CRITICAL", "high": "HIGH", "medium": "MEDIUM",
                   "low": "LOW", "fully_protected": "LOW"}
-_RWP_SEV_BORDER = {"critical": "var(--red)", "high": "var(--red-80)",
-                   "medium": "var(--gold-110)", "low": "var(--green)",
-                   "fully_protected": "var(--green)"}
-_RWP_PROT_BADGE = {"unprotected": "badge-unsynced", "protected_open": "badge-staged",
-                   "protected_closed": "badge-synced"}
+# The old values were build_css tokens (--red / --gold-110 / --green); those do
+# not exist in the v2 shell, so the declaration would have been dead markup.
+_RWP_SEV_BORDER = {"critical": "var(--tone-crit-border)",
+                   "high": "var(--tone-crit-border)",
+                   "medium": "var(--tone-warn-border)",
+                   "low": "var(--tone-ok-border)",
+                   "fully_protected": "var(--tone-ok-border)"}
+_RWP_PROT_BADGE = {"unprotected": ("badge-unsynced", "crit"),
+                   "protected_open": ("badge-staged", "warn"),
+                   "protected_closed": ("badge-synced", "ok")}
 
 
 def _rwp_severity_badge(sev: str) -> str:
     cls = _RWP_SEV_BADGE.get(str(sev).lower().strip())
     label = html.escape(str(sev) or "—")
-    return f'<span class="badge badge-{cls}">{label}</span>' if cls else label
+    # data-tone/data-sev, not a colour: .badge reads var(--mark)/var(--fill)/
+    # var(--ink) with no fallback, so an untoned badge takes the chapter's tone
+    # and every severity in the table looks the same.
+    return (f'<span class="badge badge-{cls}"{_sev_attrs(cls)}>{label}</span>'
+            if cls else label)
 
 
 def _rwp_protection_badge(state: str) -> str:
-    cls = _RWP_PROT_BADGE.get(str(state).lower().strip())
+    entry = _RWP_PROT_BADGE.get(str(state).lower().strip())
     label = html.escape(str(state) or "—")
-    return f'<span class="{cls}">{label}</span>' if cls else label
+    if not entry:
+        return label
+    cls, tone = entry
+    return f'<span class="badge {cls}" data-tone="{tone}">{label}</span>'
 
 class VenHtmlExporter:
     def __init__(self, results: dict, df: pd.DataFrame = None,
@@ -105,21 +125,11 @@ class VenHtmlExporter:
         _ven_mod00 = {"kpis": kpis}
         today_str = str(datetime.date.today())
 
-        nav_html = (
-            '<aside class="report-toc screen-only">'
-            f'<h3>{_s("rpt_nav_contents")}</h3>'
-            '<ol>'
-            f'<li><a href="#summary">{_s("rpt_ven_nav_summary")}</a></li>'
-            f'<li><a href="#online">{_s("rpt_ven_nav_online")}</a></li>'
-            f'<li><a href="#sync-issues">{_s("rpt_ven_nav_sync")}</a></li>'
-            f'<li><a href="#offline">{_s("rpt_ven_nav_offline")}</a></li>'
-            f'<li><a href="#lost-today">{_s("rpt_ven_nav_lost_today")}</a></li>'
-            f'<li><a href="#lost-yest">{_s("rpt_ven_nav_lost_yest")}</a></li>'
-            '</ol>'
-            f'<button class="print-btn" onclick="window.print()">{_s("rpt_nav_print_pdf")}</button>'
-            '</aside>'
-        )
-
+        # The v2 shell builds the table of contents from the section list, so
+        # the hard-coded aside.report-toc is gone. Chapter titles keep coming
+        # from rpt_ven_sec_*_title (the headings), not the sidebar's
+        # rpt_ven_nav_* abbreviations: "Policy Sync Issues" would drop the
+        # heading's "(Reporting Normally)" qualifier.
         kpi_cards_parts = []
         for k in kpis:
             key = k.get("i18n_key") or ""
@@ -220,70 +230,88 @@ class VenHtmlExporter:
             note_html = f'<p class="section-intro">{_s("rpt_ven_online_detail_note")}</p>'
             return f'<h3>{heading}</h3>{version_table}{note_html}'
 
-        exec_html = render_exec_summary_html(_ven_mod00, report_name=t('gui_btn_ven_report', lang=self._lang), lang=self._lang)
+        exec_html = render_exec_summary_html(
+            _ven_mod00, report_name=t('gui_btn_ven_report', lang=self._lang),
+            lang=self._lang, include_heading=False)
         _deltas = (self._r or {}).get("_trend_deltas") or []
         if _deltas:
             exec_html += _trend_deltas_section(
                 _deltas, self._lang, mismatch=(self._r or {}).get("_trend_mismatch"),
             )
-        body = (
-            exec_html
-            + '<section id="summary" class="card report-hero">'
-            '<div class="report-hero-top">'
-            f'<div class="report-kicker">{_s("rpt_kicker_ven")}</div>'
-            f'<h1>{_s("rpt_ven_title")}</h1>'
-            f'<p class="report-subtitle">{_s("rpt_generated")} '
-            + gen_at
-            + "</p></div>"
-            + self._summary_pills(online_count, offline_count, today_count, yest_count)
+        _exec_title = f'{t("rpt_exec_summary_label", lang=self._lang)} — ' \
+                      f'{t("gui_btn_ven_report", lang=self._lang)}'
+
+        # The hero's title block becomes the shell cover; the pills and the two
+        # charts stay, in order, as the first chapter.
+        _summary_body = (
+            self._summary_pills(online_count, offline_count, today_count, yest_count)
             + status_chart_html
             + os_chart_html
-            + "</section>\n"
-            + self._section("online", "rpt_ven_sec_online_title", online_count, _online_summary_html(df_online), "rpt_ven_sec_online_intro", "online", "ven_online_inventory")
-            + "\n"
-            + self._section("sync-issues", "rpt_ven_sec_sync_title", sync_count, _df_to_html(df_sync), "rpt_ven_sec_sync_intro", "warn", "ven_policy_sync_issues")
-            + "\n"
-            + (self._section("offline", "rpt_ven_sec_offline_title", offline_count, _df_to_html(df_offline), "rpt_ven_sec_offline_intro", "offline", "ven_offline")
-               + "\n"
-               if visible_in('ven_offline', profile, detail_level) else '')
-            + (self._section("lost-today", "rpt_ven_sec_lost_today_title", today_count, _df_to_html(df_today), "rpt_ven_sec_lost_today_intro", "offline", "ven_lost_heartbeat_24h")
-               + "\n"
-               if visible_in('ven_lost_heartbeat_24h', profile, detail_level) else '')
-            + (self._section("lost-yest", "rpt_ven_sec_lost_yest_title", yest_count, _df_to_html(df_yest), "rpt_ven_sec_lost_yest_intro", "warn", "ven_lost_heartbeat_48h")
-               + "\n"
-               if visible_in('ven_lost_heartbeat_48h', profile, detail_level) else '')
-            + self._estate_inventory_section()
-            + self._ransomware_posture_section()
-            + f'<footer>{_s("rpt_ven_footer")} &middot; '
-            + today_str
-            + "</footer>"
         )
 
-        _cover_title = _s("rpt_cover_type_ven")
-        cover_html = _build_cover_page(
-            title=_cover_title,
-            report_type=_cover_title,
-            date_range=("", ""),
-            pce_url=self._pce_url,
-            org_name=self._org_name,
-            lang=self._lang,
+        sections: list[ShellSection] = []
+        if exec_html:
+            sections.append(ShellSection(id="exec-summary", title=_exec_title,
+                                         html=exec_html, kind="exec"))
+        # Not rpt_ven_nav_summary ("Executive Summary") — that would put two
+        # chapters of the same name in the table of contents.
+        sections.append(self._section("summary", "rpt_tr_sec_snapshot", None,
+                                      _summary_body))
+        sections.append(self._section(
+            "online", "rpt_ven_sec_online_title", online_count,
+            _online_summary_html(df_online), "rpt_ven_sec_online_intro",
+            "ven_online_inventory"))
+        sections.append(self._section(
+            "sync-issues", "rpt_ven_sec_sync_title", sync_count,
+            _df_to_html(df_sync), "rpt_ven_sec_sync_intro",
+            "ven_policy_sync_issues"))
+        if visible_in('ven_offline', profile, detail_level):
+            sections.append(self._section(
+                "offline", "rpt_ven_sec_offline_title", offline_count,
+                _df_to_html(df_offline), "rpt_ven_sec_offline_intro", "ven_offline"))
+        if visible_in('ven_lost_heartbeat_24h', profile, detail_level):
+            sections.append(self._section(
+                "lost-today", "rpt_ven_sec_lost_today_title", today_count,
+                _df_to_html(df_today), "rpt_ven_sec_lost_today_intro",
+                "ven_lost_heartbeat_24h"))
+        if visible_in('ven_lost_heartbeat_48h', profile, detail_level):
+            sections.append(self._section(
+                "lost-yest", "rpt_ven_sec_lost_yest_title", yest_count,
+                _df_to_html(df_yest), "rpt_ven_sec_lost_yest_intro",
+                "ven_lost_heartbeat_48h"))
+        # Estate inventory and ransomware posture already had their own id and
+        # their own <h2>; they become chapters rather than being folded into one
+        # of the above, which is also how they finally reach the table of
+        # contents (the old sidebar never listed them). Both are conditional on
+        # the snapshot carrying that data.
+        for _extra in (self._estate_inventory_section(),
+                       self._ransomware_posture_section()):
+            if _extra is not None:
+                sections.append(_extra)
+
+        _report_type = _s("rpt_cover_type_ven")
+        _meta: dict[str, str] = {}
+        if self._pce_url:
+            _meta[_s("rpt_cover_pce")] = self._pce_url
+        if self._org_name:
+            _meta[_s("rpt_cover_org")] = self._org_name
+        if gen_at:
+            _meta[_s("rpt_cover_generated")] = str(gen_at)
+        _kicker = _s("rpt_kicker_ven")
+        cover = ShellCover(
+            title=_s("rpt_ven_title"),
+            doc_title=t('rpt_page_title_ven_status', lang=self._lang),
+            type_label=_report_type,
+            eyebrow=_report_type,
+            kicker='' if _kicker == _report_type else _kicker,
+            meta=_meta,
         )
-        html_lang = "zh-TW" if self._lang == "zh_TW" else "en"
-        return (
-            f'<!DOCTYPE html><html lang="{html_lang}"><head>\n'
-            '<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">\n'
-            f"<title>{t('rpt_page_title_ven_status', lang=self._lang)}</title>"
-            + _CSS + _HIGHLIGHT_CSS
-            + "</head>\n"
-            + f'<body data-report-title="{_cover_title}">'
-            + cover_html
-            + '<div class="report-shell">'
-            + nav_html
-            + '<main class="report-main">'
-            + body
-            + "</main></div>"
-            + TABLE_JS
-            + "</body></html>"
+        return build_shell_document(
+            lang=self._lang,
+            cover=cover,
+            sections=sections,
+            appendix_html=f'{_s("rpt_ven_footer")} &middot; {today_str}',
+            extra_head=_HIGHLIGHT_CSS,
         )
 
     def _summary_pills(self, online_count: int, offline_count: int, today_count: int, yest_count: int) -> str:
@@ -305,21 +333,24 @@ class VenHtmlExporter:
         html += "</div>"
         return html
 
-    def _estate_inventory_section(self) -> str:
-        """Render the Estate Inventory & Posture section from module_results."""
+    def _estate_inventory_section(self) -> ShellSection | None:
+        """The Estate Inventory & Posture chapter, or None when there is no data.
+
+        It already had its own ``id`` and its own ``<h2>``; under the v2 shell it
+        becomes a chapter of its own, so the heading is printed once and the
+        anchor finally reaches the table of contents (the old sidebar never
+        listed it).
+        """
         os_dist = self._r.get("os_distribution")
         enf_dist = self._r.get("enforcement_distribution")
         enf_net = self._r.get("enforcement_by_network")
         by_version = self._r.get("by_version")
         # Guard: older snapshots may not have these keys
         if not any([os_dist, enf_dist, enf_net, by_version]):
-            return ""
+            return None
 
         _s = self._s
-        parts = [
-            f'<section id="estate-inventory" class="card">'
-            f'<h2>{t("rpt_ei_section", lang=self._lang)}</h2>'
-        ]
+        parts: list[str] = []
 
         def _panel(tbl_html: str) -> str:
             # Wrap a <table class="report-table"> in the same styled container the
@@ -421,17 +452,19 @@ class VenHtmlExporter:
                 f'<tbody>{rows_html}</tbody></table>'
             ))
 
-        parts.append("</section>\n")
-        return "".join(parts)
+        body = "".join(parts)
+        return ShellSection(id="estate-inventory",
+                            title=t("rpt_ei_section", lang=self._lang),
+                            html=body, tone=_body_tone(body))
 
-    def _ransomware_posture_section(self) -> str:
-        """Render the Ransomware Exposure & High-Risk Open Ports section."""
+    def _ransomware_posture_section(self) -> ShellSection | None:
+        """The Ransomware Exposure & High-Risk Open Ports chapter, or None."""
         m = self._r.get("ransomware_posture")
         if not isinstance(m, dict):
-            return ""
+            return None
         per_ven = m.get("per_ven") or []
         if not per_ven:
-            return ""
+            return None
         import pandas as pd
         _l = self._lang
         kpi = m.get("kpi") or {}
@@ -439,19 +472,24 @@ class VenHtmlExporter:
 
         # ── KPI strip: exposure distribution (severity-coloured) + coverage + pending
         by_exp = kpi.get("by_exposure") or {}
+        # kpi-strip / kpi are the v2 shell's KPI vocabulary; the kpi-grid /
+        # kpi-card names stay alongside because four not-yet-migrated exporters
+        # still ship the old stylesheet that defines them. The severity colour
+        # moves from border-top (which .kpi does not draw) onto the left rule
+        # that it does.
         cards = "".join(
-            f'<div class="kpi-card" style="border-top-color:{_RWP_SEV_BORDER[lvl]}">'
+            f'<div class="kpi kpi-card" style="border-left-color:{_RWP_SEV_BORDER[lvl]}">'
             f'<div class="kpi-label">{html.escape(lvl.replace("_", " "))}</div>'
             f'<div class="kpi-value">{by_exp.get(lvl, 0)}</div></div>'
             for lvl in ("critical", "high", "medium", "low", "fully_protected")
         )
         cards += (
-            f'<div class="kpi-card"><div class="kpi-label">{t("rpt_rwp_avg_coverage", lang=_l)}</div>'
+            f'<div class="kpi kpi-card"><div class="kpi-label">{t("rpt_rwp_avg_coverage", lang=_l)}</div>'
             f'<div class="kpi-value">{kpi.get("avg_protection_percent", 0)}%</div></div>'
-            f'<div class="kpi-card"><div class="kpi-label">{t("rpt_rwp_pending", lang=_l)}</div>'
+            f'<div class="kpi kpi-card"><div class="kpi-label">{t("rpt_rwp_pending", lang=_l)}</div>'
             f'<div class="kpi-value">{kpi.get("pending", 0)}</div></div>'
         )
-        kpi_html = f'<div class="kpi-grid">{cards}</div>'
+        kpi_html = f'<div class="kpi-strip kpi-grid">{cards}</div>'
 
         # ── per-VEN risk ranking table
         ven_df = pd.DataFrame([{
@@ -501,32 +539,41 @@ class VenHtmlExporter:
                 + render_df_table(port_df, col_i18n=port_col_i18n, render_cell=_port_cell, lang=_l)
             )
 
-        return (
-            f'<section id="ransomware-posture" class="card">'
-            f'<h2>{t("rpt_rwp_section", lang=_l)}</h2>'
-            f'<p class="section-intro">{t("rpt_rwp_intro", lang=_l)}</p>'
-            f'{kpi_html}{ven_table}{port_table}</section>\n'
-        )
+        body = (f'<p class="section-intro">{t("rpt_rwp_intro", lang=_l)}</p>'
+                f'{kpi_html}{ven_table}{port_table}')
+        return ShellSection(id="ransomware-posture",
+                            title=t("rpt_rwp_section", lang=_l),
+                            html=body, tone=_body_tone(body))
 
     def _section(
         self,
         id_: str,
         title_key: str,
-        count: int,
+        count: int | None,
         content: str,
         intro_key: str = "",
-        extra_class: str = "",
         guidance_module_id: str = "",
-    ) -> str:
+    ) -> ShellSection:
+        """One chapter for the v2 shell.
+
+        The heading is printed by ``build_shell_document`` now, so the ``(n)``
+        suffix the old ``<h2>`` carried has to travel inside the title string —
+        that number is content, not decoration. ``count=None`` is the summary
+        chapter, which never had one.
+
+        The old ``extra_class`` ("online" / "offline" / "warn") is dropped: it
+        was a modifier on ``.card``, and neither the old stylesheet nor the v2
+        shell ever had a rule for those three names. The shell's per-chapter
+        signal is ``tone``, derived from the chapter's own content.
+        """
         _s = self._s
         title = _s(title_key)
+        if count is not None:
+            title = f"{title} ({count})"
         intro_html = f'<p class="section-intro">{_s(intro_key)}</p>' if intro_key else ""
         guidance_html = ""
         if guidance_module_id:
             guidance_html = render_section_guidance(guidance_module_id, profile="security_risk", detail_level=_REPORT_DETAIL_LEVEL, lang=self._lang)
-        cls = f"card {extra_class}".strip()
-        return (
-            f'<section id="{id_}" class="{cls}">'
-            f'<h2>{title} ({count})</h2>'
-            f"{intro_html}{guidance_html}{content}</section>"
-        )
+        body = f"{intro_html}{guidance_html}{content}"
+        return ShellSection(id=id_, title=title, html=body,
+                            tone=_body_tone(body))

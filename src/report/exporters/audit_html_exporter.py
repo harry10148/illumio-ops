@@ -10,22 +10,29 @@ import os
 import pandas as pd
 
 from ._output_paths import discard_reserved, reserve_unique_path, write_text_atomic
-from .html_exporter import _trend_deltas_section, render_section_guidance
+# _body_tone / _marks_tone / _sev_attrs are the v2 shell's tone helpers; they
+# live next to the traffic exporter that first needed them, which is also where
+# _trend_deltas_section and render_section_guidance already come from.
+from .html_exporter import (
+    _body_tone,
+    _marks_tone,
+    _sev_attrs,
+    _trend_deltas_section,
+    render_section_guidance,
+)
 from src.i18n import t
 from src.report.section_guidance import visible_in
-from .report_css import TABLE_JS, build_css
 from src.humanize_ext import human_number
 from .report_i18n import COL_I18N as _COL_I18N
 from .report_i18n import STRINGS
+from .report_shell import ShellCover, ShellSection, build_shell_document
 from .table_renderer import render_df_table
 from .chart_renderer import render_matplotlib_svg
 from .code_highlighter import get_highlight_css
-from src.report.analysis.audit.audit_risk import RISK_BG, RISK_COLOR, get_risk
+from src.report.analysis.audit.audit_risk import get_risk
 from src.report.exporters._exec_summary import render_exec_summary_html
 from src.report.exporters.concern_card import render_concern_cards
-from src.report.exporters.cover_page import build_cover_page as _build_cover_page
 
-_CSS = build_css("audit")
 _HIGHLIGHT_CSS = f'<style>\n{get_highlight_css()}\n</style>'
 _REPORT_DETAIL_LEVEL = "full"
 
@@ -108,10 +115,12 @@ def _df_to_html(df, no_data_key: str = "rpt_no_data", show_risk: bool = False, l
     def _render_cell(col, val, row):
         if event_type_col and col == event_type_col:
             risk_level = get_risk(str(row[event_type_col]))[0]
-            color = RISK_COLOR.get(risk_level, "#989A9B")
-            bg = RISK_BG.get(risk_level, "#F9FAFB")
+            # The v2 shell colours .risk-badge from data-tone/data-sev (it even
+            # carries the CRITICAL-solid rule for this class), so the inline
+            # RISK_COLOR/RISK_BG hexes are gone: an inline colour would win over
+            # the shell and freeze the badge outside the tone system.
             badge = (
-                f"<span class='risk-badge' style='background:{bg};color:{color};border-color:{color}'>"
+                f'<span class="risk-badge"{_sev_attrs(risk_level)}>'
                 f"{risk_level}</span>"
             )
             return f"{badge}{_wbr_at_dots(row[col])}"
@@ -150,12 +159,30 @@ class AuditHtmlExporter:
             return ""
         _s = self._s
         items_html = render_concern_cards(attention_items, self._lang)
+        # The old heading was `style="color:var(--red)"`. --red was a build_css
+        # token and does not exist in the v2 shell, so the declaration would be
+        # dead markup rather than a red heading; each card below carries its own
+        # risk badge, which is where the severity signal belongs now.
         return (
             '<div style="margin-bottom:20px">'
-            f'<h2 style="color:var(--red)">{_s("rpt_au_attention_title")}</h2>'
+            f'<h2>{_s("rpt_au_attention_title")}</h2>'
             + items_html
             + '</div>'
         )
+
+    def _attention_marks(self, attention_items: list) -> dict[str, int]:
+        """Risk histogram of the attention items — the summary chapter's marks.
+
+        Audit has no ``findings`` list; the attention items ARE its findings, so
+        they are the only thing allowed to add to a chapter mark tally (B10).
+        The severity cells in the event tables must not, which is why this reads
+        the source data rather than the rendered markup.
+        """
+        counts: dict[str, int] = {}
+        for item in attention_items or []:
+            risk = str(item.get("risk", "") or "").upper() or "INFO"
+            counts[risk] = counts.get(risk, 0) + 1
+        return counts
 
     def export(self, output_dir: str = "reports") -> str:
         os.makedirs(output_dir, exist_ok=True)
@@ -182,24 +209,14 @@ class AuditHtmlExporter:
         self._s = _s
 
         mod00 = self._r.get("mod00", {})
-        nav_html = (
-            '<aside class="report-toc screen-only">'
-            f'<h3>{_s("rpt_nav_contents")}</h3>'
-            '<ol>'
-            f'<li><a href="#summary">{_s("rpt_au_nav_summary")}</a></li>'
-            f'<li><a href="#health">{_s("rpt_au_nav_health")}</a></li>'
-            f'<li><a href="#users">{_s("rpt_au_nav_users")}</a></li>'
-            f'<li><a href="#policy">{_s("rpt_au_nav_policy")}</a></li>'
-            f'<li><a href="#correlation">{_s("rpt_au_nav_correlation")}</a></li>'
-            '</ol>'
-            f'<button class="print-btn" onclick="window.print()">{_s("rpt_nav_print_pdf")}</button>'
-            '</aside>'
-        )
+        # The v2 shell builds its own table of contents from the section list,
+        # so the hard-coded aside.report-toc is gone. Chapter titles come from
+        # each chapter's own heading key (rpt_au_sec_*), not the sidebar
+        # abbreviations (rpt_au_nav_*): the sidebar dropped the qualifiers
+        # ("1 System Health" vs "1 System Health & Agent") and using it would
+        # silently delete them from the document.
         date_str = " ~ ".join(self._date_range) if any(self._date_range) else ""
         today_str = str(datetime.date.today())
-        period_part = (
-            ' &nbsp;|&nbsp; ' + _s("rpt_period") + ' ' + date_str if date_str else ""
-        )
         summary_pills = (
             '<div class="summary-pill-row">'
             f'<div class="summary-pill"><span class="summary-pill-label">{_s("rpt_pill_period")}</span><span class="summary-pill-value">{date_str or "N/A"}</span></div>'
@@ -222,64 +239,99 @@ class AuditHtmlExporter:
             )
             summary_pills = summary_pills.replace("</div>", data_source_pill + "</div>", 1)
 
-        exec_html = render_exec_summary_html(mod00, report_name=t('gui_btn_audit_report', lang=self._lang), lang=self._lang)
-        body = (
-            exec_html
-            + render_section_guidance("audit_mod00_executive", profile="security_risk", detail_level="full", lang=self._lang)
-            + '<section id="summary" class="card report-hero">'
-            '<div class="report-hero-top">'
-            f'<div class="report-kicker">{_s("rpt_kicker_audit")}</div>'
-            f'<h1>{_s("rpt_au_title")}</h1>'
-            f'<p class="report-subtitle">{_s("rpt_generated")} '
-            + mod00.get("generated_at", "") + period_part + "</p></div>"
-            + summary_pills
-            + self._attention_section(mod00.get("attention_items", []))
+        _report_type = _s("rpt_cover_type_audit")
+        # The exec block no longer prints its own <h2>; the shell prints the
+        # chapter head. The suffix keeps the key the old heading used
+        # (gui_btn_audit_report) — unlike the traffic family this report already
+        # named its own type, so there is nothing to correct here.
+        _exec_title = f'{t("rpt_exec_summary_label", lang=self._lang)} — ' \
+                      f'{t("gui_btn_audit_report", lang=self._lang)}'
+        _exec_body = (
+            render_exec_summary_html(
+                mod00, report_name=t('gui_btn_audit_report', lang=self._lang),
+                lang=self._lang, include_heading=False)
+            + render_section_guidance("audit_mod00_executive", profile="security_risk",
+                                      detail_level="full", lang=self._lang)
+        )
+
+        # The hero's title block (kicker / h1 / "Generated:" subtitle) becomes
+        # the shell cover; everything else it carried opens the first chapter in
+        # the order it had inside the hero card.
+        _attention_items = mod00.get("attention_items", [])
+        _summary_body = (
+            summary_pills
+            + self._attention_section(_attention_items)
             + self._trend_deltas_html()
             + self._severity_dist_html(mod00)
             + f'<h2>{_s("rpt_au_top_events")}</h2>'
             + _chart_html(mod00.get("chart_spec"), lang=self._lang)
             + _df_to_html(mod00.get("top_events_overall"), lang=_sl)
-            + "</section>\n"
-            + self._section("health", "rpt_au_sec_health", self._mod01_html())
-            + "\n"
-            + self._section("users", "rpt_au_sec_users", self._mod02_html())
-            + "\n"
-            + (self._section("policy", "rpt_au_sec_policy", self._mod03_html())
-               + "\n"
-               if visible_in('audit_mod03_policy', profile, detail_level) else '')
-            + (self._section("correlation", "rpt_au_sec_correlation", self._mod04_html())
-               + "\n"
-               if visible_in('audit_mod04_correlation', profile, detail_level) else '')
-            + f'<footer>{_s("rpt_au_footer")} &middot; {today_str}</footer>'
-        )
-        _cover_title = _s("rpt_cover_type_audit")
-        cover_html = _build_cover_page(
-            title=_cover_title,
-            report_type=_cover_title,
-            date_range=self._date_range,
-            pce_url=self._pce_url,
-            org_name=self._org_name,
-            lang=self._lang,
-        )
-        return (
-            f'<!DOCTYPE html><html lang="{"zh-TW" if self._lang == "zh_TW" else "en"}"><head>\n'
-            "<meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">\n"
-            f"<title>{t('rpt_page_title_audit', lang=self._lang)}</title>"
-            + _CSS + _HIGHLIGHT_CSS
-            + "</head>\n"
-            + f'<body data-report-title="{_cover_title}">'
-            + cover_html
-            + '<div class="report-shell">'
-            + nav_html
-            + '<main class="report-main">'
-            + body
-            + "</main></div>"
-            + TABLE_JS
-            + "</body></html>"
         )
 
-    def _section(self, id_: str, i18n_key: str, content: str) -> str:
-        return f'<section id="{id_}" class="card"><h2>{self._s(i18n_key)}</h2>{content}</section>'
+        sections: list[ShellSection] = []
+        if _exec_body:
+            sections.append(ShellSection(id="exec-summary", title=_exec_title,
+                                         html=_exec_body, kind="exec"))
+        # 'summary' cannot reuse rpt_au_nav_summary ("Executive Summary") — the
+        # table of contents would then list two chapters under the same name.
+        # It carries the attention cards, so it is this report's finding chapter
+        # and its marks come from those items alone (B10): zero attention items
+        # must read as neutral even though the event tables print risk badges.
+        sections.append(self._section(
+            "summary", "rpt_tr_sec_snapshot", _summary_body,
+            kind="finding", marks=self._attention_marks(_attention_items)))
+        sections.append(self._section("health", "rpt_au_sec_health", self._mod01_html()))
+        sections.append(self._section("users", "rpt_au_sec_users", self._mod02_html()))
+        if visible_in('audit_mod03_policy', profile, detail_level):
+            sections.append(self._section("policy", "rpt_au_sec_policy", self._mod03_html()))
+        if visible_in('audit_mod04_correlation', profile, detail_level):
+            sections.append(self._section("correlation", "rpt_au_sec_correlation",
+                                          self._mod04_html()))
+
+        _meta: dict[str, str] = {}
+        if self._pce_url:
+            _meta[_s("rpt_cover_pce")] = self._pce_url
+        if self._org_name:
+            _meta[_s("rpt_cover_org")] = self._org_name
+        _cover_range = " – ".join(d for d in self._date_range if d)
+        if _cover_range:
+            _meta[_s("rpt_cover_date_range")] = _cover_range
+        if mod00.get("generated_at"):
+            _meta[_s("rpt_cover_generated")] = str(mod00["generated_at"])
+
+        _kicker = _s("rpt_kicker_audit")
+        cover = ShellCover(
+            title=_s("rpt_au_title"),
+            doc_title=t('rpt_page_title_audit', lang=self._lang),
+            type_label=_report_type,
+            eyebrow=_report_type,
+            # Suppress the kicker when it says the same thing as the eyebrow —
+            # the cover would print one string twice (T3/F6, different slot).
+            kicker='' if _kicker == _report_type else _kicker,
+            meta=_meta,
+        )
+        return build_shell_document(
+            lang=self._lang,
+            cover=cover,
+            sections=sections,
+            appendix_html=f'{_s("rpt_au_footer")} &middot; {today_str}',
+            extra_head=_HIGHLIGHT_CSS,
+        )
+
+    def _section(self, id_: str, i18n_key: str, content: str, *,
+                 kind: str = "detail",
+                 marks: dict[str, int] | None = None) -> ShellSection:
+        """One chapter for the v2 shell.
+
+        The heading is printed by ``build_shell_document`` now, so this returns
+        the body plus the metadata the shell needs. ``marks`` selects where the
+        tone comes from, and the distinction is ``None`` vs ``{}``:
+        ``None`` reads the tone off the rendered body, a dict (even an empty
+        one) reads it off the tally.
+        """
+        tone = _body_tone(content) if marks is None else _marks_tone(marks)
+        return ShellSection(id=id_, title=self._s(i18n_key), html=content,
+                            kind=kind, tone=tone, marks=dict(marks or {}))
 
     def _trend_deltas_html(self) -> str:
         return _trend_deltas_section(
@@ -375,7 +427,7 @@ class AuditHtmlExporter:
         if sec_df is not None and not sec_df.empty:
             html += (
                 f'<h3>{_s("rpt_au_sec_concern_title")}</h3>'
-                f'<p class="note note-warn">{_s("rpt_au_sec_concern_desc")}</p>'
+                f'<p class="note note-warn" data-tone="warn">{_s("rpt_au_sec_concern_desc")}</p>'
                 + _df_to_html(sec_df, show_risk=True, lang=_lang)
             )
 
@@ -420,7 +472,7 @@ class AuditHtmlExporter:
             html += (
                 self._subnote("rpt_au_failed_detail_subnote")
                 + f'<h3>{_s("rpt_au_failed_detail")}</h3>'
-                + f'<p class="note note-warn">{_s("rpt_au_failed_detail_desc")}</p>'
+                + f'<p class="note note-warn" data-tone="warn">{_s("rpt_au_failed_detail_desc")}</p>'
                 + _df_to_html(failed_detail, show_risk=True, lang=_lang)
             )
 
@@ -471,7 +523,7 @@ class AuditHtmlExporter:
             html += (
                 self._subnote("rpt_au_provision_subnote")
                 + f'<h3>{_s("rpt_au_provision_title")}</h3>'
-                + f'<p class="note note-warn">{_s("rpt_au_provision_desc")}</p>'
+                + f'<p class="note note-warn" data-tone="warn">{_s("rpt_au_provision_desc")}</p>'
                 + f'<p class="note" style="font-size:.82rem">{_s("rpt_au_provision_change_detail_note")}</p>'
                 + _df_to_html(provisions, show_risk=True, lang=_lang)
             )
@@ -530,7 +582,7 @@ class AuditHtmlExporter:
         if corr_df is not None and hasattr(corr_df, "empty") and not corr_df.empty:
             html += (
                 f'<h3>{_s("rpt_au_corr_sequences")}</h3>'
-                f'<p class="note note-warn">{_s("rpt_au_corr_desc")}</p>'
+                f'<p class="note note-warn" data-tone="warn">{_s("rpt_au_corr_desc")}</p>'
                 + _df_to_html(corr_df, lang=_lang)
             )
 

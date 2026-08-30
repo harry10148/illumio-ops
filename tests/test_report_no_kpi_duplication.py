@@ -36,8 +36,18 @@ def _count_kpi_strip(soup):
 
 
 def _count_hero_kpi_grid(soup):
-    # In the new design there should be no .kpi-grid inside .report-hero
-    return len(soup.select("section.report-hero .kpi-grid .kpi-card"))
+    """KPI blocks living anywhere OUTSIDE the executive summary.
+
+    The old selector was ``section.report-hero .kpi-grid .kpi-card``. The v2
+    shell has no ``.report-hero`` — the hero became the cover plus the first
+    chapter — so that selector stopped matching anything and the assertion below
+    became true by construction for every report type, migrated or not. The
+    intent survives unchanged: KPI numbers belong to ``.exec-summary``'s
+    ``.kpi-strip`` and a second KPI block anywhere else is the duplication this
+    file exists to catch. Not scoped to one chapter any more, which is stricter.
+    """
+    return len([el for el in soup.select(".kpi-card, .kpi-grid, .kpi-strip")
+                if el.find_parent(class_="exec-summary") is None])
 
 
 def test_traffic_report_kpis_no_duplicate():

@@ -25,6 +25,12 @@ test are the drift guard — prose alone is not:
     the old shell did; without it the 40-70% band falls back to the info blue
     and the three-level semantic colour collapses to two. A gap the design file
     shares is still a regression against the shipped output;
+  * the empty-table-panel state and the sort-indicator rules are restored from
+    the old product shell (``report_css.py:161-163,178,205-207``). Both style
+    elements that ``table_renderer.py`` / ``TABLE_JS`` still emit for all ten
+    report types; the design file never covered the JS-driven affordances, so
+    without them "no data" looks identical to a rendered table and the sort
+    arrow becomes loose text beside the column name;
   * the print block gains the wide-table release rules carried over from the
     old product shell (``report_css.py``) plus ``!important`` on the four
     column-width floors that must survive them — see the comment on the
@@ -969,6 +975,46 @@ figure.chart-static figcaption {
 }
 
 .report-table-panel--compact { max-width: 640px; }
+/* 自舊殼 report_css.py 移植的兩組「表格 JS 附屬樣式」，設計檔沒有涵蓋（T4）。
+   兩者都是 table_renderer.py / TABLE_JS 產出的元素，10 型報表共用：
+     · 空資料面板（report_css.py:205-207）——缺這一段，「無資料」與「有資料」
+       兩種面板長得一模一樣，讀者分不出是查無資料還是渲染壞掉；
+     · 排序指示器（report_css.py:161-163,178）——TABLE_JS 仍會建立
+       .sort-indicator 元素，沒有規則時它會變成擠在欄名後面的裸文字，
+       游標也不再提示欄頭可點。
+   顏色改吃殼的 token；已排序欄的強調色用 --accent 而非舊殼的 --gold：
+   那是互動狀態，殼的語意色（tone-*）保留給嚴重度。 */
+.report-table-panel--empty {
+  padding: var(--space-8) var(--space-7);
+  border-style: dashed;
+  background: var(--surface-2);
+  text-align: center;
+  color: var(--text-3);
+  font-size: var(--fs-body);
+}
+.report-table-panel--empty .empty-marker {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--line);
+  margin-right: var(--space-4);
+  vertical-align: middle;
+}
+.report-table-panel--empty .empty-text { font-style: italic; letter-spacing: 0.02em; }
+.report-table--interactive thead th { cursor: pointer; user-select: none; }
+.sort-indicator {
+  position: absolute;
+  right: var(--space-5);
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: var(--fs-mini);
+  opacity: 0.55;
+  pointer-events: none;
+}
+.report-table thead th:hover .sort-indicator { opacity: 0.85; }
+.report-table thead th.is-sorted-asc .sort-indicator,
+.report-table thead th.is-sorted-desc .sort-indicator { opacity: 1; color: var(--accent); }
 .report-table-panel--wide .report-table { font-size: var(--fs-mini); }
 
 /* 長文欄：螢幕收合、列印展開 */
