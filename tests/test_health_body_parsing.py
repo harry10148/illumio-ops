@@ -50,7 +50,12 @@ def _mk_health_analyzer(tmp_path, monkeypatch, api, *, deployment_type="on_prem"
     monkeypatch.setattr(analyzer_mod, "STATE_FILE", str(tmp_path / "state.json"))
     from src.analyzer import Analyzer
     from src.config import ConfigManager
+    from src.i18n import set_language
     cm = ConfigManager()
+    # These assertions exercise the English message contract.  Do not let the
+    # developer machine's persisted UI language change their meaning.
+    cm.config.setdefault("settings", {})["language"] = "en"
+    set_language("en")
     cm.config["api"]["deployment_type"] = deployment_type
     cm.config["rules"] = [{
         "id": 1, "name": "PCE Health", "type": "system",
