@@ -18,7 +18,11 @@ with its whitespace intact for the next comparison to trip over.
 """
 from __future__ import annotations
 
+from typing import Literal, Mapping
 from urllib.parse import urlsplit, urlunsplit
+
+
+DEFAULT_SAAS_CONSOLE_URL = "https://console.illum.io"
 
 
 def normalize_pce_url(value: object) -> str:
@@ -48,6 +52,25 @@ def normalize_pce_url(value: object) -> str:
 def normalize_org_id(value: object) -> str:
     """Whitespace around an org id is never meaningful."""
     return str(value if value is not None else "").strip()
+
+
+def pce_deployment_type(api_cfg: Mapping[str, object]) -> Literal["saas", "on_prem"]:
+    """Return the validated deployment type, defaulting legacy configs to on-prem."""
+    return "saas" if str(api_cfg.get("deployment_type") or "on_prem") == "saas" else "on_prem"
+
+
+def resolve_pce_console_url(api_cfg: Mapping[str, object]) -> str:
+    """Resolve an explicit console URL or the deployment-appropriate default."""
+    explicit = normalize_pce_url(api_cfg.get("console_url", ""))
+    if explicit:
+        return explicit
+    if pce_deployment_type(api_cfg) == "saas":
+        return DEFAULT_SAAS_CONSOLE_URL
+    base = normalize_pce_url(api_cfg.get("url", ""))
+    for suffix in ("/api/v2", "/api/v1", "/api"):
+        if base.endswith(suffix):
+            return base[:-len(suffix)]
+    return base
 
 
 def pce_target_changed(old_api: dict, new_url: str | None, new_org_id: str | None) -> bool:

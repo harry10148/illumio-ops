@@ -1,6 +1,8 @@
 {
     "api": {
         "url": "https://pce.example.com:8443",
+        "deployment_type": "on_prem",
+        "console_url": "",
         "org_id": "1",
         "key": "api_xxxxxxxxxxxxxx",
         "secret": "your-api-secret-here",

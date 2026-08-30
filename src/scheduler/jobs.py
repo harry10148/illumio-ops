@@ -2,8 +2,10 @@
 from __future__ import annotations
 
 from loguru import logger
+import functools
 import os
 import re
+import threading
 
 # Module-level imports required for test patching (patch targets must be attributes of this module)
 from src.api_client import ApiClient
@@ -14,6 +16,19 @@ from src.report.snapshot_store import read_latest
 # 得多：背景 job 沒有人在等畫面回應，寧可等 CLI 那邊跑完也不要整個 cycle 被
 # 丟掉；真的逾時就讓 TimeoutError 往上拋，job_health 記成 error（可觀測）。
 _ANALYSIS_LOCK_WAIT_S = 600.0
+
+# Events fetch on a dedicated executor, but every SQLite mutation still shares
+# this process-wide lane with traffic/aggregate/retention/archive.  The event
+# ingestor acquires it only after remote I/O completes.
+_CACHE_WRITE_LOCK = threading.RLock()
+
+
+def _serialized_cache_write(fn):
+    @functools.wraps(fn)
+    def _run(*args, **kwargs):
+        with _CACHE_WRITE_LOCK:
+            return fn(*args, **kwargs)
+    return _run
 
 
 def run_monitor_cycle(cm) -> None:
@@ -238,7 +253,8 @@ def run_events_ingest(cm) -> None:
             ing = EventsIngestor(api=api, session_factory=sf,
                                   watermark=wm,
                                   async_threshold=cfg.async_threshold_events,
-                                  siem_destinations=_enabled_siem_destinations(cm, "audit"))
+                                  siem_destinations=_enabled_siem_destinations(cm, "audit"),
+                                  write_lock=_CACHE_WRITE_LOCK)
             count = ing.run_once()
         logger.info("Events ingest: {} rows inserted", count)
         _record_ingest_pce_result("events", wm)
@@ -253,6 +269,7 @@ def run_events_ingest(cm) -> None:
         raise  # surface to _instrument → job_health status=error
 
 
+@_serialized_cache_write
 def run_traffic_ingest(cm) -> None:
     wm = None
     try:
@@ -288,6 +305,7 @@ def run_traffic_ingest(cm) -> None:
         raise  # surface to _instrument → job_health status=error
 
 
+@_serialized_cache_write
 def run_traffic_aggregate(cm) -> None:
     try:
         from sqlalchemy.orm import sessionmaker
@@ -302,6 +320,7 @@ def run_traffic_aggregate(cm) -> None:
         raise  # surface to _instrument → job_health status=error
 
 
+@_serialized_cache_write
 def run_cache_retention(cm) -> None:
     try:
         from sqlalchemy.orm import sessionmaker
@@ -322,6 +341,7 @@ def run_cache_retention(cm) -> None:
         raise  # surface to _instrument → job_health status=error
 
 
+@_serialized_cache_write
 def run_cache_archive(cm) -> None:
     try:
         from sqlalchemy.orm import sessionmaker

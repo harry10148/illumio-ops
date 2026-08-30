@@ -2,10 +2,11 @@
 title: 設定參照
 audience: [operator]
 version: 4.1.0
-last_verified: 2026-08-25
+last_verified: 2026-08-30
 verified_against:
   - src/config_models.py
   - src/config.py
+  - src/pce_target.py
   - config/config.json.example
   - config/report_config.yaml
   - src/cli/config.py
@@ -50,7 +51,8 @@ illumio-ops config show                       # 印出完整（已驗證）設�
 illumio-ops config show --section api          # 只看單一區塊
 illumio-ops config validate                    # 用 pydantic schema 驗證
 illumio-ops config set api.url https://pce.example.com:8443   # 寫入單一鍵（落地磁碟）
-illumio-ops config login --url ... --key ... --secret ... [--org-id ...]  # 設定 PCE 憑證（落地磁碟）
+illumio-ops config login --url ... --key ... --secret ... [--org-id ...] \
+  [--deployment-type saas] [--console-url ...]  # 設定 PCE 連線（落地磁碟）
 ```
 
 `config set` 與 `config login` 會驗證後直接**覆寫**磁碟上的 `config.json`（輸出時密鑰已遮蔽）。
@@ -91,6 +93,17 @@ illumio-ops config login --url ... --key ... --secret ... [--org-id ...]  # 設�
 | `secret` | str | `""` | API secret |
 | `profile` | `"production"` \| `"dev"` | `"production"` | 見下方安全護欄 |
 | `verify_ssl` | bool | `true` | 是否驗證 PCE TLS 憑證 |
+| `deployment_type` | `"saas"` \| `"on_prem"` | `"on_prem"` | PCE 部署型態；舊設定缺少此鍵時視為 `on_prem`。CLI 值寫作 `saas` / `on_prem`。 |
+| `console_url` | str | `""` | 操作者 Console 與事件告警連結的 base URL；接受完整 `http`/`https` URL。 |
+
+三個 URL 各有單一職責，不可互換：
+
+- `api.url` 是 API 傳輸端點，所有 REST 請求與健康探測都送往這裡。
+- `api.console_url` 是操作者開啟 Console 與事件告警連結的入口；事件告警連結不使用 API host。
+  SaaS 留空時預設為 `https://console.illum.io`；自訂 SaaS tenant 可填完整 Console URL。
+  on-prem 留空時則沿用 `api.url` 的 origin（並去除尾端 `/api`、`/api/v1` 或 `/api/v2`）。
+- `https://status.illumio.com/posts/dashboard` 是 provider incident 的人工參考頁，不是 API 或
+  Console URL；監控語意見 [monitoring-alerts.md](monitoring-alerts.md)。
 
 > **安全護欄**：`profile="production"` 時 `verify_ssl=false` 會直接拒絕載入（`ValueError`）。
 > 要在 lab 環境跳過憑證驗證，須先把 `profile` 明確改成 `"dev"`。
@@ -119,12 +132,18 @@ illumio-ops config login --url ... --key ... --secret ... [--org-id ...]  # 設�
 > same-pce` 明講——自動化腳本沒有人在旁邊看著，預設放行等於讓它有機會在
 > 無人察覺下把設備指到另一台 PCE。
 >
-> **從 CLI 改完之後一定要重啟監控服務。** 常駐的 `--monitor` / `--monitor-gui`
-> 行程在啟動時讀一次設定就一直用到行程結束，`config login` 或設定選單改掉
-> `url`／`org_id` 完全不會傳達給它。改完不重啟的話，它會在 30 秒內用**舊的**
+> **修改設定後一定要重啟監控服務。** CLI、互動式設定選單與 GUI 修改 PCE API 設定後都必須依提示重啟。
+> 常駐的 `--monitor` / `--monitor-gui` 行程在啟動時讀取設定；`config login`、`config set`、
+> 設定選單或 GUI 改掉
+> `url`／`org_id`／`key`／`secret`／`verify_ssl`／`deployment_type`／`console_url` 完全不會傳達給它。
+> 改完不重啟的話，
+> 仍可能用**舊的**連線或連結 metadata；若變更的是 target，它還會在 30 秒內用**舊的**
 > 位址與憑證再跑一次 cycle，把剛清空的表重新灌回舊 PCE 的事件與流量、並改寫
-> `IngestionWatermark`——這不是競態，是必然。兩支 CLI 都會在改完後印出提醒。
-> （GUI 的系統設定頁不受影響：它與排程器同一個行程，設定會被重新載入。）
+> `IngestionWatermark`——這不是競態，是必然。target 或 deployment／Console metadata 變更時
+> CLI 會印出提醒；單純輪替憑證即使沒有提醒也必須重啟。
+>
+> 只修改 `deployment_type` 或 `console_url` 是 metadata-only 變更；metadata-only 變更仍須重啟，
+> 但不算 PCE target change，也不需要清除 cache。PCE target 仍只由 `url` 與 `org_id` 判定。
 >
 > **仍然沒有防護的是 `illumio-ops config set api.url` / `config set api.org_id`
 > 這條單鍵寫入路徑，以及直接手動編輯 `config.json`**：兩者都不會問，
@@ -146,7 +165,7 @@ sudo -u illumio-ops illumio-ops cache flush --confirm
 sudo systemctl start illumio-ops
 ```
 
-`cache flush` 清除所有的快取表行、擷取水位（告訴 PCE API 下一次要拉從哪個時刻開始的資料）、以及告警的冷卻狀態。**執行後一定要重啟監控服務**，否則常駐行程會把剛清掉的資料重新灌進去（見上方「從 CLI 改完之後一定要重啟監控服務」）。
+`cache flush` 清除所有的快取表行、擷取水位（告訴 PCE API 下一次要拉從哪個時刻開始的資料）、以及告警的冷卻狀態。**執行後一定要重啟監控服務**，否則常駐行程會把剛清掉的資料重新灌進去（見上方「修改設定後一定要重啟監控服務」）。
 
 **路徑 B：切換到一個不同的 PCE**
 

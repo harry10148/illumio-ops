@@ -133,3 +133,86 @@ def test_legacy_argparse_examples_use_actual_entrypoint_name():
     main_text = _read("src/main.py")
     assert "illumio_ops.py" not in main_text
     assert "illumio-ops.py --gui" in main_text
+
+
+def test_saas_pce_monitoring_and_console_link_contracts_are_documented():
+    docs = {
+        "docs/guide/configuration.md": _read("docs/guide/configuration.md"),
+        "docs/guide/monitoring-alerts.md": _read("docs/guide/monitoring-alerts.md"),
+        "docs/guide/troubleshooting.md": _read("docs/guide/troubleshooting.md"),
+        "docs/reference/cli.md": _read("docs/reference/cli.md"),
+    }
+    required_fragments = {
+        "docs/guide/configuration.md": (
+            "`deployment_type`",
+            "`saas` / `on_prem`",
+            "`api.url` 是 API 傳輸端點",
+            "`api.console_url`",
+            "事件告警連結不使用 API host",
+            "SaaS 留空時預設為 `https://console.illum.io`",
+            "自訂 SaaS tenant 可填完整 Console URL",
+            "on-prem 留空時則沿用 `api.url` 的 origin",
+            "CLI、互動式設定選單與 GUI 修改 PCE API 設定後都必須依提示重啟",
+            "metadata-only 變更仍須重啟",
+            "不算 PCE target change",
+            "不需要清除 cache",
+            "見上方「修改設定後一定要重啟監控服務」",
+        ),
+        "docs/guide/monitoring-alerts.md": (
+            "`/api/v2/noop`",
+            "僅限 on-prem",
+            "`/api/v2/health`",
+            "`/api/v2/node_available`",
+            "https://status.illumio.com/posts/dashboard",
+            "只供人工",
+            "不會被 scrape",
+            "不參與 watchdog verdict",
+            "API 存取",
+            "`last_status`",
+            "擷取 lag",
+            "事件告警連結使用解析後的 Console URL",
+        ),
+        "docs/guide/troubleshooting.md": (
+            "`401` 是憑證／身分驗證失敗",
+            "不代表 SaaS PCE outage",
+            "`403`",
+            "`429`",
+            "`5xx`",
+            "transport failure",
+            "`/api/v2/noop`",
+        ),
+        "docs/reference/cli.md": (
+            "`--deployment-type`",
+            "`saas` / `on_prem`",
+            "`--console-url`",
+            "`--pce-target-change`",
+            "--deployment-type saas --console-url https://console.illum.io",
+        ),
+    }
+    forbidden_fragments = {
+        "docs/guide/configuration.md": (
+            "事件告警連結使用 API host",
+            "並使用 API host",
+            "on-prem 留空時則沿用 `https://console.illum.io`",
+            "GUI 的系統設定頁不受影響",
+            "CLI、互動式設定選單與 GUI 修改 PCE API 設定後都不必重啟",
+            "metadata-only 變更不必重啟",
+            "metadata-only 變更不需要重啟",
+        ),
+    }
+
+    missing = [
+        f"{path}: {fragment}"
+        for path, fragments in required_fragments.items()
+        for fragment in fragments
+        if fragment not in docs[path]
+    ]
+    forbidden = [
+        f"{path}: {fragment}"
+        for path, fragments in forbidden_fragments.items()
+        for fragment in fragments
+        if fragment in docs[path]
+    ]
+    problems = [*(f"missing: {item}" for item in missing),
+                *(f"forbidden: {item}" for item in forbidden)]
+    assert not problems, "Invalid SaaS PCE docs contracts:\n" + "\n".join(problems)

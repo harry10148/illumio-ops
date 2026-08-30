@@ -35,6 +35,7 @@ from src.state_store import load_state_file, update_state_file
 from src.interfaces import IApiClient, IReporter
 from src.api.traffic_query import TrafficQueryBuilder
 from src.pce_cache.reader import CacheReadTooLarge
+from src.pce_target import pce_deployment_type
 from src.report.cache_support import resolve_data_source
 # flow 上的三個累計計數器 (bytes_out, bytes_in, conn_count)。ingest 端存進
 # 觀測表的值必須與 analyzer 算出的當下值取自同一組欄位，否則相減毫無意義
@@ -62,6 +63,12 @@ MAX_THRESHOLD_WINDOW_MINUTES = 1440
 WATCHDOG_FAILURE_THRESHOLD = 3
 WATCHDOG_COOLDOWN_MINUTES = 60
 
+# The monitor cycle can run every 10 seconds, but an authenticated PCE probe
+# at that cadence is unnecessary and can consume SaaS rate limits. Automatic
+# telemetry is fresh enough at one probe per minute; operator-triggered probes
+# use force=True and bypass this interval.
+HEALTH_CHECK_INTERVAL_SECONDS = 60
+
 # Meta-alert cooldown for event polling overflow: when the sync events API
 # hits max_results it returns only the newest rows, so older events in the
 # window are permanently lost. Own cooldown keeps a persistent burst source
@@ -73,6 +80,17 @@ OVERFLOW_ALERT_COOLDOWN_MINUTES = 60
 # threshold 加總會低估——不可只留一行 log，必須升級成 meta-alert（同
 # event_overflow / traffic_overflow 的處理方式）。
 TRAFFIC_WINDOW_ROW_LIMIT = 10000
+
+
+def _endpoint_probe_category(status: int, accepted_statuses: tuple[int, ...]) -> str:
+    """Classify a probe without treating an endpoint-invalid 2xx as success."""
+    from src.api_client import pce_probe_category
+
+    category = pce_probe_category(status)
+    if category == "ok" and status not in accepted_statuses:
+        return "http_error"
+    return category
+
 
 # save_state() 的白名單：只有這些 key 由 Analyzer 自己的 cycle 擁有，才可以
 # 用 self.state（cycle 起始時的快照）覆蓋磁碟。state.json 是多寫入者共用的
@@ -512,7 +530,7 @@ class Analyzer:
         # this cycle (record_pce_success clearing it to None on recovery, or
         # _check_watchdog setting a fresh cooldown timestamp). Deliberately a
         # separate flag from _pce_stats_dirty: on a cache-only deployment with
-        # no health-check rule, _check_watchdog can fire (and write this key)
+        # automatic health checking disabled, _check_watchdog can fire (and write this key)
         # in a cycle where _pce_stats_dirty stays False (no real PCE probe ran
         # here) — sharing the flag would make save_state()'s _merge defer to
         # disk and immediately erase the timestamp this cycle just wrote,
@@ -1137,53 +1155,121 @@ class Analyzer:
             )
         return selected
 
-    def _run_health_check(self) -> bool:
-        """Run the PCE health check if any system/pce_health rules are configured.
+    def _run_health_check(
+        self,
+        *,
+        force: bool = False,
+        dispatch_alerts: bool = True,
+    ) -> bool:
+        """Run the PCE health probe independently of health-alert rules.
 
-        Records stats and fires health alerts as needed. The analysis cycle
-        always continues regardless of PCE health status; health failure is
-        informational, not a gate.
+        Automatic cycles honour ``settings.enable_health_check``. A manual
+        operator request uses ``force=True`` so it can diagnose connectivity
+        even when scheduled probing is disabled. Alert dispatch remains a
+        separate concern: ``dispatch_alerts=False`` records fresh telemetry
+        without unexpectedly sending notifications from a button click.
 
         Returns:
-            True always — no health-check rules configured (skipped) or check
-            completed (passed or failed). False is reserved for future use.
+            True always — disabled (skipped) or check completed (passed or
+            failed). False is reserved for future use.
         """
-        pce_health_rules = self._select_rules(
-            lambda r: r.get("type") == "system" and r.get("filter_value") == "pce_health")
-
-        if not pce_health_rules:
+        enabled = bool(
+            (self.cm.config.get("settings", {}) or {}).get("enable_health_check", True)
+        )
+        if not force and not enabled:
             return True
 
+        if not force:
+            last_check = parse_event_timestamp(
+                self.state.get("pce_stats", {}).get("last_health_check")
+            )
+            if last_check is not None:
+                age_seconds = (
+                    datetime.datetime.now(datetime.timezone.utc) - last_check
+                ).total_seconds()
+                if 0 <= age_seconds < HEALTH_CHECK_INTERVAL_SECONDS:
+                    logger.debug(
+                        "Skipping PCE health check; last probe was {:.1f}s ago",
+                        age_seconds,
+                    )
+                    return True
+
+        pce_health_rules = []
+        if dispatch_alerts:
+            pce_health_rules = self._select_rules(
+                lambda r: r.get("type") == "system"
+                and r.get("filter_value") == "pce_health"
+            )
+
+        from src.api_client import pce_probe_category
+
         logger.debug(t('checking_pce_health'))
-        h_status, h_msg = self.api.check_health()
-        if h_status != 200:
+        deployment = pce_deployment_type(self.cm.config.get("api", {}))
+        h_status, h_msg = self.api.check_connectivity()
+        category = pce_probe_category(h_status)
+        if category != "ok":
             logger.error(t('status_error'))
-            logger.warning(f"PCE health check failed: {h_status} - {h_msg[:200]}")
-            self.stats.record_pce_error("health", h_msg[:200], status=h_status)
+            logger.warning(f"PCE connectivity check failed: HTTP {h_status}, category={category}")
+            self._record_health_failure(
+                pce_health_rules,
+                status=h_status,
+                details=t(
+                    'health_probe_failed_details',
+                    probe="noop",
+                    category=category,
+                    status=h_status,
+                ),
+                probe="noop",
+                deployment=deployment,
+                category=category,
+            )
+        elif deployment == "saas":
+            logger.info(t('status_ok'))
+            logger.info("PCE connectivity check OK.")
+            self.stats.record_pce_success(
+                "health",
+                status=h_status,
+                message=h_msg[:120],
+                probe="noop",
+                deployment_type=deployment,
+                category=category,
+            )
             self._pce_stats_dirty = True
-            for rule in pce_health_rules:
-                if self._check_cooldown(rule):
-                    self.reporter.add_health_alert({
-                        "time": datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%d %H:%M:%S'),
-                        "rule": rule["name"],
-                        "status": str(h_status),
-                        "details": h_msg[:200]
-                    })
+            self._watchdog_dirty = True
         else:
+            h_status, h_msg = self.api.check_health()
+            category = _endpoint_probe_category(h_status, (200,))
+            if h_status != 200:
+                logger.error(t('status_error'))
+                logger.warning(f"PCE health check failed: HTTP {h_status}, category={category}")
+                self._record_health_failure(
+                    pce_health_rules,
+                    status=h_status,
+                    details=t(
+                        'health_probe_failed_details',
+                        probe="health",
+                        category=category,
+                        status=h_status,
+                    ),
+                    probe="health",
+                    deployment=deployment,
+                    category=category,
+                )
+                return True
+
             from src.api_client import health_status_from_body
             body_status = health_status_from_body(h_msg)
             if body_status in {"warning", "degraded", "error", "critical"}:
                 logger.warning(f"PCE health degraded: status={body_status}")
-                self.stats.record_pce_error("health", f"degraded: status={body_status}", status=h_status)
-                self._pce_stats_dirty = True
-                for rule in pce_health_rules:
-                    if self._check_cooldown(rule):
-                        self.reporter.add_health_alert({
-                            "time": datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%d %H:%M:%S'),
-                            "rule": rule["name"],
-                            "status": body_status,
-                            "details": t('health_degraded_details', status=body_status),
-                        })
+                self._record_health_failure(
+                    pce_health_rules,
+                    status=body_status,
+                    details=t('health_degraded_details', status=body_status),
+                    probe="health",
+                    deployment=deployment,
+                    category=body_status,
+                    stats_status=h_status,
+                )
             else:
                 # /health 過再探官方 SLB 端點 /node_available（200/202=健康；
                 # 404/502/連線失敗=節點不可服務——Illumio 官方判準）。Protocol
@@ -1194,24 +1280,58 @@ class Analyzer:
                     na_status, _na_msg = na_check()
                 if na_status is not None and na_status not in (200, 202):
                     logger.warning(f"PCE node_available check failed: HTTP {na_status}")
-                    self.stats.record_pce_error(
-                        "health", f"node_available: HTTP {na_status}", status=na_status)
-                    self._pce_stats_dirty = True
-                    for rule in pce_health_rules:
-                        if self._check_cooldown(rule):
-                            self.reporter.add_health_alert({
-                                "time": datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%d %H:%M:%S'),
-                                "rule": rule["name"],
-                                "status": str(na_status),
-                                "details": t('health_node_unavailable_details', status=na_status),
-                            })
+                    self._record_health_failure(
+                        pce_health_rules,
+                        status=na_status,
+                        details=t('health_node_unavailable_details', status=na_status),
+                        probe="node_available",
+                        deployment=deployment,
+                        category=_endpoint_probe_category(na_status, (200, 202)),
+                    )
                 else:
                     logger.info(t('status_ok'))
                     logger.info("PCE health check OK.")
-                    self.stats.record_pce_success("health", status=h_status, message=h_msg[:120])
+                    self.stats.record_pce_success(
+                        "health",
+                        status=h_status,
+                        message=h_msg[:120],
+                        probe="health",
+                        deployment_type=deployment,
+                        category="ok",
+                    )
                     self._pce_stats_dirty = True
                     self._watchdog_dirty = True
         return True
+
+    def _record_health_failure(
+        self,
+        rules: list[dict],
+        *,
+        status: int | str,
+        details: str,
+        probe: str,
+        deployment: str,
+        category: str,
+        stats_status: int | None = None,
+    ) -> None:
+        """Record one failed probe and dispatch its cooldown-controlled alerts."""
+        self.stats.record_pce_error(
+            "health",
+            details,
+            status=status if stats_status is None else stats_status,
+            probe=probe,
+            deployment_type=deployment,
+            category=category,
+        )
+        self._pce_stats_dirty = True
+        for rule in rules:
+            if self._check_cooldown(rule):
+                self.reporter.add_health_alert({
+                    "time": datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%d %H:%M:%S'),
+                    "rule": rule["name"],
+                    "status": str(status),
+                    "details": details,
+                })
 
     def _check_watchdog(self) -> None:
         """Self-alert when the PCE has been unreachable for N consecutive cycles.
@@ -1341,7 +1461,7 @@ class Analyzer:
 
     def run_analysis(self) -> None:
         logger.info("Starting analysis cycle.")
-        # 1. Health Check (only runs when a system rule with filter_value=pce_health is configured)
+        # 1. Health Check (telemetry is independent of optional alert rules)
         self._run_health_check()
 
         # 2. Events pipeline
@@ -2963,9 +3083,27 @@ class Analyzer:
                 health_type = rule.get("filter_value", "pce_health")
                 h_status = None
                 h_msg = ""
-                if health_type == "pce_health" and hasattr(self.api, "check_health"):
-                    h_status, h_msg = self.api.check_health()
-                is_trigger = h_status not in (200, "200")
+                health_category = "http_error"
+                if health_type == "pce_health":
+                    deployment = pce_deployment_type(self.cm.config.get("api", {}))
+                    h_status, h_msg = self.api.check_connectivity()
+                    from src.api_client import health_status_from_body, pce_probe_category
+                    health_category = pce_probe_category(h_status)
+                    if health_category == "ok" and deployment == "on_prem":
+                        h_status, h_msg = self.api.check_health()
+                        health_category = _endpoint_probe_category(h_status, (200,))
+                        if health_category == "ok":
+                            body_status = health_status_from_body(h_msg)
+                            if body_status in {
+                                    "warning", "degraded", "error", "critical"}:
+                                health_category = body_status
+                            else:
+                                na_check = getattr(self.api, "check_node_available", None)
+                                if callable(na_check):
+                                    h_status, h_msg = na_check()
+                                    health_category = _endpoint_probe_category(
+                                        h_status, (200, 202))
+                is_trigger = health_category != "ok"
                 threshold = float(rule.get("threshold_count", 1))
                 status = f"{Colors.FAIL}{t('would_trigger')}{Colors.ENDC}" if is_trigger else f"{Colors.GREEN}{t('pass')}{Colors.ENDC}"
                 print(f"  -> {t('checking_health')}")

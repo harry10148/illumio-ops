@@ -213,8 +213,10 @@ def api_cache_health():
             _max_lag = 300
         lag = check_cache_lag(sf, max_lag_seconds=_max_lag)
         cache_lag = [{"source": r["source"], "lag_s": int(r["lag_seconds"]),
-                      "level": r["level"]} for r in lag]
+                      "level": r["level"], "last_status": r.get("last_status")}
+                     for r in lag]
         levels = [c["level"] for c in cache_lag]
+        source_statuses = [c["last_status"] for c in cache_lag]
 
         with sf() as s:
             totals = _siem_window_totals(s)
@@ -228,6 +230,7 @@ def api_cache_health():
             siem_success_1h=success_1h,
             denom=totals["denom"],
             dlq=totals["dlq"],
+            source_statuses=source_statuses,
         )
         try:
             from src.pce_cache.capacity import capacity_snapshot

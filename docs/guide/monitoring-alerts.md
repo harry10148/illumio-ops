@@ -2,9 +2,11 @@
 title: 監控規則、告警與事件規則
 audience: [operator]
 version: 4.1.0
-last_verified: 2026-07-17
+last_verified: 2026-08-30
 verified_against:
   - src/analyzer.py
+  - src/api_client.py
+  - src/pce_target.py
   - src/report/rules_engine.py
   - src/report/rules/
   - src/report/analysis/mitre_map.py
@@ -43,7 +45,27 @@ illumio-ops 內部有**兩套獨立的規則判斷引擎**，加上一條**事�
 
 程式核心是 `src/analyzer.py` 的 `Analyzer` 類別。一個監控週期 `run_analysis()` 依序執行：
 
-1. `_run_health_check()` — system／`pce_health` 規則：先查 `/api/v2/health`（狀態碼＋body degraded 判讀），通過後再探官方 SLB 端點 `/api/v2/node_available`（免驗證；200/202 = 健康，404/502/無回應 = 節點不可服務，官方註明狀態反映最多延遲 30 秒）。
+```text
+deployment_type
+|-- saas    -> authenticated /api/v2/noop ----------------> API 存取
+`-- on_prem -> authenticated /api/v2/noop
+                -> /api/v2/health -> /api/v2/node_available -> API 存取
+
+events / traffic -> last_status + 擷取 lag ---------------> ingestion 新鮮度
+```
+
+這是兩條獨立訊號：SaaS control plane 只探 authenticated `/api/v2/noop`；`/api/v2/health`
+與 `/api/v2/node_available` 僅限 on-prem appliance。on-prem 依序通過 `/noop`、`/health`
+body 狀態及 `/node_available`（200/202）才算健康。`401`／`403`／`429`／`5xx` 與
+transport failure 會保留成不同類別，不會全部混成 outage。
+
+events／traffic 的 `last_status` 與擷取 lag 則共同決定 pipeline health；API `/noop` 可以是綠色，
+同時 ingestion 因上次擷取失敗或延遲過久而是紅色。兩者不可互相代替。
+
+`https://status.illumio.com/posts/dashboard` 只供人工關聯 SaaS provider incident；程式不會被 scrape，
+也不參與 watchdog verdict。
+
+1. `_run_health_check()` — system／`pce_health` 規則：依上圖執行 deployment-aware control-plane probe。
 2. `_run_event_analysis()` — event 規則。
 3. `_fetch_traffic()` ＋ `_run_rule_engine()` — traffic／bandwidth／volume 規則。
 4. `_dispatch_alerts()` — 派送 traffic 類告警。
@@ -60,7 +82,7 @@ illumio-ops 內部有**兩套獨立的規則判斷引擎**，加上一條**事�
 | `traffic` | 連線數 `num_connections` | `val >= threshold_count` | 加總（sum）| `reporter.add_traffic_alert` |
 | `volume` | 資料量 MB（`calculate_volume_mb`）| `val >= threshold_count` | 加總（sum）| `reporter.add_metric_alert` |
 | `bandwidth` | 頻寬 Mbps（`calculate_mbps`）| `bw_val > threshold_count`（**嚴格大於**）| 取最大值（max）；任一 flow 超標即觸發 | `reporter.add_metric_alert` |
-| `system` | PCE health 狀態碼 | health status **≠ 200**、`/health` body 回報 degraded、或 `/node_available` 非 200/202 即觸發 | — | `reporter.add_health_alert` |
+| `system` | PCE control-plane probe | SaaS `/noop` 非 2xx；on-prem `/noop` 失敗、`/health` 非 200／body degraded，或 `/node_available` 非 200/202 即觸發 | — | `reporter.add_health_alert` |
 
 > 運算子差異：**bandwidth 用 `>`，traffic/volume 用 `>=`**。`calculate_mbps`／`calculate_volume_mb` 以 delta（Interval）為優先、total（Avg）為次。
 
@@ -261,6 +283,10 @@ R 系列只在 unified DataFrame 帶有 **`draft_policy_decision`** 欄時才會
 
 啟用哪些通道由 `alerts.active` 清單決定（例如 `["mail", "line"]`）。各通道所需欄位、必填/密鑰標記見 `src/alerts/metadata.py` 的 `PLUGIN_METADATA`（GUI 表單即由此動態產生）。Teams webhook URL 內嵌有效機密（`sig=` 查詢字串），`redact_webhook_url()` 確保日誌與持久化只留 `scheme://host[:port]/...`，不外洩完整網址。
 
+事件告警連結使用解析後的 Console URL，不使用 API host：優先採 `api.console_url`；SaaS
+未設定時使用 `https://console.illum.io`，自訂 SaaS tenant 使用其完整 Console URL；on-prem
+未設定時回退到 `api.url` 的 Console origin。設定細節見 [configuration.md](configuration.md)。
+
 GUI 操作路徑（Settings → Channels 各通道卡片；Rules → Actions 全域測試）見 [gui-tour.md](gui-tour.md)。
 
 ### 4.2 Test-send
@@ -290,6 +316,8 @@ DLQ 讀寫皆透過 `update_state_file` 做原子檔案更新，避免併發寫�
 ### 5.2 Watchdog — PCE 連續失敗自我告警
 
 `Analyzer._check_watchdog()`：PCE 連續失敗次數（`pce_stats.consecutive_failures`）達 `WATCHDOG_FAILURE_THRESHOLD = 3` 次即觸發，以 `WATCHDOG_COOLDOWN_MINUTES = 60` 分鐘為冷卻（長時間中斷每小時只告警一次，不洗版）。目的是避免「poller 掛掉、沒有事件、沒有告警、卻誤以為一切正常」的靜默失效。
+
+watchdog 只採本機 probe／poll 結果；官方 provider status 頁不會被讀取，也不影響判定。
 
 ### 5.3 溢位 meta-alert
 

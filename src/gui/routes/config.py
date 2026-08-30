@@ -203,6 +203,7 @@ def make_config_blueprint(
             # eagerly would empty a cache that still belongs to the PCE the
             # appliance stays pointed at once the save fails.
             _do_pce_flush = False
+            _restart_required = False
             if 'api' in d:
                 api_in = d['api']
                 api_allowlist = _SETTINGS_ALLOWLISTS["api"]
@@ -223,15 +224,34 @@ def make_config_blueprint(
                         return jsonify({"ok": False, "error": t("gui_err_api_url_scheme", lang=lang)}), 400
                     if _scheme == 'http':
                         logger.warning("api.url uses plain HTTP — TLS verification cannot be performed")
+                _old_api = dict(scratch.get('api', {}))
+                _candidate_api = dict(_old_api)
+                for k in api_allowlist:
+                    if k in api_in:
+                        _candidate_api[k] = api_in[k]
+                # Validate the complete merged candidate before the target-change
+                # response can echo any requested URL. Invalid values must never
+                # reach the choice/flush path or mutate the scratch configuration.
+                from pydantic import ValidationError as _ValidationError
+                from src.config_models import ApiSettings
+                try:
+                    _validated_api = ApiSettings.model_validate(_candidate_api)
+                except _ValidationError as ve:
+                    reason = ve.errors()[0]['msg'] if ve.errors() else str(ve)
+                    return jsonify({
+                        "ok": False,
+                        "error": t("gui_err_api_invalid_config", lang=lang, reason=reason),
+                    }), 400
+                _validated_api_dict = _validated_api.model_dump()
+
                 # Changing which PCE this appliance talks to is not an edit —
                 # the cache, the ingestion positions, the archive files and the
                 # schedules all carry the previous PCE's data with no marker
                 # saying so. Make the operator say what should happen to it.
-                _old_api = scratch.get('api', {})
                 _target_changed = pce_target_changed(
                     _old_api,
-                    api_in['url'] if 'url' in api_in else None,
-                    api_in['org_id'] if 'org_id' in api_in else None,
+                    _validated_api_dict['url'] if 'url' in api_in else None,
+                    _validated_api_dict['org_id'] if 'org_id' in api_in else None,
                 )
                 _choice = d.get('pce_target_change')
                 if _target_changed:
@@ -240,8 +260,8 @@ def make_config_blueprint(
                             "ok": False,
                             "pce_target_changed": True,
                             "old": {"url": _old_api.get('url', ''), "org_id": _old_api.get('org_id', '')},
-                            "new": {"url": api_in.get('url', _old_api.get('url', '')),
-                                    "org_id": api_in.get('org_id', _old_api.get('org_id', ''))},
+                            "new": {"url": _validated_api_dict['url'],
+                                    "org_id": _validated_api_dict['org_id']},
                             "error": t("gui_err_pce_target_needs_choice", lang=lang),
                         }), 409
                     if _choice not in ("flush", "same-pce"):
@@ -249,23 +269,17 @@ def make_config_blueprint(
                                         "error": t("gui_err_pce_target_bad_choice", lang=lang)}), 400
                     if _choice == "flush":
                         _do_pce_flush = True
+                # Persist the schema's normalized form for fields present in
+                # this request (notably console_url's stripped trailing slash),
+                # while leaving omitted fields untouched.
                 for k in api_allowlist:
                     if k in api_in:
-                        scratch['api'][k] = api_in[k]
-                # 批次 5 C3 的配套：合併後的 api 區塊寫入磁碟前先驗證。
-                # 少了這一步，裸 POST（例如 verify_ssl=false 而 profile
-                # 仍是 'production'）會成功存檔，下一次 cm.load() 就會被
-                # ApiSettings 的 fail-hard TLS guard 擋下，GUI 直接自鎖。
-                from pydantic import ValidationError as _ValidationError
-                from src.config_models import ApiSettings
-                try:
-                    ApiSettings.model_validate(scratch['api'])
-                except _ValidationError as ve:
-                    reason = ve.errors()[0]['msg'] if ve.errors() else str(ve)
-                    return jsonify({
-                        "ok": False,
-                        "error": t("gui_err_api_invalid_config", lang=lang, reason=reason),
-                    }), 400
+                        scratch['api'][k] = _validated_api_dict[k]
+                _runtime_connection_changed = any(
+                    k in api_in and _old_api.get(k, _validated_api_dict[k]) != _validated_api_dict[k]
+                    for k in ("deployment_type", "console_url")
+                )
+                _restart_required = _target_changed or _runtime_connection_changed
             if 'email' in d:
                 email_in = d['email']
                 if 'sender' in email_in:
@@ -338,7 +352,10 @@ def make_config_blueprint(
                     }), 500
             cm.config = scratch
             cm.save()
-        return jsonify({"ok": True})
+        response = {"ok": True}
+        if _restart_required:
+            response["restart_required"] = True
+        return jsonify(response)
 
     # ── TLS Certificate Management ─────────────────────────────────────────────
 

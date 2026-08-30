@@ -767,16 +767,43 @@ async function mountPce(root, ctx) {
 
     // ── API connection (settings.js:386-390) ───────────────────────────
     const connPanel = panel(null, t("gui_api_conn"));
+    const deployment = selectField([
+      ["saas", "gui_deployment_saas"],
+      ["on_prem", "gui_deployment_on_prem"],
+    ], api_.deployment_type || "on_prem");
     const url = textField(api_.url);
     const org = textField(api_.org_id);
+    const consoleUrl = textField(api_.console_url || "");
     // Never re-displayed: the snapshot's api.key is already the server's mask
     // (config.py:428-431). An empty box plus the state row below says more and
     // leaks nothing.
     const key = passwordField(t("gui_sy_secret_keep"));
     const secret = passwordField(t("gui_sy_secret_keep"));
     const ssl = checkField(api_.verify_ssl);
+    connPanel.body.appendChild(labelled(t("gui_deployment_type"),
+      form.track("deployment_type", deployment)));
     connPanel.body.appendChild(labelled(t("gui_url"), form.track("url", url), t("gui_url_help")));
     connPanel.body.appendChild(labelled(t("gui_org_id"), form.track("org_id", org), t("gui_org_id_help")));
+    const consoleBox = labelled(t("gui_console_url"), form.track("console_url", consoleUrl));
+    const consoleHelpText = el("span");
+    const statusLink = el("a", {
+      href: "https://status.illumio.com/posts/dashboard",
+      target: "_blank",
+      rel: "noopener noreferrer",
+      text: t("gui_saas_status_link"),
+    });
+    const statusLinkWrap = el("span", null, " · ", statusLink);
+    const consoleHelp = el("small", { class: "hint" }, consoleHelpText, statusLinkWrap);
+    consoleBox.appendChild(consoleHelp);
+    function syncConsoleHelp() {
+      const saas = deployment.value === "saas";
+      consoleHelpText.textContent = t(saas ? "gui_console_url_help_saas" : "gui_console_url_help_on_prem");
+      statusLinkWrap.hidden = !saas;
+    }
+    // Use the form's one synchronization path: it runs for native input/change
+    // events and after programmatic writeCtl() calls such as Discard.
+    form.onSync(syncConsoleHelp);
+    connPanel.body.appendChild(consoleBox);
     connPanel.body.appendChild(labelled(t("gui_api_key"), form.track("key", key, "secret"),
       t("gui_api_key_help") + " · " + secretState(api_, "key")));
     connPanel.body.appendChild(labelled(t("gui_api_secret"), form.track("secret", secret, "secret"),
@@ -788,6 +815,44 @@ async function mountPce(root, ctx) {
      * was never ours to publish, and set/not-set now rides on the field it
      * describes instead of being restated in a section of its own. */
     connPanel.body.appendChild(note(t("gui_sy_secret_note")));
+
+    const healthRow = el("div", { class: "strip", "data-role": "pce-health-status" });
+    function paintHealth(stats) {
+      clear(healthRow);
+      const category = String((stats && stats.health_category) || "unknown");
+      const status = String((stats && stats.health_status) || "unknown");
+      const ok = category === "ok" && status === "ok";
+      const unknown = category === "unknown" || status === "unknown";
+      healthRow.dataset.tone = ok ? "ok" : (unknown ? "neutral" : "crit");
+      healthRow.appendChild(el("span", { text: t("gui_health_check") }));
+      healthRow.appendChild(badge(
+        ok ? t("gui_status_ok") : t(unknown ? "gui_card_unknown" : "gui_pce_health_status_failed"),
+        ok ? "ok" : (unknown ? "neutral" : "crit")
+      ));
+    }
+    paintHealth((d.status && d.status.pce_stats) || {});
+    connPanel.body.appendChild(healthRow);
+
+    const healthButton = btn("btn", t("gui_pce_health_check_now"), function () {
+      healthButton.disabled = true;
+      return api.postStatus("/api/pce/health-check", {}).then(function (reply) {
+        const res = reply.data || {};
+        if (reply.status !== 200 || !res.pce_stats) {
+          toast.crit(errorText(res));
+          return false;
+        }
+        paintHealth(res.pce_stats);
+        if (res.ok === true) {
+          toast.ok(t("gui_pce_health_check_passed"));
+          return true;
+        }
+        toast.crit(t("gui_pce_health_check_failed"));
+        return false;
+      }).finally(function () {
+        healthButton.disabled = false;
+      });
+    });
+    connPanel.head.appendChild(healthButton);
     board.appendChild(connPanel);
 
     // A1 fix (header point 4): key/secret are sent ONLY when the operator
@@ -797,8 +862,10 @@ async function mountPce(root, ctx) {
     form.setBody(function (v) {
       const b = {};
       const apiPart = {};
+      apiPart.deployment_type = v.deployment_type;
       apiPart.url = v.url;
       apiPart.org_id = v.org_id;
+      apiPart.console_url = v.console_url;
       if (v.key) apiPart.key = v.key;
       if (v.secret) apiPart.secret = v.secret;
       apiPart.verify_ssl = v.verify_ssl;
@@ -825,7 +892,10 @@ async function mountPce(root, ctx) {
         m.onClose(function () { resolve(false); });
       });
     };
-    form.afterSave = function () { refreshAndRemount(R_PCE, PCE_SNAPS); };
+    form.afterSave = function (_changedKeys, res) {
+      if (res && res.restart_required) toast.info(t("gui_pce_connection_restart_required"));
+      refreshAndRemount(R_PCE, PCE_SNAPS);
+    };
 
     host.appendChild(form.dock);
     form.sync();

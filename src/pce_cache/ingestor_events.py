@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
+from contextlib import nullcontext
 from typing import Optional
 
 import orjson
@@ -22,12 +23,14 @@ class EventsIngestor:
         watermark: WatermarkStore,
         async_threshold: int = 10000,
         siem_destinations: Optional[list[str]] = None,
+        write_lock=None,
     ):
         self._api = api
         self._sf = session_factory
         self._wm = watermark
         self._async_threshold = async_threshold
         self._siem_dests = list(siem_destinations or [])
+        self._write_lock = write_lock
         # Set by run_once() when the sync events pull hit max_results and the
         # async fallback did not drain the window — the PCE returns only the
         # NEWEST rows at the cap, so older events in that window are lost for
@@ -83,7 +86,8 @@ class EventsIngestor:
                         self.last_run_overflow = None
         except Exception as exc:
             logger.exception("Events ingest failed: {}", exc)
-            self._wm.record_error(self.SOURCE, str(exc))
+            with self._write_context():
+                self._wm.record_error(self.SOURCE, str(exc))
             return 0
 
         # get_events()/get_events_async() route through ApiClient.fetch_events(),
@@ -99,20 +103,30 @@ class EventsIngestor:
         # trip the error path. The real ApiClient contract is always str|None.
         if isinstance(fetch_error, str) and fetch_error:
             logger.error("Events ingest: PCE fetch reported an error — {}", fetch_error)
-            self._wm.record_error(self.SOURCE, fetch_error)
+            with self._write_context():
+                self._wm.record_error(self.SOURCE, fetch_error)
             return 0
 
         try:
-            inserted = self._insert_batch(events)
-            if events:
-                last = max(e["timestamp"] for e in events)
-                last_href = events[-1].get("href", "")
-                self._wm.advance(self.SOURCE, last_timestamp=_parse_iso(last), last_href=last_href)
+            with self._write_context():
+                inserted = self._insert_batch(events)
+                if events:
+                    last = max(e["timestamp"] for e in events)
+                    last_href = events[-1].get("href", "")
+                    self._wm.advance(
+                        self.SOURCE,
+                        last_timestamp=_parse_iso(last),
+                        last_href=last_href,
+                    )
             return inserted
         except Exception as exc:
             # insert/advance 失敗：記 error 再 re-raise（run_events_ingest 會 logger.exception）。
-            self._wm.record_error(self.SOURCE, str(exc))
+            with self._write_context():
+                self._wm.record_error(self.SOURCE, str(exc))
             raise
+
+    def _write_context(self):
+        return self._write_lock if self._write_lock is not None else nullcontext()
 
     def _since_cursor(self) -> str:
         # PCE rejects timestamps without a tz marker (HTTP 406 invalid_timestamp).

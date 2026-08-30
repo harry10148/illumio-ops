@@ -255,7 +255,10 @@ def test_analyzer_preserves_event_watermark_on_fetch_failure(monkeypatch, tmp_pa
         def execute_traffic_query_stream(self, *args, **kwargs):
             return []
 
-    cm = SimpleNamespace(config={"rules": []})
+    cm = SimpleNamespace(config={
+        "rules": [],
+        "settings": {"enable_health_check": False},
+    })
     analyzer = Analyzer(cm, FailingApi(), DummyReporter())
     original_watermark = analyzer.state["event_watermark"]
 
@@ -428,7 +431,10 @@ def test_analyzer_tracks_unknown_events_and_parser_samples(monkeypatch, tmp_path
         def execute_traffic_query_stream(self, *args, **kwargs):
             return []
 
-    cm = SimpleNamespace(config={"rules": []})
+    cm = SimpleNamespace(config={
+        "rules": [],
+        "settings": {"enable_health_check": False},
+    })
     analyzer = Analyzer(cm, Api(), DummyReporter())
     analyzer.state["event_watermark"] = "2026-04-08T11:00:00Z"
 
@@ -538,6 +544,9 @@ def test_run_debug_mode_system_rule_uses_health_check_not_traffic(monkeypatch, t
                 "num_connections": 999,
                 "timestamp_range": {"last_detected": "2026-04-08T12:00:00Z"},
             }]
+
+        def check_connectivity(self):
+            return 200, ""
 
         def check_health(self):
             return 503, "upstream timeout"

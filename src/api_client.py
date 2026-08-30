@@ -48,6 +48,9 @@ from src.i18n import t
 from src.utils import Colors
 
 MAX_RETRIES = 3
+_EVENT_RETRYABLE_STATUSES = frozenset({0, 429, 502, 503, 504})
+_EVENT_MAX_ATTEMPTS = 2
+_EVENT_RETRY_BACKOFF_SECONDS = 1.0
 _ASYNC_JOB_STATE_KEY = "async_query_jobs"
 _QUERY_LOOKUP_CACHE_TTL_SECONDS = 300
 _RULESET_CACHE_TTL_SECONDS = 300
@@ -65,6 +68,17 @@ _ASYNC_JOB_PRUNE_INTERVAL_SECONDS = 3600
 
 
 _TLS_VERIFY_DISABLED_WARNED = False
+
+
+def pce_probe_category(status: int) -> str:
+    if 200 <= status < 300:
+        return "ok"
+    return {
+        0: "transport_error",
+        401: "auth_failed",
+        403: "authorization_failed",
+        429: "rate_limited",
+    }.get(status, "server_error" if 500 <= status < 600 else "http_error")
 
 
 def _warn_tls_verification_disabled_once() -> None:
@@ -182,6 +196,19 @@ class ApiClient:
         self._session.mount("http://", adapter)
         self._session.mount("https://", adapter)
 
+        # Events use their own one-attempt transport.  fetch_events_strict()
+        # owns the small retry loop and one wall-clock deadline; inheriting the
+        # global Retry(total=3) would multiply a SaaS 60s timeout to ~4 minutes.
+        self._bounded_session = requests.Session()
+        self._bounded_session.verify = self._session.verify
+        self._bounded_session.headers.update({
+            "Authorization": self._auth_header,
+            "Accept": "application/json",
+        })
+        bounded_adapter = HTTPAdapter(pool_connections=2, pool_maxsize=4, max_retries=0)
+        self._bounded_session.mount("http://", bounded_adapter)
+        self._bounded_session.mount("https://", bounded_adapter)
+
         # ── Compose domain classes (must come after state is initialised) ──
         self._labels = LabelResolver(self)
         self._jobs = AsyncJobManager(self)
@@ -193,14 +220,17 @@ class ApiClient:
     # ═══════════════════════════════════════════════════════════════════════
 
     def close(self) -> None:
-        """Release the underlying requests.Session connection pool."""
-        if getattr(self, "_session", None) is not None:
+        """Release all underlying requests.Session connection pools."""
+        for attr in ("_session", "_bounded_session"):
+            session = getattr(self, attr, None)
+            if session is None:
+                continue
             try:
-                self._session.close()
+                session.close()
             except Exception as exc:
-                logger.warning("ApiClient.close() failed: {}", exc)
+                logger.warning("ApiClient.close() failed for {}: {}", attr, exc)
             finally:
-                self._session = None
+                setattr(self, attr, None)
 
     def __enter__(self) -> "ApiClient":
         return self
@@ -219,19 +249,34 @@ class ApiClient:
         encoded = base64.b64encode(credentials.encode('utf-8')).decode('ascii')
         return f"Basic {encoded}"
 
-    def _request(self, url: str, method: str = "GET", data: Any = None, headers: dict[str, str] | None = None, timeout: int = 15, stream: bool = False, rate_limit: bool = False) -> tuple[int, Any]:
+    def _request(self, url: str, method: str = "GET", data: Any = None,
+                 headers: dict[str, str] | None = None, timeout: float = 15,
+                 stream: bool = False, rate_limit: bool = False,
+                 transport_retries: bool = True,
+                 deadline: float | None = None) -> tuple[int, Any]:
         """Core HTTP helper using requests.Session + urllib3 Retry.
 
         Returns (status_code, response_body_bytes | response_object).
         For stream=True, returns (status_code, raw requests.Response).
         """
-        if self._session is None:
+        request_session = self._session if transport_retries else self._bounded_session
+        if request_session is None:
             raise RuntimeError("ApiClient is closed; create a new instance")
         if rate_limit:
             from src.pce_cache.rate_limiter import get_rate_limiter
-            if not get_rate_limiter(rate_per_minute=self._rate_limit_per_minute).acquire(timeout=30.0):
+            limiter_timeout = 30.0
+            if deadline is not None:
+                limiter_timeout = min(limiter_timeout, max(deadline - time.monotonic(), 0.0))
+            if not get_rate_limiter(rate_per_minute=self._rate_limit_per_minute).acquire(
+                timeout=limiter_timeout
+            ):
                 from src.exceptions import APIError
                 raise APIError("Global rate limiter timeout — PCE 500/min budget exhausted")
+        if deadline is not None:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                return 0, b"request deadline exceeded"
+            timeout = min(timeout, remaining)
         req_headers = {}
         if headers:
             req_headers.update(headers)
@@ -241,7 +286,7 @@ class ApiClient:
             req_headers.setdefault("Content-Type", "application/json")
 
         try:
-            resp = self._session.request(
+            resp = request_session.request(
                 method=method,
                 url=url,
                 data=body,
@@ -277,7 +322,7 @@ class ApiClient:
                     logger.warning("POST 429 retry skipped: rate limiter budget exhausted")
                     return resp.status_code, resp.content
             try:
-                resp = self._session.request(
+                resp = request_session.request(
                     method=method,
                     url=url,
                     data=body,
@@ -302,6 +347,17 @@ class ApiClient:
         except Exception as e:
             logger.error(f"Health check failed: {e}")
             return 0, str(e)
+
+    def check_connectivity(self) -> tuple[int, str]:
+        """GET the authenticated, non-org-scoped PCE connectivity endpoint."""
+        url = f"{self.api_cfg['url']}/api/v2/noop"
+        try:
+            status, body = self._request(url, timeout=10)
+            text = body.decode('utf-8', errors='replace') if isinstance(body, bytes) else str(body)
+            return status, text
+        except Exception as exc:
+            logger.error("connectivity/noop probe failed: {}", type(exc).__name__)
+            return 0, "connectivity/noop probe failed"
 
     def check_node_available(self) -> tuple[int, str]:
         """GET /api/v2/node_available（官方 SLB 健康檢查端點，免驗證）。
@@ -341,7 +397,30 @@ class ApiClient:
                             rate_limit: bool = False) -> list[dict[str, Any]]:
         url = self._build_events_url(start_time_str, end_time_str=end_time_str,
                                      max_results=max_results, event_type=event_type)
-        status, body = self._request(url, timeout=30, rate_limit=rate_limit)
+        is_saas = self.api_cfg.get("deployment_type") == "saas"
+        request_timeout = 60 if is_saas else 30
+        total_timeout = 65 if is_saas else 35
+        deadline = time.monotonic() + total_timeout
+        status, body = 0, b"event request deadline exceeded"
+        for attempt in range(_EVENT_MAX_ATTEMPTS):
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                break
+            status, body = self._request(
+                url,
+                timeout=min(request_timeout, remaining),
+                rate_limit=rate_limit,
+                transport_retries=False,
+                deadline=deadline,
+            )
+            if status == 200 or status not in _EVENT_RETRYABLE_STATUSES:
+                break
+            if attempt + 1 >= _EVENT_MAX_ATTEMPTS:
+                break
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                break
+            time.sleep(min(_EVENT_RETRY_BACKOFF_SECONDS, remaining))
         if status != 200:
             err_msg = body.decode('utf-8', errors='replace') if isinstance(body, bytes) else str(body)
             raise EventFetchError(status, err_msg[:1000])

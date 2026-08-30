@@ -17,6 +17,11 @@ def reporter_with_full_alerts():
         "smtp": {"host": "localhost", "port": 25},
         "alerts": {"active": ["mail"]},
         "web_gui": {"public_url": "https://gui.example"},
+        "api": {
+            "url": "https://custom-api.example.invalid/api/v2",
+            "deployment_type": "saas",
+            "console_url": "https://tenant.illumio.ai",
+        },
     }
     r = Reporter(cm)
     r.health_alerts = [{
@@ -36,6 +41,11 @@ def reporter_with_full_alerts():
         "time": "2026-05-07T10:00",
         "count": 1,
         "runbook_url": "https://runbooks/ven",
+        "raw_data": [{
+            "href": "https://fake-user:fake-pass@evil.invalid/orgs/7/events/evt-email",
+            "event_type": "agent.tampering",
+            "timestamp": "2026-05-07T10:00:00Z",
+        }],
     }]
     r.traffic_alerts = [{
         "rule": "spike",
@@ -187,3 +197,15 @@ def test_c7_4_severity_badge_and_runbook_link(reporter_with_full_alerts):
             or SIGNAL_HEX['info'] in html)
     # Runbook link for at least one issue carrying runbook_url
     assert 'runbooks/disk' in html or 'runbooks/ven' in html
+
+
+def test_event_cta_uses_console_url_while_dashboard_cta_uses_public_url(
+    reporter_with_full_alerts,
+):
+    raw = _send_and_capture(reporter_with_full_alerts)
+    html = _extract_html(raw)
+
+    assert "https://tenant.illumio.ai/#/events/evt-email" in html
+    assert "https://gui.example/dashboard?tab=events" in html
+    assert "https://custom-api.example.invalid" not in html
+    assert "fake-user" not in html

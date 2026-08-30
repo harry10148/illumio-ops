@@ -157,6 +157,10 @@ def _labels(page):
         "gui_tls_csr_generate", "gui_sy_discard", "gui_errcard_retry",
         "gui_dlq_replay", "gui_restart_success", "gui_daemon_external_restart_hint",
         "gui_sy_pce_target_same",
+        "gui_pce_connection_restart_required", "gui_console_url_help_on_prem",
+        "gui_console_url_help_saas",
+        "gui_pce_health_check_now", "gui_pce_health_check_passed",
+        "gui_status_ok",
     ]
     return page.evaluate(
         "async (keys) => { const { t } = await import('/static/js/v2/core/i18n.mjs'); "
@@ -833,6 +837,149 @@ def test_pce_secrets_never_reach_the_dom(v2_page):
     assert SENTINEL not in ledger, ledger
 
     assert SENTINEL not in _dom_text(page)
+
+
+def test_pce_runtime_connection_fields_load_save_and_show_safe_saas_status_link(v2_page):
+    """The PCE form exposes both runtime metadata fields in the required order,
+    keeps credentials omitted, does not open the target-change modal, and treats
+    the vendor status page as a manual, safely-opened link only."""
+    page, base_url = v2_page
+    _goto(page, base_url, R_PCE, "SY-18")
+    original = _api_get(page, "/api/settings")["api"]
+
+    try:
+        seeded = _api_post(page, "/api/settings", {"api": {
+            "deployment_type": "saas",
+            "console_url": "https://tenant.illumio.example/",
+        }})
+        assert seeded == {"ok": True, "restart_required": True}
+        page.reload()
+        page.wait_for_selector('body[data-booted="true"]')
+        _navigate(page, R_PCE, "SY-18")
+
+        fields = page.locator('.board [data-field]')
+        names = fields.evaluate_all("els => els.map(e => e.dataset.field)")
+        assert names.index("deployment_type") < names.index("url")
+        assert names.index("org_id") < names.index("console_url")
+        assert page.locator('select[data-field="deployment_type"]').input_value() == "saas"
+        console = page.locator('input[data-field="console_url"]')
+        assert console.input_value() == "https://tenant.illumio.example"
+
+        status_link = page.locator(
+            'a[href="https://status.illumio.com/posts/dashboard"]'
+        )
+        expect(status_link).to_be_visible()
+        assert status_link.get_attribute("target") == "_blank"
+        assert status_link.get_attribute("rel") == "noopener noreferrer"
+
+        deployment = page.locator('select[data-field="deployment_type"]')
+        deployment.select_option("on_prem")
+        expect(status_link).to_be_hidden()
+        assert _labels(page)["gui_console_url_help_on_prem"] in page.locator(
+            'input[data-field="console_url"]'
+        ).locator("xpath=..").inner_text()
+
+        page.get_by_role("button", name=_labels(page)["gui_sy_discard"], exact=True).click()
+        assert deployment.input_value() == "saas"
+        expect(status_link).to_be_visible()
+        assert _labels(page)["gui_console_url_help_saas"] in console.locator(
+            "xpath=.."
+        ).inner_text()
+
+        console.fill("https://new-tenant.illumio.example")
+        assert _labels(page)["gui_console_url_help_saas"] in console.locator(
+            "xpath=.."
+        ).inner_text()
+
+        captured = {"body": None}
+
+        def _capture(route):
+            if route.request.method != "POST":
+                route.continue_()
+                return
+            captured["body"] = route.request.post_data_json
+            route.fulfill(status=200, content_type="application/json",
+                          body='{"ok": true, "restart_required": true}')
+
+        page.route("**/api/settings", _capture)
+        try:
+            page.get_by_role("button", name=_labels(page)["gui_save"], exact=True).first.click()
+            page.wait_for_selector('.toast[data-tone="info"]')
+        finally:
+            page.unroute("**/api/settings", _capture)
+
+        assert captured["body"]["api"]["deployment_type"] == "saas"
+        assert captured["body"]["api"]["console_url"] == \
+            "https://new-tenant.illumio.example"
+        assert "key" not in captured["body"]["api"]
+        assert "secret" not in captured["body"]["api"]
+        assert page.locator(".modal").count() == 0
+        restart_message = _labels(page)["gui_pce_connection_restart_required"]
+        expect(
+            page.locator('.toast[data-tone="info"]').filter(has_text=restart_message)
+        ).to_contain_text(restart_message)
+    finally:
+        _api_post(page, "/api/settings", {"api": {
+            "deployment_type": original.get("deployment_type", "on_prem"),
+            "console_url": original.get("console_url", ""),
+        }})
+
+
+def test_pce_manual_health_check_posts_and_paints_fresh_status(v2_page):
+    page, base_url = v2_page
+    _goto(page, base_url, R_PCE, "SY-18")
+    labels = _labels(page)
+    handler = _fulfill(
+        page,
+        "**/api/pce/health-check",
+        200,
+        json.dumps({
+            "ok": True,
+            "pce_stats": {
+                "health_status": "ok",
+                "health_category": "ok",
+                "health_probe": "health",
+                "deployment_type": "on_prem",
+            },
+        }),
+    )
+    try:
+        with page.expect_request(
+            lambda req: req.method == "POST" and req.url.endswith("/api/pce/health-check")
+        ):
+            page.get_by_role(
+                "button", name=labels["gui_pce_health_check_now"], exact=True
+            ).click()
+
+        health = page.locator('[data-role="pce-health-status"]')
+        expect(health).to_contain_text(labels["gui_status_ok"])
+        expect(health.locator('.badge[data-tone="ok"]')).to_be_visible()
+        assert _toast_text(page, "ok") == labels["gui_pce_health_check_passed"]
+    finally:
+        page.unroute("**/api/pce/health-check", handler)
+
+
+def test_pce_discard_restores_on_prem_help_and_hides_saas_status_link(v2_page):
+    page, base_url = v2_page
+    _goto(page, base_url, R_PCE, "SY-18")
+    deployment = page.locator('select[data-field="deployment_type"]')
+    status_link = page.locator(
+        'a[href="https://status.illumio.com/posts/dashboard"]'
+    )
+    console_box = page.locator('input[data-field="console_url"]').locator("xpath=..")
+
+    assert deployment.input_value() == "on_prem"
+    expect(status_link).to_be_hidden()
+    assert _labels(page)["gui_console_url_help_on_prem"] in console_box.inner_text()
+
+    deployment.select_option("saas")
+    expect(status_link).to_be_visible()
+    assert _labels(page)["gui_console_url_help_saas"] in console_box.inner_text()
+
+    page.get_by_role("button", name=_labels(page)["gui_sy_discard"], exact=True).click()
+    assert deployment.input_value() == "on_prem"
+    expect(status_link).to_be_hidden()
+    assert _labels(page)["gui_console_url_help_on_prem"] in console_box.inner_text()
 
 
 def test_siem_hec_token_never_reaches_the_dom(v2_page):

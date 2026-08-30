@@ -66,6 +66,9 @@ def test_analyzer_records_pce_error_and_suppression(monkeypatch, tmp_path):
     }
 
     class Api:
+        def check_connectivity(self):
+            return 200, ""
+
         def check_health(self):
             return 503, "cluster degraded"
 
@@ -136,17 +139,21 @@ def test_reporter_persists_dispatch_history(monkeypatch, tmp_path):
     assert state["dispatch_history"][-1]["status"] == "success"
 
 
-def test_reporter_builds_vendor_event_payload():
+def test_reporter_builds_vendor_event_payload_with_shared_console_link():
     cm = SimpleNamespace(
         config={
-            "api": {"url": "https://pce.example.com:8443/api/v2"},
+            "api": {
+                "url": "https://custom-api.example.invalid/api/v2",
+                "deployment_type": "saas",
+                "console_url": "https://tenant.illumio.ai",
+            },
             "alerts": {},
             "settings": {"timezone": "UTC"},
         }
     )
     reporter = Reporter(cm)
     raw_event = {
-        "href": "/orgs/1/events/evt-1",
+        "href": "https://fake-user:fake-pass@evil.invalid/orgs/1/events/evt-1",
         "timestamp": "2026-04-08T12:00:00Z",
         "event_type": "sec_policy.create",
         "status": "success",
@@ -178,7 +185,8 @@ def test_reporter_builds_vendor_event_payload():
     assert payload["resource_changes"][0]["resource_type"] == "sec_policy"
     assert payload["notifications_count"] == 1
     assert payload["notifications"][0]["notification_type"] == "email"
-    assert payload["pce_link"] == "https://pce.example.com:8443/#/events/evt-1"
+    assert payload["pce_link"] == "https://tenant.illumio.ai/#/events/evt-1"
+    assert "fake-user" not in payload["pce_link"]
 
 
 def test_send_webhook_includes_vendor_event_payloads(monkeypatch):
@@ -213,7 +221,7 @@ def test_send_webhook_includes_vendor_event_payloads(monkeypatch):
         "severity": "info",
         "count": 1,
         "raw_data": [{
-            "href": "/orgs/1/events/evt-1",
+            "href": "https://fake-user:fake-pass@evil.invalid/orgs/1/events/evt-1",
             "timestamp": "2026-04-08T12:00:00Z",
             "event_type": "sec_policy.create",
             "status": "success",
@@ -235,6 +243,9 @@ def test_send_webhook_includes_vendor_event_payloads(monkeypatch):
     assert captured["body"]["content_model"] == "vendor_pretty_cool_events_baseline"
     assert captured["body"]["event_alert_payloads"][0]["events"][0]["event_type"] == "sec_policy.create"
     assert captured["body"]["event_alert_payloads"][0]["events"][0]["action"]["api_method"] == "POST"
+    pce_link = captured["body"]["event_alert_payloads"][0]["events"][0]["pce_link"]
+    assert pce_link == "https://pce.example.com:8443/#/events/evt-1"
+    assert "fake-user" not in pce_link
 
 
 def test_reporter_line_and_mail_templates_include_vendor_context():

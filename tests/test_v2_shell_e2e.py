@@ -134,6 +134,18 @@ def test_user_menu_opens_with_the_real_appliance_identity(v2_page):
     assert page.get_attribute(".userchip", "aria-expanded") == "false"
 
 
+def test_status_marks_legacy_config_as_on_prem_with_full_probe_chain(v2_context, v2_server):
+    """The harness config has no deployment_type, exercising the legacy default."""
+    v2_login(v2_context, v2_server)
+    resp = v2_context.request.get(v2_server + "/api/status")
+
+    assert resp.ok, resp.text()
+    body = resp.json()
+    assert body["deployment_type"] == "on_prem"
+    assert body["health_probe"] == "noop+health+node_available"
+    assert "provider_status_url" not in body
+
+
 def test_user_menu_segmented_controls_switch_theme_and_density(v2_page):
     """XC-13's two segmented controls are the same theme.mjs/density API the
     #/system/display page writes — proven by reading <html>'s dataset."""

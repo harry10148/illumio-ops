@@ -43,6 +43,56 @@ def _mk_event(i, ts):
     }
 
 
+def test_event_fetch_releases_cache_write_lane_until_persist():
+    """Slow PCE I/O must not own the lock shared with traffic/cache writers."""
+    from src.pce_cache.ingestor_events import EventsIngestor
+
+    class RecordingLock:
+        held = False
+
+        def __enter__(self):
+            assert not self.held
+            self.held = True
+
+        def __exit__(self, exc_type, exc, tb):
+            self.held = False
+
+    lock = RecordingLock()
+    event = _mk_event(1, datetime.now(timezone.utc))
+
+    class Api:
+        last_fetch_error = None
+
+        def get_events(self, **kwargs):
+            assert lock.held is False
+            return [event]
+
+    class Watermark:
+        def get(self, source):
+            return None
+
+        def advance(self, source, **kwargs):
+            assert lock.held is True
+
+        def record_error(self, source, error):
+            assert lock.held is True
+
+    class Ingestor(EventsIngestor):
+        def _insert_batch(self, events):
+            assert lock.held is True
+            return len(events)
+
+    ing = Ingestor(
+        api=Api(),
+        session_factory=None,
+        watermark=Watermark(),
+        write_lock=lock,
+    )
+
+    assert ing.run_once() == 1
+    assert lock.held is False
+
+
 def test_ingestor_writes_events_to_cache(session_factory):
     from src.pce_cache.ingestor_events import EventsIngestor
     from src.pce_cache.watermark import WatermarkStore

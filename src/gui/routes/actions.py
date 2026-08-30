@@ -31,6 +31,7 @@ from src.state_store import update_state_file
 # **另一個行程**，也會跑完整分析 cycle，兩邊的 state 快照會互相覆寫（告警冷卻
 # 被抹掉 → 同一則告警重寄）。取鎖順序固定為 file_lock → _analysis_lock。
 _ANALYSIS_LOCK_WAIT_S = 600.0
+_HEALTH_LOCK_WAIT_S = 30.0
 
 # /api/quarantine/search 的 data_source 白名單（live 分支專用；archive 分支
 # 有自己的 source=="archive" 早退，data_source 從不影響它）。只列這條路徑
@@ -757,6 +758,35 @@ def make_actions_blueprint(
                 return _err(t("gui_err_analysis_in_progress", lang=lang), 409)
             return jsonify({"ok": True, "output": t("gui_action_run_completed", lang=lang)})
 
+    @bp.route('/api/pce/health-check', methods=['POST'])
+    @limiter.limit("12 per hour")
+    @login_required
+    def api_pce_health_check():
+        """Run one probe, persist its telemetry, and never dispatch alerts."""
+        cm.load()
+        lang = cm.config.get('settings', {}).get('language', 'en') or 'en'
+        from src.api_client import ApiClient
+        from src.reporter import Reporter
+        from src.analyzer import Analyzer
+        from src.main import analysis_lock_path
+
+        try:
+            with _file_lock(analysis_lock_path(), timeout=_HEALTH_LOCK_WAIT_S):
+                with _analysis_lock:
+                    with ApiClient(cm) as api:
+                        analyzer = Analyzer(cm, api, Reporter(cm))
+                        analyzer._run_health_check(force=True, dispatch_alerts=False)
+                        analyzer.save_state()
+                        stats = dict(analyzer.state.get("pce_stats", {}))
+            return jsonify({
+                "ok": stats.get("health_category") == "ok",
+                "pce_stats": stats,
+            })
+        except TimeoutError:
+            return _err(t("gui_err_analysis_in_progress", lang=lang), 409)
+        except Exception as exc:
+            return _err_with_log("pce_health_check", exc, lang=lang)
+
     @bp.route('/api/actions/debug', methods=['POST'])
     @limiter.limit("10 per hour")
     def api_debug():
@@ -897,17 +927,22 @@ def make_actions_blueprint(
         except Exception:
             pass  # intentional: audit-log best-effort, must not block primary action
         try:
-            from src.api_client import ApiClient
+            from src.api_client import ApiClient, pce_probe_category
             with ApiClient(cm) as api:
-                status, body = api.check_health()
-                body_text = str(body)
-                clean_body = _strip_ansi(body_text)
+                status, _body = api.check_connectivity()
+                category = pce_probe_category(status)
                 try:
                     from src.module_log import ModuleLog as _ML
                     _ML.get("actions").info(f"Connection result: status={status}")
                 except Exception:
                     pass  # intentional: audit-log best-effort, must not block primary action
-                return jsonify({"ok": status == 200, "status": status, "body": clean_body[:500]})
+                return jsonify({
+                    "ok": category == "ok",
+                    "reachable": status != 0,
+                    "status": status,
+                    "category": category,
+                    "probe": "noop",
+                })
         except Exception as e:
             try:
                 from src.module_log import ModuleLog as _ML
@@ -915,6 +950,16 @@ def make_actions_blueprint(
             except Exception:
                 pass  # intentional: audit-log best-effort, must not block primary action
             lang = (request.get_json(silent=True) or {}).get('lang') or cm.config.get('settings', {}).get('language', 'en')
-            return _err_with_log("pce_test_connection", e, lang=lang)
+            error_response, error_status = _err_with_log(
+                "pce_test_connection", e, lang=lang)
+            error_body = error_response.get_json()
+            error_body.update({
+                "ok": False,
+                "reachable": False,
+                "status": 0,
+                "category": "transport_error",
+                "probe": "noop",
+            })
+            return jsonify(error_body), error_status
 
     return bp

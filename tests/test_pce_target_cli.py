@@ -21,6 +21,31 @@ from click.testing import CliRunner
 # pce_target_changed()
 # ---------------------------------------------------------------------------
 
+@pytest.mark.parametrize(("api_cfg", "expected"), [
+    ({"deployment_type": "saas", "url": "https://saas-api.example.invalid", "console_url": ""},
+     "https://console.illum.io"),
+    ({"deployment_type": "saas", "url": "https://custom-api.example.invalid:443",
+      "console_url": "https://acme.illumio.ai/"}, "https://acme.illumio.ai"),
+    ({"deployment_type": "on_prem", "url": "https://pce.lab:8443/api/v2", "console_url": ""},
+     "https://pce.lab:8443"),
+])
+def test_resolve_pce_console_url(api_cfg, expected):
+    from src.pce_target import resolve_pce_console_url
+    assert resolve_pce_console_url(api_cfg) == expected
+
+
+def test_deployment_and_console_url_are_not_pce_target_changes():
+    from src.pce_target import pce_target_changed
+    old = {
+        "deployment_type": "on_prem",
+        "console_url": "",
+        "url": "https://pce.example.com:8443",
+        "org_id": "1",
+    }
+    updated = {**old, "deployment_type": "saas", "console_url": "https://console.illum.io"}
+    assert pce_target_changed(old, updated["url"], updated["org_id"]) is False
+
+
 def test_changing_url_is_a_target_change():
     from src.pce_target import pce_target_changed
     old = {"url": "https://pce.example.com:8443", "org_id": "1"}
@@ -114,7 +139,8 @@ def _make_cm(url="https://pce.example.com:8443", org_id="1"):
     cm = MagicMock()
     cm.config = {
         "api": {"url": url, "org_id": org_id, "key": "oldkey", "secret": "oldsecret",
-                "profile": "production", "verify_ssl": True},
+                "profile": "production", "verify_ssl": True,
+                "deployment_type": "on_prem", "console_url": ""},
     }
     cm.config_file = "/fake/config.json"
     cm.models.pce_cache.db_path = "/fake/pce_cache.sqlite"
@@ -289,6 +315,31 @@ def test_interactive_target_change_prompts_and_flushes_on_choice(runner):
     mock_flush.assert_called_once()
 
 
+def test_no_interactive_runtime_fields_warn_without_target_guard_or_flush(runner):
+    from src.cli.config import config_group
+    from src.i18n import t
+
+    cm = _make_cm()
+    with patch("src.config.ConfigManager", return_value=cm):
+        with patch("src.pce_cache.flush.flush_pce_derived_state") as mock_flush:
+            result = runner.invoke(config_group, [
+                "login",
+                "--url", "https://pce.example.com:8443",
+                "--key", "k", "--secret", "s",
+                "--deployment-type", "saas",
+                "--console-url", "https://console.illum.io",
+                "--no-interactive",
+            ])
+
+    assert result.exit_code == 0, result.output
+    assert t("cli_config_login_connection_restart_required") in result.output
+    assert t("cli_config_login_pce_restart_required") not in result.output
+    assert "cleared" not in result.output.lower()
+    assert "refill" not in result.output.lower()
+    mock_flush.assert_not_called()
+    cm.save.assert_called_once()
+
+
 # ---------------------------------------------------------------------------
 # settings_menu() — interactive settings wizard, src/cli/menus/_root.py
 # ---------------------------------------------------------------------------
@@ -297,7 +348,8 @@ def _make_menu_cm(url="https://pce.example.com:8443", org_id="1"):
     cm = MagicMock()
     cm.config = {
         "api": {"url": url, "org_id": org_id, "key": "oldkey", "secret": "oldsecret",
-                "verify_ssl": True},
+                "profile": "production", "verify_ssl": True,
+                "deployment_type": "on_prem", "console_url": ""},
         "email": {"sender": "alerts@example.com"},
         "alerts": {"active": ["mail"]},
         "smtp": {"host": "localhost", "port": 25, "enable_auth": False},
@@ -317,12 +369,85 @@ def _run_menu(monkeypatch, cm, answers):
     root_module.settings_menu(cm)
 
 
+@pytest.mark.parametrize(("console_answer", "expected"), [
+    ("", "https://console.illum.io"),
+    ("https://tenant.illumio.example/", "https://tenant.illumio.example"),
+])
+def test_menu_saas_console_default_and_custom_are_atomic_runtime_edits(
+    monkeypatch, capsys, console_answer, expected,
+):
+    cm = _make_menu_cm()
+    answers = [
+        1,
+        "saas", console_answer,
+        None, None, None, None,
+        None,  # dismiss restart warning
+        None,  # leave settings menu
+    ]
+    with patch("src.pce_cache.flush.flush_pce_derived_state") as mock_flush:
+        _run_menu(monkeypatch, cm, answers)
+
+    cm.save.assert_called_once()
+    mock_flush.assert_not_called()
+    assert cm.config["api"]["deployment_type"] == "saas"
+    assert cm.config["api"]["console_url"] == expected
+    from src.i18n import t
+    output = capsys.readouterr().out
+    assert t("cli_connection_restart_required_menu") in output
+    assert t("cli_pce_restart_required_menu") not in output
+    assert "cleared" not in output.lower()
+    assert "refill" not in output.lower()
+
+
+def test_menu_invalid_console_url_is_rejected_without_mutation_or_flush(
+    monkeypatch, capsys,
+):
+    cm = _make_menu_cm()
+    before = dict(cm.config["api"])
+    answers = [
+        1,
+        "saas", "ftp://tenant.example.com",
+        None, None, None, None,
+        None,  # dismiss validation error
+        None,  # leave settings menu
+    ]
+
+    with patch("src.pce_cache.flush.flush_pce_derived_state") as mock_flush:
+        _run_menu(monkeypatch, cm, answers)
+
+    from src.i18n import t
+    output = capsys.readouterr().out
+    prefix = t("cli_config_validation_failed", errors="").split(":", 1)[0]
+    assert prefix in output
+    assert "ftp://tenant.example.com" not in output
+    cm.save.assert_not_called()
+    mock_flush.assert_not_called()
+    assert cm.config["api"] == before
+
+
+@pytest.mark.parametrize("answers", [
+    [1, None, None, None, None, None],
+    [1, "saas", None, None, None, 2, None, None],
+])
+def test_menu_cancelling_either_new_prompt_abandons_the_whole_edit(
+    monkeypatch, answers,
+):
+    cm = _make_menu_cm()
+    before = dict(cm.config["api"])
+
+    _run_menu(monkeypatch, cm, answers)
+
+    cm.save.assert_not_called()
+    assert cm.config["api"] == before
+
+
 def test_menu_cancelling_target_change_abandons_whole_edit(monkeypatch):
     """Cancel (safe_input -> None) at the target-change question must not
     save anything, not even the url/key that were already typed."""
     cm = _make_menu_cm()
     answers = [
         1,                                     # select item 1
+        "", "",                               # keep deployment / Console URL
         "https://other-pce.example.com:8443",  # new url (changed)
         None, None, None,                      # org_id/key/secret unchanged
         None,                                  # cancel the target-change question
@@ -338,7 +463,7 @@ def test_menu_cancelling_target_change_abandons_whole_edit(monkeypatch):
 def test_menu_target_change_same_pce_saves_without_flush(monkeypatch):
     cm = _make_menu_cm()
     answers = [
-        1, "https://other-pce.example.com:8443", None, None, None,
+        1, "", "", "https://other-pce.example.com:8443", None, None, None,
         2,      # same-pce
         None,   # dismiss the "restart the monitoring service" notice
         None,
@@ -353,7 +478,7 @@ def test_menu_target_change_same_pce_saves_without_flush(monkeypatch):
 def test_menu_target_change_flush_clears_cache(monkeypatch):
     cm = _make_menu_cm()
     answers = [
-        1, "https://other-pce.example.com:8443", None, None, None,
+        1, "", "", "https://other-pce.example.com:8443", None, None, None,
         1,      # flush
         None,   # dismiss the "restart the monitoring service" notice
         None,
@@ -369,7 +494,7 @@ def test_menu_target_change_flush_clears_cache(monkeypatch):
 def test_menu_target_change_warns_to_restart_the_monitoring_service(monkeypatch, capsys):
     cm = _make_menu_cm()
     answers = [
-        1, "https://other-pce.example.com:8443", None, None, None,
+        1, "", "", "https://other-pce.example.com:8443", None, None, None,
         1, None, None,
     ]
     with patch("src.pce_cache.flush.flush_pce_derived_state"):
@@ -382,7 +507,7 @@ def test_menu_flush_failure_leaves_the_connection_unchanged(monkeypatch):
     """Same ordering rule as the other two paths (review M2)."""
     cm = _make_menu_cm()
     answers = [
-        1, "https://other-pce.example.com:8443", None, None, None,
+        1, "", "", "https://other-pce.example.com:8443", None, None, None,
         1, None, None,
     ]
     with patch("src.pce_cache.flush.flush_pce_derived_state",
@@ -395,7 +520,7 @@ def test_menu_flush_failure_leaves_the_connection_unchanged(monkeypatch):
 def test_menu_stores_the_normalized_url(monkeypatch):
     cm = _make_menu_cm()
     answers = [
-        1, "  HTTPS://PCE.Example.COM:8443/  ", None, None, None,
+        1, "", "", "  HTTPS://PCE.Example.COM:8443/  ", None, None, None,
         None,
     ]
     with patch("src.pce_cache.flush.flush_pce_derived_state") as mock_flush:
@@ -411,7 +536,7 @@ def test_menu_rotating_credentials_only_saves_without_asking(monkeypatch):
     """Same url/org_id, only key/secret rotate — no target-change question."""
     cm = _make_menu_cm()
     answers = [
-        1, None, None, "newkey", "newsecret",
+        1, "", "", None, None, "newkey", "newsecret",
         None,
     ]
     with patch("src.pce_cache.flush.flush_pce_derived_state") as mock_flush:

@@ -32,7 +32,9 @@ from src.state_store import load_state_file, update_state_file
 
 def _analyzer(rules, *, subscriber_events=None, subscriber_flows=None, api=None):
     cm = MagicMock()
-    cm.config = {"rules": rules}
+    # Most tests in this module exercise non-health pipelines. Keep their API
+    # doubles isolated by explicitly disabling the independent health probe.
+    cm.config = {"rules": rules, "settings": {"enable_health_check": False}}
     az = Analyzer(cm, api or MagicMock(), MagicMock(),
                   subscriber_events=subscriber_events,
                   subscriber_flows=subscriber_flows)
@@ -114,11 +116,18 @@ def test_disabled_traffic_rule_is_not_selected_or_dispatched():
     az.reporter.add_traffic_alert.assert_not_called()
 
 
-def test_disabled_system_health_rule_does_not_probe_or_alert():
+def test_disabled_system_health_rule_still_probes_but_does_not_alert():
     az = _analyzer([{"id": "sys1", "name": "health", "type": "system",
                      "filter_value": "pce_health", "enabled": False}])
+    az.cm.config["settings"]["enable_health_check"] = True
+    az.api.check_connectivity.return_value = (200, "")
+    az.api.check_health.return_value = (200, '{"status": "normal"}')
+    az.api.check_node_available.return_value = (200, "")
+
     az._run_health_check()
-    az.api.check_health.assert_not_called()
+
+    az.api.check_health.assert_called_once()
+    assert az.state["pce_stats"]["health_status"] == "ok"
     az.reporter.add_health_alert.assert_not_called()
 
 

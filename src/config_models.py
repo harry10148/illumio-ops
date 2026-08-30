@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import ipaddress
 from typing import Literal, Optional
+from urllib.parse import urlsplit
 
 from pydantic import AliasChoices, BaseModel, ConfigDict, Field, HttpUrl, field_validator, model_validator
 
@@ -24,6 +25,23 @@ class _Base(BaseModel):
         validate_assignment=True,
     )
 
+
+def _validate_optional_http_url(value: object, field_name: str) -> str:
+    """Normalize an optional HTTP(S) URL while keeping it as a plain string."""
+    raw = str(value if value is not None else "").strip().rstrip("/")
+    if not raw:
+        return ""
+    try:
+        HttpUrl(raw)
+    except Exception:
+        raise ValueError(
+            f"{field_name} must use http or https scheme (e.g. https://console.example.com)"
+        ) from None
+    if "@" in urlsplit(raw).netloc:
+        raise ValueError(f"{field_name} must not include userinfo")
+    return raw
+
+
 class ApiSettings(_Base):
     # url is stored as plain str to avoid pydantic's trailing-slash normalization
     # (HttpUrl validates the scheme; the validator strips any trailing slash).
@@ -33,6 +51,8 @@ class ApiSettings(_Base):
     secret: str = Field(default="")
     profile: Literal["production", "dev"] = "production"
     verify_ssl: bool = True
+    deployment_type: Literal["saas", "on_prem"] = "on_prem"
+    console_url: str = ""
 
     @field_validator("verify_ssl", mode="after")
     @classmethod
@@ -58,7 +78,14 @@ class ApiSettings(_Base):
             raise ValueError(
                 "url must use http or https scheme (e.g. https://pce.example.com:8443)"
             ) from None
+        if "@" in urlsplit(raw).netloc:
+            raise ValueError("url must not include userinfo")
         return raw
+
+    @field_validator("console_url", mode="before")
+    @classmethod
+    def validate_console_url(cls, v: object) -> str:
+        return _validate_optional_http_url(v, "console_url")
 
 class AlertsSettings(_Base):
     active: list[str] = Field(default_factory=lambda: ["mail"])
@@ -180,6 +207,7 @@ class WebGuiSettings(_Base):
     password: str = "illumio"
     secret_key: str = ""
     allowed_ips: list[str] = Field(default_factory=list)
+    public_url: str = ""
     tls: WebGuiTls = Field(default_factory=WebGuiTls)
     must_change_password: bool = False
     # NOTE: `enable_v2_preview` used to live here (Task 1..10, default False).
@@ -187,6 +215,11 @@ class WebGuiSettings(_Base):
     # deleted rather than deprecated-in-place: model_config is extra="allow"
     # above, so an installed config.json that still carries the key round-trips
     # untouched instead of failing validation.
+
+    @field_validator("public_url", mode="before")
+    @classmethod
+    def validate_public_url(cls, v: object) -> str:
+        return _validate_optional_http_url(v, "public_url")
 
 class ReportSchedule(_Base):
     """Report schedule entries; extra=allow because schedule shape

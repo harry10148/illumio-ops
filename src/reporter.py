@@ -17,6 +17,7 @@ from src.alerts import build_output_plugin, get_output_registry, render_alert_te
 from src.events import normalize_event, persist_dispatch_results
 from src.events.poller import format_utc
 from src.i18n import t
+from src.pce_target import resolve_pce_console_url
 from src.state_store import update_state_file
 
 PKG_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -266,35 +267,14 @@ class Reporter:
 
     def _event_console_link(self, event: dict) -> str:
         href = str((event or {}).get("href", "") or "").strip()
-        base = self._active_pce_url().rstrip("/")
-        if not href or not base:
+        base = resolve_pce_console_url(self.cm.config.get("api", {})).rstrip("/")
+        if not base:
             return ""
-        for suffix in ("/api/v2", "/api/v1", "/api"):
-            if base.endswith(suffix):
-                base = base[: -len(suffix)]
-                break
-        base = self._console_base(base)
         if "/orgs/" in href:
             _, _, tail = href.partition("/orgs/")
             _, _, href = tail.partition("/")
             href = "/" + href if href else ""
         return f"{base}/#{href}" if href else base
-
-    @staticmethod
-    def _console_base(api_base: str) -> str:
-        """Web-console base for the event deep-link.
-
-        On-prem the API host also serves the web console, so the API base is
-        correct. Illumio SaaS serves the API from a regional SCP cluster
-        (e.g. *.ap-scp1.illumio.com) but the web console is the region-agnostic
-        console.illum.io — a different host — so the API base would 404. Map any
-        SaaS SCP API host to console.illum.io.
-        """
-        from urllib.parse import urlparse
-        host = (urlparse(api_base).hostname or "").lower()
-        if host.endswith("illumio.com") and "scp" in host:
-            return "https://console.illum.io"
-        return api_base
 
     @staticmethod
     def _summarize_notification_info(info: Any) -> str:
@@ -1125,39 +1105,52 @@ class Reporter:
                 health_section_lines.append(t('line_section_more', more=len(self.health_alerts) - 2))
 
         event_section_lines = []
+        event_priority_section_lines = []
         if self.event_alerts:
-            event_section_lines.append(section_header(t("alert_sec_event"), len(self.event_alerts)))
+            header = section_header(t("alert_sec_event"), len(self.event_alerts))
+            event_section_lines.append(header)
+            event_priority_section_lines.append(header)
             for idx, alert in enumerate(self._build_all_event_alert_payloads()[:3], start=1):
                 first = alert["events"][0] if alert["events"] else {}
-                event_section_lines.append(f"{idx}. [{alert['severity_label']}] {alert['rule']}")
+                entry_lines = [f"{idx}. [{alert['severity_label']}] {alert['rule']}"]
                 if first.get("event_type"):
-                    event_section_lines.append(f"{event_lbl}：{first['event_type']}")
+                    entry_lines.append(f"{event_lbl}：{first['event_type']}")
                 if first.get("timestamp"):
-                    event_section_lines.append(f"{time_lbl}：{self._compact_text(first['timestamp'])[:19]}")
+                    entry_lines.append(f"{time_lbl}：{self._compact_text(first['timestamp'])[:19]}")
                 if first.get("created_by"):
-                    event_section_lines.append(f"{created_by_lbl}：{first['created_by']}")
+                    entry_lines.append(f"{created_by_lbl}：{first['created_by']}")
                 if first.get("target_name"):
-                    event_section_lines.append(f"{target_lbl}：{first['target_name']}")
+                    entry_lines.append(f"{target_lbl}：{first['target_name']}")
                 if first.get("action", {}).get("label"):
-                    event_section_lines.append(f"{action_lbl}：{first['action']['label']}")
+                    entry_lines.append(f"{action_lbl}：{first['action']['label']}")
                 if first.get("action", {}).get("src_ip"):
-                    event_section_lines.append(f"{src_ip_lbl}：{first['action']['src_ip']}")
+                    entry_lines.append(f"{src_ip_lbl}：{first['action']['src_ip']}")
                 if first.get("resource_changes_count"):
-                    event_section_lines.append(f"{changes_lbl}：{first['resource_changes_count']} {records}")
+                    entry_lines.append(f"{changes_lbl}：{first['resource_changes_count']} {records}")
                 if first.get("notifications_count"):
-                    event_section_lines.append(f"{notif_lbl}：{first['notifications_count']} {records}")
+                    entry_lines.append(f"{notif_lbl}：{first['notifications_count']} {records}")
+                description_index = len(entry_lines)
                 if alert.get("desc"):
-                    event_section_lines.append(f"{summary_lbl}：{alert['desc']}")
+                    entry_lines.append(f"{summary_lbl}：{alert['desc']}")
                 if first.get("recommendation"):
-                    event_section_lines.append(f"{rec_lbl}：{first['recommendation']}")
+                    entry_lines.append(f"{rec_lbl}：{first['recommendation']}")
+                pce_line = ""
                 if first.get("pce_link"):
-                    event_section_lines.append(f"PCE：{first['pce_link']}")
-                event_section_lines.append("")
+                    pce_line = f"PCE：{first['pce_link']}"
+                    entry_lines.append(pce_line)
+                entry_lines.append("")
+                event_section_lines.extend(entry_lines)
+
+                priority_lines = list(entry_lines)
+                if pce_line and alert.get("desc"):
+                    priority_lines.remove(pce_line)
+                    priority_lines.insert(description_index, pce_line)
+                event_priority_section_lines.extend(priority_lines)
             remaining = len(self.event_alerts) - 3
             if remaining > 0:
-                event_section_lines.append(
-                    t("alert_field_remaining_events", count=remaining)
-                )
+                remaining_line = t("alert_field_remaining_events", count=remaining)
+                event_section_lines.append(remaining_line)
+                event_priority_section_lines.append(remaining_line)
 
         traffic_section_lines = []
         if self.traffic_alerts:
@@ -1187,25 +1180,37 @@ class Reporter:
             if len(self.metric_alerts) > 2:
                 metric_section_lines.append(t('line_section_more', more=len(self.metric_alerts) - 2))
 
-        message = render_alert_template(
-            "line_digest.txt.tmpl",
-            lang=_lang,
-            subject=self._compact_text(subj),
-            generated_at=self._now_str(),
-            total_issues=str(total_issues),
-            health_count=str(len(self.health_alerts)),
-            event_count=str(len(self.event_alerts)),
-            traffic_count=str(len(self.traffic_alerts)),
-            metric_count=str(len(self.metric_alerts)),
-            health_section="\n".join(health_section_lines),
-            event_section="\n".join(event_section_lines),
-            traffic_section="\n".join(traffic_section_lines),
-            metric_section="\n".join(metric_section_lines),
-        ).strip()
+        def render_message(event_lines: list[str]) -> str:
+            return render_alert_template(
+                "line_digest.txt.tmpl",
+                lang=_lang,
+                subject=self._compact_text(subj),
+                generated_at=self._now_str(),
+                total_issues=str(total_issues),
+                health_count=str(len(self.health_alerts)),
+                event_count=str(len(self.event_alerts)),
+                traffic_count=str(len(self.traffic_alerts)),
+                metric_count=str(len(self.metric_alerts)),
+                health_section="\n".join(health_section_lines),
+                event_section="\n".join(event_lines),
+                traffic_section="\n".join(traffic_section_lines),
+                metric_section="\n".join(metric_section_lines),
+            ).strip()
+
+        message = render_message(event_section_lines)
 
         if cap is not None and len(message) > cap:
             footer = t("line_message_truncated")
-            message = message[: cap - len(footer) - 1].rstrip() + "\n" + footer
+            if cap <= 0:
+                return ""
+            if cap <= len(footer):
+                return footer[:cap]
+            if event_priority_section_lines != event_section_lines:
+                message = render_message(event_priority_section_lines)
+            cut = message[: cap - len(footer) - 1]
+            newline = cut.rfind("\n")
+            cut = cut[:newline] if newline != -1 else ""
+            message = f"{cut.rstrip()}\n{footer}" if cut.strip() else footer
         return message
 
     def _build_telegram_message(self, subj: str, *, lang: str | None = None) -> str:

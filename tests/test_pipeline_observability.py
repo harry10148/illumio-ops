@@ -60,6 +60,24 @@ def test_pipeline_verdict_siem_idle_is_warn():
                             denom=0, dlq=0, siem_idle=False) == "ok"
 
 
+def test_pipeline_verdict_ingestor_error_overrides_fresh_lag_and_idle_siem():
+    """A failed ingest bumps its watermark, so lag can still look fresh.
+
+    The shared verdict must use the ingestor outcome as an independent signal;
+    otherwise a dead events/traffic pull is reported healthy when SIEM has no
+    traffic in the one-hour window.
+    """
+    from src.pce_cache.health import pipeline_verdict
+
+    assert pipeline_verdict(
+        lag_levels=["ok"],
+        source_statuses=["error"],
+        siem_success_1h=100.0,
+        denom=0,
+        dlq=0,
+    ) == "error"
+
+
 def test_overview_pipeline_flags_siem_idle_when_no_enabled_destination(tmp_path):
     """siem.enabled=true with all destinations disabled -> pipeline verdict
     warn/error and siem_idle True."""

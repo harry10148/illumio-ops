@@ -47,7 +47,10 @@ from src.state_store import load_state_file, update_state_file
 
 def _cm():
     cm = ConfigManager()
-    cm.config["rules"] = []  # no system/pce_health rule -> _run_health_check never probes
+    cm.config["rules"] = []
+    # These tests isolate cache-local state merging; disable the now-independent
+    # automatic PCE probe explicitly instead of relying on an absent alert rule.
+    cm.config["settings"]["enable_health_check"] = False
     return cm
 
 
@@ -252,7 +255,7 @@ def test_check_watchdog_alert_timestamp_survives_save_when_pce_stats_not_dirty(s
         **s, "pce_stats": {"consecutive_failures": WATCHDOG_FAILURE_THRESHOLD}
     })
     ana = _cache_analyzer()
-    _run_cache_cycle(ana)  # no health rule -> _pce_stats_dirty stays False; _check_watchdog still fires
+    _run_cache_cycle(ana)  # health probe disabled -> pce_stats stays externally owned; watchdog still fires
 
     ana.reporter.add_health_alert.assert_called_once()
     on_disk = load_state_file(state_file)

@@ -121,6 +121,55 @@ def test_redaction_never_reports_secret_length(authed_client):
     )
 
 
+def test_manual_pce_health_check_persists_fresh_status(
+        authed_client, monkeypatch, tmp_path):
+    """The operator control must run real Analyzer health state handling."""
+    import src.analyzer as analyzer_mod
+    import src.api_client as api_client_mod
+
+    class FakeApiClient:
+        def __init__(self, _cm):
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return False
+
+        def check_connectivity(self):
+            return 200, ""
+
+        def check_health(self):
+            return 200, '{"status": "normal"}'
+
+        def check_node_available(self):
+            return 200, ""
+
+        def close(self):
+            pass
+
+    state_file = tmp_path / "state.json"
+    monkeypatch.setattr(analyzer_mod, "STATE_FILE", str(state_file))
+    monkeypatch.setattr(api_client_mod, "ApiClient", FakeApiClient)
+    client, csrf = authed_client
+
+    response = client.post(
+        "/api/pce/health-check",
+        json={},
+        headers={"X-CSRF-Token": csrf},
+    )
+
+    assert response.status_code == 200
+    body = response.get_json()
+    assert body["ok"] is True
+    assert body["pce_stats"]["health_status"] == "ok"
+    assert body["pce_stats"]["health_category"] == "ok"
+    assert body["pce_stats"]["health_probe"] == "health"
+    persisted = json.loads(state_file.read_text(encoding="utf-8"))
+    assert persisted["pce_stats"]["health_status"] == "ok"
+
+
 # ── Test 1b: the contract the Integrations → Overview channel cards depend on ──
 # Regression guard for the "LINE configured but displayed as Not configured" bug.
 # The overview detects a configured channel via the redacted-secret companion flag
@@ -248,6 +297,126 @@ def test_settings_response_has_no_profile_fields(authed_client):
     body = client.get("/api/settings").get_json()
     assert "pce_profiles" not in body
     assert "active_pce_id" not in body
+
+
+def test_settings_round_trips_runtime_connection_metadata_without_target_change(
+    authed_client, app,
+):
+    """Deployment/Console metadata changes runtime connection behaviour, but
+    does not identify a different PCE or require a cache decision."""
+    client, csrf = authed_client
+
+    before = client.get("/api/settings").get_json()["api"]
+    assert before["deployment_type"] == "on_prem"
+    assert before["console_url"] == ""
+
+    res = _save(client, csrf, {
+        "deployment_type": "saas",
+        "console_url": "https://tenant.illumio.example/",
+    })
+
+    assert res.status_code == 200
+    assert res.get_json() == {"ok": True, "restart_required": True}
+    cm = app.config["CM"]
+    cm.load()
+    assert cm.config["api"]["deployment_type"] == "saas"
+    assert cm.config["api"]["console_url"] == "https://tenant.illumio.example"
+    reread = client.get("/api/settings").get_json()["api"]
+    assert reread["deployment_type"] == "saas"
+    assert reread["console_url"] == "https://tenant.illumio.example"
+
+
+@pytest.mark.parametrize("api_block", [
+    {"deployment_type": "cloud", "console_url": "https://tenant.example.com"},
+    {"deployment_type": "saas", "console_url": "ftp://tenant.example.com"},
+])
+def test_settings_rejects_invalid_runtime_connection_metadata_atomically(
+    authed_client, app, api_block,
+):
+    """A bad value in either new field rejects the complete API block; the
+    other valid value must not be partially persisted."""
+    client, csrf = authed_client
+    cm = app.config["CM"]
+    cm.load()
+    before = dict(cm.config["api"])
+
+    res = _save(client, csrf, api_block)
+
+    assert res.status_code == 400
+    assert res.get_json()["ok"] is False
+    cm.load()
+    assert cm.config["api"] == before
+
+
+@pytest.mark.parametrize(("api_block", "choice"), [
+    ({
+        "deployment_type": "saas",
+        "console_url": "https://fake-user:fake-pass@tenant.illumio.example",
+    }, None),
+    ({
+        "url": "https://fake-user:fake-pass@pce.example.com:8443",
+        "org_id": "sentinel-org",
+    }, "same-pce"),
+])
+def test_settings_rejects_userinfo_urls_without_partial_mutation(
+    authed_client, app, api_block, choice,
+):
+    client, csrf = authed_client
+    cm = app.config["CM"]
+    cm.load()
+    before = dict(cm.config["api"])
+
+    res = _save(client, csrf, api_block, choice=choice)
+
+    assert res.status_code == 400
+    assert res.get_json()["ok"] is False
+    cm.load()
+    assert cm.config["api"] == before
+    stored = json.dumps(cm.config["api"])
+    assert "fake-user" not in stored
+    assert "sentinel-org" not in stored
+
+
+def test_settings_rejects_userinfo_url_before_target_change_response(
+    authed_client, app,
+):
+    client, csrf = authed_client
+    cm = app.config["CM"]
+    cm.load()
+    before = dict(cm.config["api"])
+
+    res = _save(client, csrf, {
+        "url": "https://fake-user:fake-pass@other-pce.example.com:8443",
+        "org_id": "sentinel-org",
+    })
+
+    assert res.status_code == 400
+    body = res.get_json()
+    assert body["ok"] is False
+    assert "pce_target_changed" not in body
+    serialized_body = json.dumps(body)
+    assert "fake-user" not in serialized_body
+    assert "fake-pass" not in serialized_body
+    assert "sentinel-org" not in serialized_body
+    cm.load()
+    assert cm.config["api"] == before
+
+
+def test_runtime_connection_metadata_neither_flushes_nor_changes_target(
+    tmp_path, monkeypatch,
+):
+    client, csrf, cache_db = _flush_test_app(tmp_path, monkeypatch)
+    _seed_one_event(cache_db)
+
+    res = _save(client, csrf, {
+        "deployment_type": "saas",
+        "console_url": "https://console.illum.io",
+    })
+
+    assert res.status_code == 200
+    assert res.get_json()["restart_required"] is True
+    assert "pce_target_changed" not in res.get_json()
+    assert _count_events(cache_db) == 1
 
 
 def test_pce_profiles_endpoint_is_gone(authed_client):
@@ -429,18 +598,35 @@ def test_flush_choice_empties_the_seeded_cache(tmp_path, monkeypatch):
 
 
 def test_a_save_rejected_by_later_validation_leaves_a_flush_cache_intact(tmp_path, monkeypatch):
-    """Pins the ordering fix: verify_ssl=False stays rejected (profile is
-    still 'production') by ApiSettings.model_validate — a check that runs
-    AFTER the pce_target_change guard accepts choice="flush". If the flush
-    ran inside that guard (as it originally did) this 400 would still have
-    wiped the cache of the PCE the appliance remains pointed at."""
+    """PCE choice 通過後若較晚的 report 驗證失敗，不得先清除舊 PCE 快取。"""
     client, csrf, cache_db = _flush_test_app(tmp_path, monkeypatch)
     _seed_one_event(cache_db)
     assert _count_events(cache_db) == 1
 
-    res = _save(client, csrf,
-                {"url": "https://other-pce.example.com:8443", "verify_ssl": False},
-                choice="flush")
+    cm = client.application.config["CM"]
+    cm.load()
+    before_api = dict(cm.config["api"])
+    before_report = dict(cm.config["report"])
+
+    res = client.post(
+        "/api/settings",
+        json={
+            "api": {"url": "https://other-pce.example.com:8443"},
+            "pce_target_change": "flush",
+            "report": {"output_dir": "/etc/evil"},
+        },
+        headers={"X-CSRFToken": csrf},
+        environ_overrides={"REMOTE_ADDR": "127.0.0.1"},
+    )
+
     assert res.status_code == 400
-    assert res.get_json()["ok"] is False
-    assert _count_events(cache_db) == 1, "a rejected save must not flush the cache"
+    body = res.get_json()
+    assert body["ok"] is False
+    assert "Report output directory" in body["error"]
+    assert _count_events(cache_db) == 1, "被拒絕的 save 不得清除快取"
+    assert cm.config["api"] == before_api
+    assert cm.config["report"] == before_report
+
+    cm.load()
+    assert cm.config["api"] == before_api
+    assert cm.config["report"] == before_report
