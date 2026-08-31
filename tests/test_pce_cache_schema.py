@@ -24,6 +24,11 @@ def test_schema_creates_all_expected_tables():
             # 視窗增量觀測（phase 2）：ingest 每輪記一列，規則引擎據此推導
             # 落在視窗內的增量（src/pce_cache/flow_deltas.py）
             "pce_traffic_flow_obs",
+            # 這份快取屬於哪台 PCE——flush.py 開頭說的那個缺席的 tenant 維度。
+            # 模型刻意放在 models.py 而不是 provenance.py：init_schema() 只
+            # import Base，模型放別處就會讓這張表是否存在取決於有沒有人先
+            # import 過 provenance。這條斷言就是這樣抓到的（先前的版本真的漏建）。
+            "cache_binding",
         }
 
 

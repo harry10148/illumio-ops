@@ -28,6 +28,21 @@ from src.config_models import TrafficFilterSettings
 import pytest
 
 
+@pytest.fixture(autouse=True)
+def _skip_cache_provenance_guard():
+    """Neutralise the ingest-time PCE binding guard for this module.
+
+    These tests mock the persistence layer, so the guard would query a Mock and
+    read two different Mock reprs as two different PCEs. Disabling it here is
+    explicit rather than incidental: the guard's own behaviour is covered by
+    tests/test_pce_cache_provenance.py, including the wiring assertion that
+    run_events_ingest / run_traffic_ingest actually call it.
+    """
+    with patch("src.scheduler.jobs._guard_cache_target"):
+        yield
+
+
+
 def _cm(tmp_path):
     cm = MagicMock()
     cfg = cm.models.pce_cache

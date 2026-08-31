@@ -15,17 +15,23 @@ from sqlalchemy import create_engine, delete, func, select
 from sqlalchemy.orm import sessionmaker
 
 from src.pce_cache.models import (
-    Base, DeadLetter, IngestionCursor, IngestionWatermark, PceEvent,
+    Base, CacheBinding, DeadLetter, IngestionCursor, IngestionWatermark, PceEvent,
     PceTrafficFlowAgg, PceTrafficFlowObs, PceTrafficFlowRaw, SiemDispatch,
 )
 from src.state_store import update_state_file
 
 # Order matters: SiemDispatch and DeadLetter reference rows in the data tables
 # by (source_table, source_id), so they go first.
+#
+# CacheBinding goes last and is cleared like the rest. Every caller flushes
+# BEFORE writing the new connection, so rewriting the binding here would pin it
+# to the PCE being left behind. Clearing it lets the next ingest bind whatever is
+# configured by then, which is safe precisely because the tables above are now
+# empty: there is no other estate's data left for a wrong binding to endanger.
 _MODELS = (
     SiemDispatch, DeadLetter,
     PceTrafficFlowAgg, PceTrafficFlowObs, PceTrafficFlowRaw, PceEvent,
-    IngestionCursor, IngestionWatermark,
+    IngestionCursor, IngestionWatermark, CacheBinding,
 )
 
 # The state.json keys that describe one PCE's history. Everything else in that

@@ -182,6 +182,29 @@ class SiemDispatch(Base):
     )
 
 
+class CacheBinding(Base):
+    """這份快取屬於哪台 PCE——一列，url ＋ org_id。
+
+    src/pce_cache/flush.py 開頭寫著「the cache carries no tenant dimension」，
+    這張表就是那個缺席的維度。它記的不是 PCE 回傳的資料，而是「這些資料是從
+    哪裡來的」；驗證與綁定的邏輯全在 src/pce_cache/provenance.py。
+
+    模型放在這裡而不是 provenance.py，是因為 schema.init_schema() 只 import
+    models.Base 就建表——放在別處會讓這張表是否存在取決於有沒有人先 import 過
+    provenance，而那種 import 順序相依會在測試裡通過、在出貨路徑上消失。
+    （tests/test_pce_cache_schema.py 的表名集合斷言就是這樣抓到的。）
+
+    id 由寫入端釘成 1：綁定只有一個，一張能放兩列的表說的是相反的事。
+    """
+
+    __tablename__ = "cache_binding"
+
+    id:       Mapped[int]      = mapped_column(Integer, primary_key=True)
+    pce_url:  Mapped[str]      = mapped_column(String(255))
+    org_id:   Mapped[str]      = mapped_column(String(64))
+    bound_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
 class DeadLetter(Base):
     __tablename__ = "dead_letter"
 

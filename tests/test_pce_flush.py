@@ -9,7 +9,7 @@ from sqlalchemy import create_engine, select
 from sqlalchemy.orm import sessionmaker
 
 from src.pce_cache.models import (
-    Base, DeadLetter, IngestionCursor, IngestionWatermark, PceEvent,
+    Base, CacheBinding, DeadLetter, IngestionCursor, IngestionWatermark, PceEvent,
     PceTrafficFlowAgg, PceTrafficFlowObs, PceTrafficFlowRaw, SiemDispatch,
 )
 from src.pce_cache.flush import _MODELS, _STATE_KEYS, flush_pce_derived_state
@@ -59,6 +59,8 @@ def _seed(db_path):
         s.add(DeadLetter(source_table="pce_events", source_id=1, destination="splunk",
                          retries=3, last_error="boom", payload_preview="{}",
                          quarantined_at=now))
+        s.add(CacheBinding(id=1, pce_url="https://pce.example.com:8443", org_id="1",
+                           bound_at=now))
         s.commit()
     return engine, sf
 
@@ -113,6 +115,11 @@ _EXPECTED_TABLENAMES = {
     "ingestion_watermarks",
     "siem_dispatch",
     "dead_letter",
+    # 「這份快取屬於哪台 PCE」——flush.py 開頭說的那個缺席的 tenant 維度。
+    # 模型在 models.py（schema.init_schema 只認 Base），驗證邏輯在
+    # provenance.py。清它的理由見 flush.py 的 _MODELS 註解：每個呼叫端都在
+    # 寫入新連線**之前** flush，所以留著它就是留著被拋下那台的名字。
+    "cache_binding",
 }
 
 

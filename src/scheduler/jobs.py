@@ -239,6 +239,26 @@ def _enabled_siem_destinations(cm, source_type: str) -> list[str]:
     ]
 
 
+def _guard_cache_target(cm, session_factory) -> None:
+    """Refuse to ingest into a cache that belongs to a different PCE.
+
+    Both ingest paths call this immediately after the engine is built and before
+    anything is written, so a re-point made outside the product's own settings
+    paths — editing config/config.json by hand, which is how it happened on
+    2026-08-30 — is stopped here instead of silently blending two estates.
+
+    The exception propagates: both callers already wrap their body and record
+    `status=error` into job health, which is what makes this visible rather than
+    just refused. Swallowing it here would leave the ingest reporting success
+    while writing nothing.
+    """
+    from src.pce_cache.provenance import bind_or_verify
+    # The model itself, not model_dump(): _configured_target reads either shape,
+    # and passing the object keeps this working for any caller holding a plain
+    # settings object rather than a pydantic model.
+    bind_or_verify(session_factory, cm.models.api)
+
+
 def run_events_ingest(cm) -> None:
     wm = None
     try:
@@ -248,6 +268,7 @@ def run_events_ingest(cm) -> None:
         from src.api_client import ApiClient
         cfg = cm.models.pce_cache
         sf = sessionmaker(_get_cache_engine(cfg.db_path))
+        _guard_cache_target(cm, sf)
         wm = WatermarkStore(sf)
         with ApiClient(cm) as api:
             ing = EventsIngestor(api=api, session_factory=sf,
@@ -279,6 +300,7 @@ def run_traffic_ingest(cm) -> None:
         from src.api_client import ApiClient
         cfg = cm.models.pce_cache
         sf = sessionmaker(_get_cache_engine(cfg.db_path))
+        _guard_cache_target(cm, sf)
         wm = WatermarkStore(sf)
         with ApiClient(cm) as api:
             from src.pce_cache.traffic_filter import TrafficFilter

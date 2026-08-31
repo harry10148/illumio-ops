@@ -159,6 +159,35 @@ def run_gui_only(cm, port: int = 5001, host: str = "0.0.0.0") -> None:
     launch_gui(cm, host=host, port=port)
 
 
+def _report_cache_provenance(cm) -> None:
+    """Say once, at start, which PCE the cache belongs to.
+
+    Advisory only — it never blocks the daemon. Refusing belongs to the ingest
+    path (scheduler/jobs.py's `_guard_cache_target`), where there is a write to
+    refuse; exiting here would take the GUI down too, over a condition the
+    operator fixes in that very GUI.
+
+    What this adds is timing: it is the only place that speaks *before* the first
+    ingest binds an unbound cache, which is the one window where an appliance
+    re-pointed prior to this check existing can still be noticed.
+
+    Never fatal. A cache that cannot be opened is the ingest path's problem to
+    report; a startup advisory that could crash the daemon would be a worse bug
+    than the one it warns about.
+    """
+    try:
+        cfg = cm.models.pce_cache
+        if not cfg.enabled:
+            return
+        from sqlalchemy.orm import sessionmaker
+        from src.gui._helpers import _get_cache_engine
+        from src.pce_cache.provenance import verify_at_startup
+        verify_at_startup(sessionmaker(_get_cache_engine(cfg.db_path)),
+                          cm.models.api.model_dump())
+    except Exception as exc:  # noqa: BLE001 - advisory only, see docstring
+        logger.warning("Could not check PCE cache provenance at startup: {}", exc)
+
+
 def run_daemon_with_gui(cm, interval: int = 10, port: int = 5001, host: str = "0.0.0.0") -> None:
     """Headless monitoring loop running in background thread + Flask GUI in main thread."""
     logger.info(f"Starting daemon loop with Web GUI (interval={interval}m, port={port})")
@@ -178,6 +207,8 @@ def run_daemon_with_gui(cm, interval: int = 10, port: int = 5001, host: str = "0
         print(t("report_requires_flask"))
         print(t("cli_pip_install_hint", pkg="flask"))
         sys.exit(1)
+
+    _report_cache_provenance(cm)
 
     # Clear BEFORE registering signals: run_daemon_loop no longer clears when it
     # runs as a background thread, so a SIGTERM arriving right after registration
