@@ -30,7 +30,8 @@ from __future__ import annotations
 from datetime import datetime, timezone
 
 from loguru import logger
-from sqlalchemy import select
+from sqlalchemy import func, select
+from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 
 # The model lives in models.py so `schema.init_schema()` creates the table from
 # Base alone — see its docstring. Re-exported here because this module is where
@@ -52,12 +53,24 @@ class CacheTargetMismatch(RuntimeError):
     def __init__(self, bound: tuple[str, str], configured: tuple[str, str]) -> None:
         self.bound = bound
         self.configured = configured
+        # Only remedies that actually work. The first draft of this message
+        # offered two that do not: `cache flush` without --confirm exits with a
+        # usage error, and "Settings → save offers a flush" is false in the very
+        # case that produces this error — after a direct edit of config.json the
+        # stored value already IS the new target, so pce_target_changed() returns
+        # False and nothing is offered. A wrong instruction costs the operator
+        # more than no instruction, because they spend the time before finding out.
         super().__init__(
             f"PCE cache belongs to {bound[0]} (org {bound[1]}) but the configuration "
             f"now points at {configured[0]} (org {configured[1]}). Refusing to write: "
-            f"mixing two PCEs' data leaves both wrong. Either restore the previous "
-            f"connection, or flush the cache first "
-            f"(`illumio-ops cache flush`, or Settings → save, which offers it)."
+            f"mixing two PCEs' data leaves both wrong.\n"
+            f"  To keep the cached data: set the connection back to {bound[0]} "
+            f"(org {bound[1]}).\n"
+            f"  To move to {configured[0]}: `illumio-ops cache flush --confirm` "
+            f"discards the cached rows, after which the next ingest binds the new PCE.\n"
+            f"  If this IS the same PCE at a new address, re-run the connection "
+            f"change through Settings (or `illumio-ops config login`) and answer "
+            f"'same-pce', which keeps the data and updates the binding."
         )
 
 
@@ -95,16 +108,81 @@ def bind_or_verify(session_factory, api_cfg) -> tuple[str, str]:
     with session_factory() as session:
         row = session.execute(select(CacheBinding).where(CacheBinding.id == 1)).scalar_one_or_none()
         if row is None:
-            session.add(CacheBinding(id=1, pce_url=configured[0], org_id=configured[1],
-                                     bound_at=datetime.now(timezone.utc)))
+            # INSERT .. ON CONFLICT DO NOTHING, then re-read, rather than
+            # read-then-insert. The events and traffic jobs fire on the same
+            # scheduler kick from different executors, so both can see None and
+            # both try to write id=1; the loser of a plain insert gets an
+            # IntegrityError or "database is locked" and its first ingest fails —
+            # for traffic, up to a poll interval of delay. Whoever wins, the
+            # re-read below is what decides, so both callers agree.
+            session.execute(
+                sqlite_insert(CacheBinding)
+                .values(id=1, pce_url=configured[0], org_id=configured[1],
+                        bound_at=datetime.now(timezone.utc))
+                .on_conflict_do_nothing(index_elements=["id"])
+            )
             session.commit()
-            logger.info("PCE cache bound to {} (org {})", configured[0], configured[1])
-            return configured
+            row = session.execute(
+                select(CacheBinding).where(CacheBinding.id == 1)).scalar_one()
+            logger.info("PCE cache bound to {} (org {})", row.pce_url, row.org_id)
 
         bound = (normalize_pce_url(row.pce_url), normalize_org_id(row.org_id))
         if bound != configured:
             raise CacheTargetMismatch(bound, configured)
         return bound
+
+
+def rebind(db_path: str, api_cfg) -> tuple[str, str]:
+    """Move the binding to *api_cfg*'s target, keeping every cached row.
+
+    This is the `same-pce` answer: one PCE reachable at a new address, where the
+    operator has told us the data is still theirs. Without it the binding keeps
+    naming the old address and every ingest afterwards raises
+    :class:`CacheTargetMismatch` — a supported option would silently stop
+    monitoring, which is how this function came to exist (Codex adversarial
+    review of 0449c36b).
+
+    Takes a path rather than a session factory because its three callers are the
+    config write paths, which hold `pce_cache.db_path` and no engine. A missing
+    database is not an error: nothing has been cached yet, so there is no binding
+    to move.
+    """
+    import os
+
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import sessionmaker
+
+    from src.pce_cache.models import Base
+
+    configured = _configured_target(api_cfg)
+    # `isinstance(..., str)` before os.path.exists, and not the other way round.
+    # A MagicMock grows a `__fspath__` on demand, so `os.path.exists(mock)`
+    # returns **True** — the existence check alone let a test double through and
+    # `create_engine(f"sqlite:///{mock}")` wrote a real 172KB database named
+    # after the Mock's repr into the repository root. os.path.exists is not a
+    # type check. The same idiom, for the same reason, is in backfill.py's
+    # _raise_on_fetch_error.
+    if not isinstance(db_path, str) or not os.path.exists(db_path):
+        return configured
+
+    engine = create_engine(f"sqlite:///{db_path}")
+    try:
+        Base.metadata.create_all(engine)
+        with sessionmaker(bind=engine)() as session:
+            row = session.execute(
+                select(CacheBinding).where(CacheBinding.id == 1)).scalar_one_or_none()
+            if row is None:
+                session.add(CacheBinding(id=1, pce_url=configured[0], org_id=configured[1],
+                                         bound_at=datetime.now(timezone.utc)))
+            else:
+                row.pce_url, row.org_id = configured
+                row.bound_at = datetime.now(timezone.utc)
+            session.commit()
+    finally:
+        engine.dispose()
+    logger.warning("PCE cache re-bound to {} (org {}) — same PCE, new address; "
+                   "cached rows kept", configured[0], configured[1])
+    return configured
 
 
 def verify_at_startup(session_factory, api_cfg) -> str:
@@ -122,9 +200,15 @@ def verify_at_startup(session_factory, api_cfg) -> str:
 
     Counting rows is what separates "adopting" from "empty" — a populated cache
     with no binding is the case worth a warning, an empty one is a fresh install.
+
+    Every provenance-bearing table is counted, not just events and raw flows.
+    Raw has a 7-day retention while aggregates, observations and the ingestion
+    watermarks live far longer, so a database whose raw rows had aged out would
+    otherwise report "empty", skip the warning, and let the next ingest bind a new
+    PCE to a cache still full of the old one's derived data. The binding itself is
+    excluded for the obvious reason: this branch only runs when there isn't one.
     """
-    from src.pce_cache.models import PceEvent, PceTrafficFlowRaw
-    from sqlalchemy import func
+    from src.pce_cache.flush import _MODELS
 
     configured = _configured_target(api_cfg)
     with session_factory() as session:
@@ -141,7 +225,7 @@ def verify_at_startup(session_factory, api_cfg) -> str:
 
         rows = sum(
             session.execute(select(func.count()).select_from(m)).scalar_one()
-            for m in (PceEvent, PceTrafficFlowRaw)
+            for m in _MODELS if m is not CacheBinding
         )
         if rows == 0:
             return "empty"

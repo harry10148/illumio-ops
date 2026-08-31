@@ -280,6 +280,7 @@
   "cli_config_login_pce_target_change_prompt": "這會把設備指向另一台 PCE。既有的快取與歷史資料要如何處理？",
   "cli_pce_target_change_prompt_menu": "這會把設備指向另一台 PCE。既有的快取與歷史資料要如何處理？（1. 清除快取與歷史，2. 同一台 PCE，只是換了位址）",
   "cli_config_login_pce_flush_failed": "清除前一台 PCE 的快取資料與歷史沒有完成（{error}），連線設定因此沒有變更，設備仍指向前一台 PCE。**部分資料可能已經被清掉**——排除原因後重新執行一次會把剩下的清完，不會造成額外損失。",
+  "cli_config_login_pce_rebind_failed": "連線已儲存，但「快取資料屬於新位址」這件事沒有記錄完成（{error}）。資料完好、連線也正確，但在記錄完成前 ingest 會拒絕寫入。重跑同一次連線變更並回答 'same-pce' 即可補上。",
   "cli_pce_flush_failed_menu": "清除前一台 PCE 的快取資料與歷史沒有完成（{error}），連線設定因此沒有變更，設備仍指向前一台 PCE。",
   "cli_config_login_pce_restart_required": "請立即重新啟動監控服務。已經在執行的服務在重啟之前仍會沿用舊的連線設定，並且會把剛清掉的資料重新填回去。",
   "cli_pce_restart_required_menu": "請立即重新啟動監控服務。已經在執行的服務在重啟之前仍會沿用舊的連線設定，並且會把剛清掉的資料重新填回去。",

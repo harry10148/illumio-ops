@@ -84,6 +84,13 @@ def run_daemon_loop(cm, interval: int = 10) -> None:
     BackgroundScheduler (3 jobs: monitor_cycle, tick_report_schedules,
     tick_rule_schedules).  Resolves Status.md A3 (single-threaded blocking).
     """
+    # Both daemon shapes converge here — `--monitor-gui` calls this on a
+    # background thread and `--monitor` calls it directly — so this is where the
+    # provenance report belongs. Hanging it off run_daemon_with_gui instead left
+    # the headless daemon binding a new PCE to old data without even the
+    # `adopting` warning that exists to expose exactly that.
+    _report_cache_provenance(cm)
+
     # Signal handlers can only be registered from the main thread.
     # When called as a background thread (run_daemon_with_gui), the caller
     # registers signals before spawning; skip here to avoid ValueError.
@@ -175,15 +182,27 @@ def _report_cache_provenance(cm) -> None:
     report; a startup advisory that could crash the daemon would be a worse bug
     than the one it warns about.
     """
+    import os
+
     try:
         cfg = cm.models.pce_cache
         if not cfg.enabled:
+            return
+        # An advisory must not bring a database into being. Opening an engine
+        # creates the file, so a startup report on a fresh install would leave an
+        # empty cache behind — and under a test double whose db_path stringifies
+        # to a Mock repr it wrote 172KB files named after the Mock into the repo
+        # root, which is how this was noticed. No database means nothing has been
+        # cached yet, which is exactly the case with nothing to report.
+        # isinstance first: os.path.exists(MagicMock()) is True, because a Mock
+        # grows __fspath__ on demand. See provenance.rebind for the full note.
+        if not isinstance(cfg.db_path, str) or not os.path.exists(cfg.db_path):
             return
         from sqlalchemy.orm import sessionmaker
         from src.gui._helpers import _get_cache_engine
         from src.pce_cache.provenance import verify_at_startup
         verify_at_startup(sessionmaker(_get_cache_engine(cfg.db_path)),
-                          cm.models.api.model_dump())
+                          cm.models.api)
     except Exception as exc:  # noqa: BLE001 - advisory only, see docstring
         logger.warning("Could not check PCE cache provenance at startup: {}", exc)
 
@@ -207,8 +226,6 @@ def run_daemon_with_gui(cm, interval: int = 10, port: int = 5001, host: str = "0
         print(t("report_requires_flask"))
         print(t("cli_pip_install_hint", pkg="flask"))
         sys.exit(1)
-
-    _report_cache_provenance(cm)
 
     # Clear BEFORE registering signals: run_daemon_loop no longer clears when it
     # runs as a background thread, so a SIGTERM arriving right after registration

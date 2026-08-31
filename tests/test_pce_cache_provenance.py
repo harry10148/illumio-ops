@@ -8,6 +8,8 @@ on the ingest path instead.
 """
 from __future__ import annotations
 
+import threading
+
 import pytest
 from sqlalchemy import create_engine, func, select
 from sqlalchemy.orm import sessionmaker
@@ -159,3 +161,205 @@ def test_flush_clears_the_binding_so_the_next_target_can_be_adopted(tmp_path, sf
         assert s.execute(select(func.count()).select_from(CacheBinding)).scalar_one() == 0
     # And the freshly emptied cache accepts the new PCE.
     assert bind_or_verify(local, SAAS) == ("https://ap-scp45.illum.io", "1")
+
+
+# ── the six findings from Codex's adversarial review of 0449c36b ─────────────
+#
+# Each of these covers a path the first version got wrong. They are grouped
+# here rather than scattered so the next person can see what the review found.
+
+def test_same_pce_rebinds_and_keeps_the_rows(tmp_path):
+    """P1-a: the supported 'same-pce' answer must not stop monitoring.
+
+    One PCE reachable at a new address, operator keeps the data. Without a
+    rebind the binding still names the old address and every ingest afterwards
+    raises — a documented option would silently take monitoring down.
+    """
+    from src.pce_cache.provenance import rebind
+
+    db = tmp_path / "cache.sqlite"
+    engine = create_engine(f"sqlite:///{db}")
+    Base.metadata.create_all(engine)
+    local = sessionmaker(engine)
+    bind_or_verify(local, LAB)
+    _seed_event(local)
+
+    moved = {"url": "https://pce-new.lab.local:8443", "org_id": "1"}
+    rebind(str(db), moved)
+
+    # binding followed the address ...
+    assert bind_or_verify(local, moved) == ("https://pce-new.lab.local:8443", "1")
+    # ... and the cached rows are still there, which is the whole point.
+    with local() as s:
+        assert s.execute(select(func.count()).select_from(PceEvent)).scalar_one() == 1
+
+
+def test_rebind_on_a_missing_database_is_not_an_error(tmp_path):
+    """Nothing has been cached yet, so there is no binding to move."""
+    from src.pce_cache.provenance import rebind
+    assert rebind(str(tmp_path / "absent.sqlite"), LAB) == (
+        "https://pce.lab.local:8443", "1")
+
+
+def test_backfill_refuses_a_cache_bound_to_another_pce(sf):
+    """P1-b: backfill wrote into the same DB without ever consulting the binding.
+
+    Three supported entry points build a BackfillRunner — the CLI, the HTTP
+    endpoint and the legacy menu — so the check lives in its constructor, before
+    any write can have started.
+    """
+    from src.pce_cache.backfill import BackfillRunner
+
+    class _Api:
+        api_cfg = SAAS
+
+    bind_or_verify(sf, LAB)
+    with pytest.raises(CacheTargetMismatch):
+        BackfillRunner(_Api(), sf)
+
+
+def test_backfill_is_allowed_on_its_own_pce(sf):
+    """The other half: the guard must not block the ordinary case."""
+    from src.pce_cache.backfill import BackfillRunner
+
+    class _Api:
+        api_cfg = LAB
+
+    bind_or_verify(sf, LAB)
+    BackfillRunner(_Api(), sf)
+
+
+def test_two_racing_first_binds_agree(tmp_path):
+    """P2-a: events and traffic fire on the same kick from different executors.
+
+    Read-then-insert let both see None and both write id=1; the loser got an
+    IntegrityError and its first ingest failed. Insert-on-conflict then re-read
+    means whoever wins, both callers return the same answer.
+    """
+    db = tmp_path / "cache.sqlite"
+    engine = create_engine(f"sqlite:///{db}")
+    Base.metadata.create_all(engine)
+    local = sessionmaker(engine)
+
+    results, errors = [], []
+
+    def _bind():
+        try:
+            results.append(bind_or_verify(local, LAB))
+        except Exception as exc:  # noqa: BLE001
+            errors.append(exc)
+
+    threads = [threading.Thread(target=_bind) for _ in range(2)]
+    for th in threads:
+        th.start()
+    for th in threads:
+        th.join()
+
+    assert errors == [], errors
+    assert results == [("https://pce.lab.local:8443", "1")] * 2
+    with local() as s:
+        assert s.execute(select(func.count()).select_from(CacheBinding)).scalar_one() == 1
+
+
+def test_startup_sees_a_cache_whose_raw_rows_have_aged_out(sf):
+    """P2-c: 'empty' was decided from events + raw only.
+
+    Raw is kept 7 days, aggregates 90. A cache whose raw had aged out but which
+    still holds aggregates reported 'empty', skipped the warning, and let the
+    next ingest bind a new PCE to the old one's derived data.
+    """
+    from datetime import datetime, timezone
+    from src.pce_cache.models import PceTrafficFlowAgg
+
+    with sf() as s:
+        s.add(PceTrafficFlowAgg(bucket_day=datetime(2026, 1, 1, tzinfo=timezone.utc),
+                                port=443, protocol="tcp", action="allowed"))
+        s.commit()
+
+    assert verify_at_startup(sf, LAB) == "adopting"
+
+
+def test_the_headless_daemon_reports_provenance_too(monkeypatch):
+    """P2-b: the check hung off run_daemon_with_gui, so `--monitor` never ran it.
+
+    Asserted at the shared entry point both daemon shapes go through, because
+    that is the property that was missing — not that some function exists.
+    """
+    from src.cli import _runtime
+
+    called = []
+    monkeypatch.setattr(_runtime, "_report_cache_provenance", lambda cm: called.append(cm))
+    monkeypatch.setattr(_runtime, "_register_signals", lambda: None)
+    monkeypatch.setattr(_runtime, "build_scheduler", lambda *a, **k: None, raising=False)
+    _runtime._shutdown_event.set()  # exit the loop immediately
+
+    try:
+        _runtime.run_daemon_loop(object(), interval=1)
+    except Exception:  # noqa: BLE001 - the stubbed scheduler may bail; the call is the point
+        pass
+    assert called, "run_daemon_loop must report cache provenance"
+
+
+def test_the_mismatch_message_only_offers_remedies_that_work():
+    """P2-d: the first version's two remedies both failed.
+
+    `cache flush` without --confirm exits on a usage error, and 'Settings → save
+    offers a flush' is false in the case that produces this error: after a direct
+    config edit the stored value already is the new target, so pce_target_changed
+    returns False and nothing is offered.
+    """
+    msg = str(CacheTargetMismatch(("https://a", "1"), ("https://b", "2")))
+    assert "cache flush --confirm" in msg, "the bare command exits with a usage error"
+    assert "same-pce" in msg, "the same-address case needs its own instruction"
+    # The claim that a plain settings save offers a flush must not come back.
+    assert "which offers it" not in msg
+
+
+def test_the_startup_advisory_never_creates_a_database(tmp_path, monkeypatch):
+    """It reports; it must not bring a cache into being.
+
+    Opening an engine creates the file, so a fresh install would be left with an
+    empty database by a function whose whole job is to look. Under a MagicMock
+    whose db_path stringifies to a Mock repr it went further and wrote 172KB
+    files named after the Mock into the repository root — which is how this was
+    found, while reading what `git add -A` had staged.
+    """
+    from unittest.mock import MagicMock
+
+    from src.cli import _runtime
+
+    monkeypatch.chdir(tmp_path)
+    cm = MagicMock()
+    cm.models.pce_cache.enabled = True
+    cm.models.pce_cache.db_path = str(tmp_path / "absent.sqlite")
+
+    _runtime._report_cache_provenance(cm)
+
+    assert list(tmp_path.iterdir()) == [], (
+        f"the advisory created files: {[p.name for p in tmp_path.iterdir()]}"
+    )
+
+
+def test_the_startup_advisory_still_reports_on_a_real_cache(tmp_path, monkeypatch):
+    """The other half — skipping a missing DB must not skip a present one."""
+    from unittest.mock import MagicMock
+
+    from src.cli import _runtime
+
+    db = tmp_path / "cache.sqlite"
+    engine = create_engine(f"sqlite:///{db}")
+    Base.metadata.create_all(engine)
+    local = sessionmaker(engine)
+    bind_or_verify(local, LAB)
+    engine.dispose()
+
+    seen = {}
+    monkeypatch.setattr("src.pce_cache.provenance.verify_at_startup",
+                        lambda sf, cfg: seen.setdefault("called", True) or "match")
+
+    cm = MagicMock()
+    cm.models.pce_cache.enabled = True
+    cm.models.pce_cache.db_path = str(db)
+    _runtime._report_cache_provenance(cm)
+
+    assert seen.get("called"), "a cache that exists must still be reported on"

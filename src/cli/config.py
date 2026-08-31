@@ -366,6 +366,26 @@ def login_cmd(ctx: click.Context, url, key, secret, org_id, deployment_type,
     cm.config["api"] = validated_api_dict
     cm.save()
 
+    if target_changed and pce_target_change == "same-pce":
+        # AFTER cm.save(), unlike the flush above, and for the opposite reason.
+        # The flush must precede the save so an interrupted clear leaves the old
+        # connection stored and the operator is made to finish it. Here there is
+        # nothing to lose: the rows stay either way, and rebinding to a target
+        # that had not been saved yet would name a PCE the appliance is not using.
+        #
+        # Without this the binding keeps the old address while the config holds
+        # the new one, and every ingest afterwards refuses to write — a supported
+        # answer would silently stop monitoring.
+        from src.pce_cache.provenance import rebind
+        try:
+            rebind(cm.models.pce_cache.db_path, validated_api_dict)
+        except Exception as exc:  # noqa: BLE001
+            # Not fatal: the connection is saved and correct. A stale binding
+            # surfaces as a loud, actionable ingest refusal rather than as
+            # silent contamination, so reporting beats rolling back a good save.
+            echo_warning(ctx, t("cli_config_login_pce_rebind_failed",
+                                error=str(exc)[:200]))
+
     if restart_required and not is_json(ctx) and not is_quiet(ctx):
         # Nothing here reaches a running monitor service: it holds its own
         # ConfigManager for the life of the process and never reloads it.

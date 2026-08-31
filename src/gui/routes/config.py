@@ -203,6 +203,7 @@ def make_config_blueprint(
             # eagerly would empty a cache that still belongs to the PCE the
             # appliance stays pointed at once the save fails.
             _do_pce_flush = False
+            _do_pce_rebind = False
             _restart_required = False
             if 'api' in d:
                 api_in = d['api']
@@ -269,6 +270,13 @@ def make_config_blueprint(
                                         "error": t("gui_err_pce_target_bad_choice", lang=lang)}), 400
                     if _choice == "flush":
                         _do_pce_flush = True
+                    else:
+                        # same-pce: one PCE at a new address, data still theirs.
+                        # The binding has to move with it or every ingest after
+                        # this save refuses to write — a supported answer would
+                        # silently stop monitoring. Deferred past cm.save() below
+                        # for the same reason as the CLI path.
+                        _do_pce_rebind = True
                 # Persist the schema's normalized form for fields present in
                 # this request (notably console_url's stripped trailing slash),
                 # while leaving omitted fields untouched.
@@ -352,6 +360,18 @@ def make_config_blueprint(
                     }), 500
             cm.config = scratch
             cm.save()
+            if _do_pce_rebind:
+                # After the save, unlike the flush above: the rows stay either
+                # way, and binding to a target that had not been persisted would
+                # name a PCE the appliance is not using.
+                from src.pce_cache.provenance import rebind
+                try:
+                    rebind(cm.models.pce_cache.db_path, cm.config["api"])
+                except Exception as exc:  # noqa: BLE001
+                    # The connection is saved and correct; a stale binding shows
+                    # up as a loud ingest refusal, not as silent contamination,
+                    # so this is reported rather than failing a good save.
+                    logger.warning("PCE cache re-bind failed after same-pce save: {}", exc)
         response = {"ok": True}
         if _restart_required:
             response["restart_required"] = True

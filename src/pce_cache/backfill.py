@@ -34,6 +34,18 @@ class BackfillRunner:
     _MIN_BISECT_SPAN = timedelta(minutes=5)
 
     def __init__(self, api, session_factory: sessionmaker, rate_limit_per_minute: int = 400):
+        # The PCE binding is checked here, at construction, because this is the
+        # one point every backfill entry passes through: `illumio-ops cache
+        # backfill` (src/cli/cache.py), POST /api/cache/backfill
+        # (src/pce_cache/web.py) and the legacy menu (src/pce_cache_cli.py) all
+        # build one of these and then write into the same database using the
+        # current configuration. Guarding the two scheduler ingest paths alone
+        # left every one of those able to blend two estates — which is the thing
+        # this whole mechanism exists to stop. Raising in __init__ means no
+        # caller can be part-way through a write when it fires.
+        from src.pce_cache.provenance import bind_or_verify
+        bind_or_verify(session_factory, getattr(api, "api_cfg", {}) or {})
+
         # rate_limit_per_minute 僅保留簽名相容（pce_cache_cli 會傳入）；實際
         # 限速由 api client 端以 rate_limit=True 走其設定的全域限速器
         # （GlobalRateLimiter），與 live ingestor 相同。
