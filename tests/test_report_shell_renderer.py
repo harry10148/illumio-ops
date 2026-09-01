@@ -739,7 +739,24 @@ def test_the_cover_exec_and_toc_still_each_own_a_page():
         assert value == "page", (
             f"{selector} 的 break-after 最終生效值是 {value!r}，不是 page")
 
+_COVER_META_DT = ".cover-meta dt {\n"
+# 設計檔的 .cover-meta 是 grid，而 dt 與 dd 是兩個獨立的 grid item——三欄時會把
+# 「資料範圍 / 值 / 產生時間」排成第一列，把產生時間的值單獨丟到第二列、正好落在
+# 資料範圍的標籤底下，讀者無從判斷哪個值屬於哪個標籤。守恆檢查看不到它（字都還在，
+# 只有位置變了），是讀真實 17 頁 PDF 才發現的。_render_cover 改成每組包一層
+# .cover-meta-pair，這條規則讓那層成為唯一的 grid item，任何欄數都拆不開一組配對。
+# 下面的字串必須與 SHELL_CSS 逐字相同，drift guard 才對得上。
+_DELTA_COVER_META_PAIR = (_COVER_META_DT, """/* One grid cell per label+value pair. Without this the dt and dd are separate
+   grid items and a pair can be split across a row boundary, leaving a value
+   sitting under someone else's label. */
+.cover-meta-pair {
+  min-width: 0;
+}
+
+""" + _COVER_META_DT)
+
 AUTHORISED_DELTAS = (
+    _DELTA_COVER_META_PAIR,
     _DELTA_DROP_OLD_COVER,
     _DELTA_PAGE_NUMBER,
     _DELTA_SORT_INDICATOR_PRINT,

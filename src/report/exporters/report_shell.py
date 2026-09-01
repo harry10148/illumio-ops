@@ -307,6 +307,13 @@ h1, h2, h3, h4 { font-weight: 650; letter-spacing: -0.01em; }
   padding-top: var(--space-5);
 }
 
+/* One grid cell per label+value pair. Without this the dt and dd are separate
+   grid items and a pair can be split across a row boundary, leaving a value
+   sitting under someone else's label. */
+.cover-meta-pair {
+  min-width: 0;
+}
+
 .cover-meta dt {
   font-family: var(--font-mono);
   font-size: var(--fs-micro);
@@ -1921,7 +1928,19 @@ def _render_cover(cover: ShellCover, doc_tone: str) -> str:
         # colour it by, so the tone is neutral.
         badges += (f'<span class="score-denom" data-tone="neutral">'
                    f"{_esc(cover.score)}</span>")
-    meta = "".join(f"<dt>{_esc(k)}</dt><dd>{_esc(v)}</dd>"
+    # Each label/value pair is wrapped so the grid lays out the PAIR, not its two
+    # halves independently. `.cover-meta` is display:grid, and a bare
+    # <dt><dd><dt><dd> is four separate grid items: at three columns the flow put
+    # 資料範圍 / its value / 產生時間 on row one and left 產生時間's value alone on
+    # row two, directly beneath 資料範圍's label. The reader cannot tell which
+    # value belongs to which label — the misfiling failure conservation provably
+    # cannot see, because every string is still present and only its position
+    # moved. Found by reading a real 17-page PDF, not by any test.
+    #
+    # The appendix builds the same pairs into a plain <dl> with no grid, so it
+    # was never affected and is deliberately left alone.
+    meta = "".join(f'<div class="cover-meta-pair"><dt>{_esc(k)}</dt>'
+                   f"<dd>{_esc(v)}</dd></div>"
                    for k, v in cover.meta.items())
     return (
         f'<header class="cover" data-shell="cover" data-tone="{_tone(doc_tone)}">'
