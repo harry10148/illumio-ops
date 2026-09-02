@@ -531,12 +531,18 @@ class _TrafficReportBase:
                  profile: str = "security_risk", detail_level: str = _REPORT_DETAIL_LEVEL,
                  compute_draft: bool = False, lang: str = "en",
                  date_range: tuple[str, str] = ("", ""),
-                 pce_url: str = "", org_name: str = ""):
+                 pce_url: str = "", org_name: str = "",
+                 draft_policy_report: bool = False):
         self._r = results
         self._data_source = data_source
         self._profile = profile
         self._detail_level = _REPORT_DETAIL_LEVEL
         self._compute_draft = compute_draft
+        # `report draft-policy` produced this file. Distinct from
+        # compute_draft, which any traffic-family profile can carry when a
+        # ruleset asks for draft decisions — without this the two commands'
+        # output is indistinguishable on the cover.
+        self._draft_policy_report = draft_policy_report
         self._lang = lang
         self._date_range = date_range
         self._pce_url = pce_url
@@ -864,6 +870,8 @@ class _TrafficReportBase:
         _badges: list[tuple[str, str]] = []
         if _profile_badge_text != _report_title:
             _badges.append((_profile_badge_text, 'info'))
+        if self._draft_policy_report:
+            _badges.append((t("rpt_cover_draft_policy_report", lang=self._lang), 'warn'))
         if self._compute_draft:
             _badges.append((t("rpt_hdr_draft_enabled", lang=self._lang), 'warn'))
 

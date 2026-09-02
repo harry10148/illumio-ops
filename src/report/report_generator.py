@@ -148,6 +148,10 @@ class ReportResult:
     findings: list = field(default_factory=list)
     dataframe: object = None       # pd.DataFrame, optional
     query_context: dict = field(default_factory=dict)
+    # True only for `report draft-policy`. The traffic family's other
+    # profiles can also carry draft decisions (a ruleset may ask for them),
+    # so compute_draft alone cannot tell the two apart on the cover.
+    draft_policy_report: bool = False
 
 # ─── Generator ───────────────────────────────────────────────────────────────
 
@@ -496,6 +500,7 @@ class ReportGenerator:
             },
             traffic_report_profile=traffic_report_profile,
         )
+        result.draft_policy_report = draft_policy
         if _truncated_from and result.module_results is not None:
             # Surface the pre-cap count so the exporter can disclose that every
             # total/finding reflects only the retained rows.
@@ -614,6 +619,7 @@ class ReportGenerator:
                 profile=traffic_report_profile,
                 detail_level=_REPORT_DETAIL_LEVEL,
                 compute_draft=ruleset_needs_draft_pd(DRAFT_PD_RULES),
+                draft_policy_report=getattr(result, "draft_policy_report", False),
                 lang=lang,
             ).export(output_dir)
             paths.append(path)
