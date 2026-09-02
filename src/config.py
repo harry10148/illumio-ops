@@ -688,6 +688,21 @@ class ConfigManager:
     def load_best_practices(self):
         return self.apply_best_practices(mode="replace")
 
+    def get_best_practice_rules(self) -> list:
+        """The built-in rule set, as apply_best_practices() would build it.
+
+        Public because the CLI's impact summary needs to say how many rules a
+        replace would load, and reaching into _best_practice_rules() from a
+        menu would tie the menu to the id-allocation detail.
+        """
+        numeric_ids = []
+        for rule in self.config.get("rules", []) or []:
+            try:
+                numeric_ids.append(int(rule.get("id", 0) or 0))
+            except (TypeError, ValueError):
+                pass
+        return self._best_practice_rules((max(numeric_ids) if numeric_ids else 0) + 1)
+
     def _best_practice_rules(self, start_id: int) -> list:
         event_specs = [
             ("rule_agent_tampering", "agent.tampering", "immediate", 1, 10, 30, "all", "all", ""),

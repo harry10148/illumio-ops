@@ -5,6 +5,7 @@ import pytest
 
 from src import i18n
 from src import main as main_module
+import src.cli.menus.areas as areas_module
 
 ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -31,11 +32,18 @@ def _spy_on_file_lock(monkeypatch):
 
 
 def _prepare_menu(monkeypatch, selection):
+    """The alerting area replaced rule_management_menu in phase 2C Task 4.
+
+    It draws through menu_screen and reads through its own safe_input, so the
+    patch targets moved with it. The Analyzer/Reporter/ApiClient patches stay on
+    main_module: areas reaches them by lazy attribute lookup for exactly that
+    reason.
+    """
     answers = iter([selection, 0])
 
-    monkeypatch.setattr(main_module.os, "system", lambda *_args, **_kwargs: None)
-    monkeypatch.setattr(main_module, "draw_panel", lambda *_args, **_kwargs: None)
-    monkeypatch.setattr(main_module, "safe_input", lambda *_args, **_kwargs: next(answers))
+    monkeypatch.setattr(areas_module, "menu_screen", lambda *_a, **_k: None)
+    monkeypatch.setattr(areas_module, "build_health_line", lambda _cm: "")
+    monkeypatch.setattr(areas_module, "safe_input", lambda *_args, **_kwargs: next(answers))
     monkeypatch.setattr("builtins.input", lambda *_args, **_kwargs: "")
 
 
@@ -44,22 +52,23 @@ def _prepare_menu(monkeypatch, selection):
     [
         (2, "add_traffic_menu"),
         (3, "add_bandwidth_volume_menu"),
-        (9, "add_system_health_menu"),
+        (4, "add_system_health_menu"),   # was 9; cli-flows #13 moves it up
     ],
 )
 def test_rule_management_menu_dispatches_submenus(monkeypatch, selection, attr_name):
     calls = []
-    cm = SimpleNamespace(load=lambda: None, load_best_practices=lambda: None)
+    cm = SimpleNamespace(load=lambda: None, load_best_practices=lambda: None,
+                         config={"rules": []})
 
     _prepare_menu(monkeypatch, selection)
 
-    monkeypatch.setattr(main_module, "add_event_menu", lambda _cm: calls.append("event"))
-    monkeypatch.setattr(main_module, "add_traffic_menu", lambda _cm: calls.append("traffic"))
-    monkeypatch.setattr(main_module, "add_bandwidth_volume_menu", lambda _cm: calls.append("bandwidth"))
-    monkeypatch.setattr(main_module, "add_system_health_menu", lambda _cm: calls.append("system_health"))
-    monkeypatch.setattr(main_module, "manage_rules_menu", lambda _cm: calls.append("manage"))
+    monkeypatch.setattr(areas_module, "add_event_menu", lambda _cm: calls.append("event"))
+    monkeypatch.setattr(areas_module, "add_traffic_menu", lambda _cm: calls.append("traffic"))
+    monkeypatch.setattr(areas_module, "add_bandwidth_volume_menu", lambda _cm: calls.append("bandwidth"))
+    monkeypatch.setattr(areas_module, "add_system_health_menu", lambda _cm: calls.append("system_health"))
+    monkeypatch.setattr(areas_module, "manage_rules_menu", lambda _cm: calls.append("manage"))
 
-    main_module.rule_management_menu(cm)
+    areas_module.alerting_menu(cm)
 
     expected = {
         "add_traffic_menu": "traffic",
@@ -71,7 +80,8 @@ def test_rule_management_menu_dispatches_submenus(monkeypatch, selection, attr_n
 
 def test_rule_management_menu_option_7_runs_analysis_and_sends_alerts(monkeypatch):
     calls = []
-    cm = SimpleNamespace(load=lambda: None, load_best_practices=lambda: None)
+    cm = SimpleNamespace(load=lambda: None, load_best_practices=lambda: None,
+                         config={"rules": []})
 
     _prepare_menu(monkeypatch, 7)
     seen = _spy_on_file_lock(monkeypatch)
@@ -101,7 +111,7 @@ def test_rule_management_menu_option_7_runs_analysis_and_sends_alerts(monkeypatc
     monkeypatch.setattr(main_module, "Reporter", FakeReporter)
     monkeypatch.setattr(main_module, "Analyzer", FakeAnalyzer)
 
-    main_module.rule_management_menu(cm)
+    areas_module.alerting_menu(cm)
 
     assert "run_analysis" in calls
     assert "run_debug_mode" not in calls
@@ -134,7 +144,8 @@ def test_analysis_lock_path_honours_the_env_override(monkeypatch, tmp_path):
 
 def test_rule_management_menu_option_8_runs_debug_mode(monkeypatch):
     calls = []
-    cm = SimpleNamespace(load=lambda: None, load_best_practices=lambda: None)
+    cm = SimpleNamespace(load=lambda: None, load_best_practices=lambda: None,
+                         config={"rules": []})
 
     _prepare_menu(monkeypatch, 8)
 
@@ -163,7 +174,7 @@ def test_rule_management_menu_option_8_runs_debug_mode(monkeypatch):
     monkeypatch.setattr(main_module, "Reporter", FakeReporter)
     monkeypatch.setattr(main_module, "Analyzer", FakeAnalyzer)
 
-    main_module.rule_management_menu(cm)
+    areas_module.alerting_menu(cm)
 
     assert "run_debug_mode" in calls
     assert "run_analysis" not in calls

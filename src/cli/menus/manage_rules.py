@@ -7,6 +7,7 @@ import unicodedata
 
 from src.config import ConfigManager
 from src.i18n import t
+from src.cli.menu_chrome import confirm_box
 from src.utils import Colors, safe_input, draw_panel, draw_table, get_visible_width
 from src.cli.menus._helpers import _menu_hints
 from src.cli.menus.event import add_event_menu
@@ -35,6 +36,17 @@ def _parse_manage_rules_command(raw: str):
         return action, indices[0]
 
     return action, indices
+
+
+def _rule_summary(rule: dict) -> str:
+    """One line an operator can recognise a rule by, for the delete box."""
+    name = rule.get("name", "?")
+    rtype = rule.get("type", "?")
+    count = rule.get("threshold_count")
+    window = rule.get("threshold_window")
+    if count is None and window is None:
+        return f"{name} ({rtype})"
+    return f"{name} ({rtype}, {count}-in-{window}m)"
 
 
 def manage_rules_menu(cm: ConfigManager):
@@ -151,11 +163,28 @@ def manage_rules_menu(cm: ConfigManager):
             continue
 
         if action == "d":
-            try:
-                cm.remove_rules_by_index(target)
-                print(t("done"))
-            except Exception as e:
-                print(t("error_deleting", error=str(e)))
+            # MR-1: deletion used to happen on the keystroke — no undo, no
+            # backup. Name every rule being removed before doing it.
+            rules = cm.config.get("rules", []) or []
+            # target carries what the operator typed, and those are 1-based;
+            # remove_rules_by_index owns the conversion, so do not pre-adjust.
+            picked = [i for i in target if 1 <= i <= len(rules)]
+            summaries = [f"  - #{i} {_rule_summary(rules[i - 1])}" for i in picked]
+            if len(picked) > 1:
+                title = t("cli_confirm_delete_rules_title", count=len(picked))
+                ok_label = t("cli_confirm_delete_n_label", count=len(picked))
+                summaries.append(t("cli_confirm_no_undo"))
+            else:
+                title = t("cli_confirm_delete_rule_title")
+                ok_label = t("cli_confirm_delete_label")
+            if not confirm_box(title, summaries, ok_label):
+                print(t("operation_cancelled", default="Operation cancelled."))
+            else:
+                try:
+                    cm.remove_rules_by_index(target)
+                    print(t("done"))
+                except Exception as e:
+                    print(t("error_deleting", error=str(e)))
         elif action == "m":
             try:
                 idx = target

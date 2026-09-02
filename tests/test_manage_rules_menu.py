@@ -59,7 +59,8 @@ def test_manage_rules_menu_help_command_shows_examples(monkeypatch, capsys):
 
 def test_manage_rules_menu_delete_command_accepts_multiple_indices(monkeypatch, capsys):
     cm, removed = _make_cm()
-    _prepare_menu(monkeypatch, ["d 1, 2", "", "0"])
+    # "y" answers the MR-1 confirmation box that now stands in front of a delete.
+    _prepare_menu(monkeypatch, ["d 1, 2", "y", "", "0"])
 
     settings_module.manage_rules_menu(cm)
 
@@ -460,3 +461,45 @@ def test_bandwidth_wizard_ctrl_c_during_object_picking_returns_to_menu(monkeypat
         settings_module.add_bandwidth_volume_menu(cm)
 
     assert cm.config["rules"] == []
+
+
+def test_delete_asks_before_removing(monkeypatch, capsys):
+    """MR-1: `d` used to delete straight away, with no undo and no backup."""
+    import src.cli.menus.manage_rules as mr
+    cm, removed = _make_cm()
+    boxes = []
+    monkeypatch.setattr(mr, "confirm_box",
+                        lambda title, lines, ok: boxes.append((title, lines, ok)) or True)
+    _prepare_menu(monkeypatch, ["d 1", "", "0"])
+    mr.manage_rules_menu(cm)
+    assert removed == [[1]]
+    title, lines, _ok = boxes[0]
+    joined = "\n".join(lines)
+    assert "Event Rule" in joined          # the rule is named, not just counted
+    assert "event" in joined               # and its type shown
+
+
+def test_delete_cancelled_keeps_the_rule(monkeypatch, capsys):
+    import src.cli.menus.manage_rules as mr
+    cm, removed = _make_cm()
+    monkeypatch.setattr(mr, "confirm_box", lambda *a, **k: False)
+    _prepare_menu(monkeypatch, ["d 1", "", "0"])
+    mr.manage_rules_menu(cm)
+    assert removed == []
+    assert "cancel" in capsys.readouterr().out.lower()
+
+
+def test_multi_delete_names_every_rule_and_says_no_undo(monkeypatch):
+    import src.cli.menus.manage_rules as mr
+    cm, removed = _make_cm()
+    boxes = []
+    monkeypatch.setattr(mr, "confirm_box",
+                        lambda title, lines, ok: boxes.append((title, lines, ok)) or True)
+    _prepare_menu(monkeypatch, ["d 1,2", "", "0"])
+    mr.manage_rules_menu(cm)
+    assert removed == [[1, 2]]
+    title, lines, ok = boxes[0]
+    joined = "\n".join(lines)
+    assert "Event Rule" in joined and "Traffic Rule" in joined
+    assert "2" in title
+    assert any("undo" in ln.lower() for ln in lines)
