@@ -9,6 +9,8 @@ a plain `<major>.<minor>.<patch>` scheme. (Tags through v4.0.0 carried a
 
 ## [Unreleased]
 
+## [5.0.0] — 2026-09-02
+
 ### Added
 
 - A report produced by **`illumio-ops report draft-policy`** now says so on its
@@ -50,6 +52,298 @@ a plain `<major>.<minor>.<patch>` scheme. (Tags through v4.0.0 carried a
   archived day files may span both PCEs and should be moved (not deleted) aside
   if you want to start fresh on the new one.
 
+
+- PCE health monitoring now probes the official SLB endpoint
+  `GET /api/v2/node_available` after a passing `/health` (healthy = HTTP
+  200/202; 404/502/no-response raises the existing pce_health alert). Data
+  integrity telemetry: unrecovered collection-GET truncations persist to
+  `logs/data_integrity.json` and surface as a warn table on the
+  Integrations overview; `raise_on_error=True` collection getters now raise
+  `TruncatedCollectionError` instead of silently returning a truncated
+  page. A new cross-layer filter-key chain invariant test locks all seven
+  whitelist layers against silent-drop regressions.
+
+
+- Job health observability: every scheduled job records its last run and
+  status to `logs/job_health.json`; the Integrations overview shows a Job
+  Health table (never-ran and overdue jobs flagged) plus a TLS certificate
+  card, and a daily job renews the self-signed cert on disk when close to
+  expiry (restart still required to apply). Rule schedules now persist and
+  display per-schedule last-run state like report schedules; VEN/posture
+  dashboard tiles show data freshness and grey out when stale; alert channel
+  settings cards gained a test-send button.
+- VEN report: policy sync tracking for VENs that report normally — a KPI, a
+  dedicated section, and an XLSX sheet flag online VENs with agent health
+  errors/warnings, a sync state stuck off `applied`, stale firewall config, or
+  policy received but not applied (vendor-verified signals; the deprecated
+  `security_policy_refresh_at` column was replaced by
+  `security_policy_received_at` with a fallback for old PCEs).
+
+
+- New filter keys, wired end-to-end across the full seven-layer chain (PCE-native
+  query payload where the PCE API supports it, the async-query client-side
+  matcher, and the cache/report DataFrame matcher): `process_name` /
+  `ex_process_name`, `windows_service_name` / `ex_windows_service_name`, and a new
+  `transmission` include key (`transmission` / `ex_transmission`;
+  `transmission_excludes` remains a supported alias for the exclude side). All
+  three match case-insensitively on the full string, accept a scalar or a list of
+  values, and are null-tolerant: a flow row missing the underlying field fails
+  closed for an include filter and is never excluded by an exclude filter.
+
+- Fail-fast SQLite runtime check: entry points now refuse to start with a clear error
+  when the linked SQLite is older than `3.35.0` (`src/runtime_checks.py`), instead of
+  failing later with cryptic ALTER TABLE / window-function errors.
+- `/usr/local/bin/illumio-ops` CLI wrapper installed by `install.sh` so the CLI is on
+  `PATH` without manually activating the bundled venv.
+- `preflight.sh` now checks the bundled SQLite version against the `3.35.0` floor and
+  reports the existing cache DB's `user_version` before install/upgrade.
+- Schema registry hardening: a frozen-baseline drift guard test now fails if a future
+  column-migration entry silently rewrites `_ADDED_COLUMNS` history, and opening a
+  cache DB with a newer `user_version` than the running code knows now emits a
+  downgrade warning instead of proceeding silently.
+- `install.sh` gained a downgrade guard (blocks installing an older bundle version
+  unless `--allow-downgrade` is passed), a running-service guard (stops the service
+  before overwriting files and prompts to restart it after), and post-install
+  verification (`verify_deps` + a smoke check) that fails the install if the new
+  environment is broken.
+- Enforcement Readiness Report (`report readiness`, CLI + GUI + scheduler): a
+  standalone report answering "which app (env) can safely move to enforcement
+  next" — readiness score/grade, an advancement queue ranked ready-first with
+  per-app blocking factor and recommended action, factor breakdown, remediation
+  recommendations, and a trend chapter. Shares its scoring engine with the
+  Security report's Enforcement Readiness chapter (same `enforcement_readiness`
+  analysis, so the two reports never disagree on a given app's score). Available
+  in HTML/CSV, in both English and Traditional Chinese.
+- Plain Traffic Flow Report profile (`traffic`): overview, policy decision summary,
+  app/env distribution, bandwidth, unmanaged overview. Runs only lightweight modules.
+- Trend/drift credibility hardening (phase 6): the Baseline Drift chapter now excludes
+  noise signatures (ICMP, port 0, ephemeral ports ≥49152) from both the new/disappeared
+  tables and their counts, and collapses `(unlabeled)→(unlabeled)` pairs into a single
+  summary line instead of listing them as individual pairs. Both the Baseline Drift
+  chapter and the per-report Trend section now carry snapshot metadata (window/
+  data_source/profile); when a run's window differs materially from the previous
+  baseline/snapshot, drift comparison is refused (a note explains why, and a fresh
+  baseline is still saved) and the Trend section shows a caveat naming the differing
+  fields — snapshots saved before this metadata existed compare exactly as before (no
+  refusal, no caveat). Also fixed an off-by-one in the trend snapshot lookup that made
+  the Trend delta always compare against the run before the previous one instead of
+  the previous run itself; it now appears from the very next report after a baseline
+  exists. This closes out the 2026-07-02 traffic/security report-split spec — all six
+  phases (report split, security/inventory simplification, XLSX unification, audit/
+  policy-usage/VEN slimming, and this trend/drift hardening) have now shipped.
+
+### Changed
+
+- Changing `api.url` or `api.org_id` now asks first, wherever you change it:
+  clear the PCE-derived cache, ingestion watermarks, alert cooldowns and SIEM
+  queue, or declare it the same PCE reachable at a new address and keep them.
+  Rotating the key or secret alone still saves without asking. The GUI's system
+  settings page and the interactive `illumio-ops` settings menu both prompt;
+  `illumio-ops config login --no-interactive` refuses the change outright
+  unless `--pce-target-change flush` or `--pce-target-change same-pce` says
+  which, so an automated run cannot re-point the appliance by accident. Editing
+  `config.json` by hand is still unguarded — nothing watches that file — and
+  leaves the old PCE's cache and watermarks in place.
+- **GUI redesign v2, phase 2A — the web interface is rebuilt.** The eight-tab
+  layout is replaced by six areas (overview, investigate, alerting, automation,
+  reports, system) reached through a hash router, with 18 routes in total. The
+  frontend is now ES modules under `src/static/js/v2/` with no build step, a
+  design-token stylesheet, a command palette, and a light/dark theme that
+  applies immediately instead of on the next page load. Every legacy page
+  script (`dashboard.js`, `settings.js`, `integrations.js`, `rule-scheduler.js`,
+  `actions.js`, `alerts.js`) and the old `index.html` are deleted.
+  This is the release that ships it: `src/__init__.py` reads 5.0.0 and the
+  user guide describes the six areas.
+- Coverage of the redesign is enforced by `tools/gate_coverage_live.py`, which
+  drives a running instance (local or a deployed appliance, with `--base-url`)
+  and requires all 102 `data-cov` anchors to be present.
+- `PUT /api/report-schedules/<id>` now requires a valid `report_type` in the
+  request body, the same as `POST` always did. The storage layer merges a PUT
+  body into the stored schedule field by field, so a partial update was
+  possible before: a third-party script sending only `{"hour": 9}` used to get
+  a 200 and now gets a 400. The shipped UI always sends the whole schedule
+  body, so it is unaffected — this only reaches hand-written API callers.
+- Report schedules of type `app_summary` are now rejected without a non-empty
+  `app`, on both `POST` and `PUT`. Such a schedule could never produce a
+  report: every tick raised `app_summary schedule requires an 'app' value` and
+  logged an error. The interactive CLI wizard already refused to create one;
+  the API did not.
+- The interactive CLI's report-schedule wizard now lists every valid report
+  type, numbered from a sorted list, instead of the three it used to offer.
+  The numbers therefore moved: option 1 is `app_summary` and option 3 is
+  `network_inventory`, where they used to be `traffic` and `ven_status`.
+  Editing an existing schedule prefills its current type, so pressing Enter
+  keeps what is already stored; typing a remembered number does not.
+
+
+- Traffic queries and reports that do not explicitly pick policy decisions now
+  include `unknown` (the vendor domain is blocked / potentially_blocked /
+  allowed / unknown; `unknown` covers idle/snapshot-mode VENs and
+  Flowlink-unmanaged flows). Traffic report totals may rise versus earlier
+  runs because unknown flows are now counted. Traffic data cached/backfilled
+  before this version was fetched without unknown flows — re-run the cache
+  backfill if cache-sourced reports should include them.
+- Report cards, generation modals, and the app header now use
+  content-specific icons instead of a shared shield (shield stays with
+  Security & Risk); the header carries an original micro-segmentation mark.
+- The `pdf` report format was removed from the CLI (`--format` now offers
+  html/csv/xlsx/all): no exporter ever implemented it, so selecting it
+  silently produced no file with exit code 0. The removal guard tests that
+  were supposed to enforce this only matched an unrelated argparse choices
+  list and have been strengthened to scan every choices list plus
+  `_REPORT_FORMATS`.
+- The SIEM forwarder no longer logs a startup "PREVIEW" warning
+  (`src/siem/preview.py` removed) — the feature has been GA per the earlier
+  changelog entry and the warning contradicted it.
+- The Windows NSSM service now registers with `--monitor-gui --interval 10`,
+  matching the Linux systemd unit (previously `--monitor`, which silently
+  omitted the Web GUI on Windows service deployments). Already-registered
+  services keep their existing parameters; re-register or adjust
+  AppParameters to adopt the new default.
+- Documentation rebuilt zh-primary: task-oriented operator guides under
+  `docs/guide/` (installation, configuration, GUI tour, reports,
+  monitoring/alerts, automation, SIEM, cache maintenance, troubleshooting),
+  developer handover docs under `docs/handover/` (architecture guide and
+  module map, PCE domain notes with source-graded vendor facts, development
+  workflow), and rewritten references (CLI, REST API incl. previously
+  undocumented filter/job-health endpoints, glossary). Legacy bilingual doc
+  pairs were removed — English is retained as a slim README only — and the
+  doc gates (docs_check bilingual semantics, coverage mapping, contract
+  tests) were adapted to the new tree.
+
+
+- Offline bundle / DB hardening: `_ADDED_COLUMNS` schema registry entries are now
+  table-qualified (`("table", "column", "ddl")`) instead of column-name-only, closing
+  a drift risk where two tables could share a column name. `install.sh`'s dependency
+  refresh is now deterministic — the bundled Python runtime is restored to a pristine base and
+  wheels are fully reinstalled (not merged/patched) on upgrade, with stale files left
+  behind by the previous version cleaned up; the upgrade `rsync --delete` excludes
+  (`config/`, `data/`, `logs/`, `reports/`, `python/`, `MIGRATED_FROM`, `uninstall.sh`)
+  are now anchored to the transfer root so they can't accidentally match same-named
+  paths nested deeper in the tree. `uninstall.sh` now preserves `data/` alongside
+  `config/` by default; both are only removed with `--purge`. Docs: the upgrade SOP is
+  aligned with actual installer behavior — the installer never restarts the service
+  itself, so the documented steps now say so explicitly. The downgrade guard also
+  falls back to the cache DB's `PRAGMA user_version` when the installed version
+  string is unreadable (the uninstall-then-reinstall-older path), and the wrapper
+  docs note that real operations need `sudo`. Windows: shipped PowerShell scripts
+  now carry a UTF-8 BOM (PowerShell 5.1 misparsed the BOM-less files on CJK ANSI
+  code pages), the bundle includes the Windows-only wheels (`colorama`,
+  `win32-setctime`) that the Linux-side `pip download` silently skipped via
+  environment markers, and `install.ps1` aborts on pip failure and runs the same
+  `verify_deps.py --offline-bundle` post-install verification as Linux.
+  `install.ps1` now also carries the same upgrade guards as `install.sh` —
+  refuses downgrades unless `-AllowDowngrade` (version string with a cache-DB
+  `PRAGMA user_version` fallback) and stops a running service before copying
+  files — and its uninstall preserves `config\` and `data\` unless `-Purge`.
+  `install.ps1` also creates the runtime dirs (`logs\`, `data\`, `reports\`)
+  like `install.sh` does, and no longer fabricates a `MIGRATED_FROM` marker
+  when reinstalling over a preserved `config\`/`data\` with no service present.
+  `scripts/check_doc_coverage.sh` works again: retargeted to the split docs
+  (`docs/reference/cli.md` for subcommands, `docs/getting-started.md` for
+  deployment scripts); the analysis-module filename family was dropped as no
+  longer operator-facing.
+- `report traffic` now generates the new plain Traffic Flow Report (traffic facts only,
+  no security scoring). Use `report security` / `report inventory` for the previous
+  outputs; `--profile` on `report traffic` is deprecated.
+- Trend and baseline-drift snapshots are now keyed per report profile
+  (`traffic_security_risk`, `traffic_network_inventory`, `traffic_traffic`).
+  The first run after upgrading has no previous baseline to compare against.
+- Security report simplification (phase 2): the three former attack-summary chapters
+  (boundary breaches, suspicious pivot behavior, blast radius, blind spots) and the
+  hero key-findings block are consolidated into a single Findings & Actions chapter,
+  with attack posture items merged by subject and quantified with real evidence text;
+  the Lateral Movement chapter is trimmed to 4 summary tables (service view, fan-out
+  sources, allowed lateral flows, attack paths), with host-level detail (IP talkers/
+  pairs, bridge nodes, reachable nodes, app chains) trimmed from HTML (detail
+  retained at the analysis layer and available in the XLSX export's Lateral
+  Movement sheet); the
+  Policy Decisions chapter folds sub-1% decisions into an "Other" row (with a note
+  listing which decisions were folded) and now surfaces the audit-flags table
+  (unmanaged-source allowed traffic); the Uncovered Flows chapter merges the port/
+  service-gap view into one table with a Top Destination Apps column; the maturity,
+  enforcement-readiness, and infrastructure-scoring sections each gained a
+  plain-language "how to read this score" explanation; the dead mod05 (legacy IP
+  host talkers) and mod10 (legacy allowed-traffic audit) modules were removed now
+  that their outputs are covered by mod15 and mod02 respectively.
+- Inventory report simplification (phase 3): refocused on asset/label governance —
+  the traffic overview, traffic distribution, and bandwidth chapters are dropped
+  from `report inventory` (still available via `report traffic`); the Cross-Label
+  Matrix chapter keeps only the ENV/APP dimensions in HTML, with ROLE/LOC detail
+  trimmed from HTML (detail retained at the analysis layer and available in the
+  XLSX export's Cross-Label sheet); the Unmanaged Hosts chapter is
+  merged to 3 tables, with the exposed-ports table gaining a Top Unmanaged Sources
+  column; a date-range parsing fix means flows with no valid timestamps now show
+  a single "N/A" instead of "N/A → N/A"; the Change Impact chapter is now wired to
+  the real posture KPI snapshot — the first run after upgrading shows a "no
+  previous snapshot" note, and subsequent runs render an actual delta table
+  (previously this chapter never rendered deltas due to a snapshot key mismatch).
+- XLSX export unification: the Audit, Policy Usage, VEN, and Traffic (all three
+  profiles) XLSX exporters now build every sheet directly from the same
+  `module_results` dict that drives the HTML report — no separate re-derivation
+  or raw-dataframe recompute path, so HTML and XLSX are guaranteed same-source.
+  Behavioral fixes that came with this: the Audit Correlations sheet, which was
+  always empty under the old exporter, now carries real correlated-sequence/
+  brute-force/off-hours data; the Policy Usage Unused Rules sheet now lists the
+  complete unused-rule set from `module_results` instead of a separate
+  recomputed-and-capped (500-row) query; the VEN XLSX sheets are renamed
+  Lost Today / Lost Yesterday and now map correctly to the 24h/24-48h buckets
+  (the old "Lost <24h" / "Lost 24-48h" sheet names were swapped relative to the
+  data they contained); the Traffic XLSX gains the six Lateral Movement and four
+  Cross-Label Matrix / three Unmanaged Hosts detail tables that phase 2/3 demoted
+  out of HTML (see above), fulfilling the "available in the XLSX export" notes;
+  the old from-raw-flows Top Talkers sheet is retired and superseded by the
+  Lateral Movement sheet's `ip_top_talkers` table (same source, no duplicate
+  recompute); every dataframe cell across all four XLSX exporters is now passed
+  through the shared formula-injection guard (leading `=`/`+`/`-`/`@` neutralized)
+  the same way the HTML exporters already were. Charts are an HTML-only feature —
+  the curated XLSX workbooks keep only the Executive Summary chart (stacked-table
+  sheets have no chart anchor point) and do not attempt chart parity with HTML.
+- Report simplification (phase 5 — Audit / Policy Usage / VEN Status): the Audit
+  report's Health, Users, and Policy Changes chapters now show only the 10 most
+  recent events each in HTML (previously the full, up to 50-row, list), with a
+  note pointing to the complete list; the XLSX export gained a Recent Events
+  sub-table on each of those three sheets so the full (up to 50-row) list is
+  still available there. Audit executive-summary KPI labels (and the XLSX
+  Attention Required sheet) now resolve through their i18n key first, so zh_TW
+  reports show real Chinese labels (e.g. "事件總數") instead of the English label
+  leaking through; the traffic/VEN/policy-usage exec summaries, which already had
+  localized labels, are unaffected. Embedded chart SVGs (used across audit,
+  traffic, and policy-usage reports) no longer carry a `<metadata>` block
+  (creation date/tool), for a small size reduction with no visual change. The
+  Policy Usage report's Unused Rules chapter shows the first 50 rules in HTML
+  (previously unbounded, up to the analysis layer's existing 1000-row cap) with a
+  note giving the shown/total count and pointing to the full list in CSV/XLSX;
+  the Hit Rules chapter is unaffected. The Policy Usage report's three separate
+  Draft Policy Risk tables (visibility risk, draft conflicts, draft coverage) are
+  merged into a single Top At-Risk Flow Pairs table with a new Risk Type column
+  (each type keeps its own top-20 ranking); the by-subtype summary pills for all
+  three categories are unchanged. The VEN Status report's Online chapter now
+  shows a count plus a version-distribution summary instead of a per-host table;
+  per-host online detail moved to the XLSX/CSV export only (the Offline / Lost
+  Today / Lost Yesterday chapters, and the XLSX/CSV exports, are unaffected).
+- Filter backend chain: the unified flow DataFrame (cache and report path) now
+  carries `windows_service_name` and `transmission` flattened columns (empty
+  string when the underlying flow has no value), enabling DataFrame-path
+  filtering on cached/report data for the new filter keys below. This
+  DataFrame-path filtering only applies to flows ingested at or after this
+  release — rows cached before the upgrade were flattened by the old
+  flattener and lack these columns, so an include filter on either key
+  fails closed (matches nothing) until the flow is re-ingested.
+- FilterBar v2: PCE-native three-column layout (Source / Destination / Service with
+  is-not exclusion rows), AND/OR mode toggle with pill migration, source/destination
+  swap, per-column category panels (Transmission is destination-only), and service
+  input guidance (numeric input offers both/TCP/UDP with both as default; `-` extends
+  to a range; text matches Process Name / Windows Service / Policy Services).
+- The five GUI modals (instant report, scheduled report, saved query, traffic rule,
+  bandwidth rule) no longer render bare Port / Protocol / Exclude Port fields; port
+  and protocol filters are entered as FilterBar service pills. Saved configs with
+  legacy scalar `port`/`proto`/`ex_port` are still read back as port pills and are
+  normalized to `ports`/`ex_ports` tokens on next save.
+- Known limitation (pre-existing): in OR mode the `any_*` filter keys remain
+  single-valued on the backend, so multiple pills of the same category in the merged
+  column still resolve to the last value.
+
 ### Removed
 
 - **Windows as a host platform for the appliance itself.** illumio-ops now
@@ -88,50 +382,11 @@ a plain `<major>.<minor>.<patch>` scheme. (Tags through v4.0.0 carried a
   profile's credentials out of `config/config.json` — right up until the first
   settings save.
 
-### Changed
 
-- Changing `api.url` or `api.org_id` now asks first, wherever you change it:
-  clear the PCE-derived cache, ingestion watermarks, alert cooldowns and SIEM
-  queue, or declare it the same PCE reachable at a new address and keep them.
-  Rotating the key or secret alone still saves without asking. The GUI's system
-  settings page and the interactive `illumio-ops` settings menu both prompt;
-  `illumio-ops config login --no-interactive` refuses the change outright
-  unless `--pce-target-change flush` or `--pce-target-change same-pce` says
-  which, so an automated run cannot re-point the appliance by accident. Editing
-  `config.json` by hand is still unguarded — nothing watches that file — and
-  leaves the old PCE's cache and watermarks in place.
-- **GUI redesign v2, phase 2A — the web interface is rebuilt.** The eight-tab
-  layout is replaced by six areas (overview, investigate, alerting, automation,
-  reports, system) reached through a hash router, with 18 routes in total. The
-  frontend is now ES modules under `src/static/js/v2/` with no build step, a
-  design-token stylesheet, a command palette, and a light/dark theme that
-  applies immediately instead of on the next page load. Every legacy page
-  script (`dashboard.js`, `settings.js`, `integrations.js`, `rule-scheduler.js`,
-  `actions.js`, `alerts.js`) and the old `index.html` are deleted.
-  The agreed version number for the release that ships this is 5.0.0; the
-  string in `src/__init__.py` is bumped when the release is actually cut,
-  not here, because phases 2B-2E are still ahead of it and the user guide
-  still describes the eight-tab GUI.
-- Coverage of the redesign is enforced by `tools/gate_coverage_live.py`, which
-  drives a running instance (local or a deployed appliance, with `--base-url`)
-  and requires all 102 `data-cov` anchors to be present.
-- `PUT /api/report-schedules/<id>` now requires a valid `report_type` in the
-  request body, the same as `POST` always did. The storage layer merges a PUT
-  body into the stored schedule field by field, so a partial update was
-  possible before: a third-party script sending only `{"hour": 9}` used to get
-  a 200 and now gets a 400. The shipped UI always sends the whole schedule
-  body, so it is unaffected — this only reaches hand-written API callers.
-- Report schedules of type `app_summary` are now rejected without a non-empty
-  `app`, on both `POST` and `PUT`. Such a schedule could never produce a
-  report: every tick raised `app_summary schedule requires an 'app' value` and
-  logged an error. The interactive CLI wizard already refused to create one;
-  the API did not.
-- The interactive CLI's report-schedule wizard now lists every valid report
-  type, numbered from a sorted list, instead of the three it used to offer.
-  The numbers therefore moved: option 1 is `app_summary` and option 3 is
-  `network_inventory`, where they used to be `traffic` and `ven_status`.
-  Editing an existing schedule prefills its current type, so pressing Enter
-  keeps what is already stored; typing a remembered number does not.
+- The "past 7 days traffic trend" chart on the traffic-workload tab and its
+  backing `GET /api/traffic/trend` endpoint were removed (operator verdict:
+  no value). The KPI strip and traffic analyzer query on that tab are
+  unchanged.
 
 ### Fixed
 
@@ -290,7 +545,6 @@ a plain `<major>.<minor>.<patch>` scheme. (Tags through v4.0.0 carried a
   The tick save-state path tolerates a schedule missing its `id` without
   aborting the rest of the tick.
 
-### Fixed
 
 - Traffic-query review remediation (2026-07-24): the traffic analyzer
   no longer returns silently empty or under-counted results when a draft
@@ -310,7 +564,6 @@ a plain `<major>.<minor>.<patch>` scheme. (Tags through v4.0.0 carried a
   malformed exclude CIDR/range no longer empties the cache-served report
   table, and the workload checkbox href is escaped.
 
-### Fixed
 
 - Alert-chain review remediation (2026-07-24 audit): cache-deployment
   traffic/volume rules now evaluate the full threshold window instead of
@@ -335,19 +588,6 @@ a plain `<major>.<minor>.<patch>` scheme. (Tags through v4.0.0 carried a
   list. Cooldown=0 (disabled) and the DLQ/throttle design trade-offs
   are documented in the GUI help and operator guide.
 
-### Added
-
-- PCE health monitoring now probes the official SLB endpoint
-  `GET /api/v2/node_available` after a passing `/health` (healthy = HTTP
-  200/202; 404/502/no-response raises the existing pce_health alert). Data
-  integrity telemetry: unrecovered collection-GET truncations persist to
-  `logs/data_integrity.json` and surface as a warn table on the
-  Integrations overview; `raise_on_error=True` collection getters now raise
-  `TruncatedCollectionError` instead of silently returning a truncated
-  page. A new cross-layer filter-key chain invariant test locks all seven
-  whitelist layers against silent-drop regressions.
-
-### Fixed
 
 - Report content polish (visual review sweep): pie charts use fixed
   semantic decision/severity colors (order-based palette rendered 98%
@@ -372,31 +612,6 @@ a plain `<major>.<minor>.<patch>` scheme. (Tags through v4.0.0 carried a
   corrupt cached payload rows now log warnings; the VEN summary job raises
   on PCE fetch failure instead of writing 0/0 as truth.
 
-### Removed
-
-- The "past 7 days traffic trend" chart on the traffic-workload tab and its
-  backing `GET /api/traffic/trend` endpoint were removed (operator verdict:
-  no value). The KPI strip and traffic analyzer query on that tab are
-  unchanged.
-
-### Added
-
-- Job health observability: every scheduled job records its last run and
-  status to `logs/job_health.json`; the Integrations overview shows a Job
-  Health table (never-ran and overdue jobs flagged) plus a TLS certificate
-  card, and a daily job renews the self-signed cert on disk when close to
-  expiry (restart still required to apply). Rule schedules now persist and
-  display per-schedule last-run state like report schedules; VEN/posture
-  dashboard tiles show data freshness and grey out when stale; alert channel
-  settings cards gained a test-send button.
-- VEN report: policy sync tracking for VENs that report normally — a KPI, a
-  dedicated section, and an XLSX sheet flag online VENs with agent health
-  errors/warnings, a sync state stuck off `applied`, stale firewall config, or
-  policy received but not applied (vendor-verified signals; the deprecated
-  `security_policy_refresh_at` column was replaced by
-  `security_policy_received_at` with a fallback for old PCEs).
-
-### Fixed
 
 - Job Health no longer accumulates false alarms from renamed or disabled
   jobs: the store is pruned to the actually-registered job set at scheduler
@@ -479,232 +694,6 @@ a plain `<major>.<minor>.<patch>` scheme. (Tags through v4.0.0 carried a
   exception-rollback snapshot (which could overwrite a concurrent update)
   is gone.
 
-### Changed
-
-- Traffic queries and reports that do not explicitly pick policy decisions now
-  include `unknown` (the vendor domain is blocked / potentially_blocked /
-  allowed / unknown; `unknown` covers idle/snapshot-mode VENs and
-  Flowlink-unmanaged flows). Traffic report totals may rise versus earlier
-  runs because unknown flows are now counted. Traffic data cached/backfilled
-  before this version was fetched without unknown flows — re-run the cache
-  backfill if cache-sourced reports should include them.
-- Report cards, generation modals, and the app header now use
-  content-specific icons instead of a shared shield (shield stays with
-  Security & Risk); the header carries an original micro-segmentation mark.
-- The `pdf` report format was removed from the CLI (`--format` now offers
-  html/csv/xlsx/all): no exporter ever implemented it, so selecting it
-  silently produced no file with exit code 0. The removal guard tests that
-  were supposed to enforce this only matched an unrelated argparse choices
-  list and have been strengthened to scan every choices list plus
-  `_REPORT_FORMATS`.
-- The SIEM forwarder no longer logs a startup "PREVIEW" warning
-  (`src/siem/preview.py` removed) — the feature has been GA per the earlier
-  changelog entry and the warning contradicted it.
-- The Windows NSSM service now registers with `--monitor-gui --interval 10`,
-  matching the Linux systemd unit (previously `--monitor`, which silently
-  omitted the Web GUI on Windows service deployments). Already-registered
-  services keep their existing parameters; re-register or adjust
-  AppParameters to adopt the new default.
-- Documentation rebuilt zh-primary: task-oriented operator guides under
-  `docs/guide/` (installation, configuration, GUI tour, reports,
-  monitoring/alerts, automation, SIEM, cache maintenance, troubleshooting),
-  developer handover docs under `docs/handover/` (architecture guide and
-  module map, PCE domain notes with source-graded vendor facts, development
-  workflow), and rewritten references (CLI, REST API incl. previously
-  undocumented filter/job-health endpoints, glossary). Legacy bilingual doc
-  pairs were removed — English is retained as a slim README only — and the
-  doc gates (docs_check bilingual semantics, coverage mapping, contract
-  tests) were adapted to the new tree.
-
-### Changed
-
-- Offline bundle / DB hardening: `_ADDED_COLUMNS` schema registry entries are now
-  table-qualified (`("table", "column", "ddl")`) instead of column-name-only, closing
-  a drift risk where two tables could share a column name. `install.sh`'s dependency
-  refresh is now deterministic — the bundled Python runtime is restored to a pristine base and
-  wheels are fully reinstalled (not merged/patched) on upgrade, with stale files left
-  behind by the previous version cleaned up; the upgrade `rsync --delete` excludes
-  (`config/`, `data/`, `logs/`, `reports/`, `python/`, `MIGRATED_FROM`, `uninstall.sh`)
-  are now anchored to the transfer root so they can't accidentally match same-named
-  paths nested deeper in the tree. `uninstall.sh` now preserves `data/` alongside
-  `config/` by default; both are only removed with `--purge`. Docs: the upgrade SOP is
-  aligned with actual installer behavior — the installer never restarts the service
-  itself, so the documented steps now say so explicitly. The downgrade guard also
-  falls back to the cache DB's `PRAGMA user_version` when the installed version
-  string is unreadable (the uninstall-then-reinstall-older path), and the wrapper
-  docs note that real operations need `sudo`. Windows: shipped PowerShell scripts
-  now carry a UTF-8 BOM (PowerShell 5.1 misparsed the BOM-less files on CJK ANSI
-  code pages), the bundle includes the Windows-only wheels (`colorama`,
-  `win32-setctime`) that the Linux-side `pip download` silently skipped via
-  environment markers, and `install.ps1` aborts on pip failure and runs the same
-  `verify_deps.py --offline-bundle` post-install verification as Linux.
-  `install.ps1` now also carries the same upgrade guards as `install.sh` —
-  refuses downgrades unless `-AllowDowngrade` (version string with a cache-DB
-  `PRAGMA user_version` fallback) and stops a running service before copying
-  files — and its uninstall preserves `config\` and `data\` unless `-Purge`.
-  `install.ps1` also creates the runtime dirs (`logs\`, `data\`, `reports\`)
-  like `install.sh` does, and no longer fabricates a `MIGRATED_FROM` marker
-  when reinstalling over a preserved `config\`/`data\` with no service present.
-  `scripts/check_doc_coverage.sh` works again: retargeted to the split docs
-  (`docs/reference/cli.md` for subcommands, `docs/getting-started.md` for
-  deployment scripts); the analysis-module filename family was dropped as no
-  longer operator-facing.
-- `report traffic` now generates the new plain Traffic Flow Report (traffic facts only,
-  no security scoring). Use `report security` / `report inventory` for the previous
-  outputs; `--profile` on `report traffic` is deprecated.
-- Trend and baseline-drift snapshots are now keyed per report profile
-  (`traffic_security_risk`, `traffic_network_inventory`, `traffic_traffic`).
-  The first run after upgrading has no previous baseline to compare against.
-- Security report simplification (phase 2): the three former attack-summary chapters
-  (boundary breaches, suspicious pivot behavior, blast radius, blind spots) and the
-  hero key-findings block are consolidated into a single Findings & Actions chapter,
-  with attack posture items merged by subject and quantified with real evidence text;
-  the Lateral Movement chapter is trimmed to 4 summary tables (service view, fan-out
-  sources, allowed lateral flows, attack paths), with host-level detail (IP talkers/
-  pairs, bridge nodes, reachable nodes, app chains) trimmed from HTML (detail
-  retained at the analysis layer and available in the XLSX export's Lateral
-  Movement sheet); the
-  Policy Decisions chapter folds sub-1% decisions into an "Other" row (with a note
-  listing which decisions were folded) and now surfaces the audit-flags table
-  (unmanaged-source allowed traffic); the Uncovered Flows chapter merges the port/
-  service-gap view into one table with a Top Destination Apps column; the maturity,
-  enforcement-readiness, and infrastructure-scoring sections each gained a
-  plain-language "how to read this score" explanation; the dead mod05 (legacy IP
-  host talkers) and mod10 (legacy allowed-traffic audit) modules were removed now
-  that their outputs are covered by mod15 and mod02 respectively.
-- Inventory report simplification (phase 3): refocused on asset/label governance —
-  the traffic overview, traffic distribution, and bandwidth chapters are dropped
-  from `report inventory` (still available via `report traffic`); the Cross-Label
-  Matrix chapter keeps only the ENV/APP dimensions in HTML, with ROLE/LOC detail
-  trimmed from HTML (detail retained at the analysis layer and available in the
-  XLSX export's Cross-Label sheet); the Unmanaged Hosts chapter is
-  merged to 3 tables, with the exposed-ports table gaining a Top Unmanaged Sources
-  column; a date-range parsing fix means flows with no valid timestamps now show
-  a single "N/A" instead of "N/A → N/A"; the Change Impact chapter is now wired to
-  the real posture KPI snapshot — the first run after upgrading shows a "no
-  previous snapshot" note, and subsequent runs render an actual delta table
-  (previously this chapter never rendered deltas due to a snapshot key mismatch).
-- XLSX export unification: the Audit, Policy Usage, VEN, and Traffic (all three
-  profiles) XLSX exporters now build every sheet directly from the same
-  `module_results` dict that drives the HTML report — no separate re-derivation
-  or raw-dataframe recompute path, so HTML and XLSX are guaranteed same-source.
-  Behavioral fixes that came with this: the Audit Correlations sheet, which was
-  always empty under the old exporter, now carries real correlated-sequence/
-  brute-force/off-hours data; the Policy Usage Unused Rules sheet now lists the
-  complete unused-rule set from `module_results` instead of a separate
-  recomputed-and-capped (500-row) query; the VEN XLSX sheets are renamed
-  Lost Today / Lost Yesterday and now map correctly to the 24h/24-48h buckets
-  (the old "Lost <24h" / "Lost 24-48h" sheet names were swapped relative to the
-  data they contained); the Traffic XLSX gains the six Lateral Movement and four
-  Cross-Label Matrix / three Unmanaged Hosts detail tables that phase 2/3 demoted
-  out of HTML (see above), fulfilling the "available in the XLSX export" notes;
-  the old from-raw-flows Top Talkers sheet is retired and superseded by the
-  Lateral Movement sheet's `ip_top_talkers` table (same source, no duplicate
-  recompute); every dataframe cell across all four XLSX exporters is now passed
-  through the shared formula-injection guard (leading `=`/`+`/`-`/`@` neutralized)
-  the same way the HTML exporters already were. Charts are an HTML-only feature —
-  the curated XLSX workbooks keep only the Executive Summary chart (stacked-table
-  sheets have no chart anchor point) and do not attempt chart parity with HTML.
-- Report simplification (phase 5 — Audit / Policy Usage / VEN Status): the Audit
-  report's Health, Users, and Policy Changes chapters now show only the 10 most
-  recent events each in HTML (previously the full, up to 50-row, list), with a
-  note pointing to the complete list; the XLSX export gained a Recent Events
-  sub-table on each of those three sheets so the full (up to 50-row) list is
-  still available there. Audit executive-summary KPI labels (and the XLSX
-  Attention Required sheet) now resolve through their i18n key first, so zh_TW
-  reports show real Chinese labels (e.g. "事件總數") instead of the English label
-  leaking through; the traffic/VEN/policy-usage exec summaries, which already had
-  localized labels, are unaffected. Embedded chart SVGs (used across audit,
-  traffic, and policy-usage reports) no longer carry a `<metadata>` block
-  (creation date/tool), for a small size reduction with no visual change. The
-  Policy Usage report's Unused Rules chapter shows the first 50 rules in HTML
-  (previously unbounded, up to the analysis layer's existing 1000-row cap) with a
-  note giving the shown/total count and pointing to the full list in CSV/XLSX;
-  the Hit Rules chapter is unaffected. The Policy Usage report's three separate
-  Draft Policy Risk tables (visibility risk, draft conflicts, draft coverage) are
-  merged into a single Top At-Risk Flow Pairs table with a new Risk Type column
-  (each type keeps its own top-20 ranking); the by-subtype summary pills for all
-  three categories are unchanged. The VEN Status report's Online chapter now
-  shows a count plus a version-distribution summary instead of a per-host table;
-  per-host online detail moved to the XLSX/CSV export only (the Offline / Lost
-  Today / Lost Yesterday chapters, and the XLSX/CSV exports, are unaffected).
-- Filter backend chain: the unified flow DataFrame (cache and report path) now
-  carries `windows_service_name` and `transmission` flattened columns (empty
-  string when the underlying flow has no value), enabling DataFrame-path
-  filtering on cached/report data for the new filter keys below. This
-  DataFrame-path filtering only applies to flows ingested at or after this
-  release — rows cached before the upgrade were flattened by the old
-  flattener and lack these columns, so an include filter on either key
-  fails closed (matches nothing) until the flow is re-ingested.
-- FilterBar v2: PCE-native three-column layout (Source / Destination / Service with
-  is-not exclusion rows), AND/OR mode toggle with pill migration, source/destination
-  swap, per-column category panels (Transmission is destination-only), and service
-  input guidance (numeric input offers both/TCP/UDP with both as default; `-` extends
-  to a range; text matches Process Name / Windows Service / Policy Services).
-- The five GUI modals (instant report, scheduled report, saved query, traffic rule,
-  bandwidth rule) no longer render bare Port / Protocol / Exclude Port fields; port
-  and protocol filters are entered as FilterBar service pills. Saved configs with
-  legacy scalar `port`/`proto`/`ex_port` are still read back as port pills and are
-  normalized to `ports`/`ex_ports` tokens on next save.
-- Known limitation (pre-existing): in OR mode the `any_*` filter keys remain
-  single-valued on the backend, so multiple pills of the same category in the merged
-  column still resolve to the last value.
-
-### Added
-
-- New filter keys, wired end-to-end across the full seven-layer chain (PCE-native
-  query payload where the PCE API supports it, the async-query client-side
-  matcher, and the cache/report DataFrame matcher): `process_name` /
-  `ex_process_name`, `windows_service_name` / `ex_windows_service_name`, and a new
-  `transmission` include key (`transmission` / `ex_transmission`;
-  `transmission_excludes` remains a supported alias for the exclude side). All
-  three match case-insensitively on the full string, accept a scalar or a list of
-  values, and are null-tolerant: a flow row missing the underlying field fails
-  closed for an include filter and is never excluded by an exclude filter.
-
-- Fail-fast SQLite runtime check: entry points now refuse to start with a clear error
-  when the linked SQLite is older than `3.35.0` (`src/runtime_checks.py`), instead of
-  failing later with cryptic ALTER TABLE / window-function errors.
-- `/usr/local/bin/illumio-ops` CLI wrapper installed by `install.sh` so the CLI is on
-  `PATH` without manually activating the bundled venv.
-- `preflight.sh` now checks the bundled SQLite version against the `3.35.0` floor and
-  reports the existing cache DB's `user_version` before install/upgrade.
-- Schema registry hardening: a frozen-baseline drift guard test now fails if a future
-  column-migration entry silently rewrites `_ADDED_COLUMNS` history, and opening a
-  cache DB with a newer `user_version` than the running code knows now emits a
-  downgrade warning instead of proceeding silently.
-- `install.sh` gained a downgrade guard (blocks installing an older bundle version
-  unless `--allow-downgrade` is passed), a running-service guard (stops the service
-  before overwriting files and prompts to restart it after), and post-install
-  verification (`verify_deps` + a smoke check) that fails the install if the new
-  environment is broken.
-- Enforcement Readiness Report (`report readiness`, CLI + GUI + scheduler): a
-  standalone report answering "which app (env) can safely move to enforcement
-  next" — readiness score/grade, an advancement queue ranked ready-first with
-  per-app blocking factor and recommended action, factor breakdown, remediation
-  recommendations, and a trend chapter. Shares its scoring engine with the
-  Security report's Enforcement Readiness chapter (same `enforcement_readiness`
-  analysis, so the two reports never disagree on a given app's score). Available
-  in HTML/CSV, in both English and Traditional Chinese.
-- Plain Traffic Flow Report profile (`traffic`): overview, policy decision summary,
-  app/env distribution, bandwidth, unmanaged overview. Runs only lightweight modules.
-- Trend/drift credibility hardening (phase 6): the Baseline Drift chapter now excludes
-  noise signatures (ICMP, port 0, ephemeral ports ≥49152) from both the new/disappeared
-  tables and their counts, and collapses `(unlabeled)→(unlabeled)` pairs into a single
-  summary line instead of listing them as individual pairs. Both the Baseline Drift
-  chapter and the per-report Trend section now carry snapshot metadata (window/
-  data_source/profile); when a run's window differs materially from the previous
-  baseline/snapshot, drift comparison is refused (a note explains why, and a fresh
-  baseline is still saved) and the Trend section shows a caveat naming the differing
-  fields — snapshots saved before this metadata existed compare exactly as before (no
-  refusal, no caveat). Also fixed an off-by-one in the trend snapshot lookup that made
-  the Trend delta always compare against the run before the previous one instead of
-  the previous run itself; it now appears from the very next report after a baseline
-  exists. This closes out the 2026-07-02 traffic/security report-split spec — all six
-  phases (report split, security/inventory simplification, XLSX unification, audit/
-  policy-usage/VEN slimming, and this trend/drift hardening) have now shipped.
-
-### Fixed
 
 - Report generation no longer produces a silent empty/partial report when the PCE
   traffic query fails. `execute_traffic_query_stream` swallows a PCE failure (submit

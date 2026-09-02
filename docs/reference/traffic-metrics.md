@@ -1,7 +1,7 @@
 ---
 title: 流量指標與 PCE API 的取值邏輯
 audience: [developer, operator]
-version: 4.1.0
+version: 5.0.0
 last_verified: 2026-08-24
 verified_against:
   - src/analyzer.py

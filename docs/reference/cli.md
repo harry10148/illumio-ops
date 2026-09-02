@@ -1,7 +1,7 @@
 ---
 title: CLI 參考手冊
 audience: [operator, developer]
-version: 4.1.0
+version: 5.0.0
 last_verified: 2026-08-30
 verified_against:
   - src/cli/root.py
@@ -753,7 +753,7 @@ illumio-ops version
 
 ```bash
 illumio-ops version
-# illumio-ops 4.1.0
+# illumio-ops 5.0.0
 ```
 
 ---

@@ -1,7 +1,7 @@
 ---
 title: 架構導覽與模組地圖
 audience: [developer]
-version: 4.1.0
+version: 5.0.0
 last_verified: 2026-09-02
 verified_against:
   - illumio-ops.py

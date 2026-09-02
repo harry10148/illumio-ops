@@ -1,7 +1,7 @@
 ---
 title: illumio-ops 文件總目錄
 audience: [operator, developer, api, security]
-version: 4.1.0
+version: 5.0.0
 last_verified: 2026-09-02
 verified_against:
   - docs/guide/installation.md

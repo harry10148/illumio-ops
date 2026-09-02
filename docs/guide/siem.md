@@ -1,7 +1,7 @@
 ---
 title: SIEM 轉送
 audience: [operator]
-version: 4.1.0
+version: 5.0.0
 last_verified: 2026-09-02
 verified_against:
   - src/siem/dispatcher.py

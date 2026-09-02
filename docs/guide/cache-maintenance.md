@@ -1,7 +1,7 @@
 ---
 title: pce_cache 維運與容量規劃
 audience: [operator]
-version: 4.1.0
+version: 5.0.0
 last_verified: 2026-09-02
 verified_against:
   - src/pce_cache/models.py

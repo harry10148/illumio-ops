@@ -1,7 +1,7 @@
 ---
 title: 設定參照
 audience: [operator]
-version: 4.1.0
+version: 5.0.0
 last_verified: 2026-08-30
 verified_against:
   - src/config_models.py

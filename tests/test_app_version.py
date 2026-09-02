@@ -8,4 +8,4 @@ def test_version_is_pure_semver():
 
 
 def test_version_value():
-    assert src.__version__ == "4.1.0"
+    assert src.__version__ == "5.0.0"
