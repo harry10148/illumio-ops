@@ -2,7 +2,7 @@
 title: SIEM 轉送
 audience: [operator]
 version: 4.1.0
-last_verified: 2026-07-17
+last_verified: 2026-09-02
 verified_against:
   - src/siem/dispatcher.py
   - src/siem/dlq.py
@@ -30,7 +30,7 @@ SIEM 轉送依賴 pce_cache（見 [cache-maintenance.md](cache-maintenance.md)�
 
 ## 1. Destination 設定
 
-透過 Web GUI（Integrations → SIEM → Add destination，見 [gui-tour.md](gui-tour.md)）或直接編輯 `config.json › siem.destinations` 新增目的地。完整欄位表（型別／預設值／說明）見 [configuration.md](configuration.md) 的「siem（SIEM 轉送）」一節；本節只列出決定行為的兩組列舉。
+透過 Web GUI（系統區 `#/system/siem` 的新增目的地，見 [gui-tour.md](gui-tour.md)）或直接編輯 `config.json › siem.destinations` 新增目的地。完整欄位表（型別／預設值／說明）見 [configuration.md](configuration.md) 的「siem（SIEM 轉送）」一節；本節只列出決定行為的兩組列舉。
 
 ### 1.1 Transport（傳輸協定）
 
@@ -144,7 +144,7 @@ Requeued 12 entries for 'splunk-prod'
 
 行為：依 `--limit`（預設 100）取出該目的地最新的 DLQ 項目，各自新建一列 `siem_dispatch`（`status="pending"`、`retries=0`），並在**同一個交易**內刪除對應的 DLQ 列。刪除與重新入列在同一交易完成，是為了避免同一筆記錄被重送兩次（例如指令執行到一半中斷再重跑）。
 
-> **命令層級 vs GUI 選單層級的差異**：CLI 的 `siem replay` 是以「目的地 + 筆數上限」為單位的批次操作，沒有逐筆挑選功能。互動式選單（`illumio-ops.py` 的 SIEM 選單 → DLQ management，`src/siem_cli.py`）額外支援輸入特定 DLQ id 清單做逐筆 replay／purge，適合只想重送/清除少數幾筆的場景；GUI 的 Integrations → DLQ 頁面同樣支援勾選特定項目重送。
+> **命令層級 vs GUI 選單層級的差異**：CLI 的 `siem replay` 是以「目的地 + 筆數上限」為單位的批次操作，沒有逐筆挑選功能。互動式選單（`illumio-ops.py` 的 SIEM 選單 → DLQ management，`src/siem_cli.py`）額外支援輸入特定 DLQ id 清單做逐筆 replay／purge，適合只想重送/清除少數幾筆的場景；GUI 系統區 `#/system/siem` 的 DLQ 區塊同樣支援勾選特定項目重送。
 
 若快取資料庫尚未初始化（例如尚未有任何派送記錄），會回報「無 SIEM 資料可重送」並以非零碼結束。
 
@@ -168,7 +168,7 @@ Purged 87 DLQ entries for 'splunk-prod'
 
 ## 4. 健康判讀
 
-Integrations Overview（`src/gui/routes/dashboard.py` 的 `_overview_pipeline()`）與 `illumio-ops siem status` 共用同一套判定邏輯（`src/pce_cache/health.py` 的 `pipeline_verdict()`），三個等級：
+總覽區的管線健康卡（`src/gui/routes/dashboard.py` 的 `_overview_pipeline()`）與 `illumio-ops siem status` 共用同一套判定邏輯（`src/pce_cache/health.py` 的 `pipeline_verdict()`），三個等級：
 
 | 等級 | 觸發條件（任一成立） |
 |---|---|
@@ -184,11 +184,11 @@ Integrations Overview（`src/gui/routes/dashboard.py` 的 `_overview_pipeline()`
 
 **成因一：沒有任何啟用中的目的地。** `siem.enabled=true` 但 `destinations` 清單為空，或全部目的地的 `enabled` 都是 `false`。這種情況不需要看任何資料就能判定為 `siem_idle=true`——設定本身就不完整。
 
-- **處置**：到 Integrations → SIEM（見 [gui-tour.md](gui-tour.md)）或 `config.json › siem.destinations` 檢查是否漏了新增目的地，或目的地是否被誤停用。
+- **處置**：到系統區 `#/system/siem`（見 [gui-tour.md](gui-tour.md)）或 `config.json › siem.destinations` 檢查是否漏了新增目的地，或目的地是否被誤停用。
 
 **成因二：有啟用中的目的地，但近 24 小時完全沒有新記錄排入佇列，而來源端明顯有資料在流動。** 判定條件是「近 24 小時 `siem_dispatch.queued_at` 計數為 0」**且**「至少一個 cache 來源（events／traffic）的 lag 資訊非 `None`，代表 ingest 確實在收資料」。兩個條件同時成立才算 `siem_idle`——如果 PCE 本來就沒有新事件/流量，佇列自然是空的，這不算異常（`denom=0` 的「沒有流量」與「壞掉了、沒在送」必須能區分，這正是 2026-07-16 修掉的一個假綠燈問題，見 CHANGELOG）。
 
-- **處置**：先確認 ingest 是否真的有在寫入 cache（`illumio-ops cache status`，見 cache-maintenance.md）。若 ingest 正常但 enqueue 沒有發生，檢查對應目的地的 `source_types` 是否涵蓋目前有資料的來源（例如目的地只設了 `["audit"]`，但近期只有 traffic 流量，這不算異常，是設定選擇）；若 `source_types` 設定正確仍無記錄，檢查 `siem_dispatch` 排程 job 是否真的在跑（Integrations Overview 的 Job Health 表格，或 `logs/job_health.json`，見 [automation.md](automation.md)）。`enqueue_new_records()` 安全網補登理論上會在下個 tick 自行補上缺漏，若持續空轉，代表 job 本身沒有被觸發，而不是資料層面的問題。
+- **處置**：先確認 ingest 是否真的有在寫入 cache（`illumio-ops cache status`，見 cache-maintenance.md）。若 ingest 正常但 enqueue 沒有發生，檢查對應目的地的 `source_types` 是否涵蓋目前有資料的來源（例如目的地只設了 `["audit"]`，但近期只有 traffic 流量，這不算異常，是設定選擇）；若 `source_types` 設定正確仍無記錄，檢查 `siem_dispatch` 排程 job 是否真的在跑（自動化區 `#/automation/jobs` 的 Job 健康表，或 `logs/job_health.json`，見 [automation.md](automation.md)）。`enqueue_new_records()` 安全網補登理論上會在下個 tick 自行補上缺漏，若持續空轉，代表 job 本身沒有被觸發，而不是資料層面的問題。
 
 `siem_idle=true` 只會把整體判讀壓到 `warn`（不會單獨觸發 `error`），與 DLQ 筆數 > 0、cache lag 到達 warning 等級同一層級。
 
@@ -197,7 +197,7 @@ Integrations Overview（`src/gui/routes/dashboard.py` 的 `_overview_pipeline()`
 ## 延伸閱讀
 
 - 設定鍵完整表格（型別／預設值／說明）：[configuration.md](configuration.md)
-- GUI Integrations 頁面的 SIEM／DLQ 子頁操作：[gui-tour.md](gui-tour.md)
+- GUI 系統區 `#/system/siem`（含 DLQ）的操作：[gui-tour.md](gui-tour.md)
 - `siem_dispatch` 排程 job 的完整 job 清單與 Job Health 判讀：[automation.md](automation.md)
 - pce_cache 架構、ingest／retention／容量規劃：見 [cache-maintenance.md](cache-maintenance.md)
 - 常見故障排除（連線失敗、憑證問題、佇列積壓）：見 [troubleshooting.md](troubleshooting.md)

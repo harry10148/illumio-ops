@@ -2,7 +2,7 @@
 title: 詞彙表
 audience: [operator, developer]
 version: 4.1.0
-last_verified: 2026-07-17
+last_verified: 2026-09-02
 verified_against:
   - src/i18n/data/zh_explicit.json
   - src/config_models.py
@@ -64,13 +64,13 @@ verified_against:
 | Backfill（補填） | 以 `illumio-ops cache backfill` 觸發的歷史日期範圍填充，直接寫入 `pce_events`／`pce_traffic_flows_raw`，繞過 Watermark。用於首次啟用後補齊快取資料，或補齊舊資料缺少 `unknown` policy_decision 的缺口。 | [pce_cache 維運](../guide/cache-maintenance.md) |
 | DLQ（Dead Letter Queue，死信佇列） | PCE Cache 中的 `dead_letter` 資料表，存放已用盡所有重試的 SIEM 派發，隔離保留 30 天供操作員檢查，不影響即時佇列。 | [SIEM 轉送](../guide/siem.md) |
 | Draft Policy Alignment（R 系列） | `src/report/rules/r01`–`r05` 實作的 5 條治理型偵測規則（R01–R05），只在 DataFrame 帶 `draft_policy_decision` 欄時才會評估，該欄由查詢時 `compute_draft=True` 產生；標準／cache 報表路徑預設不含此欄，須透過獨立命令 `illumio-ops report draft-policy` 按需觸發即時 PCE 查詢。MITRE ATT&CK 全部刻意不對應（治理／衛生型規則）。 | [監控規則、告警與 SIEM §2.4](../guide/monitoring-alerts.md) |
-| FilterBar（v2 物件選擇器） | GUI 各分頁共用的篩選元件（`src/static/js/filter-bar.js` 的 `createFilterBar()`），以 labels／label groups／IP lists／workloads／services pill 取代純文字輸入。序列化出的 key（`src_labels`／`dst_workloads`／`services` 等）同 key 之間為 OR、跨 key 之間為 AND；後端物件查詢由 `src/gui/routes/filter_objects.py` 提供。 | [Web GUI 導覽](../guide/gui-tour.md) |
+| FilterBar（v2 物件選擇器） | GUI 各區共用的篩選元件（`src/static/js/v2/components/filter-bar.mjs` 的 `createFilterBar()`），以 labels／label groups／IP lists／workloads／services pill 取代純文字輸入。序列化出的 key（`src_labels`／`dst_workloads`／`services` 等）同 key 之間為 OR、跨 key 之間為 AND；後端物件查詢由 `src/gui/routes/filter_objects.py` 提供。 | [Web GUI 導覽](../guide/gui-tour.md) |
 | Hub Apps（中樞應用） | illumio-ops Web UI 中捆綁的第一方功能模組集合（Dashboard、Reports、Alerts、Settings、SIEM 等），每個 Hub App 是獨立的 Flask Blueprint。 | [Web GUI 導覽](../guide/gui-tour.md) |
 | Ingestor（擷取器） | 每個資料來源（`events`、`traffic`）各一個的背景輪詢器，依固定排程從 PCE API 拉取新資料列至 PCE Cache，受共享 token-bucket 速率限制器管控。 | [pce_cache 維運](../guide/cache-maintenance.md) |
-| Job Health（Job 健康） | 每個排程 job 的 last_run／last_status 落地 `logs/job_health.json`（`src/job_health.py`），是「應跑未跑」可觀測性的根治配套。GUI 的 Integrations → Overview 的 Job Health 表格用 `never-ran`／`overdue` 旗標呈現異常。 | [自動化：排程與 quarantine §3](../guide/automation.md)、[故障排除 §5](../guide/troubleshooting.md) |
-| Multi-PCE Profile（多 PCE 設定檔） | `config/config.json` 中的命名組態槽，存放單一 PCE 的憑證與端點設定，允許單一 illumio-ops 安裝指向多個 PCE。 | [設定參照](../guide/configuration.md) |
+| Job Health（Job 健康） | 每個排程 job 的 last_run／last_status 落地 `logs/job_health.json`（`src/job_health.py`），是「應跑未跑」可觀測性的根治配套。GUI 自動化區 `#/automation/jobs` 的 Job 健康表用 `never-ran`／`overdue` 旗標呈現異常。 | [自動化：排程與 quarantine §3](../guide/automation.md)、[故障排除 §5](../guide/troubleshooting.md) |
+| Multi-PCE Profile（多 PCE 設定檔）**（已移除）** | 曾經是 `config/config.json` 中的命名組態槽，存放單一 PCE 的憑證與端點設定。它只是憑證切換器——`config.api` 下游沒有任何東西知道 profile 存在，而快取、watermark、封存檔與排程都只帶著某一個 PCE 的資料。已移除；升級時 `pce_profiles`／`active_pce_id` 於載入時被丟棄，appliance 繼續使用 `api` 底下的那一組設定。遷移說明見設定參照。 | [設定參照](../guide/configuration.md) |
 | pce_cache（PCE Cache） | 位於 `data/pce_cache.sqlite`（`db_path` 設定鍵，`src/config_models.py`）的本地 SQLite（WAL 模式）資料庫，儲存 PCE 稽核事件與流量記錄的滾動窗口，作為 SIEM 轉發器、報表模組與告警迴圈的共享緩衝區。 | [pce_cache 維運](../guide/cache-maintenance.md) |
-| Rule Scheduler（規則排程器） | illumio-ops 內基於 APScheduler 的作業執行器，依設定間隔執行擷取器、告警評估、SIEM 派發滴答與報表生成；亦指 GUI 的規則排程分頁，可對特定 monitoring rule 建立定期執行排程。 | [自動化：排程與 quarantine §1](../guide/automation.md) |
+| Rule Scheduler（規則排程器） | illumio-ops 內基於 APScheduler 的作業執行器，依設定間隔執行擷取器、告警評估、SIEM 派發滴答與報表生成；亦指 GUI 自動化區的規則排程頁，可對特定 monitoring rule 建立定期執行排程。 | [自動化：排程與 quarantine §1](../guide/automation.md) |
 | SIEM Dispatch（SIEM 派發） | `siem_dispatch` 外寄佇列資料表，SIEM 轉發器從此佇列讀取、將事件傳送至 syslog／Splunk／Elastic，成功傳遞後移除資料列，失敗則移至 DLQ。 | [SIEM 轉送](../guide/siem.md) |
 | Watermark（水位線） | `ingestion_watermarks` 資料表中的每擷取器游標，記錄各來源最後成功擷取的時間戳記，重啟後仍保留，確保輪詢無縫隙或重複地恢復。 | [pce_cache 維運](../guide/cache-maintenance.md) |
 

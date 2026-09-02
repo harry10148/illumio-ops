@@ -2,12 +2,12 @@
 title: 自動化：規則排程、隔離操作與背景 Job
 audience: [operator]
 version: 4.1.0
-last_verified: 2026-07-17
+last_verified: 2026-09-02
 verified_against:
   - src/rule_scheduler.py
   - src/gui/routes/rule_scheduler.py
   - src/rule_scheduler_cli.py
-  - src/static/js/rule-scheduler.js
+  - src/static/js/v2/areas/automation.mjs
   - src/cli/menus/_root.py
   - src/scheduler/__init__.py
   - src/scheduler/jobs.py
@@ -24,7 +24,7 @@ verified_against:
 本篇涵蓋 illumio-ops 會**主動改變 PCE 狀態**的兩套自動化能力——Rule Scheduler（規則排程）與
 Quarantine（隔離）——以及支撐整個系統的背景排程 job 總表。兩者都是「真實副作用」操作：
 Rule Scheduler 會改寫 PCE 上的 rule 啟用旗標與 description，Quarantine 會改變 Workload 的
-enforcement。GUI 逐分頁操作步驟見 [gui-tour.md](gui-tour.md) 的「Rule Scheduler」與
+enforcement。GUI 操作步驟見 [gui-tour.md](gui-tour.md) 的「自動化」與
 「Quarantine」兩節；本篇從自動化機制與安全約束角度補充細節。
 
 ---
@@ -40,7 +40,7 @@ Rule Scheduler 讓操作者為 PCE 上**已佈署（Active）**的 Ruleset 或�
 - 核心引擎：`src/rule_scheduler.py`（`ScheduleDB` 存取排程資料、`ScheduleEngine.check()`
   逐一比對排程與 PCE 目前狀態並觸發切換）。
 - GUI：`src/gui/routes/rule_scheduler.py`（`/api/rule_scheduler/*`），對應 [gui-tour.md](gui-tour.md)
-  「Rule Scheduler」分頁的 Browse／Schedules／Logs 三個子頁。
+  自動化區的 `#/automation/rules`（瀏覽／排程／紀錄）、`#/automation/reports`、`#/automation/jobs` 三條路由。
 - CLI：`src/rule_scheduler_cli.py`（`illumio-ops shell` → `3. Rule Scheduler`，互動選單；
   `rule-scheduler` 不是頂層子命令，`illumio-ops rule` 是告警規則檢視命令群），提供與 GUI 對等的
   瀏覽、建立、編輯、刪除功能，另外多一個「立即執行一次 check」的除錯選項。
@@ -213,9 +213,9 @@ daemon 啟動時（`--monitor`／`--monitor-gui`）由 `src/scheduler/__init__.p
 `_instrument` wrapper：註冊當下先寫 `registered` 記錄，之後每次執行完寫 `ok`/`error` 到
 `logs/job_health.json`（`src/job_health.py`），**job id 本身就是 `logs/job_health.json` 裡的
 key**——例如 `tick_rule_schedules` job 的健康狀態就存在 `job_health.json` 的
-`"tick_rule_schedules"` 這個 key 下，兩者一一對應、不需要另外的對照表。GUI Integrations →
-Overview 的 Job Health 表格即讀取這份檔案，never-ran／overdue 的判讀規則見
-[gui-tour.md](gui-tour.md) 「Integrations」一節。
+`"tick_rule_schedules"` 這個 key 下，兩者一一對應、不需要另外的對照表。GUI 自動化區 `#/automation/jobs`
+的 Job 健康表即讀取這份檔案，never-ran／overdue 的判讀規則見
+[gui-tour.md](gui-tour.md) 的「背景 Job 健康」一節。
 
 全部條件開啟時共 **14 個**註冊 job（與 [architecture.md](../handover/architecture.md) §5.2
 的清單一致，兩篇互不矛盾）：

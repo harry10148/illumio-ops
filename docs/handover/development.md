@@ -2,7 +2,7 @@
 title: 開發流程與慣習
 audience: [developer]
 version: 4.1.0
-last_verified: 2026-07-17
+last_verified: 2026-09-02
 verified_against:
   - requirements.txt
   - requirements-dev.txt
@@ -29,7 +29,7 @@ verified_against:
   - src/analyzer.py
   - src/api/traffic_query.py
   - src/report/report_generator.py
-  - src/static/js/dashboard.js
+  - src/static/js/v2/areas/reports.mjs
   - src/report_scheduler.py
   - tests/test_i18n_audit.py
 ---
@@ -259,7 +259,7 @@ def t(key: str, *, lang: str | None = None, default: str | None = None, **kwargs
 
 `ReportGenerator._write_report_metadata()`（`src/report/report_generator.py` 約 L818–822）把每份報表的 metadata 寫到 `<report_path>.metadata.json`。`_build_report_metadata()`（約 L824–838）**不論 traffic／security_risk／network_inventory 哪個 profile，一律硬編回傳 `"report_type": "traffic"`**（L833）；raw CSV 匯出走另一條路徑，硬編 `"report_type": "traffic_raw_csv"`（`report_generator.py` L658）。
 
-因此前端無法只靠 sidecar 的 `report_type` 分辨這三種 traffic 家族報表——`src/static/js/dashboard.js`（約 L241–250）用**檔名前綴**覆寫：`Illumio_Traffic_Report_SecurityRisk_` → `security_risk`、`Illumio_Traffic_Report_NetworkInventory_` → `network_inventory`、`Illumio_Traffic_Report_\d{4}-`（純日期開頭）→ `traffic`；判斷順序刻意先查 SecurityRisk／NetworkInventory 兩個特化前綴，因為 `Illumio_Traffic_Report_` 是它們的 strict prefix，順序反了會誤判。Policy Diff／Policy Resolver／App Summary 三種報表完全沒有 metadata sidecar，純靠檔名前綴判斷。
+因此前端無法只靠 sidecar 的 `report_type` 分辨這三種 traffic 家族報表——`src/static/js/v2/areas/reports.mjs`（約 L423）用**檔名前綴**覆寫：`Illumio_Traffic_Report_SecurityRisk_` → `security_risk`、`Illumio_Traffic_Report_NetworkInventory_` → `network_inventory`、`Illumio_Traffic_Report_\d{4}-`（純日期開頭）→ `traffic`；判斷順序刻意先查 SecurityRisk／NetworkInventory 兩個特化前綴，因為 `Illumio_Traffic_Report_` 是它們的 strict prefix，順序反了會誤判。Policy Diff／Policy Resolver／App Summary 三種報表完全沒有 metadata sidecar，純靠檔名前綴判斷。
 
 前綴表另存一份在 `src/report_scheduler.py` 的 `_REPORT_PREFIXES`（約 L621–631，含 traffic/security_risk/network_inventory/audit/ven_status/policy_usage/policy_diff/policy_resolver/app_summary/rule_hit_count 共 10 類），`dashboard.js` 的行內註解明文標示自己是在 mirror 這份表。**新增一種 traffic 家族報表時**，只在 `_build_report_metadata()` 加新字串是不夠的——前端三段 if-else 與 `_REPORT_PREFIXES` 都要同步加對應的檔名前綴分支，否則 Dashboard 卡片會把新報表誤判成舊的 `traffic`。
 

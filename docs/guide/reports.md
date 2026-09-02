@@ -2,7 +2,7 @@
 title: 報表家族
 audience: [operator]
 version: 4.1.0
-last_verified: 2026-07-17
+last_verified: 2026-09-02
 verified_against:
   - src/report/report_generator.py
   - src/report/audit_generator.py
@@ -20,7 +20,7 @@ verified_against:
 
 # 報表家族
 
-illumio-ops 提供 9 種報表（GUI Reports 分頁的 Generate 鈕與 CLI `illumio-ops report <type>` 子命令一一對應），可用 CLI、GUI 或排程三種方式產生。除了這 9 種，Traffic 報表底下還有幾個共用同一份產生器的變體子命令（`draft-policy`／`inventory`／`app-summary`），詳見「1. Traffic Flow Report」節末的說明。
+illumio-ops 提供 9 種報表（GUI 報表區 `#/reports` 的產生鈕與 CLI `illumio-ops report <type>` 子命令一一對應；GUI 把 Traffic 底下的變體各給一張卡，所以型錄上是 11 張），可用 CLI、GUI 或排程三種方式產生。除了這 9 種，Traffic 報表底下還有幾個共用同一份產生器的變體子命令（`draft-policy`／`inventory`／`app-summary`），詳見「1. Traffic Flow Report」節末的說明。
 
 ## 報表總覽
 
@@ -37,6 +37,25 @@ illumio-ops 提供 9 種報表（GUI Reports 分頁的 Generate 鈕與 CLI `illu
 | Policy Resolver（`resolve`） | ACTIVE label-based policy 展開成 IP 層防火牆規則長什麼樣 | live（僅 ACTIVE） | json / csv / all |
 
 「資料來源」欄的 hybrid／live／cache-only 語意見各報表節與下方「cache vs live」說明；輸出格式欄位是 `_REPORT_FORMATS`／各子命令 `--format` 的實際 `choices`，不是全報表統一集合。
+
+## HTML 版面
+
+10 種報表的 HTML 共用同一個版面（`policy_resolver` 只有 JSON／CSV，沒有 HTML）：
+
+- **封面**：眉標（報表類別）、完整標題、型別短標，下方是資料範圍與產生時間
+  這類 label–value 配對；有等第的報表（Security & Risk、Enforcement Readiness）
+  在此顯示等第與分數。
+- **目錄**：章節編號與標題，每章右側一個色點標示該章的嚴重度。
+- **章節**：每章有自己的導引說明與嚴重度標記（chip），表格與圖表在其下。
+- **附錄**：產出參數與章節索引。
+
+列印（瀏覽器另存 PDF）時的版面規則：
+
+- 欄數 **9 欄以上**的表格會排在自己的**橫式頁**，其餘走 A4 直式。
+- 直式表格的欄寬有上限，過長的值會換行而不是被裁掉——報表不做無聲截斷。
+- 長文欄在列印時會展開全文，不會只留省略號。
+
+產品端**沒有伺服器產生的 PDF**：PDF 來自瀏覽器列印，版面由列印 CSS 決定。
 
 ## cache 與 live 資料來源
 
@@ -62,7 +81,7 @@ illumio-ops report traffic --format html
 
 常用旗標：`--source api|csv`（預設 api）、`--file PATH`（csv 匯入時的來源檔）、`--output-dir`、`--email`（產出後寄送，需先設定郵件通道）、`--data-source hybrid|live|cache-only`（見上節）。
 
-GUI：Reports → List 子頁 → Traffic 卡片 Generate 鈕；產出會排入伺服器端背景執行緒，即時查詢 PCE 並寫檔，視資料量可能耗時數分鐘。
+GUI：報表區 `#/reports` → Traffic 卡片的產生鈕；產出會排入伺服器端背景執行緒，即時查詢 PCE 並寫檔，視資料量可能耗時數分鐘。
 
 關鍵欄位：Executive Summary KPI（總流量／連線數／政策覆蓋率）、Policy Decisions 分布、Top 未覆蓋流量、橫向移動路徑（攻擊路徑、fan-out 來源、bridge nodes）、Cross-Label Matrix、Unmanaged Hosts。
 
@@ -88,7 +107,7 @@ illumio-ops report security --format html
 
 `--vuln-csv PATH`（選填）：接受 Qualys／Tenable 等匯出的 CSV（需含 ip 與 cve 欄位），用來產出 V-E exposure 小節。其餘旗標與 Traffic 報表相同（`--source`、`--data-source`、`--email` 等）。
 
-GUI：Reports → Security 卡片 Generate。
+GUI：報表區 `#/reports` → Security 卡片的產生鈕。
 
 關鍵欄位：policy_coverage_pct、未覆蓋流量 Top 清單、攻擊面摘要、Enforcement Readiness 小節（與獨立的 Readiness 報表共用同一分析核心 mod13，是同一套邏輯的兩種呈現）。
 
@@ -104,7 +123,7 @@ CLI 範例：
 illumio-ops report audit --start-date 2026-07-01 --end-date 2026-07-16 --format html
 ```
 
-GUI：Reports → Audit 卡片 Generate。
+GUI：報表區 `#/reports` → Audit 卡片的產生鈕。
 
 關鍵欄位：`action.src_ip`／`api_method`／`api_endpoint`、`created_by`（分辨 user／agent／system 來源）、`change_detail`（欄位前後值摘要）、`workloads_affected`。
 
@@ -122,7 +141,7 @@ illumio-ops report policy-usage --start-date 2026-07-01 --end-date 2026-07-16 --
 
 `--source api|csv --file PATH`：也支援匯入 workloader 工具產出的 rule-usage CSV。
 
-GUI：Reports → Policy Usage 卡片 Generate（逐規則各自查詢，規則數多時耗時較長）。
+GUI：報表區 `#/reports` → Policy Usage 卡片的產生鈕（逐規則各自查詢，規則數多時耗時較長）。
 
 關鍵欄位：每條規則的 hit／unused 狀態、consumers／providers／services。
 
@@ -141,7 +160,7 @@ CLI 範例：
 illumio-ops report ven-status --format html
 ```
 
-GUI：Reports → VEN Status 卡片 Generate。
+GUI：報表區 `#/reports` → VEN Status 卡片的產生鈕。
 
 關鍵欄位：Online／Offline 分類（同時要求行政狀態 `active` 且心跳在 1 小時內才算 Online，超過視為離線即使行政狀態仍是 active）；離線再分桶為近 24 小時、24–48 小時、48 小時以上或無心跳資訊。
 
@@ -159,7 +178,7 @@ illumio-ops report readiness --start-date 2026-07-01 --end-date 2026-07-16 --for
 
 支援 `--data-source hybrid|live|cache-only`（同 Traffic）。
 
-GUI：Reports → Readiness 卡片 Generate。
+GUI：報表區 `#/reports` → Readiness 卡片的產生鈕。
 
 關鍵欄位：`readiness_score`、`grade`、`current_mode`、`blocking_factor`、`recommended_action`，以及依分數排序的推進候選佇列。
 
@@ -177,7 +196,7 @@ illumio-ops report rule-hit-count --format html
 
 `--source native|csv`：`native`（預設）呼叫 PCE pull API 即時取得；`csv` 匯入 PCE UI 匯出的原生 Rule Hit Count CSV。
 
-GUI：Reports → Rule Hit Count 卡片 Generate。
+GUI：報表區 `#/reports` → Rule Hit Count 卡片的產生鈕。
 
 **啟用精靈**：此功能需先在 PCE 上啟用——PCE 端把 `report_templates/rule_hit_count_report` 設為啟用，VEN 端則要寫入 draft `firewall_settings` 的 `rule_hit_count_enabled_scopes` 並 provision，這是一次正式的 production policy 寫入。CLI 偵測到尚未啟用時，僅在互動式終端機才會跳出啟用精靈：先顯示警告說明會寫入 production policy，要求操作者明確確認，再選擇套用範圍（全部 VEN 或指定 label 範圍），完成後提示 VEN 需要一段時間才會開始回報資料。排程執行（`report_scheduler.py`）遇到未啟用一律只記警告並跳過，絕不會自動觸發精靈或自動啟用。
 
@@ -199,7 +218,7 @@ illumio-ops report policy-diff --format html --attribution-days 30
 
 `--attribution-days N`（預設 30）：決定往回查多少天的 audit 事件來做操作歸因。
 
-GUI：Reports → Policy Diff 卡片 Generate。
+GUI：報表區 `#/reports` → Policy Diff 卡片的產生鈕。
 
 關鍵欄位：規則層 diff（含風險分級）＋物件層 diff（ip_lists／services／label_groups 各自的 added／removed／modified 計數）＋操作歸因（誰改的、何時改的，來自 audit 事件回溯）。
 
@@ -217,7 +236,7 @@ illumio-ops report resolve --format json
 
 （CLI 子命令名稱是 `resolve`，不是 `policy-resolver`。）
 
-GUI：Reports → Policy Resolver 卡片 Generate。
+GUI：報表區 `#/reports` → Policy Resolver 卡片的產生鈕。
 
 關鍵欄位：依 ruleset 分組的展開結果——label→IP、iplist→CIDR/FQDN、label_group（遞迴展開子群組）→label、service→port 皆在本機用查表方式一次性展開，不是交給 PCE 端計算。
 
@@ -233,4 +252,4 @@ GUI：Reports → Policy Resolver 卡片 Generate。
 - **寄送**：排程設 `email_report: true` 時，成功產出後會組一封 HTML email 寄出（主旨含排程名稱與日期），收件人預設用系統郵件設定、可用 `email_recipients` 覆寫。寄送失敗不影響已產出的檔案。
 - **保留**：`max_reports` 只保留最新 N 份「報表」而非個別檔案（同一次產出的 html+csv 算同一份，一起留或一起刪）。保留以**單一排程為範圍**——每次排程產出會在 metadata sidecar 標記所屬排程 id，裁剪只影響同一排程自己的歷史，因此同 report_type、同輸出目錄的兩個排程不會互相刪檔（早於此機制、未標記的舊檔改由 `retention_days` 依時間裁剪）。兩者鍵位語意見 [configuration.md](configuration.md) 「report／report_schedules」節。
 
-GUI 排程操作（建立／編輯／啟用停用／立即執行 Run Now／刪除）見 [gui-tour.md](gui-tour.md) 「5) Reports」節的 Schedules 子頁；排程需 daemon 持續執行才會觸發，勾選 Email 需先在 Settings → Channels 設定好郵件通道。
+GUI 排程操作（建立／編輯／啟用停用／立即執行 Run Now／刪除）見 [gui-tour.md](gui-tour.md) 的「報表」與「自動化」節的 Schedules 子頁；排程需 daemon 持續執行才會觸發，勾選 Email 需先在 Settings → Channels 設定好郵件通道。

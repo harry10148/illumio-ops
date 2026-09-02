@@ -2,7 +2,7 @@
 title: 監控規則、告警與事件規則
 audience: [operator]
 version: 4.1.0
-last_verified: 2026-08-30
+last_verified: 2026-09-02
 verified_against:
   - src/analyzer.py
   - src/api_client.py
@@ -37,7 +37,7 @@ illumio-ops 內部有**兩套獨立的規則判斷引擎**，加上一條**事�
 
 即時監控規則引擎是「條件比對 + 門檻 + 冷卻」型：每條規則是存於 `config/alerts.json` 的一份設定字典，命中且超過門檻就派送告警。報表安全規則引擎則是「程式化偵測邏輯」型：每條規則（B/L/R 系列，共 **24 條**）是一段寫死的 Python 偵測函式，依網路情境判定嚴重度，並附上 MITRE ATT&CK 對映。
 
-設定檔結構與各鍵語意見 [configuration.md](configuration.md)；GUI 的 Alerts／Settings → Channels 頁面操作步驟見 [gui-tour.md](gui-tour.md)；報表產出與模組總覽見 [reports.md](reports.md)。
+設定檔結構與各鍵語意見 [configuration.md](configuration.md)；GUI 的告警區／系統區 `#/system/channels` 頁面操作步驟見 [gui-tour.md](gui-tour.md)；報表產出與模組總覽見 [reports.md](reports.md)。
 
 ---
 
@@ -287,12 +287,12 @@ R 系列只在 unified DataFrame 帶有 **`draft_policy_decision`** 欄時才會
 未設定時使用 `https://console.illum.io`，自訂 SaaS tenant 使用其完整 Console URL；on-prem
 未設定時回退到 `api.url` 的 Console origin。設定細節見 [configuration.md](configuration.md)。
 
-GUI 操作路徑（Settings → Channels 各通道卡片；Rules → Actions 全域測試）見 [gui-tour.md](gui-tour.md)。
+GUI 操作路徑（系統區 `#/system/channels` 各通道卡片；告警區 `#/alerting/ops` 全域測試）見 [gui-tour.md](gui-tour.md)。
 
 ### 4.2 Test-send
 
 - **端點**：`POST /api/actions/test-alert`，body 可帶 `channel`（省略則對 `alerts.active` 全部通道各發一次）。呼叫 `Reporter.send_alerts(force_test=True, channels=channels)`，會**真的發送**測試訊息，正式環境使用前請先確認收件者。
-- **每通道版本**：Settings → Channels 頁面每張通道卡片有各自的 Send test 按鈕，走同一端點但只帶該通道名稱。
+- **每通道版本**：系統區 `#/system/channels` 每張通道卡片有各自的 Send test 按鈕，走同一端點但只帶該通道名稱。
 - **限流**：端點掛 `30 per hour` rate limit（`@limiter.limit("30 per hour")`），避免誤觸洗版。
 - `force_test=True` 時**略過** DLQ 補送與空告警短路判斷，一定會嘗試對指定通道送出一則測試訊息。
 
@@ -309,7 +309,7 @@ GUI 操作路徑（Settings → Channels 各通道卡片；Rules → Actions 全
 
 DLQ 讀寫皆透過 `update_state_file` 做原子檔案更新，避免併發寫壞 state。三個刻意的設計取捨（2026-07-24 審查明文化）：
 
-- **DLQ 是 all-or-nothing**：任一通道成功即視為已遞送，其餘失敗通道不重試（只在 dispatch_history 記 failed）。次要通道長期故障請看 Integrations 的告警通道狀態，不會由 DLQ 補送。
+- **DLQ 是 all-or-nothing**：任一通道成功即視為已遞送，其餘失敗通道不重試（只在 dispatch_history 記 failed）。次要通道長期故障請看告警區 `#/alerting/ops` 的管道狀態卡，不會由 DLQ 補送。
 - **LINE 自我冷卻（3 連敗→5 分鐘）是程序內狀態**：monitor daemon 長駐期間跨 cycle 有效，程序重啟即歸零；冷卻中回報 `skipped`，不消耗 DLQ 額度。
 - **throttle 於決策時記帳**：告警放行即消耗節流額度，之後遞送失敗經 DLQ 重送不再過 throttle（不會二次記帳）；失敗遞送佔用預算屬預期語意。
 

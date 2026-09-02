@@ -2,9 +2,23 @@
 title: Web GUI 導覽
 audience: [operator]
 version: 4.1.0
-last_verified: 2026-08-23
+last_verified: 2026-09-02
 verified_against:
   - src/templates/index.html
+  - src/templates/login.html
+  - src/static/js/v2/app.mjs
+  - src/static/js/v2/shell.mjs
+  - src/static/js/v2/core/router.mjs
+  - src/static/js/v2/areas/overview.mjs
+  - src/static/js/v2/areas/investigate.mjs
+  - src/static/js/v2/areas/alerting.mjs
+  - src/static/js/v2/areas/automation.mjs
+  - src/static/js/v2/areas/reports.mjs
+  - src/static/js/v2/areas/system.mjs
+  - src/static/js/v2/areas/login.mjs
+  - src/static/js/v2/components/healthbar.mjs
+  - src/static/js/v2/components/filter-bar.mjs
+  - src/static/js/v2/components/palette.mjs
   - src/gui/__init__.py
   - src/gui/routes/auth.py
   - src/gui/routes/dashboard.py
@@ -17,11 +31,6 @@ verified_against:
   - src/gui/routes/admin.py
   - src/gui/routes/filter_objects.py
   - src/gui/filter_object_cache.py
-  - src/static/js/filter-bar.js
-  - src/static/js/dashboard.js
-  - src/static/js/integrations.js
-  - src/static/js/settings.js
-  - src/static/js/quarantine.js
   - src/config.py
   - src/job_health.py
   - src/cli/gui_cmd.py
@@ -29,10 +38,35 @@ verified_against:
 
 # Web GUI 導覽
 
-Web GUI 是單頁式應用（SPA）：登入後以頂部 8 個分頁切換，內容全部由前端 JS 模組向約
-85 條 JSON API（`/api/...`）取資料，伺服器不重新整頁。精確端點清單見 [rest-api.md](../reference/rest-api.md)。啟動方式與埠號見
-`illumio-ops gui`（預設埠 **5001**，`--host 0.0.0.0`），完整 CLI 選項見
-[cli.md](../reference/cli.md)。
+Web GUI 是單頁式應用（SPA）。登入後畫面分成**六個區**——總覽、調查、告警、
+自動化、報表、系統——底下共 **18 條路由**，以 URL 的 hash 表示（例如
+`#/investigate/traffic`）。切區不重新整頁：hash 一變，router 就 lazy-mount
+對應的區模組，只有被造訪過的區才會被下載。內容全部由前端 ES module 向約
+85 條 JSON API（`/api/...`）取資料，精確端點清單見
+[rest-api.md](../reference/rest-api.md)。
+
+前端沒有打包步驟（zero-build）：`src/templates/index.html` 直接以
+`<script type="module">` 載入 `src/static/js/v2/app.mjs`，模組分成
+`core/`（router、api、i18n、theme、fmt…）、`components/`（healthbar、
+palette、table、drawer、modal、filter-bar…）、`areas/`（六個區各一支）三層。
+
+啟動方式與埠號見 `illumio-ops gui`（預設埠 **5001**，`--host 0.0.0.0`），
+完整 CLI 選項見 [cli.md](../reference/cli.md)。
+
+**六區與其路由**
+
+| 區 | 路由 | 內容 |
+|---|---|---|
+| 總覽 | `#/overview` | 系統狀態、posture、排行、報表摘要、健康列 |
+| 調查 | `#/investigate/traffic`、`/workloads`、`/events` | 流量分析、Workload 搜尋與隔離、事件檢視 |
+| 告警 | `#/alerting/rules`、`/ops` | 告警規則 CRUD、手動動作與測試 |
+| 自動化 | `#/automation/rules`、`/reports`、`/jobs` | Rule Scheduler、報表排程、背景 job 健康 |
+| 報表 | `#/reports` | 11 型報表產生與產出清單 |
+| 系統 | `#/system/{pce,cache,siem,tls,security,display,channels,logs}` | 所有設定 |
+
+未知的 hash 會落到 placeholder mount，不會讓畫面壞掉；直接輸入任何一條
+路由網址都能到達（覆蓋率閘門 `tools/gate_coverage_live.py` 就是靠逐一開啟
+每條路由、檢查 101 個 `data-cov` 錨點在不在來把關的）。
 
 > **全域安全提醒**：除 `/login`、`/api/login`、`/logout`、`/api/csrf-token` 外，
 > 所有路由都需登入 session。`web_gui.allowed_ips` 提供 IP 允許清單，比對的是
@@ -56,25 +90,55 @@ Web GUI 是單頁式應用（SPA）：登入後以頂部 8 個分頁切換，內
   manually in Settings」）。也就是說：**目前預設帳密 `illumio`/`illumio`
   會一直有效，直到管理者自行到 Settings → Security 手動改密**，登入後不會
   被強制導向改密表單。前端仍保留「登入回應帶 `must_change_password` 旗標時
-  顯示內嵌改密表單」的邏輯（`login.js`），只是預設路徑不會觸發它——若日後
+  顯示內嵌改密表單」的邏輯（`src/static/js/v2/areas/login.mjs`），只是預設路徑不會觸發它——若日後
   該旗標被改回 `True`，這段 UI 會自動生效。
 - 登入頁與相關文件如提到「首次登入強制改密」，以本節（依原始碼查核）為準。
 
-## 頁首
 
-- 左側：產品標誌與標題。
-- 中央：**PCE 狀態晶片（status chip）**——連線健康燈號（綠 ok／琥珀
-  warn／紅 err／灰 unknown）、PCE 主機、Rules 數、Schedules 數、設定載入
-  時間（相對時間顯示）。
-- 右側：**Operations** 下拉選單——Theme（Auto／Dark／Light）、Density
-  （Compact／Comfortable）、**Logs**（開啟維運日誌檢視窗）、**Stop**（停止
-  Web 服務，會跳出確認框；僅非持久模式〔`--gui`／`--monitor-gui`
-  以外的一次性啟動〕可用）。
+## 跨區機制
+
+這幾樣不屬於任何一區，但每一區都會用到。
+
+### 頂欄與使用者選單
+
+左側是產品標誌與當前區名，右側是使用者選單（`XC-13`）——登出，以及主題與
+密度的快速切換。完整的顯示偏好（時區、語言、主題、密度）在
+`#/system/display`，兩處改的是同一份設定。
+
+### 指令面板（Cmd+K）
+
+`XC-02`。按 <kbd>Cmd</kbd>/<kbd>Ctrl</kbd>+<kbd>K</kbd> 開啟，輸入關鍵字
+直接跳到任何一條路由或動作，不必逐層點選。這是 18 條路由之外最快的導航
+方式，尤其適合系統區那 8 個子頁。
+
+### 健康列（只在總覽）
+
+`XC-01`。五盞燈橫跨總覽頁上緣：**Jobs**（背景 job）、**PCE**（連線與探測）、
+**Lag**（擷取延遲）、**SIEM**（轉發成功率，低於 95% 至少升為 warn）、
+**Chan**（告警管道）。每盞燈可點開 popover 看細節與「前往」連結。
+
+**它只掛在總覽區**（`healthbar.mjs` 開頭的 scope 註記：spec §1.1 在 Gate 2
+修訂，健康列從全域 chrome 改為總覽專屬）。離開總覽時由掛載它的區負責卸下。
+
+### 主題、密度與雙語
+
+`XC-05`／`XC-06`。亮／暗主題與 compact／comfortable 密度**立即生效**，不需
+重新載入頁面；時區與語言（English／繁體中文）同樣即時套用。設定位置在
+`#/system/display`。
+
+### 錯誤卡與重試
+
+`XC-10`。API 失敗時該區塊會換成錯誤卡，附**重試**按鈕與可展開的技術細節
+（狀態碼、端點），而不是整頁白畫面或靜默留白。
+
+### 網址即狀態
+
+`XC-14`。目前所在區、子頁都反映在 hash 上，可直接複製網址分享或加書籤。
 
 ## FilterBar v2 物件選擇器
 
 流量查詢（Traffic Analyzer）與部分報表篩選共用同一套「PCE 風格 filter
-物件選擇器」元件（`src/static/js/filter-bar.js` 的 `createFilterBar()`，
+物件選擇器」元件（`src/static/js/v2/components/filter-bar.mjs` 的 `createFilterBar()`，
 每個容器可各自實例化一份，狀態互不影響）。這是全庫目前唯一的圖形化物件
 選擇入口，過去沒有文件記錄過其操作語意，以下按元件內部語意逐項說明。
 
@@ -139,78 +203,72 @@ FilterBar 序列化出的 key（`src_labels`／`dst_workloads`／`services`／
 白名單，可與既有的 Policy Decision、時間範圍等純表單欄位並用，兩者最終
 一起交給同一組 AND 條件求值。
 
-## 分頁逐一導覽
 
-### 1) Dashboard
+## 六區逐一導覽
 
-即時總覽首頁，區分兩大區塊：
+### 總覽（`#/overview`）
 
-- **Security Posture**：分數卡（Posture Score）＋ 各分項指標（風險健康、
-  policy 覆蓋率、readiness 等）＋ Top Risk Findings 清單；未曾產生過
-  Security Posture 報表時顯示「Run a Security Posture report to populate
-  this section」提示，不會顯示假資料。
-- **Operations & Estate**：VEN Health（在線／離線／降級數、最舊心跳
-  年齡）、Pipeline（cache 擷取健康）、OS Distribution、Enforcement
-  Modes 四張磚塊，另有 Alerts 磚塊顯示近 24 小時觸發／抑制／失敗數。
-- 下方保留即時狀態卡（Health／Traffic／Risk 三組）與 Traffic Analyzer／
-  Workload Search 子頁（見下一節）。
-- 「auto-refresh 10m」勾選與 **Refresh** 鈕只是重新抓取 `/api/dashboard/
-  overview` 等端點的最新快照，**不會**重新計算或重新產生報表快照。
+一頁看完系統狀態，卡片皆為唯讀摘要，要動手的操作都在各自的區。
 
-**資料新鮮度變灰（全庫未記錄，`src/static/js/dashboard.js`）**：Dashboard
-各磚塊各自比對自己資料的時戳，超過門檻視為 stale，此時**數字本身變灰**
-（`color: var(--dim)`）並在磚塊下方多出一行「stale + 已過去的時間」（例如
-「stale 42m」），而不是隱藏或顯示零值：
+- **系統狀態**（OV-01）與**整合狀態**（OV-16）：PCE 連線、cache、SIEM 等
+  子系統的當前健康。
+- **Posture Score**（OV-02）：安全成熟度分數與分項。分數來自最近一次
+  Security Posture 報表的快照，**不是即時計算**；快照超過 26 小時時卡片
+  底部會多一行「stale since <時長>」註記（`overview.mjs` 的 `postureAge`），
+  數字本身照常顯示。沒有任何報表快照時卡片顯示提示，不會顯示假資料。
+- **Top 3 行動建議**（OV-03）：由 posture 分析導出的優先處置建議。
+- **排行總覽／排行統計**（OV-04、OV-05）：自訂查詢卡的 CRUD 與 Top-10 查詢。
+- **報表摘要**：最新 Audit（OV-06）、最新流量報表（OV-08）、Policy 使用
+  報表（OV-07）、報表最近產出 meta（OV-09）。
+- **管線健康**（OV-10）、**Job 健康**（OV-11）、**資料完整性**（OV-12）、
+  **TLS 憑證**（OV-14）、**警示通道**（OV-15）：唯讀健康摘要，內容與判讀
+  規則見下方「系統區」與 [automation.md](automation.md)。
+- **近期事件**（OV-13）：最近的 PCE 稽核事件，點進去是調查區的事件檢視。
 
-| 磚塊 | 新鮮度依據欄位 | stale 門檻 |
-|---|---|---|
-| Security Posture 分數＋分項指標 | `posture.generated_at` | 30 分鐘 |
-| VEN Health 大數字（在線／總數） | `ven.computed_at` | 15 分鐘 |
+### 調查（`#/investigate/*`）
 
-其餘磚塊（Pipeline／OS Distribution／Enforcement／Alerts）目前沒有各自的
-stale 灰化邏輯，僅在資料不可用（`verdict === 'unknown'` 或 `no_cache`）
-時顯示 `—` 或「Enable PCE Cache」提示。整體重新整理列（`ov-fresh`，
-「as of HH:MM:SS」）也有自己的 stale 判斷：距 `as_of` 超過 60 秒即整列變色
-（`.ov-fresh.stale`，紅字，門檻與磚塊各自的門檻是獨立邏輯）。
+#### 流量分析（`#/investigate/traffic`）
 
-對應設定：儀表板顯示語言／主題見 [configuration.md](configuration.md) 的「settings（一般
-設定）」；Security Posture 報表產生方式見 [reports.md](reports.md)。
+依 Policy Decision（Blocked／Potentially Blocked／Allowed／All，含 unknown
+語意）與 FilterBar 物件選擇器（見下節）篩選流量，KPI 條顯示 flows／
+connections／目的 IP 數／尖峰頻寬。
 
-### 2) Traffic & Workloads
+查詢工具列的**資料來源**三選一（IV-02）：
 
-- **Traffic Analyzer**：依 Policy Decision（Blocked／Potentially
-  Blocked／Allowed／All，含 unknown 語意）、以及 FilterBar 物件選擇器
-  （見上節）篩選流量，KPI 條顯示 flows／connections／目的 IP 數／尖峰頻
-  寬。查詢工具列的「資料來源」下拉三選一：**快取優先**（預設，先讀本機
-  cache、只為 cache 沒涵蓋到的區段補打 PCE）、**直接查 PCE**（完全略過
-  cache，較慢但保證即時）、**封存 (Archive)**（直接掃描封存日檔，不再
-  需要先「載入」到另一個資料庫）。切到封存時，時間窗控制換成一組起訖
-  日期欄位；查詢一定要帶至少一個縮小範圍的條件，且 label group／actor
-  group（AMS）／草稿 policy decision／全文搜尋等即時才算得出的條件在
-  封存下無法評估，帶了會直接回錯誤並列出哪些條件不支援，不會靜默忽
-  略。結果上方會顯示這次實際由誰回答——由快取回答、直接向 PCE 查詢回
-  答、由快取回答＋另向 PCE 補查缺口，或由封存回答；結果被上限截斷時另
-  有提示；封存查詢的彙總統計是有界的 top-N，被捨棄的分組數也會標出
-  來。archive 檔案概況（涵蓋
-  的最早／最晚日期、檔案數）見查詢區旁的狀態列，細節見
-  [cache-maintenance.md](cache-maintenance.md) §3.4。
-- **Workload Search**：依名稱／IP／hostname 查 Workload，顯示線上狀態、
-  介面、labels、管理狀態。
-- **Rankings（legacy）**：舊版 Top-N 排行小工具，維持向下相容，UI 上以
-  較低對比度標示為次要功能。
+- **快取優先**（預設）：先讀本機 cache，只為 cache 沒涵蓋到的區段補打 PCE。
+- **直接查 PCE**：完全略過 cache，較慢但保證即時。
+- **封存（Archive）**：直接掃描封存日檔。切到封存時，時間窗控制換成一組
+  起訖日期欄位。
 
-#### Quarantine（隔離）——雙重確認流程
+封存查詢一定要帶至少一個縮小範圍的條件；label group／actor group（AMS）／
+草稿 policy decision／全文搜尋這些只有即時查詢算得出的條件在封存下無法
+評估，帶了會**直接回錯誤並列出哪些條件不支援**，不會靜默忽略。
+
+結果上方會標明這次實際由誰回答——快取、直接向 PCE 查詢、快取加 PCE 補查
+缺口，或封存；結果被上限截斷時另有提示；封存查詢的彙總統計是有界的
+top-N，被捨棄的分組數也會標出來。封存檔案概況（涵蓋的最早／最晚日期、
+檔案數）見查詢區旁的狀態列（IV-06），細節見
+[cache-maintenance.md](cache-maintenance.md) §3.4。
+
+同頁另有**流量查詢指南**（IV-04）與**說明側欄**（XC-11）解釋篩選語法，
+以及 cache backfill 入口（IV-07）。
+
+#### Workload 搜尋與隔離（`#/investigate/workloads`）
+
+依名稱／IP／hostname 查 Workload（IV-08），顯示線上狀態、介面、labels、
+管理狀態。
+
+**Quarantine（隔離）——雙重確認流程**
 
 在流量列或 Workload 列勾選目標後按 **Isolate**：
 
 1. 開啟 Quarantine modal：若目標包含「有方向的一對」（例如某筆流量的來源
-   與目的都是內部 Workload），會顯示方向選擇（Source／Destination／
-   Both）；僅從 Workload Search 選取的項目一律直接隔離，不受方向選項
-   影響（modal 內有提示文字）。同時選擇 **Isolation Severity Level**：
-   `Mild`／`Moderate`／`Severe`（決定套用哪一個 Quarantine label）。
-2. 按下 Apply 後，前端跳出瀏覽器原生 `confirm()` 對話框，文字包含目標
-   數量與 severity 等級，二次確認後才真正呼叫 API——這是本功能的兩層
-   確認：先在 modal 內選定範圍與嚴重度，再由 `confirm()` 做最終攔截。
+   與目的都是內部 Workload），會顯示方向選擇（Source／Destination／Both）；
+   僅從 Workload 搜尋選取的項目一律直接隔離，不受方向選項影響（modal 內
+   有提示文字）。同時選擇 **Isolation Severity Level**：`Mild`／`Moderate`／
+   `Severe`（決定套用哪一個 Quarantine label）。
+2. 按下 Apply 後跳出破壞性動作確認（XC-08），文字包含目標數量與 severity
+   等級，二次確認後才真正呼叫 API。
 
 > **真實副作用（高風險）**：確認後呼叫 `POST /api/quarantine/apply`
 > （單一目標）或 `/bulk_apply`（多目標，最多 5 個並行 worker）。伺服器端
@@ -221,75 +279,63 @@ stale 灰化邏輯，僅在資料不可用（`verdict === 'unknown'` 或 `no_cac
 > 每次套用／解除都會寫入 `actions` 模組日誌（`user=<帳號> href=... level=...`），
 > 是 best-effort 稽核紀錄（記錄失敗不會擋下操作本身）。
 
-解除隔離：Workload 列的 **Lift** 按鈕，同樣先跳出 `confirm()`，確認後呼叫
-`POST /api/quarantine/lift`，移除該 Workload 的 Quarantine label、保留其
-餘 label。
+解除隔離是 Workload 列的 **Lift**（IV-11），同樣要確認，確認後呼叫
+`POST /api/quarantine/lift`，移除該 Workload 的 Quarantine label、保留其餘 label。
 
-- **Accelerate**：對受管 Workload 暫時提高流量回報頻率（`POST
-  /api/workloads/accelerate`，呼叫 PCE `set_flow_reporting_frequency`）。
-  > **真實副作用**：會變更 PCE 上該 Workload 的遙測頻率（不改
-  > enforcement）。僅受管 Workload 可用；持續模式由前端每 10 分鐘重送。
+**Accelerate**（IV-12）：對受管 Workload 暫時提高流量回報頻率（`POST
+/api/workloads/accelerate`，呼叫 PCE `set_flow_reporting_frequency`），畫面
+有倒數。
 
-對應設定：無獨立設定區塊；quarantine label 建立與 severity 對映屬程式
-內建行為。
+> **真實副作用**：會變更 PCE 上該 Workload 的遙測頻率（不改 enforcement）。
+> 僅受管 Workload 可用。
 
-### 3) Event Viewer
+#### 事件檢視（`#/investigate/events`）
 
-PCE 稽核事件檢視，左表右詳版面：可依時間視窗、category／group／type、
-關鍵字篩選；點選事件展開右側詳情（normalized 欄位＋raw JSON）。另含
-**Shadow Compare**（規則對實際事件的命中比對）、**Rule Test**（單一規則
-測試）、**Event Catalog**（事件型錄，vendor catalog 對映）。以上皆為
-**唯讀**功能，會即時呼叫 PCE API 取事件，不寫入本地狀態。事件規則語意
+PCE 稽核事件檢視器（IV-13），三層 catalog（category／group／type）加關鍵字
+與時間窗篩選；點選事件展開詳情卡（normalized 欄位＋raw JSON），清單以
+load-more 增量載入（IV-14）。另含 **Shadow 比對**（IV-15，新舊事件比對器）。
+以上皆為**唯讀**，會即時呼叫 PCE API 取事件，不寫入本地狀態。事件規則語意
 與 vendor catalog 詳見 [monitoring-alerts.md](monitoring-alerts.md)。
 
-### 4) Rules（告警規則，分頁標題為 Alerts）
+### 告警（`#/alerting/*`）
 
-- **Rules 子頁**：依型別（Event／Traffic／Bandwidth／System Health）篩
-  選、搜尋、編輯、刪除、批次刪除規則；新增規則開對應 modal。儲存／刪除
-  會**寫入 `config/alerts.json`**。**Load Best Practices** 可一鍵附加
-  或取代為內建最佳實務規則組（16 條 event + 1 條 traffic），操作前會有
-  確認對話：replace 模式兩層（先警告會覆寫、再次確認），append
-  模式一層。規則型別與門檻語意見 [monitoring-alerts.md](monitoring-alerts.md)。
-- **Actions 子頁**：
-  - **Send Test Alert（All）／Test [通道]**：`POST
-    /api/actions/test-alert` 會**實際發送**測試訊息到指定（或全部）
-    通道（email／LINE／webhook／Telegram／Teams）。請勿在正式環境隨意
-    點按。（Settings → Channels 亦有同端點的每通道版本，見下方 Settings
-    小節。）
-  - 亦提供手動分析 Run、Reset watermark 等除錯動作，皆屬高風險（見文末
-    彙整表）。
+#### 規則（`#/alerting/rules`）
 
-對應設定：告警規則欄位定義與通道金鑰見 [configuration.md](configuration.md) 的
-「alerts（告警通道）」與「email／smtp」兩節。
+規則清單（AL-01）可依型別篩選、搜尋、啟停、刪除；新增／編輯開對應的 drawer：
+Event（AL-02）、System health（AL-03）、Traffic（AL-04）、Bandwidth（AL-05）
+四種型別各一套欄位。儲存／刪除會**寫入 `config/alerts.json`**。另有規則
+JSON 定位（AL-06）與**規則測試沙盤**（AL-07）可在不發送的前提下試跑規則。
+規則型別與門檻語意見 [monitoring-alerts.md](monitoring-alerts.md)。
 
-### 5) Reports
+#### 維運動作（`#/alerting/ops`）
 
-- **List 子頁**：瀏覽已產生報表，可 View（HTML）、Download、Delete／批次
-  Delete（**會刪檔，不可復原**），並提供各類報表的 **Generate** 鈕
-  （Traffic／Security／Audit／Policy Usage／VEN Status／Readiness／
-  Rule Hit Count／Policy Diff／Policy Resolver 等，各報表細節見
-  [reports.md](reports.md)）。產生報表會在伺服器端排入背景執行緒、即時查詢
-  PCE 並寫出檔案，可能耗時數分鐘。
-- **Schedules 子頁**：建立／編輯／啟用停用／立即執行（Run Now）／刪除報
-  表排程。排程需 daemon 持續執行才會觸發；勾選 Email 需先設定好郵件通
-  道（Settings → Channels）。
+- **執行一次監控**（AL-08，`/api/actions/run`）：立即跑一輪分析，會查 PCE
+  並**可能實際觸發告警**。
+- **Debug 模式**（AL-09）與**輸出主控台**（AL-13）：即時看分析輸出。
+- **發送測試告警**（AL-10，`/api/actions/test-alert`）：**實際發送**測試訊息
+  到全部或指定通道（email／LINE／webhook／Telegram／Teams）。請勿在正式
+  環境隨意點按。
+- **重置事件 Watermark**（AL-11）：清空 event watermark，下次會重抓全部事件
+  並可能重觸發告警。
+- **載入最佳實踐**（AL-12）：一鍵附加或取代為內建最佳實務規則組（16 條
+  event + 1 條 traffic）。replace 模式要兩層確認，append 一層。
+- **告警管道**（AL-14）：各通道當前狀態，唯讀；要改設定去 `#/system/channels`。
 
-對應設定：輸出目錄與保留天數見 Settings → Display；報表排程資料結構見
-[configuration.md](configuration.md) 的「report／report_schedules」節。
+### 自動化（`#/automation/*`）
 
-### 6) Rule Scheduler
+#### Rule Scheduler（`#/automation/rules`）
 
-對 PCE Draft policy 的 Ruleset／Rule 排定時間觸發啟用／停用，三個子頁：
-**Browse**（瀏覽 ruleset／rule）、**Schedules**（排程清單，含各排程的
-last-run 狀態）、**Logs**。
+對 PCE Draft policy 的 Ruleset／Rule 排定時間觸發啟用／停用。頁面有狀態列
+與 KPI（AU-01）、過去 24 小時的切換時間軸（AU-02）、ruleset 瀏覽與詳情
+（AU-03）、rule 個別搜尋（AU-04）；排程可建在 ruleset 層（AU-05）或 rule
+層（AU-06），one-time 排程的 `expire_at` 語意見 drawer 內說明（AU-07）。
+排程清單（AU-08）會顯示與 PCE 的對帳狀態，另有立即檢查（AU-09）與執行
+紀錄（AU-10）。
 
-建立排程時選 Recurring（星期＋起迄時間＋時區）或 One-time（到期時
-間），Action 為 `allow`（視窗內啟用）或 `disable`。
-
-> **真實副作用**：`POST /api/rule_scheduler/schedules` 會在 **PCE rule
-> 的 description 寫入英文排程註記**，並依排程在 PCE 上**啟用／停用該
-> rule**。**Draft（未佈署）規則會被擋下**，必須先在 PCE 佈署。刪除排程
-> 會盡力清除 PCE 上的註記。
+> **真實副作用**：`POST /api/rule_scheduler/schedules` 會在 **PCE rule 的
+> description 寫入英文排程註記**，並依排程在 PCE 上**啟用／停用該 rule**。
+> **Draft（未佈署）規則會被擋下**，必須先在 PCE 佈署。刪除排程會盡力清除
+> PCE 上的註記。
 >
 > **安全約束**：排程器**不會自動佈署 ruleset**——它只在 Draft 狀態切換
 > rule 的啟用旗標，佈署需操作員另行處理；排程未啟用時只會顯示 warning，
@@ -297,75 +343,73 @@ last-run 狀態）、**Logs**。
 
 詳細操作流程與背景 job 對照表見 [automation.md](automation.md)。
 
-### 7) Integrations
+#### 報表排程（`#/automation/reports`）
 
-四個子頁，`overview`／`cache`／`siem`／`dlq`：
+報表排程的 CRUD（AU-11）與啟停／立即執行／歷史（AU-12）。排程需 daemon
+持續執行才會觸發；勾選 Email 需先設定好郵件通道（`#/system/channels`）。
+`app_summary` 型排程必須指定 App，否則會被拒絕。
 
-- **Overview**：管線健康總覽，含以下幾項卡片：
+#### 背景 Job 健康（`#/automation/jobs`）
 
-  **Job Health 表格**（`src/gui/routes/dashboard.py` 的
-  `_overview_job_health()`，讀 `logs/job_health.json`）：列出所有已註冊
-  背景 job，依嚴重度排序（error → warn → ok）。判讀規則：
-  - `error`：job 上次執行狀態為 `error`（實際跑過但失敗）。
-  - `warn`：分兩種情況——(a) job 剛註冊、還沒真正跑過第一次
-    （`last_status == "registered"`）且已超過 grace period；(b)
-    job 有跑過紀錄，但距上次 `last_run` 已超過 grace period（**overdue**）。
-    grace period = `max(2 × interval_seconds, 600)` 秒（至少 10 分鐘）。
-    表格上這兩種情況分別顯示為「never ran」與「（上次狀態文字）·
-    overdue」，UI 上是兩種不同文案，但後端判定邏輯（level）相同，都歸
-    類為 `warn`。
-  - `ok`：正常週期內執行成功。
-  - 單一壞條目（例如手動改壞 `job_health.json` 造成 interval 非數字）不
-    會讓整張表炸掉，只會跳過該筆。
+所有已註冊背景 job 的健康與歷史（AU-13，讀 `logs/job_health.json`），依嚴重度
+排序。判讀規則：
 
-  **TLS 憑證卡**（`_tls_overview()`）：GUI 未啟用 TLS 時整張卡不顯示
-  （`enabled: false`）；啟用時顯示剩餘天數，低於設定的 `auto_renew_days`
-  門檻會額外標示「Expiring soon」；憑證檢查本身失敗（如 openssl 不可用）
-  顯示「TLS 檢查失敗」而非天數。憑證輪替與每日續期 job 見
-  [configuration.md](configuration.md) 的「TLS：self-signed 憑證每日續期 job」節。
+- `error`：job 上次執行狀態為 `error`（實際跑過但失敗）。
+- `warn`：兩種情況——(a) job 剛註冊、還沒真正跑過第一次且已超過 grace
+  period（顯示「never ran」）；(b) 有跑過紀錄，但距上次 `last_run` 已超過
+  grace period（顯示「（上次狀態）· overdue」）。兩者文案不同，後端判定
+  等級相同。grace period = `max(2 × interval_seconds, 600)` 秒（至少 10 分鐘）。
+- `ok`：正常週期內執行成功。
 
-  **資料完整性表格**（`_overview_data_integrity()`，讀
-  `logs/data_integrity.json`）：列出近 7 天內「集合 GET 被 PCE 500 筆上限
-  截斷、且 async fallback 未能取回完整集合」的 API path（含實得/總數）。
-  平時為空、整節不顯示；出現條目代表以該集合為來源的報表資料不完整，
-  fallback 恢復後條目自動清除。
+單一壞條目（例如手動改壞 `job_health.json` 造成 interval 非數字）不會讓整張
+表炸掉，只會跳過該筆。
 
-- **Cache**：PCE cache 狀態卡、設定表單（保留天數、輪詢間隔、traffic
-  filter／sampling）。儲存後需 **Restart Monitor**（`POST
-  /api/daemon/restart`）才生效。可手動 **Backfill**（補填歷史，會查 PCE
-  並寫入 cache DB）或 **Retention Now**（會永久刪除過期列，UI 有
-  `confirm()`）。詳見 [cache-maintenance.md](cache-maintenance.md)。
-- **SIEM**：destination 清單與 KPI（sent／failed／DLQ／成功率／延遲）。
-  新增／編輯／刪除 destination，及 **Test**（會實際送出測試事件）。詳見
-  [siem.md](siem.md)。
-- **DLQ**：死信佇列檢視，可 **Retry（replay）**（重送失敗事件）或
-  **Clear／Purge**（永久刪除，全部清除需額外輸入 destination 名稱確
-  認——比一般 `confirm()` 更高一階的防呆）。
+### 報表（`#/reports`）
 
-### 8) Settings
+- **報表型錄**（RP-01）：11 型報表各一張卡，顯示最近一次產出。**產生**開
+  drawer（RP-02），每型有自己的參數欄位；產生過程顯示步驟式進度並輪詢
+  非同步結果（RP-03、XC-07 統一進度元件）；只跑出部分結果時會明確提示
+  （RP-04）。
+- **Rule Hit Count** 需要 PCE 端啟用，卡片會先做 enablement 檢查並提供啟用
+  入口（RP-05）。
+- **報表輸出**（RP-06、RP-07）：產出清單可下載、瀏覽、單刪或批刪
+  （**會刪檔，不可復原**）。
+- **報表語言**（RP-08）與 **App Label 查詢輔助**（RP-09）。
 
-四個子頁，`pce`／`channels`／`display`／`security`：
+產生報表會在伺服器端排入背景執行緒、即時查詢 PCE 並寫出檔案，可能耗時
+數分鐘。各型報表的內容與版面見 [reports.md](reports.md)。
 
-- **PCE**：API 連線欄位（URL／org id／key／secret／verify SSL）。
-- **Channels**：各告警通道（mail、LINE、webhook、Telegram、Teams）的
-  啟用開關與欄位。每張通道卡片有獨立的 **Send test** 按鈕（全庫未記錄
-  過的功能，`src/static/js/settings.js` `testAlertChannel()`）：呼叫與
-  Rules → Actions 相同的 `POST /api/actions/test-alert`，帶
-  `{channel: <name>}`，只測該通道；判定「全部送達」的標準是回傳
-  `results[]` 每一筆 `status === 'success'`，**`skipped` 也視為失敗**
-  （用來揪出「卡片顯示已啟用，但其實憑證有問題所以被跳過」這種平時看
-  不出來的假健康狀態），成功／失敗都以 toast 提示，不彈出 modal。
-- **Display**：timezone、language（English／繁體中文）、theme，及報表
-  輸出目錄／保留天數。
-- **Security**：Web UI 密碼（含確認欄，前端先驗證一致性）、IP 允許清
-  單，與 **TLS／HTTPS** 設定（啟用／停用、自簽 vs 自帶憑證、Generate
-  CSR、Import Certificate、Renew）。
-  > **真實副作用**：TLS 的 Renew／Import／Generate CSR 會在
-  > `config/tls/` 產生或覆寫憑證／金鑰檔，並需**重啟服務**才套用；Renew
-  > 前端有 `confirm()`。
+### 系統（`#/system/*`）
 
-對應設定：本分頁即 `config.json` 大部分區塊的圖形化編輯介面，逐鍵對照
-表見 [configuration.md](configuration.md)。
+八個子頁，是 `config.json` 大部分區塊的圖形化編輯介面。改動未存檔時儲存列
+會顯示 dirty 狀態（SY-18）。逐鍵對照見 [configuration.md](configuration.md)。
+
+| 子頁 | 路由 | 內容 |
+|---|---|---|
+| PCE | `#/system/pce` | API 連線欄位（URL／org id／key／secret／verify SSL） |
+| 快取 | `#/system/cache` | 狀態卡與 lag 列（SY-17）、設定表單（SY-02）、重啟 banner（SY-03）、retention 立即執行（SY-04）、流量過濾器與 IP 驗證（SY-05）、流量取樣（SY-06） |
+| SIEM | `#/system/siem` | 轉發器設定（SY-07）、目的地 CRUD 與條件（SY-08）、測試送出（SY-09）、DLQ（SY-10） |
+| TLS | `#/system/tls` | 憑證狀態、續期、CSR、匯入（SY-11） |
+| 安全 | `#/system/security` | 認證與 session 設定（SY-12）、停止 Web GUI（SY-16） |
+| 顯示 | `#/system/display` | 主題／密度／時區／語言（SY-13、XC-05、XC-06）、介面與報表偏好 |
+| 管道 | `#/system/channels` | 各告警通道設定與單通道測試（SY-14） |
+| 日誌 | `#/system/logs` | 模組日誌檢視（SY-15） |
+
+幾點值得單獨說明：
+
+- **改 PCE 連線位址會先問**。改 `api.url` 或 `api.org_id` 時會要求你選擇：
+  清除 PCE 衍生的快取／watermark／告警冷卻／SIEM 佇列，或宣告這是同一個
+  PCE 換了位址而保留它們。只換 key／secret 不會問。
+- **快取設定改完要重啟 Monitor**（`POST /api/daemon/restart`）才生效，頁面
+  會出現 banner 提醒。**Retention Now** 會永久刪除過期列，有確認。
+- **DLQ 的 Purge 比一般確認更嚴**：全部清除需額外輸入 destination 名稱才能
+  執行。Retry（replay）會重送失敗事件。
+- **單通道測試**（`#/system/channels` 每張卡片的 Send test）呼叫與告警區
+  相同的 `/api/actions/test-alert`，只帶該通道。判定「送達」的標準是回傳
+  每一筆 `status === 'success'`——**`skipped` 也視為失敗**，用來揪出「卡片
+  顯示已啟用，但憑證有問題所以被跳過」這種平時看不出來的假健康狀態。
+- **TLS 的 Renew／Import／Generate CSR** 會在 `config/tls/` 產生或覆寫憑證
+  與金鑰檔，**需重啟服務**才套用。
 
 ## 高風險動作彙整
 
@@ -376,8 +420,8 @@ last-run 狀態）、**Logs**。
 | Quarantine apply／bulk_apply | `/api/quarantine/apply`、`/bulk_apply` | 在 PCE 對 Workload 覆蓋套用 Quarantine label，立即改變 enforcement |
 | Quarantine lift | `/api/quarantine/lift` | 移除 Workload 上的 Quarantine label |
 | Accelerate workload | `/api/workloads/accelerate` | 變更 PCE 遙測頻率 |
-| Send Test Alert（Rules → Actions，全通道或指定通道） | `/api/actions/test-alert` | 實際發送通知到 email／LINE／webhook／Telegram／Teams |
-| Send test（Settings → Channels，單一通道卡片） | `/api/actions/test-alert` | 同上端點，僅測該卡片對應通道 |
+| Send Test Alert（告警區維運動作，全通道或指定通道） | `/api/actions/test-alert` | 實際發送通知到 email／LINE／webhook／Telegram／Teams |
+| Send test（系統區管道，單一通道卡片） | `/api/actions/test-alert` | 同上端點，僅測該卡片對應通道 |
 | 手動分析 Run | `/api/actions/run` | 查 PCE 並可能實際觸發告警 |
 | Reset watermark | `/api/actions/reset-watermark` | 清空 event watermark／告警歷史，下次會重抓全部事件並可能重觸發告警 |
 | Load Best Practices | `/api/actions/best-practices` | 覆寫／附加告警規則 |
@@ -386,4 +430,4 @@ last-run 狀態）、**Logs**。
 | Cache backfill／retention | `/api/cache/backfill`、`/retention/run` | 查 PCE 寫入／永久刪除快取列 |
 | SIEM test／DLQ replay／purge | `/api/siem/*` | 送測試事件／重送／永久刪除 |
 | TLS Renew／Import／Generate CSR | `/api/tls/renew`、`/api/tls/import-cert`、`/api/tls/generate-csr` | 產生或覆寫憑證／金鑰檔，需重啟服務才套用 |
-| Stop（頁首 Operations 選單） | `/api/shutdown` | 停止 Web 服務（僅非持久模式可用） |
+| 停止 Web GUI（系統區安全子頁） | `/api/shutdown` | 停止 Web 服務（僅非持久模式可用） |

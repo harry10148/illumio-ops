@@ -2,7 +2,7 @@
 title: pce_cache 維運與容量規劃
 audience: [operator]
 version: 4.1.0
-last_verified: 2026-07-17
+last_verified: 2026-09-02
 verified_against:
   - src/pce_cache/models.py
   - src/pce_cache/ingestor_traffic.py
@@ -87,7 +87,7 @@ PCE（events API／traffic flows API）
 |---|---|
 | CLI：`illumio-ops cache status` / `cache backfill --source events\|traffic --since YYYY-MM-DD [--until YYYY-MM-DD]` / `cache retention [--run]` | 腳本化操作，`--json` 可輸出結構化結果 |
 | 互動選單：`illumio-ops` 不帶參數啟動主選單 → `7. PCE Cache` | View status／Edit settings／Edit traffic filter／Edit traffic sampling／Backfill（互動輸入起訖日）／Run retention now |
-| GUI／API：`POST /api/cache/backfill`、`POST /api/cache/retention/run`、`GET /api/cache/status`、`GET /api/cache/lag`、`GET /api/cache/health` | 需登入；Integrations 分頁的 cache 卡片走這組 API |
+| GUI／API：`POST /api/cache/backfill`、`POST /api/cache/retention/run`、`GET /api/cache/status`、`GET /api/cache/lag`、`GET /api/cache/health` | 需登入；系統區 `#/system/cache` 的卡片走這組 API |
 
 ### 2.2 Backfill 語意（重要：不套用 live ingest 的 traffic_filter）
 

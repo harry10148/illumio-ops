@@ -2,7 +2,7 @@
 title: 安裝與部署
 audience: [operator]
 version: 4.1.0
-last_verified: 2026-08-25
+last_verified: 2026-09-02
 verified_against:
   - scripts/install.sh
   - scripts/preflight.sh
@@ -153,7 +153,7 @@ python3 illumio-ops.py status
 在瀏覽器開啟儀表板（`https://localhost:5001`，GUI 預設使用 HTTPS，首次啟動時自動
 生成自簽憑證，首次存取請接受憑證警告），使用內建預設帳密登入（`illumio` /
 `illumio`）。首次登入強制改密碼機制目前預設停用，預設帳密保持有效。建議管理者
-登入後自行至 **Settings → Security** 變更密碼，確保系統安全。
+登入後自行至系統區 **`#/system/security`** 變更密碼，確保系統安全。
 
 ## 升級
 

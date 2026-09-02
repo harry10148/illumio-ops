@@ -2,7 +2,7 @@
 title: PCE domain 須知（vendor 事實集）
 audience: [developer]
 version: 4.1.0
-last_verified: 2026-07-17
+last_verified: 2026-09-02
 verified_against:
   - src/api/traffic_query.py
   - src/api_client.py

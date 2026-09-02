@@ -2,7 +2,7 @@
 title: 故障排除
 audience: [operator]
 version: 4.1.0
-last_verified: 2026-08-30
+last_verified: 2026-09-02
 verified_against:
   - src/job_health.py
   - src/module_log.py
@@ -32,7 +32,7 @@ verified_against:
 # 故障排除
 
 本篇是**症狀導向**的排錯 runbook：每條先描述觀察到的現象，再給判讀依據，最後給實際可執行的處置指令。設定鍵的完整語意見
-[configuration.md](configuration.md)；GUI 各分頁操作見 [gui-tour.md](gui-tour.md)；子系統的深入操作（cache／告警／SIEM／排程）
+[configuration.md](configuration.md)；GUI 各區操作見 [gui-tour.md](gui-tour.md)；子系統的深入操作（cache／告警／SIEM／排程）
 分別在對應篇章，本篇只挑「排錯」的切面，避免與那些篇章重複太多細節。
 
 先備知識：正式部署的 systemd 服務單元名稱固定是 `illumio-ops`（`deploy/illumio-ops.service`）；GUI 預設埠 `5001`；正式
@@ -233,7 +233,7 @@ VEN Health 大數字在 `ven.computed_at` 超過 15 分鐘時會變灰並標示�
 ## 5. Job Health 表 never-ran／overdue 判讀
 
 `logs/job_health.json`（`src/job_health.py`）記錄每個已註冊背景 job 的 `last_run`／`last_status`／
-`interval_seconds`。GUI **Integrations → Overview** 的 Job Health 表格即時讀取這份檔案並排序呈現；沒有登入
+`interval_seconds`。GUI 自動化區 **`#/automation/jobs`** 的 Job 健康表即時讀取這份檔案並排序呈現；沒有登入
 GUI 時也可以直接看原始檔：
 
 ```bash
@@ -268,7 +268,7 @@ grace period = `max(2 × interval_seconds, 600)` 秒（至少 10 分鐘）。
 
 **症狀**：`data/pce_cache.sqlite` 持續增大不受控，或磁碟用量異常上升。
 
-**判讀**：先查 `GET /api/cache/health`（Integrations → Cache 卡片同一份資料）的 `capacity` 欄位，重點看
+**判讀**：先查 `GET /api/cache/health`（系統區 `#/system/cache` 卡片同一份資料）的 `capacity` 欄位，重點看
 `archiver_lag_seconds`：
 
 ```bash
@@ -304,7 +304,7 @@ curl -s -b <session-cookie> https://<host>:5001/api/cache/health | python3 -m js
 
 ### 7.1 先驗證通道本身能不能送
 
-Settings → Channels 頁面每張通道卡片有各自的 **Send test** 按鈕（`POST /api/actions/test-alert`，帶
+系統區 `#/system/channels` 每張通道卡片有各自的 **Send test** 按鈕（`POST /api/actions/test-alert`，帶
 `channel` 參數，會真的送出一則測試訊息），或對 `alerts.active` 全部通道各發一次（省略 `channel`）。此端點
 掛 `30 per hour` 限流，避免誤觸洗版；沒有對應的 CLI 子命令，只能透過 GUI／API 觸發。若測試都送不出去，先排除
 通道本身設定錯誤（收件人、webhook URL、bot token 等，鍵值見 [monitoring-alerts.md](monitoring-alerts.md)
@@ -343,7 +343,7 @@ grep "Watchdog" logs/illumio_ops.log
 
 ## 8. TLS 憑證到期
 
-**症狀**：瀏覽器出現 `NET::ERR_CERT_AUTHORITY_INVALID`，或 GUI Integrations → Overview 的 TLS 憑證卡顯示
+**症狀**：瀏覽器出現 `NET::ERR_CERT_AUTHORITY_INVALID`，或 GUI 總覽區的 TLS 憑證卡顯示
 「Expiring soon」。
 
 **判讀**：
@@ -360,9 +360,9 @@ grep "Watchdog" logs/illumio_ops.log
 
 1. 若已看到 `tls_renew_check` 續期成功的 warning 日誌，重啟服務套用新憑證即可：
    `sudo systemctl restart illumio-ops`。
-2. 手動立即續期／換發：Settings → Security → Renew Certificate（GUI），或 `illumio-ops` 主選單的互動選單
+2. 手動立即續期／換發：系統區 `#/system/tls` 的 Renew Certificate（GUI），或 `illumio-ops` 主選單的互動選單
    操作，完成後同樣需要重啟服務。
-3. 正式環境改用 CA 簽發憑證：Settings → Security → TLS，Generate CSR → 送 CA 簽署 → Import Certificate（貼上
+3. 正式環境改用 CA 簽發憑證：系統區 `#/system/tls`，Generate CSR → 送 CA 簽署 → Import Certificate（貼上
    含鏈的 PEM）→ 重啟服務。所有憑證變更都需要重啟才生效（無 in-process reload）。
 
 > 修正：**沒有** `illumio-ops tls renew` 這樣的頂層 CLI 子命令（目前 13 個 subcommand 為 `cache`／

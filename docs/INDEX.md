@@ -2,7 +2,7 @@
 title: illumio-ops 文件總目錄
 audience: [operator, developer, api, security]
 version: 4.1.0
-last_verified: 2026-07-17
+last_verified: 2026-09-02
 verified_against:
   - docs/guide/installation.md
   - docs/guide/configuration.md
@@ -38,7 +38,7 @@ verified_against:
 |---|---|
 | [安裝與部署](guide/installation.md) | 從原始碼或離線安裝包安裝、systemd 服務化部署、升級與解除安裝。 |
 | [設定參照](guide/configuration.md) | `config/config.json` 每個鍵的權威參照，以 pydantic schema 為 ground truth。 |
-| [Web GUI 導覽](guide/gui-tour.md) | 8 個分頁的 SPA 導覽：登入、Dashboard、Reports、Rules、Events 等。 |
+| [Web GUI 導覽](guide/gui-tour.md) | 六區 18 路由的 SPA 導覽：登入、總覽、調查、告警、自動化、報表、系統。 |
 | [監控規則、告警與事件規則](guide/monitoring-alerts.md) | 即時監控規則引擎、B/L/R 報表安全規則引擎與事件處理管線的差異與設定方式。 |
 | [報表家族](guide/reports.md) | 9 種報表的業務用途、關鍵欄位、CLI／GUI／排程三種產生方式。 |
 | [SIEM 轉送](guide/siem.md) | 把 audit events 與 traffic 摘要轉送到 syslog／Splunk HEC／JSON sink，含 DLQ 重送與清除。 |

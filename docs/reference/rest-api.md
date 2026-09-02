@@ -2,7 +2,7 @@
 title: REST API 參考
 audience: [developer, operator]
 version: 4.1.0
-last_verified: 2026-08-23
+last_verified: 2026-09-02
 verified_against:
   - src/gui/__init__.py
   - src/gui/routes/__init__.py
@@ -27,7 +27,7 @@ verified_against:
 本篇涵蓋 illumio-ops Web GUI 的完整 JSON API 端點清單，全部由 Flask 應用（`src/gui/`
 + 兩個獨立掛載的藍圖 `src/siem/web.py`、`src/pce_cache/web.py`）提供。實數為
 **116 個路由**（`@*.route(...)` 宣告數，含頁面路由），其中 112 個是 `/api/` JSON
-端點；每個端點依 GUI 分頁分區列出，欄位為方法｜路徑｜用途｜關鍵參數。各分頁的操作情境與畫面說明見
+端點；每個端點依 GUI 的六區分區列出，欄位為方法｜路徑｜用途｜關鍵參數。各區的操作情境與畫面說明見
 [guide/gui-tour.md](../guide/gui-tour.md)；本篇只列端點語法。
 
 GUI 監聽埠見 `illumio-ops gui` 的 `--port`，預設 **5001**（`src/cli/gui_cmd.py`）；
@@ -116,7 +116,7 @@ curl -sk -b cookies.txt "$BASE/api/status"
 
 ---
 
-## 端點總覽（依 GUI 分頁分區）
+## 端點總覽（依 GUI 六區分區）
 
 以下所有路徑皆相對於基底 URL；除上一節列出的公開路徑外，每個端點都需要已登入的
 session。有獨立限流的端點會在「關鍵參數」欄位標出（超出全域限流 300 次／分鐘，見文末
@@ -135,7 +135,7 @@ session。有獨立限流的端點會在「關鍵參數」欄位標出（超出�
 **`POST /api/login`** 成功回應：`{"ok": true, "csrf_token": "...", "must_change_password": false}`；
 失敗回 `401` `{"ok": false, "error": "..."}`。
 
-### 2) Dashboard 分頁（`src/gui/routes/dashboard.py`）
+### 2) 總覽區 `#/overview`（`src/gui/routes/dashboard.py`）
 
 | 方法 | 路徑 | 用途 | 關鍵參數 |
 |---|---|---|---|
@@ -150,11 +150,11 @@ session。有獨立限流的端點會在「關鍵參數」欄位標出（超出�
 | GET | `/api/dashboard/policy_usage_summary` | 最近一次 Policy Usage 報表摘要 | — |
 | POST | `/api/dashboard/top10` | 依 bandwidth／volume／count 排序查前 10 大流量 | `mins`, `pd`, `rank_by`, `search`，及完整 FilterBar 篩選鍵；**30/hour** |
 
-`/api/dashboard/overview` 的 `job_health` 欄位就是 Integrations → Overview「Job Health
+`/api/dashboard/overview` 的 `job_health` 欄位就是總覽區與 `#/automation/jobs`「Job Health
 表格」的資料來源（讀 `logs/job_health.json`，無獨立端點）；判讀規則（error／warn／ok、
 never-ran／overdue）見 [gui-tour.md](../guide/gui-tour.md) 「7) Integrations」節。
 
-### 3) Traffic & Workloads 分頁（`src/gui/routes/actions.py` 部分＋`filter_objects.py`）
+### 3) 調查區 `#/investigate/traffic`、`/workloads`（`src/gui/routes/actions.py` 部分＋`filter_objects.py`）
 
 | 方法 | 路徑 | 用途 | 關鍵參數 |
 |---|---|---|---|
@@ -185,7 +185,7 @@ policy decision 等即時才算得出的條件，以及全文 `search`，帶了�
 隔離／解除隔離的雙重確認流程、`Accelerate` 的持續模式，見
 [gui-tour.md](../guide/gui-tour.md) 「2) Traffic & Workloads」節。
 
-### 4) Event Viewer 分頁（`src/gui/routes/events.py`）
+### 4) 調查區 `#/investigate/events`（`src/gui/routes/events.py`）
 
 | 方法 | 路徑 | 用途 | 關鍵參數 |
 |---|---|---|---|
@@ -194,9 +194,9 @@ policy decision 等即時才算得出的條件，以及全文 `search`，帶了�
 | GET | `/api/events/rule_test` | 單一事件規則的命中測試（新舊比對邏輯差異） | `idx`, `mins`(≤10080), `limit`(≤500) |
 | GET | `/api/event-catalog` | 事件型錄（分類、已翻譯標籤、related_events，供規則建立 UI 用） | — |
 
-此分頁全部端點皆為唯讀，即時呼叫 PCE API，不寫入本地狀態。
+此子頁全部端點皆為唯讀，即時呼叫 PCE API，不寫入本地狀態。
 
-### 5) Rules（Alerts）分頁（`src/gui/routes/rules.py` ＋ `actions.py` Actions 子頁）
+### 5) 告警區 `#/alerting/rules`、`/ops`（`src/gui/routes/rules.py` ＋ `actions.py`）
 
 **Rules 子頁：**
 
@@ -227,10 +227,10 @@ policy decision 等即時才算得出的條件，以及全文 `search`，帶了�
 | POST | `/api/actions/best-practices` | 套用內建最佳實務規則組（16 條 event + 1 條 traffic） | `mode`(append_missing/replace)；**5/hour** |
 | POST | `/api/actions/test-connection` | 測試 PCE 連線 | **20/hour** |
 
-`POST /api/actions/test-alert` 也是 Settings → Channels 卡片上「Send test」按鈕呼叫的
+`POST /api/actions/test-alert` 也是系統區 `#/system/channels` 卡片上「Send test」按鈕呼叫的
 同一個端點（帶 `{channel: <name>}`）。
 
-### 6) Reports 分頁（`src/gui/routes/reports.py`）
+### 6) 報表區 `#/reports`、`#/automation/reports`（`src/gui/routes/reports.py`）
 
 **List 子頁 — 報表產生／管理：**
 
@@ -269,7 +269,7 @@ policy decision 等即時才算得出的條件，以及全文 `search`，帶了�
 九種報表的用途、欄位、資料來源見 [reports.md](../guide/reports.md)；`/api/reports/generate`
 與 CLI `illumio-ops report traffic --format html` 走同一份 `ReportGenerator`。
 
-### 7) Rule Scheduler 分頁（`src/gui/routes/rule_scheduler.py`）
+### 7) 自動化區 `#/automation/rules`、`/jobs`（`src/gui/routes/rule_scheduler.py`）
 
 | 方法 | 路徑 | 用途 | 關鍵參數 |
 |---|---|---|---|
@@ -288,7 +288,7 @@ policy decision 等即時才算得出的條件，以及全文 `search`，帶了�
 欄位並依排程切換 rule 的啟用旗標；排程器**不會自動佈署 ruleset**，安全約束與時窗語意見
 [automation.md](../guide/automation.md)。
 
-### 8) Integrations 分頁
+### 8) 系統區：快取與 SIEM `#/system/cache`、`/siem`
 
 **Cache 子頁**（`src/pce_cache/web.py`，藍圖前綴 `/api/cache`）：
 
@@ -338,7 +338,7 @@ destination／格式／佇列與重試、三個 DLQ CLI 對應指令見 [siem.md
 |---|---|---|---|
 | POST | `/api/daemon/restart` | **真實副作用**：重啟背景 daemon；GUI 未擁有 daemon 生命週期時回 `409` | **5/hour** |
 
-### 9) Settings 分頁（`src/gui/routes/config.py`）
+### 9) 系統區：設定 `#/system/{pce,tls,security,display,channels}`（`src/gui/routes/config.py`）
 
 | 方法 | 路徑 | 用途 | 關鍵參數 |
 |---|---|---|---|
@@ -356,7 +356,7 @@ destination／格式／佇列與重試、三個 DLQ CLI 對應指令見 [siem.md
 TLS 相關端點存檔後都需要**重啟服務**才會套用；自簽憑證每日續期 job 見
 [configuration.md](../guide/configuration.md)。設定鍵逐一對照表也見同一篇。
 
-### 10) 系統／除錯（跨分頁，`src/gui/routes/admin.py`）
+### 10) 系統／除錯（跨區，`src/gui/routes/admin.py`）
 
 | 方法 | 路徑 | 用途 | 關鍵參數 |
 |---|---|---|---|
@@ -364,20 +364,19 @@ TLS 相關端點存檔後都需要**重啟服務**才會套用；自簽憑證每
 | GET | `/api/logs/<module>` | 該模組最近日誌條目 | `n`(≤500) |
 | POST | `/api/shutdown` | **真實副作用**：優雅關閉服務（persistent mode 下回 `403`） | **5/hour** |
 
-`/api/logs*` 是模組日誌檢視器（`src/static/js/module-log.js`）的後端，不屬於 8 個主分頁
-中任何一個固定入口；`/api/shutdown` 由前端除錯用途呼叫。
+`/api/logs*` 是模組日誌檢視器（`#/system/logs`，`src/static/js/v2/areas/system.mjs`）的後端；`/api/shutdown` 由前端除錯用途呼叫。
 
 ---
 
 ## 端點總數對帳
 
-| 分頁／區塊 | 對應檔案 | 端點數 |
+| 區／區塊 | 對應檔案 | 端點數 |
 |---|---|---|
 | 認證與 session | `auth.py` | 5 |
-| Dashboard | `dashboard.py` | 10 |
-| Traffic & Workloads | `actions.py`（部分）＋ `filter_objects.py` | 9 |
-| Event Viewer | `events.py` | 4 |
-| Rules（Alerts） | `rules.py` ＋ `actions.py`（部分） | 15 |
+| 總覽 | `dashboard.py` | 10 |
+| 調查（流量／Workload） | `actions.py`（部分）＋ `filter_objects.py` | 9 |
+| 調查（事件） | `events.py` | 4 |
+| 告警 | `rules.py` ＋ `actions.py`（部分） | 15 |
 | Reports | `reports.py` | 24 |
 | Rule Scheduler | `rule_scheduler.py` | 10 |
 | Integrations（Cache／SIEM／DLQ／daemon） | `pce_cache/web.py` ＋ `siem/web.py` ＋ `__init__.py` | 24 |
@@ -497,7 +496,7 @@ REST API**——由 PCE 設備自己提供的另一套 API，不是 illumio-ops 
 ## 相關文件
 
 - [CLI 參考手冊](cli.md) — 對應的 CLI 指令
-- [Web GUI 導覽](../guide/gui-tour.md) — 各分頁畫面與操作情境
+- [Web GUI 導覽](../guide/gui-tour.md) — 各區畫面與操作情境
 - [設定參照](../guide/configuration.md) — `config.json` 逐鍵對照表
 - [報表家族](../guide/reports.md) — 九種報表的用途與欄位
 - [監控規則、告警、事件規則](../guide/monitoring-alerts.md) — `/api/rules`、`/api/event-catalog` 背後的規則引擎
