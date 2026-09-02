@@ -28,6 +28,7 @@ from src.events import (
     parse_event_timestamp,
 )
 from src.events.catalog import classify_unknown_event_type
+from src.events.stats import elide_error
 from src.exceptions import TrafficQueryError
 from src.utils import Colors, format_unit, safe_input
 from src.i18n import t
@@ -1354,7 +1355,11 @@ class Analyzer:
             "time": now_utc.strftime('%Y-%m-%d %H:%M:%S'),
             "rule": t('alert_watchdog_rule'),
             "status": "critical",
-            "details": t('alert_watchdog_details', count=failures, error=last_error[:120]),
+            # 120 characters stopped right before the "(Caused by …)" clause,
+            # so the alert said the PCE was unreachable without saying whether
+            # that was DNS, a firewall or TLS. elide_error keeps both ends.
+            "details": t('alert_watchdog_details', count=failures,
+                         error=elide_error(last_error, 400)),
         })
         logger.error(f"Watchdog: {failures} consecutive PCE failures — self-alert dispatched")
 

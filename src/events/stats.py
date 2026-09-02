@@ -9,6 +9,27 @@ from src.state_store import update_state_file
 from .poller import event_identity, format_utc
 
 DEFAULT_TIMELINE_LIMIT = 100
+
+# A connection error's diagnosis is at its END. urllib3 puts the host first,
+# the request URL (long, and mostly noise) in the middle, and the only clause
+# that says WHY — "(Caused by NewConnectionError… [Errno 110] …)" — last. A
+# leading slice therefore keeps the least useful half: the watchdog alert used
+# to stop right before the reason. Keep both ends, drop the middle, and mark
+# the cut so a shortened message never reads as a complete one.
+def elide_error(message: str, limit: int) -> str:
+    """Shorten `message` to `limit` characters, keeping its head and its tail."""
+    if message is None:
+        return ""
+    if len(message) <= limit:
+        return message
+    if limit <= 3:
+        return message[:limit]
+    head = max(1, limit * 2 // 5)
+    tail = limit - head - 3
+    if tail <= 0:
+        return message[:limit - 3] + "..."
+    return f"{message[:head]}...{message[-tail:]}"
+
 DEFAULT_DISPATCH_LIMIT = 50
 
 def ensure_monitoring_state(state: dict) -> dict:
@@ -124,9 +145,9 @@ class StatsTracker:
         if success:
             self.record_timeline("pce_ok", f"{stage} ok", status=200, message=message)
         else:
-            pce_stats["last_error"] = error[:300]
+            pce_stats["last_error"] = elide_error(error, 600)
             pce_stats["last_error_stage"] = stage
-            self.record_timeline("pce_error", f"{stage} failed", status=None, error=error[:300])
+            self.record_timeline("pce_error", f"{stage} failed", status=None, error=elide_error(error, 600))
 
     def record_pce_error(
         self,
@@ -140,7 +161,7 @@ class StatsTracker:
     ) -> None:
         now_str = format_utc(datetime.datetime.now(datetime.timezone.utc))
         pce_stats = self.state.setdefault("pce_stats", {})
-        pce_stats["last_error"] = error[:300]
+        pce_stats["last_error"] = elide_error(error, 600)
         pce_stats["last_error_status"] = "" if status is None else str(status)
         pce_stats["last_error_stage"] = stage
         pce_stats["consecutive_failures"] = int(pce_stats.get("consecutive_failures", 0)) + 1
@@ -156,7 +177,7 @@ class StatsTracker:
         else:
             pce_stats["event_poll_status"] = "error"
             pce_stats["last_event_poll"] = now_str
-        self.record_timeline("pce_error", f"{stage} failed", status=status, error=error[:300])
+        self.record_timeline("pce_error", f"{stage} failed", status=status, error=elide_error(error, 600))
 
     def record_event_batch(self, events, *, unknown_count=0, parser_note_count=0, overflow_risk=False, query_since="", query_until="") -> None:
         pce_stats = self.state.setdefault("pce_stats", {})
