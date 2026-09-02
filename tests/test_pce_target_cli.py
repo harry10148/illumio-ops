@@ -381,6 +381,7 @@ def test_menu_saas_console_default_and_custom_are_atomic_runtime_edits(
         1,
         "saas", console_answer,
         None, None, None, None,
+        None,  # SSL verify prompt (merged into this screen by #29+#31)
         None,  # dismiss restart warning
         None,  # leave settings menu
     ]
@@ -450,6 +451,7 @@ def test_menu_cancelling_target_change_abandons_whole_edit(monkeypatch):
         "", "",                               # keep deployment / Console URL
         "https://other-pce.example.com:8443",  # new url (changed)
         None, None, None,                      # org_id/key/secret unchanged
+        None,                                  # SSL verify prompt (#29+#31)
         None,                                  # cancel the target-change question
         None,                                  # back out of the menu loop
     ]
@@ -464,6 +466,7 @@ def test_menu_target_change_same_pce_saves_without_flush(monkeypatch):
     cm = _make_menu_cm()
     answers = [
         1, "", "", "https://other-pce.example.com:8443", None, None, None,
+        None,   # SSL verify prompt (#29+#31)
         2,      # same-pce
         None,   # dismiss the "restart the monitoring service" notice
         None,
@@ -479,6 +482,7 @@ def test_menu_target_change_flush_clears_cache(monkeypatch):
     cm = _make_menu_cm()
     answers = [
         1, "", "", "https://other-pce.example.com:8443", None, None, None,
+        None,   # SSL verify prompt (#29+#31)
         1,      # flush
         None,   # dismiss the "restart the monitoring service" notice
         None,
@@ -495,6 +499,7 @@ def test_menu_target_change_warns_to_restart_the_monitoring_service(monkeypatch,
     cm = _make_menu_cm()
     answers = [
         1, "", "", "https://other-pce.example.com:8443", None, None, None,
+        None,   # SSL verify prompt (#29+#31)
         1, None, None,
     ]
     with patch("src.pce_cache.flush.flush_pce_derived_state"):
@@ -508,6 +513,7 @@ def test_menu_flush_failure_leaves_the_connection_unchanged(monkeypatch):
     cm = _make_menu_cm()
     answers = [
         1, "", "", "https://other-pce.example.com:8443", None, None, None,
+        None,   # SSL verify prompt (#29+#31)
         1, None, None,
     ]
     with patch("src.pce_cache.flush.flush_pce_derived_state",
@@ -521,7 +527,8 @@ def test_menu_stores_the_normalized_url(monkeypatch):
     cm = _make_menu_cm()
     answers = [
         1, "", "", "  HTTPS://PCE.Example.COM:8443/  ", None, None, None,
-        None,
+        None,   # SSL verify prompt (#29+#31)
+        None,   # leave the system menu
     ]
     with patch("src.pce_cache.flush.flush_pce_derived_state") as mock_flush:
         _run_menu(monkeypatch, cm, answers)
@@ -537,6 +544,7 @@ def test_menu_rotating_credentials_only_saves_without_asking(monkeypatch):
     cm = _make_menu_cm()
     answers = [
         1, "", "", None, None, "newkey", "newsecret",
+        None,   # SSL verify prompt (#29+#31)
         None,
     ]
     with patch("src.pce_cache.flush.flush_pce_derived_state") as mock_flush:
