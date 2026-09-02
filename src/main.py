@@ -19,6 +19,15 @@ from src.settings import (
     manage_report_schedules_menu,
 )
 from src.i18n import t, get_language
+from src.cli.health_line import build_health_line
+from src.cli.menus.areas import (
+    overview_menu,
+    investigate_menu,
+    alerting_menu,
+    automation_menu,
+    reports_menu,
+    system_menu_entry,
+)
 
 LOG_FILE = ""  # To be set in main() or main_menu()
 
@@ -283,6 +292,29 @@ def report_generation_menu(cm):
         elif sel == 5:
             manage_report_schedules_menu(cm)
 
+def _launch_web_gui_flow(cm):
+    """The old menu item 5, lifted out unchanged so G can reuse it."""
+    from src.gui import launch_gui, HAS_FLASK, FLASK_IMPORT_ERROR
+    if not HAS_FLASK:
+        print(f"{Colors.FAIL}{t('flask_not_available')}{Colors.ENDC}")
+        if FLASK_IMPORT_ERROR:
+            print(f"{t('cli_import_error', default='Import error')}: {FLASK_IMPORT_ERROR}")
+        print(t("flask_install_hint"))
+        input(
+            f"\n{Colors.CYAN}[?]{Colors.ENDC} {t('press_enter_to_continue')} {Colors.GREEN}❯{Colors.ENDC} "
+        )
+    else:
+        port_str = safe_input(t("gui_port_prompt"), str)
+        if port_str is None:
+            # Cancel/back/EOF: go back to the menu instead of launching.
+            return
+        try:
+            port = int(port_str) if port_str.strip() else 5001
+        except (ValueError, TypeError):
+            port = 5001
+        launch_gui(cm, port=port)
+
+
 def main_menu():
     # Setup Logging
     global LOG_FILE
@@ -328,60 +360,43 @@ def main_menu():
             f"{t('cli_status_language', default='Language')}: {current_lang} | {t('cli_status_theme', default='Theme')}: {current_theme} | {_last_activity_label}: {_last_activity_val}",
             f"{Colors.DARK_GRAY}{shortcuts_line}{Colors.ENDC}",
             "-",
-            t("main_menu_root_1"),
-            t("main_menu_root_2"),
-            t("main_menu_root_3"),
-            t("main_menu_root_4"),
-            t("main_menu_root_5"),
-            t("main_menu_root_6"),
-            t("main_menu_root_7"),
-            t("main_menu_root_8"),
+            t("main_menu_area_1"),
+            t("main_menu_area_2"),
+            t("main_menu_area_3"),
+            t("main_menu_area_4"),
+            t("main_menu_area_5"),
+            t("main_menu_area_6"),
+            "",
+            t("main_menu_launch_gui"),
             t("main_menu_0"),
         ]
 
+        health = build_health_line(cm)
+        if health:
+            lines.insert(2, health)
+
         draw_panel("Illumio PCE Ops", lines)
 
-        sel = safe_input(f"\n{t('please_select')}", int, range(0, 9))
+        # str, not int: G is a selection too, and safe_input maps 0/-1/EOF to None.
+        sel = safe_input(f"\n{t('please_select')}", str,
+                         {"1", "2", "3", "4", "5", "6", "g", "G", "0"})
 
-        if sel is None or sel == 0:
+        if sel is None or sel == "0":
             break
-        elif sel == 1:
-            rule_management_menu(cm)
-        elif sel == 2:
-            report_generation_menu(cm)
-        elif sel == 3:
-            from src.rule_scheduler_cli import rule_scheduler_menu
-            rule_scheduler_menu(cm)
-        elif sel == 4:
-            settings_menu(cm)
-        elif sel == 5:
-            from src.gui import launch_gui, HAS_FLASK, FLASK_IMPORT_ERROR
-            if not HAS_FLASK:
-                print(f"{Colors.FAIL}{t('flask_not_available')}{Colors.ENDC}")
-                if FLASK_IMPORT_ERROR:
-                    print(f"{t('cli_import_error', default='Import error')}: {FLASK_IMPORT_ERROR}")
-                print(t("flask_install_hint"))
-                input(
-                    f"\n{Colors.CYAN}[?]{Colors.ENDC} {t('press_enter_to_continue')} {Colors.GREEN}❯{Colors.ENDC} "
-                )
-            else:
-                port_str = safe_input(t("gui_port_prompt"), str)
-                if port_str is None:
-                    # Cancel/back/EOF: return to the menu instead of launching.
-                    continue
-                try:
-                    port = int(port_str) if port_str.strip() else 5001
-                except (ValueError, TypeError):
-                    port = 5001
-                launch_gui(cm, port=port)
-        elif sel == 6:
-            view_logs(LOG_FILE)
-        elif sel == 7:
-            from src.pce_cache_cli import manage_pce_cache_menu
-            manage_pce_cache_menu(cm)
-        elif sel == 8:
-            from src.siem_cli import manage_siem_menu
-            manage_siem_menu(cm)
+        elif sel == "1":
+            overview_menu(cm)
+        elif sel == "2":
+            investigate_menu(cm)
+        elif sel == "3":
+            alerting_menu(cm)
+        elif sel == "4":
+            automation_menu(cm)
+        elif sel == "5":
+            reports_menu(cm)
+        elif sel == "6":
+            system_menu_entry(cm)
+        elif sel in ("g", "G"):
+            _launch_web_gui_flow(cm)
 
 # ─── Report Sub-Menu ─────────────────────────────────────────────────────────
 
