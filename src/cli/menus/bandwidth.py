@@ -60,7 +60,7 @@ def add_bandwidth_volume_menu(cm: ConfigManager, edit_rule=None) -> None:
         title,
         _menu_hints("Rules > Bandwidth/Volume"),
     )
-    _wizard_step(1, 5, t("wiz_basic_setup"))
+    _wizard_step(1, 5, t('wiz_basic_setup'), path=f"{t('cli_area_alerting')} > {t('wiz_add_bandwidth_rule')}")
     print("")
 
     def_name = edit_rule.get("name", "") if edit_rule else ""
@@ -74,7 +74,7 @@ def add_bandwidth_volume_menu(cm: ConfigManager, edit_rule=None) -> None:
     if not name:
         return
 
-    _wizard_step(2, 5, t("wiz_select_metric"))
+    _wizard_step(2, 5, t('wiz_select_metric'), path=f"{t('cli_area_alerting')} > {t('wiz_add_bandwidth_rule')}")
     print(f"\n{Colors.CYAN}{t('step_1_metric')}{Colors.ENDC}")
     print(t("metric_1"))
     print(t("metric_2"))
@@ -101,7 +101,7 @@ def add_bandwidth_volume_menu(cm: ConfigManager, edit_rule=None) -> None:
     rtype = "bandwidth" if m_sel == 1 else "volume"
     unit_prompt = "Mbps" if m_sel == 1 else "MB"
 
-    _wizard_step(3, 5, t("wiz_filters"))
+    _wizard_step(3, 5, t('wiz_filters'), path=f"{t('cli_area_alerting')} > {t('wiz_add_bandwidth_rule')}")
     print(f"\n{Colors.CYAN}{t('step_2_filters')}{Colors.ENDC}")
     print(f"{Colors.DARK_GRAY}{t('hint_return')}{Colors.ENDC}")
 
@@ -134,7 +134,7 @@ def add_bandwidth_volume_menu(cm: ConfigManager, edit_rule=None) -> None:
     if dst_picked is None:
         return
 
-    _wizard_step(4, 5, t("wiz_threshold"))
+    _wizard_step(4, 5, t('wiz_threshold'), path=f"{t('cli_area_alerting')} > {t('wiz_add_bandwidth_rule')}")
     print(f"\n{Colors.CYAN}{t('step_3_threshold')}{Colors.ENDC}")
     def_th = edit_rule.get("threshold_count", "") if edit_rule else ""
     th_in = safe_input(
@@ -209,7 +209,7 @@ def add_bandwidth_volume_menu(cm: ConfigManager, edit_rule=None) -> None:
     rid = edit_rule.get("id", gen_rule_id()) if edit_rule else gen_rule_id()
     preserved_any = preserve_any_filters(edit_rule)
 
-    _wizard_step(5, 5, t("wiz_review_save"))
+    _wizard_step(5, 5, t('wiz_review_save'), path=f"{t('cli_area_alerting')} > {t('wiz_add_bandwidth_rule')}")
     summary = [
         f"{t('sum_type')}: {rtype}",
         f"{t('sum_name')}: {name}",

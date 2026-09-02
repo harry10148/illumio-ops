@@ -60,7 +60,7 @@ def add_traffic_menu(cm: ConfigManager, edit_rule=None) -> None:
         title,
         _menu_hints("Rules > Traffic"),
     )
-    _wizard_step(1, 5, t("wiz_basic_setup"))
+    _wizard_step(1, 5, t('wiz_basic_setup'), path=f"{t('cli_area_alerting')} > {t('wiz_add_traffic_rule')}")
     print("")
 
     def_name = edit_rule.get("name", "") if edit_rule else ""
@@ -113,7 +113,7 @@ def add_traffic_menu(cm: ConfigManager, edit_rule=None) -> None:
     else:
         target_pd = -1
 
-    _wizard_step(2, 5, t("wiz_traffic_filters"))
+    _wizard_step(2, 5, t('wiz_traffic_filters'), path=f"{t('cli_area_alerting')} > {t('wiz_add_traffic_rule')}")
     print(f"\n{Colors.CYAN}{t('advanced_filters')}{Colors.ENDC}")
     print(f"{Colors.DARK_GRAY}{t('hint_return')}{Colors.ENDC}")
 
@@ -146,7 +146,7 @@ def add_traffic_menu(cm: ConfigManager, edit_rule=None) -> None:
     if dst_picked is None:
         return
 
-    _wizard_step(3, 5, t("wiz_trigger_threshold"))
+    _wizard_step(3, 5, t('wiz_trigger_threshold'), path=f"{t('cli_area_alerting')} > {t('wiz_add_traffic_rule')}")
     def_win = edit_rule.get("threshold_window", 10) if edit_rule else 10
     win_in = safe_input(
         t("time_window_mins")
@@ -196,7 +196,7 @@ def add_traffic_menu(cm: ConfigManager, edit_rule=None) -> None:
             return
     cd = cd_in
 
-    _wizard_step(4, 5, t("wiz_exclusions"))
+    _wizard_step(4, 5, t('wiz_exclusions'), path=f"{t('cli_area_alerting')} > {t('wiz_add_traffic_rule')}")
     print(f"\n{Colors.CYAN}{t('excludes_optional')}{Colors.ENDC}")
 
     ex_src_picked = _pick_or_cancel(
@@ -215,7 +215,7 @@ def add_traffic_menu(cm: ConfigManager, edit_rule=None) -> None:
     rid = edit_rule.get("id", gen_rule_id()) if edit_rule else gen_rule_id()
     preserved_any = preserve_any_filters(edit_rule)
 
-    _wizard_step(5, 5, t("wiz_review_save"))
+    _wizard_step(5, 5, t('wiz_review_save'), path=f"{t('cli_area_alerting')} > {t('wiz_add_traffic_rule')}")
     pd_text = {
         2: t("pd_label_blocked"),
         0: t("pd_label_potential"),

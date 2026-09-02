@@ -203,14 +203,14 @@ def _add_report_schedule_wizard(cm: ConfigManager, edit_sched: dict = None) -> N
                 continue
 
     # Step 1: Name
-    _wizard_step(1, 7, t("sched_name"))
+    _wizard_step(1, 7, t('sched_name'), path=f"{t('cli_area_automation')} > {t('wiz_report_schedule')}")
     default_name = edit_sched.get("name", "") if is_edit else ""
     name = _ask(t("sched_name"), default=default_name)
     if name is None:
         return
 
     # Step 2: Report type
-    _wizard_step(2, 7, t("sched_report_type"))
+    _wizard_step(2, 7, t('sched_report_type'), path=f"{t('cli_area_automation')} > {t('wiz_report_schedule')}")
     # A stored type that is not in the table gets NO default, so the operator
     # has to choose one — silently defaulting is how the old code rewrote
     # unknown types to traffic.
@@ -246,7 +246,7 @@ def _add_report_schedule_wizard(cm: ConfigManager, edit_sched: dict = None) -> N
         app = app_val.strip()
 
     # Step 3: Frequency
-    _wizard_step(3, 7, t("sched_schedule_type"))
+    _wizard_step(3, 7, t('sched_schedule_type'), path=f"{t('cli_area_automation')} > {t('wiz_report_schedule')}")
     freq_map = {"1": "daily", "2": "weekly", "3": "monthly"}
     default_freq_k = {"daily": "1", "weekly": "2", "monthly": "3"}.get(
         edit_sched.get("schedule_type", "weekly") if is_edit else "weekly", "2")
@@ -279,7 +279,7 @@ def _add_report_schedule_wizard(cm: ConfigManager, edit_sched: dict = None) -> N
 
     # Step 4: Time (input in configured timezone, stored as UTC)
     tz_label, offset_hours = _tz_offset_info(cm)
-    _wizard_step(4, 7, t("wiz_execution_time", tz=tz_label))
+    _wizard_step(4, 7, t('wiz_execution_time', tz=tz_label), path=f"{t('cli_area_automation')} > {t('wiz_report_schedule')}")
     # When editing, convert stored UTC hour → local display hour
     stored_hour = edit_sched.get("hour", 8) if is_edit else 8
     default_local_hour = str(_utc_to_local_hour(int(stored_hour), offset_hours))
@@ -296,7 +296,7 @@ def _add_report_schedule_wizard(cm: ConfigManager, edit_sched: dict = None) -> N
     hour = _local_to_utc_hour(local_hour, offset_hours)
 
     # Step 5: Lookback days
-    _wizard_step(5, 7, t("sched_lookback_days"))
+    _wizard_step(5, 7, t('sched_lookback_days'), path=f"{t('cli_area_automation')} > {t('wiz_report_schedule')}")
     default_lookback = str(edit_sched.get("lookback_days", 7)) if is_edit else "7"
     lookback_val = _ask(t("sched_lookback_days"), default=default_lookback, cast=int)
     if lookback_val is None:
@@ -308,7 +308,7 @@ def _add_report_schedule_wizard(cm: ConfigManager, edit_sched: dict = None) -> N
         return
 
     # Step 6: Output format
-    _wizard_step(6, 7, t("sched_format"))
+    _wizard_step(6, 7, t('sched_format'), path=f"{t('cli_area_automation')} > {t('wiz_report_schedule')}")
     fmt_map = {"1": ["html"], "2": ["csv"], "3": ["html", "csv"]}
     current_fmt = edit_sched.get("format", ["html"]) if is_edit else ["html"]
     default_fmt_k = "3" if len(current_fmt) > 1 else ("2" if current_fmt == ["csv"] else "1")
@@ -319,7 +319,7 @@ def _add_report_schedule_wizard(cm: ConfigManager, edit_sched: dict = None) -> N
     fmt = fmt_map.get(str(fmt_sel), ["html"])
 
     # Step 7: Email
-    _wizard_step(7, 7, t("wiz_email_options"))
+    _wizard_step(7, 7, t('wiz_email_options'), path=f"{t('cli_area_automation')} > {t('wiz_report_schedule')}")
     default_email = "Y" if (edit_sched.get("email_report", False) if is_edit else False) else "N"
     email_ans = _ask(t("sched_email_report"), default=default_email)
     if email_ans is None:
