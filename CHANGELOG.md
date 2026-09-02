@@ -390,6 +390,19 @@ a plain `<major>.<minor>.<patch>` scheme. (Tags through v4.0.0 carried a
 
 ### Fixed
 
+- **Installing the offline bundle no longer uninstalls packages from the host's
+  own Python environment.** The bundled interpreter is not marked
+  externally-managed, so pip did not hold back from the host's user
+  site-packages: installing the bundle's wheel set removed whatever the host had
+  under `~/.local/lib/pythonX.Y/site-packages` for any package sharing a name
+  with one of the bundle's — the packages ended up inside the bundle, and the
+  host's copies were gone. On a machine where an operator had installed Python
+  packages for their own use, a routine appliance install would quietly break
+  them. The bundle now runs its interpreter with user site-packages switched
+  off, in the installer, in the `illumio-ops` command it writes, and in the
+  systemd unit, so it neither reads from nor writes to anything outside its own
+  directory.
+
 - Nine-column tables now print on their own landscape page instead of being
   squeezed onto A4 portrait. The audit report's user-activity table is the one
   that needs it: at portrait width its headers and values broke mid-word

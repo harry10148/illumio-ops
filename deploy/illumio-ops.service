@@ -9,6 +9,9 @@ Type=simple
 User=illumio-ops
 Group=illumio-ops
 WorkingDirectory=/opt/illumio-ops
+# ProtectHome=true already hides /home, but say it outright: the bundled
+# interpreter must never read the host's user site-packages.
+Environment=PYTHONNOUSERSITE=1
 ExecStart=/opt/illumio-ops/python/bin/python3 /opt/illumio-ops/illumio-ops.py --monitor-gui --interval 10
 Restart=on-failure
 RestartSec=10

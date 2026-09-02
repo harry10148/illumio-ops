@@ -5,6 +5,10 @@
 #   dist/illumio-ops-<version>-offline-linux-x86_64.tar.gz
 set -euo pipefail
 
+# Keep the bundled interpreter's pip off the build host's user site-packages
+# (see the note at the top of scripts/install.sh).
+export PYTHONNOUSERSITE=1
+
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 DIST_DIR="$REPO_ROOT/dist"

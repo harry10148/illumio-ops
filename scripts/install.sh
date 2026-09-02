@@ -6,6 +6,16 @@
 #   sudo ./install.sh --install-root /opt/custom   # custom path
 set -euo pipefail
 
+# The bundled interpreter is not marked externally-managed, so PEP 668 does not
+# hold its pip back from the host's user site-packages. Without this, installing
+# the bundle's wheel set UNINSTALLS whatever the operator had in
+# ~/.local/lib/pythonX.Y/site-packages for any package that shares a name —
+# observed on 2026-09-02, where a bundle install stripped greenlet, sqlalchemy,
+# pandas, numpy, apscheduler, matplotlib and pydantic out of a developer's
+# environment. The bundle is supposed to be self-contained in both directions:
+# it neither reads nor writes anything outside its own tree.
+export PYTHONNOUSERSITE=1
+
 INSTALL_ROOT="/opt/illumio-ops"
 ALLOW_DOWNGRADE=false
 while [[ $# -gt 0 ]]; do
@@ -557,6 +567,10 @@ cat > "$WRAPPER" <<EOF
 # cd first: relative paths from config (data/, logs/, reports/) resolve
 # against the process cwd, not the app root.
 cd "$INSTALL_ROOT" || exit 1
+# Keep the bundled interpreter off the operator's user site-packages (see the
+# note at the top of install.sh); the systemd unit gets the same via
+# Environment=.
+export PYTHONNOUSERSITE=1
 exec "$INSTALL_ROOT/python/bin/python3" "$INSTALL_ROOT/illumio-ops.py" "\$@"
 EOF
 chmod 0755 "$WRAPPER"
