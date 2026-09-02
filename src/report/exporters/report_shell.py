@@ -1378,6 +1378,15 @@ figure.chart-static figcaption {
   }
   .report-table-panel--wide .report-table td.col-ts,
   .report-table-panel--wide .report-table th.col-ts { min-width: 7.5em !important; }
+  /* 直式的總寬上限。上面的 max-width: 12em 是逐欄的，欄與欄之間沒有人管總和：
+     2026-09-02 實測 audit 的 users 表 9 欄各自伸到上限，總寬 729px > 面板 674px，
+     右緣兩欄被紙張裁掉。面板 674px ÷ 最多 9 欄（10 欄起走橫式）≈ 8.6em，取 8em
+     讓「每欄都頂上限」的最壞情況仍放得下。橫式頁是 table-layout: fixed ＋
+     width: 100%，總寬本來就受面板約束，不套這條。 */
+  .report-table-panel--wide:not(.report-table-panel--landscape) .report-table tbody td:not(.num):not(.col-long),
+  .report-table-panel--wide:not(.report-table-panel--landscape) .report-table thead th:not(.num):not(.col-long) {
+    max-width: 8em !important;
+  }
   .report-table td.num, .report-table th.num { overflow-wrap: normal; }
 
   .report-table-panel--landscape { page: wide; }

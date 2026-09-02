@@ -755,6 +755,24 @@ _DELTA_COVER_META_PAIR = (_COVER_META_DT, """/* One grid cell per label+value pa
 
 """ + _COVER_META_DT)
 
+# 2026-09-02 Task 7 驗收：audit 的 users 表 9 欄各自伸到逐欄 max-width 12em，
+# 總寬 729px 超過 674px 的直式面板，右緣兩欄被紙張裁掉。逐欄上限管不到總和，
+# 所以直式（非橫式）的 meta 欄再加一道 8em 上限——面板 674px ÷ 最多 9 欄
+# （10 欄起走橫式）≈ 8.6em。設計檔沒有這一條，登記成授權 delta。
+_DELTA_PORTRAIT_TOTAL_WIDTH = (
+    _DELTA_FLOOR_TS[1],
+    _DELTA_FLOOR_TS[1] + """  /* 直式的總寬上限。上面的 max-width: 12em 是逐欄的，欄與欄之間沒有人管總和：
+     2026-09-02 實測 audit 的 users 表 9 欄各自伸到上限，總寬 729px > 面板 674px，
+     右緣兩欄被紙張裁掉。面板 674px ÷ 最多 9 欄（10 欄起走橫式）≈ 8.6em，取 8em
+     讓「每欄都頂上限」的最壞情況仍放得下。橫式頁是 table-layout: fixed ＋
+     width: 100%，總寬本來就受面板約束，不套這條。 */
+  .report-table-panel--wide:not(.report-table-panel--landscape) .report-table tbody td:not(.num):not(.col-long),
+  .report-table-panel--wide:not(.report-table-panel--landscape) .report-table thead th:not(.num):not(.col-long) {
+    max-width: 8em !important;
+  }
+""",
+)
+
 AUTHORISED_DELTAS = (
     _DELTA_COVER_META_PAIR,
     _DELTA_DROP_OLD_COVER,
@@ -768,6 +786,7 @@ AUTHORISED_DELTAS = (
     _DELTA_FLOOR_LANDSCAPE_LONG,
     _DELTA_FLOOR_META,
     _DELTA_FLOOR_TS,
+    _DELTA_PORTRAIT_TOTAL_WIDTH,
     _DELTA_MAT_FILL_WARN,
     _DELTA_TABLE_JS_AFFORDANCES,
 )
@@ -783,6 +802,20 @@ def test_mat_fill_warn_survives_the_port_from_the_old_shell():
     assert ".mat-fill.warn, .progress-fill.warn { background: var(--tone-warn-border); }" in SHELL_CSS
     assert ".mat-fill.bad, .progress-fill.bad { background: var(--tone-crit-border); }" in SHELL_CSS
     assert ".mat-fill.good, .progress-fill.good { background: var(--tone-ok-border); }" in SHELL_CSS
+
+
+def test_portrait_wide_tables_cap_the_total_column_width():
+    """Task 7 驗收回歸：逐欄 max-width 管不住總寬。
+
+    drift guard 只保證「SHELL_CSS == 設計檔 + 授權清單」，把規則連同 delta
+    一起刪掉它照樣是綠的。這裡直接斷言規則還在，且只套在直式——橫式是
+    table-layout: fixed，總寬本來就受面板約束，套上去只會白白壓窄欄位。
+    """
+    assert (
+        ".report-table-panel--wide:not(.report-table-panel--landscape) "
+        ".report-table thead th:not(.num):not(.col-long)"
+    ) in SHELL_CSS
+    assert "max-width: 8em !important;" in SHELL_CSS
 
 
 def build_expected_shell_css() -> str:
