@@ -183,6 +183,7 @@ def safe_input(
     hint=None,
     help_text=None,
     hidden=False,
+    hint_is_current=False,
 ):
     """Prompt for input with type + range validation.
 
@@ -234,7 +235,11 @@ def safe_input(
 
     full_prompt = f"\n{Colors.CYAN}[?]{Colors.ENDC} {prompt}{range_hint}"
     if hint:
-        def_text = t("def_val_prefix", default="Default")
+        # An editing prompt shows what the value IS, not what it would default
+        # to — saying "Default" there tells the operator the opposite of the
+        # truth about their own configuration.
+        _prefix_key = "cur_val_prefix" if hint_is_current else "def_val_prefix"
+        def_text = t(_prefix_key, default="Current" if hint_is_current else "Default")
         full_prompt += f" {Colors.DARK_GRAY}({def_text}: {hint}){Colors.ENDC}"
     full_prompt += f" {Colors.GREEN}{_console_prompt_symbol()}{Colors.ENDC} "
 
@@ -249,7 +254,8 @@ def safe_input(
         try:
             if use_questionary:
                 try:
-                    _def_text = t("def_val_prefix", default="Default")
+                    _prefix_key = "cur_val_prefix" if hint_is_current else "def_val_prefix"
+                    _def_text = t(_prefix_key, default="Current" if hint_is_current else "Default")
                     _prompt_fn = _q.password if hidden else _q.text
                     answer = _prompt_fn(
                         prompt + range_hint,

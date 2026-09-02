@@ -48,7 +48,15 @@ def _menu_hints(path: str) -> list[str]:
     ]
 
 
-def _wizard_step(step: int, total: int, title: str) -> None:
+def _wizard_step(step: int, total: int, title: str, *, path: str | None = None) -> None:
+    """Print the step label; with `path`, redraw the chrome above it first (DD-1).
+
+    `path=None` keeps the pre-2C behaviour exactly, so the callers that have
+    not been migrated to the six-area chrome are untouched.
+    """
+    if path is not None:
+        from src.cli.menu_chrome import menu_screen   # 延遲 import 避免循環
+        menu_screen(path, [])
     step_label = t("wiz_step")
     print(f"\n{Colors.BOLD}{Colors.CYAN}[{step_label} {step}/{total}] {title}{Colors.ENDC}")
 
