@@ -52,6 +52,39 @@ def test_freshness_check_flags_stale(tmp_path: Path) -> None:
     assert "alpha.md" in out
 
 
+def test_freshness_check_skips_archived(tmp_path: Path) -> None:
+    """An archived doc records what was true when filed; it is never re-verified.
+
+    Without this, `docs/_archive/` is a permanent false red: the frontmatter
+    check requires last_verified, and freshness then expires that same date.
+    """
+    docs = tmp_path / "docs"
+    docs.mkdir()
+    (docs / "old.md").write_text(
+        "---\ntitle: Old\nlast_verified: 2020-01-01\nstatus: archived\n---\n# Old\n"
+    )
+    (docs / "old_zh.md").write_text(
+        "---\ntitle: Old\nlast_verified: 2020-01-01\nstatus: archived\n---\n# Old\n"
+    )
+    rc, out, _ = run_check("--freshness", "30", "--root", str(docs))
+    assert rc == 0, out
+
+
+def test_freshness_check_still_flags_non_archived(tmp_path: Path) -> None:
+    """The archived skip must not become a blanket exemption."""
+    docs = tmp_path / "docs"
+    docs.mkdir()
+    (docs / "live.md").write_text(
+        "---\ntitle: Live\nlast_verified: 2020-01-01\nstatus: draft\n---\n# Live\n"
+    )
+    (docs / "live_zh.md").write_text(
+        "---\ntitle: Live\nlast_verified: 2020-01-01\nstatus: draft\n---\n# Live\n"
+    )
+    rc, out, _ = run_check("--freshness", "30", "--root", str(docs))
+    assert rc != 0
+    assert "live.md" in out
+
+
 def test_frontmatter_check_passes_on_clean(tmp_path: Path) -> None:
     docs = tmp_path / "docs"
     docs.mkdir()

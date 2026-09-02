@@ -100,6 +100,12 @@ def check_freshness(md: list[Path], days: int, issues: list[tuple[str, str, str]
         fm = parse_frontmatter(path.read_text(encoding="utf-8"))
         if not fm or "last_verified" not in fm:
             continue
+        # An archived document records what was true when it was filed; it is
+        # never re-verified, so a freshness deadline on it can only ever be a
+        # false red. The frontmatter check still requires last_verified, so the
+        # date stays on record — this only stops it expiring.
+        if str(fm.get("status", "")).strip().lower() == "archived":
+            continue
         lv = fm["last_verified"]
         if not isinstance(lv, str):
             issues.append((str(path), "freshness", f"last_verified is not a scalar: {lv!r}"))
