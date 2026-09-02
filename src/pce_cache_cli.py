@@ -5,11 +5,20 @@ from src.config_models import PceCacheSettings
 from src.gui.settings_helpers import save_section
 from src.cli.object_picker import pick_objects
 from src.i18n import t
+from src.cli.menu_chrome import confirm_box, menu_screen
+
+
+def _pcc_menu_lines() -> list:
+    """The existing menu text, one line per row, so it can go inside a panel."""
+    return [ln for ln in t("pcc_menu").splitlines() if ln.strip()]
 
 
 def manage_pce_cache_menu(cm) -> None:
     while True:
-        print(t("pcc_menu"))
+        # WZ-3: the same frame every other area draws. The input loop below is
+        # deliberately untouched — it reads through builtins.input, which is
+        # what this module's tests patch.
+        menu_screen(f"{t('cli_area_system')} > PCE Cache", _pcc_menu_lines())
         try:
             choice = input("> ").strip()
             if choice == "0":
@@ -213,6 +222,21 @@ def _run_backfill(cm):
 
 
 def _run_retention(cm):
+    """#48: this deletes rows the moment it runs. Name the windows first."""
+    cfg = cm.models.pce_cache
+    impact = [
+        t("cli_retention_impact_line", table="events", days=cfg.events_retention_days),
+        t("cli_retention_impact_line", table="traffic (raw)", days=cfg.traffic_raw_retention_days),
+        t("cli_retention_impact_line", table="traffic (aggregated)", days=cfg.traffic_agg_retention_days),
+    ]
+    if not confirm_box(t("cli_confirm_retention_title"), impact,
+                       t("cli_confirm_retention_ok")):
+        print(t("operation_cancelled", default="Operation cancelled."))
+        return
+    _retention_run(cm)
+
+
+def _retention_run(cm):
     try:
         from sqlalchemy import create_engine
         from sqlalchemy.orm import sessionmaker

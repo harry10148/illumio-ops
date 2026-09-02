@@ -1,3 +1,5 @@
+from types import SimpleNamespace
+
 import pytest
 from click.testing import CliRunner
 
@@ -121,3 +123,32 @@ def test_siem_test_bad_destination_exits_usage(runner):
     assert result.exit_code == EXIT_USAGE
     # i18n-aware: assert the destination name appears, not the surrounding text
     assert "no_such_dest" in result.output
+
+
+# ── Phase 2C Task 9: chrome, without weakening the existing gates ───────────
+
+def test_siem_menu_renders_inside_panel(monkeypatch):
+    from src import siem_cli
+    screens = []
+    monkeypatch.setattr(siem_cli, "menu_screen",
+                        lambda path, lines, **kw: screens.append((path, lines)))
+    monkeypatch.setattr("builtins.input", lambda *a, **k: "0")
+    siem_cli.manage_siem_menu(SimpleNamespace(config={"siem": {}}))
+    path, lines = screens[0]
+    assert "SIEM" in path
+    assert lines
+
+
+def test_destination_delete_still_demands_the_word_yes(monkeypatch):
+    """This gate is stricter than a y/N box; chrome must not downgrade it."""
+    from src import siem_cli
+    import inspect
+    src_text = inspect.getsource(siem_cli._delete_destination)
+    assert '"yes"' in src_text or "'yes'" in src_text
+
+
+def test_dlq_purge_still_demands_the_word_yes():
+    from src import siem_cli
+    import inspect
+    src_text = inspect.getsource(siem_cli._dlq_bulk)
+    assert '"yes"' in src_text or "'yes'" in src_text

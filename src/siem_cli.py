@@ -4,11 +4,20 @@ from __future__ import annotations
 from src.config_models import SiemDestinationSettings, SiemForwarderSettings
 from src.gui.settings_helpers import save_section
 from src.i18n import t
+from src.cli.menu_chrome import menu_screen
+
+
+def _siem_menu_lines() -> list:
+    """The existing menu text, one line per row, so it can go inside a panel."""
+    return [ln for ln in t("sic_menu").splitlines() if ln.strip()]
 
 
 def manage_siem_menu(cm) -> None:
     while True:
-        print(t("sic_menu"))
+        # WZ-3 chrome only. The delete and purge gates below already demand the
+        # literal word "yes", which is stricter than confirm_box's y/N — this
+        # task frames the menu, it does not relax them.
+        menu_screen(f"{t('cli_area_system')} > SIEM", _siem_menu_lines())
         choice = input("> ").strip()
         if choice == "0":
             return

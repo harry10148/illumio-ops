@@ -54,7 +54,8 @@ def test_menu_retention_passes_archive_enabled(tmp_path):
         },
     }))
     cm = ConfigManager(config_file=str(p))
-    with patch.object(builtins, "input", _seq(["6", "0"])), \
+    # "y" answers the confirmation that now stands in front of retention (#48).
+    with patch.object(builtins, "input", _seq(["6", "y", "0"])), \
          patch("src.pce_cache.retention.RetentionWorker") as MockWorker:
         MockWorker.return_value.run_once.return_value = {}
         manage_pce_cache_menu(cm)
@@ -104,3 +105,55 @@ def test_menu_invalid_choice(cm, capsys):
         manage_pce_cache_menu(cm)
     out = capsys.readouterr().out.lower()
     assert "invalid" in out or "please" in out
+
+
+# ── Phase 2C Task 8: chrome + a gate in front of retention ──────────────────
+
+def test_menu_renders_inside_panel(monkeypatch):
+    """The menu joins the six-area chrome; the input loop is untouched."""
+    from src import pce_cache_cli
+    screens = []
+    monkeypatch.setattr(pce_cache_cli, "menu_screen",
+                        lambda path, lines, **kw: screens.append((path, lines)))
+    monkeypatch.setattr("builtins.input", lambda *a, **k: "0")
+    pce_cache_cli.manage_pce_cache_menu(_cm_for_chrome())
+    path, lines = screens[0]
+    assert "PCE Cache" in path
+    assert lines, "the existing pcc_menu text must reach the panel"
+
+
+def test_retention_asks_first_and_names_the_windows(monkeypatch):
+    """#48: retention deletes rows immediately. Say which and how old."""
+    from src import pce_cache_cli
+    boxes = []
+    monkeypatch.setattr(pce_cache_cli, "confirm_box",
+                        lambda title, lines, ok: boxes.append((title, lines, ok)) or False)
+    ran = []
+    monkeypatch.setattr(pce_cache_cli, "_retention_run", lambda cm: ran.append("ran"),
+                        raising=False)
+    pce_cache_cli._run_retention(_cm_for_chrome())
+    assert ran == [], "declining must not delete anything"
+    _title, lines, _ok = boxes[0]
+    joined = "\n".join(lines)
+    assert "30" in joined and "7" in joined      # the configured windows
+
+
+def test_retention_runs_after_confirmation(monkeypatch):
+    from src import pce_cache_cli
+    monkeypatch.setattr(pce_cache_cli, "confirm_box", lambda *a, **k: True)
+    ran = []
+    monkeypatch.setattr(pce_cache_cli, "_retention_run", lambda cm: ran.append("ran"),
+                        raising=False)
+    pce_cache_cli._run_retention(_cm_for_chrome())
+    assert ran == ["ran"]
+
+
+def _cm_for_chrome():
+    from types import SimpleNamespace
+    return SimpleNamespace(
+        config={"pce_cache": {}},
+        models=SimpleNamespace(pce_cache=SimpleNamespace(
+            db_path="/tmp/t.db", events_retention_days=30,
+            traffic_raw_retention_days=7, traffic_agg_retention_days=90,
+            archive_enabled=False)),
+    )

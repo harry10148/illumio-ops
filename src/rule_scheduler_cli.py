@@ -6,6 +6,7 @@ import datetime
 import traceback
 from src.utils import Colors
 from src.i18n import t
+from src.cli.menu_chrome import menu_screen
 from src.rule_scheduler import ScheduleDB, ScheduleEngine, truncate, extract_id
 
 # ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -640,15 +641,38 @@ class _RuleSchedulerCLI:
 
     # ── Main Menu ──
 
+    def _menu_lines(self) -> list:
+        """Menu rows plus the status an operator would otherwise open Settings
+        for: is the scheduler on, how often it checks, how many schedules exist.
+
+        Each status value is read defensively — a menu must still draw when one
+        of them cannot be read.
+        """
+        try:
+            rs_cfg = self.cm.config.get("rule_scheduler", {}) or {}
+        except Exception:
+            rs_cfg = {}
+        try:
+            count = len(getattr(self.db, "db", {}) or {})
+        except Exception:
+            count = 0
+        status = "ON" if rs_cfg.get("enabled", False) else "OFF"
+        return [
+            t("cli_rs_status_line", status=status,
+              interval=rs_cfg.get("check_interval_seconds", 300), count=count),
+            "-",
+            f" 1. {t('rs_menu_schedule')}",
+            f" 2. {t('rs_menu_check')}",
+            f" 3. {t('rs_menu_settings')}",
+            "",
+            f" 0. {t('rs_back')}",
+        ]
+
     def run(self):
         while True:
-            print(f"\n{Colors.HEADER}╭── {Colors.BOLD}{t('rs_menu_title')}{Colors.ENDC} {Colors.DARK_GRAY}[CLI]{Colors.ENDC}")
-            print(f"{Colors.HEADER}│{Colors.ENDC} 1. {t('rs_menu_schedule')}")
-            print(f"{Colors.HEADER}│{Colors.ENDC} 2. {t('rs_menu_check')}")
-            print(f"{Colors.HEADER}│{Colors.ENDC} 3. {t('rs_menu_settings')}")
-            print(f"{Colors.HEADER}│{Colors.ENDC} 0. {t('rs_back')}")
-            print(f"{Colors.HEADER}╰{'─' * 40}{Colors.ENDC}")
-            ans = clean_input(input(f"{Colors.CYAN}❯{Colors.ENDC} "))
+            menu_screen(f"{t('cli_area_automation')} > {t('rs_menu_title')}",
+                        self._menu_lines())
+            ans = clean_input(input(f"{Colors.CYAN}\u276f{Colors.ENDC} "))
 
             try:
                 if ans == '1':
