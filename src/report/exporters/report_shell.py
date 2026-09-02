@@ -1447,9 +1447,16 @@ SEVERITY_RANK: tuple[str, ...] = (
 )
 
 # Column count at which a table stops fitting an A4 portrait page and gets its
-# own landscape named page. 8-9 columns still read fine portrait; see the wide
-# table policy in SHELL_CSS section 12.
-WIDE_TABLE_LANDSCAPE_COLS = 10
+# own landscape named page. See the wide table policy in SHELL_CSS section 12.
+#
+# 2026-09-02: was 10, on the assumption that 8-9 columns still read fine
+# portrait. Regenerating the audit report against live data disproved it — its
+# nine-column user-activity table needs 729px against a 674px portrait panel,
+# and squeezing it to fit breaks words in both the headers and the values
+# ("NOTIFICATI/ON_DETAIL", "principal_unreso/lved"). The same table on a
+# landscape page keeps every value on one line. The portrait cap in SHELL_CSS
+# stays as the safety net for eight columns and fewer.
+WIDE_TABLE_LANDSCAPE_COLS = 9
 
 _KIND_LABEL_KEY: dict[str, str] = {
     "exec": "rpt_shell_kind_exec",

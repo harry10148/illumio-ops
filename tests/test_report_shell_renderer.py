@@ -276,7 +276,11 @@ def test_shell_css_keeps_screen_print_visibility_pair():
 def test_wide_table_attrs_threshold():
     cls, hint = wide_table_attrs(11, "zh_TW")
     assert "report-table-panel--landscape" in cls and "11" in hint and "table-hint" in hint
-    assert wide_table_attrs(9, "zh_TW") == ("", "")
+    cls9, hint9 = wide_table_attrs(9, "zh_TW")
+    # 2026-09-02: nine columns moved above the threshold — the audit report's
+    # nine-column table needs 729px against a 674px portrait panel.
+    assert "report-table-panel--landscape" in cls9 and "9" in hint9
+    assert wide_table_attrs(8, "zh_TW") == ("", "")
 
 
 def test_grade_tone_maps_d_and_f_to_critical_red():
