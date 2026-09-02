@@ -128,6 +128,16 @@ a plain `<major>.<minor>.<patch>` scheme. (Tags through v4.0.0 carried a
 
 ### Fixed
 
+- The audit report's nine-column user-activity table ran off the right edge of
+  an A4 portrait page, taking the `severity` and `parser_notes` columns with it.
+  The printed table's columns each had a width cap but nothing capped their
+  total, so a table with long values in several columns could add up to more
+  than the page. Portrait tables now cap each column tighter, which keeps every
+  column on the paper; the trade-off is more wrapping inside narrow columns.
+  Tables of ten columns or more already print on their own landscape page and
+  are unaffected. Found by regenerating all eleven report types against live
+  appliance data in both languages and checking every page.
+
 - Bandwidth (Mbps) figures were computed as bytes × 8 ÷ 600 seconds — 600 being
   PCE's documented default for a field, `interval_sec`, that only ships on
   syslog/fluentd output and never on the REST query this tool actually reads,
