@@ -36,7 +36,10 @@ _AUDIT_GEN_SITES = [
 _ANALYZER_SITES = [
     ("src/gui/routes/dashboard.py", r"Analyzer\(.*?cache_reader\s*="),
     ("src/gui/routes/actions.py", r"Analyzer\(.*?cache_reader\s*="),
-    ("src/main.py", r"Analyzer\(.*?cache_reader\s*="),
+    # Phase 2C moved the interactive "run analysis now" / "debug mode" paths out
+    # of main.rule_management_menu into the alerting area. The guard follows the
+    # call, otherwise it is watching a file that no longer builds an Analyzer.
+    ("src/cli/menus/areas.py", r"Analyzer\(.*?cache_reader\s*="),
     ("src/scheduler/jobs.py", r"Analyzer\(.*?cache_reader\s*="),
 ]
 
