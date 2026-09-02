@@ -11,6 +11,13 @@ a plain `<major>.<minor>.<patch>` scheme. (Tags through v4.0.0 carried a
 
 ### Added
 
+- A report produced by **`illumio-ops report draft-policy`** now says so on its
+  cover. It and `report security` wrote files nothing could tell apart — the
+  same filename prefix, the same cover title, the same report type in the
+  metadata sidecar — so two files side by side gave no clue which command made
+  which. The filename and sidecar type are unchanged; only the cover now
+  distinguishes them.
+
 - Traffic search on the Traffic & Workloads tab now offers three honest
   data sources instead of two mislabeled ones: cache-first (the default —
   reads the local cache and only queries the PCE for whatever the cache
@@ -127,6 +134,12 @@ a plain `<major>.<minor>.<patch>` scheme. (Tags through v4.0.0 carried a
   keeps what is already stored; typing a remembered number does not.
 
 ### Fixed
+
+- Nine-column tables now print on their own landscape page instead of being
+  squeezed onto A4 portrait. The audit report's user-activity table is the one
+  that needs it: at portrait width its headers and values broke mid-word
+  ("NOTIFICATI/ON_DETAIL", "principal_unreso/lved"). On a landscape page every
+  value stays on one line, and the report is the same length as before.
 
 - The audit report's nine-column user-activity table ran off the right edge of
   an A4 portrait page, taking the `severity` and `parser_notes` columns with it.
