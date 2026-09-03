@@ -94,6 +94,7 @@ from playwright.sync_api import expect  # noqa: E402
 pytest_plugins = ["tests.v2_e2e_utils"]
 
 R_RULES = "#/policy/rulesets"
+R_SCHEDULES = "#/policy/schedules"   # v3: the schedule board (AU-01/02/08/09/10) has its own page
 R_REPORTS = "#/reports/schedules"
 R_JOBS = "#/system/jobs"
 SLOW = 45_000
@@ -280,13 +281,17 @@ def test_rules_coverage_anchors_and_i18n(v2_page, monkeypatch):
     # drawer) — see _patch_fake_ruleset's docstring.
     _patch_fake_ruleset(monkeypatch)
     page, base_url = v2_page
-    _goto(page, base_url, R_RULES, "AU-01")
+    # v3 splits the old #/automation/rules board in two pages (spec §1.1).
+    _goto(page, base_url, R_RULES, "AU-03")
     page.locator('section[data-cov="AU-03"] table.tbl tbody tr').first.click()
     page.wait_for_selector('[data-cov="AU-04"]')
     _open_all(page)
+    assert {"AU-03", "AU-04", "AU-05", "AU-06", "AU-07"} - _covs(page) == set()
+    assert _missing_i18n(page) == []
 
-    expected = {"AU-%02d" % i for i in range(1, 11)}
-    assert expected - _covs(page) == set()
+    _goto(page, base_url, R_SCHEDULES, "AU-01")
+    _open_all(page)
+    assert {"AU-01", "AU-02", "AU-08", "AU-09", "AU-10"} - _covs(page) == set()
     assert _missing_i18n(page) == []
 
 
@@ -397,7 +402,7 @@ def test_ruleset_drawer_precheck_is_real_backend_error(v2_page):
     unmodified `if not href: return _err("href required", 400)` fires
     before any PCE call is even attempted."""
     page, base_url = v2_page
-    _goto(page, base_url, R_RULES, "AU-01")
+    _goto(page, base_url, R_RULES, "AU-03")
 
     page.evaluate(
         "async () => { const { palette } = await import('/static/js/v2/components/palette.mjs'); "
@@ -455,7 +460,7 @@ def test_rule_schedule_crud_reconciles_list_and_timeline(v2_page, monkeypatch, s
     _patch_pce_gates(monkeypatch)
     _patch_fake_ruleset(monkeypatch)
     page, base_url = v2_page
-    _goto(page, base_url, R_RULES, "AU-01")
+    _goto(page, base_url, R_RULES, "AU-03")
 
     base_href = "/orgs/1/sec_policy/draft/rule_sets/900099"  # the fake ruleset's own href
     created = []
@@ -506,10 +511,11 @@ def test_rule_schedule_crud_reconciles_list_and_timeline(v2_page, monkeypatch, s
             assert result and result.get("ok") is True, result
             created.append(href)
 
+        # the schedule board is its own page in v3; reload first so the
+        # store cache does not serve the pre-creation rs_schedules snapshot
         page.reload()
         page.wait_for_selector('body[data-booted="true"]')
-        page.wait_for_selector('[data-route="%s"]' % R_RULES)
-        page.wait_for_selector('[data-cov="AU-01"]')
+        _goto(page, base_url, R_SCHEDULES, "AU-01")
 
         sched_panel = page.locator('section[data-cov="AU-08"]')
         assert sched_panel.locator("tbody tr").count() == 3
@@ -549,7 +555,7 @@ def test_immediate_check_runs_real_endpoint_when_no_schedules_exist(v2_page, sch
     (The store is NOT derived from the function-scoped temp_config_file; it is
     resolved from the source tree, which is why the fixture has to exist.)"""
     page, base_url = v2_page
-    _goto(page, base_url, R_RULES, "AU-01")
+    _goto(page, base_url, R_SCHEDULES, "AU-01")
 
     existing = _api_get(page, "/api/rule_scheduler/schedules")
     assert existing == [], "this test requires a schedule-free ScheduleDB"
@@ -629,7 +635,7 @@ def test_rule_search_note_describes_this_screens_own_search(v2_page, monkeypatch
 
     _patch_fake_ruleset(monkeypatch)
     page, base_url = v2_page
-    _goto(page, base_url, R_RULES, "AU-01")
+    _goto(page, base_url, R_RULES, "AU-03")
     page.locator('section[data-cov="AU-03"] table.tbl tbody tr').first.click()
     page.wait_for_selector('[data-cov="AU-04"]')
 
@@ -656,7 +662,7 @@ def test_rule_search_note_describes_this_screens_own_search(v2_page, monkeypatch
 
 def test_teardown_closes_surfaces_clears_callbacks_and_palette(v2_page):
     page, base_url = v2_page
-    _goto(page, base_url, R_RULES, "AU-01")
+    _goto(page, base_url, R_RULES, "AU-03")
 
     page.evaluate(
         "async () => { const { palette } = await import('/static/js/v2/components/palette.mjs'); "

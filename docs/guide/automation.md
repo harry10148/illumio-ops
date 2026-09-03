@@ -7,7 +7,7 @@ verified_against:
   - src/rule_scheduler.py
   - src/gui/routes/rule_scheduler.py
   - src/rule_scheduler_cli.py
-  - src/static/js/v2/areas/automation.mjs
+  - src/static/js/v2/areas/policy_scheduler.mjs
   - src/cli/menus/_root.py
   - src/scheduler/__init__.py
   - src/scheduler/jobs.py

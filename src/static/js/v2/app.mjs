@@ -181,7 +181,6 @@ async function boot() {
     return mountOverview(el2, ctx);
   });
   router.register("#/investigate/inbox", mountUnderConstruction);
-  router.register("#/policy/schedules", mountUnderConstruction);
   router.register("#/system/alerting", mountUnderConstruction);
   Object.keys(LEGACY_ROUTES).forEach(function (oldRoute) {
     router.register(oldRoute, async function (el2, ctx) {
@@ -205,11 +204,11 @@ async function boot() {
     return mountEvents(el2, ctx);
   });
   router.register("#/policy/alert-rules", async function (el2, ctx) {
-    const { mountRules } = await import("./areas/alerting.mjs");
+    const { mountRules } = await import("./areas/policy_rules.mjs");
     return mountRules(el2, ctx);
   });
   router.register("#/policy/ops", async function (el2, ctx) {
-    const { mountOps } = await import("./areas/alerting.mjs");
+    const { mountOps } = await import("./areas/policy_rules.mjs");
     return mountOps(el2, ctx);
   });
   // Task 7 — the automation area's three sub-routes, each lazily importing the
@@ -217,15 +216,19 @@ async function boot() {
   // "#/automation" itself keeps its placeholder, same reasoning as
   // "#/investigate": no landing page of its own, only the sub-nav's targets.
   router.register("#/policy/rulesets", async function (el2, ctx) {
-    const { mountAutoRules } = await import("./areas/automation.mjs");
-    return mountAutoRules(el2, ctx);
+    const { mountRulesets } = await import("./areas/policy_scheduler.mjs");
+    return mountRulesets(el2, ctx);
+  });
+  router.register("#/policy/schedules", async function (el2, ctx) {
+    const { mountSchedules } = await import("./areas/policy_scheduler.mjs");
+    return mountSchedules(el2, ctx);
   });
   router.register("#/reports/schedules", async function (el2, ctx) {
-    const { mountAutoReports } = await import("./areas/automation.mjs");
+    const { mountAutoReports } = await import("./areas/policy_scheduler.mjs");
     return mountAutoReports(el2, ctx);
   });
   router.register("#/system/jobs", async function (el2, ctx) {
-    const { mountAutoJobs } = await import("./areas/automation.mjs");
+    const { mountAutoJobs } = await import("./areas/policy_scheduler.mjs");
     return mountAutoJobs(el2, ctx);
   });
   // Task 8 — the reports area's single route.

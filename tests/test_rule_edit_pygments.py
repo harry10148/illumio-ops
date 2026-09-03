@@ -55,7 +55,7 @@ class TestRuleHighlightEndpoint:
         The legacy assertion was that src/templates/index.html links
         /static/pygments.css, because the legacy rule editor injected this
         endpoint's `html` field as markup. The v2 rules view
-        (src/static/js/v2/areas/alerting.mjs, AL-06) assigns it to
+        (src/static/js/v2/areas/policy_rules.mjs, AL-06) assigns it to
         `code.textContent` instead — a deliberate consequence of the v2
         no-innerHTML rule (tests/test_csp_compliance.py) — so the operator
         sees the highlighter's tags as literal text and pygments.css is not
@@ -64,7 +64,7 @@ class TestRuleHighlightEndpoint:
         styling. Logged in task-11-report.md as a product-bug backlog item.
         """
         from pathlib import Path
-        alerting = Path("src/static/js/v2/areas/alerting.mjs").read_text(encoding="utf-8")
+        alerting = Path("src/static/js/v2/areas/policy_rules.mjs").read_text(encoding="utf-8")
         assert "/highlight" in alerting, "AL-06 no longer calls the endpoint"
         assert "code.textContent = result.html" in alerting, (
             "AL-06's rendering changed — if it now renders the markup, this "

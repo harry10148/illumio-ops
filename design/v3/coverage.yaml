@@ -52,16 +52,16 @@ AL-11: {item: watermark 重置, route: "#/policy/ops"}
 AL-12: {item: 最佳實務套用, route: "#/policy/ops"}
 AL-13: {item: 輸出主控台, route: "#/policy/ops"}
 AL-14: {item: 管道狀態卡(唯讀), route: "#/policy/ops"}
-AU-01: {item: rule scheduler 狀態列+KPI, route: "#/policy/rulesets"}
-AU-02: {item: 排程時間軸, route: "#/policy/rulesets"}
+AU-01: {item: rule scheduler 狀態列+KPI, route: "#/policy/schedules"}
+AU-02: {item: 排程時間軸, route: "#/policy/schedules"}
 AU-03: {item: ruleset 瀏覽+詳情, route: "#/policy/rulesets"}
 AU-04: {item: rule 個別搜尋, route: "#/policy/rulesets"}
 AU-05: {item: ruleset 層排程 drawer, route: "#/policy/rulesets"}
 AU-06: {item: rule 層排程 drawer, route: "#/policy/rulesets"}
 AU-07: {item: one-time expire_at 語意, route: "#/policy/rulesets"}
-AU-08: {item: 排程清單+PCE 對帳狀態, route: "#/policy/rulesets"}
-AU-09: {item: 立即檢查, route: "#/policy/rulesets"}
-AU-10: {item: 執行紀錄+清除, route: "#/policy/rulesets"}
+AU-08: {item: 排程清單+PCE 對帳狀態, route: "#/policy/schedules"}
+AU-09: {item: 立即檢查, route: "#/policy/schedules"}
+AU-10: {item: 執行紀錄+清除, route: "#/policy/schedules"}
 AU-11: {item: 報表排程清單 CRUD, route: "#/reports/schedules"}
 AU-12: {item: 報表排程 toggle/run-now/history, route: "#/reports/schedules"}
 AU-13: {item: 背景 job 健康與歷史, route: "#/system/jobs"}
@@ -108,4 +108,4 @@ XC-11: {item: 說明側欄(篩選語法/隔離指南), route: "#/investigate/tra
 XC-12: {item: toast/popover/欄寬拖曳/skeleton, route: "#/investigate/traffic"}
 XC-13: {item: 頂欄使用者選單, route: "#/home"}
 XC-14: {item: URL hash 路由狀態同步, route: "#/home"}
-XC-15: {item: 建置中占位（收件匣／排程／設定-告警，3B 逐任務移除）, route: "#/investigate/inbox"}
+XC-15: {item: 建置中占位（收件匣／設定-告警，3B 逐任務移除）, route: "#/investigate/inbox"}

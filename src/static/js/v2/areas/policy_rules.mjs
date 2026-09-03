@@ -1,4 +1,4 @@
-// alerting.mjs — #/alerting/{rules,ops}. Anchors AL-01…AL-14 (design/v2/coverage.yaml).
+// policy_rules.mjs (was alerting.mjs) — #/policy/{alert-rules,ops}. Anchors AL-01…AL-14 (design/v3/coverage.yaml).
 //
 // PORT OF design/v2/mockup/js/areas/alerting.mjs against the live backend.
 // Deliberate deviations from the frozen mockup, recorded at their call sites:
@@ -42,7 +42,13 @@ const R_OPS = "#/policy/ops";
 
 // index.html:1266 (rules sub-tabs) — the product splits the same page into
 // "rules" and "actions"; the v2 area keeps that split as two routes.
-const SUB_ROUTES = [[R_RULES, "gui_tab_rules"], [R_OPS, "gui_actions"]];
+// v3 policy area sub-navigation (spec §1): alert rules, rulesets, schedules, ops.
+const SUB_ROUTES = [
+  [R_RULES, "gui_policy_tab_alert_rules"],
+  ["#/policy/rulesets", "gui_policy_tab_rulesets"],
+  ["#/policy/schedules", "gui_policy_tab_schedules"],
+  [R_OPS, "gui_actions"],
+];
 
 const RULE_SNAPS = ["rules", "event_catalog", "events_viewer"];
 const OPS_SNAPS = ["status", "alert_plugins", "rules"];
@@ -173,8 +179,8 @@ function areaHead(title, route) {
 }
 
 function areaTop(active) {
-  const head = areaHead(t("gui_nav_alerting"), active);
-  const nav = el("nav", { class: "subnav", "aria-label": t("gui_nav_alerting") });
+  const head = areaHead(t("gui_nav_policy"), active);
+  const nav = el("nav", { class: "subnav", "aria-label": t("gui_nav_policy") });
   SUB_ROUTES.forEach(function (pair) {
     const a = el("a", { href: pair[0], text: t(pair[1]) });
     if (pair[0] === active) a.setAttribute("aria-current", "page");

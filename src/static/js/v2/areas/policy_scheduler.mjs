@@ -1,4 +1,4 @@
-// automation.mjs — #/automation/{rules,reports,jobs}. Anchors AU-01…AU-13
+// policy_scheduler.mjs (was automation.mjs) — #/policy/{rulesets,schedules}, #/reports/schedules, #/system/jobs. Anchors AU-01…AU-13
 // (design/v2/coverage.yaml).
 //
 // PORT OF design/v2/mockup/js/areas/automation.mjs (2039 lines, frozen) against
@@ -97,14 +97,23 @@ import { palette } from "../components/palette.mjs";
 import { audit } from "../core/audit.mjs";
 
 const R_RULES = "#/policy/rulesets";
+const R_SCHEDULES = "#/policy/schedules";
+const R_ALERT_RULES = "#/policy/alert-rules";
+const R_OPS = "#/policy/ops";
 const R_REPORTS = "#/reports/schedules";
 const R_JOBS = "#/system/jobs";
 
-const SUB_ROUTES = [
-  [R_RULES, "gui_rs_tab"],
-  [R_REPORTS, "gui_tab_report_schedules"],
-  [R_JOBS, "gui_ov_job_health"],
+// v3 sub-navigation. The policy area (spec §1) lists its four pages; the
+// report-schedules and jobs mounts still live in this module until 3B Task 4
+// moves them, so they carry their own area's sub-nav meanwhile.
+const POLICY_SUB_ROUTES = [
+  [R_ALERT_RULES, "gui_policy_tab_alert_rules"],
+  [R_RULES, "gui_policy_tab_rulesets"],
+  [R_SCHEDULES, "gui_policy_tab_schedules"],
+  [R_OPS, "gui_actions"],
 ];
+const REPORTS_SUB_ROUTES = [["#/reports", "gui_nav_reports"], [R_REPORTS, "gui_tab_report_schedules"]];
+const SYSTEM_SUB_ROUTES = [[R_JOBS, "gui_ov_job_health"]];
 
 // The eager batch for #/policy/rulesets. rs_ruleset_detail is deliberately
 // NOT here — see deviation #2 above; it is fetched per selected row.
@@ -428,10 +437,10 @@ function areaHead(title, route) {
   );
 }
 
-function areaTop(active) {
-  const head = areaHead(t("gui_nav_automation"), active);
-  const nav = el("nav", { class: "subnav", "aria-label": t("gui_nav_automation") });
-  SUB_ROUTES.forEach(function (pair) {
+function areaTop(active, titleKey, routes) {
+  const head = areaHead(t(titleKey), active);
+  const nav = el("nav", { class: "subnav", "aria-label": t(titleKey) });
+  routes.forEach(function (pair) {
     const a = el("a", { href: pair[0], text: t(pair[1]) });
     if (pair[0] === active) a.setAttribute("aria-current", "page");
     nav.appendChild(a);
@@ -988,7 +997,11 @@ function lastRunCell(s) {
 
 // ── rules sub-view mount ───────────────────────────────────────────────────
 
-async function mountRules(root, ctx) {
+// view: "rulesets" (AU-03…AU-07, the browser + per-rule scheduling) or
+// "schedules" (AU-01/02/08/09/10, the schedule board). One state and one
+// loader, two routes — the data is shared, the pages are not (spec §1.1).
+async function mountRules(root, ctx, view) {
+  const route = view === "schedules" ? R_SCHEDULES : R_RULES;
   const handles = {};
   const state = {
     torn: false, tableHandles: {}, rsStatus: {}, rsLogHistory: [], schedules: [], rulesets: [],
@@ -1010,11 +1023,11 @@ async function mountRules(root, ctx) {
   drawer.registerAudit("au-sched-ruleset", function () { return handles.openRuleset ? handles.openRuleset() : null; });
   drawer.registerAudit("au-sched-rule", function () { return handles.openRule ? handles.openRule() : null; });
   modal.registerAudit("au-sched-delete", function () { return handles.confirmDelete ? handles.confirmDelete() : null; });
-  palette.registerFor(R_RULES, cmdSpec("au:check", t("gui_rs_run_check"), function () { if (handles.check) handles.check(); }));
+  palette.registerFor(R_SCHEDULES, cmdSpec("au:check", t("gui_rs_run_check"), function () { if (handles.check) handles.check(); }));
   palette.registerFor(R_RULES, cmdSpec("au:sched-rs", t("gui_rs_schedule_rs_btn"), function () { if (handles.openRuleset) handles.openRuleset(); }));
-  palette.registerFor(R_RULES, cmdSpec("au:clear-log", t("gui_rs_clear"), function () { if (handles.clearLog) handles.clearLog(); }));
+  palette.registerFor(R_SCHEDULES, cmdSpec("au:clear-log", t("gui_rs_clear"), function () { if (handles.clearLog) handles.clearLog(); }));
 
-  root.appendChild(areaTop(R_RULES));
+  root.appendChild(areaTop(route, "gui_nav_policy", POLICY_SUB_ROUTES));
   const board = el("div", { class: "board" });
   root.appendChild(board);
 
@@ -1074,10 +1087,9 @@ async function mountRules(root, ctx) {
     const row2 = el("div", { class: "brow" });
     const row3 = el("div", { class: "brow" });
     const row4 = el("div", { class: "brow c2" });
-    board.appendChild(row1);
-    board.appendChild(row2);
-    board.appendChild(row3);
-    board.appendChild(row4);
+    if (view === "schedules") board.appendChild(row1);
+    if (view !== "schedules") board.appendChild(row2);
+    if (view === "schedules") { board.appendChild(row3); board.appendChild(row4); }
 
     row1.appendChild(rulesStatus(state.rsStatus, state.rsLogHistory, state.schedules));
     row1.appendChild(timelinePanel(state.rsStatus, state.schedules));
@@ -1279,6 +1291,14 @@ async function mountRules(root, ctx) {
     }
 
     handles.openRuleset = openRulesetDrawer;
+    // Deep link target (#/policy/rulesets?rs=&rule=<href>): open the schedule
+    // drawer for one rule of the selected ruleset without a click.
+    handles.openRuleByHref = function (href) {
+      const rules = (state.detail && state.detail.rules) || [];
+      let hit = null;
+      rules.forEach(function (r) { if (r.href === href) hit = r; });
+      return hit ? openRuleDrawer(hit) : null;
+    };
     handles.openRule = function () {
       const rules = (state.detail && state.detail.rules) || [];
       let pick = rules[0] || null;
@@ -1512,7 +1532,19 @@ async function mountRules(root, ctx) {
       state.size = (d.rs_rulesets && d.rs_rulesets.size) || 50;
       renderBoard();
     });
+
+  // #/policy/rulesets?rs=<id>&rule=<href> — the investigate hub's "schedule a
+  // change to this rule" action lands here with both parts (spec §4b).
+  const rsQ = view !== "schedules" ? ctx.query.get("rs") : null;
+  if (rsQ && !ctx.stale() && !state.torn) {
+    await selectRuleset(rsQ);
+    const ruleQ = ctx.query.get("rule");
+    if (ruleQ && !ctx.stale() && !state.torn && handles.openRuleByHref) handles.openRuleByHref(ruleQ);
+  }
 }
+
+function mountRulesets(root, ctx) { return mountRules(root, ctx, "rulesets"); }
+function mountSchedules(root, ctx) { return mountRules(root, ctx, "schedules"); }
 
 // ═══════════════════════════════════════════════════ reports sub-view ═══════
 
@@ -1721,7 +1753,7 @@ async function mountReports(root, ctx) {
   modal.registerAudit("au-report-delete", function () { return handles.confirmDelete ? handles.confirmDelete() : null; });
   palette.registerFor(R_REPORTS, cmdSpec("au:add-sched", t("gui_sched_add"), function () { if (handles.open) handles.open(null); }));
 
-  root.appendChild(areaTop(R_REPORTS));
+  root.appendChild(areaTop(R_REPORTS, "gui_nav_reports", REPORTS_SUB_ROUTES));
   const board = el("div", { class: "board" });
   root.appendChild(board);
 
@@ -2017,7 +2049,7 @@ async function mountJobs(root, ctx) {
   installTeardown(state);
   palette.registerFor(R_JOBS, cmdSpec("au:jobs-bad", t("gui_au_job_only_bad"), function () { if (handles.onlyBad) handles.onlyBad(); }));
 
-  root.appendChild(areaTop(R_JOBS));
+  root.appendChild(areaTop(R_JOBS, "gui_nav_system", SYSTEM_SUB_ROUTES));
   const board = el("div", { class: "board" });
   root.appendChild(board);
 
@@ -2164,4 +2196,4 @@ async function mountJobs(root, ctx) {
     });
 }
 
-export { mountRules as mountAutoRules, mountReports as mountAutoReports, mountJobs as mountAutoJobs };
+export { mountRulesets, mountSchedules, mountReports as mountAutoReports, mountJobs as mountAutoJobs };

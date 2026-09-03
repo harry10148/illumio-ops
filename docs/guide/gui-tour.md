@@ -11,8 +11,8 @@ verified_against:
   - src/static/js/v2/core/router.mjs
   - src/static/js/v2/areas/overview.mjs
   - src/static/js/v2/areas/investigate.mjs
-  - src/static/js/v2/areas/alerting.mjs
-  - src/static/js/v2/areas/automation.mjs
+  - src/static/js/v2/areas/policy_rules.mjs
+  - src/static/js/v2/areas/policy_scheduler.mjs
   - src/static/js/v2/areas/reports.mjs
   - src/static/js/v2/areas/system.mjs
   - src/static/js/v2/areas/login.mjs
