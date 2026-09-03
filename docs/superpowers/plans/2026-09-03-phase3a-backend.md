@@ -97,11 +97,11 @@ Severity 對照（store 不決定，Task 2 的 hook 決定，這裡只驗值）�
 
 `AlertStore.__init__`：`sqlite3.connect(path, timeout=5.0)`＋`PRAGMA journal_mode=WAL`——CLI 選單是另一個行程，monitor＋GUI 同行程，跨行程鎖等待要有上限（本專案跨行程鎖曾實測過，memory `review2-unreviewed-subsystems`）。
 
-- [ ] **Step 1 — 紅**：`tests/test_alert_store.py`：(a) 新檔開啟後 `os.stat(path).st_mode & 0o777 == 0o600` 且 `PRAGMA user_version` 為 1；(b) insert→get 往返 payload/dispatch 相等；(c) `list(status="new")` 分頁與 total；(d) `set_status` 合法／非法／不存在；(e) `prune(days=30)` 只刪舊列；(f) `type` 非法 raise。用 `tmp_path`。
-- [ ] **Step 2 — 紅**：`tests/test_alert_store.py::test_alert_items_carry_rule_identity`：以既有 `tests/test_analyzer_with_mock_api.py`／`tests/test_analyzer.py` 的最小 Analyzer 夾具觸發一條 traffic 規則與一條 event 規則（照那兩檔既有做法建 rule dict，必含 `id`），斷言 `reporter.traffic_alerts[0]["rule_id"] == rule["id"]`、`["rule_type"] == "traffic"`；event 同。
-- [ ] **Step 3 — 綠**：實作 store 與 analyzer 三處。
-- [ ] **Step 4 — 驗證**：`timeout 600 python3 -m pytest tests/test_alert_store.py tests/test_analyzer.py tests/test_analyzer_with_mock_api.py tests/test_analyzer_decomposition.py tests/test_reporter_body_hardening.py tests/test_reporter_severity_badge.py -q`；再 `ls tests | grep -i mail` 找到 mail 樣本測試一併跑。
-- [ ] **Step 5 — Commit**：`feat(alerts): persist-ready alert store and rule identity on alert items`
+- [x] **Step 1 — 紅**：`tests/test_alert_store.py`：(a) 新檔開啟後 `os.stat(path).st_mode & 0o777 == 0o600` 且 `PRAGMA user_version` 為 1；(b) insert→get 往返 payload/dispatch 相等；(c) `list(status="new")` 分頁與 total；(d) `set_status` 合法／非法／不存在；(e) `prune(days=30)` 只刪舊列；(f) `type` 非法 raise。用 `tmp_path`。
+- [x] **Step 2 — 紅**：`tests/test_alert_store.py::test_alert_items_carry_rule_identity`：以既有 `tests/test_analyzer_with_mock_api.py`／`tests/test_analyzer.py` 的最小 Analyzer 夾具觸發一條 traffic 規則與一條 event 規則（照那兩檔既有做法建 rule dict，必含 `id`），斷言 `reporter.traffic_alerts[0]["rule_id"] == rule["id"]`、`["rule_type"] == "traffic"`；event 同。
+- [x] **Step 3 — 綠**：實作 store 與 analyzer 三處。
+- [x] **Step 4 — 驗證**：`timeout 600 python3 -m pytest tests/test_alert_store.py tests/test_analyzer.py tests/test_analyzer_with_mock_api.py tests/test_analyzer_decomposition.py tests/test_reporter_body_hardening.py tests/test_reporter_severity_badge.py -q`；再 `ls tests | grep -i mail` 找到 mail 樣本測試一併跑。
+- [x] **Step 5 — Commit**：`feat(alerts): persist-ready alert store and rule identity on alert items`
 
 ---
 
@@ -130,10 +130,10 @@ class Reporter:
 - DLQ：`_push_alert_dlq(self, buckets, attempts, first_failed_at)` 簽名不改，但 entry 多一鍵 `"alert_ids": {"health": [...], "event": [...], "traffic": [...], "metric": [...]}`（與 `buckets` 各清單同序）；`:880-893` 合併重播時同步把 `entry.get("alert_ids", {})` 接到 `self._alert_ids`（缺鍵＝舊格式，補 `None`）。
 - retention：**不能**掛在 `run_cache_retention`——它只在 `pce_cache.enabled` 時排程（`src/scheduler/__init__.py:189`），cache 關閉的部署告警會永遠不清。改為 `src/scheduler/jobs.py` 新增 `run_alerts_retention(cm)`：`AlertStore().prune(days=cm.models.pce_cache.archive_retention_days)`、log 筆數；在 `src/scheduler/__init__.py` **無條件**排程 `_instrument("alerts_retention", run_alerts_retention, 86400)`，`_IT(hours=24)`，id `alerts_retention`（`next_run_time` 比照該檔其他 24h job 的「啟動後先跑一次」寫法）。job 健康表會多一列，`docs/handover/architecture.md:193` 的 14 個 job 數字在 Task 6 更新。
 
-- [ ] **Step 1 — 紅**：`tests/test_alert_persistence.py`：(a) 用 `Reporter(cm)` 塞一則 traffic、一則 event、一則 health bucket，monkeypatch plugins 讓一個管道成功；`send_alerts()` 後 store 有 3 列，`dispatch_json` 含該管道 `status=="success"`，`fired_at` 是 UTC 格式；(b) `force_test=True` 不新增列；(c) **重播不重複**：讓全部管道失敗 → DLQ push；把 `state["alert_dlq"]` 讀回、再建一個新 Reporter 觸發 `send_alerts()`（會 pop DLQ）並讓管道成功 → 列數仍 3、原列 `dispatch_json` 更新為 success；(d) store 拋例外時 `send_alerts` 仍回傳 results 且不 raise；(e) `run_alerts_retention(cm)` 呼叫 `prune(days=cfg.archive_retention_days)`（monkeypatch `AlertStore`），且 `pce_cache.enabled=False` 時 scheduler 仍註冊 `alerts_retention`（照 `tests/test_scheduler*.py` 既有的 job 註冊斷言寫法；檔名以 `ls tests | grep scheduler` 為準）。state 檔用 `monkeypatch.setattr("src.reporter.STATE_FILE", tmp)`（reporter 有自己的 STATE_FILE 常數，`src/reporter.py:23-25`）。
-- [ ] **Step 2 — 綠**：實作。
-- [ ] **Step 3 — 驗證**：`timeout 600 python3 -m pytest tests/test_alert_persistence.py tests/test_alert_dlq.py tests/test_reporter_body_hardening.py tests/test_reporter_tz.py tests/test_pce_cache_retention.py tests/test_analyzer_review2_gates.py tests/test_cli_flows_parity.py tests/test_log_layer_english.py-q`（後面那幾檔是吞錯 AST 守門；若它們對新的 `except` 亮紅，依守門要求登記理由，不放寬守門）。
-- [ ] **Step 4 — Commit**：`feat(alerts): persist dispatched alerts and update them on DLQ replay`
+- [x] **Step 1 — 紅**：`tests/test_alert_persistence.py`：(a) 用 `Reporter(cm)` 塞一則 traffic、一則 event、一則 health bucket，monkeypatch plugins 讓一個管道成功；`send_alerts()` 後 store 有 3 列，`dispatch_json` 含該管道 `status=="success"`，`fired_at` 是 UTC 格式；(b) `force_test=True` 不新增列；(c) **重播不重複**：讓全部管道失敗 → DLQ push；把 `state["alert_dlq"]` 讀回、再建一個新 Reporter 觸發 `send_alerts()`（會 pop DLQ）並讓管道成功 → 列數仍 3、原列 `dispatch_json` 更新為 success；(d) store 拋例外時 `send_alerts` 仍回傳 results 且不 raise；(e) `run_alerts_retention(cm)` 呼叫 `prune(days=cfg.archive_retention_days)`（monkeypatch `AlertStore`），且 `pce_cache.enabled=False` 時 scheduler 仍註冊 `alerts_retention`（照 `tests/test_scheduler*.py` 既有的 job 註冊斷言寫法；檔名以 `ls tests | grep scheduler` 為準）。state 檔用 `monkeypatch.setattr("src.reporter.STATE_FILE", tmp)`（reporter 有自己的 STATE_FILE 常數，`src/reporter.py:23-25`）。
+- [x] **Step 2 — 綠**：實作。
+- [x] **Step 3 — 驗證**：`timeout 600 python3 -m pytest tests/test_alert_persistence.py tests/test_alert_dlq.py tests/test_reporter_body_hardening.py tests/test_reporter_tz.py tests/test_pce_cache_retention.py tests/test_analyzer_review2_gates.py tests/test_cli_flows_parity.py tests/test_log_layer_english.py-q`（後面那幾檔是吞錯 AST 守門；若它們對新的 `except` 亮紅，依守門要求登記理由，不放寬守門）。
+- [x] **Step 4 — Commit**：`feat(alerts): persist dispatched alerts and update them on DLQ replay`
 
 ---
 
@@ -162,10 +162,10 @@ GET   /api/alerts/<int:id>/traffic_query
 - `page_size` 上限 200；`since` 非 ISO → 400。
 - 規則查找：`cm.config["rules"]` 內 `str(r.get("id")) == rule_id`（id 可能是整數，store 存字串）。
 
-- [ ] **Step 1 — 紅**：`tests/test_gui_alerts_api.py`：照 `tests/test_gui_rules.py:32-41` 的 login＋`_csrf` 夾具；用 `monkeypatch.setattr("src.gui.routes.alerts.AlertStore", lambda: AlertStore(tmp_path/"a.sqlite"))` 隔離。案例：清單分頁與 counts；type/status 篩選；詳情 404；PATCH 合法／非法／缺 CSRF 回 400 `csrf_error`；`traffic_query` 三種回應（traffic 規則、event 規則→400、rule_id 缺→404）。
-- [ ] **Step 2 — 綠**：實作 blueprint、註冊。
-- [ ] **Step 3 — 驗證**：`timeout 600 python3 -m pytest tests/test_gui_alerts_api.py tests/test_gui_rules.py tests/test_gui_routes_robustness.py tests/test_gui_routes_lang_param.py -q`；`python3 scripts/audit_i18n_usage.py`（新錯誤文案若用 `t()` 必須入庫 en/zh）。
-- [ ] **Step 4 — Commit**：`feat(gui): alerts inbox API with status changes and traffic-query rebuild`
+- [x] **Step 1 — 紅**：`tests/test_gui_alerts_api.py`：照 `tests/test_gui_rules.py:32-41` 的 login＋`_csrf` 夾具；用 `monkeypatch.setattr("src.gui.routes.alerts.AlertStore", lambda: AlertStore(tmp_path/"a.sqlite"))` 隔離。案例：清單分頁與 counts；type/status 篩選；詳情 404；PATCH 合法／非法／缺 CSRF 回 400 `csrf_error`；`traffic_query` 三種回應（traffic 規則、event 規則→400、rule_id 缺→404）。
+- [x] **Step 2 — 綠**：實作 blueprint、註冊。
+- [x] **Step 3 — 驗證**：`timeout 600 python3 -m pytest tests/test_gui_alerts_api.py tests/test_gui_rules.py tests/test_gui_routes_robustness.py tests/test_gui_routes_lang_param.py -q`；`python3 scripts/audit_i18n_usage.py`（新錯誤文案若用 `t()` 必須入庫 en/zh）。
+- [x] **Step 4 — Commit**：`feat(gui): alerts inbox API with status changes and traffic-query rebuild`
 
 ---
 
@@ -198,11 +198,11 @@ def rule_search(self, body: dict, *, pversion: str = "active", timeout: int = 30
 3. 結論寫進腳本頂端 docstring 與 fixture：**哪一組欄位名對應「來源／目的」**、回應中 rule 與 `rule_set` 的鍵（href、name、enabled、`provision_state`？）、deny 的鍵名。遮罩：org id 換 `1`、href uuid 保留（非機密）、hostname/IP 換假值。
 4. 不確定就停下來回報，不猜。
 
-- [ ] **Step 1 — 探測**：`scp tools/probe_rule_search.py illumio-ops-test:/tmp/ && ssh illumio-ops-test 'cd /root/illumio-ops && sudo -u illumio-ops PYTHONNOUSERSITE=1 venv/bin/python /tmp/probe_rule_search.py'`，把三種回應存成 fixture（遮罩後）。
-- [ ] **Step 2 — 紅**：`tests/test_api_client_rule_search.py`：以 `responses`／既有 `_request` monkeypatch 慣例（看 `tests/test_api_client*.py` 怎麼假造 `_request`）驗證 URL 為 `/api/v2/orgs/{org}/sec_policy/active/rule_search`、method POST、非 2xx 時回傳解析後的錯誤本文而非 None。
-- [ ] **Step 3 — 綠**：實作。
-- [ ] **Step 4 — 驗證**：`timeout 600 python3 -m pytest tests/test_api_client_rule_search.py tests/test_api_client.py tests/test_api_client_request_contract.py tests/test_api_client_error_signals.py -q`；`mypy --follow-imports=silent src/api_client.py src/analyzer.py src/reporter.py`。
-- [ ] **Step 5 — Commit**：`feat(api): PCE rule_search call and recorded lab fixtures`（fixture 與探測結論一起進）
+- [x] **Step 1 — 探測**：`scp tools/probe_rule_search.py illumio-ops-test:/tmp/ && ssh illumio-ops-test 'cd /root/illumio-ops && sudo -u illumio-ops PYTHONNOUSERSITE=1 venv/bin/python /tmp/probe_rule_search.py'`，把三種回應存成 fixture（遮罩後）。
+- [x] **Step 2 — 紅**：`tests/test_api_client_rule_search.py`：以 `responses`／既有 `_request` monkeypatch 慣例（看 `tests/test_api_client*.py` 怎麼假造 `_request`）驗證 URL 為 `/api/v2/orgs/{org}/sec_policy/active/rule_search`、method POST、非 2xx 時回傳解析後的錯誤本文而非 None。
+- [x] **Step 3 — 綠**：實作。
+- [x] **Step 4 — 驗證**：`timeout 600 python3 -m pytest tests/test_api_client_rule_search.py tests/test_api_client.py tests/test_api_client_request_contract.py tests/test_api_client_error_signals.py -q`；`mypy --follow-imports=silent src/api_client.py src/analyzer.py src/reporter.py`。
+- [x] **Step 5 — Commit**：`feat(api): PCE rule_search call and recorded lab fixtures`（fixture 與探測結論一起進）
 
 ---
 
@@ -254,11 +254,11 @@ def explain_flow(api, *, src: dict, dst: dict, port: int, proto: int | str,
 - 60 秒結果快取：`(src.href|ip, dst.href|ip, port, proto, basis)` → 結果，模組層 dict＋timestamp，上限 256 筆。
 - 路由 `POST /api/policy/explain`，body `{"src": {"href","ip"}, "dst": {"href","ip"}, "port": int, "proto": str|int, "basis": "active"|"draft"}`；缺 port/proto → 400；`basis` 非法 → 400；`with ApiClient(cm) as api:`；成功 `{"ok": true, **result}`；PCE 錯誤 → 502 `{"ok": false, "code": "pce_error", ...result}`；例外 `_err_with_log("policy_explain", exc, lang=lang)`。
 
-- [ ] **Step 1 — 紅**：`tests/test_policy_explain.py`：用 Task 4 fixture 假造 `api.rule_search`、固定的 `fetch_managed_workloads`／`get_ip_lists` 回傳（照 `design/v2/snapshots` 的 workload 形狀：`href` 與 `interfaces[].address`）。案例：href 直接用；IP→workload；IP→iplist（cidr 與 range）；兩側 unresolved 不打 PCE；PCE 4xx 帶回 `pce_error`；proto 名稱→數字；快取命中不重打（計數 mock 呼叫次數）；allow_hit fixture 整形成 RuleHit 的每個鍵都有值。
-- [ ] **Step 2 — 紅**：`tests/test_gui_policy_explain.py`：登入＋CSRF；400 缺欄位；200 正常（monkeypatch `explain_flow`）；502 PCE 錯誤。
-- [ ] **Step 3 — 綠**：實作兩檔＋註冊。
-- [ ] **Step 4 — 驗證**：`timeout 600 python3 -m pytest tests/test_policy_explain.py tests/test_gui_policy_explain.py tests/test_filter_object_cache.py -q`；`python3 scripts/audit_i18n_usage.py`。
-- [ ] **Step 5 — Commit**：`feat(policy): explain which PCE rules cover a flow`
+- [x] **Step 1 — 紅**：`tests/test_policy_explain.py`：用 Task 4 fixture 假造 `api.rule_search`、固定的 `fetch_managed_workloads`／`get_ip_lists` 回傳（照 `design/v2/snapshots` 的 workload 形狀：`href` 與 `interfaces[].address`）。案例：href 直接用；IP→workload；IP→iplist（cidr 與 range）；兩側 unresolved 不打 PCE；PCE 4xx 帶回 `pce_error`；proto 名稱→數字；快取命中不重打（計數 mock 呼叫次數）；allow_hit fixture 整形成 RuleHit 的每個鍵都有值。
+- [x] **Step 2 — 紅**：`tests/test_gui_policy_explain.py`：登入＋CSRF；400 缺欄位；200 正常（monkeypatch `explain_flow`）；502 PCE 錯誤。
+- [x] **Step 3 — 綠**：實作兩檔＋註冊。
+- [x] **Step 4 — 驗證**：`timeout 600 python3 -m pytest tests/test_policy_explain.py tests/test_gui_policy_explain.py tests/test_filter_object_cache.py -q`；`python3 scripts/audit_i18n_usage.py`。
+- [x] **Step 5 — Commit**：`feat(policy): explain which PCE rules cover a flow`
 
 ---
 
@@ -276,12 +276,18 @@ def explain_flow(api, *, src: dict, dst: dict, port: int, proto: int | str,
 5. journal 無 traceback：`journalctl -u illumio-ops --since "15 min ago" | grep -i traceback`。
 6. 清理：只刪測試建立的東西（PATCH 已還原；alerts.sqlite **保留**——它是產品資料）。
 
-- [ ] **Step 1**：寫文件與 CHANGELOG；`python3 scripts/check_doc_links.py`、`timeout 300 python3 -m pytest tests/test_docs_check.py -q`。
-- [ ] **Step 2**：全套閘門（路線圖清單）。
-- [ ] **Step 3 — Commit**：`docs(alerts): document the alert record API and policy explain`；push；`gh run watch`。
-- [ ] **Step 4**：真機驗證 1–6，結果寫 `tmp/phase3a-verification/report.md`，交使用者。
+- [x] **Step 1**：寫文件與 CHANGELOG；`python3 scripts/check_doc_links.py`、`timeout 300 python3 -m pytest tests/test_docs_check.py -q`。
+- [x] **Step 2**：全套閘門（路線圖清單）。
+- [x] **Step 3 — Commit**：`docs(alerts): document the alert record API and policy explain`；push；`gh run watch`。
+- [x] **Step 4**：真機驗證 1–6，結果寫 `tmp/phase3a-verification/report.md`，交使用者。
 
 ---
+
+## 執行紀錄（2026-09-03）
+
+- 全部任務完成，main `261768ad`＋`aa81f477`；CI 綠；測試機 `illumio-ops-test` 真機驗證 OK（報告 `tmp/phase3a-verification/report.md`，gitignored）。
+- 與計畫的差異：Task 4 lab 沒有 allow rule，先跑 acceptance 模式再經使用者同意建臨時 draft ruleset 探測（已刪）；Task 6 HTTP 驗證改以模組層＋in-process 路由測試替代（Lab vault 無 GUI 帳密項目）；真機發現 `Any (0.0.0.0/0)` ip_list 讓所有 IP 都解析到它，追加「最窄 ip_list 優先」（`aa81f477`）；`archive_retention_days=0` 改為不清（原會刪光）。
+- 操作規則（真機）：CLI 一律以 service 帳號執行，否則 root 會重建 `alerts.sqlite-wal` 造成服務寫入失敗只留 ERROR。
 
 ## 自審紀錄（撰寫時）
 
