@@ -1334,7 +1334,7 @@ class Analyzer:
                     # stringified like _check_cooldown's key since older configs
                     # carry integer ids. These two keys also reach the webhook
                     # payload, which serialises the bucket wholesale.
-                    "rule_id": str(rule["id"]),
+                    "rule_id": str(rule["id"]) if rule.get("id") is not None else None,
                     "rule_type": rule.get("type", "system"),
                     "status": str(status),
                     "details": details,

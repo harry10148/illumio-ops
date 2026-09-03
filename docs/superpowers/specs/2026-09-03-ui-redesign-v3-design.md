@@ -141,7 +141,7 @@ v2「不動後端」在 v3 解除；以下三項是產品程式碼變更，各�
 - 儲存：新 SQLite `logs/alerts.sqlite`（`state.json` 為單一 JSON 不宜無限成長；pce_cache DB 有自己的 `user_version` 升級流程，不混入）。檔案由 service 帳號建立，權限 0600；安裝／升級腳本不預建。
 - 欄位：`id, fired_at, type(event|traffic|bandwidth|system), rule_id, rule_name, severity, summary, criteria, payload_json, dispatch_json, status(new|ack|done), status_by, status_at`。（2026-09-03 計畫撰寫時更正：原寫 `rule_index`，但 index 只在讀取時計算、不可持久化；rules 有穩定 uuid `id`。看門狗類 health 告警無規則物件，`rule_id` 為 NULL。）
 - 端點：`GET /api/alerts?status&type&since&page`、`GET /api/alerts/<id>`、`GET /api/alerts/<id>/traffic_query`（§4b 用；由該告警的規則重建 FilterBar query spec）、`PATCH /api/alerts/<id>` `{status}`（CSRF 同既有規則）。
-- 保留：沿用 archive retention 天數，由同一個 retention job 清理。
+- 保留：沿用 `archive_retention_days`（0＝永久保留），由**獨立的每日 job `alerts_retention`** 清理（3A 實作更正：cache retention job 只在 `pce_cache.enabled` 時存在，不能掛在它下面）。
 
 ### 4b. 路由帶狀態
 
@@ -151,9 +151,9 @@ v2「不動後端」在 v3 解除；以下三項是產品程式碼變更，各�
 
 ### 4c. flow → rule 解釋
 
-- 端點：`POST /api/policy/explain` `{src: {workload_href|ip}, dst: {workload_href|ip}, port, proto, basis: "active"|"draft"}` → `{allow: [...], deny: [...], override_deny: [...], basis, evaluated_at, source: "pce_rule_search"|"local_resolver"}`；每個 rule 項含 ruleset href／name／provision_state／enabled、rule href／index、src actors、dst actors、service、scope。
+- 端點：`POST /api/policy/explain` `{src: {href|ip}, dst: {href|ip}, port, proto(名稱或號碼), basis: "active"|"draft"}` → `{allow: [...], deny: [...], override_deny: [...], counts, basis, evaluated_at, source: "pce_rule_search"|"none", src/dst: {href, kind, ip}, partial?, pce_status, pce_error}`；每個 rule 項含 `ruleset_href`／`ruleset_name`／`ruleset_enabled`、`rule_href`／`rule_enabled`、`consumers`／`providers`（顯示字串）、`ingress_services`、`update_type`、`description`。（2026-09-03 3A 實作更正：PCE Rule Search 回應**沒有** `provision_state`，改用 `update_type`；兩端都解析不到時 `source="none"` 不打 PCE，一端解析不到時只送另一端並標 `partial: true`；`local_resolver` 純本地展開**未實作**，見下一條。）
 - 主路徑：IP → cache 內 workload／iplist href，再呼叫 PCE **Rule Search**（`POST /api/v2/orgs/:org/sec_policy/:pversion/rule_search`，Public Experimental；`rule_types` 白名單 `sec_rules, deny_rules, override_deny_rules`，版本差異靠白名單擋）。
-- 備援：對不到 href 的純 IP（未管理端點）走本地 `policy_resolver` 的 iplist CIDR 比對（沿用 `_cap_sides` 上限，標記 truncated）。
+- 備援：對不到 href 的純 IP（未管理端點）先在本地以 iplist 的 `ip_ranges`（CIDR／範圍／exclusion）找出包含它的 ip_list href，再以 `ip_list` actor 問 PCE（lab 實測 Rule Search 接受 ip_list／kubernetes_workload actor）。純本地規則展開（`_cap_sides`／`truncated`）**未實作**，列為 follow-up；IP-only 的 K8s／container 端點解析亦列 follow-up（`/workloads?managed=true` 不含它們）。
 - 快取：同一 (src,dst,port,proto,basis) 60 秒內不重打 PCE；rule_search 併發上限依 PCE 文件 12。
 - 語意：`allow` 空＝「沒有 allow rule 涵蓋」（解釋 potentially blocked／blocked）；面板另列「最接近的 ruleset」（同 dst actor 的 allow rule，差異欄標出服務／來源不符）。
 
