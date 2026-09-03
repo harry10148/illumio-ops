@@ -1330,6 +1330,12 @@ class Analyzer:
                 self.reporter.add_health_alert({
                     "time": datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%d %H:%M:%S'),
                     "rule": rule["name"],
+                    # Stable identity for the persisted alert record (v3 inbox);
+                    # stringified like _check_cooldown's key since older configs
+                    # carry integer ids. These two keys also reach the webhook
+                    # payload, which serialises the bucket wholesale.
+                    "rule_id": str(rule["id"]),
+                    "rule_type": rule.get("type", "system"),
                     "status": str(status),
                     "details": details,
                 })
@@ -1638,6 +1644,8 @@ class Analyzer:
                         alert_data = {
                             "time": first.get("timestamp", "N/A"),
                             "rule": rule["name"],
+                            "rule_id": str(rule["id"]),
+                            "rule_type": "event",
                             "desc": rule.get("desc"),
                             "severity": first_norm.get("severity") or first.get("severity", "info"),
                             "count": count_val,
@@ -2307,6 +2315,8 @@ class Analyzer:
 
                 alert_data = {
                     "rule": rule["name"],
+                    "rule_id": str(rule["id"]),
+                    "rule_type": rule["type"],
                     "count": f"{val:.2f}" if rule['type'] != 'traffic' else str(int(val)),
                     "criteria": self._build_criteria_str(rule, bound=is_bound),
                     "details": details,
