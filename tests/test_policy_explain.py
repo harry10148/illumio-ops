@@ -89,6 +89,24 @@ def test_resolve_ip_to_iplist_cidr_and_range_with_exclusion():
     assert pe.resolve_actor(api, href=None, ip="8.8.8.8").kind == "unresolved"
 
 
+def test_resolve_picks_the_narrowest_iplist_over_any():
+    """Lab fact (2026-09-03): every PCE has an 'Any (0.0.0.0/0)' ip_list, so a
+    first-match lookup would answer Any for every address."""
+    api = _api()
+    api.get_ip_lists.return_value = [
+        {"href": "/orgs/1/sec_policy/active/ip_lists/any", "name": "Any (0.0.0.0/0)",
+         "ip_ranges": [{"from_ip": "0.0.0.0/0"}]},
+        {"href": "/orgs/1/sec_policy/active/ip_lists/corp", "name": "corp",
+         "ip_ranges": [{"from_ip": "192.168.0.0/16"}]},
+        {"href": "/orgs/1/sec_policy/active/ip_lists/site", "name": "site",
+         "ip_ranges": [{"from_ip": "192.168.5.0", "to_ip": "192.168.5.255"}]},
+    ]
+    assert pe.resolve_actor(api, href=None, ip="192.168.5.5").href.endswith("/site")
+    assert pe.resolve_actor(api, href=None, ip="192.168.7.7").href.endswith("/corp")
+    a = pe.resolve_actor(api, href=None, ip="8.8.8.8")
+    assert a.kind == "ip_list" and a.href.endswith("/any")
+
+
 def test_resolve_unparsable_ip_is_unresolved():
     assert pe.resolve_actor(_api(), href=None, ip="not-an-ip").kind == "unresolved"
 

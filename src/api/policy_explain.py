@@ -117,20 +117,40 @@ def _ip_in_range(ip: ipaddress._BaseAddress, rng: dict) -> bool:
         return False
 
 
+def _range_size(rng: dict) -> int:
+    frm, to = rng.get("from_ip"), rng.get("to_ip")
+    try:
+        if to:
+            return int(ipaddress.ip_address(to)) - int(ipaddress.ip_address(frm)) + 1
+        if "/" in str(frm):
+            return ipaddress.ip_network(frm, strict=False).num_addresses
+        return 1
+    except ValueError:
+        return 0
+
+
 def iplist_href_for_ip(ip_lists: list[dict], ip_text: str) -> Optional[str]:
-    """First ip_list whose included ranges contain the IP and whose excluded
-    ranges do not. Returns None for fqdn-only lists and unparsable input."""
+    """The MOST SPECIFIC ip_list whose included ranges contain the IP and whose
+    excluded ranges do not. Every PCE ships an "Any (0.0.0.0/0)" list that
+    contains every address; picking the narrowest match keeps a corporate
+    /16 list ahead of it, while a public IP still lands on Any — which is the
+    honest answer (only rules whose actor includes Any cover it). Returns
+    None for fqdn-only lists and unparsable input."""
     try:
         ip = ipaddress.ip_address(ip_text)
     except ValueError:
         return None
+    best: Optional[tuple[int, str]] = None
     for ipl in ip_lists:
         ranges = ipl.get("ip_ranges") or []
-        included = any(_ip_in_range(ip, r) for r in ranges if not r.get("exclusion"))
+        included = [r for r in ranges if not r.get("exclusion") and _ip_in_range(ip, r)]
         excluded = any(_ip_in_range(ip, r) for r in ranges if r.get("exclusion"))
-        if included and not excluded and ipl.get("href"):
-            return ipl["href"]
-    return None
+        if not included or excluded or not ipl.get("href"):
+            continue
+        size = min(_range_size(r) for r in included)
+        if best is None or size < best[0]:
+            best = (size, ipl["href"])
+    return best[1] if best else None
 
 
 def resolve_actor(api, *, href: Optional[str], ip: Optional[str]) -> Actor:
