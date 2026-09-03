@@ -116,17 +116,34 @@ def test_pure_heartbeat_tick_skips_state_rewrite(tmp_path, monkeypatch):
 
 
 def test_heartbeat_persists_after_gap(tmp_path, monkeypatch):
-    """gap 歸零時心跳照舊落盤（節流只是延後、不是不寫）。"""
+    """gap 歸零時心跳照舊落盤（節流只是延後、不是不寫）。
+
+    Counts writes rather than comparing st_mtime_ns: two checks in a row can
+    land inside the same filesystem timestamp tick, which made this fail on CI
+    while passing locally 20 times out of 20. The claim is "it wrote again",
+    and the write is what to assert on.
+    """
+    import src.state_store as state_store
     import src.rule_scheduler as rule_scheduler
     state_file = tmp_path / "state.json"
     monkeypatch.setattr(rule_scheduler, "_resolve_rule_state_file",
                         lambda: str(state_file))
     monkeypatch.setattr(rule_scheduler, "_CHECK_PERSIST_GAP_S", 0)
+
+    writes = []
+    real_update = state_store.update_state_file
+
+    def _counting_update(path, mutate, *a, **k):
+        writes.append(path)
+        return real_update(path, mutate, *a, **k)
+
+    monkeypatch.setattr(state_store, "update_state_file", _counting_update)
+
     engine = _noop_engine(tmp_path)
     engine.check(silent=True, tz_str="UTC")
-    first_mtime = state_file.stat().st_mtime_ns
+    assert len(writes) == 1
     engine.check(silent=True, tz_str="UTC")
-    assert state_file.stat().st_mtime_ns != first_mtime
+    assert len(writes) == 2, "a zeroed gap must not suppress the second write"
 
 
 def test_check_toggle_success_records_ok(tmp_path, monkeypatch):
