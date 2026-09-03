@@ -237,3 +237,20 @@ def cli_runner():
         return CliRunner(mix_stderr=False)
     except TypeError:
         return CliRunner()
+
+
+@pytest.fixture(autouse=True)
+def _isolate_alert_store(monkeypatch, tmp_path):
+    """Never let a test write the real ``logs/alerts.sqlite``.
+
+    Reporter.send_alerts persists every dispatched alert through
+    src.alerts.store.AlertStore, whose path is resolved at call time via
+    default_alerts_db_path(); tests that drive a real Reporter (the DLQ suite,
+    the in-process GUI e2e harness) would otherwise leave junk records in the
+    developer's product database (311 rows found on 2026-09-04).
+    tests/test_alert_store_isolation.py proves this fixture is in force.
+    """
+    import src.alerts.store as _store
+    path = str(tmp_path / "alerts.sqlite")
+    monkeypatch.setattr(_store, "default_alerts_db_path", lambda: path)
+    yield path

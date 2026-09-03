@@ -179,7 +179,7 @@ v2「不動後端」在 v3 解除；以下三項是產品程式碼變更，各�
 | 主題 | 亮色為原生；暗色**保留但降為次要**（token 反轉、不另設計、真機只驗不破版） |
 | 圖表 | 依 `dataviz` skill：單一色階（magnitude）或語意色（decision）；不做雙軸、不做甜甜圈；≥2 序列附圖例＋表格檢視；伺服端 SVG 沿用 chart_renderer 重繪樣式 |
 
-token 檔：`src/static/css/v3/tokens.css`（亮暗兩套＋tone），components／areas 只能引用 token；禁止硬編色碼（守門沿用 `tests/test_color_token_lint.py` 與 `tests/test_css_color_tokens.py`，掃描範圍加入 `css/v3`）。
+token 檔：原地演進 `src/static/css/v2/tokens.css`（3B 計畫 2026-09-04 更正：不開平行 `v3/` 樹，四道 CSS 守門與 bundle 預期都綁在現有路徑；亮色為 `:root` 預設、dark 保留為次要），components／areas 只能引用 token；禁止硬編色碼（守門沿用 `tests/test_color_token_lint.py` 與 `tests/test_css_color_tokens.py`，掃描範圍加入 `css/v3`）。
 
 ## 6. 報表與 CLI 換皮
 

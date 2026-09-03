@@ -38,10 +38,17 @@ def test_new_store_is_owner_only_and_versioned(tmp_path):
     del st
 
 
-def test_default_path_lives_under_logs():
-    from src.alerts.store import default_alerts_db_path
+def test_default_path_lives_under_logs(monkeypatch):
+    """The unpatched resolver (tests run under conftest's redirect fixture)."""
+    import src.alerts.store as store_mod
     from src.config import ROOT_DIR
-    assert default_alerts_db_path() == os.path.join(ROOT_DIR, "logs", "alerts.sqlite")
+    monkeypatch.undo()   # drop the autouse redirect for this assertion only
+    assert store_mod.default_alerts_db_path() == os.path.join(ROOT_DIR, "logs", "alerts.sqlite")
+
+
+def test_store_without_path_uses_the_resolver(tmp_path, _isolate_alert_store):
+    from src.alerts.store import AlertStore
+    assert AlertStore().path == _isolate_alert_store
 
 
 # ── round trip ───────────────────────────────────────────────────────────────
