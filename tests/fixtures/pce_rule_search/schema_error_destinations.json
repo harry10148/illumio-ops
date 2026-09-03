@@ -1,0 +1,37 @@
+{
+  "request": {
+    "providers": [
+      {
+        "label": {
+          "href": "/orgs/1/labels/1"
+        }
+      }
+    ],
+    "destinations": [
+      {
+        "label": {
+          "href": "/orgs/1/labels/2"
+        }
+      }
+    ],
+    "ingress_services": [
+      {
+        "port": 22,
+        "proto": 6
+      }
+    ],
+    "rule_types": [
+      "sec_rules",
+      "deny_rules",
+      "override_deny_rules"
+    ]
+  },
+  "pversion": "active",
+  "status": 406,
+  "response": [
+    {
+      "token": "input_validation_error",
+      "message": "Input validation failed. Details: {The property '#/' contains additional properties [\"destinations\"] outside of the schema when none are allowed in schema sec_policy_rule_search_post.schema.json}"
+    }
+  ]
+}

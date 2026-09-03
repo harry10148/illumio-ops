@@ -1191,6 +1191,28 @@ class ApiClient:
             logger.error(f"API PUT {endpoint}: {e}")
             return 0
 
+    def rule_search(self, body: dict[str, Any], *, pversion: str = "active",
+                    timeout: int = 30) -> tuple[int, Any]:
+        """POST /orgs/{org}/sec_policy/{pversion}/rule_search (PCE Rule Search,
+        Public Experimental). Returns (status, parsed body). Unlike _api_post
+        the PCE error body is parsed and returned on non-2xx so the caller can
+        show why the search was refused; transport failure is (0, None)."""
+        if pversion not in ("active", "draft"):
+            raise ValueError("pversion must be 'active' or 'draft'")
+        org = self.api_cfg['org_id']
+        url = f"{self.api_cfg['url']}/api/v2/orgs/{org}/sec_policy/{pversion}/rule_search"
+        try:
+            status, raw = self._request(url, method="POST", data=body, timeout=timeout)
+        except Exception as e:
+            logger.error(f"API POST rule_search: {e}")
+            return 0, None
+        if not raw:
+            return status, None
+        try:
+            return status, orjson.loads(raw)
+        except Exception:
+            return status, raw.decode("utf-8", "replace") if isinstance(raw, bytes) else raw
+
     def _api_post(self, endpoint: str, payload: dict[str, Any], timeout: int = 15) -> tuple[int, Any]:
         """POST a PCE API endpoint. Returns (status_code, parsed_json_or_None)."""
         url = f"{self.api_cfg['url']}/api/v2{endpoint}"

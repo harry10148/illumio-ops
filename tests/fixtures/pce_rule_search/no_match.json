@@ -1,0 +1,55 @@
+{
+  "request": {
+    "consumers": [
+      {
+        "label": {
+          "href": "/orgs/1/labels/1"
+        }
+      }
+    ],
+    "providers": [
+      {
+        "label": {
+          "href": "/orgs/1/labels/116"
+        }
+      }
+    ],
+    "ingress_services": [
+      {
+        "port": 65000,
+        "proto": 6
+      }
+    ],
+    "rule_types": [
+      "sec_rules",
+      "deny_rules",
+      "override_deny_rules"
+    ]
+  },
+  "pversion": "draft",
+  "status": 200,
+  "response": {
+    "sec_rules": [],
+    "deny_rules": [],
+    "override_deny_rules": [],
+    "ip_tables_rules": [],
+    "counts": {
+      "sec_rules": {
+        "matched": 0,
+        "total": 1
+      },
+      "deny_rules": {
+        "matched": 0,
+        "total": 0
+      },
+      "override_deny_rules": {
+        "matched": 0,
+        "total": 2
+      },
+      "ip_tables_rules": {
+        "matched": 0,
+        "total": 0
+      }
+    }
+  }
+}

@@ -189,8 +189,9 @@ class Reporter:
                 while len(ids) < len(items):
                     ids.append(None)
                 for i, item in enumerate(items):
-                    if ids[i] is not None:
-                        store.update_dispatch(ids[i], dispatch)
+                    existing_id = ids[i]
+                    if existing_id is not None:
+                        store.update_dispatch(existing_id, dispatch)
                         continue
                     ids[i] = store.insert(
                         fired_at=now_utc, type=self._BUCKET_TYPE[bucket],
