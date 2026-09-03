@@ -156,6 +156,18 @@ _AUDIT_HERO_SUBTITLE = norm(
 #   pu     "Deny Effectiveness"  -> heading "Deny Rule Effectiveness"
 #   pu     "Draft Policy Risk"   -> heading "Draft Policy Decision Risk"
 _AUDIT_NAV_ABBREVS = frozenset({norm("3 Policy Changes")})
+
+# The audit tables used to print their raw snake_case column ids because
+# COL_I18N is keyed by English display name and these columns are not. They now
+# resolve through the same catalogue as every other table, so the old ids are
+# gone from the document by design — the heading text is still there, in the
+# reader's language. Listed individually rather than by pattern so adding a
+# column cannot silently join the exemption.
+_AUDIT_RAW_COLUMN_IDS = frozenset(norm(c) for c in (
+    "timestamp", "event_type", "user", "actor", "src_ip", "action",
+    "notification_detail", "severity", "parser_notes", "target_name",
+    "resource_name", "agent_hostname", "status",
+))
 _VEN_NAV_ABBREVS = frozenset({norm("Lost Today (<24h)"), norm("Lost Yesterday")})
 _PU_NAV_ABBREVS = frozenset({norm("Deny Effectiveness"), norm("Draft Policy Risk")})
 
@@ -222,7 +234,8 @@ ALLOWLIST: dict[str, frozenset[str]] = {
     "network_inventory": _COMMON_ALLOWLIST | {_WRONG_EXEC_SUFFIX},
     "audit": frozenset({_T4_WALL_CLOCK_COVER, _LEGACY_COVER_BRAND,
                         _AUDIT_FOOTER_WITH_DATE,
-                        _AUDIT_HERO_SUBTITLE}) | _AUDIT_NAV_ABBREVS,
+                        _AUDIT_HERO_SUBTITLE}) | _AUDIT_NAV_ABBREVS
+                       | _AUDIT_RAW_COLUMN_IDS,
     "ven_status": frozenset({_T4_WALL_CLOCK_COVER, _LEGACY_COVER_BRAND,
                              _VEN_FOOTER_WITH_DATE, _VEN_EMPTY_GENERATED_LABEL,
                              _VEN_LEGACY_COVER_GENERATED_LABEL}) | _VEN_NAV_ABBREVS,
@@ -322,7 +335,9 @@ KNOWN_CELLS: dict[str, tuple[str, str]] = {
     # Not the audit event_type column: its cells carry a risk badge and <wbr>
     # breaks, so get_text() returns "INFOsec_policy.create.evtzulu" and the
     # invariant would be checking the badge as much as the cell.
-    "audit": ("informational-sevzulu", "severity"),
+    # The heading is now translated, so it is asserted by key rather than by
+    # the raw id it used to print.
+    "audit": ("informational-sevzulu", t("rpt_col_severity", lang="en")),
     # Not the online chapter: since spec K2 that chapter is a version-count
     # summary, and the per-host columns only exist in sync-issues/offline.
     "ven_status": ("k8s-node-syncissue-01", "Hostname"),

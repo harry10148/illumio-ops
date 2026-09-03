@@ -368,6 +368,13 @@ h1, h2, h3, h4 { font-weight: 650; letter-spacing: -0.01em; }
   overflow-wrap: anywhere;
 }
 
+/* A toned KPI (only the grade carries one) takes the tone's ink and rule.
+   Without these two lines data-tone sets the variables and nothing reads them,
+   so the executive summary keeps printing an F in body ink while the cover
+   chip is red. */
+.kpi[data-tone] { border-left-color: var(--mark); }
+.kpi[data-tone] .kpi-value { color: var(--ink); }
+
 /* == 5. 目錄（螢幕 sticky 側欄 / 列印頁碼型） ================================ */
 .toc {
   position: sticky;

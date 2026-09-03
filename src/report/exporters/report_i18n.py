@@ -418,6 +418,27 @@ COL_I18N: dict[str, str] = {
     if key.startswith("rpt_col_") and value.get("en")
 }
 
+# The comprehension above is keyed by ENGLISH DISPLAY NAME, which is what most
+# report tables carry. The audit tables carry raw snake_case ids instead, so
+# none of them ever matched and the zh report printed TIMESTAMP / EVENT_TYPE /
+# PARSER_NOTES beside its Chinese headings. Every translation already existed —
+# only the mapping was missing.
+COL_I18N.update({
+    "timestamp": "rpt_col_timestamp",
+    "event_type": "rpt_col_event_type",
+    "user": "rpt_col_user",
+    "actor": "rpt_col_actor",
+    "src_ip": "rpt_col_src_ip",
+    "action": "rpt_col_action",
+    "notification_detail": "rpt_col_notification_detail",
+    "severity": "rpt_col_severity",
+    "parser_notes": "rpt_col_parser_notes",
+    "target_name": "rpt_col_target_name",
+    "resource_name": "rpt_col_resource_name",
+    "agent_hostname": "rpt_col_agent_hostname",
+    "status": "rpt_col_status",
+})
+
 # Render-layer value i18n maps. Pass these to render_df_table via
 # value_i18n_maps={col_name: <map>}. Stable English keys; values are
 # STRINGS lookup keys.

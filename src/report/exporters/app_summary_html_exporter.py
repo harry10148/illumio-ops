@@ -208,12 +208,25 @@ class AppSummaryHtmlExporter:
         # slot; the eyebrow keeps the report type, which the legacy cover showed
         # in .cover-type and which would otherwise leave the text layer (
         # type_label alone only reaches body[data-report-title]).
+        # The cover shows a window only when the report actually scoped one.
+        #
+        # Deliberately NOT a generation timestamp: the legacy cover stamped
+        # datetime.now() at render time, phase 2B removed it (see
+        # _T5_WALL_CLOCK_COVER in tests/test_report_shell_migration.py), and
+        # re-rendering the same report would print a different "generated"
+        # time. A date the reader cannot rely on is worse than no date.
+        meta: dict[str, str] = {}
+        date_range = " – ".join(d for d in (self._r.get("date_range") or ()) if d)
+        if date_range:
+            meta[t("rpt_cover_date_range", lang=lang)] = date_range
+
         cover = ShellCover(
             title=title,
             doc_title=title,
             type_label=report_type,
             eyebrow=report_type,
             kicker=sub,
+            meta=meta,
         )
         return build_shell_document(lang=lang, cover=cover, sections=sections)
 

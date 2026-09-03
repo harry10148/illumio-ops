@@ -67,6 +67,23 @@ def _resolve_label(k: dict, lang: str) -> str:
     return key or ''
 
 
+def _kpi_tone_attr(kpi: dict, raw_value: str) -> str:
+    """Tone attribute for a KPI, or "" for one that should stay body ink.
+
+    Only the grade gets it. The cover already tones its grade chip; without this
+    the executive summary — the page written to be skimmed — is the one page
+    that repeats an F without saying it is bad.
+
+    Counts are left alone deliberately: colouring a number implies a judgement
+    the number itself does not carry.
+    """
+    if not str(kpi.get('i18n_key', '')).endswith('_grade'):
+        return ''
+    from src.report.exporters.grade_colors import grade_tone
+    tone = grade_tone(raw_value.strip())
+    return '' if tone in ('', 'neutral') else f' data-tone="{tone}"'
+
+
 def render_exec_summary_html(mod00: dict, report_name: str, lang: str = 'en',
                              include_heading: bool = True) -> str:
     """Return a <section> HTML block for the report header.
@@ -92,9 +109,11 @@ def render_exec_summary_html(mod00: dict, report_name: str, lang: str = 'en',
         items = []
         for k in kpis[:KPI_LIMIT]:
             label = escape(_resolve_label(k, lang))
-            value = escape(str(k.get('value', '')))
+            raw = str(k.get('value', ''))
+            value = escape(raw)
             items.append(
-                f'<div class="kpi"><span class="kpi-label">{label}</span>'
+                f'<div class="kpi"{_kpi_tone_attr(k, raw)}>'
+                f'<span class="kpi-label">{label}</span>'
                 f'<span class="kpi-value">{value}</span></div>'
             )
         kpi_html = (f'<div class="kpi-strip">{"".join(items)}</div>'

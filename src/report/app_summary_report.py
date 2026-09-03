@@ -95,6 +95,11 @@ class AppSummaryReport:
         from src.report.rules_engine import RulesEngine
 
         results: dict = {"app": app, "env": env or "", "empty": False}
+        # Only what was actually asked for reaches the cover — when the caller
+        # left the window open, the cover says nothing rather than inventing a
+        # range it did not scope.
+        if start_date or end_date:
+            results["date_range"] = (start_date or "", end_date or "")
         results["baseline"] = app_baseline(scoped, app, env)
         results["mod01"] = traffic_overview(scoped)
         results["mod02"] = policy_decision_analysis(scoped, top_n=10)

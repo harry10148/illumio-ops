@@ -777,6 +777,26 @@ _DELTA_PORTRAIT_TOTAL_WIDTH = (
 """,
 )
 
+# 2026-09-03 親驗：封面的 grade chip 是紅的，一頁之後的執行摘要卻把同一個 F 用
+# 內文墨色印出來——最該被掃視的那頁反而沒說那是壞消息。data-tone 只設變數，
+# 要有這兩條規則才會被讀到。設計檔沒有這一段，登記成授權 delta。
+_KPI_VALUE_BLOCK = """.kpi-value {
+  font-family: var(--font-mono);
+  font-size: var(--fs-num);
+  font-weight: 600;
+  line-height: 1.1;
+  overflow-wrap: anywhere;
+}
+"""
+_DELTA_KPI_TONE = (_KPI_VALUE_BLOCK, _KPI_VALUE_BLOCK + """
+/* A toned KPI (only the grade carries one) takes the tone's ink and rule.
+   Without these two lines data-tone sets the variables and nothing reads them,
+   so the executive summary keeps printing an F in body ink while the cover
+   chip is red. */
+.kpi[data-tone] { border-left-color: var(--mark); }
+.kpi[data-tone] .kpi-value { color: var(--ink); }
+""")
+
 AUTHORISED_DELTAS = (
     _DELTA_COVER_META_PAIR,
     _DELTA_DROP_OLD_COVER,
@@ -791,6 +811,7 @@ AUTHORISED_DELTAS = (
     _DELTA_FLOOR_META,
     _DELTA_FLOOR_TS,
     _DELTA_PORTRAIT_TOTAL_WIDTH,
+    _DELTA_KPI_TONE,
     _DELTA_MAT_FILL_WARN,
     _DELTA_TABLE_JS_AFFORDANCES,
 )
