@@ -137,9 +137,9 @@ v2「不動後端」在 v3 解除；以下三項是產品程式碼變更，各�
 
 ### 4a. 告警落地
 
-- Hook 點：`Reporter.send_alerts`。**首次派送嘗試時就寫入**（不論成敗），鍵為 `(type, rule_index, fired_at)`；DLQ 重播時以同鍵**更新** `dispatch_json`，不新增列（否則每則先失敗後成功的告警會出現兩次）。`force_test` 不寫。
+- Hook 點：`Reporter.send_alerts`。**首次派送嘗試時就寫入**（不論成敗），落地的列 id 隨 DLQ 項目一起進 state；DLQ 重播時以該 id **更新** `dispatch_json`，不新增列（否則每則先失敗後成功的告警會出現兩次）。`force_test` 不寫。
 - 儲存：新 SQLite `logs/alerts.sqlite`（`state.json` 為單一 JSON 不宜無限成長；pce_cache DB 有自己的 `user_version` 升級流程，不混入）。檔案由 service 帳號建立，權限 0600；安裝／升級腳本不預建。
-- 欄位：`id, fired_at, type(event|traffic|bandwidth|system), rule_index, rule_name, severity, summary, criteria, payload_json, dispatch_json, status(new|ack|done), status_by, status_at`。
+- 欄位：`id, fired_at, type(event|traffic|bandwidth|system), rule_id, rule_name, severity, summary, criteria, payload_json, dispatch_json, status(new|ack|done), status_by, status_at`。（2026-09-03 計畫撰寫時更正：原寫 `rule_index`，但 index 只在讀取時計算、不可持久化；rules 有穩定 uuid `id`。看門狗類 health 告警無規則物件，`rule_id` 為 NULL。）
 - 端點：`GET /api/alerts?status&type&since&page`、`GET /api/alerts/<id>`、`GET /api/alerts/<id>/traffic_query`（§4b 用；由該告警的規則重建 FilterBar query spec）、`PATCH /api/alerts/<id>` `{status}`（CSRF 同既有規則）。
 - 保留：沿用 archive retention 天數，由同一個 retention job 清理。
 
