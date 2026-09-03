@@ -73,11 +73,17 @@ def _esc(v) -> str:
     return _html.escape(str(v), quote=True)
 
 
-def _kpi(value, label) -> str:
+def _kpi(value, label, kpi: dict | None = None) -> str:
     # .kpi / .kpi-strip is the v2 shell's KPI vocabulary; .kpi-card / .kpi-row
     # were report_css.py's and have no rule in SHELL_CSS, so keeping them would
     # leave the numbers as unstyled stacked divs.
-    return ('<div class="kpi">'
+    #
+    # This report renders its own KPI strip rather than going through
+    # _exec_summary, so it has to ask for the tone itself — the shared helper is
+    # the single rule for which KPI earns one.
+    from src.report.exporters._exec_summary import kpi_tone_attr
+    tone = kpi_tone_attr(kpi or {}, str(value))
+    return (f'<div class="kpi"{tone}>'
             f'<span class="kpi-label">{_esc(label)}</span>'
             f'<span class="kpi-value">{_esc(value)}</span></div>')
 
@@ -123,7 +129,8 @@ class ReadinessHtmlExporter:
     def _summary(self, readiness, kpis) -> str:
         lang = self._lang
         kpi_row = '<div class="kpi-strip">' + "".join(
-            _kpi(k.get("value", ""), k.get("label", k.get("i18n_key", ""))) for k in kpis
+            _kpi(k.get("value", ""), k.get("label", k.get("i18n_key", "")), k)
+            for k in kpis
         ) + "</div>"
         return (f'<p class="note">{_esc(t("rpt_readiness_subnote", lang=lang))}</p>'
                 + kpi_row)

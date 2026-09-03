@@ -67,7 +67,7 @@ def _resolve_label(k: dict, lang: str) -> str:
     return key or ''
 
 
-def _kpi_tone_attr(kpi: dict, raw_value: str) -> str:
+def kpi_tone_attr(kpi: dict, raw_value: str) -> str:
     """Tone attribute for a KPI, or "" for one that should stay body ink.
 
     Only the grade gets it. The cover already tones its grade chip; without this
@@ -112,7 +112,7 @@ def render_exec_summary_html(mod00: dict, report_name: str, lang: str = 'en',
             raw = str(k.get('value', ''))
             value = escape(raw)
             items.append(
-                f'<div class="kpi"{_kpi_tone_attr(k, raw)}>'
+                f'<div class="kpi"{kpi_tone_attr(k, raw)}>'
                 f'<span class="kpi-label">{label}</span>'
                 f'<span class="kpi-value">{value}</span></div>'
             )
