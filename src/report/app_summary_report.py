@@ -86,8 +86,16 @@ class AppSummaryReport:
                                    filters=scope_filters, use_cache=use_cache,
                                    cache_workload_hrefs=cache_hrefs)
         scoped = filter_app_flows(df, app, env)
+        # The window belongs on the cover even — especially — when nothing was
+        # found: "no traffic" is only meaningful once the reader knows over what
+        # period, and an empty report is the one most likely to be questioned.
+        window = ((start_date or "", end_date or "")
+                  if (start_date or end_date) else None)
         if scoped.empty:
-            return {"app": app, "env": env or "", "empty": True}
+            empty: dict = {"app": app, "env": env or "", "empty": True}
+            if window:
+                empty["date_range"] = window
+            return empty
 
         from src.report.analysis.mod01_traffic_overview import traffic_overview
         from src.report.analysis.mod02_policy_decisions import policy_decision_analysis
@@ -98,8 +106,8 @@ class AppSummaryReport:
         # Only what was actually asked for reaches the cover — when the caller
         # left the window open, the cover says nothing rather than inventing a
         # range it did not scope.
-        if start_date or end_date:
-            results["date_range"] = (start_date or "", end_date or "")
+        if window:
+            results["date_range"] = window
         results["baseline"] = app_baseline(scoped, app, env)
         results["mod01"] = traffic_overview(scoped)
         results["mod02"] = policy_decision_analysis(scoped, top_n=10)

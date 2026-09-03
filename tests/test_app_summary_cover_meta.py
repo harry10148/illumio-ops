@@ -37,3 +37,13 @@ def test_cover_omits_the_date_range_when_there_is_none():
     """Better a cover with no range than a cover with an invented one."""
     html = AppSummaryHtmlExporter(_results(), lang="en")._render_html()
     assert "Date Range" not in html
+
+
+def test_empty_report_still_shows_the_window_it_searched():
+    """"No traffic" means nothing until the reader knows over what period —
+    and the empty report is the one most likely to be questioned."""
+    from src.report.app_summary_report import AppSummaryReport
+    import inspect
+    src = inspect.getsource(AppSummaryReport.build)
+    empty_branch = src[src.index("if scoped.empty:"):]
+    assert "date_range" in empty_branch.split("return")[0] + empty_branch.split("return")[1][:200]
