@@ -84,6 +84,7 @@
 // so a new backend key cannot be silently dropped by this port.
 
 import { el, clear, disclosure } from "../core/dom.mjs";
+import { systemAreaTop } from "./system.mjs";
 import { t, tf } from "../core/i18n.mjs";
 import { num, dur, stamp, since, tone } from "../core/fmt.mjs";
 import { api } from "../core/api.mjs";
@@ -113,7 +114,6 @@ const POLICY_SUB_ROUTES = [
   [R_OPS, "gui_actions"],
 ];
 const REPORTS_SUB_ROUTES = [["#/reports", "gui_nav_reports"], [R_REPORTS, "gui_tab_report_schedules"]];
-const SYSTEM_SUB_ROUTES = [[R_JOBS, "gui_ov_job_health"]];
 
 // The eager batch for #/policy/rulesets. rs_ruleset_detail is deliberately
 // NOT here — see deviation #2 above; it is fetched per selected row.
@@ -2049,7 +2049,7 @@ async function mountJobs(root, ctx) {
   installTeardown(state);
   palette.registerFor(R_JOBS, cmdSpec("au:jobs-bad", t("gui_au_job_only_bad"), function () { if (handles.onlyBad) handles.onlyBad(); }));
 
-  root.appendChild(areaTop(R_JOBS, "gui_nav_system", SYSTEM_SUB_ROUTES));
+  root.appendChild(systemAreaTop(R_JOBS));
   const board = el("div", { class: "board" });
   root.appendChild(board);
 

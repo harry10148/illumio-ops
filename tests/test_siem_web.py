@@ -73,9 +73,6 @@ def test_siem_destinations_get_masks_hec_token(client, monkeypatch):
         environ_overrides={"REMOTE_ADDR": "127.0.0.1"},
     )
     assert resp.get_json()["ok"] is True
-    # _get_siem_cfg 會另建 ConfigManager（預設路徑），測試須指回本 app 的 CM
-    cm = client.application.config["CM"]
-    monkeypatch.setattr("src.siem.web._get_siem_cfg", lambda: cm.models.siem)
     body = client.get("/api/siem/destinations",
                       environ_overrides={"REMOTE_ADDR": "127.0.0.1"}).get_json()
     assert "secret-token-1" not in json.dumps(body)

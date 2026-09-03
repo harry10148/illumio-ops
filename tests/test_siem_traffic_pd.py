@@ -333,10 +333,6 @@ def client(tmp_path):
 
 
 def test_web_add_and_update_persist_traffic_pd(client, monkeypatch):
-    # _get_siem_cfg builds its own ConfigManager on the default path; point it
-    # at this app's CM the way test_siem_web does.
-    monkeypatch.setattr("src.siem.web._get_siem_cfg",
-                        lambda: client.application.config["CM"].models.siem)
     r = client.post("/api/siem/destinations",
                     json={"name": "soc", "transport": "tcp", "host": "1.2.3.4", "port": 5514,
                           "traffic_pd": ["blocked", "potentially_blocked"]},

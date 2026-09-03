@@ -24,6 +24,7 @@
 // silently dropped by this port.
 
 import { el, clear, spacer, disclosure } from "../core/dom.mjs";
+import { systemAreaTop } from "./system.mjs";
 import { t, tf } from "../core/i18n.mjs";
 import { stamp } from "../core/fmt.mjs";
 import { api } from "../core/api.mjs";
@@ -39,6 +40,7 @@ import { filterObjectQuery } from "../core/filter-objects.mjs";
 
 const R_RULES = "#/policy/alert-rules";
 const R_OPS = "#/policy/ops";
+const R_SYS_ALERTING = "#/system/alerting";   // v3: AL-10/11/14 (+ a console) live under System
 
 // index.html:1266 (rules sub-tabs) — the product splits the same page into
 // "rules" and "actions"; the v2 area keeps that split as two routes.
@@ -1326,16 +1328,22 @@ function fieldLabels(plugins, name) {
   return out;
 }
 
-async function mountOps(root, ctx) {
+// view: "ops" (#/policy/ops — AL-08 run once, AL-09 debug, AL-12 best
+// practices) or "alerting" (#/system/alerting — AL-10 test alert, AL-11
+// watermark, AL-14 channel status). Both pages carry the AL-13 output
+// console. Same loader and handles; the panels are split by view (spec §1).
+async function mountOps(root, ctx, view) {
+  const onOps = view !== "alerting";
+  const onAlerting = view === "alerting";
   const handles = {};
   const state = { torn: false, tables: [], filterBars: [] };
   installTeardown(state);
   modal.registerAudit("al-ops-watermark", function () { return handles.watermark ? handles.watermark() : null; });
   modal.registerAudit("al-ops-bp", function () { return handles.bestPractices ? handles.bestPractices() : null; });
   palette.registerFor(R_OPS, cmdSpec("al:run", t("gui_run_once"), function () { if (handles.run) handles.run(); }));
-  palette.registerFor(R_OPS, cmdSpec("al:test-alert", t("gui_test_alert"), function () { if (handles.testAll) handles.testAll(); }));
+  palette.registerFor(R_SYS_ALERTING, cmdSpec("al:test-alert", t("gui_test_alert"), function () { if (handles.testAll) handles.testAll(); }));
 
-  root.appendChild(areaTop(R_OPS));
+  root.appendChild(onAlerting ? systemAreaTop(R_SYS_ALERTING) : areaTop(R_OPS));
   const board = el("div", { class: "board" });
   root.appendChild(board);
 
@@ -1368,7 +1376,7 @@ async function mountOps(root, ctx) {
        * contention (file lock, 409 on a concurrent analysis) is real but is
        * not what you read on the way to pressing it. */
       runPanel.body.appendChild(disclosure(t("gui_gen_explain"), note(t("gui_al_run_note"))));
-      row1.appendChild(runPanel);
+      if (onOps) row1.appendChild(runPanel);
 
       // ── AL-09 debug (index.html:1306-1318, actions.py:533-566) ─────────
       const dbgPanel = panel("AL-09", t("gui_debug_mode"));
@@ -1389,7 +1397,7 @@ async function mountOps(root, ctx) {
        * window is clamped — both matter once you are reading the output, not
        * while you are choosing the two values above. */
       dbgPanel.body.appendChild(disclosure(t("gui_gen_explain"), note(t("gui_al_debug_note"))));
-      row1.appendChild(dbgPanel);
+      if (onOps) row1.appendChild(dbgPanel);
 
       // ── AL-11 watermark (index.html:1318, actions.py:597-633) ──────────
       const wmPanel = panel("AL-11", t("gui_reset_watermark_label"));
@@ -1416,7 +1424,7 @@ async function mountOps(root, ctx) {
         }));
       };
       wmPanel.body.appendChild(btn("btn danger", t("gui_reset_watermark_label"), handles.watermark));
-      row1.appendChild(wmPanel);
+      if (onAlerting) row1.appendChild(wmPanel);
 
       // ── AL-10 test alert (index.html:1320-1327, actions.js:38-57) ──────
       const testPanel = panel("AL-10", t("gui_test_alert"));
@@ -1437,7 +1445,7 @@ async function mountOps(root, ctx) {
       });
       testPanel.body.appendChild(btnRow);
       testPanel.body.appendChild(disclosure(t("gui_gen_explain"), note(t("gui_al_test_alert_note"))));
-      row2.appendChild(testPanel);
+      if (onAlerting) row2.appendChild(testPanel);
 
       // ── AL-12 best practices (rules.js:584-608, config.py:845-896) ─────
       const bpPanel = panel("AL-12", t("gui_best_practices"));
@@ -1483,7 +1491,7 @@ async function mountOps(root, ctx) {
       };
       bpPanel.body.appendChild(btn("btn danger", t("gui_load"), handles.bestPractices));
       bpPanel.body.appendChild(disclosure(t("gui_gen_explain"), note(t("gui_al_bp_note"))));
-      row2.appendChild(bpPanel);
+      if (onOps) row2.appendChild(bpPanel);
 
       // ── AL-14 channel status, read-only (actions.js:10-33) ─────────────
       const chPanel = panel("AL-14", t("gui_alert_channels"));
@@ -1515,7 +1523,7 @@ async function mountOps(root, ctx) {
         chPanel.body.appendChild(list);
       }
       chPanel.body.appendChild(disclosure(t("gui_gen_explain"), note(t("gui_al_ch_note"))));
-      row3.appendChild(chPanel);
+      if (onAlerting) row3.appendChild(chPanel);
 
       /* The page-level preamble removed from the top lands here: it is true and
        * worth having (every control on this page hits a real endpoint and some
@@ -1532,4 +1540,7 @@ async function mountOps(root, ctx) {
     });
 }
 
-export { mountRules, mountOps };
+function mountPolicyOps(root, ctx) { return mountOps(root, ctx, "ops"); }
+function mountSystemAlerting(root, ctx) { return mountOps(root, ctx, "alerting"); }
+
+export { mountRules, mountPolicyOps as mountOps, mountSystemAlerting };

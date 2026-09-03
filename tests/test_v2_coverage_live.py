@@ -125,11 +125,12 @@ def test_the_route_list_matches_the_coverage_map(gate_result):
     own (honestly named) check rather than passed off as the blind-spot guard."""
     routes = gate.routes_from(gate.expected())
     # v3 (2026-09-04): the five-area map adds #/investigate/inbox (XC-15 until
-    # 3B Task 6 lands the inbox) and splits the schedule board onto
-    # #/policy/schedules; the other legacy routes were re-keyed 1:1.
-    assert len(routes) == 21, routes
+    # 3B Task 6 lands the inbox), splits the schedule board onto
+    # #/policy/schedules and the test-alert/watermark/channel-status panels
+    # onto #/system/alerting; the other legacy routes were re-keyed 1:1.
+    assert len(routes) == 22, routes
     assert "login.html" in routes
-    assert sum(1 for r in routes if r.startswith("#")) == 20
+    assert sum(1 for r in routes if r.startswith("#")) == 21
     assert set(routes) == set(gate_result["routes"])
 
 

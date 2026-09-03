@@ -2460,6 +2460,7 @@
   "gui_system_health_pce": "PCE API 健康檢查",
   "gui_system_health_threshold_hint": "此規則在健康檢查失敗時立即觸發，只需要設定冷卻分鐘數。",
   "gui_system_health_type": "健康檢查",
+  "gui_system_tab_alerting": "告警",
   "gui_ta_guide_adv_desc": "進階條件適合用來排除噪音、聚焦特定來源/目的端與 Services。",
   "gui_ta_guide_desc": "這裡說明 Traffic Analysis 常用欄位與查詢方式。",
   "gui_ta_guide_li_excludes": "排除條件可協助去除已知噪音流量。",

@@ -181,7 +181,6 @@ async function boot() {
     return mountOverview(el2, ctx);
   });
   router.register("#/investigate/inbox", mountUnderConstruction);
-  router.register("#/system/alerting", mountUnderConstruction);
   Object.keys(LEGACY_ROUTES).forEach(function (oldRoute) {
     router.register(oldRoute, async function (el2, ctx) {
       router.replace(LEGACY_ROUTES[oldRoute], ctx.query);
@@ -210,6 +209,10 @@ async function boot() {
   router.register("#/policy/ops", async function (el2, ctx) {
     const { mountOps } = await import("./areas/policy_rules.mjs");
     return mountOps(el2, ctx);
+  });
+  router.register("#/system/alerting", async function (el2, ctx) {
+    const { mountSystemAlerting } = await import("./areas/policy_rules.mjs");
+    return mountSystemAlerting(el2, ctx);
   });
   // Task 7 — the automation area's three sub-routes, each lazily importing the
   // one module they share (same pattern as investigate/alerting above).

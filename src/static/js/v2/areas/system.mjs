@@ -178,6 +178,8 @@ const R_SECURITY = "#/system/security";
 const R_DISPLAY = "#/system/display";
 const R_CHANNELS = "#/system/channels";
 const R_LOGS = "#/system/logs";
+const R_ALERTING = "#/system/alerting";   // v3: test alert / watermark / channel status
+const R_JOBS = "#/system/jobs";           // v3: background job health (was #/automation/jobs)
 
 // index.html:1975-1983 (integrations sub-tabs) + :1994-2008 (settings sub-tabs).
 // The product splits the same concerns across two top-level tabs; v2 keeps one
@@ -190,6 +192,8 @@ const SUB_ROUTES = [
   [R_SECURITY, "gui_settings_tab_security"],
   [R_DISPLAY, "gui_settings_tab_display"],
   [R_CHANNELS, "gui_settings_tab_channels"],
+  [R_ALERTING, "gui_system_tab_alerting"],
+  [R_JOBS, "gui_ov_job_health"],
   [R_LOGS, "gui_ml_title"],
 ];
 
@@ -2709,4 +2713,6 @@ async function mountLogs(root, ctx) {
   });
 }
 
-export { mountPce, mountCache, mountSiem, mountTls, mountSecurity, mountDisplay, mountChannels, mountLogs };
+// systemAreaTop: the system sub-navigation, shared with the two pages that
+// still live in other modules until their code moves (jobs, alerting).
+export { mountPce, mountCache, mountSiem, mountTls, mountSecurity, mountDisplay, mountChannels, mountLogs, sysTop as systemAreaTop };

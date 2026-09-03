@@ -953,7 +953,17 @@ async function mountReports(root, ctx) {
   palette.registerFor(ROUTE, cmdSpec("rp:gen-audit", t("gui_gen_audit_title"), function () { if (handles.open) handles.open("audit"); }));
   palette.registerFor(ROUTE, cmdSpec("rp:outputs", t("gui_report_output"), function () { if (handles.focusOutputs) handles.focusOutputs(); }));
 
-  root.appendChild(areaHead(t("gui_nav_reports"), ROUTE));
+  // v3: the reports area has two pages (generation here, schedules under
+  // #/reports/schedules, which policy_scheduler.mjs still renders).
+  const head = areaHead(t("gui_nav_reports"), ROUTE);
+  const sub = el("nav", { class: "subnav", "aria-label": t("gui_nav_reports") });
+  [[ROUTE, "gui_nav_reports"], ["#/reports/schedules", "gui_tab_report_schedules"]].forEach(function (pair) {
+    const a = el("a", { href: pair[0], text: t(pair[1]) });
+    if (pair[0] === ROUTE) a.setAttribute("aria-current", "page");
+    sub.appendChild(a);
+  });
+  head.appendChild(sub);
+  root.appendChild(head);
   const wrap = el("div", { class: "wb" });
   const main = el("div", { class: "wb-main" });
   const aside = el("aside", { class: "wb-aside" });

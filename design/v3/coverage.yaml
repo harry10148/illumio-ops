@@ -47,11 +47,11 @@ AL-06: {item: 規則 highlight 定位, route: "#/policy/alert-rules"}
 AL-07: {item: rule_test 沙盤測試, route: "#/policy/alert-rules"}
 AL-08: {item: run-once, route: "#/policy/ops"}
 AL-09: {item: debug 模式, route: "#/policy/ops"}
-AL-10: {item: 測試告警(全+單管道), route: "#/policy/ops"}
-AL-11: {item: watermark 重置, route: "#/policy/ops"}
+AL-10: {item: 測試告警(全+單管道), route: "#/system/alerting"}
+AL-11: {item: watermark 重置, route: "#/system/alerting"}
 AL-12: {item: 最佳實務套用, route: "#/policy/ops"}
 AL-13: {item: 輸出主控台, route: "#/policy/ops"}
-AL-14: {item: 管道狀態卡(唯讀), route: "#/policy/ops"}
+AL-14: {item: 管道狀態卡(唯讀), route: "#/system/alerting"}
 AU-01: {item: rule scheduler 狀態列+KPI, route: "#/policy/schedules"}
 AU-02: {item: 排程時間軸, route: "#/policy/schedules"}
 AU-03: {item: ruleset 瀏覽+詳情, route: "#/policy/rulesets"}
@@ -108,4 +108,4 @@ XC-11: {item: 說明側欄(篩選語法/隔離指南), route: "#/investigate/tra
 XC-12: {item: toast/popover/欄寬拖曳/skeleton, route: "#/investigate/traffic"}
 XC-13: {item: 頂欄使用者選單, route: "#/home"}
 XC-14: {item: URL hash 路由狀態同步, route: "#/home"}
-XC-15: {item: 建置中占位（收件匣／設定-告警，3B 逐任務移除）, route: "#/investigate/inbox"}
+XC-15: {item: 建置中占位（收件匣，3B Task 6 移除）, route: "#/investigate/inbox"}

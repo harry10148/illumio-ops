@@ -31,6 +31,7 @@ pytest_plugins = ["tests.v2_e2e_utils"]
 
 R_RULES = "#/policy/alert-rules"
 R_OPS = "#/policy/ops"
+R_ALERTING = "#/system/alerting"   # v3: test alert / watermark / channel status moved under System
 R_SYSTEM_PCE = "#/system/pce"
 SLOW = 45_000
 
@@ -40,7 +41,8 @@ def _goto(page, base_url, route):
     page.goto(base_url + "/" + route)
     page.wait_for_selector('body[data-booted="true"]')
     page.wait_for_selector('[data-route="%s"]' % route)
-    page.wait_for_selector('[data-cov="%s"]' % ("AL-01" if route == R_RULES else "AL-08"))
+    first = {R_RULES: "AL-01", R_ALERTING: "AL-10"}.get(route, "AL-08")
+    page.wait_for_selector('[data-cov="%s"]' % first)
 
 
 def _navigate(page, route):
@@ -128,11 +130,17 @@ def test_rules_coverage_anchors_and_i18n(v2_page):
 
 def test_ops_coverage_anchors_and_i18n(v2_page):
     page, base_url = v2_page
+    # v3 splits the old ops page: run-once / debug / best practices stay under
+    # policy, test alert / watermark / channel status move under system; both
+    # carry the AL-13 console.
     _goto(page, base_url, R_OPS)
     _open_all(page)
+    assert {"AL-08", "AL-09", "AL-12", "AL-13"} - _covs(page) == set()
+    assert _missing_i18n(page) == []
 
-    expected = {"AL-%02d" % i for i in range(8, 15)}
-    assert expected - _covs(page) == set()
+    _goto(page, base_url, R_ALERTING)
+    _open_all(page)
+    assert {"AL-10", "AL-11", "AL-13", "AL-14"} - _covs(page) == set()
     assert _missing_i18n(page) == []
 
 
@@ -281,10 +289,11 @@ def test_backend_error_and_confirmation_paths_do_not_fire_destructive_calls(v2_p
     page.wait_for_selector('.toast[data-tone="crit"]')
     drawer.get_by_role("button", name=labels["gui_cancel"], exact=True).click()
 
-    _navigate(page, R_OPS)
     # AL-12's trigger button reads "Load" (gui_load); the panel title reads
     # "Load Best Practices" (gui_best_practices) — same split as the mockup.
-    for cov, key in (("AL-11", "gui_reset_watermark_label"), ("AL-12", "gui_load")):
+    # v3: AL-11 lives under #/system/alerting, AL-12 under #/policy/ops.
+    for route, cov, key in ((R_ALERTING, "AL-11", "gui_reset_watermark_label"), (R_OPS, "AL-12", "gui_load")):
+        _navigate(page, route)
         panel = page.locator('section[data-cov="%s"]' % cov)
         panel.get_by_role("button", name=labels[key], exact=True).click()
         modal = page.locator(".modal")
@@ -321,7 +330,7 @@ def test_reset_watermark_confirm_ok_sends_the_call_and_prints_the_stubbed_result
     destructive-operation discipline is unchanged. Only the frontend's
     request-building and its rendering of a success are under test."""
     page, base_url = v2_page
-    _goto(page, base_url, R_OPS)
+    _goto(page, base_url, R_ALERTING)
     labels = _labels(page)
     posted, handler = _stub_ok(page, "**/api/actions/reset-watermark",
                                {"ok": True, "output": "e2e-watermark-reset-output"})

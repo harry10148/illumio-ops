@@ -13,8 +13,10 @@ bp = Blueprint("siem", __name__, url_prefix="/api/siem")
 
 
 def _get_siem_cfg():
-    from src.config import ConfigManager
-    return ConfigManager().models.siem
+    # The app's own ConfigManager — a bare ConfigManager() read the default
+    # config path, which only matched the request-scoped instance by luck in
+    # production and never in a test harness (pre-existing defect, fixed in 3B).
+    return current_app.config["CM"].models.siem
 
 
 def _get_sf():
