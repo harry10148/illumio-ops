@@ -7,7 +7,7 @@
 .panel {
   background: var(--surface-1);
   border: 1px solid var(--line);
-  border-radius: var(--radius-m);
+  border-radius: var(--radius-l);
   min-width: 0;
   display: flex;
   flex-direction: column;
@@ -51,14 +51,15 @@
   gap: var(--space-3);
   height: var(--ctl-h); padding: 0 var(--space-5);
   border: 1px solid var(--line);
-  border-radius: var(--radius-s);
-  background: var(--surface-2); color: var(--text-1);
-  font-family: var(--font-ui); font-size: var(--fs-mini); cursor: pointer;
+  border-radius: var(--radius-m);
+  background: var(--surface-1); color: var(--text-1);
+  font-family: var(--font-ui); font-size: var(--fs-body); font-weight: 500; cursor: pointer;
   white-space: nowrap;
+  transition: background-color .15s ease, border-color .15s ease, color .15s ease;
 }
 .btn:hover { border-color: var(--accent); color: var(--accent-fg); }
 .btn[disabled] { opacity: .5; cursor: not-allowed; }
-.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-on); }
+.btn.primary { background: var(--accent-fg); border-color: var(--accent-fg); color: var(--accent-on); }
 .btn.primary:hover { color: var(--accent-on); filter: brightness(1.08); }
 .btn.danger { background: var(--tone-crit-bg); border-color: var(--tone-crit-border); color: var(--tone-crit-fg); }
 .btn.ghost { background: transparent; }
@@ -104,13 +105,14 @@ table.tbl td {
   color: var(--text-2);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
-table.tbl td.n { font-family: var(--font-mono); color: var(--text-1); font-variant-numeric: tabular-nums; }
+table.tbl td.n { font-family: var(--font-num); color: var(--text-1); font-variant-numeric: tabular-nums; }
 table.tbl td.id { font-family: var(--font-mono); color: var(--text-1); }
 table.tbl tbody tr:last-child td { border-bottom: 0; }
 /* Only exceptions wear a mark — a table where every row is flagged flags nothing. */
 table.tbl tbody tr[data-tone="warn"] td:first-child,
 table.tbl tbody tr[data-tone="crit"] td:first-child { box-shadow: inset 2px 0 0 var(--mark); }
-table.tbl tbody tr:hover td { background: var(--surface-2); }
+table.tbl td { transition: background-color .15s ease; }
+table.tbl tbody tr:hover td { background: var(--surface-hover); }
 
 /* column resize grip */
 .tbl-grip {

@@ -45,7 +45,10 @@ EXPECTED_FS = {
     "--fs-ui": "14px", "--fs-lead": "17px", "--fs-num": "21px",
     "--fs-display": "32px",
 }
-EXPECTED_RADIUS = {"--radius-s": "2px", "--radius-m": "3px", "--radius-l": "6px"}
+# Direction D "brand workbench" (docs/superpowers/specs/2026-09-03-ui-redesign-v3-design.md §5,
+# 2026-09-04): softer corners on a light, hairline-bordered surface. The type
+# scale above is unchanged — it already landed where D wants it.
+EXPECTED_RADIUS = {"--radius-s": "4px", "--radius-m": "6px", "--radius-l": "8px"}
 EXPECTED_SHADOW = ["--shadow-1", "--shadow-2"]
 
 

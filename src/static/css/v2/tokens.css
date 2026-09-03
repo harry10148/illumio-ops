@@ -1,20 +1,28 @@
 /* ============================================================================
-   design/v2 tokens — Direction B "Ops dark console" (Gate 1 winner)
-   Visual DNA transcribed from design/v2/pitch/direction-b.html:
-     · dark-first; light theme is the alternate, never the origin
-     · the top chrome stays dark in BOTH themes (instrument bezel)
-     · tone marks keep a FIXED hue across themes (a green LED is the same
-       green on paper and on glass); only ink + fill are themed
-     · numerals are monospace + tabular everywhere
-     · 1px hairlines, 2–3px radii, no elevation theatre
+   tokens — Direction D "brand workbench" (v3, 2026-09-04; spec §5 of
+   docs/superpowers/specs/2026-09-03-ui-redesign-v3-design.md)
 
-   CONTRACT (Task 7 → Tasks 8-12 may use ONLY tokens declared here):
+   Visual DNA:
+     · LIGHT-FIRST: `:root` paints the light workbench; dark is the alternate.
+     · white surfaces, hairline borders, 6–8px radii, no elevation theatre
+     · the chrome is light too — no dark bezel any more
+     · Illumio orange is reserved for ACTIONS (links, the current tab's
+       underline, the one hot number on a page); never a fill. Text ON orange
+       fails AA (3.2:1), so filled controls use the deeper --accent-fg
+       (white on #C24300 = 5.1:1) — the hue stays, the contrast passes
+     · deep cyan (`--brand-deep`) carries avatars, secondary emphasis, charts
+     · tone marks keep a FIXED hue across themes; only ink + fill are themed
+     · Montserrat for display type and numerals; CJK body stays on system
+       fonts (the offline bundle ships no CJK web font on purpose)
+
+   CONTRACT (components/areas may use ONLY tokens declared here):
      --tone-{ok,warn,crit,info,neutral}-{bg,fg,border}
      --surface-{0,1,2}   --text-{1,2,3}   --space-{1..8}
-     --font-{ui,mono}    --radius-{s,m,l}
+     --font-{ui,display,num,mono}   --radius-{s,m,l}
    EXTENDED SET (also tokens — same rule: no hardcoded colors outside this
-   file): --line, --line-soft, --accent*, --chrome*, --track, --overlay,
-   --shadow-{1,2}, --fs-*, --row-h, --ctl-h, --lead.
+   file): --line, --line-soft, --surface-hover, --accent*, --brand-deep,
+   --chrome*, --track, --overlay, --shadow-{1,2}, --fs-*, --row-h, --ctl-h,
+   --chrome-h, --nav-pad-y, --lead.
 
    DENSITY: [data-density="compact"] retunes --space-*, --fs-*, --lead, --row-h,
    --ctl-h, --chrome-h, --nav-pad-y only. No rule outside this file may branch on
@@ -22,13 +30,24 @@
    token here.
    ============================================================================ */
 
+@font-face {
+  font-family: "Montserrat";
+  src: url("../../fonts/Montserrat-VF.woff2") format("woff2-variations"),
+       url("../../fonts/Montserrat-VF.woff2") format("woff2");
+  font-weight: 300 700;
+  font-style: normal;
+  font-display: swap;
+}
+
 :root {
-  --font-ui: "Noto Sans", "Noto Sans CJK TC", "PingFang TC", "Microsoft JhengHei", sans-serif;
+  --font-ui: "Noto Sans TC", "Noto Sans CJK TC", "PingFang TC", "Microsoft JhengHei", "Noto Sans", sans-serif;
+  --font-display: "Montserrat", var(--font-ui);
+  --font-num: "Montserrat", var(--font-ui);
   --font-mono: "Noto Sans Mono", "DejaVu Sans Mono", "SFMono-Regular", Consolas, monospace;
 
-  --radius-s: 2px;
-  --radius-m: 3px;
-  --radius-l: 6px;
+  --radius-s: 4px;
+  --radius-m: 6px;
+  --radius-l: 8px;
 
   /* spacing — cozy (default) */
   --space-1: 2px;
@@ -40,15 +59,8 @@
   --space-7: 24px;
   --space-8: 32px;
 
-  /* type scale — cozy (default)
-   *
-   * Raised across the board (density spec). The previous cozy scale put table
-   * cells at 11.5px and captions at 10.5px, which is what "too dense" mostly
-   * was: no amount of restructuring makes 10px prose comfortable to read all
-   * day. The steps between sizes are preserved, so the hierarchy is unchanged —
-   * everything simply starts from a legible base. Anyone who wants the old
-   * information-per-screen back has the compact density, which is what that
-   * setting is for. */
+  /* type scale — cozy (default); unchanged from the density redesign, which
+   * already landed where Direction D wants it. */
   --fs-micro: 11px;    /* uppercase eyebrows, column heads */
   --fs-mini: 12px;     /* meta, captions */
   --fs-body: 13px;     /* table cells, list rows */
@@ -56,12 +68,12 @@
   --fs-lead: 17px;     /* panel lead numbers */
   --fs-num: 21px;      /* instrument readouts */
   --fs-display: 32px;  /* headline figures */
-  --lead: 1.45;
+  --lead: 1.5;
 
-  --row-h: 30px;       /* table row — follows --fs-body up */
-  --ctl-h: 32px;       /* buttons / inputs */
-  --chrome-h: 46px;    /* top bar height */
-  --nav-pad-y: 15px;   /* area nav vertical padding (sets the tab hit area) */
+  --row-h: 40px;       /* table row — roomier than the console */
+  --ctl-h: 36px;       /* buttons / inputs */
+  --chrome-h: 60px;    /* top bar height */
+  --nav-pad-y: 20px;   /* area nav vertical padding (sets the tab hit area) */
 }
 
 [data-density="compact"] {
@@ -74,9 +86,6 @@
   --space-7: 18px;
   --space-8: 24px;
 
-  /* Compact keeps its job — more on screen — but is pulled up with the cozy
-   * scale so that it is "tighter", not "unreadable". It now lands roughly
-   * where cozy used to be. */
   --fs-micro: 10px;
   --fs-mini: 11px;
   --fs-body: 12px;
@@ -84,110 +93,120 @@
   --fs-lead: 15px;
   --fs-num: 19px;
   --fs-display: 28px;
-  --lead: 1.32;
+  --lead: 1.35;
 
-  --row-h: 25px;
-  --ctl-h: 28px;
-  --chrome-h: 40px;
-  --nav-pad-y: 12px;
-}
-
-/* ---------------------------------------------------------------- dark ---- */
-:root,
-[data-theme="dark"] {
-  color-scheme: dark;
-
-  --surface-0: #0B0E13;
-  --surface-1: #151A21;
-  --surface-2: #1B212A;
-
-  --text-1: #E6EAF0;
-  --text-2: #9AA4B2;
-  --text-3: #6E7A8A;
-
-  --line: #232A34;
-  --line-soft: #1D242D;
-  --track: #1E252F;
-
-  --accent: #3987e5;
-  --accent-fg: #6da7ec;
-  --accent-on: #FFFFFF;
-
-  /* chrome = the dark bezel; identical in light theme by design */
-  --chrome: #0E1218;
-  --chrome-edge: #000000;
-  --chrome-text-1: #FFFFFF;
-  --chrome-text-2: #8C97A8;
-  --chrome-text-3: #6B7788;
-  --chrome-line: rgba(255, 255, 255, .09);
-  --chrome-hover: rgba(255, 255, 255, .05);
-  --chrome-active: rgba(57, 135, 229, .16);
-
-  --overlay: rgba(3, 5, 9, .66);
-  --shadow-1: 0 1px 2px rgba(0, 0, 0, .45);
-  --shadow-2: 0 14px 40px rgba(0, 0, 0, .58);
-
-  --tone-ok-border: #0ca30c;
-  --tone-ok-bg: #0F2A14;
-  --tone-ok-fg: #3ec93e;
-  --tone-warn-border: #fab219;
-  --tone-warn-bg: #2E2410;
-  --tone-warn-fg: #fab219;
-  --tone-crit-border: #d03b3b;
-  --tone-crit-bg: #2C1417;
-  --tone-crit-fg: #f07070;
-  --tone-info-border: #3987e5;
-  --tone-info-bg: #132437;
-  --tone-info-fg: #6da7ec;
-  --tone-neutral-border: #8b929e;
-  --tone-neutral-bg: #1E242D;
-  --tone-neutral-fg: #9AA4B2;
+  --row-h: 32px;
+  --ctl-h: 30px;
+  --chrome-h: 48px;
+  --nav-pad-y: 14px;
 }
 
 /* --------------------------------------------------------------- light ---- */
+:root,
 [data-theme="light"] {
   color-scheme: light;
 
-  --surface-0: #EEF1F5;
+  --surface-0: #FFFFFF;
   --surface-1: #FFFFFF;
-  --surface-2: #F5F7FA;
+  --surface-2: #F7F4EE;
+  --surface-hover: #E5F2F9;
 
-  --text-1: #12161C;
-  --text-2: #414B59;
-  --text-3: #6E7A8A;
+  --text-1: #313638;
+  --text-2: #5B6164;
+  --text-3: #6E7578;
 
-  --line: #DDE2E9;
-  --line-soft: #E7EBF0;
-  --track: #E9EDF2;
+  --line: #E6E2DA;
+  --line-soft: #F0EDE6;
+  --track: #EEEAE2;
 
-  --accent: #2a78d6;
-  --accent-fg: #1c5cab;
+  --accent: #FF5500;
+  --accent-fg: #C24300;
   --accent-on: #FFFFFF;
+  --brand-deep: #2D454C;
 
-  --chrome: #12161C;
-  --chrome-edge: #05070A;
-  --chrome-text-1: #FFFFFF;
-  --chrome-text-2: #8C97A8;
-  --chrome-text-3: #6B7788;
-  --chrome-line: rgba(255, 255, 255, .10);
-  --chrome-hover: rgba(255, 255, 255, .06);
-  --chrome-active: rgba(57, 135, 229, .22);
+  /* chrome is light now: same paper as the page, one hairline below */
+  --chrome: #FFFFFF;
+  --chrome-edge: #E6E2DA;
+  --chrome-text-1: #313638;
+  --chrome-text-2: #5B6164;
+  --chrome-text-3: #6E7578;
+  --chrome-line: #E6E2DA;
+  --chrome-hover: #F7F4EE;
+  --chrome-active: #F7F4EE;
 
-  --overlay: rgba(18, 22, 28, .38);
-  --shadow-1: 0 1px 2px rgba(18, 22, 28, .10);
-  --shadow-2: 0 14px 40px rgba(18, 22, 28, .22);
+  --overlay: rgba(49, 54, 56, .38);
+  --shadow-1: none;
+  --shadow-2: none;
 
-  /* borders keep the dark-theme hue — the mark is the constant */
-  --tone-ok-bg: #E4F3E4;
-  --tone-ok-fg: #0a7d0a;
-  --tone-warn-bg: #FBF0D8;
-  --tone-warn-fg: #8a5d00;
-  --tone-crit-bg: #FAE6E6;
-  --tone-crit-fg: #c22f2f;
-  --tone-info-bg: #E3EEFB;
-  --tone-info-fg: #1c5cab;
-  --tone-neutral-bg: #EDF0F4;
-  --tone-neutral-fg: #5c6472;
+  --tone-ok-border: #166644;
+  --tone-ok-bg: #E7F1EC;
+  --tone-ok-fg: #166644;
+  --tone-warn-border: #FFA22F;
+  --tone-warn-bg: #FFF3E0;
+  --tone-warn-fg: #8A5600;
+  --tone-crit-border: #BE122F;
+  --tone-crit-bg: #F9E6E9;
+  --tone-crit-fg: #BE122F;
+  --tone-info-border: #2D454C;
+  --tone-info-bg: #E5F2F9;
+  --tone-info-fg: #2D454C;
+  --tone-neutral-border: #9AA3A6;
+  --tone-neutral-bg: #F1F0EC;
+  --tone-neutral-fg: #5B6164;
+}
+
+/* ---------------------------------------------------------------- dark ---- */
+/* Secondary theme: kept for operators who prefer it, tuned to the same
+   brand hues; not the design origin any more. */
+[data-theme="dark"] {
+  color-scheme: dark;
+
+  --surface-0: #1B1F21;
+  --surface-1: #232829;
+  --surface-2: #2B3133;
+  --surface-hover: #2D454C;
+
+  --text-1: #F2F0EB;
+  --text-2: #B9B4AA;
+  --text-3: #8A9296;
+
+  --line: #3A4043;
+  --line-soft: #30363A;
+  --track: #30363A;
+
+  --accent: #FF5500;
+  --accent-fg: #FF7A33;
+  --accent-on: #FFFFFF;
+  --brand-deep: #9CC3CF;
+
+  --chrome: #232829;
+  --chrome-edge: #3A4043;
+  --chrome-text-1: #F2F0EB;
+  --chrome-text-2: #B9B4AA;
+  --chrome-text-3: #8A9296;
+  --chrome-line: #3A4043;
+  --chrome-hover: #2B3133;
+  --chrome-active: #2B3133;
+
+  --overlay: rgba(0, 0, 0, .6);
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, .45);
+  --shadow-2: 0 14px 40px rgba(0, 0, 0, .58);
+
+  --tone-ok-border: #166644;
+  --tone-ok-bg: #16302A;
+  --tone-ok-fg: #6FCF97;
+  --tone-warn-border: #FFA22F;
+  --tone-warn-bg: #3A2A12;
+  --tone-warn-fg: #FFC168;
+  --tone-crit-border: #BE122F;
+  --tone-crit-bg: #3A1A21;
+  --tone-crit-fg: #F08A97;
+  --tone-info-border: #2D454C;
+  --tone-info-bg: #1F3238;
+  --tone-info-fg: #9CC3CF;
+  --tone-neutral-border: #9AA3A6;
+  --tone-neutral-bg: #2B3133;
+  --tone-neutral-fg: #B9B4AA;
 }
 
 /* Tone carrier: any element with data-tone="ok|warn|crit|info|neutral" exposes

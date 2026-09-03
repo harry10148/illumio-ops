@@ -19,8 +19,14 @@ body {
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition: none !important; animation: none !important; } }
 
-.mono, .num {
+.mono {
   font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -.01em;
+}
+/* readouts and table numbers: Montserrat tabular figures, not the code face */
+.num {
+  font-family: var(--font-num);
   font-variant-numeric: tabular-nums;
   letter-spacing: -.01em;
 }
@@ -51,15 +57,15 @@ body {
 }
 
 .brand { display: flex; align-items: baseline; gap: var(--space-4); text-decoration: none; flex: none; }
-.brand b { font-size: var(--fs-lead); font-weight: 700; letter-spacing: -.01em; color: var(--chrome-text-1); }
+.brand b { font-family: var(--font-display); font-size: var(--fs-lead); font-weight: 700; letter-spacing: -.01em; color: var(--chrome-text-1); }
 .brand i {
   width: 5px; height: 5px; border-radius: 1px;
   background: var(--accent); display: inline-block; font-style: normal;
   align-self: center;
 }
 .brand span {
-  font-family: var(--font-mono); font-size: var(--fs-micro);
-  color: var(--chrome-text-3); letter-spacing: .18em; text-transform: uppercase;
+  font-family: var(--font-display); font-size: var(--fs-micro); font-weight: 700;
+  color: var(--accent-fg); letter-spacing: .18em; text-transform: uppercase;
 }
 
 .areanav { display: flex; gap: 1px; flex: 1; min-width: 0; overflow: hidden; }
@@ -71,6 +77,7 @@ body {
   color: var(--chrome-text-2);
   font-size: var(--fs-micro); font-weight: 600;
   letter-spacing: .12em; text-transform: uppercase;
+  transition: background-color .15s ease, color .15s ease;
 }
 .areanav a u { text-decoration: none; font-size: var(--fs-body); letter-spacing: 0; font-weight: 400; }
 .areanav a:hover { color: var(--chrome-text-1); background: var(--chrome-hover); }
@@ -109,8 +116,8 @@ body {
   font-family: var(--font-ui);
 }
 .userchip .avatar {
-  width: 24px; height: 24px; border-radius: var(--radius-s);
-  background: var(--accent); color: var(--accent-on);
+  width: 28px; height: 28px; border-radius: 50%;
+  background: var(--brand-deep); color: var(--accent-on);
   display: grid; place-items: center;
   font-size: var(--fs-micro); font-weight: 700; flex: none;
 }
@@ -285,7 +292,7 @@ body {
   font-size: var(--fs-micro); font-weight: 600; letter-spacing: .12em; text-transform: uppercase;
 }
 .subnav a:hover { border-color: var(--accent); color: var(--accent-fg); }
-.subnav a[aria-current] { background: var(--accent); border-color: var(--accent); color: var(--accent-on); }
+.subnav a[aria-current] { background: var(--surface-2); border-color: var(--accent); color: var(--accent-fg); box-shadow: inset 0 -2px 0 var(--accent); }
 
 .wb { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: var(--space-5); align-items: start; }
 .wb.solo { grid-template-columns: minmax(0, 1fr); }

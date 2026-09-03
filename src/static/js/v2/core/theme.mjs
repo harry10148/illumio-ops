@@ -30,16 +30,16 @@ function emit() {
 }
 
 export const theme = {
-  get() { return document.documentElement.dataset.theme === "light" ? "light" : "dark"; },
+  get() { return document.documentElement.dataset.theme === "dark" ? "dark" : "light"; },
   set(value) {
-    const next = THEMES.indexOf(value) >= 0 ? value : "dark";
+    const next = THEMES.indexOf(value) >= 0 ? value : "light";
     document.documentElement.dataset.theme = next;
     write(KEY_THEME, next);
     emit();
     return next;
   },
   toggle() { return this.set(this.get() === "dark" ? "light" : "dark"); },
-  stored() { return read(KEY_THEME, THEMES, "dark"); },
+  stored() { return read(KEY_THEME, THEMES, "light"); },
 };
 
 export const density = {

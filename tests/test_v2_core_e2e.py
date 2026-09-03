@@ -163,19 +163,19 @@ def test_theme_and_density_persist_across_reload(v2_page):
     page, base_url = v2_page
     _goto_overview(page, base_url)
 
-    assert page.evaluate("document.documentElement.dataset.theme") == "dark"
+    assert page.evaluate("document.documentElement.dataset.theme") == "light"
     assert page.evaluate("document.documentElement.dataset.density") == "cozy"
 
     page.evaluate(
         "async () => { const { theme, density } = await import('/static/js/v2/core/theme.mjs'); "
-        "theme.set('light'); density.set('compact'); }"
+        "theme.set('dark'); density.set('compact'); }"
     )
-    assert page.evaluate("document.documentElement.dataset.theme") == "light"
+    assert page.evaluate("document.documentElement.dataset.theme") == "dark"
     assert page.evaluate("document.documentElement.dataset.density") == "compact"
 
     page.reload()
     page.wait_for_selector('body[data-booted="true"]')
-    assert page.evaluate("document.documentElement.dataset.theme") == "light"
+    assert page.evaluate("document.documentElement.dataset.theme") == "dark"
     assert page.evaluate("document.documentElement.dataset.density") == "compact"
 
 

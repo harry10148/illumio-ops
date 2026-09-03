@@ -151,21 +151,22 @@ def test_user_menu_segmented_controls_switch_theme_and_density(v2_page):
     #/system/display page writes — proven by reading <html>'s dataset."""
     page, base_url = v2_page
     _boot(page, base_url)
-    assert page.evaluate("document.documentElement.dataset.theme") == "dark"
+    # v3 (Direction D, 2026-09-04): light is the default theme.
+    assert page.evaluate("document.documentElement.dataset.theme") == "light"
     assert page.evaluate("document.documentElement.dataset.density") == "cozy"
 
     page.click(".userchip")
     page.wait_for_selector(".usermenu-pop")
-    # First .seg is theme, second is density (shell.mjs builds them in that
-    # order); the second button in each is the non-default value.
-    page.locator(".usermenu-pop .seg").nth(0).locator("button").nth(1).click()
+    # First .seg is theme (buttons dark, light), second is density (cozy,
+    # compact); pick the non-default value in each.
+    page.locator(".usermenu-pop .seg").nth(0).locator("button").nth(0).click()
     page.locator(".usermenu-pop .seg").nth(1).locator("button").nth(1).click()
 
-    assert page.evaluate("document.documentElement.dataset.theme") == "light"
+    assert page.evaluate("document.documentElement.dataset.theme") == "dark"
     assert page.evaluate("document.documentElement.dataset.density") == "compact"
     # ...and the controls reflect the state they just set (onDisplayChange).
     assert (
-        page.locator(".usermenu-pop .seg").nth(0).locator("button").nth(1)
+        page.locator(".usermenu-pop .seg").nth(0).locator("button").nth(0)
         .get_attribute("aria-pressed") == "true"
     )
 
@@ -287,7 +288,7 @@ def test_palette_display_command_toggles_the_theme_for_real(v2_page):
     page, base_url = v2_page
     _boot(page, base_url)
     labels = _labels(page)
-    assert page.evaluate("document.documentElement.dataset.theme") == "dark"
+    assert page.evaluate("document.documentElement.dataset.theme") == "light"
 
     page.keyboard.press("Control+k")
     page.locator('[data-cov="XC-02"]').wait_for(state="visible")
@@ -300,7 +301,7 @@ def test_palette_display_command_toggles_the_theme_for_real(v2_page):
     )
     page.keyboard.press("Enter")
 
-    assert page.evaluate("document.documentElement.dataset.theme") == "light"
+    assert page.evaluate("document.documentElement.dataset.theme") == "dark"
     page.evaluate(
         "async () => { const { theme } = "
         "await import('/static/js/v2/core/theme.mjs'); theme.set('dark'); }"
