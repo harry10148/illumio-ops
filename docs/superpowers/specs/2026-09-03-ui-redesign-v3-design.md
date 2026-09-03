@@ -58,7 +58,8 @@ IA：六區切法不直覺、首頁不能幫忙做決定、操作流程太長太
 
 - 「自動化」區取消：rule scheduler → 政策；報表排程 → 報表；背景 job 健康 → 設定（首頁只顯示摘要燈）。
 - 告警管道不再讀寫分離：狀態與連線設定都在設定區；「測試告警」與 watermark 重置也在設定區。
-- 頂欄：品牌字（`illumio-ops`＋環境名）｜五區導覽｜五燈健康摘要（點開 popover）｜⌘K｜使用者。健康燈全頁常駐（v2 只在總覽），因為五區導覽本身變短、頂欄有空間。
+- 頂欄：品牌字（`illumio-ops`＋環境名）｜五區導覽｜五燈健康摘要（Jobs／PCE／Lag／SIEM／Channels，同 `health_line.py`；點開 popover）｜⌘K｜使用者。
+- ★ **待裁決**：頂欄健康燈改為**全頁常駐**。這推翻 2026-08-05「僅總覽區顯示」的裁決，理由是五區導覽變短、頂欄有空間；本項未在 §1–§3 口頭核可時明示，需使用者另行同意，否則沿用「只在首頁」。
 - URL：每區／子視圖穩定 hash 路由，**帶狀態**（§4b）。
 
 ### 1.1 路由表
@@ -86,7 +87,7 @@ IA：六區切法不直覺、首頁不能幫忙做決定、操作流程太長太
 | 問題 | 卡 | 資料源（既有端點） | 去處 |
 |---|---|---|---|
 | 要處理什麼 | 需要你處理：`status=new` 的告警依嚴重度列前 4 則＋計數 | `GET /api/alerts`（新，§4a） | 收件匣 |
-| 系統好不好 | 系統健康：一句話結論＋六燈（job／PCE／lag／SIEM／管道／VEN） | `/api/status`、`/api/dashboard/overview` | 設定各頁 |
+| 系統好不好 | 系統健康：一句話結論＋六燈（頂欄五燈＋VEN；VEN 只在首頁卡，不進頂欄） | `/api/status`、`/api/dashboard/overview` | 設定各頁 |
 | 今天會動什麼 | 今天會發生：rule scheduler 當日時間點、報表排程、retention | `rs_schedules`、`report_schedules`、cache settings | 政策／報表 |
 | 資料可不可信 | 7 天流量決策：allowed／potentially blocked／unknown／blocked 一條堆疊帶＋較前期變化＋一句解讀 | `dashboard_overview.blocked` | 調查／流量 |
 | 態勢往哪走 | 安全態勢：posture 分數＋三分量 | `dashboard_overview.posture` | readiness 報表 |
@@ -136,10 +137,10 @@ v2「不動後端」在 v3 解除；以下三項是產品程式碼變更，各�
 
 ### 4a. 告警落地
 
-- Hook 點：`Reporter.send_alerts` 派送完成後逐則寫入（含 DLQ 重播的告警；`force_test` 不寫）。
+- Hook 點：`Reporter.send_alerts`。**首次派送嘗試時就寫入**（不論成敗），鍵為 `(type, rule_index, fired_at)`；DLQ 重播時以同鍵**更新** `dispatch_json`，不新增列（否則每則先失敗後成功的告警會出現兩次）。`force_test` 不寫。
 - 儲存：新 SQLite `logs/alerts.sqlite`（`state.json` 為單一 JSON 不宜無限成長；pce_cache DB 有自己的 `user_version` 升級流程，不混入）。檔案由 service 帳號建立，權限 0600；安裝／升級腳本不預建。
 - 欄位：`id, fired_at, type(event|traffic|bandwidth|system), rule_index, rule_name, severity, summary, criteria, payload_json, dispatch_json, status(new|ack|done), status_by, status_at`。
-- 端點：`GET /api/alerts?status&type&since&page`、`GET /api/alerts/<id>`、`PATCH /api/alerts/<id>` `{status}`（CSRF 同既有規則）。
+- 端點：`GET /api/alerts?status&type&since&page`、`GET /api/alerts/<id>`、`GET /api/alerts/<id>/traffic_query`（§4b 用；由該告警的規則重建 FilterBar query spec）、`PATCH /api/alerts/<id>` `{status}`（CSRF 同既有規則）。
 - 保留：沿用 archive retention 天數，由同一個 retention job 清理。
 
 ### 4b. 路由帶狀態
@@ -167,7 +168,7 @@ v2「不動後端」在 v3 解除；以下三項是產品程式碼變更，各�
 
 | 項目 | 值 |
 |---|---|
-| 字型 | 標題 Montserrat Light 300（`--font-display`）；數字 Montserrat tabular；內文 Noto Sans TC → PingFang TC → Microsoft JhengHei；離線部署以本地字檔內嵌，不依賴 Google Fonts |
+| 字型 | 標題 Montserrat Light 300（`--font-display`）；數字 Montserrat tabular；內文 Noto Sans TC → PingFang TC → Microsoft JhengHei。離線部署**只內嵌 Montserrat**（Latin 子集，woff2 約 4 個字重 <100KB），CJK 沿 v2 走系統字型，不把 Noto Sans TC（每字重數 MB）塞進 bundle；不依賴 Google Fonts |
 | 面 | 白 `#FFFFFF` 主面；Tan `#F7F4EE` 次要面（目前分頁、chip、次要區塊）；Cerulean `#E5F2F9` 僅表格 hover／選取 |
 | 墨 | Slate `#313638` 主文字；`#5B6164` 次；`#8A9296` 眉標／meta；線 `#E6E2DA`／`#F0EDE6` |
 | 強調 | Orange `#FF5500` **只給動作**：主按鈕、連結、目前分頁底線、頁首關鍵數字。禁止大面積、禁止放在 Tan 上當文字 |

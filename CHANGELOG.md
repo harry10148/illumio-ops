@@ -390,6 +390,14 @@ a plain `<major>.<minor>.<patch>` scheme. (Tags through v4.0.0 carried a
 
 ### Fixed
 
+- Audit report tables now translate their 13 snake_case column headings
+  (`COL_I18N` lacked the snake_case keys, so `t()` fell back to humanised English).
+- The executive-summary grade KPI carries its semantic tone in every renderer,
+  including the readiness report's own KPI strip, which bypassed the shared one.
+- An app summary with no matching records still shows the searched date range
+  on its cover instead of dropping it on the empty-result path.
+- The rule-scheduler heartbeat test counts state writes instead of comparing
+  file timestamps, which collided within one filesystem tick on CI.
 - **Installing the offline bundle no longer uninstalls packages from the host's
   own Python environment.** The bundled interpreter is not marked
   externally-managed, so pip did not hold back from the host's user
