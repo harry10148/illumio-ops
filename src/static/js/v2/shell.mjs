@@ -39,11 +39,14 @@ class Area {
   }
 }
 
+// v3 (spec §1, 2026-09-04): five task-oriented areas. "automation" was
+// dissolved — rule scheduling lives under policy, report schedules under
+// reports, background jobs under system. The investigate landing becomes
+// the inbox once phase 3B Task 6 ships it; until then it opens on traffic.
 export const AREAS = [
-  new Area("overview", "gui_nav_overview", "#/overview"),
+  new Area("home", "gui_nav_home", "#/home"),
   new Area("investigate", "gui_nav_investigate", "#/investigate/traffic"),
-  new Area("alerting", "gui_nav_alerting", "#/alerting/rules"),
-  new Area("automation", "gui_nav_automation", "#/automation/rules"),
+  new Area("policy", "gui_nav_policy", "#/policy/alert-rules"),
   new Area("reports", "gui_nav_reports", "#/reports"),
   new Area("system", "gui_nav_system", "#/system/pce"),
 ];
@@ -206,7 +209,7 @@ export function buildShell(mountPoint) {
   const menu = userMenu();
 
   const topbar = el("div", { class: "topbar" },
-    el("a", { class: "brand", href: "#/overview" },
+    el("a", { class: "brand", href: "#/home" },
       el("b", { text: "illumio" }), el("i"), el("span", { text: "ops" })),
     nav,
     el("div", { class: "topright" }, paletteBtn, menu.el)

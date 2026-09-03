@@ -96,9 +96,9 @@ import { table, col } from "../components/table.mjs";
 import { palette } from "../components/palette.mjs";
 import { audit } from "../core/audit.mjs";
 
-const R_RULES = "#/automation/rules";
-const R_REPORTS = "#/automation/reports";
-const R_JOBS = "#/automation/jobs";
+const R_RULES = "#/policy/rulesets";
+const R_REPORTS = "#/reports/schedules";
+const R_JOBS = "#/system/jobs";
 
 const SUB_ROUTES = [
   [R_RULES, "gui_rs_tab"],
@@ -106,7 +106,7 @@ const SUB_ROUTES = [
   [R_JOBS, "gui_ov_job_health"],
 ];
 
-// The eager batch for #/automation/rules. rs_ruleset_detail is deliberately
+// The eager batch for #/policy/rulesets. rs_ruleset_detail is deliberately
 // NOT here — see deviation #2 above; it is fetched per selected row.
 const RULE_SNAPS = ["rs_status", "rs_schedules", "rs_rulesets", "rs_logs"];
 const REPORT_SNAPS = ["report_schedules"];

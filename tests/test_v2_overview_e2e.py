@@ -7,7 +7,7 @@ that module's docstring for the harness itself.
 Covers:
   - every OV-01..OV-16 coverage anchor (design/v2/coverage.yaml's overview
     subset) is present in the DOM after window.__openAllForAudit() on
-    #/overview.
+    #/home.
   - the OV-04 custom-query CRUD round trip through the REAL
     POST/DELETE /api/dashboard/queries endpoints, driven by real UI clicks
     (button clicks + form fill, not an api.post()/api.del() bypass): create
@@ -18,7 +18,7 @@ Covers:
   - the posture-detail drawer (OV-02) opens and Escape closes it.
   - a "go to" header button (present on every read-only card) navigates to
     another area — URL hash and mounted content both change.
-  - S2 teardown: navigating away from #/overview closes a drawer this area
+  - S2 teardown: navigating away from #/home closes a drawer this area
     left open. drawer.mjs/modal.mjs have no per-area scoping of their own
     (closeAll() is global), so this is the only externally observable proof
     that mountOverview()'s router.onChange teardown actually ran.
@@ -56,7 +56,7 @@ from tests.v2_e2e_utils import build_v2_app, _LiveServer, v2_login  # noqa: E402
 
 
 def _goto_overview(page, base_url):
-    page.goto(base_url + "/#/overview")
+    page.goto(base_url + "/#/home")
     page.wait_for_selector('body[data-booted="true"]')
 
 
@@ -400,7 +400,7 @@ def test_legacy_scalar_query_edit_preserves_filters_on_save(v2_context, temp_con
         page = v2_context.new_page()
         page.set_default_timeout(10_000)
         try:
-            page.goto(base_url + "/#/overview")
+            page.goto(base_url + "/#/home")
             page.wait_for_selector('body[data-booted="true"]')
 
             panel = page.locator('section[data-cov="OV-04"]')
@@ -437,7 +437,7 @@ def test_legacy_scalar_query_edit_preserves_filters_on_save(v2_context, temp_con
         page2 = v2_context.new_page()
         page2.set_default_timeout(10_000)
         try:
-            page2.goto(base_url + "/#/overview")
+            page2.goto(base_url + "/#/home")
             page2.wait_for_selector('body[data-booted="true"]')
             queries = page2.evaluate(
                 "async () => { const { api } = await import('/static/js/v2/core/api.mjs'); "
@@ -515,7 +515,7 @@ def test_goto_link_navigates_to_another_area(v2_page):
 
 
 def test_teardown_closes_drawer_on_navigate_away(v2_page):
-    """S2 acceptance: leaving #/overview must not strand an open drawer.
+    """S2 acceptance: leaving #/home must not strand an open drawer.
     Fails against a mountOverview() with no router.onChange teardown (the
     drawer would still be in the DOM after the hash change below)."""
     page, base_url = v2_page

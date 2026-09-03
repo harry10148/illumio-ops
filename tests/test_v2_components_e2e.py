@@ -34,7 +34,7 @@ pytest_plugins = ["tests.v2_e2e_utils"]
 
 
 def _goto_overview(page, base_url):
-    page.goto(base_url + "/#/overview")
+    page.goto(base_url + "/#/home")
     page.wait_for_selector('body[data-booted="true"]')
 
 
@@ -231,7 +231,7 @@ def test_table_column_resize_drag_changes_width(v2_page):
     )
     grip = page.locator("#test-table .tbl-grip").first
     grip.wait_for(state="visible")
-    # Task 4: #/overview now mounts the real 16-card board (previously a
+    # Task 4: #/home now mounts the real 16-card board (previously a
     # 2-line placeholder), so #test-table — appended straight to
     # document.body, after the board — lands far below the 720px viewport
     # (verified: page scrollHeight ~1844px). bounding_box() does not

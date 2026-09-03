@@ -43,7 +43,7 @@ pytest_plugins = ["tests.v2_e2e_utils"]
 from tests.v2_e2e_utils import v2_login  # noqa: E402
 
 
-def _boot(page, base_url, route="#/overview"):
+def _boot(page, base_url, route="#/home"):
     page.goto(base_url + "/" + route)
     page.wait_for_selector('body[data-booted="true"]')
 
@@ -90,7 +90,7 @@ def test_nav_highlight_follows_in_page_navigation(v2_page):
     _boot(page, base_url)
 
     nav = page.locator('[data-cov="XC-14"]')
-    assert nav.locator("a[aria-current]").get_attribute("href") == "#/overview"
+    assert nav.locator("a[aria-current]").get_attribute("href") == "#/home"
 
     page.click('[data-cov="XC-14"] a[href="#/reports"]')
     page.wait_for_function(
@@ -242,13 +242,13 @@ def test_palette_exists_hidden_from_boot_and_opens_on_the_shortcut(v2_page):
 
     page.keyboard.press("Control+k")
     wrap.wait_for(state="visible")
-    # Seeded by shell.mjs's seedPalette(): the six area jumps, each labelled
-    # with its landing route, all present before the user types anything.
+    # Seeded by shell.mjs's seedPalette(): the five area jumps (v3), each
+    # labelled with its landing route, all present before the user types.
     # (The list also holds whatever route-scoped commands the mounted area
-    # registered, so this checks the six by name rather than by total count.)
+    # registered, so this checks the five by name rather than by total count.)
     texts = page.locator('[data-cov="XC-02"] li[role="option"]').all_inner_texts()
-    for route in ("#/overview", "#/investigate/traffic", "#/alerting/rules",
-                  "#/automation/rules", "#/reports", "#/system/pce"):
+    for route in ("#/home", "#/investigate/traffic", "#/policy/alert-rules",
+                  "#/reports", "#/system/pce"):
         assert any(route in txt for txt in texts), (route, texts)
 
     page.keyboard.press("Escape")

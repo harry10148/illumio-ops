@@ -52,7 +52,7 @@ import threading
 import yaml
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
-COVERAGE_YAML = ROOT / "design" / "v2" / "coverage.yaml"
+COVERAGE_YAML = ROOT / "design" / "v3" / "coverage.yaml"
 
 USERNAME = "coverage-gate"
 PASSWORD = "coverage-gate-password"

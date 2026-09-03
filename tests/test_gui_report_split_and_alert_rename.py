@@ -56,7 +56,7 @@ def test_tab_alerts_label():
 # tests against the real endpoints:
 #
 #   ad-hoc report cards + generate drawer   tests/test_v2_reports_e2e.py (RP-01/RP-02)
-#   report schedules and their type list    tests/test_v2_automation_e2e.py (#/automation/reports)
+#   report schedules and their type list    tests/test_v2_automation_e2e.py (#/reports/schedules)
 #   the Alerts area label                   tests/test_v2_shell_e2e.py (XC-14 nav, gui_nav_alerting)
 #
 # CORRECTION (Task 11 review, Important 1). This block originally also claimed

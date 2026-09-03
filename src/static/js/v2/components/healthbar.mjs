@@ -87,7 +87,7 @@ class Light {
 
 // ── 1 · Daemon / 排程 ────────────────────────────────────────────────────────
 function jobsLight(ov) {
-  const light = new Light("jobs", t("gui_ov_job_health"), "#/automation/jobs");
+  const light = new Light("jobs", t("gui_ov_job_health"), "#/system/jobs");
   const jobs = (ov && ov.job_health) || [];
   const bad = jobs.filter(function (j) { return j.level !== "ok"; });
   const okCount = jobs.length - bad.length;
@@ -349,7 +349,7 @@ export const healthbar = {
 
     // Every light's popover carries reasons the gate must be able to see.
     // The opener stays global (the rail outlives any single mount) but no-ops
-    // while the rail is detached — the area only attaches this on #/overview,
+    // while the rail is detached — the area only attaches this on #/home,
     // and opening popovers in a detached tree would inflate the audit's
     // "opened" count on every other route for surfaces nobody can see.
     audit.registerGlobal("healthbar", function () {

@@ -457,8 +457,8 @@ def test_async_job_polling_stops_on_navigation_away(v2_page):
 
     # Navigate away — module-level stopProgress() (path !== ROUTE) must
     # cancel the pending setTimeout, and the docked card must detach.
-    page.evaluate("location.hash = '#/overview'")
-    page.wait_for_selector('[data-route="#/overview"]')
+    page.evaluate("location.hash = '#/home'")
+    page.wait_for_selector('[data-route="#/home"]')
     assert page.locator('[data-cov="XC-07"]').count() == 0
 
     # B1: wait past another full poll interval. If stopProgress() failed to

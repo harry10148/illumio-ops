@@ -52,11 +52,11 @@ pytest_plugins = ["tests.v2_e2e_utils"]
 # means now. Kept explicit rather than derived so a route silently disappearing
 # from the shell shows up as a test that stopped covering it.
 AREA_ROUTES = [
-    "#/overview",
-    "#/investigate/traffic", "#/investigate/workloads", "#/investigate/events",
-    "#/alerting/rules", "#/alerting/ops",
-    "#/automation/rules", "#/automation/reports", "#/automation/jobs",
-    "#/reports",
+    "#/home",
+    "#/investigate/inbox", "#/investigate/traffic", "#/investigate/workloads", "#/investigate/events",
+    "#/policy/alert-rules", "#/policy/rulesets", "#/policy/schedules", "#/policy/ops",
+    "#/reports", "#/reports/schedules",
+    "#/system/jobs", "#/system/alerting",
     "#/system/pce", "#/system/cache", "#/system/siem", "#/system/tls",
     "#/system/security", "#/system/display", "#/system/channels", "#/system/logs",
 ]
@@ -76,8 +76,8 @@ AREA_ROUTES = [
 #   #/system/display     "...the hardcoded literal \"Theme\" (settings.js:448,
 #                         no data-i18n); this page uses the existing gui_theme..."
 #   #/reports            "...newest per report_type (the filename prefix rules...)"
-#   #/automation/reports "...Every key report_schedules carries is listed..."
-#   #/alerting/ops       an <code> chip naming the alert_history field
+#   #/reports/schedules "...Every key report_schedules carries is listed..."
+#   #/policy/ops       an <code> chip naming the alert_history field
 #
 # So the match is anchored instead: a LEAKED key is a text node whose ENTIRE
 # content is the key, which is exactly what an unresolved t()/tf() renders
@@ -121,13 +121,13 @@ _TEXT_NODES_JS = """() => {
 }"""
 
 
-def _boot(page, base_url, route="#/overview"):
+def _boot(page, base_url, route="#/home"):
     page.goto(base_url + "/" + route)
     # 90s, not the 10s default. app.mjs sets data-booted only after
     # `Promise.all([mountHealth, router.start])`, and router.start() awaits the
     # FIRST route's mount — so a cold load of an area that fetches from the PCE
     # blocks this flag for as long as that fetch takes. Against this harness's
-    # unreachable PCE, #/automation/rules waits on get_all_rulesets plus a
+    # unreachable PCE, #/policy/rulesets waits on get_all_rulesets plus a
     # label-cache warm-up, each with its own urllib3 connect-retry budget:
     # measured well past 30s. This is a ceiling on a real wait, not a sleep.
     page.wait_for_selector('body[data-booted="true"]', timeout=90_000)
@@ -159,7 +159,7 @@ def test_landing_page_renders(v2_page):
     assert "illumio" in page.locator("header.chrome .brand").inner_text().lower()
     # The three things that make it a shell and not an error page.
     assert page.locator("#area-root").count() == 1
-    assert page.locator('[data-cov="XC-14"] a').count() == 6
+    assert page.locator('[data-cov="XC-14"] a').count() == 5
 
 
 def test_translation_catalogue_is_loaded(v2_page):
@@ -225,11 +225,11 @@ def test_overview_renders_in_the_configured_language(v2_page):
     )
     # .text_content(), not .inner_text(): the nav label is uppercased by CSS
     # and inner_text() returns the RENDERED text.
-    nav_label = page.locator('[data-cov="XC-14"] a[href="#/overview"] u').text_content()
+    nav_label = page.locator('[data-cov="XC-14"] a[href="#/home"] u').text_content()
     if lang == "zh_TW":
         assert re.search(r"[一-鿿]", nav_label), nav_label
     else:
-        assert nav_label == "Overview", nav_label
+        assert nav_label == "Home", nav_label
 
 
 def test_core_api_endpoints_answer_inside_a_session(v2_page):

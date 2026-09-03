@@ -93,9 +93,9 @@ from playwright.sync_api import expect  # noqa: E402
 # order) are required.
 pytest_plugins = ["tests.v2_e2e_utils"]
 
-R_RULES = "#/automation/rules"
-R_REPORTS = "#/automation/reports"
-R_JOBS = "#/automation/jobs"
+R_RULES = "#/policy/rulesets"
+R_REPORTS = "#/reports/schedules"
+R_JOBS = "#/system/jobs"
 SLOW = 45_000
 
 
@@ -663,11 +663,11 @@ def test_teardown_closes_surfaces_clears_callbacks_and_palette(v2_page):
         "palette.list().find(c => c.id === 'au:sched-rs').run(); }"
     )
     page.locator("aside.drawer").wait_for(state="visible")
-    assert "#/automation/rules" in _palette_routes(page)
+    assert "#/policy/rulesets" in _palette_routes(page)
 
     _navigate(page, R_REPORTS, "AU-11")
     assert page.locator("aside.drawer").count() == 0
-    assert "#/automation/rules" not in _palette_routes(page)
+    assert "#/policy/rulesets" not in _palette_routes(page)
 
     _open_all(page)
     assert page.locator("aside.drawer").count() >= 1

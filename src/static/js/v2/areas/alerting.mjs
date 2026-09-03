@@ -37,8 +37,8 @@ import { palette } from "../components/palette.mjs";
 import { createFilterBar, setFilterBarText, setFilterBarQuery, setFilterBarBrowser } from "../components/filter-bar.mjs";
 import { filterObjectQuery } from "../core/filter-objects.mjs";
 
-const R_RULES = "#/alerting/rules";
-const R_OPS = "#/alerting/ops";
+const R_RULES = "#/policy/alert-rules";
+const R_OPS = "#/policy/ops";
 
 // index.html:1266 (rules sub-tabs) — the product splits the same page into
 // "rules" and "actions"; the v2 area keeps that split as two routes.
@@ -856,7 +856,7 @@ async function mountRules(root, ctx) {
   wrap.appendChild(aside);
   root.appendChild(wrap);
 
-  // AL-06: #/alerting/rules?hl=<index|id>. GET /api/rules/<idx>/highlight
+  // AL-06: #/policy/alert-rules?hl=<index|id>. GET /api/rules/<idx>/highlight
   // (rules.py:515-525) returns that one rule as syntax-highlighted JSON; the
   // hash parameter is the same address in a page that has no backend.
   const hl = ctx.query.get("hl");

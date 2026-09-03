@@ -6,13 +6,13 @@ assertions about the LEGACY src/static/js/integrations.js
 rule-scheduler.js (`colspan="13"`) and index.html — every one of those files
 is gone. The v2 equivalents are real browser tests, not string greps:
 
-  job health table    tests/test_v2_automation_e2e.py (#/automation/jobs, AU-11)
+  job health table    tests/test_v2_automation_e2e.py (#/system/jobs, AU-11)
   job health light    tests/test_v2_shell_e2e.py + core_e2e (XC-01's five lights,
                       src/static/js/v2/components/healthbar.mjs jobsLight)
   TLS card            tests/test_v2_system_e2e.py (#/system/tls, SY-16)
   staleness           tests/test_v2_overview_e2e.py (the overview board's
                       computed_at/generated_at handling)
-  scheduler last-run  tests/test_v2_automation_e2e.py (#/automation/rules)
+  scheduler last-run  tests/test_v2_automation_e2e.py (#/policy/rulesets)
 
 What has no browser equivalent, and is what survives here, is the catalogue
 contract: these keys must exist in BOTH locales or the panels above render

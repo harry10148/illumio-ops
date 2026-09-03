@@ -1,0 +1,111 @@
+# design/v3/coverage.yaml — feature coverage map (v3, five areas)
+# Re-keyed from design/v2/coverage.yaml on 2026-09-04 (phase 3B Task 2): same 101
+# items, routes moved to the five-area table (spec §1.1). Items get their v3 home
+# task by task; XC-15 marks a route whose page is still under construction.
+# item: 功能, route: mockup hash 路由, anchor: data-cov 值
+#
+# === EXCLUSIONS (documented, not in DOM coverage scope) ===
+# CSRF 流程 (_csrfToken/_withFreshCsrf): non-visual mechanism, backend untouched in Phase 1, excluded from DOM coverage — Phase 2 regression scope
+# 說明彈窗 m-help 內容 (篩選語法/policy decisions): folded into XC-11 說明側欄
+OV-01: {item: 系統狀態總覽卡, route: "#/home"}
+OV-02: {item: posture score 卡+詳情, route: "#/home"}
+OV-03: {item: Top Actions 區, route: "#/home"}
+OV-04: {item: 自訂查詢卡 CRUD, route: "#/home"}
+OV-05: {item: Top10 查詢, route: "#/home"}
+OV-06: {item: audit 摘要卡, route: "#/home"}
+OV-07: {item: policy usage 摘要卡, route: "#/home"}
+OV-08: {item: dashboard snapshot, route: "#/home"}
+OV-09: {item: 報表最近產出 meta, route: "#/home"}
+OV-10: {item: pipeline 健康摘要(唯讀), route: "#/home"}
+OV-11: {item: job 健康摘要(唯讀), route: "#/home"}
+OV-12: {item: 資料完整性卡(唯讀), route: "#/home"}
+OV-13: {item: 近期事件表, route: "#/home"}
+OV-14: {item: TLS 卡, route: "#/home"}
+OV-15: {item: 告警管道卡(唯讀), route: "#/home"}
+OV-16: {item: Integrations 狀態卡摘要(_buildOvCards), route: "#/home"}
+IV-01: {item: 流量分析器查詢+KPI, route: "#/investigate/traffic"}
+IV-02: {item: 流量來源切換 即時快取/Archive（actions.py:92-107）, route: "#/investigate/traffic"}
+IV-03: {item: 進階篩選(FilterBar), route: "#/investigate/traffic"}
+IV-04: {item: 流量查詢指南, route: "#/investigate/traffic"}
+IV-05: {item: 流量結果分頁, route: "#/investigate/traffic"}
+IV-06: {item: archive 狀態/範圍, route: "#/investigate/traffic"}
+IV-07: {item: cache backfill, route: "#/investigate/traffic"}
+IV-08: {item: workload 搜尋+分頁, route: "#/investigate/workloads"}
+IV-09: {item: 隔離 apply 單台, route: "#/investigate/workloads"}
+IV-10: {item: 隔離 bulk apply, route: "#/investigate/workloads"}
+IV-11: {item: 隔離 lift, route: "#/investigate/workloads"}
+IV-12: {item: 流量更新加速+倒數, route: "#/investigate/workloads"}
+IV-13: {item: 事件檢視器三層 catalog, route: "#/investigate/events"}
+IV-14: {item: 事件 load-more+詳情卡, route: "#/investigate/events"}
+IV-15: {item: shadow compare, route: "#/investigate/events"}
+AL-01: {item: 規則清單+啟停+刪除, route: "#/policy/alert-rules"}
+AL-02: {item: Event 規則 drawer, route: "#/policy/alert-rules"}
+AL-03: {item: System health 規則 drawer, route: "#/policy/alert-rules"}
+AL-04: {item: Traffic 規則 drawer, route: "#/policy/alert-rules"}
+AL-05: {item: Bandwidth 規則 drawer, route: "#/policy/alert-rules"}
+AL-06: {item: 規則 highlight 定位, route: "#/policy/alert-rules"}
+AL-07: {item: rule_test 沙盤測試, route: "#/policy/alert-rules"}
+AL-08: {item: run-once, route: "#/policy/ops"}
+AL-09: {item: debug 模式, route: "#/policy/ops"}
+AL-10: {item: 測試告警(全+單管道), route: "#/policy/ops"}
+AL-11: {item: watermark 重置, route: "#/policy/ops"}
+AL-12: {item: 最佳實務套用, route: "#/policy/ops"}
+AL-13: {item: 輸出主控台, route: "#/policy/ops"}
+AL-14: {item: 管道狀態卡(唯讀), route: "#/policy/ops"}
+AU-01: {item: rule scheduler 狀態列+KPI, route: "#/policy/rulesets"}
+AU-02: {item: 排程時間軸, route: "#/policy/rulesets"}
+AU-03: {item: ruleset 瀏覽+詳情, route: "#/policy/rulesets"}
+AU-04: {item: rule 個別搜尋, route: "#/policy/rulesets"}
+AU-05: {item: ruleset 層排程 drawer, route: "#/policy/rulesets"}
+AU-06: {item: rule 層排程 drawer, route: "#/policy/rulesets"}
+AU-07: {item: one-time expire_at 語意, route: "#/policy/rulesets"}
+AU-08: {item: 排程清單+PCE 對帳狀態, route: "#/policy/rulesets"}
+AU-09: {item: 立即檢查, route: "#/policy/rulesets"}
+AU-10: {item: 執行紀錄+清除, route: "#/policy/rulesets"}
+AU-11: {item: 報表排程清單 CRUD, route: "#/reports/schedules"}
+AU-12: {item: 報表排程 toggle/run-now/history, route: "#/reports/schedules"}
+AU-13: {item: 背景 job 健康與歷史, route: "#/system/jobs"}
+RP-01: {item: 11 型報表卡+最近產出, route: "#/reports"}
+RP-02: {item: 產生 drawer(型專屬參數), route: "#/reports"}
+RP-03: {item: 產生進度步驟+async 輪詢, route: "#/reports"}
+RP-04: {item: 部分結果處理提示, route: "#/reports"}
+RP-05: {item: RHC enablement 檢查/啟用, route: "#/reports"}
+RP-06: {item: 產出清單 下載/瀏覽, route: "#/reports"}
+RP-07: {item: 產出清單 單刪/批刪, route: "#/reports"}
+RP-08: {item: 報表語言切換, route: "#/reports"}
+RP-09: {item: Labels 查詢輔助, route: "#/reports"}
+SY-02: {item: cache 設定表單, route: "#/system/cache"}
+SY-03: {item: cache 重啟 banner+daemon restart, route: "#/system/cache"}
+SY-04: {item: retention 立即執行, route: "#/system/cache"}
+SY-05: {item: 流量過濾器+IP 驗證, route: "#/system/cache"}
+SY-06: {item: 流量取樣設定, route: "#/system/cache"}
+SY-07: {item: SIEM forwarder 設定, route: "#/system/siem"}
+SY-08: {item: SIEM 目的地 CRUD+條件, route: "#/system/siem"}
+SY-09: {item: SIEM 測試送出, route: "#/system/siem"}
+SY-10: {item: DLQ 搜尋/分頁/回放/清除/匯出/檢視, route: "#/system/siem"}
+SY-11: {item: TLS 狀態/續期/CSR/匯入, route: "#/system/tls"}
+SY-12: {item: 安全設定(認證/session), route: "#/system/security"}
+SY-13: {item: 顯示偏好(主題/密度/時區/語言), route: "#/system/display"}
+SY-14: {item: 告警管道連線設定(5 插件), route: "#/system/channels"}
+SY-15: {item: 模組日誌檢視器, route: "#/system/logs"}
+SY-16: {item: GUI 停止, route: "#/system/security"}
+SY-17: {item: cache 狀態卡+lag 列, route: "#/system/cache"}
+SY-18: {item: 設定 dirty 追蹤+儲存列狀態, route: "#/system/pce"}
+LG-01: {item: 登入表單, route: "login.html"}
+LG-02: {item: 首次登入改密碼, route: "login.html"}
+LG-03: {item: 登出, route: "login.html"}
+XC-01: {item: 全域健康列 5 燈+popover, route: "#/home"}
+XC-02: {item: Cmd+K 指令面板, route: "#/home"}
+XC-03: {item: FilterBar pill/AND-OR/include-exclude/zone, route: "#/investigate/traffic"}
+XC-04: {item: 物件選擇 modal(suggest+browse), route: "#/investigate/traffic"}
+XC-05: {item: 亮暗主題+密度, route: "#/system/display"}
+XC-06: {item: 時區+雙語, route: "#/system/display"}
+XC-07: {item: 統一進度元件(可收合), route: "#/reports"}
+XC-08: {item: 破壞性確認 modal+影響摘要, route: "#/investigate/workloads"}
+XC-09: {item: 空狀態成因提示, route: "#/investigate/traffic"}
+XC-10: {item: 錯誤卡+重試+技術細節, route: "#/home"}
+XC-11: {item: 說明側欄(篩選語法/隔離指南), route: "#/investigate/traffic"}
+XC-12: {item: toast/popover/欄寬拖曳/skeleton, route: "#/investigate/traffic"}
+XC-13: {item: 頂欄使用者選單, route: "#/home"}
+XC-14: {item: URL hash 路由狀態同步, route: "#/home"}
+XC-15: {item: 建置中占位（收件匣／排程／設定-告警，3B 逐任務移除）, route: "#/investigate/inbox"}

@@ -6,7 +6,7 @@ that module's docstring for why this harness had to be built and why it
 lives there rather than inline here.
 
 Covers exactly the brief's Step 2 acceptance list:
-  - #/overview shows the health rail; #/reports does not (XC-01 scope, T2's
+  - #/home shows the health rail; #/reports does not (XC-01 scope, T2's
     syncRail wiring in app.mjs).
   - hash routing switches the mounted area without a page reload.
   - theme AND density persist across a reload (theme.mjs + app.mjs's
@@ -39,7 +39,7 @@ pytest_plugins = ["tests.v2_e2e_utils"]
 
 
 def _goto_overview(page, base_url):
-    page.goto(base_url + "/#/overview")
+    page.goto(base_url + "/#/home")
     page.wait_for_selector('body[data-booted="true"]')
 
 
@@ -55,7 +55,7 @@ def test_v2_boots_with_no_console_errors(v2_page):
 
     _goto_overview(page, base_url)
 
-    # Task 4: #/overview now mounts the real board (areas/overview.mjs),
+    # Task 4: #/home now mounts the real board (areas/overview.mjs),
     # which loads 14 live endpoints. One of them, GET /api/events/viewer,
     # genuinely reaches the PCE and 502s under this fixture's config
     # (build_v2_app points api.url at a closed local port — see
@@ -108,7 +108,7 @@ def test_health_rail_only_on_overview(v2_page):
     page, base_url = v2_page
     _goto_overview(page, base_url)
 
-    # #/overview: the real rail is present, with all five lights.
+    # #/home: the real rail is present, with all five lights.
     rail = page.locator('.rail-host [data-cov="XC-01"]')
     assert rail.count() == 1
     assert rail.locator(".rail-slot").count() == 5
@@ -153,7 +153,7 @@ def test_health_rail_only_on_overview(v2_page):
     # semantics): healthbar.render() runs once at boot off one pair of
     # snapshot loads, so a marker that survived the round trip is the proof
     # the rail is moved rather than rebuilt (a rebuild would also refetch).
-    page.evaluate("location.hash = '#/overview'")
+    page.evaluate("location.hash = '#/home'")
     page.wait_for_selector('.rail-host [data-cov="XC-01"]')
     assert page.locator('.rail-host [data-cov="XC-01"]').get_attribute("data-e2e-marker") == "rail-1"
     assert page.locator('.rail-host [data-cov="XC-01"] .rail-slot').count() == 5
@@ -305,7 +305,7 @@ def test_detaching_the_health_rail_releases_its_popover(v2_page):
     # test_health_rail_only_on_overview proves the identity).
     page.evaluate("location.hash = '#/reports'")
     page.wait_for_selector('[data-route="#/reports"]')
-    page.evaluate("location.hash = '#/overview'")
+    page.evaluate("location.hash = '#/home'")
     page.wait_for_selector('.rail-host [data-cov="XC-01"]')
 
     assert page.locator('.rail-host .rail-cell[aria-expanded="true"]').count() == 0

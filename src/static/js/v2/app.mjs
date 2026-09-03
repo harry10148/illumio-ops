@@ -27,7 +27,9 @@ import { buildShell, applyStatus, seedPalette } from "./shell.mjs";
 // 2). Detach, not hide: `hidden` loses to any `display` rule, and a merely
 // invisible element still shows up in the coverage gate's `[data-cov]` sweep
 // on every route — this mirrors design/v2/mockup/js/app.mjs's syncRail.
-const HEALTH_ROUTE = "#/overview";
+// v3: the rail stays on the home page only (user ruling 2026-09-04, keeping
+// the 2026-08-05 decision). `null` would attach it on every route.
+const HEALTH_ROUTES = ["#/home"];
 let railNode = null;
 
 function pathOf(route) {
@@ -37,7 +39,7 @@ function pathOf(route) {
 
 function syncRail(railHost, path) {
   if (!railNode) return;
-  const on = path === HEALTH_ROUTE;
+  const on = HEALTH_ROUTES === null || HEALTH_ROUTES.indexOf(path) >= 0;
   if (on && railNode.parentNode !== railHost) railHost.appendChild(railNode);
   else if (!on && railNode.parentNode === railHost) {
     railHost.removeChild(railNode);
@@ -119,10 +121,36 @@ async function mountPlaceholder(root, ctx) {
 // sub-routes their own sub-nav links to.
 const AREA_ROUTES = [
   "#/investigate",
-  "#/alerting",
-  "#/automation",
+  "#/policy",
   "#/system",
 ];
+
+// Routes whose page arrives in a later 3B task. They must still mount a real
+// (data-cov'd) surface so the coverage gate and the shell-flows sweep see a
+// mounted area rather than a not-found page.
+async function mountUnderConstruction(root, ctx) {
+  root.appendChild(el("div", { class: "area-head", "data-route": ctx.route },
+    el("h1", { text: t("gui_shell_building_title", "Coming soon") })
+  ));
+  root.appendChild(el("section", { class: "wip", "data-tone": "info", "data-cov": "XC-15" },
+    el("p", { text: t("gui_shell_building_body",
+      "This page is being rebuilt for the five-area layout.") })
+  ));
+}
+
+// v3 route table (spec §1.1). Legacy v2 hashes stay reachable as redirects so
+// bookmarks and the mail/LINE deep links keep working; they use
+// router.replace so Back does not bounce through the old hash.
+const LEGACY_ROUTES = {
+  "#/overview": "#/home",
+  "#/alerting/rules": "#/policy/alert-rules",
+  "#/alerting/ops": "#/policy/ops",
+  "#/alerting": "#/policy/alert-rules",
+  "#/automation/rules": "#/policy/rulesets",
+  "#/automation/reports": "#/reports/schedules",
+  "#/automation/jobs": "#/system/jobs",
+  "#/automation": "#/policy/rulesets",
+};
 
 async function boot() {
   initDisplay();
@@ -146,9 +174,19 @@ async function boot() {
 
   // Lazy per-route import (router.mjs's documented pattern): nothing but
   // this shell fetches until #/overview is actually visited.
-  router.register("#/overview", async function (el2, ctx) {
+  // #/home carries the v2 overview board until 3B Task 5 replaces it with
+  // the status + to-do page.
+  router.register("#/home", async function (el2, ctx) {
     const { mountOverview } = await import("./areas/overview.mjs");
     return mountOverview(el2, ctx);
+  });
+  router.register("#/investigate/inbox", mountUnderConstruction);
+  router.register("#/policy/schedules", mountUnderConstruction);
+  router.register("#/system/alerting", mountUnderConstruction);
+  Object.keys(LEGACY_ROUTES).forEach(function (oldRoute) {
+    router.register(oldRoute, async function (el2, ctx) {
+      router.replace(LEGACY_ROUTES[oldRoute], ctx.query);
+    });
   });
   // Task 5 — the investigate area's three sub-routes, each lazily importing
   // the one module they share. Registered before the placeholder loop would
@@ -166,11 +204,11 @@ async function boot() {
     const { mountEvents } = await import("./areas/investigate.mjs");
     return mountEvents(el2, ctx);
   });
-  router.register("#/alerting/rules", async function (el2, ctx) {
+  router.register("#/policy/alert-rules", async function (el2, ctx) {
     const { mountRules } = await import("./areas/alerting.mjs");
     return mountRules(el2, ctx);
   });
-  router.register("#/alerting/ops", async function (el2, ctx) {
+  router.register("#/policy/ops", async function (el2, ctx) {
     const { mountOps } = await import("./areas/alerting.mjs");
     return mountOps(el2, ctx);
   });
@@ -178,15 +216,15 @@ async function boot() {
   // one module they share (same pattern as investigate/alerting above).
   // "#/automation" itself keeps its placeholder, same reasoning as
   // "#/investigate": no landing page of its own, only the sub-nav's targets.
-  router.register("#/automation/rules", async function (el2, ctx) {
+  router.register("#/policy/rulesets", async function (el2, ctx) {
     const { mountAutoRules } = await import("./areas/automation.mjs");
     return mountAutoRules(el2, ctx);
   });
-  router.register("#/automation/reports", async function (el2, ctx) {
+  router.register("#/reports/schedules", async function (el2, ctx) {
     const { mountAutoReports } = await import("./areas/automation.mjs");
     return mountAutoReports(el2, ctx);
   });
-  router.register("#/automation/jobs", async function (el2, ctx) {
+  router.register("#/system/jobs", async function (el2, ctx) {
     const { mountAutoJobs } = await import("./areas/automation.mjs");
     return mountAutoJobs(el2, ctx);
   });

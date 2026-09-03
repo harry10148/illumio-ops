@@ -1,4 +1,4 @@
-// overview.mjs — #/overview. Anchors OV-01…OV-16 (design/v2/coverage.yaml).
+// overview.mjs — #/home. Anchors OV-01…OV-16 (design/v2/coverage.yaml).
 //
 // PORT OF design/v2/mockup/js/areas/overview.mjs against the live backend.
 // Differences from the frozen mockup:
@@ -71,12 +71,12 @@ import { table, col } from "../components/table.mjs";
 import { palette } from "../components/palette.mjs";
 import { chart } from "../components/chart.mjs";
 
-const ROUTE = "#/overview";
+const ROUTE = "#/home";
 
 /** Minimal area-head: title + route breadcrumb. Small enough (mockup's
  * areas/placeholder.mjs, 5 lines) that duplicating it locally beats pulling
  * in that module's own shell.mjs dependency, which does not exist here. */
-/* The route used to be printed next to the title as `<code>#/overview</code>`.
+/* The route used to be printed next to the title as `<code>#/home</code>`.
  * It is plumbing, not information an operator acts on (UI density spec R4), so
  * it now rides as a data attribute: still a stable hook for the e2e suite's
  * "has this area finished mounting" wait, no longer chrome on the screen. */
@@ -92,7 +92,7 @@ const GO_PCE = "#/system/pce";
 const GO_SIEM = "#/system/siem";
 const GO_TLS = "#/system/tls";
 const GO_CHANNELS = "#/system/channels";
-const GO_JOBS = "#/automation/jobs";
+const GO_JOBS = "#/system/jobs";
 const GO_REPORTS = "#/reports";
 const GO_TRAFFIC = "#/investigate/traffic";
 const GO_EVENTS = "#/investigate/events";
@@ -1594,7 +1594,7 @@ export async function mountOverview(root, ctx) {
 }
 
 /** S2 teardown — self-unsubscribing: the first navigation away from
- *  #/overview destroys this mount's OV-05 chart handle(s) (a real
+ *  #/home destroys this mount's OV-05 chart handle(s) (a real
  *  ResizeObserver leak otherwise), closes any drawer/modal this area left open
  *  (drawer.mjs/modal.mjs are page-global singletons with no per-area scoping,
  *  so closeAll() is the only way to guarantee nothing this mount opened

@@ -26,14 +26,14 @@ OUT = pathlib.Path(os.environ.get(
     "048b4a55-5589-4c71-adde-d2205a4c2b54/scratchpad/redesign"))
 
 ROUTES = [
-    ("overview", "#/overview"),
+    ("overview", "#/home"),
     ("traffic", "#/investigate/traffic"),
-    ("alrules", "#/alerting/rules"),
-    ("aureports", "#/automation/reports"),
+    ("alrules", "#/policy/alert-rules"),
+    ("aureports", "#/reports/schedules"),
     ("reports", "#/reports"),
     ("siem", "#/system/siem"),
-    ("jobs", "#/automation/jobs"),      # status page
-    ("ops", "#/alerting/ops"),          # action page
+    ("jobs", "#/system/jobs"),      # status page
+    ("ops", "#/policy/ops"),          # action page
     ("cache", "#/system/cache"),        # settings page
 ]
 

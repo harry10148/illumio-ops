@@ -45,7 +45,7 @@ STORE_MAP = ROOT / "src" / "static" / "js" / "v2" / "core" / "store-map.mjs"
 
 
 # The anchors every SPA route sees because they live in the chrome, not in any
-# area: the command palette, the user menu, the six-area nav and the sign-out
+# area: the command palette, the user menu, the five-area nav and the sign-out
 # form inside that menu. Used below to separate "this route mounted the shell"
 # from "this route mounted its own content".
 SHELL_ANCHORS = {"XC-02", "XC-13", "XC-14", "LG-03"}
@@ -78,7 +78,7 @@ def test_live_coverage_is_complete(gate_result):
         "the app renders data-cov values that coverage.yaml does not list: %s"
         % gate_result["extra"]
     )
-    assert gate_result["covered"] == gate_result["total"] == 101, gate_result
+    assert gate_result["covered"] == gate_result["total"] == len(gate.expected()), gate_result
 
 
 def test_every_route_contributed_something(gate_result):
@@ -124,9 +124,11 @@ def test_the_route_list_matches_the_coverage_map(gate_result):
     """The shape assertions the previous test used to stand on, kept as their
     own (honestly named) check rather than passed off as the blind-spot guard."""
     routes = gate.routes_from(gate.expected())
-    assert len(routes) == 19, routes
+    # v3 (2026-09-04): the five-area map adds #/investigate/inbox (XC-15 until
+    # 3B Task 6 lands the inbox); the other legacy routes were re-keyed 1:1.
+    assert len(routes) == 20, routes
     assert "login.html" in routes
-    assert sum(1 for r in routes if r.startswith("#")) == 18
+    assert sum(1 for r in routes if r.startswith("#")) == 19
     assert set(routes) == set(gate_result["routes"])
 
 

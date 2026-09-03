@@ -7,7 +7,7 @@
 
 import { audit } from "./audit.mjs";
 
-const DEFAULT_ROUTE = "#/overview";
+const DEFAULT_ROUTE = "#/home";
 
 const routes = new Map();       // "#/area/sub" -> mount(el, ctx)
 const changeListeners = new Set();
@@ -22,6 +22,15 @@ function normalize(hash) {
   if (!h || h === "#" || h === "#/") return DEFAULT_ROUTE;
   if (h.charAt(0) !== "#") h = "#" + (h.charAt(0) === "/" ? "" : "/") + h;
   return h;
+}
+
+function withQuery(route, query) {
+  const base = normalize(route);
+  if (query === undefined || query === null) return base;
+  const params = query instanceof URLSearchParams ? query : new URLSearchParams(query);
+  const qs = params.toString();
+  if (!qs) return base;
+  return (base.indexOf("?") >= 0 ? base + "&" : base + "?") + qs;
 }
 
 function split(route) {
@@ -62,11 +71,25 @@ export const router = {
   /** Mount used for any route with no registration (placeholder areas). */
   setFallback(mount) { fallbackMount = mount; return this; },
 
-  /** go(route) — navigates; re-mounts even when the hash is unchanged. */
-  go(route) {
-    const next = normalize(route);
+  /** go(route, query?) — navigates; re-mounts even when the hash is unchanged.
+   *  `query` (URLSearchParams | plain object) is serialised onto the hash so
+   *  areas can hand state to each other (spec §4b) without string-building. */
+  go(route, query) {
+    const next = withQuery(route, query);
     if (normalize(window.location.hash) === next) mountCurrent();
     else window.location.hash = next;
+    return next;
+  },
+
+  /** replace(route, query?) — like go() but rewrites the current history entry.
+   *  Used by legacy-route redirects: with go() the old hash would stay in
+   *  history and Back would bounce straight forward again. replaceState does
+   *  not fire hashchange, so the mount is driven explicitly. */
+  replace(route, query) {
+    const next = withQuery(route, query);
+    window.history.replaceState(window.history.state, "", next);
+    currentRoute = next;
+    mountCurrent();
     return next;
   },
 

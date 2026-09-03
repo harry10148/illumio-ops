@@ -29,8 +29,8 @@ pytest.importorskip("playwright.sync_api", exc_type=ImportError)
 
 pytest_plugins = ["tests.v2_e2e_utils"]
 
-R_RULES = "#/alerting/rules"
-R_OPS = "#/alerting/ops"
+R_RULES = "#/policy/alert-rules"
+R_OPS = "#/policy/ops"
 R_SYSTEM_PCE = "#/system/pce"
 SLOW = 45_000
 
@@ -391,11 +391,11 @@ def test_teardown_closes_surfaces_clears_callbacks_and_palette(v2_page):
     ).click()
     page.locator("aside.drawer").wait_for(state="visible")
     assert page.locator("[data-role=filter-bar]").count() == 1
-    assert "#/alerting/rules" in _palette_routes(page)
+    assert "#/policy/alert-rules" in _palette_routes(page)
 
     _navigate(page, R_OPS)
     assert page.locator("aside.drawer").count() == 0
-    assert "#/alerting/rules" not in _palette_routes(page)
+    assert "#/policy/alert-rules" not in _palette_routes(page)
     assert page.evaluate(
         "async () => { const m = await import('/static/js/v2/components/filter-bar.mjs'); "
         "return m._objfbHasBrowser(); }"

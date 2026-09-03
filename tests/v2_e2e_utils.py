@@ -290,7 +290,7 @@ def v2_login(context, base_url: str, username: str = V2_USERNAME, password: str 
 def v2_page(v2_context, v2_server):
     """A logged-in Playwright page, plus the server's base_url, ready to visit the GUI.
 
-    Yields (page, base_url) so tests can `page.goto(base_url + "/#/overview")`.
+    Yields (page, base_url) so tests can `page.goto(base_url + "/#/home")`.
     """
     v2_login(v2_context, v2_server)
     page = v2_context.new_page()

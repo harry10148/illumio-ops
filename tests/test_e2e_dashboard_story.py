@@ -42,9 +42,9 @@ def test_dashboard_story_live_browser():
             # login.mjs:309 sets data-booted on the login page itself, so that
             # condition is already true at the moment of the click and cannot
             # distinguish "signed in" from "still on the form" — the navigation
-            # below then raced the login POST and landed back on /login#/overview.
+            # below then raced the login POST and landed back on /login#/home.
             page.wait_for_url(lambda url: "/login" not in url, timeout=20000)
-            page.goto(base + "/#/overview")
+            page.goto(base + "/#/home")
             page.wait_for_selector('body[data-booted="true"]', timeout=20000)
             # The overview's own anchors, in place of the legacy story-card
             # classes: the posture/score card, the top-actions region and the
