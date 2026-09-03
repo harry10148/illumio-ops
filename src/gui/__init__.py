@@ -511,6 +511,10 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False, use_https: boo
     from src.gui.routes.rule_scheduler import make_rule_scheduler_blueprint
     app.register_blueprint(make_rule_scheduler_blueprint(cm, login_required))
 
+    # ── Alerts Blueprint (persisted alert records, v3 inbox) ───────────────────
+    from src.gui.routes.alerts import make_alerts_blueprint
+    app.register_blueprint(make_alerts_blueprint(cm, login_required))
+
     # ── Admin Blueprint ────────────────────────────────────────────────────────
     from src.gui.routes.admin import make_admin_blueprint
     app.register_blueprint(make_admin_blueprint(cm, limiter, login_required, persistent_mode))
