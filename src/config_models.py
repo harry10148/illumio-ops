@@ -340,6 +340,19 @@ class SiemDestinationSettings(_Base):
     hec_token: Optional[str] = None
     batch_size: int = Field(default=100, ge=1, le=10000)
     source_types: list[str] = Field(default_factory=lambda: ["audit", "traffic"])
+    traffic_pd: list[Literal["allowed", "potentially_blocked", "blocked", "unknown"]] = Field(
+        default_factory=list,
+        description="Policy decisions of the traffic log this destination receives. "
+                    "Empty means every decision. Enforced where a row enters the "
+                    "dispatch queue (ingest + backfill), so rows already queued "
+                    "before a change are still delivered.",
+    )
+
+    @field_validator("traffic_pd", mode="after")
+    @classmethod
+    def _dedupe_traffic_pd(cls, v: list[str]) -> list[str]:
+        return list(dict.fromkeys(v))
+
     max_retries: int = Field(default=10, ge=0)
     mask_pii: bool = Field(
         default=False,

@@ -524,6 +524,12 @@ def test_siem_destination_crud_add_then_delete(v2_page):
     drawer.wait_for(state="visible")
     drawer.locator('input[data-field="name"]').fill(name)
     drawer.locator('input[data-field="host"]').fill("127.0.0.1")
+    # traffic_pd (2026-09-03): the decision row is visible because the traffic
+    # source type is ticked by default; tick "blocked" only and expect the
+    # body to carry exactly that subscription.
+    pd_boxes = drawer.locator('input[data-field="traffic_pd"]')
+    assert pd_boxes.count() == 4
+    pd_boxes.nth(2).check()   # order = allowed, potentially_blocked, blocked, unknown
 
     try:
         with page.expect_request(
@@ -531,6 +537,7 @@ def test_siem_destination_crud_add_then_delete(v2_page):
         ) as info:
             drawer.locator(".drawer-f button.btn.primary").click()
         assert info.value.post_data_json["name"] == name
+        assert info.value.post_data_json["traffic_pd"] == ["blocked"]
         assert info.value.response().status == 200
         page.wait_for_selector("aside.drawer", state="detached")
     finally:

@@ -117,6 +117,15 @@ def _prompt_destination(existing=None):
         [x.strip() for x in raw.split(",") if x.strip()]
         if raw else existing.get("source_types", ["audit", "traffic"])
     )
+    # 空白＝保留現值；"all" 或 "*"＝清空（送全部 decision）。
+    cur_pd = existing.get("traffic_pd") or []
+    raw_pd = input(t("sic_traffic_pd_prompt", cur=",".join(cur_pd) or "all")).strip()
+    if not raw_pd:
+        traffic_pd = list(cur_pd)
+    elif raw_pd.lower() in ("all", "*"):
+        traffic_pd = []
+    else:
+        traffic_pd = [x.strip() for x in raw_pd.split(",") if x.strip()]
     max_retries = _prompt("max_retries", existing.get("max_retries", 10), int)
     return {
         "name": name,
@@ -129,6 +138,7 @@ def _prompt_destination(existing=None):
         "hec_token": hec_token or None,
         "batch_size": batch_size,
         "source_types": source_types,
+        "traffic_pd": traffic_pd,
         "max_retries": max_retries,
     }
 

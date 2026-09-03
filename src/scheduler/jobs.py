@@ -239,6 +239,23 @@ def _enabled_siem_destinations(cm, source_type: str) -> list[str]:
     ]
 
 
+def _traffic_pd_filters(cm) -> dict[str, set[str]]:
+    """Per-destination traffic policy-decision subscriptions (empty = all).
+
+    Only enabled traffic destinations with a non-empty `traffic_pd` appear;
+    everything else is "every decision" and needs no entry. Passed to both the
+    ingestor's inline enqueue and the backfill so they agree.
+    """
+    siem_cfg = getattr(cm.models, "siem", None)
+    if siem_cfg is None or not siem_cfg.enabled:
+        return {}
+    return {
+        d.name: set(d.traffic_pd)
+        for d in (siem_cfg.destinations or [])
+        if d.enabled and "traffic" in (d.source_types or []) and d.traffic_pd
+    }
+
+
 def _guard_cache_target(cm, session_factory) -> None:
     """Refuse to ingest into a cache that belongs to a different PCE.
 
@@ -313,6 +330,7 @@ def run_traffic_ingest(cm) -> None:
                                    sample_ratio_allowed=cfg.traffic_sampling.sample_ratio_allowed,
                                    max_results=cfg.traffic_sampling.max_rows_per_batch,
                                    siem_destinations=_enabled_siem_destinations(cm, "traffic"),
+                                   siem_pd_filters=_traffic_pd_filters(cm),
                                    record_observations=getattr(cfg, "flow_delta_enabled", True),
                                    obs_retention_hours=getattr(cfg, "flow_obs_retention_hours", 6))
             count = ing.run_once()
@@ -541,7 +559,8 @@ def run_siem_dispatch(cm) -> None:
             "pce_events": _enabled_siem_destinations(cm, "audit"),
             "pce_traffic_flows_raw": _enabled_siem_destinations(cm, "traffic"),
         }
-        new_count = enqueue_new_records(sf, dests_by_source_table)
+        new_count = enqueue_new_records(sf, dests_by_source_table,
+                                        pd_filters=_traffic_pd_filters(cm))
         if new_count:
             logger.info("run_siem_dispatch: enqueued {} new records", new_count)
         for dest_cfg in enabled_dests:

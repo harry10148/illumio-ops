@@ -356,6 +356,7 @@ cache 架構、容量規劃與 archive 排程細節見 [cache-maintenance.md](ca
 | `hec_token` | Optional[str] | `null` | Splunk HEC token（`transport="hec"` 時使用） |
 | `batch_size` | int（1–10000） | `100` | 單批送出筆數 |
 | `source_types` | list[str] | `["audit", "traffic"]` | 要轉送的資料型別 |
+| `traffic_pd` | list[str] | `[]` | 流量列只送這些 policy decision（`allowed`／`potentially_blocked`／`blocked`／`unknown`）；空＝全部。只影響設定後新進的列 |
 | `max_retries` | int（≥0） | `10` | 單筆最大重試次數 |
 | `mask_pii` | bool | `false` | 開啟後於格式化前遮蔽 PII（管理者帳號/email、來源 IP、label/description 文字），每個目的地各自決定 |
 

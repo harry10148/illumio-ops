@@ -2,9 +2,10 @@
 title: SIEM 轉送
 audience: [operator]
 version: 5.0.0
-last_verified: 2026-09-02
+last_verified: 2026-09-03
 verified_against:
   - src/siem/dispatcher.py
+  - src/siem/pd.py
   - src/siem/dlq.py
   - src/siem/formatters/cef.py
   - src/siem/formatters/normalized_json.py
@@ -68,12 +69,14 @@ SIEM 轉送依賴 pce_cache（見 [cache-maintenance.md](cache-maintenance.md)�
   "hec_token": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
   "batch_size": 100,
   "source_types": ["audit", "traffic"],
+  "traffic_pd": [],
   "max_retries": 10,
   "mask_pii": false
 }
 ```
 
 - `source_types`：`audit`（PCE audit events，來源表 `pce_events`）、`traffic`（traffic 摘要，來源表 `pce_traffic_flows_raw`），可只選一種或兩種都要。
+- `traffic_pd`：這個目的地要收哪些 policy decision 的流量列，值為 `allowed`、`potentially_blocked`、`blocked`、`unknown` 的子集；**空清單＝全部送**（預設）。例如只想把被擋的流量送到 SOC：`["blocked", "potentially_blocked"]`。過濾發生在「進佇列」那一層（見下節），所以只影響儲存設定**之後**新進的列；已在 `siem_dispatch` 佇列裡的 pending 列照舊送出。cache 裡 `action` 欄的數字形式（0/1/2）會先正規化成上述名稱再比對，PCE 沒給值的列算 `unknown`。GUI 的目的地表單在「轉發內容」勾了 traffic 時會出現對應的勾選列；CLI 選單提示輸入逗號清單，`all` 表示清空。
 - `mask_pii`：`true` 時在格式化前遮蔽下列欄位（逐目的地獨立設定，可讓內部 SOC 收全量、外部 SaaS SIEM 只收遮蔽後的資料）：
   - PCE audit event：`created_by.user.username`（管理者帳號/email）、`action.src_ip`（管理者來源 IP）、`resource_changes[].changes[*].{before,after}`（可能帶內部專案名稱的文字）、`actor`/`source_ip`（標準化事件的頂層欄位）
   - Traffic flow：`service.user_name`/`service.process_name`（連線相關的 OS 使用者與行程名稱；格式化時同步寫入平坦版 `un`/`pn`）
@@ -85,7 +88,7 @@ SIEM 轉送依賴 pce_cache（見 [cache-maintenance.md](cache-maintenance.md)�
 
 ### 2.1 Enqueue（入列）時機
 
-Ingestor（`src/pce_cache/ingestor_events.py`、`ingestor_traffic.py`）在把一筆事件／流量寫入 cache 的**同一個 SQL 交易**內，為每個符合 `source_types` 的啟用目的地各新增一列 `siem_dispatch`（`status="pending"`）。這保證「cache 有這筆資料」與「SIEM 佇列已排入」不會出現不一致的中間態——寫入成功即代表兩者都成立，或都不成立（交易回滾）。
+Ingestor（`src/pce_cache/ingestor_events.py`、`ingestor_traffic.py`）在把一筆事件／流量寫入 cache 的**同一個 SQL 交易**內，為每個符合 `source_types`（流量列另看 `traffic_pd`）的啟用目的地各新增一列 `siem_dispatch`（`status="pending"`）。這保證「cache 有這筆資料」與「SIEM 佇列已排入」不會出現不一致的中間態——寫入成功即代表兩者都成立，或都不成立（交易回滾）。
 
 `enqueue_new_records()`（`src/siem/dispatcher.py`）是安全網式的補登：每個 `siem_dispatch` tick 都會執行一次，正常情況下應該找不到東西可補（因為 ingest 已經 inline enqueue）。它存在的目的是覆蓋三種情境：(a) 目的地是後來才新增／啟用的，該 source_type 的歷史列從未排入過；(b) 程序崩潰造成 inline enqueue 未完成；(c) 操作者手動要求補跑。判斷範圍以 `(source_table, source_id, destination)` 三元組為準，不會漏掉「已排給 A 目的地，但缺 B 目的地」的列，也不會重複排入已存在的 pair。
 

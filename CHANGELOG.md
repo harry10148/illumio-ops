@@ -9,6 +9,17 @@ a plain `<major>.<minor>.<patch>` scheme. (Tags through v4.0.0 carried a
 
 ## [Unreleased]
 
+### Added
+
+- SIEM destinations can subscribe to a subset of traffic policy decisions
+  (`traffic_pd`: `allowed` / `potentially_blocked` / `blocked` / `unknown`;
+  empty = all). The filter is applied where a row enters the dispatch queue —
+  the ingestor's inline enqueue and the safety-net backfill agree — so a
+  blocked-only destination never has an allowed flow queued for it. Exposed in
+  the GUI destination form (shown when traffic is forwarded), the CLI SIEM
+  menu, and the REST destination API. Rows already queued before a change are
+  still delivered.
+
 ## [5.0.0] — 2026-09-02
 
 ### Added

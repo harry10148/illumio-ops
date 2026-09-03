@@ -312,7 +312,7 @@ policy decision 等即時才算得出的條件，以及全文 `search`，帶了�
 | 方法 | 路徑 | 用途 | 關鍵參數 |
 |---|---|---|---|
 | GET | `/api/siem/destinations` | 列出所有 SIEM destination | — |
-| POST | `/api/siem/destinations` | 新增 destination（名稱重複回 `409`） | `name`, `transport`, `host`, `port`, `source_types[]` … |
+| POST | `/api/siem/destinations` | 新增 destination（名稱重複回 `409`） | `name`, `transport`, `host`, `port`, `source_types[]`, `traffic_pd[]`（空＝全部 decision） … |
 | PUT | `/api/siem/destinations/<name>` | 更新 destination | — |
 | DELETE | `/api/siem/destinations/<name>` | 刪除 destination | — |
 | POST | `/api/siem/destinations/<name>/test` | **真實副作用**：送出一筆測試事件到該 destination | — |

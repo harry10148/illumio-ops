@@ -13,6 +13,7 @@ from src.pce_cache.models import (
     DeadLetter, PceEvent, PceTrafficFlowRaw, SiemDispatch,
 )
 from src.siem.formatters.base import Formatter
+from src.siem.pd import pd_accepted
 from src.siem.transports.base import Transport
 
 
@@ -319,6 +320,7 @@ def enqueue_new_records(
     session_factory: sessionmaker,
     destinations_by_source_table: dict[str, list[str]],
     dispatch_retention_days: int = 14,
+    pd_filters: Optional[dict[str, set[str]]] = None,
 ) -> int:
     """Safety-net backfill: enqueue any (cache row, destination) pairs that
     ingestors didn't enqueue inline.
@@ -366,8 +368,15 @@ def enqueue_new_records(
     SQLite's bound-parameter cap), not one transaction per row — backfilling a
     large cache on first SIEM enable would otherwise be a per-row fsync storm.
 
+    pd_filters maps a destination name to the set of traffic policy decisions
+    it subscribes to (SiemDestinationSettings.traffic_pd); absent or empty =
+    every decision. It applies to pce_traffic_flows_raw only and mirrors the
+    ingestor's inline gate, so backfill can never queue a row that ingest
+    would have skipped.
+
     Returns count of new dispatch rows created.
     """
+    pd_filters = pd_filters or {}
     pairs: list[tuple[str, type]] = [
         ("pce_events", PceEvent),
         ("pce_traffic_flows_raw", PceTrafficFlowRaw),
@@ -399,13 +408,24 @@ def enqueue_new_records(
             # Phase 1：單次全表掃描找候選 —— 缺「任一」destination dispatch
             # row 的 source rows（全部 destination 的 NOT EXISTS 以 OR 合併）。
             # 正常情況（ingest 已 inline enqueue）回空集合，直接結束。
-            candidates = s.execute(
-                select(model.id)
+            # traffic rows carry their policy decision so phase 2 can apply the
+            # per-destination pd filter without a second lookup.
+            is_traffic = source_table == "pce_traffic_flows_raw"
+            action_col = model.action if is_traffic else model.id
+            candidate_rows = s.execute(
+                select(model.id, action_col)
                 .where(model.ingested_at >= horizon)
                 .where(or_(*[~_dispatched_to(dest) for dest in dests]))
-            ).scalars().all()
-            if not candidates:
+            ).all()
+            if not candidate_rows:
                 continue
+            candidates = [sid for sid, _ in candidate_rows]
+            action_by_id = {sid: act for sid, act in candidate_rows} if is_traffic else {}
+
+            def _accepts(dest: str, sid: int) -> bool:
+                if not is_traffic:
+                    return True
+                return pd_accepted(pd_filters.get(dest), action_by_id.get(sid))
 
             # Phase 2：僅對候選 id 精確判定缺哪些 (id, destination) pair。
             # 以 chunked `id IN (...)` 走 ix_dispatch_source 索引查既有
@@ -427,7 +447,7 @@ def enqueue_new_records(
                     (source_table, sid, dest)
                     for sid in chunk
                     for dest in dests
-                    if (sid, dest) not in existing
+                    if (sid, dest) not in existing and _accepts(dest, sid)
                 )
 
     total = len(to_enqueue)

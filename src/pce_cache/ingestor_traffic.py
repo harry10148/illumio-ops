@@ -13,6 +13,7 @@ from sqlalchemy.orm import sessionmaker
 from src.pce_cache.models import PceTrafficFlowRaw, SiemDispatch
 from src.pce_cache.traffic_filter import TrafficFilter, TrafficSampler
 from src.pce_cache.watermark import WatermarkStore
+from src.siem.pd import pd_accepted
 
 
 class TrafficIngestor:
@@ -27,6 +28,7 @@ class TrafficIngestor:
         sample_ratio_allowed: int = 1,
         max_results: int = 200000,
         siem_destinations: Optional[list[str]] = None,
+        siem_pd_filters: Optional[dict[str, set[str]]] = None,
         record_observations: bool = True,
         obs_retention_hours: int = 6,
     ):
@@ -37,6 +39,9 @@ class TrafficIngestor:
         self._sampler = TrafficSampler(ratio_allowed=sample_ratio_allowed)
         self._max_results = max_results
         self._siem_dests = list(siem_destinations or [])
+        # 每個目的地想收的 policy decision（空＝全收）。閘在 enqueue 這一層，
+        # 與 siem/dispatcher.enqueue_new_records 的安全網補登用同一條件。
+        self._siem_pd_filters = {k: set(v) for k, v in (siem_pd_filters or {}).items()}
         # 視窗增量觀測（phase 2，見 src/pce_cache/flow_deltas.py）：每跑一次
         # ingest 就替每筆 flow 記一列「當下累計值」，規則引擎才有前一次觀測
         # 可相減。關掉就等於整個部署退回 phase 1 的守門（規則被抑制而非誤報）。
@@ -300,23 +305,26 @@ class TrafficIngestor:
                 )
                 # RETURNING covers inserts AND updates; new rows = those whose
                 # flow_hash was absent in the pre-upsert snapshot.
-                new_ids = [rid for rid, fh in s.execute(stmt) if fh not in existing]
+                new_rows = [(rid, fh) for rid, fh in s.execute(stmt) if fh not in existing]
+                new_ids = [rid for rid, _ in new_rows]
                 inserted += len(new_ids)
-                if self._siem_dests and new_ids:
-                    s.execute(
-                        sqlite_insert(SiemDispatch),
-                        [
-                            {
-                                "source_table": "pce_traffic_flows_raw",
-                                "source_id": rid,
-                                "destination": dest,
-                                "status": "pending",
-                                "retries": 0,
-                                "queued_at": now,
-                            }
-                            for rid in new_ids for dest in self._siem_dests
-                        ],
-                    )
+                if self._siem_dests and new_rows:
+                    action_by_hash = {r["flow_hash"]: r["action"] for r in chunk}
+                    dispatch_rows = [
+                        {
+                            "source_table": "pce_traffic_flows_raw",
+                            "source_id": rid,
+                            "destination": dest,
+                            "status": "pending",
+                            "retries": 0,
+                            "queued_at": now,
+                        }
+                        for rid, fh in new_rows
+                        for dest in self._siem_dests
+                        if pd_accepted(self._siem_pd_filters.get(dest), action_by_hash.get(fh))
+                    ]
+                    if dispatch_rows:
+                        s.execute(sqlite_insert(SiemDispatch), dispatch_rows)
                 if self._record_obs:
                     # 與 upsert 同一個交易：raw 列刷新了卻沒留下對應觀測時，
                     # 下一個 cycle 的基準會跳過這次 poll、增量涵蓋更長的區間。

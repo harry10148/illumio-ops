@@ -32,7 +32,7 @@ def test_menu_add_destination(cm):
     from src.siem_cli import manage_siem_menu
     inputs = ["4",
               "demo", "true", "udp", "cef", "127.0.0.1:514",
-              "", "", "", "", "", "",   # tls_verify, tls_ca_bundle, hec_token, batch_size, source_types, max_retries
+              "", "", "", "", "", "", "",   # tls_verify, tls_ca_bundle, hec_token, batch_size, source_types, traffic_pd, max_retries
               "0"]
     with patch.object(builtins, "input", _seq(inputs)):
         manage_siem_menu(cm)

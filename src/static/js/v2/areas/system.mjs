@@ -1340,6 +1340,13 @@ const SIEM_FORMATS = [["cef", "cef"], ["json", "json"], ["syslog_cef", "syslog_c
 // current value is still one of the defaults (:914-922).
 const SIEM_PORTS = [["udp", 514], ["tcp", 514], ["tls", 6514], ["hec", 8088]];
 const SIEM_SOURCE_TYPES = [["audit", "gui_sy_siem_st_audit"], ["traffic", "gui_sy_siem_st_traffic"]];
+// SiemDestinationSettings.traffic_pd — order matches src/siem/pd.py PD_VALUES.
+const SIEM_TRAFFIC_PD = [
+  ["allowed", "gui_pd_allowed"],
+  ["potentially_blocked", "gui_pd_potential"],
+  ["blocked", "gui_pd_blocked"],
+  ["unknown", "gui_siem_traffic_pd_unknown"],
+];
 
 function defaultPort(transport) {
   let hit = 514;
@@ -1384,6 +1391,25 @@ function destDrawer(dest, isEdit) {
     stRow.appendChild(el("label", null, box, el("span", { text: t(pair[1]) })));
   });
 
+  // Traffic policy-decision subscription; none ticked = every decision
+  // (config default traffic_pd: []). Only meaningful when traffic is forwarded,
+  // so the row follows the traffic source-type box.
+  const pdBoxes = [];
+  const pdRow = el("div", { class: "daychips" });
+  SIEM_TRAFFIC_PD.forEach(function (pair) {
+    const box = checkField((dst.traffic_pd || []).indexOf(pair[0]) >= 0);
+    box.dataset.field = "traffic_pd";
+    box.addEventListener("change", form.sync);
+    pdBoxes.push([pair[0], box]);
+    pdRow.appendChild(el("label", null, box, el("span", { text: t(pair[1]) })));
+  });
+  const pdField = labelled(t("gui_siem_traffic_pd"), pdRow, t("gui_siem_traffic_pd_help"));
+  function onSourceTypes() {
+    pdField.hidden = !stBoxes.some(function (p) { return p[0] === "traffic" && p[1].checked; });
+  }
+  stBoxes.forEach(function (p) { p[1].addEventListener("change", onSourceTypes); });
+  onSourceTypes();
+
   const tlsSection = el("div", null,
     sectionHead(t("gui_siem_sec_tls")),
     checkRow(t("gui_siem_tls_verify"), form.track("tls_verify", tlsVerify, "bool"), t("gui_sy_siem_tls_prod")),
@@ -1427,6 +1453,7 @@ function destDrawer(dest, isEdit) {
     b.max_retries = v.max_retries;
     b.source_types = stBoxes.filter(function (p) { return p[1].checked; }).map(function (p) { return p[0]; });
     if (!b.source_types.length) b.source_types = ["audit", "traffic"];
+    b.traffic_pd = pdBoxes.filter(function (p) { return p[1].checked; }).map(function (p) { return p[0]; });
     return b;
   });
 
@@ -1435,6 +1462,7 @@ function destDrawer(dest, isEdit) {
   body.appendChild(labelled(t("gui_siem_name"), form.track("name", name), isEdit ? t("gui_sy_siem_name_ro") : t("gui_sy_siem_name_new")));
   body.appendChild(checkRow(t("gui_siem_enabled"), form.track("enabled", enabled, "bool")));
   body.appendChild(labelled(t("gui_siem_source_types"), stRow, t("gui_sy_siem_st_fallback")));
+  body.appendChild(pdField);
   body.appendChild(sectionHead(t("gui_siem_sec_transport")));
   body.appendChild(labelled(t("gui_siem_transport"), form.track("transport", transport), t("gui_siem_transport_help")));
   body.appendChild(labelled(t("gui_siem_format"), form.track("format", format), t("gui_siem_format_help")));
