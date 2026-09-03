@@ -14,6 +14,7 @@ import weakref
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from src.alerts import build_output_plugin, get_output_registry, render_alert_template
+from src.alerts.store import AlertStore
 from src.events import normalize_event, persist_dispatch_results
 from src.events.poller import format_utc
 from src.i18n import t
@@ -74,6 +75,14 @@ class Reporter:
         self.traffic_alerts: list[dict[str, Any]] = []
         self.metric_alerts: list[dict[str, Any]] = []
         self.last_dispatch_results: list[dict[str, Any]] = []
+        # Persisted-record ids, one list per bucket, same order and length as
+        # the bucket. Kept BESIDE the alert items rather than on them because
+        # the webhook/mail templates serialise the buckets wholesale — an
+        # internal key on the item would ship to the customer's webhook. None
+        # = not persisted yet (first dispatch); an int = update on DLQ replay.
+        self._alert_ids: dict[str, list[int | None]] = {
+            "health": [], "event": [], "traffic": [], "metric": [],
+        }
 
     @staticmethod
     def _lang_t(lang: str) -> Callable[..., str]:
@@ -119,8 +128,13 @@ class Reporter:
         except Exception:
             return raw
 
+    # The alert record store (src/alerts/store.py). A class attribute so tests
+    # can point every Reporter at a temp file without patching module globals.
+    alert_store_factory = staticmethod(AlertStore)
+
     def add_health_alert(self, alert: dict[str, Any]) -> None:
         self.health_alerts.append(alert)
+        self._alert_ids["health"].append(None)
 
     def add_event_alert(self, alert: dict[str, Any]) -> None:
         # Map the PCE event_type to its runbook *response* (remediation steps) so
@@ -133,6 +147,7 @@ class Reporter:
             if resp:
                 alert["runbook_response"] = resp
         self.event_alerts.append(alert)
+        self._alert_ids["event"].append(None)
 
     @staticmethod
     def _runbook_response_for_alert(alert: dict) -> str:
@@ -148,9 +163,71 @@ class Reporter:
 
     def add_traffic_alert(self, alert: dict[str, Any]) -> None:
         self.traffic_alerts.append(alert)
+        self._alert_ids["traffic"].append(None)
 
     def add_metric_alert(self, alert: dict[str, Any]) -> None:
         self.metric_alerts.append(alert)
+        self._alert_ids["metric"].append(None)
+
+    # ── alert record persistence (v3 inbox) ────────────────────────────
+
+    _BUCKET_TYPE = {"health": "system", "event": "event", "traffic": "traffic", "metric": "bandwidth"}
+
+    def _persist_alerts(self, results: list[dict[str, Any]], *, now_utc: str) -> None:
+        """Write every alert in the four buckets to the AlertStore after a
+        dispatch attempt: insert on first sight, update the dispatch outcome on
+        a DLQ replay (identified through self._alert_ids, never through the
+        item). Called from send_alerts; the caller swallows and logs failures
+        because delivery has already happened and must not be reported as
+        failed just because the record could not be written."""
+        dispatch = [{k: r.get(k) for k in ("channel", "status", "target", "error")} for r in results]
+        store = self.alert_store_factory()
+        try:
+            for bucket, items in (("health", self.health_alerts), ("event", self.event_alerts),
+                                  ("traffic", self.traffic_alerts), ("metric", self.metric_alerts)):
+                ids = self._alert_ids[bucket]
+                while len(ids) < len(items):
+                    ids.append(None)
+                for i, item in enumerate(items):
+                    if ids[i] is not None:
+                        store.update_dispatch(ids[i], dispatch)
+                        continue
+                    ids[i] = store.insert(
+                        fired_at=now_utc, type=self._BUCKET_TYPE[bucket],
+                        rule_id=item.get("rule_id"), rule_name=str(item.get("rule", "")),
+                        severity=self._alert_severity(bucket, item),
+                        summary=self._alert_summary(bucket, item),
+                        criteria=str(item.get("criteria") or ""),
+                        payload=self._alert_payload(item), dispatch=dispatch,
+                    )
+        finally:
+            store.close()
+
+    @staticmethod
+    def _alert_severity(bucket: str, item: dict[str, Any]) -> str:
+        if bucket == "event":
+            return str(item.get("severity") or "info")
+        if bucket == "health":
+            return "critical" if str(item.get("status", "")).lower() in ("critical", "degraded") else "warning"
+        return "warning"
+
+    @staticmethod
+    def _alert_summary(bucket: str, item: dict[str, Any]) -> str:
+        rule = str(item.get("rule", ""))
+        if bucket == "event":
+            parts = [rule, str(item.get("source") or ""), str(item.get("target") or "")]
+            return " · ".join(p for p in parts if p).replace(" ·  · ", " · ")
+        if bucket == "health":
+            return " · ".join(p for p in (rule, str(item.get("status") or "")) if p)
+        return " · ".join(p for p in (rule, str(item.get("count") or ""), str(item.get("criteria") or "")) if p)
+
+    @staticmethod
+    def _alert_payload(item: dict[str, Any]) -> dict[str, Any]:
+        out = {k: v for k, v in item.items() if not str(k).startswith("_")}
+        raw = out.get("raw_data")
+        if isinstance(raw, list) and len(raw) > 10:
+            out["raw_data"] = raw[:10]
+        return out
 
     def _get_output_plugin(self, name: str) -> Any:
         # Reuse a cached plugin instance keyed by the long-lived ConfigManager so
@@ -839,17 +916,26 @@ class Reporter:
             return []
         return popped
 
-    def _push_alert_dlq(self, buckets: dict[str, list], attempts: int, first_failed_at: str) -> None:
+    def _push_alert_dlq(self, buckets: dict[str, list], attempts: int, first_failed_at: str,
+                        alert_ids: dict[str, list] | None = None) -> None:
         capped = {}
+        capped_ids = {}
         for name, items in buckets.items():
+            ids = list((alert_ids or {}).get(name, []))
+            ids += [None] * (len(items) - len(ids))
             if len(items) > self.ALERT_DLQ_BUCKET_CAP:
                 logger.warning(
                     "Alert DLQ: {} bucket exceeds cap ({} > {}), keeping newest",
                     name, len(items), self.ALERT_DLQ_BUCKET_CAP,
                 )
                 items = items[-self.ALERT_DLQ_BUCKET_CAP:]
+                ids = ids[-self.ALERT_DLQ_BUCKET_CAP:]
             capped[name] = items
-        entry = {"buckets": capped, "attempts": attempts, "first_failed_at": first_failed_at}
+            capped_ids[name] = ids
+        # alert_ids travels beside the buckets (same order) so a replay updates
+        # the persisted record instead of inserting a duplicate.
+        entry = {"buckets": capped, "attempts": attempts, "first_failed_at": first_failed_at,
+                 "alert_ids": capped_ids}
 
         def _append(existing: dict) -> dict:
             out = dict(existing)
@@ -880,10 +966,14 @@ class Reporter:
         if not force_test:
             for entry in self._pop_alert_dlq():
                 buckets = entry.get("buckets", {})
-                self.health_alerts.extend(buckets.get("health", []))
-                self.event_alerts.extend(buckets.get("event", []))
-                self.traffic_alerts.extend(buckets.get("traffic", []))
-                self.metric_alerts.extend(buckets.get("metric", []))
+                replay_ids = entry.get("alert_ids", {})   # absent on pre-3A entries
+                for name, target in (("health", self.health_alerts), ("event", self.event_alerts),
+                                     ("traffic", self.traffic_alerts), ("metric", self.metric_alerts)):
+                    items = buckets.get(name, [])
+                    ids = list(replay_ids.get(name, []))[:len(items)]
+                    ids += [None] * (len(items) - len(ids))
+                    target.extend(items)
+                    self._alert_ids[name].extend(ids)
                 _replayed_attempt_values.append(int(entry.get("attempts", 0)))
                 replayed_first_failed_at = replayed_first_failed_at or entry.get("first_failed_at", "")
             # 多筆合併取 min：以最年輕條目計次，避免較新告警被提早丟棄
@@ -1005,6 +1095,17 @@ class Reporter:
             self._dispatch_lang = prev_dispatch_lang
 
         self.last_dispatch_results = results
+        if not force_test:
+            try:
+                self._persist_alerts(
+                    results,
+                    now_utc=datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ'),
+                )
+            except Exception as exc:
+                # Deliberate swallow: the channels have already been attempted
+                # and the DLQ below still handles delivery; a record-keeping
+                # failure must not turn a delivered alert into a "failed" one.
+                logger.error("alert persistence failed: {}", exc)
         counts = {
             "health": len(self.health_alerts),
             "events": len(self.event_alerts),
@@ -1041,7 +1142,8 @@ class Reporter:
                         "Alert DLQ: no delivery ({} attempted), queuing for retry (attempt {})",
                         len(attempted), attempts,
                     )
-                    self._push_alert_dlq(buckets, attempts, first_failed_at)
+                    self._push_alert_dlq(buckets, attempts, first_failed_at,
+                                         alert_ids={k: list(v) for k, v in self._alert_ids.items()})
 
         try:
             persist_dispatch_results(

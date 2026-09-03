@@ -13,6 +13,7 @@ from src.scheduler.jobs import (
     tick_rule_schedules,
     run_ven_summary,
     run_posture_summary,
+    run_alerts_retention,
 )
 from src.i18n import t, get_language
 
@@ -138,6 +139,18 @@ def build_scheduler(cm, interval_minutes: int = 10) -> BackgroundScheduler:
         name="Rule schedule tick",
         replace_existing=True,
         next_run_time=_kick0 + _dt0.timedelta(seconds=40),
+    )
+    # Alert-record retention runs whether or not the pce_cache block below is
+    # enabled — the records come from dispatch, not from the cache. Startup kick
+    # like the other 24h jobs so frequent restarts cannot starve it.
+    sched.add_job(
+        _instrument("alerts_retention", run_alerts_retention, 86400),
+        trigger=IntervalTrigger(hours=24),
+        args=[cm],
+        id="alerts_retention",
+        name="Alert record retention",
+        replace_existing=True,
+        next_run_time=_kick0 + _dt0.timedelta(seconds=120),
     )
     ven_summary_interval = int(
         cm.config.get("dashboard", {}).get("ven_summary_interval_seconds", 300)

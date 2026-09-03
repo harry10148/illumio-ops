@@ -8,6 +8,7 @@ import re
 import threading
 
 # Module-level imports required for test patching (patch targets must be attributes of this module)
+from src.alerts.store import AlertStore
 from src.api_client import ApiClient
 from src.gui._helpers import _resolve_state_file, _get_cache_engine
 from src.report.snapshot_store import read_latest
@@ -72,6 +73,22 @@ def run_monitor_cycle(cm) -> None:
         # Re-raise so the _instrument wrapper records job_health status=error
         # (swallowing here made the job-health panel report perpetual 'ok').
         raise
+
+def run_alerts_retention(cm) -> int:
+    """Prune persisted alert records older than the archive retention window.
+
+    Its own job, NOT a tail on run_cache_retention: that one is only scheduled
+    when pce_cache.enabled, and alert records exist regardless of the cache.
+    """
+    days = int(cm.models.pce_cache.archive_retention_days)
+    store = AlertStore()
+    try:
+        removed = store.prune(days=days)
+    finally:
+        store.close()
+    logger.info("Alerts retention: removed {} record(s) older than {} days", removed, days)
+    return removed
+
 
 def tick_report_schedules(cm) -> None:
     """Check and fire any due report schedules."""
