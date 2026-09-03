@@ -515,6 +515,10 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False, use_https: boo
     from src.gui.routes.alerts import make_alerts_blueprint
     app.register_blueprint(make_alerts_blueprint(cm, login_required))
 
+    # ── Policy Blueprint (flow → covering rules, v3 investigate hub) ──────────
+    from src.gui.routes.policy import make_policy_blueprint
+    app.register_blueprint(make_policy_blueprint(cm, login_required))
+
     # ── Admin Blueprint ────────────────────────────────────────────────────────
     from src.gui.routes.admin import make_admin_blueprint
     app.register_blueprint(make_admin_blueprint(cm, limiter, login_required, persistent_mode))
