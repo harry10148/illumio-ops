@@ -2,9 +2,12 @@
 title: 監控規則、告警與事件規則
 audience: [operator]
 version: 5.0.0
-last_verified: 2026-09-02
+last_verified: 2026-09-03
 verified_against:
   - src/analyzer.py
+  - src/alerts/store.py
+  - src/reporter.py
+  - src/gui/routes/alerts.py
   - src/api_client.py
   - src/pce_target.py
   - src/report/rules_engine.py
@@ -339,6 +342,17 @@ if len(message) > self._LINE_MESSAGE_CAP:
 ```
 
 即**明確截斷並附上「內容已截斷」的 i18n footer**，而非無聲截斷；Telegram 通道另有獨立的截斷 footer（`telegram_truncated_footer`，於最後一個換行處截斷以維持 HTML 標記平衡）。
+
+### 5.5 告警紀錄（`logs/alerts.sqlite`）
+
+每次 `Reporter.send_alerts()` 派送後，四個 bucket 裡的每一則告警都會寫進 `logs/alerts.sqlite`（與 `state.json` 同目錄；service 帳號建立、0600；WAL）。一列＝一則告警：`fired_at`（派送當下 UTC）、`type`（event／traffic／bandwidth／system）、`rule_id`（規則的 `id`，看門狗與溢位 meta-alert 沒有規則物件故為空）、`rule_name`、`severity`、`summary`、`criteria`、`payload_json`（原告警項目，`raw_data` 最多 10 筆）、`dispatch_json`（各通道 success／failed／skipped）、`status`（new→ack→done，GUI `PATCH /api/alerts/<id>` 切換）。
+
+- **首次派送就寫、DLQ 重播只更新**：落地的列 id 隨 DLQ 項目（`alert_dlq[].alert_ids`）一起進 `state.json`，重播成功時更新同一列的 `dispatch_json`，不會出現重複列。
+- `force_test`（測試告警）不落地。
+- 落地失敗只記 `ERROR alert persistence failed`，不影響派送與 DLQ（派送已完成）。
+- 保留期沿用 `pce_cache.archive_retention_days`，由獨立的每日 job `alerts_retention` 清理；`0`（預設）＝永久保留。這個 job 不依賴 `pce_cache.enabled`。
+- 告警項目多了 `rule_id`／`rule_type` 兩個鍵，webhook／mail 模板整包序列化 bucket，所以 webhook JSON 也會看到它們（新增欄位，舊欄位不變）。
+- 查詢：`GET /api/alerts`、`/api/alerts/<id>`、`/api/alerts/<id>/traffic_query`（見 [rest-api.md](../reference/rest-api.md)）。
 
 ---
 

@@ -159,6 +159,7 @@ never-ran／overdue）見 [gui-tour.md](../guide/gui-tour.md) 「7) Integrations
 | 方法 | 路徑 | 用途 | 關鍵參數 |
 |---|---|---|---|
 | POST | `/api/init_quarantine` | 確保 PCE 上已建立三個 severity 的 Quarantine label | — |
+| POST | `/api/policy/explain` | 問 PCE 哪些 rule 涵蓋一條 flow（Rule Search，`consumers`＝來源側）；兩端由 href 或 IP 解析（IP→managed workload→ip_list），只送解析成功的一側；PCE 非 2xx 回 `502` 並附 `pce_error` | `src{href\|ip}`, `dst{href\|ip}`, `port`, `proto`(名稱或號碼), `basis`(active\|draft) |
 | POST | `/api/quarantine/search` | 查詢可隔離的流量（依 policy decision＋FilterBar 篩選）；即時來源與封存分兩條路徑，見下方說明 | `data_source`(hybrid/live), `mins`, `policy_decision`, 完整篩選鍵；改用 `source=archive` 時另帶 `archive_start`／`archive_end`（必填日期區間） |
 | GET/POST | `/api/workloads` | 搜尋 Workload（name／hostname／ip_address；IP 可逗號或 CIDR 多值） | `name`, `hostname`, `ip_address`, `max_results` |
 | POST | `/api/quarantine/apply` | **真實副作用**：隔離單一 Workload（依 severity 套用 Quarantine label，覆蓋既有） | `href`, `level`(Mild/Moderate/Severe) |
@@ -210,6 +211,10 @@ policy decision 等即時才算得出的條件，以及全文 `search`，帶了�
 | GET | `/api/rules/<idx>` | 取得單一規則 | — |
 | PUT | `/api/rules/<idx>` | 更新規則（帶 `filters` 時整組替換舊篩選鍵） | — |
 | DELETE | `/api/rules/<idx>` | 刪除規則 | — |
+| GET | `/api/alerts` | 已派送告警紀錄清單（`logs/alerts.sqlite`），最新在前；回 `items/total/page/page_size/counts{new,ack,done}` | `status`, `type`(event\|traffic\|bandwidth\|system), `since`(ISO), `page`, `page_size`(≤200) |
+| GET | `/api/alerts/<id>` | 單筆紀錄含 `payload`（原告警項目，raw_data 最多 10 筆）與 `dispatch`（各通道結果） | — |
+| PATCH | `/api/alerts/<id>` | 改處理狀態；`status_by` 記登入帳號 | `status`(new\|ack\|done) |
+| GET | `/api/alerts/<id>/traffic_query` | 由該告警的規則重建流量查詢（規則的 `filters`／`pd`／`threshold_window`／純量篩選鍵原樣回傳）；非 traffic/bandwidth 回 `400 not_traffic`，規則已刪回 `404 rule_missing` | — |
 | GET | `/api/rules/<idx>/highlight` | 該規則 JSON 的語法高亮 HTML（`{"html": "..."}`） | — |
 
 規則型別、`filters` 物件白名單鍵與 `label_group` 為何被拒絕，見
@@ -374,19 +379,19 @@ TLS 相關端點存檔後都需要**重啟服務**才會套用；自簽憑證每
 |---|---|---|
 | 認證與 session | `auth.py` | 5 |
 | 總覽 | `dashboard.py` | 10 |
-| 調查（流量／Workload） | `actions.py`（部分）＋ `filter_objects.py` | 9 |
+| 調查（流量／Workload） | `actions.py`（部分）＋ `filter_objects.py` ＋ `policy.py` | 10 |
 | 調查（事件） | `events.py` | 4 |
-| 告警 | `rules.py` ＋ `actions.py`（部分） | 15 |
+| 告警 | `rules.py` ＋ `actions.py`（部分）＋ `alerts.py` | 19 |
 | Reports | `reports.py` | 24 |
 | Rule Scheduler | `rule_scheduler.py` | 10 |
 | Integrations（Cache／SIEM／DLQ／daemon） | `pce_cache/web.py` ＋ `siem/web.py` ＋ `__init__.py` | 24 |
 | Settings | `config.py` | 12 |
 | 系統／除錯 | `admin.py` | 3 |
-| **合計** | | **116** |
+| **合計** | | **119**（2026-09-03 實測；逐區數字為盤點加減，總數以下列 grep 為準） |
 
-此數字為 `grep -c "@[a-z_]*\.route(" src/gui/routes/*.py src/gui/__init__.py`（93）
-加上另外掛載的 `src/siem/web.py`（13）與 `src/pce_cache/web.py`（10）。其中 4 個是頁面
-路由（`/`、`/login`、`/logout`、`/reports/<filename>`），其餘 112 個是 `/api/` JSON
+此數字為 `grep -c "@[a-z_]*\.route(" src/gui/routes/*.py src/gui/__init__.py`（97）
+加上另外掛載的 `src/siem/web.py`（13）與 `src/pce_cache/web.py`（9）。其中 4 個是頁面
+路由（`/`、`/login`、`/logout`、`/reports/<filename>`），其餘 115 個是 `/api/` JSON
 端點。[gui-tour.md](../guide/gui-tour.md) 的『約 85 條』是較早盤點的粗略數字（僅計 src/gui/routes
 與 gui/__init__ 的 /api 路由），非逐條稽核；本檔的對帳表才是權威清單。
 

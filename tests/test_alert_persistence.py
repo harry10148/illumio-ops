@@ -128,6 +128,11 @@ def test_run_alerts_retention_prunes_with_archive_days(monkeypatch):
     cm = SimpleNamespace(models=SimpleNamespace(pce_cache=SimpleNamespace(archive_retention_days=45)))
     assert jobs.run_alerts_retention(cm) == 3
     assert calls["days"] == 45
+    # 0 = keep forever (the archive setting's default); prune must not run at all
+    calls.clear()
+    cm.models.pce_cache.archive_retention_days = 0
+    assert jobs.run_alerts_retention(cm) == 0
+    assert calls == {}
 
 
 def test_alerts_retention_scheduled_even_when_cache_disabled(tmp_path):

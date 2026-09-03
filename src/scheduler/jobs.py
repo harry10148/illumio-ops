@@ -81,6 +81,11 @@ def run_alerts_retention(cm) -> int:
     when pce_cache.enabled, and alert records exist regardless of the cache.
     """
     days = int(cm.models.pce_cache.archive_retention_days)
+    if days <= 0:
+        # Same semantics as the archive setting: 0 means keep forever. Without
+        # this guard prune(days=0) would delete every record older than "now".
+        logger.info("Alerts retention: archive_retention_days=0, keeping all records")
+        return 0
     store = AlertStore()
     try:
         removed = store.prune(days=days)

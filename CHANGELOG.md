@@ -11,6 +11,20 @@ a plain `<major>.<minor>.<patch>` scheme. (Tags through v4.0.0 carried a
 
 ### Added
 
+- Dispatched alerts are now persisted to `logs/alerts.sqlite` (owner-only,
+  WAL) with the dispatch outcome per channel; a DLQ replay updates the same
+  record instead of adding one. New `GET /api/alerts`, `GET /api/alerts/<id>`,
+  `PATCH /api/alerts/<id>` (new / ack / done) and
+  `GET /api/alerts/<id>/traffic_query`, which rebuilds the flow query from the
+  alert's rule. Retention follows `archive_retention_days` through a new
+  daily `alerts_retention` job (0 = keep). Alert items also carry `rule_id`
+  and `rule_type`, which appear as additional fields in webhook payloads.
+- `POST /api/policy/explain` asks the PCE Rule Search API which allow / deny /
+  override-deny rules cover a flow, resolving each end from its workload href
+  or from an IP (managed workload, then ip_list range); `consumers` is the
+  source side, as measured on PCE 25.2. PCE errors are returned as `502`
+  with the PCE body, never hidden.
+
 - SIEM destinations can subscribe to a subset of traffic policy decisions
   (`traffic_pd`: `allowed` / `potentially_blocked` / `blocked` / `unknown`;
   empty = all). The filter is applied where a row enters the dispatch queue —

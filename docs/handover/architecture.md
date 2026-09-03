@@ -190,7 +190,7 @@ GUI 預設埠為 **5001**（`src/cli/gui_cmd.py` 的 `--port` 預設值；`src/g
 
 daemon 啟動時由 `src/scheduler/__init__.py:build_scheduler` 註冊。每個 job 都包 `_instrument` wrapper：註冊當下先寫 `registered` 記錄、每次執行後寫 ok/error 到 `logs/job_health.json`（`src/job_health.py`），讓「應跑未跑」可觀測；長間隔 job 一律帶啟動後錯開的首跑 kick（2026-07-14 archive 事故的根治：IntervalTrigger 預設首跑排在啟動後一整個間隔，頻繁重啟會讓 24h 間隔的 job 永遠跑不到）。
 
-全部條件開啟時共 14 個註冊 job（與測試機 `logs/job_health.json` 一致）：
+全部條件開啟時共 15 個註冊 job（與測試機 `logs/job_health.json` 一致）：
 
 | Job id | 職責 | 間隔（預設） | 註冊條件 | executor |
 |---|---|---|---|---|
@@ -199,6 +199,7 @@ daemon 啟動時由 `src/scheduler/__init__.py:build_scheduler` 註冊。每個 
 | `tick_rule_schedules` | 規則排程 tick | 設定值 | 一律 | default |
 | `ven_summary` | VEN 健康摘要寫入 store | 300s | 一律 | default |
 | `posture_summary` | posture 分數摘要 | 600s | 一律 | default |
+| `alerts_retention` | 告警紀錄（`logs/alerts.sqlite`）保留清理，天數沿用 `archive_retention_days`（0＝不清） | 24h | 一律（不依賴 cache） | default |
 | `tls_renew_check` | self-signed 憑證到期檢查與換發 | 24h | TLS 啟用＋self_signed＋auto_renew | default |
 | `pce_cache_ingest_events` | 事件 ingest 進 cache | `events_poll_interval_seconds` | cache 啟用 | cache_writer |
 | `pce_cache_ingest_traffic` | 流量 ingest 進 cache | `traffic_poll_interval_seconds` | cache 啟用 | cache_writer |
