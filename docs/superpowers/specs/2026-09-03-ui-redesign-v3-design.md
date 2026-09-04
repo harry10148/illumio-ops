@@ -1,5 +1,7 @@
 # UI/UX 重新設計 v3 — 設計規格
 
+> **2026-09-04 修訂**：§1、§2、§3、§5、§8 由 `2026-09-04-ui-redesign-v3-1-workbench-design.md` 取代（使用者裁決：PCE 主控台骨架、無收件匣與調查流程）；其餘節沿用。
+
 日期：2026-09-03
 狀態：使用者已逐節核可（§1–§7 全過）
 前置：v2 規格 [`2026-08-03-ui-ux-redesign-v2-design.md`](2026-08-03-ui-ux-redesign-v2-design.md)（已完整交付並封版 `v5.0.0`，commit `cc77fbcf`）
