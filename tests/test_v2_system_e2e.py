@@ -1569,3 +1569,20 @@ def test_pce_target_change_asks_before_saving(v2_page):
         assert url.input_value() == NEW_URL, "Cancel must leave the unsaved edit in place"
     finally:
         page.unroute("**/*", _handler)
+
+
+def test_siem_page_survives_cache_telemetry_outage(v2_page):
+    """v3 Task 5 regression (CI 2026-09-04): the pipeline / integrations cards
+    moved onto #/system/siem and pulled cache_status + cache_throughput in as
+    STRICT loads. On a host without a cache DB those answer 503 and the whole
+    page fell to the error card, taking SY-07..09 with it. They are telemetry:
+    the page must still render, the cards degrade."""
+    page, base_url = v2_page
+    def outage(route):
+        route.fulfill(status=503, content_type="application/json", body='{"ok": false, "error": "no cache db"}')
+    page.route("**/api/cache/status", outage)
+    page.route("**/api/cache/throughput", outage)
+    page.goto(base_url + "/#/system/siem")
+    page.wait_for_selector('[data-cov="SY-07"]', timeout=15000)
+    assert page.locator('[data-cov="OV-16"]').count() == 1
+    assert page.locator('[data-cov="OV-10"]').count() == 1

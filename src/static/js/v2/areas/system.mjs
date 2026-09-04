@@ -1338,7 +1338,9 @@ const SIEM_SNAPS = ["siem_forwarder", "siem_destinations", "siem_status", "siem_
  * buttons) and stay strict; siem_status (per-destination counters) and
  * siem_dlq (the queue's own rows) are telemetry read out of the cache DB, so
  * they carry the same 503 as the cache endpoints do. */
-const SIEM_SOFT = ["siem_status", "siem_dlq"];
+// v3 Task 5 moved OV-10/OV-16 here; their cache telemetry is soft too (a host
+// without a cache DB answers 503 — the cards degrade, the page stays up).
+const SIEM_SOFT = ["siem_status", "siem_dlq", "cache_status", "cache_throughput"];
 
 // integrations.js:858 (select#md-transport) / :861 (select#md-format).
 const SIEM_TRANSPORTS = [["udp", "udp"], ["tcp", "tcp"], ["tls", "tls"], ["hec", "hec"]];
