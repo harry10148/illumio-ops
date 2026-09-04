@@ -1,4 +1,8 @@
-// overview.mjs — #/home. Anchors OV-01…OV-16 (design/v2/coverage.yaml).
+// cards.mjs (was overview.mjs) — the v2 overview board's card builders and
+// helpers, now shared: #/home (home.mjs), the rankings/saved-queries row on
+// #/investigate/traffic, the summary row on #/reports and the detail cards on
+// the system pages import from here. Anchors OV-* keep their ids where the
+// card survived; design/v3/coverage.yaml says which page each one lives on.
 //
 // PORT OF design/v2/mockup/js/areas/overview.mjs against the live backend.
 // Differences from the frozen mockup:
@@ -679,11 +683,11 @@ function cardTop10(top, chartHandles) {
     cap: (top.cap === null || top.cap === undefined) ? "—" : top.cap,
     rows: tf("gui_table_rows", { total: num(top.total) }),
   }));
-  withGoto(p, GO_TRAFFIC);
+  // v3: these two cards live on the traffic page itself — no go-to link
   withTone(p, "info");
 
   if (!top.ok || !data.length) {
-    p.body.appendChild(emptyState(t("gui_top10_no_records"), GO_TRAFFIC));
+    p.body.appendChild(emptyState(t("gui_top10_no_records"), null));
     return p;
   }
 
@@ -883,11 +887,11 @@ function cardQueries(state, onEdit, onNew) {
   const p = panel("OV-04", t("gui_top10_widgets"));
   withMeta(p, tf("gui_table_rows", { total: state.queries.length }));
   withAction(p, t("gui_add_query_widget"), onNew);
-  withGoto(p, GO_TRAFFIC);
+  // v3: these two cards live on the traffic page itself — no go-to link
   withTone(p, "info");
 
   if (!state.queries.length) {
-    p.body.appendChild(emptyState(t("gui_top10_empty"), GO_TRAFFIC));
+    p.body.appendChild(emptyState(t("gui_top10_empty"), null));
     return p;
   }
   const list = el("ul", { class: "stack" });
@@ -1268,7 +1272,9 @@ function brow(cls, panels) {
   return el("div", { class: "brow " + cls }, panels);
 }
 
-function buildBoard(host, d, state) {
+// The Top10 ranking + saved-query widgets (OV-05 / OV-04) with their editor
+// drawer and refresh logic, as one self-contained mount.
+export function mountRankingsAndQueries(host, d, state) {
   const ov = d.dashboard_overview || {};
   const st = d.status || {};
 
@@ -1280,9 +1286,9 @@ function buildBoard(host, d, state) {
   });
   state.chartHandles = [];
 
-  function openPostureDetail() {
-    return drawer.open(drawerSpec(t("gui_ov_posture_score_label"), postureDetail(ov.posture || {})));
-  }
+  state.queries = state.queries || (d.dashboard_queries || []).slice();
+  state.fields = state.fields || fieldKeys(state.queries);
+  d.top10 = d.top10 || { ok: false, data: [] };
 
   // top10 (OV-05) rides a live PCE flow-search (POST /api/dashboard/top10)
   // that can take several seconds, or fail outright when the PCE is
@@ -1387,62 +1393,21 @@ function buildBoard(host, d, state) {
   }
 
   state.repaint = function () {
-    buildBoard(host, d, state);
+    mountRankingsAndQueries(host, d, state);
   };
 
   clear(host);
-
-  /* Density spec R1/R2 on the one page an operator lands on.
-   *
-   * This board used to open with sixteen cards in six rows, led by four status
-   * cards that restate what the health rail directly above them already shows
-   * (PCE, pipeline, cache, alert channels). The question someone opens the
-   * overview with is "how are we doing, and what should I do next" — so the
-   * posture score and the ranked actions lead, the traffic ranking they are
-   * usually chasing stays with them, and the remaining eleven cards become two
-   * named groups, present and one click away.
-   *
-   * Every data-cov anchor still renders: a closed <details> keeps its children
-   * in the DOM, so the coverage gate's 102 are all still there and the cards
-   * are still built from the same data. Nothing was dropped to make this fit. */
-  host.appendChild(brow("c75", [
-    cardPosture(ov, openPostureDetail),
-    cardTopActions((d.dashboard_snapshot && d.dashboard_snapshot.snapshot) || {}),
-  ]));
   host.appendChild(brow("c75", [
     cardTop10(d.top10 || {}, state.chartHandles),
     cardQueries(state, openQuery, function () { openQuery(-1); }),
   ]));
-
-  host.appendChild(disclosure(t("gui_ov_group_system"),
-    brow("c4", [
-      cardSystem(st, ov),
-      cardIntegrations(d),
-      cardPipeline(ov),
-      cardTls(d.tls_status || {}, ov.tls),
-    ]),
-    brow("c2", [
-      cardChannels(st, d.alert_plugins || {}),
-      cardIntegrity(ov),
-    ])));
-
-  host.appendChild(disclosure(t("gui_ov_group_activity"),
-    brow("c3", [
-      cardAudit(d.dashboard_audit || {}),
-      cardSnapshot(d.dashboard_snapshot || {}),
-      cardPolicyUsage(d.dashboard_pu || {}),
-    ]),
-    // Both of these are four-column tables; three to a row squeezed job names
-    // and event targets to ellipses, so they get half the board each.
-    brow("c2", [
-      cardJobs(ov),
-      cardEvents(d.events_viewer || {}),
-    ]),
-    brow("c2", [
-      cardReports(d.reports_list || {}, ov),
-    ])));
-
-  return { openPostureDetail: openPostureDetail, openQuery: openQuery, refreshTop10: refreshTop10 };
+  if (!state._rankingsBooted) {
+    state._rankingsBooted = true;
+    drawer.registerAudit("ov-query-new", function () { return openQuery(-1); });
+    drawer.registerAudit("ov-query-edit", function () { return openQuery(0); });
+    refreshTop10();
+  }
+  return { openQuery: openQuery, refreshTop10: refreshTop10, refreshQueries: refreshQueries };
 }
 
 function drawerSpec(title, body) {
@@ -1533,96 +1498,6 @@ function loadAll() {
   });
 }
 
-export async function mountOverview(root, ctx) {
-  // Everything that registers an opener or a command runs BEFORE the first await:
-  // the router clears the route registries as it navigates, so a registration made
-  // after an await would attach to whichever route the user has moved to by then.
-  // The openers close over `handles`, which the board fills in once the data is
-  // there; until then they no-op and stay retryable.
-  //
-  // The teardown that DROPS those registrations again has to obey the same
-  // rule, and used to be registered inside the render callback instead — so a
-  // mount that ended on the XC-10 error card never registered one, and its two
-  // ov:* palette commands followed the operator out of this area, where
-  // running them does nothing at all. Registered here, next to what it
-  // undoes, exactly like installTeardown() in investigate/alerting/automation.
-  const handles = {};
-  const state = { torn: false };
-  installTeardown(state);
-
-  const probe = el("div", { class: "ov-error-probe" });
-  audit.register("overview-error-card", function () {
-    if (probe.firstChild) return;                    // idempotent
-    root.appendChild(probe);
-    withErrorCard(probe, "__audit_unavailable__",
-      function () { return api.load("__audit_unavailable__"); },
-      function () { });
-  });
-  drawer.registerAudit("ov-posture-detail", function () {
-    return handles.openPostureDetail ? handles.openPostureDetail() : null;
-  });
-  drawer.registerAudit("ov-query-new", function () {
-    return handles.openQuery ? handles.openQuery(-1) : null;
-  });
-  drawer.registerAudit("ov-query-edit", function () {
-    return handles.openQuery ? handles.openQuery(0) : null;
-  });
-
-  palette.registerFor(ROUTE, cmdSpec("ov:query-new", t("gui_add_query_widget"), function () {
-    if (handles.openQuery) handles.openQuery(-1);
-  }));
-  palette.registerFor(ROUTE, cmdSpec("ov:posture", t("gui_ov_posture_score_label") + " · " + t("gui_ov_detail"), function () {
-    if (handles.openPostureDetail) handles.openPostureDetail();
-  }));
-
-  root.appendChild(areaHead(t("gui_nav_overview"), ROUTE));
-  const board = el("div", { class: "board" });
-  root.appendChild(board);
-
-  await withErrorCard(board, "overview (" + SNAPS.length + ")", loadAll, function (d) {
-    if (ctx.stale()) return;
-    state.queries = (d.dashboard_queries || []).slice();
-    state.fields = fieldKeys(state.queries);
-    const built = buildBoard(board, d, state);
-    handles.openPostureDetail = built.openPostureDetail;
-    handles.openQuery = built.openQuery;
-
-    // Kick off the real top10 fetch now that the rest of the board has
-    // already painted (see loadAll()'s comment above).
-    built.refreshTop10();
-  });
-}
-
-/** S2 teardown — self-unsubscribing: the first navigation away from
- *  #/home destroys this mount's OV-05 chart handle(s) (a real
- *  ResizeObserver leak otherwise), closes any drawer/modal this area left open
- *  (drawer.mjs/modal.mjs are page-global singletons with no per-area scoping,
- *  so closeAll() is the only way to guarantee nothing this mount opened
- *  survives the navigation), and drops this route's palette commands.
- *
- *  Called from mountOverview BEFORE its first await, together with the
- *  registrations it undoes — the shape investigate/alerting/automation's own
- *  installTeardown() already had. It used to run inside the render callback,
- *  on the argument that a mount which lost the race to a fast navigation
- *  should not register a teardown at all; the price was that a mount ending on
- *  the error card registered none either, and leaked its palette commands into
- *  every other area. Nothing here needs board state to exist: chartHandles is
- *  read defensively, and closeAll()/setRoute() are safe on an empty area.
- *  state.torn also guards refreshTop10()'s background repaint (buildBoard)
- *  against firing after teardown. */
-function installTeardown(state) {
-  const unsubscribe = router.onChange(function (path) {
-    if (state.torn) return;
-    state.torn = true;
-    unsubscribe();
-    (state.chartHandles || []).forEach(function (h) {
-      try { h.destroy(); } catch (e) { console.error("[overview] chart teardown failed", e); }
-    });
-    drawer.closeAll();
-    modal.closeAll();
-    palette.setRoute(path);
-  });
-}
 
 function cmdSpec(id, label, run) {
   const spec = {};
@@ -1631,3 +1506,10 @@ function cmdSpec(id, label, run) {
   spec.run = run;
   return spec;
 }
+
+export {
+  areaHead, panel, withMeta, withGoto, kv, badge, note, emptyState, brow,
+  drawerSpec, cmdSpec, loadOne, postureDetail, fieldKeys,
+  cardSystem, cardIntegrations, cardPipeline, cardTls, cardPosture, cardTopActions,
+  cardAudit, cardSnapshot, cardPolicyUsage, cardJobs, cardEvents, cardIntegrity, cardReports, cardChannels,
+};

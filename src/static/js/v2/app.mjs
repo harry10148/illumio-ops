@@ -174,11 +174,9 @@ async function boot() {
 
   // Lazy per-route import (router.mjs's documented pattern): nothing but
   // this shell fetches until #/overview is actually visited.
-  // #/home carries the v2 overview board until 3B Task 5 replaces it with
-  // the status + to-do page.
   router.register("#/home", async function (el2, ctx) {
-    const { mountOverview } = await import("./areas/overview.mjs");
-    return mountOverview(el2, ctx);
+    const { mountHome } = await import("./areas/home.mjs");
+    return mountHome(el2, ctx);
   });
   router.register("#/investigate/inbox", mountUnderConstruction);
   Object.keys(LEGACY_ROUTES).forEach(function (oldRoute) {

@@ -720,3 +720,29 @@ select.field { appearance: none; }
   .fb-mid { padding-top: 0; }
   .fb-mid-ghost { display: none; }
 }
+
+/* ------------------------------------------------------------ home (v3) --- */
+.pagehead { display: flex; align-items: flex-end; justify-content: space-between; gap: var(--space-6); margin-bottom: var(--space-2); }
+.pagehead .eyebrow { margin-bottom: var(--space-3); }
+.pagehead .h1 { margin: 0; font-family: var(--font-display); font-weight: 300; font-size: var(--fs-display); letter-spacing: -.01em; line-height: 1.15; color: var(--text-1); }
+.pagehead .h1 .hot { font-weight: 600; color: var(--accent-fg); font-family: var(--font-num); font-variant-numeric: tabular-nums; }
+.stack { display: flex; flex-direction: column; }
+a.kv { text-decoration: none; color: inherit; align-items: center; }
+a.kv:hover { background: var(--surface-hover); }
+.hm-alert { gap: var(--space-4); }
+.hm-alert .hm-alert-when { flex: none; width: 5.5em; font-size: var(--fs-mini); color: var(--text-3); }
+.hm-alert .hm-alert-body { flex: 1; min-width: 0; display: flex; flex-direction: column; text-align: left; }
+.hm-alert .hm-alert-body b { font-weight: 500; color: var(--text-1); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hm-alert .hm-alert-body small { font-size: var(--fs-mini); color: var(--text-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hm-today .hm-when { flex: none; width: 4em; color: var(--text-3); }
+.lead { margin: 0 0 var(--space-4); font-size: var(--fs-lead); font-family: var(--font-display); font-weight: 300; color: var(--text-1); }
+.lamps { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-4) var(--space-6); }
+.lamp { display: flex; align-items: center; gap: var(--space-4); text-decoration: none; color: inherit; padding: var(--space-2) 0; }
+.lamp .dot { width: 10px; height: 10px; border-radius: 50%; }
+.lamp b { display: block; font-weight: 500; font-size: var(--fs-body); color: var(--text-1); }
+.lamp small { display: block; font-size: var(--fs-mini); color: var(--text-3); }
+.decision-bar { display: flex; gap: 2px; height: 14px; border-radius: var(--radius-s); overflow: hidden; background: var(--track); }
+.decision-bar i { display: block; flex: 0 0 auto; background: var(--mark); }
+.legend { display: flex; flex-wrap: wrap; gap: var(--space-3) var(--space-6); margin-top: var(--space-4); font-size: var(--fs-mini); color: var(--text-2); }
+.legend > span { display: inline-flex; align-items: center; gap: var(--space-3); }
+.rankings { margin-top: var(--space-6); }

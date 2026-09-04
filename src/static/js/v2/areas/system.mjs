@@ -165,6 +165,7 @@ import { router } from "../core/router.mjs";
 import { toast } from "../core/toast.mjs";
 import { theme, density } from "../core/theme.mjs";
 import { withErrorCard } from "../components/errorcard.mjs";
+import { brow, cardSystem, cardIntegrity, cardPipeline, cardIntegrations, cardTls, cardChannels } from "./cards.mjs";
 import { drawer } from "../components/drawer.mjs";
 import { modal } from "../components/modal.mjs";
 import { table, col } from "../components/table.mjs";
@@ -749,7 +750,7 @@ async function sysPage(root, ctx, route, snaps, build, soft) {
 
 // ══════════════════════════════════════════════════ SY-01 / SY-18  PCE ═══════
 
-const PCE_SNAPS = ["settings", "status"];
+const PCE_SNAPS = ["settings", "status", "dashboard_overview"];
 /* Header point 16. `status` (GET /api/status) is the appliance's live status,
  * not configuration — and this mount reads nothing out of it (only
  * mountDisplay does), so its failure has no business replacing the PCE
@@ -763,6 +764,8 @@ async function mountPce(root, ctx) {
   installTeardown(state);
 
   await sysPage(root, ctx, R_PCE, PCE_SNAPS, function (board, d, host) {
+    // v3: OV-01 system status and OV-12 data integrity moved here from the overview
+    board.appendChild(brow("c2", [cardSystem(d.status || {}, d.dashboard_overview || {}), cardIntegrity(d.dashboard_overview || {})]));
     const s = d.settings || {};
     const api_ = s.api || {};
 
@@ -1329,7 +1332,7 @@ function kpiCell(k, v, d, tn) {
 
 // ══════════════════════════════════════════ SY-07…10  SIEM forwarder ═════════
 
-const SIEM_SNAPS = ["siem_forwarder", "siem_destinations", "siem_status", "siem_dlq"];
+const SIEM_SNAPS = ["siem_forwarder", "siem_destinations", "siem_status", "siem_dlq", "dashboard_overview", "cache_status", "cache_throughput"];
 /* Header point 16, same split as CACHE_SOFT: siem_forwarder and
  * siem_destinations are the configuration (SY-07/SY-08's form, table and CRUD
  * buttons) and stay strict; siem_status (per-destination counters) and
@@ -1581,6 +1584,8 @@ async function mountSiem(root, ctx) {
 
   await sysPage(root, ctx, R_SIEM, SIEM_SNAPS,
     function (board, d, host) {
+    // v3: OV-10 pipeline health and OV-16 integrations moved here from the overview
+    board.appendChild(brow("c2", [cardPipeline(d.dashboard_overview || {}), cardIntegrations(d)]));
       const fw = d.siem_forwarder || {};
       const dests = (d.siem_destinations && d.siem_destinations.destinations) || [];
       /* byName is refilled in place by applyStatuses() so the destination
@@ -1930,7 +1935,7 @@ async function mountSiem(root, ctx) {
 
 // ══════════════════════════════════════════════════════ SY-11  TLS ═══════════
 
-const TLS_SNAPS = ["tls_status"];
+const TLS_SNAPS = ["tls_status", "dashboard_overview"];
 const CSR_ALGS = [["rsa-2048", "RSA-2048"], ["ecdsa-p256", "ECDSA P-256"]];
 
 /** humanizeDays, settings.js:114-127 — months under 60 days, years above. */
@@ -1959,6 +1964,8 @@ async function mountTls(root, ctx) {
   palette.registerFor(R_TLS, cmdSpec("sy:tls-renew", t("gui_tls_renew"), function () { if (handles.renew) handles.renew(); }));
 
   await sysPage(root, ctx, R_TLS, TLS_SNAPS, function (board, d, host) {
+    // v3: OV-14 certificate card moved here from the overview
+    board.appendChild(brow("c2", [cardTls(d.tls_status || {}, (d.dashboard_overview || {}).tls)]));
     const s = d.tls_status || {};
     const info = s.cert_info || {};
     const form = makeForm("POST", "/api/tls/config");
@@ -2464,6 +2471,8 @@ async function mountChannels(root, ctx) {
   // requirement.
 
   await sysPage(root, ctx, R_CHANNELS, CHANNELS_SNAPS, function (board, d, host) {
+    // v3: OV-15 channel status card moved here from the overview
+    board.appendChild(brow("c2", [cardChannels(d.status || {}, d.alert_plugins || {})]));
     const plugins = (d.alert_plugins && d.alert_plugins.plugins) || {};
     const s = d.settings || {};
     const active = (s.alerts && s.alerts.active) || [];

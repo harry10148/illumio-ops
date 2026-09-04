@@ -1,0 +1,26 @@
+{
+ "counts": {
+  "ack": 0,
+  "done": 0,
+  "new": 1
+ },
+ "items": [
+  {
+   "criteria": "",
+   "fired_at": "2026-09-03T13:07:17Z",
+   "id": 1,
+   "rule_id": "27",
+   "rule_name": "Rule Set 變更",
+   "severity": "info",
+   "status": "new",
+   "status_at": "2026-09-03T13:13:53Z",
+   "status_by": "verify-3a",
+   "summary": "Rule Set 變更 · user@example.com | 10.0.0.1 · illumio-ops-3a-verify-20260903T130622Z",
+   "type": "event"
+  }
+ ],
+ "ok": true,
+ "page": 1,
+ "page_size": 4,
+ "total": 1
+}

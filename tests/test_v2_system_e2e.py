@@ -872,8 +872,10 @@ def test_pce_runtime_connection_fields_load_save_and_show_safe_saas_status_link(
         console = page.locator('input[data-field="console_url"]')
         assert console.input_value() == "https://tenant.illumio.example"
 
+        # scoped to the settings field: the OV-01 system-status card that
+        # moved onto this page (v3) carries the same provider link
         status_link = page.locator(
-            'a[href="https://status.illumio.com/posts/dashboard"]'
+            '.fld a[href="https://status.illumio.com/posts/dashboard"]'
         )
         expect(status_link).to_be_visible()
         assert status_link.get_attribute("target") == "_blank"

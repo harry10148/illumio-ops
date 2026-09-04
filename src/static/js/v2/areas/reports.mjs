@@ -127,6 +127,7 @@ import { router } from "../core/router.mjs";
 import { audit } from "../core/audit.mjs";
 import { toast } from "../core/toast.mjs";
 import { withErrorCard } from "../components/errorcard.mjs";
+import { brow, cardTopActions, cardAudit, cardSnapshot, cardPolicyUsage } from "./cards.mjs";
 import { drawer } from "../components/drawer.mjs";
 import { modal } from "../components/modal.mjs";
 import { table, col } from "../components/table.mjs";
@@ -146,7 +147,7 @@ const ROUTE = "#/reports";
  * lists for the same reason). It is still loaded for real — just individually,
  * with its own fallback, so one optional panel's outage never hides report
  * generation or the output list. */
-const SNAPS = ["reports_list", "report_schedules", "labels", "status"];
+const SNAPS = ["reports_list", "report_schedules", "labels", "status", "dashboard_snapshot", "dashboard_audit", "dashboard_pu"];
 
 /** Minimal area-head: title + route breadcrumb. Same local copy every
  * single-route area keeps (overview.mjs's own comment explains why: small
@@ -996,6 +997,13 @@ async function mountReports(root, ctx) {
       // the UI language, and anything that is not zh_TW becomes en.
       state.lang = (d.status && d.status.language) === "zh_TW" ? "zh_TW" : "en";
       state.rhc = d.rhc_enablement || {};
+      // v3: the report-derived summaries (OV-03 top actions, OV-06 audit,
+      // OV-08 snapshot, OV-07 policy usage) moved here from the overview.
+      clear(aside);
+      aside.appendChild(cardTopActions((d.dashboard_snapshot && d.dashboard_snapshot.snapshot) || {}));
+      aside.appendChild(cardAudit(d.dashboard_audit || {}));
+      aside.appendChild(cardSnapshot(d.dashboard_snapshot || {}));
+      aside.appendChild(cardPolicyUsage(d.dashboard_pu || {}));
       // state.torn is NOT reset here: the teardown above may already have
       // fired (a navigation while this load was in flight), and clearing the
       // flag would let a late async resolution repaint a board that is gone.

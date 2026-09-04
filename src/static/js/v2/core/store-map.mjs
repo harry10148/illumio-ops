@@ -103,6 +103,15 @@ export const GET_MAP = {
   dashboard_audit: "/api/dashboard/audit_summary",
   dashboard_pu: "/api/dashboard/policy_usage_summary",
   reports_list: "/api/reports",
+  // v3 alert records (3A): the inbox list, one record, and the flow query a
+  // traffic/bandwidth alert's rule rebuilds (spec §4a/§4b).
+  alerts(params) {
+    const p = params || {};
+    return "/api/alerts?" + qs({ page: p.page || 1, page_size: p.page_size || 4, status: p.status || "", type: p.type || "" },
+      ["page", "page_size", "status", "type"]);
+  },
+  alert_detail(params) { return "/api/alerts/" + encodeURIComponent(params.id); },
+  alert_traffic_query(params) { return "/api/alerts/" + encodeURIComponent(params.id) + "/traffic_query"; },
   report_schedules: "/api/report-schedules",
   rhc_enablement: "/api/rule_hit_count/enablement",
   rules: "/api/rules",

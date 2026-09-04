@@ -39,6 +39,8 @@
 - {id: dashboard_audit,     method: GET,  path: /api/dashboard/audit_summary}
 - {id: dashboard_pu,        method: GET,  path: /api/dashboard/policy_usage_summary}
 - {id: reports_list,        method: GET,  path: /api/reports}
+# v3 (3A, 2026-09-04): persisted alert records — src/gui/routes/alerts.py
+- {id: alerts,              method: GET,  path: "/api/alerts?page=1&page_size=4"}
 - {id: report_schedules,    method: GET,  path: /api/report-schedules}
 - {id: rhc_enablement,      method: GET,  path: /api/rule_hit_count/enablement}
 - {id: rules,               method: GET,  path: /api/rules}
@@ -158,3 +160,16 @@
   method: GET
   # src/static/js/filter-bar.js:653 `/api/filter-objects/browse?type=${cat}&offset=${offset}&limit=20`
   path: "/api/filter-objects/browse?type=label&offset=0&limit=20"
+- id: alert_detail
+  method: GET
+  # src/gui/routes/alerts.py @bp.route('/api/alerts/<int:alert_id>')
+  path: "/api/alerts/{id}"
+  path_from: "alerts.items[0].id"
+  note: "id 取自 alerts 快照第一筆 items[].id"
+- id: alert_traffic_query
+  method: GET
+  # src/gui/routes/alerts.py @bp.route('/api/alerts/<int:alert_id>/traffic_query');
+  # lab 快照的第一筆是 event 告警，所以錄下的是 400 not_traffic 的形狀
+  path: "/api/alerts/{id}/traffic_query"
+  path_from: "alerts.items[0].id"
+  note: "id 取自 alerts 快照第一筆 items[].id"

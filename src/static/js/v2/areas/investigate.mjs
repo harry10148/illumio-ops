@@ -127,6 +127,7 @@ import { router } from "../core/router.mjs";
 import { audit } from "../core/audit.mjs";
 import { toast } from "../core/toast.mjs";
 import { withErrorCard } from "../components/errorcard.mjs";
+import { mountRankingsAndQueries } from "./cards.mjs";
 import { drawer } from "../components/drawer.mjs";
 import { modal } from "../components/modal.mjs";
 import { table, col } from "../components/table.mjs";
@@ -233,7 +234,7 @@ const SHADOW_LIMITS = ["50", "200", "500"];
 // is fetched separately, on demand: the flow search on click, and the filter
 // objects only once a filters drawer or the object browser is opened (the bar
 // issues those itself — core/filter-objects.mjs).
-const TRAFFIC_SNAPS = ["archive_status", "cache_status", "cache_settings"];
+const TRAFFIC_SNAPS = ["archive_status", "cache_status", "cache_settings", "dashboard_queries"];
 
 function lookup(pairs, key, fallback) {
   let hit = fallback;
@@ -1463,6 +1464,9 @@ async function mountTraffic(root, ctx) {
         floatHost.appendChild(bar);
       }
 
+      const rankHost = el("div", { class: "rankings" });
+      state.rankState = state.rankState || { torn: false, chartHandles: [] };
+
       function repaint() {
         state.tables.forEach(function (h) { h.destroy(); });
         state.tables = [];
@@ -1474,6 +1478,9 @@ async function mountTraffic(root, ctx) {
         // useful (and rendered) for every source, including "archive".
         host.appendChild(archiveStrip(d));
         host.appendChild(results());
+        // v3: the Top10 ranking + saved-query widgets (OV-05 / OV-04) moved here
+        // from the overview; mounted once, re-attached on every repaint.
+        host.appendChild(rankHost);
         paintFloatTraffic();
       }
 
@@ -1781,6 +1788,8 @@ async function mountTraffic(root, ctx) {
       state.onQuarantined = function () { if (state.phase === "done") runQuery(); };
 
       repaint();
+      // v3: mount the rankings row once the first paint has attached rankHost
+      mountRankingsAndQueries(rankHost, d, state.rankState);
     });
 }
 
@@ -2949,6 +2958,13 @@ function installTeardown(state) {
     if (state.torn) return;
     state.torn = true;
     unsubscribe();
+    if (state.rankState) {
+      state.rankState.torn = true;
+      (state.rankState.chartHandles || []).forEach(function (h) {
+        try { h.destroy(); } catch (e) { console.error("[investigate] chart teardown failed", e); }
+      });
+      state.rankState.chartHandles = [];
+    }
     (state.tables || []).forEach(function (h) {
       try { h.destroy(); } catch (e) { console.error("[investigate] table teardown failed", e); }
     });

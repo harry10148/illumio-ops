@@ -1,0 +1,202 @@
+{
+ "alert": {
+  "criteria": "",
+  "dispatch": [
+   {
+    "channel": "line",
+    "error": null,
+    "status": "success",
+    "target": "***MASKED***"
+   },
+   {
+    "channel": "mail",
+    "error": null,
+    "status": "success",
+    "target": "***MASKED***"
+   }
+  ],
+  "fired_at": "2026-09-03T13:07:17Z",
+  "id": 1,
+  "payload": {
+   "action": "DELETE /rule_sets/669",
+   "count": 2,
+   "desc": "Ruleset 被建立、更新或刪除。",
+   "parsed_data": [
+    {
+     "action": "DELETE /rule_sets/669",
+     "action_method": "DELETE",
+     "action_path": "/rule_sets/669",
+     "actor": "user@example.com",
+     "actor_agent": "",
+     "actor_type": "user",
+     "actor_user": "user@example.com",
+     "category": "rule_set",
+     "event_id": "/orgs/1/events/562cdfc3-4f5b-4674-86f1-2ef5d4d9b51a",
+     "event_type": "rule_set.delete",
+     "href": "/orgs/1/events/562cdfc3-4f5b-4674-86f1-2ef5d4d9b51a",
+     "known_event_type": true,
+     "notification_types": [],
+     "notifications_count": 0,
+     "parser_notes": [],
+     "resource_changes_count": 1,
+     "resource_name": "illumio-ops-3a-verify-20260903T130622Z",
+     "resource_type": "rule_set",
+     "severity": "info",
+     "source": "user@example.com | 10.0.0.1",
+     "source_ip": "10.0.0.1",
+     "status": "success",
+     "target_name": "illumio-ops-3a-verify-20260903T130622Z",
+     "target_type": "rule_set",
+     "timestamp": "2026-09-03T13:06:22.357Z",
+     "verb": "delete",
+     "workloads_affected": 0
+    },
+    {
+     "action": "POST /rule_sets",
+     "action_method": "POST",
+     "action_path": "/rule_sets",
+     "actor": "user@example.com",
+     "actor_agent": "",
+     "actor_type": "user",
+     "actor_user": "user@example.com",
+     "category": "rule_set",
+     "event_id": "/orgs/1/events/643c84f6-ce4a-43d1-b51c-75acf6ea48d2",
+     "event_type": "rule_set.create",
+     "href": "/orgs/1/events/643c84f6-ce4a-43d1-b51c-75acf6ea48d2",
+     "known_event_type": true,
+     "notification_types": [],
+     "notifications_count": 0,
+     "parser_notes": [],
+     "resource_changes_count": 1,
+     "resource_name": "illumio-ops-3a-verify-20260903T130622Z",
+     "resource_type": "rule_set",
+     "severity": "info",
+     "source": "user@example.com | 10.0.0.1",
+     "source_ip": "10.0.0.1",
+     "status": "success",
+     "target_name": "illumio-ops-3a-verify-20260903T130622Z",
+     "target_type": "rule_set",
+     "timestamp": "2026-09-03T13:06:22.309Z",
+     "verb": "create",
+     "workloads_affected": 0
+    }
+   ],
+   "raw_data": [
+    {
+     "action": {
+      "api_endpoint": "/api/v2/orgs/1/sec_policy/draft/rule_sets/669",
+      "api_method": "DELETE",
+      "http_status_code": 204,
+      "info": {
+       "api_key_id": "***MASKED***"
+      },
+      "src_ip": "10.0.0.1",
+      "uuid": "063b0a5d-fb5e-4cef-8763-02a06b67b62a"
+     },
+     "created_by": {
+      "user": {
+       "href": "/users/11",
+       "username": "user@example.com"
+      }
+     },
+     "event_type": "rule_set.delete",
+     "href": "/orgs/1/events/562cdfc3-4f5b-4674-86f1-2ef5d4d9b51a",
+     "notifications": [],
+     "pce_fqdn": "pce.lab.local",
+     "resource_changes": [
+      {
+       "change_type": "delete",
+       "changes": null,
+       "resource": {
+        "rule_set": {
+         "href": "/orgs/1/sec_policy/draft/rule_sets/669",
+         "name": "illumio-ops-3a-verify-20260903T130622Z",
+         "scopes": [
+          []
+         ]
+        }
+       },
+       "uuid": "61700341-e3bc-4144-b653-1012d2e1ab03"
+      }
+     ],
+     "severity": "info",
+     "status": "success",
+     "timestamp": "2026-09-03T13:06:22.357Z"
+    },
+    {
+     "action": {
+      "api_endpoint": "/api/v2/orgs/1/sec_policy/draft/rule_sets",
+      "api_method": "POST",
+      "http_status_code": 201,
+      "info": {
+       "api_key_id": "***MASKED***"
+      },
+      "src_ip": "10.0.0.1",
+      "uuid": "f365882e-e524-40a8-b86a-9927fd936c2a"
+     },
+     "created_by": {
+      "user": {
+       "href": "/users/11",
+       "username": "user@example.com"
+      }
+     },
+     "event_type": "rule_set.create",
+     "href": "/orgs/1/events/643c84f6-ce4a-43d1-b51c-75acf6ea48d2",
+     "notifications": [],
+     "pce_fqdn": "pce.lab.local",
+     "resource_changes": [
+      {
+       "change_type": "create",
+       "changes": {
+        "description": {
+         "after": "3A verification trigger; safe to delete",
+         "before": null
+        },
+        "enabled": {
+         "after": true,
+         "before": null
+        },
+        "name": {
+         "after": "illumio-ops-3a-verify-20260903T130622Z",
+         "before": null
+        }
+       },
+       "resource": {
+        "rule_set": {
+         "href": "/orgs/1/sec_policy/draft/rule_sets/669",
+         "name": "illumio-ops-3a-verify-20260903T130622Z",
+         "scopes": [
+          []
+         ]
+        }
+       },
+       "uuid": "389bcd9b-c97e-4252-9c8a-96271dd15406"
+      }
+     ],
+     "severity": "info",
+     "status": "success",
+     "timestamp": "2026-09-03T13:06:22.309Z"
+    }
+   ],
+   "resource_name": "illumio-ops-3a-verify-20260903T130622Z",
+   "resource_type": "rule_set",
+   "rule": "Rule Set 變更",
+   "rule_id": "27",
+   "rule_type": "event",
+   "runbook_response": "Review the PCE web console Troubleshooting > Events to pinpoint overly broad ruleset scopes, such as those missing application or environment restrictions. When monitoring security policy create events, check the workloads affected field to see how many workloads received the updated policy. If the number of affected workloads exceeds an acceptable threshold, investigate the associated policy changes for misconfigurations.",
+   "severity": "info",
+   "source": "user@example.com | 10.0.0.1",
+   "target": "***MASKED***",
+   "time": "2026-09-03 21:06 (UTC+08)"
+  },
+  "rule_id": "27",
+  "rule_name": "Rule Set 變更",
+  "severity": "info",
+  "status": "new",
+  "status_at": "2026-09-03T13:13:53Z",
+  "status_by": "verify-3a",
+  "summary": "Rule Set 變更 · user@example.com | 10.0.0.1 · illumio-ops-3a-verify-20260903T130622Z",
+  "type": "event"
+ },
+ "ok": true
+}

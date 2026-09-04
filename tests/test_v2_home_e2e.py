@@ -55,9 +55,30 @@ pytest_plugins = ["tests.v2_e2e_utils"]
 from tests.v2_e2e_utils import build_v2_app, _LiveServer, v2_login  # noqa: E402
 
 
-def _goto_overview(page, base_url):
-    page.goto(base_url + "/#/home")
+HOME = "#/home"
+TRAFFIC = "#/investigate/traffic"   # OV-04 / OV-05 live here in v3
+PCE = "#/system/pce"                # OV-01 / OV-12
+SIEM = "#/system/siem"              # OV-10 / OV-16
+
+
+# The first card each page paints once its snapshots are in — waiting on the
+# route alone races the async load (the area head lands before the data).
+FIRST_ANCHOR = {HOME: "HM-02", TRAFFIC: "OV-04", PCE: "OV-01", SIEM: "OV-10", "#/reports": "OV-03",
+                "#/system/tls": "OV-14", "#/system/channels": "OV-15"}
+
+
+def _goto(page, base_url, route=HOME, cov=None):
+    page.set_default_timeout(30000)
+    page.goto(base_url + "/" + route)
     page.wait_for_selector('body[data-booted="true"]')
+    page.wait_for_selector('[data-route="%s"]' % route)
+    first = cov or FIRST_ANCHOR.get(route)
+    if first:
+        page.wait_for_selector('[data-cov="%s"]' % first)
+
+
+def _goto_overview(page, base_url):
+    _goto(page, base_url, HOME)
 
 
 def _labels(page):
@@ -173,16 +194,25 @@ def _pipeline(*, verdict="ok", event_status="ok", traffic_status="ok"):
 
 
 def test_overview_coverage_anchors_present(v2_page):
+    """v3: the overview board is gone; its surviving cards live on the pages
+    below (design/v3/coverage.yaml), and #/home carries the five new cards."""
     page, base_url = v2_page
-    _goto_overview(page, base_url)
-
-    page.evaluate("window.__openAllForAudit ? window.__openAllForAudit() : null")
-    page.wait_for_timeout(200)
-
-    found = set(page.eval_on_selector_all("[data-cov]", "els => els.map(e => e.dataset.cov)"))
-    expected = {"OV-%02d" % i for i in range(1, 17)}
-    missing = expected - found
-    assert missing == set(), f"missing coverage anchors: {sorted(missing)}"
+    placement = {
+        HOME: {"HM-01", "HM-02", "HM-03", "HM-04", "OV-02", "XC-01"},
+        TRAFFIC: {"OV-04", "OV-05"},
+        "#/reports": {"OV-03", "OV-06", "OV-07", "OV-08"},
+        PCE: {"OV-01", "OV-12"},
+        SIEM: {"OV-10", "OV-16"},
+        "#/system/tls": {"OV-14"},
+        "#/system/channels": {"OV-15"},
+    }
+    for route, expected in placement.items():
+        _goto(page, base_url, route)
+        page.evaluate("window.__openAllForAudit ? window.__openAllForAudit() : null")
+        page.wait_for_timeout(300)
+        found = set(page.eval_on_selector_all("[data-cov]", "els => els.map(e => e.dataset.cov)"))
+        missing = expected - found
+        assert missing == set(), f"{route}: missing coverage anchors: {sorted(missing)}"
 
 
 def test_auth_failure_is_credentials_reason_not_generic_unreachable(v2_page):
@@ -197,7 +227,7 @@ def test_auth_failure_is_credentials_reason_not_generic_unreachable(v2_page):
         ),
         pipeline=_pipeline(),
     )
-    _goto_overview(page, base_url)
+    _goto(page, base_url, HOME)
     labels = _health_labels(page)
 
     pce_cell = page.locator('.rail-host [data-cov="XC-01"] .rail-cell').nth(1)
@@ -207,6 +237,8 @@ def test_auth_failure_is_credentials_reason_not_generic_unreachable(v2_page):
     assert labels["auth"] in reasons
     assert labels["unreachable"] not in reasons
     assert "sensitive-response-body-must-not-render" not in reasons
+
+    _goto(page, base_url, PCE)
 
     system_text = page.locator('section[data-cov="OV-01"]').text_content()
     assert labels["auth"] in system_text
@@ -221,12 +253,14 @@ def test_noop_success_keeps_api_green_while_failed_ingestor_keeps_pipeline_red(v
         pce_stats=_pce_stats(event_poll_status="error"),
         pipeline=_pipeline(verdict="error", event_status="error"),
     )
-    _goto_overview(page, base_url)
+    _goto(page, base_url, HOME)
 
     cells = page.locator('.rail-host [data-cov="XC-01"] .rail-cell')
     assert cells.nth(1).get_attribute("data-tone") == "ok"
     assert cells.nth(3).get_attribute("data-tone") == "crit"
+    _goto(page, base_url, PCE)
     assert page.locator('section[data-cov="OV-01"]').get_attribute("data-tone") == "ok"
+    _goto(page, base_url, SIEM)
     assert page.locator('section[data-cov="OV-10"]').get_attribute("data-tone") == "crit"
 
     pipeline_text = page.locator('section[data-cov="OV-10"]').text_content()
@@ -241,7 +275,7 @@ def test_healthy_saas_identifies_noop_provider_and_both_ingest_freshness_rows(v2
         pce_stats=_pce_stats(),
         pipeline=_pipeline(),
     )
-    _goto_overview(page, base_url)
+    _goto(page, base_url, HOME)
     labels = _health_labels(page)
 
     pce_cell = page.locator('.rail-host [data-cov="XC-01"] .rail-cell').nth(1)
@@ -250,6 +284,8 @@ def test_healthy_saas_identifies_noop_provider_and_both_ingest_freshness_rows(v2
     reasons = page.locator(".rail-host .rail-pop").inner_text()
     assert "SaaS" in reasons
     assert "noop" in reasons
+
+    _goto(page, base_url, PCE)
 
     system = page.locator('section[data-cov="OV-01"]')
     assert "SaaS" in system.text_content()
@@ -260,6 +296,7 @@ def test_healthy_saas_identifies_noop_provider_and_both_ingest_freshness_rows(v2
     assert provider.get_attribute("target") == "_blank"
     assert provider.get_attribute("rel") == "noopener noreferrer"
 
+    _goto(page, base_url, SIEM)
     pipeline_text = page.locator('section[data-cov="OV-10"]').text_content()
     assert "events" in pipeline_text and "ok" in pipeline_text
     assert "traffic" in pipeline_text and "ok" in pipeline_text
@@ -285,7 +322,7 @@ def test_on_prem_health_body_category_and_probe_chain_render_consistently(
         deployment_type="on_prem",
         health_probe="noop+health+node_available",
     )
-    _goto_overview(page, base_url)
+    _goto(page, base_url, HOME)
     labels = _health_labels(page)
     expected_reason = labels[category]
     expected_probe = "/noop + /health + /node_available"
@@ -298,6 +335,8 @@ def test_on_prem_health_body_category_and_probe_chain_render_consistently(
     assert expected_probe in reasons
     assert "HTTP 200" not in reasons
 
+    _goto(page, base_url, PCE)
+
     system = page.locator('section[data-cov="OV-01"]')
     system_text = system.text_content()
     assert system.get_attribute("data-tone") == expected_tone
@@ -308,7 +347,7 @@ def test_on_prem_health_body_category_and_probe_chain_render_consistently(
 
 def test_custom_query_create_appears_edit_delete_round_trip(v2_page):
     page, base_url = v2_page
-    _goto_overview(page, base_url)
+    _goto(page, base_url, TRAFFIC)
     labels = _labels(page)
     query_name = "e2e-overview-query"
 
@@ -400,7 +439,7 @@ def test_legacy_scalar_query_edit_preserves_filters_on_save(v2_context, temp_con
         page = v2_context.new_page()
         page.set_default_timeout(10_000)
         try:
-            page.goto(base_url + "/#/home")
+            page.goto(base_url + "/" + TRAFFIC)
             page.wait_for_selector('body[data-booted="true"]')
 
             panel = page.locator('section[data-cov="OV-04"]')
@@ -437,7 +476,7 @@ def test_legacy_scalar_query_edit_preserves_filters_on_save(v2_context, temp_con
         page2 = v2_context.new_page()
         page2.set_default_timeout(10_000)
         try:
-            page2.goto(base_url + "/#/home")
+            page2.goto(base_url + "/" + TRAFFIC)
             page2.wait_for_selector('body[data-booted="true"]')
             queries = page2.evaluate(
                 "async () => { const { api } = await import('/static/js/v2/core/api.mjs'); "
@@ -491,27 +530,13 @@ def test_posture_drawer_opens_and_closes(v2_page):
 
 
 def test_goto_link_navigates_to_another_area(v2_page):
-    """OV-01's go-to link still works — from inside the group it now lives in.
-
-    The board leads with the posture score and the ranked actions; the status
-    cards that restate the health rail moved into the "system detail" group
-    (density spec R1/R2). Both halves are asserted: that the group really does
-    ship collapsed, and that the link inside it works once opened, which is the
-    path an operator now takes.
-    """
+    """HM-01's go-to link leaves the home page for the inbox (v3)."""
     page, base_url = v2_page
-    _goto_overview(page, base_url)
-
-    group = page.locator("details.disclose").first
-    assert group.get_attribute("open") is None
-    assert page.locator('section[data-cov="OV-01"]').count() == 1, "card must still render"
-    group.locator("summary").click()
-
-    # OV-01's header carries exactly one "go to" button (withGoto, no
-    # withAction on that card), pointing at #/system/pce.
-    page.locator('section[data-cov="OV-01"] .hact button.goto').click()
-    page.wait_for_selector('[data-route="#/system/pce"]')
-    assert page.evaluate("location.hash") == "#/system/pce"
+    _goto(page, base_url, HOME)
+    assert page.locator('section[data-cov="HM-01"]').count() == 1, "card must render"
+    page.locator('section[data-cov="HM-01"] .hact button.goto').click()
+    page.wait_for_selector('[data-route="#/investigate/inbox"]')
+    assert page.evaluate("location.hash") == "#/investigate/inbox"
 
 
 def test_teardown_closes_drawer_on_navigate_away(v2_page):
@@ -519,7 +544,7 @@ def test_teardown_closes_drawer_on_navigate_away(v2_page):
     Fails against a mountOverview() with no router.onChange teardown (the
     drawer would still be in the DOM after the hash change below)."""
     page, base_url = v2_page
-    _goto_overview(page, base_url)
+    _goto(page, base_url, TRAFFIC)
     labels = _labels(page)
 
     page.locator('section[data-cov="OV-04"]').get_by_role(
@@ -535,32 +560,18 @@ def test_teardown_closes_drawer_on_navigate_away(v2_page):
     assert page.locator("aside.drawer").count() == 0
 
 
-def test_error_card_mount_still_drops_its_palette_commands(v2_page):
-    """Task 12d F6: mountOverview registers two route-scoped palette commands
-    (ov:query-new, ov:posture) before its first await, but registered the
-    teardown that drops them again only inside the success callback. A mount
-    that ends on the XC-10 error card therefore leaked both commands into
-    every other area, where running them does nothing at all.
-
-    The failure is injected by answering GET /api/dashboard/queries with a
-    payload the board cannot build from. Note this is NOT the "loadAll()
-    rejects" path the review assumed: loadOne() catches every source
-    independently, so loadAll() cannot reject — the reachable failure is the
-    render throwing, which lands in the same withErrorCard catch and left the
-    same teardown unregistered.
-
-    RED against the pre-fix overview.mjs: both commands are still in
-    palette.list() after navigating away."""
+def test_home_palette_commands_drop_on_navigate_away(v2_page):
+    """S2: the two route-scoped palette commands mountHome registers before
+    its first await (home:inbox, ov:posture) must be gone after navigating
+    away — even when the page's own loads failed (home tolerates a broken
+    snapshot and still paints, so this is checked under a 500 on /api/status)."""
     page, base_url = v2_page
 
     def bad_payload(route):
-        route.fulfill(status=200, content_type="application/json", body="123")
-
-    page.route("**/api/dashboard/queries", bad_payload)
+        route.fulfill(status=500, content_type="application/json", body='{"ok": false}')
+    page.route("**/api/status", bad_payload)
     try:
-        _goto_overview(page, base_url)
-        page.wait_for_selector(".board .errcard")
-
+        _goto(page, base_url, HOME)
         page.evaluate("location.hash = '#/reports'")
         page.wait_for_selector('[data-route="#/reports"]')
         ids = page.evaluate(
@@ -568,6 +579,38 @@ def test_error_card_mount_still_drops_its_palette_commands(v2_page):
             "return palette.list().map(c => c.id); }"
         )
     finally:
-        page.unroute("**/api/dashboard/queries", bad_payload)
+        page.unroute("**/api/status", bad_payload)
+    assert [i for i in ids if i.startswith("ov:") or i.startswith("home:")] == [], ids
 
-    assert [i for i in ids if i.startswith("ov:")] == [], ids
+def test_home_headline_counts_open_alerts_and_alert_rows_deep_link(v2_page, _isolate_alert_store):
+    """HM-00/HM-01: the headline number is /api/alerts counts.new and each row
+    links to the inbox record (spec §2)."""
+    from src.alerts.store import AlertStore
+    st = AlertStore(_isolate_alert_store)
+    a = st.insert(fired_at="2026-09-04T01:00:00Z", type="traffic", rule_id="t1", rule_name="SSH in",
+                  severity="warning", summary="SSH in · 24", criteria="port 22", payload={}, dispatch=[])
+    st.insert(fired_at="2026-09-04T01:01:00Z", type="event", rule_id="18", rule_name="Login failed",
+              severity="critical", summary="Login failed · x", criteria="", payload={}, dispatch=[])
+    st.close()
+    page, base_url = v2_page
+    page.reload()
+    _goto(page, base_url, HOME)
+    page.wait_for_selector('[data-cov="HM-01"] .hm-alert')
+    assert "2" in page.locator('[data-cov="HM-00"]').text_content()
+    rows = page.locator('[data-cov="HM-01"] .hm-alert')
+    assert rows.count() == 2
+    # critical sorts first
+    assert "Login failed" in rows.nth(0).text_content()
+    assert rows.nth(1).get_attribute("href") == "#/investigate/inbox?id=%d" % a
+
+
+def test_home_survives_alerts_api_failure(v2_page):
+    """HM-01 shows the error inline; the other four cards still render."""
+    page, base_url = v2_page
+    page.route("**/api/alerts?*", lambda r: r.fulfill(status=500, content_type="application/json", body='{"ok": false, "error": "boom"}'))
+    _goto(page, base_url, HOME)
+    page.wait_for_selector('[data-cov="HM-02"]')
+    for cov in ("HM-01", "HM-02", "HM-03", "HM-04", "OV-02"):
+        assert page.locator('section[data-cov="%s"]' % cov).count() == 1, cov
+    assert page.locator('section[data-cov="HM-01"]').get_attribute("data-tone") == "warn"
+    page.unroute("**/api/alerts?*")

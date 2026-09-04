@@ -7,22 +7,27 @@
 # === EXCLUSIONS (documented, not in DOM coverage scope) ===
 # CSRF 流程 (_csrfToken/_withFreshCsrf): non-visual mechanism, backend untouched in Phase 1, excluded from DOM coverage — Phase 2 regression scope
 # 說明彈窗 m-help 內容 (篩選語法/policy decisions): folded into XC-11 說明側欄
-OV-01: {item: 系統狀態總覽卡, route: "#/home"}
+OV-01: {item: 系統狀態總覽卡, route: "#/system/pce"}
 OV-02: {item: posture score 卡+詳情, route: "#/home"}
-OV-03: {item: Top Actions 區, route: "#/home"}
-OV-04: {item: 自訂查詢卡 CRUD, route: "#/home"}
-OV-05: {item: Top10 查詢, route: "#/home"}
-OV-06: {item: audit 摘要卡, route: "#/home"}
-OV-07: {item: policy usage 摘要卡, route: "#/home"}
-OV-08: {item: dashboard snapshot, route: "#/home"}
-OV-09: {item: 報表最近產出 meta, route: "#/home"}
-OV-10: {item: pipeline 健康摘要(唯讀), route: "#/home"}
-OV-11: {item: job 健康摘要(唯讀), route: "#/home"}
-OV-12: {item: 資料完整性卡(唯讀), route: "#/home"}
-OV-13: {item: 近期事件表, route: "#/home"}
-OV-14: {item: TLS 卡, route: "#/home"}
-OV-15: {item: 告警管道卡(唯讀), route: "#/home"}
-OV-16: {item: Integrations 狀態卡摘要(_buildOvCards), route: "#/home"}
+OV-03: {item: Top Actions 區, route: "#/reports"}
+OV-04: {item: 自訂查詢卡 CRUD, route: "#/investigate/traffic"}
+OV-05: {item: Top10 查詢, route: "#/investigate/traffic"}
+OV-06: {item: audit 摘要卡, route: "#/reports"}
+OV-07: {item: policy usage 摘要卡, route: "#/reports"}
+OV-08: {item: dashboard snapshot, route: "#/reports"}
+# OV-09 移除（3B Task 5，2026-09-04）：報表最近產出 meta — 報表最近產出 meta → 報表區 RP-06 產出清單已涵蓋
+OV-10: {item: pipeline 健康摘要(唯讀), route: "#/system/siem"}
+# OV-11 移除（3B Task 5，2026-09-04）：job 健康摘要(唯讀) — job 健康摘要 → #/system/jobs 的 AU-13 已涵蓋
+OV-12: {item: 資料完整性卡(唯讀), route: "#/system/pce"}
+# OV-13 移除（3B Task 5，2026-09-04）：近期事件表 — 近期事件表 → #/investigate/events 的 IV-13/14 已涵蓋
+OV-14: {item: TLS 卡, route: "#/system/tls"}
+OV-15: {item: 告警管道卡(唯讀), route: "#/system/channels"}
+OV-16: {item: Integrations 狀態卡摘要(_buildOvCards), route: "#/system/siem"}
+HM-00: {item: 首頁 標題未處理告警數, route: "#/home"}
+HM-01: {item: 首頁 需要你處理（未處理告警前 4 則＋計數）, route: "#/home"}
+HM-02: {item: 首頁 系統健康（一句話＋六燈）, route: "#/home"}
+HM-03: {item: 首頁 今天會發生（規則排程／報表排程／retention）, route: "#/home"}
+HM-04: {item: 首頁 7 天流量決策帶, route: "#/home"}
 IV-01: {item: 流量分析器查詢+KPI, route: "#/investigate/traffic"}
 IV-02: {item: 流量來源切換 即時快取/Archive（actions.py:92-107）, route: "#/investigate/traffic"}
 IV-03: {item: 進階篩選(FilterBar), route: "#/investigate/traffic"}
