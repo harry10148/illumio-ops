@@ -125,18 +125,6 @@ const AREA_ROUTES = [
   "#/system",
 ];
 
-// Routes whose page arrives in a later 3B task. They must still mount a real
-// (data-cov'd) surface so the coverage gate and the shell-flows sweep see a
-// mounted area rather than a not-found page.
-async function mountUnderConstruction(root, ctx) {
-  root.appendChild(el("div", { class: "area-head", "data-route": ctx.route },
-    el("h1", { text: t("gui_shell_building_title", "Coming soon") })
-  ));
-  root.appendChild(el("section", { class: "wip", "data-tone": "info", "data-cov": "XC-15" },
-    el("p", { text: t("gui_shell_building_body",
-      "This page is being rebuilt for the five-area layout.") })
-  ));
-}
 
 // v3 route table (spec §1.1). Legacy v2 hashes stay reachable as redirects so
 // bookmarks and the mail/LINE deep links keep working; they use
@@ -178,7 +166,10 @@ async function boot() {
     const { mountHome } = await import("./areas/home.mjs");
     return mountHome(el2, ctx);
   });
-  router.register("#/investigate/inbox", mountUnderConstruction);
+  router.register("#/investigate/inbox", async function (el2, ctx) {
+    const { mountInbox } = await import("./areas/investigate.mjs");
+    return mountInbox(el2, ctx);
+  });
   Object.keys(LEGACY_ROUTES).forEach(function (oldRoute) {
     router.register(oldRoute, async function (el2, ctx) {
       router.replace(LEGACY_ROUTES[oldRoute], ctx.query);

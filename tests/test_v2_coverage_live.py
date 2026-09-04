@@ -128,9 +128,9 @@ def test_the_route_list_matches_the_coverage_map(gate_result):
     # 3B Task 6 lands the inbox), splits the schedule board onto
     # #/policy/schedules and the test-alert/watermark/channel-status panels
     # onto #/system/alerting; the other legacy routes were re-keyed 1:1.
-    assert len(routes) == 22, routes
+    assert len(routes) == 24, routes
     assert "login.html" in routes
-    assert sum(1 for r in routes if r.startswith("#")) == 21
+    assert sum(1 for r in routes if r.startswith("#")) == 23
     assert set(routes) == set(gate_result["routes"])
 
 

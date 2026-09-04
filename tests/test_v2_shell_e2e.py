@@ -247,7 +247,7 @@ def test_palette_exists_hidden_from_boot_and_opens_on_the_shortcut(v2_page):
     # (The list also holds whatever route-scoped commands the mounted area
     # registered, so this checks the five by name rather than by total count.)
     texts = page.locator('[data-cov="XC-02"] li[role="option"]').all_inner_texts()
-    for route in ("#/home", "#/investigate/traffic", "#/policy/alert-rules",
+    for route in ("#/home", "#/investigate/inbox", "#/policy/alert-rules",
                   "#/reports", "#/system/pce"):
         assert any(route in txt for txt in texts), (route, texts)
 

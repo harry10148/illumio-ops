@@ -41,11 +41,11 @@ class Area {
 
 // v3 (spec §1, 2026-09-04): five task-oriented areas. "automation" was
 // dissolved — rule scheduling lives under policy, report schedules under
-// reports, background jobs under system. The investigate landing becomes
-// the inbox once phase 3B Task 6 ships it; until then it opens on traffic.
+// reports, background jobs under system. The investigate landing is the
+// alert inbox (spec §3 step 1).
 export const AREAS = [
   new Area("home", "gui_nav_home", "#/home"),
-  new Area("investigate", "gui_nav_investigate", "#/investigate/traffic"),
+  new Area("investigate", "gui_nav_investigate", "#/investigate/inbox"),
   new Area("policy", "gui_nav_policy", "#/policy/alert-rules"),
   new Area("reports", "gui_nav_reports", "#/reports"),
   new Area("system", "gui_nav_system", "#/system/pce"),

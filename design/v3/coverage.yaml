@@ -1,7 +1,7 @@
 # design/v3/coverage.yaml — feature coverage map (v3, five areas)
 # Re-keyed from design/v2/coverage.yaml on 2026-09-04 (phase 3B Task 2): same 101
 # items, routes moved to the five-area table (spec §1.1). Items get their v3 home
-# task by task; XC-15 marks a route whose page is still under construction.
+# task by task.
 # item: 功能, route: mockup hash 路由, anchor: data-cov 值
 #
 # === EXCLUSIONS (documented, not in DOM coverage scope) ===
@@ -113,4 +113,10 @@ XC-11: {item: 說明側欄(篩選語法/隔離指南), route: "#/investigate/tra
 XC-12: {item: toast/popover/欄寬拖曳/skeleton, route: "#/investigate/traffic"}
 XC-13: {item: 頂欄使用者選單, route: "#/home"}
 XC-14: {item: URL hash 路由狀態同步, route: "#/home"}
-XC-15: {item: 建置中占位（收件匣，3B Task 6 移除）, route: "#/investigate/inbox"}
+# === INVESTIGATE HUB (spec §3, phase 3B Task 6) ===
+IN-01: {item: 告警收件匣清單（狀態／類型篩選、分頁）, route: "#/investigate/inbox"}
+IN-02: {item: 告警狀態切換 new/ack/done, route: "#/investigate/inbox?id=1"}
+IN-03: {item: 告警詳情（條件、命中、派送結果、看流量）, route: "#/investigate/inbox?id=1"}
+IN-04: {item: 流量頁告警上下文條＋步進, route: "#/investigate/traffic?alert=1"}
+IN-05: {item: 流量列「看規則」規則面板（PCE Rule Search）, route: "#/investigate/traffic?alert=1"}
+IN-06: {item: 規則面板行動列（隔離／排程變更／標記已處理）, route: "#/investigate/traffic?alert=1"}

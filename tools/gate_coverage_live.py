@@ -264,6 +264,22 @@ def temp_app_server():
         }
         cm.save()
 
+        # IN-02..06 route to ?id=1 / ?alert=1: seed one traffic alert into a
+        # throwaway store (never the product logs/alerts.sqlite) with a rule
+        # the traffic_query endpoint can rebuild a query from.
+        import src.alerts.store as _store
+        cm.config["rules"] = [{"id": "t1", "name": "gate ssh", "type": "traffic", "enabled": True,
+                               "pd": "1", "threshold_window": "60", "filters": {"port": "22"}}]
+        cm.save()
+        alerts_path = str(pathlib.Path(tmp) / "alerts.sqlite")
+        real_path_fn = _store.default_alerts_db_path
+        _store.default_alerts_db_path = lambda: alerts_path
+        stack.callback(setattr, _store, "default_alerts_db_path", real_path_fn)
+        seed = _store.AlertStore(alerts_path)
+        seed.insert(fired_at="2026-09-04T01:00:00Z", type="traffic", rule_id="t1", rule_name="gate ssh",
+                    severity="warning", summary="gate ssh · 1", criteria="port 22", payload={}, dispatch=[])
+        seed.close()
+
         app = build_app(cm, persistent_mode=True, use_https=False)
         app.config.update({"TESTING": True})
         app.testing = True  # disables Talisman's forced-HTTPS redirect

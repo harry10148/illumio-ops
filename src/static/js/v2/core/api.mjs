@@ -247,6 +247,7 @@ export const api = {
   },
 
   put(path, body) { return mutate("PUT", path, body === undefined ? {} : body); },
+  patch(path, body) { return mutate("PATCH", path, body === undefined ? {} : body); },
 
   /** del(path) -> Promise<any parsed body>. Same contract as post(). */
   del(path) {
