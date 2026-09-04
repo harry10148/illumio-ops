@@ -555,7 +555,9 @@ textarea.ta { font-family: var(--font-mono); font-size: var(--fs-mini); }
   .kpirow { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   /* the area nav must never clip a tab: the palette button drops its label
      (the ⌘K keycap stays, still 44px tall) and the nav scrolls if it must */
-  .kbd-btn span { display: none; }
+  /* visually hidden, still the button's accessible name */
+  .kbd-btn span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  .kbd-btn { position: relative; }
   .kbd-btn { padding-left: var(--space-3); padding-right: var(--space-3); }
   .areanav { overflow-x: auto; scrollbar-width: none; }
 }
