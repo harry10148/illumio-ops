@@ -706,7 +706,7 @@ select.field { appearance: none; }
   font-family: var(--font-ui); font-size: var(--fs-mini); white-space: nowrap;
 }
 .fb-seg-btn:hover { background: var(--surface-2); color: var(--text-1); }
-.fb-seg-btn.on { background: var(--accent); color: var(--accent-on); }
+.fb-seg-btn.on { background: var(--accent-fg); color: var(--accent-on); }
 .fb-seg-btn.danger.on { background: var(--tone-crit-border); }
 .fb-pop-rm {
   width: 100%; height: var(--ctl-h);

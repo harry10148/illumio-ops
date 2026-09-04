@@ -139,7 +139,7 @@ body {
   font-family: var(--font-ui); font-size: var(--fs-mini);
 }
 .usermenu-pop .seg button:hover { background: var(--surface-2); color: var(--text-1); }
-.usermenu-pop .seg button[aria-pressed="true"] { background: var(--accent); color: var(--accent-on); }
+.usermenu-pop .seg button[aria-pressed="true"] { background: var(--accent-fg); color: var(--accent-on); }
 .usermenu-pop dl { margin: var(--space-3) 0 0; padding: var(--space-3) var(--space-4) 0; border-top: 1px solid var(--line-soft); }
 .usermenu-pop dl div { display: flex; justify-content: space-between; gap: var(--space-5); padding: var(--space-1) 0; }
 .usermenu-pop dt { font-size: var(--fs-mini); color: var(--text-3); }
@@ -553,6 +553,11 @@ textarea.ta { font-family: var(--font-mono); font-size: var(--fs-mini); }
 }
 @media (max-width: 900px) {
   .kpirow { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  /* the area nav must never clip a tab: the palette button drops its label
+     (the ⌘K keycap stays, still 44px tall) and the nav scrolls if it must */
+  .kbd-btn span { display: none; }
+  .kbd-btn { padding-left: var(--space-3); padding-right: var(--space-3); }
+  .areanav { overflow-x: auto; scrollbar-width: none; }
 }
 
 /* ========================================================= reports area =====
@@ -688,7 +693,7 @@ textarea.ta { font-family: var(--font-mono); font-size: var(--fs-mini); }
   background: var(--chrome-hover); color: var(--chrome-text-2);
   font-family: var(--font-ui); font-size: var(--fs-mini);
 }
-.loginpage .seg button[aria-pressed="true"] { background: var(--accent); color: var(--accent-on); }
+.loginpage .seg button[aria-pressed="true"] { background: var(--accent-fg); color: var(--accent-on); }
 
 .loginwrap { max-width: 940px; margin: 0 auto; padding: var(--space-8) var(--space-6); }
 .loginpick { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); margin-bottom: var(--space-6); }
@@ -703,7 +708,7 @@ textarea.ta { font-family: var(--font-mono); font-size: var(--fs-mini); }
   padding: var(--space-7);
 }
 .logincard.quiet { border-top-color: var(--line); }
-.logincard h1 { margin: 0 0 var(--space-3); font-size: var(--fs-num); font-weight: 700; letter-spacing: -.02em; }
+.logincard h1 { margin: 0 0 var(--space-3); font-family: var(--font-display); font-size: var(--fs-num); font-weight: 600; letter-spacing: -.02em; }
 .logincard .sub { margin: 0 0 var(--space-6); font-size: var(--fs-body); color: var(--text-2); }
 .logincard .eyebrow { display: block; margin-bottom: var(--space-3); }
 .logincard .banner {

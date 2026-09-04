@@ -1,7 +1,8 @@
 # design/v3/coverage.yaml — feature coverage map (v3, five areas)
-# Re-keyed from design/v2/coverage.yaml on 2026-09-04 (phase 3B Task 2): same 101
-# items, routes moved to the five-area table (spec §1.1). Items get their v3 home
-# task by task.
+# Re-keyed from design/v2/coverage.yaml on 2026-09-04 (phase 3B Task 2): the 101
+# v2 items moved to the five-area route table (spec §1.1). Task 5 retired
+# OV-09/11/13 (reasons inline) and added the home cards HM-00..04; Task 6 added
+# the investigate hub IN-01..06 — 109 items, every one reachable by the live gate.
 # item: 功能, route: mockup hash 路由, anchor: data-cov 值
 #
 # === EXCLUSIONS (documented, not in DOM coverage scope) ===

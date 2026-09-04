@@ -27,7 +27,7 @@ verified_against:
 本篇涵蓋 illumio-ops Web GUI 的完整 JSON API 端點清單，全部由 Flask 應用（`src/gui/`
 + 兩個獨立掛載的藍圖 `src/siem/web.py`、`src/pce_cache/web.py`）提供。實數為
 **116 個路由**（`@*.route(...)` 宣告數，含頁面路由），其中 112 個是 `/api/` JSON
-端點；每個端點依 GUI 的六區分區列出，欄位為方法｜路徑｜用途｜關鍵參數。各區的操作情境與畫面說明見
+端點；每個端點依 GUI 的五區（v3）分區列出，標題保留舊 v2 路由供對照，欄位為方法｜路徑｜用途｜關鍵參數。各區的操作情境與畫面說明見
 [guide/gui-tour.md](../guide/gui-tour.md)；本篇只列端點語法。
 
 GUI 監聽埠見 `illumio-ops gui` 的 `--port`，預設 **5001**（`src/cli/gui_cmd.py`）；
@@ -116,7 +116,7 @@ curl -sk -b cookies.txt "$BASE/api/status"
 
 ---
 
-## 端點總覽（依 GUI 六區分區）
+## 端點總覽（依 GUI 五區分區）
 
 以下所有路徑皆相對於基底 URL；除上一節列出的公開路徑外，每個端點都需要已登入的
 session。有獨立限流的端點會在「關鍵參數」欄位標出（超出全域限流 300 次／分鐘，見文末
@@ -135,7 +135,7 @@ session。有獨立限流的端點會在「關鍵參數」欄位標出（超出�
 **`POST /api/login`** 成功回應：`{"ok": true, "csrf_token": "...", "must_change_password": false}`；
 失敗回 `401` `{"ok": false, "error": "..."}`。
 
-### 2) 總覽區 `#/overview`（`src/gui/routes/dashboard.py`）
+### 2) 首頁 `#/home`（v2 `#/overview`；`src/gui/routes/dashboard.py`）
 
 | 方法 | 路徑 | 用途 | 關鍵參數 |
 |---|---|---|---|
@@ -150,7 +150,7 @@ session。有獨立限流的端點會在「關鍵參數」欄位標出（超出�
 | GET | `/api/dashboard/policy_usage_summary` | 最近一次 Policy Usage 報表摘要 | — |
 | POST | `/api/dashboard/top10` | 依 bandwidth／volume／count 排序查前 10 大流量 | `mins`, `pd`, `rank_by`, `search`，及完整 FilterBar 篩選鍵；**30/hour** |
 
-`/api/dashboard/overview` 的 `job_health` 欄位就是總覽區與 `#/automation/jobs`「Job Health
+`/api/dashboard/overview` 的 `job_health` 欄位就是總覽區與 `#/system/jobs`「Job Health
 表格」的資料來源（讀 `logs/job_health.json`，無獨立端點）；判讀規則（error／warn／ok、
 never-ran／overdue）見 [gui-tour.md](../guide/gui-tour.md) 「7) Integrations」節。
 
@@ -197,7 +197,7 @@ policy decision 等即時才算得出的條件，以及全文 `search`，帶了�
 
 此子頁全部端點皆為唯讀，即時呼叫 PCE API，不寫入本地狀態。
 
-### 5) 告警區 `#/alerting/rules`、`/ops`（`src/gui/routes/rules.py` ＋ `actions.py`）
+### 5) 政策區：告警規則 `#/policy/alert-rules`、`/ops`；手動動作 `#/system/alerting`（v2 `#/alerting/*`；`src/gui/routes/rules.py` ＋ `actions.py`）
 
 **Rules 子頁：**
 
@@ -235,7 +235,7 @@ policy decision 等即時才算得出的條件，以及全文 `search`，帶了�
 `POST /api/actions/test-alert` 也是系統區 `#/system/channels` 卡片上「Send test」按鈕呼叫的
 同一個端點（帶 `{channel: <name>}`）。
 
-### 6) 報表區 `#/reports`、`#/automation/reports`（`src/gui/routes/reports.py`）
+### 6) 報表區 `#/reports`、`/schedules`（v2 `#/automation/reports`；`src/gui/routes/reports.py`）
 
 **List 子頁 — 報表產生／管理：**
 
@@ -274,7 +274,7 @@ policy decision 等即時才算得出的條件，以及全文 `search`，帶了�
 九種報表的用途、欄位、資料來源見 [reports.md](../guide/reports.md)；`/api/reports/generate`
 與 CLI `illumio-ops report traffic --format html` 走同一份 `ReportGenerator`。
 
-### 7) 自動化區 `#/automation/rules`、`/jobs`（`src/gui/routes/rule_scheduler.py`）
+### 7) 政策區：Rule Scheduler `#/policy/rulesets`、`/schedules`；背景 job `#/system/jobs`（v2 `#/automation/*`；`src/gui/routes/rule_scheduler.py`）
 
 | 方法 | 路徑 | 用途 | 關鍵參數 |
 |---|---|---|---|

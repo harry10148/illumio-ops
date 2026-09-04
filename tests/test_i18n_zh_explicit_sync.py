@@ -142,7 +142,9 @@ def test_the_general_invariant_is_still_backlog():
     # operator-facing copy. Lowered to 928 after task 12c pinned 76 keys whose
     # reviewer-facing copy (source citations, internal paths, product-vs-mockup
     # framing) was rewritten for operators and hand-translated into zh_explicit.
-    assert len(missing) <= 928, (
+    # Lowered to 878 on 2026-09-04 after phase 3B (v3 GUI) pinned its 77 new
+    # home / investigate-hub / five-area keys.
+    assert len(missing) <= 878, (
         f"{len(missing)} gui_* keys rendered by src/ have a zh_TW value but no "
         "zh_explicit entry, up from the 1021 ceiling — "
         "new hand-written Chinese is being added without a zh_explicit entry, "

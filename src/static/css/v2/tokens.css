@@ -176,7 +176,8 @@
 
   --accent: #FF5500;
   --accent-fg: #FF7A33;
-  --accent-on: #FFFFFF;
+  /* dark ink on the lighter orange / cyan: white on #FF7A33 is only 2.6:1 */
+  --accent-on: #1B1F21;
   --brand-deep: #9CC3CF;
 
   --chrome: #232829;

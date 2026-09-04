@@ -2,6 +2,8 @@
 
 UI/UX 全面重新設計 v2 Phase 1 — CLI 互動選單重組為六區心智模型的流程規格。
 
+> **2026-09-04 註**：Web GUI 已依 v3 spec（`docs/superpowers/specs/2026-09-03-ui-redesign-v3-design.md` §1）改為五區（首頁／調查／政策／報表／系統）。本文件的 CLI 六區是 Phase 2C 已交付的現況；CLI 對齊五區在 3C 子計畫，屆時另立 v3 版流程規格。
+
 - 依據：`docs/superpowers/specs/2026-08-03-ui-ux-redesign-v2-design.md` §5（CLI）
 - 依據：`docs/superpowers/specs/2026-08-03-ui-redesign-feature-inventory.md` §3.2（CLI 互動選單 checklist）
 - 範圍：僅互動選單（`illumio-ops.py` 不帶旗標時的 `main_menu()` 樹）。click 子指令（`cache`/`config`/`monitor`/`monitor-gui`/`gui`/`report`/`rule`/`siem`/`status`/`workload`/`completion`）結構不動，本文件不涉及（spec §5：「click 子指令：結構不動（7/24 全審過），僅術語/輸出對齊」）。

@@ -34,6 +34,32 @@ a plain `<major>.<minor>.<patch>` scheme. (Tags through v4.0.0 carried a
   menu, and the REST destination API. Rows already queued before a change are
   still delivered.
 
+### Changed
+
+- **Web GUI v3 — five task-oriented areas.** The six v2 areas become Home,
+  Investigate, Policy, Reports and System; Automation is dissolved (rule
+  scheduling under Policy, report schedules under Reports, background jobs
+  under System). Old hashes (`#/overview`, `#/alerting/*`, `#/automation/*`)
+  redirect to their new page with the query kept, so bookmarks and the
+  mail / LINE deep links keep working.
+- `#/home` replaces the overview board with five cards that answer five
+  questions — open alerts, health, today's schedules, seven-day policy
+  changes, posture. The Top-10 rankings and saved queries move to the
+  traffic page, the audit / snapshot / policy-usage summaries to Reports,
+  and the system detail cards to their System pages. The health rail now
+  lives on the home page only.
+- **Investigate hub.** The Investigate area opens on an alert inbox
+  (status / type filters, new → in progress → done) with an alert detail
+  page. "See traffic" opens the traffic page scoped to that alert: the
+  query is rebuilt from the alert's rule and run, a context strip shows
+  which alert you are chasing, and every traffic row has a Rules button
+  that asks the PCE which allow / deny rules cover the flow and offers the
+  next action — isolate, schedule a rule change, mark the alert done.
+- **Light-first brand workbench look.** White surfaces, hairline borders,
+  Illumio orange reserved for actions (filled controls use the deeper
+  AA-safe shade), Montserrat for display type and numerals; the dark theme
+  stays as the alternate. Buttons and rows are a little roomier.
+
 ## [5.0.0] — 2026-09-02
 
 ### Added

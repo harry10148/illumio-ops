@@ -38,9 +38,10 @@ verified_against:
 
 # Web GUI 導覽
 
-Web GUI 是單頁式應用（SPA）。登入後畫面分成**六個區**——總覽、調查、告警、
-自動化、報表、系統——底下共 **18 條路由**，以 URL 的 hash 表示（例如
-`#/investigate/traffic`）。切區不重新整頁：hash 一變，router 就 lazy-mount
+Web GUI 是單頁式應用（SPA）。登入後畫面分成**五個區**——首頁、調查、政策、
+報表、系統（v3，2026-09-04 起；設計依據
+`docs/superpowers/specs/2026-09-03-ui-redesign-v3-design.md`）——底下共
+**23 條路由**，以 URL 的 hash 表示（例如 `#/investigate/traffic`）。切區不重新整頁：hash 一變，router 就 lazy-mount
 對應的區模組，只有被造訪過的區才會被下載。內容全部由前端 ES module 向約
 85 條 JSON API（`/api/...`）取資料，精確端點清單見
 [rest-api.md](../reference/rest-api.md)。
@@ -48,12 +49,24 @@ Web GUI 是單頁式應用（SPA）。登入後畫面分成**六個區**——�
 前端沒有打包步驟（zero-build）：`src/templates/index.html` 直接以
 `<script type="module">` 載入 `src/static/js/v2/app.mjs`，模組分成
 `core/`（router、api、i18n、theme、fmt…）、`components/`（healthbar、
-palette、table、drawer、modal、filter-bar…）、`areas/`（六個區各一支）三層。
+palette、table、drawer、modal、filter-bar…）、`areas/`（home、investigate、policy_rules、policy_scheduler、reports、system，加上共用卡片庫 cards）三層。
 
 啟動方式與埠號見 `illumio-ops gui`（預設埠 **5001**，`--host 0.0.0.0`），
 完整 CLI 選項見 [cli.md](../reference/cli.md)。
 
-**六區與其路由**
+**五區與其路由**（判準：首頁看「現在」、調查查「這件事」、政策改「規則」、報表產「交付物」、系統改「系統」）
+
+| 區 | 路由 | 內容 |
+|---|---|---|
+| 首頁 | `#/home` | 五張卡回答五個問題：未處理告警、健康燈、今日排程、七日政策異動、posture；健康列只在這頁 |
+| 調查 | `#/investigate/inbox`（`?id=` 詳情）、`/traffic`（`?alert=`、`?f=` 帶條件）、`/workloads`、`/events` | 告警收件匣→詳情→流量→規則面板→行動的調查中樞；Workload 搜尋與隔離；事件檢視器 |
+| 政策 | `#/policy/alert-rules`、`/ops`、`/rulesets`（`?rs=&rule=`）、`/schedules` | 告警規則 CRUD 與手動動作；Rule Scheduler 的 ruleset／rule 瀏覽與排程變更 |
+| 報表 | `#/reports`、`/schedules` | 11 型報表產生、產出清單、報表排程 |
+| 系統 | `#/system/{pce,cache,siem,tls,security,display,channels,alerting,jobs,logs}` | 所有設定、告警通道與測試、背景 job、日誌 |
+
+舊 v2 六區的路由（`#/overview`、`#/alerting/*`、`#/automation/*`）仍可用，router 以 `replace` 轉到上表對應頁並保留 query。
+
+<details><summary>v2 六區路由表（2026-09-04 前，供舊書籤對照）</summary>
 
 | 區 | 路由 | 內容 |
 |---|---|---|
@@ -64,9 +77,11 @@ palette、table、drawer、modal、filter-bar…）、`areas/`（六個區各一
 | 報表 | `#/reports` | 11 型報表產生與產出清單 |
 | 系統 | `#/system/{pce,cache,siem,tls,security,display,channels,logs}` | 所有設定 |
 
+</details>
+
 未知的 hash 會落到 placeholder mount，不會讓畫面壞掉；直接輸入任何一條
 路由網址都能到達（覆蓋率閘門 `tools/gate_coverage_live.py` 就是靠逐一開啟
-每條路由、檢查 101 個 `data-cov` 錨點在不在來把關的）。
+每條路由、檢查 109 個 `data-cov` 錨點在不在來把關的）。
 
 > **全域安全提醒**：除 `/login`、`/api/login`、`/logout`、`/api/csrf-token` 外，
 > 所有路由都需登入 session。`web_gui.allowed_ips` 提供 IP 允許清單，比對的是
@@ -111,7 +126,7 @@ palette、table、drawer、modal、filter-bar…）、`areas/`（六個區各一
 直接跳到任何一條路由或動作，不必逐層點選。這是 18 條路由之外最快的導航
 方式，尤其適合系統區那 8 個子頁。
 
-### 健康列（只在總覽）
+### 健康列（只在首頁）
 
 `XC-01`。五盞燈橫跨總覽頁上緣：**Jobs**（背景 job）、**PCE**（連線與探測）、
 **Lag**（擷取延遲）、**SIEM**（轉發成功率，低於 95% 至少升為 warn）、
@@ -204,7 +219,12 @@ FilterBar 序列化出的 key（`src_labels`／`dst_workloads`／`services`／
 一起交給同一組 AND 條件求值。
 
 
-## 六區逐一導覽
+## 五區逐一導覽
+
+> **v3 過渡註記（2026-09-04）**：以下各節仍是 v2 六區的畫面說明，功能描述正確、路由與分區名稱以上表為準；
+> 新頁面（首頁 `#/home`、告警收件匣與詳情、流量頁的告警上下文條與規則面板）的完整導覽在 3D 子計畫全文重寫。
+> 對照：總覽→首頁；告警規則／手動動作→政策區（手動動作與通道測試在 `#/system/alerting`）；
+> 自動化的 Rule Scheduler→政策區、報表排程→報表區、背景 job→`#/system/jobs`。
 
 ### 總覽（`#/overview`）
 
