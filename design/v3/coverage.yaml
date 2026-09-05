@@ -9,7 +9,8 @@
 # CSRF 流程 (_csrfToken/_withFreshCsrf): non-visual mechanism, backend untouched in Phase 1, excluded from DOM coverage — Phase 2 regression scope
 # 說明彈窗 m-help 內容 (篩選語法/policy decisions): folded into XC-11 說明側欄
 OV-01: {item: 系統狀態總覽卡, route: "#/system/pce"}
-OV-02: {item: posture score 卡+詳情, route: "#/home"}
+# OV-02 移除（3E Task 4，2026-09-05）：posture 詳情抽屜 — spec v3.1 §2 首頁只留分數
+# 一行（HM-05），完整拆解在報表區的 posture 報表。
 OV-03: {item: Top Actions 區, route: "#/reports"}
 OV-04: {item: 自訂查詢卡 CRUD, route: "#/investigate/traffic"}
 OV-05: {item: Top10 查詢, route: "#/investigate/traffic"}
@@ -25,10 +26,12 @@ OV-14: {item: TLS 卡, route: "#/system/tls"}
 OV-15: {item: 告警管道卡(唯讀), route: "#/system/channels"}
 OV-16: {item: Integrations 狀態卡摘要(_buildOvCards), route: "#/system/siem"}
 HM-00: {item: 首頁 標題未處理告警數, route: "#/home"}
-HM-01: {item: 首頁 需要你處理（未處理告警前 4 則＋計數）, route: "#/home"}
-HM-02: {item: 首頁 系統健康（一句話＋六燈）, route: "#/home"}
-HM-03: {item: 首頁 今天會發生（規則排程／報表排程／retention）, route: "#/home"}
-HM-04: {item: 首頁 7 天流量決策帶, route: "#/home"}
+HM-01: {item: 首頁 最近的告警（列式前 10、未處理／全部切換、看全部）, route: "#/home"}
+HM-02: {item: 首頁 系統健康（六燈＋每燈一句＋原因收合）, route: "#/home"}
+HM-03: {item: 首頁 今天的排程（規則排程／報表排程／retention）, route: "#/home"}
+# HM-04 移除（3E Task 4，2026-09-05）：7 天流量決策帶 — spec v3.1 §2 移到能對它動手的
+# 頁面（流量搜尋），首頁不再放。
+HM-05: {item: 首頁 Policy 現況（posture 分數／納管比例／ruleset 數）, route: "#/home"}
 IV-01: {item: 流量分析器查詢+KPI, route: "#/investigate/traffic"}
 IV-02: {item: 流量來源切換 即時快取/Archive（actions.py:92-107）, route: "#/investigate/traffic"}
 IV-03: {item: 進階篩選(FilterBar), route: "#/investigate/traffic"}
@@ -100,7 +103,8 @@ SY-18: {item: 設定 dirty 追蹤+儲存列狀態, route: "#/system/pce"}
 LG-01: {item: 登入表單, route: "login.html"}
 LG-02: {item: 首次登入改密碼, route: "login.html"}
 LG-03: {item: 登出, route: "login.html"}
-XC-01: {item: 全域健康列 5 燈+popover, route: "#/home"}
+# XC-01 移除（3E Task 4，2026-09-05）：全域健康列 — 元件本身刪除，六燈與原因由
+# 首頁的 HM-02 健康卡承接。
 XC-02: {item: Cmd+K 指令面板, route: "#/home"}
 XC-03: {item: FilterBar pill/AND-OR/include-exclude/zone, route: "#/investigate/traffic"}
 XC-04: {item: 物件選擇 modal(suggest+browse), route: "#/investigate/traffic"}

@@ -195,63 +195,6 @@ body {
   .usermenu-pop { left: auto; right: 0; bottom: auto; top: calc(100% + var(--space-3)); }
 }
 
-/* --------------------------------------------------- instrument rail ------ */
-.rail {
-  display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr)) auto;
-  background: var(--chrome);
-  padding: 0 var(--space-6);
-}
-.rail-slot { position: relative; min-width: 0; border-left: 1px solid var(--chrome-line); }
-.rail-slot:first-child { border-left: 0; }
-.rail-cell {
-  display: block; width: 100%; text-align: left;
-  padding: var(--space-4) var(--space-5) 0;
-  background: none; border: 0;
-  cursor: pointer; color: inherit; font-family: var(--font-ui);
-  min-width: 0;
-}
-.rail-slot:first-child .rail-cell { padding-left: 0; }
-.rail-pop { top: calc(100% - var(--space-2)); left: 0; }
-.rail-slot:nth-child(4) .rail-pop,
-.rail-slot:nth-child(5) .rail-pop { left: auto; right: 0; }
-.rail-cell:hover { background: var(--chrome-hover); }
-.rail-cell .k {
-  display: flex; align-items: center; gap: var(--space-3);
-  font-size: var(--fs-micro); font-weight: 600; letter-spacing: .14em;
-  text-transform: uppercase; color: var(--chrome-text-2);
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-}
-.led {
-  width: 8px; height: 8px; border-radius: 1px; flex: none;
-  background: var(--mark); box-shadow: 0 0 0 2px var(--fill);
-}
-.rail-cell .v {
-  display: block;
-  font-family: var(--font-mono); font-size: var(--fs-num); color: var(--chrome-text-1);
-  margin: var(--space-3) 0 var(--space-2); letter-spacing: -.02em;
-}
-.rail-cell .d {
-  display: block;
-  font-size: var(--fs-mini); color: var(--chrome-text-3);
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-  padding-bottom: var(--space-4);
-}
-.rail-cell .ul { display: block; height: 2px; background: var(--mark); opacity: .85; }
-.rail-cell[aria-expanded="true"] .ul { opacity: 1; height: 3px; }
-
-.railmeta {
-  display: flex; align-items: center; gap: var(--space-6);
-  padding-left: var(--space-6);
-  border-left: 1px solid var(--chrome-line);
-  color: var(--chrome-text-3); font-size: var(--fs-mini);
-}
-.railmeta b { color: var(--chrome-text-2); font-weight: 400; }
-
-/* v3.1: the rail is home-page content, not chrome, so it carries its own
-   edge instead of borrowing the top bar's bottom rule. */
-.workarea .rail { border: 1px solid var(--line); border-radius: var(--radius-l); }
-
 /* ------------------------------------------------------------ work area --- */
 .workarea { padding: var(--space-7) var(--space-8); min-width: 0; }
 

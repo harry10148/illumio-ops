@@ -15,9 +15,8 @@ Covers:
     reached the backend -> edit-open shows the saved value -> delete
     (through the real confirm-modal flow) -> it disappears -> a second
     reload proves the delete reached the backend too.
-  - the posture-detail drawer (OV-02) opens and Escape closes it.
-  - a "go to" header button (present on every read-only card) navigates to
-    another area — URL hash and mounted content both change.
+  - the recent-alerts list's "see all" link navigates to another area — URL
+    hash and mounted content both change.
   - S2 teardown: navigating away from #/home closes a drawer this area
     left open. drawer.mjs/modal.mjs have no per-area scoping of their own
     (closeAll() is global), so this is the only externally observable proof
@@ -90,8 +89,7 @@ def _labels(page):
         "return { "
         "add: t('gui_add_query_widget'), "
         "edit: t('gui_edit_query_widget'), "
-        "confirm: t('gui_confirm'), "
-        "posture: t('gui_ov_posture_score_label') "
+        "confirm: t('gui_confirm') "
         "}; }"
     )
 
@@ -198,7 +196,7 @@ def test_overview_coverage_anchors_present(v2_page):
     below (design/v3/coverage.yaml), and #/home carries the five new cards."""
     page, base_url = v2_page
     placement = {
-        HOME: {"HM-01", "HM-02", "HM-03", "HM-04", "OV-02", "XC-01"},
+        HOME: {"HM-00", "HM-01", "HM-02", "HM-03", "HM-05"},
         TRAFFIC: {"OV-04", "OV-05"},
         "#/reports": {"OV-03", "OV-06", "OV-07", "OV-08"},
         PCE: {"OV-01", "OV-12"},
@@ -230,10 +228,10 @@ def test_auth_failure_is_credentials_reason_not_generic_unreachable(v2_page):
     _goto(page, base_url, HOME)
     labels = _health_labels(page)
 
-    pce_cell = page.locator('#area-root [data-cov="XC-01"] .rail-cell').nth(1)
-    assert pce_cell.get_attribute("data-tone") == "crit"
-    pce_cell.click()
-    reasons = page.locator("#area-root .rail-pop").inner_text()
+    pce_lamp = page.locator('[data-cov="HM-02"] details.lamp').nth(1)
+    assert pce_lamp.get_attribute("data-tone") == "crit"
+    pce_lamp.locator("summary").click()
+    reasons = pce_lamp.locator(".lamp-why").inner_text()
     assert labels["auth"] in reasons
     assert labels["unreachable"] not in reasons
     assert "sensitive-response-body-must-not-render" not in reasons
@@ -255,9 +253,9 @@ def test_noop_success_keeps_api_green_while_failed_ingestor_keeps_pipeline_red(v
     )
     _goto(page, base_url, HOME)
 
-    cells = page.locator('#area-root [data-cov="XC-01"] .rail-cell')
-    assert cells.nth(1).get_attribute("data-tone") == "ok"
-    assert cells.nth(3).get_attribute("data-tone") == "crit"
+    lamps = page.locator('[data-cov="HM-02"] details.lamp')
+    assert lamps.nth(1).get_attribute("data-tone") == "ok"
+    assert lamps.nth(3).get_attribute("data-tone") == "crit"
     _goto(page, base_url, PCE)
     assert page.locator('section[data-cov="OV-01"]').get_attribute("data-tone") == "ok"
     _goto(page, base_url, SIEM)
@@ -278,10 +276,10 @@ def test_healthy_saas_identifies_noop_provider_and_both_ingest_freshness_rows(v2
     _goto(page, base_url, HOME)
     labels = _health_labels(page)
 
-    pce_cell = page.locator('#area-root [data-cov="XC-01"] .rail-cell').nth(1)
-    assert pce_cell.get_attribute("data-tone") == "ok"
-    pce_cell.click()
-    reasons = page.locator("#area-root .rail-pop").inner_text()
+    pce_lamp = page.locator('[data-cov="HM-02"] details.lamp').nth(1)
+    assert pce_lamp.get_attribute("data-tone") == "ok"
+    pce_lamp.locator("summary").click()
+    reasons = pce_lamp.locator(".lamp-why").inner_text()
     assert "SaaS" in reasons
     assert "noop" in reasons
 
@@ -327,10 +325,10 @@ def test_on_prem_health_body_category_and_probe_chain_render_consistently(
     expected_reason = labels[category]
     expected_probe = "/noop + /health + /node_available"
 
-    pce_cell = page.locator('#area-root [data-cov="XC-01"] .rail-cell').nth(1)
-    assert pce_cell.get_attribute("data-tone") == expected_tone
-    pce_cell.click()
-    reasons = page.locator("#area-root .rail-pop").inner_text()
+    pce_lamp = page.locator('[data-cov="HM-02"] details.lamp').nth(1)
+    assert pce_lamp.get_attribute("data-tone") == expected_tone
+    pce_lamp.locator("summary").click()
+    reasons = pce_lamp.locator(".lamp-why").inner_text()
     assert expected_reason in reasons
     assert expected_probe in reasons
     assert "HTTP 200" not in reasons
@@ -500,41 +498,16 @@ def test_legacy_scalar_query_edit_preserves_filters_on_save(v2_context, temp_con
     assert saved.get("src_ip_in") == "10.0.0.0/8", saved
 
 
-def test_posture_drawer_opens_and_closes(v2_page):
-    page, base_url = v2_page
-    _goto_overview(page, base_url)
-    labels = _labels(page)
-
-    # A fresh test config has no posture score yet (dashboard.py's
-    # _overview_posture requires real analysis history), so OV-02's "Detail"
-    # header button does not render — buildBoard()'s openPostureDetail()
-    # opener is still registered unconditionally though (drawer.registerAudit
-    # "ov-posture-detail" in mountOverview), the same real code path a click
-    # would use once posture data exists. Reached here the same way the
-    # coverage gate reaches it.
-    page.evaluate("window.__openAllForAudit()")
-    posture_drawer = page.locator(f'aside.drawer[aria-label="{labels["posture"]}"]')
-    posture_drawer.wait_for(state="visible")
-    assert posture_drawer.count() == 1
-
-    # __openAllForAudit() may have opened more than one dialog (the "add
-    # query" opener is also registered); dom.mjs's dismissible() stack means
-    # Escape closes the topmost first, not necessarily the posture one. Press
-    # until this SPECIFIC drawer is confirmed gone rather than assume order.
-    for _ in range(6):
-        if posture_drawer.count() == 0:
-            break
-        page.keyboard.press("Escape")
-        page.wait_for_timeout(50)
-    assert posture_drawer.count() == 0
-
-
 def test_goto_link_navigates_to_another_area(v2_page):
-    """HM-01's go-to link leaves the home page for the alert list (v3.1)."""
+    """HM-01's "see all" leaves the home page for the alert list (v3.1).
+
+    3B put a "Go to <route>" button in every card header; §5.2 took those out,
+    so the list's own secondary link is the affordance being asserted.
+    """
     page, base_url = v2_page
     _goto(page, base_url, HOME)
-    assert page.locator('section[data-cov="HM-01"]').count() == 1, "card must render"
-    page.locator('section[data-cov="HM-01"] .hact button.goto').click()
+    assert page.locator('section[data-cov="HM-01"]').count() == 1, "the list must render"
+    page.locator('section[data-cov="HM-01"] a.seeall').click()
     page.wait_for_selector('[data-route="#/investigate/alerts"]')
     assert page.evaluate("location.hash") == "#/investigate/alerts"
 
@@ -562,7 +535,7 @@ def test_teardown_closes_drawer_on_navigate_away(v2_page):
 
 def test_home_palette_commands_drop_on_navigate_away(v2_page):
     """S2: the two route-scoped palette commands mountHome registers before
-    its first await (home:inbox, ov:posture) must be gone after navigating
+    its first await (home:alerts, home:traffic) must be gone after navigating
     away — even when the page's own loads failed (home tolerates a broken
     snapshot and still paints, so this is checked under a 500 on /api/status)."""
     page, base_url = v2_page
@@ -595,9 +568,9 @@ def test_home_headline_counts_open_alerts_and_alert_rows_deep_link(v2_page, _iso
     page, base_url = v2_page
     page.reload()
     _goto(page, base_url, HOME)
-    page.wait_for_selector('[data-cov="HM-01"] .hm-alert')
+    page.wait_for_selector('[data-cov="HM-01"] a.lrow')
     assert "2" in page.locator('[data-cov="HM-00"]').text_content()
-    rows = page.locator('[data-cov="HM-01"] .hm-alert')
+    rows = page.locator('[data-cov="HM-01"] a.lrow')
     assert rows.count() == 2
     # critical sorts first
     assert "Login failed" in rows.nth(0).text_content()
@@ -605,12 +578,12 @@ def test_home_headline_counts_open_alerts_and_alert_rows_deep_link(v2_page, _iso
 
 
 def test_home_survives_alerts_api_failure(v2_page):
-    """HM-01 shows the error inline; the other four cards still render."""
+    """HM-01 shows the error inline; the rest of the page still renders."""
     page, base_url = v2_page
     page.route("**/api/alerts?*", lambda r: r.fulfill(status=500, content_type="application/json", body='{"ok": false, "error": "boom"}'))
     _goto(page, base_url, HOME)
     page.wait_for_selector('[data-cov="HM-02"]')
-    for cov in ("HM-01", "HM-02", "HM-03", "HM-04", "OV-02"):
-        assert page.locator('section[data-cov="%s"]' % cov).count() == 1, cov
-    assert page.locator('section[data-cov="HM-01"]').get_attribute("data-tone") == "warn"
+    for cov in ("HM-01", "HM-02", "HM-03", "HM-05"):
+        assert page.locator('[data-cov="%s"]' % cov).count() == 1, cov
+    assert page.locator('[data-cov="HM-01"]').get_attribute("data-tone") == "warn"
     page.unroute("**/api/alerts?*")

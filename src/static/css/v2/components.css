@@ -938,3 +938,54 @@ details.more .body { display: grid; gap: var(--space-4); padding: var(--space-5)
   .phead .actions { width: 100%; }
 }
 @media (prefers-reduced-motion: reduce) { .seg button { transition: none; } }
+
+/* ============================================================== home page ==
+   v3.1 §2: the recent alerts ARE the page; the three cards beside them are
+   background. One wide column and one 320px column, folding to one at 1000px.
+   ========================================================================== */
+.home { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: var(--space-7); align-items: start; }
+.home-main { min-width: 0; }
+.home-side { display: flex; flex-direction: column; gap: var(--space-6); }
+
+.sect-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-5); margin-bottom: var(--space-4); }
+.sect-head h3 { margin: 0; font-size: var(--fs-ui); font-weight: 700; color: var(--text-1); }
+.sect-head .seeall { margin-left: auto; font-size: var(--fs-body); color: var(--accent-fg); }
+.sect-head .seg button { min-height: 28px; font-size: var(--fs-mini); padding: 0 var(--space-4); }
+
+/* the home list is narrower than the alerts page's, so it drops the "who"
+   column rather than squeezing every other one */
+.home .lrow { grid-template-columns: 4px 96px minmax(0, 1fr) auto; }
+.home .lrow .who { display: none; }
+
+/* HM-02: six lamps, a sentence each, reasons behind a disclosure */
+.lamps { display: flex; flex-direction: column; gap: var(--space-2); }
+.lamp > summary {
+  display: grid; grid-template-columns: 10px minmax(0, 1fr); gap: var(--space-4);
+  align-items: baseline; padding: var(--space-2) 0;
+  cursor: pointer; list-style: none; font-size: var(--fs-body);
+}
+.lamp > summary::-webkit-details-marker { display: none; }
+.lamp > summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.lamp .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--mark); align-self: center; }
+.lamp summary b { display: block; font-weight: 600; color: var(--text-1); }
+.lamp summary small { display: block; font-size: var(--fs-mini); color: var(--text-3); overflow-wrap: anywhere; }
+.lamp-why { padding: var(--space-3) 0 var(--space-4) var(--space-6); font-size: var(--fs-mini); color: var(--text-2); }
+.lamp-why p { margin: 0 0 var(--space-2); }
+.lamp-why a { color: var(--accent-fg); }
+
+/* HM-03: today's schedule — a clock column and one line each */
+.sched { display: grid; gap: var(--space-3); margin: 0; padding: 0; font-size: var(--fs-body); }
+.sched li { list-style: none; display: grid; grid-template-columns: 46px minmax(0, 1fr); gap: var(--space-4); align-items: baseline; }
+.sched b { font-family: var(--font-num); font-variant-numeric: tabular-nums; font-size: var(--fs-mini); font-weight: 600; color: var(--text-2); }
+.sched a { color: var(--text-1); text-decoration: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sched a:hover { color: var(--accent-fg); text-decoration: underline; }
+
+.cardlink { display: inline-block; margin-top: var(--space-4); font-size: var(--fs-body); color: var(--accent-fg); }
+
+@media (max-width: 1000px) {
+  .home { grid-template-columns: minmax(0, 1fr); }
+  /* .home .lrow is more specific than the folded .lrow rule above, so without
+     this it keeps its four-column desktop layout and the row's sentence lands
+     in the 96px clock column. */
+  .home .lrow { grid-template-columns: 4px minmax(0, 1fr); }
+}

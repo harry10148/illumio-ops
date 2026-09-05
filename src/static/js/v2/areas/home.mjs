@@ -1,53 +1,84 @@
-// home.mjs — #/home. Anchors HM-01…HM-04, OV-02 (posture), XC-01 (rail),
-// XC-10 (error card). v3 spec §2: the page answers five questions with five
-// cards — what needs me, is the system healthy, what happens today, can the
-// data be trusted, where is posture heading — and nothing else. Everything the
-// v2 overview board also showed lives in its own area now (Top10 / saved
-// queries on #/investigate/traffic; audit, snapshot and policy-usage summaries
-// on #/reports; system / pipeline / TLS / channel detail on the system pages).
+// home.mjs — #/home. Anchors HM-00..HM-03, HM-05, XC-10 (error card).
 //
-// Data: five GET snapshots, all already served by the backend — no new
-// endpoint beyond 3A's /api/alerts (spec §4a).
+// Spec v3.1 §2: the home page answers one question — "is there anything I
+// need to do right now" — so the RECENT ALERTS are the page and everything
+// else is background. 3B answered five questions with five equal panels in a
+// board; this is one list with three quiet cards beside it.
+//
+// What v3.1 removed, and why each is not a loss:
+//   · the five-light health rail (XC-01). It was chrome on one route; its six
+//     lamps and their reasons are the first side card now.
+//   · the 7-day traffic-decision band (HM-04). It belongs on the page that
+//     can act on it — traffic search — not on a page nobody queries from.
+//   · the posture DETAIL drawer (OV-02). The score survives as one line in
+//     the policy card; the breakdown lives in the reports area.
+//
+// Data: four GET snapshots plus /api/alerts, all already served — no new
+// endpoint (spec §4).
 
 import { api } from "../core/api.mjs";
 import { router } from "../core/router.mjs";
 import { t, tf } from "../core/i18n.mjs";
-import { el, clear, disclosure } from "../core/dom.mjs";
-import { num, since, stamp, tone as toneOf } from "../core/fmt.mjs";
+import { el, clear } from "../core/dom.mjs";
+import { num } from "../core/fmt.mjs";
 import { drawer } from "../components/drawer.mjs";
 import { palette } from "../components/palette.mjs";
 import { withErrorCard } from "../components/errorcard.mjs";
-import { computeLights, healthbar } from "../components/healthbar.mjs";
+import { computeLights } from "../components/healthbar.mjs";
 import { audit } from "../core/audit.mjs";
-import {
-  areaHead, panel, withMeta, withGoto, kv, badge, note, emptyState, brow,
-  cardPosture, postureDetail, drawerSpec, cmdSpec, loadOne,
-} from "./cards.mjs";
+import { pageHead, sideCard, listRow, listFoot, chip } from "../components/page.mjs";
+import { note, emptyState, loadOne } from "./cards.mjs";
 
 const ROUTE = "#/home";
-const GO_INBOX = "#/investigate/alerts";
+const GO_ALERTS = "#/investigate/alerts";
 const GO_TRAFFIC = "#/investigate/traffic";
 const GO_SCHEDULES = "#/policy/schedules";
 const GO_REPORT_SCHEDULES = "#/reports/schedules";
 const GO_JOBS = "#/system/jobs";
 const GO_REPORTS = "#/reports";
+const GO_ALERT_RULES = "#/policy/alert-rules";
+const GO_PCE = "#/system/pce";
 
 const SNAPS = ["status", "dashboard_overview", "rs_schedules", "report_schedules"];
-const ALERTS_PARAMS = { status: "new", page: 1, page_size: 4 };
+// spec §2: the list shows the ten most recent, with an unhandled/all switch.
+const LIST_SIZE = 10;
 
 // static keys so the i18n audit can see them (a concatenated key is invisible to it)
 const STATUS_LABEL = { new: "gui_alert_status_new", ack: "gui_alert_status_ack", done: "gui_alert_status_done" };
 const SEVERITY_RANK = { critical: 0, error: 1, warning: 2, warn: 2, info: 3 };
+
 function severityTone(sev) {
   const s = String(sev || "").toLowerCase();
   if (s === "critical" || s === "error") return "crit";
   if (s === "warning" || s === "warn") return "warn";
   return "info";
 }
+function statusTone(status) { return status === "done" ? "ok" : status === "ack" ? "info" : "warn"; }
+function statusText(status) { return t(STATUS_LABEL[status] || "gui_alert_status_new"); }
 
-function loadAll() {
+function hhmm(iso) {
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return "—";
+  return String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0");
+}
+function day(iso) {
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return "";
+  return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+}
+/** The summary minus the rule name it opens with — the row already has it. */
+function summaryTail(a) {
+  const summary = String(a.summary || "");
+  const rule = String(a.rule_name || "");
+  if (rule && summary.indexOf(rule) === 0) {
+    return summary.slice(rule.length).replace(/^\s*[·|,-]\s*/, "");
+  }
+  return summary;
+}
+
+function loadAll(status) {
   return Promise.all(SNAPS.map(loadOne).concat([
-    api.load("alerts", ALERTS_PARAMS).catch(function (e) {
+    api.load("alerts", { status: status, page: 1, page_size: LIST_SIZE }).catch(function (e) {
       console.error("[home] alerts failed to load", e);
       return { ok: false, error: String((e && e.message) || e) };
     }),
@@ -59,152 +90,192 @@ function loadAll() {
   });
 }
 
-// ── HM-01 需要你處理 ──────────────────────────────────────────────────────
-function cardNeedsYou(alerts) {
-  const p = panel("HM-01", t("gui_home_needs_you"));
+// ── HM-01 the recent alerts ─────────────────────────────────────────────────
+
+function alertList(alerts, state, repaint) {
+  const wrap = el("section", { class: "sect", "data-cov": "HM-01" });
+  const head = el("div", { class: "sect-head" },
+    el("h3", { text: t("gui_home_recent") }));
+
+  const filters = el("div", { class: "seg" });
+  [["new", "gui_home_filter_open"], ["", "gui_home_filter_all"]].forEach(function (pair) {
+    filters.appendChild(el("button", {
+      type: "button", text: t(pair[1]), "data-status": pair[0] || "all",
+      "aria-pressed": state.status === pair[0] ? "true" : "false",
+      onClick: function () { state.status = pair[0]; repaint(); },
+    }));
+  });
+  head.appendChild(filters);
+  head.appendChild(el("a", { class: "seeall", href: GO_ALERTS, text: t("gui_home_see_all") }));
+  wrap.appendChild(head);
+
   if (!alerts || alerts.ok === false) {
-    p.body.appendChild(note(tf("error_generic", { error: (alerts && alerts.error) || "—" })));
-    p.setAttribute("data-tone", "warn");
-    withGoto(p, GO_INBOX);
-    return p;
+    wrap.setAttribute("data-tone", "warn");
+    wrap.appendChild(note(tf("error_generic", { error: (alerts && alerts.error) || "—" })));
+    return wrap;
   }
-  const counts = alerts.counts || {};
   const items = (alerts.items || []).slice().sort(function (a, b) {
     return (SEVERITY_RANK[String(a.severity).toLowerCase()] ?? 9) - (SEVERITY_RANK[String(b.severity).toLowerCase()] ?? 9);
   });
-  withMeta(p, tf("gui_home_needs_you_meta", { total: num(alerts.total || 0), open: num(counts.new || 0) }));
   if (!items.length) {
-    p.body.appendChild(emptyState(t("gui_home_no_open_alerts"), GO_INBOX, t("gui_home_go_inbox")));
-    p.setAttribute("data-tone", "ok");
-    withGoto(p, GO_INBOX);
-    return p;
+    wrap.setAttribute("data-tone", "ok");
+    wrap.appendChild(emptyState(t("gui_home_no_open_alerts"), GO_ALERTS, t("gui_home_go_alerts")));
+    return wrap;
   }
-  const list = el("div", { class: "stack" });
+  const list = el("div", { class: "list" });
   items.forEach(function (a) {
-    const row = el("a", { class: "kv hm-alert", href: GO_INBOX + "?id=" + encodeURIComponent(a.id), "data-tone": severityTone(a.severity) },
-      el("span", { class: "hm-alert-when mono", text: since(a.fired_at) }),
-      el("span", { class: "hm-alert-body" },
-        el("b", { text: a.rule_name || "—" }),
-        el("small", { text: [a.type, a.summary].filter(Boolean).join(" · ") })),
-      badge(STATUS_LABEL[a.status] ? t(STATUS_LABEL[a.status]) : t("gui_alert_status_new"), severityTone(a.severity))
-    );
-    list.appendChild(row);
+    list.appendChild(listRow({
+      href: GO_ALERTS + "?id=" + encodeURIComponent(a.id),
+      tone: severityTone(a.severity),
+      when: { main: hhmm(a.fired_at), sub: day(a.fired_at) },
+      title: a.rule_name || "—",
+      sub: summaryTail(a),
+      status: chip(statusText(a.status), statusTone(a.status)),
+    }));
   });
-  p.body.appendChild(list);
-  p.setAttribute("data-tone", items.some(function (a) { return severityTone(a.severity) === "crit"; }) ? "crit" : "warn");
-  withGoto(p, GO_INBOX);
-  return p;
+  wrap.appendChild(list);
+  const counts = alerts.counts || {};
+  wrap.appendChild(listFoot(
+    tf("gui_home_recent_foot", { total: num(alerts.total || items.length), done: num(counts.done || 0) }),
+    el("a", { href: GO_ALERT_RULES, text: t("gui_al_manage_rules") })
+  ));
+  wrap.setAttribute("data-tone", items.some(function (a) { return severityTone(a.severity) === "crit"; }) ? "crit" : "warn");
+  return wrap;
 }
 
-// ── HM-02 系統健康 ────────────────────────────────────────────────────────
-function cardHealth(st, ov) {
-  const p = panel("HM-02", t("gui_home_health"));
+// ── HM-02 system health ─────────────────────────────────────────────────────
+
+/**
+ * Six lamps, a sentence each, and the reasons one click away.
+ *
+ * The rail this replaces put its reasons in a popover, and four e2e tests
+ * read them: an authentication failure has to be distinguishable from an
+ * unreachable PCE, and the probe chain has to be visible. "六燈＋每燈一句"
+ * (spec §2) is the resting state, not a decision to throw the diagnosis away,
+ * so each lamp is a <details> whose summary is the sentence.
+ */
+function healthCard(st, ov) {
   const lights = computeLights(st || {}, ov || {});
   const ven = (ov && ov.ven) || {};
-  const venTone = ven.verdict === "ok" ? "ok" : (ven.verdict ? "warn" : "neutral");
-  const rows = lights.map(function (l) { return { label: l.label, tone: l.tone, summary: l.summary || l.value, route: l.route }; });
+  const rows = lights.map(function (l) {
+    return { label: l.label, tone: l.tone, line: l.summary || l.value, reasons: l.reasons || [], route: l.route };
+  });
   rows.push({
-    label: t("gui_home_ven"), tone: venTone,
-    summary: ven.total !== undefined ? tf("gui_home_ven_summary", { online: num(ven.online || 0), total: num(ven.total || 0) }) : "—",
-    route: "#/system/pce",
+    label: t("gui_home_ven"),
+    tone: ven.verdict === "ok" ? "ok" : (ven.verdict ? "warn" : "neutral"),
+    line: ven.total !== undefined ? tf("gui_home_ven_summary", { online: num(ven.online || 0), total: num(ven.total || 0) }) : "—",
+    reasons: [],
+    route: GO_PCE,
   });
-  const bad = rows.filter(function (r) { return r.tone === "crit" || r.tone === "warn"; });
-  const lead = !bad.length
-    ? t("gui_home_health_all_ok")
-    : tf("gui_home_health_attention", { items: bad.map(function (r) { return r.label; }).join("、") });
-  p.body.appendChild(el("p", { class: "lead", text: lead }));
-  const grid = el("div", { class: "lamps" });
+
+  const box = el("div", { class: "lamps" });
   rows.forEach(function (r) {
-    grid.appendChild(el("a", { class: "lamp", href: r.route, "data-tone": r.tone },
-      el("i", { class: "dot" }),
-      el("span", null, el("b", { text: r.label }), el("small", { text: r.summary || "—" }))));
+    const body = el("div", { class: "lamp-why" });
+    r.reasons.forEach(function (reason) { body.appendChild(el("p", { text: reason })); });
+    body.appendChild(el("a", { href: r.route, text: t("gui_home_health_open") }));
+    box.appendChild(el("details", { class: "lamp", "data-tone": r.tone },
+      el("summary", null,
+        el("i", { class: "dot", "aria-hidden": "true" }),
+        el("span", null, el("b", { text: r.label }), el("small", { text: r.line || "—" }))),
+      body));
   });
-  p.body.appendChild(grid);
-  p.setAttribute("data-tone", bad.some(function (r) { return r.tone === "crit"; }) ? "crit" : (bad.length ? "warn" : "ok"));
-  withGoto(p, "#/system/pce");
-  return p;
+
+  const bad = rows.filter(function (r) { return r.tone === "crit" || r.tone === "warn"; });
+  const card = sideCard(t("gui_home_health"), box);
+  card.setAttribute("data-cov", "HM-02");
+  card.setAttribute("data-tone", bad.some(function (r) { return r.tone === "crit"; }) ? "crit" : (bad.length ? "warn" : "ok"));
+  return { el: card, bad: bad };
 }
 
-// ── HM-03 今天會發生 ──────────────────────────────────────────────────────
+// ── HM-03 today's schedule ──────────────────────────────────────────────────
+
 function todayLocal(iso) {
   if (!iso) return false;
   const d = new Date(iso);
   const now = new Date();
   return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate();
 }
-function hhmm(iso) {
-  const d = new Date(iso);
-  return isNaN(d.getTime()) ? "—" : String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0");
-}
-function cardToday(rs, reportSched, ov) {
-  const p = panel("HM-03", t("gui_home_today"));
+
+function todayCard(rs, reportSched, ov) {
   const items = [];
   (Array.isArray(rs) ? rs : []).forEach(function (s) {
     if (!s || s.live_enabled === false) return;
     if (s.schedule_type === "one_time" || s.type === "one_time") {
-      if (todayLocal(s.expire_at)) items.push({ when: hhmm(s.expire_at), sort: s.expire_at, text: tf("gui_home_today_rule_expire", { name: s.name || s.detail_name || "—" }), route: GO_SCHEDULES, tone: "info" });
+      if (todayLocal(s.expire_at)) items.push({ when: hhmm(s.expire_at), sort: s.expire_at, text: tf("gui_home_today_rule_expire", { name: s.name || s.detail_name || "—" }), route: GO_SCHEDULES });
       return;
     }
-    if (s.start) items.push({ when: s.start, sort: "T" + s.start, text: tf("gui_home_today_rule_start", { name: s.name || "—", action: s.action || "" }), route: GO_SCHEDULES, tone: s.last_result === "error" ? "warn" : "info" });
-    if (s.end) items.push({ when: s.end, sort: "T" + s.end, text: tf("gui_home_today_rule_end", { name: s.name || "—" }), route: GO_SCHEDULES, tone: "info" });
+    if (s.start) items.push({ when: s.start, sort: "T" + s.start, text: tf("gui_home_today_rule_start", { name: s.name || "—", action: s.action || "" }), route: GO_SCHEDULES });
+    if (s.end) items.push({ when: s.end, sort: "T" + s.end, text: tf("gui_home_today_rule_end", { name: s.name || "—" }), route: GO_SCHEDULES });
   });
   (Array.isArray(reportSched) ? reportSched : []).forEach(function (r) {
     if (!r || r.enabled === false || !r.next_run) return;
-    if (todayLocal(r.next_run)) items.push({ when: hhmm(r.next_run), sort: r.next_run, text: tf("gui_home_today_report", { name: r.name || r.report_type || "—" }), route: GO_REPORT_SCHEDULES, tone: "info" });
+    if (todayLocal(r.next_run)) items.push({ when: hhmm(r.next_run), sort: r.next_run, text: tf("gui_home_today_report", { name: r.name || r.report_type || "—" }), route: GO_REPORT_SCHEDULES });
   });
-  const jobs = (ov && ov.job_health) || [];
-  jobs.forEach(function (j) {
+  ((ov && ov.job_health) || []).forEach(function (j) {
     if (!j || !/retention|archive/.test(String(j.job_id || ""))) return;
     if (!j.last_run || !j.interval_seconds) return;
     const next = new Date(new Date(j.last_run).getTime() + j.interval_seconds * 1000);
-    if (todayLocal(next.toISOString())) items.push({ when: hhmm(next.toISOString()), sort: next.toISOString(), text: tf("gui_home_today_job", { job: j.job_id }), route: GO_JOBS, tone: j.level === "ok" ? "info" : "warn" });
+    if (todayLocal(next.toISOString())) items.push({ when: hhmm(next.toISOString()), sort: next.toISOString(), text: tf("gui_home_today_job", { job: j.job_id }), route: GO_JOBS });
   });
   items.sort(function (a, b) { return String(a.sort).localeCompare(String(b.sort)); });
-  if (!items.length) {
-    p.body.appendChild(emptyState(t("gui_home_today_empty"), GO_SCHEDULES, t("gui_home_go_schedules")));
-  } else {
-    const list = el("div", { class: "stack" });
-    items.slice(0, 6).forEach(function (it) {
-      list.appendChild(el("a", { class: "kv hm-today", href: it.route, "data-tone": it.tone },
-        el("span", { class: "mono hm-when", text: it.when }),
-        el("span", { text: it.text })));
-    });
-    p.body.appendChild(list);
-  }
-  withGoto(p, GO_SCHEDULES);
-  return p;
+
+  const body = items.length
+    ? el("ul", { class: "sched" }, items.slice(0, 6).map(function (it) {
+      return el("li", null,
+        el("b", { text: it.when }),
+        el("a", { href: it.route, text: it.text }));
+    }))
+    : el("p", { class: "note" }, el("span", { text: t("gui_home_today_empty") }));
+  const card = sideCard(t("gui_home_today"), body);
+  card.setAttribute("data-cov", "HM-03");
+  return card;
 }
 
-// ── HM-04 7 天流量決策 ────────────────────────────────────────────────────
-function cardDecisions(ov) {
-  const b = (ov && ov.blocked) || {};
-  const p = panel("HM-04", tf("gui_home_decisions", { days: num(b.window_days || 7) }));
-  const allowed = Number(b.allowed || 0), potential = Number(b.potential || 0), unknown = Number(b.unknown || 0), blocked = Number(b.blocked || 0);
-  const total = allowed + potential + unknown + blocked;
-  if (!total) {
-    p.body.appendChild(emptyState(t("gui_home_decisions_empty"), GO_TRAFFIC, t("gui_home_go_traffic")));
-    withGoto(p, GO_TRAFFIC);
-    return p;
-  }
-  if (b.vs_prev_pct !== undefined && b.vs_prev_pct !== null) {
-    withMeta(p, tf("gui_home_decisions_vs_prev", { pct: (b.vs_prev_pct > 0 ? "+" : "") + num(b.vs_prev_pct) }));
-  }
-  const bar = el("div", { class: "decision-bar", role: "img", "aria-label": t("gui_home_decisions") });
-  [["ok", allowed], ["warn", potential], ["neutral", unknown], ["crit", blocked]].forEach(function (pair) {
-    if (!pair[1]) return;
-    bar.appendChild(el("i", { "data-tone": pair[0], style: "flex-basis:" + (pair[1] / total * 100).toFixed(2) + "%" }));
-  });
-  p.body.appendChild(bar);
-  const legend = el("div", { class: "legend" });
-  [["ok", "gui_pd_allowed", allowed], ["warn", "gui_pd_potential", potential], ["neutral", "gui_siem_traffic_pd_unknown", unknown], ["crit", "gui_pd_blocked", blocked]].forEach(function (row) {
-    legend.appendChild(el("span", { "data-tone": row[0] }, el("i", { class: "dot" }), el("span", { text: t(row[1]) + " " + num(row[2]) })));
-  });
-  p.body.appendChild(legend);
-  p.body.appendChild(note(tf("gui_home_decisions_read", { n: num(potential) })));
-  p.setAttribute("data-tone", blocked ? "crit" : (potential > allowed ? "warn" : "ok"));
-  withGoto(p, GO_TRAFFIC);
-  return p;
+// ── HM-05 policy, right now ─────────────────────────────────────────────────
+
+/**
+ * What the policy looks like today, in three lines.
+ *
+ * Spec §2 asked for provision COUNT and ruleset DELTA over seven days. The
+ * backend serves neither, and §4 rules out adding an endpoint in this
+ * revision — so this shows the three policy figures the appliance really has
+ * (posture score, how many rulesets there are, how many workloads are being
+ * enforced) rather than inventing a movement nobody measured.
+ */
+function policyCard(ov) {
+  const posture = (ov && ov.posture) || {};
+  const enforcement = (ov && ov.enforcement) || {};
+  const modes = enforcement.by_mode || {};
+  const enforced = Number(modes.full || 0) + Number(modes.selective || 0);
+  const rulesets = el("b", { text: "—" });
+  const box = el("div", { class: "kv-list" },
+    el("div", { class: "kv" },
+      el("span", { text: t("gui_ov_posture_score_label") }),
+      el("b", { text: posture.available && posture.score !== undefined ? num(posture.score) + "/100" : "—" })),
+    el("div", { class: "kv" },
+      el("span", { text: t("gui_home_policy_enforced") }),
+      el("b", { text: enforcement.total ? tf("gui_home_policy_enforced_n", { n: num(enforced), total: num(enforcement.total) }) : "—" })),
+    el("div", { class: "kv" }, el("span", { text: t("gui_home_policy_rulesets") }), rulesets),
+    el("a", { class: "cardlink", href: GO_REPORTS, text: t("gui_home_policy_reports") }));
+  const card = sideCard(t("gui_home_policy_week"), box);
+  card.setAttribute("data-cov", "HM-05");
+  card.rulesets = rulesets;
+  return card;
 }
+
+/** Ruleset count comes from its own endpoint, so it lands after the card. */
+function fillRulesets(card, state) {
+  api.load("rs_rulesets", { page: 1, size: 1 }).then(function (d) {
+    if (state.torn || !card.rulesets) return;
+    const total = d && d.total;
+    card.rulesets.textContent = total === undefined || total === null ? "—" : num(total);
+  }).catch(function (e) {
+    if (state.torn) return;
+    console.error("[home] ruleset count failed to load", e);
+  });
+}
+
+// ── mount ───────────────────────────────────────────────────────────────────
 
 /** S2 — teardown is registered before the first await (tests/test_v2_teardown_registration.py). */
 function installTeardown(state) {
@@ -213,20 +284,12 @@ function installTeardown(state) {
     state.torn = true;
     unsubscribe();
     drawer.closeAll();
-    // v3.1: the health rail is this page's content now, not the shell's, so
-    // its teardown contract is this area's to honour. An open light popover
-    // holds two capture-phase document listeners and the TOPMOST entry on
-    // core/dom.mjs's shared dismiss stack; leaving one behind on a detached
-    // node means the next Escape anywhere in the app is eaten before any live
-    // surface sees it. destroy() closes them and is idempotent.
-    if (state.rail && typeof state.rail.destroy === "function") state.rail.destroy();
     palette.setRoute(path);
   });
 }
 
 export async function mountHome(root, ctx) {
-  const handles = {};
-  const state = { torn: false };
+  const state = { torn: false, status: "new" };
   installTeardown(state);
   const probe = el("div", { class: "ov-error-probe" });
   audit.register("home-error-card", function () {
@@ -236,43 +299,67 @@ export async function mountHome(root, ctx) {
       function () { return api.load("__audit_unavailable__"); },
       function () { });
   });
-  drawer.registerAudit("ov-posture-detail", function () {
-    return handles.openPostureDetail ? handles.openPostureDetail() : null;
+  audit.register("home-health-why", function () {
+    root.querySelectorAll("details.lamp").forEach(function (d) { d.open = true; });
   });
-  palette.registerFor(ROUTE, cmdSpec("home:inbox", t("gui_home_go_inbox"), function () { router.go(GO_INBOX); }));
-  palette.registerFor(ROUTE, cmdSpec("ov:posture", t("gui_ov_posture_score_label") + " · " + t("gui_ov_detail"), function () {
-    if (handles.openPostureDetail) handles.openPostureDetail();
-  }));
-
-  root.appendChild(areaHead(t("gui_nav_home"), ROUTE));
-  const board = el("div", { class: "board" });
-  root.appendChild(board);
-
-  await withErrorCard(board, "home (" + (SNAPS.length + 1) + ")", loadAll, function (d) {
-    if (ctx.stale() || state.torn) return;
-    const st = d.status || {};
-    const ov = d.dashboard_overview || {};
-    const openCount = (d.alerts && d.alerts.counts && d.alerts.counts.new) || 0;
-    const head = el("div", { class: "pagehead" },
-      el("div", null,
-        el("div", { class: "eyebrow", text: stamp(ov.as_of || st.timestamp || new Date().toISOString()) + (st.timezone ? " · " + st.timezone : "") }),
-        el("h1", { class: "h1" },
-          el("span", { text: t("gui_home_headline_prefix") }),
-          el("b", { class: "hot", "data-cov": "HM-00", text: " " + tf("gui_home_headline_count", { n: num(openCount) }) + " " }),
-          el("span", { text: t("gui_home_headline_suffix") }))),
-      el("button", { class: "btn primary", type: "button", text: t("gui_home_go_inbox"), onClick: function () { router.go(GO_INBOX); } })
-    );
-    board.appendChild(head);
-    // XC-01. Until 3B's five-light rail becomes the spec §2 side card (Task 4)
-    // it keeps its own markup, moved verbatim out of the shell — so it is on
-    // #/home and nowhere else, which is the ruling it always had.
-    state.rail = healthbar.render(st, ov);
-    board.appendChild(state.rail);
-    function openPostureDetail() {
-      return drawer.open(drawerSpec(t("gui_ov_posture_score_label"), postureDetail(ov.posture || {})));
-    }
-    handles.openPostureDetail = openPostureDetail;
-    board.appendChild(brow("c75", [cardNeedsYou(d.alerts), cardHealth(st, ov)]));
-    board.appendChild(brow("c3", [cardToday(d.rs_schedules, d.report_schedules, ov), cardDecisions(ov), cardPosture(ov, openPostureDetail)]));
+  palette.registerFor(ROUTE, {
+    id: "home:alerts", label: t("gui_home_go_alerts"), group: t("gui_cmd_group_area"),
+    run: function () { router.go(GO_ALERTS); },
   });
+  palette.registerFor(ROUTE, {
+    id: "home:traffic", label: t("gui_home_go_traffic"), group: t("gui_cmd_group_area"),
+    run: function () { router.go(GO_TRAFFIC); },
+  });
+
+  const head = pageHead({
+    route: ROUTE,
+    title: t("gui_home_loading"),
+    actions: [
+      el("button", { class: "btn", type: "button", text: t("gui_home_go_traffic"), onClick: function () { router.go(GO_TRAFFIC); } }),
+      el("button", { class: "btn primary", type: "button", text: t("gui_home_go_reports"), onClick: function () { router.go(GO_REPORTS); } }),
+    ],
+  });
+  root.appendChild(head);
+  const body = el("div", { class: "home" });
+  root.appendChild(body);
+
+  async function paint() {
+    if (state.torn) return;
+    clear(body);
+    await withErrorCard(body, "home (" + (SNAPS.length + 1) + ")", function () { return loadAll(state.status); }, function (d) {
+      if (ctx.stale() || state.torn) return;
+      const st = d.status || {};
+      const ov = d.dashboard_overview || {};
+      const counts = (d.alerts && d.alerts.counts) || {};
+      const open = counts.new || 0;
+      const health = healthCard(st, ov);
+
+      // spec §2: the title is the page's whole answer — how many alerts are
+      // still open, and how many lights are not green.
+      const h2 = head.querySelector("h2");
+      if (h2) {
+        clear(h2);
+        // spec §2's own example sentence: "{n} 件告警還沒處理，系統有 {m}
+        // 項要看一下". The count is its own node so HM-00 has something to
+        // anchor to and the number can carry the accent on its own.
+        h2.appendChild(el("b", { class: "hot", "data-cov": "HM-00", text: tf("gui_home_headline_count", { n: num(open) }) }));
+        h2.appendChild(el("span", { text: " " + tf("gui_home_headline_health", { m: num(health.bad.length) }) }));
+      }
+      const text = head.querySelector(".phead-text");
+      const oldSub = text.querySelector("p");
+      const sub = el("p", { text: t("gui_home_sub") });
+      if (oldSub) text.replaceChild(sub, oldSub); else text.appendChild(sub);
+
+      const policy = policyCard(ov);
+      const main = el("div", { class: "home-main" }, alertList(d.alerts, state, paint));
+      const side = el("aside", { class: "home-side" },
+        health.el,
+        todayCard(d.rs_schedules, d.report_schedules, ov),
+        policy);
+      body.appendChild(main);
+      body.appendChild(side);
+      fillRulesets(policy, state);
+    });
+  }
+  await paint();
 }

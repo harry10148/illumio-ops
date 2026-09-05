@@ -6,9 +6,9 @@ that module's docstring for why this harness had to be built and why it
 lives there rather than inline here.
 
 Covers exactly the brief's Step 2 acceptance list:
-  - #/home shows the health rail; #/reports does not (XC-01 scope — v3.1
-    moved the rail out of the chrome and into areas/home.mjs, so the scoping
-    is now "the home page builds it" rather than app.mjs's old syncRail).
+  - #/home shows the system lights; no other route does (HM-02 scope — v3.1
+    replaced the chrome's five-light rail with the home page's own health
+    card, so the scoping follows from where the markup is built).
   - hash routing switches the mounted area without a page reload.
   - theme AND density persist across a reload (theme.mjs + app.mjs's
     initDisplay()).
@@ -95,49 +95,40 @@ def test_v2_boots_with_no_console_errors(v2_page):
     assert unexpected == [], errors
 
 
-def test_health_rail_only_on_overview(v2_page):
-    """XC-01's route scoping, against the REAL five-light healthbar.
+def test_the_health_card_is_on_the_home_page_and_nowhere_else(v2_page):
+    """HM-02's route scoping, against the REAL lights.
 
-    v3.1 (spec §1) took the rail out of the chrome: it is home-page CONTENT
-    now, built by areas/home.mjs from the two snapshots that page already
-    loads, so app.mjs's HEALTH_ROUTES/syncRail detach-not-destroy machinery
-    is gone with it. The scoping being asserted is the same one it always
-    had — the rail is on #/home and on no other route — but the mechanism
-    underneath is "the page builds it" rather than "the shell lends it", so
-    the round trip below now asserts a REBUILT rail rather than the same node
-    coming back. That is the behaviour change, stated rather than hidden: the
-    marker must NOT survive.
+    v3.1 finished a move that started as a route rule. The five-light rail
+    used to be chrome that app.mjs attached to #/home and detached from every
+    other route (HEALTH_ROUTES/syncRail); the lights are the home page's own
+    first side card now, so the scoping is a consequence of where the markup
+    is built rather than a rule something has to keep enforcing. Asserted
+    anyway, because "health is on the home page only" is a product decision
+    (the 2026-08-05 ruling, kept at every revision since), not an accident of
+    this refactor.
     """
     page, base_url = v2_page
     _goto_overview(page, base_url)
 
-    # #/home: the real rail is present, with all five lights.
-    rail = page.locator('#area-root [data-cov="XC-01"]')
-    assert rail.count() == 1
-    assert rail.locator(".rail-slot").count() == 5
+    # #/home: six lamps — the five computed lights plus VEN.
+    card = page.locator('[data-cov="HM-02"]')
+    assert card.count() == 1
+    assert card.locator("details.lamp").count() == 6
 
-    # ...and the same /api/status snapshot that fed it reached the user menu,
-    # carrying a REAL daemon field (the running app's own version string, not
-    # a fixture literal). This is where the Task-2 rail's __version__ check
-    # lives now. The menu's <dl> only exists while the popover is open, so
-    # open it the way an operator would.
+    # ...and the same /api/status snapshot that fed them reached the user
+    # popover, carrying a REAL daemon field (the running app's own version
+    # string, not a fixture literal). The <dl> only exists while the popover
+    # is open, so open it the way an operator would.
     page.click(".who")
     assert __version__ in page.locator(".usermenu-pop dd").nth(1).inner_text()
     page.keyboard.press("Escape")
 
-    # Mark the live rail node so the assertion below can tell a rebuilt rail
-    # from the same one coming back.
-    page.evaluate(
-        "document.querySelector('#area-root [data-cov=\"XC-01\"]')"
-        ".setAttribute('data-e2e-marker', 'rail-1')"
-    )
-
-    # Client-side hash switch (no reload) to #/system: rail must detach.
+    # Client-side hash switch (no reload) to #/system: no lights there.
     # (#/system is the last route still on mountPlaceholder — it is an area
     # landing path with no page of its own, by design.)
     page.evaluate("location.hash = '#/system'")
     page.wait_for_selector('[data-route="#/system"]')
-    assert page.locator('[data-cov="XC-01"]').count() == 0
+    assert page.locator('[data-cov="HM-02"]').count() == 0
 
     # The placeholder body must degrade through the i18n fallback, not leak the
     # raw, unresolved key onto the screen (review finding: tf() had no fallback
@@ -152,14 +143,10 @@ def test_health_rail_only_on_overview(v2_page):
     assert "#/system" not in wip_text
     assert page.locator('[data-route="#/system"]').count() == 1
 
-    # And switching back BUILDS A NEW ONE: the rail is part of the page, so
-    # it is torn down with the page and rendered again from that mount's own
-    # snapshot loads. The marker must be gone — if it survived, something is
-    # still caching the node across mounts, which is the leak v3.1 removed.
+    # And switching back builds the card again from that mount's own loads.
     page.evaluate("location.hash = '#/home'")
-    page.wait_for_selector('#area-root [data-cov="XC-01"]')
-    assert page.locator('#area-root [data-cov="XC-01"]').get_attribute("data-e2e-marker") is None
-    assert page.locator('#area-root [data-cov="XC-01"] .rail-slot').count() == 5
+    page.wait_for_selector('[data-cov="HM-02"]')
+    assert page.locator('[data-cov="HM-02"] details.lamp').count() == 6
 
 
 def test_theme_and_density_persist_across_reload(v2_page):
@@ -284,47 +271,17 @@ def test_i18n_init_failure_is_logged_not_silent(v2_page):
 
 # ══════════════════════════ Task 12d — leaks the core layer used to allow ════
 
-def test_detaching_the_health_rail_releases_its_popover(v2_page):
-    """F5: leaving #/home must call the rail's destroy().
-
-    An open light popover holds two capture-phase document listeners and an
-    entry on core/dom.mjs's shared dismiss stack (dismissible()). Detaching
-    the rail hides the popover but keeps both: the stale entry stays TOPMOST
-    of the stack, so the next Escape anywhere in the app is eaten by its
-    stopImmediatePropagation() before any live surface can see it.
-
-    v3.1 moved the rail into areas/home.mjs, so the obligation moved with it:
-    that module's installTeardown() calls destroy() when the router leaves the
-    page. RED without it: the dismiss stack keeps the stale entry and the
-    Escape probe below never fires."""
-    page, base_url = v2_page
-    _goto_overview(page, base_url)
-
-    cell = page.locator('#area-root [data-cov="XC-01"] .rail-cell').first
-    cell.click()
-    assert cell.get_attribute("aria-expanded") == "true"
-    assert page.locator("#area-root .rail-pop").count() == 1
-
-    # Away and back: the rail is destroyed with the page, then rebuilt.
-    page.evaluate("location.hash = '#/reports'")
-    page.wait_for_selector('[data-route="#/reports"]')
-    page.evaluate("location.hash = '#/home'")
-    page.wait_for_selector('#area-root [data-cov="XC-01"]')
-
-    assert page.locator('#area-root .rail-cell[aria-expanded="true"]').count() == 0
-    assert page.locator("#area-root .rail-pop").count() == 0
-
-    # ...and the dismiss stack is clear: a listener registered NOW, i.e. after
-    # any stale one, still sees Escape. Same node (document), same capture
-    # phase, later registration — exactly what stopImmediatePropagation()
-    # would block.
-    page.evaluate(
-        "() => { window.__escSeen = 0; document.addEventListener('keydown', "
-        "e => { if (e.key === 'Escape') window.__escSeen++; }, true); }"
-    )
-    page.keyboard.press("Escape")
-    assert page.evaluate("() => window.__escSeen") == 1
-
+# test_detaching_the_health_rail_releases_its_popover is deleted with the rail
+# it tested (v3.1 §2). It guarded one specific leak: the rail's light popover
+# registered two capture-phase document listeners and an entry on
+# core/dom.mjs's shared dismiss stack, and detaching the rail without calling
+# destroy() left that entry TOPMOST and invisible, so the next Escape anywhere
+# in the app was eaten. The health card's lamps are <details> elements: they
+# open and close natively, register nothing on the dismiss stack, and there is
+# no detach step to forget. The general invariant the test stood for — leaving
+# a page must not strand a dismissible surface — still has an owner in
+# tests/test_v2_home_e2e.py::test_teardown_closes_drawer_on_navigate_away,
+# against a drawer, which is the surface that still uses that stack.
 
 def test_api_does_not_throw_on_a_transport_failure(v2_page):
     """F7: api.mjs's "post/put/del never throw" contract has to hold for the

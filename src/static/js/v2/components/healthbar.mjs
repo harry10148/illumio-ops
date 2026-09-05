@@ -1,9 +1,8 @@
-// healthbar.mjs — XC-01. Five lights across the instrument rail.
-//
-// Scope: the overview only (spec §1.1, amended at Gate 2 — it used to sit in
-// the chrome on every route). The area that mounts this owns the
-// attach/detach (app.mjs's syncRail pattern, T2); this module just renders
-// the rail and keeps its audit opener quiet while detached.
+// healthbar.mjs — how many system lights there are, what tone each one is,
+// and why. RENDERING LIVES ELSEWHERE: v3.1 (spec §2) replaced the instrument
+// rail this file used to draw with the home page's health card, so this is
+// now a pure computation over the two health snapshots and `computeLights` is
+// its only export. areas/home.mjs is the one consumer.
 //
 // PORT OF design/v2/mockup/js/components/healthbar.mjs. Differences from the
 // mockup:
@@ -61,12 +60,8 @@
 //
 // Data in: store.load("status") + store.load("dashboard_overview").
 
-import { el, spacer, dismissible } from "../core/dom.mjs";
 import { t, tf } from "../core/i18n.mjs";
-import { dur, since, stamp, tone, worst, atLeast } from "../core/fmt.mjs";
-import { router } from "../core/router.mjs";
-import { goLabel } from "./page.mjs";
-import { audit } from "../core/audit.mjs";
+import { dur, since, tone, worst, atLeast } from "../core/fmt.mjs";
 
 class Light {
   constructor(id, label, route) {
@@ -266,112 +261,9 @@ export function computeLights(statusSnap, overviewSnap) {
   ];
 }
 
-// ── rendering ───────────────────────────────────────────────────────────────
-function buildPopover(light, close) {
-  const pop = el("div", { class: "popover rail-pop", "data-tone": light.tone, role: "dialog" },
-    el("h4", { text: light.label + " · " + t("gui_health_reasons") }),
-    el("ul", null, light.reasons.map(function (r) {
-      return el("li", null, el("span", { class: "dot" }), el("span", { text: r }));
-    })),
-    el("div", { class: "pop-foot" },
-      el("button", {
-        class: "btn link",
-        type: "button",
-        text: goLabel(light.route),
-        onClick: function () { close(); router.go(light.route); },
-      }),
-      spacer(),
-      el("button", { class: "btn ghost", type: "button", text: t("gui_close"), onClick: close })
-    )
-  );
-  return pop;
-}
-
-function buildSlot(light, closeOthers) {
-  const slot = el("div", { class: "rail-slot" });
-  const cell = el("button", {
-    class: "rail-cell",
-    type: "button",
-    "data-tone": light.tone,
-    "aria-expanded": "false",
-  },
-    el("span", { class: "k" }, el("span", { class: "led" }), el("span", { text: light.label })),
-    el("span", { class: "v", text: light.value }),
-    el("span", { class: "d", title: light.summary, text: light.summary }),
-    el("span", { class: "ul" })
-  );
-  slot.appendChild(cell);
-
-  let pop = null;
-  let dispose = null;
-
-  function close() {
-    if (!pop) return;
-    dispose();
-    dispose = null;
-    slot.removeChild(pop);
-    pop = null;
-    cell.setAttribute("aria-expanded", "false");
-  }
-
-  function open(exclusive) {
-    if (pop) return;                 // idempotent — __openAllForAudit may re-enter
-    if (exclusive) closeOthers(close);
-    pop = buildPopover(light, close);
-    slot.appendChild(pop);
-    cell.setAttribute("aria-expanded", "true");
-    dispose = dismissible(pop, close);
-  }
-
-  cell.addEventListener("click", function () { if (pop) close(); else open(true); });
-  return { slot: slot, open: open, close: close };
-}
-
-export const healthbar = {
-  /** render(statusSnap, overviewSnap) -> HTMLElement (the whole rail, XC-01), with a .destroy() attached (see header note 2). */
-  render(statusSnap, overviewSnap) {
-    const lights = computeLights(statusSnap, overviewSnap);
-    const rail = el("div", { class: "rail", "data-cov": "XC-01", role: "group", "aria-label": t("gui_ov_pipeline_health") });
-    const handles = [];
-
-    lights.forEach(function (light) {
-      const h = buildSlot(light, function (keep) {
-        handles.forEach(function (other) { if (other.close !== keep) other.close(); });
-      });
-      handles.push(h);
-      rail.appendChild(h.slot);
-    });
-
-    const asOf = (overviewSnap && overviewSnap.as_of) || "";
-    rail.appendChild(el("div", { class: "railmeta" },
-      el("span", null, t("gui_ov_as_of") + " ", el("b", { class: "mono", text: stamp(asOf) })),
-      el("span", { class: "mono", text: (statusSnap && statusSnap.timezone) || "" })
-    ));
-
-    // Every light's popover carries reasons the gate must be able to see.
-    // The opener stays global (the rail outlives any single mount) but no-ops
-    // while the rail is detached — the area only attaches this on #/home,
-    // and opening popovers in a detached tree would inflate the audit's
-    // "opened" count on every other route for surfaces nobody can see.
-    audit.registerGlobal("healthbar", function () {
-      if (!rail.isConnected) return;
-      handles.forEach(function (h) { h.open(false); });
-    });
-
-    // Teardown contract: destroy() closes any open popover. It deliberately
-    // does not unregister the audit opener above — see header note 2.
-    rail.destroy = function () {
-      handles.forEach(function (h) { h.close(); });
-    };
-
-    return rail;
-  },
-
-  /** mount(host, statusSnap, overviewSnap) — replaces host's contents. Returns the rail (see render()). */
-  mount(host, statusSnap, overviewSnap) {
-    const rail = this.render(statusSnap, overviewSnap);
-    while (host.firstChild) host.removeChild(host.firstChild);
-    host.appendChild(rail);
-    return rail;
-  },
-};
+// v3.1 (spec §2) deleted this module's rendering half. The five-light rail
+// it drew was chrome that only ever belonged on one route, and its popover
+// printed a route as link text (§5.2). areas/home.mjs now renders the same
+// lights — plus VEN — as the home page's first side card, with each light's
+// reasons behind its own disclosure. What is left here is the computation:
+// which lights exist, what tone each one is, and why.
