@@ -88,6 +88,68 @@ export function sideCard(title, ...children) {
 }
 
 /**
+ * settingsLayout({items, onPick}) -> {el, list, form, select}
+ *
+ * The third page type (spec §5.1, and the canvas's third page): a list of the
+ * things this page configures on the left, and ONE of them open on the right.
+ *
+ * Why it is not just a two-column grid: the pages it replaces rendered every
+ * item's form at once — the channels page drew five channel cards side by
+ * side, each with its own fields, above a status card that repeated what the
+ * cards already said. An operator arriving to set up Teams had to find Teams
+ * among five open forms. Here the left column answers "what is there and what
+ * state is it in" at a glance, and the right column is one job at a time.
+ *
+ *   items   [{id, name, note, chip}] — `note` is the one-line "what is still
+ *           missing"; `chip` is the status, built by the caller so this
+ *           component has no opinion about tone.
+ *   onPick  (id) => void, called when a row is chosen. The caller repaints
+ *           `form`; this component only moves aria-current.
+ *
+ * The save row is NOT part of this: it is docked by the page (system.mjs's
+ * makeForm), because it belongs to the form's dirty state, not to the layout.
+ */
+export function settingsLayout(opts) {
+  const o = opts || {};
+  const list = el("div", { class: "setlist" });
+  const form = el("div", { class: "setform" });
+  const root = el("div", { class: "settings" }, list, form);
+  const rows = {};
+
+  function select(id) {
+    Object.keys(rows).forEach(function (key) {
+      if (key === String(id)) rows[key].setAttribute("aria-current", "true");
+      else rows[key].removeAttribute("aria-current");
+    });
+  }
+
+  (o.items || []).forEach(function (item) {
+    const text = el("span", { class: "c" }, el("b", { text: item.name || item.id }));
+    if (item.note) text.appendChild(el("span", { text: item.note }));
+    const row = el("button", { class: "setitem", type: "button", "data-item": item.id,
+      onClick: function () { select(item.id); if (o.onPick) o.onPick(item.id); } },
+      text, item.chip || null);
+    rows[String(item.id)] = row;
+    list.appendChild(row);
+  });
+
+  return { el: root, list: list, form: form, select: select };
+}
+
+/**
+ * settingsSection(title, help, ...fields) -> a titled block of the right form.
+ *
+ * §5.1: "分節（h4＋一句說明｜欄位）". The h4 and its one line sit in their own
+ * column beside the fields, so a long form reads as a few named groups rather
+ * than one run of inputs.
+ */
+export function settingsSection(title, help, ...fields) {
+  const head = el("div", { class: "fsect-h" }, el("h4", { text: title }));
+  if (help) head.appendChild(el("small", { text: help }));
+  return el("div", { class: "fsect" }, head, el("div", { class: "fields" }, fields));
+}
+
+/**
  * crumbsFor(route) -> [[text, href|null], ...]
  *
  * The trail above a page title, derived from shell.mjs's NAV so the nav and

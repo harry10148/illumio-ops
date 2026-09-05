@@ -165,12 +165,12 @@ import { router } from "../core/router.mjs";
 import { toast } from "../core/toast.mjs";
 import { theme, density } from "../core/theme.mjs";
 import { withErrorCard } from "../components/errorcard.mjs";
-import { brow, cardSystem, cardIntegrity, cardPipeline, cardIntegrations, cardTls, cardChannels } from "./cards.mjs";
+import { brow, cardSystem, cardIntegrity, cardPipeline, cardIntegrations, cardTls } from "./cards.mjs";
 import { drawer } from "../components/drawer.mjs";
 import { modal } from "../components/modal.mjs";
 import { table, col } from "../components/table.mjs";
 import { palette } from "../components/palette.mjs";
-import { pageHead, crumbsFor, chip, labelForRoute } from "../components/page.mjs";
+import { pageHead, crumbsFor, chip, labelForRoute, settingsLayout, settingsSection } from "../components/page.mjs";
 
 const R_PCE = "#/system/pce";
 const R_CACHE = "#/system/cache";
@@ -2468,45 +2468,77 @@ async function mountChannels(root, ctx) {
   // requirement.
 
   await sysPage(root, ctx, R_CHANNELS, CHANNELS_SNAPS, function (board, d, host) {
-    // v3: OV-15 channel status card moved here from the overview
-    board.appendChild(brow("c2", [cardChannels(d.status || {}, d.alert_plugins || {})]));
+    /* v3.1 §5.1, the third page type. What this replaced: a grid of five
+     * channel cards, every one of them an open form, above a status card that
+     * repeated what the five cards already said. An operator arriving to set
+     * up Teams had to find Teams among five forms and read the same states
+     * twice. Now the left column is the five channels with their state and
+     * what each still needs, and the right column is the one you picked.
+     *
+     * Every channel's controls are still BUILT and tracked up front — only
+     * the selected one is attached. form.values() reads the controls
+     * themselves, so a detached channel's values still travel with the save;
+     * rendering only the open form would silently drop the other four. */
     const plugins = (d.alert_plugins && d.alert_plugins.plugins) || {};
     const s = d.settings || {};
     const active = (s.alerts && s.alerts.active) || [];
+    const chans = (d.status && d.status.alert_channels) || [];
     const form = makeForm("POST", "/api/settings");
     const names = Object.keys(plugins).sort();
     const toggles = [];
     const fieldItems = [];
+    const built = {};
 
-    const wrap = panel("SY-14", t("gui_alert_channels"));
-    withMeta(wrap, tf("gui_sy_ch_meta", { live: active.length, total: names.length }));
-    const grid = el("div", { class: "chgrid" });
+    /* `missing_required` comes back as config PATHS (alerts.line_target_id).
+     * §5.2 says those never reach the screen, and the plugin schema already
+     * carries a human label for every one of them — matched on the same path
+     * the field declares. A path with no matching field falls back to its own
+     * last segment humanised, so an unknown key degrades to "Target id"
+     * rather than to the storage path. */
+    function missingLabels(name, paths) {
+      const fields = (plugins[name] || {}).fields || [];
+      return (paths || []).map(function (path) {
+        const hit = fields.filter(function (f) {
+          return (f.config_path || []).join(".") === path;
+        })[0];
+        if (hit && hit.label) return hit.label;
+        const leaf = String(path).split(".").pop().replace(/_/g, " ");
+        return leaf.charAt(0).toUpperCase() + leaf.slice(1);
+      });
+    }
+
+    function chanState(name) {
+      const hit = chans.filter(function (c) { return c.name === name; })[0] || {};
+      const ready = !!(hit.enabled && hit.configured);
+      return { ready: ready, missing: missingLabels(name, hit.missing_required), hit: hit };
+    }
+
     names.forEach(function (name) {
       const p = plugins[name] || {};
       const on = active.indexOf(name) >= 0;
-      const card = el("article", { class: "chcard", "data-tone": on ? "ok" : "neutral" });
       const toggle = checkField(on);
       toggles.push([name, toggle]);
       form.track("active." + name, toggle, "bool");
-      /* actions.py:568-595 POST /api/actions/test-alert {channel:name} — real
-       * and, like alerting.mjs's own run-once/test-alert, a live external
-       * side effect (it really dispatches through the configured channel).
-       * No modal.confirm (matches both the legacy product and alerting.mjs's
-       * precedent) — the e2e never clicks it. The response's own `output`/
-       * `error` is already localised server-side, so it is toasted as-is. */
-      card.appendChild(el("div", { class: "chcard-h" },
-        el("span", { class: "dot" }),
-        el("b", { text: p.display_name || name }),
-        el("code", { text: name }),
-        spacer(),
-        btn("btn ghost", t("gui_set_test_send"), function () {
-          api.post("/api/actions/test-alert", { channel: name }).then(function (res) {
-            if (res && res.ok) toast.ok(res.output || t("gui_set_test_send"));
-            else toast.crit(errorText(res));
-          });
-        })));
-      card.appendChild(note(p.description || ""));
-      card.appendChild(el("label", { class: "chk" }, toggle, el("span", { text: t("gui_enabled") })));
+
+      const box = el("div");
+      /* actions.py POST /api/actions/test-alert {channel:name} — a live
+       * external side effect (it really dispatches). No modal.confirm, which
+       * matches the legacy product and alerting.mjs; the e2e never clicks it.
+       * The response's own output/error is already localised server-side. */
+      box.appendChild(el("div", { class: "setform-h" },
+        el("div", null,
+          el("h3", { text: p.display_name || name }),
+          p.description ? el("p", { text: p.description }) : null),
+        el("div", { class: "actions" },
+          el("label", { class: "chk" }, toggle, el("span", { text: t("gui_enabled") })),
+          btn("btn ghost", t("gui_set_test_send"), function () {
+            api.post("/api/actions/test-alert", { channel: name }).then(function (res) {
+              if (res && res.ok) toast.ok(res.output || t("gui_set_test_send"));
+              else toast.crit(errorText(res));
+            });
+          }))));
+
+      const fields = [];
       (p.fields || []).forEach(function (f) {
         const value = nestedValue(s, f.config_path);
         const ctl = pluginControl(f, value);
@@ -2514,33 +2546,66 @@ async function mountChannels(root, ctx) {
         form.track(f.key, ctl, kind);
         fieldItems.push([f, ctl]);
         const labelText = f.label + (f.required ? " *" : "");
-        if (kind === "bool") card.appendChild(checkRow(labelText, ctl, f.help || null));
-        else card.appendChild(labelled(labelText, ctl, f.help || null));
+        if (kind === "bool") { fields.push(checkRow(labelText, ctl, f.help || null)); return; }
+        const box = labelled(labelText, ctl, f.secret ? t("gui_sy_secret_short") : (f.help || null));
+        /* §5.3: a secret is a state chip beside its own label, not a second
+         * read-only row below the box saying the same thing. The page used to
+         * render both — "SMTP Password" twice, once as an empty input and
+         * once as "Not set" — which reads as two settings. */
         if (f.secret) {
           const holder = nestedValue(s, (f.config_path || []).slice(0, -1)) || {};
           const leaf = (f.config_path || [])[(f.config_path || []).length - 1];
-          card.appendChild(roList([roRow(f.label, secretState(holder, leaf), t("gui_sy_secret_short"), f.key)]));
+          const state_ = secretState(holder, leaf);
+          box.lab.appendChild(chip(String(state_), secretTone(state_)));
         }
+        fields.push(box);
       });
-      grid.appendChild(card);
+      box.appendChild(settingsSection(t("gui_sy_ch_fields"), t("gui_sy_ch_secret_fix"), fields));
+      built[name] = box;
     });
-    wrap.body.appendChild(grid);
-    // R5: gui_sy_ch_schema_src described how THIS PAGE builds its own form
-    // (input_type/value_type/config_path are the plugin schema's field
-    // names, not anything an operator acts on) — a decision about the
-    // interface, not an answer to an operator's question. Dropped rather
-    // than collapsed, same call as cache's gui_sy_cache_label_fix.
-    wrap.body.appendChild(note(t("gui_sy_ch_secret_fix")));
-    wrap.body.appendChild(note(t("gui_sy_ch_test_skipped")));
-    board.appendChild(wrap);
 
-    /* _collectAlertPluginConfig settings.js:263-292 writes each value back to
-     * its config_path and collects the enabled names into alerts.active; the
-     * POST body then merges email / smtp / alerts (settings.js:689-698).
-     * A1 fix (header point 4): a secret field is skipped entirely when left
-     * blank — an unconditional assignment here would blank a stored SMTP
-     * password or bot token on every save that touched any other plugin
-     * field, since the box always starts empty. */
+    const items = names.map(function (name) {
+      const p = plugins[name] || {};
+      const st = chanState(name);
+      return {
+        id: name,
+        name: p.display_name || name,
+        note: st.ready
+          ? (active.indexOf(name) >= 0 ? t("gui_sy_ch_live") : t("gui_sy_ch_off"))
+          : tf("gui_ov_missing_fields", { fields: st.missing.join("、") || "—" }),
+        chip: chip(st.ready ? t("gui_ov_ch_verified") : t("gui_ov_ch_not_configured"),
+          st.ready ? "ok" : "neutral"),
+      };
+    });
+
+    const layout = settingsLayout({
+      items: items,
+      onPick: function (name) {
+        clear(layout.form);
+        layout.form.appendChild(built[name]);
+      },
+    });
+    /* OV-15 lives here now. The status card it came from said the same five
+     * states one panel higher; the list IS that readout, so the anchor moves
+     * rather than being retired. */
+    layout.list.setAttribute("data-cov", "OV-15");
+    layout.el.setAttribute("data-cov", "SY-14");
+    /* Open a channel that is actually set up, not whichever plugin key sorts
+     * first — landing on an empty LINE form when Email is the live channel
+     * answers a question nobody asked. */
+    const first = names.filter(function (n) { return chanState(n).ready; })[0] || names[0];
+    if (first) {
+      layout.select(first);
+      layout.form.appendChild(built[first]);
+    }
+    board.appendChild(layout.el);
+    board.appendChild(note(t("gui_sy_ch_test_skipped")));
+
+    /* _collectAlertPluginConfig writes each value back to its config_path and
+     * collects the enabled names into alerts.active. A secret field is
+     * skipped entirely when left blank — an unconditional assignment would
+     * blank a stored SMTP password or bot token on every save that touched
+     * any other field, since the box always starts empty. */
     form.setBody(function (v) {
       const b = {};
       const parts = {};
@@ -2558,6 +2623,7 @@ async function mountChannels(root, ctx) {
       b.alerts.active = toggles.filter(function (p) { return p[1].checked; }).map(function (p) { return p[0]; });
       return b;
     });
+
     form.afterSave = function () { refreshAndRemount(R_CHANNELS, CHANNELS_SNAPS); };
 
     host.appendChild(form.dock);

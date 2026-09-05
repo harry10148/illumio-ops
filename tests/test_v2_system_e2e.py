@@ -1037,20 +1037,31 @@ def test_alert_channel_secrets_never_reach_the_dom(v2_page):
     tokens — whichever the real plugin catalogue declares). Every declared
     secret box is filled, so this covers the catalogue as it actually is
     rather than one hardcoded plugin; the count assertion keeps the test from
-    passing vacuously if the catalogue ever stops declaring any secret."""
+    passing vacuously if the catalogue ever stops declaring any secret.
+
+    The page walks the channel list rather than reading one screen: on the
+    settings layout only the OPEN channel's form is attached, which is itself
+    the stronger property — a channel you are not editing has no secret box in
+    the DOM at all — but it means the catalogue has to be visited a channel at
+    a time to be covered."""
     page, base_url = v2_page
     _goto(page, base_url, R_CHANNELS, "SY-14")
 
-    boxes = page.locator('section[data-cov="SY-14"] input[type="password"]')
-    total = boxes.count()
-    assert total >= 1, "no secret field rendered — nothing to prove"
-    for i in range(total):
-        boxes.nth(i).fill(SENTINEL)
+    rows = page.locator('[data-cov="SY-14"] .setitem')
+    assert rows.count() >= 1, "no channels listed"
 
-    # Every declared secret box really holds the sentinel, and the ledger shows
-    # that many masked changes — so the DOM assertion below is about real values.
-    for i in range(total):
-        assert boxes.nth(i).input_value() == SENTINEL
+    total = 0
+    for i in range(rows.count()):
+        rows.nth(i).click()
+        boxes = page.locator('[data-cov="SY-14"] input[type="password"]')
+        for j in range(boxes.count()):
+            boxes.nth(j).fill(SENTINEL)
+            assert boxes.nth(j).input_value() == SENTINEL
+            total += 1
+    assert total >= 1, "no secret field rendered — nothing to prove"
+
+    # The ledger shows that many masked changes, so the DOM assertion below is
+    # about real values — and it accounts for the channels now off screen.
     ledger = page.locator(".savebar").inner_text()
     assert ledger.count(MASK) >= total, ledger
     assert SENTINEL not in ledger, ledger

@@ -5134,7 +5134,7 @@
   "gui_sy_cache_siem_pending": "SIEM 待送列數",
   "gui_sy_cache_tr_poll": "流量輪詢間隔（秒）",
   "gui_sy_ch_meta": "{live} / {total} 已啟用",
-  "gui_sy_ch_secret_fix": "機密欄位一律留空；下方會改用「已設定／未設定」與長度來陳述狀態。欄位留空會保留目前的值，輸入新值則會取代它。",
+  "gui_sy_ch_secret_fix": "機密欄位永不回顯。每個欄位標籤旁的晶片會說明它是否已設定；輸入框留空即保留原值，輸入新值則會取代它。",
   "gui_sy_ch_test_skipped": "測試送出會略過啟用狀態直接投遞；未設定完整的管道會回報缺少的欄位。",
   "gui_sy_clean": "沒有未儲存的變更",
   "gui_sy_dirty": "未儲存變更",
@@ -5199,7 +5199,7 @@
   "gui_sy_secret_keep": "留空＝不變更",
   "gui_sy_secret_note": "機密欄位永遠不會顯示或預填——只會陳述「已設定／尚未設定」。欄位留空會保留目前的值，輸入新值則會取代它。",
   "gui_sy_secret_set": "已設定",
-  "gui_sy_secret_short": "由伺服器回報的「是否設定」與字元數推得，不是機密本身",
+  "gui_sy_secret_short": "永不回顯；留空即維持原值。",
   "gui_sy_secret_unset": "尚未設定",
   "gui_sy_siem_dest_meta": "{n} 個目的地",
   "gui_sy_siem_i_del": "刪除目的地「{name}」",
@@ -5418,5 +5418,8 @@
   "gui_au_ro_l_sched_id": "排程 ID",
   "gui_au_ro_l_enabled": "已啟用",
   "gui_au_ro_l_last_run": "上次執行",
-  "gui_au_ro_l_status": "上次狀態"
+  "gui_au_ro_l_status": "上次狀態",
+  "gui_sy_ch_fields": "設定",
+  "gui_sy_ch_live": "已啟用——告警會經由這個通道送出。",
+  "gui_sy_ch_off": "已設定，但沒有啟用。"
 }

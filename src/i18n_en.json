@@ -5135,7 +5135,7 @@
   "gui_sy_cache_siem_pending": "SIEM pending rows",
   "gui_sy_cache_tr_poll": "Traffic poll interval (s)",
   "gui_sy_ch_meta": "{live} of {total} enabled",
-  "gui_sy_ch_secret_fix": "Secret fields stay empty; whether a value is set, and its length, is shown below instead. Leave a field blank to keep the current value, or type a new one to replace it.",
+  "gui_sy_ch_secret_fix": "Secret fields are never shown back. The chip beside each one says whether it is set; leave the box blank to keep the stored value, or type a new one to replace it.",
   "gui_sy_ch_test_skipped": "A test send bypasses the enabled state and dispatches directly; an incompletely configured channel reports which fields are missing.",
   "gui_sy_clean": "No unsaved changes",
   "gui_sy_dirty": "Unsaved changes",
@@ -5200,7 +5200,7 @@
   "gui_sy_secret_keep": "blank = unchanged",
   "gui_sy_secret_note": "Secrets are never shown or pre-filled — only whether one is configured. Leaving a box empty keeps the stored value; typing a new one replaces it.",
   "gui_sy_secret_set": "Configured",
-  "gui_sy_secret_short": "derived from whether the server reports it as set and how many characters it has, never from the secret itself",
+  "gui_sy_secret_short": "Never shown back; leave blank to keep it.",
   "gui_sy_secret_unset": "Not set",
   "gui_sy_siem_dest_meta": "{n} destinations",
   "gui_sy_siem_i_del": "Deletes the destination \"{name}\"",
@@ -5418,5 +5418,8 @@
   "gui_au_ro_l_sched_id": "Schedule ID",
   "gui_au_ro_l_enabled": "Enabled",
   "gui_au_ro_l_last_run": "Last run",
-  "gui_au_ro_l_status": "Last status"
+  "gui_au_ro_l_status": "Last status",
+  "gui_sy_ch_fields": "Settings",
+  "gui_sy_ch_live": "Enabled — alerts go out through this channel.",
+  "gui_sy_ch_off": "Set up, but not enabled."
 }

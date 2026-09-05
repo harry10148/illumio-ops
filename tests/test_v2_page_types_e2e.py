@@ -405,3 +405,29 @@ def test_no_table_column_is_squeezed_out_of_existence(v2_page):
         ".filter(p => p[0] && p[1] < 80)"
     )
     assert narrow == [], narrow
+
+
+def test_a_settings_list_never_names_a_config_path(v2_page):
+    """§5.2 on the settings layout's left column.
+
+    The channels list says what each channel still needs. The backend returns
+    that as config PATHS — `alerts.line_channel_access_token` — and printing
+    them is the same defect the read-only rows had, in a new place: the
+    operator is told to go and set something whose name appears nowhere on the
+    form they are looking at. The plugin schema carries a human label for
+    every one of those paths.
+
+    Asserted on the rendered list rather than on the mapping function, because
+    the mapping is only half of it: a path with no matching field must still
+    degrade to a humanised leaf, not to the path.
+    """
+    page, base_url = v2_page
+    _open(page, base_url, "#/system/channels")
+    page.wait_for_selector('[data-cov="SY-14"] .setitem', timeout=30000)
+
+    notes = page.eval_on_selector_all(
+        '[data-cov="SY-14"] .setitem .c span',
+        "els => els.map(e => e.textContent.trim())")
+    assert notes, "no channel notes rendered"
+    offenders = [n for n in notes if re.search(r"\b[a-z][a-z0-9]*(?:_[a-z0-9]+)+\b", n)]
+    assert offenders == [], offenders

@@ -484,6 +484,8 @@ table.tbl tbody tr:hover td { background: var(--surface-hover); }
 .fld label { display: flex; align-items: baseline; gap: var(--space-4); margin-bottom: var(--space-2); }
 .fld label span { font-size: var(--fs-body); color: var(--text-1); }
 .fld label code { margin-left: auto; font-family: var(--font-mono); font-size: var(--fs-micro); color: var(--text-3); }
+/* a secret's state sits at the end of its own label (§5.3) */
+.fld label > .chip { margin-left: auto; }
 .fld .radios { display: flex; flex-wrap: wrap; gap: var(--space-3) var(--space-5); }
 .fld .radios label { margin: 0; gap: var(--space-3); }
 .fld .hint { display: block; margin-top: var(--space-2); font-size: var(--fs-mini); color: var(--text-3); }
@@ -964,6 +966,52 @@ details.more .body { display: grid; gap: var(--space-4); padding: var(--space-5)
    v3.1 §2: the recent alerts ARE the page; the three cards beside them are
    background. One wide column and one 320px column, folding to one at 1000px.
    ========================================================================== */
+/* ---------------------------------------------- settings page type (§5.1) ---
+   Left: what this page configures, one row each, with its state and what is
+   still missing. Right: exactly one of them, open. The pages this replaces
+   drew every item's form at once, so finding the one you came for meant
+   reading past the other four. */
+.settings { display: grid; grid-template-columns: 300px minmax(0, 1fr); gap: var(--space-6); align-items: start; }
+.setlist {
+  background: var(--surface-1); border: 1px solid var(--line);
+  border-radius: var(--radius-m); overflow: hidden;
+}
+.setitem {
+  width: 100%; display: grid; grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--space-4); align-items: center; text-align: left;
+  padding: var(--space-4) var(--space-5);
+  border: 0; border-top: 1px solid var(--line-soft);
+  background: none; color: inherit; font: inherit; cursor: pointer;
+}
+.setitem:first-child { border-top: 0; }
+.setitem:hover { background: var(--surface-hover); }
+.setitem:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.setitem[aria-current] { background: var(--surface-hover); box-shadow: inset 3px 0 0 var(--accent); }
+.setitem .c { min-width: 0; }
+.setitem .c b { display: block; font-weight: 600; font-size: var(--fs-body); color: var(--text-1); }
+.setitem .c span { display: block; font-size: var(--fs-mini); color: var(--text-3); overflow-wrap: anywhere; }
+.setform { background: var(--surface-1); border: 1px solid var(--line); border-radius: var(--radius-m); min-width: 0; }
+.setform-h {
+  display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-4);
+  padding: var(--space-5) var(--space-6); border-bottom: 1px solid var(--line);
+}
+.setform-h h3 { margin: 0; font-family: var(--font-ui); font-size: var(--fs-lead); font-weight: 700; color: var(--text-1); }
+.setform-h p { margin: var(--space-1) 0 0; font-size: var(--fs-mini); color: var(--text-2); }
+.setform-h .actions { margin-left: auto; display: flex; align-items: center; gap: var(--space-4); }
+.fsect {
+  display: grid; grid-template-columns: 200px minmax(0, 1fr); gap: var(--space-4) var(--space-6);
+  padding: var(--space-5) var(--space-6); border-top: 1px solid var(--line-soft);
+}
+.fsect:first-of-type { border-top: 0; }
+.fsect-h h4 { margin: 0; font-family: var(--font-ui); font-size: var(--fs-ui); font-weight: 700; color: var(--text-1); }
+.fsect-h small { display: block; margin-top: var(--space-2); font-size: var(--fs-mini); color: var(--text-3); }
+.fsect .fields { display: grid; gap: var(--space-5); min-width: 0; max-width: 520px; }
+
+@media (max-width: 1000px) {
+  .settings { grid-template-columns: minmax(0, 1fr); }
+  .fsect { grid-template-columns: minmax(0, 1fr); }
+}
+
 .home { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: var(--space-7); align-items: start; }
 .home-main { min-width: 0; }
 /* HM-06 — the instrument strip spans both columns and leads the page, so it

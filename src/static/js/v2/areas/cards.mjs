@@ -1255,43 +1255,6 @@ function cardReports(rl, ov) {
 // integrations.js — a channel wears the "ok" chip when it is configured,
 // "muted" otherwise; status.alert_channels already carries the authoritative
 // configured/enabled pair plus the last dispatch outcome.
-function cardChannels(st, plugins) {
-  const chans = st.alert_channels || [];
-  const live = chans.filter(function (c) { return c.enabled && c.configured; });
-  const failed = live.filter(function (c) { return c.last_status && c.last_status !== "success"; });
-
-  const p = panel("OV-15", t("gui_ov_alert_channels"));
-  withMeta(p, live.length + " / " + chans.length);
-  withGoto(p, GO_CHANNELS);
-  withTone(p, failed.length ? "crit" : (live.length ? "ok" : "neutral"));
-
-  if (!chans.length) {
-    p.body.appendChild(emptyState(t("gui_action_no_plugins"), GO_CHANNELS));
-    return p;
-  }
-  const list = el("ul", { class: "stack" });
-  chans.forEach(function (c) {
-    const ready = !!(c.enabled && c.configured);
-    const bad = ready && c.last_status && c.last_status !== "success";
-    const tn = bad ? "crit" : (ready ? "ok" : "neutral");
-    const plugin = (plugins.plugins || {})[c.name] || {};
-    const detail = ready
-      ? t("gui_ov_last_dispatch") + " " + (c.last_status || "—")
-        + (c.last_timestamp ? " · " + stamp(c.last_timestamp) : "")
-        + (c.last_target ? " · " + firstLine(c.last_target, 42) : "")
-      : tf("gui_ov_missing_fields", { fields: (c.missing_required || []).join(", ") || "—" });
-    list.appendChild(el("li", { "data-tone": tn },
-      badge(ready ? t("gui_ov_ch_verified") : t("gui_ov_ch_not_configured"), tn),
-      el("span", { class: "s", text: c.display_name || c.name }),
-      el("span", { class: "c", text: tf("gui_ov_plugin_fields", { n: (plugin.fields || []).length }) }),
-      el("span", { class: "r", title: detail, text: detail })
-    ));
-  });
-  p.body.appendChild(list);
-  return p;
-}
-
-// ── board ───────────────────────────────────────────────────────────────────
 function brow(cls, panels) {
   return el("div", { class: "brow " + cls }, panels);
 }
@@ -1535,5 +1498,5 @@ export {
   areaHead, panel, withMeta, withGoto, kv, badge, note, emptyState, brow,
   drawerSpec, cmdSpec, loadOne, postureDetail, fieldKeys,
   cardSystem, cardIntegrations, cardPipeline, cardTls, cardPosture, cardTopActions,
-  cardAudit, cardSnapshot, cardPolicyUsage, cardJobs, cardEvents, cardIntegrity, cardReports, cardChannels,
+  cardAudit, cardSnapshot, cardPolicyUsage, cardJobs, cardEvents, cardIntegrity, cardReports,
 };

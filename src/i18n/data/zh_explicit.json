@@ -1649,7 +1649,7 @@
   "gui_sy_stop_i_persistent": "以服務方式常駐時無法從這裡停止——按鈕本身不會事先警告。",
   "gui_sy_tf_presave": "這些提示只是提示：儲存前不會擋下無效的 IP 或 Port，錯誤要等儲存後才會出現。",
   "gui_sy_tls_ou_note": "ou 欄位可被接受，但這份表單沒有任何輸入框會產生它",
-  "gui_sy_secret_short": "由伺服器回報的「是否設定」與字元數推得，不是機密本身",
+  "gui_sy_secret_short": "永不回顯；留空即維持原值。",
   "gui_au_reports_intro": "報表排程不改政策，只產檔案並寄信。這裡逐一列出每一筆排程的欄位：表單管得到的可以改，其餘為自動維護並註明來歷。",
   "gui_au_dow_off_list": "不在目前支援的星期清單內",
   "gui_au_rep_type_off_list": "不在目前支援的類型清單內",
@@ -1915,5 +1915,8 @@
   "gui_au_ro_l_sched_id": "排程 ID",
   "gui_au_ro_l_enabled": "已啟用",
   "gui_au_ro_l_last_run": "上次執行",
-  "gui_au_ro_l_status": "上次狀態"
+  "gui_au_ro_l_status": "上次狀態",
+  "gui_sy_ch_fields": "設定",
+  "gui_sy_ch_live": "已啟用——告警會經由這個通道送出。",
+  "gui_sy_ch_off": "已設定，但沒有啟用。"
 }
