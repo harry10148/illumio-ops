@@ -137,7 +137,7 @@ import { setFilterBarBrowser, addPillFromBrowser } from "../components/filter-ba
 import { filterObjectQuery, OBJECT_CATS } from "../core/filter-objects.mjs";
 import { pageHead, crumbsFor, goLabel } from "../components/page.mjs";
 
-const R_INBOX = "#/investigate/inbox";
+const R_ALERTS = "#/investigate/alerts";
 const R_TRAFFIC = "#/investigate/traffic";
 const R_WORKLOADS = "#/investigate/workloads";
 const R_EVENTS = "#/investigate/events";
@@ -669,7 +669,7 @@ function actorCell(actor) {
  * workload target, plus a header checkbox that (de)selects every checkbox
  * currently on the page, exactly like #qt-chkall does over the DOM's .qt-chk
  * (quarantine.js:14-17, toggleQChecks). */
-function trafficColumns(onIsolate, sel, onExplain) {
+function trafficColumns(onIsolate, sel) {
   const pageBoxes = [];
   return [
     col("pick", "", pickCell(
@@ -712,8 +712,6 @@ function trafficColumns(onIsolate, sel, onExplain) {
     })),
     col("act", t("gui_actions"), widthCell(170, function (r) {
       const cell = el("div", { class: "actrow" });
-      // v3 hub: ask the PCE which rules cover this flow (IN-05)
-      if (onExplain) cell.appendChild(btn("btn", t("gui_hub_explain"), function () { onExplain(r); }));
       // :474-476 — a row can only be isolated when at least one end is a workload
       if (!r.srcHref && !r.dstHref) {
         cell.appendChild(el("span", { class: "mono", title: t("gui_q_workload_only"), text: "—" }));
@@ -1355,240 +1353,38 @@ function trafficPayload(state) {
 }
 
 
-// ── v3 investigate hub ───────────────────────────────────────────────────────
+// ── alert hand-off (spec §1.1) ──────────────────────────────────────────────
+// The hub itself is gone: no inbox, no stepper, no context strip, no per-row
+// rule panel. areas/alerts.mjs owns the alert list and the alert page now.
+// What survives here is the hand-off INTO this page — `?alert=<id>` and
+// `?f=<query>` still prefill and run the query.
 
-const SEVERITY_TONE = { critical: "crit", error: "crit", warning: "warn", warn: "warn" };
-function sevTone(sev) { return SEVERITY_TONE[String(sev || "").toLowerCase()] || "info"; }
-const STATUS_KEY = { new: "gui_alert_status_new", ack: "gui_alert_status_ack", done: "gui_alert_status_done" };
-const STEPS = ["gui_hub_step_inbox", "gui_hub_step_detail", "gui_hub_step_traffic", "gui_hub_step_rules", "gui_hub_step_actions"];
-
-function stepper(active) {
-  const nav = el("ol", { class: "stepper", "aria-label": t("gui_hub_steps") });
-  STEPS.forEach(function (key, i) {
-    const li = el("li", { "data-active": i === active ? "true" : "false" }, el("i", { text: String(i + 1) }), el("span", { text: t(key) }));
-    nav.appendChild(li);
-  });
-  return nav;
-}
-
-/** The context strip above an alert-scoped traffic page (IN-04). */
-function paintStrip(strip, hub, alertId, onMarkDone) {
-  clear(strip);
-  if (!alertId && !hub.query && !hub.reason) { strip.hidden = true; return; }
-  strip.hidden = false;
-  if (alertId) strip.appendChild(stepper(2));
-  const row = el("div", { class: "ctxrow" });
+/**
+ * Say in the page's own subtitle where these filters came from.
+ *
+ * 3B put this in a context strip with a five-step progress indicator above the
+ * results, which told the operator they were mid-workflow. There is no
+ * workflow: this is the traffic search with a query already in it, so the
+ * provenance is one line under the title, with a link back to the alert it
+ * came from — and nothing at all when the operator simply opened the page.
+ */
+function paintProvenance(head, hub, alertId) {
+  const text = head.querySelector(".phead-text");
+  if (!text) return;
   const a = hub.alert;
+  if (!alertId && !hub.query && !hub.reason) return;
+  const line = el("p", { class: "provenance", "data-cov": "AT-06" });
   if (a) {
-    row.appendChild(el("i", { class: "dot", "data-tone": sevTone(a.severity) }));
-    row.appendChild(el("b", { text: a.rule_name || "—" }));
-    row.appendChild(el("span", { class: "mono", text: stamp(a.fired_at || "") }));
-    if (a.criteria) row.appendChild(el("span", { class: "meta", text: a.criteria }));
-    row.appendChild(badge(t(STATUS_KEY[a.status] || "gui_alert_status_new"), a.status === "done" ? "ok" : sevTone(a.severity)));
+    line.appendChild(el("span", { text: tf("gui_al_from_alert", { rule: a.rule_name || "—", when: stamp(a.fired_at || "") }) + " " }));
+    line.appendChild(el("a", { href: R_ALERTS + "?id=" + encodeURIComponent(alertId), text: t("gui_al_back_to_alert") }));
   } else if (alertId) {
-    row.appendChild(el("b", { text: t("gui_hub_alert") + " #" + alertId }));
+    line.appendChild(el("span", { text: tf("gui_al_from_alert_id", { id: String(alertId) }) + " " }));
+    line.appendChild(el("a", { href: R_ALERTS + "?id=" + encodeURIComponent(alertId), text: t("gui_al_back_to_alert") }));
   } else {
-    row.appendChild(el("b", { text: t("gui_hub_prefilled") }));
+    line.appendChild(el("span", { text: t("gui_hub_prefilled") }));
   }
-  if (hub.reason) row.appendChild(el("span", { class: "meta", "data-tone": "warn", text: hub.reason }));
-  const back = alertId
-    ? el("a", { class: "back", href: R_INBOX + "?id=" + encodeURIComponent(alertId), text: "← " + t("gui_hub_back_to_alert") })
-    : el("a", { class: "back", href: R_TRAFFIC, text: t("gui_hub_clear") });
-  row.appendChild(back);
-  strip.appendChild(row);
-}
-
-function ruleHit(h) {
-  const box = el("div", { class: "rulehit", "data-tone": h.rule_enabled === false || h.ruleset_enabled === false ? "neutral" : "ok" });
-  box.appendChild(el("div", { class: "rulehit-h" },
-    el("b", { text: h.ruleset_name || h.ruleset_href || "—" }),
-    badge(h.ruleset_enabled === false ? t("gui_disabled") : t("gui_enabled"), h.ruleset_enabled === false ? "neutral" : "ok"),
-    h.update_type ? badge(String(h.update_type), "warn") : null));
-  box.appendChild(el("div", { class: "rulehit-b mono", text:
-    (h.consumers || []).join(", ") + "  →  " + (h.providers || []).join(", ") + "  ·  " + (h.ingress_services || []).join(", ") }));
-  if (h.description) box.appendChild(el("small", { text: h.description }));
-  return box;
-}
-
-/** IN-05 rule panel + IN-06 actions for one traffic row. */
-async function explainRow(host, r, hub, alertId, actions) {
-  clear(host);
-  const p = panel("IN-05", t("gui_hub_rules_title"));
-  withMeta(p, (r.src.name || r.src.ip || "?") + " → " + (r.dst.name || r.dst.ip || "?") + " · " + (r.svc.port || "") + "/" + (r.svc.proto || ""));
-  const body = p.body;
-  body.appendChild(el("p", { class: "note", text: t("gui_hub_asking_pce") }));
-  host.appendChild(p);
-  const basisRow = el("div", { class: "qrow" });
-  let basis = "active";
-  const res = await api.post("/api/policy/explain", {
-    src: { href: r.srcHref || null, ip: r.src.ip || null },
-    dst: { href: r.dstHref || null, ip: r.dst.ip || null },
-    port: r.svc.port, proto: r.svc.proto || "TCP", basis: basis,
-  });
-  clear(body);
-  const ok = !!(res && res.ok === true);
-  const allow = ok ? res.allow || [] : [], deny = ok ? res.deny || [] : [], od = ok ? res.override_deny || [] : [];
-  if (!ok) {
-    body.appendChild(el("div", { class: "empty", "data-tone": "crit" }, el("span", { class: "et", text: errText(res) })));
-    body.appendChild(btn("btn", t("gui_errcard_retry"), function () { explainRow(host, r, hub, alertId, actions); }));
-  }
-  if (ok) {
-    const headline = allow.length ? tf("gui_hub_allow_n", { n: num(allow.length) }) : t("gui_hub_no_allow");
-    body.appendChild(el("h4", { class: "rulehead", "data-tone": allow.length ? "ok" : "crit", text: headline }));
-    const sub = [];
-    sub.push(tf("gui_hub_basis", { basis: res.basis || basis }));
-    if (res.partial) sub.push(t("gui_hub_partial"));
-    if (res.source === "none") sub.push(t("gui_hub_unresolved"));
-    body.appendChild(el("p", { class: "note", text: sub.join(" · ") }));
-  }
-  allow.forEach(function (h) { body.appendChild(ruleHit(h)); });
-  if (deny.length || od.length) {
-    body.appendChild(el("h4", { class: "eyebrow", text: t("gui_hub_deny_title") }));
-    deny.concat(od).forEach(function (h) { body.appendChild(ruleHit(h)); });
-  }
-  const act = el("div", { class: "hubactions", "data-cov": "IN-06" });
-  act.appendChild(el("h4", { class: "eyebrow", text: t("gui_hub_step_actions") }));
-  if (r.srcHref || r.dstHref) act.appendChild(btn("btn danger", t("gui_btn_isolate"), function () { actions.isolate(); }));
-  const first = allow[0] || deny[0] || od[0];
-  if (first && first.ruleset_href) {
-    act.appendChild(btn("btn", t("gui_hub_schedule_change"), function () {
-      router.go("#/policy/rulesets", { rs: String(first.ruleset_href).split("/").pop(), rule: first.rule_href || "" });
-    }));
-  }
-  if (alertId && hub.alert && hub.alert.status !== "done") {
-    act.appendChild(btn("btn", t("gui_hub_mark_done"), function () { actions.markDone(); }));
-  }
-  body.appendChild(act);
-}
-
-// ── inbox (IN-01/02) and alert detail (IN-03) ────────────────────────────────
-
-function inboxRow(a, onStatus) {
-  const seg = el("div", { class: "hubseg" });
-  ["new", "ack", "done"].forEach(function (st) {
-    const b = el("button", { type: "button", text: t(STATUS_KEY[st]), "aria-pressed": a.status === st ? "true" : "false",
-      onClick: function (ev) { ev.stopPropagation(); onStatus(a, st); } });
-    seg.appendChild(b);
-  });
-  return {
-    id: a.id, when: stamp(a.fired_at || ""), tone: sevTone(a.severity), sev: String(a.severity || "—"), type: a.type, rule: a.rule_name || "—",
-    summary: a.summary || "", status: seg, href: R_INBOX + "?id=" + encodeURIComponent(a.id),
-  };
-}
-
-function inboxColumns() {
-  return [
-    col("when", t("gui_time"), widthCell(176, function (r) { return el("span", { class: "mono", text: r.when }); })),
-    col("sev", t("gui_hub_severity"), widthCell(120, function (r) { return badge(r.sev, r.tone); })),
-    col("type", t("gui_type"), widthCell(96, function (r) { return el("span", { class: "mono", text: r.type }); })),
-    col("rule", t("gui_hub_rule"), widthCell(200, function (r) { return el("a", { href: r.href, text: r.rule }); })),
-    col("summary", t("gui_summary"), buildCell(function (r) { return el("a", { href: r.href, text: r.summary }); })),
-    col("status", t("gui_hub_status"), widthCell(230, function (r) { return r.status; })),
-  ];
-}
-
-function dispatchList(dispatch) {
-  const ul = el("ul", { class: "stack" });
-  (dispatch || []).forEach(function (d) {
-    ul.appendChild(el("li", { class: "kv" }, el("span", { text: d.channel || "—" }), badge(d.status || "—", d.status === "success" ? "ok" : d.status === "failed" ? "crit" : "neutral")));
-  });
-  return ul;
-}
-
-function alertDetail(a, onStatus) {
-  const wrap = el("div", { class: "board" });
-  wrap.appendChild(stepper(1));
-  const p = panel("IN-03", a.rule_name || "—");
-  withMeta(p, stamp(a.fired_at || "") + " · " + (a.type || ""));
-  p.setAttribute("data-tone", sevTone(a.severity));
-  const body = p.body;
-  body.appendChild(el("p", { class: "hub-lead", text: a.summary || "" }));
-  if (a.criteria) body.appendChild(el("div", { class: "kv" }, el("span", { text: t("gui_hub_criteria") }), el("b", { class: "mono", text: a.criteria })));
-  const seg = el("div", { class: "hubseg" });
-  ["new", "ack", "done"].forEach(function (st) {
-    seg.appendChild(el("button", { type: "button", text: t(STATUS_KEY[st]), "aria-pressed": a.status === st ? "true" : "false", onClick: function () { onStatus(a, st); } }));
-  });
-  body.appendChild(el("div", { class: "fld", "data-cov": "IN-02" }, el("label", null, el("span", { text: t("gui_hub_status") })), seg));
-  const payload = a.payload || {};
-  const raw = payload.raw_data || [];
-  if (raw.length) {
-    const shown = raw.slice(0, 5);
-    body.appendChild(el("h4", { class: "eyebrow", text: tf("gui_hub_matches", { shown: num(shown.length), n: num(raw.length) }) }));
-    const pre = el("pre", { class: "codepane", text: JSON.stringify(shown, null, 1) });
-    body.appendChild(pre);
-  }
-  body.appendChild(el("h4", { class: "eyebrow", text: t("gui_hub_dispatch") }));
-  body.appendChild(dispatchList(a.dispatch));
-  const act = el("div", { class: "hubactions" });
-  if (a.type === "traffic" || a.type === "bandwidth") {
-    act.appendChild(btn("btn primary", t("gui_hub_see_traffic"), function () { router.go(R_TRAFFIC, { alert: a.id }); }));
-  }
-  act.appendChild(el("a", { class: "btn", href: R_INBOX, text: "← " + t("gui_hub_back_to_inbox") }));
-  body.appendChild(act);
-  wrap.appendChild(p);
-  return wrap;
-}
-
-async function mountInbox(root, ctx) {
-  const state = { torn: false, tables: [], status: ctx.query.get("status") || "", type: ctx.query.get("type") || "", page: 0 };
-  installTeardown(state);
-  // v3.1 Task 1 registered #/investigate/alerts as an alias of this mount
-  // until Task 3 gives the alert list its own module. The head names the route
-  // the operator actually asked for, not the alias's target — a page whose
-  // breadcrumb and data-route disagree with the address bar is a page no test
-  // (and no reader) can pin down.
-  root.appendChild(areaTop(String(ctx.route || R_INBOX).split("?")[0]));
-  const board = el("div", { class: "board" });
-  root.appendChild(board);
-  const id = ctx.query.get("id");
-  function listParams() { return { status: state.status, type: state.type, page: state.page + 1, page_size: 25 }; }
-
-  async function setStatus(a, st) {
-    const res = await api.patch("/api/alerts/" + encodeURIComponent(a.id), { status: st });
-    if (state.torn) return;
-    if (!res || res.ok !== true) { toast.crit(errText(res)); return; }
-    // api.load caches per (id, params): drop exactly the entries this page reads
-    api.invalidate("alerts", listParams());
-    if (id) api.invalidate("alert_detail", { id: id });
-    toast.ok(t("gui_hub_status_saved"));
-    paint();
-  }
-
-  async function paint() {
-    if (state.torn) return;
-    clear(board);
-    if (id) {
-      await withErrorCard(board, "alert " + id, function () { return api.load("alert_detail", { id: id }); }, function (d) {
-        if (state.torn || ctx.stale()) return;
-        board.appendChild(alertDetail(d.alert || {}, setStatus));
-      });
-      return;
-    }
-    board.appendChild(stepper(0));
-    await withErrorCard(board, "alerts", function () { return api.load("alerts", listParams()); }, function (d) {
-      if (state.torn || ctx.stale()) return;
-      const p = panel("IN-01", t("gui_inbox"));
-      const counts = d.counts || {};
-      withMeta(p, tf("gui_hub_inbox_meta", { open: num(counts.new || 0), ack: num(counts.ack || 0), done: num(counts.done || 0) }));
-      const filters = el("div", { class: "qrow" });
-      filters.appendChild(selectField(t("gui_hub_status"), [["", "gui_pd_all"], ["new", "gui_alert_status_new"], ["ack", "gui_alert_status_ack"], ["done", "gui_alert_status_done"]], state.status, function (v) { state.status = v; state.page = 0; paint(); }));
-      filters.appendChild(selectField(t("gui_type"), [["", "gui_pd_all"], ["event", "gui_hub_type_event"], ["traffic", "gui_hub_type_traffic"], ["bandwidth", "gui_hub_type_bandwidth"], ["system", "gui_hub_type_system"]], state.type, function (v) { state.type = v; state.page = 0; paint(); }));
-      p.body.appendChild(filters);
-      const rows = (d.items || []).map(function (a) { return inboxRow(a, setStatus); });
-      if (!rows.length) {
-        p.body.appendChild(el("div", { class: "empty" }, el("span", { class: "et", text: t("gui_hub_inbox_empty") })));
-      } else {
-        const host = el("div", { class: "tbl-host" });
-        p.body.appendChild(host);
-        state.tables.forEach(function (h) { h.destroy(); });
-        state.tables = [table.render(host, pagedTable(inboxColumns(), rows,
-          pageSpec((d.page || 1) - 1, d.page_size || 25, d.total || rows.length),
-          function (n) { state.page = n; paint(); }))];
-      }
-      board.appendChild(p);
-    });
-  }
-  await paint();
+  if (hub.reason) line.appendChild(el("span", { class: "warnnote", "data-tone": "warn", text: " " + hub.reason }));
+  text.appendChild(line);
 }
 
 async function mountTraffic(root, ctx) {
@@ -1598,11 +1394,6 @@ async function mountTraffic(root, ctx) {
   state.tables = [];
   installTeardown(state);
   audit.register("iv-traffic-empty", function () { if (handles.probeEmpty) handles.probeEmpty(); });
-  // coverage gate: IN-05/06 live inside the rule panel, which only opens from a
-  // row; the audit opener explains a synthetic flow so the anchors render
-  audit.register("iv-hub-explain", function () {
-    if (handles.explain) handles.explain({ src: { ip: "10.0.0.1" }, dst: { ip: "10.0.0.2" }, svc: { port: 22, proto: "TCP" }, srcHref: null, dstHref: null });
-  });
   drawer.registerAudit("iv-traffic-filters", function () { return handles.openFilters ? handles.openFilters() : null; });
   drawer.registerAudit("iv-traffic-browser", function () { return handles.openBrowser ? handles.openBrowser() : null; });
   drawer.registerAudit("iv-traffic-backfill", function () { return handles.openBackfill ? handles.openBackfill() : null; });
@@ -1614,21 +1405,19 @@ async function mountTraffic(root, ctx) {
     if (handles.openBackfill) handles.openBackfill();
   }));
 
-  root.appendChild(areaTop(R_TRAFFIC));
-  // v3 hub context (spec §3): ?alert=<id> scopes this page to one alert —
-  // the strip above the results shows which, and the query is prefilled
-  // from the alert's rule (3A GET /api/alerts/<id>/traffic_query).
+  const head = areaTop(R_TRAFFIC);
+  root.appendChild(head);
+  // spec §1.1: ?alert=<id> is "open this query in traffic search" — the
+  // filters are prefilled from the alert's rule (3A GET
+  // /api/alerts/<id>/traffic_query) and the head says so in one line, with a
+  // link back to the alert. The strip, the stepper and the investigation flow
+  // they belonged to are gone.
   const alertId = ctx.query.get("alert");
   const inlineF = ctx.query.get("f");
-  const strip = el("div", { class: "ctxstrip", "data-cov": "IN-04", hidden: true });
-  root.appendChild(strip);
   const wrap = el("div", { class: "wb" });
   const main = el("div", { class: "wb-main" });
   wrap.appendChild(main);
-  const aside = guideRail();
-  const ruleHost = el("div", { class: "rulepanel-host" });
-  aside.insertBefore(ruleHost, aside.firstChild);
-  wrap.appendChild(aside);
+  wrap.appendChild(guideRail());
   root.appendChild(wrap);
   const hub = { alert: null, query: null, reason: null };
   if (alertId) {
@@ -1657,7 +1446,7 @@ async function mountTraffic(root, ctx) {
       hub.reason = t("gui_hub_bad_query");
     }
   }
-  paintStrip(strip, hub, alertId, function () { return handles.markDone ? handles.markDone() : null; });
+  paintProvenance(head, hub, alertId);
 
   await withErrorCard(main, "traffic (" + TRAFFIC_SNAPS.length + ")",
     function () { return loadAll(TRAFFIC_SNAPS); },
@@ -1995,7 +1784,7 @@ async function mountTraffic(root, ctx) {
         const shown = model.slice(state.page * state.size, (state.page + 1) * state.size);
         const sel = { isChecked: isTrafficSelected, toggle: toggleTrafficSel };
         state.tables.push(table.render(tblHost, pagedTable(
-          trafficColumns(function (r) { handles.openIsolate(r); }, sel, function (r) { handles.explain(r); }),
+          trafficColumns(function (r) { handles.openIsolate(r); }, sel),
           shown, pageSpec(state.page, state.size, model.length), function (next) {
             state.page = Math.max(0, next);
             repaint();
@@ -2075,25 +1864,6 @@ async function mountTraffic(root, ctx) {
       repaint();
       // v3: mount the rankings row once the first paint has attached rankHost
       mountRankingsAndQueries(rankHost, d, state.rankState);
-      // v3 hub: explain a row's covering rules into the side panel (IN-05/06)
-      handles.explain = function (r) {
-        return explainRow(ruleHost, r, hub, alertId, {
-          isolate: function () { return handles.openIsolate ? handles.openIsolate(r) : null; },
-          markDone: function () { return handles.markDone ? handles.markDone() : null; },
-        });
-      };
-      handles.markDone = async function () {
-        if (!alertId) return null;
-        const res = await api.patch("/api/alerts/" + encodeURIComponent(alertId), { status: "done" });
-        if (res && res.ok) {
-          hub.alert = Object.assign({}, hub.alert || {}, { status: "done" });
-          api.invalidate("alert_detail", { id: alertId });
-          paintStrip(strip, hub, alertId, handles.markDone);
-          toast.ok(t("gui_hub_marked_done"));
-        }
-        else toast.crit(errText(res));
-        return res;
-      };
       if (hub.query && !hub.reason) runQuery();
     });
 }
@@ -3292,4 +3062,4 @@ function installTeardown(state) {
 // archive_query.py's UNSUPPORTED_ARCHIVE_FILTER_KEYS the same way
 // test_archive_query.py's own drift test ties that constant to the
 // analyzer's — nothing else in this module imports it.
-export { mountInbox, mountTraffic, mountWorkloads, mountEvents, unsupportedLabel };
+export { mountTraffic, mountWorkloads, mountEvents, unsupportedLabel };

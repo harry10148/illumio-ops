@@ -49,7 +49,10 @@ body {
 /* v3.1 §1: one 224px column that owns the brand, the five areas, the current
    area's sub-items, the command-palette entry and the user popover. The top
    bar it replaces (.chrome/.topbar/.areanav/.kbd-btn/.rail-host) is gone. */
-.frame { display: grid; grid-template-columns: 224px minmax(0, 1fr); min-height: 100vh; }
+/* grid-template-rows matters at <=1000px, where this becomes a single column:
+   with two auto rows and min-height:100vh the leftover height is shared
+   between them, which floated the folded nav down the middle of the screen. */
+.frame { display: grid; grid-template-columns: 224px minmax(0, 1fr); grid-template-rows: 1fr; min-height: 100vh; }
 #shell { display: flex; }
 
 .sidenav {
@@ -177,7 +180,7 @@ body {
    that cannot survive the fold (sub-items, the spacer, the user row). Nothing
    may be clipped mid-word at any width — 3B Task 7's lesson. */
 @media (max-width: 1000px) {
-  .frame { grid-template-columns: minmax(0, 1fr); }
+  .frame { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto 1fr; }
   .sidenav {
     flex-direction: row; align-items: center; gap: var(--space-3);
     padding: var(--space-4) var(--space-5);

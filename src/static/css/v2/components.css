@@ -747,36 +747,140 @@ a.kv:hover { background: var(--surface-hover); }
 .legend > span { display: inline-flex; align-items: center; gap: var(--space-3); }
 .rankings { margin-top: var(--space-6); }
 
-/* ── v3 investigate hub (spec §3): stepper, context strip, rule panel ──────── */
-.stepper { display: flex; gap: var(--space-6); list-style: none; margin: 0; padding: 0; font-size: var(--fs-mini); color: var(--text-3); }
-.stepper li { display: flex; align-items: center; gap: var(--space-3); }
-.stepper li i { width: 18px; height: 18px; border-radius: 50%; border: 1px solid var(--line); font-style: normal; font-family: var(--font-num); font-size: var(--fs-micro); display: inline-flex; align-items: center; justify-content: center; }
-.stepper li[data-active="true"] { color: var(--text-1); font-weight: 600; }
-.stepper li[data-active="true"] i { background: var(--accent-fg); border-color: var(--accent-fg); color: var(--accent-on); }
-.ctxstrip { display: flex; flex-direction: column; gap: var(--space-4); padding: var(--space-5) var(--space-6); margin-bottom: var(--space-5); border: 1px solid var(--line); border-left: 3px solid var(--accent); border-radius: var(--radius-m); background: var(--surface-1); }
-.ctxrow { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-5); font-size: var(--fs-body); color: var(--text-2); min-width: 0; }
-.ctxrow b { color: var(--text-1); }
-.ctxrow .meta { color: var(--text-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 48ch; }
-.ctxrow .meta[data-tone] { color: var(--ink); white-space: normal; max-width: none; flex-basis: 100%; }
-.ctxrow .back { margin-left: auto; color: var(--accent-fg); text-decoration: none; }
-.ctxrow .back:hover, .ctxrow .back:focus-visible { text-decoration: underline; }
-.hub-lead { margin: 0 0 var(--space-5); font-size: var(--fs-ui); color: var(--text-1); line-height: var(--lead); }
-.actrow { display: flex; gap: var(--space-3); flex-wrap: wrap; }
-.hubseg { display: inline-flex; border: 1px solid var(--line); border-radius: var(--radius-s); overflow: hidden; }
-.hubseg button { font: inherit; font-size: var(--fs-mini); background: var(--surface-1); color: var(--text-2); border: 0; border-left: 1px solid var(--line); padding: 0 var(--space-4); height: 28px; cursor: pointer; transition: background .15s ease, color .15s ease; }
-.hubseg button:first-child { border-left: 0; }
-.hubseg button:hover { background: var(--surface-hover); }
-.hubseg button:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
-.hubseg button[aria-pressed="true"] { background: var(--tone-info-bg); color: var(--tone-info-fg); box-shadow: inset 0 -2px 0 var(--tone-info-border); font-weight: 600; }
-.rulepanel-host:empty { display: none; }
-.rulehead { margin: 0 0 var(--space-3); font-size: var(--fs-ui); font-weight: 600; color: var(--ink); }
-.rulehit { border: 1px solid var(--line); border-left: 3px solid var(--mark); border-radius: var(--radius-s); padding: var(--space-4) var(--space-5); margin-top: var(--space-4); background: var(--surface-1); }
-.rulehit-h { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); font-size: var(--fs-body); }
-.rulehit-b { margin-top: var(--space-3); font-size: var(--fs-mini); color: var(--text-2); word-break: break-word; }
-.rulehit small { display: block; margin-top: var(--space-2); font-size: var(--fs-mini); color: var(--text-3); }
-.hubactions { display: flex; flex-wrap: wrap; gap: var(--space-3); margin-top: var(--space-6); padding-top: var(--space-5); border-top: 1px solid var(--line-soft); }
-.hubactions .eyebrow { flex-basis: 100%; margin: 0; }
-@media (prefers-reduced-motion: reduce) { .hubseg button { transition: none; } }
+/* ═══════════════════════════════════════════════ list and detail pages ═════
+   v3.1 §5.1. Replaces the investigate hub's stepper, context strip, rule
+   panel and action row, which went with the workflow they belonged to.
+   ========================================================================== */
+
+/* the row list: a row is the link, not a table cell with a link in it */
+.list { background: var(--surface-1); border: 1px solid var(--line); border-radius: var(--radius-l); overflow: hidden; }
+.lrow {
+  display: grid; grid-template-columns: 4px 128px minmax(0, 1fr) 150px auto;
+  align-items: center; gap: 0 var(--space-6);
+  padding: 0 var(--space-6) 0 0; min-height: 64px;
+  border-top: 1px solid var(--line-soft);
+  text-decoration: none; color: inherit;
+}
+.lrow:first-child { border-top: 0; }
+.lrow:hover { background: var(--surface-hover); }
+.lrow:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.lrow .stripe { align-self: stretch; background: var(--mark); }
+.lrow .when { padding-left: var(--space-6); min-width: 0; }
+.lrow .when b { display: block; font-family: var(--font-num); font-variant-numeric: tabular-nums; font-size: var(--fs-ui); font-weight: 600; }
+.lrow .when span { font-size: var(--fs-mini); color: var(--text-3); }
+.lrow .what { min-width: 0; padding: var(--space-5) 0; }
+.lrow .what b { display: block; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lrow .what span { display: block; font-size: var(--fs-body); color: var(--text-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lrow .who { font-size: var(--fs-body); color: var(--text-2); min-width: 0; }
+.lrow .who i { font-style: normal; color: var(--text-3); margin-right: var(--space-3); }
+.lrow .st { justify-self: end; }
+.lfoot { display: flex; justify-content: space-between; gap: var(--space-5); padding: var(--space-5) var(--space-6); font-size: var(--fs-mini); color: var(--text-3); border-top: 1px solid var(--line-soft); }
+.lfoot a { color: var(--accent-fg); }
+
+/* status chip: colour AND word, never colour alone (§5.2) */
+.chip {
+  display: inline-flex; align-items: center; gap: var(--space-3);
+  padding: var(--space-1) var(--space-4); border-radius: 999px;
+  font-size: var(--fs-mini); font-weight: 600; white-space: nowrap;
+  color: var(--ink); background: var(--fill);
+}
+.chip i { width: 7px; height: 7px; border-radius: 50%; background: currentColor; flex: none; font-style: normal; }
+
+/* the detail page: a narrative down the middle, helpers on the right */
+.detail { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: var(--space-7); align-items: start; }
+.story { display: flex; flex-direction: column; gap: var(--space-8); min-width: 0; }
+.side { display: flex; flex-direction: column; gap: var(--space-6); position: sticky; top: var(--space-6); }
+
+/* Wrap rather than squeeze: on a 660px content column a fixed two-track grid
+   left the paragraph five words wide. The figures drop below it instead. */
+.lede {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
+  gap: var(--space-6) var(--space-7);
+  background: var(--surface-1); border: 1px solid var(--line); border-radius: var(--radius-l);
+  padding: var(--space-6) var(--space-7);
+}
+.lede p { flex: 1 1 34ch; margin: 0; max-width: 62ch; font-size: var(--fs-ui); line-height: 1.6; }
+.figs { flex: 0 0 auto; display: flex; gap: var(--space-7); }
+.figs div { text-align: right; }
+.figs b { display: block; font-family: var(--font-num); font-variant-numeric: tabular-nums; font-size: var(--fs-display); font-weight: 600; letter-spacing: -.02em; }
+.figs b.hot { color: var(--accent-fg); }
+.figs span { font-size: var(--fs-mini); color: var(--text-3); }
+
+.flows { background: var(--surface-1); border: 1px solid var(--line); border-radius: var(--radius-l); overflow: hidden; }
+/* table-layout: fixed, with a share for every column.
+   Auto layout gave the two endpoint columns everything they asked for —
+   `productcatalogservice` is 21 characters — and left the verdict column,
+   which is what an operator opens this page to read, cut off mid-word inside
+   a 660px content column. Fixed shares mean long names wrap and the verdict
+   always has its quarter. */
+.flows table { width: 100%; table-layout: fixed; border-collapse: collapse; font-size: var(--fs-body); }
+.flows th:nth-child(1), .flows td:nth-child(1) { width: 23%; }
+.flows th:nth-child(2), .flows td:nth-child(2) { width: 20px; }
+.flows th:nth-child(3), .flows td:nth-child(3) { width: 23%; }
+.flows th:nth-child(4), .flows td:nth-child(4) { width: 12%; }
+.flows th:nth-child(5), .flows td:nth-child(5) { width: 16%; }
+.flows th:nth-child(6), .flows td:nth-child(6) { width: 26%; }
+.flows th { text-align: left; font-weight: 600; font-size: var(--fs-mini); color: var(--text-3); padding: var(--space-4) var(--space-5); border-bottom: 1px solid var(--line); background: var(--surface-2); }
+.flows td { padding: var(--space-4) var(--space-5); border-top: 1px solid var(--line-soft); vertical-align: middle; }
+.flows tbody tr:first-child td { border-top: 0; }
+.flows tbody tr:hover td { background: var(--surface-hover); }
+.flows .ep b { display: block; font-weight: 600; overflow-wrap: anywhere; }
+.flows .ep span { display: block; font-size: var(--fs-mini); color: var(--text-3); overflow-wrap: anywhere; }
+/* port/proto is one identifier — it wraps as a unit or not at all */
+.flows .svc { white-space: nowrap; }
+.flows .n, .flows th.n { text-align: right; font-family: var(--font-num); font-variant-numeric: tabular-nums; font-weight: 500; }
+.flows .arrow { width: 24px; text-align: center; color: var(--text-3); }
+.flows .verdict .chip { white-space: normal; }
+.flows .verdict small { display: block; margin-top: var(--space-1); font-size: var(--fs-micro); color: var(--text-3); word-break: break-word; }
+.flows-foot { display: flex; justify-content: space-between; gap: var(--space-5); padding: var(--space-4) var(--space-5); border-top: 1px solid var(--line); font-size: var(--fs-mini); color: var(--text-3); }
+.flows-foot a { color: var(--accent-fg); }
+
+/* the action row: the first one is the recommendation and wears the mark */
+.todo { display: flex; flex-direction: column; gap: var(--space-4); }
+.todo .act {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: var(--space-6);
+  background: var(--surface-1); border: 1px solid var(--line); border-radius: var(--radius-l);
+  padding: var(--space-5) var(--space-6);
+}
+.todo .act.lead { border-left: 3px solid var(--accent); }
+.todo .act b { display: block; font-weight: 700; }
+.todo .act span { font-size: var(--fs-body); color: var(--text-2); }
+
+details.more { border-top: 1px solid var(--line); padding-top: var(--space-5); }
+details.more > summary { cursor: pointer; list-style: none; display: flex; align-items: center; gap: var(--space-4); font-weight: 600; color: var(--text-2); }
+details.more > summary::-webkit-details-marker { display: none; }
+details.more > summary::before { content: "\25B8"; color: var(--text-3); }
+details.more[open] > summary::before { content: "\25BE"; }
+details.more > summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+details.more .body { display: grid; gap: var(--space-4); padding: var(--space-5) 0 var(--space-2); font-size: var(--fs-body); color: var(--text-2); }
+
+.kv-list { display: grid; gap: var(--space-3); font-size: var(--fs-body); }
+.kv-list .kv { display: flex; justify-content: space-between; gap: var(--space-5); }
+.kv-list .kv > span { color: var(--text-3); }
+
+.timeline { display: flex; flex-direction: column; margin: 0; padding: 0; font-size: var(--fs-body); }
+.timeline li { list-style: none; display: grid; grid-template-columns: 14px minmax(0, 1fr); gap: var(--space-4); padding: var(--space-3) 0; }
+.timeline i { width: 8px; height: 8px; border-radius: 50%; background: var(--line); margin-top: var(--space-3); font-style: normal; }
+.timeline li.on i { background: var(--accent); }
+.timeline b { display: block; font-weight: 600; }
+.timeline small { color: var(--text-3); }
+
+/* the traffic page's provenance line: where these filters came from */
+.provenance a { color: var(--accent-fg); }
+.provenance .warnnote { color: var(--ink); }
+
+@media (max-width: 1000px) {
+  .detail { grid-template-columns: minmax(0, 1fr); }
+  .side { position: static; }
+  .lrow { grid-template-columns: 4px minmax(0, 1fr); gap: var(--space-3) var(--space-5); padding: var(--space-5) var(--space-6) var(--space-5) 0; }
+  /* Every part after the stripe belongs in the SECOND column. Without this the
+     five children flow round the two-column grid and land alternately in the
+     4px stripe column, which squashes the row's one sentence to nothing. */
+  .lrow > *:not(.stripe) { grid-column: 2; }
+  .lrow .stripe { grid-row: 1 / -1; }
+  .lrow .who, .lrow .st { justify-self: start; }
+  .lede { grid-template-columns: minmax(0, 1fr); }
+}
 
 /* ============================================================= page head ===
    v3.1 §5.1: one head per page — a breadcrumb trail, a SENTENCE title, one
@@ -811,7 +915,26 @@ a.kv:hover { background: var(--surface-hover); }
 .side-card { background: var(--surface-1); border: 1px solid var(--line); border-radius: var(--radius-l); padding: var(--space-5) var(--space-6); }
 .side-card h4 { margin: 0 0 var(--space-4); }
 
+/* The filter row above a list page (§5.1: segmented buttons and a count, not
+   a form). `.seg` is shared with the alert page's status control, which is the
+   same control doing the same job on one record instead of the whole list. */
+.toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-5); margin-bottom: var(--space-5); }
+.toolbar .count { font-size: var(--fs-mini); color: var(--text-3); }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: var(--radius-m); overflow: hidden; background: var(--surface-1); }
+.seg button {
+  font: inherit; font-size: var(--fs-body);
+  min-height: var(--ctl-h); padding: 0 var(--space-5);
+  border: 0; border-left: 1px solid var(--line);
+  background: transparent; color: var(--text-2); cursor: pointer;
+  transition: background-color .15s ease, color .15s ease;
+}
+.seg button:first-child { border-left: 0; }
+.seg button:hover { background: var(--surface-hover); color: var(--text-1); }
+.seg button:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.seg button[aria-pressed="true"] { background: var(--tone-info-bg); color: var(--tone-info-fg); font-weight: 600; }
+
 @media (max-width: 900px) {
   .phead-main { flex-direction: column; }
   .phead .actions { width: 100%; }
 }
+@media (prefers-reduced-motion: reduce) { .seg button { transition: none; } }

@@ -137,3 +137,56 @@ export function labelForRoute(route) {
 export function goLabel(route) {
   return tf("gui_health_goto_named", { name: labelForRoute(route) });
 }
+
+/**
+ * chip(text, tone) -> <span class="chip {tone}">
+ *
+ * §5.2: a status is a chip AND its word, never a colour alone. `tone` is one
+ * of the tone families tokens.css declares (ok / warn / crit / info /
+ * neutral); the dot inherits the chip's own text colour, so a chip stays
+ * readable for a reader who cannot separate the hues.
+ */
+export function chip(text, tone) {
+  return el("span", { class: "chip", "data-tone": tone || "neutral" },
+    el("i", { "aria-hidden": "true" }),
+    el("span", { text: text }));
+}
+
+/**
+ * listRow({href, tone, when, title, sub, who, status}) -> <a class="lrow">
+ *
+ * §5.1: a list page is rows, not a column wall. One row carries a severity
+ * stripe, when it happened, one sentence about what happened, who it was
+ * about, and a status chip — and the whole row is the link into the detail
+ * page, so there is no "open" affordance to hunt for.
+ *
+ *   when    {main, sub} — the clock time, and the day or age under it
+ *   who     [[label, valueNode], ...] — rendered only at full width (§5.4
+ *           folds the row to two lines and drops this column)
+ */
+export function listRow(opts) {
+  const o = opts || {};
+  const when = o.when || {};
+  const row = el("a", { class: "lrow", href: o.href || null, "data-tone": o.tone || "neutral" });
+  row.appendChild(el("span", { class: "stripe", "aria-hidden": "true" }));
+  row.appendChild(el("span", { class: "when" },
+    el("b", { text: when.main || "" }),
+    when.sub ? el("span", { text: when.sub }) : null));
+  const what = el("span", { class: "what" }, el("b", { text: o.title || "" }));
+  if (o.sub) what.appendChild(el("span", { text: o.sub }));
+  row.appendChild(what);
+  const who = el("span", { class: "who" });
+  (o.who || []).forEach(function (pair) {
+    who.appendChild(el("span", null, el("i", { text: pair[0] }), pair[1]));
+  });
+  row.appendChild(who);
+  row.appendChild(el("span", { class: "st" }, o.status || null));
+  return row;
+}
+
+/** listFoot(leftText, rightNode) -> the count-and-a-link line under a list. */
+export function listFoot(leftText, rightNode) {
+  return el("div", { class: "lfoot" },
+    el("span", { text: leftText }),
+    rightNode || null);
+}

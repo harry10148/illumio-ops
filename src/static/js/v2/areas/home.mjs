@@ -25,7 +25,7 @@ import {
 } from "./cards.mjs";
 
 const ROUTE = "#/home";
-const GO_INBOX = "#/investigate/inbox";
+const GO_INBOX = "#/investigate/alerts";
 const GO_TRAFFIC = "#/investigate/traffic";
 const GO_SCHEDULES = "#/policy/schedules";
 const GO_REPORT_SCHEDULES = "#/reports/schedules";

@@ -165,3 +165,42 @@ def test_no_visible_text_is_a_route(v2_page):
         "these routes print a hash route at the operator (spec §5.2):\n  "
         + "\n  ".join("%s: %s" % pair for pair in offenders[:20])
     )
+
+
+def test_the_page_head_is_actually_styled(v2_page):
+    """The head must be STYLED, not merely present.
+
+    This is here because of a real regression: a Task 3 edit truncated
+    components.css from a marker to end-of-file and took the whole page-head
+    block with it. Every gate stayed green — the colour and spacing lints
+    count tokens rather than rules, and the structural checks above only ask
+    whether `.phead h2` exists. The page shipped with an unstyled head and
+    breadcrumbs run together as "Home/Investigate/Alerts", and only a
+    screenshot caught it.
+
+    What it asserts is deliberately NOT "the title is big and bold": an
+    unstyled `<h2>` is big and bold by browser default, so that assertion
+    passes with the stylesheet gone — measured, not assumed. It asserts the
+    layout properties that ONLY this stylesheet supplies: the head is a
+    column, its title row is a spaced-out flex row, and the breadcrumb trail
+    lays its parts out with a real gap. Each of those is `block` / `0px`
+    without the rules.
+    """
+    page, base_url = v2_page
+    _open(page, base_url, "#/investigate/alerts")
+
+    def styles(selector):
+        return page.evaluate(
+            "sel => { const n = document.querySelector(sel); if (!n) return null;"
+            " const s = getComputedStyle(n);"
+            " return {display: s.display, direction: s.flexDirection,"
+            "         justify: s.justifyContent, gap: parseFloat(s.columnGap) || 0}; }",
+            selector,
+        )
+
+    head = styles(".workarea .phead")
+    assert head and head["display"] == "flex" and head["direction"] == "column", head
+    row = styles(".workarea .phead .phead-main")
+    assert row and row["display"] == "flex" and row["justify"] == "space-between", row
+    crumbs = styles(".workarea .phead .crumbs")
+    assert crumbs and crumbs["display"] == "flex" and crumbs["gap"] > 0, crumbs

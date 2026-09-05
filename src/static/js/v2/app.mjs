@@ -87,6 +87,9 @@ const AREA_ROUTES = [
 // router.replace so Back does not bounce through the old hash.
 const LEGACY_ROUTES = {
   "#/overview": "#/home",
+  // v3.1 §1.1: the inbox is gone; its bookmarks and its ?id= deep links land
+  // on the alert list and the alert page respectively.
+  "#/investigate/inbox": "#/investigate/alerts",
   "#/alerting/rules": "#/policy/alert-rules",
   "#/alerting/ops": "#/policy/ops",
   "#/alerting": "#/policy/alert-rules",
@@ -118,16 +121,10 @@ async function boot() {
     const { mountHome } = await import("./areas/home.mjs");
     return mountHome(el2, ctx);
   });
-  // v3.1 §1.1: the alert list lives at #/investigate/alerts. Task 3 gives it
-  // its own module; until then both hashes mount 3B's inbox, so the nav item
-  // Task 1 adds is not a link to a "page not found".
+  // v3.1 §1.1: the alert list and one alert's page, both on this route.
   router.register("#/investigate/alerts", async function (el2, ctx) {
-    const { mountInbox } = await import("./areas/investigate.mjs");
-    return mountInbox(el2, ctx);
-  });
-  router.register("#/investigate/inbox", async function (el2, ctx) {
-    const { mountInbox } = await import("./areas/investigate.mjs");
-    return mountInbox(el2, ctx);
+    const { mountAlerts } = await import("./areas/alerts.mjs");
+    return mountAlerts(el2, ctx);
   });
   Object.keys(LEGACY_ROUTES).forEach(function (oldRoute) {
     router.register(oldRoute, async function (el2, ctx) {

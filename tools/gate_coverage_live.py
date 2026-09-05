@@ -264,9 +264,13 @@ def temp_app_server():
         }
         cm.save()
 
-        # IN-02..06 route to ?id=1 / ?alert=1: seed one traffic alert into a
-        # throwaway store (never the product logs/alerts.sqlite) with a rule
-        # the traffic_query endpoint can rebuild a query from.
+        # AT-02..05 route to ?id=1, and #/investigate/traffic?alert=1 needs the
+        # same record: seed one traffic alert into a throwaway store (never the
+        # product logs/alerts.sqlite) with a rule the traffic_query endpoint can
+        # rebuild a query from. The payload carries one flow because the alert
+        # page's rule column (AT-04) only exists when there are flows to ask
+        # the PCE about — an empty payload would leave that anchor unreachable
+        # and the gate red for the wrong reason.
         import src.alerts.store as _store
         cm.config["rules"] = [{"id": "t1", "name": "gate ssh", "type": "traffic", "enabled": True,
                                "pd": "1", "threshold_window": "60", "filters": {"port": "22"}}]
@@ -277,7 +281,14 @@ def temp_app_server():
         stack.callback(setattr, _store, "default_alerts_db_path", real_path_fn)
         seed = _store.AlertStore(alerts_path)
         seed.insert(fired_at="2026-09-04T01:00:00Z", type="traffic", rule_id="t1", rule_name="gate ssh",
-                    severity="warning", summary="gate ssh · 1", criteria="port 22", payload={}, dispatch=[])
+                    severity="warning", summary="gate ssh · 1", criteria="port 22",
+                    payload={"raw_data": [{
+                        "source": {"href": "/orgs/1/workloads/gate-src", "ip": "10.0.0.1", "name": "gate-src"},
+                        "destination": {"href": "/orgs/1/workloads/gate-dst", "ip": "10.0.0.2", "name": "gate-dst"},
+                        "service": {"port": 22, "proto": "TCP"},
+                        "num_connections": 1, "policy_decision": "potentially_blocked",
+                    }]},
+                    dispatch=[{"channel": "mail", "status": "success"}])
         seed.close()
 
         app = build_app(cm, persistent_mode=True, use_https=False)

@@ -530,13 +530,13 @@ def test_posture_drawer_opens_and_closes(v2_page):
 
 
 def test_goto_link_navigates_to_another_area(v2_page):
-    """HM-01's go-to link leaves the home page for the inbox (v3)."""
+    """HM-01's go-to link leaves the home page for the alert list (v3.1)."""
     page, base_url = v2_page
     _goto(page, base_url, HOME)
     assert page.locator('section[data-cov="HM-01"]').count() == 1, "card must render"
     page.locator('section[data-cov="HM-01"] .hact button.goto').click()
-    page.wait_for_selector('[data-route="#/investigate/inbox"]')
-    assert page.evaluate("location.hash") == "#/investigate/inbox"
+    page.wait_for_selector('[data-route="#/investigate/alerts"]')
+    assert page.evaluate("location.hash") == "#/investigate/alerts"
 
 
 def test_teardown_closes_drawer_on_navigate_away(v2_page):
@@ -584,7 +584,7 @@ def test_home_palette_commands_drop_on_navigate_away(v2_page):
 
 def test_home_headline_counts_open_alerts_and_alert_rows_deep_link(v2_page, _isolate_alert_store):
     """HM-00/HM-01: the headline number is /api/alerts counts.new and each row
-    links to the inbox record (spec §2)."""
+    links to that alert's page (spec §2; v3.1 replaced the inbox route)."""
     from src.alerts.store import AlertStore
     st = AlertStore(_isolate_alert_store)
     a = st.insert(fired_at="2026-09-04T01:00:00Z", type="traffic", rule_id="t1", rule_name="SSH in",
@@ -601,7 +601,7 @@ def test_home_headline_counts_open_alerts_and_alert_rows_deep_link(v2_page, _iso
     assert rows.count() == 2
     # critical sorts first
     assert "Login failed" in rows.nth(0).text_content()
-    assert rows.nth(1).get_attribute("href") == "#/investigate/inbox?id=%d" % a
+    assert rows.nth(1).get_attribute("href") == "#/investigate/alerts?id=%d" % a
 
 
 def test_home_survives_alerts_api_failure(v2_page):

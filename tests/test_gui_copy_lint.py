@@ -141,18 +141,18 @@ def test_no_config_keys_are_printed_on_screen():
     )
 
 
-# Measured 2026-09-05: 12 `.codepane` panes. Four are what §5.2 still allows —
-# a log viewer or a debug console, where the raw line IS the content:
+# Measured 2026-09-05, after Task 3 deleted the alert-detail JSON dump with the
+# hub: 11 `.codepane` panes. Four are what §5.2 still allows — a log viewer or a
+# debug console, where the raw line IS the content:
 #
 #   areas/system.mjs           2  the module-log drawer's message and raw line
 #   areas/policy_scheduler.mjs 1  the schedule check's own log output
 #   areas/policy_rules.mjs     1  the alert-ops output console (AL-13)
 #
-# The other eight are raw JSON or PEM dumped at an operator, and each has an
+# The other seven are raw JSON or PEM dumped at an operator, and each has an
 # owning task: system.mjs's DLQ error/payload and CSR output (Task 5),
-# investigate.mjs's three event/flow JSON blocks (Tasks 3 and 6),
-# policy_rules.mjs's rule-highlight JSON and policy_scheduler.mjs's PCE note
-# preview (Task 6).
+# investigate.mjs's two event JSON blocks, policy_rules.mjs's rule-highlight
+# JSON and policy_scheduler.mjs's PCE note preview (Task 6).
 _CODEPANE_ALLOWED = {
     "areas/system.mjs": 2,
     "areas/policy_scheduler.mjs": 1,
