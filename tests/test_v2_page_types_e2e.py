@@ -375,3 +375,33 @@ def test_the_code_face_is_only_used_for_identifiers(v2_page):
             if not any(shape.search(text) for shape in _ID_SHAPES):
                 offenders.append((route, text))
     assert offenders == [], offenders
+
+
+def test_no_table_column_is_squeezed_out_of_existence(v2_page):
+    """A fixed-layout table whose fixed columns eat the whole width.
+
+    #/reports' output table is `table-layout: fixed` with five fixed columns
+    (34 + 170 + 150 + 90 + 190 = 634) inside a 654px main column, which left
+    the ONE flexible column — the filename, the thing the row is about —
+    twenty pixels. Every name rendered as two characters and an ellipsis.
+
+    §5.1 would replace a wall of columns like this with rows, and that is the
+    right answer for a list the operator only reads. It is not the answer
+    here: these rows carry a selection box and three per-row actions, and
+    `listRow` is a single <a> with no room for either — converting would cost
+    function to buy layout. So the column budget is fixed instead, and pinned:
+    no header cell narrower than 80px at 1280, which is below any deliberate
+    column and far above a collapse.
+    """
+    page, base_url = v2_page
+    page.set_viewport_size({"width": 1280, "height": 900})
+    _open(page, base_url, "#/reports")
+    page.wait_for_selector(".workarea table.tbl thead th", timeout=30000)
+
+    narrow = page.evaluate(
+        "Array.from(document.querySelectorAll('.workarea table.tbl'))"
+        ".flatMap(t => Array.from(t.querySelectorAll('thead th'))"
+        "  .map(e => [e.textContent.trim(), Math.round(e.getBoundingClientRect().width)]))"
+        ".filter(p => p[0] && p[1] < 80)"
+    )
+    assert narrow == [], narrow

@@ -869,10 +869,15 @@ function archiveStrip(d) {
   return strip;
 }
 
-/* IV-04 + XC-11 — the guide rail. Content is transcribed from the two shipping
- * help surfaces: index.html:2908-2942 (modal-qt-guide) and :2871-2905 (m-help).
- * Both are modals in the product; here they are a rail, because a syntax
- * reference you have to dismiss before typing is a reference you read once. */
+/* IV-04 + XC-11 — the filter-syntax and quarantine help.
+ *
+ * v3.1 §5.2 ("說明文出產品"): this was a permanent right-hand rail, on the
+ * reasoning that a syntax reference you must dismiss before typing is one you
+ * read once. That trade was wrong in one direction: the rail cost a third of
+ * the page's width on EVERY visit to pay for something read on the first few.
+ * It is now behind a "?" in the head — one click, and the search results get
+ * the width back. The anchors ride with the content, and the drawer registers
+ * an audit opener so the coverage gate can still reach them. */
 function guideSection(cov, titleKey, descKey, groups) {
   const p = panel(cov, t(titleKey));
   p.body.appendChild(note(t(descKey)));
@@ -889,8 +894,8 @@ function guideSection(cov, titleKey, descKey, groups) {
   return p;
 }
 
-function guideRail() {
-  const aside = el("aside", { class: "wb-aside", "data-cov": "XC-11" });
+function guideBody() {
+  const box = el("div", { "data-cov": "XC-11" });
 
   const traffic = guideSection("IV-04", "gui_ta_guide_title", "gui_ta_guide_desc", [
     ["gui_ta_guide_sec_search", ["gui_ta_guide_search_desc", "gui_ta_guide_li_proc", "gui_ta_guide_li_user",
@@ -899,19 +904,37 @@ function guideRail() {
     ["gui_help_filters", ["gui_help_lf", "gui_help_ipf", "gui_help_pf"]],
     ["gui_help_pd", ["gui_help_pd_blk", "gui_help_pd_pot", "gui_help_pd_all"]],
   ]);
-  aside.appendChild(traffic);
+  box.appendChild(traffic);
 
-  // The quarantine half of the rail (coverage calls XC-11 the filter-syntax /
-  // quarantine guide): index.html:2480 (gui_q_desc_line2) and :2493
-  // (gui_q_direction_hint) are the product's own two sentences about what
-  // quarantine can and cannot touch.
+  // The quarantine half (coverage calls XC-11 the filter-syntax / quarantine
+  // guide): gui_q_desc_line2 and gui_q_direction_hint are the product's own
+  // two sentences about what quarantine can and cannot touch.
   const q = panel(null, t("gui_q_title"));
   q.body.appendChild(note(t("gui_q_desc_line2")));
   q.body.appendChild(note(t("gui_q_direction_hint")));
   q.body.appendChild(el("button", { class: "btn ghost", type: "button",
     text: goLabel(R_WORKLOADS), onClick: function () { router.go(R_WORKLOADS); } }));
-  aside.appendChild(q);
-  return aside;
+  box.appendChild(q);
+  return box;
+}
+
+/** The "?" in the page head, and the audit opener that keeps IV-04 / XC-11
+ *  reachable now that they are one click away instead of always on screen. */
+function installGuide(head, state) {
+  let open = false;
+  function show() {
+    if (open) return;
+    open = true;
+    const handle = drawer.open(drawerSpec(t("gui_ta_guide_title"), guideBody()));
+    if (handle && handle.onClose) handle.onClose(function () { open = false; });
+    state.guide = handle;
+  }
+  audit.register("iv-traffic-guide", show);
+  const actions = head.querySelector(".actions") || head.querySelector(".phead-main");
+  const btn = el("button", { class: "btn", type: "button", "aria-label": t("gui_ta_guide_title"),
+    title: t("gui_ta_guide_title"), text: "?", onClick: show });
+  if (actions) actions.appendChild(btn);
+  return btn;
 }
 
 /* IV-03 + XC-03 + XC-04 — the advanced filter drawer: the ported FilterBar plus
@@ -1415,10 +1438,10 @@ async function mountTraffic(root, ctx) {
   // they belonged to are gone.
   const alertId = ctx.query.get("alert");
   const inlineF = ctx.query.get("f");
-  const wrap = el("div", { class: "wb" });
+  installGuide(head, state);
+  const wrap = el("div", { class: "wb solo" });
   const main = el("div", { class: "wb-main" });
   wrap.appendChild(main);
-  wrap.appendChild(guideRail());
   root.appendChild(wrap);
   const hub = { alert: null, query: null, reason: null };
   if (alertId) {

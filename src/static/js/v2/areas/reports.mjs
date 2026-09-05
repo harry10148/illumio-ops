@@ -1239,12 +1239,18 @@ async function mountReports(root, ctx) {
               el("b", { text: r.filename }),
               el("small", { text: r.summary || t("gui_rp_no_summary") }));
           })),
-          col("type", t("gui_col_type"), widthCell(170, typeCell)),
-          col("mtime", t("gui_col_date_created"), widthCell(150, function (r) {
+          /* The column budget. This table is `table-layout: fixed` and lives in
+           * a ~654px main column; these four used to ask for 170/150/90/190,
+           * which with the 34px checkbox left the filename — the thing every
+           * row is ABOUT — twenty pixels. Trimmed to what each actually needs:
+           * a type chip, a "YYYY-MM-DD HH:MM" stamp, "68.6 KB", and three
+           * short buttons. */
+          col("type", t("gui_col_type"), widthCell(132, typeCell)),
+          col("mtime", t("gui_col_date_created"), widthCell(124, function (r) {
             return el("code", { class: "mono", text: lastStamp(r.mtime) });
           })),
-          col("size", t("gui_col_size"), widthCell(90, function (r) { return sizeText(r.size); })),
-          col("act", t("gui_actions"), widthCell(190, function (r) {
+          col("size", t("gui_col_size"), widthCell(84, function (r) { return sizeText(r.size); })),
+          col("act", t("gui_actions"), widthCell(146, function (r) {
             const box = el("div", { class: "rowacts" });
             const isHtml = /\.html?$/i.test(String(r.filename));
             // reports.py:286-298 — GET /reports/<filename>, ?download=1 forces
