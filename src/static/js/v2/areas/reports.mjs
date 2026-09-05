@@ -135,7 +135,7 @@ import { palette } from "../components/palette.mjs";
 import { progress } from "../components/progress.mjs";
 import { createFilterBar, setFilterBarText, setFilterBarQuery } from "../components/filter-bar.mjs";
 import { filterObjectQuery } from "../core/filter-objects.mjs";
-import { pageHead, crumbsFor } from "../components/page.mjs";
+import { pageHead, crumbsFor, labelForRoute } from "../components/page.mjs";
 
 const ROUTE = "#/reports";
 
@@ -956,7 +956,7 @@ async function mountReports(root, ctx) {
   // v3.1: the reports area has two pages (generation here, schedules under
   // #/reports/schedules, which policy_scheduler.mjs still renders). Both are
   // listed by the left-hand nav; this page draws only its own head.
-  root.appendChild(areaHead(t("gui_nav_reports"), ROUTE));
+  root.appendChild(areaHead(labelForRoute(ROUTE), ROUTE));
   const wrap = el("div", { class: "wb" });
   const main = el("div", { class: "wb-main" });
   const aside = el("aside", { class: "wb-aside" });

@@ -122,6 +122,37 @@ JSON_LITERAL = re.compile(r'\{\s*"')
 #     write lock a handler takes, ANSI stripping, and function-call syntax.
 INTERNALS = re.compile(r"狀態檔|寫入鎖|ANSI|\b[a-z_]+\.[a-z_]+\(|\brun_debug_mode\b|\?[a-z]+=")
 
+# 12. This app's own UI wiring, narrated at the operator: which of its fields
+#     has a form control, how a save merges, which catalogue key a label came
+#     from, what a previous redesign lost. The operator asked for the list of
+#     these to be removed, and the reason it is a lint and not just a deletion
+#     is that every one of them was written in good faith — the panel that
+#     prompted this was titled "Stored, with no control in this form" and
+#     existed to prove that five settings were not being dropped. Proving that
+#     is the save path's job; saying it on screen only tells the operator about
+#     our wiring. `.kv`-style storage vocabulary ("this key", "the settings
+#     object") is the tell, not the intent.
+UI_WIRING = re.compile(
+    r"表單控制項|設定物件|覆蓋既有|沒有對應的[^，。]*控制項|唯一的控制項"
+    r"|這個鍵|這些鍵|鍵名|i18n_key"
+    r"|\bform control\b|\bsettings object\b|\bmerges over\b|\bthis key\b|\bthese keys\b",
+    re.IGNORECASE,
+)
+
+# 13. Our own release history. "This changed in the last redesign" dates the
+#     copy the moment it ships and means nothing to someone who never saw the
+#     old screen.
+OUR_HISTORY = re.compile(r"上一次改版|改版|\bprevious redesign\b|\bused to (?:be|show|live)\b", re.IGNORECASE)
+
+# 14. A catalogue VALUE that is a bare storage identifier. Not prose about the
+#     wiring — the wiring itself, shipped as a label: gui_siem_dispatch_tick's
+#     en value was the literal string "dispatch_tick_seconds", so the English
+#     GUI captioned a form field with its config key while the zh_TW side had
+#     a real label all along. The roField lint in tests/test_gui_copy_lint.py
+#     bans the read-only idiom that produces this; nothing looked at the
+#     catalogue itself, where an EDITABLE field's label also comes from.
+BARE_IDENTIFIER = re.compile(r"^[a-z][a-z0-9]*(?:[_.][a-z0-9]+)+$")
+
 # Known-legitimate substrings that would otherwise false-positive; stripped
 # before pattern matching (not string-replaced in the actual copy).
 ALLOWLIST = {
@@ -157,6 +188,12 @@ def _violations(key: str, value: str) -> list[str]:
         hits.append("internal-path:report_schedules")
     if DEV_RETROSPECTIVE.search(text):
         hits.append("dev-retrospective")
+    if BARE_IDENTIFIER.fullmatch(text.strip()):
+        hits.append("value-is-a-config-key")
+    if UI_WIRING.search(text):
+        hits.append("ui-wiring")
+    if OUR_HISTORY.search(text):
+        hits.append("our-history")
     if HTTP_PLUMBING.search(text):
         hits.append("http-plumbing")
     if ENDPOINT_WORD.search(text):

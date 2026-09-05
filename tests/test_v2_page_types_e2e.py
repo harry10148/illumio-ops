@@ -258,3 +258,39 @@ def test_no_settings_page_labels_a_field_with_its_config_key(v2_page):
             if re.fullmatch(r"[a-z][a-z0-9]*(_[a-z0-9]+)+", text or ""):
                 offenders.append((route, text))
     assert offenders == [], offenders
+
+
+# ── §5.1 · a page's title names the PAGE ────────────────────────────────────
+
+def test_every_page_titles_itself_and_not_the_area_it_sits_in(v2_page):
+    """The h2 is the page's own name, matching where the breadcrumb ends.
+
+    Every area helper used to pass its own `gui_nav_<area>` key as the title,
+    so all four Investigate pages were headed "Investigate" and all ten System
+    pages "System" — directly under a breadcrumb that already ended on the
+    real page name, which is how an operator on Event Viewer reads a page
+    titled "Investigate" and asks what happened to it.
+
+    The invariant is the agreement, not a table of expected strings: the h2
+    must equal the LAST breadcrumb entry. Both are derived from shell.mjs's
+    NAV, so nav, trail and title cannot drift apart, and a route added to NAV
+    is covered the day it appears without editing this test.
+
+    Home has no trail of its own and is exempt: its h2 is a sentence about the
+    day's alerts, which is the point of that page type.
+    """
+    page, base_url = v2_page
+    offenders = []
+    for route in ROUTES + SETTINGS:
+        if route == "#/home":
+            continue
+        _open(page, base_url, route)
+        head = '.workarea .phead[data-route="%s"]' % route
+        title = page.locator(head + " h2").inner_text().strip()
+        crumbs = page.eval_on_selector_all(
+            head + " .crumbs > *:not(i)", "els => els.map(e => e.textContent.trim())"
+        )
+        assert crumbs, route
+        if title != crumbs[-1]:
+            offenders.append((route, title, crumbs))
+    assert offenders == [], offenders

@@ -1,36 +1,101 @@
 {
   "_doc": "Glossary preserve-list. Terms here MUST remain English in zh_TW translations. forbidden_zh_substitutes lists Chinese strings that, if present, indicate a glossary violation. Note: the verb 'Manage' (used in CTAs like 'Manage PCE Cache') is intentionally NOT listed — it naturally renders as 管理 in Traditional Chinese menus/buttons. The product nouns 'Managed' and 'Unmanaged' (e.g. 'Managed Workload') remain whitelisted because they are Illumio product states.",
   "preserve_in_zh_tw": [
-    "Block", "Blocked", "Blocking", "Allow", "Allowed", "Allowing",
+    "Block",
+    "Blocked",
+    "Blocking",
+    "Allow",
+    "Allowed",
+    "Allowing",
     "Potentially Blocked",
-    "Managed", "Managing", "Unmanage", "Unmanaged",
-    "PCE", "VEN", "Workload", "Workloads",
-    "Service", "Services",
-    "Port", "Ports",
-    "Policy", "Policies",
+    "Managed",
+    "Managing",
+    "Unmanage",
+    "Unmanaged",
+    "PCE",
+    "VEN",
+    "Workload",
+    "Workloads",
+    "Service",
+    "Services",
+    "Port",
+    "Ports",
+    "Policy",
+    "Policies",
     "Ringfence",
-    "App", "Apps",
-    "Label", "Labels",
+    "App",
+    "Apps",
+    "Label",
+    "Labels",
     "SMTP",
-    "Online", "Offline",
+    "Online",
+    "Offline",
     "Enforcement",
-    "Ruleset", "Rulesets"
+    "Ruleset",
+    "Rulesets"
   ],
   "forbidden_zh_substitutes": {
-    "Block": ["封鎖", "阻擋"],
-    "Blocked": ["已封鎖", "已阻擋"],
-    "Allow": ["允許"],
-    "Allowed": ["已允許"],
-    "Enforcement": ["執行模式"],
-    "Label": ["標籤"],
-    "Labels": ["標籤"],
-    "Managed": ["已管理", "受管"],
-    "Offline": ["離線"],
-    "Online": ["線上", "在線"],
-    "Unmanaged": ["未管理"],
-    "Service": ["服務"],
-    "Workload": ["工作負載"],
-    "Port": ["連接埠", "埠口"],
-    "Policy": ["政策", "策略"]
+    "Block": [
+      "封鎖",
+      "阻擋"
+    ],
+    "Blocked": [
+      "已封鎖",
+      "已阻擋"
+    ],
+    "Allow": [
+      "允許"
+    ],
+    "Allowed": [
+      "已允許"
+    ],
+    "Enforcement": [
+      "執行模式"
+    ],
+    "Label": [
+      "標籤"
+    ],
+    "Labels": [
+      "標籤"
+    ],
+    "Managed": [
+      "已管理",
+      "受管"
+    ],
+    "Offline": [
+      "離線"
+    ],
+    "Online": [
+      "線上",
+      "在線"
+    ],
+    "Unmanaged": [
+      "未管理"
+    ],
+    "Service": [
+      "服務"
+    ],
+    "Workload": [
+      "工作負載"
+    ],
+    "Port": [
+      "連接埠",
+      "埠口"
+    ],
+    "Policy": [
+      "政策",
+      "策略"
+    ]
+  },
+  "_doc_exempt_keys": "Keys whose zh_TW value is allowed to drop a preserved term, listed with the term(s) they may drop. The left-hand navigation is the operator's map of the product and was asked for in Traditional Chinese; the terms themselves stay English everywhere else (reports, CLI, page bodies), which is why this is a per-key exemption and not a removal from preserve_in_zh_tw.",
+  "exempt_keys": {
+    "gui_nav_policy": [
+      "Policy",
+      "Policies"
+    ],
+    "gui_policy_tab_rulesets": [
+      "Ruleset",
+      "Rulesets"
+    ]
   }
 }

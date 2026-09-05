@@ -135,7 +135,7 @@ import { palette } from "../components/palette.mjs";
 import { createFilterBar, setFilterBarText, setFilterBarQuery } from "../components/filter-bar.mjs";
 import { setFilterBarBrowser, addPillFromBrowser } from "../components/filter-bar.mjs";
 import { filterObjectQuery, OBJECT_CATS } from "../core/filter-objects.mjs";
-import { pageHead, crumbsFor, goLabel } from "../components/page.mjs";
+import { pageHead, crumbsFor, goLabel, labelForRoute } from "../components/page.mjs";
 
 const R_ALERTS = "#/investigate/alerts";
 const R_TRAFFIC = "#/investigate/traffic";
@@ -351,8 +351,14 @@ function badge(text, tn) {
   return el("span", { class: "badge", "data-tone": tn }, el("i", { class: "dot" }), el("span", { text: text }));
 }
 
+/* v3.1 §5.1: the h2 names THIS page, not the area it sits in. Every area
+ * helper used to pass its own `gui_nav_<area>` key, so all four Investigate
+ * pages were titled "Investigate" and all ten System pages "System" while the
+ * breadcrumb right above them already ended on the real page name. The name
+ * comes from the same NAV table the nav and the crumbs read, so the three can
+ * never disagree. */
 function areaTop(active) {
-  return areaHead(t("gui_nav_investigate"), active);
+  return areaHead(labelForRoute(active), active);
 }
 
 function field(labelText, control) {

@@ -32,13 +32,20 @@ def test_zh_tw_values_preserve_glossary_terms() -> None:
     glossary = json.loads(GLOSSARY_PATH.read_text(encoding="utf-8"))
     preserve = glossary["preserve_in_zh_tw"]
     forbidden_translations = glossary["forbidden_zh_substitutes"]  # e.g., {"Service": ["服務"]}
+    # Per-key exemptions (glossary.json's _doc_exempt_keys says why each one is
+    # there). Scoped to the key AND to the named terms, so an exempt key still
+    # has to preserve every OTHER glossary term in its value.
+    exempt = glossary.get("exempt_keys", {})
 
     violations: list[tuple[str, str, str]] = []
     for key, en_val in en.items():
         zh_val = zh.get(key, "")
         if not isinstance(en_val, str) or not isinstance(zh_val, str):
             continue
+        exempt_terms = exempt.get(key, [])
         for term in preserve:
+            if term in exempt_terms:
+                continue
             if re.search(rf"\b{re.escape(term)}\b", en_val):
                 # Must appear in zh too, AND the forbidden Chinese substitute must NOT.
                 if term not in zh_val:

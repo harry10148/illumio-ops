@@ -201,6 +201,21 @@ GLOSSARY: list[tuple[str, re.Pattern]] = [
     for term in GLOSSARY_ZH_LOCALIZATIONS
 ]
 
+
+def _load_glossary_exemptions() -> dict[str, list[str]]:
+    """Per-key exemptions from glossary.json (see its _doc_exempt_keys).
+
+    Scoped to a key AND to the terms named for it, so an exempt key still has
+    to preserve every other glossary term. tests/test_i18n_glossary.py reads
+    the same field; two checkers over one list is the point.
+    """
+    glossary_path = SRC / "i18n" / "data" / "glossary.json"
+    data = _json.loads(glossary_path.read_text(encoding="utf-8"))
+    return data.get("exempt_keys", {})
+
+
+GLOSSARY_EXEMPT_KEYS: dict[str, list[str]] = _load_glossary_exemptions()
+
 CJK_RE = re.compile(r"[\u4e00-\u9fff]")
 
 GUI_KEY_PATTERNS = [
@@ -585,7 +600,10 @@ def audit_glossary_violations() -> list[Finding]:
     def check(key: str, en_val: str, zh_val: str, source: str) -> None:
         if not isinstance(en_val, str) or not isinstance(zh_val, str):
             return
+        exempt_terms = GLOSSARY_EXEMPT_KEYS.get(key, [])
         for term, term_re in GLOSSARY:
+            if term in exempt_terms:
+                continue
             if not term_re.search(en_val):
                 continue
             # Violation if zh_TW does NOT contain the English term verbatim …

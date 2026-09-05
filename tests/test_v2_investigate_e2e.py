@@ -1259,3 +1259,62 @@ def test_archive_rows_render_real_values_not_blank_cells(v2_page):
     assert "8080" in table_text
     assert "17.19" in table_text
     assert "2026-08-01 10:00:00" in table_text
+
+
+def test_the_event_detail_pane_never_widens_the_page(v2_page, v2_app, monkeypatch):
+    """IV-14: a long field value stays inside the aside instead of scrolling
+    the whole page sideways.
+
+    The defect this pins: `.kv-list` was a bare `display: grid`, so its single
+    implicit track was `auto`, whose minimum is the widest row's MIN-content —
+    and a `.kv b` is `white-space: nowrap`, so one event href (a 36-char UUID
+    on an /orgs/1/events/ path, which has no break opportunity a browser will
+    take) sized that track to 399px inside a 340px aside and pushed the
+    document to 1320px at a 1280px viewport. `min-width: 0` on the value was
+    already there and does not help: it lets a flex item SHRINK, it does not
+    lower the row's min-content contribution, so the clamp has to be on the
+    track itself.
+
+    Asserted on the DOCUMENT rather than on the pane, because that is the
+    symptom an operator has — a horizontal scrollbar under every page — and it
+    stays true however the aside is laid out later. The row is also checked
+    against its own container so a future page-level `overflow-x: hidden`
+    cannot make this pass by hiding the overflow instead of preventing it.
+    """
+    page, base_url = v2_page
+
+    def fake_fetch_events_strict(self, start_time_str, end_time_str=None, max_results=5000, event_type=None):
+        return [{
+            "href": "/orgs/1/events/4dc173cf-79d3-466d-9a8a-5f3e26e988d1",
+            "timestamp": "2026-08-14T10:00:00Z",
+            "event_type": "user.pce_session_terminated",
+            "status": "success",
+            "severity": "info",
+            "created_by": {"user": {"username": "admin@lab.local"}},
+            "action": {"api_method": "POST", "api_endpoint": "/api/v2/users/create_session"},
+        }]
+
+    monkeypatch.setattr("src.api_client.ApiClient.fetch_events_strict", fake_fetch_events_strict)
+    page.set_viewport_size({"width": 1280, "height": 900})
+    _goto(page, base_url, R_EVENTS)
+    labels = _labels(page)
+    page.locator('section[data-cov="IV-13"]').get_by_role(
+        "button", name=labels["gui_refresh"], exact=True
+    ).click()
+    page.wait_for_function("() => document.querySelectorAll('.evl tbody tr').length === 1")
+    page.wait_for_selector(".wb-aside .kv-list .kv", timeout=SLOW)
+
+    measured = page.evaluate("""() => {
+      const doc = document.documentElement;
+      const list = document.querySelector('.wb-aside .kv-list');
+      const rows = [...document.querySelectorAll('.wb-aside .kv-list .kv')];
+      return {
+        pageWidth: doc.scrollWidth,
+        viewport: doc.clientWidth,
+        widest: Math.max(...rows.map(r => Math.round(r.getBoundingClientRect().width))),
+        listWidth: Math.round(list.getBoundingClientRect().width),
+      };
+    }""")
+
+    assert measured["pageWidth"] <= measured["viewport"], measured
+    assert measured["widest"] <= measured["listWidth"], measured

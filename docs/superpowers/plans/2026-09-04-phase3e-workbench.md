@@ -5,7 +5,7 @@
 > 那一半（5b 設定頁左清單＋右表單、6b 政策／報表／流量搜尋的清單→詳情頁型）
 > 未做。逐任務的交付、驗證輸出、與計畫的偏離、以及剩餘缺陷清單見
 > `tmp/phase3e-verification/report.md`。合入 main 的 commit：
-> `19e5c00d`、`e964fe50`、`1a4c3af0`、`617256fc`、`f0974389`、`374f6b9a`、`0f66deb4`。
+> `19e5c00d`、`e964fe50`、`1a4c3af0`、`617256fc`、`f0974389`、`374f6b9a`、`0f66deb4`、`320e8766`。
 >
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 

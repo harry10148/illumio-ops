@@ -170,7 +170,7 @@ import { drawer } from "../components/drawer.mjs";
 import { modal } from "../components/modal.mjs";
 import { table, col } from "../components/table.mjs";
 import { palette } from "../components/palette.mjs";
-import { pageHead, crumbsFor, chip } from "../components/page.mjs";
+import { pageHead, crumbsFor, chip, labelForRoute } from "../components/page.mjs";
 
 const R_PCE = "#/system/pce";
 const R_CACHE = "#/system/cache";
@@ -215,8 +215,14 @@ function btn(cls, text, onClick) { return el("button", { class: cls, type: "butt
 function badge(text, tn) { return el("span", { class: "badge", "data-tone": tn }, el("i", { class: "dot" }), el("span", { text: text })); }
 function sectionHead(text) { return el("h4", { class: "eyebrow", text: text }); }
 
+/* v3.1 §5.1: the h2 names THIS page, not the area it sits in. Every area
+ * helper used to pass its own `gui_nav_<area>` key, so all four Investigate
+ * pages were titled "Investigate" and all ten System pages "System" while the
+ * breadcrumb right above them already ended on the real page name. The name
+ * comes from the same NAV table the nav and the crumbs read, so the three can
+ * never disagree. */
 function sysTop(active) {
-  return areaHead(t("gui_nav_system"), active);
+  return areaHead(labelForRoute(active), active);
 }
 
 function labelled(labelText, control, hint) {
@@ -1267,21 +1273,14 @@ async function mountCache(root, ctx) {
 
       board.appendChild(el("div", { class: "brow c2 top" }, cfgPanel, el("div", { class: "board" }, tfPanel, tsPanel)));
 
-      /* Five keys of PceCacheSettings have no control anywhere in buildCacheForm
-       * (integrations.js:182-262). They survive only because cacheSave merges
-       * over the cached settings object (:269). Dropping a backend field on the
-       * floor is exactly how the previous redesign lost data, so they are listed
-       * here with their values and the reason they are read-only. */
-      const gapPanel = panel(null, t("gui_sy_cache_nogui"));
-      gapPanel.body.appendChild(roList([
-        roField("gui_sy_ro_cache_read_max_rows", s.cache_read_max_rows, t("gui_sy_cache_nogui_note"), "cache_read_max_rows"),
-        roField("gui_sy_ro_disk_free_warn_gb", s.disk_free_warn_gb, t("gui_sy_cache_nogui_note"), "disk_free_warn_gb"),
-        roField("gui_sy_ro_flow_delta_enabled", s.flow_delta_enabled, t("gui_sy_cache_nogui_note"), "flow_delta_enabled"),
-        roField("gui_sy_ro_flow_obs_retention_hours", s.flow_obs_retention_hours, t("gui_sy_cache_nogui_note"), "flow_obs_retention_hours"),
-        roField("gui_sy_ro_siem_pending_warn_rows", s.siem_pending_warn_rows, t("gui_sy_cache_nogui_note"), "siem_pending_warn_rows"),
-      ]));
-      gapPanel.body.appendChild(note(t("gui_sy_cache_nogui_body")));
-      board.appendChild(gapPanel);
+      /* Five keys of PceCacheSettings have no control in this form. They used
+       * to be listed here, each row captioned with the reason it had none —
+       * an explanation of this app's own form wiring, which is not something
+       * an operator has any use for. The reason they were listed at all was
+       * the fear of dropping a backend field, and setBody below is what
+       * actually prevents that: it starts from the whole cached settings
+       * object and overwrites only the controlled keys, so the five travel
+       * unchanged whether or not anything renders them. */
 
       /* cacheSave (integrations.js:264-297) starts from the cached settings
        * object and overwrites the controlled keys, so the body always carries
@@ -1474,7 +1473,6 @@ function destDrawer(dest, isEdit) {
     return b;
   });
 
-  body.appendChild(note(t("gui_sy_siem_dest_src")));
   body.appendChild(sectionHead(t("gui_siem_sec_basic")));
   body.appendChild(labelled(t("gui_siem_name"), form.track("name", name), isEdit ? t("gui_sy_siem_name_ro") : t("gui_sy_siem_name_new")));
   body.appendChild(checkRow(t("gui_siem_enabled"), form.track("enabled", enabled, "bool")));
@@ -1551,17 +1549,6 @@ function dlqDrawer(entry) {
     body.appendChild(el("div", { class: "empty" },
       el("span", { class: "et", text: t("gui_it_dlq_empty_title") }),
       el("p", { text: t("gui_it_dlq_empty_body") })));
-    body.appendChild(sectionHead(t("gui_sy_dlq_fields")));
-    body.appendChild(roList([
-      roField("gui_sy_ro_dlq_destination", null, t("gui_sy_dlq_f_dest")),
-      roField("gui_sy_ro_dlq_source_id", null, t("gui_sy_dlq_f_id")),
-      roField("gui_sy_ro_dlq_quarantined_at", null, t("gui_sy_dlq_f_at")),
-      roField("gui_sy_ro_dlq_retries", null, t("gui_sy_dlq_f_retries")),
-      roField("gui_sy_ro_dlq_last_error", null, t("gui_sy_dlq_f_err")),
-      roField("gui_sy_ro_dlq_payload", null, t("gui_sy_dlq_f_payload")),
-      roField("gui_sy_ro_dlq_payload_source", null, t("gui_sy_dlq_f_src")),
-    ]));
-    body.appendChild(note(t("gui_sy_dlq_src_dropped")));
     return drawerSpec(t("gui_dlq_modal_title"), body);
   }
   body.appendChild(el("p", { class: "note", text: t("gui_app_loading") }));
@@ -2375,7 +2362,7 @@ async function mountDisplay(root, ctx) {
     dispPanel.body.appendChild(sectionHead(t("gui_sy_disp_other")));
     // enable_health_check lives in settings.settings but has no control in
     // _renderDisplaySection; it is editable here rather than dropped.
-    dispPanel.body.appendChild(checkRow(t("gui_sy_disp_health"), form.track("settings.enable_health_check", health, "bool"), t("gui_sy_disp_health_new")));
+    dispPanel.body.appendChild(checkRow(t("gui_sy_disp_health"), form.track("settings.enable_health_check", health, "bool")));
     dispPanel.body.appendChild(note(t("gui_sy_disp_dashq")));
     board.appendChild(dispPanel);
 
@@ -2725,8 +2712,7 @@ async function mountLogs(root, ctx) {
      * standing under the raw console, R4's own remedy for the "?n=" and
      * "logs_index" implementation detail gui_sy_log_cap still names. */
     p.body.appendChild(disclosure(t("gui_gen_explain"),
-      note(t("gui_sy_log_cap")),
-      note(t("gui_sy_log_i18n_gap"))));
+      note(t("gui_sy_log_cap"))));
     board.appendChild(p);
     paint();
   });

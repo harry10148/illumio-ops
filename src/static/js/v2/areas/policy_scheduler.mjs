@@ -96,7 +96,7 @@ import { modal } from "../components/modal.mjs";
 import { table, col } from "../components/table.mjs";
 import { palette } from "../components/palette.mjs";
 import { audit } from "../core/audit.mjs";
-import { pageHead, crumbsFor, goLabel } from "../components/page.mjs";
+import { pageHead, crumbsFor, goLabel, labelForRoute } from "../components/page.mjs";
 
 const R_RULES = "#/policy/rulesets";
 const R_SCHEDULES = "#/policy/schedules";
@@ -429,8 +429,14 @@ function areaHead(title, route) {
   return pageHead({ route: route, title: title, crumbs: crumbsFor(route) });
 }
 
-function areaTop(active, titleKey) {
-  return areaHead(t(titleKey), active);
+/* v3.1 §5.1: the h2 names THIS page, not the area it sits in. Every area
+ * helper used to pass its own `gui_nav_<area>` key, so all four Investigate
+ * pages were titled "Investigate" and all ten System pages "System" while the
+ * breadcrumb right above them already ended on the real page name. The name
+ * comes from the same NAV table the nav and the crumbs read, so the three can
+ * never disagree. */
+function areaTop(active) {
+  return areaHead(labelForRoute(active), active);
 }
 
 /** Shallow copy — every mutation in this area happens on a copy, never on the
@@ -1011,7 +1017,7 @@ async function mountRules(root, ctx, view) {
   palette.registerFor(R_RULES, cmdSpec("au:sched-rs", t("gui_rs_schedule_rs_btn"), function () { if (handles.openRuleset) handles.openRuleset(); }));
   palette.registerFor(R_SCHEDULES, cmdSpec("au:clear-log", t("gui_rs_clear"), function () { if (handles.clearLog) handles.clearLog(); }));
 
-  root.appendChild(areaTop(route, "gui_nav_policy"));
+  root.appendChild(areaTop(route));
   const board = el("div", { class: "board" });
   root.appendChild(board);
 
@@ -1737,7 +1743,7 @@ async function mountReports(root, ctx) {
   modal.registerAudit("au-report-delete", function () { return handles.confirmDelete ? handles.confirmDelete() : null; });
   palette.registerFor(R_REPORTS, cmdSpec("au:add-sched", t("gui_sched_add"), function () { if (handles.open) handles.open(null); }));
 
-  root.appendChild(areaTop(R_REPORTS, "gui_nav_reports"));
+  root.appendChild(areaTop(R_REPORTS));
   const board = el("div", { class: "board" });
   root.appendChild(board);
 

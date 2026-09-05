@@ -37,7 +37,7 @@ import { table, col } from "../components/table.mjs";
 import { palette } from "../components/palette.mjs";
 import { createFilterBar, setFilterBarText, setFilterBarQuery, setFilterBarBrowser } from "../components/filter-bar.mjs";
 import { filterObjectQuery } from "../core/filter-objects.mjs";
-import { pageHead, crumbsFor, goLabel } from "../components/page.mjs";
+import { pageHead, crumbsFor, goLabel, labelForRoute } from "../components/page.mjs";
 
 const R_RULES = "#/policy/alert-rules";
 const R_OPS = "#/policy/ops";
@@ -176,8 +176,14 @@ function areaHead(title, route) {
   return pageHead({ route: route, title: title, crumbs: crumbsFor(route) });
 }
 
+/* v3.1 §5.1: the h2 names THIS page, not the area it sits in. Every area
+ * helper used to pass its own `gui_nav_<area>` key, so all four Investigate
+ * pages were titled "Investigate" and all ten System pages "System" while the
+ * breadcrumb right above them already ended on the real page name. The name
+ * comes from the same NAV table the nav and the crumbs read, so the three can
+ * never disagree. */
 function areaTop(active) {
-  return areaHead(t("gui_nav_policy"), active);
+  return areaHead(labelForRoute(active), active);
 }
 
 function labelled(labelText, control, hint) {
@@ -577,7 +583,7 @@ function eventDrawer(rule, catalog, onSaved) {
     roField("desc_key", r.desc_key, t("gui_al_fn_i18n_key")),
     roField("rec", r.rec, t("gui_al_fn_rec")),
     roField("rec_key", r.rec_key, t("gui_al_fn_i18n_key")),
-    roField("throttle", r.throttle, t("gui_al_fn_throttle")),
+    roField("throttle", r.throttle),
     roField("throttle_state", r.throttle_state, t("gui_al_fn_throttle_state")),
     roField("cooldown_remaining", r.cooldown_remaining, t("gui_al_fn_cooldown_remaining")),
   ])));
@@ -674,7 +680,7 @@ function systemDrawer(rule, onSaved) {
     roField("desc", r.desc, t("gui_al_fn_desc_system")),
     roField("rec", r.rec, t("gui_al_fn_rec_system")),
     roField("match_fields", r.match_fields, t("gui_al_fn_match_system")),
-    roField("throttle", r.throttle, t("gui_al_fn_throttle")),
+    roField("throttle", r.throttle),
     roField("throttle_state", r.throttle_state, t("gui_al_fn_throttle_state")),
     roField("cooldown_remaining", r.cooldown_remaining, t("gui_al_fn_cooldown_remaining")),
   ])));
@@ -763,7 +769,7 @@ function flowDrawer(kind, rule, onSaved) {
   ro.push(roField("threshold_type", r.threshold_type || "count", t("gui_al_fn_flow_threshold")));
   ro.push(roField("desc", r.desc, t("gui_al_fn_desc_flow")));
   ro.push(roField("rec", r.rec, t("gui_al_fn_rec_flow")));
-  ro.push(roField("throttle", r.throttle, t("gui_al_fn_throttle")));
+  ro.push(roField("throttle", r.throttle));
   ro.push(roField("throttle_state", r.throttle_state, t("gui_al_fn_throttle_state")));
   ro.push(roField("cooldown_remaining", r.cooldown_remaining, t("gui_al_fn_cooldown_remaining")));
   // Collapsed for the same reason as the event drawer's — see there.
