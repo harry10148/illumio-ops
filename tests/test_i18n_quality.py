@@ -135,12 +135,28 @@ _GLOSSARY_TERMS = [
 ]
 
 
+def _glossary_exempt_keys() -> dict:
+    """Per-key exemptions, read from the same glossary.json field that
+    tests/test_i18n_glossary.py and scripts/audit_i18n_usage.py read.
+
+    Three checkers enforce this rule and they do not share a term list — the
+    one above is hardcoded here, the other two are derived from glossary.json —
+    so an exemption honoured by two of them and not the third is a green local
+    run and a red full suite, which is exactly what happened. The list of terms
+    stays where it is; only the exemption is shared.
+    """
+    path = Path(__file__).resolve().parents[1] / "src" / "i18n" / "data" / "glossary.json"
+    return json.loads(path.read_text(encoding="utf-8")).get("exempt_keys", {})
+
+
 def test_glossary_terms_stay_english_in_zh_tw():
     """For every key whose EN value contains a whitelist term, the zh_TW
     value must also contain that term (not a Chinese translation)."""
     en_messages = i18n.get_messages("en")
     zh_messages = i18n.get_messages("zh_TW")
     from src.report.exporters.report_i18n import STRINGS
+
+    exempt = _glossary_exempt_keys()
 
     offenders: list[tuple[str, str, str, str]] = []
     for key, en in en_messages.items():
@@ -154,7 +170,10 @@ def test_glossary_terms_stay_english_in_zh_tw():
         zh = zh_messages.get(key, "")
         if not isinstance(zh, str):
             continue
+        exempt_terms = exempt.get(key, [])
         for term, pattern in _GLOSSARY_TERMS:
+            if term in exempt_terms:
+                continue
             if pattern.search(en) and not pattern.search(zh):
                 offenders.append((term, key, en, zh))
 

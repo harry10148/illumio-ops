@@ -1586,3 +1586,60 @@ def test_siem_page_survives_cache_telemetry_outage(v2_page):
     page.wait_for_selector('[data-cov="SY-07"]', timeout=15000)
     assert page.locator('[data-cov="OV-16"]').count() == 1
     assert page.locator('[data-cov="OV-10"]').count() == 1
+
+
+def test_cache_save_still_carries_the_five_settings_that_have_no_control(v2_page):
+    """SY-05: saving the cache form sends the settings it cannot edit, unchanged.
+
+    Five keys of PceCacheSettings have no control anywhere on this page. They
+    used to be listed in a panel captioned with the reason each one had none —
+    copy about this app's form wiring, which was removed. What kept them alive
+    was never that panel: setBody starts from the whole cached settings object
+    and overwrites only the controlled keys.
+
+    That is a claim about the save path, so it is asserted against the save
+    path rather than left as a reading of the source. Losing a backend field
+    on the floor is how an earlier redesign lost data, and with the panel gone
+    there is no longer anything on screen that would reveal it happening.
+
+    The request is stubbed at the browser, not fulfilled by Flask, so this
+    asserts what the page SENDS — a server that silently merged would make a
+    round-trip assertion pass with the keys missing from the body.
+    """
+    page, base_url = v2_page
+    _goto(page, base_url, R_CACHE, "SY-05")
+
+    uncontrolled = [
+        "cache_read_max_rows",
+        "disk_free_warn_gb",
+        "flow_delta_enabled",
+        "flow_obs_retention_hours",
+        "siem_pending_warn_rows",
+    ]
+
+    # The save row stays disabled until the form is dirty, so change one
+    # CONTROLLED field. Which one does not matter — the point is that the five
+    # uncontrolled ones ride along with whatever the operator did edit.
+    ev_ret = page.locator('[data-field="events_retention_days"]')
+    ev_ret.fill("91")
+    ev_ret.dispatch_event("input")
+    ev_ret.dispatch_event("change")
+
+    def _stub(route):
+        if route.request.method != "PUT":
+            route.continue_()
+            return
+        route.fulfill(status=200, content_type="application/json", body='{"ok": true}')
+
+    page.route("**/api/cache/settings", _stub)
+    try:
+        with page.expect_request(
+            lambda r: "/api/cache/settings" in r.url and r.method == "PUT"
+        ) as info:
+            page.get_by_role("button", name=_labels(page)["gui_save"], exact=True).last.click()
+        body = info.value.post_data_json
+    finally:
+        page.unroute("**/api/cache/settings", _stub)
+
+    missing = [k for k in uncontrolled if k not in (body or {})]
+    assert missing == [], f"save dropped uncontrolled keys {missing}: {sorted((body or {}).keys())}"
