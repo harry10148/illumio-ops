@@ -135,6 +135,7 @@ import { palette } from "../components/palette.mjs";
 import { createFilterBar, setFilterBarText, setFilterBarQuery } from "../components/filter-bar.mjs";
 import { setFilterBarBrowser, addPillFromBrowser } from "../components/filter-bar.mjs";
 import { filterObjectQuery, OBJECT_CATS } from "../core/filter-objects.mjs";
+import { pageHead, crumbsFor } from "../components/page.mjs";
 
 const R_INBOX = "#/investigate/inbox";
 const R_TRAFFIC = "#/investigate/traffic";
@@ -143,13 +144,6 @@ const R_EVENTS = "#/investigate/events";
 
 // Where the archive strip hands archive LOADING off to — see header note 7.
 const GO_CACHE = "#/system/cache";
-
-const SUB_ROUTES = [
-  [R_INBOX, "gui_inbox"],
-  [R_TRAFFIC, "gui_traffic_analyzer"],
-  [R_WORKLOADS, "gui_workload_search"],
-  [R_EVENTS, "gui_event_viewer"],
-];
 
 // index.html:845-850 (select#qt-mins) — the window options, value + catalogue key.
 const WINDOWS = [["60", "gui_win_1h"], ["1440", "gui_win_24h"], ["10080", "gui_win_1w"], ["43200", "gui_win_1m"]];
@@ -309,14 +303,13 @@ function actualSourceText(v) {
 
 // ── shared chrome ───────────────────────────────────────────────────────────
 
-/** Minimal area-head: title + route breadcrumb. Same local copy areas/
- *  overview.mjs keeps, for the same reason (the mockup's placeholder.mjs
- *  pulls in a shell.mjs that does not exist here). */
-/* Route as a data attribute, not visible chrome — see overview.mjs's areaHead. */
+/* v3.1 §5.1: one head per page, built by components/page.mjs. The local copy
+ * this replaced also appended the area's own `.subnav`; sub-navigation lives
+ * in the left-hand shell now (shell.mjs's NAV), so an area draws content only.
+ * The route still rides on the element as data-route — not visible chrome
+ * (density spec R4), but a dozen e2e files read it as "this page mounted". */
 function areaHead(title, route) {
-  return el("div", { class: "area-head", "data-route": route },
-    el("h1", { text: title })
-  );
+  return pageHead({ route: route, title: title, crumbs: crumbsFor(route) });
 }
 
 function panel(cov, title) {
@@ -359,15 +352,7 @@ function badge(text, tn) {
 }
 
 function areaTop(active) {
-  const head = areaHead(t("gui_nav_investigate"), active);
-  const nav = el("nav", { class: "subnav", "aria-label": t("gui_nav_investigate") });
-  SUB_ROUTES.forEach(function (pair) {
-    const a = el("a", { href: pair[0], text: t(pair[1]) });
-    if (pair[0] === active) a.setAttribute("aria-current", "page");
-    nav.appendChild(a);
-  });
-  head.appendChild(nav);
-  return head;
+  return areaHead(t("gui_nav_investigate"), active);
 }
 
 function field(labelText, control) {

@@ -1,16 +1,14 @@
-// app.mjs — v2 boot order: display prefs -> audit hook -> i18n -> chrome ->
-// palette -> health rail (#/overview only) -> router.
+// app.mjs — v3.1 boot order: display prefs -> audit hook -> i18n -> the
+// left-hand shell -> palette -> the open-alert badge -> router.
 //
-// Task 11 (switchover) replaced this file's two Task-2 stand-ins with the
-// real things, now that v2 is the only GUI:
-//   - the chrome. Task 2 mounted nothing but a bare rail host into #topbar;
-//     shell.mjs now builds the brand, the six-area nav (XC-14), the palette
-//     button, the user menu (XC-13) and the sign-out form (LG-03).
-//   - the health rail. Task 2 rendered two /api/status fields inline as
-//     proof of wiring; components/healthbar.mjs (XC-01, ported in Task 3)
-//     now renders the real five lights from the same two snapshots that
-//     fill the user menu, with an XC-10 error card on failure.
-// The attach/detach mechanism around the rail (syncRail) is unchanged.
+// What v3.1 removed from this file (spec §1): the health rail and the
+// attach/detach machinery around it. The rail was chrome that only ever
+// belonged on one route, so app.mjs owned HEALTH_ROUTES, a module-level
+// railNode and a syncRail() that moved it in and out of the shell on every
+// navigation. The rail is home-page CONTENT now — areas/home.mjs builds it
+// from the two snapshots it already loads — so all of that is gone. The one
+// thing that load also did for the chrome, filling the user popover with the
+// appliance identity, stays here as its own small fetch.
 
 import { api } from "./core/api.mjs";
 import { t, i18n } from "./core/i18n.mjs";
@@ -18,74 +16,31 @@ import { initDisplay } from "./core/theme.mjs";
 import { installAuditHook } from "./core/audit.mjs";
 import { router } from "./core/router.mjs";
 import { el } from "./core/dom.mjs";
-import { healthbar } from "./components/healthbar.mjs";
+import { pageHead } from "./components/page.mjs";
 import { palette } from "./components/palette.mjs";
-import { errorCard } from "./components/errorcard.mjs";
 import { buildShell, applyStatus, seedPalette } from "./shell.mjs";
 
-// XC-01 (health rail) lives on the overview only (spec §1.1, amended at Gate
-// 2). Detach, not hide: `hidden` loses to any `display` rule, and a merely
-// invisible element still shows up in the coverage gate's `[data-cov]` sweep
-// on every route — this mirrors design/v2/mockup/js/app.mjs's syncRail.
-// v3: the rail stays on the home page only (user ruling 2026-09-04, keeping
-// the 2026-08-05 decision). `null` would attach it on every route.
-const HEALTH_ROUTES = ["#/home"];
-let railNode = null;
-
-function pathOf(route) {
-  const q = String(route || "").indexOf("?");
-  return q < 0 ? String(route || "") : String(route).slice(0, q);
-}
-
-function syncRail(railHost, path) {
-  if (!railNode) return;
-  const on = HEALTH_ROUTES === null || HEALTH_ROUTES.indexOf(path) >= 0;
-  if (on && railNode.parentNode !== railHost) railHost.appendChild(railNode);
-  else if (!on && railNode.parentNode === railHost) {
-    railHost.removeChild(railNode);
-    // Detaching is not enough. An open light popover holds two capture-phase
-    // document listeners and an entry on core/dom.mjs's shared dismiss stack;
-    // out of the document that entry is invisible but still TOPMOST, so the
-    // next Escape anywhere in the app is eaten by its
-    // stopImmediatePropagation() before any live surface sees it. destroy()
-    // closes any open popover, is idempotent, and leaves the rail fully
-    // usable when it comes back (healthbar.mjs's teardown contract, header
-    // note 2) — the node is still reused, not rebuilt. The guard is for
-    // mountHealth's OTHER railNode: the XC-10 error card, which has no
-    // destroy().
-    if (typeof railNode.destroy === "function") railNode.destroy();
-  }
-}
-
 /**
- * Build the five-light rail (XC-01) from the two live snapshots, and fill the
- * user menu from the same status payload — one pair of loads, two consumers,
- * exactly as design/v2/mockup/js/app.mjs does it.
+ * Fill the user popover with the appliance identity (SH-02), and hang the
+ * open-alert count off the nav (spec §1: "未處理告警數以小圓標掛在調查 › 告警").
  *
- * On failure the rail slot carries an XC-10 error card whose retry re-runs
- * this same function, so a transient /api/status or
- * /api/dashboard/overview_summary failure is recoverable without a reload.
+ * Both are chrome, both are one GET, and neither is allowed to keep the app
+ * from booting: a failure leaves the popover on its em-dashes and the badge
+ * hidden, and says so on the console rather than surfacing an error card over
+ * a page that is otherwise fine.
  */
-async function mountHealth(railHost, menu) {
-  // A retry re-enters here: drop whatever the previous attempt left attached
-  // (rail or error card) before building the replacement, or the two stack up.
-  if (railNode && railNode.parentNode === railHost) railHost.removeChild(railNode);
-  if (railNode && typeof railNode.destroy === "function") railNode.destroy();
-  railNode = null;
-  try {
-    const snaps = await Promise.all([api.load("status"), api.load("dashboard_overview")]);
-    applyStatus(menu, snaps[0]);
-    railNode = healthbar.render(snaps[0], snaps[1]);
-  } catch (e) {
-    railNode = el("div", { class: "rail-error" }, errorCard({
-      id: "status / dashboard_overview",
-      error: e,
-      onRetry: function () { return mountHealth(railHost, menu); },
-    }));
-  }
-  // The load races the first route mount, so ask the router where we ended
-  // up rather than assuming we are still on the route that started the fetch.
-  syncRail(railHost, pathOf(router.current()));
+function mountShellIdentity(shell) {
+  const status = api.load("status").then(function (snap) {
+    applyStatus(shell.menu, snap);
+  }).catch(function (e) {
+    console.error("[app] status failed to load", e);
+  });
+  const alerts = api.load("alerts", { status: "new", page_size: 1 }).then(function (snap) {
+    shell.setAlertCount((snap && snap.counts && snap.counts.new) || 0);
+  }).catch(function (e) {
+    console.error("[app] alert count failed to load", e);
+  });
+  return Promise.all([status, alerts]);
 }
 
 /**
@@ -98,9 +53,10 @@ async function mountHealth(railHost, menu) {
 async function mountPlaceholder(root, ctx) {
   /* The route stays a data attribute for the e2e suite and for anyone reading
    * the DOM; it is not chrome (density spec R4). */
-  root.appendChild(el("div", { class: "area-head", "data-route": ctx.route },
-    el("h1", { text: t("gui_shell_wip_title", "Page not found") })
-  ));
+  root.appendChild(pageHead({
+    route: ctx.route,
+    title: t("gui_shell_wip_title", "Page not found"),
+  }));
   root.appendChild(el("section", { class: "wip", "data-tone": "info" },
     el("p", { text: t("gui_shell_wip_body",
       "There is no page at this address. Pick an area from the menu on the left."
@@ -156,15 +112,18 @@ async function boot() {
   palette.install();
   seedPalette();
 
-  router.onChange(function (path) {
-    syncRail(shell.railHost, path);
-  });
-
   // Lazy per-route import (router.mjs's documented pattern): nothing but
   // this shell fetches until #/overview is actually visited.
   router.register("#/home", async function (el2, ctx) {
     const { mountHome } = await import("./areas/home.mjs");
     return mountHome(el2, ctx);
+  });
+  // v3.1 §1.1: the alert list lives at #/investigate/alerts. Task 3 gives it
+  // its own module; until then both hashes mount 3B's inbox, so the nav item
+  // Task 1 adds is not a link to a "page not found".
+  router.register("#/investigate/alerts", async function (el2, ctx) {
+    const { mountInbox } = await import("./areas/investigate.mjs");
+    return mountInbox(el2, ctx);
   });
   router.register("#/investigate/inbox", async function (el2, ctx) {
     const { mountInbox } = await import("./areas/investigate.mjs");
@@ -268,7 +227,7 @@ async function boot() {
   AREA_ROUTES.forEach(function (route) { router.register(route, mountPlaceholder); });
   router.setFallback(mountPlaceholder);
 
-  await Promise.all([mountHealth(shell.railHost, shell.menu), router.start(areaRoot)]);
+  await Promise.all([mountShellIdentity(shell), router.start(areaRoot)]);
   document.body.dataset.booted = "true";
 }
 

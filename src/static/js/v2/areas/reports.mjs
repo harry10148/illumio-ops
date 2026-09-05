@@ -135,6 +135,7 @@ import { palette } from "../components/palette.mjs";
 import { progress } from "../components/progress.mjs";
 import { createFilterBar, setFilterBarText, setFilterBarQuery } from "../components/filter-bar.mjs";
 import { filterObjectQuery } from "../core/filter-objects.mjs";
+import { pageHead, crumbsFor } from "../components/page.mjs";
 
 const ROUTE = "#/reports";
 
@@ -149,15 +150,13 @@ const ROUTE = "#/reports";
  * generation or the output list. */
 const SNAPS = ["reports_list", "report_schedules", "labels", "status", "dashboard_snapshot", "dashboard_audit", "dashboard_pu"];
 
-/** Minimal area-head: title + route breadcrumb. Same local copy every
- * single-route area keeps (overview.mjs's own comment explains why: small
- * enough that duplicating it beats pulling in a shell.mjs that does not
- * exist in this app). */
-/* Route as a data attribute, not visible chrome — see overview.mjs's areaHead. */
+/* v3.1 §5.1: one head per page, built by components/page.mjs. The local copy
+ * this replaced also appended the area's own `.subnav`; sub-navigation lives
+ * in the left-hand shell now (shell.mjs's NAV), so an area draws content only.
+ * The route still rides on the element as data-route — not visible chrome
+ * (density spec R4), but a dozen e2e files read it as "this page mounted". */
 function areaHead(title, route) {
-  return el("div", { class: "area-head", "data-route": route },
-    el("h1", { text: title })
-  );
+  return pageHead({ route: route, title: title, crumbs: crumbsFor(route) });
 }
 
 // index.html:2844-2852 (select#m-gen-format) — always visible, even for the two
@@ -954,17 +953,10 @@ async function mountReports(root, ctx) {
   palette.registerFor(ROUTE, cmdSpec("rp:gen-audit", t("gui_gen_audit_title"), function () { if (handles.open) handles.open("audit"); }));
   palette.registerFor(ROUTE, cmdSpec("rp:outputs", t("gui_report_output"), function () { if (handles.focusOutputs) handles.focusOutputs(); }));
 
-  // v3: the reports area has two pages (generation here, schedules under
-  // #/reports/schedules, which policy_scheduler.mjs still renders).
-  const head = areaHead(t("gui_nav_reports"), ROUTE);
-  const sub = el("nav", { class: "subnav", "aria-label": t("gui_nav_reports") });
-  [[ROUTE, "gui_nav_reports"], ["#/reports/schedules", "gui_tab_report_schedules"]].forEach(function (pair) {
-    const a = el("a", { href: pair[0], text: t(pair[1]) });
-    if (pair[0] === ROUTE) a.setAttribute("aria-current", "page");
-    sub.appendChild(a);
-  });
-  head.appendChild(sub);
-  root.appendChild(head);
+  // v3.1: the reports area has two pages (generation here, schedules under
+  // #/reports/schedules, which policy_scheduler.mjs still renders). Both are
+  // listed by the left-hand nav; this page draws only its own head.
+  root.appendChild(areaHead(t("gui_nav_reports"), ROUTE));
   const wrap = el("div", { class: "wb" });
   const main = el("div", { class: "wb-main" });
   const aside = el("aside", { class: "wb-aside" });

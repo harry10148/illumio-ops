@@ -5348,5 +5348,9 @@
   "gui_hub_deny_title": "Deny / override deny",
   "gui_hub_schedule_change": "Schedule a rule change",
   "gui_hub_mark_done": "Mark alert done",
-  "gui_hub_marked_done": "Alert marked done"
+  "gui_hub_marked_done": "Alert marked done",
+  "gui_nav_alerts": "Alerts",
+  "gui_nav_traffic_search": "Traffic search",
+  "gui_shell_search_jump": "Search or jump to…",
+  "gui_shell_user_menu": "Account and display"
 }

@@ -45,10 +45,12 @@ STORE_MAP = ROOT / "src" / "static" / "js" / "v2" / "core" / "store-map.mjs"
 
 
 # The anchors every SPA route sees because they live in the chrome, not in any
-# area: the command palette, the user menu, the five-area nav and the sign-out
-# form inside that menu. Used below to separate "this route mounted the shell"
-# from "this route mounted its own content".
-SHELL_ANCHORS = {"XC-02", "XC-13", "XC-14", "LG-03"}
+# area: the command palette dialog, the left-hand nav, its palette entry, the
+# user popover and the sign-out form inside it. Used below to separate "this
+# route mounted the shell" from "this route mounted its own content".
+# v3.1 (3E Task 1): XC-13/XC-14 became SH-02/SH-01 with the top bar's removal,
+# and the palette entry gained an anchor of its own (SH-03).
+SHELL_ANCHORS = {"XC-02", "SH-01", "SH-02", "SH-03", "LG-03"}
 
 
 @pytest.fixture(scope="module")
@@ -107,7 +109,7 @@ def test_every_route_contributed_something(gate_result):
             # The one page outside the SPA: its own anchors, and none of the
             # chrome (there is no shell on the login page to render it).
             assert {"LG-01", "LG-02"} <= anchors, (route, sorted(anchors))
-            assert not (anchors & {"XC-02", "XC-13", "XC-14"}), (route, sorted(anchors))
+            assert not (anchors & {"XC-02", "SH-01", "SH-02"}), (route, sorted(anchors))
             continue
 
         # Every SPA route mounts the shell...

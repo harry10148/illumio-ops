@@ -1822,5 +1822,9 @@
   "gui_policy_tab_schedules": "排程",
   "gui_shell_wip_body": "這個網址沒有對應的頁面。請從左側選單選擇一個區域。",
   "gui_shell_wip_title": "找不到這個頁面",
-  "gui_system_tab_alerting": "告警"
+  "gui_system_tab_alerting": "告警",
+  "gui_nav_alerts": "告警",
+  "gui_nav_traffic_search": "流量搜尋",
+  "gui_shell_search_jump": "搜尋或跳轉",
+  "gui_shell_user_menu": "帳號與顯示"
 }

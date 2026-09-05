@@ -170,6 +170,7 @@ import { drawer } from "../components/drawer.mjs";
 import { modal } from "../components/modal.mjs";
 import { table, col } from "../components/table.mjs";
 import { palette } from "../components/palette.mjs";
+import { pageHead, crumbsFor } from "../components/page.mjs";
 
 const R_PCE = "#/system/pce";
 const R_CACHE = "#/system/cache";
@@ -185,28 +186,13 @@ const R_JOBS = "#/system/jobs";           // v3: background job health (was #/au
 // index.html:1975-1983 (integrations sub-tabs) + :1994-2008 (settings sub-tabs).
 // The product splits the same concerns across two top-level tabs; v2 keeps one
 // sub-nav so "where do I configure X" has a single list.
-const SUB_ROUTES = [
-  [R_PCE, "gui_settings_tab_pce"],
-  [R_CACHE, "gui_it_cache"],
-  [R_SIEM, "gui_siem_forwarder"],
-  [R_TLS, "gui_tls_title"],
-  [R_SECURITY, "gui_settings_tab_security"],
-  [R_DISPLAY, "gui_settings_tab_display"],
-  [R_CHANNELS, "gui_settings_tab_channels"],
-  [R_ALERTING, "gui_system_tab_alerting"],
-  [R_JOBS, "gui_ov_job_health"],
-  [R_LOGS, "gui_ml_title"],
-];
-
-/** Minimal area-head: title + route breadcrumb. Same local copy every
- *  single-route/sub-nav area keeps — shell.mjs does not exist in this app
- *  (reports.mjs/automation.mjs's own comment explains why duplicating this
- *  small a helper beats depending on one). */
-/* Route as a data attribute, not visible chrome — see overview.mjs's areaHead. */
+/* v3.1 §5.1: one head per page, built by components/page.mjs. The local copy
+ * this replaced also appended the area's own `.subnav`; sub-navigation lives
+ * in the left-hand shell now (shell.mjs's NAV), so an area draws content only.
+ * The route still rides on the element as data-route — not visible chrome
+ * (density spec R4), but a dozen e2e files read it as "this page mounted". */
 function areaHead(title, route) {
-  return el("div", { class: "area-head", "data-route": route },
-    el("h1", { text: title })
-  );
+  return pageHead({ route: route, title: title, crumbs: crumbsFor(route) });
 }
 
 // ── shared chrome ───────────────────────────────────────────────────────────
@@ -230,15 +216,7 @@ function badge(text, tn) { return el("span", { class: "badge", "data-tone": tn }
 function sectionHead(text) { return el("h4", { class: "eyebrow", text: text }); }
 
 function sysTop(active) {
-  const head = areaHead(t("gui_nav_system"), active);
-  const nav = el("nav", { class: "subnav wrap", "aria-label": t("gui_nav_system") });
-  SUB_ROUTES.forEach(function (pair) {
-    const a = el("a", { href: pair[0], text: t(pair[1]) });
-    if (pair[0] === active) a.setAttribute("aria-current", "page");
-    nav.appendChild(a);
-  });
-  head.appendChild(nav);
-  return head;
+  return areaHead(t("gui_nav_system"), active);
 }
 
 function labelled(labelText, control, hint) {

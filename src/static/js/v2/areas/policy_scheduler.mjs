@@ -96,6 +96,7 @@ import { modal } from "../components/modal.mjs";
 import { table, col } from "../components/table.mjs";
 import { palette } from "../components/palette.mjs";
 import { audit } from "../core/audit.mjs";
+import { pageHead, crumbsFor } from "../components/page.mjs";
 
 const R_RULES = "#/policy/rulesets";
 const R_SCHEDULES = "#/policy/schedules";
@@ -103,17 +104,6 @@ const R_ALERT_RULES = "#/policy/alert-rules";
 const R_OPS = "#/policy/ops";
 const R_REPORTS = "#/reports/schedules";
 const R_JOBS = "#/system/jobs";
-
-// v3 sub-navigation. The policy area (spec §1) lists its four pages; the
-// report-schedules and jobs mounts still live in this module until 3B Task 4
-// moves them, so they carry their own area's sub-nav meanwhile.
-const POLICY_SUB_ROUTES = [
-  [R_ALERT_RULES, "gui_policy_tab_alert_rules"],
-  [R_RULES, "gui_policy_tab_rulesets"],
-  [R_SCHEDULES, "gui_policy_tab_schedules"],
-  [R_OPS, "gui_actions"],
-];
-const REPORTS_SUB_ROUTES = [["#/reports", "gui_nav_reports"], [R_REPORTS, "gui_tab_report_schedules"]];
 
 // The eager batch for #/policy/rulesets. rs_ruleset_detail is deliberately
 // NOT here — see deviation #2 above; it is fetched per selected row.
@@ -430,23 +420,17 @@ function showValue(v) {
   return String(v);
 }
 
-/* Route as a data attribute, not visible chrome — see overview.mjs's areaHead. */
+/* v3.1 §5.1: one head per page, built by components/page.mjs. The local copy
+ * this replaced also appended the area's own `.subnav`; sub-navigation lives
+ * in the left-hand shell now (shell.mjs's NAV), so an area draws content only.
+ * The route still rides on the element as data-route — not visible chrome
+ * (density spec R4), but a dozen e2e files read it as "this page mounted". */
 function areaHead(title, route) {
-  return el("div", { class: "area-head", "data-route": route },
-    el("h1", { text: title })
-  );
+  return pageHead({ route: route, title: title, crumbs: crumbsFor(route) });
 }
 
-function areaTop(active, titleKey, routes) {
-  const head = areaHead(t(titleKey), active);
-  const nav = el("nav", { class: "subnav", "aria-label": t(titleKey) });
-  routes.forEach(function (pair) {
-    const a = el("a", { href: pair[0], text: t(pair[1]) });
-    if (pair[0] === active) a.setAttribute("aria-current", "page");
-    nav.appendChild(a);
-  });
-  head.appendChild(nav);
-  return head;
+function areaTop(active, titleKey) {
+  return areaHead(t(titleKey), active);
 }
 
 /** Shallow copy — every mutation in this area happens on a copy, never on the
@@ -1027,7 +1011,7 @@ async function mountRules(root, ctx, view) {
   palette.registerFor(R_RULES, cmdSpec("au:sched-rs", t("gui_rs_schedule_rs_btn"), function () { if (handles.openRuleset) handles.openRuleset(); }));
   palette.registerFor(R_SCHEDULES, cmdSpec("au:clear-log", t("gui_rs_clear"), function () { if (handles.clearLog) handles.clearLog(); }));
 
-  root.appendChild(areaTop(route, "gui_nav_policy", POLICY_SUB_ROUTES));
+  root.appendChild(areaTop(route, "gui_nav_policy"));
   const board = el("div", { class: "board" });
   root.appendChild(board);
 
@@ -1753,7 +1737,7 @@ async function mountReports(root, ctx) {
   modal.registerAudit("au-report-delete", function () { return handles.confirmDelete ? handles.confirmDelete() : null; });
   palette.registerFor(R_REPORTS, cmdSpec("au:add-sched", t("gui_sched_add"), function () { if (handles.open) handles.open(null); }));
 
-  root.appendChild(areaTop(R_REPORTS, "gui_nav_reports", REPORTS_SUB_ROUTES));
+  root.appendChild(areaTop(R_REPORTS, "gui_nav_reports"));
   const board = el("div", { class: "board" });
   root.appendChild(board);
 

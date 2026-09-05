@@ -1,5 +1,5 @@
 /* ============================================================================
-   app.css — the shell: reset, chrome top bar, instrument rail, area root.
+   app.css — the shell: reset, left-hand navigation, instrument rail, work area.
    Colors come from tokens.css only.
    ============================================================================ */
 
@@ -45,21 +45,28 @@ body {
   clip: rect(0 0 0 0); white-space: nowrap; border: 0;
 }
 
-/* ------------------------------------------------------------- top bar ---- */
-.chrome { background: var(--chrome); border-bottom: 1px solid var(--chrome-edge); }
+/* ------------------------------------------------- left-hand navigation ---- */
+/* v3.1 §1: one 224px column that owns the brand, the five areas, the current
+   area's sub-items, the command-palette entry and the user popover. The top
+   bar it replaces (.chrome/.topbar/.areanav/.kbd-btn/.rail-host) is gone. */
+.frame { display: grid; grid-template-columns: 224px minmax(0, 1fr); min-height: 100vh; }
+#shell { display: flex; }
 
-.topbar {
-  display: flex;
-  align-items: center;
-  gap: var(--space-7);
-  height: var(--chrome-h);
-  padding: 0 var(--space-6);
+.sidenav {
+  flex: 1;
+  display: flex; flex-direction: column; gap: var(--space-2);
+  padding: var(--space-6) var(--space-5);
+  background: var(--chrome);
+  border-right: 1px solid var(--chrome-edge);
 }
 
-.brand { display: flex; align-items: baseline; gap: var(--space-4); text-decoration: none; flex: none; }
-.brand b { font-family: var(--font-display); font-size: var(--fs-lead); font-weight: 700; letter-spacing: -.01em; color: var(--chrome-text-1); }
+.brand {
+  display: flex; align-items: baseline; gap: var(--space-3);
+  padding: var(--space-2) var(--space-4) var(--space-7);
+}
+.brand b { font-family: var(--font-display); font-size: var(--fs-lead); font-weight: 700; letter-spacing: -.02em; color: var(--chrome-text-1); }
 .brand i {
-  width: 5px; height: 5px; border-radius: 1px;
+  width: 6px; height: 6px; border-radius: 1px;
   background: var(--accent); display: inline-block; font-style: normal;
   align-self: center;
 }
@@ -68,64 +75,81 @@ body {
   color: var(--accent-fg); letter-spacing: .18em; text-transform: uppercase;
 }
 
-.areanav { display: flex; gap: 1px; flex: 1; min-width: 0; overflow: hidden; }
-.areanav a {
-  position: relative;
-  display: flex; align-items: baseline; gap: var(--space-3);
-  padding: var(--nav-pad-y) var(--space-5);
-  text-decoration: none; white-space: nowrap;
-  color: var(--chrome-text-2);
-  font-size: var(--fs-micro); font-weight: 600;
-  letter-spacing: .12em; text-transform: uppercase;
+.sidenav > a {
+  display: flex; align-items: center; gap: var(--space-4);
+  padding: var(--space-4) var(--space-4);
+  border-radius: var(--radius-m);
+  color: var(--chrome-text-2); text-decoration: none;
+  font-size: var(--fs-ui); font-weight: 500;
   transition: background-color .15s ease, color .15s ease;
 }
-.areanav a u { text-decoration: none; font-size: var(--fs-body); letter-spacing: 0; font-weight: 400; }
-.areanav a:hover { color: var(--chrome-text-1); background: var(--chrome-hover); }
-.areanav a[aria-current] { color: var(--chrome-text-1); background: var(--chrome-active); }
-.areanav a[aria-current]::after {
-  content: ""; position: absolute; left: 0; right: 0; bottom: 0;
-  height: 2px; background: var(--accent);
+.sidenav > a:hover { background: var(--chrome-hover); color: var(--chrome-text-1); }
+.sidenav > a[aria-current] {
+  background: var(--chrome-active); color: var(--chrome-text-1); font-weight: 700;
+  box-shadow: inset 3px 0 0 var(--accent);
 }
 
-.topright { display: flex; align-items: center; gap: var(--space-5); flex: none; }
+.sidenav .sub { display: flex; flex-direction: column; gap: var(--space-1); margin: var(--space-1) 0 var(--space-3) var(--space-7); }
+.sidenav .sub a {
+  display: flex; align-items: center; gap: var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-m);
+  color: var(--chrome-text-2); text-decoration: none;
+  font-size: var(--fs-body); font-weight: 400;
+}
+.sidenav .sub a:hover { background: var(--chrome-hover); color: var(--chrome-text-1); }
+.sidenav .sub a[aria-current] { background: var(--chrome-active); color: var(--chrome-text-1); font-weight: 600; }
 
-.kbd-btn {
+/* the open-alert badge — hidden outright while the count is zero or unknown */
+.sidenav .cnt {
+  margin-left: auto;
+  font-family: var(--font-num); font-size: var(--fs-micro); font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--accent-fg); background: var(--surface-1);
+  border: 1px solid var(--line); border-radius: 999px;
+  padding: var(--space-1) var(--space-3);
+}
+
+.sidenav .spacer { flex: 1; min-height: var(--space-6); }
+
+.kbd-row {
   display: flex; align-items: center; gap: var(--space-3);
-  height: var(--ctl-h); padding: 0 var(--space-4);
+  min-height: var(--ctl-h); padding: 0 var(--space-4);
   background: var(--chrome-hover);
   border: 1px solid var(--chrome-line);
   border-radius: var(--radius-m);
   color: var(--chrome-text-2);
   font-family: var(--font-ui); font-size: var(--fs-mini);
-  cursor: pointer;
+  text-align: left; cursor: pointer;
 }
-.kbd-btn:hover { border-color: var(--accent); color: var(--chrome-text-1); }
-.kbd-btn kbd {
+.kbd-row span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.kbd-row:hover { border-color: var(--accent); color: var(--chrome-text-1); }
+.kbd-row kbd {
   font-family: var(--font-mono); font-size: var(--fs-micro);
   color: var(--chrome-text-3); border: 1px solid var(--chrome-line);
   border-radius: var(--radius-s); padding: 0 var(--space-2);
 }
 
-/* user menu */
-.usermenu { position: relative; }
-.userchip {
-  display: flex; align-items: center; gap: var(--space-4);
-  padding: var(--space-2) var(--space-3) var(--space-2) var(--space-5);
-  background: none; border: 0; border-left: 1px solid var(--chrome-line);
-  color: var(--chrome-text-2); cursor: pointer; text-align: left;
+/* user popover (SH-02) — the trigger sits at the foot of the nav and the
+   popover opens UPWARD from it, so it is not clipped by the viewport bottom. */
+.usermenu { position: relative; margin-top: var(--space-4); }
+.who {
+  display: block; width: 100%; text-align: left;
+  padding: var(--space-4);
+  background: none; border: 0; border-top: 1px solid var(--chrome-line);
+  color: var(--chrome-text-2); cursor: pointer;
   font-family: var(--font-ui);
 }
-.userchip .avatar {
-  width: 28px; height: 28px; border-radius: 50%;
-  background: var(--brand-deep); color: var(--accent-on);
-  display: grid; place-items: center;
-  font-size: var(--fs-micro); font-weight: 700; flex: none;
+.who:hover { color: var(--chrome-text-1); }
+.who b { display: block; color: var(--chrome-text-1); font-size: var(--fs-mini); font-weight: 600; }
+.who small {
+  display: block; color: var(--chrome-text-3); font-size: var(--fs-micro);
+  font-family: var(--font-mono);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
-.userchip b { display: block; color: var(--chrome-text-1); font-size: var(--fs-mini); font-weight: 600; }
-.userchip small { display: block; color: var(--chrome-text-3); font-size: var(--fs-micro); font-family: var(--font-mono); }
 
 .usermenu-pop {
-  position: absolute; right: 0; top: calc(100% + var(--space-3));
+  position: absolute; left: 0; bottom: calc(100% + var(--space-3));
   z-index: 40; min-width: 220px;
   background: var(--surface-1); border: 1px solid var(--line);
   border-radius: var(--radius-m); box-shadow: var(--shadow-2);
@@ -149,12 +173,30 @@ body {
 .usermenu-pop .signout { margin: var(--space-3) 0 0; padding: var(--space-3) var(--space-4) var(--space-1); border-top: 1px solid var(--line-soft); }
 .usermenu-pop .signout .btn { width: 100%; }
 
+/* <=1000px: the nav folds into a single scrollable row and drops everything
+   that cannot survive the fold (sub-items, the spacer, the user row). Nothing
+   may be clipped mid-word at any width — 3B Task 7's lesson. */
+@media (max-width: 1000px) {
+  .frame { grid-template-columns: minmax(0, 1fr); }
+  .sidenav {
+    flex-direction: row; align-items: center; gap: var(--space-3);
+    padding: var(--space-4) var(--space-5);
+    border-right: 0; border-bottom: 1px solid var(--chrome-edge);
+    overflow-x: auto;
+  }
+  .brand { padding: 0 var(--space-4) 0 0; }
+  .sidenav > a { flex: none; white-space: nowrap; }
+  .sidenav .sub, .sidenav .spacer { display: none; }
+  .usermenu { margin: 0 0 0 auto; }
+  .who { border-top: 0; border-left: 1px solid var(--chrome-line); white-space: nowrap; }
+  .usermenu-pop { left: auto; right: 0; bottom: auto; top: calc(100% + var(--space-3)); }
+}
+
 /* --------------------------------------------------- instrument rail ------ */
 .rail {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr)) auto;
   background: var(--chrome);
-  border-bottom: 1px solid var(--line);
   padding: 0 var(--space-6);
 }
 .rail-slot { position: relative; min-width: 0; border-left: 1px solid var(--chrome-line); }
@@ -203,16 +245,12 @@ body {
 }
 .railmeta b { color: var(--chrome-text-2); font-weight: 400; }
 
-/* the rail could not be built — the error card takes its place */
-.rail-error { padding: var(--space-5) var(--space-6); background: var(--surface-0); }
+/* v3.1: the rail is home-page content, not chrome, so it carries its own
+   edge instead of borrowing the top bar's bottom rule. */
+.workarea .rail { border: 1px solid var(--line); border-radius: var(--radius-l); }
 
-/* ------------------------------------------------------------ area root --- */
-#area-root { padding: var(--space-5) var(--space-6) var(--space-8); }
-
-.area-head { display: flex; align-items: baseline; gap: var(--space-5); margin-bottom: var(--space-5); }
-.area-head h1 { margin: 0; font-size: var(--fs-lead); font-weight: 700; letter-spacing: -.01em; }
-/* .area-head code is gone with the route readout it styled (density spec R4);
-   the route now rides on .area-head[data-route] and is not rendered. */
+/* ------------------------------------------------------------ work area --- */
+.workarea { padding: var(--space-7) var(--space-8); min-width: 0; }
 
 /* Collapsed detail — density spec R2/R5. Evidence (tables) and explanations
    ship folded so a page opens on its conclusion; nothing is deleted, it is
@@ -284,16 +322,6 @@ body {
    row, controls, results. The guide rail is the only column that is not a
    query surface, so it is visually quieter and collapsible.
    ========================================================================== */
-.subnav { display: flex; gap: 1px; margin-left: auto; }
-.subnav a {
-  padding: var(--space-2) var(--space-5);
-  border: 1px solid var(--line); border-radius: var(--radius-s);
-  background: var(--surface-1); color: var(--text-2); text-decoration: none;
-  font-size: var(--fs-micro); font-weight: 600; letter-spacing: .12em; text-transform: uppercase;
-}
-.subnav a:hover { border-color: var(--accent); color: var(--accent-fg); }
-.subnav a[aria-current] { background: var(--surface-2); border-color: var(--accent); color: var(--accent-fg); box-shadow: inset 0 -2px 0 var(--accent); }
-
 .wb { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: var(--space-5); align-items: start; }
 .wb.solo { grid-template-columns: minmax(0, 1fr); }
 .wb-main { display: flex; flex-direction: column; gap: var(--space-5); min-width: 0; }
@@ -553,13 +581,6 @@ textarea.ta { font-family: var(--font-mono); font-size: var(--fs-mini); }
 }
 @media (max-width: 900px) {
   .kpirow { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  /* the area nav must never clip a tab: the palette button drops its label
-     (the ⌘K keycap stays, still 44px tall) and the nav scrolls if it must */
-  /* visually hidden, still the button's accessible name */
-  .kbd-btn span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
-  .kbd-btn { position: relative; }
-  .kbd-btn { padding-left: var(--space-3); padding-right: var(--space-3); }
-  .areanav { overflow-x: auto; scrollbar-width: none; }
 }
 
 /* ========================================================= reports area =====
@@ -619,9 +640,6 @@ textarea.ta { font-family: var(--font-mono); font-size: var(--fs-mini); }
    value, because a settings page that cannot tell you what you are about to
    write is a page you have to verify somewhere else.
    ========================================================================== */
-.area-head { flex-wrap: wrap; }
-.subnav.wrap { flex-wrap: wrap; justify-content: flex-end; gap: 1px; }
-
 .savedock { height: 52px; }
 .savebar {
   position: fixed; left: 0; right: 0; bottom: 0; z-index: 76;
@@ -686,7 +704,17 @@ textarea.ta { font-family: var(--font-mono); font-size: var(--fs-mini); }
    signing into" is the first question, and address / version / TLS are all
    readable before authentication.
    ========================================================================== */
-.loginpage .topbar { gap: var(--space-6); }
+/* The login page is NOT the SPA: it has no left-hand navigation and keeps a
+   plain header bar. These three rules are what the v3.1 shell rewrite left
+   behind for it — scoped to .loginpage so the bar cannot come back inside the
+   app (tests/test_v2_page_types_e2e.py asserts .topbar is gone there). */
+.loginpage .chrome { background: var(--chrome); border-bottom: 1px solid var(--chrome-edge); }
+.loginpage .topbar {
+  display: flex; align-items: center; gap: var(--space-6);
+  min-height: var(--chrome-h); padding: 0 var(--space-6);
+}
+.loginpage .brand { padding: 0; flex: none; text-decoration: none; }
+.loginpage .topright { display: flex; align-items: center; gap: var(--space-5); flex: none; }
 .loginpage .topright .grp { display: flex; align-items: center; gap: var(--space-3); }
 .loginpage .topright .eyebrow { color: var(--chrome-text-3); }
 .loginpage .seg { display: flex; gap: 1px; background: var(--chrome-line); border: 1px solid var(--chrome-line); border-radius: var(--radius-s); overflow: hidden; }

@@ -53,7 +53,7 @@ pytest_plugins = ["tests.v2_e2e_utils"]
 # from the shell shows up as a test that stopped covering it.
 AREA_ROUTES = [
     "#/home",
-    "#/investigate/inbox", "#/investigate/traffic", "#/investigate/workloads", "#/investigate/events",
+    "#/investigate/alerts", "#/investigate/inbox", "#/investigate/traffic", "#/investigate/workloads", "#/investigate/events",
     "#/policy/alert-rules", "#/policy/rulesets", "#/policy/schedules", "#/policy/ops",
     "#/reports", "#/reports/schedules",
     "#/system/jobs", "#/system/alerting",
@@ -155,11 +155,11 @@ def test_landing_page_renders(v2_page):
 
     text = page.evaluate("() => document.body.innerText")
     assert text, "body innerText empty — page did not render"
-    assert page.locator("header.chrome .brand").count() == 1
-    assert "illumio" in page.locator("header.chrome .brand").inner_text().lower()
+    assert page.locator(".sidenav .brand").count() == 1
+    assert "illumio" in page.locator(".sidenav .brand").inner_text().lower()
     # The three things that make it a shell and not an error page.
     assert page.locator("#area-root").count() == 1
-    assert page.locator('[data-cov="XC-14"] a').count() == 5
+    assert page.locator('[data-cov="SH-01"] > a[href^="#/"]').count() == 5
 
 
 def test_translation_catalogue_is_loaded(v2_page):
@@ -223,9 +223,10 @@ def test_overview_renders_in_the_configured_language(v2_page):
         "async () => { const { api } = await import('/static/js/v2/core/api.mjs'); "
         "return (await api.load('status')).language || 'en'; }"
     )
-    # .text_content(), not .inner_text(): the nav label is uppercased by CSS
-    # and inner_text() returns the RENDERED text.
-    nav_label = page.locator('[data-cov="XC-14"] a[href="#/home"] u').text_content()
+    # .text_content(), not .inner_text(): v3.1's nav no longer uppercases its
+    # labels, but reading the rendered text would silently start depending on
+    # that, and the assertion is about the CATALOGUE, not the CSS.
+    nav_label = page.locator('[data-cov="SH-01"] > a[href="#/home"] span').text_content()
     if lang == "zh_TW":
         assert re.search(r"[一-鿿]", nav_label), nav_label
     else:
@@ -262,7 +263,7 @@ def test_core_api_endpoints_answer_inside_a_session(v2_page):
 # ── from test_e2e_header_menu.py ────────────────────────────────────────────
 
 def test_user_menu_closes_on_an_outside_click(v2_page):
-    """The legacy Operations dropdown's outside-click dismissal, on XC-13.
+    """The legacy Operations dropdown's outside-click dismissal, on SH-02.
 
     Its two siblings (open/close on Escape, and the Stop item raising a
     confirm) have owners already: tests/test_v2_shell_e2e.py and
@@ -272,13 +273,13 @@ def test_user_menu_closes_on_an_outside_click(v2_page):
     _boot(page, base_url)
 
     assert page.locator(".usermenu-pop").count() == 0
-    page.click(".userchip")
+    page.click(".who")
     page.wait_for_selector(".usermenu-pop")
 
     # Click well away from the menu — the area body, not the chrome.
     page.locator("#area-root").click(position={"x": 20, "y": 20})
     page.wait_for_selector(".usermenu-pop", state="detached")
-    assert page.get_attribute(".userchip", "aria-expanded") == "false"
+    assert page.get_attribute(".who", "aria-expanded") == "false"
 
 
 # ── from test_gui_settings_subtab_e2e.py ────────────────────────────────────
@@ -307,9 +308,14 @@ def test_system_subroute_deep_link(v2_page):
 
     page.wait_for_selector('[data-cov="SY-14"]')
     # ...and the nav marks the area it belongs to.
-    assert page.locator('[data-cov="XC-14"] a[aria-current]').get_attribute(
+    # v3.1: the AREA link marks itself an ancestor ("true"); the sub-item for
+    # the page itself is the one that carries aria-current="page".
+    assert page.locator('[data-cov="SH-01"] > a[aria-current="true"]').get_attribute(
         "href"
     ) == "#/system/pce"
+    assert page.locator(
+        '[data-cov="SH-01"] .sub a[aria-current="page"][href="#/system/channels"]'
+    ).count() == 1
 
 
 def test_save_label_names_the_dirty_section(v2_page):

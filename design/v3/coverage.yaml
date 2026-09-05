@@ -112,8 +112,12 @@ XC-09: {item: 空狀態成因提示, route: "#/investigate/traffic"}
 XC-10: {item: 錯誤卡+重試+技術細節, route: "#/home"}
 XC-11: {item: 說明側欄(篩選語法/隔離指南), route: "#/investigate/traffic"}
 XC-12: {item: toast/popover/欄寬拖曳/skeleton, route: "#/investigate/traffic"}
-XC-13: {item: 頂欄使用者選單, route: "#/home"}
-XC-14: {item: URL hash 路由狀態同步, route: "#/home"}
+# XC-13/XC-14 重編（3E Task 1，2026-09-05）：頂欄被左側導覽取代（spec v3.1 §1），
+# 兩項各自成為 SH-02（使用者彈出選單）與 SH-01（左導覽＋hash 路由同步）。
+# === SHELL (spec v3.1 §1, phase 3E Task 1) ===
+SH-01: {item: 左側導覽（五區＋目前區子項＋URL hash 同步）, route: "#/home"}
+SH-02: {item: 使用者彈出選單（主題／密度／PCE／版本／時區／登出）, route: "#/home"}
+SH-03: {item: 指令面板入口 ⌘K, route: "#/home"}
 # === INVESTIGATE HUB (spec §3, phase 3B Task 6) ===
 IN-01: {item: 告警收件匣清單（狀態／類型篩選、分頁）, route: "#/investigate/inbox"}
 IN-02: {item: 告警狀態切換 new/ack/done, route: "#/investigate/inbox?id=1"}

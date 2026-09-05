@@ -74,20 +74,16 @@ import { modal } from "../components/modal.mjs";
 import { table, col } from "../components/table.mjs";
 import { palette } from "../components/palette.mjs";
 import { chart } from "../components/chart.mjs";
+import { pageHead, crumbsFor } from "../components/page.mjs";
 
 const ROUTE = "#/home";
 
-/** Minimal area-head: title + route breadcrumb. Small enough (mockup's
- * areas/placeholder.mjs, 5 lines) that duplicating it locally beats pulling
- * in that module's own shell.mjs dependency, which does not exist here. */
 /* The route used to be printed next to the title as `<code>#/home</code>`.
  * It is plumbing, not information an operator acts on (UI density spec R4), so
  * it now rides as a data attribute: still a stable hook for the e2e suite's
  * "has this area finished mounting" wait, no longer chrome on the screen. */
 function areaHead(title, route) {
-  return el("div", { class: "area-head", "data-route": route },
-    el("h1", { text: title })
-  );
+  return pageHead({ route: route, title: title, crumbs: crumbsFor(route) });
 }
 
 // Where each read-only card hands off to. Kept in one place so a route rename is

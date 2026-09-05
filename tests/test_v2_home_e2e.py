@@ -230,10 +230,10 @@ def test_auth_failure_is_credentials_reason_not_generic_unreachable(v2_page):
     _goto(page, base_url, HOME)
     labels = _health_labels(page)
 
-    pce_cell = page.locator('.rail-host [data-cov="XC-01"] .rail-cell').nth(1)
+    pce_cell = page.locator('#area-root [data-cov="XC-01"] .rail-cell').nth(1)
     assert pce_cell.get_attribute("data-tone") == "crit"
     pce_cell.click()
-    reasons = page.locator(".rail-host .rail-pop").inner_text()
+    reasons = page.locator("#area-root .rail-pop").inner_text()
     assert labels["auth"] in reasons
     assert labels["unreachable"] not in reasons
     assert "sensitive-response-body-must-not-render" not in reasons
@@ -255,7 +255,7 @@ def test_noop_success_keeps_api_green_while_failed_ingestor_keeps_pipeline_red(v
     )
     _goto(page, base_url, HOME)
 
-    cells = page.locator('.rail-host [data-cov="XC-01"] .rail-cell')
+    cells = page.locator('#area-root [data-cov="XC-01"] .rail-cell')
     assert cells.nth(1).get_attribute("data-tone") == "ok"
     assert cells.nth(3).get_attribute("data-tone") == "crit"
     _goto(page, base_url, PCE)
@@ -278,10 +278,10 @@ def test_healthy_saas_identifies_noop_provider_and_both_ingest_freshness_rows(v2
     _goto(page, base_url, HOME)
     labels = _health_labels(page)
 
-    pce_cell = page.locator('.rail-host [data-cov="XC-01"] .rail-cell').nth(1)
+    pce_cell = page.locator('#area-root [data-cov="XC-01"] .rail-cell').nth(1)
     assert pce_cell.get_attribute("data-tone") == "ok"
     pce_cell.click()
-    reasons = page.locator(".rail-host .rail-pop").inner_text()
+    reasons = page.locator("#area-root .rail-pop").inner_text()
     assert "SaaS" in reasons
     assert "noop" in reasons
 
@@ -327,10 +327,10 @@ def test_on_prem_health_body_category_and_probe_chain_render_consistently(
     expected_reason = labels[category]
     expected_probe = "/noop + /health + /node_available"
 
-    pce_cell = page.locator('.rail-host [data-cov="XC-01"] .rail-cell').nth(1)
+    pce_cell = page.locator('#area-root [data-cov="XC-01"] .rail-cell').nth(1)
     assert pce_cell.get_attribute("data-tone") == expected_tone
     pce_cell.click()
-    reasons = page.locator(".rail-host .rail-pop").inner_text()
+    reasons = page.locator("#area-root .rail-pop").inner_text()
     assert expected_reason in reasons
     assert expected_probe in reasons
     assert "HTTP 200" not in reasons

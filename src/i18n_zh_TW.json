@@ -5348,5 +5348,9 @@
   "gui_hub_deny_title": "Deny／override deny",
   "gui_hub_schedule_change": "為此規則排程變更",
   "gui_hub_mark_done": "標記告警已處理",
-  "gui_hub_marked_done": "告警已標記為已處理"
+  "gui_hub_marked_done": "告警已標記為已處理",
+  "gui_nav_alerts": "告警",
+  "gui_nav_traffic_search": "流量搜尋",
+  "gui_shell_search_jump": "搜尋或跳轉",
+  "gui_shell_user_menu": "帳號與顯示"
 }

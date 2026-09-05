@@ -777,3 +777,41 @@ a.kv:hover { background: var(--surface-hover); }
 .hubactions { display: flex; flex-wrap: wrap; gap: var(--space-3); margin-top: var(--space-6); padding-top: var(--space-5); border-top: 1px solid var(--line-soft); }
 .hubactions .eyebrow { flex-basis: 100%; margin: 0; }
 @media (prefers-reduced-motion: reduce) { .hubseg button { transition: none; } }
+
+/* ============================================================= page head ===
+   v3.1 §5.1: one head per page — a breadcrumb trail, a SENTENCE title, one
+   line of subtitle, and an action row holding at most one primary button.
+   Built by components/page.mjs; every area's own `areaHead` delegates to it.
+   ========================================================================== */
+.phead { display: flex; flex-direction: column; gap: var(--space-3); margin-bottom: var(--space-7); }
+
+.crumbs { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-3); font-size: var(--fs-mini); color: var(--text-3); }
+.crumbs a { color: var(--text-3); text-decoration: none; }
+.crumbs a:hover, .crumbs a:focus-visible { color: var(--text-1); text-decoration: underline; }
+.crumbs i { font-style: normal; color: var(--text-3); }
+
+.phead-main { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-7); }
+.phead-text { min-width: 0; }
+.phead h2 {
+  margin: 0;
+  font-family: var(--font-ui); font-weight: 700;
+  font-size: var(--fs-num); line-height: 1.25; letter-spacing: -.01em;
+  color: var(--text-1); text-wrap: balance;
+}
+.phead p { margin: var(--space-3) 0 0; max-width: 70ch; color: var(--text-2); font-size: var(--fs-ui); }
+.phead .actions { display: flex; flex-wrap: wrap; gap: var(--space-4); flex: none; }
+
+/* Sections and side cards of a detail page (page.mjs's section/sideCard).
+   The h3 is body type at reading weight — §5.2 stops shouting panel titles;
+   the side card's h4 keeps the eyebrow, one of the three allowed uppercases. */
+.sect { min-width: 0; }
+.sect > h3 { margin: 0 0 var(--space-4); display: flex; align-items: baseline; gap: var(--space-4); font-size: var(--fs-ui); font-weight: 700; color: var(--text-1); }
+.sect > h3 small { font-weight: 400; font-size: var(--fs-mini); color: var(--text-3); }
+
+.side-card { background: var(--surface-1); border: 1px solid var(--line); border-radius: var(--radius-l); padding: var(--space-5) var(--space-6); }
+.side-card h4 { margin: 0 0 var(--space-4); }
+
+@media (max-width: 900px) {
+  .phead-main { flex-direction: column; }
+  .phead .actions { width: 100%; }
+}

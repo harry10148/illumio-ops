@@ -37,6 +37,7 @@ import { table, col } from "../components/table.mjs";
 import { palette } from "../components/palette.mjs";
 import { createFilterBar, setFilterBarText, setFilterBarQuery, setFilterBarBrowser } from "../components/filter-bar.mjs";
 import { filterObjectQuery } from "../core/filter-objects.mjs";
+import { pageHead, crumbsFor } from "../components/page.mjs";
 
 const R_RULES = "#/policy/alert-rules";
 const R_OPS = "#/policy/ops";
@@ -45,13 +46,6 @@ const R_SYS_ALERTING = "#/system/alerting";   // v3: AL-10/11/14 (+ a console) l
 // index.html:1266 (rules sub-tabs) — the product splits the same page into
 // "rules" and "actions"; the v2 area keeps that split as two routes.
 // v3 policy area sub-navigation (spec §1): alert rules, rulesets, schedules, ops.
-const SUB_ROUTES = [
-  [R_RULES, "gui_policy_tab_alert_rules"],
-  ["#/policy/rulesets", "gui_policy_tab_rulesets"],
-  ["#/policy/schedules", "gui_policy_tab_schedules"],
-  [R_OPS, "gui_actions"],
-];
-
 const RULE_SNAPS = ["rules", "event_catalog", "events_viewer"];
 const OPS_SNAPS = ["status", "alert_plugins", "rules"];
 
@@ -173,23 +167,17 @@ function badge(text, tn) {
   return el("span", { class: "badge", "data-tone": tn }, el("i", { class: "dot" }), el("span", { text: text }));
 }
 
-/* Route as a data attribute, not visible chrome — see overview.mjs's areaHead. */
+/* v3.1 §5.1: one head per page, built by components/page.mjs. The local copy
+ * this replaced also appended the area's own `.subnav`; sub-navigation lives
+ * in the left-hand shell now (shell.mjs's NAV), so an area draws content only.
+ * The route still rides on the element as data-route — not visible chrome
+ * (density spec R4), but a dozen e2e files read it as "this page mounted". */
 function areaHead(title, route) {
-  return el("div", { class: "area-head", "data-route": route },
-    el("h1", { text: title })
-  );
+  return pageHead({ route: route, title: title, crumbs: crumbsFor(route) });
 }
 
 function areaTop(active) {
-  const head = areaHead(t("gui_nav_policy"), active);
-  const nav = el("nav", { class: "subnav", "aria-label": t("gui_nav_policy") });
-  SUB_ROUTES.forEach(function (pair) {
-    const a = el("a", { href: pair[0], text: t(pair[1]) });
-    if (pair[0] === active) a.setAttribute("aria-current", "page");
-    nav.appendChild(a);
-  });
-  head.appendChild(nav);
-  return head;
+  return areaHead(t("gui_nav_policy"), active);
 }
 
 function labelled(labelText, control, hint) {

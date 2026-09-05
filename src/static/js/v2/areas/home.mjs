@@ -17,7 +17,7 @@ import { num, since, stamp, tone as toneOf } from "../core/fmt.mjs";
 import { drawer } from "../components/drawer.mjs";
 import { palette } from "../components/palette.mjs";
 import { withErrorCard } from "../components/errorcard.mjs";
-import { computeLights } from "../components/healthbar.mjs";
+import { computeLights, healthbar } from "../components/healthbar.mjs";
 import { audit } from "../core/audit.mjs";
 import {
   areaHead, panel, withMeta, withGoto, kv, badge, note, emptyState, brow,
@@ -213,6 +213,13 @@ function installTeardown(state) {
     state.torn = true;
     unsubscribe();
     drawer.closeAll();
+    // v3.1: the health rail is this page's content now, not the shell's, so
+    // its teardown contract is this area's to honour. An open light popover
+    // holds two capture-phase document listeners and the TOPMOST entry on
+    // core/dom.mjs's shared dismiss stack; leaving one behind on a detached
+    // node means the next Escape anywhere in the app is eaten before any live
+    // surface sees it. destroy() closes them and is idempotent.
+    if (state.rail && typeof state.rail.destroy === "function") state.rail.destroy();
     palette.setRoute(path);
   });
 }
@@ -256,6 +263,11 @@ export async function mountHome(root, ctx) {
       el("button", { class: "btn primary", type: "button", text: t("gui_home_go_inbox"), onClick: function () { router.go(GO_INBOX); } })
     );
     board.appendChild(head);
+    // XC-01. Until 3B's five-light rail becomes the spec §2 side card (Task 4)
+    // it keeps its own markup, moved verbatim out of the shell — so it is on
+    // #/home and nowhere else, which is the ruling it always had.
+    state.rail = healthbar.render(st, ov);
+    board.appendChild(state.rail);
     function openPostureDetail() {
       return drawer.open(drawerSpec(t("gui_ov_posture_score_label"), postureDetail(ov.posture || {})));
     }

@@ -1,27 +1,33 @@
-"""Phase 2A Task 11 — in-process Playwright e2e for the v2 shell (chrome).
+"""In-process Playwright e2e for the v2 shell — the left-hand navigation.
 
 Drives a real (headless) Chromium against a real Flask app + real backend
 through tests.v2_e2e_utils's shared harness — see that module's docstring for
 the harness itself.
 
-The shell is what Task 11 added: src/static/js/v2/shell.mjs, mounted by
-app.mjs into src/templates/index.html's `#shell`. Before this task the
-whole chrome was a bare rail host, so nothing here had any coverage at all.
-It owns the four cross-cutting coverage anchors that live outside every area
-(design/v2/coverage.yaml):
+The shell is src/static/js/v2/shell.mjs, mounted by app.mjs into
+src/templates/index.html's `#shell`. v3.1 (spec §1) turned it from a top bar
+into a left-hand navigation; the anchors were re-keyed with it. It owns the
+cross-cutting coverage anchors that live outside every area
+(design/v3/coverage.yaml):
 
   XC-02  the Cmd/Ctrl+K command palette — opens on the shortcut and on the
-         topbar button, filters, runs a command, closes on Escape.
-  XC-13  the topbar user menu — opens, carries the real appliance identity
-         from /api/status, and its two segmented controls really switch
-         theme and density.
-  XC-14  the six-area nav — highlights the area the URL hash names, on a
-         cold load of a deep route as well as after in-page navigation.
+         nav's own entry, filters, runs a command, closes on Escape.
+  SH-01  the left-hand nav — highlights the area the URL hash names, on a
+         cold load of a deep route as well as after in-page navigation, and
+         expands that area's sub-items and no other's. (was XC-14)
+  SH-02  the user popover — opens, carries the real appliance identity from
+         /api/status, and its two segmented controls really switch theme and
+         density. (was XC-13)
+  SH-03  the command-palette entry at the foot of the nav.
   LG-03  sign-out — a real POST /logout that lands back on /login and
          leaves the session actually dead.
 
-XC-01 (the health rail) is covered by tests/test_v2_core_e2e.py, which owns
-the attach/detach-by-route behaviour around it.
+XC-01 (the health rail) moved with v3.1 out of the chrome and into the home
+page; tests/test_v2_core_e2e.py owns its route scoping.
+
+Structural invariants of the nav itself (five areas, one expanded sub-list,
+one page head per route, nothing clipped at 800px) live in
+tests/test_v2_page_types_e2e.py — this file covers behaviour.
 
 Destructive-operation discipline: the only state-changing call in this file
 is POST /logout, and it runs on the harness's throwaway per-test config with
@@ -63,12 +69,12 @@ def _labels(page):
     )
 
 
-# ── XC-14 · the six-area nav ────────────────────────────────────────────────
+# ── SH-01 · the left-hand nav ────────────────────────────────────────────────
 
 def test_nav_marks_the_area_named_by_a_cold_deep_link(v2_page):
     """A cold load of a sub-route highlights its AREA, not just its own path.
 
-    This is the half of XC-14 that a click-driven test cannot reach: the
+    This is the half of SH-01 that a click-driven test cannot reach: the
     highlight has to be derived from the URL at boot (shell.mjs's
     router.onChange fires during router.start()), not set as a side effect
     of the click that navigated.
@@ -76,33 +82,40 @@ def test_nav_marks_the_area_named_by_a_cold_deep_link(v2_page):
     page, base_url = v2_page
     _boot(page, base_url, "#/system/siem")
 
-    nav = page.locator('[data-cov="XC-14"]')
+    nav = page.locator('[data-cov="SH-01"]')
     assert nav.count() == 1
-    current = nav.locator("a[aria-current]")
-    assert current.count() == 1
-    # #/system/siem is a SUB-route; the highlighted link is the area's
-    # landing route, which is a different href.
-    assert current.get_attribute("href") == "#/system/pce"
+    # #/system/siem is a SUB-route, so two links are marked and they are marked
+    # DIFFERENTLY: the area link says "an ancestor of the current page is here"
+    # (aria-current="true"), the sub-item says "this IS the page".
+    area = nav.locator('> a[aria-current]')
+    assert area.count() == 1
+    assert area.get_attribute("href") == "#/system/pce"
+    assert area.get_attribute("aria-current") == "true"
+    page_links = nav.locator('a[aria-current="page"]')
+    assert page_links.count() == 1
+    assert page_links.get_attribute("href") == "#/system/siem"
 
 
 def test_nav_highlight_follows_in_page_navigation(v2_page):
     page, base_url = v2_page
     _boot(page, base_url)
 
-    nav = page.locator('[data-cov="XC-14"]')
-    assert nav.locator("a[aria-current]").get_attribute("href") == "#/home"
+    nav = page.locator('[data-cov="SH-01"]')
+    assert nav.locator('> a[aria-current]').get_attribute("href") == "#/home"
 
-    page.click('[data-cov="XC-14"] a[href="#/reports"]')
+    page.click('[data-cov="SH-01"] > a[href="#/reports"]')
     page.wait_for_function(
-        "() => document.querySelector('[data-cov=\"XC-14\"] a[aria-current]')"
+        "() => document.querySelector('[data-cov=\"SH-01\"] > a[aria-current]')"
         ".getAttribute('href') === '#/reports'"
     )
-    # Exactly one link is ever current — a highlight that is added but never
-    # removed would leave two.
-    assert nav.locator("a[aria-current]").count() == 1
+    # Exactly one AREA link is ever current — a highlight that is added but
+    # never removed would leave two. (#/reports is both the area landing route
+    # and one of its two sub-items, so the sub-list marks it too.)
+    assert nav.locator('> a[aria-current]').count() == 1
+    assert nav.locator('a[aria-current="page"]').count() == 1
 
 
-# ── XC-13 · the topbar user menu ────────────────────────────────────────────
+# ── SH-02 · the user popover ────────────────────────────────────────────
 
 def test_user_menu_opens_with_the_real_appliance_identity(v2_page):
     """The menu's <dl> is filled from the SAME /api/status load that feeds the
@@ -110,14 +123,14 @@ def test_user_menu_opens_with_the_real_appliance_identity(v2_page):
     page, base_url = v2_page
     _boot(page, base_url)
 
-    assert page.locator('[data-cov="XC-13"]').count() == 1
+    assert page.locator('[data-cov="SH-02"]').count() == 1
     assert page.locator(".usermenu-pop").count() == 0
-    assert page.get_attribute(".userchip", "aria-expanded") == "false"
+    assert page.get_attribute(".who", "aria-expanded") == "false"
 
-    page.click(".userchip")
+    page.click(".who")
     pop = page.locator(".usermenu-pop")
     pop.wait_for(state="visible")
-    assert page.get_attribute(".userchip", "aria-expanded") == "true"
+    assert page.get_attribute(".who", "aria-expanded") == "true"
 
     # The running app's own version string, not a fixture literal.
     assert pop.locator("dd").nth(1).inner_text() == "v" + __version__
@@ -131,7 +144,7 @@ def test_user_menu_opens_with_the_real_appliance_identity(v2_page):
 
     page.keyboard.press("Escape")
     page.wait_for_selector(".usermenu-pop", state="detached")
-    assert page.get_attribute(".userchip", "aria-expanded") == "false"
+    assert page.get_attribute(".who", "aria-expanded") == "false"
 
 
 def test_status_marks_legacy_config_as_on_prem_with_full_probe_chain(v2_context, v2_server):
@@ -147,7 +160,7 @@ def test_status_marks_legacy_config_as_on_prem_with_full_probe_chain(v2_context,
 
 
 def test_user_menu_segmented_controls_switch_theme_and_density(v2_page):
-    """XC-13's two segmented controls are the same theme.mjs/density API the
+    """SH-02's two segmented controls are the same theme.mjs/density API the
     #/system/display page writes — proven by reading <html>'s dataset."""
     page, base_url = v2_page
     _boot(page, base_url)
@@ -155,7 +168,7 @@ def test_user_menu_segmented_controls_switch_theme_and_density(v2_page):
     assert page.evaluate("document.documentElement.dataset.theme") == "light"
     assert page.evaluate("document.documentElement.dataset.density") == "cozy"
 
-    page.click(".userchip")
+    page.click(".who")
     page.wait_for_selector(".usermenu-pop")
     # First .seg is theme (buttons dark, light), second is density (cozy,
     # compact); pick the non-default value in each.
@@ -212,14 +225,14 @@ def test_user_menu_reopen_does_not_accumulate_display_listeners(v2_page):
 
     # While the menu is OPEN the count must rise — otherwise the probe is
     # measuring nothing and the "no growth" assertion below is decoration.
-    page.click(".userchip")
+    page.click(".who")
     page.wait_for_selector(".usermenu-pop")
     assert page.evaluate(_COUNT_GETS_DURING_ONE_EMIT) > baseline
     page.keyboard.press("Escape")
     page.wait_for_selector(".usermenu-pop", state="detached")
 
     for _ in range(3):
-        page.click(".userchip")
+        page.click(".who")
         page.wait_for_selector(".usermenu-pop")
         page.keyboard.press("Escape")
         page.wait_for_selector(".usermenu-pop", state="detached")
@@ -247,7 +260,7 @@ def test_palette_exists_hidden_from_boot_and_opens_on_the_shortcut(v2_page):
     # (The list also holds whatever route-scoped commands the mounted area
     # registered, so this checks the five by name rather than by total count.)
     texts = page.locator('[data-cov="XC-02"] li[role="option"]').all_inner_texts()
-    for route in ("#/home", "#/investigate/inbox", "#/policy/alert-rules",
+    for route in ("#/home", "#/investigate/alerts", "#/policy/alert-rules",
                   "#/reports", "#/system/pce"):
         assert any(route in txt for txt in texts), (route, texts)
 
@@ -260,7 +273,7 @@ def test_palette_button_filters_and_runs_a_command(v2_page):
     _boot(page, base_url)
     labels = _labels(page)
 
-    page.click(".kbd-btn")
+    page.click(".kbd-row")
     wrap = page.locator('[data-cov="XC-02"]')
     wrap.wait_for(state="visible")
 
@@ -344,7 +357,7 @@ def test_sign_out_ends_the_session_for_real(v2_context, v2_server):
     try:
         _boot(page, v2_server)
 
-        page.click(".userchip")
+        page.click(".who")
         page.wait_for_selector(".usermenu-pop")
         form = page.locator('[data-cov="LG-03"]')
         assert form.count() == 1
@@ -408,7 +421,7 @@ def test_sign_out_survives_a_csrf_token_refresh_before_submit(v2_context, v2_ser
             "document.querySelector('meta[name=\"csrf-token\"]')"
             ".setAttribute('content', 'e2e-stale-logout-token')"
         )
-        page.click(".userchip")
+        page.click(".who")
         page.wait_for_selector(".usermenu-pop")
         stale = page.locator('[data-cov="LG-03"] input[name="csrf_token"]').input_value()
         assert stale == "e2e-stale-logout-token", stale
@@ -441,7 +454,7 @@ def test_sign_out_button_carries_the_real_product_label(v2_page):
     _boot(page, base_url)
     labels = _labels(page)
 
-    page.click(".userchip")
+    page.click(".who")
     page.wait_for_selector(".usermenu-pop")
     assert (
         page.locator('[data-cov="LG-03"] button[type="submit"]').inner_text()

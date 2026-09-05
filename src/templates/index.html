@@ -15,11 +15,14 @@
 <script src="{{ url_for('static', filename='js/v2/core/theme-bootstrap.js') }}"></script>
 </head>
 <body>
-<!-- shell.mjs builds the whole <header class="chrome"> in here (brand,
-     area nav, palette button, user menu, rail host); area-root is the only
-     thing the router ever writes into. -->
+<!-- shell.mjs builds the whole <nav class="sidenav"> in here (brand, the
+     five areas and the current one's sub-items, the palette entry, the user
+     popover); area-root is the only thing the router ever writes into. The
+     two are grid columns of .frame — see css/v2/app.css. -->
+<div class="frame">
 <div id="shell"></div>
-<main id="area-root"></main>
+<main id="area-root" class="workarea"></main>
+</div>
 <script type="module" src="{{ url_for('static', filename='js/v2/app.mjs') }}"></script>
 </body>
 </html>

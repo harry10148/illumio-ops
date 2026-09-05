@@ -6,8 +6,9 @@ that module's docstring for why this harness had to be built and why it
 lives there rather than inline here.
 
 Covers exactly the brief's Step 2 acceptance list:
-  - #/home shows the health rail; #/reports does not (XC-01 scope, T2's
-    syncRail wiring in app.mjs).
+  - #/home shows the health rail; #/reports does not (XC-01 scope — v3.1
+    moved the rail out of the chrome and into areas/home.mjs, so the scoping
+    is now "the home page builds it" rather than app.mjs's old syncRail).
   - hash routing switches the mounted area without a page reload.
   - theme AND density persist across a reload (theme.mjs + app.mjs's
     initDisplay()).
@@ -97,19 +98,21 @@ def test_v2_boots_with_no_console_errors(v2_page):
 def test_health_rail_only_on_overview(v2_page):
     """XC-01's route scoping, against the REAL five-light healthbar.
 
-    Task 11 replaced app.mjs's Task-2 stand-in rail (a #health-rail div
-    holding two /api/status fields) with components/healthbar.mjs, so the
-    selector moved from `#health-rail` to the component's own XC-01 anchor
-    and the "real daemon field reaches the DOM" assertion moved to the user
-    menu, which applyStatus() fills from the same /api/status payload. The
-    attach/detach behaviour under test is unchanged, and so is the number of
-    things asserted — see task-11-report.md.
+    v3.1 (spec §1) took the rail out of the chrome: it is home-page CONTENT
+    now, built by areas/home.mjs from the two snapshots that page already
+    loads, so app.mjs's HEALTH_ROUTES/syncRail detach-not-destroy machinery
+    is gone with it. The scoping being asserted is the same one it always
+    had — the rail is on #/home and on no other route — but the mechanism
+    underneath is "the page builds it" rather than "the shell lends it", so
+    the round trip below now asserts a REBUILT rail rather than the same node
+    coming back. That is the behaviour change, stated rather than hidden: the
+    marker must NOT survive.
     """
     page, base_url = v2_page
     _goto_overview(page, base_url)
 
     # #/home: the real rail is present, with all five lights.
-    rail = page.locator('.rail-host [data-cov="XC-01"]')
+    rail = page.locator('#area-root [data-cov="XC-01"]')
     assert rail.count() == 1
     assert rail.locator(".rail-slot").count() == 5
 
@@ -118,14 +121,14 @@ def test_health_rail_only_on_overview(v2_page):
     # a fixture literal). This is where the Task-2 rail's __version__ check
     # lives now. The menu's <dl> only exists while the popover is open, so
     # open it the way an operator would.
-    page.click(".userchip")
+    page.click(".who")
     assert __version__ in page.locator(".usermenu-pop dd").nth(1).inner_text()
     page.keyboard.press("Escape")
 
-    # Mark the live rail node so the re-attach assertion below can prove it is
-    # the SAME node coming back, not a rebuilt one.
+    # Mark the live rail node so the assertion below can tell a rebuilt rail
+    # from the same one coming back.
     page.evaluate(
-        "document.querySelector('.rail-host [data-cov=\"XC-01\"]')"
+        "document.querySelector('#area-root [data-cov=\"XC-01\"]')"
         ".setAttribute('data-e2e-marker', 'rail-1')"
     )
 
@@ -134,7 +137,7 @@ def test_health_rail_only_on_overview(v2_page):
     # landing path with no page of its own, by design.)
     page.evaluate("location.hash = '#/system'")
     page.wait_for_selector('[data-route="#/system"]')
-    assert page.locator('.rail-host [data-cov="XC-01"]').count() == 0
+    assert page.locator('[data-cov="XC-01"]').count() == 0
 
     # The placeholder body must degrade through the i18n fallback, not leak the
     # raw, unresolved key onto the screen (review finding: tf() had no fallback
@@ -149,14 +152,14 @@ def test_health_rail_only_on_overview(v2_page):
     assert "#/system" not in wip_text
     assert page.locator('[data-route="#/system"]').count() == 1
 
-    # And switching back re-attaches THE SAME node (detach-not-destroy
-    # semantics): healthbar.render() runs once at boot off one pair of
-    # snapshot loads, so a marker that survived the round trip is the proof
-    # the rail is moved rather than rebuilt (a rebuild would also refetch).
+    # And switching back BUILDS A NEW ONE: the rail is part of the page, so
+    # it is torn down with the page and rendered again from that mount's own
+    # snapshot loads. The marker must be gone — if it survived, something is
+    # still caching the node across mounts, which is the leak v3.1 removed.
     page.evaluate("location.hash = '#/home'")
-    page.wait_for_selector('.rail-host [data-cov="XC-01"]')
-    assert page.locator('.rail-host [data-cov="XC-01"]').get_attribute("data-e2e-marker") == "rail-1"
-    assert page.locator('.rail-host [data-cov="XC-01"] .rail-slot').count() == 5
+    page.wait_for_selector('#area-root [data-cov="XC-01"]')
+    assert page.locator('#area-root [data-cov="XC-01"]').get_attribute("data-e2e-marker") is None
+    assert page.locator('#area-root [data-cov="XC-01"] .rail-slot').count() == 5
 
 
 def test_theme_and_density_persist_across_reload(v2_page):
@@ -282,7 +285,7 @@ def test_i18n_init_failure_is_logged_not_silent(v2_page):
 # ══════════════════════════ Task 12d — leaks the core layer used to allow ════
 
 def test_detaching_the_health_rail_releases_its_popover(v2_page):
-    """F5: syncRail detaches the rail without calling its destroy().
+    """F5: leaving #/home must call the rail's destroy().
 
     An open light popover holds two capture-phase document listeners and an
     entry on core/dom.mjs's shared dismiss stack (dismissible()). Detaching
@@ -290,26 +293,26 @@ def test_detaching_the_health_rail_releases_its_popover(v2_page):
     of the stack, so the next Escape anywhere in the app is eaten by its
     stopImmediatePropagation() before any live surface can see it.
 
-    RED against the pre-fix app.mjs: the popover is still open when the rail
-    comes back (aria-expanded="true", .rail-pop still in it), and the Escape
-    probe below never fires."""
+    v3.1 moved the rail into areas/home.mjs, so the obligation moved with it:
+    that module's installTeardown() calls destroy() when the router leaves the
+    page. RED without it: the dismiss stack keeps the stale entry and the
+    Escape probe below never fires."""
     page, base_url = v2_page
     _goto_overview(page, base_url)
 
-    cell = page.locator('.rail-host [data-cov="XC-01"] .rail-cell').first
+    cell = page.locator('#area-root [data-cov="XC-01"] .rail-cell').first
     cell.click()
     assert cell.get_attribute("aria-expanded") == "true"
-    assert page.locator(".rail-host .rail-pop").count() == 1
+    assert page.locator("#area-root .rail-pop").count() == 1
 
-    # Away and back: the rail is detached, then re-attached (the same node —
-    # test_health_rail_only_on_overview proves the identity).
+    # Away and back: the rail is destroyed with the page, then rebuilt.
     page.evaluate("location.hash = '#/reports'")
     page.wait_for_selector('[data-route="#/reports"]')
     page.evaluate("location.hash = '#/home'")
-    page.wait_for_selector('.rail-host [data-cov="XC-01"]')
+    page.wait_for_selector('#area-root [data-cov="XC-01"]')
 
-    assert page.locator('.rail-host .rail-cell[aria-expanded="true"]').count() == 0
-    assert page.locator(".rail-host .rail-pop").count() == 0
+    assert page.locator('#area-root .rail-cell[aria-expanded="true"]').count() == 0
+    assert page.locator("#area-root .rail-pop").count() == 0
 
     # ...and the dismiss stack is clear: a listener registered NOW, i.e. after
     # any stale one, still sees Escape. Same node (document), same capture
