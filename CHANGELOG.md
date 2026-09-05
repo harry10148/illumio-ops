@@ -36,6 +36,32 @@ a plain `<major>.<minor>.<patch>` scheme. (Tags through v4.0.0 carried a
 
 ### Changed
 
+- **Web GUI v3.1 — the workbench.** The top bar becomes a left-hand
+  navigation that owns the five areas and the current area's sub-items, with
+  the open-alert count on Investigate; the command-palette entry and the user
+  popover move to its foot. Every page gets one head — breadcrumbs, a sentence
+  title, at most one primary action — built by a single component the areas
+  delegate to.
+
+  Home leads with the ten most recent alerts, one row each, and keeps three
+  quiet cards beside them: the six system lights (each with its reasons a
+  click away), today's schedule, and where policy stands. The five-light
+  instrument rail, the 7-day traffic-decision band and the posture drawer are
+  gone; the lights' computation is unchanged.
+
+  The alert inbox and the five-step investigation flow are removed. In their
+  place, `#/investigate/alerts` lists the alerts and `?id=` opens one: what
+  happened, who was talking to whom — with each flow's covering rule fetched
+  from the PCE as the page loads — what you can do, and the dispatch record
+  folded away. `#/investigate/inbox` redirects, keeping its query.
+
+  Copy: no control's text is a route any more (six modules were gluing the
+  "go to" word onto a route variable, and so was the command palette); no
+  settings field is labelled with its storage key; no heading is set in
+  capitals; a credential shows a chip saying whether it is set. Two lints and
+  three DOM gates hold each of those, and the counts they permit are recorded
+  per file so they can only fall.
+
 - **Web GUI v3 — five task-oriented areas.** The six v2 areas become Home,
   Investigate, Policy, Reports and System; Automation is dissolved (rule
   scheduling under Policy, report schedules under Reports, background jobs
