@@ -18,6 +18,7 @@ every settings route) and the `.mono` DOM sweep (§7) arrive with Tasks 5 and
 """
 from __future__ import annotations
 
+import json
 import re
 
 import pytest
@@ -310,14 +311,45 @@ def test_no_label_is_clipped_at_1280(v2_page):
     ruleset name is long because the data is long, and an ellipsis with a
     `title` is the right answer there.
 
-    #/reports is the page that showed it, and it is the densest right column
-    in the product — six cards of KPI mosaics — so it is the one worth
-    pinning.
+    The audit summary is STUBBED, and the first version of this test is why:
+    it waited on `.kpi dt` and passed locally off a stale
+    `latest_snapshot.json` left in the reports directory. CI has no snapshot,
+    so the mosaic never rendered and the gate timed out — it had been checking
+    a surface that only exists when the machine happens to have data. The stub
+    carries deliberately long labels, so the half of the rule about KPI
+    captions bites on every machine rather than on mine.
     """
     page, base_url = v2_page
+
+    audit = {
+        "ok": True,
+        "summary": {
+            "date_range": ["2026-08-30", "2026-09-06"],
+            "kpis": [
+                {"label": "Total Events", "value": "2"},
+                {"label": "Security Concerns", "value": "0"},
+                {"label": "Agent Connectivity", "value": "0"},
+                {"label": "Draft Rule Changes", "value": "1"},
+                {"label": "High-Risk Events", "value": "0"},
+                {"label": "Policy Provisions", "value": "0"},
+            ],
+            "attention_items": [],
+        },
+    }
+    page.route("**/api/dashboard/audit_summary",
+               lambda r: r.fulfill(status=200, content_type="application/json",
+                                   body=json.dumps(audit)))
+
     page.set_viewport_size({"width": 1280, "height": 900})
     _open(page, base_url, "#/reports")
     page.wait_for_selector(".workarea .kpi dt", timeout=30000)
+
+    # The stub really is what is on screen — otherwise this could pass off
+    # whatever data the machine happened to have, which is the failure the
+    # docstring above describes.
+    labels = page.eval_on_selector_all(
+        ".workarea .kpi dt", "els => els.map(e => e.textContent.trim())")
+    assert "Security Concerns" in labels, labels
 
     clipped = page.evaluate(
         "Array.from(document.querySelectorAll('.workarea .kpi dt, .workarea .panel-h h3'))"
