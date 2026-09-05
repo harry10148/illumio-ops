@@ -439,8 +439,17 @@ table.tbl tbody tr.hl td:first-child { box-shadow: inset 2px 0 0 var(--mark); }
 }
 textarea.field { height: auto; padding: var(--space-3) var(--space-4); line-height: 1.5; resize: vertical; }
 textarea.ta { font-family: var(--font-mono); font-size: var(--fs-mini); }
-.rofields .s { font-family: var(--font-mono); font-size: var(--fs-mini); color: var(--text-1); }
-.rofields code.c { color: var(--accent-fg); }
+/* A read-only backend row: human label, its value, and why it is not editable
+   here. v3.1 §5.2 took the config key out of the label, so the label is body
+   text now and the row is laid out as label / value / reason rather than as a
+   run of monospace that read like one sentence. */
+.rofields li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--space-2) var(--space-5); align-items: baseline; padding: var(--space-3) 0; border-top: 1px solid var(--line-soft); }
+.rofields li:first-child { border-top: 0; }
+/* .stack .c is the monospace identifier style, and roList is a .stack — the
+   label is a human phrase now, so it overrides it. */
+.rofields .c { font-family: var(--font-ui); font-size: var(--fs-body); color: var(--text-1); white-space: normal; }
+.rofields .s { justify-self: end; font-size: var(--fs-body); color: var(--text-1); font-variant-numeric: tabular-nums; }
+.rofields .r { grid-column: 1 / -1; font-size: var(--fs-mini); color: var(--text-3); }
 
 /* the catalogue card under the event-type select (rules.js:392-441) */
 .evinfo {

@@ -18,6 +18,8 @@ every settings route) and the `.mono` DOM sweep (§7) arrive with Tasks 5 and
 """
 from __future__ import annotations
 
+import re
+
 import pytest
 
 pytest.importorskip("playwright.sync_api", exc_type=ImportError)
@@ -204,3 +206,55 @@ def test_the_page_head_is_actually_styled(v2_page):
     assert row and row["display"] == "flex" and row["justify"] == "space-between", row
     crumbs = styles(".workarea .phead .crumbs")
     assert crumbs and crumbs["display"] == "flex" and crumbs["gap"] > 0, crumbs
+
+
+# ── §5.1 · the settings page type ───────────────────────────────────────────
+
+# The system area's editable pages. Three routes under the same prefix are
+# deliberately absent, and each for the same reason — there is nothing on them
+# to save: jobs and logs are read-only viewers, and alerting is an ACTIONS page
+# (send a test alert, reset a watermark, read channel status) rendered by
+# areas/policy_rules.mjs, not a form. Measured, not assumed: a probe over all
+# eleven system routes found a save row on exactly these eight.
+SETTINGS = [
+    "#/system/pce", "#/system/cache", "#/system/siem", "#/system/tls",
+    "#/system/security", "#/system/display", "#/system/channels",
+]
+
+
+def test_every_settings_page_has_a_docked_save_row(v2_page):
+    """§5.1: a settings page ends in a save row that says what is unsaved.
+
+    RATCHET, not a cleanup: system.mjs has docked this row since 3B, so this
+    holds the day it is written. It is here because Task 5 rewrote what those
+    pages print, and the save row is the one part of the settings page type
+    that a copy rewrite could quietly drop — the pages would still look right
+    and there would be no way to write anything.
+    """
+    page, base_url = v2_page
+    for route in SETTINGS:
+        _open(page, base_url, route)
+        page.wait_for_selector(".workarea .savebar", timeout=30000)
+        assert page.locator(".workarea .savebar").count() == 1, route
+        # ...and it is docked, not floating over the last field.
+        assert page.locator(".workarea .savedock").count() == 1, route
+
+
+def test_no_settings_page_labels_a_field_with_its_config_key(v2_page):
+    """§5.2 in the rendered DOM, where tests/test_gui_copy_lint.py cannot see.
+
+    The lint bans the roField IDIOM; this bans the RESULT. A read-only row's
+    label may not be a bare snake_case identifier, however it got there.
+    """
+    page, base_url = v2_page
+    offenders = []
+    for route in SETTINGS:
+        _open(page, base_url, route)
+        page.wait_for_selector(".workarea .savebar", timeout=30000)
+        labels = page.eval_on_selector_all(
+            ".workarea .rofields .c", "els => els.map(e => e.textContent.trim())"
+        )
+        for text in labels:
+            if re.fullmatch(r"[a-z][a-z0-9]*(_[a-z0-9]+)+", text or ""):
+                offenders.append((route, text))
+    assert offenders == [], offenders

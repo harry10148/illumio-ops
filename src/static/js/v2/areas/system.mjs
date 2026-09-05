@@ -170,7 +170,7 @@ import { drawer } from "../components/drawer.mjs";
 import { modal } from "../components/modal.mjs";
 import { table, col } from "../components/table.mjs";
 import { palette } from "../components/palette.mjs";
-import { pageHead, crumbsFor } from "../components/page.mjs";
+import { pageHead, crumbsFor, chip } from "../components/page.mjs";
 
 const R_PCE = "#/system/pce";
 const R_CACHE = "#/system/cache";
@@ -456,16 +456,46 @@ function showValue(v) {
   return String(v);
 }
 
-/** A backend field this form deliberately does not control, with the reason. */
-function roField(key, value, noteText) {
+/**
+ * A backend field this form deliberately does not control, with the reason.
+ *
+ * The first argument is an i18n KEY, not the config key. It used to be the
+ * config key itself, printed verbatim inside a <code> — so eighteen rows read
+ * `cache_read_max_rows`, `hec_token`, `old_password` at an operator, which is
+ * the thing §5.2 stops ("不印設定鍵名"). The config key survives where it is
+ * useful and invisible: on the value's `data-field`, for anyone reading the
+ * DOM. `field` may be omitted when the row describes a shape rather than a
+ * stored setting (the DLQ record's columns, the CSR's optional inputs).
+ */
+function roField(labelKey, value, noteText, field) {
+  return roRow(t(labelKey), value, noteText, field);
+}
+
+/**
+ * The same row for a label the BACKEND supplies rather than the catalogue.
+ *
+ * The notification-channel plugins describe their own fields, so their labels
+ * arrive already localized in `field.label`; passing `field.key` — which is a
+ * config path like `alerts.smtp.password` — was both the §5.2 violation and a
+ * stream of misses in i18n.missing(), because t() was being handed a path.
+ */
+function roRow(labelText, value, noteText, field) {
   const li = el("li");
-  li.appendChild(el("code", { class: "c", text: key }));
-  const v = el("span", { class: "s", text: showValue(value) });
-  v.dataset.field = key;
+  li.appendChild(el("span", { class: "c", text: labelText }));
+  const v = el("span", { class: "s" });
+  if (isSecretState(value)) v.appendChild(chip(String(value), secretTone(value)));
+  else v.textContent = showValue(value);
+  if (field) v.dataset.field = field;
   li.appendChild(v);
   li.appendChild(el("span", { class: "r", text: noteText }));
   return li;
 }
+
+/** §5.3: a credential is a chip that says whether it is set, never a mask. */
+function isSecretState(value) {
+  return value === t("gui_sy_secret_set") || value === t("gui_sy_secret_unset");
+}
+function secretTone(value) { return value === t("gui_sy_secret_set") ? "ok" : "neutral"; }
 
 function roList(rows) { return el("ul", { class: "stack rofields" }, rows); }
 
@@ -1244,11 +1274,11 @@ async function mountCache(root, ctx) {
        * here with their values and the reason they are read-only. */
       const gapPanel = panel(null, t("gui_sy_cache_nogui"));
       gapPanel.body.appendChild(roList([
-        roField("cache_read_max_rows", s.cache_read_max_rows, t("gui_sy_cache_nogui_note")),
-        roField("disk_free_warn_gb", s.disk_free_warn_gb, t("gui_sy_cache_nogui_note")),
-        roField("flow_delta_enabled", s.flow_delta_enabled, t("gui_sy_cache_nogui_note")),
-        roField("flow_obs_retention_hours", s.flow_obs_retention_hours, t("gui_sy_cache_nogui_note")),
-        roField("siem_pending_warn_rows", s.siem_pending_warn_rows, t("gui_sy_cache_nogui_note")),
+        roField("gui_sy_ro_cache_read_max_rows", s.cache_read_max_rows, t("gui_sy_cache_nogui_note"), "cache_read_max_rows"),
+        roField("gui_sy_ro_disk_free_warn_gb", s.disk_free_warn_gb, t("gui_sy_cache_nogui_note"), "disk_free_warn_gb"),
+        roField("gui_sy_ro_flow_delta_enabled", s.flow_delta_enabled, t("gui_sy_cache_nogui_note"), "flow_delta_enabled"),
+        roField("gui_sy_ro_flow_obs_retention_hours", s.flow_obs_retention_hours, t("gui_sy_cache_nogui_note"), "flow_obs_retention_hours"),
+        roField("gui_sy_ro_siem_pending_warn_rows", s.siem_pending_warn_rows, t("gui_sy_cache_nogui_note"), "siem_pending_warn_rows"),
       ]));
       gapPanel.body.appendChild(note(t("gui_sy_cache_nogui_body")));
       board.appendChild(gapPanel);
@@ -1404,7 +1434,7 @@ function destDrawer(dest, isEdit) {
   const hecSection = el("div", null,
     sectionHead(t("gui_siem_sec_hec")),
     labelled(t("gui_siem_hec_token"), form.track("hec_token", hecToken, "secret"), t("gui_sy_secret_hint")),
-    roList([roField("hec_token", secretState(dst, "hec_token"), t("gui_sy_secret_short"))]));
+    roList([roField("gui_sy_ro_hec_token", secretState(dst, "hec_token"), t("gui_sy_secret_short"), "hec_token")]));
 
   /* siemToggleCondFields, integrations.js:906-923 — TLS block for tls|hec, HEC
    * block for hec only, and the port default swap. The hidden sections are still
@@ -1463,8 +1493,8 @@ function destDrawer(dest, isEdit) {
   body.appendChild(note(t("gui_sy_secret_note")));
   body.appendChild(sectionHead(t("gui_sy_siem_nomodal")));
   body.appendChild(roList([
-    roField("profile", dst.profile, t("gui_sy_siem_profile_note")),
-    roField("mask_pii", dst.mask_pii, t("gui_sy_siem_maskpii_note")),
+    roField("gui_sy_ro_profile", dst.profile, t("gui_sy_siem_profile_note"), "profile"),
+    roField("gui_sy_ro_mask_pii", dst.mask_pii, t("gui_sy_siem_maskpii_note"), "mask_pii"),
   ]));
   body.appendChild(el("div", { class: "typechips" },
     btn("btn", t("gui_siem_test_inline"), function () {
@@ -1523,13 +1553,13 @@ function dlqDrawer(entry) {
       el("p", { text: t("gui_it_dlq_empty_body") })));
     body.appendChild(sectionHead(t("gui_sy_dlq_fields")));
     body.appendChild(roList([
-      roField("destination", null, t("gui_sy_dlq_f_dest")),
-      roField("source_id", null, t("gui_sy_dlq_f_id")),
-      roField("quarantined_at", null, t("gui_sy_dlq_f_at")),
-      roField("retries", null, t("gui_sy_dlq_f_retries")),
-      roField("last_error", null, t("gui_sy_dlq_f_err")),
-      roField("payload", null, t("gui_sy_dlq_f_payload")),
-      roField("payload_source", null, t("gui_sy_dlq_f_src")),
+      roField("gui_sy_ro_dlq_destination", null, t("gui_sy_dlq_f_dest")),
+      roField("gui_sy_ro_dlq_source_id", null, t("gui_sy_dlq_f_id")),
+      roField("gui_sy_ro_dlq_quarantined_at", null, t("gui_sy_dlq_f_at")),
+      roField("gui_sy_ro_dlq_retries", null, t("gui_sy_dlq_f_retries")),
+      roField("gui_sy_ro_dlq_last_error", null, t("gui_sy_dlq_f_err")),
+      roField("gui_sy_ro_dlq_payload", null, t("gui_sy_dlq_f_payload")),
+      roField("gui_sy_ro_dlq_payload_source", null, t("gui_sy_dlq_f_src")),
     ]));
     body.appendChild(note(t("gui_sy_dlq_src_dropped")));
     return drawerSpec(t("gui_dlq_modal_title"), body);
@@ -2112,7 +2142,7 @@ async function mountTls(root, ctx) {
     csrPanel.body.appendChild(el("div", { class: "fld" },
       el("label", null, el("span", { text: t("gui_tls_csr_pem_label") })), csrOut));
     // config.py:373 accepts an `ou` field that no input in the product produces.
-    csrPanel.body.appendChild(roList([roField("ou", null, t("gui_sy_tls_ou_note"))]));
+    csrPanel.body.appendChild(roList([roField("gui_sy_ro_csr_ou", null, t("gui_sy_tls_ou_note"))]));
     paintCsr();
 
     // ── import (settings.js:513-520, importSignedCert :652-671) ──────
@@ -2190,8 +2220,8 @@ async function mountSecurity(root, ctx) {
      * still holds its bootstrap password. It is a status row here. */
     secPanel.body.appendChild(sectionHead(t("gui_sy_sec_state")));
     secPanel.body.appendChild(roList([
-      roField("auth_setup", sec.auth_setup, t("gui_sy_sec_authsetup")),
-      roField("old_password", null, t("gui_sy_sec_oldpw")),
+      roField("gui_sy_ro_auth_setup", sec.auth_setup, t("gui_sy_sec_authsetup"), "auth_setup"),
+      roField("gui_sy_ro_old_password", null, t("gui_sy_sec_oldpw")),
     ]));
     secPanel.body.appendChild(note(t("gui_sy_sec_rotate")));
     board.appendChild(secPanel);
@@ -2502,7 +2532,7 @@ async function mountChannels(root, ctx) {
         if (f.secret) {
           const holder = nestedValue(s, (f.config_path || []).slice(0, -1)) || {};
           const leaf = (f.config_path || [])[(f.config_path || []).length - 1];
-          card.appendChild(roList([roField(f.key, secretState(holder, leaf), t("gui_sy_secret_short"))]));
+          card.appendChild(roList([roRow(f.label, secretState(holder, leaf), t("gui_sy_secret_short"), f.key)]));
         }
       });
       grid.appendChild(card);
