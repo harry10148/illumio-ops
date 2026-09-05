@@ -665,21 +665,11 @@ function genDrawer(rt, d, lang, hooks) {
   // one argument instead of needing spread syntax this codebase avoids.
   if (explainNotes.length) body.appendChild(disclosure(t("gui_gen_explain"), explainNotes));
 
-  // Body keys the form does not expose as controls, and the exact request
-  // this drawer is about to send — real evidence (RP-02's header point 4),
-  // not decoration. Left visible rather than folded into a disclosure: the
-  // drawer itself only opens on demand (investigate.mjs's filtersDrawer
-  // makes the identical call for its own payload preview, same reasoning —
-  // this is the one place an operator can see what a click on 產生 actually
-  // sends, and it is already one click away from the catalogue, not on the
-  // page's default screen). traffic_report_profile is the card's own
-  // identity (dashboard.js:962-967 reads it from the button that opened the
-  // modal, never from an input) — it still reaches the backend, so it is
-  // stated rather than left to be discovered only in the payload pane.
-  if (rt.has("filters")) {
-    body.appendChild(sectionHead(t("gui_rp_ro_section")));
-    body.appendChild(roList([roField("traffic_report_profile", rt.id, t("gui_rp_fn_profile"))]));
-  }
+  /* The one read-only row this drawer had stated the report type of the card
+   * you had just clicked, labelled with its storage key. Both halves were
+   * things the operator already knew or had no use for, so the row is gone.
+   * It still reaches the backend as `traffic_report_profile` (see repaint).
+   */
   /* The outgoing-request preview is gone from this drawer too, for the same
    * reason as the settings pages: it described the API on a surface whose job
    * is to generate a report. The form's own fields already say what will be
@@ -1060,8 +1050,11 @@ async function mountReports(root, ctx) {
         clear(grid);
         RTYPES.forEach(function (rt) {
           const card = el("article", { class: "rpcard", "data-rtype": rt.id });
+          /* The slug (`traffic`, `security_risk`, …) used to lead the card in
+           * mono, directly above the human title that says the same thing.
+           * It stays on the element as data-rtype, where the tests that need
+           * to address a card already read it, and off the screen. */
           card.appendChild(el("div", { class: "rpcard-h" },
-            el("code", { text: rt.id }),
             el("span", { class: "rpcard-sched", text: schedChip(schedByType[rt.id]) })));
           card.appendChild(el("b", { text: t(rt.titleKey) }));
           card.appendChild(el("p", { text: t(rt.descKey) }));

@@ -867,20 +867,21 @@ function scheduleDrawerBody(target, cov, onSaved) {
   // ── the fields the form sends but never shows, and the stored-only ones ──
   body.appendChild(sectionHead(t("gui_au_stored_fields")));
   body.appendChild(roList([
-    roField("href", target.href, t("gui_au_ro_href")),
-    roField("is_ruleset", String(!isRule), t("gui_au_ro_is_ruleset")),
-    roField("detail_rs", target.detail_rs, t("gui_au_ro_detail")),
-    roField("detail_src", target.detail_src, t("gui_au_ro_detail")),
-    roField("detail_dst", target.detail_dst, t("gui_au_ro_detail")),
-    roField("detail_svc", target.detail_svc, t("gui_au_ro_detail")),
-    roField("id", prev.id, t("gui_au_ro_id")),
-    roField("last_checked", prev.last_checked, t("gui_au_ro_state")),
-    roField("last_action", prev.last_action, t("gui_au_ro_state")),
-    roField("last_result", prev.last_result, t("gui_au_ro_state")),
-    roField("last_error", prev.last_error, t("gui_au_ro_state")),
-    roField("pce_status", prev.pce_status, t("gui_au_ro_recon")),
-    roField("live_enabled", prev.live_enabled, t("gui_au_ro_recon")),
-    roField("live_name", prev.live_name, t("gui_au_ro_recon")),
+    /* §5.2: named, not keyed. `is_ruleset` went instead of getting a name —
+     * it restates the shape of the address on the row above it. */
+    roField("gui_au_ro_l_href", target.href, t("gui_au_ro_href")),
+    roField("gui_au_ro_l_ruleset", target.detail_rs, t("gui_au_ro_detail")),
+    roField("gui_au_ro_l_source", target.detail_src, t("gui_au_ro_detail")),
+    roField("gui_au_ro_l_dest", target.detail_dst, t("gui_au_ro_detail")),
+    roField("gui_au_ro_l_service", target.detail_svc, t("gui_au_ro_detail")),
+    roField("gui_au_ro_l_id", prev.id, t("gui_au_ro_id")),
+    roField("gui_au_ro_l_checked", prev.last_checked, t("gui_au_ro_state")),
+    roField("gui_au_ro_l_action", prev.last_action, t("gui_au_ro_state")),
+    roField("gui_au_ro_l_result", prev.last_result, t("gui_au_ro_state")),
+    roField("gui_au_ro_l_error", prev.last_error, t("gui_au_ro_state")),
+    roField("gui_au_ro_l_pce", prev.pce_status, t("gui_au_ro_recon")),
+    roField("gui_au_ro_l_live_on", prev.live_enabled, t("gui_au_ro_recon")),
+    roField("gui_au_ro_l_live_name", prev.live_name, t("gui_au_ro_recon")),
   ]));
 
   const errLine = el("p", { class: "note", "data-tone": "crit" });
@@ -1677,11 +1678,11 @@ function reportDrawerBody(sched, onSaved) {
 
   body.appendChild(sectionHead(t("gui_au_stored_fields")));
   body.appendChild(roList([
-    roField("id", s.id, t("gui_au_ro_sched_id")),
-    roField("enabled", String(state.enabled), t("gui_au_ro_enabled")),
-    roField("last_run", s.last_run, t("gui_au_ro_state")),
-    roField("last_status", s.last_status, t("gui_au_ro_state")),
-    roField("last_error", s.last_error, t("gui_au_ro_state")),
+    roField("gui_au_ro_l_sched_id", s.id, t("gui_au_ro_sched_id")),
+    roField("gui_au_ro_l_enabled", String(state.enabled), t("gui_au_ro_enabled")),
+    roField("gui_au_ro_l_last_run", s.last_run, t("gui_au_ro_state")),
+    roField("gui_au_ro_l_status", s.last_status, t("gui_au_ro_state")),
+    roField("gui_au_ro_l_error", s.last_error, t("gui_au_ro_state")),
   ]));
 
   function syncFreq() {

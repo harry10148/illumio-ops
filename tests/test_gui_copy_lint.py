@@ -140,19 +140,19 @@ _ROFIELD_RE = re.compile(r"""roField\(\s*["'](?!gui_)[a-z][a-z0-9_]*["']""")
 # report row, all of them Task 6's area. So the baseline is asserted PER FILE
 # rather than at zero: system.mjs may not regress, and none of the other three
 # may grow.
-_ROFIELD_BASELINE = {
-    "areas/policy_rules.mjs": 27,
-    "areas/policy_scheduler.mjs": 19,
-    "areas/reports.mjs": 1,
-}
+# Zero, everywhere. The 47 rows this baseline was holding at a standstill were
+# renamed (and nine dropped — a row whose value is a constant, or is an
+# identifier out of our own catalogue, was not telling the operator anything).
+# A ratchet is the honest shape while a rule is being paid down; once it is
+# paid, the rule states itself.
+_ROFIELD_BASELINE = {}
 
 
 def test_no_config_keys_are_printed_on_screen():
     """§5.2: `smtp.password` and friends are not words an operator knows."""
     hits = _hits(_ROFIELD_RE)
     assert hits == _ROFIELD_BASELINE, (
-        "config keys rendered as field labels (spec §5.2). system.mjs must "
-        f"stay at zero and policy_rules.mjs must not grow: {hits}"
+        f"config keys rendered as field labels (spec §5.2): {hits}"
     )
 
 

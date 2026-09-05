@@ -294,3 +294,34 @@ def test_every_page_titles_itself_and_not_the_area_it_sits_in(v2_page):
         if title != crumbs[-1]:
             offenders.append((route, title, crumbs))
     assert offenders == [], offenders
+
+
+def test_no_label_is_clipped_at_1280(v2_page):
+    """A LABEL that does not fit is a layout bug, not a long value.
+
+    `test_nothing_clips_at_800` covers the nav and the page title. This covers
+    the two places a short, fixed piece of copy is laid out inside a narrow
+    column and was being cut down to nonsense at the DEFAULT width: the KPI
+    mosaic's `dt` ("Total Ev…", "Securit…", "High-Ri…") and a panel's own `h3`
+    ("Top Ac…"). Both are captions the designer chose, not data — if one does
+    not fit, the column is wrong, and the reader is left guessing.
+
+    Values are deliberately out of scope: a filename, an event href or a
+    ruleset name is long because the data is long, and an ellipsis with a
+    `title` is the right answer there.
+
+    #/reports is the page that showed it, and it is the densest right column
+    in the product — six cards of KPI mosaics — so it is the one worth
+    pinning.
+    """
+    page, base_url = v2_page
+    page.set_viewport_size({"width": 1280, "height": 900})
+    _open(page, base_url, "#/reports")
+    page.wait_for_selector(".workarea .kpi dt", timeout=30000)
+
+    clipped = page.evaluate(
+        "Array.from(document.querySelectorAll('.workarea .kpi dt, .workarea .panel-h h3'))"
+        ".filter(e => e.scrollWidth > e.clientWidth + 1)"
+        ".map(e => e.textContent.trim())"
+    )
+    assert clipped == [], clipped

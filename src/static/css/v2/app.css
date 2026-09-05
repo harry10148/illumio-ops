@@ -554,7 +554,6 @@ textarea.ta { font-family: var(--font-mono); font-size: var(--fs-mini); }
 }
 .rpcard:hover { border-color: var(--line); }
 .rpcard-h { display: flex; align-items: center; gap: var(--space-4); }
-.rpcard-h code { font-family: var(--font-mono); font-size: var(--fs-micro); color: var(--accent-fg); letter-spacing: .04em; }
 .rpcard-sched {
   margin-left: auto; font-family: var(--font-mono); font-size: var(--fs-micro);
   color: var(--text-3); border: 1px solid var(--line); border-radius: var(--radius-s);

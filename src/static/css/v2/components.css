@@ -13,7 +13,11 @@
   flex-direction: column;
 }
 .panel-h {
-  display: flex; align-items: center; gap: var(--space-4);
+  /* Wraps. In a 320px aside a title, its meta caption and a "go to" link do
+     not fit on one line, and the title is what lost — the head is allowed a
+     second line instead of cutting the caption down. */
+  display: flex; flex-wrap: wrap; align-items: center;
+  gap: var(--space-2) var(--space-4);
   padding: var(--space-4) var(--space-5);
   border-bottom: 1px solid var(--line-soft);
   min-height: 32px;
@@ -23,7 +27,12 @@
 .panel-h h3 {
   margin: 0; font-family: var(--font-ui); font-size: var(--fs-ui); font-weight: 700;
   color: var(--text-1);
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  /* It WRAPS. This used to be nowrap + ellipsis, which in the right column of
+     #/reports turned "Top Actions" into "Top Ac…" at the default width — a
+     title the designer chose, cut down to a guess. An ellipsis is the right
+     answer for a value whose length is the data's; it is the wrong answer for
+     a caption, where not fitting means the column is wrong. */
+  min-width: 0; overflow-wrap: anywhere;
 }
 .panel-h .meta {
   margin-left: auto; font-family: var(--font-mono);
@@ -411,14 +420,19 @@ table.tbl tbody tr:hover td { background: var(--surface-hover); }
 
 /* KPI mosaic — hairline-separated cells, one figure each */
 .kpi {
-  display: grid; grid-template-columns: repeat(4, minmax(0, 1fr));
+  /* auto-fit, not a fixed four: in a 320px aside four tracks are ~72px each,
+     which cut every label to "Total Ev…" / "Securit…" at the DEFAULT width.
+     The mosaic now takes as many columns as fit and drops to two when it
+     cannot. */
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(124px, 1fr));
   gap: 1px; background: var(--line-soft);
   border: 1px solid var(--line-soft); border-radius: var(--radius-s);
 }
 .kpi > div { background: var(--surface-1); padding: var(--space-3) var(--space-4); min-width: 0; }
 .kpi dt {
   font-size: var(--fs-micro); color: var(--text-3);
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  /* and it wraps, for the same reason the panel title does */
+  overflow-wrap: anywhere;
   margin-bottom: var(--space-1);
 }
 .kpi dd { margin: 0; font-family: var(--font-mono); font-size: var(--fs-lead); color: var(--text-1); }

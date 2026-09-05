@@ -576,16 +576,18 @@ function eventDrawer(rule, catalog, onSaved) {
    * A closed <details> keeps its children in the DOM, so the contract still
    * holds while the documentation stops being the first thing under the form. */
   body.appendChild(disclosure(t("gui_al_ro_section"), roList([
-    roField("type", r.type || "event", t("gui_al_fn_type")),
-    roField("filter_key", r.filter_key || "event_type", t("gui_al_fn_filter_key")),
-    roField("name_key", r.name_key, t("gui_al_fn_i18n_key")),
-    roField("desc", r.desc, t("gui_al_fn_desc")),
-    roField("desc_key", r.desc_key, t("gui_al_fn_i18n_key")),
-    roField("rec", r.rec, t("gui_al_fn_rec")),
-    roField("rec_key", r.rec_key, t("gui_al_fn_i18n_key")),
-    roField("throttle", r.throttle),
-    roField("throttle_state", r.throttle_state, t("gui_al_fn_throttle_state")),
-    roField("cooldown_remaining", r.cooldown_remaining, t("gui_al_fn_cooldown_remaining")),
+    /* §5.2: these rows are a rule's own facts, so they carry names, not the
+     * keys they are stored under. Four rows went with the rename rather than
+     * getting one: filter_key is always "event_type" and the matcher never
+     * reads it, and name_key/desc_key/rec_key are catalogue keys for built-in
+     * rules — a value that is the same on every rule, or is an identifier
+     * from our dictionary, is not information an operator can use. */
+    roField("gui_al_ro_type", r.type || "event", t("gui_al_fn_type")),
+    roField("gui_al_ro_desc", r.desc, t("gui_al_fn_desc")),
+    roField("gui_al_ro_rec", r.rec, t("gui_al_fn_rec")),
+    roField("gui_al_ro_throttle", r.throttle),
+    roField("gui_al_ro_suppression", r.throttle_state, t("gui_al_fn_throttle_state")),
+    roField("gui_al_ro_cooldown", r.cooldown_remaining, t("gui_al_fn_cooldown_remaining")),
   ])));
 
   paintEvents();
@@ -673,16 +675,15 @@ function systemDrawer(rule, onSaved) {
 
   // Collapsed for the same reason as the event drawer's — see there.
   body.appendChild(disclosure(t("gui_al_ro_section"), roList([
-    roField("type", r.type || "system", t("gui_al_fn_type")),
-    roField("threshold_type", r.threshold_type || "immediate", t("gui_al_fn_sys_threshold")),
-    roField("threshold_count", r.threshold_count === undefined ? 1 : r.threshold_count, t("gui_al_fn_sys_threshold")),
-    roField("threshold_window", r.threshold_window === undefined ? 10 : r.threshold_window, t("gui_al_fn_sys_threshold")),
-    roField("desc", r.desc, t("gui_al_fn_desc_system")),
-    roField("rec", r.rec, t("gui_al_fn_rec_system")),
-    roField("match_fields", r.match_fields, t("gui_al_fn_match_system")),
-    roField("throttle", r.throttle),
-    roField("throttle_state", r.throttle_state, t("gui_al_fn_throttle_state")),
-    roField("cooldown_remaining", r.cooldown_remaining, t("gui_al_fn_cooldown_remaining")),
+    /* The three threshold rows and match_fields are gone: a system rule is
+     * fixed at immediate/1/10 and always carries an empty match_fields, so
+     * every one of them stated a constant. */
+    roField("gui_al_ro_type", r.type || "system", t("gui_al_fn_type")),
+    roField("gui_al_ro_desc", r.desc, t("gui_al_fn_desc_system")),
+    roField("gui_al_ro_rec", r.rec, t("gui_al_fn_rec_system")),
+    roField("gui_al_ro_throttle", r.throttle),
+    roField("gui_al_ro_suppression", r.throttle_state, t("gui_al_fn_throttle_state")),
+    roField("gui_al_ro_cooldown", r.cooldown_remaining, t("gui_al_fn_cooldown_remaining")),
   ])));
   const title = r.index === undefined ? t("gui_add_system_health_rule") : t("gui_edit_system_health_rule");
   return drawerSpec(title, body, function () {
@@ -765,13 +766,13 @@ function flowDrawer(kind, rule, onSaved) {
   body.appendChild(editField("cooldown_minutes", t("gui_cooldown"), cdInput));
 
   const ro = [];
-  if (!isBw) ro.push(roField("type", r.type || "traffic", t("gui_al_fn_type")));
-  ro.push(roField("threshold_type", r.threshold_type || "count", t("gui_al_fn_flow_threshold")));
-  ro.push(roField("desc", r.desc, t("gui_al_fn_desc_flow")));
-  ro.push(roField("rec", r.rec, t("gui_al_fn_rec_flow")));
-  ro.push(roField("throttle", r.throttle));
-  ro.push(roField("throttle_state", r.throttle_state, t("gui_al_fn_throttle_state")));
-  ro.push(roField("cooldown_remaining", r.cooldown_remaining, t("gui_al_fn_cooldown_remaining")));
+  // threshold_type dropped: flow and bandwidth rules are always "count".
+  if (!isBw) ro.push(roField("gui_al_ro_type", r.type || "traffic", t("gui_al_fn_type")));
+  ro.push(roField("gui_al_ro_desc", r.desc, t("gui_al_fn_desc_flow")));
+  ro.push(roField("gui_al_ro_rec", r.rec, t("gui_al_fn_rec_flow")));
+  ro.push(roField("gui_al_ro_throttle", r.throttle));
+  ro.push(roField("gui_al_ro_suppression", r.throttle_state, t("gui_al_fn_throttle_state")));
+  ro.push(roField("gui_al_ro_cooldown", r.cooldown_remaining, t("gui_al_fn_cooldown_remaining")));
   // Collapsed for the same reason as the event drawer's — see there.
   body.appendChild(disclosure(t("gui_al_ro_section"), roList(ro)));
 
