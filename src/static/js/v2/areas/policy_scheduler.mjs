@@ -977,7 +977,12 @@ function timingText(s) {
 
 /* rule-scheduler.js:556-566 — the last-run cell. */
 function lastRunCell(s) {
-  if (!s.last_checked) return el("span", { class: "mono", text: t("gui_jh_never_ran") });
+/* §5.2: mono is for identifiers — an href, an object id, a timestamp. A
+ * duration ("30m"), a count and a phrase ("never ran") are none of those, and
+ * a page full of them reads like a log instead of a settings screen. Counts
+ * and durations take `.num` (Montserrat tabular) so the columns still line
+ * up; a phrase takes the body face. */
+  if (!s.last_checked) return el("span", { text: t("gui_jh_never_ran") });
   const suffix = s.last_action ? (" (" + s.last_action + (s.last_result === "error" ? " !" : "") + ")") : "";
   const bad = s.last_result === "error";
   const span = el("span", { class: "mono", "data-tone": bad ? "crit" : null, title: bad ? (s.last_error || "") : "" });
@@ -1120,7 +1125,7 @@ async function mountRules(root, ctx, view) {
             el("small", { text: r.prov + " · " + (r.on ? "ON" : "OFF") }));
         })),
         col("rules", t("gui_rs_col_rules"), widthCell(64, function (r) {
-          return el("span", { class: "mono", text: String(r.rules) });
+          return el("span", { class: "num", text: String(r.rules) });
         })),
       ];
       if (!rows.length) {
@@ -1215,7 +1220,7 @@ async function mountRules(root, ctx, view) {
         });
         const cols = [
           col("no", t("gui_rs_col_no"), widthCell(48, function (r) {
-            return el("span", { class: "mono", text: String(r.no || "") });
+            return el("span", { class: "num", text: String(r.no || "") });
           })),
           col("id", t("gui_rs_col_id"), widthCell(64, function (r) {
             return el("span", { class: "mono", text: String(r.id) });
@@ -1345,7 +1350,7 @@ async function mountRules(root, ctx, view) {
         col("recon", t("gui_au_recon"), widthCell(96, function (r) { return reconCell(r); })),
         col("action", t("gui_rs_col_action"), widthCell(84, function (r) { return actionCell(r); })),
         col("timing", t("gui_rs_col_timing"), widthCell(240, function (r) {
-          return el("span", { class: "mono", title: timingText(r), text: timingText(r) });
+          return el("span", { class: "num", title: timingText(r), text: timingText(r) });
         })),
         col("scope", t("gui_rs_col_source"), buildCell(function (r) {
           return el("span", { class: "idc" },
@@ -1839,14 +1844,16 @@ async function mountReports(root, ctx) {
       })),
       col("freq", t("gui_sched_col_freq"), widthCell(230, function (r) {
         const box = el("span", { class: "idc" });
-        box.appendChild(el("span", { class: "mono", title: freqText(r), text: freqText(r) }));
+        box.appendChild(el("span", { class: "num", title: freqText(r), text: freqText(r) }));
         if (r.schedule_type === "weekly" && !knownDayOfWeek(r.day_of_week)) {
           box.appendChild(el("small", { "data-tone": "warn", text: t("gui_au_dow_off_list") }));
         }
         return box;
       })),
       col("last_run", t("gui_sched_col_last"), widthCell(130, function (r) {
-        return el("span", { class: "mono", text: r.last_run ? stamp(r.last_run) : t("gui_sched_status_never") });
+        return r.last_run
+          ? el("span", { class: "mono", text: stamp(r.last_run) })
+          : el("span", { text: t("gui_sched_status_never") });
       })),
       col("last_status", t("gui_sched_col_status"), widthCell(96, function (r) { return schedStatus(r); })),
       col("enabled", t("gui_sched_col_enabled"), widthCell(74, function (r) {
@@ -2086,7 +2093,7 @@ async function mountJobs(root, ctx) {
           line.appendChild(el("small", { text: jobReason(j) }));
           if (j.last_run) {
             line.appendChild(el("small", {
-              class: "mono", text: since(j.last_run, ov.as_of) + " " + t("gui_au_job_ago"),
+              class: "num", text: since(j.last_run, ov.as_of) + " " + t("gui_au_job_ago"),
             }));
           }
           list.appendChild(line);
@@ -2152,7 +2159,7 @@ async function mountJobs(root, ctx) {
             return box;
           })),
           col("last_run", t("gui_jh_th_last_run"), widthCell(190, function (r) {
-            if (!r.last_run) return el("span", { class: "mono", text: t("gui_jh_never_ran") });
+            if (!r.last_run) return el("span", { text: t("gui_jh_never_ran") });
             return el("span", { class: "idc" }, el("b", { class: "mono", text: stamp(r.last_run) }),
               el("small", { text: since(r.last_run, ov.as_of) + " " + t("gui_au_job_ago") }));
           })),
@@ -2163,7 +2170,7 @@ async function mountJobs(root, ctx) {
             return badge(txt || "—", r._tone);
           })),
           col("interval_seconds", t("gui_jh_th_interval"), widthCell(80, function (r) {
-            return el("span", { class: "mono", text: Number(r.interval_seconds) ? dur(r.interval_seconds) : "—" });
+            return el("span", { class: "num", text: Number(r.interval_seconds) ? dur(r.interval_seconds) : "—" });
           })),
           col("beat", t("gui_au_job_beat"), buildCell(function (r) {
             const box = el("div", { "data-tone": r._tone });

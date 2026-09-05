@@ -153,6 +153,44 @@ OUR_HISTORY = re.compile(r"上一次改版|改版|\bprevious redesign\b|\bused t
 #     catalogue itself, where an EDITABLE field's label also comes from.
 BARE_IDENTIFIER = re.compile(r"^[a-z][a-z0-9]*(?:[_.][a-z0-9]+)+$")
 
+# 15. Operator copy that names one of OUR OWN stored fields. Different from
+#     rule 12: that one catches prose ABOUT the wiring, this one catches the
+#     wiring's vocabulary leaking into an otherwise fine sentence — "clears
+#     event_watermark", "timeline_24h is an empty array", "comes back in
+#     note_clear_failed", "(gui_app_required)". Placeholders are stripped
+#     first, because `{high_risk}` is a slot, not a field.
+#
+#     FIELD_NAME_OK is a per-key allowlist, and every entry is a name the
+#     OPERATOR meets outside this app — a PCE href segment they read in the
+#     target column, a value they type into a matcher, an option in a dropdown,
+#     a background job named on the jobs page, or a stored value the message
+#     exists to say is wrong. Those are the domain's vocabulary, not ours.
+INTERNAL_FIELD = re.compile(r"\b[a-z][a-z0-9]*(?:_[a-z0-9]+)+(?:\.[a-z][a-z0-9_]*)*\b")
+PLACEHOLDER = re.compile(r"\{[^}]*\}")
+FIELD_NAME_OK = {
+    # report-type / schedule values the message exists to report as invalid
+    "gui_au_dow_unknown", "gui_au_rep_type_unknown",
+    # PCE href segments, which the operator reads in the target column
+    "gui_au_kind_note", "gui_au_target_note_rule",
+    # a background job named on the jobs page (already excluded by rule 6)
+    "gui_au_rep_tick_note",
+    # the two allowed values, in a validation error about them
+    "gui_err_invalid_rule_sched_type",
+    # a matcher path the operator types by hand
+    "gui_ev_field_matchers_hint", "gui_ev_matchers_placeholder",
+    # the PCE's own API object a destructive write touches — naming it is the
+    # point of the warning
+    "gui_rhc_needs_enable_confirm", "gui_rp_rhc_detail_missing_ven", "gui_rp_rhc_i_draft",
+    # the literal option values in the format dropdown
+    "gui_siem_format_help",
+}
+# Words that read as identifiers but are ordinary English or product terms.
+FIELD_NAME_SKIP = {
+    "event_type", "rule_set", "rule_sets", "sec_rules", "deny_rules", "user_login",
+    "policy_usage", "rule_hit_count", "security_risk", "app_summary",
+    "network_inventory", "policy_diff", "policy_resolver", "traffic_filter",
+}
+
 # Known-legitimate substrings that would otherwise false-positive; stripped
 # before pattern matching (not string-replaced in the actual copy).
 ALLOWLIST = {
@@ -190,6 +228,11 @@ def _violations(key: str, value: str) -> list[str]:
         hits.append("dev-retrospective")
     if BARE_IDENTIFIER.fullmatch(text.strip()):
         hits.append("value-is-a-config-key")
+    if key not in FIELD_NAME_OK and len(text) >= 25:
+        bare = PLACEHOLDER.sub(" ", text)
+        named = [w for w in set(INTERNAL_FIELD.findall(bare)) if w not in FIELD_NAME_SKIP]
+        if named:
+            hits.append("names-internal-field:" + ",".join(sorted(named)))
     if UI_WIRING.search(text):
         hits.append("ui-wiring")
     if OUR_HISTORY.search(text):

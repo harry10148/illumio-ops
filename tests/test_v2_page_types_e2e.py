@@ -325,3 +325,53 @@ def test_no_label_is_clipped_at_1280(v2_page):
         ".map(e => e.textContent.trim())"
     )
     assert clipped == [], clipped
+
+
+# ── §5.2 · the code face is for identifiers ─────────────────────────────────
+
+# What an identifier looks like on screen. Deliberately a list of SHAPES rather
+# than one regex: each line is a thing §5.2 names ("IP、port／proto、href、
+# hostname、時間戳"), and a failure names which shape the offender missed.
+_ID_SHAPES = (
+    re.compile(r"^/"),                                   # an href or a path
+    re.compile(r"^[\d.:a-fA-F\[\]/,\s-]+$"),             # IP / CIDR / port / hex
+    re.compile(r"^[a-z][a-z0-9_]*(?:\.[a-z0-9_]+)+$"),   # user.pce_session_terminated
+    re.compile(r"\d{4}-\d{2}-\d{2}|\d{2}:\d{2}"),        # a date or a time
+    re.compile(r"^v?\d+\.\d+"),                          # a version
+    re.compile(r"\.[A-Za-z0-9]{2,5}$"),                  # a filename
+    re.compile(r"\s=\s"),                                # a distinguished name
+    re.compile(r"^[A-Za-z][A-Za-z0-9_]*$"),              # a bare token: json, udp
+    re.compile(r"^[—–-]?$"),                             # the empty placeholder
+)
+
+# Routes whose .mono nodes this harness can actually render. The others need
+# PCE data the closed-port harness has none of, so asserting over them would
+# be asserting over an empty set — a green that means nothing.
+_MONO_ROUTES = ["#/system/pce", "#/system/siem", "#/system/tls", "#/system/jobs",
+                "#/system/logs", "#/system/cache", "#/reports", "#/investigate/events"]
+
+
+def test_the_code_face_is_only_used_for_identifiers(v2_page):
+    """§5.2: mono is for things you copy, paste and compare — not for prose.
+
+    `kv()` in areas/cards.mjs set `.mono` on every readout it drew, so a
+    deployment type reached the operator as `On-premises`, an interval as
+    `87m` and a job that had not run as `never ran`, all in the code face.
+    Mono says "this is a literal"; on a word or a plain count it is simply
+    the wrong typeface, and it makes a settings page read like a log.
+
+    The check is on the RENDERED text, because the class is applied in a dozen
+    places and a source lint would have to guess at the value.
+    """
+    page, base_url = v2_page
+    offenders = []
+    for route in _MONO_ROUTES:
+        _open(page, base_url, route)
+        page.wait_for_timeout(400)
+        texts = page.eval_on_selector_all(
+            ".workarea .mono",
+            "els => els.map(e => e.textContent.trim()).filter(Boolean)")
+        for text in sorted(set(texts)):
+            if not any(shape.search(text) for shape in _ID_SHAPES):
+                offenders.append((route, text))
+    assert offenders == [], offenders

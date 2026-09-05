@@ -241,8 +241,37 @@ function withTone(p, tn) {
   return p;
 }
 
+/* §5.2: the code face is for identifiers — IP, port/proto, href, hostname,
+ * timestamp. This helper used to set `.mono` on EVERY readout it drew, so a
+ * deployment type reached the operator as `On-premises`, an interval as `87m`
+ * and a job that had never run as `never ran`, all in the code face. Mono
+ * says "this is a literal you may copy and compare"; on a word it is just the
+ * wrong typeface, and enough of them make a settings page read like a log.
+ *
+ * A plain figure gets `.num` (Montserrat tabular) rather than nothing, so the
+ * columns of numbers still line up — that was the real reason mono was
+ * reached for here. */
+const _MONO_SHAPES = [
+  /^\//,                                  // an href or a path
+  /^[\d.:a-fA-F[\]/,\s-]+$/,               // IP / CIDR / port / hex
+  /^[a-z][a-z0-9_]*(?:\.[a-z0-9_]+)+$/,    // user.pce_session_terminated
+  /\d{4}-\d{2}-\d{2}|\d{2}:\d{2}/,        // a date or a time
+  /^v?\d+\.\d+/,                          // a version
+  /\.[A-Za-z0-9]{2,5}$/,                   // a filename
+  /\s=\s/,                                // a distinguished name
+];
+
+function valueFace(value) {
+  const text = String(value === null || value === undefined ? "" : value).trim();
+  if (!text || text === "—") return "mono";
+  for (let i = 0; i < _MONO_SHAPES.length; i++) {
+    if (_MONO_SHAPES[i].test(text)) return "mono";
+  }
+  return /\d/.test(text) ? "num" : "";
+}
+
 function kv(label, value, tn) {
-  const b = el("b", { class: "mono", "data-tone": tn || null, title: String(value) });
+  const b = el("b", { class: valueFace(value), "data-tone": tn || null, title: String(value) });
   if (tn) b.appendChild(el("i", { class: "dot" }));
   b.appendChild(el("span", { text: value }));
   return el("div", { class: "kv" }, el("span", { text: label }), b);
@@ -998,7 +1027,6 @@ function cardSnapshot(ds) {
     ));
   });
   p.body.appendChild(list);
-  p.body.appendChild(note(t("gui_ov_hero_recomputed")));
   return p;
 }
 
