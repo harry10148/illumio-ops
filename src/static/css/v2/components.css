@@ -18,9 +18,11 @@
   border-bottom: 1px solid var(--line-soft);
   min-height: 32px;
 }
+/* v3.1 §5.2: a panel title is the page talking, so it is a sentence in body
+   type — the caps-and-tracking treatment is for eyebrows and table heads. */
 .panel-h h3 {
-  margin: 0; font-size: var(--fs-micro); font-weight: 700;
-  letter-spacing: .15em; text-transform: uppercase; color: var(--text-2);
+  margin: 0; font-family: var(--font-ui); font-size: var(--fs-ui); font-weight: 700;
+  color: var(--text-1);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .panel-h .meta {
@@ -150,7 +152,7 @@ table.tbl tbody tr:hover td { background: var(--surface-hover); }
 /* the header row now stays visible above an empty table (review finding #3);
    give the dashed empty card some air instead of touching the header border. */
 .tbl-wrap-empty + .empty { margin-top: var(--space-4); }
-.empty .et { font-size: var(--fs-micro); font-weight: 700; letter-spacing: .16em; text-transform: uppercase; color: var(--text-3); }
+.empty .et { font-size: var(--fs-ui); font-weight: 700; color: var(--text-1); }
 .empty p { margin: 0; font-size: var(--fs-body); color: var(--text-2); line-height: 1.6; max-width: 40ch; }
 
 /* -------------------------------------------------------------- popover --- */
@@ -163,8 +165,7 @@ table.tbl tbody tr:hover td { background: var(--surface-hover); }
 }
 .popover h4 {
   margin: 0 0 var(--space-3);
-  font-size: var(--fs-micro); font-weight: 700; letter-spacing: .14em;
-  text-transform: uppercase; color: var(--ink);
+  font-size: var(--fs-ui); font-weight: 700; color: var(--ink);
 }
 .popover ul { margin: 0; padding: 0; list-style: none; }
 .popover li {
@@ -485,8 +486,7 @@ select.field { appearance: none; }
 }
 .errcard h2 {
   margin: 0 0 var(--space-3);
-  font-size: var(--fs-body); font-weight: 700;
-  letter-spacing: .1em; text-transform: uppercase;
+  font-size: var(--fs-ui); font-weight: 700;
   color: var(--tone-crit-fg);
 }
 .errcard p { margin: 0 0 var(--space-5); font-size: var(--fs-body); color: var(--text-2); line-height: 1.6; }

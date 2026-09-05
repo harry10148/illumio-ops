@@ -5422,5 +5422,6 @@
   "gui_sy_ro_dlq_payload_source": "內容的來源",
   "gui_sy_ro_csr_ou": "組織單位",
   "gui_sy_ro_auth_setup": "登入已設定",
-  "gui_sy_ro_old_password": "目前的密碼"
+  "gui_sy_ro_old_password": "目前的密碼",
+  "gui_ev_parsed_empty": "解析器沒有從這則事件取出任何欄位。"
 }

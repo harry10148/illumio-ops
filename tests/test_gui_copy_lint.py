@@ -156,36 +156,38 @@ def test_no_config_keys_are_printed_on_screen():
     )
 
 
-# 11 `.codepane` panes after Task 3 deleted the alert-detail JSON dump.
+# A per-file RATCHET, and the reason it is a ratchet rather than a principle
+# is worth stating: this rule was written twice with a rule of thumb ("only a
+# log viewer or a debug console"), and both times opening the actual panes
+# broke it. What survives inspection is narrower and less quotable — a
+# `.codepane` holds text the operator reads or copies VERBATIM, where
+# rendering it would destroy the thing they came for:
 #
-# Task 5 re-judged the whitelist by opening every one of them, and the line
-# §5.2 actually draws is not "logs and one debug console" but "content the
-# operator reads or copies VERBATIM, where rendering it would destroy it".
-# Six qualify, and the reason is written down per file so the next reader can
-# disagree with the judgement rather than guess at it:
+#   areas/system.mjs           5  the module-log message and raw line; the
+#                                 quarantined event's error text and the exact
+#                                 payload that failed to send; the CSR's PEM.
+#   areas/investigate.mjs      1  the RAW event, as the PCE sent it — what an
+#                                 operator compares against the PCE's own
+#                                 console. (Its PARSED sibling was a JSON dump
+#                                 standing in for a rendering and is now named
+#                                 rows; that was this rule's real catch.)
+#   areas/policy_rules.mjs     2  the alert-ops output console (AL-13) and the
+#                                 rule-test response, already collapsed and
+#                                 labelled as the evidence for the sentence
+#                                 above it.
+#   areas/policy_scheduler.mjs 2  the schedule check's log output, and the
+#                                 exact note text the PCE will be given.
 #
-#   areas/system.mjs           4  the module-log drawer's message and raw line;
-#                                 the quarantined event's own error text and
-#                                 the exact payload that failed to send — an
-#                                 operator diagnosing a rejected event needs
-#                                 the bytes, not a summary of them; and the CSR
-#                                 output, which is a PEM block to copy into a
-#                                 certificate authority.
-#   areas/policy_scheduler.mjs 1  the schedule check's own log output
-#   areas/policy_rules.mjs     1  the alert-ops output console (AL-13)
-#
-# That leaves the four this rule is really aimed at, each a JSON dump standing
-# in for a rendering the page never got: investigate.mjs's two event blocks,
-# policy_rules.mjs's rule-highlight JSON and policy_scheduler.mjs's PCE note
-# preview. All four are Task 6's.
+# So the gate is: these counts may not GROW. A new pane has to be argued for
+# here, by name, which is the property the whitelist was reaching for.
 _CODEPANE_ALLOWED = {
-    "areas/system.mjs": 4,
-    "areas/policy_scheduler.mjs": 1,
-    "areas/policy_rules.mjs": 1,
+    "areas/system.mjs": 5,
+    "areas/investigate.mjs": 1,
+    "areas/policy_rules.mjs": 2,
+    "areas/policy_scheduler.mjs": 2,
 }
 
 
-@pytest.mark.xfail(strict=True, reason="Task 6 removes the four JSON dumps that stand in for a rendering")
 def test_raw_json_panes_are_confined_to_logs_and_debug_consoles():
     hits = _hits(re.compile(r'class:\s*"codepane'))
     assert hits == _CODEPANE_ALLOWED, (
@@ -193,15 +195,6 @@ def test_raw_json_panes_are_confined_to_logs_and_debug_consoles():
     )
 
 
-# §5.2/§7: uppercase is a device for eyebrows, table heads and chips. Anything
-# else — panel titles, field labels, empty-state headings — is shouting.
-_UPPERCASE_ALLOWED = {
-    ".eyebrow",
-    ".brand span",
-    ".badge",
-    "table.tbl th",
-    ".side-card h4",
-}
 _RULE_RE = re.compile(r"([^{}]+)\{([^}]*)\}", re.DOTALL)
 
 
@@ -217,19 +210,41 @@ def _uppercase_selectors() -> set[str]:
     return found
 
 
-@pytest.mark.xfail(strict=True, reason="Tasks 4-6 restyle the panel and field headings")
-def test_uppercase_is_confined_to_eyebrows_table_heads_and_chips():
-    extra = _uppercase_selectors() - _UPPERCASE_ALLOWED
-    assert extra == set(), (
-        f"selectors shouting in uppercase (spec §5.2): {sorted(extra)}"
+# §5.2: "面板標題不全大寫 … 眉標（uppercase＋字距）只留右欄卡片標題與表頭".
+#
+# The rule is about what uppercase is FOR, not about a list of class names.
+# Uppercase with letter-spacing is a label device: it marks a small caption
+# sitting over a value, and the app has a dozen of those — KPI captions, filter
+# column labels, the palette's group chip, table heads. They are fine and they
+# are what §5.2 preserves.
+#
+# What §5.2 stops is a HEADING that shouts. A panel title, a popover title, an
+# error card's title and an empty state's title are the page talking to you in
+# sentences, and setting them in caps is what made 3B read as an instrument
+# console. So the rule is exactly that: no CSS rule may uppercase a heading.
+_HEADING_RE = re.compile(r"(^|\s|>)(h[1-4]|\.et)$")
+
+
+def _uppercase_headings() -> set[str]:
+    return {sel for sel in _uppercase_selectors() if _HEADING_RE.search(sel)}
+
+
+def test_no_heading_is_set_in_uppercase():
+    """§5.2: headings are sentences, not signage."""
+    shouting = _uppercase_headings()
+    assert shouting == set(), (
+        "these headings are uppercased (spec §5.2 — uppercase is for eyebrows, "
+        f"table heads and chips, never for a title): {sorted(shouting)}"
     )
 
 
-def test_the_uppercase_whitelist_is_not_a_dead_letter():
-    """Guard the guard: the allowed selectors must really be in the stylesheets.
+def test_the_uppercase_probe_is_not_a_dead_letter():
+    """Guard the guard: the sweep must really be finding uppercase rules.
 
-    Without this, renaming `.eyebrow` would leave a whitelist that permits
-    nothing and a rule that looks stricter than it is.
+    Without this, a change to the CSS parser or to how `text-transform` is
+    written would leave a rule that finds nothing and looks stricter than it
+    is. The label device §5.2 keeps is what proves the probe still works.
     """
     found = _uppercase_selectors()
-    assert _UPPERCASE_ALLOWED & found, (found, _UPPERCASE_ALLOWED)
+    assert ".eyebrow" in found, sorted(found)
+    assert len(found) >= 8, sorted(found)

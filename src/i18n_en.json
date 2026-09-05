@@ -5422,5 +5422,6 @@
   "gui_sy_ro_dlq_payload_source": "Where the content came from",
   "gui_sy_ro_csr_ou": "Organisational unit",
   "gui_sy_ro_auth_setup": "Sign-in is configured",
-  "gui_sy_ro_old_password": "Current password"
+  "gui_sy_ro_old_password": "Current password",
+  "gui_ev_parsed_empty": "The parser filled in nothing for this event."
 }

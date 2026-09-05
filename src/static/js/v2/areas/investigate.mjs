@@ -2563,6 +2563,43 @@ function typeOptionLabel(item) {
 
 /* events.js:141-146 (_evStatusTone) — success is the only good status; failure,
  * error, warn and warning are all bad; anything else is neutral. */
+/** The parsed event as named rows — one per field the parser filled in. */
+function parsedFields(parsed) {
+  const box = el("div", { class: "kv-list" });
+  Object.keys(parsed || {}).forEach(function (key) {
+    const value = parsed[key];
+    if (value === null || value === undefined || value === "") return;
+    if (Array.isArray(value) && !value.length) return;
+    box.appendChild(el("div", { class: "kv" },
+      el("span", { text: fieldLabel(key) }),
+      el("b", { title: showText(value), text: showText(value) })));
+  });
+  if (!box.firstChild) box.appendChild(el("p", { class: "note", text: t("gui_ev_parsed_empty") }));
+  return box;
+}
+
+/**
+ * A parsed-event field name, made readable.
+ *
+ * These are not config keys — there is no settings form behind them and no
+ * curated label for each one; they are whatever src/events/normalizer.py
+ * filled in for this event type, and they change per type. So the key is
+ * humanized rather than looked up: `resource_name` reads "Resource name". The
+ * §5.2 rule this stays clear of is a SETTINGS field labelled by its storage
+ * key, which is a different thing — there the human label exists and was
+ * simply not used.
+ */
+function fieldLabel(key) {
+  const words = String(key).replace(/_/g, " ").trim();
+  return words.charAt(0).toUpperCase() + words.slice(1);
+}
+
+function showText(v) {
+  if (Array.isArray(v)) return v.join(", ");
+  if (v && typeof v === "object") return Object.keys(v).map(function (k) { return k + ": " + v[k]; }).join(" · ");
+  return String(v);
+}
+
 function statusTone(value) {
   const status = String(value || "").toLowerCase();
   if (status === "success") return "ok";
@@ -2966,8 +3003,12 @@ async function mountEvents(root, ctx) {
         meta(t("gui_ev_detail_user_ip"), username + ip);
         p.body.appendChild(dl);
         p.body.appendChild(badge(item.status || "n/a", statusTone(item.status)));
+        // v3.1 §5.2: the PARSED event is this app's own reading of the raw
+        // one — every field has a name and a value — so it is rendered as
+        // those, not dumped as JSON. The raw event below it stays verbatim,
+        // because that is the thing an operator compares against the PCE.
         p.body.appendChild(el("h4", { class: "eyebrow", text: t("gui_ev_parsed_event") }));
-        p.body.appendChild(el("pre", { class: "codepane", text: JSON.stringify(n, null, 2) }));
+        p.body.appendChild(parsedFields(n));
         p.body.appendChild(el("h4", { class: "eyebrow", text: t("gui_ev_raw_event") }));
         p.body.appendChild(el("pre", { class: "codepane", text: JSON.stringify(item.raw || {}, null, 2) }));
         aside.appendChild(p);
