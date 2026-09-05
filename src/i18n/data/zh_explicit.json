@@ -1897,5 +1897,6 @@
   "gui_home_verdict_ok": "正常",
   "gui_home_verdict_warn": "要看一下",
   "gui_home_verdict_error": "有失敗",
-  "gui_home_verdict_unknown": "量不到"
+  "gui_home_verdict_unknown": "量不到",
+  "gui_home_today_last_failed": "上次執行失敗"
 }

@@ -4898,13 +4898,6 @@
   "gui_iv_first_seen": "F {value}",
   "gui_iv_last_seen": "L {value}",
   "gui_iv_days_short": "{n}d",
-  "gui_iv_shadow_title": "Shadow compare (event matcher diff)",
-  "gui_iv_shadow_desc": "Runs the current and the legacy matcher over the same events and lists the rules whose results differ.",
-  "gui_iv_shadow_idle": "Not run yet — press refresh to fetch events and compare.",
-  "gui_iv_shadow_summary": "{rules} rules · {divergent} divergent · {events} events compared",
-  "gui_iv_shadow_current": "Current",
-  "gui_iv_shadow_legacy": "Legacy",
-  "gui_iv_shadow_delta": "Delta",
   "gui_iv_not_run": "Not run yet",
   "gui_iv_search_prompt": "Set the filters above and run the search.",
   "gui_al_add_rule": "Add rule",
@@ -5409,5 +5402,6 @@
   "gui_home_verdict_ok": "Healthy",
   "gui_home_verdict_warn": "Needs a look",
   "gui_home_verdict_error": "Failing",
-  "gui_home_verdict_unknown": "Not measured"
+  "gui_home_verdict_unknown": "Not measured",
+  "gui_home_today_last_failed": "last run failed"
 }

@@ -1,5 +1,5 @@
 // investigate.mjs — #/investigate/{traffic,workloads,events}.
-// Anchors IV-01…IV-15, XC-03/04/08/09/11/12 (design/v2/coverage.yaml).
+// Anchors IV-01…IV-14, XC-03/04/08/09/11/12 (design/v2/coverage.yaml).
 //
 // PORT OF design/v2/mockup/js/areas/investigate.mjs against the live backend.
 // The three sub-views are one instrument: a query workbench. Field semantics
@@ -56,15 +56,13 @@
 //      the route's own documented 400 (:57-58), and letting the authority
 //      answer is both simpler and honest about who decides.
 //
-//   6. IV-15 shadow compare binds to GET /api/events/shadow_compare
-//      (events.py:150-201) with the mins/limit clamps that route applies,
-//      and renders the real rule_name/current_count/legacy_count/delta/
-//      status rows (events/shadow.py:78-104). It is loaded ON DEMAND, not at
-//      mount: the route fetches up to 500 events from the PCE per call, and
-//      making that automatic would tax every visit to #/investigate/events
-//      for a panel most visits do not read. The mockup's
-//      "v2_iv_shadow_unavailable" wall is replaced by a real idle note, real
-//      rows, or the backend's real error.
+//   6. The shadow-compare panel (IV-15) is gone (2026-09-06). It ran the
+//      current matcher and the legacy one over the same events and listed the
+//      rules whose results differ — a tool for whoever was migrating the
+//      matcher, on a page an operator opens to read audit events. The
+//      endpoint it called (GET /api/events/shadow_compare) is untouched: no
+//      GUI reads it now, but src/events/shadow.py also serves
+//      /api/events/rule_test, and retiring a route is not this change's scope.
 //
 //   7. IV-06's archive strip keeps its real status readout
 //      (GET /api/cache/archive/status). Task 7 repurposed that endpoint:
@@ -221,9 +219,6 @@ const BACKFILL_RANGES = ["1", "7", "30", "60"];
 const EV_WINDOWS = [["15", "gui_ev_window_15m"], ["60", "gui_ev_window_1h"], ["360", "gui_ev_window_6h"],
   ["1440", "gui_ev_window_24h"], ["10080", "gui_ev_window_7d"], ["43200", "gui_ev_window_30d"], ["86400", "gui_ev_window_60d"]];
 const EV_LIMITS = ["25", "50", "100", "200"];
-// events.py:162-168 — shadow_compare clamps mins to [5, 10080] and limit to [1, 500].
-const SHADOW_MINS = ["60", "360", "1440", "10080"];
-const SHADOW_LIMITS = ["50", "200", "500"];
 
 // The three fast, non-PCE GETs the traffic view needs before it can render its
 // controls and its empty-state reasoning. Everything PCE-backed on this route
@@ -2613,85 +2608,6 @@ function statusTone(value) {
   return "neutral";
 }
 
-/* IV-15 — shadow compare, bound to GET /api/events/shadow_compare
- * (events.py:150-201). There is no shipping UI for this endpoint: grepping
- * src/static and src/templates for shadow_compare returns nothing, so the
- * controls are this design's, clamped exactly as :162-168 clamps them, and the
- * columns are the ones events/shadow.py:78-104 returns. Loaded on demand —
- * each call fetches up to `limit` events from the PCE (header note 6). */
-function shadowPanel(areaState) {
-  // R4 — this used to carry the endpoint path (/api/events/shadow_compare)
-  // as the panel's meta caption. The description note right below already
-  // says what the panel does in one sentence; the route it hits is not
-  // something an operator acts on.
-  const p = panel("IV-15", t("gui_iv_shadow_title"));
-  const view = {};
-  view.mins = "60";
-  view.limit = "200";
-  let handle = null;
-
-  const row = el("div", { class: "qrow" });
-  row.appendChild(selectField(t("gui_window_min"), SHADOW_MINS, view.mins, function (v) { view.mins = v; }));
-  row.appendChild(selectField(t("gui_rows"), SHADOW_LIMITS, view.limit, function (v) { view.limit = v; }));
-  row.appendChild(el("span", { class: "spacer" }));
-  const host = el("div");
-  const refresh = el("button", { class: "btn primary", type: "button", text: t("gui_refresh"),
-    onClick: function () { run(); } });
-  row.appendChild(refresh);
-  p.body.appendChild(row);
-  p.body.appendChild(note(t("gui_iv_shadow_desc")));
-  p.body.appendChild(host);
-
-  const cols = [
-    col("rule", t("gui_col_name"), buildCell(function (r) { return r.rule_name; })),
-    col("current", t("gui_iv_shadow_current"), numCell(function (r) { return num(r.current_count); })),
-    col("legacy", t("gui_iv_shadow_legacy"), numCell(function (r) { return num(r.legacy_count); })),
-    col("delta", t("gui_iv_shadow_delta"), numCell(function (r) { return num(r.delta); })),
-    col("status", t("gui_col_status"), widthCell(110, function (r) { return badge(r.status, "neutral"); })),
-  ];
-
-  function paint(rows, message, tn) {
-    if (handle) handle.destroy();
-    clear(host);
-    handle = table.render(host, buildTable(cols, rows));
-    areaState.shadowTable = handle;
-    if (message) {
-      host.appendChild(el("div", { class: "strip", "data-tone": tn },
-        el("i", { class: "dot" }), el("span", { text: message })));
-    }
-  }
-
-  async function run() {
-    refresh.disabled = true;
-    paint(null, null, null);
-    let r = null;
-    try {
-      // Task 5 brief authorises this live read-only endpoint; it is deliberately
-      // reached through the generic GET path because frozen endpoints.yaml has
-      // no snapshot entry for shadow_compare and GET_MAP must match it exactly.
-      const path = "/api/events/shadow_compare?mins=" + encodeURIComponent(view.mins)
-        + "&limit=" + encodeURIComponent(view.limit);
-      r = await api.get(path);
-    } catch (e) {
-      r = { ok: false, error: String((e && e.message) || e) };
-    }
-    if (areaState.torn) return;
-    refresh.disabled = false;
-    if (!r || r.ok !== true) {
-      paint([], errText(r), "crit");
-      return;
-    }
-    const items = r.items || [];
-    const summary = r.summary || {};
-    paint(items, tf("gui_iv_shadow_summary", {
-      rules: num(summary.rule_count), divergent: num(summary.divergent_rules), events: num(summary.fetched_events),
-    }), Number(summary.divergent_rules) ? "warn" : "ok");
-  }
-
-  paint([], t("gui_iv_shadow_idle"), "info");
-  return p;
-}
-
 async function mountEvents(root, ctx) {
   const handles = {};
   const state = {};
@@ -2735,7 +2651,6 @@ async function mountEvents(root, ctx) {
       layout.appendChild(aside);
       main.appendChild(filterHost);
       main.appendChild(layout);
-      main.appendChild(shadowPanel(state));
 
       /**
        * IV-13/IV-14 — the real GET /api/events/viewer. Every filter is a
@@ -3059,7 +2974,7 @@ async function mountEvents(root, ctx) {
  *
  * What it releases, and why each one needs releasing:
  *   - table handles: components/table.mjs's destroy() detaches the table from
- *     its host. Held in state.tables (plus the shadow panel's own handle),
+ *     its host. Held in state.tables,
  *     which every repaint also drains — so a repaint leaks nothing either.
  *   - the accelerate timers: a 10-minute re-issue interval that outlives the
  *     page would keep writing to the PCE from a route the operator has left.
@@ -3091,10 +3006,6 @@ function installTeardown(state) {
       try { h.destroy(); } catch (e) { console.error("[investigate] table teardown failed", e); }
     });
     state.tables = [];
-    if (state.shadowTable) {
-      try { state.shadowTable.destroy(); } catch (e) { console.error("[investigate] table teardown failed", e); }
-      state.shadowTable = null;
-    }
     cancelAccel(state);
     closePopover();
     setFilterBarBrowser(null);

@@ -4897,13 +4897,6 @@
   "gui_iv_first_seen": "首次 {value}",
   "gui_iv_last_seen": "最後 {value}",
   "gui_iv_days_short": "{n} 天",
-  "gui_iv_shadow_title": "Shadow 比對（新舊事件比對器）",
-  "gui_iv_shadow_desc": "以同一批事件同時跑現行比對器與舊版比對器，列出結果不同的規則。",
-  "gui_iv_shadow_idle": "尚未執行；按重新整理即向 PCE 取事件並比對。",
-  "gui_iv_shadow_summary": "{rules} 條規則 · {divergent} 條有差異 · 比對 {events} 筆事件",
-  "gui_iv_shadow_current": "現行",
-  "gui_iv_shadow_legacy": "舊版",
-  "gui_iv_shadow_delta": "差異",
   "gui_iv_not_run": "尚未查詢",
   "gui_iv_search_prompt": "設定上方條件後執行搜尋。",
   "gui_al_add_rule": "新增規則",
@@ -5409,5 +5402,6 @@
   "gui_home_verdict_ok": "正常",
   "gui_home_verdict_warn": "要看一下",
   "gui_home_verdict_error": "有失敗",
-  "gui_home_verdict_unknown": "量不到"
+  "gui_home_verdict_unknown": "量不到",
+  "gui_home_today_last_failed": "上次執行失敗"
 }

@@ -5,7 +5,7 @@ through tests.v2_e2e_utils's shared harness — see that module's docstring for
 the harness itself.
 
 Covers, per the task brief's T5 row:
-  - every IV-01..IV-15 coverage anchor (design/v2/coverage.yaml's investigate
+  - every IV-01..IV-14 coverage anchor (design/v2/coverage.yaml's investigate
     subset), split across the three sub-routes that own them, plus the
     cross-cutting anchors this area carries (XC-03/04/08/09/11/12).
   - key flow 1: add a FilterBar pill -> run the query -> the pill reaches the
@@ -54,8 +54,7 @@ intercept those POSTs with synthetic responses, so no PCE write is possible;
 they test frontend accounting only. The pagination test keeps the HTTP call
 on the real Flask route and monkeypatches only ApiClient.fetch_events_strict
 inside that live app, so the route's filtering, sorting, offset slicing and
-has_more calculation all execute. IV-15 still runs against the unmodified
-backend and observes its deliberate 502.
+has_more calculation all execute.
 """
 from __future__ import annotations
 
@@ -248,7 +247,7 @@ def test_events_coverage_anchors_present(v2_page):
     page.wait_for_timeout(300)
 
     found = _covs(page)
-    expected = {"IV-13", "IV-14", "IV-15"}
+    expected = {"IV-13", "IV-14"}
     assert expected - found == set(), sorted(expected - found)
 
 
@@ -804,28 +803,6 @@ def test_i18n_missing_is_empty_on_every_investigate_route(v2_page):
     page.evaluate("window.__openAllForAudit()")
     page.wait_for_timeout(200)
     assert _missing_i18n(page) == []
-
-
-# ── IV-15 shadow compare ────────────────────────────────────────────────────
-
-def test_shadow_compare_binds_to_its_real_endpoint(v2_page):
-    """IV-15: the panel is idle until asked, then it really calls
-    GET /api/events/shadow_compare with the clamped mins/limit and reports
-    what that endpoint answers (here: the PCE fetch failure, verbatim)."""
-    page, base_url = v2_page
-    _goto(page, base_url, R_EVENTS)
-    labels = _labels(page)
-
-    panel = page.locator('section[data-cov="IV-15"]')
-    assert panel.count() == 1
-    # The five columns this endpoint returns are declared even while empty.
-    assert panel.locator("thead th").count() == 5
-
-    with page.expect_request(lambda r: "/api/events/shadow_compare" in r.url) as info:
-        panel.get_by_role("button", name=labels["gui_refresh"], exact=True).click()
-    assert "mins=60" in info.value.url and "limit=200" in info.value.url, info.value.url
-
-    page.wait_for_selector('section[data-cov="IV-15"] .strip[data-tone="crit"]', timeout=SLOW)
 
 
 # ── Task 6: three-way source, archive date range, truncation ───────────────

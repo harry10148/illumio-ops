@@ -988,7 +988,11 @@ a.kpicell:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px
 
 /* HM-03: today's schedule — a clock column and one line each */
 .sched { display: grid; gap: var(--space-3); margin: 0; padding: 0; font-size: var(--fs-body); }
-.sched li { list-style: none; display: grid; grid-template-columns: 46px minmax(0, 1fr); gap: var(--space-4); align-items: baseline; }
+.sched li { list-style: none; display: grid; grid-template-columns: 46px minmax(0, 1fr) auto; gap: var(--space-4); align-items: baseline; }
+/* A schedule whose last run errored carries the mark AND the word — §5.2
+   does not let a colour state a status on its own. */
+.sched li[data-tone="warn"] { box-shadow: inset 2px 0 0 var(--mark); padding-left: var(--space-3); margin-left: calc(-1 * var(--space-3)); }
+.sched small { font-size: var(--fs-micro); color: var(--ink); white-space: nowrap; }
 .sched b { font-family: var(--font-num); font-variant-numeric: tabular-nums; font-size: var(--fs-mini); font-weight: 600; color: var(--text-2); }
 .sched a { color: var(--text-1); text-decoration: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .sched a:hover { color: var(--accent-fg); text-decoration: underline; }

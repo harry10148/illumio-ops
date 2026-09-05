@@ -283,29 +283,35 @@ function todayCard(rs, reportSched, ov) {
   (Array.isArray(rs) ? rs : []).forEach(function (s) {
     if (!s || s.live_enabled === false) return;
     if (s.schedule_type === "one_time" || s.type === "one_time") {
-      if (todayLocal(s.expire_at)) items.push({ when: hhmm(s.expire_at), sort: s.expire_at, text: tf("gui_home_today_rule_expire", { name: s.name || s.detail_name || "—" }), route: GO_SCHEDULES });
+      if (todayLocal(s.expire_at)) items.push({ when: hhmm(s.expire_at), sort: s.expire_at, text: tf("gui_home_today_rule_expire", { name: s.name || s.detail_name || "—" }), route: GO_SCHEDULES, tone: "info" });
       return;
     }
-    if (s.start) items.push({ when: s.start, sort: "T" + s.start, text: tf("gui_home_today_rule_start", { name: s.name || "—", action: s.action || "" }), route: GO_SCHEDULES });
-    if (s.end) items.push({ when: s.end, sort: "T" + s.end, text: tf("gui_home_today_rule_end", { name: s.name || "—" }), route: GO_SCHEDULES });
+    /* 3B marked a schedule whose last run errored; the v3.1 rewrite of this
+     * card dropped the mark, so a failed schedule read exactly like a healthy
+     * one on the page an operator looks at first. Restored with the mapping 3B
+     * used — and with a WORD, because §5.2 does not let a colour carry a
+     * status on its own. */
+    if (s.start) items.push({ when: s.start, sort: "T" + s.start, text: tf("gui_home_today_rule_start", { name: s.name || "—", action: s.action || "" }), route: GO_SCHEDULES, tone: s.last_result === "error" ? "warn" : "info" });
+    if (s.end) items.push({ when: s.end, sort: "T" + s.end, text: tf("gui_home_today_rule_end", { name: s.name || "—" }), route: GO_SCHEDULES, tone: "info" });
   });
   (Array.isArray(reportSched) ? reportSched : []).forEach(function (r) {
     if (!r || r.enabled === false || !r.next_run) return;
-    if (todayLocal(r.next_run)) items.push({ when: hhmm(r.next_run), sort: r.next_run, text: tf("gui_home_today_report", { name: r.name || r.report_type || "—" }), route: GO_REPORT_SCHEDULES });
+    if (todayLocal(r.next_run)) items.push({ when: hhmm(r.next_run), sort: r.next_run, text: tf("gui_home_today_report", { name: r.name || r.report_type || "—" }), route: GO_REPORT_SCHEDULES, tone: "info" });
   });
   ((ov && ov.job_health) || []).forEach(function (j) {
     if (!j || !/retention|archive/.test(String(j.job_id || ""))) return;
     if (!j.last_run || !j.interval_seconds) return;
     const next = new Date(new Date(j.last_run).getTime() + j.interval_seconds * 1000);
-    if (todayLocal(next.toISOString())) items.push({ when: hhmm(next.toISOString()), sort: next.toISOString(), text: tf("gui_home_today_job", { job: j.job_id }), route: GO_JOBS });
+    if (todayLocal(next.toISOString())) items.push({ when: hhmm(next.toISOString()), sort: next.toISOString(), text: tf("gui_home_today_job", { job: j.job_id }), route: GO_JOBS, tone: j.level === "error" ? "warn" : "info" });
   });
   items.sort(function (a, b) { return String(a.sort).localeCompare(String(b.sort)); });
 
   const body = items.length
     ? el("ul", { class: "sched" }, items.slice(0, 6).map(function (it) {
-      return el("li", null,
+      return el("li", { "data-tone": it.tone || "info" },
         el("b", { text: it.when }),
-        el("a", { href: it.route, text: it.text }));
+        el("a", { href: it.route, text: it.text }),
+        it.tone === "warn" ? el("small", { text: t("gui_home_today_last_failed") }) : null);
     }))
     : el("p", { class: "note" }, el("span", { text: t("gui_home_today_empty") }));
   const card = sideCard(t("gui_home_today"), body);
@@ -347,6 +353,8 @@ function policyCard(ov) {
 
 /** Ruleset count comes from its own endpoint, so it lands after the card. */
 function fillRulesets(card, state) {
+  // size: 1 — this needs `total`, not the rulesets, and the server does a
+  // per-ruleset schedule lookup for every item it serialises.
   api.load("rs_rulesets", { page: 1, size: 1 }).then(function (d) {
     if (state.torn || !card.rulesets) return;
     const total = d && d.total;

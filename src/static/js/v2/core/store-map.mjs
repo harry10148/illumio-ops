@@ -124,7 +124,15 @@ export const GET_MAP = {
       ["mins", "limit", "offset", "search", "category", "type_group", "event_type"]);
   },
   rs_status: "/api/rule_scheduler/status",
-  rs_rulesets: "/api/rule_scheduler/rulesets",
+  // Parameterised: the endpoint has always accepted page/size/q
+  // (rule_scheduler.py:109-142), but this entry was a fixed string, so a
+  // caller's {page, size} was silently dropped — the home page's ruleset
+  // COUNT was pulling the whole list to read one number off it. No params
+  // reproduces the yaml's captured path exactly, as events_viewer does.
+  rs_rulesets(params) {
+    if (!params) return "/api/rule_scheduler/rulesets";
+    return "/api/rule_scheduler/rulesets?" + qs(params, ["page", "size", "q"]);
+  },
   rs_schedules: "/api/rule_scheduler/schedules",
   rs_logs: "/api/rule_scheduler/logs",
   settings: "/api/settings",

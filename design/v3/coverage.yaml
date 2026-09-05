@@ -49,7 +49,8 @@ IV-11: {item: 隔離 lift, route: "#/investigate/workloads"}
 IV-12: {item: 流量更新加速+倒數, route: "#/investigate/workloads"}
 IV-13: {item: 事件檢視器三層 catalog, route: "#/investigate/events"}
 IV-14: {item: 事件 load-more+詳情卡, route: "#/investigate/events"}
-IV-15: {item: shadow compare, route: "#/investigate/events"}
+# IV-15 移除（2026-09-06）：shadow compare 是比對器遷移期的除錯工具，不屬於
+# 操作者在事件檢視頁要做的事。後端 /api/events/shadow_compare 未動。
 AL-01: {item: 規則清單+啟停+刪除, route: "#/policy/alert-rules"}
 AL-02: {item: Event 規則 drawer, route: "#/policy/alert-rules"}
 AL-03: {item: System health 規則 drawer, route: "#/policy/alert-rules"}

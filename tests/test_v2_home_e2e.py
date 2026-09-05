@@ -626,3 +626,59 @@ def test_the_home_dashboard_strip_reads_four_instruments_and_each_one_leads_some
     assert len(hrefs) == 4, f"a KPI cell is not a link: {hrefs}"
     assert hrefs == ["#/system/pce", "#/investigate/traffic",
                      "#/system/cache", "#/investigate/alerts"], hrefs
+
+
+def test_a_failing_rule_schedule_is_marked_on_the_home_card(v2_page):
+    """HM-03: a schedule whose last run errored is visibly not fine.
+
+    3B carried `tone: s.last_result === "error" ? "warn" : "info"` on the rule
+    START row; Phase 3E rewrote the card as a sideCard and dropped the tone
+    with it, so a failed schedule read exactly like a healthy one. The
+    schedules page still has the full status — but if the home page is where
+    an operator looks first, a row that cannot say "this one failed" is worse
+    than no row, because it answers the question wrongly rather than not at
+    all.
+
+    Two rows are served and both are asserted, so a change that tones every
+    row the same way fails as loudly as one that tones none.
+    """
+    page, base_url = v2_page
+    schedules = [
+        {"id": 1, "name": "nightly-block", "start": "08:00", "action": "block",
+         "live_enabled": True, "last_result": "error"},
+        {"id": 2, "name": "morning-allow", "start": "09:00", "action": "allow",
+         "live_enabled": True, "last_result": "ok"},
+    ]
+    page.route("**/api/rule_scheduler/schedules",
+               lambda r: r.fulfill(status=200, content_type="application/json",
+                                   body=json.dumps(schedules)))
+    _goto(page, base_url, HOME)
+    page.wait_for_selector('[data-cov="HM-03"] .sched li', timeout=30000)
+
+    tones = page.eval_on_selector_all(
+        '[data-cov="HM-03"] .sched li',
+        "els => els.map(e => [e.textContent.trim(), e.getAttribute('data-tone')])",
+    )
+    failing = [t for txt, t in tones if "nightly-block" in txt]
+    healthy = [t for txt, t in tones if "morning-allow" in txt]
+    assert failing == ["warn"], tones
+    assert healthy == ["info"], tones
+
+
+def test_the_home_ruleset_count_asks_for_one_row_not_the_whole_list(v2_page):
+    """HM-05 needs `total`, not the rulesets — so it must say so on the wire.
+
+    The call passed `{page: 1, size: 1}`, but GET_MAP's `rs_rulesets` was a
+    fixed path string, so both were dropped and the home page pulled the
+    entire ruleset list (each item costing a per-ruleset schedule lookup on
+    the server) to read one number off it. The parameters were not wrong —
+    they were not connected.
+    """
+    page, base_url = v2_page
+    with page.expect_request(
+        lambda r: "/api/rule_scheduler/rulesets" in r.url
+    ) as info:
+        _goto(page, base_url, HOME)
+    url = info.value.url
+    assert "size=1" in url, url
+    assert "page=1" in url, url
