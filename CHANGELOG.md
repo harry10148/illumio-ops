@@ -45,6 +45,30 @@ a plain `<major>.<minor>.<patch>` scheme. (Tags through v4.0.0 carried a
 
 ### Changed
 
+- **The settings page type lands** (§5.1's third). Notification channels is a
+  left list of the five channels — state, and what each still needs — beside
+  one open form; it replaced five forms side by side under a status card that
+  repeated the same five states. Cache, PCE connection, Security and Interface
+  & Reports now read as named groups: an h4 and one line saying what the group
+  is for, beside its fields. SIEM and TLS keep flat forms — three and four
+  controls under a panel title that already names them.
+
+- **Traffic search gave back a third of its width**: the permanent filter-
+  syntax rail is a "?" in the page head.
+
+- **The code face is for identifiers.** A deployment type reached the operator
+  as `On-premises`, an interval as `87m`, a job as `never ran`, a link as
+  `Go to PCE Connection`, and a failed PCE as a display-size, four-line
+  `PCE credentials were rejected (authentication failed).` — all in the
+  monospace face. Figures now take Montserrat tabular and prose takes the
+  interface face.
+
+- **Copy stopped explaining this app to its operator.** Forty-seven read-only
+  rows carried the key they are stored under; nine of them stated a constant
+  and were deleted rather than renamed. Seventeen more sentences named an
+  internal field, one shipped a bug report as UI copy, and one pointed at a
+  page v3 had already deleted.
+
 - **A page's title now names the page, not the area it sits in.** Every area
   helper passed its own `gui_nav_<area>` key, so all four Investigate pages
   were headed "Investigate" and all ten System pages "System" — under a
@@ -73,6 +97,22 @@ a plain `<major>.<minor>.<patch>` scheme. (Tags through v4.0.0 carried a
   keys.
 
 ### Fixed
+
+- **A failed schedule shows on the home page again**: the v3.1 rewrite of the
+  schedule card dropped the mark 3B carried, so a schedule whose last run
+  errored read exactly like a healthy one.
+
+- **The home page stopped pulling every ruleset to read one number.** The call
+  already passed `{page: 1, size: 1}` and the endpoint has always honoured
+  both, but the GET map entry was a fixed path string, so the parameters never
+  reached the wire.
+
+- **#/reports' filename column existed at twenty pixels.** Five fixed columns
+  asked for 634px inside a 654px table, so every name rendered as two
+  characters and an ellipsis.
+
+- **Twenty-two labels were cut short at the default width** — `.kpi` was a
+  fixed four columns in a 320px aside, and the labels were nowrap + ellipsis.
 
 - **The event detail pane no longer widens the whole page.** `.kv-list` was a
   bare `display: grid`, so its implicit track was `auto` — minimum
@@ -132,6 +172,18 @@ a plain `<major>.<minor>.<patch>` scheme. (Tags through v4.0.0 carried a
   Illumio orange reserved for actions (filled controls use the deeper
   AA-safe shade), Montserrat for display type and numerals; the dark theme
   stays as the alternate. Buttons and rows are a little roomier.
+
+### Removed
+
+- **The shadow-compare panel** on the event viewer: it ran the current event
+  matcher and the legacy one over the same events and listed the rules whose
+  results differ — a tool for whoever was migrating the matcher, on a page an
+  operator opens to read audit events. `GET /api/events/shadow_compare` is
+  untouched; `src/events/shadow.py` also serves `/api/events/rule_test`.
+
+- **The "Stored, with no control in this form" panel** and its per-row
+  captions, the DLQ drawer's list of the fields a record would have, and the
+  module-log note about two names lacking an `i18n_key` — 28 keys in all.
 
 ## [5.0.0] — 2026-09-02
 

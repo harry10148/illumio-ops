@@ -454,15 +454,20 @@ JSON 定位（AL-06）與**規則測試沙盤**（AL-07）可在不發送的前�
 八個子頁，是 `config.json` 大部分區塊的圖形化編輯介面。改動未存檔時儲存列
 會顯示 dirty 狀態（SY-18）。逐鍵對照見 [configuration.md](configuration.md)。
 
+依 v3.1 §5.1 的設定頁型（2026-09-06）：**有多個同型項目的頁面用左清單＋右表單**
+（目前只有通知通道），**其餘頁面的表單分節**——每節一個人話標題與一句「這節是
+做什麼的」，放在欄位旁邊。SIEM 與 TLS 的表單各只有三、四個控制項，面板標題已經
+命名它們，因此不再分節。
+
 | 子頁 | 路由 | 內容 |
 |---|---|---|
-| PCE | `#/system/pce` | API 連線欄位（URL／org id／key／secret／verify SSL） |
+| PCE | `#/system/pce` | 連線表單分兩節：「PCE 在哪裡」（部署型態／URL／org id／主控台位址）與「憑證」（key／secret／verify SSL） |
 | 快取 | `#/system/cache` | 狀態卡與 lag 列（SY-17）、設定表單（SY-02）、重啟 banner（SY-03）、retention 立即執行（SY-04）、流量過濾器與 IP 驗證（SY-05）、流量取樣（SY-06） |
 | SIEM | `#/system/siem` | 轉發器設定（SY-07）、目的地 CRUD 與條件（SY-08）、測試送出（SY-09）、DLQ（SY-10） |
 | TLS | `#/system/tls` | 憑證狀態、續期、CSR、匯入（SY-11） |
-| 安全 | `#/system/security` | 認證與 session 設定（SY-12）、停止 Web GUI（SY-16） |
-| 顯示 | `#/system/display` | 主題／密度／時區／語言（SY-13、XC-05、XC-06）、介面與報表偏好 |
-| 管道 | `#/system/channels` | 各告警通道設定與單通道測試（SY-14） |
+| 安全 | `#/system/security` | 分三節：誰可以登入、密碼、目前狀態（SY-12）；另有停止 Web GUI（SY-16） |
+| 介面與報表 | `#/system/display` | 主題／密度／時區／語言（XC-05、XC-06），以及分兩節的介面與報表偏好（SY-13） |
+| 通知通道 | `#/system/channels` | 設定頁型：左清單五個通道（狀態晶片＋還缺什麼），右邊一次編一個，含啟用切換與單通道測試（SY-14、OV-15） |
 | 日誌 | `#/system/logs` | 模組日誌檢視（SY-15） |
 
 幾點值得單獨說明：
