@@ -1,5 +1,12 @@
 # Phase 3E — 工作台（v3.1 修訂）實作計畫
 
+> **狀態（2026-09-05）：已交付，兩項版面工作未做。** Task 1–4、7 全做完；
+> Task 5、6 各自拆成兩半，被閘門要求的那一半（5a／6a）已交付，純版面重排的
+> 那一半（5b 設定頁左清單＋右表單、6b 政策／報表／流量搜尋的清單→詳情頁型）
+> 未做。逐任務的交付、驗證輸出、與計畫的偏離、以及剩餘缺陷清單見
+> `tmp/phase3e-verification/report.md`。合入 main 的 commit：
+> `19e5c00d`、`e964fe50`、`1a4c3af0`、`617256fc`、`f0974389`、`374f6b9a`、`0f66deb4`。
+>
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** 把 3B 交付的五區 GUI 改成 v3.1 spec 的工作台：左側導覽殼層、清單／詳情／設定三種頁型、告警清單與告警頁（自動 explain＋行動列）、首頁最近的告警、系統設定頁型、文案去工程味；砍掉 3B 的收件匣語意、步進、上下文條、逐列「看規則」。
@@ -85,7 +92,7 @@
   `AREAS`／`areaOf` 保留（palette、tests 用），由 `NAV` 推導。
 - Consumes：`router.onChange`、`palette.open`、`theme`／`density`、`GET /api/alerts?status=new&page_size=1` 的 `counts.new`（圓標；失敗顯示無圓標，不吞錯到 console 以外）。
 
-- [ ] **Step 1: 寫紅的殼層守門**（`tests/test_v2_page_types_e2e.py`）
+- [x] **Step 1: 寫紅的殼層守門**（`tests/test_v2_page_types_e2e.py`）
 ```python
 """v3.1 §1/§5.1 shell and page-type gates."""
 pytest_plugins = ["tests.v2_e2e_utils"]
@@ -128,10 +135,10 @@ def test_nothing_clips_at_800(v2_page):
     over = page.evaluate("Array.from(document.querySelectorAll('.sidenav a, .phead h2')).filter(e => e.scrollWidth > e.clientWidth + 1).length")
     assert over == 0
 ```
-- [ ] **Step 2: 跑，確認紅在 `.sidenav` 不存在**
+- [x] **Step 2: 跑，確認紅在 `.sidenav` 不存在**
 Run: `timeout 600 python3 -m pytest tests/test_v2_page_types_e2e.py -q -x --show-capture=no`
 Expected: FAIL（`.sidenav` count 0）
-- [ ] **Step 3: 實作 `components/page.mjs`、`shell.mjs` 左導覽、`app.mjs` 版面**
+- [x] **Step 3: 實作 `components/page.mjs`、`shell.mjs` 左導覽、`app.mjs` 版面**
   - `index.html`：`<div id="shell"></div><main id="area-root" class="workarea"></main>` 包在 `<div class="frame">`（grid `224px 1fr`）。
   - `shell.mjs`：`buildShell` 產 `<nav class="sidenav" data-cov="SH-01">`：品牌列、五區 `<a>`（含 `.sub` 子項，只在 `areaOf(path)` 命中的區渲染）、`spacer`、`<button class="kbd-row" data-cov="SH-03">`（⌘K）、使用者列 `<button class="who" data-cov="SH-02">` 開既有 `userMenu()` 彈出（主題／密度／PCE／版本／時區／登出）。`router.onChange` 更新 `aria-current` 與子項。`setAlertCount(n)` 寫圓標。
   - `app.mjs`：刪 `HEALTH_ROUTES`／`syncRail`／`healthbar` import（healthbar.mjs 保留給首頁卡 Task 4）；boot 後 `api.load("alerts", {status:"new", page_size:1})` → `shell.setAlertCount`。
@@ -139,14 +146,14 @@ Expected: FAIL（`.sidenav` count 0）
   - `components.css`：`.phead`（title 句用 `--font-body` 700 24px，`text-wrap: balance`）、`.crumbs`、`.phead .actions`。
   - i18n 新鍵：`gui_nav_alerts`（Alerts／告警）、`gui_nav_traffic_search`（Traffic search／流量搜尋）、`gui_shell_search_jump`（Search or jump to… ⌘K／搜尋或跳轉）、`gui_shell_user_menu`（Account and display／帳號與顯示）。三檔同步。
   - 每個 area 的 `areaTop`／`sysTop`／`systemAreaTop` 暫時改成回傳 `pageHead({crumbs, title: t(區名), sub: null, actions: []})`（Task 3–6 再改成句子）。sub-nav 不再由 area 畫。
-- [ ] **Step 4: 更新既有殼層測試**
+- [x] **Step 4: 更新既有殼層測試**
   - `tests/test_v2_shell_e2e.py`：頂欄斷言（`.topbar`、`.areanav a` 六→五、palette 入口 `.kbd-btn`）改為 `.sidenav`／`.kbd-row`；主題／密度分段仍在使用者彈出選單（先點 `.who`）。
   - `tests/test_v2_shell_flows_e2e.py`：路由表加 `#/investigate/alerts`；nav 點擊改 `.sidenav a`。
   - `tests/test_v2_home_e2e.py` 的健康列測試（HOME→PCE→SIEM 讀 rail）先標 `xfail(reason="rail moves into the home card in Task 4")`。
-- [ ] **Step 5: 綠**
+- [x] **Step 5: 綠**
 Run: `timeout 1500 python3 -m pytest tests/test_v2_page_types_e2e.py tests/test_v2_shell_e2e.py tests/test_v2_shell_flows_e2e.py tests/test_v2_core_e2e.py tests/test_v2_teardown_registration.py tests/test_color_token_lint.py tests/test_css_color_tokens.py tests/test_css_space_type_tokens.py tests/test_css_spacing_lint.py -q --show-capture=no`
 Expected: PASS；`python3 scripts/audit_i18n_usage.py` → 0 findings
-- [ ] **Step 6: 全套＋截圖＋commit**
+- [x] **Step 6: 全套＋截圖＋commit**
 Run: `timeout 3000 python3 -m pytest -q --show-capture=no --deselect tests/test_cache_cli.py::test_cache_flush_json_output`；本機 helper 截 `#/home`、`#/system/pce` 1280／800 亮／暗到 `tmp/phase3e-verification/task1/` 親看。
 ```bash
 git add src/static/js/v2/components/page.mjs src/static/js/v2/shell.mjs src/static/js/v2/app.mjs src/templates/index.html src/static/css/v2/app.css src/static/css/v2/components.css src/static/js/v2/areas/*.mjs src/i18n_en.json src/i18n_zh_TW.json src/i18n/data/zh_explicit.json tests/test_v2_page_types_e2e.py tests/test_v2_shell_e2e.py tests/test_v2_shell_flows_e2e.py tests/test_v2_home_e2e.py
@@ -188,13 +195,13 @@ git commit -m "feat(gui): left-hand navigation shell and page head"
   ```
   加：i18n 兩檔任何值含 `#/` → fail；`.mono` 出現處的 e2e DOM 掃描放 Task 6。
 
-- [ ] **Step 1: 寫 `tests/test_gui_copy_lint.py`**（含上表 4 條 regex、codepane 白名單計數、uppercase 選擇器白名單、i18n `#/`），跑
+- [x] **Step 1: 寫 `tests/test_gui_copy_lint.py`**（含上表 4 條 regex、codepane 白名單計數、uppercase 選擇器白名單、i18n `#/`），跑
 Run: `timeout 120 python3 -m pytest tests/test_gui_copy_lint.py -q`
 Expected: FAIL（withGoto 37 處、roField 18 處、codepane 12 處、i18n `gui_health_goto`）
-- [ ] **Step 2: 實作元件＋CSS**；`cards.mjs` 刪 `withGoto`／`GO_*`（卡片標題句與內容由各頁 Task 4–6 補連結）；i18n 刪 `gui_health_goto`、`gui_ov_goto*`（用 audit 找出未使用鍵一併刪）。
-- [ ] **Step 3: 綠（lint 仍紅在 roField／codepane，這兩條在 Task 5 清；本任務用 `pytest.mark.xfail(strict=True)` 標記那兩條子測試，Task 5 移除標記）**
+- [x] **Step 2: 實作元件＋CSS**；`cards.mjs` 刪 `withGoto`／`GO_*`（卡片標題句與內容由各頁 Task 4–6 補連結）；i18n 刪 `gui_health_goto`、`gui_ov_goto*`（用 audit 找出未使用鍵一併刪）。
+- [x] **Step 3: 綠（lint 仍紅在 roField／codepane，這兩條在 Task 5 清；本任務用 `pytest.mark.xfail(strict=True)` 標記那兩條子測試，Task 5 移除標記）**
 Run: `timeout 900 python3 -m pytest tests/test_gui_copy_lint.py tests/test_v2_page_types_e2e.py tests/test_v2_home_e2e.py tests/test_v2_system_e2e.py tests/test_color_token_lint.py tests/test_css_color_tokens.py tests/test_css_space_type_tokens.py tests/test_css_spacing_lint.py -q --show-capture=no`
-- [ ] **Step 4: 全套＋commit** `feat(gui): page-type components and copy lint`
+- [x] **Step 4: 全套＋commit** `feat(gui): page-type components and copy lint`
 
 ---
 
@@ -217,18 +224,18 @@ Run: `timeout 900 python3 -m pytest tests/test_gui_copy_lint.py tests/test_v2_pa
   ```
 - coverage 重編：`IN-01..06` → `AL-01` 清單（route `#/investigate/alerts`）、`AL-02` 狀態切換（`?id=1`）、`AL-03` 告警頁、`AL-04` 規則判定欄、`AL-05` 行動列；`tools/gate_coverage_live.py` 的種子告警維持（payload 需含 `raw_data` 1 條 flow，加 `src_href`／`dst_href` 為 null 即可讓 AL-04 顯示「未解析」）。
 
-- [ ] **Step 1: 寫 `tests/test_v2_alerts_e2e.py`**（沿用 hub 測試的 `_seed`，traffic 告警 payload `raw_data` 8 條真快照 flow）：
+- [x] **Step 1: 寫 `tests/test_v2_alerts_e2e.py`**（沿用 hub 測試的 `_seed`，traffic 告警 payload `raw_data` 8 條真快照 flow）：
   - 清單：兩列、色條與晶片、點列到 `?id=`；狀態分段 PATCH 後 UI 回顯（回清單再進頁不讀舊快取）。
   - 告警頁：`.phead h2` 含「4,662」或 seed 的連線數；`[data-cov="AL-04"] .chip` 數＝raw_data 條數（explain 在 e2e 環境回錯 → 全部「PCE 沒回答」晶片，數量仍正確）；`[data-cov="AL-05"] button` ≥2；「標記已處理」→ API 狀態 done、頁首晶片變更。
   - 事件型告警：無流量表，「發生了什麼」列出 actor／action／resource。
   - `#/investigate/inbox?id=N` → 轉址到 `#/investigate/alerts?id=N`。
   - `#/investigate/traffic?alert=N`：仍自動查詢（沿用 hub 測試的 request 斷言），頁首副標含「告警」且無 `.ctxstrip`。
-- [ ] **Step 2: 跑，紅在路由不存在**
-- [ ] **Step 3: 實作**（列表用 `listRow`；告警頁用 `pageHead`＋`section`×3＋`details`＋`sideCard`×3；explain 並行 `Promise.allSettled`，逐列回填；行動列文案帶對象名 `tf("gui_al_act_isolate", {name})`）
-- [ ] **Step 4: coverage 重編＋`tests/test_v2_coverage_live.py` 計數更新**（路由 24→24：`inbox`、`inbox?id=1` 換 `alerts`、`alerts?id=1`；`traffic?alert=1` 保留）
-- [ ] **Step 5: 綠**
+- [x] **Step 2: 跑，紅在路由不存在**
+- [x] **Step 3: 實作**（列表用 `listRow`；告警頁用 `pageHead`＋`section`×3＋`details`＋`sideCard`×3；explain 並行 `Promise.allSettled`，逐列回填；行動列文案帶對象名 `tf("gui_al_act_isolate", {name})`）
+- [x] **Step 4: coverage 重編＋`tests/test_v2_coverage_live.py` 計數更新**（路由 24→24：`inbox`、`inbox?id=1` 換 `alerts`、`alerts?id=1`；`traffic?alert=1` 保留）
+- [x] **Step 5: 綠**
 Run: `timeout 1800 python3 -m pytest tests/test_v2_alerts_e2e.py tests/test_v2_investigate_e2e.py tests/test_v2_coverage_live.py tests/test_v2_page_types_e2e.py tests/test_gui_copy_lint.py -q --show-capture=no`
-- [ ] **Step 6: 全套＋截圖（清單／告警頁 1280／800 亮／暗）＋commit** `feat(gui): alerts list and alert page with automatic rule explain`；部署後用測試機真告警（rule 27）開 `#/investigate/alerts?id=1` 以 curl 確認 200＋`api/policy/explain` 對真 flow 回 200。
+- [x] **Step 6: 全套＋截圖（清單／告警頁 1280／800 亮／暗）＋commit** `feat(gui): alerts list and alert page with automatic rule explain`；部署後用測試機真告警（rule 27）開 `#/investigate/alerts?id=1` 以 curl 確認 200＋`api/policy/explain` 對真 flow 回 200。
 
 ---
 
@@ -238,9 +245,9 @@ Run: `timeout 1800 python3 -m pytest tests/test_v2_alerts_e2e.py tests/test_v2_i
 - Modify: `src/static/js/v2/areas/home.mjs`（`cardNeedsYou` → 清單區塊 `listRow`×10＋未處理／全部切換＋「看全部」；`cardHealth` 改 `sideCard` 六燈＋每燈一句（沿用 `healthbar.computeLights`）；`cardToday` 改 `sideCard`；新 `cardPolicyWeek`（provision 次數、ruleset delta、posture 分數一行＋「看報表」）；刪 `cardDecisions`、posture 卡）、`src/static/js/v2/components/healthbar.mjs`（只保留 `computeLights`；rail 渲染刪除）、`design/v3/coverage.yaml`（HM-03 刪、OV-02 刪、HM-01 描述改）、`tests/test_v2_home_e2e.py`（rail 測試改讀首頁健康卡；HM-03 測試刪；新增：標題句含未處理數、切換全部後列數變化、列連到 `?id=`）
 - i18n：`gui_home_title_fmt`（"{n} alerts still open, {m} things to look at" ／「{n} 件告警還沒處理，系統有 {m} 項要看一下」）、`gui_home_recent`、`gui_home_see_all`、`gui_home_policy_week`…
 
-- [ ] **Step 1: 改測試先紅** → **Step 2: 實作** → **Step 3: 綠**
+- [x] **Step 1: 改測試先紅** → **Step 2: 實作** → **Step 3: 綠**
 Run: `timeout 900 python3 -m pytest tests/test_v2_home_e2e.py tests/test_v2_coverage_live.py tests/test_v2_page_types_e2e.py tests/test_gui_copy_lint.py -q --show-capture=no`
-- [ ] **Step 4: 全套＋截圖＋commit** `feat(gui): home leads with recent alerts`
+- [x] **Step 4: 全套＋截圖＋commit** `feat(gui): home leads with recent alerts`
 
 ---
 
@@ -249,9 +256,9 @@ Run: `timeout 900 python3 -m pytest tests/test_v2_home_e2e.py tests/test_v2_cove
 **Files:**
 - Modify: `src/static/js/v2/areas/system.mjs`（`sysPage` → `settingsLayout`＋`saveBar`；十頁各自：左清單項＝該頁的區段或目的地／通道，右表單分節；`roField(key, …)` 改 `roField(labelKey, …)` 人話標籤（既有 `gui_sy_*` 鍵有的直接用，缺的補）；秘密欄位改 `chip("已設定"/"尚未設定")`＋「設定／更換」按鈕（既有 `secret` 遮罩邏輯不動，只換呈現）；`kvRow` 的 mono 只留 IP／URL；`.codepane` 只留 logs 頁與 module log；channels 頁刪重複的狀態卡）、`src/static/css/v2/components.css`、`tests/test_v2_system_e2e.py`（sysPage 選擇器改；secret 遮罩測試改斷言晶片文字；新增每頁 `.savebar` 存在）、`tests/test_gui_copy_lint.py`（移除 Task 2 的 xfail）
 
-- [ ] **Step 1: 移除 xfail，lint 紅在 roField／codepane** → **Step 2: 逐頁改（順序：channels、siem、pce、tls、security、display、cache、alerting、jobs、logs）** → **Step 3: 綠**
+- [x] **Step 1: 移除 xfail，lint 紅在 roField／codepane** → **Step 2: 逐頁改（順序：channels、siem、pce、tls、security、display、cache、alerting、jobs、logs）** → **Step 3: 綠**
 Run: `timeout 1800 python3 -m pytest tests/test_v2_system_e2e.py tests/test_gui_copy_lint.py tests/test_v2_page_types_e2e.py tests/test_v2_coverage_live.py -q --show-capture=no`
-- [ ] **Step 4: 全套＋截圖（channels、siem、pce）＋commit** `feat(gui): system pages on the settings layout`
+- [x] **Step 4: 全套＋截圖（channels、siem、pce）＋commit** `feat(gui): system pages on the settings layout`
 
 ---
 
@@ -261,9 +268,9 @@ Run: `timeout 1800 python3 -m pytest tests/test_v2_system_e2e.py tests/test_gui_
 - Modify: `src/static/js/v2/areas/policy_rules.mjs`（規則清單 `listRow`；drawer 不動）、`policy_scheduler.mjs`（rulesets 清單／排程清單 `listRow`；`?rs=&rule=` 深連結不動；debug 主控台 codepane 保留）、`reports.mjs`（報表目錄與產出清單；右側摘要卡改 `sideCard`）、`investigate.mjs`（流量搜尋：`pageHead` 句子「查最近 1 小時的流量」＋副標；查詢表單保留；右欄 guide 刪，改 `?` 開 `m-help`；排行維持）、`cards.mjs`（標題句化）、i18n
 - Test: `tests/test_v2_page_types_e2e.py` 加 `.mono` DOM 掃描（每條路由：`.mono` 節點文字須匹配 `^[\d.:/a-fA-F\-\[\]]+$|^/orgs/|^\d{4}-\d{2}-\d{2}`，白名單 `.codepane`）；`tests/test_v2_policy_rules_e2e.py`、`test_v2_policy_scheduler_e2e.py`、`test_v2_reports_e2e.py`、`test_v2_investigate_e2e.py` 選擇器更新
 
-- [ ] **Step 1: 加 mono 守門先紅** → **Step 2: 逐區改** → **Step 3: 綠**
+- [x] **Step 1: 加 mono 守門先紅** → **Step 2: 逐區改** → **Step 3: 綠**
 Run: `timeout 2400 python3 -m pytest tests/test_v2_policy_rules_e2e.py tests/test_v2_policy_scheduler_e2e.py tests/test_v2_reports_e2e.py tests/test_v2_investigate_e2e.py tests/test_v2_filterbar_e2e.py tests/test_v2_page_types_e2e.py tests/test_gui_copy_lint.py -q --show-capture=no`
-- [ ] **Step 4: 全套＋截圖（rulesets、reports、traffic）＋commit** `feat(gui): policy, reports and traffic search on the list and detail page types`
+- [x] **Step 4: 全套＋截圖（rulesets、reports、traffic）＋commit** `feat(gui): policy, reports and traffic search on the list and detail page types`
 
 ---
 
@@ -272,9 +279,9 @@ Run: `timeout 2400 python3 -m pytest tests/test_v2_policy_rules_e2e.py tests/tes
 **Files:**
 - Modify: `src/static/js/v2/areas/login.mjs`（頁首對齊 `pageHead` 樣式；無左導覽）、`design/v3/coverage.yaml`（最終盤點：SH-01..03、AL-01..05、HM 重編；每項可達）、`tests/test_v2_coverage_live.py`、`docs/guide/gui-tour.md`（殼層、五區子項、告警頁一節；移除 3B 過渡註記）、`docs/reference/rest-api.md`（標題路由更新 `alerts`）、`CHANGELOG.md`（Unreleased「Changed」補：左導覽、告警頁、設定頁型、文案）、`tmp/phase3e-verification/report.md`
 
-- [ ] **Step 1: 實作＋文件** → **Step 2: 驗證**
+- [x] **Step 1: 實作＋文件** → **Step 2: 驗證**
 Run: 全套閘門；`python3 tools/gate_coverage_live.py -v` 100%；本機 helper 截全部路由 1280／800 亮／暗到 `tmp/phase3e-verification/final/` 親看；測試機部署後 curl smoke＋真告警頁 200。
-- [ ] **Step 3: commit** `feat(gui): login alignment, v3.1 coverage map, docs`；報告寫 `tmp/phase3e-verification/report.md`（每任務 commit／CI／測試機、兩次以上 CI 紅的根因、與計畫偏離）。
+- [x] **Step 3: commit** `feat(gui): login alignment, v3.1 coverage map, docs`；報告寫 `tmp/phase3e-verification/report.md`（每任務 commit／CI／測試機、兩次以上 CI 紅的根因、與計畫偏離）。
 
 ---
 
