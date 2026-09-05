@@ -58,6 +58,7 @@ from __future__ import annotations
 
 import json
 import pathlib
+import re
 
 import pytest
 
@@ -195,5 +196,47 @@ def test_drawer_fields_cover_snapshot_keys(v2_page, rtype):
         page.evaluate("window.__drawerProbe && window.__drawerProbe.close()")
         assert not missing, f"{rtype} drawer missing fields: {sorted(missing)}"
         assert errors == [], errors
+    finally:
+        _delete_by_name(page, name)
+
+
+@pytest.mark.parametrize("rtype", sorted(_keys_by_type()))
+def test_drawer_labels_are_words_not_keys(v2_page, rtype):
+    """The other half of "present AND NAMED", which nothing was checking.
+
+    The gate above asks whether a backend key is present in the drawer. It
+    says nothing about what the row is CALLED — and `roField` used to take one
+    argument for both, so the visible label WAS the storage key. Renaming the
+    labels to catalogue keys therefore printed `gui_al_ro_type` on screen and
+    broke the data-field contract at the same time, and every existing lint
+    stayed green: tests/test_gui_copy_lint.py matches a string literal in the
+    source (blind to `filterFieldRows`, which passes a variable), and the
+    settings-page DOM check only visits `#/system/*`.
+
+    So this reads the rendered labels: none may be a snake_case identifier
+    (`src_label`, `throttle_state`) or one of our own catalogue keys
+    (`gui_...`). Those are the two ways this row has actually gone wrong.
+    """
+    page, base_url = v2_page
+    _goto_rules(page, base_url)
+    name = "e2e-label-cov-" + rtype
+    _seed_live_rule(page, rtype, name)
+    try:
+        page.reload()
+        page.wait_for_selector('body[data-booted="true"]')
+        page.wait_for_selector("[data-cov='AL-01'] table")
+        page.evaluate("window.__drawerProbe = window.__openRuleDrawer(%s)"
+                      % json.dumps(DRAWER_OF.get(rtype, rtype)))
+        page.wait_for_timeout(300)
+        labels = page.eval_on_selector_all(
+            ".drawer .rofields .c", "els => els.map(e => e.textContent.trim())")
+        page.evaluate("window.__drawerProbe && window.__drawerProbe.close()")
+        assert labels, f"{rtype} drawer rendered no read-only rows"
+        offenders = [
+            text for text in labels
+            if text.startswith("gui_")
+            or re.fullmatch(r"[a-z][a-z0-9]*(?:_[a-z0-9]+)+", text)
+        ]
+        assert offenders == [], f"{rtype} drawer labels are keys: {offenders}"
     finally:
         _delete_by_name(page, name)
