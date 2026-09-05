@@ -34,8 +34,10 @@
      a caption, where not fitting means the column is wrong. */
   min-width: 0; overflow-wrap: anywhere;
 }
+/* A panel's meta caption is a count and a word ("0 rows", "11 types · 10
+   files"), so it takes the figure face, not the code face. */
 .panel-h .meta {
-  margin-left: auto; font-family: var(--font-mono);
+  margin-left: auto; font-family: var(--font-num);
   font-size: var(--fs-mini); color: var(--text-3); white-space: nowrap;
 }
 .panel-b { padding: var(--space-5); flex: 1; min-width: 0; }
@@ -143,7 +145,8 @@ table.tbl tbody tr:hover td { background: var(--surface-hover); }
   font-size: var(--fs-mini); color: var(--text-3);
 }
 .tbl-foot .spacer { margin-left: auto; }
-.tbl-foot .page { font-family: var(--font-mono); color: var(--text-2); }
+/* "Page 1 / 1" is a count, not an identifier (§5.2) */
+.tbl-foot .page { font-family: var(--font-num); color: var(--text-2); }
 
 /* skeleton + empty */
 .skel { display: block; height: 9px; border-radius: var(--radius-s); background: var(--track); }
@@ -384,9 +387,12 @@ table.tbl tbody tr:hover td { background: var(--surface-hover); }
   margin-left: auto; flex: none;
   display: flex; align-items: center; gap: var(--space-4);
 }
+/* A "go to" link's text is a verb and an object name (§5.2), so it is set in
+   the interface face. It used to be mono, which said "identifier" about a
+   sentence. */
 .goto {
-  font-family: var(--font-mono); font-size: var(--fs-micro);
-  letter-spacing: .06em; white-space: nowrap;
+  font-family: var(--font-ui); font-size: var(--fs-micro);
+  letter-spacing: .04em; white-space: nowrap;
 }
 .panel-b h4.eyebrow { margin: var(--space-5) 0 var(--space-3); }
 .drawer-b h4.eyebrow { margin: var(--space-6) 0 var(--space-3); }
@@ -397,8 +403,13 @@ table.tbl tbody tr:hover td { background: var(--surface-hover); }
   display: flex; align-items: baseline; gap: var(--space-4);
   margin-bottom: var(--space-4);
 }
-.lead .n { font-family: var(--font-mono); font-size: var(--fs-display); line-height: 1; letter-spacing: -.03em; color: var(--text-1); }
-.lead .u { font-family: var(--font-mono); font-size: var(--fs-mini); color: var(--text-3); }
+/* A readout is a FIGURE — Montserrat tabular, not the code face (§5.2).
+   `.says` is the other case: when the value is a sentence (a PCE that
+   answered "credentials were rejected" rather than a number), display
+   size in a numeral face is the wrong treatment twice over. */
+.lead .n { font-family: var(--font-num); font-size: var(--fs-display); line-height: 1; letter-spacing: -.03em; color: var(--text-1); }
+.lead.says .n { font-family: var(--font-ui); font-size: var(--fs-lead); font-weight: 600; line-height: 1.35; letter-spacing: 0; }
+.lead .u { font-family: var(--font-ui); font-size: var(--fs-mini); color: var(--text-3); }
 .lead .badge { margin-left: auto; }
 
 .note {

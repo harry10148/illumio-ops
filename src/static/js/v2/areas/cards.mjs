@@ -281,8 +281,14 @@ function badge(text, tn) {
   return el("span", { class: "badge", "data-tone": tn }, el("i", { class: "dot" }), el("span", { text: text }));
 }
 
+/* The big readout at the top of a status card. Usually a figure — but
+ * cardSystem passes whatever the PCE said, and when that is "PCE credentials
+ * were rejected (authentication failed)." a display-size numeral face is the
+ * wrong treatment: it is a sentence, and it wrapped across four lines. */
 function lead(value, unit, trailing) {
-  return el("div", { class: "lead" },
+  const text = String(value === null || value === undefined ? "" : value);
+  const says = text.split(/\s+/).length > 3;
+  return el("div", { class: says ? "lead says" : "lead" },
     el("span", { class: "n", text: value }),
     unit ? el("span", { class: "u", text: unit }) : null,
     trailing || null

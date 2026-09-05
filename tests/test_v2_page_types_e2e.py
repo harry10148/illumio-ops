@@ -368,9 +368,21 @@ def test_the_code_face_is_only_used_for_identifiers(v2_page):
     for route in _MONO_ROUTES:
         _open(page, base_url, route)
         page.wait_for_timeout(400)
+        # Everything WEARING the mono face, whether it got there through the
+        # `.mono` class or because a rule named the family — `.lead .n` and
+        # `.goto` did the latter, which is how a sentence ("PCE credentials
+        # were rejected (authentication failed)") and a link label ("Go to PCE
+        # Connection") reached the operator in the code face while a
+        # class-based check saw nothing. `.codepane` and `.console` are
+        # excluded: verbatim output is exactly what the face is for, including
+        # the "no lines yet" placeholder that stands in its place.
         texts = page.eval_on_selector_all(
-            ".workarea .mono",
-            "els => els.map(e => e.textContent.trim()).filter(Boolean)")
+            ".workarea *",
+            """els => els
+                 .filter(e => !e.closest('.codepane, .console') && e.children.length === 0)
+                 .filter(e => /mono|Consolas/i.test(getComputedStyle(e).fontFamily))
+                 .map(e => e.textContent.trim())
+                 .filter(Boolean)""")
         for text in sorted(set(texts)):
             if not any(shape.search(text) for shape in _ID_SHAPES):
                 offenders.append((route, text))

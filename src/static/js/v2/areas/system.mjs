@@ -801,10 +801,9 @@ async function mountPce(root, ctx) {
     const key = passwordField(t("gui_sy_secret_keep"));
     const secret = passwordField(t("gui_sy_secret_keep"));
     const ssl = checkField(api_.verify_ssl);
-    connPanel.body.appendChild(labelled(t("gui_deployment_type"),
-      form.track("deployment_type", deployment)));
-    connPanel.body.appendChild(labelled(t("gui_url"), form.track("url", url), t("gui_url_help")));
-    connPanel.body.appendChild(labelled(t("gui_org_id"), form.track("org_id", org), t("gui_org_id_help")));
+    const deployBox = labelled(t("gui_deployment_type"), form.track("deployment_type", deployment));
+    const urlBox = labelled(t("gui_url"), form.track("url", url), t("gui_url_help"));
+    const orgBox = labelled(t("gui_org_id"), form.track("org_id", org), t("gui_org_id_help"));
     const consoleBox = labelled(t("gui_console_url"), form.track("console_url", consoleUrl));
     const consoleHelpText = el("span");
     const statusLink = el("a", {
@@ -824,12 +823,17 @@ async function mountPce(root, ctx) {
     // Use the form's one synchronization path: it runs for native input/change
     // events and after programmatic writeCtl() calls such as Discard.
     form.onSync(syncConsoleHelp);
-    connPanel.body.appendChild(consoleBox);
-    connPanel.body.appendChild(labelled(t("gui_api_key"), form.track("key", key, "secret"),
-      t("gui_api_key_help") + " · " + secretState(api_, "key")));
-    connPanel.body.appendChild(labelled(t("gui_api_secret"), form.track("secret", secret, "secret"),
-      t("gui_api_secret_help") + " · " + secretState(api_, "secret")));
-    connPanel.body.appendChild(checkRow(t("gui_verify_ssl"), form.track("verify_ssl", ssl, "bool")));
+    /* §5.1: two named groups rather than one run of seven inputs. The split
+     * is the operator's own: where the PCE is, and what this appliance signs
+     * in with — the second is the half they come back to when a key rotates. */
+    connPanel.body.appendChild(settingsSection(t("gui_sy_sec_conn"), t("gui_sy_sec_conn_h"),
+      deployBox, urlBox, orgBox, consoleBox));
+    connPanel.body.appendChild(settingsSection(t("gui_sy_sec_cred"), t("gui_sy_sec_cred_h"),
+      labelled(t("gui_api_key"), form.track("key", key, "secret"),
+        t("gui_api_key_help") + " · " + secretState(api_, "key")),
+      labelled(t("gui_api_secret"), form.track("secret", secret, "secret"),
+        t("gui_api_secret_help") + " · " + secretState(api_, "secret")),
+      checkRow(t("gui_verify_ssl"), form.track("verify_ssl", ssl, "bool"))));
     /* What is left here is the connection's own identity. The "secret field
      * state" readout that used to stand above it — one row per credential,
      * each stating set/not-set and the stored length — is gone: the length
@@ -1205,25 +1209,31 @@ async function mountCache(root, ctx) {
       const rate = numberField(s.rate_limit_per_minute, 10, 500);
       const asyncTh = numberField(s.async_threshold_events, 1, 10000);
 
-      cfgPanel.body.appendChild(sectionHead(t("gui_cache_sec_basic")));
-      cfgPanel.body.appendChild(checkRow(t("gui_cache_enabled"), form.track("enabled", enabled, "bool")));
-      cfgPanel.body.appendChild(labelled(t("gui_cache_db_path"), form.track("db_path", dbPath), t("gui_cache_db_path_help")));
-      cfgPanel.body.appendChild(sectionHead(t("gui_cache_sec_retention")));
-      cfgPanel.body.appendChild(labelled(t("gui_ov_events"), form.track("events_retention_days", evRet, "number"), t("gui_cache_events_retention_days_help")));
-      cfgPanel.body.appendChild(labelled(t("gui_cache_card_traffic_raw"), form.track("traffic_raw_retention_days", rawRet, "number"), t("gui_cache_traffic_raw_retention_days_help")));
-      cfgPanel.body.appendChild(labelled(t("gui_cache_card_traffic_agg"), form.track("traffic_agg_retention_days", aggRet, "number"), t("gui_cache_traffic_agg_retention_days_help")));
-      cfgPanel.body.appendChild(sectionHead(t("gui_cache_sec_archive")));
-      cfgPanel.body.appendChild(checkRow(t("gui_cache_archive_enabled"), form.track("archive_enabled", arcOn, "bool")));
-      cfgPanel.body.appendChild(labelled(t("gui_cache_archive_dir"), form.track("archive_dir", arcDir), t("gui_cache_archive_dir_help")));
-      cfgPanel.body.appendChild(labelled(t("gui_cache_archive_interval_hours"), form.track("archive_interval_hours", arcInt, "number"), t("gui_cache_archive_interval_hours_help")));
-      cfgPanel.body.appendChild(labelled(t("gui_cache_archive_gzip_after_days"), form.track("archive_gzip_after_days", arcGzip, "number"), t("gui_cache_archive_gzip_after_days_help")));
-      cfgPanel.body.appendChild(labelled(t("gui_cache_archive_retention_days"), form.track("archive_retention_days", arcRet, "number"), t("gui_cache_archive_retention_days_help")));
-      cfgPanel.body.appendChild(sectionHead(t("gui_cache_sec_polling")));
-      cfgPanel.body.appendChild(labelled(t("gui_sy_cache_ev_poll"), form.track("events_poll_interval_seconds", evPoll, "number"), t("gui_cache_events_poll_interval_seconds_help")));
-      cfgPanel.body.appendChild(labelled(t("gui_sy_cache_tr_poll"), form.track("traffic_poll_interval_seconds", trPoll, "number"), t("gui_cache_traffic_poll_interval_seconds_help")));
-      cfgPanel.body.appendChild(sectionHead(t("gui_cache_sec_throughput")));
-      cfgPanel.body.appendChild(labelled(t("gui_sy_cache_rate"), form.track("rate_limit_per_minute", rate, "number"), t("gui_cache_rate_limit_per_minute_help")));
-      cfgPanel.body.appendChild(labelled(t("gui_sy_cache_async"), form.track("async_threshold_events", asyncTh, "number"), t("gui_cache_async_threshold_events_help")));
+      /* §5.1: "分節（h4＋一句說明｜欄位）". This was a flat run of fifteen
+       * inputs under five bare `sectionHead` eyebrows — the longest form in
+       * the product, read top to bottom with nothing to steer by. Each group
+       * now states what it is FOR beside its fields, so an operator looking
+       * for "how long is traffic kept" scans five sentences instead of
+       * fifteen labels. */
+      cfgPanel.body.appendChild(settingsSection(t("gui_cache_sec_basic"), t("gui_sy_sec_basic_h"),
+        checkRow(t("gui_cache_enabled"), form.track("enabled", enabled, "bool")),
+        labelled(t("gui_cache_db_path"), form.track("db_path", dbPath), t("gui_cache_db_path_help"))));
+      cfgPanel.body.appendChild(settingsSection(t("gui_cache_sec_retention"), t("gui_sy_sec_ret_h"),
+        labelled(t("gui_ov_events"), form.track("events_retention_days", evRet, "number"), t("gui_cache_events_retention_days_help")),
+        labelled(t("gui_cache_card_traffic_raw"), form.track("traffic_raw_retention_days", rawRet, "number"), t("gui_cache_traffic_raw_retention_days_help")),
+        labelled(t("gui_cache_card_traffic_agg"), form.track("traffic_agg_retention_days", aggRet, "number"), t("gui_cache_traffic_agg_retention_days_help"))));
+      cfgPanel.body.appendChild(settingsSection(t("gui_cache_sec_archive"), t("gui_sy_sec_arc_h"),
+        checkRow(t("gui_cache_archive_enabled"), form.track("archive_enabled", arcOn, "bool")),
+        labelled(t("gui_cache_archive_dir"), form.track("archive_dir", arcDir), t("gui_cache_archive_dir_help")),
+        labelled(t("gui_cache_archive_interval_hours"), form.track("archive_interval_hours", arcInt, "number"), t("gui_cache_archive_interval_hours_help")),
+        labelled(t("gui_cache_archive_gzip_after_days"), form.track("archive_gzip_after_days", arcGzip, "number"), t("gui_cache_archive_gzip_after_days_help")),
+        labelled(t("gui_cache_archive_retention_days"), form.track("archive_retention_days", arcRet, "number"), t("gui_cache_archive_retention_days_help"))));
+      cfgPanel.body.appendChild(settingsSection(t("gui_cache_sec_polling"), t("gui_sy_sec_poll_h"),
+        labelled(t("gui_sy_cache_ev_poll"), form.track("events_poll_interval_seconds", evPoll, "number"), t("gui_cache_events_poll_interval_seconds_help")),
+        labelled(t("gui_sy_cache_tr_poll"), form.track("traffic_poll_interval_seconds", trPoll, "number"), t("gui_cache_traffic_poll_interval_seconds_help"))));
+      cfgPanel.body.appendChild(settingsSection(t("gui_cache_sec_throughput"), t("gui_sy_sec_thru_h"),
+        labelled(t("gui_sy_cache_rate"), form.track("rate_limit_per_minute", rate, "number"), t("gui_cache_rate_limit_per_minute_help")),
+        labelled(t("gui_sy_cache_async"), form.track("async_threshold_events", asyncTh, "number"), t("gui_cache_async_threshold_events_help"))));
       /* The note that used to close this section ("these four fields have real
        * labels here, the stored key is still in the <code> column") is deleted
        * rather than collapsed: it described a decision about the interface, not
@@ -1255,6 +1265,7 @@ async function mountCache(root, ctx) {
       const tfIps = textField((tf0.exclude_src_ips || []).join(","));
       const hintBox = el("p", { class: "note", "data-tone": "crit" });
 
+      tfPanel.body.appendChild(note(t("gui_sy_sec_tf_h")));
       tfPanel.body.appendChild(labelled(t("gui_cache_tf_actions"), actionRow));
       tfPanel.body.appendChild(labelled(t("gui_cache_tf_protocols"), protoRow));
       tfPanel.body.appendChild(labelled(t("gui_cache_tf_workload_env"), form.track("traffic_filter.workload_label_env", tfEnv, "list"), t("gui_cache_workload_label_env_help")));
@@ -1267,11 +1278,16 @@ async function mountCache(root, ctx) {
       const tsPanel = panel("SY-06", t("gui_cache_sec_traffic_sampling"));
       const tsRatio = numberField(ts.sample_ratio_allowed, 1, null);
       const tsMax = numberField(ts.max_rows_per_batch, 1, 200000);
+      tsPanel.body.appendChild(note(t("gui_sy_sec_ts_h")));
       tsPanel.body.appendChild(labelled(t("gui_cache_ts_ratio"), form.track("traffic_sampling.sample_ratio_allowed", tsRatio, "number"), t("gui_cache_ts_ratio_help")));
       tsPanel.body.appendChild(labelled(t("gui_cache_ts_max_rows"), form.track("traffic_sampling.max_rows_per_batch", tsMax, "number"), t("gui_cache_ts_max_rows_help")));
       tsPanel.body.appendChild(note(t("gui_sy_ts_note")));
 
-      board.appendChild(el("div", { class: "brow c2 top" }, cfgPanel, el("div", { class: "board" }, tfPanel, tsPanel)));
+      /* The settings form is full width now. Sectioned, it is a 200px column
+       * of group names beside the fields — in half a page that left the
+       * inputs about 180px, narrower than the values they hold. */
+      board.appendChild(cfgPanel);
+      board.appendChild(el("div", { class: "brow c2 top" }, tfPanel, tsPanel));
 
       /* Five keys of PceCacheSettings have no control in this form. They used
        * to be listed here, each row captioned with the reason it had none —
@@ -2196,21 +2212,28 @@ async function mountSecurity(root, ctx) {
     const pw2 = passwordField("");
     const pwHint = el("p", { class: "note", "data-tone": "crit", hidden: true });
 
-    secPanel.body.appendChild(labelled(t("gui_username"), form.track("username", user), t("gui_sy_sec_user_default")));
-    secPanel.body.appendChild(labelled(t("gui_allowed_ips"), form.track("allowed_ips", ips, "list"), t("gui_sy_sec_lockout")));
-    secPanel.body.appendChild(note(t("gui_leave_blank_pass")));
-    secPanel.body.appendChild(labelled(t("gui_new_password"), form.track("new_password", pw, "secret"), t("gui_sy_sec_pw_rule")));
-    secPanel.body.appendChild(labelled(t("gui_new_password_confirm"), form.track("confirm_password", pw2, "secret")));
-    secPanel.body.appendChild(pwHint);
-    /* auth_setup is returned by GET /api/security (config.py:50) and rendered
-     * nowhere in settings.js — the operator cannot tell whether the appliance
-     * still holds its bootstrap password. It is a status row here. */
-    secPanel.body.appendChild(sectionHead(t("gui_sy_sec_state")));
-    secPanel.body.appendChild(roList([
-      roField("gui_sy_ro_auth_setup", sec.auth_setup, t("gui_sy_sec_authsetup"), "auth_setup"),
-      roField("gui_sy_ro_old_password", null, t("gui_sy_sec_oldpw")),
-    ]));
-    secPanel.body.appendChild(note(t("gui_sy_sec_rotate")));
+    secPanel.body.appendChild(settingsSection(t("gui_sy_sec_who"), t("gui_sy_sec_who_h"),
+      labelled(t("gui_username"), form.track("username", user), t("gui_sy_sec_user_default")),
+      labelled(t("gui_allowed_ips"), form.track("allowed_ips", ips, "list"), t("gui_sy_sec_lockout"))));
+    secPanel.body.appendChild(settingsSection(t("gui_sy_sec_pw"), t("gui_sy_sec_pw_h"),
+      labelled(t("gui_new_password"), form.track("new_password", pw, "secret"), t("gui_sy_sec_pw_rule")),
+      labelled(t("gui_new_password_confirm"), form.track("confirm_password", pw2, "secret")),
+      pwHint));
+    /* auth_setup is returned by GET /api/security and rendered nowhere in the
+     * legacy settings screen — the operator could not tell whether the
+     * appliance still holds its bootstrap password. It is a status row here. */
+    secPanel.body.appendChild(settingsSection(t("gui_sy_sec_state"), t("gui_sy_sec_state_h"),
+      /* `true` is what the API says; "Yes" is what a person reads. And the
+       * row that used to sit under it ("Current password —", captioned "this
+       * form takes no old password; the authenticated session is the
+       * authorisation") stated a fact about the form's own design — there is
+       * nothing an operator does with it. */
+      roList([
+        roField("gui_sy_ro_auth_setup",
+          t(sec.auth_setup ? "gui_sy_bool_yes" : "gui_sy_bool_no"),
+          t("gui_sy_sec_authsetup"), "auth_setup"),
+      ]),
+      note(t("gui_sy_sec_rotate"))));
     board.appendChild(secPanel);
 
     // confirm_password is compared on the client and NEVER sent — matches
@@ -2355,15 +2378,15 @@ async function mountDisplay(root, ctx) {
     const health = checkField(st.enable_health_check);
     const outDir = textField(rpt.output_dir || "reports/");
     const keepDays = numberField(rpt.retention_days === undefined ? 30 : rpt.retention_days, 0, null);
-    dispPanel.body.appendChild(sectionHead(t("gui_report_output")));
-    dispPanel.body.appendChild(labelled(t("gui_report_output_dir"), form.track("report.output_dir", outDir), t("gui_report_output_dir_hint")));
-    dispPanel.body.appendChild(labelled(t("gui_retention_days"), form.track("report.retention_days", keepDays, "number"), t("gui_retention_hint")));
-    dispPanel.body.appendChild(note(t("gui_err_report_output_dir_forbidden")));
-    dispPanel.body.appendChild(sectionHead(t("gui_sy_disp_other")));
-    // enable_health_check lives in settings.settings but has no control in
-    // _renderDisplaySection; it is editable here rather than dropped.
-    dispPanel.body.appendChild(checkRow(t("gui_sy_disp_health"), form.track("settings.enable_health_check", health, "bool")));
-    dispPanel.body.appendChild(note(t("gui_sy_disp_dashq")));
+    dispPanel.body.appendChild(settingsSection(t("gui_report_output"), t("gui_sy_sec_rpt_h"),
+      labelled(t("gui_report_output_dir"), form.track("report.output_dir", outDir), t("gui_report_output_dir_hint")),
+      labelled(t("gui_retention_days"), form.track("report.retention_days", keepDays, "number"), t("gui_retention_hint")),
+      note(t("gui_err_report_output_dir_forbidden"))));
+    // The health check has no control anywhere else; it is editable here
+    // rather than dropped.
+    dispPanel.body.appendChild(settingsSection(t("gui_sy_disp_other"), t("gui_sy_sec_other_h"),
+      checkRow(t("gui_sy_disp_health"), form.track("settings.enable_health_check", health, "bool")),
+      note(t("gui_sy_disp_dashq"))));
     board.appendChild(dispPanel);
 
     form.setBody(function (v) {
