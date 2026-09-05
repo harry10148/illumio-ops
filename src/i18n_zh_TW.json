@@ -4863,7 +4863,6 @@
   "gui_health_chan_fail": "{name}：{status}",
   "gui_health_chan_live": "{live}/{total} 個管道正常",
   "gui_health_reasons": "原因",
-  "gui_health_goto": "前往",
   "gui_fb_searching": "搜尋中…",
   "gui_fb_loading": "載入中…",
   "gui_fb_retry": "重試",
@@ -5352,5 +5351,6 @@
   "gui_nav_alerts": "告警",
   "gui_nav_traffic_search": "流量搜尋",
   "gui_shell_search_jump": "搜尋或跳轉",
-  "gui_shell_user_menu": "帳號與顯示"
+  "gui_shell_user_menu": "帳號與顯示",
+  "gui_health_goto_named": "前往 {name}"
 }

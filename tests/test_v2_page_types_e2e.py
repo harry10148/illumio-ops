@@ -48,16 +48,20 @@ ROUTES = [
 def _open(page, base_url, route):
     """Land on `route` and wait for the shell and the page head.
 
-    NOT `body[data-booted="true"]`: that flag is set after router.start()
-    resolves, i.e. after the mounted area's own loads finish, and several
-    routes here drive PCE-bound endpoints that take tens of seconds to fail
-    against the harness's closed port. The shell and the head are both built
-    synchronously, before any await — which is the property this file is
-    asserting in the first place.
+    The head is matched by its OWN data-route, not just by tag. Two routes in
+    this list differ only in the hash, and `page.goto` to a same-document hash
+    does not reload — so a bare `.phead h2` wait is satisfied by the PREVIOUS
+    route's head, still in the DOM, and every assertion after it reads the
+    wrong page. Waiting for the incoming route's head is what actually proves
+    the new area mounted.
+
+    NOT `body[data-booted="true"]` either: that flag is set once, after the
+    first router.start() resolves, and never cleared on a hash change. It says
+    nothing about the route being visited now.
     """
     page.goto(base_url + "/" + route)
     page.wait_for_selector(".sidenav", timeout=20000)
-    page.wait_for_selector(".workarea .phead h2", timeout=20000)
+    page.wait_for_selector('.workarea .phead[data-route="%s"] h2' % route, timeout=30000)
 
 
 # ── §1 · the shell ──────────────────────────────────────────────────────────
@@ -122,3 +126,42 @@ def test_nothing_clips_at_800(v2_page):
         ".filter(e => e.scrollWidth > e.clientWidth + 1).length"
     )
     assert over == 0
+
+
+# ── §5.2 · no route reaches the screen ──────────────────────────────────────
+
+def test_no_visible_text_is_a_route(v2_page):
+    """The half of §5.2 that a source lint cannot see.
+
+    tests/test_gui_copy_lint.py catches a route written as a literal piece of
+    text. It cannot catch one COMPOSED at runtime — `t("gui_health_goto") + " "
+    + route` was how 21 buttons and every command-palette entry printed an
+    address — because no regex over source tells a route variable from any
+    other string. The rendered page does tell, so this asks it directly.
+
+    body.innerText, deliberately: it is what an operator can actually read, so
+    a hash inside an href, a title attribute or a hidden surface does not count.
+    """
+    page, base_url = v2_page
+    offenders = []
+    for route in ROUTES:
+        _open(page, base_url, route)
+        # The head is synchronous, the body is not — and here the BODY is the
+        # subject, so reading straight after _open would let a page that has
+        # not painted its content yet pass for lack of anything to read. Wait
+        # for the network to go quiet instead: every area's copy arrives with
+        # (or right after) its own loads, which against the harness's closed
+        # port fail slowly, with retry backoff.
+        try:
+            page.wait_for_load_state("networkidle", timeout=90000)
+        except Exception:
+            pass
+        page.wait_for_timeout(2000)
+        text = page.evaluate("() => document.body.innerText")
+        for line in text.splitlines():
+            if "#/" in line:
+                offenders.append((route, line.strip()))
+    assert offenders == [], (
+        "these routes print a hash route at the operator (spec §5.2):\n  "
+        + "\n  ".join("%s: %s" % pair for pair in offenders[:20])
+    )

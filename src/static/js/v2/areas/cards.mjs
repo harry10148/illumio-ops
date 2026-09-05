@@ -25,7 +25,7 @@
 //      "this note only edits the on-screen copy" note is dropped — it would
 //      be a lie against a real backend.
 //   4. i18n keys renamed v2_* -> gui_* (this task's global rename). Five keys
-//      (gui_health_goto/queue_idle/queue_active/clear/jobs_ok) reuse the
+//      (gui_health_goto_named/queue_idle/queue_active/clear/jobs_ok) reuse the
 //      identical keys design/v2's Task 3 healthbar.mjs port already minted
 //      for the same v2_health_* family, rather than duplicating them; two
 //      more (gui_table_rows, gui_status_version) reuse existing product
@@ -74,7 +74,7 @@ import { modal } from "../components/modal.mjs";
 import { table, col } from "../components/table.mjs";
 import { palette } from "../components/palette.mjs";
 import { chart } from "../components/chart.mjs";
-import { pageHead, crumbsFor } from "../components/page.mjs";
+import { pageHead, crumbsFor, goLabel } from "../components/page.mjs";
 
 const ROUTE = "#/home";
 
@@ -230,7 +230,7 @@ function withGoto(p, route) {
   headBox(p).appendChild(el("button", {
     class: "btn link goto",
     type: "button",
-    text: t("gui_health_goto") + " " + route,
+    text: goLabel(route),
     onClick: function () { router.go(route); },
   }));
   return p;
@@ -271,7 +271,7 @@ function emptyState(text, route, label) {
     route ? el("button", {
       class: "btn",
       type: "button",
-      text: label || (t("gui_health_goto") + " " + route),
+      text: label || goLabel(route),
       onClick: function () { router.go(route); },
     }) : null
   );

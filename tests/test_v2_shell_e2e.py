@@ -65,6 +65,8 @@ def _labels(page):
     return page.evaluate(
         "async () => { const { t } = await import('/static/js/v2/core/i18n.mjs'); "
         "return { logout: t('gui_logout'), area: t('gui_cmd_group_area'), "
+        "home: t('gui_nav_home'), investigate: t('gui_nav_investigate'), "
+        "policy: t('gui_nav_policy'), system: t('gui_nav_system'), "
         "reports: t('gui_nav_reports'), theme: t('gui_cmd_theme') }; }"
     )
 
@@ -255,14 +257,16 @@ def test_palette_exists_hidden_from_boot_and_opens_on_the_shortcut(v2_page):
 
     page.keyboard.press("Control+k")
     wrap.wait_for(state="visible")
-    # Seeded by shell.mjs's seedPalette(): the five area jumps (v3), each
-    # labelled with its landing route, all present before the user types.
-    # (The list also holds whatever route-scoped commands the mounted area
-    # registered, so this checks the five by name rather than by total count.)
+    # Seeded by shell.mjs's seedPalette(): the five area jumps, all present
+    # before the user types. v3.1 §5.2 took the route back off the label — it
+    # used to read "Reports · #/reports" — so they are checked by NAME, from
+    # the app's own catalogue. (The list also holds whatever route-scoped
+    # commands the mounted area registered, hence "by name", not by count.)
+    labels = _labels(page)
     texts = page.locator('[data-cov="XC-02"] li[role="option"]').all_inner_texts()
-    for route in ("#/home", "#/investigate/alerts", "#/policy/alert-rules",
-                  "#/reports", "#/system/pce"):
-        assert any(route in txt for txt in texts), (route, texts)
+    for key in ("home", "investigate", "policy", "reports", "system"):
+        assert any(labels[key] in txt for txt in texts), (labels[key], texts)
+    assert not any("#/" in txt for txt in texts), texts
 
     page.keyboard.press("Escape")
     wrap.wait_for(state="hidden")
@@ -282,9 +286,10 @@ def test_palette_button_filters_and_runs_a_command(v2_page):
     # An exact substring hit scores below every fuzzy one (palette.mjs's
     # score()), so the area jump must sort to the top.
     page.wait_for_function(
-        "() => { const el = document.querySelector("
+        "label => { const el = document.querySelector("
         "'[data-cov=\"XC-02\"] li[role=\"option\"]'); "
-        "return el && el.textContent.indexOf('#/reports') >= 0; }"
+        "return el && el.textContent.indexOf(label) >= 0; }",
+        arg=labels["reports"],
     )
     assert labels["reports"] in options.first.inner_text()
     # .text_content(), not .inner_text(): the group chip is uppercased by

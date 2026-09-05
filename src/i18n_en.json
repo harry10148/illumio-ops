@@ -4864,7 +4864,6 @@
   "gui_health_chan_fail": "{name}: {status}",
   "gui_health_chan_live": "{live}/{total} channels live",
   "gui_health_reasons": "Reasons",
-  "gui_health_goto": "Go to",
   "gui_fb_searching": "Searching…",
   "gui_fb_loading": "Loading…",
   "gui_fb_retry": "Retry",
@@ -5352,5 +5351,6 @@
   "gui_nav_alerts": "Alerts",
   "gui_nav_traffic_search": "Traffic search",
   "gui_shell_search_jump": "Search or jump to…",
-  "gui_shell_user_menu": "Account and display"
+  "gui_shell_user_menu": "Account and display",
+  "gui_health_goto_named": "Go to {name}"
 }

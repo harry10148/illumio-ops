@@ -95,7 +95,7 @@
 //      drawer states the query in pills, and the request format is not
 //      operator-facing copy (density spec R4).
 //
-//  10. i18n keys renamed v2_* -> gui_*. gui_health_goto and gui_table_rows
+//  10. i18n keys renamed v2_* -> gui_*. gui_health_goto_named and gui_table_rows
 //      reuse the keys earlier tasks already minted for the same text; every
 //      other one is a new gui_iv_* / gui_nav_investigate pair in
 //      src/i18n_en.json + src/i18n_zh_TW.json, transcribed from
@@ -135,7 +135,7 @@ import { palette } from "../components/palette.mjs";
 import { createFilterBar, setFilterBarText, setFilterBarQuery } from "../components/filter-bar.mjs";
 import { setFilterBarBrowser, addPillFromBrowser } from "../components/filter-bar.mjs";
 import { filterObjectQuery, OBJECT_CATS } from "../core/filter-objects.mjs";
-import { pageHead, crumbsFor } from "../components/page.mjs";
+import { pageHead, crumbsFor, goLabel } from "../components/page.mjs";
 
 const R_INBOX = "#/investigate/inbox";
 const R_TRAFFIC = "#/investigate/traffic";
@@ -866,7 +866,7 @@ function archiveStrip(d) {
   // archive_enabled, ...) belong to the cache management page, so this is a
   // jump, not a fake action.
   strip.appendChild(el("button", { class: "btn link goto", type: "button",
-    text: t("gui_health_goto") + " " + GO_CACHE, onClick: function () { router.go(GO_CACHE); } }));
+    text: goLabel(GO_CACHE), onClick: function () { router.go(GO_CACHE); } }));
   return strip;
 }
 
@@ -910,7 +910,7 @@ function guideRail() {
   q.body.appendChild(note(t("gui_q_desc_line2")));
   q.body.appendChild(note(t("gui_q_direction_hint")));
   q.body.appendChild(el("button", { class: "btn ghost", type: "button",
-    text: t("gui_health_goto") + " " + R_WORKLOADS, onClick: function () { router.go(R_WORKLOADS); } }));
+    text: goLabel(R_WORKLOADS), onClick: function () { router.go(R_WORKLOADS); } }));
   aside.appendChild(q);
   return aside;
 }
@@ -1532,7 +1532,12 @@ function alertDetail(a, onStatus) {
 async function mountInbox(root, ctx) {
   const state = { torn: false, tables: [], status: ctx.query.get("status") || "", type: ctx.query.get("type") || "", page: 0 };
   installTeardown(state);
-  root.appendChild(areaTop(R_INBOX));
+  // v3.1 Task 1 registered #/investigate/alerts as an alias of this mount
+  // until Task 3 gives the alert list its own module. The head names the route
+  // the operator actually asked for, not the alias's target — a page whose
+  // breadcrumb and data-route disagree with the address bar is a page no test
+  // (and no reader) can pin down.
+  root.appendChild(areaTop(String(ctx.route || R_INBOX).split("?")[0]));
   const board = el("div", { class: "board" });
   root.appendChild(board);
   const id = ctx.query.get("id");

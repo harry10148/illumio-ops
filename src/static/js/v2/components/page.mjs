@@ -19,7 +19,7 @@
 //      data is still loading.
 
 import { el } from "../core/dom.mjs";
-import { t } from "../core/i18n.mjs";
+import { t, tf } from "../core/i18n.mjs";
 import { NAV } from "../shell.mjs";
 
 /**
@@ -106,4 +106,34 @@ export function crumbsFor(route) {
   trail.push([t(area.key), child ? area.route : null]);
   if (child) trail.push([t(child[1]), null]);
   return trail;
+}
+
+/**
+ * labelForRoute(route) -> string
+ *
+ * The name the left-hand nav gives a route: the sub-item's label if the route
+ * is one, otherwise the area's. Falls back to the area name and never to the
+ * route itself — printing the address is the thing this exists to stop.
+ */
+export function labelForRoute(route) {
+  const path = String(route || "").split("?")[0];
+  const seg = path.replace(/^#\//, "").split("/")[0];
+  const area = NAV.filter(function (a) { return a.id === seg; })[0];
+  if (!area) return "";
+  const child = area.children.filter(function (pair) { return pair[0] === path; })[0];
+  return child ? t(child[1]) : t(area.key);
+}
+
+/**
+ * goLabel(route) -> string — "Go to Notification Channels".
+ *
+ * Spec §5.2: a link's text is a verb or an object name. Every "Go to" control
+ * in the app used to build its own label by gluing the go-to word onto the
+ * route variable, which is how "Go to #/system/cache" reached operators from
+ * six different modules. There is no concatenation here — the destination's
+ * name goes into the catalogue string's own placeholder — so there is nothing
+ * for a caller to glue a route onto.
+ */
+export function goLabel(route) {
+  return tf("gui_health_goto_named", { name: labelForRoute(route) });
 }

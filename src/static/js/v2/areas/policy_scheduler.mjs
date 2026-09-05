@@ -96,7 +96,7 @@ import { modal } from "../components/modal.mjs";
 import { table, col } from "../components/table.mjs";
 import { palette } from "../components/palette.mjs";
 import { audit } from "../core/audit.mjs";
-import { pageHead, crumbsFor } from "../components/page.mjs";
+import { pageHead, crumbsFor, goLabel } from "../components/page.mjs";
 
 const R_RULES = "#/policy/rulesets";
 const R_SCHEDULES = "#/policy/schedules";
@@ -1956,7 +1956,7 @@ async function mountReports(root, ctx) {
     // interval in prose, and now lives in the shared explanation.
     tickPanel.body.appendChild(disclosure(t("gui_gen_explain"), note(t("gui_au_rep_tick_note"))));
     const tickRow = el("div", { class: "qrow" });
-    tickRow.appendChild(btn("btn", t("gui_health_goto") + " " + R_JOBS, function () { router.go(R_JOBS); }));
+    tickRow.appendChild(btn("btn", goLabel(R_JOBS), function () { router.go(R_JOBS); }));
     tickPanel.body.appendChild(tickRow);
     row2.appendChild(tickPanel);
 

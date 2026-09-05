@@ -37,7 +37,7 @@ import { table, col } from "../components/table.mjs";
 import { palette } from "../components/palette.mjs";
 import { createFilterBar, setFilterBarText, setFilterBarQuery, setFilterBarBrowser } from "../components/filter-bar.mjs";
 import { filterObjectQuery } from "../core/filter-objects.mjs";
-import { pageHead, crumbsFor } from "../components/page.mjs";
+import { pageHead, crumbsFor, goLabel } from "../components/page.mjs";
 
 const R_RULES = "#/policy/alert-rules";
 const R_OPS = "#/policy/ops";
@@ -1215,7 +1215,7 @@ async function mountRules(root, ctx) {
       // Density spec R5: the two-sentence "what this page does / does not do"
       // caveat merges into one explanation rather than sitting as two notes.
       scope.body.appendChild(disclosure(t("gui_gen_explain"), note(t("gui_al_scope_body")), note(t("gui_al_scope_ops"))));
-      scope.body.appendChild(btn("btn ghost", t("gui_health_goto") + " " + R_OPS, function () { router.go(R_OPS); }));
+      scope.body.appendChild(btn("btn ghost", goLabel(R_OPS), function () { router.go(R_OPS); }));
       aside.appendChild(scope);
 
       paintControls();

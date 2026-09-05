@@ -65,6 +65,7 @@ import { el, spacer, dismissible } from "../core/dom.mjs";
 import { t, tf } from "../core/i18n.mjs";
 import { dur, since, stamp, tone, worst, atLeast } from "../core/fmt.mjs";
 import { router } from "../core/router.mjs";
+import { goLabel } from "./page.mjs";
 import { audit } from "../core/audit.mjs";
 
 class Light {
@@ -276,7 +277,7 @@ function buildPopover(light, close) {
       el("button", {
         class: "btn link",
         type: "button",
-        text: t("gui_health_goto") + " " + light.route,
+        text: goLabel(light.route),
         onClick: function () { close(); router.go(light.route); },
       }),
       spacer(),

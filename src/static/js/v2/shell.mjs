@@ -348,12 +348,17 @@ export function applyStatus(menu, status) {
   if (small) small.textContent = url.replace(/^https?:\/\//, "");
 }
 
-/** The five area jumps plus the two display toggles. */
+/** The five area jumps plus the two display toggles.
+ *
+ * The jump's label is the area's NAME. It used to be `name · #/route`, which
+ * put an address on screen in the one place §5.2's source lint cannot see —
+ * the palette is hidden until it is opened, so the DOM sweep never reaches it.
+ */
 export function seedPalette() {
   AREAS.forEach(function (area) {
     palette.register({
       id: "go:" + area.id,
-      label: t(area.key) + " · " + area.route,
+      label: t(area.key),
       group: t("gui_cmd_group_area"),
       run: function () { router.go(area.route); },
     });
