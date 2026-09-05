@@ -1883,5 +1883,19 @@
   "gui_sy_ro_csr_ou": "組織單位",
   "gui_sy_ro_auth_setup": "登入已設定",
   "gui_sy_ro_old_password": "目前的密碼",
-  "gui_ev_parsed_empty": "解析器沒有從這則事件取出任何欄位。"
+  "gui_ev_parsed_empty": "解析器沒有從這則事件取出任何欄位。",
+  "gui_home_kpi_ven": "VEN 健康",
+  "gui_home_kpi_ven_d": "{n} 台離線",
+  "gui_home_kpi_flagged": "被標記的流量",
+  "gui_home_kpi_flagged_d": "近 {days} 天 · 與前一期相比 {pct}%",
+  "gui_home_kpi_pipeline": "擷取管線",
+  "gui_home_kpi_pipeline_d": "近一小時 {pct}% 送達 · 死信佇列 {dlq} 筆",
+  "gui_home_kpi_pipeline_off": "開啟快取後才量得到。",
+  "gui_home_kpi_alerts": "24 小時內發出的告警",
+  "gui_home_kpi_alerts_d": "{failed} 則送出失敗 · {suppressed} 則被抑制",
+  "gui_home_kpi_no_cache": "快取未開",
+  "gui_home_verdict_ok": "正常",
+  "gui_home_verdict_warn": "要看一下",
+  "gui_home_verdict_error": "有失敗",
+  "gui_home_verdict_unknown": "量不到"
 }

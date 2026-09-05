@@ -5395,5 +5395,19 @@
   "gui_sy_ro_csr_ou": "Organisational unit",
   "gui_sy_ro_auth_setup": "Sign-in is configured",
   "gui_sy_ro_old_password": "Current password",
-  "gui_ev_parsed_empty": "The parser filled in nothing for this event."
+  "gui_ev_parsed_empty": "The parser filled in nothing for this event.",
+  "gui_home_kpi_ven": "VEN health",
+  "gui_home_kpi_ven_d": "{n} offline",
+  "gui_home_kpi_flagged": "Flagged flows",
+  "gui_home_kpi_flagged_d": "Last {days} days · {pct}% vs the period before",
+  "gui_home_kpi_pipeline": "Ingest pipeline",
+  "gui_home_kpi_pipeline_d": "{pct}% delivered in the last hour · {dlq} in the dead-letter queue",
+  "gui_home_kpi_pipeline_off": "Turn the cache on to measure this.",
+  "gui_home_kpi_alerts": "Alerts fired (24h)",
+  "gui_home_kpi_alerts_d": "{failed} failed to send · {suppressed} suppressed",
+  "gui_home_kpi_no_cache": "Cache off",
+  "gui_home_verdict_ok": "Healthy",
+  "gui_home_verdict_warn": "Needs a look",
+  "gui_home_verdict_error": "Failing",
+  "gui_home_verdict_unknown": "Not measured"
 }

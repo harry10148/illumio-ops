@@ -196,7 +196,7 @@ def test_overview_coverage_anchors_present(v2_page):
     below (design/v3/coverage.yaml), and #/home carries the five new cards."""
     page, base_url = v2_page
     placement = {
-        HOME: {"HM-00", "HM-01", "HM-02", "HM-03", "HM-05"},
+        HOME: {"HM-00", "HM-01", "HM-02", "HM-03", "HM-05", "HM-06"},
         TRAFFIC: {"OV-04", "OV-05"},
         "#/reports": {"OV-03", "OV-06", "OV-07", "OV-08"},
         PCE: {"OV-01", "OV-12"},
@@ -587,3 +587,42 @@ def test_home_survives_alerts_api_failure(v2_page):
         assert page.locator('[data-cov="%s"]' % cov).count() == 1, cov
     assert page.locator('[data-cov="HM-01"]').get_attribute("data-tone") == "warn"
     page.unroute("**/api/alerts?*")
+
+
+def test_the_home_dashboard_strip_reads_four_instruments_and_each_one_leads_somewhere(v2_page):
+    """HM-06: the four KPI cells the operator asked to have back on the home
+    page — VEN health, flagged flows, the ingest pipeline, alerts fired in 24h.
+
+    Three things are asserted, and the third is the one worth stating: a cell
+    must be a LINK. A dashboard number with no way through to the page that
+    explains it is where an operator's investigation stops, and this page's
+    whole job is to start one. The hrefs are checked against the four areas
+    that own those figures rather than against a hard-coded list of strings,
+    so moving a route does not silently unhook a card.
+
+    No stub: the harness's PCE is a closed port and the cache is off, so this
+    exercises the branch where the panels come back `no_cache`/`unknown` —
+    which is exactly the branch that must not print a zero as if it were a
+    measurement. The values are therefore asserted to be non-empty, not to be
+    any particular number.
+    """
+    page, base_url = v2_page
+    _goto(page, base_url, HOME)
+    page.wait_for_selector('.home .kpirow[data-cov="HM-06"]', timeout=30000)
+
+    cells = page.locator('.kpirow[data-cov="HM-06"] .kpicell')
+    assert cells.count() == 4, cells.count()
+
+    for i in range(4):
+        cell = cells.nth(i)
+        label = cell.locator(".k").inner_text().strip()
+        value = cell.locator(".v").inner_text().strip()
+        assert label, f"cell {i} has no label"
+        assert value, f"cell {i} ({label}) has no value"
+
+    hrefs = page.eval_on_selector_all(
+        '.kpirow[data-cov="HM-06"] a.kpicell', "els => els.map(e => e.getAttribute('href'))"
+    )
+    assert len(hrefs) == 4, f"a KPI cell is not a link: {hrefs}"
+    assert hrefs == ["#/system/pce", "#/investigate/traffic",
+                     "#/system/cache", "#/investigate/alerts"], hrefs

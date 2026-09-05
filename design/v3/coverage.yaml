@@ -32,6 +32,9 @@ HM-03: {item: 首頁 今天的排程（規則排程／報表排程／retention�
 # HM-04 移除（3E Task 4，2026-09-05）：7 天流量決策帶 — spec v3.1 §2 移到能對它動手的
 # 頁面（流量搜尋），首頁不再放。
 HM-05: {item: 首頁 Policy 現況（posture 分數／納管比例／ruleset 數）, route: "#/home"}
+# HM-06（2026-09-05）：使用者要求首頁回到儀表板。四個數字全部取自首頁本來就在載入的
+# dashboard_overview，沒有新增請求；每格是連往能解釋它的那一頁的連結。
+HM-06: {item: 首頁 四格儀表（VEN 健康／被標記的流量／擷取管線／24 小時告警）, route: "#/home"}
 IV-01: {item: 流量分析器查詢+KPI, route: "#/investigate/traffic"}
 IV-02: {item: 流量來源切換 即時快取/Archive（actions.py:92-107）, route: "#/investigate/traffic"}
 IV-03: {item: 進階篩選(FilterBar), route: "#/investigate/traffic"}

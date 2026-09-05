@@ -20,7 +20,7 @@ import { api } from "../core/api.mjs";
 import { router } from "../core/router.mjs";
 import { t, tf } from "../core/i18n.mjs";
 import { el, clear } from "../core/dom.mjs";
-import { num } from "../core/fmt.mjs";
+import { num, tone } from "../core/fmt.mjs";
 import { drawer } from "../components/drawer.mjs";
 import { palette } from "../components/palette.mjs";
 import { withErrorCard } from "../components/errorcard.mjs";
@@ -38,6 +38,7 @@ const GO_JOBS = "#/system/jobs";
 const GO_REPORTS = "#/reports";
 const GO_ALERT_RULES = "#/policy/alert-rules";
 const GO_PCE = "#/system/pce";
+const GO_CACHE = "#/system/cache";
 
 const SNAPS = ["status", "dashboard_overview", "rs_schedules", "report_schedules"];
 // spec §2: the list shows the ten most recent, with an unhandled/all switch.
@@ -88,6 +89,87 @@ function loadAll(status) {
     out.alerts = list[SNAPS.length];
     return out;
   });
+}
+
+// ── HM-06 the four instruments ──────────────────────────────────────────────
+
+/* The dashboard strip the operator asked for. Every figure comes from the
+ * `dashboard_overview` snapshot the page already loads for its health lights,
+ * so this adds no request — the endpoint has been answering all along and
+ * nothing in the v3 GUI was reading these four branches of it.
+ *
+ * A cell is an <a>, not a <div>: a number with no way through to the page that
+ * explains it is a dead end, and each of these four has an obvious owner.
+ *
+ * "Flagged" and not "Blocked": the figure is blocked + potentially-blocked,
+ * and `Blocked` is a glossary term with a fixed meaning, so naming this one
+ * after it would be wrong twice over.
+ */
+function kpiCell(labelText, value, detailText, tn, route) {
+  return el("a", { class: "kpicell", href: route, "data-tone": tn || "neutral" },
+    el("span", { class: "k", text: labelText }),
+    el("span", { class: "v", text: value }),
+    el("span", { class: "d", title: detailText, text: detailText }));
+}
+
+/** ok / warn / error from the API, plus the two "cannot say" branches it
+ *  returns when the cache is off or a panel threw. */
+function verdictText(verdict) {
+  const v = String(verdict || "");
+  if (v === "no_cache") return t("gui_home_kpi_no_cache");
+  if (v === "ok") return t("gui_home_verdict_ok");
+  if (v === "warn") return t("gui_home_verdict_warn");
+  if (v === "error") return t("gui_home_verdict_error");
+  return t("gui_home_verdict_unknown");
+}
+
+/** True when the panel could not be computed at all — then the cell shows a
+ *  dash and says why, rather than a zero that reads like a measurement. */
+function unavailable(panel) {
+  const v = String((panel || {}).verdict || "");
+  return v === "no_cache" || v === "unknown" || !Object.keys(panel || {}).length;
+}
+
+function kpiStrip(ov) {
+  const ven = (ov && ov.ven) || {};
+  const flagged = (ov && ov.blocked) || {};
+  const pipe = (ov && ov.pipeline) || {};
+  const alerts = (ov && ov.alerts) || {};
+
+  const venOff = Number(ven.offline || 0);
+  const venCell = kpiCell(
+    t("gui_home_kpi_ven"),
+    ven.total === undefined ? "—" : num(ven.online || 0) + "/" + num(ven.total || 0),
+    ven.total === undefined ? verdictText(ven.verdict) : tf("gui_home_kpi_ven_d", { n: num(venOff) }),
+    ven.total === undefined ? "neutral" : tone(ven.verdict),
+    GO_PCE);
+
+  const flagCell = kpiCell(
+    t("gui_home_kpi_flagged"),
+    unavailable(flagged) ? "—" : num(flagged.flagged || 0),
+    unavailable(flagged)
+      ? verdictText(flagged.verdict)
+      : tf("gui_home_kpi_flagged_d", { days: num(flagged.window_days || 7), pct: num(flagged.vs_prev_pct || 0) }),
+    unavailable(flagged) ? "neutral" : tone(flagged.verdict),
+    GO_TRAFFIC);
+
+  const pipeCell = kpiCell(
+    t("gui_home_kpi_pipeline"),
+    verdictText(pipe.verdict),
+    unavailable(pipe)
+      ? t("gui_home_kpi_pipeline_off")
+      : tf("gui_home_kpi_pipeline_d", { pct: String(pipe.siem_success_1h === undefined ? 0 : pipe.siem_success_1h), dlq: num(pipe.dlq || 0) }),
+    unavailable(pipe) ? "neutral" : tone(pipe.verdict),
+    GO_CACHE);
+
+  const alertCell = kpiCell(
+    t("gui_home_kpi_alerts"),
+    num(alerts.fired_24h || 0),
+    tf("gui_home_kpi_alerts_d", { failed: num(alerts.failed || 0), suppressed: num(alerts.suppressed || 0) }),
+    tone(alerts.verdict),
+    GO_ALERTS);
+
+  return el("div", { class: "kpirow", "data-cov": "HM-06" }, venCell, flagCell, pipeCell, alertCell);
 }
 
 // ── HM-01 the recent alerts ─────────────────────────────────────────────────
@@ -352,6 +434,7 @@ export async function mountHome(root, ctx) {
 
       const policy = policyCard(ov);
       const main = el("div", { class: "home-main" }, alertList(d.alerts, state, paint));
+      body.appendChild(kpiStrip(ov));
       const side = el("aside", { class: "home-side" },
         health.el,
         todayCard(d.rs_schedules, d.report_schedules, ov),

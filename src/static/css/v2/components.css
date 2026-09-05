@@ -952,6 +952,12 @@ details.more .body { display: grid; gap: var(--space-4); padding: var(--space-5)
    ========================================================================== */
 .home { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: var(--space-7); align-items: start; }
 .home-main { min-width: 0; }
+/* HM-06 — the instrument strip spans both columns and leads the page, so it
+   reads before the alert list rather than beside it. */
+.home > .kpirow { grid-column: 1 / -1; }
+a.kpicell { display: block; text-decoration: none; color: inherit; }
+a.kpicell:hover { background: var(--surface-hover); }
+a.kpicell:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 .home-side { display: flex; flex-direction: column; gap: var(--space-6); }
 
 .sect-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-5); margin-bottom: var(--space-4); }
