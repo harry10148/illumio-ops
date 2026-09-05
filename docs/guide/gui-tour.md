@@ -40,7 +40,7 @@ verified_against:
 
 # Web GUI 導覽
 
-Web GUI 是單頁式應用（SPA）。登入後畫面分成**五個區**——首頁、調查、政策、
+Web GUI 是單頁式應用（SPA）。登入後畫面分成**五個區**——首頁、調查、規則、
 報表、系統——底下共 **23 條路由**，以 URL 的 hash 表示（例如
 `#/investigate/traffic`）。區的導覽在**畫面左側**（224px 一欄；v3.1，
 2026-09-05 起），目前所在的區會展開它的子項；≤1000px 時導覽收成頂列。
@@ -60,13 +60,18 @@ palette、table、drawer、modal、filter-bar…）、`areas/`（home、alerts�
 啟動方式與埠號見 `illumio-ops gui`（預設埠 **5001**，`--host 0.0.0.0`），
 完整 CLI 選項見 [cli.md](../reference/cli.md)。
 
-**五區與其路由**（判準：首頁看「現在」、調查查「這件事」、政策改「規則」、報表產「交付物」、系統改「系統」）
+**五區與其路由**（判準：首頁看「現在」、調查查「這件事」、規則改「規則」、報表產「交付物」、系統改「系統」）
+
+> 區名「規則」在英文介面是 `Policy`。左側導覽的 `Policy`／`Rulesets` 兩項
+> 自 2026-09-05 起在中文介面譯為「規則」「規則集」；這兩個詞在報表、CLI 與
+> 頁面內文仍維持英文（`src/i18n/data/glossary.json` 的 `exempt_keys` 只對這
+> 兩個鍵開豁免）。
 
 | 區 | 路由 | 內容 |
 |---|---|---|
-| 首頁 | `#/home` | 最近的告警（前 10 列，未處理／全部切換）為主體，右欄三張背景卡：系統健康六燈、今天的排程、Policy 現況 |
+| 首頁 | `#/home` | 頂端四格儀表（VEN 健康／被標記的流量／擷取管線／24 小時告警），下方最近的告警（前 10 列，未處理／全部切換），右欄三張背景卡：系統健康六燈、今天的排程、Policy 現況 |
 | 調查 | `#/investigate/alerts`（`?id=` 告警頁）、`/traffic`（`?alert=`、`?f=` 帶條件）、`/workloads`、`/events` | 告警清單與告警頁；流量搜尋；Workload 搜尋與隔離；事件檢視器 |
-| 政策 | `#/policy/alert-rules`、`/ops`、`/rulesets`（`?rs=&rule=`）、`/schedules` | 告警規則 CRUD 與手動動作；Rule Scheduler 的 ruleset／rule 瀏覽與排程變更 |
+| 規則 | `#/policy/alert-rules`、`/ops`、`/rulesets`（`?rs=&rule=`）、`/schedules` | 告警規則 CRUD 與手動動作；Rule Scheduler 的 ruleset／rule 瀏覽與排程變更 |
 | 報表 | `#/reports`、`/schedules` | 11 型報表產生、產出清單、報表排程 |
 | 系統 | `#/system/{pce,cache,siem,tls,security,display,channels,alerting,jobs,logs}` | 所有設定、告警通道與測試、背景 job、日誌 |
 
@@ -243,6 +248,12 @@ FilterBar 序列化出的 key（`src_labels`／`dst_workloads`／`services`／
 
 標題就是這一頁的答案：「N 件告警還沒處理，系統有 M 項要看一下」。
 
+- **四格儀表**（HM-06）：VEN 健康（線上／總數）、被標記的流量（近 7 天
+  blocked ＋ potentially blocked，附與前一期的比較）、擷取管線（判定字＋近一
+  小時送達率與死信佇列筆數）、24 小時內發出的告警（附送出失敗與被抑制數）。
+  四格各自是連結，分別到 `#/system/pce`、`#/investigate/traffic`、
+  `#/system/cache`、`#/investigate/alerts`。資料取自 `/api/dashboard/overview`，
+  與健康燈同一次載入。快取未開或該面板算不出來時顯示破折號並說明原因，不印 0。
 - **最近的告警**（HM-01）：前 10 則，一列一件——左側嚴重度色條、時間、規則名
   與一句摘要、狀態晶片。整列就是連結，點進去是那一件的告警頁。上方可在
   「未處理／全部」之間切換，右上「看全部」到 `#/investigate/alerts`。

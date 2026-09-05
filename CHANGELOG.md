@@ -11,6 +11,15 @@ a plain `<major>.<minor>.<patch>` scheme. (Tags through v4.0.0 carried a
 
 ### Added
 
+- **The home page leads with four instruments again** (`HM-06`): VEN health,
+  flagged flows over the last seven days, the ingest pipeline, and alerts
+  fired in the last 24 hours. Every figure comes from
+  `/api/dashboard/overview`, which the home page already loaded for its health
+  lights — four of its ten branches simply had no reader — so this adds no
+  request and no backend change. Each cell links to the page that explains it
+  (PCE, traffic search, cache, alerts); when the cache is off or a panel
+  cannot be computed the cell shows a dash and the reason rather than a zero.
+
 - Dispatched alerts are now persisted to `logs/alerts.sqlite` (owner-only,
   WAL) with the dispatch outcome per channel; a DLQ replay updates the same
   record instead of adding one. New `GET /api/alerts`, `GET /api/alerts/<id>`,
@@ -35,6 +44,44 @@ a plain `<major>.<minor>.<patch>` scheme. (Tags through v4.0.0 carried a
   still delivered.
 
 ### Changed
+
+- **A page's title now names the page, not the area it sits in.** Every area
+  helper passed its own `gui_nav_<area>` key, so all four Investigate pages
+  were headed "Investigate" and all ten System pages "System" — under a
+  breadcrumb that already ended on the real page name. 19 pages in all. The
+  title is derived from the same `NAV` table the navigation and the
+  breadcrumbs read, so the three cannot drift apart.
+
+- **The left-hand navigation reads Traditional Chinese**: `Policy` → 規則 and
+  `Rulesets` → 規則集. Both terms stay English in reports, the CLI and page
+  bodies — this is a per-key exemption in `src/i18n/data/glossary.json`
+  (`exempt_keys`), honoured by both the glossary test and the i18n audit, not
+  a removal from the preserve list.
+
+- **Copy that explained this app's own wiring is gone**, with the 28 keys
+  behind it: the panel titled "Stored, with no control in this form" and its
+  per-row captions, the DLQ drawer's list of the fields a record would have,
+  the note pointing at a request-body pane that no longer ships, "this is the
+  only control for this setting", and the module-log caveat about two names
+  lacking an `i18n_key`. Nothing is dropped by removing the first — saving
+  starts from the whole cached settings object, so uncontrolled keys travel
+  unchanged whether or not anything renders them.
+
+- `gui_siem_dispatch_tick` and `gui_siem_dlq_max` had config keys as their
+  English values (`dispatch_tick_seconds`, `dlq_max_per_dest`) while zh_TW had
+  real labels, so the English GUI captioned two form fields with their storage
+  keys.
+
+### Fixed
+
+- **The event detail pane no longer widens the whole page.** `.kv-list` was a
+  bare `display: grid`, so its implicit track was `auto` — minimum
+  min-content — and a value is `white-space: nowrap`, so one event href sized
+  the track to 399px inside a 340px aside and pushed the document to 1320px at
+  a 1280px viewport, giving every page a horizontal scrollbar. The track is
+  now `minmax(0, 1fr)`; `min-width: 0` on the value was already present and
+  cannot fix this, since it lets a flex item shrink without lowering the row's
+  min-content contribution.
 
 - **Web GUI v3.1 — the workbench.** The top bar becomes a left-hand
   navigation that owns the five areas and the current area's sub-items, with
