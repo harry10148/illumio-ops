@@ -76,10 +76,19 @@ GUI 在 3B／3E 換到 v3 色票，報表與 CLI 沒跟上，今天的實際狀�
       豁免外一律 0；(2) 渲染層——用**打得開上色分支**的 fixture 產 HTML，斷言
       `<style>/<script>/<svg>` 以外沒有色值，**再加一條反向斷言**那些段落確實
       渲染了且用的是 token（否則第一條在該分支上是空砲）。兩層各自注入驗證過。
-- [ ] **5. 真資料驗證**：測試機重產 11 型 × 2 語系，取回 HTML，1280／800 截圖
-      **並輸出一份 PDF**（Playwright `page.pdf()`）逐頁看。主色在灰階列印下是否
-      仍可辨識，是這個任務唯一無法用測試回答的問題。
-- [ ] **6. 全套＋commit＋部署＋CI**　`feat(report): the report shell moves to the v3 palette`
+- [x] **5. 真資料驗證**：22 份全部 rc=0，`scripts/verify_report_render.py` 22/22
+      PASS。灰階問題有答案：四階色塊最小間距**新 21、舊 14**（同法取樣兩份 PDF，
+      不是用亮度公式估的），改善而非勉強維持。**語系切換的 config 路徑是
+      `config/config.json` 不是 `config.json`**，屬主 `illumio-ops`——計畫與 2B
+      報告都寫錯，第一次跑就是這樣失敗的。
+- [x] **6. 全套＋commit＋部署＋CI**　`1ede8ea6`，4677 passed，CI `34021718804` success。
+      **順手修掉一個既有的高嚴重度缺陷**：mod13 執行模式圖例的 f-string 裡把
+      `STRINGS` fallback 寫成 `{{}}`（＝內含空 dict 的集合），分佈非空就 `TypeError`
+      而 `_mod13_html` 沒有 caller 端保護 → 整份 security_risk 報表產不出來。潛伏自
+      `633379d5`（2026-04-30）。**喚醒條件：任一環境的 workload 有非 idle 的
+      enforcement mode。**
+      另：`.gitignore` 裸的 `reports/` 會吃掉 `design/v3/reports/`，已比照
+      `!design/v2/reports/` 補例外——漏掉的話 CI 會紅在本機重現不了的地方。
 
 ---
 
@@ -95,10 +104,21 @@ GUI 在 3B／3E 換到 v3 色票，報表與 CLI 沒跟上，今天的實際狀�
   tone token
 
 **Steps:**
-- [ ] **1. 先紅**：守門斷言圖表色盤 ⊆ shell.css 的 tone token 值，現況應為紅。
-- [ ] **2. 實作＋綠**：`timeout 900 python3 -m pytest tests/test_report_chart_render.py tests/test_report_shell_renderer.py -q`
-- [ ] **3. 真資料驗證**：重產帶圖表的報表型別，逐頁看圖例與色塊。
-- [ ] **4. 全套＋commit＋部署＋CI**　`feat(report): chart colours come from the shell's tone tokens`
+- [x] **1. 先紅**：`tests/test_chart_palette_tokens.py`。
+- [x] **2. 實作＋綠**（測試檔名是 `tests/test_chart_renderer.py`，計畫寫錯）。
+      **範圍比計畫小**：`SIGNAL_COLORS`／`VERDICT_COLORS`／`RISK_COLOR`／`RISK_BG`
+      四份色表**都沒有讀者**（HTML 早在 2B Task 6 改走 `data-tone`），活的只有
+      `_SEMANTIC_COLORS` 與兩處 `#375379`。四份仍改成同源，因為下一個不能用 CSS 的
+      消費端應該讀它們，而不是再發明第三份。
+      **問題比計畫嚴重**：`_SEMANTIC_COLORS` 把 `low` 畫成綠色，而 HTML 徽章走的
+      `SEVERITY_TONE` 是 `LOW → info` 藍——同一份報表對同一個嚴重度給兩種顏色。
+- [x] **3. 真資料驗證**：六型重產，舊色盤八個值出現 0 次。**看圖才發現的一件事**：
+      照抄殼的「實心 vs 外框」把 HIGH 畫淡是錯的——圓餅切片的顏色重量會被讀成量級，
+      淡粉紅的 HIGH 比琥珀色的 MEDIUM 還輕，嚴重度排序在圖上被顛倒。改成同紅＋白色
+      斜線網底（灰階也分得出來）。
+- [x] **4. 全套＋commit＋部署＋CI**　`3b68e04c`，4686 passed，CI `34024386527` success。
+      追加 `75352810`：網路圖連線用的是 matplotlib 具名色 `"gray"`，色盤守門只找
+      十六進位所以看不到它——守門已擴充成掃所有顏色參數。
 
 ---
 
@@ -111,7 +131,9 @@ GUI 在 3B／3E 換到 v3 色票，報表與 CLI 沒跟上，今天的實際狀�
   `alerting_menu` 與 `automation_menu` 併成一個 policy 選單）
 - Modify: `src/cli/menu_chrome.py`（docstring 的「六區」）
 - Modify: i18n 三檔（`main_menu_area_*`、合併後選單的子項）
-- Modify: `docs/reference/cli-flows.md`
+- ~~Modify: `docs/reference/cli-flows.md`~~ —— **這個檔不存在**。真正的流程規格是
+  `design/v2/cli-flows.md`（95KB），它 2026-09-04 就註記「CLI 對齊五區在 3C，屆時
+  另立 v3 版流程規格」。新增 `design/v3/cli-flows.md`**只寫差異**，v2 加註指過去
 - Modify: `tests/test_cli_flows_parity.py`（`_NEW_KEY_PREFIXES` 相關），以及任何
   斷言六個選項的 CLI 測試
 
@@ -120,12 +142,20 @@ GUI 在 3B／3E 換到 v3 色票，報表與 CLI 沒跟上，今天的實際狀�
 為了讓測試通過而放寬。
 
 **Steps:**
-- [ ] **1. 盤點**：`grep -rn "main_menu_area_\|alerting_menu\|automation_menu" src/ tests/ docs/`
-      ——按概念列出所有表面再動手。
-- [ ] **2. 先紅**：守門斷言主選單恰有五個區域項，現況六個。
-- [ ] **3. 實作＋綠**：`timeout 900 python3 -m pytest tests/test_cli_flows_parity.py tests/test_cli_root_dispatch.py -q`
-- [ ] **4. 真跑一次互動選單**，五個區各進一層確認沒有死路。
-- [ ] **5. 全套＋commit＋部署＋CI**　`feat(cli): five areas, matching the GUI`
+- [x] **1. 盤點**：80 處。最重要的一項 grep 這條抓不到：`cli_area_alerting`／
+      `cli_area_automation` 是**所有精靈的麵包屑前綴**，散在六個檔共 25 處。
+- [x] **2. 先紅**：斷言**畫出來的**區域列恰五條（只驗分派表的話，多印一行按下去
+      沒反應的死選項照樣綠）＋`safe_input` 接受的集合是 `{1..5,g,G,0}`。
+- [x] **3. 實作＋綠**。既有斷言的意義變更逐條記在 `tmp/phase3c-verification/report.md`
+      §3.5，全部是改名或換編號，**沒有一條被放寬**。63 項對照表不減項——它本來就會驗
+      「它指的測試還存在」，這次確實是它抓出改名漏網的。
+- [x] **4. 真跑一次互動選單**：五區逐一進一層，無死路；規則區 1-9＋10/11 全在。
+      **這一步抓到一個潛伏數月的既有缺陷**：首頁印著原始樣板
+      `語言: {lang} | 佈景: {theme}`——`t(key, *, lang=…)` 把 `lang=` 當語言選擇器
+      吃掉，`{lang}` 永遠填不進去，而 `t()` 的 except 吞掉 KeyError 回傳原始樣板。
+      i18n audit 檢查「鍵能不能解析」，不檢查「呼叫端能不能填」。已修＋守門從
+      `inspect.signature(t)` 推導保留字。
+- [x] **5. 全套＋commit＋部署＋CI**　4689 passed。
 
 ---
 

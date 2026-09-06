@@ -19,7 +19,7 @@ def add_system_health_menu(cm: ConfigManager, edit_rule=None) -> None:
     )
     draw_panel(title, _menu_hints("Rules > System Health"))
 
-    _wizard_step(1, 3, t('wiz_basic_setup'), path=f"{t('cli_area_alerting')} > {t('wiz_add_system_rule')}")
+    _wizard_step(1, 3, t('wiz_basic_setup'), path=f"{t('cli_area_policy')} > {t('wiz_add_system_rule')}")
     print("")
 
     def_name = edit_rule.get("name", t("gui_system_health_pce")) if edit_rule else t("gui_system_health_pce")
@@ -31,7 +31,7 @@ def add_system_health_menu(cm: ConfigManager, edit_rule=None) -> None:
     if not name:
         return
 
-    _wizard_step(2, 3, t('wiz_set_trigger'), path=f"{t('cli_area_alerting')} > {t('wiz_add_system_rule')}")
+    _wizard_step(2, 3, t('wiz_set_trigger'), path=f"{t('cli_area_policy')} > {t('wiz_add_system_rule')}")
     print(f"\n{Colors.CYAN}{t('gui_system_health_desc')}{Colors.ENDC}")
     print(f"{Colors.DARK_GRAY}{t('gui_system_health_threshold_hint')}{Colors.ENDC}")
 
@@ -53,7 +53,7 @@ def add_system_health_menu(cm: ConfigManager, edit_rule=None) -> None:
     else:
         cooldown = int(cd_in)
 
-    _wizard_step(3, 3, t('wiz_review_save'), path=f"{t('cli_area_alerting')} > {t('wiz_add_system_rule')}")
+    _wizard_step(3, 3, t('wiz_review_save'), path=f"{t('cli_area_policy')} > {t('wiz_add_system_rule')}")
     summary = [
         f"{t('sum_type')}: system",
         f"{t('sum_name')}: {name}",

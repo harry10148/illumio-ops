@@ -54,7 +54,7 @@ def add_event_menu(cm: ConfigManager, edit_rule=None):
             break
         if not sel.isdigit() or not (1 <= int(sel) <= len(cats)):
             continue
-        _wizard_step(1, 4, t('wiz_select_event_type'), path=f"{t('cli_area_alerting')} > {t('wiz_add_event_rule')}")
+        _wizard_step(1, 4, t('wiz_select_event_type'), path=f"{t('cli_area_policy')} > {t('wiz_add_event_rule')}")
         cat = cats[int(sel) - 1]
         evts = FULL_EVENT_CATALOG[cat]
         evt_keys = list(evts.keys())
@@ -86,7 +86,7 @@ def add_event_menu(cm: ConfigManager, edit_rule=None):
         if not ei or ei == 0:
             continue
         k = evt_keys[ei - 1]
-        _wizard_step(2, 4, t('wiz_set_trigger'), path=f"{t('cli_area_alerting')} > {t('wiz_add_event_rule')}")
+        _wizard_step(2, 4, t('wiz_set_trigger'), path=f"{t('cli_area_policy')} > {t('wiz_add_event_rule')}")
         print(f"\n{t('selected')}: {k}")
         pmpt = f"{t('rule_trigger_type_1')}  {t('rule_trigger_type_2')}"
         def_ti = (
@@ -144,7 +144,7 @@ def add_event_menu(cm: ConfigManager, edit_rule=None):
         show_severity = k in ACTION_EVENTS or k == "*"
 
         if show_status or show_severity:
-            _wizard_step(3, 4, t('wiz_advanced_filters'), path=f"{t('cli_area_alerting')} > {t('wiz_add_event_rule')}")
+            _wizard_step(3, 4, t('wiz_advanced_filters'), path=f"{t('cli_area_policy')} > {t('wiz_add_event_rule')}")
             print(f"\n{Colors.CYAN}--- {t('advanced_filters')} ---{Colors.ENDC}")
             print(f"{Colors.DARK_GRAY}{t('hint_return')}{Colors.ENDC}")
 
@@ -192,7 +192,7 @@ def add_event_menu(cm: ConfigManager, edit_rule=None):
                     vi = v_inv.get(def_sev, 0)
                 sel_sev = v_map.get(vi, def_sev)
 
-        _wizard_step(4, 4, t('wiz_review_save'), path=f"{t('cli_area_alerting')} > {t('wiz_add_event_rule')}")
+        _wizard_step(4, 4, t('wiz_review_save'), path=f"{t('cli_area_policy')} > {t('wiz_add_event_rule')}")
         summary = [
             f"{t('sum_type')}: event",
             f"{t('sum_event')}: {k}",

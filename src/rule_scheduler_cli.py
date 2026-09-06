@@ -670,7 +670,7 @@ class _RuleSchedulerCLI:
 
     def run(self):
         while True:
-            menu_screen(f"{t('cli_area_automation')} > {t('rs_menu_title')}",
+            menu_screen(f"{t('cli_area_policy')} > {t('rs_menu_title')}",
                         self._menu_lines())
             ans = clean_input(input(f"{Colors.CYAN}\u276f{Colors.ENDC} "))
 

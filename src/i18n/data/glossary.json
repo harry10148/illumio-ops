@@ -96,6 +96,14 @@
     "gui_policy_tab_rulesets": [
       "Ruleset",
       "Rulesets"
+    ],
+    "cli_area_policy": [
+      "Policy",
+      "Policies"
+    ],
+    "main_menu_area_3": [
+      "Policy",
+      "Policies"
     ]
   }
 }

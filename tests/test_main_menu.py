@@ -68,7 +68,7 @@ def test_rule_management_menu_dispatches_submenus(monkeypatch, selection, attr_n
     monkeypatch.setattr(areas_module, "add_system_health_menu", lambda _cm: calls.append("system_health"))
     monkeypatch.setattr(areas_module, "manage_rules_menu", lambda _cm: calls.append("manage"))
 
-    areas_module.alerting_menu(cm)
+    areas_module.policy_menu(cm)
 
     expected = {
         "add_traffic_menu": "traffic",
@@ -111,7 +111,7 @@ def test_rule_management_menu_option_7_runs_analysis_and_sends_alerts(monkeypatc
     monkeypatch.setattr(main_module, "Reporter", FakeReporter)
     monkeypatch.setattr(main_module, "Analyzer", FakeAnalyzer)
 
-    areas_module.alerting_menu(cm)
+    areas_module.policy_menu(cm)
 
     assert "run_analysis" in calls
     assert "run_debug_mode" not in calls
@@ -174,7 +174,7 @@ def test_rule_management_menu_option_8_runs_debug_mode(monkeypatch):
     monkeypatch.setattr(main_module, "Reporter", FakeReporter)
     monkeypatch.setattr(main_module, "Analyzer", FakeAnalyzer)
 
-    areas_module.alerting_menu(cm)
+    areas_module.policy_menu(cm)
 
     assert "run_debug_mode" in calls
     assert "run_analysis" not in calls

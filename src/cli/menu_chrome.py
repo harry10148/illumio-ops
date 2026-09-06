@@ -1,4 +1,7 @@
-"""六區互動選單的統一畫面 chrome（Phase 2C，cli-flows.md DD-1/WZ-3/§3.5）。
+"""互動選單的統一畫面 chrome（Phase 2C，cli-flows.md DD-1/WZ-3/§3.5）。
+
+區數從六變成五（Phase 3C：告警＋自動化併為「規則」，與 GUI 同一組區域），
+chrome 本身與區數無關，這裡不再寫死數字。
 
 三個表面：`menu_screen` 是每個選單與精靈共用的框（麵包屑、可選的健康列、
 快捷鍵說明），`confirm_box` 是破壞性動作的確認框，`clear_screen` 是兩者

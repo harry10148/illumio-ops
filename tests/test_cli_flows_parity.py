@@ -38,19 +38,20 @@ def _english_ui():
 # ── the table ───────────────────────────────────────────────────────────────
 # value is either ("covered", <test file>, <test name>) or ("area", <area>)
 NODES: dict[int, tuple] = {
-    1:  ("covered", "test_cli_area_menus.py", "test_main_menu_dispatches_six_areas"),
-    2:  ("area", "alerting"),      # container, dissolved into the alerting area
-    3:  ("covered", "test_cli_area_menus.py", "test_alerting_menu_new_numbering"),
-    4:  ("covered", "test_cli_area_menus.py", "test_alerting_menu_new_numbering"),
-    5:  ("covered", "test_cli_area_menus.py", "test_alerting_menu_new_numbering"),
-    6:  ("covered", "test_cli_area_menus.py", "test_alerting_menu_new_numbering"),
+    1:  ("covered", "test_cli_area_menus.py", "test_main_menu_dispatches_five_areas"),
+    2:  ("area", "policy"),        # container, dissolved into the policy area
+                                   # (Phase 3C: alerting + automation merged)
+    3:  ("covered", "test_cli_area_menus.py", "test_policy_menu_keeps_the_alerting_numbering"),
+    4:  ("covered", "test_cli_area_menus.py", "test_policy_menu_keeps_the_alerting_numbering"),
+    5:  ("covered", "test_cli_area_menus.py", "test_policy_menu_keeps_the_alerting_numbering"),
+    6:  ("covered", "test_cli_area_menus.py", "test_policy_menu_keeps_the_alerting_numbering"),
     7:  ("covered", "test_manage_rules_menu.py", "test_delete_asks_before_removing"),
     8:  ("covered", "test_manage_rules_menu.py", "test_manage_rules_menu_modify_command_routes_by_rule_type"),
-    9:  ("covered", "test_cli_area_menus.py", "test_alerting_menu_best_practices_is_item_9"),
+    9:  ("covered", "test_cli_area_menus.py", "test_policy_menu_best_practices_is_item_9"),
     10: ("covered", "test_main_menu.py", "test_rule_management_menu_option_7_runs_analysis_and_sends_alerts"),
     11: ("covered", "test_main_menu.py", "test_rule_management_menu_option_8_runs_debug_mode"),
-    12: ("covered", "test_cli_area_menus.py", "test_alerting_menu_new_numbering"),
-    13: ("covered", "test_cli_area_menus.py", "test_alerting_menu_new_numbering"),
+    12: ("covered", "test_cli_area_menus.py", "test_policy_menu_keeps_the_alerting_numbering"),
+    13: ("covered", "test_cli_area_menus.py", "test_policy_menu_keeps_the_alerting_numbering"),
     14: ("area", "reports"),       # container, dissolved into the reports area
     15: ("covered", "test_cli_area_menus.py", "test_reports_menu_dispatch"),
     16: ("covered", "test_cli_area_menus.py", "test_reports_menu_dispatch"),
@@ -61,7 +62,7 @@ NODES: dict[int, tuple] = {
     21: ("covered", "test_cli_wizard_chrome.py", "test_every_wizard_step_passes_a_path"),
     22: ("covered", "test_cli_wizard_chrome.py", "test_every_wizard_step_passes_a_path"),
     23: ("covered", "test_cli_wizard_chrome.py", "test_every_wizard_step_passes_a_path"),
-    24: ("covered", "test_cli_area_menus.py", "test_automation_menu_dispatch_and_status"),
+    24: ("covered", "test_cli_area_menus.py", "test_policy_menu_schedule_items_dispatch_and_show_status"),
     25: ("covered", "test_rule_scheduler_cli.py", "test_scheduler_menu_renders_inside_panel_with_status"),
     26: ("covered", "test_rule_scheduler_cli.py", "test_scheduler_menu_renders_inside_panel_with_status"),
     27: ("covered", "test_rule_scheduler_cli.py", "test_scheduler_menu_renders_inside_panel_with_status"),
@@ -71,7 +72,7 @@ NODES: dict[int, tuple] = {
     31: ("covered", "test_cli_area_menus.py", "test_pce_connection_merges_api_and_ssl"),
     32: ("covered", "test_cli_area_menus.py", "test_system_menu_dispatch"),
     33: ("covered", "test_cli_area_menus.py", "test_reports_menu_shows_output_dir_and_retention"),
-    34: ("covered", "test_cli_area_menus.py", "test_automation_menu_dispatch_and_status"),
+    34: ("covered", "test_cli_area_menus.py", "test_policy_menu_schedule_items_dispatch_and_show_status"),
     35: ("covered", "test_cli_area_menus.py", "test_system_menu_dispatch"),
     36: ("covered", "test_cli_area_menus.py", "test_system_menu_dispatch"),
     37: ("covered", "test_cli_area_menus.py", "test_system_menu_dispatch"),
@@ -129,7 +130,7 @@ def test_dissolved_containers_have_an_area(node):
     """The three containers are gone on purpose; their area must exist."""
     import src.cli.menus.areas as areas
     _kind, area = NODES[node]
-    attr = {"alerting": "alerting_menu", "reports": "reports_menu",
+    attr = {"policy": "policy_menu", "reports": "reports_menu",
             "system": "system_menu_entry"}[area]
     assert callable(getattr(areas, attr))
 

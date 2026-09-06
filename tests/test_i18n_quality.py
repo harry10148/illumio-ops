@@ -259,3 +259,61 @@ def test_tracked_keys_do_not_render_missing_markers():
         "Tracked i18n keys rendered missing markers:\n"
         + "\n".join(f"  [{lang}] {key}: {text}" for lang, key, text in offenders[:50])
     )
+
+
+# ── 佔位符不得與 t() 自己的參數同名 ──────────────────────────────────────────
+
+#: 只有這些鍵可以帶保留字佔位符，且必須寫明「為什麼 Python 端不會渲染它」。
+_RESERVED_PLACEHOLDER_EXEMPT = {
+    "gui_rp_lang_set": (
+        "只有 JS 用（reports.mjs 的 tf()）。JS 端的 tf(key, params) 沒有保留參數，"
+        "`{lang}` 在那裡填得進去；Python 的 t() 從來不渲染這個鍵。"
+    ),
+}
+
+
+def _reserved_placeholder_names() -> set[str]:
+    """t() 自己吃掉的關鍵字參數名，從簽章推導而不是手打。"""
+    import inspect
+
+    from src.i18n import t as _t
+
+    return {
+        name for name, p in inspect.signature(_t).parameters.items()
+        if p.kind is inspect.Parameter.KEYWORD_ONLY
+    }
+
+
+def test_no_translation_uses_a_placeholder_t_would_swallow():
+    """`t(key, *, lang=..., default=..., **kwargs)`：`{lang}` 永遠填不進去。
+
+    `t()` 會先吃掉 `lang=`／`default=`，剩下的才進 `format()`，所以帶這種佔位符的
+    句子在呼叫端無論怎麼傳都會 `KeyError`，而 `t()` 的 except 會**吞掉錯誤、回傳
+    原始樣板**——畫面上就出現 `語言: {lang} | 佈景: {theme}`，沒有例外、沒有測試
+    失敗，只有一行 WARNING。首頁就這樣印了一段樣板，是 Phase 3C Task 3「真跑一次
+    互動選單」才看到的。
+
+    repo 為同一個成因記過一次教訓（`t()` 的第一個參數叫 key，所以佔位符不可叫
+    `{key}`）。這條把它變成可執行的規則，且保留字從簽章推導，簽章加參數時自動涵蓋。
+    """
+    import json
+    import re
+    from pathlib import Path
+
+    reserved = _reserved_placeholder_names()
+    assert reserved, "t() 的簽章沒有 keyword-only 參數？推導壞了"
+
+    root = Path(__file__).parent.parent
+    offenders = []
+    for name in ("src/i18n_en.json", "src/i18n_zh_TW.json"):
+        data = json.loads((root / name).read_text(encoding="utf-8"))
+        for key, value in data.items():
+            if not isinstance(value, str) or key in _RESERVED_PLACEHOLDER_EXEMPT:
+                continue
+            clash = sorted(set(re.findall(r"\{(\w+)\}", value)) & reserved)
+            if clash:
+                offenders.append(f"{name}:{key} 用了 {clash}")
+    assert not offenders, (
+        "翻譯字串用了 t() 會吃掉的佔位符名，Python 端永遠填不進去（而且會靜默"
+        "回傳原始樣板）。改個名字，或加進 _RESERVED_PLACEHOLDER_EXEMPT 並寫明"
+        "為什麼 Python 不渲染它：\n  " + "\n  ".join(offenders))

@@ -23,8 +23,7 @@ from src.cli.health_line import build_health_line
 from src.cli.menus.areas import (
     overview_menu,
     investigate_menu,
-    alerting_menu,
-    automation_menu,
+    policy_menu,
     reports_menu,
     system_menu_entry,
 )
@@ -246,7 +245,6 @@ def main_menu():
             t("main_menu_area_3"),
             t("main_menu_area_4"),
             t("main_menu_area_5"),
-            t("main_menu_area_6"),
             "",
             t("main_menu_launch_gui"),
             t("main_menu_0"),
@@ -260,7 +258,7 @@ def main_menu():
 
         # str, not int: G is a selection too, and safe_input maps 0/-1/EOF to None.
         sel = safe_input(f"\n{t('please_select')}", str,
-                         {"1", "2", "3", "4", "5", "6", "g", "G", "0"})
+                         {"1", "2", "3", "4", "5", "g", "G", "0"})
 
         if sel is None or sel == "0":
             break
@@ -269,12 +267,10 @@ def main_menu():
         elif sel == "2":
             investigate_menu(cm)
         elif sel == "3":
-            alerting_menu(cm)
+            policy_menu(cm)
         elif sel == "4":
-            automation_menu(cm)
-        elif sel == "5":
             reports_menu(cm)
-        elif sel == "6":
+        elif sel == "5":
             system_menu_entry(cm)
         elif sel in ("g", "G"):
             _launch_web_gui_flow(cm)

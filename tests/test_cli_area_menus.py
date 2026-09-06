@@ -48,24 +48,6 @@ def _run_main_menu(monkeypatch, selections):
     main_module.main_menu()
 
 
-@pytest.mark.parametrize(("selection", "target"), [
-    ("1", "overview_menu"),
-    ("2", "investigate_menu"),
-    ("3", "alerting_menu"),
-    ("4", "automation_menu"),
-    ("5", "reports_menu"),
-    ("6", "system_menu_entry"),
-])
-def test_main_menu_dispatches_six_areas(monkeypatch, selection, target):
-    calls = []
-    for name in ("overview_menu", "investigate_menu", "alerting_menu",
-                 "automation_menu", "reports_menu", "system_menu_entry"):
-        monkeypatch.setattr(main_module, name,
-                            (lambda n: lambda _cm: calls.append(n))(name))
-    _run_main_menu(monkeypatch, [selection, None])
-    assert calls == [target]
-
-
 def test_main_menu_g_launches_web_gui_flow(monkeypatch):
     calls = []
     monkeypatch.setattr(main_module, "_launch_web_gui_flow", lambda _cm: calls.append("gui"))
@@ -82,8 +64,8 @@ def test_main_menu_lowercase_g_also_launches(monkeypatch):
 
 def test_main_menu_zero_returns_without_dispatching(monkeypatch):
     calls = []
-    for name in ("overview_menu", "investigate_menu", "alerting_menu",
-                 "automation_menu", "reports_menu", "system_menu_entry"):
+    for name in ("overview_menu", "investigate_menu", "policy_menu",
+                 "reports_menu", "system_menu_entry"):
         monkeypatch.setattr(main_module, name,
                             (lambda n: lambda _cm: calls.append(n))(name))
     _run_main_menu(monkeypatch, ["0"])
@@ -156,7 +138,7 @@ def _prepare_alerting(monkeypatch, selections):
     (3, "add_bandwidth_volume_menu"), (4, "add_system_health_menu"),
     (5, "manage_rules_menu"),
 ])
-def test_alerting_menu_new_numbering(monkeypatch, selection, target):
+def test_policy_menu_keeps_the_alerting_numbering(monkeypatch, selection, target):
     """System Health moves to 4 (cli-flows #13); Manage Rules to 5."""
     calls = []
     for name in ("add_event_menu", "add_traffic_menu", "add_bandwidth_volume_menu",
@@ -164,16 +146,16 @@ def test_alerting_menu_new_numbering(monkeypatch, selection, target):
         monkeypatch.setattr(areas_module, name,
                             (lambda n: lambda *a, **k: calls.append(n))(name))
     _prepare_alerting(monkeypatch, [selection, None])
-    areas_module.alerting_menu(_make_cm())
+    areas_module.policy_menu(_make_cm())
     assert calls == [target]
 
 
-def test_alerting_menu_best_practices_is_item_9(monkeypatch):
+def test_policy_menu_best_practices_is_item_9(monkeypatch):
     calls = []
     monkeypatch.setattr(areas_module, "_best_practices_flow",
                         lambda _cm: calls.append("bp"))
     _prepare_alerting(monkeypatch, [9, None])
-    areas_module.alerting_menu(_make_cm())
+    areas_module.policy_menu(_make_cm())
     assert calls == ["bp"]
 
 
@@ -221,9 +203,14 @@ def test_best_practices_flow_runs_only_after_confirmation(monkeypatch):
     assert ran == ["ran"]
 
 
-# ── Task 5: Automation area ─────────────────────────────────────────────────
+# ── Task 5 的自動化區：Phase 3C 之後是「規則」區的第 10、11 項 ──────────────
+#
+# 這三條原本測的是 automation_menu 的第 1、2 項。合併之後同樣兩個功能變成
+# policy_menu 的第 10、11 項——**斷言的意義沒有改變**（同樣兩個進入點、同樣的
+# 狀態讀數要出現在畫面上），改的只是它們在哪一個選單的第幾號。編號不能沿用
+# 1/2，那是「新增 Event 規則」與「新增 Traffic 規則」。
 
-def test_automation_menu_dispatch_and_status(monkeypatch):
+def test_policy_menu_schedule_items_dispatch_and_show_status(monkeypatch):
     calls, screens = [], []
     cm = _make_cm()
     cm.config["rule_scheduler"] = {"enabled": True, "check_interval_seconds": 300}
@@ -232,18 +219,18 @@ def test_automation_menu_dispatch_and_status(monkeypatch):
                         lambda path, lines, **kw: screens.append(lines))
     monkeypatch.setattr(areas_module, "build_health_line", lambda cm: "")
     monkeypatch.setattr(areas_module, "safe_input",
-                        (lambda it: lambda *a, **k: next(it))(iter([1, 2, None])))
+                        (lambda it: lambda *a, **k: next(it))(iter([10, 11, None])))
     import src.rule_scheduler_cli as rsc
     monkeypatch.setattr(rsc, "rule_scheduler_menu", lambda _cm: calls.append("rs"))
     import src.cli.menus.report_schedule as rsched
     monkeypatch.setattr(rsched, "manage_report_schedules_menu", lambda _cm: calls.append("sched"))
-    areas_module.automation_menu(cm)
+    areas_module.policy_menu(cm)
     assert calls == ["rs", "sched"]
     joined = "\n".join(str(x) for x in screens[0])
     assert "300" in joined and "1" in joined
 
 
-def test_automation_menu_shows_scheduler_off(monkeypatch):
+def test_policy_menu_shows_scheduler_off(monkeypatch):
     screens = []
     cm = _make_cm()
     cm.config["rule_scheduler"] = {}
@@ -252,11 +239,11 @@ def test_automation_menu_shows_scheduler_off(monkeypatch):
                         lambda path, lines, **kw: screens.append(lines))
     monkeypatch.setattr(areas_module, "build_health_line", lambda cm: "")
     monkeypatch.setattr(areas_module, "safe_input", lambda *a, **k: None)
-    areas_module.automation_menu(cm)
+    areas_module.policy_menu(cm)
     assert "OFF" in "\n".join(str(x) for x in screens[0])
 
 
-def test_automation_menu_survives_missing_schedule_api(monkeypatch):
+def test_policy_menu_survives_missing_schedule_api(monkeypatch):
     """A menu must not die because one status number cannot be read."""
     screens = []
     cm = _make_cm()
@@ -265,7 +252,7 @@ def test_automation_menu_survives_missing_schedule_api(monkeypatch):
                         lambda path, lines, **kw: screens.append(lines))
     monkeypatch.setattr(areas_module, "build_health_line", lambda cm: "")
     monkeypatch.setattr(areas_module, "safe_input", lambda *a, **k: None)
-    areas_module.automation_menu(cm)          # cm has no get_report_schedules
+    areas_module.policy_menu(cm)          # cm has no get_report_schedules
     assert screens
 
 
@@ -446,3 +433,75 @@ def test_system_menu_has_no_report_output_or_rule_scheduler_items():
 def test_settings_menu_alias_still_resolves():
     """src/settings/__init__.py's shim imports this name."""
     assert root_module.settings_menu is root_module.system_menu
+
+
+# ── Phase 3C Task 3: 主選單五區（與 GUI 同一組區域） ─────────────────────────
+
+def _main_menu_render(monkeypatch):
+    """跑一次主選單，回傳 (畫出來的行, safe_input 收到的可接受選項集合)。"""
+    panels: list[list[str]] = []
+    accepted: list = []
+
+    def _draw(_title, lines, *a, **k):
+        panels.append(list(lines))
+
+    def _input(_prompt, _typ, choices, *a, **k):
+        accepted.append(choices)
+        return None
+
+    monkeypatch.setattr(main_module, "setup_logger", lambda *a, **k: None)
+    monkeypatch.setattr(main_module, "ConfigManager", lambda: _make_cm())
+    monkeypatch.setitem(sys.modules, "src.module_log",
+                        types.SimpleNamespace(ModuleLog=types.SimpleNamespace(init=lambda *a: None)))
+    monkeypatch.setattr(main_module, "draw_panel", _draw)
+    monkeypatch.setattr(main_module, "build_health_line", lambda cm: "")
+    monkeypatch.setattr(main_module, "safe_input", _input)
+    main_module.main_menu()
+    return panels[0], accepted[0]
+
+
+def test_the_area_keys_stop_at_five_in_both_catalogues():
+    """第六區的鍵必須從兩份 i18n 都消失。
+
+    直接讀 JSON 而不是問 `t()`：`t()` 對缺鍵回 `[MISSING:...]`，那既不是空字串
+    也不是例外，用它判斷「鍵不存在」會寫出看起來對、其實在比對佔位字串的斷言。
+    留著孤兒鍵的代價是下一個讀 i18n 的人以為還有第六區。
+    """
+    import json
+    from pathlib import Path
+
+    root = Path(__file__).parent.parent
+    for name in ("src/i18n_en.json", "src/i18n_zh_TW.json"):
+        data = json.loads((root / name).read_text(encoding="utf-8"))
+        present = sorted(k for k in data if k.startswith("main_menu_area_"))
+        assert present == [f"main_menu_area_{n}" for n in range(1, 6)], (
+            f"{name} 的區域鍵是 {present}，應為 1-5")
+        for dead in ("cli_area_alerting", "cli_area_automation", "cli_area_overview"):
+            assert dead not in data, f"{name} 還留著 {dead}"
+        assert "cli_area_policy" in data and "cli_area_home" in data
+
+
+def test_the_main_menu_draws_five_areas_and_accepts_only_those(monkeypatch):
+    lines, accepted = _main_menu_render(monkeypatch)
+    from src import i18n
+    area_lines = [l for l in lines
+                  if any(l == i18n.t(f"main_menu_area_{n}") for n in range(1, 9))]
+    assert len(area_lines) == 5, f"畫出來的區域列有 {len(area_lines)} 條，應為 5：{area_lines}"
+    assert set(accepted) == {"1", "2", "3", "4", "5", "g", "G", "0"}, accepted
+
+
+@pytest.mark.parametrize(("selection", "target"), [
+    ("1", "overview_menu"),
+    ("2", "investigate_menu"),
+    ("3", "policy_menu"),
+    ("4", "reports_menu"),
+    ("5", "system_menu_entry"),
+])
+def test_main_menu_dispatches_five_areas(monkeypatch, selection, target):
+    calls = []
+    for name in ("overview_menu", "investigate_menu", "policy_menu",
+                 "reports_menu", "system_menu_entry"):
+        monkeypatch.setattr(main_module, name,
+                            (lambda n: lambda _cm: calls.append(n))(name))
+    _run_main_menu(monkeypatch, [selection, None])
+    assert calls == [target]

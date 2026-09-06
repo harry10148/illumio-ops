@@ -67,8 +67,11 @@ def overview_menu(cm) -> None:
     lines = [
         f"{t('cli_status_api', default='API')}: {cm.config.get('api', {}).get('url', '-')}",
         t("cli_ov_rules_configured", **counts),
+        # ui_lang, not lang: `t(key, *, lang=..., default=..., **kwargs)` eats a
+        # `lang=` argument as its own language selector, so a `{lang}` placeholder
+        # can never be filled and the whole line renders as the raw template.
         t("cli_ov_lang_theme",
-          lang=(settings.get("language", "en") or "en").upper(),
+          ui_lang=(settings.get("language", "en") or "en").upper(),
           theme=(settings.get("theme", "dark") or "dark").capitalize(),
           activity=_last_activity_text(_log_file())),
         "-",
@@ -76,7 +79,7 @@ def overview_menu(cm) -> None:
         "",
         t("menu_return"),
     ]
-    menu_screen(t("cli_area_overview"), lines, health=build_health_line(cm))
+    menu_screen(t("cli_area_home"), lines, health=build_health_line(cm))
     safe_input(f"\n{t('please_select')}", int, range(0, 1))
 
 
@@ -133,12 +136,27 @@ def _best_practices_flow(cm) -> None:
           f"{Colors.GREEN}\u276f{Colors.ENDC} ")
 
 
-def alerting_menu(cm) -> None:
-    """§3.3.3 — nine items. System Health moves to 4 (cli-flows #13) so the four
-    'add a rule' wizards sit together."""
+def policy_menu(cm) -> None:
+    """Phase 3C：告警區與自動化區合併成「規則」，與 GUI 的五區同一組區域。
+
+    合併不是把兩張畫面接起來就算數——兩區的內容其實是同一件事的兩半：定義規則、
+    測試規則、讓規則自己跑。項次維持原有順序（1-9 告警項、10-11 排程項），中間
+    留一條空白列把「手動」與「排程」分開；操作者原本記得的編號沒有變動，只有
+    automation 的兩項從 1/2 變成 10/11。
+
+    §3.3.3 的註記仍然適用：System Health 排在 4，四個「新增規則」精靈才會相鄰。
+    AU-2 也仍然適用：規則排程器的開關只有一個家，在 rule_scheduler_cli 自己的
+    Settings 裡；這裡是入口，不是第二個切換點。
+    """
     while True:
         cm.load()
         rules = cm.config.get("rules", []) or []
+        rs_cfg = cm.config.get("rule_scheduler", {}) or {}
+        try:
+            sched_count = len(cm.get_report_schedules() or [])
+        except Exception:
+            # One unreadable status number must not take the menu down with it.
+            sched_count = 0
         lines = [
             t("cli_alerting_1"),
             t("cli_alerting_2"),
@@ -150,10 +168,15 @@ def alerting_menu(cm) -> None:
             t("cli_alerting_8"),
             t("cli_alerting_9"),
             "",
+            t("cli_auto_rule_scheduler",
+              status="ON" if rs_cfg.get("enabled", False) else "OFF",
+              interval=rs_cfg.get("check_interval_seconds", 300)),
+            t("cli_auto_report_schedules", count=sched_count),
+            "",
             t("menu_return"),
         ]
-        menu_screen(t("cli_area_alerting"), lines, health=build_health_line(cm))
-        sel = safe_input(f"\n{t('please_select')}", int, range(0, 10))
+        menu_screen(t("cli_area_policy"), lines, health=build_health_line(cm))
+        sel = safe_input(f"\n{t('please_select')}", int, range(0, 12))
         if sel is None or sel == 0:
             break
         if sel == 1:
@@ -174,6 +197,12 @@ def alerting_menu(cm) -> None:
             _run_debug_mode(cm)
         elif sel == 9:
             _best_practices_flow(cm)
+        elif sel == 10:
+            import src.rule_scheduler_cli as rsc
+            rsc.rule_scheduler_menu(cm)
+        elif sel == 11:
+            import src.cli.menus.report_schedule as rsched
+            rsched.manage_report_schedules_menu(cm)
 
 
 def _send_test_alert(cm) -> None:
@@ -223,41 +252,6 @@ def _run_debug_mode(cm) -> None:
     ana.run_debug_mode()
     input(f"\n{Colors.CYAN}[?]{Colors.ENDC} {t('press_enter_to_continue')} "
           f"{Colors.GREEN}\u276f{Colors.ENDC} ")
-
-
-def automation_menu(cm) -> None:
-    """§3.3.4 — rule schedules and report schedules, with their state on the row.
-
-    AU-2: the rule scheduler's enable/interval switch has exactly one home,
-    inside rule_scheduler_cli's own Settings. This is an entry point, not a
-    second place to toggle it.
-    """
-    while True:
-        cm.load()
-        rs_cfg = cm.config.get("rule_scheduler", {}) or {}
-        try:
-            sched_count = len(cm.get_report_schedules() or [])
-        except Exception:
-            # One unreadable status number must not take the menu down with it.
-            sched_count = 0
-        lines = [
-            t("cli_auto_rule_scheduler",
-              status="ON" if rs_cfg.get("enabled", False) else "OFF",
-              interval=rs_cfg.get("check_interval_seconds", 300)),
-            t("cli_auto_report_schedules", count=sched_count),
-            "",
-            t("menu_return"),
-        ]
-        menu_screen(t("cli_area_automation"), lines, health=build_health_line(cm))
-        sel = safe_input(f"\n{t('please_select')}", int, range(0, 3))
-        if sel is None or sel == 0:
-            break
-        if sel == 1:
-            import src.rule_scheduler_cli as rsc
-            rsc.rule_scheduler_menu(cm)
-        elif sel == 2:
-            import src.cli.menus.report_schedule as rsched
-            rsched.manage_report_schedules_menu(cm)
 
 
 def report_output_settings_menu(cm) -> None:
