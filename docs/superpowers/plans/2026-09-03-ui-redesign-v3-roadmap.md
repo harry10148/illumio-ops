@@ -12,7 +12,7 @@
 | 3A | `2026-09-03-phase3a-backend.md` | spec §4a/§4b/§4c 後端契約：告警落地 SQLite＋`/api/alerts`、`?alert=` 查詢重建端點、`POST /api/policy/explain`（PCE Rule Search＋本地備援）；純後端＋守門，不動任何前端 | 無 | **已交付**（main `261768ad`＋`aa81f477`，2026-09-03；真機驗證 OK） |
 | 3B | `2026-09-04-phase3b-gui.md` | spec §5 token（`css/v3/tokens.css`＋components）→ §1 五區路由與 shell → §2 首頁 → §3 調查中樞（收件匣／詳情／流量帶條件／規則面板／行動）→ 政策／報表／設定區搬遷 → 登入頁；`design/v3/coverage.yaml` 重編＋coverage gate 改讀；每區完成即部署測試機 | 3A | **已交付**（2026-09-04；Task 1–7 全部合入 main 並部署測試機；原地演進 v2 路徑；驗證報告 `tmp/phase3b-verification/report.md`） |
 | 3E | `2026-09-04-phase3e-workbench.md` | v3.1 修訂 spec：左導覽殼層、清單／詳情／設定三種頁型、告警頁（自動 explain＋行動）、首頁最近告警、系統設定表單、文案去工程味；砍 3B 步進／上下文條 | 3B | 已撰寫（2026-09-04，7 任務） |
-| 3C | `2026-09-04-phase3c-reports-cli.md`（輪到才寫） | spec §6：`design/v3/reports/shell.css` 只改 token＋drift guard 更新＋11 型真資料重產雙寬度逐頁驗；CLI `Colors` 換色＋五區選單＋`cli-flows.md` v3 版 | 3B（token 定案） | 待寫 |
+| 3C | `2026-09-06-phase3c-reports-cli.md` | **範圍已縮小**（2026-09-06 裁決）：報表 shell 換 v3 色票（設計權威移到 `design/v3/reports/shell.css`）＋圖表色盤鏡射 tone token＋CLI 主選單六區併五區。原列的「11 型真資料重產雙寬度逐頁驗」**已由 Phase 2B 完成**，降為 Task 1 的驗證步驟。內文墨色維持印刷黑 `#12161C`（報表要列印） | 3B（token 定案） | 計畫已寫 |
 | 3D | `2026-09-03-phase3d-final.md`（3C 合入後撰寫） | spec §7：主場景六步 Playwright 真機走查＋截圖、五區 coverage 100%、docs（gui-tour 重寫）、CHANGELOG＋版本號（建議 6.0.0，待裁決）、release tag | 3A–3C | 待寫 |
 
 判準與邊界（spec §1）：首頁看「現在」、調查查「這件事」、政策改「規則」、報表產「交付物」、設定改「系統」。
