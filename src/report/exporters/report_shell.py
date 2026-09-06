@@ -1461,6 +1461,47 @@ figure.chart-static figcaption {
 # "neutral" rather than emitting an attribute the CSS has no rule for.
 TONES: tuple[str, ...] = ("ok", "warn", "crit", "info", "neutral")
 
+
+def _parse_root_tokens(css: str) -> dict[str, str]:
+    """Custom properties declared in SHELL_CSS's ``:root`` block.
+
+    Parsed rather than retyped on purpose. Everything that cannot go through
+    ``var()`` — matplotlib takes RGB values, not CSS — still has to use the
+    shell's colours, and a second hand-written table is exactly the thing that
+    falls behind on the next palette move. There is only one such table now,
+    and it is generated from the stylesheet that ships.
+
+    Only the first ``:root`` block is read; that is where the palette lives.
+    Values are returned verbatim (including non-colour tokens like sizes), so
+    callers name the token they want and get whatever the shell says it is.
+    """
+    start = css.index(":root {")
+    end = css.index("}", start)
+    out: dict[str, str] = {}
+    for line in css[start:end].splitlines():
+        line = line.split("/*")[0].strip()
+        if not line.startswith("--") or ":" not in line:
+            continue
+        name, _, value = line.partition(":")
+        out[name.strip().lstrip("-")] = value.strip().rstrip(";").strip()
+    return out
+
+
+#: Every custom property the shell's ``:root`` declares, by name without the
+#: leading dashes (``tone-crit-border``, ``text-2``, ``space-4``, ...).
+SHELL_TOKENS: dict[str, str] = _parse_root_tokens(SHELL_CSS)
+
+#: tone -> the LED colour (``--tone-<t>-border``). This is the colour a chart
+#: should use for a solid mark of that tone.
+TONE_HEX: dict[str, str] = {t: SHELL_TOKENS[f"tone-{t}-border"] for t in TONES}
+
+#: tone -> the pale fill (``--tone-<t>-bg``) and the ink (``--tone-<t>-fg``).
+#: The fill exists so a chart can reproduce the badge's solid-vs-outlined
+#: distinction: CRITICAL and HIGH share a tone, and on paper the only thing
+#: keeping them apart is that HIGH is outlined rather than filled.
+TONE_FILL_HEX: dict[str, str] = {t: SHELL_TOKENS[f"tone-{t}-bg"] for t in TONES}
+TONE_INK_HEX: dict[str, str] = {t: SHELL_TOKENS[f"tone-{t}-fg"] for t in TONES}
+
 # Report severity vocabulary -> the shell's five tones. Copied from
 # design/v2/tools/reskin_report.py (src must not import from design/).
 # CRITICAL and HIGH share a tone; the solid-vs-outlined badge rule in

@@ -33,6 +33,11 @@ _HEX = re.compile(r"#[0-9A-Fa-f]{3}(?:[0-9A-Fa-f]{3})?\b(?![0-9A-Fa-f])")
 
 #: relpath -> (允許的字面量數量, 理由)。0 不列在這裡——沒列到的檔一律必須是 0。
 #:
+#: Task 2 收掉了兩條：`exporters/chart_renderer.py` 與
+#: `analysis/audit/audit_risk.py` 現在都從 `report_shell.SHELL_TOKENS` 解析色值，
+#: 兩個檔的字面量都降到 0。`test_the_baselines_are_not_stale` 就是為了逼這件事
+#: 發生——它在實際數量低於 baseline 時會紅，所以豁免不會靜靜地留在原地。
+#:
 #: 每一條都是「這裡的色值不能是 CSS 變數」的具體理由，不是「這個檔還沒清」。
 _ALLOWED: dict[str, tuple[int, str]] = {
     "exporters/report_shell.py": (
@@ -42,20 +47,15 @@ _ALLOWED: dict[str, tuple[int, str]] = {
     ),
     "report_generator.py": (
         32,
-        "電子郵件 HTML。收件端（Outlook、Gmail）不解析 CSS 自訂屬性，"
-        "var() 在信裡會整條宣告掉掉、留下沒有顏色的文字，所以信件範本只能寫死。"
-        "這份範本已經是 v3 品牌色。另含 severity→色 的對照表，Task 2 收斂。",
-    ),
-    "exporters/chart_renderer.py": (
-        17,
-        "matplotlib 收的是 RGB 值，不是 CSS——var() 在這裡無從解析。"
-        "Task 2 把它收成一份鏡射 shell tone token 的常數並加子集守門；"
-        "屆時這個數字會降到那份常數自己的長度。",
-    ),
-    "analysis/audit/audit_risk.py": (
-        10,
-        "risk→色的資料模型層，被 exporter 與 chart 兩邊消費，同樣不經過 CSS。"
-        "Task 2 與 chart_renderer 一起收斂。",
+        "電子郵件 HTML，**不是**報表 HTML。收件端（Outlook、Gmail）不解析 CSS "
+        "自訂屬性，var() 在信裡會整條宣告掉掉、留下沒有顏色的文字，所以信件"
+        "範本只能寫死。這份範本已經是 v3 品牌色。\n"
+        "        裡面的 `_sev_bg`（嚴重度徽章底色）在 Task 2 評估後**刻意不動**："
+        "信裡的徽章是白字，而且沒有網底可用（多數收件端會拿掉 background-image）。"
+        "照 SEVERITY_TONE 映射會讓 CRITICAL 與 HIGH 塌成同一個紅（信裡沒有第二個"
+        "裝置可以分開它們），而 MEDIUM 走 --tone-warn-border 的話白字對比只有 "
+        "1.8:1，直接讀不到。信件徽章因此保有自己的三個紅／橘，這是介質差異，"
+        "不是遺漏。",
     ),
     "exporters/policy_diff_html_exporter.py": (
         3,

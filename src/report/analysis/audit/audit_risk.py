@@ -5,6 +5,8 @@ Audit event risk classification — maps event_type to risk level and metadata.
 from __future__ import annotations
 
 from src.i18n import t
+from src.report.exporters.report_shell import (
+    SEVERITY_TONE, TONE_FILL_HEX, TONE_HEX)
 
 RISK_CRITICAL = 'CRITICAL'
 RISK_HIGH     = 'HIGH'
@@ -45,20 +47,26 @@ AUDIT_RISK_MAP = {
 }
 
 RISK_ORDER = {RISK_CRITICAL: 0, RISK_HIGH: 1, RISK_MEDIUM: 2, RISK_LOW: 3, RISK_INFO: 4}
-RISK_COLOR = {
-    RISK_CRITICAL: '#BE122F',
-    RISK_HIGH:     '#F97607',
-    RISK_MEDIUM:   '#D4A017',
-    RISK_LOW:      '#325158',
-    RISK_INFO:     '#989A9B',
+# Risk level -> the report shell's tone vocabulary. Same table the HTML badge
+# uses (report_shell.SEVERITY_TONE), so a risk level cannot mean one colour in
+# a table and another in a chart.
+RISK_TONE = {
+    RISK_CRITICAL: SEVERITY_TONE["CRITICAL"],
+    RISK_HIGH:     SEVERITY_TONE["HIGH"],
+    RISK_MEDIUM:   SEVERITY_TONE["MEDIUM"],
+    RISK_LOW:      SEVERITY_TONE["LOW"],
+    RISK_INFO:     SEVERITY_TONE["INFO"],
 }
-RISK_BG = {
-    RISK_CRITICAL: '#FEF2F2',
-    RISK_HIGH:     '#FFF7ED',
-    RISK_MEDIUM:   '#FEFCE8',
-    RISK_LOW:      '#F0F9FF',
-    RISK_INFO:     '#F9FAFB',
-}
+
+# Kept as names rather than hex tables. Nothing in src reads these two today —
+# the HTML side moved to `data-tone` in Phase 2B Task 6 and lets SHELL_CSS
+# resolve the colour (see concern_card.py and audit_html_exporter.py, which both
+# say so). They stay because they are the risk model's own statement of "what
+# colour is this level", and the next consumer that cannot use CSS (a chart, an
+# xlsx fill) should read them instead of inventing a third palette. Resolving
+# them from the shell means that consumer gets today's colours, not 2026-04's.
+RISK_COLOR = {level: TONE_HEX[tone] for level, tone in RISK_TONE.items()}
+RISK_BG = {level: TONE_FILL_HEX[tone] for level, tone in RISK_TONE.items()}
 
 def get_risk(event_type: str, lang: str | None = None):
     """Return (risk_level, description, recommendation) for an event_type.

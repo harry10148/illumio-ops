@@ -159,25 +159,65 @@ SEMANTIC_PIE_SPEC = {
 }
 
 
-def test_pie_semantic_colors_fixed_by_label():
-    """判定圓餅顏色必須依語意固定（allowed 綠/blocked 紅/PB 橘/unknown 灰），
-    不得依切片順序輪替——順序色曾把 98% 未覆蓋流量畫成安全綠。"""
+#: 判定語彙 -> 殼的 tone 名。**在測試裡獨立寫一次**，不從 chart_renderer 匯入，
+#: 否則這條會退化成「程式碼等於它自己」。tone 名就是需求本身：allowed 是好的、
+#: blocked 是壞的、PB 是要注意的、unknown 沒有語意。
+_VERDICT_TONE = {
+    "Allowed": "ok",
+    "Blocked": "crit",
+    "Potentially Blocked": "warn",
+    "Unknown": "neutral",
+}
+
+
+def _wedge_faces(spec):
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
     from src.report.exporters.chart_renderer import _build_matplotlib_figure
-    fig = _build_matplotlib_figure(SEMANTIC_PIE_SPEC, lang="en")
+    fig = _build_matplotlib_figure(spec, lang="en")
     try:
         ax = fig.axes[0]
-        wedges = [p for p in ax.patches]
-        got = [w.get_facecolor() for w in wedges]
-        from matplotlib.colors import to_rgba
-        assert got[0] == to_rgba("#16a34a")   # allowed
-        assert got[1] == to_rgba("#dc2626")   # blocked
-        assert got[2] == to_rgba("#f59e0b")   # potentially blocked
-        assert got[3] == to_rgba("#6b7280")   # unknown
+        return [w.get_facecolor() for w in ax.patches]
     finally:
         plt.close(fig)
+
+
+def test_pie_semantic_colors_fixed_by_label():
+    """判定圓餅顏色必須依語意固定（allowed 綠/blocked 紅/PB 橘/unknown 灰），
+    不得依切片順序輪替——順序色曾把 98% 未覆蓋流量畫成安全綠。
+
+    2026-09-06：色值改為從 `SHELL_CSS` 的 tone token 解析（Phase 3C Task 2），
+    所以斷言不再寫死四個十六進位值。**要求沒有放寬，反而收緊了**：原本寫死
+    hex 的版本只固定了「第 n 塊是某個顏色」，換句話說即使顏色真的是照順序發的，
+    只要順序恰好對得上它照樣綠——而「不得依順序輪替」正是它宣稱要守的那條。
+    現在改成斷言 label→tone 的綁定，並在下一條用**打亂順序**證明綁定跟著 label
+    走，不是跟著位置走。
+    """
+    from matplotlib.colors import to_rgba
+    from src.report.exporters.report_shell import TONE_HEX
+
+    got = _wedge_faces(SEMANTIC_PIE_SPEC)
+    for i, label in enumerate(SEMANTIC_PIE_SPEC["data"]["labels"]):
+        expected = TONE_HEX[_VERDICT_TONE[label]]
+        assert got[i] == to_rgba(expected), f"{label} 應為 {expected}"
+
+
+def test_pie_colour_follows_the_label_not_the_slice_position():
+    """把切片順序反過來，每個 label 仍拿到自己的顏色。
+
+    這才是「不得依順序輪替」的直接證明；固定順序的斷言證明不了它。
+    """
+    from matplotlib.colors import to_rgba
+    from src.report.exporters.report_shell import TONE_HEX
+
+    labels = list(reversed(SEMANTIC_PIE_SPEC["data"]["labels"]))
+    values = list(reversed(SEMANTIC_PIE_SPEC["data"]["values"]))
+    spec = dict(SEMANTIC_PIE_SPEC, data={"labels": labels, "values": values})
+    got = _wedge_faces(spec)
+    for i, label in enumerate(labels):
+        expected = TONE_HEX[_VERDICT_TONE[label]]
+        assert got[i] == to_rgba(expected), f"{label} 應為 {expected}"
 
 
 def test_pie_small_slices_move_to_legend():

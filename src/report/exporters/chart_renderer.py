@@ -36,6 +36,8 @@ if matplotlib.get_backend().lower() != "agg":
 import matplotlib.pyplot as plt
 from matplotlib import font_manager, rcParams
 
+from .report_shell import SEVERITY_TONE, SHELL_TOKENS, TONE_HEX
+
 # Bundle a CJK-capable font so offline-isolated deployments don't depend on
 # an OS-level font install. Loaded before rcParams so the family lookup
 # below resolves to the bundled face.
@@ -74,12 +76,25 @@ rcParams["font.family"] = _filter_existing_font_families([
 ])
 rcParams["axes.unicode_minus"] = False  # minus sign glitch fix
 
-# D.3 共享 signal palette — must match --color-signal-* in app.css and report_css.py
+# Every colour below is resolved from the report shell's :root tokens. Charts
+# cannot use var() — matplotlib takes RGB values — so "same source" is the best
+# available form of "same palette", and it is enforced by
+# tests/test_chart_palette_tokens.py rather than by a comment.
+#
+# The names and shapes are unchanged from when these were hand-written hex
+# tables, so any caller keeps working.
+
+#: Default ink for marks that carry no severity of their own (plain bar fills,
+#: network nodes). Deliberately --text-2 and not a tone: a bar with no semantic
+#: meaning should read as ink, not as "info".
+CHART_INK: str = SHELL_TOKENS["text-2"]
+
+# D.3 shared signal palette, now the shell's tone LEDs.
 SIGNAL_COLORS = {
-    'success':  '#2D9B5E',  # Allowed / Online / passing
-    'warning':  '#C47A00',  # Potentially-Blocked / Warning
-    'danger':   '#D93025',  # Blocked / Critical / Lost
-    'info':     '#0077CC',  # Info / metadata
+    'success':  TONE_HEX['ok'],       # Allowed / Online / passing
+    'warning':  TONE_HEX['warn'],     # Potentially-Blocked / Warning
+    'danger':   TONE_HEX['crit'],     # Blocked / Critical / Lost
+    'info':     TONE_HEX['info'],     # Info / metadata
 }
 
 # Convenience aliases for verdict labels (Illumio terminology — 留英 per OQ-10)
@@ -88,7 +103,7 @@ VERDICT_COLORS = {
     'Blocked':              SIGNAL_COLORS['danger'],
     'Potentially-Blocked':  SIGNAL_COLORS['warning'],
     'Potentially_Blocked':  SIGNAL_COLORS['warning'],  # alt spelling
-    'Unknown':              SIGNAL_COLORS['info'],
+    'Unknown':              TONE_HEX['neutral'],
 }
 
 def _resolve_chart_text(spec: dict[str, Any], field: str, *, lang: str = "en") -> str:
@@ -137,19 +152,41 @@ _PIE_LABEL_MIN_PCT = 3.0
 
 # 判定/嚴重度語意色：label 正規化（小寫、底線轉空白）後比對。
 # 順序色曾把 98% Potentially Blocked 畫成安全綠（2026-07-23 視覺實檢）。
-_SEMANTIC_COLORS = {
-    "allowed": "#16a34a",
-    "blocked": "#dc2626",
-    "potentially blocked": "#f59e0b",
-    "unknown": "#6b7280",
-    "critical": "#dc2626",
-    "high": "#f97316",
-    "medium": "#f59e0b",
-    "low": "#16a34a",
-    "info": "#64748b",
-    "warning": "#f59e0b",
-    "error": "#dc2626",
+#
+# 嚴重度那一半直接走 report_shell.SEVERITY_TONE——也就是 HTML 徽章用的同一份
+# 對照表。在此之前兩邊是各寫各的：`low` 在圖上是綠色、在徽章上是 info 藍，
+# 同一份報表裡對同一個嚴重度給兩種顏色，讀者無從得知哪個算數。
+_SEMANTIC_TONE = {
+    # 判定語彙
+    "allowed": "ok",
+    "blocked": "crit",
+    "potentially blocked": "warn",
+    "unknown": "neutral",
+    # 嚴重度語彙（與徽章同源）
+    "critical": SEVERITY_TONE["CRITICAL"],
+    "high": SEVERITY_TONE["HIGH"],
+    "medium": SEVERITY_TONE["MEDIUM"],
+    "low": SEVERITY_TONE["LOW"],
+    "info": SEVERITY_TONE["INFO"],
+    # 別名
+    "warning": SEVERITY_TONE["MEDIUM"],
+    "error": SEVERITY_TONE["CRITICAL"],
 }
+
+_SEMANTIC_COLORS = {k: TONE_HEX[v] for k, v in _SEMANTIC_TONE.items()}
+
+#: CRITICAL 與 HIGH 共用 crit tone；SHELL_CSS 靠「實心 vs 外框」把兩級分開
+#: （`[data-tone="crit"][data-sev="CRITICAL"]` 是唯一一條做這件事的規則）。
+#:
+#: 圖上不能照抄那個裝置。徽章是小色片，外框＝淡底不會被讀成「比較不嚴重」；
+#: 圓餅切片的顏色重量會直接被讀成量級，把 HIGH 畫成淡粉紅，它就比旁邊的琥珀色
+#: MEDIUM 還輕——嚴重度排序在圖上被顛倒過來。這與 2026-07-23 抓到的
+#: 「98% Potentially Blocked 被畫成安全綠」是同一類缺陷。
+#:
+#: 所以圖上共用 tone 的兩級用**同一個紅**保住色彩重量，靠白色斜線網底分開。
+#: 網底在灰階列印下同樣看得出來，這是色相做不到的。
+_HATCHED_LABELS = ("high",)
+_HATCH = "//"
 
 
 def _semantic_pie_colors(labels: list) -> "list[str] | None":
@@ -157,6 +194,23 @@ def _semantic_pie_colors(labels: list) -> "list[str] | None":
     colors = [_SEMANTIC_COLORS.get(str(l).strip().lower().replace("_", " "))
               for l in labels]
     return colors if colors and all(colors) else None
+
+
+def _semantic_pie_faces(labels: list) -> "list[tuple[str, str]] | None":
+    """每個切片的 (facecolor, hatch)；沒有完整語意色時回 None。
+
+    ``hatch`` 為 ``None`` 代表實心。只有 `_HATCHED_LABELS` 會拿到網底——目前
+    只有 HIGH，它與 CRITICAL 共用 crit tone。
+    """
+    faces: list[tuple[str, str | None]] = []
+    for label in labels:
+        norm = str(label).strip().lower().replace("_", " ")
+        tone = _SEMANTIC_TONE.get(norm)
+        if tone is None:
+            return None
+        faces.append((TONE_HEX[tone],
+                      _HATCH if norm in _HATCHED_LABELS else None))
+    return faces or None
 
 
 def _build_matplotlib_figure(spec: dict[str, Any], *, lang: str = "en"):
@@ -188,7 +242,7 @@ def _build_matplotlib_figure(spec: dict[str, Any], *, lang: str = "en"):
 def _draw_chart(fig, ax, chart_type, data, title, x_label, y_label) -> None:
     if chart_type == "bar":
         labels = data.get("labels", [])
-        ax.bar(labels, data.get("values", []), color="#375379")
+        ax.bar(labels, data.get("values", []), color=CHART_INK)
         ax.set_xlabel(x_label)
         ax.set_ylabel(y_label)
         # Many categories collide when drawn horizontally (e.g. the audit
@@ -207,7 +261,7 @@ def _draw_chart(fig, ax, chart_type, data, title, x_label, y_label) -> None:
         draw_labels = [l if p >= _PIE_LABEL_MIN_PCT else ""
                        for l, p in zip(labels, pcts)]
         import functools as _ft
-        ax.pie(
+        wedges, *_rest = ax.pie(
             values,
             labels=draw_labels,
             colors=_semantic_pie_colors(labels),
@@ -217,6 +271,17 @@ def _draw_chart(fig, ax, chart_type, data, title, x_label, y_label) -> None:
             labeldistance=1.08,      # slice labels at 108% of radius (default 1.1)
             textprops={"fontsize": 9},
         )
+        # CRITICAL and HIGH share the crit tone; without a second device they
+        # are one red blob. The badge outlines HIGH, a pie hatches it — see the
+        # note on _HATCHED_LABELS for why the badge's device does not transfer.
+        faces = _semantic_pie_faces(labels)
+        if faces:
+            for wedge, (face, hatch) in zip(wedges, faces):
+                wedge.set_facecolor(face)
+                wedge.set_edgecolor(SHELL_TOKENS["paper"])
+                wedge.set_linewidth(1.0)
+                if hatch:
+                    wedge.set_hatch(hatch)
         if labels:
             ax.legend(
                 [f"{l} — {v:,} ({p:.1f}%)"
@@ -263,7 +328,7 @@ def _draw_chart(fig, ax, chart_type, data, title, x_label, y_label) -> None:
         for node in nodes:
             key = node.get("id") or node.get("name")
             x, y = positions[key]
-            ax.plot(x, y, "o", markersize=20, color="#375379")
+            ax.plot(x, y, "o", markersize=20, color=CHART_INK)
             ax.annotate(node.get("label", key), (x, y), xytext=(0, -15),
                         textcoords="offset points", ha="center")
         ax.set_xlim(-1.5, 1.5)
