@@ -13,7 +13,7 @@
 | 3B | `2026-09-04-phase3b-gui.md` | spec §5 token（`css/v3/tokens.css`＋components）→ §1 五區路由與 shell → §2 首頁 → §3 調查中樞（收件匣／詳情／流量帶條件／規則面板／行動）→ 政策／報表／設定區搬遷 → 登入頁；`design/v3/coverage.yaml` 重編＋coverage gate 改讀；每區完成即部署測試機 | 3A | **已交付**（2026-09-04；Task 1–7 全部合入 main 並部署測試機；原地演進 v2 路徑；驗證報告 `tmp/phase3b-verification/report.md`） |
 | 3E | `2026-09-04-phase3e-workbench.md` | v3.1 修訂 spec：左導覽殼層、清單／詳情／設定三種頁型、告警頁（自動 explain＋行動）、首頁最近告警、系統設定表單、文案去工程味；砍 3B 步進／上下文條 | 3B | 已撰寫（2026-09-04，7 任務） |
 | 3C | `2026-09-06-phase3c-reports-cli.md` | **範圍已縮小**（2026-09-06 裁決）：報表 shell 換 v3 色票（設計權威移到 `design/v3/reports/shell.css`）＋圖表色盤鏡射 tone token＋CLI 主選單六區併五區。原列的「11 型真資料重產雙寬度逐頁驗」**已由 Phase 2B 完成**，降為 Task 1 的驗證步驟。內文墨色維持印刷黑 `#12161C`（報表要列印） | 3B（token 定案） | **已交付 2026-09-06**（`1ede8ea6`／`3b68e04c`／`75352810`＋CLI 五區）；驗收報告 `tmp/phase3c-verification/report.md`。CLI 流程規格差異在 `design/v3/cli-flows.md` |
-| 3D | `2026-09-03-phase3d-final.md`（3C 合入後撰寫） | spec §7：主場景六步 Playwright 真機走查＋截圖、五區 coverage 100%、docs（gui-tour 重寫）、CHANGELOG＋版本號（建議 6.0.0，待裁決）、release tag | 3A–3C | 待寫 |
+| 3D | `2026-09-07-phase3d-final.md` | spec §7：主場景六步 Playwright 真機走查＋截圖、五區 coverage（**現況已 108/108，任務是維持**）、docs（gui-tour 依五區重寫＋路由守門）、CHANGELOG＋版本號 **5.1.0**（使用者 2026-09-07 裁決；我建議 6.0.0）、release tag、測試機殘檔處置 | 3A–3C（全數已交付） | 計畫已寫 |
 
 判準與邊界（spec §1）：首頁看「現在」、調查查「這件事」、政策改「規則」、報表產「交付物」、設定改「系統」。
 
