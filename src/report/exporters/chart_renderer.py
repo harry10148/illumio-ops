@@ -324,7 +324,12 @@ def _draw_chart(fig, ax, chart_type, data, title, x_label, y_label) -> None:
             if src in positions and dst in positions:
                 x1, y1 = positions[src]
                 x2, y2 = positions[dst]
-                ax.plot([x1, x2], [y1, y2], "gray", alpha=0.5)
+                # The edge is structure, not signal, so it takes the shell's
+            # tertiary ink. Matplotlib's literal "gray" survived the token
+            # move because it is a name, not a hex, and the palette gate only
+            # looked for hexes — the same proxy-shape mistake the gate exists
+            # to stop. That gate now names every colour argument instead.
+            ax.plot([x1, x2], [y1, y2], color=SHELL_TOKENS["text-3"], alpha=0.5)
         for node in nodes:
             key = node.get("id") or node.get("name")
             x, y = positions[key]

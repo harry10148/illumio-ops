@@ -139,3 +139,27 @@ def test_critical_and_high_stay_apart_on_a_pie():
         assert not medium.get_hatch()
     finally:
         plt.close(fig)
+
+
+def test_no_chart_colour_is_a_matplotlib_colour_name():
+    """色值不是只有十六進位一種寫法。
+
+    `ax.plot(..., "gray", ...)` 在 token 化之後活了下來，因為守門只找十六進位——
+    它檢查的是「我想到的那個形狀」，不是「這裡的顏色從哪裡來」。這條改成掃
+    `chart_renderer.py` 裡所有顏色參數的字面量：`color=`、位置參數的樣式字串、
+    `cmap=` 之外的具名色。
+
+    看不到的仍然存在（用變數組出來的顏色名），所以真正的防線是「所有顏色都經過
+    SHELL_TOKENS」這個習慣；這條只是把已知的寫法擋住。
+    """
+    import inspect
+
+    src = inspect.getsource(chart_renderer)
+    named = re.findall(
+        r'(?:color|facecolor|edgecolor|c)\s*=\s*[\'"]([A-Za-z][A-Za-z0-9_]*)[\'"]', src)
+    # 位置參數形式：ax.plot(x, y, "gray") / "o" 之類的樣式字串裡的顏色名
+    positional = re.findall(r'ax\.plot\([^)]*?,\s*[\'"]([a-z]{3,})[\'"]', src)
+    strays = sorted(set(named) | set(positional))
+    assert not strays, (
+        "圖表出現具名顏色字面量，它不會跟著殼換色（而且十六進位守門看不到它）："
+        f"{strays}。改用 SHELL_TOKENS／TONE_HEX。")
