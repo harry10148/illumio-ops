@@ -188,6 +188,7 @@ token 檔：原地演進 `src/static/css/v2/tokens.css`（3B 計畫 2026-09-04 �
 ### 6.1 報表殼
 
 - `design/v3/reports/shell.css` 由 v2 `shell.css` 複製後**只改 token**：`--font-ui` 改 Montserrat＋Noto Sans TC；`--text-*`／`--line*` 改 Slate 系；tone 改品牌語意色；`--fs-body` 11.5→12.5px、`--fs-ui` 13→14px；`--accent` 改 Orange。
+  - **2026-09-06 使用者裁決取代上面這一行的範圍**（見 `docs/superpowers/plans/2026-09-06-phase3c-reports-cli.md`）：實作只改**主色、底色、線框**三族（`--accent`／`--accent-fg`、`--canvas`／`--surface-2`、`--line`／`--line-soft`／`--track`）。**不做**的三項與理由：`--text-*` 維持印刷黑 `#12161C`（報表會被列印，印刷黑比 GUI 的暖調 `#313638` 實）；tone 家族不動（那幾組與主題無關，且要對得起既有的嚴重度判讀習慣）；字型與級距不動。已交付於 `design/v3/reports/shell.css`，該檔標頭記錄了同一份決策。
 - 章節結構、封面、目錄、發現卡、列印分頁、寬表 landscape 規則（`WIDE_TABLE_LANDSCAPE_COLS=9`）**全部不動**；CSS drift guard（`SHELL_CSS` 對 `shell.css`＋`AUTHORISED_DELTAS`）與 conservation 測試照舊。
 - 交付前 11 型真資料重產、雙寬度 Playwright 逐頁親驗（CLAUDE.md 硬規則）。
 

@@ -135,3 +135,34 @@ def test_unsupported_chart_type_closes_the_figure():
     with pytest.raises(ValueError):
         render_matplotlib_png({"type": "sunburst", "data": {}})
     assert plt.get_fignums() == []
+
+
+# ── mod13: 執行模式圖例不得讓整份報表建置失敗 ────────────────────────────────
+
+def test_enforcement_mode_legend_renders_instead_of_killing_the_report():
+    """回歸：圖例的 STRINGS fallback 曾寫成 f-string 內的 `{{}}`。
+
+    在替換欄位裡，`{{}}` 是「內含一個空 dict 的集合」而不是空 dict，所以
+    `enforcement_mode_distribution` 只要非空就會拋
+    `TypeError: unhashable type: 'dict'`。`_mod13_html()` 在 `_build()` 裡沒有
+    caller 端的 try/except，整份 security_risk 報表因此建置失敗——不是少一張圖，
+    是沒有報表。這條用「有資料」的分佈直接建一次，確認四個模式都印出來。
+
+    最小 fixture 走不到這裡（分佈是空的），這就是它活下來的原因。
+    """
+    from src.report.exporters.html_exporter import SecurityRiskHtmlExporter
+
+    results = {k: {} for k in [
+        "mod01", "mod02", "mod03", "mod04", "mod05", "mod06", "mod07",
+        "mod08", "mod09", "mod11", "mod12", "mod14", "mod15",
+    ]}
+    results["mod13"] = {
+        "total_score": 62,
+        "grade": "C",
+        "enforcement_mode_distribution": {
+            "full": 4, "selective": 3, "visibility_only": 2, "idle": 1,
+        },
+    }
+    html = SecurityRiskHtmlExporter(results, lang="en").build()
+    for label in ("Full", "Selective", "Visibility Only", "Idle"):
+        assert f"{label}: " in html, f"圖例缺少 {label}"

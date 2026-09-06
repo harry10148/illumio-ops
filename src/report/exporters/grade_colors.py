@@ -3,7 +3,7 @@
 A — excellent → ok
 B — good → ok
 C — fair → warn
-D — fail → crit    (was #F97316 orange — semantically wrong; UX_Review §7.3)
+D — fail → crit    (was a raw orange hex — semantically wrong; UX_Review §7.3)
 F — fail → crit
 fallback — neutral
 

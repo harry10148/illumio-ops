@@ -1,13 +1,16 @@
 """
 src/report/exporters/report_shell.py
-design/v2 report shell — the shared skeleton every v2 HTML report renders into.
+design/v3 report shell — the shared skeleton every HTML report renders into.
 
-SHELL_CSS below is a port of ``design/v2/reports/shell.css``. That file stays
-the design authority for the report shell: it is what the prototype renderer
-(``design/v2/tools/reskin_report.py``) loads, and what the reviewed PDFs in
-``design/v2/reports/reskinned/`` were produced from. Any change made on the
-product side must be annotated back into ``design/v2/reports/shell.css`` so the
-two do not silently drift apart.
+SHELL_CSS below is a port of ``design/v3/reports/shell.css``. That file stays
+the design authority for the report shell. It is a copy of
+``design/v2/reports/shell.css`` with the palette tokens moved to v3 and nothing
+else touched; v2 stays where it is as the historical baseline, because it is
+what the prototype renderer (``design/v2/tools/reskin_report.py``) loads and
+what the reviewed PDFs in ``design/v2/reports/reskinned/`` were produced from —
+those artefacts still describe the file they actually came from. Any change made
+on the product side must be annotated back into ``design/v3/reports/shell.css``
+so the two do not silently drift apart.
 
 Deliberate deltas from the design file (everything else is a verbatim port).
 ``tests/test_report_shell_renderer.py`` rebuilds SHELL_CSS from the design file
@@ -92,28 +95,51 @@ __all__ = [
 
 SHELL_CSS = """\
 /* ===========================================================================
-   PORTED FROM design/v2/reports/shell.css — that file stays the design
+   PORTED FROM design/v3/reports/shell.css — that file stays the design
    authority for the report shell. Any product-side edit must be annotated
    back into it; see report_shell.py's module docstring for the deltas.
-   port-marker: shell-css-port-v2
+   port-marker: shell-css-port-v3
    (Do not remove or reword the marker: scripts/audit_i18n_usage.py scopes its
    Cat C exemption to the literal containing this exact token, and the design
    commentary below is CJK.)
    =========================================================================== */
 
 /* ============================================================================
-   design/v2 報表殼 — 「儀表印本 (instrument printout)」
-   spec §4「HTML 報表」的視覺原型；Phase 2 據此重寫 report_css.py。
+   design/v3 報表殼 — 「儀表印本 (instrument printout)」
+   自 design/v2/reports/shell.css 複製，**只改色票 token**，版面與規則不動。
+   v2 那份留在原地當歷史底本（design/v2/reports/reskinned/ 的已審 PDF 由它產）；
+   本檔起是報表殼的設計權威。
 
-   設計立場
-     · GUI 是深色監控台，報表是它的紙本對應：恆亮、白紙、髮絲線，
-       沒有陰影劇場、沒有大圓角——資訊是主角，容器要退到後面。
-     · tone 標記（LED）在紙上與螢幕上同一個色相：直接沿用
-       design/v2/mockup/assets/tokens.css 的 --tone-*-border 定值，
-       墨色/底色改用 tokens.css [data-theme="light"] 那一套（列印安全）。
+   設計立場（v2 沿用）
+     · 報表是 GUI 的紙本對應：恆亮、白紙、髮絲線，沒有陰影劇場、沒有大圓角
+       ——資訊是主角，容器要退到後面。
      · 簽名元素＝章節左側的「tone 導軌 + 等寬章號」：跨頁時導軌延續，
        讀者在任何一頁都能認出自己在哪一章、那一章多嚴重。
      · 所有數字、代碼、欄名走等寬 tabular——這是報表的性格所在。
+
+   v3 改了什麼（使用者裁決 2026-09-06）
+     · 一致到「主色、底色、線框」三族，值取 src/static/css/v2/tokens.css 的
+       亮色那一套（GUI v3 本身就是亮色，不再是深色監控台）。
+     · 內文墨色**維持印刷黑** --text-1: #12161C，不跟 GUI 的暖調 #313638。
+       報表會被列印，印刷黑印出來比暖調實。--text-2/--text-3 是它的同族衍生，
+       一併留在冷調——這一條在灰階列印下沒有差別，在螢幕上是暖底冷字，
+       是這次改動裡唯一需要人眼判斷的地方。
+     · 主色 --accent: #FF5500 在白底只有 3.2:1，所以**字與細線一律走
+       --accent-fg: #C24300**（GUI 自己也是這樣分工）。本檔已經是這樣，逐一
+       盤點過五個使用點：.exec 的 3px 左導軌、.toc a:hover、.mitre-chip、
+       .cell-long > summary::after 都走 -fg，只有 .toc a:focus-visible 那條
+       2px 外框用 --accent。
+     · --canvas 全檔只有一個使用點（body 的 background），所以它與 --line-soft
+       同值不會讓任何「底色 + 細線」的組合失去邊界。
+     · tone 家族（LED）不動——那幾組本來就與主題無關，是「紙上也一樣的燈」，
+       且報表的語意色要對得起既有的嚴重度判讀習慣。
+     · --canvas 沒有 GUI 對應 token（GUI 沒有「紙外」這個表面）。取暖色中性
+       階梯上比頁面底色低一階的值，讓紙面仍然浮得起來：
+       paper #FFFFFF > surface-2 #F7F4EE > canvas #F0EDE6 > track #EEEAE2
+       > line #E6E2DA。
+     · 字型與級距不動。design/v3 的 spec §「報表」原本還列了字型改 Montserrat、
+       --fs-body/--fs-ui 加大、tone 改品牌語意色；2026-09-06 的裁決把範圍收到
+       主色/底色/線框，那三項不做。
 
    本檔只用 tokens.css 契約內的 token 名（tone、surface、text、space、font、
    radius、line、track、accent 各族），值取亮色那一套。
@@ -150,20 +176,20 @@ SHELL_CSS = """\
 
   /* 紙面：sheet 恆為白紙，canvas 只活在螢幕上 */
   --paper: #FFFFFF;
-  --canvas: #EEF1F5;
+  --canvas: #F0EDE6;
   --surface-1: #FFFFFF;
-  --surface-2: #F5F7FA;
+  --surface-2: #F7F4EE;
 
   --text-1: #12161C;
   --text-2: #414B59;
   --text-3: #6E7A8A;
 
-  --line: #DDE2E9;
-  --line-soft: #E7EBF0;
-  --track: #E9EDF2;
+  --line: #E6E2DA;
+  --line-soft: #F0EDE6;
+  --track: #EEEAE2;
 
-  --accent: #2A78D6;
-  --accent-fg: #1C5CAB;
+  --accent: #FF5500;
+  --accent-fg: #C24300;
   --accent-on: #FFFFFF;
 
   /* tone 標記色相＝深色主題定值（LED 在紙上也是同一顆） */
@@ -1810,7 +1836,7 @@ document.addEventListener('DOMContentLoaded', () => {
 # Marker token embedded in SHELL_CSS. scripts/audit_i18n_usage.py scopes its
 # Cat C exemption to the literal containing it, so it must not be edited away;
 # tests/test_report_shell_renderer.py asserts it is still there.
-SHELL_CSS_PORT_MARKER = "shell-css-port-v2"
+SHELL_CSS_PORT_MARKER = "shell-css-port-v3"
 
 # The section id the appendix element carries (see _render_appendix). A
 # ShellSection must not reuse it or the in-page anchors collide.

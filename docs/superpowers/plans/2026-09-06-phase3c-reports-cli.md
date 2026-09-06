@@ -57,11 +57,25 @@ GUI 在 3B／3E 換到 v3 色票，報表與 CLI 沒跟上，今天的實際狀�
 豁免。漏一處的症狀各不相同——guard 紅、或 audit Cat C 突然抓到 CJK。
 
 **Steps:**
-- [ ] **1. 先紅**：把 `DESIGN_SHELL_CSS` 指向尚不存在的 v3 路徑，確認 guard 紅。
-- [ ] **2. 實作**：建 v3 shell.css、換 token、改三處 marker、清 HTML 內嵌 hex。
-- [ ] **3. 綠**：`timeout 900 python3 -m pytest tests/test_report_shell_renderer.py tests/test_report_export_hardening.py tests/test_print_button_all_exporters.py -q`
-- [ ] **4. 新守門**：HTML exporter 不得出現 `style="…#RRGGBB…"`（逐檔 ratchet，
-      每個豁免寫明理由）。注入一個 hex 證實會紅。
+- [x] **1. 先紅**：建好 v3 shell.css 後把 `DESIGN_SHELL_CSS` 指過去，在還沒動
+      `report_shell.py` 前跑 drift guard——拿到的是**內容不符**（token 值與標頭
+      兩處都差），不是 FileNotFoundError。指向不存在的路徑那種紅太廉價，證明
+      不了 guard 真的在比對內容。
+- [x] **2. 實作**：建 v3 shell.css、換 token、改 marker、清 HTML 內嵌 hex。
+      **marker 實際上是五處同步點，不是三處**：`report_shell.py` 的常數與標頭
+      字面、`test_report_shell_renderer.py` 的 `_PORT_HEADER` 散文與
+      `DESIGN_SHELL_CSS` 路徑、`audit_i18n_usage.py` 的 needle。drift guard 比對
+      的是「常數 == `_PORT_HEADER` + 設計檔」，所以測試裡那段散文也是同步點。
+      另有三處純散文：`report_shell.py` docstring、guard 的失敗訊息、
+      `policy_usage_html_exporter.py:36` 的註解。
+- [x] **3. 綠**：`timeout 900 python3 -m pytest tests/test_report_shell_renderer.py tests/test_report_export_hardening.py tests/test_print_button_all_exporters.py -q`
+- [x] **4. 新守門**：`tests/test_report_no_hardcoded_colour.py`，**兩層**。
+      原本計畫的 `style="…#RRGGBB…"` 正則看不到實際存在的三種寫法：`<style>`
+      區塊裡的規則、餵給 `style=` 的 Python dict、以及 f-string 內插的變數。
+      所以改成：(1) 逐檔 ratchet 數**任何**十六進位字面量，除五個寫明理由的
+      豁免外一律 0；(2) 渲染層——用**打得開上色分支**的 fixture 產 HTML，斷言
+      `<style>/<script>/<svg>` 以外沒有色值，**再加一條反向斷言**那些段落確實
+      渲染了且用的是 token（否則第一條在該分支上是空砲）。兩層各自注入驗證過。
 - [ ] **5. 真資料驗證**：測試機重產 11 型 × 2 語系，取回 HTML，1280／800 截圖
       **並輸出一份 PDF**（Playwright `page.pdf()`）逐頁看。主色在灰階列印下是否
       仍可辨識，是這個任務唯一無法用測試回答的問題。

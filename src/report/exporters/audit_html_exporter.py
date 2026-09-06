@@ -107,9 +107,9 @@ def _df_to_html(df, no_data_key: str = "rpt_no_data", show_risk: bool = False, l
             return ""
         risk_level = get_risk(str(row[event_type_col]))[0]
         if risk_level == "CRITICAL":
-            return " style='background:#FEF2F2;'"
+            return " style='background:var(--tone-crit-bg);'"
         if risk_level == "HIGH":
-            return " style='background:#FFF7ED;'"
+            return " style='background:var(--tone-warn-bg);'"
         return ""
 
     def _render_cell(col, val, row):
@@ -242,7 +242,8 @@ class AuditHtmlExporter:
                 "api": "rpt_data_source_api",
             }.get(self._data_source, "rpt_data_source_mixed")
             ds_label = _s(ds_key)
-            ds_color = {"cache": "#22C55E", "api": "#60A5FA"}.get(self._data_source, "#EAB308")
+            ds_color = {"cache": "var(--tone-ok-border)", "api": "var(--tone-info-border)"}.get(
+            self._data_source, "var(--tone-warn-border)")
             _pills.append(
                 f'<div class="summary-pill" style="border-left: 3px solid {ds_color};">'
                 f'<span class="summary-pill-label">{ds_label}</span>'
@@ -385,9 +386,9 @@ class AuditHtmlExporter:
         _s = self._s
         import html as _html
         html = (
-            f"<div style='margin-bottom:14px; padding:12px 16px; background:#FEF2F2; border:1px solid #FCA5A5; border-radius:8px;'>"
-            f"<div style='font-weight:700; font-size:13px; color:#991B1B; margin-bottom:6px;'>{_s('rpt_au_high_impact_title')}</div>"
-            f"<p style='font-size:12px; color:#7F1D1D; margin:0 0 10px 0;'>{_s('rpt_au_high_impact_desc')} (threshold: {threshold}+)</p>"
+            f"<div style='margin-bottom:14px; padding:12px 16px; background:var(--tone-crit-bg); border:1px solid var(--tone-crit-border); border-radius:8px;'>"
+            f"<div style='font-weight:700; font-size:13px; color:var(--tone-crit-fg); margin-bottom:6px;'>{_s('rpt_au_high_impact_title')}</div>"
+            f"<p style='font-size:12px; color:var(--tone-crit-fg); margin:0 0 10px 0;'>{_s('rpt_au_high_impact_desc')} (threshold: {threshold}+)</p>"
         )
         for item in items:
             wa = item.get("workloads_affected", 0)
@@ -398,16 +399,16 @@ class AuditHtmlExporter:
             resource_name = _html.escape(str(item.get("resource_name", "")))
             status = _html.escape(str(item.get("status", "")))
             html += (
-                f"<div style='display:flex; align-items:center; flex-wrap:wrap; gap:8px; padding:8px 10px; background:#FFF5F5; "
-                f"border-radius:6px; margin-bottom:6px; border-left:4px solid #EF4444;'>"
-                f"<span style='font-size:20px; font-weight:900; color:#DC2626;'>{wa:,}</span>"
-                f"<span style='font-size:11px; color:#991B1B;'>{_s('rpt_au_workloads_affected')}</span>"
-                f"<code style='font-size:11px; background:#FEE2E2; padding:2px 6px; border-radius:3px; color:#7F1D1D;'>{et}</code>"
-                f"<span style='font-size:11px; color:#6B7280;'>{ts}</span>"
-                f"<span style='font-size:11px; color:#6B7280;'>by <b>{actor}</b></span>"
-                + (f"<span style='font-size:11px; color:#6B7280;'>resource <b>{resource_name}</b></span>" if resource_name else "")
-                + (f"<span style='font-size:11px; color:#6B7280;'>from <code>{src_ip}</code></span>" if src_ip else "")
-                + (f"<span style='font-size:11px; color:#6B7280;'>| {status}</span>" if status else "")
+                f"<div style='display:flex; align-items:center; flex-wrap:wrap; gap:8px; padding:8px 10px; background:var(--tone-crit-bg); "
+                f"border-radius:6px; margin-bottom:6px; border-left:4px solid var(--tone-crit-border);'>"
+                f"<span style='font-size:20px; font-weight:900; color:var(--tone-crit-fg);'>{wa:,}</span>"
+                f"<span style='font-size:11px; color:var(--tone-crit-fg);'>{_s('rpt_au_workloads_affected')}</span>"
+                f"<code style='font-size:11px; background:var(--tone-crit-bg); padding:2px 6px; border-radius:3px; color:var(--tone-crit-fg);'>{et}</code>"
+                f"<span style='font-size:11px; color:var(--text-3);'>{ts}</span>"
+                f"<span style='font-size:11px; color:var(--text-3);'>by <b>{actor}</b></span>"
+                + (f"<span style='font-size:11px; color:var(--text-3);'>resource <b>{resource_name}</b></span>" if resource_name else "")
+                + (f"<span style='font-size:11px; color:var(--text-3);'>from <code>{src_ip}</code></span>" if src_ip else "")
+                + (f"<span style='font-size:11px; color:var(--text-3);'>| {status}</span>" if status else "")
                 + "</div>"
             )
         html += "</div>"
@@ -429,7 +430,7 @@ class AuditHtmlExporter:
             self._subnote("rpt_au_mod01_intro")
             + f'<p>{_s("rpt_au_total_health")} <b>{m.get("total_health_events", 0)}</b>'
             + ' &nbsp;|&nbsp; '
-            + f'{_s("rpt_au_security_concerns")} <b style="color:{"#c0392b" if sec_count > 0 else "#313638"}">{sec_count}</b>'
+            + f'{_s("rpt_au_security_concerns")} <b style="color:{"var(--tone-crit-fg)" if sec_count > 0 else "var(--text-1)"}">{sec_count}</b>'
             + ' &nbsp;|&nbsp; '
             + f'{_s("rpt_au_connectivity_issues")} <b>{conn_count}</b></p>'
         )
@@ -472,7 +473,7 @@ class AuditHtmlExporter:
             self._subnote("rpt_au_mod02_intro")
             + f'<p>{_s("rpt_au_total_user")} <b>{m.get("total_user_events", 0)}</b>'
             + ' &nbsp;|&nbsp; '
-            + f'{_s("rpt_au_failed_logins")} <b style="color:{"#c0392b" if failed > 0 else "#313638"}">{failed}</b>'
+            + f'{_s("rpt_au_failed_logins")} <b style="color:{"var(--tone-crit-fg)" if failed > 0 else "var(--text-1)"}">{failed}</b>'
         )
         if unique_ips > 0:
             html += f' &nbsp;|&nbsp; {_s("rpt_au_unique_src_ips")} <b>{unique_ips}</b>'
@@ -524,7 +525,7 @@ class AuditHtmlExporter:
             + ' &nbsp;|&nbsp; '
             + f'{_s("rpt_au_rule_changes")} <b>{rule_count}</b>'
             + ' &nbsp;|&nbsp; '
-            + f'{_s("rpt_au_provision_impact_stat")} <b style="color:{"#c0392b" if total_wa > threshold else "#313638"}">{f"{total_wa:,}" if total_wa else "0"}</b></p>'
+            + f'{_s("rpt_au_provision_impact_stat")} <b style="color:{"var(--tone-crit-fg)" if total_wa > threshold else "var(--text-1)"}">{f"{total_wa:,}" if total_wa else "0"}</b></p>'
         )
         html += f'<div class="bp-box">{_s("rpt_au_bp_policy")}</div>'
         html += f'<div class="bp-box">{_s("rpt_au_change_detail_note")}</div>'

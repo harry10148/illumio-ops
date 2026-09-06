@@ -616,7 +616,7 @@ class _TrafficReportBase:
             '<p style="margin-bottom:8px"><span class="badge badge-' +
             kf.get('severity', 'INFO') + '"' + _sev_attrs(kf.get('severity', 'INFO')) +
             '>' + kf.get('severity', '') + '</span>&nbsp;' +
-            html.escape(kf.get('finding', '')) + ' <em style="color:#718096">&rarr; ' +
+            html.escape(kf.get('finding', '')) + ' <em style="color:var(--text-3)">&rarr; ' +
             html.escape(kf.get('action', '')) + '</em></p>'
             for kf in mod12.get('key_findings', [])
         ) or f'<p class="note">{_s("rpt_no_findings")}</p>'
@@ -643,7 +643,8 @@ class _TrafficReportBase:
                 "api": "rpt_data_source_api",
             }.get(self._data_source, "rpt_data_source_mixed")
             ds_label = _s(ds_key)
-            ds_color = {"cache": "#22C55E", "api": "#60A5FA"}.get(self._data_source, "#EAB308")
+            ds_color = {"cache": "var(--tone-ok-border)", "api": "var(--tone-info-border)"}.get(
+            self._data_source, "var(--tone-warn-border)")
             _pills.append(
                 f'<div class="summary-pill" style="border-left: 3px solid {ds_color};">'
                 f'<span class="summary-pill-label">{ds_label}</span>'
@@ -1166,10 +1167,10 @@ class _TrafficReportBase:
 
         # Three-tier coverage bar: enforced (green) + staged (amber) + gap (red)
         bar_html = (
-            '<div style="display:flex;height:28px;border-radius:6px;overflow:hidden;margin:12px 0 16px 0;font-size:12px;font-weight:600;color:#fff;text-align:center;line-height:28px">'
-            f'<div style="width:{enforced_cov}%;background:#38A169" title="Enforced">{enforced_cov}%</div>'
-            + (f'<div style="width:{staged_cov}%;background:#D69E2E" title="Staged">{staged_cov}%</div>' if staged_cov > 0 else '')
-            + (f'<div style="width:{true_gap}%;background:#E53E3E" title="True Gap">{true_gap}%</div>' if true_gap > 0 else '')
+            '<div style="display:flex;height:28px;border-radius:6px;overflow:hidden;margin:12px 0 16px 0;font-size:12px;font-weight:600;color:var(--paper);text-align:center;line-height:28px">'
+            f'<div style="width:{enforced_cov}%;background:var(--tone-ok-border)" title="Enforced">{enforced_cov}%</div>'
+            + (f'<div style="width:{staged_cov}%;background:var(--tone-warn-border)" title="Staged">{staged_cov}%</div>' if staged_cov > 0 else '')
+            + (f'<div style="width:{true_gap}%;background:var(--tone-crit-border)" title="True Gap">{true_gap}%</div>' if true_gap > 0 else '')
             + '</div>'
         )
 
@@ -1213,7 +1214,7 @@ class _TrafficReportBase:
         part_e = m.get('part_e_investigation')
         if part_e is not None and hasattr(part_e, 'empty') and not part_e.empty:
             out += (
-                '<div style="background:#fff3cd;border-left:4px solid var(--tone-warn-border);'
+                '<div style="background:var(--tone-warn-bg);border-left:4px solid var(--tone-warn-border);'
                 'padding:12px 16px;margin:12px 0;border-radius:4px">'
                 f'<b>{_s("rpt_tr_investigation_title")}</b><br>'
                 f'<span style="font-size:12px">{_s("rpt_tr_investigation_desc")}</span>'
@@ -1223,7 +1224,7 @@ class _TrafficReportBase:
             )
         else:
             out += (
-                '<div style="background:#d4edda;border-left:4px solid var(--tone-ok-fg);'
+                '<div style="background:var(--tone-ok-bg);border-left:4px solid var(--tone-ok-fg);'
                 'padding:12px 16px;margin:12px 0;border-radius:4px">'
                 f'<b>{_s("rpt_tr_no_investigation")}</b>'
                 '</div>'
@@ -1633,33 +1634,51 @@ class _TrafficReportBase:
         enforcement_dist = m.get('enforcement_mode_distribution', {})
         dist_html = ''
         if enforcement_dist:
+            # The enforcement ladder has four steps, so it needs four
+            # distinguishable colours. Mapped onto the shell's tone family in
+            # ladder order: idle = neutral (nothing applied yet), visibility_only
+            # = warn (watching, not enforcing), selective = info (a deliberate
+            # partial state, not a fault), full = ok. The old lime for
+            # `selective` had no token twin, which is why it moves to info.
             mode_colors = {
-                'full': '#22C55E', 'selective': '#84CC16',
-                'visibility_only': '#EAB308', 'idle': '#6B7280',
+                'full': 'var(--tone-ok-border)',
+                'selective': 'var(--tone-info-border)',
+                'visibility_only': 'var(--tone-warn-border)',
+                'idle': 'var(--tone-neutral-border)',
             }
             total_wl = sum(enforcement_dist.values())
             bars = []
             for mode, count in sorted(enforcement_dist.items(), key=lambda x: {'full': 0, 'selective': 1, 'visibility_only': 2}.get(x[0], 9)):
                 pct = round(count / max(total_wl, 1) * 100, 1)
-                color = mode_colors.get(mode, '#6B7280')
+                color = mode_colors.get(mode, 'var(--tone-neutral-border)')
                 label = STRINGS.get(f"rpt_enforce_mode_{mode}", {}).get(self._lang) or mode.replace('_', ' ').title()
                 bars.append(
                     f'<div style="width:{pct}%;background:{color};min-width:40px" title="{label}: {count}">{count}</div>'
+                )
+            # Built as a loop, not as a generator expression inside the
+            # f-string below: the STRINGS fallback there had to be spelled
+            # `{{}}`, which inside a replacement field is a *set containing an
+            # empty dict*, so the legend raised `TypeError: unhashable type:
+            # 'dict'` for every non-empty distribution and took the whole report
+            # with it (`_mod13_html` has no caller-side guard). A bare `{}`
+            # inside a replacement field only parses on 3.12+; CI runs 3.10.
+            legend = []
+            for md, ct in sorted(enforcement_dist.items(), key=lambda x: {'full': 0, 'selective': 1, 'visibility_only': 2}.get(x[0], 9)):
+                md_label = STRINGS.get(f"rpt_enforce_mode_{md}", {}).get(self._lang) or md.replace('_', ' ').title()
+                legend.append(
+                    f'<span><span style="display:inline-block;width:12px;height:12px;border-radius:2px;'
+                    f'background:{mode_colors.get(md, "var(--tone-neutral-border)")};margin-right:4px"></span>'
+                    f'{md_label}: {ct}</span>'
                 )
             _s_local = self._s
             dist_html = (
                 f'<h4>{_s_local("rpt_tr_enforcement_dist")}</h4>'
                 '<div style="display:flex;height:32px;border-radius:6px;overflow:hidden;margin:8px 0 16px 0;'
-                'font-size:12px;font-weight:600;color:#fff;text-align:center;line-height:32px">'
+                'font-size:12px;font-weight:600;color:var(--paper);text-align:center;line-height:32px">'
                 + ''.join(bars)
                 + '</div>'
                 '<div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:16px;font-size:13px">'
-                + ''.join(
-                    f'<span><span style="display:inline-block;width:12px;height:12px;border-radius:2px;'
-                    f'background:{mode_colors.get(md, "#6B7280")};margin-right:4px"></span>'
-                    f'{STRINGS.get(f"rpt_enforce_mode_{md}", {{}}).get(self._lang) or md.replace("_", " ").title()}: {ct}</span>'
-                    for md, ct in sorted(enforcement_dist.items(), key=lambda x: {'full': 0, 'selective': 1, 'visibility_only': 2}.get(x[0], 9))
-                )
+                + ''.join(legend)
                 + '</div>'
             )
 
@@ -1894,7 +1913,11 @@ class _TrafficReportBase:
         if impact.get('skipped'):
             return f'<p class="note">{t("rpt_change_impact_no_previous", default="No previous snapshot — change impact will appear on the next report run.", lang=self._lang)}</p>'
         verdict = impact.get('overall_verdict', 'unchanged')
-        verdict_color = {'improved': '#22C55E', 'regressed': '#EF4444', 'mixed': '#EAB308'}.get(verdict, '#6B7280')
+        verdict_color = {
+            'improved': 'var(--tone-ok-border)',
+            'regressed': 'var(--tone-crit-border)',
+            'mixed': 'var(--tone-warn-border)',
+        }.get(verdict, 'var(--tone-neutral-border)')
         dir_label = {
             'improved': _s('rpt_change_direction_improved'),
             'regressed': _s('rpt_change_direction_regressed'),
@@ -1906,10 +1929,15 @@ class _TrafficReportBase:
                 f' (vs {(impact.get("previous_snapshot_at") or "")[:10]})</p>')
         deltas = impact.get('deltas', {})
         if deltas:
-            dir_color = {'improved': '#22C55E', 'regressed': '#EF4444', 'unchanged': '#6B7280', 'neutral': '#6B7280'}
+            dir_color = {
+            'improved': 'var(--tone-ok-border)',
+            'regressed': 'var(--tone-crit-border)',
+            'unchanged': 'var(--tone-neutral-border)',
+            'neutral': 'var(--tone-neutral-border)',
+        }
             rows = ""
             for kpi, d in deltas.items():
-                col = dir_color.get(d['direction'], '#6B7280')
+                col = dir_color.get(d['direction'], 'var(--tone-neutral-border)')
                 rows += (f'<tr><td>{kpi}</td><td>{d["previous"]}</td><td>{d["current"]}</td>'
                          f'<td>{d["delta"]:+}</td>'
                          f'<td style="color:{col};font-weight:600">{dir_label.get(d["direction"], d["direction"])}</td></tr>')

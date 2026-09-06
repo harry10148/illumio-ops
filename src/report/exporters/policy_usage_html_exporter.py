@@ -33,7 +33,7 @@ _HIGHLIGHT_CSS = f'<style>\n{get_highlight_css()}\n</style>'
 # 242-246, the caveat box at 252 and POLICY_USAGE_CSS's .pu-* card layout) with
 # the old build_css tokens remapped onto the v2 shell's. They are NOT in
 # SHELL_CSS: they belong to this one report type, and the shared shell has to
-# stay comparable against design/v2/reports/shell.css. Without them the rule
+# stay comparable against design/v3/reports/shell.css. Without them the rule
 # cards collapse into unstyled stacked divs — a layout loss conservation cannot
 # see, because every character of text survives.
 # Token remap: --border -> --line, --slate -> --text-1, --slate-50 -> --text-3,
@@ -572,7 +572,7 @@ class PolicyUsageHtmlExporter:
                 "{shown}", str(shown)).replace("{total}", str(count))
             note = f'<p class="note">{_msg}</p>'
         else:
-            note = f'<p style="color:#718096;font-size:12px;">{count} rows</p>' if count else ""
+            note = f'<p style="color:var(--text-3);font-size:12px;">{count} rows</p>' if count else ""
         top_ports_html = ""
         if top_ports_df is not None and not getattr(top_ports_df, "empty", True):
             top_ports_html = (
@@ -621,7 +621,7 @@ class PolicyUsageHtmlExporter:
                 note_text = t("rpt_pu_unused_truncated", lang=self._lang, count=total_unused)
             else:
                 note_text = f"{total_unused} rows" if total_unused else ""
-            note = f'<p style="color:#718096;font-size:12px;">{note_text}</p>' if note_text else ""
+            note = f'<p style="color:var(--text-3);font-size:12px;">{note_text}</p>' if note_text else ""
             html_parts.append(
                 caveat_html + note + _rule_cards_html(unused_df.head(50), mode="unused", lang=self._lang)
             )

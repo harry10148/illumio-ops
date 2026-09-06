@@ -87,7 +87,7 @@ BILINGUAL_DATA_FILES = {
 # For these, every CJK line in the literal must sit in a `/* */` or `//`
 # comment; CJK outside one is still a finding.
 COMMENT_SCOPED_CJK: set[tuple[str, str]] = {
-    ("src/report/exporters/report_shell.py", "shell-css-port-v2"),
+    ("src/report/exporters/report_shell.py", "shell-css-port-v3"),
     ("src/report/exporters/report_shell.py", "normalizeCellValue"),
 }
 
@@ -122,7 +122,7 @@ BILINGUAL_DATA_LINES: set[tuple[str, str]] = {
     # in Task 6; SHELL_CSS's own box-drawing dividers are covered by the marker
     # needle below.)
     # SHELL_CSS in report_shell.py is a verbatim port of
-    # design/v2/reports/shell.css; its CJK is that file's own design and
+    # design/v3/reports/shell.css; its CJK is that file's own design and
     # print-layout commentary carried over unchanged, not display text.
     # Same status as the CSS literals in report_css.py above, but scoped to
     # that one literal, so any other hardcoded CJK in report_shell.py is

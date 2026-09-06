@@ -9,7 +9,7 @@ from src.report.exporters.report_shell import (
     ShellSection, build_shell_document, wide_table_attrs)
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-DESIGN_SHELL_CSS = REPO_ROOT / "design" / "v2" / "reports" / "shell.css"
+DESIGN_SHELL_CSS = REPO_ROOT / "design" / "v3" / "reports" / "shell.css"
 
 
 # ---------------------------------------------------------------------------
@@ -436,7 +436,7 @@ def test_html_lang_attribute_follows_lang():
 
 
 # ---------------------------------------------------------------------------
-# F4 — drift guard for the SHELL_CSS copy of design/v2/reports/shell.css.
+# F4 — drift guard for the SHELL_CSS copy of design/v3/reports/shell.css.
 #
 # SHELL_CSS is a 1200-line copy of a file that lives outside src/. A prose
 # "keep these in sync" note in the docstring is not a gate: either side can be
@@ -445,7 +445,7 @@ def test_html_lang_attribute_follows_lang():
 # either side — or a fifth undeclared delta — turns this red.
 
 _PORT_HEADER = f"""/* ===========================================================================
-   PORTED FROM design/v2/reports/shell.css — that file stays the design
+   PORTED FROM design/v3/reports/shell.css — that file stays the design
    authority for the report shell. Any product-side edit must be annotated
    back into it; see report_shell.py's module docstring for the deltas.
    port-marker: {SHELL_CSS_PORT_MARKER}
@@ -854,7 +854,7 @@ def build_expected_shell_css() -> str:
 
 def test_shell_css_matches_the_design_file_modulo_authorised_deltas():
     assert SHELL_CSS == build_expected_shell_css(), (
-        "SHELL_CSS and design/v2/reports/shell.css have drifted apart, or a "
+        "SHELL_CSS and design/v3/reports/shell.css have drifted apart, or a "
         "delta was added without declaring it in AUTHORISED_DELTAS."
     )
 

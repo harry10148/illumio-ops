@@ -46,6 +46,9 @@ tests/.pytest_cache/
 reports/
 # design/v2 的報表殼原型是設計成果，不是 runtime 產出，必須進版控
 !design/v2/reports/
+# design/v3 同理，而且它現在是報表殼的**設計權威**——drift guard 直接讀它，
+# 漏掉的話 CI 會在一個本機看不到的地方紅（本機檔案存在、repo 裡沒有）。
+!design/v3/reports/
 build/
 dist/
 scripts/audit_i18n_report.md
