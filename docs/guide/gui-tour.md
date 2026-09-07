@@ -75,6 +75,8 @@ palette、table、drawer、modal、filter-bar…）、`areas/`（home、alerts�
 | 報表 | `#/reports`、`/schedules` | 11 型報表產生、產出清單、報表排程 |
 | 系統 | `#/system/{pce,cache,siem,tls,security,display,channels,alerting,jobs,logs}` | 所有設定、告警通道與測試、背景 job、日誌 |
 
+<!-- legacy-routes: 以下到 /legacy-routes 之間刻意提到已退役的路由，
+     它們是 router 真的會轉址的舊書籤，不是「現在該去哪裡」。 -->
 舊路由仍可用，router 以 `replace` 轉到上表對應頁並保留 query：v2 六區的
 `#/overview`、`#/alerting/*`、`#/automation/*`，以及 3B 的
 `#/investigate/inbox`（含 `?id=`）。
@@ -91,6 +93,7 @@ palette、table、drawer、modal、filter-bar…）、`areas/`（home、alerts�
 | 系統 | `#/system/{pce,cache,siem,tls,security,display,channels,logs}` | 所有設定 |
 
 </details>
+<!-- /legacy-routes -->
 
 未知的 hash 會落到 placeholder mount，不會讓畫面壞掉；直接輸入任何一條
 路由網址都能到達（覆蓋率閘門 `tools/gate_coverage_live.py` 就是靠逐一開啟
@@ -238,12 +241,6 @@ FilterBar 序列化出的 key（`src_labels`／`dst_workloads`／`services`／
 
 ## 五區逐一導覽
 
-> **過渡註記（2026-09-05）**：首頁與告警兩節（下方）已依 v3.1 重寫；其餘各節
-> 仍是 v2 六區時期的畫面說明，功能描述正確，路由與分區名稱以上表為準。
-> 對照：總覽→首頁；告警規則／手動動作→政策區（手動動作與通道測試在
-> `#/system/alerting`）；自動化的 Rule Scheduler→政策區、報表排程→報表區、
-> 背景 job→`#/system/jobs`。
-
 ### 首頁（`#/home`）
 
 標題就是這一頁的答案：「N 件告警還沒處理，系統有 M 項要看一下」。
@@ -263,6 +260,27 @@ FilterBar 序列化出的 key（`src_labels`／`dst_workloads`／`services`／
 - **Policy 現況**（HM-05）：posture 分數、已納管 workload 比例、ruleset 數，
   以及到報表區的連結。
 
+#### 舊「總覽」區的內容去哪了
+
+v2 的總覽是一頁唯讀摘要。v3 把每張卡搬到**能對它動手的那一區**——看到問題的
+地方就是修它的地方，不必再從摘要頁跳一次。逐項落點（與
+`design/v3/coverage.yaml` 同一份對照）：
+
+| v2 總覽上的卡 | 現在在哪 |
+|---|---|
+| 系統狀態（OV-01）、資料完整性（OV-12） | `#/system/pce` |
+| 整合狀態（OV-16）、管線健康（OV-10） | `#/system/siem` |
+| TLS 憑證（OV-14） | `#/system/tls` |
+| 警示通道（OV-15） | `#/system/channels` |
+| 排行總覽／排行統計（OV-04、OV-05） | `#/investigate/traffic` |
+| Top 3 行動建議（OV-03）、報表摘要（OV-06、OV-07、OV-08） | `#/reports` |
+| 健康燈（原全域健康列 XC-01） | 首頁 `HM-02`，見上面〈系統健康〉 |
+
+四張卡在 v3 移除，理由記在 `design/v3/coverage.yaml` 的註解裡：Posture 詳情
+抽屜（OV-02，首頁只留分數）、報表最近產出 meta（OV-09，報表區的產出清單
+已涵蓋）、job 健康摘要（OV-11，`#/system/jobs` 已涵蓋）、近期事件表（OV-13，
+`#/investigate/events` 已涵蓋）。
+
 ### 告警（`#/investigate/alerts`）
 
 - **清單**（AT-01）：與首頁同一種列，加上狀態篩選與頁尾計數。
@@ -275,25 +293,6 @@ FilterBar 序列化出的 key（`src_labels`／`dst_workloads`／`services`／
 - **狀態**（AT-02）：頁首右側的「未處理／處理中／已處理」，改了即時寫回。
 - 流量搜尋的 `?alert=` 入口仍在：頁首會用一行說明條件是哪一則告警帶入的，
   並提供回到那則告警的連結（AT-06）。
-
-### 總覽（`#/overview`）
-
-一頁看完系統狀態，卡片皆為唯讀摘要，要動手的操作都在各自的區。
-
-- **系統狀態**（OV-01）與**整合狀態**（OV-16）：PCE 連線、cache、SIEM 等
-  子系統的當前健康。
-- **Posture Score**（OV-02）：安全成熟度分數與分項。分數來自最近一次
-  Security Posture 報表的快照，**不是即時計算**；快照超過 26 小時時卡片
-  底部會多一行「stale since <時長>」註記（`overview.mjs` 的 `postureAge`），
-  數字本身照常顯示。沒有任何報表快照時卡片顯示提示，不會顯示假資料。
-- **Top 3 行動建議**（OV-03）：由 posture 分析導出的優先處置建議。
-- **排行總覽／排行統計**（OV-04、OV-05）：自訂查詢卡的 CRUD 與 Top-10 查詢。
-- **報表摘要**：最新 Audit（OV-06）、最新流量報表（OV-08）、Policy 使用
-  報表（OV-07）、報表最近產出 meta（OV-09）。
-- **管線健康**（OV-10）、**Job 健康**（OV-11）、**資料完整性**（OV-12）、
-  **TLS 憑證**（OV-14）、**警示通道**（OV-15）：唯讀健康摘要，內容與判讀
-  規則見下方「系統區」與 [automation.md](automation.md)。
-- **近期事件**（OV-13）：最近的 PCE 稽核事件，點進去是調查區的事件檢視。
 
 ### 調查（`#/investigate/*`）
 
@@ -367,9 +366,12 @@ load-more 增量載入（IV-14）。另含 **Shadow 比對**（IV-15，新舊事
 以上皆為**唯讀**，會即時呼叫 PCE API 取事件，不寫入本地狀態。事件規則語意
 與 vendor catalog 詳見 [monitoring-alerts.md](monitoring-alerts.md)。
 
-### 告警（`#/alerting/*`）
+### 規則（`#/policy/*`）
 
-#### 規則（`#/alerting/rules`）
+告警規則、PCE 規則排程與手動動作在同一區——它們是同一件事的三半：定義規則、
+讓規則自己跑、手動跑一次看看。
+
+#### 告警規則（`#/policy/alert-rules`）
 
 規則清單（AL-01）可依型別篩選、搜尋、啟停、刪除；新增／編輯開對應的 drawer：
 Event（AL-02）、System health（AL-03）、Traffic（AL-04）、Bandwidth（AL-05）
@@ -377,30 +379,11 @@ Event（AL-02）、System health（AL-03）、Traffic（AL-04）、Bandwidth（A
 JSON 定位（AL-06）與**規則測試沙盤**（AL-07）可在不發送的前提下試跑規則。
 規則型別與門檻語意見 [monitoring-alerts.md](monitoring-alerts.md)。
 
-#### 維運動作（`#/alerting/ops`）
+#### Ruleset 與 rule 排程（`#/policy/rulesets`）
 
-- **執行一次監控**（AL-08，`/api/actions/run`）：立即跑一輪分析，會查 PCE
-  並**可能實際觸發告警**。
-- **Debug 模式**（AL-09）與**輸出主控台**（AL-13）：即時看分析輸出。
-- **發送測試告警**（AL-10，`/api/actions/test-alert`）：**實際發送**測試訊息
-  到全部或指定通道（email／LINE／webhook／Telegram／Teams）。請勿在正式
-  環境隨意點按。
-- **重置事件 Watermark**（AL-11）：清空 event watermark，下次會重抓全部事件
-  並可能重觸發告警。
-- **載入最佳實踐**（AL-12）：一鍵附加或取代為內建最佳實務規則組（16 條
-  event + 1 條 traffic）。replace 模式要兩層確認，append 一層。
-- **告警管道**（AL-14）：各通道當前狀態，唯讀；要改設定去 `#/system/channels`。
-
-### 自動化（`#/automation/*`）
-
-#### Rule Scheduler（`#/automation/rules`）
-
-對 PCE Draft policy 的 Ruleset／Rule 排定時間觸發啟用／停用。頁面有狀態列
-與 KPI（AU-01）、過去 24 小時的切換時間軸（AU-02）、ruleset 瀏覽與詳情
-（AU-03）、rule 個別搜尋（AU-04）；排程可建在 ruleset 層（AU-05）或 rule
-層（AU-06），one-time 排程的 `expire_at` 語意見 drawer 內說明（AU-07）。
-排程清單（AU-08）會顯示與 PCE 的對帳狀態，另有立即檢查（AU-09）與執行
-紀錄（AU-10）。
+對 PCE Draft policy 的 Ruleset／Rule 排定時間觸發啟用／停用。ruleset 瀏覽與
+詳情（AU-03）、rule 個別搜尋（AU-04）；排程可建在 ruleset 層（AU-05）或
+rule 層（AU-06），one-time 排程的 `expire_at` 語意見 drawer 內說明（AU-07）。
 
 > **真實副作用**：`POST /api/rule_scheduler/schedules` 會在 **PCE rule 的
 > description 寫入英文排程註記**，並依排程在 PCE 上**啟用／停用該 rule**。
@@ -411,28 +394,22 @@ JSON 定位（AL-06）與**規則測試沙盤**（AL-07）可在不發送的前�
 > rule 的啟用旗標，佈署需操作員另行處理；排程未啟用時只會顯示 warning，
 > 絕不自動幫你 enable。
 
+#### 排程清單（`#/policy/schedules`）
+
+Rule Scheduler 的狀態列與 KPI（AU-01）、過去 24 小時的切換時間軸（AU-02）、
+排程清單與 PCE 對帳狀態（AU-08），另有立即檢查（AU-09）與執行紀錄（AU-10）。
 詳細操作流程與背景 job 對照表見 [automation.md](automation.md)。
 
-#### 報表排程（`#/automation/reports`）
+#### 維運動作（`#/policy/ops`）
 
-報表排程的 CRUD（AU-11）與啟停／立即執行／歷史（AU-12）。排程需 daemon
-持續執行才會觸發；勾選 Email 需先設定好郵件通道（`#/system/channels`）。
-`app_summary` 型排程必須指定 App，否則會被拒絕。
+- **執行一次監控**（AL-08，`/api/actions/run`）：立即跑一輪分析，會查 PCE
+  並**可能實際觸發告警**。
+- **Debug 模式**（AL-09）與**輸出主控台**（AL-13）：即時看分析輸出。
+- **載入最佳實踐**（AL-12）：一鍵附加或取代為內建最佳實務規則組（16 條
+  event + 1 條 traffic）。replace 模式要兩層確認，append 一層。
 
-#### 背景 Job 健康（`#/automation/jobs`）
-
-所有已註冊背景 job 的健康與歷史（AU-13，讀 `logs/job_health.json`），依嚴重度
-排序。判讀規則：
-
-- `error`：job 上次執行狀態為 `error`（實際跑過但失敗）。
-- `warn`：兩種情況——(a) job 剛註冊、還沒真正跑過第一次且已超過 grace
-  period（顯示「never ran」）；(b) 有跑過紀錄，但距上次 `last_run` 已超過
-  grace period（顯示「（上次狀態）· overdue」）。兩者文案不同，後端判定
-  等級相同。grace period = `max(2 × interval_seconds, 600)` 秒（至少 10 分鐘）。
-- `ok`：正常週期內執行成功。
-
-單一壞條目（例如手動改壞 `job_health.json` 造成 interval 非數字）不會讓整張
-表炸掉，只會跳過該筆。
+**發送測試告警**（AL-10）、**重置事件 Watermark**（AL-11）與**告警管道狀態**
+（AL-14）在 `#/system/alerting`——它們動的是通道與擷取狀態，不是規則本身。
 
 ### 報表（`#/reports`）
 
@@ -449,10 +426,17 @@ JSON 定位（AL-06）與**規則測試沙盤**（AL-07）可在不發送的前�
 產生報表會在伺服器端排入背景執行緒、即時查詢 PCE 並寫出檔案，可能耗時
 數分鐘。各型報表的內容與版面見 [reports.md](reports.md)。
 
+#### 報表排程（`#/reports/schedules`）
+
+報表排程的 CRUD（AU-11）與啟停／立即執行／歷史（AU-12）。排程需 daemon
+持續執行才會觸發；勾選 Email 需先設定好郵件通道（`#/system/channels`）。
+`app_summary` 型排程必須指定 App，否則會被拒絕。
+
 ### 系統（`#/system/*`）
 
-八個子頁，是 `config.json` 大部分區塊的圖形化編輯介面。改動未存檔時儲存列
-會顯示 dirty 狀態（SY-18）。逐鍵對照見 [configuration.md](configuration.md)。
+十個子頁。多數是 `config.json` 對應區塊的圖形化編輯介面，另外兩個（告警動作、
+背景 job）是唯讀的狀態頁。改動未存檔時儲存列會顯示 dirty 狀態（SY-18）。
+逐鍵對照見 [configuration.md](configuration.md)。
 
 依 v3.1 §5.1 的設定頁型（2026-09-06）：**有多個同型項目的頁面用左清單＋右表單**
 （目前只有通知通道），**其餘頁面的表單分節**——每節一個人話標題與一句「這節是
@@ -468,6 +452,8 @@ JSON 定位（AL-06）與**規則測試沙盤**（AL-07）可在不發送的前�
 | 安全 | `#/system/security` | 分三節：誰可以登入、密碼、目前狀態（SY-12）；另有停止 Web GUI（SY-16） |
 | 介面與報表 | `#/system/display` | 主題／密度／時區／語言（XC-05、XC-06），以及分兩節的介面與報表偏好（SY-13） |
 | 通知通道 | `#/system/channels` | 設定頁型：左清單五個通道（狀態晶片＋還缺什麼），右邊一次編一個，含啟用切換與單通道測試（SY-14、OV-15） |
+| 告警動作 | `#/system/alerting` | 發送測試告警（AL-10，**會實際送出**）、重置事件 watermark（AL-11，下次會重抓全部事件並可能重觸發告警）、告警管道當前狀態（AL-14，唯讀） |
+| 背景 Job | `#/system/jobs` | 所有已註冊背景 job 的健康與歷史（AU-13，讀 `logs/job_health.json`），依嚴重度排序 |
 | 日誌 | `#/system/logs` | 模組日誌檢視（SY-15） |
 
 幾點值得單獨說明：
@@ -479,12 +465,20 @@ JSON 定位（AL-06）與**規則測試沙盤**（AL-07）可在不發送的前�
   會出現 banner 提醒。**Retention Now** 會永久刪除過期列，有確認。
 - **DLQ 的 Purge 比一般確認更嚴**：全部清除需額外輸入 destination 名稱才能
   執行。Retry（replay）會重送失敗事件。
-- **單通道測試**（`#/system/channels` 每張卡片的 Send test）呼叫與告警區
-  相同的 `/api/actions/test-alert`，只帶該通道。判定「送達」的標準是回傳
+- **單通道測試**（`#/system/channels` 每張卡片的 Send test）呼叫的是與
+  `#/system/alerting` 的「發送測試告警」相同的 `/api/actions/test-alert`，
+  只帶該通道。判定「送達」的標準是回傳
   每一筆 `status === 'success'`——**`skipped` 也視為失敗**，用來揪出「卡片
   顯示已啟用，但憑證有問題所以被跳過」這種平時看不出來的假健康狀態。
 - **TLS 的 Renew／Import／Generate CSR** 會在 `config/tls/` 產生或覆寫憑證
   與金鑰檔，**需重啟服務**才套用。
+- **背景 job 的三個等級怎麼判讀**（`#/system/jobs`）：`error` 是上次執行狀態
+  為 `error`（真的跑過但失敗）；`warn` 有兩種情況——(a) job 剛註冊、還沒真正
+  跑過第一次且已超過 grace period（顯示「never ran」），(b) 有跑過紀錄但距
+  上次 `last_run` 已超過 grace period（顯示「（上次狀態）· overdue」），兩者
+  文案不同、後端判定等級相同；`ok` 是正常週期內執行成功。grace period =
+  `max(2 × interval_seconds, 600)` 秒（至少 10 分鐘）。單一壞條目（例如手動
+  改壞 `job_health.json` 造成 interval 非數字）不會讓整張表炸掉，只會跳過該筆。
 
 ## 高風險動作彙整
 
@@ -495,7 +489,7 @@ JSON 定位（AL-06）與**規則測試沙盤**（AL-07）可在不發送的前�
 | Quarantine apply／bulk_apply | `/api/quarantine/apply`、`/bulk_apply` | 在 PCE 對 Workload 覆蓋套用 Quarantine label，立即改變 enforcement |
 | Quarantine lift | `/api/quarantine/lift` | 移除 Workload 上的 Quarantine label |
 | Accelerate workload | `/api/workloads/accelerate` | 變更 PCE 遙測頻率 |
-| Send Test Alert（告警區維運動作，全通道或指定通道） | `/api/actions/test-alert` | 實際發送通知到 email／LINE／webhook／Telegram／Teams |
+| Send Test Alert（`#/system/alerting`，全通道或指定通道） | `/api/actions/test-alert` | 實際發送通知到 email／LINE／webhook／Telegram／Teams |
 | Send test（系統區管道，單一通道卡片） | `/api/actions/test-alert` | 同上端點，僅測該卡片對應通道 |
 | 手動分析 Run | `/api/actions/run` | 查 PCE 並可能實際觸發告警 |
 | Reset watermark | `/api/actions/reset-watermark` | 清空 event watermark／告警歷史，下次會重抓全部事件並可能重觸發告警 |
