@@ -82,6 +82,34 @@ OVERFLOW_ALERT_COOLDOWN_MINUTES = 60
 # event_overflow / traffic_overflow 的處理方式）。
 TRAFFIC_WINDOW_ROW_LIMIT = 10000
 
+# 規則的 `pd` 欄位只有一種語意：PCE policy_decision 的序數。這份表是那個慣例
+# 唯一有名字的地方——check_flow_match 底下從 flow 的 policy_decision 字串推導
+# 出同一組數字，GUI 抽屜（policy_rules.mjs PD_OPTS）與 dashboard 查詢
+# （gui/routes/dashboard.py）也都用它。-1 代表「不依判定篩選」，不在表內。
+# 任何寫入或顯示規則 pd 的地方都必須照這張表，別自己編一套：2026-09-08 之前
+# CLI 精靈把 Potentially Blocked 存成 0、Allowed 存成 1，規則於是靜默地監看
+# 另一種流量，而 CLI 的顯示端跟著同一套錯誤慣例，從頭到尾看起來都一致。
+PD_DECISION: dict[int, str] = {
+    0: "allowed",
+    1: "potentially_blocked",
+    2: "blocked",
+}
+
+
+def _flow_decision_label(flow: dict[str, Any]) -> str:
+    """這筆 flow 上實際寫著的 policy decision，給診斷訊息列分佈用。
+
+    先看字串欄位（PCE 線上與 cache 回傳的都是它），沒有才退回序數。不可以寫
+    `policy_decision or pd`——`pd` 是 0（allowed）時會被當成假值跳過。
+    """
+    raw = flow.get("policy_decision")
+    if raw:
+        return str(raw)
+    ordinal = flow.get("pd")
+    if ordinal is None:
+        return "?"
+    return PD_DECISION.get(_safe_int(ordinal, -1), str(ordinal))
+
 
 def _endpoint_probe_category(status: int, accepted_statuses: tuple[int, ...]) -> str:
     """Classify a probe without treating an endpoint-invalid 2xx as success."""
@@ -2962,6 +2990,40 @@ class Analyzer:
         }
         return matches[:QUERY_RESULT_CAP]
 
+    def _print_zero_match_breakdown(self, rule: dict[str, Any], rule_win: int,
+                                    rule_start: datetime.datetime,
+                                    traffic: list[dict[str, Any]]) -> None:
+        """一筆流量都沒通過時，說出是哪一道篩選擋下的。
+
+        成因（2026-09-08）：上面那行 `time_filter_results` 印的是「過完**所有**
+        條件之後」的筆數，名字卻叫「時間篩選」。測試機的規則因為 Policy 判定
+        對不上而一筆不留，畫面卻把操作者送去把視窗從 10 分鐘調到 7 天——調多久
+        都不會有用，而且沒有任何一行字會反駁他。逐層拆解讓「時間」與「判定」
+        分開，並附上這批流量實際的判定分佈，因為「這個環境根本沒有 blocked
+        流量」正是這種情況最常見的答案。
+        """
+        after_window = sum(
+            1 for f in traffic
+            if self.check_flow_match({"type": "traffic"}, f, rule_start))
+        after_pd = sum(
+            1 for f in traffic
+            if self.check_flow_match({"type": "traffic", "pd": rule.get("pd", 3)},
+                                     f, rule_start))
+        print("  -> " + t(
+            'debug_zero_match_stages',
+            default="Nothing survived. Stage by stage: {after_window} of {total} "
+                    "flow(s) fell inside the {win}-minute window, {after_pd} of "
+                    "those carried the policy decision this rule filters on "
+                    "({decision}), and 0 passed the remaining filters.",
+            total=len(traffic), win=rule_win, after_window=after_window,
+            after_pd=after_pd,
+            decision=PD_DECISION.get(rule.get("pd", 3), "any")))
+        dist = Counter(_flow_decision_label(f) for f in traffic)
+        print("  -> " + t(
+            'debug_zero_match_decisions',
+            default="Policy decisions actually present in this traffic: {dist}",
+            dist=", ".join(f"{k}={v}" for k, v in dist.most_common())))
+
     def run_debug_mode(self, mins: int | None = None, pd_sel: int | None = None, interactive: bool | None = None) -> None:
         # Interactive debug REPL: stdout is the contract here. The CLI menu
         # streams it to the user; the GUI debug API captures it via
@@ -3055,6 +3117,7 @@ class Analyzer:
 
             if rtype == "event":
                 # Event Logic
+                in_window = 0
                 for e in events:
                     # Time check for events
                     pts = e.get('timestamp')
@@ -3066,13 +3129,24 @@ class Analyzer:
                             except ValueError: pass  # intentional fallback: e_time stays None, event is not time-filtered
 
                     if e_time and e_time < rule_start: continue
+                    in_window += 1
 
                     if not matches_event_rule(rule, e):
                         continue
 
                     matches.append(e)
-                
+
                 print(t('time_filter_results', total=len(events), win=rule_win, rem=len(matches)))
+                if events and not matches:
+                    # 一筆都沒留下時，說出是視窗擋的還是條件擋的——上面那行
+                    # 印的是「過完所有條件」的數量，光看它會以為是視窗太小。
+                    print("  -> " + t(
+                        'debug_zero_match_event_stages',
+                        default="Nothing survived. Stage by stage: {after_window} "
+                                "of {total} event(s) fell inside the {win}-minute "
+                                "window, and 0 of those matched this rule's "
+                                "criteria.",
+                        total=len(events), win=rule_win, after_window=in_window))
                 val: float = len(matches)
                 threshold = float(rule.get("threshold_count", 1))
                 is_trigger = val >= threshold
@@ -3207,6 +3281,8 @@ class Analyzer:
                         matches.append(f_copy)
 
                 print(t('time_filter_results', total=len(traffic), win=rule_win, rem=len(matches)))
+                if traffic and not matches and not guarded:
+                    self._print_zero_match_breakdown(rule, rule_win, rule_start, traffic)
                 if delta_used:
                     print("  -> " + t(
                         'debug_basis_window_delta',

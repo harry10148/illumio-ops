@@ -30,16 +30,24 @@ def test_version_matches_the_changelogs_newest_release():
         f"{heads[0]}。發版時兩邊要一起改。")
 
 
-def test_the_newest_release_is_not_still_called_unreleased():
-    """`## [Unreleased]` 不得出現在最新版本標題之上。
+def test_an_unreleased_section_sits_above_the_releases():
+    """`## [Unreleased]` 若存在，必須在最新版本標題**之上**。
 
-    發版時忘了把 Unreleased 改成版本號，是這個檔案最常見的漏法——上面那條比對
-    的是「最新的**版本**標題」，一個還掛著 Unreleased 的 CHANGELOG 照樣能過。
+    這條原本寫反了：它斷言 Unreleased 必須在版本標題之下，等於禁止本 repo
+    （以及 Keep a Changelog）一直以來的作法——開發期間把新條目累積在最上面
+    的 Unreleased 區，發版時才改成版本號。5.1.0 之前每一版都是這樣寫的，
+    這條卻在下一次要寫 changelog 時才擋住人。
+
+    它原本想守的是「發版時忘了把 Unreleased 改成版本號」，而那件事
+    `test_version_matches_the_changelogs_newest_release` 已經守住了：版本號
+    一旦升上去，最新的 `## [x.y.z]` 就對不上，測試直接紅。所以這裡改成守
+    真正還沒人守的那件事——Unreleased 不可以掉到已發布的版本中間去。
     """
     text = CHANGELOG.read_text(encoding="utf-8")
     first_release = re.search(r"^## \[\d+\.\d+\.\d+\]", text, flags=re.M)
     unreleased = re.search(r"^## \[Unreleased\]", text, flags=re.M)
     if unreleased is None:
         return
-    assert unreleased.start() > first_release.start(), (
-        "CHANGELOG 最上面還是 `## [Unreleased]`；發版時要把它改成版本號與日期。")
+    assert first_release is not None, "CHANGELOG 裡找不到任何已發布的版本標題"
+    assert unreleased.start() < first_release.start(), (
+        "`## [Unreleased]` 掉到已發布的版本之間了；它只能待在最上面。")

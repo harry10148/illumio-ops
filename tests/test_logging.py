@@ -122,12 +122,20 @@ def test_log_does_not_redact_non_secret_fields(tmp_path):
     assert '[REDACTED]' not in text, "no redaction marker should appear in this output"
 
 
+# analyzer.py 裡 stdout 就是產品契約的方法：互動式除錯 REPL 與它拆出來的
+# 輔助方法。兩者都由 CLI 選單直接串流給操作者，也由 GUI 的 debug API 以
+# redirect_stdout 捕捉，所以它們的 print() 是刻意保留的。
+_DEBUG_REPL_METHODS = ('run_debug_mode', '_print_zero_match_breakdown')
+
+
 def test_no_print_in_daemon_modules():
     """M5 regression guard: analyzer and reporter run in daemon mode and
     must not print() to stdout. Exception: Analyzer.run_debug_mode is an
     interactive debug REPL whose stdout output is the contract — it is
     surfaced both by the CLI menu (sel == 8) and by the GUI debug API
     via redirect_stdout, so its print() calls are intentionally retained.
+    The exempt methods are listed in `_DEBUG_REPL_METHODS`; a helper split
+    out of the REPL inherits the exemption only by being added there.
     """
     import re
     from pathlib import Path
@@ -138,11 +146,15 @@ def test_no_print_in_daemon_modules():
         stripped = re.sub(r'"""[\s\S]*?"""', '', text)
         stripped = re.sub(r"'''[\s\S]*?'''", '', stripped)
         stripped = re.sub(r'#.*$', '', stripped, flags=re.M)
-        # Excise the interactive debug REPL block: from the def line through
-        # (but not including) the next top-level `def ` at the same indent.
-        if fn == 'analyzer.py':
+        # Excise the interactive debug REPL: each named method, from its def
+        # line through (but not including) the next method at the same indent.
+        # The list is deliberately explicit — adding a third exemption has to
+        # be a deliberate act, not a side effect of naming a method _print_*.
+        for method in _DEBUG_REPL_METHODS:
+            if fn != 'analyzer.py':
+                continue
             stripped = re.sub(
-                r'(^|\n)(    def run_debug_mode\b[\s\S]*?)(?=\n    def |\Z)',
+                r'(^|\n)(    def %s\b[\s\S]*?)(?=\n    def |\Z)' % method,
                 r'\1',
                 stripped,
             )

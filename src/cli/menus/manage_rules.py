@@ -15,6 +15,15 @@ from src.cli.menus.system_health import add_system_health_menu
 from src.cli.menus.traffic import add_traffic_menu
 from src.cli.menus.bandwidth import add_bandwidth_volume_menu
 
+# 規則清單顯示用：pd 值 → 判定名稱的 i18n 鍵。值必須照引擎的慣例
+# （src.analyzer.PD_DECISION），不是照精靈的選單編號。
+PD_RULE_LABEL_KEYS: dict[int, str] = {
+    2: "pd_label_blocked",
+    1: "pd_label_potential",
+    0: "pd_label_allowed",
+    -1: "pd_label_all",
+}
+
 
 _MANAGE_RULES_COMMAND_RE = re.compile(
     r"^\s*([dm])\s*(\d+(?:\s*,\s*\d+)*)\s*$", re.IGNORECASE
@@ -76,12 +85,7 @@ def manage_rules_menu(cm: ConfigManager):
             cond += f" (CD:{cd}m)"
             filters = []
             if r["type"] == "traffic":
-                pd_map = {
-                    2: t("pd_label_blocked"),
-                    1: t("pd_label_allowed"),
-                    0: t("pd_label_potential"),
-                    -1: t("pd_label_all"),
-                }
+                pd_map = {k: t(v) for k, v in PD_RULE_LABEL_KEYS.items()}
                 filters.append(f"[{pd_map.get(r.get('pd', 2), '?')}]")
             if r.get("port"):
                 proto_str = (

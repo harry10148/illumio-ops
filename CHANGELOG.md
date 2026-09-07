@@ -7,6 +7,51 @@ and this project adheres to [Semantic Versioning](https://semver.org/) —
 a plain `<major>.<minor>.<patch>` scheme. (Tags through v4.0.0 carried a
 `-topic-slug` codename suffix; the codename was retired in 4.1.0.)
 
+## [Unreleased]
+
+> **Upgrading — check any traffic rule that says Allowed or Potentially
+> Blocked.** The interactive CLI's rule wizard has been storing those two the
+> wrong way round since the tool's first release: choosing *Potentially
+> Blocked* saved a rule that watched **allowed** traffic, and choosing
+> *Allowed* saved one that watched **potentially blocked** traffic. The rule
+> list showed the label you picked, so nothing looked wrong. Rules authored in
+> the web UI were always correct — its form has carried the engine's
+> numbering since the first commit that had one — and *Blocked* and *All*
+> were correct everywhere. A stored rule carries no record of where it was
+> authored, so there is no safe automatic repair: open each traffic rule whose decision is
+> Allowed or Potentially Blocked and confirm it now names the traffic you
+> meant. Re-saving it from either interface writes the corrected value.
+
+### Fixed
+
+- **The CLI rule wizard wrote the wrong policy decision for two of its four
+  choices.** `pd` is the PCE ordinal — `0` allowed, `1` potentially blocked,
+  `2` blocked — and that is what the rule engine, the web UI's rule drawer and
+  the dashboard queries all use. The CLI wizard mapped menu item 2 to `0` and
+  item 3 to `1`, and the CLI's rule list mislabelled those same values to
+  match, so the lie was consistent from end to end and invisible from inside
+  the CLI. (A July fix aligned the list *to the wizard* rather than to the
+  engine, entrenching it.) The ordinal now has one named home,
+  `analyzer.PD_DECISION`, and the wizard's menu, its edit-time preselection
+  and the rule list all derive from a single table. The new gate asserts
+  purpose rather than the table: a rule authored by choosing menu item N must
+  match traffic whose `policy_decision` is the one that item names, and no
+  other.
+
+- **The rule simulation blamed the time window for exclusions it had not
+  made.** The summary line printed the count that survived *every* filter
+  under the heading "time filter", so a rule that matched nothing because of
+  its policy decision sent the operator off to widen `threshold_window` —
+  which could never help. The line is now labelled for what it counts, and
+  when nothing survives, the simulation breaks the loss down by stage (window,
+  then policy decision, then the rest) and lists the policy decisions actually
+  present in the traffic. On the test appliance that turns a dead end into the
+  answer in one line: of 23,161 flows, 320 fell inside the rule's 10-minute
+  window, 0 of those carried the decision it filters on, and the traffic
+  present is 16,818 unknown, 6,242 potentially blocked and 101 allowed — not
+  one blocked flow for the blocked-only rule to find, which is why it never
+  fired and why widening the window could never have helped.
+
 ## [5.1.0] — 2026-09-07
 
 > **Upgrading from 5.0.0 — one thing changes under your fingers.** The

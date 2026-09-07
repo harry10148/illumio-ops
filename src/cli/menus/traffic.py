@@ -22,6 +22,33 @@ from src.cli.object_picker import (
     picked_to_service_filters,
 )
 
+# 選單項目 → (i18n 鍵, 規則儲存的 pd)。pd 的值必須是引擎的慣例
+# （src.analyzer.PD_DECISION：0=allowed / 1=potentially_blocked / 2=blocked，
+# -1=不依判定篩選），不是選單自己的編號。
+PD_MENU_CHOICES: tuple[tuple[int, str, int], ...] = (
+    (1, "pd_1", 2),   # Blocked
+    (2, "pd_2", 1),   # Potentially Blocked
+    (3, "pd_3", 0),   # Allowed
+    (4, "pd_4", -1),  # 全部
+)
+
+
+def pd_for_menu_choice(menu_item: int) -> int:
+    """選單項目編號 → 規則要存的 pd 值。"""
+    for item, _key, pd_val in PD_MENU_CHOICES:
+        if item == menu_item:
+            return pd_val
+    return -1
+
+
+def menu_choice_for_pd(pd_val: int | None) -> int:
+    """規則既有的 pd 值 → 編輯時要預選的選單項目編號。"""
+    for item, _key, candidate in PD_MENU_CHOICES:
+        if candidate == pd_val:
+            return item
+    return 4
+
+
 _PICK_CATS = ("label", "iplist", "workload", "ip")  # 4c 規則不支援 label_group，故不含
 
 
@@ -77,21 +104,12 @@ def add_traffic_menu(cm: ConfigManager, edit_rule=None) -> None:
     def_pd = 1
     if edit_rule:
         tpd = edit_rule.get("pd", 2)
-        if tpd == 2:
-            def_pd = 1  # Blocked
-        elif tpd == 0:
-            def_pd = 2  # Potential
-        elif tpd == 1:
-            def_pd = 3  # Allowed
-        elif tpd == -1:
-            def_pd = 4  # All
+        def_pd = menu_choice_for_pd(tpd)
 
     print(f"{Colors.DARK_GRAY}{t('def_traffic_pd')}{Colors.ENDC}")
     print(t("policy_decision"))
-    print(t("pd_1"))
-    print(t("pd_2"))
-    print(t("pd_3"))
-    print(t("pd_4"))
+    for _item, _key, _pd in PD_MENU_CHOICES:
+        print(t(_key))
     pd_sel = safe_input(
         t("pd_select_default"), int, range(0, 5), allow_cancel=True, hint=str(def_pd)
     )
@@ -103,15 +121,7 @@ def add_traffic_menu(cm: ConfigManager, edit_rule=None) -> None:
                 add_traffic_menu(cm, edit_rule=edit_rule)
             return
 
-    # Menu mapping: 1=Blocked(pd=2), 2=Potential(pd=0), 3=Allowed(pd=1), 4=All(pd=-1)
-    if pd_sel == 1:
-        target_pd = 2
-    elif pd_sel == 2:
-        target_pd = 0
-    elif pd_sel == 3:
-        target_pd = 1
-    else:
-        target_pd = -1
+    target_pd = pd_for_menu_choice(pd_sel)
 
     _wizard_step(2, 5, t('wiz_traffic_filters'), path=f"{t('cli_area_policy')} > {t('wiz_add_traffic_rule')}")
     print(f"\n{Colors.CYAN}{t('advanced_filters')}{Colors.ENDC}")
