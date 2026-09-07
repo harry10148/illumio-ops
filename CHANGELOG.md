@@ -7,7 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/) —
 a plain `<major>.<minor>.<patch>` scheme. (Tags through v4.0.0 carried a
 `-topic-slug` codename suffix; the codename was retired in 4.1.0.)
 
-## [Unreleased]
+## [5.1.0] — 2026-09-07
+
+> **Upgrading from 5.0.0 — one thing changes under your fingers.** The
+> interactive CLI's main menu went from six areas to five: Alerting and
+> Automation merged into Policy. Anything that drove the menu by keystroke
+> order needs adjusting — inside Policy, the two scheduler entries that used to
+> be Automation's 1 and 2 are now 10 and 11, and everything else kept its
+> number. The `illumio-ops` click sub-commands and their arguments are
+> unchanged, so scripted use is unaffected.
 
 ### Added
 
@@ -34,6 +42,18 @@ a plain `<major>.<minor>.<patch>` scheme. (Tags through v4.0.0 carried a
   source side, as measured on PCE 25.2. PCE errors are returned as `502`
   with the PCE body, never hidden.
 
+- **The report shell moved to the v3 palette**, and its design authority moved
+  with it to `design/v3/reports/shell.css`. Accent, page grounds and hairlines
+  now take the GUI's values; body ink stays print black, because reports get
+  printed. `design/v2/reports/shell.css` stays where it is as the historical
+  baseline — the reviewed PDFs were produced from it.
+
+- **Chart colours come from the shell's tone tokens** rather than four
+  hand-written tables. `report_shell` parses its own `:root` block, so a
+  palette move reaches matplotlib too. Charts and table badges now agree on
+  what a severity looks like; before this a LOW finding was green in a pie and
+  info blue in the badge beside it.
+
 - SIEM destinations can subscribe to a subset of traffic policy decisions
   (`traffic_pd`: `allowed` / `potentially_blocked` / `blocked` / `unknown`;
   empty = all). The filter is applied where a row enters the dispatch queue —
@@ -44,6 +64,17 @@ a plain `<major>.<minor>.<patch>` scheme. (Tags through v4.0.0 carried a
   still delivered.
 
 ### Changed
+
+- **The interactive CLI has five areas, the same five as the GUI.** Alerting
+  and Automation became Policy; Overview became Home. Item numbers inside
+  Policy are unchanged except Automation's two, which are now 10 and 11. The
+  wizards' breadcrumbs follow (25 sites), so none of them names an area that no
+  longer exists.
+
+- **The GUI tour describes the five areas.** It had been sending operators to
+  `#/overview`, `#/alerting/*`, `#/automation/*` and `#/investigate/inbox`.
+  A new gate parses the route list out of `shell.mjs` and fails when the guide
+  names a route the app does not have, or leaves an area undocumented.
 
 - **The settings page type lands** (§5.1's third). Notification channels is a
   left list of the five channels — state, and what each still needs — beside
@@ -97,6 +128,26 @@ a plain `<major>.<minor>.<patch>` scheme. (Tags through v4.0.0 carried a
   keys.
 
 ### Fixed
+
+- **The security-risk report could not be built at all** whenever a workload
+  reported a non-idle enforcement mode. The enforcement-mode legend spelled a
+  dictionary fallback `{{}}` inside an f-string, which is a set containing an
+  empty dict, so the render raised `TypeError` and `_mod13_html` has no
+  caller-side guard. Latent since April; this lab's distribution had always
+  been empty, so no report ever hit it.
+
+- **The Home screen printed its own template** — `語言: {lang} | 佈景: {theme}`.
+  `t()` takes `lang` as its language selector, so a caller's `lang=` never
+  reaches `format()`, and `t()` answers the resulting `KeyError` with the raw
+  template and one warning line. A new check derives the reserved names from
+  `t()`'s signature, so a future parameter is covered the day it is added.
+
+- **An event alert was drawn as if it were traffic.** `payload.raw_data` holds
+  flows for traffic and bandwidth alerts but raw PCE events for event alerts,
+  and the alert page mapped whichever it found through the flow renderer: a
+  headline about connections that were not connections, two rows of dashes, and
+  a figure row calling events "connections" beside "0 pairs" and "0 covered by
+  a rule". The page now reads flows only from the alerts that carry them.
 
 - **A failed schedule shows on the home page again**: the v3.1 rewrite of the
   schedule card dropped the mark 3B carried, so a schedule whose last run
