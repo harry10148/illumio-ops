@@ -94,15 +94,18 @@ traffic 告警回 `code: "not_traffic"`——第 5 步會顯示 fallback 文案�
 - Create: `tmp/phase3d-verification/shots/step[1-6].png`（1280 寬）
 
 **Steps:**
-- [ ] **1. 確認資料**：測試機是否已有 traffic 告警；沒有就照 1.2 處置並記錄。
-- [ ] **2. 先紅**：把某一步的錨點改成不存在的值，確認測試會紅——證明它真的在看
-      畫面而不是只在看 HTTP 200。
-- [ ] **3. 實作＋跑**：
-      `ILLUMIO_OPS_E2E_BASE_URL=https://172.16.15.106:5001 timeout 900 python3 -m pytest tests/test_e2e_v3_main_scenario.py -q`
-      （憑證走既有的 `ILLUMIO_OPS_E2E_USER` / `_PASSWORD` 環境變數，不寫進檔案）
-- [ ] **4. 無 env 時必須 skip 不是 fail**：不帶環境變數再跑一次，確認 skip。
-- [ ] **5. 六張截圖逐張親看**，把每張看到什麼寫進報告（不是只貼檔名）。
-- [ ] **6. 全套＋commit＋部署＋CI**　`test(e2e): the v3 main scenario, walked end to end`
+- [x] **1. 確認資料**：測試機三筆告警全是 event。**結論與計畫的假設不同**——第 5 步
+      不是死路，`not_traffic` 是設計過的狀態（有來源說明、回程連結、原因），所以
+      不需要造 traffic 告警。順帶查明造告警的正確做法：`send_alerts(channels=[])`
+      會寫入 sqlite 但不派送；CLI 的「發送測試告警」走 `force_test=True` 不寫入。
+- [x] **2. 先紅**：第 6 步錨點改成 `AT-99` → 紅。
+- [x] **3. 實作＋跑**：1 passed（預設帳密即可）。
+- [x] **4. 無 env 時 skip**：確認。
+- [x] **5. 六張截圖逐張親看**——**抓到告警頁把 event 告警當流量渲染**（標題、
+      表格、數字列三處都錯）。根因是 `raw_data` 在不同 bucket 放不同東西。已修，
+      並修好那條因為 fixture 太乾淨而綠了很久的既有測試。
+- [x] **6. 全套＋commit＋部署＋CI**　`51018e56`＋`58230a79`（走查第 4 步改成斷言
+      目的而非單一形狀——修好之後它一度在要求缺陷回來）。
 
 ---
 
@@ -134,15 +137,13 @@ traffic 告警回 `code: "not_traffic"`——第 5 步會顯示 fallback 文案�
 教訓）。
 
 **Steps:**
-- [ ] **1. 先紅**：守門寫好後先跑，現況應該會抓到舊路由（`#/overview`、
-      `#/alerting`、`#/automation` 之類）。把它抓到的清單貼進報告——那就是要改的
-      範圍，比人工盤點可靠。
-- [ ] **2. 重寫**：逐節改，PCE 術語保留英文，五區判準（首頁看「現在」、調查查
-      「這件事」、規則改「規則」、報表產「交付物」、系統改「系統」）貫穿。
-- [ ] **3. 綠**：`timeout 600 python3 -m pytest tests/test_docs_gui_tour_routes.py -q`
-      ＋`python3 scripts/check_doc_links.py`
-- [ ] **4. 注入驗證**：在文件裡塞一個 `#/nonexistent`，確認守門紅。
-- [ ] **5. 全套＋commit＋部署＋CI**　`docs(guide): the GUI tour describes the five areas`
+- [x] **1. 先紅**：抓到 11 個，清單見報告 §2.1（含已轉址的 `#/investigate/inbox`）。
+- [x] **2. 重寫**：另外修掉兩處原本就錯的——系統區寫「八個子頁」實際十個；
+      背景 job 的三個等級判讀規則原本掛在自動化區，整段搬進系統區才沒跟著消失。
+- [x] **3. 綠**：2 passed；doc links OK。
+- [x] **4. 注入驗證**：正向（`#/nonexistent/page`）與反向（拿掉整個 `#/system/`）
+      都紅。
+- [x] **5. 全套＋commit＋部署＋CI**　`3de83b7d`，4691 passed。
 
 ---
 
@@ -184,13 +185,15 @@ time_events.py                                     → /root/tools/
 不同目錄，動手前把這件事再確認一次**。刪完重啟服務並確認 19 條規則仍在。
 
 **Steps:**
-- [ ] **1. 讀現有 Unreleased 全文**，列出已涵蓋與待補。
-- [ ] **2. 寫 CHANGELOG＋改版本號**。
-- [ ] **3. 驗證版本號**：`python3 -c "import src; print(src.__version__)"`；
-      GUI `/api/dashboard/...` 的 `version` 欄位；CLI 主選單頁尾。三處都要是 5.1.0。
-- [ ] **4. 測試機殘檔**：先確認 `alerts.json` 無讀者 → 搬移／刪除 → 重啟 →
-      `git status --porcelain` 空 → 規則數仍 19 → 告警仍 3 筆。
-- [ ] **5. 全套＋commit＋部署＋CI**　`chore(release): 5.1.0`
+- [x] **1. 讀現有 Unreleased 全文**：3A/3B/3E 已寫齊，待補 3C/3D。
+- [x] **2. 寫 CHANGELOG＋改版本號**：升級注意事項放在版本標題正下方。
+- [x] **3. 驗證版本號**：`illumio-ops version` → 5.1.0；三個消費端都是 import
+      `src.__version__`，沒有第二份字面量；另有兩個 README 徽章一併改。
+      **全套抓到 `test_app_version.py` 寫死 5.0.0**——改成比對 CHANGELOG 最新版本
+      標題，並加一條「不得還是 Unreleased」。
+- [x] **4. 測試機殘檔**：`git status` 空、規則仍 19、告警 4 筆（daemon 期間又發
+      一則）。`alerts.json` 與 `config/alerts.json` 同名不同目錄，動手前查明。
+- [x] **5. 全套＋commit＋部署＋CI**　`6252862e`，4692 passed，CI `34107154034` success。
 
 ---
 
@@ -204,17 +207,14 @@ time_events.py                                     → /root/tools/
 - Modify: `docs/superpowers/plans/2026-09-03-ui-redesign-v3-roadmap.md`（3D 標記交付）
 
 **Steps:**
-- [ ] **1. 最終閘門全跑一次**（不是引用先前結果）：五道 CI 閘門＋
-      `python3 tools/gate_coverage_live.py -v` 必須仍是 `covered=108/108 extra=[]`。
-- [ ] **2. 離線 bundle**：`bash scripts/build_offline_bundle.sh`，確認產出檔名帶
-      `5.1.0`，並依 `offline-bundle-db-hardening-delivered` 記憶的教訓抽驗
-      bundle 內容（marker 檔、wheels、wrapper 的 cd）。
-- [ ] **3. 打 tag 並推**：`git tag -a v5.1.0 -m "..."`＋`git push origin v5.1.0`。
-      **tag 只打在 CI 已經綠的 commit 上**，不要打在剛推還沒跑完的 HEAD。
-- [ ] **4. 測試機對齊 tag**：部署到 `v5.1.0`，確認 `git describe --tags` 相符。
-- [ ] **5. 驗收報告**：spec §7.1／§7.2／§7.3 逐條對照，每條寫證據來源（命令＋
-      輸出摘要＋產物路徑）。§7.2 的四條新增守門要指名是哪一個測試在守。
-- [ ] **6. commit**　`docs(plan): phase 3D delivered`
+- [x] **1. 最終閘門全跑一次**：五道全綠；coverage `covered=108/108 extra=[]`。
+- [x] **2. 離線 bundle**：`illumio-ops-5.1.0+6252862e-…tar.gz`（104M／5087 entries／
+      66 wheels），**抽驗 bundle 內的 `app/src/__init__.py` 是 5.1.0**——檔名對不
+      代表內容對。
+- [x] **3. 打 tag 並推**：`v5.1.0` → `6252862e`，在 CI success 之後才打。
+- [x] **4. 測試機對齊 tag**：`git describe --tags` → `v5.1.0`，服務 active。
+- [x] **5. 驗收報告**：`tmp/phase3d-verification/report.md` §4.1 逐條對照。
+- [x] **6. commit**
 
 ---
 
