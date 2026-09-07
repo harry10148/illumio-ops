@@ -25,6 +25,7 @@ belonged to are gone.”）。照舊稿寫的走查會對著不存在的 UI 斷�
 """
 from __future__ import annotations
 
+import json
 import os
 import pathlib
 import re
@@ -32,6 +33,12 @@ import re
 import pytest
 
 _BASE = os.environ.get("ILLUMIO_OPS_E2E_BASE_URL")
+
+#: 事件事實那一列的標籤，從 app 自己讀的同一份 i18n 取，不要在測試裡另打一份中文
+#: 字串——那會在改文案時變成第二個要維護的地方，而且對不上時給的是難解的失敗。
+_EVENT_ACTOR_LABEL = json.loads(
+    (pathlib.Path(__file__).parent.parent / "src" / "i18n_zh_TW.json")
+    .read_text(encoding="utf-8"))["gui_al_ev_actor"]
 _SHOTS = pathlib.Path(
     os.environ.get("ILLUMIO_OPS_E2E_SHOT_DIR", "tmp/phase3d-verification/shots"))
 
@@ -98,10 +105,26 @@ def test_the_main_scenario_walks_end_to_end():
             _anchor(page, "AT-02")   # 狀態切換 new/ack/done
             _step(page, 3, "alert-detail")
 
-            # ── 步驟 4：規則判定欄（載入時並行問 PCE，逐列回填） ──────────
-            page.wait_for_selector('[data-cov="AT-04"]', timeout=30000)
-            _anchor(page, "AT-04")
-            _step(page, 4, "rule-verdict")
+            # ── 步驟 4：這一頁要說「是什麼在跟什麼講話」 ─────────────────
+            #
+            # 兩種形狀，看告警型別而定，**不是**兩選一的寬鬆斷言：
+            #   · traffic／bandwidth 告警 → `AT-04` 流量表，右欄逐列回填 PCE 判定
+            #   · event／system 告警    → 事件事實（操作者／動作／資源）
+            # 舊版無條件斷言 AT-04，那正好是這次修掉的缺陷所要求的畫面——
+            # 事件被當成流量渲染。所以這裡斷言的是**這一步的目的**，並且要求
+            # 兩種形狀至少有一種真的在畫面上（都沒有就是紅）。
+            body = page.locator('[data-cov="AT-03"]')
+            page.wait_for_selector('[data-cov="AT-03"]', timeout=30000)
+            has_flows = page.locator('[data-cov="AT-04"]').count() >= 1
+            if has_flows:
+                shape = "rule-verdict"
+            else:
+                shape = "event-facts"
+                text = body.text_content() or ""
+                assert _EVENT_ACTOR_LABEL in text, (
+                    "這則告警沒有流量表，也沒有事件事實——"
+                    f"「誰在跟誰講話」整段不見了。畫面內容：{text[:200]!r}")
+            _step(page, 4, shape)
 
             # ── 步驟 5：帶著這則告警去流量搜尋 ───────────────────────────
             page.goto(base + "/#/investigate/traffic?alert=" + alert_id)
