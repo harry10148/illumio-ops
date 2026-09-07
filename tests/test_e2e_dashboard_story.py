@@ -46,10 +46,16 @@ def test_dashboard_story_live_browser():
             page.wait_for_url(lambda url: "/login" not in url, timeout=20000)
             page.goto(base + "/#/home")
             page.wait_for_selector('body[data-booted="true"]', timeout=20000)
-            # The overview's own anchors, in place of the legacy story-card
-            # classes: the posture/score card, the top-actions region and the
-            # health rail all have to reach the DOM regardless of data state.
-            for cov in ("OV-02", "OV-03", "XC-01"):
+            # 2026-09-07: the anchors this asserted (OV-02 posture card, OV-03
+            # top actions, XC-01 health rail) are not on #/home any more. v3
+            # moved them — OV-02 shrank into a line of HM-04, OV-03 is gone and
+            # the health rail became home-page content as HM-02 — so this test
+            # had been failing against the appliance ever since the redesign and
+            # nobody noticed, because it only runs when someone sets the env var.
+            # That is the whole hazard of an env-gated test: it is not in CI, so
+            # it rots silently. The replacement asserts the home page's own three
+            # load-bearing surfaces, all of which render regardless of data state.
+            for cov in ("HM-01", "HM-02", "HM-06"):
                 assert page.locator(f'[data-cov="{cov}"]').count() >= 1, f"missing {cov}"
         finally:
             browser.close()

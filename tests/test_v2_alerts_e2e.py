@@ -88,10 +88,27 @@ def _seed(path, v2_app):
     event = st.insert(
         fired_at="2026-09-04T01:01:00Z", type="event", rule_id="18", rule_name="Login failed",
         severity="critical", summary="Login failed · x",
-        criteria="", payload={"parsed_data": [{
-            "actor": "user@example.com", "action": "DELETE /rule_sets/669",
-            "resource_name": "prod-ruleset", "event_type": "rule_set.delete",
-        }]}, dispatch=[],
+        # raw_data AND parsed_data, because that is what the analyzer writes for
+        # the event bucket (analyzer.py:1657 sets both). The earlier fixture had
+        # parsed_data only, which made `asked` empty for the wrong reason: the
+        # page looked right in this test while production — where raw_data is a
+        # list of PCE EVENTS — mapped those events through flowOf() and drew two
+        # rows of "— → — · 0 connections". A fixture that is tidier than the real
+        # record hides the defect it was written to catch.
+        criteria="", payload={
+            "count": 2,
+            "raw_data": [{
+                "event_type": "rule_set.delete", "created_by": {"user": {"username": "user@example.com"}},
+                "action": {"href": "/rule_sets/669"}, "severity": "critical",
+                "status": "success", "timestamp": "2026-09-04T01:01:00Z",
+                "resource_changes": [], "notifications": [], "href": "/events/1",
+                "pce_fqdn": "pce.example.com",
+            }] * 2,
+            "parsed_data": [{
+                "actor": "user@example.com", "action": "DELETE /rule_sets/669",
+                "resource_name": "prod-ruleset", "event_type": "rule_set.delete",
+            }],
+        }, dispatch=[],
     )
     st.close()
     return traffic, event

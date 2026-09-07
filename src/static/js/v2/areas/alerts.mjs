@@ -125,6 +125,37 @@ function endpointOf(side, fallback) {
   };
 }
 
+//: Which alert types actually put FLOWS in `payload.raw_data`.
+//
+// Only the traffic and bandwidth/volume buckets do (analyzer.py:2323 writes
+// `top_10` there). The event bucket writes raw PCE EVENTS into the same field
+// (analyzer.py:1657) and carries the normalised copy in `parsed_data`, which
+// eventFacts() renders. Mapping those through flowOf() produced two rows of
+// "— → — · –/TCP · 0 connections" with "PCE didn't answer" beside them, a
+// headline reading "— 內 2 條連線命中…", and figures counting events as
+// connections — on the main scenario's most important screen. Found by walking
+// the scenario against the appliance (Phase 3D Task 1); no test saw it, because
+// every in-process fixture used a traffic alert.
+const FLOW_BEARING_TYPES = ["traffic", "bandwidth"];
+
+function isFlowBearing(alert) {
+  return FLOW_BEARING_TYPES.indexOf(String((alert || {}).type || "")) >= 0;
+}
+
+/** The alert's flows, or [] when this kind of alert has none. */
+function flowsOf(alert) {
+  if (!isFlowBearing(alert)) return [];
+  return (((alert || {}).payload || {}).raw_data || []).map(flowOf);
+}
+
+/** Matched rows for an alert that has no flows (events, health items). */
+function matchesOf(alert) {
+  const count = Number(((alert || {}).payload || {}).count);
+  if (isFinite(count) && count > 0) return count;
+  const parsed = ((alert || {}).payload || {}).parsed_data;
+  return Array.isArray(parsed) ? parsed.length : 0;
+}
+
 function flowOf(raw) {
   const svc = raw.service || {};
   return {
@@ -263,14 +294,19 @@ function narrative(a, flows, asked, verdicts) {
 }
 
 function figures(a, flows, verdicts) {
-  const connections = connectionsOf(a, flows);
-  const covered = verdicts.filter(function (v) { return v && v.kind === "allow"; }).length;
   const box = el("div", { class: "figs" });
-  [
-    [num(connections), t("gui_al_fig_connections"), true],
-    [num(flows.length), t("gui_al_fig_pairs"), false],
-    [num(covered), t("gui_al_fig_covered"), false],
-  ].forEach(function (row) {
+  // An alert with no flows must not be described in flow terms. "0 pairs,
+  // 0 covered by a rule" beside an event count labelled "connections" is three
+  // wrong numbers, not an empty state.
+  const rows = isFlowBearing(a)
+    ? [
+      [num(connectionsOf(a, flows)), t("gui_al_fig_connections"), true],
+      [num(flows.length), t("gui_al_fig_pairs"), false],
+      [num(verdicts.filter(function (v) { return v && v.kind === "allow"; }).length),
+        t("gui_al_fig_covered"), false],
+    ]
+    : [[num(matchesOf(a)), t("gui_al_fig_matches"), true]];
+  rows.forEach(function (row) {
     box.appendChild(el("div", null,
       el("b", { class: row[2] ? "hot" : null, text: row[0] }),
       el("span", { text: row[1] })));
@@ -408,8 +444,7 @@ function mountAlert(root, ctx, state, id, head) {
 
   function repaint(alert) {
     if (state.torn || ctx.stale()) return;
-    const raw = ((alert.payload || {}).raw_data) || [];
-    paintHead(alert, raw.map(flowOf));
+    paintHead(alert, flowsOf(alert));
     clear(board);
     board.appendChild(alertPage(alert, setStatus, state, ctx));
   }
@@ -423,8 +458,7 @@ function mountAlert(root, ctx, state, id, head) {
 }
 
 function alertPage(a, onStatus, state, ctx) {
-  const raw = ((a.payload || {}).raw_data) || [];
-  const flows = raw.map(flowOf);
+  const flows = flowsOf(a);
   const asked = flows.slice(0, EXPLAIN_N);
   // Verdicts live on the state, not on this call: repaint() rebuilds the whole
   // page after a status write, and a fresh array would re-ask the PCE about

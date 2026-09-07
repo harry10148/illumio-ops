@@ -5461,5 +5461,6 @@
   "gui_al_ro_ex_src_ip": "排除的來源 IP",
   "gui_al_ro_ex_dst_ip": "排除的目的 IP",
   "cli_area_home": "首頁",
-  "cli_area_policy": "規則"
+  "cli_area_policy": "規則",
+  "gui_al_fig_matches": "命中筆數"
 }
