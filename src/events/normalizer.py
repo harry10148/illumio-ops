@@ -50,6 +50,9 @@ def _href_tail(value: Any) -> str:
         return text
     return text.rstrip("/").rsplit("/", 1)[-1]
 
+# PCE 對部分事件把 action.api_endpoint 回成這個字面值，代表它自己遮蔽了端點。
+_REDACTED_ENDPOINT = "FILTERED"
+
 def _shorten_api_endpoint(endpoint: str) -> str:
     if not endpoint:
         return ""
@@ -180,9 +183,27 @@ def _extract_action(event: dict[str, Any]) -> tuple[str, str, str]:
 
     method = _pick_first(action.get("api_method"), action.get("method"))
     path = _pick_first(action.get("api_endpoint"), action.get("path"), action.get("endpoint"))
+    # PCE 對某些事件（實測：agent.tampering）把端點回成字面值 "FILTERED"——
+    # 那是它自己的遮蔽標記，不是一個路徑。照字面印出來，畫面上就會是
+    # 「PUT FILTERED」，看起來像我們解析壞了，其實是 PCE 沒有給。留下方法
+    # （PUT 是真的），路徑留空，並讓呼叫端知道它是被遮蔽而不是不存在。
+    if path.upper() == _REDACTED_ENDPOINT:
+        path = ""
     path = _shorten_api_endpoint(path)
     action_label = " ".join(part for part in (method, path) if part).strip()
     return method, path, action_label
+
+def _action_endpoint_is_redacted(event: dict[str, Any]) -> bool:
+    """PCE 把 action.api_endpoint 回成 "FILTERED" 時為 True。
+
+    「沒有端點」與「端點被遮蔽」對操作者是兩件事：前者是這個事件本來就沒有
+    API 呼叫，後者是有但 PCE 不說。顯示端要分得出來才不會把後者講成前者。
+    """
+    action = event.get("action")
+    if not isinstance(action, dict):
+        return False
+    raw = _pick_first(action.get("api_endpoint"), action.get("endpoint"))
+    return raw.upper() == _REDACTED_ENDPOINT
 
 def _extract_workloads_affected(event: dict[str, Any]) -> int:
     workloads = event.get("workloads_affected")
@@ -231,6 +252,78 @@ def _extract_notification_user(event: dict[str, Any]) -> str:
         if username:
             return username
     return ""
+
+def _extract_notification_info(event: dict[str, Any]) -> dict[str, Any]:
+    """通知條目裡 `info` 的純量欄位，攤平成一層。
+
+    為什麼要整包收而不是白名單：PCE 26.2 起 `agent.tampering` 的
+    `notifications[].info` 多了 `tampering_revert_succeeded`、
+    `event_classification`、`beginning_timestamp`/`ending_timestamp`、
+    `num_events`——正規化器只取 `info.user.username`，其餘整包落地。白名單
+    式的修法會在下一次 PCE 升版時再壞一次，而且一樣無聲。整包收下之後，顯示
+    端認得的欄位給正式名稱、認不得的照樣列出來，新欄位至少看得見。
+
+    只收純量（str/int/float/bool）：巢狀結構沒有通用的呈現方式，硬攤平只會
+    在畫面上長出一串沒人看得懂的鍵——唯一的例外是 `events[]`，它由
+    _extract_notification_events 專門處理。`user` 由
+    _extract_notification_user 另外取，不重複。多筆通知時後者覆蓋前者。
+    """
+    notifications = event.get("notifications")
+    if not isinstance(notifications, list):
+        return {}
+    out: dict[str, Any] = {}
+    for entry in notifications:
+        if not isinstance(entry, dict):
+            continue
+        info = entry.get("info")
+        if not isinstance(info, dict):
+            continue
+        for key, value in info.items():
+            if key == "user":
+                continue
+            if isinstance(value, (str, int, float, bool)):
+                out[_string(key)] = value
+    return out
+
+_NOTIFICATION_EVENT_CAP = 10
+
+def _extract_notification_events(event: dict[str, Any]) -> list[dict[str, Any]]:
+    """`notifications[].info.events[]` 的逐筆明細。
+
+    `agent.tampering` 在這裡放的是**誰動了防火牆**：`process_name`、
+    `process_id`、`tamper_type`、`kernel_functions[]`、`timestamp`。這是這類
+    事件上最可操作的一段——「有人竄改」與「/usr/bin/nft 在 14:15 刪了一條
+    nftables 規則」對值班的人是完全不同的兩句話。
+
+    發現它的方式不是讀文件，是 tools/audit_event_fields.py 對真機跑第一次就
+    列出 `notifications[].info.events[].process_name` 沒有人在看。
+
+    上限 10 筆：`num_events` 可能很大，而正規化結果會進 alert payload 與報表
+    DataFrame；總筆數由 `info.num_events` 說，這裡只留樣本。
+    """
+    notifications = event.get("notifications")
+    if not isinstance(notifications, list):
+        return []
+    out: list[dict[str, Any]] = []
+    for entry in notifications:
+        if not isinstance(entry, dict):
+            continue
+        info = entry.get("info")
+        if not isinstance(info, dict):
+            continue
+        for item in (info.get("events") or []):
+            if not isinstance(item, dict):
+                continue
+            row: dict[str, Any] = {k: v for k, v in item.items()
+                                   if isinstance(v, (str, int, float, bool))}
+            funcs = item.get("kernel_functions")
+            if isinstance(funcs, list):
+                row["kernel_functions"] = ", ".join(str(f) for f in funcs if f)
+            if row:
+                out.append(row)
+            if len(out) >= _NOTIFICATION_EVENT_CAP:
+                return out
+    return out
 
 def _extract_notification_types(event: dict[str, Any]) -> list[str]:
     notifications = event.get("notifications")
@@ -338,6 +431,9 @@ def normalize_event(event: dict[str, Any]) -> dict[str, Any]:
         "resource_changes_count": len(event.get("resource_changes") or []) if isinstance(event.get("resource_changes"), list) else 0,
         "notifications_count": len(event.get("notifications") or []) if isinstance(event.get("notifications"), list) else 0,
         "notification_types": _extract_notification_types(event),
+        "notification_info": _extract_notification_info(event),
+        "notification_events": _extract_notification_events(event),
+        "action_redacted": _action_endpoint_is_redacted(event),
         "workloads_affected": _extract_workloads_affected(event),
     }
     normalized["parser_notes"] = _build_parser_notes(event, normalized)

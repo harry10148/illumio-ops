@@ -567,16 +567,56 @@ function alertPage(a, onStatus, state, ctx) {
   return wrap;
 }
 
+// PCE 通知的 info 欄位裡，我們認得的那些的正式名稱。認不得的**照樣列出來**，
+// 用 PCE 自己的鍵當標籤——PCE 升版新增欄位時，畫面至少看得見它，而不是像
+// 2026-09-08 之前那樣整包無聲落地（見 events/normalizer.py 的
+// _extract_notification_info）。
+const EV_INFO_LABELS = {
+  tampering_revert_succeeded: "gui_al_ev_revert",
+  event_classification: "gui_al_ev_classification",
+  num_events: "gui_al_ev_occurrences",
+  beginning_timestamp: "gui_al_ev_from",
+  ending_timestamp: "gui_al_ev_to",
+};
+
+function evInfoLabel(key) {
+  return EV_INFO_LABELS[key] ? t(EV_INFO_LABELS[key]) : String(key);
+}
+function evInfoValue(v) {
+  if (v === true) return t("gui_al_ev_yes");
+  if (v === false) return t("gui_al_ev_no");
+  return String(v);
+}
+
+function kvRow(label, value) {
+  return el("div", { class: "kv" }, el("span", { text: label }), el("b", { text: value }));
+}
+
 function eventFacts(a) {
   const rows = ((a.payload || {}).parsed_data) || [];
   const box = el("div", { class: "kv-list" });
   rows.slice(0, 5).forEach(function (r) {
-    box.appendChild(el("div", { class: "kv" },
-      el("span", { text: t("gui_al_ev_actor") }), el("b", { text: r.actor || r.actor_user || "—" })));
-    box.appendChild(el("div", { class: "kv" },
-      el("span", { text: t("gui_al_ev_action") }), el("b", { text: r.action || r.event_type || "—" })));
-    box.appendChild(el("div", { class: "kv" },
-      el("span", { text: t("gui_al_ev_resource") }), el("b", { text: r.resource_name || r.target_name || "—" })));
+    box.appendChild(kvRow(t("gui_al_ev_actor"), r.actor || r.actor_user || "—"));
+    // 動作：PCE 遮蔽端點時（action_redacted）只有方法是真的，路徑是它自己的
+    // "FILTERED" 標記——照字面印會變成「PUT FILTERED」，看起來像我們解析壞了。
+    box.appendChild(kvRow(
+      t("gui_al_ev_action"),
+      r.action_redacted
+        ? tf("gui_al_ev_action_redacted", { method: r.action_method || r.action || "—" })
+        : (r.action || r.event_type || "—")));
+    box.appendChild(kvRow(t("gui_al_ev_resource"), r.resource_name || r.target_name || "—"));
+    const info = r.notification_info || {};
+    Object.keys(info).forEach(function (k) {
+      box.appendChild(kvRow(evInfoLabel(k), evInfoValue(info[k])));
+    });
+    // 逐筆竄改明細：誰動了防火牆。「有人竄改」與「/usr/bin/nft 在 14:15
+    // 刪了一條 nftables 規則」對值班的人是完全不同的兩句話。
+    (r.notification_events || []).forEach(function (evt) {
+      const what = [evt.tamper_type, evt.process_name].filter(Boolean).join(" · ");
+      box.appendChild(kvRow(
+        t("gui_al_ev_tamper_detail"),
+        what ? (evt.process_id ? what + " (pid " + evt.process_id + ")" : what) : "—"));
+    });
   });
   return box;
 }

@@ -9,6 +9,10 @@ CLAUDE.md
 logs/state.json
 state.json
 data/
+# 但 tests/data/ 是測試語料，不是執行期狀態。bare `data/` 會吃掉任何深度的
+# data 目錄——2026-09-03 的 design/v3/reports/ 是同一個坑，在本機看不出來，
+# 到 CI 才炸，而且炸的方式跟本機重現不了。
+!tests/data/
 *.tmp
 *.temp
 

@@ -51,6 +51,63 @@ def _actor_key(row) -> str:
             return val
     return ""
 
+def _info_of(row) -> dict:
+    """該列的 notification_info（正規化器攤平的 PCE 通知欄位），沒有就空 dict。"""
+    info = row.get("notification_info")
+    return info if isinstance(info, dict) else {}
+
+def _tamper_detail(row) -> str:
+    """逐筆竄改明細濃縮成一格：型別 · 行程（最多兩筆，其餘以 +N 帶過）。"""
+    events = row.get("notification_events")
+    if not isinstance(events, list) or not events:
+        return "—"
+    parts = []
+    for item in events[:2]:
+        if not isinstance(item, dict):
+            continue
+        what = " · ".join(str(item[k]) for k in ("tamper_type", "process_name")
+                          if item.get(k))
+        if what:
+            parts.append(what)
+    if not parts:
+        return "—"
+    if len(events) > len(parts):
+        parts.append(f"+{len(events) - len(parts)}")
+    return "; ".join(parts)
+
+def _agent_security_rows(work: pd.DataFrame) -> list[dict]:
+    """Agent 安全事件本身要說的話——不必等到它後面接了一個 policy 變更。
+
+    相關性那三個 pattern 只在「A 之後 window 內出現 B」時才產生列，所以一台
+    被竄改、但沒有人接著改 policy 的主機，在這份報表裡原本一個字都沒有。而
+    PCE 26.2 起這類事件自己就帶著判讀所需的事實：是否已自動還原、判定是
+    confirmed 還是別的、涵蓋的時間區間與事件次數。**已自動還原的竄改與沒有
+    還原的竄改，處置優先序完全不同**，所以這張表把它們分開講。
+
+    欄位取自 `notification_info`（events/normalizer.py 的
+    `_extract_notification_info`）；舊版 PCE 或沒帶這些欄位的事件顯示 —，
+    不是 0/否——「沒說」與「沒有」不能混。
+    """
+    agent_events = work[work["event_type"].isin(_AGENT_SECURITY_EVENTS)]
+    rows: list[dict] = []
+    for _, row in agent_events.iterrows():
+        info = _info_of(row)
+        reverted = info.get("tampering_revert_succeeded")
+        rows.append({
+            "Event": row.get("event_type", ""),
+            "Time": str(row.get("timestamp", "")),
+            "Workload": _actor_key(row),
+            "Reverted": "—" if reverted is None else ("Yes" if reverted else "No"),
+            "Classification": str(info.get("event_classification", "") or "—"),
+            "Occurrences": info.get("num_events", "—"),
+            "First Seen": str(info.get("beginning_timestamp", "") or "—"),
+            "Last Seen": str(info.get("ending_timestamp", "") or "—"),
+            # 誰動的：竄改型別與行程名。這一欄決定調查從哪裡開始，而不是
+            # 只知道「這台被動過」。
+            "What / Process": _tamper_detail(row),
+        })
+    return rows
+
 def audit_event_correlation(df: pd.DataFrame, window_minutes: int = 30) -> dict:
     """Find temporally correlated suspicious event sequences."""
     if df.empty or "event_type" not in df.columns or "timestamp" not in df.columns:
@@ -191,7 +248,14 @@ def audit_event_correlation(df: pd.DataFrame, window_minutes: int = 30) -> dict:
     risk_order = {"CRITICAL": 0, "HIGH": 1, "MEDIUM": 2}
     deduped.sort(key=lambda x: risk_order.get(x.get("Risk", "MEDIUM"), 9))
 
+    agent_rows = _agent_security_rows(work)
+    # 沒有自動還原的竄改要能一眼看出來——它是這張表裡唯一需要有人現在動手的列。
+    agent_unreverted = sum(1 for r in agent_rows if r["Reverted"] == "No")
+
     return {
+        "agent_security_events": pd.DataFrame(agent_rows[:20]) if agent_rows else pd.DataFrame(),
+        "total_agent_security": len(agent_rows),
+        "agent_security_unreverted": agent_unreverted,
         "correlated_sequences": pd.DataFrame(deduped[:30]) if deduped else pd.DataFrame(),
         "total_correlations": len(deduped),
         "brute_force_detections": pd.DataFrame(brute_force_rows[:20]) if brute_force_rows else pd.DataFrame(),

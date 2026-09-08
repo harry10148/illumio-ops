@@ -408,6 +408,17 @@ for rule_id, zh_name in {
 
 for key, entry in {
     "rpt_tr_attack_summary": ("Attack Summary", "攻擊摘要"),
+    # mod04 的 Agent 安全事件表（2026-09-08）。COL_I18N 由**這份 overlay**
+    # 推導，不是由 i18n_*.json——欄名寫進 JSON 是不會生效的。
+    "rpt_col_agent_event": ("Event", "事件"),
+    "rpt_col_agent_time": ("Time", "時間"),
+    "rpt_col_agent_workload": ("Workload", "Workload"),
+    "rpt_col_agent_reverted": ("Reverted", "已自動還原"),
+    "rpt_col_agent_classification": ("Classification", "判定分類"),
+    "rpt_col_agent_occurrences": ("Occurrences", "事件次數"),
+    "rpt_col_agent_first_seen": ("First Seen", "起始時間"),
+    "rpt_col_agent_last_seen": ("Last Seen", "結束時間"),
+    "rpt_col_agent_detail": ("What / Process", "竄改型別／行程"),
 }.items():
     STRINGS[key] = _entry(entry[0], entry[1])
 

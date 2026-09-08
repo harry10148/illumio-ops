@@ -570,11 +570,15 @@ class AuditGenerator:
             'action',
             'action_method',
             'action_path',
+            'action_redacted',
             'workloads_affected',
             'known_event_type',
             'parser_notes',
             'resource_changes_count',
             'notifications_count',
+            'notification_types',
+            'notification_info',
+            'notification_events',
         )
         for column in normalized_columns:
             if column in normalized_df.columns:

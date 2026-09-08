@@ -591,6 +591,21 @@ class AuditHtmlExporter:
             + f' &nbsp;|&nbsp; {_s("rpt_au_off_hours")} <b>{total_oh}</b></p>'
         )
 
+        # Agent 安全事件先講：它不必等到後面接了一個 policy 變更才有話說，
+        # 而「已自動還原」與「沒有還原」是完全不同的處置優先序。
+        agent_df = m.get("agent_security_events")
+        if agent_df is not None and hasattr(agent_df, "empty") and not agent_df.empty:
+            unreverted = m.get("agent_security_unreverted", 0)
+            tone = ' note-warn" data-tone="warn' if unreverted else ''
+            html += (
+                f'<h3>{_s("rpt_au_agent_section")}</h3>'
+                f'<p class="note{tone}">'
+                + (t("rpt_au_agent_unreverted", lang=_lang, n=unreverted) if unreverted
+                   else _s("rpt_au_agent_all_reverted"))
+                + '</p>'
+                + _df_to_html(agent_df, lang=_lang)
+            )
+
         corr_df = m.get("correlated_sequences")
         if corr_df is not None and hasattr(corr_df, "empty") and not corr_df.empty:
             html += (
