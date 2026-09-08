@@ -251,14 +251,16 @@ FilterBar 序列化出的 key（`src_labels`／`dst_workloads`／`services`／
   四格各自是連結，分別到 `#/system/pce`、`#/investigate/traffic`、
   `#/system/cache`、`#/investigate/alerts`。資料取自 `/api/dashboard/overview`，
   與健康燈同一次載入。快取未開或該面板算不出來時顯示破折號並說明原因，不印 0。
-- **最近的告警**（HM-01）：前 10 則，一列一件——左側嚴重度色條、時間、規則名
-  與一句摘要、狀態晶片。整列就是連結，點進去是那一件的告警頁。上方可在
-  「未處理／全部」之間切換，右上「看全部」到 `#/investigate/alerts`。
 - **系統健康**（HM-02）：六盞燈，見上面的〈系統健康〉。
 - **今天的排程**（HM-03）：今天會發生的規則排程、報表排程與 retention／archive
   工作，各一行連到它自己的頁。
 - **Policy 現況**（HM-05）：posture 分數、已納管 workload 比例、ruleset 數，
   以及到報表區的連結。
+
+首頁不列出告警內容，只回答「有沒有事要做」。標題那個數字是還沒處理的件數，
+四格儀表的最後一格是 24 小時內發出的數量；要看是哪幾件、要篩選或處理，走
+`#/investigate/alerts`——那裡才有分頁、篩選與詳情。標題的數字顯示破折號代表
+`/api/alerts` 沒有回應，不是「沒有告警」。
 
 #### 舊「總覽」區的內容去哪了
 

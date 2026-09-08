@@ -1023,25 +1023,21 @@ details.more .body { display: grid; gap: var(--space-4); padding: var(--space-5)
   .fsect { grid-template-columns: minmax(0, 1fr); }
 }
 
-.home { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: var(--space-7); align-items: start; }
-.home-main { min-width: 0; }
-/* HM-06 — the instrument strip spans both columns and leads the page, so it
-   reads before the alert list rather than beside it. */
+/* 2026-09-08: the recent-alerts list (HM-01) left the page, so the layout is
+   no longer "one wide list plus a narrow rail". The three remaining cards get
+   equal columns that collapse on their own; a fixed 1fr+320px would have left
+   the wide column empty. */
+.home { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: var(--space-7); align-items: start; }
+/* HM-06 — the instrument strip spans every column and leads the page. */
 .home > .kpirow { grid-column: 1 / -1; }
 a.kpicell { display: block; text-decoration: none; color: inherit; }
 a.kpicell:hover { background: var(--surface-hover); }
 a.kpicell:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
-.home-side { display: flex; flex-direction: column; gap: var(--space-6); }
 
 .sect-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-5); margin-bottom: var(--space-4); }
 .sect-head h3 { margin: 0; font-size: var(--fs-ui); font-weight: 700; color: var(--text-1); }
 .sect-head .seeall { margin-left: auto; font-size: var(--fs-body); color: var(--accent-fg); }
 .sect-head .seg button { min-height: 28px; font-size: var(--fs-mini); padding: 0 var(--space-4); }
-
-/* the home list is narrower than the alerts page's, so it drops the "who"
-   column rather than squeezing every other one */
-.home .lrow { grid-template-columns: 4px 96px minmax(0, 1fr) auto; }
-.home .lrow .who { display: none; }
 
 /* HM-02: six lamps, a sentence each, reasons behind a disclosure */
 .lamps { display: flex; flex-direction: column; gap: var(--space-2); }
@@ -1074,8 +1070,4 @@ a.kpicell:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px
 
 @media (max-width: 1000px) {
   .home { grid-template-columns: minmax(0, 1fr); }
-  /* .home .lrow is more specific than the folded .lrow rule above, so without
-     this it keeps its four-column desktop layout and the row's sentence lands
-     in the 96px clock column. */
-  .home .lrow { grid-template-columns: 4px minmax(0, 1fr); }
 }

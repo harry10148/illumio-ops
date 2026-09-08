@@ -55,7 +55,7 @@ def test_dashboard_story_live_browser():
             # That is the whole hazard of an env-gated test: it is not in CI, so
             # it rots silently. The replacement asserts the home page's own three
             # load-bearing surfaces, all of which render regardless of data state.
-            for cov in ("HM-01", "HM-02", "HM-06"):
+            for cov in ("HM-00", "HM-02", "HM-06"):
                 assert page.locator(f'[data-cov="{cov}"]').count() >= 1, f"missing {cov}"
         finally:
             browser.close()

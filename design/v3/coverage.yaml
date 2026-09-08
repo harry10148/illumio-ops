@@ -26,7 +26,9 @@ OV-14: {item: TLS 卡, route: "#/system/tls"}
 OV-15: {item: 告警管道卡(唯讀), route: "#/system/channels"}
 OV-16: {item: Integrations 狀態卡摘要(_buildOvCards), route: "#/system/siem"}
 HM-00: {item: 首頁 標題未處理告警數, route: "#/home"}
-HM-01: {item: 首頁 最近的告警（列式前 10、未處理／全部切換、看全部）, route: "#/home"}
+# HM-01 移除（2026-09-08，使用者要求）：首頁最近的告警 — 告警區就在一個點擊之外，
+# 而且那裡才有篩選、分頁與詳情。首頁那份是同一批資料的第二個、比較差的視圖，沒有人
+# 從這裡動手。未處理件數仍由 HM-00 的標題數字回答，24 小時告警數由 HM-06 的儀表回答。
 HM-02: {item: 首頁 系統健康（六燈＋每燈一句＋原因收合）, route: "#/home"}
 HM-03: {item: 首頁 今天的排程（規則排程／報表排程／retention）, route: "#/home"}
 # HM-04 移除（3E Task 4，2026-09-05）：7 天流量決策帶 — spec v3.1 §2 移到能對它動手的

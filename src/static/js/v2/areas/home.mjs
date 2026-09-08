@@ -1,9 +1,13 @@
-// home.mjs — #/home. Anchors HM-00..HM-03, HM-05, XC-10 (error card).
+// home.mjs — #/home. Anchors HM-00, HM-02, HM-03, HM-05, HM-06, XC-10 (error card).
 //
-// Spec v3.1 §2: the home page answers one question — "is there anything I
-// need to do right now" — so the RECENT ALERTS are the page and everything
-// else is background. 3B answered five questions with five equal panels in a
-// board; this is one list with three quiet cards beside it.
+// Spec v3.1 §2 made the RECENT ALERTS list the page and everything else
+// background. That list (HM-01) is gone as of 2026-09-08 at the operator's
+// request: the alerts area is one click away and owns the same rows with
+// filtering, paging and detail, so the home copy was a second, worse view of
+// data nobody acted on from here. What is still answered on this page is
+// "is there anything I need to do right now" — HM-00's open count in the
+// headline and HM-06's four instruments — without reprinting the list.
+// /api/alerts is still loaded, for counts.new alone (page_size 1).
 //
 // What v3.1 removed, and why each is not a loss:
 //   · the five-light health rail (XC-01). It was chrome on one route; its six
@@ -26,7 +30,7 @@ import { palette } from "../components/palette.mjs";
 import { withErrorCard } from "../components/errorcard.mjs";
 import { computeLights } from "../components/healthbar.mjs";
 import { audit } from "../core/audit.mjs";
-import { pageHead, sideCard, listRow, listFoot, chip } from "../components/page.mjs";
+import { pageHead, sideCard } from "../components/page.mjs";
 import { note, emptyState, loadOne } from "./cards.mjs";
 
 const ROUTE = "#/home";
@@ -36,50 +40,24 @@ const GO_SCHEDULES = "#/policy/schedules";
 const GO_REPORT_SCHEDULES = "#/reports/schedules";
 const GO_JOBS = "#/system/jobs";
 const GO_REPORTS = "#/reports";
-const GO_ALERT_RULES = "#/policy/alert-rules";
 const GO_PCE = "#/system/pce";
 const GO_CACHE = "#/system/cache";
 
 const SNAPS = ["status", "dashboard_overview", "rs_schedules", "report_schedules"];
-// spec §2: the list shows the ten most recent, with an unhandled/all switch.
-const LIST_SIZE = 10;
 
-// static keys so the i18n audit can see them (a concatenated key is invisible to it)
-const STATUS_LABEL = { new: "gui_alert_status_new", ack: "gui_alert_status_ack", done: "gui_alert_status_done" };
-const SEVERITY_RANK = { critical: 0, error: 1, warning: 2, warn: 2, info: 3 };
-
-function severityTone(sev) {
-  const s = String(sev || "").toLowerCase();
-  if (s === "critical" || s === "error") return "crit";
-  if (s === "warning" || s === "warn") return "warn";
-  return "info";
-}
-function statusTone(status) { return status === "done" ? "ok" : status === "ack" ? "info" : "warn"; }
-function statusText(status) { return t(STATUS_LABEL[status] || "gui_alert_status_new"); }
-
+/** HH:MM in the browser's zone — HM-03's schedule rows are times of day. */
 function hhmm(iso) {
   const d = new Date(iso);
   if (isNaN(d.getTime())) return "—";
   return String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0");
 }
-function day(iso) {
-  const d = new Date(iso);
-  if (isNaN(d.getTime())) return "";
-  return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
-}
-/** The summary minus the rule name it opens with — the row already has it. */
-function summaryTail(a) {
-  const summary = String(a.summary || "");
-  const rule = String(a.rule_name || "");
-  if (rule && summary.indexOf(rule) === 0) {
-    return summary.slice(rule.length).replace(/^\s*[·|,-]\s*/, "");
-  }
-  return summary;
-}
 
-function loadAll(status) {
+function loadAll() {
   return Promise.all(SNAPS.map(loadOne).concat([
-    api.load("alerts", { status: status, page: 1, page_size: LIST_SIZE }).catch(function (e) {
+    // HM-00 只要 counts.new，而 /api/alerts 的 counts 是整份未過濾的統計
+    // （alerts.py:68 store.counts()，與 status/paging 無關），所以這裡取
+    // 最小的一頁就夠——列表拿掉之後不需要把十筆搬回瀏覽器。
+    api.load("alerts", { page: 1, page_size: 1 }).catch(function (e) {
       console.error("[home] alerts failed to load", e);
       return { ok: false, error: String((e && e.message) || e) };
     }),
@@ -170,59 +148,6 @@ function kpiStrip(ov) {
     GO_ALERTS);
 
   return el("div", { class: "kpirow", "data-cov": "HM-06" }, venCell, flagCell, pipeCell, alertCell);
-}
-
-// ── HM-01 the recent alerts ─────────────────────────────────────────────────
-
-function alertList(alerts, state, repaint) {
-  const wrap = el("section", { class: "sect", "data-cov": "HM-01" });
-  const head = el("div", { class: "sect-head" },
-    el("h3", { text: t("gui_home_recent") }));
-
-  const filters = el("div", { class: "seg" });
-  [["new", "gui_home_filter_open"], ["", "gui_home_filter_all"]].forEach(function (pair) {
-    filters.appendChild(el("button", {
-      type: "button", text: t(pair[1]), "data-status": pair[0] || "all",
-      "aria-pressed": state.status === pair[0] ? "true" : "false",
-      onClick: function () { state.status = pair[0]; repaint(); },
-    }));
-  });
-  head.appendChild(filters);
-  head.appendChild(el("a", { class: "seeall", href: GO_ALERTS, text: t("gui_home_see_all") }));
-  wrap.appendChild(head);
-
-  if (!alerts || alerts.ok === false) {
-    wrap.setAttribute("data-tone", "warn");
-    wrap.appendChild(note(tf("error_generic", { error: (alerts && alerts.error) || "—" })));
-    return wrap;
-  }
-  const items = (alerts.items || []).slice().sort(function (a, b) {
-    return (SEVERITY_RANK[String(a.severity).toLowerCase()] ?? 9) - (SEVERITY_RANK[String(b.severity).toLowerCase()] ?? 9);
-  });
-  if (!items.length) {
-    wrap.setAttribute("data-tone", "ok");
-    wrap.appendChild(emptyState(t("gui_home_no_open_alerts"), GO_ALERTS, t("gui_home_go_alerts")));
-    return wrap;
-  }
-  const list = el("div", { class: "list" });
-  items.forEach(function (a) {
-    list.appendChild(listRow({
-      href: GO_ALERTS + "?id=" + encodeURIComponent(a.id),
-      tone: severityTone(a.severity),
-      when: { main: hhmm(a.fired_at), sub: day(a.fired_at) },
-      title: a.rule_name || "—",
-      sub: summaryTail(a),
-      status: chip(statusText(a.status), statusTone(a.status)),
-    }));
-  });
-  wrap.appendChild(list);
-  const counts = alerts.counts || {};
-  wrap.appendChild(listFoot(
-    tf("gui_home_recent_foot", { total: num(alerts.total || items.length), done: num(counts.done || 0) }),
-    el("a", { href: GO_ALERT_RULES, text: t("gui_al_manage_rules") })
-  ));
-  wrap.setAttribute("data-tone", items.some(function (a) { return severityTone(a.severity) === "crit"; }) ? "crit" : "warn");
-  return wrap;
 }
 
 // ── HM-02 system health ─────────────────────────────────────────────────────
@@ -379,7 +304,7 @@ function installTeardown(state) {
 }
 
 export async function mountHome(root, ctx) {
-  const state = { torn: false, status: "new" };
+  const state = { torn: false };
   installTeardown(state);
   const probe = el("div", { class: "ov-error-probe" });
   audit.register("home-error-card", function () {
@@ -416,11 +341,15 @@ export async function mountHome(root, ctx) {
   async function paint() {
     if (state.torn) return;
     clear(body);
-    await withErrorCard(body, "home (" + (SNAPS.length + 1) + ")", function () { return loadAll(state.status); }, function (d) {
+    await withErrorCard(body, "home (" + (SNAPS.length + 1) + ")", function () { return loadAll(); }, function (d) {
       if (ctx.stale() || state.torn) return;
       const st = d.status || {};
       const ov = d.dashboard_overview || {};
-      const counts = (d.alerts && d.alerts.counts) || {};
+      // HM-01 走了以後，/api/alerts 只剩 HM-00 這一個讀者，於是它的失敗也
+      // 只剩這一個出口。載不到就不可以印 0——那會說「沒有告警要處理」，正好
+      // 是最不能猜錯的方向；改印 —，並在副標說一次原因。
+      const alertsOk = !!(d.alerts && d.alerts.ok !== false);
+      const counts = (alertsOk && d.alerts.counts) || {};
       const open = counts.new || 0;
       const health = healthCard(st, ov);
 
@@ -432,23 +361,29 @@ export async function mountHome(root, ctx) {
         // spec §2's own example sentence: "{n} 件告警還沒處理，系統有 {m}
         // 項要看一下". The count is its own node so HM-00 has something to
         // anchor to and the number can carry the accent on its own.
-        h2.appendChild(el("b", { class: "hot", "data-cov": "HM-00", text: tf("gui_home_headline_count", { n: num(open) }) }));
+        h2.appendChild(el("b", {
+          class: "hot", "data-cov": "HM-00",
+          "data-tone": alertsOk ? null : "warn",
+          text: alertsOk ? tf("gui_home_headline_count", { n: num(open) })
+                         : tf("gui_home_headline_count", { n: "—" }),
+        }));
         h2.appendChild(el("span", { text: " " + tf("gui_home_headline_health", { m: num(health.bad.length) }) }));
       }
       const text = head.querySelector(".phead-text");
       const oldSub = text.querySelector("p");
-      const sub = el("p", { text: t("gui_home_sub") });
+      const sub = el("p", {
+        text: alertsOk ? t("gui_home_sub")
+                       : tf("error_generic", { error: (d.alerts && d.alerts.error) || "—" }),
+      });
       if (oldSub) text.replaceChild(sub, oldSub); else text.appendChild(sub);
 
       const policy = policyCard(ov);
-      const main = el("div", { class: "home-main" }, alertList(d.alerts, state, paint));
+      // 最近的告警拿掉之後，剩下的三張卡不再是「清單旁邊的配角」，所以不
+      // 走 main/side 兩欄，改成等寬並排——否則左邊會空著一個 2/3 的欄位。
       body.appendChild(kpiStrip(ov));
-      const side = el("aside", { class: "home-side" },
-        health.el,
-        todayCard(d.rs_schedules, d.report_schedules, ov),
-        policy);
-      body.appendChild(main);
-      body.appendChild(side);
+      body.appendChild(health.el);
+      body.appendChild(todayCard(d.rs_schedules, d.report_schedules, ov));
+      body.appendChild(policy);
       fillRulesets(policy, state);
     });
   }

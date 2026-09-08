@@ -196,7 +196,7 @@ def test_overview_coverage_anchors_present(v2_page):
     below (design/v3/coverage.yaml), and #/home carries the five new cards."""
     page, base_url = v2_page
     placement = {
-        HOME: {"HM-00", "HM-01", "HM-02", "HM-03", "HM-05", "HM-06"},
+        HOME: {"HM-00", "HM-02", "HM-03", "HM-05", "HM-06"},
         TRAFFIC: {"OV-04", "OV-05"},
         "#/reports": {"OV-03", "OV-06", "OV-07", "OV-08"},
         PCE: {"OV-01", "OV-12"},
@@ -499,17 +499,19 @@ def test_legacy_scalar_query_edit_preserves_filters_on_save(v2_context, temp_con
 
 
 def test_goto_link_navigates_to_another_area(v2_page):
-    """HM-01's "see all" leaves the home page for the alert list (v3.1).
+    """一張卡的次要連結要真的把人帶到別的區。
 
-    3B put a "Go to <route>" button in every card header; §5.2 took those out,
-    so the list's own secondary link is the affordance being asserted.
+    原本錨在 HM-01「看全部」上；那份最近的告警清單 2026-09-08 移除了，所以
+    改錨到 HM-05 policy 卡自己的 cardlink。斷言的是同一件事——3B 在每張卡的
+    標題放「前往 <route>」按鈕，§5.2 拿掉了，剩下的就是卡片自己的次要連結，
+    它必須有效。
     """
     page, base_url = v2_page
     _goto(page, base_url, HOME)
-    assert page.locator('section[data-cov="HM-01"]').count() == 1, "the list must render"
-    page.locator('section[data-cov="HM-01"] a.seeall').click()
-    page.wait_for_selector('[data-route="#/investigate/alerts"]')
-    assert page.evaluate("location.hash") == "#/investigate/alerts"
+    assert page.locator('[data-cov="HM-05"]').count() == 1, "the policy card must render"
+    page.locator('[data-cov="HM-05"] a.cardlink').click()
+    page.wait_for_selector('[data-route="#/reports"]')
+    assert page.evaluate("location.hash") == "#/reports"
 
 
 def test_teardown_closes_drawer_on_navigate_away(v2_page):
@@ -555,9 +557,13 @@ def test_home_palette_commands_drop_on_navigate_away(v2_page):
         page.unroute("**/api/status", bad_payload)
     assert [i for i in ids if i.startswith("ov:") or i.startswith("home:")] == [], ids
 
-def test_home_headline_counts_open_alerts_and_alert_rows_deep_link(v2_page, _isolate_alert_store):
-    """HM-00/HM-01: the headline number is /api/alerts counts.new and each row
-    links to that alert's page (spec §2; v3.1 replaced the inbox route)."""
+def test_home_headline_counts_open_alerts(v2_page, _isolate_alert_store):
+    """HM-00：標題那個數字是 /api/alerts 的 counts.new。
+
+    這條原本還一併斷言 HM-01 的每一列都深連到該告警；那份清單已移除，深連
+    的責任整個回到告警區（它本來就有自己的測試）。`counts` 是未過濾的全域
+    統計（alerts.py:68），所以首頁只取一頁最小的資料仍然數得對——這正是這
+    條要守的事。"""
     from src.alerts.store import AlertStore
     st = AlertStore(_isolate_alert_store)
     a = st.insert(fired_at="2026-09-04T01:00:00Z", type="traffic", rule_id="t1", rule_name="SSH in",
@@ -568,24 +574,27 @@ def test_home_headline_counts_open_alerts_and_alert_rows_deep_link(v2_page, _iso
     page, base_url = v2_page
     page.reload()
     _goto(page, base_url, HOME)
-    page.wait_for_selector('[data-cov="HM-01"] a.lrow')
+    page.wait_for_selector('[data-cov="HM-00"]')
     assert "2" in page.locator('[data-cov="HM-00"]').text_content()
-    rows = page.locator('[data-cov="HM-01"] a.lrow')
-    assert rows.count() == 2
-    # critical sorts first
-    assert "Login failed" in rows.nth(0).text_content()
-    assert rows.nth(1).get_attribute("href") == "#/investigate/alerts?id=%d" % a
+    assert a  # 這一則的存在就是那個 2 的一半
 
 
-def test_home_survives_alerts_api_failure(v2_page):
-    """HM-01 shows the error inline; the rest of the page still renders."""
+def test_home_does_not_report_zero_open_alerts_when_the_alerts_api_fails(v2_page):
+    """/api/alerts 掛掉時，標題不可以說「0 件告警還沒處理」。
+
+    HM-01 在的時候，這個錯誤有自己的出口（清單就地顯示錯誤）。清單移除後
+    /api/alerts 只剩 HM-00 一個讀者，錯誤也只剩這一個出口——若照 `counts.new
+    || 0` 落到 0，畫面會在最不能猜錯的方向上撒謊：它會說沒事。其餘的卡片
+    仍須照常渲染。"""
     page, base_url = v2_page
     page.route("**/api/alerts?*", lambda r: r.fulfill(status=500, content_type="application/json", body='{"ok": false, "error": "boom"}'))
     _goto(page, base_url, HOME)
     page.wait_for_selector('[data-cov="HM-02"]')
-    for cov in ("HM-01", "HM-02", "HM-03", "HM-05"):
+    for cov in ("HM-00", "HM-02", "HM-03", "HM-05", "HM-06"):
         assert page.locator('[data-cov="%s"]' % cov).count() == 1, cov
-    assert page.locator('[data-cov="HM-01"]').get_attribute("data-tone") == "warn"
+    headline = page.locator('[data-cov="HM-00"]')
+    assert "—" in headline.text_content(), headline.text_content()
+    assert headline.get_attribute("data-tone") == "warn"
     page.unroute("**/api/alerts?*")
 
 

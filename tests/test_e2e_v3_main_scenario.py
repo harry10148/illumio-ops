@@ -9,7 +9,7 @@
 
 | 步 | 路由 | 錨點 |
 |---|---|---|
-| 1 | `#/home` | `HM-01` 最近的告警 |
+| 1 | `#/home` | `HM-00` 未處理告警數＋`HM-06` 儀表 |
 | 2 | `#/investigate/alerts` | `AT-01` 告警清單 |
 | 3 | `#/investigate/alerts?id=<n>` | `AT-03` 告警頁四段 |
 | 4 | 同上 | `AT-04` 規則判定欄 |
@@ -20,8 +20,13 @@ v3 §3.1 的「步進＋上下文條」不在畫面上——v3.1 修訂砍掉了
 （`investigate.mjs`：“The strip, the stepper and the investigation flow they
 belonged to are gone.”）。照舊稿寫的走查會對著不存在的 UI 斷言。
 
-**告警 id 不寫死**：從首頁的最近告警列點進去，走查因此也順帶驗證了「首頁那一列
-真的是連結、真的指向那一件」。寫死 id 會讓這支測試在資料輪替後靜默失效。
+**告警 id 不寫死**：從告警清單的第一列取，走查因此也順帶驗證了清單那一列真的是
+連結、真的指向那一件。寫死 id 會讓這支測試在資料輪替後靜默失效。
+
+2026-09-08：第 1 步原本錨在首頁的「最近的告警」（`HM-01`）並從那裡取 id。那份
+清單依使用者要求移除了，所以第 1 步改成驗首頁仍然回答得出「有沒有事要做」
+（`HM-00` 的數字與 `HM-06` 的儀表），id 改由第 2 步的清單提供。這一支不在 CI 裡，
+壞掉不會有訊號，所以錨點跟著搬是移除工作的一部分，不是之後再說的事。
 """
 from __future__ import annotations
 
@@ -78,26 +83,33 @@ def test_the_main_scenario_walks_end_to_end():
             # ── 步驟 1：首頁看到「還沒處理的告警」 ─────────────────────────
             page.goto(base + "/#/home")
             page.wait_for_selector('body[data-booted="true"]', timeout=20000)
-            page.wait_for_selector('[data-cov="HM-01"]', timeout=20000)
-            _anchor(page, "HM-01")
-            # `?id=` 是關鍵：同一個區塊裡還有一個「看全部」連到清單頁的
-            # `#/investigate/alerts`（不帶 id）。抓錯那一條，第 3 步就沒有 id 可用。
-            recent = page.locator('[data-cov="HM-01"] a[href*="alerts?id="]')
-            assert recent.count() >= 1, (
-                "首頁的最近告警一則都沒有——這台機器上沒有告警資料，主場景走不下去。"
-                "不是版面問題，先確認 logs/alerts.sqlite 有內容。")
-            href = recent.first.get_attribute("href") or ""
+            page.wait_for_selector('[data-cov="HM-00"]', timeout=20000)
+            _anchor(page, "HM-00")
+            _anchor(page, "HM-06")
+            # 首頁的職責是回答「現在有沒有事要做」。標題那個數字若是 —，代表
+            # /api/alerts 掛了，不是「沒有告警」——那種情況要當場停，不要讓走查
+            # 帶著壞掉的前提往下走。
+            headline = page.locator('[data-cov="HM-00"]').inner_text()
+            assert "—" not in headline, (
+                f"首頁未處理告警數是 —，代表 /api/alerts 沒回應：{headline!r}")
             _step(page, 1, "home")
 
             # ── 步驟 2：告警清單 ─────────────────────────────────────────
             page.goto(base + "/#/investigate/alerts")
             page.wait_for_selector('[data-cov="AT-01"]', timeout=20000)
             _anchor(page, "AT-01")
+            # 走查要走進「某一件」告警，id 從清單第一列取——寫死會在資料輪替後
+            # 靜默失效。
+            row = page.locator('[data-cov="AT-01"] a[href*="alerts?id="]')
+            assert row.count() >= 1, (
+                "告警清單一則都沒有——這台機器上沒有告警資料，主場景走不下去。"
+                "不是版面問題，先確認 logs/alerts.sqlite 有內容。")
+            href = row.first.get_attribute("href") or ""
             _step(page, 2, "alert-list")
 
             # ── 步驟 3：告警頁 ───────────────────────────────────────────
             m = re.search(r"id=(\d+)", href)
-            assert m, f"首頁那一列的連結沒有帶 id：{href!r}"
+            assert m, f"清單那一列的連結沒有帶 id：{href!r}"
             alert_id = m.group(1)
             page.goto(base + "/#/investigate/alerts?id=" + alert_id)
             page.wait_for_selector('[data-cov="AT-03"]', timeout=20000)
