@@ -1442,7 +1442,16 @@ class _TrafficReportBase:
         out += '</div>'
 
         if bw_is_bound:
-            out += f'<p class="note" style="font-size:11px">{t("alert_criteria_lower_bound_note", lang=_lang)}</p>'
+            # 「速率基準」以前是每一列一格；那一欄在這個 PCE 上永遠是同一個值，
+            # 所以改由這句話承擔。全部是下界與「混了幾筆量測值」必須說得出差別
+            # ——否則刪掉欄位就等於刪掉資訊，而不是換個地方講。
+            _n_bound = m.get('bandwidth_bound_flow_count', 0)
+            _n_point = m.get('bandwidth_point_flow_count', 0)
+            _basis_note = (
+                t("rpt_bw_all_rates_are_bounds", lang=_lang) if not _n_point
+                else t("rpt_bw_some_rates_are_bounds", lang=_lang,
+                       bound=_n_bound, total=_n_bound + _n_point))
+            out += f'<p class="note" style="font-size:11px">{_basis_note}</p>'
         bw_unavailable = m.get('bandwidth_unavailable_count', 0)
         if bw_unavailable:
             out += (f'<p class="note" style="font-size:11px">'

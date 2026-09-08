@@ -132,20 +132,38 @@ class TestMixedBasisAggregateStats:
         assert result['bandwidth_point_flow_count'] == 3
 
 
-class TestTopBandwidthBasisLabelling:
-    def test_top_bandwidth_marks_each_rows_basis(self):
+class TestBasisIsToldInTheProseNotAColumn:
+    """速率基準不再是每列一格的欄位（2026-09-08）。
+
+    這個 PCE 幾乎不回報 flow 的區間時距，所以每一列算出來的都是下界，整欄
+    永遠是同一個值——佔掉寬度卻分辨不了任何東西。刪欄的前提是**資訊要換個
+    地方講**，不是消失：混合情況（有些是量測值）與全部都是下界，讀者仍然
+    必須分得出來。所以這裡不再斷言「兩列的標籤不同」，改成斷言敘述句說得出
+    差別。
+    """
+
+    def test_neither_table_carries_a_per_row_basis_column(self):
         df = pd.DataFrame([
             _point_row_interval(100.0, dst_ip='10.0.1.10'),
             _bound_row(500.0, dst_ip='10.0.1.20'),
         ])
         result = bandwidth_analysis(df)
-        top = result['top_bandwidth']
 
-        assert 'Rate Basis' in top.columns
-        by_dst = dict(zip(top['Dst IP'], top['Rate Basis']))
-        # The two labels must differ -- a bound row's rate cannot render
-        # identically to a point-value row's, even sorted next to each other.
-        assert by_dst['10.0.1.10'] != by_dst['10.0.1.20']
+        assert 'Rate Basis' not in result['top_bandwidth'].columns
+        assert 'Rate Basis' not in result['top_by_bytes'].columns
+        # 速率本身仍在——刪掉的是基準欄，不是量測值。
+        assert 'Bandwidth (Mbps)' in result['top_bandwidth'].columns
+
+    def test_the_counts_that_feed_the_prose_survive(self):
+        """敘述句靠這兩個計數；它們消失，刪欄就變成刪資訊。"""
+        df = pd.DataFrame([
+            _point_row_interval(100.0, dst_ip='10.0.1.10'),
+            _bound_row(500.0, dst_ip='10.0.1.20'),
+        ])
+        result = bandwidth_analysis(df)
+
+        assert result['bandwidth_bound_flow_count'] == 1
+        assert result['bandwidth_point_flow_count'] == 1
 
 
 class TestUnavailableRowsCounted:
@@ -382,3 +400,26 @@ class TestMod11HtmlRendersTheBoundLabel:
         assert "≥ 100.00 Mbps" not in html
         assert "100.00 Mbps" in html
         assert "lower bound" not in html.lower()
+
+    def test_the_note_tells_all_bounds_apart_from_a_mixed_population(self, tmp_path):
+        """刪掉每列的「速率基準」欄之後，這句話是基準資訊唯一的落點。
+        全部是下界與「混了幾筆量測值」若渲染成同一句，欄位就是被刪掉而不是
+        被搬家——這條是那件事的守門。"""
+        df = pd.DataFrame([{"Port": 443, "Protocol": "TCP", "Flow Count": 10}])
+        base = {
+            "bytes_data_available": True, "total_bytes": 1000, "total_mb": 1.0,
+            "top_by_bytes": df, "top_bandwidth": df,
+            "max_bandwidth_mbps": 500.0, "avg_bandwidth_mbps": 170.0,
+            "p95_bandwidth_mbps": 480.0, "bandwidth_stats_is_bound": True,
+            "bandwidth_unavailable_count": 0, "bandwidth_candidate_count": 4,
+        }
+        all_bound = self._export_html(tmp_path, dict(
+            base, bandwidth_bound_flow_count=4, bandwidth_point_flow_count=0))
+        mixed = self._export_html(tmp_path, dict(
+            base, bandwidth_bound_flow_count=3, bandwidth_point_flow_count=1))
+
+        assert "Every rate in this section is a lower bound" in all_bound
+        assert "Every rate in this section is a lower bound" not in mixed
+        assert "3 of the 4 rates" in mixed
+        # 混合時要說得出還有量測值存在，否則讀者會以為全部都是下界。
+        assert "measured" in mixed.lower()

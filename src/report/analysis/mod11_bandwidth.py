@@ -76,17 +76,14 @@ def bandwidth_analysis(df: pd.DataFrame, top_n: int = 20, *, lang: str = "en") -
                   'dst_ip': 'Dst IP', 'dst_hostname': 'Dst Host',
                   'port': 'Port', 'proto': 'Proto',
                   'bytes_total': 'Bytes Total', 'policy_decision': 'Decision'}
+    # 每一列的「速率基準」不再是欄位。這個 PCE 回的 flow 幾乎不帶區間時距，
+    # 所以每一列都算出下界——一整欄同樣的「≥ 下界」佔掉寬度卻不分辨任何東西。
+    # 基準改由本節開頭的敘述承擔（`bandwidth_bound_flow_count` /
+    # `bandwidth_point_flow_count` 兩個計數餵給說明句），這樣混合情況仍然說得
+    # 出來，而且是一句話而不是一整欄。
     if 'bandwidth_mbps' in has_bytes.columns:
-        _measured_label = t('rpt_bw_basis_measured', lang=lang)
-        _bound_label = t('rpt_bw_basis_bound', lang=lang)
-        _rate_basis = pd.Series(_measured_label, index=has_bytes.index)
-        _rate_basis = _rate_basis.mask(_lower_bound_mask(has_bytes), _bound_label)
-        _rate_basis = _rate_basis.mask(has_bytes['bandwidth_mbps'].isna(), '—')
-        has_bytes['rate_basis'] = _rate_basis
         _bw_cols.insert(-1, 'bandwidth_mbps')
         _bw_rename['bandwidth_mbps'] = 'Bandwidth (Mbps)'
-        _bw_cols.insert(-1, 'rate_basis')
-        _bw_rename['rate_basis'] = 'Rate Basis'
     top_by_bytes = (has_bytes.nlargest(top_n, 'bytes_total')[_bw_cols]
                     .rename(columns=_bw_rename))
     result['top_by_bytes'] = top_by_bytes
@@ -130,16 +127,11 @@ def bandwidth_analysis(df: pd.DataFrame, top_n: int = 20, *, lang: str = "en") -
         result['bandwidth_point_flow_count'] = n_point
 
         top_bw_rows = has_bw.nlargest(top_n, 'bandwidth_mbps')
-        _measured_label = t('rpt_bw_basis_measured', lang=lang)
-        _bound_label = t('rpt_bw_basis_bound', lang=lang)
-        top_bw_basis = _lower_bound_mask(top_bw_rows).map(
-            {True: _bound_label, False: _measured_label})
         top_bw = (top_bw_rows[['src_ip', 'dst_ip', 'port', 'proto', 'bandwidth_mbps', 'bytes_total']]
                   .rename(columns={'src_ip': 'Src IP', 'dst_ip': 'Dst IP',
                                    'port': 'Port', 'proto': 'Proto',
                                    'bandwidth_mbps': 'Bandwidth (Mbps)',
                                    'bytes_total': 'Bytes Total'}))
-        top_bw['Rate Basis'] = top_bw_basis.values
         result['top_bandwidth'] = top_bw
         result['max_bandwidth_mbps'] = round(float(has_bw['bandwidth_mbps'].max()), 3)
         result['avg_bandwidth_mbps'] = round(float(has_bw['bandwidth_mbps'].mean()), 3)

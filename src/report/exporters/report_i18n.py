@@ -267,7 +267,6 @@ for suffix, entry in {
     "total_bytes": ("Total Bytes", "總 Bytes"),
     "bytes_conn": ("Bytes/Conn", "Bytes/Conn"),
     "bandwidth_mbps": ("Bandwidth (Mbps)", "頻寬（Mbps）"),
-    "rate_basis": ("Rate Basis", "速率基準"),
     "source_app": ("Source App", "來源 App"),
     "source_env": ("Source Env", "來源環境"),
     "enforcement_mode": ("Enforcement Mode", "Enforcement 模式"),
