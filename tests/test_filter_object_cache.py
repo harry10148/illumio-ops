@@ -186,3 +186,45 @@ def test_service_summary_all_services_wildcard():
     from src.gui.filter_object_cache import _service_summary
     svc = {"service_ports": [{"proto": -1}]}
     assert _service_summary(svc) == "all"
+
+
+class TestLabelKeyScoping:
+    """單鍵選擇器（報表區的 app / env 兩個欄位）要的是「只有這個 key 的值」。
+
+    為什麼要在端點這一層做，而不是把整份 label 抓回前端自己濾：`total` 與
+    `truncated` 是端點算的。前端自己濾的話，畫面上剩三筆、`total` 卻說有兩百，
+    截斷提示就會對著錯的數字說話——而截斷提示正是這個欄位最不能說謊的地方。
+    """
+
+    def test_browse_with_a_label_key_returns_only_that_keys_values(self):
+        api = _api()
+        r = filter_object_cache.browse_cached_objects(api, "label", 0, 50, label_key="env")
+
+        assert [i["value"] for i in r["items"]] == ["Production"]
+        # total 必須跟著過濾走，否則截斷提示會拿全量的數字說話。
+        assert r["total"] == 1
+        assert r["truncated"] is False
+
+    def test_browse_without_a_label_key_is_unchanged(self):
+        api = _api()
+        r = filter_object_cache.browse_cached_objects(api, "label", 0, 50)
+
+        assert r["total"] == 3
+        assert {i["key"] for i in r["items"]} == {"Net", "env"}
+
+    def test_the_key_census_still_answers_what_keys_exist(self):
+        """groups 回答的是「這個 PCE 有哪些 key」；過濾之後那個問題就沒有答案
+        了，所以它必須是未過濾前的統計。"""
+        api = _api()
+        r = filter_object_cache.browse_cached_objects(api, "label", 0, 50, label_key="env")
+
+        assert {g["key"]: g["count"] for g in r["groups"]} == {"Net": 2, "env": 1}
+
+    def test_suggest_with_a_label_key_cannot_return_another_keys_value(self):
+        api = _api()
+        # "Server-172.16.15" 只存在於 key=Net 底下；限定 env 時不可以出現。
+        hit = search_cached_objects(api, "Server", ["label"], 10, label_key="env")
+        assert hit["label"]["items"] == []
+
+        without = search_cached_objects(api, "Server", ["label"], 10)
+        assert [i["value"] for i in without["label"]["items"]] == ["Server-172.16.15"]

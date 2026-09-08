@@ -28,6 +28,9 @@ def make_filter_objects_blueprint(cm, csrf, limiter, login_required):
             limit = max(1, min(_MAX_LIMIT, int(request.args.get('limit', 10))))
         except (ValueError, TypeError):
             limit = 10
+        # key= 只對 label 有意義：把候選限制在單一 label key 底下，給
+        # 「這個欄位只能是 env」這種單鍵選擇器用（報表區的 app/env）。
+        label_key = (request.args.get('key') or '').strip() or None
         if not q or not types:
             return jsonify({"ok": True, "results": {}})
 
@@ -40,7 +43,8 @@ def make_filter_objects_blueprint(cm, csrf, limiter, login_required):
             if cached_types:
                 # 快取類：module cache 若已填則離線也可回；填充失敗回空清單、不整體失敗
                 try:
-                    results.update(search_cached_objects(api, q, cached_types, limit))
+                    results.update(search_cached_objects(
+                        api, q, cached_types, limit, label_key=label_key))
                 except Exception:
                     for t in cached_types:
                         results[t] = {"items": [], "error": "pce_unreachable"}
@@ -63,6 +67,8 @@ def make_filter_objects_blueprint(cm, csrf, limiter, login_required):
         except (ValueError, TypeError):
             limit = 20
 
+        label_key = (request.args.get('key') or '').strip() or None
+
         if btype == 'workload':
             return jsonify({"ok": True, "browseable": False, "items": [], "total": None})
 
@@ -78,7 +84,8 @@ def make_filter_objects_blueprint(cm, csrf, limiter, login_required):
             if btype not in _CACHED_TYPES:
                 return jsonify({"ok": False, "error": "unknown_type"}), 400
             try:
-                return jsonify({"ok": True, **browse_cached_objects(api, btype, offset, limit)})
+                return jsonify({"ok": True, **browse_cached_objects(
+                    api, btype, offset, limit, label_key=label_key)})
             except Exception:
                 return jsonify({"ok": False, "error": "pce_unreachable"}), 502
 

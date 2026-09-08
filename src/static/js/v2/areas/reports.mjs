@@ -518,19 +518,51 @@ function genDrawer(rt, d, lang, hooks) {
   startInput.dataset.field = "start_date";
   endInput.dataset.field = "end_date";
 
-  // RP-09's other half: the two selects the product fills from /api/labels.
-  // The initial load is one unkeyed list (endpoints.yaml:56 calls
-  // /api/labels with no key), so BOTH selects are fed from it and the drawer
-  // says so rather than pretending it fetched key=app and key=env separately.
-  const labels = (d.labels && d.labels.labels) || [];
-  labels.forEach(function (v) { appSel.appendChild(el("option", { value: v, text: v })); });
-  envSel.appendChild(el("option", { value: "", text: t("gui_env_any") }));
-  labels.forEach(function (v) { envSel.appendChild(el("option", { value: v, text: v })); });
+  // RP-09's other half. These two used to be fed from ONE unkeyed /api/labels
+  // list, so the env select listed every label value on the PCE — app names,
+  // roles, locations — and the drawer's own note admitted it. They now come
+  // from the object-filter system the rest of the drawer already uses, one
+  // keyed browse each (`type=label&key=app` / `key=env`), so each select can
+  // only ever offer values of its own key. What is sent is unchanged: the
+  // label's VALUE, in the same `app` / `env` string fields the report has
+  // always taken (app_summary_report.build(app, env)).
+  const LABEL_PAGE = 100;   // the browse endpoint's own ceiling
   appSel.addEventListener("change", repaint);
   envSel.addEventListener("change", repaint);
+  const appNote = el("p", { class: "note" });
+  const envNote = el("p", { class: "note" });
   const appBox = el("div", null,
-    editField("app", t("gui_app_label_field"), appSel, t("gui_rp_app_required")),
-    editField("env", t("gui_env_label_field"), envSel));
+    editField("app", t("gui_app_label_field"), appSel, t("gui_rp_app_required")), appNote,
+    editField("env", t("gui_env_label_field"), envSel), envNote);
+
+  function fillLabelSelect(sel, noteEl, labelKey, anyText) {
+    clear(sel);
+    if (anyText) sel.appendChild(el("option", { value: "", text: anyText }));
+    return filterObjectQuery.browse("label", 0, LABEL_PAGE, labelKey).then(function (r) {
+      const items = (r && r.items) || [];
+      items.forEach(function (it) {
+        const v = it.value === undefined ? it.name : it.value;
+        sel.appendChild(el("option", { value: v, text: v }));
+      });
+      if (!items.length) {
+        noteEl.textContent = tf("gui_rp_label_key_empty", { key: labelKey });
+      } else if (r && r.truncated) {
+        // 截斷不可以是靜默的：選單少了選項而畫面若不說，操作者只會以為那個
+        // 值不存在。
+        noteEl.textContent = tf("gui_rp_label_key_truncated",
+          { shown: items.length, total: r.total, key: labelKey });
+      } else {
+        noteEl.textContent = "";
+      }
+      repaint();
+    }).catch(function (e) {
+      noteEl.textContent = tf("error_generic", { error: String((e && e.message) || e) });
+    });
+  }
+  if (rt.has("app")) {
+    fillLabelSelect(appSel, appNote, "app", null);
+    fillLabelSelect(envSel, envNote, "env", t("gui_env_any"));
+  }
 
   // RP-02's filter block: three pd checkboxes + the shared FilterBar.
   const pdRow = el("div", { class: "typechips" });

@@ -731,3 +731,58 @@ def test_specific_traffic_prefixes_are_matched_before_the_bare_dated_one(v2_repo
         assert page.locator(
             'article.rpcard[data-rtype="%s"] .rpcard-last .v' % rtype
         ).inner_text() != "\u2014", rtype
+
+
+def test_the_env_select_only_offers_env_values(v2_page):
+    """App 摘要的 app / env 兩個下拉不再共用同一份未分 key 的 label 清單。
+
+    原本兩個 select 都餵 `/api/labels` 的**無 key**全量清單（reports.mjs 自己的
+    註解也承認了這件事），所以 env 選單裡列著 app 名稱、role、location——操作者
+    要在一堆不相干的值裡面找 env。改成走物件篩選系統，各自一次帶 key 的 browse。
+
+    斷言對準目的：**env 選單不可以出現只屬於 app 的值**，反之亦然。只比對
+    「有沒有呼叫帶 key 的端點」是形狀，不是規則——端點被呼叫了但選單照樣塞
+    滿全部的值，那個斷言仍會綠。
+
+    PCE 在這個 harness 裡是關閉的埠，所以兩次 browse 都在網路邊界上以真實形狀
+    回應（`{ok, items, total}`），其餘（drawer、select、repaint）全是真的。
+    """
+    page, base_url = v2_page
+
+    def label_browse(route):
+        url = route.request.url
+        key = "env" if "key=env" in url else ("app" if "key=app" in url else None)
+        rows = {
+            "app": [{"name": "app=payments", "key": "app", "value": "payments"},
+                    {"name": "app=billing", "key": "app", "value": "billing"}],
+            "env": [{"name": "env=prod", "key": "env", "value": "prod"}],
+        }
+        items = rows.get(key, [r for v in rows.values() for r in v])
+        route.fulfill(status=200, content_type="application/json",
+                      body=json.dumps({"ok": True, "items": items,
+                                       "total": len(items), "truncated": False}))
+
+    page.route("**/api/filter-objects/browse?type=label*", label_browse)
+    try:
+        _goto(page, base_url, ROUTE, "RP-01")
+        page.locator('article[data-rtype="app_summary"] button.btn.primary').click()
+        page.wait_for_selector('[data-cov="RP-02"]')
+        # <option> 在 <select> 裡永遠是 hidden，只能等 attached。
+        page.wait_for_selector('[data-cov="RP-02"] select option[value="prod"]',
+                               state="attached")
+
+        app_opts = page.eval_on_selector_all(
+            '[data-cov="RP-02"] [data-field="app"] option',
+            "els => els.map(e => e.value)")
+        env_opts = page.eval_on_selector_all(
+            '[data-cov="RP-02"] [data-field="env"] option',
+            "els => els.map(e => e.value)")
+    finally:
+        page.unroute("**/api/filter-objects/browse?type=label*", label_browse)
+
+    assert "payments" in app_opts and "billing" in app_opts, app_opts
+    assert "prod" not in app_opts, app_opts
+    # env 保留「不限」的空值，其餘只能是 env 的值。
+    assert "prod" in env_opts, env_opts
+    assert "payments" not in env_opts and "billing" not in env_opts, env_opts
+    assert "" in env_opts, env_opts

@@ -5079,6 +5079,8 @@
   "gui_rp_label_pick": "已選 {label}",
   "gui_rp_labels_n": "{n} 個 label",
   "gui_rp_labels_note": "點一個 label 會帶著它開啟 App 摘要報表的產生視窗。",
+  "gui_rp_label_key_empty": "這個 PCE 上沒有 key 是 {key} 的 label。",
+  "gui_rp_label_key_truncated": "只列出 {key} 的前 {shown} 個值（共 {total} 個）。",
   "gui_rp_lang_field_hint": "預設值來自 UI 語言：zh_TW 以外一律送 en（syncReportLangToUi）。",
   "gui_rp_lang_note": "報表語言與 UI 語言是兩件事：這裡改的是產生 drawer 的預設值，會隨每次產生一起送出 lang。",
   "gui_rp_lang_set": "報表語言預設值改為 {lang}",

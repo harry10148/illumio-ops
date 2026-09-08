@@ -5080,6 +5080,8 @@
   "gui_rp_label_pick": "Picked {label}",
   "gui_rp_labels_n": "{n} labels",
   "gui_rp_labels_note": "Picking a label opens the app-summary generate drawer with it.",
+  "gui_rp_label_key_empty": "This PCE has no labels with the key {key}.",
+  "gui_rp_label_key_truncated": "Showing the first {shown} of {total} {key} values.",
   "gui_rp_lang_field_hint": "The default follows the UI language: anything other than zh_TW is sent as en (syncReportLangToUi).",
   "gui_rp_lang_note": "Report language and UI language are separate: this sets the generate drawer's default, and lang travels with every generate.",
   "gui_rp_lang_set": "Report language default set to {lang}",

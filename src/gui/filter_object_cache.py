@@ -142,9 +142,17 @@ def cached_type_totals(api) -> dict[str, int]:
     return {t: len(_get_or_fill(api, key, fn)) for t, (key, fn) in _TYPE_FETCHERS.items()}
 
 
-def browse_cached_objects(api, btype: str, offset: int, limit: int) -> dict:
+def browse_cached_objects(api, btype: str, offset: int, limit: int,
+                          *, label_key: str | None = None) -> dict:
     """單一類別全量瀏覽分頁。label 依 (key, value) 排序並附 groups 統計；
-    其他類別依 name 排序。item 形狀與 suggest 一致。"""
+    其他類別依 name 排序。item 形狀與 suggest 一致。
+
+    label_key 只對 btype == "label" 有意義：只留下那一個 key 的 label。給
+    「這個欄位只能是 env」這種單鍵選擇器用——沒有它，呼叫端只能把整份 label
+    抓回去自己濾，而 total 與 truncated 就會是整份的數字、對不上畫面。
+    groups 仍然是**未過濾前**的全量統計：它回答的是「這個 PCE 有哪些 key」，
+    過濾掉之後那個問題就沒有答案了。
+    """
     key, fn = _TYPE_FETCHERS[btype]
     objs = _get_or_fill(api, key, fn)
     if btype == "label":
@@ -152,6 +160,8 @@ def browse_cached_objects(api, btype: str, offset: int, limit: int) -> dict:
         groups: dict[str, int] = {}
         for l in objs:
             groups[l.get("key") or ""] = groups.get(l.get("key") or "", 0) + 1
+        if label_key:
+            objs = [l for l in objs if (l.get("key") or "") == label_key]
         items = [{"name": f"{l.get('key', '')}={l.get('value', '')}",
                   "key": l.get("key"), "value": l.get("value"), "href": l.get("href")}
                  for l in objs[offset:offset + limit]]
@@ -168,15 +178,20 @@ def browse_cached_objects(api, btype: str, offset: int, limit: int) -> dict:
     return {"items": items, "total": len(objs), "truncated": offset + limit < len(objs)}
 
 
-def search_cached_objects(api, q: str, types: list[str], limit: int) -> dict[str, Any]:
+def search_cached_objects(api, q: str, types: list[str], limit: int,
+                          *, label_key: str | None = None) -> dict[str, Any]:
     """對 cached 四類（label/label_group/iplist/service）做子字串比對，回分類分組結果。
 
     只處理 types 中屬 cached 四類者；workload 由端點另行即時查。
+    label_key 與 browse_cached_objects 同義：只對 label 生效，把候選限制在
+    那一個 key 底下。
     """
     out: dict[str, Any] = {}
     if "label" in types:
         key, fn = _TYPE_FETCHERS["label"]
         objs = _get_or_fill(api, key, fn)
+        if label_key:
+            objs = [l for l in objs if (l.get("key") or "") == label_key]
         items, trunc = _match_labels(objs, q, limit)
         out["label"] = {"items": items, "truncated": trunc}
     if "iplist" in types:

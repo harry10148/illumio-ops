@@ -64,11 +64,18 @@ export const filterObjectQuery = {
       + "&limit=" + q(limit || SUGGEST_LIMIT)).then(ok);
   },
 
-  /** browse(cat, offset, limit) -> Promise<{items, total, browseable?}> */
-  browse(cat, offset, limit) {
+  /** browse(cat, offset, limit, labelKey?) -> Promise<{items, total, browseable?}>
+   *
+   * labelKey 只對 cat === "label" 有意義（端點忽略其他類別）：把候選限制在
+   * 單一 label key 底下，讓「這個欄位只能是 env」這種選擇器不必把整份 label
+   * 抓回來自己濾——自己濾的話 total 與 truncated 會是整份的數字，跟畫面上
+   * 看得到的筆數對不上。
+   */
+  browse(cat, offset, limit, labelKey) {
     return api.get("/api/filter-objects/browse?type=" + q(cat)
       + "&offset=" + q(offset || 0)
-      + "&limit=" + q(limit || BROWSE_LIMIT)).then(ok);
+      + "&limit=" + q(limit || BROWSE_LIMIT)
+      + (labelKey ? "&key=" + q(labelKey) : "")).then(ok);
   },
 
   /** totals() -> Promise<{totals: {<cat>: n}}> */
