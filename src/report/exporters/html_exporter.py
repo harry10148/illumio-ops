@@ -32,9 +32,11 @@ from .report_i18n import (
 from .report_shell import (
     SEVERITY_RANK,
     SEVERITY_TONE,
+    TONE_HEX,
     ShellCover,
     ShellSection,
     build_shell_document,
+    ink_on,
 )
 from ._output_paths import discard_reserved, reserve_unique_path, write_text_atomic
 from src.report.exporters._exec_summary import render_exec_summary_html
@@ -1165,12 +1167,14 @@ class _TrafficReportBase:
         inb_cov = m.get('inbound_coverage_pct')
         outb_cov = m.get('outbound_coverage_pct')
 
-        # Three-tier coverage bar: enforced (green) + staged (amber) + gap (red)
+        # Three-tier coverage bar: enforced (green) + staged (amber) + gap (red).
+        # 字色**逐段**由底色決定（ink_on）：整條寫死白字時，staged 那一段是白字
+        # 壓在橘上，2.0:1——看得到但讀不了，而看得到正是它沒被發現的原因。
         bar_html = (
-            '<div style="display:flex;height:28px;border-radius:6px;overflow:hidden;margin:12px 0 16px 0;font-size:12px;font-weight:600;color:var(--paper);text-align:center;line-height:28px">'
-            f'<div style="width:{enforced_cov}%;background:var(--tone-ok-border)" title="Enforced">{enforced_cov}%</div>'
-            + (f'<div style="width:{staged_cov}%;background:var(--tone-warn-border)" title="Staged">{staged_cov}%</div>' if staged_cov > 0 else '')
-            + (f'<div style="width:{true_gap}%;background:var(--tone-crit-border)" title="True Gap">{true_gap}%</div>' if true_gap > 0 else '')
+            '<div style="display:flex;height:28px;border-radius:6px;overflow:hidden;margin:12px 0 16px 0;font-size:12px;font-weight:600;text-align:center;line-height:28px">'
+            f'<div style="width:{enforced_cov}%;background:var(--tone-ok-border);color:{ink_on(TONE_HEX["ok"])}" title="Enforced">{enforced_cov}%</div>'
+            + (f'<div style="width:{staged_cov}%;background:var(--tone-warn-border);color:{ink_on(TONE_HEX["warn"])}" title="Staged">{staged_cov}%</div>' if staged_cov > 0 else '')
+            + (f'<div style="width:{true_gap}%;background:var(--tone-crit-border);color:{ink_on(TONE_HEX["crit"])}" title="True Gap">{true_gap}%</div>' if true_gap > 0 else '')
             + '</div>'
         )
 
@@ -1655,14 +1659,19 @@ class _TrafficReportBase:
                 'visibility_only': 'var(--tone-warn-border)',
                 'idle': 'var(--tone-neutral-border)',
             }
+            # 同一條 bar 上有深色（full/selective）與亮色（visibility_only/idle）
+            # 兩種底，所以字色不能整條寫死——見 report_shell.ink_on。
+            mode_tone = {'full': 'ok', 'selective': 'info',
+                         'visibility_only': 'warn', 'idle': 'neutral'}
             total_wl = sum(enforcement_dist.values())
             bars = []
             for mode, count in sorted(enforcement_dist.items(), key=lambda x: {'full': 0, 'selective': 1, 'visibility_only': 2}.get(x[0], 9)):
                 pct = round(count / max(total_wl, 1) * 100, 1)
                 color = mode_colors.get(mode, 'var(--tone-neutral-border)')
+                ink = ink_on(TONE_HEX[mode_tone.get(mode, 'neutral')])
                 label = STRINGS.get(f"rpt_enforce_mode_{mode}", {}).get(self._lang) or mode.replace('_', ' ').title()
                 bars.append(
-                    f'<div style="width:{pct}%;background:{color};min-width:40px" title="{label}: {count}">{count}</div>'
+                    f'<div style="width:{pct}%;background:{color};color:{ink};min-width:40px" title="{label}: {count}">{count}</div>'
                 )
             # Built as a loop, not as a generator expression inside the
             # f-string below: the STRINGS fallback there had to be spelled
@@ -1683,7 +1692,7 @@ class _TrafficReportBase:
             dist_html = (
                 f'<h4>{_s_local("rpt_tr_enforcement_dist")}</h4>'
                 '<div style="display:flex;height:32px;border-radius:6px;overflow:hidden;margin:8px 0 16px 0;'
-                'font-size:12px;font-weight:600;color:var(--paper);text-align:center;line-height:32px">'
+                'font-size:12px;font-weight:600;text-align:center;line-height:32px">'
                 + ''.join(bars)
                 + '</div>'
                 '<div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:16px;font-size:13px">'

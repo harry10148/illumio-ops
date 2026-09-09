@@ -1495,6 +1495,29 @@ SHELL_TOKENS: dict[str, str] = _parse_root_tokens(SHELL_CSS)
 
 #: tone -> the LED colour (``--tone-<t>-border``). This is the colour a chart
 #: should use for a solid mark of that tone.
+def _relative_luminance(hex_colour: str) -> float:
+    """WCAG 相對亮度。給 ink_on() 決定字要壓白的還是黑的。"""
+    raw = hex_colour.lstrip("#")
+    parts = [int(raw[k:k + 2], 16) / 255 for k in (0, 2, 4)]
+    lin = [(c / 12.92 if c <= 0.03928 else ((c + 0.055) / 1.055) ** 2.4) for c in parts]
+    return 0.2126 * lin[0] + 0.7152 * lin[1] + 0.0722 * lin[2]
+
+
+def ink_on(fill_hex: str) -> str:
+    """壓在 `fill_hex` 上的字色（CSS 變數名）。
+
+    這件事本來是一句「整條 bar 都用白字」。在深綠、深紅、深青上白字沒問題，
+    但同一條 bar 上還有 warn 的橘與 neutral 的灰——白字壓上去只有 2.0 與 2.6:1，
+    看得到但讀不了，而**看得到**正是它一直沒被發現的原因。改成逐段依底色亮度
+    決定：亮底配印刷黑（warn 9.0:1、neutral 7.1:1），暗底配紙白（ok 7.0:1、
+    crit 6.3:1、info 10.2:1），全部過 AA。
+
+    門檻 0.3 落在 crit(0.116) 與 neutral(0.358) 之間，離兩邊都有餘裕；日後改
+    色票不會剛好卡在界線上。
+    """
+    return "var(--text-1)" if _relative_luminance(fill_hex) >= 0.3 else "var(--paper)"
+
+
 TONE_HEX: dict[str, str] = {t: SHELL_TOKENS[f"tone-{t}-border"] for t in TONES}
 
 #: tone -> the pale fill (``--tone-<t>-bg``) and the ink (``--tone-<t>-fg``).

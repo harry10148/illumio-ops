@@ -253,9 +253,11 @@ _MUST_RENDER: dict[str, tuple[str, ...]] = {
     # 這條照樣是綠的（實測過：只把 mod03 那一條改回寫死色值，這個測試沒紅）。
     # 所以 mod03 三段各自綁自己的 title。
     "security_risk": (
-        'background:var(--tone-ok-border)" title="Enforced"',    # mod03 已執行段
-        'background:var(--tone-warn-border)" title="Staged"',    # mod03 暫存段
-        'background:var(--tone-crit-border)" title="True Gap"',  # mod03 缺口段
+        # 三段各自帶著自己的字色（2026-09-09 ink_on）：錨點連字色一起釘，
+        # 因為「整條寫死白字」正是這裡修掉的東西，退回去必須變紅。
+        'background:var(--tone-ok-border);color:var(--paper)" title="Enforced"',
+        'background:var(--tone-warn-border);color:var(--text-1)" title="Staged"',
+        'background:var(--tone-crit-border);color:var(--paper)" title="True Gap"',
         "color:var(--paper)",                   # 覆蓋率條上的白字
         "background:var(--tone-warn-bg);",      # mod04 需調查提示框
         "var(--tone-info-border)",              # mod13 selective
@@ -287,3 +289,49 @@ def test_the_coloured_branches_actually_render_and_use_tokens(name):
         f"前者代表上面那條『沒有色值』的斷言在這個分支上是空砲，"
         f"fixture 要修；後者代表色值被改回寫死。缺少：{missing}"
     )
+
+
+# ── 壓在色塊上的字，字色要由那塊底色決定 ────────────────────────────────────
+
+class TestInkOnAFilledSegment:
+    """一條 bar 上同時有深底與亮底時，字色不能整條寫死。
+
+    2026-09-09 tone 家族對齊 GUI 之後，實際重產報表才看到 mod03 覆蓋率條的
+    staged 段是**白字壓在橘上**：2.01:1。它換色前是 1.83:1，也就是一直都讀不
+    了——沒被發現的原因正是「看得到」：白字在亮橘上還看得見輪廓，只是讀不動。
+    所以這裡斷言的是對比，不是字色字面值。
+    """
+
+    @staticmethod
+    def _contrast(a: str, b: str) -> float:
+        from src.report.exporters.report_shell import _relative_luminance
+        la, lb = _relative_luminance(a), _relative_luminance(b)
+        hi, lo = max(la, lb), min(la, lb)
+        return (hi + 0.05) / (lo + 0.05)
+
+    def test_every_tone_fill_gets_an_ink_that_passes_aa(self):
+        from src.report.exporters.report_shell import (
+            SHELL_TOKENS, TONE_HEX, ink_on,
+        )
+        inks = {"var(--paper)": SHELL_TOKENS["paper"],
+                "var(--text-1)": SHELL_TOKENS["text-1"]}
+        for tone, fill in TONE_HEX.items():
+            ink = inks[ink_on(fill)]
+            ratio = self._contrast(ink, fill)
+            assert ratio >= 4.5, f"{tone}: {ink} on {fill} is only {ratio:.2f}:1"
+
+    def test_white_on_the_warn_fill_would_not_pass(self):
+        """反向：這條測試若對任何字色都成立，它就沒有在守任何東西。白字壓在
+        warn 上必須是**不及格**的那一個——那正是被修掉的組合。"""
+        from src.report.exporters.report_shell import SHELL_TOKENS, TONE_HEX
+        ratio = self._contrast(SHELL_TOKENS["paper"], TONE_HEX["warn"])
+        assert ratio < 4.5, f"white on warn is {ratio:.2f}:1 — 前提變了，重看這條"
+
+    def test_the_enforcement_bar_inks_each_segment_too(self):
+        """mod13 的模式分佈條同樣混了深底（full/selective）與亮底
+        （visibility_only/idle）。"""
+        import inspect
+        from src.report.exporters import html_exporter
+        src = inspect.getsource(html_exporter.SecurityRiskHtmlExporter._mod13_html)
+        assert "color:{ink}" in src, "分佈條的每一段都要帶自己的字色"
+        assert "color:var(--paper);text-align:center;line-height:32px" not in src
