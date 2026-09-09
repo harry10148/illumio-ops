@@ -101,7 +101,7 @@ GUI #/system/security  API keys 卡（建立→只顯示一次、撤銷、最後
 - 清單（active／history 切換）、每列：hostname、method、來源、原因、isolated_at、release_at 倒數、狀態 chip。
 - 動作：手動隔離抽屜（target、reason、method、TTL）、釋放（確認 modal）、延長 TTL。
 - 頁首：ruleset_warning、max 使用量。
-- coverage.yaml IV-21..IV-24；i18n `gui_iso_*`；`#/system/security` 新 panel SY-17 API keys。
+- coverage.yaml IV-25..IV-28（IV-16..20 fleet、IV-21..24 dependencies）；i18n `gui_iso_*`；`#/system/security` 新 panel SY-17 API keys。
 
 ## 7. 安全
 
