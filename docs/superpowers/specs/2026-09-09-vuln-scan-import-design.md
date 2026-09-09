@@ -50,7 +50,7 @@ def load_scan(path: str, scanner: str | None = None) -> ScanResult
 ```
 
 - 對 mod_vuln 的相容：`to_vuln_df()` 一個 CVE 一列（無 CVE 的偵測用 `vuln_id` 當 `cve_id`，`severity` 由 score 反推
-  critical≥89／high≥69／medium≥39／low>0／info=0，`cvss` 為 score/10）。`vuln_csv.load_vulns` 改為
+  critical≥90／high≥70／medium≥40／low≥1／info=0（與 score 表 0/39/69/89/100 對應，五級來回映射必須恆等，寫成測試），`cvss` 為 score/10）。`vuln_csv.load_vulns` 改為
   `load_scan(path, "csv").to_vuln_df()` 的薄包裝，既有測試不動。
 - 分數：沿用 plugger／illumio-cli 的 `SEVERITY_TO_SCORE_MAP`（1–5／info–critical → 0/39/69/89/100），
   CVSS 存在時 `int(cvss*10)` 優先（v3 > v2）。
@@ -64,14 +64,15 @@ def load_scan(path: str, scanner: str | None = None) -> ScanResult
   | IPv6 直接排除 | IPv4／IPv6 都正規化（`ipaddress`）並保留 |
   | 去重鍵 `port-proto-ip-vuln`、active 蓋 fixed | 沿用 |
 - 每個 parser 只讀原始格式、產 `ScanResult`，不碰 PCE、不碰 pandas（`to_vuln_df` 在 ScanResult）。
-- 檔案大小上限 50 MB（GUI 與 CLI 同），XML 用 `defusedxml`（已在依賴？否則 stdlib `xml.etree` 加 `forbid_dtd`）。
+- 檔案大小上限 50 MB（GUI 與 CLI 同）。XML 用 stdlib `xml.etree.ElementTree`，解析前掃描前 64 KB，含 `<!DOCTYPE` 或 `<!ENTITY` 即拒絕（`defusedxml` 不在依賴，且離線 bundle 不加新 wheel）。
 
 ## 3. 上傳鏈 `src/vmaps/uploader.py`
 
 ```python
 @dataclass
-class Precheck: ok: bool; reason: str   # reason ∈ "ok" | "feature_disabled" | "http_<code>" | "transport"
-def precheck(api) -> Precheck           # GET /orgs/{org}/optional_features，找 name=="vulnerability_analytics" 且 enabled
+class Precheck: ok: bool; reason: str   # reason ∈ "ok" | "feature_disabled" | "feature_unknown" | "http_<code>" | "transport"
+def precheck(api) -> Precheck           # GET /orgs/{org}/optional_features，找 name=="vulnerability_analytics" 且 enabled；
+                                        # 旗標不在清單（舊版 PCE）→ reason="feature_unknown"，同樣 fail closed
 def upload(api, scan: ScanResult, *, report_name: str, authoritative: bool, dry_run: bool = False,
            batch_size: int = 1000, detection_batch: int = 10_000) -> UploadResult
 ```
@@ -120,7 +121,7 @@ def upload(api, scan: ScanResult, *, report_name: str, authoritative: bool, dry_
 ## 7. 測試
 
 - fixture：`tests/fixtures/vuln_scans/{sample.nessus, qualys_scan.xml, tenable_sc.csv, tenable_io.csv}`
-  （自 plugger sample-data 精簡改寫，去除真實主機名）。
+  （自 plugger sample-data 精簡改寫，去除真實主機名；目錄放 `NOTICE` 標明 Apache-2.0 出處 alexgoller/illumio-plugger）。
 - parser 單元：各格式欄位對應、Nessus severity 表、Tenable 去重、CVE strip、IPv6 保留、sniff。
 - `to_vuln_df` 餵 `mod_vuln.vuln_exposure` 結果與舊 CSV 路徑等價（同一組偵測兩種輸入）。
 - uploader：fake api 驗 precheck fail-closed 不呼叫寫入；1000 分批；authoritative 尾批；非 2xx 停止；dry_run。

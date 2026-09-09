@@ -13,8 +13,9 @@ plugger 的實作只做 `enforcement_mode=full`、deny rule 是空殼、無持�
 
 使用者決定：
 - 隔離手段每次可選 `method ∈ {label, full, both}`，系統設定預設值（出廠 `label`）。
-  `label`＝加既有 `Quarantine` label（值由設定 `isolation.label_level` 決定，預設 `Severe`），依賴操作者
-  已在 PCE 佈建的 deny ruleset；`full`＝`enforcement_mode=full`（不需 provision，下次 heartbeat 生效；
+  `label`＝加 `Quarantine` label，**值預設 `Isolated`**（設定 `isolation.label_value`），與手動 quarantine 的
+  Mild/Moderate/Severe 分開，避免 EDR 釋放時誤刪操作者手動加的隔離、或操作者 lift 時讓 isolator 紀錄失真
+  （待確認；若改用共用值，須在 §9 寫明互相干擾行為）；依賴操作者已在 PCE 佈建的 deny ruleset；`full`＝`enforcement_mode=full`（不需 provision，下次 heartbeat 生效；
   **已有 allow 規則的 workload 不會被擋**）；`both`＝兩者。
 - 認證：多把 API key，只存 argon2 hash，可個別撤銷，稽核寫 key 名稱。
 
@@ -40,11 +41,13 @@ GUI #/system/security  API keys 卡（建立→只顯示一次、撤銷、最後
 
 ## 2. API key
 
-- 格式 `iok_<id8>.<secret32>`；儲存 `config.json["isolation"]["api_keys"]`：
-  `[{"id","name","hash","created_at","created_by","revoked_at"|null,"last_used_at"|null}]`。
-  `hash` 命中 `_SECRET_PATTERN`（以 `hash` 結尾不命中，故欄位名用 `secret_hash`），`_redact_secrets` 自動遮。
-- 驗證：由 `id` 找紀錄，`verify_password(secret, secret_hash)`；revoked→401；每次成功更新 `last_used_at`
-  （節流：同 key 60 秒內不重寫檔）。
+- 格式 `iok_<id8>.<secret32>`；儲存在**獨立檔** `config/isolation_api_keys.json`（`ScheduleDB` 模式，
+  不進 config.json：避免 `GET /api/settings` 曝露與每次 webhook 都在 `cm.write_lock` 下重寫設定檔）：
+  `{id: {"name","secret_hash","created_at","created_by","revoked_at"|null,"last_used_at"|null}}`。
+  `secret_hash` 只存 argon2，任何 API 回應都不含它（列表路由白名單欄位輸出，不靠 `_redact_secrets`，
+  因為 `_SECRET_PATTERN` 不匹配以 `hash` 結尾的鍵名）。
+- 驗證：由 `id` 找紀錄，`verify_password(secret, secret_hash)`；不存在的 id 也跑一次 argon2 verify 於固定
+  dummy hash（等時）；revoked→401；成功更新 `last_used_at`（同 key 60 秒內不重寫檔）。
 - 建立：`POST /api/security/api-keys {name}` → 回明文一次；撤銷 `DELETE /api/security/api-keys/<id>`；
   列表 `GET /api/security/api-keys`（不含 hash）。都走 session auth＋既有 `/api/security` 的
   `cm.write_lock`＋scratch 模式，`@limiter.limit("10 per hour")`。
@@ -52,7 +55,8 @@ GUI #/system/security  API keys 卡（建立→只顯示一次、撤銷、最後
 ## 3. Webhook 端點（API key auth）
 
 - `security_check` 公開清單加 `/api/isolation/webhook/isolate`、`/release`；`@csrf.exempt`；
-  `@limiter.limit("30 per minute")`；423 gate 豁免 endpoint。IP allowlist 不豁免（EDR 來源 IP 須在允許清單，文件說明）。
+  限流兩層：flask-limiter 依來源 IP `120 per minute`（同一 EDR 大量事件時不至於被擋），再依 key id
+  `60 per minute`（記憶體計數）；423 gate 豁免 endpoint。IP allowlist 不豁免（EDR 來源 IP 須在允許清單，文件說明）。
 - `POST /api/isolation/webhook/isolate`
   ```
   in : {target: str（href|hostname|ip）, reason: str（必填 ≤500）, source?: str, ttl_seconds?: int(0–604800),
@@ -66,17 +70,20 @@ GUI #/system/security  API keys 卡（建立→只顯示一次、撤銷、最後
 ## 4. 服務層 `src/isolation/service.py`
 
 - `find_workload(api, target)`：`/orgs/` 開頭→`api.get_workload(href)`；否則 `api.search_workloads`
-  依 hostname（大小寫不分）→ name → ip_address 精確；多筆命中→409 `ambiguous_target` 列出候選。
+  依 hostname → name → ip_address，PCE 端可能是子字串比對，**結果再以精確（大小寫不分）比對過濾**；
+  過濾後仍多筆→409 `ambiguous_target` 列出候選。
 - `isolate(api, store, target, *, reason, source, ttl, method, actor, dry_run)`：
   1. 讀 workload，取 `enforcement_mode`、`labels`、`online`、`managed`。unmanaged→422（label 可加但無意義，full 無效）。
   2. 鎖內：已有 active 紀錄→`already_isolated`；`len(active) >= isolation.max_isolated`（預設 100）→409；
      **同一鎖內先寫入 `status:"pending"` 紀錄**再釋放鎖（修 plugger TOCTOU）。
   3. 依 method 執行；`label`：`check_and_create_quarantine_labels`＋整組替換加目標 level（照 actions.py:530-572）；
-     `full`：新 `ApiClient.set_workload_enforcement_mode(href, mode) -> bool`（PUT `{href}` `{"enforcement_mode": mode}`）。
+     `full`：重用子專案 1 的 `ApiClient.bulk_update_workloads([{"href", "enforcement_mode": "full"}])`
+     （單筆也走 bulk_update，不另開第二條寫入路徑）。
      任一步失敗→紀錄 `status:"failed"`＋已完成步驟，並回滾已完成的另一步（both 時）。
   4. 成功→`status:"active"`，`release_at = now+ttl`（ttl 0＝不自動釋放）。
-  5. 通知：`Reporter(cm).send_alerts(channels=None)` 前先把一筆 `type="system"` 的告警物件放入 health bucket
-     （summary「Isolated <hostname>（<method>）— <reason>」）；失敗不影響隔離結果。
+  5. 通知：**新建一個** `Reporter(cm)` 實例（bucket 是實例屬性，與 monitor 迴圈的實例互不干擾），
+     `add_health_alert({...})` 一筆（summary「Isolated <hostname>（<method>）— <reason>」）後
+     `send_alerts(channels=None)`；plan 內以測試確認 AlertStore 只多一列且 type="system"。失敗不影響隔離結果。
 - `release(api, store, target_or_record_id, *, reason, actor)`：依紀錄還原：`label`→過濾掉 q_hrefs
   （照 actions.py:637-690）；`full`→`set_workload_enforcement_mode(href, previous_mode)`；
   `previous_mode` 缺→**不還原、標 `needs_manual_review`**（不採 plugger 的預設 visibility_only）。

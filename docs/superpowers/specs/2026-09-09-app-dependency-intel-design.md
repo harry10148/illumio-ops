@@ -45,7 +45,7 @@ def spof(g, *, min_consumers=2, max_workloads=1) -> list[dict]
 def cycles(g, *, limit=50) -> list[dict]
 def cross_env(g) -> list[dict]
 def change_impact(g, targets: list[str]) -> dict
-def is_prod_env(env: str) -> bool     # 抽自 mod14:156，mod14 改 import 這裡
+def is_prod_env(env: str) -> bool     # 抽自 mod14:156，mod14 改 import 這裡；行為保持，先用 fixture 釘住 mod14 輸出再抽
 ```
 
 決定（對 plugger 的修正）：
@@ -66,7 +66,9 @@ total_affected_workloads|None, max_depth, chain:[{key, depth}], truncated}`。
 ## 3. 報表模組 `mod16_dependency_intel`
 
 - 註冊 `analysis/__init__.py` TRAFFIC_MODULES：新 adapter `_call_df_workloads`（抓 `api.fetch_managed_workloads()`
-  一次，與 mod_labels 共用同一次抓取：在 `report_generator` 把 workloads 放進 `self._workloads_cache`）。
+  一次，與 mod_labels 共用同一次抓取：在 `report_generator` 把 workloads 放進 `self._workloads_cache`）；
+  CSV 來源報表無 api，SPOF 一律近似並標示。profiles 先查 mod14／mod15 目前用哪一組與
+  `tests/test_inventory_sections_trim.py` 的期望再決定，預設跟 mod14 一致。
 - 輸出：`{total_apps, total_edges, spof:[...], spof_approximate, cycles:[...], cycles_truncated,
   cross_env:[...]（critical 先）, top_blast:[前 10 個 blast radius 最大的 provider], attack_posture_items, chart_spec}`。
   `attack_posture_items` 用 `finding_kind="blast_radius"`（report_metadata 已有此 key）。
@@ -80,7 +82,8 @@ total_affected_workloads|None, max_depth, chain:[{key, depth}], truncated}`。
 - 輸入：目標（app|env 下拉，自快照的節點清單；或 hostname／IP 清單 textarea）、視窗（7／14／30 天）、
   是否含 unlabeled。
 - `POST /api/dependencies/query` `{mode:"blast"|"impact", target?|targets?, days, include_unlabeled}`：
-  `_make_cache_reader(cm)`→`cover_state` 非 full 回 `{ok:False, code:"cache_incomplete", covered_until}`；
+  `_make_cache_reader(cm)`→`cover_state`：`none` 回 `{ok:False, code:"cache_incomplete"}`；`partial`
+  照算並回 `coverage:"partial"`＋`covered_until`，GUI 顯示 warn chip（30 天視窗幾乎不會是 full）；
   `count_flows` 超過 `read_max_rows` 回 `cache_too_large`；否則 `read_flows_df`→`build_graph`→結果。
   結果快取 5 分鐘（key＝days＋include_unlabeled）避免每次重讀。
 - `GET /api/dependencies/nodes?days=` 回節點清單供下拉（同快取）。
