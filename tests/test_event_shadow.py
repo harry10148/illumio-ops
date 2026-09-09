@@ -1,7 +1,8 @@
 """Tests for src/events/shadow.py — diagnostic comparison tool.
 
 shadow.py is retained because:
-- It powers the /api/events/shadow_compare and /api/events/rule_test GUI endpoints.
+- It powers the /api/events/rule_test GUI endpoint (the alert-rule sandbox).
+  /api/events/shadow_compare was retired 2026-09-09; the module stayed.
 - matches_event_rule_legacy() implements the original analyzer algorithm (exact
   comma-separated type list, no regex/negation/pipe-alternation/nested fields).
   This intentionally different logic makes divergences from the current matcher
@@ -231,3 +232,20 @@ class TestCompareEventRules:
         assert item["current_count"] == 0
         assert len(item["only_legacy"]) == 5  # capped at 5
         assert item["only_current"] == []
+
+
+def test_the_retired_route_is_gone_but_the_sandbox_still_answers():
+    """`/api/events/shadow_compare` 退役（2026-09-09），`rule_test` 沒有。
+
+    兩條路由共用 `src/events/shadow.py`，所以「刪檔案」與「退一條路由」是
+    兩件事——退役時把模組一起拿掉會靜默打斷告警規則沙盒（GUI 的 AL-07）。
+    這條測試盯的就是那個分野：路由不在了，而模組提供的兩個函式仍然匯得出來，
+    因為 rule_test 兩個都用。
+    """
+    import src.gui.routes.events as events_module
+    from src.events import compare_event_rules, matches_event_rule_legacy
+
+    source = open(events_module.__file__, encoding="utf-8").read()
+    assert "@bp.route('/api/events/shadow_compare')" not in source
+    assert "@bp.route('/api/events/rule_test')" in source
+    assert callable(compare_event_rules) and callable(matches_event_rule_legacy)

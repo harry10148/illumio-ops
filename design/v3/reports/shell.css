@@ -86,24 +86,26 @@
   --accent-fg: #C24300;
   --accent-on: #FFFFFF;
 
-  /* tone 標記色相＝深色主題定值（LED 在紙上也是同一顆） */
-  --tone-ok-border: #0CA30C;
-  --tone-warn-border: #FAB219;
-  --tone-crit-border: #D03B3B;
-  --tone-info-border: #3987E5;
-  --tone-neutral-border: #8B929E;
+  /* tone 家族＝與 GUI v3 同一組（src/static/css/v2/tokens.css 亮色）。
+     2026-09-09 之前這裡還是 v2 留下的那組——不是為紙張調過的選擇，只是
+     移植時沒有一起搬。同一份資料在 GUI 與 PDF 裡不該有兩種綠。 */
+  --tone-ok-border: #166644;
+  --tone-warn-border: #FFA22F;
+  --tone-crit-border: #BE122F;
+  --tone-info-border: #2D454C;
+  --tone-neutral-border: #9AA3A6;
 
   /* 墨色/底色＝亮色主題 */
-  --tone-ok-fg: #0A7D0A;
-  --tone-ok-bg: #E4F3E4;
-  --tone-warn-fg: #8A5D00;
-  --tone-warn-bg: #FBF0D8;
-  --tone-crit-fg: #C22F2F;
-  --tone-crit-bg: #FAE6E6;
-  --tone-info-fg: #1C5CAB;
-  --tone-info-bg: #E3EEFB;
-  --tone-neutral-fg: #5C6472;
-  --tone-neutral-bg: #EDF0F4;
+  --tone-ok-fg: #166644;
+  --tone-ok-bg: #E7F1EC;
+  --tone-warn-fg: #8A5600;
+  --tone-warn-bg: #FFF3E0;
+  --tone-crit-fg: #BE122F;
+  --tone-crit-bg: #F9E6E9;
+  --tone-info-fg: #2D454C;
+  --tone-info-bg: #E5F2F9;
+  --tone-neutral-fg: #5B6164;
+  --tone-neutral-bg: #F1F0EC;
 }
 
 [data-tone] {

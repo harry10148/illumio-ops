@@ -54,7 +54,8 @@ _ALLOWED: dict[str, tuple[int, str]] = {
         "信裡的徽章是白字，而且沒有網底可用（多數收件端會拿掉 background-image）。"
         "照 SEVERITY_TONE 映射會讓 CRITICAL 與 HIGH 塌成同一個紅（信裡沒有第二個"
         "裝置可以分開它們），而 MEDIUM 走 --tone-warn-border 的話白字對比只有 "
-        "1.8:1，直接讀不到。信件徽章因此保有自己的三個紅／橘，這是介質差異，"
+        "2.01:1（2026-09-09 tone 家族對齊 GUI 之後重算，換色前是 1.83:1），直接"
+        "讀不到。信件徽章因此保有自己的三個紅／橘，這是介質差異，"
         "不是遺漏。",
     ),
     "exporters/policy_diff_html_exporter.py": (

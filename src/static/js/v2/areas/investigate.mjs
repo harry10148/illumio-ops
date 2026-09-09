@@ -60,9 +60,9 @@
 //      current matcher and the legacy one over the same events and listed the
 //      rules whose results differ — a tool for whoever was migrating the
 //      matcher, on a page an operator opens to read audit events. The
-//      endpoint it called (GET /api/events/shadow_compare) is untouched: no
-//      GUI reads it now, but src/events/shadow.py also serves
-//      /api/events/rule_test, and retiring a route is not this change's scope.
+//      endpoint it called (GET /api/events/shadow_compare) was retired on
+//      2026-09-09 once nothing read it. src/events/shadow.py stays — it also
+//      serves /api/events/rule_test, which the alert-rule sandbox uses.
 //
 //   7. IV-06's archive strip keeps its real status readout
 //      (GET /api/cache/archive/status). Task 7 repurposed that endpoint:

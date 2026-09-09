@@ -147,59 +147,13 @@ def make_events_blueprint(
             },
         })
 
-    @bp.route('/api/events/shadow_compare')
-    def api_events_shadow_compare():
-        cm.load()
-        lang = cm.config.get('settings', {}).get('language', 'en')
-        try:
-            from src.api_client import ApiClient, EventFetchError
-            from src.events import compare_event_rules, format_utc
-        except Exception as exc:
-            logger.error("Failed to load shadow compare dependencies: {}", exc)
-            return _err(t("gui_err_service_unavailable", lang=lang), 500)
-
-        try:
-            mins = max(5, min(int(request.args.get('mins', 60)), 10080))
-        except (TypeError, ValueError):
-            mins = 60
-        try:
-            limit = max(1, min(int(request.args.get('limit', 200)), 500))
-        except (TypeError, ValueError):
-            limit = 200
-
-        now_utc = datetime.datetime.now(datetime.timezone.utc)
-        since_utc = now_utc - datetime.timedelta(minutes=mins)
-        query_since = format_utc(since_utc)
-        query_until = format_utc(now_utc)
-
-        with ApiClient(cm) as api_client:
-            try:
-                events = api_client.fetch_events_strict(
-                    start_time_str=query_since,
-                    end_time_str=query_until,
-                    max_results=limit,
-                )
-            except EventFetchError as exc:
-                return _err(t("gui_err_pce_event_fetch_status", status=exc.status, message=exc.message[:300], lang=lang), 502)
-            except Exception as exc:
-                return _err(t("gui_err_pce_event_fetch", exc=exc, lang=lang), 502)
-
-        event_rules = [rule for rule in cm.config.get("rules", []) if rule.get("type") == "event"]
-        comparisons = compare_event_rules(event_rules, events)
-        divergent = [item for item in comparisons if item.get("status") != "same"]
-
-        return jsonify({
-            "ok": True,
-            "summary": {
-                "query_since": query_since,
-                "query_until": query_until,
-                "fetched_events": len(events),
-                "rule_count": len(event_rules),
-                "divergent_rules": len(divergent),
-            },
-            "items": comparisons,
-        })
-
+    # GET /api/events/shadow_compare 已於 2026-09-09 退役。它把兩套事件比對
+    # 演算法（正式的 matches_event_rule 與 shadow.py 的
+    # matches_event_rule_legacy）跑在同一批事件上，是 v2 用來確認新比對器沒
+    # 改變行為的過渡工具；v3 的 GUI 沒有任何頁面讀它，那個確認也早就做完了。
+    # src/events/shadow.py **留著**：底下的 rule_test 端點（GUI 的 AL-07 規則
+    # 沙盒）同時用 compare_event_rules 與 matches_event_rule_legacy，兩者都是
+    # 它提供的。退役的是這條路由，不是那個模組。
     @bp.route('/api/events/rule_test')
     def api_events_rule_test():
         cm.load()

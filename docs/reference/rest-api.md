@@ -191,7 +191,6 @@ policy decision 等即時才算得出的條件，以及全文 `search`，帶了�
 | 方法 | 路徑 | 用途 | 關鍵參數 |
 |---|---|---|---|
 | GET | `/api/events/viewer` | 依時間窗／關鍵字／分類即時查 PCE 稽核事件 | `mins`(≤10080), `limit`(≤200), `offset`, `search`, `category`, `type_group`, `event_type` |
-| GET | `/api/events/shadow_compare` | 比對目前事件規則對近期事件的命中結果（shadow mode） | `mins`(≤10080), `limit`(≤500) |
 | GET | `/api/events/rule_test` | 單一事件規則的命中測試（新舊比對邏輯差異） | `idx`, `mins`(≤10080), `limit`(≤500) |
 | GET | `/api/event-catalog` | 事件型錄（分類、已翻譯標籤、related_events，供規則建立 UI 用） | — |
 
