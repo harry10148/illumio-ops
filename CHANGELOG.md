@@ -22,7 +22,63 @@ a plain `<major>.<minor>.<patch>` scheme. (Tags through v4.0.0 carried a
 > Allowed or Potentially Blocked and confirm it now names the traffic you
 > meant. Re-saving it from either interface writes the corrected value.
 
+### Added
+
+- **The workload table sorts, and one button accelerates the whole result.**
+  Columns opt in through the shared table component, whose header is a button
+  rather than a clickable `th` — the resize grip shares that cell, so a th-level
+  handler would sort on every column drag, and a button is reachable by
+  keyboard. The component reports the sort and the *area* performs it, because
+  the table only ever receives the current page: sorting there would order fifty
+  rows while the operator believed they were seeing the top of the list. Sort
+  keys follow what the cell renders (the status column sorts by online-ness then
+  name), and missing values sort last in both directions. "Accelerate all"
+  targets every row in the current result rather than the current page — paging
+  is a display concern and must not change what an action acts on — and the
+  existing drawer still states the total, the managed count and the skipped
+  count before anything is sent.
+
+- **Agent tampering events carry what they always carried.** PCE 26.2 puts the
+  triage facts in `notifications[].info`: whether the VEN reverted the change,
+  the classification, the window, the count, and in `info.events[]` the process
+  that did it with its tamper type. The normalizer read one field out of that
+  bag and dropped the rest, so no screen could say whether a tampering had
+  already been reverted. It now takes every scalar wholesale — a whitelist would
+  break again, silently, at the next PCE release — and the alert page labels the
+  fields it knows and lists the ones it does not. The audit report's mod04 gains
+  an agent-security table that does not wait for a follow-up policy change to
+  have something to say, and separates reverted from unreverted tampering. An
+  older PCE that says nothing renders a dash, never "not reverted".
+
+- **A standing check on event parsing** (`tools/audit_event_fields.py`,
+  `src/events/field_coverage.py`). Nothing was watching the gap between what the
+  PCE sends and what we read, which is why the tampering fields could go missing
+  for a release with every test green. Events are flattened to leaf paths and
+  subtracted from a ledger where each path is either read or carries a written
+  reason for being ignored; the tool runs it against a live PCE (run it after a
+  PCE upgrade) and a CI gate runs it against a paths-only corpus of 29 real
+  event types. It found `info.events[].process_name` on its first run.
+
 ### Fixed
+
+- **The home page no longer reprints the alert list.** The alerts area is one
+  click away and owns the same rows with filtering, paging and detail. The
+  headline still says how many are open and the instrument strip how many fired
+  in 24 hours; when `/api/alerts` is down the headline shows a dash rather than
+  a confident zero, which would have said there was nothing to do.
+
+- **The app-summary drawer's environment picker stopped offering app names.**
+  Both selects were filled from one unkeyed label list, so choosing an
+  environment meant finding it among values that could never be one. Each now
+  comes from its own keyed query through the object-filter system, with the
+  key filter applied at the endpoint so the truncation note counts what the
+  select actually shows.
+
+- **The bandwidth tables dropped their "Rate Basis" column.** This PCE reports
+  no per-interval duration, so every rate is a lower bound and the column
+  printed the same value on every row. The basis is now a sentence at the top of
+  the section, which still distinguishes an all-bound population from a mixed
+  one.
 
 - **The CLI rule wizard wrote the wrong policy decision for two of its four
   choices.** `pd` is the PCE ordinal — `0` allowed, `1` potentially blocked,
