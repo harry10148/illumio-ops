@@ -135,6 +135,7 @@ Commit: `feat(fleet): two-phase enforcement progression with a restorable record
 - Modify: `design/v2/tools/endpoints.yaml`（同三筆 GET，與 store-map 逐行對應，這是 `tests/test_v2_coverage_live.py` 的守門）
 - Modify: `design/v3/coverage.yaml`（IV-16..IV-20，route `#/investigate/fleet`，anchor 為 `data-cov` 值）
 - Modify: `src/static/js/v2/components/page.mjs:160-199`（`crumbsFor`／`labelForRoute` 認得新路由）
+- Modify: `src/static/js/v2/areas/system.mjs`（`#/system/pce` 設定表單加 `settings.fleet_target_ven_version` 文字欄與 `fleet_max_batch` 數字欄，經既有 `POST /api/settings` 的 `settings` 區段送出）
 - Modify: `src/i18n_en.json`、`src/i18n_zh_TW.json`、`src/i18n/data/zh_explicit.json`
 - Test: `tests/test_v2_fleet_e2e.py`
 
