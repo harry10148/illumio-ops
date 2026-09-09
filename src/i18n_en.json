@@ -1315,6 +1315,8 @@
   "freq_monthly": "Monthly (day {day})",
   "freq_weekly": "Weekly ({day})",
   "gui_accel_bulk_btn": "Increase Traffic Update Rate",
+  "gui_accel_all_btn": "Accelerate all",
+  "gui_accel_all_tip": "Accelerate every managed workload in the current search result. Unmanaged ones cannot be accelerated and appear in the skipped count on the confirmation.",
   "gui_accel_done": "Accelerated",
   "gui_accel_duration": "Duration",
   "gui_accel_modal_summary": "{total} selected, {managed} managed, {skipped} will be skipped.",

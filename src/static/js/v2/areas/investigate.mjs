@@ -128,7 +128,7 @@ import { withErrorCard } from "../components/errorcard.mjs";
 import { mountRankingsAndQueries } from "./cards.mjs";
 import { drawer } from "../components/drawer.mjs";
 import { modal } from "../components/modal.mjs";
-import { table, col } from "../components/table.mjs";
+import { table, col, sortRows } from "../components/table.mjs";
 import { palette } from "../components/palette.mjs";
 import { createFilterBar, setFilterBarText, setFilterBarQuery } from "../components/filter-bar.mjs";
 import { setFilterBarBrowser, addPillFromBrowser } from "../components/filter-bar.mjs";
@@ -387,9 +387,12 @@ function radioGroup(name, pairs, value, onChange) {
   return box;
 }
 
-function buildCell(fn) { const o = {}; o.cell = fn; return o; }
-function numCell(fn) { const o = {}; o.cell = fn; o.align = "n"; return o; }
-function widthCell(width, fn) { const o = {}; o.width = width; if (fn) o.cell = fn; return o; }
+// 第三個參數 `extra` 讓呼叫端補上 col() 的其餘選項（目前用在 `sort`），
+// 不必為了加一個選項就把每個 helper 拆掉重寫。
+function _with(o, extra) { return extra ? Object.assign(o, extra) : o; }
+function buildCell(fn, extra) { const o = {}; o.cell = fn; return _with(o, extra); }
+function numCell(fn, extra) { const o = {}; o.cell = fn; o.align = "n"; return _with(o, extra); }
+function widthCell(width, fn, extra) { const o = {}; o.width = width; if (fn) o.cell = fn; return _with(o, extra); }
 /** A checkbox column: header selects/clears the page, body cell picks one row. */
 function pickCell(headFn, cellFn) { const o = {}; o.width = 34; o.head = headFn; o.cell = cellFn; return o; }
 
@@ -400,10 +403,14 @@ function buildTable(columns, rows) {
   return spec;
 }
 
-function pagedTable(columns, rows, page, onPage) {
+function pagedTable(columns, rows, page, onPage, sort, onSort) {
   const spec = buildTable(columns, rows);
   spec.page = page;
   spec.onPage = onPage;
+  if (onSort) {
+    spec.sort = sort;
+    spec.onSort = onSort;
+  }
   return spec;
 }
 
@@ -2219,6 +2226,7 @@ async function mountWorkloads(root, ctx) {
   state.host = "";
   state.size = 50;
   state.page = 0;
+  state.sort = null;
   state.phase = "idle";
   state.rows = [];
   state.truncated = false;
@@ -2323,14 +2331,17 @@ async function mountWorkloads(root, ctx) {
         cb.addEventListener("change", function () { toggle(r.href, cb.checked); });
         return cb;
       })),
+      // 排序取的是**畫面上看得到的東西**，不是列裡剛好有的欄位：狀態欄顯示的
+      // 是「上線與否 + 名稱」，所以先排上線狀態再排名稱，否則點了「狀態」卻
+      // 依名稱排，標題與行為對不上。
       col("name", t("gui_ws_col_status"), widthCell(210, function (r) {
         return el("span", { class: "idc", "data-tone": r.online ? "ok" : "warn" },
           el("b", null, el("i", { class: "dot" }), el("span", { text: " " + r.name })),
           el("small", { text: r.hostname || "" }));
-      })),
+      }, { sort: function (r) { return (r.online ? "0" : "1") + String(r.name || ""); } })),
       col("mgmt", t("gui_ws_col_management"), widthCell(120, function (r) {
         return badge(r.managed ? t("gui_management_managed") : t("gui_management_unmanaged"), r.managed ? "ok" : "neutral");
-      })),
+      }, { sort: function (r) { return r.managed ? "0" : "1"; } })),
       col("ip", t("gui_ws_col_ip"), widthCell(180, function (r) {
         const box = el("span", { class: "idc" });
         r.ips.slice(0, 3).forEach(function (i) {
@@ -2339,10 +2350,15 @@ async function mountWorkloads(root, ctx) {
         if (r.ips.length > 3) box.appendChild(el("small", { text: tf("gui_iv_more_ips", { n: r.ips.length - 3 }) }));
         if (!r.ips.length) box.appendChild(el("small", { text: "—" }));
         return box;
-      })),
+      }, { sort: function (r) { return (r.ips && r.ips.length) ? r.ips[0].address : null; } })),
       col("labels", t("gui_ws_col_labels"), buildCell(function (r) {
         return r.labels.length ? labelChips(r.labels) : el("span", { class: "mono", text: t("gui_no_labels") });
-      })),
+      }, { sort: function (r) {
+        // 沒有 label 的排最後（sortRows 把空值一律放尾），而不是排在 "a" 前面。
+        return r.labels && r.labels.length
+          ? r.labels.map(function (l) { return String(l.key) + "=" + String(l.value); }).sort().join(",")
+          : null;
+      } })),
       // 260, and app.css's own .rowacts flex row: three buttons in a bare
       // inline span inside a `table-layout: fixed` 200px cell wrapped onto a
       // second line and, because td keeps a fixed row height, spilled OUT of
@@ -2406,6 +2422,17 @@ async function mountWorkloads(root, ctx) {
 
     const p = panel(null, t("gui_workload_search"));
     withMeta(p, tf("gui_total_found_ws", { count: num(model.length) }));
+    // 一次全部加速：勾 500 個核取方塊不是一個工作流程。送出的是**目前這批
+    // 搜尋結果**的全部，不是「這一頁」——分頁是顯示上的事，不該改變動作的
+    // 對象。抽屜本身就是確認步驟：它會說清楚總數、其中幾個納管、幾個會被
+    // 略過，而且只把納管的送出去（未納管的加速不了）。
+    const accelAll = el("button", {
+      class: "btn", type: "button", text: t("gui_accel_all_btn"),
+      title: t("gui_accel_all_tip"),
+      onClick: function () { handles.openAccel(model.map(function (r) { return r.href; })); },
+    });
+    accelAll.disabled = !model.length;
+    headBox(p).appendChild(accelAll);
     headBox(p).appendChild(selectField(t("gui_page_size"), PAGE_SIZES, String(state.size), function (v) {
       state.size = Number(v);
       state.page = 0;
@@ -2430,10 +2457,18 @@ async function mountWorkloads(root, ctx) {
         el("p", { text: state.phase === "idle" ? t("gui_iv_search_prompt") : t("gui_ws_empty") })));
     } else {
       p.body.classList.add("flush");
-      const shown = model.slice(state.page * state.size, (state.page + 1) * state.size);
+      // 排序在**分頁之前**：表格元件只拿得到當頁的列，在那裡排等於排一頁，
+      // 而操作者會以為自己看到的是全體的第一名。
+      const ordered = sortRows(model, columns(), state.sort);
+      const shown = ordered.slice(state.page * state.size, (state.page + 1) * state.size);
       state.tables.push(table.render(p.body, pagedTable(columns(), shown,
         pageSpec(state.page, state.size, model.length), function (next) {
           state.page = Math.max(0, next);
+          repaint();
+        }, state.sort, function (key, dir) {
+          state.sort = { key: key, dir: dir };
+          // 換排序就回第一頁——留在第 4 頁會讓「排序完第一名是誰」看不到。
+          state.page = 0;
           repaint();
         })));
     }

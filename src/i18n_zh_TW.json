@@ -1309,6 +1309,8 @@
   "freq_monthly": "頻率每月",
   "freq_weekly": "頻率每週",
   "gui_accel_bulk_btn": "提高 Traffic 更新頻率",
+  "gui_accel_all_btn": "全部加速",
+  "gui_accel_all_tip": "把目前搜尋結果中所有 Managed 的 workload 一次送出加速（Unmanaged 的加速不了，會計入確認畫面的略過數）。",
   "gui_accel_done": "加速已套用",
   "gui_accel_duration": "持續時長",
   "gui_accel_modal_summary": "已選 {total}，可加速 {managed}，將略過 {skipped}。",

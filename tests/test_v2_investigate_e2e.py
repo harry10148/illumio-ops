@@ -125,6 +125,7 @@ def _labels(page):
         "gui_event_type", "gui_refresh", "gui_load_more", "gui_search",
         "gui_accel_bulk_btn", "gui_q_apply", "gui_traffic_source", "gui_sort_by",
         "gui_gen_start_date", "gui_gen_end_date", "gui_window",
+        "gui_accel_all_btn", "gui_next",
     ]
     return page.evaluate(
         "async (keys) => { const { t } = await import('/static/js/v2/core/i18n.mjs'); "
@@ -1295,3 +1296,113 @@ def test_the_event_detail_pane_never_widens_the_page(v2_page, v2_app, monkeypatc
 
     assert measured["pageWidth"] <= measured["viewport"], measured
     assert measured["widest"] <= measured["listWidth"], measured
+
+
+# ── workload 表格排序 + 一次全部加速 ────────────────────────────────────────
+
+def _named_workloads(n, prefix="wl"):
+    """n 筆刻意**不照字母序**送出的 workload，這樣「有排序」與「後端剛好照
+    順序回」才分得開。"""
+    order = list(range(n))
+    order.reverse()
+    return [_fake_workload(href="/orgs/1/workloads/%d" % i,
+                           name="%s-%02d" % (prefix, i)) for i in order]
+
+
+def _run_search(page, labels):
+    page.locator('section[data-cov="IV-08"]').get_by_role(
+        "button", name=labels["gui_find"], exact=True
+    ).click()
+    page.wait_for_selector("tbody tr")
+
+
+def _visible_names(page):
+    return page.eval_on_selector_all(
+        "tbody tr td:nth-child(2) b span",
+        "els => els.map(e => e.textContent.trim())")
+
+
+def test_sorting_orders_the_whole_result_not_just_the_visible_page(v2_page):
+    """點欄位排序要排**整批搜尋結果**，不是當頁那幾列。
+
+    表格元件只拿得到當頁的列，所以排序若在元件裡做，第 1 頁會依序、換頁之後
+    順序整個重來，而操作者會以為自己看到的是全體的第一名。這條測試用 60 筆、
+    每頁 50 的資料把那個差別逼出來：正確的實作在第 1 頁看得到 wl-00，而
+    「只排當頁」的實作第一頁排完仍然是後端送來的那 50 筆（wl-59..wl-10）。
+    """
+    page, base_url = v2_page
+    _stub_workload_list(page, _named_workloads(60))
+    _goto(page, base_url, R_WORKLOADS)
+    labels = _labels(page)
+    _run_search(page, labels)
+
+    page.locator("th button.th-sort").first.click()
+    page.wait_for_selector("th[aria-sort='ascending']")
+
+    names = _visible_names(page)
+    assert names[0] == "wl-00", names[:3]
+    assert names == sorted(names), names[:5]
+    # 全體最小的那一筆在後端回應裡是**最後一筆**；它出現在第一頁，就證明排序
+    # 發生在分頁之前。
+    assert "wl-59" not in names, "整批排序後最大的一筆不該出現在第一頁"
+
+
+def test_clicking_the_same_header_twice_reverses_the_order(v2_page):
+    page, base_url = v2_page
+    _stub_workload_list(page, _named_workloads(8))
+    _goto(page, base_url, R_WORKLOADS)
+    labels = _labels(page)
+    _run_search(page, labels)
+
+    head = page.locator("th button.th-sort").first
+    head.click()
+    page.wait_for_selector("th[aria-sort='ascending']")
+    asc = _visible_names(page)
+    head.click()
+    page.wait_for_selector("th[aria-sort='descending']")
+    desc = _visible_names(page)
+
+    assert asc == sorted(asc)
+    assert desc == sorted(desc, reverse=True)
+    assert asc != desc
+
+
+def test_sorting_returns_to_the_first_page(v2_page):
+    """排序完停在第 4 頁，等於看不到排序的結果。"""
+    page, base_url = v2_page
+    _stub_workload_list(page, _named_workloads(60))
+    _goto(page, base_url, R_WORKLOADS)
+    labels = _labels(page)
+    _run_search(page, labels)
+
+    page.get_by_role("button", name=labels["gui_next"], exact=True).click()
+    page.wait_for_timeout(150)
+    page.locator("th button.th-sort").first.click()
+    page.wait_for_selector("th[aria-sort='ascending']")
+
+    assert _visible_names(page)[0] == "wl-00"
+
+
+def test_accelerate_all_targets_every_result_not_the_current_page(v2_page):
+    """「全部加速」的對象是整批搜尋結果，不是當頁——分頁是顯示上的事。
+
+    抽屜的摘要同時要說清楚有幾個是 Unmanaged 而會被略過：後端加速不了它們，
+    而畫面若不講，操作者會以為 60 台都送出去了。
+    """
+    page, base_url = v2_page
+    rows = _named_workloads(55)
+    rows.append(_fake_workload(href="/orgs/1/workloads/999", name="wl-unmanaged",
+                               managed=False))
+    _stub_workload_list(page, rows)
+    _goto(page, base_url, R_WORKLOADS)
+    labels = _labels(page)
+    _run_search(page, labels)
+
+    page.get_by_role("button", name=labels["gui_accel_all_btn"], exact=True).click()
+    drawer = page.locator("aside.drawer")
+    drawer.wait_for(state="visible")
+    summary = drawer.locator('[data-cov="IV-12"]').inner_text()
+
+    # 56 筆全部進來（不是當頁的 50），其中 55 筆可加速、1 筆略過。
+    assert "56" in summary, summary
+    assert "55" in summary, summary
