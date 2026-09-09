@@ -5340,7 +5340,7 @@
   "gui_al_ev_to": "結束時間",
   "gui_al_ev_yes": "是",
   "gui_al_ev_no": "否",
-  "gui_al_ev_action_redacted": "{method}（PCE 未提供端點）",
+  "gui_al_ev_action_redacted": "{method}（PCE 未說明是哪一項操作）",
   "gui_al_ev_action": "動作",
   "gui_al_ev_resource": "對象",
   "gui_al_act_policy": "調整規則集 {name}",

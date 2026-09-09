@@ -5340,7 +5340,7 @@
   "gui_al_ev_to": "To",
   "gui_al_ev_yes": "Yes",
   "gui_al_ev_no": "No",
-  "gui_al_ev_action_redacted": "{method} (the PCE did not disclose the endpoint)",
+  "gui_al_ev_action_redacted": "{method} (the PCE did not say which operation)",
   "gui_al_ev_action": "What they did",
   "gui_al_ev_resource": "What it touched",
   "gui_al_act_policy": "Change the policy in {name}",
