@@ -112,20 +112,21 @@ compat(pass/(pass+warn+fail)) .10），缺分量重正規化。
 `POST /api/fleet/progress/preview`
 ```
 in : {to_mode, hrefs?: [...], bucket?: <pipeline name>}   # 二擇一；bucket 從快照 index 展開
-out: {ok, to_mode, eligible: [{href, hostname, from, to}], skipped: [{href, hostname, reason}],
-      cap: max_batch, truncated: bool}
+out: {ok, to_mode, eligible: [{href, hostname, from, to}], deferred: [{href, hostname, from, to}],
+      skipped: [{href, hostname, reason}], cap: max_batch, truncated: bool}
 ```
-reason 列舉：`not_managed`、`offline`（變更會等到 VEN 重連才生效，仍列 skipped）、
-`invalid_transition`、`already_target`、`over_cap`、`unknown_href`。eligible 依 hostname 排序後截到
-`max_batch`（預設 200，上限 1000），被截者進 skipped(over_cap)。
+`deferred` = 合法轉換但 VEN 離線（PCE 立即接受，VEN 重連後才套用）；預設不勾選，操作者可加回。
+skipped reason 列舉：`not_managed`、`invalid_transition`、`already_target`、`over_cap`、`unknown_href`。
+eligible＋deferred 依 hostname 排序後合計截到 `max_batch`（預設 200，上限 1000），被截者進 skipped(over_cap)。
 
 `POST /api/fleet/progress/apply`
 ```
 in : {to_mode, hrefs: [...]}          # 只收 preview 回的 href 清單，不收 bucket/filter
-out: {ok, applied: [{href, hostname, from, to}], failed: [{href, hostname, http, error}],
+out: {ok, applied: [{href, hostname, from, to, deferred: bool}], failed: [{href, hostname, http, error}],
       record_id}
 ```
-- 伺服端重跑同一套 eligibility（不信任前端），任何 href 不合格→整批 400 回 skipped，不部分套用。
+- 伺服端重跑同一套 eligibility（不信任前端），任何 href 落在 skipped→整批 400 回 skipped，不部分套用；
+  落在 deferred 的允許，回應逐筆標 `deferred: true`。
 - 寫入：`ApiClient.bulk_update_workloads(items: list[{href, enforcement_mode}]) -> list[{href, status, errors}]`
   走 `PUT /orgs/{org}/workloads/bulk_update`，1000 筆一批，`rate_limit=True`；解析 PCE 回傳的逐筆狀態。
   官方 guide 查證：bulk_update 接受 `enforcement_mode`、每次 1000、不需 provision、下次 heartbeat 生效。
@@ -162,6 +163,6 @@ fleet health score（含 partial 註記與缺分量）、coverage gaps。表格�
 ## 9. 已知限制與風險
 
 - lab（21 台）`agent_health` 全空，compat 四態只能靠 fixture 驗證；真環境驗證待有 idle VEN 的環境。
-- 離線 VEN 的模式變更在 PCE 立即生效、VEN 重連後才套用；preview 把它列 skipped(offline) 讓操作者
-  自行加回（勾選後 apply 允許，但回應標 `deferred: true`）。
+- 離線 VEN 的模式變更在 PCE 立即生效、VEN 重連後才套用；preview 把它列 `deferred`，操作者勾選後
+  apply 允許並逐筆標 `deferred: true`。
 - `fetch_managed_workloads` 走 500 上限＋截斷偵測；>500 集合的 fallback 行為依 api-layer-hardening。
