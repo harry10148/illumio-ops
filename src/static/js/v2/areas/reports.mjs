@@ -1096,7 +1096,7 @@ async function mountReports(root, ctx) {
           const last = el("div", { class: "rpcard-last" },
             el("span", { class: "k", text: t("gui_rp_last") }),
             el("span", { class: "v mono", text: lastStamp(latestByType[rt.id]) }),
-            el("span", { class: "n mono", text: tf("gui_rp_files_n", { n: countByType[rt.id] || 0 }) }));
+            el("span", { class: "n", text: tf("gui_rp_files_n", { n: countByType[rt.id] || 0 }) }));
           card.appendChild(last);
           card.appendChild(btn("btn primary", t("gui_gen_generate"), function () { handles.open(rt.id); }));
           grid.appendChild(card);

@@ -313,8 +313,10 @@ function emptyState(text, route, label) {
 }
 
 function chips(items) {
+  // .mono：這個 helper 的左半是事件型別（user.login、rule_set.update），是識別
+  // 字。chip 的字體由呼叫端決定，不由 .chips 容器決定——見 components.css。
   return el("div", { class: "chips" }, items.map(function (pair) {
-    return el("span", { class: pair[2] ? "off" : null },
+    return el("span", { class: pair[2] ? "off mono" : "mono" },
       el("span", { text: pair[0] + " " }), el("b", { text: pair[1] }));
   }));
 }

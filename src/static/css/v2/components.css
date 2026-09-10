@@ -434,13 +434,17 @@ th[aria-sort="ascending"], th[aria-sort="descending"] { background: var(--surfac
 
 /* chips — a compact enumeration that is not a table */
 .chips { display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-3); }
+/* chip 是容器，不是內容型別：同一個 .chips 有時裝 label 的 key=value 或
+   udp/tcp（識別字），有時裝「App/Env」「Date range」「No data available」這種
+   詞句。字體因此由呼叫端以 .mono 指定，預設繼承。 */
 .chips span {
-  font-family: var(--font-mono); font-size: var(--fs-mini);
+  font-size: var(--fs-mini);
   color: var(--text-2); background: var(--surface-2);
   border: 1px solid var(--line-soft); border-radius: var(--radius-s);
   padding: var(--space-1) var(--space-3);
 }
 .chips span.off { color: var(--text-3); opacity: .6; }
+.chips span.mono, .chips span.mono b { font-family: var(--font-mono); }
 .chips span b { color: var(--text-1); font-weight: 400; }
 
 /* KPI mosaic — hairline-separated cells, one figure each */
@@ -460,7 +464,10 @@ th[aria-sort="ascending"], th[aria-sort="descending"] { background: var(--surfac
   overflow-wrap: anywhere;
   margin-bottom: var(--space-1);
 }
-.kpi dd { margin: 0; font-family: var(--font-mono); font-size: var(--fs-lead); color: var(--text-1); }
+/* KPI 讀數是量測值，不是可複製比對的字面值，所以不用等寬字——但一欄數字仍然
+   要對得齊，那件事交給 tabular-nums，那才是它該用的機制。整格寫死等寬時，
+   「0 days」「0.0%」「N/A」也一起變成了識別字的樣子。 */
+.kpi dd { margin: 0; font-variant-numeric: tabular-nums; font-size: var(--fs-lead); color: var(--text-1); }
 
 /* stacked findings — severity mark, headline, supporting line */
 .stack { list-style: none; margin: 0; padding: 0; }
@@ -478,7 +485,10 @@ th[aria-sort="ascending"], th[aria-sort="descending"] { background: var(--surfac
    same list wraps there instead of ellipsing. */
 .drawer-b .stack .s { white-space: normal; }
 .stack .r { grid-column: 2 / 4; font-size: var(--fs-mini); color: var(--text-3); line-height: 1.5; }
-.stack .c { font-family: var(--font-mono); font-size: var(--fs-mini); color: var(--text-2); white-space: nowrap; }
+/* 這一欄裝的是「+3.5」「Count 1」「依連線數」——量測值與詞句，不是可複製比對
+   的字面值。要對齊交給 tabular-nums；.mono 留給真的放識別字的呼叫端。 */
+.stack .c { font-variant-numeric: tabular-nums; font-size: var(--fs-mini); color: var(--text-2); white-space: nowrap; }
+.stack .c.mono { font-family: var(--font-mono); }
 
 /* posture instrument: a 20-step readout, not a progress bar */
 .gauge { display: flex; align-items: center; gap: var(--space-6); margin-bottom: var(--space-5); }

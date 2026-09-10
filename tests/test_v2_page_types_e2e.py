@@ -383,18 +383,6 @@ _MONO_ROUTES = ["#/system/pce", "#/system/siem", "#/system/tls", "#/system/jobs"
                 "#/system/logs", "#/system/cache", "#/reports", "#/investigate/events"]
 
 
-@pytest.mark.xfail(strict=True, reason=(
-    "找到 24 處真實違規，等排版那件工作處理——不是測試錯了。"
-    "2026-09-09 把 e2e 的 PCE 重試退避拿掉之後（每支省 6 秒），#/reports 才第一次"
-    "在這支測試的 400ms 視窗內載完；在那之前它是綠的，因為頁面根本還沒畫出來。"
-    "露出來的違規全是同一個成因：字體由**容器**決定而不是由內容決定——"
-    "`.chips span`、`.kpi dd`、`.idc small`、`.rpcard-sched` 整包套等寬，於是"
-    "`0 files`、`Date range`、`0 days`、`No data available`、"
-    "`Attack posture boundary 0 | pivot 0 | …` 都穿上了識別字的臉。"
-    "這正是這支測試當初為 `kv()` 而寫的那個錯，只是那次沒把 CSS 這幾條一起看。"
-    "修它要動五個 area 的外觀（有些 chip 裝的**是**識別字，如 label 的 key=value、"
-    "udp/tcp，那些要留著），是一件獨立的排版工作，不該混進效能修改。"
-    "strict=True：修好之後這裡會轉紅，逼人回來把 marker 拿掉。"))
 def test_the_code_face_is_only_used_for_identifiers(v2_page):
     """§5.2: mono is for things you copy, paste and compare — not for prose.
 
