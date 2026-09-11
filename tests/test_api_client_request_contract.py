@@ -179,7 +179,7 @@ def test_get_events_rate_limit_true_reaches_request(api_client):
 
 
 @pytest.mark.parametrize(("deployment_type", "expected_timeout"), [
-    ("saas", 60),
+    ("saas", 180),
     ("on_prem", 30),
     (None, 30),
 ])
@@ -215,9 +215,32 @@ def test_fetch_events_strict_uses_deployment_specific_timeout(
             "timeout": expected_timeout,
             "rate_limit": True,
             "transport_retries": False,
-            "deadline": 65.0 if deployment_type == "saas" else 35.0,
+            "deadline": 185.0 if deployment_type == "saas" else 35.0,
         },
     )]
+
+
+@pytest.mark.parametrize("deployment_type", ["saas", "on_prem"])
+def test_fetch_events_strict_honours_configured_events_timeout(
+    api_client, deployment_type, monkeypatch,
+):
+    """api.events_timeout_seconds overrides the deployment default: some SaaS
+    tenants answer /events in well over a minute, and a fixed 60s meant every
+    poll failed and the watchdog alerted forever."""
+    api_client.api_cfg["deployment_type"] = deployment_type
+    api_client.api_cfg["events_timeout_seconds"] = 240
+    calls = []
+
+    def fake_request(url, **kwargs):
+        calls.append(kwargs)
+        return 200, b"[]"
+
+    api_client._request = fake_request
+    monkeypatch.setattr("src.api_client.time.monotonic", lambda: 0.0)
+
+    api_client.fetch_events_strict("2026-08-30T01:02:03Z")
+
+    assert [(c["timeout"], c["deadline"]) for c in calls] == [(240, 245.0)]
 
 
 def test_fetch_events_retry_stays_inside_total_deadline(api_client, monkeypatch):
@@ -243,9 +266,9 @@ def test_fetch_events_retry_stays_inside_total_deadline(api_client, monkeypatch)
     with pytest.raises(EventFetchError):
         api_client.fetch_events_strict("2026-08-30T01:02:03Z")
 
-    assert [call["timeout"] for call in calls] == [60, 4.0]
+    assert [call["timeout"] for call in calls] == [180, 4.0]
     assert all(call["transport_retries"] is False for call in calls)
-    assert now["value"] == 65.0
+    assert now["value"] == 185.0
 
 
 def test_get_traffic_flows_async_enforces_max_results(api_client):

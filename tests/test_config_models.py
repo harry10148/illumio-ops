@@ -32,6 +32,17 @@ def test_api_settings_supports_explicit_deployment_and_console_url(deployment_ty
     assert cfg.console_url == "https://console.illum.io"
 
 
+def test_api_settings_events_timeout_defaults_to_none_and_bounds_explicit_values():
+    """None means 'use the deployment default'; explicit values must stay
+    inside a range that fits one monitor cycle."""
+    from src.config_models import ApiSettings
+    assert ApiSettings().events_timeout_seconds is None
+    assert ApiSettings(events_timeout_seconds=240).events_timeout_seconds == 240
+    for bad in (4, 601, "fast"):
+        with pytest.raises(ValidationError, match="events_timeout_seconds"):
+            ApiSettings(events_timeout_seconds=bad)
+
+
 def test_api_settings_rejects_unknown_deployment_type():
     from src.config_models import ApiSettings
     with pytest.raises(ValidationError, match="deployment_type"):

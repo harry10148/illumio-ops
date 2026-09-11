@@ -53,6 +53,11 @@ class ApiSettings(_Base):
     verify_ssl: bool = True
     deployment_type: Literal["saas", "on_prem"] = "on_prem"
     console_url: str = ""
+    # Per-attempt timeout for GET /events. None = deployment default
+    # (SaaS 180s, on-prem 30s). Some SaaS tenants take well over a minute to
+    # answer /events regardless of window size (2026-09-11: ap-scp45 ~23s
+    # from dev, >60s from the appliance); a fixed 60s made every poll fail.
+    events_timeout_seconds: int | None = Field(default=None, ge=5, le=600)
 
     @field_validator("verify_ssl", mode="after")
     @classmethod

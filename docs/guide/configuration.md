@@ -95,6 +95,7 @@ illumio-ops config login --url ... --key ... --secret ... [--org-id ...] \
 | `verify_ssl` | bool | `true` | 是否驗證 PCE TLS 憑證 |
 | `deployment_type` | `"saas"` \| `"on_prem"` | `"on_prem"` | PCE 部署型態；舊設定缺少此鍵時視為 `on_prem`。CLI 值寫作 `saas` / `on_prem`。 |
 | `console_url` | str | `""` | 操作者 Console 與事件告警連結的 base URL；接受完整 `http`/`https` URL。 |
+| `events_timeout_seconds` | int \| null | `null` | `GET /events` 單次逾時秒數（5–600）。`null` 依部署型態取預設：SaaS 180、on-prem 30。SaaS 租戶回應 `/events` 的延遲與查詢視窗大小無關、且租戶間差異大；輪詢連續逾時會讓事件告警靜默失效並觸發看門狗，遇到時把此值調高。 |
 
 三個 URL 各有單一職責，不可互換：
 
