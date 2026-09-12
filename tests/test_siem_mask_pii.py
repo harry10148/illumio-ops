@@ -168,9 +168,9 @@ def test_masked_flow_hides_username_in_cef_output():
             "service": {"port": 22, "proto": 6,
                         "user_name": "root", "process_name": "sshd"}}
     line = CEFFormatter().format_flow(mask_flow(flow, mask_pii=True))
-    assert "un=root" not in line
-    assert "pn=sshd" not in line
-    assert "un=[REDACTED]" in line
+    assert "root" not in line
+    assert "sshd" not in line
+    assert "user=[REDACTED]" in line and "proc=[REDACTED]" in line
 
 
 def test_dispatcher_builder_threads_mask_pii_through():

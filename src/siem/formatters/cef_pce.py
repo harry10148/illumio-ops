@@ -50,6 +50,19 @@ def _clean(value) -> str:
     return str(value).replace("\r", " ").replace("\n", " ")
 
 
+def _escape_arcsight(value) -> str:
+    """CEF extension-value escaping per the ArcSight spec: backslash, equals,
+    and line breaks.  ArcSight unescapes on parse, so cs2/cs4 JSON comes out
+    clean on the other side."""
+    value = str(value).replace("\\", "\\\\").replace("=", "\\=")
+    return value.replace("\r", "\\r").replace("\n", "\\n")
+
+
+def _rt_epoch_ms(ts: str) -> str:
+    dt = _parse_ts(ts)
+    return str(int(dt.timestamp() * 1000)) if dt else ""
+
+
 def _header_field(value: str) -> str:
     return _clean(value).replace("|", "\\|")
 
@@ -148,9 +161,37 @@ def _labels_obj(labels) -> dict:
 
 
 class PceNativeCEFFormatter(Formatter):
-    def __init__(self, *, pce_fqdn: str = "", pce_version: str = "unknown"):
+    """PCE-shaped CEF in two dialects.
+
+    graylog  — byte-for-byte the PCE's own line except rt's zone suffix
+               (Graylog's CEF codec drops lines that carry it); values are
+               not escaped; empty-valued keys are kept (`outcome=`).
+    arcsight — same keys, order and Signature IDs, but rt as epoch
+               milliseconds (unambiguous, no device-timezone guessing),
+               values escaped per the CEF spec, empty-valued keys omitted.
+               ArcSight limits cs1-cs6 to 4,000 characters, which is exactly
+               why the PCE chunks resource_changes at 3,995 (see
+               _resource_changes_chunks); the chunking is shared.
+    """
+
+    DIALECTS = ("graylog", "arcsight")
+
+    def __init__(self, *, pce_fqdn: str = "", pce_version: str = "unknown",
+                 dialect: str = "graylog"):
+        if dialect not in self.DIALECTS:
+            raise ValueError(f"unknown CEF dialect {dialect!r}")
         self._pce_fqdn = pce_fqdn
         self._pce_version = pce_version or "unknown"
+        self._dialect = dialect
+        self._arcsight = dialect == "arcsight"
+        self._v = _escape_arcsight if self._arcsight else _clean
+
+    def _kv(self, ext: list[str], key: str, value) -> None:
+        """Append key=value; the arcsight dialect skips empty values."""
+        text = "" if value is None else str(value)
+        if text == "" and self._arcsight:
+            return
+        ext.append(f"{key}={self._v(text)}")
 
     # ── audit events ────────────────────────────────────────────────────
     def format_event(self, event: dict) -> str:
@@ -167,36 +208,39 @@ class PceNativeCEFFormatter(Formatter):
         duid, duser = _actor(event.get("created_by"))
 
         ext: list[str] = []
-        rt = _rt_audit(str(event.get("timestamp") or ""))
+        rt = _rt_epoch_ms(str(event.get("timestamp") or "")) if self._arcsight else _rt_audit(str(event.get("timestamp") or ""))
         if rt:
             ext.append(f"rt={rt}")
-        ext.append(f"dvchost={_clean(dvchost)}")
+        self._kv(ext, "dvchost", dvchost)
         if duid:
-            ext.append(f"duid={_clean(duid)}")
-        ext.append(f"duser={_clean(duser)}")
-        ext.append(f"dst={_clean(dst)}")
-        ext.append(f"outcome={_clean(status or '')}")
+            self._kv(ext, "duid", duid)
+        self._kv(ext, "duser", duser)
+        self._kv(ext, "dst", dst)
+        self._kv(ext, "outcome", status or "")
         ext.append("cat=audit_events")
         if action is not None:
             if action.get("api_endpoint") is not None:
-                ext.append(f"request={_clean(action['api_endpoint'])}")
+                self._kv(ext, "request", action["api_endpoint"])
             if action.get("api_method") is not None:
-                ext.append(f"requestMethod={_clean(action['api_method'])}")
+                self._kv(ext, "requestMethod", action["api_method"])
             if action.get("http_status_code") is not None:
-                ext.append(f"reason={_clean(action['http_status_code'])}")
+                self._kv(ext, "reason", action["http_status_code"])
         rc = event.get("resource_changes") or []
         cs2, cs3 = _resource_changes_chunks(rc) if rc else ("", "")
-        ext.append(f"cs2={_clean(cs2)}")
-        ext.append("cs2Label=resource_changes")
+        self._kv(ext, "cs2", cs2)
+        if cs2 or not self._arcsight:
+            ext.append("cs2Label=resource_changes")
         notes = event.get("notifications") or []
-        ext.append(f"cs4={_clean(_compact_json(notes)) if notes else ''}")
-        ext.append("cs4Label=notifications")
+        cs4 = _compact_json(notes) if notes else ""
+        self._kv(ext, "cs4", cs4)
+        if cs4 or not self._arcsight:
+            ext.append("cs4Label=notifications")
         ext.append("cn2=2")
         ext.append("cn2Label=schema-version")
         ext.append("cs1Label=event_href")
-        ext.append(f"cs1={_clean(event.get('href') or event.get('pce_event_id') or '')}")
+        self._kv(ext, "cs1", event.get("href") or event.get("pce_event_id") or "")
         if cs3:
-            ext.append(f"cs3={_clean(cs3)}")
+            self._kv(ext, "cs3", cs3)
             ext.append("cs3Label=resource_changes_2")
         return head + " ".join(ext)
 
@@ -227,8 +271,8 @@ class PceNativeCEFFormatter(Formatter):
                     (flow.get("timestamp_range") or {}).get("last_detected"), "")
 
         ext: list[str] = [f"act={pd}", "cat=flow_summary", f"deviceDirection={1 if outbound else 0}",
-                          f"dpt={port}", f"src={_clean(_first(flow.get('src_ip'), src.get('ip'), ''))}",
-                          f"dst={_clean(_first(flow.get('dst_ip'), dst.get('ip'), ''))}", f"proto={_clean(proto)}"]
+                          f"dpt={port}", f"src={self._v(_first(flow.get('src_ip'), src.get('ip'), ''))}",
+                          f"dst={self._v(_first(flow.get('dst_ip'), dst.get('ip'), ''))}", f"proto={self._v(proto)}"]
         cnt = _first(flow.get("count"), flow.get("num_connections"), flow.get("flow_count"))
         if cnt is not None:
             ext.append(f"cnt={cnt}")
@@ -236,18 +280,18 @@ class PceNativeCEFFormatter(Formatter):
         if tbi is not None and tbo is not None:
             ext.append(f"in={tbi}")
             ext.append(f"out={tbo}")
-        rt = _rt_flow(str(ts or ""))
+        rt = _rt_epoch_ms(str(ts or "")) if self._arcsight else _rt_flow(str(ts or ""))
         if rt:
             ext.append(f"rt={rt}")
         user = _first(svc.get("user_name"), flow.get("un"))
         proc = _first(svc.get("process_name"), flow.get("pn"))
         svc_name = _first(svc.get("name"), flow.get("service_name"))
         if user:
-            ext.append(f"{'suser' if outbound else 'duser'}={_clean(user)}")
+            self._kv(ext, "suser" if outbound else "duser", user)
         if svc_name:
-            ext.append(f"destinationServiceName={_clean(svc_name)}")
+            self._kv(ext, "destinationServiceName", svc_name)
         if proc:
-            ext.append(f"{'sproc' if outbound else 'dproc'}={_clean(proc)}")
+            self._kv(ext, "sproc" if outbound else "dproc", proc)
         if flow.get("interval_sec") is not None:
             ext.append(f"cn1={flow['interval_sec']}")
             ext.append("cn1Label=interval_sec")
@@ -256,28 +300,30 @@ class PceNativeCEFFormatter(Formatter):
         if dbi is not None and dbo is not None:
             ext += [f"cn2={dbi}", "cn2Label=dbi", f"cn3={dbo}", "cn3Label=dbo"]
         state = str(flow.get("state") or "")
-        ext.append(f"cs2={_STATE.get(state, state if len(state) == 1 else '')}")
-        ext.append("cs2Label=state")
+        state_code = _STATE.get(state, state if len(state) == 1 else "")
+        self._kv(ext, "cs2", state_code)
+        if state_code or not self._arcsight:
+            ext.append("cs2Label=state")
         if src_wl is not None:
-            ext.append(f"shost={_clean(_first(flow.get('src_hostname'), src_wl.get('hostname'), src_wl.get('name'), ''))}")
-            ext.append(f"cs5={_clean(_first(flow.get('src_href'), src_wl.get('href'), ''))}")
+            self._kv(ext, "shost", _first(flow.get('src_hostname'), src_wl.get('hostname'), src_wl.get('name'), ''))
+            self._kv(ext, "cs5", _first(flow.get('src_href'), src_wl.get('href'), ''))
             ext.append("cs5Label=src_href")
             labels = _labels_obj(_first(flow.get("src_labels"), src_wl.get("labels")))
             if labels:
-                ext.append(f"cs3={_clean(_compact_json(labels))}")
+                self._kv(ext, "cs3", _compact_json(labels))
                 ext.append("cs3Label=src_labels")
         if dst_wl is not None:
-            ext.append(f"dhost={_clean(_first(flow.get('dst_hostname'), dst_wl.get('hostname'), dst_wl.get('name'), ''))}")
-            ext.append(f"cs6={_clean(_first(flow.get('dst_href'), dst_wl.get('href'), ''))}")
+            self._kv(ext, "dhost", _first(flow.get('dst_hostname'), dst_wl.get('hostname'), dst_wl.get('name'), ''))
+            self._kv(ext, "cs6", _first(flow.get('dst_href'), dst_wl.get('href'), ''))
             ext.append("cs6Label=dst_href")
             labels = _labels_obj(_first(flow.get("dst_labels"), dst_wl.get("labels")))
             if labels:
-                ext.append(f"cs4={_clean(_compact_json(labels))}")
+                self._kv(ext, "cs4", _compact_json(labels))
                 ext.append("cs4Label=dst_labels")
-        ext.append(f"dvchost={_clean(flow.get('pce_fqdn') or self._pce_fqdn)}")
+        self._kv(ext, "dvchost", flow.get('pce_fqdn') or self._pce_fqdn)
 
         msg: dict = {}
-        if flow.get("icmp_type") is not None or flow.get("type") is not None:
+        if any(v is not None for v in (flow.get("icmp_type"), flow.get("type"), svc.get("icmp_type"))):
             msg["icmp_type"] = _first(flow.get("icmp_type"), flow.get("type"), svc.get("icmp_type"))
             msg["icmp_code"] = _first(flow.get("icmp_code"), flow.get("code"), svc.get("icmp_code"))
         cls = flow.get("class") or _TRAFCLASS.get(str(flow.get("transmission") or "").lower(), "U")
@@ -291,5 +337,5 @@ class PceNativeCEFFormatter(Formatter):
             msg["network"] = net_name
         if flow.get("pd_qualifier") is not None:
             msg["pd_qualifier"] = flow["pd_qualifier"]
-        ext.append(f"msg={_clean(_compact_json(msg))}")
+        self._kv(ext, "msg", _compact_json(msg))
         return head + " ".join(ext)

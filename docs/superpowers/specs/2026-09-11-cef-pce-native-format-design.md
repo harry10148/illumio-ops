@@ -115,7 +115,20 @@ cn1 cn1Label [cn2 cn2Label cn3 cn3Label] cs2 cs2Label [shost cs5 cs5Label [cs3 c
 PII 遮罩：`mask_flow` 遮 `service.user_name`／`process_name` → `suser/duser/sproc/dproc` 自動為
 `[REDACTED]`。
 
-### 4.3 syslog 包裝
+### 4.3 ArcSight 方言（`cef`／`syslog_cef`，2026-09-12 追加）
+
+使用者決定把既有 `cef` 改成 PCE 原生形狀的 ArcSight 方言，與 §4.1／§4.2 只差：
+
+| 項目 | Graylog 方言（`cef_pce`） | ArcSight 方言（`cef`） |
+|---|---|---|
+| `rt` | PCE 字串形式（audit 去 ` +0000`） | epoch 毫秒（規格首選，避免 connector 依 device timezone 猜） |
+| 擴充值跳脫 | 不跳脫 | `\\`→`\\\\`、`=`→`\\=`、換行→`\\n`（ArcSight 解析時還原） |
+| 空值鍵 | 保留（`outcome=`、`cs2=`） | 省略（連同對應的 `csNLabel`） |
+| `cs2` 分段 | 相同（3,995／7,990 規則，對應 ArcSight cs 欄 4,000 上限） | 相同 |
+
+實作為 `PceNativeCEFFormatter(dialect="arcsight")`，`CEFFormatter` 為其子類別以維持既有引用。
+
+### 4.4 syslog 包裝
 
 `syslog_cef_pce` = `SyslogWrappedFormatter(PceNativeCEFFormatter)`，RFC5424 header 規則不變。
 

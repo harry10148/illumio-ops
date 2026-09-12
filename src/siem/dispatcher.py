@@ -255,9 +255,9 @@ def _formatter_for(dest_cfg, *, pce_fqdn: str = "", pce_version: str = "unknown"
     from src.siem.formatters.syslog_wrapped import SyslogWrappedFormatter
     fmt = dest_cfg.format
     if fmt == "cef":
-        return CEFFormatter()
+        return CEFFormatter(pce_fqdn=pce_fqdn, pce_version=pce_version)
     if fmt == "syslog_cef":
-        return SyslogWrappedFormatter(CEFFormatter())
+        return SyslogWrappedFormatter(CEFFormatter(pce_fqdn=pce_fqdn, pce_version=pce_version))
     if fmt == "cef_pce":
         return PceNativeCEFFormatter(pce_fqdn=pce_fqdn, pce_version=pce_version)
     if fmt == "syslog_cef_pce":

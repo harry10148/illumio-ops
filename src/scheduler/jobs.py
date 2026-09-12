@@ -588,7 +588,7 @@ def run_siem_dispatch(cm) -> None:
         # cef_pce stamps the PCE's fqdn/version on every line; resolve once
         # (memoised an hour) and only when such a destination exists.
         fqdn, version = "", "unknown"
-        if any(d.format in ("cef_pce", "syslog_cef_pce") for d in enabled_dests):
+        if any(d.format in ("cef", "syslog_cef", "cef_pce", "syslog_cef_pce") for d in enabled_dests):
             from src.siem.dispatcher import cached_pce_identity
             fqdn, version = cached_pce_identity(cm)
         for dest_cfg in enabled_dests:

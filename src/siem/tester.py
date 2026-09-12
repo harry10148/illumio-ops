@@ -51,9 +51,9 @@ def _build_formatter(fmt: str, *, pce_fqdn: str = "", pce_version: str = "unknow
     from src.siem.formatters.normalized_json import NormalizedJSONFormatter
     from src.siem.formatters.syslog_wrapped import SyslogWrappedFormatter
     if fmt == "cef":
-        return CEFFormatter()
+        return CEFFormatter(pce_fqdn=pce_fqdn, pce_version=pce_version)
     if fmt == "syslog_cef":
-        return SyslogWrappedFormatter(CEFFormatter())
+        return SyslogWrappedFormatter(CEFFormatter(pce_fqdn=pce_fqdn, pce_version=pce_version))
     if fmt == "cef_pce":
         return PceNativeCEFFormatter(pce_fqdn=pce_fqdn, pce_version=pce_version)
     if fmt == "syslog_cef_pce":

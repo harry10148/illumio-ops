@@ -46,14 +46,18 @@ SIEM 轉送依賴 pce_cache（見 [cache-maintenance.md](cache-maintenance.md)�
 
 | `format` | 內容 | 適用對象 |
 |---|---|---|
-| `cef` | ArcSight CEF 0.1 單行（`CEF:0\|Illumio\|PCE\|3.11\|<event_type>\|<event_type>\|<severity>\|<extension>`） | ArcSight、QRadar |
-| `syslog_cef` | 同上，外層包一層 RFC5424 syslog header | 需要 RFC5424 framing 的 syslog 伺服器 |
+| `cef` | PCE 原生形狀的 **ArcSight 方言**：與 `cef_pce` 同欄位、同順序、同 Signature ID（`<event_type>.<status>`），但 `rt` 為 epoch 毫秒、值依 CEF 規格跳脫（`\\`、`\=`）、空值鍵省略、`cs` 欄 4,000 字元分段 | ArcSight SmartConnector、QRadar 及其他嚴格 CEF 解析器 |
+| `syslog_cef` | 同上（ArcSight 方言），外層包一層 RFC5424 syslog header | 需要 RFC5424 framing 的 syslog 伺服器 |
 | `json` | 扁平 JSON，使用 Illumio 官方欄位名稱（`NormalizedJSONFormatter`） | Splunk HEC、Elastic、Logstash、檔案 sink |
 | `syslog_json` | 同上 JSON，外層包一層 RFC5424 header | rsyslog／syslog-ng（`mmjsonparse`） |
 | `cef_pce` | 對齊 PCE 原生 syslog 匯出的 CEF：Signature ID 為 `<event_type>.<status>`、嚴重度依 PCE（info 1／warning 3／err 4）、`cs2`/`cs4` 帶完整 `resource_changes`/`notifications` JSON、流量為 `flow_<pd>` 加 `act`/`cat=flow_summary`/`cs3`-`cs6` 標籤與 href | 已經在收 PCE 直送 syslog、希望 ops 轉拋用同一套 parser 與規則的 SOC |
 | `syslog_cef_pce` | 同上，外層包一層 RFC5424 header | 同上、需要 RFC5424 framing |
 
-`syslog_cef`／`syslog_json` 的 RFC5424 header 由 `wrap_rfc5424()` 產生，格式為 `<PRI>1 TIMESTAMP HOSTNAME illumio-ops - - - MSG`；`HOSTNAME` 取事件的 `pce_fqdn`，traffic 記錄沒有 `pce_fqdn` 時退回轉送端主機名稱 `illumio-ops`。CEF 的 severity 對照：`info`→3、`warning`/`warn`→6、`error`/`err`→8、`critical`/`crit`→10；syslog header 的 severity 另有一套對照（`info`→6、`warning`→4、`error`→3、`critical`→2）。
+`syslog_cef`／`syslog_json` 的 RFC5424 header 由 `wrap_rfc5424()` 產生，格式為 `<PRI>1 TIMESTAMP HOSTNAME illumio-ops - - - MSG`；`HOSTNAME` 取事件的 `pce_fqdn`，traffic 記錄沒有 `pce_fqdn` 時退回轉送端主機名稱 `illumio-ops`。CEF header 的 severity 兩種方言都依 PCE：audit `info`→1、`warning`→3、`err`→4，流量 `allowed`/`unknown`→1、`potentially_blocked`→3、`blocked`→5；syslog header 的 severity 另有一套對照（`info`→6、`warning`→4、`error`→3、`critical`→2）。
+
+#### `cef`（ArcSight 方言）與 `cef_pce`（Graylog 方言）怎麼選
+
+兩者只差三件事：`rt`（ArcSight 用 epoch 毫秒，避免 connector 以 device timezone 猜測；Graylog 用 PCE 的字串形式）、跳脫（ArcSight 依規格跳脫 `\\` 與 `\=`，connector 解析時還原；Graylog 的 CEF input 不還原跳脫，所以不跳脫）、空值（ArcSight 省略 `outcome=` 這類空值鍵，Graylog 保留以與 PCE 逐字一致）。SOC 的規則若只看 Signature ID、`event_href`、`notifications`，兩種方言通用。
 
 #### `cef_pce` 與 PCE 直送的已知差異
 

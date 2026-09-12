@@ -348,7 +348,7 @@ cache 架構、容量規劃與 archive 排程細節見 [cache-maintenance.md](ca
 | `name` | str（1–64 字） | 必填 | 目的地名稱 |
 | `enabled` | bool | `true` | 是否啟用該目的地 |
 | `transport` | str | `"udp"` | `udp`／`tcp`／`tls`／`hec` |
-| `format` | str | `"cef"` | `cef`／`json`／`syslog_cef`／`syslog_json`／`cef_pce`／`syslog_cef_pce`（後兩者對齊 PCE 原生 syslog CEF，見 siem.md §1.2） |
+| `format` | str | `"cef"` | `cef`（PCE 原生形狀的 ArcSight 方言）／`json`／`syslog_cef`／`syslog_json`／`cef_pce`（Graylog 方言，逐字對齊 PCE）／`syslog_cef_pce`，見 siem.md §1.2 |
 | `host` | str | `""` | 目的地主機 |
 | `port` | int（1–65535） | `514` | 目的地埠 |
 | `profile` | `"production"`\|`"dev"` | `"production"` | 同 `api.profile`，見下方安全護欄 |
