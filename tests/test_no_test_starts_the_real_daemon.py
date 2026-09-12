@@ -18,6 +18,7 @@ cwd 能改掉它。只要是在這個 checkout 裡以真常駐模式起來的子
 from __future__ import annotations
 
 import ast
+import os
 from pathlib import Path
 
 import pytest
@@ -158,3 +159,35 @@ def test_every_state_resolver_is_redirected():
     leaking = {k: v for k, v in resolved.items()
                if repo_logs in Path(v).resolve().parents}
     assert not leaking, f"這些仍指向這個 checkout 的 logs/：{leaking}"
+
+
+def test_the_override_reaches_every_resolver_in_a_fresh_process():
+    """只設環境變數、不靠 conftest 的 monkeypatch，五個解析點必須一致。
+
+    Codex review P2：`reporter.STATE_FILE` / `analyzer.STATE_FILE` 原本自己拼
+    `ROOT_DIR/logs/state.json`，不走 resolver，所以即使在 import 前設好環境變數，
+    scheduler／GUI 會用新路徑、watchdog 與派送紀錄仍寫進 checkout 的舊檔——
+    **狀態分裂**，而 conftest 額外 monkeypatch 兩個常數正好把這個缺口蓋住。
+    這支不吃 conftest 的 fixture，開一個乾淨行程問。
+    """
+    import json
+    import subprocess
+    import sys
+
+    target = "/tmp/illumio-ops-state-override-probe.json"
+    out = subprocess.run(
+        [sys.executable, "-c",
+         "import json, src.reporter, src.analyzer\n"
+         "from src.config import resolve_state_file\n"
+         "from src.rule_scheduler import _resolve_rule_state_file\n"
+         "print(json.dumps({'resolver': resolve_state_file(),\n"
+         "  'rule': _resolve_rule_state_file(),\n"
+         "  'reporter': src.reporter.STATE_FILE,\n"
+         "  'analyzer': src.analyzer.STATE_FILE}))"],
+        cwd=str(Path(__file__).resolve().parent.parent),
+        env={**os.environ, "ILLUMIO_OPS_STATE_FILE": target},
+        capture_output=True, text=True, timeout=120,
+    )
+    assert out.returncode == 0, out.stderr[-2000:]
+    resolved = json.loads(out.stdout.strip().splitlines()[-1])
+    assert set(resolved.values()) == {target}, f"路徑分裂：{resolved}"

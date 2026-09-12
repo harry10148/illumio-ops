@@ -29,6 +29,7 @@ from src.events import (
 )
 from src.events.catalog import classify_unknown_event_type
 from src.events.stats import elide_error
+from src.config import resolve_state_file
 from src.exceptions import TrafficQueryError
 from src.utils import Colors, format_unit, safe_input
 from src.i18n import t
@@ -46,7 +47,9 @@ from src.pce_cache.flow_deltas import cumulative_metrics as _cumulative_metrics
 # Refine Root Dir for State File
 PKG_DIR = os.path.dirname(os.path.abspath(__file__))
 ROOT_DIR = os.path.dirname(PKG_DIR)
-STATE_FILE = os.path.join(ROOT_DIR, "logs", "state.json")
+# 走共用 resolver，不自己拼：否則只設 ILLUMIO_OPS_STATE_FILE 的行程會分裂
+# ——scheduler/GUI 讀新路徑，watchdog 計數卻讀寫舊檔（Codex review P2）。
+STATE_FILE = resolve_state_file()
 
 # _dispatch_alerts 對每條觸發規則實際保留的 top matches 筆數（見其
 # `top_10 = res['top_matches'][:10]`）。_run_rule_engine 以同一個 N 對

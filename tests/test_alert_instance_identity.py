@@ -52,6 +52,29 @@ def test_the_telegram_digest_says_it(rep):
     assert "illumio-ops-test" in rep._build_telegram_message("[重大] 測試")
 
 
+def test_a_url_with_a_password_in_it_does_not_reach_the_recipients(rep):
+    """`api.url` 可以合法地帶 userinfo，而那是憑證。
+
+    `pce_target.normalize_pce_url` 明文保留它（「the userinfo half of the
+    authority … is a credential — none of them are ours to fold」），所以設定裡
+    真的可能有 `https://user:pass@pce:8443`。`urlsplit().netloc` 會把整段交出來
+    ——來源那一行等於把密碼送到 LINE／Telegram／信件。只取 hostname 與 port。
+    """
+    rep.cm.config["api"]["url"] = "https://admin:hunter2@pce.lab.example.com:8443"
+    label = rep._instance_label()
+    assert "hunter2" not in label
+    assert "admin" not in label
+    assert "pce.lab.example.com:8443" in label, "遮掉憑證之後，主機與埠仍要看得到"
+    for message in (rep._build_line_message("s"), rep._build_mail_html("s"),
+                    rep._build_telegram_message("s"), rep._build_mail_plain("s")):
+        assert "hunter2" not in message
+
+
+def test_a_url_with_no_port_still_names_the_host(rep):
+    rep.cm.config["api"]["url"] = "https://pce.lab.example.com"
+    assert "pce.lab.example.com" in rep._instance_label()
+
+
 def test_the_label_never_carries_the_credentials(rep):
     """來源識別只需要「哪一台、對哪個 PCE」；憑證不得隨告警外送。"""
     label = rep._instance_label()

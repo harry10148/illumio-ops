@@ -18,12 +18,15 @@ from src.alerts.store import AlertStore
 from src.events import normalize_event, persist_dispatch_results
 from src.events.poller import format_utc
 from src.i18n import t
-from src.pce_target import resolve_pce_console_url
+from src.pce_target import resolve_pce_console_url, strip_userinfo
+from src.config import resolve_state_file
 from src.state_store import update_state_file
 
 PKG_DIR = os.path.dirname(os.path.abspath(__file__))
 ROOT_DIR = os.path.dirname(PKG_DIR)
-STATE_FILE = os.path.join(ROOT_DIR, "logs", "state.json")
+# 走共用 resolver，不自己拼：否則只設 ILLUMIO_OPS_STATE_FILE 的行程會分裂
+# ——scheduler/GUI 讀新路徑，watchdog 計數與派送紀錄卻寫進舊檔。
+STATE_FILE = resolve_state_file()
 
 # D.3 signal palette — used by _render_cta for cross-surface consistent CTA color.
 SIGNAL_HEX = {
@@ -121,7 +124,14 @@ class Reporter:
         if raw_url:
             try:
                 from urllib.parse import urlsplit
-                target = urlsplit(raw_url).netloc or ""
+                split = urlsplit(raw_url)
+                # hostname + port, never netloc: the authority may legally carry
+                # userinfo, and pce_target.normalize_pce_url deliberately keeps
+                # it because it is a credential. netloc would hand that password
+                # to LINE, Telegram and mail. (Codex review, 2026-09-13.)
+                host = split.hostname or ""
+                port = split.port
+                target = f"{host}:{port}" if host and port else host
             except ValueError:
                 target = ""
         if target:
@@ -788,10 +798,15 @@ class Reporter:
 
         Returns '' if no URL is configured — callers must treat '' as "skip CTA".
         """
+        # strip_userinfo on both branches: this value is rendered as an <a href>
+        # in the alert email, and an api.url may legally carry `user:pass@`
+        # (pce_target.normalize_pce_url keeps it on purpose — it is a
+        # credential). Without this the PCE password was mailed to every alert
+        # recipient inside the CTA link. (Codex review, 2026-09-13.)
         web_gui_url = str(self.cm.config.get("web_gui", {}).get("public_url", "")).strip()
         if web_gui_url:
-            return web_gui_url.rstrip("/")
-        raw = self._active_pce_url().rstrip("/")
+            return strip_userinfo(web_gui_url.rstrip("/"))
+        raw = strip_userinfo(self._active_pce_url().rstrip("/"))
         if not raw:
             return ""
         for suffix in ("/api/v2", "/api/v1", "/api"):

@@ -59,14 +59,36 @@ def pce_deployment_type(api_cfg: Mapping[str, object]) -> Literal["saas", "on_pr
     return "saas" if str(api_cfg.get("deployment_type") or "on_prem") == "saas" else "on_prem"
 
 
+def strip_userinfo(url: str) -> str:
+    """Drop any ``user:password@`` from a URL's authority.
+
+    normalize_pce_url keeps userinfo on purpose — it is part of the credential
+    we authenticate the API with, and folding it would corrupt it. A **console**
+    URL is the opposite case: it is handed to a person to click, and on 2026-09-13
+    one was being written into alert emails as an ``<a href>``, mailing the PCE
+    password to every alert recipient. Nothing that renders a link wants it.
+    """
+    if not url:
+        return url
+    parts = urlsplit(url)
+    if not parts.netloc or "@" not in parts.netloc:
+        return url
+    return urlunsplit((parts.scheme, parts.netloc.rsplit("@", 1)[1],
+                       parts.path, parts.query, parts.fragment))
+
+
 def resolve_pce_console_url(api_cfg: Mapping[str, object]) -> str:
-    """Resolve an explicit console URL or the deployment-appropriate default."""
+    """Resolve an explicit console URL or the deployment-appropriate default.
+
+    Always userinfo-free: the result is rendered as a clickable link (alert
+    emails, the GUI), never used to authenticate.
+    """
     explicit = normalize_pce_url(api_cfg.get("console_url", ""))
     if explicit:
-        return explicit
+        return strip_userinfo(explicit)
     if pce_deployment_type(api_cfg) == "saas":
         return DEFAULT_SAAS_CONSOLE_URL
-    base = normalize_pce_url(api_cfg.get("url", ""))
+    base = strip_userinfo(normalize_pce_url(api_cfg.get("url", "")))
     for suffix in ("/api/v2", "/api/v1", "/api"):
         if base.endswith(suffix):
             return base[:-len(suffix)]

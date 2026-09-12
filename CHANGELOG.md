@@ -87,6 +87,15 @@ a plain `<major>.<minor>.<patch>` scheme. (Tags through v4.0.0 carried a
 
 ### Fixed
 
+- **An `api.url` carrying `user:password@` no longer mails the password to
+  every alert recipient.** `normalize_pce_url` keeps userinfo deliberately —
+  it is part of the credential the API authenticates with — but three places
+  then rendered that authority for a human to read: the new source line in
+  each digest, the console URL, and the CTA base that builds the "view
+  dashboard" link in alert email. All three now carry host and port only.
+  Console URLs are userinfo-free at the resolver, since their only use is as a
+  clickable link.
+
 - **A successful probe no longer erases the evidence of the outage it just
   ended.** `record_pce_success` zeroed the failure counter *and* cleared the
   watchdog's cooldown timestamp, so a watchdog alert reporting 936 consecutive
