@@ -87,14 +87,21 @@ a plain `<major>.<minor>.<patch>` scheme. (Tags through v4.0.0 carried a
 
 ### Fixed
 
-- **An `api.url` carrying `user:password@` no longer mails the password to
-  every alert recipient.** `normalize_pce_url` keeps userinfo deliberately —
-  it is part of the credential the API authenticates with — but three places
-  then rendered that authority for a human to read: the new source line in
-  each digest, the console URL, and the CTA base that builds the "view
-  dashboard" link in alert email. All three now carry host and port only.
-  Console URLs are userinfo-free at the resolver, since their only use is as a
-  clickable link.
+- **An `api.url` carrying `user:password@` no longer shows the password to
+  anyone.** `normalize_pce_url` keeps userinfo deliberately — it is part of the
+  credential the API authenticates with — but five places then rendered that
+  authority for a human to read: the source line in each alert digest, the
+  console URL, the CTA base behind the "view dashboard" link in alert email,
+  the `api_url` the GUI status endpoint puts in the page chrome, and two CLI
+  status lines. Every one of them now carries host and port only.
+
+  `config show` was the sharpest of them: its own docstring promises it "never
+  prints credentials in plaintext", but it masks by field *name*
+  (`key`/`secret`/`password`/`token`), so a password living inside the *value*
+  of `api.url` printed in full beside a dutifully redacted `api.key`. It now
+  shows `https://[REDACTED]@host:port` — a dump should still say that the URL
+  carries a credential, or an operator cannot explain their own auth
+  behaviour. The two display-only surfaces drop the userinfo entirely.
 
 - **A successful probe no longer erases the evidence of the outage it just
   ended.** `record_pce_success` zeroed the failure counter *and* cleared the

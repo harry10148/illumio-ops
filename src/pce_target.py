@@ -77,6 +77,25 @@ def strip_userinfo(url: str) -> str:
                        parts.path, parts.query, parts.fragment))
 
 
+def redact_userinfo(url: str) -> str:
+    """Replace a URL's ``user:password@`` with ``[REDACTED]@``.
+
+    strip_userinfo's sibling, for the one audience that needs to know a
+    credential is embedded at all: a config dump. `config show` masks by field
+    NAME, so a password living inside the *value* of a non-secret field —
+    api.url — walked straight past it. Dropping the userinfo silently would
+    hide why an operator's authentication behaves oddly; the marker says "there
+    is one, and it is not being printed".
+    """
+    if not url:
+        return url
+    parts = urlsplit(url)
+    if not parts.netloc or "@" not in parts.netloc:
+        return url
+    return urlunsplit((parts.scheme, f"[REDACTED]@{parts.netloc.rsplit('@', 1)[1]}",
+                       parts.path, parts.query, parts.fragment))
+
+
 def resolve_pce_console_url(api_cfg: Mapping[str, object]) -> str:
     """Resolve an explicit console URL or the deployment-appropriate default.
 

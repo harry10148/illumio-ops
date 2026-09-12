@@ -6,6 +6,7 @@ from loguru import logger
 import argparse
 from src.utils import setup_logger, Colors, safe_input, draw_panel, get_terminal_width, Spinner
 from src.config import ConfigManager
+from src.pce_target import strip_userinfo
 from src.api_client import ApiClient
 from src.analyzer import Analyzer
 from src.reporter import Reporter
@@ -236,7 +237,7 @@ def main_menu():
                 _last_activity_val = t("gui_no_log_activity", default="(no log activity)")
 
         lines = [
-            f"{t('cli_status_api', default='API')}: {cm.config['api']['url']} | {t('cli_status_rules', default='Rules')}: {len(cm.config['rules'])}",
+            f"{t('cli_status_api', default='API')}: {strip_userinfo(cm.config['api']['url'])} | {t('cli_status_rules', default='Rules')}: {len(cm.config['rules'])}",
             f"{t('cli_status_language', default='Language')}: {current_lang} | {t('cli_status_theme', default='Theme')}: {current_theme} | {_last_activity_label}: {_last_activity_val}",
             f"{Colors.DARK_GRAY}{shortcuts_line}{Colors.ENDC}",
             "-",

@@ -129,6 +129,15 @@ def _mask_secrets(obj):
         }
     if isinstance(obj, list):
         return [_mask_secrets(x) for x in obj]
+    # Masking by field NAME cannot see a credential living inside the VALUE of
+    # a field nobody would call secret. api.url may legally carry
+    # `user:password@` — pce_target.normalize_pce_url keeps it deliberately —
+    # so `config show` printed the PCE password in full while dutifully
+    # redacting api.key beside it. redact_userinfo is a no-op on anything that
+    # is not a URL with userinfo, so it is safe to apply to every string.
+    if isinstance(obj, str):
+        from src.pce_target import redact_userinfo
+        return redact_userinfo(obj)
     return obj
 
 

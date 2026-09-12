@@ -3,7 +3,14 @@
 #   pip install -r requirements.txt -r requirements-dev.txt
 
 # ── Test framework ──────────────────────────────────────────────────────────
-pytest>=8.0,<9.0
+# <10.0 not <9.0: the local venv had drifted to 9.x while CI installed 8.x, so
+# "the full suite is green" meant two different things. Both 8.4.2 and 9.0.3
+# run the suite clean (measured 2026-09-13, same venv, pytest swapped) — the
+# bound was holding CI a major version behind for no observed reason.
+# (The long-standing local-only failure of test_cache_flush_json_output was
+# blamed on this gap and is NOT pytest's doing: it tracks click, 8.1.6 fails
+# and 8.3.3 passes.)
+pytest>=8.0,<10.0
 pytest-cov>=5.0,<6.0
 responses>=0.25,<1.0          # Phase 2: requests mock
 freezegun>=1.4,<2.0           # Phase 6: scheduler time mock
