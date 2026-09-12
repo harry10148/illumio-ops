@@ -133,6 +133,18 @@ class Reporter:
     alert_store_factory = staticmethod(AlertStore)
 
     def add_health_alert(self, alert: dict[str, Any]) -> None:
+        # 健康告警的產生端寫的是 `status`（analyzer.py 三處都是），而決定信件/
+        # LINE **主旨**嚴重度的 _highest_severity 讀的是 `severity`——沒有人把
+        # 兩者接起來，於是每一則健康告警的主旨都落到預設值 info。實際後果：
+        # 「PCE 輪詢已連續失敗 N 個週期，事件與流量告警目前處於盲區」這種本文
+        # 標著【重大】的告警，主旨卻是 [INFO]。SOC 若以主旨嚴重度分流，最該被
+        # 看到的那一種會被濾掉——正好抵消這個告警存在的理由。
+        #
+        # 在收下的時候補上，而不是在 _highest_severity 多讀一個鍵：severity 還
+        # 有別的讀者（落地的告警紀錄、webhook payload），它們一樣不該把重大看成
+        # info。呼叫端若已明寫 severity 就尊重它。
+        if not alert.get("severity") and alert.get("status"):
+            alert["severity"] = str(alert["status"]).lower()
         self.health_alerts.append(alert)
         self._alert_ids["health"].append(None)
 
