@@ -1,0 +1,104 @@
+"""沒有任何測試可以在這個 checkout 裡啟動真的常駐模式。
+
+2026-09-12 的事故：`test_cli_backwards_compat.py` 為了證明 argparse 還認得
+`--monitor -i 1`，直接 `Popen([python, "illumio-ops.py", "--monitor", "-i", "1"])`
+跑三秒再 terminate。三秒足夠完成一個 monitor cycle——而子行程讀的是**安裝好的**
+`config/config.json`（真的 LINE token、真的 SMTP）與 `logs/state.json`。於是每跑一次
+全套測試，就有一則「[重大] PCE 連線看門狗」真的送到操作者的 LINE 和信箱。使用者
+為此花了一小時在五台機器上找「那台發警的 appliance」，而那則告警一直是我們自己
+的測試機跑測試時發的。
+
+**為什麼不能靠環境變數或 cwd 隔離**：設定檔路徑由**套件位置**決定
+（`src/config.py` 的 `ROOT_DIR = dirname(dirname(__file__))`），沒有任何 env 或
+cwd 能改掉它。只要是在這個 checkout 裡以真常駐模式起來的子行程，用的就是真的
+收件設定。所以規則不是「隔離好再跑」，是**不要跑**。
+
+這支掃的是整個 tests/ 目錄，不是那一支檔案——同一種寫法在別處出現一樣要擋下。
+"""
+from __future__ import annotations
+
+import ast
+from pathlib import Path
+
+import pytest
+
+TESTS_DIR = Path(__file__).resolve().parent
+
+# 會真的做事、會讀真設定、會對外發送的執行模式。`--help` / `version` / `status`
+# 不在此列：它們讀設定但不派送，也不進入排程迴圈。
+RUN_MODE_FLAGS = frozenset({
+    "--monitor", "--monitor-gui", "--gui", "--report",
+    "monitor", "monitor-gui", "gui", "report",
+})
+ENTRY_NAMES = ("illumio-ops.py", "illumio_ops.py", "src/main.py", "src.main")
+
+_SPAWNERS = {"Popen", "run", "call", "check_call", "check_output"}
+
+
+def _string_literals(node: ast.AST) -> list[str]:
+    return [n.value for n in ast.walk(node)
+            if isinstance(n, ast.Constant) and isinstance(n.value, str)]
+
+
+def _spawn_calls(tree: ast.AST):
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call):
+            continue
+        func = node.func
+        name = func.attr if isinstance(func, ast.Attribute) else getattr(func, "id", "")
+        if name in _SPAWNERS:
+            yield node
+
+
+def _offending(path: Path) -> list[str]:
+    try:
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+    except SyntaxError:  # 不是這支測試該管的問題
+        return []
+    out = []
+    for call in _spawn_calls(tree):
+        literals = _string_literals(call)
+        # 進入點可能以變數帶入（ENTRY = REPO_ROOT / "illumio-ops.py"），所以
+        # 只要**這個呼叫**裡出現任何一個執行模式旗標就算命中——一個測試沒有
+        # 理由把 "--monitor" 交給子行程，除非它就是要起那個模式。
+        if any(lit in RUN_MODE_FLAGS for lit in literals):
+            out.append(f"{path.name}:{call.lineno}")
+    return out
+
+
+def test_no_test_spawns_the_app_in_a_run_mode():
+    offenders: list[str] = []
+    for path in sorted(TESTS_DIR.rglob("test_*.py")):
+        if path.name == Path(__file__).name:
+            continue
+        offenders.extend(_offending(path))
+    assert not offenders, (
+        "這些測試把執行模式旗標交給了子行程：" + ", ".join(offenders) + "。"
+        "在這個 checkout 裡起真常駐模式＝用真的 LINE／SMTP 設定發真的告警"
+        "（設定路徑綁套件位置，env 與 cwd 都改不掉）。"
+        "要驗參數就問 src.main.build_legacy_parser()；要驗行為就注入假的 Reporter。"
+    )
+
+
+def test_the_gate_would_catch_the_original_defect(tmp_path):
+    """反向驗證：把當初那段寫回去，這道閘門必須紅。"""
+    offender = tmp_path / "test_reintroduced.py"
+    offender.write_text(
+        "import subprocess, sys\n"
+        "def test_x():\n"
+        "    subprocess.Popen([sys.executable, 'illumio-ops.py', '--monitor', '-i', '1'])\n",
+        encoding="utf-8",
+    )
+    assert _offending(offender), "閘門對原始缺陷無感，等於沒有閘門"
+
+
+@pytest.mark.parametrize("snippet", [
+    "subprocess.run([sys.executable, ENTRY, 'version'])",
+    "subprocess.run([sys.executable, ENTRY, '--help'])",
+    "subprocess.run([sys.executable, ENTRY, 'status'])",
+])
+def test_the_gate_leaves_the_harmless_invocations_alone(tmp_path, snippet):
+    ok = tmp_path / "test_ok.py"
+    ok.write_text(f"import subprocess, sys\nENTRY='x'\ndef test_x():\n    {snippet}\n",
+                  encoding="utf-8")
+    assert not _offending(ok)

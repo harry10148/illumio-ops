@@ -449,7 +449,16 @@ def _run_report_menu(cm):
 
 # ─── Entry Point ──────────────────────────────────────────────────────────────
 
-def main():
+def build_legacy_parser() -> argparse.ArgumentParser:
+    """The legacy argparse surface, built without running anything.
+
+    Split out of main() so a test can assert which flags are accepted
+    without starting a daemon. Spawning the real one for that answer
+    was not a cheap approximation: it read the installed config and
+    completed a monitor cycle before the terminate landed, so a run of
+    the test suite on a configured host really dispatched alerts to
+    the operator's channels (2026-09-12).
+    """
     parser = argparse.ArgumentParser(
         description="Illumio PCE Ops",
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -534,6 +543,11 @@ def main():
         default=None,
         help="Output directory for report files (default: reports/)",
     )
+    return parser
+
+
+def main():
+    parser = build_legacy_parser()
 
     args = parser.parse_args()
 
