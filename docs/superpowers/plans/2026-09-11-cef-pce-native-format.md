@@ -912,3 +912,14 @@ gh run watch --exit-status
 ```
 
 把對帳結果（joined／mismatched、容許差異清單）貼進 `docs/superpowers/plans/2026-09-11-cef-pce-native-format.md` 末尾的「驗收紀錄」段。
+
+---
+
+## 驗收紀錄（2026-09-12）
+
+- Task 1–4 依序交付：`bf4c1f6a`（audit 格式器＋19 組 golden）、`083c70e7`（流量）、`9a576e89`（notifications 遮罩）、`5e944824`（接線）。
+- 真機發現：Graylog 7.1 CEF input 把 `rt` 帶 ` +0000` 的整行丟掉、dispatch 表仍標 sent。五種變體實送定位後改為無時區毫秒形式（`19e19ab3`），重排被丟的 33 筆。
+- 對帳：`tools/siem_cef_diff.py --hours 1` → `joined=57 mismatched=0`（`bce69e6b`）。守門檢查：把 `dst` 從容許清單拿掉 → 27 筆紅、exit 1。
+- PCE 會對同一 event_href 送兩行（一行帶 request/requestMethod/reason、一行不帶），腳本取欄位最多的那行。
+- 追加（使用者 2026-09-12 決定）：`cef`／`syslog_cef` 改為 ArcSight 方言（`60579654`）；無 ArcSight 可實測，僅單元測試與目視。
+- 全套 pytest：4822 passed；`tests/test_cache_cli.py::test_cache_flush_json_output` 在乾淨 origin/main 亦失敗（Click 8.4 CliRunner 把 stderr 併入 stdout），與本案無關。
