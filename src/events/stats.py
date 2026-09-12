@@ -198,7 +198,12 @@ class StatsTracker:
         # 只有 0→1 那一次寫起點。看門狗要引用的是**開啟**這串失敗的錯誤，不是
         # 最新的那一個：2026-09-12 的告警說 /noop 401，而當下的 last_error 是
         # /health 200 body=critical——兩者屬於不同階段，讀訊息的人無從分辨。
-        if failures == 1 or not pce_stats.get("failure_run_started_at"):
+        # **只有** 0→1。刻意不加「起點缺席時補寫」的退路：升版當下若磁碟上已經
+        # 有一串進行中的失敗（計數 936、沒有起點欄位），補寫會讓起點變成「現在」、
+        # 起始錯誤變成第 937 次的那一個，於是告警說「936 次、中斷 0 分鐘」——
+        # 時長與錯誤都是假的。沒有起點就讓 _check_watchdog 走 _nostart 分支，
+        # 誠實地只講次數。
+        if failures == 1:
             pce_stats["failure_run_started_at"] = now_str
             pce_stats["failure_run_first_error"] = elide_error(error, 600)
             pce_stats["failure_run_first_stage"] = stage

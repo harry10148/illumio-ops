@@ -24,6 +24,23 @@ a plain `<major>.<minor>.<patch>` scheme. (Tags through v4.0.0 carried a
 
 ### Added
 
+- **Every alert digest now says which box sent it.** LINE, plain-text and HTML
+  mail and Telegram carry a `Source` line: this host, the PCE netloc it watches
+  and the org id. Several instances can share one LINE destination, and until
+  now nothing in the message could tell them apart — an alert arrived on
+  2026-09-12 and an hour went into ruling out four other hosts before the
+  question was even answerable. Credentials never enter the label, and every
+  lookup degrades to a shorter string rather than raising: an alert that cannot
+  be addressed still beats an alert that never goes out. Teams cards and the
+  webhook payload are unchanged.
+
+- **A finished PCE outage is kept instead of erased.** `pce_stats.last_incident`
+  records the run that just ended — when it started and ended, how many failures
+  it counted, the error that opened it and the one that closed it, and whether
+  anyone was alerted. The watchdog also writes a `watchdog` entry on the event
+  timeline when it fires. Logs rotate and counters reset; that entry persists in
+  the state file and merges by append.
+
 - **The workload table sorts, and one button accelerates the whole result.**
   Columns opt in through the shared table component, whose header is a button
   rather than a clickable `th` — the resize grip shares that cell, so a th-level
@@ -60,6 +77,29 @@ a plain `<major>.<minor>.<patch>` scheme. (Tags through v4.0.0 carried a
   event types. It found `info.events[].process_name` on its first run.
 
 ### Fixed
+
+- **A successful probe no longer erases the evidence of the outage it just
+  ended.** `record_pce_success` zeroed the failure counter *and* cleared the
+  watchdog's cooldown timestamp, so a watchdog alert reporting 936 consecutive
+  failures was followed two minutes later by a state file saying `0` / `None` —
+  the self-healing path ate the post-incident diagnosis. Zeroing now applies to
+  the live counter only.
+
+- **The watchdog message says how long the blind spot has lasted.** It used to
+  report a cycle count, which means nothing without the poll interval, and it
+  quoted `last_error` — merely the most recent error, which can belong to a
+  different stage than the failures being counted (the same alert cited a
+  `/noop` 401 while `last_error` was `/health` returning `critical`). It now
+  leads with elapsed time and quotes the error that *opened* the run. A run
+  already under way across the upgrade has no recorded start and degrades to
+  the count-only wording rather than inventing a duration.
+
+  > **Upgrading — the watchdog alert's wording has changed.** Anything
+  > downstream that matches on the text of a health alert's `details` (the
+  > webhook payload ships the bucket whole) needs rechecking. `pce_stats` also
+  > gains `failure_run_started_at`, `failure_run_first_error`,
+  > `failure_run_first_stage` and `last_incident`; existing state files pick up
+  > the defaults on the next write.
 
 - **The home page no longer reprints the alert list.** The alerts area is one
   click away and owns the same rows with filtering, paging and detail. The

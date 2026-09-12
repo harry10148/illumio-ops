@@ -208,3 +208,22 @@ def test_the_alert_leaves_a_trace_that_a_recovery_cannot_erase(ana):
 
     ana.stats.record_pce_success("health")
     assert [e for e in ana.state["event_timeline"] if e.get("kind") == "watchdog"] == marks
+
+
+def test_a_run_already_under_way_at_upgrade_does_not_invent_a_start(ana):
+    """升版當下磁碟上已有一串失敗（計數 936、沒有起點欄位）。
+
+    若在起點缺席時「順手補寫」，起點會變成**現在**、起始錯誤會變成第 937 次的
+    那一個，告警於是說「937 次、中斷 0 分鐘」——時長與錯誤都是假的，而這正是
+    2026-09-12 那個事故的形狀。沒有起點就只講次數。
+    """
+    ana.state["pce_stats"]["consecutive_failures"] = 936
+    ana.state["pce_stats"].pop("failure_run_started_at", None)
+    ana.stats.record_pce_error("health", "still refused")
+
+    assert not ana.state["pce_stats"].get("failure_run_started_at")
+    ana._check_watchdog()
+    details = ana.reporter.add_health_alert.call_args[0][0]["details"]
+    assert humanize_outage(0) not in details, "不能憑空生出一個 0 分鐘的中斷時長"
+    assert "937" in details
+    assert "still refused" in details

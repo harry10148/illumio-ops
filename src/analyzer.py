@@ -76,8 +76,11 @@ def humanize_outage(minutes: int) -> str:
     if minutes < 60:
         return t('dur_minutes', mins=minutes)
     if minutes < 60 * 48:
-        return t('dur_hours', hours=minutes // 60, mins=minutes % 60)
-    return t('dur_days', days=minutes // (60 * 24), hours=(minutes % (60 * 24)) // 60)
+        hours, mins = divmod(minutes, 60)
+        # 「39 小時 0 分鐘」是雜訊，整點就只講整點。
+        return t('dur_hours', hours=hours, mins=mins) if mins else t('dur_hours_only', hours=hours)
+    days, hours = divmod(minutes // 60, 24)
+    return t('dur_days', days=days, hours=hours) if hours else t('dur_days_only', days=days)
 
 # The monitor cycle can run every 10 seconds, but an authenticated PCE probe
 # at that cadence is unnecessary and can consume SaaS rate limits. Automatic
@@ -1384,11 +1387,17 @@ class Analyzer:
                 })
 
     def _check_watchdog(self) -> None:
-        """Self-alert when the PCE has been unreachable for N consecutive cycles.
+        """Self-alert when the PCE has been unreachable N consecutive times.
 
         Without this, a dead poller fails silent: no events, no alerts, and the
         operator assumes all is well. Uses its own cooldown so a long outage
         produces one alert per hour instead of one per cycle.
+
+        The threshold counts failures, not elapsed time — one counter serves
+        two deployment shapes (legacy poll cycles, and the cache-ingest jobs'
+        per-invocation results), and only a count means the same thing in
+        both. The MESSAGE leads with elapsed time, which is what the reader
+        actually needs; see humanize_outage.
         """
         failures = int(self.state.get("pce_stats", {}).get("consecutive_failures", 0))
         if failures < WATCHDOG_FAILURE_THRESHOLD:
