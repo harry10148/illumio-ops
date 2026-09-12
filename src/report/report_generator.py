@@ -953,9 +953,21 @@ class ReportGenerator:
         action_matrix = mod12.get('action_matrix', [])
 
         def _sev_bg(sev):
+            # 信件徽章是白字壓底色（下面 :color:white），所以底色要深到白字讀得了。
+            # 2026-09-11 之前 HIGH 的白字對比是 3.70:1、其餘是 2.76:1，兩個都低於
+            # AA 的 4.5——而這是告警信，最需要讀得清楚的通道。現在三個都過：
+            # 6.33 / 5.18 / 6.16（tests/test_report_no_hardcoded_colour.py 守著）。
+            #
+            # 這組**刻意不與報表的 tone 家族共用**，理由未變：多數收件端會拿掉
+            # background-image，徽章只剩底色可用，而報表 warn tone 配白字只有
+            # 2.01:1。信件是另一種媒介，不是報表的縮小版。
+            #
+            # 三個底色彼此的對比很低（約 1.0–1.2:1），那是同亮度必然的結果，也
+            # 沒關係：徽章自己寫著 CRITICAL／HIGH／MEDIUM，顏色是補強不是唯一
+            # 訊號——與報表把 CRITICAL/HIGH 畫成同一個紅再加網格是同一個判斷。
             if sev == 'CRITICAL': return '#BE122F'
-            if sev == 'HIGH':     return '#F43F51'
-            return '#F97607'
+            if sev == 'HIGH':     return '#C2410C'
+            return '#8A5600'
 
         kpi_rows = ''.join(
             f'<tr>'
