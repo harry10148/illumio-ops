@@ -51,7 +51,7 @@ Header：`CEF:0|Illumio|PCE|<pce_version>|<sig>|<name>|<sev>|`
 Extension（順序固定、以單一空白連接、鍵值 `k=v`）：
 
 ```
-rt dvchost [duid] duser dst outcome cat [request requestMethod reason] cs2 cs2Label cs4 cs4Label cn2 cn2Label cs1Label cs1
+rt dvchost [duid] duser dst outcome cat [request requestMethod reason] cs2 cs2Label cs4 cs4Label cn2 cn2Label cs1Label cs1 [cs3 cs3Label]
 ```
 
 | 鍵 | 值 |
@@ -63,7 +63,7 @@ rt dvchost [duid] duser dst outcome cat [request requestMethod reason] cs2 cs2La
 | `outcome` | `status`；null／空時輸出 `outcome=`（空值保留，與 PCE 一致）。 |
 | `cat` | 固定 `audit_events`。 |
 | `request`／`requestMethod`／`reason` | 只在 `action` 為 dict 時輸出：`api_endpoint`、`api_method`、`http_status_code`。三者各自為 null 時省略該鍵。 |
-| `cs2` | `resource_changes` 的 compact JSON（`orjson.dumps`，鍵序照原 JSON）；空清單或缺失 → `cs2=`。`cs2Label=resource_changes`。 |
+| `cs2` | `resource_changes` 的 compact JSON（`orjson.dumps`，鍵序照原 JSON）；空清單或缺失 → `cs2=`。`cs2Label=resource_changes`。**分段**：compact JSON 超過 3,995 字元時，`cs2` 放前 3,995 字元，其餘接在 `cs1` 之後以 `cs3=<rest> cs3Label=resource_changes_2` 輸出；超過 7,990 字元（兩段放不下）時每個 entry 拿掉 `changes`（保留 `uuid`/`resource`/`change_type`）再套同規則。兩條都由 fixture 的 7,420 與 10,338 字元真實案例證實；第三段從未觀察到（假設 PCE 只到兩段）。 |
 | `cs4` | `notifications` 同上；`cs4Label=notifications`。 |
 | `cn2` | 固定 `2`，`cn2Label=schema-version`。 |
 | `cs1Label`／`cs1` | `cs1Label=event_href` 在前、`cs1=<href>` 在後（PCE 順序如此）。href 取 `href`，缺則 `pce_event_id`。 |
