@@ -45,14 +45,19 @@ def _synthetic_event() -> dict:
             "timestamp": datetime.now(timezone.utc).isoformat()}
 
 
-def _build_formatter(fmt: str):
+def _build_formatter(fmt: str, *, pce_fqdn: str = "", pce_version: str = "unknown"):
     from src.siem.formatters.cef import CEFFormatter
+    from src.siem.formatters.cef_pce import PceNativeCEFFormatter
     from src.siem.formatters.normalized_json import NormalizedJSONFormatter
     from src.siem.formatters.syslog_wrapped import SyslogWrappedFormatter
     if fmt == "cef":
         return CEFFormatter()
     if fmt == "syslog_cef":
         return SyslogWrappedFormatter(CEFFormatter())
+    if fmt == "cef_pce":
+        return PceNativeCEFFormatter(pce_fqdn=pce_fqdn, pce_version=pce_version)
+    if fmt == "syslog_cef_pce":
+        return SyslogWrappedFormatter(PceNativeCEFFormatter(pce_fqdn=pce_fqdn, pce_version=pce_version))
     if fmt == "syslog_json":
         return SyslogWrappedFormatter(NormalizedJSONFormatter())
     return NormalizedJSONFormatter()  # json and anything else

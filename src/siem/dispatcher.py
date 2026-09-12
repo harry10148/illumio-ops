@@ -229,9 +229,28 @@ class DestinationDispatcher:
             )
 
 
-def _formatter_for(dest_cfg):
+def pce_identity(cm, api) -> tuple[str, str]:
+    """(fqdn, version) the cef_pce formatter stamps on every line. Best
+    effort: the PCE's own syslog carries its real version, we ask
+    /product_version once per dispatcher build and fall back to 'unknown'."""
+    from urllib.parse import urlsplit
+    url = str(((getattr(cm, "config", None) or {}).get("api") or {}).get("url") or "")
+    fqdn = urlsplit(url).hostname or ""
+    version = "unknown"
+    if api is not None:
+        try:
+            status, body = api._api_get("/product_version")
+            if status == 200 and isinstance(body, dict) and body.get("version"):
+                version = str(body["version"])
+        except Exception as exc:  # noqa: BLE001 — identity is cosmetic, never blocks dispatch
+            logger.warning("product_version lookup failed, cef_pce header will say 'unknown': {}", exc)
+    return fqdn, version
+
+
+def _formatter_for(dest_cfg, *, pce_fqdn: str = "", pce_version: str = "unknown"):
     """Build formatter from SiemDestinationSettings."""
     from src.siem.formatters.cef import CEFFormatter
+    from src.siem.formatters.cef_pce import PceNativeCEFFormatter
     from src.siem.formatters.normalized_json import NormalizedJSONFormatter
     from src.siem.formatters.syslog_wrapped import SyslogWrappedFormatter
     fmt = dest_cfg.format
@@ -239,9 +258,37 @@ def _formatter_for(dest_cfg):
         return CEFFormatter()
     if fmt == "syslog_cef":
         return SyslogWrappedFormatter(CEFFormatter())
+    if fmt == "cef_pce":
+        return PceNativeCEFFormatter(pce_fqdn=pce_fqdn, pce_version=pce_version)
+    if fmt == "syslog_cef_pce":
+        return SyslogWrappedFormatter(PceNativeCEFFormatter(pce_fqdn=pce_fqdn, pce_version=pce_version))
     if fmt == "syslog_json":
         return SyslogWrappedFormatter(NormalizedJSONFormatter())
     return NormalizedJSONFormatter()
+
+
+_IDENTITY_TTL_S = 3600.0
+_identity_cache: dict[str, tuple[float, tuple[str, str]]] = {}
+
+
+def cached_pce_identity(cm) -> tuple[str, str]:
+    """pce_identity() memoised per PCE url for an hour — run_siem_dispatch
+    ticks every few seconds and must not hit /product_version each time."""
+    import time
+    url = str(((getattr(cm, "config", None) or {}).get("api") or {}).get("url") or "")
+    hit = _identity_cache.get(url)
+    now = time.monotonic()
+    if hit and now - hit[0] < _IDENTITY_TTL_S:
+        return hit[1]
+    from src.api_client import ApiClient
+    try:
+        with ApiClient(cm) as api:
+            ident = pce_identity(cm, api)
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("cef_pce identity lookup failed: {}", exc)
+        ident = pce_identity(cm, None)
+    _identity_cache[url] = (now, ident)
+    return ident
 
 
 def _transport_for(dest_cfg):
@@ -273,7 +320,8 @@ def _transport_for(dest_cfg):
     raise ValueError(f"Unknown transport: {transport_type}")
 
 
-def build_dispatcher(dest_cfg, session_factory, dlq_max_per_dest: int = 10000) -> "DestinationDispatcher":
+def build_dispatcher(dest_cfg, session_factory, dlq_max_per_dest: int = 10000, *,
+                     pce_fqdn: str = "", pce_version: str = "unknown") -> "DestinationDispatcher":
     """Build a DestinationDispatcher from a SiemDestinationSettings instance.
 
     dlq_max_per_dest 是全域 SiemSettings 欄位（非 per-destination），由呼叫端
@@ -282,7 +330,7 @@ def build_dispatcher(dest_cfg, session_factory, dlq_max_per_dest: int = 10000) -
     return DestinationDispatcher(
         name=dest_cfg.name,
         session_factory=session_factory,
-        formatter=_formatter_for(dest_cfg),
+        formatter=_formatter_for(dest_cfg, pce_fqdn=pce_fqdn, pce_version=pce_version),
         transport=_transport_for(dest_cfg),
         max_retries=dest_cfg.max_retries,
         batch_size=dest_cfg.batch_size,

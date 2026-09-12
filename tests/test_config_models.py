@@ -212,3 +212,9 @@ def test_config_manager_has_no_profile_methods():
     leftovers = [n for n in dir(ConfigManager)
                  if "pce" in n.lower() or "profile" in n.lower()]
     assert leftovers == [], f"still present: {leftovers}"
+
+
+@pytest.mark.parametrize("fmt", ["cef_pce", "syslog_cef_pce"])
+def test_siem_destination_accepts_pce_native_formats(fmt):
+    from src.config_models import SiemDestinationSettings
+    assert SiemDestinationSettings(name="g", host="h", port=5514, format=fmt).format == fmt
