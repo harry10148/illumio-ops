@@ -78,10 +78,16 @@ def _parse_ts(ts: str) -> datetime | None:
 
 
 def _rt_audit(ts: str) -> str:
+    """PCE writes `Sep 11 2026 09:05:05.941 +0000`.  We drop the ` +0000`:
+    Graylog's CEF codec (7.1, verified 2026-09-12 by sending both forms to
+    the illumio-ops input) silently discards the whole line when rt carries
+    a zone suffix, while the millisecond form parses to the right instant.
+    The PCE never hits this because its lines arrive through a syslog input
+    that does not parse CEF at all.  Value is UTC either way."""
     dt = _parse_ts(ts)
     if dt is None:
         return ""
-    return dt.strftime("%b %d %Y %H:%M:%S.") + f"{dt.microsecond // 1000:03d} +0000"
+    return dt.strftime("%b %d %Y %H:%M:%S.") + f"{dt.microsecond // 1000:03d}"
 
 
 def _rt_flow(ts: str) -> str:

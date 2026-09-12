@@ -56,7 +56,7 @@ rt dvchost [duid] duser dst outcome cat [request requestMethod reason] cs2 cs2La
 
 | 鍵 | 值 |
 |---|---|
-| `rt` | `timestamp` 轉 UTC，格式 `%b %d %Y %H:%M:%S.mmm +0000`（毫秒三位，日兩位補零）。例 `Sep 11 2026 09:00:08.882 +0000`。timestamp 缺失時省略整個鍵。 |
+| `rt` | `timestamp` 轉 UTC，格式 `%b %d %Y %H:%M:%S.mmm`（毫秒三位，日兩位補零）。例 `Sep 11 2026 09:00:08.882`。**刻意差異**：PCE 送 `… +0000`，但 Graylog 7.1 的 CEF codec 遇到帶時區尾碼的 `rt` 會把整行丟掉（2026-09-12 以五種變體實測：無時區的毫秒形式解析正確）；PCE 直送走 syslog input 不解析 CEF 所以不受影響。timestamp 缺失時省略整個鍵。 |
 | `dvchost` | `pce_fqdn`；缺失時用建構時注入的 `pce_fqdn`（api.url 主機名）。 |
 | `duid`／`duser` | 依 `created_by`：`system` → 無 `duid`、`duser=system`；`user` → `duid`=`user.href` 最後一段、`duser`=`username`（缺則 `name`）；`agent`（同時有 `ven`）→ `duid`=`ven.href` 最後一段（無 `ven` 時 `agent.href` 最後一段）、`duser`=`agent.hostname`；`container_cluster` → `duid`=href 最後一段、`duser`=`name`；`service_account` → `duid`=href 最後一段、`duser`=`name`（未實測，比照 container_cluster）；其他／空 → `duser=system`。 |
 | `dst` | `action.src_ip` 存在且不是 `FILTERED` 時用它；否則用 `dvchost` 的值。已知差異：PCE 在 `FILTERED` 時送真實 IP 或 PCE 自己的 IP，API 端看不到。 |

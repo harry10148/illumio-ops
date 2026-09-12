@@ -22,6 +22,8 @@ def _expected_audit(pair: dict) -> str:
     src_ip = (event.get("action") or {}).get("src_ip")
     if not src_ip or src_ip == "FILTERED":
         cef = re.sub(r" dst=\S+ ", f" dst={PCE_FQDN} ", cef, count=1)
+    # 刻意差異：rt 去掉 ` +0000`（Graylog CEF codec 會把帶時區尾碼的整行丟掉）。
+    cef = cef.replace(" +0000 dvchost=", " dvchost=", 1)
     return cef
 
 
