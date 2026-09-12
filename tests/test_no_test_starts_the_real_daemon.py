@@ -102,3 +102,24 @@ def test_the_gate_leaves_the_harmless_invocations_alone(tmp_path, snippet):
     ok.write_text(f"import subprocess, sys\nENTRY='x'\ndef test_x():\n    {snippet}\n",
                   encoding="utf-8")
     assert not _offending(ok)
+
+
+# ── 第二半：測試不得寫進這個 checkout 的 state ──────────────────────────────
+# 同一種病的輕症。daemon 那條路會真的對外發送；這條路只寫檔，但寫的是同一個
+# `logs/state.json`：dispatch_history 只留 50 筆，跑一次測試就把真實派送紀錄擠
+# 掉（2026-09-12 就是這樣把當天那筆真 LINE 派送的證據洗掉的），而看門狗的計數與
+# 冷卻時戳也在同一個檔案裡——測試可以決定一個真部署的下一次告警發不發得出來。
+
+def test_the_state_file_is_not_the_one_in_this_checkout():
+    """斷言的是**執行當下的實際值**，不是 conftest 裡有沒有那支 fixture。"""
+    import src.analyzer
+    import src.reporter
+
+    repo_logs = (Path(__file__).resolve().parent.parent / "logs").resolve()
+    for module in (src.reporter, src.analyzer):
+        actual = Path(module.STATE_FILE).resolve()
+        assert repo_logs not in actual.parents, (
+            f"{module.__name__}.STATE_FILE 指向 {actual}——測試會寫進這個 checkout "
+            "真正在用的 state：dispatch_history 會被擠掉，看門狗計數與冷卻時戳會被"
+            "改掉。見 tests/conftest.py 的 _isolate_state_file。"
+        )

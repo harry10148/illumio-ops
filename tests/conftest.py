@@ -155,6 +155,44 @@ def _isolate_analysis_lock(_analysis_lock_file, monkeypatch):
     monkeypatch.setenv("ILLUMIO_OPS_ANALYSIS_LOCK", _analysis_lock_file)
 
 
+@pytest.fixture(scope="session")
+def _state_file_dir(tmp_path_factory):
+    """Session-private directory for the suite's state files.
+
+    Deliberately NOT under the per-test ``tmp_path``, for the same reason as
+    ``_analysis_lock_file``: a state.json appearing in a test's own tmp
+    directory would show up in any test that enumerates it.
+    """
+    return tmp_path_factory.mktemp("state_files")
+
+
+@pytest.fixture(autouse=True)
+def _isolate_state_file(_state_file_dir, monkeypatch, request):
+    """Keep the whole suite off ``<repo>/logs/state.json``.
+
+    Both src/reporter.py and src/analyzer.py anchor STATE_FILE off ``__file__``,
+    so any test that builds a real Reporter/Analyzer and lets it record
+    something writes into the working checkout's live state — the same file a
+    developer's own ``--monitor-gui`` service is reading. Two concrete costs,
+    both paid on 2026-09-12:
+
+      · ``dispatch_history`` is capped at 50 entries, so a suite run evicts the
+        real history. The record of an actual alert dispatch was overwritten by
+        test rows addressed to ``a@x`` while that dispatch was being
+        investigated.
+      · The watchdog counter and cooldown live there too, so a test can decide
+        whether a real deployment's next outage alert fires.
+
+    Per-test filename so no state leaks between tests. A test that wants to
+    drive the file itself just patches STATE_FILE again — this fixture runs
+    first, and the test's own monkeypatch wins.
+    """
+    name = request.node.nodeid.replace("/", "_").replace(":", "_")[-120:]
+    target = str(_state_file_dir / f"{name}.state.json")
+    for module in ("src.reporter", "src.analyzer"):
+        monkeypatch.setattr(f"{module}.STATE_FILE", target, raising=True)
+
+
 @pytest.fixture
 def header_client(tmp_path):
     """Minimal Flask test client for security-header contract tests.
