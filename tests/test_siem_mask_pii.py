@@ -198,3 +198,19 @@ def test_dispatcher_builder_threads_mask_pii_through():
     )
     disp2 = build_dispatcher(cfg2, _SF())
     assert getattr(disp2, "_mask_pii", None) is False
+
+
+def test_mask_redacts_notification_user_and_src_ip():
+    from src.siem.mask import mask_event, REDACTED
+    event = {"event_type": "user.login", "notifications": [
+        {"notification_type": "user.pce_session_created", "info": {"user": {"href": "/users/11", "username": "admin@lab.local"}}},
+        {"notification_type": "request.authentication_failed", "info": {"api_endpoint": "/api/v2/users/login", "src_ip": "192.168.20.30"}},
+        {"notification_type": "x", "info": None},
+        "not-a-dict",
+    ]}
+    out = mask_event(event, mask_pii=True)
+    assert out["notifications"][0]["info"]["user"]["username"] == REDACTED
+    assert out["notifications"][0]["info"]["user"]["href"] == "/users/11"
+    assert out["notifications"][1]["info"]["src_ip"] == REDACTED
+    assert out["notifications"][1]["info"]["api_endpoint"] == "/api/v2/users/login"
+    assert event["notifications"][0]["info"]["user"]["username"] == "admin@lab.local"  # caller untouched
