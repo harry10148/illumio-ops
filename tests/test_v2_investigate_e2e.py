@@ -61,6 +61,8 @@ from __future__ import annotations
 import json
 from urllib.parse import parse_qs, urlparse
 
+import time
+
 import pytest
 
 pytest.importorskip("playwright.sync_api", exc_type=ImportError)
@@ -282,6 +284,21 @@ def test_filter_pill_reaches_query_and_kpis_update(v2_page):
     zone.press("Enter")
     assert drawer.locator(".fb-pill").count() == 1
 
+    # Hold the search request open for a beat before letting it through. The
+    # assertion below wants to SEE the loading state, and without this the
+    # window it lives in is however long the server takes — here the PCE points
+    # at a closed port with retries off, so the 502 comes back in microseconds
+    # and `data-loading="true"` can come and go without ever reaching a painted
+    # frame. Under `-n 4` that is what happened: 2 of 3 full runs timed out on
+    # line 305 waiting for a state that had already been and gone. The response
+    # is NOT faked — the real request still reaches the real server; only its
+    # start is delayed, which makes the window deterministic instead of lucky.
+    def _hold_then_continue(route):
+        time.sleep(0.4)
+        route.continue_()
+
+    page.route("**/api/quarantine/search", _hold_then_continue)
+
     # Save applies the filters and runs the query.
     with page.expect_request(
         lambda r: "/api/quarantine/search" in r.url and r.method == "POST"
@@ -309,6 +326,7 @@ def test_filter_pill_reaches_query_and_kpis_update(v2_page):
 
     # XC-09: the empty result explains itself instead of shrugging.
     assert page.locator('[data-cov="XC-09"] li').count() == 3
+    page.unroute("**/api/quarantine/search", _hold_then_continue)
 
 
 # ── key flow 2: catalogue cascade + load more ───────────────────────────────
