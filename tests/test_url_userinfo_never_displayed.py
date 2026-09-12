@@ -51,6 +51,31 @@ def test_redact_keeps_the_fact_that_a_credential_is_embedded():
     assert "admin" not in out
 
 
+# URL 的 authority 有幾種形狀會讓「找 @ 然後切掉」這種寫法出錯：IPv6 字面值自帶
+# 中括號、path 與 query 裡可以合法出現 @、使用者名可以是 %40 編碼。這幾條釘住的是
+# 「遮蔽不得弄壞合法輸入，也不得漏掉帶憑證的輸入」。
+@pytest.mark.parametrize("url, stripped, redacted", [
+    ("https://[2001:db8::1]:8443",
+     "https://[2001:db8::1]:8443", "https://[2001:db8::1]:8443"),
+    ("https://u:p@[2001:db8::1]:8443",
+     "https://[2001:db8::1]:8443", "https://[REDACTED]@[2001:db8::1]:8443"),
+    # path/query 裡的 @ 不是 userinfo，一個字都不該動
+    ("https://pce.local:8443/p/with@sign?q=a@b",
+     "https://pce.local:8443/p/with@sign?q=a@b", "https://pce.local:8443/p/with@sign?q=a@b"),
+    ("https://u:p@pce.local:8443/p/with@sign?q=a@b",
+     "https://pce.local:8443/p/with@sign?q=a@b",
+     "https://[REDACTED]@pce.local:8443/p/with@sign?q=a@b"),
+    ("https://u%40dom:p@pce.local:8443",
+     "https://pce.local:8443", "https://[REDACTED]@pce.local:8443"),
+    ("https://u:p@pce.local", "https://pce.local", "https://[REDACTED]@pce.local"),
+    ("not-a-url", "not-a-url", "not-a-url"),
+    ("", "", ""),
+])
+def test_the_helpers_handle_the_awkward_authorities(url, stripped, redacted):
+    assert strip_userinfo(url) == stripped
+    assert redact_userinfo(url) == redacted
+
+
 def test_a_url_without_userinfo_is_left_alone():
     assert redact_userinfo(URL_PLAIN) == URL_PLAIN
     assert strip_userinfo(URL_PLAIN) == URL_PLAIN
