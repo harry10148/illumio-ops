@@ -138,6 +138,7 @@ def test_telegram_digest_template_renders_sections():
         "telegram_digest.html.tmpl",
         subject="Test Alert",
         generated_at="2026-05-16 14:23 (UTC+8)",
+        instance="ops-box → pce.example.com:8443 (org 1)",
         total_issues=3,
         health_count=1,
         event_count=2,

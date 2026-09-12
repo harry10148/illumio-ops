@@ -1423,6 +1423,16 @@ class Analyzer:
             "status": "critical",
             "details": details,
         })
+        # 落一筆時間軸：2026-09-12 的告警送達了，這台卻查不到任何發警痕跡——
+        # log 會輪替、state 的計數會被下一次成功歸零，而 event_timeline 隨
+        # state.json 保存、以 append 合併、不受 record_pce_success 影響，是這
+        # 條路徑上最難被抹掉的一筆。下一次再發生就有東西可查。
+        self.stats.record_timeline(
+            "watchdog", "watchdog self-alert",
+            failures=failures,
+            started_at=stats.get("failure_run_started_at", ""),
+            error=elide_error(first_error or stats.get("last_error", ""), 200),
+        )
         logger.error(f"Watchdog: {failures} consecutive PCE failures — self-alert dispatched")
 
     def _maybe_alert_overflow(self) -> None:

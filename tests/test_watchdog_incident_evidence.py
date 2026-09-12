@@ -193,3 +193,18 @@ def test_the_alert_falls_back_cleanly_when_the_start_is_unknown(ana):
 def test_the_alert_is_still_critical(ana):
     alert = _fire(ana, started_minutes_ago=5, first_error="down")
     assert alert["status"] == "critical"
+
+
+def test_the_alert_leaves_a_trace_that_a_recovery_cannot_erase(ana):
+    """2026-09-12 的告警送達了，這台卻查不到任何發警痕跡。
+
+    log 會輪替、計數會被下一次成功歸零，`event_timeline` 兩者都不是：它隨
+    state.json 保存、以 append 合併，`record_pce_success` 不碰它。
+    """
+    _fire(ana, started_minutes_ago=30, first_error="connection refused")
+    marks = [e for e in ana.state["event_timeline"] if e.get("kind") == "watchdog"]
+    assert len(marks) == 1
+    assert marks[0]["details"]["failures"] == WATCHDOG_FAILURE_THRESHOLD
+
+    ana.stats.record_pce_success("health")
+    assert [e for e in ana.state["event_timeline"] if e.get("kind") == "watchdog"] == marks

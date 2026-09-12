@@ -95,6 +95,40 @@ class Reporter:
         """
         return functools.partial(t, lang=lang)
 
+    def _instance_label(self) -> str:
+        """Which box sent this, and which PCE it watches.
+
+        2026-09-12: a watchdog alert arrived on a LINE destination shared by
+        several instances and nothing in the message could tell them apart —
+        an hour went into ruling out four other hosts. Host plus PCE target is
+        the smallest thing that answers "is this us".
+
+        Credentials never enter this: only the API URL's host and the org id,
+        both of which the recipient already operates. Every lookup degrades to
+        a shorter label rather than raising — an alert that cannot be
+        addressed is still worth more than an alert that never goes out.
+        """
+        parts: list[str] = []
+        try:
+            host = socket.gethostname()
+        except OSError:
+            host = ""
+        if host:
+            parts.append(host)
+        api = self.cm.config.get("api", {}) or {}
+        target = ""
+        raw_url = str(api.get("url", "") or "")
+        if raw_url:
+            try:
+                from urllib.parse import urlsplit
+                target = urlsplit(raw_url).netloc or ""
+            except ValueError:
+                target = ""
+        if target:
+            org = str(api.get("org_id", "") or "")
+            parts.append(f"{target} (org {org})" if org else target)
+        return " → ".join(parts)
+
     def _resolve_tz(self) -> tuple[datetime.tzinfo, str]:
         """Return (tzinfo, label) for the configured timezone (settings.timezone)."""
         from src.tz_utils import resolve_tz
@@ -1301,6 +1335,7 @@ class Reporter:
                 lang=_lang,
                 subject=self._compact_text(subj),
                 generated_at=self._now_str(),
+                instance=self._compact_text(self._instance_label()),
                 total_issues=str(total_issues),
                 health_count=str(len(self.health_alerts)),
                 event_count=str(len(self.event_alerts)),
@@ -1399,6 +1434,7 @@ class Reporter:
             lang=_lang,
             subject=html.escape(subj),
             generated_at=html.escape(self._now_str()),
+            instance=html.escape(self._instance_label()),
             total_issues=total_issues,
             health_count=len(self.health_alerts),
             event_count=len(self.event_alerts),
@@ -1812,6 +1848,7 @@ class Reporter:
   <div style="font-size:12px;color:#6f6f6f;letter-spacing:0.08em;text-transform:uppercase;margin-bottom:6px;">{esc(t('alert_tpl_summary'))}</div>
   <div style="font-size:12px;color:#a8a8a8;margin-bottom:8px;">{esc(t('alert_tpl_aggregated_blurb'))}</div>
   <div style="font-size:12px;color:#6f6f6f;margin-bottom:4px;">{esc(t('alert_tpl_generated_at'))}: <strong>{esc(generated_at)}</strong></div>
+  <div style="font-size:12px;color:#6f6f6f;margin-bottom:4px;">{esc(t('alert_tpl_instance'))}: <strong>{esc(self._instance_label())}</strong></div>
 </div>
 {summary_html}
 {health_section_html}
