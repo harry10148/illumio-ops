@@ -123,3 +123,38 @@ def test_the_state_file_is_not_the_one_in_this_checkout():
             "真正在用的 state：dispatch_history 會被擠掉，看門狗計數與冷卻時戳會被"
             "改掉。見 tests/conftest.py 的 _isolate_state_file。"
         )
+
+
+def test_every_state_resolver_is_redirected():
+    """五個 writer、三種解析方式，一個漏掉就等於沒隔離。
+
+    2026-09-12 第一版只改了 reporter/analyzer 的模組常數，全套跑完
+    `logs/state.json` 仍然被動到——`adhoc_report_jobs`、`posture_summary`、
+    `rule_schedule_states` 各自走別的路徑。斷言解析**結果**，不是解析方式。
+    """
+    import src.analyzer
+    import src.reporter
+    from src.config import resolve_state_file
+    from src.rule_scheduler import _resolve_rule_state_file
+    from src.gui._helpers import _resolve_state_file
+
+    repo_logs = (Path(__file__).resolve().parent.parent / "logs").resolve()
+    resolved = {
+        "config.resolve_state_file": resolve_state_file(),
+        "gui._helpers._resolve_state_file": _resolve_state_file(),
+        "rule_scheduler._resolve_rule_state_file": _resolve_rule_state_file(),
+        "reporter.STATE_FILE": src.reporter.STATE_FILE,
+        "analyzer.STATE_FILE": src.analyzer.STATE_FILE,
+    }
+    # ReportScheduler 把路徑存成 instance 屬性，不是模組層的東西——真的建一個
+    # 出來問它。第一版的閘門只掃模組層，把 report_scheduler 放過去了。
+    from unittest.mock import MagicMock
+
+    from src.report_scheduler import ReportScheduler
+
+    resolved["ReportScheduler._state_file"] = ReportScheduler(
+        MagicMock(), MagicMock())._state_file
+
+    leaking = {k: v for k, v in resolved.items()
+               if repo_logs in Path(v).resolve().parents}
+    assert not leaking, f"這些仍指向這個 checkout 的 logs/：{leaking}"

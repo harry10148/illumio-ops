@@ -189,6 +189,12 @@ def _isolate_state_file(_state_file_dir, monkeypatch, request):
     """
     name = request.node.nodeid.replace("/", "_").replace(":", "_")[-120:]
     target = str(_state_file_dir / f"{name}.state.json")
+    # 五個 writer、三種解析方式。env 蓋住走 config.resolve_state_file() 的那些
+    # （gui/_helpers、scheduler/jobs、rule_scheduler、report_scheduler），而且
+    # 會被子行程繼承；reporter/analyzer 的模組常數在 import 時就定了，env 追不
+    # 上，所以另外 setattr。兩者缺一都補不滿——2026-09-12 只補了後者，全套跑完
+    # 仍有 adhoc_report_jobs / posture_summary / rule_schedule_states 被寫進去。
+    monkeypatch.setenv("ILLUMIO_OPS_STATE_FILE", target)
     for module in ("src.reporter", "src.analyzer"):
         monkeypatch.setattr(f"{module}.STATE_FILE", target, raising=True)
 

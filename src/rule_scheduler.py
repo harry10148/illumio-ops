@@ -98,9 +98,14 @@ def compute_next_trigger(schedules, now=None):
 
 
 def _resolve_rule_state_file() -> str:
-    """rule 排程執行狀態存 logs/state.json（與 report scheduler 同檔異 key）。"""
-    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    return os.path.join(root, "logs", "state.json")
+    """rule 排程執行狀態存 logs/state.json（與 report scheduler 同檔異 key）。
+
+    委派給 config.resolve_state_file()，這樣 ILLUMIO_OPS_STATE_FILE 的改指
+    對這裡一樣有效——原本這裡自己拼一次路徑，測試把其他三處都導開之後，
+    只有這一處還在寫開發機真正在用的 state。
+    """
+    from src.config import resolve_state_file
+    return resolve_state_file()
 
 
 _RULE_STATE_KEY = "rule_schedule_states"

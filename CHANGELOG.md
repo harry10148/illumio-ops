@@ -24,6 +24,15 @@ a plain `<major>.<minor>.<patch>` scheme. (Tags through v4.0.0 carried a
 
 ### Added
 
+- **`ILLUMIO_OPS_STATE_FILE` redirects `logs/state.json`**, the way
+  `ILLUMIO_OPS_ANALYSIS_LOCK` already redirects the analysis lock, and every
+  reader of that path now goes through one resolver instead of joining it
+  again locally. Only the test suite sets it. The file it points at is the
+  live state of whatever service a checkout is running: `dispatch_history` is
+  capped at 50 rows, so writes there evict real delivery records, and the
+  watchdog's failure counter and cooldown live in the same file, which decides
+  whether a real deployment's next outage alert fires at all.
+
 - **Every alert digest now says which box sent it.** LINE, plain-text and HTML
   mail and Telegram carry a `Source` line: this host, the PCE netloc it watches
   and the org id. Several instances can share one LINE destination, and until
