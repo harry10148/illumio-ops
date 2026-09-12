@@ -64,6 +64,21 @@ MAX_THRESHOLD_WINDOW_MINUTES = 1440
 WATCHDOG_FAILURE_THRESHOLD = 3
 WATCHDOG_COOLDOWN_MINUTES = 60
 
+
+def humanize_outage(minutes: int) -> str:
+    """把中斷時長講成人話。
+
+    門檻本身仍然是**次數**（那是兩種部署形狀都能用的去重機制：legacy 的輪詢
+    cycle 與 cache-ingest 的兩個 job 呼叫），但次數不是操作者要的量——同一個
+    「936 次」在不同輪詢間隔上是完全不同的時長。訊息因此以時間為主。
+    """
+    minutes = max(0, int(minutes))
+    if minutes < 60:
+        return t('dur_minutes', mins=minutes)
+    if minutes < 60 * 48:
+        return t('dur_hours', hours=minutes // 60, mins=minutes % 60)
+    return t('dur_days', days=minutes // (60 * 24), hours=(minutes % (60 * 24)) // 60)
+
 # The monitor cycle can run every 10 seconds, but an authenticated PCE probe
 # at that cadence is unnecessary and can consume SaaS rate limits. Automatic
 # telemetry is fresh enough at one probe per minute; operator-triggered probes
@@ -1384,16 +1399,29 @@ class Analyzer:
             return
         self.state["watchdog_last_alert_at"] = format_utc(now_utc)
         self._watchdog_dirty = True
-        last_error = self.state.get("pce_stats", {}).get("last_error", "")
+        stats = self.state.get("pce_stats", {})
+        # 引用**開啟**這串失敗的錯誤，不是最後一次記錄的錯誤：兩者可能屬於不同
+        # 階段（2026-09-12 的告警說 /noop 401，而 last_error 是 /health 200
+        # body=critical），讀訊息的人無從分辨。起點欄位是 2026-09-12 才加的，
+        # 升版時已在進行中的失敗串沒有它——退回 last_error，並且不講時長。
+        started = parse_event_timestamp(stats.get("failure_run_started_at"))
+        first_error = stats.get("failure_run_first_error") or ""
+        # 120 characters stopped right before the "(Caused by …)" clause,
+        # so the alert said the PCE was unreachable without saying whether
+        # that was DNS, a firewall or TLS. elide_error keeps both ends.
+        if started:
+            details = t('alert_watchdog_details', count=failures,
+                        duration=humanize_outage(
+                            int((now_utc - started).total_seconds() // 60)),
+                        error=elide_error(first_error, 400))
+        else:
+            details = t('alert_watchdog_details_nostart', count=failures,
+                        error=elide_error(first_error or stats.get("last_error", ""), 400))
         self.reporter.add_health_alert({
             "time": now_utc.strftime('%Y-%m-%d %H:%M:%S'),
             "rule": t('alert_watchdog_rule'),
             "status": "critical",
-            # 120 characters stopped right before the "(Caused by …)" clause,
-            # so the alert said the PCE was unreachable without saying whether
-            # that was DNS, a firewall or TLS. elide_error keeps both ends.
-            "details": t('alert_watchdog_details', count=failures,
-                         error=elide_error(last_error, 400)),
+            "details": details,
         })
         logger.error(f"Watchdog: {failures} consecutive PCE failures — self-alert dispatched")
 

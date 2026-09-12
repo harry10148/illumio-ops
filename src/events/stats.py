@@ -47,6 +47,12 @@ def ensure_monitoring_state(state: dict) -> dict:
     pce_stats.setdefault("last_error_status", "")
     pce_stats.setdefault("last_error_stage", "")
     pce_stats.setdefault("consecutive_failures", 0)
+    # 這串失敗的起點（見 record_pce_error/record_pce_success）。歸零的是
+    # 「目前狀態」，last_incident 留的是「上一次事故」。
+    pce_stats.setdefault("failure_run_started_at", "")
+    pce_stats.setdefault("failure_run_first_error", "")
+    pce_stats.setdefault("failure_run_first_stage", "")
+    pce_stats.setdefault("last_incident", {})
     pce_stats.setdefault("health_probe", "")
     pce_stats.setdefault("deployment_type", "")
     pce_stats.setdefault("health_category", "unknown")
@@ -99,7 +105,30 @@ class StatsTracker:
         now_str = format_utc(datetime.datetime.now(datetime.timezone.utc))
         pce_stats = self.state.setdefault("pce_stats", {})
         pce_stats["last_success"] = now_str
+        # 復原＝一次事故結束。歸零之前先把它留下來：2026-09-12 使用者收到
+        # 「已連續失敗 936 次」的告警，兩分鐘後查 state.json 只看到 0 / None,
+        # 因為期間有一次探測成功，而這裡把計數與冷卻時戳一起清了。自癒機制
+        # 不應該吃掉事後診斷能力——歸零的是「目前狀態」，last_incident 是
+        # 「上一次事故」，只有真的有失敗串時才覆寫（否則健康的系統會在幾分鐘
+        # 內把唯一那筆事故洗掉）。
+        failures = int(pce_stats.get("consecutive_failures", 0) or 0)
+        if failures > 0:
+            pce_stats["last_incident"] = {
+                "started_at": pce_stats.get("failure_run_started_at", ""),
+                "ended_at": now_str,
+                "failures": failures,
+                "first_error": pce_stats.get("failure_run_first_error", ""),
+                "first_stage": pce_stats.get("failure_run_first_stage", ""),
+                "last_error": pce_stats.get("last_error", ""),
+                "last_stage": pce_stats.get("last_error_stage", ""),
+                # 在下面清掉 watchdog_last_alert_at **之前**讀——這是事後唯一
+                # 能回答「這台到底有沒有發過警」的欄位。
+                "alerted": bool(self.state.get("watchdog_last_alert_at")),
+            }
         pce_stats["consecutive_failures"] = 0
+        pce_stats["failure_run_started_at"] = ""
+        pce_stats["failure_run_first_error"] = ""
+        pce_stats["failure_run_first_stage"] = ""
         # A real PCE probe succeeding means any prior watchdog incident is
         # over: clear its cooldown timestamp so a fresh run of failures isn't
         # suppressed by the previous incident's alert. watchdog_last_alert_at
@@ -164,7 +193,15 @@ class StatsTracker:
         pce_stats["last_error"] = elide_error(error, 600)
         pce_stats["last_error_status"] = "" if status is None else str(status)
         pce_stats["last_error_stage"] = stage
-        pce_stats["consecutive_failures"] = int(pce_stats.get("consecutive_failures", 0)) + 1
+        failures = int(pce_stats.get("consecutive_failures", 0)) + 1
+        pce_stats["consecutive_failures"] = failures
+        # 只有 0→1 那一次寫起點。看門狗要引用的是**開啟**這串失敗的錯誤，不是
+        # 最新的那一個：2026-09-12 的告警說 /noop 401，而當下的 last_error 是
+        # /health 200 body=critical——兩者屬於不同階段，讀訊息的人無從分辨。
+        if failures == 1 or not pce_stats.get("failure_run_started_at"):
+            pce_stats["failure_run_started_at"] = now_str
+            pce_stats["failure_run_first_error"] = elide_error(error, 600)
+            pce_stats["failure_run_first_stage"] = stage
         if stage == "health":
             pce_stats["health_status"] = "error"
             pce_stats["last_health_check"] = now_str
