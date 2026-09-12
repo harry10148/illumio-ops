@@ -124,6 +124,23 @@ def _actor(created_by) -> tuple[str, str]:
     return "", "system"
 
 
+def _first(*values):
+    for v in values:
+        if v is not None:
+            return v
+    return None
+
+
+def _labels_obj(labels) -> dict:
+    if isinstance(labels, dict):
+        return {str(k): str(v) for k, v in labels.items() if k and v}
+    out: dict = {}
+    for lbl in labels or []:
+        if isinstance(lbl, dict) and lbl.get("key") and lbl.get("value"):
+            out[str(lbl["key"])] = str(lbl["value"])
+    return out
+
+
 class PceNativeCEFFormatter(Formatter):
     def __init__(self, *, pce_fqdn: str = "", pce_version: str = "unknown"):
         self._pce_fqdn = pce_fqdn
@@ -177,5 +194,96 @@ class PceNativeCEFFormatter(Formatter):
             ext.append("cs3Label=resource_changes_2")
         return head + " ".join(ext)
 
-    def format_flow(self, flow: dict) -> str:  # Task 2
-        raise NotImplementedError
+    def format_flow(self, flow: dict) -> str:
+        svc = flow.get("service") if isinstance(flow.get("service"), dict) else {}
+        src = flow.get("src") if isinstance(flow.get("src"), dict) else {}
+        dst = flow.get("dst") if isinstance(flow.get("dst"), dict) else {}
+        src_wl = src.get("workload") if isinstance(src.get("workload"), dict) else None
+        dst_wl = dst.get("workload") if isinstance(dst.get("workload"), dict) else None
+
+        pd_raw = _first(flow.get("pd"), flow.get("policy_decision"))
+        if isinstance(pd_raw, bool):
+            pd_raw = None
+        if isinstance(pd_raw, int):
+            pd = _FLOW_PD_NUMERIC.get(pd_raw, "unknown")
+        else:
+            pd = str(pd_raw or "unknown")
+            if pd not in _FLOW_SEVERITY:
+                pd = "unknown"
+        head = _header(f"flow_{pd}", _title(f"flow_{pd}"), _FLOW_SEVERITY[pd], self._pce_version)
+
+        dir_raw = str(_first(flow.get("flow_direction"), flow.get("dir")) or "")
+        outbound = dir_raw in ("outbound", "O")
+        proto_raw = _first(flow.get("proto"), flow.get("protocol"), svc.get("proto"))
+        proto = proto_raw if isinstance(proto_raw, str) else _PROTO.get(int(proto_raw), str(proto_raw)) if proto_raw is not None else ""
+        port = _first(flow.get("dst_port"), flow.get("port"), svc.get("port"), 0)
+        ts = _first(flow.get("timestamp"), flow.get("last_detected"),
+                    (flow.get("timestamp_range") or {}).get("last_detected"), "")
+
+        ext: list[str] = [f"act={pd}", "cat=flow_summary", f"deviceDirection={1 if outbound else 0}",
+                          f"dpt={port}", f"src={_clean(_first(flow.get('src_ip'), src.get('ip'), ''))}",
+                          f"dst={_clean(_first(flow.get('dst_ip'), dst.get('ip'), ''))}", f"proto={_clean(proto)}"]
+        cnt = _first(flow.get("count"), flow.get("num_connections"), flow.get("flow_count"))
+        if cnt is not None:
+            ext.append(f"cnt={cnt}")
+        tbi, tbo = flow.get("dst_tbi"), flow.get("dst_tbo")
+        if tbi is not None and tbo is not None:
+            ext.append(f"in={tbi}")
+            ext.append(f"out={tbo}")
+        rt = _rt_flow(str(ts or ""))
+        if rt:
+            ext.append(f"rt={rt}")
+        user = _first(svc.get("user_name"), flow.get("un"))
+        proc = _first(svc.get("process_name"), flow.get("pn"))
+        svc_name = _first(svc.get("name"), flow.get("service_name"))
+        if user:
+            ext.append(f"{'suser' if outbound else 'duser'}={_clean(user)}")
+        if svc_name:
+            ext.append(f"destinationServiceName={_clean(svc_name)}")
+        if proc:
+            ext.append(f"{'sproc' if outbound else 'dproc'}={_clean(proc)}")
+        if flow.get("interval_sec") is not None:
+            ext.append(f"cn1={flow['interval_sec']}")
+            ext.append("cn1Label=interval_sec")
+        dbi = _first(flow.get("dst_dbi"), flow.get("dst_bi"))
+        dbo = _first(flow.get("dst_dbo"), flow.get("dst_bo"))
+        if dbi is not None and dbo is not None:
+            ext += [f"cn2={dbi}", "cn2Label=dbi", f"cn3={dbo}", "cn3Label=dbo"]
+        state = str(flow.get("state") or "")
+        ext.append(f"cs2={_STATE.get(state, state if len(state) == 1 else '')}")
+        ext.append("cs2Label=state")
+        if src_wl is not None:
+            ext.append(f"shost={_clean(_first(flow.get('src_hostname'), src_wl.get('hostname'), src_wl.get('name'), ''))}")
+            ext.append(f"cs5={_clean(_first(flow.get('src_href'), src_wl.get('href'), ''))}")
+            ext.append("cs5Label=src_href")
+            labels = _labels_obj(_first(flow.get("src_labels"), src_wl.get("labels")))
+            if labels:
+                ext.append(f"cs3={_clean(_compact_json(labels))}")
+                ext.append("cs3Label=src_labels")
+        if dst_wl is not None:
+            ext.append(f"dhost={_clean(_first(flow.get('dst_hostname'), dst_wl.get('hostname'), dst_wl.get('name'), ''))}")
+            ext.append(f"cs6={_clean(_first(flow.get('dst_href'), dst_wl.get('href'), ''))}")
+            ext.append("cs6Label=dst_href")
+            labels = _labels_obj(_first(flow.get("dst_labels"), dst_wl.get("labels")))
+            if labels:
+                ext.append(f"cs4={_clean(_compact_json(labels))}")
+                ext.append("cs4Label=dst_labels")
+        ext.append(f"dvchost={_clean(flow.get('pce_fqdn') or self._pce_fqdn)}")
+
+        msg: dict = {}
+        if flow.get("icmp_type") is not None or flow.get("type") is not None:
+            msg["icmp_type"] = _first(flow.get("icmp_type"), flow.get("type"), svc.get("icmp_type"))
+            msg["icmp_code"] = _first(flow.get("icmp_code"), flow.get("code"), svc.get("icmp_code"))
+        cls = flow.get("class") or _TRAFCLASS.get(str(flow.get("transmission") or "").lower(), "U")
+        msg["trafclass_code"] = cls
+        for k in ("ddms", "tdms"):
+            if flow.get(k) is not None:
+                msg[k] = flow[k]
+        net = flow.get("network")
+        net_name = net if isinstance(net, str) else (net or {}).get("name")
+        if net_name:
+            msg["network"] = net_name
+        if flow.get("pd_qualifier") is not None:
+            msg["pd_qualifier"] = flow["pd_qualifier"]
+        ext.append(f"msg={_clean(_compact_json(msg))}")
+        return head + " ".join(ext)
