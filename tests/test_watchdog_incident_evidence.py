@@ -144,9 +144,10 @@ def test_humanize_outage_scales_the_unit():
 # ── 告警訊息 ──────────────────────────────────────────────────────────────
 
 def _fire(ana, *, started_minutes_ago: int | None, first_error: str = "",
-          first_stage: str = "health", last_error: str = "") -> dict:
+          first_stage: str = "health", last_error: str = "",
+          failures: int = WATCHDOG_FAILURE_THRESHOLD) -> dict:
     stats = ana.state["pce_stats"]
-    stats["consecutive_failures"] = WATCHDOG_FAILURE_THRESHOLD
+    stats["consecutive_failures"] = failures
     stats["last_error"] = last_error
     if started_minutes_ago is not None:
         stats["failure_run_started_at"] = format_utc(
@@ -227,3 +228,46 @@ def test_a_run_already_under_way_at_upgrade_does_not_invent_a_start(ana):
     assert humanize_outage(0) not in details, "不能憑空生出一個 0 分鐘的中斷時長"
     assert "937" in details
     assert "still refused" in details
+
+
+# ── 文案：Codex UI 評估 2026-09-13 的四條 ────────────────────────────────────
+
+def test_the_message_actually_leads_with_time_not_the_count(ana):
+    """`_check_watchdog` 的註解寫著「the MESSAGE leads with elapsed time」，
+    但第一版的字串是「已連續失敗 936 次、中斷 39 小時」——**次數仍然在前**。
+    註解宣稱了實作沒做到的事，而沒有任何測試在看那個順序。
+    """
+    # 計數刻意不用門檻值 3：時長字串「39 小時」裡就有一個 3，找裸數字會命中它。
+    alert = _fire(ana, started_minutes_ago=2340, first_error="connection refused",
+                  failures=936)
+    details = alert["details"]
+    duration = humanize_outage(2340)
+    assert duration in details and "936" in details
+    assert details.index(duration) < details.index("936"), (
+        f"時長要在次數之前：{details!r}"
+    )
+
+
+def test_a_blind_spot_shorter_than_a_minute_does_not_say_zero(ana):
+    """「已持續失敗 0 分鐘」讀起來是自相矛盾的。"""
+    assert "0" not in humanize_outage(0)
+    alert = _fire(ana, started_minutes_ago=0, first_error="down")
+    assert humanize_outage(0) in alert["details"]
+
+
+def test_the_nostart_message_says_the_duration_is_unknown(ana):
+    """沒有起點時訊息會突然少掉時長——收件者不知道是「很短」還是「不知道」。"""
+    alert = _fire(ana, started_minutes_ago=None, last_error="connection refused")
+    from src.i18n import t
+    assert t('alert_watchdog_duration_unknown') in alert["details"]
+
+
+@pytest.mark.parametrize("started", [137, None])
+def test_both_variants_warn_that_zero_alerts_is_not_all_clear(ana, started):
+    """盲區訊息會跟「安全事件：0 流量告警：0」並排顯示。
+
+    那個零正是盲區造成的，卻最容易被讀成「一切平安」——把盲區的意思讀反了。
+    """
+    alert = _fire(ana, started_minutes_ago=started, first_error="down", last_error="down")
+    from src.i18n import t
+    assert t('alert_watchdog_zero_caveat') in alert["details"]

@@ -115,9 +115,16 @@ a plain `<major>.<minor>.<patch>` scheme. (Tags through v4.0.0 carried a
   quoted `last_error` — merely the most recent error, which can belong to a
   different stage than the failures being counted (the same alert cited a
   `/noop` 401 while `last_error` was `/health` returning `critical`). It now
-  leads with elapsed time and quotes the error that *opened* the run. A run
-  already under way across the upgrade has no recorded start and degrades to
-  the count-only wording rather than inventing a duration.
+  opens with elapsed time, keeps the count as a parenthetical, and quotes the
+  error that *opened* the run. A run already under way across the upgrade has
+  no recorded start; it says so ("duration unknown") rather than inventing a
+  duration or silently dropping the figure.
+
+  The message also states that no alerts during the blind spot is not the same
+  as no events. It appears beside "security events: 0" in the same digest, and
+  that zero is *caused by* the blindness — the reading most likely to be taken
+  from it is the opposite of what it means. A gap shorter than a minute reads
+  "less than 1 min", because "failing for 0 minutes" contradicts itself.
 
   > **Upgrading — the watchdog alert's wording has changed.** Anything
   > downstream that matches on the text of a health alert's `details` (the

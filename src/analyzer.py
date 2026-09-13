@@ -76,6 +76,9 @@ def humanize_outage(minutes: int) -> str:
     「936 次」在不同輪詢間隔上是完全不同的時長。訊息因此以時間為主。
     """
     minutes = max(0, int(minutes))
+    # 「已持續失敗 0 分鐘」讀起來是自相矛盾的（Codex UI 評估，2026-09-13）。
+    if minutes < 1:
+        return t('dur_under_minute')
     if minutes < 60:
         return t('dur_minutes', mins=minutes)
     if minutes < 60 * 48:
@@ -1421,13 +1424,21 @@ class Analyzer:
         # 120 characters stopped right before the "(Caused by …)" clause,
         # so the alert said the PCE was unreachable without saying whether
         # that was DNS, a firewall or TLS. elide_error keeps both ends.
+        # 盲區訊息會跟摘要裡的「安全事件：0 流量告警：0」並排顯示，而那個零正是
+        # 盲區造成的——最容易被讀成「一切平安」，把盲區的意思讀反。
+        caveat = t('alert_watchdog_zero_caveat')
         if started:
             details = t('alert_watchdog_details', count=failures,
                         duration=humanize_outage(
                             int((now_utc - started).total_seconds() // 60)),
+                        caveat=caveat,
                         error=elide_error(first_error, 400))
         else:
+            # 沒有起點時不推算時長，但要說出「不知道」——突然少掉一個數字，
+            # 收件者無從分辨那是「很短」還是「查不到」。
             details = t('alert_watchdog_details_nostart', count=failures,
+                        unknown=t('alert_watchdog_duration_unknown'),
+                        caveat=caveat,
                         error=elide_error(first_error or stats.get("last_error", ""), 400))
         self.reporter.add_health_alert({
             "time": now_utc.strftime('%Y-%m-%d %H:%M:%S'),
