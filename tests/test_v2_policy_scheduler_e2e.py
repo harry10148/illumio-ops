@@ -680,3 +680,44 @@ def test_teardown_closes_surfaces_clears_callbacks_and_palette(v2_page):
     _navigate(page, R_JOBS, "AU-13")
     assert page.locator("aside.drawer").count() == 0
     assert all(route != R_REPORTS for route in _palette_routes(page))
+
+
+def test_the_schedule_card_does_not_promise_a_history_it_lacks(v2_page):
+    """標題承諾的，正是它自己的說明否認的。
+
+    2026-09-13 查證：卡片標題是 `gui_au_rep_history`＝「執行歷史」，而
+    `gui_au_rep_hist_note` 寫著「這裡顯示的是這個排程目前的狀態，**不是一份
+    逐次執行的歷史**」——那句被包在 `disclosure()` 裡，要展開才看得到。後端
+    那個端點回的本來就是一列狀態，不是每次執行一列。
+
+    來找「上次到底跑了沒」的證據時，最不該藏起來的就是這個限制。
+    """
+    page, base_url = v2_page
+    _goto(page, base_url, R_REPORTS, "AU-11")
+    created = _api_post(page, "/api/report-schedules", {
+        "name": "e2e-history-naming", "report_type": "traffic", "schedule_type": "weekly",
+        "day_of_week": "monday", "hour": 8, "minute": 0, "timezone": "local",
+        "lookback_days": 7, "max_reports": 30, "format": ["html"], "email_report": False,
+        "email_recipients": [], "cron_expr": "", "enabled": True,
+    })
+    assert created and created.get("ok") is True, created
+    sid = created["schedule"]["id"]
+    try:
+        page.reload()
+        page.wait_for_selector('body[data-booted="true"]')
+        page.wait_for_selector('[data-cov="AU-11"]')
+
+        title, old_title = page.evaluate(
+            "async () => { const { t } = await import('/static/js/v2/core/i18n.mjs'); "
+            "return [t('gui_au_rep_history'), '執行歷史']; }"
+        )
+        assert title != old_title, "標題仍叫「執行歷史」，而這張卡沒有逐次執行的歷史"
+        body = page.locator("body").inner_text()
+        if title in body:
+            # 限制要在看得見的地方，不是只在展開的說明裡。
+            assert page.evaluate(
+                "async () => { const { t } = await import('/static/js/v2/core/i18n.mjs'); "
+                "return t('gui_au_rep_hist_scope'); }"
+            ) in body, "限制仍然只寫在需要展開的說明裡"
+    finally:
+        _api_del(page, "/api/report-schedules/%d" % sid)

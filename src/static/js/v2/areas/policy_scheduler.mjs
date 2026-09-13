@@ -1916,7 +1916,11 @@ async function mountReports(root, ctx) {
     const p = panel(null, t("gui_au_rep_history"));
     const s = selected();
     const entries = state.history;
-    withMeta(p, tf("gui_au_rep_hist_meta", { n: num(entries.length) }));
+    // 標題原本叫「執行歷史」，而這張卡的說明自己寫著「不是一份逐次執行的歷史」
+    // ——後端回的是一列狀態。標題已改名，限制也從展開的說明搬到常駐的 meta：
+    // 來找「上次到底跑了沒」的人，最不該讓他先展開才看得到這件事。
+    withMeta(p, tf("gui_au_rep_hist_meta", { n: num(entries.length) })
+      + " · " + t("gui_au_rep_hist_scope"));
     if (s) {
       p.body.appendChild(kv(t("gui_sched_col_name"), s.name || "—"));
       p.body.appendChild(kv(t("gui_sched_col_last"), s.last_run ? stamp(s.last_run) : t("gui_sched_status_never")));

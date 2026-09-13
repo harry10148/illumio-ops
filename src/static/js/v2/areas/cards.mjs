@@ -718,8 +718,24 @@ function cardTop10(top, chartHandles) {
   }));
   // v3: these two cards live on the traffic page itself — no go-to link
   withTone(p, "info");
+  // This card sits directly under the traffic search results, but loadTop10()
+  // runs queries[0] — the FIRST SAVED query — over a hard-coded 24 hours. The
+  // search above it may well be one app over the last hour. Laid out as
+  // neighbours they read as two views of one thing, so say which query and
+  // which window this one is, and that it does not follow the search.
+  p.body.appendChild(note(tf("gui_ov_top10_independent_fmt", {
+    query: (top.query_name || (parsed.length && parsed[0].queryName)) || "—",
+    window: t("gui_ev_window_24h"),
+  })));
 
-  if (!top.ok || !data.length) {
+  // A failed query and a query that matched nothing are different facts; they
+  // shared this branch and both said "no records". Same defect as the traffic
+  // table's, one card over.
+  if (!top.ok) {
+    p.body.appendChild(emptyState(t("gui_top10_error"), top.error || null));
+    return p;
+  }
+  if (!data.length) {
     p.body.appendChild(emptyState(t("gui_top10_no_records"), null));
     return p;
   }
