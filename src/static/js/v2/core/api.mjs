@@ -49,6 +49,10 @@
 import { GET_MAP } from "./store-map.mjs";
 
 const cache = new Map(); // cacheKey -> Promise<any>
+// cacheKey -> 那份資料**被抓回來的時刻**（不是被渲染的時刻）。畫面要說「資料
+// 截至幾點」時，唯一誠實的來源就是這個——用渲染時間會永遠顯示「剛剛」，而
+// 快取命中的畫面可能是八小時前抓的。
+const fetchedAtMs = new Map();
 
 function csrfMeta() {
   return document.querySelector('meta[name="csrf-token"]');
@@ -209,7 +213,9 @@ export const api = {
     const key = cacheKey(id, params);
     if (!cache.has(key)) {
       const path = resolveEntry(id, params);
-      const p = fetchJson(path).catch(function (e) { cache.delete(key); throw e; });
+      const p = fetchJson(path)
+        .then(function (v) { fetchedAtMs.set(key, Date.now()); return v; })
+        .catch(function (e) { cache.delete(key); fetchedAtMs.delete(key); throw e; });
       cache.set(key, p);
     }
     return cache.get(key);
@@ -217,8 +223,21 @@ export const api = {
 
   /** Drop the cache entry and load again — what an error card's retry calls. */
   reload(id, params) {
-    cache.delete(cacheKey(id, params));
+    const key = cacheKey(id, params);
+    cache.delete(key);
+    fetchedAtMs.delete(key);
     return this.load(id, params);
+  },
+
+  /**
+   * 這份資料是什麼時候抓回來的（epoch ms），沒抓過就是 null。
+   *
+   * 畫面用它回答「資料截至幾點」。**不要用渲染時間代替**：快取命中時畫面是
+   * 新畫的，資料卻可能是八小時前的，那樣顯示等於在說謊。
+   */
+  fetchedAt(id, params) {
+    const at = fetchedAtMs.get(cacheKey(id, params));
+    return at === undefined ? null : at;
   },
 
   /** post(path, body) -> Promise<any parsed body>. Never throws; see header. */
