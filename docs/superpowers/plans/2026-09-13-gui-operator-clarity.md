@@ -162,3 +162,64 @@ PCE 指向關閉的埠，那個查詢從來沒成功過**。它測的一直是�
 （同一種病這個 repo 記過三次，見 `gate-checks-shape-not-rule`。）
 
 **批次 2 到此完成**（R1 於 2026-09-13，R7 後半於 2026-09-14）。
+
+---
+
+## 批次 3 五條的逐條查證（2026-09-14）
+
+原表的錨點行號已漂移，以下按**主張**重查，不是按行號。兩條的描述需要修正，
+其中一條根本不是文案問題。
+
+### R5 不是「缺找回能力」，是**第 26 筆之後在 GUI 裡拿不到**
+
+`areas/alerts.mjs:340` `mountList`：
+
+```js
+function params() {
+  return { status: state.status, type: state.type,
+           page: state.page + 1, page_size: 25 };
+}
+```
+
+- `state.page` 全檔只出現兩次：`params()` 讀它，以及切換狀態時 `= 0`。
+  **沒有任何地方遞增它**，而 `listFoot()`（`components/page.mjs:250`）只是一行
+  文字加一個連結，沒有分頁器。
+- `state.type` 只在 `mountAlerts` 從 URL query 取得（`:756`），**畫面上沒有任何
+  控制項會設定它**。要按類型篩選只能手改網址。
+
+`filters()` 只建了「全部／新／已確認／已完成」那一排。所以告警一旦超過 25 筆，
+舊的那些從介面上**不可達**——這不是「找回能力不足」，是資料拿不到。
+
+嚴重度確實只有色條（`tone: sevTone(a.severity)`），沒有文字。
+
+### R2 的「取樣上限沒說出來」是錯的——它有說
+
+`gui_al_flows_foot` = 「顯示前 {shown} 組，共 {total} 組」，常駐在流量表下方
+（`:512`）。`EXPLAIN_N` 的上限本來就寫在畫面上。
+
+R2 真正成立的是另外兩半：
+
+1. **動作順序**：`paintActions()`（`:630`）第一個 push 的是「開啟政策 X」，而
+   `acts.forEach` 把 index 0 套上 `lead` ＋ `btn primary`。找到涵蓋規則就等於
+   把「改規則集」擺成主動作，「去看那個 workload」排在它後面。
+2. **事發當時 vs 現在**：`explainFlows()`（`:181`）送 `basis: "active"`——問的是
+   **現在**的政策，而告警敘述的是**事發當時**。這一點畫面上沒有任何交代。
+
+### R3 成立，而且三個工具的規則各不相同
+
+| 工具 | 何時送查詢 |
+|---|---|
+| 流量（`runQuery`，`:1613`） | Enter 或按鈕（2 處） |
+| Workload 搜尋（`runSearch`，`:2277`） | Enter 或按鈕（2 處） |
+| 事件（`runQuery(false)`，`:2793–2863`） | **每一個控制項改動都立即重查**（6 處） |
+
+同一頁、相鄰的三個工具，三套規則。
+
+### R4 成立
+
+`areas/reports.mjs:761` 的註解自己寫著
+`no job poll survives a navigation away from #/reports`。
+
+### R6 成立
+
+`areas/home.mjs:351` 的唯一 `btn primary` 是 `gui_home_go_reports`。
