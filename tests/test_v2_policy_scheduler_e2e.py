@@ -597,8 +597,11 @@ def test_report_schedule_crud_round_trip(v2_page):
     assert body["report_type"] == "traffic"
     page.wait_for_selector("aside.drawer", state="detached")
 
+    # 抽屜關閉 ≠ 清單已重新載入並重繪。count() 是一次性讀取、不會重試，
+    # 所以列表還在 refetch 時就會讀到 0。本機夠快所以綠，CI runner 慢就紅
+    # ——2026-09-13 平行化 CI 第一次跑掛在這裡。expect() 會自動重試。
     row = panel.locator("tbody tr").filter(has_text=name)
-    assert row.count() == 1
+    expect(row).to_have_count(1)
 
     with page.expect_request(
         lambda r: "/api/report-schedules/" in r.url and r.url.endswith("/toggle") and r.method == "POST"

@@ -67,6 +67,8 @@ import pytest
 
 pytest.importorskip("playwright.sync_api", exc_type=ImportError)
 
+from playwright.sync_api import expect  # noqa: E402
+
 # Registers v2_page and its fixture chain — see tests/v2_e2e_utils.py's
 # docstring for why both this line and the importorskip above (in that exact
 # order) are required.
@@ -1187,8 +1189,12 @@ def test_actual_source_renders_for_every_backend_value(v2_page):
         page.route("**/api/quarantine/search", _stub_actual_source(value))
         with page.expect_response(lambda r: "/api/quarantine/search" in r.url):
             run_btn.click()
-        text = page.locator('section[data-cov="IV-05"]').inner_text()
-        assert catalogue[value] in text, (value, text)
+        # expect_response 等的是**回應抵達**，不是畫面重繪完成。inner_text()
+        # 是一次性讀取、不會重試，所以第二圈（api）會讀到第一圈（cache）還在
+        # 畫面上的字。本機 16 核重繪夠快所以永遠綠，CI runner 2–4 核就紅——
+        # 2026-09-13 平行化 CI 第一次跑掛在這裡。expect() 會自動重試。
+        expect(page.locator('section[data-cov="IV-05"]')).to_contain_text(
+            catalogue[value])
         page.unroute("**/api/quarantine/search")
 
     page.route(
@@ -1203,8 +1209,8 @@ def test_actual_source_renders_for_every_backend_value(v2_page):
     query.locator('input[aria-label="%s"]' % labels["gui_gen_end_date"]).fill("2026-08-07")
     with page.expect_response(lambda r: "/api/quarantine/search" in r.url):
         run_btn.click()
-    text = page.locator('section[data-cov="IV-05"]').inner_text()
-    assert catalogue["archive"] in text, text
+    expect(page.locator('section[data-cov="IV-05"]')).to_contain_text(
+        catalogue["archive"])
 
 
 def test_archive_rows_render_real_values_not_blank_cells(v2_page):

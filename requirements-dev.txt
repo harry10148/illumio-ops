@@ -12,12 +12,8 @@
 # and 8.3.3 passes.)
 pytest>=8.0,<10.0
 pytest-cov>=5.0,<6.0
-# 平行執行，**本機用**。CI 目前是單執行緒，見 .github/workflows/ci.yml 的說明
-# ——2026-09-13 開過平行，本機連六輪全綠而 CI 第一次就紅兩支，尚未查明的共用
-# 狀態在 worker 數不同時才會現形。
-# --dist loadfile（不是預設的 load）是必要的：e2e 的 live server 與 Flask app
-# 是 module 範圍的 fixture，同一檔案的測試必須留在同一個 worker，否則每支測試
-# 各起一個伺服器。
+# 平行執行。--dist loadfile（不是預設的 load）是必要的：e2e 的 live server
+# 與 Flask app 是 module 範圍的 fixture，同一檔案的測試必須留在同一個 worker。
 pytest-xdist>=3.5,<4.0
 responses>=0.25,<1.0          # Phase 2: requests mock
 freezegun>=1.4,<2.0           # Phase 6: scheduler time mock
