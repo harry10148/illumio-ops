@@ -424,6 +424,7 @@
   "gui_iv_query_failed_title": "Query failed",
   "gui_ov_top10_independent": "does not follow the search above",
   "gui_ov_top10_independent_fmt": "This leaderboard runs the saved query \"{query}\" over {window}; it does not follow the search above.",
+  "gui_sy_saved_not_applied": "Not yet confirmed applied to the running service.",
   "main_menu_area_1": " 1. Home         -- status at a glance (read-only)",
   "main_menu_area_2": " 2. Investigate   -- traffic, workloads and events",
   "main_menu_area_3": " 3. Policy        -- rules, schedules, tests and manual runs",

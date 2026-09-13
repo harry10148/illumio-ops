@@ -723,7 +723,11 @@ function makeForm(method, endpoint) {
       }
       items.forEach(function (i) { i.base = readCtl(i.c); });
       fapi.sync();
-      toast.ok(tf("gui_sy_saved", { n: n }));
+      // 「已儲存」與「已套用」是兩件事，而這一句先前同時被讀成兩者。後端硬編
+      // requires_restart:true（gui/settings_helpers.py），也就是沒有逐欄位的
+      // 重啟偵測——連系統自己都不知道這次改動需不需要重啟；而重啟橫幅只在
+      // cache 頁（SY-03）上，saveAll 卻是所有設定頁共用的。說出來比讓人猜好。
+      toast.ok(tf("gui_sy_saved", { n: n }) + " " + t("gui_sy_saved_not_applied"));
       if (!fapi.afterSave) return true;
       return Promise.resolve(fapi.afterSave(changedKeys, res)).then(function () { return true; });
     });

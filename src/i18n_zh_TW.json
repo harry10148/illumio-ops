@@ -424,6 +424,7 @@
   "gui_iv_query_failed_title": "查詢失敗",
   "gui_ov_top10_independent": "不跟隨上方的搜尋條件",
   "gui_ov_top10_independent_fmt": "此排行榜跑的是儲存查詢「{query}」的 {window}，不跟隨上方的搜尋條件。",
+  "gui_sy_saved_not_applied": "尚未確認套用到執行中的服務。",
   "main_menu_area_1": " 1. 首頁        -- 一眼看完狀態（唯讀）",
   "main_menu_area_2": " 2. 調查        -- 流量、Workload 與事件",
   "main_menu_area_3": " 3. 規則        -- 規則、排程、測試與手動執行",
