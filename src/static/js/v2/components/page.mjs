@@ -246,9 +246,32 @@ export function listRow(opts) {
   return row;
 }
 
-/** listFoot(leftText, rightNode) -> the count-and-a-link line under a list. */
-export function listFoot(leftText, rightNode) {
+/**
+ * listPager(index, size, total, onPage) -> prev/next for a list that is served
+ * a page at a time, or null when everything already fits on one page.
+ *
+ * Same strings and same disabled rules as the table's own foot
+ * (components/table.mjs): a list and a table that page differently would be
+ * two things to learn for one idea.
+ */
+export function listPager(index, size, total, onPage) {
+  const pages = size ? Math.max(1, Math.ceil(total / size)) : 1;
+  if (pages <= 1) return null;
+  const prev = el("button", { class: "btn ghost", type: "button", text: t("gui_prev"),
+    onClick: function () { onPage(index - 1); } });
+  const next = el("button", { class: "btn ghost", type: "button", text: t("gui_next"),
+    onClick: function () { onPage(index + 1); } });
+  prev.disabled = index <= 0;
+  next.disabled = index >= pages - 1;
+  return el("span", { class: "lpager" },
+    el("span", { class: "page", text: tf("gui_table_page", { page: index + 1, pages: pages }) }),
+    prev, next);
+}
+
+/** listFoot(leftText, rightNode, pagerNode) -> the line under a list. */
+export function listFoot(leftText, rightNode, pagerNode) {
   return el("div", { class: "lfoot" },
     el("span", { text: leftText }),
+    pagerNode || null,
     rightNode || null);
 }

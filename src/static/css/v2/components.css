@@ -1095,3 +1095,7 @@ a.kpicell:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px
 @media (max-width: 1000px) {
   .home { grid-template-columns: minmax(0, 1fr); }
 }
+
+/* A list served a page at a time carries the same prev/next as a table's foot. */
+.lfoot .lpager { display: flex; align-items: center; gap: var(--space-3); }
+.lfoot .lpager .page { font-family: var(--font-num); color: var(--text-2); }
