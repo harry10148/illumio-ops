@@ -121,6 +121,20 @@ Commit: `feat(fleet): ven_summary job emits the fleet snapshot; read-only fleet 
 
 Run: `timeout 600 python3 -m pytest tests/test_fleet_progress.py tests/test_gui_fleet_api.py -q`
 
+**2026-09-14 查證（Illumio KB：REST_APIs_25_2.pdf / 26_1.pdf）**：
+
+- 每批 1000 筆**正確**（隔壁 `set_flow_reporting_frequency` 的 50 是那支端點自己的上限，
+  不通用）。
+- **PCE 一次只跑一個 bulk operation。** 前一個還沒完成就送下一個，第二個回
+  **HTTP 429**。所以多批必須循序送（迴圈本來就是），而且 **429 要能跟一般速率
+  限制分辨**——兩者都是 429，但這個的意思是「上一批還在跑」，重試才對；
+  另一個是「你太快了」。
+- 政策變更**在受影響的 VEN 下一次 heartbeat 才套用**，期間 PCE 上顯示
+  `Syncing`。apply 的回應不能說「已套用」——它只知道「已送出」。這與同日
+  GUI R7 的結論同形（「已儲存」≠「已套用」）。
+- KB **沒有** bulk_update 的 response JSON schema。逐筆解析的形狀（`href` /
+  `status` / `errors`）是計畫的假設，真環境驗證前不可當事實。
+
 Commit: `feat(fleet): two-phase enforcement progression with a restorable record`
 
 ---
