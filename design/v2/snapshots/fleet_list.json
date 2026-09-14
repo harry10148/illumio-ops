@@ -1,0 +1,20 @@
+{
+  "bucket": "selective",
+  "index_truncated": false,
+  "ok": true,
+  "rows": [
+    {
+      "app": "web",
+      "compat": "unknown",
+      "env": "prod",
+      "hostname": "web-01",
+      "href": "/orgs/1/workloads/aaa",
+      "hslh": 0.2,
+      "mode": "selective",
+      "online": true,
+      "os": "ubuntu-x86_64-22.04",
+      "version": "26.2.20-2063"
+    }
+  ],
+  "total": 1
+}

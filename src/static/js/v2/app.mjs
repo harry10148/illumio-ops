@@ -143,6 +143,10 @@ async function boot() {
     const { mountWorkloads } = await import("./areas/investigate.mjs");
     return mountWorkloads(el2, ctx);
   });
+  router.register("#/investigate/fleet", async function (el2, ctx) {
+    const { mountFleet } = await import("./areas/fleet.mjs");
+    return mountFleet(el2, ctx);
+  });
   router.register("#/investigate/events", async function (el2, ctx) {
     const { mountEvents } = await import("./areas/investigate.mjs");
     return mountEvents(el2, ctx);

@@ -1,0 +1,129 @@
+{
+  "available": true,
+  "fleet": {
+    "agent_health": {
+      "errors": {
+        "count": 0,
+        "sample": []
+      },
+      "warnings": {
+        "count": 0,
+        "sample": []
+      }
+    },
+    "compat": {
+      "fail": 0,
+      "pass": 0,
+      "unknown": 1,
+      "warn": 0
+    },
+    "coverage_gaps": {
+      "by_app": {
+        "web": {
+          "selective": 1
+        }
+      },
+      "by_env": {
+        "prod": {
+          "selective": 1
+        }
+      },
+      "unlabeled": {
+        "count": 1,
+        "sample": []
+      }
+    },
+    "health_score": {
+      "components": {
+        "compat": {
+          "present": false,
+          "value": null
+        },
+        "enforcement": {
+          "present": true,
+          "value": 0.5
+        },
+        "heartbeat": {
+          "present": true,
+          "value": 0.5
+        },
+        "online": {
+          "present": true,
+          "value": 0.5
+        },
+        "version": {
+          "present": false,
+          "value": null
+        }
+      },
+      "partial": true,
+      "score": 62
+    },
+    "heartbeat": {
+      "fresh": 1,
+      "no_heartbeat": 0,
+      "stale_24h": 0,
+      "stale_48h": 1
+    },
+    "index_truncated": false,
+    "managed_offline": 1,
+    "managed_online": 1,
+    "pipeline": {
+      "full": {
+        "count": 0,
+        "sample": []
+      },
+      "idle_compat_fail": {
+        "count": 0,
+        "sample": []
+      },
+      "idle_compat_pass": {
+        "count": 0,
+        "sample": []
+      },
+      "idle_compat_unknown": {
+        "count": 1,
+        "sample": []
+      },
+      "idle_compat_warn": {
+        "count": 0,
+        "sample": []
+      },
+      "selective": {
+        "count": 1,
+        "sample": []
+      },
+      "visibility_not_ready": {
+        "count": 0,
+        "sample": []
+      },
+      "visibility_ready": {
+        "count": 0,
+        "sample": []
+      }
+    },
+    "total": 2,
+    "updated_at": "2026-09-14T00:00:00Z",
+    "versions": {
+      "distribution": {
+        "26.2.20-2063": {
+          "count": 2,
+          "os_breakdown": {
+            "ubuntu-x86_64-22.04": 2
+          }
+        }
+      },
+      "needs_upgrade": null,
+      "newest": "26.2.20-2063",
+      "oldest": "26.2.20-2063",
+      "on_target": 0,
+      "ordered": [
+        "26.2.20-2063"
+      ],
+      "target": null,
+      "unparsable": []
+    }
+  },
+  "next_run_at": null,
+  "ok": true
+}

@@ -54,6 +54,11 @@ IV-14: {item: 事件 load-more+詳情卡, route: "#/investigate/events"}
 # IV-15 移除（2026-09-06）：shadow compare 是比對器遷移期的除錯工具，不屬於
 # 操作者在事件檢視頁要做的事。後端 /api/events/shadow_compare 已於 2026-09-09 退役
 # （無 GUI 讀者；shadow.py 留著供 rule_test 用）。
+IV-16: {item: 車隊摘要卡列（score/版本/管線）, route: "#/investigate/fleet"}
+IV-17: {item: bucket 清單與分頁, route: "#/investigate/fleet"}
+IV-18: {item: 版本分布, route: "#/investigate/fleet"}
+IV-19: {item: coverage gaps, route: "#/investigate/fleet"}
+IV-20: {item: 推進抽屜 preview/apply, route: "#/investigate/fleet"}
 AL-01: {item: 規則清單+啟停+刪除, route: "#/policy/alert-rules"}
 AL-02: {item: Event 規則 drawer, route: "#/policy/alert-rules"}
 AL-03: {item: System health 規則 drawer, route: "#/policy/alert-rules"}

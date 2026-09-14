@@ -805,6 +805,11 @@ async function mountPce(root, ctx) {
     const key = passwordField(t("gui_sy_secret_keep"));
     const secret = passwordField(t("gui_sy_secret_keep"));
     const ssl = checkField(api_.verify_ssl);
+    // VEN 車隊的兩個設定跟著 PCE 走：目標版本是拿來比對這台 PCE 上的 VEN 的，
+    // 單批上限是寫回這台 PCE 的。放在別頁會讓「這是對哪個 PCE 說的」變模糊。
+    const set_ = s.settings || {};
+    const fleetTarget = textField(set_.fleet_target_ven_version || "");
+    const fleetBatch = numberField(set_.fleet_max_batch || 200, 1, 1000);
     const deployBox = labelled(t("gui_deployment_type"), form.track("deployment_type", deployment));
     const urlBox = labelled(t("gui_url"), form.track("url", url), t("gui_url_help"));
     const orgBox = labelled(t("gui_org_id"), form.track("org_id", org), t("gui_org_id_help"));
@@ -844,6 +849,11 @@ async function mountPce(root, ctx) {
      * was never ours to publish, and set/not-set now rides on the field it
      * describes instead of being restated in a section of its own. */
     connPanel.body.appendChild(note(t("gui_sy_secret_note")));
+    connPanel.body.appendChild(settingsSection(t("gui_fleet_title"), t("gui_fleet_subtitle"),
+      labelled(t("gui_fleet_target"),
+        form.track("fleet_target_ven_version", fleetTarget), t("gui_fleet_target_help")),
+      labelled(t("gui_fleet_progress_btn"),
+        form.track("fleet_max_batch", fleetBatch, "number"), t("gui_fleet_cap_help"))));
 
     const healthRow = el("div", { class: "strip", "data-role": "pce-health-status" });
     function paintHealth(stats) {
@@ -899,6 +909,12 @@ async function mountPce(root, ctx) {
       if (v.secret) apiPart.secret = v.secret;
       apiPart.verify_ssl = v.verify_ssl;
       b.api = apiPart;
+      // 這兩個鍵住在 config["settings"]，不是 config["api"]。送錯區段會被
+      // _SETTINGS_ALLOWLISTS 靜默丟掉：存了、toast 說成功、值沒變。
+      b.settings = {
+        fleet_target_ven_version: v.fleet_target_ven_version,
+        fleet_max_batch: v.fleet_max_batch,
+      };
       return b;
     });
     /* 409 + pce_target_changed is the appliance refusing to guess what should

@@ -130,9 +130,10 @@ def test_the_route_list_matches_the_coverage_map(gate_result):
     # 3B Task 6 lands the inbox), splits the schedule board onto
     # #/policy/schedules and the test-alert/watermark/channel-status panels
     # onto #/system/alerting; the other legacy routes were re-keyed 1:1.
-    assert len(routes) == 24, routes
+    # +1 於 2026-09-14：#/investigate/fleet（plugger port 1/4）。
+    assert len(routes) == 25, routes
     assert "login.html" in routes
-    assert sum(1 for r in routes if r.startswith("#")) == 23
+    assert sum(1 for r in routes if r.startswith("#")) == 24
     assert set(routes) == set(gate_result["routes"])
 
 
@@ -180,13 +181,14 @@ def test_get_map_is_an_exact_transcription_of_the_frozen_endpoint_list():
     }
 
 
-def test_get_map_has_the_thirty_seven_entries_the_gate_expects():
+def test_get_map_has_every_entry_the_gate_expects():
     """A count, on top of the set comparison, so that adding an entry to BOTH
     files without deciding it belongs still has to be a deliberate edit here.
-    40 = the yaml's 42 GET entries minus the two capture-only fb_* ids."""
+    43 = the yaml's 45 GET entries minus the two capture-only fb_* ids.
+    (+3 on 2026-09-14: fleet / fleet_list / fleet_records.)"""
     # 3A/3B (2026-09-04): + alerts, alert_detail, alert_traffic_query
-    assert len(_get_map_ids()) == 40, sorted(_get_map_ids())
-    assert len(_yaml_get_ids()) == 42, sorted(_yaml_get_ids())
+    assert len(_get_map_ids()) == 43, sorted(_get_map_ids())
+    assert len(_yaml_get_ids()) == 45, sorted(_yaml_get_ids())
 
 
 def test_post_entries_are_deliberately_absent_from_get_map():

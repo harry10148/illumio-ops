@@ -41,6 +41,10 @@
 - {id: reports_list,        method: GET,  path: /api/reports}
 # v3 (3A, 2026-09-04): persisted alert records — src/gui/routes/alerts.py
 - {id: alerts,              method: GET,  path: "/api/alerts?page=1&page_size=4"}
+# VEN fleet (plugger port 1/4, 2026-09-14): src/gui/routes/fleet.py
+- {id: fleet,               method: GET,  path: /api/fleet}
+- {id: fleet_list,          method: GET,  path: "/api/fleet/list?bucket=selective&offset=0&limit=100"}
+- {id: fleet_records,       method: GET,  path: /api/fleet/progress/records}
 - {id: report_schedules,    method: GET,  path: /api/report-schedules}
 - {id: rhc_enablement,      method: GET,  path: /api/rule_hit_count/enablement}
 - {id: rules,               method: GET,  path: /api/rules}
