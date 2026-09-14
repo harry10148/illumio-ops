@@ -124,10 +124,19 @@ def test_cache_flush_with_confirm_calls_flush_with_expected_args():
     mock_flush.assert_called_once_with("data/pce_cache.sqlite", "logs/state.json")
 
 
-def test_cache_flush_json_output():
+def test_cache_flush_json_output(cli_runner):
+    """--json 的 stdout 必須是純 JSON，重啟提示走 stderr。
+
+    這支是全 repo 唯一分開讀 `result.stderr` 的 CLI 測試，所以它是唯一一支
+    在意 click 版本的：click <8.2 的 CliRunner 預設把 stderr 混進 stdout，
+    `json.loads` 當場炸。conftest 的 `cli_runner` fixture 就是為此而存在
+    （`CliRunner(mix_stderr=False)`，8.2+ 則已預設分離），先前這裡卻直接
+    `CliRunner()`——CI 裝 requirements.lock 的 8.3.3 所以一直是綠的，
+    照 requirements.txt（`click>=8.1`）裝的人才會看到紅。
+    """
     import json
     from src.cli.cache import cache_group
-    runner = CliRunner()
+    runner = cli_runner
     cm = _mock_config_manager()
     counts = {"pce_events": 12, "pce_traffic_flow_raw": 34, "state_keys": 5, "dashboard_keys": 1}
     with patch("src.config.ConfigManager", return_value=cm):
