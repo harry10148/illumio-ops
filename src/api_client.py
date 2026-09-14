@@ -967,6 +967,72 @@ class ApiClient:
                 logger.error(f"set_flow_reporting_frequency batch error: {e}")
         return success, fail
 
+    # PCE 的上限是每次 bulk operation 1000 筆（REST_APIs_26_1.pdf）。隔壁
+    # set_flow_reporting_frequency 的 50 是那支端點自己的上限，不通用。
+    BULK_UPDATE_BATCH = 1000
+
+    def bulk_update_workloads(self, items: list[dict], *, timeout: int = 30) -> list[dict]:
+        """PUT /workloads/bulk_update，回報**每一筆**的下場。
+
+        呼叫端只准送 href + enforcement_mode：bulk_update 會照單全收，多送
+        一個欄位就是多改一個設定。
+
+        PCE 一次只跑一個 bulk operation；前一批還沒完成時第二批回 429
+        （REST_APIs_26_1.pdf）。那個 429 的意思是「等一下再送」而不是
+        「你太快了」，所以標成 retryable，讓呼叫端分得開。
+
+        回傳逐筆 {"href", "status": "updated"|"error", "http", "errors"}，
+        外加 429 時的 "retryable"。整批失敗時每一筆都要有下場——沒有回報的
+        那些會被讀成成功。
+        """
+        if not items:
+            return []
+        org = self.api_cfg["org_id"]
+        url = f"{self.api_cfg['url']}/api/v2/orgs/{org}/workloads/bulk_update"
+        out: list[dict] = []
+        for i in range(0, len(items), self.BULK_UPDATE_BATCH):
+            batch = items[i:i + self.BULK_UPDATE_BATCH]
+            payload = [{"href": it["href"], "enforcement_mode": it["enforcement_mode"]}
+                       for it in batch]
+            try:
+                status, body = self._request(url, method="PUT", data=payload,
+                                             timeout=timeout, rate_limit=True)
+            except Exception as exc:  # 傳輸層例外：連狀態碼都沒有
+                out.extend({"href": it["href"], "status": "error", "http": 0,
+                            "errors": [str(exc)[:500]]} for it in batch)
+                continue
+            if status not in (200, 201, 204):
+                detail = body.decode("utf-8", "replace")[:500] if isinstance(body, bytes) else str(body)[:500]
+                entry = {"status": "error", "http": int(status), "errors": [detail]}
+                if status == 429:
+                    entry["retryable"] = True
+                out.extend({"href": it["href"], **entry} for it in batch)
+                continue
+            # KB 沒有給 bulk_update 的 response schema；逐筆 {href, status,
+            # errors} 是計畫的假設，真 PCE 驗證前不當事實——解析不出來的那些
+            # 不能默默消失，所以下面用「回報過的」補齊整批。
+            answered: dict[str, dict] = {}
+            try:
+                parsed = orjson.loads(body) if body else []
+            except Exception:
+                parsed = []
+            if isinstance(parsed, list):
+                for row in parsed:
+                    if not isinstance(row, dict) or not row.get("href"):
+                        continue
+                    errs = row.get("errors") or []
+                    answered[str(row["href"])] = {
+                        "href": str(row["href"]),
+                        "status": "error" if errs else "updated",
+                        "http": int(status), "errors": errs,
+                    }
+            for it in batch:
+                out.append(answered.get(it["href"], {
+                    "href": it["href"], "status": "updated",
+                    "http": int(status), "errors": [],
+                }))
+        return out
+
     # ═══════════════════════════════════════════════════════════════════════
     # Rule Scheduler Features: RuleSet/Rule management, provisioning, notes
     # ═══════════════════════════════════════════════════════════════════════
