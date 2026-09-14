@@ -291,6 +291,52 @@ def temp_app_server():
                     dispatch=[{"channel": "mail", "status": "success"}])
         seed.close()
 
+        # IV-17..20 only render once the ven_summary job has written a fleet
+        # snapshot — without one the page correctly shows a single "not
+        # analysed yet" box and nothing else, which would leave four anchors
+        # unreachable and the gate red for the wrong reason. Same shape as the
+        # alert seed above: a throwaway dashboard_summary.json, never the
+        # product one.
+        import src.dashboard_store as _ds
+        dash_path = str(pathlib.Path(tmp) / "dashboard_summary.json")
+        real_dash_fn = _ds._dashboard_file
+        _ds._dashboard_file = lambda: dash_path
+        stack.callback(setattr, _ds, "_dashboard_file", real_dash_fn)
+        _ds.write_dashboard_summary(lambda d: {**d, "fleet": {
+            "total": 2, "managed_online": 1, "managed_offline": 1,
+            "versions": {"distribution": {"26.2.20-2063": {"count": 2,
+                                          "os_breakdown": {"ubuntu": 2}}},
+                         "ordered": ["26.2.20-2063"], "target": None, "on_target": 0,
+                         "needs_upgrade": None, "unparsable": [],
+                         "oldest": "26.2.20-2063", "newest": "26.2.20-2063"},
+            "compat": {"pass": 0, "warn": 0, "fail": 0, "unknown": 1},
+            "pipeline": {b: {"count": 1 if b == "selective" else 0, "sample": []} for b in
+                         ("idle_compat_pass", "idle_compat_warn", "idle_compat_fail",
+                          "idle_compat_unknown", "visibility_ready",
+                          "visibility_not_ready", "selective", "full")},
+            "heartbeat": {"fresh": 1, "stale_24h": 0, "stale_48h": 1, "no_heartbeat": 0},
+            "coverage_gaps": {"by_app": {"gate": {"selective": 1}}, "by_env": {},
+                              "unlabeled": {"count": 1, "sample": []}},
+            "agent_health": {"errors": {"count": 0, "sample": []},
+                             "warnings": {"count": 0, "sample": []}},
+            "health_score": {"score": 50, "partial": True, "components": {
+                "online": {"present": True, "value": 0.5},
+                "enforcement": {"present": True, "value": 1.0},
+                "version": {"present": False, "value": None},
+                "heartbeat": {"present": True, "value": 0.5},
+                "compat": {"present": False, "value": None}}},
+            "workloads_index": [
+                {"href": "/orgs/1/workloads/gate-a", "hostname": "gate-a",
+                 "mode": "selective", "online": True, "version": "26.2.20-2063",
+                 "compat": "unknown", "hslh": 0.2, "app": "gate", "env": "prod",
+                 "os": "ubuntu"},
+                {"href": "/orgs/1/workloads/gate-b", "hostname": "gate-b",
+                 "mode": "idle", "online": False, "version": "26.2.20-2063",
+                 "compat": "unknown", "hslh": 90.0, "app": "", "env": "",
+                 "os": "ubuntu"}],
+            "index_truncated": False, "updated_at": "2026-09-14T00:00:00Z",
+        }})
+
         app = build_app(cm, persistent_mode=True, use_https=False)
         app.config.update({"TESTING": True})
         app.testing = True  # disables Talisman's forced-HTTPS redirect

@@ -515,6 +515,10 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False, use_https: boo
     from src.gui.routes.alerts import make_alerts_blueprint
     app.register_blueprint(make_alerts_blueprint(cm, login_required))
 
+    # ── Fleet Blueprint (read-only VEN fleet snapshot) ────────────────────────
+    from src.gui.routes.fleet import make_fleet_blueprint
+    app.register_blueprint(make_fleet_blueprint(cm, csrf, limiter, login_required))
+
     # ── Policy Blueprint (flow → covering rules, v3 investigate hub) ──────────
     from src.gui.routes.policy import make_policy_blueprint
     app.register_blueprint(make_policy_blueprint(cm, login_required))

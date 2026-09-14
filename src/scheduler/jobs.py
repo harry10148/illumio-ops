@@ -486,15 +486,34 @@ def run_ven_summary(cm) -> None:
             "os_distribution": estate_inventory.os_distribution(workloads or []),
             "enforcement_distribution": estate_inventory.enforcement_distribution(workloads or []),
         }
-        write_dashboard_summary(lambda d: {**d, "ven_summary": summary})
+        # 同一份 workloads 再產出車隊層級的分析——刻意不再抓一次：1 萬台的
+        # 環境那是幾分鐘與一次多餘的 PCE 負載。
+        from src.report.analysis.fleet import analyze_fleet
+        _st = cm.config.get("settings", {}) or {}
+        fleet = analyze_fleet(
+            workloads or [], now,
+            # 空字串→None 的正規化只在 analyze_fleet 裡做一次；在這裡再做一次
+            # 是重複而不是防深，而重複的兩份遲早會分岔。
+            _st.get("fleet_target_ven_version"),
+            top_n=50,
+            index_cap=int(_st.get("fleet_index_cap") or 20000),
+        )
+        fleet["updated_at"] = now.strftime("%Y-%m-%dT%H:%M:%SZ")
+        write_dashboard_summary(lambda d: {**d, "ven_summary": summary, "fleet": fleet})
         logger.info("VEN summary: {}/{} online", online, total)
     except Exception as exc:
         logger.exception("run_ven_summary failed: {}", exc)
         def _mark_err(d):
+            stamp = now.strftime("%Y-%m-%dT%H:%M:%SZ")
             vs = dict((d.get("ven_summary") or {}))
             vs["last_error"] = str(exc)[:300]
-            vs["updated_at"] = now.strftime("%Y-%m-%dT%H:%M:%SZ")
-            return {**d, "ven_summary": vs}
+            vs["updated_at"] = stamp
+            # fleet 走同一條規則：保留上一份好資料，只補錯誤與時間。寫 0
+            # 會讓看板顯示一個從未存在過的車隊。
+            fl = dict((d.get("fleet") or {}))
+            fl["last_error"] = str(exc)[:300]
+            fl["updated_at"] = stamp
+            return {**d, "ven_summary": vs, "fleet": fl}
         try:
             write_dashboard_summary(_mark_err)
         except Exception:

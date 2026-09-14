@@ -64,3 +64,23 @@ def test_dashboard_top10_rate_limit(client):
     c, tok = client
     last = _exhaust(c, tok, "/api/dashboard/top10", limit=30)
     assert last == 429, f"Expected 429 after 30 calls, got {last}"
+
+
+def test_fleet_progress_preview_rate_limit(client):
+    """/api/fleet/progress/preview 每分鐘 10 次。
+
+    preview 每一次都要重跑一次全 index 的分類；沒有上限時它是一支免費的
+    CPU 消耗器，而且它就在登入後可達的路徑上。
+    """
+    c, tok = client
+    last = _exhaust(c, tok, "/api/fleet/progress/preview", limit=10,
+                    body={"to_mode": "selective", "bucket": "idle_compat_pass"})
+    assert last == 429, f"Expected 429 after 10 calls, got {last}"
+
+
+def test_fleet_progress_apply_rate_limit(client):
+    """apply 更該有上限——它會寫 PCE。"""
+    c, tok = client
+    last = _exhaust(c, tok, "/api/fleet/progress/apply", limit=10,
+                    body={"to_mode": "selective", "hrefs": ["/orgs/1/workloads/1"]})
+    assert last == 429, f"Expected 429 after 10 calls, got {last}"

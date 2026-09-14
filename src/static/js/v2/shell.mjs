@@ -42,6 +42,7 @@ export const NAV = [
       ["#/investigate/traffic", "gui_nav_traffic_search"],
       ["#/investigate/workloads", "gui_workload_search"],
       ["#/investigate/events", "gui_event_viewer"],
+      ["#/investigate/fleet", "gui_nav_fleet"],
     ],
   },
   {
