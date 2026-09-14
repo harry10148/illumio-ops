@@ -57,7 +57,19 @@ def resolve_state_file() -> str:
     paths that need it (e.g. flushing PCE-derived state on re-point) don't
     have to import the GUI package to get it. src.gui._helpers._resolve_state_file
     delegates to this so existing callers/monkeypatches there are unaffected.
+
+    ``ILLUMIO_OPS_STATE_FILE`` redirects the file, for the same reason
+    ``ILLUMIO_OPS_ANALYSIS_LOCK`` redirects the lock (see main.analysis_lock_path):
+    the suite runs on a developer's working checkout, where this file is the
+    live state of whatever service that checkout is running. Test writes there
+    evict real dispatch history (capped at 50 rows) and move the watchdog's
+    failure counter and cooldown, which decides whether a real deployment's
+    next outage alert fires at all. Set by tests/conftest.py; nothing in
+    production sets it.
     """
+    override = os.environ.get("ILLUMIO_OPS_STATE_FILE")
+    if override:
+        return override
     return os.path.join(ROOT_DIR, "logs", "state.json")
 
 # Default configuration template

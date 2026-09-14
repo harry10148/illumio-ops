@@ -335,3 +335,44 @@ class TestInkOnAFilledSegment:
         src = inspect.getsource(html_exporter.SecurityRiskHtmlExporter._mod13_html)
         assert "color:{ink}" in src, "分佈條的每一段都要帶自己的字色"
         assert "color:var(--paper);text-align:center;line-height:32px" not in src
+
+
+class TestTheEmailBadgeIsReadable:
+    """信件的嚴重度徽章是白字壓底色，所以底色要深到白字讀得了。
+
+    這組色刻意不跟報表的 tone 家族共用（多數收件端會拿掉 background-image，
+    徽章只剩底色可用，而 tone 的 warn 配白字只有 2.01:1）。但「自己一組」不等於
+    「隨便一組」：2026-09-11 之前 HIGH 是 3.70:1、MEDIUM 是 2.76:1，兩個都在
+    AA 之下——而這是告警信，最需要讀得清楚的通道。
+
+    斷言對比，不是斷言色碼：換色只要仍然讀得了就不該讓這條紅。
+    """
+
+    @staticmethod
+    def _contrast(a, b):
+        from src.report.exporters.report_shell import _relative_luminance
+        la, lb = _relative_luminance(a), _relative_luminance(b)
+        hi, lo = max(la, lb), min(la, lb)
+        return (hi + 0.05) / (lo + 0.05)
+
+    def test_every_email_severity_fill_carries_white_text_legibly(self):
+        import inspect
+        import re
+        from src.report import report_generator
+        src = inspect.getsource(report_generator)
+        block = src[src.index("def _sev_bg(sev):"):]
+        block = block[:block.index("kpi_rows")]
+        fills = re.findall(r"return '(#[0-9A-Fa-f]{6})'", block)
+        assert len(fills) == 3, fills
+        for fill in fills:
+            ratio = self._contrast("#FFFFFF", fill)
+            assert ratio >= 4.5, f"white on {fill} is only {ratio:.2f}:1"
+
+    def test_the_tone_family_would_not_do_which_is_why_email_keeps_its_own(self):
+        """反向：豁免的理由必須還成立。報表的 warn tone 配白字若哪天也過了 AA，
+        這個豁免就該重新討論，而不是繼續掛著一句沒人查證的舊話。"""
+        from src.report.exporters.report_shell import SHELL_TOKENS, TONE_HEX
+        ratio = self._contrast(SHELL_TOKENS["paper"], TONE_HEX["warn"])
+        assert ratio < 4.5, (
+            f"報表 warn tone 配白字現在是 {ratio:.2f}:1——豁免的前提變了，"
+            "回去重看信件是不是可以共用 tone 家族了")

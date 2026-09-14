@@ -14,6 +14,7 @@ import os
 
 from src.i18n import t
 from src.utils import Colors, safe_input
+from src.pce_target import strip_userinfo
 from src.cli.menu_chrome import confirm_box, menu_screen
 from src.cli.health_line import build_health_line
 from src.settings import (
@@ -65,7 +66,7 @@ def overview_menu(cm) -> None:
     counts = _rule_counts(cm)
     settings = cm.config.get("settings", {}) or {}
     lines = [
-        f"{t('cli_status_api', default='API')}: {cm.config.get('api', {}).get('url', '-')}",
+        f"{t('cli_status_api', default='API')}: {strip_userinfo(cm.config.get('api', {}).get('url', '')) or '-'}",
         t("cli_ov_rules_configured", **counts),
         # ui_lang, not lang: `t(key, *, lang=..., default=..., **kwargs)` eats a
         # `lang=` argument as its own language selector, so a `{lang}` placeholder

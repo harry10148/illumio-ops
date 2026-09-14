@@ -32,6 +32,17 @@ def test_api_settings_supports_explicit_deployment_and_console_url(deployment_ty
     assert cfg.console_url == "https://console.illum.io"
 
 
+def test_api_settings_events_timeout_defaults_to_none_and_bounds_explicit_values():
+    """None means 'use the deployment default'; explicit values must stay
+    inside a range that fits one monitor cycle."""
+    from src.config_models import ApiSettings
+    assert ApiSettings().events_timeout_seconds is None
+    assert ApiSettings(events_timeout_seconds=240).events_timeout_seconds == 240
+    for bad in (4, 601, "fast"):
+        with pytest.raises(ValidationError, match="events_timeout_seconds"):
+            ApiSettings(events_timeout_seconds=bad)
+
+
 def test_api_settings_rejects_unknown_deployment_type():
     from src.config_models import ApiSettings
     with pytest.raises(ValidationError, match="deployment_type"):
@@ -201,3 +212,9 @@ def test_config_manager_has_no_profile_methods():
     leftovers = [n for n in dir(ConfigManager)
                  if "pce" in n.lower() or "profile" in n.lower()]
     assert leftovers == [], f"still present: {leftovers}"
+
+
+@pytest.mark.parametrize("fmt", ["cef_pce", "syslog_cef_pce"])
+def test_siem_destination_accepts_pce_native_formats(fmt):
+    from src.config_models import SiemDestinationSettings
+    assert SiemDestinationSettings(name="g", host="h", port=5514, format=fmt).format == fmt

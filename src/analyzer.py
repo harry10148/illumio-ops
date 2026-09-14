@@ -29,6 +29,7 @@ from src.events import (
 )
 from src.events.catalog import classify_unknown_event_type
 from src.events.stats import elide_error
+from src.config import resolve_state_file
 from src.exceptions import TrafficQueryError
 from src.utils import Colors, format_unit, safe_input
 from src.i18n import t
@@ -46,7 +47,9 @@ from src.pce_cache.flow_deltas import cumulative_metrics as _cumulative_metrics
 # Refine Root Dir for State File
 PKG_DIR = os.path.dirname(os.path.abspath(__file__))
 ROOT_DIR = os.path.dirname(PKG_DIR)
-STATE_FILE = os.path.join(ROOT_DIR, "logs", "state.json")
+# 走共用 resolver，不自己拼：否則只設 ILLUMIO_OPS_STATE_FILE 的行程會分裂
+# ——scheduler/GUI 讀新路徑，watchdog 計數卻讀寫舊檔（Codex review P2）。
+STATE_FILE = resolve_state_file()
 
 # _dispatch_alerts 對每條觸發規則實際保留的 top matches 筆數（見其
 # `top_10 = res['top_matches'][:10]`）。_run_rule_engine 以同一個 N 對
@@ -63,6 +66,27 @@ MAX_THRESHOLD_WINDOW_MINUTES = 1440
 
 WATCHDOG_FAILURE_THRESHOLD = 3
 WATCHDOG_COOLDOWN_MINUTES = 60
+
+
+def humanize_outage(minutes: int) -> str:
+    """把中斷時長講成人話。
+
+    門檻本身仍然是**次數**（那是兩種部署形狀都能用的去重機制：legacy 的輪詢
+    cycle 與 cache-ingest 的兩個 job 呼叫），但次數不是操作者要的量——同一個
+    「936 次」在不同輪詢間隔上是完全不同的時長。訊息因此以時間為主。
+    """
+    minutes = max(0, int(minutes))
+    # 「已持續失敗 0 分鐘」讀起來是自相矛盾的（Codex UI 評估，2026-09-13）。
+    if minutes < 1:
+        return t('dur_under_minute')
+    if minutes < 60:
+        return t('dur_minutes', mins=minutes)
+    if minutes < 60 * 48:
+        hours, mins = divmod(minutes, 60)
+        # 「39 小時 0 分鐘」是雜訊，整點就只講整點。
+        return t('dur_hours', hours=hours, mins=mins) if mins else t('dur_hours_only', hours=hours)
+    days, hours = divmod(minutes // 60, 24)
+    return t('dur_days', days=days, hours=hours) if hours else t('dur_days_only', days=days)
 
 # The monitor cycle can run every 10 seconds, but an authenticated PCE probe
 # at that cadence is unnecessary and can consume SaaS rate limits. Automatic
@@ -1369,11 +1393,17 @@ class Analyzer:
                 })
 
     def _check_watchdog(self) -> None:
-        """Self-alert when the PCE has been unreachable for N consecutive cycles.
+        """Self-alert when the PCE has been unreachable N consecutive times.
 
         Without this, a dead poller fails silent: no events, no alerts, and the
         operator assumes all is well. Uses its own cooldown so a long outage
         produces one alert per hour instead of one per cycle.
+
+        The threshold counts failures, not elapsed time — one counter serves
+        two deployment shapes (legacy poll cycles, and the cache-ingest jobs'
+        per-invocation results), and only a count means the same thing in
+        both. The MESSAGE leads with elapsed time, which is what the reader
+        actually needs; see humanize_outage.
         """
         failures = int(self.state.get("pce_stats", {}).get("consecutive_failures", 0))
         if failures < WATCHDOG_FAILURE_THRESHOLD:
@@ -1384,17 +1414,48 @@ class Analyzer:
             return
         self.state["watchdog_last_alert_at"] = format_utc(now_utc)
         self._watchdog_dirty = True
-        last_error = self.state.get("pce_stats", {}).get("last_error", "")
+        stats = self.state.get("pce_stats", {})
+        # 引用**開啟**這串失敗的錯誤，不是最後一次記錄的錯誤：兩者可能屬於不同
+        # 階段（2026-09-12 的告警說 /noop 401，而 last_error 是 /health 200
+        # body=critical），讀訊息的人無從分辨。起點欄位是 2026-09-12 才加的，
+        # 升版時已在進行中的失敗串沒有它——退回 last_error，並且不講時長。
+        started = parse_event_timestamp(stats.get("failure_run_started_at"))
+        first_error = stats.get("failure_run_first_error") or ""
+        # 120 characters stopped right before the "(Caused by …)" clause,
+        # so the alert said the PCE was unreachable without saying whether
+        # that was DNS, a firewall or TLS. elide_error keeps both ends.
+        # 盲區訊息會跟摘要裡的「安全事件：0 流量告警：0」並排顯示，而那個零正是
+        # 盲區造成的——最容易被讀成「一切平安」，把盲區的意思讀反。
+        caveat = t('alert_watchdog_zero_caveat')
+        if started:
+            details = t('alert_watchdog_details', count=failures,
+                        duration=humanize_outage(
+                            int((now_utc - started).total_seconds() // 60)),
+                        caveat=caveat,
+                        error=elide_error(first_error, 400))
+        else:
+            # 沒有起點時不推算時長，但要說出「不知道」——突然少掉一個數字，
+            # 收件者無從分辨那是「很短」還是「查不到」。
+            details = t('alert_watchdog_details_nostart', count=failures,
+                        unknown=t('alert_watchdog_duration_unknown'),
+                        caveat=caveat,
+                        error=elide_error(first_error or stats.get("last_error", ""), 400))
         self.reporter.add_health_alert({
             "time": now_utc.strftime('%Y-%m-%d %H:%M:%S'),
             "rule": t('alert_watchdog_rule'),
             "status": "critical",
-            # 120 characters stopped right before the "(Caused by …)" clause,
-            # so the alert said the PCE was unreachable without saying whether
-            # that was DNS, a firewall or TLS. elide_error keeps both ends.
-            "details": t('alert_watchdog_details', count=failures,
-                         error=elide_error(last_error, 400)),
+            "details": details,
         })
+        # 落一筆時間軸：2026-09-12 的告警送達了，這台卻查不到任何發警痕跡——
+        # log 會輪替、state 的計數會被下一次成功歸零，而 event_timeline 隨
+        # state.json 保存、以 append 合併、不受 record_pce_success 影響，是這
+        # 條路徑上最難被抹掉的一筆。下一次再發生就有東西可查。
+        self.stats.record_timeline(
+            "watchdog", "watchdog self-alert",
+            failures=failures,
+            started_at=stats.get("failure_run_started_at", ""),
+            error=elide_error(first_error or stats.get("last_error", ""), 200),
+        )
         logger.error(f"Watchdog: {failures} consecutive PCE failures — self-alert dispatched")
 
     def _maybe_alert_overflow(self) -> None:

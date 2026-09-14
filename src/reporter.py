@@ -18,12 +18,15 @@ from src.alerts.store import AlertStore
 from src.events import normalize_event, persist_dispatch_results
 from src.events.poller import format_utc
 from src.i18n import t
-from src.pce_target import resolve_pce_console_url
+from src.pce_target import resolve_pce_console_url, strip_userinfo
+from src.config import resolve_state_file
 from src.state_store import update_state_file
 
 PKG_DIR = os.path.dirname(os.path.abspath(__file__))
 ROOT_DIR = os.path.dirname(PKG_DIR)
-STATE_FILE = os.path.join(ROOT_DIR, "logs", "state.json")
+# 走共用 resolver，不自己拼：否則只設 ILLUMIO_OPS_STATE_FILE 的行程會分裂
+# ——scheduler/GUI 讀新路徑，watchdog 計數與派送紀錄卻寫進舊檔。
+STATE_FILE = resolve_state_file()
 
 # D.3 signal palette — used by _render_cta for cross-surface consistent CTA color.
 SIGNAL_HEX = {
@@ -95,6 +98,47 @@ class Reporter:
         """
         return functools.partial(t, lang=lang)
 
+    def _instance_label(self) -> str:
+        """Which box sent this, and which PCE it watches.
+
+        2026-09-12: a watchdog alert arrived on a LINE destination shared by
+        several instances and nothing in the message could tell them apart —
+        an hour went into ruling out four other hosts. Host plus PCE target is
+        the smallest thing that answers "is this us".
+
+        Credentials never enter this: only the API URL's host and the org id,
+        both of which the recipient already operates. Every lookup degrades to
+        a shorter label rather than raising — an alert that cannot be
+        addressed is still worth more than an alert that never goes out.
+        """
+        parts: list[str] = []
+        try:
+            host = socket.gethostname()
+        except OSError:
+            host = ""
+        if host:
+            parts.append(host)
+        api = self.cm.config.get("api", {}) or {}
+        target = ""
+        raw_url = str(api.get("url", "") or "")
+        if raw_url:
+            try:
+                from urllib.parse import urlsplit
+                split = urlsplit(raw_url)
+                # hostname + port, never netloc: the authority may legally carry
+                # userinfo, and pce_target.normalize_pce_url deliberately keeps
+                # it because it is a credential. netloc would hand that password
+                # to LINE, Telegram and mail. (Codex review, 2026-09-13.)
+                host = split.hostname or ""
+                port = split.port
+                target = f"{host}:{port}" if host and port else host
+            except ValueError:
+                target = ""
+        if target:
+            org = str(api.get("org_id", "") or "")
+            parts.append(f"{target} (org {org})" if org else target)
+        return " → ".join(parts)
+
     def _resolve_tz(self) -> tuple[datetime.tzinfo, str]:
         """Return (tzinfo, label) for the configured timezone (settings.timezone)."""
         from src.tz_utils import resolve_tz
@@ -133,6 +177,18 @@ class Reporter:
     alert_store_factory = staticmethod(AlertStore)
 
     def add_health_alert(self, alert: dict[str, Any]) -> None:
+        # 健康告警的產生端寫的是 `status`（analyzer.py 三處都是），而決定信件/
+        # LINE **主旨**嚴重度的 _highest_severity 讀的是 `severity`——沒有人把
+        # 兩者接起來，於是每一則健康告警的主旨都落到預設值 info。實際後果：
+        # 「PCE 輪詢已連續失敗 N 次，事件與流量告警目前處於盲區」這種本文
+        # 標著【重大】的告警，主旨卻是 [INFO]。SOC 若以主旨嚴重度分流，最該被
+        # 看到的那一種會被濾掉——正好抵消這個告警存在的理由。
+        #
+        # 在收下的時候補上，而不是在 _highest_severity 多讀一個鍵：severity 還
+        # 有別的讀者（落地的告警紀錄、webhook payload），它們一樣不該把重大看成
+        # info。呼叫端若已明寫 severity 就尊重它。
+        if not alert.get("severity") and alert.get("status"):
+            alert["severity"] = str(alert["status"]).lower()
         self.health_alerts.append(alert)
         self._alert_ids["health"].append(None)
 
@@ -742,10 +798,15 @@ class Reporter:
 
         Returns '' if no URL is configured — callers must treat '' as "skip CTA".
         """
+        # strip_userinfo on both branches: this value is rendered as an <a href>
+        # in the alert email, and an api.url may legally carry `user:pass@`
+        # (pce_target.normalize_pce_url keeps it on purpose — it is a
+        # credential). Without this the PCE password was mailed to every alert
+        # recipient inside the CTA link. (Codex review, 2026-09-13.)
         web_gui_url = str(self.cm.config.get("web_gui", {}).get("public_url", "")).strip()
         if web_gui_url:
-            return web_gui_url.rstrip("/")
-        raw = self._active_pce_url().rstrip("/")
+            return strip_userinfo(web_gui_url.rstrip("/"))
+        raw = strip_userinfo(self._active_pce_url().rstrip("/"))
         if not raw:
             return ""
         for suffix in ("/api/v2", "/api/v1", "/api"):
@@ -1289,6 +1350,7 @@ class Reporter:
                 lang=_lang,
                 subject=self._compact_text(subj),
                 generated_at=self._now_str(),
+                instance=self._compact_text(self._instance_label()),
                 total_issues=str(total_issues),
                 health_count=str(len(self.health_alerts)),
                 event_count=str(len(self.event_alerts)),
@@ -1387,6 +1449,7 @@ class Reporter:
             lang=_lang,
             subject=html.escape(subj),
             generated_at=html.escape(self._now_str()),
+            instance=html.escape(self._instance_label()),
             total_issues=total_issues,
             health_count=len(self.health_alerts),
             event_count=len(self.event_alerts),
@@ -1800,6 +1863,7 @@ class Reporter:
   <div style="font-size:12px;color:#6f6f6f;letter-spacing:0.08em;text-transform:uppercase;margin-bottom:6px;">{esc(t('alert_tpl_summary'))}</div>
   <div style="font-size:12px;color:#a8a8a8;margin-bottom:8px;">{esc(t('alert_tpl_aggregated_blurb'))}</div>
   <div style="font-size:12px;color:#6f6f6f;margin-bottom:4px;">{esc(t('alert_tpl_generated_at'))}: <strong>{esc(generated_at)}</strong></div>
+  <div style="font-size:12px;color:#6f6f6f;margin-bottom:4px;">{esc(t('alert_tpl_instance'))}: <strong>{esc(self._instance_label())}</strong></div>
 </div>
 {summary_html}
 {health_section_html}

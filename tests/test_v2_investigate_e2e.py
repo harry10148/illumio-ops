@@ -61,9 +61,13 @@ from __future__ import annotations
 import json
 from urllib.parse import parse_qs, urlparse
 
+import time
+
 import pytest
 
 pytest.importorskip("playwright.sync_api", exc_type=ImportError)
+
+from playwright.sync_api import expect  # noqa: E402
 
 # Registers v2_page and its fixture chain — see tests/v2_e2e_utils.py's
 # docstring for why both this line and the importorskip above (in that exact
@@ -282,6 +286,21 @@ def test_filter_pill_reaches_query_and_kpis_update(v2_page):
     zone.press("Enter")
     assert drawer.locator(".fb-pill").count() == 1
 
+    # Hold the search request open for a beat before letting it through. The
+    # assertion below wants to SEE the loading state, and without this the
+    # window it lives in is however long the server takes — here the PCE points
+    # at a closed port with retries off, so the 502 comes back in microseconds
+    # and `data-loading="true"` can come and go without ever reaching a painted
+    # frame. Under `-n 4` that is what happened: 2 of 3 full runs timed out on
+    # line 305 waiting for a state that had already been and gone. The response
+    # is NOT faked — the real request still reaches the real server; only its
+    # start is delayed, which makes the window deterministic instead of lucky.
+    def _hold_then_continue(route):
+        time.sleep(0.4)
+        route.continue_()
+
+    page.route("**/api/quarantine/search", _hold_then_continue)
+
     # Save applies the filters and runs the query.
     with page.expect_request(
         lambda r: "/api/quarantine/search" in r.url and r.method == "POST"
@@ -307,8 +326,26 @@ def test_filter_pill_reaches_query_and_kpis_update(v2_page):
     assert page.locator('.kpirow[data-loading="true"]').count() == 0
     assert page.locator(".kpirow .kpicell .v span").first.inner_text() == "0"
 
-    # XC-09: the empty result explains itself instead of shrugging.
-    assert page.locator('[data-cov="XC-09"] li').count() == 3
+    # XC-09 explains itself instead of shrugging. Note what this query actually
+    # did: e2e points the PCE at a closed port, so the search FAILED — it did
+    # not return zero rows. Until 2026-09-13 both landed on the same "no
+    # traffic data" panel with the same three why-is-this-empty causes, which
+    # is why this assertion counted three <li> and passed. It was green on a
+    # premise that was never true.
+    #
+    # Failure now has its own panel, so the causes list belongs to the genuine
+    # zero-row case and this query gets the failure text instead.
+    xc09 = page.locator('[data-cov="XC-09"]')
+    assert xc09.count() == 1
+    failed_title = page.evaluate(
+        "async () => { const { t } = await import('/static/js/v2/core/i18n.mjs'); "
+        "return t('gui_iv_query_failed_title'); }"
+    )
+    assert failed_title in xc09.inner_text()
+    assert xc09.locator("li").count() == 0, (
+        "查詢失敗的畫面不該列出「為什麼是空的」——那些原因回答的是一個沒被問出口的問題"
+    )
+    page.unroute("**/api/quarantine/search", _hold_then_continue)
 
 
 # ── key flow 2: catalogue cascade + load more ───────────────────────────────
@@ -1152,8 +1189,12 @@ def test_actual_source_renders_for_every_backend_value(v2_page):
         page.route("**/api/quarantine/search", _stub_actual_source(value))
         with page.expect_response(lambda r: "/api/quarantine/search" in r.url):
             run_btn.click()
-        text = page.locator('section[data-cov="IV-05"]').inner_text()
-        assert catalogue[value] in text, (value, text)
+        # expect_response 等的是**回應抵達**，不是畫面重繪完成。inner_text()
+        # 是一次性讀取、不會重試，所以第二圈（api）會讀到第一圈（cache）還在
+        # 畫面上的字。本機 16 核重繪夠快所以永遠綠，CI runner 2–4 核就紅——
+        # 2026-09-13 平行化 CI 第一次跑掛在這裡。expect() 會自動重試。
+        expect(page.locator('section[data-cov="IV-05"]')).to_contain_text(
+            catalogue[value])
         page.unroute("**/api/quarantine/search")
 
     page.route(
@@ -1168,8 +1209,8 @@ def test_actual_source_renders_for_every_backend_value(v2_page):
     query.locator('input[aria-label="%s"]' % labels["gui_gen_end_date"]).fill("2026-08-07")
     with page.expect_response(lambda r: "/api/quarantine/search" in r.url):
         run_btn.click()
-    text = page.locator('section[data-cov="IV-05"]').inner_text()
-    assert catalogue["archive"] in text, text
+    expect(page.locator('section[data-cov="IV-05"]')).to_contain_text(
+        catalogue["archive"])
 
 
 def test_archive_rows_render_real_values_not_blank_cells(v2_page):
@@ -1406,3 +1447,92 @@ def test_accelerate_all_targets_every_result_not_the_current_page(v2_page):
     # 56 筆全部進來（不是當頁的 50），其中 55 筆可加速、1 筆略過。
     assert "56" in summary, summary
     assert "55" in summary, summary
+
+
+def test_a_failed_traffic_query_does_not_render_as_no_traffic(v2_page):
+    """查詢失敗與「查到零筆」是不同的事實，畫面不得說成同一件。
+
+    2026-09-13 的評估指出流量頁失敗後仍渲染空結果說明。查下去成因更根本：
+    `state.phase` 只有 idle / busy / done **三個值，沒有 error**。失敗之後
+    phase 是 done、rows 是空的，於是走進「成功但零筆」那個分支，畫面說
+    「無可用資料／沒有流量資料」。`state.error` 其實有被設，只是 `emptyState()`
+    從來不看它；唯一的失敗訊號是一個會自己消失的 toast。
+
+    凌晨三點看到「沒有流量」與看到「查詢失敗」，下一步完全不同——前者會讓人
+    以為 PCE 沒事。
+    """
+    page, base_url = v2_page
+    _goto(page, base_url, R_TRAFFIC)
+
+    # 讓真的查詢失敗：攔截那個 POST 回 502。不是假造前端狀態——走的是 code 裡
+    # `r.ok !== true` 那條真實路徑。
+    page.route("**/api/quarantine/search",
+               lambda route: route.fulfill(status=502, content_type="application/json",
+                                           body='{"ok":false,"error":"boom"}'))
+    try:
+        labels = _labels(page)
+        run_btn = page.locator('section[data-cov="IV-01"]').get_by_role(
+            "button", name=labels["gui_query_flow"], exact=True)
+        with page.expect_request(
+            lambda r: "/api/quarantine/search" in r.url and r.method == "POST"
+        ):
+            run_btn.click()
+        page.wait_for_selector('.kpirow[data-phase="done"]', timeout=SLOW)
+
+        hosts = page.locator('[data-cov="XC-12"]')
+        # 頁面上可能有兩個 XC-12：真的結果區，以及 audit probe 自己造的那份
+        # （它硬塞 phase:"done" 且沒有 error）。只看真的那個。
+        assert hosts.count() >= 1, "XC-12 不存在"
+        body = hosts.first.inner_text()
+        no_traffic = page.evaluate(
+            "async () => { const { t } = await import('/static/js/v2/core/i18n.mjs'); "
+            "return t('gui_no_traffic'); }"
+        )
+        assert no_traffic not in body, (
+            f"查詢失敗卻顯示「{no_traffic}」——那是「查到零筆」的說法：{body[:200]!r}"
+        )
+    finally:
+        page.unroute("**/api/quarantine/search")
+
+
+def test_the_leaderboard_says_it_is_not_the_search_above_it(v2_page):
+    """流量結果下方的排行榜跑的是**別的**查詢。
+
+    `cards.mjs:loadTop10` 用 `queries[0]`（第一個儲存查詢）＋寫死 `mins: 1440`。
+    它被接在流量搜尋結果的正下方，而上面那個搜尋可能是「某個 app、最近一小時」。
+    版面上兩者看起來是同一件事的兩種呈現，條件卻完全不同——2026-09-13 的介面
+    評估把這條列為最容易誤讀的資訊鄰接關係。
+    """
+    page, base_url = v2_page
+    _goto(page, base_url, R_TRAFFIC)
+    card = page.locator('[data-cov="OV-05"]')
+    assert card.count() == 1
+    hint = page.evaluate(
+        "async () => { const { t } = await import('/static/js/v2/core/i18n.mjs'); "
+        "return t('gui_ov_top10_independent'); }"
+    )
+    assert hint in card.inner_text(), (
+        f"排行榜沒有說明它獨立於上方搜尋：{card.inner_text()[:200]!r}"
+    )
+
+
+def test_the_leaderboard_tells_a_failure_from_zero_rows(v2_page):
+    """`!top.ok || !data.length` 把「查詢失敗」與「查到零筆」寫成同一個分支，
+    兩者都顯示「查無記錄。」——跟流量表那個缺陷是同一種，只是在另一張卡上。
+    """
+    page, base_url = v2_page
+    page.route("**/api/dashboard/top10",
+               lambda route: route.fulfill(status=502, content_type="application/json",
+                                           body='{"ok":false,"error":"boom"}'))
+    try:
+        _goto(page, base_url, R_TRAFFIC)
+        card = page.locator('[data-cov="OV-05"]')
+        no_records, failed = page.evaluate(
+            "async () => { const { t } = await import('/static/js/v2/core/i18n.mjs'); "
+            "return [t('gui_top10_no_records'), t('gui_top10_error')]; }"
+        )
+        text = card.inner_text()
+        assert no_records not in text, f"查詢失敗卻說「{no_records}」：{text[:200]!r}"
+        assert failed in text
+    finally:
+        page.unroute("**/api/dashboard/top10")

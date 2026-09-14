@@ -377,7 +377,8 @@ function statusCell(r) {
  * chip: a colour per type would invent four severities the product does not
  * have (rules.js:83 prints the bare capitalised word). */
 function typeCell(r) {
-  return el("span", { class: "chips" }, el("span", null, el("b", { text: r.type })));
+  // 規則型別（traffic／event／system）是識別字，所以這個 chip 要等寬。
+  return el("span", { class: "chips" }, el("span", { class: "mono" }, el("b", { text: r.type })));
 }
 
 // ── drawer building blocks ──────────────────────────────────────────────────

@@ -24,6 +24,32 @@ a plain `<major>.<minor>.<patch>` scheme. (Tags through v4.0.0 carried a
 
 ### Added
 
+- **`ILLUMIO_OPS_STATE_FILE` redirects `logs/state.json`**, the way
+  `ILLUMIO_OPS_ANALYSIS_LOCK` already redirects the analysis lock, and every
+  reader of that path now goes through one resolver instead of joining it
+  again locally. Only the test suite sets it. The file it points at is the
+  live state of whatever service a checkout is running: `dispatch_history` is
+  capped at 50 rows, so writes there evict real delivery records, and the
+  watchdog's failure counter and cooldown live in the same file, which decides
+  whether a real deployment's next outage alert fires at all.
+
+- **Every alert digest now says which box sent it.** LINE, plain-text and HTML
+  mail and Telegram carry a `Source` line: this host, the PCE netloc it watches
+  and the org id. Several instances can share one LINE destination, and until
+  now nothing in the message could tell them apart — an alert arrived on
+  2026-09-12 and an hour went into ruling out four other hosts before the
+  question was even answerable. Credentials never enter the label, and every
+  lookup degrades to a shorter string rather than raising: an alert that cannot
+  be addressed still beats an alert that never goes out. Teams cards and the
+  webhook payload are unchanged.
+
+- **A finished PCE outage is kept instead of erased.** `pce_stats.last_incident`
+  records the run that just ended — when it started and ended, how many failures
+  it counted, the error that opened it and the one that closed it, and whether
+  anyone was alerted. The watchdog also writes a `watchdog` entry on the event
+  timeline when it fires. Logs rotate and counters reset; that entry persists in
+  the state file and merges by append.
+
 - **The workload table sorts, and one button accelerates the whole result.**
   Columns opt in through the shared table component, whose header is a button
   rather than a clickable `th` — the resize grip shares that cell, so a th-level
@@ -60,6 +86,52 @@ a plain `<major>.<minor>.<patch>` scheme. (Tags through v4.0.0 carried a
   event types. It found `info.events[].process_name` on its first run.
 
 ### Fixed
+
+- **An `api.url` carrying `user:password@` no longer shows the password to
+  anyone.** `normalize_pce_url` keeps userinfo deliberately — it is part of the
+  credential the API authenticates with — but five places then rendered that
+  authority for a human to read: the source line in each alert digest, the
+  console URL, the CTA base behind the "view dashboard" link in alert email,
+  the `api_url` the GUI status endpoint puts in the page chrome, and two CLI
+  status lines. Every one of them now carries host and port only.
+
+  `config show` was the sharpest of them: its own docstring promises it "never
+  prints credentials in plaintext", but it masks by field *name*
+  (`key`/`secret`/`password`/`token`), so a password living inside the *value*
+  of `api.url` printed in full beside a dutifully redacted `api.key`. It now
+  shows `https://[REDACTED]@host:port` — a dump should still say that the URL
+  carries a credential, or an operator cannot explain their own auth
+  behaviour. The two display-only surfaces drop the userinfo entirely.
+
+- **A successful probe no longer erases the evidence of the outage it just
+  ended.** `record_pce_success` zeroed the failure counter *and* cleared the
+  watchdog's cooldown timestamp, so a watchdog alert reporting 936 consecutive
+  failures was followed two minutes later by a state file saying `0` / `None` —
+  the self-healing path ate the post-incident diagnosis. Zeroing now applies to
+  the live counter only.
+
+- **The watchdog message says how long the blind spot has lasted.** It used to
+  report a cycle count, which means nothing without the poll interval, and it
+  quoted `last_error` — merely the most recent error, which can belong to a
+  different stage than the failures being counted (the same alert cited a
+  `/noop` 401 while `last_error` was `/health` returning `critical`). It now
+  opens with elapsed time, keeps the count as a parenthetical, and quotes the
+  error that *opened* the run. A run already under way across the upgrade has
+  no recorded start; it says so ("duration unknown") rather than inventing a
+  duration or silently dropping the figure.
+
+  The message also states that no alerts during the blind spot is not the same
+  as no events. It appears beside "security events: 0" in the same digest, and
+  that zero is *caused by* the blindness — the reading most likely to be taken
+  from it is the opposite of what it means. A gap shorter than a minute reads
+  "less than 1 min", because "failing for 0 minutes" contradicts itself.
+
+  > **Upgrading — the watchdog alert's wording has changed.** Anything
+  > downstream that matches on the text of a health alert's `details` (the
+  > webhook payload ships the bucket whole) needs rechecking. `pce_stats` also
+  > gains `failure_run_started_at`, `failure_run_first_error`,
+  > `failure_run_first_stage` and `last_incident`; existing state files pick up
+  > the defaults on the next write.
 
 - **The home page no longer reprints the alert list.** The alerts area is one
   click away and owns the same rows with filtering, paging and detail. The

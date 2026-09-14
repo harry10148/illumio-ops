@@ -114,6 +114,13 @@ def _seed(path, v2_app):
     return traffic, event
 
 
+def _t(page, key):
+    """畫面上那個按鈕的實際字串，由頁面自己的 i18n 決定。"""
+    return page.evaluate(
+        "async (k) => { const { t } = await import('/static/js/v2/core/i18n.mjs'); "
+        "return t(k); }", key)
+
+
 def _open_list(page, base_url):
     page.goto(base_url + "/" + ALERTS)
     page.wait_for_selector('[data-cov="AT-01"]', timeout=20000)
@@ -297,3 +304,50 @@ def test_an_f_link_still_prefills_the_query_without_an_alert(v2_page):
     assert body["policy_decision"] == "0" and body["mins"] == 1440
     assert "3389" in req.value.post_data
     assert page.locator(".stepper").count() == 0
+
+
+def test_every_alert_in_the_store_is_reachable_from_the_list(v2_page, v2_app, _isolate_alert_store):
+    """超過一頁時，舊的那些必須拿得到。
+
+    `mountList` 送 `page: state.page + 1, page_size: 25`，而 `state.page` 全檔
+    只有兩處：`params()` 讀它、切換狀態時歸零。**沒有任何地方遞增它**，
+    `listFoot()` 也只是一行文字加一個連結。所以第 26 筆之後在 GUI 裡不可達——
+    後端 `/api/alerts` 一直都回 `total` / `page` / `page_size`，前端沒用。
+
+    斷言寫成「每一筆都走得到」，不是「畫面上有沒有下一頁按鈕」：按鈕存在不代表
+    它會換頁，而這支要守的是資料拿不拿得到。
+    """
+    from src.alerts.store import AlertStore
+
+    st = AlertStore(_isolate_alert_store)
+    names = []
+    for i in range(30):
+        name = "Rule %02d" % i
+        names.append(name)
+        st.insert(
+            fired_at="2026-09-04T%02d:00:00Z" % i, type="event", rule_id=str(i),
+            rule_name=name, severity="warning", summary=name,
+            criteria="", payload={"count": 1, "raw_data": [], "parsed_data": []},
+            dispatch=[],
+        )
+    st.close()
+
+    page, base_url = v2_page
+    _open_list(page, base_url)
+
+    seen = set()
+    for _ in range(10):
+        for name in names:
+            if page.locator('[data-cov="AT-01"] .list').get_by_text(name, exact=True).count():
+                seen.add(name)
+        nxt = page.get_by_role("button", name=_t(page, "gui_next"), exact=True)
+        if not nxt.count() or nxt.first.is_disabled():
+            break
+        nxt.first.click()
+        page.wait_for_timeout(400)
+
+    missing = sorted(set(names) - seen)
+    assert not missing, (
+        "這 %d 筆告警在清單上走不到：%s——清單一頁 25 筆，"
+        "而畫面沒有任何方式換到下一頁" % (len(missing), missing[:5])
+    )

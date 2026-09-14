@@ -838,6 +838,25 @@ function emptyState(state, d) {
       el("p", { text: t("gui_iv_search_prompt") })
     );
   }
+  // A failed query is not an empty result. state.phase has no "error" value —
+  // a failure lands on "done" with no rows, which is the same shape as a
+  // successful query that matched nothing, so this used to render "no traffic
+  // data" plus the whole why-is-this-empty diagnostic (is the cache
+  // collecting? is the window wide enough?) — every line of it answering a
+  // question that was never asked, because the query never reached the PCE.
+  // The only failure signal was a toast, which disappears. At 3am "no
+  // traffic" and "the query failed" lead somewhere completely different: the
+  // first reads as the PCE being fine.
+  // 失敗訊息在流量頁存的是 state.meta.error（見 /api/quarantine/search 的失敗
+  // 分支），事件頁等其他 view 用的是 state.error——兩個都收，否則只修好一半。
+  const failure = (state.meta && state.meta.error) || state.error;
+  if (failure) {
+    return el("div", { class: "empty", "data-cov": "XC-09" },
+      el("span", { class: "et", text: t("gui_iv_query_failed_title") }),
+      el("p", { class: "mono", text: failure }),
+      el("p", { text: t("gui_iv_query_failed_hint") })
+    );
+  }
   const archiveReason = state.source === "archive" ? archiveEmptyReason(state) : null;
   return el("div", { class: "empty", "data-cov": "XC-09" },
     el("span", { class: "et", text: t("gui_empty_state_no_data_title") }),

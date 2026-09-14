@@ -45,6 +45,10 @@ const GO_CACHE = "#/system/cache";
 
 const SNAPS = ["status", "dashboard_overview", "rs_schedules", "report_schedules"];
 
+// 健康資料超過這麼久就明說它過期。10 分鐘＝測試機 monitor 的輪詢間隔，也就是
+// 「這份資料本來就該被更新過一次」的時點。
+const HEALTH_STALE_MIN = 10;
+
 /** HH:MM in the browser's zone — HM-03's schedule rows are times of day. */
 function hhmm(iso) {
   const d = new Date(iso);
@@ -186,6 +190,19 @@ function healthCard(st, ov) {
         el("span", null, el("b", { text: r.label }), el("small", { text: r.line || "—" }))),
       body));
   });
+
+  // 「資料截至幾點」——沒有它，一個綠燈可能是八小時前的事實，而畫面上沒有
+  // 任何字說明。時間取自 api 快取記下的**抓取時刻**，不是渲染時刻：快取命中
+  // 時畫面是新畫的、資料是舊的，用渲染時間等於在說謊。
+  // status 過期的門檻用 monitor 的輪詢間隔當級距——超過就明說，不要讓讀的人
+  // 自己判斷還能不能信。
+  const at = api.fetchedAt("status");
+  const ageMin = at === null ? null : Math.floor((Date.now() - at) / 60000);
+  box.appendChild(el("p", { class: "asof", "data-stale": ageMin !== null && ageMin >= HEALTH_STALE_MIN ? "true" : null },
+    at === null
+      ? t("gui_home_health_asof_never")
+      : tf(ageMin >= HEALTH_STALE_MIN ? "gui_home_health_asof_stale_fmt" : "gui_home_health_asof_fmt",
+           { label: t("gui_home_health_asof_label"), time: hhmm(new Date(at).toISOString()) })));
 
   const bad = rows.filter(function (r) { return r.tone === "crit" || r.tone === "warn"; });
   const card = sideCard(t("gui_home_health"), box);

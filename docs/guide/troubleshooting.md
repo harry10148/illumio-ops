@@ -339,6 +339,10 @@ grep "Watchdog" logs/illumio_ops.log
 60 分鐘為冷卻，長時間中斷每小時只告警一次，這是刻意設計避免洗版，不是遺漏。若連這則訊息都沒有出現過，先確認
 `monitor_cycle` job 本身有沒有在跑（見 §5 Job Health）。
 
+反過來，若 watchdog **每小時都在告警**而 PCE 其他功能正常，先看 `pce_stats.last_error` 是不是 `/events` 的
+read timeout：SaaS 租戶回應 `/events` 可能超過一分鐘且與查詢視窗大小無關，逾時會讓每一輪輪詢失敗、事件告警
+靜默失效。把 `api.events_timeout_seconds` 調高（見 configuration.md §2）並重啟。
+
 ---
 
 ## 8. TLS 憑證到期

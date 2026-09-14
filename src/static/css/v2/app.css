@@ -341,7 +341,14 @@ body {
 /* two-line identity cell */
 .idc { display: block; min-width: 0; }
 .idc b { display: block; font-weight: 600; color: var(--text-1); overflow: hidden; text-overflow: ellipsis; }
-.idc small { display: block; font-family: var(--font-mono); font-size: var(--fs-micro); color: var(--text-3); }
+/* 副標的字體跟著**內容**走，不是跟著容器走：這一格有時放 hostname 或時間戳
+   （識別字，該用等寬），有時放一句摘要（不該）。所以預設繼承，放識別字的呼叫
+   端自己加 .mono——`.badlist > .idc small` 早就是這個作法（見上），這裡只是把
+   同一個決定推到通則。2026-09-09 之前整格寫死等寬，於是報表卡的
+   「Attack posture boundary 0 | pivot 0 | …」與「no summary」都穿上了識別字
+   的臉。 */
+.idc small { display: block; font-size: var(--fs-micro); color: var(--text-3); }
+.idc small.mono { font-family: var(--font-mono); }
 .linkish { color: var(--accent-fg); text-decoration: underline dotted; text-underline-offset: 2px; cursor: pointer; background: none; border: 0; padding: 0; font: inherit; }
 
 /* guide rail */
@@ -554,8 +561,9 @@ textarea.ta { font-family: var(--font-mono); font-size: var(--fs-mini); }
 }
 .rpcard:hover { border-color: var(--line); }
 .rpcard-h { display: flex; align-items: center; gap: var(--space-4); }
+/* 排程晶片放的是「Manual」「每日」這種詞，不是識別字。 */
 .rpcard-sched {
-  margin-left: auto; font-family: var(--font-mono); font-size: var(--fs-micro);
+  margin-left: auto; font-size: var(--fs-micro);
   color: var(--text-3); border: 1px solid var(--line); border-radius: var(--radius-s);
   padding: 0 var(--space-2); white-space: nowrap;
 }

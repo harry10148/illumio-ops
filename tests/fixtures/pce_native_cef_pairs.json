@@ -1,0 +1,2466 @@
+{
+ "_note": "Real pairs captured 2026-09-11 from pce.lab.local (PCE 26.2.20): audit = same event_href in ops cache raw_json and PCE syslog CEF (Graylog input illumio). flows = same 5-tuple but NOT the same record instance: PCE flow_summary is a per-VEN interval report, ops rows are aggregated traffic_flows API results; use pce_cef_reference for shape only.",
+ "audit": [
+  {
+   "event": {
+    "href": "/orgs/1/events/9f0e5641-44f9-4212-9e67-f1a7c8384c9a",
+    "timestamp": "2026-09-11T09:05:05.941Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+     "system": {}
+    },
+    "event_type": "user.create_session",
+    "status": "success",
+    "severity": "info",
+    "action": {
+     "uuid": "54e7b5b8-afab-4dc8-a623-a4ba2aa4014b",
+     "api_endpoint": "/api/v2/users/create_session",
+     "api_method": "POST",
+     "http_status_code": 201,
+     "src_ip": "FILTERED"
+    },
+    "resource_changes": [],
+    "notifications": [
+     {
+      "uuid": "e2e3cf56-a9cf-48ac-8751-48fffb5d3c94",
+      "notification_type": "user.pce_session_created",
+      "info": {
+       "user": {
+        "href": "/users/11",
+        "username": "admin@lab.local"
+       }
+      }
+     }
+    ]
+   },
+   "cef": "CEF:0|Illumio|PCE|26.2.20|user.create_session.success|User Create Session Success|1|rt=Sep 11 2026 09:05:05.941 +0000 dvchost=pce.lab.local duser=system dst=172.16.15.130 outcome=success cat=audit_events request=/api/v2/users/create_session requestMethod=POST reason=201 cs2= cs2Label=resource_changes cs4=[{\"uuid\":\"e2e3cf56-a9cf-48ac-8751-48fffb5d3c94\",\"notification_type\":\"user.pce_session_created\",\"info\":{\"user\":{\"href\":\"/users/11\",\"username\":\"admin@lab.local\"}}}] cs4Label=notifications cn2=2 cn2Label=schema-version cs1Label=event_href cs1=/orgs/1/events/9f0e5641-44f9-4212-9e67-f1a7c8384c9a"
+  },
+  {
+   "event": {
+    "href": "/orgs/1/events/2e224ecb-a8f5-4cff-a9c8-ba13c2bb09b4",
+    "timestamp": "2026-09-11T09:04:15.498Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+     "system": {}
+    },
+    "event_type": "user.pce_session_terminated",
+    "status": null,
+    "severity": "info",
+    "action": null,
+    "resource_changes": [],
+    "notifications": [
+     {
+      "uuid": "55e47e47-003d-415b-9969-6e7fa2d90213",
+      "notification_type": "user.pce_session_terminated",
+      "info": {
+       "reason": "timeout",
+       "user": {
+        "href": "/users/11",
+        "username": "admin@lab.local"
+       }
+      }
+     }
+    ]
+   },
+   "cef": "CEF:0|Illumio|PCE|26.2.20|user.pce_session_terminated|User Pce Session Terminated|1|rt=Sep 11 2026 09:04:15.498 +0000 dvchost=pce.lab.local duser=system dst=pce.lab.local outcome= cat=audit_events cs2= cs2Label=resource_changes cs4=[{\"uuid\":\"55e47e47-003d-415b-9969-6e7fa2d90213\",\"notification_type\":\"user.pce_session_terminated\",\"info\":{\"reason\":\"timeout\",\"user\":{\"href\":\"/users/11\",\"username\":\"admin@lab.local\"}}}] cs4Label=notifications cn2=2 cn2Label=schema-version cs1Label=event_href cs1=/orgs/1/events/2e224ecb-a8f5-4cff-a9c8-ba13c2bb09b4"
+  },
+  {
+   "event": {
+    "href": "/orgs/1/events/3345fa5b-01c3-45a8-9bfe-4c86c78287ab",
+    "timestamp": "2026-09-11T09:01:45.198Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+     "container_cluster": {
+      "href": "/orgs/1/container_clusters/103701a1-b8a9-4f8c-875d-3e00e0937854",
+      "name": "local_k8s"
+     }
+    },
+    "event_type": "container_cluster.security_policy_applied",
+    "status": "success",
+    "severity": "info",
+    "action": {
+     "uuid": "14e65263-e662-444c-9e1d-2e87ecf2d887",
+     "api_endpoint": "/api/v2/orgs/1/container_clusters/103701a1-b8a9-4f8c-875d-3e00e0937854/security_policy_applied",
+     "api_method": "PUT",
+     "http_status_code": 200,
+     "src_ip": "172.16.15.121"
+    },
+    "resource_changes": [],
+    "notifications": []
+   },
+   "cef": "CEF:0|Illumio|PCE|26.2.20|container_cluster.security_policy_applied.success|Container Cluster Security Policy Applied Success|1|rt=Sep 11 2026 09:01:45.198 +0000 dvchost=pce.lab.local duid=103701a1-b8a9-4f8c-875d-3e00e0937854 duser=local_k8s dst=172.16.15.121 outcome=success cat=audit_events request=/api/v2/orgs/1/container_clusters/103701a1-b8a9-4f8c-875d-3e00e0937854/security_policy_applied requestMethod=PUT reason=200 cs2= cs2Label=resource_changes cs4= cs4Label=notifications cn2=2 cn2Label=schema-version cs1Label=event_href cs1=/orgs/1/events/3345fa5b-01c3-45a8-9bfe-4c86c78287ab"
+  },
+  {
+   "event": {
+    "href": "/orgs/1/events/17484552-fefd-4907-9c1d-885f6b906dfe",
+    "timestamp": "2026-09-11T09:00:13.031Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+     "user": {
+      "href": "/users/11",
+      "username": "admin@lab.local"
+     }
+    },
+    "event_type": "user.login",
+    "status": "success",
+    "severity": "info",
+    "action": {
+     "uuid": "26064512-1335-4c5a-bfa6-0adad80e58d5",
+     "api_endpoint": "/api/v2/users/login",
+     "api_method": "GET",
+     "http_status_code": 200,
+     "src_ip": "192.168.20.30"
+    },
+    "resource_changes": [],
+    "notifications": [
+     {
+      "uuid": "7f842d00-f228-43b3-ab30-b212b34ff099",
+      "notification_type": "user.pce_session_created",
+      "info": {
+       "user": {
+        "href": "/users/11",
+        "username": "admin@lab.local"
+       }
+      }
+     }
+    ]
+   },
+   "cef": "CEF:0|Illumio|PCE|26.2.20|user.login.success|User Login Success|1|rt=Sep 11 2026 09:00:13.031 +0000 dvchost=pce.lab.local duid=11 duser=admin@lab.local dst=192.168.20.30 outcome=success cat=audit_events request=/api/v2/users/login requestMethod=GET reason=200 cs2= cs2Label=resource_changes cs4=[{\"uuid\":\"7f842d00-f228-43b3-ab30-b212b34ff099\",\"notification_type\":\"user.pce_session_created\",\"info\":{\"user\":{\"href\":\"/users/11\",\"username\":\"admin@lab.local\"}}}] cs4Label=notifications cn2=2 cn2Label=schema-version cs1Label=event_href cs1=/orgs/1/events/17484552-fefd-4907-9c1d-885f6b906dfe"
+  },
+  {
+   "event": {
+    "href": "/orgs/1/events/d2c79c03-518b-4ba8-940e-991976ff2a38",
+    "timestamp": "2026-09-11T09:00:12.560Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+     "user": {
+      "href": "/users/11",
+      "username": "admin@lab.local"
+     }
+    },
+    "event_type": "user.sign_in",
+    "status": "success",
+    "severity": "info",
+    "action": {
+     "uuid": "eca22b45-decc-4a47-ab1e-5adb213cf8d1",
+     "api_endpoint": "/login/users/sign_in",
+     "api_method": "POST",
+     "http_status_code": 302,
+     "src_ip": "192.168.20.30"
+    },
+    "resource_changes": [
+     {
+      "uuid": "9fd23db9-e132-4940-9b9b-db2973cd1311",
+      "resource": {
+       "user": {
+        "href": "/users/11",
+        "type": "local",
+        "username": "admin@lab.local"
+       }
+      },
+      "changes": {
+       "sign_in_attempts_count": {
+        "before": 270,
+        "after": 271
+       }
+      },
+      "change_type": "update"
+     }
+    ],
+    "notifications": [
+     {
+      "uuid": "f584ef4a-3a37-49ab-a569-b2b914d71d9d",
+      "notification_type": "user.login_session_created",
+      "info": {
+       "user": {
+        "href": "/users/11",
+        "type": "local",
+        "username": "admin@lab.local"
+       }
+      }
+     }
+    ]
+   },
+   "cef": "CEF:0|Illumio|PCE|26.2.20|user.sign_in.success|User Sign In Success|1|rt=Sep 11 2026 09:00:12.560 +0000 dvchost=pce.lab.local duid=11 duser=admin@lab.local dst=192.168.20.30 outcome=success cat=audit_events request=/login/users/sign_in requestMethod=POST reason=302 cs2=[{\"uuid\":\"9fd23db9-e132-4940-9b9b-db2973cd1311\",\"resource\":{\"user\":{\"href\":\"/users/11\",\"type\":\"local\",\"username\":\"admin@lab.local\"}},\"changes\":{\"sign_in_attempts_count\":{\"before\":270,\"after\":271}},\"change_type\":\"update\"}] cs2Label=resource_changes cs4=[{\"uuid\":\"f584ef4a-3a37-49ab-a569-b2b914d71d9d\",\"notification_type\":\"user.login_session_created\",\"info\":{\"user\":{\"href\":\"/users/11\",\"type\":\"local\",\"username\":\"admin@lab.local\"}}}] cs4Label=notifications cn2=2 cn2Label=schema-version cs1Label=event_href cs1=/orgs/1/events/d2c79c03-518b-4ba8-940e-991976ff2a38"
+  },
+  {
+   "event": {
+    "href": "/system_events/d8dedc06-76ba-4866-ab76-a2e9a20e49bb",
+    "timestamp": "2026-09-11T09:00:08.882Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+     "system": {}
+    },
+    "event_type": "user.login",
+    "status": "failure",
+    "severity": "err",
+    "action": {
+     "uuid": "d7603b30-9546-413b-aaaa-6143a6945f29",
+     "api_endpoint": "/api/v2/users/login",
+     "api_method": "GET",
+     "http_status_code": 401,
+     "src_ip": "192.168.20.30"
+    },
+    "resource_changes": [],
+    "notifications": [
+     {
+      "uuid": "430d0329-d1cf-4b92-9be3-590348b62106",
+      "notification_type": "request.authentication_failed",
+      "info": {
+       "api_endpoint": "/api/v2/users/login",
+       "api_method": "GET",
+       "src_ip": "192.168.20.30"
+      }
+     }
+    ]
+   },
+   "cef": "CEF:0|Illumio|PCE|26.2.20|user.login.failure|User Login Failure|4|rt=Sep 11 2026 09:00:08.882 +0000 dvchost=pce.lab.local duser=system dst=192.168.20.30 outcome=failure cat=audit_events request=/api/v2/users/login requestMethod=GET reason=401 cs2= cs2Label=resource_changes cs4=[{\"uuid\":\"430d0329-d1cf-4b92-9be3-590348b62106\",\"notification_type\":\"request.authentication_failed\",\"info\":{\"api_endpoint\":\"/api/v2/users/login\",\"api_method\":\"GET\",\"src_ip\":\"192.168.20.30\"}}] cs4Label=notifications cn2=2 cn2Label=schema-version cs1Label=event_href cs1=/system_events/d8dedc06-76ba-4866-ab76-a2e9a20e49bb"
+  },
+  {
+   "event": {
+    "href": "/orgs/1/events/6fc2bb96-7dba-41e7-b638-27452bcb14ac",
+    "timestamp": "2026-09-11T05:29:56.395Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+     "user": {
+      "href": "/users/11",
+      "username": "admin@lab.local"
+     }
+    },
+    "event_type": "user.sign_out",
+    "status": "success",
+    "severity": "info",
+    "action": {
+     "uuid": "e1abf740-d8c7-4b67-ba96-9927d9f5897a",
+     "api_endpoint": "/login/logout",
+     "api_method": "GET",
+     "http_status_code": 302,
+     "src_ip": "192.168.20.30"
+    },
+    "resource_changes": [],
+    "notifications": []
+   },
+   "cef": "CEF:0|Illumio|PCE|26.2.20|user.sign_out.success|User Sign Out Success|1|rt=Sep 11 2026 05:29:56.395 +0000 dvchost=pce.lab.local duid=11 duser=admin@lab.local dst=192.168.20.30 outcome=success cat=audit_events request=/login/logout requestMethod=GET reason=302 cs2= cs2Label=resource_changes cs4= cs4Label=notifications cn2=2 cn2Label=schema-version cs1Label=event_href cs1=/orgs/1/events/6fc2bb96-7dba-41e7-b638-27452bcb14ac"
+  },
+  {
+   "event": {
+    "href": "/system_events/f9bea933-1dbe-4dec-9afd-ef6fcaf94fd7",
+    "timestamp": "2026-09-11T05:29:56.040Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+     "system": {}
+    },
+    "event_type": "user.logout",
+    "status": "success",
+    "severity": "info",
+    "action": {
+     "uuid": "ba8f7858-9dee-4f3c-871d-c71fac8c5aa5",
+     "api_endpoint": "/api/v2/users/logout_from_jwt",
+     "api_method": "POST",
+     "http_status_code": 204,
+     "src_ip": "FILTERED"
+    },
+    "resource_changes": [],
+    "notifications": [
+     {
+      "uuid": "107496d3-269b-4948-a6c6-8bce54562b25",
+      "notification_type": "user.pce_session_terminated",
+      "info": {
+       "reason": "user_logout",
+       "user": {
+        "href": "/users/11",
+        "username": "admin@lab.local"
+       }
+      }
+     },
+     {
+      "uuid": "b61afd74-6de7-458e-90d7-92307b732e07",
+      "notification_type": "user.pce_session_terminated",
+      "info": {
+       "reason": "user_logout",
+       "user": {
+        "href": "/users/11",
+        "username": "admin@lab.local"
+       }
+      }
+     },
+     {
+      "uuid": "21159c44-ce1d-44dd-ab23-95f4d92a3b05",
+      "notification_type": "user.pce_session_terminated",
+      "info": {
+       "reason": "user_logout",
+       "user": {
+        "href": "/users/11",
+        "username": "admin@lab.local"
+       }
+      }
+     },
+     {
+      "uuid": "bff8cfe4-6873-492f-bcf8-7a064626b4a2",
+      "notification_type": "user.pce_session_terminated",
+      "info": {
+       "reason": "user_logout",
+       "user": {
+        "href": "/users/11",
+        "username": "admin@lab.local"
+       }
+      }
+     },
+     {
+      "uuid": "894ebac5-1e6b-48c5-acbd-41f9029a14ae",
+      "notification_type": "user.pce_session_terminated",
+      "info": {
+       "reason": "user_logout",
+       "user": {
+        "href": "/users/11",
+        "username": "admin@lab.local"
+       }
+      }
+     },
+     {
+      "uuid": "f51a2431-2037-439d-9694-d96141ca7322",
+      "notification_type": "user.pce_session_terminated",
+      "info": {
+       "reason": "user_logout",
+       "user": {
+        "href": "/users/11",
+        "username": "admin@lab.local"
+       }
+      }
+     },
+     {
+      "uuid": "b948fecb-c55b-41ca-9eeb-629e9e5b2b86",
+      "notification_type": "user.pce_session_terminated",
+      "info": {
+       "reason": "user_logout",
+       "user": {
+        "href": "/users/11",
+        "username": "admin@lab.local"
+       }
+      }
+     },
+     {
+      "uuid": "84b59102-44b6-434b-b272-27abfd1d2d54",
+      "notification_type": "user.pce_session_terminated",
+      "info": {
+       "reason": "user_logout",
+       "user": {
+        "href": "/users/11",
+        "username": "admin@lab.local"
+       }
+      }
+     },
+     {
+      "uuid": "42267fa8-7a10-4130-ac11-69abb1e7894d",
+      "notification_type": "user.pce_session_terminated",
+      "info": {
+       "reason": "user_logout",
+       "user": {
+        "href": "/users/11",
+        "username": "admin@lab.local"
+       }
+      }
+     },
+     {
+      "uuid": "6a923b8c-c507-4b57-808f-5bb7b3c155ef",
+      "notification_type": "user.pce_session_terminated",
+      "info": {
+       "reason": "user_logout",
+       "user": {
+        "href": "/users/11",
+        "username": "admin@lab.local"
+       }
+      }
+     },
+     {
+      "uuid": "71ad0e7d-8f56-4506-8106-c2b75b23ec42",
+      "notification_type": "user.pce_session_terminated",
+      "info": {
+       "reason": "user_logout",
+       "user": {
+        "href": "/users/11",
+        "username": "admin@lab.local"
+       }
+      }
+     },
+     {
+      "uuid": "920650bd-3a58-41a1-bde5-065b9f4a8243",
+      "notification_type": "user.pce_session_terminated",
+      "info": {
+       "reason": "user_logout",
+       "user": {
+        "href": "/users/11",
+        "username": "admin@lab.local"
+       }
+      }
+     },
+     {
+      "uuid": "8e3f760f-29c7-4efe-8e60-8ab1a6abdd75",
+      "notification_type": "user.pce_session_terminated",
+      "info": {
+       "reason": "user_logout",
+       "user": {
+        "href": "/users/11",
+        "username": "admin@lab.local"
+       }
+      }
+     },
+     {
+      "uuid": "36297328-4415-4574-87cc-612e6031c82a",
+      "notification_type": "user.pce_session_terminated",
+      "info": {
+       "reason": "user_logout",
+       "user": {
+        "href": "/users/11",
+        "username": "admin@lab.local"
+       }
+      }
+     },
+     {
+      "uuid": "d5b1ceb0-f588-441a-8d76-a8d2c20276e1",
+      "notification_type": "user.pce_session_terminated",
+      "info": {
+       "reason": "user_logout",
+       "user": {
+        "href": "/users/11",
+        "username": "admin@lab.local"
+       }
+      }
+     },
+     {
+      "uuid": "2b3704d1-925b-44a6-a719-924e53b59b46",
+      "notification_type": "user.pce_session_terminated",
+      "info": {
+       "reason": "user_logout",
+       "user": {
+        "href": "/users/11",
+        "username": "admin@lab.local"
+       }
+      }
+     }
+    ]
+   },
+   "cef": "CEF:0|Illumio|PCE|26.2.20|user.logout.success|User Logout Success|1|rt=Sep 11 2026 05:29:56.040 +0000 dvchost=pce.lab.local duser=system dst=172.16.15.130 outcome=success cat=audit_events request=/api/v2/users/logout_from_jwt requestMethod=POST reason=204 cs2= cs2Label=resource_changes cs4=[{\"uuid\":\"107496d3-269b-4948-a6c6-8bce54562b25\",\"notification_type\":\"user.pce_session_terminated\",\"info\":{\"reason\":\"user_logout\",\"user\":{\"href\":\"/users/11\",\"username\":\"admin@lab.local\"}}},{\"uuid\":\"b61afd74-6de7-458e-90d7-92307b732e07\",\"notification_type\":\"user.pce_session_terminated\",\"info\":{\"reason\":\"user_logout\",\"user\":{\"href\":\"/users/11\",\"username\":\"admin@lab.local\"}}},{\"uuid\":\"21159c44-ce1d-44dd-ab23-95f4d92a3b05\",\"notification_type\":\"user.pce_session_terminated\",\"info\":{\"reason\":\"user_logout\",\"user\":{\"href\":\"/users/11\",\"username\":\"admin@lab.local\"}}},{\"uuid\":\"bff8cfe4-6873-492f-bcf8-7a064626b4a2\",\"notification_type\":\"user.pce_session_terminated\",\"info\":{\"reason\":\"user_logout\",\"user\":{\"href\":\"/users/11\",\"username\":\"admin@lab.local\"}}},{\"uuid\":\"894ebac5-1e6b-48c5-acbd-41f9029a14ae\",\"notification_type\":\"user.pce_session_terminated\",\"info\":{\"reason\":\"user_logout\",\"user\":{\"href\":\"/users/11\",\"username\":\"admin@lab.local\"}}},{\"uuid\":\"f51a2431-2037-439d-9694-d96141ca7322\",\"notification_type\":\"user.pce_session_terminated\",\"info\":{\"reason\":\"user_logout\",\"user\":{\"href\":\"/users/11\",\"username\":\"admin@lab.local\"}}},{\"uuid\":\"b948fecb-c55b-41ca-9eeb-629e9e5b2b86\",\"notification_type\":\"user.pce_session_terminated\",\"info\":{\"reason\":\"user_logout\",\"user\":{\"href\":\"/users/11\",\"username\":\"admin@lab.local\"}}},{\"uuid\":\"84b59102-44b6-434b-b272-27abfd1d2d54\",\"notification_type\":\"user.pce_session_terminated\",\"info\":{\"reason\":\"user_logout\",\"user\":{\"href\":\"/users/11\",\"username\":\"admin@lab.local\"}}},{\"uuid\":\"42267fa8-7a10-4130-ac11-69abb1e7894d\",\"notification_type\":\"user.pce_session_terminated\",\"info\":{\"reason\":\"user_logout\",\"user\":{\"href\":\"/users/11\",\"username\":\"admin@lab.local\"}}},{\"uuid\":\"6a923b8c-c507-4b57-808f-5bb7b3c155ef\",\"notification_type\":\"user.pce_session_terminated\",\"info\":{\"reason\":\"user_logout\",\"user\":{\"href\":\"/users/11\",\"username\":\"admin@lab.local\"}}},{\"uuid\":\"71ad0e7d-8f56-4506-8106-c2b75b23ec42\",\"notification_type\":\"user.pce_session_terminated\",\"info\":{\"reason\":\"user_logout\",\"user\":{\"href\":\"/users/11\",\"username\":\"admin@lab.local\"}}},{\"uuid\":\"920650bd-3a58-41a1-bde5-065b9f4a8243\",\"notification_type\":\"user.pce_session_terminated\",\"info\":{\"reason\":\"user_logout\",\"user\":{\"href\":\"/users/11\",\"username\":\"admin@lab.local\"}}},{\"uuid\":\"8e3f760f-29c7-4efe-8e60-8ab1a6abdd75\",\"notification_type\":\"user.pce_session_terminated\",\"info\":{\"reason\":\"user_logout\",\"user\":{\"href\":\"/users/11\",\"username\":\"admin@lab.local\"}}},{\"uuid\":\"36297328-4415-4574-87cc-612e6031c82a\",\"notification_type\":\"user.pce_session_terminated\",\"info\":{\"reason\":\"user_logout\",\"user\":{\"href\":\"/users/11\",\"username\":\"admin@lab.local\"}}},{\"uuid\":\"d5b1ceb0-f588-441a-8d76-a8d2c20276e1\",\"notification_type\":\"user.pce_session_terminated\",\"info\":{\"reason\":\"user_logout\",\"user\":{\"href\":\"/users/11\",\"username\":\"admin@lab.local\"}}},{\"uuid\":\"2b3704d1-925b-44a6-a719-924e53b59b46\",\"notification_type\":\"user.pce_session_terminated\",\"info\":{\"reason\":\"user_logout\",\"user\":{\"href\":\"/users/11\",\"username\":\"admin@lab.local\"}}}] cs4Label=notifications cn2=2 cn2Label=schema-version cs1Label=event_href cs1=/system_events/f9bea933-1dbe-4dec-9afd-ef6fcaf94fd7"
+  },
+  {
+   "event": {
+    "href": "/orgs/1/events/1ac546e2-afe8-411b-a9a4-4f0928f3e3b4",
+    "timestamp": "2026-09-11T05:29:55.805Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+     "user": {
+      "href": "/users/11",
+      "username": "admin@lab.local"
+     }
+    },
+    "event_type": "user.logout",
+    "status": "success",
+    "severity": "info",
+    "action": {
+     "uuid": "041df59e-52a8-4403-b769-a7320ed5626a",
+     "api_endpoint": "/api/v2/users/11/logout",
+     "api_method": "PUT",
+     "http_status_code": 204,
+     "src_ip": "FILTERED"
+    },
+    "resource_changes": [],
+    "notifications": [
+     {
+      "uuid": "d6f09f5d-9449-4eef-9560-f2511aeee9f9",
+      "notification_type": "user.pce_session_terminated",
+      "info": {
+       "reason": "user_logout",
+       "user": {
+        "href": "/users/11",
+        "username": "admin@lab.local"
+       }
+      }
+     }
+    ]
+   },
+   "cef": "CEF:0|Illumio|PCE|26.2.20|user.logout.success|User Logout Success|1|rt=Sep 11 2026 05:29:55.805 +0000 dvchost=pce.lab.local duid=11 duser=admin@lab.local dst=192.168.20.30 outcome=success cat=audit_events request=/api/v2/users/11/logout requestMethod=PUT reason=204 cs2= cs2Label=resource_changes cs4=[{\"uuid\":\"d6f09f5d-9449-4eef-9560-f2511aeee9f9\",\"notification_type\":\"user.pce_session_terminated\",\"info\":{\"reason\":\"user_logout\",\"user\":{\"href\":\"/users/11\",\"username\":\"admin@lab.local\"}}}] cs4Label=notifications cn2=2 cn2Label=schema-version cs1Label=event_href cs1=/orgs/1/events/1ac546e2-afe8-411b-a9a4-4f0928f3e3b4"
+  },
+  {
+   "event": {
+    "href": "/system_events/76ec40df-b782-495c-8e29-2e3df5cca250",
+    "timestamp": "2026-09-10T00:46:38.778Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+     "system": {}
+    },
+    "event_type": "request.authentication_failed",
+    "status": "failure",
+    "severity": "err",
+    "action": null,
+    "resource_changes": [],
+    "notifications": [
+     {
+      "uuid": "e4004070-f6ac-4ff3-9585-af30512815c4",
+      "notification_type": "request.authentication_failed",
+      "info": {
+       "api_endpoint": "/api/v2/noop",
+       "api_method": "GET",
+       "src_ip": "192.168.20.32",
+       "api_key_id": "1042e9261ebdc846c"
+      }
+     }
+    ]
+   },
+   "cef": "CEF:0|Illumio|PCE|26.2.20|request.authentication_failed.failure|Request Authentication Failed Failure|4|rt=Sep 10 2026 00:46:38.778 +0000 dvchost=pce.lab.local duser=system dst=pce.lab.local outcome=failure cat=audit_events cs2= cs2Label=resource_changes cs4=[{\"uuid\":\"e4004070-f6ac-4ff3-9585-af30512815c4\",\"notification_type\":\"request.authentication_failed\",\"info\":{\"api_endpoint\":\"/api/v2/noop\",\"api_method\":\"GET\",\"src_ip\":\"192.168.20.32\",\"api_key_id\":\"1042e9261ebdc846c\"}}] cs4Label=notifications cn2=2 cn2Label=schema-version cs1Label=event_href cs1=/system_events/76ec40df-b782-495c-8e29-2e3df5cca250"
+  },
+  {
+   "event": {
+    "href": "/orgs/1/events/d352acd0-862e-4b20-b841-81595579549d",
+    "timestamp": "2026-09-09T13:52:16.218Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+     "agent": {
+      "href": "/orgs/1/agents/1351",
+      "hostname": "dev.lab.local"
+     },
+     "ven": {
+      "href": "/orgs/1/vens/d54de6b3-be96-4cf7-93c6-19870a1fdb9c",
+      "hostname": "dev.lab.local"
+     }
+    },
+    "event_type": "workload_interfaces.update",
+    "status": "success",
+    "severity": "warning",
+    "action": {
+     "uuid": "16e97a21-dc5d-419b-9427-29f8532ac7e8",
+     "api_endpoint": "FILTERED",
+     "api_method": "PUT",
+     "http_status_code": 200,
+     "src_ip": "192.168.20.32"
+    },
+    "resource_changes": [
+     {
+      "uuid": "e3162d0b-903b-45d3-bc51-99388ea64415",
+      "resource": {
+       "workload": {
+        "href": "/orgs/1/workloads/d54de6b3-be96-4cf7-93c6-19870a1fdb9c",
+        "name": null,
+        "hostname": "dev.lab.local",
+        "labels": []
+       }
+      },
+      "changes": {
+       "workload_interfaces": {
+        "updated": [
+         {
+          "resource": {
+           "href": "/orgs/1/workloads/d54de6b3-be96-4cf7-93c6-19870a1fdb9c/interfaces/enp3s0",
+           "name": "enp3s0",
+           "address": "192.168.20.32",
+           "network": {
+            "href": "/orgs/1/networks/27058b12-718b-4538-8cb9-e59169fa75ed",
+            "name": "Corporate"
+           }
+          },
+          "changes": {
+           "cidr_block": {
+            "before": null,
+            "after": 24
+           },
+           "link_state": {
+            "before": "unknown",
+            "after": null
+           },
+           "network": {
+            "before": null,
+            "after": {
+             "href": "/orgs/1/networks/27058b12-718b-4538-8cb9-e59169fa75ed"
+            }
+           },
+           "network_detection_mode": {
+            "before": null,
+            "after": "single_private_brn"
+           },
+           "address": {
+            "before": null,
+            "after": "192.168.20.32"
+           },
+           "default_gateway_address": {
+            "before": null,
+            "after": "192.168.20.254"
+           }
+          }
+         },
+         {
+          "resource": {
+           "href": "/orgs/1/workloads/d54de6b3-be96-4cf7-93c6-19870a1fdb9c/interfaces/br-924339ed3add",
+           "name": "br-924339ed3add",
+           "address": "172.21.0.1",
+           "network": {
+            "href": "/orgs/1/networks/27058b12-718b-4538-8cb9-e59169fa75ed",
+            "name": "Corporate"
+           }
+          },
+          "changes": {
+           "cidr_block": {
+            "before": null,
+            "after": 16
+           },
+           "link_state": {
+            "before": "unknown",
+            "after": null
+           },
+           "network": {
+            "before": null,
+            "after": {
+             "href": "/orgs/1/networks/27058b12-718b-4538-8cb9-e59169fa75ed"
+            }
+           },
+           "network_detection_mode": {
+            "before": null,
+            "after": "single_private_brn"
+           },
+           "address": {
+            "before": null,
+            "after": "172.21.0.1"
+           }
+          }
+         },
+         {
+          "resource": {
+           "href": "/orgs/1/workloads/d54de6b3-be96-4cf7-93c6-19870a1fdb9c/interfaces/br-b4517b680da0",
+           "name": "br-b4517b680da0",
+           "address": "172.23.0.1",
+           "network": {
+            "href": "/orgs/1/networks/27058b12-718b-4538-8cb9-e59169fa75ed",
+            "name": "Corporate"
+           }
+          },
+          "changes": {
+           "cidr_block": {
+            "before": null,
+            "after": 16
+           },
+           "link_state": {
+            "before": "unknown",
+            "after": null
+           },
+           "network": {
+            "before": null,
+            "after": {
+             "href": "/orgs/1/networks/27058b12-718b-4538-8cb9-e59169fa75ed"
+            }
+           },
+           "network_detection_mode": {
+            "before": null,
+            "after": "single_private_brn"
+           },
+           "address": {
+            "before": null,
+            "after": "172.23.0.1"
+           }
+          }
+         },
+         {
+          "resource": {
+           "href": "/orgs/1/workloads/d54de6b3-be96-4cf7-93c6-19870a1fdb9c/interfaces/docker0",
+           "name": "docker0",
+           "address": "172.17.0.1",
+           "network": {
+            "href": "/orgs/1/networks/27058b12-718b-4538-8cb9-e59169fa75ed",
+            "name": "Corporate"
+           }
+          },
+          "changes": {
+           "cidr_block": {
+            "before": null,
+            "after": 16
+           },
+           "link_state": {
+            "before": "unknown",
+            "after": null
+           },
+           "network": {
+            "before": null,
+            "after": {
+             "href": "/orgs/1/networks/27058b12-718b-4538-8cb9-e59169fa75ed"
+            }
+           },
+           "network_detection_mode": {
+            "before": null,
+            "after": "single_private_brn"
+           },
+           "address": {
+            "before": null,
+            "after": "172.17.0.1"
+           }
+          }
+         },
+         {
+          "resource": {
+           "href": "/orgs/1/workloads/d54de6b3-be96-4cf7-93c6-19870a1fdb9c/interfaces/br-06613c53834c",
+           "name": "br-06613c53834c",
+           "address": "172.19.0.1",
+           "network": {
+            "href": "/orgs/1/networks/27058b12-718b-4538-8cb9-e59169fa75ed",
+            "name": "Corporate"
+           }
+          },
+          "changes": {
+           "cidr_block": {
+            "before": null,
+            "after": 16
+           },
+           "link_state": {
+            "before": "unknown",
+            "after": null
+           },
+           "network": {
+            "before": null,
+            "after": {
+             "href": "/orgs/1/networks/27058b12-718b-4538-8cb9-e59169fa75ed"
+            }
+           },
+           "network_detection_mode": {
+            "before": null,
+            "after": "single_private_brn"
+           },
+           "address": {
+            "before": null,
+            "after": "172.19.0.1"
+           }
+          }
+         },
+         {
+          "resource": {
+           "href": "/orgs/1/workloads/d54de6b3-be96-4cf7-93c6-19870a1fdb9c/interfaces/br-3816c7c8beef",
+           "name": "br-3816c7c8beef",
+           "address": "172.18.0.1",
+           "network": {
+            "href": "/orgs/1/networks/27058b12-718b-4538-8cb9-e59169fa75ed",
+            "name": "Corporate"
+           }
+          },
+          "changes": {
+           "cidr_block": {
+            "before": null,
+            "after": 16
+           },
+           "link_state": {
+            "before": "unknown",
+            "after": null
+           },
+           "network": {
+            "before": null,
+            "after": {
+             "href": "/orgs/1/networks/27058b12-718b-4538-8cb9-e59169fa75ed"
+            }
+           },
+           "network_detection_mode": {
+            "before": null,
+            "after": "single_private_brn"
+           },
+           "address": {
+            "before": null,
+            "after": "172.18.0.1"
+           }
+          }
+         },
+         {
+          "resource": {
+           "href": "/orgs/1/workloads/d54de6b3-be96-4cf7-93c6-19870a1fdb9c/interfaces/br-7fe33c4abae6",
+           "name": "br-7fe33c4abae6",
+           "address": "172.20.0.1",
+           "network": {
+            "href": "/orgs/1/networks/27058b12-718b-4538-8cb9-e59169fa75ed",
+            "name": "Corporate"
+           }
+          },
+          "changes": {
+           "cidr_block": {
+            "before": null,
+            "after": 16
+           },
+           "link_state": {
+            "before": "unknown",
+            "after": null
+           },
+           "network": {
+            "before": null,
+            "after": {
+             "href": "/orgs/1/networks/27058b12-718b-4538-8cb9-e59169fa75ed"
+            }
+           },
+           "network_detection_mode": {
+            "before": null,
+            "after": "single_private_brn"
+           },
+           "address": {
+            "before": null,
+            "after": "172.20.0.1"
+           }
+          }
+         },
+         {
+          "resource": {
+           "href": "/orgs/1/workloads/d54de6b3-be96-4cf7-93c6-19870a1fdb9c/interfaces/br-89dfddb72ec5",
+           "name": "br-89dfddb72ec5",
+           "address": "172.22.0.1",
+           "network": {
+            "href": "/orgs/1/networks/27058b12-718b-4538-8cb9-e59169fa75ed",
+            "name": "Corporate"
+           }
+          },
+          "changes": {
+           "cidr_block": {
+            "before": null,
+            "after": 16
+           },
+           "link_state": {
+            "before": "unknown",
+            "after": null
+           },
+           "network": {
+            "before": null,
+            "after": {
+             "href": "/orgs/1/networks/27058b12-718b-4538-8cb9-e59169fa75ed"
+            }
+           },
+           "network_detection_mode": {
+            "before": null,
+            "after": "single_private_brn"
+           },
+           "address": {
+            "before": null,
+            "after": "172.22.0.1"
+           }
+          }
+         }
+        ],
+        "created": [
+         {
+          "href": "/orgs/1/workloads/d54de6b3-be96-4cf7-93c6-19870a1fdb9c/interfaces/enp3s0",
+          "name": "enp3s0",
+          "address": "fe80::bfd6:299a:5315:d912",
+          "network": {
+           "href": "/orgs/1/networks/633cc308-4001-4541-a1e0-1aa0fd219f28",
+           "name": "Corporate"
+          }
+         },
+         {
+          "href": "/orgs/1/workloads/d54de6b3-be96-4cf7-93c6-19870a1fdb9c/interfaces/br-924339ed3add",
+          "name": "br-924339ed3add",
+          "address": "fe80::f085:a6ff:fe05:9a42",
+          "network": {
+           "href": "/orgs/1/networks/633cc308-4001-4541-a1e0-1aa0fd219f28",
+           "name": "Corporate"
+          }
+         },
+         {
+          "href": "/orgs/1/workloads/d54de6b3-be96-4cf7-93c6-19870a1fdb9c/interfaces/br-b4517b680da0",
+          "name": "br-b4517b680da0",
+          "address": "fe80::c0b:3bff:fe19:dd85",
+          "network": {
+           "href": "/orgs/1/networks/633cc308-4001-4541-a1e0-1aa0fd219f28",
+           "name": "Corporate"
+          }
+         },
+         {
+          "href": "/orgs/1/workloads/d54de6b3-be96-4cf7-93c6-19870a1fdb9c/interfaces/br-06613c53834c",
+          "name": "br-06613c53834c",
+          "address": "fe80::18e2:47ff:fea0:9d83",
+          "network": {
+           "href": "/orgs/1/networks/633cc308-4001-4541-a1e0-1aa0fd219f28",
+           "name": "Corporate"
+          }
+         },
+         {
+          "href": "/orgs/1/workloads/d54de6b3-be96-4cf7-93c6-19870a1fdb9c/interfaces/br-3816c7c8beef",
+          "name": "br-3816c7c8beef",
+          "address": "fe80::1c74:55ff:fe4e:e155",
+          "network": {
+           "href": "/orgs/1/networks/633cc308-4001-4541-a1e0-1aa0fd219f28",
+           "name": "Corporate"
+          }
+         },
+         {
+          "href": "/orgs/1/workloads/d54de6b3-be96-4cf7-93c6-19870a1fdb9c/interfaces/br-7fe33c4abae6",
+          "name": "br-7fe33c4abae6",
+          "address": "fe80::acfc:ceff:fe1e:217c",
+          "network": {
+           "href": "/orgs/1/networks/633cc308-4001-4541-a1e0-1aa0fd219f28",
+           "name": "Corporate"
+          }
+         },
+         {
+          "href": "/orgs/1/workloads/d54de6b3-be96-4cf7-93c6-19870a1fdb9c/interfaces/br-89dfddb72ec5",
+          "name": "br-89dfddb72ec5",
+          "address": "fe80::ccb6:a9ff:fe87:7e9",
+          "network": {
+           "href": "/orgs/1/networks/633cc308-4001-4541-a1e0-1aa0fd219f28",
+           "name": "Corporate"
+          }
+         }
+        ],
+        "deleted": [
+         {
+          "href": "/orgs/1/workloads/d54de6b3-be96-4cf7-93c6-19870a1fdb9c/interfaces/veth038b3d9",
+          "name": "veth038b3d9",
+          "address": null,
+          "network": null
+         },
+         {
+          "href": "/orgs/1/workloads/d54de6b3-be96-4cf7-93c6-19870a1fdb9c/interfaces/veth049f34e",
+          "name": "veth049f34e",
+          "address": null,
+          "network": null
+         },
+         {
+          "href": "/orgs/1/workloads/d54de6b3-be96-4cf7-93c6-19870a1fdb9c/interfaces/veth0bda4d2",
+          "name": "veth0bda4d2",
+          "address": null,
+          "network": null
+         },
+         {
+          "href": "/orgs/1/workloads/d54de6b3-be96-4cf7-93c6-19870a1fdb9c/interfaces/veth0d5b831",
+          "name": "veth0d5b831",
+          "address": null,
+          "network": null
+         },
+         {
+          "href": "/orgs/1/workloads/d54de6b3-be96-4cf7-93c6-19870a1fdb9c/interfaces/veth109466d",
+          "name": "veth109466d",
+          "address": null,
+          "network": null
+         },
+         {
+          "href": "/orgs/1/workloads/d54de6b3-be96-4cf7-93c6-19870a1fdb9c/interfaces/veth12629cc",
+          "name": "veth12629cc",
+          "address": null,
+          "network": null
+         },
+         {
+          "href": "/orgs/1/workloads/d54de6b3-be96-4cf7-93c6-19870a1fdb9c/interfaces/veth256e5a4",
+          "name": "veth256e5a4",
+          "address": null,
+          "network": null
+         },
+         {
+          "href": "/orgs/1/workloads/d54de6b3-be96-4cf7-93c6-19870a1fdb9c/interfaces/veth3322bee",
+          "name": "veth3322bee",
+          "address": null,
+          "network": null
+         },
+         {
+          "href": "/orgs/1/workloads/d54de6b3-be96-4cf7-93c6-19870a1fdb9c/interfaces/veth38514dc",
+          "name": "veth38514dc",
+          "address": null,
+          "network": null
+         },
+         {
+          "href": "/orgs/1/workloads/d54de6b3-be96-4cf7-93c6-19870a1fdb9c/interfaces/veth41b412a",
+          "name": "veth41b412a",
+          "address": null,
+          "network": null
+         },
+         {
+          "href": "/orgs/1/workloads/d54de6b3-be96-4cf7-93c6-19870a1fdb9c/interfaces/veth570ece8",
+          "name": "veth570ece8",
+          "address": null,
+          "network": null
+         },
+         {
+          "href": "/orgs/1/workloads/d54de6b3-be96-4cf7-93c6-19870a1fdb9c/interfaces/veth5e4fb77",
+          "name": "veth5e4fb77",
+          "address": null,
+          "network": null
+         },
+         {
+          "href": "/orgs/1/workloads/d54de6b3-be96-4cf7-93c6-19870a1fdb9c/interfaces/veth73bf261",
+          "name": "veth73bf261",
+          "address": null,
+          "network": null
+         },
+         {
+          "href": "/orgs/1/workloads/d54de6b3-be96-4cf7-93c6-19870a1fdb9c/interfaces/veth787cb41",
+          "name": "veth787cb41",
+          "address": null,
+          "network": null
+         },
+         {
+          "href": "/orgs/1/workloads/d54de6b3-be96-4cf7-93c6-19870a1fdb9c/interfaces/veth7a17ca6",
+          "name": "veth7a17ca6",
+          "address": null,
+          "network": null
+         },
+         {
+          "href": "/orgs/1/workloads/d54de6b3-be96-4cf7-93c6-19870a1fdb9c/interfaces/veth7a90c67",
+          "name": "veth7a90c67",
+          "address": null,
+          "network": null
+         },
+         {
+          "href": "/orgs/1/workloads/d54de6b3-be96-4cf7-93c6-19870a1fdb9c/interfaces/veth7c7a003",
+          "name": "veth7c7a003",
+          "address": null,
+          "network": null
+         },
+         {
+          "href": "/orgs/1/workloads/d54de6b3-be96-4cf7-93c6-19870a1fdb9c/interfaces/veth83ac42b",
+          "name": "veth83ac42b",
+          "address": null,
+          "network": null
+         },
+         {
+          "href": "/orgs/1/workloads/d54de6b3-be96-4cf7-93c6-19870a1fdb9c/interfaces/veth8ec67d7",
+          "name": "veth8ec67d7",
+          "address": null,
+          "network": null
+         },
+         {
+          "href": "/orgs/1/workloads/d54de6b3-be96-4cf7-93c6-19870a1fdb9c/interfaces/vetha5c62c6",
+          "name": "vetha5c62c6",
+          "address": null,
+          "network": null
+         },
+         {
+          "href": "/orgs/1/workloads/d54de6b3-be96-4cf7-93c6-19870a1fdb9c/interfaces/vetha912375",
+          "name": "vetha912375",
+          "address": null,
+          "network": null
+         },
+         {
+          "href": "/orgs/1/workloads/d54de6b3-be96-4cf7-93c6-19870a1fdb9c/interfaces/vethb5ae895",
+          "name": "vethb5ae895",
+          "address": null,
+          "network": null
+         },
+         {
+          "href": "/orgs/1/workloads/d54de6b3-be96-4cf7-93c6-19870a1fdb9c/interfaces/vethbe0e0d0",
+          "name": "vethbe0e0d0",
+          "address": null,
+          "network": null
+         },
+         {
+          "href": "/orgs/1/workloads/d54de6b3-be96-4cf7-93c6-19870a1fdb9c/interfaces/vethbf67d73",
+          "name": "vethbf67d73",
+          "address": null,
+          "network": null
+         },
+         {
+          "href": "/orgs/1/workloads/d54de6b3-be96-4cf7-93c6-19870a1fdb9c/interfaces/vethd4bc94d",
+          "name": "vethd4bc94d",
+          "address": null,
+          "network": null
+         },
+         {
+          "href": "/orgs/1/workloads/d54de6b3-be96-4cf7-93c6-19870a1fdb9c/interfaces/vethe128fa5",
+          "name": "vethe128fa5",
+          "address": null,
+          "network": null
+         },
+         {
+          "href": "/orgs/1/workloads/d54de6b3-be96-4cf7-93c6-19870a1fdb9c/interfaces/vetheb1344e",
+          "name": "vetheb1344e",
+          "address": null,
+          "network": null
+         }
+        ]
+       }
+      },
+      "change_type": "update"
+     }
+    ],
+    "notifications": [
+     {
+      "uuid": "c3f8b0d9-990f-4f53-bcd4-d270e21f5d86",
+      "notification_type": "soft_limit.exceeded",
+      "info": {
+       "limit_type": "interfaces_per_agent",
+       "limit_value_found": 33,
+       "soft_limit": 32,
+       "hard_limit": -1
+      }
+     }
+    ]
+   },
+   "cef": "CEF:0|Illumio|PCE|26.2.20|workload_interfaces.update.success|Workload Interfaces Update Success|3|rt=Sep 09 2026 13:52:16.218 +0000 dvchost=pce.lab.local duid=d54de6b3-be96-4cf7-93c6-19870a1fdb9c duser=dev.lab.local dst=192.168.20.32 outcome=success cat=audit_events request=FILTERED requestMethod=PUT reason=200 cs2=[{\"uuid\":\"e3162d0b-903b-45d3-bc51-99388ea64415\",\"resource\":{\"workload\":{\"href\":\"/orgs/1/workloads/d54de6b3-be96-4cf7-93c6-19870a1fdb9c\",\"name\":null,\"hostname\":\"dev.lab.local\",\"labels\":[]}},\"change_type\":\"update\"}] cs2Label=resource_changes cs4=[{\"uuid\":\"c3f8b0d9-990f-4f53-bcd4-d270e21f5d86\",\"notification_type\":\"soft_limit.exceeded\",\"info\":{\"limit_type\":\"interfaces_per_agent\",\"limit_value_found\":33,\"soft_limit\":32,\"hard_limit\":-1}}] cs4Label=notifications cn2=2 cn2Label=schema-version cs1Label=event_href cs1=/orgs/1/events/d352acd0-862e-4b20-b841-81595579549d"
+  },
+  {
+   "event": {
+    "href": "/orgs/1/events/2f06d432-2949-4020-abfe-4672a53b185f",
+    "timestamp": "2026-09-09T10:48:33.783Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+     "agent": {
+      "href": "/orgs/1/agents/1349",
+      "hostname": "dev.lab.local"
+     },
+     "ven": {
+      "href": "/orgs/1/vens/f4e86232-0e8d-49f6-a701-d0d3a89680fe",
+      "hostname": "dev.lab.local"
+     }
+    },
+    "event_type": "request.authentication_failed",
+    "status": "failure",
+    "severity": "err",
+    "action": null,
+    "resource_changes": [],
+    "notifications": [
+     {
+      "uuid": "7b159483-9a7a-4c95-8f2e-310021c1a108",
+      "notification_type": "request.authentication_failed",
+      "info": {
+       "api_endpoint": "/api/v30/orgs/1/agents/1349/settings",
+       "api_method": "GET",
+       "src_ip": "192.168.20.32"
+      }
+     }
+    ]
+   },
+   "cef": "CEF:0|Illumio|PCE|26.2.20|request.authentication_failed.failure|Request Authentication Failed Failure|4|rt=Sep 09 2026 10:48:33.783 +0000 dvchost=pce.lab.local duid=f4e86232-0e8d-49f6-a701-d0d3a89680fe duser=dev.lab.local dst=pce.lab.local outcome=failure cat=audit_events cs2= cs2Label=resource_changes cs4=[{\"uuid\":\"7b159483-9a7a-4c95-8f2e-310021c1a108\",\"notification_type\":\"request.authentication_failed\",\"info\":{\"api_endpoint\":\"/api/v30/orgs/1/agents/1349/settings\",\"api_method\":\"GET\",\"src_ip\":\"192.168.20.32\"}}] cs4Label=notifications cn2=2 cn2Label=schema-version cs1Label=event_href cs1=/orgs/1/events/2f06d432-2949-4020-abfe-4672a53b185f"
+  },
+  {
+   "event": {
+    "href": "/system_events/3b4aec8f-bfdb-4c5a-b61b-ab80bf823ae7",
+    "timestamp": "2026-09-09T08:25:24.314Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+     "system": {}
+    },
+    "event_type": "user.logout",
+    "status": "failure",
+    "severity": "err",
+    "action": {
+     "uuid": "fd1623a6-7d33-4be8-b98b-7672a6de2ab6",
+     "api_endpoint": "/api/v2/users/11/logout",
+     "api_method": "PUT",
+     "http_status_code": 401,
+     "src_ip": "FILTERED"
+    },
+    "resource_changes": [],
+    "notifications": [
+     {
+      "uuid": "a0462b5f-6271-4c4d-b683-ed96c2ae319a",
+      "notification_type": "request.authentication_failed",
+      "info": {
+       "api_endpoint": "/api/v2/users/11/logout",
+       "api_method": "PUT",
+       "src_ip": "192.168.20.103"
+      }
+     }
+    ]
+   },
+   "cef": "CEF:0|Illumio|PCE|26.2.20|user.logout.failure|User Logout Failure|4|rt=Sep 09 2026 08:25:24.314 +0000 dvchost=pce.lab.local duser=system dst=192.168.20.103 outcome=failure cat=audit_events request=/api/v2/users/11/logout requestMethod=PUT reason=401 cs2= cs2Label=resource_changes cs4=[{\"uuid\":\"a0462b5f-6271-4c4d-b683-ed96c2ae319a\",\"notification_type\":\"request.authentication_failed\",\"info\":{\"api_endpoint\":\"/api/v2/users/11/logout\",\"api_method\":\"PUT\",\"src_ip\":\"192.168.20.103\"}}] cs4Label=notifications cn2=2 cn2Label=schema-version cs1Label=event_href cs1=/system_events/3b4aec8f-bfdb-4c5a-b61b-ab80bf823ae7"
+  },
+  {
+   "event": {
+    "href": "/orgs/1/events/785ca100-3214-44f2-9cd5-869786477768",
+    "timestamp": "2026-09-07T16:54:40.820Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+     "agent": {
+      "href": "/orgs/1/agents/1349",
+      "hostname": "dev.lab.local"
+     },
+     "ven": {
+      "href": "/orgs/1/vens/f4e86232-0e8d-49f6-a701-d0d3a89680fe",
+      "hostname": "dev.lab.local"
+     }
+    },
+    "event_type": "agent.activate",
+    "status": "success",
+    "severity": "warning",
+    "action": {
+     "uuid": "1e8cf890-e915-4797-9e4c-9ef5c31e9219",
+     "api_endpoint": "FILTERED",
+     "api_method": "POST",
+     "http_status_code": 201,
+     "src_ip": "192.168.20.32"
+    },
+    "resource_changes": [
+     {
+      "uuid": "3653eb9f-a62a-4ae0-b33e-26f66a27c3b6",
+      "resource": {
+       "workload": {
+        "href": "/orgs/1/workloads/f4e86232-0e8d-49f6-a701-d0d3a89680fe",
+        "name": null,
+        "hostname": "dev.lab.local",
+        "labels": []
+       }
+      },
+      "changes": {
+       "online": {
+        "before": null,
+        "after": true
+       },
+       "os_id": {
+        "before": null,
+        "after": "ubuntu-x86_64-noble"
+       },
+       "hostname": {
+        "before": null,
+        "after": "dev.lab.local"
+       },
+       "public_ip": {
+        "before": null,
+        "after": "192.168.20.32"
+       },
+       "os_detail": {
+        "before": null,
+        "after": "7.0.0-30-generic #30~24.04.1-Ubuntu SMP PREEMPT_DYNAMIC Fri Aug 7 13:27:52 UTC 2 (Ubuntu 24.04.4 LTS)"
+       },
+       "enforcement_mode": {
+        "before": null,
+        "after": "idle"
+       },
+       "secure_connect_settings": {
+        "before": null,
+        "after": {
+         "ike_version": 0,
+         "support_nat": true
+        }
+       },
+       "deleted": {
+        "before": null,
+        "after": false
+       },
+       "label_ids_array": {
+        "before": null,
+        "after": []
+       },
+       "log_traffic": {
+        "before": null,
+        "after": false
+       },
+       "visibility_level": {
+        "before": null,
+        "after": "flow_summary"
+       },
+       "server_roles": {
+        "before": null,
+        "after": []
+       },
+       "datacenter_nat_1to1": {
+        "before": null,
+        "after": false
+       },
+       "row_modified_at": {
+        "before": null,
+        "after": "2026-09-07T16:54:40.509Z"
+       },
+       "workload_interfaces": {
+        "created": [
+         {
+          "href": "/orgs/1/workloads/f4e86232-0e8d-49f6-a701-d0d3a89680fe/interfaces/br-06613c53834c",
+          "name": "br-06613c53834c",
+          "address": null,
+          "network": null
+         },
+         {
+          "href": "/orgs/1/workloads/f4e86232-0e8d-49f6-a701-d0d3a89680fe/interfaces/br-3816c7c8beef",
+          "name": "br-3816c7c8beef",
+          "address": null,
+          "network": null
+         },
+         {
+          "href": "/orgs/1/workloads/f4e86232-0e8d-49f6-a701-d0d3a89680fe/interfaces/br-7fe33c4abae6",
+          "name": "br-7fe33c4abae6",
+          "address": null,
+          "network": null
+         },
+         {
+          "href": "/orgs/1/workloads/f4e86232-0e8d-49f6-a701-d0d3a89680fe/interfaces/br-89dfddb72ec5",
+          "name": "br-89dfddb72ec5",
+          "address": null,
+          "network": null
+         },
+         {
+          "href": "/orgs/1/workloads/f4e86232-0e8d-49f6-a701-d0d3a89680fe/interfaces/br-924339ed3add",
+          "name": "br-924339ed3add",
+          "address": null,
+          "network": null
+         },
+         {
+          "href": "/orgs/1/workloads/f4e86232-0e8d-49f6-a701-d0d3a89680fe/interfaces/br-b4517b680da0",
+          "name": "br-b4517b680da0",
+          "address": null,
+          "network": null
+         },
+         {
+          "href": "/orgs/1/workloads/f4e86232-0e8d-49f6-a701-d0d3a89680fe/interfaces/docker0",
+          "name": "docker0",
+          "address": null,
+          "network": null
+         },
+         {
+          "href": "/orgs/1/workloads/f4e86232-0e8d-49f6-a701-d0d3a89680fe/interfaces/enp3s0",
+          "name": "enp3s0",
+          "address": null,
+          "network": null
+         },
+         {
+          "href": "/orgs/1/workloads/f4e86232-0e8d-49f6-a701-d0d3a89680fe/interfaces/veth038b3d9",
+          "name": "veth038b3d9",
+          "address": null,
+          "network": null
+         },
+         {
+          "href": "/orgs/1/workloads/f4e86232-0e8d-49f6-a701-d0d3a89680fe/interfaces/veth049f34e",
+          "name": "veth049f34e",
+          "address": null,
+          "network": null
+         },
+         {
+          "href": "/orgs/1/workloads/f4e86232-0e8d-49f6-a701-d0d3a89680fe/interfaces/veth0bda4d2",
+          "name": "veth0bda4d2",
+          "address": null,
+          "network": null
+         },
+         {
+          "href": "/orgs/1/workloads/f4e86232-0e8d-49f6-a701-d0d3a89680fe/interfaces/veth0d5b831",
+          "name": "veth0d5b831",
+          "address": null,
+          "network": null
+         },
+         {
+          "href": "/orgs/1/workloads/f4e86232-0e8d-49f6-a701-d0d3a89680fe/interfaces/veth109466d",
+          "name": "veth109466d",
+          "address": null,
+          "network": null
+         },
+         {
+          "href": "/orgs/1/workloads/f4e86232-0e8d-49f6-a701-d0d3a89680fe/interfaces/veth12629cc",
+          "name": "veth12629cc",
+          "address": null,
+          "network": null
+         },
+         {
+          "href": "/orgs/1/workloads/f4e86232-0e8d-49f6-a701-d0d3a89680fe/interfaces/veth256e5a4",
+          "name": "veth256e5a4",
+          "address": null,
+          "network": null
+         },
+         {
+          "href": "/orgs/1/workloads/f4e86232-0e8d-49f6-a701-d0d3a89680fe/interfaces/veth3322bee",
+          "name": "veth3322bee",
+          "address": null,
+          "network": null
+         },
+         {
+          "href": "/orgs/1/workloads/f4e86232-0e8d-49f6-a701-d0d3a89680fe/interfaces/veth38514dc",
+          "name": "veth38514dc",
+          "address": null,
+          "network": null
+         },
+         {
+          "href": "/orgs/1/workloads/f4e86232-0e8d-49f6-a701-d0d3a89680fe/interfaces/veth41b412a",
+          "name": "veth41b412a",
+          "address": null,
+          "network": null
+         },
+         {
+          "href": "/orgs/1/workloads/f4e86232-0e8d-49f6-a701-d0d3a89680fe/interfaces/veth570ece8",
+          "name": "veth570ece8",
+          "address": null,
+          "network": null
+         },
+         {
+          "href": "/orgs/1/workloads/f4e86232-0e8d-49f6-a701-d0d3a89680fe/interfaces/veth5e4fb77",
+          "name": "veth5e4fb77",
+          "address": null,
+          "network": null
+         },
+         {
+          "href": "/orgs/1/workloads/f4e86232-0e8d-49f6-a701-d0d3a89680fe/interfaces/veth73bf261",
+          "name": "veth73bf261",
+          "address": null,
+          "network": null
+         },
+         {
+          "href": "/orgs/1/workloads/f4e86232-0e8d-49f6-a701-d0d3a89680fe/interfaces/veth787cb41",
+          "name": "veth787cb41",
+          "address": null,
+          "network": null
+         },
+         {
+          "href": "/orgs/1/workloads/f4e86232-0e8d-49f6-a701-d0d3a89680fe/interfaces/veth7a17ca6",
+          "name": "veth7a17ca6",
+          "address": null,
+          "network": null
+         },
+         {
+          "href": "/orgs/1/workloads/f4e86232-0e8d-49f6-a701-d0d3a89680fe/interfaces/veth7a90c67",
+          "name": "veth7a90c67",
+          "address": null,
+          "network": null
+         },
+         {
+          "href": "/orgs/1/workloads/f4e86232-0e8d-49f6-a701-d0d3a89680fe/interfaces/veth7c7a003",
+          "name": "veth7c7a003",
+          "address": null,
+          "network": null
+         },
+         {
+          "href": "/orgs/1/workloads/f4e86232-0e8d-49f6-a701-d0d3a89680fe/interfaces/veth83ac42b",
+          "name": "veth83ac42b",
+          "address": null,
+          "network": null
+         },
+         {
+          "href": "/orgs/1/workloads/f4e86232-0e8d-49f6-a701-d0d3a89680fe/interfaces/veth8ec67d7",
+          "name": "veth8ec67d7",
+          "address": null,
+          "network": null
+         },
+         {
+          "href": "/orgs/1/workloads/f4e86232-0e8d-49f6-a701-d0d3a89680fe/interfaces/vetha5c62c6",
+          "name": "vetha5c62c6",
+          "address": null,
+          "network": null
+         },
+         {
+          "href": "/orgs/1/workloads/f4e86232-0e8d-49f6-a701-d0d3a89680fe/interfaces/vetha912375",
+          "name": "vetha912375",
+          "address": null,
+          "network": null
+         },
+         {
+          "href": "/orgs/1/workloads/f4e86232-0e8d-49f6-a701-d0d3a89680fe/interfaces/vethb5ae895",
+          "name": "vethb5ae895",
+          "address": null,
+          "network": null
+         },
+         {
+          "href": "/orgs/1/workloads/f4e86232-0e8d-49f6-a701-d0d3a89680fe/interfaces/vethbe0e0d0",
+          "name": "vethbe0e0d0",
+          "address": null,
+          "network": null
+         },
+         {
+          "href": "/orgs/1/workloads/f4e86232-0e8d-49f6-a701-d0d3a89680fe/interfaces/vethbf67d73",
+          "name": "vethbf67d73",
+          "address": null,
+          "network": null
+         },
+         {
+          "href": "/orgs/1/workloads/f4e86232-0e8d-49f6-a701-d0d3a89680fe/interfaces/vethd4bc94d",
+          "name": "vethd4bc94d",
+          "address": null,
+          "network": null
+         },
+         {
+          "href": "/orgs/1/workloads/f4e86232-0e8d-49f6-a701-d0d3a89680fe/interfaces/vethe128fa5",
+          "name": "vethe128fa5",
+          "address": null,
+          "network": null
+         },
+         {
+          "href": "/orgs/1/workloads/f4e86232-0e8d-49f6-a701-d0d3a89680fe/interfaces/vetheb1344e",
+          "name": "vetheb1344e",
+          "address": null,
+          "network": null
+         }
+        ]
+       }
+      },
+      "change_type": "create"
+     },
+     {
+      "uuid": "b388163f-d9dc-4ae5-88a7-edc5229f9a9f",
+      "resource": {
+       "ven": {
+        "href": "/orgs/1/vens/f4e86232-0e8d-49f6-a701-d0d3a89680fe",
+        "hostname": "dev.lab.local"
+       },
+       "agent": {
+        "href": "/orgs/1/agents/1349",
+        "name": null,
+        "hostname": "dev.lab.local"
+       }
+      },
+      "changes": {
+       "uid": {
+        "before": null,
+        "after": "1e59a1a8-d99d-0000-0000-000000000000"
+       },
+       "status": {
+        "before": null,
+        "after": "active"
+       },
+       "agent_version": {
+        "before": null,
+        "after": "26.2.20-2063"
+       },
+       "managed_since": {
+        "before": null,
+        "after": "2026-09-07T16:54:40.534Z"
+       },
+       "pairing_profile": {
+        "before": null,
+        "after": {
+         "href": "/orgs/1/pairing_profiles/10"
+        }
+       },
+       "activation_type": {
+        "before": null,
+        "after": "pairing_key"
+       },
+       "hostname": {
+        "before": null,
+        "after": "dev.lab.local"
+       },
+       "machine_id": {
+        "before": null,
+        "after": "64fd41416598479989bf87dd86eb0ccd"
+       },
+       "os_platform": {
+        "before": null,
+        "after": "linux"
+       },
+       "tampered": {
+        "before": null,
+        "after": false
+       },
+       "secure_connect_error": {
+        "before": null,
+        "after": false
+       },
+       "api_version": {
+        "before": null,
+        "after": 1
+       },
+       "token_ttl_grace_count": {
+        "before": null,
+        "after": 0
+       },
+       "token_in_use": {
+        "before": null,
+        "after": false
+       },
+       "pce_apply_policy_seq": {
+        "before": null,
+        "after": 0
+       },
+       "agent_apply_policy_seq": {
+        "before": null,
+        "after": 0
+       },
+       "synchronized": {
+        "before": null,
+        "after": false
+       },
+       "type": {
+        "before": null,
+        "after": "AgentInfo"
+       },
+       "label_ids_array": {
+        "before": null,
+        "after": []
+       },
+       "ven_type": {
+        "before": null,
+        "after": "server"
+       },
+       "network_detect_state": {
+        "before": null,
+        "after": 0
+       },
+       "golden_image": {
+        "before": null,
+        "after": false
+       }
+      },
+      "change_type": "create"
+     }
+    ],
+    "notifications": [
+     {
+      "uuid": "492c3b82-3f89-4b66-8501-063e4ded024f",
+      "notification_type": "workload.nat_rules_present",
+      "info": null
+     }
+    ]
+   },
+   "cef": "CEF:0|Illumio|PCE|26.2.20|agent.activate.success|Agent Activate Success|3|rt=Sep 07 2026 16:54:40.820 +0000 dvchost=pce.lab.local duid=f4e86232-0e8d-49f6-a701-d0d3a89680fe duser=dev.lab.local dst=192.168.20.32 outcome=success cat=audit_events request=FILTERED requestMethod=POST reason=201 cs2=[{\"uuid\":\"3653eb9f-a62a-4ae0-b33e-26f66a27c3b6\",\"resource\":{\"workload\":{\"href\":\"/orgs/1/workloads/f4e86232-0e8d-49f6-a701-d0d3a89680fe\",\"name\":null,\"hostname\":\"dev.lab.local\",\"labels\":[]}},\"changes\":{\"online\":{\"before\":null,\"after\":true},\"os_id\":{\"before\":null,\"after\":\"ubuntu-x86_64-noble\"},\"hostname\":{\"before\":null,\"after\":\"dev.lab.local\"},\"public_ip\":{\"before\":null,\"after\":\"192.168.20.32\"},\"os_detail\":{\"before\":null,\"after\":\"7.0.0-30-generic #30~24.04.1-Ubuntu SMP PREEMPT_DYNAMIC Fri Aug 7 13:27:52 UTC 2 (Ubuntu 24.04.4 LTS)\"},\"enforcement_mode\":{\"before\":null,\"after\":\"idle\"},\"secure_connect_settings\":{\"before\":null,\"after\":{\"ike_version\":0,\"support_nat\":true}},\"deleted\":{\"before\":null,\"after\":false},\"label_ids_array\":{\"before\":null,\"after\":[]},\"log_traffic\":{\"before\":null,\"after\":false},\"visibility_level\":{\"before\":null,\"after\":\"flow_summary\"},\"server_roles\":{\"before\":null,\"after\":[]},\"datacenter_nat_1to1\":{\"before\":null,\"after\":false},\"row_modified_at\":{\"before\":null,\"after\":\"2026-09-07T16:54:40.509Z\"},\"workload_interfaces\":{\"created\":[{\"href\":\"/orgs/1/workloads/f4e86232-0e8d-49f6-a701-d0d3a89680fe/interfaces/br-06613c53834c\",\"name\":\"br-06613c53834c\",\"address\":null,\"network\":null},{\"href\":\"/orgs/1/workloads/f4e86232-0e8d-49f6-a701-d0d3a89680fe/interfaces/br-3816c7c8beef\",\"name\":\"br-3816c7c8beef\",\"address\":null,\"network\":null},{\"href\":\"/orgs/1/workloads/f4e86232-0e8d-49f6-a701-d0d3a89680fe/interfaces/br-7fe33c4abae6\",\"name\":\"br-7fe33c4abae6\",\"address\":null,\"network\":null},{\"href\":\"/orgs/1/workloads/f4e86232-0e8d-49f6-a701-d0d3a89680fe/interfaces/br-89dfddb72ec5\",\"name\":\"br-89dfddb72ec5\",\"address\":null,\"network\":null},{\"href\":\"/orgs/1/workloads/f4e86232-0e8d-49f6-a701-d0d3a89680fe/interfaces/br-924339ed3add\",\"name\":\"br-924339ed3add\",\"address\":null,\"network\":null},{\"href\":\"/orgs/1/workloads/f4e86232-0e8d-49f6-a701-d0d3a89680fe/interfaces/br-b4517b680da0\",\"name\":\"br-b4517b680da0\",\"address\":null,\"network\":null},{\"href\":\"/orgs/1/workloads/f4e86232-0e8d-49f6-a701-d0d3a89680fe/interfaces/docker0\",\"name\":\"docker0\",\"address\":null,\"network\":null},{\"href\":\"/orgs/1/workloads/f4e86232-0e8d-49f6-a701-d0d3a89680fe/interfaces/enp3s0\",\"name\":\"enp3s0\",\"address\":null,\"network\":null},{\"href\":\"/orgs/1/workloads/f4e86232-0e8d-49f6-a701-d0d3a89680fe/interfaces/veth038b3d9\",\"name\":\"veth038b3d9\",\"address\":null,\"network\":null},{\"href\":\"/orgs/1/workloads/f4e86232-0e8d-49f6-a701-d0d3a89680fe/interfaces/veth049f34e\",\"name\":\"veth049f34e\",\"address\":null,\"network\":null},{\"href\":\"/orgs/1/workloads/f4e86232-0e8d-49f6-a701-d0d3a89680fe/interfaces/veth0bda4d2\",\"name\":\"veth0bda4d2\",\"address\":null,\"network\":null},{\"href\":\"/orgs/1/workloads/f4e86232-0e8d-49f6-a701-d0d3a89680fe/interfaces/veth0d5b831\",\"name\":\"veth0d5b831\",\"address\":null,\"network\":null},{\"href\":\"/orgs/1/workloads/f4e86232-0e8d-49f6-a701-d0d3a89680fe/interfaces/veth109466d\",\"name\":\"veth109466d\",\"address\":null,\"network\":null},{\"href\":\"/orgs/1/workloads/f4e86232-0e8d-49f6-a701-d0d3a89680fe/interfaces/veth12629cc\",\"name\":\"veth12629cc\",\"address\":null,\"network\":null},{\"href\":\"/orgs/1/workloads/f4e86232-0e8d-49f6-a701-d0d3a89680fe/interfaces/veth256e5a4\",\"name\":\"veth256e5a4\",\"address\":null,\"network\":null},{\"href\":\"/orgs/1/workloads/f4e86232-0e8d-49f6-a701-d0d3a89680fe/interfaces/veth3322bee\",\"name\":\"veth3322bee\",\"address\":null,\"network\":null},{\"href\":\"/orgs/1/workloads/f4e86232-0e8d-49f6-a701-d0d3a89680fe/interfaces/veth38514dc\",\"name\":\"veth38514dc\",\"address\":null,\"network\":null},{\"href\":\"/orgs/1/workloads/f4e86232-0e8d-49f6-a701-d0d3a89680fe/interfaces/veth41b412a\",\"name\":\"veth41b412a\",\"address\":null,\"network\":null},{\"href\":\"/orgs/1/workloads/f4e86232-0e8d-49f6-a701-d0d3a89680fe/interfaces/veth570ece8\",\"name\":\"veth570ece8\",\"address\":null,\"network\":null},{\"href\":\"/orgs/1/workloads/f4e86232-0e8d-49f6-a701-d0d3a89680fe/interfaces/veth5e4fb77\",\"name\":\"veth5e4fb77\",\"address\":null,\"network\":null},{\"href\":\"/orgs/1/workloads/f4e86232-0e8d-49f6-a701-d0d3a89680fe/interfaces/veth73bf261\",\"name\":\"veth73bf261\", cs2Label=resource_changes cs4=[{\"uuid\":\"492c3b82-3f89-4b66-8501-063e4ded024f\",\"notification_type\":\"workload.nat_rules_present\",\"info\":null}] cs4Label=notifications cn2=2 cn2Label=schema-version cs1Label=event_href cs1=/orgs/1/events/785ca100-3214-44f2-9cd5-869786477768 cs3=\"address\":null,\"network\":null},{\"href\":\"/orgs/1/workloads/f4e86232-0e8d-49f6-a701-d0d3a89680fe/interfaces/veth787cb41\",\"name\":\"veth787cb41\",\"address\":null,\"network\":null},{\"href\":\"/orgs/1/workloads/f4e86232-0e8d-49f6-a701-d0d3a89680fe/interfaces/veth7a17ca6\",\"name\":\"veth7a17ca6\",\"address\":null,\"network\":null},{\"href\":\"/orgs/1/workloads/f4e86232-0e8d-49f6-a701-d0d3a89680fe/interfaces/veth7a90c67\",\"name\":\"veth7a90c67\",\"address\":null,\"network\":null},{\"href\":\"/orgs/1/workloads/f4e86232-0e8d-49f6-a701-d0d3a89680fe/interfaces/veth7c7a003\",\"name\":\"veth7c7a003\",\"address\":null,\"network\":null},{\"href\":\"/orgs/1/workloads/f4e86232-0e8d-49f6-a701-d0d3a89680fe/interfaces/veth83ac42b\",\"name\":\"veth83ac42b\",\"address\":null,\"network\":null},{\"href\":\"/orgs/1/workloads/f4e86232-0e8d-49f6-a701-d0d3a89680fe/interfaces/veth8ec67d7\",\"name\":\"veth8ec67d7\",\"address\":null,\"network\":null},{\"href\":\"/orgs/1/workloads/f4e86232-0e8d-49f6-a701-d0d3a89680fe/interfaces/vetha5c62c6\",\"name\":\"vetha5c62c6\",\"address\":null,\"network\":null},{\"href\":\"/orgs/1/workloads/f4e86232-0e8d-49f6-a701-d0d3a89680fe/interfaces/vetha912375\",\"name\":\"vetha912375\",\"address\":null,\"network\":null},{\"href\":\"/orgs/1/workloads/f4e86232-0e8d-49f6-a701-d0d3a89680fe/interfaces/vethb5ae895\",\"name\":\"vethb5ae895\",\"address\":null,\"network\":null},{\"href\":\"/orgs/1/workloads/f4e86232-0e8d-49f6-a701-d0d3a89680fe/interfaces/vethbe0e0d0\",\"name\":\"vethbe0e0d0\",\"address\":null,\"network\":null},{\"href\":\"/orgs/1/workloads/f4e86232-0e8d-49f6-a701-d0d3a89680fe/interfaces/vethbf67d73\",\"name\":\"vethbf67d73\",\"address\":null,\"network\":null},{\"href\":\"/orgs/1/workloads/f4e86232-0e8d-49f6-a701-d0d3a89680fe/interfaces/vethd4bc94d\",\"name\":\"vethd4bc94d\",\"address\":null,\"network\":null},{\"href\":\"/orgs/1/workloads/f4e86232-0e8d-49f6-a701-d0d3a89680fe/interfaces/vethe128fa5\",\"name\":\"vethe128fa5\",\"address\":null,\"network\":null},{\"href\":\"/orgs/1/workloads/f4e86232-0e8d-49f6-a701-d0d3a89680fe/interfaces/vetheb1344e\",\"name\":\"vetheb1344e\",\"address\":null,\"network\":null}]}},\"change_type\":\"create\"},{\"uuid\":\"b388163f-d9dc-4ae5-88a7-edc5229f9a9f\",\"resource\":{\"ven\":{\"href\":\"/orgs/1/vens/f4e86232-0e8d-49f6-a701-d0d3a89680fe\",\"hostname\":\"dev.lab.local\"},\"agent\":{\"href\":\"/orgs/1/agents/1349\",\"name\":null,\"hostname\":\"dev.lab.local\"}},\"changes\":{\"uid\":{\"before\":null,\"after\":\"1e59a1a8-d99d-0000-0000-000000000000\"},\"status\":{\"before\":null,\"after\":\"active\"},\"agent_version\":{\"before\":null,\"after\":\"26.2.20-2063\"},\"managed_since\":{\"before\":null,\"after\":\"2026-09-07T16:54:40.534Z\"},\"pairing_profile\":{\"before\":null,\"after\":{\"href\":\"/orgs/1/pairing_profiles/10\"}},\"activation_type\":{\"before\":null,\"after\":\"pairing_key\"},\"hostname\":{\"before\":null,\"after\":\"dev.lab.local\"},\"machine_id\":{\"before\":null,\"after\":\"64fd41416598479989bf87dd86eb0ccd\"},\"os_platform\":{\"before\":null,\"after\":\"linux\"},\"tampered\":{\"before\":null,\"after\":false},\"secure_connect_error\":{\"before\":null,\"after\":false},\"api_version\":{\"before\":null,\"after\":1},\"token_ttl_grace_count\":{\"before\":null,\"after\":0},\"token_in_use\":{\"before\":null,\"after\":false},\"pce_apply_policy_seq\":{\"before\":null,\"after\":0},\"agent_apply_policy_seq\":{\"before\":null,\"after\":0},\"synchronized\":{\"before\":null,\"after\":false},\"type\":{\"before\":null,\"after\":\"AgentInfo\"},\"label_ids_array\":{\"before\":null,\"after\":[]},\"ven_type\":{\"before\":null,\"after\":\"server\"},\"network_detect_state\":{\"before\":null,\"after\":0},\"golden_image\":{\"before\":null,\"after\":false}},\"change_type\":\"create\"}] cs3Label=resource_changes_2"
+  },
+  {
+   "event": {
+    "href": "/orgs/1/events/3d707f6d-0e6a-4960-bb5e-d494a1cce017",
+    "timestamp": "2026-09-07T05:36:11.057Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+     "user": {
+      "href": "/users/11",
+      "username": "admin@lab.local"
+     }
+    },
+    "event_type": "request.internal_server_error",
+    "status": "failure",
+    "severity": "err",
+    "action": null,
+    "resource_changes": [],
+    "notifications": [
+     {
+      "uuid": "2ede9f6b-0a5c-4a74-947d-40628b141d4b",
+      "notification_type": "request.internal_server_error",
+      "info": {
+       "api_endpoint": "/api/v2/orgs/1/sec_policy/active/policy_view",
+       "api_method": "GET",
+       "src_ip": "192.168.20.32"
+      }
+     }
+    ]
+   },
+   "cef": "CEF:0|Illumio|PCE|26.2.20|request.internal_server_error.failure|Request Internal Server Error Failure|4|rt=Sep 07 2026 05:36:11.057 +0000 dvchost=pce.lab.local duid=11 duser=admin@lab.local dst=pce.lab.local outcome=failure cat=audit_events cs2= cs2Label=resource_changes cs4=[{\"uuid\":\"2ede9f6b-0a5c-4a74-947d-40628b141d4b\",\"notification_type\":\"request.internal_server_error\",\"info\":{\"api_endpoint\":\"/api/v2/orgs/1/sec_policy/active/policy_view\",\"api_method\":\"GET\",\"src_ip\":\"192.168.20.32\"}}] cs4Label=notifications cn2=2 cn2Label=schema-version cs1Label=event_href cs1=/orgs/1/events/3d707f6d-0e6a-4960-bb5e-d494a1cce017"
+  },
+  {
+   "event": {
+    "href": "/orgs/1/events/44169ddd-62ad-4f5d-b669-e7e410fdcb4a",
+    "timestamp": "2026-09-06T14:15:41.431Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+     "agent": {
+      "href": "/orgs/1/agents/1334",
+      "hostname": "batch.lab.local"
+     },
+     "ven": {
+      "href": "/orgs/1/vens/82f29350-bfa4-4a43-b22f-c4c3a6128e78",
+      "hostname": "batch.lab.local"
+     }
+    },
+    "event_type": "agent.tampering",
+    "status": "success",
+    "severity": "warning",
+    "action": {
+     "uuid": "bbe6d64b-075b-4c3d-9be1-a859066aafca",
+     "api_endpoint": "FILTERED",
+     "api_method": "PUT",
+     "http_status_code": 204,
+     "src_ip": "172.16.15.106"
+    },
+    "resource_changes": [],
+    "notifications": [
+     {
+      "uuid": "80feaf40-8fc9-4082-b121-9926132076c5",
+      "notification_type": "workload.oob_policy_changes",
+      "info": {
+       "event_classification": "signal",
+       "events": [
+        {
+         "timestamp": "2026-09-06T14:15:41Z",
+         "tamper_type": "firewall",
+         "process_id": 1849396,
+         "kernel_functions": [
+          "nfnetlink_rcv_batch,nf_tables_newrule",
+          "nfnetlink_rcv_batch,nf_tables_newchain"
+         ],
+         "process_name": "iptables"
+        }
+       ]
+      }
+     }
+    ]
+   },
+   "cef": "CEF:0|Illumio|PCE|26.2.20|agent.tampering.success|Agent Tampering Success|3|rt=Sep 06 2026 14:15:41.431 +0000 dvchost=pce.lab.local duid=82f29350-bfa4-4a43-b22f-c4c3a6128e78 duser=batch.lab.local dst=172.16.15.106 outcome=success cat=audit_events request=FILTERED requestMethod=PUT reason=204 cs2= cs2Label=resource_changes cs4=[{\"uuid\":\"80feaf40-8fc9-4082-b121-9926132076c5\",\"notification_type\":\"workload.oob_policy_changes\",\"info\":{\"event_classification\":\"signal\",\"events\":[{\"timestamp\":\"2026-09-06T14:15:41Z\",\"tamper_type\":\"firewall\",\"process_id\":1849396,\"kernel_functions\":[\"nfnetlink_rcv_batch,nf_tables_newrule\",\"nfnetlink_rcv_batch,nf_tables_newchain\"],\"process_name\":\"iptables\"}]}}] cs4Label=notifications cn2=2 cn2Label=schema-version cs1Label=event_href cs1=/orgs/1/events/44169ddd-62ad-4f5d-b669-e7e410fdcb4a"
+  },
+  {
+   "event": {
+    "href": "/orgs/1/events/841e6b2d-ef63-4148-a427-8ff9d56ef5b0",
+    "timestamp": "2026-09-01T04:23:34.285Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+     "user": {
+      "href": "/users/11",
+      "username": "admin@lab.local"
+     }
+    },
+    "event_type": "request.authorization_failed",
+    "status": "failure",
+    "severity": "err",
+    "action": null,
+    "resource_changes": [],
+    "notifications": [
+     {
+      "uuid": "543fb82e-de96-462c-af47-f8a3c728ab4a",
+      "notification_type": "request.authorization_failed",
+      "info": {
+       "api_endpoint": "/api/v2/orgs/1/vulnerabilities",
+       "api_method": "GET",
+       "src_ip": "192.168.20.32",
+       "api_key_id": "15ef99cd896304347"
+      }
+     }
+    ]
+   },
+   "cef": "CEF:0|Illumio|PCE|26.2.20|request.authorization_failed.failure|Request Authorization Failed Failure|4|rt=Sep 01 2026 04:23:34.285 +0000 dvchost=pce.lab.local duid=11 duser=admin@lab.local dst=pce.lab.local outcome=failure cat=audit_events cs2= cs2Label=resource_changes cs4=[{\"uuid\":\"543fb82e-de96-462c-af47-f8a3c728ab4a\",\"notification_type\":\"request.authorization_failed\",\"info\":{\"api_endpoint\":\"/api/v2/orgs/1/vulnerabilities\",\"api_method\":\"GET\",\"src_ip\":\"192.168.20.32\",\"api_key_id\":\"15ef99cd896304347\"}}] cs4Label=notifications cn2=2 cn2Label=schema-version cs1Label=event_href cs1=/orgs/1/events/841e6b2d-ef63-4148-a427-8ff9d56ef5b0"
+  },
+  {
+   "event": {
+    "href": "/orgs/1/events/3f11b01f-c147-44f1-af16-0b076e43db00",
+    "timestamp": "2026-09-01T04:10:52.707Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+     "user": {
+      "href": "/users/11",
+      "username": "admin@lab.local"
+     }
+    },
+    "event_type": "vulnerability_report.update",
+    "status": "failure",
+    "severity": "err",
+    "action": {
+     "uuid": "4d5b433a-6ecb-4b54-b45f-b7ef18e6d6d3",
+     "info": {
+      "api_key_id": "15ef99cd896304347"
+     },
+     "api_endpoint": "/api/v2/orgs/1/vulnerability_reports/codex-license-probe-20260901-28522",
+     "api_method": "PUT",
+     "http_status_code": 403,
+     "src_ip": "192.168.20.32"
+    },
+    "resource_changes": [],
+    "notifications": [
+     {
+      "uuid": "0611aa5f-8b09-49ec-b41f-e1b1701f27ba",
+      "notification_type": "request.authorization_failed",
+      "info": {
+       "api_endpoint": "/api/v2/orgs/1/vulnerability_reports/codex-license-probe-20260901-28522",
+       "api_method": "PUT",
+       "src_ip": "192.168.20.32",
+       "api_key_id": "15ef99cd896304347"
+      }
+     }
+    ]
+   },
+   "cef": "CEF:0|Illumio|PCE|26.2.20|vulnerability_report.update.failure|Vulnerability Report Update Failure|4|rt=Sep 01 2026 04:10:52.707 +0000 dvchost=pce.lab.local duid=11 duser=admin@lab.local dst=192.168.20.32 outcome=failure cat=audit_events request=/api/v2/orgs/1/vulnerability_reports/codex-license-probe-20260901-28522 requestMethod=PUT reason=403 cs2= cs2Label=resource_changes cs4=[{\"uuid\":\"0611aa5f-8b09-49ec-b41f-e1b1701f27ba\",\"notification_type\":\"request.authorization_failed\",\"info\":{\"api_endpoint\":\"/api/v2/orgs/1/vulnerability_reports/codex-license-probe-20260901-28522\",\"api_method\":\"PUT\",\"src_ip\":\"192.168.20.32\",\"api_key_id\":\"15ef99cd896304347\"}}] cs4Label=notifications cn2=2 cn2Label=schema-version cs1Label=event_href cs1=/orgs/1/events/3f11b01f-c147-44f1-af16-0b076e43db00"
+  },
+  {
+   "event": {
+    "href": "/orgs/1/events/e92f9cd8-c9f0-4573-ba23-7c086cc9916a",
+    "timestamp": "2026-09-01T04:10:52.455Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+     "user": {
+      "href": "/users/11",
+      "username": "admin@lab.local"
+     }
+    },
+    "event_type": "vulnerability.update",
+    "status": "failure",
+    "severity": "err",
+    "action": {
+     "uuid": "6b534ff4-8006-44c2-a2ee-f84cec48dff1",
+     "info": {
+      "api_key_id": "15ef99cd896304347"
+     },
+     "api_endpoint": "/api/v2/orgs/1/vulnerabilities/codex-license-probe-20260901-28522",
+     "api_method": "PUT",
+     "http_status_code": 403,
+     "src_ip": "192.168.20.32"
+    },
+    "resource_changes": [],
+    "notifications": [
+     {
+      "uuid": "8eb30407-cc9b-4783-a424-b2ffd2d191fb",
+      "notification_type": "request.authorization_failed",
+      "info": {
+       "api_endpoint": "/api/v2/orgs/1/vulnerabilities/codex-license-probe-20260901-28522",
+       "api_method": "PUT",
+       "src_ip": "192.168.20.32",
+       "api_key_id": "15ef99cd896304347"
+      }
+     }
+    ]
+   },
+   "cef": "CEF:0|Illumio|PCE|26.2.20|vulnerability.update.failure|Vulnerability Update Failure|4|rt=Sep 01 2026 04:10:52.455 +0000 dvchost=pce.lab.local duid=11 duser=admin@lab.local dst=192.168.20.32 outcome=failure cat=audit_events request=/api/v2/orgs/1/vulnerabilities/codex-license-probe-20260901-28522 requestMethod=PUT reason=403 cs2= cs2Label=resource_changes cs4=[{\"uuid\":\"8eb30407-cc9b-4783-a424-b2ffd2d191fb\",\"notification_type\":\"request.authorization_failed\",\"info\":{\"api_endpoint\":\"/api/v2/orgs/1/vulnerabilities/codex-license-probe-20260901-28522\",\"api_method\":\"PUT\",\"src_ip\":\"192.168.20.32\",\"api_key_id\":\"15ef99cd896304347\"}}] cs4Label=notifications cn2=2 cn2Label=schema-version cs1Label=event_href cs1=/orgs/1/events/e92f9cd8-c9f0-4573-ba23-7c086cc9916a"
+  }
+ ],
+ "flows": [
+  {
+   "flow": {
+    "src": {
+     "ip": "172.16.15.120",
+     "workload": {
+      "hostname": "k8s-master",
+      "name": "k8s-master",
+      "href": "/orgs/1/workloads/08e76a74-4baf-406e-bd43-20a9ef10a9a7",
+      "os_type": "linux",
+      "enforcement_mode": "selective",
+      "endpoint": false,
+      "managed": true,
+      "labels": [
+       {
+        "href": "/orgs/1/labels/55",
+        "key": "app",
+        "value": "K8sNode"
+       },
+       {
+        "href": "/orgs/1/labels/15",
+        "key": "env",
+        "value": "Kubernetes"
+       },
+       {
+        "href": "/orgs/1/labels/145",
+        "key": "loc",
+        "value": "TP"
+       },
+       {
+        "href": "/orgs/1/labels/54",
+        "key": "role",
+        "value": "Master"
+       },
+       {
+        "href": "/orgs/1/labels/69",
+        "key": "os",
+        "value": "Ubuntu"
+       }
+      ],
+      "sub_labels": []
+     }
+    },
+    "dst": {
+     "ip": "172.16.15.100",
+     "workload": {
+      "hostname": "dc",
+      "name": "dc",
+      "href": "/orgs/1/workloads/743a6abc-a353-44c4-a951-ce2331fe21dd",
+      "os_type": "windows",
+      "enforcement_mode": "selective",
+      "endpoint": false,
+      "managed": true,
+      "labels": [
+       {
+        "href": "/orgs/1/labels/121",
+        "key": "app",
+        "value": "CoreServices"
+       },
+       {
+        "href": "/orgs/1/labels/21",
+        "key": "env",
+        "value": "Server"
+       },
+       {
+        "href": "/orgs/1/labels/145",
+        "key": "loc",
+        "value": "TP"
+       },
+       {
+        "href": "/orgs/1/labels/19",
+        "key": "role",
+        "value": "DomainController"
+       },
+       {
+        "href": "/orgs/1/labels/67",
+        "key": "os",
+        "value": "WinServer"
+       },
+       {
+        "href": "/orgs/1/labels/142",
+        "key": "Net",
+        "value": "Server-172.16.15"
+       }
+      ],
+      "sub_labels": []
+     }
+    },
+    "network": {
+     "name": "Corporate",
+     "href": "/orgs/1/networks/27058b12-718b-4538-8cb9-e59169fa75ed"
+    },
+    "service": {
+     "port": 53,
+     "proto": 17
+    },
+    "num_connections": 21,
+    "policy_decision": "allowed",
+    "boundary_decision": null,
+    "state": "snapshot",
+    "icmp_type": 0,
+    "icmp_code": 0,
+    "flow_direction": "outbound",
+    "dst_bi": 1410,
+    "dst_bo": 4510,
+    "timestamp_range": {
+     "last_detected": "2026-09-11T08:29:02Z",
+     "first_detected": "2026-09-11T08:29:02Z"
+    },
+    "client_type": "server",
+    "seq_id": 395,
+    "caps": [
+     "write"
+    ]
+   },
+   "pce_cef_reference": "CEF:0|Illumio|PCE|26.2.20|flow_potentially_blocked|Flow Potentially Blocked|3|act=potentially_blocked cat=flow_summary deviceDirection=0 dpt=53 src=172.16.15.120 dst=172.16.15.100 proto=udp cnt=23 in=3744 out=4137 rt=Sep 11 2026 09:11:55 duser=NT AUTHORITY\\SYSTEM dproc=dns.exe cn1=601 cn1Label=interval_sec cn2=3744 cn2Label=dbi cn3=4137 cn3Label=dbo cs2=A cs2Label=state shost=k8s-master cs5=/orgs/1/workloads/08e76a74-4baf-406e-bd43-20a9ef10a9a7 cs5Label=src_href cs3={\"env\":\"Kubernetes\",\"role\":\"Master\",\"app\":\"K8sNode\",\"os\":\"Ubuntu\",\"loc\":\"TP\"} cs3Label=src_labels dhost=dc cs6=/orgs/1/workloads/743a6abc-a353-44c4-a951-ce2331fe21dd cs6Label=dst_href cs4={\"role\":\"DomainController\",\"env\":\"Server\",\"os\":\"WinServer\",\"app\":\"CoreServices\",\"Net\":\"Server-172.16.15\",\"loc\":\"TP\"} cs4Label=dst_labels dvchost=pce.lab.local msg={\"trafclass_code\":\"U\",\"ddms\":1025578,\"tdms\":1025578,\"network\":\"Corporate\",\"pd_qualifier\":0}"
+  },
+  {
+   "flow": {
+    "src": {
+     "ip": "172.16.15.130",
+     "workload": {
+      "hostname": "pce.lab.local",
+      "name": "pce.lab.local",
+      "href": "/orgs/1/workloads/da7aa018-06fa-4ef5-89c6-0bf5b1b08e61",
+      "os_type": "linux",
+      "enforcement_mode": "selective",
+      "endpoint": false,
+      "managed": true,
+      "labels": [
+       {
+        "href": "/orgs/1/labels/40",
+        "key": "app",
+        "value": "Illumio"
+       },
+       {
+        "href": "/orgs/1/labels/21",
+        "key": "env",
+        "value": "Server"
+       },
+       {
+        "href": "/orgs/1/labels/145",
+        "key": "loc",
+        "value": "TP"
+       },
+       {
+        "href": "/orgs/1/labels/46",
+        "key": "role",
+        "value": "PCE"
+       },
+       {
+        "href": "/orgs/1/labels/142",
+        "key": "Net",
+        "value": "Server-172.16.15"
+       },
+       {
+        "href": "/orgs/1/labels/244",
+        "key": "os",
+        "value": "Redhat"
+       }
+      ],
+      "sub_labels": []
+     }
+    },
+    "dst": {
+     "ip": "172.16.15.100",
+     "workload": {
+      "hostname": "dc",
+      "name": "dc",
+      "href": "/orgs/1/workloads/743a6abc-a353-44c4-a951-ce2331fe21dd",
+      "os_type": "windows",
+      "enforcement_mode": "selective",
+      "endpoint": false,
+      "managed": true,
+      "labels": [
+       {
+        "href": "/orgs/1/labels/121",
+        "key": "app",
+        "value": "CoreServices"
+       },
+       {
+        "href": "/orgs/1/labels/21",
+        "key": "env",
+        "value": "Server"
+       },
+       {
+        "href": "/orgs/1/labels/145",
+        "key": "loc",
+        "value": "TP"
+       },
+       {
+        "href": "/orgs/1/labels/19",
+        "key": "role",
+        "value": "DomainController"
+       },
+       {
+        "href": "/orgs/1/labels/67",
+        "key": "os",
+        "value": "WinServer"
+       },
+       {
+        "href": "/orgs/1/labels/142",
+        "key": "Net",
+        "value": "Server-172.16.15"
+       }
+      ],
+      "sub_labels": []
+     }
+    },
+    "network": {
+     "name": "Corporate",
+     "href": "/orgs/1/networks/27058b12-718b-4538-8cb9-e59169fa75ed"
+    },
+    "service": {
+     "port": 53,
+     "proto": 17,
+     "process_name": "dns.exe",
+     "user_name": "NT AUTHORITY\\SYSTEM"
+    },
+    "num_connections": 1529,
+    "policy_decision": "potentially_blocked",
+    "state": "active",
+    "flow_direction": "inbound",
+    "dst_bi": 214885,
+    "dst_bo": 226324,
+    "timestamp_range": {
+     "last_detected": "2026-09-11T09:21:56Z",
+     "first_detected": "2026-09-11T00:00:48Z"
+    },
+    "client_type": "server",
+    "seq_id": 79,
+    "caps": [
+     "write"
+    ]
+   },
+   "pce_cef_reference": "CEF:0|Illumio|PCE|26.2.20|flow_potentially_blocked|Flow Potentially Blocked|3|act=potentially_blocked cat=flow_summary deviceDirection=0 dpt=53 src=172.16.15.130 dst=172.16.15.100 proto=udp cnt=9 in=1282 out=1343 rt=Sep 11 2026 09:11:55 duser=NT AUTHORITY\\SYSTEM dproc=dns.exe cn1=601 cn1Label=interval_sec cn2=1282 cn2Label=dbi cn3=1343 cn3Label=dbo cs2=A cs2Label=state shost=pce.lab.local cs5=/orgs/1/workloads/da7aa018-06fa-4ef5-89c6-0bf5b1b08e61 cs5Label=src_href cs3={\"env\":\"Server\",\"app\":\"Illumio\",\"role\":\"PCE\",\"Net\":\"Server-172.16.15\",\"loc\":\"TP\",\"os\":\"Redhat\"} cs3Label=src_labels dhost=dc cs6=/orgs/1/workloads/743a6abc-a353-44c4-a951-ce2331fe21dd cs6Label=dst_href cs4={\"role\":\"DomainController\",\"env\":\"Server\",\"os\":\"WinServer\",\"app\":\"CoreServices\",\"Net\":\"Server-172.16.15\",\"loc\":\"TP\"} cs4Label=dst_labels dvchost=pce.lab.local msg={\"trafclass_code\":\"U\",\"ddms\":426011,\"tdms\":426011,\"network\":\"Corporate\",\"pd_qualifier\":0}"
+  },
+  {
+   "flow": {
+    "src": {
+     "ip": "192.168.20.32",
+     "workload": {
+      "hostname": "dev.lab.local",
+      "name": "dev.lab.local",
+      "href": "/orgs/1/workloads/d54de6b3-be96-4cf7-93c6-19870a1fdb9c",
+      "os_type": "linux",
+      "enforcement_mode": "idle",
+      "endpoint": false,
+      "managed": true,
+      "labels": [
+       {
+        "href": "/orgs/1/labels/138",
+        "key": "type",
+        "value": "container"
+       }
+      ],
+      "sub_labels": []
+     }
+    },
+    "dst": {
+     "ip": "172.16.15.100",
+     "workload": {
+      "hostname": "dc",
+      "name": "dc",
+      "href": "/orgs/1/workloads/743a6abc-a353-44c4-a951-ce2331fe21dd",
+      "os_type": "windows",
+      "enforcement_mode": "selective",
+      "endpoint": false,
+      "managed": true,
+      "labels": [
+       {
+        "href": "/orgs/1/labels/121",
+        "key": "app",
+        "value": "CoreServices"
+       },
+       {
+        "href": "/orgs/1/labels/21",
+        "key": "env",
+        "value": "Server"
+       },
+       {
+        "href": "/orgs/1/labels/145",
+        "key": "loc",
+        "value": "TP"
+       },
+       {
+        "href": "/orgs/1/labels/19",
+        "key": "role",
+        "value": "DomainController"
+       },
+       {
+        "href": "/orgs/1/labels/67",
+        "key": "os",
+        "value": "WinServer"
+       },
+       {
+        "href": "/orgs/1/labels/142",
+        "key": "Net",
+        "value": "Server-172.16.15"
+       }
+      ],
+      "sub_labels": []
+     }
+    },
+    "network": {
+     "name": "Corporate",
+     "href": "/orgs/1/networks/27058b12-718b-4538-8cb9-e59169fa75ed"
+    },
+    "service": {
+     "port": 53,
+     "proto": 6,
+     "process_name": "systemd-resolved",
+     "user_name": "systemd-resolve"
+    },
+    "num_connections": 6,
+    "policy_decision": "unknown",
+    "state": "snapshot",
+    "flow_direction": "outbound",
+    "dst_bi": 6,
+    "dst_bo": 6,
+    "timestamp_range": {
+     "last_detected": "2026-09-11T09:14:11Z",
+     "first_detected": "2026-09-11T00:01:44Z"
+    },
+    "client_type": "server",
+    "seq_id": 213,
+    "caps": [
+     "write"
+    ]
+   },
+   "pce_cef_reference": "CEF:0|Illumio|PCE|26.2.20|flow_potentially_blocked|Flow Potentially Blocked|3|act=potentially_blocked cat=flow_summary deviceDirection=0 dpt=53 src=192.168.20.32 dst=172.16.15.100 proto=udp cnt=2 in=272 out=258 rt=Sep 11 2026 09:11:55 duser=NT AUTHORITY\\SYSTEM dproc=dns.exe cn1=601 cn1Label=interval_sec cn2=272 cn2Label=dbi cn3=258 cn3Label=dbo cs2=A cs2Label=state shost=dev.lab.local cs5=/orgs/1/workloads/d54de6b3-be96-4cf7-93c6-19870a1fdb9c cs5Label=src_href dhost=dc cs6=/orgs/1/workloads/743a6abc-a353-44c4-a951-ce2331fe21dd cs6Label=dst_href cs4={\"role\":\"DomainController\",\"env\":\"Server\",\"os\":\"WinServer\",\"app\":\"CoreServices\",\"Net\":\"Server-172.16.15\",\"loc\":\"TP\"} cs4Label=dst_labels dvchost=pce.lab.local msg={\"trafclass_code\":\"U\",\"ddms\":82218,\"tdms\":82218,\"network\":\"Corporate\",\"pd_qualifier\":0}"
+  },
+  {
+   "flow": {
+    "src": {
+     "ip": "172.16.15.161",
+     "workload": {
+      "hostname": "d-web1",
+      "name": "d-web1",
+      "href": "/orgs/1/workloads/18994e1c-16c5-4f42-8024-306299f4141c",
+      "os_type": "linux",
+      "enforcement_mode": "selective",
+      "endpoint": false,
+      "managed": true,
+      "labels": [
+       {
+        "href": "/orgs/1/labels/116",
+        "key": "app",
+        "value": "DemoApp"
+       },
+       {
+        "href": "/orgs/1/labels/21",
+        "key": "env",
+        "value": "Server"
+       },
+       {
+        "href": "/orgs/1/labels/145",
+        "key": "loc",
+        "value": "TP"
+       },
+       {
+        "href": "/orgs/1/labels/1",
+        "key": "role",
+        "value": "Web"
+       },
+       {
+        "href": "/orgs/1/labels/69",
+        "key": "os",
+        "value": "Ubuntu"
+       },
+       {
+        "href": "/orgs/1/labels/142",
+        "key": "Net",
+        "value": "Server-172.16.15"
+       }
+      ],
+      "sub_labels": []
+     }
+    },
+    "dst": {
+     "ip": "172.16.15.100",
+     "workload": {
+      "hostname": "dc",
+      "name": "dc",
+      "href": "/orgs/1/workloads/743a6abc-a353-44c4-a951-ce2331fe21dd",
+      "os_type": "windows",
+      "enforcement_mode": "selective",
+      "endpoint": false,
+      "managed": true,
+      "labels": [
+       {
+        "href": "/orgs/1/labels/121",
+        "key": "app",
+        "value": "CoreServices"
+       },
+       {
+        "href": "/orgs/1/labels/21",
+        "key": "env",
+        "value": "Server"
+       },
+       {
+        "href": "/orgs/1/labels/145",
+        "key": "loc",
+        "value": "TP"
+       },
+       {
+        "href": "/orgs/1/labels/19",
+        "key": "role",
+        "value": "DomainController"
+       },
+       {
+        "href": "/orgs/1/labels/67",
+        "key": "os",
+        "value": "WinServer"
+       },
+       {
+        "href": "/orgs/1/labels/142",
+        "key": "Net",
+        "value": "Server-172.16.15"
+       }
+      ],
+      "sub_labels": []
+     }
+    },
+    "network": {
+     "name": "Corporate",
+     "href": "/orgs/1/networks/27058b12-718b-4538-8cb9-e59169fa75ed"
+    },
+    "service": {
+     "port": 53,
+     "proto": 17,
+     "user_name": "systemd-resolve"
+    },
+    "num_connections": 587,
+    "policy_decision": "allowed",
+    "state": "timed out",
+    "flow_direction": "outbound",
+    "dst_bi": 63695,
+    "dst_bo": 112775,
+    "timestamp_range": {
+     "last_detected": "2026-09-11T09:16:32Z",
+     "first_detected": "2026-09-11T00:06:44Z"
+    },
+    "client_type": "server",
+    "seq_id": 274,
+    "caps": [
+     "write"
+    ]
+   },
+   "pce_cef_reference": "CEF:0|Illumio|PCE|26.2.20|flow_potentially_blocked|Flow Potentially Blocked|3|act=potentially_blocked cat=flow_summary deviceDirection=0 dpt=53 src=172.16.15.161 dst=172.16.15.100 proto=udp cnt=4 in=626 out=702 rt=Sep 11 2026 09:11:54 duser=NT AUTHORITY\\SYSTEM dproc=dns.exe cn1=601 cn1Label=interval_sec cn2=626 cn2Label=dbi cn3=702 cn3Label=dbo cs2=A cs2Label=state shost=d-web1 cs5=/orgs/1/workloads/18994e1c-16c5-4f42-8024-306299f4141c cs5Label=src_href cs3={\"role\":\"Web\",\"env\":\"Server\",\"os\":\"Ubuntu\",\"app\":\"DemoApp\",\"Net\":\"Server-172.16.15\",\"loc\":\"TP\"} cs3Label=src_labels dhost=dc cs6=/orgs/1/workloads/743a6abc-a353-44c4-a951-ce2331fe21dd cs6Label=dst_href cs4={\"role\":\"DomainController\",\"env\":\"Server\",\"os\":\"WinServer\",\"app\":\"CoreServices\",\"Net\":\"Server-172.16.15\",\"loc\":\"TP\"} cs4Label=dst_labels dvchost=pce.lab.local msg={\"trafclass_code\":\"U\",\"ddms\":180461,\"tdms\":180461,\"network\":\"Corporate\",\"pd_qualifier\":0}"
+  },
+  {
+   "flow": {
+    "src": {
+     "ip": "172.16.15.160",
+     "workload": {
+      "hostname": "d-db",
+      "name": "d-db",
+      "href": "/orgs/1/workloads/25952d04-a842-4d38-9449-fd33137b473e",
+      "os_type": "linux",
+      "enforcement_mode": "selective",
+      "endpoint": false,
+      "managed": true,
+      "labels": [
+       {
+        "href": "/orgs/1/labels/116",
+        "key": "app",
+        "value": "DemoApp"
+       },
+       {
+        "href": "/orgs/1/labels/21",
+        "key": "env",
+        "value": "Server"
+       },
+       {
+        "href": "/orgs/1/labels/145",
+        "key": "loc",
+        "value": "TP"
+       },
+       {
+        "href": "/orgs/1/labels/2",
+        "key": "role",
+        "value": "Database"
+       },
+       {
+        "href": "/orgs/1/labels/69",
+        "key": "os",
+        "value": "Ubuntu"
+       },
+       {
+        "href": "/orgs/1/labels/142",
+        "key": "Net",
+        "value": "Server-172.16.15"
+       }
+      ],
+      "sub_labels": []
+     }
+    },
+    "dst": {
+     "ip": "172.16.15.100",
+     "workload": {
+      "hostname": "dc",
+      "name": "dc",
+      "href": "/orgs/1/workloads/743a6abc-a353-44c4-a951-ce2331fe21dd",
+      "os_type": "windows",
+      "enforcement_mode": "selective",
+      "endpoint": false,
+      "managed": true,
+      "labels": [
+       {
+        "href": "/orgs/1/labels/121",
+        "key": "app",
+        "value": "CoreServices"
+       },
+       {
+        "href": "/orgs/1/labels/21",
+        "key": "env",
+        "value": "Server"
+       },
+       {
+        "href": "/orgs/1/labels/145",
+        "key": "loc",
+        "value": "TP"
+       },
+       {
+        "href": "/orgs/1/labels/19",
+        "key": "role",
+        "value": "DomainController"
+       },
+       {
+        "href": "/orgs/1/labels/67",
+        "key": "os",
+        "value": "WinServer"
+       },
+       {
+        "href": "/orgs/1/labels/142",
+        "key": "Net",
+        "value": "Server-172.16.15"
+       }
+      ],
+      "sub_labels": []
+     }
+    },
+    "network": {
+     "name": "Corporate",
+     "href": "/orgs/1/networks/27058b12-718b-4538-8cb9-e59169fa75ed"
+    },
+    "service": {
+     "port": 53,
+     "proto": 17,
+     "user_name": "systemd-resolve"
+    },
+    "num_connections": 53,
+    "policy_decision": "allowed",
+    "state": "active",
+    "flow_direction": "outbound",
+    "dst_bi": 4599,
+    "dst_bo": 8127,
+    "timestamp_range": {
+     "last_detected": "2026-09-11T04:40:22Z",
+     "first_detected": "2026-09-11T00:35:20Z"
+    },
+    "client_type": "server",
+    "seq_id": 292,
+    "caps": [
+     "write"
+    ]
+   },
+   "pce_cef_reference": "CEF:0|Illumio|PCE|26.2.20|flow_potentially_blocked|Flow Potentially Blocked|3|act=potentially_blocked cat=flow_summary deviceDirection=0 dpt=53 src=172.16.15.160 dst=172.16.15.100 proto=udp cnt=3 in=514 out=594 rt=Sep 11 2026 09:11:54 duser=NT AUTHORITY\\SYSTEM dproc=dns.exe cn1=601 cn1Label=interval_sec cn2=514 cn2Label=dbi cn3=594 cn3Label=dbo cs2=A cs2Label=state shost=d-db cs5=/orgs/1/workloads/25952d04-a842-4d38-9449-fd33137b473e cs5Label=src_href cs3={\"role\":\"Database\",\"env\":\"Server\",\"os\":\"Ubuntu\",\"app\":\"DemoApp\",\"Net\":\"Server-172.16.15\",\"loc\":\"TP\"} cs3Label=src_labels dhost=dc cs6=/orgs/1/workloads/743a6abc-a353-44c4-a951-ce2331fe21dd cs6Label=dst_href cs4={\"role\":\"DomainController\",\"env\":\"Server\",\"os\":\"WinServer\",\"app\":\"CoreServices\",\"Net\":\"Server-172.16.15\",\"loc\":\"TP\"} cs4Label=dst_labels dvchost=pce.lab.local msg={\"trafclass_code\":\"U\",\"ddms\":207330,\"tdms\":207330,\"network\":\"Corporate\",\"pd_qualifier\":0}"
+  },
+  {
+   "flow": {
+    "src": {
+     "ip": "172.16.15.150",
+     "workload": {
+      "hostname": "win10-jd",
+      "name": "win10-jd",
+      "href": "/orgs/1/workloads/622bbda7-2950-488e-b0d3-43feb1ffa088",
+      "os_type": "windows",
+      "enforcement_mode": "selective",
+      "endpoint": true,
+      "managed": true,
+      "labels": [
+       {
+        "href": "/orgs/1/labels/49",
+        "key": "app",
+        "value": "Jumpdesk"
+       },
+       {
+        "href": "/orgs/1/labels/21",
+        "key": "env",
+        "value": "Server"
+       },
+       {
+        "href": "/orgs/1/labels/145",
+        "key": "loc",
+        "value": "TP"
+       },
+       {
+        "href": "/orgs/1/labels/39",
+        "key": "role",
+        "value": "PC"
+       },
+       {
+        "href": "/orgs/1/labels/142",
+        "key": "Net",
+        "value": "Server-172.16.15"
+       },
+       {
+        "href": "/orgs/1/labels/68",
+        "key": "os",
+        "value": "WinPC"
+       }
+      ],
+      "sub_labels": []
+     }
+    },
+    "dst": {
+     "ip": "172.16.15.100",
+     "fqdn": "dc.lab.local",
+     "workload": {
+      "hostname": "dc",
+      "name": "dc",
+      "href": "/orgs/1/workloads/743a6abc-a353-44c4-a951-ce2331fe21dd",
+      "os_type": "windows",
+      "enforcement_mode": "selective",
+      "endpoint": false,
+      "managed": true,
+      "labels": [
+       {
+        "href": "/orgs/1/labels/121",
+        "key": "app",
+        "value": "CoreServices"
+       },
+       {
+        "href": "/orgs/1/labels/21",
+        "key": "env",
+        "value": "Server"
+       },
+       {
+        "href": "/orgs/1/labels/145",
+        "key": "loc",
+        "value": "TP"
+       },
+       {
+        "href": "/orgs/1/labels/19",
+        "key": "role",
+        "value": "DomainController"
+       },
+       {
+        "href": "/orgs/1/labels/67",
+        "key": "os",
+        "value": "WinServer"
+       },
+       {
+        "href": "/orgs/1/labels/142",
+        "key": "Net",
+        "value": "Server-172.16.15"
+       }
+      ],
+      "sub_labels": []
+     }
+    },
+    "network": {
+     "name": "Corporate",
+     "href": "/orgs/1/networks/27058b12-718b-4538-8cb9-e59169fa75ed"
+    },
+    "service": {
+     "port": 53,
+     "proto": 17,
+     "process_name": "svchost.exe",
+     "user_name": "NT AUTHORITY\\NETWORK SERVICE"
+    },
+    "num_connections": 367,
+    "policy_decision": "allowed",
+    "state": "timed out",
+    "flow_direction": "outbound",
+    "dst_bi": 35484,
+    "dst_bo": 51188,
+    "timestamp_range": {
+     "last_detected": "2026-09-11T09:13:46Z",
+     "first_detected": "2026-09-11T00:00:59Z"
+    },
+    "client_type": "endpoint",
+    "seq_id": 229,
+    "caps": [
+     "write"
+    ]
+   },
+   "pce_cef_reference": "CEF:0|Illumio|PCE|26.2.20|flow_potentially_blocked|Flow Potentially Blocked|3|act=potentially_blocked cat=flow_summary deviceDirection=0 dpt=53 src=172.16.15.150 dst=172.16.15.100 proto=udp cnt=1 in=90 out=97 rt=Sep 11 2026 09:11:53 duser=NT AUTHORITY\\SYSTEM dproc=dns.exe cn1=601 cn1Label=interval_sec cn2=90 cn2Label=dbi cn3=97 cn3Label=dbo cs2=A cs2Label=state shost=win10-jd cs5=/orgs/1/workloads/622bbda7-2950-488e-b0d3-43feb1ffa088 cs5Label=src_href cs3={\"env\":\"Server\",\"role\":\"PC\",\"app\":\"Jumpdesk\",\"os\":\"WinPC\",\"Net\":\"Server-172.16.15\",\"loc\":\"TP\"} cs3Label=src_labels dhost=dc cs6=/orgs/1/workloads/743a6abc-a353-44c4-a951-ce2331fe21dd cs6Label=dst_href cs4={\"role\":\"DomainController\",\"env\":\"Server\",\"os\":\"WinServer\",\"app\":\"CoreServices\",\"Net\":\"Server-172.16.15\",\"loc\":\"TP\"} cs4Label=dst_labels dvchost=pce.lab.local msg={\"trafclass_code\":\"U\",\"ddms\":15114,\"tdms\":15114,\"network\":\"Corporate\",\"pd_qualifier\":0}"
+  }
+ ]
+}

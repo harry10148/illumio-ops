@@ -457,8 +457,16 @@ def _get_cache_engine(db_path: str):
 # ---------------------------------------------------------------------------
 
 def _get_active_pce_url(cm: 'ConfigManager') -> str:
-    """Return the PCE URL this appliance is configured against."""
-    return cm.config.get('api', {}).get('url', '')
+    """Return the PCE URL this appliance is configured against, for display.
+
+    userinfo-free: the only consumers render it (the /api/status payload, which
+    shell.mjs and cards.mjs put in the GUI chrome after stripping the scheme),
+    and api.url may legally carry `user:password@`, which pce_target
+    .normalize_pce_url keeps on purpose because it is a credential. Nothing
+    authenticates with this value.
+    """
+    from src.pce_target import strip_userinfo
+    return strip_userinfo(cm.config.get('api', {}).get('url', ''))
 
 
 # ---------------------------------------------------------------------------

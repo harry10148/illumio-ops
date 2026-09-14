@@ -168,9 +168,9 @@ def test_masked_flow_hides_username_in_cef_output():
             "service": {"port": 22, "proto": 6,
                         "user_name": "root", "process_name": "sshd"}}
     line = CEFFormatter().format_flow(mask_flow(flow, mask_pii=True))
-    assert "un=root" not in line
-    assert "pn=sshd" not in line
-    assert "un=[REDACTED]" in line
+    assert "root" not in line
+    assert "sshd" not in line
+    assert "user=[REDACTED]" in line and "proc=[REDACTED]" in line
 
 
 def test_dispatcher_builder_threads_mask_pii_through():
@@ -198,3 +198,19 @@ def test_dispatcher_builder_threads_mask_pii_through():
     )
     disp2 = build_dispatcher(cfg2, _SF())
     assert getattr(disp2, "_mask_pii", None) is False
+
+
+def test_mask_redacts_notification_user_and_src_ip():
+    from src.siem.mask import mask_event, REDACTED
+    event = {"event_type": "user.login", "notifications": [
+        {"notification_type": "user.pce_session_created", "info": {"user": {"href": "/users/11", "username": "admin@lab.local"}}},
+        {"notification_type": "request.authentication_failed", "info": {"api_endpoint": "/api/v2/users/login", "src_ip": "192.168.20.30"}},
+        {"notification_type": "x", "info": None},
+        "not-a-dict",
+    ]}
+    out = mask_event(event, mask_pii=True)
+    assert out["notifications"][0]["info"]["user"]["username"] == REDACTED
+    assert out["notifications"][0]["info"]["user"]["href"] == "/users/11"
+    assert out["notifications"][1]["info"]["src_ip"] == REDACTED
+    assert out["notifications"][1]["info"]["api_endpoint"] == "/api/v2/users/login"
+    assert event["notifications"][0]["info"]["user"]["username"] == "admin@lab.local"  # caller untouched

@@ -9,6 +9,8 @@ forwarding to an external SIEM:
   3. `resource_changes[].changes[*].{before,after}` — free-text values
      such as rule descriptions and label assignments, which often carry
      internal project / customer names.
+  4. `notifications[].info.{user.username,user.name,user.email,src_ip}` —
+     the same actor / client IP again, forwarded verbatim by `cef_pce` (cs4).
 
 Masking is opt-in **per destination** (config: SiemDestinationSettings.mask_pii)
 so an internal SOC and an external managed-SIEM can coexist with different
@@ -76,6 +78,28 @@ def _mask_top_level_actor(event: dict[str, Any]) -> None:
         event["source_ip"] = REDACTED
 
 
+def _mask_notifications(event: dict[str, Any]) -> None:
+    """cs4 (cef_pce) forwards notifications verbatim; the PCE puts the
+    acting user's email and the client IP inside `info`, same PII as
+    created_by / action."""
+    notes = event.get("notifications")
+    if not isinstance(notes, list):
+        return
+    for entry in notes:
+        if not isinstance(entry, dict):
+            continue
+        info = entry.get("info")
+        if not isinstance(info, dict):
+            continue
+        user = info.get("user")
+        if isinstance(user, dict):
+            for key in ("username", "name", "email"):
+                if user.get(key):
+                    user[key] = REDACTED
+        if info.get("src_ip"):
+            info["src_ip"] = REDACTED
+
+
 def mask_event(event: dict[str, Any], *, mask_pii: bool = False) -> dict[str, Any]:
     """Return a possibly-masked copy of an event.
 
@@ -93,6 +117,7 @@ def mask_event(event: dict[str, Any], *, mask_pii: bool = False) -> dict[str, An
     _mask_top_level_actor(masked)
     _mask_action(masked)
     _mask_changes(masked)
+    _mask_notifications(masked)
     return masked
 
 

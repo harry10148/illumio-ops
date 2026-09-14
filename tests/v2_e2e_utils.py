@@ -226,7 +226,32 @@ class _LiveServer:
 
 
 @pytest.fixture
-def v2_app(temp_config_file):
+def _no_pce_retry_backoff(monkeypatch):
+    """這個 harness 裡不重試 PCE——重試改變不了結果，只改變等待時間。
+
+    `_closed_local_port()` 讓每個 PCE 呼叫都以「connection refused」立刻失敗，
+    但 ApiClient 的 urllib3 `Retry(total=3, backoff_factor=1.0)` 仍然照重三次，
+    退避是 0s + 2s + 4s。**每一支 e2e 因此固定多花 6 秒**：實測單一 refused
+    請求 total=3 是 6.00s、total=0 是 0.001s，而 e2e 的 call 階段耗時清一色
+    落在 6.4–6.7s——那整段就是這個。約 250 支 e2e，合計約 14 分鐘。
+
+    設成 0 不會弱化任何斷言：拒絕連線在這個 harness 裡不是暫時性錯誤，重試
+    三次與零次觀察到的結果**完全相同**，只是後者不必等。（實測：把首頁「API
+    掛掉不可印 0」與 workload「排序要排整批」兩個守門注入退化版本，加速後
+    照樣變紅。）
+
+    **不是 autouse。** 第一版寫成 autouse，而 `v2_e2e_utils` 是靠
+    `pytest_plugins = [...]` 註冊的**外掛**——外掛裡的 autouse fixture 作用於
+    整個 session，不是只作用於引入它的檔案。結果它把重試關掉的範圍蓋到了
+    `test_api_client_retry_adapter.py`（那支正是在驗重試契約的）與
+    `test_analyzer_review2_gates.py`，兩支都紅。掛在 `v2_app` 底下才是對的
+    範圍：只有真的起 v2 GUI 的測試會拿到它。
+    """
+    monkeypatch.setattr("src.api_client.MAX_RETRIES", 0, raising=True)
+
+
+@pytest.fixture
+def v2_app(temp_config_file, _no_pce_retry_backoff):
     """A real Flask app serving the v2 GUI. Not served — see v2_server."""
     app, _cm = build_v2_app(temp_config_file)
     return app

@@ -100,7 +100,10 @@ class ReportScheduler:
         # Determine paths
         pkg_dir = os.path.dirname(os.path.abspath(__file__))
         self._root_dir = os.path.dirname(pkg_dir)
-        self._state_file = os.path.join(self._root_dir, "logs", "state.json")
+        # 同 rule_scheduler：走共用 resolver，ILLUMIO_OPS_STATE_FILE 才改得動
+        # （原本這裡自己拼一次路徑，測試導不開）。
+        from src.config import resolve_state_file
+        self._state_file = resolve_state_file()
         self._config_dir = os.path.join(self._root_dir, "config")
 
     # ─── State helpers ────────────────────────────────────────────────────────

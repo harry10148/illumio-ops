@@ -691,3 +691,76 @@ def test_the_home_ruleset_count_asks_for_one_row_not_the_whole_list(v2_page):
     url = info.value.url
     assert "size=1" in url, url
     assert "page=1" in url, url
+
+
+def test_the_health_card_says_when_its_data_was_confirmed(v2_page):
+    """「PCE 健康：正常」沒有時間依據，可能是八小時前的事實。
+
+    `core/api.mjs` 的 `load()` 註解自己寫著 `Cached per (id, params)`，成功結果
+    留在快取，要更新得另外呼叫 reload／invalidate。首頁的四個快照
+    （status / dashboard_overview / rs_schedules / report_schedules）全走
+    `api.load`，側欄的告警數也是（`app.mjs` 的 `mountShellIdentity`）。所以：
+
+        第一次進首頁    → fetch，畫面正確
+        切走再回來      → 快取命中，畫面是舊的
+        掛著一整夜      → 還是第一次那份，而畫面上沒有一個字說明
+
+    2026-09-13 的介面評估把這條列為最高優先，原話是「凌晨最危險的不是紅燈，
+    而是沒有時間依據的綠燈」。
+    """
+    page, base_url = v2_page
+    _goto(page, base_url, HOME)
+    card = page.locator('[data-cov="HM-02"]')
+    assert card.count() == 1
+    asof = page.evaluate(
+        "async () => { const { t } = await import('/static/js/v2/core/i18n.mjs'); "
+        "return t('gui_home_health_asof_label'); }"
+    )
+    assert asof in card.inner_text(), (
+        f"健康卡沒有說資料截至何時：{card.inner_text()[:200]!r}"
+    )
+
+
+def test_the_asof_time_comes_from_the_fetch_not_the_render(v2_page):
+    """快取命中時畫面是新畫的，資料卻是舊的。
+
+    若時間取自渲染時刻，它會永遠顯示「剛剛」——那比不顯示更糟，因為它看起來
+    像是在保證新鮮。這支把時鐘往前撥，重畫，然後看那行字有沒有跟著變老。
+    """
+    page, base_url = v2_page
+    _goto(page, base_url, HOME)
+    before = page.evaluate(
+        "async () => { const { api } = await import('/static/js/v2/core/api.mjs'); "
+        "return api.fetchedAt('status'); }"
+    )
+    assert isinstance(before, (int, float)) and before > 0, "抓取時刻必須被記下來"
+
+    # 重新造訪不重新 fetch（api.load 有快取），所以抓取時刻不得改變。
+    _goto(page, base_url, PCE)
+    _goto(page, base_url, HOME)
+    after = page.evaluate(
+        "async () => { const { api } = await import('/static/js/v2/core/api.mjs'); "
+        "return api.fetchedAt('status'); }"
+    )
+    assert after == before, (
+        "快取命中卻更新了抓取時刻——那等於用渲染時間冒充資料時間"
+    )
+
+
+def test_stale_health_data_says_so(v2_page):
+    """超過輪詢間隔還沒更新，要明說，不要讓讀的人自己判斷還能不能信。"""
+    page, base_url = v2_page
+    _goto(page, base_url, HOME)
+    # 把記錄的抓取時刻往前推一小時，再重畫一次首頁。
+    page.evaluate(
+        "async () => { const { api } = await import('/static/js/v2/core/api.mjs'); "
+        "const real = api.fetchedAt.bind(api); "
+        "api.fetchedAt = (id, p) => { const v = real(id, p); "
+        "return v === null ? null : v - 3600000; }; }"
+    )
+    _goto(page, base_url, PCE)
+    _goto(page, base_url, HOME)
+    card = page.locator('[data-cov="HM-02"]')
+    assert card.locator('.asof[data-stale="true"]').count() == 1, (
+        f"一小時前的資料沒有被標成過期：{card.inner_text()[:200]!r}"
+    )

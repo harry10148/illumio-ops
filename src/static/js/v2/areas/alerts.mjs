@@ -41,7 +41,7 @@ import { drawer } from "../components/drawer.mjs";
 import { palette } from "../components/palette.mjs";
 import { withErrorCard } from "../components/errorcard.mjs";
 import { audit } from "../core/audit.mjs";
-import { pageHead, section, sideCard, listRow, listFoot, chip, crumbsFor } from "../components/page.mjs";
+import { pageHead, section, sideCard, listRow, listFoot, listPager, chip, crumbsFor } from "../components/page.mjs";
 
 const ROUTE = "#/investigate/alerts";
 const R_TRAFFIC = "#/investigate/traffic";
@@ -338,12 +338,14 @@ function segStatus(current, onPick) {
   return box;
 }
 
+const PAGE_SIZE = 25;
+
 function mountList(root, ctx, state) {
   const board = el("div", { class: "board" });
   root.appendChild(board);
 
   function params() {
-    return { status: state.status, type: state.type, page: state.page + 1, page_size: 25 };
+    return { status: state.status, type: state.type, page: state.page + 1, page_size: PAGE_SIZE };
   }
 
   function filters(counts) {
@@ -392,9 +394,19 @@ function mountList(root, ctx, state) {
         }));
       });
       wrap.appendChild(list);
+      // The store serves one page at a time and answers with total/page/page_size.
+      // Without a pager, `state.page` could only ever be 0 and everything past
+      // the first page was unreachable — not "hard to find", unreachable.
+      const size = Number(d.page_size) || PAGE_SIZE;
+      const total = Number(d.total) || items.length;
       wrap.appendChild(listFoot(
-        tf("gui_al_list_foot", { shown: num(items.length), total: num(d.total || items.length) }),
-        el("a", { href: R_ALERT_RULES, text: t("gui_al_manage_rules") })
+        tf("gui_al_list_foot", { shown: num(items.length), total: num(total) }),
+        el("a", { href: R_ALERT_RULES, text: t("gui_al_manage_rules") }),
+        listPager(state.page, size, total, function (next) {
+          const pages = Math.max(1, Math.ceil(total / size));
+          state.page = Math.max(0, Math.min(next, pages - 1));
+          paint();
+        })
       ));
       board.appendChild(wrap);
     });

@@ -392,14 +392,33 @@ class ApiClient:
             url += f"&event_type[eq][]={urllib.parse.quote(event_type)}"
         return url
 
+    _EVENTS_TIMEOUT_SAAS = 180
+    _EVENTS_TIMEOUT_ON_PREM = 30
+
+    def _events_request_timeout(self) -> int:
+        """Per-attempt timeout for GET /events.
+
+        SaaS tenants answer /events slowly and unevenly — the latency is a
+        property of the tenant, not of the query window (a 5-minute and a
+        24-hour window both took ~23s on one tenant, and other tenants exceed
+        a minute). `api.events_timeout_seconds` overrides the deployment
+        default; the analyzer cycle is 300s so the ceiling is 600s (the model
+        bounds it) and a value that large should come with a longer interval.
+        """
+        configured = self.api_cfg.get("events_timeout_seconds")
+        if isinstance(configured, (int, float)) and not isinstance(configured, bool) and configured > 0:
+            return int(configured)
+        is_saas = self.api_cfg.get("deployment_type") == "saas"
+        return self._EVENTS_TIMEOUT_SAAS if is_saas else self._EVENTS_TIMEOUT_ON_PREM
+
     def fetch_events_strict(self, start_time_str: str, end_time_str: str | None = None,
                             max_results: int = 5000, event_type: str | None = None,
                             rate_limit: bool = False) -> list[dict[str, Any]]:
         url = self._build_events_url(start_time_str, end_time_str=end_time_str,
                                      max_results=max_results, event_type=event_type)
-        is_saas = self.api_cfg.get("deployment_type") == "saas"
-        request_timeout = 60 if is_saas else 30
-        total_timeout = 65 if is_saas else 35
+        request_timeout = self._events_request_timeout()
+        # +5s: room for one short retry on 429/5xx after a full-length attempt.
+        total_timeout = request_timeout + 5
         deadline = time.monotonic() + total_timeout
         status, body = 0, b"event request deadline exceeded"
         for attempt in range(_EVENT_MAX_ATTEMPTS):

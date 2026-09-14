@@ -77,7 +77,17 @@ jobs:
         run: mypy --follow-imports=silent src/api_client.py src/analyzer.py src/reporter.py
 
       - name: Run tests
-        run: pytest --tb=short
+        # -n auto --dist loadfile。loadfile 不可省略，見 requirements-dev.txt。
+        #
+        # 2026-09-13 開過一次，CI 第一次跑紅兩支，退回單執行緒後查明根因：
+        # 那兩支在點擊之後用 inner_text()／count() 做**一次性**讀取，而它們等的
+        # 是「HTTP 回應抵達」或「抽屜關閉」——都不等於畫面重繪完成。本機 16 核
+        # 重繪夠快所以永遠綠，runner 2–4 核才會讀到上一輪的畫面。改用會自動
+        # 重試的 expect() 之後修好。
+        #
+        # 本機數字不預測 CI：這台 16 核 6:30，單執行緒 18:48；標準 runner 只有
+        # 2–4 核，加速會小得多。用 auto 正是因為兩邊核心數不同。
+        run: pytest --tb=short -n auto --dist loadfile
 
   # 離線 bundle 的套件集合（requirements-offline.lock）必須在**它實際部署的
   # Python** 上稽核，所以獨立成一個 job 而不是掛在 test matrix 底下。

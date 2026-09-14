@@ -490,3 +490,31 @@ def test_enqueue_new_records_skips_rows_beyond_dispatch_retention(sf):
             select(PceEvent.id).where(PceEvent.pce_event_id == "uuid-new")
         ).scalar_one()
     assert rows[0].source_id == new_id
+
+
+def test_formatter_for_pce_native_formats_injects_identity():
+    from src.config_models import SiemDestinationSettings
+    from src.siem.dispatcher import _formatter_for
+    from src.siem.formatters.cef_pce import PceNativeCEFFormatter
+    from src.siem.formatters.syslog_wrapped import SyslogWrappedFormatter
+    plain = _formatter_for(SiemDestinationSettings(name="g", host="h", port=1, format="cef_pce"),
+                           pce_fqdn="pce.lab.local", pce_version="26.2.20")
+    assert isinstance(plain, PceNativeCEFFormatter)
+    assert plain.format_event({"event_type": "a.b", "status": "success", "severity": "info",
+                               "timestamp": "2026-01-01T00:00:00Z", "created_by": {"system": {}}}
+                              ).startswith("CEF:0|Illumio|PCE|26.2.20|a.b.success|")
+    wrapped = _formatter_for(SiemDestinationSettings(name="g", host="h", port=1, format="syslog_cef_pce"),
+                             pce_fqdn="pce.lab.local", pce_version="26.2.20")
+    assert isinstance(wrapped, SyslogWrappedFormatter)
+    assert isinstance(wrapped._inner, PceNativeCEFFormatter)
+
+
+def test_pce_identity_uses_api_host_and_product_version():
+    from unittest.mock import MagicMock
+    from src.siem.dispatcher import pce_identity
+    cm = MagicMock(); cm.config = {"api": {"url": "https://pce.lab.local:8443"}}
+    api = MagicMock(); api._api_get.return_value = (200, {"version": "26.2.20-2063"})
+    assert pce_identity(cm, api) == ("pce.lab.local", "26.2.20-2063")
+    api._api_get.side_effect = RuntimeError("down")
+    assert pce_identity(cm, api) == ("pce.lab.local", "unknown")
+    assert pce_identity(cm, None) == ("pce.lab.local", "unknown")

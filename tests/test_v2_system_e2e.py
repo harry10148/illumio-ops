@@ -1654,3 +1654,51 @@ def test_cache_save_still_carries_the_five_settings_that_have_no_control(v2_page
 
     missing = [k for k in uncontrolled if k not in (body or {})]
     assert missing == [], f"save dropped uncontrolled keys {missing}: {sorted((body or {}).keys())}"
+
+
+def test_saving_does_not_claim_the_running_service_picked_it_up(v2_page):
+    """「已儲存 N 項變更。」沒有說它還沒套用到執行中的服務。
+
+    2026-09-13 的介面評估（R7 後半）：成功 toast 同時被讀成「寫進設定了」與
+    「生效了」。後端硬編 `requires_restart: true`（`gui/settings_helpers.py`），
+    也就是**沒有逐欄位的重啟偵測**——連系統自己都不知道你這次的改動需不需要
+    重啟。而重啟橫幅只在 cache 頁（SY-03）上，`saveAll` 卻是所有設定頁共用的。
+
+    所以 toast 要自己說清楚：已儲存，尚未確認套用。
+
+    這支斷言的是**畫面上真的出現的那行字**，不是 system.mjs 裡有沒有那個鍵——
+    後者只是代理指標，一次死碼或一次 t() 拼錯都能讓它繼續綠。
+    """
+    page, base_url = v2_page
+    _goto(page, base_url, R_CACHE, "SY-05")
+    labels = _labels(page)
+    pending = page.evaluate(
+        "async () => { const { t } = await import('/static/js/v2/core/i18n.mjs'); "
+        "return t('gui_sy_saved_not_applied'); }"
+    )
+    _clear_toasts(page)
+
+    # 存檔列要 dirty 才會亮；改哪一欄不重要，重要的是儲存成功後說了什麼。
+    ev_ret = page.locator('[data-field="events_retention_days"]')
+    ev_ret.fill("91")
+    ev_ret.dispatch_event("input")
+    ev_ret.dispatch_event("change")
+
+    def _stub(route):
+        if route.request.method != "PUT":
+            route.continue_()
+            return
+        route.fulfill(status=200, content_type="application/json", body='{"ok": true}')
+
+    page.route("**/api/cache/settings", _stub)
+    try:
+        page.get_by_role("button", name=labels["gui_save"], exact=True).last.click()
+        text = _toast_text(page, "ok")
+    finally:
+        page.unroute("**/api/cache/settings", _stub)
+
+    assert pending and pending != "gui_sy_saved_not_applied", "缺少『尚未確認套用』的字串"
+    assert pending in text, (
+        "儲存成功的 toast 只說了已儲存：%r——那句話同時被讀成「寫進設定了」"
+        "與「生效了」，而後端根本沒有逐欄位的重啟偵測" % text
+    )
