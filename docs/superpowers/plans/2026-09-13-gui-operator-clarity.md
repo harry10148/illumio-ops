@@ -223,3 +223,36 @@ R2 真正成立的是另外兩半：
 ### R6 成立
 
 `areas/home.mjs:351` 的唯一 `btn primary` 是 `gui_home_go_reports`。
+
+---
+
+## R5 拆出來先修（2026-09-14）
+
+查證顯示 R5 裡混了兩種不同性質的東西，只有第一種是缺陷：
+
+| | 性質 | 處置 |
+|---|---|---|
+| 第 26 筆之後不可達 | **資料拿不到** | 抽出來單獨修，`ab8a7dab` |
+| 缺類型／時間搜尋、嚴重度只有色條 | 找回能力與可讀性 | 留在批次 3 的 spec |
+
+分頁修好之後，**每一筆告警都走得到了**——類型篩選是「比較快找到」，不再是
+「找不到」，所以它跟其他四條一樣屬於心智模型層，該走 spec。
+
+### 修法
+
+`components/page.mjs` 新增 `listPager(index, size, total, onPage)`，緊鄰
+`listFoot`，**沿用 table foot 既有的字串與 disabled 規則**
+（`gui_prev` / `gui_next` / `gui_table_page`）——清單與表格用兩套換頁方式，
+等於同一個概念要學兩次。沒有新增 i18n 鍵。
+
+後端一直都回 `total` / `page` / `page_size`（`gui/routes/alerts.py:48`、
+`alerts/store.py:131`），前端只是沒用。
+
+### 守門
+
+斷言的是**不變量**「種進 store 的每一筆都能從清單走到」，不是「畫面上有沒有
+下一頁按鈕」——按鈕可以存在而不換頁。RED 時精準指出走不到的 5 筆（30 − 25）。
+
+**順帶發現**：`pageSpec()` 在 `investigate` / `policy_scheduler` / `system` /
+`reports` 四個 area 各複製了一份一模一樣的實作。這次沒動它（不在範圍內），
+但它是下一次改分頁行為時的四個漏網點。
