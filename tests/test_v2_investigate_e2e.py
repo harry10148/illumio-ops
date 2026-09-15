@@ -103,6 +103,29 @@ MOUNTED = {
 }
 
 
+def _settled_text(page, selector, previous=None, timeout_ms=15000):
+    """等畫面真的畫完再讀。
+
+    `expect_response` 等的是回應抵達，不是重繪完成。對「某字串要出現」的斷言，
+    讀太早只是 flaky；對「某字串**不該**出現」的斷言，讀太早會**通過**——
+    一個還沒畫任何東西的面板當然不含那個字串。那不是不穩定，是靜默的空洞斷言，
+    而且會一直綠。
+
+    previous 給第二次以後的查詢用：面板上還留著上一輪的內容，「非空」不足以
+    證明新結果已經到位，要等它**變了**。
+    """
+    loc = page.locator(selector)
+    page.wait_for_function(
+        """([sel, prev]) => {
+             const el = document.querySelector(sel);
+             if (!el) return false;
+             const t = (el.innerText || "").trim();
+             return t.length > 0 && (prev === null || t !== prev);
+           }""",
+        arg=[selector, previous], timeout=timeout_ms)
+    return loc.inner_text()
+
+
 def _goto(page, base_url, route):
     page.set_default_timeout(SLOW)
     page.goto(base_url + "/" + route)
@@ -980,7 +1003,7 @@ def test_unsupported_archive_filters_never_show_raw_backend_keys(v2_page):
     with page.expect_response(lambda r: "/api/quarantine/search" in r.url):
         query.get_by_role("button", name=labels["gui_query_flow"], exact=True).click()
 
-    text = page.locator('section[data-cov="IV-05"]').inner_text()
+    text = _settled_text(page, 'section[data-cov="IV-05"]')
     assert "src_label_group" not in text, text
     assert "draft_policy_decision" not in text, text
 
@@ -1050,7 +1073,7 @@ def test_archive_empty_result_reason_reflects_scanned_and_matched_not_review_db_
     )
     with page.expect_response(lambda r: "/api/quarantine/search" in r.url):
         run_btn.click()
-    text1 = page.locator('[data-cov="XC-09"]').inner_text()
+    text1 = _settled_text(page, '[data-cov="XC-09"]')
     assert not_loaded_text not in text1, text1
     page.unroute("**/api/quarantine/search")
 
@@ -1064,7 +1087,7 @@ def test_archive_empty_result_reason_reflects_scanned_and_matched_not_review_db_
     )
     with page.expect_response(lambda r: "/api/quarantine/search" in r.url):
         run_btn.click()
-    text2 = page.locator('[data-cov="XC-09"]').inner_text()
+    text2 = _settled_text(page, '[data-cov="XC-09"]', previous=text1)
     assert not_loaded_text not in text2, text2
     assert text1 != text2, "scanned==0 and scanned>0/matched==0 must not read the same"
 
@@ -1103,7 +1126,7 @@ def test_archive_incomplete_scan_is_distinguished_from_a_complete_empty_result(v
     }))
     with page.expect_response(lambda r: "/api/quarantine/search" in r.url):
         run_btn.click()
-    text_complete = page.locator('[data-cov="XC-09"]').inner_text()
+    text_complete = _settled_text(page, '[data-cov="XC-09"]')
     page.unroute("**/api/quarantine/search")
 
     # case 2: the scan stopped on its deadline after day 1 of a 7-day range.
@@ -1113,7 +1136,7 @@ def test_archive_incomplete_scan_is_distinguished_from_a_complete_empty_result(v
     }))
     with page.expect_response(lambda r: "/api/quarantine/search" in r.url):
         run_btn.click()
-    text_deadline = page.locator('[data-cov="XC-09"]').inner_text()
+    text_deadline = _settled_text(page, '[data-cov="XC-09"]', previous=text_complete)
     page.unroute("**/api/quarantine/search")
 
     # case 3: the scan stopped on its size cap after day 1.
@@ -1123,7 +1146,7 @@ def test_archive_incomplete_scan_is_distinguished_from_a_complete_empty_result(v
     }))
     with page.expect_response(lambda r: "/api/quarantine/search" in r.url):
         run_btn.click()
-    text_size_cap = page.locator('[data-cov="XC-09"]').inner_text()
+    text_size_cap = _settled_text(page, '[data-cov="XC-09"]', previous=text_deadline)
 
     assert text_complete != text_deadline, (text_complete, text_deadline)
     assert text_complete != text_size_cap, (text_complete, text_size_cap)
@@ -1270,14 +1293,14 @@ def test_archive_rows_render_real_values_not_blank_cells(v2_page):
     with page.expect_response(lambda r: "/api/quarantine/search" in r.url):
         run_btn.click()
 
-    table_text = page.locator('[data-cov="XC-12"]').inner_text()
-    assert "web-01" in table_text
-    assert "10.0.0.30" in table_text
-    assert "db-01" in table_text
-    assert "10.0.0.31" in table_text
-    assert "8080" in table_text
-    assert "17.19" in table_text
-    assert "2026-08-01 10:00:00" in table_text
+    # expect_response 等的是**回應抵達**，不是畫面重繪完成——與正上方那支
+    # （2026-09-13 `4720715e`）同一個缺陷，當時只修了上面那一個函式，這支就
+    # 緊接在它下面帶著同樣的寫法活下來，2026-09-15 在 CI 的 py3.11 job 上炸：
+    # 表頭都在、每一格都是空的。expect() 會自動重試。
+    tbl = page.locator('[data-cov="XC-12"]')
+    for value in ("web-01", "10.0.0.30", "db-01", "10.0.0.31", "8080",
+                  "17.19", "2026-08-01 10:00:00"):
+        expect(tbl).to_contain_text(value)
 
 
 def test_the_event_detail_pane_never_widens_the_page(v2_page, v2_app, monkeypatch):
