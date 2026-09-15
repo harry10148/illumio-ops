@@ -131,30 +131,35 @@ def test_login_timing_equivalent_for_invalid_username_and_password(app_client):
     elapsed) catches the case where argon2 was clearly skipped, regardless
     of how argon2 params are tuned. The ratio check is belt-and-suspenders."""
     client, _cm = app_client
-    # Warm caches AND measure baseline argon2 cost (bad-pass = full argon2)
-    t0 = time.perf_counter()
+    # Warm caches. The timing is DISCARDED: a first call carries import and
+    # cache warm-up that the steady state does not, and it measured roughly
+    # twice a settled call here. Deriving the floor from it put the floor
+    # within a few percent of the very value it was judging — CI failed at
+    # 0.214s against a floor of 0.223s on 2026-09-15, with nothing wrong.
     client.post('/api/login', json={'username': 'illumio', 'password': 'wrong'})
-    baseline = time.perf_counter() - t0
-    # Self-calibrating floor: half the baseline. If a future config tunes argon2
-    # down (e.g. time_cost=1 on CI), the floor scales with it.
-    floor = baseline * 0.5
 
     # Time invalid-username path
     t0 = time.perf_counter()
     r1 = client.post('/api/login', json={'username': 'nobody', 'password': 'wrong'})
     elapsed_bad_user = time.perf_counter() - t0
 
-    # Time invalid-password path (correct user)
+    # Time invalid-password path (correct user) — this is the reference, and it
+    # is measured in the same run under the same load as the one above.
     t0 = time.perf_counter()
     r2 = client.post('/api/login', json={'username': 'illumio', 'password': 'wrong'})
     elapsed_bad_pass = time.perf_counter() - t0
 
     assert r1.status_code == 401
     assert r2.status_code == 401
-    # Floor proves verify_password actually ran (no short-circuit on missing user)
+    # Floor proves verify_password actually ran (no short-circuit on missing
+    # user). Half the SETTLED bad-password cost, not half the warm-up: the two
+    # are then like for like, and the margin against the real defect is huge —
+    # a short-circuited lookup returns in well under a millisecond, hundreds of
+    # times below this floor, so the factor does not need to be tight.
+    floor = elapsed_bad_pass * 0.5
     assert elapsed_bad_user > floor, (
-        f"invalid-username path too fast ({elapsed_bad_user:.3f}s vs floor={floor:.3f}s) "
-        f"— short-circuit not removed"
+        f"invalid-username path too fast ({elapsed_bad_user:.3f}s vs floor={floor:.3f}s, "
+        f"bad-password={elapsed_bad_pass:.3f}s) — short-circuit not removed"
     )
     # Ratio is the second check — argon2 default params vary 80-250ms even on a
     # single host, so a loaded CI runner can hit 3.5x without a real regression.
