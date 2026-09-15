@@ -166,6 +166,34 @@ GUI：報表區 `#/reports` → VEN Status 卡片的產生鈕。
 
 注意事項：即時查詢，沒有 cache／`--data-source` 選項；PCE 的 `agent.status.status` 只反映行政狀態，不代表真的連得到，這是本報表存在的理由。
 
+### 車隊章節（2026-09-15 新增）
+
+同一份 workloads 另外產出四章，不多抓一次 PCE：
+
+| 章節 | 回答什麼 |
+|---|---|
+| Enforcement 推進管線 | 每台工作負載走到 `idle` → `full` 這條路的哪裡，還在 `idle` 的被什麼擋住 |
+| 相容性檢查 | PCE 對仍在 `idle` 的工作負載的判定。**四態**：pass／warn／fail／unknown |
+| 車隊健康度 | 五個分量合成的一個分數 |
+| Label 覆蓋 | 依 app／env 拆開的 enforcement 分布，以及沒有 Label 因此政策碰不到的工作負載 |
+
+三件這些章節刻意不做：
+
+- **沒設定目標 VEN 版本就不印「待升級」數字**，不是印 0。那個數字沒有依據。
+- **部分分數會在紙上標明**。分量缺資料時是剔除並把剩下的權重重新正規化，不是
+  當成 0——否則光是沒設目標版本就會讓健康的車隊看起來壞掉；標註會說出哪幾個
+  分量沒被計入。
+- **xlsx 的 `Fleet` 工作表全量不截**。HTML 的樣本表截到 50 列並標示出來，但
+  試算表是拿去篩選排序的，截斷比沒有還糟。
+
+相容性四態是刻意的（來源 plugger 把 warning 併進 fail）：warning 值得在推進前
+讀一次，fail 才是擋，unknown 代表沒檢查過——「沒檢查」不是「通過」。
+
+這四章與 GUI 的 Investigate → VEN 車隊讀**同一支分析函式**，所以紙上與畫面上
+不可能對同一個階段報出不同台數。
+
+設定目標版本：系統區 → PCE 設定頁的 `目標版本` 欄位。
+
 ## 6. Enforcement Readiness Report
 
 用途：哪個 App(Env) 可以安全推進到下一個 enforcement mode，依政策覆蓋率、ringfence 成熟度、目前 enforcement mode、staged readiness、remote app coverage 五個因子計分排序。

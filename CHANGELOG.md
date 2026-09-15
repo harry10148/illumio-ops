@@ -24,6 +24,42 @@ a plain `<major>.<minor>.<patch>` scheme. (Tags through v4.0.0 carried a
 
 ### Added
 
+- **A VEN fleet view, at Investigate → VEN fleet.** Where every managed
+  workload stands on the way from `idle` to `full` enforcement, which VEN
+  versions are out there, what the PCE's compatibility check says about the
+  ones still in `idle`, and which workloads carry no `app` or `env` label and
+  so cannot be named by a policy. The page reads the snapshot the VEN summary
+  job already writes — it never queries the PCE itself, and it renders no
+  numbers at all before that job has run once: "not analysed yet" and "nothing
+  out there" look identical as a zero and mean opposite things on a call.
+
+  The fleet health score is one number over five parts (online, enforcement
+  progress, version consistency, heartbeat freshness, compatibility). A part
+  with no data is dropped and the remaining weights renormalised rather than
+  counted as zero, and the page says which parts were left out — otherwise
+  simply not having set a target VEN version would make a healthy fleet look
+  broken.
+
+- **Two-phase enforcement progression.** Preview shows exactly which workloads
+  would change, which are offline (they change too, applying at the VEN's next
+  heartbeat — left unticked so the choice is yours), and which are left out
+  with the reason. Apply writes one field, `enforcement_mode`, forward only:
+  `idle` → anything, `visibility_only` → `selective`/`full`, `selective` →
+  `full`. Never backwards.
+
+  If any workload in the batch is ineligible the whole batch is refused and
+  nothing is sent — a partial apply leaves nobody knowing which hosts moved.
+  Each run is recorded to `config/fleet_progressions.json` with every
+  workload's previous mode, so a progression can be reversed by hand. The
+  success message says the change was *sent*: the PCE has it, and each VEN
+  applies it when it next reports in.
+
+- **Four fleet chapters in the VEN status report** — enforcement pipeline,
+  compatibility checks, fleet health score and label coverage — plus a `Fleet`
+  sheet in the workbook carrying every workload, uncapped. The report and the
+  web console call the same analysis function, so they cannot disagree about
+  how many workloads sit in a stage.
+
 - **`ILLUMIO_OPS_STATE_FILE` redirects `logs/state.json`**, the way
   `ILLUMIO_OPS_ANALYSIS_LOCK` already redirects the analysis lock, and every
   reader of that path now goes through one resolver instead of joining it
@@ -84,6 +120,18 @@ a plain `<major>.<minor>.<patch>` scheme. (Tags through v4.0.0 carried a
   reason for being ignored; the tool runs it against a live PCE (run it after a
   PCE upgrade) and a CI gate runs it against a paths-only corpus of 29 real
   event types. It found `info.events[].process_name` on its first run.
+
+### Changed
+
+- **Three settings now live on the PCE settings page**, under the API
+  connection: `fleet_target_ven_version` (the VEN version this fleet should be
+  on — leave it empty and no version comparison is made, and the fleet health
+  score simply does not count that part), and `fleet_max_batch` (how many
+  workloads one progression may change at once; the PCE's own ceiling is
+  1000). `fleet_index_cap` is settable too but has no control: past that many
+  workloads the per-host list is dropped from the stored snapshot and the page
+  says so, while the counts stay exact.
+
 
 ### Fixed
 

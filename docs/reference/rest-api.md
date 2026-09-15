@@ -196,6 +196,58 @@ policy decision 等即時才算得出的條件，以及全文 `search`，帶了�
 
 此子頁全部端點皆為唯讀，即時呼叫 PCE API，不寫入本地狀態。
 
+### 4b) 調查區 `#/investigate/fleet`（`src/gui/routes/fleet.py`）
+
+| 方法 | 路徑 | 用途 | 關鍵參數 |
+|---|---|---|---|
+| GET | `/api/fleet` | 車隊快照摘要（版本、compat、管線、心跳、gaps、health score）| — |
+| GET | `/api/fleet/list` | 取單一 bucket 的逐台清單 | `bucket`（見下）, `offset`, `limit`(≤500，預設 100) |
+| POST | `/api/fleet/progress/preview` | 預覽一次 enforcement 推進會動到誰 | `to_mode`, 以及 `hrefs` 或 `bucket`（**二擇一**，皆缺或皆給回 400）|
+| POST | `/api/fleet/progress/apply` | 實際寫入 PCE | `to_mode`, `hrefs` |
+| GET | `/api/fleet/progress/records` | 歷次推進紀錄（新到舊）| `limit`(≤100，預設 20) |
+
+**資料來源**：前三支唯讀，讀的是 `ven_summary` 排程寫進
+`logs/dashboard_summary.json["fleet"]` 的快照，**不即時呼叫 PCE**。排程還沒跑過時
+`/api/fleet` 回 `{"ok": true, "available": false, "fleet": {}}`——那不是「車隊是空的」，
+是「還沒分析過」，呼叫端必須分辨。
+
+**`bucket` 值域**：`idle_compat_pass`、`idle_compat_warn`、`idle_compat_fail`、
+`idle_compat_unknown`、`visibility_ready`、`visibility_not_ready`、`selective`、
+`full`、`fresh`、`stale_24h`、`stale_48h`、`no_heartbeat`、`unlabeled`、`offline`。
+不合法的值回 **400**，不是空清單——空清單會被讀成「這個 bucket 沒東西」。
+
+**寫入約束**（`apply` 是本專案唯一會改 PCE 物件的端點）：
+
+- 只送 `enforcement_mode` 一個欄位，body 是重建的，不轉送 index 列。
+- 只准往前：`idle` → `visibility_only`/`selective`/`full`；`visibility_only` →
+  `selective`/`full`；`selective` → `full`。白名單制，新模式預設不可推進。
+- **全有或全無**：伺服端重跑分類（不信任瀏覽器送來的 preview），任一 href 落在
+  skipped 就整批回 400 且完全不呼叫 PCE。
+- 回應帶 `pending_heartbeat: true`。PCE 收下 ≠ VEN 已套用——政策在各 VEN 下次
+  heartbeat 才生效，期間 PCE 顯示 `Syncing`（REST_APIs_26_1.pdf）。
+- 兩支 POST 皆限流 `10/分鐘`，皆走 app 層 CSRF。
+
+**紀錄格式**（`config/fleet_progressions.json`，key 為 `record_id`）：
+
+```json
+{
+  "at": "2026-09-15T01:00:00Z",
+  "user": "admin",
+  "to_mode": "selective",
+  "items": [{
+    "href": "/orgs/1/workloads/...", "hostname": "web-01",
+    "previous_mode": "idle", "new_mode": "selective",
+    "deferred": false, "status": "updated", "http": 200, "errors": []
+  }]
+}
+```
+
+`previous_mode` 是還原的依據——沒有它這份紀錄只是流水帳。
+
+**未經真環境驗證**：Illumio 的 KB 沒有 `workloads/bulk_update` 的 response schema，
+逐筆 `{href, status, errors}` 的解析是依據推測。PCE 沒有回應到的 href 會被賦予整批
+的結果，而不是猜它成功或失敗。
+
 ### 5) 政策區：告警規則 `#/policy/alert-rules`、`/ops`；手動動作 `#/system/alerting`（v2 `#/alerting/*`；`src/gui/routes/rules.py` ＋ `actions.py`）
 
 **Rules 子頁：**
@@ -380,17 +432,18 @@ TLS 相關端點存檔後都需要**重啟服務**才會套用；自簽憑證每
 | 總覽 | `dashboard.py` | 10 |
 | 調查（流量／Workload） | `actions.py`（部分）＋ `filter_objects.py` ＋ `policy.py` | 10 |
 | 調查（事件） | `events.py` | 4 |
+| 調查（VEN 車隊） | `fleet.py` | 5 |
 | 告警 | `rules.py` ＋ `actions.py`（部分）＋ `alerts.py` | 19 |
 | Reports | `reports.py` | 24 |
 | Rule Scheduler | `rule_scheduler.py` | 10 |
 | Integrations（Cache／SIEM／DLQ／daemon） | `pce_cache/web.py` ＋ `siem/web.py` ＋ `__init__.py` | 24 |
 | Settings | `config.py` | 12 |
 | 系統／除錯 | `admin.py` | 3 |
-| **合計** | | **119**（2026-09-03 實測；逐區數字為盤點加減，總數以下列 grep 為準） |
+| **合計** | | **123**（2026-09-15 實測；逐區數字為盤點加減，總數以下列 grep 為準） |
 
-此數字為 `grep -c "@[a-z_]*\.route(" src/gui/routes/*.py src/gui/__init__.py`（97）
+此數字為 `grep -c "@[a-z_]*\.route(" src/gui/routes/*.py src/gui/__init__.py`（101）
 加上另外掛載的 `src/siem/web.py`（13）與 `src/pce_cache/web.py`（9）。其中 4 個是頁面
-路由（`/`、`/login`、`/logout`、`/reports/<filename>`），其餘 115 個是 `/api/` JSON
+路由（`/`、`/login`、`/logout`、`/reports/<filename>`），其餘 119 個是 `/api/` JSON
 端點。[gui-tour.md](../guide/gui-tour.md) 的『約 85 條』是較早盤點的粗略數字（僅計 src/gui/routes
 與 gui/__init__ 的 /api 路由），非逐條稽核；本檔的對帳表才是權威清單。
 

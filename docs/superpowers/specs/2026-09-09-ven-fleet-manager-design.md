@@ -1,6 +1,9 @@
 # VEN Fleet Manager 設計（子專案 1／4，借鑒 illumio-plugger ven-fleet-manager）
 
-日期：2026-09-09　狀態：已核准（使用者「ok」）　分支：feat/ven-fleet-manager
+日期：2026-09-09　狀態：**已實作**（2026-09-15 合入 main）　分支：feat/ven-fleet-manager（已合併）
+
+> 實作與本文的偏離逐條記在文末「實作偏離」一節。§2.1 的七項決定**全部照做**；
+> 偏離集中在計畫（plan）寫錯的錨點與兩個本文沒查證的假設。
 
 ## 0. 背景與範圍
 
@@ -166,3 +169,56 @@ fleet health score（含 partial 註記與缺分量）、coverage gaps。表格�
 - 離線 VEN 的模式變更在 PCE 立即生效、VEN 重連後才套用；preview 把它列 `deferred`，操作者勾選後
   apply 允許並逐筆標 `deferred: true`。
 - `fetch_managed_workloads` 走 500 上限＋截斷偵測；>500 集合的 fallback 行為依 api-layer-hardening。
+
+---
+
+## 實作偏離（2026-09-15 收尾時逐條對照）
+
+§2.1 的七項決定全部照做，逐項驗證都有守門測試（`tests/test_fleet_analysis.py`）。
+以下是**與本文或計畫不符**之處，都是實作時查原始碼才發現的。
+
+### 本文（spec）層面
+
+1. **`visibility_only` 不是 glossary 詞。** 本文與計畫都要求它「依 glossary
+   保留英文」，實查 `src/i18n/data/glossary.json` 並沒有這一條，而 reviewer-copy
+   閘門會正確地把 snake_case 形式判成內部欄位名。操作者文案改用 PCE 主控台自己
+   的顯示形式 **Visibility only**；API 值域、bucket 名與紀錄欄位仍是
+   `visibility_only`。
+
+2. **`visibility_ready` / `visibility_not_ready` 在逐台清單上分不出來。**
+   兩者的差別是 `security_policy_received_at`，而它沒有進 `workloads_index`
+   （§2.2 定義的欄位裡沒有）。摘要的 `count` 仍精確；`/api/fleet/list` 對這兩個
+   bucket 都列出整個 `visibility_only`。要分開就得擴充 index 的欄位。
+
+3. **bulk_update 的 response schema 未經證實。** Illumio KB（REST_APIs_25_2／
+   26_1）有批次上限 1000、一次只能跑一個 bulk operation（並行回 429）、政策在
+   VEN 下次 heartbeat 才套用——但**沒有** response 的結構。逐筆
+   `{href, status, errors}` 的解析是假設；PCE 沒有回應到的 href 會被賦予整批的
+   結果，而不是猜它成功或失敗。**真 PCE 驗證仍未做。**
+
+### 計畫（plan）層面
+
+4. **`next_run_at` 的來源不存在。** 計畫要求從 `logs/job_health.json` 的
+   `ven_summary` 條目取，該檔只有 `last_run` / `last_status` /
+   `interval_seconds` / `registered_at`——APScheduler 的 `next_run_time` 活在
+   排程行程的記憶體裡。改為由 `last_run + interval_seconds` 推導；job 卡住時
+   推導值會落在過去，那本身就是訊號。兩個輸入缺一即 `null`。
+
+5. **`components.weight` 沒有實作。** §2.1 寫回傳
+   `components{name:{value,weight,present}}`，實作只給 `{value, present}`。
+   權重是模組級常數 `_SCORE_WEIGHTS`，逐分量重複一次只是讓兩份數字有機會分岔。
+
+6. **`crumbsFor` / `labelForRoute` 不需要改。** 計畫要求改
+   `components/page.mjs`，但那兩支是從 `NAV` 讀的，在 `shell.mjs` 加一筆導覽項
+   就夠了。
+
+7. **端點是 5 個不是 6 個。** 計畫的 Task 6 寫「fleet 六個端點」，實際是
+   `/api/fleet`、`/api/fleet/list`、`progress/preview`、`progress/apply`、
+   `progress/records`。
+
+### 未完成
+
+- **真機驗收未做**：計畫 Task 5 要求對 lab 產 en／zh 兩份 VEN 報表，用
+  Playwright 在 800／1280 兩種寬度逐頁截圖確認四個新章節沒有截斷或溢出。
+  測試機 2026-09-15 處於關機狀態，這一項留待開機後補做。本專案的規則寫明
+  報表交付前要用實際樣本跑一次完整輸出並逐頁檢查，所以**不視為已通過**。
