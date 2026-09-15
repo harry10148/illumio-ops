@@ -285,7 +285,8 @@ class VenHtmlExporter:
         # contents (the old sidebar never listed them). Both are conditional on
         # the snapshot carrying that data.
         for _extra in (self._estate_inventory_section(),
-                       self._ransomware_posture_section()):
+                       self._ransomware_posture_section(),
+                       *self._fleet_sections()):
             if _extra is not None:
                 sections.append(_extra)
 
@@ -332,6 +333,135 @@ class VenHtmlExporter:
             )
         html += "</div>"
         return html
+
+    # ── VEN fleet chapters (plugger port 1/4) ────────────────────────────
+    #
+    # The same analyse_fleet() dict the GUI's #/investigate/fleet reads. One
+    # function, two surfaces: the report and the console cannot disagree about
+    # how many workloads are in a stage, because neither of them counts.
+    _FLEET_STAGES = ("idle_compat_pass", "idle_compat_warn", "idle_compat_fail",
+                     "idle_compat_unknown", "visibility_ready",
+                     "visibility_not_ready", "selective", "full")
+    _FLEET_PARTS = ("online", "enforcement", "version", "heartbeat", "compat")
+    _FLEET_SAMPLE_CAP = 50
+
+    def _fleet_sections(self) -> list[ShellSection]:
+        """The four fleet chapters, or nothing when there is no analysis.
+
+        Older snapshots predate the fleet key; a report over one of those keeps
+        the chapters out rather than printing four empty tables.
+        """
+        fleet = self._r.get("fleet")
+        if not fleet or not isinstance(fleet, dict) or "pipeline" not in fleet:
+            return []
+        return [self._fleet_pipeline_section(fleet),
+                self._fleet_compat_section(fleet),
+                self._fleet_score_section(fleet),
+                self._fleet_gaps_section(fleet)]
+
+    def _fleet_panel(self, tbl_html: str) -> str:
+        return ('<div class="report-table-panel report-table-panel--compact">'
+                f'<div class="report-table-wrap">{tbl_html}</div></div>')
+
+    def _fleet_table(self, headers: list[str], rows: list[list[str]]) -> str:
+        head = "".join(f"<th>{html.escape(h)}</th>" for h in headers)
+        # hostname 一類的長值靠 word-break 換行，不省略——專案規則：過長內容
+        # 的處理必須明確，不可無聲截斷。
+        body = "".join(
+            "<tr>" + "".join(
+                f'<td style="word-break:break-word">{html.escape(str(c))}</td>'
+                for c in r) + "</tr>"
+            for r in rows)
+        return self._fleet_panel(
+            f'<table class="report-table"><thead><tr>{head}</tr></thead>'
+            f'<tbody>{body}</tbody></table>')
+
+    def _fleet_pipeline_section(self, fleet: dict) -> ShellSection:
+        _s = self._s
+        pipe = fleet.get("pipeline") or {}
+        # 階段名沿用後端的字面（idle / visibility_only / selective / full），
+        # 那是 PCE 自己的詞彙，報表讀者在 PCE 主控台上看到的就是它。
+        rows = [[k, str((pipe.get(k) or {}).get("count", 0))]
+                for k in self._FLEET_STAGES]
+        content = self._fleet_table(
+            [_s("rpt_ven_fleet_stage"), _s("rpt_ven_fleet_count")], rows)
+        total = sum((pipe.get(k) or {}).get("count", 0) for k in self._FLEET_STAGES)
+        return self._section("fleet-pipeline", "rpt_ven_fleet_pipeline_title", total,
+                             content, "rpt_ven_fleet_pipeline_intro",
+                             "ven_fleet_pipeline")
+
+    def _fleet_compat_section(self, fleet: dict) -> ShellSection:
+        _s = self._s
+        compat = fleet.get("compat") or {}
+        rows = [[k, str(compat.get(k, 0))] for k in ("pass", "warn", "fail", "unknown")]
+        content = self._fleet_table(
+            [_s("rpt_ven_fleet_verdict"), _s("rpt_ven_fleet_count")], rows)
+        return self._section("fleet-compat", "rpt_ven_fleet_compat_title",
+                             sum(compat.values()) if compat else 0, content,
+                             "rpt_ven_fleet_compat_intro", "ven_fleet_compat")
+
+    def _fleet_score_section(self, fleet: dict) -> ShellSection:
+        _s = self._s
+        hs = fleet.get("health_score") or {}
+        comps = hs.get("components") or {}
+        parts: list[str] = []
+        score = hs.get("score")
+        if score is None:
+            parts.append(f'<p>{_s("rpt_ven_fleet_score_none")}</p>')
+        else:
+            parts.append(
+                f'<p><strong>{_s("rpt_ven_fleet_score_label")}: {int(score)}</strong></p>')
+        # 「部分分數」必須印在紙上：一個沒有註記的數字會被當成五個分量都算過。
+        if hs.get("partial"):
+            parts.append(f'<p class="section-intro">{_s("rpt_ven_fleet_partial")}</p>')
+        rows = []
+        for k in self._FLEET_PARTS:
+            c = comps.get(k) or {}
+            present = bool(c.get("present"))
+            value = c.get("value")
+            rows.append([
+                k,
+                "" if value is None else ("%.0f%%" % (float(value) * 100)),
+                _s("rpt_ven_fleet_counted" if present else "rpt_ven_fleet_not_counted"),
+            ])
+        parts.append(self._fleet_table(
+            [_s("rpt_ven_fleet_part"), _s("rpt_ven_fleet_value"), ""], rows))
+        versions = fleet.get("versions") or {}
+        target = versions.get("target") or _s("rpt_ven_fleet_target_unset")
+        parts.append(f'<p>{_s("rpt_ven_fleet_target")}: {html.escape(str(target))}</p>')
+        return self._section("fleet-score", "rpt_ven_fleet_score_title", None,
+                             "".join(parts), "rpt_ven_fleet_score_intro",
+                             "ven_fleet_score")
+
+    def _fleet_gaps_section(self, fleet: dict) -> ShellSection:
+        _s = self._s
+        gaps = fleet.get("coverage_gaps") or {}
+        parts: list[str] = []
+        for key, title_key in (("by_app", "rpt_ven_fleet_by_app"),
+                               ("by_env", "rpt_ven_fleet_by_env")):
+            data = gaps.get(key) or {}
+            parts.append(f'<h3>{_s(title_key)}</h3>')
+            if not data:
+                parts.append(f'<p>{t("rpt_no_records", lang=self._lang)}</p>')
+                continue
+            names = sorted(data)
+            shown = names[:self._FLEET_SAMPLE_CAP]
+            rows = [[n, " · ".join("%s %d" % (m or "—", c)
+                                   for m, c in sorted((data[n] or {}).items()))]
+                    for n in shown]
+            parts.append(self._fleet_table(
+                [_s(title_key), _s("rpt_ven_fleet_count")], rows))
+            if len(names) > len(shown):
+                # 截斷要說出來，不可無聲。
+                parts.append('<p class="section-intro">%s</p>' % t(
+                    "rpt_ven_fleet_sample_note", lang=self._lang,
+                    shown=len(shown), total=len(names)))
+        unlabeled = (gaps.get("unlabeled") or {}).get("count", 0)
+        parts.append(
+            f'<p>{_s("rpt_ven_fleet_unlabeled")}: <strong>{int(unlabeled)}</strong></p>')
+        return self._section("fleet-gaps", "rpt_ven_fleet_gaps_title", int(unlabeled),
+                             "".join(parts), "rpt_ven_fleet_gaps_intro",
+                             "ven_fleet_gaps")
 
     def _estate_inventory_section(self) -> ShellSection | None:
         """The Estate Inventory & Posture chapter, or None when there is no data.
