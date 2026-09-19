@@ -32,14 +32,27 @@
   修它要重產 11 型 × 2 語系逐頁複驗。
 - **worktree `.worktrees/ven-fleet-manager` 與分支 `feat/ven-fleet-manager` 已刪。**
 
+- **F1–F6 已全修並發版。** 使用者裁示先修再發版。修復 `bf76652c`／`3aff6bb0`／
+  `24659b83`／`b780d4b6`，複驗涵蓋全部 11 種 HTML 報表 × 2 語系 × 2 寬度
+  （2,440 個面板、0 問題），**v5.2.0** 已 tag（`aea03e37`）、已推、測試機已部署。
+
 ### 仍待人工處理
 
 - **Mac 端記憶體同步**：拓撲是 Mac → dev（dev 託管 bare repo），dev 沒有到 Mac 的
   SSH 入口，只能由操作者在 Mac 上跑 `mem-sync`，跑完 dev 這側再跑一次才算收斂
-  （Mac 先、dev 最後）。bare repo 最後兩筆是 09-15 14:58／14:59Z，晚於本文初版，
-  但從 dev 這側分不出其中是否有一筆來自 Mac。
-- **發版未做**：`CHANGELOG.md` 的 `[Unreleased]` 已累積整個 fleet（目前 tag v5.1.0）。
-  因為 F1–F6 都落在這段描述的功能裡，發版與否留給操作者決定。
+  （Mac 先、dev 最後）。
+
+- **`.worktrees/saas-pce-monitoring-links` 有兩個未追蹤檔要刪**：它們是 main 上那兩份
+  plan／spec 的**未去識別化版本**（main 寫「NFR PCE」與 `org_id: "1"`，這兩份留著真實
+  租戶 org id 與「production PCE」）。依 CLAUDE.md 安全規則該清掉，但 agent 的 `rm`
+  被權限層擋下，需要人工執行。
+
+### 已知 follow-up（非阻斷）
+
+- traffic 家族報表 policy 章在 1280 的第三欄只有 210px、表格自然寬 247px，39px 藏在
+  水平捲軸後面，列印會無聲切掉 Connections 欄。已確認**不是** v5.2.0 的回歸（用同一份
+  HTML 對照修復前後樣式各量一次）。
+- fleet 的 `bulk_update` response schema 仍未經真 PCE 驗證（見 §3）。
 
 ## 3. 已完成：VEN Fleet Manager（plugger 移植 1／4）
 
