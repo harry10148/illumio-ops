@@ -345,6 +345,34 @@ class VenHtmlExporter:
     _FLEET_PARTS = ("online", "enforcement", "version", "heartbeat", "compat")
     _FLEET_SAMPLE_CAP = 50
 
+    # A bucket key is a field name, not a word: printing `idle_compat_unknown`
+    # in the operator's Stage column asks them to decode the backend's
+    # vocabulary, and `visibility_ready` is not even the PCE's — this tool
+    # invented it. The copy is the console's copy, key for key, and
+    # tests/test_fleet_report_copy_parity.py fails if the two drift; two
+    # surfaces over one analysis must not name the same bucket differently.
+    # Keys are spelled out rather than built from a prefix and the bucket
+    # name: the i18n audit reads the source for literal keys, so a key glued
+    # together at runtime is invisible to it and a missing string would ship
+    # as its own identifier with no gate noticing.
+    _FLEET_STAGE_KEYS = {
+        "idle_compat_pass": "rpt_ven_fleet_stage_idle_compat_pass",
+        "idle_compat_warn": "rpt_ven_fleet_stage_idle_compat_warn",
+        "idle_compat_fail": "rpt_ven_fleet_stage_idle_compat_fail",
+        "idle_compat_unknown": "rpt_ven_fleet_stage_idle_compat_unknown",
+        "visibility_ready": "rpt_ven_fleet_stage_visibility_ready",
+        "visibility_not_ready": "rpt_ven_fleet_stage_visibility_not_ready",
+        "selective": "rpt_ven_fleet_stage_selective",
+        "full": "rpt_ven_fleet_stage_full",
+    }
+    _FLEET_PART_KEYS = {
+        "online": "rpt_ven_fleet_part_online",
+        "enforcement": "rpt_ven_fleet_part_enforcement",
+        "version": "rpt_ven_fleet_part_version",
+        "heartbeat": "rpt_ven_fleet_part_heartbeat",
+        "compat": "rpt_ven_fleet_part_compat",
+    }
+
     def _fleet_sections(self) -> list[ShellSection]:
         """The four fleet chapters, or nothing when there is no analysis.
 
@@ -379,9 +407,8 @@ class VenHtmlExporter:
     def _fleet_pipeline_section(self, fleet: dict) -> ShellSection:
         _s = self._s
         pipe = fleet.get("pipeline") or {}
-        # 階段名沿用後端的字面（idle / visibility_only / selective / full），
-        # 那是 PCE 自己的詞彙，報表讀者在 PCE 主控台上看到的就是它。
-        rows = [[k, str((pipe.get(k) or {}).get("count", 0))]
+        rows = [[_s(self._FLEET_STAGE_KEYS[k]),
+                 str((pipe.get(k) or {}).get("count", 0))]
                 for k in self._FLEET_STAGES]
         content = self._fleet_table(
             [_s("rpt_ven_fleet_stage"), _s("rpt_ven_fleet_count")], rows)
@@ -420,12 +447,17 @@ class VenHtmlExporter:
             present = bool(c.get("present"))
             value = c.get("value")
             rows.append([
-                k,
+                _s(self._FLEET_PART_KEYS[k]),
                 "" if value is None else ("%.0f%%" % (float(value) * 100)),
                 _s("rpt_ven_fleet_counted" if present else "rpt_ven_fleet_not_counted"),
             ])
+        # The third column carried no header at all. A column of
+        # Counted / Not counted with nothing above it reads as a stray
+        # annotation rather than as the answer to a question the reader can
+        # see being asked.
         parts.append(self._fleet_table(
-            [_s("rpt_ven_fleet_part"), _s("rpt_ven_fleet_value"), ""], rows))
+            [_s("rpt_ven_fleet_part"), _s("rpt_ven_fleet_value"),
+             _s("rpt_ven_fleet_in_score")], rows))
         versions = fleet.get("versions") or {}
         target = versions.get("target") or _s("rpt_ven_fleet_target_unset")
         parts.append(f'<p>{_s("rpt_ven_fleet_target")}: {html.escape(str(target))}</p>')
@@ -437,8 +469,14 @@ class VenHtmlExporter:
         _s = self._s
         gaps = fleet.get("coverage_gaps") or {}
         parts: list[str] = []
-        for key, title_key in (("by_app", "rpt_ven_fleet_by_app"),
-                               ("by_env", "rpt_ven_fleet_by_env")):
+        # The heading names the cut ("By app"); the column header names what
+        # is actually in the cells (an app label, and a count per enforcement
+        # mode). Printing the heading again as the first column header said
+        # neither, and left the second column labelled "Workloads" over cells
+        # that read "selective 2".
+        for key, title_key, value_key in (
+                ("by_app", "rpt_ven_fleet_by_app", "rpt_ven_fleet_app_value"),
+                ("by_env", "rpt_ven_fleet_by_env", "rpt_ven_fleet_env_value")):
             data = gaps.get(key) or {}
             parts.append(f'<h3>{_s(title_key)}</h3>')
             if not data:
@@ -450,7 +488,7 @@ class VenHtmlExporter:
                                    for m, c in sorted((data[n] or {}).items()))]
                     for n in shown]
             parts.append(self._fleet_table(
-                [_s(title_key), _s("rpt_ven_fleet_count")], rows))
+                [_s(value_key), _s("rpt_ven_fleet_by_mode")], rows))
             if len(names) > len(shown):
                 # 截斷要說出來，不可無聲。
                 parts.append('<p class="section-intro">%s</p>' % t(
