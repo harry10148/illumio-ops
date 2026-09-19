@@ -1,4 +1,4 @@
-# 交接：2026-09-15
+# 交接：2026-09-15（2026-09-19 更新）
 
 給接手的 agent。**先讀這份，再讀你要動的那條線的計畫／spec。**
 
@@ -8,55 +8,40 @@
 
 | repo | HEAD | 狀態 |
 |---|---|---|
-| `illumio-ops` | `cc4d9e26` | main 乾淨、已推、CI 綠 |
-| `claude-config` | `e5df8af` | 乾淨、已推 |
+| `illumio-ops` | `2fd3798c` | main 乾淨、已推（2026-09-19） |
+| `claude-config` | `b42a550` | 乾淨、已推（2026-09-19） |
 | `~/.claude-mem` | — | dev 側已推；**Mac 側待人在 Mac 上跑 `mem-sync`** |
 
-`feat/ven-fleet-manager` **已完全併入 main**（領先 0 個 commit），PR #31 MERGED。
-worktree `.worktrees/ven-fleet-manager` 還在但已無獨立內容，可刪。
+`feat/ven-fleet-manager` **已完全併入 main**，PR #31 MERGED；分支與 worktree
+已於 2026-09-19 刪除。
 
 ---
 
-## 2. 卡住的兩件事（都不是程式問題）
+## 2. 2026-09-19 的變化：原本卡住的三件事已收掉
 
-### 測試機關機中
+測試機 `illumio-ops-test`（172.16.15.106）已開機。因此：
 
-`illumio-ops-test`（172.16.15.106）**電源關閉**，`No route to host`。因此：
+- **部署已做。** 從 `ab827179`（09-14，落後 22 個 commit）拉到 `91383d77`，
+  重啟後 `systemctl is-active` = active，六個排程 job 全 `ok`，
+  `ven_summary` 已在新程式下跑過並寫出 fleet 快照。
+- **VEN 報表真機驗收已做，條件通過。** en／zh_TW × 800／1280，四章無截斷無溢出。
+  親看另外揪出六項非阻斷問題（F1–F6），連同 F1 的根因一併記在
+  `plans/2026-09-09-ven-fleet-manager.md` 文末（commit `2fd3798c`）。
+  **F1 不是 fleet 的問題**：v2 report shell 移植時把 `.report-table-panel` 的
+  `width: max-content` 漏掉、註解卻搬了過來，五處 `--compact` 呼叫端共用，
+  修它要重產 11 型 × 2 語系逐頁複驗。
+- **worktree `.worktrees/ven-fleet-manager` 與分支 `feat/ven-fleet-manager` 已刪。**
 
-- **部署沒做。** main 上 `2a9d56ae`（fleet 合併）之後的東西都還沒上測試機。
-  開機後跑：
-  ```
-  ssh illumio-ops-test 'cd /root/illumio-ops && git pull --ff-only -q origin main \
-    && git rev-parse --short HEAD && systemctl restart illumio-ops \
-    && sleep 6 && systemctl is-active illumio-ops'
-  ```
-- **VEN 報表的真機驗收沒做**（見 §3）。
+### 仍待人工處理
 
-### Mac 端記憶體同步
+- **Mac 端記憶體同步**：拓撲是 Mac → dev（dev 託管 bare repo），dev 沒有到 Mac 的
+  SSH 入口，只能由操作者在 Mac 上跑 `mem-sync`，跑完 dev 這側再跑一次才算收斂
+  （Mac 先、dev 最後）。bare repo 最後兩筆是 09-15 14:58／14:59Z，晚於本文初版，
+  但從 dev 這側分不出其中是否有一筆來自 Mac。
+- **發版未做**：`CHANGELOG.md` 的 `[Unreleased]` 已累積整個 fleet（目前 tag v5.1.0）。
+  因為 F1–F6 都落在這段描述的功能裡，發版與否留給操作者決定。
 
-拓撲是 Mac → dev（dev 託管 bare repo），dev 沒有到 Mac 的 SSH 入口，所以 Mac 側
-只能由操作者在 Mac 上跑 `mem-sync`。跑完之後 dev 這側要再跑一次才算收斂
-（規則：Mac 先、dev 最後）。
-
----
-
-## 3. 唯一的未完成驗收項
-
-**VEN 狀態報表四個新章節的真機視覺驗收。**
-
-計畫（`plans/2026-09-09-ven-fleet-manager.md` Task 5）要求：對 lab 產 en 與 zh
-各一份 VEN 報表，用 Playwright 在 **800 與 1280 兩種寬度**逐頁截圖，確認
-`fleet-pipeline`／`fleet-compat`／`fleet-score`／`fleet-gaps` 四章沒有截斷或溢出。
-
-**不要把它當成已通過。** 本專案 `CLAUDE.md` 明寫：報表交付前要用實際樣本跑一次
-完整輸出並逐頁檢查，而這個 repo 的報表截斷問題重複發生過 5 次。
-
-同一件事也記在 spec 的「未完成」段落
-（`specs/2026-09-09-ven-fleet-manager-design.md` 文末）。
-
----
-
-## 4. 已完成：VEN Fleet Manager（plugger 移植 1／4）
+## 3. 已完成：VEN Fleet Manager（plugger 移植 1／4）
 
 六個 task 全交付，全套 4986 passed、五道閘門綠、CI 綠。
 
@@ -82,7 +67,7 @@ worktree `.worktrees/ven-fleet-manager` 還在但已無獨立內容，可刪。
 
 ---
 
-## 5. 下一條線
+## 4. 下一條線
 
 `plugger-port-program`：fleet → **app-dep** → vmaps → isolator。
 
@@ -105,7 +90,7 @@ worktree `.worktrees/ven-fleet-manager` 還在但已無獨立內容，可刪。
 
 ---
 
-## 6. 這一輪學到、對你有用的三件事
+## 5. 這一輪學到、對你有用的三件事
 
 - **宣布任何守門「有效」之前，注入它該抓的缺陷確認會變紅。** 這輪注入 29 次，
   抓到 **3 支假綠**：版本排序（fixture 的 26/25/23 字串序與數值序恰好一致）、
