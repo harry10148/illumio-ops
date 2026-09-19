@@ -215,3 +215,55 @@ Commit: `feat(reports): VEN status report grows fleet pipeline, compat, score an
 - 逐條對照 spec §2.1 七項決定與 §5 合約，任何偏離寫進 spec 註記。
 
 Commit: `docs(fleet): reference, guide and changelog for the VEN fleet manager`
+
+---
+
+## Task 5 真機視覺驗收紀錄（2026-09-19）
+
+測試機 `illumio-ops-test` 開機後補做。部署 `91383d77`，`ven_summary` 於
+`05:48:45Z` 以新程式跑過一次並寫出 fleet 快照（21 台 managed workload，真 lab
+資料，非 fixture）。用 `VenStatusGenerator` 直接產 en 與 zh_TW 各一份 HTML
+（不改 `settings.language`），在 Chromium 800／1280 兩種寬度逐章截圖並量測。
+
+**四章都在，兩語系兩寬度都沒有截斷或溢出** —— 頁面 `scrollWidth == clientWidth`，
+四章之內沒有任何元素出現水平溢出、`text-overflow: ellipsis` 實際生效、或
+`overflow-y: hidden` 下的縱向裁切。計畫要求的驗收條件通過。
+
+逐頁親看之後另外發現六項**不是截斷、但該修**的問題（依嚴重度）：
+
+| # | 章節 | 問題 |
+|---|---|---|
+| F1 | `fleet-compat` | 表格實寬 156px，卻裝在 638px 的整寬卡片裡，卡片右側留下一大塊有框空白 |
+| F2 | `fleet-pipeline` | 導讀說「範例清單有上限並會標示出來」，但這一章只印 Stage／Workloads 兩欄，從不印範例 |
+| F3 | `fleet-pipeline` | Stage 欄直接印內部 bucket key：`idle_compat_pass`／`_warn`／`_fail`／`_unknown`、`visibility_ready`、`visibility_not_ready` |
+| F4 | `fleet-score` | 第三欄（已列入／未列入）表頭是空字串 |
+| F5 | `fleet-gaps` | Workloads 欄放的是「模式 數量」配對（`selective 2`），表頭只寫 Workloads |
+| F6 | `fleet-gaps` | 小節標題「依 app」與表格第一欄表頭字面重複 |
+
+**F1 的根因已查明，而且不是 fleet 的回歸，是 v2 report shell 移植時掉的一行。**
+`report_shell.py` 的 auto-fit 兩處註解都寫「the panel itself is `width:
+max-content`，所以窄表的空白會落在卡片外面」，但 v2 的 CSS 裡**沒有這條規則**。
+舊 shell 有：`report_css.py` 的 `.report-table-panel` 帶
+`width: max-content; max-width: 100%`，且上面就是解釋它為什麼存在的註解。
+`1b1b2df5`（v2 shell 移植）把兩段註解搬過來、把規則漏掉，`97c3bef3`（移除舊
+shell CSS）讓它正式生效。v2 的 `.report-table-panel` 只剩
+`margin/border/radius/background/overflow/min-width`，是整寬 block；
+`--compact` 也只有 `max-width: 640px`。
+
+於是當一張表的欄位全屬 narrow／numeric（沒有 `text` 欄可分配 slack）時，auto-fit
+走 else 分支保留自然寬度並把 `table.style.width` 釘在 `naturalTotal`，空白就留在
+卡片**裡面**。`fleet-compat`（Verdict／Workloads 兩個短欄）正好踩中。
+`report-table-panel--compact` 有五處呼叫端（`ven_html_exporter.py` ×3、
+`html_exporter.py`、`table_renderer.py`），所以這是報表殼層的共通缺陷，
+修它要照本專案規則重產全部 11 型 × 2 語系逐頁複驗。
+
+**證據**（`tmp/` 已被 gitignore，只留在本機）：
+`tmp/ven-fleet-acceptance-2026-09-19/` —— `shots/` 20 張截圖（2 語系 × 2 寬度 ×
+四章＋整頁）、`reports/` 兩份原始 HTML、`shot.py`／`probe2.py` 兩支量測腳本。
+關鍵量測：`fleet-compat` 為 `tableW 156 / wrapW 638 / panelW 640`，同頁
+`fleet-pipeline`／`fleet-score`／`fleet-gaps` 三章皆 `tableW 638`。
+
+四章 × 2 語系 × 2 寬度共 16 張章節截圖全部以量測掃過；其中 8 張（zh_TW@800 四章、
+en@800 pipeline／score／gaps、en@1280 compat、zh_TW@1280 gaps）另以肉眼逐張看過。
+
+F1–F6 均為新發現、非阻斷項，列為 follow-up，不在本次驗收範圍內修。

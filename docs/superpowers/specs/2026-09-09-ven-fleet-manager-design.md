@@ -216,9 +216,18 @@ fleet health score（含 partial 註記與缺分量）、coverage gaps。表格�
    `/api/fleet`、`/api/fleet/list`、`progress/preview`、`progress/apply`、
    `progress/records`。
 
+### 真機驗收（2026-09-19 完成）
+
+- **Task 5 的真機視覺驗收已補做。** 測試機開機後部署 `91383d77`，用 lab 真資料
+  （21 台 managed workload）產 en／zh_TW 兩份 VEN 報表，Chromium 800／1280 兩種
+  寬度逐章截圖並量測：**四章在兩語系兩寬度都沒有截斷或溢出，計畫的驗收條件通過。**
+  逐頁親看另外發現六項非阻斷的版面／文案問題（F1–F6），連同 F1 的根因
+  （v2 report shell 移植時漏掉 `.report-table-panel` 的 `width: max-content`，
+  影響五處 `--compact` 呼叫端、非 fleet 專屬）一併記在
+  `docs/superpowers/plans/2026-09-09-ven-fleet-manager.md` 文末的驗收紀錄，
+  列為 follow-up。
+
 ### 未完成
 
-- **真機驗收未做**：計畫 Task 5 要求對 lab 產 en／zh 兩份 VEN 報表，用
-  Playwright 在 800／1280 兩種寬度逐頁截圖確認四個新章節沒有截斷或溢出。
-  測試機 2026-09-15 處於關機狀態，這一項留待開機後補做。本專案的規則寫明
-  報表交付前要用實際樣本跑一次完整輸出並逐頁檢查，所以**不視為已通過**。
+- **`bulk_update` 的 response schema 仍未經真 PCE 驗證**（見上方第 3 條）。
+  這是整個功能唯一沒有事實基礎的地方，且推進動作是唯一會寫 PCE 的一段。
