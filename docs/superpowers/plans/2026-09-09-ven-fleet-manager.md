@@ -266,4 +266,53 @@ shell CSS）讓它正式生效。v2 的 `.report-table-panel` 只剩
 四章 × 2 語系 × 2 寬度共 16 張章節截圖全部以量測掃過；其中 8 張（zh_TW@800 四章、
 en@800 pipeline／score／gaps、en@1280 compat、zh_TW@1280 gaps）另以肉眼逐張看過。
 
-F1–F6 均為新發現、非阻斷項，列為 follow-up，不在本次驗收範圍內修。
+F1–F6 起初列為 follow-up。使用者 2026-09-19 裁示**先修 F1–F6 再發版**，以下是修復
+與複驗紀錄。
+
+---
+
+## F1–F6 修復與全報表複驗（2026-09-19）
+
+| # | 狀態 | commit |
+|---|---|---|
+| F1 | 修復 | `bf76652c` 還原 `.report-table-panel` 的 `width: max-content; max-width: 100%`（設計檔同步修，`--empty` 以 `width: auto` 退出）；`b780d4b6` 把 `--compact` 的上限改成 `min(640px, 100%)` |
+| F2 | 修復 | `3aff6bb0` 範例清單那句移到真的有上限的 gaps 章，pipeline 換成對它為真的敘述（階段互斥、計數加總等於總數） |
+| F3 | 修復 | `3aff6bb0` Stage 與分量欄改用主控台同一份文案（17 個新 i18n 鍵）；`24659b83` 導讀裡殘留的 `visibility_only` 也改掉 |
+| F4 | 修復 | `3aff6bb0` 分數表第三欄補上「是否列入」表頭 |
+| F5 | 修復 | `3aff6bb0` gaps 第二欄表頭改為「依 enforcement 模式」 |
+| F6 | 修復 | `3aff6bb0` gaps 第一欄表頭改為「app Label／env Label」，不再與小節標題重複 |
+
+**F1 的修復自己帶出一個回歸，是重產全報表才抓到的。** `max-width` 不是累加的：
+`--compact` 的 `max-width: 640px` 取代（而非收緊）基礎的 `max-width: 100%`。面板還是
+整寬 block 時這無害；一旦面板改由內容決定寬度，在比 640px 窄的欄位裡就沒有任何上限
+在作用。traffic 家族報表的 policy 章在 1280 會切成約 210px 的欄，裡面的面板於是掛到
+隔壁欄上。`min(640px, 100%)` 同時保住兩個界限（`b780d4b6`）。
+
+### 複驗範圍與結果
+
+修復後在測試機（`b780d4b6`）用 lab 真資料重產**全部 11 種 HTML 報表 × 2 語系 = 20 份**
+（traffic／security／inventory／audit／ven-status／policy-usage／rule-hit-count／
+readiness／policy-diff／app-summary；`resolve` 只出 JSON／CSV，不走報表殼層），在
+800／1280 兩種寬度逐一量測每一個 `.report-table-panel`：
+
+**40 次頁面量測、共 2,440 個面板，0 項問題。** 沒有面板比它的表格寬超過一個框線的量、
+沒有面板溢出所屬欄位、沒有寬表失去水平捲動、沒有空狀態卡片塌成 chip、沒有頁面水平捲動、
+四個 fleet 章仍然沒有截斷或溢出。
+
+守門有效性已逐項確認：探針對**修復前**的 audit 報表會紅（抓到 summary 與 users 兩個
+面板各 480／393px 的空白），i18n 對帳測試把任一邊改回欄位名就會紅，面板寬度測試
+拿掉 CSS 規則就會紅。
+
+### 複驗時發現、但不是本次造成的一項
+
+traffic 家族 policy 章在 1280 的第三欄（Top Inbound／Outbound Ports）只有 210px，
+而表格自然寬 247px，有 39px 藏在水平捲軸後面。**修復前後完全相同**（已用同一份 HTML
+分別以修復後樣式與還原成 v2 出貨樣式各量一次比對），所以不是這次的回歸。螢幕上可捲動，
+列印時會無聲切掉 Connections 欄——依本專案規則這仍是缺陷，列為 follow-up。
+
+### 證據
+
+`tmp/ven-fleet-acceptance-2026-09-19/`（`tmp/` 被 gitignore，只在本機）：
+- `batch-after-fixes/` — 修復後 20 份報表、`panel-probe.json` 全量量測、`shots/` 34 張截圖
+- `reports/`、`shots/` — 首次驗收（修復前）的 2 份報表與 20 張截圖
+- `batch_probe.py`、`cmp.py`、`shot.py`、`shot3.py`、`probe2.py` — 量測與截圖腳本

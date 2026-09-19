@@ -221,11 +221,14 @@ fleet health score（含 partial 註記與缺分量）、coverage gaps。表格�
 - **Task 5 的真機視覺驗收已補做。** 測試機開機後部署 `91383d77`，用 lab 真資料
   （21 台 managed workload）產 en／zh_TW 兩份 VEN 報表，Chromium 800／1280 兩種
   寬度逐章截圖並量測：**四章在兩語系兩寬度都沒有截斷或溢出，計畫的驗收條件通過。**
-  逐頁親看另外發現六項非阻斷的版面／文案問題（F1–F6），連同 F1 的根因
-  （v2 report shell 移植時漏掉 `.report-table-panel` 的 `width: max-content`，
-  影響五處 `--compact` 呼叫端、非 fleet 專屬）一併記在
-  `docs/superpowers/plans/2026-09-09-ven-fleet-manager.md` 文末的驗收紀錄，
-  列為 follow-up。
+  逐頁親看另外發現六項非阻斷的版面／文案問題（F1–F6）。
+
+- **F1–F6 已於同日全數修復並複驗**（使用者裁示先修再發版）。F1 的根因是 v2 report
+  shell 移植時漏掉 `.report-table-panel` 的 `width: max-content`，影響五處
+  `--compact` 呼叫端、非 fleet 專屬；修它又帶出一個 `--compact` 上限不收斂到欄寬的
+  回歸，靠重產全報表抓到。複驗涵蓋全部 11 種 HTML 報表 × 2 語系 × 2 寬度，
+  共 2,440 個面板、0 項問題。逐項紀錄在
+  `docs/superpowers/plans/2026-09-09-ven-fleet-manager.md` 文末。
 
 ### 未完成
 
