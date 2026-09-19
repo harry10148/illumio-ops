@@ -1057,7 +1057,10 @@ figure.chart-static figcaption {
   padding: 0 var(--space-2);
 }
 
-.report-table-panel--compact { max-width: 640px; }
+/* min(), not 640px: max-width does not cascade additively, so a flat 640px
+   here replaces the base 100% and stops clamping in any column narrower than
+   640px — the traffic reports put these panels in ~210px columns. */
+.report-table-panel--compact { max-width: min(640px, 100%); }
 /* 自舊殼 report_css.py 移植的兩組「表格 JS 附屬樣式」，設計檔沒有涵蓋（T4）。
    兩者都是 table_renderer.py / TABLE_JS 產出的元素，10 型報表共用：
      · 空資料面板（report_css.py:205-207）——缺這一段，「無資料」與「有資料」

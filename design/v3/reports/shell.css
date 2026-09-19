@@ -912,7 +912,10 @@ figure.chart-static figcaption {
   padding: 0 var(--space-2);
 }
 
-.report-table-panel--compact { max-width: 640px; }
+/* min(), not 640px: max-width does not cascade additively, so a flat 640px
+   here replaces the base 100% and stops clamping in any column narrower than
+   640px — the traffic reports put these panels in ~210px columns. */
+.report-table-panel--compact { max-width: min(640px, 100%); }
 .report-table-panel--wide .report-table { font-size: var(--fs-mini); }
 
 /* 長文欄：螢幕收合、列印展開 */

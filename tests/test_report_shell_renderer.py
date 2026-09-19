@@ -575,7 +575,12 @@ _DELTA_MAT_FILL_WARN = (_MAT_FILL_GOOD, _MAT_FILL_GOOD + """/* 舊殼 report_css
 # table_renderer.py / TABLE_JS 產出的元素，10 型報表共用——缺了之後「查無資料」
 # 的面板與正常表格長得一樣，TABLE_JS 建立的 .sort-indicator 也失去定位。
 # 同 F1 的判準：設計檔也漏只代表設計檔有洞，基準是產品舊殼的輸出。
-_PANEL_COMPACT = ".report-table-panel--compact { max-width: 640px; }\n"
+_PANEL_COMPACT = """\
+/* min(), not 640px: max-width does not cascade additively, so a flat 640px
+   here replaces the base 100% and stops clamping in any column narrower than
+   640px — the traffic reports put these panels in ~210px columns. */
+.report-table-panel--compact { max-width: min(640px, 100%); }
+"""
 _DELTA_TABLE_JS_AFFORDANCES = (_PANEL_COMPACT, _PANEL_COMPACT + """\
 /* 自舊殼 report_css.py 移植的兩組「表格 JS 附屬樣式」，設計檔沒有涵蓋（T4）。
    兩者都是 table_renderer.py / TABLE_JS 產出的元素，10 型報表共用：

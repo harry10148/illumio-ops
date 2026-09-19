@@ -72,6 +72,19 @@ EMPTY = ('<div class="report-table-panel report-table-panel--empty">'
          '<span class="empty-marker"></span>'
          '<span class="empty-text">No data</span></div>')
 
+# The traffic reports put compact panels inside a narrow column of a
+# multi-column section; at 1280 those columns are ~210px while the tables in
+# them want ~250px. A max-width that is a fixed 640px does not clamp to a
+# parent narrower than that, so a panel sized by max-content escapes its
+# column. These numbers are the measured ones, not invented.
+IN_A_NARROW_COLUMN = (
+    '<div style="width:210px">'
+    + _panel("report-table-panel--compact",
+             _table(["Rule", "Hits"],
+                    [["a-moderately-long-rule-name-here", "12"],
+                     ["another-rule-name-that-is-long", "3"]]))
+    + "</div>")
+
 
 def _document() -> str:
     return build_shell_document(
@@ -82,6 +95,7 @@ def _document() -> str:
             ShellSection(id="narrow", title="Narrow", html=NARROW),
             ShellSection(id="wide", title="Wide", html=WIDE),
             ShellSection(id="empty", title="Empty", html=EMPTY),
+            ShellSection(id="column", title="Column", html=IN_A_NARROW_COLUMN),
         ],
     )
 
@@ -106,7 +120,8 @@ def _measure(tmp_path, width: int) -> dict:
           overflowsParent: pr.right > parent.right + 1,
         };
       };
-      return {narrow: read('narrow'), wide: read('wide'), empty: read('empty')};
+      return {narrow: read('narrow'), wide: read('wide'), empty: read('empty'),
+              column: read('column')};
     }
     """
     with sync_playwright() as p:
@@ -154,3 +169,20 @@ def test_an_empty_state_panel_stays_a_full_width_card(tmp_path, width):
     assert m["panelW"] >= m["parentW"] - 40, (
         f"the empty-state card shrank to {m['panelW']:.0f} of "
         f"{m['parentW']:.0f}px and reads as a chip, not as a panel")
+
+
+@pytest.mark.parametrize("width", VIEWPORTS)
+def test_a_compact_panel_stays_inside_a_column_narrower_than_its_cap(tmp_path, width):
+    """--compact's 640px cap must not out-rank the 100% one.
+
+    `max-width: 640px` on the compact variant overrides the base
+    `max-width: 100%` rather than adding to it, so in a column narrower than
+    640px the cap stops clamping anything. With the panel sized by
+    max-content that is the difference between sitting in the column and
+    hanging out of it — which is what the traffic reports' policy section
+    does at 1280, where its columns are about 210px wide.
+    """
+    m = _measure(tmp_path, width)["column"]
+    assert not m["overflowsParent"], (
+        f"the compact panel is {m['panelW']:.0f}px inside a "
+        f"{m['parentW']:.0f}px column at viewport {width}")
