@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/) —
 a plain `<major>.<minor>.<patch>` scheme. (Tags through v4.0.0 carried a
 `-topic-slug` codename suffix; the codename was retired in 4.1.0.)
 
-## [Unreleased]
+## [5.2.0] — 2026-09-19
 
 > **Upgrading — check any traffic rule that says Allowed or Potentially
 > Blocked.** The interactive CLI's rule wizard has been storing those two the
