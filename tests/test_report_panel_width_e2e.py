@@ -129,9 +129,24 @@ def _measure(tmp_path, width: int) -> dict:
         page = browser.new_page(viewport={"width": width, "height": 1000})
         page.goto(path.as_uri())
         page.wait_for_load_state("networkidle")
-        # The auto-fit runs on load and writes inline widths; measuring before
-        # it settles reads the pre-fit layout and passes for the wrong reason.
-        page.wait_for_timeout(700)
+        # Wait for the thing itself, not for a number of milliseconds. The
+        # auto-fit runs on load and writes inline widths, and it marks each
+        # table when it is done; a fixed sleep is a race that a loaded machine
+        # loses, and losing it silently reads the pre-fit layout. Under the
+        # full suite (`-n auto`) that race is lost often enough to turn every
+        # case in this file red at once.
+        page.wait_for_function(
+            "() => Array.from(document.querySelectorAll('table.report-table'))"
+            ".every(t => t.dataset.autoFitted === 'true')",
+            timeout=30_000)
+        # And prove the stylesheet is in force before believing any geometry:
+        # a document rendered without SHELL_CSS has full-width block panels,
+        # which fails these assertions for a reason that has nothing to do
+        # with what they are testing.
+        assert page.evaluate(
+            "() => getComputedStyle(document.querySelector("
+            "'.report-table-panel')).borderTopWidth") == "1px", (
+            "SHELL_CSS did not apply; the measurements below would be noise")
         out = page.evaluate(js)
         browser.close()
     return out
