@@ -34,7 +34,7 @@
 
 - **F1–F6 已全修並發版。** 使用者裁示先修再發版。修復 `bf76652c`／`3aff6bb0`／
   `24659b83`／`b780d4b6`，複驗涵蓋全部 11 種 HTML 報表 × 2 語系 × 2 寬度
-  （2,440 個面板、0 問題），**v5.2.0** 已 tag（`aea03e37`）、已推、測試機已部署。
+  （516 個面板、0 問題），**v5.2.0** 已 tag（`aea03e37`）、已推、測試機已部署。
 
 ### 仍待人工處理
 
@@ -53,6 +53,10 @@
   水平捲軸後面，列印會無聲切掉 Connections 欄。已確認**不是** v5.2.0 的回歸（用同一份
   HTML 對照修復前後樣式各量一次）。
 - fleet 的 `bulk_update` response schema 仍未經真 PCE 驗證（見 §3）。
+- **VEN 報表把 trend 快照寫進 CWD 下的 `reports/history/ven/`，不管 `output_dir` 指到
+  哪裡**；其餘報表型的 history 是跟著 `output_dir` 走的（複驗時把報表產到 `/tmp` 也
+  照樣在測試機的正式 history 留了四筆，事後已 chown 回 `illumio-ops`）。兩種行為不一致，
+  且會讓任何「產一份到別處看看」的動作污染正式趨勢資料。
 
 ## 3. 已完成：VEN Fleet Manager（plugger 移植 1／4）
 

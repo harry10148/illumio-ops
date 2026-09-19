@@ -227,7 +227,7 @@ fleet health score（含 partial 註記與缺分量）、coverage gaps。表格�
   shell 移植時漏掉 `.report-table-panel` 的 `width: max-content`，影響五處
   `--compact` 呼叫端、非 fleet 專屬；修它又帶出一個 `--compact` 上限不收斂到欄寬的
   回歸，靠重產全報表抓到。複驗涵蓋全部 11 種 HTML 報表 × 2 語系 × 2 寬度，
-  共 2,440 個面板、0 項問題。逐項紀錄在
+  共 516 個面板、0 項問題。逐項紀錄在
   `docs/superpowers/plans/2026-09-09-ven-fleet-manager.md` 文末。
 
 ### 未完成
