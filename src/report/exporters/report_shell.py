@@ -953,6 +953,14 @@ figure.chart-static figcaption {
         捲動＋欄數提示；列印切橫式頁 @page wide（實測 Chromium 147 生效，
         audit 6 頁轉橫式：p8/p10/p19/p20/p21/p22）。
    ========================================================================= */
+/* width: max-content is load-bearing, not cosmetic. autoFitColumns' else
+   branch declines to spend the slack when a table has no `text` column — it
+   keeps the natural column widths and pins table.style.width to their total —
+   on the stated premise that the panel shrinks to the table, so the leftover
+   space lands in the card background rather than inside the border. Without
+   the pair, every all-narrow-column table sits in an oversized bordered box.
+   max-width is the other half: it keeps a wide table's panel inside its
+   column and hands the overflow to .report-table-wrap, which scrolls. */
 .report-table-panel {
   margin: var(--space-4) 0 var(--space-6);
   border: 1px solid var(--line);
@@ -960,6 +968,8 @@ figure.chart-static figcaption {
   background: var(--surface-1);
   overflow: hidden;
   min-width: 0;
+  width: max-content;
+  max-width: 100%;
 }
 
 .report-table-wrap { overflow-x: auto; max-width: 100%; }
@@ -1057,7 +1067,11 @@ figure.chart-static figcaption {
        游標也不再提示欄頭可點。
    顏色改吃殼的 token；已排序欄的強調色用 --accent 而非舊殼的 --gold：
    那是互動狀態，殼的語意色（tone-*）保留給嚴重度。 */
+/* An empty-state panel holds no table, so max-content is the width of the
+   words "No data" — a full-width card would collapse into a chip and its
+   text-align: center would stop meaning anything. It opts out. */
 .report-table-panel--empty {
+  width: auto;
   padding: var(--space-8) var(--space-7);
   border-style: dashed;
   background: var(--surface-2);

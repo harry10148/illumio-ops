@@ -586,7 +586,11 @@ _DELTA_TABLE_JS_AFFORDANCES = (_PANEL_COMPACT, _PANEL_COMPACT + """\
        游標也不再提示欄頭可點。
    顏色改吃殼的 token；已排序欄的強調色用 --accent 而非舊殼的 --gold：
    那是互動狀態，殼的語意色（tone-*）保留給嚴重度。 */
+/* An empty-state panel holds no table, so max-content is the width of the
+   words "No data" — a full-width card would collapse into a chip and its
+   text-align: center would stop meaning anything. It opts out. */
 .report-table-panel--empty {
+  width: auto;
   padding: var(--space-8) var(--space-7);
   border-style: dashed;
   background: var(--surface-2);
