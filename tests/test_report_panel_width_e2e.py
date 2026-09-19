@@ -29,6 +29,8 @@ the table ends. The three cases pull in different directions on purpose:
 """
 from __future__ import annotations
 
+import concurrent.futures
+
 import pytest
 
 pytest.importorskip("playwright.sync_api", exc_type=ImportError)
@@ -101,6 +103,22 @@ def _document() -> str:
 
 
 def _measure(tmp_path, width: int) -> dict:
+    """Drive the browser on a worker thread.
+
+    ``sync_playwright()`` refuses to start while an asyncio loop is running on
+    the calling thread, and under ``-n auto`` this file shares an xdist worker
+    with tests that leave one behind — the whole file then fails with "you are
+    using Playwright Sync API inside the asyncio loop", which looks nothing
+    like a layout problem. A fresh thread has no loop of its own. The repo's
+    other Playwright tests dodge this by opening playwright in a session
+    fixture before anything else runs; this file has no such harness and
+    should not need one.
+    """
+    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+        return pool.submit(_measure_in_browser, tmp_path, width).result()
+
+
+def _measure_in_browser(tmp_path, width: int) -> dict:
     path = tmp_path / f"panel-{width}.html"
     path.write_text(_document(), encoding="utf-8")
     js = """
