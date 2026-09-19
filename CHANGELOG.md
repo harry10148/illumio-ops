@@ -135,6 +135,30 @@ a plain `<major>.<minor>.<patch>` scheme. (Tags through v4.0.0 carried a
 
 ### Fixed
 
+- **A narrow table no longer sits in an oversized bordered card.** Every
+  report's table panel is supposed to shrink to the table it holds, so that a
+  four-row summary looks like a small table rather than like a rendering
+  fault. The column-fitting script relies on it — when every column is narrow
+  or numeric it deliberately leaves the spare width unspent — but the
+  declaration that made the panel shrink was lost when the report shell was
+  rebuilt, while the two comments describing it were kept. Any table of short
+  values has rendered inside a full-width empty box since. Wide tables are
+  unaffected and keep their horizontal scroll, and "no data" panels stay
+  full-width cards.
+
+- **The VEN report's fleet chapters no longer print internal field names.**
+  The enforcement pipeline showed its stages as `idle_compat_unknown` and
+  `visibility_not_ready` — the analysis code's own dictionary keys, which are
+  not the PCE's vocabulary and in two cases not anyone's. They now read the
+  way the same buckets read on the VEN fleet page, in both languages, and the
+  two surfaces are held to the same words by a test. The fleet health score's
+  Counted / Not counted column gained the header it never had; the label
+  coverage tables stopped repeating their own heading as a column header and
+  now say that their second column is a breakdown by enforcement mode. The
+  pipeline chapter's how-to-read no longer promises sample lists it does not
+  print — that sentence belongs to label coverage, which does cap its lists
+  at 50 and say so.
+
 - **An `api.url` carrying `user:password@` no longer shows the password to
   anyone.** `normalize_pce_url` keeps userinfo deliberately — it is part of the
   credential the API authenticates with — but five places then rendered that
