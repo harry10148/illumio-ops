@@ -24,6 +24,15 @@
 - **部署已做。** 從 `ab827179`（09-14，落後 22 個 commit）拉到 `91383d77`，
   重啟後 `systemctl is-active` = active，六個排程 job 全 `ok`，
   `ven_summary` 已在新程式下跑過並寫出 fleet 快照。
+
+> **這個專案有兩台部署目標。** 本文與歷來所有交付紀錄都只寫「測試機」，
+> 但另有一台正式機 **`ilo-flow` / 172.16.15.135**（Rocky 9.5），以**離線 bundle**
+> 裝在 `/opt/illumio-ops`——沒有 `.git`、沒有系統 `git`、沒有 `venv`，版本要讀
+> `src/__init__.py`。更新方式與測試機完全不同：建 bundle → scp → `tar xzf` →
+> `./preflight.sh` → `./install.sh` → `systemctl restart`（installer 會自動停服務
+> 但**不會**自動啟動）。2026-09-20 已用這條路徑把它從 5.1.0 升到 5.2.0。
+> `~/.ssh/config` 沒有它的條目，直接 `ssh root@172.16.15.135`。
+> **宣稱「已部署」之前兩台都要確認。**
 - **VEN 報表真機驗收已做，條件通過。** en／zh_TW × 800／1280，四章無截斷無溢出。
   親看另外揪出六項非阻斷問題（F1–F6），連同 F1 的根因一併記在
   `plans/2026-09-09-ven-fleet-manager.md` 文末（commit `2fd3798c`）。

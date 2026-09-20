@@ -197,12 +197,16 @@ sudo systemctl start illumio-ops
 
 ### 升級後保留的檔案
 
-升級一律保留操作者擁有的狀態檔，不會被覆寫：
+升級一律保留操作者擁有的狀態檔，不會被覆寫。**整個 `config/`、`data/`、`logs/`、
+`reports/` 目錄都排除在全量重裝之外**，所以下列只是最常被問到的幾項，不是完整清單：
 
 - `config/config.json`
 - `config/alerts.json`
 - `config/rule_schedules.json`
+- `config/tls/`（自簽憑證與私鑰——升級不會讓它重新簽發）
+- `config/report_config.yaml`
 - `logs/`
+- `reports/`
 - `data/pce_cache.sqlite`（cache DB；schema 於服務下次啟動時自動遷移）
 
 另外只更新 `*.example` 範本檔（`config.json.example` 等），方便操作者用
