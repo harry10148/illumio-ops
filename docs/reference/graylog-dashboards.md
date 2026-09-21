@@ -163,6 +163,26 @@ pipeline 已經建好並掛在 `Illumio PCE` stream 上，內容即程式碼放�
 在 pipeline 裡解析正常，`rt` 正確轉成 epoch。規則仍保留去時區那一步當保險，
 因為 CEF **input** 那條路的丟棄行為並沒有改變。
 
+### 2.1c 目前已經上線的東西（2026-09-21）
+
+| 類別 | 名稱 | 狀態 |
+|---|---|---|
+| stream | `Illumio PCE`、`Illumio Ops` | 啟用，不動 Default Stream |
+| pipeline | `Illumio PCE direct`（9 規則） | 掛 `Illumio PCE`，解析成功率 100%、失敗 0 |
+| pipeline | `FortiGate ops`（3 規則） | 掛 `FortiGate Syslog`，補 `sent_bytes`/`cpu_pct` 等可聚合欄位 |
+| dashboard | 頁 0 資料可信度（7 widget） | 已驗，0 errors |
+| dashboard | 分段待辦（8 widget） | 已驗，0 errors |
+| dashboard | FortiGate 防火牆維運（4 分頁 19 widget） | 已驗，0 errors |
+| 告警 | 9 條 event definition | 全部 ENABLED 並排程 |
+
+**FortiGate 的數值欄位要另外做**：`sentbyte`/`rcvdbyte`/`cpu`/`mem` 在既有索引裡是
+`keyword`，`sum()` 會直接回 `not supported for aggregation`，而既有 mapping 不能改。
+解法是 pipeline 另寫一組 `sent_bytes`/`rcvd_bytes`/`cpu_pct`/`mem_pct`/`sessions` 數值欄位。
+
+**告警要先驗過會不會響**：用一條 canary 定義（查一定存在的資料）確認事件真的產生，
+收到事件後再刪掉。沒驗過的告警定義等於不知道它會不會響。
+另外本機目前**沒有任何 notification channel**，事件只會進 Events 清單，不會外送。
+
 ### 2.2 Stream 切分
 
 目前兩個 Illumio input 都落在 Default Stream。建議：
