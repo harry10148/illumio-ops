@@ -56,13 +56,15 @@ verified_against:
 | [開發流程與慣習](handover/development.md) | 開發環境建置、測試與 CI 守門、i18n 鍵值合約、常見斷鏈坑、發版流程。 |
 | [PCE domain 須知（vendor 事實集）](handover/pce-domain-notes.md) | 無法從程式碼反推、踩過坑才知道的 Illumio PCE vendor 知識。 |
 
-## 參考（`reference/`，3 篇）
+## 參考（`reference/`，5 篇）
 
 | 文件 | 一句話說明 |
 |---|---|
 | [CLI 參考手冊](reference/cli.md) | `illumio-ops` 完整命令樹：13 個頂層子命令的旗標、範例與行為。 |
 | [REST API 參考](reference/rest-api.md) | Web GUI 背後 Flask 應用的完整 JSON API 端點清單。 |
 | [詞彙表](reference/glossary.md) | Illumio 產品術語中英對照；決策/狀態類術語刻意不強譯，與產品 UI 一致。 |
+| [流量指標定義](reference/traffic-metrics.md) | 報表與 GUI 中各流量指標的計算口徑與資料來源。 |
+| [Graylog 儀表板與告警設計](reference/graylog-dashboards.md) | Illumio 直送／轉送與 FortiGate 日誌在 Graylog 上能做出什麼儀表板與告警，以及轉送待補的欄位。 |
 
 ## 文件如何保鮮
 
