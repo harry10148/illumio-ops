@@ -484,7 +484,7 @@ num_connections, policy_decision, seq_id, service, src, state, timestamp_range
 補充：`state` 欄位上游回的是字串 `"snapshot"`，格式化器經 `_STATE` 轉成單碼後送出，
 與直送的 `cs2=S` 對得上；此處無缺口。
 
-| 8 | **長壽 flow 的後續增量不會再送** | `ingestor_traffic.py:307` 只對「新的 flow_hash」建立 SIEM dispatch 列；同一條 flow 之後 counters 被 upsert 更新（`:292`）時不會重新入列。**ops 看到的是每條 flow 第一次出現時的數值**，不是最終值 | 這是量差之外、**數值完整度**的缺口。要嘛在 counters 明顯成長時重新入列，要嘛在文件與儀表板標明 ops 的 bytes/cnt 是「首見值」 |
+| 8 | **長壽 flow 的後續增量不會再送** | `ingestor_traffic.py:307` 只對「新的 flow_hash」建立 SIEM dispatch 列；同一條 flow 之後 counters 被 upsert 更新（`:292`）時不會重新入列。**ops 看到的是每條 flow 第一次出現時的數值**，不是最終值 | 這是量差之外、**數值完整度**的缺口。**決定（2026-09-23）：標明「首見值」，不改 ingestor**。精確說是「送出當下的快照」：upsert 會把 `raw_json` 換成較新的一份，dispatcher 在送出時才讀，所以入列到送出之間的成長會帶上，送出之後的不會。已寫進 `docs/guide/siem.md` 與 Graylog 頁 0 的說明 |
 
 補充兩點求嚴謹：
 - 量差「不是 bug」只表示**目前設定沒有過濾**（`.106` 實測 `traffic_filter.actions=[]`、`traffic_pd=[]`）。
@@ -500,7 +500,7 @@ num_connections, policy_decision, seq_id, service, src, state, timestamp_range
 audit 側以同一個 24 小時窗的 `event_href` 集合比對：交集 1,580、直送獨有 3、ops 獨有 10（視窗邊界時間差），
 **無缺口**；`resource_changes` 也有正確帶出（已驗 `workloads.update.success`）。
 
-**優先序（2026-09-23 修正）**：1、2 經實測**不做**（見表內）；3、4 要等 PCE 開功能或改用直送；8 是唯一實際影響數值正確性的缺口，要決定是重新入列還是標明「首見值」。
+**優先序（2026-09-23 修正）**：1、2 經實測**不做**（見表內）；3、4 要等 PCE 開功能或改用直送；8 已決定標明「首見值」（見表內）。
 
 ## 附錄：拿到 log 之後，先跑這五個查詢
 

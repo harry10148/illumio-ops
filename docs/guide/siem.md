@@ -66,7 +66,7 @@ SIEM 轉送依賴 pce_cache（見 [cache-maintenance.md](cache-maintenance.md)�
 - **Header 版本欄**：ops 送 `GET /api/v2/product_version` 的結果，取不到時為 `unknown`。
 - **`rt`（audit）**：PCE 送 `Sep 11 2026 09:00:08.882 +0000`，ops 不送 ` +0000`——Graylog 的 CEF input 遇到帶時區的 `rt` 會整行丟棄（實測），值同為 UTC。
 - **`dst`**：PCE 送操作者來源 IP；當 API 回的 `action.src_ip` 是 `FILTERED` 或 `action` 為 null，ops 改送 PCE 主機名。
-- **流量語意**：PCE 的 `flow_summary` 是每個 VEN 每個取樣區間一筆（`cn1=interval_sec`、`cnt` 為區間內連線數），ops 的來源是 `traffic_flows` API 的聚合結果，一個 flow key 一筆、`cnt`/`cn2`/`cn3` 為查詢視窗內總量；`in`/`out`/`cn1` 只有原始資料帶時才輸出。欄位名與順序相同，數值不可跨來源相加。
+- **流量語意**：PCE 的 `flow_summary` 是每個 VEN 每個取樣區間一筆（`cn1=interval_sec`、`cnt` 為區間內連線數），ops 的來源是 `traffic_flows` API 的聚合結果，一個 flow key 一筆，而且**每條 flow 只送一次**：`cnt`/`cn2`/`cn3` 是**首見值**——送出當下那份快照（通常是首次入庫後幾分鐘內），長壽 flow 之後的成長只會更新本機快取、不會再送出，所以在 SIEM 端加總會低估長連線的量；要看最終值請用 ops 報表或 PCE 直送。`in`/`out`/`cn1` 只有原始資料帶時才輸出（traffic_flows API 實際上不帶）。欄位名與順序相同，數值不可跨來源相加。
 - **`resource_changes` 過大**：與 PCE 相同，`cs2` 放前 3,995 字元、其餘接在 `cs3`（`cs3Label=resource_changes_2`）；兩段放不下時每個 entry 拿掉 `changes`。
 - 擴充欄位值**不做 CEF 跳脫**（PCE 亦然），`cs2`/`cs4` 可直接當 JSON 解析。
 
