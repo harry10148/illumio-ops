@@ -174,6 +174,8 @@ pipeline 已經建好並掛在 `Illumio PCE` stream 上，內容即程式碼放�
 | dashboard | 分段待辦（8 widget） | 已驗，0 errors |
 | dashboard | 政策與強制變更（6 widget，7 天） | 已驗，0 errors（09-23） |
 | dashboard | 存取與身分（6 widget，7 天） | 已驗，0 errors（09-23） |
+| dashboard | Illumio × FortiGate 對外依賴（4 widget） | 已驗，0 errors（09-23）；對外潛在阻擋大宗是各伺服器直接對外 NTP（123） |
+| 升級 | 7.1.1 → 7.1.2 計畫 | 未執行，見 graylog-ops `docs/upgrade-7.1.2.md` |
 | dashboard | FortiGate 防火牆維運（4 分頁 19 widget） | 已驗，0 errors |
 | 告警 | 9 條 event definition | 全部 ENABLED 並排程 |
 
@@ -471,8 +473,8 @@ num_connections, policy_decision, seq_id, service, src, state, timestamp_range
 
 | # | 欄位 | 格式化器 | 上游 API | 判定與建議 |
 |---|---|---|---|---|
-| 1 | `cn1=interval_sec` | 有（`cef_pce.py:295`，取 `flow["interval_sec"]`） | **無** | API 給的是 `timestamp_range`（first/last detected）→ **可由兩者相減算出**，建議在 ingest 時補 |
-| 2 | `in` / `out` | 有（`cef_pce.py:279`，取 `dst_tbi`/`dst_tbo`） | **無**（只有 `dst_bi`/`dst_bo`） | PCE 的「Show Amount of Data Transfer」未啟用時本來就沒有 total bytes（已查 KB）。折衷：比照 PCE 直送的做法，用 `dst_bi`/`dst_bo` 同時填 `in`/`out` 與 `cn2`/`cn3` |
+| 1 | `cn1=interval_sec` | 有（`cef_pce.py:295`，取 `flow["interval_sec"]`） | **無** | ~~可由 `timestamp_range` 相減算出~~ **不建議**（2026-09-23 實測）：直送的 `interval_sec` 是 PCE 的回報區間（500 筆裡 900／601／600／0 佔絕大多數），而 ops 的 `first_detected` 常等於 `last_detected`，相減多半是 0——兩者語意不同，填進同一個欄位名會誤導。維持不送 |
+| 2 | `in` / `out` | 有（`cef_pce.py:279`，取 `dst_tbi`/`dst_tbo`） | **無**（只有 `dst_bi`/`dst_bo`） | PCE 的「Show Amount of Data Transfer」未啟用時本來就沒有 total bytes（已查 KB）。~~折衷：用 `dst_bi`/`dst_bo` 同時填 `in`/`out`~~ **不建議**（2026-09-23 實測）：直送的 `in`/`out` 是**累計總量**、`dbi`/`dbo` 是**區間增量**，152 筆有 `in` 的裡只有 102 筆兩者相等（例：`in`=198,864,860、`dbi`=263,044），snapshot 狀態幾乎不帶 `in`。ops 已經送 `cn2`/`cn3`（dbi/dbo），那才是兩路可比的欄位；`in`/`out` 維持不送 |
 | 3 | `msg.pd_qualifier` | 有（`cef_pce.py:338`） | **無** | **API 不提供阻擋原因**。§4.1 那張分類表只能從直送做——這也是「直送為主」最實在的理由 |
 | 4 | `msg.ddms` / `tdms` | 有（`cef_pce.py:331`） | **無** | 同上，API 無連線持續時間。次要 |
 | 5 | `shost`/`dhost` 覆蓋率低（抽樣 22% / 2.7%，直送 82% / 41%） | 有（`cef_pce.py:308/316`，但需 `src.workload` 存在） | 部分 | API 只在該端是納管工作負載時回 `workload` 物件；未納管端就沒有主機名。**不是 bug，是資料本質** |
@@ -488,13 +490,17 @@ num_connections, policy_decision, seq_id, service, src, state, timestamp_range
 - 量差「不是 bug」只表示**目前設定沒有過濾**（`.106` 實測 `traffic_filter.actions=[]`、`traffic_pd=[]`）。
   `traffic_filter.py` 另有 allowed 抽樣器、`ingestor_traffic.py:145` 有達 max_results 上限時的二分補抓，
   兩者都可能造成缺漏；要完全排除漏送，得比對同窗的 flow 鍵集合，本次尚未做。
-- 上表第 1–4 項的「上游無」是依實機 `raw_json` 最新一筆判定（key 只有 `dst_bi`/`dst_bo` 等 14 個）。
-  這是單筆證據，**不是全量**；正式結論前應抽數十筆確認，或直接查 PCE 的 traffic_flows API 文件。
+- 上表第 1–4 項的「上游無」原本只依最新一筆判定；2026-09-23 已在 `.106` 的
+  `pce_cache.sqlite` 抽最新 80 筆＋最舊 40 筆（全表 58,371 筆）確認：沒有任何一筆帶
+  `dst_tbi`/`dst_tbo`、`interval_sec`、`pd_qualifier`，`timestamp_range` 的
+  `first_detected`/`last_detected` 則 120 筆都有。另外舊資料 40 筆裡有 24 筆帶
+  `boundary_decision`——它可能對應 `pd_qualifier=1`（被 boundary 擋），是 #3 唯一可能的
+  替代來源，尚未驗證語意。
 
 audit 側以同一個 24 小時窗的 `event_href` 集合比對：交集 1,580、直送獨有 3、ops 獨有 10（視窗邊界時間差），
 **無缺口**；`resource_changes` 也有正確帶出（已驗 `workloads.update.success`）。
 
-**優先序**：1（可算得出來）→ 2（折衷可補）→ 3、4（要等 PCE 開功能或改用直送）。
+**優先序（2026-09-23 修正）**：1、2 經實測**不做**（見表內）；3、4 要等 PCE 開功能或改用直送；8 是唯一實際影響數值正確性的缺口，要決定是重新入列還是標明「首見值」。
 
 ## 附錄：拿到 log 之後，先跑這五個查詢
 
@@ -520,7 +526,7 @@ audit 側以同一個 24 小時窗的 `event_href` 集合比對：交集 1,580�
 ## 8. 不在範圍／待確認
 
 - `trafclass_code`（U/B/M = unicast/broadcast/multicast，見 `cef_pce.py:39`）與 `state` 的 `new→N` 一項，原廠文件無完整代碼表，已向 KB 查證，仍需向原廠確認。
-- `deviceDirection` 0/1 何者為 inbound，文件未明示，需實測比對。
+- ~~`deviceDirection` 0/1 何者為 inbound~~ **已實測（2026-09-23）**：**1＝outbound（由來源端 VEN 回報），0＝inbound（由目的端 VEN 回報）**。直送裡只有來源端納管的 flow 1,091 筆全為 1、只有目的端納管的 351 筆全為 0；兩路共同的 845 組 flow 有 825 組值相同，不同的 20 組都是兩端皆納管、兩台 VEN 各報一次。與 `cef_pce.py` 的 `outbound → 1` 一致。
 - ops 是否能補 `pd_qualifier`：取決於 traffic_flows API 是否回傳，尚未查證。
 - Graylog 升級 7.1.1 → 7.1.2（目前唯一的系統通知）。
 - 保留期：目前單一 index set，30–40 天。若拆 flow/audit 兩個 index set，需重新估算。
