@@ -163,7 +163,7 @@ pipeline 已經建好並掛在 `Illumio PCE` stream 上，內容即程式碼放�
 在 pipeline 裡解析正常，`rt` 正確轉成 epoch。規則仍保留去時區那一步當保險，
 因為 CEF **input** 那條路的丟棄行為並沒有改變。
 
-### 2.1c 目前已經上線的東西（2026-09-21）
+### 2.1c 目前已經上線的東西（2026-09-21，09-23 補兩頁）
 
 | 類別 | 名稱 | 狀態 |
 |---|---|---|
@@ -172,6 +172,8 @@ pipeline 已經建好並掛在 `Illumio PCE` stream 上，內容即程式碼放�
 | pipeline | `FortiGate ops`（3 規則） | 掛 `FortiGate Syslog`，補 `sent_bytes`/`cpu_pct` 等可聚合欄位 |
 | dashboard | 頁 0 資料可信度（7 widget） | 已驗，0 errors |
 | dashboard | 分段待辦（8 widget） | 已驗，0 errors |
+| dashboard | 政策與強制變更（6 widget，7 天） | 已驗，0 errors（09-23） |
+| dashboard | 存取與身分（6 widget，7 天） | 已驗，0 errors（09-23） |
 | dashboard | FortiGate 防火牆維運（4 分頁 19 widget） | 已驗，0 errors |
 | 告警 | 9 條 event definition | 全部 ENABLED 並排程 |
 
@@ -181,6 +183,7 @@ pipeline 已經建好並掛在 `Illumio PCE` stream 上，內容即程式碼放�
 
 **告警要先驗過會不會響**：用一條 canary 定義（查一定存在的資料）確認事件真的產生，
 收到事件後再刪掉。沒驗過的告警定義等於不知道它會不會響。
+刪掉定義**不會**刪掉它產生的事件——OSS 沒有刪單筆事件的 API，canary 留下的 20 筆是 09-23 以輪替 `gl-events` 再刪舊 index（`gl-events_0`/`_1`）清掉的；下次做 canary 前先想好這一步，或接受它們等保留期（30–40 天）自然過期。
 另外本機目前**沒有任何 notification channel**，事件只會進 Events 清單，不會外送。
 
 ### 2.2 Stream 切分
@@ -331,6 +334,15 @@ workloads.update.success  duser=admin@lab.local
 | 容器叢集政策套用 | `container_cluster.security_policy_applied.*` | 223 筆 |
 | 標籤／規則異動 | `cat:audit_events` 且 `requestMethod:(PUT OR POST OR DELETE)` | — |
 
+**實作後的補充（2026-09-23，graylog-ops `171e432`）**
+
+- 上表的「4 筆」是 pipeline 上線（09-21）**之前**的全文搜尋結果，那些行沒有被解析，所以上線後的 7 天窗是 0——不是規則壞了。用 pipeline simulator 拿 09-20 的原始行重跑，規則 20 取得出 `enf_before=[selective]`、`enf_after=[idle]`。
+- 規則 20 另取 `enf_workload`（`$..resource.workload.hostname`），否則明細只知道有人改了、不知道改了哪台。容器叢集的強制模式變更（`container_cluster.update.success`）沒有 hostname、`before` 也是空的，明細裡那一欄會是空白。
+- `select_jsonpath` 取出的是陣列（`["idle"]`），查詢 `enf_after:idle` 照樣命中。
+- 直送**有** `requestMethod`。但不排除工具噪音時 7 天 920 筆幾乎全是 system 的 `user.create_session.success`，套用 §4.3 的排除式後剩 169 筆。
+- 分段的偵測用 `_exists_:resource_changes_2`；「整個丟掉 changes」那種情況仍然偵測不到，所以明細空白不代表沒有變更。
+- audit 很稀疏，這兩頁預設 7 天；直送 audit 會重複，事件數並列 `card(event_href)`。
+
 ### 4.3 頁 3：存取與身分
 
 | Widget | 查詢 | 現值（7d） |
@@ -354,6 +366,8 @@ workloads.update.success  duser=admin@lab.local
 排除工具自身噪音時只擋**成功的 session 建立／終止**：
 `NOT (duser:system AND outcome:success AND event_class_id:user.create_session.success)`。
 登入失敗、system 帳號的其他異動一律保留。
+
+**實作後的補充（2026-09-23）**：VEN、容器叢集、驗證失敗這些已用 `event_class_id` 精準指定的格子只夾直送、不夾 `cat:audit_events`，和告警寫法一致，免得 `cat` 猜錯整格變 0。驗證失敗類有不少行沒有 `event_href`，只能看 count。上線當下 7 天：驗證失敗 2、非 system 活動 172、VEN 風險事件 5、防竄改 0。
 
 ### 4.4 先不要做的
 
