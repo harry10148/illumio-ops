@@ -175,7 +175,7 @@ pipeline 已經建好並掛在 `Illumio PCE` stream 上，內容即程式碼放�
 | dashboard | 政策與強制變更（6 widget，7 天） | 已驗，0 errors（09-23） |
 | dashboard | 存取與身分（6 widget，7 天） | 已驗，0 errors（09-23） |
 | dashboard | Illumio × FortiGate 對外依賴（4 widget） | 已驗，0 errors（09-23）；對外潛在阻擋大宗是各伺服器直接對外 NTP（123） |
-| 升級 | 7.1.1 → 7.1.2 計畫 | 未執行，見 graylog-ops `docs/upgrade-7.1.2.md` |
+| 升級 | 7.1.1 → 7.1.9 計畫 | 未執行，見 graylog-ops `docs/upgrade-7.1.9.md`（系統通知寫 7.1.2 是過時的，apt 候選已是 7.1.9） |
 | dashboard | FortiGate 防火牆維運（4 分頁 19 widget） | 已驗，0 errors |
 | 告警 | 9 條 event definition | 全部 ENABLED 並排程 |
 
@@ -528,5 +528,5 @@ audit 側以同一個 24 小時窗的 `event_href` 集合比對：交集 1,580�
 - `trafclass_code`（U/B/M = unicast/broadcast/multicast，見 `cef_pce.py:39`）與 `state` 的 `new→N` 一項，原廠文件無完整代碼表，已向 KB 查證，仍需向原廠確認。
 - ~~`deviceDirection` 0/1 何者為 inbound~~ **已實測（2026-09-23）**：**1＝outbound（由來源端 VEN 回報），0＝inbound（由目的端 VEN 回報）**。直送裡只有來源端納管的 flow 1,091 筆全為 1、只有目的端納管的 351 筆全為 0；兩路共同的 845 組 flow 有 825 組值相同，不同的 20 組都是兩端皆納管、兩台 VEN 各報一次。與 `cef_pce.py` 的 `outbound → 1` 一致。
 - ops 是否能補 `pd_qualifier`：取決於 traffic_flows API 是否回傳，尚未查證。
-- Graylog 升級 7.1.1 → 7.1.2（目前唯一的系統通知）。
+- Graylog 升級 7.1.1 → 7.1.9：計畫見 graylog-ops `docs/upgrade-7.1.9.md`。
 - 保留期：目前單一 index set，30–40 天。若拆 flow/audit 兩個 index set，需重新估算。
