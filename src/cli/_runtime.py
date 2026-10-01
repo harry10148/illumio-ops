@@ -284,9 +284,22 @@ def run_daemon_with_gui(cm, interval: int = 10, port: int = 5001, host: str = "0
 
     launch_gui(cm, host=host, port=port, persistent_mode=True)
 
+    # GUI 沒能啟動（port 被佔用、憑證缺失…）而不是被要求關閉：停掉背景排程後
+    # 以結束碼 1 退出，讓 systemd（Restart=on-failure）重啟。舊版走到這裡會以
+    # 0 結束，服務管理器視為正常停止，監控與 SIEM 轉送就此停擺。
+    start_error = getattr(_gui, "_last_start_error", None)
+    gui_failed = bool(start_error) and not _shutdown_event.is_set()
+    if gui_failed:
+        logger.error("Web GUI failed to start ({}); stopping background jobs and "
+                     "exiting with status 1 so the service manager restarts the process",
+                     start_error)
+        _shutdown_event.set()
+
     # After launch_gui returns (server stopped), join the daemon thread so the
     # background scheduler exits cooperatively before the process terminates.
     if t_daemon is not None:
         t_daemon.join(timeout=10)
         if t_daemon.is_alive():
             logger.warning("background scheduler thread did not exit within 10s — proceeding with hard shutdown")
+    if gui_failed:
+        sys.exit(1)

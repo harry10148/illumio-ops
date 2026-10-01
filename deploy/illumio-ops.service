@@ -13,7 +13,9 @@ WorkingDirectory=/opt/illumio-ops
 # interpreter must never read the host's user site-packages.
 Environment=PYTHONNOUSERSITE=1
 ExecStart=/opt/illumio-ops/python/bin/python3 /opt/illumio-ops/illumio-ops.py --monitor-gui --interval 10
-Restart=on-failure
+# always 而非 on-failure：長駐服務任何非預期的結束（包含以 0 結束）都應重啟；
+# systemctl stop 不會觸發重啟。
+Restart=always
 RestartSec=10
 TimeoutStopSec=30
 KillSignal=SIGTERM
