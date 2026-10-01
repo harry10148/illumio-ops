@@ -158,3 +158,40 @@ def test_dispatcher_marks_failed_when_payload_none(sf):
     assert row.status == "failed"
     assert len(dlq) == 1
     assert dlq[0].last_error == "payload_build_failed"
+
+
+def test_run_siem_dispatch_raises_when_a_destination_is_unreachable():
+    """有目的地連不上時，其他目的地照常處理完，job 再拋出讓 job_health 記 error；
+    舊版吞掉例外，SIEM 收不到資料時健康面板仍顯示 ok。"""
+    from unittest.mock import MagicMock, patch
+    import pytest
+    from src.scheduler.jobs import run_siem_dispatch
+
+    cm = MagicMock()
+    cm.models.siem.enabled = True
+    cm.models.siem.dispatch_tick_seconds = 30
+    good, bad = MagicMock(), MagicMock()
+    good.name, bad.name = "good", "bad"
+    good.enabled = bad.enabled = True
+    good.format = bad.format = "json"
+    cm.models.siem.destinations = [bad, good]
+
+    def _build(dest_cfg, *a, **kw):
+        d = MagicMock()
+        d.__enter__.return_value = d
+        d.tick.return_value = (
+            {"sent": 0, "failed": 1, "quarantined": 0, "batches": 1,
+             "aborted": True, "error": "connection refused"}
+            if dest_cfg is bad else
+            {"sent": 5, "failed": 0, "quarantined": 0, "batches": 1,
+             "aborted": False, "error": None})
+        return d
+
+    with patch("src.scheduler.jobs._get_cache_engine"), \
+         patch("src.scheduler.jobs._enabled_siem_destinations", return_value=[]), \
+         patch("src.scheduler.jobs._traffic_pd_filters", return_value={}), \
+         patch("src.siem.dispatcher.enqueue_new_records", return_value=0), \
+         patch("src.siem.dispatcher.build_dispatcher", side_effect=_build) as mock_build:
+        with pytest.raises(RuntimeError, match="bad: connection refused"):
+            run_siem_dispatch(cm)
+    assert mock_build.call_count == 2   # 壞的目的地沒有擋住好的

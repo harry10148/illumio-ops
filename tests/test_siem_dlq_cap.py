@@ -1,8 +1,8 @@
-"""DLQ 每目的地上限 dlq_max_per_dest 的實際執行（backlog fix 4）。
+"""DLQ 每目的地上限 dlq_max_per_dest 的實際執行。
 
-設定欄位存在已久但 _quarantine() 從未依它裁剪——本測試釘住：
-寫入 DLQ 後若該目的地筆數超過上限，最舊的項目被刪除（ring-buffer 語意），
-其他目的地不受影響。
+舊版是 ring buffer：滿了就刪最舊的 DLQ 項目，那些記錄從此找不回來。現在
+DLQ 滿了就不再收新項目——該列維持 pending、以最長退避重試，資料不遺失；
+DLQ 本身仍維持在上限內，其他目的地不受影響。
 """
 from __future__ import annotations
 
@@ -63,20 +63,26 @@ def _dispatch_row(sf):
         return s.get(SiemDispatch, rid)
 
 
-def test_quarantine_prunes_oldest_beyond_cap(sf):
-    """已有 100 筆（=上限）再進 1 筆 → 最舊的 source_id=0 被刪、總數維持 100，
-    新項目存在。"""
+def test_quarantine_at_cap_keeps_row_queued_and_deletes_nothing(sf):
+    """已有 100 筆（=上限）再要進 1 筆 → 不刪任何舊項目、不收新項目；
+    該列維持 pending，下次重試排在最長退避之後。"""
     _seed_dlq_staggered(sf, 100)
     d = _make_dispatcher(sf, dlq_max=100)
-    d._quarantine(_dispatch_row(sf), payload="p", error="boom")
+    row = _dispatch_row(sf)
+    assert d._quarantine(row, payload="p", error="boom") is False
 
     with sf() as s:
         rows = s.execute(select(DeadLetter).where(DeadLetter.destination == "dest1")).scalars().all()
+        disp = s.get(SiemDispatch, row.id)
     assert len(rows) == 100
     source_ids = {r.source_id for r in rows}
-    assert 99999 in source_ids, "新進項目必須保留"
-    assert 0 not in source_ids, "最舊項目必須被裁剪"
-    assert 1 in source_ids
+    assert 0 in source_ids, "既有的 DLQ 項目不得被刪除"
+    assert 99999 not in source_ids
+    assert disp.status == "pending"
+    next_at = disp.next_attempt_at
+    if next_at.tzinfo is None:
+        next_at = next_at.replace(tzinfo=timezone.utc)
+    assert next_at > datetime.now(timezone.utc) + timedelta(minutes=50)
 
 
 def test_quarantine_cap_scoped_per_destination(sf):
@@ -94,7 +100,7 @@ def test_quarantine_cap_scoped_per_destination(sf):
 def test_quarantine_under_cap_prunes_nothing(sf):
     _seed_dlq_staggered(sf, 10)
     d = _make_dispatcher(sf, dlq_max=100)
-    d._quarantine(_dispatch_row(sf), payload="p", error="boom")
+    assert d._quarantine(_dispatch_row(sf), payload="p", error="boom") is True
 
     with sf() as s:
         rows = s.execute(select(DeadLetter).where(DeadLetter.destination == "dest1")).scalars().all()

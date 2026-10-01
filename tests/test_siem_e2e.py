@@ -64,7 +64,8 @@ def test_e2e_event_reaches_transport(sf):
     dispatcher = DestinationDispatcher("splunk", sf, CEFFormatter(), transport)
     result = dispatcher.tick()
 
-    assert result == {"sent": 1, "failed": 0, "quarantined": 0}
+    assert {k: result[k] for k in ("sent", "failed", "quarantined")} == \
+        {"sent": 1, "failed": 0, "quarantined": 0}
     assert len(transport.payloads) == 1
     assert "CEF:0|Illumio|PCE|" in transport.payloads[0]
     assert "policy.update" in transport.payloads[0]

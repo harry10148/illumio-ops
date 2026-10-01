@@ -430,27 +430,96 @@ def test_process_batch_missing_source_row_quarantines_without_affecting_others(s
     assert dlq_rows[0].last_error == "payload_build_failed"
 
 
-def test_process_batch_mixed_success_and_failure(sf):
+def test_destination_failure_aborts_batch_without_burning_retries(sf):
+    """斷路器：目的地連不上時只記失敗那一筆，其餘列原封不動留在佇列。
+    舊版會逐筆把整批耗完——每筆都等逾時、都被扣重試次數。"""
     from src.siem.dispatcher import DestinationDispatcher
     for i in range(1, 4):
         _seed_event(sf, i)                      # 3 筆 pending
     counting = _CountingSF(sf)
-    tr = FailTransport(fail_times=1)            # 第一筆 send 失敗，其餘成功
+    tr = FailTransport(fail_times=1)            # 第一筆 send 失敗
     d = DestinationDispatcher("test-dest", counting, _FakeFormatter(), tr, max_retries=5)
 
     result = d.tick()
 
-    assert result["sent"] == 2
-    assert result["failed"] == 1
+    assert result["sent"] == 0 and result["failed"] == 1
+    assert result["aborted"] is True and "simulated failure" in result["error"]
+    assert tr.calls == 1                        # 沒有對剩下兩筆重複等逾時
     with sf() as s:
-        rows = s.execute(select(SiemDispatch)).scalars().all()
-    sent = [r for r in rows if r.status == "sent"]
-    pending = [r for r in rows if r.status == "pending"]
-    assert len(sent) == 2
-    assert len(pending) == 1
-    assert pending[0].retries == 1 and pending[0].next_attempt_at is not None
-    # 1 個逐列 retry 交易 + 1 個批次 sent 交易 = 2
-    assert counting.begin_calls == 2
+        rows = s.execute(select(SiemDispatch).order_by(SiemDispatch.id)).scalars().all()
+    assert [r.status for r in rows] == ["pending"] * 3
+    assert [r.retries for r in rows] == [1, 0, 0]
+    assert rows[0].next_attempt_at is not None
+    assert counting.begin_calls == 1            # 只有失敗那一筆的 retry 交易
+
+
+def test_rows_sent_before_failure_are_marked_sent(sf):
+    from src.siem.dispatcher import DestinationDispatcher
+    for i in range(1, 4):
+        _seed_event(sf, i)
+
+    class FailOnSecond:
+        calls = 0
+        def send(self, p):
+            FailOnSecond.calls += 1
+            if FailOnSecond.calls == 2:
+                raise ConnectionError("peer went away")
+        def close(self): pass
+
+    result = DestinationDispatcher("test-dest", sf, _FakeFormatter(), FailOnSecond(),
+                                   max_retries=5).tick()
+    assert result["sent"] == 1 and result["failed"] == 1 and result["aborted"]
+    with sf() as s:
+        statuses = [r.status for r in s.execute(
+            select(SiemDispatch).order_by(SiemDispatch.id)).scalars().all()]
+    assert statuses == ["sent", "pending", "pending"]
+
+
+def test_permanent_error_goes_straight_to_dlq_and_batch_continues(sf):
+    """HEC 400/403 之類重試也不會成功的錯誤：直接進 DLQ，不中止這一批。"""
+    from src.siem.dispatcher import DestinationDispatcher
+    for i in range(1, 4):
+        _seed_event(sf, i)
+
+    class _Resp:
+        status_code = 400
+
+    class RejectFirst:
+        calls = 0
+        def send(self, p):
+            RejectFirst.calls += 1
+            if RejectFirst.calls == 1:
+                err = RuntimeError("400 Bad Request")
+                err.response = _Resp()
+                raise err
+        def close(self): pass
+
+    result = DestinationDispatcher("test-dest", sf, _FakeFormatter(), RejectFirst(),
+                                   max_retries=5).tick()
+    assert result == {**result, "sent": 2, "quarantined": 1, "aborted": False}
+    with sf() as s:
+        assert s.execute(select(DeadLetter)).scalars().one().last_error.startswith("permanent:")
+
+
+def test_tick_with_budget_drains_queue_across_batches(sf):
+    """有時間預算時一批接一批送到佇列清空，不再固定每 tick 只送一批。"""
+    from src.siem.dispatcher import DestinationDispatcher
+    for i in range(1, 8):
+        _seed_event(sf, i)                      # 7 筆，batch_size=3 → 3 批
+    tr = SuccessTransport()
+    result = DestinationDispatcher("test-dest", sf, _FakeFormatter(), tr,
+                                   batch_size=3).tick(time_budget_seconds=30)
+    assert result["sent"] == 7 and result["batches"] == 3
+    assert len(tr.sent) == 7
+
+
+def test_tick_without_budget_sends_one_batch(sf):
+    from src.siem.dispatcher import DestinationDispatcher
+    for i in range(1, 8):
+        _seed_event(sf, i)
+    result = DestinationDispatcher("test-dest", sf, _FakeFormatter(), SuccessTransport(),
+                                   batch_size=3).tick()
+    assert result["sent"] == 3 and result["batches"] == 1
 
 
 def test_enqueue_new_records_skips_rows_beyond_dispatch_retention(sf):

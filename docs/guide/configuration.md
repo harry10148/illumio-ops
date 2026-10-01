@@ -356,7 +356,7 @@ cache 架構、容量規劃與 archive 排程細節見 [cache-maintenance.md](ca
 | 鍵 | 型別 | 預設 | 說明 |
 |---|---|---|---|
 | `enabled` | bool | `false` | 是否啟用 SIEM 轉送 |
-| `dlq_max_per_dest` | int（≥100） | `10000` | 每個目的地 DLQ 上限筆數 |
+| `dlq_max_per_dest` | int（≥100） | `10000` | 每個目的地 DLQ 上限筆數。已滿時不再收新項目、也不刪舊項目，要進 DLQ 的列留在佇列以最長退避重試，資料不遺失 |
 | `dispatch_tick_seconds` | int（≥1） | `30` | 送出排程 tick 間隔（範本示範 `5`，見上方已知落差） |
 
 `destinations[]`：
@@ -373,7 +373,7 @@ cache 架構、容量規劃與 archive 排程細節見 [cache-maintenance.md](ca
 | `tls_verify` | bool | `true` | 是否驗證目的地 TLS 憑證 |
 | `tls_ca_bundle` | Optional[str] | `null` | 自訂 CA bundle 路徑 |
 | `hec_token` | Optional[str] | `null` | Splunk HEC token（`transport="hec"` 時使用） |
-| `batch_size` | int（1–10000） | `100` | 單批送出筆數 |
+| `batch_size` | int（1–10000） | `100` | 單批送出筆數。每個 tick 會在時間預算內一批接一批送到佇列清空，所以它決定的是每批的大小（以及多久確認一次送達、標記一次 sent），不再是吞吐量上限 |
 | `source_types` | list[str] | `["audit", "traffic"]` | 要轉送的資料型別 |
 | `traffic_pd` | list[str] | `[]` | 流量列只送這些 policy decision（`allowed`／`potentially_blocked`／`blocked`／`unknown`）；空＝全部。只影響設定後新進的列 |
 | `max_retries` | int（≥0） | `10` | 單筆最大重試次數 |
