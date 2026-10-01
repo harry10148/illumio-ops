@@ -77,6 +77,7 @@ TRAFFIC_MODULES: list[tuple[str, str, str, Callable, frozenset]] = [
     ('mod15', 'src.report.analysis.mod15_lateral_movement',     'lateral_movement_risk',    _call_df_n_cfgkw, _SEC_INV),
     ('mod_draft_summary', 'src.report.analysis.mod_draft_summary', 'analyze',               _call_df,       _SEC_INV),
     ('mod_ringfence',     'src.report.analysis.mod_ringfence',     'analyze',               _call_df,       _SEC_INV),
+    ('mod_enforcement',   'src.report.analysis.mod_enforcement_progress', 'analyze',        _call_df_n,     frozenset({"security_risk"})),
 ]
 
 # Module 12 (executive_summary) runs last and depends on all other results.
