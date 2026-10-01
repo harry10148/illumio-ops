@@ -130,7 +130,7 @@ event 規則用 `filter_value` 比對 event type（`src/events/matcher.py`）：
 | `rule_agent_suspend` | `agent.suspend` | immediate | 1 | 10 | 30 | — | agent 被暫停（停止強制執行）|
 | `rule_agent_clone` | `agent.clone_detected` | immediate | 1 | 10 | 30 | — | 偵測 cloned agent |
 | `rule_agent_heartbeat` | `system_task.agent_missed_heartbeats_check` | count | 3 | 30 | 60 | `1/30m` | 心跳遺失 |
-| `rule_agent_offline` | `system_task.agent_offline_check` | count | 3 | 30 | 60 | `1/30m` | agent 離線 |
+| `rule_agent_offline` | `system_task.agent_offline_check` | immediate | 1 | 10 | 60 | — | agent 離線（PCE 已將 workload 移出 policy；依 VEN 分別冷卻。已存在的 `alerts.json` 不會自動改，需重新套用最佳實務或手動調整）|
 | `rule_lost_agent` | `lost_agent.found` | immediate | 1 | 10 | 60 | — | lost-agent 復原 |
 | `rule_login_failed` | `user.sign_in,user.login` | count | 5 | 10 | 30 | `1/15m` | `filter_status=failure`；登入失敗 |
 | `rule_api_auth_failed` | `request.authentication_failed` | count | 5 | 10 | 30 | `1/15m` | API 認證失敗 |
