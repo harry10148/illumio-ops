@@ -27,19 +27,23 @@ from loguru import logger
 # line_channel_access_token, smtp_password, authorization (header).
 # The optional `Bearer ` prefix lets us strip the token from
 # `Authorization: Bearer <token>` style headers without keeping the value.
+# 欄位名稱允許任意 `xxx_` 前綴（hec_token、teams_webhook_url、
+# telegram_bot_token、smtp_password…）：舊版以 \b 錨定，`_` 是 word 字元，
+# 所以 `hec_token` 裡的 `token` 前面沒有字界，整個欄位不會被遮。
+# Authorization 的值可能帶 Bearer／Basic／Splunk 前綴：舊版只認 Bearer，
+# `Authorization: Splunk <token>` 會只遮掉 "Splunk" 這個字、token 本體照印。
 _LOG_SECRET_FIELD = _re.compile(
-    r'\b('
-    r'api[_-]?key'
+    r'\b((?:[a-z0-9]+[_-])*'
+    r'(?:api[_-]?key'
     r'|secret(?:[_-]?key)?'
     r'|password'
-    r'|(?:line[_-]?channel[_-]?access[_-]?)?token'
+    r'|token'
     r'|webhook[_-]?url'
-    r'|authorization'
-    r'|smtp[_-]?password'
-    r')\b'
+    r'|authorization))'
+    r'\b'
     r'["\']?'         # optional closing quote of a quoted JSON-style key
     r'\s*[:=]\s*'
-    r'["\']?(?:Bearer\s+)?([^,"\'\s}\)]{4,})',
+    r'["\']?(?:(?:Bearer|Basic|Splunk)\s+)?([^,"\'\s}\)]{4,})',
     _re.IGNORECASE,
 )
 
@@ -166,6 +170,9 @@ def setup_loguru(
         sys.stderr,
         level=level,
         colorize=True,
+        # diagnose=False：例外 traceback 不印出區域變數的值——dest_cfg.hec_token、
+        # api secret 這類機密會跟著 traceback 寫進日誌，訊息遮罩管不到。
+        diagnose=False,
         filter=_redact_log_record,  # L4: redact secrets even on console
         format=(
             "<green>{time:YYYY-MM-DD HH:mm:ss}</green> "
@@ -193,6 +200,9 @@ def setup_loguru(
         compression=_compress_and_chmod,  # L5/L6: gzip + chmod 0o640 on rotation
         encoding="utf-8",
         enqueue=True,
+        # diagnose=False：例外 traceback 不印出區域變數的值——dest_cfg.hec_token、
+        # api secret 這類機密會跟著 traceback 寫進日誌，訊息遮罩管不到。
+        diagnose=False,
         filter=_redact_log_record,  # L4
         format="{time:YYYY-MM-DD HH:mm:ss} {level: <8} {name}:{line} - {message}",
         opener=_open_0o640,  # L5/L6: active file 0o640 on create/rotation-reopen
@@ -212,6 +222,7 @@ def setup_loguru(
             retention=retention,
             serialize=True,
             enqueue=True,
+            diagnose=False,  # 見上方檔案 sink 的說明
             filter=_redact_log_record,  # L4
             opener=_open_0o640,  # L5/L6
         )
