@@ -8,8 +8,7 @@ from src.report_scheduler import ReportScheduler
 
 
 def test_prefix_registered():
-    assert ReportScheduler._REPORT_PREFIXES["policy_resolver"] == \
-        "Illumio_Policy_Resolver_"
+    assert ("Illumio_Policy_Resolver_", False) in ReportScheduler._REPORT_PREFIXES["policy_resolver"]
 
 
 def test_prune_by_count_handles_policy_resolver(tmp_path):

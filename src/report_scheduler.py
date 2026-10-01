@@ -49,6 +49,29 @@ def _now_in_schedule_tz(tz_str: str) -> datetime.datetime:
     tz_obj = resolve_tz(tz_str)
     return datetime.datetime.now(tz_obj).replace(tzinfo=None)
 
+def _report_window(lookback_days: int, tz_str: str | None,
+                   now_utc: datetime.datetime | None = None) -> tuple[str, str, str, str]:
+    """The last ``lookback_days`` COMPLETE days in the schedule's timezone.
+
+    Returns (start_utc, end_utc, start_label, end_label): ISO-Z bounds for the
+    generators and local calendar dates for the email. The old window ran
+    from (now - N days) 00:00Z to today 23:59:59Z — about N+1 calendar days,
+    partly in the future, always in UTC days, so consecutive weekly reports
+    double-counted the run day. 'local'/unset follows the scheduler's own
+    convention (UTC, see _now_in_schedule_tz).
+    """
+    now_utc = now_utc or datetime.datetime.now(datetime.timezone.utc)
+    tz = datetime.timezone.utc if (not tz_str or tz_str == "local") else resolve_tz(tz_str)
+    today = now_utc.astimezone(tz).date()
+    first_day = today - datetime.timedelta(days=max(int(lookback_days), 1))
+    start_local = datetime.datetime.combine(first_day, datetime.time(0), tzinfo=tz)
+    end_local = datetime.datetime.combine(today, datetime.time(0), tzinfo=tz) - datetime.timedelta(seconds=1)
+
+    def _z(dt: datetime.datetime) -> str:
+        return dt.astimezone(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    return _z(start_local), _z(end_local), first_day.isoformat(), (today - datetime.timedelta(days=1)).isoformat()
+
+
 # State key written to state.json
 _STATE_KEY = "report_schedule_states"
 
@@ -456,9 +479,9 @@ class ReportScheduler:
             output_dir = os.path.join(self._root_dir, output_dir)
         os.makedirs(output_dir, exist_ok=True)
 
-        now_utc = datetime.datetime.now(datetime.timezone.utc)
-        end_date = now_utc.strftime("%Y-%m-%dT23:59:59Z")
-        start_date = (now_utc - datetime.timedelta(days=lookback_days)).strftime("%Y-%m-%dT00:00:00Z")
+        sched_tz = schedule.get("timezone") or self.cm.config.get("settings", {}).get("timezone", "local")
+        start_date, end_date, start_label, end_label = _report_window(lookback_days, sched_tz)
+        period = (start_label, end_label)
 
         # Read optional traffic filters from schedule config
         schedule_filters = schedule.get('filters') or None
@@ -485,7 +508,8 @@ class ReportScheduler:
                 outcome = ScheduleOutcome(paths=list(paths))
                 if send_email and paths:
                     outcome = self._deliver(schedule, result, paths, start_date, end_date,
-                                            custom_recipients, report_type=report_type, lang=lang)
+                                            custom_recipients, report_type=report_type, lang=lang,
+                                            period=period)
 
             logger.info(f"[Scheduler] '{name}': completed, files={[os.path.basename(p) for p in paths]}")
             try:
@@ -554,11 +578,13 @@ class ReportScheduler:
         elif report_type == "ven_status":
             from src.report.ven_status_generator import VenStatusGenerator
             gen = VenStatusGenerator(self.cm, api_client=api)
-            result = gen.generate(lang=lang)
+            # output_dir：趨勢快照要跟著這個排程的輸出目錄，不是相對路徑 reports/。
+            result = gen.generate(lang=lang, output_dir=output_dir)
             if result.record_count == 0:
                 logger.warning(f"[Scheduler] '{name}': no VEN data — skipping export")
                 return None, []
-            paths = gen.export(result, output_dir=output_dir)
+            # fmt：舊版沒傳，XLSX／CSV 排程只會產出 HTML。
+            paths = gen.export(result, fmt=fmt, output_dir=output_dir)
             return result, paths
 
         elif report_type == "policy_usage":
@@ -649,7 +675,7 @@ class ReportScheduler:
     def _send_report_email(self, schedule: dict, result, paths: list,
                             start_date: str, end_date: str,
                             custom_recipients: list, report_type: str,
-                            lang: str = "en"):
+                            lang: str = "en", period: tuple | None = None):
         """Build and send the scheduled report email."""
         import html as _html
 
@@ -669,8 +695,12 @@ class ReportScheduler:
                       "app_summary": t("rpt_app_title", lang=lang),
                       "rule_hit_count": t("rpt_rhc_report_title", lang=lang),
                       "readiness": t("rpt_readiness_report_title", lang=lang)}.get(report_type, "Report")
-        start_disp = start_date[:10] if start_date else "N/A"
-        end_disp = end_date[:10] if end_date else "N/A"
+        # 以排程時區的日曆日顯示（UTC 字串前 10 碼在非 UTC 時區會差一天）。
+        if period:
+            start_disp, end_disp = period
+        else:
+            start_disp = start_date[:10] if start_date else "N/A"
+            end_disp = end_date[:10] if end_date else "N/A"
 
         body = "<html><body style='margin:0;padding:0;background:#F4F4F4;font-family:\"Montserrat\",Arial,sans-serif;color:#313638;'>"
         body += "<div style='max-width:860px;margin:0 auto;padding:16px;'>"
@@ -812,7 +842,8 @@ class ReportScheduler:
     # ─── Delivery outcome ────────────────────────────────────────────────────
 
     def _deliver(self, schedule: dict, result, paths: list, start_date: str, end_date: str,
-                 custom_recipients: list, report_type: str, lang: str) -> "ScheduleOutcome":
+                 custom_recipients: list, report_type: str, lang: str,
+                 period: tuple | None = None) -> "ScheduleOutcome":
         """Send the report email and classify a failure instead of raising."""
         try:
             self.reporter.last_report_email_outcome = "unknown"
@@ -820,7 +851,8 @@ class ReportScheduler:
             pass  # intentional fallback: a reporter stub without attributes still sends
         try:
             self._send_report_email(schedule, result, paths, start_date, end_date,
-                                    custom_recipients, report_type=report_type, lang=lang)
+                                    custom_recipients, report_type=report_type, lang=lang,
+                                    period=period)
             return ScheduleOutcome(paths=list(paths))
         except Exception as exc:
             kind = getattr(self.reporter, "last_report_email_outcome", "unknown")
@@ -830,6 +862,7 @@ class ReportScheduler:
                 pending = {
                     "paths": list(paths), "start_date": start_date, "end_date": end_date,
                     "report_type": report_type, "lang": lang,
+                    "period": list(period) if period else None,
                     "record_count": int(getattr(result, "record_count", 0) or 0),
                     "attempts": 1, "next_attempt": self._next_delivery_attempt(1),
                 }
@@ -897,7 +930,7 @@ class ReportScheduler:
             outcome = self._deliver(sched, result, paths, pend.get("start_date", ""),
                                     pend.get("end_date", ""), sched.get("email_recipients", []),
                                     report_type=pend.get("report_type", sched.get("report_type", "")),
-                                    lang=lang)
+                                    lang=lang, period=tuple(pend["period"]) if pend.get("period") else None)
             if outcome.status == "delivery_pending":
                 kind = getattr(self.reporter, "last_report_email_outcome", "unknown")
                 status, error = self._classify_delivery_failure(
@@ -929,32 +962,54 @@ class ReportScheduler:
     # schedule's SecurityRisk/NetworkInventory reports (cross-type loss). The
     # regex anchors on the timestamp's leading digit right after the prefix so
     # it matches only the unsuffixed traffic filename.
+    # 每種報表的所有輸出（HTML／XLSX／CSV zip）各自的檔名樣式。舊版只列
+    # HTML 的前綴、副檔名只認 .html/.zip/.json：XLSX 從來不會被清，大小寫
+    # 不同的 Illumio_Audit_Report_／Illumio_VEN_Report_ 等也從不計入
+    # max_reports，磁碟持續累積。
+    #
+    # (pattern, shared)：shared=True 的樣式被不只一種報表使用（例如 Security
+    # Risk 與 Traffic 的 XLSX／CSV 檔名相同），只在以 schedule_id 限定範圍時
+    # 才納入，避免無主（舊版）檔案被別種報表的保留規則刪掉。
+    _TRAFFIC_SHARED = re.compile(r"^Illumio_Traffic_Report_\d{4}-")
     _REPORT_PREFIXES = {
-        "traffic":           re.compile(r"^Illumio_Traffic_Report_\d{4}-"),
-        "security_risk":     "Illumio_Traffic_Report_SecurityRisk_",
-        "network_inventory": "Illumio_Traffic_Report_NetworkInventory_",
-        "audit":             "illumio_audit_report_",
-        "ven_status":        "illumio_ven_status_",
-        "policy_usage":      "illumio_policy_usage_report_",
-        "policy_diff":       "Illumio_Policy_Diff_Report_",
-        "policy_resolver":   "Illumio_Policy_Resolver_",
-        "app_summary":       "Illumio_App_Summary_",
-        "rule_hit_count":    "Illumio_Rule_Hit_Count_Report_",
-        "readiness":         "Illumio_Readiness_Report_",
+        # traffic 的 HTML 本身就是無後綴檔名，與 Security Risk 的 XLSX 同形。
+        "traffic":           [(_TRAFFIC_SHARED, False)],
+        "security_risk":     [("Illumio_Traffic_Report_SecurityRisk_", False), (_TRAFFIC_SHARED, True)],
+        "network_inventory": [("Illumio_Traffic_Report_NetworkInventory_", False), (_TRAFFIC_SHARED, True)],
+        "audit":             [("illumio_audit_report_", False), ("Illumio_Audit_Report_", False)],
+        "ven_status":        [("illumio_ven_status_", False), ("Illumio_VEN_Report_", False),
+                              ("Illumio_VEN_Status_Report_", False)],
+        "policy_usage":      [("illumio_policy_usage_report_", False), ("Illumio_PolicyUsage_Report_", False),
+                              ("Illumio_Policy_Usage_Report_", False)],
+        "policy_diff":       [("Illumio_Policy_Diff_Report_", False)],
+        "policy_resolver":   [("Illumio_Policy_Resolver_", False)],
+        "app_summary":       [("Illumio_App_Summary_", False)],
+        "rule_hit_count":    [("Illumio_Rule_Hit_Count_Report_", False)],
+        "readiness":         [("Illumio_Readiness_Report_", False)],
     }
+    _REPORT_EXTS = (".html", ".zip", ".json", ".xlsx")
+    # 儀表板讀的「最新摘要」不是報表，年齡清理不得刪掉（月排程／暫停的排程
+    # 會讓它們超過 30 天，面板就變空）。
+    _KEEP_FILES = re.compile(r"^latest_[a-z0-9_]+\.json$")
+    _UNIT_TS = re.compile(r"(\d{4}-\d{2}-\d{2}_\d{4}(?:-[0-9a-f]+)?)")
 
     @staticmethod
     def _report_unit_key(fname: str) -> str:
-        """Collapse a report file and its metadata sidecar to one report-unit key.
+        """Collapse every file one report run produced to one unit key.
 
-        A single report run emits e.g. ``<stem>.html`` plus its
-        ``<stem>.html.metadata.json`` sidecar; both map to the same key so that
-        ``max_reports`` limits reports, not individual files.
+        HTML, XLSX and CSV zip of the same run carry different stems
+        (``illumio_audit_report_<ts>.html`` vs ``Illumio_Audit_Report_<ts>.xlsx``)
+        but the same minute timestamp, so the timestamp is the unit; the
+        ``.metadata.json`` sidecar maps onto its report. Names without a
+        timestamp fall back to the stem.
         """
         name = fname
         if name.endswith(".metadata.json"):
             name = name[: -len(".metadata.json")]
-        for ext in (".html", ".zip", ".json"):
+        m = ReportScheduler._UNIT_TS.search(name)
+        if m:
+            return m.group(1)
+        for ext in ReportScheduler._REPORT_EXTS:
             if name.endswith(ext):
                 name = name[: -len(ext)]
                 break
@@ -1022,18 +1077,20 @@ class ReportScheduler:
         """
         if max_reports <= 0 or not os.path.isdir(output_dir):
             return
-        prefix = self._REPORT_PREFIXES.get(report_type)
-        if not prefix:
+        patterns = self._REPORT_PREFIXES.get(report_type)
+        if not patterns:
             return
-        # 'prefix' is either a literal string (startswith) or a compiled regex
-        # (match) -- see _REPORT_PREFIXES.
-        matches = prefix.match if isinstance(prefix, re.Pattern) else \
-            (lambda fname: fname.startswith(prefix))
+        active = [p for p, shared in patterns if not shared or schedule_id is not None]
 
-        # Group matching files into report units (report + its metadata sidecar).
+        def matches(fname: str) -> bool:
+            # 每個樣式是字面前綴（startswith）或編譯好的 regex（match）。
+            return any(p.match(fname) if isinstance(p, re.Pattern) else fname.startswith(p)
+                       for p in active)
+
+        # Group matching files into report units (all formats of one run + sidecars).
         units: dict[str, dict] = {}
         for fname in os.listdir(output_dir):
-            if not (matches(fname) and fname.endswith((".html", ".zip", ".json"))):
+            if not (matches(fname) and fname.endswith(self._REPORT_EXTS)):
                 continue
             fpath = os.path.join(output_dir, fname)
             try:
@@ -1068,7 +1125,8 @@ class ReportScheduler:
     def _prune_old_reports(self, output_dir: str):
         """Delete report files older than retention_days (default 30).
 
-        Covers .html, .zip, and .json files produced by the report engine.
+        Covers .html, .xlsx, .zip and .json files produced by the report engine;
+        the dashboard's latest_*.json summaries are kept.
         Controlled by config.report.retention_days; set to 0 to disable.
         """
         retention_days = int(
@@ -1082,7 +1140,7 @@ class ReportScheduler:
         cutoff = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days=retention_days)
         removed = 0
         for fname in os.listdir(output_dir):
-            if not fname.endswith((".html", ".zip", ".json")):
+            if not fname.endswith(self._REPORT_EXTS) or self._KEEP_FILES.match(fname):
                 continue
             fpath = os.path.join(output_dir, fname)
             try:

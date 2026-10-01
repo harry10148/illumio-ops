@@ -76,4 +76,4 @@ def test_not_enabled_skips_without_prompting(monkeypatch, tmp_path):
 
 
 def test_rule_hit_count_prefix_registered():
-    assert ReportScheduler._REPORT_PREFIXES["rule_hit_count"] == "Illumio_Rule_Hit_Count_Report_"
+    assert ("Illumio_Rule_Hit_Count_Report_", False) in ReportScheduler._REPORT_PREFIXES["rule_hit_count"]

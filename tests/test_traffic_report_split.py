@@ -130,7 +130,7 @@ def test_scheduler_has_policy_diff_prefix_and_subject():
     mirroring how security_risk/network_inventory were wired in ff93df9."""
     from src.report_scheduler import ReportScheduler
     assert "policy_diff" in ReportScheduler._REPORT_PREFIXES
-    assert ReportScheduler._REPORT_PREFIXES["policy_diff"].startswith("Illumio_Policy_Diff_Report_")
+    assert ("Illumio_Policy_Diff_Report_", False) in ReportScheduler._REPORT_PREFIXES["policy_diff"]
 
 
 def test_scheduler_prune_by_count_handles_policy_diff(tmp_path):
