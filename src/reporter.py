@@ -1933,6 +1933,11 @@ class Reporter:
         _MAX_ATTACH_BYTES = 10 * 1024 * 1024  # 10 MB per attachment
         _MAX_TOTAL_BYTES = 20 * 1024 * 1024   # 20 MB 全信總量預算（以 base64 後估算）
 
+        # 失敗的「種類」決定排程器要不要重寄：部分收件人被拒時其他人已收到
+        # （重寄＝重複信）、沒有收件人／認證失敗是設定問題（重寄無用），只有
+        # 連線類暫時性錯誤才值得只重寄信、不重產報表。回傳值仍維持 bool。
+        self.last_report_email_outcome = "unknown"
+        self.last_report_email_refused: dict = {}
         cfg = self.cm.config["email"]
         recipients = (
             [r.strip() for r in custom_recipients if r.strip()]
@@ -1941,6 +1946,7 @@ class Reporter:
         )
         if not recipients:
             logger.warning(t('no_recipients'))
+            self.last_report_email_outcome = "no_recipients"
             return False
 
         # Zip non-.zip files in-memory; skip files that exceed the size limit
@@ -2052,17 +2058,29 @@ class Reporter:
                 logger.warning(
                     f"[Email] Some recipients refused by SMTP server: {refused}"
                 )
+                self.last_report_email_outcome = "partial"
+                self.last_report_email_refused = {str(k): str(v) for k, v in refused.items()}
                 return False
             logger.info(t('mail_sent', host=host, port=port))
+            self.last_report_email_outcome = "sent"
             return True
         except smtplib.SMTPAuthenticationError as e:
             logger.error(f"SMTP auth failed (config error, not retrying): {e}")
+            self.last_report_email_outcome = "auth_failed"
+            return False
+        except smtplib.SMTPRecipientsRefused as e:
+            # 全部收件人被拒：位址問題，重寄也一樣。
+            logger.error(t('mail_failed', error=e))
+            self.last_report_email_outcome = "recipients_refused"
+            self.last_report_email_refused = {str(k): str(v) for k, v in (e.recipients or {}).items()}
             return False
         except (smtplib.SMTPConnectError, smtplib.SMTPServerDisconnected, ConnectionError, OSError, socket.timeout) as e:
             logger.warning(f"SMTP transient failure: {e}")
+            self.last_report_email_outcome = "transient"
             return False
         except smtplib.SMTPException as e:
             logger.error(t('mail_failed', error=e))
+            self.last_report_email_outcome = "smtp_error"
             return False
 
     def send_report_email(self, subject: str, html_body: str, attachment_path: str | None = None) -> bool:

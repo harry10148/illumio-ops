@@ -113,6 +113,12 @@ GUI：報表區 `#/reports` → Security 卡片的產生鈕。
 
 注意事項：與 Traffic 報表相同——policy_decisions 預設含 unknown，且支援 `--data-source`。
 
+成熟度分數（`mod12`）怎麼算：
+
+- **Enforcement 覆蓋（40%）**：workload 實際的 enforcement 模式（full 計 1、selective 計 0.5）；沒有 workload 資料時改用流量目的端的 enforcement 模式。來源完全沒有 enforcement 模式（例如 CSV 匯入）時這一項顯示「無資料」，其餘項目按比例換算成 100 分，不會當成 0 分或滿分。
+- **Potentially Blocked 不計分**：這類流量代表**沒有任何規則允許**，只是目的端還沒開 enforcement 才放行，一開 enforcement 就會被擋——它是曝險，不是進度。占比偏高時 key finding 為 HIGH，建議先為合法流量補 allow 規則再開 enforcement。
+- **橫向移動與高風險埠**只計**未被封鎖**的流量：已被擋的 SMB／RDP 是控制住了，不會再拉低分數。「橫向移動埠」只有遠端管理／遠端執行／檔案分享（SSH、RDP、SMB、WinRM、VNC 等），資料庫與目錄服務埠不算；清單由 `report_config.yaml` 的 `lateral_movement_ports` 統一定義，mod15 與規則引擎共用。
+
 ## 3. Audit & System Events Report
 
 用途：誰在什麼時候透過 API／GUI／agent 改了什麼（policy commit、物件變更前後值、workload 通知），用來回溯稽核操作。
@@ -128,6 +134,8 @@ GUI：報表區 `#/reports` → Audit 卡片的產生鈕。
 關鍵欄位：`action.src_ip`／`api_method`／`api_endpoint`、`created_by`（分辨 user／agent／system 來源）、`change_detail`（欄位前後值摘要）、`workloads_affected`。
 
 注意事項：這裡有兩層獨立的截斷，不要混為一談。第一層在 generator（`audit_generator.py`）組 `change_detail` 字串時就發生：每個 before/after 欄位值先裁到 80 字元、最多納入 8 個欄位（`_truncate_val(val, max_len=80)` ＋ `summaries[:8]`），HTML 與 CSV 的 `change_detail` 拿到的都是同一條已裁切字串，無法回復。第二層只在 HTML 匯出層（`audit_html_exporter.py` 的 `_LONG_TEXT_TRUNCATE_AT = 150`）：`change_detail` 字串若超過 150 字元會再用 `<details>` 折疊顯示，點開可看到 `change_detail` 的完整內容——但那仍是第一層裁過的摘要，不是原始值。真正未裁切的原始變更資料只在 `raw_events.csv`（CSV ZIP 內的獨立檔案）的 `resource_changes` 欄位裡。
+
+事件數量：PCE 單次 `GET /events` 最多回 10,000 筆且只留最新的那批。報表遇到上限會把時間窗對半切開再抓，直到每段都低於上限；切到最小跨度仍碰頂時，報表開頭會顯示「資料不完整」警示，數字視為下限。PCE 回錯誤時報表產生失敗，不會產出一份看起來正常但其實是空的報表。
 
 ## 4. Policy Usage Report
 
@@ -277,7 +285,12 @@ GUI：報表區 `#/reports` → Policy Resolver 卡片的產生鈕。
 - **觸發方式**：每筆排程可用 `schedule_type`（`daily`／`weekly`／`monthly`，依當地時區的時／分匹配，並有限於「目標日當天」的補跑語意）或 `cron_expr`（優先於 `schedule_type`，用 APScheduler 的 cron 表示式，如 `0 8 * * MON-FRI`）擇一設定；時區依 `timezone` 欄位解析，未設定時視同 UTC。cron 排程首次評估時，引擎會以「當下往前一小段補跑窗」為基準計算下一次觸發，確保 tick 落在觸發秒之後也會在首輪就觸發（不會因首跑無前次時間而永遠錯過）。`monthly` 排程設 `day_of_month` 大於當月天數時（如 31 遇到 2 月），會自動夾取到當月最後一天。
 - **可排程的 report_type**：`traffic`、`security_risk`、`network_inventory`、`audit`、`ven_status`、`policy_usage`、`policy_diff`、`policy_resolver`、`app_summary`、`rule_hit_count`、`readiness`——這 11 種直接對應內部 dispatch 字串，比 GUI Generate 鈕的 9 種多出 `network_inventory` 與 `app_summary`（後兩者在 GUI 是 Traffic 家族底下的變體，未各自出現在 Generate 鈕列）。
 - **失敗重試**：產出失敗不會推進「已跑」時間，而是記錄失敗次數與時間並套用指數退避（60 秒起、每次翻倍、上限 1 小時），退避窗內的 tick 會跳過該排程；下次成功後計數歸零。避免壞排程每 60 秒重試灌爆與遮蔽其他排程。
-- **寄送**：排程設 `email_report: true` 時，成功產出後會組一封 HTML email 寄出（主旨含排程名稱與日期），收件人預設用系統郵件設定、可用 `email_recipients` 覆寫。寄送失敗不影響已產出的檔案。
+- **寄送**：排程設 `email_report: true` 時，成功產出後會組一封 HTML email 寄出（主旨含排程名稱與日期），收件人預設用系統郵件設定、可用 `email_recipients` 覆寫。報表產生和寄送分開處理：報表一旦產出，這一期就算完成（推進已跑時間），寄送問題不會讓整個排程重跑、重抓 PCE、重寄給已收到的人。
+  - 連線類暫時錯誤：只重寄已產生的檔案，間隔 5／15／45／135 分鐘，最多 5 次，狀態顯示「重寄中」。
+  - 部分收件人被拒（其他人已收到）：狀態「已寄出（部分）」，錯誤欄列出被拒地址，不重寄。
+  - 沒有收件人、SMTP 認證失敗、所有收件人被拒：狀態「寄送失敗」，屬設定問題，不重試。
+- **沒有資料 vs 抓取失敗**：PCE 抓取失敗一律算產出失敗（走上面的退避重試）；PCE 正常但這期真的沒有資料時狀態為「無資料」；Rule Hit Count 未在 PCE 啟用時為「已略過」並附原因。
+- **防重複執行**：每次執行前會留下 running 標記（不推進已跑時間）。GUI「重新啟動」時舊排程器的報表可能還在跑，新排程器看到標記就不會同一期再跑一次；標記超過 6 小時視為殘留。GUI「立即執行」失敗不會推進已跑時間，也不累計退避。
 - **保留**：`max_reports` 只保留最新 N 份「報表」而非個別檔案（同一次產出的 html+csv 算同一份，一起留或一起刪）。保留以**單一排程為範圍**——每次排程產出會在 metadata sidecar 標記所屬排程 id，裁剪只影響同一排程自己的歷史，因此同 report_type、同輸出目錄的兩個排程不會互相刪檔（早於此機制、未標記的舊檔改由 `retention_days` 依時間裁剪）。兩者鍵位語意見 [configuration.md](configuration.md) 「report／report_schedules」節。
 
 GUI 排程操作（建立／編輯／啟用停用／立即執行 Run Now／刪除）見 [gui-tour.md](gui-tour.md) 的「報表」與「自動化」節的 Schedules 子頁；排程需 daemon 持續執行才會觸發，勾選 Email 需先在 Settings → Channels 設定好郵件通道。

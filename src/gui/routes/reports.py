@@ -1221,7 +1221,7 @@ def make_reports_blueprint(
             if not sched:
                 return jsonify({"ok": False, "error": t("gui_schedule_not_found", lang=lang)}), 404
 
-            from src.report_scheduler import ReportScheduler, _now_in_schedule_tz
+            from src.report_scheduler import ReportScheduler, ScheduleOutcome, _now_in_schedule_tz
             from src.reporter import Reporter
             reporter = Reporter(cm)
             scheduler = ReportScheduler(cm, reporter)
@@ -1231,17 +1231,19 @@ def make_reports_blueprint(
             # UTC-aware）。讀取端（should_run）仍相容 aware/naive 兩種既有格式。
             global_tz = cm.config.get('settings', {}).get('timezone', 'local')
             sched_tz = sched.get('timezone') or global_tz
-            now_str = _now_in_schedule_tz(sched_tz).isoformat()
-            scheduler._save_state(schedule_id, now_str, "running")
+            # running 標記不推進 last_run：手動執行失敗時，該期排程照常會跑
+            # （舊寫法先把 last_run 設成現在，失敗後那一期就永遠不重試）。
+            scheduler._mark_running(schedule_id)
 
             def _run():
                 try:
-                    scheduler.run_schedule(sched)
+                    outcome = scheduler.run_schedule(sched)
+                    if not isinstance(outcome, ScheduleOutcome):
+                        outcome = ScheduleOutcome()
                     now_str = _now_in_schedule_tz(sched_tz).isoformat()
-                    scheduler._save_state(schedule_id, now_str, "success")
+                    scheduler.record_outcome(schedule_id, now_str, outcome)
                 except Exception as e:
-                    now_str = _now_in_schedule_tz(sched_tz).isoformat()
-                    scheduler._save_state(schedule_id, now_str, "failed", str(e))
+                    scheduler.record_manual_failure(schedule_id, str(e))
                     logger.exception(f"GUI-triggered schedule {schedule_id} failed: {e}")
 
             t_thread = threading.Thread(target=_run, daemon=True)
