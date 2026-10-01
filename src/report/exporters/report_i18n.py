@@ -2,7 +2,8 @@
 Shared i18n helpers for HTML report exporters.
 
 After Phase 1 migration, STRINGS is a _StringsView that:
-  - Stores runtime overlay entries (dynamic writes from this module's bottom loops)
+  - Keeps an in-memory overlay for any key written at runtime (this module
+    no longer writes any: report strings live in the i18n JSON catalogues)
   - Falls back to get_messages() for any key not in the overlay
   - Preserves the dict-like API (subscript, .get, __setitem__, __delitem__,
     __contains__, keys()) that 9 exporter files depend on.

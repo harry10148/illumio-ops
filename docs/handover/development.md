@@ -241,7 +241,7 @@ Category C 掃 `.js` 時會先略過 `/* */` 區塊註解（含不以 `*` 開頭
 
 ### 3.7 報表的字串與靜態資產
 
-- **報表文字全部在兩個 i18n JSON**：`src/report/exporters/report_i18n.py` 不再在 import 時補字串，只提供 `STRINGS`（兩個 JSON 的唯讀檢視）與 `COL_I18N`。安全規則的修正說明是 `rpt_rule_<規則ID>_how` 鍵；要改文字就改 JSON。
+- **報表文字全部在兩個 i18n JSON**：`src/report/exporters/report_i18n.py` 不再在 import 時補字串，只提供 `STRINGS`（以兩個 JSON 為底的字典檢視）與 `COL_I18N`。安全規則的修正說明是 `rpt_rule_<規則ID>_how` 鍵；要改文字就改 JSON。
 - **欄名對照（`COL_I18N`）** 在 `src/report/exporters/col_i18n_map.json`：pandas 欄名 → i18n 鍵。新增分析欄位時把欄名加進這裡，HTML 表頭才會翻譯。
 - **報表外殼的 CSS／表格 JS** 在 `src/report/exporters/assets/report_shell.css` 與 `report_table.js`，由 `report_shell.py` 逐位元組讀入（`SHELL_CSS`／`TABLE_JS`）。drift guard 仍比對 `design/v3/reports/shell.css`；`tests/test_report_no_hardcoded_colour.py` 的色值 ratchet 也涵蓋這兩個檔。
 - **HTML 寫檔一律用 `_output_paths.save_text_report(path, body)`**：它負責保留檔名、寫入，失敗時清掉半成品。
