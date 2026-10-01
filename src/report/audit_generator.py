@@ -447,6 +447,8 @@ class AuditGenerator:
         self._config_dir = config_dir
         self._cache = cache_reader
         self._lang = "en"  # overwritten by generate_from_api when lang is known
+        from src.report.provenance import pce_identity
+        self._pce_url, self._org_name = pce_identity(config_manager)
 
     def _fetch_events(self, start: datetime.datetime, end: datetime.datetime) -> tuple[list, str]:
         """Fetch events with cache-aware hybrid coverage.

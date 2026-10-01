@@ -112,6 +112,8 @@ class VenStatusGenerator:
     def __init__(self, config_manager, api_client=None):
         self.cm = config_manager
         self.api = api_client
+        from src.report.provenance import pce_identity
+        self._pce_url, self._org_name = pce_identity(config_manager)
 
     # ── public ───────────────────────────────────────────────────────────────
 
@@ -197,7 +199,8 @@ class VenStatusGenerator:
         paths = []
         if fmt in ('html', 'all'):
             path = VenHtmlExporter(result.module_results, df=result.dataframe, lang=lang,
-                                   pce_url=pce_url, org_name=org_name).export(output_dir)
+                                   pce_url=pce_url or self._pce_url,
+                                   org_name=org_name or self._org_name).export(output_dir)
             paths.append(path)
             self._write_report_metadata(path, result, file_format='html')
             print(t("rpt_ven_html_saved", path=path, lang=lang))

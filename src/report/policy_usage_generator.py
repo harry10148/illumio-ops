@@ -100,6 +100,8 @@ class PolicyUsageGenerator:
         self.api = api_client
         self._config_dir = config_dir
         self._lang = "en"  # overwritten by generate_from_api/generate when lang is known
+        from src.report.provenance import pce_identity
+        self._pce_url, self._org_name = pce_identity(config_manager)
 
     # ── Public interface ───────────────────────────────────────────────────────
 

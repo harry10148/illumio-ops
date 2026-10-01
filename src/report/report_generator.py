@@ -596,6 +596,11 @@ class ReportGenerator:
             traffic_report_profile=traffic_report_profile,
         )
         result.draft_policy_report = draft_policy
+        if result.module_results is not None:
+            from src.report.provenance import build_provenance
+            result.module_results["_provenance"] = build_provenance(
+                self.cm, source=_source, start=start_date, end=end_date,
+                filters=filters, policy_decisions=policy_decisions)
         if _truncated_from and result.module_results is not None:
             # Surface the pre-cap count so the exporter can disclose that every
             # total/finding reflects only the retained rows.
@@ -626,7 +631,11 @@ class ReportGenerator:
         logger.info(f"[ReportGenerator] Starting CSV-source report from: {csv_path}")
         print(t("rpt_parsing_csv", path=csv_path, lang=lang))
         df = self._parse_csv(csv_path)
-        return self._run_pipeline(df, source='csv', traffic_report_profile=traffic_report_profile)
+        result = self._run_pipeline(df, source='csv', traffic_report_profile=traffic_report_profile)
+        if result.module_results is not None:
+            from src.report.provenance import build_provenance
+            result.module_results["_provenance"] = build_provenance(self.cm, source="csv")
+        return result
 
     def export(self, result: ReportResult, fmt: str = 'html',
                output_dir: str = 'reports',
@@ -718,9 +727,13 @@ class ReportGenerator:
                 "network_inventory": NetworkInventoryHtmlExporter,
                 "traffic": TrafficFlowsHtmlExporter,
             }.get(traffic_report_profile, SecurityRiskHtmlExporter)
+            _prov = (result.module_results or {}).get("_provenance") or {}
             path = _exporter_cls(
                 result.module_results,
                 data_source=result.data_source,
+                date_range=(_prov.get("window_start", ""), _prov.get("window_end", "")),
+                pce_url=_prov.get("pce_url", ""),
+                org_name=_prov.get("org", ""),
                 profile=traffic_report_profile,
                 detail_level=_REPORT_DETAIL_LEVEL,
                 compute_draft=ruleset_needs_draft_pd(DRAFT_PD_RULES),

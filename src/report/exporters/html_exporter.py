@@ -640,11 +640,12 @@ class _TrafficReportBase:
         ]
 
         if self._data_source:
-            ds_key = {
-                "cache": "rpt_data_source_cache",
-                "api": "rpt_data_source_api",
-            }.get(self._data_source, "rpt_data_source_mixed")
-            ds_label = _s(ds_key)
+            # CSV 匯入以前掉進預設分支，被標成「cache + API」。
+            ds_label = {
+                "cache": _s("rpt_data_source_cache"),
+                "api": _s("rpt_data_source_api"),
+                "csv": t("rpt_data_source_csv", lang=_sl),
+            }.get(self._data_source, _s("rpt_data_source_mixed"))
             ds_color = {"cache": "var(--tone-ok-border)", "api": "var(--tone-info-border)"}.get(
             self._data_source, "var(--tone-warn-border)")
             _pills.append(
@@ -901,8 +902,14 @@ class _TrafficReportBase:
         _date_str = " – ".join(d for d in self._date_range if d)
         if _date_str:
             _meta[_s("rpt_cover_date_range")] = _date_str
-        if generated_at:
-            _meta[_s("rpt_cover_generated")] = str(generated_at)
+        _prov = self._r.get('_provenance') or {}
+        # 產生時間帶時區（mod12 的值是沒有時區的伺服器本地時間）。
+        if _prov.get('generated_at') or generated_at:
+            _meta[_s("rpt_cover_generated")] = _prov.get('generated_at') or str(generated_at)
+        if _prov.get('filters'):
+            _meta[t("rpt_cover_filters", lang=_sl)] = _prov['filters']
+        if _prov.get('tool_version'):
+            _meta[t("rpt_cover_tool_version", lang=_sl)] = _prov['tool_version']
 
         # The maturity grade rides on the cover only where the legacy cover put
         # it: the security profile, and only when a real grade was computed.
@@ -1766,6 +1773,11 @@ class _TrafficReportBase:
             )
         )
         if app_env_scores is not None and not app_env_scores.empty:
+            # *_ratio 欄是 0–1 的比例，但欄名標「%」：先換算成百分比再顯示
+            # （舊版直接印 0.4593）。
+            app_env_scores = app_env_scores.copy()
+            for _rc in [c for c in app_env_scores.columns if str(c).endswith("_ratio")]:
+                app_env_scores[_rc] = (pd.to_numeric(app_env_scores[_rc], errors="coerce") * 100).round(1)
             _aes = app_env_scores.rename(columns={
                 "app_env_key": "App (Env)",
                 "readiness_score": "Readiness Score",
