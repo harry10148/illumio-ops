@@ -29,6 +29,20 @@ schema 的預設值為準，並在下方「已知落差」標註。
 安裝與升級流程見 [installation.md](installation.md)（安裝與部署）；監控規則／告警通道的規則語意見
 [monitoring-alerts.md](monitoring-alerts.md)（規則語意不在本文件範圍）。
 
+### 驗證失敗時的行為
+
+- **`api` 區塊**驗證失敗：拒絕啟動（`ConfigError`），避免 TLS 防護失效。
+- **其他區塊**驗證失敗：**只有該頂層區塊**退回預設值，其餘區塊照常生效，並在 log
+  記一筆 `Config section(s) failed validation and fell back to defaults: …`
+  （`ConfigManager.invalid_sections` 可取得清單）。舊版會把整份設定退回預設值，
+  一個無關欄位出錯就讓 `siem.enabled`／`pce_cache.enabled` 變成 `false`、SIEM
+  轉送無聲停擺。
+- **頂層未知鍵**：已註冊告警外掛的設定區段（外掛欄位路徑的第一段）原樣保留、
+  不參與 schema 驗證；其餘頂層未知鍵視為打錯字，記 ERROR log 後忽略。
+- **存檔**：`save()` 寫入前先驗證，會**新增**驗證錯誤的變更一律拒絕
+  （`ConfigValidationError`，GUI 回 400 並列出欄位），不寫入磁碟；載入時就已
+  存在的錯誤不擋，否則連修正都存不進去。
+
 ## 設定檔案總表
 
 illumio-ops 的設定分散在四個檔案，全部位於 `config/`（`.gitignore` 已排除，因為含密鑰）：
@@ -223,6 +237,9 @@ sudo systemctl start illumio-ops
 | `timezone` | str | `"local"` | 顯示用時區 |
 | `enable_health_check` | bool | `true` | 是否啟用健康檢查旗標 |
 | `dashboard_queries` | list[dict] | `[]` | GUI 儀表板自訂查詢；型別未經 pydantic 深層驗證（`list[dict]`），實際欄位形狀（`name`/`rank_by`/`pd`/`port`/`proto`/`src_label`/… 等）見 `config.json.example` 或 GUI 儀表板設定頁 |
+| `fleet_target_ven_version` | str | `""` | VEN 車隊目標版本；空字串＝不比對（GUI 的 PCE 連線頁儲存） |
+| `fleet_max_batch` | int（1–1000）\| null | `null` | VEN 車隊單批推進上限；`null`／空字串＝預設 200 |
+| `fleet_index_cap` | int（≥1）\| null | `null` | VEN 車隊 workloads index 落地上限；`null`＝預設 20000 |
 
 ## rules 區塊
 

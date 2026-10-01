@@ -269,3 +269,38 @@ def test_settings_support_dynamic_plugin_roots(monkeypatch):
         import src.gui as gui_module
         gui_module.PLUGIN_METADATA.pop("dummy_settings_plugin", None)
         os.unlink(path)
+
+
+def test_settings_save_rejects_invalid_value_with_400():
+    """會讓 config 驗證失敗的變更回 400 + i18n 訊息，且不寫入磁碟。"""
+    fd, path = tempfile.mkstemp(suffix=".json")
+    os.close(fd)
+    try:
+        with open(path, 'w', encoding='utf-8') as f:
+            json.dump({
+                "api": {"url": "https://pce.test", "key": "test", "secret": "test", "org_id": "1"},
+                "rules": [],
+                "web_gui": {"username": "admin", "password": "testpass",
+                            "allowed_ips": ["127.0.0.1"], "secret_key": "test-secret"},
+            }, f)
+        cm = ConfigManager(config_file=path)
+        cm.load()
+        app = _create_app(cm, persistent_mode=True)
+        app.config.update({"TESTING": True})
+        client = app.test_client()
+        login = client.post('/api/login', json={"username": "admin", "password": "testpass"},
+                            environ_overrides={'REMOTE_ADDR': '127.0.0.1'})
+        csrf_token = _csrf(login)
+        with open(path, encoding='utf-8') as f:
+            before = f.read()
+        resp = client.post('/api/settings', json={"smtp": {"port": 99999}},
+                           environ_overrides={'REMOTE_ADDR': '127.0.0.1'},
+                           headers={"X-CSRF-Token": csrf_token})
+        assert resp.status_code == 400
+        body = resp.get_json()
+        assert body["ok"] is False
+        assert "smtp.port" in body["fields"]
+        with open(path, encoding='utf-8') as f:
+            assert f.read() == before
+    finally:
+        os.unlink(path)

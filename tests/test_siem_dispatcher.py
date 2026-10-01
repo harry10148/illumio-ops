@@ -518,3 +518,34 @@ def test_pce_identity_uses_api_host_and_product_version():
     api._api_get.side_effect = RuntimeError("down")
     assert pce_identity(cm, api) == ("pce.lab.local", "unknown")
     assert pce_identity(cm, None) == ("pce.lab.local", "unknown")
+
+
+def test_dispatcher_passes_record_time_to_send_record(sf):
+    """支援 send_record 的 transport（HEC）要拿到事件本身的時間，不是送出時間。"""
+    from src.siem.dispatcher import DestinationDispatcher
+    from src.siem.formatters.cef import CEFFormatter
+    now = datetime.now(timezone.utc)
+    with sf.begin() as s:
+        ev = PceEvent(
+            pce_href="/orgs/1/events/t1", pce_event_id="uuid-t1",
+            timestamp=now, event_type="policy.update", severity="info",
+            status="success", pce_fqdn="pce.test",
+            raw_json='{"event_type":"policy.update","timestamp":"2026-09-11T03:04:05Z"}',
+            ingested_at=now,
+        )
+        s.add(ev)
+        s.flush()
+        s.add(SiemDispatch(source_table="pce_events", source_id=ev.id,
+                           destination="test-dest", status="pending",
+                           retries=0, queued_at=now))
+
+    class RecordingTransport:
+        def __init__(self): self.records = []
+        def send(self, p): raise AssertionError("send_record should be used")
+        def send_record(self, p, event_time=None): self.records.append(event_time)
+        def close(self): pass
+
+    tr = RecordingTransport()
+    assert DestinationDispatcher("test-dest", sf, CEFFormatter(), tr).tick()["sent"] == 1
+    expected = datetime(2026, 9, 11, 3, 4, 5, tzinfo=timezone.utc).timestamp()
+    assert tr.records == [expected]

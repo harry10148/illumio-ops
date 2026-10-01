@@ -21,6 +21,21 @@ def _backoff_seconds(retries: int) -> int:
     return min(2 ** retries * 5, 3600)
 
 
+def _record_epoch(source_table: str, raw_json: Optional[str]) -> Optional[float]:
+    """記錄本身的時間（epoch 秒）：event 取 timestamp、flow 取 last_detected。"""
+    if not raw_json:
+        return None
+    from src.siem.formatters.syslog_header import event_record_time, flow_record_time
+    try:
+        data = orjson.loads(raw_json)
+    except Exception:
+        return None
+    if not isinstance(data, dict):
+        return None
+    dt = event_record_time(data) if source_table == "pce_events" else flow_record_time(data)
+    return dt.timestamp() if dt else None
+
+
 # SQLite 的 SQLITE_LIMIT_VARIABLE_NUMBER 預設為 999；批次標記 sent 時把
 # id 清單切成 ≤ 此值一組，避免 batch_size 調高（config 允許到 10000）時
 # 觸發 "too many SQL variables"。仍在同一 transaction 內完成（每 tick 一次 commit）。
@@ -77,8 +92,7 @@ class DestinationDispatcher:
 
     def _process_batch(self) -> dict[str, int]:
         now = datetime.now(timezone.utc)
-        sent = failed = quarantined = 0
-        sent_ids: list[int] = []
+        failed = quarantined = 0
 
         with self._sf() as s:
             rows = s.execute(
@@ -96,6 +110,7 @@ class DestinationDispatcher:
             # session —— NullPool 下 batch=100 就是 100 條新 SQLite 連線）。
             sources = self._load_sources(s, rows)
 
+        sent_rows: list[tuple[SiemDispatch, str]] = []
         for dispatch_row in rows:
             payload = self._build_payload(
                 dispatch_row, sources.get((dispatch_row.source_table, dispatch_row.source_id))
@@ -107,26 +122,36 @@ class DestinationDispatcher:
                 quarantined += 1
                 continue
             try:
-                self._transport.send(payload)
-                sent_ids.append(dispatch_row.id)
-                sent += 1
+                self._send(payload, dispatch_row,
+                           sources.get((dispatch_row.source_table, dispatch_row.source_id)))
+                sent_rows.append((dispatch_row, payload))
             except Exception as exc:
                 logger.warning("SIEM dispatch failed for row {}: {}", dispatch_row.id, exc)
-                new_retries = dispatch_row.retries + 1
-                if new_retries >= self._max_retries:
-                    self._quarantine(dispatch_row, payload, str(exc))
+                if self._record_failure(dispatch_row, payload, str(exc)):
                     quarantined += 1
                 else:
-                    next_at = datetime.now(timezone.utc) + timedelta(
-                        seconds=_backoff_seconds(new_retries)
-                    )
-                    with self._sf.begin() as s:
-                        s.execute(
-                            update(SiemDispatch)
-                            .where(SiemDispatch.id == dispatch_row.id)
-                            .values(retries=new_retries, next_attempt_at=next_at)
-                        )
                     failed += 1
+
+        # 串流型 transport（TCP／TLS）在標記 sent 之前先 graceful close 確認送達：
+        # 直接 close() 會因接收 buffer 有未讀資料（TLS session ticket）送出 RST，
+        # 對端丟掉這一批的尾段；對端在收尾時 reset 也代表這批不保證送達。
+        # 確認失敗就把這批當成送出失敗走重試／DLQ（at-least-once，可能重複）。
+        finish_batch = getattr(self._transport, "finish_batch", None)
+        if sent_rows and finish_batch is not None:
+            try:
+                finish_batch()
+            except Exception as exc:
+                logger.warning(
+                    "SIEM destination {!r}: delivery of {} row(s) not confirmed at "
+                    "connection close ({}); will retry", self._name, len(sent_rows), exc)
+                for dispatch_row, payload in sent_rows:
+                    if self._record_failure(dispatch_row, payload, f"delivery_unconfirmed: {exc}"):
+                        quarantined += 1
+                    else:
+                        failed += 1
+                sent_rows = []
+        sent = len(sent_rows)
+        sent_ids = [row.id for row, _ in sent_rows]
 
         # 成功送出的列以單一 transaction 一次標記 sent（原本逐列 commit 是
         # 與 ingest 對撞的主要寫鎖 churn）。若 process 在網路送出後、此
@@ -145,6 +170,21 @@ class DestinationDispatcher:
                     )
 
         return {"sent": sent, "failed": failed, "quarantined": quarantined}
+
+    def _record_failure(self, row: SiemDispatch, payload: Optional[str], error: str) -> bool:
+        """記一次送出失敗：達 max_retries 進 DLQ（回 True），否則排退避重試（回 False）。"""
+        new_retries = row.retries + 1
+        if new_retries >= self._max_retries:
+            self._quarantine(row, payload, error)
+            return True
+        next_at = datetime.now(timezone.utc) + timedelta(seconds=_backoff_seconds(new_retries))
+        with self._sf.begin() as s:
+            s.execute(
+                update(SiemDispatch)
+                .where(SiemDispatch.id == row.id)
+                .values(retries=new_retries, next_attempt_at=next_at)
+            )
+        return False
 
     _SOURCE_MODELS = {
         "pce_events": PceEvent,
@@ -174,6 +214,14 @@ class DestinationDispatcher:
                 ):
                     loaded[(table_name, src_id)] = raw_json
         return loaded
+
+    def _send(self, payload: str, row: SiemDispatch, raw_json: Optional[str]) -> None:
+        """送出一筆；transport 支援 send_record 時一併帶上記錄本身的時間。"""
+        send_record = getattr(self._transport, "send_record", None)
+        if send_record is None:
+            self._transport.send(payload)
+            return
+        send_record(payload, event_time=_record_epoch(row.source_table, raw_json))
 
     def _build_payload(self, row: SiemDispatch, raw_json: Optional[str]) -> Optional[str]:
         if raw_json is None:

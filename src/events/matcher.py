@@ -32,6 +32,29 @@ def _value_matches(pattern: str, value: str | None) -> bool:
 
     return pattern == normalized
 
+# PCE 事件 severity 的實際值是 "err"／"warning"／"info"（真機 fixture
+# tests/fixtures/pce_native_cef_pairs.json 與 REST API 文件皆同），但 GUI 與 CLI
+# 的嚴重度選項存的是 "error"。精確比對下選 error 的規則永遠不會命中，
+# 所以比對前兩邊都正規化成 PCE 的值。
+_SEVERITY_ALIASES = {"error": "err"}
+
+
+def _canon_severity(value: str | None) -> str:
+    text = str(value if value is not None else "").strip().lower()
+    return _SEVERITY_ALIASES.get(text, text)
+
+
+def _severity_matches(pattern: str, value: str | None) -> bool:
+    pattern = str(pattern or "").strip()
+    if pattern.startswith("!"):
+        return not _severity_matches(pattern[1:], value)
+    if _looks_like_regex(pattern):
+        # regex 由使用者自訂：原值或正規化值任一符合即算命中。
+        return _value_matches(pattern, value) or _value_matches(pattern, _canon_severity(value))
+    canon_pattern = "|".join(_canon_severity(p) for p in pattern.split("|"))
+    return _value_matches(canon_pattern, _canon_severity(value))
+
+
 def _extract_nested(event: dict[str, Any], field_path: str) -> str | None:
     current: Any = event
     for part in field_path.split("."):
@@ -68,7 +91,7 @@ def matches_event_rule(rule: dict[str, Any], event: dict[str, Any]) -> bool:
     if not _value_matches(str(rule.get("filter_status", "all")), event.get("status")):
         return False
 
-    if not _value_matches(str(rule.get("filter_severity", "all")), event.get("severity")):
+    if not _severity_matches(str(rule.get("filter_severity", "all")), event.get("severity")):
         return False
 
     match_fields = rule.get("match_fields") or rule.get("filter_match_fields") or {}

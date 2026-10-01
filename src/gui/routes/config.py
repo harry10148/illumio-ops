@@ -9,6 +9,7 @@ from flask import Blueprint, jsonify, request
 from loguru import logger
 
 from src.config import ConfigManager, hash_password, verify_password
+from src.exceptions import ConfigValidationError
 from src.alerts import PLUGIN_METADATA, plugin_config_path
 from src.i18n import t
 from src.pce_target import normalize_org_id, normalize_pce_url, pce_target_changed
@@ -359,7 +360,18 @@ def make_config_blueprint(
                         "error": t("gui_err_pce_flush_failed", lang=lang),
                     }), 500
             cm.config = scratch
-            cm.save()
+            try:
+                cm.save()
+            except ConfigValidationError as exc:
+                # 只回欄位路徑，不回原始值（可能是機密）；完整訊息在 server log。
+                logger.warning("Settings save rejected: {}", exc)
+                cm.load()  # 丟掉這次沒寫進去的記憶體變更
+                return jsonify({
+                    "ok": False,
+                    "error": t("gui_err_config_validation", lang=lang,
+                               fields=", ".join(exc.fields)),
+                    "fields": exc.fields,
+                }), 400
             if _do_pce_rebind:
                 # After the save, unlike the flush above: the rows stay either
                 # way, and binding to a target that had not been persisted would

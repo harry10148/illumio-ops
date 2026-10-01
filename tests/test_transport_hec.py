@@ -50,3 +50,18 @@ def test_hec_retries_on_503():
     tr = SplunkHECTransport("https://splunk.example.com", token="tok", verify_tls=False)
     tr.send("retry payload")
     assert len(responses_lib.calls) == 3
+
+
+@responses_lib.activate
+def test_hec_send_record_carries_event_time():
+    """沒帶 time 時 Splunk 以收到時間為事件時間；send_record 必須帶上記錄時間。"""
+    import json as _json
+    from src.siem.transports.splunk_hec import SplunkHECTransport
+    responses_lib.add(responses_lib.POST,
+                      "https://splunk.example.com/services/collector/event",
+                      json={"text": "Success", "code": 0}, status=200)
+    tr = SplunkHECTransport("https://splunk.example.com", token="t", verify_tls=False)
+    tr.send_record('{"a": 1}', event_time=1757559845.123)
+    body = _json.loads(responses_lib.calls[0].request.body)
+    assert body["time"] == 1757559845.123
+    assert body["event"] == {"a": 1}
