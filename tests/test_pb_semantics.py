@@ -83,6 +83,8 @@ def test_mod12_exposes_pb_uncovered_exposure_kpi():
         for kpi in out["kpis"]:
             if isinstance(kpi, dict) and "label" in kpi:
                 kpis_dict[kpi["label"]] = kpi.get("value")
+                # 標籤文字已改為 "Potentially Blocked (no rule)"；以 key 判斷別名仍在
+                kpis_dict[kpi.get("label_key", "")] = kpi.get("value")
     assert "pb_uncovered_exposure" in kpis_dict or "PB Uncovered Exposure" in kpis_dict, (
         f"pb_uncovered_exposure KPI not found. Available KPIs: {list(kpis_dict.keys())}"
     )
@@ -107,10 +109,12 @@ def test_mod12_legacy_alias_present_for_one_release():
         for kpi in out["kpis"]:
             if isinstance(kpi, dict) and "label" in kpi:
                 kpis_dict[kpi["label"]] = kpi.get("value")
+                # 標籤文字已改為 "Potentially Blocked (no rule)"；以 key 判斷別名仍在
+                kpis_dict[kpi.get("label_key", "")] = kpi.get("value")
     # Either in kpis or in kpi_aliases (if that structure exists)
     has_alias = (
         "staged_coverage" in kpis_dict or
-        "Staged Coverage" in kpis_dict or
+        "mod12_kpi_staged_coverage" in kpis_dict or
         "staged_coverage" in out.get("kpi_aliases", {})
     )
     assert has_alias, (

@@ -168,7 +168,7 @@ def _resolver_report(monkeypatch, rulesets, rows_per_ruleset):
     class _Api:
         def get_active_rulesets(self, raise_on_error=False):
             return rulesets
-        def fetch_managed_workloads(self):
+        def fetch_managed_workloads(self, *a, **kw):
             return []
         def get_ip_lists(self, raise_on_error=False):
             return []

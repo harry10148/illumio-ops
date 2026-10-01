@@ -10,9 +10,11 @@ from __future__ import annotations
 
 import datetime
 import json
+from dataclasses import dataclass, field
 from loguru import logger
 import os
 import re
+from types import SimpleNamespace
 
 from src.i18n import t
 from src.report.report_metadata import extract_attack_summary
@@ -93,6 +95,37 @@ VALID_REPORT_TYPES: frozenset[str] = frozenset({
     "readiness",
 })
 
+# 寄送失敗只重寄信（不重產報表）的次數上限與退避（分鐘）。
+_DELIVERY_MAX_ATTEMPTS = 5
+_DELIVERY_BACKOFF_MINUTES = (5, 15, 45, 135)
+# running 標記多久後視為殘留（行程在執行中被殺掉）。
+_RUNNING_STALE_SECONDS = 6 * 3600
+# 寄送失敗種類 → 這一期的最終狀態（不重試）。其餘種類（暫時性）排入只重寄信。
+_PERMANENT_DELIVERY_FAILURES = {
+    "partial": "delivery_partial",          # 其他收件人已收到，重寄＝重複信
+    "no_recipients": "delivery_failed",     # 設定問題
+    "auth_failed": "delivery_failed",       # 設定問題
+    "recipients_refused": "delivery_failed",
+}
+
+
+@dataclass
+class ScheduleOutcome:
+    """一次排程執行的結果。產生報表失敗一律 raise（走失敗退避重試）；能走到
+    這裡代表報表這一期已處理完，last_run 要推進。
+
+    status: success | no_data | skipped | delivery_partial | delivery_pending
+            | delivery_failed
+    """
+    status: str = "success"
+    error: str = ""
+    paths: list = field(default_factory=list)
+    pending_delivery: dict | None = None
+
+    def __bool__(self) -> bool:  # 舊呼叫端把回傳值當「有產出」判斷
+        return self.status not in ("no_data", "skipped")
+
+
 class ReportScheduler:
     def __init__(self, config_manager, reporter):
         self.cm = config_manager
@@ -125,6 +158,8 @@ class ReportScheduler:
                 # 成功/手動執行清掉失敗計數與 backoff 時戳
                 entry.pop("consecutive_failures", None)
                 entry.pop("last_attempt", None)
+                if status != "running":
+                    entry.pop("running_since", None)
                 states[str(schedule_id)] = entry
                 return data
 
@@ -134,6 +169,70 @@ class ReportScheduler:
 
     # 失敗 backoff 上限（秒）：2^(n-1)*60，夾在 [60, _FAILURE_BACKOFF_MAX]
     _FAILURE_BACKOFF_MAX = 3600
+
+    def _update_entry(self, schedule_id, fn) -> None:
+        """Read-modify-write one schedule's state entry (atomic via state_store)."""
+        try:
+            def _merge(existing):
+                data = dict(existing)
+                states = data.setdefault(_STATE_KEY, {})
+                entry = dict(states.get(str(schedule_id), {}))
+                fn(entry)
+                states[str(schedule_id)] = entry
+                return data
+
+            update_state_file(self._state_file, _merge)
+        except Exception as e:
+            logger.error(f"Failed to save schedule state: {e}")
+
+    def _mark_running(self, schedule_id) -> None:
+        """執行前留下 running 標記但**不動 last_run**：執行中途重啟 scheduler
+        （GUI「重新啟動」用 wait=False 關舊排程器，舊 job 會繼續跑）時，新的
+        tick 看到標記就不會同一期再跑一次、再寄一次。失敗時 last_run 也沒被
+        推進，該期仍會重試。"""
+        now_iso = datetime.datetime.now(datetime.timezone.utc).isoformat()
+
+        def _set(entry):
+            entry["running_since"] = now_iso
+            entry["status"] = "running"
+        self._update_entry(schedule_id, _set)
+
+    def _running_marker_active(self, schedule_id) -> bool:
+        st = self._load_states().get(str(schedule_id), {})
+        since = st.get("running_since")
+        if not since:
+            return False
+        try:
+            ts = datetime.datetime.fromisoformat(since)
+        except (TypeError, ValueError):
+            return False
+        if ts.tzinfo is None:
+            ts = ts.replace(tzinfo=datetime.timezone.utc)
+        age = (datetime.datetime.now(datetime.timezone.utc) - ts).total_seconds()
+        return age < _RUNNING_STALE_SECONDS
+
+    def record_outcome(self, schedule_id, run_ts: str, outcome: "ScheduleOutcome") -> None:
+        """報表這一期已處理完（產出、或確定沒有資料）：推進 last_run，寫入
+        真正的狀態（不再一律 success），寄送暫時失敗時排入只重寄信。"""
+        def _set(entry):
+            entry.update({"last_run": run_ts, "status": outcome.status,
+                          "error": str(outcome.error or "")[:300]})
+            for k in ("consecutive_failures", "last_attempt", "running_since"):
+                entry.pop(k, None)
+            if outcome.pending_delivery:
+                entry["pending_delivery"] = outcome.pending_delivery
+            else:
+                entry.pop("pending_delivery", None)
+        self._update_entry(schedule_id, _set)
+
+    def record_manual_failure(self, schedule_id, error: str) -> None:
+        """手動「立即執行」失敗：記錯誤，但不推進 last_run（該期排程照常
+        會跑），也不累計 backoff（手動失敗不該延後下一次排程執行）。"""
+        def _set(entry):
+            entry["status"] = "failed"
+            entry["error"] = str(error)[:300]
+            entry.pop("running_since", None)
+        self._update_entry(schedule_id, _set)
 
     def _record_failure(self, schedule_id, error: str, attempt_iso: str):
         """記錄一次執行失敗但**不推進 last_run**——該期下 tick 仍 due 會重試
@@ -147,6 +246,7 @@ class ReportScheduler:
                 entry["status"] = "failed"
                 entry["error"] = str(error)[:300]
                 entry["last_attempt"] = attempt_iso
+                entry.pop("running_since", None)
                 entry["consecutive_failures"] = int(entry.get("consecutive_failures", 0)) + 1
                 states[str(schedule_id)] = entry
                 return data
@@ -318,10 +418,15 @@ class ReportScheduler:
 
     # ─── Execution ───────────────────────────────────────────────────────────
 
-    def run_schedule(self, schedule: dict) -> bool:
+    def run_schedule(self, schedule: dict) -> "ScheduleOutcome":
         """
         Execute a single report schedule: generate report + optionally email it.
-        Returns True on success.
+
+        Generation failures (including a PCE fetch error that left a report
+        empty) raise, so the period is retried with backoff. Once the report
+        exists, delivery problems no longer raise: re-running the whole
+        schedule would re-query the PCE and re-send to recipients who already
+        got it. They come back in the returned ScheduleOutcome instead.
         """
         try:
             from src.module_log import ModuleLog as _ML
@@ -368,12 +473,19 @@ class ReportScheduler:
                     filters=schedule_filters, lang=lang, schedule=schedule)
 
                 if result is None:
-                    return False
+                    # 「沒有資料」與「PCE 抓取失敗」必須分開：後者以前被吞成空
+                    # 清單 → 記成 success、不重試、沒人知道。
+                    fetch_err = getattr(api, "last_fetch_error", None)
+                    if isinstance(fetch_err, str) and fetch_err:
+                        raise RuntimeError(t("sched_err_pce_fetch", lang=lang, error=fetch_err))
+                    skip = getattr(self, "_skip_reason", "") or ""
+                    logger.info(f"[Scheduler] '{name}': nothing exported ({'skipped' if skip else 'no data'})")
+                    return ScheduleOutcome(status="skipped" if skip else "no_data", error=skip)
 
+                outcome = ScheduleOutcome(paths=list(paths))
                 if send_email and paths:
-                    self._send_report_email(schedule, result, paths, start_date, end_date,
-                                            custom_recipients, report_type=report_type,
-                                            lang=lang)
+                    outcome = self._deliver(schedule, result, paths, start_date, end_date,
+                                            custom_recipients, report_type=report_type, lang=lang)
 
             logger.info(f"[Scheduler] '{name}': completed, files={[os.path.basename(p) for p in paths]}")
             try:
@@ -385,7 +497,7 @@ class ReportScheduler:
             max_reports = int(schedule.get("max_reports", 30))
             self._prune_by_count(output_dir, report_type, max_reports, schedule_id=sched_id)
             self._prune_old_reports(output_dir)
-            return True
+            return outcome
 
         except Exception as e:
             try:
@@ -400,6 +512,7 @@ class ReportScheduler:
     def _generate_report(self, report_type, api, fmt, output_dir, start_date, end_date, name, filters=None, lang: str = "en", schedule: dict | None = None):
         """Dispatch to the appropriate generator. Returns (result, paths) or (None, [])."""
         from src.main import _make_cache_reader
+        self._skip_reason = ""
         if report_type == "traffic":
             from src.report.report_generator import ReportGenerator
             gen = ReportGenerator(self.cm, api_client=api, config_dir=self._config_dir,
@@ -509,6 +622,7 @@ class ReportScheduler:
             except RuleHitCountNotEnabled as exc:
                 # Scheduler NEVER prompts or auto-enables — skip with a warning.
                 logger.warning(f"[Scheduler] '{name}': native rule hit count not enabled ({exc}) — skipping")
+                self._skip_reason = t("sched_err_rhc_not_enabled", lang=lang, error=str(exc))
                 return None, []
             if result.record_count == 0:
                 logger.warning(f"[Scheduler] '{name}': native report returned no rules — skipping export")
@@ -694,6 +808,114 @@ class ReportScheduler:
         )
         if sent is False:
             raise RuntimeError(t("rpt_email_failed", lang=lang, error=""))
+
+    # ─── Delivery outcome ────────────────────────────────────────────────────
+
+    def _deliver(self, schedule: dict, result, paths: list, start_date: str, end_date: str,
+                 custom_recipients: list, report_type: str, lang: str) -> "ScheduleOutcome":
+        """Send the report email and classify a failure instead of raising."""
+        try:
+            self.reporter.last_report_email_outcome = "unknown"
+        except Exception:
+            pass  # intentional fallback: a reporter stub without attributes still sends
+        try:
+            self._send_report_email(schedule, result, paths, start_date, end_date,
+                                    custom_recipients, report_type=report_type, lang=lang)
+            return ScheduleOutcome(paths=list(paths))
+        except Exception as exc:
+            kind = getattr(self.reporter, "last_report_email_outcome", "unknown")
+            status, error = self._classify_delivery_failure(kind, exc, attempt=1, lang=lang)
+            pending = None
+            if status == "delivery_pending":
+                pending = {
+                    "paths": list(paths), "start_date": start_date, "end_date": end_date,
+                    "report_type": report_type, "lang": lang,
+                    "record_count": int(getattr(result, "record_count", 0) or 0),
+                    "attempts": 1, "next_attempt": self._next_delivery_attempt(1),
+                }
+            logger.warning(f"[Scheduler] '{schedule.get('name', '')}': report generated, delivery {status}: {error}")
+            return ScheduleOutcome(status=status, error=error, paths=list(paths), pending_delivery=pending)
+
+    def _classify_delivery_failure(self, kind: str, exc: Exception, *, attempt: int,
+                                   lang: str) -> tuple[str, str]:
+        refused = ", ".join(sorted((getattr(self.reporter, "last_report_email_refused", None) or {}).keys()))
+        if kind == "partial":
+            return "delivery_partial", t("sched_err_delivery_partial", lang=lang, refused=refused)
+        if kind == "no_recipients":
+            return "delivery_failed", t("sched_err_no_recipients", lang=lang)
+        if kind == "auth_failed":
+            return "delivery_failed", t("sched_err_smtp_auth", lang=lang)
+        if kind == "recipients_refused":
+            return "delivery_failed", t("sched_err_recipients_refused", lang=lang, refused=refused)
+        if attempt >= _DELIVERY_MAX_ATTEMPTS:
+            return "delivery_failed", t("sched_err_delivery_gave_up", lang=lang,
+                                        max=_DELIVERY_MAX_ATTEMPTS, error=str(exc))
+        return "delivery_pending", t("sched_err_delivery_retry", lang=lang, attempt=attempt,
+                                     max=_DELIVERY_MAX_ATTEMPTS, error=str(exc))
+
+    @staticmethod
+    def _next_delivery_attempt(attempts_done: int) -> str:
+        idx = min(max(attempts_done, 1), len(_DELIVERY_BACKOFF_MINUTES)) - 1
+        when = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(
+            minutes=_DELIVERY_BACKOFF_MINUTES[idx])
+        return when.isoformat()
+
+    def _retry_pending_deliveries(self) -> None:
+        """重寄先前暫時失敗的報表信：只寄已產生的檔案，不重查 PCE、不重產報表。"""
+        states = self._load_states()
+        if not any((st or {}).get("pending_delivery") for st in states.values()):
+            return
+        schedules = {str(s.get("id", "")): s for s in self.cm.config.get("report_schedules", []) or []}
+        now = datetime.datetime.now(datetime.timezone.utc)
+        for sid, st in states.items():
+            pend = (st or {}).get("pending_delivery")
+            if not pend:
+                continue
+            sched = schedules.get(sid)
+            lang = pend.get("lang", "en")
+            if not sched or not sched.get("email_report"):
+                self._update_entry(sid, lambda e: e.pop("pending_delivery", None))
+                continue
+            try:
+                due_at = datetime.datetime.fromisoformat(pend.get("next_attempt", ""))
+                if due_at.tzinfo is None:
+                    due_at = due_at.replace(tzinfo=datetime.timezone.utc)
+                if now < due_at:
+                    continue
+            except (TypeError, ValueError):
+                pass  # unreadable timestamp: retry now rather than never
+            paths = [p for p in pend.get("paths", []) if p and os.path.exists(p)]
+            if not paths:
+                def _gone(e, lang=lang):
+                    e.pop("pending_delivery", None)
+                    e["status"] = "delivery_failed"
+                    e["error"] = t("sched_err_delivery_files_gone", lang=lang)
+                self._update_entry(sid, _gone)
+                continue
+            result = SimpleNamespace(record_count=pend.get("record_count", 0), module_results={}, findings=[])
+            attempt = int(pend.get("attempts", 1)) + 1
+            outcome = self._deliver(sched, result, paths, pend.get("start_date", ""),
+                                    pend.get("end_date", ""), sched.get("email_recipients", []),
+                                    report_type=pend.get("report_type", sched.get("report_type", "")),
+                                    lang=lang)
+            if outcome.status == "delivery_pending":
+                kind = getattr(self.reporter, "last_report_email_outcome", "unknown")
+                status, error = self._classify_delivery_failure(
+                    kind, RuntimeError(outcome.error), attempt=attempt, lang=lang)
+                if status == "delivery_pending":
+                    pend = dict(pend, attempts=attempt, next_attempt=self._next_delivery_attempt(attempt))
+                    outcome = ScheduleOutcome(status=status, error=error, paths=paths, pending_delivery=pend)
+                else:
+                    outcome = ScheduleOutcome(status=status, error=error, paths=paths)
+
+            def _apply(e, outcome=outcome):
+                e["status"] = outcome.status
+                e["error"] = str(outcome.error or "")[:300]
+                if outcome.pending_delivery:
+                    e["pending_delivery"] = outcome.pending_delivery
+                else:
+                    e.pop("pending_delivery", None)
+            self._update_entry(sid, _apply)
 
     # ─── Report retention ────────────────────────────────────────────────────
 
@@ -885,6 +1107,11 @@ class ReportScheduler:
 
         global_tz = self.cm.config.get('settings', {}).get('timezone', 'local')
 
+        try:
+            self._retry_pending_deliveries()
+        except Exception as e:
+            logger.error(f"[Scheduler] pending delivery retry failed: {e}")
+
         for sched in schedules:
             sched_tz = sched.get('timezone') or global_tz
             now = _now_in_schedule_tz(sched_tz)
@@ -907,12 +1134,18 @@ class ReportScheduler:
             # 連續失敗 backoff：due 但仍在退避窗內就跳過（審查 H，防每 tick spam）
             if self._failure_backoff_active(sid, now):
                 continue
+            # 另一個執行個體（重啟前的舊排程器）還在跑這一期
+            if self._running_marker_active(sid):
+                continue
 
             logger.info(f"[Scheduler] Triggering schedule id={sid} name='{name}'")
+            self._mark_running(sid)
             try:
-                self.run_schedule(sched)
+                outcome = self.run_schedule(sched)
+                if not isinstance(outcome, ScheduleOutcome):
+                    outcome = ScheduleOutcome()
                 # id 缺失容錯：用已算好的 sid，不用 sched["id"]（審查 L6）
-                self._save_state(sid, run_ts, "success")
+                self.record_outcome(sid, run_ts, outcome)
             except Exception as e:
                 # 失敗不推進 last_run——該期下 tick 仍 due 會重試（審查 H）
                 self._record_failure(sid, str(e), run_ts)

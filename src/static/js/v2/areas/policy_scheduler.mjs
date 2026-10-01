@@ -1566,6 +1566,11 @@ function schedStatus(s) {
   if (s.last_status === "success") return badge(t("gui_sched_status_success"), "ok");
   if (s.last_status === "failed") return badge(t("gui_sched_status_failed"), "crit");
   if (s.last_status === "running") return badge(t("sched_running"), "info");
+  if (s.last_status === "no_data") return badge(t("gui_sched_status_no_data"), "neutral");
+  if (s.last_status === "skipped") return badge(t("gui_sched_status_skipped"), "warn");
+  if (s.last_status === "delivery_partial") return badge(t("gui_sched_status_delivery_partial"), "warn");
+  if (s.last_status === "delivery_pending") return badge(t("gui_sched_status_delivery_pending"), "warn");
+  if (s.last_status === "delivery_failed") return badge(t("gui_sched_status_delivery_failed"), "crit");
   return badge(t("gui_sched_status_never"), "neutral");
 }
 
@@ -1826,7 +1831,8 @@ async function mountReports(root, ctx) {
 
     const rows = state.schedules.map(function (s) {
       const r = copyOf(s);
-      r._tone = s.last_status === "failed" ? "crit" : null;
+      r._tone = (s.last_status === "failed" || s.last_status === "delivery_failed") ? "crit"
+        : (s.last_status === "delivery_partial" || s.last_status === "delivery_pending" || s.last_status === "skipped") ? "warn" : null;
       return r;
     });
     const cols = [

@@ -228,6 +228,13 @@ _T5_ALLOWLIST = frozenset({
     _LEGACY_COVER_GENERATED_LABEL,
 })
 
+_APP_SUMMARY_PB_RELABEL = frozenset({norm("Enforced"), norm("Staged")})
+# The app-summary KPIs labelled the allowed share "Enforced" and the Potentially
+# Blocked share "Staged" ("rules ready, pending enforcement"). Both were wrong:
+# allowed ≠ enforced, and Potentially Blocked means NO rule allows the flow. The
+# labels now read "Covered by allow rule" / "Potentially Blocked"; the counts
+# are unchanged. Pinned in tests/test_report_scoring_semantics.py.
+
 ALLOWLIST: dict[str, frozenset[str]] = {
     "traffic": _COMMON_ALLOWLIST,
     "security_risk": _COMMON_ALLOWLIST | {_WRONG_EXEC_SUFFIX},
@@ -245,7 +252,7 @@ ALLOWLIST: dict[str, frozenset[str]] = {
     # a footer, a sidebar with its own wording, or a hero that glued a label to
     # a value, so the three shapes Tasks 3 and 4 had to exempt do not arise here.
     "policy_diff": _T5_ALLOWLIST,
-    "app_summary": _T5_ALLOWLIST,
+    "app_summary": _T5_ALLOWLIST | _APP_SUMMARY_PB_RELABEL,
     "rule_hit_count": _T5_ALLOWLIST,
     "readiness": _T5_ALLOWLIST,
 }

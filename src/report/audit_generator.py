@@ -499,7 +499,7 @@ class AuditGenerator:
                     gap_end_str = gap_end_dt.isoformat().replace("+00:00", "Z")
                     try:
                         if gap_end_dt >= start:
-                            gap = self.api.fetch_events(start_str, gap_end_str) or []
+                            gap = self._fetch_api_events(start, gap_end_dt)
                         else:
                             # 次秒級 gap：回退 1 秒後已無有意義的窗口可查詢。
                             gap = []
@@ -523,9 +523,27 @@ class AuditGenerator:
         # path uses) rather than get_events(since=...): the latter defaults to
         # max_results=500 and ignores end, so a busy window silently analyzed
         # only 500 events and pulled data past the requested end_date.
-        start_str = start.isoformat().replace("+00:00", "Z")
-        end_str = end.isoformat().replace("+00:00", "Z")
-        return self.api.fetch_events(start_str, end_str), "api"
+        return self._fetch_api_events(start, end), "api"
+
+    # PCE 同步 GET /events 單次上限（REST API guide）。
+    _EVENTS_MAX_RESULTS = 10000
+
+    def _fetch_api_events(self, start: datetime.datetime, end: datetime.datetime) -> list:
+        """Every event in [start, end] from the PCE.
+
+        A single GET /events returns at most max_results (the old call asked
+        for 5,000) and silently keeps only the newest ones, so a busy week
+        undercounted failed logins and policy changes with no warning. The
+        window is bisected until each slice is under the cap (shared with the
+        events ingestor); slices that still hit the cap are recorded in
+        ``self._events_truncation`` and disclosed on the report. A PCE error
+        raises instead of looking like an empty week.
+        """
+        from src.pce_cache.events_fetch import fetch_events_drained
+        res = fetch_events_drained(self.api, start, end, max_results=self._EVENTS_MAX_RESULTS)
+        if res.truncated:
+            self._events_truncation = (getattr(self, "_events_truncation", None) or []) + res.truncated_windows
+        return res.events
 
     def generate_from_api(self, start_date: Optional[str] = None,
                           end_date: Optional[str] = None,
@@ -546,6 +564,7 @@ class AuditGenerator:
         print(t("rpt_audit_querying", start=start_date, end=end_date, lang=self._lang))
         _start_dt = datetime.datetime.fromisoformat(start_date.replace("Z", "+00:00"))
         _end_dt = datetime.datetime.fromisoformat(end_date.replace("Z", "+00:00"))
+        self._events_truncation = []
         events, source = self._fetch_events(_start_dt, _end_dt)
 
         if not events:
@@ -743,6 +762,12 @@ class AuditGenerator:
                          len(module_errors),
                          ", ".join(e['module'] for e in module_errors))
         results['mod00'] = audit_executive_summary(results, df, lang=self._lang)
+        truncation = getattr(self, "_events_truncation", None) or []
+        if truncation:
+            results['_events_truncation'] = {
+                "windows": len(truncation),
+                "max_results": self._EVENTS_MAX_RESULTS,
+            }
         print(t("rpt_audit_complete", lang=self._lang) + "             ")
 
         return AuditReportResult(

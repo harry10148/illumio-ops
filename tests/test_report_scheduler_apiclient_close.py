@@ -43,7 +43,7 @@ def test_run_schedule_closes_api_client(tmp_path, monkeypatch):
     ok = scheduler.run_schedule({"id": 1, "name": "t", "report_type": "traffic",
                                  "format": ["html"], "email_report": False})
 
-    assert ok is True
+    assert ok.status == "success"
     assert "api" in captured, "ApiClient never reached _generate_report"
     assert captured["api"]._session is None, "ApiClient session was not closed after run_schedule"
 

@@ -171,8 +171,14 @@ def manage_report_schedules_menu(cm: ConfigManager) -> None:
                     from src.reporter import Reporter
                     reporter = Reporter(cm)
                     scheduler = ReportScheduler(cm, reporter)
-                    scheduler.run_schedule(sched)
-                    print(f"{Colors.GREEN}{t('sched_run_success')}{Colors.ENDC}")
+                    outcome = scheduler.run_schedule(sched)
+                    status = getattr(outcome, "status", "success")
+                    if status == "success":
+                        print(f"{Colors.GREEN}{t('sched_run_success')}{Colors.ENDC}")
+                    elif status in ("no_data", "skipped"):
+                        print(f"{Colors.WARNING}{t('sched_run_nothing_exported', reason=outcome.error or t('gui_sched_status_no_data'))}{Colors.ENDC}")
+                    else:
+                        print(f"{Colors.WARNING}{t('sched_run_delivery_warning', error=outcome.error)}{Colors.ENDC}")
                 except Exception as e:
                     print(f"{Colors.FAIL}{t('sched_run_failed', error=e)}{Colors.ENDC}")
                 input(f"\n{Colors.CYAN}[?]{Colors.ENDC} {t('press_enter_to_continue')} ")

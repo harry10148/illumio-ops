@@ -106,10 +106,12 @@ def test_report_generator_hybrid_fetch_on_fresh_cache(tmp_path):
     request_start = now - timedelta(days=3)  # user wants 3 days
 
     api = _make_mock_api()
-    api.fetch_traffic_for_report.return_value = [_make_flow()]  # API fills the gap
+    # 兩筆是不同的 flow（first_detected 不同）；同身分的 flow 會被去重。
+    api.fetch_traffic_for_report.return_value = [
+        {**_make_flow(), "first_detected": "2026-09-01T00:00:00Z"}]  # API fills the gap
     cache = _make_cache_reader(
         cover_state="partial",
-        flows=[_make_flow()],          # cache contributes 1 flow
+        flows=[{**_make_flow(), "first_detected": "2026-09-02T00:00:00Z"}],  # cache contributes 1 flow
         earliest=cache_start,
     )
 
@@ -268,8 +270,10 @@ def test_fetch_traffic_hybrid_boundary_flow_counted_exactly_once(tmp_path):
         return datetime.strptime(ts, '%Y-%m-%dT%H:%M:%SZ').replace(tzinfo=timezone.utc)
 
     boundary_flow = {**_make_flow(), "id": "boundary",
+                     "first_detected": (cache_start - timedelta(minutes=5)).strftime('%Y-%m-%dT%H:%M:%SZ'),
                      "last_detected": cache_start.strftime('%Y-%m-%dT%H:%M:%SZ')}
     gap_only_flow = {**_make_flow(), "id": "gap-only",
+                     "first_detected": (cache_start - timedelta(hours=2)).strftime('%Y-%m-%dT%H:%M:%SZ'),
                      "last_detected": (cache_start - timedelta(hours=1)).strftime('%Y-%m-%dT%H:%M:%SZ')}
     all_flows = [gap_only_flow, boundary_flow]
 
@@ -346,3 +350,41 @@ def test_fetch_traffic_df_hybrid_boundary_flow_counted_exactly_once(tmp_path):
     assert ids.count("boundary") == 1  # 端點 flow 恰好一次
     assert ids.count("gap-only") == 1  # gap 段 flow 不受影響
     assert source == "mixed"
+
+
+def test_fetch_traffic_hybrid_long_lived_flow_not_double_counted():
+    """跨越 cache_start 的長壽 flow：API gap（視窗重疊即回傳）與 cache 都會
+    回傳它。舊版直接 gap + cached，連線數翻倍；以 flow_hash 身分去重、
+    保留 cache 那份（計數器較新）。"""
+    from datetime import datetime, timedelta, timezone
+    from src.report.report_generator import ReportGenerator
+
+    now = datetime.now(timezone.utc).replace(microsecond=0)
+    cache_start = now - timedelta(hours=2)
+    fmt = '%Y-%m-%dT%H:%M:%SZ'
+    base = {"src": {"ip": "10.0.0.1"}, "dst": {"ip": "10.0.0.2"},
+            "service": {"port": 5432, "proto": 6}, "policy_decision": "allowed",
+            "first_detected": (cache_start - timedelta(hours=5)).strftime(fmt)}
+    gap_copy = {**base, "num_connections": 7, "last_detected": (cache_start - timedelta(seconds=1)).strftime(fmt)}
+    cache_copy = {**base, "num_connections": 9, "last_detected": now.strftime(fmt)}
+
+    api = _make_mock_api()
+    api.fetch_traffic_for_report.return_value = [gap_copy]
+    cache = _make_cache_reader(cover_state="partial", flows=[cache_copy], earliest=cache_start)
+
+    result = ReportGenerator(api=api, cache_reader=cache)._fetch_traffic(now - timedelta(days=1), now)
+    assert len(result["raw"]) == 1
+    assert result["raw"][0]["num_connections"] == 9
+
+
+def test_merge_hybrid_df_keeps_cache_copy_of_shared_flow():
+    import pandas as pd
+    from src.report.report_generator import _merge_hybrid_df
+    row = {"src_ip": "10.0.0.1", "dst_ip": "10.0.0.2", "port": 5432, "proto": "TCP",
+           "first_detected": "2026-09-30T00:00:00Z"}
+    gap = pd.DataFrame([{**row, "num_connections": 7},
+                        {**row, "dst_ip": "10.0.0.3", "num_connections": 1}])
+    cache = pd.DataFrame([{**row, "first_detected": pd.Timestamp("2026-09-30", tz="UTC"),
+                           "num_connections": 9}])
+    out = _merge_hybrid_df(gap, cache)
+    assert sorted(out["num_connections"].tolist()) == [1, 9]

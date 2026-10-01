@@ -134,8 +134,14 @@ def ransomware_exposure(df: pd.DataFrame, report_config: dict, top_n: int = 20, 
         'i18n': {'lang': lang},
     }
 
+    # Blocked flows on risk ports are controlled; scoring and the executive
+    # summary use the unblocked count so blocking SMB/RDP improves the grade
+    # instead of lowering it. risk_flows_total stays the all-decision count
+    # the tables (Part A/C) are built from.
+    unblocked = risk_df['policy_decision'].astype(str).str.lower() != 'blocked'
     return {
         'risk_flows_total': len(risk_df),
+        'risk_flows_unblocked': int(unblocked.sum()),
         'part_a_summary': part_a,
         'part_b_per_port': part_b,
         'part_c_by_decision': part_c,

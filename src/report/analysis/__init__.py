@@ -51,6 +51,11 @@ def _call_df_cfg_n(fn, df, cfg, n, lang):
         return fn(df, cfg, n, lang=lang)
     return fn(df, cfg, n)
 
+def _call_df_n_cfgkw(fn, df, cfg, n, lang):
+    """fn(df, n, lang=, report_config=) — keeps the positional (df, top_n)
+    signature callers/tests already use while handing over report_config."""
+    return fn(df, n, lang=lang, report_config=cfg)
+
 def _call_readiness(fn, df, _cfg, n, lang):
     if _supports_lang(fn):
         return fn(df, workloads=None, top_n=n, lang=lang)
@@ -69,7 +74,7 @@ TRAFFIC_MODULES: list[tuple[str, str, str, Callable, frozenset]] = [
     ('mod11', 'src.report.analysis.mod11_bandwidth',            'bandwidth_analysis',       _call_df_n,     _TRAFFIC_TOO),
     ('mod13', 'src.report.analysis.mod13_readiness',            'enforcement_readiness',    _call_readiness, _SEC_INV),
     ('mod14', 'src.report.analysis.mod14_infrastructure',       'infrastructure_scoring',   _call_df_n,     _SEC_INV),
-    ('mod15', 'src.report.analysis.mod15_lateral_movement',     'lateral_movement_risk',    _call_df_n,     _SEC_INV),
+    ('mod15', 'src.report.analysis.mod15_lateral_movement',     'lateral_movement_risk',    _call_df_n_cfgkw, _SEC_INV),
     ('mod_draft_summary', 'src.report.analysis.mod_draft_summary', 'analyze',               _call_df,       _SEC_INV),
     ('mod_ringfence',     'src.report.analysis.mod_ringfence',     'analyze',               _call_df,       _SEC_INV),
 ]

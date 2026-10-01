@@ -137,6 +137,48 @@ def _build_snapshot(module_results: dict) -> dict:
 
 # ─── Result container ─────────────────────────────────────────────────────────
 
+def _merge_hybrid_raw(gap: list, cached: list) -> list:
+    """API gap + cache, keeping one row per flow.
+
+    The 1-second gap shift only separates flows stamped exactly at
+    cache_start. A long-lived flow that started before cache_start and is
+    still active comes back from BOTH sides (the PCE returns flows that
+    overlap the gap window), which used to double its connection count.
+    Identity is the cache's own flow_hash (src/dst IP, port, proto,
+    first_detected); the cache copy wins because it carries the latest
+    counters — same rule as analyzer._merge_dedup_flows.
+    """
+    if not gap or not cached:
+        return list(cached) + list(gap)
+    from src.pce_cache.ingestor_traffic import flow_hash
+    seen = {flow_hash(f) for f in cached}
+    return list(cached) + [f for f in gap if flow_hash(f) not in seen]
+
+
+_HYBRID_KEY_COLS = ("src_ip", "dst_ip", "port", "proto", "first_detected")
+
+
+def _merge_hybrid_df(df_gap, df_cache):
+    """DataFrame form of _merge_hybrid_raw (cache rows win on identity)."""
+    import pandas as pd
+    parts = [d for d in (df_cache, df_gap) if d is not None and not d.empty]
+    if len(parts) < 2:
+        return pd.concat(parts, ignore_index=True) if parts else pd.DataFrame()
+    if not all(c in df_gap.columns and c in df_cache.columns for c in _HYBRID_KEY_COLS):
+        return pd.concat(parts, ignore_index=True)
+
+    def _keys(df):
+        first = pd.to_datetime(df["first_detected"], utc=True, errors="coerce")
+        return (df["src_ip"].astype(str) + "|" + df["dst_ip"].astype(str) + "|"
+                + df["port"].astype(str) + "|" + df["proto"].astype(str) + "|"
+                + first.astype(str))
+
+    dup = _keys(df_gap).isin(set(_keys(df_cache)))
+    if dup.any():
+        logger.info("Traffic report hybrid: dropped {} API-gap rows already in cache", int(dup.sum()))
+    return pd.concat([df_cache, df_gap[~dup]], ignore_index=True)
+
+
 @dataclass
 class ReportResult:
     """In-memory report result (replaces DB persistence in Mode A)."""
@@ -254,7 +296,8 @@ class ReportGenerator:
                     else:
                         # agg data not available for hybrid results
                         source = "mixed" if gap else "cache"
-                        return {"raw": gap + cached, "agg": None, "source": source}
+                        return {"raw": _merge_hybrid_raw(gap, cached), "agg": None,
+                                "source": source}
         flows = self.api.fetch_traffic_for_report(
             start_time_str=_fmt_iso(start),
             end_time_str=_fmt_iso(end),
@@ -338,8 +381,7 @@ class ReportGenerator:
                             "Traffic report hybrid: {} — falling back to full API path", exc)
                     else:
                         df_cache = apply_df_traffic_filters(df_cache, filters)
-                        parts = [d for d in (df_gap, df_cache) if not d.empty]
-                        df = pd.concat(parts, ignore_index=True) if parts else pd.DataFrame()
+                        df = _merge_hybrid_df(df_gap, df_cache)
                         return df, ("mixed" if not df_gap.empty else "cache")
         flows = self.api.fetch_traffic_for_report(
             start_time_str=_fmt_iso(start),

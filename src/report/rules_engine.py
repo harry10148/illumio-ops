@@ -80,7 +80,8 @@ class RulesEngine:
         self._cfg = report_config
         self._thresholds = report_config.get('thresholds', {})
         self._risk_ports = self._build_risk_port_map(report_config)
-        self._lateral_ports = set(report_config.get('lateral_movement_ports', []))
+        from src.report.lateral_ports import lateral_ports
+        self._lateral_ports = set(lateral_ports(report_config))
         self._lang = lang
         # 本次 evaluate() 中拋例外而被跳過的規則名稱；由 evaluate() 轉成一筆
         # 「規則評估未完成」finding，讓報表上「沒有發現」與「沒跑完」可區分。
