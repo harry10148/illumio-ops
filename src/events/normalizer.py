@@ -248,7 +248,15 @@ def _extract_notification_user(event: dict[str, Any]) -> str:
             continue
         info = entry.get("info") or {}
         user = info.get("user") or {}
-        username = _pick_first(user.get("username"), user.get("name"))
+        # 登入失敗時帳號放在 info.associated_user.supplied_username（REST API
+        # 文件的 user.sign_in failure 範例）；舊版只讀 info.user，這類告警的
+        # 來源一律顯示成「System」。
+        associated = info.get("associated_user") or {}
+        username = _pick_first(
+            user.get("username"), user.get("name"),
+            associated.get("supplied_username") if isinstance(associated, dict) else None,
+            info.get("supplied_username"),
+        )
         if username:
             return username
     return ""

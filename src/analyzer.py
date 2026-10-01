@@ -33,7 +33,9 @@ from src.config import resolve_state_file
 from src.exceptions import TrafficQueryError
 from src.utils import Colors, format_unit, safe_input
 from src.i18n import t
-from src.state_store import load_state_file, update_state_file
+from src.state_store import (
+    StateReadError, load_state_file_strict, update_state_file,
+)
 from src.interfaces import IApiClient, IReporter
 from src.api.traffic_query import TrafficQueryBuilder
 from src.pce_cache.reader import CacheReadTooLarge
@@ -616,8 +618,17 @@ class Analyzer:
         self._timeline_baseline_ids = {id(e) for e in self._timeline_baseline}
 
     def load_state(self) -> None:
+        self._state_load_error: str | None = None
         try:
-            data = load_state_file(STATE_FILE)
+            data = load_state_file_strict(STATE_FILE)
+        except StateReadError as exc:
+            # 暫時讀不到（權限、I/O）≠ 沒有 state。舊版一律當成空的繼續跑：
+            # 冷卻與節流歸零、count 視窗清空，存檔時再把這份空 state 寫回去。
+            # 記下錯誤，run_analysis 會中止這一輪，下一輪再讀。
+            logger.error("Cannot read state file; this analysis cycle will be skipped: {}", exc)
+            self._state_load_error = str(exc)
+            return
+        try:
             if not data:
                 logger.info("State file not found, starting fresh.")
                 return
@@ -1573,6 +1584,10 @@ class Analyzer:
         永久遺失。save_state() 本身失敗則照舊直接往上拋（冷卻沒落盤時不可送，
         否則每個 cycle 重送同一則告警）。
         """
+        if getattr(self, "_state_load_error", None):
+            raise RuntimeError(
+                f"state file could not be read; skipping cycle without saving: "
+                f"{self._state_load_error}")
         logger.info("Starting analysis cycle.")
         stage_error: Exception | None = None
         try:
@@ -1708,9 +1723,22 @@ class Analyzer:
             logger.info(f"Found {len(events)} events.")
             now_utc = datetime.datetime.now(datetime.timezone.utc)
             normalized_by_id = {}
+            good_events: list = []
             for event in events:
-                normalized = normalize_event(event)
-                normalized_by_id[event_identity(event)] = normalized
+                # 逐筆隔離：一筆格式異常的事件丟例外時，整批（cache 部署上是
+                # subscriber 的 processor）都會失敗、cursor 不前進，下一輪又讀到
+                # 同一筆——事件監控從此卡死。略過這一筆並記 ERROR，其餘照常處理。
+                try:
+                    normalized = normalize_event(event)
+                    identity = event_identity(event)
+                except Exception as exc:  # noqa: BLE001
+                    logger.error("Skipping malformed event {}: {}",
+                                 str(event.get("href") if isinstance(event, dict) else event)[:200],
+                                 exc)
+                    continue
+                normalized_by_id[identity] = normalized
+                good_events.append(event)
+            events = good_events
             self._update_parser_observability(list(normalized_by_id.values()))
             self.stats.record_event_batch(
                 events,

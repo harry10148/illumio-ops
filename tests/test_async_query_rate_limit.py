@@ -32,3 +32,20 @@ def test_submit_returns_none_when_rate_limiter_times_out():
         raise APIError("Global rate limiter timeout")
     mgr, _ = _mgr(_raise)
     assert mgr.submit_async_query({"query_name": "q"}) is None
+
+
+def test_delete_async_query_job_is_best_effort():
+    """下載完後刪除 PCE 上的 job；失敗只記 log，不得影響已取得的結果。"""
+    from src.api.async_jobs import delete_async_query_job
+    client = MagicMock()
+    client.api_cfg = {"url": "https://pce.test"}
+
+    client._request.return_value = (204, b"")
+    assert delete_async_query_job(client, "/orgs/1/traffic_flows/async_queries/x") is True
+    args, kwargs = client._request.call_args
+    assert args[0] == "https://pce.test/api/v2/orgs/1/traffic_flows/async_queries/x"
+    assert kwargs["method"] == "DELETE"
+
+    client._request.side_effect = RuntimeError("boom")
+    assert delete_async_query_job(client, "/orgs/1/traffic_flows/async_queries/y") is False
+    assert delete_async_query_job(client, "") is False

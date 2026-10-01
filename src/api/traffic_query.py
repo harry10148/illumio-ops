@@ -871,6 +871,9 @@ class TrafficQueryBuilder:
             if not c.last_fetch_error:
                 c.last_fetch_error = msg
             return
+        # 結果已完整下載到記憶體：刪掉 PCE 上的 job，不再一路累積。
+        from src.api.async_jobs import delete_async_query_job
+        delete_async_query_job(c, job_url, rate_limit=rate_limit)
         for item in rows:
             yield item
 
@@ -1737,6 +1740,9 @@ class TrafficQueryBuilder:
         def _download(job_href):
             try:
                 summary = jobs_mgr.summarize_async_query(job_href)
+                # 摘要已存進本機 state（之後的「重用」只讀它），PCE 上的 job 可以刪了。
+                from src.api.async_jobs import delete_async_query_job
+                delete_async_query_job(c, job_href)
                 return job_href, summary, None
             except AsyncDownloadError as exc:
                 # 下載失敗（非 200）不得偽裝成 0 flows；交回呼叫端走 failed_rule_details，

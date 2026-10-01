@@ -64,6 +64,31 @@ def _state_lock(lock_path: str, timeout: float = _LOCK_TIMEOUT_SECONDS):
                 raise TimeoutError(f"Timed out acquiring state lock: {lock_path}")
             time.sleep(_LOCK_RETRY_SECONDS)
 
+class StateReadError(OSError):
+    """state 檔存在但暫時讀不到（權限、I/O 錯誤）——不是「沒有 state」。"""
+
+
+def load_state_file_strict(state_file: str) -> dict:
+    """同 load_state_file，但暫時性的讀取錯誤（OSError）拋 StateReadError。
+
+    檔案不存在回 {}；內容損毀（JSON 錯誤）仍回 {}——那種情況由
+    update_state_file 備份壞檔後重建，屬於可自我修復的狀況。
+    """
+    if not os.path.exists(state_file):
+        return {}
+    try:
+        with open(state_file, "rb") as f:
+            raw = f.read()
+    except OSError as exc:
+        raise StateReadError(f"cannot read state file {state_file}: {exc}") from exc
+    try:
+        data = orjson.loads(raw)
+    except Exception as exc:
+        logger.error("State file {} is corrupt ({}); treating as empty", state_file, exc)
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
 def load_state_file(state_file: str) -> dict:
     if not os.path.exists(state_file):
         return {}

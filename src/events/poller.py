@@ -8,9 +8,14 @@ import json
 from dataclasses import dataclass
 from typing import Any
 
-def parse_event_timestamp(value: str | None) -> dt.datetime | None:
+def parse_event_timestamp(value: str | dt.datetime | None) -> dt.datetime | None:
     if not value:
         return None
+    if isinstance(value, dt.datetime):
+        # cache 的 raw_json 損毀時會退回欄位投影，timestamp 是 datetime 而非字串；
+        # 舊版在 strptime 丟 TypeError，整批失敗、cursor 永遠卡在這一筆。
+        aware = value if value.tzinfo is not None else value.replace(tzinfo=dt.timezone.utc)
+        return aware.astimezone(dt.timezone.utc)
     for fmt in ("%Y-%m-%dT%H:%M:%S.%fZ", "%Y-%m-%dT%H:%M:%SZ"):
         try:
             return dt.datetime.strptime(value, fmt).replace(tzinfo=dt.timezone.utc)

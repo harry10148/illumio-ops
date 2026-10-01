@@ -7,14 +7,14 @@ from typing import Optional
 
 import orjson
 from loguru import logger
-from sqlalchemy import func, or_, select, update
+from sqlalchemy import and_, func, or_, select, update
 from sqlalchemy.orm import sessionmaker
 
 from src.pce_cache.models import (
     DeadLetter, PceEvent, PceTrafficFlowRaw, SiemDispatch,
 )
 from src.siem.formatters.base import Formatter
-from src.siem.pd import pd_accepted
+from src.siem.pd import pd_accepted, pd_sql_predicate
 from src.siem.transports.base import Transport
 
 
@@ -449,6 +449,7 @@ def _transport_for(dest_cfg):
             url,
             token=dest_cfg.hec_token or "",
             verify_tls=dest_cfg.tls_verify,
+            ca_bundle=dest_cfg.tls_ca_bundle,
         )
     raise ValueError(f"Unknown transport: {transport_type}")
 
@@ -593,10 +594,21 @@ def enqueue_new_records(
             # per-destination pd filter without a second lookup.
             is_traffic = source_table == "pce_traffic_flows_raw"
             action_col = model.action if is_traffic else model.id
+
+            def _missing_for(dest: str):
+                # traffic 的 pd 篩選要在這裡就套用：否則被目的地篩掉的 flow
+                # 永遠「缺」這個目的地的 dispatch 列，每個 tick 都成為候選。
+                missing = ~_dispatched_to(dest)
+                if is_traffic:
+                    pd_pred = pd_sql_predicate(model.action, pd_filters.get(dest))
+                    if pd_pred is not None:
+                        return and_(missing, pd_pred)
+                return missing
+
             candidate_rows = s.execute(
                 select(model.id, action_col)
                 .where(model.ingested_at >= horizon)
-                .where(or_(*[~_dispatched_to(dest) for dest in dests]))
+                .where(or_(*[_missing_for(dest) for dest in dests]))
             ).all()
             if not candidate_rows:
                 continue

@@ -102,6 +102,17 @@ class RetentionWorker:
             SiemDispatch.status == "sent",
             SiemDispatch.sent_at < now - timedelta(days=dispatch_days))
 
+        # status='failed' 的列是「已移入 DLQ」的紀錄：DLQ replay 一律建立新的
+        # pending 列，這些舊列之後再也不會被讀。舊版從不清除它們，而來源列的
+        # 引用守門又把 failed 也算進去，進過 DLQ 的來源列因此永遠刪不掉，DB
+        # 無上限成長。保留到 DLQ 本身的保留期過後再刪：在那之前，安全網補登
+        # （以 (source, id, destination) anti-join）還看得到它們，不會把仍在
+        # DLQ 裡的記錄重新排入。
+        results["siem_dispatch_failed"] = self._batched_delete(
+            SiemDispatch,
+            SiemDispatch.status == "failed",
+            SiemDispatch.queued_at < now - timedelta(days=max(dlq_days, dispatch_days)))
+
         # 視窗增量觀測（pce_traffic_flow_obs）：以小時計的工作資料，主修剪點
         # 在 traffic ingest 之後（TrafficIngestor._prune_observations，跟著
         # poll 節奏跑）；這裡是後備，涵蓋「ingest 端修剪失敗」與「只靠
@@ -117,9 +128,11 @@ class RetentionWorker:
         """仍會回讀來源列的 SIEM 端引用：未送達的 dispatch（dispatcher 於送出
         時才以 (source_table, source_id) 重讀 raw_json 建 payload）與 DLQ
         （replay 只重新 enqueue 同一組 key）。"""
+        # 只有 pending 會回讀來源列；failed（已進 DLQ）的引用由下面的 DLQ 子查詢
+        # 涵蓋，DLQ 項目被清除或重送後就不再擋。
         pending = select(SiemDispatch.source_id).where(
             SiemDispatch.source_table == source_table,
-            SiemDispatch.status != "sent",
+            SiemDispatch.status == "pending",
         )
         dlq = select(DeadLetter.source_id).where(
             DeadLetter.source_table == source_table)
