@@ -32,6 +32,19 @@ def _serialized_cache_write(fn):
     return _run
 
 
+def run_analysis_then_send(ana, rep, **send_kwargs) -> None:
+    """run_analysis() 後送告警；中途階段失敗（state 已落盤）時照樣送出已建立
+    的告警再把錯誤往上拋——否則 cache 部署那批事件告警的 cursor 已前進，
+    之後再也不會被送出。"""
+    from src.analyzer import AnalysisPartialFailure
+    try:
+        ana.run_analysis()
+    except AnalysisPartialFailure:
+        rep.send_alerts(**send_kwargs)
+        raise
+    rep.send_alerts(**send_kwargs)
+
+
 def run_monitor_cycle(cm) -> None:
     """Execute one monitoring analysis + alert dispatch."""
     from src.api_client import ApiClient
@@ -64,8 +77,7 @@ def run_monitor_cycle(cm) -> None:
                                    subscriber_events=sub_events, subscriber_flows=sub_flows,
                                    cache_reader=_make_cache_reader(cm),
                                    flow_delta_reader=_make_flow_delta_reader(cm))
-                    ana.run_analysis()
-                    rep.send_alerts()
+                    run_analysis_then_send(ana, rep)
         mlog.info("Monitor cycle complete")
     except Exception as exc:
         logger.exception("Monitor cycle failed: {}", exc)

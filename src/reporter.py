@@ -956,9 +956,21 @@ class Reporter:
         return _html.escape(text)
 
     ALERT_DLQ_MAX_ATTEMPTS = 3
+    # 丟棄前至少保留的秒數。cache 模式每 30 秒一個 cycle，只看次數的話通道
+    # 中斷約 1 分鐘告警就被永久丟掉；同時達到次數與保留時間才丟。
+    ALERT_DLQ_MIN_RETENTION_SECONDS = 3600
     # 全 skipped（無可用通道）時 DLQ 會逐 cycle 累積新告警——單 bucket 上限
     # 防無界成長，超出裁掉最舊（2026-07-24 審查 B1 配套）
     ALERT_DLQ_BUCKET_CAP = 100
+
+    @staticmethod
+    def _dlq_age_seconds(first_failed_at: str) -> float:
+        """距離第一次失敗的秒數；時間無法解析時視為已超過保留時間。"""
+        from src.events.poller import parse_event_timestamp
+        first = parse_event_timestamp(first_failed_at)
+        if first is None:
+            return float("inf")
+        return (datetime.datetime.now(datetime.timezone.utc) - first).total_seconds()
 
     def _pop_alert_dlq(self) -> list[dict[str, Any]]:
         """Atomically take all pending DLQ entries from the state file."""
@@ -1025,6 +1037,11 @@ class Reporter:
         replayed_attempts = 0
         replayed_first_failed_at = ""
         _replayed_attempt_values: list[int] = []
+        # 本 cycle 自己產生的告警（重播前就在 bucket 裡）。它們還沒失敗過，
+        # 不能沿用重播條目的次數——舊版合併後一律用 replayed_attempts+1，
+        # 只試過一次的新告警會跟著舊條目一起被丟掉。
+        has_new_alerts = any([self.health_alerts, self.event_alerts,
+                              self.traffic_alerts, self.metric_alerts])
         if not force_test:
             for entry in self._pop_alert_dlq():
                 buckets = entry.get("buckets", {})
@@ -1181,7 +1198,8 @@ class Reporter:
             # 全 skipped（設定缺失/通道冷卻）也要入列——抽乾後不回寫等於
             # 永久遺失；但只有真的嘗試過遞送才消耗重試額度
             # （2026-07-24 審查 B1/B2）
-            attempts = replayed_attempts + (1 if attempted else 0)
+            base_attempts = 0 if has_new_alerts else replayed_attempts
+            attempts = base_attempts + (1 if attempted else 0)
             first_failed_at = replayed_first_failed_at or format_utc(
                 datetime.datetime.now(datetime.timezone.utc)
             )
@@ -1192,7 +1210,9 @@ class Reporter:
                 "metric": list(self.metric_alerts),
             }
             if any(buckets.values()):
-                if attempted and attempts >= self.ALERT_DLQ_MAX_ATTEMPTS:
+                if (attempted and attempts >= self.ALERT_DLQ_MAX_ATTEMPTS
+                        and self._dlq_age_seconds(first_failed_at)
+                        >= self.ALERT_DLQ_MIN_RETENTION_SECONDS):
                     logger.error(
                         "Alert DLQ: dropping {} alert bucket(s) after {} failed dispatch attempts",
                         sum(len(v) for v in buckets.values()), attempts,

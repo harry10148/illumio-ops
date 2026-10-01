@@ -752,8 +752,8 @@ def make_actions_blueprint(
                 with _file_lock(analysis_lock_path(), timeout=_ANALYSIS_LOCK_WAIT_S):
                     with _analysis_lock:
                         ana = Analyzer(cm, api, rep, cache_reader=_make_cache_reader(cm))
-                        ana.run_analysis()
-                        rep.send_alerts(lang=lang)
+                        from src.scheduler.jobs import run_analysis_then_send
+                        run_analysis_then_send(ana, rep, lang=lang)
             except TimeoutError:
                 return _err(t("gui_err_analysis_in_progress", lang=lang), 409)
             return jsonify({"ok": True, "output": t("gui_action_run_completed", lang=lang)})
