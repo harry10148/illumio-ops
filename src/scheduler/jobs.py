@@ -340,8 +340,10 @@ def run_events_ingest(cm) -> None:
         raise  # surface to _instrument → job_health status=error
 
 
-@_serialized_cache_write
 def run_traffic_ingest(cm) -> None:
+    # 不再整段包 _serialized_cache_write：抓 PCE（async query 最多等 900 秒、
+    # 二分時乘上子窗數）的期間持有全域寫鎖，會讓 events ingest 等寫入一路卡住。
+    # 寫入 SQLite 的部分改由 TrafficIngestor 以 write_lock 逐窗持鎖。
     wm = None
     try:
         from sqlalchemy.orm import sessionmaker
@@ -350,7 +352,8 @@ def run_traffic_ingest(cm) -> None:
         from src.api_client import ApiClient
         cfg = cm.models.pce_cache
         sf = sessionmaker(_get_cache_engine(cfg.db_path))
-        _guard_cache_target(cm, sf)
+        with _CACHE_WRITE_LOCK:
+            _guard_cache_target(cm, sf)
         wm = WatermarkStore(sf)
         with ApiClient(cm) as api:
             from src.pce_cache.traffic_filter import TrafficFilter
@@ -366,7 +369,8 @@ def run_traffic_ingest(cm) -> None:
                                    siem_pd_filters=_traffic_pd_filters(cm),
                                    record_observations=getattr(cfg, "flow_delta_enabled", True),
                                    overlap=_ingest_overlap(cfg),
-                                   obs_retention_hours=getattr(cfg, "flow_obs_retention_hours", 6))
+                                   obs_retention_hours=getattr(cfg, "flow_obs_retention_hours", 6),
+                                   write_lock=_CACHE_WRITE_LOCK)
             count = ing.run_once()
         logger.info("Traffic ingest: {} rows inserted", count)
         _record_ingest_pce_result("traffic", wm)

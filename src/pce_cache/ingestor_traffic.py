@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+from contextlib import nullcontext
 from datetime import datetime, timezone, timedelta
 from typing import Optional
 
@@ -32,6 +33,7 @@ class TrafficIngestor:
         record_observations: bool = True,
         obs_retention_hours: int = 6,
         overlap: timedelta = timedelta(minutes=20),
+        write_lock=None,
     ):
         self._api = api
         self._sf = session_factory
@@ -47,6 +49,10 @@ class TrafficIngestor:
         # ingest 就替每筆 flow 記一列「當下累計值」，規則引擎才有前一次觀測
         # 可相減。關掉就等於整個部署退回 phase 1 的守門（規則被抑制而非誤報）。
         self._overlap = overlap
+        # 只在寫入 SQLite 時持有的鎖（與 events ingest、retention 等共用）。
+        # 抓 PCE 的期間不持有：async query 每次最多等 900 秒、二分時再乘上
+        # 子窗數，舊版整段持鎖讓 events 寫入一路被卡住，告警與 SIEM 都延遲。
+        self._write_lock = write_lock
         self._until_dt: Optional[datetime] = None
         self._record_obs = record_observations
         self._obs_retention_hours = max(1, int(obs_retention_hours))
@@ -66,60 +72,90 @@ class TrafficIngestor:
     _MIN_BISECT_SPAN = timedelta(minutes=1)
 
     def run_once(self) -> int:
+        """依時間順序逐窗「抓 → 寫 → 推進 watermark」。
+
+        舊版把所有子窗（二分最多 64 窗、每窗最多 20 萬筆）全部串成一個 list，
+        再建一份含 raw_json／report_json 的 rows 才寫入；中斷多日後恢復就可能
+        OOM，而 watermark 沒推進，重啟後同一批積壓再 OOM，ingest 卡死。現在
+        記憶體裡最多只有一個子窗的資料，每寫完一窗就把 watermark 推到該窗結束
+        時間為止——中途崩潰也只需重抓尚未寫入的那幾窗。
+        """
         since = self._since_cursor()
         self._overflow_windows = []
         self.last_run_overflow = None
-        try:
-            flows = self._fetch_all(since)
-        except Exception as exc:
-            logger.exception("Traffic ingest failed: {}", exc)
-            self._wm.record_error(self.SOURCE, str(exc))
-            return 0
-
-        if self._overflow_windows:
-            self.last_run_overflow = {
-                "detected_at": datetime.now(timezone.utc).isoformat(),
-                "query_since": min(w["since"] for w in self._overflow_windows),
-                "query_until": max(w["until"] for w in self._overflow_windows),
-                "raw_count": sum(w["count"] for w in self._overflow_windows),
-                "max_results": self._max_results,
-                "window_count": len(self._overflow_windows),
-            }
-
-        inserted = 0
+        seen: set[str] = set()
+        fetched = inserted = 0
         watermark_advanced = False
+        windows = self._iter_windows(since)
         try:
-            inserted = self._insert_batch(flows)
-            if flows:
-                last = max(_ts(f, "last_detected") for f in flows)
-                if last:
-                    last_dt = _parse_iso(last)
-                    if last_dt.tzinfo is None:
-                        last_dt = last_dt.replace(tzinfo=timezone.utc)
-                    # 不超過這次查詢的結束時間：VEN 時鐘偏快送來「未來」的
-                    # last_detected 時，watermark 若被推到未來，overlap 也蓋不回。
-                    if self._until_dt is not None:
-                        last_dt = min(last_dt, self._until_dt)
-                    self._wm.advance(self.SOURCE, last_timestamp=last_dt)
-                    watermark_advanced = True
+            while True:
+                try:
+                    window = next(windows)
+                except StopIteration:
+                    break
+                except Exception as exc:
+                    # 抓取失敗：已寫入的子窗與 watermark 進度保留，記 error 後結束
+                    # 這一輪（與舊版相同不往上拋，由 _record_ingest_pce_result 回報）。
+                    logger.exception("Traffic ingest failed: {}", exc)
+                    with self._write_context():
+                        self._wm.record_error(self.SOURCE, str(exc))
+                    return inserted
+                w_until, flows = window
+                fetched += len(flows)
+                with self._write_context():
+                    inserted += self._insert_batch(flows, seen=seen)
+                    if self._advance_watermark(flows, w_until):
+                        watermark_advanced = True
+                del flows, window
+
+            if self._overflow_windows:
+                self.last_run_overflow = {
+                    "detected_at": datetime.now(timezone.utc).isoformat(),
+                    "query_since": min(w["since"] for w in self._overflow_windows),
+                    "query_until": max(w["until"] for w in self._overflow_windows),
+                    "raw_count": sum(w["count"] for w in self._overflow_windows),
+                    "max_results": self._max_results,
+                    "window_count": len(self._overflow_windows),
+                }
             # 觀測表修剪跟著 ingest 節奏跑（而非只靠 24h 的 retention job）：
             # 每筆 flow 每次 poll 記一列，等一天才刪的話 60 秒輪詢的部署會囤
-            # 上千倍的列。放在 watermark 前進之後、且不讓失敗污染 ingest 狀態
-            # ——修剪失敗不代表這次 ingest 失敗（retention job 仍是後備）。
-            self._prune_observations()
+            # 上千倍的列。修剪失敗不代表這次 ingest 失敗（retention job 仍是後備）。
+            with self._write_context():
+                self._prune_observations()
             return inserted
         except Exception as exc:
             # insert/advance 失敗（如 database is locked）：記 error 讓 last_status
             # 反映真實，再 re-raise（run_traffic_ingest 仍以 logger.exception 記錄）。
-            self._wm.record_error(self.SOURCE, str(exc))
+            with self._write_context():
+                self._wm.record_error(self.SOURCE, str(exc))
             raise
         finally:
             logger.info(
                 "Traffic ingest poll: fetched={} inserted={} watermark_advanced={} since={}",
-                len(flows), inserted, watermark_advanced, since,
+                fetched, inserted, watermark_advanced, since,
             )
 
-    def _fetch_all(self, since: Optional[str]) -> list[dict]:
+    def _write_context(self):
+        return self._write_lock if self._write_lock is not None else nullcontext()
+
+    def _advance_watermark(self, flows: list[dict], window_until: datetime) -> bool:
+        if not flows:
+            return False
+        last = max(_ts(f, "last_detected") for f in flows)
+        if not last:
+            return False
+        last_dt = _parse_iso(last)
+        if last_dt.tzinfo is None:
+            last_dt = last_dt.replace(tzinfo=timezone.utc)
+        # 不超過這個子窗的結束時間：長壽 flow 的 last_detected 可能落在後面的
+        # 子窗，若先推過去而後面的子窗沒寫成，那段就被跳過；VEN 時鐘偏快送來
+        # 「未來」的 last_detected 時也不會把 watermark 推到未來。
+        self._wm.advance(self.SOURCE, last_timestamp=min(last_dt, window_until))
+        return True
+
+    def _iter_windows(self, since: Optional[str]):
+        """依時間順序產生 (子窗結束時間, flows)。碰 max_results 就二分，
+        先丟掉父窗的資料再抓子窗，記憶體裡最多只有一個子窗。"""
         until_dt = datetime.now(timezone.utc).replace(microsecond=0)
         self._until_dt = until_dt
         if since is not None:
@@ -127,31 +163,13 @@ class TrafficIngestor:
         else:
             # 鏡射 api_client 的預設：無 watermark 時往回抓 24 小時
             since_dt = until_dt - timedelta(hours=24)
-        return self._fetch_window(since_dt, until_dt, depth=0)
+        yield from self._iter_window(since_dt, until_dt, depth=0)
 
-    def _fetch_window(self, since_dt: datetime, until_dt: datetime, depth: int) -> list[dict]:
-        flows = self._api.get_traffic_flows_async(
-            max_results=self._max_results,
-            rate_limit=True,
-            since=since_dt.isoformat(),
-            until=until_dt.isoformat(),
-        )
-        # get_traffic_flows_async() routes through the async query submit path
-        # (src/api/traffic_query.py _submit_and_stream_async_query), which
-        # swallows a connection-layer PCE failure into an empty result instead
-        # of raising — so `flows == []` alone can't tell "PCE unreachable" apart
-        # from "genuinely no new flows". Raise here so run_once()'s except
-        # branch records it via watermark.record_error(), same as any other
-        # fetch failure (see watchdog-live-reverify-report.md step 2).
-        fetch_error = getattr(self._api, "last_fetch_error", None)
-        # isinstance guard: many tests pass a bare MagicMock() as `api`, whose
-        # unconfigured attributes auto-vivify into truthy child Mocks rather
-        # than None — without this guard every such test would spuriously
-        # trip the error path. The real ApiClient contract is always str|None.
-        if isinstance(fetch_error, str) and fetch_error:
-            raise RuntimeError(f"PCE traffic fetch failed: {fetch_error}")
+    def _iter_window(self, since_dt: datetime, until_dt: datetime, depth: int):
+        flows = self._fetch_one(since_dt, until_dt)
         if len(flows) < self._max_results:
-            return flows
+            yield until_dt, flows
+            return
         span = until_dt - since_dt
         if depth >= self._MAX_BISECT_DEPTH or span <= self._MIN_BISECT_SPAN:
             logger.warning(
@@ -164,14 +182,46 @@ class TrafficIngestor:
                 "until": until_dt.isoformat(),
                 "count": len(flows),
             })
-            return flows
+            yield until_dt, flows
+            return
         mid = since_dt + span / 2
         logger.warning(
             "Traffic ingest hit max_results cap ({}); bisecting {} → {} at {}",
             self._max_results, since_dt, until_dt, mid,
         )
-        return (self._fetch_window(since_dt, mid, depth + 1)
-                + self._fetch_window(mid, until_dt, depth + 1))
+        del flows
+        yield from self._iter_window(since_dt, mid, depth + 1)
+        yield from self._iter_window(mid, until_dt, depth + 1)
+
+    def _fetch_all(self, since: Optional[str]) -> list[dict]:
+        """一次抓完整個視窗（測試與相容用；ingest 本身走 _iter_windows）。"""
+        flows: list[dict] = []
+        for _, part in self._iter_windows(since):
+            flows.extend(part)
+        return flows
+
+    def _fetch_one(self, since_dt: datetime, until_dt: datetime) -> list[dict]:
+        flows = self._api.get_traffic_flows_async(
+            max_results=self._max_results,
+            rate_limit=True,
+            since=since_dt.isoformat(),
+            until=until_dt.isoformat(),
+        )
+        # get_traffic_flows_async() routes through the async query submit path
+        # (src/api/traffic_query.py _submit_and_stream_async_query), which
+        # swallows a connection-layer PCE failure into an empty result instead
+        # of raising — so `flows == []` alone can't tell "PCE unreachable" apart
+        # from "genuinely no new flows". Raise here so run_once() records it
+        # via watermark.record_error(), same as any other fetch failure (see
+        # watchdog-live-reverify-report.md step 2).
+        fetch_error = getattr(self._api, "last_fetch_error", None)
+        # isinstance guard: many tests pass a bare MagicMock() as `api`, whose
+        # unconfigured attributes auto-vivify into truthy child Mocks rather
+        # than None — without this guard every such test would spuriously
+        # trip the error path. The real ApiClient contract is always str|None.
+        if isinstance(fetch_error, str) and fetch_error:
+            raise RuntimeError(f"PCE traffic fetch failed: {fetch_error}")
+        return list(flows or [])
 
     def _since_cursor(self) -> Optional[str]:
         wm = self._wm.get(self.SOURCE)
@@ -196,7 +246,7 @@ class TrafficIngestor:
     # 意義且會挑錯邊）。那兩欄改以 last_detected 較新的一側取代，見 _insert_batch。
     _VOLATILE = ("last_detected", "bytes_in", "bytes_out", "flow_count")
 
-    def _insert_batch(self, flows: list[dict]) -> int:
+    def _insert_batch(self, flows: list[dict], seen: Optional[set] = None) -> int:
         """Bulk-upsert flows in chunks (dedup by flow_hash). One transaction per
         chunk instead of one per row — at 100k+ flows the per-row commit/fsync
         was the dominant ingest cost and a major source of SQLite write-lock
@@ -242,7 +292,10 @@ class TrafficIngestor:
         rows: list[dict] = []
         # obs_pairs 與 rows 同序、同長度：分塊時兩者用同一組索引切片。
         obs_pairs: list[tuple[str, dict]] = []
-        seen: set[str] = set()
+        # seen 由 run_once 跨子窗共用：同一筆 flow 出現在兩個子窗時只取第一次，
+        # 與舊版「全部串起來再去重」的結果相同（觀測表一輪只記一列）。
+        if seen is None:
+            seen = set()
         for flow in flows:
             flat = _flatten_flow(flow)
             if not self._filter.passes(flat):
