@@ -1723,9 +1723,22 @@ class Analyzer:
             logger.info(f"Found {len(events)} events.")
             now_utc = datetime.datetime.now(datetime.timezone.utc)
             normalized_by_id = {}
+            good_events: list = []
             for event in events:
-                normalized = normalize_event(event)
-                normalized_by_id[event_identity(event)] = normalized
+                # 逐筆隔離：一筆格式異常的事件丟例外時，整批（cache 部署上是
+                # subscriber 的 processor）都會失敗、cursor 不前進，下一輪又讀到
+                # 同一筆——事件監控從此卡死。略過這一筆並記 ERROR，其餘照常處理。
+                try:
+                    normalized = normalize_event(event)
+                    identity = event_identity(event)
+                except Exception as exc:  # noqa: BLE001
+                    logger.error("Skipping malformed event {}: {}",
+                                 str(event.get("href") if isinstance(event, dict) else event)[:200],
+                                 exc)
+                    continue
+                normalized_by_id[identity] = normalized
+                good_events.append(event)
+            events = good_events
             self._update_parser_observability(list(normalized_by_id.values()))
             self.stats.record_event_batch(
                 events,

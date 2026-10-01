@@ -121,5 +121,14 @@ def _row_to_dict(row) -> dict:
             # 降級成欄位投影（缺 raw payload 細節）——要留下損毀證據
             logger.warning("corrupt cached payload row id={}; falling back to column projection",
                            getattr(row, "id", "?"))
-    # Fallback minimal projection
-    return {c.name: getattr(row, c.name) for c in row.__table__.columns}
+    # Fallback minimal projection。datetime 欄位轉成 ISO 字串，與 raw payload
+    # 的形狀一致——下游（事件時間解析、JSON 序列化）都預期字串。
+    out = {}
+    for c in row.__table__.columns:
+        value = getattr(row, c.name)
+        if isinstance(value, datetime):
+            if value.tzinfo is None:
+                value = value.replace(tzinfo=timezone.utc)
+            value = value.isoformat().replace("+00:00", "Z")
+        out[c.name] = value
+    return out
