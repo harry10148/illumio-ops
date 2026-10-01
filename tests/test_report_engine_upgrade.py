@@ -77,7 +77,7 @@ def test_ven_generate_produces_trend_deltas(tmp_path):
     cm = types.SimpleNamespace(config={"settings": {"timezone": "UTC"}})
 
     class _Api:
-        def fetch_managed_workloads(self):
+        def fetch_managed_workloads(self, *a, **kw):
             return [{"hostname": "h1", "interfaces": [{"address": "10.0.0.1"}], "labels": [],
                      "agent": {"status": {"status": "active", "hours_since_last_heartbeat": 0.1,
                                           "security_policy_sync_state": "active",

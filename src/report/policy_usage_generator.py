@@ -134,7 +134,8 @@ class PolicyUsageGenerator:
             logger.warning(f"Label cache update failed (non-fatal): {e}")
 
         # Step 2 — fetch draft rulesets (matching workloader behaviour)
-        rulesets = self.api.get_all_rulesets(force_refresh=True)
+        # raise_on_error：PCE 斷線不得看起來像「沒有規則」而被當成空報表略過。
+        rulesets = self.api.get_all_rulesets(force_refresh=True, raise_on_error=True)
         if not rulesets:
             logger.warning("get_all_rulesets() returned empty list")
             return PolicyUsageResult(record_count=0)

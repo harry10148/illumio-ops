@@ -123,7 +123,8 @@ class VenStatusGenerator:
         self._detail_level = _REPORT_DETAIL_LEVEL
         self._lang = lang
         print(t("rpt_ven_fetching", lang=self._lang))
-        workloads = self.api.fetch_managed_workloads()
+        # raise_on_error：PCE 斷線不得看起來像「沒有 VEN」而被當成空報表略過。
+        workloads = self.api.fetch_managed_workloads(raise_on_error=True)
 
         if not workloads:
             print(t("rpt_ven_no_data", lang=self._lang))

@@ -176,9 +176,12 @@ def test_fetch_events_hybrid_boundary_event_counted_exactly_once(tmp_path):
 
     api = _make_mock_api()
 
-    def _api_fetch(start_str, end_str):
+    def _api_fetch(start_str, end_str=None, *, end_time_str=None, max_results=None, rate_limit=False):
         # 模擬 PCE events API：timestamp[gte]=start_str, timestamp[lte]=end_str
-        s, e = _parse(start_str), _parse(end_str)
+        # （audit 改走 fetch_events_drained，以 end_time_str 關鍵字傳入、帶微秒）
+        end_str = end_str or end_time_str
+        s = datetime.fromisoformat(start_str.replace("Z", "+00:00"))
+        e = datetime.fromisoformat(end_str.replace("Z", "+00:00"))
         return [ev for ev in all_events if s <= _parse(ev["timestamp"]) <= e]
     api.fetch_events.side_effect = _api_fetch
 

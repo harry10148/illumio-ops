@@ -12,7 +12,7 @@ class _StubApiClient:
         pass
     def fetch_traffic_for_report(self, *a, **kw):
         return []
-    def get_all_rulesets(self, force_refresh=False):
+    def get_all_rulesets(self, force_refresh=False, raise_on_error=False):
         return []
     def get_active_rulesets(self):
         return []

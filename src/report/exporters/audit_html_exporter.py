@@ -271,8 +271,18 @@ class AuditHtmlExporter:
         # the shell cover; everything else it carried opens the first chapter in
         # the order it had inside the hero card.
         _attention_items = mod00.get("attention_items", [])
+        _trunc = self._r.get("_events_truncation") or {}
+        _trunc_html = ""
+        if _trunc.get("windows"):
+            _trunc_html = (
+                '<p class="note note-warn" data-tone="warn">'
+                + html.escape(t("rpt_audit_events_truncated", lang=self._lang,
+                                 windows=_trunc["windows"], max=f'{_trunc.get("max_results", 0):,}'))
+                + '</p>'
+            )
         _summary_body = (
             summary_pills
+            + _trunc_html
             + self._attention_section(_attention_items)
             + self._trend_deltas_html()
             + self._severity_dist_html(mod00)
