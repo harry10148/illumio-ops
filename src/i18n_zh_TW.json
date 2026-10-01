@@ -2929,7 +2929,7 @@
   "mod12_kpi_active_allow_coverage": "主動 Allow 覆蓋率",
   "mod12_kpi_allowed_flows": "Allowed 流量",
   "mod12_kpi_blocked_flows": "Blocked 流量",
-  "mod12_kpi_date_range": "日期範圍",
+  "mod12_kpi_date_range": "實際資料時間範圍",
   "mod12_kpi_enforce_mode_full": "Full（完整）",
   "mod12_kpi_enforce_mode_idle": "Idle（閒置）",
   "mod12_kpi_enforce_mode_selective": "Selective（選擇性）",
@@ -5652,5 +5652,9 @@
   "rpt_xlsx_period": "期間：{start} → {end}",
   "rpt_xlsx_records": "筆數：{count}",
   "rpt_au_kpi_authz_failures": "權限不足（403）",
-  "rpt_pu_kpi_disabled_skipped": "停用的規則（未評估）"
+  "rpt_pu_kpi_disabled_skipped": "停用的規則（未評估）",
+  "rpt_data_source_csv": "資料來源：CSV 匯入",
+  "rpt_cover_filters": "篩選條件",
+  "rpt_cover_tool_version": "illumio-ops 版本",
+  "rpt_col_connection_coverage_pct": "連線覆蓋率 %"
 }

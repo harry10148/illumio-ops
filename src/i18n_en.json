@@ -2956,7 +2956,7 @@
   "mod12_kpi_active_allow_coverage": "Active Allow Coverage",
   "mod12_kpi_allowed_flows": "Allowed Flows",
   "mod12_kpi_blocked_flows": "Blocked Flows",
-  "mod12_kpi_date_range": "Date Range",
+  "mod12_kpi_date_range": "Observed Data Span",
   "mod12_kpi_enforce_mode_full": "Full",
   "mod12_kpi_enforce_mode_idle": "Idle",
   "mod12_kpi_enforce_mode_selective": "Selective",
@@ -5652,5 +5652,9 @@
   "rpt_xlsx_period": "Period: {start} → {end}",
   "rpt_xlsx_records": "Records: {count}",
   "rpt_au_kpi_authz_failures": "Permission Denied (403)",
-  "rpt_pu_kpi_disabled_skipped": "Disabled Rules (not evaluated)"
+  "rpt_pu_kpi_disabled_skipped": "Disabled Rules (not evaluated)",
+  "rpt_data_source_csv": "Data source: CSV import",
+  "rpt_cover_filters": "Filters",
+  "rpt_cover_tool_version": "illumio-ops version",
+  "rpt_col_connection_coverage_pct": "Connection Coverage %"
 }

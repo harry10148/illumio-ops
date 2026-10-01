@@ -423,3 +423,20 @@ class TestMod11HtmlRendersTheBoundLabel:
         assert "3 of the 4 rates" in mixed
         # 混合時要說得出還有量測值存在，否則讀者會以為全部都是下界。
         assert "measured" in mixed.lower()
+
+
+def test_b008_silent_on_uniform_volumes():
+    """百分位數門檻本身永遠有 ~5% 的流量超過；資料量幾乎一致時不得出 finding。"""
+    engine = RulesEngine({'thresholds': {'high_bytes_percentile': 95}}, lang='en')
+    df = pd.DataFrame([{'src_ip': f'10.0.0.{i}', 'dst_ip': '10.0.1.1', 'port': 443,
+                        'bytes_total': 1000 + i, 'num_connections': 1} for i in range(100)])
+    assert engine._b008_bandwidth_anomaly(df) is None
+
+
+def test_l003_needs_one_widely_exposed_database():
+    """六個資料庫各自只被自己的 app tier 存取，不算資料庫被廣泛暴露。"""
+    engine = RulesEngine({'thresholds': {'db_unique_src_app_threshold': 5}}, lang='en')
+    df = pd.DataFrame([{'src_ip': f'10.0.0.{i}', 'dst_ip': f'10.0.9.{i}', 'port': 5432,
+                        'src_app': f'app{i}', 'policy_decision': 'allowed', 'num_connections': 1}
+                       for i in range(6)])
+    assert engine._l003_database_port_wide_exposure(df) is None

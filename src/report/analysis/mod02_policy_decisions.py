@@ -208,12 +208,14 @@ def _compute_port_coverage(df: pd.DataFrame, top_n: int = 20) -> pd.DataFrame:
     result = pd.DataFrame({
         'Port': pd.array(ports, dtype='Int64'),
         'Proto': protos,
-        'Total Flows': pd.array(total_per_key.values, dtype='Int64'),
+        # 這張表加總的是 num_connections（連線數），標題列的覆蓋率則是以流量
+        # 列數計算——欄名要說清楚是哪一種，兩個「覆蓋率」才不會看起來互相矛盾。
+        'Total Connections': pd.array(total_per_key.values, dtype='Int64'),
         'Allowed': pd.array(allowed.values, dtype='Int64'),
         'Blocked': pd.array(blocked.values, dtype='Int64'),
         'Potentially Blocked': pd.array(pb.values, dtype='Int64'),
-        'Coverage %': coverage.values,
-    }).sort_values('Total Flows', ascending=False).head(top_n).reset_index(drop=True)
+        'Connection Coverage %': coverage.values,
+    }).sort_values('Total Connections', ascending=False).head(top_n).reset_index(drop=True)
 
     # Drop Proto column entirely if every value is empty (keeps output clean
     # when upstream data has no proto dimension).

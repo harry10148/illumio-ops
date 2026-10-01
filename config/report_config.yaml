@@ -41,7 +41,9 @@ thresholds:
   lateral_movement_outbound_dst: 10   # B006: alert if unique dst > 10 on lateral ports
   user_destination_threshold: 20      # B007: alert if user reaches > 20 unique dst
   unmanaged_connection_threshold: 50  # B004: alert if unmanaged src conns > 50
-  high_bytes_percentile: 95           # B008: anomaly if bytes > 95th percentile
+  high_bytes_percentile: 95           # B008: anomaly if bytes > 95th percentile …
+  high_bytes_median_factor: 10        # B008: … AND > 10× the median flow …
+  high_bytes_min_bytes: 1048576       # B008: … AND > 1 MB (no finding on uniform small flows)
   high_bandwidth_percentile: 95       # bandwidth spike percentile
   cross_env_connection_threshold: 100 # B009: cross-env flow volume alert
 

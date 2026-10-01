@@ -447,6 +447,9 @@ COL_I18N.update({
     "resource_name": "rpt_col_resource_name",
     "agent_hostname": "rpt_col_agent_hostname",
     "status": "rpt_col_status",
+    # JSON-backed headers (src/i18n_*.json), not overlay entries.
+    "Total Connections": "rpt_col_total_connections",
+    "Connection Coverage %": "rpt_col_connection_coverage_pct",
 })
 
 # Render-layer value i18n maps. Pass these to render_df_table via
