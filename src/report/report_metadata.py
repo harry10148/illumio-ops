@@ -58,18 +58,17 @@ def attack_summary_counts(attack_summary: dict[str, Any]) -> dict[str, int]:
         counts[key] = len(values) if isinstance(values, list) else 0
     return counts
 
-def build_attack_summary_brief(counts: dict[str, int]) -> str:
+def build_attack_summary_brief(counts: dict[str, int], lang: str = "en") -> str:
     total = sum(int(counts.get(k, 0) or 0) for k in ATTACK_SECTION_KEYS)
     if total <= 0:
         return ""
-    return (
-        "Attack posture "
-        f"boundary {counts.get('boundary_breaches', 0)} | "
-        f"pivot {counts.get('suspicious_pivot_behavior', 0)} | "
-        f"blast {counts.get('blast_radius', 0)} | "
-        f"blind {counts.get('blind_spots', 0)} | "
-        f"actions {counts.get('action_matrix', 0)}"
-    )
+    from src.i18n import t
+    return t("rpt_attack_brief", lang=lang,
+             boundary=counts.get('boundary_breaches', 0),
+             pivot=counts.get('suspicious_pivot_behavior', 0),
+             blast=counts.get('blast_radius', 0),
+             blind=counts.get('blind_spots', 0),
+             actions=counts.get('action_matrix', 0))
 
 
 def write_metadata_sidecar(report_path: str, payload: dict[str, Any]) -> None:

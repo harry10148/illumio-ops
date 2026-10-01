@@ -425,7 +425,7 @@ class PolicyUsageGenerator:
             summary_bits.append(f"failed {execution['failed_jobs']}")
         attack_summary = extract_attack_summary(result.module_results, top_n=5)
         counts = attack_summary_counts(attack_summary)
-        attack_brief = build_attack_summary_brief(counts)
+        attack_brief = build_attack_summary_brief(counts, lang=getattr(self, '_lang', 'en'))
         if attack_brief:
             summary_bits.append(attack_brief)
         return {

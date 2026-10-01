@@ -39,7 +39,7 @@ from .report_shell import (
     build_shell_document,
     ink_on,
 )
-from ._output_paths import discard_reserved, reserve_unique_path, write_text_atomic
+from ._output_paths import save_text_report
 from src.report.exporters._exec_summary import render_exec_summary_html
 from .table_renderer import render_df_table
 from .chart_renderer import render_matplotlib_svg
@@ -389,57 +389,7 @@ def _trend_deltas_section(deltas: list | None, lang: str = "en", mismatch: list 
     )
 
 # Rule descriptions: human-readable explanation of what each built-in rule checks
-_RULE_DESCRIPTIONS = {
-    # ── Ransomware exposure ────────────────────────────────────────────────────
-    'B001': ('Ransomware Critical Ports Not Blocked',
-             'Checks for traffic on ransomware\'s primary attack ports (SMB 445, RPC 135, RDP 3389, WinRM 5985/5986) that is NOT blocked. These are the exact ports used in EternalBlue, NotPetya, and WannaCry-class attacks for network-wide lateral spread.'),
-    'B002': ('Ransomware High-Risk Remote Access Allowed',
-             'Detects allowed flows on secondary remote-access ports (TeamViewer 5938, VNC 5900, NetBIOS 137-139). Ransomware operators and APT groups use these for C2 persistence and remote control after initial compromise.'),
-    'B003': ('Ransomware Risk Port (Medium) — Uncovered',
-             t('rpt_rule_b003_desc', lang="en")),
-    # ── Policy & coverage gaps ─────────────────────────────────────────────────
-    'B004': ('Unmanaged Source High Activity',
-             'Counts flows from hosts not enrolled in the PCE. Unmanaged hosts have no VEN and therefore no micro-segmentation enforcement — they are outside the zero-trust boundary and represent uncontrolled attack surface.'),
-    'B005': ('Low Policy Coverage',
-             'Measures the percentage of observed flows with an active allow policy. Coverage below 30% means most traffic is uncontrolled — a sign that segmentation is in early stages and large attack surface remains exposed.'),
-    'B009': ('Cross-Environment Flow Volume',
-             'Tracks the number of flows crossing environment boundaries (e.g. Production → Development). Excessive cross-env traffic may indicate lateral movement from a compromised lower-security zone into production.'),
-    # ── Anomalous behaviour ────────────────────────────────────────────────────
-    'B006': ('Lateral Movement Fan-Out',
-             'Detects source IPs that connect to an abnormally high number of distinct destinations on lateral movement ports. This fan-out pattern (one source → many destinations) is the hallmark of worm propagation and attacker pivoting after initial compromise.'),
-    'B007': ('User Account Reaching Many Destinations',
-             'Detects individual user accounts connecting to unusually many unique destination IPs. This may indicate a compromised account being used for automated reconnaissance, credential stuffing, or data staging before exfiltration.'),
-    'B008': ('High Data Volume Per Flow',
-             'Flags individual flows exceeding the 95th percentile of byte volume in the dataset. Sudden high-volume transfers from unexpected sources are a key indicator of data staging, exfiltration, or unsanctioned large-scale backups.'),
-    # ── Lateral movement — cleartext & legacy protocols ────────────────────────
-    'L001': ('Cleartext Protocol in Use (Telnet / FTP)',
-             'Detects any traffic on Telnet (23) or FTP (20/21). These protocols transmit credentials and data without encryption. Any attacker with network access can perform a man-in-the-middle or ARP poisoning attack to harvest passwords in plaintext — enabling instant credential reuse for lateral movement.'),
-    'L002': ('Network Discovery Protocol Exposure',
-             'Detects unblocked flows on broadcast/discovery protocols: NetBIOS (137/138), mDNS (5353), LLMNR (5355), SSDP (1900). Tools like Responder and Inveigh exploit these to perform hostname poisoning and capture NTLMv2 hashes without any authentication — then crack or relay those hashes for lateral movement.'),
-    # ── Lateral movement — database exposure ───────────────────────────────────
-    'L003': ('Database Port Accessible from Many App Tiers',
-             'Checks whether database ports (MSSQL 1433, MySQL 3306, PostgreSQL 5432, Oracle 1521, MongoDB 27017, Redis 6379, Elasticsearch 9200) are reachable from many distinct application labels. Databases should only be reachable from their direct app tier. Wide exposure provides direct data access after a single lateral move.'),
-    'L004': ('Cross-Environment Database Access',
-             'Detects allowed database flows crossing environment boundaries (e.g. Dev app → Production database). Environment boundaries are the macro-segmentation layer. Breaching them allows an attacker in a low-security Dev environment to directly access Production data stores.'),
-    # ── Lateral movement — identity infrastructure ──────────────────────────────
-    'L005': ('Identity Infrastructure Wide Exposure',
-             'Detects Kerberos (88), LDAP (389/636), and Global Catalog (3268/3269) traffic from many source applications. Active Directory is the domain\'s authentication authority. Excessive access enables domain enumeration (BloodHound), Kerberoasting, Golden/Silver Ticket attacks, and full domain takeover.'),
-    # ── Lateral movement — graph-based blast radius ─────────────────────────────
-    'L006': ('High Blast-Radius Lateral Path (Graph BFS)',
-             'Uses BFS graph traversal on allowed lateral-port connections to find apps that can reach many others through a chain of pivots. High reachability = high blast radius. An attacker who compromises a top-ranked app can traverse the entire reachable subgraph — this is the MCP detect-lateral-movement-paths methodology.'),
-    # ── Lateral movement — unmanaged pivot ──────────────────────────────────────
-    'L007': ('Unmanaged Host Accessing Critical Services',
-             'Detects unmanaged (non-PCE) hosts communicating on database, identity (Kerberos/LDAP), or Windows management ports to managed workloads. Unmanaged hosts have no VEN enforcement — they are outside zero-trust. If they can reach critical services, they represent uncontrolled lateral movement entry points.'),
-    # ── Lateral movement — enforcement gap ──────────────────────────────────────
-    'L008': ('Lateral Ports in Test Mode (PB)',
-             t('rpt_rule_l008_desc', lang="en")),
-    # ── Lateral movement — exfiltration pattern ─────────────────────────────────
-    'L009': ('Data Exfiltration Pattern — Outbound to Unmanaged',
-             'Detects managed workloads transferring significant data volume to unmanaged (external/unknown) destinations. This is the post-lateral-movement exfiltration phase: attacker has pivoted to a high-value host and is now staging or exfiltrating data to an external C2 or drop server outside PCE visibility.'),
-    # ── Lateral movement — cross-env boundary break ──────────────────────────────
-    'L010': ('Cross-Environment Lateral Port Access — Boundary Break',
-             'CRITICAL: Detects lateral movement ports (SMB 445, RDP 3389, WinRM 5985/5986, RPC 135) allowed between different environments. Environment segmentation is the macro-security boundary. If lateral ports cross it, an attacker who compromises Dev/Test can directly pivot into Production using exactly the same techniques, bypassing all environment-level controls.'),
-}
+# Rule "how it checks" text lives in the i18n catalogues as rpt_rule_<ID>_how.
 
 # EXTERNAL/INTERNAL：mod08 Network 欄的內外網 badge（公網未受管來源標紅）
 _SEVERITY_TOKENS = {'CRITICAL', 'HIGH', 'MEDIUM', 'LOW', 'INFO', 'EXTERNAL', 'INTERNAL'}
@@ -615,12 +565,7 @@ class _TrafficReportBase:
         # _build()，建置中途拋錯就留下 0-byte 報表（GUI 照樣列出並可下載）。
         # 再以 O_EXCL 搶下唯一檔名（同分鐘併發產出會撞名）＋暫存檔 os.replace。
         body = self._build()
-        filepath = reserve_unique_path(os.path.join(output_dir, filename))
-        try:
-            write_text_atomic(filepath, body)
-        except BaseException:
-            discard_reserved(filepath)
-            raise
+        filepath = save_text_report(os.path.join(output_dir, filename), body)
         logger.info(f"[HtmlExporter] Saved: {filepath}")
         return filepath
 
@@ -1663,7 +1608,8 @@ class _TrafficReportBase:
                 f'<p style="font-size:12px;color:var(--text-3);margin-bottom:14px;">{cat_desc}</p>'
             )
             for f in cat_findings:
-                _rule_title, rule_how = _RULE_DESCRIPTIONS.get(f.rule_id, (f.rule_name, ''))
+                how_key = f'rpt_rule_{f.rule_id}_how'
+                rule_how = _s(how_key) if how_key in _S else ''
                 evidence_html = _format_evidence(f.evidence, lang=self._lang)
                 rule_name_key = f'rpt_rule_{f.rule_id}_name'
                 rule_name = _s(rule_name_key) if rule_name_key in _S else f.rule_name
@@ -1692,14 +1638,7 @@ class _TrafficReportBase:
                     f'</div>'
                 )
                 if rule_how:
-                    how_key = f'rpt_rule_{f.rule_id}_how'
-                    # For English use the rich _RULE_DESCRIPTIONS text directly:
-                    # the STRINGS en value is the placeholder 'Rule detail', so
-                    # _s(how_key) would shadow the real description in EN reports.
-                    if self._lang == "en":
-                        how_text = rule_how
-                    else:
-                        how_text = _s(how_key) if how_key in _S else rule_how
+                    how_text = html.escape(rule_how)
                     cards_html += (
                         f'<p style="font-size:11px;color:var(--text-3);margin-bottom:8px;">'
                         f'<b>{_s("rpt_rule_check_label")}</b>'
