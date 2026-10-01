@@ -142,7 +142,10 @@ def _rs_background_scheduler(cm: ConfigManager) -> None:
             rs_cfg = cm.config.get("rule_scheduler", {})
             interval = rs_cfg.get("check_interval_seconds", 300)
             now = time.time()
-            if last_check is None or (now - last_check) >= interval:
+            if not rs_cfg.get("enabled", True):
+                # 關閉時不得改動 PCE 上的規則（舊版不檢查這個開關）。
+                pass
+            elif last_check is None or (now - last_check) >= interval:
                 from src.rule_scheduler import ScheduleDB, ScheduleEngine
                 from src.api_client import ApiClient as _ApiClient
                 db_path = os.path.join(_resolve_config_dir(), "rule_schedules.json")

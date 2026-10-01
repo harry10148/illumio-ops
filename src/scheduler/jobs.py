@@ -125,6 +125,12 @@ def tick_rule_schedules(cm) -> None:
     from src.module_log import ModuleLog
 
     mlog = ModuleLog.get("rule_scheduler")
+    from src.rule_scheduler import rule_scheduler_enabled
+    if not rule_scheduler_enabled(cm):
+        # 舊版永遠註冊並執行這個 job、也不檢查開關：CLI 把 Rule Scheduler 切成
+        # OFF 之後，PCE 上的規則仍照排程被啟用／停用並 provision。
+        logger.debug("Rule scheduler disabled (rule_scheduler.enabled=false); skipping tick")
+        return
     try:
         pkg_dir = os.path.dirname(os.path.abspath(__file__))
         root_dir = os.path.dirname(os.path.dirname(pkg_dir))
