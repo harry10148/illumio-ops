@@ -362,6 +362,12 @@ class TrafficIngestor:
                 set_["raw_json"] = case((newer, base.excluded.raw_json), else_=raw_cols.raw_json)
                 set_["report_json"] = case(
                     (newer, base.excluded.report_json), else_=raw_cols.report_json)
+                # 決策與 workload 欄位跟著 payload 走：只刷新 report_json 時，
+                # SQL 的 action IN (...) 過濾用的是初見決策、DataFrame 顯示的卻是
+                # 最新決策——「只看 blocked」的報表會漏列或混進 allowed 的列
+                # （archive_query.merge_row 已修過同一問題，F6）。
+                for col in ("action", "src_workload", "dst_workload"):
+                    set_[col] = case((newer, base.excluded[col]), else_=raw_cols[col])
                 # re-pull 一律 bump 到本次 ingest 時間，讓 archiver 游標重新看到本列。
                 set_["ingested_at"] = base.excluded.ingested_at
                 stmt = (
