@@ -136,3 +136,43 @@ def test_dispatcher_does_not_mark_sent_when_delivery_unconfirmed(tmp_path):
         row = s.execute(select(SiemDispatch)).scalar_one()
     assert row.status == "pending"
     assert row.retries == 1
+
+
+def test_frame_payload_lf_and_octet_counting():
+    from src.siem.transports._stream import frame_payload
+    assert frame_payload("abc") == b"abc\n"
+    # 長度以 UTF-8 位元組計（中文每字 3 bytes），訊息內的換行不會被切開
+    msg = "標籤\nx"
+    assert frame_payload(msg, "octet_counting") == b"8 " + msg.encode("utf-8")
+
+
+def test_tcp_octet_counting_on_the_wire():
+    from src.siem.transports.syslog_tcp import SyslogTCPTransport
+
+    ls, port = _listen()
+    got = []
+
+    def serve():
+        c, _ = ls.accept()
+        buf = b""
+        while True:
+            d = c.recv(65536)
+            if not d:
+                break
+            buf += d
+        got.append(buf)
+        c.close()
+
+    th = threading.Thread(target=serve, daemon=True)
+    th.start()
+    tr = SyslogTCPTransport("127.0.0.1", port, framing="octet_counting")
+    tr.send("hello\nworld")
+    tr.finish_batch()
+    th.join(timeout=5)
+    ls.close()
+    assert got == [b"11 hello\nworld"]
+
+
+def test_framing_defaults_to_lf_in_schema():
+    from src.config_models import SiemDestinationSettings
+    assert SiemDestinationSettings(name="d").framing == "lf"

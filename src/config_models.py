@@ -363,6 +363,11 @@ class SiemDestinationSettings(_Base):
             )
         return v
     tls_ca_bundle: Optional[str] = None
+    # TCP／TLS 的訊息分隔方式。lf：每筆後接換行（多數 syslog 接收端的預設，
+    # 也是舊版唯一的方式）；octet_counting：RFC 6587／RFC 5425 的「長度 + 空白
+    # + 訊息」，訊息內含換行也不會被切開，TLS syslog 規範要求用這個。只有接收端
+    # 也設定為 octet-counting 時才改，否則接收端會把長度當成訊息內容。
+    framing: Literal["lf", "octet_counting"] = "lf"
     hec_token: Optional[str] = None
     batch_size: int = Field(default=100, ge=1, le=10000)
     source_types: list[str] = Field(default_factory=lambda: ["audit", "traffic"])
