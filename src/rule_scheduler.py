@@ -170,6 +170,26 @@ def _rs_db_delete(db, href):
     return db.delete(href)
 
 
+
+def rule_scheduler_enabled(cm) -> bool:
+    """rule_scheduler.enabled 的目前值。
+
+    優先讀磁碟上的 config.json：CLI 在另一個行程切換開關時，常駐服務的
+    ConfigManager 不一定重新載入過；讀不到時退回記憶體中的設定。預設 True
+    （與 RuleSchedulerSettings 一致）。
+    """
+    path = getattr(cm, "config_file", None)
+    if isinstance(path, str) and os.path.exists(path):
+        try:
+            with open(path, encoding="utf-8") as f:
+                section = (json.load(f) or {}).get("rule_scheduler") or {}
+            return bool(section.get("enabled", True))
+        except (OSError, ValueError) as exc:
+            logger.warning("rule_scheduler.enabled: could not read {} ({}); using loaded config",
+                           path, exc)
+    config = getattr(cm, "config", None) or {}
+    return bool((config.get("rule_scheduler") or {}).get("enabled", True))
+
 class ScheduleDB:
     """Manages the local JSON-based storage for configured rule schedules."""
 

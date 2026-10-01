@@ -239,8 +239,8 @@ def _run_analysis_now(cm) -> None:
     try:
         with _file_lock(_main.analysis_lock_path(), timeout=_main._ANALYSIS_LOCK_WAIT_S):
             _api, rep, ana = _analyzer(cm)
-            ana.run_analysis()
-            rep.send_alerts()
+            from src.scheduler.jobs import run_analysis_then_send
+            run_analysis_then_send(ana, rep)
     except TimeoutError:
         print(f"{Colors.WARNING}{t('cli_analysis_in_progress')}{Colors.ENDC}")
     input(f"\n{Colors.CYAN}[?]{Colors.ENDC} {t('press_enter_to_continue')} "

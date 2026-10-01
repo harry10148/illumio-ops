@@ -291,7 +291,15 @@ class AsyncJobManager:
         """Submit an async traffic query and return the job href, or None on failure."""
         c = self._client
         url = f"{c.base_url}/traffic_flows/async_queries"
-        status, body = c._request(url, method="POST", data=payload, timeout=10)
+        # rate_limit=True：rule usage 會一次送出數百個查詢，PCE 每個 API key
+        # 每分鐘上限 500 次，超過回 429；走全域限速器排隊而不是撞牆。
+        # 限速器逾時（預算耗盡）視同送出失敗，交回呼叫端記為 failed。
+        try:
+            status, body = c._request(url, method="POST", data=payload, timeout=10,
+                                      rate_limit=True)
+        except Exception as exc:  # noqa: BLE001 — APIError from the rate limiter
+            logger.warning(f"submit_async_query not sent: {exc}")
+            return None
         if status not in (200, 201, 202):
             text = body.decode('utf-8', errors='replace') if isinstance(body, bytes) else str(body)
             logger.debug(f"submit_async_query failed: {status} {text[:200]}")
@@ -424,7 +432,7 @@ class AsyncJobManager:
         """Download completed async query results and yield flow dicts one by one."""
         c = self._client
         dl_url = f"{c.api_cfg['url']}/api/v2{job_href}/download"
-        dl_status, dl_body = c._request(dl_url, timeout=60)
+        dl_status, dl_body = c._request(dl_url, timeout=60, rate_limit=True)
         if dl_status != 200:
             logger.error(f"download_async_query failed: {dl_status}")
             self._save_async_job_state(job_href, download_status=f"failed:{dl_status}")
@@ -515,7 +523,7 @@ class AsyncJobManager:
         dl_url = f"{c.api_cfg['url']}/api/v2{job_href}/download"
         if include_draft_policy:
             dl_url += "?include_draft_policy_in_csv=true"
-        dl_status, dl_body = c._request(dl_url, timeout=60)
+        dl_status, dl_body = c._request(dl_url, timeout=60, rate_limit=True)
         if dl_status != 200:
             self._save_async_job_state(job_href, download_status=f"failed:{dl_status}")
             raise RuntimeError(f"CSV download failed with status {dl_status}")

@@ -310,7 +310,7 @@ def test_traffic_run_once_records_error_status_on_insert_failure(session_factory
     ing = TrafficIngestor(api=fake, session_factory=session_factory,
                           watermark=WatermarkStore(session_factory))
 
-    def _boom(_flows):
+    def _boom(_flows, **_kw):
         raise OperationalError("INSERT", {}, Exception("database is locked"))
     ing._insert_batch = _boom
 
@@ -480,3 +480,70 @@ def test_volatile_tuple_excludes_json_blobs():
 
     assert "raw_json" not in TrafficIngestor._VOLATILE
     assert "report_json" not in TrafficIngestor._VOLATILE
+
+
+def test_write_lock_not_held_while_fetching_from_pce(session_factory):
+    """抓 PCE（async query 最多等 900 秒）的期間不得持有共用寫鎖，
+    否則 events ingest 等寫入會一路被卡住；寫入時則必須持有。"""
+    import threading
+    from src.pce_cache.ingestor_traffic import TrafficIngestor
+    from src.pce_cache.watermark import WatermarkStore
+
+    lock = threading.RLock()
+
+    class Api:
+        def get_traffic_flows_async(self, max_results=200000, **kw):
+            # RLock 沒有 locked()；用另一個執行緒試著拿，拿得到才代表沒被持有。
+            got = []
+
+            def _probe():
+                ok = lock.acquire(blocking=False)
+                got.append(ok)
+                if ok:
+                    lock.release()   # RLock 必須由取得它的執行緒釋放
+            t = threading.Thread(target=_probe)
+            t.start(); t.join()
+            assert got[0], "fetch 期間持有寫鎖"
+            return [_mk_flow(1)]
+
+    ing = TrafficIngestor(api=Api(), session_factory=session_factory,
+                          watermark=WatermarkStore(session_factory), write_lock=lock)
+    orig = ing._insert_batch
+
+    def _checked(flows, **kw):
+        assert lock._is_owned(), "寫入時必須持有寫鎖"
+        return orig(flows, **kw)
+    ing._insert_batch = _checked
+    assert ing.run_once() == 1
+
+
+def test_windows_are_written_incrementally_and_progress_survives_failure(session_factory):
+    """逐窗寫入：後面的子窗抓取失敗時，前面已寫入的子窗與 watermark 進度保留，
+    下一輪不必從頭重抓（舊版全部抓完才寫，失敗就全部白做）。"""
+    from src.pce_cache.ingestor_traffic import TrafficIngestor
+    from src.pce_cache.models import IngestionWatermark, PceTrafficFlowRaw
+    from src.pce_cache.watermark import WatermarkStore
+
+    base = datetime.now(timezone.utc) - timedelta(hours=2)
+
+    class Api:
+        last_fetch_error = None
+        calls = 0
+
+        def get_traffic_flows_async(self, max_results=200000, since=None, until=None, **kw):
+            Api.calls += 1
+            if Api.calls == 1:      # 全窗碰頂 → 二分
+                return [_mk_flow(i, ts=base) for i in range(max_results)]
+            if Api.calls == 2:      # 前半窗成功
+                return [_mk_flow(100, ts=base)]
+            Api.last_fetch_error = "Connection refused"   # 後半窗失敗
+            return []
+
+    ing = TrafficIngestor(api=Api(), session_factory=session_factory,
+                          watermark=WatermarkStore(session_factory), max_results=5)
+    assert ing.run_once() == 1
+    with session_factory() as s:
+        assert len(s.execute(select(PceTrafficFlowRaw)).scalars().all()) == 1
+        wm = s.get(IngestionWatermark, "traffic")
+    assert wm.last_timestamp is not None          # 前半窗的進度已落盤
+    assert wm.last_status == "error"              # 失敗仍回報

@@ -32,6 +32,19 @@ def _serialized_cache_write(fn):
     return _run
 
 
+def run_analysis_then_send(ana, rep, **send_kwargs) -> None:
+    """run_analysis() 後送告警；中途階段失敗（state 已落盤）時照樣送出已建立
+    的告警再把錯誤往上拋——否則 cache 部署那批事件告警的 cursor 已前進，
+    之後再也不會被送出。"""
+    from src.analyzer import AnalysisPartialFailure
+    try:
+        ana.run_analysis()
+    except AnalysisPartialFailure:
+        rep.send_alerts(**send_kwargs)
+        raise
+    rep.send_alerts(**send_kwargs)
+
+
 def run_monitor_cycle(cm) -> None:
     """Execute one monitoring analysis + alert dispatch."""
     from src.api_client import ApiClient
@@ -64,8 +77,7 @@ def run_monitor_cycle(cm) -> None:
                                    subscriber_events=sub_events, subscriber_flows=sub_flows,
                                    cache_reader=_make_cache_reader(cm),
                                    flow_delta_reader=_make_flow_delta_reader(cm))
-                    ana.run_analysis()
-                    rep.send_alerts()
+                    run_analysis_then_send(ana, rep)
         mlog.info("Monitor cycle complete")
     except Exception as exc:
         logger.exception("Monitor cycle failed: {}", exc)
@@ -113,6 +125,12 @@ def tick_rule_schedules(cm) -> None:
     from src.module_log import ModuleLog
 
     mlog = ModuleLog.get("rule_scheduler")
+    from src.rule_scheduler import rule_scheduler_enabled
+    if not rule_scheduler_enabled(cm):
+        # 舊版永遠註冊並執行這個 job、也不檢查開關：CLI 把 Rule Scheduler 切成
+        # OFF 之後，PCE 上的規則仍照排程被啟用／停用並 provision。
+        logger.debug("Rule scheduler disabled (rule_scheduler.enabled=false); skipping tick")
+        return
     try:
         pkg_dir = os.path.dirname(os.path.abspath(__file__))
         root_dir = os.path.dirname(os.path.dirname(pkg_dir))
@@ -340,8 +358,10 @@ def run_events_ingest(cm) -> None:
         raise  # surface to _instrument → job_health status=error
 
 
-@_serialized_cache_write
 def run_traffic_ingest(cm) -> None:
+    # 不再整段包 _serialized_cache_write：抓 PCE（async query 最多等 900 秒、
+    # 二分時乘上子窗數）的期間持有全域寫鎖，會讓 events ingest 等寫入一路卡住。
+    # 寫入 SQLite 的部分改由 TrafficIngestor 以 write_lock 逐窗持鎖。
     wm = None
     try:
         from sqlalchemy.orm import sessionmaker
@@ -350,7 +370,8 @@ def run_traffic_ingest(cm) -> None:
         from src.api_client import ApiClient
         cfg = cm.models.pce_cache
         sf = sessionmaker(_get_cache_engine(cfg.db_path))
-        _guard_cache_target(cm, sf)
+        with _CACHE_WRITE_LOCK:
+            _guard_cache_target(cm, sf)
         wm = WatermarkStore(sf)
         with ApiClient(cm) as api:
             from src.pce_cache.traffic_filter import TrafficFilter
@@ -366,7 +387,8 @@ def run_traffic_ingest(cm) -> None:
                                    siem_pd_filters=_traffic_pd_filters(cm),
                                    record_observations=getattr(cfg, "flow_delta_enabled", True),
                                    overlap=_ingest_overlap(cfg),
-                                   obs_retention_hours=getattr(cfg, "flow_obs_retention_hours", 6))
+                                   obs_retention_hours=getattr(cfg, "flow_obs_retention_hours", 6),
+                                   write_lock=_CACHE_WRITE_LOCK)
             count = ing.run_once()
         logger.info("Traffic ingest: {} rows inserted", count)
         _record_ingest_pce_result("traffic", wm)

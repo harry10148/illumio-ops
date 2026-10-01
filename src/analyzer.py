@@ -145,6 +145,10 @@ def _endpoint_probe_category(status: int, accepted_statuses: tuple[int, ...]) ->
     return category
 
 
+class AnalysisPartialFailure(RuntimeError):
+    """run_analysis 中途某階段失敗，但 state（含冷卻）已落盤：已建立的告警可以送出。"""
+
+
 # save_state() 的白名單：只有這些 key 由 Analyzer 自己的 cycle 擁有，才可以
 # 用 self.state（cycle 起始時的快照）覆蓋磁碟。state.json 是多寫入者共用的
 # 單一檔案（report_scheduler / rule_scheduler / GUI adhoc jobs / async_query
@@ -1560,31 +1564,47 @@ class Analyzer:
         logger.warning(f"{log_label} meta-alert dispatched")
 
     def run_analysis(self) -> None:
+        """跑一個分析 cycle。
+
+        中間某個階段失敗時仍會 save_state()，再拋 AnalysisPartialFailure：
+        已經建立的告警（cache 部署的事件告警，其 cursor 已前進、不會再送進來）
+        連同它們的冷卻狀態都已落盤，呼叫端應照樣 send_alerts() 再回報錯誤。
+        舊版任何階段丟例外都會跳過 save_state 與 send_alerts，那批事件告警就此
+        永久遺失。save_state() 本身失敗則照舊直接往上拋（冷卻沒落盤時不可送，
+        否則每個 cycle 重送同一則告警）。
+        """
         logger.info("Starting analysis cycle.")
-        # 1. Health Check (telemetry is independent of optional alert rules)
-        self._run_health_check()
+        stage_error: Exception | None = None
+        try:
+            # 1. Health Check (telemetry is independent of optional alert rules)
+            self._run_health_check()
 
-        # 2. Events pipeline
-        event_triggers = self._run_event_analysis()
+            # 2. Events pipeline
+            self._run_event_analysis()
 
-        # 3. Traffic pipeline
-        traffic_stream, tr_rules, now_utc = self._fetch_traffic()
-        triggers = []
-        if traffic_stream is not None:
-            triggers = self._run_rule_engine(traffic_stream, tr_rules, now_utc)
+            # 3. Traffic pipeline
+            traffic_stream, tr_rules, now_utc = self._fetch_traffic()
+            triggers = []
+            if traffic_stream is not None:
+                triggers = self._run_rule_engine(traffic_stream, tr_rules, now_utc)
 
-        # 4. Dispatch alerts for traffic triggers
-        self._dispatch_alerts(triggers, tr_rules)
+            # 4. Dispatch alerts for traffic triggers
+            self._dispatch_alerts(triggers, tr_rules)
 
-        # Overflow meta-alerts (event polling / traffic ingest) — must run
-        # unconditionally every cycle, not just on the legacy event-poll
-        # branch, so the pce_cache-ingest path's traffic_overflow is checked
-        # even when _run_event_analysis took the cache-subscriber branch.
-        self._maybe_alert_overflow()
+            # Overflow meta-alerts (event polling / traffic ingest) — must run
+            # unconditionally every cycle, not just on the legacy event-poll
+            # branch, so the pce_cache-ingest path's traffic_overflow is checked
+            # even when _run_event_analysis took the cache-subscriber branch.
+            self._maybe_alert_overflow()
 
-        self._check_watchdog()
+            self._check_watchdog()
+        except Exception as exc:
+            logger.exception("Analysis cycle stage failed: {}", exc)
+            stage_error = exc
 
         self.save_state()
+        if stage_error is not None:
+            raise AnalysisPartialFailure(str(stage_error)) from stage_error
         logger.info("Analysis cycle completed.")
         gc.collect()
 
