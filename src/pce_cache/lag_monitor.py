@@ -107,6 +107,12 @@ def status_alerts(results: list[dict]) -> list[str]:
     return msgs
 
 
+def _notify(cm, message: str, status: str) -> None:
+    """舊版 lag 警告只寫 log；現在同時送到告警通道（已受 _should_alert 節流）。"""
+    from src.reporter import send_ops_alert
+    send_ops_alert(cm, "ops_alert_cache_ingest_title", message, status=status)
+
+
 def run_cache_lag_monitor(cm) -> None:
     """APScheduler job: check ingestor lag, log if stalled."""
     from sqlalchemy.orm import sessionmaker as _SM
@@ -132,15 +138,15 @@ def run_cache_lag_monitor(cm) -> None:
         if r["level"] == "error":
             _clear_alert(warning_key)
             if _should_alert(error_key):
-                logger.error(
-                    t("alert_cache_lag_error", source=source, lag=int(r["lag_seconds"]))
-                )
+                msg = t("alert_cache_lag_error", source=source, lag=int(r["lag_seconds"]))
+                logger.error(msg)
+                _notify(cm, msg, "error")
         elif r["level"] == "warning":
             _clear_alert(error_key)
             if _should_alert(warning_key):
-                logger.warning(
-                    t("alert_cache_lag_warning", source=source, lag=int(r["lag_seconds"]))
-                )
+                msg = t("alert_cache_lag_warning", source=source, lag=int(r["lag_seconds"]))
+                logger.warning(msg)
+                _notify(cm, msg, "warning")
         else:
             _clear_alert(error_key)
             _clear_alert(warning_key)
@@ -150,5 +156,6 @@ def run_cache_lag_monitor(cm) -> None:
             if _should_alert(status_key):
                 for msg in status_alerts([r]):
                     logger.error(msg)
+                    _notify(cm, msg, "error")
         else:
             _clear_alert(status_key)

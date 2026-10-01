@@ -5625,5 +5625,7 @@
   "cli_area_policy": "Policy",
   "gui_al_fig_matches": "matches",
   "gui_err_config_validation": "Settings not saved: the change would make the configuration invalid ({fields}). Nothing was written.",
-  "rpt_query_truncated": "The PCE returned only the first {max} flows for this time range (its per-query limit); additional flows were not retrieved. Narrow the time range or add filters for complete results."
+  "rpt_query_truncated": "The PCE returned only the first {max} flows for this time range (its per-query limit); additional flows were not retrieved. Narrow the time range or add filters for complete results.",
+  "ops_alert_cache_ingest_title": "Cache ingest health",
+  "ops_alert_capacity_title": "Cache capacity"
 }
