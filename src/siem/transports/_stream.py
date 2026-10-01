@@ -77,3 +77,15 @@ def graceful_close(sock: socket.socket, linger_seconds: float = 2.0) -> None:
             sock.close()
         except OSError:
             pass
+
+
+def frame_payload(payload: str, framing: str = "lf") -> bytes:
+    """依 framing 把一筆訊息編成要送上 stream 的 bytes。
+
+    lf：訊息 + 換行。octet_counting（RFC 6587 §3.4.1／RFC 5425 §4.3）：
+    「位元組長度 + 空白 + 訊息」，訊息內含換行也不會被接收端切成兩筆。
+    """
+    data = payload.encode("utf-8")
+    if framing == "octet_counting":
+        return str(len(data)).encode("ascii") + b" " + data
+    return data + b"\n"

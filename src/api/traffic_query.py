@@ -1247,6 +1247,13 @@ class TrafficQueryBuilder:
                 f"hit max_results={MAX_TRAFFIC_RESULTS} cap; more flows may exist "
                 f"and were not returned"
             )
+            # 舊版只寫 log：報表照常產出，讀者無從得知總數與發現只涵蓋前 N 筆。
+            # 寫進 diagnostics，報表產生器據此在報表上揭露。
+            diag = dict(self._client.last_traffic_query_diagnostics or {})
+            diag["query_truncated"] = {
+                "returned": len(records), "max_results": MAX_TRAFFIC_RESULTS,
+            }
+            self._client.last_traffic_query_diagnostics = diag
 
         # execute_traffic_query_stream demotes any native filter that fails href
         # resolution into the *effective* fallback set, which it publishes on the

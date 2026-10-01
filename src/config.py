@@ -826,7 +826,11 @@ class ConfigManager:
             ("rule_agent_suspend", "agent.suspend", "immediate", 1, 10, 30, "all", "all", ""),
             ("rule_agent_clone", "agent.clone_detected", "immediate", 1, 10, 30, "all", "all", ""),
             ("rule_agent_heartbeat", "system_task.agent_missed_heartbeats_check", "count", 3, 30, 60, "all", "all", "1/30m"),
-            ("rule_agent_offline", "system_task.agent_offline_check", "count", 3, 30, 60, "all", "all", "1/30m"),
+            # immediate：PCE 已把 VEN 標成 offline 並將 workload 移出 policy（原廠
+            # Events Monitoring Best Practices），每一筆都是安全狀態變化。舊版
+            # 「30 分鐘內 3 筆」讓單一 VEN 離線永遠湊不到門檻。搭配依目標冷卻，
+            # 每台 VEN 各自冷卻。
+            ("rule_agent_offline", "system_task.agent_offline_check", "immediate", 1, 10, 60, "all", "all", ""),
             ("rule_lost_agent", "lost_agent.found", "immediate", 1, 10, 60, "all", "all", ""),
             ("rule_login_failed", "user.sign_in,user.login", "count", 5, 10, 30, "failure", "all", "1/15m"),
             ("rule_api_auth_failed", "request.authentication_failed", "count", 5, 10, 30, "all", "all", "1/15m"),

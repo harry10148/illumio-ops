@@ -84,11 +84,12 @@ def _build_transport(dest_cfg: SiemDestinationSettings):
     if t == "udp":
         return SyslogUDPTransport(host, port)
     if t == "tcp":
-        return SyslogTCPTransport(host, port)
+        return SyslogTCPTransport(host, port, framing=getattr(dest_cfg, "framing", "lf"))
     if t == "tls":
         return SyslogTLSTransport(
             host, port,
             tls_verify=dest_cfg.tls_verify,
             ca_bundle=dest_cfg.tls_ca_bundle,
+            framing=getattr(dest_cfg, "framing", "lf"),
         )
     raise ValueError(f"unsupported transport: {t}")

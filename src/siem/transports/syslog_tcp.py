@@ -2,12 +2,13 @@ from __future__ import annotations
 import socket
 import threading
 from loguru import logger
-from src.siem.transports._stream import graceful_close, peer_closed
+from src.siem.transports._stream import frame_payload, graceful_close, peer_closed
 from src.siem.transports.base import Transport
 
 
 class SyslogTCPTransport(Transport):
-    def __init__(self, host: str, port: int, timeout: float = 10.0):
+    def __init__(self, host: str, port: int, timeout: float = 10.0, framing: str = "lf"):
+        self._framing = framing
         self._host = host
         self._port = port
         self._timeout = timeout
@@ -30,7 +31,7 @@ class SyslogTCPTransport(Transport):
         self._sock = s
 
     def send(self, payload: str) -> None:
-        data = (payload + "\n").encode("utf-8")
+        data = frame_payload(payload, self._framing)
         with self._lock:
             if self._sock is not None and peer_closed(self._sock):
                 # 對端已關閉時第一個 sendall() 仍會「成功」而資料被丟掉，

@@ -371,7 +371,8 @@ cache 架構、容量規劃與 archive 排程細節見 [cache-maintenance.md](ca
 | `port` | int（1–65535） | `514` | 目的地埠 |
 | `profile` | `"production"`\|`"dev"` | `"production"` | 同 `api.profile`，見下方安全護欄 |
 | `tls_verify` | bool | `true` | 是否驗證目的地 TLS 憑證 |
-| `tls_ca_bundle` | Optional[str] | `null` | 自訂 CA bundle 路徑 |
+| `tls_ca_bundle` | Optional[str] | `null` | 自訂 CA bundle 路徑（`tls` 與 `hec` 皆適用） |
+| `framing` | `"lf"` \| `"octet_counting"` | `"lf"` | TCP／TLS 的訊息分隔方式。`lf`＝每筆後接換行；`octet_counting`＝RFC 6587／RFC 5425 的「位元組長度＋空白＋訊息」，訊息內含換行也不會被切開。只有接收端也設定為 octet-counting 時才改，否則接收端會把長度數字當成訊息內容 |
 | `hec_token` | Optional[str] | `null` | Splunk HEC token（`transport="hec"` 時使用） |
 | `batch_size` | int（1–10000） | `100` | 單批送出筆數。每個 tick 會在時間預算內一批接一批送到佇列清空，所以它決定的是每批的大小（以及多久確認一次送達、標記一次 sent），不再是吞吐量上限 |
 | `source_types` | list[str] | `["audit", "traffic"]` | 要轉送的資料型別 |

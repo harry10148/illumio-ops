@@ -39,7 +39,7 @@ SIEM 轉送依賴 pce_cache（見 [cache-maintenance.md](cache-maintenance.md)�
 |---|---|---|---|
 | `udp` | Syslog UDP | 514 | 無傳遞保證，簡單快速 |
 | `tcp` | Syslog TCP | 514 | 有序、可靠傳遞，自動重連；每筆送出前偵測對端是否已關閉（對端重啟後第一個 `sendall()` 仍會回成功而資料被丟掉），每批結束時 graceful close 確認送達後才標記 sent |
-| `tls` | Syslog TCP + TLS | 6514 | `tls_verify`／`tls_ca_bundle` 控制憑證驗證；`profile="production"` 時禁止 `tls_verify=false`（載入時直接拒絕）。與 `tcp` 相同的對端關閉偵測與 graceful close——直接 `close()` 會因未讀的 TLS 1.3 session ticket 送出 RST，讓對端丟掉一批的尾段 |
+| `tls` | Syslog TCP + TLS（`framing` 預設 `lf`；RFC 5425 規定 octet-counting，接收端支援時可設 `framing: "octet_counting"`） | 6514 | `tls_verify`／`tls_ca_bundle` 控制憑證驗證；`profile="production"` 時禁止 `tls_verify=false`（載入時直接拒絕）。與 `tcp` 相同的對端關閉偵測與 graceful close——直接 `close()` 會因未讀的 TLS 1.3 session ticket 送出 RST，讓對端丟掉一批的尾段 |
 | `hec` | Splunk HTTP Event Collector | 8088 | 僅 HTTPS，需 `hec_token` |
 
 ### 1.2 Format（輸出格式）

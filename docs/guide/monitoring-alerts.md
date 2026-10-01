@@ -116,7 +116,8 @@ event 規則用 `filter_value` 比對 event type（`src/events/matcher.py`）：
 
 命中門檻後需通過兩道閘：
 
-1. **Cooldown**：`cooldown_minutes`（未設時預設＝`threshold_window`，再預設 10 分鐘）。距上次同規則告警未滿冷卻時間 → 抑制（`cooldown` suppression）。
+1. **Cooldown**：`cooldown_minutes`（未設時預設＝`threshold_window`，再預設 10 分鐘）。距上次同規則告警未滿冷卻時間 → 抑制（`cooldown` suppression）。**immediate 型事件規則依目標分別冷卻**（`alert_history` 的 key 為 `<rule_id>|<target>`，target 取正規化後的 `target_name`／`resource_name`）：主機 A 觸發後的冷卻期間，主機 B 的同類事件照樣告警，告警只帶還沒在冷卻中的目標；全部目標都在冷卻中才記一筆抑制。count 型規則是跨目標加總門檻，維持以規則為單位。目標冷卻紀錄超過 7 天自動清除。
+   - 流量規則可設 `settings.traffic_alert_lag_minutes`（0–60，預設 0）：評估視窗整個往前平移這段時間，讓 VEN 晚上報（約每 10 分鐘一次）的短命 flow 也落在視窗內，代價是告警晚發。cache 模式下 `pce_cache.traffic_poll_interval_seconds` 比最短的流量規則視窗還長時，每個 cycle 會記一筆警告——視窗只看得到每次 ingest 前最後那一小段的 flow。
 2. **Throttle**（`AlertThrottler.allow`，`src/events/throttle.py`）：規則 `throttle` 欄為 `"count/period[unit]"`（unit：`s`/`m`/`h`/`d`，省略預設 `m`）。滑動視窗 `period` 內已派送達 `count` 次 → 抑制（`throttle` suppression）。
 
 ### 1.5 預設出廠規則（Best-Practice Rule Set）
@@ -129,7 +130,7 @@ event 規則用 `filter_value` 比對 event type（`src/events/matcher.py`）：
 | `rule_agent_suspend` | `agent.suspend` | immediate | 1 | 10 | 30 | — | agent 被暫停（停止強制執行）|
 | `rule_agent_clone` | `agent.clone_detected` | immediate | 1 | 10 | 30 | — | 偵測 cloned agent |
 | `rule_agent_heartbeat` | `system_task.agent_missed_heartbeats_check` | count | 3 | 30 | 60 | `1/30m` | 心跳遺失 |
-| `rule_agent_offline` | `system_task.agent_offline_check` | count | 3 | 30 | 60 | `1/30m` | agent 離線 |
+| `rule_agent_offline` | `system_task.agent_offline_check` | immediate | 1 | 10 | 60 | — | agent 離線（PCE 已將 workload 移出 policy；依 VEN 分別冷卻。已存在的 `alerts.json` 不會自動改，需重新套用最佳實務或手動調整）|
 | `rule_lost_agent` | `lost_agent.found` | immediate | 1 | 10 | 60 | — | lost-agent 復原 |
 | `rule_login_failed` | `user.sign_in,user.login` | count | 5 | 10 | 30 | `1/15m` | `filter_status=failure`；登入失敗 |
 | `rule_api_auth_failed` | `request.authentication_failed` | count | 5 | 10 | 30 | `1/15m` | API 認證失敗 |

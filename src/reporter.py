@@ -2209,3 +2209,26 @@ class Reporter:
         except smtplib.SMTPException as e:
             logger.error(t('mail_failed', error=e))
             return False
+
+
+def send_ops_alert(cm: Any, title_key: str, message: str, *, status: str = "warning") -> bool:
+    """把維運警告（ingest 落後、磁碟不足、SIEM 積壓…）送到已設定的告警通道。
+
+    舊版這些警告只寫進 log，沒有人盯 log 時等於沒有發生。盡力而為：送出失敗
+    只記 log，不讓呼叫它的排程 job 失敗。
+    """
+    import datetime as _dt
+    from src.i18n import t as _t
+    try:
+        rep = Reporter(cm)
+        rep.add_health_alert({
+            "time": _dt.datetime.now(_dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "rule": _t(title_key),
+            "status": status,
+            "details": message,
+        })
+        rep.send_alerts()
+        return True
+    except Exception as exc:  # noqa: BLE001 — best effort
+        logger.warning("ops alert could not be dispatched: {}", exc)
+        return False

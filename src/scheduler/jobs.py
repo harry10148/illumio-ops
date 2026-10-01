@@ -591,6 +591,29 @@ def run_posture_summary(cm) -> None:
         raise  # surface to _instrument → job_health status=error
 
 
+# 容量警告送到告警通道的節流：同一類警告 6 小時最多一則（job 每次都會重新
+# 算出同樣的警告，不節流會洗版）。行程內狀態，重啟後至多重送一則。
+_CAPACITY_ALERT_COOLDOWN_S = 6 * 3600
+_capacity_alerted_at: dict[str, float] = {}
+
+
+def _notify_capacity_warnings(cm, messages: list[str]) -> None:
+    import time as _time
+    from src.reporter import send_ops_alert
+    now = _time.monotonic()
+    active = set()
+    for msg in messages:
+        kind = re.sub(r"[\d.,]+", "#", msg)   # 同類警告（數字會變）共用節流
+        active.add(kind)
+        last = _capacity_alerted_at.get(kind)
+        if last is not None and now - last < _CAPACITY_ALERT_COOLDOWN_S:
+            continue
+        if send_ops_alert(cm, "ops_alert_capacity_title", msg):
+            _capacity_alerted_at[kind] = now
+    for kind in [k for k in _capacity_alerted_at if k not in active]:
+        _capacity_alerted_at.pop(kind, None)   # 恢復後下次再發生立即告警
+
+
 def run_capacity_monitor(cm) -> None:
     """容量監控：唯讀，走 default executor（不佔 cache_writer）。"""
     from sqlalchemy.orm import sessionmaker as _SM
@@ -607,8 +630,10 @@ def run_capacity_monitor(cm) -> None:
              if snap["disk_free_bytes"] is not None else "n/a"),
             snap["siem_pending"], snap["archiver_lag_seconds"],
         )
-        for msg in capacity_warnings(snap, cfg):
+        warnings_now = capacity_warnings(snap, cfg)
+        for msg in warnings_now:
             logger.warning(msg)
+        _notify_capacity_warnings(cm, warnings_now)
     except Exception:
         logger.exception("Capacity monitor failed")
         raise  # surface to _instrument → job_health status=error

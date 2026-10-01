@@ -434,13 +434,14 @@ def _transport_for(dest_cfg):
         return SyslogUDPTransport(host, port)
     elif transport_type == "tcp":
         from src.siem.transports.syslog_tcp import SyslogTCPTransport
-        return SyslogTCPTransport(host, port)
+        return SyslogTCPTransport(host, port, framing=getattr(dest_cfg, "framing", "lf"))
     elif transport_type == "tls":
         from src.siem.transports.syslog_tls import SyslogTLSTransport
         return SyslogTLSTransport(
             host, port,
             tls_verify=dest_cfg.tls_verify,
             ca_bundle=dest_cfg.tls_ca_bundle,
+            framing=getattr(dest_cfg, "framing", "lf"),
         )
     elif transport_type == "hec":
         from src.siem.transports.splunk_hec import SplunkHECTransport

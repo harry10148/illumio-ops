@@ -147,6 +147,10 @@ class GeneralSettings(_Base):
     # VEN 車隊（GUI 的 PCE 連線表單每次儲存都會寫入這兩個鍵）。schema 少了它們
     # 時 extra="forbid" 會讓整份 config 驗證失敗，cm.models 全退回預設值
     # （siem/pce_cache.enabled=False）——SIEM 轉送因此無聲停擺。
+    # 流量告警規則的評估延遲（分鐘）。VEN 約每 10 分鐘上報一次 flow，評估
+    # 「最近 N 分鐘」時剛發生的短命 flow 多半還沒進 PCE；設成 10 左右可讓整個
+    # 視窗往前平移，避免漏判，代價是告警晚發這段時間。0＝不延後（預設）。
+    traffic_alert_lag_minutes: int = Field(default=0, ge=0, le=60)
     fleet_target_ven_version: str = ""
     fleet_max_batch: Optional[int] = Field(default=None, ge=1, le=1000)
     fleet_index_cap: Optional[int] = Field(default=None, ge=1)
@@ -359,6 +363,11 @@ class SiemDestinationSettings(_Base):
             )
         return v
     tls_ca_bundle: Optional[str] = None
+    # TCP／TLS 的訊息分隔方式。lf：每筆後接換行（多數 syslog 接收端的預設，
+    # 也是舊版唯一的方式）；octet_counting：RFC 6587／RFC 5425 的「長度 + 空白
+    # + 訊息」，訊息內含換行也不會被切開，TLS syslog 規範要求用這個。只有接收端
+    # 也設定為 octet-counting 時才改，否則接收端會把長度當成訊息內容。
+    framing: Literal["lf", "octet_counting"] = "lf"
     hec_token: Optional[str] = None
     batch_size: int = Field(default=100, ge=1, le=10000)
     source_types: list[str] = Field(default_factory=lambda: ["audit", "traffic"])

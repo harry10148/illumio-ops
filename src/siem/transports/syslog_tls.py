@@ -4,7 +4,7 @@ import ssl
 import threading
 from typing import Optional
 from loguru import logger
-from src.siem.transports._stream import graceful_close, peer_closed
+from src.siem.transports._stream import frame_payload, graceful_close, peer_closed
 from src.siem.transports.base import Transport
 
 
@@ -16,7 +16,9 @@ class SyslogTLSTransport(Transport):
         tls_verify: bool = True,
         ca_bundle: Optional[str] = None,
         timeout: float = 10.0,
+        framing: str = "lf",
     ):
+        self._framing = framing
         self._host = host
         self._port = port
         self._tls_verify = tls_verify
@@ -54,7 +56,7 @@ class SyslogTLSTransport(Transport):
         self._sock = sock
 
     def send(self, payload: str) -> None:
-        data = (payload + "\n").encode("utf-8")
+        data = frame_payload(payload, self._framing)
         with self._lock:
             if self._sock is not None and peer_closed(self._sock):
                 # 對端已關閉時第一個 sendall() 仍會「成功」而資料被丟掉，

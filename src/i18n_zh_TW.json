@@ -5624,5 +5624,8 @@
   "cli_area_home": "首頁",
   "cli_area_policy": "規則",
   "gui_al_fig_matches": "命中筆數",
-  "gui_err_config_validation": "設定未儲存：這次變更會讓設定檔無法通過驗證（{fields}），未寫入任何內容。"
+  "gui_err_config_validation": "設定未儲存：這次變更會讓設定檔無法通過驗證（{fields}），未寫入任何內容。",
+  "rpt_query_truncated": "PCE 對這個時間範圍只回傳了前 {max} 筆流量（單次查詢上限），其餘流量沒有取回；請縮短時間範圍或加上篩選條件，以取得完整結果。",
+  "ops_alert_cache_ingest_title": "Cache ingest 健康狀態",
+  "ops_alert_capacity_title": "Cache 容量"
 }

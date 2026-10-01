@@ -547,3 +547,33 @@ def test_windows_are_written_incrementally_and_progress_survives_failure(session
         wm = s.get(IngestionWatermark, "traffic")
     assert wm.last_timestamp is not None          # 前半窗的進度已落盤
     assert wm.last_status == "error"              # 失敗仍回報
+
+
+def _labelled_flow(i, src_env, dst_env):
+    def _wl(env):
+        return {"href": f"/orgs/1/workloads/{env or 'x'}{i}",
+                "labels": ([{"href": "/orgs/1/labels/1", "key": "env", "value": env}] if env else [])}
+    return {
+        "src": {"ip": f"10.0.{i}.1", "workload": _wl(src_env)},
+        "dst": {"ip": f"10.1.{i}.1", "workload": _wl(dst_env)},
+        "service": {"port": 443, "proto": 6},
+        "policy_decision": "allowed", "num_connections": 1,
+        "timestamp_range": {"first_detected": "2026-10-01T00:00:00Z",
+                            "last_detected": "2026-10-01T00:01:00Z"},
+    }
+
+
+def test_workload_label_env_filter_actually_filters():
+    """舊版 _flatten_flow 不產 workload_env，env 篩選永遠放行。"""
+    from src.pce_cache.ingestor_traffic import _flatten_flow
+    from src.pce_cache.traffic_filter import TrafficFilter
+    f = TrafficFilter(workload_label_env=["prod"])
+    assert f.passes(_flatten_flow(_labelled_flow(1, "prod", "dev")))
+    assert f.passes(_flatten_flow(_labelled_flow(2, "dev", "prod")))
+    assert not f.passes(_flatten_flow(_labelled_flow(3, "dev", "test")))
+    assert f.passes(_flatten_flow(_labelled_flow(4, None, None)))   # 非受管：放行
+
+
+def test_flatten_includes_dst_ip_for_sampler_key():
+    from src.pce_cache.ingestor_traffic import _flatten_flow
+    assert _flatten_flow(_labelled_flow(5, "prod", None))["dst_ip"] == "10.1.5.1"
