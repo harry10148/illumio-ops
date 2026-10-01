@@ -202,6 +202,51 @@ def _traffic_flows_summary(results: dict[str, Any], lang: str = "en") -> dict:
     }
 
 
+# The executive summary shows only the first KPIs (see _exec_summary.KPI_LIMIT):
+# risk and posture first, volume after. Volume counts used to fill the first
+# screen and push Blocked / Potentially Blocked / Unmanaged off it.
+_RISK_KPI_ORDER = (
+    "mod12_kpi_maturity_score",
+    "mod12_kpi_crit_high_findings",
+    "mod12_kpi_staged_coverage",
+    "mod12_kpi_enforced_coverage",
+    "mod12_kpi_true_gap",
+    "mod12_kpi_unmanaged_src_pct",
+    "mod12_kpi_blocked_flows",
+)
+
+
+def _risk_first(kpis: list[dict]) -> list[dict]:
+    rank = {k: i for i, k in enumerate(_RISK_KPI_ORDER)}
+    return sorted(kpis, key=lambda k: rank.get(k.get("label_key", ""), len(rank)))
+
+
+_SEV_RANK = {"CRITICAL": 0, "HIGH": 1, "MEDIUM": 2, "LOW": 3, "INFO": 4}
+
+
+def _top_actions(key_findings: list[dict], findings: list, limit: int = 3) -> list[dict]:
+    """The few things to do first: posture callouts and rule findings, by severity.
+
+    The executive summary used to stop at volume KPIs; the highest-severity
+    rule finding could sit in the last chapter of a long report.
+    """
+    items: list[dict] = []
+    for kf in key_findings:
+        items.append({"severity": kf.get("severity", "INFO"), "finding": kf.get("finding", ""),
+                      "action": kf.get("action", "")})
+    for f in findings or []:
+        sev = str(getattr(f, "severity", "") or "").upper()
+        if sev not in ("CRITICAL", "HIGH"):
+            continue
+        rid = getattr(f, "rule_id", "")
+        name = getattr(f, "rule_name", "")
+        items.append({"severity": sev,
+                      "finding": f"{rid} {name}: {getattr(f, 'description', '')}".strip(),
+                      "action": getattr(f, "recommendation", "") or ""})
+    items.sort(key=lambda x: _SEV_RANK.get(str(x.get("severity", "INFO")).upper(), 9))
+    return [i for i in items if i["severity"] in ("CRITICAL", "HIGH", "MEDIUM")][:limit]
+
+
 def executive_summary(results: dict[str, Any], profile: str = "security_risk", lang: str = "en") -> dict:
     if profile == "traffic":
         return _traffic_flows_summary(results, lang=lang)
@@ -302,6 +347,17 @@ def executive_summary(results: dict[str, Any], profile: str = "security_risk", l
         "label": t("mod12_kpi_maturity_score", default="Maturity Score", lang=lang),
         "value": f"{maturity['maturity_score']}/100 ({maturity['maturity_grade']})",
     })
+    n_crit = int(findings_summary.get("CRITICAL", 0))
+    n_high = int(findings_summary.get("HIGH", 0))
+    kpis.insert(1, {
+        "label_key": "mod12_kpi_crit_high_findings",
+        "label": t("mod12_kpi_crit_high_findings", lang=lang),
+        "value": f"{n_crit} / {n_high}",
+    })
+    kpis = _risk_first(kpis)
+    verdict = t("rpt_exec_verdict", lang=lang, grade=maturity["maturity_grade"],
+                score=maturity["maturity_score"], crit=n_crit, high=n_high, pb=staged_cov)
+    top_actions = _top_actions(key_findings, findings)
 
     dim_labels = [
         'Enforcement Coverage',
@@ -317,6 +373,8 @@ def executive_summary(results: dict[str, Any], profile: str = "security_risk", l
     return {
         "generated_at": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         "kpis": kpis,
+        "verdict": verdict,
+        "top_actions": top_actions,
         "findings_summary": findings_summary,
         "total_findings": len(findings),
         "key_findings": key_findings,

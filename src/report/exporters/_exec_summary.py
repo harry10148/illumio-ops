@@ -84,6 +84,25 @@ def kpi_tone_attr(kpi: dict, raw_value: str) -> str:
     return '' if tone in ('', 'neutral') else f' data-tone="{tone}"'
 
 
+def _top_actions_html(actions: list, lang: str) -> str:
+    """'Do these first' list: severity, what is wrong, what to do."""
+    if not actions:
+        return ''
+    items = []
+    for a in actions[:3]:
+        sev = str(a.get('severity', 'INFO')).upper()
+        sev_label = t(f'rpt_severity_{sev.lower()}', lang=lang, default=sev)
+        items.append(
+            '<li>'
+            f'<span class="badge badge-{escape(sev)}" data-sev="{escape(sev)}">{escape(sev_label)}</span> '
+            f'<span class="exec-action-finding">{escape(str(a.get("finding", "")))}</span>'
+            + (f'<br><b class="exec-action-do">{escape(str(a.get("action", "")))}</b>' if a.get('action') else '')
+            + '</li>'
+        )
+    return (f'<h3 class="exec-actions-title">{escape(t("rpt_exec_top_actions", lang=lang))}</h3>'
+            f'<ol class="exec-actions">{"".join(items)}</ol>')
+
+
 def render_exec_summary_html(mod00: dict, report_name: str, lang: str = 'en',
                              include_heading: bool = True) -> str:
     """Return a <section> HTML block for the report header.
@@ -120,6 +139,7 @@ def render_exec_summary_html(mod00: dict, report_name: str, lang: str = 'en',
                     + _elision_note('rpt_exec_kpi_elided', len(kpis), KPI_LIMIT, lang))
 
     verdict_html = f'<p class="verdict">{escape(str(verdict))}</p>' if verdict else ''
+    actions_html = _top_actions_html(mod00.get('top_actions') or [], lang)
     summary_html = f'<p class="summary-text">{escape(str(summary_text))}</p>' if summary_text else ''
 
     notes_html = ''
@@ -133,7 +153,7 @@ def render_exec_summary_html(mod00: dict, report_name: str, lang: str = 'en',
         # No heading means no element for aria-labelledby to point at; a
         # dangling reference is worse than none.
         return (f'<section class="exec-summary">'
-                f'{verdict_html}{kpi_html}{summary_html}{notes_html}'
+                f'{verdict_html}{actions_html}{kpi_html}{summary_html}{notes_html}'
                 f'</section>')
 
     label = t('rpt_exec_summary_label', lang=lang, default='Executive Summary')
@@ -141,6 +161,6 @@ def render_exec_summary_html(mod00: dict, report_name: str, lang: str = 'en',
     return (
         f'<section class="exec-summary" aria-labelledby="exec-summary-title">'
         f'<h2 id="exec-summary-title">{heading}</h2>'
-        f'{verdict_html}{kpi_html}{summary_html}{notes_html}'
+        f'{verdict_html}{actions_html}{kpi_html}{summary_html}{notes_html}'
         f'</section>'
     )
