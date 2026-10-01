@@ -231,3 +231,32 @@ def test_run_analysis_saves_state_then_raises_partial_failure(monkeypatch):
     with pytest.raises(AnalysisPartialFailure):
         ana.run_analysis()
     assert calls == ["health", "events", "save"]
+
+
+def test_unreadable_state_skips_cycle_instead_of_resetting(tmp_path, monkeypatch):
+    """state 檔暫時讀不到時，舊版當成空的繼續跑：冷卻、節流歸零，存檔時再把
+    空 state 寫回去。現在這一輪直接中止、不存檔。"""
+    import src.analyzer as analyzer_mod
+    from src.state_store import StateReadError
+
+    def _raise(_path):
+        raise StateReadError("permission denied")
+    monkeypatch.setattr(analyzer_mod, "load_state_file_strict", _raise)
+    ana = analyzer_mod.Analyzer.__new__(analyzer_mod.Analyzer)
+    ana.state = {"alert_history": {"keep": "me"}}
+    ana.load_state()
+    saved = []
+    ana.save_state = lambda: saved.append(True)
+    with pytest.raises(RuntimeError, match="state file could not be read"):
+        ana.run_analysis()
+    assert saved == []
+    assert ana.state["alert_history"] == {"keep": "me"}
+
+
+def test_corrupt_state_is_treated_as_empty(tmp_path):
+    """內容損毀仍視為空的（update_state_file 會備份壞檔後重建）。"""
+    from src.state_store import load_state_file_strict
+    p = tmp_path / "state.json"
+    p.write_text("{not json", encoding="utf-8")
+    assert load_state_file_strict(str(p)) == {}
+    assert load_state_file_strict(str(tmp_path / "missing.json")) == {}

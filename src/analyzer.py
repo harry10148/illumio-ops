@@ -33,7 +33,9 @@ from src.config import resolve_state_file
 from src.exceptions import TrafficQueryError
 from src.utils import Colors, format_unit, safe_input
 from src.i18n import t
-from src.state_store import load_state_file, update_state_file
+from src.state_store import (
+    StateReadError, load_state_file_strict, update_state_file,
+)
 from src.interfaces import IApiClient, IReporter
 from src.api.traffic_query import TrafficQueryBuilder
 from src.pce_cache.reader import CacheReadTooLarge
@@ -616,8 +618,17 @@ class Analyzer:
         self._timeline_baseline_ids = {id(e) for e in self._timeline_baseline}
 
     def load_state(self) -> None:
+        self._state_load_error: str | None = None
         try:
-            data = load_state_file(STATE_FILE)
+            data = load_state_file_strict(STATE_FILE)
+        except StateReadError as exc:
+            # 暫時讀不到（權限、I/O）≠ 沒有 state。舊版一律當成空的繼續跑：
+            # 冷卻與節流歸零、count 視窗清空，存檔時再把這份空 state 寫回去。
+            # 記下錯誤，run_analysis 會中止這一輪，下一輪再讀。
+            logger.error("Cannot read state file; this analysis cycle will be skipped: {}", exc)
+            self._state_load_error = str(exc)
+            return
+        try:
             if not data:
                 logger.info("State file not found, starting fresh.")
                 return
@@ -1573,6 +1584,10 @@ class Analyzer:
         永久遺失。save_state() 本身失敗則照舊直接往上拋（冷卻沒落盤時不可送，
         否則每個 cycle 重送同一則告警）。
         """
+        if getattr(self, "_state_load_error", None):
+            raise RuntimeError(
+                f"state file could not be read; skipping cycle without saving: "
+                f"{self._state_load_error}")
         logger.info("Starting analysis cycle.")
         stage_error: Exception | None = None
         try:
