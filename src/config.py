@@ -179,6 +179,51 @@ def _strip_deprecated_keys(merged: dict) -> list[str]:
             dropped.append(path)
     return dropped
 
+def _split_plugin_roots(data: dict) -> tuple[dict, dict]:
+    """拆成 (schema 認得的頂層區段, 其餘頂層鍵＝外掛設定區段)。"""
+    from src.config_models import ConfigSchema
+
+    fields = ConfigSchema.model_fields
+    known = {k: v for k, v in data.items() if k in fields}
+    extra = {k: v for k, v in data.items() if k not in fields}
+    return known, extra
+
+
+def _registered_plugin_roots() -> set[str]:
+    """已註冊告警外掛的設定區段名稱（PLUGIN_METADATA 欄位路徑的第一段）。"""
+    try:
+        from src.alerts.metadata import PLUGIN_METADATA
+    except Exception:
+        return set()
+    return {
+        path.split(".", 1)[0]
+        for meta in PLUGIN_METADATA.values()
+        for path in (getattr(meta, "fields", None) or {})
+    }
+
+
+def _validate_by_section(merged: dict):
+    """逐頂層區段驗證：通過的區段沿用，失敗的區段退回預設值。
+
+    回傳 (ConfigSchema, 失敗區段名稱清單)。未知的頂層鍵直接略過（不進 models）。
+    """
+    from pydantic import ValidationError
+    from src.config_models import ConfigSchema
+
+    good: dict = {}
+    bad: list[str] = []
+    for name in ConfigSchema.model_fields:
+        if name not in merged:
+            continue
+        try:
+            ConfigSchema.model_validate({name: merged[name]})
+        except ValidationError:
+            bad.append(name)
+            continue
+        good[name] = merged[name]
+    return ConfigSchema.model_validate(good), bad
+
+
 class ConfigManager:
     def __init__(self, config_file: str = CONFIG_FILE, alerts_file: str | None = None):
         self.config_file = config_file
@@ -195,6 +240,12 @@ class ConfigManager:
         self.alerts_file = alerts_file
         self.config = json.loads(json.dumps(_DEFAULT_CONFIG))  # deep copy
         self._last_loaded_at: float | None = None
+        # 最近一次 load() 的驗證錯誤位置（loc tuple）。save() 用它判斷「這次寫入是否
+        # 引入新的驗證錯誤」——只擋新增的，不擋載入時就已存在的（否則壞掉的設定
+        # 連透過 GUI 修好都存不進去）。
+        self._load_error_locs: set[tuple] = set()
+        # 驗證失敗而退回預設值的頂層區段（空 = 整份通過驗證）。
+        self.invalid_sections: list[str] = []
         # Re-entrant lock guarding load-modify-save critical sections. cheroot
         # serves the Web GUI from a multi-thread pool; without serialization two
         # concurrent handlers doing load→mutate→save interleave and silently drop
@@ -309,10 +360,25 @@ class ConfigManager:
                 ", ".join(_dropped),
             )
 
+        self._load_error_locs = set()
+        self.invalid_sections = []
+        # schema 不認得的頂層鍵是動態告警外掛的設定區段（PLUGIN_METADATA 的
+        # "<root>.<field>"，經 /api/settings 寫入）：原樣保留在 dict 裡，不送進
+        # extra="forbid" 的 schema——否則外掛存過一次設定，下次載入整份 config
+        # 就驗證失敗。巢狀欄位仍嚴格驗證。
+        known, plugin_roots = _split_plugin_roots(merged)
+        _unknown = sorted(set(plugin_roots) - _registered_plugin_roots())
+        if _unknown:
+            logger.error(
+                "Unknown top-level config key(s): {} — not part of the schema and "
+                "not a registered alert-plugin section; kept as-is but ignored. "
+                "Check config.json for a typo.", ", ".join(_unknown))
         try:
-            self.models = ConfigSchema.model_validate(merged)
+            self.models = ConfigSchema.model_validate(known)
             self.config = self.models.model_dump(mode="json")
+            self.config.update(plugin_roots)
         except ValidationError as e:
+            self._load_error_locs = {tuple(err["loc"]) for err in e.errors()}
             # Format pydantic errors into readable log lines
             logger.error(f"Config validation failed: {e.error_count()} error(s):")
             api_errors: list[str] = []
@@ -342,10 +408,18 @@ class ConfigManager:
                 )
                 logger.error(message)
                 raise ConfigError(message) from e
-            # Fall back to the merged data (preserves valid sections, logs errors).
-            # This keeps the app functional even with partially invalid config.
+            # 逐區段退回：只有驗證失敗的頂層區段改用預設值，其餘區段照常生效。
+            # 過去整份退回 ConfigSchema()，任何一個無關欄位（例如 settings 下
+            # 一個多出來的鍵）出錯，就會讓 siem/pce_cache.enabled 變成 False、
+            # api.url 變成 pce.example.com——SIEM 轉送無聲停擺而健康面板仍全綠。
             # Only reached when the 'api' block itself validated cleanly.
-            self.models = ConfigSchema()  # typed access uses defaults
+            self.models, self.invalid_sections = _validate_by_section(merged)
+            logger.error(
+                "Config section(s) failed validation and fell back to defaults: {} "
+                "— all other sections remain in effect. Fix the field(s) listed "
+                "above in config.json.",
+                ", ".join(self.invalid_sections) or "(none)",
+            )
             self.config = merged          # dict access uses the raw merged data
 
         # Preserve post-load side effects
@@ -506,6 +580,18 @@ class ConfigManager:
                 "re-run the command) and re-apply your edit."
             )
 
+        # 寫入前驗證：拒絕「會新增驗證錯誤」的設定。寫進去之後下一次 load()
+        # 會把該區段退回預設值（例如 siem 整段停用），那時才發現已經太晚。
+        # 載入時就已存在的錯誤不擋，否則操作者連修正都存不進去。
+        new_errors = self._new_validation_errors()
+        if new_errors:
+            from src.exceptions import ConfigValidationError
+            raise ConfigValidationError(
+                "Refusing to save: the change would make config.json fail "
+                f"validation at {'; '.join(new_errors)}. Nothing was written.",
+                fields=[e.split(":", 1)[0] for e in new_errors],
+            )
+
         try:
             # Persist rules to alerts.json first so an interruption between
             # the two writes never leaves stale rules in config.json.
@@ -553,6 +639,25 @@ class ConfigManager:
             # the next load() reverted the operator's change. Re-raise so callers
             # (GUI handlers) can surface a real error.
             raise
+
+    def _new_validation_errors(self) -> list[str]:
+        """回傳 self.config 相對於載入時「新增」的驗證錯誤（loc: msg，不含輸入值，
+        避免把機密欄位寫進錯誤訊息）。"""
+        from pydantic import ValidationError
+        from src.config_models import ConfigSchema
+
+        candidate = json.loads(json.dumps(self.config, default=str))
+        _strip_deprecated_keys(candidate)
+        candidate, _ = _split_plugin_roots(candidate)
+        try:
+            ConfigSchema.model_validate(candidate)
+        except ValidationError as e:
+            return [
+                f"{'.'.join(str(p) for p in err['loc'])}: {err['msg']}"
+                for err in e.errors()
+                if tuple(err["loc"]) not in self._load_error_locs
+            ]
+        return []
 
     def _read_alerts_file(self):
         """Return the parsed alerts.json dict, or None if file is missing.

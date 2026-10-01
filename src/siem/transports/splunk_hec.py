@@ -38,11 +38,18 @@ class SplunkHECTransport(Transport):
         return s
 
     def send(self, payload: str) -> None:
+        self.send_record(payload)
+
+    def send_record(self, payload: str, event_time: float | None = None) -> None:
         try:
             event_data = json.loads(payload)
         except (ValueError, TypeError):
             event_data = payload  # CEF and other non-JSON formats stay as string
         body = {"event": event_data, "sourcetype": self._sourcetype}
+        # /services/collector/event 不會從內容抽時間：沒帶 `time` 時 Splunk 以
+        # 收到當下為事件時間，積壓或 DLQ replay 時時間軸就會偏移數小時。
+        if event_time is not None:
+            body["time"] = round(float(event_time), 3)
         resp = self._session.post(
             self._endpoint,
             json=body,

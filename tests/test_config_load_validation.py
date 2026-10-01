@@ -322,3 +322,91 @@ def test_minimal_config_enables_self_signed_tls_by_default(tmp_path):
     assert tls["enabled"] is True
     assert tls["self_signed"] is True
     assert tls["key_algorithm"] == "ecdsa-p256"
+
+
+def _siem_cfg():
+    return {
+        "api": {"url": "https://pce.test", "org_id": "1", "key": "k", "secret": "s"},
+        "pce_cache": {"enabled": True},
+        "siem": {"enabled": True, "destinations": [
+            {"name": "soc", "transport": "tcp", "format": "cef",
+             "host": "10.0.0.1", "port": 5514}]},
+    }
+
+
+def test_gui_fleet_settings_keys_validate(tmp_path):
+    """GUI 的 PCE 連線表單每次儲存都會寫 settings.fleet_*；它們必須通過
+    schema，否則整份 config 驗證失敗、SIEM 被退回停用。"""
+    from src.config import ConfigManager
+    body = _siem_cfg()
+    body["settings"] = {"fleet_target_ven_version": "23.2.10",
+                        "fleet_max_batch": 200, "fleet_index_cap": 20000}
+    body["dashboard"] = {"ven_summary_interval_seconds": 300}
+    body["events"] = {"overlap_seconds": 300}
+    cm = ConfigManager(_write(tmp_path, body))
+    assert cm.invalid_sections == []
+    assert cm.models.siem.enabled is True
+    assert cm.models.settings.fleet_max_batch == 200
+
+
+def test_gui_fleet_blank_number_means_default(tmp_path):
+    from src.config import ConfigManager
+    body = _siem_cfg()
+    body["settings"] = {"fleet_max_batch": "", "fleet_index_cap": None}
+    cm = ConfigManager(_write(tmp_path, body))
+    assert cm.invalid_sections == []
+    assert cm.models.settings.fleet_max_batch is None
+
+
+def test_invalid_section_falls_back_alone(tmp_path):
+    """一個區段壞掉只退回該區段；siem / pce_cache 照常生效。"""
+    from src.config import ConfigManager
+    body = _siem_cfg()
+    body["smtp"] = {"host": "x", "port": 99999}
+    cm = ConfigManager(_write(tmp_path, body))
+    assert cm.invalid_sections == ["smtp"]
+    assert cm.models.siem.enabled is True
+    assert cm.models.pce_cache.enabled is True
+    assert cm.models.siem.destinations[0].port == 5514
+    assert cm.models.smtp.port == 25  # 壞掉的區段退回預設
+
+
+def test_save_refuses_change_that_breaks_validation(tmp_path):
+    from src.config import ConfigManager
+    from src.exceptions import ConfigError
+    path = _write(tmp_path, _siem_cfg())
+    cm = ConfigManager(path)
+    before = (tmp_path / "config.json").read_text(encoding="utf-8")
+    cm.config["settings"]["not_a_real_key"] = 1
+    with pytest.raises(ConfigError):
+        cm.save()
+    assert (tmp_path / "config.json").read_text(encoding="utf-8") == before
+
+
+def test_save_allows_preexisting_errors(tmp_path):
+    """載入時就壞的區段不擋存檔，否則操作者連修正其他設定都存不進去。"""
+    from src.config import ConfigManager
+    body = _siem_cfg()
+    body["smtp"] = {"host": "x", "port": 99999}
+    cm = ConfigManager(_write(tmp_path, body))
+    cm.config["settings"]["language"] = "zh_TW"
+    cm.save()  # 不應拋例外
+    cm2 = ConfigManager(str(tmp_path / "config.json"))
+    assert cm2.models.settings.language == "zh_TW"
+    assert cm2.models.siem.enabled is True
+
+
+def test_plugin_root_sections_survive_load_and_save(tmp_path):
+    """動態外掛的頂層設定區段不得讓整份 config 驗證失敗，且存檔後保留。"""
+    from src.config import ConfigManager
+    body = _siem_cfg()
+    body["dummy_plugin"] = {"token": "abc", "retries": 2}
+    cm = ConfigManager(_write(tmp_path, body))
+    assert cm.invalid_sections == []
+    assert cm.models.siem.enabled is True
+    assert cm.config["dummy_plugin"] == {"token": "abc", "retries": 2}
+    cm.config["dummy_plugin"]["retries"] = 3
+    cm.save()
+    cm2 = ConfigManager(str(tmp_path / "config.json"))
+    assert cm2.config["dummy_plugin"]["retries"] == 3
+    assert cm2.models.siem.enabled is True

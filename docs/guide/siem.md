@@ -38,8 +38,8 @@ SIEM 轉送依賴 pce_cache（見 [cache-maintenance.md](cache-maintenance.md)�
 | `transport` | 協定 | 預設埠 | 備註 |
 |---|---|---|---|
 | `udp` | Syslog UDP | 514 | 無傳遞保證，簡單快速 |
-| `tcp` | Syslog TCP | 514 | 有序、可靠傳遞，自動重連 |
-| `tls` | Syslog TCP + TLS | 6514 | `tls_verify`／`tls_ca_bundle` 控制憑證驗證；`profile="production"` 時禁止 `tls_verify=false`（載入時直接拒絕） |
+| `tcp` | Syslog TCP | 514 | 有序、可靠傳遞，自動重連；每筆送出前偵測對端是否已關閉（對端重啟後第一個 `sendall()` 仍會回成功而資料被丟掉），每批結束時 graceful close 確認送達後才標記 sent |
+| `tls` | Syslog TCP + TLS | 6514 | `tls_verify`／`tls_ca_bundle` 控制憑證驗證；`profile="production"` 時禁止 `tls_verify=false`（載入時直接拒絕）。與 `tcp` 相同的對端關閉偵測與 graceful close——直接 `close()` 會因未讀的 TLS 1.3 session ticket 送出 RST，讓對端丟掉一批的尾段 |
 | `hec` | Splunk HTTP Event Collector | 8088 | 僅 HTTPS，需 `hec_token` |
 
 ### 1.2 Format（輸出格式）
@@ -53,7 +53,7 @@ SIEM 轉送依賴 pce_cache（見 [cache-maintenance.md](cache-maintenance.md)�
 | `cef_pce` | 對齊 PCE 原生 syslog 匯出的 CEF：Signature ID 為 `<event_type>.<status>`、嚴重度依 PCE（info 1／warning 3／err 4）、`cs2`/`cs4` 帶完整 `resource_changes`/`notifications` JSON、流量為 `flow_<pd>` 加 `act`/`cat=flow_summary`/`cs3`-`cs6` 標籤與 href | 已經在收 PCE 直送 syslog、希望 ops 轉拋用同一套 parser 與規則的 SOC |
 | `syslog_cef_pce` | 同上，外層包一層 RFC5424 header | 同上、需要 RFC5424 framing |
 
-`syslog_cef`／`syslog_json` 的 RFC5424 header 由 `wrap_rfc5424()` 產生，格式為 `<PRI>1 TIMESTAMP HOSTNAME illumio-ops - - - MSG`；`HOSTNAME` 取事件的 `pce_fqdn`，traffic 記錄沒有 `pce_fqdn` 時退回轉送端主機名稱 `illumio-ops`。CEF header 的 severity 兩種方言都依 PCE：audit `info`→1、`warning`→3、`err`→4，流量 `allowed`/`unknown`→1、`potentially_blocked`→3、`blocked`→5；syslog header 的 severity 另有一套對照（`info`→6、`warning`→4、`error`→3、`critical`→2）。
+`syslog_cef`／`syslog_json` 的 RFC5424 header 由 `wrap_rfc5424()` 產生，格式為 `<PRI>1 TIMESTAMP HOSTNAME illumio-ops - - - MSG`；`TIMESTAMP` 是**記錄本身的時間**（audit 取 `timestamp`，traffic 取 `last_detected`，與 `cef_pce` 的 `rt` 一致），不是送出時間——積壓或 DLQ replay 時 SIEM 的時間軸才不會偏移；記錄沒有可解析的時間時才退回送出時間。Splunk HEC 同理會在 request body 帶 `time`（epoch 秒），因為 `/services/collector/event` 不會從內容抽時間。`HOSTNAME` 取事件的 `pce_fqdn`，traffic 記錄沒有 `pce_fqdn` 時退回轉送端主機名稱 `illumio-ops`。CEF header 的 severity 兩種方言都依 PCE：audit `info`→1、`warning`→3、`err`→4，流量 `allowed`/`unknown`→1、`potentially_blocked`→3、`blocked`→5；syslog header 的 severity 另有一套對照（`info`→6、`warning`→4、`error`→3、`critical`→2）。
 
 #### `cef`（ArcSight 方言）與 `cef_pce`（Graylog 方言）怎麼選
 

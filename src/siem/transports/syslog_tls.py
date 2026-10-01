@@ -4,6 +4,7 @@ import ssl
 import threading
 from typing import Optional
 from loguru import logger
+from src.siem.transports._stream import graceful_close, peer_closed
 from src.siem.transports.base import Transport
 
 
@@ -55,6 +56,11 @@ class SyslogTLSTransport(Transport):
     def send(self, payload: str) -> None:
         data = (payload + "\n").encode("utf-8")
         with self._lock:
+            if self._sock is not None and peer_closed(self._sock):
+                # 對端已關閉時第一個 sendall() 仍會「成功」而資料被丟掉，
+                # 所以送之前先確認，已關閉就重連。
+                logger.info("TLS syslog peer closed the connection, reconnecting")
+                self._drop_socket()
             if self._sock is None:
                 self._connect()
             try:
@@ -69,11 +75,26 @@ class SyslogTLSTransport(Transport):
                 self._connect()
                 self._sock.sendall(data)
 
+    def _drop_socket(self) -> None:
+        try:
+            self._sock.close()
+        except Exception:
+            pass
+        self._sock = None
+
+    def finish_batch(self) -> None:
+        """確認這一批已送達對端：graceful close，對端 reset 時拋 OSError。"""
+        with self._lock:
+            if self._sock is None:
+                return
+            sock, self._sock = self._sock, None
+            graceful_close(sock)
+
     def close(self) -> None:
         with self._lock:
             if self._sock:
+                sock, self._sock = self._sock, None
                 try:
-                    self._sock.close()
-                except Exception:
-                    pass
-                self._sock = None
+                    graceful_close(sock)
+                except Exception as exc:
+                    logger.warning("TLS syslog close was not graceful: {}", exc)

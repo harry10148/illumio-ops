@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 from src.siem.formatters.base import Formatter
-from src.siem.formatters.syslog_header import wrap_rfc5424
+from src.siem.formatters.syslog_header import (
+    event_record_time, flow_record_time, wrap_rfc5424,
+)
 
 _SYSLOG_SEV_MAP = {
     "info": 6,
@@ -32,9 +34,11 @@ class SyslogWrappedFormatter(Formatter):
         sev_str = str(event.get("severity", "info")).lower()
         sev_num = _SYSLOG_SEV_MAP.get(sev_str, 6)
         hostname = str(event.get("pce_fqdn") or self._host)
-        return wrap_rfc5424(payload, severity=sev_num, hostname=hostname)
+        return wrap_rfc5424(payload, severity=sev_num, hostname=hostname,
+                            timestamp=event_record_time(event))
 
     def format_flow(self, flow: dict) -> str:
         payload = self._inner.format_flow(flow)
         hostname = str(flow.get("pce_fqdn") or self._host)
-        return wrap_rfc5424(payload, severity=6, hostname=hostname)
+        return wrap_rfc5424(payload, severity=6, hostname=hostname,
+                            timestamp=flow_record_time(flow))

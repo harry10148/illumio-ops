@@ -144,6 +144,18 @@ class GeneralSettings(_Base):
     timezone: str = "local"
     enable_health_check: bool = True
     dashboard_queries: list[dict] = Field(default_factory=list)
+    # VEN 車隊（GUI 的 PCE 連線表單每次儲存都會寫入這兩個鍵）。schema 少了它們
+    # 時 extra="forbid" 會讓整份 config 驗證失敗，cm.models 全退回預設值
+    # （siem/pce_cache.enabled=False）——SIEM 轉送因此無聲停擺。
+    fleet_target_ven_version: str = ""
+    fleet_max_batch: Optional[int] = Field(default=None, ge=1, le=1000)
+    fleet_index_cap: Optional[int] = Field(default=None, ge=1)
+
+    @field_validator("fleet_max_batch", "fleet_index_cap", mode="before")
+    @classmethod
+    def _blank_to_none(cls, v: object) -> object:
+        # GUI 數字欄位清空時送 "" 或 null；兩者都代表「用預設值」。
+        return None if v in ("", None) else v
 
 class ReportApiQuery(_Base):
     start_date: Optional[str] = None
@@ -404,6 +416,19 @@ class SiemForwarderSettings(_Base):
     dispatch_tick_seconds: int = Field(default=30, ge=1)
 
 
+class DashboardSettings(_Base):
+    """Dashboard 背景摘要 job 的間隔（scheduler/__init__.py 讀取）。"""
+    model_config = ConfigDict(extra="ignore")
+    ven_summary_interval_seconds: int = Field(default=300, ge=30)
+    posture_summary_interval_seconds: int = Field(default=600, ge=30)
+
+
+class EventsSettings(_Base):
+    """事件輪詢設定（analyzer.py 讀取；EventPoller 會再夾到 [60, 900]）。"""
+    model_config = ConfigDict(extra="ignore")
+    overlap_seconds: Optional[int] = Field(default=None, ge=1)
+
+
 class ConfigSchema(_Base):
     api: ApiSettings = Field(default_factory=ApiSettings)
     alerts: AlertsSettings = Field(default_factory=AlertsSettings)
@@ -421,3 +446,5 @@ class ConfigSchema(_Base):
     rule_backups: list = Field(default_factory=list)
     pce_cache: PceCacheSettings = Field(default_factory=PceCacheSettings)
     siem: SiemForwarderSettings = Field(default_factory=SiemForwarderSettings)
+    dashboard: DashboardSettings = Field(default_factory=DashboardSettings)
+    events: EventsSettings = Field(default_factory=EventsSettings)

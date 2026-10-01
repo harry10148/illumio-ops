@@ -60,6 +60,14 @@ class ConfigError(IllumioOpsError):
     pass
 
 
+class ConfigValidationError(ConfigError):
+    """save() 拒絕寫入會讓 config.json 驗證失敗的變更。fields 為出錯欄位路徑。"""
+
+    def __init__(self, message: str, fields: list[str] | None = None):
+        super().__init__(message)
+        self.fields = list(fields or [])
+
+
 class ReportError(IllumioOpsError):
     pass
 

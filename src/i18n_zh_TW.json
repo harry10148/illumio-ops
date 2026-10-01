@@ -5623,5 +5623,6 @@
   "gui_al_ro_ex_dst_ip": "排除的目的 IP",
   "cli_area_home": "首頁",
   "cli_area_policy": "規則",
-  "gui_al_fig_matches": "命中筆數"
+  "gui_al_fig_matches": "命中筆數",
+  "gui_err_config_validation": "設定未儲存：這次變更會讓設定檔無法通過驗證（{fields}），未寫入任何內容。"
 }

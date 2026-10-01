@@ -5623,5 +5623,6 @@
   "gui_al_ro_ex_dst_ip": "Excluded destination IPs",
   "cli_area_home": "Home",
   "cli_area_policy": "Policy",
-  "gui_al_fig_matches": "matches"
+  "gui_al_fig_matches": "matches",
+  "gui_err_config_validation": "Settings not saved: the change would make the configuration invalid ({fields}). Nothing was written."
 }

@@ -713,7 +713,8 @@ class _RuleSchedulerCLI:
             print(f"{Colors.GREEN}{t('rsc_toggle_result', status=new_status, default='[+] Rule Scheduler → {status}')}{Colors.ENDC}")
         elif ans == '2':
             raw = clean_input(input(f"{t('rs_cfg_interval_prompt', default='New interval (seconds)')}: "))
-            if raw.isdigit() and int(raw) > 0:
+            # schema 要求 ≥ 60（RuleSchedulerSettings.check_interval_seconds）
+            if raw.isdigit() and int(raw) >= 60:
                 rs_cfg["check_interval_seconds"] = int(raw)
                 self.cm.save()
                 print(f"{Colors.GREEN}{t('rsc_interval_result', raw=raw, default='[+] Interval → {raw}s')}{Colors.ENDC}")
