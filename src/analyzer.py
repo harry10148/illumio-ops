@@ -1817,7 +1817,7 @@ class Analyzer:
             tr_rules = self._select_rules(
                 lambda r: r.get("type") in ("traffic", "bandwidth", "volume"))
         max_win = max((r.get('threshold_window', 10) for r in tr_rules), default=10)
-        start_dt = now_utc - datetime.timedelta(minutes=max_win + 2)
+        start_dt = now_utc - datetime.timedelta(minutes=max_win + self._traffic_alert_lag() + 2)
         traffic_stream = self.api.execute_traffic_query_stream(
             start_dt.strftime('%Y-%m-%dT%H:%M:%SZ'),
             now_utc.strftime('%Y-%m-%dT%H:%M:%SZ'),
@@ -1856,7 +1856,9 @@ class Analyzer:
             # 全視窗查詢（同 legacy API 語意：max_win + 2 分鐘）——cursor 增量
             # 會把 count/volume 規則的視窗退化成輪詢間隔（2026-07-24 審查 A1）
             max_win = max(r.get('threshold_window', 10) for r in tr_rules)
-            since = now_utc - datetime.timedelta(minutes=max_win + 2)
+            since = now_utc - datetime.timedelta(
+                minutes=max_win + self._traffic_alert_lag() + 2)
+            self._warn_if_ingest_slower_than_windows(tr_rules)
             flows = self._sub_flows.fetch_window_rows(since, limit=TRAFFIC_WINDOW_ROW_LIMIT)
             logger.info("Analyzer flow path: cache window ({} rows)", len(flows))
             # 撞到列數上限＝視窗內最舊的列被丟掉，加總必然低估。寫進 state 讓
@@ -1869,10 +1871,50 @@ class Analyzer:
                     "raw_count": len(flows),
                     "max_results": TRAFFIC_WINDOW_ROW_LIMIT,
                 }
-            return flows, tr_rules, now_utc
+            return flows, tr_rules, self._evaluation_time(now_utc)
 
         traffic_stream, now_utc = self._legacy_fetch_traffic(tr_rules)
-        return traffic_stream, tr_rules, now_utc
+        return traffic_stream, tr_rules, self._evaluation_time(now_utc)
+
+    def _traffic_alert_lag(self) -> int:
+        """settings.traffic_alert_lag_minutes（預設 0＝不延後）。"""
+        try:
+            value = (self.cm.config.get("settings") or {}).get("traffic_alert_lag_minutes", 0)
+            return max(0, min(int(value or 0), 60))
+        except (TypeError, ValueError, AttributeError):
+            return 0
+
+    def _evaluation_time(self, now_utc: datetime.datetime) -> datetime.datetime:
+        """流量規則的評估基準時間：now − traffic_alert_lag_minutes。
+
+        VEN 約每 10 分鐘才上報一次 flow，評估「最近 N 分鐘」時，剛發生的短命
+        flow（例如一次性的掃描）多半還沒進 PCE；等它進來時已落在之後所有視窗
+        之外。設定延遲後整個視窗往前平移（長度不變）：bucket 基準守門與視窗增量
+        推導都用同一個基準，計算保持一致；代價是告警晚發這段時間。
+        """
+        lag = self._traffic_alert_lag()
+        return now_utc - datetime.timedelta(minutes=lag) if lag else now_utc
+
+    def _warn_if_ingest_slower_than_windows(self, tr_rules: list) -> None:
+        """cache 模式下 traffic ingest 間隔比最短的規則視窗還長時記警告：
+        視窗只看得到每次 ingest 前最後那一小段的 flow，其餘時間的流量永遠
+        不會被這條規則評估到。"""
+        try:
+            interval_s = int(self.cm.models.pce_cache.traffic_poll_interval_seconds)
+        except (AttributeError, TypeError, ValueError):
+            return
+        windows = [int(r.get("threshold_window", 10)) for r in tr_rules]
+        if not windows:
+            return
+        shortest = min(windows)
+        if interval_s > shortest * 60 and not getattr(self, "_warned_ingest_interval", False):
+            logger.warning(
+                "pce_cache.traffic_poll_interval_seconds ({}s) is longer than the shortest "
+                "traffic rule window ({} min): flows are ingested in batches, so a "
+                "{}-minute window only sees the tail of each batch and traffic in between "
+                "is never evaluated. Lower the traffic poll interval or widen the window.",
+                interval_s, shortest, shortest)
+            self._warned_ingest_interval = True
 
     def _warm_service_lookup_cache(self, tr_rules: list) -> None:
         """規則帶 services/ex_services 時，先把 service_ports_cache 暖起來。

@@ -147,6 +147,10 @@ class GeneralSettings(_Base):
     # VEN 車隊（GUI 的 PCE 連線表單每次儲存都會寫入這兩個鍵）。schema 少了它們
     # 時 extra="forbid" 會讓整份 config 驗證失敗，cm.models 全退回預設值
     # （siem/pce_cache.enabled=False）——SIEM 轉送因此無聲停擺。
+    # 流量告警規則的評估延遲（分鐘）。VEN 約每 10 分鐘上報一次 flow，評估
+    # 「最近 N 分鐘」時剛發生的短命 flow 多半還沒進 PCE；設成 10 左右可讓整個
+    # 視窗往前平移，避免漏判，代價是告警晚發這段時間。0＝不延後（預設）。
+    traffic_alert_lag_minutes: int = Field(default=0, ge=0, le=60)
     fleet_target_ven_version: str = ""
     fleet_max_batch: Optional[int] = Field(default=None, ge=1, le=1000)
     fleet_index_cap: Optional[int] = Field(default=None, ge=1)
