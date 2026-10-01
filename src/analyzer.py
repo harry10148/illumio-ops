@@ -147,6 +147,10 @@ def _endpoint_probe_category(status: int, accepted_statuses: tuple[int, ...]) ->
     return category
 
 
+# 依目標分別冷卻時 alert_history 的 key："<rule_id>|<target>"。
+_COOLDOWN_KEY_SEP = "|"
+
+
 class AnalysisPartialFailure(RuntimeError):
     """run_analysis 中途某階段失敗，但 state（含冷卻）已落盤：已建立的告警可以送出。"""
 
@@ -722,8 +726,17 @@ class Analyzer:
             _live_rule_ids = set()
         alert_history = self.state.get("alert_history")
         if _live_rule_ids and isinstance(alert_history, dict):
-            for _stale_rid in [k for k in alert_history if k not in _live_rule_ids]:
+            # 依目標分別冷卻的 key 是 "<rule_id>|<target>"：以規則部分判斷存活。
+            for _stale_rid in [k for k in alert_history
+                               if k.split(_COOLDOWN_KEY_SEP, 1)[0] not in _live_rule_ids]:
                 alert_history.pop(_stale_rid, None)
+        if isinstance(alert_history, dict):
+            # 目標冷卻 key 會隨主機數成長：超過 7 天（遠大於任何冷卻時間）就清掉。
+            _target_cutoff = now - datetime.timedelta(days=7)
+            for _k in [k for k in alert_history if _COOLDOWN_KEY_SEP in k]:
+                _ts = parse_event_timestamp(alert_history.get(_k))
+                if _ts is None or _ts < _target_cutoff:
+                    alert_history.pop(_k, None)
 
         unknown_events = self.state.get("unknown_events", {})
         if isinstance(unknown_events, dict) and len(unknown_events) > 100:
@@ -1773,8 +1786,18 @@ class Analyzer:
                 # count 型須有本 cycle 新事件（matches 非空）才告警：視窗計數
                 # 只作門檻；無新證據時發出的告警必然是 time=N/A 的空殼
                 # （2026-07-24 審查 A2）
+                if (count_val >= _safe_float(rule.get("threshold_count", 1)) and count_val > 0
+                        and matches and not is_count_rule):
+                    # immediate 型：依目標（主機／使用者）分別冷卻。舊版以規則為
+                    # 單位，主機 A 觸發 agent.tampering 後的冷卻期間，主機 B 的
+                    # tampering 只記一筆抑制、不送也不彙總。只保留「還沒在冷卻」
+                    # 的目標的事件。
+                    matches = self._filter_targets_in_cooldown(rule, matches, normalized_by_id)
+                    count_val = len(matches)
                 if count_val >= _safe_float(rule.get("threshold_count", 1)) and count_val > 0 and matches:
-                    if self._check_cooldown(rule):
+                    _target_keys = (None if is_count_rule else
+                                    self._event_target_keys(rule, matches, normalized_by_id))
+                    if self._check_cooldown(rule, target_keys=_target_keys):
                         self.stats.record_rule_trigger(rule, match_count=count_val, metric_value=count_val)
                         first = matches[0] if matches else {}
                         first_norm = normalized_by_id.get(event_identity(first)) or normalize_event(first)
@@ -2507,13 +2530,52 @@ class Analyzer:
                 else:
                     self.reporter.add_traffic_alert(alert_data)
 
-    def _check_cooldown(self, rule: dict[str, Any]) -> bool:
+    def _event_target(self, event: dict, normalized_by_id: dict) -> str:
+        norm = normalized_by_id.get(event_identity(event)) or {}
+        return str(norm.get("target_name") or norm.get("resource_name") or "")
+
+    def _event_target_keys(self, rule: dict, matches: list, normalized_by_id: dict) -> list[str]:
+        rid = str(rule["id"])
+        targets = {self._event_target(e, normalized_by_id) for e in matches}
+        return sorted(f"{rid}{_COOLDOWN_KEY_SEP}{t}" for t in targets)
+
+    def _filter_targets_in_cooldown(self, rule: dict, matches: list, normalized_by_id: dict) -> list:
+        """去掉「目標仍在冷卻中」的事件；全部都在冷卻時記一筆抑制。"""
+        cd_minutes = rule.get("cooldown_minutes", rule.get("threshold_window", 10))
+        if not cd_minutes:
+            return matches
+        rid = str(rule["id"])
+        history = self.state.get("alert_history", {})
+        now_utc = datetime.datetime.now(datetime.timezone.utc)
+        kept, cooling_until = [], None
+        for event in matches:
+            key = f"{rid}{_COOLDOWN_KEY_SEP}{self._event_target(event, normalized_by_id)}"
+            last = parse_event_timestamp(history.get(key))
+            if last is not None and (now_utc - last).total_seconds() < cd_minutes * 60:
+                until = last + datetime.timedelta(minutes=cd_minutes)
+                cooling_until = until if cooling_until is None else max(cooling_until, until)
+                continue
+            kept.append(event)
+        if not kept and cooling_until is not None:
+            self.alert_throttler.record_cooldown_suppressed(rule, now_utc, next_allowed_at=cooling_until)
+            self.stats.record_suppression(
+                rule, "cooldown", cooldown_minutes=cd_minutes,
+                next_allowed_at=format_utc(cooling_until))
+            logger.info(f"Rule '{rule['name']}': every matched target is in cooldown.")
+        return kept
+
+    def _check_cooldown(self, rule: dict[str, Any], target_keys: list[str] | None = None) -> bool:
         """冷卻＋節流閘門。cooldown_minutes=0 是刻意語意：停用冷卻
         （每個 cycle 都可再告警，僅剩 throttle 限制）——GUI/CLI hint 與
-        monitoring-alerts.md 已明文（審查 A5 確認項）。"""
+        monitoring-alerts.md 已明文（審查 A5 確認項）。
+
+        target_keys：immediate 型事件規則依目標分別冷卻（呼叫端已用
+        _filter_targets_in_cooldown 濾掉冷卻中的目標），這裡跳過規則層級的
+        冷卻檢查，通過節流後把每個目標的時戳寫進 alert_history。
+        """
         rid = str(rule["id"])
         now_utc = datetime.datetime.now(datetime.timezone.utc)
-        last_alert = self.state.get("alert_history", {}).get(rid)
+        last_alert = None if target_keys is not None else self.state.get("alert_history", {}).get(rid)
 
         cd_minutes = rule.get("cooldown_minutes", rule.get("threshold_window", 10))
 
@@ -2557,7 +2619,10 @@ class Analyzer:
         logger.warning(f"Alert triggered: {rule['name']}")
         if "alert_history" not in self.state:
             self.state["alert_history"] = {}
-        self.state["alert_history"][rid] = now_utc.strftime('%Y-%m-%dT%H:%M:%SZ')
+        stamp = now_utc.strftime('%Y-%m-%dT%H:%M:%SZ')
+        self.state["alert_history"][rid] = stamp
+        for key in target_keys or ():
+            self.state["alert_history"][key] = stamp
         return True
 
     def _build_criteria_str(self, rule: dict[str, Any], *, lang: str | None = None,
