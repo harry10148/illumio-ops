@@ -298,6 +298,16 @@ def _guard_cache_target(cm, session_factory) -> None:
     bind_or_verify(session_factory, cm.models.api)
 
 
+def _ingest_overlap(cfg):
+    """pce_cache.ingest_overlap_minutes → timedelta（缺值或非數字時退回 20 分鐘）。"""
+    from datetime import timedelta
+    try:
+        minutes = int(getattr(cfg, "ingest_overlap_minutes", 20))
+    except (TypeError, ValueError):
+        minutes = 20
+    return timedelta(minutes=max(5, minutes))
+
+
 def run_events_ingest(cm) -> None:
     wm = None
     try:
@@ -314,7 +324,8 @@ def run_events_ingest(cm) -> None:
                                   watermark=wm,
                                   async_threshold=cfg.async_threshold_events,
                                   siem_destinations=_enabled_siem_destinations(cm, "audit"),
-                                  write_lock=_CACHE_WRITE_LOCK)
+                                  write_lock=_CACHE_WRITE_LOCK,
+                                  overlap=_ingest_overlap(cfg))
             count = ing.run_once()
         logger.info("Events ingest: {} rows inserted", count)
         _record_ingest_pce_result("events", wm)
@@ -354,6 +365,7 @@ def run_traffic_ingest(cm) -> None:
                                    siem_destinations=_enabled_siem_destinations(cm, "traffic"),
                                    siem_pd_filters=_traffic_pd_filters(cm),
                                    record_observations=getattr(cfg, "flow_delta_enabled", True),
+                                   overlap=_ingest_overlap(cfg),
                                    obs_retention_hours=getattr(cfg, "flow_obs_retention_hours", 6))
             count = ing.run_once()
         logger.info("Traffic ingest: {} rows inserted", count)

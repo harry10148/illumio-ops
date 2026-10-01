@@ -54,9 +54,11 @@ class EventBatch:
 
 class EventPoller:
     # overlap 是 watermark（貼著 now 推進）之下唯一的補抓保險：PCE 事件索引
-    # 延遲超過 overlap 即靜默漏事件（2026-07-24 審查 D1）。預設 300s；
+    # 延遲、或 VEN 離線後補送的事件晚於 overlap 到達即靜默漏事件（2026-07-24
+    # 審查 D1）。預設 1200s＝兩個 VEN 上報週期（約 10 分鐘一次），上限 3600s；
     # event_seen dedup（4h）保證加大 overlap 不會產生重複告警。
-    DEFAULT_OVERLAP_SECONDS = 300
+    DEFAULT_OVERLAP_SECONDS = 1200
+    MAX_OVERLAP_SECONDS = 3600
 
     def __init__(self, api_client, max_results: int = 5000,
                  overlap_seconds: int | None = None, subscriber=None):
@@ -64,7 +66,7 @@ class EventPoller:
         self.max_results = max_results
         self.overlap_seconds = (
             self.DEFAULT_OVERLAP_SECONDS if overlap_seconds is None
-            else max(60, min(int(overlap_seconds), 900))
+            else max(60, min(int(overlap_seconds), self.MAX_OVERLAP_SECONDS))
         )
         self._subscriber = subscriber
 
@@ -86,12 +88,20 @@ class EventPoller:
         query_since = format_utc(query_since_dt)
         query_until = format_utc(poll_started_at)
 
-        raw_events = self.api.fetch_events_strict(
-            start_time_str=query_since,
-            end_time_str=query_until,
-            max_results=self.max_results,
-        )
-        overflow_risk = len(raw_events) >= self.max_results
+        # 碰 max_results 時 PCE 只回最新的那批；舊版標記 overflow_risk 後
+        # watermark 照樣推到 now，較舊的事件永久遺失。改為二分切窗抽乾，只有
+        # 切到最小跨度仍碰頂才算 overflow。fetch_events_strict 失敗會直接拋出。
+        from src.pce_cache.events_fetch import fetch_events_drained
+
+        def _strict(start_iso, end_iso, limit):
+            return self.api.fetch_events_strict(
+                start_time_str=start_iso, end_time_str=end_iso, max_results=limit)
+
+        drained = fetch_events_drained(
+            self.api, query_since_dt, poll_started_at,
+            max_results=self.max_results, fetch=_strict)
+        raw_events = drained.events
+        overflow_risk = drained.truncated
 
         seen = dict(seen_events or {})
         deduped: list[dict[str, Any]] = []
@@ -116,7 +126,9 @@ class EventPoller:
         )
         watermark_candidates = [poll_started_at, watermark_dt]
         if latest_event_ts is not None:
-            watermark_candidates.append(latest_event_ts)
+            # 不超過這次查詢的結束時間：VEN 時鐘偏快送來未來時間戳時，
+            # watermark 若被推到未來，overlap 也蓋不回這段期間。
+            watermark_candidates.append(min(latest_event_ts, poll_started_at))
         next_watermark = format_utc(max(watermark_candidates))
 
         return EventBatch(

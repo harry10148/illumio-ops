@@ -9,6 +9,7 @@ from loguru import logger
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.orm import sessionmaker
 
+from src.pce_cache.events_fetch import EventsFetchError, fetch_events_drained
 from src.pce_cache.models import PceEvent, SiemDispatch
 from src.pce_cache.watermark import WatermarkStore
 
@@ -24,6 +25,7 @@ class EventsIngestor:
         async_threshold: int = 10000,
         siem_destinations: Optional[list[str]] = None,
         write_lock=None,
+        overlap: timedelta = timedelta(minutes=20),
     ):
         self._api = api
         self._sf = session_factory
@@ -31,6 +33,7 @@ class EventsIngestor:
         self._async_threshold = async_threshold
         self._siem_dests = list(siem_destinations or [])
         self._write_lock = write_lock
+        self._overlap = overlap
         # Set by run_once() when the sync events pull hit max_results and the
         # async fallback did not drain the window — the PCE returns only the
         # NEWEST rows at the cap, so older events in that window are lost for
@@ -40,83 +43,58 @@ class EventsIngestor:
         self.last_run_overflow: Optional[dict] = None
 
     def run_once(self, *, force_async: bool = False) -> int:
-        since = self._since_cursor()
+        """拉 [watermark − overlap, now] 的事件寫入 cache。
+
+        force_async 僅為簽名相容保留（舊版走 get_events_async stub）；現在一律
+        以 fetch_events_drained 帶明確結束時間抓取，碰上限就二分抽乾。
+        """
+        until_dt = datetime.now(timezone.utc).replace(microsecond=0)
+        since_dt = self._since_dt()
         self.last_run_overflow = None
         try:
-            if force_async:
-                events = self._api.get_events_async(since=since, rate_limit=True)
-            else:
-                events = self._api.get_events(
-                    max_results=self._async_threshold,
-                    since=since,
-                    rate_limit=True,
-                )
-                if len(events) >= self._async_threshold:
-                    # WARNING（非 INFO）：碰頂代表「比回傳批次更舊的事件」已經
-                    # 被 PCE 丟掉，除非下面的 async 補抓真的把整個視窗抽乾。
-                    now_iso = datetime.now(timezone.utc).isoformat()
-                    logger.warning(
-                        "Events sync pull hit cap ({}) for window since={} — the PCE "
-                        "returns only the newest rows at the cap, so older events in "
-                        "this window are permanently lost; switching to async",
-                        self._async_threshold, since,
-                    )
-                    self.last_run_overflow = {
-                        "detected_at": now_iso,
-                        "query_since": since,
-                        "query_until": now_iso,
-                        "raw_count": len(events),
-                        "max_results": self._async_threshold,
-                        # 來源標記：Analyzer 的 cache 分支只清「legacy pull 留下的」
-                        # 陳舊紀錄，看到這個來源就不清（見 _run_event_analysis）。
-                        "source": "cache_ingest",
-                    }
-                    events_async = self._api.get_events_async(since=since, rate_limit=True)
-                    # get_events_async is an unimplemented stub returning [] (Phase
-                    # 13). Never let its empty result clobber the already-fetched
-                    # sync batch: discarding it loses up to `cap` events, and with
-                    # no max timestamp the watermark can't advance, so the next
-                    # poll re-fetches and re-discards forever (permanent stall +
-                    # total loss above the threshold). Keep the sync batch; the
-                    # advance below pages forward to its max timestamp.
-                    if events_async:
-                        events = events_async
-                        # async 查詢沒有 max_results 上限：整個視窗真的抽乾了，
-                        # 這一輪就不算資料遺失，撤回 overflow 訊號。
-                        self.last_run_overflow = None
+            result = fetch_events_drained(
+                self._api, since_dt, until_dt, max_results=self._async_threshold)
+        except EventsFetchError as exc:
+            # ApiClient 把連線層失敗（DNS/refused/timeout）吞成空清單、只寫
+            # last_fetch_error——`events == []` 分不出「PCE 不可達」與「真的
+            # 沒有新事件」，所以視同失敗記錄（見 watchdog-live-reverify-report.md）。
+            logger.error("Events ingest: PCE fetch reported an error — {}", exc)
+            with self._write_context():
+                self._wm.record_error(self.SOURCE, str(exc))
+            return 0
         except Exception as exc:
             logger.exception("Events ingest failed: {}", exc)
             with self._write_context():
                 self._wm.record_error(self.SOURCE, str(exc))
             return 0
 
-        # get_events()/get_events_async() route through ApiClient.fetch_events(),
-        # which swallows connection-layer PCE failures (DNS/refused/timeout)
-        # into an empty list instead of raising — so `events == []` alone can't
-        # tell "PCE unreachable" apart from "genuinely no new events". ApiClient
-        # surfaces the swallowed failure on last_fetch_error; treat it the same
-        # as the except-branch above (see watchdog-live-reverify-report.md step 2).
-        fetch_error = getattr(self._api, "last_fetch_error", None)
-        # isinstance guard: many tests pass a bare MagicMock() as `api`, whose
-        # unconfigured attributes auto-vivify into truthy child Mocks rather
-        # than None — without this guard every such test would spuriously
-        # trip the error path. The real ApiClient contract is always str|None.
-        if isinstance(fetch_error, str) and fetch_error:
-            logger.error("Events ingest: PCE fetch reported an error — {}", fetch_error)
-            with self._write_context():
-                self._wm.record_error(self.SOURCE, fetch_error)
-            return 0
+        events = result.events
+        if result.truncated:
+            windows = result.truncated_windows
+            self.last_run_overflow = {
+                "detected_at": datetime.now(timezone.utc).isoformat(),
+                "query_since": min(w["since"] for w in windows),
+                "query_until": max(w["until"] for w in windows),
+                "raw_count": sum(w["count"] for w in windows),
+                "max_results": self._async_threshold,
+                "window_count": len(windows),
+                # 來源標記：Analyzer 的 cache 分支只清「legacy pull 留下的」
+                # 陳舊紀錄，看到這個來源就不清（見 _run_event_analysis）。
+                "source": "cache_ingest",
+            }
 
         try:
             with self._write_context():
                 inserted = self._insert_batch(events)
                 if events:
-                    last = max(e["timestamp"] for e in events)
-                    last_href = events[-1].get("href", "")
+                    last = max(_parse_iso(e["timestamp"]) for e in events)
+                    # 不超過這次查詢的結束時間：VEN 時鐘偏快送來「未來」時間戳
+                    # 時，watermark 若被推到未來，overlap 也蓋不回這段期間。
+                    last = min(_aware(last), until_dt)
                     self._wm.advance(
                         self.SOURCE,
-                        last_timestamp=_parse_iso(last),
-                        last_href=last_href,
+                        last_timestamp=last,
+                        last_href=events[-1].get("href", ""),
                     )
             return inserted
         except Exception as exc:
@@ -128,24 +106,24 @@ class EventsIngestor:
     def _write_context(self):
         return self._write_lock if self._write_lock is not None else nullcontext()
 
-    def _since_cursor(self) -> str:
-        # PCE rejects timestamps without a tz marker (HTTP 406 invalid_timestamp).
-        # SQLite + SQLAlchemy DateTime(timezone=True) returns naive datetimes on
-        # read, so always re-attach UTC. Cold start defaults to 24h ago to mirror
-        # get_traffic_flows_async.
+    def _since_dt(self) -> datetime:
+        # SQLite + SQLAlchemy DateTime(timezone=True) 讀回 naive datetime，一律補
+        # UTC（PCE 拒收沒有時區的時間戳：HTTP 406 invalid_timestamp）。
+        # 冷啟動往回 24 小時，比照 get_traffic_flows_async。
         wm = self._wm.get(self.SOURCE)
         last = wm.last_timestamp if wm else None
         if last is None:
             last = datetime.now(timezone.utc) - timedelta(hours=24)
         else:
-            # Grace window：多節點 PCE（schema 逐事件記 pce_fqdn）的事件可能
-            # 亂序晚到；watermark 只有秒級 flooring（~1s 容忍），比照 traffic
-            # ingestor 的 5 分鐘 re-pull。pce_href unique + ON CONFLICT DO
-            # NOTHING 讓重拉完全冪等。
-            last = last - timedelta(minutes=5)
-        if last.tzinfo is None:
-            last = last.replace(tzinfo=timezone.utc)
-        return last.replace(microsecond=0).isoformat()
+            # Overlap：事件時間戳是「發生時間」不是「寫入 PCE 的時間」，VEN 離線
+            # 期間的事件重連後才上送；多節點 PCE 的事件也可能亂序晚到。往回重抓
+            # overlap（預設 20 分鐘＝兩個 VEN 上報週期）；pce_href unique +
+            # ON CONFLICT DO NOTHING 讓重抓完全冪等。
+            last = _aware(last) - self._overlap
+        return _aware(last).replace(microsecond=0)
+
+    def _since_cursor(self) -> str:
+        return self._since_dt().isoformat()
 
     _CHUNK = 500
 
@@ -200,6 +178,10 @@ class EventsIngestor:
                         ],
                     )
         return inserted
+
+
+def _aware(dt: datetime) -> datetime:
+    return dt if dt.tzinfo is not None else dt.replace(tzinfo=timezone.utc)
 
 
 def _parse_iso(s: str) -> datetime:

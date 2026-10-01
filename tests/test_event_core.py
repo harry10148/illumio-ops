@@ -576,15 +576,45 @@ def test_run_debug_mode_system_rule_uses_health_check_not_traffic(monkeypatch, t
     assert "計算出的總數" not in output
 
 
-def test_poller_default_overlap_300_and_clamped():
-    """D1（2026-07-24 審查）：overlap 是 watermark 下唯一補抓保險，
-    預設 300s、config 覆寫夾在 [60, 900]。"""
+def test_poller_default_overlap_1200_and_clamped():
+    """D1（2026-07-24 審查）：overlap 是 watermark 下唯一補抓保險。
+    預設 1200s（兩個 VEN 上報週期），config 覆寫夾在 [60, 3600]。"""
     from unittest.mock import MagicMock
     from src.events.poller import EventPoller
-    assert EventPoller(MagicMock()).overlap_seconds == 300
+    assert EventPoller(MagicMock()).overlap_seconds == 1200
     assert EventPoller(MagicMock(), overlap_seconds=30).overlap_seconds == 60
-    assert EventPoller(MagicMock(), overlap_seconds=1200).overlap_seconds == 900
+    assert EventPoller(MagicMock(), overlap_seconds=7200).overlap_seconds == 3600
     assert EventPoller(MagicMock(), overlap_seconds=120).overlap_seconds == 120
+
+
+def test_poller_drains_capped_window_instead_of_losing_older_events():
+    """碰 max_results 時 PCE 只回最新的那批；舊版標記 overflow 後 watermark
+    照樣推到 now，較舊的事件永久遺失。現在要二分切窗把整個視窗抓完。"""
+    import datetime as _dt
+    from src.events.poller import EventPoller, parse_event_timestamp
+
+    now = _dt.datetime.now(_dt.timezone.utc)
+    events = [{"href": f"/orgs/1/events/{i}",
+               "timestamp": (now - _dt.timedelta(seconds=30 * i)).strftime("%Y-%m-%dT%H:%M:%SZ"),
+               "event_type": "user.sign_in"} for i in range(1, 25)]
+
+    class Api:
+        calls = 0
+
+        def fetch_events_strict(self, start_time_str, end_time_str=None, max_results=5000):
+            Api.calls += 1
+            start = parse_event_timestamp(start_time_str)
+            end = parse_event_timestamp(end_time_str)
+            hits = [e for e in events
+                    if start <= parse_event_timestamp(e["timestamp"]) <= end]
+            hits.sort(key=lambda e: e["timestamp"], reverse=True)
+            return hits[:max_results]
+
+    poller = EventPoller(Api(), max_results=5)
+    batch = poller.fetch_batch(watermark=None)
+    assert len(batch.events) == 24
+    assert batch.overflow_risk is False
+    assert Api.calls > 1
 
 
 def test_mail_plain_not_truncated_at_line_cap():

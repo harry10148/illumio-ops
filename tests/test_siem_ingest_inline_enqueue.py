@@ -25,6 +25,10 @@ class FakeEventsApi:
     def get_events_async(self, since=None, rate_limit=False, **kw):
         return []
 
+    def fetch_events(self, start_time_str, end_time_str=None, max_results=5000,
+                     rate_limit=False):
+        return self._events[:max_results]
+
 
 class FakeTrafficApi:
     def __init__(self, flows):
