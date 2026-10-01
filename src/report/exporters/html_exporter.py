@@ -769,6 +769,11 @@ class _TrafficReportBase:
             _cap_banner = ('<p class="note note-warn" data-tone="warn">' + html.escape(
                 t("rpt_analysis_truncated", lang=_sl)
                 .replace("{shown}", f"{_cap['to']:,}").replace("{total}", f"{_cap['from']:,}")) + '</p>')
+        _qcap = self._r.get('_query_truncation') or {}
+        if _qcap.get('max_results'):
+            _cap_banner += ('<p class="note note-warn" data-tone="warn">' + html.escape(
+                t("rpt_query_truncated", lang=_sl)
+                .replace("{max}", f"{_qcap['max_results']:,}")) + '</p>')
         # Disclose analysis modules that threw: without this the sections below
         # render their missing metrics as real zeros (0% coverage, 0 flows) and
         # the reader cannot tell a healthy estate from a failed module.

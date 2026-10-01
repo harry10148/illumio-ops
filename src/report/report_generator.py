@@ -507,6 +507,12 @@ class ReportGenerator:
             result.module_results["_analysis_truncation"] = {
                 "from": _truncated_from, "to": max_results,
             }
+        # PCE 查詢本身碰到單次上限（max_results）：取回的就不是完整資料，
+        # 與上面「取回後再裁切」是不同的截斷，分開揭露。
+        _diag = (self.api.get_last_traffic_query_diagnostics() if self.api else {}) or {}
+        _qtrunc = _diag.get("query_truncated") if isinstance(_diag, dict) else None
+        if _qtrunc and _source == "api" and result.module_results is not None:
+            result.module_results["_query_truncation"] = dict(_qtrunc)
         return result
 
     def generate_from_csv(self, csv_path: str,
