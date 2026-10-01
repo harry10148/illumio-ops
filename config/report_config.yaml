@@ -29,8 +29,10 @@ ransomware_risk_ports:
     - {ports: [111],        proto: tcp,       service: SunRPC,     control: easy}
     - {ports: [4444],       proto: [tcp,udp], service: Metasploit, control: easy}
 
-# ─── Lateral Movement Ports (Module 5) ───────────────────────────────────────
-lateral_movement_ports: [3389, 5900, 22, 445, 5985, 5986, 5938, 23]
+# ─── Lateral Movement Ports (mod15 + rules engine; src/report/lateral_ports.py) ─
+# Remote admin / remote exec / file sharing. Database and directory ports are
+# deliberately NOT lateral: app-to-DB traffic is normal, not host hopping.
+lateral_movement_ports: [22, 23, 111, 135, 139, 445, 2049, 3389, 5900, 5938, 5985, 5986]
 
 # ─── Analysis Thresholds ─────────────────────────────────────────────────────
 thresholds:

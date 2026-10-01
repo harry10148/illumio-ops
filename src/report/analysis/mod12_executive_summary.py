@@ -42,15 +42,41 @@ def _maturity_grade(score: float) -> str:
         return "D"
     return "F"
 
+def _enforcement_ratio(results: dict[str, Any]) -> tuple[float | None, str]:
+    """Real enforcement progress (0-1) and where it came from.
+
+    Workload enforcement modes (mod13) first, then the share of flows whose
+    destination is enforced (mod03). Potentially Blocked flows earn nothing:
+    no rule allows them, they only pass because the destination is not
+    enforced yet. None when the data carries no enforcement mode at all.
+    """
+    dist = _enforcement_mode_distribution(results)
+    total = sum(int(v or 0) for v in dist.values()) if dist else 0
+    if total > 0:
+        full = int(dist.get("full", 0) or 0)
+        selective = int(dist.get("selective", 0) or 0)
+        return (full + 0.5 * selective) / total, "workload_modes"
+    mod03 = results.get("mod03", {})
+    pct = mod03.get("dst_enforced_flow_pct") if isinstance(mod03, dict) else None
+    if pct is not None:
+        return float(pct) / 100.0, "flow_destinations"
+    return None, "unavailable"
+
+
 def _compute_maturity_score(results: dict[str, Any]) -> dict[str, Any]:
     """Compute a single 0-100 Microsegmentation Maturity Score.
 
     Dimensions and weights:
-      - Enforcement coverage (40%): enforced + 0.5*staged
+      - Enforcement coverage (40%): workloads (or flow destinations) in
+        selective/full enforcement — NOT Potentially Blocked flows
       - Policy coverage (25%): allowed / total flows
       - Lateral movement control (15%): inverse of lateral_pct
       - Unmanaged asset ratio (10%): inverse of unmanaged %
       - High-risk port exposure (10%): inverse of risk flow ratio
+
+    When the source has no enforcement mode (CSV import) that dimension is
+    marked unavailable and the remaining weights are rescaled to 100 rather
+    than scoring it as zero or as full.
     """
     mod01 = results.get("mod01", {})
     mod03 = results.get("mod03", {})
@@ -59,13 +85,11 @@ def _compute_maturity_score(results: dict[str, Any]) -> dict[str, Any]:
 
     total_flows = mod01.get("total_flows", 0) or 1
 
-    # Dimension 1: Enforcement coverage (enforced + half credit for staged)
-    enforced_pct = mod03.get("enforced_coverage_pct", mod01.get("policy_coverage_pct", 0))
-    staged_pct = mod03.get("staged_coverage_pct", 0)
-    enforcement_ratio = min(100.0, enforced_pct + staged_pct * 0.5) / 100.0
+    enforcement_ratio, enforcement_source = _enforcement_ratio(results)
 
-    # Dimension 2: Policy coverage (same as enforced for now)
-    policy_ratio = enforced_pct / 100.0
+    # Dimension 2: Policy coverage — share of flows an allow rule matched.
+    allowed_pct = mod03.get("enforced_coverage_pct", mod01.get("policy_coverage_pct", 0))
+    policy_ratio = allowed_pct / 100.0
 
     # Dimension 3: Lateral movement control (lower lateral % = better)
     lateral_pct = 0.0
@@ -78,8 +102,10 @@ def _compute_maturity_score(results: dict[str, Any]) -> dict[str, Any]:
     unmanaged_pct = 100.0 - mod01.get("src_managed_pct", 100)
     managed_ratio = max(0.0, 1.0 - min(unmanaged_pct, 50.0) / 50.0)
 
-    # Dimension 5: Risk port exposure (lower risk flows = better)
-    risk_flows = mod04.get("risk_flows_total", 0) if isinstance(mod04, dict) else 0
+    # Dimension 5: Risk port exposure (lower uncontrolled risk flows = better)
+    risk_flows = 0
+    if isinstance(mod04, dict):
+        risk_flows = mod04.get("risk_flows_unblocked", mod04.get("risk_flows_total", 0))
     risk_ratio = risk_flows / total_flows if total_flows > 0 else 0
     risk_control = max(0.0, 1.0 - min(risk_ratio * 5, 1.0))  # 20% risk flows = 0 score
 
@@ -90,25 +116,32 @@ def _compute_maturity_score(results: dict[str, Any]) -> dict[str, Any]:
         "managed_asset_ratio": 10,
         "risk_port_control": 10,
     }
-    scores = {
-        "enforcement_coverage": round(weights["enforcement_coverage"] * enforcement_ratio, 1),
-        "policy_coverage": round(weights["policy_coverage"] * policy_ratio, 1),
-        "lateral_movement_control": round(weights["lateral_movement_control"] * lateral_control, 1),
-        "managed_asset_ratio": round(weights["managed_asset_ratio"] * managed_ratio, 1),
-        "risk_port_control": round(weights["risk_port_control"] * risk_control, 1),
+    ratios = {
+        "enforcement_coverage": enforcement_ratio,
+        "policy_coverage": policy_ratio,
+        "lateral_movement_control": lateral_control,
+        "managed_asset_ratio": managed_ratio,
+        "risk_port_control": risk_control,
     }
-    total = round(sum(scores.values()), 1)
+    dimensions: dict[str, dict[str, Any]] = {}
+    raw_total = 0.0
+    weight_total = 0
+    for key, weight in weights.items():
+        ratio = ratios[key]
+        if ratio is None:
+            dimensions[key] = {"weight": weight, "score": None, "ratio": None, "available": False}
+            continue
+        score = round(weight * ratio, 1)
+        dimensions[key] = {"weight": weight, "score": score, "ratio": round(ratio, 4), "available": True}
+        raw_total += weight * ratio
+        weight_total += weight
+    dimensions["enforcement_coverage"]["source"] = enforcement_source
+    total = round(raw_total / weight_total * 100, 1) if weight_total else 0.0
 
     return {
         "maturity_score": total,
         "maturity_grade": _maturity_grade(total),
-        "maturity_dimensions": {
-            "enforcement_coverage": {"weight": 40, "score": scores["enforcement_coverage"], "ratio": round(enforcement_ratio, 4)},
-            "policy_coverage": {"weight": 25, "score": scores["policy_coverage"], "ratio": round(policy_ratio, 4)},
-            "lateral_movement_control": {"weight": 15, "score": scores["lateral_movement_control"], "ratio": round(lateral_control, 4)},
-            "managed_asset_ratio": {"weight": 10, "score": scores["managed_asset_ratio"], "ratio": round(managed_ratio, 4)},
-            "risk_port_control": {"weight": 10, "score": scores["risk_port_control"], "ratio": round(risk_control, 4)},
-        },
+        "maturity_dimensions": dimensions,
     }
 
 # Coverage / enforcement gap callouts (not part of the Action Matrix —
@@ -182,7 +215,8 @@ def executive_summary(results: dict[str, Any], profile: str = "security_risk", l
 
     # Three-tier coverage from mod03
     enforced_cov = mod03.get("enforced_coverage_pct", mod01.get("policy_coverage_pct", 0))
-    staged_cov = mod03.get("staged_coverage_pct", 0)
+    # Potentially Blocked share: uncovered exposure (no rule allows it).
+    staged_cov = mod03.get("pb_uncovered_share", mod03.get("staged_coverage_pct", 0))
     true_gap = mod03.get("true_gap_pct", 0)
 
     # Enforcement mode distribution
@@ -222,13 +256,15 @@ def executive_summary(results: dict[str, Any], profile: str = "security_risk", l
     coverage = enforced_cov
     if coverage < 50:
         if staged_cov > 20:
+            # Not "nearly there": these flows have no allow rule and will be
+            # blocked the moment enforcement is turned on.
             f, a = _kf("staged_enforcement", lang, cov=coverage, staged=staged_cov)
-            key_findings.append({"severity": "MEDIUM", "finding": f, "action": a})
+            key_findings.append({"severity": "HIGH", "finding": f, "action": a})
         else:
             f, a = _kf("policy_gap", lang, cov=coverage, gap=true_gap)
             key_findings.append({"severity": "HIGH", "finding": f, "action": a})
 
-    ransomware_total = mod04.get("risk_flows_total", 0)
+    ransomware_total = mod04.get("risk_flows_unblocked", mod04.get("risk_flows_total", 0))
     if ransomware_total > 0:
         f, a = _actmtx("ransomware", lang, n=_fmt(ransomware_total))
         key_findings.append({

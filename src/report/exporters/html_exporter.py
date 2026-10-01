@@ -673,8 +673,18 @@ class _TrafficReportBase:
         maturity_bars = ''
         for dim_key, dim_label in m_dim_labels.items():
             dim = m_dims.get(dim_key, {})
-            dim_score = dim.get('score', 0)
             dim_weight = dim.get('weight', 0)
+            if dim.get('available') is False:
+                # 來源沒有 enforcement 模式（例如 CSV 匯入）：不計分、不畫 0。
+                maturity_bars += (
+                    f'<div class="mat-row">'
+                    f'<div class="mat-name">{dim_label}</div>'
+                    f'<div class="mat-bar"></div>'
+                    f'<div class="mat-val" title="{html.escape(t("rpt_mat_unavailable", lang=_sl), quote=True)}">{html.escape(t("rpt_mat_na", lang=_sl))}</div>'
+                    f'</div>'
+                )
+                continue
+            dim_score = dim.get('score', 0) or 0
             dim_pct = round(dim_score / max(dim_weight, 1) * 100, 0) if dim_weight else 0
             fill_cls = 'good' if dim_pct >= 70 else ('warn' if dim_pct >= 40 else 'bad')
             maturity_bars += (

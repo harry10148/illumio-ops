@@ -10,24 +10,7 @@ import pandas as pd
 from .attack_posture import build_app_display, make_posture_item, rank_posture_items, _enrich_app_display
 from src.i18n import t
 
-_LATERAL_PORTS = {
-    445: "SMB",
-    135: "RPC",
-    139: "NetBIOS",
-    3389: "RDP",
-    22: "SSH",
-    5985: "WinRM-HTTP",
-    5986: "WinRM-HTTPS",
-    23: "Telnet",
-    2049: "NFS",
-    111: "RPC Portmapper",
-    389: "LDAP",
-    636: "LDAPS",
-    88: "Kerberos",
-    1433: "MSSQL",
-    3306: "MySQL",
-    5432: "PostgreSQL",
-}
+from src.report.lateral_ports import DEFAULT_LATERAL_PORTS as _LATERAL_PORTS, lateral_ports as _lateral_ports
 
 def _normalize_key_series(df: pd.DataFrame, app_col: str, env_col: str) -> pd.Series:
     app = df.get(app_col, pd.Series(index=df.index, dtype=object)).fillna("").astype(str).str.strip().str.lower()
@@ -113,9 +96,17 @@ def _path_weight(path: list[str], edge_weights: dict[tuple[str, str], int]) -> i
         total += int(edge_weights.get((path[i], path[i + 1]), 0))
     return total
 
-def lateral_movement_risk(df: pd.DataFrame, top_n: int = 20, max_depth: int = 4, *, lang: str = "en") -> dict:
+def lateral_movement_risk(df: pd.DataFrame, top_n: int = 20, max_depth: int = 4, *, lang: str = "en",
+                          report_config: dict | None = None) -> dict:
+    """Lateral-movement exposure on remote admin / exec / file-share ports.
+
+    Blocked flows are excluded: they are controlled, not exposure. Counting
+    them made blocking SMB/RDP *raise* the lateral-movement finding and drop
+    the maturity score. Their count is reported as ``blocked_lateral_flows``.
+    """
     if df.empty:
         return {"error": t("rpt_mod_err_no_data", lang=lang)}
+    port_map = _lateral_ports(report_config)
 
     work = df.copy()
     work["port"] = pd.to_numeric(work.get("port", -1), errors="coerce").fillna(-1).astype(int)
@@ -124,10 +115,13 @@ def lateral_movement_risk(df: pd.DataFrame, top_n: int = 20, max_depth: int = 4,
     work["src_key"] = _normalize_key_series(work, "src_app", "src_env")
     work["dst_key"] = _normalize_key_series(work, "dst_app", "dst_env")
 
-    lateral = work[work["port"].isin(_LATERAL_PORTS)].copy()
-    lateral["service"] = lateral["port"].map(_LATERAL_PORTS)
+    on_lateral_port = work["port"].isin(port_map)
+    blocked_lateral_flows = int((on_lateral_port & (work["policy_decision"] == "blocked")).sum())
+    lateral = work[on_lateral_port & (work["policy_decision"] != "blocked")].copy()
+    lateral["service"] = lateral["port"].map(port_map)
     if lateral.empty:
         return {
+            "blocked_lateral_flows": blocked_lateral_flows,
             "total_lateral_flows": 0,
             "unique_lateral_src": 0,
             "unique_lateral_dst": 0,
@@ -474,6 +468,7 @@ def lateral_movement_risk(df: pd.DataFrame, top_n: int = 20, max_depth: int = 4,
 
     return {
         "node_ips": node_ips,
+        "blocked_lateral_flows": blocked_lateral_flows,
         "total_lateral_flows": int(len(lateral)),
         "unique_lateral_src": int(lateral["src_ip"].nunique()) if "src_ip" in lateral.columns else 0,
         "unique_lateral_dst": int(lateral["dst_ip"].nunique()) if "dst_ip" in lateral.columns else 0,

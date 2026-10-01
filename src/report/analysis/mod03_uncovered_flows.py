@@ -15,10 +15,17 @@ def _rec_map(lang: str) -> dict[str, str]:
 def uncovered_flows(df: pd.DataFrame, top_n: int = 20, *, lang: str = "en") -> dict:
     """
     Three-tier coverage analysis:
-      - Enforced Coverage: flows explicitly allowed by active policy rules.
-      - Staged Coverage: flows that would be blocked (potentially_blocked) —
-        rules exist but workloads are still in test/visibility mode.
+      - Allowed (``enforced_coverage_pct``, historical name): flows an allow
+        rule matched.
+      - Potentially Blocked (``pb_uncovered_share``): NO rule allows the flow;
+        it passes only because the destination is not enforced yet and it
+        WILL be blocked once enforcement is turned on. This is uncovered
+        exposure, not progress.
       - True Gap: blocked + unknown — no matching allow rule or not evaluated.
+
+    ``dst_enforced_flow_pct`` is the share of flows (with known destination
+    enforcement mode) whose destination workload is in selective/full
+    enforcement; None when the data carries no enforcement mode (CSV import).
 
     Also produces top uncovered flows, structural recommendations, per-port gap
     ranking, and inbound/outbound coverage split.
@@ -43,8 +50,11 @@ def uncovered_flows(df: pd.DataFrame, top_n: int = 20, *, lang: str = "en") -> d
     uncovered = df[decisions != 'allowed'].copy()
     total_uncovered = len(uncovered)
 
+    dst_enforced_flow_pct = _dst_enforced_flow_pct(df)
+
     if uncovered.empty:
         return {
+            'dst_enforced_flow_pct': dst_enforced_flow_pct,
             'total_uncovered': 0,
             'coverage_pct': 100.0,
             'enforced_coverage_pct': 100.0,
@@ -141,6 +151,7 @@ def uncovered_flows(df: pd.DataFrame, top_n: int = 20, *, lang: str = "en") -> d
     uncovered_services = _service_gap_ranking(uncovered, top_n=top_n)
 
     return {
+        'dst_enforced_flow_pct': dst_enforced_flow_pct,
         'total_uncovered': total_uncovered,
         'coverage_pct': coverage_pct,
         'enforced_coverage_pct': enforced_coverage_pct,
@@ -174,6 +185,24 @@ def uncovered_flows(df: pd.DataFrame, top_n: int = 20, *, lang: str = "en") -> d
             'i18n': {'lang': lang},
         },
     }
+
+_ENFORCED_MODES = {'full', 'selective'}
+
+
+def _dst_enforced_flow_pct(df: pd.DataFrame):
+    """Share of flows whose destination workload is selective/full enforced.
+
+    Only rows with a known destination enforcement mode count; returns None
+    when no row carries one (CSV exports have no such column).
+    """
+    if 'dst_enforcement' not in df.columns:
+        return None
+    modes = df['dst_enforcement'].fillna('').astype(str).str.strip().str.lower()
+    known = modes[modes != '']
+    if known.empty:
+        return None
+    return round(float(known.isin(_ENFORCED_MODES).mean()) * 100, 1)
+
 
 def _port_gap_ranking(df: pd.DataFrame, uncovered: pd.DataFrame, top_n: int = 20) -> pd.DataFrame:
     """Ranks (port, proto) by number of uncovered flows; shows total vs uncovered and gap %."""
