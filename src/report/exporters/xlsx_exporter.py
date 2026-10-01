@@ -7,6 +7,7 @@ rows. chart_spec (if present) rendered as matplotlib PNG and embedded.
 from __future__ import annotations
 
 import io
+import re
 import pandas as pd
 from loguru import logger
 from typing import Any
@@ -23,7 +24,27 @@ _HEADER_FONT = Font(bold=True, color="FFFFFF")
 _HEADER_FILL = PatternFill("solid", fgColor="375379")
 _ALERT_FILL = PatternFill("solid", fgColor="FFC7CE")
 _ALERT_TOKENS = ("blocked", "deny", "violat", "critical", "red_flag")
+# Word-level match. The old substring test also painted every
+# "potentially_blocked" row red, i.e. most of a visibility-mode estate.
+_ALERT_RE = re.compile(r"(?<!potentially_)(?<!potentially )\bblocked\b|\bdeny\b|violat|\bcritical\b|red_flag")
 _FORMULA_PREFIXES = ("=", "+", "-", "@")
+_NUMBER_RE = re.compile(r"^-?(?:0|[1-9]\d{0,2}(?:,\d{3})+|[1-9]\d*)(?:\.\d+)?$")
+_PERCENT_RE = re.compile(r"^(-?\d+(?:\.\d+)?)%$")
+
+
+def _coerce_number(val: Any) -> tuple[Any, str | None]:
+    """'1,234' → 1234 and '45.2%' → 45.2 (shown as 45.2%), so Excel can sort,
+    sum and pivot KPI values instead of treating them as text."""
+    if not isinstance(val, str):
+        return val, None
+    text = val.strip()
+    m = _PERCENT_RE.match(text)
+    if m:
+        return float(m.group(1)), '0.0"%"'
+    if _NUMBER_RE.match(text):
+        num = text.replace(",", "")
+        return (float(num) if "." in num else int(num)), None
+    return val, None
 
 
 def _neutralize(val: Any) -> Any:
@@ -79,8 +100,12 @@ def append_df_rows(ws, df: pd.DataFrame, *, header: bool = True) -> None:
     for record in df.to_dict("records"):
         row_vals = [_clean_nan(record.get(c)) for c in columns]
         row_text = " ".join(str(v).lower() for v in row_vals)
-        is_alert = any(tok in row_text for tok in _ALERT_TOKENS)
-        ws.append([_neutralize(v) for v in row_vals])
+        is_alert = bool(_ALERT_RE.search(row_text))
+        coerced = [_coerce_number(v) for v in row_vals]
+        ws.append([_neutralize(v) for v, _fmt in coerced])
+        for cell, (_v, fmt) in zip(ws[ws.max_row], coerced):
+            if fmt:
+                cell.number_format = fmt
         if is_alert:
             for cell in ws[ws.max_row]:
                 cell.fill = _ALERT_FILL
@@ -102,6 +127,8 @@ def add_df_sheet(
     if df is not None and not df.empty:
         append_df_rows(ws, df)
         ws.freeze_panes = "A2"
+        # 單表 sheet 加上篩選，方便直接排序／篩選（堆疊 sheet 無法這樣做）。
+        ws.auto_filter.ref = ws.dimensions
         _autosize_columns(ws, df)
         anchor_row = 1 + len(df) + 3
     else:
