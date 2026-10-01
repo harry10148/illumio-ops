@@ -49,3 +49,16 @@ def test_change_impact_flags_unlike_basis():
                   current_basis={"policy_decisions": "b", "filters": "x"})
     assert out["basis_mismatch"] == ["policy_decisions", "filters"]
     assert basis_mismatch({"policy_decisions": "abpu"}, {"kpis": {}}) == ["basis"]
+
+
+def test_change_impact_section_renders_basis_warning(monkeypatch):
+    """The section binds a local named `html`; the warning must still render."""
+    from src.report.exporters import html_exporter as he
+    monkeypatch.setattr("src.report.snapshot_store.read_latest",
+                        lambda *a, **k: {"kpis": {"maturity_score": 40}, "generated_at": "2026-09-01",
+                                         "basis": {"policy_decisions": "abpu", "filters": ""}})
+    exp = he.SecurityRiskHtmlExporter({"mod12": {"maturity_score": 50},
+                                       "_comparison_basis": {"policy_decisions": "b", "filters": ""}})
+    exp._s = lambda k: k
+    out = exp._mod_change_impact_html()
+    assert "policy_decisions" in out

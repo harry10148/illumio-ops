@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import datetime
 import html
+from html import escape as _escape_html  # methods that bind a local named `html`
 import os
 import re
 from loguru import logger
@@ -1975,7 +1976,7 @@ class _TrafficReportBase:
                 f' (vs {(impact.get("previous_snapshot_at") or "")[:10]})</p>')
         if impact.get('basis_mismatch'):
             html += ('<p class="note note-warn" data-tone="warn">'
-                     + html.escape(t("rpt_change_impact_basis_mismatch", lang=self._lang,
+                     + _escape_html(t("rpt_change_impact_basis_mismatch", lang=self._lang,
                                          fields=", ".join(impact['basis_mismatch'])))
                      + '</p>')
         deltas = impact.get('deltas', {})
