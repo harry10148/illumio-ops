@@ -66,8 +66,11 @@ class TrafficFilter:
                     if addr in net:
                         return False
         if self._envs is not None:
+            # 兩側任一 workload 的 env 在清單內就收；兩側都沒有 env label
+            # （非受管 IP）時維持放行，與舊版的 None 語意一致。
             env = flow.get("workload_env")
-            if env is not None and env not in self._envs:
+            envs = env if isinstance(env, (list, tuple, set)) else ([env] if env else [])
+            if envs and not any(e in self._envs for e in envs):
                 return False
         return True
 

@@ -463,13 +463,26 @@ def _proto_to_str(proto) -> str:
 
 def _flatten_flow(flow: dict) -> dict:
     """Return a flat-field view of flow for filter/sampler checks (handles nested PCE API format)."""
+    from src.report.parsers.api_parser import _extract_labels
     svc = flow.get("service") or {}
     src = flow.get("src") or {}
+    dst = flow.get("dst") or {}
+    # workload_env：src／dst 兩側 workload 的 env label。舊版沒有這兩個欄位，
+    # workload_label_env 篩選永遠放行；抽樣鍵少了 dst_ip，不同目的地的 flow
+    # 被當成同一個。
+    envs = []
+    for side in (src, dst):
+        labels = ((side.get("workload") or {}).get("labels")) or []
+        env = _extract_labels(labels).get("env")
+        if env:
+            envs.append(env)
     return {
         "action": flow.get("action") or flow.get("policy_decision", "unknown"),
         "src_ip": flow.get("src_ip", "") or src.get("ip", ""),
+        "dst_ip": flow.get("dst_ip", "") or dst.get("ip", ""),
         "port": svc.get("port") if svc else flow.get("port"),
         "protocol": _proto_to_str(svc.get("proto") if svc else flow.get("protocol")),
+        "workload_env": envs,
     }
 
 
