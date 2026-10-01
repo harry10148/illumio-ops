@@ -69,6 +69,47 @@ def _build_recommendations(attack_items: list[dict], top_n: int, lang: str = "en
         )
     return pd.DataFrame(rows)
 
+_ENFORCED = {"full": 1.0, "selective": 0.5}
+
+
+def _app_enforce_ratio(flows: pd.DataFrame, key: str):
+    """(full + 0.5×selective) / workloads with a known mode, for this app(env).
+
+    Uses the workloads' own enforcement mode carried on the flows. The old
+    factor was the share of flow endpoints that were MANAGED — every app with
+    a VEN read 100% "Enforcement Mode" even when nothing was enforced.
+    Returns None when the data carries no mode (CSV import).
+    """
+    parts = []
+    for side in ("src", "dst"):
+        mode_col, ip_col = f"{side}_enforcement", f"{side}_ip"
+        if mode_col not in flows.columns:
+            continue
+        sel = flows[f"{side}_key"] == key
+        sub = pd.DataFrame({
+            "ip": flows.loc[sel, ip_col] if ip_col in flows.columns else flows.loc[sel].index,
+            "mode": flows.loc[sel, mode_col],
+        })
+        parts.append(sub)
+    if not parts:
+        return None
+    wl = pd.concat(parts, ignore_index=True)
+    wl["mode"] = wl["mode"].fillna("").astype(str).str.strip().str.lower()
+    wl = wl[wl["mode"] != ""].drop_duplicates(subset=["ip"])
+    if wl.empty:
+        return None
+    return float(wl["mode"].map(lambda m: _ENFORCED.get(m, 0.0)).mean())
+
+
+def _weighted(parts: dict) -> float:
+    """Weighted 0-100 score over the factors that are available (ratio not None)."""
+    avail = {k: r for k, r in parts.items() if r is not None}
+    weight = sum(_WEIGHTS[k] for k in avail)
+    if not weight:
+        return 0.0
+    return round(sum(_WEIGHTS[k] * r for k, r in avail.items()) / weight * 100, 1)
+
+
 def enforcement_readiness(df: pd.DataFrame, workloads: list | None = None, top_n: int = 20, *, lang: str = "en") -> dict:
     if df.empty:
         return {"error": t("rpt_mod_err_no_data", lang=lang)}
@@ -84,10 +125,25 @@ def enforcement_readiness(df: pd.DataFrame, workloads: list | None = None, top_n
     app_rows: list[dict] = []
     attack_items: list[dict] = []
 
-    global_workload_ratio = 0.5
+    # Per-app modes from the workload inventory (the standalone Readiness
+    # report passes it); the flows' own enforcement columns win when present.
+    workload_ratio_by_key: dict[str, float] = {}
+    global_workload_ratio = None
     if workloads:
-        enforced = sum(1 for w in workloads if str(w.get("enforcement_mode", "")).lower() in {"full", "selective"})
-        global_workload_ratio = enforced / max(1, len(workloads))
+        buckets: dict[str, list[float]] = {}
+        for w in workloads:
+            app = env = ""
+            for lbl in (w.get("labels") or []):
+                if lbl.get("key") == "app":
+                    app = str(lbl.get("value") or "")
+                elif lbl.get("key") == "env":
+                    env = str(lbl.get("value") or "")
+            wkey = f"{app.strip().lower() or 'unlabeled'}|{env.strip().lower() or 'unlabeled'}"
+            buckets.setdefault(wkey, []).append(
+                _ENFORCED.get(str(w.get("enforcement_mode", "")).lower(), 0.0))
+        workload_ratio_by_key = {k: sum(v) / len(v) for k, v in buckets.items()}
+        all_vals = [x for v in buckets.values() for x in v]
+        global_workload_ratio = sum(all_vals) / len(all_vals) if all_vals else None
 
     for key in all_keys:
         app, env = key.split("|", 1)
@@ -99,38 +155,37 @@ def enforcement_readiness(df: pd.DataFrame, workloads: list | None = None, top_n
         allowed_ratio = float((flows["policy_decision"] == "allowed").mean())
         ringfence_ratio = float((flows["src_key"] == flows["dst_key"]).mean()) if total else 0.0
 
-        src_flags = (
-            flows.loc[flows["src_key"] == key, "src_managed"].fillna(False).astype(bool).tolist()
-            if "src_managed" in flows.columns
-            else []
-        )
-        dst_flags = (
-            flows.loc[flows["dst_key"] == key, "dst_managed"].fillna(False).astype(bool).tolist()
-            if "dst_managed" in flows.columns
-            else []
-        )
-        managed_flags = src_flags + dst_flags
-        enforce_ratio = float(sum(managed_flags) / len(managed_flags)) if managed_flags else global_workload_ratio
+        enforce_ratio = _app_enforce_ratio(flows, key)
+        if enforce_ratio is None:
+            enforce_ratio = workload_ratio_by_key.get(key, global_workload_ratio)
 
         # PB flows are uncovered exposure (no enforcement yet). Only allowed flows count as ready.
         pb_ratio = float((flows["policy_decision"] == "potentially_blocked").mean())
         blocked_ratio = float((flows["policy_decision"] == "blocked").mean())
         pb_uncovered_count = int((flows["policy_decision"] == "potentially_blocked").sum())
-        # staged_ratio reflects only enforced (allowed) coverage — PB is NOT credited here
-        staged_ratio = allowed_ratio
+        # "Staged readiness" was the allowed share again — the same number as
+        # policy coverage, so 50% of the weight sat on one metric. It is now
+        # the share of flows that keep working once enforced: everything but
+        # Potentially Blocked (blocked flows are already being dropped).
+        staged_ratio = 1.0 - pb_ratio
 
         remote = flows[flows["port"].isin(_REMOTE_PORTS)]
-        if remote.empty:
-            remote_coverage = 1.0
-        else:
-            remote_coverage = float((remote["policy_decision"] == "allowed").mean())
+        # No remote-access flows: the factor does not apply (it used to score
+        # as 100% covered).
+        remote_coverage = None if remote.empty else float((remote["policy_decision"] == "allowed").mean())
 
-        policy_score = round(_WEIGHTS["policy_coverage"] * allowed_ratio, 1)
-        ringfence_score = round(_WEIGHTS["ringfence_maturity"] * ringfence_ratio, 1)
-        enforce_score = round(_WEIGHTS["enforcement_mode"] * enforce_ratio, 1)
-        staged_score = round(_WEIGHTS["staged_readiness"] * staged_ratio, 1)
-        remote_score = round(_WEIGHTS["remote_app_coverage"] * remote_coverage, 1)
-        readiness_score = round(policy_score + ringfence_score + enforce_score + staged_score + remote_score, 1)
+        def _pts(k, r):
+            return None if r is None else round(_WEIGHTS[k] * r, 1)
+        policy_score = _pts("policy_coverage", allowed_ratio)
+        ringfence_score = _pts("ringfence_maturity", ringfence_ratio)
+        enforce_score = _pts("enforcement_mode", enforce_ratio)
+        staged_score = _pts("staged_readiness", staged_ratio)
+        remote_score = _pts("remote_app_coverage", remote_coverage)
+        readiness_score = _weighted({
+            "policy_coverage": allowed_ratio, "ringfence_maturity": ringfence_ratio,
+            "enforcement_mode": enforce_ratio, "staged_readiness": staged_ratio,
+            "remote_app_coverage": remote_coverage,
+        })
 
         app_rows.append(
             {
@@ -139,10 +194,10 @@ def enforcement_readiness(df: pd.DataFrame, workloads: list | None = None, top_n
                 "readiness_score": readiness_score,
                 "policy_coverage_ratio": round(allowed_ratio, 4),
                 "ringfence_maturity_ratio": round(ringfence_ratio, 4),
-                "enforcement_mode_ratio": round(enforce_ratio, 4),
+                "enforcement_mode_ratio": None if enforce_ratio is None else round(enforce_ratio, 4),
                 "staged_readiness_ratio": round(staged_ratio, 4),
                 "potentially_blocked_ratio": round(pb_ratio, 4),
-                "remote_app_coverage_ratio": round(remote_coverage, 4),
+                "remote_app_coverage_ratio": None if remote_coverage is None else round(remote_coverage, 4),
                 "policy_coverage_score": policy_score,
                 "ringfence_maturity_score": ringfence_score,
                 "enforcement_mode_score": enforce_score,
@@ -205,7 +260,7 @@ def enforcement_readiness(df: pd.DataFrame, workloads: list | None = None, top_n
                     evidence={"flow_count": total, "blocked_ratio": round(blocked_ratio, 4)},
                 )
             )
-        if not remote.empty and remote_coverage < 0.85:
+        if remote_coverage is not None and remote_coverage < 0.85:
             attack_items.append(
                 make_posture_item(
                     scope="traffic_report",
@@ -231,30 +286,38 @@ def enforcement_readiness(df: pd.DataFrame, workloads: list | None = None, top_n
         by=["readiness_score", "app_env_key"], ascending=[True, True]
     ).reset_index(drop=True)
 
-    avg_policy = float(app_env_scores["policy_coverage_ratio"].mean())
-    avg_ringfence = float(app_env_scores["ringfence_maturity_ratio"].mean())
-    avg_enforce = float(app_env_scores["enforcement_mode_ratio"].mean())
-    avg_staged = float(app_env_scores["staged_readiness_ratio"].mean())
-    avg_remote = float(app_env_scores["remote_app_coverage_ratio"].mean())
+    def _avg(col):
+        v = pd.to_numeric(app_env_scores[col], errors="coerce").dropna()
+        return None if v.empty else float(v.mean())
 
-    factor_scores = {
-        "policy_coverage": round(_WEIGHTS["policy_coverage"] * avg_policy, 1),
-        "ringfence_maturity": round(_WEIGHTS["ringfence_maturity"] * avg_ringfence, 1),
-        "enforcement_mode": round(_WEIGHTS["enforcement_mode"] * avg_enforce, 1),
-        "staged_readiness": round(_WEIGHTS["staged_readiness"] * avg_staged, 1),
-        "remote_app_coverage": round(_WEIGHTS["remote_app_coverage"] * avg_remote, 1),
+    avg_policy = _avg("policy_coverage_ratio") or 0.0
+    avg_ringfence = _avg("ringfence_maturity_ratio")
+    avg_enforce = _avg("enforcement_mode_ratio")
+    avg_staged = _avg("staged_readiness_ratio")
+    avg_remote = _avg("remote_app_coverage_ratio")
+    averages = {"policy_coverage": avg_policy, "ringfence_maturity": avg_ringfence,
+                "enforcement_mode": avg_enforce, "staged_readiness": avg_staged,
+                "remote_app_coverage": avg_remote}
+
+    # A factor with no data (no enforcement mode in the source, no remote
+    # flows) is shown as N/A and left out of the total, which is rescaled
+    # over the factors that do apply.
+    factor_scores = {k: (None if r is None else round(_WEIGHTS[k] * r, 1)) for k, r in averages.items()}
+    total_score = _weighted(averages)
+    _labels = {
+        "policy_coverage": t("rpt_factor_policy_coverage", default="Policy Coverage", lang=lang),
+        "ringfence_maturity": t("rpt_factor_ringfence_maturity", default="Ringfence Maturity", lang=lang),
+        "enforcement_mode": t("rpt_factor_enforcement_mode", default="Enforcement Mode", lang=lang),
+        "staged_readiness": t("rpt_factor_staged_readiness", default="Staged Readiness", lang=lang),
+        "remote_app_coverage": t("rpt_factor_remote_app_coverage", default="Remote-App Coverage", lang=lang),
     }
-
-    total_score = round(sum(factor_scores.values()), 1)
-    factor_table = pd.DataFrame(
-        [
-            {"Factor": t("rpt_factor_policy_coverage", default="Policy Coverage", lang=lang), "Weight": _WEIGHTS["policy_coverage"], "Score": factor_scores["policy_coverage"], "Ratio %": round(avg_policy * 100, 1)},
-            {"Factor": t("rpt_factor_ringfence_maturity", default="Ringfence Maturity", lang=lang), "Weight": _WEIGHTS["ringfence_maturity"], "Score": factor_scores["ringfence_maturity"], "Ratio %": round(avg_ringfence * 100, 1)},
-            {"Factor": t("rpt_factor_enforcement_mode", default="Enforcement Mode", lang=lang), "Weight": _WEIGHTS["enforcement_mode"], "Score": factor_scores["enforcement_mode"], "Ratio %": round(avg_enforce * 100, 1)},
-            {"Factor": t("rpt_factor_staged_readiness", default="Staged Readiness", lang=lang), "Weight": _WEIGHTS["staged_readiness"], "Score": factor_scores["staged_readiness"], "Ratio %": round(avg_staged * 100, 1)},
-            {"Factor": t("rpt_factor_remote_app_coverage", default="Remote-App Coverage", lang=lang), "Weight": _WEIGHTS["remote_app_coverage"], "Score": factor_scores["remote_app_coverage"], "Ratio %": round(avg_remote * 100, 1)},
-        ]
-    )
+    na = t("rpt_mat_na", lang=lang)
+    factor_table = pd.DataFrame([
+        {"Factor": _labels[k], "Weight": _WEIGHTS[k],
+         "Score": na if factor_scores[k] is None else factor_scores[k],
+         "Ratio %": na if averages[k] is None else round(averages[k] * 100, 1)}
+        for k in _WEIGHTS
+    ])
 
     # Enforcement mode distribution from workloads (if available)
     enforcement_mode_distribution: dict[str, int] = {}
@@ -274,11 +337,11 @@ def enforcement_readiness(df: pd.DataFrame, workloads: list | None = None, top_n
         t("rpt_factor_remote_app_coverage", default="Remote-App Coverage", lang=lang),
     ]
     factor_chart_values = [
-        factor_scores['policy_coverage'],
-        factor_scores['ringfence_maturity'],
-        factor_scores['enforcement_mode'],
-        factor_scores['staged_readiness'],
-        factor_scores['remote_app_coverage'],
+        factor_scores['policy_coverage'] or 0,
+        factor_scores['ringfence_maturity'] or 0,
+        factor_scores['enforcement_mode'] or 0,
+        factor_scores['staged_readiness'] or 0,
+        factor_scores['remote_app_coverage'] or 0,
     ]
 
     # Estate-wide PB total must come from the deduped flow frame: summing the

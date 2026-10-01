@@ -170,7 +170,11 @@ class ReadinessReportGenerator:
             bucket[mode] = bucket.get(mode, 0) + 1
         rows = []
         for _, s in scores.iterrows():
-            ratios = {name: float(s.get(col, 0.0)) for name, col in _QUEUE_FACTORS}
+            # Factors with no data (None/NaN) do not apply to this app.
+            ratios = {name: float(s.get(col)) for name, col in _QUEUE_FACTORS
+                      if s.get(col) is not None and not pd.isna(s.get(col))}
+            if not ratios:
+                ratios = {"policy_coverage": float(s.get("policy_coverage_ratio", 0.0) or 0.0)}
             # Blocking factor = the one costing the most WEIGHTED points, not the
             # lowest raw ratio: a small dip in a 35-pt factor outranks a large dip
             # in a 10-pt one for directing the recommended action.
