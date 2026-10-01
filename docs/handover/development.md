@@ -237,6 +237,16 @@ def t(key: str, *, lang: str | None = None, default: str | None = None, **kwargs
 | I | `i18n_zh_TW.json` 中缺少的已追蹤 EN 鍵值 |
 | J | Dashboard zh_TW 核准翻譯迴歸閘道：`dashboard_approved.json` 每個鍵須與核准值完全相符，Han 字元比例 ≥ 0.8（`han_ratio_exceptions` 內的合法拉丁術語除外） |
 
+Category C 掃 `.js` 時會先略過 `/* */` 區塊註解（含不以 `*` 開頭的續行），所以註解裡的 CJK 不算違規；行尾 `//` 註解仍照下方規則處理。
+
+### 3.7 報表的字串與靜態資產
+
+- **報表文字全部在兩個 i18n JSON**：`src/report/exporters/report_i18n.py` 不再在 import 時補字串，只提供 `STRINGS`（以兩個 JSON 為底的字典檢視）與 `COL_I18N`。安全規則的修正說明是 `rpt_rule_<規則ID>_how` 鍵；要改文字就改 JSON。
+- **欄名對照（`COL_I18N`）** 在 `src/report/exporters/col_i18n_map.json`：pandas 欄名 → i18n 鍵。新增分析欄位時把欄名加進這裡，HTML 表頭才會翻譯。
+- **報表外殼的 CSS／表格 JS** 在 `src/report/exporters/assets/report_shell.css` 與 `report_table.js`，由 `report_shell.py` 逐位元組讀入（`SHELL_CSS`／`TABLE_JS`）。drift guard 仍比對 `design/v3/reports/shell.css`；`tests/test_report_no_hardcoded_colour.py` 的色值 ratchet 也涵蓋這兩個檔。
+- **HTML 寫檔一律用 `_output_paths.save_text_report(path, body)`**：它負責保留檔名、寫入，失敗時清掉半成品。
+- **KPI 數字的回歸測試**在 `tests/test_report_golden_numbers.py`：一組手算的流量與事件走完真實的 parser 與模組管線。改了 KPI 算法，要在測試註解裡重新推導期望值，不能直接把新輸出貼回去。
+
 ---
 
 ## 4. 常見斷鏈坑

@@ -29,7 +29,8 @@ REPORT_SRC = REPO_ROOT / "src" / "report"
 
 #: 3 碼與 6 碼十六進位色值。後面的 negative lookahead 擋掉 8 碼（帶 alpha）被
 #: 當成 6 碼＋雜訊，也擋掉 git SHA 之類的長字串被切一段出來當顏色。
-_HEX = re.compile(r"#[0-9A-Fa-f]{3}(?:[0-9A-Fa-f]{3})?\b(?![0-9A-Fa-f])")
+#: 前面的 (?<!&) 擋掉 HTML 數字實體（`&#160;`），那不是顏色。
+_HEX = re.compile(r"(?<!&)#[0-9A-Fa-f]{3}(?:[0-9A-Fa-f]{3})?\b(?![0-9A-Fa-f])")
 
 #: relpath -> (允許的字面量數量, 理由)。0 不列在這裡——沒列到的檔一律必須是 0。
 #:
@@ -40,10 +41,11 @@ _HEX = re.compile(r"#[0-9A-Fa-f]{3}(?:[0-9A-Fa-f]{3})?\b(?![0-9A-Fa-f])")
 #:
 #: 每一條都是「這裡的色值不能是 CSS 變數」的具體理由，不是「這個檔還沒清」。
 _ALLOWED: dict[str, tuple[int, str]] = {
-    "exporters/report_shell.py": (
-        39,
+    "exporters/assets/report_shell.css": (
+        38,
         "SHELL_CSS 的 :root token 區塊本身——色票就是在這裡定義的，"
-        "值必須是字面量。這個檔另有 drift guard 綁住 design/v3/reports/shell.css。",
+        "值必須是字面量。report_shell.py 逐位元組讀入這個檔，另有 drift guard "
+        "綁住 design/v3/reports/shell.css。",
     ),
     "report_generator.py": (
         32,
@@ -69,8 +71,12 @@ _ALLOWED: dict[str, tuple[int, str]] = {
 
 
 def _relpaths() -> list[str]:
+    # The shell's stylesheet and table script are shipped as asset files that
+    # report_shell.py reads verbatim, so they are part of the ratchet too.
     return sorted(
-        str(p.relative_to(REPORT_SRC)) for p in REPORT_SRC.rglob("*.py")
+        str(p.relative_to(REPORT_SRC))
+        for pattern in ("*.py", "*.css", "*.js")
+        for p in REPORT_SRC.rglob(pattern)
     )
 
 

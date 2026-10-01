@@ -64,3 +64,20 @@ def write_bytes_atomic(path: str, data: bytes) -> None:
 def write_text_atomic(path: str, text: str, encoding: str = "utf-8") -> None:
     """Text convenience wrapper over write_bytes_atomic()."""
     write_bytes_atomic(path, text.encode(encoding))
+
+
+def save_text_report(path: str, body: str) -> str:
+    """Reserve a unique name for ``path``, write ``body`` atomically, return it.
+
+    The one save sequence every exporter used to repeat by hand: claim the
+    name with O_EXCL (two same-minute runs would otherwise clobber each other),
+    write through a temp file + os.replace (no half-written report the GUI
+    could list), and release the reservation if the write fails.
+    """
+    reserved = reserve_unique_path(path)
+    try:
+        write_text_atomic(reserved, body)
+    except BaseException:
+        discard_reserved(reserved)
+        raise
+    return reserved

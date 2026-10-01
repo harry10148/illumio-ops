@@ -359,16 +359,10 @@ def executive_summary(results: dict[str, Any], profile: str = "security_risk", l
                 score=maturity["maturity_score"], crit=n_crit, high=n_high, pb=staged_cov)
     top_actions = _top_actions(key_findings, findings)
 
-    dim_labels = [
-        'Enforcement Coverage',
-        'Policy Coverage',
-        'Lateral Control',
-        'Managed Asset Ratio',
-        'Risk Port Control',
-    ]
     dim_keys = ['enforcement_coverage', 'policy_coverage', 'lateral_movement_control',
                 'managed_asset_ratio', 'risk_port_control']
-    dim_values = [maturity['maturity_dimensions'][k]['score'] for k in dim_keys]
+    dim_labels = [t(f"rpt_mat_{k}", lang=lang) for k in dim_keys]
+    dim_values = [maturity['maturity_dimensions'][k]['score'] or 0 for k in dim_keys]
 
     return {
         "generated_at": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),

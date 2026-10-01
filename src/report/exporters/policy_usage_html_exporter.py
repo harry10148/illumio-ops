@@ -9,11 +9,11 @@ import os
 
 import pandas as pd
 
-from ._output_paths import discard_reserved, reserve_unique_path, write_text_atomic
+from ._output_paths import save_text_report
 from .report_i18n import COL_I18N as _COL_I18N
 from .report_i18n import STRINGS
 from .report_i18n import RISK_TYPE_VALUE_I18N
-from .report_shell import ShellCover, ShellSection, build_shell_document
+from .report_shell import ShellCover, ShellSection, build_shell_document, cover_meta
 from .table_renderer import render_df_table
 from .chart_renderer import render_matplotlib_svg
 from .code_highlighter import get_highlight_css
@@ -213,12 +213,7 @@ class PolicyUsageHtmlExporter:
         # _build()，建置中途拋錯就留下 0-byte 報表（GUI 照樣列出並可下載）。
         # 再以 O_EXCL 搶下唯一檔名（同分鐘併發產出會撞名）＋暫存檔 os.replace。
         body = self._build()
-        filepath = reserve_unique_path(os.path.join(output_dir, filename))
-        try:
-            write_text_atomic(filepath, body)
-        except BaseException:
-            discard_reserved(filepath)
-            raise
+        filepath = save_text_report(os.path.join(output_dir, filename), body)
         logger.info("[PolicyUsageHtmlExporter] Saved: {}", filepath)
         return filepath
 
@@ -274,16 +269,9 @@ class PolicyUsageHtmlExporter:
         sections.append(self._section("draft-pd", "rpt_pu_sec_draft_pd", self._mod05_html()))
 
         _report_type = _s("rpt_cover_type_policy")
-        _meta: dict[str, str] = {}
-        if self._pce_url:
-            _meta[_s("rpt_cover_pce")] = self._pce_url
-        if self._org_name:
-            _meta[_s("rpt_cover_org")] = self._org_name
-        _cover_range = " – ".join(d for d in self._date_range if d)
-        if _cover_range:
-            _meta[_s("rpt_cover_date_range")] = _cover_range
-        if mod00.get("generated_at"):
-            _meta[_s("rpt_cover_generated")] = str(mod00["generated_at"])
+        _meta = cover_meta(_sl, pce_url=self._pce_url, org_name=self._org_name,
+                           date_range=self._date_range,
+                           generated_at=mod00.get("generated_at"))
 
         # rpt_kicker_policy and rpt_cover_type_policy are the same string
         # ("Policy Usage Report"), so printing both would stack one line on top

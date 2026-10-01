@@ -877,7 +877,7 @@ class AuditGenerator:
         mod00 = result.module_results.get('mod00', {}) if isinstance(result.module_results, dict) else {}
         attack_summary = extract_attack_summary(result.module_results, top_n=5)
         counts = attack_summary_counts(attack_summary)
-        summary = build_attack_summary_brief(counts)
+        summary = build_attack_summary_brief(counts, lang=getattr(self, '_lang', 'en'))
         if not summary:
             summary = f"audit events {int(getattr(result, 'record_count', 0) or 0)}"
         return {

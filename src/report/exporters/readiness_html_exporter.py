@@ -25,15 +25,12 @@ import html as _html
 import os
 
 from src.i18n import t
-from src.report.exporters._output_paths import (
-    discard_reserved,
-    reserve_unique_path,
-    write_text_atomic,
-)
+from src.report.exporters._output_paths import save_text_report
 from src.report.exporters.report_shell import (
     ShellCover,
     ShellSection,
     build_shell_document,
+    cover_meta,
 )
 from src.report.exporters.table_renderer import wrap_table_panel
 
@@ -224,14 +221,8 @@ class ReadinessHtmlExporter:
         # eyebrow carries the type label because type_label alone only reaches
         # body[data-report-title] — which this report did not have at all before
         # (nor a lang attribute); the shell supplies both.
-        meta: dict[str, str] = {}
-        if self._pce_url:
-            meta[t("rpt_cover_pce", lang=lang)] = self._pce_url
-        if self._org_name:
-            meta[t("rpt_cover_org", lang=lang)] = self._org_name
-        date_range = " – ".join(d for d in (self._result.date_range or ()) if d)
-        if date_range:
-            meta[t("rpt_cover_date_range", lang=lang)] = date_range
+        meta = cover_meta(lang, pce_url=self._pce_url, org_name=self._org_name,
+                          date_range=self._result.date_range or ())
         # The legacy cover suppressed the grade block for a missing or "?"
         # grade; the same guard, or the cover would print an empty chip whose
         # tone says "neutral" as if that were a measured result.
@@ -253,11 +244,5 @@ class ReadinessHtmlExporter:
         # _render_html()，建置中途拋錯就留下 0-byte 報表（GUI 照樣列出並可下載）。
         # 再以 O_EXCL 搶下唯一檔名（同分鐘併發產出會撞名）＋暫存檔 os.replace。
         body = self._render_html()
-        path = reserve_unique_path(
-            os.path.join(output_dir, f"Illumio_Readiness_Report_{ts}.html"))
-        try:
-            write_text_atomic(path, body)
-        except BaseException:
-            discard_reserved(path)
-            raise
+        path = save_text_report(os.path.join(output_dir, f"Illumio_Readiness_Report_{ts}.html"), body)
         return path

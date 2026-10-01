@@ -11,11 +11,7 @@ import os
 
 from loguru import logger
 
-from src.report.exporters._output_paths import (
-    discard_reserved,
-    reserve_unique_path,
-    write_text_atomic,
-)
+from src.report.exporters._output_paths import save_text_report
 from src.report.exporters.csv_exporter import CsvExporter
 from src.report.report_metadata import write_metadata_sidecar
 
@@ -34,13 +30,7 @@ class PolicyResolverExporter:
         # 序列化中途拋錯就留下半截／0-byte 的 JSON（GUI 照樣列出並可下載）。
         # 再以 O_EXCL 搶下唯一檔名（同分鐘併發產出會撞名）＋暫存檔 os.replace。
         body = json.dumps(self._r, ensure_ascii=False, indent=2)
-        path = reserve_unique_path(
-            os.path.join(output_dir, f"Illumio_Policy_Resolver_{ts}.json"))
-        try:
-            write_text_atomic(path, body)
-        except BaseException:
-            discard_reserved(path)
-            raise
+        path = save_text_report(os.path.join(output_dir, f"Illumio_Policy_Resolver_{ts}.json"), body)
         self._write_report_metadata(path, file_format="json")
         logger.info(f"[PolicyResolverExporter] Wrote JSON -> {path}")
         return path

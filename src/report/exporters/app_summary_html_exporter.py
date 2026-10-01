@@ -19,16 +19,13 @@ import os
 
 from src.i18n import t
 from src.report.app_summary_report import _safe_filename_token
-from src.report.exporters._output_paths import (
-    discard_reserved,
-    reserve_unique_path,
-    write_text_atomic,
-)
+from src.report.exporters._output_paths import save_text_report
 from src.report.exporters.html_exporter import _sev_attrs
 from src.report.exporters.report_shell import (
     ShellCover,
     ShellSection,
     build_shell_document,
+    cover_meta,
 )
 from src.report.exporters.table_renderer import render_df_table, wrap_table_panel
 from src.report.report_metadata import write_metadata_sidecar
@@ -215,10 +212,7 @@ class AppSummaryHtmlExporter:
         # _T5_WALL_CLOCK_COVER in tests/test_report_shell_migration.py), and
         # re-rendering the same report would print a different "generated"
         # time. A date the reader cannot rely on is worse than no date.
-        meta: dict[str, str] = {}
-        date_range = " – ".join(d for d in (self._r.get("date_range") or ()) if d)
-        if date_range:
-            meta[t("rpt_cover_date_range", lang=lang)] = date_range
+        meta = cover_meta(lang, date_range=self._r.get("date_range") or ())
 
         cover = ShellCover(
             title=title,
@@ -237,13 +231,7 @@ class AppSummaryHtmlExporter:
         token = _safe_filename_token(self._r.get("app", "app"))
         # 以 O_EXCL 搶下唯一檔名（同分鐘、同 app 併發產出會撞名）＋暫存檔
         # os.replace，避免兩張同型報表互相截斷、或半寫檔被 GUI 列出。
-        path = reserve_unique_path(
-            os.path.join(output_dir, f"Illumio_App_Summary_{token}_{ts}.html"))
-        try:
-            write_text_atomic(path, html)
-        except BaseException:
-            discard_reserved(path)
-            raise
+        path = save_text_report(os.path.join(output_dir, f"Illumio_App_Summary_{token}_{ts}.html"), html)
         self._write_report_metadata(path)
         return path
 
