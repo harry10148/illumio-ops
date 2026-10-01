@@ -86,10 +86,10 @@ BILINGUAL_DATA_FILES = {
 # UI string added anywhere inside the same literal would inherit the exemption.
 # For these, every CJK line in the literal must sit in a `/* */` or `//`
 # comment; CJK outside one is still a finding.
-COMMENT_SCOPED_CJK: set[tuple[str, str]] = {
-    ("src/report/exporters/report_shell.py", "shell-css-port-v3"),
-    ("src/report/exporters/report_shell.py", "normalizeCellValue"),
-}
+# The report shell's stylesheet and table script used to be two such literals in
+# report_shell.py; they now live in src/report/exporters/assets/ (.css is not
+# scanned, and the .js scan below already ignores `/* */` comments).
+COMMENT_SCOPED_CJK: set[tuple[str, str]] = set()
 
 # (file_relpath, needle) pairs — specific intentional CJK spots that
 # should not count as findings. `needle` is a substring we expect on the line.
@@ -110,8 +110,6 @@ BILINGUAL_DATA_LINES: set[tuple[str, str]] = {
     ("src/cli/menus/_helpers.py", '"是"'),
     # Column-name match keyword, not a display string.
     ("src/report/exporters/html_exporter.py", "_INT_COL_KEYWORDS"),
-    # TABLE_JS and SHELL_CSS live in COMMENT_SCOPED_CJK above, not here: their
-    # exemption is limited to CJK inside code comments (C4).
     # Policy usage overview: hit/unused labels resolved via col_i18n; kept
     # as zh so the pandas column name maps to the HTML header translation.
     ("src/report/analysis/policy_usage/pu_mod01_overview.py", "已命中"),
@@ -426,6 +424,11 @@ def _js_html_cjk_literals(path: Path) -> list[tuple[int, str]]:
     """Find CJK appearing in string literals or text content in JS/HTML."""
     out: list[tuple[int, str]] = []
     text = _read(path)
+    if path.suffix in (".js", ".mjs"):
+        # Blank out /* ... */ block comments (keeping newlines so line numbers
+        # stay right): a comment's continuation lines don't start with "*",
+        # so the per-line check below can't recognise them as comments.
+        text = re.sub(r"/\*.*?\*/", lambda m: "\n" * m.group(0).count("\n"), text, flags=re.S)
     for line_no, line in enumerate(text.splitlines(), start=1):
         if not CJK_RE.search(line):
             continue
