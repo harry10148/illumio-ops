@@ -133,9 +133,44 @@ def _build_snapshot(module_results: dict) -> dict:
         'maturity_dimensions': mod12.get('maturity_dimensions', {}),
         'maturity_score':      _safe_val(mod12.get('maturity_score', 0)),
         'maturity_grade':      mod12.get('maturity_grade', '?'),
+        # 截斷揭露：儀表板讀到的總數可能只是部分資料。
+        'analysis_truncation': module_results.get('_analysis_truncation') or None,
+        'query_truncation':    module_results.get('_query_truncation') or None,
     }
 
 # ─── Result container ─────────────────────────────────────────────────────────
+
+_PD_CODE = {"allowed": "a", "blocked": "b", "potentially_blocked": "p", "unknown": "u"}
+
+
+def comparison_basis(result) -> dict:
+    """What a KPI snapshot was computed over, so two runs are only compared
+    like for like: the requested window, the policy-decision set, a hash of
+    the other filters, and whether rows were capped or the PCE query hit its
+    limit. A label-filtered GUI report compared against the scheduled
+    whole-estate report used to be shown as "improved/regressed" silently.
+    """
+    import hashlib
+    import json as _json
+    qc = getattr(result, "query_context", None) or {}
+    mr = getattr(result, "module_results", None) or {}
+    pds = qc.get("policy_decisions") or ["allowed", "blocked", "potentially_blocked", "unknown"]
+    code = "".join(sorted(_PD_CODE.get(str(p), "?") for p in pds))
+    other = {k: v for k, v in (qc.get("filters") or {}).items()
+             if k not in ("policy_decisions", "requires_draft_pd") and v not in (None, "", [], {})}
+    fhash = hashlib.sha1(_json.dumps(other, sort_keys=True, default=str).encode("utf-8"),
+                         usedforsecurity=False).hexdigest()[:12] if other else ""
+    start, end = qc.get("start_date"), qc.get("end_date")
+    if not (start and end):
+        dr = getattr(result, "date_range", None) or ("", "")
+        start, end = (dr[0] if dr else ""), (dr[1] if len(dr) > 1 else "")
+    return {
+        "window": {"start": start or "", "end": end or ""},
+        "policy_decisions": code,
+        "filters": fhash,
+        "truncated": bool(mr.get("_analysis_truncation") or mr.get("_query_truncation")),
+    }
+
 
 def _merge_hybrid_raw(gap: list, cached: list) -> list:
     """API gap + cache, keeping one row per flow.
@@ -426,15 +461,33 @@ class ReportGenerator:
     def _cap_records(df, max_results, draft_policy: bool = False):
         """Cap df to max_results rows so analysis/render stays tractable on busy
         PCEs. For draft-policy reports, move the draft-divergent (subtype) flows —
-        the R01-R05 subjects — ahead of the cap so they survive the truncation."""
+        the R01-R05 subjects — ahead of the cap so they survive the truncation.
+
+        Rows are ranked by connection count (then most recent) before the cut.
+        A plain head() kept whatever came first, and cache/mixed frames are
+        ordered by last_detected ascending — the cap silently kept the oldest
+        days of the window and dropped the newest.
+        """
         if not max_results or df.empty or len(df) <= max_results:
             return df
         import pandas as pd
+        sort_cols, ascending = [], []
+        if "num_connections" in df.columns:
+            df = df.assign(_cap_conn=pd.to_numeric(df["num_connections"], errors="coerce").fillna(0))
+            sort_cols.append("_cap_conn")
+            ascending.append(False)
+        if "last_detected" in df.columns:
+            df = df.assign(_cap_last=pd.to_datetime(df["last_detected"], utc=True, errors="coerce"))
+            sort_cols.append("_cap_last")
+            ascending.append(False)
+        if sort_cols:
+            df = df.sort_values(sort_cols, ascending=ascending, kind="stable", na_position="last")
         if draft_policy and "draft_policy_decision" in df.columns:
             sub = df["draft_policy_decision"].astype(str).str.contains(
                 "_by_boundary|_override_deny|_across_boundary", regex=True, na=False)
-            df = pd.concat([df[sub], df[~sub]], ignore_index=True)
-        return df.head(max_results)
+            df = pd.concat([df[sub], df[~sub]])
+        df = df.head(max_results).drop(columns=["_cap_conn", "_cap_last"], errors="ignore")
+        return df.reset_index(drop=True)
 
     # ── public ───────────────────────────────────────────────────────────────
 
@@ -543,6 +596,11 @@ class ReportGenerator:
             traffic_report_profile=traffic_report_profile,
         )
         result.draft_policy_report = draft_policy
+        if result.module_results is not None:
+            from src.report.provenance import build_provenance
+            result.module_results["_provenance"] = build_provenance(
+                self.cm, source=_source, start=start_date, end=end_date,
+                filters=filters, policy_decisions=policy_decisions)
         if _truncated_from and result.module_results is not None:
             # Surface the pre-cap count so the exporter can disclose that every
             # total/finding reflects only the retained rows.
@@ -553,7 +611,8 @@ class ReportGenerator:
         # 與上面「取回後再裁切」是不同的截斷，分開揭露。
         _diag = (self.api.get_last_traffic_query_diagnostics() if self.api else {}) or {}
         _qtrunc = _diag.get("query_truncated") if isinstance(_diag, dict) else None
-        if _qtrunc and _source == "api" and result.module_results is not None:
+        # mixed 的 API gap 段同樣可能碰頂。
+        if _qtrunc and _source in ("api", "mixed") and result.module_results is not None:
             result.module_results["_query_truncation"] = dict(_qtrunc)
         return result
 
@@ -572,7 +631,11 @@ class ReportGenerator:
         logger.info(f"[ReportGenerator] Starting CSV-source report from: {csv_path}")
         print(t("rpt_parsing_csv", path=csv_path, lang=lang))
         df = self._parse_csv(csv_path)
-        return self._run_pipeline(df, source='csv', traffic_report_profile=traffic_report_profile)
+        result = self._run_pipeline(df, source='csv', traffic_report_profile=traffic_report_profile)
+        if result.module_results is not None:
+            from src.report.provenance import build_provenance
+            result.module_results["_provenance"] = build_provenance(self.cm, source="csv")
+        return result
 
     def export(self, result: ReportResult, fmt: str = 'html',
                output_dir: str = 'reports',
@@ -624,17 +687,20 @@ class ReportGenerator:
             ts = meta.get("generated_at", "")
             prev = load_previous(output_dir, _trend_key)
             prev = canonicalize_legacy_keys(prev, candidate_keys=list(kpi_dict.keys()))
+            _basis = comparison_basis(result)
+            result.module_results["_comparison_basis"] = _basis
             _snapshot_meta = {
-                "window": {
-                    "start": result.date_range[0] if result.date_range else "",
-                    "end": result.date_range[1] if len(result.date_range) > 1 else "",
-                },
+                # 查詢時段（不是資料最早/最晚時間——長壽 flow 與抽樣上限會讓
+                # 那個區間跟請求的不一樣）。
+                "window": _basis["window"],
                 "data_source": result.data_source,
                 "profile": traffic_report_profile,
                 # 判定值域代碼：abpu = allowed/blocked/potentially_blocked/unknown
-                # （2026-07 起預設含 unknown）。舊快照無此欄——snapshot_mismatch
-                # 據此對「換基準」比較發出警語。
-                "policy_decisions": "abpu",
+                # （2026-07 起預設含 unknown）；依實際查詢條件產生，不再寫死。
+                # 舊快照無此欄——snapshot_mismatch 據此對「換基準」比較發出警語。
+                "policy_decisions": _basis["policy_decisions"],
+                "filters": _basis["filters"],
+                "truncated": _basis["truncated"],
             }
             save_snapshot(output_dir, _trend_key, kpi_dict, generated_at=ts, meta=_snapshot_meta)
             if prev:
@@ -661,9 +727,13 @@ class ReportGenerator:
                 "network_inventory": NetworkInventoryHtmlExporter,
                 "traffic": TrafficFlowsHtmlExporter,
             }.get(traffic_report_profile, SecurityRiskHtmlExporter)
+            _prov = (result.module_results or {}).get("_provenance") or {}
             path = _exporter_cls(
                 result.module_results,
                 data_source=result.data_source,
+                date_range=(_prov.get("window_start", ""), _prov.get("window_end", "")),
+                pce_url=_prov.get("pce_url", ""),
+                org_name=_prov.get("org", ""),
                 profile=traffic_report_profile,
                 detail_level=_REPORT_DETAIL_LEVEL,
                 compute_draft=ruleset_needs_draft_pd(DRAFT_PD_RULES),
@@ -770,10 +840,8 @@ class ReportGenerator:
                     "report_type": "traffic",
                     "profile": traffic_report_profile,
                     "generated_at": datetime.now(timezone.utc).isoformat(),
-                    "query_window": {
-                        "start": result.date_range[0] if result.date_range else None,
-                        "end": result.date_range[1] if len(result.date_range) > 1 else None,
-                    },
+                    "query_window": comparison_basis(result)["window"],
+                    "basis": comparison_basis(result),
                     "kpis": kpis_dict,
                     "policy_changes_since_previous": [],
                 }
@@ -1125,10 +1193,24 @@ def build_traffic_xlsx(module_results: dict, out_path: str, *, profile: str,
     meta = metadata or {}
     summary_ws["A1"] = meta.get("title", "Traffic Flow Report")
     summary_ws["A1"].font = Font(size=18, bold=True)
-    summary_ws["A2"] = f"Generated: {meta.get('generated_at', '')}"
+    summary_ws["A2"] = t("rpt_xlsx_generated", lang=lang, ts=meta.get('generated_at', ''))
     if meta.get("start_date"):
-        summary_ws["A3"] = f"Period: {meta.get('start_date')} → {meta.get('end_date', '')}"
-    summary_ws["A4"] = f"Records: {record_count}"
+        summary_ws["A3"] = t("rpt_xlsx_period", lang=lang, start=meta.get('start_date'),
+                             end=meta.get('end_date', ''))
+    summary_ws["A4"] = t("rpt_xlsx_records", lang=lang, count=f"{record_count:,}")
+    # 截斷揭露：HTML 有警示，XLSX 以前沒有，讀者會把部分資料的總數當完整。
+    row = 5
+    _cap = module_results.get("_analysis_truncation") or {}
+    if _cap.get("from") and _cap.get("to") and _cap["from"] > _cap["to"]:
+        summary_ws.cell(row=row, column=1, value=t("rpt_analysis_truncated", lang=lang).replace(
+            "{shown}", f"{_cap['to']:,}").replace("{total}", f"{_cap['from']:,}"))
+        summary_ws.cell(row=row, column=1).font = Font(bold=True, color="B45309")
+        row += 1
+    _qcap = module_results.get("_query_truncation") or {}
+    if _qcap.get("max_results"):
+        summary_ws.cell(row=row, column=1, value=t("rpt_query_truncated", lang=lang).replace(
+            "{max}", f"{_qcap['max_results']:,}"))
+        summary_ws.cell(row=row, column=1).font = Font(bold=True, color="B45309")
     summary_ws.freeze_panes = "A2"
 
     kpi_col = t("rpt_xlsx_col_kpi", lang=lang)

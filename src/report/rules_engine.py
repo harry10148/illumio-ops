@@ -540,9 +540,16 @@ class RulesEngine:
         percentile = self._thresholds.get('high_bytes_percentile', 95)
         if df['bytes_total'].sum() == 0:
             return None
-        threshold_bytes = df['bytes_total'].quantile(percentile / 100.0)
-        if threshold_bytes == 0:
+        percentile_bytes = df['bytes_total'].quantile(percentile / 100.0)
+        if percentile_bytes == 0:
             return None
+        # 只用同一份資料的百分位數當門檻，約 5% 的流量「永遠」超過——資料量
+        # 幾乎一致（1000–1099 bytes）也會出 MEDIUM。必須同時遠高於中位數
+        # （離群）且超過絕對下限，才算異常大量傳輸。
+        median_bytes = float(df['bytes_total'].median() or 0)
+        floor_bytes = float(self._thresholds.get('high_bytes_min_bytes', 1024 * 1024))
+        outlier_factor = float(self._thresholds.get('high_bytes_median_factor', 10))
+        threshold_bytes = max(percentile_bytes, median_bytes * outlier_factor, floor_bytes)
         anomalies = df[df['bytes_total'] > threshold_bytes]
         if not anomalies.empty:
             top = anomalies.nlargest(3, 'bytes_total')[['src_ip', 'dst_ip', 'bytes_total']].to_dict('records')
@@ -685,10 +692,10 @@ class RulesEngine:
                   .reset_index())
         wide = per_db[per_db['unique_src_apps'] > threshold]
         if wide.empty:
-            # Also flag if total unique src apps across all DBs is high
-            total_unique = db_flows['src_app'].nunique()
-            if total_unique <= threshold:
-                return None
+            # 以前退而求其次看「所有資料庫合計的來源 app 數」：六個資料庫各自只被
+            # 自己的 app tier 存取，也會發出 HIGH，而描述卻寫 0 個資料庫過度暴露。
+            # 只有單一資料庫被太多 app 存取才是本規則要抓的情況。
+            return None
         top_db = per_db.nlargest(5, 'unique_src_apps')[['dst_ip', 'port', 'unique_src_apps']].to_dict('records')
         top_ports = db_flows['port'].value_counts().head(5).to_dict()
         _db_names = {1433: 'MSSQL', 3306: 'MySQL', 5432: 'PostgreSQL', 1521: 'Oracle',

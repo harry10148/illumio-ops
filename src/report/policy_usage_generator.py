@@ -47,7 +47,9 @@ def build_rule_baseline(rulesets: list) -> tuple:
 
     Each rule dict is augmented with:
     - _ruleset_name, _ruleset_href: for display
-    - _ruleset_scopes: first scope array from the parent ruleset (for query building)
+    - _ruleset_scopes: first scope array from the parent ruleset (kept for callers)
+    - _ruleset_scope_list: EVERY scope of the parent ruleset (query building)
+    - _rule_enabled: False when the rule or its ruleset is disabled
 
     Shared by the Policy Usage and Rule Hit Count reports.
     Returns (flat_rules, ruleset_map).
@@ -80,6 +82,9 @@ def build_rule_baseline(rulesets: list) -> tuple:
             rule_copy['_ruleset_href'] = rs_href
             rule_copy['_ruleset_name'] = rs_name
             rule_copy['_ruleset_scopes'] = first_scope
+            rule_copy['_ruleset_scope_list'] = list(scopes)
+            rule_copy['_rule_enabled'] = (rule.get('enabled') is not False
+                                          and rs.get('enabled') is not False)
             rule_copy['_ruleset_id'] = rs_id
             rule_copy['_rule_id'] = rule_href.split('/')[-1] if rule_href else ''
             rule_copy['_rule_no'] = rule_no
@@ -95,6 +100,8 @@ class PolicyUsageGenerator:
         self.api = api_client
         self._config_dir = config_dir
         self._lang = "en"  # overwritten by generate_from_api/generate when lang is known
+        from src.report.provenance import pce_identity
+        self._pce_url, self._org_name = pce_identity(config_manager)
 
     # ── Public interface ───────────────────────────────────────────────────────
 
@@ -146,9 +153,20 @@ class PolicyUsageGenerator:
         if not flat_rules:
             return PolicyUsageResult(record_count=0)
 
+        # 停用的規則（或停用的 ruleset）不是生效中的 policy：查它的流量只會
+        # 讓它看起來「有在用」，列成未使用又會被拿去清理。不查詢、不計入，
+        # 數量在摘要揭露。
+        disabled = [r for r in flat_rules if not r.get('_rule_enabled', True)]
+        if disabled:
+            logger.info("Policy usage: skipping {} disabled rule(s)", len(disabled))
+            flat_rules = [r for r in flat_rules if r.get('_rule_enabled', True)]
+            if not flat_rules:
+                return PolicyUsageResult(record_count=0)
+
         # Step 3 — per-rule async traffic queries
         print(t("rpt_pu_fetching_traffic", start=start_date[:10], end=end_date[:10], lang=self._lang))
         hit_hrefs, hit_counts, execution_stats = self._extract_hit_data(flat_rules, start_date, end_date)
+        execution_stats = dict(execution_stats or {}, disabled_rules_skipped=len(disabled))
         print(t("rpt_pu_flows_processed", hit=len(hit_hrefs), lang=self._lang))
 
         # Step 4 — run analysis pipeline

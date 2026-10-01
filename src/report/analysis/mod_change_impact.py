@@ -34,7 +34,28 @@ def collect_current_kpis(module_results: dict) -> dict:
     return kpis
 
 
-def compare(*, current_kpis: dict, previous: Optional[dict]) -> dict:
+def basis_mismatch(current_basis: Optional[dict], previous: Optional[dict]) -> list[str]:
+    """Fields on which the two snapshots were computed differently.
+
+    Old snapshots carry no basis: they are reported as an unknown basis
+    rather than assumed comparable.
+    """
+    if not current_basis or previous is None:
+        return []
+    prev_basis = previous.get("basis")
+    if not prev_basis:
+        return ["basis"]
+    out = []
+    for field in ("policy_decisions", "filters"):
+        if current_basis.get(field) != prev_basis.get(field):
+            out.append(field)
+    if current_basis.get("truncated") or prev_basis.get("truncated"):
+        out.append("truncated")
+    return out
+
+
+def compare(*, current_kpis: dict, previous: Optional[dict],
+            current_basis: Optional[dict] = None) -> dict:
     if previous is None:
         return {"skipped": True, "reason": "no_previous_snapshot"}
     prev_kpis = previous.get("kpis", {})
@@ -61,6 +82,7 @@ def compare(*, current_kpis: dict, previous: Optional[dict]) -> dict:
         "regressed_count": regressed_count,
         "overall_verdict": verdict,
         "previous_snapshot_at": previous.get("generated_at"),
+        "basis_mismatch": basis_mismatch(current_basis, previous),
     }
 
 

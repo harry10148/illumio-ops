@@ -76,4 +76,4 @@ def test_zero_records_skips_export(monkeypatch, tmp_path):
 
 
 def test_readiness_prefix_registered():
-    assert ReportScheduler._REPORT_PREFIXES["readiness"] == "Illumio_Readiness_Report_"
+    assert ("Illumio_Readiness_Report_", False) in ReportScheduler._REPORT_PREFIXES["readiness"]

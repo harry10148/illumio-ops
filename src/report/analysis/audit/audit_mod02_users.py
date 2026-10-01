@@ -53,6 +53,7 @@ def audit_user_activity(df: pd.DataFrame) -> dict:
         return {
             "total_user_events": 0,
             "failed_logins": 0,
+            "authorization_failures": 0,
             "unique_src_ips": 0,
             "summary": pd.DataFrame(),
             "per_user": pd.DataFrame(),
@@ -67,7 +68,12 @@ def audit_user_activity(df: pd.DataFrame) -> dict:
         )
     else:
         fail_mask = target_df["event_type"].isin(_ALWAYS_FAILURE_EVENTS)
-    failed_logins = int(fail_mask.sum())
+    # 403（request.authorization_failed）是「已登入但沒權限」的 API 呼叫，
+    # 不是登入失敗；併在一起會讓一個權限設錯的整合帳號看起來像暴力破解。
+    # 分開計數，失敗明細仍列出兩者。
+    authz_mask = target_df["event_type"].eq("request.authorization_failed")
+    authorization_failures = int(authz_mask.sum())
+    failed_logins = int((fail_mask & ~authz_mask).sum())
 
     unique_src_ips = 0
     if "src_ip" in target_df.columns:
@@ -107,7 +113,7 @@ def audit_user_activity(df: pd.DataFrame) -> dict:
         per_user = user_stats.sort_values(["Failures", "Total Events"], ascending=[False, False]).head(20)
 
     failed_login_detail = pd.DataFrame()
-    if failed_logins > 0:
+    if int(fail_mask.sum()) > 0:
         fail_df = target_df[fail_mask]
         detail_cols = ["timestamp", "event_type"]
         for column in (
@@ -154,6 +160,7 @@ def audit_user_activity(df: pd.DataFrame) -> dict:
     return {
         "total_user_events": len(target_df),
         "failed_logins": failed_logins,
+        "authorization_failures": authorization_failures,
         "unique_src_ips": unique_src_ips,
         "summary": summary,
         "per_user": per_user,

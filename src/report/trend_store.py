@@ -185,11 +185,17 @@ def snapshot_mismatch(
         if cur_span is not None and prev_span is not None and abs(cur_span - prev_span) > 1:
             mismatches.append({"field": "window", "previous": prev_window, "current": cur_window})
 
-    for field in ("data_source", "profile"):
+    for field in ("data_source", "profile", "filters"):
         cur_val = current_meta.get(field)
         prev_val = previous_meta.get(field)
         if cur_val is not None and prev_val is not None and cur_val != prev_val:
             mismatches.append({"field": field, "previous": prev_val, "current": cur_val})
+
+    # 任一邊被抽樣上限或 PCE 查詢上限截斷，總量就不是同一個母體。
+    if current_meta.get("truncated") or previous_meta.get("truncated"):
+        mismatches.append({"field": "truncated",
+                           "previous": bool(previous_meta.get("truncated")),
+                           "current": bool(current_meta.get("truncated"))})
 
     # policy_decisions（判定值域）特別處理：前次快照「缺此欄」正是 2026-07
     # unknown 改版前的舊基準——這正是要警告的換基準情境，不能靜默相容。

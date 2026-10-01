@@ -577,3 +577,84 @@ def test_workload_label_env_filter_actually_filters():
 def test_flatten_includes_dst_ip_for_sampler_key():
     from src.pce_cache.ingestor_traffic import _flatten_flow
     assert _flatten_flow(_labelled_flow(5, "prod", None))["dst_ip"] == "10.1.5.1"
+
+
+class DecisionChangingApiClient:
+    """同一筆 flow 第二次 pull 時 policy decision 從 potentially_blocked 變 blocked。"""
+    _FIRST = datetime(2026, 5, 1, 12, 0, 0, tzinfo=timezone.utc).isoformat()
+
+    def __init__(self):
+        self.calls = 0
+
+    def get_traffic_flows_async(self, max_results=200000, rate_limit=False, **kw):
+        self.calls += 1
+        minute = 1 if self.calls == 1 else 6
+        last = datetime(2026, 5, 1, 12, minute, 0, tzinfo=timezone.utc).isoformat()
+        return [{
+            "src_ip": "10.0.0.1", "dst_ip": "10.0.0.2", "port": 445, "protocol": "tcp",
+            "action": "potentially_blocked" if self.calls == 1 else "blocked",
+            "flow_count": 1, "first_detected": self._FIRST, "last_detected": last,
+        }]
+
+
+def test_repulled_flow_refreshes_policy_decision(session_factory):
+    """action 欄位要跟最新快照一致，否則 SQL 的決策過濾與 DataFrame 不一致。"""
+    from src.pce_cache.ingestor_traffic import TrafficIngestor
+    from src.pce_cache.watermark import WatermarkStore
+
+    ing = TrafficIngestor(api=DecisionChangingApiClient(), session_factory=session_factory,
+                          watermark=WatermarkStore(session_factory))
+    ing.run_once()
+    ing.run_once()
+    with session_factory() as s:
+        row = s.execute(select(PceTrafficFlowRaw)).scalars().one()
+    assert row.action == "blocked"
+
+
+def test_cache_reader_selects_flows_overlapping_the_window(session_factory):
+    """還在活動中的 flow（last_detected 已超過視窗終點）仍屬於這個視窗。"""
+    from src.pce_cache.ingestor_traffic import TrafficIngestor
+    from src.pce_cache.reader import CacheReader
+    from src.pce_cache.watermark import WatermarkStore
+
+    base = datetime(2026, 5, 1, tzinfo=timezone.utc)
+
+    class _Api:
+        def get_traffic_flows_async(self, max_results=200000, rate_limit=False, **kw):
+            return [
+                # 上週開始、這週還在跑
+                {**_mk_flow(1), "first_detected": (base - timedelta(days=3)).isoformat(),
+                 "last_detected": (base + timedelta(days=5)).isoformat()},
+                # 完全在視窗之後
+                {**_mk_flow(2), "first_detected": (base + timedelta(days=2)).isoformat(),
+                 "last_detected": (base + timedelta(days=3)).isoformat()},
+            ]
+
+    TrafficIngestor(api=_Api(), session_factory=session_factory,
+                    watermark=WatermarkStore(session_factory)).run_once()
+    reader = CacheReader(session_factory, events_retention_days=90, traffic_raw_retention_days=3650)
+    got = reader.read_flows_raw(base - timedelta(days=7), base)
+    assert [f["src_ip"] for f in got] == ["10.0.1.1"]
+    assert reader.count_flows(base - timedelta(days=7), base) == 1
+
+
+def test_cover_state_is_miss_when_ingest_stalled_before_window_end(session_factory):
+    """只看最早一筆資料會把「ingest 已停擺 3 天」的快取判成完整。"""
+    from src.pce_cache.models import IngestionWatermark, PceTrafficFlowRaw
+    from src.pce_cache.reader import CacheReader
+
+    now = datetime.now(timezone.utc)
+    with session_factory.begin() as s:
+        s.add(PceTrafficFlowRaw(flow_hash="h1", first_detected=now - timedelta(days=10),
+                                last_detected=now - timedelta(days=9), src_ip="10.0.0.1",
+                                dst_ip="10.0.0.2", port=22, protocol="tcp", action="allowed",
+                                flow_count=1, bytes_in=0, bytes_out=0, raw_json="{}", ingested_at=now))
+        s.add(IngestionWatermark(source="traffic", last_status="error",
+                                 last_timestamp=now - timedelta(days=3), last_sync_at=now))
+    reader = CacheReader(session_factory, events_retention_days=90, traffic_raw_retention_days=90)
+    assert reader.cover_state("traffic", now - timedelta(days=7), now) == "miss"
+    # ingest 正常、只落後幾分鐘：照常用快取
+    with session_factory.begin() as s:
+        wm = s.get(IngestionWatermark, "traffic")
+        wm.last_status, wm.last_sync_at = "ok", now - timedelta(minutes=10)
+    assert reader.cover_state("traffic", now - timedelta(days=7), now) == "full"

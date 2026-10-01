@@ -922,6 +922,34 @@ class ApiClient:
                 raise APIError(f"fetch_managed_workloads failed: {e}") from e
             return []
 
+    def fetch_all_workloads(self, raise_on_error: bool = False) -> list:
+        """Every workload, managed AND unmanaged.
+
+        Unmanaged workloads carry labels too, and label-based rules apply to
+        them; resolving rules against managed workloads only under-reports
+        the IPs a rule covers. Same collection semantics (truncation guard,
+        async fallback) as fetch_managed_workloads.
+        """
+        try:
+            org = self.api_cfg['org_id']
+            path = f"/orgs/{org}/workloads"
+            status, data, _total = self._get_collection(path, timeout=30)
+            if status == 200:
+                if raise_on_error:
+                    self._raise_if_truncated(path, "fetch_all_workloads")
+                return data
+            logger.error(f"Fetch All Workloads Failed: {status}")
+            if raise_on_error:
+                raise APIError(f"fetch_all_workloads failed: HTTP {status}")
+            return []
+        except APIError:
+            raise
+        except Exception as e:
+            logger.error(f"Fetch All Workloads Error: {e}")
+            if raise_on_error:
+                raise APIError(f"fetch_all_workloads failed: {e}") from e
+            return []
+
     def search_workloads(self, params: dict) -> list:
         """Search workloads matching query params (e.g., name, hostname, ip_address, labels)"""
         try:

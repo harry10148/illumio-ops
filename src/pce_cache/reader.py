@@ -12,6 +12,22 @@ from src.pce_cache.models import PceEvent, PceTrafficFlowAgg, PceTrafficFlowRaw
 CoverState = Literal["full", "partial", "miss"]
 
 
+def _flow_overlaps(start: datetime, end: datetime) -> tuple:
+    """A flow belongs to [start, end] when its activity overlaps the window.
+
+    Selecting only by last_detected IN [start, end] dropped every flow still
+    active after `end`: ingest keeps moving last_detected forward, so a
+    report for last week served from the cache lost flows that were also
+    active this week — flows the live PCE query (overlap semantics) returns.
+    first_detected is NULL only on pre-migration rows; keep those.
+    """
+    return (
+        PceTrafficFlowRaw.last_detected >= start,
+        or_(PceTrafficFlowRaw.first_detected <= end,
+            PceTrafficFlowRaw.first_detected.is_(None)),
+    )
+
+
 class CacheReadTooLarge(RuntimeError):
     """查詢窗列數超過 read_max_rows 護欄。
 
@@ -53,9 +69,47 @@ class CacheReader:
         # bypassed the cache, defeating the backfill workflow.
         if end < earliest:
             return "miss"      # request ends before any data we hold
+        if self._tail_is_stale(source, end):
+            # Ingest stopped before the window's end: the cache is missing the
+            # most recent part of the window. Judging coverage by the earliest
+            # row alone served such a window as complete and quietly dropped
+            # its last N days. Callers treat "miss" as "query the PCE".
+            return "miss"
         if start < earliest:
             return "partial"   # request reaches back before our earliest data
         return "full"
+
+    # How far the ingest may lag behind a window's end before the cache no
+    # longer counts as covering it (poll intervals + VEN reporting delay are
+    # minutes; an hour means ingest has actually stalled).
+    _TAIL_TOLERANCE = timedelta(hours=1)
+
+    def _tail_is_stale(self, source: str, end: datetime) -> bool:
+        """True when the ingest has not caught up to ``end``.
+
+        A successful sync means the cache holds data up to the sync time; a
+        failing ingest still bumps last_sync_at, so only the data high-water
+        mark counts then. No watermark row (a backfill-only cache) → unknown,
+        not stale.
+        """
+        from src.pce_cache.models import IngestionWatermark
+        with self._sf() as s:
+            wm = s.get(IngestionWatermark, source)
+        if wm is None:
+            return False
+
+        def _aware(dt):
+            if dt is not None and dt.tzinfo is None:
+                return dt.replace(tzinfo=timezone.utc)
+            return dt
+
+        covered = _aware(wm.last_sync_at) if wm.last_status == "ok" else _aware(wm.last_timestamp)
+        if covered is None:
+            return False
+        if end.tzinfo is None:
+            end = end.replace(tzinfo=timezone.utc)
+        end = min(end, datetime.now(timezone.utc))
+        return end - covered > self._TAIL_TOLERANCE
 
     def earliest_ingested_at(self, source: str) -> datetime | None:
         """MIN(ingested_at). Operational metric for ingest-lag monitoring.
@@ -93,8 +147,7 @@ class CacheReader:
                     policy_decisions: list[str] | None = None) -> int:
         with self._sf() as s:
             q = (select(func.count()).select_from(PceTrafficFlowRaw)
-                 .where(PceTrafficFlowRaw.last_detected >= start,
-                        PceTrafficFlowRaw.last_detected <= end))
+                 .where(*_flow_overlaps(start, end)))
             if workload_hrefs:
                 hrefs = list(workload_hrefs)
                 q = q.where(or_(PceTrafficFlowRaw.src_workload.in_(hrefs),
@@ -158,10 +211,7 @@ class CacheReader:
         with self._sf() as s:
             q = (
                 select(PceTrafficFlowRaw.raw_json)
-                .where(
-                    PceTrafficFlowRaw.last_detected >= start,
-                    PceTrafficFlowRaw.last_detected <= end,
-                )
+                .where(*_flow_overlaps(start, end))
             )
             if workload_hrefs:
                 hrefs = list(workload_hrefs)
@@ -191,10 +241,7 @@ class CacheReader:
         from src.analyzer import calculate_mbps
 
         def _window(*cols):
-            q = select(*cols).where(
-                PceTrafficFlowRaw.last_detected >= start,
-                PceTrafficFlowRaw.last_detected <= end,
-            )
+            q = select(*cols).where(*_flow_overlaps(start, end))
             if workload_hrefs:
                 hrefs = list(workload_hrefs)
                 q = q.where(or_(

@@ -67,6 +67,14 @@ illumio-ops 提供 9 種報表（GUI 報表區 `#/reports` 的產生鈕與 CLI `
 
 舊版 `--cache/--no-cache` 旗標已棄用，行為保留但建議改用 `--data-source`。`clip_to_cache` 是額外選項（`generate_from_api(clip_to_cache=True)`）：把查詢起點往後夾到 cache 最早資料點，省去撈一段 cache 已經沒有、PCE 也早已過期的前段窗口；若 cache 最早資料點比請求結束時間還晚，會直接跳過夾取並記錄日誌，不會誤夾出空窗口。
 
+快取怎麼判斷「涵蓋」這個時段：
+
+- 流量以「活動期間與報表時段重疊」選取（`first_detected` ≤ 結束且 `last_detected` ≥ 開始），與 PCE 即時查詢一致，仍在進行中的長連線也會算進來。
+- 快取與即時查詢混合時，以 flow 身分（來源／目的 IP、port、protocol、`first_detected`）去重，同一筆 flow 不會被算兩次。
+- 如果 ingest 停擺、落後時段終點超過 1 小時，這個時段視為快取未涵蓋，直接查 PCE，不會用缺了最近幾天的快取。
+
+報表封面列出資料來源（PCE API／本機快取／混合／CSV 匯入）、PCE 與 org、以報表時區顯示的查詢時段、篩選條件與 illumio-ops 版本；執行摘要裡的「實際資料時間範圍」則是資料本身最早到最晚的時間。分析筆數超過上限時，保留連線數最多（其次是最近）的流量，HTML 與 XLSX 摘要頁都會揭露截斷。趨勢與 Change Impact 會記錄每份報表的查詢條件，前後兩份條件不同（決策範圍、篩選、截斷）時標示「不是同條件比較」。
+
 Audit 報表也走 cache + live 補洞（`mixed`/`cache`/`api` 三種 `source` 標記），但**沒有** CLI 旗標讓操作者手動切換——完全由產生器內部判斷。VEN Status／Policy Usage／Rule Hit Count／Policy Diff／Policy Resolver 這幾種報表本質上是「當下狀態」或「逐條即時查詢」，一律 live，沒有 cache 選項。
 
 ## 1. Traffic Flow Report
@@ -150,6 +158,9 @@ illumio-ops report policy-usage --start-date 2026-07-01 --end-date 2026-07-16 --
 `--source api|csv --file PATH`：也支援匯入 workloader 工具產出的 rule-usage CSV。
 
 GUI：報表區 `#/reports` → Policy Usage 卡片的產生鈕（逐規則各自查詢，規則數多時耗時較長）。
+
+規則集有多個 scope 時，每個 scope 都會納入查詢（只在第二個以後的 scope 用到的規則不會被誤判為未使用）；scope 內的「All Workloads」只計 scope 範圍內的 workload。停用的規則或停用的規則集不查詢、不列為未使用，數量顯示在摘要的「停用的規則（未評估）」。
+
 
 關鍵欄位：每條規則的 hit／unused 狀態、consumers／providers／services。
 
