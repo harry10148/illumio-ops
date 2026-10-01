@@ -28,11 +28,7 @@ import html as _html
 import os
 
 from src.i18n import t
-from src.report.exporters._output_paths import (
-    discard_reserved,
-    reserve_unique_path,
-    write_text_atomic,
-)
+from src.report.exporters._output_paths import save_text_report
 from src.report.exporters.report_shell import (
     ShellCover,
     ShellSection,
@@ -235,11 +231,5 @@ class RuleHitCountHtmlExporter:
         # _render_html()，建置中途拋錯就留下 0-byte 報表（GUI 照樣列出並可下載）。
         # 再以 O_EXCL 搶下唯一檔名（同分鐘併發產出會撞名）＋暫存檔 os.replace。
         body = self._render_html()
-        path = reserve_unique_path(
-            os.path.join(output_dir, f"Illumio_Rule_Hit_Count_Report_{ts}.html"))
-        try:
-            write_text_atomic(path, body)
-        except BaseException:
-            discard_reserved(path)
-            raise
+        path = save_text_report(os.path.join(output_dir, f"Illumio_Rule_Hit_Count_Report_{ts}.html"), body)
         return path

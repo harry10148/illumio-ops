@@ -10,7 +10,7 @@ import os
 
 import pandas as pd
 
-from ._output_paths import discard_reserved, reserve_unique_path, write_text_atomic
+from ._output_paths import save_text_report
 from .report_i18n import COL_I18N as _COL_I18N
 from .report_i18n import STRINGS
 from .report_shell import ShellCover, ShellSection, build_shell_document
@@ -104,12 +104,7 @@ class VenHtmlExporter:
         # _build()，建置中途拋錯就留下 0-byte 報表（GUI 照樣列出並可下載）。
         # 再以 O_EXCL 搶下唯一檔名（同分鐘併發產出會撞名）＋暫存檔 os.replace。
         body = self._build()
-        filepath = reserve_unique_path(os.path.join(output_dir, filename))
-        try:
-            write_text_atomic(filepath, body)
-        except BaseException:
-            discard_reserved(filepath)
-            raise
+        filepath = save_text_report(os.path.join(output_dir, filename), body)
         logger.info("[VenHtmlExporter] Saved: {}", filepath)
         return filepath
 
