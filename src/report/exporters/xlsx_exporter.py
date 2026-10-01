@@ -174,10 +174,12 @@ def export_xlsx(report_result: dict[str, Any], output_path: str) -> None:
     meta = report_result.get("metadata", {})
     summary_ws["A1"] = meta.get("title", "Report")
     summary_ws["A1"].font = Font(size=18, bold=True)
-    summary_ws["A2"] = f"Generated: {meta.get('generated_at', '')}"
+    lang = meta.get("lang", "en")
+    summary_ws["A2"] = t("rpt_xlsx_generated", lang=lang, ts=meta.get('generated_at', ''))
     if meta.get("start_date"):
-        summary_ws["A3"] = f"Period: {meta.get('start_date')} \u2192 {meta.get('end_date', '')}"
-    summary_ws["A4"] = f"Records: {report_result.get('record_count', 0)}"
+        summary_ws["A3"] = t("rpt_xlsx_period", lang=lang, start=meta.get('start_date'),
+                             end=meta.get('end_date', ''))
+    summary_ws["A4"] = t("rpt_xlsx_records", lang=lang, count=f"{report_result.get('record_count', 0):,}")
     summary_ws.freeze_panes = "A2"
 
     for mod_name, mod_data in (report_result.get("module_results") or {}).items():

@@ -1942,7 +1942,8 @@ class _TrafficReportBase:
         if not current_kpis:
             return f'<p class="note">{_s("rpt_mod_change_impact_no_kpi")}</p>'
         previous = read_latest('traffic', profile=self._profile)
-        impact = compare(current_kpis=current_kpis, previous=previous)
+        impact = compare(current_kpis=current_kpis, previous=previous,
+                         current_basis=self._r.get('_comparison_basis'))
         if impact.get('skipped'):
             return f'<p class="note">{t("rpt_change_impact_no_previous", default="No previous snapshot — change impact will appear on the next report run.", lang=self._lang)}</p>'
         verdict = impact.get('overall_verdict', 'unchanged')
@@ -1960,6 +1961,11 @@ class _TrafficReportBase:
         html = (f'<p><b>{_s("rpt_mod_change_impact_overall_label")}:</b>'
                 f' <span style="color:{verdict_color};font-weight:700">{dir_label.get(verdict, verdict).upper()}</span>'
                 f' (vs {(impact.get("previous_snapshot_at") or "")[:10]})</p>')
+        if impact.get('basis_mismatch'):
+            html += ('<p class="note note-warn" data-tone="warn">'
+                     + html.escape(t("rpt_change_impact_basis_mismatch", lang=self._lang,
+                                         fields=", ".join(impact['basis_mismatch'])))
+                     + '</p>')
         deltas = impact.get('deltas', {})
         if deltas:
             dir_color = {
