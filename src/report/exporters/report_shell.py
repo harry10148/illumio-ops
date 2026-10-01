@@ -274,6 +274,28 @@ class ShellCover:
     meta: dict[str, str] = field(default_factory=dict)
 
 
+def cover_meta(lang: str, *, pce_url: object = "", org_name: object = "",
+               date_range: object = None, generated_at: object = "",
+               extra: Sequence[tuple[str, object]] = ()) -> dict[str, str]:
+    """The cover's label → value rows, in the one order every report uses.
+
+    PCE, org, data period, generated-at, then ``extra`` (already-translated
+    labels). Empty values are left out rather than printed as blank rows.
+    ``date_range`` may be a string or a (start, end) pair, joined with " – ".
+    Values are raw: build_shell_document escapes them.
+    """
+    if isinstance(date_range, (tuple, list)):
+        date_range = " – ".join(str(d) for d in date_range if d)
+    rows: list[tuple[str, object]] = [
+        (t("rpt_cover_pce", lang=lang), pce_url),
+        (t("rpt_cover_org", lang=lang), org_name),
+        (t("rpt_cover_date_range", lang=lang), date_range),
+        (t("rpt_cover_generated", lang=lang), generated_at),
+        *extra,
+    ]
+    return {label: str(value) for label, value in rows if value}
+
+
 @dataclass(frozen=True)
 class ShellSection:
     """One chapter. ``html`` is already-rendered, already-escaped markup."""

@@ -13,7 +13,7 @@ import pandas as pd
 from ._output_paths import save_text_report
 from .report_i18n import COL_I18N as _COL_I18N
 from .report_i18n import STRINGS
-from .report_shell import ShellCover, ShellSection, build_shell_document
+from .report_shell import ShellCover, ShellSection, build_shell_document, cover_meta
 from .table_renderer import render_df_table
 from .chart_renderer import render_matplotlib_svg
 from .code_highlighter import get_highlight_css
@@ -286,13 +286,8 @@ class VenHtmlExporter:
                 sections.append(_extra)
 
         _report_type = _s("rpt_cover_type_ven")
-        _meta: dict[str, str] = {}
-        if self._pce_url:
-            _meta[_s("rpt_cover_pce")] = self._pce_url
-        if self._org_name:
-            _meta[_s("rpt_cover_org")] = self._org_name
-        if gen_at:
-            _meta[_s("rpt_cover_generated")] = str(gen_at)
+        _meta = cover_meta(_sl, pce_url=self._pce_url, org_name=self._org_name,
+                           generated_at=gen_at)
         _kicker = _s("rpt_kicker_ven")
         cover = ShellCover(
             title=_s("rpt_ven_title"),

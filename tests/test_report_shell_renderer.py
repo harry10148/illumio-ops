@@ -948,3 +948,17 @@ def test_the_deleted_modules_are_really_gone():
     assert TABLE_JS in build_shell_document(
         lang="en", cover=ShellCover(title="t", doc_title="d", type_label="x"),
         sections=[ShellSection(id="s", title="s", html="")])
+
+
+def test_cover_meta_order_and_blank_rows():
+    from src.i18n import t
+    from src.report.exporters.report_shell import cover_meta
+    meta = cover_meta("en", pce_url="https://pce.example", org_name="",
+                      date_range=("2026-09-01", "2026-09-07"), generated_at=None,
+                      extra=(("Filters", "src=web"), ("Version", "")))
+    assert list(meta.items()) == [
+        (t("rpt_cover_pce", lang="en"), "https://pce.example"),
+        (t("rpt_cover_date_range", lang="en"), "2026-09-01 – 2026-09-07"),
+        ("Filters", "src=web"),
+    ]
+    assert cover_meta("en", date_range=("", "")) == {}

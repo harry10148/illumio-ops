@@ -35,6 +35,7 @@ from .report_shell import (
     SEVERITY_TONE,
     TONE_HEX,
     ShellCover,
+    cover_meta,
     ShellSection,
     build_shell_document,
     ink_on,
@@ -880,22 +881,15 @@ class _TrafficReportBase:
         if self._compute_draft:
             _badges.append((t("rpt_hdr_draft_enabled", lang=self._lang), 'warn'))
 
-        _meta: dict[str, str] = {}
-        if self._pce_url:
-            _meta[_s("rpt_cover_pce")] = self._pce_url
-        if self._org_name:
-            _meta[_s("rpt_cover_org")] = self._org_name
-        _date_str = " – ".join(d for d in self._date_range if d)
-        if _date_str:
-            _meta[_s("rpt_cover_date_range")] = _date_str
         _prov = self._r.get('_provenance') or {}
-        # 產生時間帶時區（mod12 的值是沒有時區的伺服器本地時間）。
-        if _prov.get('generated_at') or generated_at:
-            _meta[_s("rpt_cover_generated")] = _prov.get('generated_at') or str(generated_at)
-        if _prov.get('filters'):
-            _meta[t("rpt_cover_filters", lang=_sl)] = _prov['filters']
-        if _prov.get('tool_version'):
-            _meta[t("rpt_cover_tool_version", lang=_sl)] = _prov['tool_version']
+        _meta = cover_meta(
+            _sl, pce_url=self._pce_url, org_name=self._org_name,
+            date_range=self._date_range,
+            # 產生時間帶時區（mod12 的值是沒有時區的伺服器本地時間）。
+            generated_at=_prov.get('generated_at') or generated_at,
+            extra=((t("rpt_cover_filters", lang=_sl), _prov.get('filters')),
+                   (t("rpt_cover_tool_version", lang=_sl), _prov.get('tool_version'))),
+        )
 
         # The maturity grade rides on the cover only where the legacy cover put
         # it: the security profile, and only when a real grade was computed.

@@ -25,6 +25,7 @@ from src.report.exporters.report_shell import (
     ShellCover,
     ShellSection,
     build_shell_document,
+    cover_meta,
 )
 from src.report.exporters.table_renderer import render_df_table, wrap_table_panel
 from src.report.report_metadata import write_metadata_sidecar
@@ -211,10 +212,7 @@ class AppSummaryHtmlExporter:
         # _T5_WALL_CLOCK_COVER in tests/test_report_shell_migration.py), and
         # re-rendering the same report would print a different "generated"
         # time. A date the reader cannot rely on is worse than no date.
-        meta: dict[str, str] = {}
-        date_range = " – ".join(d for d in (self._r.get("date_range") or ()) if d)
-        if date_range:
-            meta[t("rpt_cover_date_range", lang=lang)] = date_range
+        meta = cover_meta(lang, date_range=self._r.get("date_range") or ())
 
         cover = ShellCover(
             title=title,

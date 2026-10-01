@@ -30,6 +30,7 @@ from src.report.exporters.report_shell import (
     ShellCover,
     ShellSection,
     build_shell_document,
+    cover_meta,
 )
 from src.report.exporters.table_renderer import wrap_table_panel
 
@@ -220,14 +221,8 @@ class ReadinessHtmlExporter:
         # eyebrow carries the type label because type_label alone only reaches
         # body[data-report-title] — which this report did not have at all before
         # (nor a lang attribute); the shell supplies both.
-        meta: dict[str, str] = {}
-        if self._pce_url:
-            meta[t("rpt_cover_pce", lang=lang)] = self._pce_url
-        if self._org_name:
-            meta[t("rpt_cover_org", lang=lang)] = self._org_name
-        date_range = " – ".join(d for d in (self._result.date_range or ()) if d)
-        if date_range:
-            meta[t("rpt_cover_date_range", lang=lang)] = date_range
+        meta = cover_meta(lang, pce_url=self._pce_url, org_name=self._org_name,
+                          date_range=self._result.date_range or ())
         # The legacy cover suppressed the grade block for a missing or "?"
         # grade; the same guard, or the cover would print an empty chip whose
         # tone says "neutral" as if that were a measured result.
