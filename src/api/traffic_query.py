@@ -1674,7 +1674,13 @@ class TrafficQueryBuilder:
 
         def _poll_one(job_href):
             url = f"{c.api_cfg['url']}/api/v2{job_href}"
-            status, body = c._request(url, timeout=15)
+            # 走全域限速器：數百個 job 每輪全部輪詢一次，很快就超過 PCE 每分鐘
+            # 500 次的上限，被 429 擋住的 job 會一路 pending 到 300 秒期限。
+            try:
+                status, body = c._request(url, timeout=15, rate_limit=True)
+            except Exception as exc:  # noqa: BLE001 — APIError from the rate limiter
+                logger.debug("Async job poll deferred for {}: {}", job_href, exc)
+                return job_href, "pending"
             if status in (404, 410):
                 # PCE 已清掉這個 async job（保留期短、重啟即消失）——視為終局
                 # 並持久化 failed，讓下一輪執行走 retry 重送，而不是把死掉的
@@ -1700,8 +1706,12 @@ class TrafficQueryBuilder:
                 state = "pending"
             return job_href, state
 
+        poll_interval = 2.0
         while pending and time.time() < deadline:
-            time.sleep(2)
+            time.sleep(poll_interval)
+            # 輪詢間隔逐步拉長（2 → 10 秒），長時間 pending 的 job 不會持續
+            # 以最高頻率消耗 API 預算。
+            poll_interval = min(poll_interval * 1.5, 10.0)
             pending_list = list(pending)
             with ThreadPoolExecutor(max_workers=min(max_concurrent, len(pending_list))) as ex:
                 poll_results = list(ex.map(_poll_one, pending_list))
@@ -1733,6 +1743,9 @@ class TrafficQueryBuilder:
                 # 不進 hit/unused 名單。單一 rule 失敗不得中斷整批下載。
                 logger.warning(f"Async result download failed for {job_href}: {exc}")
                 return job_href, None, exc
+            except Exception as exc:  # noqa: BLE001 — e.g. rate limiter budget exhausted
+                logger.warning(f"Async result download failed for {job_href}: {exc}")
+                return job_href, None, AsyncDownloadError(str(exc))
 
         with ThreadPoolExecutor(max_workers=max_concurrent) as ex:
             futs = {ex.submit(_download, jh): jh for jh in completed}
