@@ -24,6 +24,27 @@ from src.state_store import load_state_file, update_state_file
 _ASYNC_JOB_STATE_KEY = "async_query_jobs"
 
 
+def delete_async_query_job(client, job_href: str, rate_limit: bool = True) -> bool:
+    """結果下載完後刪除 PCE 上的 async query（盡力而為，失敗只記 log）。
+
+    舊版從不 DELETE：每次 ingest、報表、rule usage 都在 PCE 留下一個已完成的
+    job，日積月累佔用 PCE 端的 async query 配額與儲存。rule usage 的「重用」
+    讀的是本機存下的摘要、不會回 PCE 重下載，所以下載完成後刪除是安全的。
+    """
+    if not job_href:
+        return False
+    url = f"{client.api_cfg['url']}/api/v2{job_href}"
+    try:
+        status, _ = client._request(url, method="DELETE", timeout=15, rate_limit=rate_limit)
+    except Exception as exc:  # noqa: BLE001 — best effort cleanup
+        logger.debug(f"async query cleanup skipped for {job_href}: {exc}")
+        return False
+    if status not in (200, 202, 204, 404):
+        logger.debug(f"async query cleanup for {job_href} returned HTTP {status}")
+        return False
+    return True
+
+
 class AsyncJobManager:
     """Owns async traffic query job lifecycle + persisted state tracking."""
 
