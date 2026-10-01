@@ -82,7 +82,7 @@ def test_run_produces_module_results_per_ruleset():
             "ingress_services": [{"port": 443, "proto": 6}],
         }],
     }]
-    api.fetch_managed_workloads.return_value = [
+    api.fetch_all_workloads.return_value = [
         {"href": "/wl/1", "interfaces": [{"address": "10.0.1.5"}],
          "labels": [{"href": "/labels/web"}]},
         {"href": "/wl/2", "interfaces": [{"address": "10.0.2.7"}],

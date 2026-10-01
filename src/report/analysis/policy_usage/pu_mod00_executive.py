@@ -42,6 +42,11 @@ def pu_executive_summary(results: dict, lookback_days: int, *, lang: str = "en")
         {"label_key": "rpt_pu_kpi_new_queries",  "label": t("rpt_pu_kpi_new_queries", default="New Queries", lang=lang), "value": str(submitted)},
         {"label_key": "rpt_pu_kpi_top_hit_port", "label": t("rpt_pu_kpi_top_hit_port", default="Top Hit Port", lang=lang), "value": top_port_label},
     ]
+    disabled_skipped = int(execution.get("disabled_rules_skipped", 0) or 0)
+    if disabled_skipped:
+        kpis.append({"label_key": "rpt_pu_kpi_disabled_skipped",
+                     "label": t("rpt_pu_kpi_disabled_skipped", lang=lang),
+                     "value": str(disabled_skipped)})
 
     # Top rulesets by unused rules 必須用 mod03 未截斷的計數。改從 unused_df
     # 重數會落在 _MAX_ROWS 截斷後、且按 Ruleset 字母序排過的表格上：字母序在

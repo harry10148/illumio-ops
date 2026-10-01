@@ -160,7 +160,8 @@ class PolicyResolverReport:
         # PCE 抓取失敗一律 raise_on_error=True：故障要讓報表往上炸失敗，
         # 不得誤把「抓取失敗」當成「規則全被移除」產出誤導性結果。
         rulesets = api.get_active_rulesets(raise_on_error=True)
-        workloads = api.fetch_managed_workloads(raise_on_error=True)
+        # 含 unmanaged workload：它們同樣帶 label，label 型規則也套用在它們身上。
+        workloads = api.fetch_all_workloads(raise_on_error=True)
         ip_lists = api.get_ip_lists(raise_on_error=True)
         groups = api.get_label_groups(raise_on_error=True)
         services = api.get_services(raise_on_error=True)

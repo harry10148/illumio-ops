@@ -5646,5 +5646,11 @@
   "gui_sched_status_skipped": "Skipped",
   "gui_sched_status_delivery_partial": "Sent (partial)",
   "gui_sched_status_delivery_pending": "Email retrying",
-  "gui_sched_status_delivery_failed": "Email failed"
+  "gui_sched_status_delivery_failed": "Email failed",
+  "rpt_change_impact_basis_mismatch": "Not a like-for-like comparison: the previous snapshot was computed with a different {fields}. Treat the direction labels as indicative only.",
+  "rpt_xlsx_generated": "Generated: {ts}",
+  "rpt_xlsx_period": "Period: {start} → {end}",
+  "rpt_xlsx_records": "Records: {count}",
+  "rpt_au_kpi_authz_failures": "Permission Denied (403)",
+  "rpt_pu_kpi_disabled_skipped": "Disabled Rules (not evaluated)"
 }

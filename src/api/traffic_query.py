@@ -1349,7 +1349,13 @@ class TrafficQueryBuilder:
 
         for actor in actor_list:
             if actor.get("actors") == "ams":
-                non_label_groups.append([{"actors": "ams"}])
+                # "All Workloads" inside a scoped ruleset means all workloads IN
+                # THE SCOPE. Querying bare ams counted traffic from the whole
+                # org, so such a rule could never come out unused.
+                if scope_items_with_dim:
+                    non_label_groups.append([item for _, item in scope_items_with_dim])
+                else:
+                    non_label_groups.append([{"actors": "ams"}])
             elif "label" in actor:
                 dim = _label_dim(actor["label"].get("href", ""))
                 label_actors_by_dim[dim].append({"label": actor["label"]})
@@ -1399,16 +1405,35 @@ class TrafficQueryBuilder:
         return services
 
     def _build_rule_query_payload(self, rule, start_date, end_date):
-        """Build the async query payload dict for a single rule."""
-        try:
-            scope_labels = rule.get("_ruleset_scopes", [])
-            unscoped_consumers = rule.get("unscoped_consumers", False)
-            consumer_scope = [] if unscoped_consumers else scope_labels
+        """Build the async query payload dict for a single rule.
 
-            sources_include      = self._build_query_actors(rule.get("consumers", []),
-                                                            scope_labels=consumer_scope)
-            destinations_include = self._build_query_actors(rule.get("providers", []),
-                                                            scope_labels=scope_labels)
+        A ruleset can carry several scopes; the rule applies in each of them.
+        Querying only the first scope reported rules used solely in scope 2+
+        as unused (and suggested cleaning them up). Each scope contributes
+        its own include groups and the groups are OR'd. The cross-scope
+        combinations this admits (source in scope A, destination in scope B)
+        can only over-count — the safe direction for an "is this rule
+        unused?" question.
+        """
+        try:
+            scope_list = rule.get("_ruleset_scope_list")
+            if scope_list is None:
+                scope_list = [rule.get("_ruleset_scopes", [])]
+            scope_list = scope_list or [[]]
+            unscoped_consumers = rule.get("unscoped_consumers", False)
+
+            def _union(actors, scoped: bool):
+                groups, seen = [], set()
+                for scope in scope_list:
+                    for g in self._build_query_actors(actors, scope_labels=scope if scoped else []):
+                        key = json.dumps(g, sort_keys=True)
+                        if key not in seen:
+                            seen.add(key)
+                            groups.append(g)
+                return groups
+
+            sources_include      = _union(rule.get("consumers", []), scoped=not unscoped_consumers)
+            destinations_include = _union(rule.get("providers", []), scoped=True)
             services_include     = self._build_query_services(rule)
 
             rule_href = rule.get('href', '')

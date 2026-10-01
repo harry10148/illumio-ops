@@ -5646,5 +5646,11 @@
   "gui_sched_status_skipped": "已略過",
   "gui_sched_status_delivery_partial": "已寄出（部分）",
   "gui_sched_status_delivery_pending": "重寄中",
-  "gui_sched_status_delivery_failed": "寄送失敗"
+  "gui_sched_status_delivery_failed": "寄送失敗",
+  "rpt_change_impact_basis_mismatch": "兩份不是同條件比較：前次快照的 {fields} 與本次不同。以下改善／退步的判定僅供參考。",
+  "rpt_xlsx_generated": "產生時間：{ts}",
+  "rpt_xlsx_period": "期間：{start} → {end}",
+  "rpt_xlsx_records": "筆數：{count}",
+  "rpt_au_kpi_authz_failures": "權限不足（403）",
+  "rpt_pu_kpi_disabled_skipped": "停用的規則（未評估）"
 }

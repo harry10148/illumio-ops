@@ -39,6 +39,7 @@ def audit_executive_summary(results: dict, df: pd.DataFrame, lang: str = "en") -
         {"label_key": "rpt_au_kpi_security_concerns", "label": "Security Concerns", "value": str(mod01.get("security_concern_count", 0))},
         {"label_key": "rpt_au_kpi_agent_connectivity", "label": "Agent Connectivity", "value": str(mod01.get("connectivity_event_count", 0))},
         {"label_key": "rpt_au_kpi_failed_logins", "label": "Failed Logins", "value": str(mod02.get("failed_logins", 0))},
+        {"label_key": "rpt_au_kpi_authz_failures", "label": "Permission Denied (403)", "value": str(mod02.get("authorization_failures", 0))},
         {"label_key": "rpt_au_kpi_policy_provisions", "label": "Policy Provisions", "value": str(mod03.get("provision_count", 0))},
         {"label_key": "rpt_au_kpi_draft_rule_changes", "label": "Draft Rule Changes", "value": str(mod03.get("rule_change_count", 0))},
         {"label_key": "rpt_au_kpi_high_risk_events", "label": "High-Risk Events", "value": str(mod03.get("high_risk_count", 0))},

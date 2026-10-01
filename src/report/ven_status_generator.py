@@ -414,7 +414,9 @@ class VenStatusGenerator:
                 return False
             # Try hours_since_last_heartbeat (most reliable — PCE-computed)
             hslh = row.get('hours_since_last_heartbeat')
-            if hslh is not None:
+            # 部分列缺這個欄位時 pandas 會補 NaN：float(nan) <= 1 為 False，
+            # 舊版直接回傳「離線」，心跳 5 分鐘前的 VEN 也被算成離線。
+            if hslh is not None and not pd.isna(hslh):
                 try:
                     return float(hslh) <= _ONLINE_HEARTBEAT_THRESHOLD_HOURS
                 except (TypeError, ValueError):
