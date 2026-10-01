@@ -37,6 +37,7 @@ import matplotlib.pyplot as plt
 from matplotlib import font_manager, rcParams
 
 from .report_shell import SEVERITY_TONE, SHELL_TOKENS, TONE_HEX
+from src.i18n import t
 
 # Bundle a CJK-capable font so offline-isolated deployments don't depend on
 # an OS-level font install. Loaded before rcParams so the family lookup
@@ -374,4 +375,16 @@ def render_matplotlib_svg(spec: dict[str, Any], *, lang: str = "en") -> str:
     # Matplotlib's SVG backend still emits the block even when Date/Creator are None.
     import re
     svg = re.sub(r'\s*<metadata>.*?</metadata>\s*', '', svg, flags=re.DOTALL)
+    # Accessible name for screen readers: the chart's own (localized) title.
+    from html import escape as _esc
+    title = ""
+    if spec.get("title_key"):
+        title = t(spec["title_key"], lang=lang, default=spec.get("title", ""))
+    title = title or spec.get("title", "") or ""
+    if title and svg.startswith("<svg"):
+        svg = (f'<svg role="img" aria-label="{_esc(title, quote=True)}"'
+               + svg[len("<svg"):])
+        close = svg.find(">")
+        if close != -1:
+            svg = svg[:close + 1] + f"<title>{_esc(title)}</title>" + svg[close + 1:]
     return svg

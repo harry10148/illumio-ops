@@ -298,9 +298,9 @@ for suffix, entry in {
     "app_env": ("App (Env)", "App（環境）"),
     "readiness_score": ("Readiness Score", "就緒度分數"),
     "policy_coverage_pct": ("Policy Coverage %", "Policy 覆蓋率 %"),
-    "ringfence_maturity_pct": ("Ringfence Maturity %", "Ringfence 成熟度 %"),
+    "ringfence_maturity_pct": ("Intra-App Traffic %", "App 內部流量 %"),
     "enforcement_mode_pct": ("Enforcement Mode %", "Enforcement 模式 %"),
-    "staged_readiness_pct": ("Staged Readiness %", "Staged 就緒度 %"),
+    "staged_readiness_pct": ("No-Breakage %", "開啟後不中斷 %"),
     "remote_app_coverage_pct": ("Remote-App Coverage %", "遠端 App 覆蓋率 %"),
     "grade": ("Grade", "等級"),
     # factor_table / recommendations shared columns
@@ -450,6 +450,13 @@ COL_I18N.update({
     # JSON-backed headers (src/i18n_*.json), not overlay entries.
     "Total Connections": "rpt_col_total_connections",
     "Connection Coverage %": "rpt_col_connection_coverage_pct",
+    "Workloads": "rpt_col_workload_count",
+    "Full": "rpt_col_mode_full",
+    "Selective": "rpt_col_mode_selective",
+    "Visibility Only": "rpt_col_mode_visibility_only",
+    "Idle": "rpt_col_mode_idle",
+    "Enforced %": "rpt_col_enforced_pct",
+    "Suggested Allow Rule": "rpt_col_suggested_allow_rule",
 })
 
 # Render-layer value i18n maps. Pass these to render_df_table via

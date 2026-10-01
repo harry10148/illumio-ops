@@ -764,6 +764,7 @@ class ReportGenerator:
                     result.module_results or {}, xlsx_path,
                     profile=traffic_report_profile, lang=lang,
                     record_count=result.record_count, metadata=xlsx_metadata,
+                    raw_df=result.dataframe,
                 )
                 paths.append(xlsx_path)
                 print(t("rpt_xlsx_saved", path=xlsx_path, lang=lang, default=f"XLSX saved: {xlsx_path}"))
@@ -1158,9 +1159,12 @@ class ReportGenerator:
 </body></html>"""
 
 
+_XLSX_RAW_ROW_CAP = 50_000
+
+
 def build_traffic_xlsx(module_results: dict, out_path: str, *, profile: str,
                        lang: str = "en", record_count: int = 0,
-                       metadata: dict | None = None) -> str:
+                       metadata: dict | None = None, raw_df=None) -> str:
     """依 _run_pipeline 產出的 module_results 組裝 Traffic curated workbook，只讀不重算。
 
     分頁對應（key 缺，即該 profile 未跑該模組 → 整張 sheet 略過，不寫空 sheet）：
@@ -1307,6 +1311,45 @@ def build_traffic_xlsx(module_results: dict, out_path: str, *, profile: str,
             ],
             lang=lang,
         )
+
+    # --- Findings（規則引擎）：以前只在 HTML，XLSX 沒有。---
+    findings = module_results.get("findings") or []
+    if findings:
+        rows = []
+        for f in findings:
+            get = (lambda k, f=f: getattr(f, k, "")) if not isinstance(f, dict) else f.get
+            rows.append({
+                t("rpt_email_col_id", lang=lang): get("rule_id"),
+                t("rpt_email_col_severity", lang=lang): get("severity"),
+                t("rpt_xlsx_col_rule", lang=lang): get("rule_name"),
+                t("rpt_xlsx_col_description", lang=lang): get("description"),
+                t("rpt_xlsx_col_recommendation", lang=lang): get("recommendation"),
+            })
+        add_df_sheet(wb, t("rpt_xlsx_sheet_findings", lang=lang), pd.DataFrame(rows), lang=lang)
+
+    # --- Enforcement progress / flows that break（mod_enforcement）---
+    mod_enf = module_results.get("mod_enforcement")
+    if mod_enf and not mod_enf.get("error"):
+        add_stacked_tables_sheet(
+            wb, t("rpt_xlsx_sheet_enforcement", lang=lang),
+            [
+                (t("rpt_tr_enf_progress_title", lang=lang), mod_enf.get("progress")),
+                (t("rpt_tr_enf_breaks_title", lang=lang), mod_enf.get("breaks_on_enforcement")),
+            ],
+            lang=lang,
+        )
+
+    # --- Raw flows：可直接樞紐分析的原始資料（單表、有篩選）。---
+    if raw_df is not None and not getattr(raw_df, "empty", True):
+        raw = raw_df
+        drop = [c for c in raw.columns
+                if raw[c].map(lambda v: isinstance(v, (dict, list))).any()]
+        raw = raw.drop(columns=drop).head(_XLSX_RAW_ROW_CAP)
+        add_df_sheet(wb, t("rpt_xlsx_sheet_raw_flows", lang=lang), raw, lang=lang)
+        if len(raw_df) > _XLSX_RAW_ROW_CAP:
+            summary_ws.cell(row=summary_ws.max_row + 1, column=1,
+                            value=t("rpt_xlsx_raw_capped", lang=lang,
+                                    shown=f"{_XLSX_RAW_ROW_CAP:,}", total=f"{len(raw_df):,}"))
 
     wb.save(out_path)
     return out_path

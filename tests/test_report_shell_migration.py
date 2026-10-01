@@ -235,6 +235,12 @@ _APP_SUMMARY_PB_RELABEL = frozenset({norm("Enforced"), norm("Staged")})
 # labels now read "Covered by allow rule" / "Potentially Blocked"; the counts
 # are unchanged. Pinned in tests/test_report_scoring_semantics.py.
 
+_READINESS_FACTOR_RENAME = frozenset({norm("Staged Readiness")})
+# The "Staged Readiness" factor was the allowed share again — the same number
+# as Policy Coverage. It now measures the share of flows that keep working once
+# enforced (everything but Potentially Blocked) and is named for that
+# ("No-Breakage Share"). Pinned in tests/test_readiness_factors.py.
+
 ALLOWLIST: dict[str, frozenset[str]] = {
     "traffic": _COMMON_ALLOWLIST,
     "security_risk": _COMMON_ALLOWLIST | {_WRONG_EXEC_SUFFIX},
@@ -254,7 +260,7 @@ ALLOWLIST: dict[str, frozenset[str]] = {
     "policy_diff": _T5_ALLOWLIST,
     "app_summary": _T5_ALLOWLIST | _APP_SUMMARY_PB_RELABEL,
     "rule_hit_count": _T5_ALLOWLIST,
-    "readiness": _T5_ALLOWLIST,
+    "readiness": _T5_ALLOWLIST | _READINESS_FACTOR_RENAME,
 }
 
 # The i18n key each type's footer text comes from. It moves into the appendix

@@ -19,7 +19,8 @@ def test_security_risk_profile_unchanged_full_set():
     full = {"mod01", "mod02", "mod03", "mod04", "mod06", "mod07", "mod08",
             "mod09", "mod11", "mod13", "mod14", "mod15",
             "mod_draft_summary", "mod_ringfence"}
-    assert _ids("security_risk") == full
+    # Enforcement progress / flows that break is a security_risk-only chapter.
+    assert _ids("security_risk") == full | {"mod_enforcement"}
     assert _ids("network_inventory") == full
 
 

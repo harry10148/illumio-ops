@@ -93,6 +93,23 @@ def _iter_dataframes(data, prefix: str):
             except Exception:
                 pass  # intentional fallback: skip data sections that cannot be converted to a DataFrame
 
+def _findings_frame(findings) -> pd.DataFrame | None:
+    """Rules-engine findings (dataclasses or dicts) as one flat table."""
+    if not findings:
+        return None
+    rows = []
+    for f in findings:
+        get = f.get if isinstance(f, dict) else (lambda k, f=f: getattr(f, k, ''))
+        evidence = get('evidence')
+        rows.append({
+            'rule_id': get('rule_id'), 'severity': get('severity'), 'rule_name': get('rule_name'),
+            'category': get('category'), 'description': get('description'),
+            'recommendation': get('recommendation'),
+            'evidence': '; '.join(f'{k}={v}' for k, v in evidence.items()) if isinstance(evidence, dict) else (evidence or ''),
+        })
+    return pd.DataFrame(rows)
+
+
 class CsvExporter:
     """
     Export report module_results as a ZIP of CSV files.
@@ -117,14 +134,27 @@ class CsvExporter:
         tmp_path = f'{zip_path}.{os.getpid()}.tmp'
 
         written = 0
+        manifest: list[dict] = []
         try:
             with zipfile.ZipFile(tmp_path, 'w', zipfile.ZIP_DEFLATED) as zf:
+                # 規則引擎的 findings 以前被略過，CSV 使用者看不到任何發現。
+                findings_df = _findings_frame(self._r.get('findings'))
+                if findings_df is not None:
+                    _write_df_entry(zf, 'findings.csv', findings_df)
+                    manifest.append({'file': 'findings.csv', 'rows': len(findings_df),
+                                     'columns': ', '.join(map(str, findings_df.columns))})
+                    written += 1
                 for mod_key, mod_data in self._r.items():
                     if mod_key in _SKIP_KEYS:
                         continue
                     for csv_name, df in _iter_dataframes(mod_data, mod_key):
                         _write_df_entry(zf, csv_name, df)
+                        manifest.append({'file': csv_name, 'rows': len(df),
+                                         'columns': ', '.join(map(str, df.columns))})
                         written += 1
+                # 檔案清單：一個 zip 動輒數十個 CSV，沒有清單很難找。
+                if manifest:
+                    _write_df_entry(zf, '_manifest.csv', pd.DataFrame(manifest))
             os.replace(tmp_path, zip_path)
         except BaseException:
             discard_reserved(tmp_path)

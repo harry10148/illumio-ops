@@ -98,6 +98,8 @@ GUI：報表區 `#/reports` → Traffic 卡片的產生鈕；產出會排入伺�
 - **2026-07 起預設含 unknown**：查詢的 `policy_decisions` 篩選未指定時，預設含四值 `blocked, potentially_blocked, allowed, unknown`，涵蓋 idle／快照模式 VEN 與 Flowlink 未管理流量。若沿用舊版習慣手動指定只含前三值的 filter，統計出來的總量會明顯偏低；unknown 值域的完整說明見 [pce-domain-notes.md](../handover/pce-domain-notes.md) 「policy_decision 值域」節。
 - 若走 cache（hybrid／cache-only），而快取資料是在支援 unknown 值之前寫入的舊資料，該時間範圍內的 unknown flows 不會自動補上，須重跑 backfill 才能取得完整含 unknown 的歷史資料（backfill 操作見 [cache-maintenance.md](cache-maintenance.md)）。
 - HTML 版面對一般欄位（IP／port／label）沒有特別截斷；xlsx 匯出欄寬依內容自動估算但上限 60 字元寬，這只是欄位顯示寬度，不會截斷儲存格內容本身。
+- XLSX：數字（含千分位與百分比）存成真正的數值，可直接排序、加總、做樞紐分析；另有「發現」工作表（規則引擎的所有 finding）與「原始流量」工作表（前 50,000 筆，超過時摘要頁會註明，完整資料在 CSV）。單表工作表都帶篩選。紅底只標真正的 blocked／deny／critical 列，`potentially_blocked` 不會被標紅。
+- CSV zip：新增 `findings.csv`（規則引擎的發現）與 `_manifest.csv`（每個檔案的列數與欄位）。
 - 以下子命令與 Traffic 共用同一產生器（`report_generator.py`），未各自成節：
   - `illumio-ops report draft-policy` — DRAFT policy 影響評估，永遠即時查 PCE（含 `draft_policy_decision` 計算），不使用 cache；建議用 `--start-date`/`--end-date` 縮小窗口，全時間窗口計算成本較高。
   - `illumio-ops report inventory` — Network & Traffic Inventory，同一分析管線的資產盤點視角。
@@ -118,6 +120,26 @@ illumio-ops report security --format html
 GUI：報表區 `#/reports` → Security 卡片的產生鈕。
 
 關鍵欄位：policy_coverage_pct、未覆蓋流量 Top 清單、攻擊面摘要、Enforcement Readiness 小節（與獨立的 Readiness 報表共用同一分析核心 mod13，是同一套邏輯的兩種呈現）。
+
+第一頁（執行摘要）依序是：
+
+1. 一句總評：等級、Critical／High 發現數，以及 Potentially Blocked 占比。
+2. 「優先處理」：最多 3 件，依嚴重度排序，每件附具體動作。
+3. 風險指標排在前面，流量規模指標排在後面。
+
+「Enforcement 進度與開啟後會中斷的流量」一章有兩張表：
+
+- 各 app (env) 依 workload 實際的 enforcement 模式算出的進度，最落後的排在最前面。
+- 「開啟 Enforcement 後會中斷的流量」：依來源 app、目的 app、Service 分組的 Potentially Blocked 流量，每列附一條能讓它繼續運作的 allow 規則建議。
+
+發現的佐證欄完整列出內容：清單超過 5 項時標示「另有 N 項」，沒有 label 的端點顯示「（無 label）」。
+
+Readiness 評分因子：
+
+- **Enforcement Mode**：依 workload 的實際模式計算；舊版用的是「端點是否受管」。
+- **開啟後不中斷比例**：取代舊的 Staged Readiness（舊版與 Policy Coverage 是同一個數字）。
+- **App 內部流量比例**：App 內部流量的占比。
+- **沒有資料時**：沒有遠端存取流量或沒有 enforcement 模式時，該因子顯示「無資料」，不計分，其餘因子按比例換算。
 
 注意事項：與 Traffic 報表相同——policy_decisions 預設含 unknown，且支援 `--data-source`。
 
