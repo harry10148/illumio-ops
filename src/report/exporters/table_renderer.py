@@ -234,7 +234,7 @@ def render_df_table(
         else:
             label_html = f'<span class="th-label">{label_text}</span>'
         cls = _cell_class(col, numeric_cols, ts_cols)
-        html_parts.append(f'<th title="{title}"{cls}>{label_html}</th>')
+        html_parts.append(f'<th scope="col" title="{title}"{cls}>{label_html}</th>')
     html_parts.append("</tr></thead><tbody>")
 
     for _, row in df.iterrows():

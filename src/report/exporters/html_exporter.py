@@ -226,6 +226,32 @@ def _progress_bar(pct: float) -> str:
         f'</div>'
     )
 
+_EV_LIST_LIMIT = 5
+
+
+def _ev_text(x, unlabeled: str) -> str:
+    """One evidence value in reader form, never cut mid-word.
+
+    Tuples were printed raw (``('prod', 'dev'):168``), list items were cut to
+    40 characters with no marker, and an empty label rendered as nothing at
+    all (``→ backup``).
+    """
+    if isinstance(x, tuple):
+        return " → ".join(_ev_text(p, unlabeled) for p in x)
+    if isinstance(x, dict):
+        src = {k[4:]: v for k, v in x.items() if str(k).startswith("src_")}
+        dst = {k[4:]: v for k, v in x.items() if str(k).startswith("dst_")}
+        rest = {k: v for k, v in x.items() if not str(k).startswith(("src_", "dst_"))}
+        parts = []
+        if src or dst:
+            parts.append(f"{'/'.join(_ev_text(v, unlabeled) for v in src.values())}"
+                         f" → {'/'.join(_ev_text(v, unlabeled) for v in dst.values())}")
+        parts.extend(f"{k}: {_ev_text(v, unlabeled)}" for k, v in rest.items())
+        return ", ".join(parts)
+    text = "" if x is None else str(x).strip()
+    return text if text else unlabeled
+
+
 def _format_evidence(evidence: dict, lang: str | None = None) -> str:
     """Convert evidence dict to readable pills, parsing Python literal strings where possible."""
     if not evidence:
@@ -233,6 +259,7 @@ def _format_evidence(evidence: dict, lang: str | None = None) -> str:
     import ast
     pills = []
     _sl = lang or get_language()
+    unlabeled = t("rpt_ev_unlabeled", lang=_sl)
     for k, v in evidence.items():
         full_key = f"rpt_col_{k}"
         entry = STRINGS.get(full_key, {})
@@ -243,20 +270,26 @@ def _format_evidence(evidence: dict, lang: str | None = None) -> str:
             label = cand
         else:
             label = k.replace('_', ' ').title()
-        v_str = str(v)
-        # Try to parse Python-literal dicts/lists for nicer display
-        try:
-            parsed = ast.literal_eval(v_str)
-            if isinstance(parsed, dict):
-                v_display = ', '.join(f'{pk}:{pv}' for pk, pv in list(parsed.items())[:5])
-            elif isinstance(parsed, list):
-                v_display = ', '.join(str(x)[:40] for x in parsed[:3])
-                if len(parsed) > 3:
-                    v_display += f' …+{len(parsed)-3}'
-            else:
-                v_display = v_str
-        except (ValueError, SyntaxError):
-            v_display = v_str
+        parsed = v
+        if isinstance(v, str):
+            try:
+                parsed = ast.literal_eval(v)
+            except (ValueError, SyntaxError):
+                parsed = v
+        if isinstance(parsed, dict):
+            items = list(parsed.items())
+            shown = [f"{_ev_text(pk, unlabeled)}: {_ev_text(pv, unlabeled)}" for pk, pv in items[:_EV_LIST_LIMIT]]
+            v_display = '; '.join(shown)
+            hidden = len(items) - len(shown)
+        elif isinstance(parsed, (list, tuple, set)) and not isinstance(parsed, tuple):
+            seq = list(parsed)
+            v_display = '; '.join(_ev_text(x, unlabeled) for x in seq[:_EV_LIST_LIMIT])
+            hidden = len(seq) - min(len(seq), _EV_LIST_LIMIT)
+        else:
+            v_display = _ev_text(parsed, unlabeled) if not isinstance(parsed, str) else (parsed or unlabeled)
+            hidden = 0
+        if hidden > 0:
+            v_display += ' ' + t("rpt_ev_more", lang=_sl, n=hidden)
         pills.append(
             f'<div class="ev-pill">'
             f'<span class="ev-label">{html.escape(label)}</span>'
@@ -626,7 +659,10 @@ class _TrafficReportBase:
 
         generated_at = mod12.get('generated_at', '')
         today_str = str(datetime.date.today())
-        _traffic_mod00 = {"kpis": _kpi_items}
+        # 第一屏：總評 → 優先處理的 3 件事 → 風險指標（traffic profile 沒有評分，
+        # mod12 不產生前兩者，自然只剩 KPI）。
+        _traffic_mod00 = {"kpis": _kpi_items, "verdict": mod12.get("verdict", ""),
+                          "top_actions": mod12.get("top_actions") or []}
         total_flows = self._r.get('mod01', {}).get('total_flows', 0)
         # Built as a list of pills and closed once at the end. The old code
         # appended the data-source pill with
@@ -833,6 +869,10 @@ class _TrafficReportBase:
             'drift': self._section('drift', 'rpt_tr_sec_drift', 'Baseline Drift',
                           render_section_guidance('mod_drift', profile=profile, detail_level=detail_level, lang=self._lang) + self._mod_drift_html(),
                           'rpt_tr_sec_drift_intro', 'Compare this period\'s app-to-app connections against the previous report to spot new paths and disappeared baselines.'),
+            'enforcement': (None if not self._r.get('mod_enforcement') else
+                            self._section('enforcement', 'rpt_tr_sec_enforcement', 'Enforcement Progress',
+                                          self._mod_enforcement_html(),
+                                          'rpt_tr_sec_enforcement_intro', '')),
             'ransomware': self._section('ransomware', 'rpt_tr_sec_ransomware', 'Ransomware Exposure',
                           render_section_guidance('mod04', profile=profile, detail_level=detail_level, lang=self._lang) + self._mod04_html(),
                           'rpt_tr_sec_ransomware_intro', 'Check high-risk Ports, Allowed flows, and host exposure commonly tied to ransomware attack chains.'),
@@ -1280,6 +1320,29 @@ class _TrafficReportBase:
             + _df_to_html(m.get('part_d_host_exposure'), lang=_lang)
             + _trunc_note(m.get('part_d_host_exposure'), m.get('part_d_total_hosts', 0), _lang)
         )
+        return out
+
+    def _mod_enforcement_html(self) -> str:
+        m = self._r.get('mod_enforcement') or {}
+        if 'error' in m:
+            return f'<p class="note">{html.escape(str(m["error"]))}</p>'
+        _lang = self._lang
+        out = f'<h3>{html.escape(t("rpt_tr_enf_progress_title", lang=_lang))}</h3>'
+        progress = m.get('progress')
+        if progress is None or getattr(progress, 'empty', True):
+            out += f'<p class="note">{html.escape(t("rpt_tr_enf_no_modes", lang=_lang))}</p>'
+        else:
+            out += (f'<p class="note">{html.escape(t("rpt_tr_enf_progress_note", lang=_lang))}</p>'
+                    + _df_to_html(progress, lang=_lang)
+                    + _trunc_note(progress, m.get('progress_total', 0), _lang))
+        out += f'<h3>{html.escape(t("rpt_tr_enf_breaks_title", lang=_lang))}</h3>'
+        breaks = m.get('breaks_on_enforcement')
+        if breaks is None or getattr(breaks, 'empty', True):
+            out += f'<p class="note">{html.escape(t("rpt_tr_enf_no_pb", lang=_lang))}</p>'
+        else:
+            out += (f'<p class="note note-warn" data-tone="warn">{html.escape(t("rpt_tr_enf_breaks_note", lang=_lang))}</p>'
+                    + _df_to_html(breaks, lang=_lang)
+                    + _trunc_note(breaks, m.get('breaks_total', 0), _lang))
         return out
 
     def _mod06_html(self):
@@ -1783,9 +1846,9 @@ class _TrafficReportBase:
                 "app_env_key": "App (Env)",
                 "readiness_score": "Readiness Score",
                 "policy_coverage_ratio": "Policy Coverage %",
-                "ringfence_maturity_ratio": "Ringfence Maturity %",
+                "ringfence_maturity_ratio": "Intra-App Traffic %",
                 "enforcement_mode_ratio": "Enforcement Mode %",
-                "staged_readiness_ratio": "Staged Readiness %",
+                "staged_readiness_ratio": "No-Breakage %",
                 "remote_app_coverage_ratio": "Remote-App Coverage %",
                 "potentially_blocked_ratio": "PB Ratio %",
                 "pb_uncovered_count": "PB Uncovered",
@@ -1802,9 +1865,9 @@ class _TrafficReportBase:
             html += (
                 f'<h4>{_s("rpt_tr_app_env_readiness")}</h4>'
                 + f'<h5 class="subtable-label">{_s("rpt_tr_app_env_scores_summary")}</h5>'
-                + _aes_sub(["App (Env)", "Grade", "Readiness Score", "Policy Coverage %", "Enforcement Mode %", "Ringfence Maturity %"])
+                + _aes_sub(["App (Env)", "Grade", "Readiness Score", "Policy Coverage %", "Enforcement Mode %", "Intra-App Traffic %"])
                 + f'<h5 class="subtable-label">{_s("rpt_tr_app_env_coverage")}</h5>'
-                + _aes_sub(["App (Env)", "Remote-App Coverage %", "Staged Readiness %", "PB Ratio %", "PB Uncovered"])
+                + _aes_sub(["App (Env)", "Remote-App Coverage %", "No-Breakage %", "PB Ratio %", "PB Uncovered"])
                 + f'<h5 class="subtable-label">{_s("rpt_tr_app_env_flows")}</h5>'
                 + _aes_sub(["App (Env)", "Flows", "Connections", "Blocked/PB Flows"])
             )
@@ -2019,7 +2082,7 @@ class SecurityRiskHtmlExporter(_TrafficReportBase):
         return False
 
     def _ordered_section_keys(self) -> list[str]:
-        return ['summary', 'drift', 'overview', 'policy', 'uncovered', 'ransomware',
+        return ['summary', 'drift', 'overview', 'policy', 'uncovered', 'enforcement', 'ransomware',
                 'vuln', 'user', 'readiness', 'infrastructure', 'lateral', 'findings']
 
 
