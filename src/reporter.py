@@ -2211,7 +2211,7 @@ class Reporter:
             return False
 
 
-def send_ops_alert(cm, title_key: str, message: str, *, status: str = "warning") -> bool:
+def send_ops_alert(cm: Any, title_key: str, message: str, *, status: str = "warning") -> bool:
     """把維運警告（ingest 落後、磁碟不足、SIEM 積壓…）送到已設定的告警通道。
 
     舊版這些警告只寫進 log，沒有人盯 log 時等於沒有發生。盡力而為：送出失敗
