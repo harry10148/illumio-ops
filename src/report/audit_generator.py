@@ -344,7 +344,7 @@ def _extract_notifications_detail(raw_notifications) -> str:
             details.append(ntype)
         if isinstance(info, dict):
             # Failed login: supplied_username
-            username = info.get('supplied_username')
+            username = _info_supplied_username(info)
             if username:
                 details.append(f'username={username}')
             # Agent info
@@ -352,6 +352,22 @@ def _extract_notifications_detail(raw_notifications) -> str:
             if hostname:
                 details.append(f'host={hostname}')
     return '; '.join(details[:4])
+
+def _info_supplied_username(info: dict) -> str:
+    """登入失敗時使用者輸入的帳號。
+
+    PCE 放在 `info.associated_user.supplied_username`（REST API 文件的
+    user.sign_in failure 範例）；舊版只讀 `info.supplied_username`，真機事件
+    永遠取不到，報表的「輸入帳號」欄因此一直是空的。兩個位置都讀，新位置優先。
+    """
+    associated = info.get('associated_user')
+    if isinstance(associated, dict):
+        value = associated.get('supplied_username')
+        if value:
+            return str(value).strip()
+    value = info.get('supplied_username')
+    return str(value).strip() if value else ''
+
 
 def _extract_supplied_username(raw_notifications) -> str:
     """Extract the username supplied during failed auth flows."""
@@ -364,9 +380,9 @@ def _extract_supplied_username(raw_notifications) -> str:
         info = notification.get('info', {})
         if not isinstance(info, dict):
             continue
-        username = info.get('supplied_username')
+        username = _info_supplied_username(info)
         if username:
-            return str(username).strip()
+            return username
     return ''
 
 def _stringify_parser_notes(value) -> str:
