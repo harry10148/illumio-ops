@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 import threading
+import time
 from datetime import datetime, timezone, timedelta
 from typing import Optional
 
 import orjson
 from loguru import logger
-from sqlalchemy import delete, or_, select, update
+from sqlalchemy import func, or_, select, update
 from sqlalchemy.orm import sessionmaker
 
 from src.pce_cache.models import (
@@ -15,6 +16,23 @@ from src.pce_cache.models import (
 from src.siem.formatters.base import Formatter
 from src.siem.pd import pd_accepted
 from src.siem.transports.base import Transport
+
+
+def _is_permanent_send_error(exc: BaseException) -> bool:
+    """重試也不會成功的送出錯誤：直接進 DLQ。
+
+    - HTTP 4xx（408 逾時、429 限流除外）：HEC 回 400（格式錯）、401/403（token
+      錯）重送同一筆只會得到同樣結果。
+    - EMSGSIZE：UDP 訊息超過 datagram 上限，重送同樣送不出去。
+    """
+    import errno
+    response = getattr(exc, "response", None)
+    status = getattr(response, "status_code", None)
+    if isinstance(status, int) and 400 <= status < 500 and status not in (408, 429):
+        return True
+    if isinstance(exc, OSError) and exc.errno == errno.EMSGSIZE:
+        return True
+    return False
 
 
 def _backoff_seconds(retries: int) -> int:
@@ -81,12 +99,42 @@ class DestinationDispatcher:
         self.close()
         return False
 
-    def tick(self) -> dict[str, int]:
-        """Process one batch. Returns {sent, failed, quarantined}."""
+    # tick 內最多處理幾批：時間預算之外的第二道上限，保證迴圈有界。
+    _MAX_BATCHES_PER_TICK = 1000
+
+    def tick(self, time_budget_seconds: Optional[float] = None) -> dict:
+        """送出待送列。
+
+        time_budget_seconds=None：只處理一批（舊行為）。給了預算就在預算內一批
+        接一批送，直到佇列清空、某批因目的地連線失敗而中止，或預算用完——
+        舊版每 tick 固定一批（預設每 30 秒 100 筆，約每天 28.8 萬筆），traffic
+        一次 ingest 就可能排入 20 萬筆，積壓只會越來越久。
+
+        回傳 {sent, failed, quarantined, batches, aborted, error}；aborted 為
+        True 表示目的地連不上（斷路器打開），error 是最後一次的錯誤訊息。
+        """
+        totals = {"sent": 0, "failed": 0, "quarantined": 0, "batches": 0,
+                  "aborted": False, "error": None}
         if not self._lock.acquire(blocking=False):
-            return {"sent": 0, "failed": 0, "quarantined": 0}
+            return totals
         try:
-            return self._process_batch()
+            deadline = (time.monotonic() + time_budget_seconds
+                        if time_budget_seconds is not None else None)
+            while totals["batches"] < self._MAX_BATCHES_PER_TICK:
+                result = self._process_batch()
+                totals["batches"] += 1
+                for key in ("sent", "failed", "quarantined"):
+                    totals[key] += result[key]
+                if result.get("aborted"):
+                    totals["aborted"] = True
+                    totals["error"] = result.get("error")
+                    break
+                attempted = result["sent"] + result["failed"] + result["quarantined"]
+                if deadline is None or attempted < self._batch_size or attempted == 0:
+                    break
+                if time.monotonic() >= deadline:
+                    break
+            return totals
         finally:
             self._lock.release()
 
@@ -111,6 +159,7 @@ class DestinationDispatcher:
             sources = self._load_sources(s, rows)
 
         sent_rows: list[tuple[SiemDispatch, str]] = []
+        aborted_error: Optional[str] = None
         for dispatch_row in rows:
             payload = self._build_payload(
                 dispatch_row, sources.get((dispatch_row.source_table, dispatch_row.source_id))
@@ -118,19 +167,39 @@ class DestinationDispatcher:
             if payload is None:
                 # Route build failures through the DLQ (not a bare status='failed')
                 # so the dropped event stays inspectable and replayable.
-                self._quarantine(dispatch_row, None, "payload_build_failed")
-                quarantined += 1
+                if self._quarantine(dispatch_row, None, "payload_build_failed"):
+                    quarantined += 1
+                else:
+                    failed += 1
                 continue
             try:
                 self._send(payload, dispatch_row,
                            sources.get((dispatch_row.source_table, dispatch_row.source_id)))
                 sent_rows.append((dispatch_row, payload))
             except Exception as exc:
-                logger.warning("SIEM dispatch failed for row {}: {}", dispatch_row.id, exc)
+                if _is_permanent_send_error(exc):
+                    # 重試也不會成功（HEC 400/403、UDP 訊息超過 datagram 上限）：
+                    # 直接進 DLQ，不佔用重試，也不必中止這一批。
+                    logger.warning("SIEM dispatch for row {} rejected permanently: {}",
+                                   dispatch_row.id, exc)
+                    if self._quarantine(dispatch_row, payload, f"permanent: {exc}"):
+                        quarantined += 1
+                    else:
+                        failed += 1
+                    continue
+                # 斷路器：目的地層級的失敗（連不上、逾時、5xx）會讓同批其餘列
+                # 一筆一筆重複等逾時——HEC 每筆最多重試 4 次×10 秒，一批 100 筆
+                # 可以卡住整個 job 超過一小時，其他目的地也被拖住，而且這些列
+                # 全都被扣重試次數、提早進 DLQ。這裡只記這一筆的失敗，剩下的列
+                # 原封不動留在佇列，下個 tick 再試。
+                logger.warning("SIEM destination {!r} send failed for row {}: {} — "
+                               "aborting this batch", self._name, dispatch_row.id, exc)
                 if self._record_failure(dispatch_row, payload, str(exc)):
                     quarantined += 1
                 else:
                     failed += 1
+                aborted_error = str(exc)
+                break
 
         # 串流型 transport（TCP／TLS）在標記 sent 之前先 graceful close 確認送達：
         # 直接 close() 會因接收 buffer 有未讀資料（TLS session ticket）送出 RST，
@@ -150,6 +219,7 @@ class DestinationDispatcher:
                     else:
                         failed += 1
                 sent_rows = []
+                aborted_error = aborted_error or f"delivery_unconfirmed: {exc}"
         sent = len(sent_rows)
         sent_ids = [row.id for row, _ in sent_rows]
 
@@ -169,14 +239,16 @@ class DestinationDispatcher:
                         .values(status="sent", sent_at=sent_at)
                     )
 
-        return {"sent": sent, "failed": failed, "quarantined": quarantined}
+        return {"sent": sent, "failed": failed, "quarantined": quarantined,
+                "aborted": aborted_error is not None, "error": aborted_error}
 
     def _record_failure(self, row: SiemDispatch, payload: Optional[str], error: str) -> bool:
-        """記一次送出失敗：達 max_retries 進 DLQ（回 True），否則排退避重試（回 False）。"""
+        """記一次送出失敗：達 max_retries 進 DLQ（回 True），否則排退避重試（回 False）。
+        DLQ 已滿時不進 DLQ，留在佇列以最長退避重試（也回 False）。"""
         new_retries = row.retries + 1
         if new_retries >= self._max_retries:
-            self._quarantine(row, payload, error)
-            return True
+            # DLQ 已滿時 _quarantine 自己會把這一列排成最長退避，不再覆寫。
+            return self._quarantine(row, payload, error)
         next_at = datetime.now(timezone.utc) + timedelta(seconds=_backoff_seconds(new_retries))
         with self._sf.begin() as s:
             s.execute(
@@ -242,9 +314,37 @@ class DestinationDispatcher:
             logger.exception("Failed to build payload for dispatch row {}: {}", row.id, exc)
         return None
 
-    def _quarantine(self, row: SiemDispatch, payload: Optional[str], error: str) -> None:
+    def _dlq_full(self, s) -> bool:
+        if not self._dlq_max or self._dlq_max <= 0:
+            return False
+        count = s.execute(
+            select(func.count(DeadLetter.id)).where(DeadLetter.destination == self._name)
+        ).scalar_one()
+        return count >= self._dlq_max
+
+    def _quarantine(self, row: SiemDispatch, payload: Optional[str], error: str) -> bool:
+        """移入 DLQ。回傳 True 表示已移入；DLQ 已達上限時回 False，該列留在佇列。
+
+        舊版是 ring buffer：滿了就刪最舊的 DLQ 項目，那些記錄從此找不回來，
+        補登機制也不會補（它只看 siem_dispatch）。現在 DLQ 滿了就不再收：
+        這一列維持 pending、以最長退避（1 小時）重試，資料留在本機不遺失；
+        佇列積壓由 siem_pending_warn_rows 告警，操作者清理或重送 DLQ 後恢復。
+        """
         now = datetime.now(timezone.utc)
         with self._sf.begin() as s:
+            if self._dlq_full(s):
+                logger.error(
+                    "SIEM DLQ for {!r} is full ({} entries); row {} stays queued "
+                    "instead of dropping older dead letters — replay or purge the DLQ",
+                    self._name, self._dlq_max, row.id,
+                )
+                s.execute(
+                    update(SiemDispatch)
+                    .where(SiemDispatch.id == row.id)
+                    .values(retries=row.retries + 1,
+                            next_attempt_at=now + timedelta(seconds=_backoff_seconds(99)))
+                )
+                return False
             s.add(DeadLetter(
                 source_table=row.source_table,
                 source_id=row.source_id,
@@ -254,27 +354,12 @@ class DestinationDispatcher:
                 payload_preview=payload[:512] if payload else "",
                 quarantined_at=now,
             ))
-            # dlq_max_per_dest：ring-buffer 語意，超過上限即刪最舊項目，
-            # 否則持續失敗的目的地會讓 dead_letter 無上限成長。
-            if self._dlq_max and self._dlq_max > 0:
-                s.flush()
-                excess_ids = s.execute(
-                    select(DeadLetter.id)
-                    .where(DeadLetter.destination == self._name)
-                    .order_by(DeadLetter.quarantined_at.desc(), DeadLetter.id.desc())
-                    .offset(self._dlq_max)
-                ).scalars().all()
-                if excess_ids:
-                    s.execute(delete(DeadLetter).where(DeadLetter.id.in_(excess_ids)))
-                    logger.warning(
-                        "SIEM DLQ cap ({}) reached for {!r}: pruned {} oldest entries",
-                        self._dlq_max, self._name, len(excess_ids),
-                    )
             s.execute(
                 update(SiemDispatch)
                 .where(SiemDispatch.id == row.id)
                 .values(status="failed")
             )
+        return True
 
 
 def pce_identity(cm, api) -> tuple[str, str]:

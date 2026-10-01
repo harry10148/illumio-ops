@@ -243,7 +243,10 @@ archiver 把舊檔 gzip 壓縮後（`archive_gzip_after_days`，預設 7 天）�
 ### 4.3 7/24 營運注意
 
 - 正式常駐一律只用 **`--monitor-gui`**。systemd unit（`deploy/illumio-ops.service`）啟動指令為
-  `--monitor-gui --interval 10`，並配 `Restart=on-failure`。
+  `--monitor-gui --interval 10`，並配 `Restart=always`（任何非預期結束都重啟，`systemctl stop` 不會觸發）。
+  Web GUI 啟動失敗（port 被佔用、TLS 憑證缺失或設定不完整）時，程序會停掉背景排程並以結束碼 1 退出，
+  原因寫在 ERROR 日誌（`Web GUI did not start: …`）；舊版以 0 結束，服務管理器視為正常停止，監控與
+  SIEM 轉送就此停擺。
 - **絕不可**用 `--gui`（GUI-only 模式）常駐正式環境：該模式不啟動任何排程，cache 的 ingestion／
   aggregation／retention 都不會自動觸發——cache 只能靠手動 Backfill 填入，也不再被清理。程式碼本身即有
   明確警語（`src/cli/_runtime.py`）：

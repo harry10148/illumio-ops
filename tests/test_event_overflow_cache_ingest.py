@@ -6,8 +6,8 @@ pce_cache.enabled=true 的部署根本不走那條路——EventsIngestor 是唯
 截斷的地方，卻只記一行 INFO，meta-alert 從來不會發。
 
 本檔把整條鏈釘住：
-  1. EventsIngestor 碰頂 → last_run_overflow（含 source 標記）＋ WARNING。
-  2. async 補抓真的抽乾整個視窗 → 撤回訊號（不算資料遺失）。
+  1. EventsIngestor 碰頂且二分到最小跨度仍碰頂 → last_run_overflow（含 source 標記）＋ WARNING。
+  2. 二分切窗真的抽乾整個視窗 → 不發訊號（不算資料遺失）。
   3. run_events_ingest → state.json 的 event_overflow。
   4. Analyzer 的 cache 分支只清 legacy 殘留，不得清掉 ingest 寫的訊號。
   5. save_state 不得用 cycle 起始快照把 ingest 剛寫的訊號整包蓋回去。
@@ -39,8 +39,10 @@ def _skip_cache_provenance_guard():
 
 def _ingestor(api, **kw):
     from src.pce_cache.ingestor_events import EventsIngestor
+    wm = MagicMock()
+    wm.get.return_value = None  # 冷啟動：往回 24 小時
     ing = EventsIngestor(api=api, session_factory=MagicMock(),
-                         watermark=MagicMock(), async_threshold=2, **kw)
+                         watermark=wm, async_threshold=2, **kw)
     ing._insert_batch = MagicMock(return_value=0)
     return ing
 
@@ -53,36 +55,36 @@ def _events(n):
 def test_events_cap_hit_records_overflow_and_warns(caplog):
     api = MagicMock()
     api.last_fetch_error = None
-    api.get_events.return_value = _events(2)      # == async_threshold → 碰頂
-    api.get_events_async.return_value = []        # stub（Phase 13 未實作）
+    api.fetch_events.return_value = _events(2)    # 每個子窗都 == 上限 → 切不乾
     ing = _ingestor(api)
 
-    with caplog.at_level(logging.WARNING, logger="src.pce_cache.ingestor_events"):
+    with caplog.at_level(logging.WARNING):
         ing.run_once()
 
     ovf = ing.last_run_overflow
     assert ovf, "碰頂未留下 overflow 訊號 → meta-alert 永遠不會發"
-    assert ovf["raw_count"] == 2 and ovf["max_results"] == 2
+    assert ovf["raw_count"] >= 2 and ovf["max_results"] == 2
     assert ovf["query_since"] and ovf["query_until"]
     assert ovf["source"] == "cache_ingest"
-    assert any("hit cap" in r.message for r in caplog.records), \
+    assert any("hit max_results cap" in r.message for r in caplog.records), \
         f"碰頂必須是 WARNING（資料遺失）；實得：{[r.message for r in caplog.records]}"
 
 
-def test_events_cap_hit_cleared_when_async_drains_window():
+def test_events_cap_hit_no_overflow_when_bisect_drains_window():
     api = MagicMock()
     api.last_fetch_error = None
-    api.get_events.return_value = _events(2)
-    api.get_events_async.return_value = _events(9)   # async 沒有上限 → 真的抽乾
+    # 整窗碰頂，二分後兩個子窗都低於上限 → 抽乾，不算資料遺失
+    api.fetch_events.side_effect = [_events(2), _events(1), _events(1)]
     ing = _ingestor(api)
     ing.run_once()
+    assert api.fetch_events.call_count == 3
     assert ing.last_run_overflow is None
 
 
 def test_events_no_cap_no_overflow():
     api = MagicMock()
     api.last_fetch_error = None
-    api.get_events.return_value = _events(1)
+    api.fetch_events.return_value = _events(1)
     ing = _ingestor(api)
     ing.run_once()
     assert ing.last_run_overflow is None

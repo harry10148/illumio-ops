@@ -39,6 +39,8 @@ def test_unit_has_hardening_directives():
 
 
 def test_unit_restart_policy():
+    # always 而非 on-failure：長駐服務任何非預期結束（包含以 0 結束，例如舊版
+    # Web GUI 啟動失敗時）都要重啟；systemctl stop 不會觸發重啟。
     cp = _parse_unit()
-    assert cp["Service"]["Restart"] == "on-failure"
+    assert cp["Service"]["Restart"] == "always"
     assert int(cp["Service"]["RestartSec"]) >= 5

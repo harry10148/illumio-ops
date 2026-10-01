@@ -219,6 +219,9 @@ def test_events_connection_failure_signals_watchdog_end_to_end(tmp_path):
         def get_events_async(self, since=None, rate_limit=False, **kw):
             return []
 
+        def fetch_events(self, *args, **kw):
+            return []
+
     cm = _cm(tmp_path)
     engine = create_engine(f"sqlite:///{tmp_path / 'cache.sqlite'}")
     init_schema(engine)

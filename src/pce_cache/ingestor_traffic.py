@@ -31,6 +31,7 @@ class TrafficIngestor:
         siem_pd_filters: Optional[dict[str, set[str]]] = None,
         record_observations: bool = True,
         obs_retention_hours: int = 6,
+        overlap: timedelta = timedelta(minutes=20),
     ):
         self._api = api
         self._sf = session_factory
@@ -45,6 +46,8 @@ class TrafficIngestor:
         # 視窗增量觀測（phase 2，見 src/pce_cache/flow_deltas.py）：每跑一次
         # ingest 就替每筆 flow 記一列「當下累計值」，規則引擎才有前一次觀測
         # 可相減。關掉就等於整個部署退回 phase 1 的守門（規則被抑制而非誤報）。
+        self._overlap = overlap
+        self._until_dt: Optional[datetime] = None
         self._record_obs = record_observations
         self._obs_retention_hours = max(1, int(obs_retention_hours))
         # Set by run_once() when a window's bisection hit the 1-min floor
@@ -90,7 +93,14 @@ class TrafficIngestor:
             if flows:
                 last = max(_ts(f, "last_detected") for f in flows)
                 if last:
-                    self._wm.advance(self.SOURCE, last_timestamp=_parse_iso(last))
+                    last_dt = _parse_iso(last)
+                    if last_dt.tzinfo is None:
+                        last_dt = last_dt.replace(tzinfo=timezone.utc)
+                    # 不超過這次查詢的結束時間：VEN 時鐘偏快送來「未來」的
+                    # last_detected 時，watermark 若被推到未來，overlap 也蓋不回。
+                    if self._until_dt is not None:
+                        last_dt = min(last_dt, self._until_dt)
+                    self._wm.advance(self.SOURCE, last_timestamp=last_dt)
                     watermark_advanced = True
             # 觀測表修剪跟著 ingest 節奏跑（而非只靠 24h 的 retention job）：
             # 每筆 flow 每次 poll 記一列，等一天才刪的話 60 秒輪詢的部署會囤
@@ -111,6 +121,7 @@ class TrafficIngestor:
 
     def _fetch_all(self, since: Optional[str]) -> list[dict]:
         until_dt = datetime.now(timezone.utc).replace(microsecond=0)
+        self._until_dt = until_dt
         if since is not None:
             since_dt = datetime.fromisoformat(since)
         else:
@@ -165,8 +176,10 @@ class TrafficIngestor:
     def _since_cursor(self) -> Optional[str]:
         wm = self._wm.get(self.SOURCE)
         if wm and wm.last_timestamp:
-            # Grace window: re-pull 5 minutes back to catch late-arriving flows
-            grace = wm.last_timestamp - timedelta(minutes=5)
+            # Overlap：VEN 約每 10 分鐘上報一次 flow、離線時快取後補傳，晚到的
+            # flow 其 last_detected 早於上一輪的 watermark。往回重抓 overlap
+            # （預設 20 分鐘＝兩個上報週期）；flow_hash upsert 讓重抓冪等。
+            grace = wm.last_timestamp - self._overlap
             # SQLite + DateTime(timezone=True) reads back NAIVE, so an offset-less
             # ISO string would make the PCE reject the query (HTTP 406
             # invalid_timestamp). Re-attach UTC, mirroring EventsIngestor.

@@ -556,7 +556,7 @@ class Analyzer:
             "event_parser_samples": [],
         }
         ensure_monitoring_state(self.state)
-        # overlap 可調（events.overlap_seconds，預設 300、夾 [60, 900]）：
+        # overlap 可調（events.overlap_seconds，預設 1200、夾 [60, 3600]）：
         # PCE 事件索引延遲的唯一補抓保險（2026-07-24 審查 D1）
         _overlap_cfg = None
         try:

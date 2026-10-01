@@ -15,20 +15,27 @@ def session_factory(tmp_path):
     return sessionmaker(engine)
 
 
+def _parse(ts):
+    return datetime.fromisoformat(ts.replace("Z", "+00:00"))
+
+
 class FakeApiClient:
-    def __init__(self, events, async_events=None):
+    """模擬 PCE GET /events：依 [start, end] 篩選，碰 max_results 時只回最新的 N 筆。"""
+
+    def __init__(self, events):
         self._events = events
-        self._async_events = async_events or []
-        self.sync_calls = 0
-        self.async_calls = 0
+        self.calls = []
 
-    def get_events(self, max_results=500, since=None, rate_limit=False, **kw):
-        self.sync_calls += 1
-        return self._events[:max_results]
-
-    def get_events_async(self, since=None, rate_limit=False, **kw):
-        self.async_calls += 1
-        return self._async_events
+    def fetch_events(self, start_time_str, end_time_str=None, max_results=5000,
+                     rate_limit=False):
+        self.calls.append((start_time_str, end_time_str, max_results))
+        start = _parse(start_time_str)
+        end = _parse(end_time_str) if end_time_str else None
+        hits = [e for e in self._events
+                if _parse(e["timestamp"]) >= start
+                and (end is None or _parse(e["timestamp"]) <= end)]
+        hits.sort(key=lambda e: e["timestamp"], reverse=True)
+        return hits[:max_results]
 
 
 def _mk_event(i, ts):
@@ -63,7 +70,7 @@ def test_event_fetch_releases_cache_write_lane_until_persist():
     class Api:
         last_fetch_error = None
 
-        def get_events(self, **kwargs):
+        def fetch_events(self, *args, **kwargs):
             assert lock.held is False
             return [event]
 
@@ -97,7 +104,7 @@ def test_ingestor_writes_events_to_cache(session_factory):
     from src.pce_cache.ingestor_events import EventsIngestor
     from src.pce_cache.watermark import WatermarkStore
 
-    ts = datetime.now(timezone.utc)
+    ts = datetime.now(timezone.utc) - timedelta(minutes=1)
     fake = FakeApiClient(events=[_mk_event(1, ts), _mk_event(2, ts + timedelta(seconds=1))])
     ing = EventsIngestor(api=fake, session_factory=session_factory,
                          watermark=WatermarkStore(session_factory),
@@ -116,7 +123,7 @@ def test_ingestor_coerces_null_status_to_default(session_factory):
     from src.pce_cache.ingestor_events import EventsIngestor
     from src.pce_cache.watermark import WatermarkStore
 
-    ts = datetime.now(timezone.utc)
+    ts = datetime.now(timezone.utc) - timedelta(minutes=1)
     null_status = _mk_event(1, ts)
     null_status["status"] = None        # PCE returns explicit null, not an absent key
     good = _mk_event(2, ts + timedelta(seconds=1))
@@ -139,7 +146,7 @@ def test_ingestor_skips_duplicates(session_factory):
     from src.pce_cache.ingestor_events import EventsIngestor
     from src.pce_cache.watermark import WatermarkStore
 
-    ts = datetime.now(timezone.utc)
+    ts = datetime.now(timezone.utc) - timedelta(minutes=1)
     fake = FakeApiClient(events=[_mk_event(1, ts)])
     ing = EventsIngestor(api=fake, session_factory=session_factory,
                          watermark=WatermarkStore(session_factory),
@@ -148,31 +155,28 @@ def test_ingestor_skips_duplicates(session_factory):
     assert ing.run_once() == 0  # same event, unique pce_href blocks re-insert
 
 
-def test_ingestor_switches_to_async_when_forced(session_factory):
+def test_force_async_is_accepted_for_compat(session_factory):
+    """force_async 只為簽名相容保留；一律走帶結束時間的 fetch_events。"""
     from src.pce_cache.ingestor_events import EventsIngestor
     from src.pce_cache.watermark import WatermarkStore
 
-    ts = datetime.now(timezone.utc)
-    async_batch = [_mk_event(i, ts) for i in range(20)]
-    fake = FakeApiClient(events=[], async_events=async_batch)
+    ts = datetime.now(timezone.utc) - timedelta(minutes=1)
+    fake = FakeApiClient(events=[_mk_event(i, ts) for i in range(20)])
     ing = EventsIngestor(api=fake, session_factory=session_factory,
                          watermark=WatermarkStore(session_factory),
                          async_threshold=10000)
-    ing.run_once(force_async=True)
-    assert fake.async_calls == 1
+    assert ing.run_once(force_async=True) == 20
+    assert fake.calls and fake.calls[0][1] is not None  # 帶 end_time
 
 
 class _RecordingApiClient:
-    """Captures the `since` value passed to get_events so we can assert format."""
+    """Captures the start time passed to fetch_events so we can assert format."""
     def __init__(self):
         self.since_seen = None
 
-    def get_events(self, max_results=500, since=None, rate_limit=False, **kw):
-        self.since_seen = since
-        return []
-
-    def get_events_async(self, since=None, rate_limit=False, **kw):
-        self.since_seen = since
+    def fetch_events(self, start_time_str, end_time_str=None, max_results=5000,
+                     rate_limit=False):
+        self.since_seen = start_time_str
         return []
 
 
@@ -187,7 +191,7 @@ def test_since_cursor_cold_start_returns_24h_ago_with_tz(session_factory):
     ing.run_once()
 
     assert api.since_seen is not None and api.since_seen != ""
-    parsed = datetime.fromisoformat(api.since_seen)
+    parsed = _parse(api.since_seen)
     assert parsed.tzinfo is not None, "PCE rejects naive timestamps (HTTP 406)"
     delta = datetime.now(timezone.utc) - parsed
     assert timedelta(hours=23, minutes=55) < delta < timedelta(hours=24, minutes=5)
@@ -209,8 +213,8 @@ def test_since_cursor_normalises_naive_watermark_to_utc(session_factory):
                          async_threshold=10000)
     ing.run_once()
 
-    # watermark 12:00 − 5 分鐘 grace（晚到事件 re-pull，比照 traffic ingestor）
-    assert api.since_seen == "2026-05-01T11:55:00+00:00"
+    # watermark 12:00 − 20 分鐘 overlap（兩個 VEN 上報週期，晚到事件 re-pull）
+    assert api.since_seen == "2026-05-01T11:40:00Z"
 
 
 def test_since_cursor_preserves_aware_watermark(session_factory):
@@ -229,63 +233,90 @@ def test_since_cursor_preserves_aware_watermark(session_factory):
                          async_threshold=10000)
     ing.run_once()
 
-    parsed = datetime.fromisoformat(api.since_seen)
+    parsed = _parse(api.since_seen)
     assert parsed.tzinfo is not None
-    # aware watermark 減 5 分鐘 grace 後仍為 aware（不被剝除 tz）
-    assert parsed.astimezone(timezone.utc) == aware_ts - timedelta(minutes=5)
+    # aware watermark 減 overlap 後仍為 aware（不被剝除 tz）
+    assert parsed.astimezone(timezone.utc) == aware_ts - timedelta(minutes=20)
 
 
-def test_async_threshold_stub_does_not_discard_sync_batch(session_factory):
-    """Regression: when the sync pull hits the async threshold, the async path is
-    an unimplemented stub returning []. The already-fetched sync events must be
-    inserted (not discarded) and the watermark must advance to their max
-    timestamp so the next poll pages forward instead of re-fetching forever."""
+def test_overlap_is_configurable(session_factory):
     from src.pce_cache.ingestor_events import EventsIngestor
     from src.pce_cache.models import IngestionWatermark
     from src.pce_cache.watermark import WatermarkStore
 
-    base = datetime(2026, 5, 1, 12, 0, 0, tzinfo=timezone.utc)
-    sync_batch = [_mk_event(i, base + timedelta(seconds=i)) for i in range(3)]
-    fake = FakeApiClient(events=sync_batch, async_events=[])  # stub returns []
-    ing = EventsIngestor(api=fake, session_factory=session_factory,
-                         watermark=WatermarkStore(session_factory),
-                         async_threshold=3)
-    inserted = ing.run_once()
+    aware_ts = datetime(2026, 5, 1, 12, 0, 0, tzinfo=timezone.utc)
+    with session_factory.begin() as s:
+        s.add(IngestionWatermark(source="events", last_timestamp=aware_ts,
+                                 last_sync_at=aware_ts, last_status="ok"))
+    api = _RecordingApiClient()
+    EventsIngestor(api=api, session_factory=session_factory,
+                   watermark=WatermarkStore(session_factory),
+                   overlap=timedelta(minutes=45)).run_once()
+    assert api.since_seen == "2026-05-01T11:15:00Z"
 
-    assert fake.async_calls == 1            # cap path was taken
-    assert inserted == 3                    # fetched events inserted, NOT discarded
+
+def _wm_ts(session_factory):
+    from src.pce_cache.models import IngestionWatermark
     with session_factory() as s:
-        rows = s.execute(select(PceEvent)).scalars().all()
-        assert len(rows) == 3
-        wm_row = s.get(IngestionWatermark, "events")
-        advanced = wm_row.last_timestamp
-    assert advanced is not None, "watermark must advance so paging continues"
-    if advanced.tzinfo is None:             # SQLite reads back naive
-        advanced = advanced.replace(tzinfo=timezone.utc)
-    assert advanced == base + timedelta(seconds=2)
+        ts = s.get(IngestionWatermark, "events").last_timestamp
+    return ts if ts.tzinfo else ts.replace(tzinfo=timezone.utc)
 
 
-def test_async_threshold_uses_async_result_when_non_empty(session_factory):
-    """When get_events_async is eventually implemented (returns a non-empty
-    batch), the cap path must use the async result (current behavior preserved
-    for the non-stub case)."""
+def test_cap_hit_bisects_until_window_drained(session_factory):
+    """碰上限時 PCE 只回最新 N 筆；舊版保留這 N 筆就推 watermark，較舊的永久遺失。
+    現在要二分切窗把整個視窗抓完。"""
     from src.pce_cache.ingestor_events import EventsIngestor
     from src.pce_cache.watermark import WatermarkStore
 
-    ts = datetime(2026, 5, 1, 12, 0, 0, tzinfo=timezone.utc)
-    sync_batch = [_mk_event(i, ts) for i in range(3)]            # hits cap=3
-    async_batch = [_mk_event(100 + i, ts) for i in range(5)]    # real async data
-    fake = FakeApiClient(events=sync_batch, async_events=async_batch)
+    base = datetime.now(timezone.utc).replace(microsecond=0) - timedelta(hours=3)
+    events = [_mk_event(i, base + timedelta(minutes=5 * i)) for i in range(25)]
+    fake = FakeApiClient(events=events)
     ing = EventsIngestor(api=fake, session_factory=session_factory,
                          watermark=WatermarkStore(session_factory),
-                         async_threshold=3)
-    inserted = ing.run_once()
+                         async_threshold=10)
 
-    assert fake.async_calls == 1
-    assert inserted == 5                     # async batch used
+    assert ing.run_once() == 25            # 一筆都沒漏
+    assert ing.last_run_overflow is None   # 抽乾了，不算資料遺失
+    assert len(fake.calls) > 1             # 確實有切窗
     with session_factory() as s:
-        ids = {r.pce_event_id for r in s.execute(select(PceEvent)).scalars().all()}
-    assert ids == {f"uuid-{100 + i}" for i in range(5)}
+        assert len(s.execute(select(PceEvent)).scalars().all()) == 25
+    assert _wm_ts(session_factory) == base + timedelta(minutes=5 * 24)
+
+
+def test_cap_unresolvable_reports_overflow(session_factory):
+    """同一秒超過上限、切到最小跨度仍碰頂：保留拿到的資料並回報 overflow。"""
+    from src.pce_cache.ingestor_events import EventsIngestor
+    from src.pce_cache.watermark import WatermarkStore
+
+    ts = datetime.now(timezone.utc).replace(microsecond=0) - timedelta(minutes=2)
+    fake = FakeApiClient(events=[_mk_event(i, ts) for i in range(15)])
+    ing = EventsIngestor(api=fake, session_factory=session_factory,
+                         watermark=WatermarkStore(session_factory),
+                         async_threshold=10)
+
+    assert ing.run_once() == 10
+    assert ing.last_run_overflow is not None
+    assert ing.last_run_overflow["max_results"] == 10
+    assert ing.last_run_overflow["source"] == "cache_ingest"
+
+
+def test_watermark_never_advances_past_query_end(session_factory):
+    """VEN 時鐘偏快送來未來時間戳時，watermark 不得被推到未來。"""
+    from src.pce_cache.ingestor_events import EventsIngestor
+    from src.pce_cache.watermark import WatermarkStore
+
+    future = datetime.now(timezone.utc) + timedelta(hours=2)
+
+    class Api:
+        last_fetch_error = None
+
+        def fetch_events(self, *a, **kw):
+            return [_mk_event(1, future)]
+
+    before = datetime.now(timezone.utc)
+    EventsIngestor(api=Api(), session_factory=session_factory,
+                   watermark=WatermarkStore(session_factory)).run_once()
+    assert _wm_ts(session_factory) <= before + timedelta(seconds=5)
 
 
 class _ConnectionFailingApiClient:
@@ -294,10 +325,7 @@ class _ConnectionFailingApiClient:
     src/api_client.py fetch_events / watchdog-live-reverify-report.md step 2)."""
     last_fetch_error = "Connection refused"
 
-    def get_events(self, max_results=500, since=None, rate_limit=False, **kw):
-        return []
-
-    def get_events_async(self, since=None, rate_limit=False, **kw):
+    def fetch_events(self, *args, **kw):
         return []
 
 

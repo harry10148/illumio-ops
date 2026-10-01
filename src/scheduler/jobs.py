@@ -298,6 +298,16 @@ def _guard_cache_target(cm, session_factory) -> None:
     bind_or_verify(session_factory, cm.models.api)
 
 
+def _ingest_overlap(cfg):
+    """pce_cache.ingest_overlap_minutes → timedelta（缺值或非數字時退回 20 分鐘）。"""
+    from datetime import timedelta
+    try:
+        minutes = int(getattr(cfg, "ingest_overlap_minutes", 20))
+    except (TypeError, ValueError):
+        minutes = 20
+    return timedelta(minutes=max(5, minutes))
+
+
 def run_events_ingest(cm) -> None:
     wm = None
     try:
@@ -314,7 +324,8 @@ def run_events_ingest(cm) -> None:
                                   watermark=wm,
                                   async_threshold=cfg.async_threshold_events,
                                   siem_destinations=_enabled_siem_destinations(cm, "audit"),
-                                  write_lock=_CACHE_WRITE_LOCK)
+                                  write_lock=_CACHE_WRITE_LOCK,
+                                  overlap=_ingest_overlap(cfg))
             count = ing.run_once()
         logger.info("Events ingest: {} rows inserted", count)
         _record_ingest_pce_result("events", wm)
@@ -354,6 +365,7 @@ def run_traffic_ingest(cm) -> None:
                                    siem_destinations=_enabled_siem_destinations(cm, "traffic"),
                                    siem_pd_filters=_traffic_pd_filters(cm),
                                    record_observations=getattr(cfg, "flow_delta_enabled", True),
+                                   overlap=_ingest_overlap(cfg),
                                    obs_retention_hours=getattr(cfg, "flow_obs_retention_hours", 6))
             count = ing.run_once()
         logger.info("Traffic ingest: {} rows inserted", count)
@@ -580,6 +592,14 @@ def run_capacity_monitor(cm) -> None:
         raise  # surface to _instrument → job_health status=error
 
 
+def _dispatch_budget_seconds(siem_cfg, dest_count: int) -> float:
+    try:
+        tick = float(getattr(siem_cfg, "dispatch_tick_seconds", 30))
+    except (TypeError, ValueError):
+        tick = 30.0
+    return max(1.0, tick * 0.8 / max(1, dest_count))
+
+
 def run_siem_dispatch(cm) -> None:
     from sqlalchemy.orm import sessionmaker
     from src.siem.dispatcher import enqueue_new_records, build_dispatcher
@@ -610,13 +630,32 @@ def run_siem_dispatch(cm) -> None:
         if any(d.format in ("cef", "syslog_cef", "cef_pce", "syslog_cef_pce") for d in enabled_dests):
             from src.siem.dispatcher import cached_pce_identity
             fqdn, version = cached_pce_identity(cm)
+        # 每個目的地在預算內一批接一批送到佇列清空（舊版每 tick 只送一批）。
+        # 預算取 tick 間隔的八成平均分給各目的地，留餘裕避免與下一輪重疊；
+        # 斷路器讓連不上的目的地很快放棄這一輪，不會吃掉其他目的地的時間。
+        budget = _dispatch_budget_seconds(siem_cfg, len(enabled_dests))
+        unhealthy: list[str] = []
         for dest_cfg in enabled_dests:
             try:
                 with build_dispatcher(dest_cfg, sf, dlq_max_per_dest=siem_cfg.dlq_max_per_dest,
                                       pce_fqdn=fqdn, pce_version=version) as dispatcher:
-                    dispatcher.tick()
+                    result = dispatcher.tick(time_budget_seconds=budget)
+                if not isinstance(result, dict):
+                    result = {}
+                if result.get("sent") or result.get("failed") or result.get("quarantined"):
+                    logger.info(
+                        "SIEM dispatch {!r}: sent={} failed={} quarantined={} batches={}",
+                        dest_cfg.name, result.get("sent"), result.get("failed"),
+                        result.get("quarantined"), result.get("batches"))
+                if result.get("aborted") is True:
+                    unhealthy.append(f"{dest_cfg.name}: {result.get('error')}")
             except Exception as exc:
                 logger.exception("run_siem_dispatch destination {!r} failed: {}", dest_cfg.name, exc)
+                unhealthy.append(f"{dest_cfg.name}: {exc}")
+        if unhealthy:
+            # 其他目的地照常處理完才拋出，讓 job_health 反映「有目的地送不出去」，
+            # 而不是在 SIEM 收不到資料時仍顯示 ok。
+            raise RuntimeError("SIEM destination(s) unreachable — " + "; ".join(unhealthy))
     except Exception as exc:
         logger.exception("run_siem_dispatch failed: {}", exc)
         raise  # surface to _instrument → job_health status=error

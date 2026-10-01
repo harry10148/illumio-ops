@@ -319,9 +319,10 @@ Rule Scheduler 的排程建立、時窗語意與安全約束見 [automation.md](
 | `traffic_raw_retention_days` | int（≥1） | `7` | traffic 明細保留天數 |
 | `traffic_agg_retention_days` | int（≥1） | `90` | traffic 聚合資料保留天數 |
 | `events_poll_interval_seconds` | int（≥30） | `300` | events 輪詢間隔 |
+| `ingest_overlap_minutes` | int（5–1440） | `20` | events 與 traffic ingest 每次往回重抓的分鐘數。VEN 約每 10 分鐘上報一次、離線時快取後補傳，事件時間戳是發生時間而非寫入 PCE 的時間；晚到的資料只要落在 watermark − overlap 之後就抓得到。重抓由 `pce_href`／`flow_hash` 去重，冪等。watermark 不會超過該次查詢的結束時間 |
 | `traffic_poll_interval_seconds` | int（≥60） | `3600` | traffic 輪詢間隔（範本示範 `600`，見上方已知落差） |
 | `rate_limit_per_minute` | int（10–500） | `400` | 對 PCE 的每分鐘請求上限 |
-| `async_threshold_events` | int（1–10000） | `10000` | 超過此筆數才走 async query |
+| `async_threshold_events` | int（1–10000） | `10000` | 單次 events 查詢的 `max_results`。視窗內筆數碰到此上限時，ingest 把視窗對半切開各自再抓，直到抽乾（PCE 碰頂只回最新的那批）；切到最小跨度仍碰頂才發 overflow 告警 |
 | `archive_enabled` | bool | `false` | 是否啟用 archive |
 | `archive_dir` | str | `"data/archive"` | archive 檔輸出目錄 |
 | `archive_interval_hours` | int（≥1） | `24` | archive 執行間隔（小時） |
@@ -355,7 +356,7 @@ cache 架構、容量規劃與 archive 排程細節見 [cache-maintenance.md](ca
 | 鍵 | 型別 | 預設 | 說明 |
 |---|---|---|---|
 | `enabled` | bool | `false` | 是否啟用 SIEM 轉送 |
-| `dlq_max_per_dest` | int（≥100） | `10000` | 每個目的地 DLQ 上限筆數 |
+| `dlq_max_per_dest` | int（≥100） | `10000` | 每個目的地 DLQ 上限筆數。已滿時不再收新項目、也不刪舊項目，要進 DLQ 的列留在佇列以最長退避重試，資料不遺失 |
 | `dispatch_tick_seconds` | int（≥1） | `30` | 送出排程 tick 間隔（範本示範 `5`，見上方已知落差） |
 
 `destinations[]`：
@@ -372,7 +373,7 @@ cache 架構、容量規劃與 archive 排程細節見 [cache-maintenance.md](ca
 | `tls_verify` | bool | `true` | 是否驗證目的地 TLS 憑證 |
 | `tls_ca_bundle` | Optional[str] | `null` | 自訂 CA bundle 路徑 |
 | `hec_token` | Optional[str] | `null` | Splunk HEC token（`transport="hec"` 時使用） |
-| `batch_size` | int（1–10000） | `100` | 單批送出筆數 |
+| `batch_size` | int（1–10000） | `100` | 單批送出筆數。每個 tick 會在時間預算內一批接一批送到佇列清空，所以它決定的是每批的大小（以及多久確認一次送達、標記一次 sent），不再是吞吐量上限 |
 | `source_types` | list[str] | `["audit", "traffic"]` | 要轉送的資料型別 |
 | `traffic_pd` | list[str] | `[]` | 流量列只送這些 policy decision（`allowed`／`potentially_blocked`／`blocked`／`unknown`）；空＝全部。只影響設定後新進的列 |
 | `max_retries` | int（≥0） | `10` | 單筆最大重試次數 |

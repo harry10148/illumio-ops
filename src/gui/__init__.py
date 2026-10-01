@@ -73,6 +73,17 @@ _DAEMON_RESTART_FN = None
 # Active cheroot server reference — set by _run_http/_run_https so the
 # SIGTERM watcher in _runtime.py can call .stop() to unblock the main thread.
 _active_server = None
+# launch_gui 沒能把 server 跑起來時的原因（None＝正常啟動或正常停止）。
+# run_daemon_with_gui 據此以非 0 結束碼退出：舊版吞掉「port 被佔用」、憑證
+# 缺失等錯誤後以 0 結束，systemd 的 Restart=on-failure 不會重啟，監控與 SIEM
+# 轉送整個停擺。
+_last_start_error = None
+
+
+def _start_failed(reason: str) -> None:
+    global _last_start_error
+    _last_start_error = reason
+    logger.error("Web GUI did not start: {}", reason)
 
 # ── Shared helpers (moved to _helpers.py; re-exported here for backwards compat) ─
 from src.gui._helpers import (  # noqa: F401
@@ -668,6 +679,7 @@ def _run_http(app, host: str, port: int) -> None:
         if "Address already in use" in str(e):
             logger.error("Port {} is already in use. Stop the existing process first (fuser -k {}/tcp) then retry.", port, port)
             print(f"\n  ERROR: Port {port} is already in use. Stop the existing process first, then retry.")
+            _start_failed(f"port {port} is already in use")
         else:
             raise
     except KeyboardInterrupt:
@@ -730,6 +742,7 @@ def _run_https(app, host: str, port: int, cert_file: str, key_file: str,
         if "Address already in use" in str(e):
             logger.error("Port {} is already in use. Stop the existing process first (fuser -k {}/tcp) then retry.", port, port)
             print(f"\n  ERROR: Port {port} is already in use. Stop the existing process first, then retry.")
+            _start_failed(f"port {port} is already in use")
         else:
             raise
     except KeyboardInterrupt:
@@ -746,12 +759,15 @@ def build_app(cm: ConfigManager, persistent_mode: bool = False, use_https: bool 
     return _create_app(cm, persistent_mode=persistent_mode, use_https=use_https)
 
 def launch_gui(cm: ConfigManager = None, host='0.0.0.0', port=5001, persistent_mode=False):
+    global _last_start_error
+    _last_start_error = None
     if not HAS_FLASK:
         print("Flask is not installed. The Web GUI requires Flask.")
         print("Install it with:")
         if FLASK_IMPORT_ERROR:
             print(f"  Import error: {FLASK_IMPORT_ERROR}")
         print("  pip install flask")
+        _start_failed("Flask is not installed")
         return
 
     if cm is None:
@@ -780,9 +796,11 @@ def launch_gui(cm: ConfigManager = None, host='0.0.0.0', port=5001, persistent_m
             # User-provided certificate
             if not os.path.exists(cert_file):
                 print(f"  ERROR: TLS cert_file not found: {cert_file}")
+                _start_failed(f"TLS cert_file not found: {cert_file}")
                 return
             if not os.path.exists(key_file):
                 print(f"  ERROR: TLS key_file not found: {key_file}")
+                _start_failed(f"TLS key_file not found: {key_file}")
                 return
             ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
             ssl_context.load_cert_chain(cert_file, key_file)
@@ -817,9 +835,11 @@ def launch_gui(cm: ConfigManager = None, host='0.0.0.0', port=5001, persistent_m
                     print(f"  TLS: Using self-signed certificate")
             except RuntimeError as e:
                 print(f"  ERROR: {e}")
+                _start_failed(f"self-signed certificate: {e}")
                 return
         else:
             print("  ERROR: TLS enabled but no cert_file/key_file and self_signed=false")
+            _start_failed("TLS enabled but no cert_file/key_file and self_signed=false")
             return
 
     scheme = "https" if ssl_context else "http"

@@ -117,8 +117,14 @@ Ingestor（`src/pce_cache/ingestor_events.py`、`ingestor_traffic.py`）在把�
 
 1. 取出該目的地至多 `batch_size`（預設 100）筆 `status="pending"` 且到了重試時間（`next_attempt_at` 為空或已過期）的列，依 `queued_at` 排序。
 2. 逐筆格式化並透過 transport 送出。
-3. 送出失敗：重試次數 `retries += 1`。若未達 `max_retries`（預設 10）：以指數退避排定下次嘗試時間，公式為 `min(2^retries × 5, 3600)` 秒（例如第 1 次失敗後 10 秒重試，第 5 次失敗後約 160 秒，封頂 1 小時）。若已達 `max_retries`：這筆記錄移入 DLQ，`siem_dispatch` 列標記 `status="failed"`。
-4. 送出成功的列在同一個 tick 結束時，以單一交易批次標記 `status="sent"`（而非逐筆 commit）。
+3. 送出失敗分三種：
+   - **目的地層級失敗**（連不上、逾時、HTTP 5xx）：只記這一筆的失敗，**這一批立即中止**（斷路器），剩下的列原封不動留在佇列、不扣重試次數，下個 tick 再試。舊版會逐筆把整批耗完，每筆都等逾時、都被扣重試次數，還會拖住其他目的地。
+   - **永久性失敗**（HTTP 4xx——408、429 除外，例如 HEC 400 格式錯、401/403 token 錯；UDP `EMSGSIZE` 訊息超過 datagram 上限）：重試也不會成功，直接進 DLQ（`last_error` 以 `permanent:` 開頭），這一批繼續送。
+   - 失敗那一筆的重試次數 `retries += 1`。若未達 `max_retries`（預設 10）：以指數退避排定下次嘗試時間，公式為 `min(2^retries × 5, 3600)` 秒（例如第 1 次失敗後 10 秒重試，第 5 次失敗後約 160 秒，封頂 1 小時）。若已達 `max_retries`：這筆記錄移入 DLQ，`siem_dispatch` 列標記 `status="failed"`。
+4. TCP／TLS 在標記前先 graceful close 確認送達；送出成功的列以單一交易批次標記 `status="sent"`（而非逐筆 commit）。
+5. 時間預算內接著取下一批，直到佇列清空、某批因目的地失敗而中止，或預算用完。預算是 `dispatch_tick_seconds` 的八成平均分給各啟用目的地；舊版每個 tick 固定只送一批（預設每 30 秒 100 筆，約每天 28.8 萬筆），traffic 量大時積壓只會越來越久。
+
+只要有任何目的地在這一輪中止，其他目的地照常處理完後 `siem_dispatch` job 會記為失敗（`job_health` 顯示 error 並附目的地名稱與錯誤），不再在 SIEM 收不到資料時顯示正常。
 
 **at-least-once 語意（刻意取捨）**：若程序在「已成功送出至 transport」與「標記為 sent 的 commit」之間崩潰，下一輪會重送同一筆記錄，SIEM 端可能收到重複事件。這是刻意的設計取捨——SIEM 轉送本質上就是 at-least-once（網路層面同樣可能重複），為了避免逐筆 commit 造成的鎖爭用（會與 ingest 寫入互撞），改為批次 commit 換取較寬的重複交付窗口。
 
@@ -182,7 +188,7 @@ illumio-ops siem purge --dest splunk-prod --older-than 30
 Purged 87 DLQ entries for 'splunk-prod'
 ```
 
-行為：刪除該目的地 `quarantined_at` 早於「現在 − `--older-than` 天」（預設 30 天）的 DLQ 列，**永久刪除、不可還原**。另外 `dlq_max_per_dest`（預設 10000）自 2026-07-17 起實際生效：每次寫入 DLQ（`_quarantine()`）後若該目的地筆數超過上限，**最舊的項目會被自動刪除**（ring-buffer 語意，同交易內完成並記 warning 日誌）——持續失敗的目的地不會再讓 `dead_letter` 表無上限成長。`purge` 仍是手動批次刪除的手段；要清空整個目的地的 DLQ，可用 `--older-than 0`（等同「早於現在」，涵蓋全部既有項目）。
+行為：刪除該目的地 `quarantined_at` 早於「現在 − `--older-than` 天」（預設 30 天）的 DLQ 列，**永久刪除、不可還原**。另外 `dlq_max_per_dest`（預設 10000）是每個目的地 DLQ 的上限：**DLQ 已滿時不再收新項目，也不刪除任何既有項目**——要進 DLQ 的那一列維持 `pending`、以最長退避（1 小時）重試，並記 ERROR 日誌。舊版是 ring buffer，滿了就刪最舊的 DLQ 項目，那些記錄從此找不回來（補登機制只看 `siem_dispatch`，也不會補回）；現在資料一律留在本機，佇列積壓由 `pce_cache.siem_pending_warn_rows` 告警提醒，清理或重送 DLQ 後自動恢復。`purge` 仍是手動批次刪除的手段；要清空整個目的地的 DLQ，可用 `--older-than 0`（等同「早於現在」，涵蓋全部既有項目）。
 
 > `illumio-ops siem` 底下沒有手動清空佇列（flush）用的子命令——派送本身由 `siem_dispatch` job 依 tick 間隔自動排空佇列，不需要、也不存在這種手動動作；DLQ 的手動出口只有 `replay`（送回去）與 `purge`（丟掉）兩種。
 

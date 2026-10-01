@@ -240,11 +240,12 @@ R 系列只在 unified DataFrame 帶有 **`draft_policy_decision`** 欄時才會
 
 ### 3.1 Poll ＋ Dedup（`poller.py`）
 
-- `EventPoller(api_client, max_results=5000, overlap_seconds=60, subscriber=None)`。
-- `fetch_batch(watermark, seen_events)`：以 `watermark - overlap_seconds`（**60 秒重疊**，補抓遲到事件）為查詢起點。
+- `EventPoller(api_client, max_results=5000, overlap_seconds=None, subscriber=None)`；`overlap_seconds` 由 `events.overlap_seconds` 設定，預設 **1200 秒**（兩個 VEN 上報週期），夾在 [60, 3600]。
+- `fetch_batch(watermark, seen_events)`：以 `watermark - overlap_seconds` 為查詢起點、本次輪詢開始時間為終點，補抓遲到事件（VEN 離線後補送、PCE 索引延遲）。
 - **去重**：`event_identity(event)` 為去重鍵——有 `href` 直接用之，否則對 `event_type/timestamp/status/severity/created_by/resource/message` 取 `sha1` 指紋；已在 `seen` 中者跳過。
-- **溢位風險**：`overflow_risk = raw_count >= max_results`（≥ 5000 代表視窗可能被截斷）——由第 4 節的溢位 meta-alert 通知。
-- `next_watermark` 取 `max(poll_started_at, watermark, latest_event_ts)`，單調不回退。
+- **碰上限時二分抽乾**：PCE 在視窗內超過 `max_results` 時只回最新的那批，所以碰頂就把視窗對半切開各自再抓（`src/pce_cache/events_fetch.py:fetch_events_drained`），直到每個子窗都低於上限。
+- **溢位風險**：只有切到最小跨度仍碰頂時 `overflow_risk` 才為真（該子窗較舊的事件可能遺失）——由第 4 節的溢位 meta-alert 通知。
+- `next_watermark` 取 `max(poll_started_at, watermark, min(latest_event_ts, poll_started_at))`，單調不回退；事件時間戳在未來（VEN 時鐘偏快）時不會把 watermark 推到未來。
 
 ### 3.2 Normalize（`normalizer.py`）
 

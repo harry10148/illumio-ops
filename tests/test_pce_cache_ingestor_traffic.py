@@ -243,7 +243,8 @@ def test_since_cursor_attaches_utc_offset_to_naive_watermark(session_factory):
     assert parsed.tzinfo is not None, "PCE rejects naive timestamps (HTTP 406)"
     assert parsed.utcoffset() == timedelta(0)
     # 5-minute grace window still applied, now with a UTC offset
-    assert parsed == datetime(2026, 5, 1, 11, 55, 0, tzinfo=timezone.utc)
+    # watermark 12:00 − 20 分鐘 overlap（兩個 VEN 上報週期）
+    assert parsed == datetime(2026, 5, 1, 11, 40, 0, tzinfo=timezone.utc)
 
 
 class _ConnectionFailingApiClient:

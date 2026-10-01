@@ -71,26 +71,17 @@ class BackfillRunner:
         （端點含重複由 pce_href unique 去重），到深度/最小跨度仍碰頂則記
         warning。舊版只把 since 丟給 get_events（預設 500 上限、無 until）
         ——超過 500 筆的視窗被靜默截斷，抓到的還可能落在視窗之外。"""
-        events = self._api.fetch_events(
-            _iso_z(since_dt),
-            end_time_str=_iso_z(until_dt),
-            max_results=self._EVENTS_MAX,
-            rate_limit=True,
-        )
-        self._raise_on_fetch_error("events")
-        if len(events) < self._EVENTS_MAX:
-            return events
-        span = until_dt - since_dt
-        if depth >= self._MAX_BISECT_DEPTH or span <= self._MIN_BISECT_SPAN:
-            logger.warning(
-                "Events backfill hit max_results cap ({}) in window {} → {} at depth {}; "
-                "cannot bisect further — events in this window may be incomplete",
-                self._EVENTS_MAX, since_dt, until_dt, depth,
+        from src.pce_cache.events_fetch import EventsFetchError, fetch_events_drained
+        try:
+            result = fetch_events_drained(
+                self._api, since_dt, until_dt,
+                max_results=self._EVENTS_MAX,
+                max_depth=self._MAX_BISECT_DEPTH,
+                min_span=self._MIN_BISECT_SPAN,
             )
-            return events
-        mid = since_dt + span / 2
-        return (self._fetch_events_window(since_dt, mid, depth + 1)
-                + self._fetch_events_window(mid, until_dt, depth + 1))
+        except EventsFetchError as exc:
+            raise RuntimeError(f"PCE events backfill fetch failed: {exc}") from exc
+        return result.events
 
     def run_traffic(self, since: datetime, until: datetime, filters: dict | None = None) -> BackfillResult:
         """Fetch traffic via API and write to pce_traffic_flows_raw. Does NOT advance watermark."""

@@ -309,6 +309,11 @@ class PceCacheSettings(_Base):
     traffic_raw_retention_days: int = Field(default=7, ge=1)
     traffic_agg_retention_days: int = Field(default=90, ge=1)
     events_poll_interval_seconds: int = Field(default=300, ge=30)
+    # 每次 ingest 往回重抓的分鐘數（events 與 traffic 共用）。VEN 約每 10 分鐘
+    # 上報一次、離線時快取後補傳；事件時間戳是「發生時間」不是「寫入 PCE 的
+    # 時間」，晚到的資料只要落在 watermark − overlap 之後就抓得到。預設取兩個
+    # 上報週期；重抓由 pce_href／flow_hash 去重，冪等。
+    ingest_overlap_minutes: int = Field(default=20, ge=5, le=1440)
     traffic_poll_interval_seconds: int = Field(default=3600, ge=60)
     rate_limit_per_minute: int = Field(default=400, ge=10, le=500)
     async_threshold_events: int = Field(default=10000, ge=1, le=10000)
@@ -424,7 +429,7 @@ class DashboardSettings(_Base):
 
 
 class EventsSettings(_Base):
-    """事件輪詢設定（analyzer.py 讀取；EventPoller 會再夾到 [60, 900]）。"""
+    """事件輪詢設定（analyzer.py 讀取；EventPoller 會再夾到 [60, 3600]，預設 1200）。"""
     model_config = ConfigDict(extra="ignore")
     overlap_seconds: Optional[int] = Field(default=None, ge=1)
 
