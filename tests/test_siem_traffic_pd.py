@@ -410,3 +410,27 @@ def test_gui_drawer_and_i18n_carry_traffic_pd():
     for k in keys | {"sic_traffic_pd_prompt"}:
         assert en.get(k), f"missing en key {k}"
         assert zh.get(k), f"missing zh key {k}"
+
+
+def test_filtered_out_flows_are_not_backfill_candidates(session_factory):
+    """pd 篩選要在候選掃描階段就套用：舊版被篩掉的 flow 永遠「缺」該目的地的
+    dispatch 列，每個 tick 都成為候選並觸發第二階段的 IN 查詢。"""
+    from sqlalchemy import event
+    from src.siem.dispatcher import enqueue_new_records
+
+    _seed_traffic(session_factory, ["allowed", "allowed", "0", "Allowed"])
+    statements: list[str] = []
+    engine = session_factory.kw["bind"]
+
+    @event.listens_for(engine, "before_cursor_execute")
+    def _count(conn, cursor, statement, *a):
+        statements.append(statement)
+
+    created = enqueue_new_records(
+        session_factory, {"pce_traffic_flows_raw": ["blocked-only"]},
+        pd_filters={"blocked-only": {"blocked"}})
+    event.remove(engine, "before_cursor_execute", _count)
+    assert created == 0
+    # 只有第一階段那一次查詢；沒有候選就不會進第二階段的 source_id IN 查詢。
+    assert sum("FROM pce_traffic_flows_raw" in st for st in statements) == 1
+    assert not any("siem_dispatch.source_id IN" in st for st in statements)

@@ -37,3 +37,31 @@ def pd_accepted(filters: set[str] | frozenset[str] | None, action: Any) -> bool:
     if not filters:
         return True
     return normalise_pd(action) in filters
+
+
+def pd_sql_predicate(column, filters: set[str] | frozenset[str] | None):
+    """與 pd_accepted 等價的 SQL 條件（None＝不篩選）。
+
+    安全網補登在候選掃描階段就要套用目的地的 pd 篩選：否則被篩掉的 flow
+    （例如只收 blocked 的目的地遇上所有 allowed flow）每個 tick 都會成為候選，
+    觸發大量 IN 查詢、把整個視窗的 id 載入記憶體。
+    """
+    from sqlalchemy import func, or_
+
+    if not filters:
+        return None
+    norm = func.lower(func.trim(column))
+    accepted: set[str] = set()
+    for name in filters:
+        if name == "unknown":
+            continue
+        accepted.add(name)
+        accepted.update(code for code, n in _BY_CODE.items() if n == name)
+    known = set(PD_VALUES) - {"unknown"} | set(_BY_CODE)
+    clauses = []
+    if accepted:
+        clauses.append(norm.in_(sorted(accepted)))
+    if "unknown" in filters:
+        clauses.append(column.is_(None))
+        clauses.append(norm.not_in(sorted(known)))
+    return or_(*clauses)

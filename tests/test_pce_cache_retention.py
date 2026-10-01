@@ -141,24 +141,48 @@ def test_retention_purges_old_sent_siem_dispatch(session_factory):
     deleted = worker.run_once(events_days=90, traffic_raw_days=7, traffic_agg_days=90,
                               dlq_days=30, dispatch_days=14)
     assert deleted["siem_dispatch"] == 6
+    assert deleted["siem_dispatch_failed"] == 1   # 已過 DLQ 保留期的 failed 列
     with session_factory() as s:
         remaining = s.execute(select(SiemDispatch)).scalars().all()
-    # 2 recent 'sent' + 3 pending + 1 failed survive; 6 aged 'sent' purged
-    assert len(remaining) == 6
+    # 2 recent 'sent' + 3 pending survive; 6 aged 'sent' and the aged 'failed' purged
     assert sorted(r.status for r in remaining) == \
-        ["failed", "pending", "pending", "pending", "sent", "sent"]
+        ["pending", "pending", "pending", "sent", "sent"]
 
 
-def test_retention_keeps_pending_and_failed_siem_dispatch(session_factory):
-    """Only delivered ('sent') rows past the cutoff are purged. Pending/failed
-    rows (retry/DLQ candidates, NULL sent_at) must never be deleted by age."""
+def test_retention_keeps_pending_and_recent_failed_siem_dispatch(session_factory):
+    """pending（待送、NULL sent_at）永遠不因年齡刪除；failed 列保留到 DLQ 的
+    保留期過後——在那之前安全網補登還要靠它們判斷「已排入過」。"""
     _seed_dispatch(session_factory, sent_old=0, sent_new=0, pending=4, failed=2)
     from src.pce_cache.retention import RetentionWorker
     worker = RetentionWorker(session_factory)
-    deleted = worker.run_once(dispatch_days=1)
+    deleted = worker.run_once(dispatch_days=1, dlq_days=3650)
     assert deleted["siem_dispatch"] == 0
+    assert deleted["siem_dispatch_failed"] == 0
     with session_factory() as s:
         assert len(s.execute(select(SiemDispatch)).scalars().all()) == 6
+
+
+def test_failed_dispatch_no_longer_pins_source_rows(session_factory):
+    """舊版引用守門把 failed 也算進去，而 failed 列從不清除——進過 DLQ 的
+    來源列因此永遠刪不掉。DLQ 項目還在時仍要擋，DLQ 清掉後就可以刪。"""
+    from src.pce_cache.retention import RetentionWorker
+    from src.pce_cache.models import DeadLetter
+    _seed_raw_flows(session_factory, old_count=2, new_count=0)
+    with session_factory() as s:
+        ids = [r.id for r in s.execute(select(PceTrafficFlowRaw)).scalars().all()]
+    with session_factory.begin() as s:
+        for fid in ids:
+            s.add(SiemDispatch(source_table="pce_traffic_flows_raw", source_id=fid,
+                               destination="d", status="failed", retries=10,
+                               queued_at=_now(), sent_at=None))
+        s.add(DeadLetter(source_table="pce_traffic_flows_raw", source_id=ids[0],
+                         destination="d", retries=10, last_error="x",
+                         payload_preview="", quarantined_at=_now()))
+    deleted = RetentionWorker(session_factory).run_once(traffic_raw_days=7)
+    assert deleted["traffic_raw"] == 1      # 只剩 DLQ 仍引用的那筆被保留
+    with session_factory() as s:
+        left = [r.id for r in s.execute(select(PceTrafficFlowRaw)).scalars().all()]
+    assert left == [ids[0]]
 
 
 def _set_archiver_cursor(sf, source_table, last_ingested_at):
