@@ -15,21 +15,31 @@ class SplunkHECTransport(Transport):
         verify_tls: bool = True,
         sourcetype: str = "illumio_ops",
         timeout: float = 10.0,
+        ca_bundle: str | None = None,
     ):
         self._endpoint = endpoint.rstrip("/") + "/services/collector/event"
         self._token = token
-        self._verify = verify_tls
+        # tls_ca_bundle 舊版沒有傳進 HEC transport：私有 CA 簽發的 Splunk 只能
+        # 關掉驗證。驗證開啟且有指定 bundle 時，以該 bundle 驗證。
+        self._verify = ca_bundle if (verify_tls and ca_bundle) else verify_tls
         self._sourcetype = sourcetype
         self._timeout = timeout
         self._session = self._build_session()
 
     def _build_session(self) -> requests.Session:
         s = requests.Session()
+        # 只對「確定沒被收下」的情況自動重送 POST：連線建立失敗、429（限流）、
+        # 503（HEC 佇列滿）。500/502/504 與讀取逾時時事件可能已經進了 Splunk，
+        # urllib3 再重送就會重複——交給 dispatcher 的逐列重試與斷路器處理。
         retry = Retry(
             total=3,
+            connect=3,
+            read=0,
+            status=3,
             backoff_factor=0.5,
-            status_forcelist=[429, 500, 502, 503, 504],
+            status_forcelist=[429, 503],
             allowed_methods=["POST"],
+            respect_retry_after_header=True,
         )
         adapter = HTTPAdapter(max_retries=retry)
         s.mount("https://", adapter)

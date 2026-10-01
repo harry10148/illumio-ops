@@ -79,6 +79,7 @@ def _build_transport(dest_cfg: SiemDestinationSettings):
             url,
             token=dest_cfg.hec_token or "",
             verify_tls=dest_cfg.tls_verify,
+            ca_bundle=getattr(dest_cfg, "tls_ca_bundle", None),
         )
     if t == "udp":
         return SyslogUDPTransport(host, port)

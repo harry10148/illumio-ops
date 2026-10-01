@@ -449,6 +449,7 @@ def _transport_for(dest_cfg):
             url,
             token=dest_cfg.hec_token or "",
             verify_tls=dest_cfg.tls_verify,
+            ca_bundle=dest_cfg.tls_ca_bundle,
         )
     raise ValueError(f"Unknown transport: {transport_type}")
 
