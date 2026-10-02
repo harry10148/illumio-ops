@@ -192,6 +192,10 @@ def _validate_report_schedule(d: dict, lang: str) -> None:
                                allowed=", ".join(_VALID_DAYS_OF_WEEK)))
 
 
+# At most this many ad-hoc traffic reports generate at once (see _run_adhoc).
+_TRAFFIC_REPORT_SLOTS = threading.BoundedSemaphore(2)
+
+
 def make_reports_blueprint(
     cm: ConfigManager,
     csrf,           # flask_wtf.csrf.CSRFProtect instance (unused here, kept for consistent signature)
@@ -333,6 +337,14 @@ def make_reports_blueprint(
         return send_from_directory(reports_dir, filename, as_attachment=as_download)
 
     def _run_adhoc(job_id: str, payload: dict):
+        # A traffic report over a large estate peaks at several GB (7.6 GB
+        # RSS at 500k flows, measured 2026-10); each request used to get its
+        # own unbounded thread, so two at once could exhaust the appliance.
+        # Extra requests wait their turn (their job stays "running").
+        with _TRAFFIC_REPORT_SLOTS:
+            _run_adhoc_body(job_id, payload)
+
+    def _run_adhoc_body(job_id: str, payload: dict):
         """Generate the ad-hoc traffic report in a daemon thread.
 
         Writes status running→done/error (with files/error/finished_at) into

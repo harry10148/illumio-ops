@@ -275,6 +275,14 @@ class AuditHtmlExporter:
                                  windows=_trunc["windows"], max=f'{_trunc.get("max_results", 0):,}'))
                 + '</p>'
             )
+        _capped = self._r.get("_events_capped") or {}
+        if _capped.get("total"):
+            _trunc_html += (
+                '<p class="note note-warn" data-tone="warn">'
+                + html.escape(t("rpt_audit_events_capped", lang=self._lang,
+                                 total=f'{_capped["total"]:,}', cap=f'{_capped.get("cap", 0):,}'))
+                + '</p>'
+            )
         _summary_body = (
             summary_pills
             + _trunc_html

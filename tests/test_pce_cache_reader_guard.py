@@ -118,3 +118,40 @@ def test_read_events_guard_raises_over_cap(session_factory):
     ok = CacheReader(session_factory, events_retention_days=90,
                      traffic_raw_retention_days=7, read_max_rows=10)
     assert len(ok.read_events(now - timedelta(hours=1), now + timedelta(hours=1))) == 3
+
+
+def test_read_events_newest_returns_the_latest_in_time_order(session_factory):
+    from src.pce_cache.models import PceEvent
+    from src.pce_cache.reader import CacheReader
+    base = datetime.now(timezone.utc) - timedelta(minutes=10)
+    with session_factory.begin() as s:
+        for i in range(5):
+            s.add(PceEvent(
+                pce_href=f"/orgs/1/events/n{i}", pce_event_id=f"n{i}",
+                timestamp=base + timedelta(minutes=i), event_type="t", severity="info",
+                status="success", pce_fqdn="pce", raw_json=f'{{"i": {i}}}',
+                ingested_at=base))
+    reader = CacheReader(session_factory, events_retention_days=90,
+                         traffic_raw_retention_days=7, read_max_rows=2)
+    got = reader.read_events_newest(base - timedelta(hours=1), base + timedelta(hours=1), 2)
+    assert [e["i"] for e in got] == [3, 4]
+
+
+def test_audit_report_over_the_read_cap_analyses_the_newest_and_says_so():
+    """A window over cache_read_max_rows used to fail the whole audit report."""
+    from unittest.mock import MagicMock
+    from src.pce_cache.reader import CacheReadTooLarge
+    from src.report.audit_generator import AuditGenerator
+
+    now = datetime.now(timezone.utc)
+    cache = MagicMock()
+    cache.cover_state.return_value = "full"
+    cache.read_events.side_effect = CacheReadTooLarge(700_000, 500_000)
+    cache.read_events_newest.return_value = [{"event_type": "user.login", "href": "/orgs/1/events/1"}]
+    gen = AuditGenerator(api=MagicMock(), cache_reader=cache)
+    gen._events_capped = None
+    events, source = gen._fetch_events(now - timedelta(days=7), now)
+    assert source == "cache" and len(events) == 1
+    cache.read_events_newest.assert_called_once()
+    assert cache.read_events_newest.call_args[0][2] == 500_000
+    assert gen._events_capped == {"total": 700_000, "cap": 500_000}

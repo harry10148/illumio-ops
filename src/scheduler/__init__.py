@@ -220,7 +220,13 @@ def build_scheduler(cm, interval_minutes: int = 10) -> BackgroundScheduler:
             sched.add_job(_instrument("pce_cache_ingest_traffic", run_traffic_ingest, cache_cfg.traffic_poll_interval_seconds),
                           _IT(seconds=cache_cfg.traffic_poll_interval_seconds),
                           args=[cm], id="pce_cache_ingest_traffic", replace_existing=True,
-                          next_run_time=_kick, executor="cache_writer")
+                          next_run_time=_kick, executor="cache_writer",
+                          # Shares the single cache_writer worker with
+                          # aggregate/retention/archive, which run for minutes
+                          # on a busy estate. Behind them the 60 s default
+                          # skipped the ingest as a misfire, leaving a whole
+                          # interval with no new flows.
+                          misfire_grace_time=max(60, int(cache_cfg.traffic_poll_interval_seconds)))
             # aggregate/retention/archive 同樣需要首跑 kick（2026-07-14 真機事故：
             # 未帶 next_run_time 時 IntervalTrigger 首跑排在啟動後一整個間隔，
             # 部署頻繁重啟下 24h 間隔的 archive/retention 一次都沒跑過——

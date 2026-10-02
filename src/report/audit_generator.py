@@ -464,7 +464,7 @@ class AuditGenerator:
         if self._cache is not None:
             state = self._cache.cover_state("events", start, end)
             if state == "full":
-                cached = self._cache.read_events(start, end)
+                cached = self._read_cached_events(start, end)
                 if cached:
                     logger.info("Audit report: events from cache ({} → {})", start, end)
                     return cached, "cache"
@@ -511,7 +511,7 @@ class AuditGenerator:
                         )
                         gap = None
                     if gap is not None:
-                        cached = self._cache.read_events(cache_start, end)
+                        cached = self._read_cached_events(cache_start, end)
                         if gap or cached:
                             source = "mixed" if gap else "cache"
                             return gap + cached, source
@@ -526,6 +526,24 @@ class AuditGenerator:
         # max_results=500 and ignores end, so a busy window silently analyzed
         # only 500 events and pulled data past the requested end_date.
         return self._fetch_api_events(start, end), "api"
+
+    def _read_cached_events(self, start: datetime.datetime, end: datetime.datetime) -> list:
+        """Cache events in [start, end]; past the read cap, the newest cap.
+
+        The cache refuses windows above pce_cache.cache_read_max_rows so a
+        report cannot load millions of rows into the daemon. That used to fail
+        the whole audit report (a default 7-day report at ~71k events/day).
+        Analysing the newest events within the same bound, and saying so on
+        the report, keeps the report and the memory bound.
+        """
+        from src.pce_cache.reader import CacheReadTooLarge
+        try:
+            return self._cache.read_events(start, end)
+        except CacheReadTooLarge as exc:
+            logger.warning("Audit report: {} cached events in window, over the {} read cap; "
+                           "analysing the newest {}", exc.count, exc.cap, exc.cap)
+            self._events_capped = {"total": int(exc.count), "cap": int(exc.cap)}
+            return self._cache.read_events_newest(start, end, exc.cap)
 
     # PCE 同步 GET /events 單次上限（REST API guide）。
     _EVENTS_MAX_RESULTS = 10000
@@ -567,6 +585,7 @@ class AuditGenerator:
         _start_dt = datetime.datetime.fromisoformat(start_date.replace("Z", "+00:00"))
         _end_dt = datetime.datetime.fromisoformat(end_date.replace("Z", "+00:00"))
         self._events_truncation = []
+        self._events_capped = None
         events, source = self._fetch_events(_start_dt, _end_dt)
 
         if not events:
@@ -764,6 +783,8 @@ class AuditGenerator:
                          len(module_errors),
                          ", ".join(e['module'] for e in module_errors))
         results['mod00'] = audit_executive_summary(results, df, lang=self._lang)
+        if getattr(self, "_events_capped", None):
+            results['_events_capped'] = dict(self._events_capped)
         truncation = getattr(self, "_events_truncation", None) or []
         if truncation:
             results['_events_truncation'] = {

@@ -66,6 +66,30 @@ a plain `<major>.<minor>.<patch>` scheme. (Tags through v4.0.0 carried a
 - **Traffic alert lag shifts both ends of the window**, so flows newer than
   the lag are left for the next cycle instead of being counted twice.
 
+### Performance
+
+Measured on a synthetic estate of 20k workloads and ~4,000 app|env keys.
+
+- **XLSX export is linear in rows.** Every appended row was looked up by
+  scanning the whole sheet; a 10k-flow report spent about eight minutes
+  writing its spreadsheet and a 50k-row raw sheet most of an hour. 5,000 rows
+  now take about a second.
+- **Traffic report analysis at scale: 149 s → 19 s** for enforcement
+  readiness, infrastructure scoring and lateral movement at 100k flows, with
+  peak memory down from gigabytes to the size of the result. Output is
+  unchanged, except that above 1,500 app|env path sources infrastructure
+  betweenness is estimated from 500 evenly spaced sources.
+- **An audit report over the cache read limit no longer fails.** Above
+  `pce_cache.cache_read_max_rows` events it analyses the newest that many and
+  says so on the report.
+- **VEN inventory** keeps a per-workload list up to 100,000 workloads (was
+  20,000) and parses its stored snapshot once per change instead of on every
+  request.
+- At most two web-console traffic reports generate at once; others wait.
+  The cache's traffic ingest is no longer skipped when it waits behind a long
+  aggregate or retention run, and the overview's blocked-traffic card reads
+  a covering index.
+
 ### Security
 
 - **Stored secrets no longer follow an address change.** Changing the PCE URL
@@ -98,6 +122,11 @@ a plain `<major>.<minor>.<patch>` scheme. (Tags through v4.0.0 carried a
   the process is killed between the two, that cycle's alerts are lost.
 - Delivery is all-or-nothing: when one channel succeeds, a failed channel in
   the same cycle is not retried.
+- At 2–5 million flows a day the cache grows to 60–150 GB over seven days,
+  traffic ingest takes about an hour of CPU a day, and the aggregate and
+  retention jobs hold the cache's write lock for minutes. Reports over long
+  windows at that volume analyse a disclosed sample (the read limit and the
+  PCE's 200,000-flow query cap).
 - Logging out clears the browser's session cookie but does not revoke a copy
   of it taken earlier; changing the password does.
 

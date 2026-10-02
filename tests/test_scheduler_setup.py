@@ -111,3 +111,19 @@ def test_cache_ingest_jobs_have_next_run_time_within_30s(tmp_path):
     assert job is not None
     delta = (job.next_run_time - now).total_seconds()
     assert -5 <= delta <= 30, f"expected first fire within ~30s of start; got delta={delta}s"
+
+
+def test_traffic_ingest_survives_waiting_behind_long_cache_jobs():
+    """Traffic ingest shares the one cache_writer worker with aggregate,
+    retention and archive. With the 60 s default it was skipped as a misfire
+    whenever one of those ran longer than a minute."""
+    from src.scheduler import build_scheduler
+    cm = _fake_cm()
+    cm.models.pce_cache.enabled = True
+    cm.models.pce_cache.events_poll_interval_seconds = 300
+    cm.models.pce_cache.traffic_poll_interval_seconds = 3600
+    cm.models.pce_cache.archive_enabled = False
+    sched = build_scheduler(cm, interval_minutes=10)
+    job = sched.get_job("pce_cache_ingest_traffic")
+    assert job is not None
+    assert job.misfire_grace_time == 3600

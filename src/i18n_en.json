@@ -5666,6 +5666,7 @@
   "ops_alert_capacity_title": "Cache capacity",
   "rpt_mat_na": "N/A",
   "rpt_mat_unavailable": "Not scored: this data source carries no workload enforcement mode; the other dimensions are rescaled to 100.",
+  "rpt_audit_events_capped": "Incomplete data: the period holds {total} events, more than the {cap} this appliance reads at once, so only the newest {cap} are analysed. Counts below are lower bounds; shorten the period to see all of them.",
   "rpt_audit_events_truncated": "Incomplete data: in {windows} time slice(s) the PCE still returned its {max} event limit after the window was split, so the oldest events in those slices are missing. Counts below are lower bounds.",
   "sched_err_pce_fetch": "PCE data fetch failed: {error}",
   "sched_err_rhc_not_enabled": "Rule hit count is not enabled on the PCE, nothing to report: {error}",

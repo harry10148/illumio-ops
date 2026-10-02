@@ -5666,6 +5666,7 @@
   "ops_alert_capacity_title": "Cache 容量",
   "rpt_mat_na": "無資料",
   "rpt_mat_unavailable": "未計分：此資料來源沒有 Workload 的 Enforcement 模式；其餘項目已按比例換算為 100 分。",
+  "rpt_audit_events_capped": "資料不完整：此期間共有 {total} 筆事件，超過本機單次讀取上限 {cap} 筆，因此只分析最新的 {cap} 筆。以下數字為下限值；縮短期間即可看到全部。",
   "rpt_audit_events_truncated": "資料不完整：有 {windows} 個時段在切分後仍達到 PCE 單次 {max} 筆事件上限，這些時段中較舊的事件未納入。以下數字為下限值。",
   "sched_err_pce_fetch": "PCE 資料抓取失敗：{error}",
   "sched_err_rhc_not_enabled": "PCE 未啟用 Rule Hit Count，沒有可產出的內容：{error}",
