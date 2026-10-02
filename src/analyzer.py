@@ -11,7 +11,7 @@ import os
 import sys
 import threading
 from dataclasses import dataclass
-from typing import Any, Iterator
+from typing import Any, Callable, Iterator
 from loguru import logger
 from collections import Counter
 from src.api.labels import LabelResolver
@@ -107,7 +107,10 @@ HEALTH_REPROBE_DELAY_SECONDS = 2.0
 _TRANSIENT_PROBE_CATEGORIES = frozenset({"transport_error", "server_error", "rate_limited"})
 
 
-def _probe_twice_if_transient(probe, classify):
+def _probe_twice_if_transient(
+    probe: Callable[[], tuple[int, str]],
+    classify: Callable[[int], str],
+) -> tuple[int, str]:
     """Run ``probe()``; if ``classify(status)`` says the failure is transient,
     wait and run it once more. Returns the (status, body) actually recorded."""
     import time
