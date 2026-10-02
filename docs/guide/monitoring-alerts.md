@@ -93,7 +93,7 @@ events／traffic 的 `last_status` 與擷取 lag 則共同決定 pipeline health
 
 每條 traffic/bandwidth/volume 規則對每個 flow 依序檢查：
 
-1. **滑動視窗**：flow 時間早於 `now - threshold_window` 則排除。
+1. **滑動視窗**：flow 時間早於 `now - threshold_window` 則排除；設了 `settings.traffic_alert_lag_minutes` 時視窗兩端一起往前平移，晚於 `now - lag` 的 flow 留給下一輪，不會被算兩次。
 2. **policy_decision（`pd`）**：flow 的 `pd` 數值化為內部代碼 `0=allowed`、`1=potentially_blocked`、`2=blocked`（無 `pd` 欄時由 `policy_decision` 字串推斷）。規則 `pd` 未設時預設為 `-1`（event 類）或 `3`（traffic 類）；`-1` 與 `3` 皆為工具內部的「任意 PD」sentinel，其餘需精確相等才命中。
    > 這個 `3` sentinel 是本工具內部代碼，與 PCE 原始 traffic 資料的 `policy_decision` 值域**不同**——PCE 側的實際值域是四值（含 `unknown`），詳見 [pce-domain-notes.md](../handover/pce-domain-notes.md) 的 policy_decision 一節；預設查詢若漏掉 `unknown`，統計數字會大幅偏低。
 3. **Port／Proto**：`rule.port`、`rule.proto` 需與 flow 的 `dst_port`／`service.port`、`proto`／`service.proto` 相等。
@@ -111,12 +111,14 @@ event 規則用 `filter_value` 比對 event type（`src/events/matcher.py`）：
 - **正規式**：含 `^ $ * + ? [ ] ( ) { } \` 或 `.* .+ .?` 者，以 `^pattern$` 錨定比對。
 - **否定**：前綴 `!` → 反向。
 - 另比對 `filter_status`（如 `failure`）與 `filter_severity`，以及 `match_fields`（巢狀欄位 dot-path）。
+- **只對新事件發告警**：immediate 型規則會略過時間早於 `EVENT_ALERT_MAX_AGE_MINUTES = 120` 分鐘的命中（記一行 INFO）。cache 首次回填、cursor 重置或停機後補抓的歷史事件因此不會一次全部發出去；count 型規則的視窗以 `event_id` 去重，重送的同一筆事件只算一次。
+- **單一規則出錯不影響其他規則**：每條 event 規則各自評估，某條規則拋出例外只記 log，其餘規則照常判斷，cursor 照常前進。
 
 ### 1.4 冷卻與節流：`_check_cooldown`
 
 命中門檻後需通過兩道閘：
 
-1. **Cooldown**：`cooldown_minutes`（未設時預設＝`threshold_window`，再預設 10 分鐘）。距上次同規則告警未滿冷卻時間 → 抑制（`cooldown` suppression）。**immediate 型事件規則依目標分別冷卻**（`alert_history` 的 key 為 `<rule_id>|<target>`，target 取正規化後的 `target_name`／`resource_name`）：主機 A 觸發後的冷卻期間，主機 B 的同類事件照樣告警，告警只帶還沒在冷卻中的目標；全部目標都在冷卻中才記一筆抑制。count 型規則是跨目標加總門檻，維持以規則為單位。目標冷卻紀錄超過 7 天自動清除。
+1. **Cooldown**：`cooldown_minutes`（未設時預設＝`threshold_window`，再預設 10 分鐘；非數字的值記 warning 並退回 10 分鐘，`0` 表示不冷卻）。距上次同規則告警未滿冷卻時間 → 抑制（`cooldown` suppression）。**immediate 型事件規則依目標分別冷卻**（`alert_history` 的 key 為 `<rule_id>|<target>`，target 取正規化後的 `target_name`／`resource_name`，兩者皆空時退回來源 `src:<source_ip 或 actor>`，例如登入失敗依來源 IP 分別冷卻）：主機 A 觸發後的冷卻期間，主機 B 的同類事件照樣告警，告警只帶還沒在冷卻中的目標；全部目標都在冷卻中才記一筆抑制。count 型規則是跨目標加總門檻，維持以規則為單位。目標冷卻紀錄超過 7 天自動清除。
    - 流量規則可設 `settings.traffic_alert_lag_minutes`（0–60，預設 0）：評估視窗整個往前平移這段時間，讓 VEN 晚上報（約每 10 分鐘一次）的短命 flow 也落在視窗內，代價是告警晚發。cache 模式下 `pce_cache.traffic_poll_interval_seconds` 比最短的流量規則視窗還長時，每個 cycle 會記一筆警告——視窗只看得到每次 ingest 前最後那一小段的 flow。
 2. **Throttle**（`AlertThrottler.allow`，`src/events/throttle.py`）：規則 `throttle` 欄為 `"count/period[unit]"`（unit：`s`/`m`/`h`/`d`，省略預設 `m`）。滑動視窗 `period` 內已派送達 `count` 次 → 抑制（`throttle` suppression）。
 
@@ -317,6 +319,13 @@ DLQ 讀寫皆透過 `update_state_file` 做原子檔案更新，避免併發寫�
 - **DLQ 是 all-or-nothing**：任一通道成功即視為已遞送，其餘失敗通道不重試（只在 dispatch_history 記 failed）。次要通道長期故障請看告警區 `#/alerting/ops` 的管道狀態卡，不會由 DLQ 補送。
 - **LINE 自我冷卻（3 連敗→5 分鐘）是程序內狀態**：monitor daemon 長駐期間跨 cycle 有效，程序重啟即歸零；冷卻中回報 `skipped`，不消耗 DLQ 額度。
 - **throttle 於決策時記帳**：告警放行即消耗節流額度，之後遞送失敗經 DLQ 重送不再過 throttle（不會二次記帳）；失敗遞送佔用預算屬預期語意。
+
+- **已知限制：狀態先存、告警後送**：冷卻紀錄與 cursor 在派送前寫入 `state.json`。若程序剛好在兩者之間被終止（kill -9、主機斷電），那一輪的告警不會補送（需要 outbox 機制，尚未實作）。
+- **已知限制：部分通道失敗不補送**：見上方 all-or-nothing 說明；例如 email 成功、webhook 失敗時，webhook 那一則不會重送。
+
+### 5.1a PCE health 規則的門檻與恢復通知
+
+`system`（`pce_health`）規則的 `threshold_count` 是「連續失敗幾次才告警」（預設 1）：設為 3 時，前兩次失敗只記錄，第 3 次才發告警。已經告警過的失敗在 PCE 恢復後會發一則 `recovered`（severity `info`）通知，說明先前連續失敗幾次；從未達門檻的短暫失敗恢復時不發通知。
 
 ### 5.2 Watchdog — PCE 連續失敗自我告警
 

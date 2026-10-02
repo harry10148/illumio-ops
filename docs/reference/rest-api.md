@@ -163,11 +163,15 @@ never-ran／overdue）見 [gui-tour.md](../guide/gui-tour.md) 「7) Integrations
 | POST | `/api/quarantine/search` | 查詢可隔離的流量（依 policy decision＋FilterBar 篩選）；即時來源與封存分兩條路徑，見下方說明 | `data_source`(hybrid/live), `mins`, `policy_decision`, 完整篩選鍵；改用 `source=archive` 時另帶 `archive_start`／`archive_end`（必填日期區間） |
 | GET/POST | `/api/workloads` | 搜尋 Workload（name／hostname／ip_address；IP 可逗號或 CIDR 多值） | `name`, `hostname`, `ip_address`, `max_results` |
 | POST | `/api/quarantine/apply` | **真實副作用**：隔離單一 Workload（依 severity 套用 Quarantine label，覆蓋既有） | `href`, `level`(Mild/Moderate/Severe) |
-| POST | `/api/quarantine/bulk_apply` | **真實副作用**：批次隔離（最多 5 個平行 worker） | `hrefs[]`, `level` |
-| POST | `/api/quarantine/lift` | **真實副作用**：解除隔離（移除 Quarantine label、保留其餘 label） | `hrefs[]` |
+| POST | `/api/quarantine/bulk_apply` | **真實副作用**：批次隔離（最多 5 個平行 worker；單次最多 500 筆，超過回 400） | `hrefs[]`, `level` |
+| POST | `/api/quarantine/lift` | **真實副作用**：解除隔離（移除 Quarantine label、保留其餘 label；單次最多 500 筆） | `hrefs[]` |
 | POST | `/api/workloads/accelerate` | **真實副作用**：提高受管 Workload 的流量回報頻率 | `hrefs[]`, `duration_minutes` |
 | GET | `/api/filter-objects/suggest` | FilterBar pill 輸入即時建議；label／label_group／iplist／service 走快取，workload 即時查 PCE | `q`, `types`, `limit`(≤25)；**240/hour** |
 | GET | `/api/filter-objects/browse` | FilterBar pill 分頁瀏覽（不支援 `type=workload`） | `type`, `offset`, `limit`(≤100)；**240/hour** |
+
+會寫入 PCE 的端點（隔離、解除隔離、Rule Scheduler 建立／刪除排程、Rule Hit Count 啟用）只接受完整的 PCE href 格式（`/orgs/<n>/workloads/<id>`、`/orgs/<n>/sec_policy/{active,draft}/rule_sets/<n>[/sec_rules|deny_rules|rules/<n>]`），其他字串一律 400。每次執行（含每次登入嘗試）在 `logs/modules/audit.log` 寫一行 JSON：`action`、`user`、`remote_addr` 與動作相關欄位（href、level、結果；排程則含變更前後內容），密碼不會寫入。
+
+變更 PCE URL 的主機、SMTP 主機或 SIEM destination 的 host／port 時，同一個請求必須重新帶入對應的密鑰（`api.secret`、`smtp.password`、`hec_token`），否則回 400；已存的密鑰不會自動跟著新位址走。報表下載／刪除端點只處理報表格式（`.html .htm .zip .pdf .xlsx .csv .json`），`report.output_dir` 不能是 `config/`、`logs/`、`data/`、`src/`、`deploy/`、`scripts/` 或包含它們的目錄。
 
 `/api/quarantine/search` 的即時來源用 `data_source` 挑：`hybrid`（預設，先讀本機
 cache、只為 cache 沒有的區段補打 PCE）或 `live`（別名 `no-cache`／`api`，完全略過
@@ -508,6 +512,7 @@ TLS 相關端點存檔後都需要**重啟服務**才會套用；自簽憑證每
 | `POST /api/tls/generate-csr`、`POST /api/tls/import-cert` | 20/小時 |
 | `POST /api/actions/test-connection` | 20/小時 |
 | `POST /api/report-schedules/<id>/run` | 20/小時 |
+| `POST /api/quarantine/apply`、`/bulk_apply`、`/lift` | 30/分鐘 |
 | `POST /api/dashboard/top10`、`POST /api/settings` | 30/小時 |
 | `POST /api/reports/generate`、`POST /api/actions/test-alert` | 30/小時 |
 | `GET /api/labels` | 60/小時 |
