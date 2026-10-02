@@ -78,7 +78,7 @@ def _fleet(**over):
     return f
 
 
-def _stub(page, *, available=True, fleet=None, rows=None):
+def _stub(page, *, available=True, fleet=None, rows=None, list_calls=None):
     body = {"ok": True, "available": available,
             "fleet": {} if not available else (fleet if fleet is not None else _fleet()),
             "next_run_at": "2026-09-14T00:05:00Z"}
@@ -87,11 +87,18 @@ def _stub(page, *, available=True, fleet=None, rows=None):
         route.fulfill(status=200, content_type="application/json", body=json.dumps(payload))
 
     page.route("**/api/fleet", lambda r: _json(r, body))
-    page.route("**/api/fleet/list*", lambda r: _json(r, {
+    list_body = {
         "ok": True, "bucket": "selective",
         "total": len(rows if rows is not None else _index()),
         "rows": rows if rows is not None else _index(),
-        "index_truncated": bool((fleet or {}).get("index_truncated"))}))
+        "index_truncated": bool((fleet or {}).get("index_truncated"))}
+
+    def _list(r):
+        if list_calls is not None:
+            list_calls.append(r.request.url)
+        _json(r, list_body)
+
+    page.route("**/api/fleet/list*", _list)
 
 
 def _goto(page, base_url):
@@ -129,33 +136,29 @@ def test_no_snapshot_renders_no_numbers_at_all(v2_page):
     text = box.inner_text()
     assert labels["gui_fleet_no_snapshot"] in text
     import re
-    # next_run_at 的時間戳本身有數字，所以只看說明那兩段
-    head = text.split("2026")[0]
+    # next_run_at 那一行本身有時間數字，所以只看說明那兩段
+    head = box.locator(".et").inner_text() + "\n" + box.locator("p").first.inner_text()
     assert not re.search(r"\d", head), "沒有快照卻渲染了數字：%r" % head
 
 
 def test_a_partial_score_names_the_parts_it_left_out(v2_page):
-    """只說「部分資料」等於說「這個數字有條件」但不說是什麼條件。"""
+    """只說「部分資料」等於說「這個數字有條件」但不說是什麼條件：每個沒列入
+    的分量都要在它自己那一列寫出「未列入」。"""
     page, base_url = v2_page
     _stub(page)
     _goto(page, base_url)
-    labels = _labels(page)
-    card = page.locator('[data-cov="IV-16"]')
-    card.wait_for(state="visible")
-    text = card.inner_text()
-    assert labels["gui_fleet_partial"] in text
-    version_word = page.evaluate(
+    words = page.evaluate(
         "async () => { const { t } = await import('/static/js/v2/core/i18n.mjs'); "
-        "return t('gui_fleet_c_version'); }")
-    # 斷言「那個詞出現在說明句裡」，不是「出現在整張卡裡」——版本卡就在隔壁，
-    # 後者只要卡片列的任何地方提到版本就綠（注入實測：拿掉缺項名單仍全綠）。
-    prefix = page.evaluate(
-        "async () => { const { tf } = await import('/static/js/v2/core/i18n.mjs'); "
-        "return tf('gui_fleet_partial_missing', { names: '\u0000' }).split('\u0000')[0]; }")
-    assert prefix and prefix in text, "缺項說明整句不見了"
-    after = text.split(prefix, 1)[1]
-    assert version_word in after.split("\n")[0], (
-        "說了「部分資料」卻沒點名缺的分量：%r" % after.split("\n")[0])
+        "return [t('gui_fleet_partial'), t('gui_fleet_c_version'), t('gui_fleet_not_counted'), "
+        "t('gui_fleet_c_online')]; }")
+    partial, version_word, not_counted, online_word = words
+    health = page.locator('[data-role="fleet-health"]')
+    health.wait_for(state="visible")
+    assert partial in health.inner_text()
+    version_row = health.locator(".fl-part", has_text=version_word)
+    assert not_counted in version_row.inner_text(), "缺的分量沒有被點名"
+    online_row = health.locator(".fl-part", has_text=online_word)
+    assert not_counted not in online_row.inner_text()
 
 
 def test_an_unset_target_links_to_where_it_is_set(v2_page):
@@ -166,7 +169,8 @@ def test_an_unset_target_links_to_where_it_is_set(v2_page):
     card = page.locator('[data-cov="IV-16"]')
     card.wait_for(state="visible")
     assert labels["gui_fleet_target_unset"] in card.inner_text()
-    assert card.locator('a[href="#/system/pce"]').count(), "沒有指向設定它的地方"
+    strip = page.locator('[data-role="fleet-asof"]')
+    assert strip.locator('a[href="#/system/pce"]').count(), "沒有指向設定它的地方"
 
 
 def test_a_truncated_index_says_so_instead_of_looking_empty(v2_page):
@@ -179,9 +183,6 @@ def test_a_truncated_index_says_so_instead_of_looking_empty(v2_page):
     host = page.locator('[data-cov="IV-17"]')
     host.wait_for(state="visible")
     assert labels["gui_fleet_index_truncated"] in host.inner_text()
-
-
-# ── 推進抽屜 ─────────────────────────────────────────────────────────────────
 
 
 # ── 唯讀 ─────────────────────────────────────────────────────────────────────
@@ -198,3 +199,37 @@ def test_the_page_offers_no_way_to_change_enforcement(v2_page):
     assert page.locator('[data-field="open_progress"]').count() == 0
     assert page.locator('[data-cov="IV-20"]').count() == 0
     assert writes == []
+
+
+# ── 每個數字都通往清單 ───────────────────────────────────────────────────────
+
+def test_a_figure_narrows_the_list_to_what_it_counted(v2_page):
+    """摘要上的數字不是終點：點「Online」那格，清單就換成離線那幾台。"""
+    page, base_url = v2_page
+    calls = []
+    _stub(page, list_calls=calls)
+    _goto(page, base_url)
+    page.wait_for_selector('[data-field="fleet-table"] table', timeout=10000)
+    label = page.evaluate(
+        "async () => { const { t } = await import('/static/js/v2/core/i18n.mjs'); "
+        "return t('gui_fleet_kpi_online'); }")
+    page.locator("button.fl-kpi", has_text=label).click()
+    page.wait_for_timeout(300)
+    assert any("bucket=offline" in u for u in calls), calls
+    href = page.locator('[data-field="fleet-export"]').get_attribute("href")
+    assert "bucket=offline" in href and href.startswith("/api/fleet/export.csv")
+
+
+def test_search_and_sort_go_to_the_server(v2_page):
+    """清單是分頁的，所以搜尋與排序都必須是伺服端的，不能只排目前這一頁。"""
+    page, base_url = v2_page
+    calls = []
+    _stub(page, list_calls=calls)
+    _goto(page, base_url)
+    page.wait_for_selector('[data-field="fleet-table"] table', timeout=10000)
+    page.fill('[data-field="fleet-search"]', "sel-1")
+    page.wait_for_timeout(600)
+    assert any("q=sel-1" in u for u in calls), calls
+    page.locator('[data-field="fleet-table"] th button.th-sort').nth(4).click()
+    page.wait_for_timeout(300)
+    assert any("sort=version" in u for u in calls), calls

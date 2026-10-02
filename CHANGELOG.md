@@ -19,6 +19,17 @@ a plain `<major>.<minor>.<patch>` scheme. (Tags through v4.0.0 carried a
   longer used. A `settings.fleet_max_batch` value left in `config.json` by an
   older version still loads and is ignored.
 
+### Changed
+
+- **The VEN inventory page was rebuilt.** It shows when its data was taken,
+  six figures that each narrow the workload list (managed, online, heartbeat
+  overdue, needs upgrade, unlabeled, VEN health), the enforcement
+  distribution by mode and stage, what the health score is made of, the
+  errors and warnings VENs report, label coverage per app/env, and the
+  version spread. The workload list can be searched, filtered by stage,
+  version, app or env, sorted on the server across pages, and exported to
+  CSV. The page is read-only.
+
 ### Fixed
 
 - **PCE health no longer stays red after a healthy manual check.** The web

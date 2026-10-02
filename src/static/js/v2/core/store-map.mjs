@@ -117,8 +117,11 @@ export const GET_MAP = {
   fleet: "/api/fleet",
   fleet_list(params) {
     const p = params || {};
-    return "/api/fleet/list?" + qs({ bucket: p.bucket || "selective",
-      offset: p.offset || 0, limit: p.limit || 100 }, ["bucket", "offset", "limit"]);
+    return "/api/fleet/list?" + qs({ bucket: p.bucket || "all", q: p.q || "",
+      version: p.version || "", app: p.app || "", env: p.env || "",
+      sort: p.sort || "hostname", dir: p.dir || "asc",
+      offset: p.offset || 0, limit: p.limit || 100 },
+    ["bucket", "q", "version", "app", "env", "sort", "dir", "offset", "limit"]);
   },
   report_schedules: "/api/report-schedules",
   rhc_enablement: "/api/rule_hit_count/enablement",

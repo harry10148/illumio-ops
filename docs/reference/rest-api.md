@@ -201,17 +201,26 @@ policy decision 等即時才算得出的條件，以及全文 `search`，帶了�
 | 方法 | 路徑 | 用途 | 關鍵參數 |
 |---|---|---|---|
 | GET | `/api/fleet` | VEN 盤點快照摘要（版本、compat、管線、心跳、gaps、health score）| — |
-| GET | `/api/fleet/list` | 取單一 bucket 的逐台清單 | `bucket`（見下）, `offset`, `limit`(≤500，預設 100) |
+| GET | `/api/fleet/list` | 逐台清單（篩選、搜尋、排序、分頁）| `bucket`（見下，預設 `all`）, `q`, `version`, `app`, `env`, `sort`, `dir`, `offset`, `limit`(≤500，預設 100) |
+| GET | `/api/fleet/export.csv` | 目前篩選結果的完整 CSV（不分頁，表頭依介面語言）| 與 `/api/fleet/list` 相同，不含 `offset`/`limit` |
 
-**資料來源**：兩支都唯讀，讀的是 `ven_summary` 排程寫進
+**資料來源**：全部唯讀，讀的是 `ven_summary` 排程寫進
 `logs/dashboard_summary.json["fleet"]` 的快照，**不即時呼叫 PCE**。排程還沒跑過時
 `/api/fleet` 回 `{"ok": true, "available": false, "fleet": {}}`——那不是「沒有 VEN」，
 是「還沒分析過」，呼叫端必須分辨。
 
 **`bucket` 值域**：`idle_compat_pass`、`idle_compat_warn`、`idle_compat_fail`、
 `idle_compat_unknown`、`visibility_ready`、`visibility_not_ready`、`selective`、
-`full`、`fresh`、`stale_24h`、`stale_48h`、`no_heartbeat`、`unlabeled`、`offline`。
+`full`、`fresh`、`stale_24h`、`stale_48h`、`no_heartbeat`、`unlabeled`、`offline`、
+`online`、`all`，以及依目標版本判定的 `needs_upgrade`／`on_target`（版本字串與目標相同即在目標上，
+與摘要的計數同一個判定；未設定目標版本時這兩個值回 **400**）。
 不合法的值回 **400**，不是空清單——空清單會被讀成「這個 bucket 沒東西」。
+
+**搜尋與排序**：`q` 不分大小寫比對主機名稱、app、env、版本與 OS；`version`／`app`／`env` 是精確
+比對。`sort` 可為 `hostname`、`mode`（依 idle → visibility_only → selective → full）、`online`、
+`version`（數值比較，`9.1` 排在 `26.2` 前面）、`compat`、`hslh`、`app`、`env`、`os`；`dir` 為
+`asc`／`desc`。缺值不論方向一律排在最後。其他值回 **400**。CSV 匯出會把開頭為 `= + - @` 的
+儲存格加上單引號，避免試算表把 PCE 帶來的名稱當公式執行。
 
 **不提供寫入**：本工具不改 PCE 上的 enforcement mode。舊版的
 `/api/fleet/progress/{preview,apply,records}` 已移除；推進請在 PCE 進行。
