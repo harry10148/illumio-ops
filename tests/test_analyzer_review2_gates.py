@@ -60,7 +60,7 @@ def _traffic_rule(**over):
 
 
 def _raw_event():
-    return {"timestamp": "2026-01-01T00:00:00Z", "event_type": "user.login",
+    return {"timestamp": datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"), "event_type": "user.login",
             "severity": "warning", "status": "success", "created_by": {}}
 
 

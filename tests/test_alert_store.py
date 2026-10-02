@@ -135,7 +135,7 @@ def test_event_alert_items_carry_rule_identity():
     rule = {"id": 18, "name": "Login failed", "type": "event", "threshold_type": "instant",
             "threshold_count": 1, "threshold_window": 10, "filter_type": "any", "filter_value": ""}
     az = _make_analyzer([rule])
-    raw = {"timestamp": "2026-01-01T00:00:00Z", "event_type": "user.login",
+    raw = {"timestamp": datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"), "event_type": "user.login",
            "severity": "warning", "status": "success", "created_by": {}}
     az._fetch_event_batch = MagicMock(return_value=EventBatch(
         events=[raw], next_watermark="2026-01-01T00:00:00Z", query_since="2026-01-01T00:00:00Z",
@@ -167,6 +167,8 @@ def test_health_rule_alert_items_carry_rule_identity():
     rule = {"id": 7, "name": "PCE health", "type": "system", "filter_value": "pce_health"}
     az = _make_analyzer([rule])
     az.stats = MagicMock()
+    # The real StatsTracker counts the failure into state; the mock does not.
+    az.state.setdefault("pce_stats", {})["consecutive_failures"] = 1
     with patch.object(az, "_check_cooldown", return_value=True):
         az._record_health_failure([rule], status="degraded", details="details", probe="health",
                                   deployment="saas", category="health")

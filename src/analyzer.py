@@ -109,9 +109,11 @@ HEALTH_REPROBE_DELAY_SECONDS = 2.0
 # cache flush, a PCE rebind or first enabling the cache hands the analyzer
 # events that happened hours or days ago (backfilled rows are stamped with
 # today's ingested_at), and every historical agent.tampering or ruleset change
-# used to page on-call as if it had just happened. Two hours is far above how
-# late the PCE and the ingest cycle ever deliver a live event.
-EVENT_ALERT_MAX_AGE_MINUTES = 120
+# used to page on-call as if it had just happened. A day is far above how late
+# the PCE and the ingest cycle ever deliver a live event, and still covers an
+# overnight outage of this tool: what happened while it was down is alerted
+# when it comes back, rather than lost.
+EVENT_ALERT_MAX_AGE_MINUTES = 24 * 60
 _TRANSIENT_PROBE_CATEGORIES = frozenset({"transport_error", "server_error", "rate_limited"})
 
 

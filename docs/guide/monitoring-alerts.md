@@ -111,7 +111,7 @@ event 規則用 `filter_value` 比對 event type（`src/events/matcher.py`）：
 - **正規式**：含 `^ $ * + ? [ ] ( ) { } \` 或 `.* .+ .?` 者，以 `^pattern$` 錨定比對。
 - **否定**：前綴 `!` → 反向。
 - 另比對 `filter_status`（如 `failure`）與 `filter_severity`，以及 `match_fields`（巢狀欄位 dot-path）。
-- **只對新事件發告警**：immediate 型規則會略過時間早於 `EVENT_ALERT_MAX_AGE_MINUTES = 120` 分鐘的命中（記一行 INFO）。cache 首次回填、cursor 重置或停機後補抓的歷史事件因此不會一次全部發出去；count 型規則的視窗以 `event_id` 去重，重送的同一筆事件只算一次。
+- **只對新事件發告警**：immediate 型規則會略過時間早於 `EVENT_ALERT_MAX_AGE_MINUTES`（24 小時）的命中（記一行 INFO）。cache 首次回填、cursor 重置時，更早的歷史事件因此不會被當成剛發生而發告警；本工具停機一晚以內期間發生的事件，恢復後仍會補發。count 型規則的視窗以 `event_id` 去重，重送的同一筆事件只算一次。
 - **單一規則出錯不影響其他規則**：每條 event 規則各自評估，某條規則拋出例外只記 log，其餘規則照常判斷，cursor 照常前進。
 
 ### 1.4 冷卻與節流：`_check_cooldown`

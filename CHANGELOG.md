@@ -48,8 +48,10 @@ a plain `<major>.<minor>.<patch>` scheme. (Tags through v4.0.0 carried a
 - **Pressing Enter on the login page signs in.**
 - **Event alerts fire for new events only.** A cache backfill, a cursor reset
   or catching up after downtime used to page every matching historical event
-  at once; immediate event rules now skip matches older than two hours (logged
-  at INFO), and count rules count a replayed event once.
+  at once; immediate event rules now skip matches older than 24 hours (logged
+  at INFO), so a backfill no longer pages old history while events from an
+  overnight outage of this tool are still alerted. Count rules count a
+  replayed event once.
 - **One broken rule no longer stops the others.** An event rule that raised an
   exception ended the whole evaluation (and kept the cursor from moving); each
   rule is now evaluated on its own. A non-numeric `cooldown_minutes`,
