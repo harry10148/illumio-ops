@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from collections import defaultdict, deque
+import heapq
 
 import sys
 
@@ -11,6 +12,11 @@ from .attack_posture import build_app_display, make_posture_item, rank_posture_i
 from src.i18n import t
 
 from src.report.lateral_ports import DEFAULT_LATERAL_PORTS as _LATERAL_PORTS, lateral_ports as _lateral_ports
+
+_ATTACK_PATH_COLUMNS = [
+    "Source App (Env)", "Source App Env Key", "Target App (Env)", "Target App Env Key",
+    "Path Depth", "Path", "Path Connection Weight",
+]
 
 def _normalize_key_series(df: pd.DataFrame, app_col: str, env_col: str) -> pd.Series:
     app = df.get(app_col, pd.Series(index=df.index, dtype=object)).fillna("").astype(str).str.strip().str.lower()
@@ -82,13 +88,32 @@ def _bfs_reachability(source: str, adjacency: dict[str, set[str]], max_depth: in
         node, path = q.popleft()
         if len(path) - 1 >= max_depth:
             continue
-        for nxt in sorted(adjacency.get(node, set())):
+        neighbors = adjacency.get(node, ())
+        # Callers on large graphs pass pre-sorted lists; sorting a set on
+        # every visit was 3.8M sorted() calls at 100k flows.
+        for nxt in (neighbors if isinstance(neighbors, list) else sorted(neighbors)):
             if nxt in path or nxt in paths:
                 continue
             new_path = path + [nxt]
             paths[nxt] = new_path
             q.append((nxt, new_path))
     return paths
+
+def _reach_count(source: str, adjacency: dict, max_depth: int) -> int:
+    """len(_bfs_reachability(...)) without building the paths."""
+    seen = {source}
+    frontier = [source]
+    for _ in range(max_depth):
+        nxt_frontier = []
+        for node in frontier:
+            for nxt in adjacency.get(node, ()):
+                if nxt not in seen:
+                    seen.add(nxt)
+                    nxt_frontier.append(nxt)
+        if not nxt_frontier:
+            break
+        frontier = nxt_frontier
+    return len(seen) - 1
 
 def _path_weight(path: list[str], edge_weights: dict[tuple[str, str], int]) -> int:
     total = 0
@@ -201,10 +226,10 @@ def lateral_movement_risk(df: pd.DataFrame, top_n: int = 20, max_depth: int = 4,
     edge_weights: dict[tuple[str, str], int] = defaultdict(int)
     adjacency: dict[str, set[str]] = defaultdict(set)
     undirected: dict[str, set[str]] = defaultdict(set)
-    for _, row in traversable.iterrows():
-        src = str(row["src_key"])
-        dst = str(row["dst_key"])
-        edge_weights[(src, dst)] += int(row["num_connections"])
+    # One groupby instead of iterrows; sort=False keeps first-seen order.
+    grouped = traversable.groupby(["src_key", "dst_key"], sort=False)["num_connections"].sum()
+    for (src, dst), w in grouped.items():
+        edge_weights[(str(src), str(dst))] += int(w)
     for (src, dst), _w in edge_weights.items():
         adjacency[src].add(dst)
         undirected[src].add(dst)
@@ -235,16 +260,25 @@ def lateral_movement_risk(df: pd.DataFrame, top_n: int = 20, max_depth: int = 4,
                 node_ips.setdefault(k, []).append(ip)
 
     reach_rows: list[dict] = []
-    path_rows: list[dict] = []
     bridge_rows: list[dict] = []
     attack_items: list[dict] = []
+    # Attack paths: only the top_n are reported, so only the top_n are kept.
+    # Every reachable pair used to become a row with display strings, then
+    # the whole table was sorted and cut — 2.2M rows and 12.7M display
+    # builds at 100k flows, 7.6 GB at 500k (measured 2026-10). The candidates
+    # are (sort key, sequence, ...) tuples ranked with the table's own sort,
+    # and the sequence keeps ties in the order the table had them.
+    path_candidates: list[tuple] = []
+    path_seq = 0
+    any_path = False
 
-    max_reach = 1
-    reach_cache: dict[str, dict[str, list[str]]] = {}
+    # Reach counts first (for max_reach); the BFS is re-run in the loop below
+    # rather than every node's paths being held at once (V² path lists).
+    sorted_adjacency = {k: sorted(v) for k, v in adjacency.items()}
+    reach_counts: dict[str, int] = {}
     for node in nodes:
-        reached = _bfs_reachability(node, adjacency, max_depth=max_depth)
-        reach_cache[node] = reached
-        max_reach = max(max_reach, len(reached))
+        reach_counts[node] = _reach_count(node, sorted_adjacency, max_depth)
+    max_reach = max([1, *reach_counts.values()])
 
     def _ip_fallback_display(item: dict, key: str) -> dict:
         new_display = _enrich_app_display(item.get("app_display", ""), key, node_ips)
@@ -252,7 +286,7 @@ def lateral_movement_risk(df: pd.DataFrame, top_n: int = 20, max_depth: int = 4,
 
     for node in nodes:
         app, env = node.split("|", 1)
-        reached = reach_cache.get(node, {})
+        reached = _bfs_reachability(node, sorted_adjacency, max_depth=max_depth)
         reach_count = len(reached)
         reach_score = round((reach_count / max_reach) * 100.0, 1) if max_reach else 0.0
         bridge_score = round((60.0 if node in articulation else 0.0) + (reach_score * 0.4), 1)
@@ -307,21 +341,17 @@ def lateral_movement_risk(df: pd.DataFrame, top_n: int = 20, max_depth: int = 4,
                 ), node
             ))
 
+        node_candidates = []
         for target, path in reached.items():
             if len(path) <= 2:
                 continue
-            tgt_app, tgt_env = target.split("|", 1)
-            path_rows.append(
-                {
-                    "Source App (Env)": build_app_display(app, env),
-                    "Source App Env Key": node,
-                    "Target App (Env)": build_app_display(tgt_app, tgt_env),
-                    "Target App Env Key": target,
-                    "Path Depth": len(path) - 1,
-                    "Path": " → ".join(build_app_display(*hop.split("|", 1)) for hop in path),
-                    "Path Connection Weight": _path_weight(path, edge_weights),
-                }
-            )
+            depth = len(path) - 1
+            weight = _path_weight(path, edge_weights)
+            node_candidates.append(((-depth, -weight, node, path_seq), target, path, weight))
+            path_seq += 1
+        if node_candidates:
+            any_path = True
+            path_candidates.extend(heapq.nsmallest(top_n, node_candidates, key=lambda c: c[0]))
 
     top_reachable_nodes = (
         pd.DataFrame(reach_rows)
@@ -339,12 +369,25 @@ def lateral_movement_risk(df: pd.DataFrame, top_n: int = 20, max_depth: int = 4,
         if bridge_rows
         else pd.DataFrame()
     )
+    path_rows: list[dict] = []
+    for (neg_depth, _w, src_node, _seq), target, path, weight in heapq.nsmallest(
+            max(top_n, 0), path_candidates, key=lambda c: c[0]):
+        src_app, src_env = src_node.split("|", 1)
+        tgt_app, tgt_env = target.split("|", 1)
+        path_rows.append(
+            {
+                "Source App (Env)": build_app_display(src_app, src_env),
+                "Source App Env Key": src_node,
+                "Target App (Env)": build_app_display(tgt_app, tgt_env),
+                "Target App Env Key": target,
+                "Path Depth": -neg_depth,
+                "Path": " → ".join(build_app_display(*hop.split("|", 1)) for hop in path),
+                "Path Connection Weight": weight,
+            }
+        )
     attack_paths = (
-        pd.DataFrame(path_rows)
-        .sort_values(by=["Path Depth", "Path Connection Weight", "Source App Env Key"], ascending=[False, False, True])
-        .head(top_n)
-        .reset_index(drop=True)
-        if path_rows
+        pd.DataFrame(path_rows, columns=_ATTACK_PATH_COLUMNS).reset_index(drop=True)
+        if any_path
         else pd.DataFrame()
     )
     app_chains = top_reachable_nodes.copy() if not top_reachable_nodes.empty else pd.DataFrame()

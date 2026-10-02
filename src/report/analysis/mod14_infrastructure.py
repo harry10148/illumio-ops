@@ -1,10 +1,11 @@
 """Module 14: Deterministic infrastructure scoring by app(env)."""
 from __future__ import annotations
 
-from collections import defaultdict, deque
+from collections import defaultdict
 
 import pandas as pd
 
+from ._key_rows import rows_by_key
 from .attack_posture import build_app_display, make_posture_item, rank_posture_items
 from src.i18n import t, get_language
 
@@ -15,42 +16,76 @@ def _normalize_key_series(df: pd.DataFrame, app_col: str, env_col: str) -> pd.Se
     env = env.where(env != "", "unlabeled")
     return app + "|" + env
 
-def _betweenness_centrality(nodes: list[str], adjacency: dict[str, set[str]]) -> dict[str, float]:
-    # Brandes algorithm for unweighted directed graph.
-    bc = {n: 0.0 for n in nodes}
-    for source in nodes:
-        stack: list[str] = []
-        preds = {v: [] for v in nodes}
-        sigma = {v: 0.0 for v in nodes}
-        sigma[source] = 1.0
-        dist = {v: -1 for v in nodes}
-        dist[source] = 0
-        q: deque[str] = deque([source])
+# Above this many path sources, betweenness is estimated from an evenly spaced
+# sample of them (Brandes & Pich pivot sampling) instead of computed from all:
+# exact cost is O(V·E) in Python — about 18 s for 4,000 app|env keys and 30k
+# edges — and the score is only used relative to its maximum.
+BETWEENNESS_EXACT_MAX_SOURCES = 1500
+BETWEENNESS_SAMPLE_SOURCES = 500
 
-        while q:
-            v = q.popleft()
-            stack.append(v)
-            for w in adjacency.get(v, set()):
+
+def _betweenness_centrality(nodes: list[str], adjacency: dict[str, set[str]],
+                            info: dict | None = None) -> dict[str, float]:
+    # Brandes algorithm for unweighted directed graph, normalised to the max.
+    #
+    # Same algorithm as before on integer node ids: the old version allocated
+    # four dicts of every node per source (V² dict entries, ~48 s at 4,000
+    # app|env keys) and kept a predecessor list per node. Predecessors of w are
+    # exactly its in-neighbours one BFS level closer, so they are read from
+    # the reverse adjacency instead of being stored.
+    n = len(nodes)
+    index = {name: i for i, name in enumerate(nodes)}
+    succ: list[list[int]] = [[] for _ in range(n)]
+    pred_all: list[list[int]] = [[] for _ in range(n)]
+    for name, targets in adjacency.items():
+        u = index.get(name)
+        if u is None:
+            continue
+        for target in targets:
+            v = index.get(target)
+            if v is not None:
+                succ[u].append(v)
+                pred_all[v].append(u)
+
+    # A node with no out-edges is no path's source.
+    sources = [i for i in range(n) if succ[i]]
+    if len(sources) > BETWEENNESS_EXACT_MAX_SOURCES:
+        step = len(sources) / BETWEENNESS_SAMPLE_SOURCES
+        sources = [sources[int(k * step)] for k in range(BETWEENNESS_SAMPLE_SOURCES)]
+        if info is not None:
+            info["betweenness_sampled_sources"] = len(sources)
+    bc = [0.0] * n
+    for s in sources:
+        sigma = [0.0] * n
+        dist = [-1] * n
+        sigma[s] = 1.0
+        dist[s] = 0
+        order = [s]
+        head = 0
+        while head < len(order):
+            v = order[head]
+            head += 1
+            dv1 = dist[v] + 1
+            sv = sigma[v]
+            for w in succ[v]:
                 if dist[w] < 0:
-                    q.append(w)
-                    dist[w] = dist[v] + 1
-                if dist[w] == dist[v] + 1:
-                    sigma[w] += sigma[v]
-                    preds[w].append(v)
+                    dist[w] = dv1
+                    order.append(w)
+                if dist[w] == dv1:
+                    sigma[w] += sv
+        delta = [0.0] * n
+        for w in reversed(order[1:]):
+            dw1 = dist[w] - 1
+            coeff = (1.0 + delta[w]) / sigma[w]
+            for v in pred_all[w]:
+                if dist[v] == dw1:
+                    delta[v] += sigma[v] * coeff
+            bc[w] += delta[w]
 
-        delta = {v: 0.0 for v in nodes}
-        while stack:
-            w = stack.pop()
-            for v in preds[w]:
-                if sigma[w] > 0:
-                    delta[v] += (sigma[v] / sigma[w]) * (1.0 + delta[w])
-            if w != source:
-                bc[w] += delta[w]
-
-    max_v = max(bc.values(), default=0.0)
+    max_v = max(bc, default=0.0)
     if max_v <= 0:
-        return {k: 0.0 for k in bc}
-    return {k: v / max_v for k, v in bc.items()}
+        return {k: 0.0 for k in nodes}
+    return {k: bc[i] / max_v for i, k in enumerate(nodes)}
 
 # Critical asset port groups for automatic tier boosting
 _DB_PORTS = {1433, 3306, 5432, 1521, 27017, 6379, 9200, 5984, 50000}
@@ -113,11 +148,10 @@ def infrastructure_scoring(df: pd.DataFrame, top_n: int = 20, *, lang: str = "en
     in_weight: dict[str, int] = defaultdict(int)
     out_weight: dict[str, int] = defaultdict(int)
 
-    for _, row in app_flows.iterrows():
-        src = str(row["src_key"])
-        dst = str(row["dst_key"])
-        w = int(row.get("num_connections", 1))
-        edge_weights[(src, dst)] += w
+    # One groupby instead of iterrows over every cross-app flow.
+    grouped = app_flows.groupby(["src_key", "dst_key"], sort=False)["num_connections"].sum()
+    for (src, dst), w in grouped.items():
+        edge_weights[(str(src), str(dst))] += int(w)
 
     for (src, dst), w in edge_weights.items():
         adjacency[src].add(dst)
@@ -130,7 +164,8 @@ def infrastructure_scoring(df: pd.DataFrame, top_n: int = 20, *, lang: str = "en
     if not all_nodes:
         return {"error": t("rpt_mod14_err_no_nodes", lang=lang)}
 
-    bc = _betweenness_centrality(all_nodes, adjacency)
+    bc_info: dict = {}
+    bc = _betweenness_centrality(all_nodes, adjacency, bc_info)
     max_in_degree = max(in_degree.values(), default=1)
     max_out_degree = max(out_degree.values(), default=1)
     max_in_weight = max(in_weight.values(), default=1)
@@ -144,9 +179,10 @@ def infrastructure_scoring(df: pd.DataFrame, top_n: int = 20, *, lang: str = "en
     rows: list[dict] = []
     attack_items: list[dict] = []
 
+    key_rows = rows_by_key(app_flows)
     for key in all_nodes:
         app, env = key.split("|", 1)
-        node_flows = app_flows[(app_flows["src_key"] == key) | (app_flows["dst_key"] == key)]
+        node_flows = app_flows.iloc[key_rows[key]]
         mixed_ratio = 0.0
         if not node_flows.empty and "src_managed" in node_flows.columns and "dst_managed" in node_flows.columns:
             managed_pair = node_flows["src_managed"].fillna(False).astype(bool) & node_flows["dst_managed"].fillna(False).astype(bool)
@@ -277,6 +313,9 @@ def infrastructure_scoring(df: pd.DataFrame, top_n: int = 20, *, lang: str = "en
     return {
         "total_apps": int(len(all_nodes)),
         "total_edges": int(len(edge_weights)),
+        # Set when betweenness was estimated from a sample of path sources
+        # (very large graphs); absent when it is exact.
+        **bc_info,
         "top_apps": top_apps,
         "top_edges": edge_df.reset_index(drop=True),
         "role_summary": role_summary.reset_index(drop=True),
