@@ -184,11 +184,12 @@ def test_get_map_is_an_exact_transcription_of_the_frozen_endpoint_list():
 def test_get_map_has_every_entry_the_gate_expects():
     """A count, on top of the set comparison, so that adding an entry to BOTH
     files without deciding it belongs still has to be a deliberate edit here.
-    43 = the yaml's 45 GET entries minus the two capture-only fb_* ids.
-    (+3 on 2026-09-14: fleet / fleet_list / fleet_records.)"""
+    42 = the yaml's 44 GET entries minus the two capture-only fb_* ids.
+    (+3 on 2026-09-14: fleet / fleet_list / fleet_records; -1 on 2026-10-02:
+    fleet_records went with enforcement progression.)"""
     # 3A/3B (2026-09-04): + alerts, alert_detail, alert_traffic_query
-    assert len(_get_map_ids()) == 43, sorted(_get_map_ids())
-    assert len(_yaml_get_ids()) == 45, sorted(_yaml_get_ids())
+    assert len(_get_map_ids()) == 42, sorted(_get_map_ids())
+    assert len(_yaml_get_ids()) == 44, sorted(_yaml_get_ids())
 
 
 def test_post_entries_are_deliberately_absent_from_get_map():

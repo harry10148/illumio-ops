@@ -1,54 +1,25 @@
-"""VEN 車隊 API（唯讀）——只讀 run_ven_summary 寫下的快照，不碰 PCE。
+"""VEN 盤點 API（唯讀）——只讀 run_ven_summary 寫下的快照，不碰 PCE。
 
     GET /api/fleet
-    GET /api/fleet/list?bucket=&offset=&limit=
+    GET /api/fleet/list?bucket=&q=&version=&app=&env=&sort=&dir=&offset=&limit=
+    GET /api/fleet/export.csv?<same filters, no paging>
 
-寫入 PCE 的那一半（preview／apply）在 Task 3，會用這裡的 `BUCKET_PREDICATES`
-挑出同一批對象：預覽看到的與真正被改的必須是同一個定義，兩份各寫一次就會
-在某個版本分岔。
+本工具不改 PCE 上的 enforcement mode：盤點只負責呈現現況，推進請在 PCE 進行。
 
-Auth 走 app 層的 before_request；這兩支都是 GET，沒有 CSRF。
+Auth 走 app 層的 before_request；全部都是 GET，沒有 CSRF。
 """
 from __future__ import annotations
 
-from typing import Callable
+import csv
+import io
+from typing import Any, Callable
 
-import datetime
-import os
-import uuid
-
-from flask import Blueprint, jsonify, request
-from loguru import logger
+from flask import Blueprint, Response, jsonify, request
 
 from src.dashboard_store import read_dashboard_summary
-from src.fleet_progress_store import FleetProgressStore
-from src.gui._helpers import _err, _is_workload_href
-from src.report.analysis.fleet import PIPELINE_BUCKETS, VALID_PROGRESSIONS
-
-
-def _store_path() -> str:
-    """紀錄檔位置。獨立成函式，測試才有一個乾淨的替換點。"""
-    return os.path.join("config", "fleet_progressions.json")
-
-
-def _current_user() -> str:
-    try:
-        from flask_login import current_user
-        if getattr(current_user, "is_authenticated", False):
-            return str(current_user.get_id())
-    except Exception:
-        pass
-    return "?"
-
-
-def _audit_action(action: str, **fields) -> None:
-    """審計 log——best-effort，絕不阻斷主操作（比照 routes/actions.py）。"""
-    try:
-        from src.module_log import ModuleLog
-        parts = " ".join(f"{k}={v}" for k, v in fields.items())
-        ModuleLog.get("actions").info(f"{action}: user={_current_user()} {parts}")
-    except Exception:
-        pass
+from src.gui._helpers import _err
+from src.i18n import t
+from src.report.analysis.fleet import parse_ven_version
 
 _MAX_LIMIT = 500
 _DEFAULT_LIMIT = 100
@@ -97,72 +68,95 @@ BUCKET_PREDICATES: dict[str, Callable[[dict], bool]] = {
     "no_heartbeat": lambda r: r.get("hslh") is None,
     "unlabeled": lambda r: not (r.get("app") or r.get("env")),
     "offline": lambda r: not r.get("online"),
+    "online": lambda r: bool(r.get("online")),
+    "all": lambda r: True,
 }
 
+# 這兩個桶依賴快照裡的目標版本，所以不是靜態 predicate。判定與 analyze_fleet
+# 的 on_target 完全相同（版本字串相等），清單筆數才會等於摘要上的數字。
+_TARGET_BUCKETS = ("needs_upgrade", "on_target")
 
-# 推進只准往前，且只准動 enforcement_mode 一個欄位。這兩件事在這裡是 white-list
-# 而非檢查清單：新增一個 PCE 模式時預設是「不可推進」。
-_PROGRESS_TARGETS = ("visibility_only", "selective", "full")
+_SORT_KEYS = ("hostname", "mode", "online", "version", "compat", "hslh", "app", "env", "os")
+
+# enforcement 由寬到嚴；排序照這個順序而不是字母，"full" 才不會排在 "idle" 前面。
+_MODE_ORDER = {"idle": 0, "visibility_only": 1, "selective": 2, "full": 3}
+_COMPAT_ORDER = {"fail": 0, "warn": 1, "unknown": 2, "pass": 3}
 
 
-def classify_targets(index_rows: list[dict], to_mode: str, cap: int,
-                     *, requested: list[str] | None = None
-                     ) -> tuple[list[dict], list[dict], list[dict]]:
-    """把候選分成 eligible／deferred／skipped，每個 skipped 都帶一個理由。
+def _sort_value(row: dict, key: str) -> Any:
+    v = row.get(key)
+    if key == "version":
+        return parse_ven_version(v)
+    if key == "mode":
+        return _MODE_ORDER.get(str(v or ""))
+    if key == "compat":
+        return _COMPAT_ORDER.get(str(v or ""))
+    if key == "online":
+        return None if v is None else (1 if v else 0)
+    if key == "hslh":
+        try:
+            return None if v is None else float(v)
+        except (TypeError, ValueError):
+            return None
+    text = str(v or "").strip().casefold()
+    return text or None
 
-    preview 與 apply 呼叫的是同一支：預覽看到的與真正被改的必須出自同一個
-    定義，兩份各寫一次遲早會在某個版本分岔。
 
-    - deferred：合法但目前離線。PCE 接受寫入，VEN 下次 heartbeat 才套用，
-      所以它不是「不能推」而是「推了要等」。歸進 skipped 會讓操作者以為
-      這台有問題。
-    - skipped 的理由：unknown_href / not_managed / already_target /
-      invalid_transition / over_cap。沒有理由的 skipped 清單等於沒有清單。
-    """
-    by_href = {str(r.get("href") or ""): r for r in index_rows or []}
-    if requested is None:
-        rows = list(index_rows or [])
-        missing: list[str] = []
+def _sorted(rows: list[dict], key: str, desc: bool) -> list[dict]:
+    """缺值一律排最後（兩個方向都是）：未知不是最小值。"""
+    present = [r for r in rows if _sort_value(r, key) is not None]
+    missing = [r for r in rows if _sort_value(r, key) is None]
+    present.sort(key=lambda r: (_sort_value(r, key), str(r.get("hostname") or "")), reverse=desc)
+    return present + missing
+
+
+def _matches_query(row: dict, q: str) -> bool:
+    hay = " ".join(str(row.get(k) or "") for k in ("hostname", "app", "env", "version", "os"))
+    return q in hay.casefold()
+
+
+def _filter_rows(fleet: dict, args) -> tuple[list[dict] | None, str]:
+    """套用 bucket／q／version／app／env 篩選。不合法的參數回 (None, 錯誤字串)。"""
+    bucket = args.get("bucket") or "all"
+    rows = list(fleet.get("workloads_index") or [])
+    if bucket in _TARGET_BUCKETS:
+        target = ((fleet.get("versions") or {}).get("target") or "").strip()
+        if not target:
+            # 沒設目標版本時「待升級」沒有定義；回空清單會被讀成「全部都在目標上」。
+            return None, "no target version set"
+        want = bucket == "on_target"
+        rows = [r for r in rows if (r.get("version") == target) == want]
     else:
-        rows = [by_href[h] for h in requested if h in by_href]
-        missing = [h for h in requested if h not in by_href]
+        pred = BUCKET_PREDICATES.get(bucket)
+        if pred is None:
+            # 不合法的桶回 400：空清單會被讀成「這個桶裡沒東西」。
+            return None, "invalid bucket"
+        rows = [r for r in rows if pred(r)]
+    for field in ("version", "app", "env"):
+        val = args.get(field)
+        if val is not None and val != "":
+            rows = [r for r in rows if str(r.get(field) or "") == val]
+    q = (args.get("q") or "").strip().casefold()
+    if q:
+        rows = [r for r in rows if _matches_query(r, q)]
+    sort = args.get("sort") or "hostname"
+    if sort not in _SORT_KEYS:
+        return None, "invalid sort"
+    direction = args.get("dir") or "asc"
+    if direction not in ("asc", "desc"):
+        return None, "invalid sort"
+    return _sorted(rows, sort, direction == "desc"), ""
 
-    eligible: list[dict] = []
-    deferred: list[dict] = []
-    skipped: list[dict] = [{"href": h, "hostname": "", "reason": "unknown_href"}
-                           for h in missing]
 
-    for r in rows:
-        href = str(r.get("href") or "")
-        host = str(r.get("hostname") or "")
-        mode = str(r.get("mode") or "")
-        brief = {"href": href, "hostname": host, "from": mode, "to": to_mode}
-        if not mode:
-            skipped.append({"href": href, "hostname": host, "reason": "not_managed"})
-        elif mode == to_mode:
-            skipped.append({"href": href, "hostname": host, "reason": "already_target"})
-        elif to_mode not in VALID_PROGRESSIONS.get(mode, set()):
-            skipped.append({"href": href, "hostname": host, "reason": "invalid_transition"})
-        elif r.get("online"):
-            eligible.append(brief)
-        else:
-            deferred.append(brief)
+_CSV_PREFIXES = ("=", "+", "-", "@")
 
-    # cap 是「這一批要寫幾筆 PCE」，離線的一樣會被寫，所以兩者合計後才截。
-    eligible.sort(key=lambda r: r["hostname"])
-    deferred.sort(key=lambda r: r["hostname"])
-    combined = sorted(eligible + deferred, key=lambda r: r["hostname"])
-    cap = max(0, int(cap))
-    if len(combined) > cap:
-        kept = {r["href"] for r in combined[:cap]}
-        for r in combined[cap:]:
-            # 被 cap 掉的必須出現在 skipped：默默消失的那幾台是最危險的
-            # 那種「成功」。
-            skipped.append({"href": r["href"], "hostname": r["hostname"],
-                            "reason": "over_cap"})
-        eligible = [r for r in eligible if r["href"] in kept]
-        deferred = [r for r in deferred if r["href"] in kept]
-    return eligible, deferred, skipped
+
+def _csv_cell(v: Any) -> Any:
+    # 與 csv_exporter._neutralize 同契約：主機名稱與 label 來自 PCE，開頭為
+    # = + - @ 的字串在試算表裡會被當公式執行。
+    if isinstance(v, str) and v[:1] in _CSV_PREFIXES:
+        return "'" + v
+    return v
 
 
 def _next_run_at(job_id: str = "ven_summary") -> str | None:
@@ -205,7 +199,7 @@ def make_fleet_blueprint(cm, csrf, limiter, login_required) -> Blueprint:
     @login_required
     def get_fleet():
         fleet = _load_fleet()
-        # 「還沒跑過排程」與「車隊是空的」是兩件事：回一份 0 的摘要會讓
+        # 「還沒跑過排程」與「沒有任何 VEN」是兩件事：回一份 0 的摘要會讓
         # 看板顯示一個從未存在過的答案。
         available = bool(fleet) and "total" in fleet
         summary = {k: v for k, v in fleet.items() if k != "workloads_index"} if available else {}
@@ -215,11 +209,6 @@ def make_fleet_blueprint(cm, csrf, limiter, login_required) -> Blueprint:
     @bp.route("/api/fleet/list")
     @login_required
     def list_fleet():
-        bucket = request.args.get("bucket") or ""
-        pred = BUCKET_PREDICATES.get(bucket)
-        if pred is None:
-            # 不合法的桶回 400：空清單會被讀成「這個桶裡沒東西」。
-            return _err("invalid bucket", 400)
         try:
             offset = max(0, int(request.args.get("offset", 0)))
             limit = min(_MAX_LIMIT, max(1, int(request.args.get("limit", _DEFAULT_LIMIT))))
@@ -227,131 +216,34 @@ def make_fleet_blueprint(cm, csrf, limiter, login_required) -> Blueprint:
             return _err("invalid paging", 400)
 
         fleet = _load_fleet()
-        rows = [r for r in (fleet.get("workloads_index") or []) if pred(r)]
-        return jsonify({"ok": True, "bucket": bucket, "total": len(rows),
-                        "rows": rows[offset:offset + limit],
+        rows, problem = _filter_rows(fleet, request.args)
+        if rows is None:
+            return _err(problem, 400)
+        return jsonify({"ok": True, "bucket": request.args.get("bucket") or "all",
+                        "total": len(rows), "rows": rows[offset:offset + limit],
                         "index_truncated": bool(fleet.get("index_truncated"))})
 
-    def _index_rows() -> list[dict]:
-        return _load_fleet().get("workloads_index") or []
-
-    def _cap() -> int:
-        raw = (cm.config.get("settings", {}) or {}).get("fleet_max_batch") or 200
-        try:
-            return min(1000, max(1, int(raw)))
-        except (TypeError, ValueError):
-            return 200
-
-    def _targets(payload: dict):
-        """把 {hrefs} 或 {bucket} 解析成候選列，並回 (rows, requested, err)。"""
-        hrefs, bucket = payload.get("hrefs"), payload.get("bucket")
-        # 兩個都給時該用哪個沒有正確答案，所以不猜。
-        if bool(hrefs) == bool(bucket):
-            return None, None, _err("give exactly one of hrefs or bucket", 400)
-        rows = _index_rows()
-        if bucket:
-            pred = BUCKET_PREDICATES.get(str(bucket))
-            if pred is None:
-                return None, None, _err("invalid bucket", 400)
-            return [r for r in rows if pred(r)], None, None
-        clean = [str(h).strip() for h in hrefs if _is_workload_href(str(h))]
-        if not clean:
-            return None, None, _err("no valid workload href", 400)
-        return rows, clean, None
-
-    @bp.route("/api/fleet/progress/preview", methods=["POST"])
-    @limiter.limit("10 per minute")
+    @bp.route("/api/fleet/export.csv")
     @login_required
-    def preview_progress():
-        payload = request.get_json(silent=True) or {}
-        to_mode = str(payload.get("to_mode") or "")
-        if to_mode not in _PROGRESS_TARGETS:
-            return _err("invalid to_mode", 400)
-        rows, requested, err = _targets(payload)
-        if err is not None:
-            return err
-        cap = _cap()
-        eligible, deferred, skipped = classify_targets(rows, to_mode, cap, requested=requested)
-        return jsonify({"ok": True, "to_mode": to_mode, "eligible": eligible,
-                        "deferred": deferred, "skipped": skipped, "cap": cap,
-                        "truncated": any(s["reason"] == "over_cap" for s in skipped)})
-
-    @bp.route("/api/fleet/progress/apply", methods=["POST"])
-    @limiter.limit("10 per minute")
-    @login_required
-    def apply_progress():
-        payload = request.get_json(silent=True) or {}
-        to_mode = str(payload.get("to_mode") or "")
-        if to_mode not in _PROGRESS_TARGETS:
-            return _err("invalid to_mode", 400)
-        raw = payload.get("hrefs")
-        if not isinstance(raw, list) or not raw:
-            return _err("hrefs required", 400)
-        requested = [str(h).strip() for h in raw if _is_workload_href(str(h))]
-        if len(requested) != len(raw):
-            return _err("invalid workload href", 400)
-
-        # 伺服端重跑分類：preview 的結果不可信（畫面可能過期，也可能被改過）。
-        eligible, deferred, skipped = classify_targets(
-            _index_rows(), to_mode, _cap(), requested=requested)
-        if skipped:
-            # 一筆不合格就整批拒絕。部分套用是最難收拾的結果：操作者不知道
-            # 哪幾台動了。
-            return jsonify({"ok": False, "skipped": skipped}), 400
-
-        targets = eligible + deferred
-        deferred_hrefs = {r["href"] for r in deferred}
-        from src.api_client import ApiClient
-        with ApiClient(cm) as api:
-            results = api.bulk_update_workloads(
-                [{"href": r["href"], "enforcement_mode": to_mode} for r in targets])
-        by_href = {r.get("href"): r for r in results}
-
-        applied, failed, items = [], [], []
-        for r in targets:
-            res = by_href.get(r["href"]) or {"status": "error", "http": 0,
-                                             "errors": ["no answer for this href"]}
-            row = {"href": r["href"], "hostname": r["hostname"], "from": r["from"],
-                   "to": to_mode, "deferred": r["href"] in deferred_hrefs}
-            if res.get("status") == "updated":
-                applied.append(row)
-            else:
-                failed.append({**row, "http": res.get("http"),
-                               "error": str(res.get("errors") or "")[:300]})
-            items.append({"href": r["href"], "hostname": r["hostname"],
-                          "previous_mode": r["from"], "new_mode": to_mode,
-                          "deferred": row["deferred"], "status": res.get("status"),
-                          "http": res.get("http"), "errors": res.get("errors") or []})
-
-        record_id = uuid.uuid4().hex
-        try:
-            FleetProgressStore(_store_path()).put(record_id, {
-                "at": datetime.datetime.now(datetime.timezone.utc)
-                        .strftime("%Y-%m-%dT%H:%M:%SZ"),
-                "user": _current_user(), "to_mode": to_mode, "items": items,
-            })
-        except Exception:
-            logger.exception("fleet progression record failed to persist")
-        _audit_action("fleet_progress", to_mode=to_mode, applied=len(applied),
-                      failed=len(failed), record_id=record_id)
-        return jsonify({"ok": True, "applied": applied, "failed": failed,
-                        "record_id": record_id,
-                        # PCE 收下 ≠ VEN 套用了：政策在受影響的 VEN 下次
-                        # heartbeat 才生效，期間 PCE 顯示 Syncing。
-                        "pending_heartbeat": True})
-
-    @bp.route("/api/fleet/progress/records")
-    @login_required
-    def progress_records():
-        try:
-            limit = min(100, max(1, int(request.args.get("limit", 20))))
-        except ValueError:
-            return _err("invalid limit", 400)
-        try:
-            records = FleetProgressStore(_store_path()).recent(limit)
-        except Exception:
-            logger.exception("fleet progression records unreadable")
-            return _err("records unreadable", 500)
-        return jsonify({"ok": True, "records": records})
+    def export_fleet():
+        """目前篩選的完整清單（不分頁）。表頭跟著介面語言。"""
+        fleet = _load_fleet()
+        rows, problem = _filter_rows(fleet, request.args)
+        if rows is None:
+            return _err(problem, 400)
+        lang = (cm.config.get("settings", {}) or {}).get("language", "en") or "en"
+        cols = [("hostname", "gui_fleet_col_hostname"), ("mode", "gui_fleet_col_mode"),
+                ("online", "gui_fleet_col_online"), ("version", "gui_fleet_col_version"),
+                ("compat", "gui_fleet_col_compat"), ("hslh", "gui_fleet_col_hslh"),
+                ("app", "gui_fleet_col_app"), ("env", "gui_fleet_col_env"),
+                ("os", "gui_fleet_col_os"), ("href", "gui_fleet_col_href")]
+        buf = io.StringIO()
+        w = csv.writer(buf)
+        w.writerow([t(key, lang=lang) for _f, key in cols])
+        for r in rows:
+            w.writerow([_csv_cell("" if r.get(f) is None else r.get(f)) for f, _k in cols])
+        # BOM 讓 Excel 以 UTF-8 開啟中文主機名稱與 label。
+        return Response("\ufeff" + buf.getvalue(), mimetype="text/csv; charset=utf-8",
+                        headers={"Content-Disposition": 'attachment; filename="ven_inventory.csv"'})
 
     return bp

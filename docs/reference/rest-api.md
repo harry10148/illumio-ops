@@ -200,53 +200,30 @@ policy decision 等即時才算得出的條件，以及全文 `search`，帶了�
 
 | 方法 | 路徑 | 用途 | 關鍵參數 |
 |---|---|---|---|
-| GET | `/api/fleet` | 車隊快照摘要（版本、compat、管線、心跳、gaps、health score）| — |
-| GET | `/api/fleet/list` | 取單一 bucket 的逐台清單 | `bucket`（見下）, `offset`, `limit`(≤500，預設 100) |
-| POST | `/api/fleet/progress/preview` | 預覽一次 enforcement 推進會動到誰 | `to_mode`, 以及 `hrefs` 或 `bucket`（**二擇一**，皆缺或皆給回 400）|
-| POST | `/api/fleet/progress/apply` | 實際寫入 PCE | `to_mode`, `hrefs` |
-| GET | `/api/fleet/progress/records` | 歷次推進紀錄（新到舊）| `limit`(≤100，預設 20) |
+| GET | `/api/fleet` | VEN 盤點快照摘要（版本、compat、管線、心跳、gaps、health score）| — |
+| GET | `/api/fleet/list` | 逐台清單（篩選、搜尋、排序、分頁）| `bucket`（見下，預設 `all`）, `q`, `version`, `app`, `env`, `sort`, `dir`, `offset`, `limit`(≤500，預設 100) |
+| GET | `/api/fleet/export.csv` | 目前篩選結果的完整 CSV（不分頁，表頭依介面語言）| 與 `/api/fleet/list` 相同，不含 `offset`/`limit` |
 
-**資料來源**：前三支唯讀，讀的是 `ven_summary` 排程寫進
+**資料來源**：全部唯讀，讀的是 `ven_summary` 排程寫進
 `logs/dashboard_summary.json["fleet"]` 的快照，**不即時呼叫 PCE**。排程還沒跑過時
-`/api/fleet` 回 `{"ok": true, "available": false, "fleet": {}}`——那不是「車隊是空的」，
+`/api/fleet` 回 `{"ok": true, "available": false, "fleet": {}}`——那不是「沒有 VEN」，
 是「還沒分析過」，呼叫端必須分辨。
 
 **`bucket` 值域**：`idle_compat_pass`、`idle_compat_warn`、`idle_compat_fail`、
 `idle_compat_unknown`、`visibility_ready`、`visibility_not_ready`、`selective`、
-`full`、`fresh`、`stale_24h`、`stale_48h`、`no_heartbeat`、`unlabeled`、`offline`。
+`full`、`fresh`、`stale_24h`、`stale_48h`、`no_heartbeat`、`unlabeled`、`offline`、
+`online`、`all`，以及依目標版本判定的 `needs_upgrade`／`on_target`（版本字串與目標相同即在目標上，
+與摘要的計數同一個判定；未設定目標版本時這兩個值回 **400**）。
 不合法的值回 **400**，不是空清單——空清單會被讀成「這個 bucket 沒東西」。
 
-**寫入約束**（`apply` 是本專案唯一會改 PCE 物件的端點）：
+**搜尋與排序**：`q` 不分大小寫比對主機名稱、app、env、版本與 OS；`version`／`app`／`env` 是精確
+比對。`sort` 可為 `hostname`、`mode`（依 idle → visibility_only → selective → full）、`online`、
+`version`（數值比較，`9.1` 排在 `26.2` 前面）、`compat`、`hslh`、`app`、`env`、`os`；`dir` 為
+`asc`／`desc`。缺值不論方向一律排在最後。其他值回 **400**。CSV 匯出會把開頭為 `= + - @` 的
+儲存格加上單引號，避免試算表把 PCE 帶來的名稱當公式執行。
 
-- 只送 `enforcement_mode` 一個欄位，body 是重建的，不轉送 index 列。
-- 只准往前：`idle` → `visibility_only`/`selective`/`full`；`visibility_only` →
-  `selective`/`full`；`selective` → `full`。白名單制，新模式預設不可推進。
-- **全有或全無**：伺服端重跑分類（不信任瀏覽器送來的 preview），任一 href 落在
-  skipped 就整批回 400 且完全不呼叫 PCE。
-- 回應帶 `pending_heartbeat: true`。PCE 收下 ≠ VEN 已套用——政策在各 VEN 下次
-  heartbeat 才生效，期間 PCE 顯示 `Syncing`（REST_APIs_26_1.pdf）。
-- 兩支 POST 皆限流 `10/分鐘`，皆走 app 層 CSRF。
-
-**紀錄格式**（`config/fleet_progressions.json`，key 為 `record_id`）：
-
-```json
-{
-  "at": "2026-09-15T01:00:00Z",
-  "user": "admin",
-  "to_mode": "selective",
-  "items": [{
-    "href": "/orgs/1/workloads/...", "hostname": "web-01",
-    "previous_mode": "idle", "new_mode": "selective",
-    "deferred": false, "status": "updated", "http": 200, "errors": []
-  }]
-}
-```
-
-`previous_mode` 是還原的依據——沒有它這份紀錄只是流水帳。
-
-**未經真環境驗證**：Illumio 的 KB 沒有 `workloads/bulk_update` 的 response schema，
-逐筆 `{href, status, errors}` 的解析是依據推測。PCE 沒有回應到的 href 會被賦予整批
-的結果，而不是猜它成功或失敗。
+**不提供寫入**：本工具不改 PCE 上的 enforcement mode。舊版的
+`/api/fleet/progress/{preview,apply,records}` 已移除；推進請在 PCE 進行。
 
 ### 5) 政策區：告警規則 `#/policy/alert-rules`、`/ops`；手動動作 `#/system/alerting`（v2 `#/alerting/*`；`src/gui/routes/rules.py` ＋ `actions.py`）
 
@@ -432,7 +409,7 @@ TLS 相關端點存檔後都需要**重啟服務**才會套用；自簽憑證每
 | 總覽 | `dashboard.py` | 10 |
 | 調查（流量／Workload） | `actions.py`（部分）＋ `filter_objects.py` ＋ `policy.py` | 10 |
 | 調查（事件） | `events.py` | 4 |
-| 調查（VEN 車隊） | `fleet.py` | 5 |
+| 調查（VEN 盤點） | `fleet.py` | 2 |
 | 告警 | `rules.py` ＋ `actions.py`（部分）＋ `alerts.py` | 19 |
 | Reports | `reports.py` | 24 |
 | Rule Scheduler | `rule_scheduler.py` | 10 |

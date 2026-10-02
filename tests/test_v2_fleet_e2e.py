@@ -24,10 +24,9 @@ ROUTE = "#/investigate/fleet"
 
 def _labels(page):
     keys = [
-        "gui_fleet_title", "gui_fleet_no_snapshot", "gui_fleet_progress_btn",
-        "gui_fleet_preview", "gui_fleet_target_unset", "gui_fleet_partial",
-        "gui_fleet_deferred_note", "gui_fleet_r_invalid_transition",
-        "gui_fleet_pending_heartbeat", "gui_fleet_index_truncated",
+        "gui_fleet_title", "gui_fleet_no_snapshot",
+        "gui_fleet_target_unset", "gui_fleet_partial",
+        "gui_fleet_index_truncated",
         "gui_nav_fleet",
     ]
     return page.evaluate(
@@ -79,8 +78,7 @@ def _fleet(**over):
     return f
 
 
-def _stub(page, *, available=True, fleet=None, rows=None, preview=None, apply_=None,
-          records=None, calls=None):
+def _stub(page, *, available=True, fleet=None, rows=None, list_calls=None):
     body = {"ok": True, "available": available,
             "fleet": {} if not available else (fleet if fleet is not None else _fleet()),
             "next_run_at": "2026-09-14T00:05:00Z"}
@@ -89,29 +87,18 @@ def _stub(page, *, available=True, fleet=None, rows=None, preview=None, apply_=N
         route.fulfill(status=200, content_type="application/json", body=json.dumps(payload))
 
     page.route("**/api/fleet", lambda r: _json(r, body))
-    page.route("**/api/fleet/list*", lambda r: _json(r, {
+    list_body = {
         "ok": True, "bucket": "selective",
         "total": len(rows if rows is not None else _index()),
         "rows": rows if rows is not None else _index(),
-        "index_truncated": bool((fleet or {}).get("index_truncated"))}))
-    page.route("**/api/fleet/progress/records*", lambda r: _json(r, {
-        "ok": True, "records": records or []}))
+        "index_truncated": bool((fleet or {}).get("index_truncated"))}
 
-    def _preview(route):
-        if calls is not None:
-            calls.append(("preview", route.request.post_data_json))
-        _json(route, preview or {"ok": True, "to_mode": "selective", "eligible": [],
-                                 "deferred": [], "skipped": [], "cap": 200,
-                                 "truncated": False})
+    def _list(r):
+        if list_calls is not None:
+            list_calls.append(r.request.url)
+        _json(r, list_body)
 
-    def _apply(route):
-        if calls is not None:
-            calls.append(("apply", route.request.post_data_json))
-        _json(route, apply_ or {"ok": True, "applied": [], "failed": [],
-                                "record_id": "abc", "pending_heartbeat": True})
-
-    page.route("**/api/fleet/progress/preview", _preview)
-    page.route("**/api/fleet/progress/apply", _apply)
+    page.route("**/api/fleet/list*", _list)
 
 
 def _goto(page, base_url):
@@ -121,11 +108,11 @@ def _goto(page, base_url):
 
 # ── 冷載入 ───────────────────────────────────────────────────────────────────
 
-def test_the_page_mounts_with_all_five_anchors_and_a_nav_entry(v2_page):
+def test_the_page_mounts_with_all_four_anchors_and_a_nav_entry(v2_page):
     page, base_url = v2_page
     _stub(page)
     _goto(page, base_url)
-    for cov in ("IV-16", "IV-17", "IV-18", "IV-19", "IV-20"):
+    for cov in ("IV-16", "IV-17", "IV-18", "IV-19"):
         assert page.locator('[data-cov="%s"]' % cov).count(), "缺 anchor %s" % cov
     labels = _labels(page)
     nav = page.locator('a[href="%s"]' % ROUTE)
@@ -149,33 +136,29 @@ def test_no_snapshot_renders_no_numbers_at_all(v2_page):
     text = box.inner_text()
     assert labels["gui_fleet_no_snapshot"] in text
     import re
-    # next_run_at 的時間戳本身有數字，所以只看說明那兩段
-    head = text.split("2026")[0]
+    # next_run_at 那一行本身有時間數字，所以只看說明那兩段
+    head = box.locator(".et").inner_text() + "\n" + box.locator("p").first.inner_text()
     assert not re.search(r"\d", head), "沒有快照卻渲染了數字：%r" % head
 
 
 def test_a_partial_score_names_the_parts_it_left_out(v2_page):
-    """只說「部分資料」等於說「這個數字有條件」但不說是什麼條件。"""
+    """只說「部分資料」等於說「這個數字有條件」但不說是什麼條件：每個沒列入
+    的分量都要在它自己那一列寫出「未列入」。"""
     page, base_url = v2_page
     _stub(page)
     _goto(page, base_url)
-    labels = _labels(page)
-    card = page.locator('[data-cov="IV-16"]')
-    card.wait_for(state="visible")
-    text = card.inner_text()
-    assert labels["gui_fleet_partial"] in text
-    version_word = page.evaluate(
+    words = page.evaluate(
         "async () => { const { t } = await import('/static/js/v2/core/i18n.mjs'); "
-        "return t('gui_fleet_c_version'); }")
-    # 斷言「那個詞出現在說明句裡」，不是「出現在整張卡裡」——版本卡就在隔壁，
-    # 後者只要卡片列的任何地方提到版本就綠（注入實測：拿掉缺項名單仍全綠）。
-    prefix = page.evaluate(
-        "async () => { const { tf } = await import('/static/js/v2/core/i18n.mjs'); "
-        "return tf('gui_fleet_partial_missing', { names: '\u0000' }).split('\u0000')[0]; }")
-    assert prefix and prefix in text, "缺項說明整句不見了"
-    after = text.split(prefix, 1)[1]
-    assert version_word in after.split("\n")[0], (
-        "說了「部分資料」卻沒點名缺的分量：%r" % after.split("\n")[0])
+        "return [t('gui_fleet_partial'), t('gui_fleet_c_version'), t('gui_fleet_not_counted'), "
+        "t('gui_fleet_c_online')]; }")
+    partial, version_word, not_counted, online_word = words
+    health = page.locator('[data-role="fleet-health"]')
+    health.wait_for(state="visible")
+    assert partial in health.inner_text()
+    version_row = health.locator(".fl-part", has_text=version_word)
+    assert not_counted in version_row.inner_text(), "缺的分量沒有被點名"
+    online_row = health.locator(".fl-part", has_text=online_word)
+    assert not_counted not in online_row.inner_text()
 
 
 def test_an_unset_target_links_to_where_it_is_set(v2_page):
@@ -186,7 +169,8 @@ def test_an_unset_target_links_to_where_it_is_set(v2_page):
     card = page.locator('[data-cov="IV-16"]')
     card.wait_for(state="visible")
     assert labels["gui_fleet_target_unset"] in card.inner_text()
-    assert card.locator('a[href="#/system/pce"]').count(), "沒有指向設定它的地方"
+    strip = page.locator('[data-role="fleet-asof"]')
+    assert strip.locator('a[href="#/system/pce"]').count(), "沒有指向設定它的地方"
 
 
 def test_a_truncated_index_says_so_instead_of_looking_empty(v2_page):
@@ -201,83 +185,51 @@ def test_a_truncated_index_says_so_instead_of_looking_empty(v2_page):
     assert labels["gui_fleet_index_truncated"] in host.inner_text()
 
 
-# ── 推進抽屜 ─────────────────────────────────────────────────────────────────
+# ── 唯讀 ─────────────────────────────────────────────────────────────────────
 
-def _open_drawer(page, labels):
-    page.get_by_role("button", name=labels["gui_fleet_progress_btn"], exact=True).first.click()
-    page.wait_for_selector(".drawer", timeout=10000)
-
-
-def test_preview_lists_three_groups_and_leaves_offline_unticked(v2_page):
-    """離線那組預設不勾：它合法、PCE 也收得下，但何時生效不由這裡決定。"""
+def test_the_page_offers_no_way_to_change_enforcement(v2_page):
+    """VEN 盤點只看不改：頁面上沒有推進按鈕，也不送任何非 GET 的請求。"""
     page, base_url = v2_page
-    preview = {"ok": True, "to_mode": "selective", "cap": 200, "truncated": False,
-               "eligible": [{"href": "/orgs/1/workloads/a", "hostname": "a",
-                             "from": "idle", "to": "selective"}],
-               "deferred": [{"href": "/orgs/1/workloads/b", "hostname": "b",
-                             "from": "idle", "to": "selective"}],
-               "skipped": [{"href": "/orgs/1/workloads/c", "hostname": "c",
-                            "reason": "invalid_transition"}]}
-    _stub(page, preview=preview)
+    _stub(page)
+    writes = []
+    page.on("request", lambda req: writes.append(req.url)
+            if req.method != "GET" and "/api/fleet" in req.url else None)
     _goto(page, base_url)
-    labels = _labels(page)
-    _open_drawer(page, labels)
-    page.get_by_role("button", name=labels["gui_fleet_preview"], exact=True).click()
-    out = page.locator('[data-field="preview_out"]')
-    out.wait_for(state="visible")
-    page.wait_for_function(
-        "() => document.querySelectorAll('[data-field=\"preview_out\"] input[type=checkbox]').length === 2")
-    boxes = page.locator('[data-field="preview_out"] input[type="checkbox"]')
-    assert boxes.nth(0).is_checked() is True, "eligible 應該預設勾選"
-    assert boxes.nth(1).is_checked() is False, "離線的不該替操作者勾"
-    text = out.inner_text()
-    assert labels["gui_fleet_deferred_note"] in text
-    assert labels["gui_fleet_r_invalid_transition"] in text, "skipped 沒有說明理由"
+    page.wait_for_selector('[data-cov="IV-17"]', timeout=10000)
+    assert page.locator('[data-field="open_progress"]').count() == 0
+    assert page.locator('[data-cov="IV-20"]').count() == 0
+    assert writes == []
 
 
-def test_apply_sends_only_the_ticked_hosts(v2_page):
-    """送出的必須是畫面上勾的那些，不是預覽回來的全部。"""
+# ── 每個數字都通往清單 ───────────────────────────────────────────────────────
+
+def test_a_figure_narrows_the_list_to_what_it_counted(v2_page):
+    """摘要上的數字不是終點：點「Online」那格，清單就換成離線那幾台。"""
     page, base_url = v2_page
     calls = []
-    preview = {"ok": True, "to_mode": "selective", "cap": 200, "truncated": False,
-               "eligible": [{"href": "/orgs/1/workloads/a", "hostname": "a",
-                             "from": "idle", "to": "selective"}],
-               "deferred": [{"href": "/orgs/1/workloads/b", "hostname": "b",
-                             "from": "idle", "to": "selective"}],
-               "skipped": []}
-    _stub(page, preview=preview, calls=calls,
-          apply_={"ok": True, "applied": [{"href": "/orgs/1/workloads/a"}],
-                  "failed": [], "record_id": "rec1", "pending_heartbeat": True})
+    _stub(page, list_calls=calls)
     _goto(page, base_url)
-    labels = _labels(page)
-    _open_drawer(page, labels)
-    page.get_by_role("button", name=labels["gui_fleet_preview"], exact=True).click()
-    page.wait_for_function(
-        "() => document.querySelectorAll('[data-field=\"preview_out\"] input[type=checkbox]').length === 2")
-    page.locator('[data-field="apply"]').click()
-    page.wait_for_function("() => document.querySelector('.toast')")
-    sent = [c for c in calls if c[0] == "apply"]
-    assert len(sent) == 1, calls
-    assert sent[0][1]["hrefs"] == ["/orgs/1/workloads/a"], sent[0][1]
+    page.wait_for_selector('[data-field="fleet-table"] table', timeout=10000)
+    label = page.evaluate(
+        "async () => { const { t } = await import('/static/js/v2/core/i18n.mjs'); "
+        "return t('gui_fleet_kpi_online'); }")
+    page.locator("button.fl-kpi", has_text=label).click()
+    page.wait_for_timeout(300)
+    assert any("bucket=offline" in u for u in calls), calls
+    href = page.locator('[data-field="fleet-export"]').get_attribute("href")
+    assert "bucket=offline" in href and href.startswith("/api/fleet/export.csv")
 
 
-def test_the_success_toast_does_not_say_the_vens_have_it(v2_page):
-    """PCE 收下 ≠ VEN 套用了。這條在後端回應裡是 pending_heartbeat。"""
+def test_search_and_sort_go_to_the_server(v2_page):
+    """清單是分頁的，所以搜尋與排序都必須是伺服端的，不能只排目前這一頁。"""
     page, base_url = v2_page
-    preview = {"ok": True, "to_mode": "selective", "cap": 200, "truncated": False,
-               "eligible": [{"href": "/orgs/1/workloads/a", "hostname": "a",
-                             "from": "idle", "to": "selective"}],
-               "deferred": [], "skipped": []}
-    _stub(page, preview=preview,
-          apply_={"ok": True, "applied": [{"href": "/orgs/1/workloads/a"}],
-                  "failed": [], "record_id": "rec1", "pending_heartbeat": True})
+    calls = []
+    _stub(page, list_calls=calls)
     _goto(page, base_url)
-    labels = _labels(page)
-    _open_drawer(page, labels)
-    page.get_by_role("button", name=labels["gui_fleet_preview"], exact=True).click()
-    page.wait_for_function(
-        "() => document.querySelectorAll('[data-field=\"preview_out\"] input[type=checkbox]').length === 1")
-    page.locator('[data-field="apply"]').click()
-    toast = page.locator('.toast[data-tone="ok"]').first
-    toast.wait_for(state="visible")
-    assert labels["gui_fleet_pending_heartbeat"] in toast.inner_text()
+    page.wait_for_selector('[data-field="fleet-table"] table', timeout=10000)
+    page.fill('[data-field="fleet-search"]', "sel-1")
+    page.wait_for_timeout(600)
+    assert any("q=sel-1" in u for u in calls), calls
+    page.locator('[data-field="fleet-table"] th button.th-sort').nth(4).click()
+    page.wait_for_timeout(300)
+    assert any("sort=version" in u for u in calls), calls

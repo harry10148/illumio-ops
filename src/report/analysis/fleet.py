@@ -1,9 +1,9 @@
-"""VEN 車隊分析：版本分布、compat 四態、推進管線、coverage gaps、健康分數。
+"""VEN 盤點分析：版本分布、compat 四態、enforcement 管線、coverage gaps、健康分數。
 
 移植自 illumio-plugger 的 ven-fleet-manager，但四態化了 compat（plugger 把
 warning 併進 fail，於是「有疑慮」與「不能推」看起來一樣），並且分數在分量
 缺席時重正規化而不是補零——把缺的分量當 0，會讓一個沒設定 target 版本的
-健康車隊看起來像壞掉的。
+健康的環境看起來像壞掉的。
 
 純函式：不 import Flask、不碰 ApiClient、不讀檔。呼叫端（`run_ven_summary`）
 負責把既有那一次 `fetch_managed_workloads` 的結果餵進來。
@@ -16,19 +16,10 @@ from typing import Any
 
 __all__ = [
     "PIPELINE_BUCKETS",
-    "VALID_PROGRESSIONS",
     "analyze_fleet",
     "compat_state",
     "parse_ven_version",
 ]
-
-# 模式只能往前推。white-list 而非 black-list：新增一個 PCE 模式時，預設是
-# 「不可推進」而不是「可推進到任何地方」。
-VALID_PROGRESSIONS: dict[str, set[str]] = {
-    "idle": {"visibility_only", "selective", "full"},
-    "visibility_only": {"selective", "full"},
-    "selective": {"full"},
-}
 
 PIPELINE_BUCKETS = (
     "idle_compat_pass", "idle_compat_warn", "idle_compat_fail", "idle_compat_unknown",
@@ -184,7 +175,7 @@ def _score(*, total: int, online: int, non_idle: int, target: str | None,
 
 def analyze_fleet(workloads: list[dict], now: dt.datetime, target_version: str | None,
                   *, top_n: int = 50, index_cap: int = 20000) -> dict:
-    """車隊層級的一包分析結果。呼叫端只讀這個 dict——GUI、報表、批次推進都是。"""
+    """VEN 盤點的一包分析結果。呼叫端只讀這個 dict——GUI 與報表都是。"""
     target = (target_version or "").strip() or None
 
     pipeline: dict[str, dict] = {b: {"count": 0, "sample": []} for b in PIPELINE_BUCKETS}
@@ -297,7 +288,7 @@ def analyze_fleet(workloads: list[dict], now: dt.datetime, target_version: str |
             "target": target,
             "on_target": on_target_n,
             "needs_upgrade": (total - on_target_n) if target else None,
-            # oldest/newest 只在可解析的版本之間有意義：全是 "dev" 的車隊沒有
+            # oldest/newest 只在可解析的版本之間有意義：全是 "dev" 的環境沒有
             # 「最舊」可言，回 None 比回一個任意字串誠實。
             "oldest": (sortable[-1] if sortable else None),
             "newest": (sortable[0] if sortable else None),

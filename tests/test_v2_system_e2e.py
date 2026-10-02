@@ -1702,3 +1702,43 @@ def test_saving_does_not_claim_the_running_service_picked_it_up(v2_page):
         "儲存成功的 toast 只說了已儲存：%r——那句話同時被讀成「寫進設定了」"
         "與「生效了」，而後端根本沒有逐欄位的重啟偵測" % text
     )
+
+
+# ══════════════════════════ manual PCE check repaints every light ══════════
+
+def test_a_healthy_manual_check_turns_the_status_card_green(v2_page):
+    """手動檢查健康、系統卻顯示 error：status 快照在 mount 時抓一次就快取整個
+    session，按鈕只重畫自己那一列。按下去之後 OV-01 必須跟著改判。"""
+    page, base_url = v2_page
+
+    def _status_with_error(route):
+        resp = route.fetch()
+        body = resp.json()
+        body["pce_stats"] = dict(body.get("pce_stats") or {},
+                                 health_category="auth_failed", health_status="error",
+                                 consecutive_failures=3, last_error_stage="health")
+        route.fulfill(response=resp, body=json.dumps(body))
+
+    def _check_ok(route):
+        route.fulfill(status=200, content_type="application/json", body=json.dumps({
+            "ok": True, "pce_stats": {"health_category": "ok", "health_status": "ok",
+                                      "consecutive_failures": 0}}))
+
+    page.route("**/api/status", _status_with_error)
+    page.route("**/api/pce/health-check", _check_ok)
+    try:
+        _goto(page, base_url, R_PCE, "OV-01")
+        card = page.locator('section.panel[data-cov="OV-01"]')
+        assert card.get_attribute("data-tone") == "crit"
+
+        label = page.evaluate(
+            "async () => { const { t } = await import('/static/js/v2/core/i18n.mjs'); "
+            "return t('gui_pce_health_check_now'); }")
+        page.get_by_role("button", name=label, exact=True).click()
+
+        page.wait_for_function(
+            "() => document.querySelector('section.panel[data-cov=\"OV-01\"]')"
+            ".getAttribute('data-tone') === 'ok'")
+    finally:
+        page.unroute("**/api/status", _status_with_error)
+        page.unroute("**/api/pce/health-check", _check_ok)

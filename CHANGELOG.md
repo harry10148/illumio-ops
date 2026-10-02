@@ -7,6 +7,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/) —
 a plain `<major>.<minor>.<patch>` scheme. (Tags through v4.0.0 carried a
 `-topic-slug` codename suffix; the codename was retired in 4.1.0.)
 
+## [Unreleased]
+
+### Removed
+
+- **Enforcement progression is gone; this tool no longer changes a workload's
+  enforcement mode.** The VEN page (now **VEN inventory**, 「VEN 盤點」) only
+  shows where each VEN stands; move workloads forward in the PCE itself. The
+  `/api/fleet/progress/{preview,apply,records}` routes, the batch-size setting
+  on the PCE settings page and `config/fleet_progressions.json` records are no
+  longer used. A `settings.fleet_max_batch` value left in `config.json` by an
+  older version still loads and is ignored.
+
+### Changed
+
+- **The VEN inventory page was rebuilt.** It shows when its data was taken,
+  six figures that each narrow the workload list (managed, online, heartbeat
+  overdue, needs upgrade, unlabeled, VEN health), the enforcement
+  distribution by mode and stage, what the health score is made of, the
+  errors and warnings VENs report, label coverage per app/env, and the
+  version spread. The workload list can be searched, filtered by stage,
+  version, app or env, sorted on the server across pages, and exported to
+  CSV. The page is read-only.
+
+### Fixed
+
+- **PCE health no longer stays red after a healthy manual check.** The web
+  console cached `/api/status` for the whole browser session, so a probe that
+  had failed once kept every PCE light red until a full reload, and "Check
+  now" only repainted its own row. Live status snapshots now expire after 60
+  seconds, and a manual check repaints the status card and drops the cached
+  snapshot.
+- **One dropped connection no longer raises a PCE health alert.** A probe that
+  fails transiently (connection error, 5xx, 429) is tried once more before it
+  is recorded; 401/403 and an unhealthy status the PCE itself reports are not
+  retried.
+- **A standalone `--monitor` daemon picks up config changes** (API key, URL,
+  deployment type) made in the web console; it used to keep probing with the
+  values it started with.
+- **Pressing Enter on the login page signs in.**
+
 ## [5.2.0] — 2026-09-19
 
 > **Upgrading — check any traffic rule that says Allowed or Potentially

@@ -60,6 +60,15 @@ def run_monitor_cycle(cm) -> None:
     mlog = ModuleLog.get("monitor")
     try:
         mlog.info("Starting monitor cycle")
+        # Re-read config.json each cycle. A standalone --monitor daemon never
+        # reloads it otherwise: after the API key, URL or deployment type was
+        # changed in the GUI (another process) it kept probing with the old
+        # values and wrote "error" into the shared state.json, while the GUI's
+        # manual check — which loads fresh config — said healthy. The shared
+        # write lock keeps the reload from replacing cm.config in the middle
+        # of a GUI request's read-modify-write (same as the rule scheduler).
+        with cm.write_lock:
+            cm.load()
         with ApiClient(cm) as api:
             rep = Reporter(cm)
             sub_events, sub_flows = _make_subscribers(cm)
@@ -520,7 +529,7 @@ def run_ven_summary(cm) -> None:
             "os_distribution": estate_inventory.os_distribution(workloads or []),
             "enforcement_distribution": estate_inventory.enforcement_distribution(workloads or []),
         }
-        # 同一份 workloads 再產出車隊層級的分析——刻意不再抓一次：1 萬台的
+        # 同一份 workloads 再產出 VEN 盤點分析——刻意不再抓一次：1 萬台的
         # 環境那是幾分鐘與一次多餘的 PCE 負載。
         from src.report.analysis.fleet import analyze_fleet
         _st = cm.config.get("settings", {}) or {}
@@ -543,7 +552,7 @@ def run_ven_summary(cm) -> None:
             vs["last_error"] = str(exc)[:300]
             vs["updated_at"] = stamp
             # fleet 走同一條規則：保留上一份好資料，只補錯誤與時間。寫 0
-            # 會讓看板顯示一個從未存在過的車隊。
+            # 會讓看板顯示一個從未存在過的盤點結果。
             fl = dict((d.get("fleet") or {}))
             fl["last_error"] = str(exc)[:300]
             fl["updated_at"] = stamp

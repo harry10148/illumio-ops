@@ -147,17 +147,150 @@ def test_limit_is_capped(client, monkeypatch, tmp_path):
     assert len(r.get_json()["rows"]) == 3
 
 
+# ── 搜尋、排序、版本與 label 篩選、匯出 ───────────────────────────────────────
+
+def _with_target(fleet, target):
+    fleet["versions"]["target"] = target
+    return fleet
+
+
+def test_no_bucket_means_every_workload(client, monkeypatch, tmp_path):
+    _seed(monkeypatch, tmp_path, {"fleet": _fleet(n_sel=3, n_idle=1)})
+    _login(client)
+    d = client.get("/api/fleet/list").get_json()
+    assert d["total"] == 4 and d["bucket"] == "all"
+
+
+def test_search_matches_hostname_app_env_and_version(client, monkeypatch, tmp_path):
+    _seed(monkeypatch, tmp_path, {"fleet": _fleet(n_sel=3, n_idle=1)})
+    _login(client)
+    assert client.get("/api/fleet/list?q=SEL-1").get_json()["total"] == 1   # case-insensitive
+    assert client.get("/api/fleet/list?q=web").get_json()["total"] == 3     # app
+    assert client.get("/api/fleet/list?q=23.4").get_json()["total"] == 1    # version
+    assert client.get("/api/fleet/list?q=nothing-like-it").get_json()["total"] == 0
+
+
+def test_version_app_and_env_filters_stack_with_the_bucket(client, monkeypatch, tmp_path):
+    _seed(monkeypatch, tmp_path, {"fleet": _fleet(n_sel=3, n_idle=1)})
+    _login(client)
+    d = client.get("/api/fleet/list?version=23.4.11-8").get_json()
+    assert [r["hostname"] for r in d["rows"]] == ["idle-0"]
+    assert client.get("/api/fleet/list?app=web&env=prod").get_json()["total"] == 3
+    assert client.get("/api/fleet/list?bucket=offline&app=web").get_json()["total"] == 0
+
+
+def test_needs_upgrade_lists_exactly_what_the_summary_counts(client, monkeypatch, tmp_path):
+    """摘要說「待升級 1」，點進去就必須是那 1 台——判定與 analyze_fleet 相同。"""
+    _seed(monkeypatch, tmp_path, {"fleet": _with_target(_fleet(n_sel=3, n_idle=1), "26.2.20-2063")})
+    _login(client)
+    d = client.get("/api/fleet/list?bucket=needs_upgrade").get_json()
+    assert [r["hostname"] for r in d["rows"]] == ["idle-0"]
+    assert client.get("/api/fleet/list?bucket=on_target").get_json()["total"] == 3
+
+
+def test_needs_upgrade_without_a_target_is_a_400(client, monkeypatch, tmp_path):
+    """沒有目標版本時「待升級」沒有定義；空清單會被讀成「全都在目標上」。"""
+    _seed(monkeypatch, tmp_path, {"fleet": _fleet()})
+    _login(client)
+    assert client.get("/api/fleet/list?bucket=needs_upgrade").status_code == 400
+
+
+def test_sort_by_version_is_numeric_and_missing_values_go_last(client, monkeypatch, tmp_path):
+    fleet = _fleet(n_sel=1, n_idle=1)
+    fleet["workloads_index"].append({"href": "/w/x", "hostname": "nover", "mode": "full",
+                                     "online": True, "version": "", "compat": "unknown",
+                                     "hslh": None, "app": "", "env": "", "os": ""})
+    fleet["workloads_index"].append({"href": "/w/y", "hostname": "nine", "mode": "full",
+                                     "online": True, "version": "9.1.0-1", "compat": "unknown",
+                                     "hslh": 1.0, "app": "", "env": "", "os": ""})
+    _seed(monkeypatch, tmp_path, {"fleet": fleet})
+    _login(client)
+    asc = [r["hostname"] for r in client.get("/api/fleet/list?sort=version&dir=asc").get_json()["rows"]]
+    desc = [r["hostname"] for r in client.get("/api/fleet/list?sort=version&dir=desc").get_json()["rows"]]
+    # 字串排序會把 "9.1" 排在 "26.2" 之後
+    assert asc == ["nine", "idle-0", "sel-0", "nover"]
+    assert desc == ["sel-0", "idle-0", "nine", "nover"]
+    hb = [r["hostname"] for r in client.get("/api/fleet/list?sort=hslh&dir=desc").get_json()["rows"]]
+    assert hb[0] == "idle-0" and hb[-1] == "nover"
+
+
+def test_sort_by_mode_follows_the_road_to_enforcement(client, monkeypatch, tmp_path):
+    _seed(monkeypatch, tmp_path, {"fleet": _fleet(n_sel=2, n_idle=1)})
+    _login(client)
+    rows = client.get("/api/fleet/list?sort=mode").get_json()["rows"]
+    assert [r["mode"] for r in rows] == ["idle", "selective", "selective"]
+
+
+def test_an_unknown_sort_key_is_a_400(client, monkeypatch, tmp_path):
+    _seed(monkeypatch, tmp_path, {"fleet": _fleet()})
+    _login(client)
+    assert client.get("/api/fleet/list?sort=href").status_code == 400
+    assert client.get("/api/fleet/list?dir=sideways").status_code == 400
+
+
+def test_export_is_the_filtered_list_unpaged_and_formula_safe(client, monkeypatch, tmp_path):
+    fleet = _fleet(n_sel=3, n_idle=1)
+    fleet["workloads_index"][0]["hostname"] = "=HYPERLINK(\"x\")"
+    _seed(monkeypatch, tmp_path, {"fleet": fleet})
+    _login(client)
+    r = client.get("/api/fleet/export.csv?app=web&limit=1")
+    assert r.status_code == 200
+    assert r.mimetype == "text/csv"
+    assert "attachment" in r.headers["Content-Disposition"]
+    text = r.get_data(as_text=True).lstrip("\ufeff")
+    lines = text.strip().splitlines()
+    assert len(lines) == 1 + 3                      # header + every match, no paging
+    assert lines[1].startswith("\"'=HYPERLINK")       # spreadsheet formula defused
+    assert "idle-0" not in text
+
+
+def test_export_requires_login(client, monkeypatch, tmp_path):
+    _seed(monkeypatch, tmp_path, {"fleet": _fleet()})
+    r = client.get("/api/fleet/export.csv")
+    assert r.status_code in (302, 401, 403)
+
+
 # ── 設定鍵 ───────────────────────────────────────────────────────────────────
 
-def test_the_three_fleet_settings_are_savable(client):
+def test_the_fleet_settings_are_savable(client):
     """白名單外的鍵會被 PUT /api/settings 靜默丟掉——那是最難查的那種壞法。
 
     GUI 存了、toast 說成功、下次讀回來是舊值，沒有任何地方報錯。
     """
     from src.gui._helpers import _SETTINGS_ALLOWLISTS
     allowed = _SETTINGS_ALLOWLISTS["settings"]
-    for key in ("fleet_target_ven_version", "fleet_max_batch", "fleet_index_cap"):
+    for key in ("fleet_target_ven_version", "fleet_index_cap"):
         assert key in allowed, "%s 不在白名單，存了會被無聲丟掉" % key
+
+
+# ── 唯讀 ─────────────────────────────────────────────────────────────────────
+
+def test_the_inventory_has_no_route_that_writes(client):
+    """VEN 盤點只看不改：enforcement 推進已移除，不准再長回來。
+
+    任何 /api/fleet 底下的非 GET 路由、或 ApiClient 上改 enforcement mode 的
+    方法，都代表這個工具又能改 PCE 的 enforcement 了。
+    """
+    from flask import current_app
+    from src.api_client import ApiClient
+    with client.application.app_context():
+        writes = [(r.rule, sorted(r.methods - {"GET", "HEAD", "OPTIONS"}))
+                  for r in current_app.url_map.iter_rules()
+                  if r.rule.startswith("/api/fleet") and r.methods - {"GET", "HEAD", "OPTIONS"}]
+    assert writes == []
+    assert not hasattr(ApiClient, "bulk_update_workloads")
+
+
+def test_a_config_saved_by_an_older_gui_still_loads(tmp_path):
+    """舊版 GUI 每次儲存都寫 fleet_max_batch；拿掉 schema 欄位會讓整份 config
+    驗證失敗、全部退回預設值（SIEM 轉送因此停擺）。"""
+    import json as _json
+    from src.config import ConfigManager
+    cfg = tmp_path / "config.json"
+    cfg.write_text(_json.dumps({"settings": {"fleet_max_batch": 200}}), encoding="utf-8")
+    cm = ConfigManager(str(cfg))
+    assert not getattr(cm, "_load_error_locs", None)
+    assert cm.models.settings.fleet_max_batch == 200
 
 
 def test_every_pipeline_bucket_can_actually_be_listed():

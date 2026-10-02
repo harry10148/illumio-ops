@@ -295,3 +295,59 @@ def test_on_prem_system_rule_simulator_checks_node_availability(
     assert "WOULD TRIGGER" in capsys.readouterr().out
     assert api.method_calls[-3:] == [
         call.check_connectivity(), call.check_health(), call.check_node_available()]
+
+
+# ── 一次閃斷不翻紅 ───────────────────────────────────────────────────────────
+
+def test_a_single_transient_failure_is_reprobed_and_recorded_healthy(tmp_path, monkeypatch):
+    """斷線一次就翻成 error 並發告警，操作者手動檢查卻是健康——兩邊對不起來。
+    暫時性失敗（斷線、5xx、429）要再探一次，第二次成功就記為健康、不發告警。"""
+    api = MagicMock()
+    api.check_connectivity.side_effect = [(0, "connection reset"), (200, "")]
+    ana, rep = _mk_health_analyzer(tmp_path, monkeypatch, api, deployment_type="saas")
+
+    ana._run_health_check()
+
+    assert api.check_connectivity.call_count == 2
+    rep.add_health_alert.assert_not_called()
+    stats = ana.state["pce_stats"]
+    assert stats["health_category"] == "ok"
+    assert stats["consecutive_failures"] == 0
+
+
+def test_a_failure_that_repeats_is_still_recorded(tmp_path, monkeypatch):
+    api = MagicMock()
+    api.check_connectivity.side_effect = [(503, ""), (503, "")]
+    ana, rep = _mk_health_analyzer(tmp_path, monkeypatch, api, deployment_type="saas")
+
+    ana._run_health_check()
+
+    assert api.check_connectivity.call_count == 2
+    rep.add_health_alert.assert_called_once()
+    assert ana.state["pce_stats"]["health_category"] == "server_error"
+
+
+def test_an_auth_failure_is_not_retried(tmp_path, monkeypatch):
+    """401 不會自己好，再探一次只是多送一個會失敗的請求。"""
+    api = MagicMock()
+    api.check_connectivity.return_value = (401, "unauthorized")
+    ana, rep = _mk_health_analyzer(tmp_path, monkeypatch, api, deployment_type="saas")
+
+    ana._run_health_check()
+
+    api.check_connectivity.assert_called_once()
+    assert ana.state["pce_stats"]["health_category"] == "auth_failed"
+
+
+def test_an_on_prem_node_available_blip_is_reprobed(tmp_path, monkeypatch):
+    api = MagicMock()
+    api.check_connectivity.return_value = (200, "")
+    api.check_health.return_value = (200, '[{"status": "normal"}]')
+    api.check_node_available.side_effect = [(502, ""), (200, "")]
+    ana, rep = _mk_health_analyzer(tmp_path, monkeypatch, api)
+
+    ana._run_health_check()
+
+    assert api.check_node_available.call_count == 2
+    rep.add_health_alert.assert_not_called()
+    assert ana.state["pce_stats"]["health_category"] == "ok"

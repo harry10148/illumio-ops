@@ -368,31 +368,28 @@ load-more 增量載入（IV-14）。另含 **Shadow 比對**（IV-15，新舊事
 以上皆為**唯讀**，會即時呼叫 PCE API 取事件，不寫入本地狀態。事件規則語意
 與 vendor catalog 詳見 [monitoring-alerts.md](monitoring-alerts.md)。
 
-#### VEN 車隊（`#/investigate/fleet`）
+#### VEN 盤點（`#/investigate/fleet`）
 
-受管 VEN 的車隊層級視角：健康度分數（IV-16）、逐 bucket 的工作負載清單
-（IV-17）、版本分布（IV-18）、Label 覆蓋（IV-19），以及 enforcement 推進抽屜
-（IV-20）。
+所有受管 VEN 的盤點，由上而下：
 
-**資料來源是 `ven_summary` 排程寫的快照，這一頁不呼叫 PCE。** 排程還沒跑過時
-畫面**一個數字都不會出現**，只說「尚未分析過」——「還沒算」與「外面沒東西」
+- **資料時間列**：快照是何時產生的、下次何時更新、目標 VEN 版本（未設定時直接連到設定頁）。
+- **摘要（IV-16）**：六個數字（受管總數、Online、心跳逾時、待升級、缺 Label、VEN 健康度），
+  每一個都能點，點下去下方清單就只列出那一群；Enforcement 分布（各模式與各階段的台數與比例）；
+  健康度的五個分量各自多少、哪些沒列入；VEN agent 回報的錯誤與警告。
+- **Label 覆蓋（IV-19）**：每個 app／env 在各 enforcement 模式的台數與 Selective + Full 比例；
+  點名稱即篩選清單。另列出沒有 app 或 env Label 的台數。
+- **版本分布（IV-18）**：每個版本的台數、比例與 OS 組成，標出目標版本；點版本即篩選清單。
+- **工作負載清單（IV-17）**：搜尋（主機名稱、app、env、版本、OS）、依階段／版本／app／env 篩選、
+  點欄名排序（伺服端排序，跨頁一致）、分頁，以及把目前篩選結果整份匯出成 CSV。
+  相容性只對 idle 的主機顯示；離線或心跳超過 48 小時的列左側會標紅。
+
+**資料來源是 `ven_summary` 排程寫的快照，這一頁不呼叫 PCE，也不寫入 PCE。** 排程
+還沒跑過時畫面**一個數字都不會出現**，只說「尚未產生」——「還沒算」與「外面沒東西」
 當成 0 會長得一模一樣，對值班的人意思卻相反。
 
-**推進抽屜是本頁唯一會寫 PCE 的地方**，兩段式：
+本工具不改 enforcement mode：這一頁只呈現現況，推進請在 PCE 進行。
 
-1. **預覽**列出三組——會被變更的、離線的（一樣會變更，VEN 下次回報時才套用，
-   **預設不勾選**，由你決定）、被略過的（每一筆都帶理由）。
-2. **套用**只送你勾的那些。任一筆不合格就整批拒絕、完全不呼叫 PCE——部分套用
-   會讓人不知道哪幾台動了。
-
-只動 `enforcement_mode` 一個欄位，而且只准往前（`idle` → 任意、
-`visibility_only` → `selective`/`full`、`selective` → `full`）。每次套用落一筆
-紀錄到 `config/fleet_progressions.json`，含每台的 `previous_mode`，可據以還原。
-
-成功訊息說的是「**已送出**」不是「已套用」：PCE 收到了，各 VEN 在下次回報時
-才生效，在那之前 PCE 上顯示為同步中。
-
-目標 VEN 版本與單批上限在系統區 → PCE 設定頁。
+目標 VEN 版本在系統區 → PCE 設定頁。
 
 ### 規則（`#/policy/*`）
 
@@ -524,7 +521,6 @@ Rule Scheduler 的狀態列與 KPI（AU-01）、過去 24 小時的切換時間�
 | Load Best Practices | `/api/actions/best-practices` | 覆寫／附加告警規則 |
 | Rule Scheduler 建立／刪除 | `/api/rule_scheduler/schedules*` | 改寫 PCE rule 註記並切換 rule 啟用 |
 | Report 產生／刪除 | `/api/reports/*`、`/api/*_report/generate` | 查 PCE、寫檔／刪檔；勾 Email 會寄信 |
-| **VEN 車隊推進 apply** | `/api/fleet/progress/apply` | **在 PCE 上改 Workload 的 `enforcement_mode`**，最多一次 `fleet_max_batch` 台。只准往前推、整批全有或全無；各 VEN 下次 heartbeat 才實際套用 |
 | Cache backfill／retention | `/api/cache/backfill`、`/retention/run` | 查 PCE 寫入／永久刪除快取列 |
 | SIEM test／DLQ replay／purge | `/api/siem/*` | 送測試事件／重送／永久刪除 |
 | TLS Renew／Import／Generate CSR | `/api/tls/renew`、`/api/tls/import-cert`、`/api/tls/generate-csr` | 產生或覆寫憑證／金鑰檔，需重啟服務才套用 |

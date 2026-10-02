@@ -112,15 +112,17 @@ export const GET_MAP = {
   },
   alert_detail(params) { return "/api/alerts/" + encodeURIComponent(params.id); },
   alert_traffic_query(params) { return "/api/alerts/" + encodeURIComponent(params.id) + "/traffic_query"; },
-  // VEN fleet (plugger port 1/4): the snapshot the ven_summary job writes,
-  // one bucket of its index at a time, and the progression history.
+  // VEN inventory: the snapshot the ven_summary job writes, and one bucket of
+  // its index at a time.
   fleet: "/api/fleet",
   fleet_list(params) {
     const p = params || {};
-    return "/api/fleet/list?" + qs({ bucket: p.bucket || "selective",
-      offset: p.offset || 0, limit: p.limit || 100 }, ["bucket", "offset", "limit"]);
+    return "/api/fleet/list?" + qs({ bucket: p.bucket || "all", q: p.q || "",
+      version: p.version || "", app: p.app || "", env: p.env || "",
+      sort: p.sort || "hostname", dir: p.dir || "asc",
+      offset: p.offset || 0, limit: p.limit || 100 },
+    ["bucket", "q", "version", "app", "env", "sort", "dir", "offset", "limit"]);
   },
-  fleet_records: "/api/fleet/progress/records",
   report_schedules: "/api/report-schedules",
   rhc_enablement: "/api/rule_hit_count/enablement",
   rules: "/api/rules",

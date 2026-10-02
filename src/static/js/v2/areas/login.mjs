@@ -112,8 +112,14 @@ function setError(box, message) {
   else box.input.classList.remove("bad");
 }
 
-function btn(cls, text, onClick) {
-  return el("button", { class: cls, type: "button", text: text, onClick: onClick });
+// A form's own button must be type="submit". With two fields (username and
+// password) and no submit button, HTML's implicit submission does nothing on
+// Enter — the operator had to reach for the mouse. The form's submit handler
+// does the work, so the button carries no click handler of its own (that
+// would run it twice). While the button is disabled (a request in flight),
+// Enter is a no-op too, which is the double-submit guard.
+function submitBtn(cls, text) {
+  return el("button", { class: cls, type: "submit", text: text });
 }
 
 function segmented(labelText, options, get, set) {
@@ -155,8 +161,10 @@ function build(root) {
   const passBox = field("password", t("gui_login_password", "Password"), "password", "current-password");
   passBox.input.placeholder = t("gui_login_password_placeholder", "Enter password");
   passBox.input.required = true;
-  const signIn = btn("btn primary wide", t("gui_login_btn", "Sign in"), submit);
-  const loginForm = el("form", { class: "loginform" }, userBox, passBox, signIn);
+  const signIn = submitBtn("btn primary wide", t("gui_login_btn", "Sign in"));
+  // novalidate: the empty-field messages are this page's own, shown under the
+  // field; the browser's native bubble would pre-empt them on submit.
+  const loginForm = el("form", { class: "loginform", novalidate: true }, userBox, passBox, signIn);
   loginForm.addEventListener("submit", function (e) { e.preventDefault(); submit(); });
 
   const cardHeading = el("h1", { text: t("gui_login_header", "PCE Ops") });
@@ -168,8 +176,8 @@ function build(root) {
   const cfmBox = field("confirm_password", t("gui_login_confirm_password", "Confirm new password"), "password", "new-password");
   newBox.input.minLength = 12;
   cfmBox.input.minLength = 12;
-  const changeBtn = btn("btn primary wide", t("gui_login_change_pw_btn", "Change password and continue"), changePassword);
-  const pwForm = el("form", { class: "loginform" }, newBox, cfmBox, changeBtn);
+  const changeBtn = submitBtn("btn primary wide", t("gui_login_change_pw_btn", "Change password and continue"));
+  const pwForm = el("form", { class: "loginform", novalidate: true }, newBox, cfmBox, changeBtn);
   pwForm.addEventListener("submit", function (e) { e.preventDefault(); changePassword(); });
 
   const pwHeading = el("h1", { text: t("gui_login_header", "PCE Ops") });

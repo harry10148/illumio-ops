@@ -15,6 +15,19 @@ from contextlib import contextmanager
 import pytest
 
 
+
+class _StubCM:
+    """Just enough ConfigManager for run_monitor_cycle: it re-reads config
+    under the shared write lock before each cycle."""
+
+    def __init__(self):
+        import threading
+        self.write_lock = threading.RLock()
+        self.loads = 0
+
+    def load(self):
+        self.loads += 1
+
 def test_run_monitor_cycle_builds_analyzer_inside_both_locks(monkeypatch):
     import src.analyzer
     import src.api_client
@@ -70,8 +83,12 @@ def test_run_monitor_cycle_builds_analyzer_inside_both_locks(monkeypatch):
     monkeypatch.setattr(src.main, "_make_subscribers", lambda cm: (None, None))
     monkeypatch.setattr(src.main, "_make_cache_reader", lambda cm: None)
 
-    run_monitor_cycle(object())
+    cm = _StubCM()
+    run_monitor_cycle(cm)
 
+    # A standalone --monitor daemon must pick up config edits made in the GUI
+    # (another process); without the reload it probes with stale credentials.
+    assert cm.loads == 1, "monitor cycle did not re-read config.json"
     assert seen["lock_path"] == src.main.analysis_lock_path(), \
         "取的不是 CLI/GUI 那把跨行程鎖 → 三方仍未互斥"
     assert seen["timeout"] and seen["timeout"] > 0
@@ -120,4 +137,4 @@ def test_run_monitor_cycle_surfaces_lock_timeout(monkeypatch):
     monkeypatch.setattr(src.reporter, "Reporter", _FakeReporter)
 
     with pytest.raises(TimeoutError):
-        run_monitor_cycle(object())
+        run_monitor_cycle(_StubCM())

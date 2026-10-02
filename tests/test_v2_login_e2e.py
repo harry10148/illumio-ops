@@ -198,6 +198,35 @@ def test_correct_password_lands_on_the_gui_shell(v2_login_page):
     assert page.locator("#login-root").count() == 0
 
 
+def test_enter_in_the_password_field_signs_in(v2_login_page):
+    """Enter 要能送出：表單有兩個欄位又沒有 submit 按鈕時，瀏覽器的隱式送出
+    什麼都不做，操作者只能伸手去點滑鼠。"""
+    page, base_url = v2_login_page
+    _goto_login(page, base_url)
+
+    page.fill('[data-cov="LG-01"] input[data-field="username"]', V2_USERNAME)
+    page.fill('[data-cov="LG-01"] input[data-field="password"]', V2_PASSWORD)
+    page.press('[data-cov="LG-01"] input[data-field="password"]', "Enter")
+
+    page.wait_for_url(base_url + "/")
+    page.wait_for_selector('body[data-booted="true"]')
+    assert page.locator("#area-root").count() == 1
+
+
+def test_enter_with_an_empty_password_shows_the_page_own_message(v2_login_page):
+    """novalidate：空欄位的提示是這一頁自己的，不是瀏覽器的原生泡泡。"""
+    page, base_url = v2_login_page
+    _goto_login(page, base_url)
+
+    page.fill('[data-cov="LG-01"] input[data-field="username"]', V2_USERNAME)
+    page.press('[data-cov="LG-01"] input[data-field="username"]', "Enter")
+
+    err = page.locator('[data-cov="LG-01"] input[data-field="password"] + .fld-err')
+    err.wait_for(state="visible")
+    assert err.inner_text().strip()
+    assert page.url == base_url + "/login"
+
+
 # ── LG-02: first-login password change, real backend state ─────────────────
 
 def test_first_login_change_password_flow_hits_real_backend(v2_first_login_page):

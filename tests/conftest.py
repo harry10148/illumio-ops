@@ -284,24 +284,11 @@ def cli_runner():
 
 
 @pytest.fixture(autouse=True)
-def _isolate_fleet_progress_store(monkeypatch, tmp_path):
-    """Never let a test write the real ``config/fleet_progressions.json``.
-
-    POST /api/fleet/progress/apply persists one record per run through
-    FleetProgressStore, whose default path is resolved at call time via
-    src.gui.routes.fleet._store_path(). Any test that reaches a successful
-    apply — including an injection experiment that disables the all-or-nothing
-    guard — would otherwise leave enforcement-progression records in the
-    developer's product config (3 records found on 2026-09-14, which is how
-    this fixture came to exist).
-
-    Same shape as _isolate_alert_store below, and for the same reason.
-    tests/test_fleet_store_isolation.py proves this fixture is in force.
-    """
-    import src.gui.routes.fleet as _fleet
-    path = str(tmp_path / "fleet_progressions.json")
-    monkeypatch.setattr(_fleet, "_store_path", lambda: path)
-    yield path
+def _no_health_reprobe_pause(monkeypatch):
+    """The analyzer waits before re-probing a transiently failed PCE health
+    check; tests that drive that path should not sleep for it."""
+    import src.analyzer as _analyzer
+    monkeypatch.setattr(_analyzer, "HEALTH_REPROBE_DELAY_SECONDS", 0.0)
 
 
 @pytest.fixture(autouse=True)

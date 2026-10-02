@@ -54,6 +54,14 @@ const cache = new Map(); // cacheKey -> Promise<any>
 // 快取命中的畫面可能是八小時前抓的。
 const fetchedAtMs = new Map();
 
+// Snapshots of LIVE state get a shelf life; everything else is cached for the
+// session as before. /api/status carries pce_stats — the PCE health every page
+// colours its lights from — and a session-long cache meant a probe that failed
+// once stayed red on screen until a full reload, even after the operator's own
+// "check now" came back healthy. 60s matches the monitor's own probe cadence
+// (HEALTH_CHECK_INTERVAL_SECONDS): anything older may already be superseded.
+const MAX_AGE_MS = { status: 60000, dashboard_overview: 60000 };
+
 function csrfMeta() {
   return document.querySelector('meta[name="csrf-token"]');
 }
@@ -211,6 +219,14 @@ export const api = {
    */
   load(id, params) {
     const key = cacheKey(id, params);
+    const maxAge = MAX_AGE_MS[id];
+    const at = fetchedAtMs.get(key);
+    // Only a settled entry can be stale: an in-flight fetch has no time yet
+    // and is the freshest answer there is.
+    if (maxAge && at !== undefined && Date.now() - at > maxAge) {
+      cache.delete(key);
+      fetchedAtMs.delete(key);
+    }
     if (!cache.has(key)) {
       const path = resolveEntry(id, params);
       const p = fetchJson(path)
@@ -293,6 +309,7 @@ export const api = {
   /** Drop a cached load() entry without refetching. */
   invalidate(id, params) {
     cache.delete(cacheKey(id, params));
+    fetchedAtMs.delete(cacheKey(id, params));
   },
 
   /** get(path) -> Promise<any>. Generic uncached GET using shared plumbing. */
