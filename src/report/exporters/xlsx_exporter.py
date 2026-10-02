@@ -90,9 +90,18 @@ def append_df_rows(ws, df: pd.DataFrame, *, header: bool = True) -> None:
     """DataFrame 逐列寫入現有 sheet：header 列 + 資料列；每格經 _neutralize；
     列文字含 _ALERT_TOKENS 者套 _ALERT_FILL；NaN 寫空字串。"""
     columns = [str(c) for c in df.columns]
+    ncols = len(columns)
+    # The row just appended is ws._current_row. ws[ws.max_row] looked it up
+    # through max_row/max_column, each of which scans every cell already in
+    # the sheet, so writing N rows cost O(N²): a 10k-flow report spent eight
+    # minutes here and a 50k-row raw sheet most of an hour.
+
+    def _row_cells(r: int):
+        return [ws.cell(row=r, column=j) for j in range(1, ncols + 1)]
+
     if header:
         ws.append([_neutralize(c) for c in columns])
-        for cell in ws[ws.max_row]:
+        for cell in _row_cells(ws._current_row):
             cell.font = _HEADER_FONT
             cell.fill = _HEADER_FILL
             cell.alignment = Alignment(horizontal="center")
@@ -103,11 +112,12 @@ def append_df_rows(ws, df: pd.DataFrame, *, header: bool = True) -> None:
         is_alert = bool(_ALERT_RE.search(row_text))
         coerced = [_coerce_number(v) for v in row_vals]
         ws.append([_neutralize(v) for v, _fmt in coerced])
-        for cell, (_v, fmt) in zip(ws[ws.max_row], coerced):
+        r = ws._current_row
+        for j, (_v, fmt) in enumerate(coerced, 1):
             if fmt:
-                cell.number_format = fmt
+                ws.cell(row=r, column=j).number_format = fmt
         if is_alert:
-            for cell in ws[ws.max_row]:
+            for cell in _row_cells(r):
                 cell.fill = _ALERT_FILL
 
 

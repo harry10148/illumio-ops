@@ -171,3 +171,32 @@ def test_run_ven_summary_error_writes_last_error_to_dashboard_store(tmp_path, mo
     assert vs["total"] == 7          # last-good counts preserved
     assert "last_error" in vs
     assert "PCE unreachable" in vs["last_error"]
+
+
+def test_read_parses_once_until_the_file_is_rewritten(tmp_path, monkeypatch):
+    """The fleet index makes this file several MB; every VEN inventory request
+    re-parsed it. Unchanged file → one parse; a rewrite → the new content."""
+    _patch_file(tmp_path, monkeypatch)
+    write_dashboard_summary({"fleet": {"total": 1}})
+    calls = []
+    real = dashboard_store._read_file
+    monkeypatch.setattr(dashboard_store, "_read_file", lambda p: calls.append(p) or real(p))
+    assert read_dashboard_summary()["fleet"]["total"] == 1
+    assert read_dashboard_summary()["fleet"]["total"] == 1
+    assert len(calls) == 1
+    write_dashboard_summary({"fleet": {"total": 2}})
+    assert read_dashboard_summary()["fleet"]["total"] == 2
+
+
+def test_write_never_mutates_the_shared_read(tmp_path, monkeypatch):
+    _patch_file(tmp_path, monkeypatch)
+    write_dashboard_summary({"fleet": {"total": 1}})
+    shared = read_dashboard_summary()
+
+    def _mutating(d):
+        d["fleet"]["total"] = 99
+        return d
+
+    write_dashboard_summary(_mutating)
+    assert shared["fleet"]["total"] == 1
+    assert read_dashboard_summary()["fleet"]["total"] == 99

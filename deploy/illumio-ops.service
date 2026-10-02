@@ -22,6 +22,11 @@ KillSignal=SIGTERM
 StandardOutput=journal
 StandardError=journal
 SyslogIdentifier=illumio-ops
+# Files this service creates (config.json backups, the cache, state, reports,
+# logs) hold PCE data and credentials; without this they were 0644 and any
+# local account could read them. Group keeps read access for log shippers
+# added to the illumio-ops group.
+UMask=0027
 
 # --- Hardening ---
 NoNewPrivileges=true

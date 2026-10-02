@@ -91,16 +91,17 @@ def test_siem_destination_partial_put_preserves_omitted_fields(client):
         environ_overrides={"REMOTE_ADDR": "127.0.0.1"},
     )
     assert resp.get_json()["ok"] is True
-    # partial PUT：只改 host
+    # partial PUT：只改 batch_size（改 host/port 必須重填 token，見下一個測試）
     resp = client.put(
         "/api/siem/destinations/sp2",
-        json={"transport": "hec", "host": "splunk2.corp", "port": 8088},
+        json={"transport": "hec", "batch_size": 50},
         environ_overrides={"REMOTE_ADDR": "127.0.0.1"},
     )
     assert resp.get_json()["ok"] is True
     cm = client.application.config["CM"]
     d = next(x for x in cm.models.siem.destinations if x.name == "sp2")
-    assert d.host == "splunk2.corp"
+    assert d.host == "splunk.corp"
+    assert d.batch_size == 50
     assert d.hec_token == "secret-token-2"   # not wiped
     assert d.mask_pii is True                # not reset
     # placeholder round-trip：GET 回的星號值存回去不得覆寫真 token
@@ -154,3 +155,29 @@ def test_siem_dispatch_status_500_does_not_leak_exception_detail(client, monkeyp
     assert body["ok"] is False
     assert "request_id" in body
     assert "secret-db-path-leak" not in body["error"]
+
+
+def test_siem_destination_new_host_requires_token_again(client):
+    """The stored HEC token goes wherever host/port point; moving the
+    destination without re-entering it would hand the token to the new
+    address on the next test send."""
+    resp = client.post(
+        "/api/siem/destinations",
+        json={"name": "sp3", "transport": "hec", "host": "splunk.corp", "port": 8088,
+              "hec_token": "secret-token-3"},
+        environ_overrides={"REMOTE_ADDR": "127.0.0.1"},
+    )
+    assert resp.get_json()["ok"] is True
+    for change in ({"host": "attacker.example"}, {"port": 9999},
+                   {"host": "attacker.example", "hec_token": "*" * 8}):
+        resp = client.put("/api/siem/destinations/sp3", json=change,
+                          environ_overrides={"REMOTE_ADDR": "127.0.0.1"})
+        assert resp.status_code == 400, change
+    cm = client.application.config["CM"]
+    cm.load()
+    d = next(x for x in cm.models.siem.destinations if x.name == "sp3")
+    assert d.host == "splunk.corp" and d.port == 8088
+    resp = client.put("/api/siem/destinations/sp3",
+                      json={"host": "splunk2.corp", "hec_token": "secret-token-new"},
+                      environ_overrides={"REMOTE_ADDR": "127.0.0.1"})
+    assert resp.get_json()["ok"] is True

@@ -170,10 +170,20 @@ def _extract_actor(event: dict[str, Any]) -> tuple[str, str, str, str]:
 
 def _extract_source_ip(event: dict[str, Any]) -> str:
     action = event.get("action") or {}
+    if not isinstance(action, dict):
+        action = {}
+    # request.authentication_failed and similar system-created events carry
+    # the caller's address only inside notifications[].info.
+    notified = [
+        (n.get("info") or {}).get("src_ip")
+        for n in (event.get("notifications") or [])
+        if isinstance(n, dict) and isinstance(n.get("info"), dict)
+    ]
     return _pick_first(
         event.get("src_ip"),
         action.get("src_ip"),
         action.get("source_ip"),
+        *notified,
     )
 
 def _extract_action(event: dict[str, Any]) -> tuple[str, str, str]:

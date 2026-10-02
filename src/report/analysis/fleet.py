@@ -174,7 +174,7 @@ def _score(*, total: int, online: int, non_idle: int, target: str | None,
 
 
 def analyze_fleet(workloads: list[dict], now: dt.datetime, target_version: str | None,
-                  *, top_n: int = 50, index_cap: int = 20000) -> dict:
+                  *, top_n: int = 50, index_cap: int = 100000) -> dict:
     """VEN 盤點的一包分析結果。呼叫端只讀這個 dict——GUI 與報表都是。"""
     target = (target_version or "").strip() or None
 

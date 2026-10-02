@@ -195,6 +195,23 @@ class CacheReader:
             )
             return [orjson.loads(rj) for (rj,) in s.execute(q)]
 
+    def read_events_newest(self, start: datetime, end: datetime, limit: int) -> list[dict]:
+        """The newest *limit* events in [start, end], oldest first.
+
+        For a caller that hit CacheReadTooLarge and would rather analyse a
+        disclosed sample than fail: the memory bound is the same cap.
+        """
+        with self._sf() as s:
+            q = (
+                select(PceEvent.raw_json)
+                .where(PceEvent.timestamp >= start, PceEvent.timestamp <= end)
+                .order_by(PceEvent.timestamp.desc())
+                .limit(int(limit))
+            )
+            rows = [orjson.loads(rj) for (rj,) in s.execute(q)]
+        rows.reverse()
+        return rows
+
     def read_flows_raw(self, start: datetime, end: datetime,
                        workload_hrefs: list[str] | None = None) -> list[dict]:
         """Read raw flows in [start, end].

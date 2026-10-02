@@ -104,6 +104,16 @@ HEALTH_CHECK_INTERVAL_SECONDS = 60
 # an unhealthy status the PCE itself reports are deterministic and are never
 # retried.
 HEALTH_REPROBE_DELAY_SECONDS = 2.0
+
+# An immediate event rule only pages for events this recent. A backfill, a
+# cache flush, a PCE rebind or first enabling the cache hands the analyzer
+# events that happened hours or days ago (backfilled rows are stamped with
+# today's ingested_at), and every historical agent.tampering or ruleset change
+# used to page on-call as if it had just happened. A day is far above how late
+# the PCE and the ingest cycle ever deliver a live event, and still covers an
+# overnight outage of this tool: what happened while it was down is alerted
+# when it comes back, rather than lost.
+EVENT_ALERT_MAX_AGE_MINUTES = 24 * 60
 _TRANSIENT_PROBE_CATEGORIES = frozenset({"transport_error", "server_error", "rate_limited"})
 
 
@@ -281,6 +291,67 @@ def _safe_float(value: Any, default: float = 0.0) -> float:
         return float(value)
     except (ValueError, TypeError):
         return default
+
+
+def rule_cooldown_minutes(rule: dict[str, Any]) -> float:
+    """The rule's cooldown in minutes, always a number.
+
+    alerts.json is hand-editable and the rule editor once stored a value it
+    could not parse as-is, so ``cooldown_minutes`` can arrive as "" or "abc".
+    Used raw, ``cd * 60`` raised TypeError inside the cycle: on the cache path
+    the event cursor then never advanced (the pipeline stalled for good) and on
+    the live path every later rule was skipped. An unreadable value falls back
+    to the default of 10 and says so; 0 keeps its meaning (cooldown off).
+    """
+    raw = rule.get("cooldown_minutes", rule.get("threshold_window", 10))
+    value = _safe_float(raw, -1.0)
+    if value < 0:
+        logger.warning("Rule {!r}: cooldown_minutes {!r} is not a number of minutes; using 10",
+                       rule.get("name"), raw)
+        return 10.0
+    return value
+
+
+def usable_traffic_rules(rules: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Traffic rules with their numeric fields as numbers; unusable ones dropped.
+
+    alerts.json is hand-editable and the rule editor once kept an unparsable
+    value as typed. A string window raised inside the per-flow loop (taking
+    every other rule down for the cycle); a string port or decision made the
+    rule silently never match. Each rule is checked once, here: a value that is
+    present but not a number drops that rule with a warning naming the field,
+    rather than letting it fail quietly or loudly at 3 a.m.
+    """
+    out: list[dict[str, Any]] = []
+    for rule in rules or []:
+        fixed = dict(rule)
+        bad: list[str] = []
+        for field, default in (("threshold_window", 10.0), ("threshold_count", 1.0)):
+            raw = rule.get(field)
+            value = default if raw is None or raw == "" else _safe_float(raw, -1.0)
+            if value <= 0 and not (field == "threshold_count" and value == 0):
+                bad.append(field)
+            # Whole numbers stay ints: the window is printed in warnings and
+            # alert text ("10 min", not "10.0 min").
+            fixed[field] = int(value) if float(value).is_integer() else value
+        for field in ("port", "proto", "pd"):
+            raw = rule.get(field)
+            if raw == "":
+                # An empty form field means "no filter", same as absent.
+                fixed.pop(field, None)
+                continue
+            if raw is None:
+                continue
+            value = _safe_int(raw, -999)
+            if value == -999:
+                bad.append(field)
+            fixed[field] = value
+        if bad:
+            logger.warning("Traffic rule {!r} skipped: {} not a number ({})", rule.get("name"),
+                           ", ".join(bad), ", ".join(repr(rule.get(b)) for b in bad))
+            continue
+        out.append(fixed)
+    return out
 
 
 def rule_enabled(rule: dict[str, Any]) -> bool:
@@ -882,7 +953,8 @@ class Analyzer:
         return calculate_volume_mb(flow)
 
     def check_flow_match(self, rule: dict[str, Any], f: dict[str, Any], start_time_limit: datetime.datetime | None,
-                         *, strict_window: bool = False) -> bool:
+                         *, strict_window: bool = False,
+                         end_time_limit: datetime.datetime | None = None) -> bool:
         # Dynamic Sliding Window Check
         if start_time_limit:
             ts_str = f.get("timestamp")
@@ -904,6 +976,12 @@ class Analyzer:
             # （strict_window=False）維持舊語意——那些 flow 已由 SQL/上游過窗，
             # cache/archive 投影常無 timestamp 欄，fail-closed 會整批誤殺。
             if f_time is not None and f_time < start_time_limit:
+                return False
+            # With traffic_alert_lag_minutes the window is [now-lag-W, now-lag]:
+            # flows newer than its end belong to a later evaluation. Without
+            # this bound the lag only moved the start, so a rule summed W+lag
+            # minutes of traffic and fired below its real threshold.
+            if f_time is not None and end_time_limit is not None and f_time > end_time_limit:
                 return False
             if f_time is None and strict_window:
                 return False
@@ -993,7 +1071,8 @@ class Analyzer:
         return True
 
     def _match_flow_filters(self, rule: dict[str, Any], f: dict[str, Any], window_start: datetime.datetime | None,
-                            *, strict_window: bool = False) -> bool:
+                            *, strict_window: bool = False,
+                            window_end: datetime.datetime | None = None) -> bool:
         """統一的 flow×filter 比對：legacy 純量 key 走 check_flow_match（含
         pd/時間窗/port/proto/list 形 IP），物件/複數 key 投影委派給報表路徑
         同一套 _flow_matches_filters（兩者 AND）。三個呼叫點共用：規則引擎、
@@ -1002,7 +1081,8 @@ class Analyzer:
         （不影響比對結果）。此函式在 per-flow 熱迴圈內被逐筆呼叫，故不在此記
         debug log（會被洗版）；只有手改 alerts.json 繞過端點拒收才會走到這個
         分支，屬邊角情境。"""
-        if not self.check_flow_match(rule, f, window_start, strict_window=strict_window):
+        if not self.check_flow_match(rule, f, window_start, strict_window=strict_window,
+                                     end_time_limit=window_end):
             return False
         object_rule = {k: rule[k] for k in _OBJECT_FILTER_KEYS if rule.get(k)}
         if object_rule:
@@ -1116,6 +1196,9 @@ class Analyzer:
 
     def _event_count_in_window(self, rule_id: Any, window_start: datetime.datetime) -> int:
         total = 0
+        # The same event can be recorded twice when the cache replays a batch
+        # (cursor rewound, backfill); one event is one count.
+        seen_ids: set[str] = set()
         for rec in self.state.get("history", {}).get(str(rule_id), []):
             try:
                 ts = datetime.datetime.strptime(rec['t'], '%Y-%m-%dT%H:%M:%SZ').replace(tzinfo=datetime.timezone.utc)
@@ -1125,6 +1208,11 @@ class Analyzer:
                 continue
             # Each history record represents exactly one event (records only ever
             # store {'t', 'event_id'}; there is no count-compression field).
+            eid = rec.get("event_id")
+            if eid:
+                if eid in seen_ids:
+                    continue
+                seen_ids.add(eid)
             total += 1
         return total
 
@@ -1333,16 +1421,8 @@ class Analyzer:
         elif deployment == "saas":
             logger.info(t('status_ok'))
             logger.info("PCE connectivity check OK.")
-            self.stats.record_pce_success(
-                "health",
-                status=h_status,
-                message=h_msg[:120],
-                probe="noop",
-                deployment_type=deployment,
-                category=category,
-            )
-            self._pce_stats_dirty = True
-            self._watchdog_dirty = True
+            self._record_health_success(pce_health_rules, status=h_status, message=h_msg,
+                                        probe="noop", deployment=deployment, category=category)
         else:
             h_status, h_msg = _probe_twice_if_transient(self.api.check_health, pce_probe_category)
             category = _endpoint_probe_category(h_status, (200,))
@@ -1398,17 +1478,49 @@ class Analyzer:
                 else:
                     logger.info(t('status_ok'))
                     logger.info("PCE health check OK.")
-                    self.stats.record_pce_success(
-                        "health",
-                        status=h_status,
-                        message=h_msg[:120],
-                        probe="health",
-                        deployment_type=deployment,
-                        category="ok",
-                    )
-                    self._pce_stats_dirty = True
-                    self._watchdog_dirty = True
+                    self._record_health_success(pce_health_rules, status=h_status, message=h_msg,
+                                                probe="health", deployment=deployment, category="ok")
         return True
+
+    def _record_health_success(self, rules: list[dict], *, status: int, message: str,
+                               probe: str, deployment: str, category: str) -> None:
+        """Record a healthy probe; tell on-call when it ends an incident they were paged for.
+
+        A pce_health alert used to be the last word: the PCE came back and
+        nothing said so, so whoever was paged had to go and look. When the
+        probe that just succeeded ends a failure run long enough to have paged
+        under a rule, that rule now sends one "recovered" notice. Rules only
+        reach here on automatic checks (a manual check passes none), so a
+        manual "check now" never sends it.
+        """
+        stats = self.state.get("pce_stats", {}) or {}
+        was_failing = stats.get("health_status") == "error"
+        failures_before = int(stats.get("consecutive_failures", 0) or 0)
+        self.stats.record_pce_success(
+            "health",
+            status=status,
+            message=message[:120],
+            probe=probe,
+            deployment_type=deployment,
+            category=category,
+        )
+        self._pce_stats_dirty = True
+        self._watchdog_dirty = True
+        if not was_failing:
+            return
+        for rule in rules:
+            needed = max(1, int(_safe_float(rule.get("threshold_count", 1), 1.0)))
+            if failures_before < needed:
+                continue   # this rule never paged for the run that just ended
+            self.reporter.add_health_alert({
+                "time": datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%d %H:%M:%S'),
+                "rule": rule["name"],
+                "rule_id": str(rule["id"]) if rule.get("id") is not None else None,
+                "rule_type": rule.get("type", "system"),
+                "status": "recovered",
+                "severity": "info",
+                "details": t('health_recovered_details', failures=failures_before),
+            })
 
     def _record_health_failure(
         self,
@@ -1431,7 +1543,16 @@ class Analyzer:
             category=category,
         )
         self._pce_stats_dirty = True
+        failures = int(self.state.get("pce_stats", {}).get("consecutive_failures", 0) or 0)
         for rule in rules:
+            # threshold_count = how many probes in a row must fail before this
+            # rule pages. It used to be ignored: one failed probe paged even
+            # when the rule asked for three.
+            needed = max(1, int(_safe_float(rule.get("threshold_count", 1), 1.0)))
+            if failures < needed:
+                logger.info("PCE health rule {!r}: {} consecutive failure(s), alerting at {}",
+                            rule.get("name"), failures, needed)
+                continue
             if self._check_cooldown(rule):
                 self.reporter.add_health_alert({
                     "time": datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%d %H:%M:%S'),
@@ -1790,66 +1911,91 @@ class Analyzer:
             self._pce_stats_local_dirty = True
 
             for rule in self._select_rules(lambda r: r.get("type") == "event"):
-                matches = [e for e in events if matches_event_rule(rule, e)]
-
-                is_count_rule = rule.get("threshold_type") == "count"
-                # history 只有 count 型規則會讀回（_event_count_in_window）。
-                # 以前每條 event 規則（含 immediate 型，佔最佳實踐目錄多數）
-                # 都逐筆寫入，那些紀錄沒有任何讀者，卻要在每個 cycle 被
-                # strptime 重新解析、跟著整份 state.json 重新序列化＋fsync，
-                # 而 state.json 的鎖是全域共用的。改成只有 count 型才記錄。
-                # 代價：規則從 immediate 改成 count 後視窗要重新累積。
-                if matches and is_count_rule:
-                    self._record_event_matches(rule["id"], matches, now_utc)
-
-                # Check Threshold
-                count_val = len(matches)
-                if is_count_rule:
-                    win_minutes = rule.get("threshold_window", 10)
-                    win_start = now_utc - datetime.timedelta(minutes=win_minutes)
-                    count_val = self._event_count_in_window(rule["id"], win_start)
-
-                # count 型須有本 cycle 新事件（matches 非空）才告警：視窗計數
-                # 只作門檻；無新證據時發出的告警必然是 time=N/A 的空殼
-                # （2026-07-24 審查 A2）
-                if (count_val >= _safe_float(rule.get("threshold_count", 1)) and count_val > 0
-                        and matches and not is_count_rule):
-                    # immediate 型：依目標（主機／使用者）分別冷卻。舊版以規則為
-                    # 單位，主機 A 觸發 agent.tampering 後的冷卻期間，主機 B 的
-                    # tampering 只記一筆抑制、不送也不彙總。只保留「還沒在冷卻」
-                    # 的目標的事件。
-                    matches = self._filter_targets_in_cooldown(rule, matches, normalized_by_id)
-                    count_val = len(matches)
-                if count_val >= _safe_float(rule.get("threshold_count", 1)) and count_val > 0 and matches:
-                    _target_keys = (None if is_count_rule else
-                                    self._event_target_keys(rule, matches, normalized_by_id))
-                    if self._check_cooldown(rule, target_keys=_target_keys):
-                        self.stats.record_rule_trigger(rule, match_count=count_val, metric_value=count_val)
-                        first = matches[0] if matches else {}
-                        first_norm = normalized_by_id.get(event_identity(first)) or normalize_event(first)
-                        alert_data = {
-                            "time": first.get("timestamp", "N/A"),
-                            "rule": rule["name"],
-                            "rule_id": str(rule["id"]),
-                            "rule_type": "event",
-                            "desc": rule.get("desc"),
-                            "severity": first_norm.get("severity") or first.get("severity", "info"),
-                            "count": count_val,
-                            "source": first_norm.get("source", ""),
-                            "target": first_norm.get("target_name", ""),
-                            "resource_type": first_norm.get("resource_type", ""),
-                            "resource_name": first_norm.get("resource_name", ""),
-                            "action": first_norm.get("action", ""),
-                            "raw_data": matches[:5],
-                            "parsed_data": [
-                                normalized_by_id.get(event_identity(event)) or normalize_event(event)
-                                for event in matches[:5]
-                            ],
-                        }
-                        self.reporter.add_event_alert(alert_data)
-                        event_triggers.append(alert_data)
+                # One broken rule (a hand-edited alerts.json value the code
+                # cannot use) must not take the batch down with it: on the
+                # cache path an exception here kept the event cursor from ever
+                # advancing, and on the live path it skipped every later rule
+                # while the events were already marked as seen.
+                try:
+                    self._evaluate_event_rule(rule, events, normalized_by_id, now_utc, event_triggers)
+                except Exception:
+                    logger.exception("Event rule {!r} could not be evaluated; skipped this cycle",
+                                     rule.get("name"))
 
         return event_triggers
+
+    def _evaluate_event_rule(self, rule: dict, events: list, normalized_by_id: dict,
+                             now_utc: datetime.datetime, event_triggers: list) -> None:
+        """Match one event rule against this batch and queue its alert."""
+        matches = [e for e in events if matches_event_rule(rule, e)]
+
+        is_count_rule = rule.get("threshold_type") == "count"
+        if matches and not is_count_rule:
+            # Count rules are already bounded: they count by the event's own
+            # timestamp inside their window. Immediate rules had no bound.
+            oldest = now_utc - datetime.timedelta(minutes=EVENT_ALERT_MAX_AGE_MINUTES)
+            fresh = [e for e in matches
+                     if (parse_event_timestamp(e.get("timestamp")) or now_utc) >= oldest]
+            if len(fresh) < len(matches):
+                logger.info("Rule {!r}: {} matching event(s) older than {} min not alerted "
+                            "(replayed history, e.g. after a backfill)",
+                            rule.get("name"), len(matches) - len(fresh), EVENT_ALERT_MAX_AGE_MINUTES)
+            matches = fresh
+        # history 只有 count 型規則會讀回（_event_count_in_window）。
+        # 以前每條 event 規則（含 immediate 型，佔最佳實踐目錄多數）
+        # 都逐筆寫入，那些紀錄沒有任何讀者，卻要在每個 cycle 被
+        # strptime 重新解析、跟著整份 state.json 重新序列化＋fsync，
+        # 而 state.json 的鎖是全域共用的。改成只有 count 型才記錄。
+        # 代價：規則從 immediate 改成 count 後視窗要重新累積。
+        if matches and is_count_rule:
+            self._record_event_matches(rule["id"], matches, now_utc)
+
+        # Check Threshold
+        count_val = len(matches)
+        if is_count_rule:
+            win_minutes = _safe_float(rule.get("threshold_window", 10), 10.0)
+            win_start = now_utc - datetime.timedelta(minutes=win_minutes)
+            count_val = self._event_count_in_window(rule["id"], win_start)
+
+        # count 型須有本 cycle 新事件（matches 非空）才告警：視窗計數
+        # 只作門檻；無新證據時發出的告警必然是 time=N/A 的空殼
+        # （2026-07-24 審查 A2）
+        if (count_val >= _safe_float(rule.get("threshold_count", 1)) and count_val > 0
+                and matches and not is_count_rule):
+            # immediate 型：依目標（主機／使用者）分別冷卻。舊版以規則為
+            # 單位，主機 A 觸發 agent.tampering 後的冷卻期間，主機 B 的
+            # tampering 只記一筆抑制、不送也不彙總。只保留「還沒在冷卻」
+            # 的目標的事件。
+            matches = self._filter_targets_in_cooldown(rule, matches, normalized_by_id)
+            count_val = len(matches)
+        if count_val >= _safe_float(rule.get("threshold_count", 1)) and count_val > 0 and matches:
+            _target_keys = (None if is_count_rule else
+                            self._event_target_keys(rule, matches, normalized_by_id))
+            if self._check_cooldown(rule, target_keys=_target_keys):
+                self.stats.record_rule_trigger(rule, match_count=count_val, metric_value=count_val)
+                first = matches[0] if matches else {}
+                first_norm = normalized_by_id.get(event_identity(first)) or normalize_event(first)
+                alert_data = {
+                    "time": first.get("timestamp", "N/A"),
+                    "rule": rule["name"],
+                    "rule_id": str(rule["id"]),
+                    "rule_type": "event",
+                    "desc": rule.get("desc"),
+                    "severity": first_norm.get("severity") or first.get("severity", "info"),
+                    "count": count_val,
+                    "source": first_norm.get("source", ""),
+                    "target": first_norm.get("target_name", ""),
+                    "resource_type": first_norm.get("resource_type", ""),
+                    "resource_name": first_norm.get("resource_name", ""),
+                    "action": first_norm.get("action", ""),
+                    "raw_data": matches[:5],
+                    "parsed_data": [
+                        normalized_by_id.get(event_identity(event)) or normalize_event(event)
+                        for event in matches[:5]
+                    ],
+                }
+                self.reporter.add_event_alert(alert_data)
+                event_triggers.append(alert_data)
 
     def _legacy_fetch_traffic(self, tr_rules: list | None = None) -> tuple[Any, datetime.datetime]:
         """Fetch traffic from the PCE API (legacy path used when no cache subscriber).
@@ -2195,6 +2341,7 @@ class Analyzer:
         top-N 集合與順序，與 dispatch 從全量累積推導出的結果完全一致
         （tie-break 見 _push_bounded_top_match）。
         """
+        tr_rules = usable_traffic_rules(tr_rules)
         rule_results: dict[Any, dict[str, Any]] = {r['id']: {'max_val': 0.0, 'top_matches': []} for r in tr_rules}
         top_heaps: dict[Any, list] = {r['id']: [] for r in tr_rules}
         # bucket-basis 守門的每規則彙總（見模組上方「Bucket-basis guard」）。
@@ -2207,6 +2354,10 @@ class Analyzer:
 
         flow_keys, baselines_by_window = self._prefetch_window_baselines(
             traffic_stream, tr_rules, now_utc)
+        # now_utc here is the evaluation time (now − lag). Only bound the end
+        # when a lag is set: with no lag the end is the real "now", and a PCE
+        # clock a little ahead of ours would drop the newest flows.
+        window_end = now_utc if self._traffic_alert_lag() else None
 
         count_processed = 0
         no_byte_fields = 0
@@ -2229,7 +2380,8 @@ class Analyzer:
                 r_win = rule.get("threshold_window", 10)
                 r_start = now_utc - datetime.timedelta(minutes=r_win)
 
-                if not self._match_flow_filters(rule, f, r_start, strict_window=True):
+                if not self._match_flow_filters(rule, f, r_start, strict_window=True,
+                                                window_end=window_end):
                     continue
 
                 # 本規則實際採用的量測值：預設就是 flow 上的原始（bucket 累計）
@@ -2558,7 +2710,15 @@ class Analyzer:
 
     def _event_target(self, event: dict, normalized_by_id: dict) -> str:
         norm = normalized_by_id.get(event_identity(event)) or {}
-        return str(norm.get("target_name") or norm.get("resource_name") or "")
+        target = norm.get("target_name") or norm.get("resource_name")
+        if target:
+            return str(target)
+        # Auth failures created by {"system": {}} carry no target — only the
+        # address the attempt came from. Keying them all as "" put every
+        # source under one cooldown: attempts from IP B were suppressed by IP
+        # A's alert. Fall back to who/where the event came from.
+        fallback = norm.get("source_ip") or norm.get("actor")
+        return f"src:{fallback}" if fallback else ""
 
     def _event_target_keys(self, rule: dict, matches: list, normalized_by_id: dict) -> list[str]:
         rid = str(rule["id"])
@@ -2567,7 +2727,7 @@ class Analyzer:
 
     def _filter_targets_in_cooldown(self, rule: dict, matches: list, normalized_by_id: dict) -> list:
         """去掉「目標仍在冷卻中」的事件；全部都在冷卻時記一筆抑制。"""
-        cd_minutes = rule.get("cooldown_minutes", rule.get("threshold_window", 10))
+        cd_minutes = rule_cooldown_minutes(rule)
         if not cd_minutes:
             return matches
         rid = str(rule["id"])
@@ -2603,7 +2763,7 @@ class Analyzer:
         now_utc = datetime.datetime.now(datetime.timezone.utc)
         last_alert = None if target_keys is not None else self.state.get("alert_history", {}).get(rid)
 
-        cd_minutes = rule.get("cooldown_minutes", rule.get("threshold_window", 10))
+        cd_minutes = rule_cooldown_minutes(rule)
 
         if last_alert:
             try:

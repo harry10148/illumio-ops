@@ -70,4 +70,6 @@ def test_every_health_alert_emitter_still_only_sets_status():
     from src import analyzer
     src = inspect.getsource(analyzer)
     emitters = src.count("add_health_alert(")
-    assert emitters == 3, f"健康告警產生處變成 {emitters} 個，回來確認新的那個寫的是什麼鍵"
+    # 第 4 個是 PCE 恢復通知：status="recovered" 不是嚴重度，所以它明確寫
+    # severity="info"（明確的 severity 優先，見上一條測試）。
+    assert emitters == 4, f"健康告警產生處變成 {emitters} 個，回來確認新的那個寫的是什麼鍵"

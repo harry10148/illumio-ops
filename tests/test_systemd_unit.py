@@ -44,3 +44,9 @@ def test_unit_restart_policy():
     cp = _parse_unit()
     assert cp["Service"]["Restart"] == "always"
     assert int(cp["Service"]["RestartSec"]) >= 5
+
+
+def test_unit_keeps_created_files_private():
+    # Config backups, the cache, state and reports hold PCE data and
+    # credentials; 0644 let any local account read them.
+    assert _parse_unit()["Service"]["UMask"] == "0027"

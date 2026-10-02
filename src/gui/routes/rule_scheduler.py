@@ -11,12 +11,17 @@ from loguru import logger
 
 from src.config import ConfigManager
 from src.gui._helpers import (
+    _audit,
+    _is_rule_href,
     _err,
     _resolve_config_dir,
     _strip_ansi,
 )
 from src.href_utils import extract_id as _extract_id_href
 from src.i18n import t
+
+# One request may delete at most this many schedules (each one is a PCE write).
+_MAX_BULK = 500
 
 # 三個 PCE rule collection：sec_rules（allow）、rules（legacy allow list）、
 # deny_rules（deny/override_deny）——與 src/api_client.py 的 has_draft_changes
@@ -322,9 +327,11 @@ def make_rule_scheduler_blueprint(
         with _get_rs_components() as (db, api, _):
             data = request.get_json() or {}
             lang = data.get('lang') or cm.config.get('settings', {}).get('language', 'en')
-            href = data.get('href', '')
+            href = str(data.get('href', '') or '').strip()
             if not href:
                 return _err("href required", 400)
+            if not _is_rule_href(href):
+                return _err(t("gui_err_invalid_rule_href", lang=lang), 400)
 
             # Block draft-only scheduling natively for GUI.
             # get_provision_state 是三態：'unknown' 代表 PCE 根本沒回答（連線
@@ -416,7 +423,9 @@ def make_rule_scheduler_blueprint(
                     db.delete(href)
                 else:
                     db.put(href, prev)
+                _audit("rule_schedule_create", href=href, result="failed", reason="pce_note_write")
                 return _err(t("gui_api_update_failed", lang=lang), 502)
+            _audit("rule_schedule_create", href=href, before=prev, after=db_entry, result="success")
             return jsonify({"ok": True, "id": _extract_id_href(href)})
 
     @bp.route('/api/rule_scheduler/schedules/<path:href>')
@@ -437,6 +446,11 @@ def make_rule_scheduler_blueprint(
         with _get_rs_components() as (db, api, _):
             data = request.get_json(silent=True) or {}
             hrefs = data.get('hrefs', [])
+            lang = data.get('lang') or cm.config.get('settings', {}).get('language', 'en')
+            if not isinstance(hrefs, list) or len(hrefs) > _MAX_BULK:
+                return _err(t("gui_err_bulk_too_large", lang=lang, n=_MAX_BULK), 400)
+            if any(not _is_rule_href(h) for h in hrefs):
+                return _err(t("gui_err_invalid_rule_href", lang=lang), 400)
             deleted = []
             # 註記清除失敗（回 False 或 raise）要記 warning 並回報 href 清單：
             # 本地 entry 刪掉後不會再有人清這個 PCE 註記，靜默吞掉＝永久殘留。
@@ -451,8 +465,11 @@ def make_rule_scheduler_blueprint(
                     logger.warning(f"[GUI:rule_note_clear] PCE note clear raised for {href}: {_e}")
                 with _rs_db_lock:
                     db.load()
+                    before = db.db.get(href)
                     if db.delete(href):
                         deleted.append(_extract_id_href(href))
+                        _audit("rule_schedule_delete", href=href, before=before,
+                               note_cleared=href not in note_clear_failed, result="success")
             return jsonify({"ok": True, "deleted": deleted,
                             "note_clear_failed": note_clear_failed})
 

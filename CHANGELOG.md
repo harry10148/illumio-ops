@@ -46,6 +46,89 @@ a plain `<major>.<minor>.<patch>` scheme. (Tags through v4.0.0 carried a
   deployment type) made in the web console; it used to keep probing with the
   values it started with.
 - **Pressing Enter on the login page signs in.**
+- **Event alerts fire for new events only.** A cache backfill, a cursor reset
+  or catching up after downtime used to page every matching historical event
+  at once; immediate event rules now skip matches older than 24 hours (logged
+  at INFO), so a backfill no longer pages old history while events from an
+  overnight outage of this tool are still alerted. Count rules count a
+  replayed event once.
+- **One broken rule no longer stops the others.** An event rule that raised an
+  exception ended the whole evaluation (and kept the cursor from moving); each
+  rule is now evaluated on its own. A non-numeric `cooldown_minutes`,
+  `threshold_window`, `port` or `pd` falls back or skips that rule with a
+  warning instead of crashing, and the rule editor refuses non-numeric values.
+- **PCE health rules honour `threshold_count`** (consecutive failures before
+  paging) and send one `recovered` notice when a PCE that had paged is healthy
+  again.
+- **Failed logins are cooled down per source.** Events with no target (failed
+  logins) are grouped by source IP for the per-target cooldown, so one noisy
+  source no longer silences alerts for every other.
+- **Traffic alert lag shifts both ends of the window**, so flows newer than
+  the lag are left for the next cycle instead of being counted twice.
+
+### Performance
+
+Measured on a synthetic estate of 20k workloads and ~4,000 app|env keys.
+
+- **XLSX export is linear in rows.** Every appended row was looked up by
+  scanning the whole sheet; a 10k-flow report spent about eight minutes
+  writing its spreadsheet and a 50k-row raw sheet most of an hour. 5,000 rows
+  now take about a second.
+- **Traffic report analysis at scale: 149 s → 19 s** for enforcement
+  readiness, infrastructure scoring and lateral movement at 100k flows, with
+  peak memory down from gigabytes to the size of the result. Output is
+  unchanged, except that above 1,500 app|env path sources infrastructure
+  betweenness is estimated from 500 evenly spaced sources.
+- **An audit report over the cache read limit no longer fails.** Above
+  `pce_cache.cache_read_max_rows` events it analyses the newest that many and
+  says so on the report.
+- **VEN inventory** keeps a per-workload list up to 100,000 workloads (was
+  20,000) and parses its stored snapshot once per change instead of on every
+  request.
+- At most two web-console traffic reports generate at once; others wait.
+  The cache's traffic ingest is no longer skipped when it waits behind a long
+  aggregate or retention run, and the overview's blocked-traffic card reads
+  a covering index.
+
+### Security
+
+- **Stored secrets no longer follow an address change.** Changing the PCE URL
+  host, the SMTP host or a SIEM destination's host/port now needs the secret
+  (API secret, SMTP password, HEC token) typed again in the same save;
+  otherwise "test connection" sent the stored credential to the new address.
+- **Report download/delete only touch report files**, and `report.output_dir`
+  may not be (or sit in, or contain) `config/`, `logs/`, `data/`, `src/`,
+  `deploy/` or `scripts/`. Pointing it at `config` used to serve
+  `config.json` in full.
+- **PCE writes take exact hrefs only.** Quarantine, lift, rule schedules and
+  Rule Hit Count enablement refuse anything that is not a workload or
+  ruleset/rule href; bulk requests are capped at 500 items and quarantine
+  endpoints are limited to 30 requests a minute.
+- **An audit log.** Every login attempt, quarantine, rule schedule change and
+  Rule Hit Count change writes one JSON line to `logs/modules/audit.log`
+  (who, from where, what, result). Module logs escape CR/LF so a request value
+  cannot forge a log entry.
+- **Rule Hit Count enablement will not provision someone else's draft.** If
+  the firewall settings draft already holds unprovisioned changes it stops
+  and says so instead of provisioning them along with its own.
+- Webhook and Teams error messages no longer include the webhook URL; a
+  password reset from the CLI rotates the session signing key; the systemd
+  unit sets `UMask=0027` so new reports, cache and config backups are not
+  world-readable.
+
+### Known limitations
+
+- Cooldown state and the event cursor are saved before alerts are sent. If
+  the process is killed between the two, that cycle's alerts are lost.
+- Delivery is all-or-nothing: when one channel succeeds, a failed channel in
+  the same cycle is not retried.
+- At 2–5 million flows a day the cache grows to 60–150 GB over seven days,
+  traffic ingest takes about an hour of CPU a day, and the aggregate and
+  retention jobs hold the cache's write lock for minutes. Reports over long
+  windows at that volume analyse a disclosed sample (the read limit and the
+  PCE's 200,000-flow query cap).
+- Logging out clears the browser's session cookie but does not revoke a copy
+  of it taken earlier; changing the password does.
 
 ## [5.2.0] — 2026-09-19
 

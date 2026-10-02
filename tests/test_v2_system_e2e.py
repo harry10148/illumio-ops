@@ -1483,6 +1483,9 @@ def _answer_pce_target_modal(page, base_url, button_key):
     button_name = labels[button_key]
     url = page.locator('.board input[data-field="url"]')
     url.fill("https://other-appliance.example.org:9443")
+    # A new host needs the API secret typed again (the stored one never
+    # follows the URL on its own); without it the save is a 400, not a 409.
+    page.locator('.board input[data-field="secret"]').fill("typed-again-secret")
 
     page.get_by_role("button", name=labels["gui_save"], exact=True).first.click()
     modal = page.locator(".modal").first
@@ -1550,6 +1553,7 @@ def test_pce_target_change_asks_before_saving(v2_page):
     assert NEW_URL != OLD_URL and "other-appliance.example.org" not in OLD_URL
     url.fill(NEW_URL)
     assert url.input_value() == NEW_URL
+    page.locator('.board input[data-field="secret"]').fill("typed-again-secret")
 
     sent = {"hit": False}
 

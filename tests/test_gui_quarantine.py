@@ -189,7 +189,7 @@ def test_quarantine_apply_writes_audit_log(app_persistent, monkeypatch):
                     environ_overrides={'REMOTE_ADDR': '127.0.0.1'},
                     headers={'X-CSRF-Token': csrf_token})
     assert r.json["ok"] is True
-    audit = [m for m in records if "quarantine_apply" in m]
+    audit = [m for m in records if "quarantine_apply" in m and not m.startswith("{")]
     assert len(audit) == 1
     assert "/orgs/1/workloads/1" in audit[0]
     assert "Mild" in audit[0]
@@ -272,6 +272,6 @@ def test_quarantine_bulk_apply_writes_audit_log(app_persistent, monkeypatch):
                 json={"hrefs": ["/orgs/1/workloads/1", "/orgs/1/workloads/2"], "level": "Mild"},
                 environ_overrides={'REMOTE_ADDR': '127.0.0.1'},
                 headers={'X-CSRF-Token': csrf_token})
-    audit = [m for m in records if "quarantine_bulk_apply" in m]
+    audit = [m for m in records if "quarantine_bulk_apply" in m and not m.startswith("{")]
     assert len(audit) == 1
     assert "success=2" in audit[0]

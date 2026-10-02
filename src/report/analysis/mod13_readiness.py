@@ -4,6 +4,7 @@ from __future__ import annotations
 import pandas as pd
 from src.i18n import t
 
+from ._key_rows import rows_by_key
 from .attack_posture import (
     build_app_display,
     make_posture_item,
@@ -72,33 +73,46 @@ def _build_recommendations(attack_items: list[dict], top_n: int, lang: str = "en
 _ENFORCED = {"full": 1.0, "selective": 0.5}
 
 
-def _app_enforce_ratio(flows: pd.DataFrame, key: str):
-    """(full + 0.5×selective) / workloads with a known mode, for this app(env).
+def _enforce_ratio_by_key(work: pd.DataFrame) -> dict[str, float] | None:
+    """{app|env key: (full + 0.5×selective) / workloads with a known mode}.
 
     Uses the workloads' own enforcement mode carried on the flows. The old
     factor was the share of flow endpoints that were MANAGED — every app with
     a VEN read 100% "Enforcement Mode" even when nothing was enforced.
-    Returns None when the data carries no mode (CSV import).
+    Returns None when the data carries no mode (CSV import); a key whose
+    workloads carry no mode is absent.
+
+    One pass over all keys. It replaced a per-key helper that built a
+    DataFrame for every app|env key (21 s of 35 s at 1,000 keys). A key's
+    workloads are its src-side endpoints in row order, then its dst-side
+    endpoints in row order, deduplicated by IP keeping the first — the same
+    order the per-key version used, so the same mode wins for an IP seen
+    with two.
     """
     parts = []
-    for side in ("src", "dst"):
+    positions = pd.RangeIndex(len(work))
+    for side_order, side in enumerate(("src", "dst")):
         mode_col, ip_col = f"{side}_enforcement", f"{side}_ip"
-        if mode_col not in flows.columns:
+        if mode_col not in work.columns:
             continue
-        sel = flows[f"{side}_key"] == key
-        sub = pd.DataFrame({
-            "ip": flows.loc[sel, ip_col] if ip_col in flows.columns else flows.loc[sel].index,
-            "mode": flows.loc[sel, mode_col],
-        })
-        parts.append(sub)
+        parts.append(pd.DataFrame({
+            "key": work[f"{side}_key"].to_numpy(),
+            "ip": work[ip_col].to_numpy() if ip_col in work.columns else work.index.to_numpy(),
+            "mode": work[mode_col].to_numpy(),
+            "side": side_order,
+            "pos": positions,
+        }))
     if not parts:
         return None
     wl = pd.concat(parts, ignore_index=True)
     wl["mode"] = wl["mode"].fillna("").astype(str).str.strip().str.lower()
-    wl = wl[wl["mode"] != ""].drop_duplicates(subset=["ip"])
+    wl = wl[wl["mode"] != ""]
+    wl = wl.sort_values(["key", "side", "pos"], kind="stable")
+    wl = wl.drop_duplicates(subset=["key", "ip"])
     if wl.empty:
-        return None
-    return float(wl["mode"].map(lambda m: _ENFORCED.get(m, 0.0)).mean())
+        return {}
+    ratio = wl["mode"].map(lambda m: _ENFORCED.get(m, 0.0))
+    return {str(k): float(v) for k, v in ratio.groupby(wl["key"]).mean().items()}
 
 
 def _weighted(parts: dict) -> float:
@@ -145,9 +159,11 @@ def enforcement_readiness(df: pd.DataFrame, workloads: list | None = None, top_n
         all_vals = [x for v in buckets.values() for x in v]
         global_workload_ratio = sum(all_vals) / len(all_vals) if all_vals else None
 
+    key_rows = rows_by_key(work)
+    enforce_by_key = _enforce_ratio_by_key(work)
     for key in all_keys:
         app, env = key.split("|", 1)
-        flows = work[(work["src_key"] == key) | (work["dst_key"] == key)]
+        flows = work.iloc[key_rows.get(key, [])]
         if flows.empty:
             continue
 
@@ -155,7 +171,7 @@ def enforcement_readiness(df: pd.DataFrame, workloads: list | None = None, top_n
         allowed_ratio = float((flows["policy_decision"] == "allowed").mean())
         ringfence_ratio = float((flows["src_key"] == flows["dst_key"]).mean()) if total else 0.0
 
-        enforce_ratio = _app_enforce_ratio(flows, key)
+        enforce_ratio = None if enforce_by_key is None else enforce_by_key.get(key)
         if enforce_ratio is None:
             enforce_ratio = workload_ratio_by_key.get(key, global_workload_ratio)
 

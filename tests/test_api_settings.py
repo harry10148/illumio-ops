@@ -200,7 +200,7 @@ def test_mass_assignment_rejected(authed_client, app):
     client, csrf = authed_client
     res = client.post(
         "/api/settings",
-        json={"smtp": {"__proto__": "x", "host": "test.host"}},
+        json={"smtp": {"__proto__": "x", "host": "test.host", "password": "pw"}},
         headers={"X-CSRF-Token": csrf},
     )
     assert res.status_code == 200
@@ -441,7 +441,7 @@ def _save(client, csrf, api_block, choice=None):
 
 def test_changing_url_without_a_choice_is_refused(authed_client):
     client, csrf = authed_client
-    res = _save(client, csrf, {"url": "https://other-pce.example.com:8443"})
+    res = _save(client, csrf, {"url": "https://other-pce.example.com:8443", "secret": "s"})
     assert res.status_code == 409
     body = res.get_json()
     assert body["ok"] is False
@@ -472,7 +472,7 @@ def test_same_pce_choice_saves_without_touching_data(tmp_path, monkeypatch):
     _seed_one_event(cache_db)
     assert _count_events(cache_db) == 1
 
-    res = _save(client, csrf, {"url": "https://renamed.example.com:8443"},
+    res = _save(client, csrf, {"url": "https://renamed.example.com:8443", "secret": "s"},
                 choice="same-pce")
     assert res.status_code == 200
     assert res.get_json()["ok"] is True
@@ -481,7 +481,7 @@ def test_same_pce_choice_saves_without_touching_data(tmp_path, monkeypatch):
 
 def test_unknown_choice_is_rejected(authed_client):
     client, csrf = authed_client
-    res = _save(client, csrf, {"url": "https://other.example.com:8443"},
+    res = _save(client, csrf, {"url": "https://other.example.com:8443", "secret": "s"},
                 choice="whatever")
     assert res.status_code == 400
 
@@ -591,7 +591,7 @@ def test_flush_choice_empties_the_seeded_cache(tmp_path, monkeypatch):
     _seed_one_event(cache_db)
     assert _count_events(cache_db) == 1
 
-    res = _save(client, csrf, {"url": "https://other-pce.example.com:8443"}, choice="flush")
+    res = _save(client, csrf, {"url": "https://other-pce.example.com:8443", "secret": "s"}, choice="flush")
     assert res.status_code == 200
     assert res.get_json()["ok"] is True
     assert _count_events(cache_db) == 0
@@ -611,7 +611,7 @@ def test_a_save_rejected_by_later_validation_leaves_a_flush_cache_intact(tmp_pat
     res = client.post(
         "/api/settings",
         json={
-            "api": {"url": "https://other-pce.example.com:8443"},
+            "api": {"url": "https://other-pce.example.com:8443", "secret": "s"},
             "pce_target_change": "flush",
             "report": {"output_dir": "/etc/evil"},
         },

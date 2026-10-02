@@ -163,7 +163,7 @@ class TestRunEventAnalysis(unittest.TestCase):
     def test_returns_empty_list_when_no_event_rules(self):
         """_run_event_analysis returns [] when there are no event rules."""
         az = _make_analyzer([_traffic_rule()])
-        raw_event = {"timestamp": "2026-01-01T00:00:00Z", "event_type": "user.login",
+        raw_event = {"timestamp": datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"), "event_type": "user.login",
                      "severity": "info", "status": "success", "created_by": {}}
         az._fetch_event_batch = MagicMock(return_value=_make_event_batch(events=[raw_event]))
         result = az._run_event_analysis()
@@ -173,7 +173,7 @@ class TestRunEventAnalysis(unittest.TestCase):
         """Triggered event rule fires reporter.add_event_alert and is returned in list."""
         rule = self._make_event_rule(threshold=1)
         az = _make_analyzer([rule])
-        raw_event = {"timestamp": "2026-01-01T00:00:00Z", "event_type": "user.login",
+        raw_event = {"timestamp": datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"), "event_type": "user.login",
                      "severity": "warning", "status": "success", "created_by": {}}
         az._fetch_event_batch = MagicMock(return_value=_make_event_batch(events=[raw_event]))
 
@@ -189,7 +189,7 @@ class TestRunEventAnalysis(unittest.TestCase):
         """No alert is dispatched when match count is below threshold_count."""
         rule = self._make_event_rule(threshold=5)
         az = _make_analyzer([rule])
-        raw_event = {"timestamp": "2026-01-01T00:00:00Z", "event_type": "user.login",
+        raw_event = {"timestamp": datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"), "event_type": "user.login",
                      "severity": "info", "status": "success", "created_by": {}}
         az._fetch_event_batch = MagicMock(return_value=_make_event_batch(events=[raw_event]))
 

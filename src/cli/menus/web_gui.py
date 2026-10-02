@@ -73,6 +73,11 @@ def web_gui_security_menu(cm: ConfigManager) -> None:
                 # the must-change gate at next web login.
                 cm.config["web_gui"].pop("_initial_password", None)
                 cm.config["web_gui"].pop("must_change_password", None)
+                # Same as the web password change: a new session signing key,
+                # so cookies issued under the old password (possibly the
+                # reason for the reset) stop working once the GUI restarts.
+                import secrets as _secrets
+                cm.config["web_gui"]["secret_key"] = _secrets.token_hex(32)
                 print(f"\n{Colors.GREEN}{t('wgs_pw_updated')}{Colors.ENDC}")
                 cm.save()
             input(f"\n{Colors.CYAN}[?]{Colors.ENDC} {t('press_enter_to_continue')} ")

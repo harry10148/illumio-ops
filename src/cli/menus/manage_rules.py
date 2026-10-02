@@ -86,7 +86,10 @@ def manage_rules_menu(cm: ConfigManager):
             filters = []
             if r["type"] == "traffic":
                 pd_map = {k: t(v) for k, v in PD_RULE_LABEL_KEYS.items()}
-                filters.append(f"[{pd_map.get(r.get('pd', 2), '?')}]")
+                # The engine treats a missing pd (and 3) as "any decision";
+                # this list used to call it Blocked.
+                pd_val = r.get("pd", -1)
+                filters.append(f"[{pd_map.get(-1 if pd_val == 3 else pd_val, '?')}]")
             if r.get("port"):
                 proto_str = (
                     "/TCP"

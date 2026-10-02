@@ -140,8 +140,24 @@ def enable_rule_hit_count(api, scopes: list | None = None) -> list:
         raise EnablementError(f"PCE report template enable failed: HTTP {st}", steps_done)
     steps_done.append("pce_report_template")
 
+    # Provisioning firewall_settings ships the WHOLE draft object, not just the
+    # field written below. If someone has staged other firewall-settings edits
+    # that nobody has reviewed yet, enabling rule hit count would push them to
+    # every VEN as a side effect. Refuse instead, and say why; fail closed when
+    # the draft cannot be read at all.
+    draft_href = f"/orgs/{org}/sec_policy/draft/firewall_settings"
+    st, draft = api._api_get(draft_href)
+    if st != 200 or not isinstance(draft, dict):
+        raise EnablementError(f"could not read draft firewall_settings: HTTP {st}", steps_done)
+    if draft.get("update_type"):
+        raise EnablementError(
+            "draft firewall_settings already has unprovisioned changes; review and provision "
+            "or revert them in the PCE first, then enable rule hit count again", steps_done)
+    logger.info("Rule hit count: firewall_settings scopes before change: {}",
+                draft.get("rule_hit_count_enabled_scopes"))
+
     payload = {"rule_hit_count_enabled_scopes": scopes if scopes is not None else [[]]}
-    st = api._api_put(f"/orgs/{org}/sec_policy/draft/firewall_settings", payload)
+    st = api._api_put(draft_href, payload)
     if st not in (200, 204):
         raise EnablementError(f"VEN firewall_settings draft update failed: HTTP {st}", steps_done)
     steps_done.append("ven_firewall_settings_draft")

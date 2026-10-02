@@ -107,6 +107,11 @@ _ADDED_INDEXES = (
     # (4th element = partial-index WHERE predicate.)
     ("ix_raw_report_json_null", "pce_traffic_flows_raw", "last_detected",
      "report_json IS NULL"),
+    # Covering index for the overview's blocked/potentially-blocked totals
+    # (two weeks of the aggregate table, every refresh): answered from the
+    # index alone instead of visiting each row — 558 ms → 139 ms on 487k
+    # aggregate rows (measured 2026-10); ~16 s → ~4 s at 14M rows.
+    ("ix_agg_day_action_count", "pce_traffic_flows_agg", "bucket_day, action, flow_count"),
 )
 
 # Single-column indexes removed because no query filters/sorts by them — they

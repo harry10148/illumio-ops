@@ -91,7 +91,7 @@ def _event_rule(rule_id="ev1", threshold=1):
 
 def _raw_event(event_type="user.login"):
     return {
-        "timestamp": "2026-01-01T00:00:00Z",
+        "timestamp": datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "event_type": event_type,
         "severity": "warning",
         "status": "success",

@@ -539,7 +539,7 @@ def run_ven_summary(cm) -> None:
             # 是重複而不是防深，而重複的兩份遲早會分岔。
             _st.get("fleet_target_ven_version"),
             top_n=50,
-            index_cap=int(_st.get("fleet_index_cap") or 20000),
+            index_cap=int(_st.get("fleet_index_cap") or 100000),
         )
         fleet["updated_at"] = now.strftime("%Y-%m-%dT%H:%M:%SZ")
         write_dashboard_summary(lambda d: {**d, "ven_summary": summary, "fleet": fleet})

@@ -497,8 +497,20 @@ def make_rules_blueprint(
                 # _parse_threshold_window 驗證＋轉型，這裡不再重複檢查）
                 for k in ('port', 'ex_port', 'proto', 'threshold_count', 'cooldown_minutes', 'pd'):
                     if k in old and old[k] is not None:
-                        try: old[k] = int(old[k]) if k != 'threshold_count' else float(old[k])
-                        except (ValueError, TypeError): pass  # intentional fallback: keep raw value if numeric cast fails
+                        if old[k] == '':
+                            # An emptied form field means "not set".
+                            old.pop(k)
+                            continue
+                        try:
+                            old[k] = int(old[k]) if k != 'threshold_count' else float(old[k])
+                        except (ValueError, TypeError):
+                            # Used to be kept as typed. A non-numeric cooldown
+                            # then raised inside the monitor cycle and stalled
+                            # the event pipeline; a non-numeric port made the
+                            # rule silently never match. Refuse it instead, and
+                            # drop the half-applied edit from memory.
+                            cm.load()
+                            return _err(t("gui_err_invalid_number", lang=lang) + f" ({k})", 400)
                 cm.save()
                 return jsonify({"ok": True})
             return _err(t("gui_not_found", lang=lang), 404)
