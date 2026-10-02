@@ -149,15 +149,45 @@ def test_limit_is_capped(client, monkeypatch, tmp_path):
 
 # ── 設定鍵 ───────────────────────────────────────────────────────────────────
 
-def test_the_three_fleet_settings_are_savable(client):
+def test_the_fleet_settings_are_savable(client):
     """白名單外的鍵會被 PUT /api/settings 靜默丟掉——那是最難查的那種壞法。
 
     GUI 存了、toast 說成功、下次讀回來是舊值，沒有任何地方報錯。
     """
     from src.gui._helpers import _SETTINGS_ALLOWLISTS
     allowed = _SETTINGS_ALLOWLISTS["settings"]
-    for key in ("fleet_target_ven_version", "fleet_max_batch", "fleet_index_cap"):
+    for key in ("fleet_target_ven_version", "fleet_index_cap"):
         assert key in allowed, "%s 不在白名單，存了會被無聲丟掉" % key
+
+
+# ── 唯讀 ─────────────────────────────────────────────────────────────────────
+
+def test_the_inventory_has_no_route_that_writes(client):
+    """VEN 盤點只看不改：enforcement 推進已移除，不准再長回來。
+
+    任何 /api/fleet 底下的非 GET 路由、或 ApiClient 上改 enforcement mode 的
+    方法，都代表這個工具又能改 PCE 的 enforcement 了。
+    """
+    from flask import current_app
+    from src.api_client import ApiClient
+    with client.application.app_context():
+        writes = [(r.rule, sorted(r.methods - {"GET", "HEAD", "OPTIONS"}))
+                  for r in current_app.url_map.iter_rules()
+                  if r.rule.startswith("/api/fleet") and r.methods - {"GET", "HEAD", "OPTIONS"}]
+    assert writes == []
+    assert not hasattr(ApiClient, "bulk_update_workloads")
+
+
+def test_a_config_saved_by_an_older_gui_still_loads(tmp_path):
+    """舊版 GUI 每次儲存都寫 fleet_max_batch；拿掉 schema 欄位會讓整份 config
+    驗證失敗、全部退回預設值（SIEM 轉送因此停擺）。"""
+    import json as _json
+    from src.config import ConfigManager
+    cfg = tmp_path / "config.json"
+    cfg.write_text(_json.dumps({"settings": {"fleet_max_batch": 200}}), encoding="utf-8")
+    cm = ConfigManager(str(cfg))
+    assert not getattr(cm, "_load_error_locs", None)
+    assert cm.models.settings.fleet_max_batch == 200
 
 
 def test_every_pipeline_bucket_can_actually_be_listed():

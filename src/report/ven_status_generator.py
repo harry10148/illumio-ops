@@ -150,7 +150,7 @@ class VenStatusGenerator:
                 self.api, workloads, rate_per_minute=_rpm)
             results["ransomware_posture"] = _rwp.ransomware_posture(workloads, _enr)
 
-        # 車隊層級分析：同一份 workloads，不再抓一次。GUI 的 #/investigate/fleet
+        # VEN 盤點分析：同一份 workloads，不再抓一次。GUI 的 #/investigate/fleet
         # 與這份報表讀的是同一支純函式，兩邊的數字因此不可能各說各話。
         from src.report.analysis.fleet import analyze_fleet
         _fleet_target = ((self.cm.config.get("settings") or {})
@@ -562,7 +562,7 @@ def generate_ven_xlsx(analysis: dict, out_path: str, *, lang: str = "en") -> str
     ) if by_version else None
     add_df_sheet(wb, t("rpt_xlsx_sheet_ven_versions", lang=lang), versions_df, lang=lang)
 
-    # 車隊逐台索引：HTML 那邊的樣本表截到 50 列並標示出來，這裡是全量不截——
+    # VEN 盤點逐台索引：HTML 那邊的樣本表截到 50 列並標示出來，這裡是全量不截——
     # xlsx 的用途就是拿去篩選與排序，一個被截斷的試算表比沒有還糟。
     fleet = analysis.get("fleet") or {}
     index = fleet.get("workloads_index") or []

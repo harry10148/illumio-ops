@@ -24,10 +24,9 @@ ROUTE = "#/investigate/fleet"
 
 def _labels(page):
     keys = [
-        "gui_fleet_title", "gui_fleet_no_snapshot", "gui_fleet_progress_btn",
-        "gui_fleet_preview", "gui_fleet_target_unset", "gui_fleet_partial",
-        "gui_fleet_deferred_note", "gui_fleet_r_invalid_transition",
-        "gui_fleet_pending_heartbeat", "gui_fleet_index_truncated",
+        "gui_fleet_title", "gui_fleet_no_snapshot",
+        "gui_fleet_target_unset", "gui_fleet_partial",
+        "gui_fleet_index_truncated",
         "gui_nav_fleet",
     ]
     return page.evaluate(
@@ -79,8 +78,7 @@ def _fleet(**over):
     return f
 
 
-def _stub(page, *, available=True, fleet=None, rows=None, preview=None, apply_=None,
-          records=None, calls=None):
+def _stub(page, *, available=True, fleet=None, rows=None):
     body = {"ok": True, "available": available,
             "fleet": {} if not available else (fleet if fleet is not None else _fleet()),
             "next_run_at": "2026-09-14T00:05:00Z"}
@@ -94,24 +92,6 @@ def _stub(page, *, available=True, fleet=None, rows=None, preview=None, apply_=N
         "total": len(rows if rows is not None else _index()),
         "rows": rows if rows is not None else _index(),
         "index_truncated": bool((fleet or {}).get("index_truncated"))}))
-    page.route("**/api/fleet/progress/records*", lambda r: _json(r, {
-        "ok": True, "records": records or []}))
-
-    def _preview(route):
-        if calls is not None:
-            calls.append(("preview", route.request.post_data_json))
-        _json(route, preview or {"ok": True, "to_mode": "selective", "eligible": [],
-                                 "deferred": [], "skipped": [], "cap": 200,
-                                 "truncated": False})
-
-    def _apply(route):
-        if calls is not None:
-            calls.append(("apply", route.request.post_data_json))
-        _json(route, apply_ or {"ok": True, "applied": [], "failed": [],
-                                "record_id": "abc", "pending_heartbeat": True})
-
-    page.route("**/api/fleet/progress/preview", _preview)
-    page.route("**/api/fleet/progress/apply", _apply)
 
 
 def _goto(page, base_url):
@@ -121,11 +101,11 @@ def _goto(page, base_url):
 
 # ── 冷載入 ───────────────────────────────────────────────────────────────────
 
-def test_the_page_mounts_with_all_five_anchors_and_a_nav_entry(v2_page):
+def test_the_page_mounts_with_all_four_anchors_and_a_nav_entry(v2_page):
     page, base_url = v2_page
     _stub(page)
     _goto(page, base_url)
-    for cov in ("IV-16", "IV-17", "IV-18", "IV-19", "IV-20"):
+    for cov in ("IV-16", "IV-17", "IV-18", "IV-19"):
         assert page.locator('[data-cov="%s"]' % cov).count(), "缺 anchor %s" % cov
     labels = _labels(page)
     nav = page.locator('a[href="%s"]' % ROUTE)
@@ -203,81 +183,18 @@ def test_a_truncated_index_says_so_instead_of_looking_empty(v2_page):
 
 # ── 推進抽屜 ─────────────────────────────────────────────────────────────────
 
-def _open_drawer(page, labels):
-    page.get_by_role("button", name=labels["gui_fleet_progress_btn"], exact=True).first.click()
-    page.wait_for_selector(".drawer", timeout=10000)
 
+# ── 唯讀 ─────────────────────────────────────────────────────────────────────
 
-def test_preview_lists_three_groups_and_leaves_offline_unticked(v2_page):
-    """離線那組預設不勾：它合法、PCE 也收得下，但何時生效不由這裡決定。"""
+def test_the_page_offers_no_way_to_change_enforcement(v2_page):
+    """VEN 盤點只看不改：頁面上沒有推進按鈕，也不送任何非 GET 的請求。"""
     page, base_url = v2_page
-    preview = {"ok": True, "to_mode": "selective", "cap": 200, "truncated": False,
-               "eligible": [{"href": "/orgs/1/workloads/a", "hostname": "a",
-                             "from": "idle", "to": "selective"}],
-               "deferred": [{"href": "/orgs/1/workloads/b", "hostname": "b",
-                             "from": "idle", "to": "selective"}],
-               "skipped": [{"href": "/orgs/1/workloads/c", "hostname": "c",
-                            "reason": "invalid_transition"}]}
-    _stub(page, preview=preview)
+    _stub(page)
+    writes = []
+    page.on("request", lambda req: writes.append(req.url)
+            if req.method != "GET" and "/api/fleet" in req.url else None)
     _goto(page, base_url)
-    labels = _labels(page)
-    _open_drawer(page, labels)
-    page.get_by_role("button", name=labels["gui_fleet_preview"], exact=True).click()
-    out = page.locator('[data-field="preview_out"]')
-    out.wait_for(state="visible")
-    page.wait_for_function(
-        "() => document.querySelectorAll('[data-field=\"preview_out\"] input[type=checkbox]').length === 2")
-    boxes = page.locator('[data-field="preview_out"] input[type="checkbox"]')
-    assert boxes.nth(0).is_checked() is True, "eligible 應該預設勾選"
-    assert boxes.nth(1).is_checked() is False, "離線的不該替操作者勾"
-    text = out.inner_text()
-    assert labels["gui_fleet_deferred_note"] in text
-    assert labels["gui_fleet_r_invalid_transition"] in text, "skipped 沒有說明理由"
-
-
-def test_apply_sends_only_the_ticked_hosts(v2_page):
-    """送出的必須是畫面上勾的那些，不是預覽回來的全部。"""
-    page, base_url = v2_page
-    calls = []
-    preview = {"ok": True, "to_mode": "selective", "cap": 200, "truncated": False,
-               "eligible": [{"href": "/orgs/1/workloads/a", "hostname": "a",
-                             "from": "idle", "to": "selective"}],
-               "deferred": [{"href": "/orgs/1/workloads/b", "hostname": "b",
-                             "from": "idle", "to": "selective"}],
-               "skipped": []}
-    _stub(page, preview=preview, calls=calls,
-          apply_={"ok": True, "applied": [{"href": "/orgs/1/workloads/a"}],
-                  "failed": [], "record_id": "rec1", "pending_heartbeat": True})
-    _goto(page, base_url)
-    labels = _labels(page)
-    _open_drawer(page, labels)
-    page.get_by_role("button", name=labels["gui_fleet_preview"], exact=True).click()
-    page.wait_for_function(
-        "() => document.querySelectorAll('[data-field=\"preview_out\"] input[type=checkbox]').length === 2")
-    page.locator('[data-field="apply"]').click()
-    page.wait_for_function("() => document.querySelector('.toast')")
-    sent = [c for c in calls if c[0] == "apply"]
-    assert len(sent) == 1, calls
-    assert sent[0][1]["hrefs"] == ["/orgs/1/workloads/a"], sent[0][1]
-
-
-def test_the_success_toast_does_not_say_the_vens_have_it(v2_page):
-    """PCE 收下 ≠ VEN 套用了。這條在後端回應裡是 pending_heartbeat。"""
-    page, base_url = v2_page
-    preview = {"ok": True, "to_mode": "selective", "cap": 200, "truncated": False,
-               "eligible": [{"href": "/orgs/1/workloads/a", "hostname": "a",
-                             "from": "idle", "to": "selective"}],
-               "deferred": [], "skipped": []}
-    _stub(page, preview=preview,
-          apply_={"ok": True, "applied": [{"href": "/orgs/1/workloads/a"}],
-                  "failed": [], "record_id": "rec1", "pending_heartbeat": True})
-    _goto(page, base_url)
-    labels = _labels(page)
-    _open_drawer(page, labels)
-    page.get_by_role("button", name=labels["gui_fleet_preview"], exact=True).click()
-    page.wait_for_function(
-        "() => document.querySelectorAll('[data-field=\"preview_out\"] input[type=checkbox]').length === 1")
-    page.locator('[data-field="apply"]').click()
-    toast = page.locator('.toast[data-tone="ok"]').first
-    toast.wait_for(state="visible")
-    assert labels["gui_fleet_pending_heartbeat"] in toast.inner_text()
+    page.wait_for_selector('[data-cov="IV-17"]', timeout=10000)
+    assert page.locator('[data-field="open_progress"]').count() == 0
+    assert page.locator('[data-cov="IV-20"]').count() == 0
+    assert writes == []

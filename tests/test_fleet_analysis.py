@@ -19,7 +19,6 @@ import pytest
 
 from src.report.analysis.fleet import (
     PIPELINE_BUCKETS,
-    VALID_PROGRESSIONS,
     analyze_fleet,
     compat_state,
     parse_ven_version,
@@ -177,14 +176,6 @@ def test_a_workload_with_no_labels_is_unlabeled():
     assert gaps["unlabeled"]["count"] == 1
     assert gaps["unlabeled"]["sample"][0]["hostname"] == "bare"
     assert gaps["by_app"]["web"] == {"selective": 1}
-
-
-def test_valid_progressions_never_go_backwards():
-    """PCE 寫入的白名單：模式只能往前推，不能退。"""
-    assert VALID_PROGRESSIONS["idle"] == {"visibility_only", "selective", "full"}
-    assert VALID_PROGRESSIONS["visibility_only"] == {"selective", "full"}
-    assert VALID_PROGRESSIONS["selective"] == {"full"}
-    assert "full" not in VALID_PROGRESSIONS
 
 
 def test_a_fleet_with_no_parsable_version_has_no_oldest_or_newest():

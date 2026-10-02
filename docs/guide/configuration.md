@@ -237,9 +237,9 @@ sudo systemctl start illumio-ops
 | `timezone` | str | `"local"` | 顯示用時區 |
 | `enable_health_check` | bool | `true` | 是否啟用健康檢查旗標 |
 | `dashboard_queries` | list[dict] | `[]` | GUI 儀表板自訂查詢；型別未經 pydantic 深層驗證（`list[dict]`），實際欄位形狀（`name`/`rank_by`/`pd`/`port`/`proto`/`src_label`/… 等）見 `config.json.example` 或 GUI 儀表板設定頁 |
-| `fleet_target_ven_version` | str | `""` | VEN 車隊目標版本；空字串＝不比對（GUI 的 PCE 連線頁儲存） |
-| `fleet_max_batch` | int（1–1000）\| null | `null` | VEN 車隊單批推進上限；`null`／空字串＝預設 200 |
-| `fleet_index_cap` | int（≥1）\| null | `null` | VEN 車隊 workloads index 落地上限；`null`＝預設 20000 |
+| `fleet_target_ven_version` | str | `""` | VEN 盤點目標版本；空字串＝不比對（GUI 的 PCE 連線頁儲存） |
+| `fleet_max_batch` | int（1–1000）\| null | `null` | **已停用**（enforcement 推進已移除）。舊版 GUI 寫入的值仍可載入，但不再被讀取 |
+| `fleet_index_cap` | int（≥1）\| null | `null` | VEN 盤點 workloads index 落地上限；`null`＝預設 20000 |
 
 ## rules 區塊
 

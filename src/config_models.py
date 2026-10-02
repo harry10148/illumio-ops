@@ -144,7 +144,7 @@ class GeneralSettings(_Base):
     timezone: str = "local"
     enable_health_check: bool = True
     dashboard_queries: list[dict] = Field(default_factory=list)
-    # VEN 車隊（GUI 的 PCE 連線表單每次儲存都會寫入這兩個鍵）。schema 少了它們
+    # VEN 盤點（GUI 的 PCE 連線表單儲存時會寫入這些鍵）。schema 少了它們
     # 時 extra="forbid" 會讓整份 config 驗證失敗，cm.models 全退回預設值
     # （siem/pce_cache.enabled=False）——SIEM 轉送因此無聲停擺。
     # 流量告警規則的評估延遲（分鐘）。VEN 約每 10 分鐘上報一次 flow，評估
@@ -152,6 +152,9 @@ class GeneralSettings(_Base):
     # 視窗往前平移，避免漏判，代價是告警晚發這段時間。0＝不延後（預設）。
     traffic_alert_lag_minutes: int = Field(default=0, ge=0, le=60)
     fleet_target_ven_version: str = ""
+    # 已停用：enforcement 推進功能移除後不再讀取。舊版 GUI 每次儲存都會寫入
+    # 這個鍵，extra="forbid" 下若從 schema 拿掉，既有 config 會整份驗證失敗，
+    # 所以保留欄位、只是沒有人用。
     fleet_max_batch: Optional[int] = Field(default=None, ge=1, le=1000)
     fleet_index_cap: Optional[int] = Field(default=None, ge=1)
 

@@ -177,8 +177,8 @@ _SETTINGS_ALLOWLISTS = {
     "settings": {
         "language", "theme", "timezone", "enable_health_check", "dashboard_queries",
         "traffic_alert_lag_minutes",
-        # VEN 車隊：目標版本（空字串＝不比對）、單批推進上限、index 落地上限
-        "fleet_target_ven_version", "fleet_max_batch", "fleet_index_cap",
+        # VEN 盤點：目標版本（空字串＝不比對）、index 落地上限
+        "fleet_target_ven_version", "fleet_index_cap",
     },
     "api": {"url", "org_id", "key", "secret", "verify_ssl",
             "deployment_type", "console_url"},

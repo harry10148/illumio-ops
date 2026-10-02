@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/) —
 a plain `<major>.<minor>.<patch>` scheme. (Tags through v4.0.0 carried a
 `-topic-slug` codename suffix; the codename was retired in 4.1.0.)
 
+## [Unreleased]
+
+### Removed
+
+- **Enforcement progression is gone; this tool no longer changes a workload's
+  enforcement mode.** The VEN page (now **VEN inventory**, 「VEN 盤點」) only
+  shows where each VEN stands; move workloads forward in the PCE itself. The
+  `/api/fleet/progress/{preview,apply,records}` routes, the batch-size setting
+  on the PCE settings page and `config/fleet_progressions.json` records are no
+  longer used. A `settings.fleet_max_batch` value left in `config.json` by an
+  older version still loads and is ignored.
+
 ## [5.2.0] — 2026-09-19
 
 > **Upgrading — check any traffic rule that says Allowed or Potentially
