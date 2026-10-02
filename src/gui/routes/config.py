@@ -34,6 +34,15 @@ from src.gui._helpers import (
 )
 
 
+
+
+def _host_changed(old_url, new_url) -> bool:
+    """True when *new_url* points at a different host (or port) than *old_url*.
+    An unset old URL is first-time setup, not a change."""
+    old = urllib.parse.urlparse(str(old_url or "")).netloc.lower()
+    new = urllib.parse.urlparse(str(new_url or "")).netloc.lower()
+    return bool(old) and old != new
+
 def make_config_blueprint(
     cm: ConfigManager,
     csrf,           # flask_wtf.csrf.CSRFProtect instance (unused here, kept for consistent signature)
@@ -227,6 +236,15 @@ def make_config_blueprint(
                     if _scheme == 'http':
                         logger.warning("api.url uses plain HTTP — TLS verification cannot be performed")
                 _old_api = dict(scratch.get('api', {}))
+                # The stored key/secret go wherever api.url points. Moving the
+                # URL to another host while keeping them let a session (or a
+                # CSRF-free script holding one) send the real credentials to
+                # any server via "test connection" — reproduced. A new host
+                # needs the secret typed again in the same request.
+                if 'url' in api_in and _host_changed(_old_api.get('url'), api_in['url']) \
+                        and not str(api_in.get('secret') or '').strip():
+                    return jsonify({"ok": False,
+                                    "error": t("gui_err_secret_required_for_new_host", lang=lang)}), 400
                 _candidate_api = dict(_old_api)
                 for k in api_allowlist:
                     if k in api_in:
@@ -298,6 +316,17 @@ def make_config_blueprint(
             if 'smtp' in d:
                 allowlist = _SETTINGS_ALLOWLISTS["smtp"]
                 filtered = {k: v for k, v in d['smtp'].items() if k in allowlist}
+                _old_smtp = scratch.get('smtp', {}) or {}
+                # Same rule as api.url: the stored SMTP password follows
+                # smtp.host, so a new host needs the password typed again.
+                if ('host' in filtered
+                        and str(filtered.get('host') or '').strip().lower()
+                        != str(_old_smtp.get('host') or '').strip().lower()
+                        and str(_old_smtp.get('host') or '').strip()
+                        and _old_smtp.get('password')
+                        and not str(filtered.get('password') or '').strip()):
+                    return jsonify({"ok": False,
+                                    "error": t("gui_err_secret_required_for_new_host", lang=lang)}), 400
                 scratch.setdefault('smtp', {}).update(filtered)
             if 'alerts' in d:
                 allowlist = _SETTINGS_ALLOWLISTS["alerts"]

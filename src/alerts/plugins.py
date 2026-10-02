@@ -54,6 +54,29 @@ def redact_webhook_url(url: str) -> str:
     return "..."
 
 
+def scrub_webhook_url(text, url: str) -> str:
+    """Remove *url* (and its secret-bearing path/query) from an error text.
+
+    ``redact_webhook_url`` covers the target field, but exception text can
+    still carry the full URL — ``ValueError: unknown url type: '<url>'`` for
+    a malformed one, or a proxy/receiver echoing the request line in its
+    error body — and that text lands in logs and the dispatch history.
+    """
+    out = str(text or "")
+    if not url:
+        return out
+    safe = redact_webhook_url(url)
+    out = out.replace(url, safe)
+    try:
+        parts = urlsplit(url)
+        tail = parts.path + (("?" + parts.query) if parts.query else "")
+        if len(tail) > 1:
+            out = out.replace(tail, "/...")
+    except Exception:
+        pass
+    return out
+
+
 class MailAlertPlugin(AlertOutputPlugin):
     name = "mail"
 
@@ -232,14 +255,17 @@ class WebhookAlertPlugin(AlertOutputPlugin):
                 error_body = exc.read().decode("utf-8")
             except Exception:
                 error_body = "Could not read error body"
-            print(f"{Colors.FAIL}{t('webhook_alert_failed', lang=lang, error=f'{exc} - {error_body}', status=exc.code)}{Colors.ENDC}")
-            return {"channel": "webhook", "status": "failed", "target": safe_target, "error": f"{exc} - {error_body}"}
+            err = scrub_webhook_url(f"{exc} - {error_body}", webhook_url)
+            print(f"{Colors.FAIL}{t('webhook_alert_failed', lang=lang, error=err, status=exc.code)}{Colors.ENDC}")
+            return {"channel": "webhook", "status": "failed", "target": safe_target, "error": err}
         except (urllib.error.URLError, TimeoutError) as exc:
-            print(f"{Colors.FAIL}{t('webhook_alert_failed', lang=lang, error=f'Connection Error/Timeout: {exc}', status='')}{Colors.ENDC}")
-            return {"channel": "webhook", "status": "failed", "target": safe_target, "error": f"Connection Error/Timeout: {exc}"}
+            err = scrub_webhook_url(f"Connection Error/Timeout: {exc}", webhook_url)
+            print(f"{Colors.FAIL}{t('webhook_alert_failed', lang=lang, error=err, status='')}{Colors.ENDC}")
+            return {"channel": "webhook", "status": "failed", "target": safe_target, "error": err}
         except Exception as exc:
-            print(f"{Colors.FAIL}{t('webhook_alert_failed', lang=lang, error=exc, status='')}{Colors.ENDC}")
-            return {"channel": "webhook", "status": "failed", "target": safe_target, "error": str(exc)}
+            err = scrub_webhook_url(str(exc), webhook_url)
+            print(f"{Colors.FAIL}{t('webhook_alert_failed', lang=lang, error=err, status='')}{Colors.ENDC}")
+            return {"channel": "webhook", "status": "failed", "target": safe_target, "error": err}
 
 
 class TelegramAlertPlugin(AlertOutputPlugin):
@@ -328,11 +354,14 @@ class TeamsAlertPlugin(AlertOutputPlugin):
                 error_body = exc.read().decode("utf-8")
             except Exception:
                 error_body = "Could not read error body"
-            print(f"{Colors.FAIL}{t('teams_alert_failed', lang=lang, error=f'{exc} - {error_body}', status=exc.code)}{Colors.ENDC}")
-            return {"channel": "teams", "status": "failed", "target": safe_target, "error": f"{exc} - {error_body}"}
+            err = scrub_webhook_url(f"{exc} - {error_body}", webhook_url)
+            print(f"{Colors.FAIL}{t('teams_alert_failed', lang=lang, error=err, status=exc.code)}{Colors.ENDC}")
+            return {"channel": "teams", "status": "failed", "target": safe_target, "error": err}
         except (urllib.error.URLError, TimeoutError) as exc:
-            print(f"{Colors.FAIL}{t('teams_alert_failed', lang=lang, error=f'Connection Error/Timeout: {exc}', status='')}{Colors.ENDC}")
-            return {"channel": "teams", "status": "failed", "target": safe_target, "error": f"Connection Error/Timeout: {exc}"}
+            err = scrub_webhook_url(f"Connection Error/Timeout: {exc}", webhook_url)
+            print(f"{Colors.FAIL}{t('teams_alert_failed', lang=lang, error=err, status='')}{Colors.ENDC}")
+            return {"channel": "teams", "status": "failed", "target": safe_target, "error": err}
         except Exception as exc:
-            print(f"{Colors.FAIL}{t('teams_alert_failed', lang=lang, error=exc, status='')}{Colors.ENDC}")
-            return {"channel": "teams", "status": "failed", "target": safe_target, "error": str(exc)}
+            err = scrub_webhook_url(str(exc), webhook_url)
+            print(f"{Colors.FAIL}{t('teams_alert_failed', lang=lang, error=err, status='')}{Colors.ENDC}")
+            return {"channel": "teams", "status": "failed", "target": safe_target, "error": err}

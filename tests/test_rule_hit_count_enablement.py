@@ -104,6 +104,7 @@ class TestEnable(unittest.TestCase):
         api.api_cfg = {"org_id": 1}
         api._api_put.return_value = 204
         api._api_post.return_value = (201, {})
+        api._api_get.return_value = (200, {"update_type": None, "rule_hit_count_enabled_scopes": []})
         return api
 
     def test_enable_all_vens_runs_three_steps_in_order(self):
@@ -140,6 +141,25 @@ class TestEnable(unittest.TestCase):
             enable_rule_hit_count(api)
         self.assertEqual(ctx.exception.steps_done, ["pce_report_template"])
         api._api_post.assert_not_called()   # provision must NOT run after failure
+
+
+class TestPendingDraft(unittest.TestCase):
+    def test_refuses_when_firewall_settings_has_unreviewed_draft_changes(self):
+        """Provisioning firewall_settings would ship someone else's staged edits."""
+        api = TestEnable()._api_ok()
+        api._api_get.return_value = (200, {"update_type": "update"})
+        with self.assertRaises(EnablementError) as ctx:
+            enable_rule_hit_count(api)
+        self.assertIn("unprovisioned", str(ctx.exception))
+        self.assertEqual(len(api._api_put.call_args_list), 1)   # template only
+        api._api_post.assert_not_called()
+
+    def test_refuses_when_the_draft_cannot_be_read(self):
+        api = TestEnable()._api_ok()
+        api._api_get.return_value = (500, None)
+        with self.assertRaises(EnablementError):
+            enable_rule_hit_count(api)
+        api._api_post.assert_not_called()
 
 
 class TestNotEnabledException(unittest.TestCase):

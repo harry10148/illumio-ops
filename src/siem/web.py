@@ -87,7 +87,18 @@ def update_destination(name: str):
         # PUT must not silently reset omitted fields to pydantic defaults
         # (hec_token wiped, mask_pii disabled). Redaction placeholders from a
         # round-tripped GET are stripped first so the stored token survives.
-        merged = {**dests[idx], **_strip_redaction_placeholders(data)}
+        incoming = _strip_redaction_placeholders(data)
+        # The stored HEC token is sent to whatever host this destination
+        # names. Changing host/port while keeping it would hand the token to
+        # the new address on the next "test" — the same hole as api.url. A
+        # new address needs the token typed again in the same request.
+        old = dests[idx]
+        moved = any(k in incoming and str(incoming[k]).strip().lower() != str(old.get(k) or "").strip().lower()
+                    for k in ("host", "port"))
+        if moved and old.get("hec_token") and not str(incoming.get("hec_token") or "").strip():
+            return jsonify({"ok": False,
+                            "error": t("gui_err_secret_required_for_new_host", lang=lang)}), 400
+        merged = {**old, **incoming}
         merged["name"] = name
         SiemDestinationSettings(**merged)  # validate merged result
         dests[idx] = merged

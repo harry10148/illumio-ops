@@ -13,6 +13,7 @@ from loguru import logger
 
 from src.config import ConfigManager, verify_password
 from src.gui._helpers import (
+    _audit,
     _ui_translation_dict, _ok, _err, _safe_log,
 )
 from src.i18n import t
@@ -110,6 +111,10 @@ def make_auth_blueprint(
         # Do NOT insert early returns or blank lines between these two lines.
         username_ok = _hmac.compare_digest(username.strip(), saved_username.strip())
         password_ok = verify_password(password, saved_password)
+        # Every attempt is recorded, successful or not: brute force is only
+        # rate-limited per address, so the log is how a spread-out attempt
+        # gets noticed. The password itself is never written.
+        _audit("login", user=username[:64], result="success" if (username_ok and password_ok) else "failure")
         if username_ok and password_ok:
             session.permanent = True
             login_user(AdminUser(username))

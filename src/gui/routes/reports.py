@@ -15,7 +15,9 @@ from src.config import ConfigManager
 from src.i18n import t
 from src.state_store import load_state_file, update_state_file
 from src.gui._helpers import (
+    _audit,
     _ALLOWED_REPORT_FORMATS,
+    _is_report_file,
     _resolve_reports_dir,
     _resolve_config_dir,
     _resolve_state_file,
@@ -211,6 +213,7 @@ def make_reports_blueprint(
             _ML.get("actions").info(f"{action}: user={user} result={result} {parts}")
         except Exception:
             pass
+        _audit(action, result=result, **fields)
 
     # ── API: Reports ──────────────────────────────────────────────────────────
 
@@ -264,7 +267,7 @@ def make_reports_blueprint(
         reports_dir = _resolve_reports_dir(cm)
         # Prevent path traversal
         target = os.path.realpath(os.path.join(reports_dir, filename))
-        if not target.startswith(os.path.realpath(reports_dir) + os.sep):
+        if not target.startswith(os.path.realpath(reports_dir) + os.sep) or not _is_report_file(target):
             return jsonify({"ok": False, "error": t("gui_invalid_filename", lang=lang)}), 400
         if not os.path.isfile(target):
             return jsonify({"ok": False, "error": t("gui_file_not_found", lang=lang)}), 404
@@ -296,7 +299,7 @@ def make_reports_blueprint(
         for filename in filenames:
             try:
                 target = os.path.realpath(os.path.join(reports_dir, filename))
-                if not target.startswith(resolved_reports_dir + os.sep):
+                if not target.startswith(resolved_reports_dir + os.sep) or not _is_report_file(target):
                     errors.append(f"{filename}: {t('gui_invalid_filename', lang=lang)}")
                     continue
                 if not os.path.isfile(target):
@@ -324,7 +327,7 @@ def make_reports_blueprint(
         reports_dir = _resolve_reports_dir(cm)
         # Path traversal protection: ensure resolved path stays within reports_dir
         target = os.path.realpath(os.path.join(reports_dir, filename))
-        if not target.startswith(os.path.realpath(reports_dir) + os.sep):
+        if not target.startswith(os.path.realpath(reports_dir) + os.sep) or not _is_report_file(target):
             return jsonify({"ok": False, "error": t("gui_err_invalid_path", lang=lang)}), 403
         as_download = request.args.get('download') == '1'
         return send_from_directory(reports_dir, filename, as_attachment=as_download)

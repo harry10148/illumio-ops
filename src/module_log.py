@@ -73,6 +73,10 @@ class ModuleLog:
         # so operators correlate the two logs without a hidden UTC offset.
         ts = datetime.datetime.now().astimezone().strftime("%Y-%m-%d %H:%M:%S")
         clean = _ANSI_RE.sub("", str(message))
+        # One entry is one line. Values in these messages come from requests
+        # (hrefs, names); a raw newline let a request append a forged entry
+        # to an audit log (reproduced with a quarantine href).
+        clean = clean.replace("\r", "\\r").replace("\n", "\\n")
         entry = {"ts": ts, "level": level, "msg": clean}
         line = f"{ts} [{level:5s}] {clean}"
         with self._lock:

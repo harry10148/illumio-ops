@@ -13,6 +13,7 @@ from src.analyzer import QUERY_RESULT_CAP, analysis_lock as _analysis_lock
 from src.config import ConfigManager
 from src.file_lock import file_lock as _file_lock
 from src.gui._helpers import (
+    _audit,
     _err,
     _err_with_log,
     _is_workload_href,
@@ -43,10 +44,14 @@ _HEALTH_LOCK_WAIT_S = 30.0
 _TRAFFIC_DATA_SOURCE_VALUES = {"hybrid", "cache", "live", "no-cache", "api"}
 
 
+# One request may touch at most this many workloads: every one is a PCE write.
+_MAX_BULK = 500
+
+
 def make_actions_blueprint(
     cm: ConfigManager,
     csrf,           # flask_wtf.csrf.CSRFProtect instance (unused here, kept for consistent signature)
-    limiter,        # flask_limiter.Limiter instance (unused here, kept for consistent signature)
+    limiter,        # flask_limiter.Limiter instance
     login_required,  # flask_login.login_required decorator (unused here, kept for consistent signature)
 ) -> Blueprint:
     bp = Blueprint("actions", __name__)
@@ -64,6 +69,7 @@ def make_actions_blueprint(
             _ML.get("actions").info(f"{action}: user={user} {parts}")
         except Exception:
             pass
+        _audit(action, **fields)
 
     @bp.route('/api/init_quarantine', methods=['POST'])
     def api_init_quarantine():
@@ -527,6 +533,7 @@ def make_actions_blueprint(
             return _err_with_log("workloads_search", e, lang=lang)
 
     @bp.route('/api/quarantine/apply', methods=['POST'])
+    @limiter.limit("30 per minute")
     def api_quarantine_apply():
         d = request.json or {}
         lang = d.get('lang') or cm.config.get('settings', {}).get('language', 'en')
@@ -573,10 +580,13 @@ def make_actions_blueprint(
             return _err_with_log("quarantine_apply", e, lang=lang)
 
     @bp.route('/api/quarantine/bulk_apply', methods=['POST'])
+    @limiter.limit("30 per minute")
     def api_quarantine_bulk_apply():
         d = request.json or {}
         lang = d.get('lang') or cm.config.get('settings', {}).get('language', 'en')
         raw_hrefs = d.get('hrefs', [])
+        if not isinstance(raw_hrefs, list) or len(raw_hrefs) > _MAX_BULK:
+            return _err(t("gui_err_bulk_too_large", lang=lang, n=_MAX_BULK), 400)
         hrefs = _normalize_quarantine_hrefs(raw_hrefs)
         level = d.get('level')
         try:
@@ -633,6 +643,7 @@ def make_actions_blueprint(
             return _err_with_log("quarantine_bulk_apply", e, lang=lang)
 
     @bp.route('/api/quarantine/lift', methods=['POST'])
+    @limiter.limit("30 per minute")
     def api_quarantine_lift():
         """解除隔離：移除 Quarantine 標籤、保留其餘標籤（spec §11.2）。
 
@@ -642,6 +653,8 @@ def make_actions_blueprint(
         d = request.json or {}
         lang = d.get('lang') or cm.config.get('settings', {}).get('language', 'en')
         raw_hrefs = d.get('hrefs', [])
+        if not isinstance(raw_hrefs, list) or len(raw_hrefs) > _MAX_BULK:
+            return _err(t("gui_err_bulk_too_large", lang=lang, n=_MAX_BULK), 400)
         hrefs = _normalize_quarantine_hrefs(raw_hrefs)
         try:
             if not hrefs:
@@ -700,6 +713,8 @@ def make_actions_blueprint(
         d = request.json or {}
         lang = d.get('lang') or cm.config.get('settings', {}).get('language', 'en')
         raw_hrefs = d.get('hrefs', []) or []
+        if not isinstance(raw_hrefs, list) or len(raw_hrefs) > _MAX_BULK:
+            return _err(t("gui_err_bulk_too_large", lang=lang, n=_MAX_BULK), 400)
         try:
             duration = int(d.get('duration_minutes', 0) or 0)  # logged only
         except (TypeError, ValueError):

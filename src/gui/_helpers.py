@@ -211,9 +211,53 @@ def _normalize_match_fields(raw_value):
         return normalized
     raise ValueError("match_fields must be an object of field-path to pattern.")
 
+# A workload href and nothing else: /orgs/<n>/workloads/<id>. The old check
+# was "contains /workloads/", so "/orgs/1/sec_policy/draft/label_groups/x?a=/workloads/"
+# passed, and quarantine then PUT a labels body onto a label group. These
+# hrefs are pasted into PCE write URLs, so the shape has to be exact.
+_WORKLOAD_HREF_RE = re.compile(r"/orgs/\d+/workloads/[A-Za-z0-9][A-Za-z0-9-]{0,63}")
+
+
+def _audit(action: str, **fields) -> None:
+    """One audit line per security-relevant action, in logs/modules/audit.log.
+
+    Who (session user), from where (remote address), what, and the result.
+    Values are JSON-encoded, so a crafted href or name cannot break the line
+    or impersonate another field. Best-effort: auditing never blocks the
+    action it records.
+    """
+    try:
+        from flask import has_request_context, request as _rq
+        from src.module_log import ModuleLog as _ML
+        user, addr = "?", ""
+        try:
+            from flask_login import current_user
+            if getattr(current_user, "is_authenticated", False):
+                user = str(current_user.get_id())
+        except Exception:
+            pass
+        if has_request_context():
+            addr = _rq.remote_addr or ""
+        record = {"action": action, "user": fields.pop("user", user), "remote_addr": addr}
+        record.update(fields)
+        _ML.get("audit").info(json.dumps(record, ensure_ascii=False, default=str))
+    except Exception:
+        pass
+
+
 def _is_workload_href(href: str) -> bool:
-    normalized = str(href or "").strip()
-    return bool(normalized) and "/workloads/" in normalized
+    return bool(_WORKLOAD_HREF_RE.fullmatch(str(href or "").strip()))
+
+
+# A ruleset or a rule inside one. The rule scheduler writes a description
+# onto this href and provisions it, so anything else (a label group, the
+# firewall settings, a URL with a query string) must be refused up front.
+_RULE_HREF_RE = re.compile(
+    r"/orgs/\d+/sec_policy/(?:active|draft)/rule_sets/\d+(?:/(?:sec_rules|deny_rules|rules)/\d+)?")
+
+
+def _is_rule_href(href: str) -> bool:
+    return bool(_RULE_HREF_RE.fullmatch(str(href or "").strip()))
 
 def _normalize_quarantine_hrefs(raw_hrefs) -> list[str]:
     normalized: list[str] = []
@@ -309,6 +353,8 @@ def _is_forbidden_report_output_dir(raw: str) -> bool:
     resolved = os.path.realpath(resolved)
     if resolved == os.sep:
         return True
+    if _overlaps_sensitive_dir(resolved):
+        return True
     parts = resolved.split(os.sep)
     if len(parts) > 1:
         top_level = os.sep + parts[1]
@@ -318,6 +364,36 @@ def _is_forbidden_report_output_dir(raw: str) -> bool:
 
 def _resolve_config_dir() -> str:
     return os.path.join(_ROOT_DIR, 'config')
+
+
+# Directories that hold secrets or live state. A report directory that is one
+# of them, sits inside one, or contains one would let the report download and
+# delete endpoints reach config.json (PCE secret, session secret_key), the TLS
+# keys, state.json or the cache — reproduced: output_dir=config served
+# config.json in full.
+def _sensitive_dirs() -> list[str]:
+    return [os.path.realpath(os.path.join(_ROOT_DIR, d))
+            for d in ("config", "logs", "data", "src", "deploy", "scripts")]
+
+
+def _overlaps_sensitive_dir(resolved: str) -> bool:
+    for d in _sensitive_dirs():
+        if resolved == d or resolved.startswith(d + os.sep) or d.startswith(resolved + os.sep):
+            return True
+    return False
+
+
+# What the report endpoints may serve or delete: the formats reports are
+# written in, never anything else that happens to sit in the directory.
+_REPORT_FILE_EXTS = (".html", ".htm", ".zip", ".pdf", ".xlsx", ".csv", ".json")
+
+
+def _is_report_file(target: str) -> bool:
+    """True when *target* (already realpath'd) is a report file the GUI may
+    serve or delete: a report extension, and nowhere near secrets/state."""
+    if not target.lower().endswith(_REPORT_FILE_EXTS):
+        return False
+    return not _overlaps_sensitive_dir(os.path.dirname(target))
 
 def _resolve_state_file() -> str:
     return _resolve_state_file_impl()
