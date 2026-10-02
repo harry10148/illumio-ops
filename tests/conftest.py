@@ -284,6 +284,14 @@ def cli_runner():
 
 
 @pytest.fixture(autouse=True)
+def _no_health_reprobe_pause(monkeypatch):
+    """The analyzer waits before re-probing a transiently failed PCE health
+    check; tests that drive that path should not sleep for it."""
+    import src.analyzer as _analyzer
+    monkeypatch.setattr(_analyzer, "HEALTH_REPROBE_DELAY_SECONDS", 0.0)
+
+
+@pytest.fixture(autouse=True)
 def _isolate_alert_store(monkeypatch, tmp_path):
     """Never let a test write the real ``logs/alerts.sqlite``.
 

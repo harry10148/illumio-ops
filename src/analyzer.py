@@ -96,6 +96,29 @@ def humanize_outage(minutes: int) -> str:
 # use force=True and bypass this interval.
 HEALTH_CHECK_INTERVAL_SECONDS = 60
 
+# A probe that fails for a reason that can clear by itself — the connection
+# dropped, a 5xx, a 429 — is tried once more after this pause before it is
+# recorded. One blip used to flip PCE health to "error" and send a pce_health
+# alert straight away; the operator would then check by hand, get a healthy
+# answer, and be left with an alert nothing could explain. Auth failures and
+# an unhealthy status the PCE itself reports are deterministic and are never
+# retried.
+HEALTH_REPROBE_DELAY_SECONDS = 2.0
+_TRANSIENT_PROBE_CATEGORIES = frozenset({"transport_error", "server_error", "rate_limited"})
+
+
+def _probe_twice_if_transient(probe, classify):
+    """Run ``probe()``; if ``classify(status)`` says the failure is transient,
+    wait and run it once more. Returns the (status, body) actually recorded."""
+    import time
+
+    status, body = probe()
+    if classify(status) in _TRANSIENT_PROBE_CATEGORIES:
+        logger.info("PCE probe failed transiently (HTTP {}); probing once more", status)
+        time.sleep(HEALTH_REPROBE_DELAY_SECONDS)
+        status, body = probe()
+    return status, body
+
 # Meta-alert cooldown for event polling overflow: when the sync events API
 # hits max_results it returns only the newest rows, so older events in the
 # window are permanently lost. Own cooldown keeps a persistent burst source
@@ -1286,7 +1309,7 @@ class Analyzer:
 
         logger.debug(t('checking_pce_health'))
         deployment = pce_deployment_type(self.cm.config.get("api", {}))
-        h_status, h_msg = self.api.check_connectivity()
+        h_status, h_msg = _probe_twice_if_transient(self.api.check_connectivity, pce_probe_category)
         category = pce_probe_category(h_status)
         if category != "ok":
             logger.error(t('status_error'))
@@ -1318,7 +1341,7 @@ class Analyzer:
             self._pce_stats_dirty = True
             self._watchdog_dirty = True
         else:
-            h_status, h_msg = self.api.check_health()
+            h_status, h_msg = _probe_twice_if_transient(self.api.check_health, pce_probe_category)
             category = _endpoint_probe_category(h_status, (200,))
             if h_status != 200:
                 logger.error(t('status_error'))
@@ -1358,7 +1381,7 @@ class Analyzer:
                 na_check = getattr(self.api, "check_node_available", None)
                 na_status = None
                 if callable(na_check):
-                    na_status, _na_msg = na_check()
+                    na_status, _na_msg = _probe_twice_if_transient(na_check, pce_probe_category)
                 if na_status is not None and na_status not in (200, 202):
                     logger.warning(f"PCE node_available check failed: HTTP {na_status}")
                     self._record_health_failure(

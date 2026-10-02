@@ -783,7 +783,8 @@ async function mountPce(root, ctx) {
 
   await sysPage(root, ctx, R_PCE, PCE_SNAPS, function (board, d, host) {
     // v3: OV-01 system status and OV-12 data integrity moved here from the overview
-    board.appendChild(brow("c2", [cardSystem(d.status || {}, d.dashboard_overview || {}), cardIntegrity(d.dashboard_overview || {})]));
+    let sysCard = cardSystem(d.status || {}, d.dashboard_overview || {});
+    board.appendChild(brow("c2", [sysCard, cardIntegrity(d.dashboard_overview || {})]));
     const s = d.settings || {};
     const api_ = s.api || {};
 
@@ -878,6 +879,16 @@ async function mountPce(root, ctx) {
           return false;
         }
         paintHealth(res.pce_stats);
+        // The check just rewrote pce_stats. Drop the cached snapshot so every
+        // other light (home, health bar) reads the new verdict, and repaint
+        // the status card above in place — it was built from the snapshot
+        // taken at mount and would otherwise stay red next to a green row.
+        api.invalidate("status");
+        api.invalidate("dashboard_overview");
+        const fresh = cardSystem(Object.assign({}, d.status || {}, { pce_stats: res.pce_stats }),
+          d.dashboard_overview || {});
+        sysCard.replaceWith(fresh);
+        sysCard = fresh;
         if (res.ok === true) {
           toast.ok(t("gui_pce_health_check_passed"));
           return true;

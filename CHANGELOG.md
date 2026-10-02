@@ -19,6 +19,23 @@ a plain `<major>.<minor>.<patch>` scheme. (Tags through v4.0.0 carried a
   longer used. A `settings.fleet_max_batch` value left in `config.json` by an
   older version still loads and is ignored.
 
+### Fixed
+
+- **PCE health no longer stays red after a healthy manual check.** The web
+  console cached `/api/status` for the whole browser session, so a probe that
+  had failed once kept every PCE light red until a full reload, and "Check
+  now" only repainted its own row. Live status snapshots now expire after 60
+  seconds, and a manual check repaints the status card and drops the cached
+  snapshot.
+- **One dropped connection no longer raises a PCE health alert.** A probe that
+  fails transiently (connection error, 5xx, 429) is tried once more before it
+  is recorded; 401/403 and an unhealthy status the PCE itself reports are not
+  retried.
+- **A standalone `--monitor` daemon picks up config changes** (API key, URL,
+  deployment type) made in the web console; it used to keep probing with the
+  values it started with.
+- **Pressing Enter on the login page signs in.**
+
 ## [5.2.0] — 2026-09-19
 
 > **Upgrading — check any traffic rule that says Allowed or Potentially

@@ -60,6 +60,15 @@ def run_monitor_cycle(cm) -> None:
     mlog = ModuleLog.get("monitor")
     try:
         mlog.info("Starting monitor cycle")
+        # Re-read config.json each cycle. A standalone --monitor daemon never
+        # reloads it otherwise: after the API key, URL or deployment type was
+        # changed in the GUI (another process) it kept probing with the old
+        # values and wrote "error" into the shared state.json, while the GUI's
+        # manual check — which loads fresh config — said healthy. The shared
+        # write lock keeps the reload from replacing cm.config in the middle
+        # of a GUI request's read-modify-write (same as the rule scheduler).
+        with cm.write_lock:
+            cm.load()
         with ApiClient(cm) as api:
             rep = Reporter(cm)
             sub_events, sub_flows = _make_subscribers(cm)

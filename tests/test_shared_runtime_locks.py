@@ -9,6 +9,19 @@ new 一把 Lock 都會紅。
 import threading
 
 
+
+class _StubCM:
+    """Just enough ConfigManager for run_monitor_cycle: it re-reads config
+    under the shared write lock before each cycle."""
+
+    def __init__(self):
+        import threading
+        self.write_lock = threading.RLock()
+        self.loads = 0
+
+    def load(self):
+        self.loads += 1
+
 def test_rule_scheduler_db_lock_is_shared_with_gui():
     import src.rule_scheduler as core
     import src.gui.routes.rule_scheduler as gui_rs
@@ -78,7 +91,7 @@ def test_run_monitor_cycle_holds_analysis_lock_during_analysis(monkeypatch):
     monkeypatch.setattr(src.main, "_make_subscribers", lambda cm: (None, None))
     monkeypatch.setattr(src.main, "_make_cache_reader", lambda cm: None)
 
-    run_monitor_cycle(object())
+    run_monitor_cycle(_StubCM())
 
     assert held.get("during_analysis") is True, "run_analysis 不在 analysis_lock 內"
     assert held.get("during_send") is True, "send_alerts 不在 analysis_lock 內"
