@@ -834,6 +834,34 @@
             ],
             "title": "DeploymentType",
             "type": "string"
+          },
+          "PceReset": {
+            "properties": {
+              "archive_moved_to": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Archive Moved To"
+              },
+              "cleared": {
+                "items": {
+                  "type": "string"
+                },
+                "title": "Cleared",
+                "type": "array"
+              }
+            },
+            "required": [
+              "cleared",
+              "archive_moved_to"
+            ],
+            "title": "PceReset",
+            "type": "object"
           }
         },
         "properties": {
@@ -863,6 +891,16 @@
             "title": "Org Id",
             "type": "string"
           },
+          "reset": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/PceReset"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "revision": {
             "title": "Revision",
             "type": "integer"
@@ -891,9 +929,10 @@
           "api_secret",
           "deployment_type",
           "console_url",
-          "verify_tls"
+          "verify_tls",
+          "reset"
         ],
-        "title": "PceConnection",
+        "title": "PceConnectionSaved",
         "type": "object"
       }
     },

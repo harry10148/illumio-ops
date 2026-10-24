@@ -114,6 +114,9 @@ button:disabled { cursor: progress; opacity: .7; }
 .actions { display: flex; align-items: center; gap: var(--space-5); flex-wrap: wrap; }
 .field-error { color: var(--tone-crit-fg); font-size: var(--fs-mini); }
 .form-ok { margin: 0; color: var(--tone-ok-fg); }
+.notice { margin: 0; padding: var(--s-2, 8px) var(--s-3, 12px); border: 1px solid var(--tone-info-border);
+          background: var(--tone-info-bg); color: var(--tone-info-fg); }
+.form-grid .notice { grid-column: 1 / -1; }
 .inline-action { margin-left: var(--space-5); }
 .probe-list { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-3); }
 .probe-row {

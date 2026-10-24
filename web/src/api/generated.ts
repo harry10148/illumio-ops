@@ -184,6 +184,29 @@ verify_tls: (boolean | string)
 }
 /**
  * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "PceReset".
+ */
+export interface PceReset {
+archive_moved_to: (string | null)
+cleared: string[]
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "PceConnectionSaved".
+ */
+export interface PceConnectionSaved {
+api_key: string
+api_secret: string
+console_url: (string | null)
+deployment_type: DeploymentType
+org_id: string
+reset: (PceReset | null)
+revision: number
+url: string
+verify_tls: (boolean | string)
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
  * via the `definition` "SecurityView".
  */
 export interface SecurityView {
@@ -325,7 +348,7 @@ export interface Responses {
   "system.pce.get": PceConnection;
   "system.pce.latest": LatestProbe;
   "system.pce.probe": ProbeRun;
-  "system.pce.update": PceConnection;
+  "system.pce.update": PceConnectionSaved;
   "system.security.get": SecurityView;
   "system.security.update": SecurityView;
   "system.tls.csr": CsrResult;

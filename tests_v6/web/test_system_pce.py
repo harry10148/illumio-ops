@@ -147,3 +147,46 @@ def test_switching_pce_forgets_the_previous_probe(client, ctx):
     assert client.get("/api/system/pce/latest", environ_overrides=LOCAL).get_json()["data"]["run"] is not None
     _save(client, url="https://other-pce.example.com:8443", api_key="k2", api_secret="s2")
     assert client.get("/api/system/pce/latest", environ_overrides=LOCAL).get_json()["data"]["run"] is None
+
+
+def _bind(ctx, url=BASE, org="1"):
+    from datetime import UTC, datetime
+
+    from illumio_ops.store.flowdb import binding
+    with ctx.flows().connect() as conn:
+        binding.bind(conn, url, org, datetime.now(UTC))
+
+
+def _bound(ctx):
+    from illumio_ops.store.flowdb import binding
+    with ctx.flows().connect() as conn:
+        return binding.current(conn)
+
+
+def test_pce_update_same_target_does_not_reset(client, ctx):
+    login(client)
+    _save(client)
+    _bind(ctx)
+    r = _save(client, url=BASE + "/", api_key=MASK, api_secret=MASK, console_url="https://console.example.com")
+    assert r.status_code == 200 and r.get_json()["data"]["reset"] is None
+    assert _bound(ctx) is not None
+
+
+def test_pce_update_new_org_resets(client, ctx):
+    login(client)
+    _save(client)
+    _bind(ctx)
+    r = _save(client, org_id="2")
+    assert r.status_code == 200
+    reset = r.get_json()["data"]["reset"]
+    assert reset is not None and "flows" in reset["cleared"]
+    assert _bound(ctx) is None and ctx.settings.current().pce.org_id == "2"
+
+
+def test_rejected_save_does_not_reset(client, ctx):
+    login(client)
+    _save(client)
+    _bind(ctx)
+    rev = client.get("/api/system/pce", environ_overrides=LOCAL).get_json()["data"]["revision"]
+    assert _put(client, _form(org_id="2") | {"revision": rev - 1}).status_code == 409
+    assert _bound(ctx) is not None

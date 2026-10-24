@@ -102,6 +102,8 @@
   "pce_deployment": "Deployment",
   "pce_key_role_hint": "Use a service account with the read-only (Global Viewer) role; it covers everything except Rule Hit Count.",
   "pce_org_id": "Organization ID",
+  "pce_reset_archive_moved": "Archive files of the previous PCE were moved to data/archive/{folder}.",
+  "pce_reset_notice": "Data collected from the previous PCE was cleared; collection and a first backfill now start for this PCE.",
   "pce_secret_hint": "Leave unchanged to keep the saved value (re-enter it if you change the address or TLS check).",
   "pce_test_hint": "Tests the saved connection.",
   "pce_url": "PCE URL",

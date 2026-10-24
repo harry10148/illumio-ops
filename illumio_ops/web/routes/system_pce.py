@@ -11,6 +11,7 @@ from pydantic import BaseModel, Field
 from illumio_ops.domain.values import DeploymentType, ProbeName
 from illumio_ops.pce.health import ProbeResult
 from illumio_ops.services import pce_health
+from illumio_ops.services.collect.reset import pce_target_changed, reset_for_new_pce
 from illumio_ops.settings.secrets import MASK, redact
 from illumio_ops.web.auth import get_ctx
 from illumio_ops.web.contract import ApiFailure, api_route, operation
@@ -38,6 +39,16 @@ class PceConnectionUpdate(BaseModel):
     verify_tls: bool | str
 
 
+class PceReset(BaseModel):
+    cleared: list[str]
+    archive_moved_to: str | None
+
+
+class PceConnectionSaved(PceConnection):
+    # Set when the save pointed the product at another PCE and its collected data was cleared.
+    reset: PceReset | None
+
+
 class ProbeItem(BaseModel):
     name: ProbeName
     ok: bool
@@ -56,7 +67,7 @@ class LatestProbe(BaseModel):
 
 
 OP_GET = operation("system.pce.get", "GET", "/api/system/pce", None, PceConnection)
-OP_UPDATE = operation("system.pce.update", "PUT", "/api/system/pce", PceConnectionUpdate, PceConnection)
+OP_UPDATE = operation("system.pce.update", "PUT", "/api/system/pce", PceConnectionUpdate, PceConnectionSaved)
 OP_PROBE = operation("system.pce.probe", "POST", "/api/system/pce/probe", None, ProbeRun)
 OP_LATEST = operation("system.pce.latest", "GET", "/api/system/pce/latest", None, LatestProbe)
 
@@ -80,7 +91,7 @@ def get_connection() -> PceConnection:
 
 
 @api_route(bp, OP_UPDATE)
-def update_connection(body: PceConnectionUpdate) -> PceConnection:
+def update_connection(body: PceConnectionUpdate) -> PceConnectionSaved:
     fields = body.model_dump(mode="json", exclude={"revision"})
     # A blank or masked secret means "keep what is saved": the form never receives
     # the real values, so it cannot send them back.
@@ -104,10 +115,16 @@ def update_connection(body: PceConnectionUpdate) -> PceConnection:
         d["pce"].update(fields)
 
     ctx = get_ctx()
-    ctx.settings.update(body.revision, mutate)
-    if other_pce:
+    new = ctx.settings.update(body.revision, mutate).pce
+    # Cleared only after the save succeeded: a rejected save must not cost the collected data.
+    # In between, the collectors refuse to write (their database is still bound to the old PCE).
+    reset = None
+    if saved.url and pce_target_changed(saved, new):
+        report = reset_for_new_pce(ctx)
+        reset = PceReset(cleared=report.cleared, archive_moved_to=report.archive_moved_to)
+    elif other_pce:
         pce_health.forget(ctx)
-    return _view()
+    return PceConnectionSaved(**_view().model_dump(), reset=reset)
 
 
 @api_route(bp, OP_PROBE)
