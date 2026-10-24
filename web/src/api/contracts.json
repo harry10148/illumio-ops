@@ -1,0 +1,196 @@
+{
+  "operations": {
+    "auth.csrf": {
+      "method": "GET",
+      "path": "/api/auth/csrf",
+      "request_schema": null,
+      "response_schema": {
+        "properties": {
+          "csrf_token": {
+            "title": "Csrf Token",
+            "type": "string"
+          }
+        },
+        "required": [
+          "csrf_token"
+        ],
+        "title": "CsrfToken",
+        "type": "object"
+      }
+    },
+    "auth.login": {
+      "method": "POST",
+      "path": "/api/auth/login",
+      "request_schema": {
+        "properties": {
+          "password": {
+            "maxLength": 1024,
+            "title": "Password",
+            "type": "string"
+          },
+          "username": {
+            "maxLength": 256,
+            "title": "Username",
+            "type": "string"
+          }
+        },
+        "required": [
+          "username",
+          "password"
+        ],
+        "title": "LoginRequest",
+        "type": "object"
+      },
+      "response_schema": {
+        "properties": {
+          "csrf_token": {
+            "title": "Csrf Token",
+            "type": "string"
+          },
+          "must_change_password": {
+            "title": "Must Change Password",
+            "type": "boolean"
+          },
+          "username": {
+            "title": "Username",
+            "type": "string"
+          }
+        },
+        "required": [
+          "username",
+          "must_change_password",
+          "csrf_token"
+        ],
+        "title": "LoginResult",
+        "type": "object"
+      }
+    },
+    "auth.logout": {
+      "method": "POST",
+      "path": "/api/auth/logout",
+      "request_schema": null,
+      "response_schema": {
+        "properties": {},
+        "title": "Empty",
+        "type": "object"
+      }
+    },
+    "auth.me": {
+      "method": "GET",
+      "path": "/api/auth/me",
+      "request_schema": null,
+      "response_schema": {
+        "properties": {
+          "must_change_password": {
+            "title": "Must Change Password",
+            "type": "boolean"
+          },
+          "username": {
+            "title": "Username",
+            "type": "string"
+          }
+        },
+        "required": [
+          "username",
+          "must_change_password"
+        ],
+        "title": "Me",
+        "type": "object"
+      }
+    },
+    "auth.password": {
+      "method": "POST",
+      "path": "/api/auth/password",
+      "request_schema": {
+        "properties": {
+          "confirm_password": {
+            "maxLength": 4096,
+            "title": "Confirm Password",
+            "type": "string"
+          },
+          "new_password": {
+            "maxLength": 4096,
+            "title": "New Password",
+            "type": "string"
+          },
+          "old_password": {
+            "anyOf": [
+              {
+                "maxLength": 1024,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Old Password"
+          }
+        },
+        "required": [
+          "new_password",
+          "confirm_password"
+        ],
+        "title": "PasswordChangeRequest",
+        "type": "object"
+      },
+      "response_schema": {
+        "properties": {
+          "csrf_token": {
+            "title": "Csrf Token",
+            "type": "string"
+          }
+        },
+        "required": [
+          "csrf_token"
+        ],
+        "title": "CsrfToken",
+        "type": "object"
+      }
+    }
+  },
+  "values": {
+    "AlertRuleType": [
+      "bandwidth",
+      "event",
+      "system",
+      "traffic",
+      "volume"
+    ],
+    "DeploymentType": [
+      "on_prem",
+      "saas"
+    ],
+    "DraftPolicyDecision": [
+      "allowed",
+      "allowed_across_boundary",
+      "blocked",
+      "blocked_by_boundary",
+      "blocked_by_override_deny",
+      "potentially_blocked",
+      "potentially_blocked_by_boundary",
+      "potentially_blocked_by_override_deny",
+      "unknown"
+    ],
+    "Language": [
+      "en",
+      "zh_TW"
+    ],
+    "PolicyDecision": [
+      "allowed",
+      "blocked",
+      "potentially_blocked",
+      "unknown"
+    ],
+    "ProbeName": [
+      "health",
+      "node_available",
+      "noop"
+    ],
+    "RuleAction": [
+      "allow",
+      "deny",
+      "override_deny"
+    ]
+  }
+}

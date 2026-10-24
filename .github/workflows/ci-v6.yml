@@ -42,7 +42,7 @@ jobs:
         run: pip-audit -r requirements-v6.lock --strict
 
       - name: Lint (ruff)
-        run: ruff check illumio_ops tests_v6
+        run: ruff check illumio_ops tests_v6 scripts/v6
 
       - name: Type check (mypy strict)
         run: mypy --config-file mypy-v6.ini

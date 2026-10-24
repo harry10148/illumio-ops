@@ -98,3 +98,29 @@ def test_must_change_password_gate(tmp_path, static_dir):
 
 def test_csrf_endpoint_is_public(client):
     assert csrf(client)
+
+
+def test_logout_revokes_a_copied_session_cookie(app):
+    a, b = app.test_client(), app.test_client()
+    token = login(a).get_json()["data"]["csrf_token"]
+    b.set_cookie("session", a.get_cookie("session").value)
+    assert b.get("/api/auth/me", environ_overrides=LOCAL).status_code == 200
+    assert post(a, "/api/auth/logout", token=token).status_code == 200
+    assert b.get("/api/auth/me", environ_overrides=LOCAL).status_code == 401
+
+
+def test_login_issues_a_new_session_id(app):
+    c = app.test_client()
+    login(c)
+    first = c.get_cookie("session").value
+    login(c)
+    assert c.get_cookie("session").value != first
+
+
+def test_password_change_is_rate_limited(client):
+    login(client)
+    token = csrf(client)
+    codes = [post(client, "/api/auth/password", {"old_password": "wrong", "new_password": "x",
+                                                  "confirm_password": "x"}, token=token).status_code
+             for _ in range(6)]
+    assert codes[:5] == [400] * 5 and codes[5] == 429

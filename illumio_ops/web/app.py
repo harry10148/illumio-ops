@@ -17,16 +17,17 @@ from werkzeug.wrappers import Response as WerkzeugResponse
 
 from illumio_ops.services.context import AppContext
 from illumio_ops.web import security
-from illumio_ops.web.auth import AdminUser, make_auth_blueprint
+from illumio_ops.web.auth import AdminUser, make_auth_blueprint, session_is_active
+from illumio_ops.web.contract import op_id_for_endpoint
 from illumio_ops.web.errors import api_error
 from illumio_ops.web.ipallow import RstDrop, is_allowed, rst_drop
 
 DEFAULT_STATIC_DIR = Path(__file__).resolve().parent / "static"
 
-# Endpoints reachable without a session (the login page needs these before signing in).
-PUBLIC_ENDPOINTS = frozenset({"auth.login", "auth.csrf_token"})
+# Operations reachable without a session (the login page needs these before signing in).
+PUBLIC_OPS = frozenset({"auth.login", "auth.csrf", "i18n.dictionary"})
 # While the admin must change the password, only these respond.
-PASSWORD_CHANGE_ENDPOINTS = frozenset({"auth.change_password", "auth.logout", "auth.me", "auth.csrf_token"})
+PASSWORD_CHANGE_OPS = frozenset({"auth.password", "auth.logout", "auth.me", "auth.csrf"})
 
 
 def create_app(ctx: AppContext, *, use_https: bool, static_dir: Path | None = None) -> Flask:
@@ -61,7 +62,7 @@ def create_app(ctx: AppContext, *, use_https: bool, static_dir: Path | None = No
     @login_manager.user_loader
     def _load_user(user_id: str) -> AdminUser | None:
         name = ctx.settings.current().web.username
-        return AdminUser(name) if user_id == name else None
+        return AdminUser(name) if user_id == name and session_is_active() else None
 
     # 4. CSRF
     app.config.update(
@@ -85,12 +86,12 @@ def create_app(ctx: AppContext, *, use_https: bool, static_dir: Path | None = No
     # 7. Authentication for /api/*
     @app.before_request
     def require_login() -> tuple[Response, int] | None:
-        if not request.path.startswith("/api/") or request.endpoint in PUBLIC_ENDPOINTS:
+        op_id = op_id_for_endpoint(request.endpoint)
+        if not request.path.startswith("/api/") or op_id in PUBLIC_OPS:
             return None
         if not current_user.is_authenticated:
             return api_error(401, "auth_required", "err_auth_required")
-        if (ctx.settings.current().web.must_change_password
-                and request.endpoint not in PASSWORD_CHANGE_ENDPOINTS):
+        if ctx.settings.current().web.must_change_password and op_id not in PASSWORD_CHANGE_OPS:
             return api_error(423, "password_change_required", "err_password_change_required")
         return None
 

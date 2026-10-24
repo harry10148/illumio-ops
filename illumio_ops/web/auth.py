@@ -2,15 +2,15 @@
 from __future__ import annotations
 
 import hmac
+import secrets
 from typing import Any
 
-from flask import Blueprint, Flask, Response, current_app, g, session
-from flask import request as flask_request
+from flask import Blueprint, Flask, current_app, g, session
 from flask_limiter import Limiter
 from flask_login import UserMixin, current_user, login_user, logout_user
 from flask_wtf.csrf import CSRFProtect, generate_csrf
 from loguru import logger
-from pydantic import BaseModel, ConfigDict, Field, ValidationError
+from pydantic import BaseModel, Field
 
 from illumio_ops.services.context import AppContext
 from illumio_ops.settings.secrets import (
@@ -20,11 +20,12 @@ from illumio_ops.settings.secrets import (
     new_secret_key,
     verify_password,
 )
-from illumio_ops.web.errors import api_error, api_ok
+from illumio_ops.web.contract import ApiFailure, Empty, api_route, operation
 
-# Re-exported for callers that think of these as web concerns.
 __all__ = ["PASSWORD_MAX_LEN", "PASSWORD_MIN_LEN", "AdminUser", "get_ctx", "hash_password",
-           "make_auth_blueprint", "verify_password"]
+           "make_auth_blueprint", "session_is_active", "verify_password"]
+
+_SESSIONS_KEY = "illumio_ops_sessions"
 
 
 class AdminUser(UserMixin):
@@ -37,97 +38,118 @@ def get_ctx(app: Flask | None = None) -> AppContext:
     return ctx
 
 
-class _Login(BaseModel):
-    model_config = ConfigDict(extra="ignore")
+# Live sessions are tracked server-side (in memory) so logout really ends a session:
+# the signed cookie alone would stay valid until it expires if someone copied it.
+# A restart therefore signs everyone out.
+def _active(app: Flask | None = None) -> set[str]:
+    sessions: set[str] = (app or current_app).extensions.setdefault(_SESSIONS_KEY, set())
+    return sessions
+
+
+def session_is_active() -> bool:
+    sid = session.get("sid")
+    return isinstance(sid, str) and sid in _active()
+
+
+class LoginRequest(BaseModel):
     username: str = Field(max_length=256)
     password: str = Field(max_length=1024)
 
 
-class _PasswordChange(BaseModel):
-    model_config = ConfigDict(extra="ignore")
+class PasswordChangeRequest(BaseModel):
     old_password: str | None = Field(default=None, max_length=1024)
     new_password: str = Field(max_length=4096)
     confirm_password: str = Field(max_length=4096)
 
 
-def _body(model: type[BaseModel]) -> Any:
-    try:
-        return model.model_validate(flask_request.get_json(silent=True) or {})
-    except ValidationError as exc:
-        # Never echo the body: it carries passwords.
-        locs = [".".join(str(p) for p in e["loc"]) for e in exc.errors(include_input=False)]
-        logger.warning("auth form rejected: fields={}", locs)
-        return None
+class CsrfToken(BaseModel):
+    csrf_token: str
 
 
-def _me() -> dict[str, Any]:
-    s = get_ctx().settings.current()
-    return {"username": s.web.username, "must_change_password": s.web.must_change_password}
+class Me(BaseModel):
+    username: str
+    must_change_password: bool
+
+
+class LoginResult(Me):
+    csrf_token: str
+
+
+OP_CSRF = operation("auth.csrf", "GET", "/api/auth/csrf", None, CsrfToken)
+OP_LOGIN = operation("auth.login", "POST", "/api/auth/login", LoginRequest, LoginResult)
+OP_LOGOUT = operation("auth.logout", "POST", "/api/auth/logout", None, Empty)
+OP_ME = operation("auth.me", "GET", "/api/auth/me", None, Me)
+OP_PASSWORD = operation("auth.password", "POST", "/api/auth/password", PasswordChangeRequest, CsrfToken)
+
+
+def _me() -> Me:
+    web = get_ctx().settings.current().web
+    return Me(username=web.username, must_change_password=web.must_change_password)
 
 
 def make_auth_blueprint(csrf: CSRFProtect, limiter: Limiter) -> Blueprint:
     bp = Blueprint("auth", __name__)
 
-    @bp.get("/api/auth/csrf")
-    def csrf_token() -> tuple[Response, int]:
-        return api_ok({"csrf_token": generate_csrf()})
+    @api_route(bp, OP_CSRF)
+    def csrf_token() -> CsrfToken:
+        return CsrfToken(csrf_token=generate_csrf())
 
-    @bp.post("/api/auth/login")
-    @csrf.exempt
-    @limiter.limit("5 per minute")
-    def login() -> tuple[Response, int]:
-        form = _body(_Login)
-        if form is None:
-            return api_error(400, "invalid_input", "err_invalid_input")
+    @api_route(bp, OP_LOGIN, decorators=[limiter.limit("5 per minute"), csrf.exempt])
+    def login(body: LoginRequest) -> LoginResult:
         web = get_ctx().settings.current().web
         # Always run both checks so a wrong username costs the same time as a wrong password.
-        username_ok = hmac.compare_digest(form.username.strip().encode(), web.username.strip().encode())
-        password_ok = verify_password(form.password, web.password_hash)
+        username_ok = hmac.compare_digest(body.username.strip().encode(), web.username.strip().encode())
+        password_ok = verify_password(body.password, web.password_hash)
         if not (username_ok and password_ok):
-            return api_error(401, "invalid_credentials", "err_invalid_credentials")
+            raise ApiFailure(401, "invalid_credentials", "err_invalid_credentials")
+        session.clear()  # no fixation: a fresh session for every login
+        sid = secrets.token_urlsafe(24)
+        _active().add(sid)
+        session["sid"] = sid
         session.permanent = True
         login_user(AdminUser(web.username))
-        return api_ok(_me() | {"csrf_token": generate_csrf()})
+        return LoginResult(**_me().model_dump(), csrf_token=generate_csrf())
 
-    @bp.post("/api/auth/logout")
-    def logout() -> tuple[Response, int]:
+    @api_route(bp, OP_LOGOUT)
+    def logout() -> Empty:
+        _active().discard(session.get("sid", ""))
         logout_user()
         session.clear()
-        return api_ok({})
+        return Empty()
 
-    @bp.get("/api/auth/me")
-    def me() -> tuple[Response, int]:
-        return api_ok(_me())
+    @api_route(bp, OP_ME)
+    def me() -> Me:
+        return _me()
 
-    @bp.post("/api/auth/password")
-    def change_password() -> tuple[Response, int]:
-        form = _body(_PasswordChange)
-        if form is None:
-            return api_error(400, "invalid_input", "err_invalid_input")
+    @api_route(bp, OP_PASSWORD, decorators=[limiter.limit("5 per minute")])
+    def change_password(body: PasswordChangeRequest) -> CsrfToken:
         ctx = get_ctx()
         cur = ctx.settings.current()
         if not cur.web.must_change_password:
-            if not form.old_password:
-                return api_error(400, "old_password_required", "err_old_password_required", field="old_password")
-            if not verify_password(form.old_password, cur.web.password_hash):
-                return api_error(400, "old_password_incorrect", "err_old_password_incorrect", field="old_password")
-        new = form.new_password
-        if not (PASSWORD_MIN_LEN <= len(new) <= PASSWORD_MAX_LEN) or new != form.confirm_password:
-            return api_error(400, "invalid_new_password", "err_invalid_new_password", field="new_password",
+            if not body.old_password:
+                raise ApiFailure(400, "old_password_required", "err_old_password_required", field="old_password")
+            if not verify_password(body.old_password, cur.web.password_hash):
+                raise ApiFailure(400, "old_password_incorrect", "err_old_password_incorrect", field="old_password")
+        new = body.new_password
+        if not (PASSWORD_MIN_LEN <= len(new) <= PASSWORD_MAX_LEN) or new != body.confirm_password:
+            raise ApiFailure(400, "invalid_new_password", "err_invalid_new_password", field="new_password",
                              params={"min": str(PASSWORD_MIN_LEN), "max": str(PASSWORD_MAX_LEN)})
         new_hash, new_key = hash_password(new), new_secret_key()
 
         def mutate(d: dict[str, Any]) -> None:
             d["web"].update(password_hash=new_hash, secret_key=new_key, must_change_password=False)
 
-        ctx.settings.update(cur.revision, mutate)
-        # Rotating the signing key logs out every other session (a leaked cookie is a
-        # common reason to change the password); this response re-signs the caller's.
+        ctx.settings.update(cur.revision, mutate)  # raises before anything below on failure
+        # Every other session ends (a leaked cookie is a common reason to change the
+        # password): drop them server-side and rotate the signing key; this response
+        # re-signs the caller's session with the new key.
+        mine = session.get("sid", "")
+        _active().intersection_update({mine})
         current_app.secret_key = new_key
         current_app.config["SECRET_KEY"] = new_key
         session.modified = True
         g.pop("csrf_token", None)
         logger.info("admin password changed by {}; other sessions revoked", current_user.get_id())
-        return api_ok({"csrf_token": generate_csrf()})
+        return CsrfToken(csrf_token=generate_csrf())
 
     return bp
