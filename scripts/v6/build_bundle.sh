@@ -83,6 +83,7 @@ rm -rf "$py"/lib/python3.*/tkinter "$py"/lib/python3.*/idlelib "$py"/lib/python3
        "$py"/lib/python3.*/pydoc_data "$py"/lib/python3.*/test "$py"/lib/python3.*/config-3.*
 find "$py"/lib -name '*.a' -delete 2>/dev/null || true
 
-tar czf "$ARCHIVE" -C "$REPO_ROOT/build/v6" "$NAME"
+# root-owned entries: extracting as root must not hand the code to whoever built it
+tar --owner=0 --group=0 --numeric-owner -czf "$ARCHIVE" -C "$REPO_ROOT/build/v6" "$NAME"
 (cd "$(dirname "$ARCHIVE")" && sha256sum "$(basename "$ARCHIVE")") | tee "$ARCHIVE.sha256"  # relative name: checkable anywhere
 echo "==> Built $ARCHIVE"

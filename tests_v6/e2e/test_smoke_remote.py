@@ -42,9 +42,13 @@ def test_sign_in_connect_probe_and_see_it_everywhere():
             page.fill("input[name=ca_path]", verify)
         page.get_by_role("button", name="Save").click()
         page.wait_for_selector("text=Saved.")
-        page.get_by_role("button", name="Test connection").click()
-        page.wait_for_selector(".probe-row")
-        page.wait_for_timeout(500)
+        # The page already shows the previous check; wait for THIS probe's answer and for the
+        # rendered check time to change, or we would read stale rows (a false green seen once).
+        before = page.inner_text(".probe-results") if page.locator(".probe-results").count() else ""
+        with page.expect_response(lambda r: r.url.endswith("/api/system/pce/probe")) as resp:
+            page.get_by_role("button", name="Test connection").click()
+        assert resp.value.status in (200, 502), resp.value.status
+        sync_api.expect(page.locator(".probe-results")).not_to_have_text(before or "\u0000", timeout=10000)
         tones = [r.get_attribute("data-tone") for r in page.locator(".probe-row").all()]
         texts = [r.inner_text() for r in page.locator(".probe-row").all()]
         assert tones and all(t == "ok" for t in tones), texts

@@ -10,7 +10,7 @@ Group=illumio-ops
 WorkingDirectory=@PREFIX@
 Environment=PYTHONNOUSERSITE=1
 Environment=PYTHONPATH=@PREFIX@
-ExecStart=@PREFIX@/python/bin/python3 -m illumio_ops serve --root @PREFIX@
+ExecStart=@PREFIX@/python/bin/python3 -P -m illumio_ops serve --root @PREFIX@
 Restart=on-failure
 RestartSec=10
 TimeoutStopSec=30

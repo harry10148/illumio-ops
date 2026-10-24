@@ -64,12 +64,20 @@ fi
 
 echo "==> Installing illumio-ops v6 into $PREFIX"
 mkdir -p "$PREFIX"
-cp -a "$BUNDLE_DIR/python" "$PREFIX/python"
-cp -a "$BUNDLE_DIR/illumio_ops" "$PREFIX/illumio_ops"
+# Copy without the archive's owner; as root, the code and the interpreter must be root's
+# (the service account only writes config/data/logs/reports).
+cp -R --preserve=mode,timestamps "$BUNDLE_DIR/python" "$PREFIX/python"
+cp -R --preserve=mode,timestamps "$BUNDLE_DIR/illumio_ops" "$PREFIX/illumio_ops"
+if (( ! NO_SYSTEMD )); then
+    chown root:root "$PREFIX"
+    chmod 755 "$PREFIX"
+    chown -R root:root "$PREFIX/python" "$PREFIX/illumio_ops"
+fi
 chmod -R go-w "$PREFIX/python" "$PREFIX/illumio_ops"
+cd "$PREFIX"  # a directory we own: never let python -m pick modules up from the caller's cwd
 
 echo "==> Installing locked dependencies (hash-checked, offline)"
-PYTHONNOUSERSITE=1 "$PREFIX/python/bin/python3" -m pip install --quiet --no-index --no-warn-script-location \
+"$PREFIX/python/bin/python3" -I -m pip install --quiet --no-index --no-warn-script-location \
     --require-hashes --find-links "$BUNDLE_DIR/wheels" -r "$BUNDLE_DIR/requirements-v6.lock"
 
 for d in config data logs reports; do
@@ -77,7 +85,8 @@ for d in config data logs reports; do
     chmod 700 "$PREFIX/$d"
 done
 
-RUN=(env "PYTHONPATH=$PREFIX" PYTHONNOUSERSITE=1 "$PREFIX/python/bin/python3" -m illumio_ops.rescue
+# -P: do not put the current directory on sys.path; the package comes from PYTHONPATH only.
+RUN=(env "PYTHONPATH=$PREFIX" PYTHONNOUSERSITE=1 "$PREFIX/python/bin/python3" -P -m illumio_ops.rescue
      init --root "$PREFIX" --port "$PORT")
 if (( NO_SYSTEMD )); then
     "${RUN[@]}"

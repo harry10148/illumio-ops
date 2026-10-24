@@ -29,7 +29,7 @@ def test_rendered_unit_keeps_every_5x_hardening_directive():
 
 def test_rendered_unit_paths():
     unit = _render("--prefix", "/opt/illumio-ops-v6/", "--service-name", "illumio-ops-v6").stdout
-    assert "ExecStart=/opt/illumio-ops-v6/python/bin/python3 -m illumio_ops serve --root /opt/illumio-ops-v6\n" in unit
+    assert "ExecStart=/opt/illumio-ops-v6/python/bin/python3 -P -m illumio_ops serve --root /opt/illumio-ops-v6\n" in unit
     assert "ReadWritePaths=/opt/illumio-ops-v6/config /opt/illumio-ops-v6/data /opt/illumio-ops-v6/logs " \
            "/opt/illumio-ops-v6/reports\n" in unit
     assert "Environment=PYTHONPATH=/opt/illumio-ops-v6\n" in unit and "Environment=PYTHONNOUSERSITE=1\n" in unit

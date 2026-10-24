@@ -45,7 +45,8 @@ def test_non_2xx_is_returned_not_raised(client):
 
 
 @pytest.mark.parametrize(("verify", "expected"), [(True, True), (False, False), ("/etc/ssl/ca.crt", "/etc/ssl/ca.crt")])
-def test_verify_tls_three_modes(verify, expected):
+def test_verify_tls_three_modes(verify, expected, monkeypatch):
+    monkeypatch.setattr(client_mod, "SYSTEM_CA_BUNDLES", ())
     c = PceClient(pce_settings(verify_tls=verify))
     assert c._session.verify == expected and c._bounded_session.verify == expected
 
@@ -212,3 +213,16 @@ def test_closed_client_refuses_requests():
     c.close()
     with pytest.raises(RuntimeError):
         c.request("GET", "/x")
+
+
+def test_verify_true_uses_the_os_trust_store(tmp_path, monkeypatch):
+    bundle = tmp_path / "ca-certificates.crt"
+    bundle.write_text("-----BEGIN CERTIFICATE-----\n")
+    monkeypatch.setattr(client_mod, "SYSTEM_CA_BUNDLES", (str(tmp_path / "missing.pem"), str(bundle)))
+    c = PceClient(pce_settings(verify_tls=True))
+    assert c._session.verify == str(bundle) and c._bounded_session.verify == str(bundle)
+
+
+def test_verify_true_falls_back_to_bundled_cas_without_an_os_store(tmp_path, monkeypatch):
+    monkeypatch.setattr(client_mod, "SYSTEM_CA_BUNDLES", (str(tmp_path / "missing.pem"),))
+    assert PceClient(pce_settings(verify_tls=True))._session.verify is True

@@ -9,6 +9,7 @@ from __future__ import annotations
 import errno
 import json as _json
 import math
+import os
 import time
 from collections.abc import Mapping
 from dataclasses import dataclass, field
@@ -31,6 +32,20 @@ POST_429_DEFAULT_WAIT = 2.0
 POST_429_MAX_WAIT = 30.0
 
 _sleep = time.sleep  # module-level so tests can observe waits without sleeping
+
+# "Verify with the system's trusted CAs" means the operating system's store, where an
+# organisation installs its own CA. requests' default (certifi) is a fixed public list that
+# ignores it. First existing file wins; none → requests' bundled list.
+SYSTEM_CA_BUNDLES: tuple[str, ...] = (
+    "/etc/ssl/certs/ca-certificates.crt",   # Debian, Ubuntu
+    "/etc/pki/tls/certs/ca-bundle.crt",     # RHEL, Rocky, Fedora
+    "/etc/ssl/ca-bundle.pem",               # SUSE
+    "/etc/ssl/cert.pem",                    # Alpine, macOS
+)
+
+
+def _system_ca_bundle() -> str | None:
+    return next((p for p in SYSTEM_CA_BUNDLES if os.path.isfile(p)), None)
 
 
 class PceNotConfigured(Exception):
@@ -89,7 +104,12 @@ _tls_off_warned = False
 def _make_session(cfg: PceSettings, *, retries: bool) -> requests.Session:
     global _tls_off_warned
     s = requests.Session()
-    s.verify = cfg.verify_tls if isinstance(cfg.verify_tls, str) else bool(cfg.verify_tls)
+    if isinstance(cfg.verify_tls, str):
+        s.verify = cfg.verify_tls
+    elif cfg.verify_tls:
+        s.verify = _system_ca_bundle() or True
+    else:
+        s.verify = False
     if s.verify is False:
         urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
         if not _tls_off_warned:
