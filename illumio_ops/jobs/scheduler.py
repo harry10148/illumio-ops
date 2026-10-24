@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import traceback
 from collections.abc import Callable
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 from apscheduler.schedulers.background import BackgroundScheduler
 from loguru import logger
@@ -12,14 +12,27 @@ from loguru import logger
 from illumio_ops.jobs.health import record_finish, record_start
 from illumio_ops.pce.client import PceNotConfigured
 from illumio_ops.services import pce_health
+from illumio_ops.services.collect.events import run_events_cycle
+from illumio_ops.services.collect.traffic import run_traffic_cycle
 from illumio_ops.services.context import AppContext
+from illumio_ops.settings.schema import Settings
 from illumio_ops.web.tls import ensure_self_signed
 
-# job id -> interval in seconds (the home page and the jobs page read this too)
-JOB_INTERVALS: dict[str, int] = {
-    "pce_probe": 300,
-    "tls_renew_check": 86400,
-}
+PCE_PROBE_SECONDS = 300
+TLS_RENEW_SECONDS = 86400
+# Collectors wait a little after start-up so the listener and the first probe come first.
+COLLECTOR_FIRST_RUN_DELAY = timedelta(seconds=30)
+
+
+def job_intervals(settings: Settings) -> dict[str, int]:
+    """job id -> interval in seconds (the home page and the jobs page read this too)."""
+    c = settings.collection
+    return {
+        "pce_probe": PCE_PROBE_SECONDS,
+        "tls_renew_check": TLS_RENEW_SECONDS,
+        "collect_traffic": c.traffic_interval_seconds,
+        "collect_events": c.events_interval_seconds,
+    }
 
 
 def instrument(job_id: str, fn: Callable[[], None], ctx: AppContext) -> Callable[[], None]:
@@ -58,13 +71,36 @@ def _tls_renew_job(ctx: AppContext) -> Callable[[], None]:
     return renew
 
 
+def _collector_jobs(ctx: AppContext) -> dict[str, Callable[[], None]]:
+    def traffic() -> None:
+        run_traffic_cycle(ctx)
+
+    def events() -> None:
+        run_events_cycle(ctx)
+
+    return {"collect_traffic": traffic, "collect_events": events}
+
+
 def build_scheduler(ctx: AppContext) -> BackgroundScheduler:
     sched = BackgroundScheduler(timezone=UTC, job_defaults={"coalesce": True, "max_instances": 1})
+    intervals = job_intervals(ctx.settings.current())
     # coalesce/max_instances are passed per job: job_defaults only apply once the
     # scheduler starts, and a job must never pile up behind a slow previous run.
     sched.add_job(instrument("pce_probe", _probe_job(ctx), ctx), "interval", id="pce_probe",
-                  seconds=JOB_INTERVALS["pce_probe"], next_run_time=datetime.now(UTC),
+                  seconds=intervals["pce_probe"], next_run_time=datetime.now(UTC),
                   coalesce=True, max_instances=1)
     sched.add_job(instrument("tls_renew_check", _tls_renew_job(ctx), ctx), "interval", id="tls_renew_check",
-                  seconds=JOB_INTERVALS["tls_renew_check"], coalesce=True, max_instances=1)
+                  seconds=intervals["tls_renew_check"], coalesce=True, max_instances=1)
+    first = datetime.now(UTC) + COLLECTOR_FIRST_RUN_DELAY
+    for job_id, fn in _collector_jobs(ctx).items():
+        sched.add_job(instrument(job_id, fn, ctx), "interval", id=job_id, seconds=intervals[job_id],
+                      next_run_time=first, coalesce=True, max_instances=1)
     return sched
+
+
+def apply_schedule(sched: BackgroundScheduler, settings: Settings) -> None:
+    """Follow interval changes made in settings without restarting the service."""
+    for job_id, seconds in job_intervals(settings).items():
+        job = sched.get_job(job_id)
+        if job is not None and job.trigger.interval.total_seconds() != seconds:
+            sched.reschedule_job(job_id, trigger="interval", seconds=seconds)

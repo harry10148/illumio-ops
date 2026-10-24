@@ -43,3 +43,11 @@ def test_jobs_list_includes_never_run_jobs(client, ctx):
     jobs = client.get("/api/system/jobs", environ_overrides=LOCAL).get_json()["data"]["jobs"]
     probe = next(j for j in jobs if j["job_id"] == "pce_probe")
     assert probe["last_ok"] is False and probe["failures"] == 1 and probe["interval_seconds"] == 300
+
+
+def test_jobs_page_shows_settings_interval(client, ctx):
+    login(client)
+    ctx.settings.update(ctx.settings.current().revision,
+                        lambda d: d["collection"].update({"traffic_interval_seconds": 900}))
+    jobs = {j["job_id"]: j for j in client.get("/api/system/jobs", environ_overrides=LOCAL).get_json()["data"]["jobs"]}
+    assert jobs["collect_traffic"]["interval_seconds"] == 900 and jobs["collect_events"]["interval_seconds"] == 300

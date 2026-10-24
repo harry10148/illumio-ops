@@ -46,6 +46,7 @@ def cmd_serve(root: Path | None) -> int:
     signal.signal(signal.SIGINT, on_signal)
     app = create_app(rt.ctx, use_https=rt.ssl_ctx is not None)
     scheduler = build_scheduler(rt.ctx)
+    rt.ctx.scheduler = scheduler  # settings pages reschedule through it
     scheduler.start()
     try:
         serve(app, s.web.host, s.web.port, rt.ssl_ctx, stop,
