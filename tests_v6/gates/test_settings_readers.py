@@ -42,10 +42,10 @@ SETTINGS_READERS: dict[str, str] = {
     "web.tls.key_algorithm": "illumio_ops.web.tls",
     "web.tls.min_version": "illumio_ops.web.tls",
     "web.tls.ciphers": "illumio_ops.web.tls",
+    "display.language": "illumio_ops.web.auth",
 }
 # Fields whose reader arrives later: value = the task or phase that adds it.
 PENDING_READERS: dict[str, str] = {
-    "display.language": "P1-T13",
     "pce.events_timeout_seconds": "P2",
     "pce.console_url": "P3",
     "display.timezone": "P3",
@@ -148,3 +148,7 @@ def test_selftest_proper_reader_is_green(tmp_path):
     pkg = _pkg(tmp_path, "def f(s):\n    return s.logging.level\n")
     v = find_reader_violations({"logging.level": "illumio_ops.r"}, {"other.level": "P9"}, {}, leaf_paths(_Root), pkg)
     assert v == []
+
+
+def test_no_p1_pending_left():
+    assert [p for p, due in PENDING_READERS.items() if due.startswith("P1-")] == []

@@ -167,3 +167,7 @@ textarea { width: 100%; padding: var(--space-4); border: 1px solid var(--line); 
 .kv-list { display: grid; grid-template-columns: max-content 1fr; gap: var(--space-3) var(--space-7); margin: 0; }
 .kv-list dt { color: var(--text-3); }
 .kv-list dd { margin: 0; }
+
+.shell-banner { margin-bottom: var(--space-6); }
+.shell-banner a { color: inherit; font-weight: 600; }
+.spaced { margin-top: var(--space-6); }

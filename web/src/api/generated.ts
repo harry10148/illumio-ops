@@ -2,6 +2,11 @@
 /* eslint-disable */
 /**
  * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "Language".
+ */
+export type Language = ("en" | "zh_TW")
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
  * via the `definition` "ProbeName".
  */
 export type ProbeName = ("noop" | "health" | "node_available")
@@ -32,6 +37,8 @@ username: string
  */
 export interface LoginResult {
 csrf_token: string
+default_password_in_use: boolean
+language: Language
 must_change_password: boolean
 username: string
 }
@@ -47,6 +54,8 @@ export interface Empty {
  * via the `definition` "Me".
  */
 export interface Me {
+default_password_in_use: boolean
+language: Language
 must_change_password: boolean
 username: string
 }
@@ -92,6 +101,22 @@ pce: (PceSummary | null)
  */
 export interface Dictionary {
 [k: string]: string
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "DisplayView".
+ */
+export interface DisplayView {
+language: Language
+revision: number
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "DisplayUpdate".
+ */
+export interface DisplayUpdate {
+language: Language
+revision: number
 }
 /**
  * This interface was referenced by `ContractRoot`'s JSON-Schema
@@ -156,6 +181,28 @@ org_id: string
 revision: number
 url: string
 verify_tls: (boolean | string)
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "SecurityView".
+ */
+export interface SecurityView {
+allowed_ips: string[]
+requester_ip: string
+revision: number
+username: string
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "SecurityUpdate".
+ */
+export interface SecurityUpdate {
+/**
+ * @maxItems 500
+ */
+allowed_ips: string[]
+confirm_lockout?: boolean
+revision: number
 }
 /**
  * This interface was referenced by `ContractRoot`'s JSON-Schema
@@ -238,7 +285,7 @@ revision: number
 validity_days: number
 }
 
-export type OpId = "auth.csrf" | "auth.login" | "auth.logout" | "auth.me" | "auth.password" | "home.summary" | "i18n.dictionary" | "system.jobs.list" | "system.pce.get" | "system.pce.latest" | "system.pce.probe" | "system.pce.update" | "system.tls.csr" | "system.tls.import" | "system.tls.renew" | "system.tls.status" | "system.tls.update";
+export type OpId = "auth.csrf" | "auth.login" | "auth.logout" | "auth.me" | "auth.password" | "home.summary" | "i18n.dictionary" | "system.display.get" | "system.display.update" | "system.jobs.list" | "system.pce.get" | "system.pce.latest" | "system.pce.probe" | "system.pce.update" | "system.security.get" | "system.security.update" | "system.tls.csr" | "system.tls.import" | "system.tls.renew" | "system.tls.status" | "system.tls.update";
 
 export interface Requests {
   "auth.csrf": undefined;
@@ -248,11 +295,15 @@ export interface Requests {
   "auth.password": PasswordChangeRequest;
   "home.summary": undefined;
   "i18n.dictionary": undefined;
+  "system.display.get": undefined;
+  "system.display.update": DisplayUpdate;
   "system.jobs.list": undefined;
   "system.pce.get": undefined;
   "system.pce.latest": undefined;
   "system.pce.probe": undefined;
   "system.pce.update": PceConnectionUpdate;
+  "system.security.get": undefined;
+  "system.security.update": SecurityUpdate;
   "system.tls.csr": CsrRequest;
   "system.tls.import": ImportRequest;
   "system.tls.renew": undefined;
@@ -268,11 +319,15 @@ export interface Responses {
   "auth.password": CsrfToken;
   "home.summary": HomeSummary;
   "i18n.dictionary": Dictionary;
+  "system.display.get": DisplayView;
+  "system.display.update": DisplayView;
   "system.jobs.list": JobList;
   "system.pce.get": PceConnection;
   "system.pce.latest": LatestProbe;
   "system.pce.probe": ProbeRun;
   "system.pce.update": PceConnection;
+  "system.security.get": SecurityView;
+  "system.security.update": SecurityView;
   "system.tls.csr": CsrResult;
   "system.tls.import": TlsStatus;
   "system.tls.renew": TlsStatus;
@@ -288,11 +343,15 @@ export const OPERATIONS = {
   "auth.password": { method: "POST", path: "/api/auth/password" },
   "home.summary": { method: "GET", path: "/api/home/summary" },
   "i18n.dictionary": { method: "GET", path: "/api/i18n/<lang>" },
+  "system.display.get": { method: "GET", path: "/api/system/display" },
+  "system.display.update": { method: "PUT", path: "/api/system/display" },
   "system.jobs.list": { method: "GET", path: "/api/system/jobs" },
   "system.pce.get": { method: "GET", path: "/api/system/pce" },
   "system.pce.latest": { method: "GET", path: "/api/system/pce/latest" },
   "system.pce.probe": { method: "POST", path: "/api/system/pce/probe" },
   "system.pce.update": { method: "PUT", path: "/api/system/pce" },
+  "system.security.get": { method: "GET", path: "/api/system/security" },
+  "system.security.update": { method: "PUT", path: "/api/system/security" },
   "system.tls.csr": { method: "POST", path: "/api/system/tls/csr" },
   "system.tls.import": { method: "POST", path: "/api/system/tls/import" },
   "system.tls.renew": { method: "POST", path: "/api/system/tls/renew" },

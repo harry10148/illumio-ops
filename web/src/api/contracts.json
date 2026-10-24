@@ -42,10 +42,27 @@
         "type": "object"
       },
       "response_schema": {
+        "$defs": {
+          "Language": {
+            "enum": [
+              "en",
+              "zh_TW"
+            ],
+            "title": "Language",
+            "type": "string"
+          }
+        },
         "properties": {
           "csrf_token": {
             "title": "Csrf Token",
             "type": "string"
+          },
+          "default_password_in_use": {
+            "title": "Default Password In Use",
+            "type": "boolean"
+          },
+          "language": {
+            "$ref": "#/$defs/Language"
           },
           "must_change_password": {
             "title": "Must Change Password",
@@ -59,6 +76,8 @@
         "required": [
           "username",
           "must_change_password",
+          "language",
+          "default_password_in_use",
           "csrf_token"
         ],
         "title": "LoginResult",
@@ -80,7 +99,24 @@
       "path": "/api/auth/me",
       "request_schema": null,
       "response_schema": {
+        "$defs": {
+          "Language": {
+            "enum": [
+              "en",
+              "zh_TW"
+            ],
+            "title": "Language",
+            "type": "string"
+          }
+        },
         "properties": {
+          "default_password_in_use": {
+            "title": "Default Password In Use",
+            "type": "boolean"
+          },
+          "language": {
+            "$ref": "#/$defs/Language"
+          },
           "must_change_password": {
             "title": "Must Change Password",
             "type": "boolean"
@@ -92,7 +128,9 @@
         },
         "required": [
           "username",
-          "must_change_password"
+          "must_change_password",
+          "language",
+          "default_password_in_use"
         ],
         "title": "Me",
         "type": "object"
@@ -258,6 +296,96 @@
           "type": "string"
         },
         "title": "Dictionary",
+        "type": "object"
+      }
+    },
+    "system.display.get": {
+      "method": "GET",
+      "path": "/api/system/display",
+      "request_schema": null,
+      "response_schema": {
+        "$defs": {
+          "Language": {
+            "enum": [
+              "en",
+              "zh_TW"
+            ],
+            "title": "Language",
+            "type": "string"
+          }
+        },
+        "properties": {
+          "language": {
+            "$ref": "#/$defs/Language"
+          },
+          "revision": {
+            "title": "Revision",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "revision",
+          "language"
+        ],
+        "title": "DisplayView",
+        "type": "object"
+      }
+    },
+    "system.display.update": {
+      "method": "PUT",
+      "path": "/api/system/display",
+      "request_schema": {
+        "$defs": {
+          "Language": {
+            "enum": [
+              "en",
+              "zh_TW"
+            ],
+            "title": "Language",
+            "type": "string"
+          }
+        },
+        "properties": {
+          "language": {
+            "$ref": "#/$defs/Language"
+          },
+          "revision": {
+            "title": "Revision",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "revision",
+          "language"
+        ],
+        "title": "DisplayUpdate",
+        "type": "object"
+      },
+      "response_schema": {
+        "$defs": {
+          "Language": {
+            "enum": [
+              "en",
+              "zh_TW"
+            ],
+            "title": "Language",
+            "type": "string"
+          }
+        },
+        "properties": {
+          "language": {
+            "$ref": "#/$defs/Language"
+          },
+          "revision": {
+            "title": "Revision",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "revision",
+          "language"
+        ],
+        "title": "DisplayView",
         "type": "object"
       }
     },
@@ -766,6 +894,104 @@
           "verify_tls"
         ],
         "title": "PceConnection",
+        "type": "object"
+      }
+    },
+    "system.security.get": {
+      "method": "GET",
+      "path": "/api/system/security",
+      "request_schema": null,
+      "response_schema": {
+        "properties": {
+          "allowed_ips": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Allowed Ips",
+            "type": "array"
+          },
+          "requester_ip": {
+            "title": "Requester Ip",
+            "type": "string"
+          },
+          "revision": {
+            "title": "Revision",
+            "type": "integer"
+          },
+          "username": {
+            "title": "Username",
+            "type": "string"
+          }
+        },
+        "required": [
+          "revision",
+          "username",
+          "allowed_ips",
+          "requester_ip"
+        ],
+        "title": "SecurityView",
+        "type": "object"
+      }
+    },
+    "system.security.update": {
+      "method": "PUT",
+      "path": "/api/system/security",
+      "request_schema": {
+        "properties": {
+          "allowed_ips": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 500,
+            "title": "Allowed Ips",
+            "type": "array"
+          },
+          "confirm_lockout": {
+            "default": false,
+            "title": "Confirm Lockout",
+            "type": "boolean"
+          },
+          "revision": {
+            "title": "Revision",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "revision",
+          "allowed_ips"
+        ],
+        "title": "SecurityUpdate",
+        "type": "object"
+      },
+      "response_schema": {
+        "properties": {
+          "allowed_ips": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Allowed Ips",
+            "type": "array"
+          },
+          "requester_ip": {
+            "title": "Requester Ip",
+            "type": "string"
+          },
+          "revision": {
+            "title": "Revision",
+            "type": "integer"
+          },
+          "username": {
+            "title": "Username",
+            "type": "string"
+          }
+        },
+        "required": [
+          "revision",
+          "username",
+          "allowed_ips",
+          "requester_ip"
+        ],
+        "title": "SecurityView",
         "type": "object"
       }
     },

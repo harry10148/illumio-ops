@@ -5,6 +5,8 @@ import { App } from "./App";
 import "./pages/system/PceConnection";
 import "./pages/system/Jobs";
 import "./pages/system/Tls";
+import "./pages/system/Security";
+import "./pages/system/Display";
 import "./styles/tokens.css";
 import "./styles/base.css";
 

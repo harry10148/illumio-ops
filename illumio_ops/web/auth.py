@@ -13,8 +13,10 @@ from flask_wtf.csrf import CSRFProtect, generate_csrf
 from loguru import logger
 from pydantic import BaseModel, Field
 
+from illumio_ops.domain.values import Language
 from illumio_ops.services.context import AppContext
 from illumio_ops.settings.secrets import (
+    DEFAULT_ADMIN_PASSWORD,
     PASSWORD_MAX_LEN,
     PASSWORD_MIN_LEN,
     hash_password,
@@ -78,6 +80,8 @@ class CsrfToken(BaseModel):
 class Me(BaseModel):
     username: str
     must_change_password: bool
+    language: Language
+    default_password_in_use: bool
 
 
 class LoginResult(Me):
@@ -92,8 +96,9 @@ OP_PASSWORD = operation("auth.password", "POST", "/api/auth/password", PasswordC
 
 
 def _me() -> Me:
-    web = get_ctx().settings.current().web
-    return Me(username=web.username, must_change_password=web.must_change_password)
+    s = get_ctx().settings.current()
+    return Me(username=s.web.username, must_change_password=s.web.must_change_password,
+              language=s.display.language, default_password_in_use=bool(session.get("default_password")))
 
 
 def make_auth_blueprint(csrf: CSRFProtect, limiter: Limiter) -> Blueprint:
@@ -117,6 +122,8 @@ def make_auth_blueprint(csrf: CSRFProtect, limiter: Limiter) -> Blueprint:
         sid = secrets.token_urlsafe(24)
         _active()[sid] = time.time()
         session["sid"] = sid
+        # Known from the password just typed; no extra hashing to find out later.
+        session["default_password"] = hmac.compare_digest(body.password.encode(), DEFAULT_ADMIN_PASSWORD.encode())
         session.permanent = True
         login_user(AdminUser(web.username))
         return LoginResult(**_me().model_dump(), csrf_token=generate_csrf())
@@ -160,6 +167,7 @@ def make_auth_blueprint(csrf: CSRFProtect, limiter: Limiter) -> Blueprint:
             del active[sid]
         current_app.secret_key = new_key
         current_app.config["SECRET_KEY"] = new_key
+        session["default_password"] = False
         session.modified = True
         g.pop("csrf_token", None)
         logger.info("admin password changed by {}; other sessions revoked", current_user.get_id())

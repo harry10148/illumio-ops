@@ -3,36 +3,49 @@ import { BrowserRouter } from "react-router-dom";
 
 import { AUTH_REQUIRED_EVENT, call } from "./api/client";
 import type { Me } from "./api/generated";
-import { LangContext, type Lang, initialLang, loadDictionary, t } from "./i18n";
+import { LangContext, type Lang, initialLang, loadDictionary, rememberLang, t } from "./i18n";
 import { Login } from "./pages/Login";
 import { PasswordChange } from "./pages/PasswordChange";
-import { Shell } from "./shell/Shell";
+import { ME_CHANGED_EVENT, Shell } from "./shell/Shell";
 
 type Auth = { state: "checking" } | { state: "signed-out" } | { state: "signed-in"; me: Me };
 
 export function App() {
-  const [lang] = useState<Lang>(initialLang);
-  const [ready, setReady] = useState(false);
+  const [lang, setLang] = useState<Lang>(initialLang);
+  const [dictVersion, setDictVersion] = useState(0);
   const [auth, setAuth] = useState<Auth>({ state: "checking" });
 
   const refreshMe = useCallback(async () => {
     const env = await call("auth.me");
-    setAuth(env.ok && env.data ? { state: "signed-in", me: env.data } : { state: "signed-out" });
+    if (env.ok && env.data) {
+      setAuth({ state: "signed-in", me: env.data });
+      setLang(env.data.language); // the server-side display setting wins once signed in
+    } else {
+      setAuth({ state: "signed-out" });
+    }
   }, []);
 
   useEffect(() => {
-    void loadDictionary(lang).then(() => setReady(true));
+    void loadDictionary(lang).then(() => {
+      rememberLang(lang);
+      setDictVersion((v) => v + 1);
+    });
   }, [lang]);
 
   useEffect(() => {
     void refreshMe();
     const onAuthRequired = () => setAuth({ state: "signed-out" });
+    const onMeChanged = () => void refreshMe();
     window.addEventListener(AUTH_REQUIRED_EVENT, onAuthRequired);
-    return () => window.removeEventListener(AUTH_REQUIRED_EVENT, onAuthRequired);
+    window.addEventListener(ME_CHANGED_EVENT, onMeChanged);
+    return () => {
+      window.removeEventListener(AUTH_REQUIRED_EVENT, onAuthRequired);
+      window.removeEventListener(ME_CHANGED_EVENT, onMeChanged);
+    };
   }, [refreshMe]);
 
-  if (!ready || auth.state === "checking") {
-    return <div className="center-page muted">{ready ? t("loading") : "…"}</div>;
+  if (dictVersion === 0 || auth.state === "checking") {
+    return <div className="center-page muted">{dictVersion ? t("loading") : "…"}</div>;
   }
 
   let body;
@@ -47,7 +60,8 @@ export function App() {
   } else {
     body = (
       <BrowserRouter>
-        <Shell username={auth.me.username} onSignedOut={() => setAuth({ state: "signed-out" })} />
+        {/* re-mounted on a language change so every label re-renders */}
+        <Shell key={dictVersion} me={auth.me} onSignedOut={() => setAuth({ state: "signed-out" })} />
       </BrowserRouter>
     );
   }
