@@ -57,3 +57,30 @@ def test_backfilled_day_is_rolled_up_at_once(tmp_path, fake_traffic, monkeypatch
     fake_traffic.answer = lambda s, e, m: [raw_flow(7, s + minutes(5), s + minutes(6))]
     run_backfill(ctx, start=past, end=past + timedelta(days=1), now=NOW)
     assert _rollup(ctx, past.strftime("%Y-%m-%d")) == 1
+
+
+def _write(ctx, *raws, at=NOW):
+    from illumio_ops.domain.flows import normalize_flow
+    from illumio_ops.domain.values import DataOrigin
+    from illumio_ops.store.flowdb.flows import upsert_flows
+    with ctx.flows().write_lock, ctx.flows().connect() as conn:
+        return upsert_flows(conn, [normalize_flow(r) for r in raws], origin=DataOrigin.INGEST, now=at)
+
+
+def test_a_new_record_touches_only_its_own_day(tmp_path):
+    """The same 4-tuple recurs daily; a new record of it must not mark every past day changed
+    (that rebuilt 13 rollups per cycle on .106)."""
+    ctx = configured_ctx(tmp_path)
+    old = NOW - timedelta(days=5)
+    _write(ctx, raw_flow(1, old, old + minutes(5)))
+    stats = _write(ctx, raw_flow(1, NOW - minutes(30), NOW - minutes(20)))
+    assert stats.days_touched == {NOW.strftime("%Y-%m-%d")}
+
+
+def test_a_pair_across_midnight_touches_both_days(tmp_path):
+    ctx = configured_ctx(tmp_path)
+    midnight = NOW.replace(hour=0, minute=0)
+    _write(ctx, raw_flow(1, midnight - minutes(10), midnight - minutes(1)))  # outbound, day before
+    stats = _write(ctx, raw_flow(1, midnight + minutes(1), midnight + minutes(5), direction="inbound"))
+    assert stats.paired == 1
+    assert stats.days_touched == {(midnight - minutes(1)).strftime("%Y-%m-%d"), midnight.strftime("%Y-%m-%d")}

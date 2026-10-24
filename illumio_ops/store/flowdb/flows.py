@@ -118,14 +118,18 @@ def _merge_connection(conn: sqlite3.Connection, conn_key: str) -> None:
                      (max(known_in) if known_in else None, max(known_out) if known_out else None, primary["id"]))
 
 
-def _repair_tuple(conn: sqlite3.Connection, tup: tuple[str, str, int | None, int]) -> tuple[set[str], set[str], int]:
+def _repair_tuple(conn: sqlite3.Connection, tup: tuple[str, str, int | None, int],
+                  written: set[str]) -> tuple[set[str], int]:
     """Re-decide which records of one (src, dst, port, proto) are the same connection.
 
     Deterministic whatever order the records arrived in: outbound and inbound records are each
     taken in (first_detected, record_key) order, and every outbound record is matched with the
     first unmatched inbound record whose time range is within the pairing gap. Everything else
     stands alone — when it is unclear, count separately (spec §6.5.7).
-    Returns (conn_keys to rebuild, days of the rows, pairs formed)."""
+    Returns (the connections that changed — those holding a record written in this batch, and
+    both sides of every record that moved — and the pairs formed). Connections of the tuple that
+    did not change are left alone: the tuple recurs daily, and touching them would mark every past
+    day's rollup and archive as changed."""
     rows = conn.execute(
         "SELECT id, record_key, conn_key, direction, first_detected, last_detected FROM flows "
         "WHERE src_ip = ? AND dst_ip = ? AND port IS ? AND proto = ? ORDER BY first_detected, record_key", tup,
@@ -148,11 +152,12 @@ def _repair_tuple(conn: sqlite3.Connection, tup: tuple[str, str, int | None, int
                 break
     keys: set[str] = set()
     for r in rows:
-        keys.add(str(r["conn_key"]))
         if r["conn_key"] != want[r["id"]]:
             conn.execute("UPDATE flows SET conn_key = ? WHERE id = ?", (want[r["id"]], r["id"]))
-        keys.add(want[r["id"]])
-    return keys, {str(r["last_detected"])[:10] for r in rows}, pairs
+            keys |= {str(r["conn_key"]), want[r["id"]]}
+        elif r["record_key"] in written:
+            keys.add(want[r["id"]])
+    return keys, pairs
 
 
 # "+is_primary" keeps the planner on ix_flows_conn: left to itself it picks ix_flows_primary_last
@@ -187,9 +192,11 @@ def upsert_flows(conn: sqlite3.Connection, records: Sequence[FlowRecord], *, ori
     inserted = refreshed = paired = 0
     days: set[str] = set()
     tuples: set[tuple[str, str, int | None, int]] = set()
+    written: set[str] = set()
     with transaction(conn):
         for r in records:
             key = record_key(r)
+            written.add(key)
             old = conn.execute("SELECT id, last_detected FROM flows WHERE record_key = ?", (key,)).fetchone()
             if old is not None:
                 days.add(str(old["last_detected"])[:10])
@@ -201,13 +208,18 @@ def upsert_flows(conn: sqlite3.Connection, records: Sequence[FlowRecord], *, ori
             tuples.add((r.src_ip, r.dst_ip, r.port, r.proto))
         keys: set[str] = set()
         for tup in sorted(tuples, key=str):
-            tup_keys, tup_days, tup_pairs = _repair_tuple(conn, tup)
+            tup_keys, tup_pairs = _repair_tuple(conn, tup, written)
             keys |= tup_keys
-            days |= tup_days
             paired += tup_pairs
-        for conn_key in sorted(keys):
+        ordered = sorted(keys)
+        for conn_key in ordered:
             _merge_connection(conn, conn_key)
             _update_baselines(conn, conn_key)
+        for i in range(0, len(ordered), 500):  # every row of a changed connection may have changed
+            chunk = ordered[i:i + 500]
+            days |= {d for (d,) in conn.execute(
+                f"SELECT DISTINCT substr(last_detected, 1, 10) FROM flows WHERE conn_key IN ({','.join('?' * len(chunk))})",
+                chunk)}
         archive.mark_stale(conn, "flows", days)
         conn.executemany("INSERT INTO rollup_state (day, dirty) VALUES (?, 1) "
                          "ON CONFLICT(day) DO UPDATE SET dirty = 1", [(d,) for d in sorted(days)])
