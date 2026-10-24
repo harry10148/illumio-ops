@@ -57,7 +57,7 @@ def test_flows_and_rollups_commit_together(tmp_path, fake_traffic, monkeypatch):
     fake_traffic.answer = lambda s, e, m: [raw_flow(1, e - minutes(2), e - minutes(1))]
     def broken_rollup(conn, day):
         raise sqlite3.OperationalError("rollup failed")
-    monkeypatch.setattr(traffic, "rebuild_rollup", broken_rollup)
+    monkeypatch.setattr(traffic, "refresh_rollups", broken_rollup)
     with pytest.raises(sqlite3.OperationalError):
         run_traffic_cycle(ctx, now=NOW)
     with ctx.flows().connect() as conn:

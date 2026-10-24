@@ -29,7 +29,7 @@ from illumio_ops.services.context import AppContext
 from illumio_ops.store.flowdb import ingest_state
 from illumio_ops.store.flowdb.db import FlowDb, StaleGeneration, transaction
 from illumio_ops.store.flowdb.events import upsert_events
-from illumio_ops.store.flowdb.flows import rebuild_rollup, upsert_flows
+from illumio_ops.store.flowdb.flows import refresh_rollups, upsert_flows
 
 SOURCE = IngestSource.BACKFILL
 Plan = Literal["initial", "manual"]
@@ -119,9 +119,8 @@ def _run_backfill(ctx: AppContext, *, start: datetime, end: datetime, plan: Plan
                         ingest_state.mark_failed(conn, SOURCE, at, f"binding: {exc}")
                         return CycleResult(rows, windows, gaps, skipped)
                     with transaction(conn):  # one day lands completely or not at all
-                        stats = upsert_flows(conn, flows, origin=DataOrigin.BACKFILL, now=at)
-                        for day in sorted(stats.days_touched):
-                            rebuild_rollup(conn, day)
+                        upsert_flows(conn, flows, origin=DataOrigin.BACKFILL, now=at)
+                        refresh_rollups(conn, at)
                         upsert_events(conn, events, origin=DataOrigin.BACKFILL, now=at)
                         for src, trunc in ((IngestSource.TRAFFIC, t_trunc), (IngestSource.EVENTS, e_trunc)):
                             for ta, tb, n in trunc:

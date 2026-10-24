@@ -10,13 +10,13 @@ from __future__ import annotations
 import sqlite3
 from collections.abc import Sequence
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 
 from illumio_ops.domain.flows import FlowRecord, ranges_within, record_key
 from illumio_ops.domain.identity import endpoint_key
 from illumio_ops.domain.values import DataOrigin, FlowDirection
 from illumio_ops.store.flowdb import archive
-from illumio_ops.store.flowdb.db import db_time, transaction
+from illumio_ops.store.flowdb.db import db_day, db_time, transaction
 from illumio_ops.store.flowdb.labels import label_set_id
 
 NO_PORT = -1  # rollup and baseline keys cannot be NULL
@@ -209,6 +209,8 @@ def upsert_flows(conn: sqlite3.Connection, records: Sequence[FlowRecord], *, ori
             _merge_connection(conn, conn_key)
             _update_baselines(conn, conn_key)
         archive.mark_stale(conn, "flows", days)
+        conn.executemany("INSERT INTO rollup_state (day, dirty) VALUES (?, 1) "
+                         "ON CONFLICT(day) DO UPDATE SET dirty = 1", [(d,) for d in sorted(days)])
     return UpsertStats(inserted=inserted, refreshed=refreshed, paired=paired, days_touched=frozenset(days))
 
 
@@ -223,14 +225,33 @@ ROLLUP_INSERT = (
     "COALESCE(initiator_process, '')")
 
 
-def rebuild_rollup(conn: sqlite3.Connection, day: str) -> int:
+def rebuild_rollup(conn: sqlite3.Connection, day: str, *, at: datetime | None = None) -> int:
     """Recompute one UTC day from the primary rows whose last_detected falls in it."""
     start = datetime.fromisoformat(f"{day}T00:00:00+00:00")
     lo, hi = db_time(start), db_time(start + timedelta(days=1))
     with transaction(conn):
         conn.execute("DELETE FROM flow_rollup_daily WHERE day = ?", (day,))
         cur = conn.execute(ROLLUP_INSERT, (day, NO_PORT, lo, hi, NO_PORT))
+        conn.execute("INSERT INTO rollup_state (day, dirty, built_at) VALUES (?, 0, ?) "
+                     "ON CONFLICT(day) DO UPDATE SET dirty = 0, built_at = excluded.built_at",
+                     (day, db_time(at or datetime.now(UTC))))
         return cur.rowcount
+
+
+TODAY_ROLLUP_EVERY = timedelta(hours=1)
+
+
+def refresh_rollups(conn: sqlite3.Connection, at: datetime, *, today_every: timedelta = TODAY_ROLLUP_EVERY) -> list[str]:
+    """Rebuild the rollups that changed: a past day at once (a backfill, a late record, or the day that
+    just closed), today only if its last rebuild is at least today_every old. Returns the days rebuilt."""
+    today = db_day(at)
+    due = []
+    for day, built_at in conn.execute("SELECT day, built_at FROM rollup_state WHERE dirty = 1 ORDER BY day"):
+        if day < today or built_at is None or at - datetime.fromisoformat(built_at) >= today_every:
+            due.append(day)
+    for day in due:
+        rebuild_rollup(conn, day, at=at)
+    return due
 
 
 
@@ -252,6 +273,7 @@ def delete_connections_before(conn: sqlite3.Connection, cutoff: datetime, *, arc
 
 def delete_rollups_before(conn: sqlite3.Connection, day: str) -> int:
     with transaction(conn):
+        conn.execute("DELETE FROM rollup_state WHERE day < ?", (day,))
         return conn.execute("DELETE FROM flow_rollup_daily WHERE day < ?", (day,)).rowcount
 
 

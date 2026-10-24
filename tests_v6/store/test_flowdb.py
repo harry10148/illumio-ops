@@ -8,7 +8,7 @@ from illumio_ops.store.ownership import TABLE_OWNERS
 
 FLOWDB_TABLES = {
     "pce_binding", "ingest_state", "ingest_gaps", "label_sets", "label_set_members", "flows",
-    "flow_rollup_daily", "connection_baseline", "user_baseline", "events", "workloads",
+    "flow_rollup_daily", "rollup_state", "connection_baseline", "user_baseline", "events", "workloads",
     "workload_snapshot_daily", "ransomware_services", "ransomware_snapshot_daily",
     "org_risk_snapshot_daily", "pce_capabilities", "archive_log",
 }

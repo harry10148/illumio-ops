@@ -124,6 +124,13 @@ CREATE TABLE flow_rollup_daily (
     PRIMARY KEY (day, src_key, dst_key, port, proto, policy_decision, initiator_user, initiator_process)
 ) WITHOUT ROWID;
 
+-- Which daily rollups are out of date: past days are rebuilt as soon as they change, today's at most
+-- hourly (a full-day rebuild was most of every collection cycle, P2 Task 14).
+CREATE TABLE rollup_state (
+    day      TEXT PRIMARY KEY,
+    dirty    INTEGER NOT NULL,
+    built_at TEXT
+) WITHOUT ROWID;
 CREATE TABLE connection_baseline (
     src_key    TEXT NOT NULL,
     dst_key    TEXT NOT NULL,

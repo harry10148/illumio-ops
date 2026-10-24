@@ -16,6 +16,7 @@ TABLE_OWNERS: dict[str, str] = {
     "label_set_members": "illumio_ops.store.flowdb.labels",
     "flows": "illumio_ops.store.flowdb.flows",
     "flow_rollup_daily": "illumio_ops.store.flowdb.flows",
+    "rollup_state": "illumio_ops.store.flowdb.flows",
     "connection_baseline": "illumio_ops.store.flowdb.flows",
     "user_baseline": "illumio_ops.store.flowdb.flows",
     "events": "illumio_ops.store.flowdb.events",

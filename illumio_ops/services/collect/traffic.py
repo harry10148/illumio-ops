@@ -39,7 +39,7 @@ from illumio_ops.services.collect.windows import harvest
 from illumio_ops.services.context import AppContext
 from illumio_ops.store.flowdb import ingest_state
 from illumio_ops.store.flowdb.db import StaleGeneration, transaction
-from illumio_ops.store.flowdb.flows import rebuild_rollup, upsert_flows
+from illumio_ops.store.flowdb.flows import refresh_rollups, upsert_flows
 
 SOURCE = IngestSource.TRAFFIC
 OVERLAP = timedelta(seconds=600)
@@ -113,9 +113,8 @@ def run_traffic_cycle(ctx: AppContext, *, now: datetime | None = None) -> CycleR
                 return CycleResult(0, windows, 0, skipped)
             # Flows, rollups, gaps and the watermark move together or not at all.
             with transaction(conn):
-                stats = upsert_flows(conn, records, origin=DataOrigin.INGEST, now=at)
-                for day in sorted(stats.days_touched):
-                    rebuild_rollup(conn, day)
+                upsert_flows(conn, records, origin=DataOrigin.INGEST, now=at)
+                refresh_rollups(conn, at)
                 for a, b, n in truncated:
                     ingest_state.record_gap(conn, SOURCE, a, b, "truncated",
                                             f"{n} rows returned at the PCE's per-query limit", at)
