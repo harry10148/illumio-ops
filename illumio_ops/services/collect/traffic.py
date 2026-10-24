@@ -91,7 +91,7 @@ def run_traffic_cycle(ctx: AppContext, *, now: datetime | None = None) -> CycleR
         return CycleResult(0, 0, 0)
     at = _now(now)
     fdb = ctx.flows()
-    start = begin(fdb, SOURCE, at, overlap=OVERLAP, cold_start=COLD_START)
+    start, done_progress = begin(fdb, SOURCE, at, overlap=OVERLAP, cold_start=COLD_START)
     try:
         with client:
             rows, windows, truncated = fetch_traffic(client, start, at, query_name="illumio-ops traffic")
@@ -117,7 +117,7 @@ def run_traffic_cycle(ctx: AppContext, *, now: datetime | None = None) -> CycleR
                     ingest_state.record_gap(conn, SOURCE, a, b, "truncated",
                                             f"{n} rows returned at the PCE's per-query limit", at)
                 ingest_state.resolve_failed_gaps(conn, SOURCE, start, at, at)
-                ingest_state.mark_ok(conn, SOURCE, at, watermark=at, rows=len(records), progress={})
+                ingest_state.mark_ok(conn, SOURCE, at, watermark=at, rows=len(records), progress=done_progress)
     except Exception as exc:
         fail(fdb, SOURCE, start, at, exc)
         raise

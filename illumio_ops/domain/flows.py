@@ -180,3 +180,30 @@ def merge_sightings(a: FlowRecord, b: FlowRecord) -> FlowRecord:
         own_process=later.own_process or earlier.own_process,
         own_user=later.own_user or earlier.own_user,
     )
+
+
+def group_pairs(records: list[FlowRecord]) -> list[tuple[FlowRecord, FlowRecord | None]]:
+    """(primary, partner) per connection, decided like the flow store does it: per 4-tuple,
+    outbound and inbound records each in (first_detected, record_key) order, every outbound
+    record takes the first unmatched inbound record within the pairing gap; the rest stand alone.
+    The primary is the outbound record of a pair."""
+    by_tuple: dict[tuple[str, str, int | None, int], list[FlowRecord]] = {}
+    for r in records:
+        by_tuple.setdefault((r.src_ip, r.dst_ip, r.port, r.proto), []).append(r)
+    out: list[tuple[FlowRecord, FlowRecord | None]] = []
+    for group in by_tuple.values():
+        group.sort(key=lambda r: (r.first_detected, record_key(r)))
+        outs = [r for r in group if r.direction is FlowDirection.OUTBOUND]
+        ins = [r for r in group if r.direction is FlowDirection.INBOUND]
+        used: set[int] = set()
+        for o in outs:
+            partner = None
+            for idx, i in enumerate(ins):
+                if idx not in used and ranges_within(o.first_detected, o.last_detected,
+                                                     i.first_detected, i.last_detected):
+                    used.add(idx)
+                    partner = i
+                    break
+            out.append((o, partner))
+        out.extend((i, None) for idx, i in enumerate(ins) if idx not in used)
+    return out
