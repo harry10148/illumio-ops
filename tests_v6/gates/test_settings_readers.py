@@ -56,10 +56,10 @@ SETTINGS_READERS: dict[str, str] = {
     "collection.retention.baseline_days": "illumio_ops.services.collect.retention",
     "collection.archive.enabled": "illumio_ops.services.collect.archive",
     "collection.archive.retention_days": "illumio_ops.services.collect.archive",
+    "collection.disk_free_warn_gb": "illumio_ops.services.collect.status",
 }
 # Fields whose reader arrives later: value = the task or phase that adds it.
 PENDING_READERS: dict[str, str] = {
-    "collection.disk_free_warn_gb": "P2-T12",
     "pce.console_url": "P3",
     "display.timezone": "P3",
 }

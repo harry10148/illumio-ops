@@ -5,6 +5,7 @@ never enter alert evaluation (spec §7). Progress survives restarts; the live wa
 """
 from __future__ import annotations
 
+import threading
 from datetime import UTC, datetime, timedelta
 
 from loguru import logger
@@ -27,6 +28,8 @@ from illumio_ops.store.flowdb.events import upsert_events
 from illumio_ops.store.flowdb.flows import rebuild_rollup, upsert_flows
 
 SOURCE = IngestSource.BACKFILL
+# One backfill at a time, whether started by the periodic check or from the collection page.
+BACKFILL_LOCK = threading.Lock()
 
 
 def _days(start: datetime, end: datetime) -> list[tuple[datetime, datetime]]:
@@ -40,6 +43,16 @@ def _days(start: datetime, end: datetime) -> list[tuple[datetime, datetime]]:
 
 
 def run_backfill(ctx: AppContext, *, start: datetime, end: datetime, now: datetime | None = None) -> CycleResult:
+    if not BACKFILL_LOCK.acquire(blocking=False):
+        logger.info("a backfill is already running; this one was not started")
+        return CycleResult(0, 0, 0)
+    try:
+        return _run_backfill(ctx, start=start, end=end, now=now)
+    finally:
+        BACKFILL_LOCK.release()
+
+
+def _run_backfill(ctx: AppContext, *, start: datetime, end: datetime, now: datetime | None) -> CycleResult:
     settings = ctx.settings.current()
     if not settings.collection.enabled:
         return CycleResult(0, 0, 0)

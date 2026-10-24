@@ -9,6 +9,13 @@ import { registerNav } from "../../shell/nav";
 const JOB_LABEL_KEYS: Record<string, string> = {
   pce_probe: "job_name_pce_probe",
   tls_renew_check: "job_name_tls_renew_check",
+  collect_traffic: "job_name_collect_traffic",
+  collect_events: "job_name_collect_events",
+  collect_inventory: "job_name_collect_inventory",
+  collect_backfill: "job_name_collect_backfill",
+  collect_backfill_manual: "job_name_collect_backfill_manual",
+  collect_archive: "job_name_collect_archive",
+  collect_retention: "job_name_collect_retention",
 };
 
 function every(seconds: number | null): string {
