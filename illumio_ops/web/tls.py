@@ -185,7 +185,7 @@ def ensure_self_signed(tls_dir: Path, tls: TlsSettings) -> tuple[Path, Path]:
             reason = f"expires in {left} days"
     if reason is None:
         return cert_path, key_path
-    logger.info("renewing the self-signed certificate: {}", reason)
+    logger.info("{} the self-signed certificate: {}", "creating" if reason == "missing" else "renewing", reason)
     return generate_self_signed(tls_dir, days=tls.validity_days, key_algorithm=tls.key_algorithm)
 
 

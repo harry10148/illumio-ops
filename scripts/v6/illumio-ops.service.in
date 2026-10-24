@@ -1,0 +1,49 @@
+[Unit]
+Description=illumio-ops v6 (@SERVICE_NAME@)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=illumio-ops
+Group=illumio-ops
+WorkingDirectory=@PREFIX@
+Environment=PYTHONNOUSERSITE=1
+Environment=PYTHONPATH=@PREFIX@
+ExecStart=@PREFIX@/python/bin/python3 -m illumio_ops serve --root @PREFIX@
+Restart=on-failure
+RestartSec=10
+TimeoutStopSec=30
+KillSignal=SIGTERM
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=@SERVICE_NAME@
+
+# --- Hardening (same directives as 5.x deploy/illumio-ops.service) ---
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+ProtectClock=true
+ProtectHostname=true
+ProtectProc=invisible
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+RestrictNamespaces=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+LockPersonality=true
+# MemoryDenyWriteExecute intentionally omitted: CPython 3.12 needs PROT_WRITE|PROT_EXEC
+# during thread start on RHEL/Rocky 9 ("can't start new thread").
+SystemCallFilter=@system-service
+SystemCallErrorNumber=EPERM
+CapabilityBoundingSet=
+AmbientCapabilities=
+ReadWritePaths=@PREFIX@/config @PREFIX@/data @PREFIX@/logs @PREFIX@/reports
+
+[Install]
+WantedBy=multi-user.target
