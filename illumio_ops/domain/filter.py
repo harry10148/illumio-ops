@@ -17,7 +17,7 @@ import ipaddress
 import itertools
 import re
 from collections.abc import Callable, Mapping
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any
 
 from pydantic import (
@@ -91,6 +91,19 @@ class FilterSpec(_Model):
     service_user: str | None = None
     text: str | None = None
     exclude_system_accounts: bool = False
+
+    # The store keeps milliseconds: a bound finer than that is moved inward to the next whole
+    # millisecond, so the SQL bound and the per-record predicate see the same window.
+    @field_validator("start")
+    @classmethod
+    def _start_ms(cls, v: datetime) -> datetime:
+        extra = v.microsecond % 1000
+        return v + timedelta(microseconds=1000 - extra) if extra else v
+
+    @field_validator("end")
+    @classmethod
+    def _end_ms(cls, v: datetime) -> datetime:
+        return v - timedelta(microseconds=v.microsecond % 1000)
 
     @model_validator(mode="after")
     def _window(self) -> FilterSpec:

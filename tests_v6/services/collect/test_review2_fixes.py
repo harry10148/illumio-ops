@@ -7,7 +7,7 @@ import responses
 from pydantic import ValidationError
 
 from illumio_ops.domain.events import normalize_event
-from illumio_ops.domain.filter import FilterSpec
+from illumio_ops.domain.filter import FilterSpec, matches
 from illumio_ops.domain.flows import normalize_flow
 from illumio_ops.domain.values import DataOrigin, IngestSource
 from illumio_ops.pce.async_query import PceQueryError
@@ -371,3 +371,18 @@ def test_archive_running_across_a_pce_switch_writes_nothing(tmp_path, monkeypatc
     assert run_archive(ctx, now=NOW) == 0
     assert [p.name for p in ctx.paths.archive_dir.iterdir() if p.is_file()] == []
     assert _count(ctx, "archive_log") == 0
+
+
+# ── Group F: filter bounds ──────────────────────────────────────────────────
+
+@pytest.mark.parametrize("bound", ["start", "end"])
+def test_sub_millisecond_bounds_agree_between_store_and_predicate(tmp_path, fake_fill, bound):  # finding 7
+    ctx = configured_ctx(tmp_path)
+    t = NOW - minutes(30)
+    fake_fill.answer = lambda s, e, m: [raw_flow(1, t, t)]
+    run_traffic_cycle(ctx, now=NOW)
+    us = timedelta(microseconds=1)
+    spec = (FilterSpec(start=t + us, end=t + minutes(1)) if bound == "start"
+            else FilterSpec(start=t - minutes(1), end=t - us))
+    in_store = len(query_flows(ctx, spec, limit=10, order="last_detected_desc", now=NOW).rows) == 1
+    assert in_store is matches(spec, normalize_flow(raw_flow(1, t, t))) is False
