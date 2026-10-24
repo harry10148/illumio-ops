@@ -21,8 +21,9 @@ from illumio_ops.services.collect import CycleResult
 from illumio_ops.services.collect.guard import BindingMismatch, ensure_binding
 from illumio_ops.services.collect.traffic import PCE_FAILURES
 from illumio_ops.services.context import AppContext
+from illumio_ops.settings.schema import PceSettings
 from illumio_ops.store.flowdb import capabilities, ingest_state, ransomware, workloads
-from illumio_ops.store.flowdb.db import FlowDb, db_day, db_time
+from illumio_ops.store.flowdb.db import FlowDb, db_day, db_time, transaction
 from illumio_ops.store.flowdb.labels import label_set_id
 
 SOURCE = IngestSource.INVENTORY
@@ -114,14 +115,24 @@ def run_inventory_cycle(ctx: AppContext, *, now: datetime | None = None) -> Cycl
     if not settings.collection.enabled:
         return CycleResult(0, 0, 0)
     try:
-        client = ctx.pce_client()
+        client = ctx.pce_client(settings.pce)
     except PceNotConfigured:
         return CycleResult(0, 0, 0)
     at = (now or datetime.now(UTC)).astimezone(UTC).replace(microsecond=0)
     day = db_day(at)
     fdb = ctx.flows()
-    with fdb.connect() as conn:
+    with fdb.write_lock, fdb.connect() as conn:
         ingest_state.mark_started(conn, SOURCE, at)
+    try:
+        return _inventory(ctx, client, settings.pce, fdb, at, day)
+    except Exception as exc:
+        with fdb.write_lock, fdb.connect() as conn:
+            ingest_state.mark_failed(conn, SOURCE, at, f"{type(exc).__name__}: {exc}")
+        raise
+
+
+def _inventory(ctx: AppContext, client: PceClient, pce: PceSettings, fdb: FlowDb, at: datetime,
+               day: str) -> CycleResult:
     with client:
         try:
             rows = get_all(client, "/workloads", params={"managed": "true"}, deadline=_deadline())
@@ -136,16 +147,17 @@ def run_inventory_cycle(ctx: AppContext, *, now: datetime | None = None) -> Cycl
             return CycleResult(0, 0, 1)
         with fdb.write_lock, fdb.connect() as conn:
             try:
-                ensure_binding(conn, settings.pce, at)
+                ensure_binding(conn, pce, at)
             except BindingMismatch as exc:
                 ingest_state.mark_failed(conn, SOURCE, at, f"binding: {exc}")
                 return CycleResult(0, 1, 0)
             stamp = db_time(at)
-            workloads.replace_inventory(conn, [_row(conn, w, stamp) for w in rows])
-            ransomware.prune_missing(conn, (str(w["href"]) for w in rows))
-            for name, state in detect_from_workloads(rows).items():
-                capabilities.record(conn, name, state, None, at)
-            ingest_state.mark_ok(conn, SOURCE, at, watermark=None, rows=len(rows))
+            with transaction(conn):
+                workloads.replace_inventory(conn, [_row(conn, w, stamp) for w in rows])
+                ransomware.prune_missing(conn, (str(w["href"]) for w in rows))
+                for name, state in detect_from_workloads(rows).items():
+                    capabilities.record(conn, name, state, None, at)
+                ingest_state.mark_ok(conn, SOURCE, at, watermark=None, rows=len(rows))
         try:
             _org_summary(client, fdb, day, at)
             wanted, fetched, failed = _risk_details(client, fdb, rows, at)

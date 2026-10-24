@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import hashlib
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 from typing import Any
 
@@ -161,3 +161,22 @@ def same_connection(a: FlowRecord, b: FlowRecord, *, max_gap_seconds: int = PAIR
     if (a.src_ip, a.dst_ip, a.port, a.proto) != (b.src_ip, b.dst_ip, b.port, b.proto):
         return False
     return ranges_within(a.first_detected, a.last_detected, b.first_detected, b.last_detected, max_gap_seconds)
+
+
+def _larger(a: int | None, b: int | None) -> int | None:
+    known = [v for v in (a, b) if v is not None]
+    return max(known) if known else None
+
+
+def merge_sightings(a: FlowRecord, b: FlowRecord) -> FlowRecord:
+    """Two copies of one PCE record (same record_key, e.g. from both halves of a split window):
+    counters only grow, a known byte count is never replaced by none, the later copy wins the rest."""
+    later, earlier = (b, a) if b.last_detected >= a.last_detected else (a, b)
+    return replace(
+        later,
+        num_connections=max(a.num_connections, b.num_connections),
+        bytes_in=_larger(a.bytes_in, b.bytes_in),
+        bytes_out=_larger(a.bytes_out, b.bytes_out),
+        own_process=later.own_process or earlier.own_process,
+        own_user=later.own_user or earlier.own_user,
+    )

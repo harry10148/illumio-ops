@@ -5,6 +5,8 @@ import sqlite3
 from collections.abc import Sequence
 from dataclasses import astuple, dataclass, fields
 
+from illumio_ops.store.flowdb.db import transaction
+
 
 @dataclass(frozen=True)
 class WorkloadRow:
@@ -31,14 +33,14 @@ _MARKS = ", ".join("?" for _ in fields(WorkloadRow))
 
 def replace_inventory(conn: sqlite3.Connection, rows: Sequence[WorkloadRow]) -> None:
     """The PCE's current list replaces the stored one (callers pass only complete lists)."""
-    with conn:
+    with transaction(conn):
         conn.execute("DELETE FROM workloads")
         conn.executemany(f"INSERT INTO workloads ({_COLUMNS}) VALUES ({_MARKS})", [astuple(r) for r in rows])
 
 
 def snapshot_day(conn: sqlite3.Connection, day: str) -> int:
     """First snapshot of the day wins; later runs that day change nothing."""
-    with conn:
+    with transaction(conn):
         return conn.execute(
             "INSERT OR IGNORE INTO workload_snapshot_daily (day, href, enforcement_mode, visibility_level, "
             "risk_exposure, risk_percent) SELECT ?, href, enforcement_mode, visibility_level, risk_exposure, "
@@ -47,5 +49,5 @@ def snapshot_day(conn: sqlite3.Connection, day: str) -> int:
 
 
 def delete_snapshots_before(conn: sqlite3.Connection, day: str) -> int:
-    with conn:
+    with transaction(conn):
         return conn.execute("DELETE FROM workload_snapshot_daily WHERE day < ?", (day,)).rowcount

@@ -8,7 +8,7 @@ from collections.abc import Iterable, Mapping, Sequence
 from datetime import datetime
 from typing import Any
 
-from illumio_ops.store.flowdb.db import db_time
+from illumio_ops.store.flowdb.db import db_time, transaction
 
 
 def _int(value: Any, default: int) -> int:
@@ -22,7 +22,7 @@ def upsert_services(conn: sqlite3.Connection, workload_href: str, services: Sequ
              s.get("severity"), s.get("category"), s.get("protection_state"), s.get("port_status"),
              s.get("active_policy"), s.get("draft_policy"), s.get("recommendation") or None,
              source_updated_at, db_time(at)) for s in services if isinstance(s, Mapping)]
-    with conn:
+    with transaction(conn):
         conn.execute("DELETE FROM ransomware_services WHERE workload_href = ?", (workload_href,))
         conn.executemany(
             "INSERT OR REPLACE INTO ransomware_services (workload_href, name, port, proto, severity, category, "
@@ -40,13 +40,13 @@ def source_updated(conn: sqlite3.Connection) -> dict[str, str | None]:
 def prune_missing(conn: sqlite3.Connection, keep: Iterable[str]) -> int:
     keep_set = set(keep)
     gone = [h for h in source_updated(conn) if h not in keep_set]
-    with conn:
+    with transaction(conn):
         conn.executemany("DELETE FROM ransomware_services WHERE workload_href = ?", [(h,) for h in gone])
     return len(gone)
 
 
 def snapshot_day(conn: sqlite3.Connection, day: str) -> int:
-    with conn:
+    with transaction(conn):
         return conn.execute(
             "INSERT OR IGNORE INTO ransomware_snapshot_daily (day, workload_href, name, port, proto, severity, "
             "protection_state, port_status) SELECT ?, workload_href, name, port, proto, severity, "
@@ -54,12 +54,12 @@ def snapshot_day(conn: sqlite3.Connection, day: str) -> int:
 
 
 def write_org_summary(conn: sqlite3.Connection, day: str, summary: Mapping[str, Any]) -> None:
-    with conn:
+    with transaction(conn):
         conn.execute("INSERT OR REPLACE INTO org_risk_snapshot_daily (day, summary_json) VALUES (?, ?)",
                      (day, json.dumps(summary, separators=(",", ":"))))
 
 
 def delete_snapshots_before(conn: sqlite3.Connection, day: str) -> int:
-    with conn:
+    with transaction(conn):
         n = conn.execute("DELETE FROM ransomware_snapshot_daily WHERE day < ?", (day,)).rowcount
         return n + conn.execute("DELETE FROM org_risk_snapshot_daily WHERE day < ?", (day,)).rowcount

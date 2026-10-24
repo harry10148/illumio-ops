@@ -4,11 +4,11 @@ from __future__ import annotations
 import sqlite3
 from datetime import datetime
 
-from illumio_ops.store.flowdb.db import db_time
+from illumio_ops.store.flowdb.db import db_time, transaction
 
 
 def record(conn: sqlite3.Connection, kind: str, day: str, rows: int, path: str, at: datetime) -> None:
-    with conn:
+    with transaction(conn):
         conn.execute("INSERT OR REPLACE INTO archive_log (kind, day, rows, path, written_at) VALUES (?, ?, ?, ?, ?)",
                      (kind, day, rows, path, db_time(at)))
 
@@ -22,5 +22,5 @@ def entries_before(conn: sqlite3.Connection, day: str) -> list[tuple[str, str, s
 
 
 def forget(conn: sqlite3.Connection, kind: str, day: str) -> None:
-    with conn:
+    with transaction(conn):
         conn.execute("DELETE FROM archive_log WHERE kind = ? AND day = ?", (kind, day))

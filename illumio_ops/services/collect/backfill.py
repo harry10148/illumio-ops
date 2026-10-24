@@ -22,6 +22,7 @@ from illumio_ops.services.collect.traffic import (
 )
 from illumio_ops.services.context import AppContext
 from illumio_ops.store.flowdb import ingest_state
+from illumio_ops.store.flowdb.db import transaction
 from illumio_ops.store.flowdb.events import upsert_events
 from illumio_ops.store.flowdb.flows import rebuild_rollup, upsert_flows
 
@@ -43,13 +44,13 @@ def run_backfill(ctx: AppContext, *, start: datetime, end: datetime, now: dateti
     if not settings.collection.enabled:
         return CycleResult(0, 0, 0)
     try:
-        client = ctx.pce_client()
+        client = ctx.pce_client(settings.pce)
     except PceNotConfigured:
         return CycleResult(0, 0, 0)
     at = (now or datetime.now(UTC)).astimezone(UTC).replace(microsecond=0)
     start, end = start.astimezone(UTC).replace(microsecond=0), end.astimezone(UTC).replace(microsecond=0)
     fdb = ctx.flows()
-    with fdb.connect() as conn:
+    with fdb.write_lock, fdb.connect() as conn:
         state = ingest_state.get(conn, SOURCE)
         ingest_state.mark_started(conn, SOURCE, at)
     progress = state.progress if state and state.progress else None
@@ -68,23 +69,31 @@ def run_backfill(ctx: AppContext, *, start: datetime, end: datetime, now: dateti
                     ingest_state.mark_failed(conn, SOURCE, at, str(exc))
                 logger.warning("backfill stopped at {}: {}", a, exc)
                 return CycleResult(rows, windows, gaps + 1, skipped)
-            flows, s1 = normalize_all(traffic_rows)
-            events, s2 = normalize_events(event_rows)
-            with fdb.write_lock, fdb.connect() as conn:
-                try:
-                    ensure_binding(conn, settings.pce, at)
-                except BindingMismatch as exc:
-                    ingest_state.mark_failed(conn, SOURCE, at, f"binding: {exc}")
-                    return CycleResult(rows, windows, gaps, skipped)
-                stats = upsert_flows(conn, flows, origin=DataOrigin.BACKFILL, now=at)
-                for day in sorted(stats.days_touched):
-                    rebuild_rollup(conn, day)
-                upsert_events(conn, events, origin=DataOrigin.BACKFILL, now=at)
-                for src, trunc in ((IngestSource.TRAFFIC, t_trunc), (IngestSource.EVENTS, e_trunc)):
-                    for ta, tb, n in trunc:
-                        ingest_state.record_gap(conn, src, ta, tb, "truncated", f"backfill: {n} rows at the limit", at)
-                ingest_state.set_progress(conn, SOURCE, {"start": start.isoformat(), "end": end.isoformat(),
-                                                         "done_through": b.isoformat(), "finished": False})
+            try:
+                flows, s1 = normalize_all(traffic_rows)
+                events, s2 = normalize_events(event_rows)
+                with fdb.write_lock, fdb.connect() as conn:
+                    try:
+                        ensure_binding(conn, settings.pce, at)
+                    except BindingMismatch as exc:
+                        ingest_state.mark_failed(conn, SOURCE, at, f"binding: {exc}")
+                        return CycleResult(rows, windows, gaps, skipped)
+                    with transaction(conn):  # one day lands completely or not at all
+                        stats = upsert_flows(conn, flows, origin=DataOrigin.BACKFILL, now=at)
+                        for day in sorted(stats.days_touched):
+                            rebuild_rollup(conn, day)
+                        upsert_events(conn, events, origin=DataOrigin.BACKFILL, now=at)
+                        for src, trunc in ((IngestSource.TRAFFIC, t_trunc), (IngestSource.EVENTS, e_trunc)):
+                            for ta, tb, n in trunc:
+                                ingest_state.record_gap(conn, src, ta, tb, "truncated",
+                                                        f"backfill: {n} rows at the limit", at)
+                        ingest_state.set_progress(conn, SOURCE, {"start": start.isoformat(), "end": end.isoformat(),
+                                                                 "done_through": b.isoformat(), "finished": False})
+            except Exception as exc:
+                with fdb.write_lock, fdb.connect() as conn:
+                    ingest_state.record_gap(conn, IngestSource.TRAFFIC, a, b, "failed", f"backfill: {exc}", at)
+                    ingest_state.mark_failed(conn, SOURCE, at, f"{type(exc).__name__}: {exc}")
+                raise
             rows += len(flows) + len(events)
             windows += w1 + w2
             gaps += len(t_trunc) + len(e_trunc)

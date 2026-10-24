@@ -7,14 +7,14 @@ from datetime import datetime
 
 from illumio_ops.domain.events import EventRecord
 from illumio_ops.domain.values import DataOrigin
-from illumio_ops.store.flowdb.db import db_time
+from illumio_ops.store.flowdb.db import db_time, transaction
 
 
 def upsert_events(conn: sqlite3.Connection, records: Sequence[EventRecord], *, origin: DataOrigin,
                   now: datetime) -> int:
     """Insert events not seen before (an event never changes); returns how many were new."""
     stamp = db_time(now)
-    with conn:
+    with transaction(conn):
         before = conn.total_changes
         conn.executemany(
             "INSERT OR IGNORE INTO events (href, event_type, severity, status, timestamp, created_by_kind, "
@@ -31,6 +31,6 @@ def delete_events_before(conn: sqlite3.Connection, cutoff: datetime, *, archived
     rows = conn.execute("SELECT DISTINCT substr(timestamp, 1, 10) FROM events WHERE timestamp < ?",
                         (db_time(cutoff),)).fetchall()
     days = [r[0] for r in rows if archived_days is None or r[0] in archived_days]
-    with conn:
+    with transaction(conn):
         return sum(conn.execute("DELETE FROM events WHERE timestamp < ? AND substr(timestamp, 1, 10) = ?",
                                 (db_time(cutoff), d)).rowcount for d in days)

@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING
 from illumio_ops.paths import InstallPaths
 from illumio_ops.pce.client import PceClient, client_from_settings
 from illumio_ops.pce.rate_limit import RateLimiter
-from illumio_ops.settings.schema import TlsSettings
+from illumio_ops.settings.schema import PceSettings, TlsSettings
 from illumio_ops.settings.store import SettingsStore
 from illumio_ops.store.db import connect
 from illumio_ops.store.flowdb.db import FlowDb
@@ -46,6 +46,9 @@ class AppContext:
         assert self.flowdb is not None  # set in __post_init__
         return self.flowdb
 
-    def pce_client(self) -> PceClient:
-        """A client for the configured PCE that spends the shared rate budget."""
-        return self.pce_factory(self.settings.current().pce, rate_limiter=self.rate_limiter)
+    def pce_client(self, pce: PceSettings | None = None) -> PceClient:
+        """A client that spends the shared rate budget. Pass the settings snapshot the caller works
+        from, so the client and everything checked against that snapshot (e.g. the flow database
+        binding) refer to the same PCE even if the settings change meanwhile."""
+        return self.pce_factory(pce if pce is not None else self.settings.current().pce,
+                                rate_limiter=self.rate_limiter)

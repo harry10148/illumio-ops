@@ -6,8 +6,11 @@ SQLite's busy timeout and a PCE switch never deletes the file mid-write.
 """
 from __future__ import annotations
 
+import itertools
 import sqlite3
 import threading
+from collections.abc import Iterator
+from contextlib import contextmanager
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -20,6 +23,24 @@ MIGRATIONS_PACKAGE = "illumio_ops.store.flowdb.migrations"
 def db_time(value: datetime) -> str:
     """The one stored timestamp format: fixed-width UTC, so text order is time order."""
     return store_time(value)
+
+
+_savepoints = itertools.count()
+
+
+@contextmanager
+def transaction(conn: sqlite3.Connection) -> Iterator[sqlite3.Connection]:
+    """A unit of work that nests: the outermost one commits, an inner one is a savepoint.
+    Store functions use it so that a collector can wrap a whole cycle's writes in one."""
+    name = f"sp{next(_savepoints)}"
+    conn.execute(f"SAVEPOINT {name}")
+    try:
+        yield conn
+    except BaseException:
+        conn.execute(f"ROLLBACK TO {name}")
+        conn.execute(f"RELEASE {name}")
+        raise
+    conn.execute(f"RELEASE {name}")
 
 
 def db_day(value: datetime) -> str:

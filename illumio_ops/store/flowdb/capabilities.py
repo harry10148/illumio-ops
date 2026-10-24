@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from datetime import datetime
 
 from illumio_ops.domain.values import CapabilityState
-from illumio_ops.store.flowdb.db import db_time
+from illumio_ops.store.flowdb.db import db_time, transaction
 
 
 @dataclass(frozen=True)
@@ -18,7 +18,7 @@ class CapabilityRow:
 
 
 def record(conn: sqlite3.Connection, name: str, state: CapabilityState, detail: str | None, at: datetime) -> None:
-    with conn:
+    with transaction(conn):
         conn.execute("INSERT INTO pce_capabilities (name, state, detail, checked_at) VALUES (?, ?, ?, ?) "
                      "ON CONFLICT(name) DO UPDATE SET state = excluded.state, detail = excluded.detail, "
                      "checked_at = excluded.checked_at", (name, state.value, detail, db_time(at)))

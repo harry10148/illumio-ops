@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Literal
 
-from illumio_ops.store.flowdb.db import db_time
+from illumio_ops.store.flowdb.db import db_time, transaction
 
 GapKind = Literal["failed", "truncated"]
 
@@ -65,7 +65,7 @@ def all_states(conn: sqlite3.Connection) -> dict[str, IngestState]:
 
 
 def mark_started(conn: sqlite3.Connection, source: str, at: datetime) -> None:
-    with conn:
+    with transaction(conn):
         conn.execute("INSERT INTO ingest_state (source, last_started_at) VALUES (?, ?) "
                      "ON CONFLICT(source) DO UPDATE SET last_started_at = excluded.last_started_at",
                      (source, db_time(at)))
@@ -73,7 +73,7 @@ def mark_started(conn: sqlite3.Connection, source: str, at: datetime) -> None:
 
 def mark_ok(conn: sqlite3.Connection, source: str, at: datetime, *, watermark: datetime | None, rows: int,
             progress: dict[str, Any] | None = None) -> None:
-    with conn:
+    with transaction(conn):
         conn.execute(
             "INSERT INTO ingest_state (source, watermark, last_finished_at, last_ok_at, last_error, last_rows, "
             "consecutive_failures, progress_json) VALUES (?, ?, ?, ?, NULL, ?, 0, ?) "
@@ -86,7 +86,7 @@ def mark_ok(conn: sqlite3.Connection, source: str, at: datetime, *, watermark: d
 
 
 def mark_failed(conn: sqlite3.Connection, source: str, at: datetime, error: str) -> None:
-    with conn:
+    with transaction(conn):
         conn.execute(
             "INSERT INTO ingest_state (source, last_finished_at, last_error, consecutive_failures) "
             "VALUES (?, ?, ?, 1) ON CONFLICT(source) DO UPDATE SET last_finished_at = excluded.last_finished_at, "
@@ -95,7 +95,7 @@ def mark_failed(conn: sqlite3.Connection, source: str, at: datetime, error: str)
 
 
 def set_progress(conn: sqlite3.Connection, source: str, progress: dict[str, Any] | None) -> None:
-    with conn:
+    with transaction(conn):
         conn.execute("INSERT INTO ingest_state (source, progress_json) VALUES (?, ?) "
                      "ON CONFLICT(source) DO UPDATE SET progress_json = excluded.progress_json",
                      (source, json.dumps(progress) if progress is not None else None))
@@ -103,7 +103,7 @@ def set_progress(conn: sqlite3.Connection, source: str, progress: dict[str, Any]
 
 def record_gap(conn: sqlite3.Connection, source: str, start: datetime, end: datetime, kind: GapKind,
                detail: str | None, at: datetime) -> None:
-    with conn:
+    with transaction(conn):
         conn.execute("INSERT INTO ingest_gaps (source, window_start, window_end, kind, detail, recorded_at) "
                      "VALUES (?, ?, ?, ?, ?, ?)",
                      (source, db_time(start), db_time(end), kind, (detail or "")[:500] or None, db_time(at)))
@@ -112,7 +112,7 @@ def record_gap(conn: sqlite3.Connection, source: str, start: datetime, end: date
 def resolve_failed_gaps(conn: sqlite3.Connection, source: str, start: datetime, end: datetime,
                         at: datetime) -> int:
     """A later successful read of [start, end] covers earlier failed windows inside it."""
-    with conn:
+    with transaction(conn):
         cur = conn.execute(
             "UPDATE ingest_gaps SET resolved_at = ? WHERE source = ? AND kind = 'failed' AND resolved_at IS NULL "
             "AND window_start >= ? AND window_end <= ?", (db_time(at), source, db_time(start), db_time(end)))
@@ -133,5 +133,5 @@ def open_gaps(conn: sqlite3.Connection, source: str | None = None) -> list[Gap]:
 
 
 def delete_gaps_before(conn: sqlite3.Connection, cutoff: datetime) -> int:
-    with conn:
+    with transaction(conn):
         return conn.execute("DELETE FROM ingest_gaps WHERE recorded_at < ?", (db_time(cutoff),)).rowcount

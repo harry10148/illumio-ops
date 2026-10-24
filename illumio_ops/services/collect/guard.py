@@ -13,12 +13,25 @@ class BindingMismatch(Exception):
     """The flow database is bound to a different PCE than the one configured."""
 
 
+_DEFAULT_PORTS = {"https": 443, "http": 80}
+
+
 def normalize_target(url: str, org_id: str) -> tuple[str, str]:
-    """Compare PCE identities without being fooled by case or a trailing slash."""
+    """A PCE's identity: scheme, host, port (default folded), base path, and org — compared without
+    being fooled by case, a trailing slash, an explicit default port or a zero-padded org ID.
+    The result parses back to itself (IPv6 hosts keep their brackets)."""
     parts = urlsplit(url.strip())
+    scheme = parts.scheme.lower()
     host = (parts.hostname or "").lower()
-    port = f":{parts.port}" if parts.port else ""
-    return f"{parts.scheme.lower()}://{host}{port}", org_id.strip()
+    if ":" in host:
+        host = f"[{host}]"
+    try:
+        port = parts.port
+    except ValueError:
+        port = None
+    authority = host if port is None or _DEFAULT_PORTS.get(scheme) == port else f"{host}:{port}"
+    org = org_id.strip()
+    return f"{scheme}://{authority}{parts.path.rstrip('/')}", str(int(org)) if org.isdigit() else org
 
 
 def ensure_binding(conn: sqlite3.Connection, pce: PceSettings, now: datetime) -> None:
