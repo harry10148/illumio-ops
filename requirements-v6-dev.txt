@@ -1,0 +1,10 @@
+# illumio-ops v6 development & CI tools (not bundled). Ranges copied from requirements-dev.txt where present.
+pytest>=8.0,<10.0
+pytest-xdist>=3.5,<4.0
+responses>=0.25,<1.0
+freezegun>=1.4,<2.0
+playwright>=1.55,<2.0
+ruff>=0.4,<1.0
+mypy>=1.10,<2.0
+pip-audit>=2.7,<3.0
+pip-tools>=7.4,<8.0
