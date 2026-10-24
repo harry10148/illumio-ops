@@ -6,6 +6,7 @@ from __future__ import annotations
 import gzip
 import json
 import os
+from collections.abc import Iterable
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
@@ -28,13 +29,16 @@ def _day_range(day: str) -> tuple[str, str]:
     return db_time(start), db_time(start + timedelta(days=1))
 
 
-def _write_atomic(path: Path, lines: list[str]) -> None:
+def _write_atomic(path: Path, lines: Iterable[str]) -> int:
+    """Write lines as they come (a 1M-row day held in memory peaked at 3.1 GB); return how many."""
     tmp = path.with_name(path.name + ".tmp")
     fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    count = 0
     try:
         with os.fdopen(fd, "wb") as raw, gzip.GzipFile(fileobj=raw, mode="wb") as gz:
             for line in lines:
                 gz.write(line.encode("utf-8") + b"\n")
+                count += 1
             gz.close()
             raw.flush()
             os.fsync(raw.fileno())
@@ -42,6 +46,7 @@ def _write_atomic(path: Path, lines: list[str]) -> None:
     except BaseException:
         tmp.unlink(missing_ok=True)
         raise
+    return count
 
 
 def run_archive(ctx: AppContext, *, now: datetime | None = None) -> int:
@@ -73,10 +78,11 @@ def _archive(ctx: AppContext, gen: int, now: datetime | None) -> int:
             # Read, write and record under the lock: a row changed in between would otherwise be
             # missing from the file while the day is recorded as archived.
             with fdb.writing(gen) as conn:
-                rows = [dict(r) for r in conn.execute(day_query, _day_range(day))]
+                rows = conn.execute(day_query, _day_range(day))
                 path = out_dir / f"{kind}-{day}.jsonl.gz"
-                _write_atomic(path, [json.dumps(r, separators=(",", ":"), ensure_ascii=False) for r in rows])
-                archive.record(conn, kind, day, len(rows), str(path), at)
+                count = _write_atomic(path, (json.dumps(dict(r), separators=(",", ":"), ensure_ascii=False)
+                                             for r in rows))
+                archive.record(conn, kind, day, count, str(path), at)
             written += 1
     if settings.retention_days > 0:
         cutoff = db_day(at - timedelta(days=settings.retention_days))

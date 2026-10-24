@@ -2,6 +2,7 @@
 import gzip
 import json
 import os
+import tracemalloc
 from datetime import timedelta
 
 from illumio_ops.domain.flows import normalize_flow
@@ -54,3 +55,24 @@ def test_archive_retention_deletes_old_files(tmp_path):
     run_archive(ctx, now=NOW)
     names = sorted(p.name for p in ctx.paths.archive_dir.iterdir())
     assert names == [f"flows-{(NOW - timedelta(days=2)).strftime('%Y-%m-%d')}.jsonl.gz"]
+
+
+def test_archive_writes_a_day_without_holding_all_its_rows_in_memory(tmp_path):
+    # A 1M-row day held as dicts peaked at 3.1 GB (P2 re-measure); rows are written as they are read.
+    ctx = configured_ctx(tmp_path)
+    _enable(ctx)
+    day_ago = NOW - timedelta(days=1)
+    recs = [normalize_flow(raw_flow(i, day_ago - timedelta(seconds=i + 300), day_ago - timedelta(seconds=i)))
+            for i in range(5000)]
+    with ctx.flows().connect() as conn:
+        upsert_flows(conn, recs, origin=DataOrigin.INGEST, now=NOW)
+    tracemalloc.start()
+    try:
+        assert run_archive(ctx, now=NOW) == 1
+        _, peak = tracemalloc.get_traced_memory()
+    finally:
+        tracemalloc.stop()
+    day1 = (NOW - timedelta(days=1)).strftime("%Y-%m-%d")
+    with gzip.open(ctx.paths.archive_dir / f"flows-{day1}.jsonl.gz", "rt") as fh:
+        assert sum(1 for _ in fh) == 5000
+    assert peak < 4 * 1024 * 1024, f"archiving 5,000 rows peaked at {peak / 1e6:.1f} MB"
