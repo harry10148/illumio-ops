@@ -181,3 +181,22 @@ def test_concurrent_updates_serialise(settings_file):
     for t in ts:
         t.join()
     assert errors == [] and store.current().revision == 80
+
+
+def test_directory_fsync_failure_after_rename_keeps_memory_in_sync(settings_file, monkeypatch):
+    import os
+    import stat
+
+    store = SettingsStore(settings_file)
+    s0 = store.load()
+    real_fsync = os.fsync
+
+    def fsync(fd):
+        if stat.S_ISDIR(os.fstat(fd).st_mode):
+            raise OSError(5, "EIO")
+        return real_fsync(fd)
+
+    monkeypatch.setattr(os, "fsync", fsync)
+    s1 = store.update(s0.revision, lambda d: d["web"].update(port=6000))
+    assert store.current() == s1 and s1.web.port == 6000
+    assert SettingsStore(settings_file).load().web.port == 6000

@@ -14,6 +14,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
+from loguru import logger
 from pydantic import ValidationError
 
 from illumio_ops.settings.schema import Settings, default_settings
@@ -90,7 +91,8 @@ class SettingsStore:
             cand["revision"] = cur.revision + 1
             new = _validate(cand)
             self._write(new, replace=True)
-            self._current = new
+            self._current = new  # the file now holds `new`: memory must follow it
+            self._sync_dir()
             return new
 
     def create_initial(self, *, password_hash: str, secret_key: str, port: int = 5001) -> Settings:
@@ -98,6 +100,7 @@ class SettingsStore:
         with self._lock:
             self._write(s, replace=False)
             self._current = s
+            self._sync_dir()
         return s
 
     def _write(self, s: Settings, *, replace: bool) -> None:
@@ -118,8 +121,17 @@ class SettingsStore:
             if os.path.exists(tmp):
                 os.unlink(tmp)
             raise
-        dfd = os.open(self._path.parent, os.O_RDONLY)
+
+    def _sync_dir(self) -> None:
+        """Make the rename durable. By now the new file is in place and in memory, so a
+        failure here is reported, not raised: raising would tell the caller the change
+        did not happen when it did."""
         try:
-            os.fsync(dfd)
-        finally:
-            os.close(dfd)
+            dfd = os.open(self._path.parent, os.O_RDONLY)
+            try:
+                os.fsync(dfd)
+            finally:
+                os.close(dfd)
+        except OSError as exc:
+            logger.error("settings saved but the directory sync failed ({}); "
+                         "the change may not survive a power loss", type(exc).__name__)

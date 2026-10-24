@@ -147,3 +147,35 @@ def test_expired_session_ids_are_pruned(app, monkeypatch):
     monkeypatch.setattr(auth.time, "time", lambda: real() + 28800 + 1)
     login(app.test_client())
     assert len(sessions) == 1
+
+
+def test_password_change_token_is_usable(client):
+    login(client)
+    token = _change(client, old_password="illumio", new_password="a-new-password-1",
+                    confirm_password="a-new-password-1").get_json()["data"]["csrf_token"]
+    r = client.post("/api/auth/logout", json={}, environ_overrides=LOCAL, headers={"X-CSRFToken": token})
+    assert r.status_code == 200
+
+
+def test_inflight_old_session_is_not_upgraded_by_key_rotation(app):
+    """A request from an old session that is still being processed while the password
+    changes must not come out with a usable, re-signed session."""
+    from flask import request as flask_request
+
+    admin, other = app.test_client(), app.test_client()
+
+    @app.before_request
+    def _race():
+        if flask_request.headers.get("X-Race") == "1":
+            r = _change(admin, old_password="illumio", new_password="a-new-password-1",
+                        confirm_password="a-new-password-1")
+            assert r.status_code == 200
+
+    login(admin)
+    login(other)
+
+    r = other.post("/api/auth/login", json={"username": "illumio", "password": "wrong"},
+                   environ_overrides=LOCAL, headers={"X-Race": "1"})
+    assert r.status_code == 401
+    assert other.get("/api/auth/me", environ_overrides=LOCAL).status_code == 401
+    assert admin.get("/api/auth/me", environ_overrides=LOCAL).status_code == 200
