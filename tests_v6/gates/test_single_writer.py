@@ -85,3 +85,9 @@ def test_owner_upsert_is_clean(tmp_path):
                  'SQL = ("INSERT INTO job_health (job_id) VALUES (?) "\n'
                  '       "ON CONFLICT(job_id) DO UPDATE SET runs = runs + 1")\n')
     assert find_foreign_writers(iter_modules(root)) == []
+
+
+def test_foreign_write_to_flowdb_table_is_caught(tmp_path):
+    root = _tree(tmp_path, "web/bad.py", 'SQL = "DELETE FROM flows WHERE id = ?"\n')
+    [violation] = find_foreign_writers(iter_modules(root))
+    assert "owned by illumio_ops.store.flowdb.flows" in violation

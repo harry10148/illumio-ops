@@ -17,7 +17,7 @@ _UPSERT = (
 def run_probe(ctx: AppContext) -> list[ProbeResult]:
     """Probe the configured PCE now and record the outcome. PceNotConfigured propagates."""
     s = ctx.settings.current()
-    with ctx.pce_factory(s.pce) as client:
+    with ctx.pce_client() as client:
         results = probe_pce(client, s.pce.deployment_type)
     payload = json.dumps([
         {"name": r.name.value, "ok": r.ok, "status": r.status, "category": r.category, "detail_key": r.detail_key}

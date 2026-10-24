@@ -1,4 +1,5 @@
-"""The application state database (data/app.sqlite): connection setup and schema migrations."""
+"""SQLite connection setup and schema migrations for the application state database
+(data/app.sqlite) and, with another migrations package, the flow database."""
 from __future__ import annotations
 
 import re
@@ -19,9 +20,12 @@ def connect(path: Path) -> sqlite3.Connection:
     return conn
 
 
-def _migrations() -> list[tuple[int, str]]:
+APP_MIGRATIONS = "illumio_ops.store.migrations"
+
+
+def _migrations(package: str = APP_MIGRATIONS) -> list[tuple[int, str]]:
     out = []
-    for entry in resources.files("illumio_ops.store.migrations").iterdir():
+    for entry in resources.files(package).iterdir():
         m = _MIGRATION_NAME.match(entry.name)
         if m:
             out.append((int(m.group(1)), entry.read_text(encoding="utf-8")))
@@ -32,13 +36,13 @@ def _migrations() -> list[tuple[int, str]]:
     return out
 
 
-def migrate(conn: sqlite3.Connection) -> int:
+def migrate(conn: sqlite3.Connection, package: str = APP_MIGRATIONS) -> int:
     """Apply pending migrations, one transaction per file; return the resulting version.
 
     A database newer than this program is refused rather than used: running an
     older build against a newer schema is how data gets silently mangled.
     """
-    migrations = _migrations()
+    migrations = _migrations(package)
     latest = migrations[-1][0] if migrations else 0
     current = int(conn.execute("PRAGMA user_version").fetchone()[0])
     if current > latest:

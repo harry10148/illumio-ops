@@ -43,11 +43,11 @@ SETTINGS_READERS: dict[str, str] = {
     "web.tls.min_version": "illumio_ops.web.tls",
     "web.tls.ciphers": "illumio_ops.web.tls",
     "display.language": "illumio_ops.web.auth",
+    "collection.rate_limit_per_minute": "illumio_ops.services.context",
 }
 # Fields whose reader arrives later: value = the task or phase that adds it.
 PENDING_READERS: dict[str, str] = {
     "pce.events_timeout_seconds": "P2-T4",
-    "collection.rate_limit_per_minute": "P2-T2",
     "collection.enabled": "P2-T6",
     "collection.traffic_interval_seconds": "P2-T6",
     "collection.events_interval_seconds": "P2-T6",

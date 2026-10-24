@@ -40,7 +40,7 @@ def test_failed_migration_rolls_back_whole_file(tmp_path, monkeypatch):
     conn = connect(tmp_path / "app.sqlite")
     good = db._migrations()
     bad = (len(good) + 1, "CREATE TABLE half_done(x INTEGER);\nTHIS IS NOT SQL;")
-    monkeypatch.setattr(db, "_migrations", lambda: [*good, bad])
+    monkeypatch.setattr(db, "_migrations", lambda package=None: [*good, bad])
     with pytest.raises(sqlite3.Error):
         migrate(conn)
     assert conn.execute("PRAGMA user_version").fetchone()[0] == len(good)
