@@ -26,7 +26,7 @@ sys.path.insert(0, str(REPO))
 from illumio_ops.domain.flows import normalize_flow
 from illumio_ops.domain.values import DataOrigin
 from illumio_ops.store.flowdb.db import FlowDb, db_day
-from illumio_ops.store.flowdb.flows import rebuild_rollup, upsert_flows
+from illumio_ops.store.flowdb.flows import rebuild_rollup, refresh_rollups, upsert_flows
 
 BATCH = 2000  # about one collector cycle's worth of records
 PORTS = [(445, 6, 20), (3389, 6, 8), (22, 6, 10), (443, 6, 25), (80, 6, 8), (135, 6, 6), (5985, 6, 3),
@@ -132,6 +132,8 @@ def generate(root: Path, *, workloads: int, days: int, flows_per_day: int, seed:
             rebuild_rollup(conn, db_day(day_start))
         write_seconds += time.monotonic() - t0
         print(f"day {d + 1}/{days}: {written} records, {time.monotonic() - started:.0f} s", file=sys.stderr)
+    with fdb.write_lock, fdb.connect() as conn:  # a pair across midnight re-dirtied the day before
+        refresh_rollups(conn, end)
     with fdb.connect() as conn:
         rows, conns = conn.execute("SELECT count(*), count(DISTINCT conn_key) FROM flows").fetchone()
     size = sum(p.stat().st_size for p in fdb.path.parent.glob("flows.sqlite*"))
