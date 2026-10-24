@@ -77,3 +77,17 @@ def test_two_tabs_second_save_sees_conflict(context, live_app, fake_pce):
     assert live_app.ctx.settings.current().pce.url == fake_pce.url
     second.click("text=Reload")
     expect(second.locator("input[name=url]")).to_have_value(fake_pce.url)
+
+
+def test_url_guidance_follows_the_deployment_type(context, live_app):
+    page = context.new_page()
+    _open_pce_page(page, live_app.url)
+    url_label = page.locator("label:has(input[name=url])")
+    console = page.locator("input[name=console_url]")
+    page.select_option("select[name=deployment_type]", "on_prem")
+    expect(url_label).to_contain_text("8443")
+    assert page.get_attribute("input[name=url]", "placeholder") == "https://pce.example.com:8443"
+    page.select_option("select[name=deployment_type]", "saas")
+    expect(url_label).to_contain_text("illum.io")
+    expect(url_label).not_to_contain_text("8443")
+    assert console.get_attribute("placeholder") == "https://console.illum.io"

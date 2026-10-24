@@ -197,22 +197,40 @@ SIEM 轉送（22.4 萬筆全數送達）**；GUI 告警收件匣 146 則從未�
 | audit | PCE 事件稽核 | 保留 |
 | ven_status | agent 健康與版本分布 | 保留 |
 | policy_usage | **草稿政策**下哪些規則會被流量用到、哪些流量會被草稿擋掉（draft rulesets＋`compute_draft`） | 保留【使用者】 |
-| rule_hit_count | **已佈署規則**的實際命中次數（PCE 原生 RHC 報表） | 保留，**含啟用 RHC**：RHC 只能經 API 開啟，所以 v6.0 由本產品提供啟用動作【使用者】（見下）。**RHC 只記錄已 provision 的規則**【使用者】：報表必須區分「沒有紀錄」（草稿規則、或期間內尚未佈署）與「有紀錄但 0 次」，不得把前者顯示成 0；草稿規則導向 policy_usage。RHC 是否只從啟用時刻起累計：**NFR 無法實測**（見下方「NFR 實測」），P5 開工前在可啟用的環境驗證 |
+| rule_hit_count | **已佈署規則**的實際命中次數（PCE 原生 RHC 報表） | 保留，**含啟用 RHC**：RHC 只能經 API 開啟，**SaaS 與地端都要能在本產品開啟**【使用者，2026-10-24】（見下「RHC 啟用」）。**RHC 只記錄已 provision 的規則**【使用者】：報表必須區分「沒有紀錄」（草稿規則、或期間內尚未佈署）與「有紀錄但 0 次」，不得把前者顯示成 0；草稿規則導向 policy_usage。RHC 是否只從啟用時刻起累計：NFR 尚無法實測，P5 在可啟用的環境驗證 |
 | policy_resolver | 把已佈署規則展開成 IP 層級的平面列，供其他工具使用（例如與傳統防火牆規則比對） | 保留，維持 JSON＋CSV 輸出、不做 HTML；列數上限與截斷揭露照舊【使用者】 |
 
 另【判斷】：拿掉所有 CSV 上傳輸入（PCE UI 匯出、workloader、vuln CSV）與獨立的 `draft_policy`
 偽型別——產品前提是走 API；draft policy decision 已是 traffic 家族報表的內建欄位。
 
-**RHC 啟用（v6.0 唯一會寫 PCE 的動作）**：RHC 只能經 API 開啟。【使用者】沿用 5.x 的三步
-（`src/report/rule_hit_count_enablement.py`）：`PUT /orgs/{org}/report_templates/rule_hit_count_report`
-→ `PUT /orgs/{org}/sec_policy/draft/firewall_settings` → `POST /orgs/{org}/sec_policy` 且
-`change_subset` 只含 firewall_settings（不會順帶 provision 客戶其他草稿）。另加【判斷】：
-- 執行前顯示將做的三步與「會 provision firewall_settings」，操作者確認後才執行；任一步失敗即停，
-  回報已完成到哪一步。
-- 執行前比對 draft 與 active 的 firewall_settings；若已有客戶自己尚未 provision 的 firewall_settings
-  變更，拒絕執行並說明（否則會被一併 provision）。
-- 寫入權限不足（例如唯讀 key）時明說需要可寫入的 API 權限，不得顯示成功。
+**RHC 啟用（v6.0 唯一會寫 PCE 的動作）**【使用者，2026-10-24 定案】：RHC 只能經 API 開啟，**不分 SaaS
+或地端**（REST API〈Rule Hit Count〉：PCE 與 VEN 預設都關閉，兩邊都要開）。流程：
+
+1. **狀態檢查**：產品隨時能回答「RHC 開了沒」。判定依兩個讀取：
+   `GET /orgs/{org}/report_templates/rule_hit_count_report` 的 `enabled`（PCE 端），以及
+   `GET /orgs/{org}/sec_policy/active/firewall_settings` 的 `rule_hit_count_enabled_scopes`（VEN 端，非空才算開；
+   `[[]]` 為全部 VEN，否則為指定 scope）。狀態為：已開啟／只開了一半（指出哪一半）／未開啟／無法判定（權限或連線錯誤，
+   照實顯示原因，不猜）。
+2. **報表反灰**：未完全開啟時，報表頁的 rule_hit_count **反灰、不能產生，也不能排程**，旁邊說明原因並連到設定頁；
+   已排程的 RHC 報表在執行時若發現未開啟，記為失敗並寫明原因，不產出空報表。
+3. **在設定頁開啟**：開啟動作只放在設定頁（報表前置設定），不放在報表頁。按下後才經 API 執行：
+   `PUT /orgs/{org}/report_templates/rule_hit_count_report {"enabled": true}` →
+   `PUT /orgs/{org}/sec_policy/draft/firewall_settings`（`rule_hit_count_enabled_scopes`，預設 `[[]]`）→
+   `POST /orgs/{org}/sec_policy`，`change_subset` 只含 firewall_settings（不會順帶 provision 客戶其他草稿）。
+   已開的那一半不重做。
+
+防護【判斷】：
+- 執行前顯示將做的步驟與「會 provision firewall_settings」，操作者確認後才執行；任一步失敗即停，回報已完成到哪一步，
+  之後重新檢查狀態並顯示。
+- 執行前比對 draft 與 active 的 firewall_settings；若已有客戶自己尚未 provision 的 firewall_settings 變更，
+  拒絕執行並說明（否則會被一併 provision）。
+- PCE 拒絕（403 等）時照實顯示 PCE 的回應與「需要可寫入、具組織管理權限的 API key」，不得顯示成功。
 - 架構上歸在報表服務的「報表前置設定」，不開「政策動作」服務。
+
+**P5 開工時要先釐清的已知風險**：NFR SaaS（26.40.2）以 owner 角色的 user API key 對
+`PUT /report_templates/rule_hit_count_report` 回 403（連 `enabled:false` 也是），`optional_features` 沒有相關旗標，
+官方文件也未列 SaaS 差異。P5 要在 NFR 找出原因（例如 API key 的類型或角色、租戶設定），在那之前上述流程的第 3 步
+在該租戶會走「PCE 拒絕」分支並如實顯示。
 
 **v6.0 不做，延到 v6.1**【判斷，使用者未表示異議；可推翻】：調查工具（流量搜尋、workload 搜尋、
 事件檢視、VEN 車隊總覽）與其他**會寫 PCE** 的動作（隔離、規則／ruleset 定時啟停並 provision、
@@ -232,9 +250,20 @@ VEN enforcement 推進、心跳加速）。理由：使用者排序最後、測�
   → 403 `forbidden_error "Access denied."`；`POST /reports`（RHC）→ 403 `"report template type rule_hit_count_report
   not enabled"`。NFR 上 RHC 範本是停用的，**tenant owner 無法經 API 啟用**；官方文件（REST API 26.1）寫的是
   「organization administrator」可做，與實測不符。依防護規則第一步失敗即停，未動 firewall_settings。
-- 因此「RHC 只能經 API 開啟」在 SaaS 上不成立或另有前提（可能需 Illumio 支援開範本）。**待使用者決定**（P5 開工前）：
-  SaaS 的 RHC 啟用要怎麼呈現（例如偵測範本狀態，停用時說明需向 Illumio 申請，只做 VEN 端兩步），以及日常 key
-  的建議角色（`read_only` 不夠產報表；需找出能 `POST /reports` 而不能改政策的最小角色）。
+- RHC 啟用的 SaaS 403 見上方「P5 開工時要先釐清的已知風險」。日常 API key 的建議角色仍待定：`read_only`
+  不夠產 PCE 報表，P5 要找出能 `POST /reports` 而不能改政策的最小角色，寫進安裝文件。
+
+**PCE 健康檢查與網址（依部署型態）**【使用者要求依官方文件，2026-10-24；P1 已實作探測順序】：
+- 共同基線：`GET /api/v2/noop`（驗證連線與 API 憑證，Public Stable API）。
+- 地端另加：`GET /api/v2/health`（HTTP 200 且 body 狀態為 normal；warning／critical 等為不健康，讀不懂為「未知」）→
+  `GET /api/v2/node_available`（200 或 202）。這兩個端點文件註明只適用地端，**SaaS 不呼叫**。
+- SaaS 是否健康不能只靠一次 HTTP 探測；P2 起加上事件與流量收集的最新狀態與延遲。
+- 網址格式不同：地端 API 網址是 PCE 本身（通常 `https://<pce-fqdn>:8443`），主控台就是同一個網址；SaaS 的 API
+  網址是區域 SCP 主機（`https://<scp>.illum.io:443` 這類），人類登入走 Illumio Console（預設 `https://console.illum.io`，
+  亦可為自訂的 `*.illumio.ai`），兩者不同。設定頁依部署型態給對應的範例與主控台預設值；`console_url` 留空時，
+  SaaS 用 `https://console.illum.io`，地端用 API 網址。
+- 部署型態是明確欄位（`on_prem`／`saas`），不從主機名稱推測。
+
 告警詳情頁的主要動作為「在 PCE 主控台開啟」（`console_url`）。規則編輯器需要的 label／IP list 等
 物件查詢、告警詳情裡的政策解釋仍要做。5.x 的規則排程（`rule_schedules.json`）與 VEN 推進紀錄
 不遷移，升級報告列出它們並說明 v6.0 不支援。

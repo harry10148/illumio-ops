@@ -8,6 +8,8 @@ import { registerNav } from "../../shell/nav";
 
 type TlsMode = "system" | "bundle" | "off";
 
+const SAAS_CONSOLE = "https://console.illum.io";
+
 interface Form {
   url: string;
   org_id: string;
@@ -117,6 +119,9 @@ export function PceConnection() {
   }
 
   const generalError = error && !fieldOf(error) ? error : null;
+  // SaaS: the API lives on a regional host and people sign in through Illumio Console;
+  // on-prem: one PCE address for both (spec §6.5, health check and URLs).
+  const saas = form.deployment_type === "saas";
 
   return (
     <section className="page">
@@ -125,8 +130,8 @@ export function PceConnection() {
         <label>
           {t("pce_url")}
           <input name="url" value={form.url} onChange={(e) => set("url", e.target.value)}
-                 placeholder="https://pce.example.com:8443" />
-          <span className="hint">{t("pce_url_hint")}</span>
+                 placeholder={saas ? "https://xx-scpN.illum.io:443" : "https://pce.example.com:8443"} />
+          <span className="hint">{t(saas ? "pce_url_hint_saas" : "pce_url_hint_on_prem")}</span>
           <FieldError name="url" error={error} />
         </label>
         <label>
@@ -156,8 +161,9 @@ export function PceConnection() {
         </label>
         <label>
           {t("pce_console_url")}
-          <input name="console_url" value={form.console_url} onChange={(e) => set("console_url", e.target.value)} />
-          <span className="hint">{t("pce_console_url_hint")}</span>
+          <input name="console_url" value={form.console_url} onChange={(e) => set("console_url", e.target.value)}
+                 placeholder={saas ? SAAS_CONSOLE : form.url} />
+          <span className="hint">{t(saas ? "pce_console_url_hint_saas" : "pce_console_url_hint_on_prem")}</span>
           <FieldError name="console_url" error={error} />
         </label>
         <label>
