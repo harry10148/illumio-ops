@@ -13,6 +13,7 @@ from illumio_ops.jobs.health import record_finish, record_start
 from illumio_ops.pce.client import PceNotConfigured
 from illumio_ops.services import pce_health
 from illumio_ops.services.collect.events import run_events_cycle
+from illumio_ops.services.collect.inventory import run_inventory_cycle
 from illumio_ops.services.collect.traffic import run_traffic_cycle
 from illumio_ops.services.context import AppContext
 from illumio_ops.settings.schema import Settings
@@ -32,6 +33,7 @@ def job_intervals(settings: Settings) -> dict[str, int]:
         "tls_renew_check": TLS_RENEW_SECONDS,
         "collect_traffic": c.traffic_interval_seconds,
         "collect_events": c.events_interval_seconds,
+        "collect_inventory": c.inventory_interval_seconds,
     }
 
 
@@ -78,7 +80,10 @@ def _collector_jobs(ctx: AppContext) -> dict[str, Callable[[], None]]:
     def events() -> None:
         run_events_cycle(ctx)
 
-    return {"collect_traffic": traffic, "collect_events": events}
+    def inventory() -> None:
+        run_inventory_cycle(ctx)
+
+    return {"collect_traffic": traffic, "collect_events": events, "collect_inventory": inventory}
 
 
 def build_scheduler(ctx: AppContext) -> BackgroundScheduler:

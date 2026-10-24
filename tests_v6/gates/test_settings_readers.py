@@ -48,10 +48,10 @@ SETTINGS_READERS: dict[str, str] = {
     "collection.enabled": "illumio_ops.services.collect.traffic",
     "collection.traffic_interval_seconds": "illumio_ops.jobs.scheduler",
     "collection.events_interval_seconds": "illumio_ops.jobs.scheduler",
+    "collection.inventory_interval_seconds": "illumio_ops.jobs.scheduler",
 }
 # Fields whose reader arrives later: value = the task or phase that adds it.
 PENDING_READERS: dict[str, str] = {
-    "collection.inventory_interval_seconds": "P2-T7",
     "collection.backfill_days": "P2-T8",
     "collection.retention.flow_days": "P2-T8",
     "collection.retention.event_days": "P2-T8",
