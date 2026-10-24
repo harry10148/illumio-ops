@@ -1,7 +1,11 @@
-"""Which settings are secret, and how they leave the process (masked)."""
+"""Secret settings: which they are, how they leave the process (masked), and the admin password hash."""
 from __future__ import annotations
 
+import secrets as _secrets
 from typing import Any
+
+from argon2 import PasswordHasher
+from argon2.exceptions import InvalidHashError, VerificationError, VerifyMismatchError
 
 from illumio_ops.settings.schema import Settings
 
@@ -22,3 +26,27 @@ def redact(s: Settings) -> dict[str, Any]:
         if node[leaf]:
             node[leaf] = MASK
     return d
+
+
+# ── Admin password (argon2id, same parameters as 5.x so migrated hashes verify) ──
+PASSWORD_MIN_LEN = 12
+PASSWORD_MAX_LEN = 512
+_PH = PasswordHasher(time_cost=4, memory_cost=131072, parallelism=4)
+
+
+def hash_password(plain: str) -> str:
+    return _PH.hash(plain)
+
+
+def verify_password(plain: str, stored: str) -> bool:
+    if not stored:
+        return False
+    try:
+        return _PH.verify(stored, plain)
+    except (VerifyMismatchError, VerificationError, InvalidHashError):
+        return False
+
+
+def new_secret_key() -> str:
+    """64 hex characters, the format WebSettings.secret_key requires."""
+    return _secrets.token_hex(32)
