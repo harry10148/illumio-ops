@@ -100,3 +100,17 @@ def test_threads_opening_a_new_flow_store_at_once_all_succeed(tmp_path):
     for t in threads:
         t.join()
     assert errors == []
+
+
+def test_switching_a_new_database_to_wal_waits_for_a_writer(tmp_path):
+    # SQLite answers "database is locked" at once, without the busy timeout, when another connection
+    # holds a write lock while this one changes the journal mode — what job threads opening a brand-new
+    # store at the same moment run into (1 in ~25 rounds of the threads test above).
+    import threading
+    path = tmp_path / "app.sqlite"
+    holder = sqlite3.connect(path, isolation_level=None, check_same_thread=False)
+    holder.execute("CREATE TABLE t (x)")
+    holder.execute("BEGIN IMMEDIATE")
+    threading.Timer(0.3, lambda: holder.execute("COMMIT")).start()
+    conn = connect(path)
+    assert conn.execute("PRAGMA journal_mode").fetchone()[0] == "wal"

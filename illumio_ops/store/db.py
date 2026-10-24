@@ -4,20 +4,45 @@ from __future__ import annotations
 
 import re
 import sqlite3
+import time
 from importlib import resources
 from pathlib import Path
 
 _MIGRATION_NAME = re.compile(r"^(\d{4})_[a-z0-9_]+\.sql$")
 
 
+BUSY_TIMEOUT_SECONDS = 5.0
+
+
 def connect(path: Path) -> sqlite3.Connection:
     path.parent.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(path)
+    conn = sqlite3.connect(path, timeout=BUSY_TIMEOUT_SECONDS)
     conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA journal_mode=WAL")
-    conn.execute("PRAGMA foreign_keys=ON")
-    conn.execute("PRAGMA busy_timeout=5000")
+    try:
+        _use_wal(conn)
+        conn.execute("PRAGMA foreign_keys=ON")
+        conn.execute(f"PRAGMA busy_timeout={int(BUSY_TIMEOUT_SECONDS * 1000)}")
+    except BaseException:
+        conn.close()
+        raise
     return conn
+
+
+def _use_wal(conn: sqlite3.Connection) -> None:
+    """Switch a new database to WAL (a database switched once stays switched). SQLite refuses the
+    switch at once, without the busy timeout, while another connection holds a write lock — job
+    threads opening a brand-new store at the same moment — so this waits for it like a busy lock."""
+    deadline = time.monotonic() + BUSY_TIMEOUT_SECONDS
+    while True:
+        try:
+            if conn.execute("PRAGMA journal_mode=WAL").fetchone()[0] == "wal":
+                return
+        except sqlite3.OperationalError as exc:
+            if "locked" not in str(exc) or time.monotonic() >= deadline:
+                raise
+        else:
+            raise sqlite3.OperationalError("the database could not be switched to WAL")
+        time.sleep(0.05)
 
 
 APP_MIGRATIONS = "illumio_ops.store.migrations"
