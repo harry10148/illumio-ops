@@ -4,6 +4,7 @@ from datetime import timedelta
 
 from illumio_ops.domain.flows import normalize_flow
 from illumio_ops.domain.values import DataOrigin
+from illumio_ops.services.collect import retention
 from illumio_ops.services.collect.retention import run_retention
 from illumio_ops.store.flowdb import archive as archive_store
 from illumio_ops.store.flowdb.flows import upsert_flows
@@ -72,3 +73,52 @@ def test_retention_prunes_rollups_and_snapshots(tmp_path):
         conn.commit()
     counts = run_retention(ctx, now=NOW)  # rollup_days 180
     assert counts["rollups"] == 1 and counts["snapshots"] == 2
+
+
+def test_retention_keeps_a_connection_whose_other_half_is_on_an_unarchived_day(tmp_path):
+    ctx = configured_ctx(tmp_path)
+    ctx.settings.update(ctx.settings.current().revision, lambda d: d["collection"]["archive"].update({"enabled": True}))
+    out = replace(_rec(1, 41), last_detected=NOW - timedelta(days=41))
+    inn = replace(out, direction=out.direction.__class__("inbound"), last_detected=NOW - timedelta(days=40))
+    _write(ctx, [out, inn])  # both halves expired, on two different days
+    with ctx.flows().connect() as conn:
+        archive_store.record(conn, "flows", out.last_detected.strftime("%Y-%m-%d"), 1, "/x.jsonl.gz", NOW)
+    run_retention(ctx, now=NOW)
+    assert _count(ctx, "flows") == 2  # the inbound half's day is not archived: keep the whole connection
+
+
+def test_retention_lets_other_writers_in_between_batches(tmp_path, monkeypatch):
+    # One expired 1M-row day took 46 min in a single hold of the write lock (P2 re-measure), and
+    # collection waited the whole time.
+    monkeypatch.setattr(retention, "FLOW_BATCH", 2, raising=False)
+    ctx = configured_ctx(tmp_path)
+    _write(ctx, [_rec(i, 40) for i in range(6)] + [_rec(99, 1)])
+    fdb = ctx.flows()
+    lock, holds = fdb.write_lock, []
+
+    class CountingLock:
+        def __enter__(self):
+            lock.acquire()
+            holds.append(1)
+
+        def __exit__(self, *exc):
+            lock.release()
+
+    monkeypatch.setattr(fdb, "write_lock", CountingLock())
+    counts = run_retention(ctx, now=NOW)
+    assert counts["flows"] == 6 and _count(ctx, "flows") == 1
+    assert len(holds) >= 3  # six expired connections, two per hold
+
+
+def test_retention_stops_quietly_when_the_pce_is_switched_while_it_runs(tmp_path, monkeypatch):
+    ctx = configured_ctx(tmp_path)
+    _write(ctx, [_rec(1, 40)])
+    fdb, real = ctx.flows(), retention.expired_page
+
+    def switched_meanwhile(conn, *a):
+        page = real(conn, *a)
+        fdb.reset()  # between reading a page and deleting it (no lock is held while reading)
+        return page
+
+    monkeypatch.setattr(retention, "expired_page", switched_meanwhile)
+    assert run_retention(ctx, now=NOW) == {}

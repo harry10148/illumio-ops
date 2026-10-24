@@ -289,20 +289,34 @@ def refresh_rollups(conn: sqlite3.Connection, at: datetime, *, today_every: time
 
 
 
-def delete_connections_before(conn: sqlite3.Connection, cutoff: datetime, *, archived_days: set[str] | None) -> int:
-    """Delete whole connections whose newest record is older than cutoff; with archived_days,
-    only connections every row of which lies on an archived day (the two halves of a pair can
-    fall on different days)."""
-    old = conn.execute(
-        "SELECT conn_key, group_concat(DISTINCT substr(last_detected, 1, 10)) AS days FROM flows "
-        "GROUP BY conn_key HAVING MAX(last_detected) < ?", (db_time(cutoff),)).fetchall()
-    keys = [r["conn_key"] for r in old
-            if archived_days is None or set(str(r["days"]).split(",")) <= archived_days]
+def expired_page(conn: sqlite3.Connection, cutoff: datetime, after: tuple[str, int], limit: int) -> list[sqlite3.Row]:
+    """The next `limit` rows last seen before cutoff, in (last_detected, id) order after `after`;
+    ix_flows_last serves it, so a page costs its own rows, not a pass over the table."""
+    return conn.execute(
+        "SELECT last_detected, id, conn_key FROM flows WHERE last_detected < ? AND (last_detected, id) > (?, ?) "
+        "ORDER BY last_detected, id LIMIT ?", (db_time(cutoff), after[0], after[1], limit)).fetchall()
+
+
+def delete_connections_before(conn: sqlite3.Connection, cutoff: datetime, *, conn_keys: Sequence[str],
+                              archived_days: set[str] | None) -> int:
+    """Of these connections, delete those whose newest record is older than cutoff; with
+    archived_days, only those every row of which lies on an archived day (the two halves of a
+    pair can fall on different days). Returns the connections deleted."""
+    rows: dict[str, list[tuple[int, str]]] = {}
+    for i in range(0, len(conn_keys), 500):
+        chunk = list(conn_keys[i:i + 500])
+        for rid, key, last in conn.execute(
+                f"SELECT id, conn_key, last_detected FROM flows WHERE conn_key IN ({','.join('?' * len(chunk))})",
+                chunk):
+            rows.setdefault(key, []).append((rid, last))
+    c = db_time(cutoff)
+    doomed = [found for found in rows.values()
+              if max(last for _, last in found) < c
+              and (archived_days is None or {last[:10] for _, last in found} <= archived_days)]
     with transaction(conn):
-        for i in range(0, len(keys), 500):
-            chunk = keys[i:i + 500]
-            conn.execute(f"DELETE FROM flows WHERE conn_key IN ({','.join('?' * len(chunk))})", chunk)
-    return len(keys)
+        # in table order: rows of one day sit together, so this walks the table instead of jumping
+        conn.executemany("DELETE FROM flows WHERE id = ?", sorted((rid,) for found in doomed for rid, _ in found))
+    return len(doomed)
 
 
 def delete_rollups_before(conn: sqlite3.Connection, day: str) -> int:
