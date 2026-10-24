@@ -145,7 +145,8 @@ def record_key(r: FlowRecord) -> str:
     """Identity of one PCE record: the same record re-pulled later maps to the same key."""
     parts = [r.direction.value, r.src_ip, r.dst_ip, str(r.port), str(r.proto),
              r.first_detected.isoformat()]
-    return hashlib.sha256("|".join(parts).encode()).hexdigest()
+    # 128 bits: no collision in any realistic store, half the index size of a full sha256 hex.
+    return hashlib.sha256("|".join(parts).encode()).hexdigest()[:32]
 
 
 def ranges_within(a_first: datetime, a_last: datetime, b_first: datetime, b_last: datetime,

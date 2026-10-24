@@ -99,14 +99,12 @@ CREATE TABLE flows (
     origin            TEXT NOT NULL CHECK (origin IN ('ingest', 'backfill')),
     ingested_at       TEXT NOT NULL
 );
+-- Only indexes with a reader: every index is one more random write per stored record, and at
+-- customer scale the write path is bound by them (P2 Task 14). Time ranges (rollup, FlowSource,
+-- archive) use ix_flows_last; per-connection work ix_flows_conn; re-pairing ix_flows_tuple.
+-- Workbench filters (P6) add what their measured queries need.
 CREATE INDEX ix_flows_last ON flows (last_detected);
 CREATE INDEX ix_flows_conn ON flows (conn_key);
-CREATE INDEX ix_flows_primary_last ON flows (is_primary, last_detected);
-CREATE INDEX ix_flows_src ON flows (src_key);
-CREATE INDEX ix_flows_dst ON flows (dst_key);
-CREATE INDEX ix_flows_port ON flows (port, proto);
-CREATE INDEX ix_flows_iuser ON flows (initiator_user);
-CREATE INDEX ix_flows_iproc ON flows (initiator_process);
 CREATE INDEX ix_flows_tuple ON flows (src_ip, dst_ip, port, proto);
 
 CREATE TABLE flow_rollup_daily (
@@ -124,7 +122,7 @@ CREATE TABLE flow_rollup_daily (
     bytes_out           INTEGER NOT NULL,
     bytes_known_records INTEGER NOT NULL,
     PRIMARY KEY (day, src_key, dst_key, port, proto, policy_decision, initiator_user, initiator_process)
-);
+) WITHOUT ROWID;
 
 CREATE TABLE connection_baseline (
     src_key    TEXT NOT NULL,
@@ -134,7 +132,7 @@ CREATE TABLE connection_baseline (
     first_seen TEXT NOT NULL,
     last_seen  TEXT NOT NULL,
     PRIMARY KEY (src_key, dst_key, port, proto)
-);
+) WITHOUT ROWID;
 CREATE TABLE user_baseline (
     initiator_user TEXT NOT NULL,
     dst_key        TEXT NOT NULL,
@@ -143,7 +141,7 @@ CREATE TABLE user_baseline (
     first_seen     TEXT NOT NULL,
     last_seen      TEXT NOT NULL,
     PRIMARY KEY (initiator_user, dst_key, port, proto)
-);
+) WITHOUT ROWID;
 
 -- PCE audit events (owner: store.flowdb.events).
 CREATE TABLE events (
@@ -193,7 +191,7 @@ CREATE TABLE workload_snapshot_daily (
     risk_exposure    TEXT,
     risk_percent     REAL,
     PRIMARY KEY (day, href)
-);
+) WITHOUT ROWID;
 
 -- Ransomware protection as the PCE judges it (owner: store.flowdb.ransomware).
 CREATE TABLE ransomware_services (
@@ -228,7 +226,7 @@ CREATE TABLE ransomware_snapshot_daily (
     protection_state TEXT,
     port_status      TEXT,
     PRIMARY KEY (day, workload_href, name, port, proto)
-);
+) WITHOUT ROWID;
 CREATE TABLE org_risk_snapshot_daily (
     day          TEXT PRIMARY KEY,
     summary_json TEXT NOT NULL

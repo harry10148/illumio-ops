@@ -13,13 +13,19 @@ from loguru import logger
 
 from illumio_ops.services.context import AppContext
 from illumio_ops.store.flowdb import archive
-from illumio_ops.store.flowdb.db import StaleGeneration, db_day
+from illumio_ops.store.flowdb.db import StaleGeneration, db_day, db_time
 
 _KINDS = {
-    # kind -> (day expression, query for one day's rows)
-    "flows": ("substr(last_detected, 1, 10)", "SELECT * FROM flows WHERE substr(last_detected, 1, 10) = ? ORDER BY id"),
-    "events": ("substr(timestamp, 1, 10)", "SELECT * FROM events WHERE substr(timestamp, 1, 10) = ? ORDER BY id"),
+    # kind -> (day expression, query for one day's rows as a time range, so the time index serves it)
+    "flows": ("substr(last_detected, 1, 10)",
+              "SELECT * FROM flows WHERE last_detected >= ? AND last_detected < ? ORDER BY id"),
+    "events": ("substr(timestamp, 1, 10)", "SELECT * FROM events WHERE timestamp >= ? AND timestamp < ? ORDER BY id"),
 }
+
+
+def _day_range(day: str) -> tuple[str, str]:
+    start = datetime.fromisoformat(f"{day}T00:00:00+00:00")
+    return db_time(start), db_time(start + timedelta(days=1))
 
 
 def _write_atomic(path: Path, lines: list[str]) -> None:
@@ -67,7 +73,7 @@ def _archive(ctx: AppContext, gen: int, now: datetime | None) -> int:
             # Read, write and record under the lock: a row changed in between would otherwise be
             # missing from the file while the day is recorded as archived.
             with fdb.writing(gen) as conn:
-                rows = [dict(r) for r in conn.execute(day_query, (day,))]
+                rows = [dict(r) for r in conn.execute(day_query, _day_range(day))]
                 path = out_dir / f"{kind}-{day}.jsonl.gz"
                 _write_atomic(path, [json.dumps(r, separators=(",", ":"), ensure_ascii=False) for r in rows])
                 archive.record(conn, kind, day, len(rows), str(path), at)

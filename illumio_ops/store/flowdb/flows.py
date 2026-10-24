@@ -212,22 +212,24 @@ def upsert_flows(conn: sqlite3.Connection, records: Sequence[FlowRecord], *, ori
     return UpsertStats(inserted=inserted, refreshed=refreshed, paired=paired, days_touched=frozenset(days))
 
 
+ROLLUP_INSERT = (
+    "INSERT INTO flow_rollup_daily (day, src_key, dst_key, port, proto, policy_decision, initiator_user, "
+    "initiator_process, connections, flow_records, bytes_in, bytes_out, bytes_known_records) "
+    "SELECT ?, src_key, dst_key, COALESCE(port, ?), proto, policy_decision, COALESCE(initiator_user, ''), "
+    "COALESCE(initiator_process, ''), SUM(num_connections), COUNT(*), COALESCE(SUM(bytes_in), 0), "
+    "COALESCE(SUM(bytes_out), 0), COUNT(bytes_in) FROM flows "
+    "WHERE is_primary = 1 AND last_detected >= ? AND last_detected < ? "
+    "GROUP BY src_key, dst_key, COALESCE(port, ?), proto, policy_decision, COALESCE(initiator_user, ''), "
+    "COALESCE(initiator_process, '')")
+
+
 def rebuild_rollup(conn: sqlite3.Connection, day: str) -> int:
     """Recompute one UTC day from the primary rows whose last_detected falls in it."""
     start = datetime.fromisoformat(f"{day}T00:00:00+00:00")
     lo, hi = db_time(start), db_time(start + timedelta(days=1))
     with transaction(conn):
         conn.execute("DELETE FROM flow_rollup_daily WHERE day = ?", (day,))
-        cur = conn.execute(
-            "INSERT INTO flow_rollup_daily (day, src_key, dst_key, port, proto, policy_decision, initiator_user, "
-            "initiator_process, connections, flow_records, bytes_in, bytes_out, bytes_known_records) "
-            "SELECT ?, src_key, dst_key, COALESCE(port, ?), proto, policy_decision, COALESCE(initiator_user, ''), "
-            "COALESCE(initiator_process, ''), SUM(num_connections), COUNT(*), COALESCE(SUM(bytes_in), 0), "
-            "COALESCE(SUM(bytes_out), 0), COUNT(bytes_in) FROM flows "
-            "WHERE is_primary = 1 AND last_detected >= ? AND last_detected < ? "
-            "GROUP BY src_key, dst_key, COALESCE(port, ?), proto, policy_decision, COALESCE(initiator_user, ''), "
-            "COALESCE(initiator_process, '')",
-            (day, NO_PORT, lo, hi, NO_PORT))
+        cur = conn.execute(ROLLUP_INSERT, (day, NO_PORT, lo, hi, NO_PORT))
         return cur.rowcount
 
 
