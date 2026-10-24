@@ -21,6 +21,7 @@ from illumio_ops.web.auth import AdminUser, make_auth_blueprint, session_is_acti
 from illumio_ops.web.contract import op_id_for_endpoint
 from illumio_ops.web.errors import api_error
 from illumio_ops.web.ipallow import RstDrop, is_allowed, rst_drop
+from illumio_ops.web.routes import i18n as i18n_routes
 
 DEFAULT_STATIC_DIR = Path(__file__).resolve().parent / "static"
 
@@ -96,6 +97,7 @@ def create_app(ctx: AppContext, *, use_https: bool, static_dir: Path | None = No
         return None
 
     app.register_blueprint(make_auth_blueprint(csrf, limiter))
+    app.register_blueprint(i18n_routes.bp)
 
     # 8. The single-page app: hashed assets, anything else that is a file, else index.html
     @app.get("/")

@@ -41,6 +41,27 @@ jobs:
       - name: Security audit (pip-audit)
         run: pip-audit -r requirements-v6.lock --strict
 
+      - name: Set up Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install frontend dependencies
+        run: npm ci --prefix web
+
+      - name: Generated contracts and types are committed and current
+        run: |
+          bash scripts/v6/gen_contracts.sh
+          git diff --exit-code web/src/api/contracts.json web/src/api/generated.ts
+
+      - name: Frontend typecheck
+        run: npm --prefix web run typecheck
+
+      - name: Frontend build
+        run: npm --prefix web run build
+
       - name: Lint (ruff)
         run: ruff check illumio_ops tests_v6 scripts/v6
 

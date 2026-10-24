@@ -147,6 +147,18 @@
         "title": "CsrfToken",
         "type": "object"
       }
+    },
+    "i18n.dictionary": {
+      "method": "GET",
+      "path": "/api/i18n/<lang>",
+      "request_schema": null,
+      "response_schema": {
+        "additionalProperties": {
+          "type": "string"
+        },
+        "title": "Dictionary",
+        "type": "object"
+      }
     }
   },
   "values": {

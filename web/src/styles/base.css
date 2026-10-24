@@ -1,0 +1,110 @@
+/* Layout and controls. Colors, spacing and type come only from tokens.css. */
+*, *::before, *::after { box-sizing: border-box; }
+
+html, body, #root { height: 100%; }
+
+body {
+  margin: 0;
+  background: var(--surface-2);
+  color: var(--text-1);
+  font-family: var(--font-ui);
+  font-size: var(--fs-ui);
+  line-height: var(--lead);
+}
+
+h1 { font-family: var(--font-display); font-size: var(--fs-lead); font-weight: 600; margin: 0 0 var(--space-6); }
+h2 { font-size: var(--fs-ui); font-weight: 600; margin: 0 0 var(--space-4); }
+.muted { color: var(--text-3); }
+
+/* ── shell: top bar, 224px left navigation, content ─────────────────── */
+.shell {
+  display: grid;
+  grid-template-columns: 224px 1fr;
+  grid-template-rows: var(--chrome-h) 1fr;
+  height: 100%;
+}
+.topbar {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: var(--space-5);
+  padding: 0 var(--space-7);
+  background: var(--chrome);
+  border-bottom: 1px solid var(--chrome-edge);
+}
+.topbar-spacer { flex: 1; }
+.brand { font-family: var(--font-display); font-weight: 700; color: var(--accent-fg); }
+.user { color: var(--chrome-text-2); }
+.sidenav {
+  background: var(--surface-1);
+  border-right: 1px solid var(--line);
+  padding: var(--space-6) var(--space-4);
+  overflow-y: auto;
+}
+.nav-section {
+  margin: var(--space-6) var(--space-4) var(--space-3);
+  font-size: var(--fs-micro);
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  color: var(--text-3);
+}
+.nav-item {
+  display: block;
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-m);
+  color: var(--text-2);
+  text-decoration: none;
+}
+.nav-item:hover { background: var(--surface-hover); }
+.nav-item.active { color: var(--text-1); background: var(--surface-2); box-shadow: inset 3px 0 0 var(--accent); }
+.content { overflow: auto; padding: var(--space-7) var(--space-8); }
+.page { max-width: 1080px; }
+
+/* ── cards and forms ─────────────────────────────────────────────────── */
+.card {
+  background: var(--surface-1);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-l);
+  padding: var(--space-6) var(--space-7);
+}
+.center-page { display: grid; place-items: center; min-height: 100%; padding: var(--space-7); }
+.auth-card { width: min(400px, 100%); display: grid; gap: var(--space-5); }
+label { display: grid; gap: var(--space-2); color: var(--text-2); font-size: var(--fs-body); }
+input, select {
+  height: var(--ctl-h);
+  padding: 0 var(--space-4);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-m);
+  background: var(--surface-0);
+  color: var(--text-1);
+  font: inherit;
+}
+input:focus-visible, select:focus-visible, button:focus-visible { outline: 2px solid var(--brand-deep); outline-offset: 1px; }
+.hint { color: var(--text-3); font-size: var(--fs-mini); }
+.form-error {
+  margin: 0;
+  padding: var(--space-4) var(--space-5);
+  border-left: 3px solid var(--tone-crit-border);
+  background: var(--tone-crit-bg);
+  color: var(--tone-crit-fg);
+  overflow-wrap: anywhere;
+}
+button { font: inherit; cursor: pointer; }
+button:disabled { cursor: progress; opacity: .7; }
+.btn-primary {
+  height: var(--ctl-h);
+  padding: 0 var(--space-6);
+  border: 0;
+  border-radius: var(--radius-m);
+  background: var(--accent-fg);
+  color: var(--accent-on);
+  font-weight: 600;
+}
+.btn-quiet {
+  height: var(--ctl-h);
+  padding: 0 var(--space-5);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-m);
+  background: transparent;
+  color: var(--text-2);
+}

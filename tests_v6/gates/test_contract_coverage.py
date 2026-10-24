@@ -4,7 +4,6 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-import pytest
 from flask import Blueprint, Flask
 from pydantic import BaseModel
 
@@ -68,7 +67,6 @@ def test_injected_unrouted_contract_is_caught(tmp_path, monkeypatch):
     assert "contract ghost.op is not routed" in routes_without_contract(_app(tmp_path), reg)
 
 
-@pytest.mark.xfail(strict=True, reason="web/ arrives in Task 8")
 def test_every_operation_has_a_frontend_caller():
     assert ops_without_caller(WEB_SRC, sorted(REGISTRY)) == []
 
