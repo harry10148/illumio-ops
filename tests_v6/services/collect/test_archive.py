@@ -47,7 +47,9 @@ def test_archive_writes_complete_days_once_atomically(tmp_path):
 
 def test_archive_retention_deletes_old_files(tmp_path):
     ctx = configured_ctx(tmp_path)
-    _enable(ctx, retention_days=5)
+    ctx.settings.update(ctx.settings.current().revision, lambda d: d["collection"]["retention"].update(
+        {"flow_days": 7, "event_days": 7, "rollup_days": 7, "baseline_days": 7}))
+    _enable(ctx, retention_days=8)
     _write_flows(ctx, [10, 2])
     run_archive(ctx, now=NOW)
     names = sorted(p.name for p in ctx.paths.archive_dir.iterdir())

@@ -7,6 +7,7 @@ from datetime import datetime
 
 from illumio_ops.domain.events import EventRecord
 from illumio_ops.domain.values import DataOrigin
+from illumio_ops.store.flowdb import archive
 from illumio_ops.store.flowdb.db import db_time, transaction
 
 
@@ -14,7 +15,14 @@ def upsert_events(conn: sqlite3.Connection, records: Sequence[EventRecord], *, o
                   now: datetime) -> int:
     """Insert events not seen before (an event never changes); returns how many were new."""
     stamp = db_time(now)
+    hrefs = sorted({r.href for r in records})
+    known: set[str] = set()
+    for i in range(0, len(hrefs), 500):
+        chunk = hrefs[i:i + 500]
+        known |= {h for (h,) in conn.execute(f"SELECT href FROM events WHERE href IN ({','.join('?' * len(chunk))})",
+                                            chunk)}
     with transaction(conn):
+        archive.mark_stale(conn, "events", {db_time(r.timestamp)[:10] for r in records if r.href not in known})
         before = conn.total_changes
         conn.executemany(
             "INSERT OR IGNORE INTO events (href, event_type, severity, status, timestamp, created_by_kind, "

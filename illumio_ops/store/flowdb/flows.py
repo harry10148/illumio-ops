@@ -15,6 +15,7 @@ from datetime import datetime, timedelta
 from illumio_ops.domain.flows import FlowRecord, ranges_within, record_key
 from illumio_ops.domain.identity import endpoint_key
 from illumio_ops.domain.values import DataOrigin, FlowDirection
+from illumio_ops.store.flowdb import archive
 from illumio_ops.store.flowdb.db import db_time, transaction
 from illumio_ops.store.flowdb.labels import label_set_id
 
@@ -203,6 +204,7 @@ def upsert_flows(conn: sqlite3.Connection, records: Sequence[FlowRecord], *, ori
         for conn_key in sorted(keys):
             _merge_connection(conn, conn_key)
             _update_baselines(conn, conn_key)
+        archive.mark_stale(conn, "flows", days)
     return UpsertStats(inserted=inserted, refreshed=refreshed, paired=paired, days_touched=frozenset(days))
 
 
@@ -228,11 +230,13 @@ def rebuild_rollup(conn: sqlite3.Connection, day: str) -> int:
 
 def delete_connections_before(conn: sqlite3.Connection, cutoff: datetime, *, archived_days: set[str] | None) -> int:
     """Delete whole connections whose newest record is older than cutoff; with archived_days,
-    only connections whose primary day is in that set (unarchived days are kept)."""
-    stale = conn.execute(
-        "SELECT conn_key, MAX(last_detected) AS newest FROM flows GROUP BY conn_key HAVING MAX(last_detected) < ?",
-        (db_time(cutoff),)).fetchall()
-    keys = [r["conn_key"] for r in stale if archived_days is None or str(r["newest"])[:10] in archived_days]
+    only connections every row of which lies on an archived day (the two halves of a pair can
+    fall on different days)."""
+    old = conn.execute(
+        "SELECT conn_key, group_concat(DISTINCT substr(last_detected, 1, 10)) AS days FROM flows "
+        "GROUP BY conn_key HAVING MAX(last_detected) < ?", (db_time(cutoff),)).fetchall()
+    keys = [r["conn_key"] for r in old
+            if archived_days is None or set(str(r["days"]).split(",")) <= archived_days]
     with transaction(conn):
         for i in range(0, len(keys), 500):
             chunk = keys[i:i + 500]

@@ -72,3 +72,14 @@ def test_logs_page_filters_by_level(context, live_app):
     page.get_by_role("button", name="Search").click()
     expect(table).not_to_contain_text("started")
     expect(table).to_contain_text("traffic failed")
+
+
+def test_collection_settings_explain_short_archive_retention(context, live_app):
+    page = context.new_page()
+    _open_collection(page, live_app.url)
+    form = page.locator("[data-role=collection-settings]")
+    form.locator("input[name=archive_enabled]").check()
+    form.locator("input[name=archive_days]").fill("7")
+    form.get_by_role("button", name="Save").click()
+    expect(form.locator("[role=alert]")).to_contain_text("at least as long as flows and events")
+    assert live_app.ctx.settings.current().collection.archive.enabled is False

@@ -80,3 +80,11 @@ def test_logs_tail_filters_and_truncation_flag(client, ctx):
     page = q({"limit": 2})
     assert len(page["lines"]) == 2 and page["truncated"] is True
     assert json.dumps(page)  # serialisable
+
+
+def test_archive_retention_shorter_than_raw_is_a_field_error(client, ctx):
+    login(client)
+    data = client.get("/api/system/collection", environ_overrides=LOCAL).get_json()["data"]
+    data["settings"]["archive"] = {"enabled": True, "retention_days": 7}
+    err = _send(client, "PUT", "/api/system/collection", data).get_json()["error"]
+    assert err["field"] == "settings" and err["code"] == "invalid_input"

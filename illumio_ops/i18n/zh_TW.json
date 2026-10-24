@@ -52,6 +52,7 @@
   "deployment_saas": "SaaS",
   "display_language": "語言",
   "display_language_hint": "套用到所有登入的使用者。",
+  "err_archive_retention_short": "封存檔保留天數不可少於流量與事件的保留天數（或設為 0 表示永久保留）。",
   "err_auth_required": "請先登入。",
   "err_backfill_beyond_retention": "這段日期早於流量保留期限，回填後會立即被清除。",
   "err_backfill_range_invalid": "起始日必須早於或等於結束日，且結束日不可晚於今天。",

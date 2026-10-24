@@ -1,5 +1,6 @@
 """Archive: write each complete UTC day of flows and events to data/archive as gzipped JSON lines
-(written to a temporary name, then renamed), once; expire archive files after retention_days."""
+(written to a temporary name, then renamed); a day whose rows changed afterwards (a backfill, a
+late record) is written again. Archive files expire after retention_days."""
 from __future__ import annotations
 
 import gzip
@@ -54,11 +55,12 @@ def run_archive(ctx: AppContext, *, now: datetime | None = None) -> int:
         for day in days:
             if day >= today or day in done:
                 continue
-            with fdb.connect() as conn:
-                rows = [dict(r) for r in conn.execute(day_query, (day,))]
-            path = out_dir / f"{kind}-{day}.jsonl.gz"
-            _write_atomic(path, [json.dumps(r, separators=(",", ":"), ensure_ascii=False) for r in rows])
+            # Read, write and record under the lock: a row changed in between would otherwise be
+            # missing from the file while the day is recorded as archived.
             with fdb.write_lock, fdb.connect() as conn:
+                rows = [dict(r) for r in conn.execute(day_query, (day,))]
+                path = out_dir / f"{kind}-{day}.jsonl.gz"
+                _write_atomic(path, [json.dumps(r, separators=(",", ":"), ensure_ascii=False) for r in rows])
                 archive.record(conn, kind, day, len(rows), str(path), at)
             written += 1
     if settings.retention_days > 0:

@@ -52,6 +52,7 @@
   "deployment_saas": "SaaS",
   "display_language": "Language",
   "display_language_hint": "Applies to everyone who signs in.",
+  "err_archive_retention_short": "Archive files must be kept at least as long as flows and events are (or set 0 to keep them).",
   "err_auth_required": "Please sign in.",
   "err_backfill_beyond_retention": "Those days are older than flows are kept, so they would be deleted again right away.",
   "err_backfill_range_invalid": "The start date must be on or before the end date, and the end date cannot be in the future.",

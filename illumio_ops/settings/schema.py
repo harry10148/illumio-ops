@@ -191,6 +191,15 @@ class CollectionSettings(StrictModel):
     retention: RetentionSettings
     archive: ArchiveSettings
 
+    @model_validator(mode="after")
+    def _archive_outlives_raw(self) -> CollectionSettings:
+        # Retention drops a day only once it is archived; a file that expired first would leave the
+        # day unarchived, its rows never dropped, and the file written and deleted again every day.
+        days = self.archive.retention_days
+        if self.archive.enabled and 0 < days < max(self.retention.flow_days, self.retention.event_days):
+            raise ValueError("archive retention_days must be 0 (keep) or at least flow_days and event_days")
+        return self
+
 
 class Settings(StrictModel):
     schema_version: Literal[2]

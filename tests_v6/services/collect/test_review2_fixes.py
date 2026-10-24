@@ -1,19 +1,29 @@
 """Regression tests for the second adversarial review (Tasks 7-11): each one failed before its fix."""
+import gzip
 from datetime import datetime, timedelta
 
 import pytest
+from pydantic import ValidationError
 
+from illumio_ops.domain.events import normalize_event
 from illumio_ops.domain.filter import FilterSpec
-from illumio_ops.domain.values import IngestSource
+from illumio_ops.domain.flows import normalize_flow
+from illumio_ops.domain.values import DataOrigin, IngestSource
 from illumio_ops.pce.async_query import PceQueryError
 from illumio_ops.pce.events import EventsPage
 from illumio_ops.services import flowsource
 from illumio_ops.services.collect import events as ev
+from illumio_ops.services.collect.archive import run_archive
 from illumio_ops.services.collect.backfill import ensure_initial_backfill, run_backfill
+from illumio_ops.services.collect.retention import run_retention
 from illumio_ops.services.collect.traffic import run_traffic_cycle
 from illumio_ops.services.eventsource import query_events
 from illumio_ops.services.flowsource import query_flows
-from illumio_ops.store.flowdb import ingest_state
+from illumio_ops.settings.schema import CollectionSettings, default_collection
+from illumio_ops.store.flowdb import archive, ingest_state
+from illumio_ops.store.flowdb.db import db_day
+from illumio_ops.store.flowdb.events import upsert_events
+from illumio_ops.store.flowdb.flows import upsert_flows
 
 from .conftest import NOW, configured_ctx, minutes, raw_flow
 
@@ -179,3 +189,75 @@ def test_manual_backfill_does_not_abandon_an_unfinished_initial_one(tmp_path, fa
     fake_fill.calls.clear()
     ensure_initial_backfill(ctx, now=NOW)
     assert fake_fill.calls and _starts(fake_fill.calls)[0] == seen[1]  # resumes where it stopped
+
+
+# ── Group C: archive and retention ──────────────────────────────────────────
+
+def _archiving(ctx, *, archive_days=0):
+    ctx.settings.update(ctx.settings.current().revision, lambda d: d["collection"]["archive"].update(
+        {"enabled": True, "retention_days": archive_days}))
+
+
+def _store(ctx, records):
+    with ctx.flows().connect() as conn:
+        upsert_flows(conn, [normalize_flow(r) for r in records], origin=DataOrigin.BACKFILL, now=NOW)
+
+
+def _count(ctx, table="flows"):
+    with ctx.flows().connect() as conn:
+        return conn.execute(f"SELECT count(*) FROM {table}").fetchone()[0]
+
+
+def test_retention_keeps_a_pair_until_every_day_of_it_is_archived(tmp_path):  # finding 9
+    ctx = configured_ctx(tmp_path)
+    _archiving(ctx)
+    midnight = (NOW - 40 * DAY).replace(hour=0, minute=0)
+    out = raw_flow(1, midnight - minutes(10), midnight - minutes(1))  # day D1, 23:59
+    inn = raw_flow(1, midnight + minutes(1), midnight + minutes(5), direction="inbound")  # day D2, 00:05
+    _store(ctx, [inn])
+    with ctx.flows().connect() as conn:
+        archive.record(conn, "flows", db_day(midnight), 1, "x", NOW)  # D2 archived before D1's half arrived
+    _store(ctx, [out])
+    assert run_retention(ctx, now=NOW)["flows"] == 0 and _count(ctx) == 2
+
+
+def test_rows_added_to_an_archived_day_are_archived_again(tmp_path):  # finding 15
+    ctx = configured_ctx(tmp_path)
+    _archiving(ctx)
+    day = NOW - 40 * DAY
+    _store(ctx, [raw_flow(1, day, day + minutes(1))])
+    assert run_archive(ctx, now=NOW) == 1
+    _store(ctx, [raw_flow(2, day, day + minutes(1))])  # a backfill adds to the archived day
+    assert run_retention(ctx, now=NOW)["flows"] == 0 and _count(ctx) == 2  # not archived yet: kept
+    assert run_archive(ctx, now=NOW) == 1
+    with gzip.open(ctx.paths.archive_dir / f"flows-{db_day(day)}.jsonl.gz", "rt") as fh:
+        assert len(fh.readlines()) == 2
+    assert run_retention(ctx, now=NOW)["flows"] == 2 and _count(ctx) == 0
+
+
+def test_events_added_to_an_archived_day_are_archived_again(tmp_path):  # finding 15, events
+    ctx = configured_ctx(tmp_path)
+    _archiving(ctx)
+    day = NOW - 100 * DAY
+    def event(i):
+        return normalize_event({"href": f"/orgs/1/events/{i}", "event_type": "user.sign_in",
+                                "timestamp": day.strftime("%Y-%m-%dT%H:%M:%SZ")})
+    with ctx.flows().connect() as conn:
+        upsert_events(conn, [event(1)], origin=DataOrigin.INGEST, now=NOW)
+    run_archive(ctx, now=NOW)
+    with ctx.flows().connect() as conn:
+        upsert_events(conn, [event(1), event(2)], origin=DataOrigin.BACKFILL, now=NOW)
+    assert run_retention(ctx, now=NOW)["events"] == 0
+    run_archive(ctx, now=NOW)
+    assert run_retention(ctx, now=NOW)["events"] == 2
+
+
+@pytest.mark.parametrize(("archive_days", "ok"), [(0, True), (7, False), (89, False), (90, True), (400, True)])
+def test_archive_files_must_outlive_the_raw_data(archive_days, ok):  # finding 16
+    c = default_collection().model_dump()
+    c["archive"] = {"enabled": True, "retention_days": archive_days}  # flows 35, events 90 days
+    if ok:
+        CollectionSettings.model_validate(c)
+    else:
+        with pytest.raises(ValidationError, match="archive"):
+            CollectionSettings.model_validate(c)

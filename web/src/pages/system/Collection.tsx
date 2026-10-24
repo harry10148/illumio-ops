@@ -119,6 +119,13 @@ function fromForm(f: Form): CollectionSettings {
   };
 }
 
+/** The two rules that span several fields are explained in words, not as "some fields are not valid". */
+function settingsError(e: ApiError): string {
+  if (e.field === "settings.retention") return t("err_retention_order");
+  if (e.field === "settings") return t("err_archive_retention_short");
+  return t(e.message_key, e.params);
+}
+
 function today(): string {
   return new Date().toISOString().slice(0, 10);
 }
@@ -300,7 +307,7 @@ export function Collection() {
           {num("archive_days", t("archive_retention_days"))}
           {error && (
             <div className="form-error" role="alert">
-              {error.field === "settings.retention" ? t("err_retention_order") : t(error.message_key, error.params)}
+              {settingsError(error)}
             </div>
           )}
           {saved && <p className="form-ok" role="status">{t("saved_ok")}</p>}
