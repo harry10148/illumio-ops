@@ -216,3 +216,11 @@ def test_allowlist_entries_5x_ignored_are_dropped_and_reported():
     assert result.settings.web.allowed_ips == ("10.0.0.0/8", "::ffff:192.168.1.5")
     item = _item(result.report, "web_gui.allowed_ips")
     assert item.action == "rewritten" and item.reason_key == "migrate_5x_effective_value"
+
+
+def test_allowlist_with_no_valid_entry_blocks_instead_of_opening_up():
+    raw = _base()
+    raw["web_gui"]["allowed_ips"] = ["localhost", "server.example"]  # 5.x refused everyone
+    result = migrate_v5(raw)
+    assert result.settings is None and [p for p, _ in result.blocking] == ["web_gui.allowed_ips"]
+    assert sorted(i.source for i in result.report.items) == sorted(leaf_keys(raw))

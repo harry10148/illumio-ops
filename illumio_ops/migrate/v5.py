@@ -202,6 +202,9 @@ def migrate_v5(raw: dict[str, Any]) -> MigrationResult:
         secret_key, key_item = new_secret_key(), ("rewritten", "migrate_secret_key_new")
 
     out = default_settings(password_hash=password_hash, secret_key=secret_key).model_dump(mode="json")
+    if v5.web_gui.allowed_ips and not any(_is_ip(ip) for ip in v5.web_gui.allowed_ips):
+        # 5.x refused every client with such a list; an empty v6 list would allow everyone.
+        blocking.append(("web_gui.allowed_ips", "no entry is an IP address or network; fix the list in 5.x first"))
     org = v5.api.org_id
     if org.isdigit():
         out["pce"]["org_id"] = org
