@@ -27,7 +27,7 @@ def instrument(job_id: str, fn: Callable[[], None], ctx: AppContext) -> Callable
         error: str | None = None
         try:
             fn()
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 - job boundary: record every failure, never propagate
             logger.error("job {} failed: {}", job_id, traceback.format_exc())
             error = f"{type(exc).__name__}: {exc}"[:500]
         with ctx.db() as conn:
