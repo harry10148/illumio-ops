@@ -81,6 +81,11 @@ class FlowDb:
         try:
             conn.execute(f"PRAGMA wal_autocheckpoint={self.WAL_SAFETY_NET_PAGES}")
             conn.execute(f"PRAGMA journal_size_limit={self.WAL_KEEP_BYTES}")
+            # A commit does not fsync (it queued behind the checkpoint's writes: 20.9 s holds of the
+            # lock, P2 re-measure). With WAL the file cannot be corrupted; a power cut can lose the last
+            # commits, and the collection watermarks in this same file roll back with them, so that
+            # range is pulled again.
+            conn.execute("PRAGMA synchronous=NORMAL")
             migrate(conn, MIGRATIONS_PACKAGE)
         except BaseException:
             conn.close()

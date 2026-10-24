@@ -108,3 +108,10 @@ def test_a_stalled_background_checkpoint_still_bounds_the_wal(tmp_path):
     with fdb.connect() as conn:
         assert conn.execute("PRAGMA wal_autocheckpoint").fetchone()[0] == FlowDb.WAL_SAFETY_NET_PAGES
         assert conn.execute("PRAGMA journal_size_limit").fetchone()[0] == FlowDb.WAL_KEEP_BYTES
+
+
+def test_a_flow_store_commit_does_not_wait_for_the_disk(tmp_path):
+    # With synchronous=FULL each commit fsyncs the WAL behind the background checkpoint's writes:
+    # retention holds of the lock reached 20.9 s, 11.5 s with NORMAL (P2 re-measure).
+    conn = FlowDb(tmp_path / "flows.sqlite").connect()
+    assert conn.execute("PRAGMA synchronous").fetchone()[0] == 1  # NORMAL
