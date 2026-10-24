@@ -266,7 +266,8 @@ VEN enforcement 推進、心跳加速）。理由：使用者排序最後、測�
 
 - **只有 owner 能產生 PCE 原生報表與開啟 RHC 範本**，連 admin 都不行；owner 角色可以給 service account。
 - 除了 RHC 以外，v6 的監控、告警、SIEM、資料收集與其他報表（都由本機收集的資料產生）只需要 `read_only`。
-- 現況：客戶的 key 都給 owner【使用者，2026-10-24】。建議見 §6.5 決定紀錄（待使用者選擇）。
+- 現況：客戶的 key 都給 owner【使用者，2026-10-24】。
+- **決定：拆兩把 key**【使用者，2026-10-24】：PCE 連線的主要 key 建議用 `read_only`（Global Viewer）的 service account，供監控、告警、SIEM、資料收集與 RHC 以外的所有報表；另設一把**選填**的 RHC key（owner 角色的 service account），只用於 RHC 狀態檢查、開啟與 RHC 報表產生。RHC key 沒填時，RHC 報表反灰並說明需要 owner 權限的 key；主要 key 若給了 owner 也能運作（相容現有客戶），設定頁提示建議改用 read_only。RHC key 欄位在 P5 加入（設定 schema 升版並由遷移器處理）。
 
 **PCE 健康檢查與網址（依部署型態）**【使用者要求依官方文件，2026-10-24；P1 已實作探測順序】：
 - 共同基線：`GET /api/v2/noop`（驗證連線與 API 憑證，Public Stable API）。

@@ -95,6 +95,7 @@
   "pce_console_url_hint_on_prem": "Used for links that open the PCE console. Leave empty to use the PCE URL.",
   "pce_console_url_hint_saas": "Used for links that open Illumio Console. Leave empty for https://console.illum.io; enter your own *.illumio.ai address if you have one.",
   "pce_deployment": "Deployment",
+  "pce_key_role_hint": "Use a service account with the read-only (Global Viewer) role; it covers everything except Rule Hit Count.",
   "pce_org_id": "Organization ID",
   "pce_secret_hint": "Leave unchanged to keep the saved value (re-enter it if you change the address or TLS check).",
   "pce_test_hint": "Tests the saved connection.",

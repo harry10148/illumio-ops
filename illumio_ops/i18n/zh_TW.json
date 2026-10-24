@@ -95,6 +95,7 @@
   "pce_console_url_hint_on_prem": "用於開啟 PCE 主控台的連結。留空則使用 PCE 網址。",
   "pce_console_url_hint_saas": "用於開啟 Illumio Console 的連結。留空即使用 https://console.illum.io；若有自訂的 *.illumio.ai 網址請填入。",
   "pce_deployment": "部署型態",
+  "pce_key_role_hint": "建議使用唯讀（Global Viewer）角色的 service account，除了 Rule Hit Count 以外的功能都夠用。",
   "pce_org_id": "組織 ID",
   "pce_secret_hint": "不修改即沿用已儲存的值（變更網址或 TLS 驗證時需重新輸入）。",
   "pce_test_hint": "測試的是已儲存的連線設定。",
