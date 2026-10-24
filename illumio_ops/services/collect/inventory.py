@@ -6,6 +6,7 @@ inventory: a partial list would make missing hosts look like hosts that left.
 """
 from __future__ import annotations
 
+import sqlite3
 import time
 from collections.abc import Mapping
 from datetime import UTC, datetime
@@ -13,7 +14,11 @@ from typing import Any
 
 from loguru import logger
 
-from illumio_ops.domain.values import IngestSource, visibility_sees_allowed
+from illumio_ops.domain.values import (
+    CapabilityState,
+    IngestSource,
+    visibility_sees_allowed,
+)
 from illumio_ops.pce.capabilities import detect_from_status, detect_from_workloads
 from illumio_ops.pce.client import PceClient, PceNotConfigured
 from illumio_ops.pce.collections import PceCollectionIncomplete, get_all
@@ -73,13 +78,19 @@ def _deadline() -> float:
     return time.monotonic() + DEADLINE_SECONDS
 
 
-def _org_summary(client: PceClient, fdb: FlowDb, day: str, at: datetime) -> None:
+def _org_summary(client: PceClient, fdb: FlowDb, day: str, at: datetime) -> str | None:
+    """Read and store the organisation summary; returns what went wrong, if anything. A PCE
+    without the endpoint (404) is a missing capability, not a failure."""
     resp = client.request("GET", "/reports/risk_summary", timeout=60, deadline=_deadline())
     state = detect_from_status(resp.status)
+    summary = resp.json() if resp.status == 200 else None  # unreadable JSON raises to the risk stage
     with fdb.write_lock, fdb.connect() as conn:
         capabilities.record(conn, "ransomware_org_summary", state, None if resp.status == 200 else f"HTTP {resp.status}", at)
-        if resp.status == 200:
-            ransomware.write_org_summary(conn, day, resp.json())
+        if summary is not None:
+            ransomware.write_org_summary(conn, day, summary)
+    if resp.status == 200 or state is CapabilityState.UNSUPPORTED:
+        return None
+    return f"organisation summary: HTTP {resp.status}"
 
 
 def _risk_details(client: PceClient, fdb: FlowDb, rows: list[dict[str, Any]], at: datetime) -> tuple[int, int, int]:
@@ -99,7 +110,11 @@ def _risk_details(client: PceClient, fdb: FlowDb, rows: list[dict[str, Any]], at
         if resp.status != 200:
             failed += 1
             continue
-        body = resp.json()
+        try:
+            body = resp.json()
+        except ValueError:
+            failed += 1
+            continue
         rd = body.get("risk_details") if isinstance(body, Mapping) else None
         rw = rd.get("ransomware") if isinstance(rd, Mapping) else None
         details = rw.get("details") if isinstance(rw, Mapping) else None
@@ -158,16 +173,19 @@ def _inventory(ctx: AppContext, client: PceClient, pce: PceSettings, fdb: FlowDb
                 for name, state in detect_from_workloads(rows).items():
                     capabilities.record(conn, name, state, None, at)
                 ingest_state.mark_ok(conn, SOURCE, at, watermark=None, rows=len(rows))
+        # The ransomware stage reports on its own source and never fails the inventory before it.
         try:
-            _org_summary(client, fdb, day, at)
+            summary_error = _org_summary(client, fdb, day, at)
             wanted, fetched, failed = _risk_details(client, fdb, rows, at)
-        except PCE_FAILURES as exc:
+        except (*PCE_FAILURES, ValueError, sqlite3.Error) as exc:  # ValueError: an unreadable body
+            logger.warning("ransomware protection could not be read: {}", exc)
             with fdb.write_lock, fdb.connect() as conn:
-                ingest_state.mark_failed(conn, RISK_SOURCE, at, str(exc))
+                ingest_state.mark_failed(conn, RISK_SOURCE, at, f"{type(exc).__name__}: {exc}")
         else:
+            problems = [p for p in (summary_error, f"{failed} of {wanted} workloads failed" if failed else None) if p]
             with fdb.write_lock, fdb.connect() as conn:
-                if failed:
-                    ingest_state.mark_failed(conn, RISK_SOURCE, at, f"{failed} of {wanted} workloads failed")
+                if problems:
+                    ingest_state.mark_failed(conn, RISK_SOURCE, at, "; ".join(problems))
                 else:
                     ingest_state.mark_ok(conn, RISK_SOURCE, at, watermark=None, rows=fetched)
     with fdb.write_lock, fdb.connect() as conn:

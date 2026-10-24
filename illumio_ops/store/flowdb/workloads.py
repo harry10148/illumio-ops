@@ -39,10 +39,11 @@ def replace_inventory(conn: sqlite3.Connection, rows: Sequence[WorkloadRow]) -> 
 
 
 def snapshot_day(conn: sqlite3.Connection, day: str) -> int:
-    """First snapshot of the day wins; later runs that day change nothing."""
+    """The day's snapshot is the inventory at its latest run: replaced whole, never merged."""
     with transaction(conn):
+        conn.execute("DELETE FROM workload_snapshot_daily WHERE day = ?", (day,))
         return conn.execute(
-            "INSERT OR IGNORE INTO workload_snapshot_daily (day, href, enforcement_mode, visibility_level, "
+            "INSERT INTO workload_snapshot_daily (day, href, enforcement_mode, visibility_level, "
             "risk_exposure, risk_percent) SELECT ?, href, enforcement_mode, visibility_level, risk_exposure, "
             "risk_percent FROM workloads", (day,)).rowcount
 

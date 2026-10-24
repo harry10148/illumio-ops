@@ -3,6 +3,7 @@ import gzip
 from datetime import datetime, timedelta
 
 import pytest
+import responses
 from pydantic import ValidationError
 
 from illumio_ops.domain.events import normalize_event
@@ -15,17 +16,19 @@ from illumio_ops.services import flowsource
 from illumio_ops.services.collect import events as ev
 from illumio_ops.services.collect.archive import run_archive
 from illumio_ops.services.collect.backfill import ensure_initial_backfill, run_backfill
+from illumio_ops.services.collect.inventory import run_inventory_cycle
 from illumio_ops.services.collect.retention import run_retention
 from illumio_ops.services.collect.traffic import run_traffic_cycle
 from illumio_ops.services.eventsource import query_events
 from illumio_ops.services.flowsource import query_flows
 from illumio_ops.settings.schema import CollectionSettings, default_collection
-from illumio_ops.store.flowdb import archive, ingest_state
+from illumio_ops.store.flowdb import archive, ingest_state, ransomware
 from illumio_ops.store.flowdb.db import db_day
 from illumio_ops.store.flowdb.events import upsert_events
 from illumio_ops.store.flowdb.flows import upsert_flows
 
 from .conftest import NOW, configured_ctx, minutes, raw_flow
+from .test_inventory import SUMMARY, WL, _details, _workload
 
 DAY = timedelta(days=1)
 HOUR = timedelta(hours=1)
@@ -261,3 +264,63 @@ def test_archive_files_must_outlive_the_raw_data(archive_days, ok):  # finding 1
     else:
         with pytest.raises(ValidationError, match="archive"):
             CollectionSettings.model_validate(c)
+
+
+# ── Group D: inventory and ransomware protection ────────────────────────────
+
+def _service(name, state):
+    return {"name": name, "port": 445 if name == "SMB" else 3389, "proto": 6, "severity": "critical",
+            "protection_state": state, "port_status": "listening"}
+
+
+def test_a_days_snapshot_is_one_consistent_state(tmp_path):  # finding 10
+    ctx = configured_ctx(tmp_path)
+    day = db_day(NOW)
+    with ctx.flows().connect() as conn:
+        ransomware.upsert_services(conn, "/w/1", [_service("SMB", "unprotected")], source_updated_at="a", at=NOW)
+        ransomware.write_org_summary(conn, day, {"score": 1})
+        ransomware.snapshot_day(conn, day)
+        ransomware.upsert_services(conn, "/w/1", [_service("RDP", "protected")], source_updated_at="b", at=NOW)
+        ransomware.snapshot_day(conn, day)
+        names = [r[0] for r in conn.execute("SELECT name FROM ransomware_snapshot_daily WHERE day = ?", (day,))]
+    assert names == ["RDP"]  # the state at the last snapshot of the day, never a mix of two
+
+
+@responses.activate
+def test_org_summary_error_marks_ransomware_failed(tmp_path):  # finding 11
+    ctx = configured_ctx(tmp_path)
+    responses.add(responses.GET, WL, json=[_workload(1)])
+    responses.add(responses.GET, SUMMARY, status=500)
+    responses.add(responses.GET, f"{WL}/w-1/risk_details", json=_details(1))
+    run_inventory_cycle(ctx, now=NOW)
+    with ctx.flows().connect() as conn:
+        risk = ingest_state.get(conn, IngestSource.RANSOMWARE)
+        inv = ingest_state.get(conn, IngestSource.INVENTORY)
+    assert risk.consecutive_failures == 1 and "500" in risk.last_error and risk.last_ok_at is None
+    assert inv.consecutive_failures == 0 and inv.last_ok_at == NOW
+
+
+@responses.activate
+def test_unreadable_org_summary_does_not_fail_the_inventory(tmp_path):  # finding 11
+    ctx = configured_ctx(tmp_path)
+    responses.add(responses.GET, WL, json=[_workload(1)])
+    responses.add(responses.GET, SUMMARY, body=b"<html>", content_type="text/html")
+    responses.add(responses.GET, f"{WL}/w-1/risk_details", json=_details(1))
+    run_inventory_cycle(ctx, now=NOW)
+    with ctx.flows().connect() as conn:
+        risk = ingest_state.get(conn, IngestSource.RANSOMWARE)
+        inv = ingest_state.get(conn, IngestSource.INVENTORY)
+        snapped = conn.execute("SELECT count(*) FROM workload_snapshot_daily").fetchone()[0]
+    assert risk.consecutive_failures == 1 and inv.consecutive_failures == 0 and snapped == 1
+
+
+@responses.activate
+def test_empty_risk_details_are_not_fetched_again(tmp_path):  # finding 12
+    ctx = configured_ctx(tmp_path)
+    responses.add(responses.GET, WL, json=[_workload(1)])
+    responses.add(responses.GET, SUMMARY, json={"ransomware": {}})
+    empty = {"risk_details": {"ransomware": {"last_updated_at": "2026-10-24T08:49:37Z", "details": []}}}
+    responses.add(responses.GET, f"{WL}/w-1/risk_details", json=empty)
+    run_inventory_cycle(ctx, now=NOW)
+    run_inventory_cycle(ctx, now=NOW + HOUR)
+    assert len([c for c in responses.calls if c.request.url.endswith("/risk_details")]) == 1
