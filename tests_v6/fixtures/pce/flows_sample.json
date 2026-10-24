@@ -1,0 +1,2967 @@
+[
+ {
+  "src": {
+   "ip": "10.0.0.1",
+   "workload": {
+    "hostname": "host-01",
+    "name": "host-02",
+    "href": "/orgs/1/workloads/00000000-0000-4000-8000-000000000001",
+    "os_type": "linux",
+    "enforcement_mode": "visibility_only",
+    "endpoint": false,
+    "managed": false,
+    "labels": [
+     {
+      "href": "/orgs/1/labels/75",
+      "key": "app",
+      "value": "Traffic"
+     },
+     {
+      "href": "/orgs/1/labels/18",
+      "key": "env",
+      "value": "NetworkDevice"
+     },
+     {
+      "href": "/orgs/1/labels/145",
+      "key": "loc",
+      "value": "TP"
+     },
+     {
+      "href": "/orgs/1/labels/44",
+      "key": "role",
+      "value": "Firewall"
+     },
+     {
+      "href": "/orgs/1/labels/71",
+      "key": "os",
+      "value": "OEMOS"
+     }
+    ],
+    "sub_labels": []
+   }
+  },
+  "dst": {
+   "ip": "10.0.0.2",
+   "workload": {
+    "hostname": "host-03",
+    "name": "host-03",
+    "href": "/orgs/1/workloads/00000000-0000-4000-8000-000000000002",
+    "os_type": "linux",
+    "enforcement_mode": "selective",
+    "endpoint": false,
+    "managed": true,
+    "labels": [
+     {
+      "href": "/orgs/1/labels/40",
+      "key": "app",
+      "value": "Illumio"
+     },
+     {
+      "href": "/orgs/1/labels/21",
+      "key": "env",
+      "value": "Server"
+     },
+     {
+      "href": "/orgs/1/labels/145",
+      "key": "loc",
+      "value": "TP"
+     },
+     {
+      "href": "/orgs/1/labels/124",
+      "key": "role",
+      "value": "Flowlink"
+     },
+     {
+      "href": "/orgs/1/labels/142",
+      "key": "Net",
+      "value": "Server-172.16.15"
+     },
+     {
+      "href": "/orgs/1/labels/152",
+      "key": "os",
+      "value": "RockyLinux"
+     }
+    ],
+    "sub_labels": []
+   }
+  },
+  "network": {
+   "name": "host-04",
+   "href": "/orgs/1/networks/00000000-0000-4000-8000-000000000003"
+  },
+  "service": {
+   "port": 2055,
+   "proto": 17
+  },
+  "num_connections": 371,
+  "policy_decision": "potentially_blocked",
+  "state": "active",
+  "flow_direction": "inbound",
+  "dst_bi": 104732056,
+  "dst_bo": 0,
+  "timestamp_range": {
+   "last_detected": "2026-10-24T06:51:05Z",
+   "first_detected": "2026-10-23T00:00:53Z"
+  },
+  "client_type": "server",
+  "seq_id": 0,
+  "caps": [
+   "write"
+  ],
+  "rules": [],
+  "enforcement_boundaries": [],
+  "override_deny_rules": [],
+  "draft_policy_decision": "potentially_blocked"
+ },
+ {
+  "src": {
+   "ip": "10.0.0.1",
+   "workload": {
+    "hostname": "host-01",
+    "name": "host-02",
+    "href": "/orgs/1/workloads/00000000-0000-4000-8000-000000000001",
+    "os_type": "linux",
+    "enforcement_mode": "visibility_only",
+    "endpoint": false,
+    "managed": false,
+    "labels": [
+     {
+      "href": "/orgs/1/labels/75",
+      "key": "app",
+      "value": "Traffic"
+     },
+     {
+      "href": "/orgs/1/labels/18",
+      "key": "env",
+      "value": "NetworkDevice"
+     },
+     {
+      "href": "/orgs/1/labels/145",
+      "key": "loc",
+      "value": "TP"
+     },
+     {
+      "href": "/orgs/1/labels/44",
+      "key": "role",
+      "value": "Firewall"
+     },
+     {
+      "href": "/orgs/1/labels/71",
+      "key": "os",
+      "value": "OEMOS"
+     }
+    ],
+    "sub_labels": []
+   }
+  },
+  "dst": {
+   "ip": "10.0.0.2",
+   "workload": {
+    "hostname": "host-03",
+    "name": "host-03",
+    "href": "/orgs/1/workloads/00000000-0000-4000-8000-000000000002",
+    "os_type": "linux",
+    "enforcement_mode": "selective",
+    "endpoint": false,
+    "managed": true,
+    "labels": [
+     {
+      "href": "/orgs/1/labels/40",
+      "key": "app",
+      "value": "Illumio"
+     },
+     {
+      "href": "/orgs/1/labels/21",
+      "key": "env",
+      "value": "Server"
+     },
+     {
+      "href": "/orgs/1/labels/145",
+      "key": "loc",
+      "value": "TP"
+     },
+     {
+      "href": "/orgs/1/labels/124",
+      "key": "role",
+      "value": "Flowlink"
+     },
+     {
+      "href": "/orgs/1/labels/142",
+      "key": "Net",
+      "value": "Server-172.16.15"
+     },
+     {
+      "href": "/orgs/1/labels/152",
+      "key": "os",
+      "value": "RockyLinux"
+     }
+    ],
+    "sub_labels": []
+   }
+  },
+  "network": {
+   "name": "host-04",
+   "href": "/orgs/1/networks/00000000-0000-4000-8000-000000000003"
+  },
+  "service": {
+   "port": 2055,
+   "proto": 17
+  },
+  "num_connections": 1838,
+  "policy_decision": "unknown",
+  "state": "snapshot",
+  "flow_direction": "outbound",
+  "dst_bi": 0,
+  "dst_bo": 0,
+  "timestamp_range": {
+   "last_detected": "2026-10-24T06:39:05Z",
+   "first_detected": "2026-10-23T00:09:08Z"
+  },
+  "client_type": "flowlink",
+  "seq_id": 815,
+  "caps": [
+   "write"
+  ],
+  "rules": [],
+  "enforcement_boundaries": [],
+  "override_deny_rules": [],
+  "draft_policy_decision": "potentially_blocked"
+ },
+ {
+  "src": {
+   "ip": "10.0.0.3",
+   "workload": {
+    "hostname": "host-05",
+    "name": "host-05",
+    "href": "/orgs/1/workloads/00000000-0000-4000-8000-000000000004",
+    "os_type": "linux",
+    "enforcement_mode": "selective",
+    "endpoint": true,
+    "managed": true,
+    "labels": [
+     {
+      "href": "/orgs/1/labels/72",
+      "key": "app",
+      "value": "Endpoint"
+     },
+     {
+      "href": "/orgs/1/labels/248",
+      "key": "env",
+      "value": "WIFI"
+     },
+     {
+      "href": "/orgs/1/labels/145",
+      "key": "loc",
+      "value": "TP"
+     },
+     {
+      "href": "/orgs/1/labels/135",
+      "key": "role",
+      "value": "MAC"
+     }
+    ],
+    "sub_labels": []
+   }
+  },
+  "dst": {
+   "ip": "10.0.0.4",
+   "workload": {
+    "hostname": "host-01",
+    "name": "host-06",
+    "href": "/orgs/1/workloads/00000000-0000-4000-8000-000000000005",
+    "os_type": "linux",
+    "enforcement_mode": "visibility_only",
+    "endpoint": false,
+    "managed": false,
+    "labels": [
+     {
+      "href": "/orgs/1/labels/72",
+      "key": "app",
+      "value": "Endpoint"
+     },
+     {
+      "href": "/orgs/1/labels/248",
+      "key": "env",
+      "value": "WIFI"
+     },
+     {
+      "href": "/orgs/1/labels/145",
+      "key": "loc",
+      "value": "TP"
+     },
+     {
+      "href": "/orgs/1/labels/73",
+      "key": "role",
+      "value": "DHCP-client"
+     },
+     {
+      "href": "/orgs/1/labels/141",
+      "key": "Net",
+      "value": "LAN-A"
+     }
+    ],
+    "sub_labels": []
+   }
+  },
+  "network": {
+   "name": "host-04",
+   "href": "/orgs/1/networks/00000000-0000-4000-8000-000000000003"
+  },
+  "service": {
+   "port": 5353,
+   "proto": 17,
+   "user_name": "user-01"
+  },
+  "num_connections": 2,
+  "policy_decision": "potentially_blocked",
+  "state": "active",
+  "flow_direction": "outbound",
+  "dst_bi": 0,
+  "dst_bo": 0,
+  "timestamp_range": {
+   "last_detected": "2026-10-24T06:50:55Z",
+   "first_detected": "2026-10-24T02:13:26Z"
+  },
+  "client_type": "endpoint",
+  "seq_id": 1,
+  "caps": [
+   "write"
+  ],
+  "rules": [],
+  "enforcement_boundaries": [],
+  "override_deny_rules": [],
+  "draft_policy_decision": "potentially_blocked"
+ },
+ {
+  "src": {
+   "ip": "10.0.0.5",
+   "workload": {
+    "hostname": "host-07",
+    "name": "host-07",
+    "href": "/orgs/1/workloads/00000000-0000-4000-8000-000000000006",
+    "os_type": "linux",
+    "enforcement_mode": "visibility_only",
+    "endpoint": false,
+    "managed": true,
+    "labels": [
+     {
+      "href": "/orgs/1/labels/55",
+      "key": "app",
+      "value": "K8sNode"
+     },
+     {
+      "href": "/orgs/1/labels/15",
+      "key": "env",
+      "value": "Kubernetes"
+     },
+     {
+      "href": "/orgs/1/labels/145",
+      "key": "loc",
+      "value": "TP"
+     },
+     {
+      "href": "/orgs/1/labels/54",
+      "key": "role",
+      "value": "Master"
+     },
+     {
+      "href": "/orgs/1/labels/69",
+      "key": "os",
+      "value": "Ubuntu"
+     }
+    ],
+    "sub_labels": []
+   }
+  },
+  "dst": {
+   "ip": "10.0.0.6",
+   "workload": {
+    "hostname": "host-08",
+    "name": null,
+    "href": "/orgs/1/workloads/00000000-0000-4000-8000-000000000007",
+    "os_type": "linux",
+    "enforcement_mode": "visibility_only",
+    "endpoint": false,
+    "managed": true,
+    "labels": [
+     {
+      "href": "/orgs/1/labels/55",
+      "key": "app",
+      "value": "K8sNode"
+     },
+     {
+      "href": "/orgs/1/labels/15",
+      "key": "env",
+      "value": "Kubernetes"
+     },
+     {
+      "href": "/orgs/1/labels/145",
+      "key": "loc",
+      "value": "TP"
+     },
+     {
+      "href": "/orgs/1/labels/56",
+      "key": "role",
+      "value": "Worker"
+     },
+     {
+      "href": "/orgs/1/labels/69",
+      "key": "os",
+      "value": "Ubuntu"
+     }
+    ],
+    "sub_labels": []
+   }
+  },
+  "network": {
+   "name": "host-04",
+   "href": "/orgs/1/networks/00000000-0000-4000-8000-000000000003"
+  },
+  "service": {
+   "port": 5473,
+   "proto": 6,
+   "process_name": "calico-node"
+  },
+  "num_connections": 370,
+  "policy_decision": "potentially_blocked",
+  "boundary_decision": null,
+  "state": "snapshot",
+  "icmp_type": 0,
+  "icmp_code": 0,
+  "flow_direction": "outbound",
+  "dst_bi": 370,
+  "dst_bo": 370,
+  "timestamp_range": {
+   "last_detected": "2026-10-24T06:49:23Z",
+   "first_detected": "2026-10-23T00:01:44Z"
+  },
+  "client_type": "server",
+  "seq_id": 48,
+  "caps": [
+   "write"
+  ],
+  "rules": [],
+  "enforcement_boundaries": [],
+  "override_deny_rules": [],
+  "draft_policy_decision": "potentially_blocked"
+ },
+ {
+  "src": {
+   "ip": "10.0.0.6",
+   "workload": {
+    "hostname": "host-08",
+    "name": null,
+    "href": "/orgs/1/workloads/00000000-0000-4000-8000-000000000007",
+    "os_type": "linux",
+    "enforcement_mode": "visibility_only",
+    "endpoint": false,
+    "managed": true,
+    "labels": [
+     {
+      "href": "/orgs/1/labels/55",
+      "key": "app",
+      "value": "K8sNode"
+     },
+     {
+      "href": "/orgs/1/labels/15",
+      "key": "env",
+      "value": "Kubernetes"
+     },
+     {
+      "href": "/orgs/1/labels/145",
+      "key": "loc",
+      "value": "TP"
+     },
+     {
+      "href": "/orgs/1/labels/56",
+      "key": "role",
+      "value": "Worker"
+     },
+     {
+      "href": "/orgs/1/labels/69",
+      "key": "os",
+      "value": "Ubuntu"
+     }
+    ],
+    "sub_labels": []
+   }
+  },
+  "dst": {
+   "ip": "10.0.0.5",
+   "workload": {
+    "hostname": "host-07",
+    "name": "host-07",
+    "href": "/orgs/1/workloads/00000000-0000-4000-8000-000000000006",
+    "os_type": "linux",
+    "enforcement_mode": "visibility_only",
+    "endpoint": false,
+    "managed": true,
+    "labels": [
+     {
+      "href": "/orgs/1/labels/55",
+      "key": "app",
+      "value": "K8sNode"
+     },
+     {
+      "href": "/orgs/1/labels/15",
+      "key": "env",
+      "value": "Kubernetes"
+     },
+     {
+      "href": "/orgs/1/labels/145",
+      "key": "loc",
+      "value": "TP"
+     },
+     {
+      "href": "/orgs/1/labels/54",
+      "key": "role",
+      "value": "Master"
+     },
+     {
+      "href": "/orgs/1/labels/69",
+      "key": "os",
+      "value": "Ubuntu"
+     }
+    ],
+    "sub_labels": []
+   }
+  },
+  "network": {
+   "name": "host-04",
+   "href": "/orgs/1/networks/00000000-0000-4000-8000-000000000003"
+  },
+  "service": {
+   "port": 10249,
+   "proto": 6,
+   "process_name": "kube-proxy"
+  },
+  "num_connections": 185,
+  "policy_decision": "potentially_blocked",
+  "boundary_decision": null,
+  "state": "snapshot",
+  "icmp_type": 0,
+  "icmp_code": 0,
+  "flow_direction": "inbound",
+  "dst_bi": 185,
+  "dst_bo": 185,
+  "timestamp_range": {
+   "last_detected": "2026-10-24T06:49:23Z",
+   "first_detected": "2026-10-23T00:01:44Z"
+  },
+  "client_type": "server",
+  "seq_id": 37,
+  "caps": [
+   "write"
+  ],
+  "rules": [],
+  "enforcement_boundaries": [],
+  "override_deny_rules": [],
+  "draft_policy_decision": "potentially_blocked"
+ },
+ {
+  "src": {
+   "ip": "10.0.0.7",
+   "workload": {
+    "hostname": "host-09",
+    "name": "host-09",
+    "href": "/orgs/1/workloads/00000000-0000-4000-8000-000000000008",
+    "os_type": "linux",
+    "enforcement_mode": "selective",
+    "endpoint": false,
+    "managed": true,
+    "labels": [
+     {
+      "href": "/orgs/1/labels/116",
+      "key": "app",
+      "value": "DemoApp"
+     },
+     {
+      "href": "/orgs/1/labels/21",
+      "key": "env",
+      "value": "Server"
+     },
+     {
+      "href": "/orgs/1/labels/145",
+      "key": "loc",
+      "value": "TP"
+     },
+     {
+      "href": "/orgs/1/labels/110",
+      "key": "role",
+      "value": "Apiserver"
+     },
+     {
+      "href": "/orgs/1/labels/142",
+      "key": "Net",
+      "value": "Server-172.16.15"
+     },
+     {
+      "href": "/orgs/1/labels/69",
+      "key": "os",
+      "value": "Ubuntu"
+     }
+    ],
+    "sub_labels": []
+   }
+  },
+  "dst": {
+   "ip": "10.0.0.8",
+   "workload": {
+    "hostname": "host-10",
+    "name": "host-10",
+    "href": "/orgs/1/workloads/00000000-0000-4000-8000-000000000009",
+    "os_type": "linux",
+    "enforcement_mode": "selective",
+    "endpoint": false,
+    "managed": true,
+    "labels": [
+     {
+      "href": "/orgs/1/labels/116",
+      "key": "app",
+      "value": "DemoApp"
+     },
+     {
+      "href": "/orgs/1/labels/21",
+      "key": "env",
+      "value": "Server"
+     },
+     {
+      "href": "/orgs/1/labels/145",
+      "key": "loc",
+      "value": "TP"
+     },
+     {
+      "href": "/orgs/1/labels/2",
+      "key": "role",
+      "value": "Database"
+     },
+     {
+      "href": "/orgs/1/labels/69",
+      "key": "os",
+      "value": "Ubuntu"
+     },
+     {
+      "href": "/orgs/1/labels/142",
+      "key": "Net",
+      "value": "Server-172.16.15"
+     }
+    ],
+    "sub_labels": []
+   }
+  },
+  "network": {
+   "name": "host-04",
+   "href": "/orgs/1/networks/00000000-0000-4000-8000-000000000003"
+  },
+  "service": {
+   "port": 3306,
+   "proto": 6,
+   "process_name": "mysqld",
+   "user_name": "user-02"
+  },
+  "num_connections": 42621,
+  "policy_decision": "potentially_blocked",
+  "state": "closed",
+  "flow_direction": "inbound",
+  "dst_bi": 126653516,
+  "dst_bo": 200234550,
+  "timestamp_range": {
+   "last_detected": "2026-10-24T06:48:52Z",
+   "first_detected": "2026-10-23T00:08:33Z"
+  },
+  "client_type": "server",
+  "seq_id": 94,
+  "caps": [
+   "write"
+  ],
+  "rules": [],
+  "enforcement_boundaries": [
+   {
+    "href": "/orgs/1/sec_policy/draft/rule_sets/673/deny_rules/309"
+   }
+  ],
+  "override_deny_rules": [],
+  "draft_policy_decision": "blocked_by_boundary"
+ },
+ {
+  "src": {
+   "ip": "10.0.0.3",
+   "workload": {
+    "hostname": "host-05",
+    "name": "host-05",
+    "href": "/orgs/1/workloads/00000000-0000-4000-8000-000000000004",
+    "os_type": "linux",
+    "enforcement_mode": "selective",
+    "endpoint": true,
+    "managed": true,
+    "labels": [
+     {
+      "href": "/orgs/1/labels/72",
+      "key": "app",
+      "value": "Endpoint"
+     },
+     {
+      "href": "/orgs/1/labels/248",
+      "key": "env",
+      "value": "WIFI"
+     },
+     {
+      "href": "/orgs/1/labels/145",
+      "key": "loc",
+      "value": "TP"
+     },
+     {
+      "href": "/orgs/1/labels/135",
+      "key": "role",
+      "value": "MAC"
+     }
+    ],
+    "sub_labels": []
+   }
+  },
+  "dst": {
+   "ip": "10.0.0.9",
+   "ip_lists": [
+    {
+     "name": "host-11",
+     "href": "/orgs/1/sec_policy/draft/ip_lists/108",
+     "size": 4278059008,
+     "rules": [],
+     "enforcement_boundaries": [],
+     "override_deny_rules": []
+    }
+   ]
+  },
+  "network": {
+   "name": "host-04",
+   "href": "/orgs/1/networks/00000000-0000-4000-8000-000000000003"
+  },
+  "service": {
+   "port": 443,
+   "proto": 6,
+   "user_name": "user-03"
+  },
+  "num_connections": 129,
+  "policy_decision": "potentially_blocked",
+  "state": "active",
+  "flow_direction": "outbound",
+  "dst_bi": 0,
+  "dst_bo": 0,
+  "timestamp_range": {
+   "last_detected": "2026-10-24T06:50:55Z",
+   "first_detected": "2026-10-23T06:57:34Z"
+  },
+  "client_type": "endpoint",
+  "seq_id": 2,
+  "caps": [
+   "write"
+  ],
+  "rules": [],
+  "enforcement_boundaries": [],
+  "override_deny_rules": [],
+  "draft_policy_decision": "potentially_blocked"
+ },
+ {
+  "src": {
+   "ip": "10.0.0.10",
+   "workload": {
+    "hostname": "host-01",
+    "name": "host-12",
+    "href": "/orgs/1/workloads/00000000-0000-4000-8000-000000000010",
+    "os_type": "linux",
+    "enforcement_mode": "visibility_only",
+    "endpoint": false,
+    "managed": false,
+    "labels": [
+     {
+      "href": "/orgs/1/labels/75",
+      "key": "app",
+      "value": "Traffic"
+     },
+     {
+      "href": "/orgs/1/labels/18",
+      "key": "env",
+      "value": "NetworkDevice"
+     },
+     {
+      "href": "/orgs/1/labels/145",
+      "key": "loc",
+      "value": "TP"
+     },
+     {
+      "href": "/orgs/1/labels/6",
+      "key": "role",
+      "value": "LoadBalancer"
+     },
+     {
+      "href": "/orgs/1/labels/140",
+      "key": "Net",
+      "value": "DMZ-B"
+     },
+     {
+      "href": "/orgs/1/labels/71",
+      "key": "os",
+      "value": "OEMOS"
+     }
+    ],
+    "sub_labels": []
+   }
+  },
+  "dst": {
+   "ip": "10.0.0.11",
+   "workload": {
+    "hostname": "host-13",
+    "name": "host-13",
+    "href": "/orgs/1/workloads/00000000-0000-4000-8000-000000000011",
+    "os_type": "linux",
+    "enforcement_mode": "selective",
+    "endpoint": false,
+    "managed": true,
+    "labels": [
+     {
+      "href": "/orgs/1/labels/247",
+      "key": "app",
+      "value": "file"
+     },
+     {
+      "href": "/orgs/1/labels/21",
+      "key": "env",
+      "value": "Server"
+     },
+     {
+      "href": "/orgs/1/labels/145",
+      "key": "loc",
+      "value": "TP"
+     },
+     {
+      "href": "/orgs/1/labels/137",
+      "key": "role",
+      "value": "FTP"
+     },
+     {
+      "href": "/orgs/1/labels/69",
+      "key": "os",
+      "value": "Ubuntu"
+     },
+     {
+      "href": "/orgs/1/labels/142",
+      "key": "Net",
+      "value": "Server-172.16.15"
+     }
+    ],
+    "sub_labels": []
+   }
+  },
+  "network": {
+   "name": "host-04",
+   "href": "/orgs/1/networks/00000000-0000-4000-8000-000000000003"
+  },
+  "service": {
+   "port": 0,
+   "proto": 1
+  },
+  "num_connections": 369,
+  "policy_decision": "potentially_blocked",
+  "state": "active",
+  "icmp_type": 8,
+  "icmp_code": 0,
+  "flow_direction": "inbound",
+  "dst_bi": 1858416,
+  "dst_bo": 1858416,
+  "timestamp_range": {
+   "last_detected": "2026-10-24T06:45:17Z",
+   "first_detected": "2026-10-23T00:04:54Z"
+  },
+  "client_type": "server",
+  "seq_id": 336,
+  "caps": [
+   "write"
+  ],
+  "rules": [],
+  "enforcement_boundaries": [],
+  "override_deny_rules": [],
+  "draft_policy_decision": "potentially_blocked"
+ },
+ {
+  "src": {
+   "ip": "10.0.0.3",
+   "workload": {
+    "hostname": "host-05",
+    "name": "host-05",
+    "href": "/orgs/1/workloads/00000000-0000-4000-8000-000000000004",
+    "os_type": "linux",
+    "enforcement_mode": "selective",
+    "endpoint": true,
+    "managed": true,
+    "labels": [
+     {
+      "href": "/orgs/1/labels/72",
+      "key": "app",
+      "value": "Endpoint"
+     },
+     {
+      "href": "/orgs/1/labels/248",
+      "key": "env",
+      "value": "WIFI"
+     },
+     {
+      "href": "/orgs/1/labels/145",
+      "key": "loc",
+      "value": "TP"
+     },
+     {
+      "href": "/orgs/1/labels/135",
+      "key": "role",
+      "value": "MAC"
+     }
+    ],
+    "sub_labels": []
+   }
+  },
+  "dst": {
+   "ip": "10.0.0.12",
+   "ip_lists": [
+    {
+     "name": "host-11",
+     "href": "/orgs/1/sec_policy/draft/ip_lists/108",
+     "size": 4278059008,
+     "rules": [],
+     "enforcement_boundaries": [],
+     "override_deny_rules": []
+    }
+   ]
+  },
+  "network": {
+   "name": "host-04",
+   "href": "/orgs/1/networks/00000000-0000-4000-8000-000000000003"
+  },
+  "service": {
+   "port": 443,
+   "proto": 6,
+   "user_name": "root"
+  },
+  "num_connections": 32,
+  "policy_decision": "potentially_blocked",
+  "state": "active",
+  "flow_direction": "outbound",
+  "dst_bi": 0,
+  "dst_bo": 0,
+  "timestamp_range": {
+   "last_detected": "2026-10-24T06:50:55Z",
+   "first_detected": "2026-10-23T07:22:49Z"
+  },
+  "client_type": "endpoint",
+  "seq_id": 3,
+  "caps": [
+   "write"
+  ],
+  "rules": [],
+  "enforcement_boundaries": [],
+  "override_deny_rules": [],
+  "draft_policy_decision": "potentially_blocked"
+ },
+ {
+  "src": {
+   "ip": "10.0.0.3",
+   "workload": {
+    "hostname": "host-05",
+    "name": "host-05",
+    "href": "/orgs/1/workloads/00000000-0000-4000-8000-000000000004",
+    "os_type": "linux",
+    "enforcement_mode": "selective",
+    "endpoint": true,
+    "managed": true,
+    "labels": [
+     {
+      "href": "/orgs/1/labels/72",
+      "key": "app",
+      "value": "Endpoint"
+     },
+     {
+      "href": "/orgs/1/labels/248",
+      "key": "env",
+      "value": "WIFI"
+     },
+     {
+      "href": "/orgs/1/labels/145",
+      "key": "loc",
+      "value": "TP"
+     },
+     {
+      "href": "/orgs/1/labels/135",
+      "key": "role",
+      "value": "MAC"
+     }
+    ],
+    "sub_labels": []
+   }
+  },
+  "dst": {
+   "ip": "10.0.0.13",
+   "ip_lists": [
+    {
+     "name": "host-11",
+     "href": "/orgs/1/sec_policy/draft/ip_lists/108",
+     "size": 4278059008,
+     "rules": [],
+     "enforcement_boundaries": [],
+     "override_deny_rules": []
+    }
+   ]
+  },
+  "network": {
+   "name": "host-04",
+   "href": "/orgs/1/networks/00000000-0000-4000-8000-000000000003"
+  },
+  "service": {
+   "port": 443,
+   "proto": 6,
+   "user_name": "user-03"
+  },
+  "num_connections": 33,
+  "policy_decision": "potentially_blocked",
+  "state": "active",
+  "flow_direction": "outbound",
+  "dst_bi": 0,
+  "dst_bo": 0,
+  "timestamp_range": {
+   "last_detected": "2026-10-24T06:50:55Z",
+   "first_detected": "2026-10-23T08:28:30Z"
+  },
+  "client_type": "endpoint",
+  "seq_id": 4,
+  "caps": [
+   "write"
+  ],
+  "rules": [],
+  "enforcement_boundaries": [],
+  "override_deny_rules": [],
+  "draft_policy_decision": "potentially_blocked"
+ },
+ {
+  "src": {
+   "ip": "10.0.0.3",
+   "workload": {
+    "hostname": "host-05",
+    "name": "host-05",
+    "href": "/orgs/1/workloads/00000000-0000-4000-8000-000000000004",
+    "os_type": "linux",
+    "enforcement_mode": "selective",
+    "endpoint": true,
+    "managed": true,
+    "labels": [
+     {
+      "href": "/orgs/1/labels/72",
+      "key": "app",
+      "value": "Endpoint"
+     },
+     {
+      "href": "/orgs/1/labels/248",
+      "key": "env",
+      "value": "WIFI"
+     },
+     {
+      "href": "/orgs/1/labels/145",
+      "key": "loc",
+      "value": "TP"
+     },
+     {
+      "href": "/orgs/1/labels/135",
+      "key": "role",
+      "value": "MAC"
+     }
+    ],
+    "sub_labels": []
+   }
+  },
+  "dst": {
+   "ip": "10.0.0.14",
+   "ip_lists": [
+    {
+     "name": "host-11",
+     "href": "/orgs/1/sec_policy/draft/ip_lists/108",
+     "size": 4278059008,
+     "rules": [],
+     "enforcement_boundaries": [],
+     "override_deny_rules": []
+    }
+   ]
+  },
+  "network": {
+   "name": "host-04",
+   "href": "/orgs/1/networks/00000000-0000-4000-8000-000000000003"
+  },
+  "service": {
+   "port": 443,
+   "proto": 17,
+   "user_name": "user-03"
+  },
+  "num_connections": 36,
+  "policy_decision": "potentially_blocked",
+  "state": "timed out",
+  "flow_direction": "outbound",
+  "dst_bi": 0,
+  "dst_bo": 0,
+  "timestamp_range": {
+   "last_detected": "2026-10-24T06:50:54Z",
+   "first_detected": "2026-10-23T17:26:59Z"
+  },
+  "client_type": "endpoint",
+  "seq_id": 5,
+  "caps": [
+   "write"
+  ],
+  "rules": [],
+  "enforcement_boundaries": [],
+  "override_deny_rules": [],
+  "draft_policy_decision": "potentially_blocked"
+ },
+ {
+  "src": {
+   "ip": "10.0.0.3",
+   "workload": {
+    "hostname": "host-05",
+    "name": "host-05",
+    "href": "/orgs/1/workloads/00000000-0000-4000-8000-000000000004",
+    "os_type": "linux",
+    "enforcement_mode": "selective",
+    "endpoint": true,
+    "managed": true,
+    "labels": [
+     {
+      "href": "/orgs/1/labels/72",
+      "key": "app",
+      "value": "Endpoint"
+     },
+     {
+      "href": "/orgs/1/labels/248",
+      "key": "env",
+      "value": "WIFI"
+     },
+     {
+      "href": "/orgs/1/labels/145",
+      "key": "loc",
+      "value": "TP"
+     },
+     {
+      "href": "/orgs/1/labels/135",
+      "key": "role",
+      "value": "MAC"
+     }
+    ],
+    "sub_labels": []
+   }
+  },
+  "dst": {
+   "ip": "10.0.0.15",
+   "ip_lists": [
+    {
+     "name": "host-11",
+     "href": "/orgs/1/sec_policy/draft/ip_lists/108",
+     "size": 4278059008,
+     "rules": [],
+     "enforcement_boundaries": [],
+     "override_deny_rules": []
+    }
+   ]
+  },
+  "network": {
+   "name": "host-04",
+   "href": "/orgs/1/networks/00000000-0000-4000-8000-000000000003"
+  },
+  "service": {
+   "port": 443,
+   "proto": 6,
+   "user_name": "root"
+  },
+  "num_connections": 201,
+  "policy_decision": "potentially_blocked",
+  "state": "timed out",
+  "flow_direction": "outbound",
+  "dst_bi": 0,
+  "dst_bo": 0,
+  "timestamp_range": {
+   "last_detected": "2026-10-24T06:50:44Z",
+   "first_detected": "2026-10-23T06:56:35Z"
+  },
+  "client_type": "endpoint",
+  "seq_id": 6,
+  "caps": [
+   "write"
+  ],
+  "rules": [],
+  "enforcement_boundaries": [],
+  "override_deny_rules": [],
+  "draft_policy_decision": "potentially_blocked"
+ },
+ {
+  "src": {
+   "ip": "10.0.0.16"
+  },
+  "dst": {
+   "ip": "10.0.0.17",
+   "workload": {
+    "hostname": "host-05",
+    "name": "host-05",
+    "href": "/orgs/1/workloads/00000000-0000-4000-8000-000000000004",
+    "os_type": "linux",
+    "enforcement_mode": "selective",
+    "endpoint": true,
+    "managed": true,
+    "labels": [
+     {
+      "href": "/orgs/1/labels/72",
+      "key": "app",
+      "value": "Endpoint"
+     },
+     {
+      "href": "/orgs/1/labels/248",
+      "key": "env",
+      "value": "WIFI"
+     },
+     {
+      "href": "/orgs/1/labels/145",
+      "key": "loc",
+      "value": "TP"
+     },
+     {
+      "href": "/orgs/1/labels/135",
+      "key": "role",
+      "value": "MAC"
+     }
+    ],
+    "sub_labels": []
+   }
+  },
+  "network": {
+   "name": "host-14",
+   "href": "/orgs/1/networks/00000000-0000-4000-8000-000000000012"
+  },
+  "service": {
+   "port": 0,
+   "proto": 58
+  },
+  "num_connections": 7,
+  "policy_decision": "allowed",
+  "state": "timed out",
+  "icmp_type": 135,
+  "icmp_code": 0,
+  "flow_direction": "inbound",
+  "dst_bi": 0,
+  "dst_bo": 0,
+  "timestamp_range": {
+   "last_detected": "2026-10-24T06:50:43Z",
+   "first_detected": "2026-10-24T05:26:29Z"
+  },
+  "client_type": "endpoint",
+  "seq_id": 7,
+  "caps": [
+   "write"
+  ],
+  "rules": [
+   {
+    "essential_service_rule": "icmp_v6_ingress"
+   }
+  ],
+  "enforcement_boundaries": [],
+  "override_deny_rules": [],
+  "draft_policy_decision": "allowed"
+ },
+ {
+  "src": {
+   "ip": "10.0.0.18",
+   "workload": {
+    "hostname": "host-15",
+    "name": null,
+    "href": "/orgs/1/workloads/00000000-0000-4000-8000-000000000013",
+    "os_type": "linux",
+    "enforcement_mode": "visibility_only",
+    "endpoint": false,
+    "managed": true,
+    "labels": [
+     {
+      "href": "/orgs/1/labels/55",
+      "key": "app",
+      "value": "K8sNode"
+     },
+     {
+      "href": "/orgs/1/labels/15",
+      "key": "env",
+      "value": "Kubernetes"
+     },
+     {
+      "href": "/orgs/1/labels/145",
+      "key": "loc",
+      "value": "TP"
+     },
+     {
+      "href": "/orgs/1/labels/56",
+      "key": "role",
+      "value": "Worker"
+     },
+     {
+      "href": "/orgs/1/labels/69",
+      "key": "os",
+      "value": "Ubuntu"
+     }
+    ],
+    "sub_labels": []
+   }
+  },
+  "dst": {
+   "ip": "10.0.0.19",
+   "workload": {
+    "hostname": null,
+    "name": "host-16",
+    "href": "/orgs/1/kubernetes_workloads/00000000-0000-4000-8000-000000000014",
+    "os_type": "unknown",
+    "enforcement_mode": "visibility_only",
+    "endpoint": false,
+    "managed": true,
+    "labels": [
+     {
+      "href": "/orgs/1/labels/240",
+      "key": "app",
+      "value": "onlineboutique"
+     },
+     {
+      "href": "/orgs/1/labels/15",
+      "key": "env",
+      "value": "Kubernetes"
+     },
+     {
+      "href": "/orgs/1/labels/145",
+      "key": "loc",
+      "value": "TP"
+     }
+    ],
+    "sub_labels": []
+   }
+  },
+  "network": {
+   "name": "host-04",
+   "href": "/orgs/1/networks/00000000-0000-4000-8000-000000000003"
+  },
+  "service": {
+   "port": 50051,
+   "proto": 6
+  },
+  "num_connections": 24490,
+  "policy_decision": "potentially_blocked",
+  "boundary_decision": null,
+  "state": "snapshot",
+  "icmp_type": 0,
+  "icmp_code": 0,
+  "flow_direction": "inbound",
+  "dst_bi": 0,
+  "dst_bo": 0,
+  "timestamp_range": {
+   "last_detected": "2026-10-24T06:50:39Z",
+   "first_detected": "2026-10-23T00:00:20Z"
+  },
+  "client_type": "server",
+  "seq_id": 8,
+  "caps": [
+   "write"
+  ],
+  "rules": [],
+  "enforcement_boundaries": [],
+  "override_deny_rules": [],
+  "draft_policy_decision": "potentially_blocked"
+ },
+ {
+  "src": {
+   "ip": "10.0.0.18",
+   "workload": {
+    "hostname": "host-15",
+    "name": null,
+    "href": "/orgs/1/workloads/00000000-0000-4000-8000-000000000013",
+    "os_type": "linux",
+    "enforcement_mode": "visibility_only",
+    "endpoint": false,
+    "managed": true,
+    "labels": [
+     {
+      "href": "/orgs/1/labels/55",
+      "key": "app",
+      "value": "K8sNode"
+     },
+     {
+      "href": "/orgs/1/labels/15",
+      "key": "env",
+      "value": "Kubernetes"
+     },
+     {
+      "href": "/orgs/1/labels/145",
+      "key": "loc",
+      "value": "TP"
+     },
+     {
+      "href": "/orgs/1/labels/56",
+      "key": "role",
+      "value": "Worker"
+     },
+     {
+      "href": "/orgs/1/labels/69",
+      "key": "os",
+      "value": "Ubuntu"
+     }
+    ],
+    "sub_labels": []
+   }
+  },
+  "dst": {
+   "ip": "10.0.0.20",
+   "workload": {
+    "hostname": null,
+    "name": "host-17",
+    "href": "/orgs/1/kubernetes_workloads/00000000-0000-4000-8000-000000000015",
+    "os_type": "unknown",
+    "enforcement_mode": "visibility_only",
+    "endpoint": false,
+    "managed": true,
+    "labels": [
+     {
+      "href": "/orgs/1/labels/240",
+      "key": "app",
+      "value": "onlineboutique"
+     },
+     {
+      "href": "/orgs/1/labels/15",
+      "key": "env",
+      "value": "Kubernetes"
+     },
+     {
+      "href": "/orgs/1/labels/145",
+      "key": "loc",
+      "value": "TP"
+     }
+    ],
+    "sub_labels": []
+   }
+  },
+  "network": {
+   "name": "host-04",
+   "href": "/orgs/1/networks/00000000-0000-4000-8000-000000000003"
+  },
+  "service": {
+   "port": 9555,
+   "proto": 6
+  },
+  "num_connections": 16326,
+  "policy_decision": "potentially_blocked",
+  "boundary_decision": null,
+  "state": "snapshot",
+  "icmp_type": 0,
+  "icmp_code": 0,
+  "flow_direction": "inbound",
+  "dst_bi": 0,
+  "dst_bo": 0,
+  "timestamp_range": {
+   "last_detected": "2026-10-24T06:50:39Z",
+   "first_detected": "2026-10-23T00:00:20Z"
+  },
+  "client_type": "server",
+  "seq_id": 9,
+  "caps": [
+   "write"
+  ],
+  "rules": [],
+  "enforcement_boundaries": [],
+  "override_deny_rules": [],
+  "draft_policy_decision": "potentially_blocked"
+ },
+ {
+  "src": {
+   "ip": "10.0.0.18",
+   "workload": {
+    "hostname": "host-15",
+    "name": null,
+    "href": "/orgs/1/workloads/00000000-0000-4000-8000-000000000013",
+    "os_type": "linux",
+    "enforcement_mode": "visibility_only",
+    "endpoint": false,
+    "managed": true,
+    "labels": [
+     {
+      "href": "/orgs/1/labels/55",
+      "key": "app",
+      "value": "K8sNode"
+     },
+     {
+      "href": "/orgs/1/labels/15",
+      "key": "env",
+      "value": "Kubernetes"
+     },
+     {
+      "href": "/orgs/1/labels/145",
+      "key": "loc",
+      "value": "TP"
+     },
+     {
+      "href": "/orgs/1/labels/56",
+      "key": "role",
+      "value": "Worker"
+     },
+     {
+      "href": "/orgs/1/labels/69",
+      "key": "os",
+      "value": "Ubuntu"
+     }
+    ],
+    "sub_labels": []
+   }
+  },
+  "dst": {
+   "ip": "10.0.0.21",
+   "workload": {
+    "hostname": null,
+    "name": "host-18",
+    "href": "/orgs/1/kubernetes_workloads/00000000-0000-4000-8000-000000000016",
+    "os_type": "unknown",
+    "enforcement_mode": "visibility_only",
+    "endpoint": false,
+    "managed": true,
+    "labels": [
+     {
+      "href": "/orgs/1/labels/240",
+      "key": "app",
+      "value": "onlineboutique"
+     },
+     {
+      "href": "/orgs/1/labels/15",
+      "key": "env",
+      "value": "Kubernetes"
+     },
+     {
+      "href": "/orgs/1/labels/145",
+      "key": "loc",
+      "value": "TP"
+     }
+    ],
+    "sub_labels": []
+   }
+  },
+  "network": {
+   "name": "host-04",
+   "href": "/orgs/1/networks/00000000-0000-4000-8000-000000000003"
+  },
+  "service": {
+   "port": 8080,
+   "proto": 6
+  },
+  "num_connections": 48980,
+  "policy_decision": "potentially_blocked",
+  "boundary_decision": null,
+  "state": "snapshot",
+  "icmp_type": 0,
+  "icmp_code": 0,
+  "flow_direction": "inbound",
+  "dst_bi": 0,
+  "dst_bo": 0,
+  "timestamp_range": {
+   "last_detected": "2026-10-24T06:50:39Z",
+   "first_detected": "2026-10-23T00:00:20Z"
+  },
+  "client_type": "server",
+  "seq_id": 10,
+  "caps": [
+   "write"
+  ],
+  "rules": [],
+  "enforcement_boundaries": [],
+  "override_deny_rules": [],
+  "draft_policy_decision": "potentially_blocked"
+ },
+ {
+  "src": {
+   "ip": "10.0.0.18",
+   "workload": {
+    "hostname": "host-15",
+    "name": null,
+    "href": "/orgs/1/workloads/00000000-0000-4000-8000-000000000013",
+    "os_type": "linux",
+    "enforcement_mode": "visibility_only",
+    "endpoint": false,
+    "managed": true,
+    "labels": [
+     {
+      "href": "/orgs/1/labels/55",
+      "key": "app",
+      "value": "K8sNode"
+     },
+     {
+      "href": "/orgs/1/labels/15",
+      "key": "env",
+      "value": "Kubernetes"
+     },
+     {
+      "href": "/orgs/1/labels/145",
+      "key": "loc",
+      "value": "TP"
+     },
+     {
+      "href": "/orgs/1/labels/56",
+      "key": "role",
+      "value": "Worker"
+     },
+     {
+      "href": "/orgs/1/labels/69",
+      "key": "os",
+      "value": "Ubuntu"
+     }
+    ],
+    "sub_labels": []
+   }
+  },
+  "dst": {
+   "ip": "10.0.0.22",
+   "workload": {
+    "hostname": null,
+    "name": "host-19",
+    "href": "/orgs/1/kubernetes_workloads/00000000-0000-4000-8000-000000000017",
+    "os_type": "unknown",
+    "enforcement_mode": "visibility_only",
+    "endpoint": false,
+    "managed": true,
+    "labels": [
+     {
+      "href": "/orgs/1/labels/240",
+      "key": "app",
+      "value": "onlineboutique"
+     },
+     {
+      "href": "/orgs/1/labels/15",
+      "key": "env",
+      "value": "Kubernetes"
+     },
+     {
+      "href": "/orgs/1/labels/145",
+      "key": "loc",
+      "value": "TP"
+     }
+    ],
+    "sub_labels": []
+   }
+  },
+  "network": {
+   "name": "host-04",
+   "href": "/orgs/1/networks/00000000-0000-4000-8000-000000000003"
+  },
+  "service": {
+   "port": 3550,
+   "proto": 6
+  },
+  "num_connections": 24490,
+  "policy_decision": "potentially_blocked",
+  "boundary_decision": null,
+  "state": "snapshot",
+  "icmp_type": 0,
+  "icmp_code": 0,
+  "flow_direction": "inbound",
+  "dst_bi": 0,
+  "dst_bo": 0,
+  "timestamp_range": {
+   "last_detected": "2026-10-24T06:50:39Z",
+   "first_detected": "2026-10-23T00:00:20Z"
+  },
+  "client_type": "server",
+  "seq_id": 11,
+  "caps": [
+   "write"
+  ],
+  "rules": [],
+  "enforcement_boundaries": [],
+  "override_deny_rules": [],
+  "draft_policy_decision": "potentially_blocked"
+ },
+ {
+  "src": {
+   "ip": "10.0.0.23",
+   "workload": {
+    "hostname": null,
+    "name": "host-20",
+    "href": "/orgs/1/kubernetes_workloads/00000000-0000-4000-8000-000000000018",
+    "os_type": "unknown",
+    "enforcement_mode": "visibility_only",
+    "endpoint": false,
+    "managed": true,
+    "labels": [
+     {
+      "href": "/orgs/1/labels/40",
+      "key": "app",
+      "value": "Illumio"
+     },
+     {
+      "href": "/orgs/1/labels/15",
+      "key": "env",
+      "value": "Kubernetes"
+     },
+     {
+      "href": "/orgs/1/labels/145",
+      "key": "loc",
+      "value": "TP"
+     }
+    ],
+    "sub_labels": []
+   }
+  },
+  "dst": {
+   "ip": "10.0.0.24",
+   "fqdn": null,
+   "workload": {
+    "hostname": "host-21",
+    "name": "host-21",
+    "href": "/orgs/1/workloads/00000000-0000-4000-8000-000000000019",
+    "os_type": "linux",
+    "enforcement_mode": "selective",
+    "endpoint": false,
+    "managed": true,
+    "labels": [
+     {
+      "href": "/orgs/1/labels/40",
+      "key": "app",
+      "value": "Illumio"
+     },
+     {
+      "href": "/orgs/1/labels/21",
+      "key": "env",
+      "value": "Server"
+     },
+     {
+      "href": "/orgs/1/labels/145",
+      "key": "loc",
+      "value": "TP"
+     },
+     {
+      "href": "/orgs/1/labels/46",
+      "key": "role",
+      "value": "PCE"
+     },
+     {
+      "href": "/orgs/1/labels/142",
+      "key": "Net",
+      "value": "Server-172.16.15"
+     },
+     {
+      "href": "/orgs/1/labels/244",
+      "key": "os",
+      "value": "Redhat"
+     }
+    ],
+    "sub_labels": []
+   }
+  },
+  "network": {
+   "name": "host-04",
+   "href": "/orgs/1/networks/00000000-0000-4000-8000-000000000003"
+  },
+  "service": {
+   "port": 8443,
+   "proto": 6
+  },
+  "num_connections": 14622,
+  "policy_decision": "potentially_blocked",
+  "boundary_decision": null,
+  "state": "snapshot",
+  "icmp_type": 0,
+  "icmp_code": 0,
+  "flow_direction": "outbound",
+  "dst_bi": 0,
+  "dst_bo": 0,
+  "timestamp_range": {
+   "last_detected": "2026-10-24T06:50:39Z",
+   "first_detected": "2026-10-23T00:00:20Z"
+  },
+  "client_type": "server",
+  "seq_id": 12,
+  "caps": [
+   "write"
+  ],
+  "rules": [],
+  "enforcement_boundaries": [],
+  "override_deny_rules": [],
+  "draft_policy_decision": "potentially_blocked"
+ },
+ {
+  "src": {
+   "ip": "10.0.0.18",
+   "workload": {
+    "hostname": "host-15",
+    "name": null,
+    "href": "/orgs/1/workloads/00000000-0000-4000-8000-000000000013",
+    "os_type": "linux",
+    "enforcement_mode": "visibility_only",
+    "endpoint": false,
+    "managed": true,
+    "labels": [
+     {
+      "href": "/orgs/1/labels/55",
+      "key": "app",
+      "value": "K8sNode"
+     },
+     {
+      "href": "/orgs/1/labels/15",
+      "key": "env",
+      "value": "Kubernetes"
+     },
+     {
+      "href": "/orgs/1/labels/145",
+      "key": "loc",
+      "value": "TP"
+     },
+     {
+      "href": "/orgs/1/labels/56",
+      "key": "role",
+      "value": "Worker"
+     },
+     {
+      "href": "/orgs/1/labels/69",
+      "key": "os",
+      "value": "Ubuntu"
+     }
+    ],
+    "sub_labels": []
+   }
+  },
+  "dst": {
+   "ip": "10.0.0.25",
+   "workload": {
+    "hostname": null,
+    "name": "host-22",
+    "href": "/orgs/1/kubernetes_workloads/00000000-0000-4000-8000-000000000020",
+    "os_type": "unknown",
+    "enforcement_mode": "visibility_only",
+    "endpoint": false,
+    "managed": true,
+    "labels": [
+     {
+      "href": "/orgs/1/labels/240",
+      "key": "app",
+      "value": "onlineboutique"
+     },
+     {
+      "href": "/orgs/1/labels/15",
+      "key": "env",
+      "value": "Kubernetes"
+     },
+     {
+      "href": "/orgs/1/labels/145",
+      "key": "loc",
+      "value": "TP"
+     }
+    ],
+    "sub_labels": []
+   }
+  },
+  "network": {
+   "name": "host-04",
+   "href": "/orgs/1/networks/00000000-0000-4000-8000-000000000003"
+  },
+  "service": {
+   "port": 6379,
+   "proto": 6
+  },
+  "num_connections": 48980,
+  "policy_decision": "potentially_blocked",
+  "boundary_decision": null,
+  "state": "snapshot",
+  "icmp_type": 0,
+  "icmp_code": 0,
+  "flow_direction": "inbound",
+  "dst_bi": 0,
+  "dst_bo": 0,
+  "timestamp_range": {
+   "last_detected": "2026-10-24T06:50:39Z",
+   "first_detected": "2026-10-23T00:00:20Z"
+  },
+  "client_type": "server",
+  "seq_id": 13,
+  "caps": [
+   "write"
+  ],
+  "rules": [],
+  "enforcement_boundaries": [],
+  "override_deny_rules": [],
+  "draft_policy_decision": "potentially_blocked"
+ },
+ {
+  "src": {
+   "ip": "10.0.0.18",
+   "workload": {
+    "hostname": "host-15",
+    "name": null,
+    "href": "/orgs/1/workloads/00000000-0000-4000-8000-000000000013",
+    "os_type": "linux",
+    "enforcement_mode": "visibility_only",
+    "endpoint": false,
+    "managed": true,
+    "labels": [
+     {
+      "href": "/orgs/1/labels/55",
+      "key": "app",
+      "value": "K8sNode"
+     },
+     {
+      "href": "/orgs/1/labels/15",
+      "key": "env",
+      "value": "Kubernetes"
+     },
+     {
+      "href": "/orgs/1/labels/145",
+      "key": "loc",
+      "value": "TP"
+     },
+     {
+      "href": "/orgs/1/labels/56",
+      "key": "role",
+      "value": "Worker"
+     },
+     {
+      "href": "/orgs/1/labels/69",
+      "key": "os",
+      "value": "Ubuntu"
+     }
+    ],
+    "sub_labels": []
+   }
+  },
+  "dst": {
+   "ip": "10.0.0.26",
+   "workload": {
+    "hostname": null,
+    "name": "host-23",
+    "href": "/orgs/1/kubernetes_workloads/00000000-0000-4000-8000-000000000021",
+    "os_type": "unknown",
+    "enforcement_mode": "visibility_only",
+    "endpoint": false,
+    "managed": true,
+    "labels": [
+     {
+      "href": "/orgs/1/labels/240",
+      "key": "app",
+      "value": "onlineboutique"
+     },
+     {
+      "href": "/orgs/1/labels/15",
+      "key": "env",
+      "value": "Kubernetes"
+     },
+     {
+      "href": "/orgs/1/labels/145",
+      "key": "loc",
+      "value": "TP"
+     }
+    ],
+    "sub_labels": []
+   }
+  },
+  "network": {
+   "name": "host-04",
+   "href": "/orgs/1/networks/00000000-0000-4000-8000-000000000003"
+  },
+  "service": {
+   "port": 50051,
+   "proto": 6
+  },
+  "num_connections": 36735,
+  "policy_decision": "potentially_blocked",
+  "boundary_decision": null,
+  "state": "snapshot",
+  "icmp_type": 0,
+  "icmp_code": 0,
+  "flow_direction": "inbound",
+  "dst_bi": 0,
+  "dst_bo": 0,
+  "timestamp_range": {
+   "last_detected": "2026-10-24T06:50:39Z",
+   "first_detected": "2026-10-23T00:00:20Z"
+  },
+  "client_type": "server",
+  "seq_id": 14,
+  "caps": [
+   "write"
+  ],
+  "rules": [],
+  "enforcement_boundaries": [],
+  "override_deny_rules": [],
+  "draft_policy_decision": "potentially_blocked"
+ },
+ {
+  "src": {
+   "ip": "10.0.0.18",
+   "workload": {
+    "hostname": "host-15",
+    "name": null,
+    "href": "/orgs/1/workloads/00000000-0000-4000-8000-000000000013",
+    "os_type": "linux",
+    "enforcement_mode": "visibility_only",
+    "endpoint": false,
+    "managed": true,
+    "labels": [
+     {
+      "href": "/orgs/1/labels/55",
+      "key": "app",
+      "value": "K8sNode"
+     },
+     {
+      "href": "/orgs/1/labels/15",
+      "key": "env",
+      "value": "Kubernetes"
+     },
+     {
+      "href": "/orgs/1/labels/145",
+      "key": "loc",
+      "value": "TP"
+     },
+     {
+      "href": "/orgs/1/labels/56",
+      "key": "role",
+      "value": "Worker"
+     },
+     {
+      "href": "/orgs/1/labels/69",
+      "key": "os",
+      "value": "Ubuntu"
+     }
+    ],
+    "sub_labels": []
+   }
+  },
+  "dst": {
+   "ip": "10.0.0.23",
+   "workload": {
+    "hostname": null,
+    "name": "host-20",
+    "href": "/orgs/1/kubernetes_workloads/00000000-0000-4000-8000-000000000018",
+    "os_type": "unknown",
+    "enforcement_mode": "visibility_only",
+    "endpoint": false,
+    "managed": true,
+    "labels": [
+     {
+      "href": "/orgs/1/labels/40",
+      "key": "app",
+      "value": "Illumio"
+     },
+     {
+      "href": "/orgs/1/labels/15",
+      "key": "env",
+      "value": "Kubernetes"
+     },
+     {
+      "href": "/orgs/1/labels/145",
+      "key": "loc",
+      "value": "TP"
+     }
+    ],
+    "sub_labels": []
+   }
+  },
+  "network": {
+   "name": "host-04",
+   "href": "/orgs/1/networks/00000000-0000-4000-8000-000000000003"
+  },
+  "service": {
+   "port": 8081,
+   "proto": 6
+  },
+  "num_connections": 5936,
+  "policy_decision": "potentially_blocked",
+  "boundary_decision": null,
+  "state": "snapshot",
+  "icmp_type": 0,
+  "icmp_code": 0,
+  "flow_direction": "inbound",
+  "dst_bi": 0,
+  "dst_bo": 0,
+  "timestamp_range": {
+   "last_detected": "2026-10-24T06:50:39Z",
+   "first_detected": "2026-10-23T00:00:20Z"
+  },
+  "client_type": "server",
+  "seq_id": 15,
+  "caps": [
+   "write"
+  ],
+  "rules": [],
+  "enforcement_boundaries": [],
+  "override_deny_rules": [],
+  "draft_policy_decision": "potentially_blocked"
+ },
+ {
+  "src": {
+   "ip": "10.0.0.5",
+   "workload": {
+    "hostname": "host-07",
+    "name": "host-07",
+    "href": "/orgs/1/workloads/00000000-0000-4000-8000-000000000006",
+    "os_type": "linux",
+    "enforcement_mode": "visibility_only",
+    "endpoint": false,
+    "managed": true,
+    "labels": [
+     {
+      "href": "/orgs/1/labels/55",
+      "key": "app",
+      "value": "K8sNode"
+     },
+     {
+      "href": "/orgs/1/labels/15",
+      "key": "env",
+      "value": "Kubernetes"
+     },
+     {
+      "href": "/orgs/1/labels/145",
+      "key": "loc",
+      "value": "TP"
+     },
+     {
+      "href": "/orgs/1/labels/54",
+      "key": "role",
+      "value": "Master"
+     },
+     {
+      "href": "/orgs/1/labels/69",
+      "key": "os",
+      "value": "Ubuntu"
+     }
+    ],
+    "sub_labels": []
+   }
+  },
+  "dst": {
+   "ip": "10.0.0.23",
+   "workload": {
+    "hostname": null,
+    "name": "host-20",
+    "href": "/orgs/1/kubernetes_workloads/00000000-0000-4000-8000-000000000018",
+    "os_type": "unknown",
+    "enforcement_mode": "visibility_only",
+    "endpoint": false,
+    "managed": true,
+    "labels": [
+     {
+      "href": "/orgs/1/labels/40",
+      "key": "app",
+      "value": "Illumio"
+     },
+     {
+      "href": "/orgs/1/labels/15",
+      "key": "env",
+      "value": "Kubernetes"
+     },
+     {
+      "href": "/orgs/1/labels/145",
+      "key": "loc",
+      "value": "TP"
+     }
+    ],
+    "sub_labels": []
+   }
+  },
+  "network": {
+   "name": "host-04",
+   "href": "/orgs/1/networks/00000000-0000-4000-8000-000000000003"
+  },
+  "service": {
+   "port": 9000,
+   "proto": 6
+  },
+  "num_connections": 535,
+  "policy_decision": "potentially_blocked",
+  "boundary_decision": null,
+  "state": "snapshot",
+  "icmp_type": 0,
+  "icmp_code": 0,
+  "flow_direction": "inbound",
+  "dst_bi": 0,
+  "dst_bo": 0,
+  "timestamp_range": {
+   "last_detected": "2026-10-24T06:50:39Z",
+   "first_detected": "2026-10-23T00:03:05Z"
+  },
+  "client_type": "server",
+  "seq_id": 16,
+  "caps": [
+   "write"
+  ],
+  "rules": [],
+  "enforcement_boundaries": [],
+  "override_deny_rules": [],
+  "draft_policy_decision": "potentially_blocked"
+ },
+ {
+  "src": {
+   "ip": "10.0.0.18",
+   "workload": {
+    "hostname": "host-15",
+    "name": null,
+    "href": "/orgs/1/workloads/00000000-0000-4000-8000-000000000013",
+    "os_type": "linux",
+    "enforcement_mode": "visibility_only",
+    "endpoint": false,
+    "managed": true,
+    "labels": [
+     {
+      "href": "/orgs/1/labels/55",
+      "key": "app",
+      "value": "K8sNode"
+     },
+     {
+      "href": "/orgs/1/labels/15",
+      "key": "env",
+      "value": "Kubernetes"
+     },
+     {
+      "href": "/orgs/1/labels/145",
+      "key": "loc",
+      "value": "TP"
+     },
+     {
+      "href": "/orgs/1/labels/56",
+      "key": "role",
+      "value": "Worker"
+     },
+     {
+      "href": "/orgs/1/labels/69",
+      "key": "os",
+      "value": "Ubuntu"
+     }
+    ],
+    "sub_labels": []
+   }
+  },
+  "dst": {
+   "ip": "10.0.0.27",
+   "workload": {
+    "hostname": null,
+    "name": "host-24",
+    "href": "/orgs/1/kubernetes_workloads/00000000-0000-4000-8000-000000000022",
+    "os_type": "unknown",
+    "enforcement_mode": "visibility_only",
+    "endpoint": false,
+    "managed": true,
+    "labels": [
+     {
+      "href": "/orgs/1/labels/240",
+      "key": "app",
+      "value": "onlineboutique"
+     },
+     {
+      "href": "/orgs/1/labels/15",
+      "key": "env",
+      "value": "Kubernetes"
+     },
+     {
+      "href": "/orgs/1/labels/145",
+      "key": "loc",
+      "value": "TP"
+     }
+    ],
+    "sub_labels": []
+   }
+  },
+  "network": {
+   "name": "host-04",
+   "href": "/orgs/1/networks/00000000-0000-4000-8000-000000000003"
+  },
+  "service": {
+   "port": 8080,
+   "proto": 6
+  },
+  "num_connections": 48980,
+  "policy_decision": "potentially_blocked",
+  "boundary_decision": null,
+  "state": "snapshot",
+  "icmp_type": 0,
+  "icmp_code": 0,
+  "flow_direction": "inbound",
+  "dst_bi": 0,
+  "dst_bo": 0,
+  "timestamp_range": {
+   "last_detected": "2026-10-24T06:50:39Z",
+   "first_detected": "2026-10-23T00:00:20Z"
+  },
+  "client_type": "server",
+  "seq_id": 17,
+  "caps": [
+   "write"
+  ],
+  "rules": [],
+  "enforcement_boundaries": [],
+  "override_deny_rules": [],
+  "draft_policy_decision": "potentially_blocked"
+ },
+ {
+  "src": {
+   "ip": "10.0.0.18",
+   "workload": {
+    "hostname": "host-15",
+    "name": null,
+    "href": "/orgs/1/workloads/00000000-0000-4000-8000-000000000013",
+    "os_type": "linux",
+    "enforcement_mode": "visibility_only",
+    "endpoint": false,
+    "managed": true,
+    "labels": [
+     {
+      "href": "/orgs/1/labels/55",
+      "key": "app",
+      "value": "K8sNode"
+     },
+     {
+      "href": "/orgs/1/labels/15",
+      "key": "env",
+      "value": "Kubernetes"
+     },
+     {
+      "href": "/orgs/1/labels/145",
+      "key": "loc",
+      "value": "TP"
+     },
+     {
+      "href": "/orgs/1/labels/56",
+      "key": "role",
+      "value": "Worker"
+     },
+     {
+      "href": "/orgs/1/labels/69",
+      "key": "os",
+      "value": "Ubuntu"
+     }
+    ],
+    "sub_labels": []
+   }
+  },
+  "dst": {
+   "ip": "10.0.0.28",
+   "workload": {
+    "hostname": null,
+    "name": "host-25",
+    "href": "/orgs/1/kubernetes_workloads/00000000-0000-4000-8000-000000000023",
+    "os_type": "unknown",
+    "enforcement_mode": "visibility_only",
+    "endpoint": false,
+    "managed": true,
+    "labels": [
+     {
+      "href": "/orgs/1/labels/240",
+      "key": "app",
+      "value": "onlineboutique"
+     },
+     {
+      "href": "/orgs/1/labels/15",
+      "key": "env",
+      "value": "Kubernetes"
+     },
+     {
+      "href": "/orgs/1/labels/145",
+      "key": "loc",
+      "value": "TP"
+     }
+    ],
+    "sub_labels": []
+   }
+  },
+  "network": {
+   "name": "host-04",
+   "href": "/orgs/1/networks/00000000-0000-4000-8000-000000000003"
+  },
+  "service": {
+   "port": 7070,
+   "proto": 6
+  },
+  "num_connections": 24490,
+  "policy_decision": "potentially_blocked",
+  "boundary_decision": null,
+  "state": "snapshot",
+  "icmp_type": 0,
+  "icmp_code": 0,
+  "flow_direction": "inbound",
+  "dst_bi": 0,
+  "dst_bo": 0,
+  "timestamp_range": {
+   "last_detected": "2026-10-24T06:50:39Z",
+   "first_detected": "2026-10-23T00:00:20Z"
+  },
+  "client_type": "server",
+  "seq_id": 18,
+  "caps": [
+   "write"
+  ],
+  "rules": [],
+  "enforcement_boundaries": [],
+  "override_deny_rules": [],
+  "draft_policy_decision": "potentially_blocked"
+ },
+ {
+  "src": {
+   "ip": "10.0.0.6",
+   "workload": {
+    "hostname": "host-08",
+    "name": null,
+    "href": "/orgs/1/workloads/00000000-0000-4000-8000-000000000007",
+    "os_type": "linux",
+    "enforcement_mode": "visibility_only",
+    "endpoint": false,
+    "managed": true,
+    "labels": [
+     {
+      "href": "/orgs/1/labels/55",
+      "key": "app",
+      "value": "K8sNode"
+     },
+     {
+      "href": "/orgs/1/labels/15",
+      "key": "env",
+      "value": "Kubernetes"
+     },
+     {
+      "href": "/orgs/1/labels/145",
+      "key": "loc",
+      "value": "TP"
+     },
+     {
+      "href": "/orgs/1/labels/56",
+      "key": "role",
+      "value": "Worker"
+     },
+     {
+      "href": "/orgs/1/labels/69",
+      "key": "os",
+      "value": "Ubuntu"
+     }
+    ],
+    "sub_labels": []
+   }
+  },
+  "dst": {
+   "ip": "10.0.0.29",
+   "workload": {
+    "hostname": null,
+    "name": "host-26",
+    "href": "/orgs/1/kubernetes_workloads/00000000-0000-4000-8000-000000000024",
+    "os_type": "unknown",
+    "enforcement_mode": "visibility_only",
+    "endpoint": false,
+    "managed": true,
+    "labels": [
+     {
+      "href": "/orgs/1/labels/240",
+      "key": "app",
+      "value": "onlineboutique"
+     },
+     {
+      "href": "/orgs/1/labels/15",
+      "key": "env",
+      "value": "Kubernetes"
+     },
+     {
+      "href": "/orgs/1/labels/145",
+      "key": "loc",
+      "value": "TP"
+     }
+    ],
+    "sub_labels": []
+   }
+  },
+  "network": {
+   "name": "host-04",
+   "href": "/orgs/1/networks/00000000-0000-4000-8000-000000000003"
+  },
+  "service": {
+   "port": 7000,
+   "proto": 6
+  },
+  "num_connections": 24490,
+  "policy_decision": "potentially_blocked",
+  "boundary_decision": null,
+  "state": "snapshot",
+  "icmp_type": 0,
+  "icmp_code": 0,
+  "flow_direction": "inbound",
+  "dst_bi": 0,
+  "dst_bo": 0,
+  "timestamp_range": {
+   "last_detected": "2026-10-24T06:50:36Z",
+   "first_detected": "2026-10-23T00:00:17Z"
+  },
+  "client_type": "server",
+  "seq_id": 19,
+  "caps": [
+   "write"
+  ],
+  "rules": [],
+  "enforcement_boundaries": [],
+  "override_deny_rules": [],
+  "draft_policy_decision": "potentially_blocked"
+ },
+ {
+  "src": {
+   "ip": "10.0.0.6",
+   "workload": {
+    "hostname": "host-08",
+    "name": null,
+    "href": "/orgs/1/workloads/00000000-0000-4000-8000-000000000007",
+    "os_type": "linux",
+    "enforcement_mode": "visibility_only",
+    "endpoint": false,
+    "managed": true,
+    "labels": [
+     {
+      "href": "/orgs/1/labels/55",
+      "key": "app",
+      "value": "K8sNode"
+     },
+     {
+      "href": "/orgs/1/labels/15",
+      "key": "env",
+      "value": "Kubernetes"
+     },
+     {
+      "href": "/orgs/1/labels/145",
+      "key": "loc",
+      "value": "TP"
+     },
+     {
+      "href": "/orgs/1/labels/56",
+      "key": "role",
+      "value": "Worker"
+     },
+     {
+      "href": "/orgs/1/labels/69",
+      "key": "os",
+      "value": "Ubuntu"
+     }
+    ],
+    "sub_labels": []
+   }
+  },
+  "dst": {
+   "ip": "10.0.0.30",
+   "workload": {
+    "hostname": null,
+    "name": "host-27",
+    "href": "/orgs/1/kubernetes_workloads/00000000-0000-4000-8000-000000000025",
+    "os_type": "unknown",
+    "enforcement_mode": "visibility_only",
+    "endpoint": false,
+    "managed": true,
+    "labels": [
+     {
+      "href": "/orgs/1/labels/240",
+      "key": "app",
+      "value": "onlineboutique"
+     },
+     {
+      "href": "/orgs/1/labels/15",
+      "key": "env",
+      "value": "Kubernetes"
+     },
+     {
+      "href": "/orgs/1/labels/145",
+      "key": "loc",
+      "value": "TP"
+     }
+    ],
+    "sub_labels": []
+   }
+  },
+  "network": {
+   "name": "host-04",
+   "href": "/orgs/1/networks/00000000-0000-4000-8000-000000000003"
+  },
+  "service": {
+   "port": 5050,
+   "proto": 6
+  },
+  "num_connections": 24490,
+  "policy_decision": "potentially_blocked",
+  "boundary_decision": null,
+  "state": "snapshot",
+  "icmp_type": 0,
+  "icmp_code": 0,
+  "flow_direction": "inbound",
+  "dst_bi": 0,
+  "dst_bo": 0,
+  "timestamp_range": {
+   "last_detected": "2026-10-24T06:50:36Z",
+   "first_detected": "2026-10-23T00:00:17Z"
+  },
+  "client_type": "server",
+  "seq_id": 20,
+  "caps": [
+   "write"
+  ],
+  "rules": [],
+  "enforcement_boundaries": [],
+  "override_deny_rules": [],
+  "draft_policy_decision": "potentially_blocked"
+ },
+ {
+  "src": {
+   "ip": "10.0.0.3",
+   "workload": {
+    "hostname": "host-05",
+    "name": "host-05",
+    "href": "/orgs/1/workloads/00000000-0000-4000-8000-000000000004",
+    "os_type": "linux",
+    "enforcement_mode": "selective",
+    "endpoint": true,
+    "managed": true,
+    "labels": [
+     {
+      "href": "/orgs/1/labels/72",
+      "key": "app",
+      "value": "Endpoint"
+     },
+     {
+      "href": "/orgs/1/labels/248",
+      "key": "env",
+      "value": "WIFI"
+     },
+     {
+      "href": "/orgs/1/labels/145",
+      "key": "loc",
+      "value": "TP"
+     },
+     {
+      "href": "/orgs/1/labels/135",
+      "key": "role",
+      "value": "MAC"
+     }
+    ],
+    "sub_labels": []
+   }
+  },
+  "dst": {
+   "ip": "10.0.0.31",
+   "fqdn": null,
+   "ip_lists": [
+    {
+     "name": "host-11",
+     "href": "/orgs/1/sec_policy/draft/ip_lists/108",
+     "size": 4278059008,
+     "rules": [],
+     "enforcement_boundaries": [],
+     "override_deny_rules": []
+    }
+   ]
+  },
+  "network": {
+   "name": "host-04",
+   "href": "/orgs/1/networks/00000000-0000-4000-8000-000000000003"
+  },
+  "service": {
+   "port": 443,
+   "proto": 6,
+   "user_name": "root"
+  },
+  "num_connections": 312,
+  "policy_decision": "potentially_blocked",
+  "state": "timed out",
+  "flow_direction": "outbound",
+  "dst_bi": 0,
+  "dst_bo": 0,
+  "timestamp_range": {
+   "last_detected": "2026-10-24T06:50:36Z",
+   "first_detected": "2026-10-23T00:00:37Z"
+  },
+  "client_type": "endpoint",
+  "seq_id": 21,
+  "caps": [
+   "write"
+  ],
+  "rules": [],
+  "enforcement_boundaries": [],
+  "override_deny_rules": [],
+  "draft_policy_decision": "potentially_blocked"
+ },
+ {
+  "src": {
+   "ip": "10.0.0.6",
+   "workload": {
+    "hostname": "host-08",
+    "name": null,
+    "href": "/orgs/1/workloads/00000000-0000-4000-8000-000000000007",
+    "os_type": "linux",
+    "enforcement_mode": "visibility_only",
+    "endpoint": false,
+    "managed": true,
+    "labels": [
+     {
+      "href": "/orgs/1/labels/55",
+      "key": "app",
+      "value": "K8sNode"
+     },
+     {
+      "href": "/orgs/1/labels/15",
+      "key": "env",
+      "value": "Kubernetes"
+     },
+     {
+      "href": "/orgs/1/labels/145",
+      "key": "loc",
+      "value": "TP"
+     },
+     {
+      "href": "/orgs/1/labels/56",
+      "key": "role",
+      "value": "Worker"
+     },
+     {
+      "href": "/orgs/1/labels/69",
+      "key": "os",
+      "value": "Ubuntu"
+     }
+    ],
+    "sub_labels": []
+   }
+  },
+  "dst": {
+   "ip": "10.0.0.32",
+   "workload": {
+    "hostname": null,
+    "name": "host-28",
+    "href": "/orgs/1/kubernetes_workloads/00000000-0000-4000-8000-000000000026",
+    "os_type": "unknown",
+    "enforcement_mode": "visibility_only",
+    "endpoint": false,
+    "managed": true,
+    "labels": [
+     {
+      "href": "/orgs/1/labels/240",
+      "key": "app",
+      "value": "onlineboutique"
+     },
+     {
+      "href": "/orgs/1/labels/15",
+      "key": "env",
+      "value": "Kubernetes"
+     },
+     {
+      "href": "/orgs/1/labels/145",
+      "key": "loc",
+      "value": "TP"
+     }
+    ],
+    "sub_labels": []
+   }
+  },
+  "network": {
+   "name": "host-04",
+   "href": "/orgs/1/networks/00000000-0000-4000-8000-000000000003"
+  },
+  "service": {
+   "port": 8080,
+   "proto": 6
+  },
+  "num_connections": 24490,
+  "policy_decision": "potentially_blocked",
+  "boundary_decision": null,
+  "state": "snapshot",
+  "icmp_type": 0,
+  "icmp_code": 0,
+  "flow_direction": "inbound",
+  "dst_bi": 0,
+  "dst_bo": 0,
+  "timestamp_range": {
+   "last_detected": "2026-10-24T06:50:36Z",
+   "first_detected": "2026-10-23T00:00:17Z"
+  },
+  "client_type": "server",
+  "seq_id": 22,
+  "caps": [
+   "write"
+  ],
+  "rules": [],
+  "enforcement_boundaries": [],
+  "override_deny_rules": [],
+  "draft_policy_decision": "potentially_blocked"
+ },
+ {
+  "src": {
+   "ip": "10.0.0.23",
+   "workload": {
+    "hostname": null,
+    "name": "host-20",
+    "href": "/orgs/1/kubernetes_workloads/00000000-0000-4000-8000-000000000018",
+    "os_type": "unknown",
+    "enforcement_mode": "visibility_only",
+    "endpoint": false,
+    "managed": true,
+    "labels": [
+     {
+      "href": "/orgs/1/labels/40",
+      "key": "app",
+      "value": "Illumio"
+     },
+     {
+      "href": "/orgs/1/labels/15",
+      "key": "env",
+      "value": "Kubernetes"
+     },
+     {
+      "href": "/orgs/1/labels/145",
+      "key": "loc",
+      "value": "TP"
+     }
+    ],
+    "sub_labels": []
+   }
+  },
+  "dst": {
+   "ip": "10.0.0.33",
+   "workload": {
+    "hostname": null,
+    "name": "host-29",
+    "href": "/orgs/1/kubernetes_workloads/00000000-0000-4000-8000-000000000027",
+    "os_type": "unknown",
+    "enforcement_mode": "visibility_only",
+    "endpoint": false,
+    "managed": true,
+    "labels": [
+     {
+      "href": "/orgs/1/labels/42",
+      "key": "app",
+      "value": "KubeSystem"
+     },
+     {
+      "href": "/orgs/1/labels/15",
+      "key": "env",
+      "value": "Kubernetes"
+     },
+     {
+      "href": "/orgs/1/labels/145",
+      "key": "loc",
+      "value": "TP"
+     }
+    ],
+    "sub_labels": []
+   }
+  },
+  "network": {
+   "name": "host-30",
+   "href": "/orgs/1/networks/00000000-0000-4000-8000-000000000028"
+  },
+  "service": {
+   "port": 53,
+   "proto": 17
+  },
+  "num_connections": 149861,
+  "policy_decision": "potentially_blocked",
+  "boundary_decision": null,
+  "state": "snapshot",
+  "icmp_type": 0,
+  "icmp_code": 0,
+  "flow_direction": "outbound",
+  "dst_bi": 0,
+  "dst_bo": 0,
+  "timestamp_range": {
+   "last_detected": "2026-10-24T06:50:35Z",
+   "first_detected": "2026-10-23T00:00:20Z"
+  },
+  "client_type": "server",
+  "seq_id": 23,
+  "caps": [
+   "write"
+  ],
+  "rules": [],
+  "enforcement_boundaries": [],
+  "override_deny_rules": [],
+  "draft_policy_decision": "potentially_blocked"
+ },
+ {
+  "src": {
+   "ip": "10.0.0.32",
+   "workload": {
+    "hostname": null,
+    "name": "host-28",
+    "href": "/orgs/1/kubernetes_workloads/00000000-0000-4000-8000-000000000026",
+    "os_type": "unknown",
+    "enforcement_mode": "visibility_only",
+    "endpoint": false,
+    "managed": true,
+    "labels": [
+     {
+      "href": "/orgs/1/labels/240",
+      "key": "app",
+      "value": "onlineboutique"
+     },
+     {
+      "href": "/orgs/1/labels/15",
+      "key": "env",
+      "value": "Kubernetes"
+     },
+     {
+      "href": "/orgs/1/labels/145",
+      "key": "loc",
+      "value": "TP"
+     }
+    ],
+    "sub_labels": []
+   }
+  },
+  "dst": {
+   "ip": "10.0.0.33",
+   "workload": {
+    "hostname": null,
+    "name": "host-29",
+    "href": "/orgs/1/kubernetes_workloads/00000000-0000-4000-8000-000000000027",
+    "os_type": "unknown",
+    "enforcement_mode": "visibility_only",
+    "endpoint": false,
+    "managed": true,
+    "labels": [
+     {
+      "href": "/orgs/1/labels/42",
+      "key": "app",
+      "value": "KubeSystem"
+     },
+     {
+      "href": "/orgs/1/labels/15",
+      "key": "env",
+      "value": "Kubernetes"
+     },
+     {
+      "href": "/orgs/1/labels/145",
+      "key": "loc",
+      "value": "TP"
+     }
+    ],
+    "sub_labels": []
+   }
+  },
+  "network": {
+   "name": "host-30",
+   "href": "/orgs/1/networks/00000000-0000-4000-8000-000000000028"
+  },
+  "service": {
+   "port": 53,
+   "proto": 17
+  },
+  "num_connections": 69302,
+  "policy_decision": "potentially_blocked",
+  "boundary_decision": null,
+  "state": "snapshot",
+  "icmp_type": 0,
+  "icmp_code": 0,
+  "flow_direction": "outbound",
+  "dst_bi": 0,
+  "dst_bo": 0,
+  "timestamp_range": {
+   "last_detected": "2026-10-24T06:50:34Z",
+   "first_detected": "2026-10-23T00:00:14Z"
+  },
+  "client_type": "server",
+  "seq_id": 24,
+  "caps": [
+   "write"
+  ],
+  "rules": [],
+  "enforcement_boundaries": [],
+  "override_deny_rules": [],
+  "draft_policy_decision": "potentially_blocked"
+ }
+]

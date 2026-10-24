@@ -367,6 +367,10 @@ export const VALUES = {
     "traffic",
     "volume"
   ],
+  "DataOrigin": [
+    "backfill",
+    "ingest"
+  ],
   "DeploymentType": [
     "on_prem",
     "saas"
@@ -381,6 +385,17 @@ export const VALUES = {
     "potentially_blocked_by_boundary",
     "potentially_blocked_by_override_deny",
     "unknown"
+  ],
+  "FlowDirection": [
+    "inbound",
+    "outbound"
+  ],
+  "IngestSource": [
+    "backfill",
+    "events",
+    "inventory",
+    "ransomware",
+    "traffic"
   ],
   "Language": [
     "en",
@@ -401,5 +416,15 @@ export const VALUES = {
     "allow",
     "deny",
     "override_deny"
+  ],
+  "TamperClassification": [
+    "confirmed",
+    "signal"
+  ],
+  "VisibilityLevel": [
+    "enhanced_data_collection",
+    "flow_drops",
+    "flow_off",
+    "flow_summary"
   ]
 } as const;

@@ -46,6 +46,53 @@ class ProbeName(StrEnum):
     NODE_AVAILABLE = "node_available"
 
 
+class FlowDirection(StrEnum):
+    """Which VEN reported the flow: outbound = the initiating side, inbound = the serving side."""
+    INBOUND = "inbound"
+    OUTBOUND = "outbound"
+
+
+class VisibilityLevel(StrEnum):
+    FLOW_SUMMARY = "flow_summary"
+    ENHANCED_DATA_COLLECTION = "enhanced_data_collection"
+    FLOW_DROPS = "flow_drops"
+    FLOW_OFF = "flow_off"
+
+
+class TamperClassification(StrEnum):
+    CONFIRMED = "confirmed"
+    SIGNAL = "signal"
+
+
+class IngestSource(StrEnum):
+    TRAFFIC = "traffic"
+    EVENTS = "events"
+    INVENTORY = "inventory"
+    RANSOMWARE = "ransomware"
+    BACKFILL = "backfill"
+
+
+class DataOrigin(StrEnum):
+    INGEST = "ingest"
+    BACKFILL = "backfill"
+
+
+# REST API guide: flow_summary records allowed, blocked and potentially blocked connections;
+# flow_drops only blocked and potentially blocked; flow_off nothing. Enhanced data collection
+# adds byte counts on top of flow_summary. Anything else is unknown, never guessed.
+_SEES_ALLOWED: dict[str, bool] = {
+    VisibilityLevel.FLOW_SUMMARY: True,
+    VisibilityLevel.ENHANCED_DATA_COLLECTION: True,
+    VisibilityLevel.FLOW_DROPS: False,
+    VisibilityLevel.FLOW_OFF: False,
+}
+
+
+def visibility_sees_allowed(level: str | None) -> bool | None:
+    """Whether a VEN at this visibility level reports allowed traffic (None = unknown level)."""
+    return _SEES_ALLOWED.get(level) if level is not None else None
+
+
 # Draft policy decision is an OPEN domain: the PCE adds values (boundary and
 # override-deny variants arrived after the base four), and neither the REST
 # API guide nor the schema lists them all. Unknown values pass through
@@ -71,6 +118,7 @@ def parse_draft_policy_decision(raw: str) -> str:
 
 _ENUMS: tuple[type[StrEnum], ...] = (
     PolicyDecision, RuleAction, AlertRuleType, DeploymentType, Language, ProbeName,
+    FlowDirection, VisibilityLevel, TamperClassification, IngestSource, DataOrigin,
 )
 
 

@@ -167,6 +167,7 @@ CREATE TABLE workloads (
     visibility_level TEXT,
     os_id            TEXT,
     ven_version      TEXT,
+    ven_href         TEXT,               -- joins agent events (created_by.ven) to the host
     label_set        INTEGER REFERENCES label_sets(id),
     online           INTEGER,
     risk_exposure    TEXT,
@@ -174,6 +175,7 @@ CREATE TABLE workloads (
     risk_updated_at  TEXT,
     fetched_at       TEXT NOT NULL
 );
+CREATE INDEX ix_workloads_ven ON workloads (ven_href);
 CREATE TABLE workload_snapshot_daily (
     day              TEXT NOT NULL,
     href             TEXT NOT NULL,
