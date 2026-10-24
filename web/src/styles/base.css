@@ -145,3 +145,10 @@ button:disabled { cursor: progress; opacity: .7; }
   .topbar { padding: 0 var(--space-5); }
   .probe-row { grid-template-columns: 1fr; gap: var(--space-2); }
 }
+
+.table-wrap { overflow-x: auto; padding: 0; }
+.table { width: 100%; border-collapse: collapse; font-size: var(--fs-body); }
+.table th, .table td { text-align: left; padding: var(--space-4) var(--space-6); border-bottom: 1px solid var(--line-soft); vertical-align: top; }
+.table th { font-size: var(--fs-micro); text-transform: uppercase; letter-spacing: .04em; color: var(--text-3); font-weight: 600; }
+.badge { display: inline-block; padding: 0 var(--space-4); border-radius: var(--radius-s); background: var(--fill); color: var(--ink); border: 1px solid var(--mark); font-size: var(--fs-mini); }
+.wrap { overflow-wrap: anywhere; max-width: 48ch; }

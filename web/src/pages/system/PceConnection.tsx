@@ -1,8 +1,9 @@
 import { type FormEvent, useCallback, useEffect, useState } from "react";
 
 import { type ApiError, call } from "../../api/client";
-import type { PceConnection as Conn, ProbeItem, ProbeRun } from "../../api/generated";
-import { t, useLang } from "../../i18n";
+import type { PceConnection as Conn, ProbeRun } from "../../api/generated";
+import { ProbeResults } from "../../components/ProbeResults";
+import { t } from "../../i18n";
 import { registerNav } from "../../shell/nav";
 
 type TlsMode = "system" | "bundle" | "off";
@@ -17,12 +18,6 @@ interface Form {
   tls: TlsMode;
   ca_path: string;
 }
-
-const PROBE_LABEL_KEYS: Record<ProbeItem["name"], string> = {
-  noop: "probe_name_noop",
-  health: "probe_name_health",
-  node_available: "probe_name_node_available",
-};
 
 function toForm(c: Conn): Form {
   const tls: TlsMode = typeof c.verify_tls === "string" ? "bundle" : c.verify_tls ? "system" : "off";
@@ -47,25 +42,6 @@ function fieldOf(error: ApiError | null): string | null {
 function FieldError({ name, error }: { name: string; error: ApiError | null }) {
   if (fieldOf(error) !== name || !error) return null;
   return <span className="field-error">{t(error.message_key, error.params)}</span>;
-}
-
-function ProbeResults({ run }: { run: ProbeRun | null }) {
-  const lang = useLang();
-  if (!run) return <p className="muted">{t("home_pce_not_checked")}</p>;
-  const time = new Date(run.checked_at).toLocaleString(lang === "zh_TW" ? "zh-TW" : "en");
-  return (
-    <div className="probe-results">
-      <p className="muted">{t("probe_last_check", { time })}</p>
-      <ul className="probe-list">
-        {run.results.map((r) => (
-          <li key={r.name} data-tone={r.ok ? "ok" : "crit"} className="probe-row">
-            <span className="probe-name">{t(PROBE_LABEL_KEYS[r.name])}</span>
-            <span className="probe-detail">{t(r.detail_key, { status: r.category })}</span>
-          </li>
-        ))}
-      </ul>
-    </div>
-  );
 }
 
 export function PceConnection() {
@@ -221,7 +197,7 @@ export function PceConnection() {
       </form>
       <div className="card">
         <h2>{t("probe_results_title")}</h2>
-        <ProbeResults run={run} />
+        <ProbeResults checkedAt={run?.checked_at ?? null} results={run?.results ?? []} />
       </div>
     </section>
   );

@@ -2,14 +2,14 @@
 /* eslint-disable */
 /**
  * This interface was referenced by `ContractRoot`'s JSON-Schema
- * via the `definition` "DeploymentType".
- */
-export type DeploymentType = ("on_prem" | "saas")
-/**
- * This interface was referenced by `ContractRoot`'s JSON-Schema
  * via the `definition` "ProbeName".
  */
 export type ProbeName = ("noop" | "health" | "node_available")
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "DeploymentType".
+ */
+export type DeploymentType = ("on_prem" | "saas")
 
 /**
  * This interface was referenced by `ContractRoot`'s JSON-Schema
@@ -61,10 +61,58 @@ old_password?: (string | null)
 }
 /**
  * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "PceSummary".
+ */
+export interface PceSummary {
+checked_at: string
+results: ProbeItem[]
+stale: boolean
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "ProbeItem".
+ */
+export interface ProbeItem {
+category: string
+detail_key: string
+name: ProbeName
+ok: boolean
+status: (number | null)
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "HomeSummary".
+ */
+export interface HomeSummary {
+pce: (PceSummary | null)
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
  * via the `definition` "Dictionary".
  */
 export interface Dictionary {
 [k: string]: string
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "JobView".
+ */
+export interface JobView {
+failures: number
+interval_seconds: (number | null)
+job_id: string
+last_error: (string | null)
+last_finished_at: (string | null)
+last_ok: (boolean | null)
+last_started_at: (string | null)
+runs: number
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "JobList".
+ */
+export interface JobList {
+jobs: JobView[]
 }
 /**
  * This interface was referenced by `ContractRoot`'s JSON-Schema
@@ -79,17 +127,6 @@ org_id: string
 revision: number
 url: string
 verify_tls: (boolean | string)
-}
-/**
- * This interface was referenced by `ContractRoot`'s JSON-Schema
- * via the `definition` "ProbeItem".
- */
-export interface ProbeItem {
-category: string
-detail_key: string
-name: ProbeName
-ok: boolean
-status: (number | null)
 }
 /**
  * This interface was referenced by `ContractRoot`'s JSON-Schema
@@ -121,7 +158,7 @@ url: string
 verify_tls: (boolean | string)
 }
 
-export type OpId = "auth.csrf" | "auth.login" | "auth.logout" | "auth.me" | "auth.password" | "i18n.dictionary" | "system.pce.get" | "system.pce.latest" | "system.pce.probe" | "system.pce.update";
+export type OpId = "auth.csrf" | "auth.login" | "auth.logout" | "auth.me" | "auth.password" | "home.summary" | "i18n.dictionary" | "system.jobs.list" | "system.pce.get" | "system.pce.latest" | "system.pce.probe" | "system.pce.update";
 
 export interface Requests {
   "auth.csrf": undefined;
@@ -129,7 +166,9 @@ export interface Requests {
   "auth.logout": undefined;
   "auth.me": undefined;
   "auth.password": PasswordChangeRequest;
+  "home.summary": undefined;
   "i18n.dictionary": undefined;
+  "system.jobs.list": undefined;
   "system.pce.get": undefined;
   "system.pce.latest": undefined;
   "system.pce.probe": undefined;
@@ -142,7 +181,9 @@ export interface Responses {
   "auth.logout": Empty;
   "auth.me": Me;
   "auth.password": CsrfToken;
+  "home.summary": HomeSummary;
   "i18n.dictionary": Dictionary;
+  "system.jobs.list": JobList;
   "system.pce.get": PceConnection;
   "system.pce.latest": LatestProbe;
   "system.pce.probe": ProbeRun;
@@ -155,7 +196,9 @@ export const OPERATIONS = {
   "auth.logout": { method: "POST", path: "/api/auth/logout" },
   "auth.me": { method: "GET", path: "/api/auth/me" },
   "auth.password": { method: "POST", path: "/api/auth/password" },
+  "home.summary": { method: "GET", path: "/api/home/summary" },
   "i18n.dictionary": { method: "GET", path: "/api/i18n/<lang>" },
+  "system.jobs.list": { method: "GET", path: "/api/system/jobs" },
   "system.pce.get": { method: "GET", path: "/api/system/pce" },
   "system.pce.latest": { method: "GET", path: "/api/system/pce/latest" },
   "system.pce.probe": { method: "POST", path: "/api/system/pce/probe" },
