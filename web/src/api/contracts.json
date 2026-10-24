@@ -370,6 +370,16 @@
             "title": "ArchiveSettings",
             "type": "object"
           },
+          "CollectionMode": {
+            "description": "What data collection reads (spec §6.4): everything; events plus short-lived traffic for\nalerts; or events only.",
+            "enum": [
+              "full",
+              "alert",
+              "events_only"
+            ],
+            "title": "CollectionMode",
+            "type": "string"
+          },
           "CollectionSettings": {
             "additionalProperties": false,
             "properties": {
@@ -403,6 +413,10 @@
                 "minimum": 900,
                 "title": "Inventory Interval Seconds",
                 "type": "integer"
+              },
+              "mode": {
+                "$ref": "#/$defs/CollectionMode",
+                "default": "full"
               },
               "rate_limit_per_minute": {
                 "maximum": 1000,
@@ -539,6 +553,10 @@
           },
           "SourceStatus": {
             "properties": {
+              "collected": {
+                "title": "Collected",
+                "type": "boolean"
+              },
               "consecutive_failures": {
                 "title": "Consecutive Failures",
                 "type": "integer"
@@ -645,6 +663,7 @@
             },
             "required": [
               "source",
+              "collected",
               "interval_seconds",
               "last_started_at",
               "last_ok_at",
@@ -695,6 +714,10 @@
             "title": "Enabled",
             "type": "boolean"
           },
+          "mode": {
+            "title": "Mode",
+            "type": "string"
+          },
           "open_gap_counts": {
             "additionalProperties": {
               "type": "integer"
@@ -734,6 +757,7 @@
         },
         "required": [
           "enabled",
+          "mode",
           "pce_configured",
           "binding_host",
           "sources",
@@ -776,6 +800,16 @@
             "title": "ArchiveSettings",
             "type": "object"
           },
+          "CollectionMode": {
+            "description": "What data collection reads (spec §6.4): everything; events plus short-lived traffic for\nalerts; or events only.",
+            "enum": [
+              "full",
+              "alert",
+              "events_only"
+            ],
+            "title": "CollectionMode",
+            "type": "string"
+          },
           "CollectionSettings": {
             "additionalProperties": false,
             "properties": {
@@ -809,6 +843,10 @@
                 "minimum": 900,
                 "title": "Inventory Interval Seconds",
                 "type": "integer"
+              },
+              "mode": {
+                "$ref": "#/$defs/CollectionMode",
+                "default": "full"
               },
               "rate_limit_per_minute": {
                 "maximum": 1000,
@@ -917,6 +955,16 @@
             "title": "ArchiveSettings",
             "type": "object"
           },
+          "CollectionMode": {
+            "description": "What data collection reads (spec §6.4): everything; events plus short-lived traffic for\nalerts; or events only.",
+            "enum": [
+              "full",
+              "alert",
+              "events_only"
+            ],
+            "title": "CollectionMode",
+            "type": "string"
+          },
           "CollectionSettings": {
             "additionalProperties": false,
             "properties": {
@@ -950,6 +998,10 @@
                 "minimum": 900,
                 "title": "Inventory Interval Seconds",
                 "type": "integer"
+              },
+              "mode": {
+                "$ref": "#/$defs/CollectionMode",
+                "default": "full"
               },
               "rate_limit_per_minute": {
                 "maximum": 1000,
@@ -2627,6 +2679,11 @@
       "supported",
       "unknown",
       "unsupported"
+    ],
+    "CollectionMode": [
+      "alert",
+      "events_only",
+      "full"
     ],
     "DataOrigin": [
       "backfill",

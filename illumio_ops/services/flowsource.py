@@ -34,6 +34,7 @@ from illumio_ops.domain.identity import endpoint_key
 from illumio_ops.domain.values import FlowDirection, IngestSource
 from illumio_ops.pce.async_query import run_traffic_query
 from illumio_ops.pce.client import PceNotConfigured
+from illumio_ops.services.collect.mode import collects
 from illumio_ops.services.collect.traffic import PCE_FAILURES
 from illumio_ops.services.context import AppContext
 from illumio_ops.services.coverage import (
@@ -182,11 +183,13 @@ def _live_rows(conn: Any, spec: FilterSpec, fetched: list[FlowRecord]) -> list[F
 def query_flows(ctx: AppContext, spec: FilterSpec, *, limit: int, order: Order,
                 fill_gaps: bool = False, now: datetime | None = None) -> FlowQuery:
     at = (now or datetime.now(UTC)).astimezone(UTC)
-    floor = at - timedelta(days=ctx.settings.current().collection.retention.flow_days)
+    settings = ctx.settings.current()
+    floor = at - timedelta(days=settings.collection.retention.flow_days)
     with ctx.flows().connect() as conn:
         for name, fn in sql_functions().items():
             conn.create_function(name, -1, fn, deterministic=True)
-        cov = store_coverage(conn, IngestSource.TRAFFIC, (spec.start, spec.end), floor=floor)
+        cov = store_coverage(conn, IngestSource.TRAFFIC, (spec.start, spec.end), floor=floor,
+                             collected=collects(settings, IngestSource.TRAFFIC))
         where, params = to_sql(spec)
         db_rows = conn.execute(f"SELECT {_COLUMNS} FROM flows f WHERE {where} ORDER BY {_ORDER_SQL[order]} LIMIT ?",
                                [*params, limit + 1]).fetchall()

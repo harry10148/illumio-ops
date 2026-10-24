@@ -212,7 +212,9 @@ CARRY: dict[Path_, _Carry] = {
                                  lambda v: v.logging.level.upper() if v.logging.level.upper() in LOG_LEVELS else "INFO",
                                  "migrate_5x_effective_value"),
     # pce_cache: applied only when the 5.x file has the section (never configured → v6 defaults)
-    ("pce_cache", "enabled"): _Carry("collection.enabled", lambda v: v.pce_cache.enabled),
+    ("pce_cache", "enabled"): _Carry("collection.mode", lambda v: "full" if v.pce_cache.enabled else "events_only",
+                                     lambda v: "migrate_cache_on_full" if v.pce_cache.enabled
+                                     else "migrate_cache_off_events_only"),
     ("pce_cache", "traffic_poll_interval_seconds"): _Carry("collection.traffic_interval_seconds", _traffic_interval,
                                                            _traffic_interval_reason),
     ("pce_cache", "events_poll_interval_seconds"): _Carry(
@@ -291,6 +293,8 @@ def migrate_v5(raw: dict[str, Any]) -> MigrationResult:
         if path[0] == "pce_cache" and not isinstance(raw.get("pce_cache"), dict):
             continue
         _set(out, carry.target, carry.convert(v5))
+    if not isinstance(raw.get("pce_cache"), dict):
+        out["collection"]["mode"] = "events_only"  # 5.x without the section kept no traffic (spec §7)
 
     for path in leaf_paths(raw):
         source = show(path)

@@ -1,7 +1,7 @@
 import { type FormEvent, useCallback, useEffect, useState } from "react";
 
 import { type ApiError, call } from "../../api/client";
-import type { CollectionSettings, CollectionStatus, SourceStatus } from "../../api/generated";
+import type { CollectionMode, CollectionSettings, CollectionStatus, SourceStatus } from "../../api/generated";
 import { formatTime } from "../../components/ProbeResults";
 import { t, useLang } from "../../i18n";
 import { registerNav } from "../../shell/nav";
@@ -31,6 +31,11 @@ const CAP_KEYS: Record<string, string> = {
   tamper_signal: "cap_tamper_signal",
   draft_recompute: "cap_draft_recompute",
 };
+const MODES: { value: CollectionMode; labelKey: string; hintKey: string }[] = [
+  { value: "full", labelKey: "mode_full", hintKey: "mode_full_hint" },
+  { value: "alert", labelKey: "mode_alert", hintKey: "mode_alert_hint" },
+  { value: "events_only", labelKey: "mode_events_only", hintKey: "mode_events_only_hint" },
+];
 const CAP_STATE_KEYS: Record<string, string> = {
   supported: "cap_state_supported",
   unsupported: "cap_state_unsupported",
@@ -61,6 +66,7 @@ function bytes(n: number): string {
 }
 
 function sourceLine(s: SourceStatus): { tone: string; text: string } {
+  if (!s.collected) return { tone: "neutral", text: t("collection_not_in_mode") };
   if (s.consecutive_failures > 0) {
     const reason = label(REASON_KEYS, s.last_error_reason ?? "other");
     return { tone: "crit", text: t("collection_failing", { n: String(s.consecutive_failures), reason }) };
@@ -72,6 +78,7 @@ function sourceLine(s: SourceStatus): { tone: string; text: string } {
 
 interface Form {
   enabled: boolean;
+  mode: CollectionMode;
   traffic_min: string;
   events_min: string;
   inventory_min: string;
@@ -89,6 +96,7 @@ interface Form {
 function toForm(c: CollectionSettings): Form {
   return {
     enabled: c.enabled,
+    mode: c.mode ?? "full",
     traffic_min: String(c.traffic_interval_seconds / 60),
     events_min: String(c.events_interval_seconds / 60),
     inventory_min: String(c.inventory_interval_seconds / 60),
@@ -108,6 +116,7 @@ function fromForm(f: Form): CollectionSettings {
   const n = (v: string) => Number(v.trim());
   return {
     enabled: f.enabled,
+    mode: f.mode,
     traffic_interval_seconds: Math.round(n(f.traffic_min) * 60),
     events_interval_seconds: Math.round(n(f.events_min) * 60),
     inventory_interval_seconds: Math.round(n(f.inventory_min) * 60),
@@ -122,7 +131,7 @@ function fromForm(f: Form): CollectionSettings {
 /** The two rules that span several fields are explained in words, not as "some fields are not valid". */
 function settingsError(e: ApiError): string {
   if (e.field === "settings.retention") return t("err_retention_order");
-  if (e.field === "settings") return t("err_archive_retention_short");
+  if (e.field === "settings.archive") return t("err_archive_retention_short");
   return t(e.message_key, e.params);
 }
 
@@ -194,6 +203,18 @@ export function Collection() {
       setBackfillError(env.error);
     }
   }
+
+  /** A mode brings its suggested retention with it; the operator can still change the numbers. */
+  const chooseMode = (mode: CollectionMode) => {
+    if (!form) return;
+    const next = { ...form, mode };
+    if (mode === "alert") Object.assign(next, { flow_days: "3", rollup_days: "3" });
+    if (mode === "full" && Number(form.flow_days) < Number(form.baseline_days)) {
+      Object.assign(next, { flow_days: "35", rollup_days: String(Math.max(180, Number(form.rollup_days) || 0)) });
+    }
+    setForm(next);
+    setSaved(false);
+  };
 
   const num = (key: keyof Form, text: string) => (
     <label>
@@ -288,6 +309,13 @@ export function Collection() {
           <label className="check">
             <input type="checkbox" name="enabled" checked={form.enabled} onChange={(e) => set("enabled", e.target.checked)} />
             {t("collection_enabled")}
+          </label>
+          <label className="span-all">
+            {t("collection_mode")}
+            <select name="mode" value={form.mode} onChange={(e) => chooseMode(e.target.value as CollectionMode)}>
+              {MODES.map((m) => <option key={m.value} value={m.value}>{t(m.labelKey)}</option>)}
+            </select>
+            <span className="hint">{t(MODES.find((m) => m.value === form.mode)?.hintKey ?? "mode_full_hint")}</span>
           </label>
           {num("traffic_min", t("collection_traffic_minutes"))}
           {num("events_min", t("collection_events_minutes"))}

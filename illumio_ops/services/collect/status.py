@@ -13,6 +13,7 @@ from pydantic import BaseModel
 
 from illumio_ops.domain.values import IngestSource
 from illumio_ops.services.collect.inventory import visibility_summary
+from illumio_ops.services.collect.mode import in_mode
 from illumio_ops.services.context import AppContext
 from illumio_ops.store.flowdb import binding, capabilities, ingest_state
 
@@ -46,6 +47,7 @@ def error_reason(detail: str | None) -> str | None:
 
 class SourceStatus(BaseModel):
     source: str
+    collected: bool                   # the collection mode reads this source
     interval_seconds: int | None
     last_started_at: datetime | None
     last_ok_at: datetime | None
@@ -68,6 +70,7 @@ class GapView(BaseModel):
 
 class CollectionStatus(BaseModel):
     enabled: bool
+    mode: str
     pce_configured: bool
     binding_host: str | None
     sources: list[SourceStatus]
@@ -124,9 +127,10 @@ def collection_status(ctx: AppContext, *, now: datetime | None = None) -> Collec
         last_ok = st.last_ok_at if st else None
         reference = last_ok or (st.last_started_at if st else None)
         lag = int((at - last_ok).total_seconds()) if last_ok else None
-        stale = bool(interval and reference and (at - reference).total_seconds() > 2 * interval)
+        collected = in_mode(s, source)
+        stale = bool(collected and interval and reference and (at - reference).total_seconds() > 2 * interval)
         sources.append(SourceStatus(
-            source=source, interval_seconds=interval, last_started_at=st.last_started_at if st else None,
+            source=source, collected=collected, interval_seconds=interval, last_started_at=st.last_started_at if st else None,
             last_ok_at=last_ok, last_error=st.last_error if st else None,
             last_error_reason=error_reason(st.last_error) if st and st.consecutive_failures else None,
             consecutive_failures=st.consecutive_failures if st else 0, last_rows=st.last_rows if st else None,
@@ -135,7 +139,7 @@ def collection_status(ctx: AppContext, *, now: datetime | None = None) -> Collec
     db_bytes = sum(p.stat().st_size for p in (fdb.path, fdb.path.with_name(fdb.path.name + "-wal")) if p.exists())
     free = shutil.disk_usage(ctx.paths.data_dir).free
     return CollectionStatus(
-        enabled=s.collection.enabled, pce_configured=bool(s.pce.url and s.pce.org_id and s.pce.api_key),
+        enabled=s.collection.enabled, mode=s.collection.mode.value, pce_configured=bool(s.pce.url and s.pce.org_id and s.pce.api_key),
         binding_host=urlsplit(bound.pce_url).hostname if bound else None,
         sources=sources,
         open_gaps=recent[:GAP_LIST_LIMIT],

@@ -8,9 +8,11 @@ from typing import Literal
 from flask import Blueprint
 from pydantic import BaseModel, Field
 
+from illumio_ops.domain.values import IngestSource
 from illumio_ops.jobs.scheduler import apply_schedule, instrument
 from illumio_ops.services import logs
 from illumio_ops.services.collect import backfill
+from illumio_ops.services.collect.mode import backfill_sources
 from illumio_ops.services.collect.status import CollectionStatus, collection_status
 from illumio_ops.settings.schema import CollectionSettings
 from illumio_ops.web.auth import get_ctx
@@ -99,7 +101,10 @@ def start_backfill(body: BackfillRequest) -> BackfillAccepted:
     today = now.date()
     if body.start > body.end or body.end > today:
         raise ApiFailure(400, "backfill_range_invalid", "err_backfill_range_invalid", field="start")
-    if body.start < today - timedelta(days=ctx.settings.current().collection.retention.flow_days):
+    settings = ctx.settings.current()
+    keep = settings.collection.retention
+    days = keep.flow_days if IngestSource.TRAFFIC in backfill_sources(settings, manual=True) else keep.event_days
+    if body.start < today - timedelta(days=days):
         raise ApiFailure(400, "backfill_beyond_retention", "err_backfill_beyond_retention", field="start")
     if backfill.BACKFILL_LOCK.locked():
         raise ApiFailure(409, "backfill_running", "err_backfill_running")

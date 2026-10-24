@@ -2,8 +2,9 @@
 
 A source's coverage is the union of the ranges it has read (live cycles and backfill days,
 ingest_coverage), clipped at the retention floor. Every part of the request outside it is a gap:
-before_retention below the floor, not_yet_collected above it. Recorded failed / truncated windows
-(ingest_gaps) are listed whether or not the window around them is covered.
+before_retention below the floor, not_yet_collected above it — or collection_off when the source is
+not being collected (collection switched off, or a mode that does not read it). Recorded failed /
+truncated windows (ingest_gaps) are listed whether or not the window around them is covered.
 """
 from __future__ import annotations
 
@@ -16,7 +17,7 @@ from pydantic import BaseModel
 
 from illumio_ops.store.flowdb import ingest_state
 
-GapReason = Literal["before_retention", "not_yet_collected", "ingest_failed", "truncated"]
+GapReason = Literal["before_retention", "not_yet_collected", "collection_off", "ingest_failed", "truncated"]
 Window = tuple[datetime, datetime]
 
 
@@ -64,7 +65,8 @@ def merge_gaps(gaps: Sequence[tuple[datetime, datetime, str]]) -> list[tuple[dat
     return sorted(out)
 
 
-def store_coverage(conn: Any, source: str, window: Window, *, floor: datetime) -> StoreCoverage:
+def store_coverage(conn: Any, source: str, window: Window, *, floor: datetime,
+                   collected: bool = True) -> StoreCoverage:
     start, end = window
     ranges = [(max(a, floor), b) for a, b in ingest_state.coverage(conn, source) if b > floor]
     recorded = [(max(g.window_start, start), min(g.window_end, end),
@@ -76,7 +78,7 @@ def store_coverage(conn: Any, source: str, window: Window, *, floor: datetime) -
             if x < floor:
                 gaps.append((x, min(y, floor), "before_retention"))
             if y > floor:
-                gaps.append((max(x, floor), y, "not_yet_collected"))
+                gaps.append((max(x, floor), y, "not_yet_collected" if collected else "collection_off"))
     return StoreCoverage(
         gaps=merge_gaps(gaps),
         store_from=min((a for a, _ in ranges), default=None), store_to=max((b for _, b in ranges), default=None),

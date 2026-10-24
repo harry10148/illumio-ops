@@ -83,3 +83,23 @@ def test_collection_settings_explain_short_archive_retention(context, live_app):
     form.get_by_role("button", name="Save").click()
     expect(form.locator("[role=alert]")).to_contain_text("at least as long as flows and events")
     assert live_app.ctx.settings.current().collection.archive.enabled is False
+
+
+def test_mode_switch_fills_suggested_retention(context, live_app):
+    page = context.new_page()
+    _open_collection(page, live_app.url)
+    form = page.locator("[data-role=collection-settings]")
+    form.locator("select[name=mode]").select_option("alert")
+    expect(form.locator("input[name=flow_days]")).to_have_value("3")
+    expect(form.locator("input[name=rollup_days]")).to_have_value("3")
+    expect(form).to_contain_text("past traffic is not read back")
+    form.get_by_role("button", name="Save").click()
+    expect(form.locator(".form-ok")).to_have_text("Saved.")
+    c = live_app.ctx.settings.current().collection
+    assert (c.mode, c.retention.flow_days, c.retention.rollup_days) == ("alert", 3, 3)
+    form.locator("select[name=mode]").select_option("events_only")
+    form.get_by_role("button", name="Save").click()
+    expect(form.locator(".form-ok")).to_have_text("Saved.")
+    page.reload()
+    expect(page.locator("[data-source=traffic]")).to_contain_text("Not collected in this mode")
+    expect(page.locator("select[name=mode]")).to_have_value("events_only")

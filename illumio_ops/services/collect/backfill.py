@@ -19,6 +19,7 @@ from illumio_ops.pce.events import events_timeout
 from illumio_ops.services.collect import CycleResult, drops_stale
 from illumio_ops.services.collect.events import fetch_event_rows, normalize_events
 from illumio_ops.services.collect.guard import BindingMismatch, ensure_binding
+from illumio_ops.services.collect.mode import backfill_sources
 from illumio_ops.services.collect.traffic import (
     PCE_FAILURES,
     fetch_traffic,
@@ -32,7 +33,6 @@ from illumio_ops.store.flowdb.flows import rebuild_rollup, upsert_flows
 
 SOURCE = IngestSource.BACKFILL
 Plan = Literal["initial", "manual"]
-_BOTH = (IngestSource.TRAFFIC, IngestSource.EVENTS)
 # One backfill at a time, whether started by the periodic check or from the collection page.
 BACKFILL_LOCK = threading.Lock()
 
@@ -48,27 +48,30 @@ def _days(start: datetime, end: datetime) -> list[tuple[datetime, datetime]]:
 
 
 def run_backfill(ctx: AppContext, *, start: datetime, end: datetime, plan: Plan = "manual",
-                 now: datetime | None = None) -> CycleResult:
+                 sources: tuple[IngestSource, ...] | None = None, now: datetime | None = None) -> CycleResult:
+    """Read [start, end] one day at a time. `sources` defaults to what the collection mode backfills
+    (services.collect.mode.backfill_sources)."""
     if not BACKFILL_LOCK.acquire(blocking=False):
         logger.info("a backfill is already running; this one was not started")
         return CycleResult(0, 0, 0)
     try:
-        return _run_backfill(ctx, start=start, end=end, plan=plan, now=now)
+        return _run_backfill(ctx, start=start, end=end, plan=plan, sources=sources, now=now)
     finally:
         BACKFILL_LOCK.release()
 
 
-def _record_failure(fdb: FlowDb, gen: int, a: datetime, b: datetime, at: datetime, error: str) -> None:
-    """Neither source was stored for the day: both get the gap, resolved when a retry succeeds."""
+def _record_failure(fdb: FlowDb, gen: int, sources: tuple[IngestSource, ...], a: datetime, b: datetime,
+                    at: datetime, error: str) -> None:
+    """None of the day's sources was stored: each gets the gap, resolved when a retry succeeds."""
     with fdb.writing(gen) as conn:
-        for src in _BOTH:
+        for src in sources:
             ingest_state.record_gap(conn, src, a, b, "failed", f"backfill: {error}", at)
         ingest_state.mark_failed(conn, SOURCE, at, error)
 
 
 @drops_stale
 def _run_backfill(ctx: AppContext, *, start: datetime, end: datetime, plan: Plan,
-                  now: datetime | None) -> CycleResult:
+                  sources: tuple[IngestSource, ...] | None, now: datetime | None) -> CycleResult:
     gen = ctx.flows().generation  # noted before the settings it goes with (FlowDb.generation)
     settings = ctx.settings.current()
     if not settings.collection.enabled:
@@ -79,6 +82,8 @@ def _run_backfill(ctx: AppContext, *, start: datetime, end: datetime, plan: Plan
         return CycleResult(0, 0, 0)
     at = (now or datetime.now(UTC)).astimezone(UTC).replace(microsecond=0)
     start, end = start.astimezone(UTC).replace(microsecond=0), end.astimezone(UTC).replace(microsecond=0)
+    reads = sources or backfill_sources(settings, manual=plan == "manual")
+    names = sorted(str(s) for s in reads)
     fdb = ctx.flows()
     with fdb.writing(gen) as conn:
         state = ingest_state.get(conn, SOURCE)
@@ -86,21 +91,22 @@ def _run_backfill(ctx: AppContext, *, start: datetime, end: datetime, plan: Plan
         plans: dict[str, Any] = dict(state.progress or {}) if state else {}
         mine = plans.get(plan)
         if (mine and not mine.get("finished") and mine.get("start") == start.isoformat()
-                and mine.get("end") == end.isoformat()):
+                and mine.get("end") == end.isoformat() and mine.get("sources") == names):
             resume_from = datetime.fromisoformat(mine["done_through"])
         else:  # pinned before the first PCE call, so a failed first day retries the same range
             resume_from = start
             plans[plan] = {"start": start.isoformat(), "end": end.isoformat(), "done_through": start.isoformat(),
-                           "finished": False}
+                           "finished": False, "sources": names}
             ingest_state.set_progress(conn, SOURCE, plans)
     rows = windows = gaps = skipped = 0
     with client:
         for a, b in _days(resume_from, end):
             try:
-                traffic_rows, w1, t_trunc = fetch_traffic(client, a, b, query_name="illumio-ops backfill")
+                traffic_rows, w1, t_trunc = (fetch_traffic(client, a, b, query_name="illumio-ops backfill")
+                                             if IngestSource.TRAFFIC in reads else ([], 0, []))
                 event_rows, w2, e_trunc = fetch_event_rows(client, a, b, timeout=events_timeout(settings.pce))
             except PCE_FAILURES as exc:
-                _record_failure(fdb, gen, a, b, at, str(exc))
+                _record_failure(fdb, gen, reads, a, b, at, str(exc))
                 logger.warning("backfill stopped at {}: {}", a, exc)
                 return CycleResult(rows, windows, gaps + 1, skipped)
             try:
@@ -121,7 +127,7 @@ def _run_backfill(ctx: AppContext, *, start: datetime, end: datetime, plan: Plan
                             for ta, tb, n in trunc:
                                 ingest_state.record_gap(conn, src, ta, tb, "truncated",
                                                         f"backfill: {n} rows at the limit", at)
-                        for src in _BOTH:
+                        for src in reads:
                             ingest_state.resolve_failed_gaps(conn, src, a, b, at)
                             ingest_state.add_coverage(conn, src, a, b)
                         plans[plan] = {**plans[plan], "done_through": b.isoformat()}
@@ -129,7 +135,7 @@ def _run_backfill(ctx: AppContext, *, start: datetime, end: datetime, plan: Plan
             except StaleGeneration:
                 raise
             except Exception as exc:
-                _record_failure(fdb, gen, a, b, at, f"{type(exc).__name__}: {exc}")
+                _record_failure(fdb, gen, reads, a, b, at, f"{type(exc).__name__}: {exc}")
                 raise
             rows += len(flows) + len(events)
             windows += w1 + w2
@@ -137,26 +143,33 @@ def _run_backfill(ctx: AppContext, *, start: datetime, end: datetime, plan: Plan
             skipped += s1 + s2
     with fdb.writing(gen) as conn:
         plans[plan] = {**plans[plan], "done_through": end.isoformat(), "finished": True}
+        if plan == "initial":  # what the initial backfills have read so far, whatever the mode was
+            plans["initial_done"] = sorted({*plans.get("initial_done", []), *names})
         ingest_state.mark_ok(conn, SOURCE, at, watermark=None, rows=rows, progress=plans)
     return CycleResult(rows, windows, gaps, skipped)
 
 
 def ensure_initial_backfill(ctx: AppContext, *, now: datetime | None = None) -> CycleResult | None:
-    """Run the first backfill of a binding (backfill_days back from the live watermark), or resume an
-    unfinished one. Returns None when there is nothing to do."""
+    """Run the first backfill of a binding (backfill_days back from the live watermark), resume an
+    unfinished one, or backfill a source the mode now reads that no initial backfill has read yet
+    (events only → full). Returns None when there is nothing to do."""
     settings = ctx.settings.current()
     if not settings.collection.enabled or settings.collection.backfill_days == 0:
         return None
     at = (now or datetime.now(UTC)).astimezone(UTC).replace(microsecond=0)
     with ctx.flows().connect() as conn:
         state = ingest_state.get(conn, SOURCE)
-        traffic = ingest_state.get(conn, IngestSource.TRAFFIC)
-    initial = (state.progress or {}).get("initial") if state else None
-    if initial:
-        if initial.get("finished"):
-            return None
+        marks = {src: ingest_state.get(conn, src) for src in (IngestSource.TRAFFIC, IngestSource.EVENTS)}
+    progress = (state.progress or {}) if state else {}
+    initial = progress.get("initial")
+    if initial and not initial.get("finished"):
         return run_backfill(ctx, start=datetime.fromisoformat(initial["start"]),
-                            end=datetime.fromisoformat(initial["end"]), plan="initial", now=at)
-    end = traffic.watermark if traffic and traffic.watermark else at
+                            end=datetime.fromisoformat(initial["end"]), plan="initial",
+                            sources=tuple(IngestSource(s) for s in initial.get("sources", [])) or None, now=at)
+    done = set(progress.get("initial_done", []))
+    missing = tuple(s for s in backfill_sources(settings, manual=False) if str(s) not in done)
+    if not missing:
+        return None
+    end = next((m.watermark for src in missing if (m := marks[src]) is not None and m.watermark), at)
     return run_backfill(ctx, start=end - timedelta(days=settings.collection.backfill_days), end=end,
-                        plan="initial", now=at)
+                        plan="initial", sources=missing, now=at)

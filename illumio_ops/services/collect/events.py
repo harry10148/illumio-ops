@@ -18,6 +18,7 @@ from illumio_ops.pce.events import EVENTS_PAGE_LIMIT, events_timeout, fetch_even
 from illumio_ops.services.collect import CycleResult, drops_stale
 from illumio_ops.services.collect.cycle import begin, fail
 from illumio_ops.services.collect.guard import BindingMismatch, ensure_binding
+from illumio_ops.services.collect.mode import collects
 from illumio_ops.services.collect.traffic import PCE_FAILURES
 from illumio_ops.services.collect.windows import harvest
 from illumio_ops.services.context import AppContext
@@ -61,7 +62,7 @@ def normalize_events(rows: list[dict[str, Any]]) -> tuple[list[EventRecord], int
 def run_events_cycle(ctx: AppContext, *, now: datetime | None = None) -> CycleResult:
     gen = ctx.flows().generation  # noted before the settings it goes with (FlowDb.generation)
     settings = ctx.settings.current()  # one snapshot for the client and the binding check
-    if not settings.collection.enabled:
+    if not collects(settings, IngestSource.EVENTS):
         return CycleResult(0, 0, 0)
     try:
         client = ctx.pce_client(settings.pce)

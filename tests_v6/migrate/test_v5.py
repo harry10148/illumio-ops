@@ -156,11 +156,18 @@ def test_filter_and_sampling_dropped_with_reason():
     assert next(i for i in report.items if i.source == "pce_cache.flow_delta_enabled").action == "dropped"
 
 
-def test_collection_on_unless_5x_turned_the_cache_off():
-    assert migrate_v5(_with_cache(enabled=False)).settings.collection.enabled is False
+def test_cache_off_becomes_events_only():
+    r = migrate_v5(_with_cache(enabled=False))
+    assert (r.settings.collection.enabled, r.settings.collection.mode) == (True, "events_only")
+    item = _cache_item(r, "pce_cache.enabled")
+    assert (item.target, item.action, item.reason_key) == (
+        "collection.mode", "rewritten", "migrate_cache_off_events_only")
+    r = migrate_v5(_with_cache(enabled=True))
+    assert r.settings.collection.mode == "full"
+    assert _cache_item(r, "pce_cache.enabled").reason_key == "migrate_cache_on_full"
     raw = _base()
     raw.pop("pce_cache", None)
-    assert migrate_v5(raw).settings.collection.enabled is True  # never configured: the v6 default
+    assert migrate_v5(raw).settings.collection.mode == "events_only"  # 5.x kept no traffic
 
 
 def test_106_pce_cache_every_leaf_accounted_for():
@@ -170,7 +177,7 @@ def test_106_pce_cache_every_leaf_accounted_for():
     assert sorted(i.source for i in items) == sorted(k for k in leaf_keys(raw) if k.startswith("pce_cache."))
     assert not [i for i in items if i.reason_key == "migrate_unknown_key" or i.params.get("phase") == "P2"]
     c = result.settings.collection
-    assert (c.enabled, c.traffic_interval_seconds, c.archive.enabled, c.archive.retention_days) == (True, 300, True, 365)
+    assert (c.mode, c.traffic_interval_seconds, c.archive.enabled, c.archive.retention_days) == ("full", 300, True, 365)
 
 
 def test_render_never_contains_secret_values():

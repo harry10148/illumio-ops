@@ -72,6 +72,14 @@ class IngestSource(StrEnum):
     BACKFILL = "backfill"
 
 
+class CollectionMode(StrEnum):
+    """What data collection reads (spec §6.4): everything; events plus short-lived traffic for
+    alerts; or events only."""
+    FULL = "full"
+    ALERT = "alert"
+    EVENTS_ONLY = "events_only"
+
+
 class CapabilityState(StrEnum):
     SUPPORTED = "supported"
     UNSUPPORTED = "unsupported"
@@ -125,6 +133,7 @@ def parse_draft_policy_decision(raw: str) -> str:
 _ENUMS: tuple[type[StrEnum], ...] = (
     PolicyDecision, RuleAction, AlertRuleType, DeploymentType, Language, ProbeName,
     FlowDirection, VisibilityLevel, TamperClassification, IngestSource, DataOrigin, CapabilityState,
+    CollectionMode,
 )
 
 

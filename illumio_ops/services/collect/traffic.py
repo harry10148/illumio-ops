@@ -34,6 +34,7 @@ from illumio_ops.pce.client import (
 from illumio_ops.services.collect import CycleResult, drops_stale
 from illumio_ops.services.collect.cycle import begin, fail
 from illumio_ops.services.collect.guard import BindingMismatch, ensure_binding
+from illumio_ops.services.collect.mode import collects
 from illumio_ops.services.collect.windows import harvest
 from illumio_ops.services.context import AppContext
 from illumio_ops.store.flowdb import ingest_state
@@ -85,7 +86,7 @@ def normalize_all(rows: list[dict[str, Any]]) -> tuple[list[FlowRecord], int]:
 def run_traffic_cycle(ctx: AppContext, *, now: datetime | None = None) -> CycleResult:
     gen = ctx.flows().generation  # noted before the settings it goes with (FlowDb.generation)
     settings = ctx.settings.current()  # one snapshot for the client and the binding check
-    if not settings.collection.enabled:
+    if not collects(settings, IngestSource.TRAFFIC):
         return CycleResult(0, 0, 0)
     try:
         client = ctx.pce_client(settings.pce)

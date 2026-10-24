@@ -87,4 +87,4 @@ def test_archive_retention_shorter_than_raw_is_a_field_error(client, ctx):
     data = client.get("/api/system/collection", environ_overrides=LOCAL).get_json()["data"]
     data["settings"]["archive"] = {"enabled": True, "retention_days": 7}
     err = _send(client, "PUT", "/api/system/collection", data).get_json()["error"]
-    assert err["field"] == "settings" and err["code"] == "invalid_input"
+    assert err["field"] == "settings.archive" and err["code"] == "invalid_input"

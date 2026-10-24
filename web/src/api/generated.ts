@@ -11,6 +11,19 @@ export type Language = ("en" | "zh_TW")
  */
 export type ProbeName = ("noop" | "health" | "node_available")
 /**
+ * What data collection reads (spec §6.4): everything; events plus short-lived traffic for
+ * alerts; or events only.
+ * 
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "CollectionMode".
+ */
+export type CollectionMode = ("full" | "alert" | "events_only")
+/**
+ * What data collection reads (spec §6.4): everything; events plus short-lived traffic for
+ * alerts; or events only.
+ */
+export type CollectionMode1 = ("full" | "alert" | "events_only")
+/**
  * This interface was referenced by `ContractRoot`'s JSON-Schema
  * via the `definition` "DeploymentType".
  */
@@ -137,6 +150,7 @@ disk_free_warn_gb: number
 enabled: boolean
 events_interval_seconds: number
 inventory_interval_seconds: number
+mode?: CollectionMode1
 rate_limit_per_minute: number
 retention: RetentionSettings
 traffic_interval_seconds: number
@@ -175,6 +189,7 @@ window_start: string
  * via the `definition` "SourceStatus".
  */
 export interface SourceStatus {
+collected: boolean
 consecutive_failures: number
 interval_seconds: (number | null)
 lag_seconds: (number | null)
@@ -202,6 +217,7 @@ db_bytes: number
 disk_free_bytes: number
 disk_low: boolean
 enabled: boolean
+mode: string
 open_gap_counts: {
 [k: string]: number
 }
@@ -556,6 +572,11 @@ export const VALUES = {
     "supported",
     "unknown",
     "unsupported"
+  ],
+  "CollectionMode": [
+    "alert",
+    "events_only",
+    "full"
   ],
   "DataOrigin": [
     "backfill",

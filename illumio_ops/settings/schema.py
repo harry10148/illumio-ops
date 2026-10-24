@@ -15,12 +15,13 @@ from pydantic import (
     BaseModel,
     ConfigDict,
     Field,
+    ValidationInfo,
     field_validator,
     model_validator,
 )
 
 from illumio_ops.domain.netaddr import parse_ip_token
-from illumio_ops.domain.values import DeploymentType, Language
+from illumio_ops.domain.values import CollectionMode, DeploymentType, Language
 
 SCHEMA_VERSION: Literal[2] = 2
 _UTC_OFFSET = re.compile(r"UTC([+-]\d+(?:\.\d+)?)")
@@ -166,10 +167,7 @@ class RetentionSettings(StrictModel):
 
     @model_validator(mode="after")
     def _ordering(self) -> RetentionSettings:
-        # "New connection" detection compares against the baseline window, so raw flows
-        # must outlive it; daily rollups feed period-over-period reports beyond that.
-        if self.flow_days < self.baseline_days:
-            raise ValueError("flow_days must be at least baseline_days")
+        # Daily rollups feed period-over-period reports beyond the raw flows.
         if self.rollup_days < self.flow_days:
             raise ValueError("rollup_days must be at least flow_days")
         return self
@@ -182,6 +180,7 @@ class ArchiveSettings(StrictModel):
 
 class CollectionSettings(StrictModel):
     enabled: bool
+    mode: CollectionMode = CollectionMode.FULL  # declared before retention: its validator reads it
     traffic_interval_seconds: int = Field(ge=300, le=86400)
     events_interval_seconds: int = Field(ge=60, le=3600)
     inventory_interval_seconds: int = Field(ge=900, le=86400)
@@ -191,14 +190,26 @@ class CollectionSettings(StrictModel):
     retention: RetentionSettings
     archive: ArchiveSettings
 
-    @model_validator(mode="after")
-    def _archive_outlives_raw(self) -> CollectionSettings:
+    # Field validators, so an error names the field it is about (the page explains each in words).
+    @field_validator("retention")
+    @classmethod
+    def _raw_outlives_baseline(cls, v: RetentionSettings, info: ValidationInfo) -> RetentionSettings:
+        # In full mode the workbench must be able to show the history of a "new connection",
+        # so raw flows outlive the baseline window. Alert mode keeps traffic briefly by design;
+        # the baseline table itself is kept for baseline_days either way (spec §6.4).
+        if info.data.get("mode", CollectionMode.FULL) is CollectionMode.FULL and v.flow_days < v.baseline_days:
+            raise ValueError("in full mode flow_days must be at least baseline_days")
+        return v
+
+    @field_validator("archive")
+    @classmethod
+    def _archive_outlives_raw(cls, v: ArchiveSettings, info: ValidationInfo) -> ArchiveSettings:
         # Retention drops a day only once it is archived; a file that expired first would leave the
         # day unarchived, its rows never dropped, and the file written and deleted again every day.
-        days = self.archive.retention_days
-        if self.archive.enabled and 0 < days < max(self.retention.flow_days, self.retention.event_days):
+        r = info.data.get("retention")
+        if r is not None and v.enabled and 0 < v.retention_days < max(r.flow_days, r.event_days):
             raise ValueError("archive retention_days must be 0 (keep) or at least flow_days and event_days")
-        return self
+        return v
 
 
 class Settings(StrictModel):

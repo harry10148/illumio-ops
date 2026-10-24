@@ -15,6 +15,7 @@ from illumio_ops.domain.events import EventShapeError, normalize_event
 from illumio_ops.domain.values import IngestSource
 from illumio_ops.pce.client import PceNotConfigured
 from illumio_ops.pce.events import events_timeout, fetch_events
+from illumio_ops.services.collect.mode import collects
 from illumio_ops.services.collect.traffic import PCE_FAILURES
 from illumio_ops.services.context import AppContext
 from illumio_ops.services.coverage import Coverage, merge_gaps, store_coverage
@@ -53,9 +54,11 @@ def query_events(ctx: AppContext, *, start: datetime, end: datetime, event_types
                  workload_href: str | None = None, limit: int, fill_gaps: bool = False,
                  now: datetime | None = None) -> EventQuery:
     at = (now or datetime.now(UTC)).astimezone(UTC)
-    floor = at - timedelta(days=ctx.settings.current().collection.retention.event_days)
+    settings = ctx.settings.current()
+    floor = at - timedelta(days=settings.collection.retention.event_days)
     with ctx.flows().connect() as conn:
-        cov = store_coverage(conn, IngestSource.EVENTS, (start, end), floor=floor)
+        cov = store_coverage(conn, IngestSource.EVENTS, (start, end), floor=floor,
+                             collected=collects(settings, IngestSource.EVENTS))
         gaps = cov.gaps
         clauses, params = ["e.timestamp >= ?", "e.timestamp <= ?"], [db_time(start), db_time(end)]
         if event_types:
@@ -84,7 +87,6 @@ def query_events(ctx: AppContext, *, start: datetime, end: datetime, event_types
         if not fill_gaps:
             kept = gaps
         else:
-            settings = ctx.settings.current()
             for g in gaps:
                 if g[2] == "truncated":
                     kept.append(g)

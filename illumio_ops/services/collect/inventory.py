@@ -24,6 +24,7 @@ from illumio_ops.pce.client import PceClient, PceNotConfigured
 from illumio_ops.pce.collections import PceCollectionIncomplete, get_all
 from illumio_ops.services.collect import CycleResult, drops_stale
 from illumio_ops.services.collect.guard import BindingMismatch, ensure_binding
+from illumio_ops.services.collect.mode import collects
 from illumio_ops.services.collect.traffic import PCE_FAILURES
 from illumio_ops.services.context import AppContext
 from illumio_ops.settings.schema import PceSettings
@@ -136,7 +137,7 @@ def _risk_details(client: PceClient, fdb: FlowDb, gen: int, rows: list[dict[str,
 def run_inventory_cycle(ctx: AppContext, *, now: datetime | None = None) -> CycleResult:
     gen = ctx.flows().generation  # noted before the settings it goes with (FlowDb.generation)
     settings = ctx.settings.current()
-    if not settings.collection.enabled:
+    if not collects(settings, IngestSource.INVENTORY):
         return CycleResult(0, 0, 0)
     try:
         client = ctx.pce_client(settings.pce)
