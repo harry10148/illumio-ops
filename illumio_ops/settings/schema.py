@@ -10,12 +10,19 @@ import re
 from typing import Annotated, Literal
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from pydantic import AfterValidator, BaseModel, ConfigDict, Field, field_validator
+from pydantic import (
+    AfterValidator,
+    BaseModel,
+    ConfigDict,
+    Field,
+    field_validator,
+    model_validator,
+)
 
 from illumio_ops.domain.netaddr import parse_ip_token
 from illumio_ops.domain.values import DeploymentType, Language
 
-SCHEMA_VERSION: Literal[1] = 1
+SCHEMA_VERSION: Literal[2] = 2
 _UTC_OFFSET = re.compile(r"UTC([+-]\d+(?:\.\d+)?)")
 
 
@@ -151,13 +158,59 @@ class LoggingSettings(StrictModel):
     level: Literal["TRACE", "DEBUG", "INFO", "SUCCESS", "WARNING", "ERROR", "CRITICAL"]  # loguru's levels
 
 
+class RetentionSettings(StrictModel):
+    flow_days: int = Field(ge=1, le=3650)
+    event_days: int = Field(ge=1, le=3650)
+    rollup_days: int = Field(ge=1, le=3650)
+    baseline_days: int = Field(ge=7, le=365)
+
+    @model_validator(mode="after")
+    def _ordering(self) -> RetentionSettings:
+        # "New connection" detection compares against the baseline window, so raw flows
+        # must outlive it; daily rollups feed period-over-period reports beyond that.
+        if self.flow_days < self.baseline_days:
+            raise ValueError("flow_days must be at least baseline_days")
+        if self.rollup_days < self.flow_days:
+            raise ValueError("rollup_days must be at least flow_days")
+        return self
+
+
+class ArchiveSettings(StrictModel):
+    enabled: bool
+    retention_days: int = Field(ge=0, le=3650)  # 0 = keep archive files forever
+
+
+class CollectionSettings(StrictModel):
+    enabled: bool
+    traffic_interval_seconds: int = Field(ge=300, le=86400)
+    events_interval_seconds: int = Field(ge=60, le=3600)
+    inventory_interval_seconds: int = Field(ge=900, le=86400)
+    rate_limit_per_minute: int = Field(ge=10, le=1000)
+    backfill_days: int = Field(ge=0, le=90)
+    disk_free_warn_gb: int = Field(ge=1, le=100000)
+    retention: RetentionSettings
+    archive: ArchiveSettings
+
+
 class Settings(StrictModel):
-    schema_version: Literal[1]
+    schema_version: Literal[2]
     revision: int = Field(ge=0)
     pce: PceSettings
     web: WebSettings
     display: DisplaySettings
     logging: LoggingSettings
+    collection: CollectionSettings
+
+
+def default_collection() -> CollectionSettings:
+    """Defaults for a fresh install and for upgrading a schema-1 file (spec §6.5 data collection)."""
+    return CollectionSettings(
+        enabled=True, traffic_interval_seconds=600, events_interval_seconds=300,
+        inventory_interval_seconds=3600, rate_limit_per_minute=400, backfill_days=30,
+        disk_free_warn_gb=10,
+        retention=RetentionSettings(flow_days=35, event_days=90, rollup_days=180, baseline_days=30),
+        archive=ArchiveSettings(enabled=False, retention_days=0),
+    )
 
 
 def default_settings(*, password_hash: str, secret_key: str, port: int = 5001) -> Settings:
@@ -180,4 +233,5 @@ def default_settings(*, password_hash: str, secret_key: str, port: int = 5001) -
         ),
         display=DisplaySettings(language=Language.EN, timezone="local"),
         logging=LoggingSettings(level="INFO"),
+        collection=default_collection(),
     )

@@ -46,7 +46,20 @@ SETTINGS_READERS: dict[str, str] = {
 }
 # Fields whose reader arrives later: value = the task or phase that adds it.
 PENDING_READERS: dict[str, str] = {
-    "pce.events_timeout_seconds": "P2",
+    "pce.events_timeout_seconds": "P2-T4",
+    "collection.rate_limit_per_minute": "P2-T2",
+    "collection.enabled": "P2-T6",
+    "collection.traffic_interval_seconds": "P2-T6",
+    "collection.events_interval_seconds": "P2-T6",
+    "collection.inventory_interval_seconds": "P2-T6",
+    "collection.backfill_days": "P2-T8",
+    "collection.retention.flow_days": "P2-T8",
+    "collection.retention.event_days": "P2-T8",
+    "collection.retention.rollup_days": "P2-T8",
+    "collection.retention.baseline_days": "P2-T8",
+    "collection.archive.enabled": "P2-T8",
+    "collection.archive.retention_days": "P2-T8",
+    "collection.disk_free_warn_gb": "P2-T12",
     "pce.console_url": "P3",
     "display.timezone": "P3",
 }
