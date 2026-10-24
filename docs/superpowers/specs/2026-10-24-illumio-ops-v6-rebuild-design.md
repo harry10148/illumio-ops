@@ -597,6 +597,9 @@ services 條目只有 port、to_port、proto、process_name、windows_service_na
   如何切分、組織分數如何彙總、暴露等級門檻。
 - **F7 延遲底線（文件）**：VEN 每 10 分鐘回報 flow；地端 PCE 可在收到後立即以 syslog／Fluentd 匯出
   （`runtime_env.yml` `export_flow_summaries_to_syslog`，Public Experimental）；SaaS 改寫到客戶 S3。
+  **流量晚到（實測，lab，P2 Task 15）**：新連線從首見到出現在 traffic query 的延遲中位數 9.4 分鐘、p99 14.7、最大約 16–18
+  分鐘，32% 晚於 10 分鐘。因此收集每輪往回重疊 30 分鐘（不論收集間隔）；只往回 10 分鐘時實測漏 2.28%。5.x 的游標是
+  每批最大 `last_detected`，晚到的一律跳過（lab 實測少收約 35%），不能當完整性的比較基準。
 - **F8**：async query 上限 200,000 筆（文件）。deny rule 在 ruleset 內（`rule_sets[].deny_rules`）；組織層
   `/sec_policy/{p}/deny_rules` 在 lab 回 404（實測）。
 - **F9 5.x 可回收的分析**：`mod15_lateral_movement`（BFS 可達、articulation points）、`attack_posture`

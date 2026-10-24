@@ -31,11 +31,14 @@ def test_traffic_cycle_writes_and_advances_watermark(tmp_path, fake_traffic):
     assert fake_traffic.calls[0][0] == "2026-10-23T12:00:00Z"  # cold start: 24 hours back
 
 
-def test_next_cycle_overlaps_previous_window_by_600s(tmp_path, fake_traffic):
+def test_next_cycle_overlaps_previous_window_by_30_minutes(tmp_path, fake_traffic):
+    # Records reach the PCE late: on lab 32% more than 10 min after first_detected, max ≈ 16–18 min
+    # (P2 Task 15 probe). A record arriving d after its last_detected is caught in every cycle phase
+    # only if d <= overlap, whatever the interval.
     ctx = configured_ctx(tmp_path)
     run_traffic_cycle(ctx, now=NOW)
     run_traffic_cycle(ctx, now=NOW + minutes(10))
-    assert fake_traffic.calls[1] == ("2026-10-24T11:50:00Z", "2026-10-24T12:10:00Z")
+    assert fake_traffic.calls[1] == ("2026-10-24T11:30:00Z", "2026-10-24T12:10:00Z")
 
 
 def test_failed_window_keeps_watermark_and_records_gap(tmp_path, fake_traffic):

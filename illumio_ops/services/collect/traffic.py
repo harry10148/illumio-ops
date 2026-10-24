@@ -42,7 +42,9 @@ from illumio_ops.store.flowdb.db import StaleGeneration, transaction
 from illumio_ops.store.flowdb.flows import refresh_rollups, upsert_flows
 
 SOURCE = IngestSource.TRAFFIC
-OVERLAP = timedelta(seconds=600)
+# Records reach the PCE up to ~18 min after they happen (P2 Task 15 probe on lab: 32% later than
+# 10 min); a record is caught in every cycle phase only if its delay is within the overlap.
+OVERLAP = timedelta(minutes=30)
 COLD_START = timedelta(hours=24)
 MAX_RESULTS = 200_000
 QUERY_DEADLINE_SECONDS = 900
