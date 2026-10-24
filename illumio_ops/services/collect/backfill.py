@@ -16,7 +16,7 @@ from loguru import logger
 from illumio_ops.domain.values import DataOrigin, IngestSource
 from illumio_ops.pce.client import PceNotConfigured
 from illumio_ops.pce.events import events_timeout
-from illumio_ops.services.collect import CycleResult
+from illumio_ops.services.collect import CycleResult, drops_stale
 from illumio_ops.services.collect.events import fetch_event_rows, normalize_events
 from illumio_ops.services.collect.guard import BindingMismatch, ensure_binding
 from illumio_ops.services.collect.traffic import (
@@ -26,7 +26,7 @@ from illumio_ops.services.collect.traffic import (
 )
 from illumio_ops.services.context import AppContext
 from illumio_ops.store.flowdb import ingest_state
-from illumio_ops.store.flowdb.db import transaction
+from illumio_ops.store.flowdb.db import FlowDb, StaleGeneration, transaction
 from illumio_ops.store.flowdb.events import upsert_events
 from illumio_ops.store.flowdb.flows import rebuild_rollup, upsert_flows
 
@@ -58,16 +58,18 @@ def run_backfill(ctx: AppContext, *, start: datetime, end: datetime, plan: Plan 
         BACKFILL_LOCK.release()
 
 
-def _record_failure(fdb: Any, a: datetime, b: datetime, at: datetime, error: str) -> None:
+def _record_failure(fdb: FlowDb, gen: int, a: datetime, b: datetime, at: datetime, error: str) -> None:
     """Neither source was stored for the day: both get the gap, resolved when a retry succeeds."""
-    with fdb.write_lock, fdb.connect() as conn:
+    with fdb.writing(gen) as conn:
         for src in _BOTH:
             ingest_state.record_gap(conn, src, a, b, "failed", f"backfill: {error}", at)
         ingest_state.mark_failed(conn, SOURCE, at, error)
 
 
+@drops_stale
 def _run_backfill(ctx: AppContext, *, start: datetime, end: datetime, plan: Plan,
                   now: datetime | None) -> CycleResult:
+    gen = ctx.flows().generation  # noted before the settings it goes with (FlowDb.generation)
     settings = ctx.settings.current()
     if not settings.collection.enabled:
         return CycleResult(0, 0, 0)
@@ -78,7 +80,7 @@ def _run_backfill(ctx: AppContext, *, start: datetime, end: datetime, plan: Plan
     at = (now or datetime.now(UTC)).astimezone(UTC).replace(microsecond=0)
     start, end = start.astimezone(UTC).replace(microsecond=0), end.astimezone(UTC).replace(microsecond=0)
     fdb = ctx.flows()
-    with fdb.write_lock, fdb.connect() as conn:
+    with fdb.writing(gen) as conn:
         state = ingest_state.get(conn, SOURCE)
         ingest_state.mark_started(conn, SOURCE, at)
         plans: dict[str, Any] = dict(state.progress or {}) if state else {}
@@ -98,13 +100,13 @@ def _run_backfill(ctx: AppContext, *, start: datetime, end: datetime, plan: Plan
                 traffic_rows, w1, t_trunc = fetch_traffic(client, a, b, query_name="illumio-ops backfill")
                 event_rows, w2, e_trunc = fetch_event_rows(client, a, b, timeout=events_timeout(settings.pce))
             except PCE_FAILURES as exc:
-                _record_failure(fdb, a, b, at, str(exc))
+                _record_failure(fdb, gen, a, b, at, str(exc))
                 logger.warning("backfill stopped at {}: {}", a, exc)
                 return CycleResult(rows, windows, gaps + 1, skipped)
             try:
                 flows, s1 = normalize_all(traffic_rows)
                 events, s2 = normalize_events(event_rows)
-                with fdb.write_lock, fdb.connect() as conn:
+                with fdb.writing(gen) as conn:
                     try:
                         ensure_binding(conn, settings.pce, at)
                     except BindingMismatch as exc:
@@ -124,14 +126,16 @@ def _run_backfill(ctx: AppContext, *, start: datetime, end: datetime, plan: Plan
                             ingest_state.add_coverage(conn, src, a, b)
                         plans[plan] = {**plans[plan], "done_through": b.isoformat()}
                         ingest_state.set_progress(conn, SOURCE, plans)
+            except StaleGeneration:
+                raise
             except Exception as exc:
-                _record_failure(fdb, a, b, at, f"{type(exc).__name__}: {exc}")
+                _record_failure(fdb, gen, a, b, at, f"{type(exc).__name__}: {exc}")
                 raise
             rows += len(flows) + len(events)
             windows += w1 + w2
             gaps += len(t_trunc) + len(e_trunc)
             skipped += s1 + s2
-    with fdb.write_lock, fdb.connect() as conn:
+    with fdb.writing(gen) as conn:
         plans[plan] = {**plans[plan], "done_through": end.isoformat(), "finished": True}
         ingest_state.mark_ok(conn, SOURCE, at, watermark=None, rows=rows, progress=plans)
     return CycleResult(rows, windows, gaps, skipped)

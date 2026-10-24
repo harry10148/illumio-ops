@@ -9,8 +9,8 @@ from illumio_ops.store.flowdb.db import FlowDb
 COLD_START_KEY = "cold_start_from"
 
 
-def begin(fdb: FlowDb, source: str, at: datetime, *, overlap: timedelta,
-          cold_start: timedelta) -> tuple[datetime, dict[str, str]]:
+def begin(fdb: FlowDb, source: str, at: datetime, *, overlap: timedelta, cold_start: timedelta,
+          generation: int) -> tuple[datetime, dict[str, str]]:
     """Record the start (under the write lock); return where this cycle's window begins and the
     progress to store when it succeeds.
 
@@ -18,7 +18,7 @@ def begin(fdb: FlowDb, source: str, at: datetime, *, overlap: timedelta,
     until a cycle succeeds, so a failed first attempt is retried from the same place instead of
     sliding forward and silently skipping its oldest part. The progress returned for a success
     clears that bound; what was read is recorded separately as coverage (ingest_coverage)."""
-    with fdb.write_lock, fdb.connect() as conn:
+    with fdb.writing(generation) as conn:
         state = ingest_state.get(conn, source)
         ingest_state.mark_started(conn, source, at)
         progress = (state.progress or {}) if state is not None else {}
@@ -31,9 +31,9 @@ def begin(fdb: FlowDb, source: str, at: datetime, *, overlap: timedelta,
         return start, {}
 
 
-def fail(fdb: FlowDb, source: str, start: datetime, at: datetime, exc: BaseException) -> None:
+def fail(fdb: FlowDb, source: str, start: datetime, at: datetime, exc: BaseException, *, generation: int) -> None:
     """The whole window failed: keep the watermark, record the gap and the error."""
     detail = f"{type(exc).__name__}: {exc}"
-    with fdb.write_lock, fdb.connect() as conn:
+    with fdb.writing(generation) as conn:
         ingest_state.record_gap(conn, source, start, at, "failed", detail, at)
         ingest_state.mark_failed(conn, source, at, detail)

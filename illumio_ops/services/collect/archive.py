@@ -13,7 +13,7 @@ from loguru import logger
 
 from illumio_ops.services.context import AppContext
 from illumio_ops.store.flowdb import archive
-from illumio_ops.store.flowdb.db import db_day
+from illumio_ops.store.flowdb.db import StaleGeneration, db_day
 
 _KINDS = {
     # kind -> (day expression, query for one day's rows)
@@ -39,6 +39,15 @@ def _write_atomic(path: Path, lines: list[str]) -> None:
 
 
 def run_archive(ctx: AppContext, *, now: datetime | None = None) -> int:
+    gen = ctx.flows().generation  # a PCE switch moves the archive aside; see FlowDb.generation
+    try:
+        return _archive(ctx, gen, now)
+    except StaleGeneration:
+        logger.info("archive: the PCE was switched while it ran; nothing more was written")
+        return 0
+
+
+def _archive(ctx: AppContext, gen: int, now: datetime | None) -> int:
     settings = ctx.settings.current().collection.archive
     if not settings.enabled:
         return 0
@@ -57,7 +66,7 @@ def run_archive(ctx: AppContext, *, now: datetime | None = None) -> int:
                 continue
             # Read, write and record under the lock: a row changed in between would otherwise be
             # missing from the file while the day is recorded as archived.
-            with fdb.write_lock, fdb.connect() as conn:
+            with fdb.writing(gen) as conn:
                 rows = [dict(r) for r in conn.execute(day_query, (day,))]
                 path = out_dir / f"{kind}-{day}.jsonl.gz"
                 _write_atomic(path, [json.dumps(r, separators=(",", ":"), ensure_ascii=False) for r in rows])
@@ -65,7 +74,7 @@ def run_archive(ctx: AppContext, *, now: datetime | None = None) -> int:
             written += 1
     if settings.retention_days > 0:
         cutoff = db_day(at - timedelta(days=settings.retention_days))
-        with fdb.write_lock, fdb.connect() as conn:
+        with fdb.writing(gen) as conn:
             for kind, day, stored in archive.entries_before(conn, cutoff):
                 try:
                     Path(stored).unlink(missing_ok=True)

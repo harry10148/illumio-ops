@@ -31,13 +31,13 @@ from illumio_ops.pce.client import (
     PceNotConfigured,
     PceTransportError,
 )
-from illumio_ops.services.collect import CycleResult
+from illumio_ops.services.collect import CycleResult, drops_stale
 from illumio_ops.services.collect.cycle import begin, fail
 from illumio_ops.services.collect.guard import BindingMismatch, ensure_binding
 from illumio_ops.services.collect.windows import harvest
 from illumio_ops.services.context import AppContext
 from illumio_ops.store.flowdb import ingest_state
-from illumio_ops.store.flowdb.db import transaction
+from illumio_ops.store.flowdb.db import StaleGeneration, transaction
 from illumio_ops.store.flowdb.flows import rebuild_rollup, upsert_flows
 
 SOURCE = IngestSource.TRAFFIC
@@ -81,7 +81,9 @@ def normalize_all(rows: list[dict[str, Any]]) -> tuple[list[FlowRecord], int]:
     return list(records.values()), skipped
 
 
+@drops_stale
 def run_traffic_cycle(ctx: AppContext, *, now: datetime | None = None) -> CycleResult:
+    gen = ctx.flows().generation  # noted before the settings it goes with (FlowDb.generation)
     settings = ctx.settings.current()  # one snapshot for the client and the binding check
     if not settings.collection.enabled:
         return CycleResult(0, 0, 0)
@@ -91,17 +93,17 @@ def run_traffic_cycle(ctx: AppContext, *, now: datetime | None = None) -> CycleR
         return CycleResult(0, 0, 0)
     at = _now(now)
     fdb = ctx.flows()
-    start, done_progress = begin(fdb, SOURCE, at, overlap=OVERLAP, cold_start=COLD_START)
+    start, done_progress = begin(fdb, SOURCE, at, overlap=OVERLAP, cold_start=COLD_START, generation=gen)
     try:
         with client:
             rows, windows, truncated = fetch_traffic(client, start, at, query_name="illumio-ops traffic")
     except PCE_FAILURES as exc:
-        fail(fdb, SOURCE, start, at, exc)
+        fail(fdb, SOURCE, start, at, exc, generation=gen)
         logger.warning("traffic collection failed for {} – {}: {}", start, at, exc)
         return CycleResult(0, 0, 1)
     try:
         records, skipped = normalize_all(rows)
-        with fdb.write_lock, fdb.connect() as conn:
+        with fdb.writing(gen) as conn:
             try:
                 ensure_binding(conn, settings.pce, at)
             except BindingMismatch as exc:
@@ -119,7 +121,9 @@ def run_traffic_cycle(ctx: AppContext, *, now: datetime | None = None) -> CycleR
                 ingest_state.resolve_failed_gaps(conn, SOURCE, start, at, at)
                 ingest_state.add_coverage(conn, SOURCE, start, at)
                 ingest_state.mark_ok(conn, SOURCE, at, watermark=at, rows=len(records), progress=done_progress)
+    except StaleGeneration:
+        raise
     except Exception as exc:
-        fail(fdb, SOURCE, start, at, exc)
+        fail(fdb, SOURCE, start, at, exc, generation=gen)
         raise
     return CycleResult(len(records), windows, len(truncated), skipped)

@@ -17,12 +17,13 @@ from illumio_ops.services.collect import events as ev
 from illumio_ops.services.collect.archive import run_archive
 from illumio_ops.services.collect.backfill import ensure_initial_backfill, run_backfill
 from illumio_ops.services.collect.inventory import run_inventory_cycle
+from illumio_ops.services.collect.reset import reset_for_new_pce
 from illumio_ops.services.collect.retention import run_retention
 from illumio_ops.services.collect.traffic import run_traffic_cycle
 from illumio_ops.services.eventsource import query_events
 from illumio_ops.services.flowsource import query_flows
 from illumio_ops.settings.schema import CollectionSettings, default_collection
-from illumio_ops.store.flowdb import archive, ingest_state, ransomware
+from illumio_ops.store.flowdb import archive, binding, ingest_state, ransomware
 from illumio_ops.store.flowdb.db import db_day
 from illumio_ops.store.flowdb.events import upsert_events
 from illumio_ops.store.flowdb.flows import upsert_flows
@@ -324,3 +325,49 @@ def test_empty_risk_details_are_not_fetched_again(tmp_path):  # finding 12
     run_inventory_cycle(ctx, now=NOW)
     run_inventory_cycle(ctx, now=NOW + HOUR)
     assert len([c for c in responses.calls if c.request.url.endswith("/risk_details")]) == 1
+
+
+# ── Group E: switching PCE while work is in flight ──────────────────────────
+
+def _switch_to_b(ctx):
+    ctx.settings.update(ctx.settings.current().revision,
+                        lambda d: d["pce"].update({"url": "https://pce-b.example.com:8443"}))
+    reset_for_new_pce(ctx, now=NOW)
+
+
+def _bound_host(ctx):
+    with ctx.flows().connect() as conn:
+        b = binding.current(conn)
+    return b.pce_url if b else None
+
+
+def test_collector_running_across_a_pce_switch_writes_nothing(tmp_path, fake_fill):  # finding 17
+    ctx = configured_ctx(tmp_path)
+    def answer(s, e, m):
+        _switch_to_b(ctx)  # the switch lands while A's query is in flight
+        return [raw_flow(1, NOW - minutes(30), NOW - minutes(20))]
+    fake_fill.answer = answer
+    run_traffic_cycle(ctx, now=NOW)
+    assert _count(ctx) == 0 and _bound_host(ctx) is None
+    with ctx.flows().connect() as conn:
+        assert ingest_state.all_states(conn) == {} and ingest_state.open_gaps(conn) == []
+    fake_fill.answer = lambda s, e, m: [raw_flow(2, NOW - minutes(30), NOW - minutes(20))]
+    run_traffic_cycle(ctx, now=NOW + minutes(10))  # B collects normally
+    assert _count(ctx) == 1 and "pce-b" in _bound_host(ctx)
+
+
+def test_archive_running_across_a_pce_switch_writes_nothing(tmp_path, monkeypatch):  # finding 18
+    from illumio_ops.services.collect import archive as archive_job
+    ctx = configured_ctx(tmp_path)
+    _archiving(ctx)
+    day = NOW - 3 * DAY
+    _store(ctx, [raw_flow(1, day, day + minutes(1))])
+    real = archive_job.archive.archived_days
+    def switch_then_list(conn, kind):
+        if kind == "flows":
+            _switch_to_b(ctx)  # A's day list is in hand; the database is now B's
+        return real(conn, kind)
+    monkeypatch.setattr(archive_job.archive, "archived_days", switch_then_list)
+    assert run_archive(ctx, now=NOW) == 0
+    assert [p.name for p in ctx.paths.archive_dir.iterdir() if p.is_file()] == []
+    assert _count(ctx, "archive_log") == 0

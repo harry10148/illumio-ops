@@ -36,7 +36,9 @@ def reset_for_new_pce(ctx: AppContext, *, now: datetime | None = None) -> ResetR
     at = (now or datetime.now(UTC)).astimezone(UTC)
     fdb = ctx.flows()
     moved: str | None = None
-    with fdb.write_lock:  # waits for a collector that is mid-write
+
+    def move_archive_aside() -> None:
+        nonlocal moved
         archive_dir = ctx.paths.archive_dir
         files = [p for p in archive_dir.iterdir() if p.is_file()] if archive_dir.is_dir() else []
         if files:
@@ -45,7 +47,11 @@ def reset_for_new_pce(ctx: AppContext, *, now: datetime | None = None) -> ResetR
             target.mkdir(mode=0o700)
             for p in files:
                 p.rename(target / p.name)
-    fdb.reset()  # takes the write lock itself
+
+    # One hold of the write lock (it waits for a collector that is mid-write): the generation moves
+    # on, the old archive goes aside and the file is rebuilt, so work begun for the old PCE writes
+    # nothing afterwards (FlowDb.writing).
+    fdb.reset(also=move_archive_aside)
     for table in APP_DB_PCE_DERIVED:
         _CLEARERS[table](ctx)
     return ResetReport(cleared=["flows", *APP_DB_PCE_DERIVED], archive_moved_to=moved)
