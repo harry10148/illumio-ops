@@ -199,3 +199,29 @@ def rebuild_rollup(conn: sqlite3.Connection, day: str) -> int:
             (day, NO_PORT, lo, hi, NO_PORT))
         return cur.rowcount
 
+
+
+def delete_connections_before(conn: sqlite3.Connection, cutoff: datetime, *, archived_days: set[str] | None) -> int:
+    """Delete whole connections whose newest record is older than cutoff; with archived_days,
+    only connections whose primary day is in that set (unarchived days are kept)."""
+    stale = conn.execute(
+        "SELECT conn_key, MAX(last_detected) AS newest FROM flows GROUP BY conn_key HAVING MAX(last_detected) < ?",
+        (db_time(cutoff),)).fetchall()
+    keys = [r["conn_key"] for r in stale if archived_days is None or str(r["newest"])[:10] in archived_days]
+    with conn:
+        for i in range(0, len(keys), 500):
+            chunk = keys[i:i + 500]
+            conn.execute(f"DELETE FROM flows WHERE conn_key IN ({','.join('?' * len(chunk))})", chunk)
+    return len(keys)
+
+
+def delete_rollups_before(conn: sqlite3.Connection, day: str) -> int:
+    with conn:
+        return conn.execute("DELETE FROM flow_rollup_daily WHERE day < ?", (day,)).rowcount
+
+
+def delete_baselines_before(conn: sqlite3.Connection, cutoff: datetime) -> int:
+    """A connection not seen within the baseline window is 'new' again when it reappears."""
+    with conn:
+        n = conn.execute("DELETE FROM connection_baseline WHERE last_seen < ?", (db_time(cutoff),)).rowcount
+        return n + conn.execute("DELETE FROM user_baseline WHERE last_seen < ?", (db_time(cutoff),)).rowcount

@@ -44,3 +44,8 @@ def snapshot_day(conn: sqlite3.Connection, day: str) -> int:
             "risk_exposure, risk_percent) SELECT ?, href, enforcement_mode, visibility_level, risk_exposure, "
             "risk_percent FROM workloads", (day,)).rowcount
 
+
+
+def delete_snapshots_before(conn: sqlite3.Connection, day: str) -> int:
+    with conn:
+        return conn.execute("DELETE FROM workload_snapshot_daily WHERE day < ?", (day,)).rowcount

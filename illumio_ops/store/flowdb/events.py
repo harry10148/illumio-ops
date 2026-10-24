@@ -25,3 +25,12 @@ def upsert_events(conn: sqlite3.Connection, records: Sequence[EventRecord], *, o
               origin.value, stamp) for r in records],
         )
         return conn.total_changes - before
+
+
+def delete_events_before(conn: sqlite3.Connection, cutoff: datetime, *, archived_days: set[str] | None) -> int:
+    rows = conn.execute("SELECT DISTINCT substr(timestamp, 1, 10) FROM events WHERE timestamp < ?",
+                        (db_time(cutoff),)).fetchall()
+    days = [r[0] for r in rows if archived_days is None or r[0] in archived_days]
+    with conn:
+        return sum(conn.execute("DELETE FROM events WHERE timestamp < ? AND substr(timestamp, 1, 10) = ?",
+                                (db_time(cutoff), d)).rowcount for d in days)

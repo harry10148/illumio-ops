@@ -57,3 +57,9 @@ def write_org_summary(conn: sqlite3.Connection, day: str, summary: Mapping[str, 
     with conn:
         conn.execute("INSERT OR REPLACE INTO org_risk_snapshot_daily (day, summary_json) VALUES (?, ?)",
                      (day, json.dumps(summary, separators=(",", ":"))))
+
+
+def delete_snapshots_before(conn: sqlite3.Connection, day: str) -> int:
+    with conn:
+        n = conn.execute("DELETE FROM ransomware_snapshot_daily WHERE day < ?", (day,)).rowcount
+        return n + conn.execute("DELETE FROM org_risk_snapshot_daily WHERE day < ?", (day,)).rowcount

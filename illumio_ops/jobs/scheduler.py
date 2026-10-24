@@ -12,8 +12,11 @@ from loguru import logger
 from illumio_ops.jobs.health import record_finish, record_start
 from illumio_ops.pce.client import PceNotConfigured
 from illumio_ops.services import pce_health
+from illumio_ops.services.collect.archive import run_archive
+from illumio_ops.services.collect.backfill import ensure_initial_backfill
 from illumio_ops.services.collect.events import run_events_cycle
 from illumio_ops.services.collect.inventory import run_inventory_cycle
+from illumio_ops.services.collect.retention import run_retention
 from illumio_ops.services.collect.traffic import run_traffic_cycle
 from illumio_ops.services.context import AppContext
 from illumio_ops.settings.schema import Settings
@@ -21,6 +24,9 @@ from illumio_ops.web.tls import ensure_self_signed
 
 PCE_PROBE_SECONDS = 300
 TLS_RENEW_SECONDS = 86400
+DAILY_SECONDS = 86400
+# Checks whether a first backfill (or an interrupted one) needs to run; cheap when nothing is due.
+BACKFILL_CHECK_SECONDS = 600
 # Collectors wait a little after start-up so the listener and the first probe come first.
 COLLECTOR_FIRST_RUN_DELAY = timedelta(seconds=30)
 
@@ -34,6 +40,9 @@ def job_intervals(settings: Settings) -> dict[str, int]:
         "collect_traffic": c.traffic_interval_seconds,
         "collect_events": c.events_interval_seconds,
         "collect_inventory": c.inventory_interval_seconds,
+        "collect_backfill": BACKFILL_CHECK_SECONDS,
+        "collect_archive": DAILY_SECONDS,
+        "collect_retention": DAILY_SECONDS,
     }
 
 
@@ -83,7 +92,18 @@ def _collector_jobs(ctx: AppContext) -> dict[str, Callable[[], None]]:
     def inventory() -> None:
         run_inventory_cycle(ctx)
 
-    return {"collect_traffic": traffic, "collect_events": events, "collect_inventory": inventory}
+    def backfill() -> None:
+        ensure_initial_backfill(ctx)
+
+    def archive() -> None:
+        run_archive(ctx)
+
+    def retention() -> None:
+        run_retention(ctx)
+
+    # Archive runs before retention so that, with archiving on, expiring days are written first.
+    return {"collect_traffic": traffic, "collect_events": events, "collect_inventory": inventory,
+            "collect_backfill": backfill, "collect_archive": archive, "collect_retention": retention}
 
 
 def build_scheduler(ctx: AppContext) -> BackgroundScheduler:
