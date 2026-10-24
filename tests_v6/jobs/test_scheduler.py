@@ -77,3 +77,13 @@ def test_apply_schedule_reschedules_changed_interval(tmp_path):
     apply_schedule(sched, ctx.settings.current())
     assert sched.get_job("collect_traffic").trigger.interval.total_seconds() == 1800
     assert sched.get_job("collect_events").trigger.interval.total_seconds() == 300
+
+
+def test_flow_store_checkpoint_runs_as_its_own_job(tmp_path):
+    from illumio_ops.jobs.scheduler import FLOWS_CHECKPOINT_SECONDS
+    ctx = make_ctx(tmp_path)
+    sched = build_scheduler(ctx)
+    job = sched.get_job("flows_checkpoint")
+    assert job is not None and job.trigger.interval.total_seconds() == FLOWS_CHECKPOINT_SECONDS == 60
+    job.func()
+    assert _health(ctx)["flows_checkpoint"].last_ok is True

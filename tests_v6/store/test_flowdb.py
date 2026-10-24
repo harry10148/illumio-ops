@@ -83,3 +83,28 @@ def test_flow_origin_is_constrained(tmp_path):
                 "dst_key, src_managed, dst_managed, proto, policy_decision, first_detected, last_detected, "
                 "num_connections, origin, ingested_at) VALUES ('k','k',1,'outbound','1.1.1.1','2.2.2.2',"
                 "'ip:1.1.1.1','ip:2.2.2.2',0,0,6,'allowed','t','t',1,'live','t')")
+
+
+def _write_pages(fdb, pages):
+    with fdb.write_lock, fdb.connect() as conn:
+        conn.execute("CREATE TABLE IF NOT EXISTS scratch (b BLOB)")
+        conn.executemany("INSERT INTO scratch VALUES (randomblob(4000))", [()] * pages)
+
+
+def test_a_commit_leaves_checkpointing_to_the_background(tmp_path):
+    # Measured at 1M rows/day: the automatic checkpoint inside a collection commit wrote ~43k pages
+    # back at random positions, 7 of 17 s, under the write lock. Commits now only append to the WAL.
+    fdb = FlowDb(tmp_path / "flows.sqlite")
+    fdb.connect().close()
+    before = fdb.path.stat().st_size
+    _write_pages(fdb, 3000)  # three times SQLite's default automatic-checkpoint threshold
+    assert fdb.path.stat().st_size - before < 1_000_000  # still in the WAL
+    done = fdb.checkpoint()
+    assert done >= 3000 and fdb.path.stat().st_size - before > 12_000_000
+
+
+def test_a_stalled_background_checkpoint_still_bounds_the_wal(tmp_path):
+    fdb = FlowDb(tmp_path / "flows.sqlite")
+    with fdb.connect() as conn:
+        assert conn.execute("PRAGMA wal_autocheckpoint").fetchone()[0] == FlowDb.WAL_SAFETY_NET_PAGES
+        assert conn.execute("PRAGMA journal_size_limit").fetchone()[0] == FlowDb.WAL_KEEP_BYTES

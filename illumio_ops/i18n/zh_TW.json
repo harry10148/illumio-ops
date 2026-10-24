@@ -99,6 +99,7 @@
   "job_name_collect_events": "事件收集",
   "job_name_collect_inventory": "工作負載與勒索防護",
   "job_name_collect_retention": "保留期清理",
+  "job_name_flows_checkpoint": "流量庫寫回",
   "job_name_collect_traffic": "流量收集",
   "job_name_pce_probe": "PCE 健康檢查",
   "job_name_tls_renew_check": "憑證續期檢查",

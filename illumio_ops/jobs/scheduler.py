@@ -27,6 +27,8 @@ TLS_RENEW_SECONDS = 86400
 DAILY_SECONDS = 86400
 # Checks whether a first backfill (or an interrupted one) needs to run; cheap when nothing is due.
 BACKFILL_CHECK_SECONDS = 600
+# Moves committed flow-store pages from the WAL into the database outside the write lock (FlowDb).
+FLOWS_CHECKPOINT_SECONDS = 60
 # Collectors wait a little after start-up so the listener and the first probe come first.
 COLLECTOR_FIRST_RUN_DELAY = timedelta(seconds=30)
 
@@ -43,6 +45,7 @@ def job_intervals(settings: Settings) -> dict[str, int]:
         "collect_backfill": BACKFILL_CHECK_SECONDS,
         "collect_archive": DAILY_SECONDS,
         "collect_retention": DAILY_SECONDS,
+        "flows_checkpoint": FLOWS_CHECKPOINT_SECONDS,
     }
 
 
@@ -101,9 +104,13 @@ def _collector_jobs(ctx: AppContext) -> dict[str, Callable[[], None]]:
     def retention() -> None:
         run_retention(ctx)
 
+    def checkpoint() -> None:
+        ctx.flows().checkpoint()
+
     # Archive runs before retention so that, with archiving on, expiring days are written first.
     return {"collect_traffic": traffic, "collect_events": events, "collect_inventory": inventory,
-            "collect_backfill": backfill, "collect_archive": archive, "collect_retention": retention}
+            "collect_backfill": backfill, "collect_archive": archive, "collect_retention": retention,
+            "flows_checkpoint": checkpoint}
 
 
 def build_scheduler(ctx: AppContext) -> BackgroundScheduler:

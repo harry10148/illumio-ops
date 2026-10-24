@@ -16,6 +16,7 @@ const JOB_LABEL_KEYS: Record<string, string> = {
   collect_backfill_manual: "job_name_collect_backfill_manual",
   collect_archive: "job_name_collect_archive",
   collect_retention: "job_name_collect_retention",
+  flows_checkpoint: "job_name_flows_checkpoint",
 };
 
 function every(seconds: number | null): string {

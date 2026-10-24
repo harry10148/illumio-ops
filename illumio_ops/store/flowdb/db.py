@@ -53,6 +53,13 @@ class StaleGeneration(Exception):
 
 
 class FlowDb:
+    # Checkpointing is the flows_checkpoint job's, outside the write lock: inside a collection commit
+    # it wrote ~43k pages back at random positions, 7 of 17 s at 1M rows/day (P2 re-measure). The
+    # automatic checkpoint stays as a safety net far above one cycle's pages, so a stalled job cannot
+    # let the WAL grow without bound; a checkpointed WAL file is cut back to WAL_KEEP_BYTES.
+    WAL_SAFETY_NET_PAGES = 250_000  # about 1 GB of WAL
+    WAL_KEEP_BYTES = 64 * 1024 * 1024
+
     def __init__(self, path: Path) -> None:
         self.path = Path(path)
         self.write_lock = threading.Lock()
@@ -72,11 +79,23 @@ class FlowDb:
     def connect(self) -> sqlite3.Connection:
         conn = connect(self.path)
         try:
+            conn.execute(f"PRAGMA wal_autocheckpoint={self.WAL_SAFETY_NET_PAGES}")
+            conn.execute(f"PRAGMA journal_size_limit={self.WAL_KEEP_BYTES}")
             migrate(conn, MIGRATIONS_PACKAGE)
         except BaseException:
             conn.close()
             raise
         return conn
+
+    def checkpoint(self) -> int:
+        """Copy committed WAL pages into the database file without waiting for readers or writers
+        (no write lock); returns the pages checkpointed."""
+        conn = self.connect()
+        try:
+            _busy, _log, done = conn.execute("PRAGMA wal_checkpoint(PASSIVE)").fetchone()
+        finally:
+            conn.close()
+        return int(done)
 
     def reset(self, *, also: Callable[[], None] | None = None) -> None:
         """Drop every row by recreating the file (used when the PCE changes). `also` runs in the

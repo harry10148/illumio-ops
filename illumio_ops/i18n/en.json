@@ -99,6 +99,7 @@
   "job_name_collect_events": "Event collection",
   "job_name_collect_inventory": "Workloads and ransomware protection",
   "job_name_collect_retention": "Retention clean-up",
+  "job_name_flows_checkpoint": "Flow store write-back",
   "job_name_collect_traffic": "Traffic collection",
   "job_name_pce_probe": "PCE health check",
   "job_name_tls_renew_check": "Certificate renewal check",
