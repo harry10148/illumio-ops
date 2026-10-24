@@ -44,17 +44,31 @@ def migrate(conn: sqlite3.Connection, package: str = APP_MIGRATIONS) -> int:
     """
     migrations = _migrations(package)
     latest = migrations[-1][0] if migrations else 0
-    current = int(conn.execute("PRAGMA user_version").fetchone()[0])
+    current = _user_version(conn)
     if current > latest:
         raise RuntimeError(f"database schema version {current} is newer than this program ({latest})")
-    for version, sql in migrations:
-        if version <= current:
-            continue
-        try:
-            conn.executescript(f"BEGIN;\n{sql}\nPRAGMA user_version = {version};\nCOMMIT;")
-        except sqlite3.Error:
-            if conn.in_transaction:
-                conn.rollback()
-            raise
-        current = version
-    return current
+    pending = [(v, sql) for v, sql in migrations if v > current]
+    if not pending:
+        return current
+    # Job threads (and the rescue command) open a new database at the same moment: each step
+    # takes the write lock first and re-reads the version under it, so it is applied once.
+    legacy = conn.autocommit
+    conn.autocommit = True  # executescript must not commit the BEGIN IMMEDIATE below
+    try:
+        for version, sql in pending:
+            conn.execute("BEGIN IMMEDIATE")
+            try:
+                if _user_version(conn) < version:
+                    conn.executescript(f"{sql}\nPRAGMA user_version = {version};")
+                conn.execute("COMMIT")
+            except BaseException:
+                if conn.in_transaction:
+                    conn.execute("ROLLBACK")
+                raise
+    finally:
+        conn.autocommit = legacy
+    return _user_version(conn)
+
+
+def _user_version(conn: sqlite3.Connection) -> int:
+    return int(conn.execute("PRAGMA user_version").fetchone()[0])

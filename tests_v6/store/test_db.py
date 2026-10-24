@@ -52,3 +52,51 @@ def test_pce_probe_is_single_row(tmp_path):
     migrate(conn)
     with pytest.raises(sqlite3.IntegrityError):
         conn.execute("INSERT INTO pce_probe(id, checked_at, results_json) VALUES (2, 'x', '[]')")
+
+
+class _MigratedByAnotherAfterRead(sqlite3.Connection):
+    """Another connection migrates the file right after this one first reads the version: the
+    window two job threads opening a new database at once fall into."""
+    other_path = None
+
+    def execute(self, sql, *args):
+        cur = super().execute(sql, *args)
+        if sql == "PRAGMA user_version" and type(self).other_path is not None:
+            path, type(self).other_path = type(self).other_path, None
+            other = connect(path)
+            migrate(other)
+            other.close()
+        return cur
+
+
+def test_migration_applied_by_another_connection_meanwhile_is_not_reapplied(tmp_path):
+    path = tmp_path / "app.sqlite"
+    connect(path).close()
+    _MigratedByAnotherAfterRead.other_path = path
+    conn = sqlite3.connect(path, factory=_MigratedByAnotherAfterRead)
+    latest = db._migrations()[-1][0]
+    assert migrate(conn) == latest
+    assert conn.execute("PRAGMA user_version").fetchone()[0] == latest
+
+
+def test_threads_opening_a_new_flow_store_at_once_all_succeed(tmp_path):
+    import threading
+
+    from illumio_ops.store.flowdb.db import FlowDb
+
+    fdb = FlowDb(tmp_path / "flows.sqlite")
+    start, errors = threading.Barrier(8), []
+
+    def open_it():
+        start.wait()
+        try:
+            fdb.connect().close()
+        except Exception as e:  # noqa: BLE001 - the test collects every failure
+            errors.append(e)
+
+    threads = [threading.Thread(target=open_it) for _ in range(8)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    assert errors == []
