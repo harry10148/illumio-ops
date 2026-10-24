@@ -504,7 +504,7 @@ VEN 車隊總覽。架構保留「政策動作」服務的位置，v6.1 加入�
   （§6.6 F5）；取代 5.x 報表自訂的勒索 port 清單（`report_config.yaml`，與主控台數字對不起來）。
 - **分數照原廠算法呈現並附拆解**（§6.6 F6）：每台主機列出「服務、嚴重度權重、覆蓋率、貢獻」；allow 規則造成的
   扣分要指出是哪條規則，並說明「被允許的來源仍算攻擊面，這是原廠刻意的設計」。逐主機逐服務的精確覆蓋率 API 不提供
-  （只有 `protection_state`），可用 app group 的逐服務平均覆蓋率；做不到精確時寫明是近似。
+  （只有 `protection_state`）；app group 逐服務覆蓋率的端點位置未知（§6.6 角色表），找到前一律以 `protection_state` 呈現並寫明是近似。
 - **矛盾要標出來**：例如「全部服務已防護，但分數 0%」（lab 實況），標為「原廠數字與明細不一致」，不拿來排序。
 - **疊加流量**：「未防護＋listening」再依近 30 天有無流量分成「最優先（有人在用）」與「可直接封（零影響）」；
   「未防護＋inactive 卻有連線嘗試」標為可疑。
@@ -523,8 +523,8 @@ services 條目只有 port、to_port、proto、process_name、windows_service_na
 - 資料模型存成兩組維度：**發起端 process／使用者**（來自 outbound）與**服務端 process／使用者**（來自 inbound），
   畫面與報表都分開顯示，不混成一欄。
 - **去重**：兩端都受管時同一條連線可能被兩邊各回報一次（lab 有 258 筆兩端皆受管的 flow 帶 process／使用者）。
-  聚合以「一條連線」為單位，兩邊的屬性合併到同一筆；配對規則由 builder 依實測定（候選鍵：來源 IP、目的 IP、
-  port、協定、時間重疊）。配對不確定時寧可分開計並標示，不得默默重複計數。
+  聚合以「一條連線」為單位，兩邊的屬性合併到同一筆；配對規則依實測（§6.6 F11）：來源 IP、目的 IP、port、協定相同，方向相反，且時間區間重疊或相距 ≤ 600 秒；
+  不得用 `first_detected` 相等配對。配對不確定時寧可分開計並標示，不得默默重複計數。
 - **正規化**：process 名稱去路徑、Windows 不分大小寫；使用者拆成網域與帳號，系統帳號（`NT AUTHORITY\*`、`root`、
   服務帳號）可一鍵排除。
 - **比對**：部分比對與萬用字元（`*`），不分大小寫；不做正規表示式【判斷 修訂】。
@@ -574,6 +574,9 @@ services 條目只有 port、to_port、proto、process_name、windows_service_na
   `/sec_policy/{p}/deny_rules` 在 lab 回 404（實測）。
 - **F9 5.x 可回收的分析**：`mod15_lateral_movement`（BFS 可達、articulation points）、`attack_posture`
   （攻擊階段排序）、rules_engine B006（扇出）與 L010（跨環境管理 port）。
+- **F11 雙端回報（實測，lab 7 天）**：兩端都受管的 1,882 筆 flow 依（來源 IP、目的 IP、port、協定）分成 1,707 組；只有 outbound 的
+  1,515 組、只有 inbound 的 73 組、**inbound 與 outbound 都有的約 75 組**（約 4%）。154 對 outbound×inbound 配對中，150 對時間區間重疊、
+  3 對相距 10 分鐘內、1 對超過 10 分鐘；只有 12 對 `first_detected` 完全相同，所以不能用相同首見時間配對。
 - **F10 process／使用者屬於回報端（實測，lab 7 天）**：2,412 筆帶 process 或使用者的 flow 中，outbound 2,184、
   inbound 228；兩端受管情形（來源受管, 目的受管）＝(是, 否) 2,099、(是, 是) 258、(否, 是) 55。outbound 的值是
   發起端（`harry`／`root` 的 443、`LAB\Administrator` 的 `onedrive.exe`），inbound 的值是服務端（`dns.exe`、
@@ -581,20 +584,24 @@ services 條目只有 port、to_port、proto、process_name、windows_service_na
   P2 驗證）。async query 的 services 條目可用欄位只有 port／to_port／proto／process_name／windows_service_name
   （2026-07 經官方 API guide 查證），使用者不能當條件。
 
-**修訂版新增呼叫的角色需求**（P2 開工時先用臨時 `read_only` service account 實測未驗項目，方法同 P1 Task 0；
-若橫向移動或勒索的核心讀取需要比 `read_only` 更高的角色，雙 key 設計要重議）：
+**修訂版新增呼叫的角色需求**（2026-10-24 P2 計畫撰寫時實測，lab 與 NFR 結果相同；方法同 P1 Task 0：以 API 臨時建立各角色
+service account、寫入類送無效 body——403＝無權限、406＝有權限——測完即刪）：
 
-| 呼叫 | 用途 | `read_only` |
-|---|---|---|
-| `POST /traffic_flows/async_queries` | 收集、工作台 | ✓ 已實測（NFR） |
-| `PUT {query}/update_rules` | 預計阻擋重算 | 未驗 |
-| `GET /events`（agent.tampering 等） | 竄改、前兆 | ✓ 已實測（events 讀取） |
-| `GET /workloads`（visibility_level、risk_summary） | 可見度、勒索 | ✓ 端點已實測；欄位是否因角色缺漏未驗 |
-| `GET {workload}/risk_details` | 勒索明細 | 未驗 |
-| `GET /reports/risk_summary` | 組織勒索摘要 | 未驗（`read_only` 不能 `POST /reports`） |
-| `GET /app_groups/risk_summary`、`/app_groups/{id}/risk_details` | app group 勒索 | 未驗 |
-| `GET /sec_policy/{p}/rule_sets`（含 deny_rules） | 規則名稱、試算 | ✓ 已實測 |
-| `POST /labels`、`PUT {workload}`（labels） | 隔離 | ✗ 需要寫入；最小可用角色未驗 |
+| 呼叫 | 用途 | owner | `read_only` | workload_manager | global_object_provisioner | admin |
+|---|---|---|---|---|---|---|
+| `PUT {query}/update_rules` | 預計阻擋重算 | ✓ | ✓ | ✗（連流量查詢都不能送） | ✓ | ✓ |
+| `GET /workloads`（`risk_summary`、`visibility_level` 欄位） | 可見度、勒索 | ✓ | ✓ | ✓ | ✓ | ✓ |
+| `GET {workload}/risk_details` | 勒索明細 | ✓ | ✓ | ✓ | ✓ | ✓ |
+| `GET /reports/risk_summary` | 組織勒索摘要 | ✓ | ✓ | ✗ | ✓ | ✓ |
+| `GET /app_groups/risk_summary` | app group 勒索 | ✓ | ✓ | ✓ | ✓ | ✓ |
+| `GET {app_group href}/risk_details` | app group 逐服務覆蓋率 | 404（各角色皆同：路徑或 href 形式不對，**端點位置未知**） | | | | |
+| `GET /events?event_type=agent.tampering` | 竄改、前兆 | ✓ | ✓ | ✗ | ✓ | ✓ |
+| `POST /labels`（建立 Quarantine label） | 隔離 | ✓ | ✗ | ✗ | ✗ | ✓ |
+| `PUT {workload}`（labels） | 隔離 | ✓ | ✗ | ✓ | ✗ | ✓ |
+
+結論：**橫向移動、勒索、竄改的所有讀取在 `read_only` 下可用，雙 key 設計不需重議**。隔離需要能建 label（owner 或 admin；
+label 已存在時 workload_manager 也能套用）；RHC 需要 owner，所以寫入用 key 建議 owner。app group 逐服務覆蓋率的端點位置未知，
+§6.5.6 的「可用 app group 逐服務平均覆蓋率」在找到正確端點前不成立，拆解先以 `protection_state` 呈現並標為近似。
 
 ## 7. 從 5.x 升級【使用者：設定必須帶過去，資料不必】
 
