@@ -71,6 +71,8 @@ class SettingsStore:
             data = json.loads(raw)
         except json.JSONDecodeError as exc:
             raise SettingsInvalid([("", f"invalid JSON (line {exc.lineno}, column {exc.colno})")]) from None
+        except ValueError:  # UnicodeDecodeError: not UTF-8 text
+            raise SettingsInvalid([("", "not UTF-8 text")]) from None
         s = validate_settings(data)
         with self._lock:
             self._current = s

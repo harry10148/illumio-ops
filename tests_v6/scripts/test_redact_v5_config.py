@@ -68,3 +68,33 @@ def test_secrets_hosts_ips_org_replaced(tmp_path):
 def test_prints_nothing_to_stdout(tmp_path):
     r, _ = _run(tmp_path)
     assert r.stdout == ""
+
+
+LEAKY = {
+    "web_gui": {"username": "customer-admin", "allowed_ips": ["2001:db8:abcd::1", "10.9.8.0/24"]},
+    "alerts": {"telegram_chat_id": "-1001234567890", "active": ["mail", "line"]},
+    "siem": {"destinations": [
+        {"name": "corp-graylog", "endpoint": "logs.customer.local:514"},
+        {"name": "b", "transport": "hec",
+         "endpoint": "https://svc:FAKE_PASSWORD!@logs.customer.local:8088/services/collector?token=QSECRET"},
+    ]},
+    "api": {"url": "https://pce.customer.local/api/FAKE_SHARED_SECRET_1234567890"},
+    "rules": [{"desc": "from server.customer.local"}],
+    "settings": {"language": "en", "timezone": "Asia/Taipei"},
+}
+
+
+def test_default_deny_leaves_nothing_identifying(tmp_path):
+    src, dst = tmp_path / "in.json", tmp_path / "out.json"
+    src.write_text(json.dumps(LEAKY))
+    r = subprocess.run([sys.executable, "-I", str(SCRIPT), str(src), str(dst)], capture_output=True, text=True,
+                       timeout=60, check=False)
+    assert r.returncode == 0, r.stderr
+    text = dst.read_text()
+    for value in ("customer", "2001:db8:abcd::1", "10.9.8.0", "-1001234567890", "FAKE_PASSWORD", "QSECRET",
+                  "FAKE_SHARED_SECRET", "corp-graylog", "svc"):
+        assert value not in text, value
+    out = json.loads(text)
+    assert out["settings"] == LEAKY["settings"] and out["alerts"]["active"] == ["mail", "line"]
+    assert out["web_gui"]["allowed_ips"][1].endswith("/24")  # network shape kept
+    assert out["siem"]["destinations"][1]["transport"] == "hec"

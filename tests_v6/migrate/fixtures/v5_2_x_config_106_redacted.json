@@ -2,7 +2,7 @@
   "api": {
     "url": "https://host-1.example.invalid:8443",
     "org_id": "1",
-    "key": "REDACTED",
+    "key": "redacted-1",
     "secret": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
     "profile": "dev",
     "verify_ssl": false,
@@ -14,24 +14,24 @@
       "line",
       "mail"
     ],
-    "line_channel_access_token": "REDACTED",
-    "line_target_id": "REDACTED",
+    "line_channel_access_token": "redacted-2",
+    "line_target_id": "redacted-3",
     "webhook_url": "",
     "telegram_bot_token": "",
     "telegram_chat_id": "",
     "teams_webhook_url": ""
   },
   "email": {
-    "sender": "user@example.invalid",
+    "sender": "redacted-4",
     "recipients": [
-      "user@example.invalid"
+      "redacted-5"
     ]
   },
   "smtp": {
-    "host": "host-2.example.invalid",
+    "host": "redacted-6",
     "port": 587,
-    "user": "user@example.invalid",
-    "password": "REDACTED",
+    "user": "redacted-7",
+    "password": "redacted-8",
     "enable_auth": true,
     "enable_tls": true
   },
@@ -42,32 +42,32 @@
     "enable_health_check": true,
     "dashboard_queries": [
       {
-        "name": "Design-v2 AND sample",
-        "rank_by": "count",
+        "name": "redacted-9",
+        "rank_by": "redacted-10",
         "pd": 3,
         "port": null,
         "proto": null,
         "ex_port": null,
         "src_labels": [
-          "DemoApp"
+          "redacted-11"
         ],
         "dst_labels": [
-          "CoreServices"
+          "redacted-12"
         ],
         "ports": [
-          "443"
+          "redacted-13"
         ]
       },
       {
-        "name": "Design-v2 OR sample",
-        "rank_by": "count",
+        "name": "redacted-14",
+        "rank_by": "redacted-15",
         "pd": 3,
         "port": null,
         "proto": null,
         "ex_port": null,
-        "any_label": "DemoApp",
+        "any_label": "redacted-16",
         "ports": [
-          "3389"
+          "redacted-17"
         ]
       }
     ]
@@ -82,7 +82,7 @@
       "html"
     ],
     "email_report": false,
-    "output_dir": "reports/",
+    "output_dir": "redacted-18",
     "retention_days": 30,
     "include_raw_data": false,
     "max_top_n": 20,
@@ -97,11 +97,11 @@
   "report_schedules": [
     {
       "id": 1785735229014,
-      "name": "UI Redesign Snapshot Demo",
+      "name": "redacted-19",
       "cron_expr": null,
       "timezone": "local",
       "report_type": "audit_summary",
-      "schedule_type": "weekly",
+      "schedule_type": "redacted-20",
       "day_of_week": "mon",
       "day_of_month": 1,
       "hour": 8,
@@ -122,10 +122,10 @@
   },
   "scheduler": {
     "persist": false,
-    "db_path": "config/scheduler.db"
+    "db_path": "redacted-21"
   },
   "web_gui": {
-    "username": "illumio",
+    "username": "redacted-22",
     "password": "$argon2id$v=19$m=131072,t=4,p=4$cmVkYWN0ZWRzYWx0$cmVkYWN0ZWRyZWRhY3RlZHJlZGFjdGVkcmVkYWN0ZWQ",
     "secret_key": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
     "allowed_ips": [],
@@ -154,7 +154,7 @@
   "rule_backups": [],
   "pce_cache": {
     "enabled": true,
-    "db_path": "data/pce_cache.sqlite",
+    "db_path": "redacted-23",
     "events_retention_days": 90,
     "traffic_raw_retention_days": 7,
     "traffic_agg_retention_days": 90,
@@ -174,7 +174,7 @@
       "max_rows_per_batch": 200000
     },
     "archive_enabled": true,
-    "archive_dir": "data/archive",
+    "archive_dir": "redacted-24",
     "archive_interval_hours": 24,
     "archive_gzip_after_days": 7,
     "archive_retention_days": 365,
@@ -188,7 +188,7 @@
     "enabled": true,
     "destinations": [
       {
-        "name": "graylog",
+        "name": "redacted-25",
         "enabled": true,
         "transport": "tcp",
         "format": "cef_pce",
@@ -200,8 +200,8 @@
         "hec_token": null,
         "batch_size": 100,
         "source_types": [
-          "audit",
-          "traffic"
+          "redacted-26",
+          "redacted-27"
         ],
         "traffic_pd": [],
         "max_retries": 10,

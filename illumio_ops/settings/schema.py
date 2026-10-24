@@ -129,7 +129,7 @@ class DisplaySettings(StrictModel):
 
 
 class LoggingSettings(StrictModel):
-    level: Literal["DEBUG", "INFO", "WARNING", "ERROR"]
+    level: Literal["TRACE", "DEBUG", "INFO", "SUCCESS", "WARNING", "ERROR", "CRITICAL"]  # loguru's levels
 
 
 class Settings(StrictModel):

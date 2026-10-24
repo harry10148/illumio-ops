@@ -25,18 +25,15 @@ from illumio_ops.web.server import serve
 
 def cmd_serve(root: Path | None) -> int:
     paths = resolve_paths(root)
-    try:
-        paths.ensure_dirs()
-    except OSError as exc:
-        sys.stderr.write(f"cannot create the data directories under {paths.root}: {exc.strerror}\n")
-        return EXIT_UNAVAILABLE
-    configure_logging(paths, "INFO")
+    configure_logging(None, "INFO")  # stderr (the journal) until the settings are known to be valid
     try:
         rt = prepare(root)
     except StartupError as exc:
-        logger.error("not starting: {}", exc.message)
         sys.stderr.write(exc.message + "\n")
         return exc.exit_code
+    except OSError as exc:
+        sys.stderr.write(f"cannot prepare {paths.root}: {exc.strerror or type(exc).__name__}\n")
+        return EXIT_UNAVAILABLE
     s = rt.ctx.settings.current()
     configure_logging(paths, s.logging.level)
     stop = threading.Event()

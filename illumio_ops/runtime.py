@@ -46,10 +46,12 @@ def acquire_service_lock(paths: InstallPaths) -> int:
     return fd
 
 
-def configure_logging(paths: InstallPaths, level: str) -> None:
+def configure_logging(paths: InstallPaths | None, level: str) -> None:
+    """stderr only while paths is None (before the settings are known to be valid)."""
     logger.remove()
     logger.add(sys.stderr, level=level)
-    logger.add(paths.logs_dir / "illumio-ops.log", level=level, rotation="10 MB", retention=10, enqueue=True)
+    if paths is not None:
+        logger.add(paths.logs_dir / "illumio-ops.log", level=level, rotation="10 MB", retention=10, enqueue=True)
 
 
 def load_settings(store: SettingsStore) -> Settings:
@@ -77,12 +79,20 @@ def _tls_material(paths: InstallPaths, s: Settings) -> tuple[ssl.SSLContext | No
     if not tls.enabled:
         return None, None
     if tls.mode == "self_signed":
-        cert, key = ensure_self_signed(paths.tls_dir, tls)
+        try:
+            cert, key = ensure_self_signed(paths.tls_dir, tls)
+        except OSError as exc:
+            raise StartupError(EXIT_CONFIG, f"Cannot write the self-signed certificate in {paths.tls_dir} "
+                                            f"({exc.strerror or type(exc).__name__}).") from None
     else:
         cert, key = Path(tls.cert_file), Path(tls.key_file)
         if not (cert.is_file() and key.is_file()):
             raise StartupError(EXIT_CONFIG, f"TLS certificate or key file not found ({cert}, {key}).")
-    ctx = build_ssl_context(tls)
+    try:
+        ctx = build_ssl_context(tls)
+    except ssl.SSLError:
+        raise StartupError(EXIT_CONFIG, "The TLS cipher list in the settings is not accepted "
+                                        "(web.tls.ciphers).") from None
     try:
         ctx.load_cert_chain(cert, key)
     except (ssl.SSLError, OSError) as exc:
@@ -94,6 +104,10 @@ def _tls_material(paths: InstallPaths, s: Settings) -> tuple[ssl.SSLContext | No
 
 def prepare(root: Path | None) -> Runtime:
     paths = resolve_paths(root)
+    # An existing but invalid settings file stops us before anything is written
+    # (no directories, no lock file, no log file).
+    if paths.settings_file.exists():
+        load_settings(SettingsStore(paths.settings_file))
     paths.ensure_dirs()
     lock_fd = acquire_service_lock(paths)
     try:

@@ -23,7 +23,7 @@ def _load(name):
 @pytest.mark.parametrize("name", FIXTURE_NAMES)
 def test_report_covers_every_input_leaf_key(name):
     raw = _load(name)
-    _, report = migrate_v5(raw)
+    report = migrate_v5(raw).report
     sources = [i.source for i in report.items]
     assert sorted(sources) == sorted(leaf_keys(raw))
     assert len(sources) == len(set(sources))
@@ -32,7 +32,7 @@ def test_report_covers_every_input_leaf_key(name):
 @pytest.mark.parametrize("name", FIXTURE_NAMES)
 def test_migrated_settings_validate(name):
     raw = _load(name)
-    s, _ = migrate_v5(raw)
+    s = migrate_v5(raw).settings
     assert s.pce.url == raw["api"]["url"].rstrip("/")
     assert s.web.tls.mode == "self_signed" and s.web.tls.validity_days == raw["web_gui"]["tls"]["validity_days"]
     assert s.display.language is Language(raw["settings"]["language"])
@@ -42,7 +42,8 @@ def test_migrated_settings_validate(name):
 
 def test_argon2_hash_carried_verbatim():
     raw = _load("v5_0_0_config.json")
-    s, report = migrate_v5(raw)
+    result = migrate_v5(raw)
+    s, report = result.settings, result.report
     assert s.web.password_hash == raw["web_gui"]["password"]
     item = next(i for i in report.items if i.source == "web_gui.password")
     assert (item.target, item.action) == ("web.password_hash", "carried")
@@ -51,7 +52,8 @@ def test_argon2_hash_carried_verbatim():
 def test_plaintext_password_is_hashed_and_marked_rewritten():
     raw = _load("v5_0_0_config.json")
     raw["web_gui"]["password"] = "legacy-plain-pass"
-    s, report = migrate_v5(raw)
+    result = migrate_v5(raw)
+    s, report = result.settings, result.report
     assert verify_password("legacy-plain-pass", s.web.password_hash)
     item = next(i for i in report.items if i.source == "web_gui.password")
     assert item.action == "rewritten" and item.reason_key == "migrate_password_hashed"
@@ -60,7 +62,8 @@ def test_plaintext_password_is_hashed_and_marked_rewritten():
 def test_empty_password_becomes_the_5x_default():
     raw = _load("v5_0_0_config.json")
     raw["web_gui"]["password"] = ""
-    s, report = migrate_v5(raw)
+    result = migrate_v5(raw)
+    s, report = result.settings, result.report
     assert verify_password("illumio", s.web.password_hash)
     assert next(i for i in report.items if i.source == "web_gui.password").reason_key == "migrate_password_default"
 
@@ -72,7 +75,7 @@ def test_deprecated_keys_dropped_with_reason():
     raw["pce_profiles"] = [{"name": "x"}]
     raw["active_pce_id"] = 1
     raw["pce_cache"]["archive_review_max_days"] = 7
-    _, report = migrate_v5(raw)
+    report = migrate_v5(raw).report
     dep = {i.source: i for i in report.items if i.reason_key == "migrate_deprecated_in_5x"}
     assert set(dep) >= {"report.attack_surface.enabled", "web_gui.tls.http_redirect_port", "pce_profiles",
                         "active_pce_id", "pce_cache.archive_review_max_days"}
@@ -80,7 +83,7 @@ def test_deprecated_keys_dropped_with_reason():
 
 
 def test_unsupported_sections_name_their_phase():
-    _, report = migrate_v5(_load("v5_2_x_config_106_redacted.json"))
+    report = migrate_v5(_load("v5_2_x_config_106_redacted.json")).report
     by_source = {i.source: i for i in report.items}
     assert by_source["smtp.host"].params == {"phase": "P3"} and by_source["smtp.host"].action == "unsupported"
     assert by_source["siem.enabled"].params == {"phase": "P4"}
@@ -95,7 +98,7 @@ def test_render_never_contains_secret_values():
     raw["api"]["secret"] = "SECRET-api-value-123"
     raw["smtp"]["password"] = "SECRET-smtp-value-456"
     raw["alerts"]["line_channel_access_token"] = "SECRET-line-789"
-    _, report = migrate_v5(raw)
+    report = migrate_v5(raw).report
     for lang in Language:
         text = render(report, lang)
         assert "SECRET" not in text and raw["web_gui"]["password"] not in text and raw["web_gui"]["secret_key"] not in text
@@ -122,3 +125,85 @@ def test_report_only_writes_nothing(tmp_path):
     assert r.returncode == 0, r.stderr
     assert "api.secret" in r.stdout and "fake-secret" not in r.stdout
     assert sorted(str(p) for p in tmp_path.rglob("*")) == before
+
+
+# ── 5.x semantics (adversarial review of Task 12) ─────────────────────────
+
+def _base():
+    return _load("v5_0_0_config.json")
+
+
+def _item(report, source):
+    return next(i for i in report.items if i.source == source)
+
+
+def test_5x_normalisation_strips_and_coerces():
+    raw = _base()
+    raw["api"]["verify_ssl"] = "true"
+    raw["api"]["key"] = " FAKE_KEY "
+    raw["web_gui"]["password"] = " legacy-password "
+    result = migrate_v5(raw)
+    s = result.settings
+    assert s.pce.verify_tls is True and s.pce.api_key == "FAKE_KEY"
+    assert verify_password("legacy-password", s.web.password_hash)
+    assert _item(result.report, "api.verify_ssl").action == "rewritten"
+    assert _item(result.report, "api.key").action == "rewritten"
+
+
+def test_provided_cert_paths_win_over_self_signed_flag():
+    raw = _base()
+    raw["web_gui"]["tls"].update(self_signed=True, cert_file="/etc/pki/c.pem", key_file="/etc/pki/k.pem")
+    s = migrate_v5(raw).settings
+    assert s.web.tls.mode == "provided" and s.web.tls.cert_file == "/etc/pki/c.pem"
+    raw["web_gui"]["tls"].update(self_signed="false", cert_file="", key_file="")
+    assert migrate_v5(raw).settings.web.tls.mode == "self_signed"  # 5.x: enabled without files
+
+
+def test_missing_keys_take_the_5x_defaults():
+    raw = _base()
+    del raw["api"]["org_id"]
+    del raw["web_gui"]
+    result = migrate_v5(raw)
+    assert result.settings.pce.org_id == "1"
+    assert result.settings.web.username == "illumio"
+
+
+@pytest.mark.parametrize(("path", "value", "expected"), [
+    ("web_gui.session_lifetime_seconds", 30, 60),
+    ("settings.timezone", "", "local"),
+    ("settings.timezone", "Mars/Olympus", "UTC"),
+    ("web_gui.tls.min_version", "TLSv1.1", "TLSv1.2"),
+    ("web_gui.tls.key_algorithm", "rsa-4096", "ecdsa-p256"),
+    ("logging.level", "CRITICAL", "CRITICAL"),
+    ("api.url", "https://pce.example.com:8443/", "https://pce.example.com:8443"),
+    ("web_gui.tls.enabled", "false", False),
+])
+def test_5x_values_become_their_effective_v6_value(path, value, expected):
+    raw = _base()
+    *parents, leaf = path.split(".")
+    node = raw
+    for p in parents:
+        node = node[p]
+    node[leaf] = value
+    result = migrate_v5(raw)
+    target = result.settings.model_dump(mode="json")
+    for part in _item(result.report, path).target.split("."):
+        target = target[part]
+    assert target == expected
+    assert _item(result.report, path).action == ("carried" if value == expected else "rewritten")
+
+
+def test_non_numeric_org_id_blocks_but_the_report_is_complete():
+    raw = _base()
+    raw["api"]["org_id"] = "tenant-a"
+    result = migrate_v5(raw)
+    assert result.settings is None and [p for p, _ in result.blocking] == ["api.org_id"]
+    assert sorted(i.source for i in result.report.items) == sorted(leaf_keys(raw))
+
+
+def test_dotted_extra_keys_stay_distinct():
+    raw = _base()
+    raw["web_gui"]["audit"] = {"destination": 1}
+    raw["web_gui"]["audit.destination"] = 2
+    sources = [i.source for i in migrate_v5(raw).report.items]
+    assert len(sources) == len(set(sources)) == len(leaf_keys(raw))

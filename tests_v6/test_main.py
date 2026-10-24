@@ -110,3 +110,49 @@ def test_serve_starts_https_and_stops_on_sigterm(tmp_path):
         proc.send_signal(signal.SIGTERM)
         _out, err = proc.communicate(timeout=30)
     assert proc.returncode == 0, err[-2000:]
+
+
+def _tree(root: Path) -> list[str]:
+    return sorted(str(p.relative_to(root)) for p in root.rglob("*"))
+
+
+def test_invalid_settings_write_nothing_at_all(tmp_path):
+    cfg = tmp_path / "config"
+    cfg.mkdir()
+    f = cfg / "settings.json"
+    paths = resolve_paths(tmp_path)
+    SettingsStore(paths.settings_file).create_initial(password_hash=cached_hash("illumio"), secret_key="ab" * 32)
+    d = json.loads(f.read_text())
+    d["web"]["port"] = 0
+    f.write_text(json.dumps(d))
+    before = _tree(tmp_path)
+    r = _run(tmp_path)
+    assert r.returncode == 78
+    assert _tree(tmp_path) == before  # no logs/, no data/service.lock, nothing
+
+
+def test_undecodable_settings_exit_78(tmp_path):
+    f = _initial(tmp_path)
+    f.write_bytes(b'{"schema_version": 1, "x": "\xff"}')
+    r = _run(tmp_path)
+    assert r.returncode == 78 and "Traceback" not in r.stderr
+
+
+def test_bad_ciphers_exit_78(tmp_path):
+    f = _initial(tmp_path)
+    d = json.loads(f.read_text())
+    d["web"]["tls"]["ciphers"] = "THIS_IS_NOT_A_CIPHER"
+    f.write_text(json.dumps(d))
+    r = _run(tmp_path)
+    assert r.returncode == 78 and "Traceback" not in r.stderr
+
+
+def test_unwritable_certificate_directory_exit_78(tmp_path):
+    _initial(tmp_path)
+    tls_dir = resolve_paths(tmp_path).tls_dir
+    tls_dir.chmod(0o500)
+    try:
+        r = _run(tmp_path)
+    finally:
+        tls_dir.chmod(0o700)
+    assert r.returncode == 78 and "Traceback" not in r.stderr

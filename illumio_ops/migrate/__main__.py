@@ -12,7 +12,6 @@ from pathlib import Path
 from illumio_ops.domain.values import Language
 from illumio_ops.migrate.report import render
 from illumio_ops.migrate.v5 import migrate_v5, read_v5
-from illumio_ops.settings.store import SettingsInvalid
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -32,13 +31,12 @@ def main(argv: list[str] | None = None) -> int:
     except ValueError as exc:
         sys.stderr.write(f"{exc}\n")
         return 65
-    try:
-        _settings, report = migrate_v5(raw)
-    except SettingsInvalid as exc:
-        sys.stderr.write("the 5.x values cannot become valid v6 settings:\n")
-        sys.stderr.write("".join(f"  {loc}: {msg}\n" for loc, msg in exc.errors))
+    result = migrate_v5(raw)
+    sys.stdout.write(render(result.report, Language(args.lang)))
+    if result.blocking:
+        sys.stderr.write("these 5.x values cannot become v6 settings; nothing would be migrated:\n")
+        sys.stderr.write("".join(f"  {loc}: {msg}\n" for loc, msg in result.blocking))
         return 65
-    sys.stdout.write(render(report, Language(args.lang)))
     return 0
 
 
