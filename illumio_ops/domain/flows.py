@@ -148,10 +148,16 @@ def record_key(r: FlowRecord) -> str:
     return hashlib.sha256("|".join(parts).encode()).hexdigest()
 
 
+def ranges_within(a_first: datetime, a_last: datetime, b_first: datetime, b_last: datetime,
+                  max_gap_seconds: int = PAIRING_MAX_GAP_SECONDS) -> bool:
+    """True when two [first, last] ranges overlap or lie at most max_gap_seconds apart."""
+    gap = max(a_first, b_first) - min(a_last, b_last)
+    return gap.total_seconds() <= max_gap_seconds
+
+
 def same_connection(a: FlowRecord, b: FlowRecord, *, max_gap_seconds: int = PAIRING_MAX_GAP_SECONDS) -> bool:
     if a.direction == b.direction:
         return False
     if (a.src_ip, a.dst_ip, a.port, a.proto) != (b.src_ip, b.dst_ip, b.port, b.proto):
         return False
-    gap = max(a.first_detected, b.first_detected) - min(a.last_detected, b.last_detected)
-    return gap.total_seconds() <= max_gap_seconds
+    return ranges_within(a.first_detected, a.last_detected, b.first_detected, b.last_detected, max_gap_seconds)
