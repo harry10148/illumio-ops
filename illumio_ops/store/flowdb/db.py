@@ -11,6 +11,7 @@ import threading
 from datetime import UTC, datetime
 from pathlib import Path
 
+from illumio_ops.domain.timefmt import store_time
 from illumio_ops.store.db import connect, migrate
 
 MIGRATIONS_PACKAGE = "illumio_ops.store.flowdb.migrations"
@@ -18,9 +19,7 @@ MIGRATIONS_PACKAGE = "illumio_ops.store.flowdb.migrations"
 
 def db_time(value: datetime) -> str:
     """The one stored timestamp format: fixed-width UTC, so text order is time order."""
-    if value.tzinfo is None:
-        raise ValueError("stored timestamps need a time zone")
-    return value.astimezone(UTC).isoformat(timespec="milliseconds")
+    return store_time(value)
 
 
 def db_day(value: datetime) -> str:
