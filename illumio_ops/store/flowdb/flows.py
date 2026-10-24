@@ -28,6 +28,7 @@ class UpsertStats:
     refreshed: int
     paired: int
     days_touched: frozenset[str]
+    unchanged: int = 0  # re-pulled exactly as stored: nothing written
 
 
 def _max_bytes(column: str) -> str:
@@ -86,6 +87,23 @@ def _refresh(conn: sqlite3.Connection, row_id: int, r: FlowRecord, origin: DataO
         r.own_process, r.own_user, r.own_process, r.own_user,
         origin.value, origin.value, stamp, row_id,
     ))
+
+
+_STORED = ("SELECT id, direction, last_detected, num_connections, bytes_in, bytes_out, initiator_process, "
+           "initiator_user, service_process, service_user, origin FROM flows WHERE record_key = ?")
+
+
+def _adds_nothing(old: sqlite3.Row, r: FlowRecord, origin: DataOrigin) -> bool:
+    """Whether _refresh would leave the stored row as it is (ingested_at aside, which nothing reads)."""
+    def more_bytes(new: int | None, have: int | None) -> bool:
+        return new is not None and (have is None or new > have)
+    side = "initiator" if old["direction"] == FlowDirection.OUTBOUND.value else "service"
+    return (db_time(r.last_detected) <= old["last_detected"]
+            and r.num_connections <= old["num_connections"]
+            and not more_bytes(r.bytes_in, old["bytes_in"]) and not more_bytes(r.bytes_out, old["bytes_out"])
+            and not (r.own_process and old[f"{side}_process"] is None)
+            and not (r.own_user and old[f"{side}_user"] is None)
+            and (old["origin"] == DataOrigin.INGEST.value or old["origin"] == origin.value))
 
 
 def _first(values: list[str | None]) -> str | None:
@@ -189,15 +207,18 @@ def upsert_flows(conn: sqlite3.Connection, records: Sequence[FlowRecord], *, ori
     """Write a batch in one transaction (nested in the caller's, if any). The caller holds
     FlowDb.write_lock."""
     stamp = db_time(now)
-    inserted = refreshed = paired = 0
+    inserted = refreshed = paired = unchanged = 0
     days: set[str] = set()
     tuples: set[tuple[str, str, int | None, int]] = set()
     written: set[str] = set()
     with transaction(conn):
         for r in records:
             key = record_key(r)
+            old = conn.execute(_STORED, (key,)).fetchone()
+            if old is not None and _adds_nothing(old, r, origin):
+                unchanged += 1
+                continue
             written.add(key)
-            old = conn.execute("SELECT id, last_detected FROM flows WHERE record_key = ?", (key,)).fetchone()
             if old is not None:
                 days.add(str(old["last_detected"])[:10])
                 _refresh(conn, int(old["id"]), r, origin, stamp)
@@ -223,7 +244,8 @@ def upsert_flows(conn: sqlite3.Connection, records: Sequence[FlowRecord], *, ori
         archive.mark_stale(conn, "flows", days)
         conn.executemany("INSERT INTO rollup_state (day, dirty) VALUES (?, 1) "
                          "ON CONFLICT(day) DO UPDATE SET dirty = 1", [(d,) for d in sorted(days)])
-    return UpsertStats(inserted=inserted, refreshed=refreshed, paired=paired, days_touched=frozenset(days))
+    return UpsertStats(inserted=inserted, refreshed=refreshed, paired=paired, days_touched=frozenset(days),
+                       unchanged=unchanged)
 
 
 ROLLUP_INSERT = (

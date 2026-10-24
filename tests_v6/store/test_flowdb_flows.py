@@ -34,8 +34,26 @@ def _rows(conn, sql="SELECT * FROM flows ORDER BY id", *args):
 def test_upsert_is_idempotent(conn, recs):
     first = upsert_flows(conn, recs, origin=DataOrigin.INGEST, now=NOW)
     again = upsert_flows(conn, recs, origin=DataOrigin.INGEST, now=NOW)
-    assert first.inserted == len(recs) and again.inserted == 0 and again.refreshed == len(recs)
+    assert first.inserted == len(recs) and again.inserted == 0 and again.unchanged == len(recs)
     assert conn.execute("SELECT count(*) FROM flows").fetchone()[0] == len(recs)
+
+
+def test_identical_repull_writes_nothing(conn, recs):
+    # Collection re-reads an overlap every cycle (late records): a record that comes back the same
+    # costs a lookup, not a rewrite, a re-pairing, a rollup rebuild or a re-archive of its day.
+    upsert_flows(conn, recs, origin=DataOrigin.INGEST, now=NOW)
+    before = conn.total_changes
+    again = upsert_flows(conn, recs, origin=DataOrigin.INGEST, now=NOW + timedelta(minutes=10))
+    assert conn.total_changes == before
+    assert again.refreshed == 0 and again.days_touched == frozenset()
+
+
+def test_repull_that_adds_a_process_is_written(conn, recs):
+    r = next(x for x in recs if x.own_process is None)
+    upsert_flows(conn, [r], origin=DataOrigin.INGEST, now=NOW)
+    stats = upsert_flows(conn, [replace(r, own_process="sshd")], origin=DataOrigin.INGEST, now=NOW)
+    column = "initiator_process" if r.direction.value == "outbound" else "service_process"
+    assert stats.refreshed == 1 and _rows(conn)[0][column] == "sshd"
 
 
 def test_repull_refreshes_volatile_columns_with_max(conn, recs):
@@ -154,3 +172,12 @@ def test_labels_become_shared_sets(conn, recs):
     n_sets = conn.execute("SELECT count(*) FROM label_sets").fetchone()[0]
     distinct = {r.src_labels for r in recs if r.src_labels} | {r.dst_labels for r in recs if r.dst_labels}
     assert n_sets == len(distinct)
+
+
+@pytest.mark.parametrize("field", ["num_connections", "bytes_in", "bytes_out"])
+def test_repull_with_larger_counters_at_the_same_time_is_written(conn, recs, field):
+    r = recs[0]
+    upsert_flows(conn, [r], origin=DataOrigin.INGEST, now=NOW)
+    larger = (getattr(r, field) or 0) + 1000
+    stats = upsert_flows(conn, [replace(r, **{field: larger})], origin=DataOrigin.INGEST, now=NOW)
+    assert stats.refreshed == 1 and _rows(conn)[0][field] == larger
