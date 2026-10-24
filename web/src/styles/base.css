@@ -69,7 +69,7 @@ h2 { font-size: var(--fs-ui); font-weight: 600; margin: 0 0 var(--space-4); }
 }
 .center-page { display: grid; place-items: center; min-height: 100%; padding: var(--space-7); }
 .auth-card { width: min(400px, 100%); display: grid; gap: var(--space-5); }
-label { display: grid; gap: var(--space-2); color: var(--text-2); font-size: var(--fs-body); }
+label { display: grid; gap: var(--space-2); align-content: start; color: var(--text-2); font-size: var(--fs-body); }
 input, select {
   height: var(--ctl-h);
   padding: 0 var(--space-4);
@@ -107,4 +107,41 @@ button:disabled { cursor: progress; opacity: .7; }
   border-radius: var(--radius-m);
   background: transparent;
   color: var(--text-2);
+}
+
+.form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: var(--space-6); margin-bottom: var(--space-7); }
+.form-grid .form-error, .form-grid .form-ok, .form-grid .actions { grid-column: 1 / -1; }
+.actions { display: flex; align-items: center; gap: var(--space-5); flex-wrap: wrap; }
+.field-error { color: var(--tone-crit-fg); font-size: var(--fs-mini); }
+.form-ok { margin: 0; color: var(--tone-ok-fg); }
+.inline-action { margin-left: var(--space-5); }
+.probe-list { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-3); }
+.probe-row {
+  display: grid;
+  grid-template-columns: minmax(140px, 200px) 1fr;
+  gap: var(--space-5);
+  padding: var(--space-4) var(--space-5);
+  border-left: 3px solid var(--mark);
+  background: var(--fill);
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+.probe-name { font-weight: 600; }
+
+/* ── narrow screens: navigation becomes a strip under the top bar ───────── */
+@media (max-width: 760px) {
+  .shell { grid-template-columns: 1fr; grid-template-rows: var(--chrome-h) auto 1fr; }
+  .sidenav {
+    display: flex;
+    gap: var(--space-3);
+    overflow-x: auto;
+    padding: var(--space-3) var(--space-5);
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+  }
+  .nav-section { display: none; }
+  .nav-item { white-space: nowrap; }
+  .content { padding: var(--space-6) var(--space-5); }
+  .topbar { padding: 0 var(--space-5); }
+  .probe-row { grid-template-columns: 1fr; gap: var(--space-2); }
 }

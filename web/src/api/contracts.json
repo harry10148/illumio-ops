@@ -159,6 +159,406 @@
         "title": "Dictionary",
         "type": "object"
       }
+    },
+    "system.pce.get": {
+      "method": "GET",
+      "path": "/api/system/pce",
+      "request_schema": null,
+      "response_schema": {
+        "$defs": {
+          "DeploymentType": {
+            "enum": [
+              "on_prem",
+              "saas"
+            ],
+            "title": "DeploymentType",
+            "type": "string"
+          }
+        },
+        "properties": {
+          "api_key": {
+            "title": "Api Key",
+            "type": "string"
+          },
+          "api_secret": {
+            "title": "Api Secret",
+            "type": "string"
+          },
+          "console_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Console Url"
+          },
+          "deployment_type": {
+            "$ref": "#/$defs/DeploymentType"
+          },
+          "org_id": {
+            "title": "Org Id",
+            "type": "string"
+          },
+          "revision": {
+            "title": "Revision",
+            "type": "integer"
+          },
+          "url": {
+            "title": "Url",
+            "type": "string"
+          },
+          "verify_tls": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "title": "Verify Tls"
+          }
+        },
+        "required": [
+          "revision",
+          "url",
+          "org_id",
+          "api_key",
+          "api_secret",
+          "deployment_type",
+          "console_url",
+          "verify_tls"
+        ],
+        "title": "PceConnection",
+        "type": "object"
+      }
+    },
+    "system.pce.latest": {
+      "method": "GET",
+      "path": "/api/system/pce/latest",
+      "request_schema": null,
+      "response_schema": {
+        "$defs": {
+          "ProbeItem": {
+            "properties": {
+              "category": {
+                "title": "Category",
+                "type": "string"
+              },
+              "detail_key": {
+                "title": "Detail Key",
+                "type": "string"
+              },
+              "name": {
+                "$ref": "#/$defs/ProbeName"
+              },
+              "ok": {
+                "title": "Ok",
+                "type": "boolean"
+              },
+              "status": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Status"
+              }
+            },
+            "required": [
+              "name",
+              "ok",
+              "status",
+              "category",
+              "detail_key"
+            ],
+            "title": "ProbeItem",
+            "type": "object"
+          },
+          "ProbeName": {
+            "enum": [
+              "noop",
+              "health",
+              "node_available"
+            ],
+            "title": "ProbeName",
+            "type": "string"
+          },
+          "ProbeRun": {
+            "properties": {
+              "checked_at": {
+                "format": "date-time",
+                "title": "Checked At",
+                "type": "string"
+              },
+              "results": {
+                "items": {
+                  "$ref": "#/$defs/ProbeItem"
+                },
+                "title": "Results",
+                "type": "array"
+              }
+            },
+            "required": [
+              "checked_at",
+              "results"
+            ],
+            "title": "ProbeRun",
+            "type": "object"
+          }
+        },
+        "properties": {
+          "run": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/ProbeRun"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "run"
+        ],
+        "title": "LatestProbe",
+        "type": "object"
+      }
+    },
+    "system.pce.probe": {
+      "method": "POST",
+      "path": "/api/system/pce/probe",
+      "request_schema": null,
+      "response_schema": {
+        "$defs": {
+          "ProbeItem": {
+            "properties": {
+              "category": {
+                "title": "Category",
+                "type": "string"
+              },
+              "detail_key": {
+                "title": "Detail Key",
+                "type": "string"
+              },
+              "name": {
+                "$ref": "#/$defs/ProbeName"
+              },
+              "ok": {
+                "title": "Ok",
+                "type": "boolean"
+              },
+              "status": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Status"
+              }
+            },
+            "required": [
+              "name",
+              "ok",
+              "status",
+              "category",
+              "detail_key"
+            ],
+            "title": "ProbeItem",
+            "type": "object"
+          },
+          "ProbeName": {
+            "enum": [
+              "noop",
+              "health",
+              "node_available"
+            ],
+            "title": "ProbeName",
+            "type": "string"
+          }
+        },
+        "properties": {
+          "checked_at": {
+            "format": "date-time",
+            "title": "Checked At",
+            "type": "string"
+          },
+          "results": {
+            "items": {
+              "$ref": "#/$defs/ProbeItem"
+            },
+            "title": "Results",
+            "type": "array"
+          }
+        },
+        "required": [
+          "checked_at",
+          "results"
+        ],
+        "title": "ProbeRun",
+        "type": "object"
+      }
+    },
+    "system.pce.update": {
+      "method": "PUT",
+      "path": "/api/system/pce",
+      "request_schema": {
+        "$defs": {
+          "DeploymentType": {
+            "enum": [
+              "on_prem",
+              "saas"
+            ],
+            "title": "DeploymentType",
+            "type": "string"
+          }
+        },
+        "properties": {
+          "api_key": {
+            "maxLength": 512,
+            "title": "Api Key",
+            "type": "string"
+          },
+          "api_secret": {
+            "maxLength": 1024,
+            "title": "Api Secret",
+            "type": "string"
+          },
+          "console_url": {
+            "anyOf": [
+              {
+                "maxLength": 2048,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Console Url"
+          },
+          "deployment_type": {
+            "$ref": "#/$defs/DeploymentType"
+          },
+          "org_id": {
+            "maxLength": 32,
+            "title": "Org Id",
+            "type": "string"
+          },
+          "revision": {
+            "title": "Revision",
+            "type": "integer"
+          },
+          "url": {
+            "maxLength": 2048,
+            "title": "Url",
+            "type": "string"
+          },
+          "verify_tls": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "title": "Verify Tls"
+          }
+        },
+        "required": [
+          "revision",
+          "url",
+          "org_id",
+          "api_key",
+          "api_secret",
+          "deployment_type",
+          "console_url",
+          "verify_tls"
+        ],
+        "title": "PceConnectionUpdate",
+        "type": "object"
+      },
+      "response_schema": {
+        "$defs": {
+          "DeploymentType": {
+            "enum": [
+              "on_prem",
+              "saas"
+            ],
+            "title": "DeploymentType",
+            "type": "string"
+          }
+        },
+        "properties": {
+          "api_key": {
+            "title": "Api Key",
+            "type": "string"
+          },
+          "api_secret": {
+            "title": "Api Secret",
+            "type": "string"
+          },
+          "console_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Console Url"
+          },
+          "deployment_type": {
+            "$ref": "#/$defs/DeploymentType"
+          },
+          "org_id": {
+            "title": "Org Id",
+            "type": "string"
+          },
+          "revision": {
+            "title": "Revision",
+            "type": "integer"
+          },
+          "url": {
+            "title": "Url",
+            "type": "string"
+          },
+          "verify_tls": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "title": "Verify Tls"
+          }
+        },
+        "required": [
+          "revision",
+          "url",
+          "org_id",
+          "api_key",
+          "api_secret",
+          "deployment_type",
+          "console_url",
+          "verify_tls"
+        ],
+        "title": "PceConnection",
+        "type": "object"
+      }
     }
   },
   "values": {

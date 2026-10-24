@@ -5,6 +5,7 @@ from illumio_ops.services.context import AppContext
 from illumio_ops.settings.schema import default_settings
 from illumio_ops.settings.secrets import hash_password, new_secret_key
 from illumio_ops.settings.store import SettingsStore
+from illumio_ops.store.db import migrate
 from illumio_ops.web.app import create_app
 
 ADMIN_PASSWORD = "illumio"
@@ -41,7 +42,10 @@ def make_ctx(tmp_path, **web_overrides):
     store.create_initial(password_hash=s.web.password_hash, secret_key=s.web.secret_key)
     if web_overrides:
         store.update(0, lambda d: d["web"].update(web_overrides))
-    return AppContext(paths=paths, settings=store)
+    ctx = AppContext(paths=paths, settings=store)
+    with ctx.db() as conn:
+        migrate(conn)
+    return ctx
 
 
 @pytest.fixture

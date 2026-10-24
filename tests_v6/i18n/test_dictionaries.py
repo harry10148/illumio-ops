@@ -2,7 +2,7 @@
 and no code builds a key name at runtime (which would hide it from this gate).
 
 What counts as a reference:
-  TS      t("key") and message_key: "key"
+  TS      t("key"), message_key: "key" and labelKey: "key"
   Python  a keyword argument named in I18N_KWARGS with a string literal; the 3rd positional
           argument (message key) of api_error(...) / ApiFailure(...); the values of a
           module-level dict whose name ends in _KEYS.
@@ -25,7 +25,7 @@ _MSG_POSITIONAL = {"api_error", "ApiFailure"}
 # such as api_key / secret_key are not dictionary keys.
 I18N_KWARGS = frozenset({"message_key", "detail_key", "reason_key", "label_key", "hint_key"})
 _TS_T = re.compile(r"""\bt\(\s*["']([A-Za-z0-9_.]+)["']""")
-_TS_MSG = re.compile(r"""\bmessage_key\s*:\s*["']([A-Za-z0-9_.]+)["']""")
+_TS_MSG = re.compile(r"""\b(?:message_key|labelKey)\s*:\s*["']([A-Za-z0-9_.]+)["']""")
 _TS_DYNAMIC = re.compile(r"""\bt\(\s*`""")
 _TS_LITERAL = re.compile(r"""["'`]([A-Za-z0-9_.]+)["'`]""")
 

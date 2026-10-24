@@ -2,6 +2,17 @@
 /* eslint-disable */
 /**
  * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "DeploymentType".
+ */
+export type DeploymentType = ("on_prem" | "saas")
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "ProbeName".
+ */
+export type ProbeName = ("noop" | "health" | "node_available")
+
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
  * via the `definition` "CsrfToken".
  */
 export interface CsrfToken {
@@ -55,8 +66,62 @@ old_password?: (string | null)
 export interface Dictionary {
 [k: string]: string
 }
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "PceConnection".
+ */
+export interface PceConnection {
+api_key: string
+api_secret: string
+console_url: (string | null)
+deployment_type: DeploymentType
+org_id: string
+revision: number
+url: string
+verify_tls: (boolean | string)
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "ProbeItem".
+ */
+export interface ProbeItem {
+category: string
+detail_key: string
+name: ProbeName
+ok: boolean
+status: (number | null)
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "ProbeRun".
+ */
+export interface ProbeRun {
+checked_at: string
+results: ProbeItem[]
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "LatestProbe".
+ */
+export interface LatestProbe {
+run: (ProbeRun | null)
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "PceConnectionUpdate".
+ */
+export interface PceConnectionUpdate {
+api_key: string
+api_secret: string
+console_url: (string | null)
+deployment_type: DeploymentType
+org_id: string
+revision: number
+url: string
+verify_tls: (boolean | string)
+}
 
-export type OpId = "auth.csrf" | "auth.login" | "auth.logout" | "auth.me" | "auth.password" | "i18n.dictionary";
+export type OpId = "auth.csrf" | "auth.login" | "auth.logout" | "auth.me" | "auth.password" | "i18n.dictionary" | "system.pce.get" | "system.pce.latest" | "system.pce.probe" | "system.pce.update";
 
 export interface Requests {
   "auth.csrf": undefined;
@@ -65,6 +130,10 @@ export interface Requests {
   "auth.me": undefined;
   "auth.password": PasswordChangeRequest;
   "i18n.dictionary": undefined;
+  "system.pce.get": undefined;
+  "system.pce.latest": undefined;
+  "system.pce.probe": undefined;
+  "system.pce.update": PceConnectionUpdate;
 }
 
 export interface Responses {
@@ -74,6 +143,10 @@ export interface Responses {
   "auth.me": Me;
   "auth.password": CsrfToken;
   "i18n.dictionary": Dictionary;
+  "system.pce.get": PceConnection;
+  "system.pce.latest": LatestProbe;
+  "system.pce.probe": ProbeRun;
+  "system.pce.update": PceConnection;
 }
 
 export const OPERATIONS = {
@@ -83,6 +156,10 @@ export const OPERATIONS = {
   "auth.me": { method: "GET", path: "/api/auth/me" },
   "auth.password": { method: "POST", path: "/api/auth/password" },
   "i18n.dictionary": { method: "GET", path: "/api/i18n/<lang>" },
+  "system.pce.get": { method: "GET", path: "/api/system/pce" },
+  "system.pce.latest": { method: "GET", path: "/api/system/pce/latest" },
+  "system.pce.probe": { method: "POST", path: "/api/system/pce/probe" },
+  "system.pce.update": { method: "PUT", path: "/api/system/pce" },
 } as const satisfies Record<OpId, { method: string; path: string }>;
 
 export const VALUES = {
