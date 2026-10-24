@@ -1,0 +1,46 @@
+{
+ "_source": "LAB-PCE 26.2.20, 2026-10-24, GET /orgs/1/events?timestamp[gte]=<30 days ago> with Prefer: respond-async",
+ "accept": {
+  "status": 202,
+  "location": "/orgs/1/jobs/00000000-0000-4000-8000-000000000001",
+  "retry_after": "5"
+ },
+ "job_pending": {
+  "headers": {
+   "Retry-After": "30"
+  },
+  "body": {
+   "href": "/orgs/1/jobs/00000000-0000-4000-8000-000000000001",
+   "job_type": "events",
+   "description": "",
+   "requested_at": "2026-10-24T10:36:20Z",
+   "requested_by": {
+    "href": "/users/1"
+   },
+   "result": null,
+   "status": "pending",
+   "terminated_at": null
+  }
+ },
+ "job_done": {
+  "body": {
+   "href": "/orgs/1/jobs/00000000-0000-4000-8000-000000000001",
+   "job_type": "events",
+   "description": "",
+   "requested_at": "2026-10-24T10:36:20Z",
+   "requested_by": {
+    "href": "/users/1"
+   },
+   "result": {
+    "href": "/orgs/1/datafiles/00000000-0000-4000-8000-000000000002"
+   },
+   "status": "done",
+   "terminated_at": "2026-10-24T10:37:30Z"
+  }
+ },
+ "result": {
+  "rows": 45523,
+  "x_total_count": "124255",
+  "note": "X-Total-Count is the unfiltered total; the result honours max_results if sent"
+ }
+}

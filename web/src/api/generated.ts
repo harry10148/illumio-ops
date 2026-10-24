@@ -367,6 +367,11 @@ export const VALUES = {
     "traffic",
     "volume"
   ],
+  "CapabilityState": [
+    "supported",
+    "unknown",
+    "unsupported"
+  ],
   "DataOrigin": [
     "backfill",
     "ingest"

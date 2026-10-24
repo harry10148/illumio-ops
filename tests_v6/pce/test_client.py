@@ -233,3 +233,10 @@ def test_unreadable_ca_bundle_is_a_transport_error():
     with pytest.raises(PceTransportError) as e:
         c.request("GET", "/noop", org_scoped=False)
     assert e.value.kind == "ca_bundle"
+
+
+@responses.activate
+def test_request_sends_extra_headers(client):
+    responses.add(responses.GET, f"{BASE}/api/v2/orgs/1/workloads", status=202,
+                  match=[responses.matchers.header_matcher({"Prefer": "respond-async"})])
+    assert client.request("GET", "/workloads", headers={"Prefer": "respond-async"}).status == 202

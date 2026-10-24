@@ -165,7 +165,7 @@ class PceClient:
 
     def request(self, method: str, path: str, *, json: Any = None, timeout: float = 15,
                 org_scoped: bool = True, bounded: bool = False, deadline: float | None = None,
-                budget_timeout: float = 30.0) -> PceResponse:
+                budget_timeout: float = 30.0, headers: Mapping[str, str] | None = None) -> PceResponse:
         session = self._bounded_session if bounded else self._session
         if session is None:
             raise RuntimeError("PceClient is closed")
@@ -178,17 +178,17 @@ class PceClient:
             if remaining <= 0:
                 raise PceTransportError(path, "timeout")
             timeout = min(timeout, remaining)
-        headers: dict[str, str] = {}
+        send_headers: dict[str, str] = dict(headers or {})
         body = None
         if json is not None:
             body = _json.dumps(json).encode("utf-8")
-            headers["Content-Type"] = "application/json"
+            send_headers["Content-Type"] = "application/json"
         url = self._url(path, org_scoped)
 
         def send() -> requests.Response:
             assert session is not None
             try:
-                return session.request(method=method, url=url, data=body, headers=headers, timeout=timeout)
+                return session.request(method=method, url=url, data=body, headers=send_headers, timeout=timeout)
             except requests.exceptions.RequestException as exc:
                 kind = _transport_kind(exc)
                 logger.warning("PCE {} {} failed: {} ({})", method, path, kind, type(exc).__name__)

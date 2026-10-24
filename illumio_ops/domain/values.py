@@ -72,6 +72,12 @@ class IngestSource(StrEnum):
     BACKFILL = "backfill"
 
 
+class CapabilityState(StrEnum):
+    SUPPORTED = "supported"
+    UNSUPPORTED = "unsupported"
+    UNKNOWN = "unknown"
+
+
 class DataOrigin(StrEnum):
     INGEST = "ingest"
     BACKFILL = "backfill"
@@ -118,7 +124,7 @@ def parse_draft_policy_decision(raw: str) -> str:
 
 _ENUMS: tuple[type[StrEnum], ...] = (
     PolicyDecision, RuleAction, AlertRuleType, DeploymentType, Language, ProbeName,
-    FlowDirection, VisibilityLevel, TamperClassification, IngestSource, DataOrigin,
+    FlowDirection, VisibilityLevel, TamperClassification, IngestSource, DataOrigin, CapabilityState,
 )
 
 
