@@ -158,7 +158,7 @@ def make_blueprint(limiter: Limiter) -> Blueprint:
         except tls.CertificateError:
             raise ApiFailure(400, "certificate_rejected", "err_certificate_rejected", field="cert_pem") from None
         cert_file = str(ctx.paths.tls_dir / tls.CA_SIGNED_CERT)
-        key_file = str(ctx.paths.tls_dir / tls.CSR_KEY)
+        key_file = str(ctx.paths.tls_dir / tls.CA_SIGNED_KEY)
 
         def mutate(d: dict[str, Any]) -> None:
             d["web"]["tls"].update(mode="provided", cert_file=cert_file, key_file=key_file)

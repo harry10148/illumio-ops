@@ -7,15 +7,34 @@ default_settings(), used for a fresh install and by the 5.x migrator.
 from __future__ import annotations
 
 import re
-from typing import Literal
+from typing import Annotated, Literal
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import AfterValidator, BaseModel, ConfigDict, Field, field_validator
 
+from illumio_ops.domain.netaddr import parse_ip_token
 from illumio_ops.domain.values import DeploymentType, Language
 
 SCHEMA_VERSION: Literal[1] = 1
 _UTC_OFFSET = re.compile(r"UTC([+-]\d+(?:\.\d+)?)")
+
+
+def _ip_or_network(v: str) -> str:
+    try:
+        parse_ip_token(v)
+    except ValueError:
+        raise ValueError("must be an IP address or network") from None
+    return v
+
+
+def _absolute_or_empty(v: str) -> str:
+    if v and not v.startswith("/"):
+        raise ValueError("must be an absolute path")
+    return v
+
+
+AllowedIp = Annotated[str, AfterValidator(_ip_or_network)]
+FilePath = Annotated[str, AfterValidator(_absolute_or_empty)]
 
 
 class StrictModel(BaseModel):
@@ -69,8 +88,8 @@ class PceSettings(StrictModel):
 class TlsSettings(StrictModel):
     enabled: bool
     mode: Literal["self_signed", "provided"]
-    cert_file: str
-    key_file: str
+    cert_file: FilePath
+    key_file: FilePath
     auto_renew: bool
     auto_renew_days: int = Field(ge=1)
     validity_days: int = Field(ge=1)
@@ -85,7 +104,7 @@ class WebSettings(StrictModel):
     username: str = Field(min_length=1)
     password_hash: str
     secret_key: str
-    allowed_ips: tuple[str, ...]
+    allowed_ips: tuple[AllowedIp, ...]
     session_lifetime_seconds: int = Field(ge=60)
     must_change_password: bool
     tls: TlsSettings

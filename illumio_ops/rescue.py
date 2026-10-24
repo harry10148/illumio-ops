@@ -11,6 +11,7 @@ from __future__ import annotations
 import argparse
 import getpass
 import os
+import pwd
 import sys
 from pathlib import Path
 from typing import Any
@@ -35,6 +36,7 @@ from illumio_ops.settings.store import SettingsInvalid, SettingsStore
 EXIT_DATAERR = 65
 EXIT_NOINPUT = 66
 EXIT_CANTCREAT = 73
+EXIT_NOPERM = 77
 
 
 def _err(msg: str) -> None:
@@ -109,6 +111,20 @@ def main(argv: list[str] | None = None) -> int:
             sp.add_argument("--port", type=int, default=5001)
     args = ap.parse_args(argv)
     paths = resolve_paths(args.root)
+    # Files written here must stay readable by the service: run as the account that owns
+    # the installation (as root, a rewritten settings file would become root's 0600 file
+    # and the service would no longer start).
+    if paths.config_dir.is_dir():
+        owner = paths.config_dir.stat().st_uid
+        if os.geteuid() != owner:
+            try:
+                name = pwd.getpwuid(owner).pw_name
+            except KeyError:
+                name = str(owner)
+            _err(f"Run this as the account that owns {paths.root}, for example:\n"
+                 f"  runuser -u {name} -- env PYTHONPATH={paths.root} {sys.executable} -P -m illumio_ops.rescue "
+                 f"{' '.join(argv if argv is not None else sys.argv[1:])}")
+            return EXIT_NOPERM
     paths.ensure_dirs()
     try:
         fd = acquire_service_lock(paths)

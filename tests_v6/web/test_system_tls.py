@@ -44,7 +44,7 @@ def test_csr_then_import_switches_to_provided(client, ctx):
     data = r.get_json()["data"]
     assert r.status_code == 200 and data["mode"] == "provided" and data["cert"]["subject_cn"] == "ops.example.com"
     t = ctx.settings.current().web.tls
-    assert t.cert_file == str(ctx.paths.tls_dir / tls.CA_SIGNED_CERT) and t.key_file == str(ctx.paths.tls_dir / tls.CSR_KEY)
+    assert t.cert_file == str(ctx.paths.tls_dir / tls.CA_SIGNED_CERT) and t.key_file == str(ctx.paths.tls_dir / tls.CA_SIGNED_KEY)
 
 
 def test_import_mismatched_cert_is_refused_and_settings_unchanged(client, ctx):
@@ -79,3 +79,17 @@ def test_update_marks_restart_required(client, ctx):
     r = client.put("/api/system/tls", json=body, environ_overrides=LOCAL, headers={"X-CSRFToken": csrf(client)})
     assert r.status_code == 200 and r.get_json()["data"]["restart_required"] is True
     assert ctx.settings.current().web.tls.auto_renew_days == 45
+
+
+def test_a_new_csr_does_not_replace_the_key_in_use(client, ctx):
+    import ssl
+
+    login(client)
+    body = {"cn": "ops.example.com", "o": "", "ou": "", "c": "", "san_dns": [], "san_ip": [], "key_algorithm": "rsa-2048"}
+    post(client, "/api/system/tls/csr", body)
+    pending = sorted(p.name for p in ctx.paths.tls_dir.iterdir())
+    key_for_ca = next(ctx.paths.tls_dir / n for n in pending if "key" in n)
+    assert post(client, "/api/system/tls/import", {"cert_pem": _sign_with_own_ca(key_for_ca)}).status_code == 200
+    t = ctx.settings.current().web.tls
+    post(client, "/api/system/tls/csr", body | {"cn": "renewal.example.com"})  # e.g. preparing a renewal
+    ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER).load_cert_chain(t.cert_file, t.key_file)  # still a pair

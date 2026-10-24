@@ -200,3 +200,18 @@ def test_directory_fsync_failure_after_rename_keeps_memory_in_sync(settings_file
     s1 = store.update(s0.revision, lambda d: d["web"].update(port=6000))
     assert store.current() == s1 and s1.web.port == 6000
     assert SettingsStore(settings_file).load().web.port == 6000
+
+
+def test_hand_edit_on_disk_is_not_overwritten_by_the_next_save(settings_file):
+    store = SettingsStore(settings_file)
+    s0 = store.load()
+    d = json.loads(settings_file.read_text())
+    d["display"]["language"] = "zh_TW"  # edited by hand while the service runs
+    settings_file.write_text(json.dumps(d))
+    edited = settings_file.read_bytes()
+    with pytest.raises(SettingsConflict):
+        store.update(s0.revision, lambda x: x["web"].update(port=6000))
+    assert settings_file.read_bytes() == edited
+    assert store.current().display.language == "zh_TW"  # the edit is now what the service uses
+    store.update(store.current().revision, lambda x: x["web"].update(port=6000))
+    assert SettingsStore(settings_file).load().display.language == "zh_TW"

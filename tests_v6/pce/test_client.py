@@ -226,3 +226,10 @@ def test_verify_true_uses_the_os_trust_store(tmp_path, monkeypatch):
 def test_verify_true_falls_back_to_bundled_cas_without_an_os_store(tmp_path, monkeypatch):
     monkeypatch.setattr(client_mod, "SYSTEM_CA_BUNDLES", (str(tmp_path / "missing.pem"),))
     assert PceClient(pce_settings(verify_tls=True))._session.verify is True
+
+
+def test_unreadable_ca_bundle_is_a_transport_error():
+    c = PceClient(pce_settings(verify_tls="/nonexistent/ca.pem"))
+    with pytest.raises(PceTransportError) as e:
+        c.request("GET", "/noop", org_scoped=False)
+    assert e.value.kind == "ca_bundle"

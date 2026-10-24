@@ -35,6 +35,8 @@ def test_rendered_unit_paths():
     assert "Environment=PYTHONPATH=/opt/illumio-ops-v6\n" in unit and "Environment=PYTHONNOUSERSITE=1\n" in unit
     assert "WorkingDirectory=/opt/illumio-ops-v6\n" in unit and "SyslogIdentifier=illumio-ops-v6\n" in unit
     assert not re.search(r"@[A-Z_]+@", unit)
+    # an invalid settings file or a second instance must end in "failed", not a restart loop
+    assert "RestartPreventExitStatus=75 78\n" in unit
 
 
 def test_bad_arguments_are_refused():

@@ -16,6 +16,7 @@ from typing import Any
 
 from pydantic import ValidationError
 
+from illumio_ops.domain.netaddr import parse_ip_token
 from illumio_ops.domain.values import Language
 from illumio_ops.migrate.report import Action, MigrationItem, MigrationReport
 from illumio_ops.migrate.v5_models import V5Config
@@ -109,6 +110,15 @@ def _tz(v5: V5Config) -> str:
     return tz
 
 
+def _is_ip(value: str) -> bool:
+    """5.x skipped allowlist entries it could not parse; v6 refuses them, so they are dropped."""
+    try:
+        parse_ip_token(value)
+    except ValueError:
+        return False
+    return True
+
+
 def _tls_mode(v5: V5Config) -> str:
     t = v5.web_gui.tls
     # 5.x (src/gui/__init__.py, launch) uses both files when given, whatever self_signed says.
@@ -125,7 +135,8 @@ CARRY: dict[Path_, _Carry] = {
                                    "migrate_empty_is_unset"),
     ("api", "events_timeout_seconds"): _Carry("pce.events_timeout_seconds", lambda v: v.api.events_timeout_seconds),
     ("web_gui", "username"): _Carry("web.username", lambda v: v.web_gui.username),
-    ("web_gui", "allowed_ips"): _Carry("web.allowed_ips", lambda v: list(v.web_gui.allowed_ips)),
+    ("web_gui", "allowed_ips"): _Carry("web.allowed_ips", lambda v: [ip for ip in v.web_gui.allowed_ips if _is_ip(ip)],
+                                       "migrate_5x_effective_value"),
     ("web_gui", "session_lifetime_seconds"): _Carry("web.session_lifetime_seconds",
                                                     lambda v: max(60, v.web_gui.session_lifetime_seconds),
                                                     "migrate_raised_to_minimum"),

@@ -26,3 +26,18 @@ def test_default_password_banner_and_lockout_guard(context, live_app):
     page.get_by_role("button", name="Save addresses").click()
     expect(page.locator("[role=alert]")).to_contain_text("127.0.0.1")
     assert live_app.ctx.settings.current().web.allowed_ips == ()
+
+
+def test_change_password_then_save_addresses(context, live_app):
+    page = context.new_page()
+    sign_in(page, live_app.url)
+    page.click("nav >> text=Security")
+    page.fill("input[autocomplete=current-password]", "illumio")
+    page.fill("input[autocomplete=new-password] >> nth=0", "a-new-password-1")
+    page.fill("input[autocomplete=new-password] >> nth=1", "a-new-password-1")
+    page.get_by_role("button", name="Change password").click()
+    expect(page.locator("text=Password changed.")).to_be_visible()
+    page.fill("textarea[name=allowed_ips]", "127.0.0.1")
+    page.get_by_role("button", name="Save addresses").click()
+    expect(page.locator(".form-ok", has_text="Saved.")).to_be_visible()
+    assert live_app.ctx.settings.current().web.allowed_ips == ("127.0.0.1",)

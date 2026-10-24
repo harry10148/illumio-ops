@@ -93,3 +93,10 @@ def test_rescue_refuses_while_service_runs(tmp_path, cmd):
         assert rescue.main([cmd, "--root", str(tmp_path)]) == 75
     finally:
         os.close(fd)
+
+
+def test_rescue_refuses_to_run_as_another_user_than_the_owner(tmp_path, monkeypatch, capsys):
+    _init(tmp_path)
+    monkeypatch.setattr(rescue.os, "geteuid", lambda: os.stat(tmp_path / "config").st_uid + 1)
+    assert rescue.main(["check-settings", "--root", str(tmp_path)]) == 77
+    assert "runuser" in capsys.readouterr().err

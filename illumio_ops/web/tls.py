@@ -27,8 +27,11 @@ from illumio_ops.settings.schema import TlsSettings
 DEFAULT_CIPHERS = "ECDHE+AESGCM:ECDHE+CHACHA20:DHE+AESGCM:!aNULL:!MD5:!DSS:!RC4:!3DES:!EXPORT"
 SELF_SIGNED_CERT = "self_signed.pem"
 SELF_SIGNED_KEY = "self_signed_key.pem"
-CSR_KEY = "csr_key.pem"
+# The key of a request waiting for the CA, kept apart from the key in use: preparing a
+# renewal must not break the running certificate (5.x overwrote it in place).
+CSR_KEY = "csr_pending_key.pem"
 CA_SIGNED_CERT = "ca_signed.pem"
+CA_SIGNED_KEY = "ca_signed_key.pem"
 
 
 class CertificateError(ValueError):
@@ -229,7 +232,10 @@ def import_signed_cert(tls_dir: Path, cert_pem: str) -> CertInfo:
             != key.public_key().public_bytes(serialization.Encoding.PEM, spki)):
         raise CertificateError("the certificate does not match the stored request key")
     path = tls_dir / CA_SIGNED_CERT
-    _write_public(path, cert.public_bytes(serialization.Encoding.PEM))
+    tmp = tls_dir / f".{CA_SIGNED_CERT}.tmp"
+    _write_public(tmp, cert.public_bytes(serialization.Encoding.PEM))
+    os.replace(key_path, tls_dir / CA_SIGNED_KEY)  # the pending key becomes the key in use
+    os.replace(tmp, path)
     info = cert_info(path)
     assert info is not None
     return info

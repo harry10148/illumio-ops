@@ -12,7 +12,7 @@ from collections.abc import Iterable
 
 from flask import request
 
-IpToken = ipaddress.IPv4Address | ipaddress.IPv6Address | ipaddress.IPv4Network | ipaddress.IPv6Network
+from illumio_ops.domain.netaddr import IpToken, parse_ip_token
 
 
 class RstDrop(Exception):
@@ -26,19 +26,7 @@ class InvalidIpEntries(ValueError):
 
 
 def normalize_ip_token(value: str) -> IpToken:
-    token = str(value or "").strip()
-    if not token:
-        raise ValueError("empty ip token")
-    if "/" in token:
-        net = ipaddress.ip_network(token, strict=False)
-        if isinstance(net, ipaddress.IPv6Network) and net.network_address.ipv4_mapped:
-            mapped = net.network_address.ipv4_mapped
-            return ipaddress.ip_network(f"{mapped}/{max(0, net.prefixlen - 96)}", strict=False)
-        return net
-    addr = ipaddress.ip_address(token)
-    if isinstance(addr, ipaddress.IPv6Address) and addr.ipv4_mapped:
-        return addr.ipv4_mapped
-    return addr
+    return parse_ip_token(value)
 
 
 def is_allowed(allowed_ips: Iterable[str], remote_addr: str | None) -> bool:

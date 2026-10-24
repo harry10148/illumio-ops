@@ -27,6 +27,7 @@ DETAIL_KEYS: dict[str, str] = {
     "refused": "probe_transport_refused",
     "timeout": "probe_transport_timeout",
     "tls": "probe_transport_tls",
+    "ca_bundle": "probe_transport_ca_bundle",
     "other": "probe_transport_other",
     "health_unknown": "probe_health_unknown",
     "warning": "probe_health_bad",

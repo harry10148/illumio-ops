@@ -207,3 +207,12 @@ def test_dotted_extra_keys_stay_distinct():
     raw["web_gui"]["audit.destination"] = 2
     sources = [i.source for i in migrate_v5(raw).report.items]
     assert len(sources) == len(set(sources)) == len(leaf_keys(raw))
+
+
+def test_allowlist_entries_5x_ignored_are_dropped_and_reported():
+    raw = _base()
+    raw["web_gui"]["allowed_ips"] = ["10.0.0.0/8", "localhost", "::ffff:192.168.1.5"]
+    result = migrate_v5(raw)
+    assert result.settings.web.allowed_ips == ("10.0.0.0/8", "::ffff:192.168.1.5")
+    item = _item(result.report, "web_gui.allowed_ips")
+    assert item.action == "rewritten" and item.reason_key == "migrate_5x_effective_value"

@@ -82,3 +82,30 @@ def test_timezone_accepts_the_5x_formats():
     for bad in ("UTC+24", "Mars/Base", "../etc/passwd", "GMT+8x", ""):
         with pytest.raises(ValidationError):
             DisplaySettings(language="en", timezone=bad)
+
+
+# ── final review fixes ─────────────────────────────────────────────────────
+
+def _with_web(**web):
+    d = default_settings(password_hash=HASH, secret_key=KEY).model_dump(mode="json")
+    d["web"].update(web)
+    return d
+
+
+def test_allowed_ips_entries_must_be_addresses():
+    from illumio_ops.settings.store import SettingsInvalid, validate_settings
+
+    validate_settings(_with_web(allowed_ips=["10.0.0.0/8", "::1", "192.168.1.7"]))
+    with pytest.raises(SettingsInvalid) as e:
+        validate_settings(_with_web(allowed_ips=["10.0.0.0/8", "10.0.0.0/33", "server.example"]))
+    assert [loc for loc, _ in e.value.errors] == ["web.allowed_ips.1", "web.allowed_ips.2"]
+
+
+def test_certificate_paths_must_be_absolute():
+    from illumio_ops.settings.store import SettingsInvalid, validate_settings
+
+    d = _with_web()
+    d["web"]["tls"].update(cert_file="certs/c.pem", key_file="/etc/k.pem")
+    with pytest.raises(SettingsInvalid) as e:
+        validate_settings(d)
+    assert [loc for loc, _ in e.value.errors] == ["web.tls.cert_file"]

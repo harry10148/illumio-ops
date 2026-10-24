@@ -115,6 +115,13 @@ def prepare(root: Path | None) -> Runtime:
         try:
             s = load_settings(store)
         except FileNotFoundError:
+            # Only a brand-new root gets first-start settings. If this installation already
+            # has a database or certificates, the file was lost: starting on defaults would
+            # reopen it with the default sign-in and no address restriction.
+            if paths.app_db.exists() or any(paths.tls_dir.iterdir()):
+                raise StartupError(EXIT_CONFIG, f"The settings file {store.path} is missing from an existing "
+                                                "installation. Restore it from a backup, or run "
+                                                "`python -m illumio_ops.rescue init` to start over.") from None
             s = store.create_initial(password_hash=hash_password(DEFAULT_ADMIN_PASSWORD),
                                      secret_key=new_secret_key())
             logger.warning("no settings file found: created {} with the default sign-in", store.path)

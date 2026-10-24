@@ -1,6 +1,7 @@
 """System › PCE connection: view and edit the connection, run and read health probes."""
 from __future__ import annotations
 
+import os
 from datetime import datetime
 from typing import Any
 
@@ -93,11 +94,19 @@ def update_connection(body: PceConnectionUpdate) -> PceConnection:
     moved = (body.url.rstrip("/") != saved.url or body.verify_tls != saved.verify_tls)
     if kept and moved and (saved.api_key or saved.api_secret):
         raise ApiFailure(400, "credentials_required", "err_credentials_required", field="api_key")
+    # The service account must be able to read the CA bundle (systemd hides /root and /home).
+    if isinstance(body.verify_tls, str) and body.verify_tls.startswith("/") and not os.access(body.verify_tls, os.R_OK):
+        raise ApiFailure(400, "ca_bundle_unreadable", "err_ca_bundle_unreadable", field="verify_tls")
+    other_pce = (body.url.rstrip("/"), body.org_id, body.deployment_type) != (saved.url, saved.org_id,
+                                                                                saved.deployment_type)
 
     def mutate(d: dict[str, Any]) -> None:
         d["pce"].update(fields)
 
-    get_ctx().settings.update(body.revision, mutate)
+    ctx = get_ctx()
+    ctx.settings.update(body.revision, mutate)
+    if other_pce:
+        pce_health.forget(ctx)
     return _view()
 
 

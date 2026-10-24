@@ -124,3 +124,26 @@ def test_other_edits_keep_saved_credentials(client, ctx):
     _save(client)
     assert _save(client, deployment_type="saas", api_key=MASK, api_secret=MASK).status_code == 200
     assert ctx.settings.current().pce.api_secret == "SECRETVALUE"
+
+
+def test_saving_an_unreadable_ca_bundle_is_refused(client, ctx):
+    login(client)
+    _save(client)
+    r = _save(client, verify_tls="/nonexistent/ca.pem", api_key="k", api_secret="s")
+    err = r.get_json()["error"]
+    assert r.status_code == 400 and err["code"] == "ca_bundle_unreadable" and err["field"] == "verify_tls"
+
+
+@responses.activate
+def test_switching_pce_forgets_the_previous_probe(client, ctx):
+    responses.add_passthru("http://localhost")
+    login(client)
+    _save(client, deployment_type="saas")
+    responses.add(responses.GET, f"{BASE}/api/v2/noop", status=204)
+    from .conftest import post
+    post(client, "/api/system/pce/probe")
+    assert client.get("/api/system/pce/latest", environ_overrides=LOCAL).get_json()["data"]["run"] is not None
+    _save(client, deployment_type="saas", api_key=MASK, api_secret=MASK)  # same PCE: keep it
+    assert client.get("/api/system/pce/latest", environ_overrides=LOCAL).get_json()["data"]["run"] is not None
+    _save(client, url="https://other-pce.example.com:8443", api_key="k2", api_secret="s2")
+    assert client.get("/api/system/pce/latest", environ_overrides=LOCAL).get_json()["data"]["run"] is None

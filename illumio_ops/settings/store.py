@@ -6,6 +6,7 @@ touching disk, atomic (temp file + fsync + rename) and 0600.
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import tempfile
@@ -60,6 +61,7 @@ class SettingsStore:
         self._path = Path(path)
         self._lock = threading.Lock()
         self._current: Settings | None = None
+        self._disk_digest: str | None = None  # what we last read or wrote
 
     @property
     def path(self) -> Path:
@@ -76,6 +78,7 @@ class SettingsStore:
         s = validate_settings(data)
         with self._lock:
             self._current = s
+            self._disk_digest = hashlib.sha256(raw).hexdigest()
         return s
 
     def current(self) -> Settings:
@@ -86,6 +89,7 @@ class SettingsStore:
 
     def update(self, expected_revision: int, mutate: Callable[[dict[str, Any]], None]) -> Settings:
         with self._lock:
+            self._adopt_outside_edit()
             cur = self.current()
             if cur.revision != expected_revision:
                 raise SettingsConflict(expected_revision, cur.revision)
@@ -98,6 +102,25 @@ class SettingsStore:
             self._sync_dir()
             return new
 
+    def _adopt_outside_edit(self) -> None:
+        """If someone changed the file by hand since we last read or wrote it, take their
+        version (when valid) and report a conflict, rather than overwrite it."""
+        try:
+            raw = self._path.read_bytes()
+        except FileNotFoundError:
+            raise SettingsInvalid([("", "the settings file was removed while the service was running")]) from None
+        if self._disk_digest is None or hashlib.sha256(raw).hexdigest() == self._disk_digest:
+            return
+        try:
+            data = json.loads(raw)
+        except ValueError:
+            raise SettingsInvalid([("", "the settings file was changed by hand and is no longer valid JSON")]) from None
+        disk = validate_settings(data)
+        stale = self.current().revision
+        self._current = disk
+        self._disk_digest = hashlib.sha256(raw).hexdigest()
+        raise SettingsConflict(stale, disk.revision)
+
     def create_initial(self, *, password_hash: str, secret_key: str, port: int = 5001) -> Settings:
         s = default_settings(password_hash=password_hash, secret_key=secret_key, port=port)
         with self._lock:
@@ -108,6 +131,7 @@ class SettingsStore:
 
     def _write(self, s: Settings, *, replace: bool) -> None:
         body = (json.dumps(s.model_dump(mode="json"), indent=2, ensure_ascii=False) + "\n").encode()
+        self._disk_digest = hashlib.sha256(body).hexdigest()
         fd, tmp = tempfile.mkstemp(dir=self._path.parent, prefix=".settings.", suffix=".tmp")
         try:
             with os.fdopen(fd, "wb") as fh:

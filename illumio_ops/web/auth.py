@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import hmac
 import secrets
+import threading
 import time
 from typing import Any
 
@@ -29,6 +30,7 @@ __all__ = ["PASSWORD_MAX_LEN", "PASSWORD_MIN_LEN", "AdminUser", "get_ctx", "hash
            "make_auth_blueprint", "session_is_active", "verify_password"]
 
 _SESSIONS_KEY = "illumio_ops_sessions"
+_SESSIONS_LOCK = threading.Lock()  # request threads add, drop and scan live sessions
 
 
 class AdminUser(UserMixin):
@@ -53,8 +55,9 @@ def _prune_expired() -> None:
     lifetime = get_ctx().settings.current().web.session_lifetime_seconds
     cutoff = time.time() - lifetime
     active = _active()
-    for sid in [s for s, issued in active.items() if issued < cutoff]:
-        del active[sid]
+    with _SESSIONS_LOCK:
+        for sid in [s for s, issued in active.items() if issued < cutoff]:
+            del active[sid]
 
 
 def session_is_active() -> bool:
@@ -116,11 +119,13 @@ def make_auth_blueprint(csrf: CSRFProtect, limiter: Limiter) -> Blueprint:
         password_ok = verify_password(body.password, web.password_hash)
         if not (username_ok and password_ok):
             raise ApiFailure(401, "invalid_credentials", "err_invalid_credentials")
-        _active().pop(session.get("sid", ""), None)  # a re-login retires the old session
+        with _SESSIONS_LOCK:
+            _active().pop(session.get("sid", ""), None)  # a re-login retires the old session
         session.clear()  # no fixation: a fresh session for every login
         _prune_expired()
         sid = secrets.token_urlsafe(24)
-        _active()[sid] = time.time()
+        with _SESSIONS_LOCK:
+            _active()[sid] = time.time()
         session["sid"] = sid
         # Known from the password just typed; no extra hashing to find out later.
         session["default_password"] = hmac.compare_digest(body.password.encode(), DEFAULT_ADMIN_PASSWORD.encode())
@@ -130,7 +135,8 @@ def make_auth_blueprint(csrf: CSRFProtect, limiter: Limiter) -> Blueprint:
 
     @api_route(bp, OP_LOGOUT)
     def logout() -> Empty:
-        _active().pop(session.get("sid", ""), None)
+        with _SESSIONS_LOCK:
+            _active().pop(session.get("sid", ""), None)
         logout_user()
         session.clear()
         return Empty()
@@ -163,8 +169,9 @@ def make_auth_blueprint(csrf: CSRFProtect, limiter: Limiter) -> Blueprint:
         # re-signs the caller's session with the new key.
         mine = session.get("sid", "")
         active = _active()
-        for sid in [s for s in active if s != mine]:
-            del active[sid]
+        with _SESSIONS_LOCK:
+            for sid in [s for s in active if s != mine]:
+                del active[sid]
         current_app.secret_key = new_key
         current_app.config["SECRET_KEY"] = new_key
         session["default_password"] = False

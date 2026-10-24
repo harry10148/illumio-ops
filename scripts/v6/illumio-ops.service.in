@@ -13,6 +13,8 @@ Environment=PYTHONPATH=@PREFIX@
 ExecStart=@PREFIX@/python/bin/python3 -P -m illumio_ops serve --root @PREFIX@
 Restart=on-failure
 RestartSec=10
+# 75 = already running, 78 = invalid settings/TLS: restarting cannot help
+RestartPreventExitStatus=75 78
 TimeoutStopSec=30
 KillSignal=SIGTERM
 StandardOutput=journal

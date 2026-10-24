@@ -156,3 +156,12 @@ def test_unwritable_certificate_directory_exit_78(tmp_path):
     finally:
         tls_dir.chmod(0o700)
     assert r.returncode == 78 and "Traceback" not in r.stderr
+
+
+def test_missing_settings_on_an_existing_installation_is_refused(tmp_path):
+    rt = prepare(tmp_path)  # first start: creates settings, database, certificate
+    rt.release()
+    rt.paths.settings_file.unlink()
+    r = _run(tmp_path)
+    assert r.returncode == 78 and "rescue" in r.stderr
+    assert not rt.paths.settings_file.exists()

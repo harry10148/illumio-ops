@@ -36,3 +36,9 @@ def latest(ctx: AppContext) -> tuple[datetime, list[ProbeResult]] | None:
     results = [ProbeResult(ProbeName(d["name"]), d["ok"], d["status"], d["category"], d["detail_key"])
                for d in json.loads(row["results_json"])]
     return datetime.fromisoformat(row["checked_at"]), results
+
+
+def forget(ctx: AppContext) -> None:
+    """Drop the stored result: it described a different PCE (spec §6.4, switching PCE)."""
+    with ctx.db() as conn:
+        conn.execute("DELETE FROM pce_probe")

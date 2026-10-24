@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import os
+import threading
 import time
 from pathlib import Path
 from typing import Any
@@ -43,6 +44,7 @@ class JsonFileStorage(MemoryStorage):
         parsed = urlparse(uri or "")
         self._snapshot = Path(parsed.netloc + parsed.path) / "rate_limits.json"
         self._snapshot.parent.mkdir(parents=True, exist_ok=True)
+        self._write_lock = threading.Lock()  # request threads write the snapshot concurrently
         self._load_snapshot()
 
     def _load_snapshot(self) -> None:
@@ -62,8 +64,9 @@ class JsonFileStorage(MemoryStorage):
 
     def _write_snapshot(self) -> None:
         now = time.time()
-        data = {k: {"val": int(v), "exp": self.expirations.get(k, now)}
-                for k, v in self.storage.items() if self.expirations.get(k, 0) > now}
+        storage, expirations = dict(self.storage), dict(self.expirations)  # copies: the expiry timer mutates both
+        data = {k: {"val": int(v), "exp": expirations.get(k, now)}
+                for k, v in storage.items() if expirations.get(k, 0) > now}
         tmp = self._snapshot.with_suffix(".tmp")
         try:
             tmp.write_text(json.dumps(data))
@@ -72,8 +75,9 @@ class JsonFileStorage(MemoryStorage):
             logger.warning("rate-limit snapshot write failed: {}", type(exc).__name__)
 
     def incr(self, key: str, expiry: float, amount: int = 1) -> int:
-        result = super().incr(key, expiry, amount)
-        self._write_snapshot()
+        with self._write_lock:
+            result = super().incr(key, expiry, amount)
+            self._write_snapshot()
         return result
 
     def check(self) -> bool:

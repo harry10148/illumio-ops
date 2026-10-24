@@ -25,7 +25,7 @@ from urllib3.util.retry import Retry
 from illumio_ops.pce.rate_limit import RateLimiter
 from illumio_ops.settings.schema import PceSettings
 
-TransportKind = Literal["dns", "refused", "timeout", "tls", "other"]
+TransportKind = Literal["dns", "refused", "timeout", "tls", "ca_bundle", "other"]
 
 MAX_RETRIES = 3
 POST_429_DEFAULT_WAIT = 2.0
@@ -191,6 +191,11 @@ class PceClient:
                 return session.request(method=method, url=url, data=body, headers=headers, timeout=timeout)
             except requests.exceptions.RequestException as exc:
                 kind = _transport_kind(exc)
+                logger.warning("PCE {} {} failed: {} ({})", method, path, kind, type(exc).__name__)
+                raise PceTransportError(path, kind) from None
+            except OSError as exc:
+                # requests raises a bare OSError when the configured CA bundle cannot be read.
+                kind = "ca_bundle" if "CA certificate bundle" in str(exc) else "other"
                 logger.warning("PCE {} {} failed: {} ({})", method, path, kind, type(exc).__name__)
                 raise PceTransportError(path, kind) from None
 

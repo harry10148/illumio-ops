@@ -9,7 +9,13 @@ import { PasswordChange } from "../PasswordChange";
 
 const toList = (text: string) => text.split(/[\s,]+/).map((s) => s.trim()).filter(Boolean);
 
-function AllowedAddresses({ view, onSaved }: { view: SecurityView; onSaved: (v: SecurityView) => void }) {
+interface AllowedProps {
+  view: SecurityView;
+  onSaved: (v: SecurityView) => void;
+  onReload: () => void;
+}
+
+function AllowedAddresses({ view, onSaved, onReload }: AllowedProps) {
   const [text, setText] = useState(view.allowed_ips.join("\n"));
   const [error, setError] = useState<ApiError | null>(null);
   const [saved, setSaved] = useState(false);
@@ -55,6 +61,11 @@ function AllowedAddresses({ view, onSaved }: { view: SecurityView; onSaved: (v: 
               {t("security_save_anyway")}
             </button>
           )}
+          {error.code === "stale_revision" && (
+            <button type="button" className="btn-quiet inline-action" onClick={onReload}>
+              {t("btn_reload")}
+            </button>
+          )}
         </div>
       )}
       {saved && <p className="form-ok" role="status">{t("saved_ok")}</p>}
@@ -94,10 +105,11 @@ export function Security() {
             </dl>
           </div>
           <div>
-            <PasswordChange requireOld onChanged={() => { setChanged(true); notifyMeChanged(); }} />
+            {/* a password change saves the settings too: reload so the next save is not stale */}
+            <PasswordChange requireOld onChanged={() => { setChanged(true); notifyMeChanged(); void load(); }} />
             {changed && <p className="form-ok" role="status">{t("security_password_changed")}</p>}
           </div>
-          <AllowedAddresses key={view.revision} view={view} onSaved={setView} />
+          <AllowedAddresses view={view} onSaved={setView} onReload={() => void load()} />
         </>
       )}
     </section>

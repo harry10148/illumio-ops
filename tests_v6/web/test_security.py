@@ -147,3 +147,30 @@ def test_limiter_snapshot_survives_restart_and_drops_expired(tmp_path):
     assert s2.get("ip:1.2.3.4") == 2
     assert s2.get("short") == 0
     assert Path(tmp_path / "lim" / "rate_limits.json").exists()
+
+
+def test_limiter_snapshot_is_thread_safe(tmp_path):
+    import threading
+
+    from loguru import logger
+
+    from illumio_ops.web.security import JsonFileStorage
+
+    storage = JsonFileStorage(f"file://{tmp_path / 'lim'}")
+    errors = []
+    sink = logger.add(lambda m: errors.append(m.record["message"]), level="WARNING")
+
+    def hammer(n):
+        try:
+            for i in range(300):
+                storage.incr(f"k{n}-{i}", expiry=60)
+        except Exception as exc:  # noqa: BLE001 - the test collects any failure
+            errors.append(exc)
+
+    threads = [threading.Thread(target=hammer, args=(n,)) for n in range(10)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    logger.remove(sink)
+    assert errors == []
