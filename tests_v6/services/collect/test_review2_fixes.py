@@ -1,5 +1,5 @@
 """Regression tests for the second adversarial review (Tasks 7-11): each one failed before its fix."""
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 import pytest
 
@@ -9,7 +9,7 @@ from illumio_ops.pce.async_query import PceQueryError
 from illumio_ops.pce.events import EventsPage
 from illumio_ops.services import flowsource
 from illumio_ops.services.collect import events as ev
-from illumio_ops.services.collect.backfill import run_backfill
+from illumio_ops.services.collect.backfill import ensure_initial_backfill, run_backfill
 from illumio_ops.services.collect.traffic import run_traffic_cycle
 from illumio_ops.services.eventsource import query_events
 from illumio_ops.services.flowsource import query_flows
@@ -129,3 +129,53 @@ def test_stored_half_of_a_filled_pair_is_not_counted_twice(tmp_path, fake_fill):
     fake_fill.answer = lambda s, e, m: [out, inn]
     q = _flows(ctx, NOW - minutes(60), NOW, fill=True)
     assert len(q.rows) == 1
+
+
+# ── Group B: backfill ───────────────────────────────────────────────────────
+
+def _starts(calls):
+    return [datetime.fromisoformat(s) for s, _ in calls]
+
+
+def test_initial_backfill_keeps_its_start_after_a_first_day_failure(tmp_path, fake_fill):  # finding 13
+    ctx = configured_ctx(tmp_path)
+    run_traffic_cycle(ctx, now=NOW)
+    fake_fill.answer = lambda s, e, m: (_ for _ in ()).throw(PceQueryError("timeout"))
+    ensure_initial_backfill(ctx, now=NOW)
+    fake_fill.answer = lambda s, e, m: []
+    run_traffic_cycle(ctx, now=NOW + minutes(10))  # the live watermark moves on
+    fake_fill.calls.clear()
+    ensure_initial_backfill(ctx, now=NOW + minutes(10))
+    assert _starts(fake_fill.calls)[0] == NOW - 30 * DAY
+
+
+def test_backfill_failure_and_retry_resolve_both_sources(tmp_path, fake_fill):  # finding 14
+    ctx = configured_ctx(tmp_path)
+    window = (NOW - 3 * DAY, NOW - 2 * DAY)
+    fake_fill.answer = lambda s, e, m: (_ for _ in ()).throw(PceQueryError("timeout"))
+    run_backfill(ctx, start=window[0], end=window[1], now=NOW)
+    with ctx.flows().connect() as conn:
+        assert {g.source for g in ingest_state.open_gaps(conn)} == {"traffic", "events"}
+    fake_fill.answer = lambda s, e, m: []
+    run_backfill(ctx, start=window[0], end=window[1], now=NOW)
+    with ctx.flows().connect() as conn:
+        assert ingest_state.open_gaps(conn) == []
+    assert _gaps(_flows(ctx, *window)) == []
+
+
+def test_manual_backfill_does_not_abandon_an_unfinished_initial_one(tmp_path, fake_fill):
+    ctx = configured_ctx(tmp_path, backfill_days=3)
+    run_traffic_cycle(ctx, now=NOW)
+    seen = []
+    def answer(s, e, m):
+        seen.append(s)
+        if len(seen) == 2:
+            raise PceQueryError("timeout")
+        return []
+    fake_fill.answer = answer
+    ensure_initial_backfill(ctx, now=NOW)  # day 1 done, day 2 fails
+    fake_fill.answer = lambda s, e, m: []
+    run_backfill(ctx, start=NOW - 10 * DAY, end=NOW - 9 * DAY, now=NOW)  # someone backfills by hand
+    fake_fill.calls.clear()
+    ensure_initial_backfill(ctx, now=NOW)
+    assert fake_fill.calls and _starts(fake_fill.calls)[0] == seen[1]  # resumes where it stopped

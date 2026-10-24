@@ -38,7 +38,7 @@ def test_backfill_oldest_first_and_resumes(tmp_path, fake_traffic):
     first = run_backfill(ctx, start=start, end=NOW, now=NOW)
     assert first.gaps == 1 and days_seen == sorted(days_seen)
     with ctx.flows().connect() as conn:
-        progress = ingest_state.get(conn, IngestSource.BACKFILL).progress
+        progress = ingest_state.get(conn, IngestSource.BACKFILL).progress["manual"]
     assert progress["done_through"] == (start.replace(hour=0, minute=0) + timedelta(days=1)).isoformat()
     fake_traffic.answer = lambda s, e, m: [raw_flow(9, s + minutes(1), s + minutes(2))]
     calls_before = len(fake_traffic.calls)
@@ -46,7 +46,7 @@ def test_backfill_oldest_first_and_resumes(tmp_path, fake_traffic):
     resumed_from = fake_traffic.calls[calls_before][0]
     assert resumed_from == progress["done_through"].replace("+00:00", "Z").replace(".000", "")
     with ctx.flows().connect() as conn:
-        assert ingest_state.get(conn, IngestSource.BACKFILL).progress["finished"] is True
+        assert ingest_state.get(conn, IngestSource.BACKFILL).progress["manual"]["finished"] is True
 
 
 def test_backfill_marks_origin_and_seeds_baseline(tmp_path, fake_traffic):
@@ -86,4 +86,4 @@ def test_unfinished_backfill_is_resumed_by_the_check(tmp_path, fake_traffic):
     fake_traffic.answer = lambda s, e, m: []
     assert ensure_initial_backfill(ctx, now=NOW + timedelta(minutes=10)) is not None
     with ctx.flows().connect() as conn:
-        assert ingest_state.get(conn, IngestSource.BACKFILL).progress["finished"] is True
+        assert ingest_state.get(conn, IngestSource.BACKFILL).progress["initial"]["finished"] is True
