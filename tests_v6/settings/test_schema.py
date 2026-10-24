@@ -72,3 +72,13 @@ def test_redact_masks_nonempty_secrets_only(initial):
     assert r["web"]["password_hash"] == MASK and r["web"]["secret_key"] == MASK
     assert r["pce"]["api_key"] == "" and r["pce"]["api_secret"] == ""  # empty stays empty: "not set"
     assert SECRET_FIELDS == {"pce.api_key", "pce.api_secret", "web.password_hash", "web.secret_key"}
+
+
+def test_timezone_accepts_the_5x_formats():
+    from illumio_ops.settings.schema import DisplaySettings
+
+    for tz in ("local", "UTC", "UTC+8", "UTC-5", "UTC+5.5", "Asia/Taipei"):
+        assert DisplaySettings(language="en", timezone=tz).timezone == tz
+    for bad in ("UTC+24", "Mars/Base", "../etc/passwd", "GMT+8x", ""):
+        with pytest.raises(ValidationError):
+            DisplaySettings(language="en", timezone=bad)

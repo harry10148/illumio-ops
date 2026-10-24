@@ -4,7 +4,7 @@ and no code builds a key name at runtime (which would hide it from this gate).
 What counts as a reference:
   TS      t("key"), message_key: "key" and labelKey: "key"
   Python  a keyword argument named in I18N_KWARGS with a string literal; the 3rd positional
-          argument (message key) of api_error(...) / ApiFailure(...); the values of a
+          argument (message key) of api_error(...) / ApiFailure(...); the 2nd of translate(...); the values of a
           module-level dict whose name ends in _KEYS.
 "No dead keys" is broader: a key is alive if it appears as a string literal anywhere
 in illumio_ops/**/*.py or web/src/**/*.ts(x).
@@ -20,7 +20,8 @@ from tests_v6.gates._scan import PKG_ROOT, REPO_ROOT, iter_modules
 
 DICT_DIR = PKG_ROOT / "i18n"
 WEB_SRC = REPO_ROOT / "web" / "src"
-_MSG_POSITIONAL = {"api_error", "ApiFailure"}
+_MSG_POSITIONAL = {"api_error", "ApiFailure"}  # message key is the 3rd positional argument
+_KEY_SECOND = {"translate"}  # translate(lang, "key", ...)
 # Keyword arguments that carry an i18n key. An allowlist, not "*_key": settings fields
 # such as api_key / secret_key are not dictionary keys.
 I18N_KWARGS = frozenset({"message_key", "detail_key", "reason_key", "label_key", "hint_key"})
@@ -56,8 +57,10 @@ def python_refs(pkg: Path) -> tuple[set[str], list[str]]:
                             refs.add(kw.value.value)
                         elif isinstance(kw.value, (ast.JoinedStr, ast.BinOp)):
                             dynamic.append(f"{path}:{node.lineno}")
-                if _call_name(node) in _MSG_POSITIONAL and len(node.args) >= 3:
-                    a = node.args[2]
+                name = _call_name(node)
+                pos = 2 if name in _MSG_POSITIONAL else 1 if name in _KEY_SECOND else None
+                if pos is not None and len(node.args) > pos:
+                    a = node.args[pos]
                     if isinstance(a, ast.Constant) and isinstance(a.value, str):
                         refs.add(a.value)
                     elif isinstance(a, (ast.JoinedStr, ast.BinOp)):

@@ -47,7 +47,8 @@ def _errors(exc: ValidationError) -> list[tuple[str, str]]:
     return out
 
 
-def _validate(data: Any) -> Settings:
+def validate_settings(data: Any) -> Settings:
+    """Settings from a plain dict, or SettingsInvalid with field paths (never values)."""
     try:
         return Settings.model_validate(data)
     except ValidationError as exc:
@@ -70,7 +71,7 @@ class SettingsStore:
             data = json.loads(raw)
         except json.JSONDecodeError as exc:
             raise SettingsInvalid([("", f"invalid JSON (line {exc.lineno}, column {exc.colno})")]) from None
-        s = _validate(data)
+        s = validate_settings(data)
         with self._lock:
             self._current = s
         return s
@@ -89,7 +90,7 @@ class SettingsStore:
             cand = cur.model_dump(mode="json")  # a fresh tree: mutate cannot reach cur
             mutate(cand)
             cand["revision"] = cur.revision + 1
-            new = _validate(cand)
+            new = validate_settings(cand)
             self._write(new, replace=True)
             self._current = new  # the file now holds `new`: memory must follow it
             self._sync_dir()

@@ -15,6 +15,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 from illumio_ops.domain.values import DeploymentType, Language
 
 SCHEMA_VERSION: Literal[1] = 1
+_UTC_OFFSET = re.compile(r"UTC([+-]\d+(?:\.\d+)?)")
 
 
 class StrictModel(BaseModel):
@@ -111,12 +112,19 @@ class DisplaySettings(StrictModel):
     @field_validator("timezone")
     @classmethod
     def _tz(cls, v: str) -> str:
-        if v == "local":
+        # The formats 5.x accepted (src/tz_utils.py), so migrated values carry over as-is;
+        # unlike 5.x an unknown value is rejected instead of silently becoming UTC.
+        if v in ("local", "UTC"):
+            return v
+        m = _UTC_OFFSET.fullmatch(v)
+        if m:
+            if abs(float(m.group(1))) >= 24:
+                raise ValueError("a UTC offset must be less than 24 hours")
             return v
         try:
             ZoneInfo(v)
         except (ZoneInfoNotFoundError, ValueError):
-            raise ValueError("must be 'local' or an IANA time zone name") from None
+            raise ValueError("must be 'local', 'UTC', 'UTC+N' or an IANA time zone name") from None
         return v
 
 
