@@ -124,3 +124,26 @@ def test_password_change_is_rate_limited(client):
                                                   "confirm_password": "x"}, token=token).status_code
              for _ in range(6)]
     assert codes[:5] == [400] * 5 and codes[5] == 429
+
+
+def test_relogin_retires_the_previous_session(app):
+    a, b = app.test_client(), app.test_client()
+    login(a)
+    b.set_cookie("session", a.get_cookie("session").value)
+    assert b.get("/api/auth/me", environ_overrides=LOCAL).status_code == 200
+    login(a)
+    assert b.get("/api/auth/me", environ_overrides=LOCAL).status_code == 401
+    assert a.get("/api/auth/me", environ_overrides=LOCAL).status_code == 200
+
+
+def test_expired_session_ids_are_pruned(app, monkeypatch):
+    from illumio_ops.web import auth
+
+    c = app.test_client()
+    login(c)
+    sessions = app.extensions[auth._SESSIONS_KEY]
+    assert len(sessions) == 1
+    real = auth.time.time
+    monkeypatch.setattr(auth.time, "time", lambda: real() + 28800 + 1)
+    login(app.test_client())
+    assert len(sessions) == 1

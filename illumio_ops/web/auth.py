@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import hmac
 import secrets
+import time
 from typing import Any
 
 from flask import Blueprint, Flask, current_app, g, session
@@ -38,12 +39,20 @@ def get_ctx(app: Flask | None = None) -> AppContext:
     return ctx
 
 
-# Live sessions are tracked server-side (in memory) so logout really ends a session:
-# the signed cookie alone would stay valid until it expires if someone copied it.
-# A restart therefore signs everyone out.
-def _active(app: Flask | None = None) -> set[str]:
-    sessions: set[str] = (app or current_app).extensions.setdefault(_SESSIONS_KEY, set())
+# Live sessions are tracked server-side (in memory, sid -> issued at) so logout really
+# ends a session: the signed cookie alone would stay valid until it expires if someone
+# copied it. A restart therefore signs everyone out.
+def _active(app: Flask | None = None) -> dict[str, float]:
+    sessions: dict[str, float] = (app or current_app).extensions.setdefault(_SESSIONS_KEY, {})
     return sessions
+
+
+def _prune_expired() -> None:
+    lifetime = get_ctx().settings.current().web.session_lifetime_seconds
+    cutoff = time.time() - lifetime
+    active = _active()
+    for sid in [s for s, issued in active.items() if issued < cutoff]:
+        del active[sid]
 
 
 def session_is_active() -> bool:
@@ -102,9 +111,11 @@ def make_auth_blueprint(csrf: CSRFProtect, limiter: Limiter) -> Blueprint:
         password_ok = verify_password(body.password, web.password_hash)
         if not (username_ok and password_ok):
             raise ApiFailure(401, "invalid_credentials", "err_invalid_credentials")
+        _active().pop(session.get("sid", ""), None)  # a re-login retires the old session
         session.clear()  # no fixation: a fresh session for every login
+        _prune_expired()
         sid = secrets.token_urlsafe(24)
-        _active().add(sid)
+        _active()[sid] = time.time()
         session["sid"] = sid
         session.permanent = True
         login_user(AdminUser(web.username))
@@ -112,7 +123,7 @@ def make_auth_blueprint(csrf: CSRFProtect, limiter: Limiter) -> Blueprint:
 
     @api_route(bp, OP_LOGOUT)
     def logout() -> Empty:
-        _active().discard(session.get("sid", ""))
+        _active().pop(session.get("sid", ""), None)
         logout_user()
         session.clear()
         return Empty()
@@ -144,7 +155,9 @@ def make_auth_blueprint(csrf: CSRFProtect, limiter: Limiter) -> Blueprint:
         # password): drop them server-side and rotate the signing key; this response
         # re-signs the caller's session with the new key.
         mine = session.get("sid", "")
-        _active().intersection_update({mine})
+        active = _active()
+        for sid in [s for s in active if s != mine]:
+            del active[sid]
         current_app.secret_key = new_key
         current_app.config["SECRET_KEY"] = new_key
         session.modified = True
