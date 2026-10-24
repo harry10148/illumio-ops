@@ -155,10 +155,14 @@ def _repair_tuple(conn: sqlite3.Connection, tup: tuple[str, str, int | None, int
     return keys, {str(r["last_detected"])[:10] for r in rows}, pairs
 
 
+# "+is_primary" keeps the planner on ix_flows_conn: left to itself it picks ix_flows_primary_last
+# and walks every primary row, making each cycle slower as the store grows (test_query_plans).
+PRIMARY_OF_CONNECTION = ("SELECT src_key, dst_key, port, proto, first_detected, last_detected, initiator_user "
+                         "FROM flows WHERE conn_key = ? AND +is_primary = 1")
+
+
 def _update_baselines(conn: sqlite3.Connection, conn_key: str) -> None:
-    row = conn.execute(
-        "SELECT src_key, dst_key, port, proto, first_detected, last_detected, initiator_user FROM flows "
-        "WHERE conn_key = ? AND is_primary = 1", (conn_key,)).fetchone()
+    row = conn.execute(PRIMARY_OF_CONNECTION, (conn_key,)).fetchone()
     if row is None:
         return
     port = row["port"] if row["port"] is not None else NO_PORT
