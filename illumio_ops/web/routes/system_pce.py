@@ -12,7 +12,7 @@ from illumio_ops.pce.health import ProbeResult
 from illumio_ops.services import pce_health
 from illumio_ops.settings.secrets import MASK, redact
 from illumio_ops.web.auth import get_ctx
-from illumio_ops.web.contract import api_route, operation
+from illumio_ops.web.contract import ApiFailure, api_route, operation
 
 
 class PceConnection(BaseModel):
@@ -83,9 +83,16 @@ def update_connection(body: PceConnectionUpdate) -> PceConnection:
     fields = body.model_dump(mode="json", exclude={"revision"})
     # A blank or masked secret means "keep what is saved": the form never receives
     # the real values, so it cannot send them back.
-    for secret in ("api_key", "api_secret"):
-        if fields[secret] in ("", MASK):
-            del fields[secret]
+    kept = [k for k in ("api_key", "api_secret") if fields[k] in ("", MASK)]
+    for k in kept:
+        del fields[k]
+    # ...except when the destination or its TLS check changes: otherwise anyone holding
+    # a session could point the saved credentials at their own host and read them off
+    # the next connection test.
+    saved = get_ctx().settings.current().pce
+    moved = (body.url.rstrip("/") != saved.url or body.verify_tls != saved.verify_tls)
+    if kept and moved and (saved.api_key or saved.api_secret):
+        raise ApiFailure(400, "credentials_required", "err_credentials_required", field="api_key")
 
     def mutate(d: dict[str, Any]) -> None:
         d["pce"].update(fields)

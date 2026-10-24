@@ -162,6 +162,7 @@ export function PceConnection() {
           {t("pce_api_key")}
           <input name="api_key" autoComplete="off" value={form.api_key} onChange={(e) => set("api_key", e.target.value)} />
           <span className="hint">{t("pce_secret_hint")}</span>
+          <FieldError name="api_key" error={error} />
         </label>
         <label>
           {t("pce_api_secret")}

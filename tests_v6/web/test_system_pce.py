@@ -97,3 +97,30 @@ def test_latest_is_empty_before_any_probe(client):
 
 def test_pce_endpoints_require_login(client):
     assert client.get("/api/system/pce", environ_overrides=LOCAL).status_code == 401
+
+
+def test_changing_the_pce_address_requires_reentering_credentials(client, ctx):
+    login(client)
+    _save(client)
+    r = _save(client, url="https://attacker.example.com:8443", api_key=MASK, api_secret=MASK)
+    err = r.get_json()["error"]
+    assert r.status_code == 400 and err["code"] == "credentials_required" and err["field"] == "api_key"
+    assert ctx.settings.current().pce.url == BASE
+    ok = _save(client, url="https://new-pce.example.com:8443", api_key="k2", api_secret="s2")
+    assert ok.status_code == 200 and ctx.settings.current().pce.api_secret == "s2"
+
+
+def test_weakening_tls_check_requires_reentering_credentials(client, ctx):
+    login(client)
+    _save(client)
+    r = _save(client, verify_tls=False, api_key=MASK, api_secret=MASK)
+    assert r.status_code == 400 and r.get_json()["error"]["code"] == "credentials_required"
+    assert ctx.settings.current().pce.verify_tls is True
+    assert _save(client, verify_tls="/etc/pki/ca.pem", api_key=MASK, api_secret=MASK).status_code == 400
+
+
+def test_other_edits_keep_saved_credentials(client, ctx):
+    login(client)
+    _save(client)
+    assert _save(client, deployment_type="saas", api_key=MASK, api_secret=MASK).status_code == 200
+    assert ctx.settings.current().pce.api_secret == "SECRETVALUE"
