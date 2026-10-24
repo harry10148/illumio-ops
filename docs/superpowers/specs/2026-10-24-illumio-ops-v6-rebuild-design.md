@@ -197,7 +197,7 @@ SIEM 轉送（22.4 萬筆全數送達）**；GUI 告警收件匣 146 則從未�
 | audit | PCE 事件稽核 | 保留 |
 | ven_status | agent 健康與版本分布 | 保留 |
 | policy_usage | **草稿政策**下哪些規則會被流量用到、哪些流量會被草稿擋掉（draft rulesets＋`compute_draft`） | 保留【使用者】 |
-| rule_hit_count | **已佈署規則**的實際命中次數（PCE 原生 RHC 報表） | 保留，**含啟用 RHC**：RHC 只能經 API 開啟，所以 v6.0 由本產品提供啟用動作【使用者】（見下）。**RHC 只記錄已 provision 的規則**【使用者】：報表必須區分「沒有紀錄」（草稿規則、或期間內尚未佈署）與「有紀錄但 0 次」，不得把前者顯示成 0；草稿規則導向 policy_usage。RHC 是否只從啟用時刻起累計，實作時在 NFR 驗證後寫回 |
+| rule_hit_count | **已佈署規則**的實際命中次數（PCE 原生 RHC 報表） | 保留，**含啟用 RHC**：RHC 只能經 API 開啟，所以 v6.0 由本產品提供啟用動作【使用者】（見下）。**RHC 只記錄已 provision 的規則**【使用者】：報表必須區分「沒有紀錄」（草稿規則、或期間內尚未佈署）與「有紀錄但 0 次」，不得把前者顯示成 0；草稿規則導向 policy_usage。RHC 是否只從啟用時刻起累計：**NFR 無法實測**（見下方「NFR 實測」），P5 開工前在可啟用的環境驗證 |
 | policy_resolver | 把已佈署規則展開成 IP 層級的平面列，供其他工具使用（例如與傳統防火牆規則比對） | 保留，維持 JSON＋CSV 輸出、不做 HTML；列數上限與截斷揭露照舊【使用者】 |
 
 另【判斷】：拿掉所有 CSV 上傳輸入（PCE UI 匯出、workloader、vuln CSV）與獨立的 `draft_policy`
@@ -222,8 +222,19 @@ VEN enforcement 推進、心跳加速）。理由：使用者排序最後、測�
 因此 v6.0：除 RHC 啟用外，PCE client 不做任何政策或 workload 寫入；**目標是日常運作只需唯讀 API
 角色**，啟用 RHC 是一次性動作、需要可寫入的權限。讀取路徑仍有三個 POST——
 `/traffic_flows/async_queries`（流量查詢）、`/sec_policy/{pversion}/rule_search`（政策解釋）、
-`POST /orgs/{org}/reports`（拉 RHC 報表，會在 PCE 建立報表物件）——是否在 Read Only 權限內**尚未驗證**，
-實作計畫第一步在 NFR SaaS 用 Read Only API key 實測三者，結果寫回本節與安裝文件。
+`POST /orgs/{org}/reports`（拉 RHC 報表，會在 PCE 建立報表物件）。
+
+**NFR 實測（2026-10-24，SaaS 26.40.2，以 API 臨時建立 `read_only` 角色的 service account，測完即刪）**：
+- `POST /traffic_flows/async_queries` → 202、`POST /sec_policy/active/rule_search` → 200：**唯讀角色可用**。
+- `POST /reports` → 403（RHC、executive_summary、ransomware_risk 三種範本皆同；同一請求用 owner key → 201）：
+  **唯讀角色不能產生任何 PCE 原生報表**。所以只要要拉 RHC 報表，日常 key 就不能是 `read_only`。
+- 用 **owner** 角色的 user API key `PUT /report_templates/rule_hit_count_report`（連 `enabled:false` 的 no-op 也一樣）
+  → 403 `forbidden_error "Access denied."`；`POST /reports`（RHC）→ 403 `"report template type rule_hit_count_report
+  not enabled"`。NFR 上 RHC 範本是停用的，**tenant owner 無法經 API 啟用**；官方文件（REST API 26.1）寫的是
+  「organization administrator」可做，與實測不符。依防護規則第一步失敗即停，未動 firewall_settings。
+- 因此「RHC 只能經 API 開啟」在 SaaS 上不成立或另有前提（可能需 Illumio 支援開範本）。**待使用者決定**（P5 開工前）：
+  SaaS 的 RHC 啟用要怎麼呈現（例如偵測範本狀態，停用時說明需向 Illumio 申請，只做 VEN 端兩步），以及日常 key
+  的建議角色（`read_only` 不夠產報表；需找出能 `POST /reports` 而不能改政策的最小角色）。
 告警詳情頁的主要動作為「在 PCE 主控台開啟」（`console_url`）。規則編輯器需要的 label／IP list 等
 物件查詢、告警詳情裡的政策解釋仍要做。5.x 的規則排程（`rule_schedules.json`）與 VEN 推進紀錄
 不遷移，升級報告列出它們並說明 v6.0 不支援。
