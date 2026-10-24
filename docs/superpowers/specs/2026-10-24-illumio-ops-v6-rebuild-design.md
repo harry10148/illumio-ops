@@ -250,8 +250,23 @@ VEN enforcement 推進、心跳加速）。理由：使用者排序最後、測�
   → 403 `forbidden_error "Access denied."`；`POST /reports`（RHC）→ 403 `"report template type rule_hit_count_report
   not enabled"`。NFR 上 RHC 範本是停用的，**tenant owner 無法經 API 啟用**；官方文件（REST API 26.1）寫的是
   「organization administrator」可做，與實測不符。依防護規則第一步失敗即停，未動 firewall_settings。
-- RHC 啟用的 SaaS 403 見上方「P5 開工時要先釐清的已知風險」。日常 API key 的建議角色仍待定：`read_only`
-  不夠產 PCE 報表，P5 要找出能 `POST /reports` 而不能改政策的最小角色，寫進安裝文件。
+- RHC 啟用的 SaaS 403 見上方「P5 開工時要先釐清的已知風險」。
+
+**API key 角色實測（2026-10-24，lab 地端 26.2.20 與 NFR SaaS 26.40.2 結果相同）**：以 API 為每個角色臨時建立 service account，
+跑 v6 會用到的呼叫（寫入類一律送無效 body：403＝無權限、406＝有權限但內容不合法，不改任何資料），測完即刪。
+
+| 呼叫 | read_only | global_object_provisioner | ruleset_* / workload_manager | admin | owner |
+|---|---|---|---|---|---|
+| labels、workloads、rule_sets、流量查詢、rule_search | ✓ | ✓ | 多數 ✓（workload_manager ✗） | ✓ | ✓ |
+| events、active firewall_settings | ✓ | ✓ | ✗ | ✓ | ✓ |
+| 讀 RHC 報表範本（狀態檢查） | ✗ | ✗ | ✗ | ✓ | ✓ |
+| 產生任何 PCE 原生報表（含 RHC 報表） | ✗ | ✗ | ✗ | **✗** | ✓ |
+| 開啟 RHC 報表範本 | ✗ | ✗ | ✗ | ✗ | ✓ |
+| 改 draft firewall_settings、provision、建 label／ruleset | ✗ | 部分（provision 全域物件） | 部分 | ✓ | ✓ |
+
+- **只有 owner 能產生 PCE 原生報表與開啟 RHC 範本**，連 admin 都不行；owner 角色可以給 service account。
+- 除了 RHC 以外，v6 的監控、告警、SIEM、資料收集與其他報表（都由本機收集的資料產生）只需要 `read_only`。
+- 現況：客戶的 key 都給 owner【使用者，2026-10-24】。建議見 §6.5 決定紀錄（待使用者選擇）。
 
 **PCE 健康檢查與網址（依部署型態）**【使用者要求依官方文件，2026-10-24；P1 已實作探測順序】：
 - 共同基線：`GET /api/v2/noop`（驗證連線與 API 憑證，Public Stable API）。
