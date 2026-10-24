@@ -1,5 +1,5 @@
-"""The parts of the 5.x settings model the P1 migration reads, with 5.x's own parsing:
-strings stripped, "true"/"false" coerced, and 5.x defaults for missing keys
+"""The parts of the 5.x settings model the migration reads, with 5.x's own parsing:
+strings stripped, "true"/"false" coerced, 5.x's bounds, and 5.x defaults for missing keys
 (src/config_models.py, identical in v5.0.0 and v5.2.x for these fields). Unknown keys are
 ignored here; the migration report accounts for every key separately.
 """
@@ -56,8 +56,25 @@ class V5Logging(_V5):
     level: str = "INFO"
 
 
+
+
+class V5PceCache(_V5):
+    """5.x PceCacheSettings: only the fields that carry over (the rest are reported as dropped)."""
+    enabled: bool = False
+    events_retention_days: int = Field(default=90, ge=1)
+    traffic_raw_retention_days: int = Field(default=7, ge=1)
+    traffic_agg_retention_days: int = Field(default=90, ge=1)
+    events_poll_interval_seconds: int = Field(default=300, ge=30)
+    traffic_poll_interval_seconds: int = Field(default=3600, ge=60)
+    rate_limit_per_minute: int = Field(default=400, ge=10, le=500)
+    archive_enabled: bool = False
+    archive_retention_days: int = Field(default=0, ge=0)
+    disk_free_warn_gb: int = Field(default=10, ge=1)
+
+
 class V5Config(_V5):
     api: V5Api = Field(default_factory=V5Api)
     web_gui: V5WebGui = Field(default_factory=V5WebGui)
     settings: V5General = Field(default_factory=V5General)
     logging: V5Logging = Field(default_factory=V5Logging)
+    pce_cache: V5PceCache = Field(default_factory=V5PceCache)

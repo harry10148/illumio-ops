@@ -165,3 +165,7 @@ def test_selftest_proper_reader_is_green(tmp_path):
 
 def test_no_p1_pending_left():
     assert [p for p, due in PENDING_READERS.items() if due.startswith("P1-")] == []
+
+
+def test_no_p2_pending_left():
+    assert [p for p, due in PENDING_READERS.items() if due.startswith("P2-")] == []

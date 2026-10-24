@@ -82,15 +82,95 @@ def test_deprecated_keys_dropped_with_reason():
     assert all(i.action == "dropped" for i in dep.values())
 
 
-def test_unsupported_sections_name_their_phase():
+def test_phase_labels_follow_revised_roadmap():
     report = migrate_v5(_load("v5_2_x_config_106_redacted.json")).report
     by_source = {i.source: i for i in report.items}
-    assert by_source["smtp.host"].params == {"phase": "P3"} and by_source["smtp.host"].action == "unsupported"
-    assert by_source["siem.enabled"].params == {"phase": "P4"}
+    assert by_source["smtp.host"].params == {"phase": "P4"} and by_source["smtp.host"].action == "unsupported"
+    assert by_source["siem.enabled"].params == {"phase": "P7"}
     assert by_source["report_schedules"].params == {"phase": "P5"}
-    assert by_source["pce_cache.enabled"].params == {"phase": "P2"}
+    assert by_source["pce_cache.siem_pending_warn_rows"].params == {"phase": "P7"}
     assert by_source["settings.theme"].reason_key == "migrate_not_in_v6"
     assert by_source["api.profile"].action == "dropped"
+    raw = _base()
+    raw["web_gui"]["public_url"] = "https://ops.example.com"
+    item = next(i for i in migrate_v5(raw).report.items if i.source == "web_gui.public_url")
+    assert item.params == {"phase": "P5"}
+    assert not any(i.params.get("phase") in ("P2", "P3") for i in report.items)
+
+
+def _with_cache(**values):
+    raw = _base()
+    raw["pce_cache"] = dict(values)
+    return raw
+
+
+def _cache_item(result, source):
+    return next(i for i in result.report.items if i.source == source)
+
+
+def test_pce_cache_carried_and_rewritten():
+    r = migrate_v5(_with_cache(enabled=True, traffic_poll_interval_seconds=3600, events_poll_interval_seconds=20 * 60,
+                               rate_limit_per_minute=300, events_retention_days=120, disk_free_warn_gb=25))
+    c = r.settings.collection
+    assert (c.enabled, c.traffic_interval_seconds, c.events_interval_seconds, c.rate_limit_per_minute) == (
+        True, 600, 1200, 300)
+    assert (c.retention.event_days, c.disk_free_warn_gb) == (120, 25)
+    item = _cache_item(r, "pce_cache.traffic_poll_interval_seconds")
+    assert (item.target, item.action, item.reason_key) == (
+        "collection.traffic_interval_seconds", "rewritten", "migrate_v6_default_interval")
+    assert _cache_item(r, "pce_cache.events_poll_interval_seconds").action == "carried"
+    r = migrate_v5(_with_cache(traffic_poll_interval_seconds=1800, events_poll_interval_seconds=30))
+    assert r.settings.collection.traffic_interval_seconds == 1800
+    assert _cache_item(r, "pce_cache.traffic_poll_interval_seconds").action == "carried"
+    assert r.settings.collection.events_interval_seconds == 60  # 5.x allowed 30 s
+    assert _cache_item(r, "pce_cache.events_poll_interval_seconds").reason_key == "migrate_raised_to_minimum"
+
+
+def test_raw_retention_raised_to_baseline():
+    r = migrate_v5(_with_cache(traffic_raw_retention_days=7, traffic_agg_retention_days=20))
+    ret = r.settings.collection.retention
+    assert (ret.flow_days, ret.rollup_days) == (35, 35)
+    for key in ("traffic_raw_retention_days", "traffic_agg_retention_days"):
+        assert _cache_item(r, f"pce_cache.{key}").reason_key == "migrate_raised_to_baseline"
+    r = migrate_v5(_with_cache(traffic_raw_retention_days=60, traffic_agg_retention_days=400))
+    assert (r.settings.collection.retention.flow_days, r.settings.collection.retention.rollup_days) == (60, 400)
+
+
+def test_archive_retention_raised_to_outlive_raw_data():
+    r = migrate_v5(_with_cache(archive_enabled=True, archive_retention_days=30, events_retention_days=90))
+    assert r.settings.collection.archive.retention_days == 90
+    assert _cache_item(r, "pce_cache.archive_retention_days").reason_key == "migrate_raised_for_archive"
+    r = migrate_v5(_with_cache(archive_enabled=True, archive_retention_days=0))
+    assert r.settings.collection.archive.retention_days == 0  # keep forever
+
+
+def test_filter_and_sampling_dropped_with_reason():
+    raw = _with_cache(traffic_filter={"actions": ["blocked"], "ports": [445]},
+                      traffic_sampling={"sample_ratio_allowed": 5}, db_path="data/x.sqlite", flow_delta_enabled=True)
+    report = migrate_v5(raw).report
+    for source in ("pce_cache.traffic_filter.actions", "pce_cache.traffic_filter.ports",
+                   "pce_cache.traffic_sampling.sample_ratio_allowed"):
+        item = next(i for i in report.items if i.source == source)
+        assert (item.action, item.reason_key) == ("dropped", "migrate_no_sampling")
+    assert next(i for i in report.items if i.source == "pce_cache.db_path").reason_key == "migrate_fixed_path"
+    assert next(i for i in report.items if i.source == "pce_cache.flow_delta_enabled").action == "dropped"
+
+
+def test_collection_on_unless_5x_turned_the_cache_off():
+    assert migrate_v5(_with_cache(enabled=False)).settings.collection.enabled is False
+    raw = _base()
+    raw.pop("pce_cache", None)
+    assert migrate_v5(raw).settings.collection.enabled is True  # never configured: the v6 default
+
+
+def test_106_pce_cache_every_leaf_accounted_for():
+    raw = _load("v5_2_x_config_106_redacted.json")
+    result = migrate_v5(raw)
+    items = [i for i in result.report.items if i.source.startswith("pce_cache.")]
+    assert sorted(i.source for i in items) == sorted(k for k in leaf_keys(raw) if k.startswith("pce_cache."))
+    assert not [i for i in items if i.reason_key == "migrate_unknown_key" or i.params.get("phase") == "P2"]
+    c = result.settings.collection
+    assert (c.enabled, c.traffic_interval_seconds, c.archive.enabled, c.archive.retention_days) == (True, 300, True, 365)
 
 
 def test_render_never_contains_secret_values():
