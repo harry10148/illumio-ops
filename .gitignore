@@ -117,3 +117,6 @@ docs/ux-review-2026-05-14/
 # v6: frontend build output and node modules
 illumio_ops/web/static/
 web/node_modules/
+
+# v6 frontend: the lockfile is required by `npm ci` in CI and the bundle build
+!web/package-lock.json
