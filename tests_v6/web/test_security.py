@@ -36,7 +36,7 @@ def test_allowed_ip_passes(guarded_app, remote):
 
 def test_blocked_ip_receives_no_http_body(guarded_app):
     r = guarded_app.test_client().get("/api/auth/csrf", environ_overrides={"REMOTE_ADDR": "10.0.0.1"})
-    assert r.data == b""
+    assert r.data == b"" and r.status_code == 403 and r.headers["Connection"] == "close"
 
 
 def _csp(r):

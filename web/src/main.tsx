@@ -4,6 +4,7 @@ import { createRoot } from "react-dom/client";
 import { App } from "./App";
 import "./pages/system/PceConnection";
 import "./pages/system/Jobs";
+import "./pages/system/Tls";
 import "./styles/tokens.css";
 import "./styles/base.css";
 

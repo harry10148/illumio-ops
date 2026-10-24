@@ -29,15 +29,22 @@ SETTINGS_READERS: dict[str, str] = {
     "web.secret_key": "illumio_ops.web.app",
     "web.allowed_ips": "illumio_ops.web.app",
     "web.session_lifetime_seconds": "illumio_ops.web.app",
+    "web.host": "illumio_ops.__main__",
+    "web.port": "illumio_ops.__main__",
+    "logging.level": "illumio_ops.__main__",
+    "web.tls.enabled": "illumio_ops.runtime",
+    "web.tls.mode": "illumio_ops.runtime",
+    "web.tls.cert_file": "illumio_ops.runtime",
+    "web.tls.key_file": "illumio_ops.runtime",
+    "web.tls.auto_renew": "illumio_ops.web.tls",
+    "web.tls.auto_renew_days": "illumio_ops.web.tls",
+    "web.tls.validity_days": "illumio_ops.web.tls",
+    "web.tls.key_algorithm": "illumio_ops.web.tls",
+    "web.tls.min_version": "illumio_ops.web.tls",
+    "web.tls.ciphers": "illumio_ops.web.tls",
 }
 # Fields whose reader arrives later: value = the task or phase that adds it.
 PENDING_READERS: dict[str, str] = {
-    "web.host": "P1-T11",
-    "web.port": "P1-T11",
-    **{f"web.tls.{f}": "P1-T11" for f in (
-        "enabled", "mode", "cert_file", "key_file", "auto_renew", "auto_renew_days",
-        "validity_days", "key_algorithm", "min_version", "ciphers")},
-    "logging.level": "P1-T11",
     "display.language": "P1-T13",
     "pce.events_timeout_seconds": "P2",
     "pce.console_url": "P3",

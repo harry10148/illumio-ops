@@ -1,0 +1,112 @@
+"""`python -m illumio_ops serve`: refuses to start rather than guess."""
+import fcntl
+import json
+import os
+import signal
+import socket
+import ssl
+import subprocess
+import sys
+import time
+import urllib.request
+from pathlib import Path
+
+from illumio_ops.paths import resolve_paths
+from illumio_ops.runtime import prepare
+from illumio_ops.settings.store import SettingsStore
+from tests_v6.web.conftest import cached_hash
+
+REPO = Path(__file__).resolve().parents[1]
+
+
+def _run(root: Path, timeout: int = 60) -> subprocess.CompletedProcess[str]:
+    env = os.environ | {"PYTHONPATH": str(REPO), "ILLUMIO_OPS_RATELIMIT_URI": "memory://"}
+    return subprocess.run([sys.executable, "-m", "illumio_ops", "serve", "--root", str(root)],
+                          capture_output=True, text=True, timeout=timeout, env=env, cwd="/", check=False)
+
+
+def _initial(root: Path, port: int = 5001) -> Path:
+    paths = resolve_paths(root)
+    paths.ensure_dirs()
+    SettingsStore(paths.settings_file).create_initial(password_hash=cached_hash("illumio"),
+                                                      secret_key="ab" * 32, port=port)
+    return paths.settings_file
+
+
+def test_serve_refuses_invalid_settings(tmp_path):
+    f = _initial(tmp_path)
+    d = json.loads(f.read_text())
+    d["web"]["port"] = 0
+    f.write_text(json.dumps(d))
+    before = f.read_bytes()
+    r = _run(tmp_path)
+    assert r.returncode == 78
+    assert "web.port" in r.stderr
+    assert f.read_bytes() == before
+
+
+def test_second_instance_refused(tmp_path):
+    _initial(tmp_path)
+    paths = resolve_paths(tmp_path)
+    fd = os.open(paths.service_lock, os.O_RDWR | os.O_CREAT, 0o600)
+    fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    try:
+        r = _run(tmp_path)
+    finally:
+        os.close(fd)
+    assert r.returncode == 75 and "already running" in r.stderr
+
+
+def test_fresh_root_creates_initial_settings_0600(tmp_path):
+    root = tmp_path / "fresh"  # no config/ or data/ yet
+    rt = prepare(root)
+    try:
+        assert (rt.paths.settings_file.stat().st_mode & 0o777) == 0o600
+        s = rt.ctx.settings.current()
+        assert s.web.username == "illumio" and s.web.port == 5001
+        assert rt.paths.app_db.is_file() and rt.ssl_ctx is not None
+        assert rt.ctx.served_cert_fingerprint
+    finally:
+        rt.release()
+
+
+def test_provided_cert_missing_is_refused(tmp_path):
+    f = _initial(tmp_path)
+    d = json.loads(f.read_text())
+    d["web"]["tls"].update(mode="provided", cert_file="/nonexistent/cert.pem", key_file="/nonexistent/key.pem")
+    f.write_text(json.dumps(d))
+    r = _run(tmp_path)
+    assert r.returncode == 78 and "certificate" in r.stderr.lower()
+
+
+def _free_port() -> int:
+    s = socket.socket()
+    s.bind(("127.0.0.1", 0))
+    port = s.getsockname()[1]
+    s.close()
+    return port
+
+
+def test_serve_starts_https_and_stops_on_sigterm(tmp_path):
+    port = _free_port()
+    _initial(tmp_path, port=port)
+    env = os.environ | {"PYTHONPATH": str(REPO), "ILLUMIO_OPS_RATELIMIT_URI": "memory://"}
+    proc = subprocess.Popen([sys.executable, "-m", "illumio_ops", "serve", "--root", str(tmp_path)],
+                            stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, env=env, cwd="/")
+    try:
+        ctx = ssl.create_default_context()
+        ctx.check_hostname = False
+        ctx.verify_mode = ssl.CERT_NONE
+        body = None
+        for _ in range(100):
+            try:
+                with urllib.request.urlopen(f"https://127.0.0.1:{port}/api/auth/csrf", context=ctx, timeout=2) as r:
+                    body = json.loads(r.read())
+                break
+            except OSError:
+                time.sleep(0.1)
+        assert body is not None and body["ok"] is True
+    finally:
+        proc.send_signal(signal.SIGTERM)
+        _out, err = proc.communicate(timeout=30)
+    assert proc.returncode == 0, err[-2000:]

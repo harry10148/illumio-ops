@@ -157,8 +157,88 @@ revision: number
 url: string
 verify_tls: (boolean | string)
 }
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "CsrRequest".
+ */
+export interface CsrRequest {
+c: string
+cn: string
+key_algorithm: ("ecdsa-p256" | "rsa-2048")
+o: string
+ou: string
+/**
+ * @maxItems 50
+ */
+san_dns: string[]
+/**
+ * @maxItems 50
+ */
+san_ip: string[]
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "CsrResult".
+ */
+export interface CsrResult {
+csr_pem: string
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "ImportRequest".
+ */
+export interface ImportRequest {
+cert_pem: string
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "CertView".
+ */
+export interface CertView {
+days_remaining: number
+issuer_cn: string
+not_after: string
+not_before: string
+san: string[]
+self_signed: boolean
+subject_cn: string
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "TlsStatus".
+ */
+export interface TlsStatus {
+auto_renew: boolean
+auto_renew_days: number
+cert: (CertView | null)
+cert_file: string
+enabled: boolean
+key_algorithm: ("ecdsa-p256" | "rsa-2048")
+key_file: string
+min_version: ("TLSv1.2" | "TLSv1.3")
+mode: ("self_signed" | "provided")
+restart_required: boolean
+revision: number
+validity_days: number
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "TlsUpdate".
+ */
+export interface TlsUpdate {
+auto_renew: boolean
+auto_renew_days: number
+cert_file: string
+enabled: boolean
+key_algorithm: ("ecdsa-p256" | "rsa-2048")
+key_file: string
+min_version: ("TLSv1.2" | "TLSv1.3")
+mode: ("self_signed" | "provided")
+revision: number
+validity_days: number
+}
 
-export type OpId = "auth.csrf" | "auth.login" | "auth.logout" | "auth.me" | "auth.password" | "home.summary" | "i18n.dictionary" | "system.jobs.list" | "system.pce.get" | "system.pce.latest" | "system.pce.probe" | "system.pce.update";
+export type OpId = "auth.csrf" | "auth.login" | "auth.logout" | "auth.me" | "auth.password" | "home.summary" | "i18n.dictionary" | "system.jobs.list" | "system.pce.get" | "system.pce.latest" | "system.pce.probe" | "system.pce.update" | "system.tls.csr" | "system.tls.import" | "system.tls.renew" | "system.tls.status" | "system.tls.update";
 
 export interface Requests {
   "auth.csrf": undefined;
@@ -173,6 +253,11 @@ export interface Requests {
   "system.pce.latest": undefined;
   "system.pce.probe": undefined;
   "system.pce.update": PceConnectionUpdate;
+  "system.tls.csr": CsrRequest;
+  "system.tls.import": ImportRequest;
+  "system.tls.renew": undefined;
+  "system.tls.status": undefined;
+  "system.tls.update": TlsUpdate;
 }
 
 export interface Responses {
@@ -188,6 +273,11 @@ export interface Responses {
   "system.pce.latest": LatestProbe;
   "system.pce.probe": ProbeRun;
   "system.pce.update": PceConnection;
+  "system.tls.csr": CsrResult;
+  "system.tls.import": TlsStatus;
+  "system.tls.renew": TlsStatus;
+  "system.tls.status": TlsStatus;
+  "system.tls.update": TlsStatus;
 }
 
 export const OPERATIONS = {
@@ -203,6 +293,11 @@ export const OPERATIONS = {
   "system.pce.latest": { method: "GET", path: "/api/system/pce/latest" },
   "system.pce.probe": { method: "POST", path: "/api/system/pce/probe" },
   "system.pce.update": { method: "PUT", path: "/api/system/pce" },
+  "system.tls.csr": { method: "POST", path: "/api/system/tls/csr" },
+  "system.tls.import": { method: "POST", path: "/api/system/tls/import" },
+  "system.tls.renew": { method: "POST", path: "/api/system/tls/renew" },
+  "system.tls.status": { method: "GET", path: "/api/system/tls" },
+  "system.tls.update": { method: "PUT", path: "/api/system/tls" },
 } as const satisfies Record<OpId, { method: string; path: string }>;
 
 export const VALUES = {

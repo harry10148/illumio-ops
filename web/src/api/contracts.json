@@ -768,6 +768,736 @@
         "title": "PceConnection",
         "type": "object"
       }
+    },
+    "system.tls.csr": {
+      "method": "POST",
+      "path": "/api/system/tls/csr",
+      "request_schema": {
+        "properties": {
+          "c": {
+            "maxLength": 2,
+            "title": "C",
+            "type": "string"
+          },
+          "cn": {
+            "maxLength": 253,
+            "minLength": 1,
+            "title": "Cn",
+            "type": "string"
+          },
+          "key_algorithm": {
+            "enum": [
+              "ecdsa-p256",
+              "rsa-2048"
+            ],
+            "title": "Key Algorithm",
+            "type": "string"
+          },
+          "o": {
+            "maxLength": 64,
+            "title": "O",
+            "type": "string"
+          },
+          "ou": {
+            "maxLength": 64,
+            "title": "Ou",
+            "type": "string"
+          },
+          "san_dns": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 50,
+            "title": "San Dns",
+            "type": "array"
+          },
+          "san_ip": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 50,
+            "title": "San Ip",
+            "type": "array"
+          }
+        },
+        "required": [
+          "cn",
+          "o",
+          "ou",
+          "c",
+          "san_dns",
+          "san_ip",
+          "key_algorithm"
+        ],
+        "title": "CsrRequest",
+        "type": "object"
+      },
+      "response_schema": {
+        "properties": {
+          "csr_pem": {
+            "title": "Csr Pem",
+            "type": "string"
+          }
+        },
+        "required": [
+          "csr_pem"
+        ],
+        "title": "CsrResult",
+        "type": "object"
+      }
+    },
+    "system.tls.import": {
+      "method": "POST",
+      "path": "/api/system/tls/import",
+      "request_schema": {
+        "properties": {
+          "cert_pem": {
+            "maxLength": 65536,
+            "minLength": 1,
+            "title": "Cert Pem",
+            "type": "string"
+          }
+        },
+        "required": [
+          "cert_pem"
+        ],
+        "title": "ImportRequest",
+        "type": "object"
+      },
+      "response_schema": {
+        "$defs": {
+          "CertView": {
+            "properties": {
+              "days_remaining": {
+                "title": "Days Remaining",
+                "type": "integer"
+              },
+              "issuer_cn": {
+                "title": "Issuer Cn",
+                "type": "string"
+              },
+              "not_after": {
+                "format": "date-time",
+                "title": "Not After",
+                "type": "string"
+              },
+              "not_before": {
+                "format": "date-time",
+                "title": "Not Before",
+                "type": "string"
+              },
+              "san": {
+                "items": {
+                  "type": "string"
+                },
+                "title": "San",
+                "type": "array"
+              },
+              "self_signed": {
+                "title": "Self Signed",
+                "type": "boolean"
+              },
+              "subject_cn": {
+                "title": "Subject Cn",
+                "type": "string"
+              }
+            },
+            "required": [
+              "subject_cn",
+              "issuer_cn",
+              "not_before",
+              "not_after",
+              "days_remaining",
+              "san",
+              "self_signed"
+            ],
+            "title": "CertView",
+            "type": "object"
+          }
+        },
+        "properties": {
+          "auto_renew": {
+            "title": "Auto Renew",
+            "type": "boolean"
+          },
+          "auto_renew_days": {
+            "title": "Auto Renew Days",
+            "type": "integer"
+          },
+          "cert": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/CertView"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "cert_file": {
+            "title": "Cert File",
+            "type": "string"
+          },
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "key_algorithm": {
+            "enum": [
+              "ecdsa-p256",
+              "rsa-2048"
+            ],
+            "title": "Key Algorithm",
+            "type": "string"
+          },
+          "key_file": {
+            "title": "Key File",
+            "type": "string"
+          },
+          "min_version": {
+            "enum": [
+              "TLSv1.2",
+              "TLSv1.3"
+            ],
+            "title": "Min Version",
+            "type": "string"
+          },
+          "mode": {
+            "enum": [
+              "self_signed",
+              "provided"
+            ],
+            "title": "Mode",
+            "type": "string"
+          },
+          "restart_required": {
+            "title": "Restart Required",
+            "type": "boolean"
+          },
+          "revision": {
+            "title": "Revision",
+            "type": "integer"
+          },
+          "validity_days": {
+            "title": "Validity Days",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "revision",
+          "enabled",
+          "mode",
+          "cert_file",
+          "key_file",
+          "auto_renew",
+          "auto_renew_days",
+          "validity_days",
+          "key_algorithm",
+          "min_version",
+          "cert",
+          "restart_required"
+        ],
+        "title": "TlsStatus",
+        "type": "object"
+      }
+    },
+    "system.tls.renew": {
+      "method": "POST",
+      "path": "/api/system/tls/renew",
+      "request_schema": null,
+      "response_schema": {
+        "$defs": {
+          "CertView": {
+            "properties": {
+              "days_remaining": {
+                "title": "Days Remaining",
+                "type": "integer"
+              },
+              "issuer_cn": {
+                "title": "Issuer Cn",
+                "type": "string"
+              },
+              "not_after": {
+                "format": "date-time",
+                "title": "Not After",
+                "type": "string"
+              },
+              "not_before": {
+                "format": "date-time",
+                "title": "Not Before",
+                "type": "string"
+              },
+              "san": {
+                "items": {
+                  "type": "string"
+                },
+                "title": "San",
+                "type": "array"
+              },
+              "self_signed": {
+                "title": "Self Signed",
+                "type": "boolean"
+              },
+              "subject_cn": {
+                "title": "Subject Cn",
+                "type": "string"
+              }
+            },
+            "required": [
+              "subject_cn",
+              "issuer_cn",
+              "not_before",
+              "not_after",
+              "days_remaining",
+              "san",
+              "self_signed"
+            ],
+            "title": "CertView",
+            "type": "object"
+          }
+        },
+        "properties": {
+          "auto_renew": {
+            "title": "Auto Renew",
+            "type": "boolean"
+          },
+          "auto_renew_days": {
+            "title": "Auto Renew Days",
+            "type": "integer"
+          },
+          "cert": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/CertView"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "cert_file": {
+            "title": "Cert File",
+            "type": "string"
+          },
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "key_algorithm": {
+            "enum": [
+              "ecdsa-p256",
+              "rsa-2048"
+            ],
+            "title": "Key Algorithm",
+            "type": "string"
+          },
+          "key_file": {
+            "title": "Key File",
+            "type": "string"
+          },
+          "min_version": {
+            "enum": [
+              "TLSv1.2",
+              "TLSv1.3"
+            ],
+            "title": "Min Version",
+            "type": "string"
+          },
+          "mode": {
+            "enum": [
+              "self_signed",
+              "provided"
+            ],
+            "title": "Mode",
+            "type": "string"
+          },
+          "restart_required": {
+            "title": "Restart Required",
+            "type": "boolean"
+          },
+          "revision": {
+            "title": "Revision",
+            "type": "integer"
+          },
+          "validity_days": {
+            "title": "Validity Days",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "revision",
+          "enabled",
+          "mode",
+          "cert_file",
+          "key_file",
+          "auto_renew",
+          "auto_renew_days",
+          "validity_days",
+          "key_algorithm",
+          "min_version",
+          "cert",
+          "restart_required"
+        ],
+        "title": "TlsStatus",
+        "type": "object"
+      }
+    },
+    "system.tls.status": {
+      "method": "GET",
+      "path": "/api/system/tls",
+      "request_schema": null,
+      "response_schema": {
+        "$defs": {
+          "CertView": {
+            "properties": {
+              "days_remaining": {
+                "title": "Days Remaining",
+                "type": "integer"
+              },
+              "issuer_cn": {
+                "title": "Issuer Cn",
+                "type": "string"
+              },
+              "not_after": {
+                "format": "date-time",
+                "title": "Not After",
+                "type": "string"
+              },
+              "not_before": {
+                "format": "date-time",
+                "title": "Not Before",
+                "type": "string"
+              },
+              "san": {
+                "items": {
+                  "type": "string"
+                },
+                "title": "San",
+                "type": "array"
+              },
+              "self_signed": {
+                "title": "Self Signed",
+                "type": "boolean"
+              },
+              "subject_cn": {
+                "title": "Subject Cn",
+                "type": "string"
+              }
+            },
+            "required": [
+              "subject_cn",
+              "issuer_cn",
+              "not_before",
+              "not_after",
+              "days_remaining",
+              "san",
+              "self_signed"
+            ],
+            "title": "CertView",
+            "type": "object"
+          }
+        },
+        "properties": {
+          "auto_renew": {
+            "title": "Auto Renew",
+            "type": "boolean"
+          },
+          "auto_renew_days": {
+            "title": "Auto Renew Days",
+            "type": "integer"
+          },
+          "cert": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/CertView"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "cert_file": {
+            "title": "Cert File",
+            "type": "string"
+          },
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "key_algorithm": {
+            "enum": [
+              "ecdsa-p256",
+              "rsa-2048"
+            ],
+            "title": "Key Algorithm",
+            "type": "string"
+          },
+          "key_file": {
+            "title": "Key File",
+            "type": "string"
+          },
+          "min_version": {
+            "enum": [
+              "TLSv1.2",
+              "TLSv1.3"
+            ],
+            "title": "Min Version",
+            "type": "string"
+          },
+          "mode": {
+            "enum": [
+              "self_signed",
+              "provided"
+            ],
+            "title": "Mode",
+            "type": "string"
+          },
+          "restart_required": {
+            "title": "Restart Required",
+            "type": "boolean"
+          },
+          "revision": {
+            "title": "Revision",
+            "type": "integer"
+          },
+          "validity_days": {
+            "title": "Validity Days",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "revision",
+          "enabled",
+          "mode",
+          "cert_file",
+          "key_file",
+          "auto_renew",
+          "auto_renew_days",
+          "validity_days",
+          "key_algorithm",
+          "min_version",
+          "cert",
+          "restart_required"
+        ],
+        "title": "TlsStatus",
+        "type": "object"
+      }
+    },
+    "system.tls.update": {
+      "method": "PUT",
+      "path": "/api/system/tls",
+      "request_schema": {
+        "properties": {
+          "auto_renew": {
+            "title": "Auto Renew",
+            "type": "boolean"
+          },
+          "auto_renew_days": {
+            "maximum": 365,
+            "minimum": 1,
+            "title": "Auto Renew Days",
+            "type": "integer"
+          },
+          "cert_file": {
+            "maxLength": 4096,
+            "title": "Cert File",
+            "type": "string"
+          },
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "key_algorithm": {
+            "enum": [
+              "ecdsa-p256",
+              "rsa-2048"
+            ],
+            "title": "Key Algorithm",
+            "type": "string"
+          },
+          "key_file": {
+            "maxLength": 4096,
+            "title": "Key File",
+            "type": "string"
+          },
+          "min_version": {
+            "enum": [
+              "TLSv1.2",
+              "TLSv1.3"
+            ],
+            "title": "Min Version",
+            "type": "string"
+          },
+          "mode": {
+            "enum": [
+              "self_signed",
+              "provided"
+            ],
+            "title": "Mode",
+            "type": "string"
+          },
+          "revision": {
+            "title": "Revision",
+            "type": "integer"
+          },
+          "validity_days": {
+            "maximum": 825,
+            "minimum": 1,
+            "title": "Validity Days",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "revision",
+          "enabled",
+          "mode",
+          "cert_file",
+          "key_file",
+          "auto_renew",
+          "auto_renew_days",
+          "validity_days",
+          "key_algorithm",
+          "min_version"
+        ],
+        "title": "TlsUpdate",
+        "type": "object"
+      },
+      "response_schema": {
+        "$defs": {
+          "CertView": {
+            "properties": {
+              "days_remaining": {
+                "title": "Days Remaining",
+                "type": "integer"
+              },
+              "issuer_cn": {
+                "title": "Issuer Cn",
+                "type": "string"
+              },
+              "not_after": {
+                "format": "date-time",
+                "title": "Not After",
+                "type": "string"
+              },
+              "not_before": {
+                "format": "date-time",
+                "title": "Not Before",
+                "type": "string"
+              },
+              "san": {
+                "items": {
+                  "type": "string"
+                },
+                "title": "San",
+                "type": "array"
+              },
+              "self_signed": {
+                "title": "Self Signed",
+                "type": "boolean"
+              },
+              "subject_cn": {
+                "title": "Subject Cn",
+                "type": "string"
+              }
+            },
+            "required": [
+              "subject_cn",
+              "issuer_cn",
+              "not_before",
+              "not_after",
+              "days_remaining",
+              "san",
+              "self_signed"
+            ],
+            "title": "CertView",
+            "type": "object"
+          }
+        },
+        "properties": {
+          "auto_renew": {
+            "title": "Auto Renew",
+            "type": "boolean"
+          },
+          "auto_renew_days": {
+            "title": "Auto Renew Days",
+            "type": "integer"
+          },
+          "cert": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/CertView"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "cert_file": {
+            "title": "Cert File",
+            "type": "string"
+          },
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "key_algorithm": {
+            "enum": [
+              "ecdsa-p256",
+              "rsa-2048"
+            ],
+            "title": "Key Algorithm",
+            "type": "string"
+          },
+          "key_file": {
+            "title": "Key File",
+            "type": "string"
+          },
+          "min_version": {
+            "enum": [
+              "TLSv1.2",
+              "TLSv1.3"
+            ],
+            "title": "Min Version",
+            "type": "string"
+          },
+          "mode": {
+            "enum": [
+              "self_signed",
+              "provided"
+            ],
+            "title": "Mode",
+            "type": "string"
+          },
+          "restart_required": {
+            "title": "Restart Required",
+            "type": "boolean"
+          },
+          "revision": {
+            "title": "Revision",
+            "type": "integer"
+          },
+          "validity_days": {
+            "title": "Validity Days",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "revision",
+          "enabled",
+          "mode",
+          "cert_file",
+          "key_file",
+          "auto_renew",
+          "auto_renew_days",
+          "validity_days",
+          "key_algorithm",
+          "min_version",
+          "cert",
+          "restart_required"
+        ],
+        "title": "TlsStatus",
+        "type": "object"
+      }
     }
   },
   "values": {

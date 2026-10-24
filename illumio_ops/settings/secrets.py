@@ -29,6 +29,9 @@ def redact(s: Settings) -> dict[str, Any]:
 
 
 # ── Admin password (argon2id, same parameters as 5.x so migrated hashes verify) ──
+# First-start credentials, as in 5.x (the operator is not forced to change them).
+DEFAULT_ADMIN_USERNAME = "illumio"
+DEFAULT_ADMIN_PASSWORD = "illumio"
 PASSWORD_MIN_LEN = 12
 PASSWORD_MAX_LEN = 512
 _PH = PasswordHasher(time_cost=4, memory_cost=131072, parallelism=4)

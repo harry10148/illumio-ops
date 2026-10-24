@@ -22,7 +22,7 @@ from illumio_ops.web.contract import op_id_for_endpoint
 from illumio_ops.web.errors import api_error
 from illumio_ops.web.ipallow import RstDrop, is_allowed, rst_drop
 from illumio_ops.web.routes import i18n as i18n_routes
-from illumio_ops.web.routes import system_jobs, system_pce
+from illumio_ops.web.routes import system_jobs, system_pce, system_tls
 
 DEFAULT_STATIC_DIR = Path(__file__).resolve().parent / "static"
 
@@ -101,6 +101,7 @@ def create_app(ctx: AppContext, *, use_https: bool, static_dir: Path | None = No
     app.register_blueprint(i18n_routes.bp)
     app.register_blueprint(system_pce.bp)
     app.register_blueprint(system_jobs.bp)
+    app.register_blueprint(system_tls.make_blueprint(limiter))
 
     # 8. The single-page app: hashed assets, anything else that is a file, else index.html
     @app.get("/")
@@ -114,7 +115,10 @@ def create_app(ctx: AppContext, *, use_https: bool, static_dir: Path | None = No
 
     @app.errorhandler(RstDrop)
     def _rst(_: RstDrop) -> Response:
-        return Response(b"", status=200)  # the socket is already gone; write nothing
+        # Refused peers are normally reset at accept time (web.server). This only runs for a
+        # keep-alive connection whose address was removed from the list mid-connection, or
+        # when the socket could not be reached: end it without content and never with 200.
+        return Response(b"", status=403, headers={"Connection": "close"})
 
     @app.errorhandler(CSRFError)
     def _csrf_error(_: CSRFError) -> tuple[Response, int]:

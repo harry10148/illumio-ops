@@ -13,10 +13,12 @@ from illumio_ops.jobs.health import record_finish, record_start
 from illumio_ops.pce.client import PceNotConfigured
 from illumio_ops.services import pce_health
 from illumio_ops.services.context import AppContext
+from illumio_ops.web.tls import ensure_self_signed
 
 # job id -> interval in seconds (the home page and the jobs page read this too)
 JOB_INTERVALS: dict[str, int] = {
     "pce_probe": 300,
+    "tls_renew_check": 86400,
 }
 
 
@@ -46,6 +48,16 @@ def _probe_job(ctx: AppContext) -> Callable[[], None]:
     return probe
 
 
+def _tls_renew_job(ctx: AppContext) -> Callable[[], None]:
+    def renew() -> None:
+        tls = ctx.settings.current().web.tls
+        if tls.enabled and tls.mode == "self_signed" and tls.auto_renew:
+            # A renewed certificate is used after the next restart (the listener keeps the
+            # one it started with); the certificate page says so.
+            ensure_self_signed(ctx.paths.tls_dir, tls)
+    return renew
+
+
 def build_scheduler(ctx: AppContext) -> BackgroundScheduler:
     sched = BackgroundScheduler(timezone=UTC, job_defaults={"coalesce": True, "max_instances": 1})
     # coalesce/max_instances are passed per job: job_defaults only apply once the
@@ -53,4 +65,6 @@ def build_scheduler(ctx: AppContext) -> BackgroundScheduler:
     sched.add_job(instrument("pce_probe", _probe_job(ctx), ctx), "interval", id="pce_probe",
                   seconds=JOB_INTERVALS["pce_probe"], next_run_time=datetime.now(UTC),
                   coalesce=True, max_instances=1)
+    sched.add_job(instrument("tls_renew_check", _tls_renew_job(ctx), ctx), "interval", id="tls_renew_check",
+                  seconds=JOB_INTERVALS["tls_renew_check"], coalesce=True, max_instances=1)
     return sched
