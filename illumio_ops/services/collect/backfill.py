@@ -100,6 +100,8 @@ def _run_backfill(ctx: AppContext, *, start: datetime, end: datetime, now: datet
                             for ta, tb, n in trunc:
                                 ingest_state.record_gap(conn, src, ta, tb, "truncated",
                                                         f"backfill: {n} rows at the limit", at)
+                        for src in (IngestSource.TRAFFIC, IngestSource.EVENTS):
+                            ingest_state.add_coverage(conn, src, a, b)
                         ingest_state.set_progress(conn, SOURCE, {"start": start.isoformat(), "end": end.isoformat(),
                                                                  "done_through": b.isoformat(), "finished": False})
             except Exception as exc:

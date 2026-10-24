@@ -63,10 +63,12 @@ def test_filter_is_applied_in_store(collected):
     assert len(q.rows) == 3
 
 
-def test_window_before_retention_lists_gap_without_pce_call(collected, fake_traffic):
-    q = query_flows(collected, _spec(NOW - timedelta(days=3), NOW), limit=100, order="last_detected_desc")
-    reasons = [g[2] for g in q.coverage.gaps]
-    assert reasons == ["before_retention"] and q.coverage.gaps[0][0] == NOW - timedelta(days=3)
+def test_uncovered_windows_list_gaps_without_pce_call(collected, fake_traffic):
+    q = query_flows(collected, _spec(NOW - timedelta(days=3), NOW), limit=100, order="last_detected_desc", now=NOW)
+    assert q.coverage.gaps == [(NOW - timedelta(days=3), NOW - timedelta(days=1), "not_yet_collected")]
+    q = query_flows(collected, _spec(NOW - timedelta(days=40), NOW - timedelta(days=36)), limit=100,
+                    order="last_detected_desc", now=NOW)
+    assert [g[2] for g in q.coverage.gaps] == ["before_retention"]
     assert fake_traffic.calls == [] and q.coverage.source == "store"
 
 

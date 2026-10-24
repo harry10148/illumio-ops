@@ -93,6 +93,7 @@ def run_events_cycle(ctx: AppContext, *, now: datetime | None = None) -> CycleRe
                     ingest_state.record_gap(conn, SOURCE, a, b, "truncated",
                                             f"{n} events returned at the PCE's per-request limit", at)
                 ingest_state.resolve_failed_gaps(conn, SOURCE, start, at, at)
+                ingest_state.add_coverage(conn, SOURCE, start, at)
                 ingest_state.mark_ok(conn, SOURCE, at, watermark=at, rows=written, progress=done_progress)
     except Exception as exc:
         fail(fdb, SOURCE, start, at, exc)

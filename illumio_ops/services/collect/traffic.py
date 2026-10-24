@@ -117,6 +117,7 @@ def run_traffic_cycle(ctx: AppContext, *, now: datetime | None = None) -> CycleR
                     ingest_state.record_gap(conn, SOURCE, a, b, "truncated",
                                             f"{n} rows returned at the PCE's per-query limit", at)
                 ingest_state.resolve_failed_gaps(conn, SOURCE, start, at, at)
+                ingest_state.add_coverage(conn, SOURCE, start, at)
                 ingest_state.mark_ok(conn, SOURCE, at, watermark=at, rows=len(records), progress=done_progress)
     except Exception as exc:
         fail(fdb, SOURCE, start, at, exc)

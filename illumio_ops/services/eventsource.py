@@ -1,5 +1,6 @@
 """EventSource: the one way the rest of the product reads PCE events, with the same coverage
-semantics as FlowSource (store window, recorded gaps, optional filling from the PCE)."""
+semantics as FlowSource (services.coverage: what was read, recorded gaps, optional filling from
+the PCE)."""
 from __future__ import annotations
 
 import json
@@ -14,11 +15,9 @@ from illumio_ops.domain.events import EventShapeError, normalize_event
 from illumio_ops.domain.values import IngestSource
 from illumio_ops.pce.client import PceNotConfigured
 from illumio_ops.pce.events import events_timeout, fetch_events
-from illumio_ops.services.collect.cycle import COVERED_FROM_KEY
 from illumio_ops.services.collect.traffic import PCE_FAILURES
 from illumio_ops.services.context import AppContext
-from illumio_ops.services.flowsource import Coverage
-from illumio_ops.store.flowdb import ingest_state
+from illumio_ops.services.coverage import Coverage, merge_gaps, store_coverage
 from illumio_ops.store.flowdb.db import db_time
 
 FILL_DEADLINE_SECONDS = 900
@@ -44,20 +43,6 @@ class EventQuery(BaseModel):
     limit_hit: bool
 
 
-def _bounds(conn: Any, ctx: AppContext, now: datetime) -> tuple[datetime | None, datetime | None]:
-    state = ingest_state.get(conn, IngestSource.EVENTS)
-    if state is None or state.watermark is None:
-        return None, None
-    covered = (state.progress or {}).get(COVERED_FROM_KEY)
-    store_from = datetime.fromisoformat(covered) if covered else state.watermark
-    backfill = ingest_state.get(conn, IngestSource.BACKFILL)
-    bp = (backfill.progress or {}) if backfill else {}
-    if bp.get("finished") and bp.get("start"):
-        store_from = min(store_from, datetime.fromisoformat(bp["start"]))
-    floor = now - timedelta(days=ctx.settings.current().collection.retention.event_days)
-    return max(store_from, floor), state.watermark
-
-
 def _matches(row: EventRow, event_types: tuple[str, ...], ven_hrefs: set[str] | None) -> bool:
     if event_types and row.event_type not in event_types:
         return False
@@ -68,20 +53,10 @@ def query_events(ctx: AppContext, *, start: datetime, end: datetime, event_types
                  workload_href: str | None = None, limit: int, fill_gaps: bool = False,
                  now: datetime | None = None) -> EventQuery:
     at = (now or datetime.now(UTC)).astimezone(UTC)
+    floor = at - timedelta(days=ctx.settings.current().collection.retention.event_days)
     with ctx.flows().connect() as conn:
-        store_from, store_to = _bounds(conn, ctx, at)
-        gaps: list[tuple[datetime, datetime, str]] = []
-        if store_from is None or store_to is None:
-            gaps.append((start, end, "not_yet_collected"))
-        else:
-            if start < store_from:
-                gaps.append((start, min(store_from, end), "before_retention"))
-            if end > store_to:
-                gaps.append((max(store_to, start), end, "not_yet_collected"))
-            for open_gap in ingest_state.open_gaps(conn, IngestSource.EVENTS):
-                if open_gap.window_start < end and open_gap.window_end > start:
-                    gaps.append((max(open_gap.window_start, start), min(open_gap.window_end, end),
-                                 "truncated" if open_gap.kind == "truncated" else "ingest_failed"))
+        cov = store_coverage(conn, IngestSource.EVENTS, (start, end), floor=floor)
+        gaps = cov.gaps
         clauses, params = ["e.timestamp >= ?", "e.timestamp <= ?"], [db_time(start), db_time(end)]
         if event_types:
             clauses.append(f"e.event_type IN ({','.join('?' * len(event_types))})")
@@ -102,6 +77,7 @@ def query_events(ctx: AppContext, *, start: datetime, end: datetime, event_types
                          created_by_name=r["created_by_name"], created_by_href=r["created_by_href"],
                          tamper_classification=r["tamper_classification"], raw=json.loads(r["raw_json"]),
                          origin=r["origin"]) for r in db_rows]
+        from_store = bool(rows)
         known = {r.href for r in rows}
         filled: list[tuple[datetime, datetime]] = []
         kept: list[tuple[datetime, datetime, str]] = []
@@ -137,8 +113,10 @@ def query_events(ctx: AppContext, *, start: datetime, end: datetime, event_types
                         known.add(row.href)
                         rows.append(row)
     rows.sort(key=lambda r: r.timestamp, reverse=True)
-    used_store = store_from is not None and store_to is not None and start < store_to and end > store_from
+    used_store = from_store or cov.covers_any
     source: Literal["store", "pce", "mixed"] = "mixed" if filled and used_store else "pce" if filled else "store"
+    kept = merge_gaps(kept)
     return EventQuery(rows=rows[:limit], limit_hit=len(rows) > limit,
-                      coverage=Coverage(source=source, store_from=store_from, store_to=store_to, gaps=sorted(kept),
-                                        filled_from_pce=filled, truncated=any(g[2] == "truncated" for g in kept)))
+                      coverage=Coverage(source=source, store_from=cov.store_from, store_to=cov.store_to, gaps=kept,
+                                        filled_from_pce=sorted(filled),
+                                        truncated=any(g[2] == "truncated" for g in kept)))

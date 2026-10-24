@@ -119,6 +119,25 @@ def resolve_failed_gaps(conn: sqlite3.Connection, source: str, start: datetime, 
         return cur.rowcount
 
 
+def add_coverage(conn: sqlite3.Connection, source: str, start: datetime, end: datetime) -> None:
+    """[start, end] has been read and stored; join it with the ranges it overlaps or touches."""
+    lo, hi = db_time(start), db_time(end)
+    with transaction(conn):
+        rows = conn.execute("SELECT range_start, range_end FROM ingest_coverage WHERE source = ? "
+                            "AND range_start <= ? AND range_end >= ?", (source, hi, lo)).fetchall()
+        conn.executemany("DELETE FROM ingest_coverage WHERE source = ? AND range_start = ?",
+                         [(source, r[0]) for r in rows])
+        lo = min([lo, *(r[0] for r in rows)])
+        hi = max([hi, *(r[1] for r in rows)])
+        conn.execute("INSERT INTO ingest_coverage (source, range_start, range_end) VALUES (?, ?, ?)",
+                     (source, lo, hi))
+
+
+def coverage(conn: sqlite3.Connection, source: str) -> list[tuple[datetime, datetime]]:
+    return [(datetime.fromisoformat(a), datetime.fromisoformat(b)) for a, b in conn.execute(
+        "SELECT range_start, range_end FROM ingest_coverage WHERE source = ? ORDER BY range_start", (source,))]
+
+
 def open_gaps(conn: sqlite3.Connection, source: str | None = None) -> list[Gap]:
     sql = "SELECT * FROM ingest_gaps WHERE resolved_at IS NULL"
     args: tuple[Any, ...] = ()

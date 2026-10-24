@@ -35,6 +35,15 @@ CREATE TABLE ingest_gaps (
     resolved_at  TEXT
 );
 CREATE INDEX ix_gaps_open ON ingest_gaps (source, resolved_at);
+-- The stretches each source has read (merged as they grow). A read window counts once it is stored;
+-- a truncated part of it is still listed in ingest_gaps. FlowSource / EventSource report anything
+-- outside these ranges as a gap.
+CREATE TABLE ingest_coverage (
+    source      TEXT NOT NULL,
+    range_start TEXT NOT NULL,
+    range_end   TEXT NOT NULL,
+    PRIMARY KEY (source, range_start)
+);
 
 -- Distinct label combinations, shared by flows and workloads (owner: store.flowdb.labels).
 CREATE TABLE label_sets (
@@ -203,6 +212,12 @@ CREATE TABLE ransomware_services (
     fetched_at        TEXT NOT NULL,
     PRIMARY KEY (workload_href, name, port, proto)
 );
+-- Which version of each workload's risk details was last read, also when the list was empty.
+CREATE TABLE ransomware_fetch (
+    workload_href     TEXT PRIMARY KEY,
+    source_updated_at TEXT,
+    fetched_at        TEXT NOT NULL
+);
 CREATE TABLE ransomware_snapshot_daily (
     day              TEXT NOT NULL,
     workload_href    TEXT NOT NULL,
@@ -234,5 +249,6 @@ CREATE TABLE archive_log (
     rows       INTEGER NOT NULL,
     path       TEXT NOT NULL,
     written_at TEXT NOT NULL,
+    stale      INTEGER NOT NULL DEFAULT 0,  -- rows of the day changed after the file was written
     PRIMARY KEY (kind, day)
 );
