@@ -194,3 +194,32 @@ def test_archive_file_name_is_made_durable_before_the_day_is_recorded(tmp_path, 
     monkeypatch.setattr(archive_job.os, "fsync", fsync)
     assert run_archive(ctx, now=NOW) == 1
     assert synced == [False, True]  # the file, then its directory
+
+
+def test_rewriting_a_day_retention_has_thinned_keeps_its_archived_rows(tmp_path):
+    # The cutoff day's morning rows go to retention once archived; a backfilled record of the next day
+    # that pairs with an evening record marks the day stale, and its file was rewritten from what was
+    # left: the archived morning rows were lost for good.
+    ctx = configured_ctx(tmp_path)
+    _enable(ctx)
+    cutoff = NOW - timedelta(days=35)  # flow_days 35
+    day = cutoff.strftime("%Y-%m-%d")
+    morning, evening = cutoff.replace(hour=1), cutoff.replace(hour=23, minute=55)
+    with ctx.flows().connect() as conn:
+        upsert_flows(conn, [normalize_flow(raw_flow(1, morning, morning + timedelta(minutes=5))),
+                            normalize_flow(raw_flow(2, evening, evening + timedelta(minutes=3)))],
+                     origin=DataOrigin.INGEST, now=cutoff)
+    run_archive(ctx, now=cutoff + timedelta(days=2))
+    run_retention(ctx, now=NOW)  # the morning connection goes (its day is archived)
+    nxt = (cutoff + timedelta(days=1)).replace(hour=0, minute=1)
+    with ctx.flows().connect() as conn:
+        stats = upsert_flows(conn, [normalize_flow(raw_flow(2, nxt, nxt + timedelta(minutes=3), direction="inbound"))],
+                             origin=DataOrigin.BACKFILL, now=NOW)
+        assert stats.paired == 1 and day not in archive_log.archived_days(conn, "flows")  # stale again
+    run_archive(ctx, now=NOW)
+    with gzip.open(ctx.paths.archive_dir / f"flows-{day}.jsonl.gz", "rt") as fh:
+        rows = [json.loads(line) for line in fh]
+    assert sorted(r["src_ip"] for r in rows) == ["10.0.1.1", "10.0.1.2"]
+    with ctx.flows().connect() as conn:
+        assert day in archive_log.archived_days(conn, "flows")
+        assert conn.execute("SELECT rows FROM archive_log WHERE kind = 'flows' AND day = ?", (day,)).fetchone()[0] == 2

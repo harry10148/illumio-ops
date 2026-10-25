@@ -6,7 +6,8 @@ from __future__ import annotations
 import gzip
 import json
 import os
-from collections.abc import Iterable
+import sqlite3
+from collections.abc import Iterable, Iterator
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
@@ -22,6 +23,7 @@ _KINDS = {
               "SELECT * FROM flows WHERE last_detected >= ? AND last_detected < ? ORDER BY id"),
     "events": ("substr(timestamp, 1, 10)", "SELECT * FROM events WHERE timestamp >= ? AND timestamp < ? ORDER BY id"),
 }
+_KEY = {"flows": "record_key", "events": "href"}  # a row's identity across rewrites of its day
 _HAS_ROWS = {
     "flows": "SELECT 1 FROM flows WHERE last_detected >= ? AND last_detected < ? LIMIT 1",
     "events": "SELECT 1 FROM events WHERE timestamp >= ? AND timestamp < ? LIMIT 1",
@@ -58,6 +60,25 @@ def _write_atomic(path: Path, lines: Iterable[str]) -> int:
     return count
 
 
+def _day_lines(conn: sqlite3.Connection, kind: str, day: str, path: Path, keep_old: bool) -> Iterator[str]:
+    """The day's file as JSON lines from one read snapshot. With keep_old, a line of the file already
+    written for the day whose row is no longer stored (retention dropped it) is kept: the database
+    no longer holds the whole day, the file does."""
+    conn.execute("BEGIN")  # one snapshot for the look-ups and the day's rows
+    try:
+        if keep_old and path.exists():
+            key = _KEY[kind]
+            with gzip.open(path, "rt", encoding="utf-8") as old:
+                for line in old:
+                    k = json.loads(line).get(key)
+                    if k is None or conn.execute(f"SELECT 1 FROM {kind} WHERE {key} = ?", (k,)).fetchone() is None:
+                        yield line.rstrip("\n")
+        for r in conn.execute(_KINDS[kind][1], _day_range(day)):
+            yield json.dumps(dict(r), separators=(",", ":"), ensure_ascii=False)
+    finally:
+        conn.rollback()
+
+
 def run_archive(ctx: AppContext, *, now: datetime | None = None) -> int:
     gen = ctx.flows().generation  # a PCE switch moves the archive aside; see FlowDb.generation
     try:
@@ -68,16 +89,20 @@ def run_archive(ctx: AppContext, *, now: datetime | None = None) -> int:
 
 
 def _archive(ctx: AppContext, gen: int, now: datetime | None) -> int:
-    settings = ctx.settings.current().collection.archive
+    collection = ctx.settings.current().collection
+    settings = collection.archive
     if not settings.enabled:
         return 0
     at = (now or datetime.now(UTC)).astimezone(UTC)
     today = db_day(at)
+    # Days retention may have thinned (up to the raw cutoff's day): a rewrite keeps the file's other rows.
+    thinned = {"flows": db_day(at - timedelta(days=collection.retention.flow_days)),
+               "events": db_day(at - timedelta(days=collection.retention.event_days))}
     out_dir = ctx.paths.archive_dir
     out_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
     fdb = ctx.flows()
     written = 0
-    for kind, (day_expr, day_query) in _KINDS.items():
+    for kind, (day_expr, _) in _KINDS.items():
         with fdb.connect() as conn:
             done = archive.archived_days(conn, kind)
             days = [r[0] for r in conn.execute(f"SELECT DISTINCT {day_expr} FROM {kind} ORDER BY 1")]
@@ -91,9 +116,7 @@ def _archive(ctx: AppContext, gen: int, now: datetime | None) -> int:
                 archive.begin(conn, kind, day, str(path), at)
             try:
                 with fdb.connect() as conn:
-                    rows = conn.execute(day_query, _day_range(day))  # one statement: one snapshot
-                    count = _write_atomic(path, (json.dumps(dict(r), separators=(",", ":"), ensure_ascii=False)
-                                                 for r in rows))
+                    count = _write_atomic(path, _day_lines(conn, kind, day, path, keep_old=day <= thinned[kind]))
                 with fdb.writing(gen) as conn:
                     written += archive.finish(conn, kind, day, count, at)
             except StaleGeneration:
