@@ -4,18 +4,24 @@ would block it. Not stored: the answer changes with every draft edit (spec §6.4
 from __future__ import annotations
 
 import time
+from collections.abc import Iterable
 from datetime import UTC, datetime
 
 from pydantic import BaseModel, ConfigDict
 
 from illumio_ops.domain.filter import FilterSpec, matches, to_pce_payload
-from illumio_ops.domain.flows import FlowShapeError, normalize_flow
-from illumio_ops.domain.policy import RuleRef, index_rules, parse_draft
+from illumio_ops.domain.flows import (
+    FlowShapeError,
+    group_pairs,
+    normalize_flow,
+    record_key,
+)
+from illumio_ops.domain.policy import DraftView, RuleRef, index_rules, parse_draft
 from illumio_ops.domain.values import CapabilityState
 from illumio_ops.pce.async_query import PceQueryError, run_traffic_query
 from illumio_ops.pce.policy import fetch_policy_names, fetch_rule_sets
 from illumio_ops.services.context import AppContext
-from illumio_ops.services.flowsource import FlowRow, live_row
+from illumio_ops.services.flowsource import FlowRow, pair_row
 from illumio_ops.store.flowdb import capabilities
 
 _ALWAYS = (datetime(1970, 1, 1, tzinfo=UTC), datetime(9999, 1, 1, tzinfo=UTC))
@@ -64,20 +70,34 @@ def predict_blocks(ctx: AppContext, spec: FilterSpec, *, limit: int = 1000, max_
             raise
         rules = index_rules(fetch_rule_sets(client, "draft", deadline=deadline),
                             **fetch_policy_names(client, "draft", deadline=deadline).__dict__)
-    rows: list[PredictedRow] = []
+    views: dict[str, DraftView] = {}
+    records = []
     for raw in result.rows:
         try:
-            flow = live_row(normalize_flow(raw))
+            rec = normalize_flow(raw)
         except FlowShapeError:
             continue
+        records.append(rec)
+        views[record_key(rec)] = parse_draft(raw)
+    rows: list[PredictedRow] = []
+    # A connection both VENs reported is one row with both ends' attributes, filtered as such (P3 final
+    # review #13); its draft evidence is both ends' rules.
+    for primary, partner in group_pairs(records):
+        flow = pair_row(primary, partner)
         if not matches(residual, flow.model_dump()):
             continue
-        view = parse_draft(raw)
-        rows.append(PredictedRow(flow=flow, draft_decision=view.draft_decision,
-                                 blocking_rules=list(view.deny_rule_hrefs + view.override_deny_hrefs),
-                                 allow_rules=list(view.allow_rule_hrefs),
-                                 essential_service_rules=list(view.essential_service_rules)))
+        ends = [views[record_key(primary)]] + ([views[record_key(partner)]] if partner is not None else [])
+        decision = next((v.draft_decision for v in ends if v.draft_decision.startswith("blocked")), ends[0].draft_decision)
+        rows.append(PredictedRow(
+            flow=flow, draft_decision=decision,
+            blocking_rules=_union(h for v in ends for h in v.deny_rule_hrefs + v.override_deny_hrefs),
+            allow_rules=_union(h for v in ends for h in v.allow_rule_hrefs),
+            essential_service_rules=_union(h for v in ends for h in v.essential_service_rules)))
     named = {h for r in rows for h in (*r.blocking_rules, *r.allow_rules)}
     return PredictedBlock(rows=rows[:limit], rules={h: rules[h] for h in sorted(named) if h in rules},
                           capped=result.capped, limit_hit=len(rows) > limit, computed_at=at, unsupported=False,
                           missing_rules=sorted(named - rules.keys()))
+
+
+def _union(hrefs: Iterable[str]) -> list[str]:
+    return list(dict.fromkeys(hrefs))

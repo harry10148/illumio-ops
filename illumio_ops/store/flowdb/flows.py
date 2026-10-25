@@ -91,10 +91,9 @@ def _refresh(conn: sqlite3.Connection, row_id: int, r: FlowRecord, origin: DataO
     ))
 
 
-# The record's own counts (a primary row's bytes_* are its connection's); rows written before flow db
-# 0002 that were part of a pair have no own count and fall back to bytes_*.
-_STORED = ("SELECT id, direction, last_detected, num_connections, COALESCE(own_bytes_in, bytes_in) AS bytes_in, "
-           "COALESCE(own_bytes_out, bytes_out) AS bytes_out, initiator_process, "
+# The record's own counts (a primary row's bytes_* are its connection's).
+_STORED = ("SELECT id, direction, last_detected, num_connections, own_bytes_in AS bytes_in, "
+           "own_bytes_out AS bytes_out, initiator_process, "
            "initiator_user, service_process, service_user, origin FROM flows WHERE record_key = ?")
 
 
@@ -148,11 +147,8 @@ def _merge_connection(conn: sqlite3.Connection, conn_key: str) -> None:
 
 
 def _own(row: sqlite3.Row, side: str) -> int | None:
-    """A row's own byte count; rows written before flow db 0002 as part of a pair have none recorded and
-    keep what they show."""
+    """A row's own byte count; None = the record carried no byte data (flow db 0002 filled every older row)."""
     value: int | None = row[f"own_bytes_{side}"]
-    if value is None:
-        value = row[f"bytes_{side}"]
     return value
 
 

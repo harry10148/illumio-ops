@@ -189,6 +189,11 @@ def _row_from_store(r: Any, labels: dict[int, dict[str, str]]) -> FlowRow:
     return FlowRow(**d)
 
 
+def pair_row(primary: FlowRecord, partner: FlowRecord | None) -> FlowRow:
+    """One connection's row from the records the PCE sent for it (one end, or both paired)."""
+    return _row_from_pce(primary, partner)
+
+
 def _row_from_pce(primary: FlowRecord, partner: FlowRecord | None) -> FlowRow:
     out = primary if primary.direction is FlowDirection.OUTBOUND else None
     inn = partner if partner is not None else (primary if primary.direction is FlowDirection.INBOUND else None)
@@ -209,11 +214,6 @@ def _row_from_pce(primary: FlowRecord, partner: FlowRecord | None) -> FlowRow:
         num_connections=primary.num_connections, bytes_in=max(known_in) if known_in else None,
         bytes_out=max(known_out) if known_out else None, state=primary.state, origin="pce",
     )
-
-
-def live_row(record: FlowRecord) -> FlowRow:
-    """One record read live from the PCE (not paired, not stored) as a FlowRow."""
-    return _row_from_pce(record, None)
 
 
 def _fetch(ctx: AppContext, pce: PceSettings, spec: FilterSpec,
@@ -237,7 +237,7 @@ _RECORD_COLUMNS = ("record_key, direction, src_ip, dst_ip, src_href, dst_href, s
                    "src_managed, dst_managed, src_mode, dst_mode, src_label_set, dst_label_set, port, proto, "
                    "initiator_process, initiator_user, service_process, service_user, windows_service, "
                    "policy_decision, first_detected, last_detected, num_connections, "
-                   "COALESCE(own_bytes_in, bytes_in) AS own_in, COALESCE(own_bytes_out, bytes_out) AS own_out, "
+                   "own_bytes_in AS own_in, own_bytes_out AS own_out, "
                    "state, transmission, network_href")
 
 
@@ -279,13 +279,17 @@ def _live_rows(conn: Any, spec: FilterSpec, fetched: list[FlowRecord]) -> tuple[
     stored = _stored_records(conn, {(r.src_ip, r.dst_ip, r.port, r.proto) for r in merged.values()})
     for k, rec in stored.items():
         merged[k] = merge_sightings(rec, merged[k]) if k in merged else rec
+    # A tuple where the PCE brought a record the store lacks, or more about a stored one, is paired anew as a
+    # whole: a new record can take a stored record's partner, and the pair it leaves must be rebuilt too
+    # (P3 final review #3). A tuple with nothing new is left to the store.
+    changed = {(r.src_ip, r.dst_ip, r.port, r.proto) for k, r in merged.items() if stored.get(k) != r}
     _, residual = to_pce_payload(spec, max_results=FILL_MAX_RESULTS, query_name="illumio-ops query", label_hrefs={})
     out: list[FlowRow] = []
     superseded: set[str] = set()
     for primary, partner in group_pairs(list(merged.values())):
-        keys = {record_key(primary)} | ({record_key(partner)} if partner is not None else set())
-        if keys <= stored.keys():
+        if (primary.src_ip, primary.dst_ip, primary.port, primary.proto) not in changed:
             continue
+        keys = {record_key(primary)} | ({record_key(partner)} if partner is not None else set())
         superseded |= keys & stored.keys()
         row = _row_from_pce(primary, partner)
         if matches(residual, row.model_dump()):
@@ -547,7 +551,7 @@ def baseline_first_seen(ctx: AppContext,
 
 @dataclass(frozen=True)
 class TrafficSummary:
-    sources: int
+    sources: int | None  # None: traffic was not watched over the whole period, so "nobody" cannot be said
     last_seen: datetime | None
     decisions: frozenset[str]
 
@@ -555,17 +559,22 @@ class TrafficSummary:
 def service_traffic(ctx: AppContext, targets: Collection[tuple[str, int, int]], *,
                     since: datetime) -> dict[tuple[str, int, int], TrafficSummary]:
     """Recent traffic to each (destination key, port, proto), from the connection baseline (read by port
-    through ix_baseline_port). A target nobody reached since `since` has sources 0."""
+    through ix_baseline_port). A target nobody reached since `since` has sources 0 — only when traffic was
+    collected over that whole period; otherwise every target's sources are None (P3 final review #4)."""
     fdb, gen, settings = _store_read(ctx)
     wanted = set(targets)
     numbers = sorted({port for _, port, _ in wanted})
+    unknown = {t: TrafficSummary(sources=None, last_seen=None, decisions=frozenset()) for t in wanted}
+    if not numbers or not collects(settings, IngestSource.TRAFFIC):
+        return unknown
     out = {t: TrafficSummary(sources=0, last_seen=None, decisions=frozenset()) for t in wanted}
-    if not numbers:
-        return out
     stamp = db_time(since)
     acc: dict[tuple[str, int, int], tuple[set[str], str | None, set[str]]] = {}
     with fdb.connect() as conn:
         require_same_pce(conn, settings.pce)
+        ranges = ingest_state.coverage(conn, IngestSource.TRAFFIC)
+        if not ranges or ranges[0][0] > since:
+            return unknown
         for r in conn.execute("SELECT src_key, dst_key, port, proto, last_seen, last_decision FROM connection_baseline "
                               f"WHERE port IN ({','.join('?' * len(numbers))})", numbers):
             key = (r["dst_key"], r["port"], r["proto"])

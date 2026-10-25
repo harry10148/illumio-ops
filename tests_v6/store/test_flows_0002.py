@@ -51,6 +51,20 @@ def test_repair_does_not_double_count_bytes(conn, recs):
     assert sum(r["bytes_in"] for r in primaries) == 600 and sum(r["bytes_out"] for r in primaries) == 60
 
 
+def test_record_without_bytes_does_not_take_its_partners_on_repair(conn, recs):
+    # Final review #2: a new record's NULL own count (no byte data) was read as "legacy, keep the merged".
+    inbound, outbound = recs[0], recs[1]
+    a = replace(outbound, bytes_in=None, bytes_out=None)
+    b = replace(inbound, bytes_in=500, bytes_out=50)
+    upsert_flows(conn, [a, b], origin=DataOrigin.INGEST, now=NOW)
+    start = min(a.first_detected, b.first_detected) - timedelta(seconds=30)
+    a2 = replace(outbound, first_detected=start, last_detected=b.first_detected + timedelta(seconds=30),
+                 bytes_in=None, bytes_out=None)
+    upsert_flows(conn, [a2], origin=DataOrigin.INGEST, now=NOW)
+    primaries = [r for r in _rows(conn) if r["is_primary"]]
+    assert len(primaries) == 2 and sum(r["bytes_in"] or 0 for r in primaries) == 500
+
+
 def test_refresh_grows_own_bytes(conn, recs):
     a = replace(recs[1], bytes_in=100, bytes_out=None)
     upsert_flows(conn, [a], origin=DataOrigin.INGEST, now=NOW)
@@ -92,7 +106,9 @@ def test_legacy_multi_row_connection_keeps_bytes_after_0002(tmp_path):
     with FlowDb(p).connect() as conn:
         rows = {r["id"]: r for r in _rows(conn)}
     assert rows[3]["own_bytes_in"] == 42
-    assert rows[1]["own_bytes_in"] is None and rows[2]["own_bytes_in"] is None
+    # A pair's own counts were not kept before 0002: each row's shown count stands in for it (final
+    # review #2 ruling), so a NULL own count after 0002 always means "no byte data".
+    assert rows[1]["own_bytes_in"] == 500 and rows[2]["own_bytes_in"] == 500
     assert rows[1]["bytes_in"] == 500
 
 

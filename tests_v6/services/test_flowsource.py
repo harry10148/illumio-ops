@@ -180,3 +180,25 @@ def test_fill_keeps_connection_whose_partner_is_stored(collected, fake_traffic):
     everything = query_flows(collected, _spec(NOW - minutes(60), NOW), limit=100, order="last_detected_desc",
                              fill_gaps=True)
     assert len(everything.rows) == 3  # the stored row of flow 1 is not listed a second time
+
+
+def test_fill_that_re_pairs_a_stored_record_does_not_count_twice(collected, fake_traffic):
+    # Final review #3: a live record that takes over a stored pair's partner left the old pair's merged row.
+    from illumio_ops.domain.flows import normalize_flow
+    from illumio_ops.domain.values import DataOrigin
+    from illumio_ops.store.flowdb.flows import upsert_flows
+
+    def rec(direction, first, last, bytes_in):
+        raw = raw_flow(5, first, last, direction=direction)
+        if bytes_in is not None:
+            raw["dst_bi"], raw["dst_bo"] = bytes_in, 0
+        return raw
+    a, b = rec("outbound", NOW - minutes(30), NOW - minutes(25), 100), rec("inbound", NOW - minutes(30), NOW - minutes(25), 500)
+    with collected.flows().connect() as conn:
+        upsert_flows(conn, [normalize_flow(a), normalize_flow(b)], origin=DataOrigin.INGEST, now=NOW)
+        ingest_state.record_gap(conn, IngestSource.TRAFFIC, NOW - minutes(35), NOW - minutes(15), "failed", "x", NOW)
+    a2 = rec("outbound", NOW - minutes(31), NOW - minutes(24), None)  # earlier: pairing takes b from a
+    fake_traffic.answer = lambda s, e, m: [a, b, a2]
+    q = query_flows(collected, _spec(NOW - minutes(60), NOW), limit=100, order="last_detected_desc", fill_gaps=True)
+    mine = [r for r in q.rows if r.src_ip == "10.0.1.5"]
+    assert len(mine) == 2 and sum(r.bytes_in or 0 for r in mine) == 600

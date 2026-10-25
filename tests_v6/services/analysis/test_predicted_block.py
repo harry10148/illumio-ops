@@ -91,3 +91,23 @@ def test_predicted_block_segment_dispatch(tmp_path, fake):
     res = run_segment(configured_ctx(tmp_path), FlowSegment(filter=SPEC, view=SegmentView.PREDICTED_BLOCK, limit=5),
                       now=NOW)
     assert res.view is SegmentView.PREDICTED_BLOCK and len(res.predicted.rows) == 5 and res.limit_hit is True
+
+
+def test_both_ends_paired_before_filtering(tmp_path, fake, monkeypatch):
+    # Final review #13: each end was filtered alone (a condition on each end matched neither) and a connection
+    # reported by both VENs was listed twice.
+    from tests_v6.services.collect.conftest import raw_flow
+    draft = {"draft_policy_decision": "blocked_by_boundary", "enforcement_boundaries": [{"href": TEDT_DENY}]}
+    out = raw_flow(1, NOW - minutes(30), NOW - minutes(20), user="LAB\\alice") | draft
+    inn = raw_flow(1, NOW - minutes(30), NOW - minutes(20), direction="inbound") | draft
+    inn["service"] = inn["service"] | {"process_name": "serverproc", "user_name": None}
+
+    def query(client, payload, *, deadline, compute_draft=False, delete_after=True):
+        return AsyncQueryResult(rows=[out, inn], matches_count=2, flows_count=2, capped=False)
+    monkeypatch.setattr(predicted_block, "run_traffic_query", query)
+    ctx = configured_ctx(tmp_path)
+    both = SPEC.model_copy(update={"initiator_user": "alice", "service_process": "serverproc"})
+    [row] = predict_blocks(ctx, both).rows
+    assert (row.flow.initiator_user, row.flow.service_process) == ("LAB\\alice", "serverproc")
+    assert row.blocking_rules == [TEDT_DENY]
+    assert len(predict_blocks(ctx, SPEC).rows) == 1

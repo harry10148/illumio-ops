@@ -2,13 +2,14 @@
 
 -- F10: each record keeps its own byte counts; a connection's bytes (on its primary row) are recomputed
 -- from them whenever its records change, so a record that moves to another connection takes its bytes
--- along instead of leaving them counted twice (owner: store.flowdb.flows). Rows of a single-record
--- connection hold their own counts already; rows of a multi-record connection written before this
--- migration stay NULL (own count unknown) and keep their stored bytes.
+-- along instead of leaving them counted twice (owner: store.flowdb.flows). Before this migration a
+-- pair's own counts were not kept: every row's shown count stands in for its own (a pair's primary
+-- shows the larger of the two), so that from here on a NULL own count only ever means "no byte data"
+-- (P3 final review #2: a NULL that could also mean "unknown, keep what is shown" re-counted a partner's
+-- bytes after a re-pairing).
 ALTER TABLE flows ADD COLUMN own_bytes_in INTEGER;
 ALTER TABLE flows ADD COLUMN own_bytes_out INTEGER;
-UPDATE flows SET own_bytes_in = bytes_in, own_bytes_out = bytes_out
- WHERE conn_key IN (SELECT conn_key FROM flows GROUP BY conn_key HAVING COUNT(*) = 1);
+UPDATE flows SET own_bytes_in = bytes_in, own_bytes_out = bytes_out;
 
 -- The reported decision of each baseline connection's newest observation: the exposure graph is built
 -- from the baseline (kept baseline_days in every collection mode) and splits "now" from "all enforced"

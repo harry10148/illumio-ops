@@ -5,10 +5,16 @@ from datetime import timedelta
 import responses
 
 from illumio_ops.domain.flows import normalize_flow
-from illumio_ops.domain.values import CapabilityState, DataOrigin
+from illumio_ops.domain.values import CapabilityState, DataOrigin, IngestSource
 from illumio_ops.services.analysis.hourly import HOURLY_STEPS
 from illumio_ops.services.analysis.ransomware import host_ransomware, ransomware_overlay
-from illumio_ops.store.flowdb import analysis, capabilities, ransomware, workloads
+from illumio_ops.store.flowdb import (
+    analysis,
+    capabilities,
+    ingest_state,
+    ransomware,
+    workloads,
+)
 from illumio_ops.store.flowdb.flows import upsert_flows
 from tests_v6.services.collect.conftest import NOW, PCE, configured_ctx, raw_flow
 
@@ -27,9 +33,10 @@ def _svc(name, port, severity, state, status, active="blocked_by_override_deny")
             "protection_state": state, "port_status": status, "active_policy": active, "recommendation": ""}
 
 
-def _ctx(tmp_path):
-    ctx = configured_ctx(tmp_path)
+def _ctx(tmp_path, *, covered_days=31, **collection):
+    ctx = configured_ctx(tmp_path, **collection)
     with ctx.flows().connect() as conn:
+        ingest_state.add_coverage(conn, IngestSource.TRAFFIC, NOW - timedelta(days=covered_days), NOW)
         workloads.replace_inventory(conn, [_wl(FIN, "fin-db", 0.0, "fully_protected"), _wl(WEB, "web", 10.0)])
         ransomware.upsert_services(conn, FIN, [_svc("RDP", 3389, "critical", "protected_closed", "listening")],
                                    source_updated_at=None, at=NOW)
@@ -95,3 +102,21 @@ def test_allow_attribution_only_for_allowed_services(tmp_path):
     assert {s.name: s.traffic.value for s in r.breakdown.services} == {"RDP": "priority", "SMB": "safe_to_block",
                                                                         "WinRM": "suspicious"}
     assert r.breakdown.hostname == "web" and r.breakdown.pce_percent == 10.0
+
+
+def _classes(ctx):
+    ransomware_overlay(ctx, NOW)
+    with ctx.flows().connect() as conn:
+        res = json.loads(analysis.read_result(conn, "ransomware")["result_json"])
+    return {(h["href"], s["name"]): s["traffic"] for h in res["hosts"] for s in h["services"]}, res
+
+
+def test_traffic_not_collected_is_unknown_not_safe_to_block(tmp_path):
+    # Final review #4: no traffic collected read as "nobody connects", so a listening RDP was "safe to block".
+    classes, res = _classes(_ctx(tmp_path, mode="events_only"))
+    assert classes[(WEB, "SMB")] == "unknown" and res["safe_to_block"] == []
+
+
+def test_traffic_watched_shorter_than_the_window_is_unknown(tmp_path):
+    classes, _ = _classes(_ctx(tmp_path, covered_days=1))
+    assert classes[(WEB, "SMB")] == "unknown"
