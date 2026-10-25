@@ -58,10 +58,9 @@ def is_system_account(user: str | None) -> bool:
     low = user.lower()
     if low in SYSTEM_ACCOUNTS:
         return True
-    domain, account = split_user(low)
-    if domain is not None:
-        return domain == "nt authority"
-    return account in SYSTEM_ACCOUNTS or any((account or "").startswith(p) for p in _SYSTEM_PREFIXES)
+    if "\\" in low or "@" in low:  # qualified (even with an empty domain): only the listed principals
+        return False
+    return any(low.startswith(p) for p in _SYSTEM_PREFIXES)
 
 
 def account_key(user: str | None) -> str | None:
