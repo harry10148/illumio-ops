@@ -58,3 +58,51 @@ def test_every_focus_key_in_both_languages():
     from illumio_ops.domain.focus import FOCUS_KEYS
     for lang in (Language.EN, Language.ZH_TW):
         assert all(k in dictionary(lang) for k in FOCUS_KEYS.values())
+
+
+def _det(i, severity, minutes_ago):
+    return DetectionWrite(
+        detector="fanout", fingerprint=f"fanout|/w/{severity}{i}", subject_key=f"/w/{severity}{i}", severity=severity,
+        first_seen=NOW - timedelta(minutes=minutes_ago + 5), last_seen=NOW - timedelta(minutes=minutes_ago),
+        critical_asset=False, summary_json=json.dumps({"targets": 12, "window_minutes": 60}),
+        segment_json='{"view": "detail"}', confidence_json="{}")
+
+
+def test_detections_chosen_by_rank_not_age_and_total_disclosed(tmp_path):
+    # Final review #14: the newest 500 were taken before ranking, so newer mediums hid an older critical.
+    ctx = configured_ctx(tmp_path)
+    with ctx.flows().connect() as conn:
+        analysis.upsert_detections(conn, [_det(0, "critical", 3000)] + [_det(i, "medium", i % 600) for i in range(510)],
+                                   dedup={"fanout": timedelta(minutes=1)}, late=False, at=NOW)
+    build_focus(ctx, NOW)
+    res = _result(ctx)
+    assert "det|fanout|/w/critical0" in {i["fingerprint"] for i in res["items"]}
+    assert res["detections"] == {"total": 511, "considered": 500}
+
+
+def test_failed_or_old_source_not_reported_ok(tmp_path):
+    # Final review #15: an old stored result is not "ok" when its last run failed or it has aged.
+    ctx = configured_ctx(tmp_path)
+    with ctx.flows().connect() as conn:
+        analysis.write_result(conn, "exposure", params={}, result={"hosts": [], "assets": [], "cross_env": []},
+                              at=NOW - timedelta(days=2))
+        analysis.write_result(conn, "tamper", params={}, result={"hosts": []}, at=NOW - timedelta(minutes=5))
+        analysis.set_run(conn, "tamper", started_at=NOW, error="RuntimeError: boom")
+    build_focus(ctx, NOW)
+    status = _result(ctx)["sources_status"]
+    assert status["exposure"] == "stale" and status["tamper"] == "error"
+
+
+def test_traffic_items_recomputed_at_most_daily(tmp_path, monkeypatch):
+    # P3 Task 15 scale: the two 7-day scans behind the coverage and mode-switch items ran every hour.
+    from illumio_ops.services.analysis import focus as focus_service
+    ctx = configured_ctx(tmp_path)
+    calls = []
+    real = focus_service.field_coverage
+    monkeypatch.setattr(focus_service, "field_coverage", lambda *a, **kw: calls.append(1) or real(*a, **kw))
+    build_focus(ctx, NOW)
+    build_focus(ctx, NOW + timedelta(hours=1))
+    assert len(calls) == 1 and _result(ctx)["sources_status"]["traffic"] == "ok"
+    assert _result(ctx)["traffic_computed_at"].startswith("2026-10-24T12:00")
+    build_focus(ctx, NOW + timedelta(hours=25))
+    assert len(calls) == 2

@@ -43,7 +43,7 @@ class DenySimulation(BaseModel):
     limit_hit: bool
     reach_change: list[AssetReachChange]
     coverage: Coverage
-    field_coverage: FieldCoverage
+    field_coverage: FieldCoverage | None
 
 
 def simulate_deny(ctx: AppContext, proposal: DenyProposal, *, now: datetime | None = None,

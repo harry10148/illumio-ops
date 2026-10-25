@@ -343,3 +343,22 @@ def test_empty_admin_port_set_disables_management_detectors():
     assert by_kind[DetectorKind.FANOUT].state is DetectorState.DISABLED
     assert by_kind[DetectorKind.FANOUT].reason_key == "detector_no_admin_ports"
     assert by_kind[DetectorKind.BLOCKED_SURGE].state is not DetectorState.DISABLED
+
+
+def _with_os(i):
+    return replace(i, hosts=lambda k, ip, name, labels: replace(host(k), os_id="win-x86_64" if "win" in k else "ubuntu"))
+
+
+def test_partial_user_coverage_names_the_host_kinds_without_any():
+    # Final review #18: a few covered hosts must not hide that a whole kind of host carries no user.
+    rows = [obs("/w/lin1", f"/w/t{i}") for i in range(12)] + [obs("/w/win1", "/w/t0", user="CORP\\alice")]
+    _, status = detect_account_fanout(_with_os(inp(rows)))
+    assert status.state is DetectorState.OK and status.reason_key == "detector_partial_users_none_from"
+    assert status.params == {"covered": 1, "total": 13, "kinds": "Linux"}
+
+
+def test_partial_process_coverage_names_the_host_kinds_without_any():
+    rows = [obs("/w/lin1", f"/w/t{i}") for i in range(12)] + [obs("/w/win1", "/w/t0", proc="svchost.exe")]
+    _, status = detect_unexpected_initiator(_with_os(inp(rows)))
+    assert status.reason_key == "detector_partial_process_none_from"
+    assert status.params == {"not_evaluable": 12, "total": 13, "kinds": "Linux"}

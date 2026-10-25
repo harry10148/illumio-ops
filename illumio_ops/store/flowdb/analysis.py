@@ -95,6 +95,16 @@ def detections_since(conn: sqlite3.Connection, since: datetime, *, detectors: Co
     return conn.execute(sql + " ORDER BY last_seen DESC, id DESC LIMIT ?", [*params, limit]).fetchall()
 
 
+def detections_ranked(conn: sqlite3.Connection, since: datetime, *, limit: int) -> tuple[list[sqlite3.Row], int]:
+    """(the `limit` most important detections seen since `since` — severity, then a critical asset, then
+    the newest — and how many there are in all)."""
+    rank = " ".join(f"WHEN '{s.value}' THEN {i}" for i, s in enumerate(SEVERITY_ORDER))
+    rows = conn.execute(f"SELECT * FROM detections WHERE last_seen >= ? ORDER BY CASE severity {rank} ELSE -1 END DESC, "
+                        "critical_asset DESC, last_seen DESC, id DESC LIMIT ?", (db_time(since), limit)).fetchall()
+    total = conn.execute("SELECT COUNT(*) FROM detections WHERE last_seen >= ?", (db_time(since),)).fetchone()[0]
+    return rows, int(total)
+
+
 def get_run(conn: sqlite3.Connection, kind: str) -> sqlite3.Row | None:
     row: sqlite3.Row | None = conn.execute("SELECT * FROM analysis_runs WHERE kind = ?", (kind,)).fetchone()
     return row

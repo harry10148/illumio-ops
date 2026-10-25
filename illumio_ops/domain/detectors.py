@@ -434,8 +434,9 @@ def detect_account_fanout(inp: DetectorInput) -> tuple[list[Detection], Detector
                                 view=SegmentView.DETAIL, limit=200),
             confidence=DetectionConfidence(field="initiator_user", covered=len(covered), total=len(in_window),
                                            incomplete_gaps=inp.gaps)))
-    return out, DetectorStatus(DetectorKind.ACCOUNT_FANOUT, DetectorState.OK,
-                               params={"covered": len(covered), "total": len(in_window)})
+    return out, _coverage_status(DetectorKind.ACCOUNT_FANOUT, ("detector_partial_users", "detector_partial_users_none_from"),
+                                 {"covered": len(covered), "total": len(in_window)}, len(covered) < len(in_window),
+                                 _kinds_without(in_window, lambda o: bool(o.initiator_user), inp))
 
 
 def detect_unexpected_initiator(inp: DetectorInput) -> tuple[list[Detection], DetectorStatus]:
@@ -445,12 +446,14 @@ def detect_unexpected_initiator(inp: DetectorInput) -> tuple[list[Detection], De
     cfg = inp.config
     found: dict[tuple[str, str, int, int], Obs] = {}
     judged = not_evaluable = 0
+    listed: list[Obs] = []
     for o in inp.obs:
         if not evaluable(o, inp) or o.port is None:
             continue
         expected = cfg.expected.get((o.port, o.proto), cfg.expected.get((o.port, None)))
         if expected is None:
             continue
+        listed.append(o)
         if not o.initiator_process:
             not_evaluable += 1
             continue
@@ -471,8 +474,39 @@ def detect_unexpected_initiator(inp: DetectorInput) -> tuple[list[Detection], De
             segment=evidence(inp, o.first, o.last, src=o),
             confidence=DetectionConfidence(field="initiator_process", covered=judged, total=judged + not_evaluable,
                                            incomplete_gaps=inp.gaps)))
-    return out, DetectorStatus(DetectorKind.UNEXPECTED_INITIATOR, DetectorState.OK,
-                               params={"not_evaluable": not_evaluable})
+    if not not_evaluable:
+        return out, DetectorStatus(DetectorKind.UNEXPECTED_INITIATOR, DetectorState.OK,
+                                   params={"not_evaluable": 0})
+    return out, _coverage_status(DetectorKind.UNEXPECTED_INITIATOR,
+                                 ("detector_partial_process", "detector_partial_process_none_from"),
+                                 {"not_evaluable": not_evaluable, "total": judged + not_evaluable}, True,
+                                 _kinds_without(listed, lambda o: bool(o.initiator_process), inp))
+
+
+def _kinds_without(rows: Sequence[Obs], has: Callable[[Obs], bool], inp: DetectorInput) -> str:
+    """The kinds of managed source host (Windows, Linux) none of whose rows carry the field."""
+    seen: set[str] = set()
+    carrying: set[str] = set()
+    for o in rows:
+        os_id = _src_host(o, inp).os_id
+        if not os_id:
+            continue
+        kind = "Windows" if os_id.lower().startswith("win") else "Linux"
+        seen.add(kind)
+        if has(o):
+            carrying.add(kind)
+    return ", ".join(sorted(seen - carrying))
+
+
+def _coverage_status(kind: DetectorKind, keys: tuple[str, str], params: dict[str, Any], partial: bool,
+                     kinds: str) -> DetectorStatus:
+    """Running, saying how much of the data carries the field when not all of it does (anti-goal 8);
+    keys = (partial, partial and none at all from some kinds of host)."""
+    if not partial:
+        return DetectorStatus(kind, DetectorState.OK, params=params)
+    if kinds:
+        return DetectorStatus(kind, DetectorState.OK, keys[1], params | {"kinds": kinds})
+    return DetectorStatus(kind, DetectorState.OK, keys[0], params)
 
 
 def apply_precursors(dets: Sequence[Detection], precursors: Sequence[Precursor], *,

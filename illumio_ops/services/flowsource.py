@@ -149,7 +149,7 @@ class FieldCoverage(BaseModel):
 class FlowAggregate(BaseModel):
     rows: list[AggRow]
     coverage: Coverage
-    field_coverage: FieldCoverage
+    field_coverage: FieldCoverage | None  # None when the caller skipped it
     limit_hit: bool
 
 
@@ -369,9 +369,11 @@ def _field_coverage(conn: Any, where: str, params: list[Any]) -> FieldCoverage:
     return FieldCoverage(**dict(r))
 
 
-def aggregate_flows(ctx: AppContext, seg: FlowSegment, *, now: datetime | None = None) -> FlowAggregate:
+def aggregate_flows(ctx: AppContext, seg: FlowSegment, *, now: datetime | None = None,
+                    with_field_coverage: bool = True) -> FlowAggregate:
     """A segment's ranking, answered from the store only: what lies outside its coverage is listed as gaps
-    (a ranking mixed with PCE rows could not be grouped the way the store groups connections)."""
+    (a ranking mixed with PCE rows could not be grouped the way the store groups connections). The field
+    coverage is a second scan of the same rows; a caller that does not show it skips it."""
     at = (now or datetime.now(UTC)).astimezone(UTC)
     fdb, gen, settings = _store_read(ctx)
     floor = at - timedelta(days=settings.collection.retention.flow_days)
@@ -384,7 +386,7 @@ def aggregate_flows(ctx: AppContext, seg: FlowSegment, *, now: datetime | None =
         sql, params = compile_flow_ranking(seg)
         found = conn.execute(sql, params).fetchall()
         where, where_params = to_sql(seg.filter)
-        fields = _field_coverage(conn, where, where_params)
+        fields = _field_coverage(conn, where, where_params) if with_field_coverage else None
     if fdb.generation != gen:
         raise StaleGeneration
     levels = len(seg.group_by)
