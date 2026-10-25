@@ -25,6 +25,7 @@ from illumio_ops.web.routes import i18n as i18n_routes
 from illumio_ops.web.routes import (
     system_collection,
     system_jobs,
+    system_lateral,
     system_pce,
     system_security,
     system_tls,
@@ -110,6 +111,7 @@ def create_app(ctx: AppContext, *, use_https: bool, static_dir: Path | None = No
     app.register_blueprint(system_tls.make_blueprint(limiter))
     app.register_blueprint(system_security.bp)
     app.register_blueprint(system_collection.bp)
+    app.register_blueprint(system_lateral.bp)
 
     # 8. The single-page app: hashed assets, anything else that is a file, else index.html
     @app.get("/")
