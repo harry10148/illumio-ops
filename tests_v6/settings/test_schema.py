@@ -29,7 +29,7 @@ def test_default_settings_values():
     assert c.enabled is True and c.traffic_interval_seconds == 600 and c.events_interval_seconds == 300
     assert c.inventory_interval_seconds == 3600 and c.rate_limit_per_minute == 400
     assert c.backfill_days == 30 and c.disk_free_warn_gb == 10
-    assert (c.retention.flow_days, c.retention.event_days, c.retention.rollup_days, c.retention.baseline_days) == (35, 90, 180, 30)
+    assert (c.retention.flow_days, c.retention.event_days, c.retention.rollup_days, c.retention.baseline_days) == (35, 90, 90, 30)
     assert c.archive.enabled is False and c.archive.retention_days == 0
 
 

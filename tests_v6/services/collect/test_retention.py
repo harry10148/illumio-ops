@@ -71,7 +71,7 @@ def test_retention_prunes_rollups_and_snapshots(tmp_path):
         conn.execute("INSERT INTO workload_snapshot_daily VALUES ('2026-01-01','/w',NULL,NULL,NULL,NULL)")
         conn.execute("INSERT INTO org_risk_snapshot_daily VALUES ('2026-01-01','{}')")
         conn.commit()
-    counts = run_retention(ctx, now=NOW)  # rollup_days 180
+    counts = run_retention(ctx, now=NOW)  # rollup_days 90
     assert counts["rollups"] == 1 and counts["snapshots"] == 2
 
 

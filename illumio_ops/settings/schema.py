@@ -228,7 +228,7 @@ def default_collection() -> CollectionSettings:
         enabled=True, traffic_interval_seconds=600, events_interval_seconds=300,
         inventory_interval_seconds=3600, rate_limit_per_minute=400, backfill_days=30,
         disk_free_warn_gb=10,
-        retention=RetentionSettings(flow_days=35, event_days=90, rollup_days=180, baseline_days=30),
+        retention=RetentionSettings(flow_days=35, event_days=90, rollup_days=90, baseline_days=30),
         archive=ArchiveSettings(enabled=False, retention_days=0),
     )
 

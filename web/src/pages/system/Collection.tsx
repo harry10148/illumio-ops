@@ -210,7 +210,7 @@ export function Collection() {
     const next = { ...form, mode };
     if (mode === "alert") Object.assign(next, { flow_days: "3", rollup_days: "3" });
     if (mode === "full" && Number(form.flow_days) < Number(form.baseline_days)) {
-      Object.assign(next, { flow_days: "35", rollup_days: String(Math.max(180, Number(form.rollup_days) || 0)) });
+      Object.assign(next, { flow_days: "35", rollup_days: String(Math.max(90, Number(form.rollup_days) || 0)) });
     }
     setForm(next);
     setSaved(false);

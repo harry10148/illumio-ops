@@ -55,7 +55,7 @@ def test_collection_settings_rejects_rollup_shorter_than_flows(context, live_app
     form.locator("input[name=rollup_days]").fill("5")
     form.get_by_role("button", name="Save").click()
     expect(form.locator("[role=alert]")).to_contain_text("daily summaries at least as long as flows")
-    assert live_app.ctx.settings.current().collection.retention.rollup_days == 180
+    assert live_app.ctx.settings.current().collection.retention.rollup_days == 90
 
 
 def test_logs_page_filters_by_level(context, live_app):
