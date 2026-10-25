@@ -419,6 +419,32 @@
 
 ---
 
+### Task 14b: 收集模式（完整／告警／僅事件）【使用者 2026-10-24 加入】
+
+依 spec §6.4「收集模式」、§7「收集模式的對應」。
+
+**Files:**
+- Create: `illumio_ops/services/collect/mode.py`、`tests_v6/services/collect/test_mode.py`
+- Modify: `illumio_ops/domain/values.py`（`CollectionMode`）、`illumio_ops/settings/schema.py`（`collection.mode`，預設 `full`；
+  `flow_days ≥ baseline_days` 只在 `full` 驗證）、`illumio_ops/settings/upgrade.py`（v2 檔缺 `mode` → `full`）、各收集器與回填、
+  `services/coverage.py`（未收集的來源回報 `collection_off`）、`services/collect/status.py`、`web/routes/system_collection.py`、
+  `web/src/pages/system/Collection.tsx`、`illumio_ops/migrate/v5.py`、i18n、讀者閘門
+
+**Interfaces:**
+- `mode.collects(settings, source) -> bool`：`enabled` 且來源屬於模式；`full`／`alert`：traffic、events、inventory、ransomware；
+  `events_only`：events、inventory、ransomware
+- `mode.backfill_sources(settings, *, manual: bool) -> tuple[IngestSource, ...]`：初次回填 `full` → (traffic, events)，其餘 → (events,)；
+  手動回填依模式收的來源
+- 收集頁：模式下拉選單；切換時表單填入該模式的建議保留值（告警：flow 3、rollup 3），可再改；不在模式內的來源顯示「此模式不收集」
+- 遷移：`pce_cache` 缺段或 `enabled=false` → `events_only`；`true` → `full`
+
+- [ ] Step 1：失敗測試——`test_events_only_skips_traffic`、`test_alert_mode_skips_traffic_backfill`、`test_alert_mode_allows_short_flow_retention`、
+  `test_full_mode_requires_flow_retention_over_baseline`、`test_coverage_reports_collection_off`、`test_status_marks_sources_outside_mode`、
+  `test_mode_switch_fills_suggested_retention`（e2e）、遷移 `test_cache_off_becomes_events_only`
+- [ ] Step 2：實作；全部閘門；commit `feat(v6): collection modes (full, alert, events only)`
+
+---
+
 ### Task 15: 實機驗收（.106 並排 24 小時、NFR、離線 bundle）
 
 **Files:**

@@ -51,6 +51,7 @@ export function PceConnection() {
   const [form, setForm] = useState<Form | null>(null);
   const [error, setError] = useState<ApiError | null>(null);
   const [saved, setSaved] = useState(false);
+  const [resetNote, setResetNote] = useState<{ moved: string | null } | null>(null);
   const [busy, setBusy] = useState(false);
   const [run, setRun] = useState<ProbeRun | null>(null);
 
@@ -100,6 +101,7 @@ export function PceConnection() {
       setRevision(env.data.revision);
       setError(null);
       setSaved(true);
+      setResetNote(env.data.reset ? { moved: env.data.reset.archive_moved_to } : null);
     } else {
       setError(env.error);
       setSaved(false);
@@ -194,6 +196,12 @@ export function PceConnection() {
           </div>
         )}
         {saved && <p className="form-ok" role="status">{t("saved_ok")}</p>}
+        {resetNote && (
+          <p className="notice" role="status">
+            {t("pce_reset_notice")}
+            {resetNote.moved && <> {t("pce_reset_archive_moved", { folder: resetNote.moved })}</>}
+          </p>
+        )}
         <div className="actions">
           <button type="submit" className="btn-primary" disabled={busy}>{t("btn_save")}</button>
           <button type="button" className="btn-quiet" disabled={busy} onClick={() => void test()}>

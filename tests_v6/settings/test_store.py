@@ -57,7 +57,7 @@ def test_load_nested_unknown_key_is_invalid(settings_file):
 
 def test_future_schema_version_is_invalid(settings_file):
     d = json.loads(settings_file.read_text())
-    d["schema_version"] = 2
+    d["schema_version"] = 99
     settings_file.write_text(json.dumps(d))
     with pytest.raises(SettingsInvalid) as e:
         SettingsStore(settings_file).load()

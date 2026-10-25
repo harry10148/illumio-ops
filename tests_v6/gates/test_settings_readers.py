@@ -43,10 +43,24 @@ SETTINGS_READERS: dict[str, str] = {
     "web.tls.min_version": "illumio_ops.web.tls",
     "web.tls.ciphers": "illumio_ops.web.tls",
     "display.language": "illumio_ops.web.auth",
+    "collection.rate_limit_per_minute": "illumio_ops.services.context",
+    "pce.events_timeout_seconds": "illumio_ops.pce.events",
+    "collection.enabled": "illumio_ops.services.collect.mode",
+    "collection.mode": "illumio_ops.services.collect.mode",
+    "collection.traffic_interval_seconds": "illumio_ops.jobs.scheduler",
+    "collection.events_interval_seconds": "illumio_ops.jobs.scheduler",
+    "collection.inventory_interval_seconds": "illumio_ops.jobs.scheduler",
+    "collection.backfill_days": "illumio_ops.services.collect.backfill",
+    "collection.retention.flow_days": "illumio_ops.services.collect.retention",
+    "collection.retention.event_days": "illumio_ops.services.collect.retention",
+    "collection.retention.rollup_days": "illumio_ops.services.collect.retention",
+    "collection.retention.baseline_days": "illumio_ops.services.collect.retention",
+    "collection.archive.enabled": "illumio_ops.services.collect.archive",
+    "collection.archive.retention_days": "illumio_ops.services.collect.archive",
+    "collection.disk_free_warn_gb": "illumio_ops.services.collect.status",
 }
 # Fields whose reader arrives later: value = the task or phase that adds it.
 PENDING_READERS: dict[str, str] = {
-    "pce.events_timeout_seconds": "P2",
     "pce.console_url": "P3",
     "display.timezone": "P3",
 }
@@ -152,3 +166,7 @@ def test_selftest_proper_reader_is_green(tmp_path):
 
 def test_no_p1_pending_left():
     assert [p for p, due in PENDING_READERS.items() if due.startswith("P1-")] == []
+
+
+def test_no_p2_pending_left():
+    assert [p for p, due in PENDING_READERS.items() if due.startswith("P2-")] == []

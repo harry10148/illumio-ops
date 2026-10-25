@@ -1,0 +1,208 @@
+[
+ {
+  "href": "/orgs/1/events/00000000-0000-4000-8000-000000000029",
+  "timestamp": "2026-10-02T11:58:03.363Z",
+  "pce_fqdn": "pce.example.com",
+  "created_by": {
+   "agent": {
+    "href": "/orgs/1/agents/1351",
+    "hostname": "host-31"
+   },
+   "ven": {
+    "href": "/orgs/1/vens/00000000-0000-4000-8000-000000000030",
+    "hostname": "host-31"
+   }
+  },
+  "event_type": "agent.tampering",
+  "status": "success",
+  "severity": "info",
+  "action": {
+   "uuid": "00000000-0000-4000-8000-000000000031",
+   "api_endpoint": "FILTERED",
+   "api_method": "PUT",
+   "http_status_code": 204,
+   "src_ip": "10.0.0.34"
+  },
+  "resource_changes": [],
+  "notifications": [
+   {
+    "uuid": "00000000-0000-4000-8000-000000000032",
+    "notification_type": "workload.oob_policy_changes",
+    "info": {
+     "tampering_revert_succeeded": true,
+     "event_classification": "confirmed",
+     "beginning_timestamp": "2026-10-02T11:58:03Z",
+     "ending_timestamp": "2026-10-02T11:58:03Z",
+     "num_events": 1
+    }
+   }
+  ]
+ },
+ {
+  "href": "/orgs/1/events/00000000-0000-4000-8000-000000000033",
+  "timestamp": "2026-10-02T11:48:38.303Z",
+  "pce_fqdn": "pce.example.com",
+  "created_by": {
+   "agent": {
+    "href": "/orgs/1/agents/1351",
+    "hostname": "host-31"
+   },
+   "ven": {
+    "href": "/orgs/1/vens/00000000-0000-4000-8000-000000000030",
+    "hostname": "host-31"
+   }
+  },
+  "event_type": "agent.tampering",
+  "status": "success",
+  "severity": "info",
+  "action": {
+   "uuid": "00000000-0000-4000-8000-000000000034",
+   "api_endpoint": "FILTERED",
+   "api_method": "PUT",
+   "http_status_code": 204,
+   "src_ip": "10.0.0.34"
+  },
+  "resource_changes": [],
+  "notifications": [
+   {
+    "uuid": "00000000-0000-4000-8000-000000000035",
+    "notification_type": "workload.oob_policy_changes",
+    "info": {
+     "tampering_revert_succeeded": true,
+     "event_classification": "confirmed",
+     "beginning_timestamp": "2026-10-02T11:48:38Z",
+     "ending_timestamp": "2026-10-02T11:48:38Z",
+     "num_events": 1
+    }
+   }
+  ]
+ },
+ {
+  "href": "/orgs/1/events/00000000-0000-4000-8000-000000000036",
+  "timestamp": "2026-10-02T07:34:58.540Z",
+  "pce_fqdn": "pce.example.com",
+  "created_by": {
+   "agent": {
+    "href": "/orgs/1/agents/1334",
+    "hostname": "host-32"
+   },
+   "ven": {
+    "href": "/orgs/1/vens/00000000-0000-4000-8000-000000000037",
+    "hostname": "host-32"
+   }
+  },
+  "event_type": "agent.tampering",
+  "status": "success",
+  "severity": "warning",
+  "action": {
+   "uuid": "00000000-0000-4000-8000-000000000038",
+   "api_endpoint": "FILTERED",
+   "api_method": "PUT",
+   "http_status_code": 204,
+   "src_ip": "10.0.0.35"
+  },
+  "resource_changes": [],
+  "notifications": [
+   {
+    "uuid": "00000000-0000-4000-8000-000000000039",
+    "notification_type": "workload.oob_policy_changes",
+    "info": {
+     "event_classification": "signal",
+     "events": [
+      {
+       "timestamp": "2026-10-02T07:08:04Z",
+       "tamper_type": "firewall",
+       "process_id": 1110873,
+       "kernel_functions": [
+        "nfnetlink_rcv_batch,nf_tables_newrule"
+       ],
+       "process_name": "iptables"
+      },
+      {
+       "timestamp": "2026-10-02T07:08:04Z",
+       "tamper_type": "firewall",
+       "process_id": 1110877,
+       "kernel_functions": [
+        "nfnetlink_rcv_batch,nf_tables_newrule"
+       ],
+       "process_name": "iptables"
+      },
+      {
+       "timestamp": "2026-10-02T07:34:58Z",
+       "tamper_type": "firewall",
+       "process_id": 1123840,
+       "kernel_functions": [
+        "nfnetlink_rcv_batch,nf_tables_delrule"
+       ],
+       "process_name": "iptables"
+      }
+     ]
+    }
+   }
+  ]
+ },
+ {
+  "href": "/orgs/1/events/00000000-0000-4000-8000-000000000040",
+  "timestamp": "2026-10-02T07:08:04.053Z",
+  "pce_fqdn": "pce.example.com",
+  "created_by": {
+   "agent": {
+    "href": "/orgs/1/agents/1334",
+    "hostname": "host-32"
+   },
+   "ven": {
+    "href": "/orgs/1/vens/00000000-0000-4000-8000-000000000037",
+    "hostname": "host-32"
+   }
+  },
+  "event_type": "agent.tampering",
+  "status": "success",
+  "severity": "warning",
+  "action": {
+   "uuid": "00000000-0000-4000-8000-000000000041",
+   "api_endpoint": "FILTERED",
+   "api_method": "PUT",
+   "http_status_code": 204,
+   "src_ip": "10.0.0.35"
+  },
+  "resource_changes": [],
+  "notifications": [
+   {
+    "uuid": "00000000-0000-4000-8000-000000000042",
+    "notification_type": "workload.oob_policy_changes",
+    "info": {
+     "event_classification": "signal",
+     "events": [
+      {
+       "timestamp": "2026-10-01T12:47:57Z",
+       "tamper_type": "firewall",
+       "process_id": 1050086,
+       "kernel_functions": [
+        "nfnetlink_rcv_batch,nf_tables_delrule"
+       ],
+       "process_name": "iptables"
+      },
+      {
+       "timestamp": "2026-10-01T12:47:57Z",
+       "tamper_type": "firewall",
+       "process_id": 1050091,
+       "kernel_functions": [
+        "nfnetlink_rcv_batch,nf_tables_delrule"
+       ],
+       "process_name": "iptables"
+      },
+      {
+       "timestamp": "2026-10-02T07:08:04Z",
+       "tamper_type": "firewall",
+       "process_id": 1110867,
+       "kernel_functions": [
+        "nfnetlink_rcv_batch,nf_tables_newrule"
+       ],
+       "process_name": "iptables"
+      }
+     ]
+    }
+   }
+  ]
+ }
+]

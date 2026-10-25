@@ -37,6 +37,14 @@ class InstallPaths:
         return self.data_dir / "app.sqlite"
 
     @property
+    def flows_db(self) -> Path:
+        return self.data_dir / "flows.sqlite"
+
+    @property
+    def archive_dir(self) -> Path:
+        return self.data_dir / "archive"
+
+    @property
     def service_lock(self) -> Path:
         return self.data_dir / "service.lock"
 
@@ -58,7 +66,7 @@ class InstallPaths:
         Entry points call this before taking the service lock or opening a
         database, so a fresh root without data/ does not fail on first start.
         """
-        for d in (self.config_dir, self.tls_dir, self.data_dir, self.limiter_dir,
+        for d in (self.config_dir, self.tls_dir, self.data_dir, self.limiter_dir, self.archive_dir,
                   self.logs_dir, self.reports_dir):
             if not d.is_dir():
                 d.mkdir(mode=0o700, parents=True, exist_ok=True)

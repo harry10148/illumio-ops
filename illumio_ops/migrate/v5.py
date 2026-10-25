@@ -33,19 +33,32 @@ Path_ = tuple[str, ...]
 DEPRECATED_PREFIXES: tuple[Path_, ...] = (("report", "attack_surface"), ("web_gui", "tls", "http_redirect_port"),
                                           ("pce_profiles",), ("active_pce_id",),
                                           ("pce_cache", "archive_review_max_days"))
-PHASE_OF_SECTION = {"pce_cache": "P2", "alerts": "P3", "email": "P3", "smtp": "P3", "rules": "P3",
-                    "siem": "P4", "report": "P5", "report_schedules": "P5"}
+PHASE_OF_SECTION = {"alerts": "P4", "email": "P4", "smtp": "P4", "rules": "P4",
+                    "siem": "P7", "report": "P5", "report_schedules": "P5"}
 NOT_IN_V6_SECTIONS = ("rule_scheduler", "scheduler", "rule_backups")
 SPECIAL: dict[Path_, tuple[Action, str, dict[str, str]]] = {
     ("api", "profile"): ("dropped", "migrate_no_profiles", {}),
     ("settings", "enable_health_check"): ("dropped", "migrate_always_on", {}),
     ("settings", "theme"): ("unsupported", "migrate_not_in_v6", {}),
     ("settings", "dashboard_queries"): ("unsupported", "migrate_not_in_v6", {}),
-    ("web_gui", "public_url"): ("unsupported", "migrate_arrives_in_phase", {"phase": "P3"}),
+    ("web_gui", "public_url"): ("unsupported", "migrate_arrives_in_phase", {"phase": "P5"}),
+    ("pce_cache", "db_path"): ("dropped", "migrate_fixed_path", {}),
+    ("pce_cache", "archive_dir"): ("dropped", "migrate_fixed_path", {}),
+    ("pce_cache", "archive_interval_hours"): ("dropped", "migrate_archive_daily", {}),
+    ("pce_cache", "archive_gzip_after_days"): ("dropped", "migrate_archive_always_gzip", {}),
+    ("pce_cache", "async_threshold_events"): ("dropped", "migrate_fixed_event_cap", {}),
+    ("pce_cache", "cache_read_max_rows"): ("dropped", "migrate_not_in_v6", {}),
+    ("pce_cache", "flow_delta_enabled"): ("dropped", "migrate_not_in_v6", {}),
+    ("pce_cache", "flow_obs_retention_hours"): ("dropped", "migrate_not_in_v6", {}),
+    ("pce_cache", "siem_pending_warn_rows"): ("unsupported", "migrate_arrives_in_phase", {"phase": "P7"}),
     ("logging", "json_sink"): ("unsupported", "migrate_not_in_v6", {}),
     ("logging", "rotation"): ("unsupported", "migrate_not_in_v6", {}),
     ("logging", "retention"): ("unsupported", "migrate_not_in_v6", {}),
 }
+# Whole subtrees dropped with one reason: v6 collects every flow, since a filtered or sampled
+# store would hide exactly the lateral movement it exists to find.
+DROPPED_PREFIXES: dict[Path_, str] = {("pce_cache", "traffic_filter"): "migrate_no_sampling",
+                                      ("pce_cache", "traffic_sampling"): "migrate_no_sampling"}
 LOG_LEVELS = ("TRACE", "DEBUG", "INFO", "SUCCESS", "WARNING", "ERROR", "CRITICAL")
 _HEX_KEY = re.compile(r"[0-9a-f]{64,}")
 _MISSING = object()
@@ -98,7 +111,43 @@ def read_v5(v5_root: Path) -> dict[str, Any]:
 class _Carry:
     target: str
     convert: Callable[[V5Config], Any]
-    reason_if_changed: str = "migrate_normalized"
+    reason_if_changed: str | Callable[[V5Config], str] = "migrate_normalized"
+
+
+def _clamped(value: int, lo: int, hi: int) -> int:
+    return min(max(value, lo), hi)
+
+
+def _bound_reason(value: int, lo: int, hi: int) -> str:
+    return "migrate_raised_to_minimum" if value < lo else "migrate_lowered_to_maximum" if value > hi \
+        else "migrate_normalized"
+
+
+def _traffic_interval(v: V5Config) -> int:
+    t = v.pce_cache.traffic_poll_interval_seconds
+    return 600 if t == 3600 else _clamped(t, 300, 86400)  # 5.x's default hourly → v6's 10 minutes
+
+
+def _traffic_interval_reason(v: V5Config) -> str:
+    t = v.pce_cache.traffic_poll_interval_seconds
+    return "migrate_v6_default_interval" if t == 3600 else _bound_reason(t, 300, 86400)
+
+
+def _flow_days(v: V5Config) -> int:
+    # "New connection" detection compares against 30 days of baseline; raw flows must outlive it.
+    d = v.pce_cache.traffic_raw_retention_days
+    return 35 if d < 30 else min(d, 3650)
+
+
+def _rollup_days(v: V5Config) -> int:
+    return min(max(v.pce_cache.traffic_agg_retention_days, _flow_days(v)), 3650)
+
+
+def _archive_days(v: V5Config) -> int:
+    c = v.pce_cache
+    floor = max(_flow_days(v), min(c.events_retention_days, 3650))
+    days = min(c.archive_retention_days, 3650)
+    return floor if c.archive_enabled and 0 < days < floor else days
 
 
 def _tz(v5: V5Config) -> str:
@@ -162,6 +211,36 @@ CARRY: dict[Path_, _Carry] = {
     ("logging", "level"): _Carry("logging.level",
                                  lambda v: v.logging.level.upper() if v.logging.level.upper() in LOG_LEVELS else "INFO",
                                  "migrate_5x_effective_value"),
+    # pce_cache: applied only when the 5.x file has the section (never configured → v6 defaults)
+    ("pce_cache", "enabled"): _Carry("collection.mode", lambda v: "full" if v.pce_cache.enabled else "events_only",
+                                     lambda v: "migrate_cache_on_full" if v.pce_cache.enabled
+                                     else "migrate_cache_off_events_only"),
+    ("pce_cache", "traffic_poll_interval_seconds"): _Carry("collection.traffic_interval_seconds", _traffic_interval,
+                                                           _traffic_interval_reason),
+    ("pce_cache", "events_poll_interval_seconds"): _Carry(
+        "collection.events_interval_seconds", lambda v: _clamped(v.pce_cache.events_poll_interval_seconds, 60, 3600),
+        lambda v: _bound_reason(v.pce_cache.events_poll_interval_seconds, 60, 3600)),
+    ("pce_cache", "rate_limit_per_minute"): _Carry("collection.rate_limit_per_minute",
+                                                   lambda v: v.pce_cache.rate_limit_per_minute),
+    ("pce_cache", "events_retention_days"): _Carry(
+        "collection.retention.event_days", lambda v: min(v.pce_cache.events_retention_days, 3650),
+        "migrate_lowered_to_maximum"),
+    ("pce_cache", "traffic_raw_retention_days"): _Carry("collection.retention.flow_days", _flow_days,
+                                                        lambda v: "migrate_raised_to_baseline"
+                                                        if v.pce_cache.traffic_raw_retention_days < 30
+                                                        else "migrate_lowered_to_maximum"),
+    ("pce_cache", "traffic_agg_retention_days"): _Carry("collection.retention.rollup_days", _rollup_days,
+                                                        lambda v: "migrate_lowered_to_maximum"
+                                                        if v.pce_cache.traffic_agg_retention_days > 3650
+                                                        else "migrate_raised_to_baseline"),
+    ("pce_cache", "archive_enabled"): _Carry("collection.archive.enabled", lambda v: v.pce_cache.archive_enabled),
+    ("pce_cache", "archive_retention_days"): _Carry("collection.archive.retention_days", _archive_days,
+                                                    lambda v: "migrate_lowered_to_maximum"
+                                                    if v.pce_cache.archive_retention_days > 3650
+                                                    else "migrate_raised_for_archive"),
+    ("pce_cache", "disk_free_warn_gb"): _Carry("collection.disk_free_warn_gb",
+                                               lambda v: min(v.pce_cache.disk_free_warn_gb, 100000),
+                                               "migrate_lowered_to_maximum"),
 }
 
 
@@ -211,7 +290,11 @@ def migrate_v5(raw: dict[str, Any]) -> MigrationResult:
     else:
         blocking.append(("api.org_id", "a PCE organization ID is a number"))
     for path, carry in CARRY.items():
+        if path[0] == "pce_cache" and not isinstance(raw.get("pce_cache"), dict):
+            continue
         _set(out, carry.target, carry.convert(v5))
+    if not isinstance(raw.get("pce_cache"), dict):
+        out["collection"]["mode"] = "events_only"  # 5.x without the section kept no traffic (spec §7)
 
     for path in leaf_paths(raw):
         source = show(path)
@@ -232,11 +315,15 @@ def migrate_v5(raw: dict[str, Any]) -> MigrationResult:
             carry = CARRY[path]
             value = carry.convert(v5)
             same = _raw(raw, path) == value and type(_raw(raw, path)) is type(value)
+            reason = carry.reason_if_changed if isinstance(carry.reason_if_changed, str) \
+                else carry.reason_if_changed(v5)
             add(MigrationItem(source, carry.target, "carried" if same else "rewritten",
-                              "migrate_carried" if same else carry.reason_if_changed))
+                              "migrate_carried" if same else reason))
         elif path in SPECIAL:
             action, reason, params = SPECIAL[path]
             add(MigrationItem(source, None, action, reason, params))
+        elif dropped := next((r for p, r in DROPPED_PREFIXES.items() if path[:len(p)] == p), None):
+            add(MigrationItem(source, None, "dropped", dropped))
         elif path[0] in PHASE_OF_SECTION:
             add(MigrationItem(source, None, "unsupported", "migrate_arrives_in_phase",
                               {"phase": PHASE_OF_SECTION[path[0]]}))

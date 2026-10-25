@@ -37,3 +37,15 @@ def test_ensure_dirs_keeps_existing_mode(tmp_path):
     p.logs_dir.chmod(0o755)
     p.ensure_dirs()
     assert (p.logs_dir.stat().st_mode & 0o777) == 0o755
+
+
+def test_flow_db_and_archive_paths(tmp_path):
+    p = resolve_paths(tmp_path)
+    assert p.flows_db == tmp_path / "data" / "flows.sqlite"
+    assert p.archive_dir == tmp_path / "data" / "archive"
+
+
+def test_ensure_dirs_creates_archive_dir_0700(tmp_path):
+    p = resolve_paths(tmp_path / "fresh")
+    p.ensure_dirs()
+    assert p.archive_dir.is_dir() and (p.archive_dir.stat().st_mode & 0o777) == 0o700

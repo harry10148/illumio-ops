@@ -17,7 +17,7 @@ def _pce(**kw):
 
 def test_default_settings_values():
     s = default_settings(password_hash=HASH, secret_key=KEY, port=5443)
-    assert s.schema_version == 1 and s.revision == 0
+    assert s.schema_version == 2 and s.revision == 0
     assert s.pce.url == "" and s.pce.deployment_type is DeploymentType.ON_PREM
     assert s.web.port == 5443 and s.web.username == "illumio" and s.web.must_change_password is False
     assert s.web.session_lifetime_seconds == 28800 and s.web.allowed_ips == ()
@@ -25,6 +25,12 @@ def test_default_settings_values():
     assert s.web.tls.key_algorithm == "ecdsa-p256" and s.web.tls.min_version == "TLSv1.2"
     assert s.display.language is Language.EN and s.display.timezone == "local"
     assert s.logging.level == "INFO"
+    c = s.collection
+    assert c.enabled is True and c.traffic_interval_seconds == 600 and c.events_interval_seconds == 300
+    assert c.inventory_interval_seconds == 3600 and c.rate_limit_per_minute == 400
+    assert c.backfill_days == 30 and c.disk_free_warn_gb == 10
+    assert (c.retention.flow_days, c.retention.event_days, c.retention.rollup_days, c.retention.baseline_days) == (35, 90, 90, 30)
+    assert c.archive.enabled is False and c.archive.retention_days == 0
 
 
 def test_verify_tls_accepts_ca_bundle_path():
@@ -84,6 +90,23 @@ def test_timezone_accepts_the_5x_formats():
             DisplaySettings(language="en", timezone=bad)
 
 
+def test_display_zone_resolves_every_accepted_format():
+    from datetime import UTC, datetime, timedelta
+    from zoneinfo import ZoneInfo
+
+    from illumio_ops.settings.schema import DisplaySettings
+
+    def zone(tz):
+        return DisplaySettings(language="en", timezone=tz).zone()
+
+    at = datetime(2026, 10, 24, 19, 0, tzinfo=UTC)
+    assert zone("local") is None  # the server's own clock
+    assert zone("UTC") is UTC
+    assert at.astimezone(zone("UTC+8")).hour == 3 and at.astimezone(zone("UTC-5")).hour == 14
+    assert at.astimezone(zone("UTC+5.5")).utcoffset() == timedelta(hours=5, minutes=30)
+    assert zone("Asia/Taipei") == ZoneInfo("Asia/Taipei")
+
+
 # ── final review fixes ─────────────────────────────────────────────────────
 
 def _with_web(**web):
@@ -109,3 +132,39 @@ def test_certificate_paths_must_be_absolute():
     with pytest.raises(SettingsInvalid) as e:
         validate_settings(d)
     assert [loc for loc, _ in e.value.errors] == ["web.tls.cert_file"]
+
+
+def _with_collection(**changes):
+    d = default_settings(password_hash=HASH, secret_key=KEY).model_dump(mode="json")
+    for dotted, value in changes.items():
+        node = d["collection"]
+        *parents, leaf = dotted.split("__")
+        for part in parents:
+            node = node[part]
+        node[leaf] = value
+    return d
+
+
+def test_retention_flow_days_below_baseline_is_invalid():
+    from illumio_ops.settings.store import SettingsInvalid, validate_settings
+    with pytest.raises(SettingsInvalid) as e:
+        validate_settings(_with_collection(retention__flow_days=20))
+    [(loc, msg)] = e.value.errors
+    assert loc == "collection.retention" and "flow_days" in msg and "20" not in msg
+
+
+def test_retention_rollup_below_flow_is_invalid():
+    with pytest.raises(ValidationError):
+        Settings.model_validate(_with_collection(retention__rollup_days=31))
+
+
+def test_collection_unknown_key_is_invalid():
+    d = _with_collection()
+    d["collection"]["traffic_filter"] = {"actions": ["allowed"]}
+    with pytest.raises(ValidationError):
+        Settings.model_validate(d)
+
+
+def test_collection_interval_bounds():
+    with pytest.raises(ValidationError):
+        Settings.model_validate(_with_collection(traffic_interval_seconds=60))

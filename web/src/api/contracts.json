@@ -299,6 +299,795 @@
         "type": "object"
       }
     },
+    "system.collection.backfill": {
+      "method": "POST",
+      "path": "/api/system/collection/backfill",
+      "request_schema": {
+        "properties": {
+          "end": {
+            "format": "date",
+            "title": "End",
+            "type": "string"
+          },
+          "start": {
+            "format": "date",
+            "title": "Start",
+            "type": "string"
+          }
+        },
+        "required": [
+          "start",
+          "end"
+        ],
+        "title": "BackfillRequest",
+        "type": "object"
+      },
+      "response_schema": {
+        "properties": {
+          "end": {
+            "format": "date-time",
+            "title": "End",
+            "type": "string"
+          },
+          "start": {
+            "format": "date-time",
+            "title": "Start",
+            "type": "string"
+          }
+        },
+        "required": [
+          "start",
+          "end"
+        ],
+        "title": "BackfillAccepted",
+        "type": "object"
+      }
+    },
+    "system.collection.get": {
+      "method": "GET",
+      "path": "/api/system/collection",
+      "request_schema": null,
+      "response_schema": {
+        "$defs": {
+          "ArchiveSettings": {
+            "additionalProperties": false,
+            "properties": {
+              "enabled": {
+                "title": "Enabled",
+                "type": "boolean"
+              },
+              "retention_days": {
+                "maximum": 3650,
+                "minimum": 0,
+                "title": "Retention Days",
+                "type": "integer"
+              }
+            },
+            "required": [
+              "enabled",
+              "retention_days"
+            ],
+            "title": "ArchiveSettings",
+            "type": "object"
+          },
+          "CollectionMode": {
+            "description": "What data collection reads (spec §6.4): everything; events plus short-lived traffic for\nalerts; or events only.",
+            "enum": [
+              "full",
+              "alert",
+              "events_only"
+            ],
+            "title": "CollectionMode",
+            "type": "string"
+          },
+          "CollectionSettings": {
+            "additionalProperties": false,
+            "properties": {
+              "archive": {
+                "$ref": "#/$defs/ArchiveSettings"
+              },
+              "backfill_days": {
+                "maximum": 90,
+                "minimum": 0,
+                "title": "Backfill Days",
+                "type": "integer"
+              },
+              "disk_free_warn_gb": {
+                "maximum": 100000,
+                "minimum": 1,
+                "title": "Disk Free Warn Gb",
+                "type": "integer"
+              },
+              "enabled": {
+                "title": "Enabled",
+                "type": "boolean"
+              },
+              "events_interval_seconds": {
+                "maximum": 3600,
+                "minimum": 60,
+                "title": "Events Interval Seconds",
+                "type": "integer"
+              },
+              "inventory_interval_seconds": {
+                "maximum": 86400,
+                "minimum": 900,
+                "title": "Inventory Interval Seconds",
+                "type": "integer"
+              },
+              "mode": {
+                "$ref": "#/$defs/CollectionMode",
+                "default": "full"
+              },
+              "rate_limit_per_minute": {
+                "maximum": 1000,
+                "minimum": 10,
+                "title": "Rate Limit Per Minute",
+                "type": "integer"
+              },
+              "retention": {
+                "$ref": "#/$defs/RetentionSettings"
+              },
+              "traffic_interval_seconds": {
+                "maximum": 86400,
+                "minimum": 300,
+                "title": "Traffic Interval Seconds",
+                "type": "integer"
+              }
+            },
+            "required": [
+              "enabled",
+              "traffic_interval_seconds",
+              "events_interval_seconds",
+              "inventory_interval_seconds",
+              "rate_limit_per_minute",
+              "backfill_days",
+              "disk_free_warn_gb",
+              "retention",
+              "archive"
+            ],
+            "title": "CollectionSettings",
+            "type": "object"
+          },
+          "RetentionSettings": {
+            "additionalProperties": false,
+            "properties": {
+              "baseline_days": {
+                "maximum": 365,
+                "minimum": 7,
+                "title": "Baseline Days",
+                "type": "integer"
+              },
+              "event_days": {
+                "maximum": 3650,
+                "minimum": 1,
+                "title": "Event Days",
+                "type": "integer"
+              },
+              "flow_days": {
+                "maximum": 3650,
+                "minimum": 1,
+                "title": "Flow Days",
+                "type": "integer"
+              },
+              "rollup_days": {
+                "maximum": 3650,
+                "minimum": 1,
+                "title": "Rollup Days",
+                "type": "integer"
+              }
+            },
+            "required": [
+              "flow_days",
+              "event_days",
+              "rollup_days",
+              "baseline_days"
+            ],
+            "title": "RetentionSettings",
+            "type": "object"
+          }
+        },
+        "properties": {
+          "revision": {
+            "title": "Revision",
+            "type": "integer"
+          },
+          "settings": {
+            "$ref": "#/$defs/CollectionSettings"
+          }
+        },
+        "required": [
+          "revision",
+          "settings"
+        ],
+        "title": "CollectionView",
+        "type": "object"
+      }
+    },
+    "system.collection.status": {
+      "method": "GET",
+      "path": "/api/system/collection/status",
+      "request_schema": null,
+      "response_schema": {
+        "$defs": {
+          "GapView": {
+            "properties": {
+              "detail": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Detail"
+              },
+              "kind": {
+                "title": "Kind",
+                "type": "string"
+              },
+              "source": {
+                "title": "Source",
+                "type": "string"
+              },
+              "window_end": {
+                "format": "date-time",
+                "title": "Window End",
+                "type": "string"
+              },
+              "window_start": {
+                "format": "date-time",
+                "title": "Window Start",
+                "type": "string"
+              }
+            },
+            "required": [
+              "source",
+              "kind",
+              "window_start",
+              "window_end",
+              "detail"
+            ],
+            "title": "GapView",
+            "type": "object"
+          },
+          "SourceStatus": {
+            "properties": {
+              "collected": {
+                "title": "Collected",
+                "type": "boolean"
+              },
+              "consecutive_failures": {
+                "title": "Consecutive Failures",
+                "type": "integer"
+              },
+              "interval_seconds": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Interval Seconds"
+              },
+              "lag_seconds": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Lag Seconds"
+              },
+              "last_error": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Last Error"
+              },
+              "last_error_reason": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Last Error Reason"
+              },
+              "last_ok_at": {
+                "anyOf": [
+                  {
+                    "format": "date-time",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Last Ok At"
+              },
+              "last_rows": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Last Rows"
+              },
+              "last_started_at": {
+                "anyOf": [
+                  {
+                    "format": "date-time",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Last Started At"
+              },
+              "progress": {
+                "anyOf": [
+                  {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Progress"
+              },
+              "source": {
+                "title": "Source",
+                "type": "string"
+              },
+              "stale": {
+                "title": "Stale",
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "source",
+              "collected",
+              "interval_seconds",
+              "last_started_at",
+              "last_ok_at",
+              "last_error",
+              "last_error_reason",
+              "consecutive_failures",
+              "last_rows",
+              "lag_seconds",
+              "stale",
+              "progress"
+            ],
+            "title": "SourceStatus",
+            "type": "object"
+          }
+        },
+        "properties": {
+          "binding_host": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Binding Host"
+          },
+          "capabilities": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Capabilities",
+            "type": "object"
+          },
+          "db_bytes": {
+            "title": "Db Bytes",
+            "type": "integer"
+          },
+          "disk_free_bytes": {
+            "title": "Disk Free Bytes",
+            "type": "integer"
+          },
+          "disk_low": {
+            "title": "Disk Low",
+            "type": "boolean"
+          },
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "mode": {
+            "title": "Mode",
+            "type": "string"
+          },
+          "open_gap_counts": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Open Gap Counts",
+            "type": "object"
+          },
+          "open_gaps": {
+            "items": {
+              "$ref": "#/$defs/GapView"
+            },
+            "title": "Open Gaps",
+            "type": "array"
+          },
+          "open_gaps_truncated": {
+            "title": "Open Gaps Truncated",
+            "type": "boolean"
+          },
+          "pce_configured": {
+            "title": "Pce Configured",
+            "type": "boolean"
+          },
+          "sources": {
+            "items": {
+              "$ref": "#/$defs/SourceStatus"
+            },
+            "title": "Sources",
+            "type": "array"
+          },
+          "visibility": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Visibility",
+            "type": "object"
+          }
+        },
+        "required": [
+          "enabled",
+          "mode",
+          "pce_configured",
+          "binding_host",
+          "sources",
+          "open_gaps",
+          "open_gaps_truncated",
+          "open_gap_counts",
+          "db_bytes",
+          "disk_free_bytes",
+          "disk_low",
+          "visibility",
+          "capabilities"
+        ],
+        "title": "CollectionStatus",
+        "type": "object"
+      }
+    },
+    "system.collection.update": {
+      "method": "PUT",
+      "path": "/api/system/collection",
+      "request_schema": {
+        "$defs": {
+          "ArchiveSettings": {
+            "additionalProperties": false,
+            "properties": {
+              "enabled": {
+                "title": "Enabled",
+                "type": "boolean"
+              },
+              "retention_days": {
+                "maximum": 3650,
+                "minimum": 0,
+                "title": "Retention Days",
+                "type": "integer"
+              }
+            },
+            "required": [
+              "enabled",
+              "retention_days"
+            ],
+            "title": "ArchiveSettings",
+            "type": "object"
+          },
+          "CollectionMode": {
+            "description": "What data collection reads (spec §6.4): everything; events plus short-lived traffic for\nalerts; or events only.",
+            "enum": [
+              "full",
+              "alert",
+              "events_only"
+            ],
+            "title": "CollectionMode",
+            "type": "string"
+          },
+          "CollectionSettings": {
+            "additionalProperties": false,
+            "properties": {
+              "archive": {
+                "$ref": "#/$defs/ArchiveSettings"
+              },
+              "backfill_days": {
+                "maximum": 90,
+                "minimum": 0,
+                "title": "Backfill Days",
+                "type": "integer"
+              },
+              "disk_free_warn_gb": {
+                "maximum": 100000,
+                "minimum": 1,
+                "title": "Disk Free Warn Gb",
+                "type": "integer"
+              },
+              "enabled": {
+                "title": "Enabled",
+                "type": "boolean"
+              },
+              "events_interval_seconds": {
+                "maximum": 3600,
+                "minimum": 60,
+                "title": "Events Interval Seconds",
+                "type": "integer"
+              },
+              "inventory_interval_seconds": {
+                "maximum": 86400,
+                "minimum": 900,
+                "title": "Inventory Interval Seconds",
+                "type": "integer"
+              },
+              "mode": {
+                "$ref": "#/$defs/CollectionMode",
+                "default": "full"
+              },
+              "rate_limit_per_minute": {
+                "maximum": 1000,
+                "minimum": 10,
+                "title": "Rate Limit Per Minute",
+                "type": "integer"
+              },
+              "retention": {
+                "$ref": "#/$defs/RetentionSettings"
+              },
+              "traffic_interval_seconds": {
+                "maximum": 86400,
+                "minimum": 300,
+                "title": "Traffic Interval Seconds",
+                "type": "integer"
+              }
+            },
+            "required": [
+              "enabled",
+              "traffic_interval_seconds",
+              "events_interval_seconds",
+              "inventory_interval_seconds",
+              "rate_limit_per_minute",
+              "backfill_days",
+              "disk_free_warn_gb",
+              "retention",
+              "archive"
+            ],
+            "title": "CollectionSettings",
+            "type": "object"
+          },
+          "RetentionSettings": {
+            "additionalProperties": false,
+            "properties": {
+              "baseline_days": {
+                "maximum": 365,
+                "minimum": 7,
+                "title": "Baseline Days",
+                "type": "integer"
+              },
+              "event_days": {
+                "maximum": 3650,
+                "minimum": 1,
+                "title": "Event Days",
+                "type": "integer"
+              },
+              "flow_days": {
+                "maximum": 3650,
+                "minimum": 1,
+                "title": "Flow Days",
+                "type": "integer"
+              },
+              "rollup_days": {
+                "maximum": 3650,
+                "minimum": 1,
+                "title": "Rollup Days",
+                "type": "integer"
+              }
+            },
+            "required": [
+              "flow_days",
+              "event_days",
+              "rollup_days",
+              "baseline_days"
+            ],
+            "title": "RetentionSettings",
+            "type": "object"
+          }
+        },
+        "properties": {
+          "revision": {
+            "title": "Revision",
+            "type": "integer"
+          },
+          "settings": {
+            "$ref": "#/$defs/CollectionSettings"
+          }
+        },
+        "required": [
+          "revision",
+          "settings"
+        ],
+        "title": "CollectionUpdate",
+        "type": "object"
+      },
+      "response_schema": {
+        "$defs": {
+          "ArchiveSettings": {
+            "additionalProperties": false,
+            "properties": {
+              "enabled": {
+                "title": "Enabled",
+                "type": "boolean"
+              },
+              "retention_days": {
+                "maximum": 3650,
+                "minimum": 0,
+                "title": "Retention Days",
+                "type": "integer"
+              }
+            },
+            "required": [
+              "enabled",
+              "retention_days"
+            ],
+            "title": "ArchiveSettings",
+            "type": "object"
+          },
+          "CollectionMode": {
+            "description": "What data collection reads (spec §6.4): everything; events plus short-lived traffic for\nalerts; or events only.",
+            "enum": [
+              "full",
+              "alert",
+              "events_only"
+            ],
+            "title": "CollectionMode",
+            "type": "string"
+          },
+          "CollectionSettings": {
+            "additionalProperties": false,
+            "properties": {
+              "archive": {
+                "$ref": "#/$defs/ArchiveSettings"
+              },
+              "backfill_days": {
+                "maximum": 90,
+                "minimum": 0,
+                "title": "Backfill Days",
+                "type": "integer"
+              },
+              "disk_free_warn_gb": {
+                "maximum": 100000,
+                "minimum": 1,
+                "title": "Disk Free Warn Gb",
+                "type": "integer"
+              },
+              "enabled": {
+                "title": "Enabled",
+                "type": "boolean"
+              },
+              "events_interval_seconds": {
+                "maximum": 3600,
+                "minimum": 60,
+                "title": "Events Interval Seconds",
+                "type": "integer"
+              },
+              "inventory_interval_seconds": {
+                "maximum": 86400,
+                "minimum": 900,
+                "title": "Inventory Interval Seconds",
+                "type": "integer"
+              },
+              "mode": {
+                "$ref": "#/$defs/CollectionMode",
+                "default": "full"
+              },
+              "rate_limit_per_minute": {
+                "maximum": 1000,
+                "minimum": 10,
+                "title": "Rate Limit Per Minute",
+                "type": "integer"
+              },
+              "retention": {
+                "$ref": "#/$defs/RetentionSettings"
+              },
+              "traffic_interval_seconds": {
+                "maximum": 86400,
+                "minimum": 300,
+                "title": "Traffic Interval Seconds",
+                "type": "integer"
+              }
+            },
+            "required": [
+              "enabled",
+              "traffic_interval_seconds",
+              "events_interval_seconds",
+              "inventory_interval_seconds",
+              "rate_limit_per_minute",
+              "backfill_days",
+              "disk_free_warn_gb",
+              "retention",
+              "archive"
+            ],
+            "title": "CollectionSettings",
+            "type": "object"
+          },
+          "RetentionSettings": {
+            "additionalProperties": false,
+            "properties": {
+              "baseline_days": {
+                "maximum": 365,
+                "minimum": 7,
+                "title": "Baseline Days",
+                "type": "integer"
+              },
+              "event_days": {
+                "maximum": 3650,
+                "minimum": 1,
+                "title": "Event Days",
+                "type": "integer"
+              },
+              "flow_days": {
+                "maximum": 3650,
+                "minimum": 1,
+                "title": "Flow Days",
+                "type": "integer"
+              },
+              "rollup_days": {
+                "maximum": 3650,
+                "minimum": 1,
+                "title": "Rollup Days",
+                "type": "integer"
+              }
+            },
+            "required": [
+              "flow_days",
+              "event_days",
+              "rollup_days",
+              "baseline_days"
+            ],
+            "title": "RetentionSettings",
+            "type": "object"
+          }
+        },
+        "properties": {
+          "revision": {
+            "title": "Revision",
+            "type": "integer"
+          },
+          "settings": {
+            "$ref": "#/$defs/CollectionSettings"
+          }
+        },
+        "required": [
+          "revision",
+          "settings"
+        ],
+        "title": "CollectionView",
+        "type": "object"
+      }
+    },
     "system.display.get": {
       "method": "GET",
       "path": "/api/system/display",
@@ -494,6 +1283,119 @@
           "jobs"
         ],
         "title": "JobList",
+        "type": "object"
+      }
+    },
+    "system.logs.query": {
+      "method": "POST",
+      "path": "/api/system/logs/query",
+      "request_schema": {
+        "properties": {
+          "contains": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Contains"
+          },
+          "level": {
+            "anyOf": [
+              {
+                "enum": [
+                  "DEBUG",
+                  "INFO",
+                  "WARNING",
+                  "ERROR",
+                  "CRITICAL"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Level"
+          },
+          "limit": {
+            "default": 200,
+            "maximum": 1000,
+            "minimum": 1,
+            "title": "Limit",
+            "type": "integer"
+          },
+          "module": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Module"
+          }
+        },
+        "title": "LogQuery",
+        "type": "object"
+      },
+      "response_schema": {
+        "$defs": {
+          "LogLine": {
+            "properties": {
+              "level": {
+                "title": "Level",
+                "type": "string"
+              },
+              "message": {
+                "title": "Message",
+                "type": "string"
+              },
+              "module": {
+                "title": "Module",
+                "type": "string"
+              },
+              "ts": {
+                "title": "Ts",
+                "type": "string"
+              }
+            },
+            "required": [
+              "ts",
+              "level",
+              "module",
+              "message"
+            ],
+            "title": "LogLine",
+            "type": "object"
+          }
+        },
+        "properties": {
+          "lines": {
+            "items": {
+              "$ref": "#/$defs/LogLine"
+            },
+            "title": "Lines",
+            "type": "array"
+          },
+          "truncated": {
+            "title": "Truncated",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "lines",
+          "truncated"
+        ],
+        "title": "LogLines",
         "type": "object"
       }
     },
@@ -834,6 +1736,34 @@
             ],
             "title": "DeploymentType",
             "type": "string"
+          },
+          "PceReset": {
+            "properties": {
+              "archive_moved_to": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Archive Moved To"
+              },
+              "cleared": {
+                "items": {
+                  "type": "string"
+                },
+                "title": "Cleared",
+                "type": "array"
+              }
+            },
+            "required": [
+              "cleared",
+              "archive_moved_to"
+            ],
+            "title": "PceReset",
+            "type": "object"
           }
         },
         "properties": {
@@ -863,6 +1793,16 @@
             "title": "Org Id",
             "type": "string"
           },
+          "reset": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/PceReset"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "revision": {
             "title": "Revision",
             "type": "integer"
@@ -891,9 +1831,10 @@
           "api_secret",
           "deployment_type",
           "console_url",
-          "verify_tls"
+          "verify_tls",
+          "reset"
         ],
-        "title": "PceConnection",
+        "title": "PceConnectionSaved",
         "type": "object"
       }
     },
@@ -1734,6 +2675,20 @@
       "traffic",
       "volume"
     ],
+    "CapabilityState": [
+      "supported",
+      "unknown",
+      "unsupported"
+    ],
+    "CollectionMode": [
+      "alert",
+      "events_only",
+      "full"
+    ],
+    "DataOrigin": [
+      "backfill",
+      "ingest"
+    ],
     "DeploymentType": [
       "on_prem",
       "saas"
@@ -1748,6 +2703,17 @@
       "potentially_blocked_by_boundary",
       "potentially_blocked_by_override_deny",
       "unknown"
+    ],
+    "FlowDirection": [
+      "inbound",
+      "outbound"
+    ],
+    "IngestSource": [
+      "backfill",
+      "events",
+      "inventory",
+      "ransomware",
+      "traffic"
     ],
     "Language": [
       "en",
@@ -1768,6 +2734,16 @@
       "allow",
       "deny",
       "override_deny"
+    ],
+    "TamperClassification": [
+      "confirmed",
+      "signal"
+    ],
+    "VisibilityLevel": [
+      "enhanced_data_collection",
+      "flow_drops",
+      "flow_off",
+      "flow_summary"
     ]
   }
 }

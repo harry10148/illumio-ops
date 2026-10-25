@@ -11,6 +11,19 @@ export type Language = ("en" | "zh_TW")
  */
 export type ProbeName = ("noop" | "health" | "node_available")
 /**
+ * What data collection reads (spec §6.4): everything; events plus short-lived traffic for
+ * alerts; or events only.
+ * 
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "CollectionMode".
+ */
+export type CollectionMode = ("full" | "alert" | "events_only")
+/**
+ * What data collection reads (spec §6.4): everything; events plus short-lived traffic for
+ * alerts; or events only.
+ */
+export type CollectionMode1 = ("full" | "alert" | "events_only")
+/**
  * This interface was referenced by `ContractRoot`'s JSON-Schema
  * via the `definition` "DeploymentType".
  */
@@ -104,6 +117,128 @@ export interface Dictionary {
 }
 /**
  * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "BackfillRequest".
+ */
+export interface BackfillRequest {
+end: string
+start: string
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "BackfillAccepted".
+ */
+export interface BackfillAccepted {
+end: string
+start: string
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "ArchiveSettings".
+ */
+export interface ArchiveSettings {
+enabled: boolean
+retention_days: number
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "CollectionSettings".
+ */
+export interface CollectionSettings {
+archive: ArchiveSettings
+backfill_days: number
+disk_free_warn_gb: number
+enabled: boolean
+events_interval_seconds: number
+inventory_interval_seconds: number
+mode?: CollectionMode1
+rate_limit_per_minute: number
+retention: RetentionSettings
+traffic_interval_seconds: number
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "RetentionSettings".
+ */
+export interface RetentionSettings {
+baseline_days: number
+event_days: number
+flow_days: number
+rollup_days: number
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "CollectionView".
+ */
+export interface CollectionView {
+revision: number
+settings: CollectionSettings
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "GapView".
+ */
+export interface GapView {
+detail: (string | null)
+kind: string
+source: string
+window_end: string
+window_start: string
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "SourceStatus".
+ */
+export interface SourceStatus {
+collected: boolean
+consecutive_failures: number
+interval_seconds: (number | null)
+lag_seconds: (number | null)
+last_error: (string | null)
+last_error_reason: (string | null)
+last_ok_at: (string | null)
+last_rows: (number | null)
+last_started_at: (string | null)
+progress: ({
+[k: string]: unknown
+} | null)
+source: string
+stale: boolean
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "CollectionStatus".
+ */
+export interface CollectionStatus {
+binding_host: (string | null)
+capabilities: {
+[k: string]: string
+}
+db_bytes: number
+disk_free_bytes: number
+disk_low: boolean
+enabled: boolean
+mode: string
+open_gap_counts: {
+[k: string]: number
+}
+open_gaps: GapView[]
+open_gaps_truncated: boolean
+pce_configured: boolean
+sources: SourceStatus[]
+visibility: {
+[k: string]: number
+}
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "CollectionUpdate".
+ */
+export interface CollectionUpdate {
+revision: number
+settings: CollectionSettings
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
  * via the `definition` "DisplayView".
  */
 export interface DisplayView {
@@ -138,6 +273,34 @@ runs: number
  */
 export interface JobList {
 jobs: JobView[]
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "LogQuery".
+ */
+export interface LogQuery {
+contains?: (string | null)
+level?: (("DEBUG" | "INFO" | "WARNING" | "ERROR" | "CRITICAL") | null)
+limit?: number
+module?: (string | null)
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "LogLine".
+ */
+export interface LogLine {
+level: string
+message: string
+module: string
+ts: string
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "LogLines".
+ */
+export interface LogLines {
+lines: LogLine[]
+truncated: boolean
 }
 /**
  * This interface was referenced by `ContractRoot`'s JSON-Schema
@@ -178,6 +341,29 @@ api_secret: string
 console_url: (string | null)
 deployment_type: DeploymentType
 org_id: string
+revision: number
+url: string
+verify_tls: (boolean | string)
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "PceReset".
+ */
+export interface PceReset {
+archive_moved_to: (string | null)
+cleared: string[]
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "PceConnectionSaved".
+ */
+export interface PceConnectionSaved {
+api_key: string
+api_secret: string
+console_url: (string | null)
+deployment_type: DeploymentType
+org_id: string
+reset: (PceReset | null)
 revision: number
 url: string
 verify_tls: (boolean | string)
@@ -285,7 +471,7 @@ revision: number
 validity_days: number
 }
 
-export type OpId = "auth.csrf" | "auth.login" | "auth.logout" | "auth.me" | "auth.password" | "home.summary" | "i18n.dictionary" | "system.display.get" | "system.display.update" | "system.jobs.list" | "system.pce.get" | "system.pce.latest" | "system.pce.probe" | "system.pce.update" | "system.security.get" | "system.security.update" | "system.tls.csr" | "system.tls.import" | "system.tls.renew" | "system.tls.status" | "system.tls.update";
+export type OpId = "auth.csrf" | "auth.login" | "auth.logout" | "auth.me" | "auth.password" | "home.summary" | "i18n.dictionary" | "system.collection.backfill" | "system.collection.get" | "system.collection.status" | "system.collection.update" | "system.display.get" | "system.display.update" | "system.jobs.list" | "system.logs.query" | "system.pce.get" | "system.pce.latest" | "system.pce.probe" | "system.pce.update" | "system.security.get" | "system.security.update" | "system.tls.csr" | "system.tls.import" | "system.tls.renew" | "system.tls.status" | "system.tls.update";
 
 export interface Requests {
   "auth.csrf": undefined;
@@ -295,9 +481,14 @@ export interface Requests {
   "auth.password": PasswordChangeRequest;
   "home.summary": undefined;
   "i18n.dictionary": undefined;
+  "system.collection.backfill": BackfillRequest;
+  "system.collection.get": undefined;
+  "system.collection.status": undefined;
+  "system.collection.update": CollectionUpdate;
   "system.display.get": undefined;
   "system.display.update": DisplayUpdate;
   "system.jobs.list": undefined;
+  "system.logs.query": LogQuery;
   "system.pce.get": undefined;
   "system.pce.latest": undefined;
   "system.pce.probe": undefined;
@@ -319,13 +510,18 @@ export interface Responses {
   "auth.password": CsrfToken;
   "home.summary": HomeSummary;
   "i18n.dictionary": Dictionary;
+  "system.collection.backfill": BackfillAccepted;
+  "system.collection.get": CollectionView;
+  "system.collection.status": CollectionStatus;
+  "system.collection.update": CollectionView;
   "system.display.get": DisplayView;
   "system.display.update": DisplayView;
   "system.jobs.list": JobList;
+  "system.logs.query": LogLines;
   "system.pce.get": PceConnection;
   "system.pce.latest": LatestProbe;
   "system.pce.probe": ProbeRun;
-  "system.pce.update": PceConnection;
+  "system.pce.update": PceConnectionSaved;
   "system.security.get": SecurityView;
   "system.security.update": SecurityView;
   "system.tls.csr": CsrResult;
@@ -343,9 +539,14 @@ export const OPERATIONS = {
   "auth.password": { method: "POST", path: "/api/auth/password" },
   "home.summary": { method: "GET", path: "/api/home/summary" },
   "i18n.dictionary": { method: "GET", path: "/api/i18n/<lang>" },
+  "system.collection.backfill": { method: "POST", path: "/api/system/collection/backfill" },
+  "system.collection.get": { method: "GET", path: "/api/system/collection" },
+  "system.collection.status": { method: "GET", path: "/api/system/collection/status" },
+  "system.collection.update": { method: "PUT", path: "/api/system/collection" },
   "system.display.get": { method: "GET", path: "/api/system/display" },
   "system.display.update": { method: "PUT", path: "/api/system/display" },
   "system.jobs.list": { method: "GET", path: "/api/system/jobs" },
+  "system.logs.query": { method: "POST", path: "/api/system/logs/query" },
   "system.pce.get": { method: "GET", path: "/api/system/pce" },
   "system.pce.latest": { method: "GET", path: "/api/system/pce/latest" },
   "system.pce.probe": { method: "POST", path: "/api/system/pce/probe" },
@@ -367,6 +568,20 @@ export const VALUES = {
     "traffic",
     "volume"
   ],
+  "CapabilityState": [
+    "supported",
+    "unknown",
+    "unsupported"
+  ],
+  "CollectionMode": [
+    "alert",
+    "events_only",
+    "full"
+  ],
+  "DataOrigin": [
+    "backfill",
+    "ingest"
+  ],
   "DeploymentType": [
     "on_prem",
     "saas"
@@ -381,6 +596,17 @@ export const VALUES = {
     "potentially_blocked_by_boundary",
     "potentially_blocked_by_override_deny",
     "unknown"
+  ],
+  "FlowDirection": [
+    "inbound",
+    "outbound"
+  ],
+  "IngestSource": [
+    "backfill",
+    "events",
+    "inventory",
+    "ransomware",
+    "traffic"
   ],
   "Language": [
     "en",
@@ -401,5 +627,15 @@ export const VALUES = {
     "allow",
     "deny",
     "override_deny"
+  ],
+  "TamperClassification": [
+    "confirmed",
+    "signal"
+  ],
+  "VisibilityLevel": [
+    "enhanced_data_collection",
+    "flow_drops",
+    "flow_off",
+    "flow_summary"
   ]
 } as const;

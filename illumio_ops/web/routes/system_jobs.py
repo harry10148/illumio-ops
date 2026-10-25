@@ -7,7 +7,7 @@ from flask import Blueprint
 from pydantic import BaseModel
 
 from illumio_ops.jobs.health import list_health
-from illumio_ops.jobs.scheduler import JOB_INTERVALS
+from illumio_ops.jobs.scheduler import PCE_PROBE_SECONDS, job_intervals
 from illumio_ops.services import pce_health
 from illumio_ops.web.auth import get_ctx
 from illumio_ops.web.contract import api_route, operation
@@ -47,14 +47,16 @@ bp = Blueprint("system_jobs", __name__)
 
 @api_route(bp, OP_JOBS)
 def list_jobs() -> JobList:
-    with get_ctx().db() as conn:
+    ctx = get_ctx()
+    intervals = job_intervals(ctx.settings.current())
+    with ctx.db() as conn:
         health = {h.job_id: h for h in list_health(conn)}
     out = []
-    for job_id in sorted(set(JOB_INTERVALS) | set(health)):
+    for job_id in sorted(set(intervals) | set(health)):
         h = health.get(job_id)
         out.append(JobView(
             job_id=job_id,
-            interval_seconds=JOB_INTERVALS.get(job_id),
+            interval_seconds=intervals.get(job_id),
             last_started_at=h.last_started_at if h else None,
             last_finished_at=h.last_finished_at if h else None,
             last_ok=h.last_ok if h else None,
@@ -71,5 +73,5 @@ def home_summary() -> HomeSummary:
     if stored is None:
         return HomeSummary(pce=None)
     checked_at, results = stored
-    stale = (datetime.now(UTC) - checked_at).total_seconds() > 2 * JOB_INTERVALS["pce_probe"]
+    stale = (datetime.now(UTC) - checked_at).total_seconds() > 2 * PCE_PROBE_SECONDS
     return HomeSummary(pce=PceSummary(checked_at=checked_at, stale=stale, results=_items(results)))

@@ -19,6 +19,7 @@ from loguru import logger
 from pydantic import ValidationError
 
 from illumio_ops.settings.schema import Settings, default_settings
+from illumio_ops.settings.upgrade import NewerSchema, upgrade
 
 
 class SettingsInvalid(Exception):
@@ -49,7 +50,12 @@ def _errors(exc: ValidationError) -> list[tuple[str, str]]:
 
 
 def validate_settings(data: Any) -> Settings:
-    """Settings from a plain dict, or SettingsInvalid with field paths (never values)."""
+    """Settings from a plain dict (upgraded in memory from an older schema first), or
+    SettingsInvalid with field paths (never values)."""
+    try:
+        data = upgrade(data)
+    except NewerSchema:
+        raise SettingsInvalid([("schema_version", "newer than this program")]) from None
     try:
         return Settings.model_validate(data)
     except ValidationError as exc:
