@@ -556,8 +556,11 @@ class TrafficSummary:
     decisions: frozenset[str]
 
 
-def service_traffic(ctx: AppContext, targets: Collection[tuple[str, int, int]], *,
-                    since: datetime) -> dict[tuple[str, int, int], TrafficSummary]:
+FRESH = timedelta(hours=1)  # how far behind now the newest traffic coverage may end and still count as current
+
+
+def service_traffic(ctx: AppContext, targets: Collection[tuple[str, int, int]], *, since: datetime,
+                    now: datetime) -> dict[tuple[str, int, int], TrafficSummary]:
     """Recent traffic to each (destination key, port, proto), from the connection baseline (read by port
     through ix_baseline_port). A target nobody reached since `since` has sources 0 — only when traffic was
     collected over that whole period; otherwise every target's sources are None (P3 final review #4)."""
@@ -572,10 +575,10 @@ def service_traffic(ctx: AppContext, targets: Collection[tuple[str, int, int]], 
     acc: dict[tuple[str, int, int], tuple[set[str], str | None, set[str]]] = {}
     with fdb.connect() as conn:
         require_same_pce(conn, settings.pce)
-        # Watched without a hole from `since` to the newest collection, and no read in that stretch failed or
-        # was cut short: only then does "nobody connected" hold.
+        # Watched without a hole from `since` up to about now, and no read in that stretch failed or was cut
+        # short: only then does "nobody connected" hold.
         ranges = ingest_state.coverage(conn, IngestSource.TRAFFIC)
-        if not ranges or ranges[-1][0] > since or any(
+        if not ranges or ranges[-1][0] > since or ranges[-1][1] < now - FRESH or any(
                 g.window_end > since for g in ingest_state.open_gaps(conn, IngestSource.TRAFFIC)):
             return unknown
         for r in conn.execute("SELECT src_key, dst_key, port, proto, last_seen, last_decision FROM connection_baseline "

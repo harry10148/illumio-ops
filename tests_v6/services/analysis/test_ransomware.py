@@ -137,3 +137,14 @@ def test_hole_or_failed_gap_in_the_window_is_unknown(tmp_path):
         ransomware.upsert_services(conn, WEB, [_svc("SMB", 445, "high", "unprotected", "listening")],
                                    source_updated_at=None, at=NOW)
     assert _classes(holed)[0][(WEB, "SMB")] == "unknown"
+
+
+def test_collection_that_stopped_is_unknown(tmp_path):
+    # Security review of 2e8efd82: coverage must reach the present, not only start early enough.
+    ctx = configured_ctx(tmp_path)
+    with ctx.flows().connect() as conn:
+        ingest_state.add_coverage(conn, IngestSource.TRAFFIC, NOW - timedelta(days=40), NOW - timedelta(days=10))
+        workloads.replace_inventory(conn, [_wl(WEB, "web", 10.0)])
+        ransomware.upsert_services(conn, WEB, [_svc("SMB", 445, "high", "unprotected", "listening")],
+                                   source_updated_at=None, at=NOW)
+    assert _classes(ctx)[0][(WEB, "SMB")] == "unknown"

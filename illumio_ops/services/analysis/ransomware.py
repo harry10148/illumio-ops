@@ -40,7 +40,7 @@ def _breakdowns(ctx: AppContext, now: datetime, only: str | None = None) -> list
     if only is not None:
         services = {only: services.get(only, [])}
     targets = {(endpoint_key(href, ""), int(s["port"]), int(s["proto"])) for href, rows in services.items() for s in rows}
-    traffic = service_traffic(ctx, targets, since=now - timedelta(days=days))
+    traffic = service_traffic(ctx, targets, since=now - timedelta(days=days), now=now)
     out = []
     for href, rows in sorted(services.items()):
         wl = inventory.get(href)

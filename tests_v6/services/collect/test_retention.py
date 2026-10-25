@@ -167,3 +167,18 @@ def test_retention_drops_expired_detections_and_snapshots(tmp_path):
     assert counts["analysis"] == 3
     assert _count(ctx, "detections") == 1 and _count(ctx, "focus_items") == 0
     assert _count(ctx, "lateral_snapshot_daily") == 1
+
+
+def test_open_gaps_kept_as_long_as_the_baseline(tmp_path):
+    # Security review of 2e8efd82: an unresolved gap inside the baseline (what the analysis looks back over)
+    # must outlive a shorter rollup retention, or a failed read stops showing.
+    from illumio_ops.domain.values import IngestSource
+    from illumio_ops.store.flowdb import ingest_state
+    ctx = configured_ctx(tmp_path, mode="alert",
+                         retention={"flow_days": 7, "event_days": 90, "rollup_days": 7, "baseline_days": 30})
+    with ctx.flows().connect() as conn:
+        ingest_state.record_gap(conn, IngestSource.TRAFFIC, NOW - timedelta(days=10), NOW - timedelta(days=9, hours=23),
+                                "failed", "x", NOW - timedelta(days=10))
+    run_retention(ctx, now=NOW)
+    with ctx.flows().connect() as conn:
+        assert len(ingest_state.open_gaps(conn, IngestSource.TRAFFIC)) == 1
