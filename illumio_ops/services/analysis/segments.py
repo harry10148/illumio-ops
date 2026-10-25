@@ -9,6 +9,7 @@ from pydantic import BaseModel
 
 from illumio_ops.domain.segment import EventSegment, FlowSegment
 from illumio_ops.domain.values import IngestSource, SegmentView
+from illumio_ops.services.analysis.predicted_block import predict_blocks
 from illumio_ops.services.context import AppContext
 from illumio_ops.services.coverage import Coverage
 from illumio_ops.services.eventsource import EventRow, aggregate_events, event_detail
@@ -64,7 +65,11 @@ def run_segment(ctx: AppContext, seg: FlowSegment | EventSegment, *, now: dateti
                              field_coverage=fagg.field_coverage, limit_hit=fagg.limit_hit, observed_from=start,
                              observed_to=end, latency_seconds=latency)
     if seg.view is SegmentView.PREDICTED_BLOCK:
-        raise NotImplementedError("P3-T9: predicted blocks are wired in by Task 9")
+        pb = predict_blocks(ctx, seg.filter, limit=seg.limit)
+        return SegmentResult(view=seg.view, predicted=pb, field_coverage=None, limit_hit=pb.limit_hit,
+                             observed_from=start, observed_to=end, latency_seconds=None,
+                             coverage=Coverage(source="pce", store_from=None, store_to=None, gaps=[],
+                                               filled_from_pce=[(start, end)], truncated=pb.capped))
     fq = query_flows(ctx, seg.filter, limit=seg.limit, order="last_detected_desc", now=at)
     return SegmentResult(view=seg.view, detail=fq.rows, coverage=fq.coverage,
                          field_coverage=field_coverage(ctx, seg.filter), limit_hit=fq.limit_hit,

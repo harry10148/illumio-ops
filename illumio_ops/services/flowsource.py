@@ -211,6 +211,11 @@ def _row_from_pce(primary: FlowRecord, partner: FlowRecord | None) -> FlowRow:
     )
 
 
+def live_row(record: FlowRecord) -> FlowRow:
+    """One record read live from the PCE (not paired, not stored) as a FlowRow."""
+    return _row_from_pce(record, None)
+
+
 def _fetch(ctx: AppContext, pce: PceSettings, spec: FilterSpec,
            window: tuple[datetime, datetime], max_results: int) -> tuple[list[FlowRecord], bool]:
     """Read one gap window from the PCE with the pushable part of the filter: (records, capped).

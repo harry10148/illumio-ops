@@ -43,6 +43,3 @@ def test_run_segment_dispatches_detail_and_ranking(ctx):
     assert later.latency_seconds == 300
 
 
-def test_predicted_block_view_not_yet_wired(ctx):
-    with pytest.raises(NotImplementedError, match="P3-T9"):
-        run_segment(ctx, FlowSegment(filter=SPEC, view=V.PREDICTED_BLOCK, limit=10), now=NOW)
