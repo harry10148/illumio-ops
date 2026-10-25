@@ -10,6 +10,7 @@ from datetime import UTC, datetime
 from loguru import logger
 
 from illumio_ops.services.analysis.exposure import run_exposure
+from illumio_ops.services.analysis.ransomware import ransomware_overlay
 from illumio_ops.services.context import AppContext
 from illumio_ops.store.flowdb import analysis
 from illumio_ops.store.flowdb.db import StaleGeneration
@@ -24,6 +25,7 @@ def _exposure(ctx: AppContext, now: datetime) -> None:
 # Later steps read what earlier ones stored (the focus list last).
 HOURLY_STEPS: list[tuple[str, HourlyStep]] = [
     ("exposure", _exposure),
+    ("ransomware", ransomware_overlay),
 ]
 
 

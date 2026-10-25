@@ -541,3 +541,42 @@ def baseline_first_seen(ctx: AppContext,
     if fdb.generation != gen:
         raise StaleGeneration
     return out
+
+
+@dataclass(frozen=True)
+class TrafficSummary:
+    sources: int
+    last_seen: datetime | None
+    decisions: frozenset[str]
+
+
+def service_traffic(ctx: AppContext, targets: Collection[tuple[str, int, int]], *,
+                    since: datetime) -> dict[tuple[str, int, int], TrafficSummary]:
+    """Recent traffic to each (destination key, port, proto), from the connection baseline (read by port
+    through ix_baseline_port). A target nobody reached since `since` has sources 0."""
+    fdb, gen, settings = _store_read(ctx)
+    wanted = set(targets)
+    numbers = sorted({port for _, port, _ in wanted})
+    out = {t: TrafficSummary(sources=0, last_seen=None, decisions=frozenset()) for t in wanted}
+    if not numbers:
+        return out
+    stamp = db_time(since)
+    acc: dict[tuple[str, int, int], tuple[set[str], str | None, set[str]]] = {}
+    with fdb.connect() as conn:
+        require_same_pce(conn, settings.pce)
+        for r in conn.execute("SELECT src_key, dst_key, port, proto, last_seen, last_decision FROM connection_baseline "
+                              f"WHERE port IN ({','.join('?' * len(numbers))})", numbers):
+            key = (r["dst_key"], r["port"], r["proto"])
+            if key not in wanted or r["last_seen"] < stamp:
+                continue
+            srcs, last, decisions = acc.setdefault(key, (set(), None, set()))
+            srcs.add(r["src_key"])
+            if r["last_decision"]:
+                decisions.add(r["last_decision"])
+            acc[key] = (srcs, max(last or "", r["last_seen"]), decisions)
+    if fdb.generation != gen:
+        raise StaleGeneration
+    for key, (srcs, last, decisions) in acc.items():
+        out[key] = TrafficSummary(sources=len(srcs), last_seen=datetime.fromisoformat(last) if last else None,
+                                  decisions=frozenset(decisions))
+    return out

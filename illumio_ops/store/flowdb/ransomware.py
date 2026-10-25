@@ -54,6 +54,13 @@ def unprotected_listening(conn: sqlite3.Connection) -> list[tuple[str, str, int,
         "WHERE protection_state = 'unprotected' AND port_status = 'listening' ORDER BY workload_href, port, proto")]
 
 
+def services_by_host(conn: sqlite3.Connection) -> dict[str, list[sqlite3.Row]]:
+    out: dict[str, list[sqlite3.Row]] = {}
+    for r in conn.execute("SELECT * FROM ransomware_services ORDER BY workload_href, port, proto, name"):
+        out.setdefault(r["workload_href"], []).append(r)
+    return out
+
+
 def prune_missing(conn: sqlite3.Connection, keep: Iterable[str]) -> int:
     keep_set = set(keep)
     gone = [h for h in source_updated(conn) if h not in keep_set]
