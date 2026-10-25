@@ -15,6 +15,7 @@ gap, because the windows it re-reads were collected.
 """
 from __future__ import annotations
 
+import sqlite3
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
@@ -125,6 +126,15 @@ def _read_day(fdb: FlowDb, gen: int, settings: Settings, client: PceClient, plan
             ingest_state.mark_failed(conn, SOURCE, at, f"re-read of {mine['day']}: {error}")
         logger.warning("re-read of {} stopped: {}", mine["day"], error)
 
+    def bound(conn: sqlite3.Connection) -> bool:
+        """Every write first checks that the store belongs to the configured PCE."""
+        try:
+            ensure_binding(conn, settings.pce, at)
+        except BindingMismatch as exc:
+            ingest_state.mark_failed(conn, SOURCE, at, f"binding: {exc}")
+            return False
+        return True
+
     with fdb.writing(gen) as conn:
         ingest_state.mark_started(conn, SOURCE, at)
         plans[PLAN] = mine
@@ -157,24 +167,25 @@ def _read_day(fdb: FlowDb, gen: int, settings: Settings, client: PceClient, plan
                 batches += [(grown[i:i + WRITE_BATCH], DataOrigin.BACKFILL) for i in range(0, len(grown), WRITE_BATCH)]
                 for batch, origin in batches:
                     with fdb.writing(gen) as conn:
-                        try:
-                            ensure_binding(conn, settings.pce, at)
-                        except BindingMismatch as exc:
-                            ingest_state.mark_failed(conn, SOURCE, at, f"binding: {exc}")
+                        if not bound(conn):
                             return CycleResult(rows, windows, gaps, skipped)
                         upsert_flows(conn, batch, origin=origin, now=at)
                     rows += len(batch)
-                with fdb.writing(gen) as conn, transaction(conn):
-                    rows += upsert_events(conn, fresh, origin=DataOrigin.INGEST, now=at) if fresh else 0
-                    for src, trunc in ((IngestSource.TRAFFIC, t_trunc), (IngestSource.EVENTS, e_trunc)):
-                        for ta, tb, n in trunc:
-                            ingest_state.record_gap(conn, src, ta, tb, "truncated", f"re-read: {n} rows at the limit", at)
-                    for src, s in reads.items():
-                        ingest_state.resolve_failed_gaps(conn, src, s, b, at)
-                        ingest_state.add_coverage(conn, src, s, b)
-                    mine = {**mine, "done_through": b.isoformat()}
-                    plans[PLAN] = mine
-                    ingest_state.set_progress(conn, SOURCE, plans)
+                with fdb.writing(gen) as conn:
+                    if not bound(conn):
+                        return CycleResult(rows, windows, gaps, skipped)
+                    with transaction(conn):
+                        rows += upsert_events(conn, fresh, origin=DataOrigin.INGEST, now=at) if fresh else 0
+                        for src, trunc in ((IngestSource.TRAFFIC, t_trunc), (IngestSource.EVENTS, e_trunc)):
+                            for ta, tb, n in trunc:
+                                ingest_state.record_gap(conn, src, ta, tb, "truncated",
+                                                        f"re-read: {n} rows at the limit", at)
+                        for src, s in reads.items():
+                            ingest_state.resolve_failed_gaps(conn, src, s, b, at)
+                            ingest_state.add_coverage(conn, src, s, b)
+                        mine = {**mine, "done_through": b.isoformat()}
+                        plans[PLAN] = mine
+                        ingest_state.set_progress(conn, SOURCE, plans)
             except StaleGeneration:
                 raise
             except Exception as exc:
@@ -183,8 +194,11 @@ def _read_day(fdb: FlowDb, gen: int, settings: Settings, client: PceClient, plan
             windows += w1 + w2
             gaps += len(t_trunc) + len(e_trunc)
             skipped += s1 + s2
-    with fdb.writing(gen) as conn, transaction(conn):
-        refresh_rollups(conn, at, frozen_through=frozen)  # the day's rollup, rebuilt once if it changed
-        plans[PLAN] = {**mine, "finished": True}
-        ingest_state.mark_ok(conn, SOURCE, at, watermark=None, rows=rows, progress=plans)
+    with fdb.writing(gen) as conn:
+        if not bound(conn):
+            return CycleResult(rows, windows, gaps, skipped)
+        with transaction(conn):
+            refresh_rollups(conn, at, frozen_through=frozen)  # the day's rollup, rebuilt once if it changed
+            plans[PLAN] = {**mine, "finished": True}
+            ingest_state.mark_ok(conn, SOURCE, at, watermark=None, rows=rows, progress=plans)
     return CycleResult(rows, windows, gaps, skipped)

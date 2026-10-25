@@ -219,3 +219,19 @@ def test_events_only_mode_rereads_events_and_adds_only_new_ones(tmp_path, fake_t
     with ctx.flows().connect() as conn:
         assert {r[0]: r[1] for r in conn.execute("SELECT href, origin FROM events")} == {
             "/orgs/1/events/e-1": "ingest", "/orgs/1/events/e-2": "ingest"}
+
+
+def test_refuses_a_store_bound_to_another_pce(tmp_path, fake_traffic, fake_events):
+    from illumio_ops.store.flowdb import binding
+    ctx = _ctx(tmp_path)
+    _cover(ctx, "traffic", DAY - timedelta(days=1), DAY + timedelta(hours=5))
+    _cover(ctx, "events", DAY - timedelta(days=1), DAY + timedelta(hours=5))
+    with ctx.flows().connect() as conn:
+        binding.bind(conn, "https://other-pce.example.com:8443", "7", RUN)
+    fake_events.items = [_event(1, DAY + HOUR)]  # no flows: the check must not hang on flow batches
+    ensure_daily_reread(ctx, now=RUN)
+    st, _ = _progress(ctx)
+    with ctx.flows().connect() as conn:
+        assert conn.execute("SELECT count(*) FROM events").fetchone()[0] == 0
+        assert ingest_state.coverage(conn, "events") == [(DAY - timedelta(days=1), DAY + timedelta(hours=5))]
+    assert "binding" in st.last_error
