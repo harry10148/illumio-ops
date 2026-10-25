@@ -215,7 +215,7 @@ def _hosts_of(rows: list[Any]) -> Callable[[EventHosts], tuple[set[str], int]]:
     others from the fallback, P3 final review #12): a VEN through the inventory, a workload href as it is,
     and a host paired again (new VEN or workload href, same host) by its hostname when that names exactly
     one host. Returns (the hrefs, how many of the event's hosts matched none)."""
-    by_ven = {h["ven_href"]: h["href"] for h in rows if h["ven_href"]}
+    by_ven: dict[str, str] = {h["ven_href"]: h["href"] for h in rows if h["ven_href"]}
     known = {h["href"] for h in rows}
     by_name: dict[str, list[str]] = {}
     for h in rows:
