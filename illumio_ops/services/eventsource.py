@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import json
 import time
+from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
 from typing import Any, Literal
 
@@ -12,6 +13,12 @@ from loguru import logger
 from pydantic import BaseModel
 
 from illumio_ops.domain.events import EventShapeError, normalize_event
+from illumio_ops.domain.segment import (
+    EVENT_FROM,
+    EventSegment,
+    compile_event_ranking,
+    compile_event_where,
+)
 from illumio_ops.domain.values import IngestSource
 from illumio_ops.pce.client import PceNotConfigured
 from illumio_ops.pce.events import events_timeout, fetch_events
@@ -20,7 +27,8 @@ from illumio_ops.services.collect.mode import collects
 from illumio_ops.services.collect.traffic import PCE_FAILURES
 from illumio_ops.services.context import AppContext
 from illumio_ops.services.coverage import Coverage, merge_gaps, store_coverage
-from illumio_ops.store.flowdb.db import db_time
+from illumio_ops.services.flowsource import AggRow
+from illumio_ops.store.flowdb.db import StaleGeneration, db_time
 
 FILL_DEADLINE_SECONDS = 900
 
@@ -124,3 +132,59 @@ def query_events(ctx: AppContext, *, start: datetime, end: datetime, event_types
                       coverage=Coverage(source=source, store_from=cov.store_from, store_to=cov.store_to, gaps=kept,
                                         filled_from_pce=sorted(filled),
                                         truncated=any(g[2] == "truncated" for g in kept)))
+
+
+class EventAggregate(BaseModel):
+    rows: list[AggRow]
+    coverage: Coverage
+    limit_hit: bool
+
+
+def _event_row(r: Any) -> EventRow:
+    return EventRow(href=r["href"], event_type=r["event_type"], severity=r["severity"], status=r["status"],
+                    timestamp=datetime.fromisoformat(r["timestamp"]), created_by_kind=r["created_by_kind"],
+                    created_by_name=r["created_by_name"], created_by_href=r["created_by_href"],
+                    tamper_classification=r["tamper_classification"], raw=json.loads(r["raw_json"]),
+                    origin=r["origin"])
+
+
+def _segment_read(ctx: AppContext, seg: EventSegment, at: datetime,
+                  read: Callable[[Any], list[Any]]) -> tuple[list[Any], Coverage]:
+    """Run a store-only read of an event segment with its coverage (events never fill from the PCE here:
+    a ranking mixed with PCE rows could not be grouped the way the store's rows are)."""
+    fdb = ctx.flows()
+    gen = fdb.generation  # noted before the settings it goes with (FlowDb.generation)
+    settings = ctx.settings.current()
+    floor = at - timedelta(days=settings.collection.retention.event_days)
+    with fdb.connect() as conn:
+        require_same_pce(conn, settings.pce)
+        cov = store_coverage(conn, IngestSource.EVENTS, (seg.filter.start, seg.filter.end), floor=floor,
+                             collected=collects(settings, IngestSource.EVENTS))
+        found = read(conn)
+    if fdb.generation != gen:
+        raise StaleGeneration
+    gaps = merge_gaps(cov.gaps)
+    return found, Coverage(source="store", store_from=cov.store_from, store_to=cov.store_to, gaps=gaps,
+                           filled_from_pce=[], truncated=any(g[2] == "truncated" for g in gaps))
+
+
+def aggregate_events(ctx: AppContext, seg: EventSegment, *, now: datetime | None = None) -> EventAggregate:
+    at = (now or datetime.now(UTC)).astimezone(UTC)
+    sql, params = compile_event_ranking(seg)
+    found, cov = _segment_read(ctx, seg, at, lambda conn: conn.execute(sql, params).fetchall())
+    levels = len(seg.group_by)
+    rows = [AggRow(keys=[r[f"k{i}"] for i in range(levels)], display=[None] * levels, value=r["value"],
+                   bytes_known=None) for r in found]
+    return EventAggregate(rows=rows[:seg.limit], coverage=cov, limit_hit=len(rows) > seg.limit)
+
+
+def event_detail(ctx: AppContext, seg: EventSegment, *, now: datetime | None = None) -> EventQuery:
+    """An event segment's rows, newest first, with the same filter semantics as its ranking."""
+    at = (now or datetime.now(UTC)).astimezone(UTC)
+    where, params = compile_event_where(seg.filter)
+    sql = ("SELECT e.href, e.event_type, e.severity, e.status, e.timestamp, e.created_by_kind, e.created_by_name, "
+           f"e.created_by_href, e.tamper_classification, e.raw_json, e.origin {EVENT_FROM} WHERE {where} "
+           "ORDER BY e.timestamp DESC, e.id DESC LIMIT ?")
+    found, cov = _segment_read(ctx, seg, at, lambda conn: conn.execute(sql, [*params, seg.limit + 1]).fetchall())
+    rows = [_event_row(r) for r in found]
+    return EventQuery(rows=rows[:seg.limit], coverage=cov, limit_hit=len(rows) > seg.limit)

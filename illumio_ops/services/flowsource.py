@@ -9,6 +9,7 @@ never written to the store.
 from __future__ import annotations
 
 import time
+from collections.abc import Sequence
 from datetime import UTC, datetime, timedelta
 from typing import Any, Literal
 
@@ -17,7 +18,9 @@ from pydantic import BaseModel
 
 from illumio_ops.domain.filter import (
     FilterSpec,
+    PortProto,
     matches,
+    port_matches,
     sql_functions,
     to_pce_payload,
     to_sql,
@@ -31,6 +34,11 @@ from illumio_ops.domain.flows import (
     record_key,
 )
 from illumio_ops.domain.identity import endpoint_key
+from illumio_ops.domain.segment import (
+    FIELD_COVERAGE_SQL,
+    FlowSegment,
+    compile_flow_ranking,
+)
 from illumio_ops.domain.values import FlowDirection, IngestSource
 from illumio_ops.pce.async_query import run_traffic_query
 from illumio_ops.pce.client import PceNotConfigured
@@ -45,9 +53,10 @@ from illumio_ops.services.coverage import (
     store_coverage,
 )
 from illumio_ops.settings.schema import PceSettings
-from illumio_ops.store.flowdb.db import StaleGeneration
+from illumio_ops.store.flowdb.db import StaleGeneration, db_time
 
-__all__ = ["Coverage", "FlowQuery", "FlowRow", "GapReason", "query_flows"]
+__all__ = ["AggRow", "Coverage", "FieldCoverage", "FlowAggregate", "FlowQuery", "FlowRow", "GapReason", "UserPair",
+           "aggregate_flows", "field_coverage", "new_user_pairs", "query_flows"]
 
 Order = Literal["last_detected_desc", "connections_desc"]
 FILL_MAX_RESULTS = 200_000
@@ -95,6 +104,39 @@ class FlowQuery(BaseModel):
     rows: list[FlowRow]
     coverage: Coverage
     limit_hit: bool
+
+
+class AggRow(BaseModel):
+    keys: list[str | int | None]       # one per grouping level
+    display: list[str | None]          # what to show for each key (a host's name); None = the key itself
+    value: int
+    bytes_known: int | None            # rows behind a bytes value that had byte data
+
+
+class FieldCoverage(BaseModel):
+    """How many of the matching connections carry each optional field (spec §6.5.7: process and user
+    are on few flows, bytes on fewer)."""
+    total: int
+    initiator_process: int
+    initiator_user: int
+    service_process: int
+    service_user: int
+    bytes: int
+
+
+class FlowAggregate(BaseModel):
+    rows: list[AggRow]
+    coverage: Coverage
+    field_coverage: FieldCoverage
+    limit_hit: bool
+
+
+class UserPair(BaseModel):
+    user: str
+    dst_key: str
+    port: int | None
+    proto: int
+    first_seen: datetime
 
 
 _COLUMNS = ("record_key, conn_key, direction, src_ip, dst_ip, src_key, dst_key, src_href, dst_href, src_hostname, "
@@ -164,26 +206,64 @@ def _fetch(ctx: AppContext, pce: PceSettings, spec: FilterSpec,
     return records, result.capped
 
 
-def _live_rows(conn: Any, spec: FilterSpec, fetched: list[FlowRecord]) -> list[FlowRow]:
-    """Connections read live, built the way the store builds them: copies of one record are merged,
-    records are paired, a connection that has any record already stored is left to the store, and
-    only then is the rest of the filter applied (process / user conditions name either end)."""
+_RECORD_COLUMNS = ("record_key, direction, src_ip, dst_ip, src_href, dst_href, src_hostname, dst_hostname, "
+                   "src_managed, dst_managed, src_mode, dst_mode, src_label_set, dst_label_set, port, proto, "
+                   "initiator_process, initiator_user, service_process, service_user, windows_service, "
+                   "policy_decision, first_detected, last_detected, num_connections, "
+                   "COALESCE(own_bytes_in, bytes_in) AS own_in, COALESCE(own_bytes_out, bytes_out) AS own_out, "
+                   "state, transmission, network_href")
+
+
+def _stored_records(conn: Any, tuples: set[tuple[str, str, int | None, int]]) -> dict[str, FlowRecord]:
+    """The stored records of these (src, dst, port, proto) tuples, as the records they were stored from."""
+    rows = []
+    for src, dst, port, proto in sorted(tuples, key=str):
+        rows += conn.execute(f"SELECT {_RECORD_COLUMNS} FROM flows WHERE src_ip = ? AND dst_ip = ? AND port IS ? "
+                             "AND proto = ?", (src, dst, port, proto)).fetchall()
+    labels = _labels(conn, {r[k] for r in rows for k in ("src_label_set", "dst_label_set") if r[k]})
+    out: dict[str, FlowRecord] = {}
+    for r in rows:
+        outbound = r["direction"] == FlowDirection.OUTBOUND.value
+        out[r["record_key"]] = FlowRecord(
+            direction=FlowDirection(r["direction"]), src_ip=r["src_ip"], dst_ip=r["dst_ip"], src_href=r["src_href"],
+            dst_href=r["dst_href"], src_hostname=r["src_hostname"], dst_hostname=r["dst_hostname"],
+            src_managed=bool(r["src_managed"]), dst_managed=bool(r["dst_managed"]), src_mode=r["src_mode"],
+            dst_mode=r["dst_mode"], src_labels=tuple(sorted(labels.get(r["src_label_set"] or -1, {}).items())),
+            dst_labels=tuple(sorted(labels.get(r["dst_label_set"] or -1, {}).items())), port=r["port"],
+            proto=r["proto"], own_process=r["initiator_process"] if outbound else r["service_process"],
+            own_user=r["initiator_user"] if outbound else r["service_user"], windows_service=r["windows_service"],
+            policy_decision=r["policy_decision"], first_detected=datetime.fromisoformat(r["first_detected"]),
+            last_detected=datetime.fromisoformat(r["last_detected"]), num_connections=r["num_connections"],
+            bytes_in=r["own_in"], bytes_out=r["own_out"], state=r["state"], transmission=r["transmission"],
+            network_href=r["network_href"])
+    return out
+
+
+def _live_rows(conn: Any, spec: FilterSpec, fetched: list[FlowRecord]) -> tuple[list[FlowRow], set[str]]:
+    """Connections read live, built the way the store builds them: copies of one record are merged, the
+    stored records of the same tuples join them (F7: a connection half stored, half only at the PCE is
+    still one connection, with both ends' attributes), records are paired, a connection whose records are
+    all stored is left to the store, and only then is the rest of the filter applied (process / user
+    conditions name either end). Returns the rows and the stored record keys they supersede."""
     merged: dict[str, FlowRecord] = {}
     for r in fetched:
         k = record_key(r)
         merged[k] = merge_sightings(merged[k], r) if k in merged else r
-    keys = sorted(merged)
-    stored = {k for (k,) in conn.execute(
-        f"SELECT record_key FROM flows WHERE record_key IN ({','.join('?' * len(keys))})", keys)} if keys else set()
+    stored = _stored_records(conn, {(r.src_ip, r.dst_ip, r.port, r.proto) for r in merged.values()})
+    for k, rec in stored.items():
+        merged[k] = merge_sightings(rec, merged[k]) if k in merged else rec
     _, residual = to_pce_payload(spec, max_results=FILL_MAX_RESULTS, query_name="illumio-ops query", label_hrefs={})
-    out = []
+    out: list[FlowRow] = []
+    superseded: set[str] = set()
     for primary, partner in group_pairs(list(merged.values())):
-        if record_key(primary) in stored or (partner is not None and record_key(partner) in stored):
+        keys = {record_key(primary)} | ({record_key(partner)} if partner is not None else set())
+        if keys <= stored.keys():
             continue
+        superseded |= keys & stored.keys()
         row = _row_from_pce(primary, partner)
         if matches(residual, row.model_dump()):
             out.append(row)
-    return out
+    return out, superseded
 
 
 def query_flows(ctx: AppContext, spec: FilterSpec, *, limit: int, order: Order,
@@ -227,7 +307,8 @@ def query_flows(ctx: AppContext, spec: FilterSpec, *, limit: int, order: Order,
             if capped:
                 kept_gaps.append((g[0], g[1], "truncated"))
         with fdb.connect() as conn:
-            pce_rows = _live_rows(conn, spec, fetched)
+            pce_rows, superseded = _live_rows(conn, spec, fetched)
+        rows = [r for r in rows if r.record_key not in superseded]
     else:
         kept_gaps = cov.gaps
     if fdb.generation != gen:
@@ -247,3 +328,84 @@ def query_flows(ctx: AppContext, spec: FilterSpec, *, limit: int, order: Order,
                           gaps=kept_gaps, filled_from_pce=sorted(filled),
                           truncated=any(g[2] == "truncated" for g in kept_gaps)),
     )
+
+
+def _store_read(ctx: AppContext) -> tuple[Any, int, Any]:
+    """(flow db, generation noted before the settings, settings) for a store-only read."""
+    fdb = ctx.flows()
+    gen = fdb.generation  # noted before the settings it goes with (FlowDb.generation)
+    return fdb, gen, ctx.settings.current()
+
+
+def _field_coverage(conn: Any, where: str, params: list[Any]) -> FieldCoverage:
+    r = conn.execute(FIELD_COVERAGE_SQL.format(where=where), params).fetchone()
+    return FieldCoverage(**dict(r))
+
+
+def aggregate_flows(ctx: AppContext, seg: FlowSegment, *, now: datetime | None = None) -> FlowAggregate:
+    """A segment's ranking, answered from the store only: what lies outside its coverage is listed as gaps
+    (a ranking mixed with PCE rows could not be grouped the way the store groups connections)."""
+    at = (now or datetime.now(UTC)).astimezone(UTC)
+    fdb, gen, settings = _store_read(ctx)
+    floor = at - timedelta(days=settings.collection.retention.flow_days)
+    with fdb.connect() as conn:
+        require_same_pce(conn, settings.pce)
+        for name, fn in sql_functions().items():
+            conn.create_function(name, -1, fn, deterministic=True)
+        cov = store_coverage(conn, IngestSource.TRAFFIC, (seg.filter.start, seg.filter.end), floor=floor,
+                             collected=collects(settings, IngestSource.TRAFFIC))
+        sql, params = compile_flow_ranking(seg)
+        found = conn.execute(sql, params).fetchall()
+        where, where_params = to_sql(seg.filter)
+        fields = _field_coverage(conn, where, where_params)
+    if fdb.generation != gen:
+        raise StaleGeneration
+    levels = len(seg.group_by)
+    rows = [AggRow(keys=[r[f"k{i}"] for i in range(levels)], display=[r[f"d{i}"] for i in range(levels)],
+                   value=r["value"] or 0, bytes_known=r["bytes_known"]) for r in found]
+    gaps = merge_gaps(cov.gaps)
+    return FlowAggregate(
+        rows=rows[:seg.limit], limit_hit=len(rows) > seg.limit, field_coverage=fields,
+        coverage=Coverage(source="store", store_from=cov.store_from, store_to=cov.store_to, gaps=gaps,
+                          filled_from_pce=[], truncated=any(g[2] == "truncated" for g in gaps)))
+
+
+def field_coverage(ctx: AppContext, spec: FilterSpec) -> FieldCoverage:
+    """The field coverage of the connections a filter matches in the store."""
+    fdb, gen, settings = _store_read(ctx)
+    with fdb.connect() as conn:
+        require_same_pce(conn, settings.pce)
+        for name, fn in sql_functions().items():
+            conn.create_function(name, -1, fn, deterministic=True)
+        where, params = to_sql(spec)
+        fields = _field_coverage(conn, where, params)
+    if fdb.generation != gen:
+        raise StaleGeneration
+    return fields
+
+
+def new_user_pairs(ctx: AppContext, ports: Sequence[PortProto], *, since: datetime) -> list[UserPair]:
+    """User x destination x port combinations first seen since `since` (spec §6.5.7, "new combinations
+    against the baseline"). user_baseline holds only connections with a user (about a tenth of them on
+    lab), so it is scanned whole."""
+    fdb, gen, settings = _store_read(ctx)
+    numbers = sorted({p.port for p in ports if p.port is not None})
+    with fdb.connect() as conn:
+        require_same_pce(conn, settings.pce)
+        sql = "SELECT initiator_user, dst_key, port, proto, first_seen FROM user_baseline WHERE first_seen >= ?"
+        params: list[Any] = [db_time(since)]
+        if numbers:
+            sql += f" AND port IN ({','.join('?' * len(numbers))})"
+            params += numbers
+        found = conn.execute(sql + " ORDER BY first_seen, initiator_user", params).fetchall()
+    if fdb.generation != gen:
+        raise StaleGeneration
+    out = []
+    for r in found:
+        port = None if r["port"] == -1 else r["port"]
+        if ports and not any(port_matches(p, port, r["proto"]) for p in ports):
+            continue
+        out.append(UserPair(user=r["initiator_user"], dst_key=r["dst_key"], port=port, proto=r["proto"],
+                            first_seen=datetime.fromisoformat(r["first_seen"])))
+    return out
+

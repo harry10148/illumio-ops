@@ -355,6 +355,16 @@ def _port_matches(p: PortProto, v: Mapping[str, Any]) -> bool:
     return p.port is None or port == p.port
 
 
+def port_matches(p: PortProto, port: int | None, proto: int) -> bool:
+    """One port condition on a (port, proto) pair, as matches and to_sql apply it."""
+    return _port_matches(p, {"port": port, "proto": proto})
+
+
+def endpoint_matches(ep: EndpointFilter, *, href: str | None, ip: str, labels: Mapping[str, str]) -> bool:
+    """One endpoint condition on one end (a host's href, address and labels), as matches applies it."""
+    return _side_matches(ep, {"x_href": href, "x_ip": ip, "x_labels": labels}, "x")
+
+
 def matches(spec: FilterSpec, record: FlowRecord | Mapping[str, Any]) -> bool:
     v = _view(record)
     if v.get("is_primary", 1) != 1:

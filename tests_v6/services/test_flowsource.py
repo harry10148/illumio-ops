@@ -164,3 +164,19 @@ def test_gap_filling_stops_at_its_row_budget(collected, fake_traffic, monkeypatc
                     order="last_detected_desc", fill_gaps=True)
     assert len(fake_traffic.calls) == 1  # the second gap is not read once the budget is spent
     assert [g[2] for g in q.coverage.gaps] == ["truncated", "truncated"]
+
+
+def test_fill_keeps_connection_whose_partner_is_stored(collected, fake_traffic):
+    # F7: flow 1's outbound record is stored; its inbound half (with the serving account) lies in a failed
+    # window only the PCE can fill. A query naming both ends must still find the connection.
+    with collected.flows().connect() as conn:
+        ingest_state.record_gap(conn, IngestSource.TRAFFIC, NOW - minutes(35), NOW - minutes(15), "failed", "x", NOW)
+    out = raw_flow(1, NOW - minutes(31), NOW - minutes(21), user="LAB\\u1")
+    inn = raw_flow(1, NOW - minutes(31), NOW - minutes(21), direction="inbound", user="svc-db")
+    fake_traffic.answer = lambda s, e, m: [out, inn]
+    q = query_flows(collected, _spec(NOW - minutes(60), NOW, initiator_user="u1", service_user="svc-db"), limit=100,
+                    order="last_detected_desc", fill_gaps=True)
+    assert [(r.initiator_user, r.service_user) for r in q.rows] == [("LAB\\u1", "svc-db")]
+    everything = query_flows(collected, _spec(NOW - minutes(60), NOW), limit=100, order="last_detected_desc",
+                             fill_gaps=True)
+    assert len(everything.rows) == 3  # the stored row of flow 1 is not listed a second time
