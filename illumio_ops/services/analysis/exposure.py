@@ -51,7 +51,7 @@ def run_exposure(ctx: AppContext, *, now: datetime) -> ExposureResult | None:
         "unknown_edges": result.unknown_edges, "pivots_now": sum(h.pivot_now for h in result.hosts),
         "assets_reachable_now": sum(1 for a in result.assets if a.sources_now),
         "assets_reachable_enforced": sum(1 for a in result.assets if a.sources_enforced),
-        "cross_env_edges": len(result.cross_env), "max_reach_now": max((h.reach_now for h in result.hosts), default=0),
+        "cross_env_edges": result.cross_env_total, "max_reach_now": max((h.reach_now for h in result.hosts), default=0),
     }
     with fdb.writing(lc.generation) as conn:
         analysis.write_result(conn, KIND, params={"hops": lat.graph_hops, "observation_days": days,

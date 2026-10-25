@@ -16,6 +16,7 @@ from collections import Counter, deque
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime
+from functools import cached_property
 from itertools import pairwise
 from typing import Literal
 
@@ -28,7 +29,7 @@ _STRENGTH = {EdgeState.UNKNOWN: 0, EdgeState.POTENTIALLY_BLOCKED: 1, EdgeState.A
 Port = tuple[int, int]  # (port, proto)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class EdgeIn:
     src: str
     dst: str
@@ -58,6 +59,11 @@ class Graph:
     out: tuple[tuple[int, ...], ...]
     edge_info: Mapping[tuple[int, int], tuple[frozenset[Port], EdgeState]]
 
+    @cached_property
+    def rev(self) -> list[list[int]]:
+        """Each node's predecessors, built once: every path and cut search reads it (P3 Task 15 scale)."""
+        return _reverse(self)
+
 
 def build_graph(edges: Iterable[EdgeIn], *, enforced: bool) -> Graph:
     """One edge per host pair: its ports merged, its state the strongest of them."""
@@ -73,10 +79,12 @@ def build_graph(edges: Iterable[EdgeIn], *, enforced: bool) -> Graph:
     index = {n: i for i, n in enumerate(nodes)}
     out: list[list[int]] = [[] for _ in nodes]
     info: dict[tuple[int, int], tuple[frozenset[Port], EdgeState]] = {}
-    for (s, d), (ports, state) in sorted(merged.items()):
-        out[index[s]].append(index[d])
-        info[(index[s], index[d])] = (frozenset(ports), state)
-    return Graph(nodes=nodes, index=index, out=tuple(tuple(sorted(o)) for o in out), edge_info=info)
+    # Sorted by node index, which is node-name order: the same order as sorting the names, without
+    # comparing strings for every edge.
+    for (si, di), (ports, state) in sorted(((index[s], index[d]), v) for (s, d), v in merged.items()):
+        out[si].append(di)
+        info[(si, di)] = (frozenset(ports), state)
+    return Graph(nodes=nodes, index=index, out=tuple(tuple(o) for o in out), edge_info=info)
 
 
 def reach_counts(g: Graph, hops: int) -> list[int]:
@@ -139,7 +147,7 @@ def paths_to(g: Graph, target: str, hops: int) -> dict[str, tuple[str, ...]]:
     if target not in g.index:
         return {}
     t = g.index[target]
-    nxt = _paths_to(g, _reverse(g), t, hops)
+    nxt = _paths_to(g, g.rev, t, hops)
     return {g.nodes[s]: tuple(g.nodes[i] for i in _path(nxt, s, t)) for s in nxt}
 
 
@@ -151,7 +159,7 @@ def articulation_points(g: Graph) -> frozenset[str]:
         for u in outs:
             adj[v].add(u)
             adj[u].add(v)
-    neighbours = [sorted(a) for a in adj]
+    neighbours = [list(a) for a in adj]  # which hosts are articulation points does not depend on the order
     disc = [-1] * n
     low = [0] * n
     points: set[int] = set()
@@ -244,14 +252,14 @@ class Cut(BaseModel):
     after: int
 
 
-def suggest_cuts(g: Graph, target: str, hops: int, *, top: int = 3, max_candidates: int = 60) -> list[Cut]:
+def suggest_cuts(g: Graph, target: str, hops: int, *, top: int = 3, max_candidates: int = 20) -> list[Cut]:
     """Greedy single cuts: of the edges and intermediate hosts on the shortest paths into `target`, the
     ones whose removal leaves the fewest hosts reaching it. Ties: an edge before a host, fewer ports
     first (the narrowest deny rule), then by name."""
     if target not in g.index:
         return []
     t = g.index[target]
-    rev = _reverse(g)
+    rev = g.rev
     base = _paths_to(g, rev, t, hops)
     before = len(base)
     if not before:
@@ -306,16 +314,19 @@ class ExposureResult(BaseModel):
     unknown_edges: int
     hosts: list[HostExposure]
     assets: list[AssetExposure]
-    cross_env: list[CrossEnvEdge]
+    cross_env: list[CrossEnvEdge]  # at most max_cross_env: allowed ones first, then by name
+    cross_env_total: int
     footholds: list[Foothold]
     limits_hit: list[str]
 
 
 def compute_exposure(edges: Sequence[EdgeIn], hosts: Mapping[str, HostInfo], footholds: Sequence[Foothold], *,
                      hops: int, critical: frozenset[str], env_of: Mapping[str, str | None], computed_at: datetime,
-                     observation_from: datetime, observation_to: datetime, max_assets: int = 50) -> ExposureResult:
+                     observation_from: datetime, observation_to: datetime, max_assets: int = 50,
+                     max_cross_env: int = 500) -> ExposureResult:
     """Everything the lateral-movement page, the focus list and the posture report read. Critical assets
-    beyond max_assets (the least reachable ones) are listed with their numbers only, and limits_hit says so."""
+    beyond max_assets (the least reachable ones) are listed with their numbers only, cross-environment
+    edges beyond max_cross_env are counted only, and limits_hit says so for each."""
     now = build_graph(edges, enforced=False)
     enf = build_graph(edges, enforced=True)
     reach_now = dict(zip(now.nodes, reach_counts(now, hops), strict=True))
@@ -335,9 +346,12 @@ def compute_exposure(edges: Sequence[EdgeIn], hosts: Mapping[str, HostInfo], foo
         assets.append(AssetExposure(key=a, sources_now=len(now_paths[a]), sources_enforced=enf_sources[a],
                                     paths=[list(p) for p in paths],
                                     cuts=suggest_cuts(now, a, hops) if detailed else []))
+    crossing = cross_env(now, env_of)
+    crossing.sort(key=lambda x: (x.state is not EdgeState.ALLOWED, x.src, x.dst))
+    limits = (["assets"] if len(order) > max_assets else []) + (["cross_env"] if len(crossing) > max_cross_env else [])
     return ExposureResult(
         computed_at=computed_at, observation_from=observation_from, observation_to=observation_to, hops=hops,
         nodes=len(now.nodes), edges_now=len(now.edge_info), edges_enforced=len(enf.edge_info),
         unknown_edges=sum(1 for _, st in now.edge_info.values() if st is EdgeState.UNKNOWN),
-        hosts=host_rows, assets=assets, cross_env=cross_env(now, env_of), footholds=list(footholds),
-        limits_hit=["assets"] if len(order) > max_assets else [])
+        hosts=host_rows, assets=assets, cross_env=crossing[:max_cross_env], cross_env_total=len(crossing),
+        footholds=list(footholds), limits_hit=limits)

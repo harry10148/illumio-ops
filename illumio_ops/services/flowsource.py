@@ -444,7 +444,7 @@ def new_user_pairs(ctx: AppContext, ports: Sequence[PortProto], *, since: dateti
 
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)  # hundreds of thousands at 1,000 workloads (P3 Task 15 scale)
 class BaselineEdge:
     src_key: str
     dst_key: str
@@ -474,16 +474,16 @@ def baseline_edges(ctx: AppContext, ports: AdminPortSet, *, since: datetime) -> 
     stamp = db_time(since)
     with fdb.connect() as conn:
         require_same_pce(conn, settings.pce)
-        found = conn.execute(
+        # Rows are turned into edges as they are read, never all held at once.
+        cur = conn.execute(
             "SELECT src_key, dst_key, port, proto, first_seen, last_seen, last_decision FROM connection_baseline "
-            f"WHERE port IN ({','.join('?' * len(numbers))})", numbers).fetchall()
+            f"WHERE port IN ({','.join('?' * len(numbers))}) AND last_seen >= ?", [*numbers, stamp])
+        edges = [BaselineEdge(src_key=src, dst_key=dst, port=port, proto=proto, first_seen=datetime.fromisoformat(first),
+                              last_seen=datetime.fromisoformat(last), decision=decision)
+                 for src, dst, port, proto, first, last, decision in cur if ports.matches(port, proto)]
         ranges = ingest_state.coverage(conn, IngestSource.TRAFFIC)
     if fdb.generation != gen:
         raise StaleGeneration
-    edges = [BaselineEdge(src_key=r["src_key"], dst_key=r["dst_key"], port=r["port"], proto=r["proto"],
-                          first_seen=datetime.fromisoformat(r["first_seen"]),
-                          last_seen=datetime.fromisoformat(r["last_seen"]), decision=r["last_decision"])
-             for r in found if r["last_seen"] >= stamp and ports.matches(r["port"], r["proto"])]
     return BaselineEdges(edges=edges, baseline_from=ranges[0][0] if ranges else None, collected=True)
 
 

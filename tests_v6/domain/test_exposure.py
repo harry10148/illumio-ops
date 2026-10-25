@@ -153,3 +153,27 @@ def test_compute_exposure_performance():
                          computed_at=NOW, observation_from=NOW - timedelta(days=30), observation_to=NOW)
     assert time.monotonic() - start < 120
     assert r.nodes == n and len(r.assets) == 20
+
+
+def test_cross_env_list_capped_with_total_and_limit():
+    # P3 Task 15 scale: 153k cross-environment edges were stored every hour (a 24 MB result).
+    edges = [e(f"a{i}", f"b{i}", A if i < 3 else P) for i in range(30)]
+    env = {f"a{i}": "Prod" for i in range(30)} | {f"b{i}": "Dev" for i in range(30)}
+    hosts = {k: _host(k) for k in env}
+    r = compute_exposure(edges, hosts, [], hops=3, critical=frozenset(), env_of=env, computed_at=NOW,
+                         observation_from=NOW - timedelta(days=30), observation_to=NOW, max_cross_env=10)
+    assert len(r.cross_env) == 10 and r.cross_env_total == 30 and "cross_env" in r.limits_hit
+    assert [x.state for x in r.cross_env[:3]] == [A, A, A]  # the edges that pass after enforcement first
+
+
+def test_reverse_graph_built_once_per_graph(monkeypatch):
+    # P3 Task 15 scale: rebuilding the reverse graph for every critical asset took 451 of 561 s.
+    from illumio_ops.domain import exposure as mod
+    calls = []
+    real = mod._reverse
+    monkeypatch.setattr(mod, "_reverse", lambda g: calls.append(1) or real(g))
+    edges = [e("a", "b"), e("b", "c"), e("c", "d", A), e("x", "c"), e("d", "e")]
+    hosts = {k: _host(k, critical=k in "cde") for k in "abcdex"}
+    compute_exposure(edges, hosts, [], hops=3, critical=frozenset("cde"), env_of={}, computed_at=NOW,
+                     observation_from=NOW - timedelta(days=30), observation_to=NOW)
+    assert len(calls) <= 2

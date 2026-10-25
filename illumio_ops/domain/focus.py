@@ -159,9 +159,10 @@ def exposure_items(exposure: Mapping[str, Any], *, names: Mapping[str, str | Non
                          confidence=confidence))
     crossing = list(exposure.get("cross_env") or ())
     if crossing:
-        allowed = any(e.get("state") == "allowed" for e in crossing)
+        allowed = any(e.get("state") == "allowed" for e in crossing)  # listed first, so the cap never hides one
         out.append(_item(FocusKind.CROSS_ENV, "xenv", Severity.HIGH if allowed else Severity.MEDIUM,
-                         "title_cross_env_edges", "why_cross_env", {"count": len(crossing)},
+                         "title_cross_env_edges", "why_cross_env",
+                         {"count": int(exposure.get("cross_env_total") or len(crossing))},
                          FocusAction(target="lateral"), confidence=confidence))
     return out
 
