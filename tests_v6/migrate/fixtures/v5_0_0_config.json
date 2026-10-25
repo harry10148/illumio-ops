@@ -1,0 +1,141 @@
+{
+    "api": {
+        "url": "https://pce.example.com:8443",
+        "org_id": "1",
+        "key": "api_fake_key",
+        "secret": "fake-secret",
+        "profile": "production",
+        "verify_ssl": true,
+        "deployment_type": "on_prem",
+        "console_url": ""
+    },
+    "alerts": {
+        "active": [
+            "mail"
+        ],
+        "line_channel_access_token": "",
+        "line_target_id": "",
+        "webhook_url": "",
+        "telegram_bot_token": "",
+        "telegram_chat_id": "",
+        "teams_webhook_url": ""
+    },
+    "email": {
+        "sender": "monitor@localhost",
+        "recipients": [
+            "admin@example.com"
+        ]
+    },
+    "smtp": {
+        "host": "localhost",
+        "port": 25,
+        "user": "",
+        "password": "",
+        "enable_auth": false,
+        "enable_tls": false
+    },
+    "settings": {
+        "language": "en",
+        "theme": "light",
+        "timezone": "local",
+        "enable_health_check": true,
+        "dashboard_queries": []
+    },
+    "report": {
+        "enabled": false,
+        "schedule": "weekly",
+        "day_of_week": "monday",
+        "hour": 8,
+        "source": "api",
+        "format": [
+            "html"
+        ],
+        "email_report": false,
+        "output_dir": "reports/",
+        "retention_days": 30,
+        "include_raw_data": false,
+        "max_top_n": 20,
+        "api_query": {
+            "start_date": null,
+            "end_date": null,
+            "max_results": 200000
+        },
+        "snapshot_retention_days": 90,
+        "draft_actions_enabled": true
+    },
+    "report_schedules": [],
+    "rule_scheduler": {
+        "enabled": true,
+        "check_interval_seconds": 300
+    },
+    "scheduler": {
+        "persist": false,
+        "db_path": "config/scheduler.db"
+    },
+    "web_gui": {
+        "username": "illumio",
+        "password": "$argon2id$v=19$m=131072,t=4,p=4$ZmFrZXNhbHRmYWtlc2FsdA$ZmFrZWhhc2hmYWtlaGFzaGZha2VoYXNoZmFrZWhhc2g",
+        "secret_key": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "allowed_ips": [],
+        "public_url": "",
+        "tls": {
+            "enabled": true,
+            "cert_file": "",
+            "key_file": "",
+            "self_signed": true,
+            "auto_renew": true,
+            "auto_renew_days": 30,
+            "min_version": "TLSv1.2",
+            "ciphers": null,
+            "key_algorithm": "ecdsa-p256",
+            "validity_days": 397
+        },
+        "must_change_password": false,
+        "session_lifetime_seconds": 28800
+    },
+    "logging": {
+        "level": "INFO",
+        "json_sink": false,
+        "rotation": "10 MB",
+        "retention": 10
+    },
+    "rule_backups": [],
+    "pce_cache": {
+        "enabled": false,
+        "db_path": "data/pce_cache.sqlite",
+        "events_retention_days": 90,
+        "traffic_raw_retention_days": 7,
+        "traffic_agg_retention_days": 90,
+        "events_poll_interval_seconds": 300,
+        "traffic_poll_interval_seconds": 3600,
+        "rate_limit_per_minute": 400,
+        "async_threshold_events": 10000,
+        "traffic_filter": {
+            "actions": [],
+            "workload_label_env": [],
+            "ports": [],
+            "protocols": [],
+            "exclude_src_ips": []
+        },
+        "traffic_sampling": {
+            "sample_ratio_allowed": 1,
+            "max_rows_per_batch": 200000
+        },
+        "archive_enabled": false,
+        "archive_dir": "data/archive",
+        "archive_interval_hours": 24,
+        "archive_gzip_after_days": 7,
+        "archive_retention_days": 0,
+        "disk_free_warn_gb": 10,
+        "siem_pending_warn_rows": 50000,
+        "cache_read_max_rows": 500000,
+        "flow_delta_enabled": true,
+        "flow_obs_retention_hours": 6
+    },
+    "siem": {
+        "enabled": false,
+        "destinations": [],
+        "dlq_max_per_dest": 10000,
+        "dispatch_tick_seconds": 30
+    }
+}

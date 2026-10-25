@@ -1,0 +1,1773 @@
+{
+  "operations": {
+    "auth.csrf": {
+      "method": "GET",
+      "path": "/api/auth/csrf",
+      "request_schema": null,
+      "response_schema": {
+        "properties": {
+          "csrf_token": {
+            "title": "Csrf Token",
+            "type": "string"
+          }
+        },
+        "required": [
+          "csrf_token"
+        ],
+        "title": "CsrfToken",
+        "type": "object"
+      }
+    },
+    "auth.login": {
+      "method": "POST",
+      "path": "/api/auth/login",
+      "request_schema": {
+        "properties": {
+          "password": {
+            "maxLength": 1024,
+            "title": "Password",
+            "type": "string"
+          },
+          "username": {
+            "maxLength": 256,
+            "title": "Username",
+            "type": "string"
+          }
+        },
+        "required": [
+          "username",
+          "password"
+        ],
+        "title": "LoginRequest",
+        "type": "object"
+      },
+      "response_schema": {
+        "$defs": {
+          "Language": {
+            "enum": [
+              "en",
+              "zh_TW"
+            ],
+            "title": "Language",
+            "type": "string"
+          }
+        },
+        "properties": {
+          "csrf_token": {
+            "title": "Csrf Token",
+            "type": "string"
+          },
+          "default_password_in_use": {
+            "title": "Default Password In Use",
+            "type": "boolean"
+          },
+          "language": {
+            "$ref": "#/$defs/Language"
+          },
+          "must_change_password": {
+            "title": "Must Change Password",
+            "type": "boolean"
+          },
+          "username": {
+            "title": "Username",
+            "type": "string"
+          }
+        },
+        "required": [
+          "username",
+          "must_change_password",
+          "language",
+          "default_password_in_use",
+          "csrf_token"
+        ],
+        "title": "LoginResult",
+        "type": "object"
+      }
+    },
+    "auth.logout": {
+      "method": "POST",
+      "path": "/api/auth/logout",
+      "request_schema": null,
+      "response_schema": {
+        "properties": {},
+        "title": "Empty",
+        "type": "object"
+      }
+    },
+    "auth.me": {
+      "method": "GET",
+      "path": "/api/auth/me",
+      "request_schema": null,
+      "response_schema": {
+        "$defs": {
+          "Language": {
+            "enum": [
+              "en",
+              "zh_TW"
+            ],
+            "title": "Language",
+            "type": "string"
+          }
+        },
+        "properties": {
+          "default_password_in_use": {
+            "title": "Default Password In Use",
+            "type": "boolean"
+          },
+          "language": {
+            "$ref": "#/$defs/Language"
+          },
+          "must_change_password": {
+            "title": "Must Change Password",
+            "type": "boolean"
+          },
+          "username": {
+            "title": "Username",
+            "type": "string"
+          }
+        },
+        "required": [
+          "username",
+          "must_change_password",
+          "language",
+          "default_password_in_use"
+        ],
+        "title": "Me",
+        "type": "object"
+      }
+    },
+    "auth.password": {
+      "method": "POST",
+      "path": "/api/auth/password",
+      "request_schema": {
+        "properties": {
+          "confirm_password": {
+            "maxLength": 4096,
+            "title": "Confirm Password",
+            "type": "string"
+          },
+          "new_password": {
+            "maxLength": 4096,
+            "title": "New Password",
+            "type": "string"
+          },
+          "old_password": {
+            "anyOf": [
+              {
+                "maxLength": 1024,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Old Password"
+          }
+        },
+        "required": [
+          "new_password",
+          "confirm_password"
+        ],
+        "title": "PasswordChangeRequest",
+        "type": "object"
+      },
+      "response_schema": {
+        "properties": {
+          "csrf_token": {
+            "title": "Csrf Token",
+            "type": "string"
+          }
+        },
+        "required": [
+          "csrf_token"
+        ],
+        "title": "CsrfToken",
+        "type": "object"
+      }
+    },
+    "home.summary": {
+      "method": "GET",
+      "path": "/api/home/summary",
+      "request_schema": null,
+      "response_schema": {
+        "$defs": {
+          "PceSummary": {
+            "properties": {
+              "checked_at": {
+                "format": "date-time",
+                "title": "Checked At",
+                "type": "string"
+              },
+              "results": {
+                "items": {
+                  "$ref": "#/$defs/ProbeItem"
+                },
+                "title": "Results",
+                "type": "array"
+              },
+              "stale": {
+                "title": "Stale",
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "checked_at",
+              "stale",
+              "results"
+            ],
+            "title": "PceSummary",
+            "type": "object"
+          },
+          "ProbeItem": {
+            "properties": {
+              "category": {
+                "title": "Category",
+                "type": "string"
+              },
+              "detail_key": {
+                "title": "Detail Key",
+                "type": "string"
+              },
+              "name": {
+                "$ref": "#/$defs/ProbeName"
+              },
+              "ok": {
+                "title": "Ok",
+                "type": "boolean"
+              },
+              "status": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Status"
+              }
+            },
+            "required": [
+              "name",
+              "ok",
+              "status",
+              "category",
+              "detail_key"
+            ],
+            "title": "ProbeItem",
+            "type": "object"
+          },
+          "ProbeName": {
+            "enum": [
+              "noop",
+              "health",
+              "node_available"
+            ],
+            "title": "ProbeName",
+            "type": "string"
+          }
+        },
+        "properties": {
+          "pce": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/PceSummary"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "pce"
+        ],
+        "title": "HomeSummary",
+        "type": "object"
+      }
+    },
+    "i18n.dictionary": {
+      "method": "GET",
+      "path": "/api/i18n/<lang>",
+      "request_schema": null,
+      "response_schema": {
+        "additionalProperties": {
+          "type": "string"
+        },
+        "title": "Dictionary",
+        "type": "object"
+      }
+    },
+    "system.display.get": {
+      "method": "GET",
+      "path": "/api/system/display",
+      "request_schema": null,
+      "response_schema": {
+        "$defs": {
+          "Language": {
+            "enum": [
+              "en",
+              "zh_TW"
+            ],
+            "title": "Language",
+            "type": "string"
+          }
+        },
+        "properties": {
+          "language": {
+            "$ref": "#/$defs/Language"
+          },
+          "revision": {
+            "title": "Revision",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "revision",
+          "language"
+        ],
+        "title": "DisplayView",
+        "type": "object"
+      }
+    },
+    "system.display.update": {
+      "method": "PUT",
+      "path": "/api/system/display",
+      "request_schema": {
+        "$defs": {
+          "Language": {
+            "enum": [
+              "en",
+              "zh_TW"
+            ],
+            "title": "Language",
+            "type": "string"
+          }
+        },
+        "properties": {
+          "language": {
+            "$ref": "#/$defs/Language"
+          },
+          "revision": {
+            "title": "Revision",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "revision",
+          "language"
+        ],
+        "title": "DisplayUpdate",
+        "type": "object"
+      },
+      "response_schema": {
+        "$defs": {
+          "Language": {
+            "enum": [
+              "en",
+              "zh_TW"
+            ],
+            "title": "Language",
+            "type": "string"
+          }
+        },
+        "properties": {
+          "language": {
+            "$ref": "#/$defs/Language"
+          },
+          "revision": {
+            "title": "Revision",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "revision",
+          "language"
+        ],
+        "title": "DisplayView",
+        "type": "object"
+      }
+    },
+    "system.jobs.list": {
+      "method": "GET",
+      "path": "/api/system/jobs",
+      "request_schema": null,
+      "response_schema": {
+        "$defs": {
+          "JobView": {
+            "properties": {
+              "failures": {
+                "title": "Failures",
+                "type": "integer"
+              },
+              "interval_seconds": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Interval Seconds"
+              },
+              "job_id": {
+                "title": "Job Id",
+                "type": "string"
+              },
+              "last_error": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Last Error"
+              },
+              "last_finished_at": {
+                "anyOf": [
+                  {
+                    "format": "date-time",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Last Finished At"
+              },
+              "last_ok": {
+                "anyOf": [
+                  {
+                    "type": "boolean"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Last Ok"
+              },
+              "last_started_at": {
+                "anyOf": [
+                  {
+                    "format": "date-time",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Last Started At"
+              },
+              "runs": {
+                "title": "Runs",
+                "type": "integer"
+              }
+            },
+            "required": [
+              "job_id",
+              "interval_seconds",
+              "last_started_at",
+              "last_finished_at",
+              "last_ok",
+              "last_error",
+              "runs",
+              "failures"
+            ],
+            "title": "JobView",
+            "type": "object"
+          }
+        },
+        "properties": {
+          "jobs": {
+            "items": {
+              "$ref": "#/$defs/JobView"
+            },
+            "title": "Jobs",
+            "type": "array"
+          }
+        },
+        "required": [
+          "jobs"
+        ],
+        "title": "JobList",
+        "type": "object"
+      }
+    },
+    "system.pce.get": {
+      "method": "GET",
+      "path": "/api/system/pce",
+      "request_schema": null,
+      "response_schema": {
+        "$defs": {
+          "DeploymentType": {
+            "enum": [
+              "on_prem",
+              "saas"
+            ],
+            "title": "DeploymentType",
+            "type": "string"
+          }
+        },
+        "properties": {
+          "api_key": {
+            "title": "Api Key",
+            "type": "string"
+          },
+          "api_secret": {
+            "title": "Api Secret",
+            "type": "string"
+          },
+          "console_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Console Url"
+          },
+          "deployment_type": {
+            "$ref": "#/$defs/DeploymentType"
+          },
+          "org_id": {
+            "title": "Org Id",
+            "type": "string"
+          },
+          "revision": {
+            "title": "Revision",
+            "type": "integer"
+          },
+          "url": {
+            "title": "Url",
+            "type": "string"
+          },
+          "verify_tls": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "title": "Verify Tls"
+          }
+        },
+        "required": [
+          "revision",
+          "url",
+          "org_id",
+          "api_key",
+          "api_secret",
+          "deployment_type",
+          "console_url",
+          "verify_tls"
+        ],
+        "title": "PceConnection",
+        "type": "object"
+      }
+    },
+    "system.pce.latest": {
+      "method": "GET",
+      "path": "/api/system/pce/latest",
+      "request_schema": null,
+      "response_schema": {
+        "$defs": {
+          "ProbeItem": {
+            "properties": {
+              "category": {
+                "title": "Category",
+                "type": "string"
+              },
+              "detail_key": {
+                "title": "Detail Key",
+                "type": "string"
+              },
+              "name": {
+                "$ref": "#/$defs/ProbeName"
+              },
+              "ok": {
+                "title": "Ok",
+                "type": "boolean"
+              },
+              "status": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Status"
+              }
+            },
+            "required": [
+              "name",
+              "ok",
+              "status",
+              "category",
+              "detail_key"
+            ],
+            "title": "ProbeItem",
+            "type": "object"
+          },
+          "ProbeName": {
+            "enum": [
+              "noop",
+              "health",
+              "node_available"
+            ],
+            "title": "ProbeName",
+            "type": "string"
+          },
+          "ProbeRun": {
+            "properties": {
+              "checked_at": {
+                "format": "date-time",
+                "title": "Checked At",
+                "type": "string"
+              },
+              "results": {
+                "items": {
+                  "$ref": "#/$defs/ProbeItem"
+                },
+                "title": "Results",
+                "type": "array"
+              }
+            },
+            "required": [
+              "checked_at",
+              "results"
+            ],
+            "title": "ProbeRun",
+            "type": "object"
+          }
+        },
+        "properties": {
+          "run": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/ProbeRun"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "run"
+        ],
+        "title": "LatestProbe",
+        "type": "object"
+      }
+    },
+    "system.pce.probe": {
+      "method": "POST",
+      "path": "/api/system/pce/probe",
+      "request_schema": null,
+      "response_schema": {
+        "$defs": {
+          "ProbeItem": {
+            "properties": {
+              "category": {
+                "title": "Category",
+                "type": "string"
+              },
+              "detail_key": {
+                "title": "Detail Key",
+                "type": "string"
+              },
+              "name": {
+                "$ref": "#/$defs/ProbeName"
+              },
+              "ok": {
+                "title": "Ok",
+                "type": "boolean"
+              },
+              "status": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Status"
+              }
+            },
+            "required": [
+              "name",
+              "ok",
+              "status",
+              "category",
+              "detail_key"
+            ],
+            "title": "ProbeItem",
+            "type": "object"
+          },
+          "ProbeName": {
+            "enum": [
+              "noop",
+              "health",
+              "node_available"
+            ],
+            "title": "ProbeName",
+            "type": "string"
+          }
+        },
+        "properties": {
+          "checked_at": {
+            "format": "date-time",
+            "title": "Checked At",
+            "type": "string"
+          },
+          "results": {
+            "items": {
+              "$ref": "#/$defs/ProbeItem"
+            },
+            "title": "Results",
+            "type": "array"
+          }
+        },
+        "required": [
+          "checked_at",
+          "results"
+        ],
+        "title": "ProbeRun",
+        "type": "object"
+      }
+    },
+    "system.pce.update": {
+      "method": "PUT",
+      "path": "/api/system/pce",
+      "request_schema": {
+        "$defs": {
+          "DeploymentType": {
+            "enum": [
+              "on_prem",
+              "saas"
+            ],
+            "title": "DeploymentType",
+            "type": "string"
+          }
+        },
+        "properties": {
+          "api_key": {
+            "maxLength": 512,
+            "title": "Api Key",
+            "type": "string"
+          },
+          "api_secret": {
+            "maxLength": 1024,
+            "title": "Api Secret",
+            "type": "string"
+          },
+          "console_url": {
+            "anyOf": [
+              {
+                "maxLength": 2048,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Console Url"
+          },
+          "deployment_type": {
+            "$ref": "#/$defs/DeploymentType"
+          },
+          "org_id": {
+            "maxLength": 32,
+            "title": "Org Id",
+            "type": "string"
+          },
+          "revision": {
+            "title": "Revision",
+            "type": "integer"
+          },
+          "url": {
+            "maxLength": 2048,
+            "title": "Url",
+            "type": "string"
+          },
+          "verify_tls": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "title": "Verify Tls"
+          }
+        },
+        "required": [
+          "revision",
+          "url",
+          "org_id",
+          "api_key",
+          "api_secret",
+          "deployment_type",
+          "console_url",
+          "verify_tls"
+        ],
+        "title": "PceConnectionUpdate",
+        "type": "object"
+      },
+      "response_schema": {
+        "$defs": {
+          "DeploymentType": {
+            "enum": [
+              "on_prem",
+              "saas"
+            ],
+            "title": "DeploymentType",
+            "type": "string"
+          }
+        },
+        "properties": {
+          "api_key": {
+            "title": "Api Key",
+            "type": "string"
+          },
+          "api_secret": {
+            "title": "Api Secret",
+            "type": "string"
+          },
+          "console_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Console Url"
+          },
+          "deployment_type": {
+            "$ref": "#/$defs/DeploymentType"
+          },
+          "org_id": {
+            "title": "Org Id",
+            "type": "string"
+          },
+          "revision": {
+            "title": "Revision",
+            "type": "integer"
+          },
+          "url": {
+            "title": "Url",
+            "type": "string"
+          },
+          "verify_tls": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "title": "Verify Tls"
+          }
+        },
+        "required": [
+          "revision",
+          "url",
+          "org_id",
+          "api_key",
+          "api_secret",
+          "deployment_type",
+          "console_url",
+          "verify_tls"
+        ],
+        "title": "PceConnection",
+        "type": "object"
+      }
+    },
+    "system.security.get": {
+      "method": "GET",
+      "path": "/api/system/security",
+      "request_schema": null,
+      "response_schema": {
+        "properties": {
+          "allowed_ips": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Allowed Ips",
+            "type": "array"
+          },
+          "requester_ip": {
+            "title": "Requester Ip",
+            "type": "string"
+          },
+          "revision": {
+            "title": "Revision",
+            "type": "integer"
+          },
+          "username": {
+            "title": "Username",
+            "type": "string"
+          }
+        },
+        "required": [
+          "revision",
+          "username",
+          "allowed_ips",
+          "requester_ip"
+        ],
+        "title": "SecurityView",
+        "type": "object"
+      }
+    },
+    "system.security.update": {
+      "method": "PUT",
+      "path": "/api/system/security",
+      "request_schema": {
+        "properties": {
+          "allowed_ips": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 500,
+            "title": "Allowed Ips",
+            "type": "array"
+          },
+          "confirm_lockout": {
+            "default": false,
+            "title": "Confirm Lockout",
+            "type": "boolean"
+          },
+          "revision": {
+            "title": "Revision",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "revision",
+          "allowed_ips"
+        ],
+        "title": "SecurityUpdate",
+        "type": "object"
+      },
+      "response_schema": {
+        "properties": {
+          "allowed_ips": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Allowed Ips",
+            "type": "array"
+          },
+          "requester_ip": {
+            "title": "Requester Ip",
+            "type": "string"
+          },
+          "revision": {
+            "title": "Revision",
+            "type": "integer"
+          },
+          "username": {
+            "title": "Username",
+            "type": "string"
+          }
+        },
+        "required": [
+          "revision",
+          "username",
+          "allowed_ips",
+          "requester_ip"
+        ],
+        "title": "SecurityView",
+        "type": "object"
+      }
+    },
+    "system.tls.csr": {
+      "method": "POST",
+      "path": "/api/system/tls/csr",
+      "request_schema": {
+        "properties": {
+          "c": {
+            "maxLength": 2,
+            "title": "C",
+            "type": "string"
+          },
+          "cn": {
+            "maxLength": 253,
+            "minLength": 1,
+            "title": "Cn",
+            "type": "string"
+          },
+          "key_algorithm": {
+            "enum": [
+              "ecdsa-p256",
+              "rsa-2048"
+            ],
+            "title": "Key Algorithm",
+            "type": "string"
+          },
+          "o": {
+            "maxLength": 64,
+            "title": "O",
+            "type": "string"
+          },
+          "ou": {
+            "maxLength": 64,
+            "title": "Ou",
+            "type": "string"
+          },
+          "san_dns": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 50,
+            "title": "San Dns",
+            "type": "array"
+          },
+          "san_ip": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 50,
+            "title": "San Ip",
+            "type": "array"
+          }
+        },
+        "required": [
+          "cn",
+          "o",
+          "ou",
+          "c",
+          "san_dns",
+          "san_ip",
+          "key_algorithm"
+        ],
+        "title": "CsrRequest",
+        "type": "object"
+      },
+      "response_schema": {
+        "properties": {
+          "csr_pem": {
+            "title": "Csr Pem",
+            "type": "string"
+          }
+        },
+        "required": [
+          "csr_pem"
+        ],
+        "title": "CsrResult",
+        "type": "object"
+      }
+    },
+    "system.tls.import": {
+      "method": "POST",
+      "path": "/api/system/tls/import",
+      "request_schema": {
+        "properties": {
+          "cert_pem": {
+            "maxLength": 65536,
+            "minLength": 1,
+            "title": "Cert Pem",
+            "type": "string"
+          }
+        },
+        "required": [
+          "cert_pem"
+        ],
+        "title": "ImportRequest",
+        "type": "object"
+      },
+      "response_schema": {
+        "$defs": {
+          "CertView": {
+            "properties": {
+              "days_remaining": {
+                "title": "Days Remaining",
+                "type": "integer"
+              },
+              "issuer_cn": {
+                "title": "Issuer Cn",
+                "type": "string"
+              },
+              "not_after": {
+                "format": "date-time",
+                "title": "Not After",
+                "type": "string"
+              },
+              "not_before": {
+                "format": "date-time",
+                "title": "Not Before",
+                "type": "string"
+              },
+              "san": {
+                "items": {
+                  "type": "string"
+                },
+                "title": "San",
+                "type": "array"
+              },
+              "self_signed": {
+                "title": "Self Signed",
+                "type": "boolean"
+              },
+              "subject_cn": {
+                "title": "Subject Cn",
+                "type": "string"
+              }
+            },
+            "required": [
+              "subject_cn",
+              "issuer_cn",
+              "not_before",
+              "not_after",
+              "days_remaining",
+              "san",
+              "self_signed"
+            ],
+            "title": "CertView",
+            "type": "object"
+          }
+        },
+        "properties": {
+          "auto_renew": {
+            "title": "Auto Renew",
+            "type": "boolean"
+          },
+          "auto_renew_days": {
+            "title": "Auto Renew Days",
+            "type": "integer"
+          },
+          "cert": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/CertView"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "cert_file": {
+            "title": "Cert File",
+            "type": "string"
+          },
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "key_algorithm": {
+            "enum": [
+              "ecdsa-p256",
+              "rsa-2048"
+            ],
+            "title": "Key Algorithm",
+            "type": "string"
+          },
+          "key_file": {
+            "title": "Key File",
+            "type": "string"
+          },
+          "min_version": {
+            "enum": [
+              "TLSv1.2",
+              "TLSv1.3"
+            ],
+            "title": "Min Version",
+            "type": "string"
+          },
+          "mode": {
+            "enum": [
+              "self_signed",
+              "provided"
+            ],
+            "title": "Mode",
+            "type": "string"
+          },
+          "restart_required": {
+            "title": "Restart Required",
+            "type": "boolean"
+          },
+          "revision": {
+            "title": "Revision",
+            "type": "integer"
+          },
+          "validity_days": {
+            "title": "Validity Days",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "revision",
+          "enabled",
+          "mode",
+          "cert_file",
+          "key_file",
+          "auto_renew",
+          "auto_renew_days",
+          "validity_days",
+          "key_algorithm",
+          "min_version",
+          "cert",
+          "restart_required"
+        ],
+        "title": "TlsStatus",
+        "type": "object"
+      }
+    },
+    "system.tls.renew": {
+      "method": "POST",
+      "path": "/api/system/tls/renew",
+      "request_schema": null,
+      "response_schema": {
+        "$defs": {
+          "CertView": {
+            "properties": {
+              "days_remaining": {
+                "title": "Days Remaining",
+                "type": "integer"
+              },
+              "issuer_cn": {
+                "title": "Issuer Cn",
+                "type": "string"
+              },
+              "not_after": {
+                "format": "date-time",
+                "title": "Not After",
+                "type": "string"
+              },
+              "not_before": {
+                "format": "date-time",
+                "title": "Not Before",
+                "type": "string"
+              },
+              "san": {
+                "items": {
+                  "type": "string"
+                },
+                "title": "San",
+                "type": "array"
+              },
+              "self_signed": {
+                "title": "Self Signed",
+                "type": "boolean"
+              },
+              "subject_cn": {
+                "title": "Subject Cn",
+                "type": "string"
+              }
+            },
+            "required": [
+              "subject_cn",
+              "issuer_cn",
+              "not_before",
+              "not_after",
+              "days_remaining",
+              "san",
+              "self_signed"
+            ],
+            "title": "CertView",
+            "type": "object"
+          }
+        },
+        "properties": {
+          "auto_renew": {
+            "title": "Auto Renew",
+            "type": "boolean"
+          },
+          "auto_renew_days": {
+            "title": "Auto Renew Days",
+            "type": "integer"
+          },
+          "cert": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/CertView"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "cert_file": {
+            "title": "Cert File",
+            "type": "string"
+          },
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "key_algorithm": {
+            "enum": [
+              "ecdsa-p256",
+              "rsa-2048"
+            ],
+            "title": "Key Algorithm",
+            "type": "string"
+          },
+          "key_file": {
+            "title": "Key File",
+            "type": "string"
+          },
+          "min_version": {
+            "enum": [
+              "TLSv1.2",
+              "TLSv1.3"
+            ],
+            "title": "Min Version",
+            "type": "string"
+          },
+          "mode": {
+            "enum": [
+              "self_signed",
+              "provided"
+            ],
+            "title": "Mode",
+            "type": "string"
+          },
+          "restart_required": {
+            "title": "Restart Required",
+            "type": "boolean"
+          },
+          "revision": {
+            "title": "Revision",
+            "type": "integer"
+          },
+          "validity_days": {
+            "title": "Validity Days",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "revision",
+          "enabled",
+          "mode",
+          "cert_file",
+          "key_file",
+          "auto_renew",
+          "auto_renew_days",
+          "validity_days",
+          "key_algorithm",
+          "min_version",
+          "cert",
+          "restart_required"
+        ],
+        "title": "TlsStatus",
+        "type": "object"
+      }
+    },
+    "system.tls.status": {
+      "method": "GET",
+      "path": "/api/system/tls",
+      "request_schema": null,
+      "response_schema": {
+        "$defs": {
+          "CertView": {
+            "properties": {
+              "days_remaining": {
+                "title": "Days Remaining",
+                "type": "integer"
+              },
+              "issuer_cn": {
+                "title": "Issuer Cn",
+                "type": "string"
+              },
+              "not_after": {
+                "format": "date-time",
+                "title": "Not After",
+                "type": "string"
+              },
+              "not_before": {
+                "format": "date-time",
+                "title": "Not Before",
+                "type": "string"
+              },
+              "san": {
+                "items": {
+                  "type": "string"
+                },
+                "title": "San",
+                "type": "array"
+              },
+              "self_signed": {
+                "title": "Self Signed",
+                "type": "boolean"
+              },
+              "subject_cn": {
+                "title": "Subject Cn",
+                "type": "string"
+              }
+            },
+            "required": [
+              "subject_cn",
+              "issuer_cn",
+              "not_before",
+              "not_after",
+              "days_remaining",
+              "san",
+              "self_signed"
+            ],
+            "title": "CertView",
+            "type": "object"
+          }
+        },
+        "properties": {
+          "auto_renew": {
+            "title": "Auto Renew",
+            "type": "boolean"
+          },
+          "auto_renew_days": {
+            "title": "Auto Renew Days",
+            "type": "integer"
+          },
+          "cert": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/CertView"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "cert_file": {
+            "title": "Cert File",
+            "type": "string"
+          },
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "key_algorithm": {
+            "enum": [
+              "ecdsa-p256",
+              "rsa-2048"
+            ],
+            "title": "Key Algorithm",
+            "type": "string"
+          },
+          "key_file": {
+            "title": "Key File",
+            "type": "string"
+          },
+          "min_version": {
+            "enum": [
+              "TLSv1.2",
+              "TLSv1.3"
+            ],
+            "title": "Min Version",
+            "type": "string"
+          },
+          "mode": {
+            "enum": [
+              "self_signed",
+              "provided"
+            ],
+            "title": "Mode",
+            "type": "string"
+          },
+          "restart_required": {
+            "title": "Restart Required",
+            "type": "boolean"
+          },
+          "revision": {
+            "title": "Revision",
+            "type": "integer"
+          },
+          "validity_days": {
+            "title": "Validity Days",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "revision",
+          "enabled",
+          "mode",
+          "cert_file",
+          "key_file",
+          "auto_renew",
+          "auto_renew_days",
+          "validity_days",
+          "key_algorithm",
+          "min_version",
+          "cert",
+          "restart_required"
+        ],
+        "title": "TlsStatus",
+        "type": "object"
+      }
+    },
+    "system.tls.update": {
+      "method": "PUT",
+      "path": "/api/system/tls",
+      "request_schema": {
+        "properties": {
+          "auto_renew": {
+            "title": "Auto Renew",
+            "type": "boolean"
+          },
+          "auto_renew_days": {
+            "maximum": 365,
+            "minimum": 1,
+            "title": "Auto Renew Days",
+            "type": "integer"
+          },
+          "cert_file": {
+            "maxLength": 4096,
+            "title": "Cert File",
+            "type": "string"
+          },
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "key_algorithm": {
+            "enum": [
+              "ecdsa-p256",
+              "rsa-2048"
+            ],
+            "title": "Key Algorithm",
+            "type": "string"
+          },
+          "key_file": {
+            "maxLength": 4096,
+            "title": "Key File",
+            "type": "string"
+          },
+          "min_version": {
+            "enum": [
+              "TLSv1.2",
+              "TLSv1.3"
+            ],
+            "title": "Min Version",
+            "type": "string"
+          },
+          "mode": {
+            "enum": [
+              "self_signed",
+              "provided"
+            ],
+            "title": "Mode",
+            "type": "string"
+          },
+          "revision": {
+            "title": "Revision",
+            "type": "integer"
+          },
+          "validity_days": {
+            "maximum": 825,
+            "minimum": 1,
+            "title": "Validity Days",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "revision",
+          "enabled",
+          "mode",
+          "cert_file",
+          "key_file",
+          "auto_renew",
+          "auto_renew_days",
+          "validity_days",
+          "key_algorithm",
+          "min_version"
+        ],
+        "title": "TlsUpdate",
+        "type": "object"
+      },
+      "response_schema": {
+        "$defs": {
+          "CertView": {
+            "properties": {
+              "days_remaining": {
+                "title": "Days Remaining",
+                "type": "integer"
+              },
+              "issuer_cn": {
+                "title": "Issuer Cn",
+                "type": "string"
+              },
+              "not_after": {
+                "format": "date-time",
+                "title": "Not After",
+                "type": "string"
+              },
+              "not_before": {
+                "format": "date-time",
+                "title": "Not Before",
+                "type": "string"
+              },
+              "san": {
+                "items": {
+                  "type": "string"
+                },
+                "title": "San",
+                "type": "array"
+              },
+              "self_signed": {
+                "title": "Self Signed",
+                "type": "boolean"
+              },
+              "subject_cn": {
+                "title": "Subject Cn",
+                "type": "string"
+              }
+            },
+            "required": [
+              "subject_cn",
+              "issuer_cn",
+              "not_before",
+              "not_after",
+              "days_remaining",
+              "san",
+              "self_signed"
+            ],
+            "title": "CertView",
+            "type": "object"
+          }
+        },
+        "properties": {
+          "auto_renew": {
+            "title": "Auto Renew",
+            "type": "boolean"
+          },
+          "auto_renew_days": {
+            "title": "Auto Renew Days",
+            "type": "integer"
+          },
+          "cert": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/CertView"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "cert_file": {
+            "title": "Cert File",
+            "type": "string"
+          },
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "key_algorithm": {
+            "enum": [
+              "ecdsa-p256",
+              "rsa-2048"
+            ],
+            "title": "Key Algorithm",
+            "type": "string"
+          },
+          "key_file": {
+            "title": "Key File",
+            "type": "string"
+          },
+          "min_version": {
+            "enum": [
+              "TLSv1.2",
+              "TLSv1.3"
+            ],
+            "title": "Min Version",
+            "type": "string"
+          },
+          "mode": {
+            "enum": [
+              "self_signed",
+              "provided"
+            ],
+            "title": "Mode",
+            "type": "string"
+          },
+          "restart_required": {
+            "title": "Restart Required",
+            "type": "boolean"
+          },
+          "revision": {
+            "title": "Revision",
+            "type": "integer"
+          },
+          "validity_days": {
+            "title": "Validity Days",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "revision",
+          "enabled",
+          "mode",
+          "cert_file",
+          "key_file",
+          "auto_renew",
+          "auto_renew_days",
+          "validity_days",
+          "key_algorithm",
+          "min_version",
+          "cert",
+          "restart_required"
+        ],
+        "title": "TlsStatus",
+        "type": "object"
+      }
+    }
+  },
+  "values": {
+    "AlertRuleType": [
+      "bandwidth",
+      "event",
+      "system",
+      "traffic",
+      "volume"
+    ],
+    "DeploymentType": [
+      "on_prem",
+      "saas"
+    ],
+    "DraftPolicyDecision": [
+      "allowed",
+      "allowed_across_boundary",
+      "blocked",
+      "blocked_by_boundary",
+      "blocked_by_override_deny",
+      "potentially_blocked",
+      "potentially_blocked_by_boundary",
+      "potentially_blocked_by_override_deny",
+      "unknown"
+    ],
+    "Language": [
+      "en",
+      "zh_TW"
+    ],
+    "PolicyDecision": [
+      "allowed",
+      "blocked",
+      "potentially_blocked",
+      "unknown"
+    ],
+    "ProbeName": [
+      "health",
+      "node_available",
+      "noop"
+    ],
+    "RuleAction": [
+      "allow",
+      "deny",
+      "override_deny"
+    ]
+  }
+}

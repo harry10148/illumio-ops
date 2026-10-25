@@ -1,0 +1,72 @@
+name: CI v6
+
+on:
+  push:
+    branches: [main, "feat/v6-**"]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ci-v6-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: v6 (py3.12)
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: |
+            requirements-v6.lock
+            requirements-v6-dev.txt
+
+      - name: Install runtime dependencies (locked + hash-verified)
+        run: |
+          pip install --upgrade pip
+          pip install --require-hashes -r requirements-v6.lock
+
+      - name: Install dev dependencies
+        run: pip install -r requirements-v6-dev.txt
+
+      - name: Install Playwright browser
+        # A clean runner has the playwright package but no browser binary.
+        run: python -m playwright install --with-deps chromium
+
+      - name: Security audit (pip-audit)
+        run: pip-audit -r requirements-v6.lock --strict
+
+      - name: Set up Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install frontend dependencies
+        run: npm ci --prefix web
+
+      - name: Generated contracts and types are committed and current
+        run: |
+          bash scripts/v6/gen_contracts.sh
+          git diff --exit-code web/src/api/contracts.json web/src/api/generated.ts
+
+      - name: Frontend typecheck
+        run: npm --prefix web run typecheck
+
+      - name: Frontend build
+        run: npm --prefix web run build
+
+      - name: Lint (ruff)
+        run: ruff check illumio_ops tests_v6 scripts/v6
+
+      - name: Type check (mypy strict)
+        run: mypy --config-file mypy-v6.ini
+
+      - name: Tests
+        run: python -m pytest tests_v6 -n auto --dist loadfile

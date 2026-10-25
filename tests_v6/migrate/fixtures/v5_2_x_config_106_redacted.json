@@ -1,0 +1,214 @@
+{
+  "api": {
+    "url": "https://host-1.example.invalid:8443",
+    "org_id": "1",
+    "key": "redacted-1",
+    "secret": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+    "profile": "dev",
+    "verify_ssl": false,
+    "deployment_type": "on_prem",
+    "console_url": ""
+  },
+  "alerts": {
+    "active": [
+      "line",
+      "mail"
+    ],
+    "line_channel_access_token": "redacted-2",
+    "line_target_id": "redacted-3",
+    "webhook_url": "",
+    "telegram_bot_token": "",
+    "telegram_chat_id": "",
+    "teams_webhook_url": ""
+  },
+  "email": {
+    "sender": "redacted-4",
+    "recipients": [
+      "redacted-5"
+    ]
+  },
+  "smtp": {
+    "host": "redacted-6",
+    "port": 587,
+    "user": "redacted-7",
+    "password": "redacted-8",
+    "enable_auth": true,
+    "enable_tls": true
+  },
+  "settings": {
+    "language": "zh_TW",
+    "theme": "light",
+    "timezone": "UTC+8",
+    "enable_health_check": true,
+    "dashboard_queries": [
+      {
+        "name": "redacted-9",
+        "rank_by": "redacted-10",
+        "pd": 3,
+        "port": null,
+        "proto": null,
+        "ex_port": null,
+        "src_labels": [
+          "redacted-11"
+        ],
+        "dst_labels": [
+          "redacted-12"
+        ],
+        "ports": [
+          "redacted-13"
+        ]
+      },
+      {
+        "name": "redacted-14",
+        "rank_by": "redacted-15",
+        "pd": 3,
+        "port": null,
+        "proto": null,
+        "ex_port": null,
+        "any_label": "redacted-16",
+        "ports": [
+          "redacted-17"
+        ]
+      }
+    ]
+  },
+  "report": {
+    "enabled": false,
+    "schedule": "weekly",
+    "day_of_week": "monday",
+    "hour": 8,
+    "source": "api",
+    "format": [
+      "html"
+    ],
+    "email_report": false,
+    "output_dir": "redacted-18",
+    "retention_days": 30,
+    "include_raw_data": false,
+    "max_top_n": 20,
+    "api_query": {
+      "start_date": null,
+      "end_date": null,
+      "max_results": 200000
+    },
+    "snapshot_retention_days": 90,
+    "draft_actions_enabled": true
+  },
+  "report_schedules": [
+    {
+      "id": 1785735229014,
+      "name": "redacted-19",
+      "cron_expr": null,
+      "timezone": "local",
+      "report_type": "audit_summary",
+      "schedule_type": "redacted-20",
+      "day_of_week": "mon",
+      "day_of_month": 1,
+      "hour": 8,
+      "minute": 0,
+      "lookback_days": 7,
+      "max_reports": 30,
+      "format": [
+        "html"
+      ],
+      "email_report": false,
+      "email_recipients": [],
+      "enabled": true
+    }
+  ],
+  "rule_scheduler": {
+    "enabled": true,
+    "check_interval_seconds": 300
+  },
+  "scheduler": {
+    "persist": false,
+    "db_path": "redacted-21"
+  },
+  "web_gui": {
+    "username": "redacted-22",
+    "password": "$argon2id$v=19$m=131072,t=4,p=4$cmVkYWN0ZWRzYWx0$cmVkYWN0ZWRyZWRhY3RlZHJlZGFjdGVkcmVkYWN0ZWQ",
+    "secret_key": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+    "allowed_ips": [],
+    "public_url": "",
+    "tls": {
+      "enabled": true,
+      "cert_file": "",
+      "key_file": "",
+      "self_signed": true,
+      "auto_renew": true,
+      "auto_renew_days": 30,
+      "min_version": "TLSv1.2",
+      "ciphers": null,
+      "key_algorithm": "ecdsa-p256",
+      "validity_days": 397
+    },
+    "must_change_password": false,
+    "session_lifetime_seconds": 28800
+  },
+  "logging": {
+    "level": "INFO",
+    "json_sink": false,
+    "rotation": "10 MB",
+    "retention": 10
+  },
+  "rule_backups": [],
+  "pce_cache": {
+    "enabled": true,
+    "db_path": "redacted-23",
+    "events_retention_days": 90,
+    "traffic_raw_retention_days": 7,
+    "traffic_agg_retention_days": 90,
+    "events_poll_interval_seconds": 300,
+    "traffic_poll_interval_seconds": 120,
+    "rate_limit_per_minute": 400,
+    "async_threshold_events": 10000,
+    "traffic_filter": {
+      "actions": [],
+      "workload_label_env": [],
+      "ports": [],
+      "protocols": [],
+      "exclude_src_ips": []
+    },
+    "traffic_sampling": {
+      "sample_ratio_allowed": 1,
+      "max_rows_per_batch": 200000
+    },
+    "archive_enabled": true,
+    "archive_dir": "redacted-24",
+    "archive_interval_hours": 24,
+    "archive_gzip_after_days": 7,
+    "archive_retention_days": 365,
+    "disk_free_warn_gb": 10,
+    "siem_pending_warn_rows": 50000,
+    "cache_read_max_rows": 500000,
+    "flow_delta_enabled": true,
+    "flow_obs_retention_hours": 6
+  },
+  "siem": {
+    "enabled": true,
+    "destinations": [
+      {
+        "name": "redacted-25",
+        "enabled": true,
+        "transport": "tcp",
+        "format": "cef_pce",
+        "host": "192.0.2.1",
+        "port": 5514,
+        "profile": "production",
+        "tls_verify": true,
+        "tls_ca_bundle": null,
+        "hec_token": null,
+        "batch_size": 100,
+        "source_types": [
+          "redacted-26",
+          "redacted-27"
+        ],
+        "traffic_pd": [],
+        "max_retries": 10,
+        "mask_pii": false
+      }
+    ],
+    "dlq_max_per_dest": 10000,
+    "dispatch_tick_seconds": 5
+  }
+}
