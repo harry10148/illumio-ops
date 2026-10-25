@@ -1,0 +1,55 @@
+{
+  "request": {
+    "consumers": [
+      {
+        "ip_list": {
+          "href": "/orgs/1/sec_policy/active/ip_lists/1"
+        }
+      }
+    ],
+    "providers": [
+      {
+        "label": {
+          "href": "/orgs/1/labels/1"
+        }
+      }
+    ],
+    "ingress_services": [
+      {
+        "port": 22,
+        "proto": 6
+      }
+    ],
+    "rule_types": [
+      "sec_rules",
+      "deny_rules",
+      "override_deny_rules"
+    ]
+  },
+  "pversion": "active",
+  "status": 200,
+  "response": {
+    "sec_rules": [],
+    "deny_rules": [],
+    "override_deny_rules": [],
+    "ip_tables_rules": [],
+    "counts": {
+      "sec_rules": {
+        "matched": 0,
+        "total": 0
+      },
+      "deny_rules": {
+        "matched": 0,
+        "total": 0
+      },
+      "override_deny_rules": {
+        "matched": 0,
+        "total": 2
+      },
+      "ip_tables_rules": {
+        "matched": 0,
+        "total": 0
+      }
+    }
+  }
+}

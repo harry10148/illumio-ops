@@ -3,6 +3,7 @@ says about one flow (P3 Task 0: enforcement_boundaries carries the deny rules th
 allow rules or essential-service rules that allow it)."""
 from __future__ import annotations
 
+import ipaddress
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any, Literal
@@ -127,3 +128,67 @@ def parse_draft(raw: Mapping[str, Any]) -> DraftView:
         override_deny_hrefs=_hrefs(raw.get("override_deny_rules")),
         allow_rule_hrefs=_hrefs(rules),
         essential_service_rules=tuple(str(r["essential_service_rule"]) for r in rules if r.get("essential_service_rule")))
+
+
+_SEARCH_BUCKETS = (("sec_rules", RuleAction.ALLOW), ("deny_rules", RuleAction.DENY),
+                   ("override_deny_rules", RuleAction.OVERRIDE_DENY))
+
+
+def parse_rule_search(body: Any) -> list[RuleRef]:
+    """The rules a Rule Search answered with; each carries its rule set, and its labels come with key and
+    value (unlike rule set reads)."""
+    if not isinstance(body, Mapping):
+        return []
+    out = []
+    for bucket, rule_type in _SEARCH_BUCKETS:
+        for raw in body.get(bucket) or ():
+            if isinstance(raw, Mapping) and raw.get("href"):
+                rs = raw.get("rule_set") if isinstance(raw.get("rule_set"), Mapping) else {}
+                out.append(_rule(raw, rule_type, rs or {}, {}, {}))
+    return out
+
+
+def _in_range(ip: ipaddress.IPv4Address | ipaddress.IPv6Address, rng: Mapping[str, Any]) -> bool:
+    frm, to = rng.get("from_ip"), rng.get("to_ip")
+    if not frm:
+        return False
+    try:
+        if to:
+            return ipaddress.ip_address(frm) <= ip <= ipaddress.ip_address(to)  # type: ignore[operator]
+        if "/" in str(frm):
+            return ip in ipaddress.ip_network(str(frm), strict=False)
+        return ip == ipaddress.ip_address(frm)
+    except (ValueError, TypeError):
+        return False
+
+
+def _size(rng: Mapping[str, Any]) -> int:
+    frm, to = rng.get("from_ip"), rng.get("to_ip")
+    try:
+        if to:
+            return int(ipaddress.ip_address(str(to))) - int(ipaddress.ip_address(str(frm))) + 1
+        if "/" in str(frm):
+            return ipaddress.ip_network(str(frm), strict=False).num_addresses
+        return 1
+    except (ValueError, TypeError):
+        return 0
+
+
+def iplist_href_for_ip(ip_lists: Sequence[Mapping[str, Any]], ip_text: str) -> str | None:
+    """The narrowest IP list whose included ranges hold the address and whose excluded ranges do not. Every
+    PCE has an "Any (0.0.0.0/0)" list: the narrowest match keeps a corporate list ahead of it, while a public
+    address still lands on Any — the honest answer (5.x lab fact, 2026-09-03)."""
+    try:
+        ip = ipaddress.ip_address(ip_text)
+    except ValueError:
+        return None
+    best: tuple[int, str] | None = None
+    for ipl in ip_lists:
+        ranges = ipl.get("ip_ranges") or []
+        included = [r for r in ranges if not r.get("exclusion") and _in_range(ip, r)]
+        if not included or not ipl.get("href") or any(_in_range(ip, r) for r in ranges if r.get("exclusion")):
+            continue
+        size = min(_size(r) for r in included)
+        if best is None or size < best[0]:
+            best = (size, str(ipl["href"]))
+    return best[1] if best else None
