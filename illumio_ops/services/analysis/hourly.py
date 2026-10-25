@@ -10,6 +10,7 @@ from datetime import UTC, datetime
 from loguru import logger
 
 from illumio_ops.services.analysis.exposure import run_exposure
+from illumio_ops.services.analysis.focus import build_focus
 from illumio_ops.services.analysis.ransomware import ransomware_overlay
 from illumio_ops.services.analysis.tamper import tamper_summary
 from illumio_ops.services.context import AppContext
@@ -28,6 +29,7 @@ HOURLY_STEPS: list[tuple[str, HourlyStep]] = [
     ("exposure", _exposure),
     ("ransomware", ransomware_overlay),
     ("tamper", tamper_summary),
+    ("focus", build_focus),
 ]
 
 
