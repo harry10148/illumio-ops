@@ -34,6 +34,7 @@ from illumio_ops.domain.identity import endpoint_key
 from illumio_ops.domain.values import FlowDirection, IngestSource
 from illumio_ops.pce.async_query import run_traffic_query
 from illumio_ops.pce.client import PceNotConfigured
+from illumio_ops.services.collect.guard import require_same_pce
 from illumio_ops.services.collect.mode import collects
 from illumio_ops.services.collect.traffic import PCE_FAILURES
 from illumio_ops.services.context import AppContext
@@ -192,6 +193,7 @@ def query_flows(ctx: AppContext, spec: FilterSpec, *, limit: int, order: Order,
     settings = ctx.settings.current()
     floor = at - timedelta(days=settings.collection.retention.flow_days)
     with fdb.connect() as conn:
+        require_same_pce(conn, settings.pce)
         for name, fn in sql_functions().items():
             conn.create_function(name, -1, fn, deterministic=True)
         cov = store_coverage(conn, IngestSource.TRAFFIC, (spec.start, spec.end), floor=floor,

@@ -190,3 +190,17 @@ def test_rejected_save_does_not_reset(client, ctx):
     rev = client.get("/api/system/pce", environ_overrides=LOCAL).get_json()["data"]["revision"]
     assert _put(client, _form(org_id="2") | {"revision": rev - 1}).status_code == 409
     assert _bound(ctx) is not None
+
+
+def test_a_switch_that_must_wait_for_a_reader_says_so_in_words(client, ctx, monkeypatch):
+    from illumio_ops.store.flowdb import db as flowdb
+    monkeypatch.setattr(flowdb, "RESET_WAIT_SECONDS", 0.2)
+    login(client)
+    _save(client)
+    _bind(ctx)
+    reader = ctx.flows().connect()  # a lock-free read still open on the old file
+    r = _save(client, org_id="2")
+    reader.close()
+    body = r.get_json()
+    assert r.status_code == 503 and body["error"]["code"] == "pce_switch_pending"
+    assert ctx.settings.current().pce.org_id == "2" and _bound(ctx) is not None  # saved; cleared later

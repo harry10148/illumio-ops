@@ -154,3 +154,26 @@ def test_reset_gives_up_when_a_connection_stays_open(tmp_path, monkeypatch):
     reader.close()
     with fdb.connect() as conn:  # nothing was deleted
         assert conn.execute("SELECT count(*) FROM pce_binding").fetchone()[0] == 1
+
+
+def test_a_connection_asked_for_during_a_reset_gets_the_new_file(tmp_path):
+    # Opened while the reset waited, it would sit on the old file when that is deleted.
+    fdb = FlowDb(tmp_path / "flows.sqlite")
+    with fdb.connect() as conn:
+        conn.execute("INSERT INTO pce_binding(id, pce_url, org_id, bound_at) VALUES (1, 'https://a', '1', 'x')")
+        conn.commit()
+    reader = fdb.connect()
+    t = threading.Thread(target=fdb.reset)
+    t.start()
+    while fdb.generation == 0:
+        pass
+    seen = []
+    late = threading.Thread(target=lambda: seen.append(
+        fdb.connect().execute("SELECT count(*) FROM pce_binding").fetchone()[0]))
+    late.start()
+    late.join(0.3)
+    assert seen == []  # it waits for the reset
+    reader.close()
+    t.join(5)
+    late.join(5)
+    assert seen == [0]

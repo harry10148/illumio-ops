@@ -15,6 +15,7 @@ from illumio_ops.domain.events import EventShapeError, normalize_event
 from illumio_ops.domain.values import IngestSource
 from illumio_ops.pce.client import PceNotConfigured
 from illumio_ops.pce.events import events_timeout, fetch_events
+from illumio_ops.services.collect.guard import require_same_pce
 from illumio_ops.services.collect.mode import collects
 from illumio_ops.services.collect.traffic import PCE_FAILURES
 from illumio_ops.services.context import AppContext
@@ -57,6 +58,7 @@ def query_events(ctx: AppContext, *, start: datetime, end: datetime, event_types
     settings = ctx.settings.current()
     floor = at - timedelta(days=settings.collection.retention.event_days)
     with ctx.flows().connect() as conn:
+        require_same_pce(conn, settings.pce)
         cov = store_coverage(conn, IngestSource.EVENTS, (start, end), floor=floor,
                              collected=collects(settings, IngestSource.EVENTS))
         gaps = cov.gaps

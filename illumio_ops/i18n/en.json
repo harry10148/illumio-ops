@@ -62,6 +62,7 @@
   "err_ca_bundle_unreadable": "The service cannot read this file. Use a path outside /root and /home that the service account can read.",
   "err_certificate_rejected": "The certificate is not valid or does not match the request generated here.",
   "err_credentials_required": "Enter the API key and secret again when you change the PCE address or the TLS check.",
+  "err_pce_switch_pending": "The new PCE is saved. Data from the previous PCE is still being read, so the next collection run clears it within a few minutes.",
   "err_csrf_error": "The page's security token expired. Try again.",
   "err_http_error": "The server answered with HTTP {status}.",
   "err_internal_error": "Something went wrong on the server (reference {ref}).",

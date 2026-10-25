@@ -42,3 +42,10 @@ def ensure_binding(conn: sqlite3.Connection, pce: PceSettings, now: datetime) ->
         return
     if normalize_target(current.pce_url, current.org_id) != want:
         raise BindingMismatch("the flow database belongs to another PCE")
+
+
+def require_same_pce(conn: sqlite3.Connection, pce: PceSettings) -> None:
+    """For readers: refuse to answer from another PCE's data (a switch whose clearing has not finished)."""
+    current = binding.current(conn)
+    if current is not None and normalize_target(current.pce_url, current.org_id) != normalize_target(pce.url, pce.org_id):
+        raise BindingMismatch("the flow database still holds another PCE's data; the next collector run clears it")

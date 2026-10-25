@@ -62,6 +62,7 @@
   "err_ca_bundle_unreadable": "服務讀不到這個檔案，請放在 /root 與 /home 以外、服務帳號可讀的位置。",
   "err_certificate_rejected": "憑證格式不正確，或與此處產生的憑證請求不相符。",
   "err_credentials_required": "變更 PCE 網址或 TLS 驗證方式時，請重新輸入 API key 與 secret。",
+  "err_pce_switch_pending": "新的 PCE 已儲存。先前 PCE 的資料仍有讀取進行中，下一輪收集會在幾分鐘內清除。",
   "err_csrf_error": "頁面驗證已過期，請再試一次。",
   "err_http_error": "伺服器回應 HTTP {status}。",
   "err_internal_error": "伺服器發生錯誤（參考碼 {ref}）。",

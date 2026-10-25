@@ -166,7 +166,9 @@ def test_a_pce_switch_while_a_file_is_written_leaves_no_file_for_the_new_pce(tmp
     assert run_archive(ctx, now=NOW) == 0
     switch.join(10)
     assert not switch.is_alive()
-    assert [p.name for p in ctx.paths.archive_dir.iterdir() if p.is_file()] == []
+    # The read stopped at once rather than finishing the day (269 s at 1,000 workloads, longer than the
+    # switch waits): no file was written, so none was moved aside with the old PCE's archive either.
+    assert list(ctx.paths.archive_dir.rglob("*.jsonl.gz")) == []
 
 
 def test_an_expired_archive_file_waits_until_its_rows_are_gone(tmp_path):

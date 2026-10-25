@@ -13,6 +13,7 @@ from illumio_ops.pce.health import ProbeResult
 from illumio_ops.services import pce_health
 from illumio_ops.services.collect.reset import pce_target_changed, reset_for_new_pce
 from illumio_ops.settings.secrets import MASK, redact
+from illumio_ops.store.flowdb.db import FlowDbBusy
 from illumio_ops.web.auth import get_ctx
 from illumio_ops.web.contract import ApiFailure, api_route, operation
 
@@ -120,7 +121,10 @@ def update_connection(body: PceConnectionUpdate) -> PceConnectionSaved:
     # In between, the collectors refuse to write (their database is still bound to the old PCE).
     reset = None
     if saved.url and pce_target_changed(saved, new):
-        report = reset_for_new_pce(ctx)
+        try:
+            report = reset_for_new_pce(ctx)
+        except FlowDbBusy:  # saved; the next collector run finishes the switch (finish_pending_switch)
+            raise ApiFailure(503, "pce_switch_pending", "err_pce_switch_pending") from None
         reset = PceReset(cleared=report.cleared, archive_moved_to=report.archive_moved_to)
     elif other_pce:
         pce_health.forget(ctx)

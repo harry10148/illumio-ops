@@ -140,3 +140,16 @@ def test_a_pce_switch_during_a_filled_query_is_not_answered_with_both_pces(colle
     with pytest.raises(StaleGeneration):
         query_flows(collected, _spec(NOW - minutes(60), NOW + minutes(15)), limit=100,
                     order="last_detected_desc", fill_gaps=True)
+
+
+def test_reads_refuse_while_the_store_still_holds_another_pces_data(collected):
+    # A switch whose clearing did not finish yet (the next collector run finishes it): answering from
+    # the store would show the previous PCE's flows and events as the new one's.
+    from illumio_ops.services.collect.guard import BindingMismatch
+    from illumio_ops.services.eventsource import query_events
+    collected.settings.update(collected.settings.current().revision,
+                              lambda d: d["pce"].update({"url": "https://pce-b.example.com:8443"}))
+    with pytest.raises(BindingMismatch):
+        query_flows(collected, _spec(NOW - minutes(60), NOW), limit=100, order="last_detected_desc")
+    with pytest.raises(BindingMismatch):
+        query_events(collected, start=NOW - minutes(60), end=NOW, limit=100)

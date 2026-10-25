@@ -104,6 +104,10 @@ class FlowDb:
         self.generation = 0
         self._open: weakref.WeakSet[FlowConnection] = weakref.WeakSet()
         self._open_lock = threading.Lock()
+        # While a reset runs, connect() waits: a connection opened then would sit on the file it deletes.
+        self._gate = threading.Condition(self._open_lock)
+        self._resetting = False
+        self._opening = 0
         # One idle connection kept open, so the connection a writer closes is never the file's last:
         # SQLite checkpoints the whole WAL when the last connection closes, which inside a write would
         # bring back the checkpoint under the lock (see WAL_SAFETY_NET_PAGES). Not counted by reset.
@@ -119,7 +123,15 @@ class FlowDb:
                 yield conn
 
     def connect(self) -> sqlite3.Connection:
-        conn = connect(self.path, factory=FlowConnection)
+        with self._gate:
+            while self._resetting:
+                self._gate.wait()
+            self._opening += 1
+        try:
+            conn = connect(self.path, factory=FlowConnection)
+        except BaseException:
+            self._opened(None)
+            raise
         try:
             conn.execute(f"PRAGMA wal_autocheckpoint={self.WAL_SAFETY_NET_PAGES}")
             conn.execute(f"PRAGMA journal_size_limit={self.WAL_KEEP_BYTES}")
@@ -131,15 +143,22 @@ class FlowDb:
             migrate(conn, MIGRATIONS_PACKAGE)
         except BaseException:
             conn.close()
+            self._opened(None)
             raise
-        with self._open_lock:
-            self._open.add(conn)  # type: ignore[arg-type]
-            if self._anchor is None:
-                self._anchor = sqlite3.connect(self.path, check_same_thread=False)
-                # A read attaches it to the WAL (it holds the shared lock that marks it open from then on);
-                # autocommit, so it keeps no snapshot and never holds a checkpoint back.
-                self._anchor.execute("SELECT count(*) FROM sqlite_master").fetchone()
+        self._opened(conn)
         return conn
+
+    def _opened(self, conn: sqlite3.Connection | None) -> None:
+        with self._gate:
+            self._opening -= 1
+            if conn is not None:
+                self._open.add(conn)  # type: ignore[arg-type]
+                if self._anchor is None:
+                    self._anchor = sqlite3.connect(self.path, check_same_thread=False)
+                    # A read attaches it to the WAL (it holds the shared lock that marks it open from then
+                    # on); autocommit, so it keeps no snapshot and never holds a checkpoint back.
+                    self._anchor.execute("SELECT count(*) FROM sqlite_master").fetchone()
+            self._gate.notify_all()
 
     def _drop_anchor(self) -> None:
         with self._open_lock:
@@ -152,17 +171,18 @@ class FlowDb:
         deadline = time.monotonic() + timeout
         collected = False
         while True:
-            with self._open_lock:
-                still = sum(1 for c in self._open if not c.closed)
+            with self._gate:
+                still = self._opening + sum(1 for c in self._open if not c.closed)
+                if still and collected and time.monotonic() < deadline:
+                    self._gate.wait(0.05)
+                    continue
             if not still:
                 return
             if not collected:  # one held only by a reference cycle (a traceback) goes with a collection
                 gc.collect()
                 collected = True
                 continue
-            if time.monotonic() >= deadline:
-                raise FlowDbBusy(f"{still} connection(s) to the flow database stayed open")
-            time.sleep(0.05)
+            raise FlowDbBusy(f"{still} connection(s) to the flow database stayed open")
 
     def checkpoint(self) -> int:
         """Copy committed WAL pages into the database file without waiting for readers or writers
@@ -181,11 +201,21 @@ class FlowDb:
         would, closing last on it, delete the new file's WAL and shared memory by name. Raises
         FlowDbBusy, deleting nothing, if connections stay open for RESET_WAIT_SECONDS."""
         with self.write_lock:
-            self.generation += 1  # first: long lock-free reads notice it and stop
-            self._wait_for_connections(RESET_WAIT_SECONDS)
-            self._drop_anchor()
-            if also is not None:
-                also()
-            for suffix in ("", "-wal", "-shm"):
-                Path(f"{self.path}{suffix}").unlink(missing_ok=True)
+            # First, so long lock-free reads notice it and stop. It stays moved if the reset gives up:
+            # work begun for the old PCE is dropped either way, and the settings already name the new one,
+            # so collectors refuse to write until the next run finishes the switch (finish_pending_switch).
+            self.generation += 1
+            with self._gate:
+                self._resetting = True
+            try:
+                self._wait_for_connections(RESET_WAIT_SECONDS)
+                self._drop_anchor()
+                if also is not None:
+                    also()
+                for suffix in ("", "-wal", "-shm"):
+                    Path(f"{self.path}{suffix}").unlink(missing_ok=True)
+            finally:
+                with self._gate:
+                    self._resetting = False
+                    self._gate.notify_all()
             self.connect().close()
