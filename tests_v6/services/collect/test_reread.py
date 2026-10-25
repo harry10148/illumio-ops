@@ -148,12 +148,12 @@ def test_records_already_stored_take_no_write(tmp_path, fake_traffic, fake_event
 
 def test_resolves_a_failed_live_window(tmp_path, fake_traffic, fake_events):
     ctx = _ctx(tmp_path)
-    _cover(ctx, "traffic", DAY - timedelta(days=1), DAY + timedelta(hours=5))
-    _cover(ctx, "traffic", DAY + timedelta(hours=5, minutes=10), RUN)
+    _cover(ctx, "traffic", DAY - timedelta(days=1), DAY + timedelta(hours=5, minutes=50))
+    _cover(ctx, "traffic", DAY + timedelta(hours=6, minutes=20), RUN)
     fdb = ctx.flows()
-    with fdb.writing(fdb.generation) as conn:
-        ingest_state.record_gap(conn, "traffic", DAY + timedelta(hours=5), DAY + timedelta(hours=5, minutes=10),
-                                "failed", "timeout", RUN - timedelta(hours=20))
+    with fdb.writing(fdb.generation) as conn:  # across an hour boundary: no single hour read contains it
+        ingest_state.record_gap(conn, "traffic", DAY + timedelta(hours=5, minutes=50),
+                                DAY + timedelta(hours=6, minutes=20), "failed", "timeout", RUN - timedelta(hours=20))
     ensure_daily_reread(ctx, now=RUN)
     with ctx.flows().connect() as conn:
         assert ingest_state.open_gaps(conn, "traffic") == []
@@ -235,3 +235,48 @@ def test_refuses_a_store_bound_to_another_pce(tmp_path, fake_traffic, fake_event
         assert conn.execute("SELECT count(*) FROM events").fetchone()[0] == 0
         assert ingest_state.coverage(conn, "events") == [(DAY - timedelta(days=1), DAY + timedelta(hours=5))]
     assert "binding" in st.last_error
+
+
+def test_progress_moves_only_with_what_was_stored(tmp_path, fake_traffic, fake_events, monkeypatch):
+    # The hour's events and its progress commit together: a write error after the progress was
+    # computed must not leave progress past events that were rolled back.
+    import sqlite3
+    ctx = _ctx(tmp_path)
+    _cover(ctx, "events", DAY - timedelta(days=1), RUN)
+    fake_events.items = [_event(1, DAY + minutes(10))]
+    real = ingest_state.set_progress
+
+    def flaky(conn, source, progress):
+        if (progress or {}).get("reread", {}).get("done_through") == (DAY + HOUR).isoformat():
+            raise sqlite3.OperationalError("disk I/O error")
+        return real(conn, source, progress)
+    monkeypatch.setattr(ingest_state, "set_progress", flaky)
+    with pytest.raises(sqlite3.OperationalError):
+        ensure_daily_reread(ctx, now=RUN)
+    monkeypatch.setattr(ingest_state, "set_progress", real)
+    _, mine = _progress(ctx)
+    assert mine["done_through"] == DAY.isoformat() and mine["attempts"] == 1
+    ensure_daily_reread(ctx, now=RUN + minutes(10))
+    with ctx.flows().connect() as conn:
+        assert conn.execute("SELECT count(*) FROM events").fetchone()[0] == 1
+
+
+def test_a_source_added_since_the_last_attempt_is_read_from_the_start(tmp_path, fake_traffic, fake_events):
+    ctx = _ctx(tmp_path, mode="events_only")
+    _cover(ctx, "traffic", DAY - timedelta(days=1), RUN)
+    _cover(ctx, "events", DAY - timedelta(days=1), RUN)
+
+    def failing(client, *, start, end, timeout, deadline, max_results=10000):
+        if start >= DAY + timedelta(hours=12):
+            raise PceQueryError("timeout")
+        return EventsPage(items=[], capped=False)
+    import illumio_ops.services.collect.events as events_mod
+    real = events_mod.fetch_events
+    events_mod.fetch_events = failing
+    try:
+        ensure_daily_reread(ctx, now=RUN)  # events read up to 12:00, then the PCE failed
+    finally:
+        events_mod.fetch_events = real
+    ctx.settings.update(ctx.settings.current().revision, lambda d: d["collection"].update({"mode": "full"}))
+    ensure_daily_reread(ctx, now=RUN + minutes(10))
+    assert fake_traffic.calls[0][0] == pce_time(DAY)  # traffic was never re-read: from the day's start

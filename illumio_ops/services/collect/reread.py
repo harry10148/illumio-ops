@@ -88,16 +88,18 @@ def _reread(ctx: AppContext, *, at: datetime, local_date: str) -> CycleResult | 
     if mine and mine.get("local_date") == local_date:
         if mine.get("finished") or mine.get("attempts", 0) >= MAX_ATTEMPTS:
             return None
+        start = datetime.fromisoformat(mine["day"]).replace(tzinfo=UTC)
     else:
-        day = _target(at)
-        mine = {"day": day.date().isoformat(), "local_date": local_date, "done_through": day.isoformat(),
-                "finished": False, "attempts": 0}
-    start = datetime.fromisoformat(mine["day"]).replace(tzinfo=UTC)
+        mine, start = None, _target(at)
     end = start + timedelta(days=1)
     # Only where the store claims to have collected: a day nobody collected is not re-read.
     begins = {src: max(start, r[0][0]) for src, r in ranges.items() if any(a < end and b > start for a, b in r)}
     if not begins:
         return None
+    names = sorted(str(s) for s in begins)
+    if mine is None or mine.get("sources") != names:  # a source added since the last attempt: from the start
+        mine = {"day": start.date().isoformat(), "local_date": local_date, "done_through": start.isoformat(),
+                "finished": False, "attempts": mine.get("attempts", 0) if mine else 0, "sources": names}
     try:
         client = ctx.pce_client(settings.pce)
     except PceNotConfigured:
@@ -171,11 +173,12 @@ def _read_day(fdb: FlowDb, gen: int, settings: Settings, client: PceClient, plan
                                 ingest_state.record_gap(conn, src, ta, tb, "truncated",
                                                         f"re-read: {n} rows at the limit", at)
                         for src, s in reads.items():
-                            ingest_state.resolve_failed_gaps(conn, src, s, b, at)
                             ingest_state.add_coverage(conn, src, s, b)
-                        mine = {**mine, "done_through": b.isoformat()}
-                        plans[PLAN] = mine
-                        ingest_state.set_progress(conn, SOURCE, plans)
+                            ingest_state.resolve_covered_gaps(conn, src, at)
+                        nxt = {**mine, "done_through": b.isoformat()}
+                        ingest_state.set_progress(conn, SOURCE, {**plans, PLAN: nxt})
+                mine = nxt  # only once the hour has committed
+                plans[PLAN] = mine
             except StaleGeneration:
                 raise
             except Exception as exc:

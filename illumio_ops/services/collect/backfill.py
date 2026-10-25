@@ -31,7 +31,7 @@ from illumio_ops.services.context import AppContext
 from illumio_ops.store.flowdb import ingest_state
 from illumio_ops.store.flowdb.db import FlowDb, StaleGeneration, db_day, transaction
 from illumio_ops.store.flowdb.events import upsert_events
-from illumio_ops.store.flowdb.flows import refresh_rollups, upsert_flows
+from illumio_ops.store.flowdb.flows import rebuild_rollup, refresh_rollups, upsert_flows
 
 SOURCE = IngestSource.BACKFILL
 Plan = Literal["initial", "manual"]
@@ -100,6 +100,9 @@ def _run_backfill(ctx: AppContext, *, start: datetime, end: datetime, plan: Plan
             plans[plan] = {"start": start.isoformat(), "end": end.isoformat(), "done_through": start.isoformat(),
                            "finished": False, "sources": names}
             ingest_state.set_progress(conn, SOURCE, plans)
+    frozen = db_day(at - timedelta(days=settings.collection.retention.flow_days))
+    if db_day(resume_from) <= frozen:  # a day past the raw cutoff is written whole in one run
+        resume_from = max(start, resume_from.replace(hour=0, minute=0, second=0))
     rows = windows = gaps = skipped = 0
     with client:
         for a, b in _days(resume_from, end):
@@ -129,8 +132,12 @@ def _run_backfill(ctx: AppContext, *, start: datetime, end: datetime, plan: Plan
                         with transaction(conn):  # one piece lands completely or not at all
                             upsert_flows(conn, flows, origin=DataOrigin.BACKFILL, now=at)
                             if pb == b:  # the day's rollups once, with its last piece
-                                refresh_rollups(conn, at, frozen_through=db_day(
-                                    at - timedelta(days=settings.collection.retention.flow_days)))
+                                refresh_rollups(conn, at, frozen_through=frozen)
+                                if db_day(a) <= frozen:
+                                    # Past the raw cutoff a built day is frozen; this one is complete
+                                    # (read from its midnight, retention waits for backfills), so a
+                                    # partial build a live cycle made between two pieces is replaced.
+                                    rebuild_rollup(conn, db_day(a), at=at)
                             upsert_events(conn, events, origin=DataOrigin.BACKFILL, now=at)
                             for src, trunc in ((IngestSource.TRAFFIC, t_trunc), (IngestSource.EVENTS, e_trunc)):
                                 for ta, tb, n in trunc:
@@ -139,8 +146,8 @@ def _run_backfill(ctx: AppContext, *, start: datetime, end: datetime, plan: Plan
                             for src in reads:
                                 if src is IngestSource.TRAFFIC or first:
                                     read_to = pb if src is IngestSource.TRAFFIC else b
-                                    ingest_state.resolve_failed_gaps(conn, src, a, read_to, at)
                                     ingest_state.add_coverage(conn, src, a, read_to)
+                                    ingest_state.resolve_covered_gaps(conn, src, at)
                             plans[plan] = {**plans[plan], "done_through": pb.isoformat()}
                             ingest_state.set_progress(conn, SOURCE, plans)
                 except StaleGeneration:

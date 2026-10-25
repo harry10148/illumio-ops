@@ -7,6 +7,7 @@ from datetime import UTC, datetime, timedelta
 
 from loguru import logger
 
+from illumio_ops.services.collect.backfill import BACKFILL_LOCK
 from illumio_ops.services.context import AppContext
 from illumio_ops.store.flowdb import archive, ingest_state, ransomware, workloads
 from illumio_ops.store.flowdb.db import FlowDb, StaleGeneration, db_day
@@ -22,6 +23,13 @@ FLOW_BATCH = 20_000  # expired flow rows per hold of the write lock
 
 
 def run_retention(ctx: AppContext, *, now: datetime | None = None) -> dict[str, int]:
+    # A backfill writes a day an hour at a time and builds its rollup with the last hour: rows of a
+    # day past the raw cutoff deleted in between would leave a partial rollup, kept rollup_days.
+    with BACKFILL_LOCK:
+        return _run_retention(ctx, now=now)
+
+
+def _run_retention(ctx: AppContext, *, now: datetime | None) -> dict[str, int]:
     c = ctx.settings.current().collection
     r = c.retention
     at = (now or datetime.now(UTC)).astimezone(UTC)

@@ -108,3 +108,42 @@ def test_a_day_retention_has_pruned_keeps_its_rollup_when_touched_again(tmp_path
     with ctx.flows().connect() as conn:
         assert conn.execute("SELECT count(*) FROM flows WHERE is_primary = 0").fetchone()[0] == 1  # paired
     assert stats.rows == 1 and _rollup(ctx, day) == 2
+
+
+def test_a_backfilled_day_past_the_raw_cutoff_gets_its_whole_rollup(tmp_path, fake_traffic, monkeypatch):
+    # The backfill writes a day an hour at a time; a live cycle's refresh between two hours built the
+    # day from its first hour, and the freeze rule for days past the raw cutoff then kept that build.
+    from illumio_ops.store.flowdb.db import db_day
+    from illumio_ops.store.flowdb.flows import refresh_rollups
+    monkeypatch.setattr(ev, "fetch_events", lambda client, **kw: EventsPage(items=[], capped=False))
+    ctx = configured_ctx(tmp_path)  # flow_days 35
+    day = (NOW - timedelta(days=40)).replace(hour=0)
+
+    def answer(s, e, m):
+        if s == day + timedelta(hours=1):  # the first hour is stored; the live collector refreshes now
+            fdb = ctx.flows()
+            with fdb.writing(fdb.generation) as conn:
+                refresh_rollups(conn, NOW, frozen_through=db_day(NOW - timedelta(days=35)))
+        return [raw_flow(s.hour, s + minutes(5), s + minutes(6))]
+    fake_traffic.answer = answer
+    run_backfill(ctx, start=day, end=day + timedelta(days=1), now=NOW)
+    assert _rollup(ctx, day.strftime("%Y-%m-%d")) == 24
+
+
+def test_a_day_past_the_raw_cutoff_resumes_from_its_midnight(tmp_path, fake_traffic, monkeypatch):
+    # Between two runs retention may delete the hours already written; the day is read again whole.
+    from illumio_ops.pce.async_query import PceQueryError
+    monkeypatch.setattr(ev, "fetch_events", lambda client, **kw: EventsPage(items=[], capped=False))
+    ctx = configured_ctx(tmp_path)  # flow_days 35
+    day = (NOW - timedelta(days=40)).replace(hour=0)
+
+    def failing(s, e, m):
+        if s >= day + timedelta(hours=5):
+            raise PceQueryError("timeout")
+        return []
+    fake_traffic.answer = failing
+    run_backfill(ctx, start=day, end=day + timedelta(days=1), now=NOW)
+    fake_traffic.answer = lambda s, e, m: []
+    fake_traffic.calls.clear()
+    run_backfill(ctx, start=day, end=day + timedelta(days=1), now=NOW)
+    assert fake_traffic.calls[0][0] == day.strftime("%Y-%m-%dT%H:%M:%SZ") and len(fake_traffic.calls) == 24

@@ -126,8 +126,8 @@ def run_traffic_cycle(ctx: AppContext, *, now: datetime | None = None) -> CycleR
                         for ta, tb, n in truncated:
                             ingest_state.record_gap(conn, SOURCE, ta, tb, "truncated",
                                                     f"{n} rows returned at the PCE's per-query limit", at)
-                        ingest_state.resolve_failed_gaps(conn, SOURCE, start, b, at)
-                        ingest_state.add_coverage(conn, SOURCE, start, b)
+                        ingest_state.add_coverage(conn, SOURCE, a, b)
+                        ingest_state.resolve_covered_gaps(conn, SOURCE, at)
                         ingest_state.mark_ok(conn, SOURCE, at, watermark=b, rows=rows + len(records),
                                              progress=done_progress)
             except StaleGeneration:

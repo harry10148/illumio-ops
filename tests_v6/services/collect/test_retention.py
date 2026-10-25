@@ -130,3 +130,18 @@ def test_retention_stops_quietly_when_the_pce_is_switched_while_it_runs(tmp_path
     assert run_retention(ctx, now=NOW) == {}
     switch.join(10)
     assert not switch.is_alive()
+
+
+def test_retention_waits_for_a_running_backfill(tmp_path):
+    # The backfill writes a day an hour at a time and builds its rollup with the last hour; retention
+    # deleting the day's first hours in between would leave a partial rollup that is then kept 90 days.
+    from illumio_ops.services.collect.backfill import BACKFILL_LOCK
+    ctx = configured_ctx(tmp_path)
+    _write(ctx, [_rec(1, 40)])
+    with BACKFILL_LOCK:
+        t = threading.Thread(target=run_retention, args=(ctx,), kwargs={"now": NOW})
+        t.start()
+        time.sleep(0.3)
+        assert _count(ctx, "flows") == 1
+    t.join(timeout=10)
+    assert not t.is_alive() and _count(ctx, "flows") == 0

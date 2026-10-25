@@ -119,6 +119,18 @@ def resolve_failed_gaps(conn: sqlite3.Connection, source: str, start: datetime, 
         return cur.rowcount
 
 
+def resolve_covered_gaps(conn: sqlite3.Connection, source: str, at: datetime) -> int:
+    """Failed windows that later reads have covered completely, however many reads that took (a
+    catch-up read an hour at a time can fail part-way more than once)."""
+    ranges = conn.execute("SELECT range_start, range_end FROM ingest_coverage WHERE source = ?", (source,)).fetchall()
+    gaps = conn.execute("SELECT id, window_start, window_end FROM ingest_gaps WHERE source = ? AND kind = 'failed' "
+                        "AND resolved_at IS NULL", (source,)).fetchall()
+    done = [(db_time(at), g[0]) for g in gaps if any(a <= g[1] and g[2] <= b for a, b in ranges)]
+    with transaction(conn):
+        conn.executemany("UPDATE ingest_gaps SET resolved_at = ? WHERE id = ?", done)
+    return len(done)
+
+
 def add_coverage(conn: sqlite3.Connection, source: str, start: datetime, end: datetime) -> None:
     """[start, end] has been read and stored; join it with the ranges it overlaps or touches."""
     lo, hi = db_time(start), db_time(end)

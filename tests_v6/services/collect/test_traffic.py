@@ -167,3 +167,25 @@ def test_a_failure_mid_catch_up_keeps_the_hours_already_read(tmp_path, fake_traf
     assert fake_traffic.calls[0][0] == "2026-10-23T16:30:00Z"  # from the watermark, overlap included
     state, gaps = _state(ctx)
     assert state.watermark == NOW + minutes(10) and gaps == []
+
+
+def test_a_gap_left_by_an_earlier_partial_cycle_is_resolved_once_covered(tmp_path, fake_traffic):
+    # Two cycles each read part of a catch-up and failed; the third finished it. The first gap starts
+    # before the third cycle's window, so only the coverage can tell it has been read.
+    ctx = configured_ctx(tmp_path)
+    stops = iter([NOW - timedelta(hours=22), NOW - timedelta(hours=19)])
+    stop = next(stops)
+
+    def answer(s, e, m):
+        if s >= stop:
+            raise PceQueryError("timeout")
+        return []
+    fake_traffic.answer = answer
+    run_traffic_cycle(ctx, now=NOW)
+    stop = next(stops)
+    run_traffic_cycle(ctx, now=NOW + minutes(10))
+    assert len(_state(ctx)[1]) == 2
+    fake_traffic.answer = lambda s, e, m: []
+    run_traffic_cycle(ctx, now=NOW + minutes(20))
+    state, gaps = _state(ctx)
+    assert gaps == [] and state.watermark == NOW + minutes(20)
