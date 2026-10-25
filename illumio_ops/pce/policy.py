@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from typing import Any, Literal
 
 from illumio_ops.pce.client import PceClient
-from illumio_ops.pce.collections import get_all
+from illumio_ops.pce.collections import PceCollectionIncomplete, get_all
 
 Version = Literal["draft", "active"]
 
@@ -17,8 +17,13 @@ def fetch_rule_sets(client: PceClient, pversion: Version, *, deadline: float) ->
     sets = get_all(client, f"/sec_policy/{pversion}/rule_sets", params={}, deadline=deadline)
     for rs in sets:
         if "deny_rules" not in rs and rs.get("href"):
-            resp = client.request("GET", f"{rs['href']}/deny_rules", org_scoped=False, timeout=60, deadline=deadline)
-            rs["deny_rules"] = resp.json() if resp.status == 200 and isinstance(resp.json(), list) else []
+            path = f"{rs['href']}/deny_rules"
+            resp = client.request("GET", path, org_scoped=False, timeout=60, deadline=deadline)
+            body = resp.json() if resp.status == 200 else None
+            if not isinstance(body, list):  # a failed read is not "no deny rules" (P3 final review #16)
+                raise PceCollectionIncomplete(path, 0, f"HTTP {resp.status}" if resp.status != 200 else
+                                              "response is not a list")
+            rs["deny_rules"] = body
     return sets
 
 

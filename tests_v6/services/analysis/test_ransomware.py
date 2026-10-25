@@ -148,3 +148,12 @@ def test_collection_that_stopped_is_unknown(tmp_path):
         ransomware.upsert_services(conn, WEB, [_svc("SMB", 445, "high", "unprotected", "listening")],
                                    source_updated_at=None, at=NOW)
     assert _classes(ctx)[0][(WEB, "SMB")] == "unknown"
+
+
+@responses.activate
+def test_failed_allow_explanation_is_kept_per_service(tmp_path):
+    # Final review #17: a Rule Search failure left an empty list, indistinguishable from "no allow rule".
+    org = f"{PCE['url']}/api/v2/orgs/1"
+    responses.add(responses.POST, f"{org}/sec_policy/active/rule_search", status=500, json={})
+    r = host_ransomware(_ctx(tmp_path), WEB, now=NOW)
+    assert r.allow_rules == {"3389/6": []} and r.allow_status == {"3389/6": "error"}

@@ -117,3 +117,15 @@ def test_each_host_of_a_batch_event_resolved_on_its_own(tmp_path):
     got = precursor_events(ctx, start=NOW - minutes(60), end=NOW)
     assert sorted(p.host_key for p in got.items) == ["/orgs/1/workloads/a", "/orgs/1/workloads/b-new"]
     assert got.unmatched == 1
+
+
+def test_event_naming_no_host_is_counted_unmatched(tmp_path):
+    # Security review of 23e68c98: an event without any host field must not vanish from the counts.
+    from illumio_ops.services.eventsource import precursor_events, tamper_events
+    ctx = configured_ctx(tmp_path)
+    _inventory(ctx, ("/orgs/1/workloads/w-1", "a", "/v/1"))
+    bare = _tamper("/orgs/1/events/e1", "/v/1", "a", NOW - minutes(10))
+    bare["created_by"] = {}
+    _store_events(ctx, [bare])
+    assert precursor_events(ctx, start=NOW - minutes(60), end=NOW).unmatched == 1
+    assert tamper_events(ctx, start=NOW - minutes(60), end=NOW).unmatched == 1

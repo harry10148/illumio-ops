@@ -232,6 +232,8 @@ def _hosts_of(rows: list[Any]) -> Callable[[EventHosts], tuple[set[str], int]]:
         return None
 
     def resolve(hosts: EventHosts) -> tuple[set[str], int]:
+        if not hosts.entities:
+            return set(), 1  # an event naming no host at all is unmatched, not invisible
         found = [one(*e) for e in hosts.entities]
         return {h for h in found if h is not None}, sum(1 for h in found if h is None)
     return resolve

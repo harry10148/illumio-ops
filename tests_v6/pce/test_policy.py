@@ -40,3 +40,16 @@ def test_policy_names_cover_labels_ip_lists_services_and_label_groups(client):
     assert names.labels == {"/orgs/1/labels/21": ("env", "Server")}
     assert names.names["/orgs/1/sec_policy/draft/services/1"] == "All Services"
     assert names.names["/orgs/1/sec_policy/draft/label_groups/3"] == "Prod apps"
+
+
+@responses.activate
+def test_failed_deny_rule_read_is_an_error_not_an_empty_list(client):
+    # Final review #16: a 500 on the per-rule-set read looked like "this rule set has no deny rules".
+    import pytest
+
+    from illumio_ops.pce.collections import PceCollectionIncomplete
+    responses.add(responses.GET, f"{ORG}/sec_policy/draft/rule_sets", json=[
+        {"href": "/orgs/1/sec_policy/draft/rule_sets/2", "name": "separate", "rules": []}])
+    responses.add(responses.GET, f"{ORG}/sec_policy/draft/rule_sets/2/deny_rules", status=500, json={})
+    with pytest.raises(PceCollectionIncomplete):
+        fetch_rule_sets(client, "draft", deadline=_deadline())

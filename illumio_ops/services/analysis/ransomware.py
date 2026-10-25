@@ -29,6 +29,7 @@ class HostRansomware(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
     breakdown: HostBreakdown
     allow_rules: dict[str, list[RuleRef]]  # "port/proto" -> the allow rules exposing that service
+    allow_status: dict[str, str] = {}      # "port/proto" -> ok, partial (one end unplaced) or error (the PCE failed)
 
 
 def _breakdowns(ctx: AppContext, now: datetime, only: str | None = None) -> list[HostBreakdown]:
@@ -56,11 +57,16 @@ def host_ransomware(ctx: AppContext, href: str, *, now: datetime | None = None,
     at = (now or datetime.now(UTC)).astimezone(UTC)
     [breakdown] = _breakdowns(ctx, at, only=href)
     allow_rules: dict[str, list[RuleRef]] = {}
+    status: dict[str, str] = {}
     if explain_allows:
         for s in breakdown.services:
             if (s.active_policy or "").lower() in ALLOWING:  # only services an allow rule can be behind
-                allow_rules[f"{s.port}/{s.proto}"] = explain_service(ctx, href, s.port, s.proto).allow
-    return HostRansomware(breakdown=breakdown, allow_rules=allow_rules)
+                answer = explain_service(ctx, href, s.port, s.proto)
+                key = f"{s.port}/{s.proto}"
+                allow_rules[key] = answer.allow
+                # An empty list after a failed Rule Search is not "no allow rule" (P3 final review #17).
+                status[key] = "error" if answer.pce_error else "partial" if answer.partial else "ok"
+    return HostRansomware(breakdown=breakdown, allow_rules=allow_rules, allow_status=status)
 
 
 def _row(b: HostBreakdown, s: ServiceContribution) -> dict[str, object]:
