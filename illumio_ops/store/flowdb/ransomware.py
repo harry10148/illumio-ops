@@ -39,6 +39,13 @@ def source_updated(conn: sqlite3.Connection) -> dict[str, str | None]:
     return {r[0]: r[1] for r in conn.execute("SELECT workload_href, source_updated_at FROM ransomware_fetch")}
 
 
+def admin_services(conn: sqlite3.Connection) -> list[tuple[int, int, str]]:
+    """The PCE's high-risk services of category admin, as (port, proto, name), once each."""
+    return [(int(p), int(proto), str(name)) for p, proto, name in conn.execute(
+        "SELECT DISTINCT port, proto, name FROM ransomware_services WHERE category = 'admin' AND port >= 0 "
+        "ORDER BY port, proto, name")]
+
+
 def prune_missing(conn: sqlite3.Connection, keep: Iterable[str]) -> int:
     keep_set = set(keep)
     gone = [h for h in source_updated(conn) if h not in keep_set]

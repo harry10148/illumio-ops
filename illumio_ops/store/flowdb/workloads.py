@@ -38,6 +38,10 @@ def replace_inventory(conn: sqlite3.Connection, rows: Sequence[WorkloadRow]) -> 
         conn.executemany(f"INSERT INTO workloads ({_COLUMNS}) VALUES ({_MARKS})", [astuple(r) for r in rows])
 
 
+def all_workloads(conn: sqlite3.Connection) -> list[WorkloadRow]:
+    return [WorkloadRow(*r) for r in conn.execute(f"SELECT {_COLUMNS} FROM workloads ORDER BY href")]
+
+
 def snapshot_day(conn: sqlite3.Connection, day: str) -> int:
     """The day's snapshot is the inventory at its latest run: replaced whole, never merged."""
     with transaction(conn):
