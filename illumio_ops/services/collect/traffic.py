@@ -1,7 +1,7 @@
 """Traffic collector: pull flows since the watermark into the flow database.
 
-Window [watermark - 600 s, now] (VEN reports every 10 minutes; the overlap re-reads records that
-were still growing). A failed window records a gap and leaves the watermark where it was; a window
+Window [watermark - 30 min, now] (records reach the PCE late; the overlap re-reads them), read an
+hour at a time when it is longer (a cold start, a catch-up). A failed window records a gap and leaves the watermark where it was; a window
 that still hits the 200,000 cap at the smallest split is written and recorded as truncated.
 """
 from __future__ import annotations
@@ -35,7 +35,7 @@ from illumio_ops.services.collect import CycleResult, drops_stale
 from illumio_ops.services.collect.cycle import begin, fail
 from illumio_ops.services.collect.guard import BindingMismatch, ensure_binding
 from illumio_ops.services.collect.mode import collects
-from illumio_ops.services.collect.windows import harvest
+from illumio_ops.services.collect.windows import harvest, slices
 from illumio_ops.services.context import AppContext
 from illumio_ops.store.flowdb import ingest_state
 from illumio_ops.store.flowdb.db import StaleGeneration, db_day, transaction
@@ -97,36 +97,46 @@ def run_traffic_cycle(ctx: AppContext, *, now: datetime | None = None) -> CycleR
     at = _now(now)
     fdb = ctx.flows()
     start, done_progress = begin(fdb, SOURCE, at, overlap=OVERLAP, cold_start=COLD_START, generation=gen)
-    try:
-        with client:
-            rows, windows, truncated = fetch_traffic(client, start, at, query_name="illumio-ops traffic")
-    except PCE_FAILURES as exc:
-        fail(fdb, SOURCE, start, at, exc, generation=gen)
-        logger.warning("traffic collection failed for {} – {}: {}", start, at, exc)
-        return CycleResult(0, 0, 1)
-    try:
-        records, skipped = normalize_all(rows)
-        with fdb.writing(gen) as conn:
+    pieces = slices(start, at)  # a cold start or a catch-up is read and written an hour at a time
+    rows = windows = gaps = skipped = 0
+    with client:
+        for a, b in pieces:
             try:
-                ensure_binding(conn, settings.pce, at)
-            except BindingMismatch as exc:
-                ingest_state.mark_failed(conn, SOURCE, at, f"binding: {exc}")
-                logger.error("traffic collection refused: {}", exc)
-                return CycleResult(0, windows, 0, skipped)
-            # Flows, rollups, gaps and the watermark move together or not at all.
-            with transaction(conn):
-                upsert_flows(conn, records, origin=DataOrigin.INGEST, now=at)
-                refresh_rollups(conn, at, frozen_through=db_day(
-                    at - timedelta(days=settings.collection.retention.flow_days)))
-                for a, b, n in truncated:
-                    ingest_state.record_gap(conn, SOURCE, a, b, "truncated",
-                                            f"{n} rows returned at the PCE's per-query limit", at)
-                ingest_state.resolve_failed_gaps(conn, SOURCE, start, at, at)
-                ingest_state.add_coverage(conn, SOURCE, start, at)
-                ingest_state.mark_ok(conn, SOURCE, at, watermark=at, rows=len(records), progress=done_progress)
-    except StaleGeneration:
-        raise
-    except Exception as exc:
-        fail(fdb, SOURCE, start, at, exc, generation=gen)
-        raise
-    return CycleResult(len(records), windows, len(truncated), skipped)
+                raw, w, truncated = fetch_traffic(client, a, b, query_name="illumio-ops traffic")
+            except PCE_FAILURES as exc:
+                fail(fdb, SOURCE, a, at, exc, generation=gen)  # nothing from a on was read
+                logger.warning("traffic collection failed for {} – {}: {}", a, at, exc)
+                return CycleResult(rows, windows, gaps + 1, skipped)
+            try:
+                records, s = normalize_all(raw)
+                with fdb.writing(gen) as conn:
+                    try:
+                        ensure_binding(conn, settings.pce, at)
+                    except BindingMismatch as exc:
+                        ingest_state.mark_failed(conn, SOURCE, at, f"binding: {exc}")
+                        logger.error("traffic collection refused: {}", exc)
+                        return CycleResult(rows, windows + w, gaps, skipped + s)
+                    # Flows, gaps and the watermark move together or not at all; the rollups once a
+                    # cycle (a dirty day stays dirty until a cycle rebuilds it).
+                    with transaction(conn):
+                        upsert_flows(conn, records, origin=DataOrigin.INGEST, now=at)
+                        if b == at:
+                            refresh_rollups(conn, at, frozen_through=db_day(
+                                at - timedelta(days=settings.collection.retention.flow_days)))
+                        for ta, tb, n in truncated:
+                            ingest_state.record_gap(conn, SOURCE, ta, tb, "truncated",
+                                                    f"{n} rows returned at the PCE's per-query limit", at)
+                        ingest_state.resolve_failed_gaps(conn, SOURCE, start, b, at)
+                        ingest_state.add_coverage(conn, SOURCE, start, b)
+                        ingest_state.mark_ok(conn, SOURCE, at, watermark=b, rows=rows + len(records),
+                                             progress=done_progress)
+            except StaleGeneration:
+                raise
+            except Exception as exc:
+                fail(fdb, SOURCE, a, at, exc, generation=gen)
+                raise
+            rows += len(records)
+            windows += w
+            gaps += len(truncated)
+            skipped += s
+    return CycleResult(rows, windows, gaps, skipped)

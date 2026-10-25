@@ -51,6 +51,8 @@ __all__ = ["Coverage", "FlowQuery", "FlowRow", "GapReason", "query_flows"]
 
 Order = Literal["last_detected_desc", "connections_desc"]
 FILL_MAX_RESULTS = 200_000
+# Records one query reads from the PCE over all its gaps, held in memory (~6 KB each once parsed).
+FILL_BUDGET = 50_000
 FILL_DEADLINE_SECONDS = 900
 
 
@@ -146,11 +148,11 @@ def _row_from_pce(primary: FlowRecord, partner: FlowRecord | None) -> FlowRow:
 
 
 def _fetch(ctx: AppContext, pce: PceSettings, spec: FilterSpec,
-           window: tuple[datetime, datetime]) -> tuple[list[FlowRecord], bool]:
+           window: tuple[datetime, datetime], max_results: int) -> tuple[list[FlowRecord], bool]:
     """Read one gap window from the PCE with the pushable part of the filter: (records, capped).
     Raises a PCE failure for the caller to report."""
     sub = spec.model_copy(update={"start": window[0], "end": window[1]})
-    payload, _ = to_pce_payload(sub, max_results=FILL_MAX_RESULTS, query_name="illumio-ops query", label_hrefs={})
+    payload, _ = to_pce_payload(sub, max_results=max_results, query_name="illumio-ops query", label_hrefs={})
     with ctx.pce_client(pce) as client:
         result = run_traffic_query(client, payload, deadline=time.monotonic() + FILL_DEADLINE_SECONDS)
     records = []
@@ -208,17 +210,19 @@ def query_flows(ctx: AppContext, spec: FilterSpec, *, limit: int, order: Order,
     pce_rows: list[FlowRow] = []
     if fill_gaps:
         fetched: list[FlowRecord] = []
+        budget = FILL_BUDGET
         for g in cov.gaps:  # no connection is held while the PCE answers (a PCE switch waits for them)
-            if g[2] == "truncated":  # re-reading a window that hit the cap would hit it again
-                kept_gaps.append(g)
+            if g[2] == "truncated" or budget <= 0:  # a capped window would cap again; a spent budget
+                kept_gaps.append((g[0], g[1], "truncated"))  # leaves the rest unread, said so
                 continue
             try:
-                records, capped = _fetch(ctx, settings.pce, spec, (g[0], g[1]))
+                records, capped = _fetch(ctx, settings.pce, spec, (g[0], g[1]), min(budget, FILL_MAX_RESULTS))
             except (*PCE_FAILURES, PceNotConfigured) as exc:
                 logger.warning("could not fill a gap from the PCE: {}", exc)
                 kept_gaps.append((g[0], g[1], "ingest_failed"))
                 continue
             fetched.extend(records)
+            budget -= len(records)
             filled.append((g[0], g[1]))
             if capped:
                 kept_gaps.append((g[0], g[1], "truncated"))

@@ -21,7 +21,7 @@ def _count(ctx, sql="SELECT count(*) FROM flows"):
 
 def test_traffic_cycle_writes_and_advances_watermark(tmp_path, fake_traffic):
     ctx = configured_ctx(tmp_path)
-    fake_traffic.answer = lambda s, e, m: [raw_flow(i, e - minutes(5), e - minutes(1)) for i in range(3)]
+    fake_traffic.answer = lambda s, e, m: [raw_flow(i, e - minutes(5), e - minutes(1)) for i in range(3)] if e == NOW else []
     result = run_traffic_cycle(ctx, now=NOW)
     assert (result.rows, result.gaps) == (3, 0)
     state, gaps = _state(ctx)
@@ -38,7 +38,7 @@ def test_next_cycle_overlaps_previous_window_by_30_minutes(tmp_path, fake_traffi
     ctx = configured_ctx(tmp_path)
     run_traffic_cycle(ctx, now=NOW)
     run_traffic_cycle(ctx, now=NOW + minutes(10))
-    assert fake_traffic.calls[1] == ("2026-10-24T11:30:00Z", "2026-10-24T12:10:00Z")
+    assert fake_traffic.calls[-1] == ("2026-10-24T11:30:00Z", "2026-10-24T12:10:00Z")
 
 
 def test_failed_window_keeps_watermark_and_records_gap(tmp_path, fake_traffic):
@@ -70,13 +70,13 @@ def test_cap_bisects_until_under_cap(tmp_path, fake_traffic, monkeypatch):
     from illumio_ops.services.collect import traffic
     monkeypatch.setattr(traffic, "MAX_RESULTS", 4)
     ctx = configured_ctx(tmp_path)
-    # 6 flows spread over the 24-hour cold-start window: the whole window caps, halves do not.
-    flows = [raw_flow(i, NOW - timedelta(hours=23 - 4 * i), NOW - timedelta(hours=23 - 4 * i) + minutes(1))
-             for i in range(6)]
+    run_traffic_cycle(ctx, now=NOW)
+    # 6 flows spread over the next window [NOW-30m, NOW+10m]: the whole window caps, halves do not.
+    flows = [raw_flow(i, NOW - minutes(28 - 6 * i), NOW - minutes(27 - 6 * i)) for i in range(6)]
     fake_traffic.answer = lambda s, e, m: [f for f in flows
                                            if s.strftime("%Y-%m-%dT%H:%M:%SZ") <= f["timestamp_range"]["first_detected"]
                                            < e.strftime("%Y-%m-%dT%H:%M:%SZ")][:m]
-    result = run_traffic_cycle(ctx, now=NOW)
+    result = run_traffic_cycle(ctx, now=NOW + minutes(10))
     assert result.windows == 3 and result.gaps == 0 and _count(ctx) == 6
 
 
@@ -130,6 +130,40 @@ def test_first_cycle_binds_the_database(tmp_path, fake_traffic):
 def test_malformed_records_are_skipped_not_fatal(tmp_path, fake_traffic):
     ctx = configured_ctx(tmp_path)
     good = raw_flow(1, NOW - minutes(5), NOW - minutes(4))
-    fake_traffic.answer = lambda s, e, m: [good, {"src": {"ip": "1.1.1.1"}}]
+    fake_traffic.answer = lambda s, e, m: [good, {"src": {"ip": "1.1.1.1"}}] if e == NOW else []
     result = run_traffic_cycle(ctx, now=NOW)
     assert result.rows == 1 and result.skipped == 1 and _count(ctx) == 1
+
+
+def test_a_long_window_is_read_an_hour_at_a_time(tmp_path, fake_traffic):
+    # A cold start or a catch-up after an outage reads a day: at 1,000 workloads ~1M records, ~6 GB
+    # once parsed (P2 Task 15), so one query covers at most an hour and is written before the next.
+    ctx = configured_ctx(tmp_path)
+    run_traffic_cycle(ctx, now=NOW)
+    assert len(fake_traffic.calls) == 24
+    assert fake_traffic.calls[0] == ("2026-10-23T12:00:00Z", "2026-10-23T13:00:00Z")
+    assert fake_traffic.calls[-1][1] == "2026-10-24T12:00:00Z"
+    state, gaps = _state(ctx)
+    assert state.watermark == NOW and gaps == []
+
+
+def test_a_failure_mid_catch_up_keeps_the_hours_already_read(tmp_path, fake_traffic):
+    ctx = configured_ctx(tmp_path)
+    stop = NOW - timedelta(hours=19)
+
+    def answer(s, e, m):
+        if s >= stop:
+            raise PceQueryError("timeout")
+        return [raw_flow(s.hour, s + minutes(1), s + minutes(2))]
+    fake_traffic.answer = answer
+    run_traffic_cycle(ctx, now=NOW)
+    state, gaps = _state(ctx)
+    assert _count(ctx) == 5 and state.watermark == stop
+    [gap] = gaps
+    assert (gap.window_start, gap.window_end, gap.kind) == (stop, NOW, "failed")
+    fake_traffic.answer = lambda s, e, m: []
+    fake_traffic.calls.clear()
+    run_traffic_cycle(ctx, now=NOW + minutes(10))
+    assert fake_traffic.calls[0][0] == "2026-10-23T16:30:00Z"  # from the watermark, overlap included
+    state, gaps = _state(ctx)
+    assert state.watermark == NOW + minutes(10) and gaps == []

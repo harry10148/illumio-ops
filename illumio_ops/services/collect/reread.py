@@ -6,7 +6,7 @@ coverage says its window is complete. Once a day in the display time zone, from 
 the latest UTC day that ended at least SETTLE before is read again, for the sources the mode
 collects live and from where the store's coverage of each begins.
 
-It reads one hour at a time (memory and write-lock holds stay small at 1,000 workloads), compares
+It reads one slice (an hour) at a time, so memory and write-lock holds stay small, compares
 on a read connection and writes only what the store lacks: a record found late is live data
 (origin ingest, so alerting sees it); a stored record that grew keeps its origin. Its progress is
 kept with the backfill's, and one runs at a time (BACKFILL_LOCK). A failure is reported on the
@@ -34,6 +34,7 @@ from illumio_ops.services.collect.traffic import (
     fetch_traffic,
     normalize_all,
 )
+from illumio_ops.services.collect.windows import slices
 from illumio_ops.services.context import AppContext
 from illumio_ops.settings.schema import Settings
 from illumio_ops.store.flowdb import ingest_state
@@ -46,7 +47,6 @@ PLAN = "reread"
 LIVE = (IngestSource.TRAFFIC, IngestSource.EVENTS)
 REREAD_LOCAL_HOUR = 3            # off-peak, in the display time zone
 SETTLE = timedelta(hours=6)      # every record of the day had at least this long to reach the PCE
-HOUR = timedelta(hours=1)
 MAX_ATTEMPTS = 3                 # per day; a PCE that keeps failing is not queried all day
 WRITE_BATCH = 20_000             # records per hold of the write lock
 
@@ -54,16 +54,6 @@ WRITE_BATCH = 20_000             # records per hold of the write lock
 def _target(at: datetime) -> datetime:
     """Start of the latest UTC day that ended at least SETTLE before `at`."""
     return (at - SETTLE).replace(hour=0, minute=0, second=0, microsecond=0) - timedelta(days=1)
-
-
-def _hours(start: datetime, end: datetime) -> list[tuple[datetime, datetime]]:
-    out = []
-    cur = start
-    while cur < end:
-        nxt = min(cur.replace(minute=0, second=0, microsecond=0) + HOUR, end)
-        out.append((cur, nxt))
-        cur = nxt
-    return out
 
 
 def ensure_daily_reread(ctx: AppContext, *, now: datetime | None = None) -> CycleResult | None:
@@ -144,7 +134,7 @@ def _read_day(fdb: FlowDb, gen: int, settings: Settings, client: PceClient, plan
     frozen = db_day(at - timedelta(days=settings.collection.retention.flow_days))
     rows = windows = gaps = skipped = 0
     with client:
-        for a, b in _hours(resume, end):
+        for a, b in slices(resume, end):
             reads = {src: max(a, s) for src, s in begins.items() if s < b}
             try:
                 t_rows, w1, t_trunc = (fetch_traffic(client, reads[IngestSource.TRAFFIC], b,

@@ -39,7 +39,7 @@ def test_backfill_oldest_first_and_resumes(tmp_path, fake_traffic):
     assert first.gaps == 1 and days_seen == sorted(days_seen)
     with ctx.flows().connect() as conn:
         progress = ingest_state.get(conn, IngestSource.BACKFILL).progress["manual"]
-    assert progress["done_through"] == (start.replace(hour=0, minute=0) + timedelta(days=1)).isoformat()
+    assert progress["done_through"] == (start + timedelta(hours=1)).isoformat()  # traffic is read by the hour
     fake_traffic.answer = lambda s, e, m: [raw_flow(9, s + minutes(1), s + minutes(2))]
     calls_before = len(fake_traffic.calls)
     run_backfill(ctx, start=start, end=NOW, now=NOW)
@@ -101,3 +101,19 @@ def test_resumed_initial_backfill_reads_only_what_the_mode_now_collects(tmp_path
     with ctx.flows().connect() as conn:
         progress = ingest_state.get(conn, IngestSource.BACKFILL).progress
     assert progress["initial"]["finished"] is True and progress["initial_done"] == ["events"]
+
+
+def test_backfill_reads_traffic_by_the_hour_and_events_by_the_day(tmp_path, fake_traffic, monkeypatch):
+    # A day of traffic at 1,000 workloads is ~6 GB once parsed; events are few, and on SaaS every
+    # /events call costs 22-60 s, so they stay one query per day.
+    event_calls = []
+    monkeypatch.setattr(ev, "fetch_events", lambda client, **kw: (
+        event_calls.append((kw["start"], kw["end"])), EventsPage(items=[], capped=False))[1])
+    ctx = configured_ctx(tmp_path)
+    day = NOW.replace(hour=0) - timedelta(days=2)
+    run_backfill(ctx, start=day, end=day + timedelta(days=1), now=NOW)
+    assert len(fake_traffic.calls) == 24 and fake_traffic.calls[1][0] == "2026-10-22T01:00:00Z"
+    assert event_calls == [(day, day + timedelta(days=1))]
+    with ctx.flows().connect() as conn:
+        assert ingest_state.coverage(conn, "traffic") == [(day, day + timedelta(days=1))]
+        assert ingest_state.coverage(conn, "events") == [(day, day + timedelta(days=1))]

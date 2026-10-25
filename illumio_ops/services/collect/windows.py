@@ -8,6 +8,9 @@ from typing import Any
 
 MIN_WINDOW = timedelta(seconds=60)
 MAX_DEPTH = 12
+# The most one traffic query reads, written before the next is read: at 1,000 workloads a day is
+# ~1M records, ~6 GB once parsed (P2 Task 15), an hour ~42k records, ~260 MB.
+SLICE = timedelta(hours=1)
 
 
 @dataclass
@@ -39,4 +42,14 @@ def harvest(fetch: Callable[[datetime, datetime], tuple[list[dict[str, Any]], bo
         walk(mid, b, depth + 1)
 
     walk(start, end, 0)
+    return out
+
+
+def slices(start: datetime, end: datetime) -> list[tuple[datetime, datetime]]:
+    """[start, end] as consecutive pieces of at most SLICE (one piece when it is no longer)."""
+    out = []
+    cur = start
+    while cur < end:
+        out.append((cur, min(cur + SLICE, end)))
+        cur += SLICE
     return out

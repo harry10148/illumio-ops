@@ -54,7 +54,7 @@ def test_backfilled_day_is_rolled_up_at_once(tmp_path, fake_traffic, monkeypatch
     monkeypatch.setattr(ev, "fetch_events", lambda client, **kw: EventsPage(items=[], capped=False))
     ctx = configured_ctx(tmp_path)
     past = NOW - timedelta(days=3)
-    fake_traffic.answer = lambda s, e, m: [raw_flow(7, s + minutes(5), s + minutes(6))]
+    fake_traffic.answer = lambda s, e, m: [raw_flow(7, s + minutes(5), s + minutes(6))] if s == past else []
     run_backfill(ctx, start=past, end=past + timedelta(days=1), now=NOW)
     assert _rollup(ctx, past.strftime("%Y-%m-%d")) == 1
 
@@ -102,7 +102,7 @@ def test_a_day_retention_has_pruned_keeps_its_rollup_when_touched_again(tmp_path
     assert _rollup(ctx, day) == 2
     run_retention(ctx, now=NOW)  # the morning connection goes, the evening one stays
     nxt = (cutoff + timedelta(days=1)).replace(hour=0, minute=1)
-    fake_traffic.answer = lambda s, e, m: [raw_flow(2, nxt, nxt + minutes(3), direction="inbound")]
+    fake_traffic.answer = lambda s, e, m: [raw_flow(2, nxt, nxt + minutes(3), direction="inbound")] if s <= nxt < e else []
     monkeypatch.setattr(ev, "fetch_events", lambda client, **kw: EventsPage(items=[], capped=False))
     stats = run_backfill(ctx, start=nxt.replace(minute=0), end=nxt + HOUR, now=NOW)
     with ctx.flows().connect() as conn:

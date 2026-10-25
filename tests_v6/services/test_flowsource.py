@@ -153,3 +153,14 @@ def test_reads_refuse_while_the_store_still_holds_another_pces_data(collected):
         query_flows(collected, _spec(NOW - minutes(60), NOW), limit=100, order="last_detected_desc")
     with pytest.raises(BindingMismatch):
         query_events(collected, start=NOW - minutes(60), end=NOW, limit=100)
+
+
+def test_gap_filling_stops_at_its_row_budget(collected, fake_traffic, monkeypatch):
+    # What a query reads from the PCE is held in memory: bounded over all its gaps, not per gap.
+    from illumio_ops.services import flowsource
+    monkeypatch.setattr(flowsource, "FILL_BUDGET", 3)
+    fake_traffic.answer = lambda s, e, m: [raw_flow(10 + i, e - minutes(3), e - minutes(2)) for i in range(5)][:m]
+    q = query_flows(collected, _spec(NOW - timedelta(hours=25), NOW + minutes(15)), limit=100,
+                    order="last_detected_desc", fill_gaps=True)
+    assert len(fake_traffic.calls) == 1  # the second gap is not read once the budget is spent
+    assert [g[2] for g in q.coverage.gaps] == ["truncated", "truncated"]

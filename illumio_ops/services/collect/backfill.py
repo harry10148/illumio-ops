@@ -1,4 +1,5 @@
-"""Backfill: read history the live collectors never saw, one UTC day at a time, oldest first.
+"""Backfill: read history the live collectors never saw, one UTC day at a time (traffic an hour at a
+time), oldest first.
 
 Rows are marked origin=backfill: they seed the baseline and the exposure graph (spec §6.4) but
 never enter alert evaluation (spec §7). Progress survives restarts; the live watermarks never move.
@@ -25,6 +26,7 @@ from illumio_ops.services.collect.traffic import (
     fetch_traffic,
     normalize_all,
 )
+from illumio_ops.services.collect.windows import slices
 from illumio_ops.services.context import AppContext
 from illumio_ops.store.flowdb import ingest_state
 from illumio_ops.store.flowdb.db import FlowDb, StaleGeneration, db_day, transaction
@@ -101,46 +103,56 @@ def _run_backfill(ctx: AppContext, *, start: datetime, end: datetime, plan: Plan
     rows = windows = gaps = skipped = 0
     with client:
         for a, b in _days(resume_from, end):
-            try:
-                traffic_rows, w1, t_trunc = (fetch_traffic(client, a, b, query_name="illumio-ops backfill")
-                                             if IngestSource.TRAFFIC in reads else ([], 0, []))
-                event_rows, w2, e_trunc = fetch_event_rows(client, a, b, timeout=events_timeout(settings.pce))
-            except PCE_FAILURES as exc:
-                _record_failure(fdb, gen, reads, a, b, at, str(exc))
-                logger.warning("backfill stopped at {}: {}", a, exc)
-                return CycleResult(rows, windows, gaps + 1, skipped)
-            try:
-                flows, s1 = normalize_all(traffic_rows)
-                events, s2 = normalize_events(event_rows)
-                with fdb.writing(gen) as conn:
-                    try:
-                        ensure_binding(conn, settings.pce, at)
-                    except BindingMismatch as exc:
-                        ingest_state.mark_failed(conn, SOURCE, at, f"binding: {exc}")
-                        return CycleResult(rows, windows, gaps, skipped)
-                    with transaction(conn):  # one day lands completely or not at all
-                        upsert_flows(conn, flows, origin=DataOrigin.BACKFILL, now=at)
-                        refresh_rollups(conn, at, frozen_through=db_day(
-                            at - timedelta(days=settings.collection.retention.flow_days)))
-                        upsert_events(conn, events, origin=DataOrigin.BACKFILL, now=at)
-                        for src, trunc in ((IngestSource.TRAFFIC, t_trunc), (IngestSource.EVENTS, e_trunc)):
-                            for ta, tb, n in trunc:
-                                ingest_state.record_gap(conn, src, ta, tb, "truncated",
-                                                        f"backfill: {n} rows at the limit", at)
-                        for src in reads:
-                            ingest_state.resolve_failed_gaps(conn, src, a, b, at)
-                            ingest_state.add_coverage(conn, src, a, b)
-                        plans[plan] = {**plans[plan], "done_through": b.isoformat()}
-                        ingest_state.set_progress(conn, SOURCE, plans)
-            except StaleGeneration:
-                raise
-            except Exception as exc:
-                _record_failure(fdb, gen, reads, a, b, at, f"{type(exc).__name__}: {exc}")
-                raise
-            rows += len(flows) + len(events)
-            windows += w1 + w2
-            gaps += len(t_trunc) + len(e_trunc)
-            skipped += s1 + s2
+            # Traffic an hour at a time (a day at 1,000 workloads is ~6 GB once parsed); the day's
+            # events in one query with the first hour (on SaaS each /events call costs 22-60 s).
+            pieces = slices(a, b) if IngestSource.TRAFFIC in reads else [(a, b)]
+            for pa, pb in pieces:
+                first = pa == a
+                try:
+                    traffic_rows, w1, t_trunc = (fetch_traffic(client, pa, pb, query_name="illumio-ops backfill")
+                                                 if IngestSource.TRAFFIC in reads else ([], 0, []))
+                    event_rows, w2, e_trunc = (fetch_event_rows(client, a, b, timeout=events_timeout(settings.pce))
+                                               if first else ([], 0, []))
+                except PCE_FAILURES as exc:
+                    _record_failure(fdb, gen, reads if first else (IngestSource.TRAFFIC,), pa, b, at, str(exc))
+                    logger.warning("backfill stopped at {}: {}", pa, exc)
+                    return CycleResult(rows, windows, gaps + 1, skipped)
+                try:
+                    flows, s1 = normalize_all(traffic_rows)
+                    events, s2 = normalize_events(event_rows)
+                    with fdb.writing(gen) as conn:
+                        try:
+                            ensure_binding(conn, settings.pce, at)
+                        except BindingMismatch as exc:
+                            ingest_state.mark_failed(conn, SOURCE, at, f"binding: {exc}")
+                            return CycleResult(rows, windows, gaps, skipped)
+                        with transaction(conn):  # one piece lands completely or not at all
+                            upsert_flows(conn, flows, origin=DataOrigin.BACKFILL, now=at)
+                            if pb == b:  # the day's rollups once, with its last piece
+                                refresh_rollups(conn, at, frozen_through=db_day(
+                                    at - timedelta(days=settings.collection.retention.flow_days)))
+                            upsert_events(conn, events, origin=DataOrigin.BACKFILL, now=at)
+                            for src, trunc in ((IngestSource.TRAFFIC, t_trunc), (IngestSource.EVENTS, e_trunc)):
+                                for ta, tb, n in trunc:
+                                    ingest_state.record_gap(conn, src, ta, tb, "truncated",
+                                                            f"backfill: {n} rows at the limit", at)
+                            for src in reads:
+                                if src is IngestSource.TRAFFIC or first:
+                                    read_to = pb if src is IngestSource.TRAFFIC else b
+                                    ingest_state.resolve_failed_gaps(conn, src, a, read_to, at)
+                                    ingest_state.add_coverage(conn, src, a, read_to)
+                            plans[plan] = {**plans[plan], "done_through": pb.isoformat()}
+                            ingest_state.set_progress(conn, SOURCE, plans)
+                except StaleGeneration:
+                    raise
+                except Exception as exc:
+                    _record_failure(fdb, gen, reads if first else (IngestSource.TRAFFIC,), pa, b, at,
+                                    f"{type(exc).__name__}: {exc}")
+                    raise
+                rows += len(flows) + len(events)
+                windows += w1 + w2
+                gaps += len(t_trunc) + len(e_trunc)
+                skipped += s1 + s2
     with fdb.writing(gen) as conn:
         plans[plan] = {**plans[plan], "done_through": end.isoformat(), "finished": True}
         if plan == "initial":  # what the initial backfills have read so far, whatever the mode was
