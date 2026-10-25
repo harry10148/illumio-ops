@@ -2,7 +2,7 @@
 # Build the v6 offline bundle: dist/illumio-ops-<version>-offline-linux-x86_64.tar.gz
 #
 #   illumio-ops-<version>/
-#     python/                 python-build-standalone CPython 3.12.7 (SHA256-pinned)
+#     python/                 python-build-standalone CPython 3.12.15 (SHA256-pinned)
 #     wheels/                 every wheel requirements-v6.lock names
 #     requirements-v6.lock
 #     illumio_ops/            the package, including the built web UI
@@ -17,10 +17,13 @@ cd "$REPO_ROOT"
 PYTHON="${PYTHON:-python3}"
 LOCK=requirements-v6.lock
 
-# Same pins as 5.x scripts/build_offline_bundle.sh; bump all three together.
-PBS_TAG="20241016"
-PBS_PYTHON="3.12.7"
-PBS_SHA256_LINUX_X86_64="43576f7db1033dd57b900307f09c2e86f371152ac8a2607133afa51cbfc36064"
+# python-build-standalone. Ahead of 5.x's pins (scripts/build_offline_bundle.sh, left as it is until
+# the P8 cutover): v6 checkpoints from a background thread while collectors write, the pattern SQLite's
+# WAL-reset bug needs (3.7.0-3.51.2, sqlite.org/wal.html), so the bundled SQLite must be 3.51.3 or later
+# (this one has 3.53.1; checked below). Bump the three together.
+PBS_TAG="20261001"
+PBS_PYTHON="3.12.15"
+PBS_SHA256_LINUX_X86_64="0e56475e23f61a9c7d254fe16bc4931544026d591fc1cb8b770712ee94fa6260"
 PBS_URL="https://github.com/astral-sh/python-build-standalone/releases/download/${PBS_TAG}/cpython-${PBS_PYTHON}+${PBS_TAG}-x86_64-unknown-linux-gnu-install_only.tar.gz"
 
 VERSION="$("$PYTHON" -c 'import re,sys; print(re.search(r"__version__ = \"([^\"]+)\"", open("illumio_ops/__init__.py").read()).group(1))')"
@@ -75,13 +78,18 @@ chmod +x "$STAGE/install.sh"
 
 echo "==> Slimming the bundled Python"
 py="$STAGE/python"
-for f in "$py"/lib/libpython3.*.so.* "$py"/bin/python3.[0-9]*; do
+# The library only: binutils 2.42's strip corrupts the 2026 PBS executable (".dynstr not in segment").
+for f in "$py"/lib/libpython3.*.so.*; do
     [[ -f "$f" ]] && strip --strip-debug "$f" 2>/dev/null || true
 done
 rm -rf "$py"/lib/tcl8* "$py"/lib/tk8* "$py"/lib/Tix* "$py"/lib/itcl* "$py"/lib/thread2* "$py"/include
 rm -rf "$py"/lib/python3.*/tkinter "$py"/lib/python3.*/idlelib "$py"/lib/python3.*/lib2to3 \
        "$py"/lib/python3.*/pydoc_data "$py"/lib/python3.*/test "$py"/lib/python3.*/config-3.*
 find "$py"/lib -name '*.a' -delete 2>/dev/null || true
+# The slimmed interpreter still starts, and its SQLite is past the WAL-reset bug (see PBS_TAG).
+"$py/bin/python3" -I -c 'import sqlite3, ssl, sys, zlib
+v = sqlite3.sqlite_version_info
+sys.exit(0 if v >= (3, 51, 3) else f"bundled SQLite {sqlite3.sqlite_version} has the WAL-reset bug; need 3.51.3+")'
 
 # root-owned entries: extracting as root must not hand the code to whoever built it
 tar --owner=0 --group=0 --numeric-owner -czf "$ARCHIVE" -C "$REPO_ROOT/build/v6" "$NAME"
