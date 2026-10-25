@@ -87,3 +87,13 @@ def test_flow_store_checkpoint_runs_as_its_own_job(tmp_path):
     assert job is not None and job.trigger.interval.total_seconds() == FLOWS_CHECKPOINT_SECONDS == 60
     job.func()
     assert _health(ctx)["flows_checkpoint"].last_ok is True
+
+
+def test_backfill_check_also_runs_the_daily_reread(tmp_path, monkeypatch):
+    from illumio_ops.jobs import scheduler
+    calls = []
+    monkeypatch.setattr(scheduler, "ensure_initial_backfill", lambda ctx: calls.append("initial"))
+    monkeypatch.setattr(scheduler, "ensure_daily_reread", lambda ctx: calls.append("reread"))
+    ctx = make_ctx(tmp_path)
+    build_scheduler(ctx).get_job("collect_backfill").func()
+    assert calls == ["initial", "reread"] and _health(ctx)["collect_backfill"].last_ok is True

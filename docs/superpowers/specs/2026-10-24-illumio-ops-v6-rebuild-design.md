@@ -617,6 +617,10 @@ services 條目只有 port、to_port、proto、process_name、windows_service_na
   **流量晚到（實測，lab，P2 Task 15）**：新連線從首見到出現在 traffic query 的延遲中位數 9.4 分鐘、p99 14.7、最大約 16–18
   分鐘，32% 晚於 10 分鐘。因此收集每輪往回重疊 30 分鐘（不論收集間隔）；只往回 10 分鐘時實測漏 2.28%。5.x 的游標是
   每批最大 `last_detected`，晚到的一律跳過（lab 實測少收約 35%），不能當完整性的比較基準。
+  晚於重疊的紀錄（例如 VEN 離線緩存、數小時後補傳）由**每日重讀**補回【決定，2026-10-25，P2 最終審查 F12】：每天在
+  顯示時區 03:00 後，把最近一個結束滿 6 小時的 UTC 日、依收集模式即時收集的來源，從該來源覆蓋範圍的起點起逐小時重讀
+  一次；只寫入店裡沒有的（晚到的紀錄算即時資料，origin 為 ingest；已存紀錄保留原 origin），失敗不記缺口、當天最多
+  重試 3 次。代價是每天多一次一天份的 PCE 查詢，寫入鎖只隨差異量持有。
 - **F8**：async query 上限 200,000 筆（文件）。deny rule 在 ruleset 內（`rule_sets[].deny_rules`）；組織層
   `/sec_policy/{p}/deny_rules` 在 lab 回 404（實測）。
 - **F9 5.x 可回收的分析**：`mod15_lateral_movement`（BFS 可達、articulation points）、`attack_posture`

@@ -202,6 +202,20 @@ def _update_baselines(conn: sqlite3.Connection, conn_key: str) -> None:
             (row["initiator_user"], row["dst_key"], port, row["proto"], row["first_detected"], row["last_detected"]))
 
 
+def split_unseen(conn: sqlite3.Connection, records: Sequence[FlowRecord]) -> tuple[list[FlowRecord], list[FlowRecord]]:
+    """(records not stored yet, stored records with something to add). Read-only, so a caller can
+    leave the unchanged ones out before it takes the write lock."""
+    new: list[FlowRecord] = []
+    grown: list[FlowRecord] = []
+    for r in records:
+        old = conn.execute(_STORED, (record_key(r),)).fetchone()
+        if old is None:
+            new.append(r)
+        elif not _adds_nothing(old, r, DataOrigin.BACKFILL):  # backfill: an ingest row stays ingest
+            grown.append(r)
+    return new, grown
+
+
 def upsert_flows(conn: sqlite3.Connection, records: Sequence[FlowRecord], *, origin: DataOrigin,
                  now: datetime) -> UpsertStats:
     """Write a batch in one transaction (nested in the caller's, if any). The caller holds

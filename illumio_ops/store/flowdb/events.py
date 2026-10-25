@@ -11,16 +11,28 @@ from illumio_ops.store.flowdb import archive
 from illumio_ops.store.flowdb.db import db_time, transaction
 
 
-def upsert_events(conn: sqlite3.Connection, records: Sequence[EventRecord], *, origin: DataOrigin,
-                  now: datetime) -> int:
-    """Insert events not seen before (an event never changes); returns how many were new."""
-    stamp = db_time(now)
+def _known(conn: sqlite3.Connection, records: Sequence[EventRecord]) -> set[str]:
     hrefs = sorted({r.href for r in records})
     known: set[str] = set()
     for i in range(0, len(hrefs), 500):
         chunk = hrefs[i:i + 500]
         known |= {h for (h,) in conn.execute(f"SELECT href FROM events WHERE href IN ({','.join('?' * len(chunk))})",
                                             chunk)}
+    return known
+
+
+def unseen_events(conn: sqlite3.Connection, records: Sequence[EventRecord]) -> list[EventRecord]:
+    """The events not stored yet. Read-only, so a caller can leave the rest out before it takes the
+    write lock."""
+    known = _known(conn, records)
+    return [r for r in records if r.href not in known]
+
+
+def upsert_events(conn: sqlite3.Connection, records: Sequence[EventRecord], *, origin: DataOrigin,
+                  now: datetime) -> int:
+    """Insert events not seen before (an event never changes); returns how many were new."""
+    stamp = db_time(now)
+    known = _known(conn, records)
     with transaction(conn):
         archive.mark_stale(conn, "events", {db_time(r.timestamp)[:10] for r in records if r.href not in known})
         before = conn.total_changes

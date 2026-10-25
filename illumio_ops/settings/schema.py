@@ -7,6 +7,7 @@ default_settings(), used for a fresh install and by the 5.x migrator.
 from __future__ import annotations
 
 import re
+from datetime import UTC, timedelta, timezone, tzinfo
 from typing import Annotated, Literal
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
@@ -153,6 +154,17 @@ class DisplaySettings(StrictModel):
         except (ZoneInfoNotFoundError, ValueError):
             raise ValueError("must be 'local', 'UTC', 'UTC+N' or an IANA time zone name") from None
         return v
+
+    def zone(self) -> tzinfo | None:
+        """The zone the setting names; None is the server's own clock ('local')."""
+        if self.timezone == "local":
+            return None
+        if self.timezone == "UTC":
+            return UTC
+        m = _UTC_OFFSET.fullmatch(self.timezone)
+        if m:
+            return timezone(timedelta(hours=float(m.group(1))))
+        return ZoneInfo(self.timezone)
 
 
 class LoggingSettings(StrictModel):

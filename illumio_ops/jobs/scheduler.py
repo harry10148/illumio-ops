@@ -16,6 +16,7 @@ from illumio_ops.services.collect.archive import run_archive
 from illumio_ops.services.collect.backfill import ensure_initial_backfill
 from illumio_ops.services.collect.events import run_events_cycle
 from illumio_ops.services.collect.inventory import run_inventory_cycle
+from illumio_ops.services.collect.reread import ensure_daily_reread
 from illumio_ops.services.collect.reset import finish_pending_switch
 from illumio_ops.services.collect.retention import run_retention
 from illumio_ops.services.collect.traffic import run_traffic_cycle
@@ -26,7 +27,8 @@ from illumio_ops.web.tls import ensure_self_signed
 PCE_PROBE_SECONDS = 300
 TLS_RENEW_SECONDS = 86400
 DAILY_SECONDS = 86400
-# Checks whether a first backfill (or an interrupted one) needs to run; cheap when nothing is due.
+# Checks whether a first backfill (or an interrupted one) or the nightly re-read needs to run;
+# cheap when nothing is due.
 BACKFILL_CHECK_SECONDS = 600
 # Moves committed flow-store pages from the WAL into the database outside the write lock (FlowDb).
 FLOWS_CHECKPOINT_SECONDS = 60
@@ -103,6 +105,7 @@ def _collector_jobs(ctx: AppContext) -> dict[str, Callable[[], None]]:
     def backfill() -> None:
         finish_pending_switch(ctx)
         ensure_initial_backfill(ctx)
+        ensure_daily_reread(ctx)
 
     def archive() -> None:
         run_archive(ctx)

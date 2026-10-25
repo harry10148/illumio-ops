@@ -90,6 +90,23 @@ def test_timezone_accepts_the_5x_formats():
             DisplaySettings(language="en", timezone=bad)
 
 
+def test_display_zone_resolves_every_accepted_format():
+    from datetime import UTC, datetime, timedelta
+    from zoneinfo import ZoneInfo
+
+    from illumio_ops.settings.schema import DisplaySettings
+
+    def zone(tz):
+        return DisplaySettings(language="en", timezone=tz).zone()
+
+    at = datetime(2026, 10, 24, 19, 0, tzinfo=UTC)
+    assert zone("local") is None  # the server's own clock
+    assert zone("UTC") is UTC
+    assert at.astimezone(zone("UTC+8")).hour == 3 and at.astimezone(zone("UTC-5")).hour == 14
+    assert at.astimezone(zone("UTC+5.5")).utcoffset() == timedelta(hours=5, minutes=30)
+    assert zone("Asia/Taipei") == ZoneInfo("Asia/Taipei")
+
+
 # ── final review fixes ─────────────────────────────────────────────────────
 
 def _with_web(**web):
