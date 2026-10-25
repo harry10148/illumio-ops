@@ -7,7 +7,10 @@ from datetime import timedelta
 
 from illumio_ops.domain.flows import normalize_flow
 from illumio_ops.domain.values import DataOrigin
+from illumio_ops.services.collect import archive as archive_job
 from illumio_ops.services.collect.archive import run_archive
+from illumio_ops.services.collect.reset import reset_for_new_pce
+from illumio_ops.store.flowdb import archive as archive_log
 from illumio_ops.store.flowdb.flows import upsert_flows
 
 from .conftest import NOW, configured_ctx, raw_flow
@@ -76,3 +79,78 @@ def test_archive_writes_a_day_without_holding_all_its_rows_in_memory(tmp_path):
     with gzip.open(ctx.paths.archive_dir / f"flows-{day1}.jsonl.gz", "rt") as fh:
         assert sum(1 for _ in fh) == 5000
     assert peak < 4 * 1024 * 1024, f"archiving 5,000 rows peaked at {peak / 1e6:.1f} MB"
+
+
+def _during_write(monkeypatch, action):
+    """Run action() just before the archive job writes a day's file, then write it."""
+    real = archive_job._write_atomic
+
+    def write(path, lines):
+        action()
+        return real(path, lines)
+    monkeypatch.setattr(archive_job, "_write_atomic", write)
+
+
+def test_archive_writes_a_day_without_holding_the_write_lock(tmp_path, monkeypatch):
+    # One 1M-row day took 269 s to write (P2 re-measure, 35 days); collection must not wait for it.
+    ctx = configured_ctx(tmp_path)
+    _enable(ctx)
+    _write_flows(ctx, [2, 1])
+    held = []
+    _during_write(monkeypatch, lambda: held.append(ctx.flows().write_lock.locked()))
+    assert run_archive(ctx, now=NOW) == 2
+    assert held == [False, False]
+
+
+def test_a_day_changed_while_its_file_is_written_is_written_again(tmp_path, monkeypatch):
+    ctx = configured_ctx(tmp_path)
+    _enable(ctx)
+    _write_flows(ctx, [1])
+    fdb = ctx.flows()
+    day1 = (NOW - timedelta(days=1)).strftime("%Y-%m-%d")
+    late = normalize_flow(raw_flow(7, NOW - timedelta(days=1, minutes=9), NOW - timedelta(days=1, minutes=4)))
+
+    def late_record():
+        assert fdb.write_lock.acquire(timeout=1), "the archive job held the write lock while writing"
+        try:
+            with fdb.connect() as conn:
+                upsert_flows(conn, [late], origin=DataOrigin.INGEST, now=NOW)
+        finally:
+            fdb.write_lock.release()
+    _during_write(monkeypatch, late_record)
+    assert run_archive(ctx, now=NOW) == 0
+    with fdb.connect() as conn:
+        assert day1 not in archive_log.archived_days(conn, "flows")  # retention keeps the day's rows
+    monkeypatch.undo()
+    assert run_archive(ctx, now=NOW) == 1
+    with gzip.open(ctx.paths.archive_dir / f"flows-{day1}.jsonl.gz", "rt") as fh:
+        assert sum(1 for _ in fh) == 2
+
+
+def test_a_day_whose_file_could_not_be_written_is_not_archived(tmp_path, monkeypatch):
+    ctx = configured_ctx(tmp_path)
+    _enable(ctx)
+    _write_flows(ctx, [1])
+
+    def disk_full():
+        raise OSError(28, "No space left on device")
+    _during_write(monkeypatch, disk_full)
+    try:
+        run_archive(ctx, now=NOW)
+    except OSError:
+        pass
+    with ctx.flows().connect() as conn:
+        assert archive_log.archived_days(conn, "flows") == set()
+
+
+def test_a_pce_switch_while_a_file_is_written_leaves_no_file_for_the_new_pce(tmp_path, monkeypatch):
+    ctx = configured_ctx(tmp_path)
+    _enable(ctx)
+    _write_flows(ctx, [1])
+
+    def switch():
+        if not ctx.flows().write_lock.locked():  # (the old code held it: switching here would hang)
+            reset_for_new_pce(ctx, now=NOW)
+    _during_write(monkeypatch, switch)
+    assert run_archive(ctx, now=NOW) == 0
+    assert [p.name for p in ctx.paths.archive_dir.iterdir() if p.is_file()] == []

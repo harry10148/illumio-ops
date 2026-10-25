@@ -75,15 +75,25 @@ def _archive(ctx: AppContext, gen: int, now: datetime | None) -> int:
         for day in days:
             if day >= today or day in done:
                 continue
-            # Read, write and record under the lock: a row changed in between would otherwise be
-            # missing from the file while the day is recorded as archived.
+            path = out_dir / f"{kind}-{day}.jsonl.gz"
+            # The file is written without the write lock (a 1M-row day took 269 s, P2 re-measure); a row
+            # changed meanwhile marks the day stale, so finish() leaves it to be written again.
             with fdb.writing(gen) as conn:
-                rows = conn.execute(day_query, _day_range(day))
-                path = out_dir / f"{kind}-{day}.jsonl.gz"
-                count = _write_atomic(path, (json.dumps(dict(r), separators=(",", ":"), ensure_ascii=False)
-                                             for r in rows))
-                archive.record(conn, kind, day, count, str(path), at)
-            written += 1
+                archive.begin(conn, kind, day, str(path), at)
+            try:
+                with fdb.connect() as conn:
+                    rows = conn.execute(day_query, _day_range(day))  # one statement: one snapshot
+                    count = _write_atomic(path, (json.dumps(dict(r), separators=(",", ":"), ensure_ascii=False)
+                                                 for r in rows))
+                with fdb.writing(gen) as conn:
+                    written += archive.finish(conn, kind, day, count, at)
+            except StaleGeneration:
+                path.unlink(missing_ok=True)  # the old PCE's day, written after its archive went aside
+                raise
+            except OSError:
+                if fdb.generation != gen:  # the archive went aside under this write
+                    raise StaleGeneration from None
+                raise
     if settings.retention_days > 0:
         cutoff = db_day(at - timedelta(days=settings.retention_days))
         with fdb.writing(gen) as conn:
