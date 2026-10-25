@@ -50,13 +50,18 @@ def split_user(name: str | None) -> tuple[str | None, str | None]:
 
 
 def is_system_account(user: str | None) -> bool:
+    """An operating-system account: the NT AUTHORITY principals, or a bare local account that is one by
+    name. A domain account never is, whatever its name: the local-name heuristics applied to it would let
+    anyone who can name a domain account hide it from the account analyses."""
     if not user:
         return False
     low = user.lower()
     if low in SYSTEM_ACCOUNTS:
         return True
-    account = split_user(low)[1] or ""
-    return any(account.startswith(p) for p in _SYSTEM_PREFIXES)
+    domain, account = split_user(low)
+    if domain is not None:
+        return domain == "nt authority"
+    return account in SYSTEM_ACCOUNTS or any((account or "").startswith(p) for p in _SYSTEM_PREFIXES)
 
 
 def account_key(user: str | None) -> str | None:

@@ -48,3 +48,10 @@ def test_is_system_account(user, expected):
 ])
 def test_visibility_sees_allowed_table(level, expected):
     assert visibility_sees_allowed(level) is expected
+
+
+@pytest.mark.parametrize("user", ["CORP\\_svc-backup", "CORP\\systemd-admin", "_svc@corp.example", "CORP\\root"])
+def test_a_domain_account_is_never_taken_for_a_system_one(user):
+    # The local-account heuristics (a leading "_", "systemd-", "root") must not exempt domain accounts: anyone
+    # able to name a domain account would otherwise hide it from the account fan-out detector.
+    assert is_system_account(user) is False
