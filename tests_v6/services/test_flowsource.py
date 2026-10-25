@@ -127,3 +127,16 @@ def test_never_collected_is_one_gap(tmp_path, fake_traffic):
     q = query_flows(ctx, _spec(NOW - minutes(60), NOW), limit=10, order="last_detected_desc")
     assert q.rows == [] and [g[2] for g in q.coverage.gaps] == ["not_yet_collected"]
     assert q.coverage.store_to is None
+
+
+def test_a_pce_switch_during_a_filled_query_is_not_answered_with_both_pces(collected, fake_traffic):
+    from illumio_ops.services.collect.reset import reset_for_new_pce
+    from illumio_ops.store.flowdb.db import StaleGeneration
+
+    def switch_then_answer(s, e, m):
+        reset_for_new_pce(collected, now=NOW)  # the operator saves another PCE meanwhile
+        return [raw_flow(7, e - minutes(2), e - minutes(1))]
+    fake_traffic.answer = switch_then_answer
+    with pytest.raises(StaleGeneration):
+        query_flows(collected, _spec(NOW - minutes(60), NOW + minutes(15)), limit=100,
+                    order="last_detected_desc", fill_gaps=True)

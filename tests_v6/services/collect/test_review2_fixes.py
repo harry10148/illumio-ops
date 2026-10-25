@@ -1,5 +1,7 @@
 """Regression tests for the second adversarial review (Tasks 7-11): each one failed before its fix."""
 import gzip
+import threading
+import time
 from datetime import datetime, timedelta
 
 import pytest
@@ -363,12 +365,19 @@ def test_archive_running_across_a_pce_switch_writes_nothing(tmp_path, monkeypatc
     day = NOW - 3 * DAY
     _store(ctx, [raw_flow(1, day, day + minutes(1))])
     real = archive_job.archive.archived_days
+    fdb = ctx.flows()
+    switch = threading.Thread(target=lambda: _switch_to_b(ctx))
     def switch_then_list(conn, kind):
-        if kind == "flows":
-            _switch_to_b(ctx)  # A's day list is in hand; the database is now B's
+        if kind == "flows":  # A's day list is in hand; the switch waits for this read, then B's database
+            gen = fdb.generation
+            switch.start()
+            while fdb.generation == gen:
+                time.sleep(0.01)
         return real(conn, kind)
     monkeypatch.setattr(archive_job.archive, "archived_days", switch_then_list)
     assert run_archive(ctx, now=NOW) == 0
+    switch.join(10)
+    assert not switch.is_alive()
     assert [p.name for p in ctx.paths.archive_dir.iterdir() if p.is_file()] == []
     assert _count(ctx, "archive_log") == 0
 

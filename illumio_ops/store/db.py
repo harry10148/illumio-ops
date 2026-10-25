@@ -14,9 +14,9 @@ _MIGRATION_NAME = re.compile(r"^(\d{4})_[a-z0-9_]+\.sql$")
 BUSY_TIMEOUT_SECONDS = 5.0
 
 
-def connect(path: Path) -> sqlite3.Connection:
+def connect(path: Path, *, factory: type[sqlite3.Connection] = sqlite3.Connection) -> sqlite3.Connection:
     path.parent.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(path, timeout=BUSY_TIMEOUT_SECONDS)
+    conn = sqlite3.connect(path, timeout=BUSY_TIMEOUT_SECONDS, factory=factory)
     conn.row_factory = sqlite3.Row
     try:
         _use_wal(conn)

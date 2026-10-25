@@ -7,7 +7,7 @@ import gzip
 import json
 import os
 import sqlite3
-from collections.abc import Iterable, Iterator
+from collections.abc import Callable, Iterable, Iterator
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
@@ -60,21 +60,34 @@ def _write_atomic(path: Path, lines: Iterable[str]) -> int:
     return count
 
 
-def _day_lines(conn: sqlite3.Connection, kind: str, day: str, path: Path, keep_old: bool) -> Iterator[str]:
+CHECK_EVERY = 1000  # rows between checks that the PCE was not switched (a reset waits for this read)
+
+
+def _day_lines(conn: sqlite3.Connection, kind: str, day: str, path: Path, keep_old: bool,
+               current: Callable[[], bool]) -> Iterator[str]:
     """The day's file as JSON lines from one read snapshot. With keep_old, a line of the file already
     written for the day whose row is no longer stored (retention dropped it) is kept: the database
-    no longer holds the whole day, the file does."""
+    no longer holds the whole day, the file does. Stops (StaleGeneration) once current() is false."""
     conn.execute("BEGIN")  # one snapshot for the look-ups and the day's rows
     try:
+        n = 0
         if keep_old and path.exists():
             key = _KEY[kind]
             with gzip.open(path, "rt", encoding="utf-8") as old:
                 for line in old:
+                    if n % CHECK_EVERY == 0 and not current():
+                        raise StaleGeneration
+                    n += 1
                     k = json.loads(line).get(key)
                     if k is None or conn.execute(f"SELECT 1 FROM {kind} WHERE {key} = ?", (k,)).fetchone() is None:
                         yield line.rstrip("\n")
         for r in conn.execute(_KINDS[kind][1], _day_range(day)):
+            if n % CHECK_EVERY == 0 and not current():
+                raise StaleGeneration
+            n += 1
             yield json.dumps(dict(r), separators=(",", ":"), ensure_ascii=False)
+        if not current():
+            raise StaleGeneration
     finally:
         conn.rollback()
 
@@ -116,7 +129,8 @@ def _archive(ctx: AppContext, gen: int, now: datetime | None) -> int:
                 archive.begin(conn, kind, day, str(path), at)
             try:
                 with fdb.connect() as conn:
-                    count = _write_atomic(path, _day_lines(conn, kind, day, path, keep_old=day <= thinned[kind]))
+                    count = _write_atomic(path, _day_lines(conn, kind, day, path, keep_old=day <= thinned[kind],
+                                                           current=lambda: fdb.generation == gen))
                 with fdb.writing(gen) as conn:
                     written += archive.finish(conn, kind, day, count, at)
             except StaleGeneration:

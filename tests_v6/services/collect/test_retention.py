@@ -1,4 +1,6 @@
 """Retention: per-kind cutoffs, whole connections, archive awareness, baseline by last_seen."""
+import threading
+import time
 from dataclasses import replace
 from datetime import timedelta
 
@@ -114,11 +116,17 @@ def test_retention_stops_quietly_when_the_pce_is_switched_while_it_runs(tmp_path
     ctx = configured_ctx(tmp_path)
     _write(ctx, [_rec(1, 40)])
     fdb, real = ctx.flows(), retention.expired_page
+    switch = threading.Thread(target=fdb.reset)
 
     def switched_meanwhile(conn, *a):
         page = real(conn, *a)
-        fdb.reset()  # between reading a page and deleting it (no lock is held while reading)
+        gen = fdb.generation
+        switch.start()  # between reading a page and deleting it (no lock is held while reading)
+        while fdb.generation == gen:  # it waits for this read's connection to close
+            time.sleep(0.01)
         return page
 
     monkeypatch.setattr(retention, "expired_page", switched_meanwhile)
     assert run_retention(ctx, now=NOW) == {}
+    switch.join(10)
+    assert not switch.is_alive()

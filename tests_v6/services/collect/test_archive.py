@@ -147,15 +147,25 @@ def test_a_day_whose_file_could_not_be_written_is_not_archived(tmp_path, monkeyp
 
 
 def test_a_pce_switch_while_a_file_is_written_leaves_no_file_for_the_new_pce(tmp_path, monkeypatch):
+    # The operator saves another PCE while a day is being written: the switch waits for the read, the
+    # read sees the generation move and stops, and nothing of the old PCE lands in the new archive.
+    import threading
+    import time
     ctx = configured_ctx(tmp_path)
     _enable(ctx)
     _write_flows(ctx, [1])
+    fdb = ctx.flows()
+    switch = threading.Thread(target=lambda: reset_for_new_pce(ctx, now=NOW))
 
-    def switch():
-        if not ctx.flows().write_lock.locked():  # (the old code held it: switching here would hang)
-            reset_for_new_pce(ctx, now=NOW)
-    _during_write(monkeypatch, switch)
+    def start_switch():
+        gen = fdb.generation
+        switch.start()
+        while fdb.generation == gen:  # it holds the lock and waits for the open read
+            time.sleep(0.01)
+    _during_write(monkeypatch, start_switch)
     assert run_archive(ctx, now=NOW) == 0
+    switch.join(10)
+    assert not switch.is_alive()
     assert [p.name for p in ctx.paths.archive_dir.iterdir() if p.is_file()] == []
 
 

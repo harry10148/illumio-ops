@@ -3,6 +3,7 @@ import threading
 
 import pytest
 
+from illumio_ops.store.flowdb import db as flowdb
 from illumio_ops.store.flowdb.db import FlowDb
 from illumio_ops.store.ownership import TABLE_OWNERS
 
@@ -115,3 +116,41 @@ def test_a_flow_store_commit_does_not_wait_for_the_disk(tmp_path):
     # retention holds of the lock reached 20.9 s, 11.5 s with NORMAL (P2 re-measure).
     conn = FlowDb(tmp_path / "flows.sqlite").connect()
     assert conn.execute("PRAGMA synchronous").fetchone()[0] == 1  # NORMAL
+
+
+def test_a_flow_store_connection_is_closed_when_its_block_ends(tmp_path):
+    # sqlite3's own `with` only commits; FlowDb must know when no connection to the file is left.
+    fdb = FlowDb(tmp_path / "flows.sqlite")
+    with fdb.connect() as conn:
+        conn.execute("SELECT 1")
+    with pytest.raises(sqlite3.ProgrammingError):
+        conn.execute("SELECT 1")
+
+
+def test_reset_waits_until_no_connection_to_the_file_is_open(tmp_path):
+    # Unlinking the file under an open connection lets that connection, when it closes last on the old
+    # file, delete the new file's WAL and shared memory by name (sqlite.org/howtocorrupt.html).
+    fdb = FlowDb(tmp_path / "flows.sqlite")
+    reader = fdb.connect()
+    done = []
+    t = threading.Thread(target=lambda: (fdb.reset(), done.append(True)))
+    t.start()
+    t.join(0.3)
+    assert done == [] and fdb.generation == 1  # bumped first, so long readers can notice and stop
+    reader.close()
+    t.join(5)
+    assert done == [True]
+
+
+def test_reset_gives_up_when_a_connection_stays_open(tmp_path, monkeypatch):
+    monkeypatch.setattr(flowdb, "RESET_WAIT_SECONDS", 0.2, raising=False)
+    fdb = FlowDb(tmp_path / "flows.sqlite")
+    with fdb.connect() as conn:
+        conn.execute("INSERT INTO pce_binding(id, pce_url, org_id, bound_at) VALUES (1, 'https://a', '1', 'x')")
+        conn.commit()
+    reader = fdb.connect()
+    with pytest.raises(flowdb.FlowDbBusy):
+        fdb.reset()
+    reader.close()
+    with fdb.connect() as conn:  # nothing was deleted
+        assert conn.execute("SELECT count(*) FROM pce_binding").fetchone()[0] == 1

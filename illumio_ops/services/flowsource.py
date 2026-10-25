@@ -43,6 +43,8 @@ from illumio_ops.services.coverage import (
     merge_gaps,
     store_coverage,
 )
+from illumio_ops.settings.schema import PceSettings
+from illumio_ops.store.flowdb.db import StaleGeneration
 
 __all__ = ["Coverage", "FlowQuery", "FlowRow", "GapReason", "query_flows"]
 
@@ -142,12 +144,13 @@ def _row_from_pce(primary: FlowRecord, partner: FlowRecord | None) -> FlowRow:
     )
 
 
-def _fetch(ctx: AppContext, spec: FilterSpec, window: tuple[datetime, datetime]) -> tuple[list[FlowRecord], bool]:
+def _fetch(ctx: AppContext, pce: PceSettings, spec: FilterSpec,
+           window: tuple[datetime, datetime]) -> tuple[list[FlowRecord], bool]:
     """Read one gap window from the PCE with the pushable part of the filter: (records, capped).
     Raises a PCE failure for the caller to report."""
     sub = spec.model_copy(update={"start": window[0], "end": window[1]})
     payload, _ = to_pce_payload(sub, max_results=FILL_MAX_RESULTS, query_name="illumio-ops query", label_hrefs={})
-    with ctx.pce_client() as client:
+    with ctx.pce_client(pce) as client:
         result = run_traffic_query(client, payload, deadline=time.monotonic() + FILL_DEADLINE_SECONDS)
     records = []
     for raw in result.rows:
@@ -182,10 +185,13 @@ def _live_rows(conn: Any, spec: FilterSpec, fetched: list[FlowRecord]) -> list[F
 
 def query_flows(ctx: AppContext, spec: FilterSpec, *, limit: int, order: Order,
                 fill_gaps: bool = False, now: datetime | None = None) -> FlowQuery:
+    """Raises StaleGeneration if the PCE was switched while the query ran (its parts would belong to two)."""
     at = (now or datetime.now(UTC)).astimezone(UTC)
+    fdb = ctx.flows()
+    gen = fdb.generation  # noted before the settings it goes with (FlowDb.generation)
     settings = ctx.settings.current()
     floor = at - timedelta(days=settings.collection.retention.flow_days)
-    with ctx.flows().connect() as conn:
+    with fdb.connect() as conn:
         for name, fn in sql_functions().items():
             conn.create_function(name, -1, fn, deterministic=True)
         cov = store_coverage(conn, IngestSource.TRAFFIC, (spec.start, spec.end), floor=floor,
@@ -195,28 +201,31 @@ def query_flows(ctx: AppContext, spec: FilterSpec, *, limit: int, order: Order,
                                [*params, limit + 1]).fetchall()
         labels = _labels(conn, {r[k] for r in db_rows for k in ("src_label_set", "dst_label_set") if r[k]})
         rows = [_row_from_store(r, labels) for r in db_rows]
-        filled: list[tuple[datetime, datetime]] = []
-        kept_gaps: list[tuple[datetime, datetime, str]] = []
-        pce_rows: list[FlowRow] = []
-        if fill_gaps:
-            fetched: list[FlowRecord] = []
-            for g in cov.gaps:
-                if g[2] == "truncated":  # re-reading a window that hit the cap would hit it again
-                    kept_gaps.append(g)
-                    continue
-                try:
-                    records, capped = _fetch(ctx, spec, (g[0], g[1]))
-                except (*PCE_FAILURES, PceNotConfigured) as exc:
-                    logger.warning("could not fill a gap from the PCE: {}", exc)
-                    kept_gaps.append((g[0], g[1], "ingest_failed"))
-                    continue
-                fetched.extend(records)
-                filled.append((g[0], g[1]))
-                if capped:
-                    kept_gaps.append((g[0], g[1], "truncated"))
+    filled: list[tuple[datetime, datetime]] = []
+    kept_gaps: list[tuple[datetime, datetime, str]] = []
+    pce_rows: list[FlowRow] = []
+    if fill_gaps:
+        fetched: list[FlowRecord] = []
+        for g in cov.gaps:  # no connection is held while the PCE answers (a PCE switch waits for them)
+            if g[2] == "truncated":  # re-reading a window that hit the cap would hit it again
+                kept_gaps.append(g)
+                continue
+            try:
+                records, capped = _fetch(ctx, settings.pce, spec, (g[0], g[1]))
+            except (*PCE_FAILURES, PceNotConfigured) as exc:
+                logger.warning("could not fill a gap from the PCE: {}", exc)
+                kept_gaps.append((g[0], g[1], "ingest_failed"))
+                continue
+            fetched.extend(records)
+            filled.append((g[0], g[1]))
+            if capped:
+                kept_gaps.append((g[0], g[1], "truncated"))
+        with fdb.connect() as conn:
             pce_rows = _live_rows(conn, spec, fetched)
-        else:
-            kept_gaps = cov.gaps
+    else:
+        kept_gaps = cov.gaps
+    if fdb.generation != gen:
+        raise StaleGeneration
     combined = rows + pce_rows
     if order == "last_detected_desc":
         combined.sort(key=lambda r: r.last_detected, reverse=True)

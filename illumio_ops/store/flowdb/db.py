@@ -3,16 +3,25 @@
 Collectors run on separate scheduler threads; every module that writes this database
 holds write_lock for the whole transaction, so a long rollup rebuild never meets
 SQLite's busy timeout and a PCE switch never deletes the file mid-write.
+
+A connection is closed when its `with` block ends, and a PCE switch (reset) deletes the file only
+once no connection to it is open. So never hold a FlowDb connection while waiting for write_lock,
+and let long lock-free reads stop when `generation` moves (StaleGeneration).
 """
 from __future__ import annotations
 
+import gc
 import itertools
 import sqlite3
 import threading
+import time
+import weakref
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from datetime import UTC, datetime
 from pathlib import Path
+from types import TracebackType
+from typing import Literal
 
 from illumio_ops.domain.timefmt import store_time
 from illumio_ops.store.db import connect, migrate
@@ -47,6 +56,33 @@ def db_day(value: datetime) -> str:
     return value.astimezone(UTC).strftime("%Y-%m-%d")
 
 
+# How long a PCE switch waits for open connections (lock-free reads: a checkpoint took 26 s and a
+# one-day facet scan 20-28 s at 1,000 workloads, P2 re-measure) before it gives up for this time.
+RESET_WAIT_SECONDS = 120.0
+
+
+class FlowDbBusy(Exception):
+    """A reset gave up: connections to the flow database stayed open; nothing was deleted."""
+
+
+class FlowConnection(sqlite3.Connection):
+    """A flow-store connection that is closed when its `with` block ends (sqlite3's own only commits)."""
+
+    closed = False
+
+    def close(self) -> None:
+        self.closed = True
+        super().close()
+
+    def __exit__(self, exc_type: type[BaseException] | None, exc: BaseException | None,
+                 tb: TracebackType | None) -> Literal[False]:
+        try:
+            super().__exit__(exc_type, exc, tb)
+        finally:
+            self.close()
+        return False
+
+
 class StaleGeneration(Exception):
     """The flow database was reset for another PCE after this work began: what it read belongs
     to the previous PCE and must not be written."""
@@ -66,6 +102,12 @@ class FlowDb:
         # Bumped by reset(). Work that reads the PCE notes it first (before the settings it uses)
         # and writes through writing(), so a switch landing mid-cycle drops the old PCE's results.
         self.generation = 0
+        self._open: weakref.WeakSet[FlowConnection] = weakref.WeakSet()
+        self._open_lock = threading.Lock()
+        # One idle connection kept open, so the connection a writer closes is never the file's last:
+        # SQLite checkpoints the whole WAL when the last connection closes, which inside a write would
+        # bring back the checkpoint under the lock (see WAL_SAFETY_NET_PAGES). Not counted by reset.
+        self._anchor: sqlite3.Connection | None = None
 
     @contextmanager
     def writing(self, generation: int) -> Iterator[sqlite3.Connection]:
@@ -77,7 +119,7 @@ class FlowDb:
                 yield conn
 
     def connect(self) -> sqlite3.Connection:
-        conn = connect(self.path)
+        conn = connect(self.path, factory=FlowConnection)
         try:
             conn.execute(f"PRAGMA wal_autocheckpoint={self.WAL_SAFETY_NET_PAGES}")
             conn.execute(f"PRAGMA journal_size_limit={self.WAL_KEEP_BYTES}")
@@ -90,7 +132,37 @@ class FlowDb:
         except BaseException:
             conn.close()
             raise
+        with self._open_lock:
+            self._open.add(conn)  # type: ignore[arg-type]
+            if self._anchor is None:
+                self._anchor = sqlite3.connect(self.path, check_same_thread=False)
+                # A read attaches it to the WAL (it holds the shared lock that marks it open from then on);
+                # autocommit, so it keeps no snapshot and never holds a checkpoint back.
+                self._anchor.execute("SELECT count(*) FROM sqlite_master").fetchone()
         return conn
+
+    def _drop_anchor(self) -> None:
+        with self._open_lock:
+            anchor, self._anchor = self._anchor, None
+        if anchor is not None:
+            anchor.setconfig(sqlite3.SQLITE_DBCONFIG_NO_CKPT_ON_CLOSE, True)  # the file is about to go
+            anchor.close()
+
+    def _wait_for_connections(self, timeout: float) -> None:
+        deadline = time.monotonic() + timeout
+        collected = False
+        while True:
+            with self._open_lock:
+                still = sum(1 for c in self._open if not c.closed)
+            if not still:
+                return
+            if not collected:  # one held only by a reference cycle (a traceback) goes with a collection
+                gc.collect()
+                collected = True
+                continue
+            if time.monotonic() >= deadline:
+                raise FlowDbBusy(f"{still} connection(s) to the flow database stayed open")
+            time.sleep(0.05)
 
     def checkpoint(self) -> int:
         """Copy committed WAL pages into the database file without waiting for readers or writers
@@ -104,9 +176,14 @@ class FlowDb:
 
     def reset(self, *, also: Callable[[], None] | None = None) -> None:
         """Drop every row by recreating the file (used when the PCE changes). `also` runs in the
-        same hold of the write lock, so no writer of the old generation slips in between."""
+        same hold of the write lock, so no writer of the old generation slips in between. The file is
+        deleted only once no connection to it is open: a connection still open on the deleted file
+        would, closing last on it, delete the new file's WAL and shared memory by name. Raises
+        FlowDbBusy, deleting nothing, if connections stay open for RESET_WAIT_SECONDS."""
         with self.write_lock:
-            self.generation += 1
+            self.generation += 1  # first: long lock-free reads notice it and stop
+            self._wait_for_connections(RESET_WAIT_SECONDS)
+            self._drop_anchor()
             if also is not None:
                 also()
             for suffix in ("", "-wal", "-shm"):
