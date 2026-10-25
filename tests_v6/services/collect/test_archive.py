@@ -10,6 +10,7 @@ from illumio_ops.domain.values import DataOrigin
 from illumio_ops.services.collect import archive as archive_job
 from illumio_ops.services.collect.archive import run_archive
 from illumio_ops.services.collect.reset import reset_for_new_pce
+from illumio_ops.services.collect.retention import run_retention
 from illumio_ops.store.flowdb import archive as archive_log
 from illumio_ops.store.flowdb.flows import upsert_flows
 
@@ -55,6 +56,8 @@ def test_archive_retention_deletes_old_files(tmp_path):
         {"flow_days": 7, "event_days": 7, "rollup_days": 7, "baseline_days": 7}))
     _enable(ctx, retention_days=8)
     _write_flows(ctx, [10, 2])
+    run_archive(ctx, now=NOW)
+    run_retention(ctx, now=NOW)  # the 10-day-old rows go first (an expired file waits for them)
     run_archive(ctx, now=NOW)
     names = sorted(p.name for p in ctx.paths.archive_dir.iterdir())
     assert names == [f"flows-{(NOW - timedelta(days=2)).strftime('%Y-%m-%d')}.jsonl.gz"]
@@ -154,3 +157,40 @@ def test_a_pce_switch_while_a_file_is_written_leaves_no_file_for_the_new_pce(tmp
     _during_write(monkeypatch, switch)
     assert run_archive(ctx, now=NOW) == 0
     assert [p.name for p in ctx.paths.archive_dir.iterdir() if p.is_file()] == []
+
+
+def test_an_expired_archive_file_waits_until_its_rows_are_gone(tmp_path):
+    # Raw 7 days, archive 8, but the initial backfill reaches 30 days back: a day older than the archive
+    # retention was archived, its file deleted and its log forgotten at once, so retention never
+    # dropped its rows (they were "unarchived") and the cycle repeated every day.
+    ctx = configured_ctx(tmp_path)
+    ctx.settings.update(ctx.settings.current().revision, lambda d: d["collection"]["retention"].update(
+        {"flow_days": 7, "event_days": 7, "rollup_days": 7, "baseline_days": 7}))
+    _enable(ctx, retention_days=8)
+    _write_flows(ctx, [10])
+    day10 = (NOW - timedelta(days=10)).strftime("%Y-%m-%d")
+    run_archive(ctx, now=NOW)
+    assert (ctx.paths.archive_dir / f"flows-{day10}.jsonl.gz").exists()  # kept while its rows exist
+    run_retention(ctx, now=NOW)
+    with ctx.flows().connect() as conn:
+        assert conn.execute("SELECT count(*) FROM flows").fetchone()[0] == 0
+    run_archive(ctx, now=NOW)
+    assert not (ctx.paths.archive_dir / f"flows-{day10}.jsonl.gz").exists()
+    with ctx.flows().connect() as conn:
+        assert archive_log.archived_days(conn, "flows") == set()
+
+
+def test_archive_file_name_is_made_durable_before_the_day_is_recorded(tmp_path, monkeypatch):
+    # The rename is durable only once the directory is synced; retention may drop the day's rows right after.
+    import stat
+    ctx = configured_ctx(tmp_path)
+    _enable(ctx)
+    _write_flows(ctx, [1])
+    synced, real = [], os.fsync
+
+    def fsync(fd):
+        synced.append(stat.S_ISDIR(os.fstat(fd).st_mode))
+        real(fd)
+    monkeypatch.setattr(archive_job.os, "fsync", fsync)
+    assert run_archive(ctx, now=NOW) == 1
+    assert synced == [False, True]  # the file, then its directory

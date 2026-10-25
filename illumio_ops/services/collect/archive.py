@@ -22,6 +22,10 @@ _KINDS = {
               "SELECT * FROM flows WHERE last_detected >= ? AND last_detected < ? ORDER BY id"),
     "events": ("substr(timestamp, 1, 10)", "SELECT * FROM events WHERE timestamp >= ? AND timestamp < ? ORDER BY id"),
 }
+_HAS_ROWS = {
+    "flows": "SELECT 1 FROM flows WHERE last_detected >= ? AND last_detected < ? LIMIT 1",
+    "events": "SELECT 1 FROM events WHERE timestamp >= ? AND timestamp < ? LIMIT 1",
+}
 
 
 def _day_range(day: str) -> tuple[str, str]:
@@ -43,6 +47,11 @@ def _write_atomic(path: Path, lines: Iterable[str]) -> int:
             raw.flush()
             os.fsync(raw.fileno())
         os.replace(tmp, path)
+        dirfd = os.open(path.parent, os.O_RDONLY)  # the new name survives a power cut only once this is synced
+        try:
+            os.fsync(dirfd)
+        finally:
+            os.close(dirfd)
     except BaseException:
         tmp.unlink(missing_ok=True)
         raise
@@ -98,6 +107,10 @@ def _archive(ctx: AppContext, gen: int, now: datetime | None) -> int:
         cutoff = db_day(at - timedelta(days=settings.retention_days))
         with fdb.writing(gen) as conn:
             for kind, day, stored in archive.entries_before(conn, cutoff):
+                # Not while the day still has rows: retention drops only archived days, so a forgotten
+                # day would keep its rows for good (and be archived and expired again every day).
+                if conn.execute(_HAS_ROWS[kind], _day_range(day)).fetchone():
+                    continue
                 try:
                     Path(stored).unlink(missing_ok=True)
                 except OSError as exc:
