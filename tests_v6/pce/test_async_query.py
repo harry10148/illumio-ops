@@ -119,6 +119,38 @@ def test_download_retry_succeeds_second_time(client):
 
 
 @responses.activate
+def test_download_short_of_flows_count_is_retried_then_fails(client, _no_sleep):
+    # Measured on lab: the result file always holds flows_count rows (matches_count can be larger).
+    _submit_ok()
+    responses.add(responses.GET, Q, json={"status": "completed", "matches_count": 5, "flows_count": 5})
+    responses.add(responses.GET, f"{Q}/download", body=_gz([{"a": 1}]))
+    responses.add(responses.GET, f"{Q}/download", body=_gz([{"a": 1}]))
+    with pytest.raises(PceQueryError) as e:
+        run_traffic_query(client, _payload(), deadline=_deadline())
+    assert e.value.stage == "download" and 3.0 in _no_sleep
+
+
+@responses.activate
+def test_download_short_once_then_whole_succeeds(client):
+    _submit_ok()
+    responses.add(responses.GET, Q, json={"status": "completed", "matches_count": 9, "flows_count": 2})
+    responses.add(responses.GET, f"{Q}/download", body=_gz([{"a": 1}]))
+    responses.add(responses.GET, f"{Q}/download", body=_gz([{"a": 1}, {"a": 2}]))
+    responses.add(responses.DELETE, Q, status=204)
+    assert len(run_traffic_query(client, _payload(), deadline=_deadline()).rows) == 2
+
+
+@responses.activate
+def test_truncated_gzip_download_is_a_download_failure(client):
+    _submit_ok()
+    responses.add(responses.GET, Q, json={"status": "completed", "matches_count": 2, "flows_count": 2})
+    responses.add(responses.GET, f"{Q}/download", body=_gz([{"a": 1}, {"a": 2}])[:-8])
+    with pytest.raises(PceQueryError) as e:
+        run_traffic_query(client, _payload(), deadline=_deadline())
+    assert e.value.stage == "download"
+
+
+@responses.activate
 def test_true_zero_matches_is_success(client):
     _submit_ok()
     responses.add(responses.GET, Q, json={"status": "completed", "matches_count": 0, "flows_count": 0})

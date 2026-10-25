@@ -9,6 +9,7 @@ from __future__ import annotations
 import gzip
 import json
 import time
+import zlib
 from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import datetime
@@ -86,10 +87,8 @@ def _poll(client: PceClient, href: str, deadline: float, *, done: Any, stage: St
 
 
 def _parse_download(body: bytes) -> list[dict[str, Any]]:
-    try:
+    if body[:2] == b"\x1f\x8b":  # gzip; a truncated one raises EOFError, a corrupt one OSError / zlib.error
         body = gzip.decompress(body)
-    except OSError:
-        pass  # served uncompressed
     rows: list[dict[str, Any]] = []
     for line in body.splitlines():
         line = line.strip()
@@ -108,8 +107,14 @@ def _download(client: PceClient, href: str, deadline: float) -> list[dict[str, A
         raise PceQueryError("download", resp.status)
     try:
         return _parse_download(resp.body)
-    except (ValueError, UnicodeDecodeError) as exc:
+    except (EOFError, OSError, zlib.error, ValueError, UnicodeDecodeError) as exc:
         raise PceQueryError("download", detail=type(exc).__name__) from None
+
+
+def _short(rows: list[dict[str, Any]], flows: object, matches: object) -> bool:
+    if isinstance(flows, int):
+        return len(rows) < flows
+    return not rows and isinstance(matches, int) and matches > 0
 
 
 def run_traffic_query(client: PceClient, payload: Mapping[str, Any], *, deadline: float,
@@ -130,13 +135,16 @@ def run_traffic_query(client: PceClient, payload: Mapping[str, Any], *, deadline
                        done=lambda b: str(b.get("status", "")).lower() == "completed"
                        and str(b.get("rules") or "completed").lower() == "completed")
     matches = status.get("matches_count")
+    flows = status.get("flows_count")
     rows = _download(client, href, deadline)
-    if not rows and isinstance(matches, int) and matches > 0:
+    if _short(rows, flows, matches):
         # The PCE sometimes reports completed before the result file exists (5.x, long-running service).
+        # The file holds flows_count rows (always equal on lab; matches_count can be larger).
         _sleep(_EMPTY_RETRY_WAIT)
         rows = _download(client, href, deadline)
-        if not rows:
-            raise PceQueryError("download", detail=f"PCE reported {matches} matches but the result was empty")
+        if _short(rows, flows, matches):
+            raise PceQueryError("download", detail=f"PCE reported {flows if isinstance(flows, int) else matches} "
+                                                   f"flows but the result had {len(rows)}")
     if delete_after:
         try:
             gone = client.request("DELETE", href, org_scoped=False, timeout=30)
@@ -144,7 +152,6 @@ def run_traffic_query(client: PceClient, payload: Mapping[str, Any], *, deadline
                 logger.warning("could not delete finished traffic query (HTTP {})", gone.status)
         except Exception as exc:  # noqa: BLE001 - cleanup only; the result is already in hand
             logger.warning("could not delete finished traffic query: {}", type(exc).__name__)
-    flows = status.get("flows_count")
     return AsyncQueryResult(
         rows=rows,
         matches_count=matches if isinstance(matches, int) else None,
