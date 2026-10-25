@@ -113,6 +113,24 @@ def test_secret_gate_fails_when_key_or_operator_file_staged(tmp_path, relpath):
     assert "staged into the bundle" in r.stderr
 
 
+@pytest.mark.skipif(shutil.which("bash") is None or shutil.which("rsync") is None, reason="bash and rsync required")
+def test_stage_app_leaves_the_v6_tree_out_of_the_5x_bundle(tmp_path):
+    """v6 lives in the same repo (illumio_ops/, web/, scripts/v6/) and ships its own bundle;
+    none of it may ride along in the 5.x offline bundle."""
+    src = _bash_text(BUILD_SCRIPT)
+    script = "\n".join([
+        f"REPO_ROOT='{ROOT}'", f"LOCK_FILE='{OFFLINE_LOCK}'", "VERSION=test",
+        _extract_fn(src, "assert_no_secrets_staged"), _extract_fn(src, "stage_app"),
+        f"stage_app '{tmp_path}'",
+    ])
+    r = subprocess.run(["bash", "-c", script], capture_output=True, text=True)
+    assert r.returncode == 0, r.stderr
+    app = tmp_path / "app"
+    assert (app / "scripts" / "install.sh").is_file()
+    for v6 in ("scripts/v6", "illumio_ops", "web", "tests_v6"):
+        assert not (app / v6).exists(), f"{v6} was staged into the 5.x bundle"
+
+
 # ── Parity items fixed alongside the two High findings ───────────────────────
 
 def test_setup_sh_unit_matches_the_shipped_unit():

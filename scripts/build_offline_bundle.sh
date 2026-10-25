@@ -135,7 +135,8 @@ stage_app() {
         --exclude='*.pfx' \
         "$REPO_ROOT/config/" "$dest/app/config/"
     assert_no_secrets_staged "$dest"
-    rsync -a "$REPO_ROOT/scripts/" "$dest/app/scripts/"
+    # scripts/v6/ belongs to the v6 rebuild, which ships its own bundle (scripts/v6/build_bundle.sh).
+    rsync -a --exclude='v6/' "$REPO_ROOT/scripts/" "$dest/app/scripts/"
     cp "$REPO_ROOT/requirements-offline.txt" "$dest/app/"
     # 鎖檔一定要進 bundle：install.sh 就是拿它配 --require-hashes 安裝。
     cp "$LOCK_FILE" "$dest/app/"
