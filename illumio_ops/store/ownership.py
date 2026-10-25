@@ -28,4 +28,9 @@ TABLE_OWNERS: dict[str, str] = {
     "org_risk_snapshot_daily": "illumio_ops.store.flowdb.ransomware",
     "pce_capabilities": "illumio_ops.store.flowdb.capabilities",
     "archive_log": "illumio_ops.store.flowdb.archive",
+    "detections": "illumio_ops.store.flowdb.analysis",
+    "analysis_runs": "illumio_ops.store.flowdb.analysis",
+    "analysis_results": "illumio_ops.store.flowdb.analysis",
+    "lateral_snapshot_daily": "illumio_ops.store.flowdb.analysis",
+    "focus_items": "illumio_ops.store.flowdb.analysis",
 }

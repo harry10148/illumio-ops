@@ -41,6 +41,7 @@ _REFRESH = (
     "last_detected = MAX(last_detected, ?), "
     "num_connections = MAX(num_connections, ?), "
     f"{_max_bytes('bytes_in')}, {_max_bytes('bytes_out')}, "
+    f"{_max_bytes('own_bytes_in')}, {_max_bytes('own_bytes_out')}, "
     "state = CASE WHEN ? > last_detected THEN ? ELSE state END, "
     "initiator_process = CASE WHEN direction = 'outbound' THEN COALESCE(initiator_process, ?) "
     "ELSE initiator_process END, "
@@ -57,8 +58,8 @@ _INSERT = (
     "src_href, dst_href, src_hostname, dst_hostname, src_managed, dst_managed, src_mode, dst_mode, "
     "src_label_set, dst_label_set, port, proto, initiator_process, initiator_user, service_process, "
     "service_user, windows_service, policy_decision, first_detected, last_detected, num_connections, "
-    "bytes_in, bytes_out, state, transmission, network_href, origin, ingested_at) "
-    "VALUES (?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+    "bytes_in, bytes_out, own_bytes_in, own_bytes_out, state, transmission, network_href, origin, ingested_at) "
+    "VALUES (?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
 )
 
 
@@ -73,7 +74,7 @@ def _insert(conn: sqlite3.Connection, r: FlowRecord, key: str, conn_key: str, or
         r.own_process if outbound else None, r.own_user if outbound else None,
         None if outbound else r.own_process, None if outbound else r.own_user,
         r.windows_service, r.policy_decision, db_time(r.first_detected), db_time(r.last_detected),
-        r.num_connections, r.bytes_in, r.bytes_out, r.state, r.transmission, r.network_href,
+        r.num_connections, r.bytes_in, r.bytes_out, r.bytes_in, r.bytes_out, r.state, r.transmission, r.network_href,
         origin.value, stamp,
     ))
 
@@ -83,13 +84,17 @@ def _refresh(conn: sqlite3.Connection, row_id: int, r: FlowRecord, origin: DataO
     conn.execute(_REFRESH, (
         last, r.num_connections,
         r.bytes_in, r.bytes_in, r.bytes_in, r.bytes_out, r.bytes_out, r.bytes_out,
+        r.bytes_in, r.bytes_in, r.bytes_in, r.bytes_out, r.bytes_out, r.bytes_out,
         last, r.state,
         r.own_process, r.own_user, r.own_process, r.own_user,
         origin.value, origin.value, stamp, row_id,
     ))
 
 
-_STORED = ("SELECT id, direction, last_detected, num_connections, bytes_in, bytes_out, initiator_process, "
+# The record's own counts (a primary row's bytes_* are its connection's); rows written before flow db
+# 0002 that were part of a pair have no own count and fall back to bytes_*.
+_STORED = ("SELECT id, direction, last_detected, num_connections, COALESCE(own_bytes_in, bytes_in) AS bytes_in, "
+           "COALESCE(own_bytes_out, bytes_out) AS bytes_out, initiator_process, "
            "initiator_user, service_process, service_user, origin FROM flows WHERE record_key = ?")
 
 
@@ -112,10 +117,13 @@ def _first(values: list[str | None]) -> str | None:
 
 def _merge_connection(conn: sqlite3.Connection, conn_key: str) -> None:
     """Pick the primary row of one connection and complete each row with the other side's
-    attributes (a lone row has nothing from the other side)."""
+    attributes (a lone row has nothing from the other side). The primary row's bytes are the largest
+    own count among the connection's records, recomputed every time: a record re-paired into another
+    connection takes its bytes along (F10). Every other row shows its own count."""
     rows = conn.execute(
         "SELECT id, direction, initiator_process, initiator_user, service_process, service_user, "
-        "bytes_in, bytes_out FROM flows WHERE conn_key = ? ORDER BY id", (conn_key,)).fetchall()
+        "bytes_in, bytes_out, own_bytes_in, own_bytes_out FROM flows WHERE conn_key = ? ORDER BY id",
+        (conn_key,)).fetchall()
     if not rows:
         return
     outs = [row for row in rows if row["direction"] == FlowDirection.OUTBOUND.value]
@@ -129,11 +137,23 @@ def _merge_connection(conn: sqlite3.Connection, conn_key: str) -> None:
     conn.execute("UPDATE flows SET service_process = ?, service_user = ? WHERE conn_key = ? AND direction = ?",
                  (_first([i["service_process"] for i in ins]), _first([i["service_user"] for i in ins]),
                   conn_key, FlowDirection.OUTBOUND.value))
-    if len(rows) > 1:
-        known_in = [row["bytes_in"] for row in rows if row["bytes_in"] is not None]
-        known_out = [row["bytes_out"] for row in rows if row["bytes_out"] is not None]
-        conn.execute("UPDATE flows SET bytes_in = ?, bytes_out = ? WHERE id = ?",
-                     (max(known_in) if known_in else None, max(known_out) if known_out else None, primary["id"]))
+    own = {row["id"]: (_own(row, "in"), _own(row, "out")) for row in rows}
+    known_in = [v[0] for v in own.values() if v[0] is not None]
+    known_out = [v[1] for v in own.values() if v[1] is not None]
+    total = (max(known_in) if known_in else None, max(known_out) if known_out else None)
+    for row in rows:
+        want = total if row["id"] == primary["id"] else own[row["id"]]
+        if (row["bytes_in"], row["bytes_out"]) != want:
+            conn.execute("UPDATE flows SET bytes_in = ?, bytes_out = ? WHERE id = ?", (*want, row["id"]))
+
+
+def _own(row: sqlite3.Row, side: str) -> int | None:
+    """A row's own byte count; rows written before flow db 0002 as part of a pair have none recorded and
+    keep what they show."""
+    value: int | None = row[f"own_bytes_{side}"]
+    if value is None:
+        value = row[f"bytes_{side}"]
+    return value
 
 
 def _repair_tuple(conn: sqlite3.Connection, tup: tuple[str, str, int | None, int],
@@ -180,8 +200,8 @@ def _repair_tuple(conn: sqlite3.Connection, tup: tuple[str, str, int | None, int
 
 # "+is_primary" keeps the planner on ix_flows_conn: left to itself it picks ix_flows_primary_last
 # and walks every primary row, making each cycle slower as the store grows (test_query_plans).
-PRIMARY_OF_CONNECTION = ("SELECT src_key, dst_key, port, proto, first_detected, last_detected, initiator_user "
-                         "FROM flows WHERE conn_key = ? AND +is_primary = 1")
+PRIMARY_OF_CONNECTION = ("SELECT src_key, dst_key, port, proto, first_detected, last_detected, initiator_user, "
+                         "policy_decision FROM flows WHERE conn_key = ? AND +is_primary = 1")
 
 
 def _update_baselines(conn: sqlite3.Connection, conn_key: str) -> None:
@@ -189,11 +209,14 @@ def _update_baselines(conn: sqlite3.Connection, conn_key: str) -> None:
     if row is None:
         return
     port = row["port"] if row["port"] is not None else NO_PORT
+    # The newest observation's decision wins (SET expressions all read the row as it was before).
     conn.execute(
-        "INSERT INTO connection_baseline (src_key, dst_key, port, proto, first_seen, last_seen) "
-        "VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(src_key, dst_key, port, proto) DO UPDATE SET "
-        "first_seen = MIN(first_seen, excluded.first_seen), last_seen = MAX(last_seen, excluded.last_seen)",
-        (row["src_key"], row["dst_key"], port, row["proto"], row["first_detected"], row["last_detected"]))
+        "INSERT INTO connection_baseline (src_key, dst_key, port, proto, first_seen, last_seen, last_decision) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?) ON CONFLICT(src_key, dst_key, port, proto) DO UPDATE SET "
+        "first_seen = MIN(first_seen, excluded.first_seen), last_seen = MAX(last_seen, excluded.last_seen), "
+        "last_decision = CASE WHEN excluded.last_seen >= last_seen THEN excluded.last_decision ELSE last_decision END",
+        (row["src_key"], row["dst_key"], port, row["proto"], row["first_detected"], row["last_detected"],
+         row["policy_decision"]))
     if row["initiator_user"]:
         conn.execute(
             "INSERT INTO user_baseline (initiator_user, dst_key, port, proto, first_seen, last_seen) "

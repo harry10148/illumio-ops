@@ -23,7 +23,7 @@ def test_flowdb_migrates_on_first_connect(tmp_path):
     fdb = FlowDb(tmp_path / "data" / "flows.sqlite")
     with fdb.connect() as conn:
         assert FLOWDB_TABLES <= _tables(conn)
-        assert conn.execute("PRAGMA user_version").fetchone()[0] == 1
+        assert conn.execute("PRAGMA user_version").fetchone()[0] == 2
         assert conn.execute("PRAGMA journal_mode").fetchone()[0] == "wal"
 
 
