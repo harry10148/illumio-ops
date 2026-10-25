@@ -63,6 +63,22 @@ def test_detection_watermark_advances_only_after_write(ctx, monkeypatch):
     assert _run_row(ctx)["watermark"].startswith("2026-10-24T12:00")
 
 
+def test_run_records_last_ok_and_last_error(ctx, monkeypatch):
+    # The settings page shows when detection last ran from last_ok_at (Task 15 acceptance found it never set).
+    run_detection(ctx, now=NOW)
+    row = _run_row(ctx)
+    assert row["last_ok_at"] is not None and row["last_ok_at"].startswith("2026-10-24T12:00") and row["last_error"] is None
+    _collected(ctx, until=NOW + minutes(10))
+
+    def broken(*a, **kw):
+        raise RuntimeError("disk full")
+    monkeypatch.setattr(detect.analysis, "upsert_detections", broken)
+    with pytest.raises(RuntimeError):
+        run_detection(ctx, now=NOW + minutes(10))
+    row = _run_row(ctx)
+    assert "disk full" in row["last_error"] and row["last_ok_at"].startswith("2026-10-24T12:00")
+
+
 def test_overlap_reevaluation_does_not_duplicate(ctx):
     assert run_detection(ctx, now=NOW).new == 1
     _collected(ctx, until=NOW + minutes(10))

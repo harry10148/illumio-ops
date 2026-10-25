@@ -88,8 +88,8 @@ def _lookback(cfg: DetectorConfig) -> timedelta:
 
 def run_detection(ctx: AppContext, *, now: datetime | None = None, window: tuple[datetime, datetime] | None = None,
                   late: bool = False) -> DetectionRun:
-    """A failure while storing propagates (the job records it) and leaves the watermark where it was, so the
-    next run evaluates the same window again."""
+    """A failure propagates (the job records it), is kept as the run's last error, and leaves the watermark
+    where it was, so the next run evaluates the same window again. last_ok_at is when a run last evaluated."""
     at = (now or datetime.now(UTC)).astimezone(UTC)
     lc = load_lateral_context(ctx, now=at)
     fdb = ctx.flows()
@@ -130,12 +130,19 @@ def run_detection(ctx: AppContext, *, now: datetime | None = None, window: tuple
         with fdb.writing(lc.generation) as conn:
             new, updated = analysis.upsert_detections(conn, [_write(d) for d in found], dedup=dedup_windows(cfg),
                                                       late=late, at=at)
-            analysis.set_run(conn, KIND, watermark=None if window is not None else hi,
+            analysis.set_run(conn, KIND, watermark=None if window is not None else hi, ok_at=at,
                              status={s["detector"]: s for s in status_rows})
         return DetectionRun(window=(lo, hi), new=new, updated=updated, statuses=status_rows, gaps=list(gaps),
                             late=late)
     except StaleGeneration:
         return empty  # the PCE was switched: nothing of the previous one is stored
+    except Exception as exc:
+        try:
+            with fdb.writing(lc.generation) as conn:
+                analysis.set_run(conn, KIND, error=f"{type(exc).__name__}: {exc}"[:500])
+        except StaleGeneration:
+            pass
+        raise
 
 
 def _hosts(lc: LateralContext) -> HostLookup:
