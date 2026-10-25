@@ -7,6 +7,7 @@ from datetime import UTC, datetime, timedelta
 from pydantic import BaseModel, ConfigDict
 
 from illumio_ops.domain.flows import parse_time
+from illumio_ops.domain.identity import endpoint_key
 from illumio_ops.domain.tamper import (
     HOST_TIMELINE_TYPES,
     ORG_TIMELINE_TYPES,
@@ -78,14 +79,15 @@ def _signal_capability(ctx: AppContext) -> CapabilityState:
 
 def host_tamper(ctx: AppContext, href: str, *, now: datetime | None = None, days: int = SUMMARY_DAYS) -> HostTamper:
     at = (now or datetime.now(UTC)).astimezone(UTC)
-    found = query_events(ctx, start=at - timedelta(days=days), end=at, event_types=("agent.tampering",),
-                         workload_href=href, limit=10_000, now=at)
-    rows = sorted(found.rows, key=lambda r: r.timestamp)
-    readings = [reading for r in rows for reading in interpret(r.raw)]
-    pattern = classify([r.timestamp for r in rows])
+    # The same host matching as the summary (a re-paired VEN is found by its hostname, P3 final review #11).
+    key = endpoint_key(href, "")
+    raws = sorted((raw for host, raw in tamper_events(ctx, start=at - timedelta(days=days), end=at).items
+                   if host == key), key=lambda raw: parse_time(raw["timestamp"]))
+    readings = [reading for raw in raws for reading in interpret(raw)]
+    pattern = classify([parse_time(raw["timestamp"]) for raw in raws])
     events: list[TimelineEvent] = []
-    if rows:
-        first = rows[0].timestamp
+    if raws:
+        first = parse_time(raws[0]["timestamp"])
         window = {"start": first - timedelta(hours=24), "end": first + timedelta(hours=24), "limit": 500, "now": at}
         nearby = query_events(ctx, event_types=HOST_TIMELINE_TYPES, workload_href=href, **window).rows  # type: ignore[arg-type]
         nearby += query_events(ctx, event_types=ORG_TIMELINE_TYPES, **window).rows  # type: ignore[arg-type]
@@ -106,6 +108,8 @@ def host_tamper(ctx: AppContext, href: str, *, now: datetime | None = None, days
 def tamper_summary(ctx: AppContext, now: datetime) -> None:
     """The hourly step: per host with tampering in the last 60 days, its counts, pattern and how many recent
     readings no known cause explains."""
+    fdb = ctx.flows()
+    gen = fdb.generation  # noted before the reads: a PCE switch meanwhile must not store the old PCE's summary
     found = tamper_events(ctx, start=now - timedelta(days=SUMMARY_DAYS), end=now)
     by_host: dict[str, list[dict[str, object]]] = {}
     for host, raw in found.items:
@@ -126,7 +130,6 @@ def tamper_summary(ctx: AppContext, now: datetime) -> None:
             "unexplained_7d": unexplained,
             "has_signal": any(r.classification == TamperClassification.SIGNAL for r in readings)}))
     hosts = [h for _, _, h in sorted(ranked, key=lambda x: (x[0], x[1]), reverse=True)]  # most unexplained first
-    fdb = ctx.flows()
-    with fdb.writing(fdb.generation) as conn:
+    with fdb.writing(gen) as conn:
         analysis.write_result(conn, KIND, params={"days": SUMMARY_DAYS}, result={"hosts": hosts, "unmatched": found.unmatched},
                               at=now)

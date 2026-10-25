@@ -202,7 +202,7 @@ def event_detail(ctx: AppContext, seg: EventSegment, *, now: datetime | None = N
 class PrecursorEvents(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
     items: list[Precursor]
-    unmatched: int  # precursor events whose host could not be told
+    unmatched: int  # hosts named in precursor events that match no host of the inventory
 
 
 class HostEvents(BaseModel):
@@ -210,9 +210,11 @@ class HostEvents(BaseModel):
     unmatched: int
 
 
-def _hosts_of(rows: list[Any]) -> Callable[[EventHosts], set[str]]:
-    """How an event's hosts become workload hrefs: a VEN through the inventory, a workload href as it is, and
-    a VEN paired again (new VEN href, same host) by its hostname when that names exactly one host."""
+def _hosts_of(rows: list[Any]) -> Callable[[EventHosts], tuple[set[str], int]]:
+    """How an event's hosts become workload hrefs, each host on its own (one matched host must not keep the
+    others from the fallback, P3 final review #12): a VEN through the inventory, a workload href as it is,
+    and a host paired again (new VEN or workload href, same host) by its hostname when that names exactly
+    one host. Returns (the hrefs, how many of the event's hosts matched none)."""
     by_ven = {h["ven_href"]: h["href"] for h in rows if h["ven_href"]}
     known = {h["href"] for h in rows}
     by_name: dict[str, list[str]] = {}
@@ -220,9 +222,18 @@ def _hosts_of(rows: list[Any]) -> Callable[[EventHosts], set[str]]:
         if h["hostname"]:
             by_name.setdefault(h["hostname"], []).append(h["href"])
 
-    def resolve(hosts: EventHosts) -> set[str]:
-        found = {by_ven[v] for v in hosts.ven_hrefs if v in by_ven} | (hosts.workload_hrefs & known)
-        return found or {by_name[n][0] for n in hosts.hostnames if len(by_name.get(n, ())) == 1}
+    def one(ven: str | None, workload: str | None, hostname: str | None) -> str | None:
+        if ven is not None and ven in by_ven:
+            return by_ven[ven]
+        if workload is not None and workload in known:
+            return workload
+        if hostname is not None and len(by_name.get(hostname, ())) == 1:
+            return by_name[hostname][0]
+        return None
+
+    def resolve(hosts: EventHosts) -> tuple[set[str], int]:
+        found = [one(*e) for e in hosts.entities]
+        return {h for h in found if h is not None}, sum(1 for h in found if h is None)
     return resolve
 
 
@@ -253,9 +264,9 @@ def precursor_events(ctx: AppContext, *, start: datetime, end: datetime) -> Prec
         if res is None:
             continue
         kind, event_hosts, signal = res
-        hrefs = resolve(event_hosts)
+        hrefs, missed = resolve(event_hosts)
+        unmatched += missed
         if not hrefs:
-            unmatched += 1
             continue
         at = datetime.fromisoformat(r["timestamp"])
         items += [Precursor(host_key=endpoint_key(h, ""), kind=kind, at=at, signal=signal) for h in sorted(hrefs)]
@@ -270,9 +281,7 @@ def tamper_events(ctx: AppContext, *, start: datetime, end: datetime) -> HostEve
     unmatched = 0
     for r in found:
         raw = json.loads(r["raw_json"])
-        hrefs = resolve(event_hosts(raw))
-        if not hrefs:
-            unmatched += 1
-            continue
+        hrefs, missed = resolve(event_hosts(raw))
+        unmatched += missed
         items += [(endpoint_key(h, ""), raw) for h in sorted(hrefs)]
     return HostEvents(items=items, unmatched=unmatched)

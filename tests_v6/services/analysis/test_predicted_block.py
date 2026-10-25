@@ -111,3 +111,18 @@ def test_both_ends_paired_before_filtering(tmp_path, fake, monkeypatch):
     assert (row.flow.initiator_user, row.flow.service_process) == ("LAB\\alice", "serverproc")
     assert row.blocking_rules == [TEDT_DENY]
     assert len(predict_blocks(ctx, SPEC).rows) == 1
+
+
+def test_switch_during_recompute_records_nothing_for_the_new_pce(tmp_path, fake, monkeypatch):
+    # Final review #1: a 404 from the old PCE was recorded as the new PCE's capability.
+    from illumio_ops.store.flowdb.db import StaleGeneration
+    ctx = configured_ctx(tmp_path)
+
+    def switched(client, payload, *, deadline, compute_draft=False, delete_after=True):
+        ctx.flows().reset()
+        raise PceQueryError("update_rules", 404)
+    monkeypatch.setattr(predicted_block, "run_traffic_query", switched)
+    with pytest.raises(StaleGeneration):
+        predict_blocks(ctx, SPEC)
+    with ctx.flows().connect() as conn:
+        assert "draft_recompute" not in capabilities.all(conn)

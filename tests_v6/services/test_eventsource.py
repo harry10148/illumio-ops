@@ -98,3 +98,22 @@ def test_unmatched_precursor_counted(tmp_path):
                         _tamper("/orgs/1/events/e2", "/v/gone2", "nobody-knows", NOW - minutes(30))])
     got = precursor_events(ctx, start=NOW - minutes(60), end=NOW)
     assert got.items == [] and got.unmatched == 2
+
+
+def test_each_host_of_a_batch_event_resolved_on_its_own(tmp_path):
+    # Final review #12: one host matched directly kept the others from the hostname fallback.
+    from illumio_ops.services.eventsource import precursor_events
+    ctx = configured_ctx(tmp_path)
+    _inventory(ctx, ("/orgs/1/workloads/a", "a", "/v/a"), ("/orgs/1/workloads/b-new", "b", "/v/b"))
+
+    def lost(href, name):
+        return {"resource": {"workload": {"href": href, "hostname": name}},
+                "changes": {"online": {"before": True, "after": False}}}
+    _store_events(ctx, [{"href": "/orgs/1/events/o1", "event_type": "system_task.agent_offline_check",
+                         "timestamp": (NOW - minutes(10)).strftime("%Y-%m-%dT%H:%M:%SZ"), "severity": "info",
+                         "created_by": {"system": {}},
+                         "resource_changes": [lost("/orgs/1/workloads/a", "a"), lost("/orgs/1/workloads/b-old", "b"),
+                                              lost("/orgs/1/workloads/c-old", "nobody-knows")]}])
+    got = precursor_events(ctx, start=NOW - minutes(60), end=NOW)
+    assert sorted(p.host_key for p in got.items) == ["/orgs/1/workloads/a", "/orgs/1/workloads/b-new"]
+    assert got.unmatched == 1

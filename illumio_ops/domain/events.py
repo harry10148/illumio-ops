@@ -74,22 +74,32 @@ def normalize_event(raw: Mapping[str, Any]) -> EventRecord:
     )
 
 
+HostRef = tuple[str | None, str | None, str | None]  # (VEN href, workload href, hostname) of one host
+
+
 @dataclass(frozen=True)
 class EventHosts:
     ven_hrefs: frozenset[str]
     workload_hrefs: frozenset[str]
     hostnames: frozenset[str]
+    entities: tuple[HostRef, ...] = ()  # each host as the event names it, to be resolved on its own
 
 
 def _hosts(cb: Mapping[str, Any], resource_changes: list[Any], *, online_lost_only: bool) -> EventHosts:
     vens, wls, names = set(), set(), set()
+    entities: list[HostRef] = []
+    sender: tuple[str | None, str | None] = (None, None)
     for kind in ("ven", "agent"):
         entry = cb.get(kind) if isinstance(cb.get(kind), Mapping) else None
         if entry:
             if kind == "ven" and entry.get("href"):
                 vens.add(str(entry["href"]))
+                sender = (str(entry["href"]), sender[1])
             if entry.get("hostname"):
                 names.add(str(entry["hostname"]))
+                sender = (sender[0], sender[1] or str(entry["hostname"]))
+    if sender != (None, None):
+        entities.append((sender[0], None, sender[1]))
     for change in resource_changes:
         if not isinstance(change, Mapping):
             continue
@@ -103,7 +113,10 @@ def _hosts(cb: Mapping[str, Any], resource_changes: list[Any], *, online_lost_on
             wls.add(str(wl["href"]))
         if wl.get("hostname"):
             names.add(str(wl["hostname"]))
-    return EventHosts(frozenset(vens), frozenset(wls), frozenset(names))
+        if wl.get("href") or wl.get("hostname"):
+            entities.append((None, str(wl["href"]) if wl.get("href") else None,
+                             str(wl["hostname"]) if wl.get("hostname") else None))
+    return EventHosts(frozenset(vens), frozenset(wls), frozenset(names), tuple(entities))
 
 
 def event_hosts(raw: Mapping[str, Any]) -> EventHosts:

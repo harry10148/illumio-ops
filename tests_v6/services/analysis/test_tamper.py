@@ -1,5 +1,6 @@
 """Tamper analysis per host and the hourly summary; known causes are kept per PCE."""
 import json
+from dataclasses import replace
 from datetime import timedelta
 
 from illumio_ops.domain.events import normalize_event
@@ -87,3 +88,31 @@ def test_every_guidance_key_in_both_languages():
     for lang in (Language.EN, Language.ZH_TW):
         d = dictionary(lang)
         assert all(k in d for k in [*GUIDANCE_KEYS.values(), *TAMPER_ACTION_KEYS.values()])
+
+
+def test_host_tamper_finds_events_of_a_re_paired_ven(tmp_path):
+    # Final review #11: the detail read only the current VEN's events while the summary used the hostname fallback.
+    ctx = _ctx(tmp_path)
+    with ctx.flows().connect() as conn:
+        workloads.replace_inventory(conn, [replace(workloads.all_workloads(conn)[0], ven_href="/orgs/1/vens/v-new")])
+    assert len(host_tamper(ctx, HOST, now=NOW).readings) == 12
+
+
+def test_tamper_summary_for_a_switched_pce_writes_nothing(tmp_path, monkeypatch):
+    # Final review #1: the generation was read at write time, so the old PCE's summary landed in the new store.
+    import pytest
+
+    from illumio_ops.services.analysis import tamper as tamper_service
+    from illumio_ops.store.flowdb.db import StaleGeneration
+    ctx = _ctx(tmp_path)
+    real = tamper_service.tamper_events
+
+    def switch_meanwhile(c, **kw):
+        found = real(c, **kw)
+        c.flows().reset()
+        return found
+    monkeypatch.setattr(tamper_service, "tamper_events", switch_meanwhile)
+    with pytest.raises(StaleGeneration):
+        tamper_summary(ctx, NOW)
+    with ctx.flows().connect() as conn:
+        assert analysis.read_result(conn, "tamper") is None

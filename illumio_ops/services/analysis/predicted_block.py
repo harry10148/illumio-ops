@@ -23,6 +23,7 @@ from illumio_ops.pce.policy import fetch_policy_names, fetch_rule_sets
 from illumio_ops.services.context import AppContext
 from illumio_ops.services.flowsource import FlowRow, pair_row
 from illumio_ops.store.flowdb import capabilities
+from illumio_ops.store.flowdb.db import StaleGeneration
 
 _ALWAYS = (datetime(1970, 1, 1, tzinfo=UTC), datetime(9999, 1, 1, tzinfo=UTC))
 
@@ -49,6 +50,8 @@ class PredictedBlock(BaseModel):
 def predict_blocks(ctx: AppContext, spec: FilterSpec, *, limit: int = 1000, max_results: int = 200_000,
                    deadline_seconds: int = 900) -> PredictedBlock:
     at = datetime.now(UTC)
+    fdb = ctx.flows()
+    gen = fdb.generation  # noted before the settings it goes with: an answer from a switched-away PCE is dropped
     settings = ctx.settings.current()
     payload, residual = to_pce_payload(spec, max_results=max_results, query_name="illumio-ops predicted blocks",
                                        label_hrefs={})
@@ -61,8 +64,7 @@ def predict_blocks(ctx: AppContext, spec: FilterSpec, *, limit: int = 1000, max_
             result = run_traffic_query(client, payload, deadline=deadline, compute_draft=True)
         except PceQueryError as exc:
             if exc.stage == "update_rules" and exc.status == 404:
-                fdb = ctx.flows()
-                with fdb.writing(fdb.generation) as conn:
+                with fdb.writing(gen) as conn:
                     capabilities.record(conn, "draft_recompute", CapabilityState.UNSUPPORTED,
                                         "update_rules answered 404", at)
                 return PredictedBlock(rows=[], rules={}, capped=False, limit_hit=False, computed_at=at,
@@ -93,6 +95,8 @@ def predict_blocks(ctx: AppContext, spec: FilterSpec, *, limit: int = 1000, max_
             blocking_rules=_union(h for v in ends for h in v.deny_rule_hrefs + v.override_deny_hrefs),
             allow_rules=_union(h for v in ends for h in v.allow_rule_hrefs),
             essential_service_rules=_union(h for v in ends for h in v.essential_service_rules)))
+    if fdb.generation != gen:
+        raise StaleGeneration
     named = {h for r in rows for h in (*r.blocking_rules, *r.allow_rules)}
     return PredictedBlock(rows=rows[:limit], rules={h: rules[h] for h in sorted(named) if h in rules},
                           capped=result.capped, limit_hit=len(rows) > limit, computed_at=at, unsupported=False,
