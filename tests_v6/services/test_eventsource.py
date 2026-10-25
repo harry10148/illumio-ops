@@ -53,3 +53,48 @@ def test_events_by_workload_joins_through_ven(collected):
 def test_events_after_watermark_not_yet_collected(collected):
     q = query_events(collected, start=NOW - minutes(60), end=NOW + minutes(5), limit=100)
     assert [g[2] for g in q.coverage.gaps] == ["not_yet_collected"]
+
+
+def _store_events(ctx, raws):
+    from illumio_ops.domain.events import normalize_event
+    from illumio_ops.domain.values import DataOrigin
+    from illumio_ops.store.flowdb.events import upsert_events
+    with ctx.flows().connect() as conn:
+        upsert_events(conn, [normalize_event(r) for r in raws], origin=DataOrigin.INGEST, now=NOW)
+
+
+def _tamper(href, ven, hostname, ts):
+    return {"href": href, "event_type": "agent.tampering", "timestamp": ts.strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "severity": "warning", "created_by": {"ven": {"href": ven, "hostname": hostname}},
+            "notifications": [{"info": {"event_classification": "signal"}}]}
+
+
+def _inventory(ctx, *rows):
+    with ctx.flows().connect() as conn:
+        workloads.replace_inventory(conn, [workloads.WorkloadRow(
+            href=href, hostname=name, name=None, managed=1, enforcement_mode=None, visibility_level=None, os_id=None,
+            ven_version=None, ven_href=ven, label_set=None, online=1, risk_exposure=None, risk_percent=None,
+            risk_updated_at=None, fetched_at="x") for href, name, ven in rows])
+
+
+def test_repaired_ven_matched_by_unique_hostname(tmp_path):
+    from illumio_ops.domain.values import PrecursorKind
+    from illumio_ops.services.eventsource import precursor_events
+    ctx = configured_ctx(tmp_path)
+    _inventory(ctx, ("/orgs/1/workloads/w-9", "host-31", "/orgs/1/vens/new"), ("/orgs/1/workloads/w-1", "a", "/v/1"))
+    _store_events(ctx, [_tamper("/orgs/1/events/e1", "/orgs/1/vens/old", "host-31", NOW - minutes(30)),
+                        _tamper("/orgs/1/events/e2", "/v/1", "a", NOW - minutes(20))])
+    got = precursor_events(ctx, start=NOW - minutes(60), end=NOW)
+    assert sorted((p.host_key, p.kind, p.signal) for p in got.items) == [
+        ("/orgs/1/workloads/w-1", PrecursorKind.TAMPER, True), ("/orgs/1/workloads/w-9", PrecursorKind.TAMPER, True)]
+    assert got.unmatched == 0
+
+
+def test_unmatched_precursor_counted(tmp_path):
+    from illumio_ops.services.eventsource import precursor_events
+    ctx = configured_ctx(tmp_path)
+    _inventory(ctx, ("/orgs/1/workloads/w-1", "same", "/v/1"), ("/orgs/1/workloads/w-2", "same", "/v/2"))
+    _store_events(ctx, [_tamper("/orgs/1/events/e1", "/v/gone", "same", NOW - minutes(30)),  # name not unique
+                        _tamper("/orgs/1/events/e2", "/v/gone2", "nobody-knows", NOW - minutes(30))])
+    got = precursor_events(ctx, start=NOW - minutes(60), end=NOW)
+    assert got.items == [] and got.unmatched == 2

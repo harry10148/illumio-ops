@@ -57,3 +57,11 @@ def is_system_account(user: str | None) -> bool:
         return True
     account = split_user(low)[1] or ""
     return any(account.startswith(p) for p in _SYSTEM_PREFIXES)
+
+
+def account_key(user: str | None) -> str | None:
+    """How an account is grouped: domain accounts (DOMAIN\\acct, acct@domain) case-insensitively, local
+    Linux accounts as they are (the analysis segments group the same way)."""
+    if not user:
+        return None
+    return user.lower() if "\\" in user or "@" in user else user

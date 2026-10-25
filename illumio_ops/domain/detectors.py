@@ -13,11 +13,12 @@ from __future__ import annotations
 
 from collections import Counter
 from collections.abc import Callable, Mapping, Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import datetime, timedelta
 from typing import Any
 
 from illumio_ops.domain.filter import EndpointFilter, FilterSpec
+from illumio_ops.domain.identity import account_key, is_system_account
 from illumio_ops.domain.lateral import AdminPortSet, HostInfo
 from illumio_ops.domain.segment import FlowSegment
 from illumio_ops.domain.values import (
@@ -113,6 +114,7 @@ class DetectorConfig:
     admin_ports: AdminPortSet
     environment_label_key: str
     admin_groups_configured: bool
+    environment_labels_present: bool  # the inventory carries the environment label key at all
 
 
 HostLookup = Callable[[str, str, str | None, Mapping[str, str]], HostInfo]  # (key, ip, hostname, flow labels)
@@ -131,6 +133,8 @@ class DetectorInput:
     baseline_required: int
     baseline_full: bool
     gaps: tuple[Gap, ...]
+    # src -> the most distinct blocked targets it had in any blocked_window of the 7 days before
+    blocked_history: Mapping[str, int] = field(default_factory=dict)
 
 
 def evaluable(o: Obs, inp: DetectorInput) -> bool:
@@ -238,16 +242,266 @@ def detect_new_admin(inp: DetectorInput) -> tuple[list[Detection], DetectorStatu
     return out, DetectorStatus(DetectorKind.NEW_ADMIN_CONNECTION, DetectorState.OK)
 
 
-def _pending(kind: DetectorKind) -> Callable[[DetectorInput], tuple[list[Detection], DetectorStatus]]:
-    def run(inp: DetectorInput) -> tuple[list[Detection], DetectorStatus]:
-        return [], DetectorStatus(kind, DetectorState.DISABLED, "detector_pending")
-    return run
+def _src_host(o: Obs, inp: DetectorInput) -> HostInfo:
+    return inp.hosts(o.src_key, o.src_ip, o.src_hostname, o.src_labels)
+
+
+def _max_window(rows: list[Obs], window: timedelta, key: Callable[[Obs], str],
+                ends: Callable[[Obs], bool]) -> tuple[int, int, int] | None:
+    """Over rows sorted by last: the window of at most `window` ending at a row `ends` accepts that holds
+    the most distinct key values -> (count, first index, last index)."""
+    counts: Counter[str] = Counter()
+    best: tuple[int, int, int] | None = None
+    j = 0
+    for i, o in enumerate(rows):
+        counts[key(o)] += 1
+        while rows[j].last < o.last - window:
+            counts[key(rows[j])] -= 1
+            if not counts[key(rows[j])]:
+                del counts[key(rows[j])]
+            j += 1
+        if ends(o) and (best is None or len(counts) > best[0]):
+            best = (len(counts), j, i)
+    return best
+
+
+def detect_pivot_chain(inp: DetectorInput) -> tuple[list[Detection], DetectorStatus]:
+    """A → B, then B → C, both on management ports and not blocked, "connected in time": B → C last seen no
+    earlier than A → B was first seen, and started no later than chain_window after A → B was last seen.
+    Flow times come in ten-minute reporting buckets, so the two legs may share one: the summary says the
+    legs connect in time, never that it is a proven chain."""
+    cfg = inp.config
+    legs = [o for o in inp.obs if not_blocked(o)]
+    from_host: dict[str, list[Obs]] = {}
+    for o in legs:
+        from_host.setdefault(o.src_key, []).append(o)
+    chains: dict[tuple[str, str, str], tuple[Obs, Obs]] = {}
+    for ab in legs:
+        for bc in from_host.get(ab.dst_key, ()):
+            if bc.dst_key == ab.src_key or not (evaluable(ab, inp) or evaluable(bc, inp)):
+                continue
+            if bc.last >= ab.first and bc.first <= ab.last + cfg.chain_window:
+                chains.setdefault((ab.src_key, ab.dst_key, bc.dst_key), (ab, bc))
+    per_pivot: Counter[str] = Counter(b for _, b, _ in chains)
+    out, kept = [], Counter[str]()
+    for (a, b, c), (ab, bc) in sorted(chains.items()):
+        if kept[b] >= 20:  # a busy pivot: the first 20 chains are kept, the summary counts all
+            continue
+        kept[b] += 1
+        critical = _dst_host(bc, inp).critical
+        out.append(Detection(
+            detector=DetectorKind.PIVOT_CHAIN, fingerprint=f"chain|{a}|{b}|{c}", subject_key=a,
+            severity=Severity.HIGH if critical else Severity.MEDIUM, first_seen=min(ab.first, bc.first),
+            last_seen=max(ab.last, bc.last), critical_asset=critical,
+            summary={"via": ab.dst_hostname or ab.dst_ip, "target": bc.dst_hostname or bc.dst_ip,
+                     "ports": [ab.port, bc.port], "chains_through_pivot": per_pivot[b]},
+            segment=evidence(inp, min(ab.first, bc.first), max(ab.last, bc.last), src=ab),
+            confidence=DetectionConfidence(incomplete_gaps=inp.gaps)))
+    return out, DetectorStatus(DetectorKind.PIVOT_CHAIN, DetectorState.OK)
+
+
+def blocked_counts(inp: DetectorInput) -> dict[str, int]:
+    """Per source: the most distinct targets it was blocked from within blocked_window, at a window ending
+    in this run."""
+    by_src: dict[str, list[Obs]] = {}
+    for o in inp.blocked_obs:
+        by_src.setdefault(o.src_key, []).append(o)
+    out = {}
+    for src, rows in by_src.items():
+        rows.sort(key=lambda o: o.last)
+        best = _max_window(rows, inp.config.blocked_window, lambda o: o.dst_key, lambda o: evaluable(o, inp))
+        if best is not None:
+            out[src] = best[0]
+    return out
+
+
+def max_window_targets(rows: Sequence[Obs], window: timedelta) -> int:
+    """The most distinct targets any window of this length holds (the 7-day history of a source)."""
+    ordered = sorted(rows, key=lambda o: o.last)
+    best = _max_window(ordered, window, lambda o: o.dst_key, lambda o: True)
+    return best[0] if best else 0
+
+
+def detect_blocked_surge(inp: DetectorInput) -> tuple[list[Detection], DetectorStatus]:
+    """A source blocked from at least blocked_targets hosts within blocked_window, and at least
+    blocked_surge_factor times its most in any such window of the 7 days before (the threshold alone when
+    it had none). Any port: a scan does not keep to management ports."""
+    cfg = inp.config
+    out = []
+    for src, n in sorted(blocked_counts(inp).items()):
+        previous = inp.blocked_history.get(src, 0)
+        if n < cfg.blocked_targets or (previous and n < cfg.blocked_surge_factor * previous):
+            continue
+        rows = sorted((o for o in inp.blocked_obs if o.src_key == src), key=lambda o: o.last)
+        out.append(Detection(
+            detector=DetectorKind.BLOCKED_SURGE, fingerprint=f"blocked|{src}", subject_key=src, severity=Severity.MEDIUM,
+            first_seen=rows[0].first, last_seen=rows[-1].last, critical_asset=any(_dst_host(o, inp).critical for o in rows),
+            summary={"targets": n, "previous_max": previous, "sample_targets": _names(rows),
+                     "window_minutes": int(cfg.blocked_window / timedelta(minutes=1))},
+            segment=FlowSegment(filter=FilterSpec(start=rows[-1].last - cfg.blocked_window, end=rows[-1].last,
+                                                  src=_endpoint(rows[-1].src_href, rows[-1].src_ip)),
+                                view=SegmentView.DETAIL, limit=200),
+            confidence=DetectionConfidence(incomplete_gaps=inp.gaps)))
+    return out, DetectorStatus(DetectorKind.BLOCKED_SURGE, DetectorState.OK)
+
+
+def _per_tuple(inp: DetectorInput, keep: Callable[[Obs], bool]) -> dict[tuple[str, str, int, int], Obs]:
+    out: dict[tuple[str, str, int, int], Obs] = {}
+    for o in inp.obs:
+        if evaluable(o, inp) and keep(o):
+            out.setdefault((o.src_key, o.dst_key, o.port if o.port is not None else -1, o.proto), o)
+    return out
+
+
+def detect_non_admin_group(inp: DetectorInput) -> tuple[list[Detection], DetectorStatus]:
+    """A source outside every admin group (unmanaged sources included) using a management port."""
+    if not inp.config.admin_groups_configured:
+        return [], DetectorStatus(DetectorKind.NON_ADMIN_GROUP, DetectorState.DISABLED, "detector_admin_groups_unset")
+    out = []
+    for (src, dst, port, proto), o in sorted(_per_tuple(inp, lambda o: not_blocked(o)
+                                                        and not _src_host(o, inp).admin_group).items()):
+        critical = _dst_host(o, inp).critical
+        out.append(Detection(
+            detector=DetectorKind.NON_ADMIN_GROUP, fingerprint=f"nag|{src}|{dst}|{port}|{proto}", subject_key=src,
+            severity=Severity.HIGH if critical else Severity.MEDIUM, first_seen=o.first, last_seen=o.last,
+            critical_asset=critical,
+            summary={"target": o.dst_hostname or o.dst_ip, "port": port, "proto": proto, "decision": o.decision},
+            segment=evidence(inp, o.first, o.last, src=o, dst=o),
+            confidence=DetectionConfidence(incomplete_gaps=inp.gaps)))
+    return out, DetectorStatus(DetectorKind.NON_ADMIN_GROUP, DetectorState.OK)
+
+
+def detect_cross_env(inp: DetectorInput) -> tuple[list[Detection], DetectorStatus]:
+    """A management-port connection between two different environments that was not blocked (5.x L010;
+    allowed is high, the rest medium — one level is left for a precursor to raise)."""
+    cfg = inp.config
+    if not cfg.environment_labels_present:
+        return [], DetectorStatus(DetectorKind.CROSS_ENV, DetectorState.NO_DATA, "detector_no_env_labels",
+                                  {"label_key": cfg.environment_label_key})
+    key = cfg.environment_label_key
+    out = []
+    for (src, dst, port, proto), o in sorted(_per_tuple(inp, not_blocked).items()):
+        se, de = _src_host(o, inp).labels.get(key), _dst_host(o, inp).labels.get(key)
+        if not (se and de and se != de):
+            continue
+        out.append(Detection(
+            detector=DetectorKind.CROSS_ENV, fingerprint=f"xenv|{src}|{dst}|{port}|{proto}", subject_key=src,
+            severity=Severity.HIGH if o.decision == "allowed" else Severity.MEDIUM, first_seen=o.first,
+            last_seen=o.last, critical_asset=_dst_host(o, inp).critical,
+            summary={"target": o.dst_hostname or o.dst_ip, "src_env": se, "dst_env": de, "port": port,
+                     "decision": o.decision},
+            segment=evidence(inp, o.first, o.last, src=o, dst=o),
+            confidence=DetectionConfidence(incomplete_gaps=inp.gaps)))
+    return out, DetectorStatus(DetectorKind.CROSS_ENV, DetectorState.OK)
+
+
+def detect_account_fanout(inp: DetectorInput) -> tuple[list[Detection], DetectorStatus]:
+    """One initiating account starting management-port connections to at least account_fanout_targets
+    hosts within its window. Only as good as the user field's coverage, which every result states."""
+    cfg = inp.config
+    rows = [o for o in inp.obs if not_blocked(o)]
+    in_window = [o for o in rows if evaluable(o, inp)]
+    covered = [o for o in in_window if o.initiator_user]
+    if in_window and not covered:
+        return [], DetectorStatus(DetectorKind.ACCOUNT_FANOUT, DetectorState.NO_DATA, "detector_no_user_data",
+                                  {"covered": 0, "total": len(in_window)})
+    by_user: dict[str, list[Obs]] = {}
+    for o in rows:
+        account = account_key(o.initiator_user)
+        if account is None or (cfg.exclude_system_accounts and is_system_account(o.initiator_user)):
+            continue
+        by_user.setdefault(account, []).append(o)
+    out = []
+    for account, user_rows in sorted(by_user.items()):
+        user_rows.sort(key=lambda o: o.last)
+        best = _max_window(user_rows, cfg.account_fanout_window, lambda o: o.dst_key, lambda o: evaluable(o, inp))
+        if best is None or best[0] < cfg.account_fanout_targets:
+            continue
+        window_rows = user_rows[best[1]:best[2] + 1]
+        last = window_rows[-1].last
+        out.append(Detection(
+            detector=DetectorKind.ACCOUNT_FANOUT, fingerprint=f"acct|{account}", subject_key=account,
+            severity=Severity.HIGH, first_seen=min(o.first for o in window_rows), last_seen=last,
+            critical_asset=any(_dst_host(o, inp).critical for o in window_rows),
+            summary={"targets": best[0], "sample_targets": _names(window_rows),
+                     "sources": sorted({o.src_hostname or o.src_ip for o in window_rows})[:SAMPLE],
+                     "window_minutes": int(cfg.account_fanout_window / timedelta(minutes=1))},
+            segment=FlowSegment(filter=FilterSpec(start=last - cfg.account_fanout_window, end=last,
+                                                  initiator_user=window_rows[-1].initiator_user,
+                                                  ports=cfg.admin_ports.port_filters()),
+                                view=SegmentView.DETAIL, limit=200),
+            confidence=DetectionConfidence(field="initiator_user", covered=len(covered), total=len(in_window),
+                                           incomplete_gaps=inp.gaps)))
+    return out, DetectorStatus(DetectorKind.ACCOUNT_FANOUT, DetectorState.OK,
+                               params={"covered": len(covered), "total": len(in_window)})
+
+
+def detect_unexpected_initiator(inp: DetectorInput) -> tuple[list[Detection], DetectorStatus]:
+    """A management-port connection started by a process not on that port's expected list. Ports without
+    a list are not evaluated; a connection without process data cannot be judged and is counted, never
+    called unexpected."""
+    cfg = inp.config
+    found: dict[tuple[str, str, int, int], Obs] = {}
+    judged = not_evaluable = 0
+    for o in inp.obs:
+        if not evaluable(o, inp) or o.port is None:
+            continue
+        expected = cfg.expected.get((o.port, o.proto), cfg.expected.get((o.port, None)))
+        if expected is None:
+            continue
+        if not o.initiator_process:
+            not_evaluable += 1
+            continue
+        judged += 1
+        if o.initiator_process not in expected:
+            found.setdefault((o.src_key, o.initiator_process, o.port, o.proto), o)
+    if not judged and not_evaluable:
+        return [], DetectorStatus(DetectorKind.UNEXPECTED_INITIATOR, DetectorState.NO_DATA, "detector_no_process_data",
+                                  {"not_evaluable": not_evaluable})
+    out = []
+    for (src, process, port, proto), o in sorted(found.items()):
+        critical = _dst_host(o, inp).critical
+        out.append(Detection(
+            detector=DetectorKind.UNEXPECTED_INITIATOR, fingerprint=f"proc|{src}|{process}|{port}|{proto}",
+            subject_key=src, severity=Severity.HIGH if critical else Severity.MEDIUM, first_seen=o.first,
+            last_seen=o.last, critical_asset=critical,
+            summary={"process": process, "port": port, "proto": proto, "target": o.dst_hostname or o.dst_ip},
+            segment=evidence(inp, o.first, o.last, src=o),
+            confidence=DetectionConfidence(field="initiator_process", covered=judged, total=judged + not_evaluable,
+                                           incomplete_gaps=inp.gaps)))
+    return out, DetectorStatus(DetectorKind.UNEXPECTED_INITIATOR, DetectorState.OK,
+                               params={"not_evaluable": not_evaluable})
+
+
+def apply_precursors(dets: Sequence[Detection], precursors: Sequence[Precursor], *,
+                     window: timedelta) -> list[Detection]:
+    """A host-led detection whose host showed a precursor (tampering, a suspended or offline VEN) within
+    `window` before it or during it is raised one level and says why (spec §6.5.1 前兆加權)."""
+    by_host: dict[str, list[Precursor]] = {}
+    for p in precursors:
+        by_host.setdefault(p.host_key, []).append(p)
+    out = []
+    for d in dets:
+        found = [p for p in by_host.get(d.subject_key, ()) if d.first_seen - window <= p.at <= d.last_seen]
+        if d.detector is DetectorKind.ACCOUNT_FANOUT or not found:
+            out.append(d)
+            continue
+        listed = [{"kind": p.kind.value, "at": p.at.isoformat(), "signal": p.signal}
+                  for p in sorted(found, key=lambda p: p.at)]
+        out.append(replace(d, severity=raise_severity(d.severity), summary=dict(d.summary) | {"precursors": listed}))
+    return out
 
 
 DETECTORS: dict[DetectorKind, Callable[[DetectorInput], tuple[list[Detection], DetectorStatus]]] = {
     DetectorKind.FANOUT: detect_fanout,
     DetectorKind.NEW_ADMIN_CONNECTION: detect_new_admin,
-} | {k: _pending(k) for k in DetectorKind if k not in (DetectorKind.FANOUT, DetectorKind.NEW_ADMIN_CONNECTION)}
+    DetectorKind.PIVOT_CHAIN: detect_pivot_chain,
+    DetectorKind.BLOCKED_SURGE: detect_blocked_surge,
+    DetectorKind.NON_ADMIN_GROUP: detect_non_admin_group,
+    DetectorKind.CROSS_ENV: detect_cross_env,
+    DetectorKind.ACCOUNT_FANOUT: detect_account_fanout,
+    DetectorKind.UNEXPECTED_INITIATOR: detect_unexpected_initiator,
+}
 
 
 def dedup_windows(cfg: DetectorConfig) -> dict[str, timedelta]:
@@ -268,4 +522,4 @@ def run_detectors(inp: DetectorInput) -> tuple[list[Detection], list[DetectorSta
         found, status = DETECTORS[kind](inp)
         detections += found
         statuses.append(status)
-    return detections, statuses
+    return apply_precursors(detections, inp.precursors, window=inp.config.precursor_window), statuses

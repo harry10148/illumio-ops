@@ -17,8 +17,10 @@ from illumio_ops.domain.detectors import (
     DetectorInput,
     DetectorStatus,
     HostLookup,
+    blocked_counts,
     dedup_windows,
     evaluable,
+    max_window_targets,
     run_detectors,
 )
 from illumio_ops.domain.filter import FilterSpec
@@ -31,6 +33,7 @@ from illumio_ops.services.analysis.context import (
 )
 from illumio_ops.services.collect.traffic import OVERLAP
 from illumio_ops.services.context import AppContext
+from illumio_ops.services.eventsource import precursor_events
 from illumio_ops.services.flowsource import baseline_first_seen, observations
 from illumio_ops.settings.schema import DetectorSettings, LateralSettings
 from illumio_ops.store.flowdb import analysis
@@ -61,7 +64,8 @@ def _config(lc: LateralContext) -> DetectorConfig:
         exclude_system_accounts=d.exclude_system_accounts, precursor_window=timedelta(hours=d.precursor_hours),
         expected={(e.port, e.proto): frozenset(e.processes) for e in lat.expected_initiators},
         admin_ports=lc.admin_ports, environment_label_key=lat.environment_label_key,
-        admin_groups_configured=bool(lat.admin_groups))
+        admin_groups_configured=bool(lat.admin_groups),
+        environment_labels_present=any(k == lat.environment_label_key for k, _ in lc.known_labels))
 
 
 def _status(s: DetectorStatus, incomplete: bool) -> dict[str, Any]:
@@ -118,7 +122,9 @@ def run_detection(ctx: AppContext, *, now: datetime | None = None, window: tuple
                              baseline_required=lc.baseline_required, baseline_full=lc.baseline_full(), gaps=gaps)
         tuples = {(o.src_key, o.dst_key, o.port if o.port is not None else -1, o.proto)
                   for o in admin.rows if evaluable(o, inp0)}
-        inp = replace(inp0, baseline_first_seen=baseline_first_seen(ctx, tuples))
+        precursors = precursor_events(ctx, start=lo - cfg.precursor_window, end=hi)
+        inp = replace(inp0, baseline_first_seen=baseline_first_seen(ctx, tuples), precursors=precursors.items,
+                      blocked_history=_blocked_history(ctx, inp0, at))
         found, statuses = run_detectors(inp)
         status_rows = [_status(s, bool(gaps)) for s in statuses]
         with fdb.writing(lc.generation) as conn:
@@ -136,3 +142,19 @@ def _hosts(lc: LateralContext) -> HostLookup:
     def lookup(key: str, ip: str, hostname: str | None, labels: Mapping[str, str]) -> HostInfo:
         return host_for(lc, key, ip=ip, hostname=hostname, labels=labels)
     return lookup
+
+
+HISTORY = timedelta(days=7)
+
+
+def _blocked_history(ctx: AppContext, inp: DetectorInput, at: datetime) -> dict[str, int]:
+    """For the sources over the blocked threshold now: their most distinct blocked targets in any window of
+    the 7 days before this run's window (read only for them; usually none are over)."""
+    cfg = inp.config
+    over = [src for src, n in blocked_counts(inp).items() if n >= cfg.blocked_targets]
+    if not over:
+        return {}
+    lo = inp.window[0]
+    rows = observations(ctx, FilterSpec(start=lo - HISTORY, end=lo, decisions=(PolicyDecision.BLOCKED,)), now=at).rows
+    return {src: max_window_targets([o for o in rows if o.src_key == src and o.last <= lo], cfg.blocked_window)
+            for src in over}

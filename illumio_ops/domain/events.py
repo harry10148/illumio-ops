@@ -8,7 +8,7 @@ from datetime import datetime
 from typing import Any
 
 from illumio_ops.domain.flows import FlowShapeError, parse_time
-from illumio_ops.domain.values import TamperClassification
+from illumio_ops.domain.values import PrecursorKind, TamperClassification
 
 # created_by carries one of these; for agent events the PCE sends both agent and ven,
 # and the VEN href is the one that leads to a workload.
@@ -72,3 +72,64 @@ def normalize_event(raw: Mapping[str, Any]) -> EventRecord:
         tamper_classification=_classification(raw) if event_type == "agent.tampering" else None,
         raw_json=json.dumps(raw, separators=(",", ":"), ensure_ascii=False),
     )
+
+
+@dataclass(frozen=True)
+class EventHosts:
+    ven_hrefs: frozenset[str]
+    workload_hrefs: frozenset[str]
+    hostnames: frozenset[str]
+
+
+def _hosts(cb: Mapping[str, Any], resource_changes: list[Any], *, online_lost_only: bool) -> EventHosts:
+    vens, wls, names = set(), set(), set()
+    for kind in ("ven", "agent"):
+        entry = cb.get(kind) if isinstance(cb.get(kind), Mapping) else None
+        if entry:
+            if kind == "ven" and entry.get("href"):
+                vens.add(str(entry["href"]))
+            if entry.get("hostname"):
+                names.add(str(entry["hostname"]))
+    for change in resource_changes:
+        if not isinstance(change, Mapping):
+            continue
+        wl = (change.get("resource") or {}).get("workload") if isinstance(change.get("resource"), Mapping) else None
+        if not isinstance(wl, Mapping):
+            continue
+        online = ((change.get("changes") or {}).get("online") or {}) if isinstance(change.get("changes"), Mapping) else {}
+        if online_lost_only and not (online.get("before") is True and online.get("after") is False):
+            continue
+        if wl.get("href"):
+            wls.add(str(wl["href"]))
+        if wl.get("hostname"):
+            names.add(str(wl["hostname"]))
+    return EventHosts(frozenset(vens), frozenset(wls), frozenset(names))
+
+
+def event_hosts(raw: Mapping[str, Any]) -> EventHosts:
+    """The hosts an event is about, in the three shapes events carry them: created_by.ven / created_by.agent
+    (VEN-sent events) and resource_changes[].resource.workload (system tasks such as the offline check)."""
+    cb = raw.get("created_by") if isinstance(raw.get("created_by"), Mapping) else {}
+    changes = raw.get("resource_changes") if isinstance(raw.get("resource_changes"), list) else []
+    return _hosts(cb or {}, changes or [], online_lost_only=False)
+
+
+PRECURSOR_EVENT_TYPES: Mapping[str, PrecursorKind] = {
+    "agent.tampering": PrecursorKind.TAMPER,
+    "agent.suspend": PrecursorKind.SUSPEND,
+    "system_task.agent_offline_check": PrecursorKind.OFFLINE,
+}
+
+
+def precursor_of(raw: Mapping[str, Any]) -> tuple[PrecursorKind, EventHosts, bool] | None:
+    """(kind, hosts, signal-type) when the event is a lateral-movement precursor (spec §6.5.1 前兆): an offline
+    check counts only for the workloads it took offline."""
+    kind = PRECURSOR_EVENT_TYPES.get(str(raw.get("event_type")))
+    if kind is None:
+        return None
+    cb = raw.get("created_by") if isinstance(raw.get("created_by"), Mapping) else {}
+    changes = raw.get("resource_changes") if isinstance(raw.get("resource_changes"), list) else []
+    hosts = _hosts(cb or {}, changes or [], online_lost_only=kind is PrecursorKind.OFFLINE)
+    if kind is PrecursorKind.OFFLINE and not hosts.workload_hrefs:
+        return None
+    return kind, hosts, _classification(raw) == TamperClassification.SIGNAL

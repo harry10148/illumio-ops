@@ -106,3 +106,40 @@ def test_pce_switch_during_run_writes_nothing(ctx, monkeypatch):
     r = run_detection(ctx, now=NOW)
     assert r.new == 0 and r.window is None
     assert _detections(ctx) == [] and _run_row(ctx) is None
+
+
+def test_precursor_event_raises_the_detection(ctx):
+    from illumio_ops.domain.events import normalize_event
+    from illumio_ops.store.flowdb import workloads
+    from illumio_ops.store.flowdb.events import upsert_events
+    with ctx.flows().connect() as conn:
+        workloads.replace_inventory(conn, [workloads.WorkloadRow(
+            href="/orgs/1/workloads/src-1", hostname="s1", name=None, managed=1, enforcement_mode=None,
+            visibility_level=None, os_id=None, ven_version=None, ven_href="/v/1", label_set=None, online=1,
+            risk_exposure=None, risk_percent=None, risk_updated_at=None, fetched_at="x")])
+        upsert_events(conn, [normalize_event({
+            "href": "/orgs/1/events/t1", "event_type": "agent.tampering", "severity": "info",
+            "timestamp": (NOW - timedelta(hours=2)).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "created_by": {"ven": {"href": "/v/1", "hostname": "s1"}},
+            "notifications": [{"info": {"event_classification": "confirmed"}}]})], origin=DataOrigin.INGEST, now=NOW)
+    run_detection(ctx, now=NOW)
+    [row] = _detections(ctx)
+    assert row["severity"] == "high" and json.loads(row["summary_json"])["precursors"][0]["kind"] == "tamper"
+
+
+def test_blocked_history_damps_a_usual_burst(tmp_path):
+    from illumio_ops.domain.values import DataOrigin as Origin
+    c = configured_ctx(tmp_path)
+    recs = []
+    for day_ago, n in ((3, 4), (0, 6)):  # 4 blocked targets three days ago, 6 now: 6 < 3 x 4
+        for i in range(n):
+            raw = raw_flow(2, NOW - timedelta(days=day_ago, minutes=6), NOW - timedelta(days=day_ago, minutes=5),
+                           port=8000 + i)
+            raw["dst"]["ip"] = f"10.0.4.{i}"
+            raw["dst"]["workload"]["href"] = f"/orgs/1/workloads/b{i}"
+            raw["policy_decision"] = "blocked"
+            recs.append(normalize_flow(raw))
+    with c.flows().connect() as conn:
+        upsert_flows(conn, recs, origin=Origin.INGEST, now=NOW)
+    _collected(c)
+    assert run_detection(c, now=NOW).new == 0

@@ -10,9 +10,16 @@ from datetime import UTC, datetime, timedelta
 from typing import Any, Literal
 
 from loguru import logger
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
-from illumio_ops.domain.events import EventShapeError, normalize_event
+from illumio_ops.domain.detectors import Precursor
+from illumio_ops.domain.events import (
+    PRECURSOR_EVENT_TYPES,
+    EventShapeError,
+    normalize_event,
+    precursor_of,
+)
+from illumio_ops.domain.identity import endpoint_key
 from illumio_ops.domain.segment import (
     EVENT_FROM,
     EventSegment,
@@ -188,3 +195,49 @@ def event_detail(ctx: AppContext, seg: EventSegment, *, now: datetime | None = N
     found, cov = _segment_read(ctx, seg, at, lambda conn: conn.execute(sql, [*params, seg.limit + 1]).fetchall())
     rows = [_event_row(r) for r in found]
     return EventQuery(rows=rows[:seg.limit], coverage=cov, limit_hit=len(rows) > seg.limit)
+
+
+class PrecursorEvents(BaseModel):
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+    items: list[Precursor]
+    unmatched: int  # precursor events whose host could not be told
+
+
+def precursor_events(ctx: AppContext, *, start: datetime, end: datetime) -> PrecursorEvents:
+    """Tampering, suspended and offline VENs in the store, by host. A VEN-sent event names its VEN, joined
+    to the host through the inventory; a VEN paired again (a new VEN href, same host) is matched by its
+    hostname when that names exactly one host. Events that still match nothing are counted, not dropped."""
+    fdb = ctx.flows()
+    gen = fdb.generation  # noted before the settings it goes with (FlowDb.generation)
+    settings = ctx.settings.current()
+    types = sorted(PRECURSOR_EVENT_TYPES)
+    with fdb.connect() as conn:
+        require_same_pce(conn, settings.pce)
+        found = conn.execute(f"SELECT raw_json, timestamp FROM events WHERE event_type IN ({','.join('?' * len(types))}) "
+                             "AND timestamp >= ? AND timestamp <= ? ORDER BY timestamp",
+                             [*types, db_time(start), db_time(end)]).fetchall()
+        hosts = conn.execute("SELECT href, hostname, ven_href FROM workloads").fetchall()
+    if fdb.generation != gen:
+        raise StaleGeneration
+    by_ven = {h["ven_href"]: h["href"] for h in hosts if h["ven_href"]}
+    known = {h["href"] for h in hosts}
+    by_name: dict[str, list[str]] = {}
+    for h in hosts:
+        if h["hostname"]:
+            by_name.setdefault(h["hostname"], []).append(h["href"])
+    items: list[Precursor] = []
+    unmatched = 0
+    for r in found:
+        res = precursor_of(json.loads(r["raw_json"]))
+        if res is None:
+            continue
+        kind, event_hosts, signal = res
+        hrefs = {by_ven[v] for v in event_hosts.ven_hrefs if v in by_ven} | (event_hosts.workload_hrefs & known)
+        if not hrefs:
+            hrefs = {by_name[n][0] for n in event_hosts.hostnames if len(by_name.get(n, ())) == 1}
+        if not hrefs:
+            unmatched += 1
+            continue
+        at = datetime.fromisoformat(r["timestamp"])
+        items += [Precursor(host_key=endpoint_key(h, ""), kind=kind, at=at, signal=signal) for h in sorted(hrefs)]
+    return PrecursorEvents(items=items, unmatched=unmatched)
