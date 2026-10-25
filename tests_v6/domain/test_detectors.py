@@ -322,3 +322,24 @@ def test_run_detectors_applies_precursors():
     tamper = Precursor(host_key="/w/a", kind=PrecursorKind.TAMPER, at=NOW - timedelta(hours=1), signal=False)
     dets, _ = run_detectors(inp(fan("/w/a", 10), precursors=[tamper]))
     assert dets[0].severity is Severity.HIGH
+
+
+def test_backfill_rows_never_count_toward_thresholds():
+    # Final review #10 (spec §7): history from a backfill must not complete a live detection.
+    assert not [d for d in run_detectors(inp(fan("/w/a", 9, origin="backfill") + [obs("/w/a", "/w/x")]))[0]
+                if d.detector is DetectorKind.FANOUT]
+    legs = [obs("/w/a", "/w/b", minutes_ago=20, origin="backfill"), obs("/w/b", "/w/c", minutes_ago=10)]
+    assert not [d for d in run_detectors(inp(legs))[0] if d.detector is DetectorKind.PIVOT_CHAIN]
+
+
+def test_empty_admin_port_set_disables_management_detectors():
+    # Final review #8: no management ports must not mean "every port".
+    cfg = replace(CFG, admin_ports=effective_admin_ports(LATERAL_PORTS_DEFAULT, (), extra=(),
+                                                         removed=[(p, None) for p, _ in LATERAL_PORTS_DEFAULT],
+                                                         include_pce=False))
+    dets, statuses = run_detectors(inp(fan("/w/a", 12, port=443), cfg=cfg))
+    assert dets == []
+    by_kind = {s.detector: s for s in statuses}
+    assert by_kind[DetectorKind.FANOUT].state is DetectorState.DISABLED
+    assert by_kind[DetectorKind.FANOUT].reason_key == "detector_no_admin_ports"
+    assert by_kind[DetectorKind.BLOCKED_SURGE].state is not DetectorState.DISABLED

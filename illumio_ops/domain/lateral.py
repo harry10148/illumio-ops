@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Collection, Mapping, Sequence
 from dataclasses import dataclass
+from functools import cached_property
 from typing import Literal
 
 from illumio_ops.domain.filter import PortProto
@@ -23,11 +24,20 @@ class AdminPort:
 class AdminPortSet:
     entries: tuple[AdminPort, ...]
 
+    @cached_property
+    def _lookup(self) -> frozenset[tuple[int, int | None]]:
+        return frozenset((e.port, e.proto) for e in self.entries)
+
     def matches(self, port: int | None, proto: int) -> bool:
-        return port is not None and any(e.port == port and e.proto in (None, proto) for e in self.entries)
+        # Read for every baseline row of the exposure graph: a set lookup, not a scan of the entries.
+        return port is not None and ((port, None) in self._lookup or (port, proto) in self._lookup)
+
+    @cached_property
+    def _filters(self) -> tuple[PortProto, ...]:
+        return tuple(dict.fromkeys(PortProto(port=e.port, proto=e.proto) for e in self.entries))
 
     def port_filters(self) -> tuple[PortProto, ...]:
-        return tuple(dict.fromkeys(PortProto(port=e.port, proto=e.proto) for e in self.entries))
+        return self._filters  # every detection's evidence segment carries it
 
 
 def effective_admin_ports(builtin: Sequence[tuple[int, str]], pce_admin: Sequence[tuple[int, int, str]],

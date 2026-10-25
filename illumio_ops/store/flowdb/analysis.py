@@ -39,24 +39,39 @@ def _higher(a: str, b: str) -> str:
     return a if SEVERITY_ORDER.index(Severity(a)) >= SEVERITY_ORDER.index(Severity(b)) else b
 
 
+def _distance(row: sqlite3.Row, d: DetectionWrite) -> timedelta:
+    """How far apart a stored detection and a new one are in time (zero when they overlap)."""
+    zero = timedelta(0)
+    return max(zero, d.first_seen - datetime.fromisoformat(row["last_seen"]),
+               datetime.fromisoformat(row["first_seen"]) - d.last_seen)
+
+
 def upsert_detections(conn: sqlite3.Connection, rows: Sequence[DetectionWrite], *, dedup: Mapping[str, timedelta],
                       late: bool, at: datetime) -> tuple[int, int]:
-    """(new rows, updated rows). A detection that starts within its detector's dedup window of the
-    fingerprint's latest row extends that row; the severity never goes down."""
+    """(new rows, updated rows). A detection within its detector's dedup window of a row of the same
+    fingerprint — before or after it, the nearest such row — extends that row; the severity never goes
+    down, and the evidence stays the newer of the two (a late pass reaching back must not replace it)."""
     new = updated = 0
     stamp = db_time(at)
     with transaction(conn):
         for d in rows:
-            old = conn.execute(
-                "SELECT id, last_seen, severity FROM detections WHERE detector = ? AND fingerprint = ? "
-                "ORDER BY last_seen DESC LIMIT 1", (d.detector, d.fingerprint)).fetchone()
-            if old is not None and d.first_seen - datetime.fromisoformat(old["last_seen"]) <= dedup[d.detector]:
+            gap = dedup[d.detector]
+            near = conn.execute(
+                "SELECT id, first_seen, last_seen, severity FROM detections WHERE detector = ? AND fingerprint = ? "
+                "AND last_seen >= ? AND first_seen <= ?",
+                (d.detector, d.fingerprint, db_time(d.first_seen - gap), db_time(d.last_seen + gap))).fetchall()
+            old = min(near, key=lambda r: (_distance(r, d), -int(r["id"])), default=None)
+            if old is not None:
+                newer = d.last_seen >= datetime.fromisoformat(old["last_seen"])
                 conn.execute(
                     "UPDATE detections SET first_seen = MIN(first_seen, ?), last_seen = MAX(last_seen, ?), "
                     "occurrences = occurrences + 1, severity = ?, critical_asset = MAX(critical_asset, ?), "
-                    "summary_json = ?, segment_json = ?, confidence_json = ?, updated_at = ? WHERE id = ?",
+                    "summary_json = CASE WHEN ? THEN ? ELSE summary_json END, "
+                    "segment_json = CASE WHEN ? THEN ? ELSE segment_json END, "
+                    "confidence_json = CASE WHEN ? THEN ? ELSE confidence_json END, updated_at = ? WHERE id = ?",
                     (db_time(d.first_seen), db_time(d.last_seen), _higher(old["severity"], d.severity),
-                     int(d.critical_asset), d.summary_json, d.segment_json, d.confidence_json, stamp, old["id"]))
+                     int(d.critical_asset), newer, d.summary_json, newer, d.segment_json, newer, d.confidence_json,
+                     stamp, old["id"]))
                 updated += 1
             else:
                 conn.execute(

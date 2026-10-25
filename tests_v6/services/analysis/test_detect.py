@@ -159,3 +159,22 @@ def test_blocked_history_damps_a_usual_burst(tmp_path):
         upsert_flows(conn, recs, origin=Origin.INGEST, now=NOW)
     _collected(c)
     assert run_detection(c, now=NOW).new == 0
+
+
+def test_all_stale_admin_groups_disable_the_detector(ctx):
+    # Final review #7 (plan Review Focus 4): admin groups whose labels are all gone are not "configured".
+    ctx.settings.update(ctx.settings.current().revision,
+                        lambda d: d["lateral"].update({"admin_groups": [{"key": "role", "value": "DeletedJump"}]}))
+    r = run_detection(ctx, now=NOW)
+    nag = next(s for s in r.statuses if s["detector"] == "non_admin_group")
+    assert (nag["state"], nag["reason_key"]) == ("disabled", "detector_admin_groups_stale")
+    assert not [d for d in _detections(ctx) if d["detector"] == "non_admin_group"]
+
+
+def test_gap_in_lookback_marks_incomplete(ctx):
+    # Final review #9: the detectors look back a window before the evaluated range; a gap there counts.
+    with ctx.flows().connect() as conn:
+        ingest_state.record_gap(conn, IngestSource.TRAFFIC, NOW - minutes(120), NOW - minutes(110), "failed", "x", NOW)
+    r = run_detection(ctx, now=NOW)
+    assert r.window[0] == NOW - minutes(90) and [g[2] for g in r.gaps] == ["ingest_failed"]
+    assert next(s for s in r.statuses if s["detector"] == "fanout")["state"] == "incomplete"

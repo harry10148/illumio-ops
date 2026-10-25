@@ -12,7 +12,12 @@ from loguru import logger
 from illumio_ops.jobs.health import record_finish, record_start
 from illumio_ops.pce.client import PceNotConfigured
 from illumio_ops.services import pce_health
-from illumio_ops.services.analysis.detect import run_detection
+from illumio_ops.services.analysis.detect import (
+    clear_late_day,
+    pending_late_days,
+    queue_late_day,
+    run_detection,
+)
 from illumio_ops.services.analysis.hourly import run_hourly_analysis
 from illumio_ops.services.collect.archive import run_archive
 from illumio_ops.services.collect.backfill import ensure_initial_backfill
@@ -113,9 +118,12 @@ def _collector_jobs(ctx: AppContext) -> dict[str, Callable[[], None]]:
         ensure_initial_backfill(ctx)
         reread = ensure_daily_reread(ctx)
         day = last_reread_day(ctx) if reread is not None and reread.rows > 0 else None
-        if day is not None:  # records found late are evaluated now, marked late
-            start = datetime.combine(day, time(0), UTC)
+        if day is not None:  # records found late are evaluated, marked late; owed until a pass succeeds
+            queue_late_day(ctx, day)
+        for owed in pending_late_days(ctx):
+            start = datetime.combine(owed, time(0), UTC)
             run_detection(ctx, window=(start, start + timedelta(days=1)), late=True)
+            clear_late_day(ctx, owed)
 
     def archive() -> None:
         run_archive(ctx)

@@ -112,3 +112,24 @@ def test_reset_clears_analysis_tables(tmp_path):
     with fdb.connect() as c:
         for table in ("detections", "analysis_runs", "analysis_results", "lateral_snapshot_daily", "focus_items"):
             assert c.execute(f"SELECT count(*) FROM {table}").fetchone()[0] == 0
+
+
+def test_late_detection_a_day_earlier_does_not_merge_into_newest(conn):
+    # Final review #5: dedup measured one way merged any earlier late detection into the newest row.
+    analysis.upsert_detections(conn, [_det(targets=12)], dedup=DEDUP, late=False, at=NOW)
+    yesterday = NOW - timedelta(hours=24)
+    assert analysis.upsert_detections(conn, [_det(seen=yesterday, targets=10)], dedup=DEDUP, late=True,
+                                      at=NOW) == (1, 0)
+    rows = {r["late"]: r for r in analysis.detections_since(conn, NOW - timedelta(days=2), limit=10)}
+    assert rows[0]["last_seen"].startswith("2026-10-25T12:00") and json.loads(rows[0]["summary_json"])["targets"] == 12
+    assert rows[1]["last_seen"].startswith("2026-10-24T12:00")
+
+
+def test_late_detection_within_window_extends_without_replacing_newer_evidence(conn):
+    analysis.upsert_detections(conn, [_det(targets=12)], dedup=DEDUP, late=False, at=NOW)
+    earlier = NOW - timedelta(minutes=30)
+    assert analysis.upsert_detections(conn, [_det(seen=earlier, targets=10)], dedup=DEDUP, late=True,
+                                      at=NOW) == (0, 1)
+    [row] = analysis.detections_since(conn, NOW - timedelta(days=1), limit=10)
+    assert row["first_seen"].startswith("2026-10-25T11:25") and row["last_seen"].startswith("2026-10-25T12:00")
+    assert json.loads(row["summary_json"])["targets"] == 12

@@ -113,8 +113,9 @@ class DetectorConfig:
     expected: Mapping[tuple[int, int | None], frozenset[str]]
     admin_ports: AdminPortSet
     environment_label_key: str
-    admin_groups_configured: bool
+    admin_groups_configured: bool     # at least one admin-group selector names a label that exists
     environment_labels_present: bool  # the inventory carries the environment label key at all
+    admin_groups_stale: bool = False  # selectors are set but every one names a label that is gone
 
 
 HostLookup = Callable[[str, str, str | None, Mapping[str, str]], HostInfo]  # (key, ip, hostname, flow labels)
@@ -356,7 +357,8 @@ def _per_tuple(inp: DetectorInput, keep: Callable[[Obs], bool]) -> dict[tuple[st
 def detect_non_admin_group(inp: DetectorInput) -> tuple[list[Detection], DetectorStatus]:
     """A source outside every admin group (unmanaged sources included) using a management port."""
     if not inp.config.admin_groups_configured:
-        return [], DetectorStatus(DetectorKind.NON_ADMIN_GROUP, DetectorState.DISABLED, "detector_admin_groups_unset")
+        reason = "detector_admin_groups_stale" if inp.config.admin_groups_stale else "detector_admin_groups_unset"
+        return [], DetectorStatus(DetectorKind.NON_ADMIN_GROUP, DetectorState.DISABLED, reason)
     out = []
     for (src, dst, port, proto), o in sorted(_per_tuple(inp, lambda o: not_blocked(o)
                                                         and not _src_host(o, inp).admin_group).items()):
@@ -515,10 +517,22 @@ def dedup_windows(cfg: DetectorConfig) -> dict[str, timedelta]:
     }
 
 
+# The detectors that read management-port connections; the blocked-surge detector reads every port.
+MANAGEMENT_DETECTORS = frozenset(DetectorKind) - {DetectorKind.BLOCKED_SURGE}
+
+
 def run_detectors(inp: DetectorInput) -> tuple[list[Detection], list[DetectorStatus]]:
+    """Every detector over the ingested rows only: backfilled history is baseline, never part of what an
+    alert counts (spec §7). Without management ports the management detectors are off, not "any port"."""
+    inp = replace(inp, obs=[o for o in inp.obs if o.origin == "ingest"],
+                  blocked_obs=[o for o in inp.blocked_obs if o.origin == "ingest"])
+    no_ports = not inp.config.admin_ports.entries
     detections: list[Detection] = []
     statuses: list[DetectorStatus] = []
     for kind in DetectorKind:
+        if no_ports and kind in MANAGEMENT_DETECTORS:
+            statuses.append(DetectorStatus(kind, DetectorState.DISABLED, "detector_no_admin_ports"))
+            continue
         found, status = DETECTORS[kind](inp)
         detections += found
         statuses.append(status)

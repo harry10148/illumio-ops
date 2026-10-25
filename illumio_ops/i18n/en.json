@@ -376,6 +376,8 @@
   "detector_baseline_accumulating": "Baseline {days} of {required} days: until it is full every connection looks new.",
   "detector_collection_off": "This collection mode does not read traffic.",
   "detector_admin_groups_unset": "Set the admin groups below to turn it on.",
+  "detector_admin_groups_stale": "Every admin-group label set below is gone from the PCE: set them again to turn it on.",
+  "detector_no_admin_ports": "No management ports are set: add some below to turn it on.",
   "detector_no_env_labels": "No workload carries the label key {label_key}.",
   "detector_no_user_data": "None of the {total} connections carries a user ({covered} do).",
   "detector_no_process_data": "{not_evaluable} connections on the listed ports carry no process.",

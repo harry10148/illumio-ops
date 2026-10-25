@@ -6,7 +6,7 @@ from __future__ import annotations
 import json
 from collections.abc import Mapping
 from dataclasses import asdict, replace
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from typing import Any
 
 from pydantic import BaseModel
@@ -17,6 +17,7 @@ from illumio_ops.domain.detectors import (
     DetectorInput,
     DetectorStatus,
     HostLookup,
+    Obs,
     blocked_counts,
     dedup_windows,
     evaluable,
@@ -41,6 +42,7 @@ from illumio_ops.store.flowdb.analysis import DetectionWrite
 from illumio_ops.store.flowdb.db import StaleGeneration
 
 KIND = "detect"
+LATE_KIND = "detect_late"  # its status holds the days whose late pass is still owed
 
 
 class DetectionRun(BaseModel):
@@ -55,6 +57,8 @@ class DetectionRun(BaseModel):
 def _config(lc: LateralContext) -> DetectorConfig:
     lat: LateralSettings = lc.settings
     d: DetectorSettings = lat.detectors
+    gone = {(k, v) for setting, k, v in lc.stale if setting == "admin_groups"}
+    live_groups = [g for g in lat.admin_groups if (g.key, g.value) not in gone]
     return DetectorConfig(
         fanout_targets=d.fanout_targets, fanout_window=timedelta(minutes=d.fanout_window_minutes),
         account_fanout_targets=d.account_fanout_targets,
@@ -64,7 +68,7 @@ def _config(lc: LateralContext) -> DetectorConfig:
         exclude_system_accounts=d.exclude_system_accounts, precursor_window=timedelta(hours=d.precursor_hours),
         expected={(e.port, e.proto): frozenset(e.processes) for e in lat.expected_initiators},
         admin_ports=lc.admin_ports, environment_label_key=lat.environment_label_key,
-        admin_groups_configured=bool(lat.admin_groups),
+        admin_groups_configured=bool(live_groups), admin_groups_stale=bool(lat.admin_groups) and not live_groups,
         environment_labels_present=any(k == lat.environment_label_key for k, _ in lc.known_labels))
 
 
@@ -112,11 +116,15 @@ def run_detection(ctx: AppContext, *, now: datetime | None = None, window: tuple
             lo = (previous if previous is not None else hi - cfg.fanout_window) - OVERLAP
         else:
             lo, hi = window
-        admin = observations(ctx, FilterSpec(start=lo - _lookback(cfg), end=hi, ports=cfg.admin_ports.port_filters()),
-                             now=at)
+        start = lo - _lookback(cfg)
         blocked = observations(ctx, FilterSpec(start=lo - cfg.blocked_window, end=hi,
                                                decisions=(PolicyDecision.BLOCKED,)), now=at)
-        gaps = tuple(g for g in admin.coverage.gaps if g[0] < hi and g[1] > lo)
+        # No management ports: nothing to read (an empty port filter would mean every port).
+        admin = observations(ctx, FilterSpec(start=start, end=hi, ports=cfg.admin_ports.port_filters()),
+                             now=at) if cfg.admin_ports.entries else blocked.model_copy(update={"rows": []})
+        # A gap anywhere the detectors look — the lookback before the window included — makes the run incomplete.
+        gaps = tuple(g for g in admin.coverage.gaps + blocked.coverage.gaps if g[0] < hi and g[1] > start)
+        gaps = tuple(dict.fromkeys(gaps))
         inp0 = DetectorInput(window=(lo, hi), obs=admin.rows, blocked_obs=blocked.rows, hosts=_hosts(lc),
                              baseline_first_seen={}, precursors=[], config=cfg, baseline_days=lc.baseline_days,
                              baseline_required=lc.baseline_required, baseline_full=lc.baseline_full(), gaps=gaps)
@@ -163,5 +171,31 @@ def _blocked_history(ctx: AppContext, inp: DetectorInput, at: datetime) -> dict[
         return {}
     lo = inp.window[0]
     rows = observations(ctx, FilterSpec(start=lo - HISTORY, end=lo, decisions=(PolicyDecision.BLOCKED,)), now=at).rows
-    return {src: max_window_targets([o for o in rows if o.src_key == src and o.last <= lo], cfg.blocked_window)
-            for src in over}
+    by_src: dict[str, list[Obs]] = {src: [] for src in over}
+    for o in rows:  # one pass: a scan per source was the slowest part of a busy run (P3 Task 15 scale)
+        if o.src_key in by_src and o.last <= lo:
+            by_src[o.src_key].append(o)
+    return {src: max_window_targets(found, cfg.blocked_window) for src, found in by_src.items()}
+
+
+def _pending(conn: Any) -> set[str]:
+    run = analysis.get_run(conn, LATE_KIND)
+    return set(json.loads(run["status_json"]).get("pending", [])) if run is not None and run["status_json"] else set()
+
+
+def queue_late_day(ctx: AppContext, day: date) -> None:
+    """A day the daily re-read added records to: its late pass is owed until one succeeds."""
+    fdb = ctx.flows()
+    with fdb.writing(fdb.generation) as conn:
+        analysis.set_run(conn, LATE_KIND, status={"pending": sorted(_pending(conn) | {day.isoformat()})})
+
+
+def pending_late_days(ctx: AppContext) -> list[date]:
+    with ctx.flows().connect() as conn:
+        return [date.fromisoformat(d) for d in sorted(_pending(conn))]
+
+
+def clear_late_day(ctx: AppContext, day: date) -> None:
+    fdb = ctx.flows()
+    with fdb.writing(fdb.generation) as conn:
+        analysis.set_run(conn, LATE_KIND, status={"pending": sorted(_pending(conn) - {day.isoformat()})})

@@ -376,6 +376,8 @@
   "detector_baseline_accumulating": "基準期 {days}／{required} 天：未滿之前每條連線都會像是新的。",
   "detector_collection_off": "目前的收集模式不讀取流量。",
   "detector_admin_groups_unset": "請在下方設定管理群組才會啟用。",
+  "detector_admin_groups_stale": "下方設定的管理群組 label 在 PCE 上都已不存在，重新設定後才會啟用。",
+  "detector_no_admin_ports": "沒有設定任何管理 port，請在下方加入後才會啟用。",
   "detector_no_env_labels": "沒有任何 workload 帶有 label key {label_key}。",
   "detector_no_user_data": "{total} 條連線中沒有帶使用者的（{covered} 條有）。",
   "detector_no_process_data": "所列 port 上有 {not_evaluable} 條連線不帶 process。",
