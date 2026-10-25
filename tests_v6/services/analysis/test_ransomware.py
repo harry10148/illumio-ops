@@ -120,3 +120,20 @@ def test_traffic_not_collected_is_unknown_not_safe_to_block(tmp_path):
 def test_traffic_watched_shorter_than_the_window_is_unknown(tmp_path):
     classes, _ = _classes(_ctx(tmp_path, covered_days=1))
     assert classes[(WEB, "SMB")] == "unknown"
+
+
+def test_hole_or_failed_gap_in_the_window_is_unknown(tmp_path):
+    # Security review of 92d642b1: a period watched with a hole, or with a failed read, proves no "nobody".
+    ctx = _ctx(tmp_path)
+    with ctx.flows().connect() as conn:
+        ingest_state.record_gap(conn, IngestSource.TRAFFIC, NOW - timedelta(days=3), NOW - timedelta(days=2, hours=23),
+                                "failed", "x", NOW)
+    assert _classes(ctx)[0][(WEB, "SMB")] == "unknown"
+    holed = configured_ctx(tmp_path / "holed")
+    with holed.flows().connect() as conn:
+        ingest_state.add_coverage(conn, IngestSource.TRAFFIC, NOW - timedelta(days=31), NOW - timedelta(days=10))
+        ingest_state.add_coverage(conn, IngestSource.TRAFFIC, NOW - timedelta(days=9), NOW)
+        workloads.replace_inventory(conn, [_wl(WEB, "web", 10.0)])
+        ransomware.upsert_services(conn, WEB, [_svc("SMB", 445, "high", "unprotected", "listening")],
+                                   source_updated_at=None, at=NOW)
+    assert _classes(holed)[0][(WEB, "SMB")] == "unknown"

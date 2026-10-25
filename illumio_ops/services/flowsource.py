@@ -572,8 +572,11 @@ def service_traffic(ctx: AppContext, targets: Collection[tuple[str, int, int]], 
     acc: dict[tuple[str, int, int], tuple[set[str], str | None, set[str]]] = {}
     with fdb.connect() as conn:
         require_same_pce(conn, settings.pce)
+        # Watched without a hole from `since` to the newest collection, and no read in that stretch failed or
+        # was cut short: only then does "nobody connected" hold.
         ranges = ingest_state.coverage(conn, IngestSource.TRAFFIC)
-        if not ranges or ranges[0][0] > since:
+        if not ranges or ranges[-1][0] > since or any(
+                g.window_end > since for g in ingest_state.open_gaps(conn, IngestSource.TRAFFIC)):
             return unknown
         for r in conn.execute("SELECT src_key, dst_key, port, proto, last_seen, last_decision FROM connection_baseline "
                               f"WHERE port IN ({','.join('?' * len(numbers))})", numbers):
