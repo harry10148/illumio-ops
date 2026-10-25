@@ -67,7 +67,7 @@ def test_unknown_edges_in_now_marked():
     states = {(g.nodes[a], g.nodes[b]): info[1] for (a, b), info in g.edge_info.items()}
     assert states == {("a", "b"): U, ("b", "c"): P}
     ports = next(info[0] for (a, b), info in g.edge_info.items() if g.nodes[a] == "a")
-    assert ports == frozenset({(22, 6), (445, 6)})
+    assert ports == ((22, 6), (445, 6))
     # the strongest state of parallel ports wins
     g2 = build_graph([e("a", "b", U), e("a", "b", A, port=3389)], enforced=False)
     assert next(iter(g2.edge_info.values()))[1] is A

@@ -8,6 +8,7 @@ never written to the store.
 """
 from __future__ import annotations
 
+import sys
 import time
 from collections.abc import Collection, Sequence
 from dataclasses import dataclass
@@ -450,8 +451,6 @@ class BaselineEdge:
     dst_key: str
     port: int
     proto: int
-    first_seen: datetime
-    last_seen: datetime
     decision: str | None  # the reported decision of the newest observation; None before flow db 0002
 
 
@@ -476,11 +475,12 @@ def baseline_edges(ctx: AppContext, ports: AdminPortSet, *, since: datetime) -> 
         require_same_pce(conn, settings.pce)
         # Rows are turned into edges as they are read, never all held at once.
         cur = conn.execute(
-            "SELECT src_key, dst_key, port, proto, first_seen, last_seen, last_decision FROM connection_baseline "
+            "SELECT src_key, dst_key, port, proto, last_decision FROM connection_baseline "
             f"WHERE port IN ({','.join('?' * len(numbers))}) AND last_seen >= ?", [*numbers, stamp])
-        edges = [BaselineEdge(src_key=src, dst_key=dst, port=port, proto=proto, first_seen=datetime.fromisoformat(first),
-                              last_seen=datetime.fromisoformat(last), decision=decision)
-                 for src, dst, port, proto, first, last, decision in cur if ports.matches(port, proto)]
+        # Host keys repeat on every row of a host: one string per host, not one per row.
+        edges = [BaselineEdge(src_key=sys.intern(src), dst_key=sys.intern(dst), port=port, proto=proto,
+                              decision=decision)
+                 for src, dst, port, proto, decision in cur if ports.matches(port, proto)]
         ranges = ingest_state.coverage(conn, IngestSource.TRAFFIC)
     if fdb.generation != gen:
         raise StaleGeneration

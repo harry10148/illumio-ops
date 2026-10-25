@@ -57,7 +57,7 @@ class Graph:
     nodes: tuple[str, ...]
     index: Mapping[str, int]
     out: tuple[tuple[int, ...], ...]
-    edge_info: Mapping[tuple[int, int], tuple[frozenset[Port], EdgeState]]
+    edge_info: Mapping[tuple[int, int], tuple[tuple[Port, ...], EdgeState]]  # ports sorted
 
     @cached_property
     def rev(self) -> list[list[int]]:
@@ -78,12 +78,14 @@ def build_graph(edges: Iterable[EdgeIn], *, enforced: bool) -> Graph:
     nodes = tuple(sorted({n for pair in merged for n in pair}))
     index = {n: i for i, n in enumerate(nodes)}
     out: list[list[int]] = [[] for _ in nodes]
-    info: dict[tuple[int, int], tuple[frozenset[Port], EdgeState]] = {}
+    info: dict[tuple[int, int], tuple[tuple[Port, ...], EdgeState]] = {}
     # Sorted by node index, which is node-name order: the same order as sorting the names, without
-    # comparing strings for every edge.
-    for (si, di), (ports, state) in sorted(((index[s], index[d]), v) for (s, d), v in merged.items()):
+    # comparing strings for every edge. Each pair's ports become a sorted tuple (a set per pair was a third
+    # of the graph's memory at 1,000 workloads), and the working dict is emptied as it is read.
+    for si, di in sorted((index[s], index[d]) for s, d in merged):
+        ports, state = merged.pop((nodes[si], nodes[di]))
         out[si].append(di)
-        info[(si, di)] = (frozenset(ports), state)
+        info[(si, di)] = (tuple(sorted(ports)), state)
     return Graph(nodes=nodes, index=index, out=tuple(tuple(o) for o in out), edge_info=info)
 
 
