@@ -294,5 +294,18 @@
   "visibility_sees_allowed": "Hosts that record allowed and blocked traffic: {n}",
   "visibility_title": "What the VENs can see",
   "visibility_unknown": "Hosts that have not reported a visibility level: {n}",
-  "job_name_analysis_hourly": "Lateral-movement analysis"
+  "job_name_analysis_hourly": "Lateral-movement analysis",
+  "tamper_action_add_rule": "Added a rule",
+  "tamper_action_delete_rule": "Deleted a rule",
+  "tamper_action_add_chain": "Added a chain",
+  "tamper_action_delete_chain": "Deleted a chain",
+  "tamper_action_add_table": "Added a table",
+  "tamper_action_delete_table": "Deleted a table",
+  "tamper_cmd_nft_ruleset": "List the firewall rules without counters (nftables)",
+  "tamper_cmd_nft_monitor": "Watch rule changes with timestamps (nftables)",
+  "tamper_cmd_nft_writer": "See which process adds rules (nftables, needs bpftrace)",
+  "tamper_cmd_ven_evidence": "The rules the VEN last found tampered (it keeps only the latest)",
+  "tamper_cmd_audit_rule": "Record which process replaces the rules (iptables-legacy, auditd)",
+  "tamper_cmd_audit_search": "Read what auditd recorded",
+  "tamper_cmd_win_platform_log": "Find the VEN's platform.log under its data directory (Windows)"
 }

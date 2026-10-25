@@ -11,6 +11,7 @@ from loguru import logger
 
 from illumio_ops.services.analysis.exposure import run_exposure
 from illumio_ops.services.analysis.ransomware import ransomware_overlay
+from illumio_ops.services.analysis.tamper import tamper_summary
 from illumio_ops.services.context import AppContext
 from illumio_ops.store.flowdb import analysis
 from illumio_ops.store.flowdb.db import StaleGeneration
@@ -26,6 +27,7 @@ def _exposure(ctx: AppContext, now: datetime) -> None:
 HOURLY_STEPS: list[tuple[str, HourlyStep]] = [
     ("exposure", _exposure),
     ("ransomware", ransomware_overlay),
+    ("tamper", tamper_summary),
 ]
 
 

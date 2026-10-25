@@ -294,5 +294,18 @@
   "visibility_sees_allowed": "{n} 台主機記錄允許與被擋的流量",
   "visibility_title": "VEN 可見度",
   "visibility_unknown": "{n} 台主機尚未回報可見度",
-  "job_name_analysis_hourly": "橫向移動分析"
+  "job_name_analysis_hourly": "橫向移動分析",
+  "tamper_action_add_rule": "新增規則",
+  "tamper_action_delete_rule": "刪除規則",
+  "tamper_action_add_chain": "新增 chain",
+  "tamper_action_delete_chain": "刪除 chain",
+  "tamper_action_add_table": "新增表",
+  "tamper_action_delete_table": "刪除表",
+  "tamper_cmd_nft_ruleset": "列出防火牆規則，不含計數器（nftables）",
+  "tamper_cmd_nft_monitor": "帶時間戳監看規則變更（nftables）",
+  "tamper_cmd_nft_writer": "找出是哪個程序在新增規則（nftables，需要 bpftrace）",
+  "tamper_cmd_ven_evidence": "VEN 最近一次記下的被竄改規則（只保留最新一次）",
+  "tamper_cmd_audit_rule": "記錄是哪個程序替換規則（iptables-legacy，auditd）",
+  "tamper_cmd_audit_search": "讀出 auditd 記錄的內容",
+  "tamper_cmd_win_platform_log": "在 VEN 資料目錄中找出 platform.log（Windows）"
 }

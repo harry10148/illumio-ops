@@ -15,7 +15,9 @@ from pydantic import BaseModel, ConfigDict
 from illumio_ops.domain.detectors import Precursor
 from illumio_ops.domain.events import (
     PRECURSOR_EVENT_TYPES,
+    EventHosts,
     EventShapeError,
+    event_hosts,
     normalize_event,
     precursor_of,
 )
@@ -203,14 +205,31 @@ class PrecursorEvents(BaseModel):
     unmatched: int  # precursor events whose host could not be told
 
 
-def precursor_events(ctx: AppContext, *, start: datetime, end: datetime) -> PrecursorEvents:
-    """Tampering, suspended and offline VENs in the store, by host. A VEN-sent event names its VEN, joined
-    to the host through the inventory; a VEN paired again (a new VEN href, same host) is matched by its
-    hostname when that names exactly one host. Events that still match nothing are counted, not dropped."""
+class HostEvents(BaseModel):
+    items: list[tuple[str, dict[str, Any]]]  # (host key, raw event), oldest first
+    unmatched: int
+
+
+def _hosts_of(rows: list[Any]) -> Callable[[EventHosts], set[str]]:
+    """How an event's hosts become workload hrefs: a VEN through the inventory, a workload href as it is, and
+    a VEN paired again (new VEN href, same host) by its hostname when that names exactly one host."""
+    by_ven = {h["ven_href"]: h["href"] for h in rows if h["ven_href"]}
+    known = {h["href"] for h in rows}
+    by_name: dict[str, list[str]] = {}
+    for h in rows:
+        if h["hostname"]:
+            by_name.setdefault(h["hostname"], []).append(h["href"])
+
+    def resolve(hosts: EventHosts) -> set[str]:
+        found = {by_ven[v] for v in hosts.ven_hrefs if v in by_ven} | (hosts.workload_hrefs & known)
+        return found or {by_name[n][0] for n in hosts.hostnames if len(by_name.get(n, ())) == 1}
+    return resolve
+
+
+def _typed_events(ctx: AppContext, types: list[str], start: datetime, end: datetime) -> tuple[list[Any], list[Any]]:
     fdb = ctx.flows()
     gen = fdb.generation  # noted before the settings it goes with (FlowDb.generation)
     settings = ctx.settings.current()
-    types = sorted(PRECURSOR_EVENT_TYPES)
     with fdb.connect() as conn:
         require_same_pce(conn, settings.pce)
         found = conn.execute(f"SELECT raw_json, timestamp FROM events WHERE event_type IN ({','.join('?' * len(types))}) "
@@ -219,12 +238,14 @@ def precursor_events(ctx: AppContext, *, start: datetime, end: datetime) -> Prec
         hosts = conn.execute("SELECT href, hostname, ven_href FROM workloads").fetchall()
     if fdb.generation != gen:
         raise StaleGeneration
-    by_ven = {h["ven_href"]: h["href"] for h in hosts if h["ven_href"]}
-    known = {h["href"] for h in hosts}
-    by_name: dict[str, list[str]] = {}
-    for h in hosts:
-        if h["hostname"]:
-            by_name.setdefault(h["hostname"], []).append(h["href"])
+    return found, hosts
+
+
+def precursor_events(ctx: AppContext, *, start: datetime, end: datetime) -> PrecursorEvents:
+    """Tampering, suspended and offline VENs in the store, by host. Events that match no host are counted,
+    not dropped."""
+    found, hosts = _typed_events(ctx, sorted(PRECURSOR_EVENT_TYPES), start, end)
+    resolve = _hosts_of(hosts)
     items: list[Precursor] = []
     unmatched = 0
     for r in found:
@@ -232,12 +253,26 @@ def precursor_events(ctx: AppContext, *, start: datetime, end: datetime) -> Prec
         if res is None:
             continue
         kind, event_hosts, signal = res
-        hrefs = {by_ven[v] for v in event_hosts.ven_hrefs if v in by_ven} | (event_hosts.workload_hrefs & known)
-        if not hrefs:
-            hrefs = {by_name[n][0] for n in event_hosts.hostnames if len(by_name.get(n, ())) == 1}
+        hrefs = resolve(event_hosts)
         if not hrefs:
             unmatched += 1
             continue
         at = datetime.fromisoformat(r["timestamp"])
         items += [Precursor(host_key=endpoint_key(h, ""), kind=kind, at=at, signal=signal) for h in sorted(hrefs)]
     return PrecursorEvents(items=items, unmatched=unmatched)
+
+
+def tamper_events(ctx: AppContext, *, start: datetime, end: datetime) -> HostEvents:
+    """Every agent.tampering event in the store with its host, the same host matching as precursors use."""
+    found, hosts = _typed_events(ctx, ["agent.tampering"], start, end)
+    resolve = _hosts_of(hosts)
+    items: list[tuple[str, dict[str, Any]]] = []
+    unmatched = 0
+    for r in found:
+        raw = json.loads(r["raw_json"])
+        hrefs = resolve(event_hosts(raw))
+        if not hrefs:
+            unmatched += 1
+            continue
+        items += [(endpoint_key(h, ""), raw) for h in sorted(hrefs)]
+    return HostEvents(items=items, unmatched=unmatched)

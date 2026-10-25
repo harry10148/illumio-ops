@@ -7,6 +7,7 @@ TABLE_OWNERS: dict[str, str] = {
     # data/app.sqlite
     "job_health": "illumio_ops.jobs.health",
     "pce_probe": "illumio_ops.services.pce_health",
+    "tamper_annotations": "illumio_ops.store.annotations",
     # data/flows.sqlite
     "pce_binding": "illumio_ops.store.flowdb.binding",
     "ingest_state": "illumio_ops.store.flowdb.ingest_state",
