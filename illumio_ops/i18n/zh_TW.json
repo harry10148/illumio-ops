@@ -293,5 +293,6 @@
   "visibility_off": "{n} 台主機完全不記錄流量",
   "visibility_sees_allowed": "{n} 台主機記錄允許與被擋的流量",
   "visibility_title": "VEN 可見度",
-  "visibility_unknown": "{n} 台主機尚未回報可見度"
+  "visibility_unknown": "{n} 台主機尚未回報可見度",
+  "job_name_analysis_hourly": "橫向移動分析"
 }

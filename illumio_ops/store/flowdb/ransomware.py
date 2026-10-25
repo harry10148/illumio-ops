@@ -46,6 +46,14 @@ def admin_services(conn: sqlite3.Connection) -> list[tuple[int, int, str]]:
         "ORDER BY port, proto, name")]
 
 
+def unprotected_listening(conn: sqlite3.Connection) -> list[tuple[str, str, int, int, str | None]]:
+    """(workload href, service name, port, proto, severity) of every unprotected high-risk service the
+    PCE sees listening: the footholds on the exposure graph."""
+    return [(r[0], r[1], int(r[2]), int(r[3]), r[4]) for r in conn.execute(
+        "SELECT workload_href, name, port, proto, severity FROM ransomware_services "
+        "WHERE protection_state = 'unprotected' AND port_status = 'listening' ORDER BY workload_href, port, proto")]
+
+
 def prune_missing(conn: sqlite3.Connection, keep: Iterable[str]) -> int:
     keep_set = set(keep)
     gone = [h for h in source_updated(conn) if h not in keep_set]

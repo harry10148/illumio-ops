@@ -63,14 +63,14 @@ SETTINGS_READERS: dict[str, str] = {
     "lateral.include_pce_admin_services": "illumio_ops.services.analysis.context",
     "lateral.critical_assets": "illumio_ops.services.analysis.context",
     "lateral.admin_groups": "illumio_ops.services.analysis.context",
+    "lateral.environment_label_key": "illumio_ops.services.analysis.exposure",
+    "lateral.graph_hops": "illumio_ops.services.analysis.exposure",
+    "lateral.observation_days": "illumio_ops.services.analysis.exposure",
 }
 # Fields whose reader arrives later: value = the task or phase that adds it.
 PENDING_READERS: dict[str, str] = {
     "pce.console_url": "P3",
     "display.timezone": "P3",
-    "lateral.environment_label_key": "P3-T5",
-    "lateral.graph_hops": "P3-T5",
-    "lateral.observation_days": "P3-T5",
     "lateral.expected_initiators": "P3-T8",
     "lateral.detectors.fanout_targets": "P3-T7",
     "lateral.detectors.fanout_window_minutes": "P3-T7",

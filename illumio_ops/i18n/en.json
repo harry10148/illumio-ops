@@ -293,5 +293,6 @@
   "visibility_off": "Hosts that record no traffic: {n}",
   "visibility_sees_allowed": "Hosts that record allowed and blocked traffic: {n}",
   "visibility_title": "What the VENs can see",
-  "visibility_unknown": "Hosts that have not reported a visibility level: {n}"
+  "visibility_unknown": "Hosts that have not reported a visibility level: {n}",
+  "job_name_analysis_hourly": "Lateral-movement analysis"
 }

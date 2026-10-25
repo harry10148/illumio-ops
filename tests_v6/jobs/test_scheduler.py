@@ -97,3 +97,16 @@ def test_backfill_check_also_runs_the_daily_reread(tmp_path, monkeypatch):
     ctx = make_ctx(tmp_path)
     build_scheduler(ctx).get_job("collect_backfill").func()
     assert calls == ["initial", "reread"] and _health(ctx)["collect_backfill"].last_ok is True
+
+
+def test_scheduler_registers_analysis_hourly(tmp_path, monkeypatch):
+    from illumio_ops.jobs import scheduler as sched_mod
+    ctx = make_ctx(tmp_path)
+    sched = build_scheduler(ctx)
+    job = sched.get_job("analysis_hourly")
+    assert job is not None and job.trigger.interval.total_seconds() == 3600
+    assert job.coalesce is True and job.max_instances == 1
+    calls = []
+    monkeypatch.setattr(sched_mod, "run_hourly_analysis", lambda c: calls.append(c))
+    sched_mod.build_scheduler(ctx).get_job("analysis_hourly").func()
+    assert calls == [ctx]

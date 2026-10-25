@@ -10,11 +10,12 @@ from __future__ import annotations
 
 import time
 from collections.abc import Sequence
+from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Any, Literal
 
 from loguru import logger
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 from illumio_ops.domain.filter import (
     FilterSpec,
@@ -34,6 +35,7 @@ from illumio_ops.domain.flows import (
     record_key,
 )
 from illumio_ops.domain.identity import endpoint_key
+from illumio_ops.domain.lateral import AdminPortSet
 from illumio_ops.domain.segment import (
     FIELD_COVERAGE_SQL,
     FlowSegment,
@@ -53,10 +55,11 @@ from illumio_ops.services.coverage import (
     store_coverage,
 )
 from illumio_ops.settings.schema import PceSettings
+from illumio_ops.store.flowdb import ingest_state
 from illumio_ops.store.flowdb.db import StaleGeneration, db_time
 
-__all__ = ["AggRow", "Coverage", "FieldCoverage", "FlowAggregate", "FlowQuery", "FlowRow", "GapReason", "UserPair",
-           "aggregate_flows", "field_coverage", "new_user_pairs", "query_flows"]
+__all__ = ["AggRow", "BaselineEdge", "BaselineEdges", "Coverage", "FieldCoverage", "FlowAggregate", "FlowQuery", "FlowRow", "GapReason", "UserPair",
+           "aggregate_flows", "baseline_edges", "field_coverage", "new_user_pairs", "query_flows"]
 
 Order = Literal["last_detected_desc", "connections_desc"]
 FILL_MAX_RESULTS = 200_000
@@ -409,3 +412,46 @@ def new_user_pairs(ctx: AppContext, ports: Sequence[PortProto], *, since: dateti
                             first_seen=datetime.fromisoformat(r["first_seen"])))
     return out
 
+
+
+@dataclass(frozen=True)
+class BaselineEdge:
+    src_key: str
+    dst_key: str
+    port: int
+    proto: int
+    first_seen: datetime
+    last_seen: datetime
+    decision: str | None  # the reported decision of the newest observation; None before flow db 0002
+
+
+class BaselineEdges(BaseModel):
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+    edges: list[BaselineEdge]
+    baseline_from: datetime | None  # where the traffic coverage begins
+    collected: bool
+
+
+def baseline_edges(ctx: AppContext, ports: AdminPortSet, *, since: datetime) -> BaselineEdges:
+    """The management-port connections seen since `since`, from the connection baseline (kept for the
+    baseline period in every collection mode). Reads by port through ix_baseline_port; the protocol and
+    the time are checked here."""
+    fdb, gen, settings = _store_read(ctx)
+    collected = collects(settings, IngestSource.TRAFFIC)
+    numbers = sorted({e.port for e in ports.entries})
+    if not collected or not numbers:
+        return BaselineEdges(edges=[], baseline_from=None, collected=collected)
+    stamp = db_time(since)
+    with fdb.connect() as conn:
+        require_same_pce(conn, settings.pce)
+        found = conn.execute(
+            "SELECT src_key, dst_key, port, proto, first_seen, last_seen, last_decision FROM connection_baseline "
+            f"WHERE port IN ({','.join('?' * len(numbers))})", numbers).fetchall()
+        ranges = ingest_state.coverage(conn, IngestSource.TRAFFIC)
+    if fdb.generation != gen:
+        raise StaleGeneration
+    edges = [BaselineEdge(src_key=r["src_key"], dst_key=r["dst_key"], port=r["port"], proto=r["proto"],
+                          first_seen=datetime.fromisoformat(r["first_seen"]),
+                          last_seen=datetime.fromisoformat(r["last_seen"]), decision=r["last_decision"])
+             for r in found if r["last_seen"] >= stamp and ports.matches(r["port"], r["proto"])]
+    return BaselineEdges(edges=edges, baseline_from=ranges[0][0] if ranges else None, collected=True)

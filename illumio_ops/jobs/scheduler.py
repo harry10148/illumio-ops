@@ -12,6 +12,7 @@ from loguru import logger
 from illumio_ops.jobs.health import record_finish, record_start
 from illumio_ops.pce.client import PceNotConfigured
 from illumio_ops.services import pce_health
+from illumio_ops.services.analysis.hourly import run_hourly_analysis
 from illumio_ops.services.collect.archive import run_archive
 from illumio_ops.services.collect.backfill import ensure_initial_backfill
 from illumio_ops.services.collect.events import run_events_cycle
@@ -32,6 +33,8 @@ DAILY_SECONDS = 86400
 BACKFILL_CHECK_SECONDS = 600
 # Moves committed flow-store pages from the WAL into the database outside the write lock (FlowDb).
 FLOWS_CHECKPOINT_SECONDS = 60
+# The exposure graph, ransomware overlay, tamper summary and focus list (services.analysis.hourly).
+ANALYSIS_HOURLY_SECONDS = 3600
 # Collectors wait a little after start-up so the listener and the first probe come first.
 COLLECTOR_FIRST_RUN_DELAY = timedelta(seconds=30)
 
@@ -49,6 +52,7 @@ def job_intervals(settings: Settings) -> dict[str, int]:
         "collect_archive": DAILY_SECONDS,
         "collect_retention": DAILY_SECONDS,
         "flows_checkpoint": FLOWS_CHECKPOINT_SECONDS,
+        "analysis_hourly": ANALYSIS_HOURLY_SECONDS,
     }
 
 
@@ -116,10 +120,13 @@ def _collector_jobs(ctx: AppContext) -> dict[str, Callable[[], None]]:
     def checkpoint() -> None:
         ctx.flows().checkpoint()
 
+    def hourly_analysis() -> None:
+        run_hourly_analysis(ctx)
+
     # Archive runs before retention so that, with archiving on, expiring days are written first.
     return {"collect_traffic": traffic, "collect_events": events, "collect_inventory": inventory,
             "collect_backfill": backfill, "collect_archive": archive, "collect_retention": retention,
-            "flows_checkpoint": checkpoint}
+            "flows_checkpoint": checkpoint, "analysis_hourly": hourly_analysis}
 
 
 def build_scheduler(ctx: AppContext) -> BackgroundScheduler:
