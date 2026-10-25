@@ -162,9 +162,13 @@ def ensure_initial_backfill(ctx: AppContext, *, now: datetime | None = None) -> 
     progress = (state.progress or {}) if state else {}
     initial = progress.get("initial")
     if initial and not initial.get("finished"):
+        # Only what the mode still backfills; a source dropped here is not marked done, so a switch
+        # back to full mode backfills it then.
+        allowed = backfill_sources(settings, manual=False)
+        resumed = tuple(src for s in initial.get("sources", []) if (src := IngestSource(s)) in allowed)
         return run_backfill(ctx, start=datetime.fromisoformat(initial["start"]),
                             end=datetime.fromisoformat(initial["end"]), plan="initial",
-                            sources=tuple(IngestSource(s) for s in initial.get("sources", [])) or None, now=at)
+                            sources=resumed or None, now=at)
     done = set(progress.get("initial_done", []))
     missing = tuple(s for s in backfill_sources(settings, manual=False) if str(s) not in done)
     if not missing:
