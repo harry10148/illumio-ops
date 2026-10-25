@@ -10,10 +10,13 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 
+from loguru import logger
+
 from illumio_ops.services import pce_health
 from illumio_ops.services.collect.guard import normalize_target
 from illumio_ops.services.context import AppContext
 from illumio_ops.settings.schema import PceSettings
+from illumio_ops.store.flowdb import binding
 
 # app.sqlite tables that describe one PCE (cleared on a switch) and those that do not.
 # tests_v6/services/collect/test_reset.py checks that every app.sqlite table is in exactly one.
@@ -55,3 +58,18 @@ def reset_for_new_pce(ctx: AppContext, *, now: datetime | None = None) -> ResetR
     for table in APP_DB_PCE_DERIVED:
         _CLEARERS[table](ctx)
     return ResetReport(cleared=["flows", *APP_DB_PCE_DERIVED], archive_moved_to=moved)
+
+
+def finish_pending_switch(ctx: AppContext, *, now: datetime | None = None) -> ResetReport | None:
+    """The PCE page saves the new PCE, then clears the old one's data. If clearing failed or the service
+    stopped in between, the flow database is still bound to the old PCE and every collector refuses to
+    write; each collector run calls this first, outside the write lock, to finish the switch."""
+    pce = ctx.settings.current().pce
+    if not pce.url:
+        return None
+    with ctx.flows().connect() as conn:
+        bound = binding.current(conn)
+    if bound is None or normalize_target(bound.pce_url, bound.org_id) == normalize_target(pce.url, pce.org_id):
+        return None
+    logger.warning("the flow database still holds another PCE's data; clearing it to finish the switch")
+    return reset_for_new_pce(ctx, now=now)

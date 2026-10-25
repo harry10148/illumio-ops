@@ -16,6 +16,7 @@ from illumio_ops.services.collect.archive import run_archive
 from illumio_ops.services.collect.backfill import ensure_initial_backfill
 from illumio_ops.services.collect.events import run_events_cycle
 from illumio_ops.services.collect.inventory import run_inventory_cycle
+from illumio_ops.services.collect.reset import finish_pending_switch
 from illumio_ops.services.collect.retention import run_retention
 from illumio_ops.services.collect.traffic import run_traffic_cycle
 from illumio_ops.services.context import AppContext
@@ -86,16 +87,21 @@ def _tls_renew_job(ctx: AppContext) -> Callable[[], None]:
 
 
 def _collector_jobs(ctx: AppContext) -> dict[str, Callable[[], None]]:
+    # Each collector first finishes a PCE switch whose clearing did not complete (services.collect.reset).
     def traffic() -> None:
+        finish_pending_switch(ctx)
         run_traffic_cycle(ctx)
 
     def events() -> None:
+        finish_pending_switch(ctx)
         run_events_cycle(ctx)
 
     def inventory() -> None:
+        finish_pending_switch(ctx)
         run_inventory_cycle(ctx)
 
     def backfill() -> None:
+        finish_pending_switch(ctx)
         ensure_initial_backfill(ctx)
 
     def archive() -> None:
