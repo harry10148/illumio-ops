@@ -104,7 +104,7 @@ echo "ALL GATES GREEN"
 
 **計畫撰寫時已實測（2026-10-25，唯讀；數字是 Task 5、7、8、11、12 預設值的依據，Task 16 寫回 spec）**
 
-.106 v6 流量庫，lab 21 台，資料期間 9/21–10/25，共 56.9 萬筆主列。原始輸出在 gitignored 的 `tmp/v6-p2-verification/p3-store-facts.json`。
+.106 v6 流量庫，lab 21 台，資料期間 9/21–10/25，共 56.9 萬筆主列。原始輸出在 `/home/harry/rd/illumio-ops/tmp/v6-p2-verification/p3-store-facts.json`（主 checkout，gitignored）。
 
 - **欄位覆蓋率**（主列）：
   - 發起端 process 1.6%、發起端使用者 9.8%、服務端 process 0.8%、位元組 3.1%。
@@ -148,7 +148,7 @@ echo "ALL GATES GREEN"
 
 lab PCE（地端 26.2.20）。
 
-- **60 天竄改事件**：已錄下並去識別，主機名改成 host-NN，不含 href、IP、主機名稱。檔案在 `tmp/v6-p2-verification/p3-tamper_60d.json`，共 335 筆、7 台主機：
+- **60 天竄改事件**：已錄下並去識別，主機名改成 host-NN，不含 href、IP、主機名稱。檔案在 `/home/harry/rd/illumio-ops/tmp/v6-p2-verification/p3-tamper_60d.json`（主 checkout，gitignored），共 335 筆、7 台主機：
 
   | 主機 | 筆數 | 中位間隔（分鐘） | 四分位 | 分類 |
   |---|---|---|---|---|
@@ -171,7 +171,7 @@ lab PCE（地端 26.2.20）。
   - 可辨識一條 deny rule 的是：規則集名稱、規則型別（deny／override_deny）、consumers、providers、services。
   - lab 有規則集 `tedt`（env=Server → env=Server、All Services、deny）與 `Quarantine` 的兩條 override_deny。
 
-規模：.106 上 1,000 台合成庫的 `connection_baseline` 全表掃描，冷快取超過 25 分鐘仍未完成，所以圖不得做全表掃描。Task 2 加 `ix_baseline_port`，見下面的 Ruling。
+規模：.106 上 1,000 台合成庫的 `connection_baseline` 全表計數（`SELECT COUNT(*)`），冷快取跑滿 15 分鐘的上限仍未完成，所以圖不得做全表掃描。Task 2 加 `ix_baseline_port`，見下面的 Ruling。
 
 **撰寫計畫時已做的裁定**（執行時照抄進帳本，格式 `Ruling: 決定 — 理由 — 錯了的代價`）
 - **圖由 `connection_baseline` 加上新的 `last_decision` 欄建**，不由 flows 建：
@@ -548,14 +548,17 @@ lab PCE（地端 26.2.20）。
   def load_lateral_context(ctx, *, now: datetime) -> LateralContext
   def host_for(lc: LateralContext, key: str, *, ip: str, hostname: str | None) -> HostInfo   # 非受管端點給一個 managed=False、不在任何群組的 HostInfo
   ```
-  - `baseline_days` = now − `ingest_coverage`（TRAFFIC）最早的 `range_start`，以天計、上限 `baseline_days` 設定。沒有涵蓋時為 0。
+  - `baseline_days` = `ingest_coverage`（TRAFFIC）中**包含流量收集水位的那段連續範圍**的長度，以天計、上限 `baseline_days` 設定；沒有這段範圍時為 0。
+    - 只看最早的 `range_start` 是錯的：初次回填由舊到新，寫完 −30 天那天時，−29 到 −1 天還沒讀，若此時就當成累積滿 30 天，即時收集看到的每個管理 port 組合都會被當成「新的」。
+    - 初次回填未完成時（BACKFILL `progress["initial"]["finished"]` 為假，與 `reread.py` 用的是同一個判斷），`baseline_days` 一律視為未滿。
+  - `known_labels` 只取目前清冊（`workloads.label_set` 參照到的 label 組合）裡的 key／value。不能用 `label_set_members` 全部：那裡留著流量上出現過、PCE 早已刪掉的 label，這樣設定了已刪除 label 的選擇永遠不會被標成失效。Task 14 的 label 選擇器列的也是同一份。
   - `collected` = 收集已開啟且 `collects(settings, TRAFFIC)`。
   - `generation` 在讀設定之前記下，比照 `FlowDb.generation` 的用法。
 - 讀者登錄：Task 1 標 `"P3-T4"` 的設定葉，改指向 `illumio_ops.services.analysis.context`。
 
 - [ ] **Step 1：失敗測試**：
   - domain：`test_effective_ports_union_and_removal`、`test_pce_admin_services_toggle`、`test_any_protocol_entry_matches_both`、`test_removed_without_proto_removes_all_protocols`、`test_selector_union_semantics`、`test_stale_selector_detected`。
-  - service：`test_host_index_marks_critical_and_admin`、`test_context_events_only_mode_not_collected`、`test_baseline_days_from_traffic_coverage`。
+  - service：`test_host_index_marks_critical_and_admin`、`test_context_events_only_mode_not_collected`、`test_baseline_days_from_traffic_coverage`、`test_baseline_days_ignores_disconnected_backfill_range`、`test_baseline_not_full_while_initial_backfill_runs`、`test_known_labels_come_from_current_inventory`。
 - [ ] **Step 2：** `timeout 300 .venv/bin/python -m pytest tests_v6/domain/test_lateral.py tests_v6/services/analysis/test_context.py tests_v6/store tests_v6/gates -q` → FAIL
 - [ ] **Step 3：實作。**
 - [ ] **Step 4：PASS；閘門。**
@@ -967,7 +970,7 @@ lab PCE（地端 26.2.20）。
   - 結果不存庫，因為它隨 draft 政策變動（spec §6.4）。
   - `run_segment` 的 predicted_block 視角接到這裡。
 - **fixtures**（去識別，比照 P2 Task 3）：
-  - `rule_sets_draft.json`：lab 的 draft 規則集，含 `tedt` 的 deny rule 與 Quarantine 的 override_deny，物件名稱保留，那是本人 lab 的測試物件。
+  - `rule_sets_draft.json`：用 `fetch_rule_sets` 經 PCE client 錄下 lab 的 draft 規則集原始回應，含 `tedt` 的 deny rule 與 Quarantine 的 override_deny。物件名稱保留，那是本人 lab 的測試物件；`created_by`／`updated_by` 改成 `/users/0`，`description` 裡若有人名一併替換。不要用 MCP 的輸出，那裡帶使用者名稱與 email。
   - `draft_rows.json`：20 列，含 blocked_by_boundary 帶 `enforcement_boundaries`、allowed 帶 `essential_service_rule`、potentially_blocked。
 
 - [ ] **Step 1：失敗測試**：
@@ -1080,7 +1083,7 @@ lab PCE（地端 26.2.20）。
 ### Task 12：竄改判讀、規律分類與已知原因
 
 **Files:**
-- Create: `illumio_ops/domain/tamper.py`、`illumio_ops/services/analysis/tamper.py`、`illumio_ops/store/migrations/0003_tamper_annotations.sql`、`illumio_ops/store/annotations.py`、`tests_v6/domain/test_tamper.py`、`tests_v6/services/analysis/test_tamper.py`、`tests_v6/fixtures/pce/tamper_60d.json`（從 `tmp/v6-p2-verification/p3-tamper_60d.json` 複製，Task 0 已去識別）
+- Create: `illumio_ops/domain/tamper.py`、`illumio_ops/services/analysis/tamper.py`、`illumio_ops/store/migrations/0003_tamper_annotations.sql`、`illumio_ops/store/annotations.py`、`tests_v6/domain/test_tamper.py`、`tests_v6/services/analysis/test_tamper.py`、`tests_v6/fixtures/pce/tamper_60d.json`（從 `/home/harry/rd/illumio-ops/tmp/v6-p2-verification/p3-tamper_60d.json`複製，Task 0 已去識別）
 - Modify: `illumio_ops/store/ownership.py`、`illumio_ops/services/analysis/hourly.py`、`illumio_ops/i18n/` 兩個語系字典
 
 **Interfaces:**
@@ -1203,7 +1206,7 @@ lab PCE（地端 26.2.20）。
   | 竄改 | 近 7 天有未解釋的竄改：burst 為 high；regular_cycle 為 medium，why 鍵說明「多半是另一套防火牆程式與 VEN 搶表」；sporadic 為 medium；含 signal 型時升一級 |
   | 勒索 priority 服務 | 嚴重度依服務：critical／high 照用，其餘 medium |
   | 原廠數字矛盾 | 有矛盾時一項，low，不排序其他項 |
-  | 切換模式的阻礙 | visibility_only／selective 主機近 7 天有 potentially_blocked 的入向連線，以 `aggregate_flows` 取前 50；medium，參數帶主機數與連線數 |
+  | 切換模式的阻礙 | 近 7 天有 potentially_blocked 入向連線的主機：`aggregate_flows` 以 dst_host 分組、decision 限 potentially_blocked、limit 1000，再在服務層以**目前清冊**的 enforcement_mode 篩出 visibility_only／selective 的主機（`FilterSpec` 沒有模式條件，而 `flows.dst_mode` 是觀測當時的模式）。medium，參數帶主機數與連線數；1,000 筆截斷時參數帶 `truncated` |
   | 資料品質 | 近 7 天 process 或使用者覆蓋 < 20% 為 low（data_coverage）；有 `flow_drops`／`flow_off` 主機為 medium（visibility）；近 7 天有未解的收集缺口，failed 為 high、truncated 為 medium（collection_gap） |
   | 系統健康 | job 健康失敗或 PCE 探測失敗，high |
   | 設定 | 重要資產或管理群組未設定為 low（setup_required）；選擇的 label 已不存在為 medium（stale_selector） |
@@ -1272,7 +1275,7 @@ lab PCE（地端 26.2.20）。
 
 ### Task 15：驗收（.106、lab、規模）、文件回寫與全分支審查
 
-驗證腳本放 `tmp/v6-p3-verification/`（gitignored）；部署腳本從 P2 的 `tmp/v6-p2-verification/deploy106.sh` 複製並改路徑。
+驗證腳本放 `tmp/v6-p3-verification/`（gitignored）；部署腳本從主 checkout 的 `tmp/v6-p2-verification/deploy106.sh` 複製並改路徑。
 
 - [ ] **Step 1：打包並部署到 .106**：
   - `PYTHON=.venv/bin/python bash scripts/v6/build_bundle.sh`；
@@ -1300,7 +1303,7 @@ lab PCE（地端 26.2.20）。
   - 在 10–20 分鐘內 `detections` 出現該來源的扇出偵測。
   - 告警送達屬 P4 的驗收，這裡只驗偵測。
 - [ ] **Step 7：規模**：
-  - **寫入成本**：在 1,000 台合成庫的副本上（`/root/v6-p2-load/load1m35` 以 SQLite backup API 複製，先跑 0002），用 P2 Task 14 的量測腳本重量尖峰每輪持鎖（指令見 `tmp/v6-p2-verification/load-test.md`）。
+  - **寫入成本**：在 1,000 台合成庫的副本上（`/root/v6-p2-load/load1m35` 以 SQLite backup API 複製，先跑 0002），用 P2 Task 14 的量測腳本重量尖峰每輪持鎖（指令見主 checkout 的 `tmp/v6-p2-verification/load-test.md`）。
     - 目標：不得超過 P2 量到的 4 GB 約 25 秒的 10%（≤ 27.5 秒）。
   - **每小時分析**：在同一副本上計時 `run_hourly_analysis` 的耗時與記憶體增量，目標 60 秒、500 MB（Global Constraints）。超過時：
     - 依瓶頸改成 `limits_hit` 加降級，例如只對受管主機算可觸及數，或延長間隔；
