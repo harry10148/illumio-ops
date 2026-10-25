@@ -84,3 +84,27 @@ def test_a_pair_across_midnight_touches_both_days(tmp_path):
     stats = _write(ctx, raw_flow(1, midnight + minutes(1), midnight + minutes(5), direction="inbound"))
     assert stats.paired == 1
     assert stats.days_touched == {(midnight - minutes(1)).strftime("%Y-%m-%d"), midnight.strftime("%Y-%m-%d")}
+
+
+def test_a_day_retention_has_pruned_keeps_its_rollup_when_touched_again(tmp_path, fake_traffic, monkeypatch):
+    # The cutoff day loses its rows before the cutoff time to retention; a backfilled record of the next
+    # day that pairs with one of its evening records touched it again, and the rebuild from what was left
+    # lowered a rollup that is kept 90 days.
+    from illumio_ops.services.collect.retention import run_retention
+    from illumio_ops.store.flowdb.flows import refresh_rollups
+    ctx = configured_ctx(tmp_path)
+    cutoff = NOW - timedelta(days=35)  # flow_days 35: rows of this day before 12:00 expire
+    day = cutoff.strftime("%Y-%m-%d")
+    morning, evening = cutoff.replace(hour=1), cutoff.replace(hour=23, minute=55)
+    _write(ctx, raw_flow(1, morning, morning + minutes(5)), raw_flow(2, evening, evening + minutes(3)))
+    with ctx.flows().write_lock, ctx.flows().connect() as conn:
+        refresh_rollups(conn, cutoff + timedelta(days=1))
+    assert _rollup(ctx, day) == 2
+    run_retention(ctx, now=NOW)  # the morning connection goes, the evening one stays
+    nxt = (cutoff + timedelta(days=1)).replace(hour=0, minute=1)
+    fake_traffic.answer = lambda s, e, m: [raw_flow(2, nxt, nxt + minutes(3), direction="inbound")]
+    monkeypatch.setattr(ev, "fetch_events", lambda client, **kw: EventsPage(items=[], capped=False))
+    stats = run_backfill(ctx, start=nxt.replace(minute=0), end=nxt + HOUR, now=NOW)
+    with ctx.flows().connect() as conn:
+        assert conn.execute("SELECT count(*) FROM flows WHERE is_primary = 0").fetchone()[0] == 1  # paired
+    assert stats.rows == 1 and _rollup(ctx, day) == 2

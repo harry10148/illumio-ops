@@ -55,7 +55,7 @@ def test_write_failure_marks_failed_and_records_gap(tmp_path, fake_traffic, monk
 def test_flows_and_rollups_commit_together(tmp_path, fake_traffic, monkeypatch):
     ctx = configured_ctx(tmp_path)
     fake_traffic.answer = lambda s, e, m: [raw_flow(1, e - minutes(2), e - minutes(1))]
-    def broken_rollup(conn, day):
+    def broken_rollup(conn, at, **kw):
         raise sqlite3.OperationalError("rollup failed")
     monkeypatch.setattr(traffic, "refresh_rollups", broken_rollup)
     with pytest.raises(sqlite3.OperationalError):

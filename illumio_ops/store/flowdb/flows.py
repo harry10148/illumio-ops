@@ -275,14 +275,22 @@ def rebuild_rollup(conn: sqlite3.Connection, day: str, *, at: datetime | None = 
 TODAY_ROLLUP_EVERY = timedelta(hours=1)
 
 
-def refresh_rollups(conn: sqlite3.Connection, at: datetime, *, today_every: timedelta = TODAY_ROLLUP_EVERY) -> list[str]:
+def refresh_rollups(conn: sqlite3.Connection, at: datetime, *, today_every: timedelta = TODAY_ROLLUP_EVERY,
+                    frozen_through: str | None = None) -> list[str]:
     """Rebuild the rollups that changed: a past day at once (a backfill, a late record, or the day that
-    just closed), today only if its last rebuild is at least today_every old. Returns the days rebuilt."""
+    just closed), today only if its last rebuild is at least today_every old. Returns the days rebuilt.
+    A day up to frozen_through (the raw-flow retention cutoff's day) that was built before is left as
+    it is: retention may have dropped some of its rows, so they no longer add up to its rollup."""
     today = db_day(at)
-    due = []
+    due, frozen = [], []
     for day, built_at in conn.execute("SELECT day, built_at FROM rollup_state WHERE dirty = 1 ORDER BY day"):
-        if day < today or built_at is None or at - datetime.fromisoformat(built_at) >= today_every:
+        if frozen_through is not None and day <= frozen_through and built_at is not None:
+            frozen.append((day,))
+        elif day < today or built_at is None or at - datetime.fromisoformat(built_at) >= today_every:
             due.append(day)
+    if frozen:
+        with transaction(conn):
+            conn.executemany("UPDATE rollup_state SET dirty = 0 WHERE day = ?", frozen)
     for day in due:
         rebuild_rollup(conn, day, at=at)
     return due
