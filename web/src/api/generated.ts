@@ -578,6 +578,11 @@ export const VALUES = {
     "events_only",
     "full"
   ],
+  "Confidence": [
+    "high",
+    "low",
+    "medium"
+  ],
   "DataOrigin": [
     "backfill",
     "ingest"
@@ -585,6 +590,24 @@ export const VALUES = {
   "DeploymentType": [
     "on_prem",
     "saas"
+  ],
+  "DetectorKind": [
+    "account_fanout",
+    "blocked_surge",
+    "cross_env",
+    "fanout",
+    "new_admin_connection",
+    "non_admin_group",
+    "pivot_chain",
+    "unexpected_initiator"
+  ],
+  "DetectorState": [
+    "accumulating",
+    "collection_off",
+    "disabled",
+    "incomplete",
+    "no_data",
+    "ok"
   ],
   "DraftPolicyDecision": [
     "allowed",
@@ -597,9 +620,30 @@ export const VALUES = {
     "potentially_blocked_by_override_deny",
     "unknown"
   ],
+  "EdgeState": [
+    "allowed",
+    "potentially_blocked",
+    "unknown"
+  ],
   "FlowDirection": [
     "inbound",
     "outbound"
+  ],
+  "FocusKind": [
+    "collection_gap",
+    "cross_env",
+    "data_coverage",
+    "detection",
+    "exposure_asset",
+    "mode_switch_blocker",
+    "pivot_host",
+    "ransomware_priority",
+    "setup_required",
+    "stale_selector",
+    "system_health",
+    "tamper",
+    "vendor_contradiction",
+    "visibility"
   ],
   "IngestSource": [
     "backfill",
@@ -618,19 +662,82 @@ export const VALUES = {
     "potentially_blocked",
     "unknown"
   ],
+  "PrecursorKind": [
+    "offline",
+    "suspend",
+    "tamper"
+  ],
   "ProbeName": [
     "health",
     "node_available",
     "noop"
+  ],
+  "RansomwareTrafficClass": [
+    "priority",
+    "protected",
+    "safe_to_block",
+    "suspicious",
+    "unknown"
   ],
   "RuleAction": [
     "allow",
     "deny",
     "override_deny"
   ],
+  "SegmentDimension": [
+    "actor",
+    "decision",
+    "direction",
+    "dst_host",
+    "dst_label",
+    "event_host",
+    "event_severity",
+    "event_type",
+    "initiator_process",
+    "initiator_user",
+    "service",
+    "service_process",
+    "service_user",
+    "src_host",
+    "src_label"
+  ],
+  "SegmentMetric": [
+    "bytes",
+    "connections",
+    "distinct_dst",
+    "distinct_ports",
+    "distinct_src",
+    "events",
+    "flows"
+  ],
+  "SegmentView": [
+    "detail",
+    "predicted_block",
+    "ranking"
+  ],
+  "Severity": [
+    "critical",
+    "high",
+    "low",
+    "medium"
+  ],
+  "TamperAction": [
+    "add_chain",
+    "add_rule",
+    "add_table",
+    "delete_chain",
+    "delete_rule",
+    "delete_table"
+  ],
   "TamperClassification": [
     "confirmed",
     "signal"
+  ],
+  "TamperPattern": [
+    "burst",
+    "regular_cycle",
+    "sporadic",
+    "too_few"
   ],
   "VisibilityLevel": [
     "enhanced_data_collection",

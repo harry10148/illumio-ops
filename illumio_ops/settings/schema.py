@@ -21,10 +21,11 @@ from pydantic import (
     model_validator,
 )
 
+from illumio_ops.domain.identity import normalize_process
 from illumio_ops.domain.netaddr import parse_ip_token
 from illumio_ops.domain.values import CollectionMode, DeploymentType, Language
 
-SCHEMA_VERSION: Literal[2] = 2
+SCHEMA_VERSION: Literal[3] = 3
 _UTC_OFFSET = re.compile(r"UTC([+-]\d+(?:\.\d+)?)")
 
 
@@ -224,14 +225,89 @@ class CollectionSettings(StrictModel):
         return v
 
 
+def _process_names(v: tuple[str, ...]) -> tuple[str, ...]:
+    out = []
+    for name in v:
+        norm = normalize_process(name)
+        if norm is None:
+            raise ValueError("every entry must be a process name")
+        out.append(norm)
+    return tuple(out)
+
+
+class PortEntry(StrictModel):
+    port: int = Field(ge=0, le=65535)
+    proto: int | None = Field(ge=0, le=255)  # None = any protocol
+
+
+class LabelSelector(StrictModel):
+    key: str = Field(min_length=1, max_length=255)
+    value: str = Field(min_length=1, max_length=255)
+
+
+class ExpectedInitiators(StrictModel):
+    port: int = Field(ge=0, le=65535)
+    proto: int | None = Field(ge=0, le=255)
+    # Stored as normalize_process gives them, so the comparison with flow records is exact.
+    processes: Annotated[tuple[str, ...], AfterValidator(_process_names)] = Field(min_length=1)
+
+
+class DetectorSettings(StrictModel):
+    fanout_targets: int = Field(ge=2, le=10000)
+    fanout_window_minutes: int = Field(ge=10, le=1440)
+    account_fanout_targets: int = Field(ge=2, le=10000)
+    account_fanout_window_minutes: int = Field(ge=10, le=1440)
+    chain_window_minutes: int = Field(ge=10, le=1440)
+    blocked_targets: int = Field(ge=2, le=10000)
+    blocked_window_minutes: int = Field(ge=10, le=1440)
+    blocked_surge_factor: float = Field(ge=1.0, le=100.0)
+    exclude_system_accounts: bool
+    precursor_hours: int = Field(ge=1, le=168)
+
+
+class LateralSettings(StrictModel):
+    """Lateral-movement analysis (spec §6.5.1): which ports count as management, which hosts matter,
+    and the detectors' thresholds."""
+    extra_admin_ports: tuple[PortEntry, ...]
+    removed_admin_ports: tuple[PortEntry, ...]
+    include_pce_admin_services: bool
+    critical_assets: tuple[LabelSelector, ...]
+    admin_groups: tuple[LabelSelector, ...]
+    environment_label_key: str = Field(min_length=1, max_length=255)
+    graph_hops: int = Field(ge=1, le=6)
+    observation_days: int = Field(ge=1, le=365)
+    expected_initiators: tuple[ExpectedInitiators, ...]
+    detectors: DetectorSettings
+
+    @field_validator("removed_admin_ports")
+    @classmethod
+    def _not_added_and_removed(cls, v: tuple[PortEntry, ...], info: ValidationInfo) -> tuple[PortEntry, ...]:
+        added = {(e.port, e.proto) for e in info.data.get("extra_admin_ports", ())}
+        if added & {(e.port, e.proto) for e in v}:
+            raise ValueError("a port cannot be both added and removed")
+        return v
+
+    @field_validator("expected_initiators")
+    @classmethod
+    def _one_row_per_port(cls, v: tuple[ExpectedInitiators, ...]) -> tuple[ExpectedInitiators, ...]:
+        keys = [(e.port, e.proto) for e in v]
+        if len(keys) != len(set(keys)):
+            raise ValueError("each port and protocol may be listed once")
+        return v
+
+
 class Settings(StrictModel):
-    schema_version: Literal[2]
+    schema_version: Literal[3]
     revision: int = Field(ge=0)
     pce: PceSettings
     web: WebSettings
     display: DisplaySettings
     logging: LoggingSettings
     collection: CollectionSettings
+    # observation_days is not checked against collection.retention.baseline_days here: lowering the
+    # baseline on the data-collection page must not fail on a field of another page. The exposure
+    # graph uses the smaller of the two and says so (P3 Task 1 ruling).
+    lateral: LateralSettings
 
 
 def default_collection() -> CollectionSettings:
@@ -242,6 +318,34 @@ def default_collection() -> CollectionSettings:
         disk_free_warn_gb=10,
         retention=RetentionSettings(flow_days=35, event_days=90, rollup_days=90, baseline_days=30),
         archive=ArchiveSettings(enabled=False, retention_days=0),
+    )
+
+
+def default_lateral() -> LateralSettings:
+    """Defaults for a fresh install and for upgrading a schema-2 file. The expected initiators come from
+    what lab showed on each port (P3 plan Task 0); LDAP and Kerberos have too many legitimate ones."""
+    windows_remote = ("powershell.exe", "pwsh.exe", "pwsh", "wsmprovhost.exe", "svchost.exe")
+    return LateralSettings(
+        extra_admin_ports=(), removed_admin_ports=(), include_pce_admin_services=True,
+        critical_assets=(), admin_groups=(), environment_label_key="env", graph_hops=3, observation_days=30,
+        expected_initiators=(
+            ExpectedInitiators(port=445, proto=6, processes=("system", "svchost.exe", "lsass.exe", "explorer.exe",
+                                                             "services.exe", "mount.cifs", "smbclient")),
+            ExpectedInitiators(port=3389, proto=6, processes=("mstsc.exe", "msrdc.exe", "rdcman.exe", "xfreerdp",
+                                                              "remmina")),
+            ExpectedInitiators(port=22, proto=6, processes=("ssh", "scp", "sftp", "rsync", "git", "ssh.exe",
+                                                            "putty.exe", "plink.exe", "winscp.exe")),
+            ExpectedInitiators(port=5985, proto=6, processes=windows_remote),
+            ExpectedInitiators(port=5986, proto=6, processes=windows_remote),
+            ExpectedInitiators(port=135, proto=6, processes=("lsass.exe", "svchost.exe", "services.exe",
+                                                             "backgroundtaskhost.exe", "wmiprvse.exe", "dsregcmd.exe",
+                                                             "mmc.exe")),
+        ),
+        detectors=DetectorSettings(
+            fanout_targets=10, fanout_window_minutes=60, account_fanout_targets=10, account_fanout_window_minutes=60,
+            chain_window_minutes=30, blocked_targets=5, blocked_window_minutes=60, blocked_surge_factor=3.0,
+            exclude_system_accounts=True, precursor_hours=24,
+        ),
     )
 
 
@@ -266,4 +370,5 @@ def default_settings(*, password_hash: str, secret_key: str, port: int = 5001) -
         display=DisplaySettings(language=Language.EN, timezone="local"),
         logging=LoggingSettings(level="INFO"),
         collection=default_collection(),
+        lateral=default_lateral(),
     )

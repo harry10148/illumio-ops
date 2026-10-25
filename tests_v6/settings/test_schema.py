@@ -17,7 +17,7 @@ def _pce(**kw):
 
 def test_default_settings_values():
     s = default_settings(password_hash=HASH, secret_key=KEY, port=5443)
-    assert s.schema_version == 2 and s.revision == 0
+    assert s.schema_version == 3 and s.revision == 0
     assert s.pce.url == "" and s.pce.deployment_type is DeploymentType.ON_PREM
     assert s.web.port == 5443 and s.web.username == "illumio" and s.web.must_change_password is False
     assert s.web.session_lifetime_seconds == 28800 and s.web.allowed_ips == ()
@@ -168,3 +168,73 @@ def test_collection_unknown_key_is_invalid():
 def test_collection_interval_bounds():
     with pytest.raises(ValidationError):
         Settings.model_validate(_with_collection(traffic_interval_seconds=60))
+
+
+
+def _with_lateral(**changes):
+    d = default_settings(password_hash=HASH, secret_key=KEY).model_dump(mode="json")
+    d["lateral"] |= changes
+    return d
+
+
+def _invalid_paths(d):
+    with pytest.raises(ValidationError) as e:
+        Settings.model_validate(d)
+    return [".".join(str(p) for p in err["loc"]) for err in e.value.errors()]
+
+
+def test_default_lateral_pins_values():
+    lat = default_settings(password_hash=HASH, secret_key=KEY).lateral
+    assert lat.extra_admin_ports == () and lat.removed_admin_ports == ()
+    assert lat.include_pce_admin_services is True
+    assert lat.critical_assets == () and lat.admin_groups == ()
+    assert lat.environment_label_key == "env" and lat.graph_hops == 3 and lat.observation_days == 30
+    d = lat.detectors
+    assert (d.fanout_targets, d.fanout_window_minutes, d.account_fanout_targets, d.account_fanout_window_minutes) == (10, 60, 10, 60)
+    assert (d.chain_window_minutes, d.blocked_targets, d.blocked_window_minutes, d.blocked_surge_factor) == (30, 5, 60, 3.0)
+    assert d.exclude_system_accounts is True and d.precursor_hours == 24
+    expected = {(e.port, e.proto): e.processes for e in lat.expected_initiators}
+    assert set(expected) == {(445, 6), (3389, 6), (22, 6), (5985, 6), (5986, 6), (135, 6)}
+    assert expected[(445, 6)] == ("system", "svchost.exe", "lsass.exe", "explorer.exe", "services.exe", "mount.cifs", "smbclient")
+    assert expected[(3389, 6)] == ("mstsc.exe", "msrdc.exe", "rdcman.exe", "xfreerdp", "remmina")
+    assert expected[(22, 6)] == ("ssh", "scp", "sftp", "rsync", "git", "ssh.exe", "putty.exe", "plink.exe", "winscp.exe")
+    assert expected[(5985, 6)] == expected[(5986, 6)] == ("powershell.exe", "pwsh.exe", "pwsh", "wsmprovhost.exe", "svchost.exe")
+    assert expected[(135, 6)] == ("lsass.exe", "svchost.exe", "services.exe", "backgroundtaskhost.exe", "wmiprvse.exe",
+                                  "dsregcmd.exe", "mmc.exe")
+
+
+def test_lateral_unknown_key_invalid():
+    assert "lateral.bogus" in _invalid_paths(_with_lateral(bogus=1))
+
+
+def test_observation_days_may_exceed_baseline():
+    # Lowering the baseline retention on the data-collection page must not fail on a lateral field;
+    # the exposure graph uses the smaller of the two (Task 5).
+    d = _with_lateral(observation_days=60)
+    assert Settings.model_validate(d).lateral.observation_days == 60
+    d["collection"]["retention"]["baseline_days"] = 7
+    assert Settings.model_validate(d).collection.retention.baseline_days == 7
+
+
+def test_port_both_added_and_removed_invalid():
+    entry = {"port": 8080, "proto": 6}
+    assert any(p.startswith("lateral") for p in _invalid_paths(
+        _with_lateral(extra_admin_ports=[entry], removed_admin_ports=[entry])))
+
+
+def test_duplicate_expected_initiator_port_invalid():
+    rows = [{"port": 22, "proto": 6, "processes": ["ssh"]}, {"port": 22, "proto": 6, "processes": ["scp"]}]
+    assert any(p.startswith("lateral") for p in _invalid_paths(_with_lateral(expected_initiators=rows)))
+
+
+def test_expected_initiator_processes_normalized():
+    d = _with_lateral(expected_initiators=[{"port": 3389, "proto": 6, "processes": ["C:\\Windows\\System32\\MSTSC.EXE"]}])
+    assert Settings.model_validate(d).lateral.expected_initiators[0].processes == ("mstsc.exe",)
+    blank = _with_lateral(expected_initiators=[{"port": 3389, "proto": 6, "processes": [""]}])
+    assert any(p.startswith("lateral") for p in _invalid_paths(blank))
+
+
+def test_invalid_lateral_messages_do_not_echo_values():
+    with pytest.raises(ValidationError) as e:
+        Settings.model_validate(_with_lateral(environment_label_key="", graph_hops=99))
+    assert "99" not in " ".join(err["msg"] for err in e.value.errors())

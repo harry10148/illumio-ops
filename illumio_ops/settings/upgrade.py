@@ -10,7 +10,11 @@ import copy
 from collections.abc import Callable
 from typing import Any
 
-from illumio_ops.settings.schema import SCHEMA_VERSION, default_collection
+from illumio_ops.settings.schema import (
+    SCHEMA_VERSION,
+    default_collection,
+    default_lateral,
+)
 
 
 class NewerSchema(Exception):
@@ -22,9 +26,15 @@ def _v1_to_v2(data: dict[str, Any]) -> dict[str, Any]:
     return data
 
 
+def _v2_to_v3(data: dict[str, Any]) -> dict[str, Any]:
+    data["lateral"] = default_lateral().model_dump(mode="json")
+    return data
+
+
 # source version -> function producing source version + 1
 UPGRADES: dict[int, Callable[[dict[str, Any]], dict[str, Any]]] = {
     1: _v1_to_v2,
+    2: _v2_to_v3,
 }
 
 

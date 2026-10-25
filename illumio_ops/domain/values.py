@@ -91,6 +91,151 @@ class DataOrigin(StrEnum):
     BACKFILL = "backfill"
 
 
+
+class Severity(StrEnum):
+    LOW = "low"
+    MEDIUM = "medium"
+    HIGH = "high"
+    CRITICAL = "critical"
+
+
+SEVERITY_ORDER: tuple[Severity, ...] = (Severity.LOW, Severity.MEDIUM, Severity.HIGH, Severity.CRITICAL)
+
+
+def raise_severity(s: Severity, steps: int = 1) -> Severity:
+    """One or more levels up, never past critical (a precursor on the host raises a detection)."""
+    return SEVERITY_ORDER[min(SEVERITY_ORDER.index(s) + steps, len(SEVERITY_ORDER) - 1)]
+
+
+class DetectorKind(StrEnum):
+    """The lateral-movement detectors of spec §6.5.1."""
+    FANOUT = "fanout"
+    NEW_ADMIN_CONNECTION = "new_admin_connection"
+    PIVOT_CHAIN = "pivot_chain"
+    BLOCKED_SURGE = "blocked_surge"
+    NON_ADMIN_GROUP = "non_admin_group"
+    CROSS_ENV = "cross_env"
+    ACCOUNT_FANOUT = "account_fanout"
+    UNEXPECTED_INITIATOR = "unexpected_initiator"
+
+
+class DetectorState(StrEnum):
+    """What a detector run can say besides its detections: "no detection" is only ever OK."""
+    OK = "ok"
+    DISABLED = "disabled"
+    ACCUMULATING = "accumulating"
+    NO_DATA = "no_data"
+    COLLECTION_OFF = "collection_off"
+    INCOMPLETE = "incomplete"
+
+
+class SegmentDimension(StrEnum):
+    # flows
+    SRC_HOST = "src_host"
+    DST_HOST = "dst_host"
+    SRC_LABEL = "src_label"
+    DST_LABEL = "dst_label"
+    SERVICE = "service"
+    INITIATOR_PROCESS = "initiator_process"
+    INITIATOR_USER = "initiator_user"
+    SERVICE_PROCESS = "service_process"
+    SERVICE_USER = "service_user"
+    DECISION = "decision"
+    DIRECTION = "direction"
+    # events
+    EVENT_TYPE = "event_type"
+    EVENT_HOST = "event_host"
+    EVENT_SEVERITY = "event_severity"
+    ACTOR = "actor"
+
+
+class SegmentMetric(StrEnum):
+    FLOWS = "flows"
+    CONNECTIONS = "connections"
+    DISTINCT_DST = "distinct_dst"
+    DISTINCT_SRC = "distinct_src"
+    DISTINCT_PORTS = "distinct_ports"
+    BYTES = "bytes"
+    EVENTS = "events"
+
+
+class SegmentView(StrEnum):
+    DETAIL = "detail"
+    RANKING = "ranking"
+    PREDICTED_BLOCK = "predicted_block"
+
+
+class EdgeState(StrEnum):
+    """An exposure-graph edge by the reported decision of its newest observation (blocked edges are
+    not in the graph)."""
+    ALLOWED = "allowed"
+    POTENTIALLY_BLOCKED = "potentially_blocked"
+    UNKNOWN = "unknown"
+
+
+class TamperPattern(StrEnum):
+    REGULAR_CYCLE = "regular_cycle"
+    BURST = "burst"
+    SPORADIC = "sporadic"
+    TOO_FEW = "too_few"
+
+
+class TamperAction(StrEnum):
+    """What a signal-type tamper event did, from its kernel functions (spec §6.6 F4)."""
+    ADD_RULE = "add_rule"
+    DELETE_RULE = "delete_rule"
+    ADD_CHAIN = "add_chain"
+    DELETE_CHAIN = "delete_chain"
+    ADD_TABLE = "add_table"
+    DELETE_TABLE = "delete_table"
+
+
+class PrecursorKind(StrEnum):
+    TAMPER = "tamper"
+    SUSPEND = "suspend"
+    OFFLINE = "offline"
+
+
+class RansomwareTrafficClass(StrEnum):
+    """An unprotected high-risk service by its recent traffic (spec §6.5.6)."""
+    PRIORITY = "priority"
+    SAFE_TO_BLOCK = "safe_to_block"
+    SUSPICIOUS = "suspicious"
+    PROTECTED = "protected"
+    UNKNOWN = "unknown"
+
+
+class FocusKind(StrEnum):
+    DETECTION = "detection"
+    EXPOSURE_ASSET = "exposure_asset"
+    PIVOT_HOST = "pivot_host"
+    CROSS_ENV = "cross_env"
+    TAMPER = "tamper"
+    RANSOMWARE_PRIORITY = "ransomware_priority"
+    VENDOR_CONTRADICTION = "vendor_contradiction"
+    MODE_SWITCH_BLOCKER = "mode_switch_blocker"
+    DATA_COVERAGE = "data_coverage"
+    VISIBILITY = "visibility"
+    COLLECTION_GAP = "collection_gap"
+    SYSTEM_HEALTH = "system_health"
+    SETUP_REQUIRED = "setup_required"
+    STALE_SELECTOR = "stale_selector"
+
+
+class Confidence(StrEnum):
+    HIGH = "high"
+    MEDIUM = "medium"
+    LOW = "low"
+
+
+# The default management / lateral port set, as 5.x _LATERAL_PORTS (src/report/analysis/
+# mod15_lateral_movement.py, 5.x f022272e); settings add to and remove from it (spec §6.5.1).
+LATERAL_PORTS_DEFAULT: tuple[tuple[int, str], ...] = (
+    (445, "SMB"), (135, "RPC"), (139, "NetBIOS"), (3389, "RDP"), (22, "SSH"), (5985, "WinRM-HTTP"),
+    (5986, "WinRM-HTTPS"), (23, "Telnet"), (2049, "NFS"), (111, "RPC Portmapper"), (389, "LDAP"),
+    (636, "LDAPS"), (88, "Kerberos"), (1433, "MSSQL"), (3306, "MySQL"), (5432, "PostgreSQL"),
+)
+
 # REST API guide: flow_summary records allowed, blocked and potentially blocked connections;
 # flow_drops only blocked and potentially blocked; flow_off nothing. Enhanced data collection
 # adds byte counts on top of flow_summary. Anything else is unknown, never guessed.
@@ -133,7 +278,8 @@ def parse_draft_policy_decision(raw: str) -> str:
 _ENUMS: tuple[type[StrEnum], ...] = (
     PolicyDecision, RuleAction, AlertRuleType, DeploymentType, Language, ProbeName,
     FlowDirection, VisibilityLevel, TamperClassification, IngestSource, DataOrigin, CapabilityState,
-    CollectionMode,
+    CollectionMode, Severity, DetectorKind, DetectorState, SegmentDimension, SegmentMetric, SegmentView,
+    EdgeState, TamperPattern, TamperAction, PrecursorKind, RansomwareTrafficClass, FocusKind, Confidence,
 )
 
 

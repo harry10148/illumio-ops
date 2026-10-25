@@ -63,6 +63,25 @@ SETTINGS_READERS: dict[str, str] = {
 PENDING_READERS: dict[str, str] = {
     "pce.console_url": "P3",
     "display.timezone": "P3",
+    "lateral.extra_admin_ports": "P3-T4",
+    "lateral.removed_admin_ports": "P3-T4",
+    "lateral.include_pce_admin_services": "P3-T4",
+    "lateral.critical_assets": "P3-T4",
+    "lateral.admin_groups": "P3-T4",
+    "lateral.environment_label_key": "P3-T4",
+    "lateral.graph_hops": "P3-T5",
+    "lateral.observation_days": "P3-T5",
+    "lateral.expected_initiators": "P3-T8",
+    "lateral.detectors.fanout_targets": "P3-T7",
+    "lateral.detectors.fanout_window_minutes": "P3-T7",
+    "lateral.detectors.account_fanout_targets": "P3-T8",
+    "lateral.detectors.account_fanout_window_minutes": "P3-T8",
+    "lateral.detectors.chain_window_minutes": "P3-T8",
+    "lateral.detectors.blocked_targets": "P3-T8",
+    "lateral.detectors.blocked_window_minutes": "P3-T8",
+    "lateral.detectors.blocked_surge_factor": "P3-T8",
+    "lateral.detectors.exclude_system_accounts": "P3-T8",
+    "lateral.detectors.precursor_hours": "P3-T8",
 }
 # Fields with no runtime reader by design.
 STRUCTURAL: dict[str, str] = {
