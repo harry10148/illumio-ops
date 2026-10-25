@@ -9,7 +9,7 @@ never written to the store.
 from __future__ import annotations
 
 import time
-from collections.abc import Sequence
+from collections.abc import Collection, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Any, Literal
@@ -17,6 +17,7 @@ from typing import Any, Literal
 from loguru import logger
 from pydantic import BaseModel, ConfigDict
 
+from illumio_ops.domain.detectors import Obs
 from illumio_ops.domain.filter import (
     FilterSpec,
     PortProto,
@@ -58,8 +59,26 @@ from illumio_ops.settings.schema import PceSettings
 from illumio_ops.store.flowdb import ingest_state
 from illumio_ops.store.flowdb.db import StaleGeneration, db_time
 
-__all__ = ["AggRow", "BaselineEdge", "BaselineEdges", "Coverage", "FieldCoverage", "FlowAggregate", "FlowQuery", "FlowRow", "GapReason", "UserPair",
-           "aggregate_flows", "baseline_edges", "field_coverage", "new_user_pairs", "query_flows"]
+__all__ = [
+    "AggRow",
+    "BaselineEdge",
+    "BaselineEdges",
+    "Coverage",
+    "FieldCoverage",
+    "FlowAggregate",
+    "FlowQuery",
+    "FlowRow",
+    "GapReason",
+    "Observations",
+    "UserPair",
+    "aggregate_flows",
+    "baseline_edges",
+    "baseline_first_seen",
+    "field_coverage",
+    "new_user_pairs",
+    "observations",
+    "query_flows",
+]
 
 Order = Literal["last_detected_desc", "connections_desc"]
 FILL_MAX_RESULTS = 200_000
@@ -455,3 +474,65 @@ def baseline_edges(ctx: AppContext, ports: AdminPortSet, *, since: datetime) -> 
                           last_seen=datetime.fromisoformat(r["last_seen"]), decision=r["last_decision"])
              for r in found if r["last_seen"] >= stamp and ports.matches(r["port"], r["proto"])]
     return BaselineEdges(edges=edges, baseline_from=ranges[0][0] if ranges else None, collected=True)
+
+
+class Observations(BaseModel):
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+    rows: list[Obs]
+    coverage: Coverage
+
+
+_OBS_COLUMNS = ("src_key, dst_key, src_href, dst_href, src_ip, dst_ip, src_hostname, dst_hostname, port, proto, "
+                "policy_decision, first_detected, last_detected, num_connections, initiator_user, initiator_process, "
+                "src_label_set, dst_label_set, src_managed, origin")
+
+
+def observations(ctx: AppContext, spec: FilterSpec, *, now: datetime | None = None) -> Observations:
+    """The connections a filter matches in the store, as slim rows for the detectors. No row limit: the
+    caller bounds the time window and the ports."""
+    at = (now or datetime.now(UTC)).astimezone(UTC)
+    fdb, gen, settings = _store_read(ctx)
+    floor = at - timedelta(days=settings.collection.retention.flow_days)
+    with fdb.connect() as conn:
+        require_same_pce(conn, settings.pce)
+        for name, fn in sql_functions().items():
+            conn.create_function(name, -1, fn, deterministic=True)
+        cov = store_coverage(conn, IngestSource.TRAFFIC, (spec.start, spec.end), floor=floor,
+                             collected=collects(settings, IngestSource.TRAFFIC))
+        where, params = to_sql(spec)
+        found = conn.execute(f"SELECT {_OBS_COLUMNS} FROM flows f WHERE {where}", params).fetchall()
+        labels = _labels(conn, {r[k] for r in found for k in ("src_label_set", "dst_label_set") if r[k]})
+    if fdb.generation != gen:
+        raise StaleGeneration
+    rows = [Obs(src_key=r["src_key"], dst_key=r["dst_key"], src_href=r["src_href"], dst_href=r["dst_href"],
+                src_ip=r["src_ip"], dst_ip=r["dst_ip"], src_hostname=r["src_hostname"], dst_hostname=r["dst_hostname"],
+                port=r["port"], proto=r["proto"], decision=r["policy_decision"],
+                first=datetime.fromisoformat(r["first_detected"]), last=datetime.fromisoformat(r["last_detected"]),
+                num_connections=r["num_connections"], initiator_user=r["initiator_user"],
+                initiator_process=r["initiator_process"], src_labels=labels.get(r["src_label_set"] or -1, {}),
+                dst_labels=labels.get(r["dst_label_set"] or -1, {}), src_managed=bool(r["src_managed"]),
+                origin=r["origin"]) for r in found]
+    gaps = merge_gaps(cov.gaps)
+    return Observations(rows=rows, coverage=Coverage(
+        source="store", store_from=cov.store_from, store_to=cov.store_to, gaps=gaps, filled_from_pce=[],
+        truncated=any(g[2] == "truncated" for g in gaps)))
+
+
+def baseline_first_seen(ctx: AppContext,
+                        tuples: Collection[tuple[str, str, int, int]]) -> dict[tuple[str, str, int, int], datetime]:
+    """When the baseline first saw each (src_key, dst_key, port or -1, proto), by primary key."""
+    fdb, gen, settings = _store_read(ctx)
+    keys = sorted(set(tuples))
+    out: dict[tuple[str, str, int, int], datetime] = {}
+    with fdb.connect() as conn:
+        require_same_pce(conn, settings.pce)
+        for i in range(0, len(keys), 200):
+            chunk = keys[i:i + 200]
+            marks = ",".join("(?, ?, ?, ?)" for _ in chunk)
+            for r in conn.execute("SELECT src_key, dst_key, port, proto, first_seen FROM connection_baseline "
+                                  f"WHERE (src_key, dst_key, port, proto) IN (VALUES {marks})",
+                                  [v for k in chunk for v in k]):
+                out[(r[0], r[1], r[2], r[3])] = datetime.fromisoformat(r[4])
+    if fdb.generation != gen:
+        raise StaleGeneration
+    return out

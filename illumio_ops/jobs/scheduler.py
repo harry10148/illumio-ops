@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import traceback
 from collections.abc import Callable
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime, time, timedelta
 
 from apscheduler.schedulers.background import BackgroundScheduler
 from loguru import logger
@@ -12,12 +12,13 @@ from loguru import logger
 from illumio_ops.jobs.health import record_finish, record_start
 from illumio_ops.pce.client import PceNotConfigured
 from illumio_ops.services import pce_health
+from illumio_ops.services.analysis.detect import run_detection
 from illumio_ops.services.analysis.hourly import run_hourly_analysis
 from illumio_ops.services.collect.archive import run_archive
 from illumio_ops.services.collect.backfill import ensure_initial_backfill
 from illumio_ops.services.collect.events import run_events_cycle
 from illumio_ops.services.collect.inventory import run_inventory_cycle
-from illumio_ops.services.collect.reread import ensure_daily_reread
+from illumio_ops.services.collect.reread import ensure_daily_reread, last_reread_day
 from illumio_ops.services.collect.reset import finish_pending_switch
 from illumio_ops.services.collect.retention import run_retention
 from illumio_ops.services.collect.traffic import run_traffic_cycle
@@ -97,6 +98,7 @@ def _collector_jobs(ctx: AppContext) -> dict[str, Callable[[], None]]:
     def traffic() -> None:
         finish_pending_switch(ctx)
         run_traffic_cycle(ctx)
+        run_detection(ctx)  # the detectors evaluate what the cycle just collected
 
     def events() -> None:
         finish_pending_switch(ctx)
@@ -109,7 +111,11 @@ def _collector_jobs(ctx: AppContext) -> dict[str, Callable[[], None]]:
     def backfill() -> None:
         finish_pending_switch(ctx)
         ensure_initial_backfill(ctx)
-        ensure_daily_reread(ctx)
+        reread = ensure_daily_reread(ctx)
+        day = last_reread_day(ctx) if reread is not None and reread.rows > 0 else None
+        if day is not None:  # records found late are evaluated now, marked late
+            start = datetime.combine(day, time(0), UTC)
+            run_detection(ctx, window=(start, start + timedelta(days=1)), late=True)
 
     def archive() -> None:
         run_archive(ctx)

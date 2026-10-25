@@ -66,22 +66,22 @@ SETTINGS_READERS: dict[str, str] = {
     "lateral.environment_label_key": "illumio_ops.services.analysis.exposure",
     "lateral.graph_hops": "illumio_ops.services.analysis.exposure",
     "lateral.observation_days": "illumio_ops.services.analysis.exposure",
+    "lateral.expected_initiators": "illumio_ops.services.analysis.detect",
+    "lateral.detectors.fanout_targets": "illumio_ops.services.analysis.detect",
+    "lateral.detectors.fanout_window_minutes": "illumio_ops.services.analysis.detect",
+    "lateral.detectors.account_fanout_targets": "illumio_ops.services.analysis.detect",
+    "lateral.detectors.account_fanout_window_minutes": "illumio_ops.services.analysis.detect",
+    "lateral.detectors.chain_window_minutes": "illumio_ops.services.analysis.detect",
+    "lateral.detectors.blocked_targets": "illumio_ops.services.analysis.detect",
+    "lateral.detectors.blocked_window_minutes": "illumio_ops.services.analysis.detect",
+    "lateral.detectors.blocked_surge_factor": "illumio_ops.services.analysis.detect",
+    "lateral.detectors.exclude_system_accounts": "illumio_ops.services.analysis.detect",
+    "lateral.detectors.precursor_hours": "illumio_ops.services.analysis.detect",
 }
 # Fields whose reader arrives later: value = the task or phase that adds it.
 PENDING_READERS: dict[str, str] = {
     "pce.console_url": "P3",
     "display.timezone": "P3",
-    "lateral.expected_initiators": "P3-T8",
-    "lateral.detectors.fanout_targets": "P3-T7",
-    "lateral.detectors.fanout_window_minutes": "P3-T7",
-    "lateral.detectors.account_fanout_targets": "P3-T8",
-    "lateral.detectors.account_fanout_window_minutes": "P3-T8",
-    "lateral.detectors.chain_window_minutes": "P3-T8",
-    "lateral.detectors.blocked_targets": "P3-T8",
-    "lateral.detectors.blocked_window_minutes": "P3-T8",
-    "lateral.detectors.blocked_surge_factor": "P3-T8",
-    "lateral.detectors.exclude_system_accounts": "P3-T8",
-    "lateral.detectors.precursor_hours": "P3-T8",
 }
 # Fields with no runtime reader by design.
 STRUCTURAL: dict[str, str] = {
