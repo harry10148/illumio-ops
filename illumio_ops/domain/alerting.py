@@ -44,6 +44,8 @@ FAILURES_TO_REPORT = 3
 EVENT_MESSAGE_KEYS: Mapping[ThresholdType, str] = {
     ThresholdType.IMMEDIATE: "alert_event_immediate", ThresholdType.COUNT: "alert_event_count",
 }
+# An immediate event alert about no host says who made the change instead, or neither.
+EVENT_SUBJECT_KEYS: Mapping[str, str] = {"actor": "alert_event_immediate_actor", "none": "alert_event_immediate_none"}
 FLOW_MESSAGE_KEYS: Mapping[AlertRuleType, str] = {
     AlertRuleType.TRAFFIC: "alert_traffic", AlertRuleType.VOLUME: "alert_volume",
     AlertRuleType.BANDWIDTH: "alert_bandwidth",
@@ -127,6 +129,7 @@ class EventFact:
     host_key: str | None
     hostname: str | None
     raw: Mapping[str, Any]
+    actor: str | None = None  # who made the change, for events about no host (a user, a service account)
 
 
 @dataclass(frozen=True)
@@ -225,12 +228,16 @@ def _event_trigger(rule: EventRule, matched: Sequence[EventFact], subject: str, 
                                                host_hrefs=(host,) if host else ()),
                             view=SegmentView.DETAIL, limit=EVIDENCE_ROWS)
     first, last = min(e.timestamp for e in matched), max(e.timestamp for e in matched)
-    names = sorted({e.hostname for e in matched if e.hostname})
+    names = sorted({e.hostname for e in matched if e.hostname and e.host_key})
+    actors = sorted({e.actor for e in matched if e.actor})
+    key = EVENT_MESSAGE_KEYS[rule.threshold]
+    if rule.threshold is ThresholdType.IMMEDIATE and not names:
+        key = EVENT_SUBJECT_KEYS["actor" if actors else "none"]
     return Trigger(
         rule_id=rule.id, rule_type=AlertRuleType.EVENT, subject_key=subject, severity=severity, first_seen=first,
         last_seen=last, late=all(e.timestamp < now - LATE_AFTER for e in matched),
-        message_key=EVENT_MESSAGE_KEYS[rule.threshold], params={"event_types": list(types), "hosts": names[:10],
-                                                                   "hosts_total": len(names)},
+        message_key=key, params={"event_types": list(types), "hosts": names[:10], "hosts_total": len(names),
+                                 "actors": actors[:10]},
         facts=facts, evidence=evidence, confidence=Confidence(window=window))
 
 

@@ -684,5 +684,7 @@
   "migrate_smtp_auth_by_user": "v6 signs in when an account is set",
   "migrate_smtp_env_password": "if 5.x took the SMTP password from the ILLUMIO_SMTP_PASSWORD environment variable, type it on the notification channels page",
   "migrate_smtp_no_auth": "sign-in was off in 5.x",
-  "migrate_smtp_tls": "STARTTLS when 5.x had TLS on, otherwise none"
+  "migrate_smtp_tls": "STARTTLS when 5.x had TLS on, otherwise none",
+  "alert_event_immediate_actor": "{event_types} by {actors} ({matches})",
+  "alert_event_immediate_none": "{event_types} ({matches})"
 }

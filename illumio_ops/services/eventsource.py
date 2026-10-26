@@ -294,16 +294,20 @@ def tamper_events(ctx: AppContext, *, start: datetime, end: datetime) -> HostEve
 class NewEvent(EventRow):
     id: int
     host_key: str | None   # the workload the event is about (its href), when the store can tell
-    hostname: str | None
+    hostname: str | None   # that host's name (a VEN-sent event names its host even when no workload matches)
+    actor: str | None      # who made the change, when a user or a service account did
 
 
 _NEW_COLUMNS = ("e.id, e.href, e.event_type, e.severity, e.status, e.timestamp, e.created_by_kind, e.created_by_name, "
                 "e.created_by_href, e.tamper_classification, e.raw_json, e.origin, "
-                "COALESCE(e.workload_href, w.href) AS host_key, COALESCE(w.hostname, e.created_by_name) AS hostname")
+                "COALESCE(e.workload_href, w.href) AS host_key, COALESCE(w.hostname, CASE WHEN e.created_by_kind IN "
+                "('ven', 'agent') THEN e.created_by_name END) AS hostname, CASE WHEN e.created_by_kind IN "
+                "('user', 'service_account') THEN e.created_by_name END AS actor")
 
 
 def _new_event(r: Any) -> NewEvent:
-    return NewEvent(**_event_row(r).model_dump(), id=r["id"], host_key=r["host_key"], hostname=r["hostname"])
+    return NewEvent(**_event_row(r).model_dump(), id=r["id"], host_key=r["host_key"], hostname=r["hostname"],
+                    actor=r["actor"])
 
 
 def _ingest_read(ctx: AppContext, sql: str, params: list[Any]) -> list[Any]:

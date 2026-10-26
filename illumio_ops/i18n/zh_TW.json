@@ -684,5 +684,7 @@
   "migrate_smtp_auth_by_user": "v6 依是否有帳號決定是否登入",
   "migrate_smtp_env_password": "若 5.x 由環境變數 ILLUMIO_SMTP_PASSWORD 提供 SMTP 密碼，請到通知通道頁輸入",
   "migrate_smtp_no_auth": "5.x 未啟用登入",
-  "migrate_smtp_tls": "5.x 開啟 TLS 時用 STARTTLS，否則不加密"
+  "migrate_smtp_tls": "5.x 開啟 TLS 時用 STARTTLS，否則不加密",
+  "alert_event_immediate_actor": "{actors} 執行 {event_types}（{matches} 筆）",
+  "alert_event_immediate_none": "{event_types}（{matches} 筆）"
 }

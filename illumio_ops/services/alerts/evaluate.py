@@ -141,7 +141,7 @@ def _now(now: datetime | None) -> datetime:
 
 def event_fact(e: NewEvent) -> EventFact:
     return EventFact(href=e.href, event_type=e.event_type, status=e.status, severity=e.severity, timestamp=e.timestamp,
-                     host_key=e.host_key, hostname=e.hostname, raw=e.raw)
+                     host_key=e.host_key, hostname=e.hostname, raw=e.raw, actor=e.actor)
 
 
 def _window_matches(ctx: AppContext, rule: EventRule, at: datetime) -> int:

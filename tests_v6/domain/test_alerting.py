@@ -50,10 +50,10 @@ def event_rule(**kw):
     return EventRule(**d)
 
 
-def ev(i, *, host="/orgs/1/workloads/w1", minutes_ago=1, severity="warning", event_type="agent.tampering"):
+def ev(i, *, host="/orgs/1/workloads/w1", minutes_ago=1, severity="warning", event_type="agent.tampering", actor=None):
     at = NOW - timedelta(minutes=minutes_ago)
     return EventFact(href=f"/orgs/1/events/{i}", event_type=event_type, status="success", severity=severity,
-                     timestamp=at, host_key=host, hostname="h1" if host else None,
+                     timestamp=at, host_key=host, hostname="h1" if host else None, actor=actor,
                      raw={"event_type": event_type, "status": "success", "severity": severity})
 
 
@@ -263,3 +263,15 @@ def test_pce_health_from_probe():
 
 def test_rule_state_is_hashable_value():
     assert RuleState(None, ()) == RuleState(None, ())
+
+
+def test_event_without_host_names_its_actor_not_a_host():
+    # NFR acceptance: a user's label change read "label.delete on <the user's email>".
+    r = event_rule(event_types=("label.create",))
+    [t] = evaluate_event_rule(r, [ev(1, host=None, event_type="label.create", actor="admin@example.com")], 0, now=NOW)
+    assert t.message_key == "alert_event_immediate_actor"
+    assert (t.params["hosts"], t.params["actors"]) == ([], ["admin@example.com"])
+    [t] = evaluate_event_rule(r, [ev(2, host=None, event_type="label.create")], 0, now=NOW)
+    assert t.message_key == "alert_event_immediate_none"
+    [t] = evaluate_event_rule(event_rule(), [ev(3)], 0, now=NOW)
+    assert t.message_key == "alert_event_immediate" and t.params["hosts"] == ["h1"]
