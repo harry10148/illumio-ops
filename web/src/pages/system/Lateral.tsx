@@ -18,6 +18,9 @@ const DETECTOR_KEYS: Record<string, string> = {
   unexpected_initiator: "detector_name_unexpected_initiator",
   peer_deviation: "detector_name_peer_deviation",
   volume_surge: "detector_name_volume_surge",
+  account_new_source: "detector_name_account_new_source",
+  suspicious_tool: "detector_name_suspicious_tool",
+  new_process: "detector_name_new_process",
 };
 const STATE_KEYS: Record<string, string> = {
   ok: "detector_state_ok",

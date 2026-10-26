@@ -16,7 +16,7 @@ export type Severity = ("low" | "medium" | "high" | "critical")
  * This interface was referenced by `ContractRoot`'s JSON-Schema
  * via the `definition` "DetectorKind".
  */
-export type DetectorKind = ("fanout" | "new_admin_connection" | "pivot_chain" | "blocked_surge" | "non_admin_group" | "cross_env" | "account_fanout" | "unexpected_initiator" | "peer_deviation" | "volume_surge")
+export type DetectorKind = ("fanout" | "new_admin_connection" | "pivot_chain" | "blocked_surge" | "non_admin_group" | "cross_env" | "account_fanout" | "unexpected_initiator" | "peer_deviation" | "volume_surge" | "account_new_source" | "suspicious_tool" | "new_process")
 /**
  * An event rule fires on the matches of one evaluation (immediate) or on a count within its window.
  * 
@@ -1414,13 +1414,16 @@ export const VALUES = {
   ],
   "DetectorKind": [
     "account_fanout",
+    "account_new_source",
     "blocked_surge",
     "cross_env",
     "fanout",
     "new_admin_connection",
+    "new_process",
     "non_admin_group",
     "peer_deviation",
     "pivot_chain",
+    "suspicious_tool",
     "unexpected_initiator",
     "volume_surge"
   ],

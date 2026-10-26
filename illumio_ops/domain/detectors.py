@@ -600,6 +600,10 @@ def _coverage_status(kind: DetectorKind, keys: tuple[str, str], params: dict[str
     return DetectorStatus(kind, DetectorState.OK, keys[0], params)
 
 
+# Detections whose subject is an account, not a host: a host's precursor does not raise them.
+ACCOUNT_DETECTORS = frozenset({DetectorKind.ACCOUNT_FANOUT, DetectorKind.ACCOUNT_NEW_SOURCE})
+
+
 def apply_precursors(dets: Sequence[Detection], precursors: Sequence[Precursor], *,
                      window: timedelta) -> list[Detection]:
     """A host-led detection whose host showed a precursor (tampering, a suspended or offline VEN) within
@@ -610,7 +614,7 @@ def apply_precursors(dets: Sequence[Detection], precursors: Sequence[Precursor],
     out = []
     for d in dets:
         found = [p for p in by_host.get(d.subject_key, ()) if d.first_seen - window <= p.at <= d.last_seen]
-        if d.detector is DetectorKind.ACCOUNT_FANOUT or not found:
+        if d.detector in ACCOUNT_DETECTORS or not found:
             out.append(d)
             continue
         listed = [{"kind": p.kind.value, "at": p.at.isoformat(), "signal": p.signal}
@@ -634,6 +638,9 @@ DETECTORS: dict[DetectorKind, DetectorFn] = {
     # Through a lambda: anomaly imports this module, so its functions may not exist yet when this line runs.
     DetectorKind.PEER_DEVIATION: lambda i: anomaly.detect_peer_deviation(i),
     DetectorKind.VOLUME_SURGE: lambda i: anomaly.detect_volume_surge(i),
+    DetectorKind.ACCOUNT_NEW_SOURCE: lambda i: anomaly.detect_account_new_source(i),
+    DetectorKind.SUSPICIOUS_TOOL: lambda i: anomaly.detect_suspicious_tool(i),
+    DetectorKind.NEW_PROCESS: lambda i: anomaly.detect_new_process(i),
 }
 
 
@@ -646,6 +653,8 @@ def dedup_windows(cfg: DetectorConfig) -> dict[str, timedelta]:
         DetectorKind.UNEXPECTED_INITIATOR: day, DetectorKind.ACCOUNT_FANOUT: cfg.account_fanout_window,
         DetectorKind.BLOCKED_SURGE: cfg.blocked_window,
         DetectorKind.PEER_DEVIATION: timedelta(days=30), DetectorKind.VOLUME_SURGE: anomaly.SURGE_WINDOW,
+        DetectorKind.ACCOUNT_NEW_SOURCE: timedelta(days=30), DetectorKind.SUSPICIOUS_TOOL: day,
+        DetectorKind.NEW_PROCESS: timedelta(days=30),
     }
 
 

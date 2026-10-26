@@ -6,14 +6,29 @@ from datetime import timedelta
 from pathlib import Path
 
 from illumio_ops.domain.anomaly import (
+    detect_account_new_source,
+    detect_new_process,
     detect_peer_deviation,
+    detect_suspicious_tool,
     detect_volume_surge,
     group_of,
     target_signature,
 )
-from illumio_ops.domain.detectors import DETECTORS, Activity, AnomalyData, dedup_windows
+from illumio_ops.domain.detectors import (
+    DETECTORS,
+    Activity,
+    AnomalyData,
+    Precursor,
+    dedup_windows,
+    run_detectors,
+)
 from illumio_ops.domain.focus import DETECTION_TITLE_KEYS
-from illumio_ops.domain.values import DetectorKind, DetectorState, Severity
+from illumio_ops.domain.values import (
+    DetectorKind,
+    DetectorState,
+    PrecursorKind,
+    Severity,
+)
 from tests_v6.domain.test_detectors import CFG, NOW, host, inp, obs
 
 I18N = Path(__file__).resolve().parents[2] / "illumio_ops" / "i18n"
@@ -172,6 +187,128 @@ def test_volume_not_evaluated_in_late_pass():
 def test_volume_critical_source_is_high():
     [d], _ = surge({("/w/fin", "all"): Activity(5000, None, 0, 0)})
     assert d.severity is Severity.HIGH
+
+
+# ── C an account from a new source ────────────────────────────────────────────
+
+ALICE = "corp\\alice"
+OLD = NOW - timedelta(days=10)
+NEW_FIRST = NOW - timedelta(minutes=10)
+
+
+def acct_data(src="/w/b", *, since=OLD, first=NEW_FIRST, sources=1, account=ALICE):
+    return AnomalyData(account_first={(account, src): first}, account_since={account: since},
+                       account_sources={account: sources})
+
+
+def test_account_from_new_source():
+    rows = [obs("/w/b", "/w/t1", port=8080, user="CORP\\Alice")]
+    [d], status = run(rows, data=acct_data(), detector=detect_account_new_source)
+    assert d.detector is DetectorKind.ACCOUNT_NEW_SOURCE and d.subject_key == ALICE
+    assert d.fingerprint == f"acctsrc|{ALICE}|/w/b" and d.severity is Severity.MEDIUM
+    assert d.summary["user"] == "CORP\\Alice" and d.summary["source"] == "/w/b" and d.summary["known_sources"] == 1
+    assert d.segment.filter.initiator_user == "CORP\\Alice"
+    assert d.confidence.field == "initiator_user" and (d.confidence.covered, d.confidence.total) == (1, 1)
+    assert status.state is DetectorState.OK
+
+
+def test_account_case_variants_match():
+    rows = [obs("/w/b", "/w/t1", port=8080, user="corp\\ALICE")]
+    assert len(run(rows, data=acct_data(), detector=detect_account_new_source)[0]) == 1
+
+
+def test_new_account_is_not_judged():
+    rows = [obs("/w/b", "/w/t1", port=8080, user="CORP\\Alice")]
+    assert run(rows, data=acct_data(since=NOW - timedelta(days=3)), detector=detect_account_new_source)[0] == []
+
+
+def test_known_source_is_not_new():
+    rows = [obs("/w/b", "/w/t1", port=8080, user="CORP\\Alice")]
+    assert run(rows, data=acct_data(first=OLD), detector=detect_account_new_source)[0] == []
+
+
+def test_system_account_skipped():
+    rows = [obs("/w/b", "/w/t1", port=8080, user="NT AUTHORITY\\SYSTEM")]
+    data = acct_data(account="nt authority\\system")
+    assert run(rows, data=data, detector=detect_account_new_source)[0] == []
+
+
+def test_account_accumulating_and_no_user_data():
+    rows = [obs("/w/b", "/w/t1", port=8080, user="CORP\\Alice")]
+    _, status = run(rows, data=acct_data(), baseline_days=10.0, detector=detect_account_new_source)
+    assert status.state is DetectorState.ACCUMULATING
+    dets, status = run([obs("/w/b", "/w/t1", port=8080)], data=acct_data(), detector=detect_account_new_source)
+    assert dets == [] and status.state is DetectorState.NO_DATA and status.reason_key == "detector_no_user_data"
+
+
+def test_account_detection_skips_precursor_raise():
+    rows = [obs("/w/b", "/w/t1", port=8080, user="CORP\\Alice")]
+    i = replace(inp([], precursors=[Precursor(ALICE, PrecursorKind.TAMPER, NOW - timedelta(minutes=30), True)]),
+                traffic_obs=rows, anomaly=acct_data())
+    dets, _ = run_detectors(i)
+    [d] = [d for d in dets if d.detector is DetectorKind.ACCOUNT_NEW_SOURCE]
+    assert d.severity is Severity.MEDIUM and "precursors" not in d.summary
+
+
+# ── D suspicious tools and new processes ─────────────────────────────────────
+
+TOOLS = replace(CFG, suspicious_tools=frozenset({"psexec.exe", "powershell.exe", "nc"}))
+
+
+def test_tool_to_internal_target():
+    rows = [obs("/w/a", "/w/t1", port=8080, proc="psexec.exe"), obs("/w/a", "/w/t2", port=8080, proc="psexec.exe")]
+    [d], status = run(rows, cfg=TOOLS, detector=detect_suspicious_tool)
+    assert d.detector is DetectorKind.SUSPICIOUS_TOOL and d.fingerprint == "tool|/w/a|psexec.exe"
+    assert d.summary["targets"] == 2 and d.summary["process"] == "psexec.exe" and d.severity is Severity.MEDIUM
+    assert d.segment.filter.initiator_process == "psexec.exe"
+    assert status.state is DetectorState.OK
+
+
+def test_tool_to_public_target_skipped():
+    rows = [replace(obs("/w/a", "ip:8.8.8.8", port=443, proc="nc"), dst_ip="8.8.8.8", dst_href=None)]
+    assert run(rows, cfg=TOOLS, detector=detect_suspicious_tool)[0] == []
+
+
+def test_tool_on_port_with_expected_list_skipped():
+    rows = [obs("/w/a", "/w/t1", port=445, proc="powershell.exe")]  # 445 has a list: unexpected_initiator judges it
+    assert run(rows, cfg=TOOLS, detector=detect_suspicious_tool)[0] == []
+
+
+def test_empty_tool_list_disabled():
+    dets, status = run([obs("/w/a", "/w/t1", port=8080, proc="psexec.exe")], detector=detect_suspicious_tool)
+    assert dets == [] and status.state is DetectorState.DISABLED and status.reason_key == "detector_no_tools"
+
+
+def test_no_process_data_status():
+    dets, status = run([obs("/w/a", "/w/t1", port=8080)], cfg=TOOLS, detector=detect_suspicious_tool)
+    assert dets == [] and status.state is DetectorState.NO_DATA and status.reason_key == "detector_no_process_field"
+
+
+def proc_data(src="/w/a", process="curl", *, first=NEW_FIRST, since=OLD):
+    return AnomalyData(process_first={(src, process): first}, process_since={src: since})
+
+
+def test_first_process_on_established_host():
+    rows = [obs("/w/a", "/w/t1", port=8080, proc="curl")]
+    [d], _ = run(rows, cfg=TOOLS, data=proc_data(), detector=detect_new_process)
+    assert d.detector is DetectorKind.NEW_PROCESS and d.fingerprint == "newproc|/w/a|curl"
+    assert d.severity is Severity.LOW and d.summary["process"] == "curl"
+
+
+def test_new_process_on_new_host_skipped():
+    rows = [obs("/w/a", "/w/t1", port=8080, proc="curl")]
+    assert run(rows, cfg=TOOLS, data=proc_data(since=NOW - timedelta(days=2)), detector=detect_new_process)[0] == []
+
+
+def test_tool_is_not_also_new_process():
+    rows = [obs("/w/a", "/w/t1", port=8080, proc="psexec.exe")]
+    assert run(rows, cfg=TOOLS, data=proc_data(process="psexec.exe"), detector=detect_new_process)[0] == []
+
+
+def test_new_process_accumulating():
+    rows = [obs("/w/a", "/w/t1", port=8080, proc="curl")]
+    _, status = run(rows, cfg=TOOLS, data=proc_data(), baseline_days=3.0, detector=detect_new_process)
+    assert status.state is DetectorState.ACCUMULATING
 
 
 # ── registration ─────────────────────────────────────────────────────────────

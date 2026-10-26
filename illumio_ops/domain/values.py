@@ -165,6 +165,9 @@ class DetectorKind(StrEnum):
     # anomalies in allowed traffic (spec §6.5.8)
     PEER_DEVIATION = "peer_deviation"
     VOLUME_SURGE = "volume_surge"
+    ACCOUNT_NEW_SOURCE = "account_new_source"
+    SUSPICIOUS_TOOL = "suspicious_tool"
+    NEW_PROCESS = "new_process"
 
 
 class PortClass(StrEnum):

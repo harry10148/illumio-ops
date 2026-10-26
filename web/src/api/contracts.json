@@ -111,7 +111,10 @@
               "account_fanout",
               "unexpected_initiator",
               "peer_deviation",
-              "volume_surge"
+              "volume_surge",
+              "account_new_source",
+              "suspicious_tool",
+              "new_process"
             ],
             "title": "DetectorKind",
             "type": "string"
@@ -1067,7 +1070,10 @@
               "account_fanout",
               "unexpected_initiator",
               "peer_deviation",
-              "volume_surge"
+              "volume_surge",
+              "account_new_source",
+              "suspicious_tool",
+              "new_process"
             ],
             "title": "DetectorKind",
             "type": "string"
@@ -2125,7 +2131,10 @@
               "account_fanout",
               "unexpected_initiator",
               "peer_deviation",
-              "volume_surge"
+              "volume_surge",
+              "account_new_source",
+              "suspicious_tool",
+              "new_process"
             ],
             "title": "DetectorKind",
             "type": "string"
@@ -3171,7 +3180,10 @@
               "account_fanout",
               "unexpected_initiator",
               "peer_deviation",
-              "volume_surge"
+              "volume_surge",
+              "account_new_source",
+              "suspicious_tool",
+              "new_process"
             ],
             "title": "DetectorKind",
             "type": "string"
@@ -4238,7 +4250,10 @@
               "account_fanout",
               "unexpected_initiator",
               "peer_deviation",
-              "volume_surge"
+              "volume_surge",
+              "account_new_source",
+              "suspicious_tool",
+              "new_process"
             ],
             "title": "DetectorKind",
             "type": "string"
@@ -5283,7 +5298,10 @@
               "account_fanout",
               "unexpected_initiator",
               "peer_deviation",
-              "volume_surge"
+              "volume_surge",
+              "account_new_source",
+              "suspicious_tool",
+              "new_process"
             ],
             "title": "DetectorKind",
             "type": "string"
@@ -6288,7 +6306,10 @@
               "account_fanout",
               "unexpected_initiator",
               "peer_deviation",
-              "volume_surge"
+              "volume_surge",
+              "account_new_source",
+              "suspicious_tool",
+              "new_process"
             ],
             "title": "DetectorKind",
             "type": "string"
@@ -7244,7 +7265,10 @@
               "account_fanout",
               "unexpected_initiator",
               "peer_deviation",
-              "volume_surge"
+              "volume_surge",
+              "account_new_source",
+              "suspicious_tool",
+              "new_process"
             ],
             "title": "DetectorKind",
             "type": "string"
@@ -11662,7 +11686,10 @@
               "account_fanout",
               "unexpected_initiator",
               "peer_deviation",
-              "volume_surge"
+              "volume_surge",
+              "account_new_source",
+              "suspicious_tool",
+              "new_process"
             ],
             "title": "DetectorKind",
             "type": "string"
@@ -12693,7 +12720,10 @@
               "account_fanout",
               "unexpected_initiator",
               "peer_deviation",
-              "volume_surge"
+              "volume_surge",
+              "account_new_source",
+              "suspicious_tool",
+              "new_process"
             ],
             "title": "DetectorKind",
             "type": "string"
@@ -14704,13 +14734,16 @@
     ],
     "DetectorKind": [
       "account_fanout",
+      "account_new_source",
       "blocked_surge",
       "cross_env",
       "fanout",
       "new_admin_connection",
+      "new_process",
       "non_admin_group",
       "peer_deviation",
       "pivot_chain",
+      "suspicious_tool",
       "unexpected_initiator",
       "volume_surge"
     ],

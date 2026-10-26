@@ -12,7 +12,7 @@ from __future__ import annotations
 import ipaddress
 from collections import Counter
 from collections.abc import Mapping, Sequence
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 from illumio_ops.domain.detectors import (
     Detection,
@@ -20,13 +20,16 @@ from illumio_ops.domain.detectors import (
     DetectorInput,
     DetectorStatus,
     Obs,
+    _coverage_status,
     _dst_host,
+    _kinds_without,
     _src_host,
     evaluable,
     not_blocked,
 )
 from illumio_ops.domain.filter import EndpointFilter, FilterSpec, PortProto
-from illumio_ops.domain.lateral import HostInfo
+from illumio_ops.domain.identity import account_key, is_system_account
+from illumio_ops.domain.lateral import EXECUTION, HostInfo
 from illumio_ops.domain.segment import FlowSegment
 from illumio_ops.domain.values import (
     DetectorKind,
@@ -42,6 +45,7 @@ DYNAMIC_PORTS = 49152          # IANA dynamic range: a destination port up here 
 PEER_ROLLOUT = 0.5             # half a group starting the same thing at once is a change to the group, not one host
 SURGE_WINDOW = timedelta(minutes=60)
 ACTIVITY_DAYS = 7
+SAMPLE = 10                    # target names a summary carries
 NOT_BLOCKED = (PolicyDecision.ALLOWED, PolicyDecision.POTENTIALLY_BLOCKED, PolicyDecision.UNKNOWN)
 
 
@@ -185,3 +189,154 @@ def detect_volume_surge(inp: DetectorInput) -> tuple[list[Detection], DetectorSt
     """B: a source's connections or bytes in the last hour far above any hour of its own last 7 days."""
     cfg = inp.config
     return _surge(inp, DetectorKind.VOLUME_SURGE, "all", cfg.volume_min_connections, "volume")
+
+
+def _names(rows: Sequence[Obs]) -> list[str]:
+    seen: dict[str, str] = {}
+    for o in rows:
+        seen.setdefault(o.dst_key, o.dst_hostname or o.dst_ip)
+    return sorted(seen.values())[:SAMPLE]
+
+
+def _span(rows: Sequence[Obs]) -> tuple[datetime, datetime]:
+    first, last = min(o.first for o in rows), max(o.last for o in rows)
+    return first, last if last > first else first + timedelta(seconds=1)
+
+
+def _in_window(inp: DetectorInput) -> list[Obs]:
+    return [o for o in inp.traffic_obs if evaluable(o, inp) and not_blocked(o)]
+
+
+def detect_account_new_source(inp: DetectorInput) -> tuple[list[Detection], DetectorStatus]:
+    """An account with history (first seen at least account_history before the window) starting connections
+    from a source host the baseline never saw it on (spec §6.5.8 C). Only as good as the user field's
+    coverage, which every result states."""
+    kind = DetectorKind.ACCOUNT_NEW_SOURCE
+    cfg, data = inp.config, inp.anomaly
+    if not inp.baseline_full:
+        return [], _accumulating(kind, inp)
+    rows = _in_window(inp)
+    covered = [o for o in rows if o.initiator_user]
+    if rows and not covered:
+        return [], _status(kind, DetectorState.NO_DATA, "detector_no_user_data", covered=0, total=len(rows))
+    lo, hi = inp.window
+    found: dict[tuple[str, str], list[Obs]] = {}
+    for o in covered:
+        account = account_key(o.initiator_user)
+        if account is None or (cfg.exclude_system_accounts and is_system_account(o.initiator_user)):
+            continue
+        first, since = data.account_first.get((account, o.src_key)), data.account_since.get(account)
+        if first is None or since is None or not lo < first <= hi or since > lo - cfg.account_history:
+            continue
+        found.setdefault((account, o.src_key), []).append(o)
+    out = []
+    for (account, src), hits in sorted(found.items()):
+        critical = any(_dst_host(o, inp).critical for o in hits)
+        start, end = _span(hits)
+        out.append(Detection(
+            detector=kind, fingerprint=f"acctsrc|{account}|{src}", subject_key=account,
+            severity=raise_severity(Severity.MEDIUM) if critical else Severity.MEDIUM,
+            first_seen=data.account_first[(account, src)], last_seen=max(o.last for o in hits), critical_asset=critical,
+            summary={"user": hits[0].initiator_user, "source": hits[0].src_hostname or hits[0].src_ip,
+                     "known_sources": data.account_sources.get(account, 0), "sample_targets": _names(hits)},
+            segment=FlowSegment(filter=FilterSpec(start=start, end=end, src=_endpoint(src, hits[0].src_ip),
+                                                  initiator_user=hits[0].initiator_user, decisions=NOT_BLOCKED),
+                                view=SegmentView.DETAIL, limit=200),
+            confidence=DetectionConfidence(field="initiator_user", covered=len(covered), total=len(rows),
+                                           incomplete_gaps=inp.gaps)))
+    return out, _coverage_status(kind, ("detector_partial_users", "detector_partial_users_none_from"),
+                                 {"covered": len(covered), "total": len(rows)}, len(covered) < len(rows),
+                                 _kinds_without(rows, lambda o: bool(o.initiator_user), inp))
+
+
+def _process_status(kind: DetectorKind, inp: DetectorInput, rows: Sequence[Obs],
+                    covered: Sequence[Obs]) -> DetectorStatus:
+    return _coverage_status(kind, ("detector_partial_processes", "detector_partial_processes_none_from"),
+                            {"covered": len(covered), "total": len(rows)}, len(covered) < len(rows),
+                            _kinds_without(rows, lambda o: bool(o.initiator_process), inp))
+
+
+def _internal(o: Obs, inp: DetectorInput) -> bool:
+    return _dst_host(o, inp).managed or not is_public(o.dst_ip)
+
+
+def detect_suspicious_tool(inp: DetectorInput) -> tuple[list[Detection], DetectorStatus]:
+    """A remote-execution, reconnaissance or directory-attack tool (the configured list) starting a connection to
+    an internal host (spec §6.5.8 D, E③). A port with an expected-initiator list is left to the unexpected-initiator
+    detector, which already judges every process there."""
+    kind = DetectorKind.SUSPICIOUS_TOOL
+    cfg = inp.config
+    if not cfg.suspicious_tools:
+        return [], _status(kind, DetectorState.DISABLED, "detector_no_tools")
+    rows = _in_window(inp)
+    covered = [o for o in rows if o.initiator_process]
+    if rows and not covered:
+        return [], _status(kind, DetectorState.NO_DATA, "detector_no_process_field", total=len(rows))
+    found: dict[tuple[str, str], list[Obs]] = {}
+    for o in covered:
+        process = o.initiator_process or ""
+        if process not in cfg.suspicious_tools or not _internal(o, inp) or _judged_elsewhere(o, inp):
+            continue
+        found.setdefault((o.src_key, process), []).append(o)
+    out = []
+    for (src, process), hits in sorted(found.items()):
+        critical = any(_dst_host(o, inp).critical for o in hits)
+        start, end = _span(hits)
+        out.append(Detection(
+            detector=kind, fingerprint=f"tool|{src}|{process}", subject_key=src,
+            severity=raise_severity(Severity.MEDIUM) if critical else Severity.MEDIUM,
+            first_seen=min(o.first for o in hits), last_seen=max(o.last for o in hits), critical_asset=critical,
+            summary={"process": process, "port": hits[0].port, "target": hits[0].dst_hostname or hits[0].dst_ip,
+                     "targets": len({o.dst_key for o in hits}), "sample_targets": _names(hits)},
+            segment=FlowSegment(filter=FilterSpec(start=start, end=end, src=_endpoint(src, hits[0].src_ip),
+                                                  initiator_process=process),
+                                view=SegmentView.DETAIL, limit=200),
+            confidence=DetectionConfidence(field="initiator_process", covered=len(covered), total=len(rows),
+                                           incomplete_gaps=inp.gaps)))
+    return out, _process_status(kind, inp, rows, covered)
+
+
+def _judged_elsewhere(o: Obs, inp: DetectorInput) -> bool:
+    cfg = inp.config
+    listed = (o.port, o.proto) in cfg.expected or (o.port, None) in cfg.expected
+    return listed and cfg.admin_ports.matches(o.port, o.proto, EXECUTION)
+
+
+def detect_new_process(inp: DetectorInput) -> tuple[list[Detection], DetectorStatus]:
+    """A process starting connections on a host for the first time, on a host whose process history reaches
+    process_history back (spec §6.5.8 D). Low: software updates do this too; it shows on the focus list and the
+    lateral page, and a precursor or a critical target raises it."""
+    kind = DetectorKind.NEW_PROCESS
+    cfg, data = inp.config, inp.anomaly
+    if not inp.baseline_full:
+        return [], _accumulating(kind, inp)
+    rows = _in_window(inp)
+    covered = [o for o in rows if o.initiator_process]
+    if rows and not covered:
+        return [], _status(kind, DetectorState.NO_DATA, "detector_no_process_field", total=len(rows))
+    lo, hi = inp.window
+    found: dict[tuple[str, str], list[Obs]] = {}
+    for o in covered:
+        process = o.initiator_process or ""
+        if process in cfg.suspicious_tools:
+            continue
+        first, since = data.process_first.get((o.src_key, process)), data.process_since.get(o.src_key)
+        if first is None or since is None or not lo < first <= hi or since > lo - cfg.process_history:
+            continue
+        found.setdefault((o.src_key, process), []).append(o)
+    out = []
+    for (src, process), hits in sorted(found.items()):
+        critical = any(_dst_host(o, inp).critical for o in hits)
+        start, end = _span(hits)
+        out.append(Detection(
+            detector=kind, fingerprint=f"newproc|{src}|{process}", subject_key=src,
+            severity=raise_severity(Severity.LOW) if critical else Severity.LOW,
+            first_seen=data.process_first[(src, process)], last_seen=max(o.last for o in hits),
+            critical_asset=critical,
+            summary={"process": process, "port": hits[0].port, "target": hits[0].dst_hostname or hits[0].dst_ip},
+            segment=FlowSegment(filter=FilterSpec(start=start, end=end, src=_endpoint(src, hits[0].src_ip),
+                                                  initiator_process=process),
+                                view=SegmentView.DETAIL, limit=200),
+            confidence=DetectionConfidence(field="initiator_process", covered=len(covered), total=len(rows),
+                                           baseline_days=round(inp.baseline_days, 1), incomplete_gaps=inp.gaps)))
+    return out, _process_status(kind, inp, rows, covered)
