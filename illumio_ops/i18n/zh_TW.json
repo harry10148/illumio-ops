@@ -692,5 +692,12 @@
   "tamper_pattern_regular_cycle": "規律循環（多半是另一套防火牆程式改寫 VEN 的表）",
   "tamper_pattern_burst": "短時間密集（人或腳本手動修改）",
   "tamper_pattern_sporadic": "零星",
-  "tamper_pattern_too_few": "事件太少，無法判斷"
+  "tamper_pattern_too_few": "事件太少，無法判斷",
+  "cond_src_exclude": "來源不是",
+  "cond_dst_exclude": "目的不是",
+  "cond_exclusions": "排除",
+  "cond_exclude_hint": "符合任一項的流量不算；留空表示不排除。",
+  "rule_match_fields": "進階：比對事件欄位",
+  "rule_match_fields_label": "欄位比對，一行一項",
+  "rule_match_fields_hint": "路徑=樣式，例如 created_by.user.username=admin@example.com；notification_type 會查每一則 notification。樣式寫法同事件型別，! 表示否定。"
 }

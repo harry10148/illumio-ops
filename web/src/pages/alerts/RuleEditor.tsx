@@ -263,6 +263,20 @@ export function RuleEditor() {
   );
 }
 
+// match_fields as text: one "path=pattern" per line (the pattern may itself hold "=").
+function fieldsText(fields: Record<string, string> | undefined): string {
+  return Object.entries(fields ?? {}).map(([k, v]) => `${k}=${v}`).join("\n");
+}
+
+function parseFields(text: string): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const line of text.split("\n")) {
+    const at = line.indexOf("=");
+    if (at > 0) out[line.slice(0, at).trim()] = line.slice(at + 1).trim();
+  }
+  return out;
+}
+
 function EventFields({ rule, set, fieldError }: {
   rule: EventRule; set: (patch: Partial<EventRule>) => void; fieldError: (name: string) => ReactElement | null;
 }) {
@@ -287,6 +301,17 @@ function EventFields({ rule, set, fieldError }: {
           {fieldError("event_severity")}
         </label>
       </div>
+      <details open={Object.keys(rule.match_fields ?? {}).length > 0}>
+        <summary>{t("rule_match_fields")}</summary>
+        <label>
+          {t("rule_match_fields_label")}
+          <textarea name="match_fields" rows={3} defaultValue={fieldsText(rule.match_fields)}
+                    placeholder="created_by.user.username=admin@example.com&#10;notification_type=hard_limit.exceeded"
+                    onBlur={(e) => set({ match_fields: parseFields(e.target.value) })} />
+          <span className="hint">{t("rule_match_fields_hint")}</span>
+          {fieldError("match_fields")}
+        </label>
+      </details>
       <p className="sentence">
         <select name="threshold" value={rule.threshold} onChange={(e) => set({ threshold: e.target.value as ThresholdType })}>
           <option value="immediate">{t("rule_threshold_immediate")}</option>

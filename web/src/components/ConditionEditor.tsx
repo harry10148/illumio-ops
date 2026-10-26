@@ -1,5 +1,5 @@
-// A flow condition (FlowCondition) as a form: source and destination by label or address, ports, the reported
-// decision, the initiating process or user. Labels come from the inventory the store holds.
+// A flow condition (FlowCondition) as a form: source and destination by label or address, and what each must not
+// be; ports, the reported decision, the initiating process or user. Labels come from the inventory the store holds.
 import { useState } from "react";
 
 import type { EndpointFilter, FlowCondition, LabelChoice, PolicyDecision, PortProto } from "../api/generated";
@@ -11,7 +11,9 @@ const DECISION_KEYS: Record<string, string> = {
   unknown: "decision_unknown",
 };
 
-const SIDE_KEYS: Record<string, string> = { src: "cond_src", dst: "cond_dst" };
+const SIDE_KEYS: Record<string, string> = {
+  src: "cond_src", dst: "cond_dst", src_exclude: "cond_src_exclude", dst_exclude: "cond_dst_exclude",
+};
 
 const list = (text: string) => text.split(/[\s,]+/).map((s) => s.trim()).filter(Boolean);
 
@@ -78,7 +80,7 @@ function Side({ name, value, choices, onChange }: {
         <input name={`${name}_ips`} defaultValue={(v.ips ?? []).join(", ")} placeholder="10.0.0.5, 10.1.0.0/16"
                onBlur={(e) => set({ ...v, ips: list(e.target.value) })} />
       </label>
-      <p className="hint">{t("cond_side_hint")}</p>
+      <p className="hint">{t(name.endsWith("_exclude") ? "cond_exclude_hint" : "cond_side_hint")}</p>
     </fieldset>
   );
 }
@@ -94,6 +96,15 @@ export function ConditionEditor({ value, choices, onChange, onInvalid }: {
         <Side name="src" value={value.src} choices={choices} onChange={(src) => onChange({ ...value, src })} />
         <Side name="dst" value={value.dst} choices={choices} onChange={(dst) => onChange({ ...value, dst })} />
       </div>
+      <details open={Boolean(value.src_exclude || value.dst_exclude)}>
+        <summary>{t("cond_exclusions")}</summary>
+        <div className="form-grid">
+          <Side name="src_exclude" value={value.src_exclude} choices={choices}
+                onChange={(src_exclude) => onChange({ ...value, src_exclude })} />
+          <Side name="dst_exclude" value={value.dst_exclude} choices={choices}
+                onChange={(dst_exclude) => onChange({ ...value, dst_exclude })} />
+        </div>
+      </details>
       <label>
         {t("cond_ports")}
         <input name="ports" defaultValue={portsText(value.ports)} placeholder="22, 3389, 135-139, 53/udp"

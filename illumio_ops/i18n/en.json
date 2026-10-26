@@ -692,5 +692,12 @@
   "tamper_pattern_regular_cycle": "a regular cycle (often another firewall program rewriting the VEN's table)",
   "tamper_pattern_burst": "a burst (changes by hand or by a script)",
   "tamper_pattern_sporadic": "sporadic",
-  "tamper_pattern_too_few": "too few events to tell"
+  "tamper_pattern_too_few": "too few events to tell",
+  "cond_src_exclude": "Source is not",
+  "cond_dst_exclude": "Destination is not",
+  "cond_exclusions": "Exclusions",
+  "cond_exclude_hint": "Flows matching any of these are left out; leave empty to exclude nothing.",
+  "rule_match_fields": "Advanced: match event fields",
+  "rule_match_fields_label": "Field matches, one per line",
+  "rule_match_fields_hint": "path=pattern, e.g. created_by.user.username=admin@example.com; notification_type looks in every notification. Patterns work as for event types, ! negates."
 }

@@ -81,6 +81,46 @@ def test_rule_create_traffic_with_condition(context, live_app):
     assert [p.port for p in mine.condition.ports] == [22] and [d.value for d in mine.condition.decisions] == ["blocked"]
 
 
+def test_rule_traffic_exclusions_round_trip(context, live_app):
+    """Task 9: each side can exclude addresses; saved, and shown again when the rule is opened (review: no
+    control existed, and a migrated exclusion could not be seen)."""
+    page = context.new_page()
+    sign_in(page, live_app.url)
+    page.goto(f"{live_app.url}/alerts/rules/new")
+    form = page.locator("[data-role=rule-editor]")
+    form.locator("select[name=type]").select_option("traffic")
+    form.locator("input[name=name]").fill("Blocked but not the scanner")
+    form.locator("input[name=decision_blocked]").check()
+    form.get_by_text("Exclusions").click()
+    form.locator("input[name=src_exclude_ips]").fill("10.9.9.9")
+    form.locator("input[name=src_exclude_ips]").blur()
+    form.get_by_role("button", name="Save").click()
+    page.wait_for_selector("[data-role=rule-list]")
+    mine = next(r for r in live_app.ctx.settings.current().alerts.rules if r.name == "Blocked but not the scanner")
+    assert mine.condition.src_exclude is not None and mine.condition.src_exclude.ips == ("10.9.9.9",)
+    page.goto(f"{live_app.url}/alerts/rules/{mine.id}")
+    expect(page.locator("input[name=src_exclude_ips]")).to_have_value("10.9.9.9")
+
+
+def test_rule_event_match_fields_round_trip(context, live_app):
+    """Task 9: an event rule's advanced field matches, one path=pattern per line (review: no control)."""
+    page = context.new_page()
+    sign_in(page, live_app.url)
+    page.goto(f"{live_app.url}/alerts/rules/new")
+    form = page.locator("[data-role=rule-editor]")
+    form.locator("input[name=name]").fill("Hard limit")
+    form.locator("input[name=event_types]").fill("system_task.prune_old_log_events")
+    form.get_by_text("Advanced: match event fields").click()
+    form.locator("textarea[name=match_fields]").fill("notification_type=hard_limit.exceeded")
+    form.locator("textarea[name=match_fields]").blur()
+    form.get_by_role("button", name="Save").click()
+    page.wait_for_selector("[data-role=rule-list]")
+    mine = next(r for r in live_app.ctx.settings.current().alerts.rules if r.name == "Hard limit")
+    assert dict(mine.match_fields) == {"notification_type": "hard_limit.exceeded"}
+    page.goto(f"{live_app.url}/alerts/rules/{mine.id}")
+    expect(page.locator("textarea[name=match_fields]")).to_have_value("notification_type=hard_limit.exceeded")
+
+
 def test_rule_invalid_regex_field_error(context, live_app):
     page = context.new_page()
     sign_in(page, live_app.url)
