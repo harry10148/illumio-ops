@@ -368,17 +368,23 @@ def test_partial_process_coverage_names_the_host_kinds_without_any():
 # .106: a PCE record spanning ~24 h (batch → Imperva:22, first 10-25 00:01, last 10-26 00:21) sat in a fan-out's
 # window and dragged first_seen back a day, so the 60-minute dedup merged it with any fan-out of the day before.
 
-def test_window_detectors_first_seen_is_bounded_by_the_window():
-    day_long = 24 * 60
-    fanout_rows = fan("/w/a", 9) + [obs("/w/a", "/w/long", first_ago=day_long)]
-    [d] = detect_fanout(inp(fanout_rows))[0]
+DAY_LONG = 24 * 60
+
+
+def test_fanout_first_seen_is_bounded_by_its_window():
+    [d] = detect_fanout(inp(fan("/w/a", 9) + [obs("/w/a", "/w/long", first_ago=DAY_LONG)]))[0]
     assert d.first_seen >= d.last_seen - CFG.fanout_window
 
+
+def test_account_fanout_first_seen_is_bounded_by_its_window():
     users = [obs("/w/a", f"/w/t{i}", user="LAB\\alice") for i in range(9)]
-    users.append(obs("/w/a", "/w/long", user="LAB\\alice", first_ago=day_long))
+    users.append(obs("/w/a", "/w/long", user="LAB\\alice", first_ago=DAY_LONG))
     [d] = detect_account_fanout(inp(users))[0]
     assert d.first_seen >= d.last_seen - CFG.account_fanout_window
 
-    blocked = _blocked("/w/a", 4) + [obs("/w/a", "/w/long", decision="blocked", first_ago=day_long)]
-    [d] = detect_blocked_surge(inp([], blocked=blocked))[0]
+
+def test_blocked_surge_first_seen_is_bounded_by_its_window():
+    # last seen a minute before the others, so it is the source's first row
+    long = obs("/w/a", "/w/long", decision="blocked", minutes_ago=6, first_ago=DAY_LONG)
+    [d] = detect_blocked_surge(inp([], blocked=[long] + _blocked("/w/a", 4)))[0]
     assert d.first_seen >= d.last_seen - CFG.blocked_window
