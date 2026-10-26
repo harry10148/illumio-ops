@@ -79,6 +79,7 @@ __all__ = [
     "baseline_edges",
     "baseline_first_seen",
     "field_coverage",
+    "increment_times",
     "increment_totals",
     "increments_watermark",
     "new_user_pairs",
@@ -683,3 +684,13 @@ def increments_watermark(ctx: AppContext) -> datetime | None:
         require_same_pce(conn, settings.pce)
         value = conn.execute("SELECT MAX(observed_at) FROM flow_increments").fetchone()[0]
     return datetime.fromisoformat(value) if value else None
+
+
+def increment_times(ctx: AppContext, *, start: datetime, end: datetime) -> list[datetime]:
+    """When growth was recorded within (start, end] — the moments a live evaluation ran (rule preview)."""
+    fdb, _gen, settings = _store_read(ctx)
+    with fdb.connect() as conn:
+        require_same_pce(conn, settings.pce)
+        found = conn.execute("SELECT DISTINCT observed_at FROM flow_increments WHERE late = 0 AND observed_at > ? "
+                             "AND observed_at <= ? ORDER BY observed_at", (db_time(start), db_time(end))).fetchall()
+    return [datetime.fromisoformat(r[0]) for r in found]

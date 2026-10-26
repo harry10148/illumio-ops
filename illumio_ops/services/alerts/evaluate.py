@@ -139,7 +139,7 @@ def _now(now: datetime | None) -> datetime:
 
 # ── events ───────────────────────────────────────────────────────────────────
 
-def _fact(e: NewEvent) -> EventFact:
+def event_fact(e: NewEvent) -> EventFact:
     return EventFact(href=e.href, event_type=e.event_type, status=e.status, severity=e.severity, timestamp=e.timestamp,
                      host_key=e.host_key, hostname=e.hostname, raw=e.raw)
 
@@ -194,7 +194,7 @@ def evaluate_events(ctx: AppContext, *, now: datetime | None = None) -> EvalRun:
         rows, more = events_after(ctx, after, limit=EVENT_BATCH)
         if not rows:
             break
-        facts = [_fact(e) for e in rows]
+        facts = [event_fact(e) for e in rows]
         for rule in rules:
             matched = [f for f in facts if event_matches(rule, f.raw)]
             if not matched:
@@ -215,7 +215,7 @@ def evaluate_events(ctx: AppContext, *, now: datetime | None = None) -> EvalRun:
 
 # ── traffic, bandwidth, volume ───────────────────────────────────────────────
 
-def _increment_facts(totals: Any, at: datetime, watermark: datetime | None) -> IncrementFacts:
+def increment_facts(totals: Any, at: datetime, watermark: datetime | None) -> IncrementFacts:
     return IncrementFacts(
         connections=totals.connections, bytes=totals.bytes, bytes_rows=totals.bytes_rows, rows=totals.rows,
         new_rows=totals.new_rows, max_mbps=totals.max_mbps,
@@ -244,7 +244,7 @@ def evaluate_traffic(ctx: AppContext, *, now: datetime | None = None) -> EvalRun
         window = (at - timedelta(minutes=rule.window_minutes), at)
         totals = increment_totals(ctx, rule.condition, start=window[0], end=window[1], new_after=since,
                                   rank_by="mbps" if isinstance(rule, BandwidthRule) else "connections", now=at)
-        facts = _increment_facts(totals, at, newest)
+        facts = increment_facts(totals, at, newest)
         if isinstance(rule, TrafficRule):
             trigger = evaluate_traffic_rule(rule, facts, now=at, window=window)
         elif isinstance(rule, BandwidthRule):
@@ -268,7 +268,7 @@ def _is_new(row: Any, start: tuple[str, int]) -> bool:
     return bool(row["created_at"] > start[0] or (row["created_at"] == start[0] and row["id"] > start[1]))
 
 
-def _detection_fact(row: Any, *, start: tuple[str, int], names: dict[str, str | None],
+def detection_fact(row: Any, *, start: tuple[str, int], names: dict[str, str | None],
                     previous: Severity | None) -> DetectionFact:
     severity = Severity(row["severity"])
     is_new = _is_new(row, start)
@@ -318,7 +318,7 @@ def evaluate_lateral(ctx: AppContext, *, now: datetime | None = None) -> EvalRun
                     with ctx.db() as conn:
                         last = store.last_alert(conn, rule.id, row["fingerprint"])
                     previous = Severity(last["severity"]) if last is not None else None
-                facts.append(_detection_fact(row, start=start, names=names, previous=previous))
+                facts.append(detection_fact(row, start=start, names=names, previous=previous))
             rec.record(rule, evaluate_lateral_rule(rule, facts))
         run.evaluated += len(changed)
         mark = (str(changed[-1]["updated_at"]), int(changed[-1]["id"]))
