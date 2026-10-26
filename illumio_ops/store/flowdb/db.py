@@ -112,6 +112,10 @@ class FlowDb:
         # SQLite checkpoints the whole WAL when the last connection closes, which inside a write would
         # bring back the checkpoint under the lock (see WAL_SAFETY_NET_PAGES). Not counted by reset.
         self._anchor: sqlite3.Connection | None = None
+        # Connections opened while one applies a migration wait here, not on SQLite's busy timeout,
+        # which a long migration outlasts (0002: 820 s at 1,000 workloads): every job opening the
+        # store then failed with "database is locked" (.106 upgrade).
+        self._migrate_lock = threading.Lock()
 
     @contextmanager
     def writing(self, generation: int) -> Iterator[sqlite3.Connection]:
@@ -140,7 +144,8 @@ class FlowDb:
             # commits, and the collection watermarks in this same file roll back with them, so that
             # range is pulled again.
             conn.execute("PRAGMA synchronous=NORMAL")
-            migrate(conn, MIGRATIONS_PACKAGE)
+            with self._migrate_lock:
+                migrate(conn, MIGRATIONS_PACKAGE)
         except BaseException:
             conn.close()
             self._opened(None)
