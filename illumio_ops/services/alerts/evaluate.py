@@ -273,11 +273,22 @@ def _is_new(row: Any, start: tuple[str, int]) -> bool:
     return bool(row["created_at"] > start[0] or (row["created_at"] == start[0] and row["id"] > start[1]))
 
 
+def _alerted_severity(last: Any) -> Severity | None:
+    """The detection's severity when this rule last alerted on it (an alert's own severity may be the rule's)."""
+    if last is None:
+        return None
+    facts = json.loads(last["facts_json"])
+    return Severity(facts.get("detection_severity") or last["severity"])
+
+
 def detection_fact(row: Any, *, start: tuple[str, int], names: dict[str, str | None],
                     previous: Severity | None) -> DetectionFact:
+    """previous: the detection's severity when the rule last alerted on it; None, an updated detection the rule
+    has not alerted on yet (it was below the rule's floor, or the rule is newer): it counts as risen, so the rule
+    alerts the first time the detection qualifies."""
     severity = Severity(row["severity"])
     is_new = _is_new(row, start)
-    rose = previous is not None and SEVERITY_ORDER.index(severity) > SEVERITY_ORDER.index(previous)
+    rose = previous is None or SEVERITY_ORDER.index(severity) > SEVERITY_ORDER.index(previous)
     return DetectionFact(
         id=row["id"], detector=DetectorKind(row["detector"]), fingerprint=row["fingerprint"],
         subject_key=row["subject_key"], subject_name=names.get(row["subject_key"]) or row["subject_key"],
@@ -322,7 +333,7 @@ def evaluate_lateral(ctx: AppContext, *, now: datetime | None = None) -> EvalRun
                 if not _is_new(row, start):  # changed, not new: alert again only if its severity rose
                     with ctx.db() as conn:
                         last = store.last_alert(conn, rule.id, row["fingerprint"])
-                    previous = Severity(last["severity"]) if last is not None else None
+                    previous = _alerted_severity(last)
                 facts.append(detection_fact(row, start=start, names=names, previous=previous))
             rec.record(rule, evaluate_lateral_rule(rule, facts))
         run.evaluated += len(changed)

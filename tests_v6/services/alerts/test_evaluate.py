@@ -291,6 +291,35 @@ def test_lateral_realert_on_severity_rise_only(ctx):
     assert [a["severity"] for a in _alerts(ctx)] == ["high", "medium"]
 
 
+def _lateral_rules(ctx, **values):
+    def change(d):
+        for r in d["alerts"]["rules"]:
+            if r["type"] == "lateral":
+                r.update(values)
+    ctx.settings.update(ctx.settings.current().revision, change)
+
+
+def test_lateral_alerts_when_a_detection_first_reaches_the_floor(ctx):
+    """New at medium under a high floor: nothing; risen to high later: the rule's first alert for it (review: the
+    rise was judged against an alert that never existed)."""
+    _lateral_rules(ctx, min_severity="high")
+    evaluate_lateral(ctx, now=NOW)
+    _detect(ctx, at=NOW + minutes(1))
+    assert evaluate_lateral(ctx, now=NOW + minutes(2)).fired == 0
+    _detect(ctx, severity="high", at=NOW + minutes(3))
+    assert evaluate_lateral(ctx, now=NOW + minutes(4)).fired == 1
+
+
+def test_lateral_fixed_rule_severity_does_not_realert(ctx):
+    """The rule's own severity is the alert's, not the detection's: a repeat is not a rise (review)."""
+    _lateral_rules(ctx, severity="low")
+    evaluate_lateral(ctx, now=NOW)
+    _detect(ctx, severity="high", at=NOW + minutes(1))
+    assert evaluate_lateral(ctx, now=NOW + minutes(2)).fired == 1
+    _detect(ctx, severity="high", at=NOW + minutes(3))
+    assert evaluate_lateral(ctx, now=NOW + minutes(4)).fired == 0
+
+
 def test_lateral_notify_false_recorded(ctx):
     def quiet(d):
         for r in d["alerts"]["rules"]:

@@ -340,7 +340,8 @@ def evaluate_lateral_rule(rule: LateralRule, changed: Sequence[DetectionFact]) -
             message_key=LATERAL_MESSAGE_KEYS[d.detector],
             params={**dict(d.summary), "detector": d.detector.value, "risen": d.severity_rose and not d.is_new,
                     "host": d.subject_name, "account": d.subject_key, "minutes": d.summary.get("window_minutes")},
-            facts={"detection_id": d.id, "critical_asset": d.critical_asset}, evidence=d.segment,
+            facts={"detection_id": d.id, "critical_asset": d.critical_asset, "detection_severity": d.severity.value},
+            evidence=d.segment,
             confidence=Confidence(window=(d.first_seen, d.last_seen), field=c.get("field"), covered=c.get("covered"),
                                   total=c.get("total"),
                                   incomplete_gaps=tuple(tuple(g) for g in c.get("incomplete_gaps", ())))))
