@@ -6,7 +6,11 @@ from datetime import timedelta
 from pathlib import Path
 
 from illumio_ops.domain.anomaly import (
+    apply_directory_followup,
     detect_account_new_source,
+    detect_auth_to_non_dc,
+    detect_directory_surge,
+    detect_new_dc_client,
     detect_new_process,
     detect_peer_deviation,
     detect_suspicious_tool,
@@ -18,15 +22,20 @@ from illumio_ops.domain.detectors import (
     DETECTORS,
     Activity,
     AnomalyData,
+    Detection,
+    DetectionConfidence,
     Precursor,
     dedup_windows,
     run_detectors,
 )
+from illumio_ops.domain.filter import FilterSpec
 from illumio_ops.domain.focus import DETECTION_TITLE_KEYS
+from illumio_ops.domain.segment import FlowSegment
 from illumio_ops.domain.values import (
     DetectorKind,
     DetectorState,
     PrecursorKind,
+    SegmentView,
     Severity,
 )
 from tests_v6.domain.test_detectors import CFG, NOW, host, inp, obs
@@ -309,6 +318,132 @@ def test_new_process_accumulating():
     rows = [obs("/w/a", "/w/t1", port=8080, proc="curl")]
     _, status = run(rows, cfg=TOOLS, data=proc_data(), baseline_days=3.0, detector=detect_new_process)
     assert status.state is DetectorState.ACCUMULATING
+
+
+# ── E directory and authentication ────────────────────────────────────────────
+
+DC = "/w/dc1"
+
+
+def dc_data(**kw):
+    return AnomalyData(**{"directory_servers": frozenset({DC}), "directory_inferred": 1, **kw})
+
+
+def test_ldap_to_non_directory_server():
+    rows = [obs("/w/a", "/w/x", port=389), obs("/w/a", DC, port=389), obs("/w/a", "/w/x", port=8080)]
+    [d], status = run(rows, data=dc_data(), detector=detect_auth_to_non_dc)
+    assert d.detector is DetectorKind.AUTH_TO_NON_DC and d.fingerprint == "authdst|/w/a|/w/x|389"
+    assert d.severity is Severity.MEDIUM and d.summary["port"] == 389 and status.state is DetectorState.OK
+
+
+def test_kerberos_to_public_ip_is_high():
+    rows = [replace(obs("ip:10.9.9.9", "ip:123.56.53.50", port=88), dst_ip="123.56.53.50", dst_href=None)]
+    [d], _ = run(rows, data=dc_data(), detector=detect_auth_to_non_dc)
+    assert d.severity is Severity.HIGH
+
+
+def test_traffic_to_declared_ip_is_not_flagged():
+    rows = [replace(obs("/w/a", "ip:10.0.7.7", port=88), dst_ip="10.0.7.7", dst_href=None)]
+    assert run(rows, data=dc_data(directory_ips=frozenset({"10.0.7.7"})), detector=detect_auth_to_non_dc)[0] == []
+
+
+def test_no_directory_servers_status():
+    for detector in (detect_auth_to_non_dc, detect_new_dc_client):
+        dets, status = run([obs("/w/a", "/w/x", port=389)], detector=detector)
+        assert dets == [] and status.state is DetectorState.NO_DATA
+        assert status.reason_key == "detector_no_directory_servers"
+
+
+def test_declared_but_not_inferred_status():
+    _, status = run([], data=dc_data(directory_declared_missing=2), detector=detect_auth_to_non_dc)
+    assert status.state is DetectorState.OK and status.reason_key == "detector_directory_mismatch"
+    assert status.params["missing"] == 2
+
+
+def test_new_dc_client_unmanaged_medium_managed_low():
+    rows = [replace(obs("ip:10.0.8.8", DC, port=88), src_managed=False, src_href=None),
+            obs("/w/ws4", DC, port=389)]
+    dets, _ = run(rows, first_seen=new(rows), data=dc_data(), detector=detect_new_dc_client)
+    by_src = {d.subject_key: d for d in dets}
+    assert by_src["ip:10.0.8.8"].severity is Severity.MEDIUM and by_src["/w/ws4"].severity is Severity.LOW
+    assert by_src["ip:10.0.8.8"].fingerprint == "dcclient|ip:10.0.8.8"
+
+
+def test_known_dc_client_not_flagged():
+    rows = [obs("/w/ws4", DC, port=389)]
+    data = dc_data(directory_clients_before=frozenset({"/w/ws4"}))
+    assert run(rows, first_seen=new(rows), data=data, detector=detect_new_dc_client)[0] == []
+    old = {k: NOW - timedelta(days=3) for k in new(rows)}
+    assert run(rows, first_seen=old, data=dc_data(), detector=detect_new_dc_client)[0] == []
+
+
+def test_new_dc_client_accumulating():
+    rows = [obs("/w/ws4", DC, port=389)]
+    _, status = run(rows, first_seen=new(rows), data=dc_data(), baseline_days=3.0, detector=detect_new_dc_client)
+    assert status.state is DetectorState.ACCUMULATING
+
+
+def test_directory_surge():
+    data = AnomalyData(activity={("/w/a", "directory"): Activity(800, None, 100, 0)}, activity_days=8.0)
+    [d], _ = run([], data=data, detector=detect_directory_surge)
+    assert d.detector is DetectorKind.DIRECTORY_SURGE and d.fingerprint == "dirsurge|/w/a"
+    assert {p.port for p in d.segment.filter.ports} >= {88, 389}
+
+
+def test_directory_ports_removed_disables_e():
+    from illumio_ops.domain.lateral import effective_admin_ports
+    from illumio_ops.domain.values import LATERAL_PORTS_DEFAULT, PortClass
+    ports = effective_admin_ports(LATERAL_PORTS_DEFAULT, (), extra=(), include_pce=False,
+                                  removed=[(p, None) for p, _, c in LATERAL_PORTS_DEFAULT if c is PortClass.DIRECTORY])
+    cfg = replace(CFG, admin_ports=ports)
+    for detector in (detect_auth_to_non_dc, detect_new_dc_client, detect_directory_surge):
+        dets, status = run([obs("/w/a", "/w/x", port=389)], data=dc_data(), cfg=cfg, detector=detector)
+        assert dets == [] and status.state is DetectorState.DISABLED
+        assert status.reason_key == "detector_no_directory_ports"
+
+
+def _det(kind, subject, first_min, last_min, severity=Severity.MEDIUM):
+    return Detection(detector=kind, fingerprint=f"{kind.value}|{subject}", subject_key=subject, severity=severity,
+                     first_seen=NOW + timedelta(minutes=first_min), last_seen=NOW + timedelta(minutes=last_min),
+                     critical_asset=False, summary={},
+                     segment=FlowSegment(filter=FilterSpec(start=NOW, end=NOW + timedelta(hours=1)),
+                                         view=SegmentView.DETAIL, limit=10),
+                     confidence=DetectionConfidence())
+
+
+def test_fanout_after_directory_is_raised():
+    window = timedelta(minutes=30)
+    recent = [("/w/a", "auth_to_non_dc", NOW, NOW + timedelta(minutes=5))]
+    [d] = apply_directory_followup([_det(DetectorKind.FANOUT, "/w/a", 15, 20)], recent, window=window)
+    assert d.severity is Severity.HIGH and d.summary["after_directory"]["detector"] == "auth_to_non_dc"
+    [late] = apply_directory_followup([_det(DetectorKind.FANOUT, "/w/a", 40, 45)], recent, window=window)
+    assert late.severity is Severity.MEDIUM and "after_directory" not in late.summary
+
+
+def test_fanout_before_directory_not_raised():
+    recent = [("/w/a", "new_dc_client", NOW + timedelta(minutes=30), NOW + timedelta(minutes=35))]
+    [d] = apply_directory_followup([_det(DetectorKind.FANOUT, "/w/a", 0, 10)], recent, window=timedelta(minutes=30))
+    assert d.severity is Severity.MEDIUM
+
+
+def test_non_execution_detections_not_raised():
+    recent = [("/w/a", "auth_to_non_dc", NOW, NOW + timedelta(minutes=5))]
+    [d] = apply_directory_followup([_det(DetectorKind.VOLUME_SURGE, "/w/a", 10, 20)], recent,
+                                   window=timedelta(minutes=30))
+    assert d.severity is Severity.MEDIUM
+
+
+def test_followup_reads_stored_and_this_runs_directory_detections():
+    rows = [obs("/w/a", "/w/x", port=389, minutes_ago=20)] + [obs("/w/a", f"/w/t{i}", minutes_ago=5) for i in range(10)]
+    i = replace(inp([o for o in rows if o.port == 445]), traffic_obs=rows, anomaly=dc_data())
+    dets, _ = run_detectors(i)
+    [fan_det] = [d for d in dets if d.detector is DetectorKind.FANOUT]
+    assert "after_directory" in fan_det.summary
+    stored = replace(i, traffic_obs=[o for o in rows if o.port == 445],
+                     anomaly=dc_data(recent_directory=[("/w/a", "auth_to_non_dc", NOW - timedelta(minutes=25),
+                                                        NOW - timedelta(minutes=20))]))
+    [fan_det] = [d for d in run_detectors(stored)[0] if d.detector is DetectorKind.FANOUT]
+    assert "after_directory" in fan_det.summary
 
 
 # ── registration ─────────────────────────────────────────────────────────────

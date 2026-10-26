@@ -21,6 +21,9 @@ const DETECTOR_KEYS: Record<string, string> = {
   account_new_source: "detector_name_account_new_source",
   suspicious_tool: "detector_name_suspicious_tool",
   new_process: "detector_name_new_process",
+  auth_to_non_dc: "detector_name_auth_to_non_dc",
+  new_dc_client: "detector_name_new_dc_client",
+  directory_surge: "detector_name_directory_surge",
 };
 const STATE_KEYS: Record<string, string> = {
   ok: "detector_state_ok",

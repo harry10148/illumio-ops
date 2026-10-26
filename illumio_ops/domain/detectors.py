@@ -641,6 +641,9 @@ DETECTORS: dict[DetectorKind, DetectorFn] = {
     DetectorKind.ACCOUNT_NEW_SOURCE: lambda i: anomaly.detect_account_new_source(i),
     DetectorKind.SUSPICIOUS_TOOL: lambda i: anomaly.detect_suspicious_tool(i),
     DetectorKind.NEW_PROCESS: lambda i: anomaly.detect_new_process(i),
+    DetectorKind.AUTH_TO_NON_DC: lambda i: anomaly.detect_auth_to_non_dc(i),
+    DetectorKind.NEW_DC_CLIENT: lambda i: anomaly.detect_new_dc_client(i),
+    DetectorKind.DIRECTORY_SURGE: lambda i: anomaly.detect_directory_surge(i),
 }
 
 
@@ -654,7 +657,8 @@ def dedup_windows(cfg: DetectorConfig) -> dict[str, timedelta]:
         DetectorKind.BLOCKED_SURGE: cfg.blocked_window,
         DetectorKind.PEER_DEVIATION: timedelta(days=30), DetectorKind.VOLUME_SURGE: anomaly.SURGE_WINDOW,
         DetectorKind.ACCOUNT_NEW_SOURCE: timedelta(days=30), DetectorKind.SUSPICIOUS_TOOL: day,
-        DetectorKind.NEW_PROCESS: timedelta(days=30),
+        DetectorKind.NEW_PROCESS: timedelta(days=30), DetectorKind.AUTH_TO_NON_DC: day,
+        DetectorKind.NEW_DC_CLIENT: timedelta(days=30), DetectorKind.DIRECTORY_SURGE: anomaly.SURGE_WINDOW,
     }
 
 
@@ -682,4 +686,8 @@ def run_detectors(inp: DetectorInput) -> tuple[list[Detection], list[DetectorSta
         found, status = DETECTORS[kind](inp)
         detections += found
         statuses.append(status)
-    return apply_precursors(detections, inp.precursors, window=inp.config.precursor_window), statuses
+    raised = apply_precursors(detections, inp.precursors, window=inp.config.precursor_window)
+    directory = [(d.subject_key, d.detector.value, d.first_seen, d.last_seen) for d in detections
+                 if d.detector in anomaly.DIRECTORY_DETECTORS]
+    return anomaly.apply_directory_followup(raised, [*inp.anomaly.recent_directory, *directory],
+                                            window=inp.config.directory_followup), statuses

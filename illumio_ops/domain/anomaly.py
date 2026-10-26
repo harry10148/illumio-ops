@@ -12,9 +12,11 @@ from __future__ import annotations
 import ipaddress
 from collections import Counter
 from collections.abc import Mapping, Sequence
+from dataclasses import replace
 from datetime import datetime, timedelta
 
 from illumio_ops.domain.detectors import (
+    AnomalyData,
     Detection,
     DetectionConfidence,
     DetectorInput,
@@ -340,3 +342,139 @@ def detect_new_process(inp: DetectorInput) -> tuple[list[Detection], DetectorSta
             confidence=DetectionConfidence(field="initiator_process", covered=len(covered), total=len(rows),
                                            baseline_days=round(inp.baseline_days, 1), incomplete_gaps=inp.gaps)))
     return out, _process_status(kind, inp, rows, covered)
+
+
+# ── E directory and authentication (spec §6.5.8 E) ───────────────────────────
+DIRECTORY = frozenset({PortClass.DIRECTORY})
+DIRECTORY_DETECTORS = frozenset({DetectorKind.AUTH_TO_NON_DC, DetectorKind.NEW_DC_CLIENT, DetectorKind.DIRECTORY_SURGE})
+# What an attacker does after reading the directory: start running things on other hosts (E④).
+EXECUTION_DETECTORS = frozenset({
+    DetectorKind.FANOUT, DetectorKind.NEW_ADMIN_CONNECTION, DetectorKind.PIVOT_CHAIN, DetectorKind.NON_ADMIN_GROUP,
+    DetectorKind.UNEXPECTED_INITIATOR, DetectorKind.SUSPICIOUS_TOOL,
+})
+
+
+def _no_directory_ports(kind: DetectorKind, inp: DetectorInput) -> DetectorStatus | None:
+    if any(e.category is PortClass.DIRECTORY for e in inp.config.admin_ports.entries):
+        return None
+    return _status(kind, DetectorState.DISABLED, "detector_no_directory_ports")
+
+
+def _directory_rows(inp: DetectorInput) -> list[Obs]:
+    ports = inp.config.admin_ports
+    return [o for o in _in_window(inp) if ports.matches(o.port, o.proto, DIRECTORY)]
+
+
+def _is_server(o: Obs, data: AnomalyData) -> bool:
+    return o.dst_key in data.directory_servers or o.dst_ip in data.directory_ips
+
+
+def _servers_status(kind: DetectorKind, data: AnomalyData) -> DetectorStatus:
+    if data.directory_declared_missing:
+        return _status(kind, reason="detector_directory_mismatch", missing=data.directory_declared_missing,
+                       inferred=data.directory_inferred)
+    return _status(kind, inferred=data.directory_inferred)
+
+
+def detect_auth_to_non_dc(inp: DetectorInput) -> tuple[list[Detection], DetectorStatus]:
+    """① Authentication or directory traffic going to a host that is not a directory server (inferred from traffic,
+    or declared). A public destination is high: Kerberos and LDAP have no business leaving."""
+    kind = DetectorKind.AUTH_TO_NON_DC
+    data = inp.anomaly
+    off = _no_directory_ports(kind, inp)
+    if off is not None:
+        return [], off
+    if not data.directory_servers and not data.directory_ips:
+        return [], _status(kind, DetectorState.NO_DATA, "detector_no_directory_servers")
+    found: dict[tuple[str, str, int], Obs] = {}
+    for o in _directory_rows(inp):
+        if o.port is not None and not _is_server(o, data):
+            found.setdefault((o.src_key, o.dst_key, o.port), o)
+    out = []
+    for (src, dst, port), o in sorted(found.items()):
+        host = _dst_host(o, inp)
+        severity = Severity.HIGH if is_public(o.dst_ip) else Severity.MEDIUM
+        out.append(Detection(
+            detector=kind, fingerprint=f"authdst|{src}|{dst}|{port}", subject_key=src,
+            severity=raise_severity(severity) if host.critical else severity, first_seen=o.first, last_seen=o.last,
+            critical_asset=host.critical,
+            summary={"target": o.dst_hostname or o.dst_ip, "port": port, "decision": o.decision},
+            segment=_pair_segment(o),
+            confidence=DetectionConfidence(incomplete_gaps=inp.gaps)))
+    return out, _servers_status(kind, data)
+
+
+def _pair_segment(o: Obs) -> FlowSegment:
+    end = o.last if o.last > o.first else o.first + timedelta(seconds=1)
+    return FlowSegment(filter=FilterSpec(start=o.first, end=end, src=_endpoint(o.src_key, o.src_ip),
+                                         dst=_endpoint(o.dst_key, o.dst_ip),
+                                         ports=(PortProto(port=o.port, proto=o.proto),) if o.port is not None else ()),
+                       view=SegmentView.DETAIL, limit=200)
+
+
+def detect_new_dc_client(inp: DetectorInput) -> tuple[list[Detection], DetectorStatus]:
+    """② A source that had never talked to any directory server starting to (its connection first seen in this
+    window). An unmanaged source is medium, a managed one low: a new domain member does this too."""
+    kind = DetectorKind.NEW_DC_CLIENT
+    data = inp.anomaly
+    off = _no_directory_ports(kind, inp)
+    if off is not None:
+        return [], off
+    if not data.directory_servers and not data.directory_ips:
+        return [], _status(kind, DetectorState.NO_DATA, "detector_no_directory_servers")
+    if not inp.baseline_full:
+        return [], _accumulating(kind, inp)
+    lo, hi = inp.window
+    found: dict[str, Obs] = {}
+    for o in _directory_rows(inp):
+        if not _is_server(o, data) or o.src_key in data.directory_clients_before:
+            continue
+        first = inp.baseline_first_seen.get((o.src_key, o.dst_key, o.port if o.port is not None else -1, o.proto))
+        if first is not None and lo < first <= hi:
+            found.setdefault(o.src_key, o)
+    out = []
+    for src, o in sorted(found.items()):
+        severity = Severity.LOW if o.src_managed else Severity.MEDIUM
+        out.append(Detection(
+            detector=kind, fingerprint=f"dcclient|{src}", subject_key=src, severity=severity, first_seen=o.first,
+            last_seen=o.last, critical_asset=False,
+            summary={"target": o.dst_hostname or o.dst_ip, "port": o.port, "managed": o.src_managed},
+            segment=_pair_segment(o),
+            confidence=DetectionConfidence(baseline_days=round(inp.baseline_days, 1), incomplete_gaps=inp.gaps)))
+    return out, _servers_status(kind, data)
+
+
+def detect_directory_surge(inp: DetectorInput) -> tuple[list[Detection], DetectorStatus]:
+    """③ A source's directory traffic in the last hour far above any hour of its own last 7 days (the built-in
+    directory ports: the flow store counts them without reading settings)."""
+    kind = DetectorKind.DIRECTORY_SURGE
+    off = _no_directory_ports(kind, inp)
+    if off is not None:
+        return [], off
+    return _surge(inp, kind, "directory", inp.config.directory_min_connections, "dirsurge")
+
+
+Recent = tuple[str, str, datetime, datetime]  # (subject, detector, first seen, last seen)
+
+
+def apply_directory_followup(dets: Sequence[Detection], recent: Sequence[Recent], *,
+                             window: timedelta) -> list[Detection]:
+    """④ An execution detection (fan-out, a new management connection, a pivot, a tool…) of a host that had a
+    directory detection shortly before is raised one level and says so: reading the directory, then running
+    things elsewhere. Only an execution that ends after the directory activity began and starts within `window`
+    of its end counts."""
+    by_subject: dict[str, list[Recent]] = {}
+    for r in recent:
+        by_subject.setdefault(r[0], []).append(r)
+    out = []
+    for d in dets:
+        found = [r for r in by_subject.get(d.subject_key, ())
+                 if d.last_seen >= r[2] and d.first_seen <= r[3] + window]
+        if d.detector not in EXECUTION_DETECTORS or not found or "after_directory" in d.summary:
+            out.append(d)
+            continue
+        last = max(found, key=lambda r: r[3])
+        out.append(replace(d, severity=raise_severity(d.severity),
+                           summary=dict(d.summary) | {"after_directory": {"detector": last[1],
+                                                                         "last_seen": last[3].isoformat()}}))
+    return out

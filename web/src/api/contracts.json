@@ -114,7 +114,10 @@
               "volume_surge",
               "account_new_source",
               "suspicious_tool",
-              "new_process"
+              "new_process",
+              "auth_to_non_dc",
+              "new_dc_client",
+              "directory_surge"
             ],
             "title": "DetectorKind",
             "type": "string"
@@ -1073,7 +1076,10 @@
               "volume_surge",
               "account_new_source",
               "suspicious_tool",
-              "new_process"
+              "new_process",
+              "auth_to_non_dc",
+              "new_dc_client",
+              "directory_surge"
             ],
             "title": "DetectorKind",
             "type": "string"
@@ -2134,7 +2140,10 @@
               "volume_surge",
               "account_new_source",
               "suspicious_tool",
-              "new_process"
+              "new_process",
+              "auth_to_non_dc",
+              "new_dc_client",
+              "directory_surge"
             ],
             "title": "DetectorKind",
             "type": "string"
@@ -3183,7 +3192,10 @@
               "volume_surge",
               "account_new_source",
               "suspicious_tool",
-              "new_process"
+              "new_process",
+              "auth_to_non_dc",
+              "new_dc_client",
+              "directory_surge"
             ],
             "title": "DetectorKind",
             "type": "string"
@@ -4253,7 +4265,10 @@
               "volume_surge",
               "account_new_source",
               "suspicious_tool",
-              "new_process"
+              "new_process",
+              "auth_to_non_dc",
+              "new_dc_client",
+              "directory_surge"
             ],
             "title": "DetectorKind",
             "type": "string"
@@ -5301,7 +5316,10 @@
               "volume_surge",
               "account_new_source",
               "suspicious_tool",
-              "new_process"
+              "new_process",
+              "auth_to_non_dc",
+              "new_dc_client",
+              "directory_surge"
             ],
             "title": "DetectorKind",
             "type": "string"
@@ -6309,7 +6327,10 @@
               "volume_surge",
               "account_new_source",
               "suspicious_tool",
-              "new_process"
+              "new_process",
+              "auth_to_non_dc",
+              "new_dc_client",
+              "directory_surge"
             ],
             "title": "DetectorKind",
             "type": "string"
@@ -7268,7 +7289,10 @@
               "volume_surge",
               "account_new_source",
               "suspicious_tool",
-              "new_process"
+              "new_process",
+              "auth_to_non_dc",
+              "new_dc_client",
+              "directory_surge"
             ],
             "title": "DetectorKind",
             "type": "string"
@@ -11689,7 +11713,10 @@
               "volume_surge",
               "account_new_source",
               "suspicious_tool",
-              "new_process"
+              "new_process",
+              "auth_to_non_dc",
+              "new_dc_client",
+              "directory_surge"
             ],
             "title": "DetectorKind",
             "type": "string"
@@ -12723,7 +12750,10 @@
               "volume_surge",
               "account_new_source",
               "suspicious_tool",
-              "new_process"
+              "new_process",
+              "auth_to_non_dc",
+              "new_dc_client",
+              "directory_surge"
             ],
             "title": "DetectorKind",
             "type": "string"
@@ -14735,10 +14765,13 @@
     "DetectorKind": [
       "account_fanout",
       "account_new_source",
+      "auth_to_non_dc",
       "blocked_surge",
       "cross_env",
+      "directory_surge",
       "fanout",
       "new_admin_connection",
+      "new_dc_client",
       "new_process",
       "non_admin_group",
       "peer_deviation",

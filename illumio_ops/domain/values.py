@@ -168,6 +168,9 @@ class DetectorKind(StrEnum):
     ACCOUNT_NEW_SOURCE = "account_new_source"
     SUSPICIOUS_TOOL = "suspicious_tool"
     NEW_PROCESS = "new_process"
+    AUTH_TO_NON_DC = "auth_to_non_dc"
+    NEW_DC_CLIENT = "new_dc_client"
+    DIRECTORY_SURGE = "directory_surge"
 
 
 class PortClass(StrEnum):
