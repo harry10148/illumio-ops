@@ -1,0 +1,144 @@
+"""What the anomaly detectors need besides the run's connections (spec §6.5.8): peer groups, hourly activity, and
+the account, process and directory baselines — looked up only for the keys this run's candidates name."""
+from __future__ import annotations
+
+from collections.abc import Sequence
+from dataclasses import replace
+from datetime import UTC, datetime, timedelta
+
+from illumio_ops.domain.anomaly import (
+    ACTIVITY_DAYS,
+    DIRECTORY,
+    DIRECTORY_DETECTORS,
+    DYNAMIC_PORTS,
+    SURGE_WINDOW,
+    group_of,
+    is_public,
+    target_signature,
+)
+from illumio_ops.domain.detectors import (
+    Activity,
+    AnomalyData,
+    DetectorInput,
+    Obs,
+    evaluable,
+    not_blocked,
+)
+from illumio_ops.domain.identity import account_key
+from illumio_ops.domain.lateral import selector_matches
+from illumio_ops.services import flowsource_anomaly as fa
+from illumio_ops.services.analysis.context import LateralContext, host_for
+from illumio_ops.services.context import AppContext
+from illumio_ops.settings.schema import LateralSettings
+from illumio_ops.store.flowdb import analysis
+
+RECENT_LIMIT = 500
+
+
+def _candidates(inp: DetectorInput) -> list[Obs]:
+    return [o for o in inp.traffic_obs if o.origin == "ingest" and evaluable(o, inp) and not_blocked(o)]
+
+
+def _first_in_window(inp: DetectorInput, o: Obs) -> bool:
+    lo, hi = inp.window
+    first = inp.baseline_first_seen.get((o.src_key, o.dst_key, o.port if o.port is not None else -1, o.proto))
+    return first is not None and lo < first <= hi
+
+
+def _peers(ctx: AppContext, lc: LateralContext, inp: DetectorInput, rows: Sequence[Obs]) -> tuple[
+        dict[str, int], dict[tuple[str, int, int], frozenset[str]]]:
+    cfg = inp.config
+    keys = cfg.peer_group_keys
+    members: dict[str, list[str]] = {}
+    for key, host in lc.hosts.items():
+        group = group_of(host.labels, keys) if host.managed else None
+        if group is not None:
+            members.setdefault(group, []).append(key)
+    sizes = {g: len(m) for g, m in members.items()}
+    wanted: set[tuple[str, int, int]] = set()
+    for o in rows:
+        if o.port is None or o.port >= DYNAMIC_PORTS or cfg.admin_ports.matches(o.port, o.proto):
+            continue
+        src = lc.hosts.get(o.src_key)
+        group = group_of(src.labels, keys) if src is not None and src.managed else None
+        if group is not None and sizes.get(group, 0) >= cfg.peer_min_group and _first_in_window(inp, o):
+            wanted.add((group, o.port, o.proto))
+    seen: dict[tuple[str, int, int], frozenset[str]] = {}
+    for group, port, proto in sorted(wanted):
+        sigs = set()
+        for dst in fa.peer_seen(ctx, members[group], port, proto, before=inp.window[0]):
+            ip = dst[3:] if dst.startswith("ip:") else ""
+            sig = target_signature(dst, ip, host_for(lc, dst, ip=ip, hostname=None), keys)
+            if sig is not None:
+                sigs.add(sig)
+        seen[(group, port, proto)] = frozenset(sigs)
+    return sizes, seen
+
+
+def _activity(ctx: AppContext, inp: DetectorInput, at: datetime) -> tuple[dict[tuple[str, str], Activity], float]:
+    cfg = inp.config
+    covered = fa.activity_coverage(ctx)
+    hour = at.astimezone(UTC).replace(minute=0, second=0, microsecond=0)
+    days = (hour - covered) / timedelta(days=1) if covered is not None else 0.0
+    if days < ACTIVITY_DAYS:
+        return {}, max(days, 0.0)
+    now = fa.activity_now(ctx, since=at - SURGE_WINDOW, until=at)
+    floors = {"all": cfg.volume_min_connections, "directory": cfg.directory_min_connections}
+    over = {k: v for k, v in now.items()
+            if v[0] >= floors[k[1]] or (k[1] == "all" and v[1] is not None and v[1] >= cfg.volume_min_bytes)}
+    history = fa.activity_history(ctx, sorted({src for src, _ in over}), start=hour - timedelta(days=ACTIVITY_DAYS),
+                                  end=hour - timedelta(hours=1)) if over else {}
+    return {k: Activity(v[0], v[1], *history.get(k, (0, 0))) for k, v in over.items()}, days
+
+
+def _with_directory(ctx: AppContext, lc: LateralContext, inp: DetectorInput, rows: Sequence[Obs], at: datetime,
+                    data: AnomalyData) -> AnomalyData:
+    cfg = inp.config
+    lat: LateralSettings = lc.settings
+    ports = sorted({e.port for e in cfg.admin_ports.entries if e.category in DIRECTORY})
+    if not ports:
+        return data
+    since = at - timedelta(days=lc.baseline_required)
+
+    def internal(key: str) -> bool:
+        host = lc.hosts.get(key)
+        return host.managed if host is not None else key.startswith("ip:") and not is_public(key[3:])
+
+    counts = fa.directory_sources(ctx, ports, since=since)
+    inferred = {k for k, n in counts.items() if n >= lat.detectors.directory_min_sources and internal(k)}
+    selectors = [(s.key, s.value) for s in lat.directory_servers]
+    declared = {k for k, h in lc.hosts.items() if selectors and selector_matches(h.labels, selectors)}
+    servers = inferred | declared
+    ips = frozenset(lat.directory_server_ips)
+    candidates = {o.src_key for o in rows if cfg.admin_ports.matches(o.port, o.proto, DIRECTORY)
+                  and (o.dst_key in servers or o.dst_ip in ips) and _first_in_window(inp, o)}
+    before = fa.directory_clients_before(ctx, candidates, servers, ports, before=inp.window[0]) if candidates else set()
+    with ctx.flows().connect() as conn:
+        recent = analysis.detections_since(conn, inp.window[0] - cfg.directory_followup,
+                                           detectors=sorted(d.value for d in DIRECTORY_DETECTORS), limit=RECENT_LIMIT)
+    return replace(data, directory_servers=frozenset(servers), directory_ips=ips, directory_inferred=len(inferred),
+                   directory_declared_missing=len(declared - inferred), directory_clients_before=frozenset(before),
+                   recent_directory=[(r["subject_key"], r["detector"], datetime.fromisoformat(r["first_seen"]),
+                                      datetime.fromisoformat(r["last_seen"])) for r in recent])
+
+
+def load_anomaly_data(ctx: AppContext, lc: LateralContext, inp: DetectorInput, *, at: datetime,
+                      live: bool) -> AnomalyData:
+    """inp carries the run's window, traffic_obs and baseline_first_seen (for every candidate tuple)."""
+    rows = _candidates(inp)
+    sizes, peer_seen = _peers(ctx, lc, inp, rows)
+    activity, days = _activity(ctx, inp, at) if live else ({}, 0.0)
+    lo, hi = inp.window
+    pairs = {(a, o.src_key) for o in rows if (a := account_key(o.initiator_user)) is not None}
+    account_first = fa.account_first_seen(ctx, pairs) if pairs else {}
+    accounts = {a for (a, _), first in account_first.items() if lo < first <= hi}
+    procs = {(o.src_key, o.initiator_process) for o in rows if o.initiator_process}
+    process_first = fa.process_first_seen(ctx, procs) if procs else {}
+    hosts = {s for (s, _), first in process_first.items() if lo < first <= hi}
+    data = AnomalyData(
+        peer_seen=peer_seen, group_sizes=sizes, activity=activity, activity_days=days, live=live,
+        account_first=account_first,
+        account_since=fa.account_since(ctx, accounts) if accounts else {},
+        account_sources=fa.account_history(ctx, accounts, before=lo) if accounts else {},
+        process_first=process_first, process_since=fa.process_since(ctx, hosts) if hosts else {})
+    return _with_directory(ctx, lc, inp, rows, at, data)

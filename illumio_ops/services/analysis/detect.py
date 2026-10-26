@@ -11,6 +11,7 @@ from typing import Any
 
 from pydantic import BaseModel
 
+from illumio_ops.domain.anomaly import NOT_BLOCKED
 from illumio_ops.domain.detectors import (
     Detection,
     DetectorConfig,
@@ -26,6 +27,7 @@ from illumio_ops.domain.filter import FilterSpec
 from illumio_ops.domain.lateral import HostInfo
 from illumio_ops.domain.values import DetectorKind, DetectorState, PolicyDecision
 from illumio_ops.services.analysis import blocked_history
+from illumio_ops.services.analysis.anomaly_inputs import load_anomaly_data
 from illumio_ops.services.analysis.context import (
     LateralContext,
     host_for,
@@ -68,7 +70,12 @@ def _config(lc: LateralContext) -> DetectorConfig:
         expected={(e.port, e.proto): frozenset(e.processes) for e in lat.expected_initiators},
         admin_ports=lc.admin_ports, environment_label_key=lat.environment_label_key,
         admin_groups_configured=bool(live_groups), admin_groups_stale=bool(lat.admin_groups) and not live_groups,
-        environment_labels_present=any(k == lat.environment_label_key for k, _ in lc.known_labels))
+        environment_labels_present=any(k == lat.environment_label_key for k, _ in lc.known_labels),
+        peer_group_keys=lat.peer_group_keys, peer_min_group=d.peer_min_group, volume_surge_factor=d.volume_surge_factor,
+        volume_min_connections=d.volume_min_connections, volume_min_bytes=d.volume_min_mb * 2**20,
+        directory_min_connections=d.directory_min_connections, account_history=timedelta(days=d.account_history_days),
+        process_history=timedelta(days=d.process_history_days), suspicious_tools=frozenset(lat.suspicious_tools),
+        directory_followup=timedelta(minutes=d.directory_followup_minutes))
 
 
 def _status(s: DetectorStatus, incomplete: bool) -> dict[str, Any]:
@@ -121,18 +128,23 @@ def run_detection(ctx: AppContext, *, now: datetime | None = None, window: tuple
         # No management ports: nothing to read (an empty port filter would mean every port).
         admin = observations(ctx, FilterSpec(start=start, end=hi, ports=cfg.admin_ports.port_filters()),
                              now=at) if cfg.admin_ports.entries else blocked.model_copy(update={"rows": []})
+        # Every port, not blocked, in the window: the anomaly detectors' connections (spec §6.5.8).
+        traffic = observations(ctx, FilterSpec(start=lo, end=hi, decisions=NOT_BLOCKED), now=at)
         # A gap anywhere the detectors look — the lookback before the window included — makes the run incomplete.
-        gaps = tuple(g for g in admin.coverage.gaps + blocked.coverage.gaps if g[0] < hi and g[1] > start)
+        gaps = tuple(g for g in admin.coverage.gaps + blocked.coverage.gaps + traffic.coverage.gaps
+                     if g[0] < hi and g[1] > start)
         gaps = tuple(dict.fromkeys(gaps))
         inp0 = DetectorInput(window=(lo, hi), obs=admin.rows, blocked_obs=blocked.rows, hosts=_hosts(lc),
                              baseline_first_seen={}, precursors=[], config=cfg, baseline_days=lc.baseline_days,
-                             baseline_required=lc.baseline_required, baseline_full=lc.baseline_full(), gaps=gaps)
+                             baseline_required=lc.baseline_required, baseline_full=lc.baseline_full(), gaps=gaps,
+                             traffic_obs=traffic.rows)
         tuples = {(o.src_key, o.dst_key, o.port if o.port is not None else -1, o.proto)
-                  for o in admin.rows if evaluable(o, inp0)}
+                  for o in [*admin.rows, *traffic.rows] if o.origin == "ingest" and evaluable(o, inp0)}
         precursors = precursor_events(ctx, start=lo - cfg.precursor_window, end=hi)
         history, history_mode = _blocked_history(ctx, inp0, at)
-        inp = replace(inp0, baseline_first_seen=baseline_first_seen(ctx, tuples), precursors=precursors.items,
-                      blocked_history=history)
+        inp1 = replace(inp0, baseline_first_seen=baseline_first_seen(ctx, tuples), precursors=precursors.items,
+                       blocked_history=history)
+        inp = replace(inp1, anomaly=load_anomaly_data(ctx, lc, inp1, at=at, live=not late))
         found, statuses = run_detectors(inp)
         status_rows = [_status(s, bool(gaps)) for s in statuses]
         for row in status_rows:

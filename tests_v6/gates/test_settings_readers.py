@@ -77,6 +77,19 @@ SETTINGS_READERS: dict[str, str] = {
     "lateral.detectors.blocked_surge_factor": "illumio_ops.services.analysis.detect",
     "lateral.detectors.exclude_system_accounts": "illumio_ops.services.analysis.detect",
     "lateral.detectors.precursor_hours": "illumio_ops.services.analysis.detect",
+    "lateral.peer_group_keys": "illumio_ops.services.analysis.detect",
+    "lateral.suspicious_tools": "illumio_ops.services.analysis.detect",
+    "lateral.directory_servers": "illumio_ops.services.analysis.anomaly_inputs",
+    "lateral.directory_server_ips": "illumio_ops.services.analysis.anomaly_inputs",
+    "lateral.detectors.directory_min_sources": "illumio_ops.services.analysis.anomaly_inputs",
+    "lateral.detectors.peer_min_group": "illumio_ops.services.analysis.detect",
+    "lateral.detectors.volume_surge_factor": "illumio_ops.services.analysis.detect",
+    "lateral.detectors.volume_min_connections": "illumio_ops.services.analysis.detect",
+    "lateral.detectors.volume_min_mb": "illumio_ops.services.analysis.detect",
+    "lateral.detectors.directory_min_connections": "illumio_ops.services.analysis.detect",
+    "lateral.detectors.account_history_days": "illumio_ops.services.analysis.detect",
+    "lateral.detectors.process_history_days": "illumio_ops.services.analysis.detect",
+    "lateral.detectors.directory_followup_minutes": "illumio_ops.services.analysis.detect",
     "alerts.rules": "illumio_ops.services.alerts.evaluate",
     "alerts.retention_days": "illumio_ops.services.alerts.retention",
     "pce.console_url": "illumio_ops.services.alerts.messages",
@@ -102,19 +115,6 @@ SETTINGS_READERS: dict[str, str] = {
 }
 # Fields whose reader arrives later: value = the task or phase that adds it.
 PENDING_READERS: dict[str, str] = {
-    "lateral.peer_group_keys": "P4.5 Task 7",
-    "lateral.directory_servers": "P4.5 Task 7",
-    "lateral.directory_server_ips": "P4.5 Task 7",
-    "lateral.suspicious_tools": "P4.5 Task 7",
-    "lateral.detectors.peer_min_group": "P4.5 Task 7",
-    "lateral.detectors.volume_surge_factor": "P4.5 Task 7",
-    "lateral.detectors.volume_min_connections": "P4.5 Task 7",
-    "lateral.detectors.volume_min_mb": "P4.5 Task 7",
-    "lateral.detectors.directory_min_connections": "P4.5 Task 7",
-    "lateral.detectors.account_history_days": "P4.5 Task 7",
-    "lateral.detectors.process_history_days": "P4.5 Task 7",
-    "lateral.detectors.directory_min_sources": "P4.5 Task 7",
-    "lateral.detectors.directory_followup_minutes": "P4.5 Task 7",
 }
 # Fields with no runtime reader by design.
 STRUCTURAL: dict[str, str] = {
