@@ -15,10 +15,15 @@ type RuleType = Rule["type"];
 
 const NEW_ID = "0".repeat(32);
 const SEVERITIES: Severity[] = ["low", "medium", "high", "critical"];
-const DETECTORS: DetectorKind[] = ["fanout", "new_admin_connection", "pivot_chain", "blocked_surge", "non_admin_group",
-                                   "cross_env", "account_fanout", "unexpected_initiator", "peer_deviation", "volume_surge",
-                                   "account_new_source", "suspicious_tool", "new_process", "auth_to_non_dc",
-                                   "new_dc_client", "directory_surge"];
+// Lateral-movement detectors, then the allowed-traffic anomaly detectors (spec §6.5.8), each group under its title.
+const DETECTOR_GROUPS: { titleKey: string; kinds: DetectorKind[] }[] = [
+  { titleKey: "lateral_detectors_lateral",
+    kinds: ["fanout", "new_admin_connection", "pivot_chain", "blocked_surge", "non_admin_group", "cross_env",
+            "account_fanout", "unexpected_initiator"] },
+  { titleKey: "lateral_detectors_anomaly",
+    kinds: ["peer_deviation", "volume_surge", "account_new_source", "suspicious_tool", "new_process", "auth_to_non_dc",
+            "new_dc_client", "directory_surge"] },
+];
 const DETECTOR_KEYS: Record<string, string> = {
   fanout: "detector_name_fanout", new_admin_connection: "detector_name_new_admin_connection",
   pivot_chain: "detector_name_pivot_chain", blocked_surge: "detector_name_blocked_surge",
@@ -177,16 +182,21 @@ export function RuleEditor() {
           <>
             <fieldset>
               <legend>{t("rule_detectors")}</legend>
-              <div className="form-grid">
-                {DETECTORS.map((d) => (
-                  <label key={d} className="check">
-                    <input type="checkbox" name={`detector_${d}`} checked={rule.detectors.includes(d)}
-                           onChange={(e) => set({ detectors: (e.target.checked ? [...rule.detectors, d]
-                             : rule.detectors.filter((x) => x !== d)) as [DetectorKind, ...DetectorKind[]] })} />
-                    {t(DETECTOR_KEYS[d] ?? d)}
-                  </label>
-                ))}
-              </div>
+              {DETECTOR_GROUPS.map((g) => (
+                <div key={g.titleKey} className="stack">
+                  <p className="hint">{t(g.titleKey)}</p>
+                  <div className="form-grid">
+                    {g.kinds.map((d) => (
+                      <label key={d} className="check">
+                        <input type="checkbox" name={`detector_${d}`} checked={rule.detectors.includes(d)}
+                               onChange={(e) => set({ detectors: (e.target.checked ? [...rule.detectors, d]
+                                 : rule.detectors.filter((x) => x !== d)) as [DetectorKind, ...DetectorKind[]] })} />
+                        {t(DETECTOR_KEYS[d] ?? d)}
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              ))}
               {fieldError("detectors")}
             </fieldset>
             <label>

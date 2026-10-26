@@ -59,3 +59,29 @@ def test_observation_beyond_baseline_says_what_is_used(context, live_app):
     form = page.locator("[data-role=lateral-settings]")
     form.locator("input[name=observation_days]").fill("60")
     expect(form).to_contain_text("The graph uses 30 days")
+
+
+def test_anomaly_settings_and_port_class_saved_and_kept(context, live_app):
+    page = context.new_page()
+    _open(page, live_app.url)
+    expect(page.locator("[data-role=admin-ports] tr[data-port='389'] [data-class=directory]")).to_have_text(
+        "Directory / authentication")
+    form = page.locator("[data-role=lateral-settings]")
+    form.locator("input[name=new_port]").fill("1521")
+    form.locator("select[name=new_category]").select_option("database")
+    form.get_by_role("button", name="Add port").click()
+    anomaly = form.locator("[data-role=anomaly-settings]")
+    anomaly.locator("input[name=peer_group_keys]").fill("app, env")
+    anomaly.locator("input[name=directory_server_ips]").fill("10.0.0.5")
+    anomaly.locator("textarea[name=suspicious_tools]").fill("PsExec.exe, nc")
+    form.locator("input[name=peer_min_group]").fill("4")
+    form.get_by_role("button", name="Save").click()
+    expect(form.locator(".form-ok")).to_have_text("Saved.")
+    lat = live_app.ctx.settings.current().lateral
+    assert lat.peer_group_keys == ("app", "env") and lat.directory_server_ips == ("10.0.0.5",)
+    assert lat.suspicious_tools == ("psexec.exe", "nc") and lat.detectors.peer_min_group == 4
+    assert [(p.port, p.category) for p in lat.extra_admin_ports] == [(1521, "database")]
+    page.reload()
+    page.wait_for_selector("[data-role=lateral-settings]")
+    expect(page.locator("input[name=peer_group_keys]")).to_have_value("app, env")
+    expect(page.locator("[data-role=admin-ports] tr[data-port='1521'] [data-class=database]")).to_have_text("Database")
