@@ -180,6 +180,12 @@ def set_eval_watermark(conn: sqlite3.Connection, source: str, value: str, *, pce
                  "watermark = excluded.watermark", (source, pce_url, org_id, value))
 
 
+def clear_eval_state(conn: sqlite3.Connection) -> None:
+    """Forget every evaluation watermark: they point into a flow database that a PCE switch has just cleared."""
+    with conn:
+        conn.execute("DELETE FROM alert_eval_state")
+
+
 # ── deliveries and channels ──────────────────────────────────────────────────
 
 def due_deliveries(conn: sqlite3.Connection, now: datetime, *, limit: int) -> list[sqlite3.Row]:

@@ -131,6 +131,34 @@ def test_event_id_not_reused_after_retention(ctx, pce):
     assert _collect_and_evaluate(ctx, pce, NOW + minutes(4)).evaluated == 1
 
 
+def test_pce_switch_during_evaluation_records_nothing(ctx, pce, monkeypatch):
+    """The PCE changed between reading the events and recording them: nothing is recorded under either PCE, and
+    the watermark stays (review: B's events were recorded as A's)."""
+    _collect_and_evaluate(ctx, pce, NOW)
+    pce.event(2, "rule_set.create", NOW + minutes(1))
+    run_events_cycle(ctx, now=NOW + minutes(2))
+    real = evaluate.events_after
+
+    def switching(c, after, *, limit):
+        rows = real(c, after, limit=limit)
+        c.settings.update(c.settings.current().revision, lambda d: d["pce"].update({"url": "https://other.example"}))
+        return rows
+    monkeypatch.setattr(evaluate, "events_after", switching)
+    evaluate_events(ctx, now=NOW + minutes(2))
+    with ctx.db() as conn:
+        assert conn.execute("SELECT count(*) FROM alerts").fetchone()[0] == 0
+        assert store.eval_watermark(conn, "events", pce_url=PCE["url"], org_id=PCE["org_id"]) == "0"
+
+
+def test_pce_reset_starts_alert_evaluation_over(ctx, pce):
+    """A -> B -> A without an evaluation for B: A's old cursor must not survive the cleared store (review)."""
+    from illumio_ops.services.collect.reset import reset_for_new_pce
+    _collect_and_evaluate(ctx, pce, NOW)
+    reset_for_new_pce(ctx, now=NOW + minutes(1))
+    with ctx.db() as conn:
+        assert store.eval_watermark(conn, "events", pce_url=PCE["url"], org_id=PCE["org_id"]) is None
+
+
 def test_immediate_event_alert_recorded_with_evidence(ctx, pce):
     _collect_and_evaluate(ctx, pce, NOW)
     pce.event(2, "rule_set.create", NOW + minutes(3))

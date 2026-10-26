@@ -73,6 +73,7 @@ from illumio_ops.services.flowsource import increment_totals, increments_waterma
 from illumio_ops.settings.schema import Settings
 from illumio_ops.store import alerts as store
 from illumio_ops.store.flowdb import analysis, ingest_state, workloads
+from illumio_ops.store.flowdb.db import StaleGeneration
 
 EVENT_BATCH = 5_000
 EVENT_BATCHES = 10
@@ -95,7 +96,10 @@ def _one_at_a_time(source: str) -> Callable[[Callable[..., EvalRun]], Callable[.
         @functools.wraps(fn)
         def run(*args: Any, **kwargs: Any) -> EvalRun:
             with _LOCKS[source]:
-                return fn(*args, **kwargs)
+                try:
+                    return fn(*args, **kwargs)
+                except StaleGeneration:  # the PCE was switched meanwhile: nothing of this run is recorded
+                    return EvalRun(source=source, evaluated=0, fired=0, suppressed=0, statuses={})
         return run
     return wrap
 
@@ -121,6 +125,7 @@ class _Recorder:
     def __init__(self, ctx: AppContext, s: Settings, now: datetime) -> None:
         self.ctx, self.now = ctx, now
         self.pce = (s.pce.url, s.pce.org_id)
+        self.generation = ctx.flows().generation  # what was read is this flow database's
         self.channels = enabled_channels(s.alerts.channels)
         self.fired = self.suppressed = 0
         self.pending: list[tuple[AlertRule, list[Trigger]]] = []
@@ -132,6 +137,9 @@ class _Recorder:
     def commit(self, source: str, watermark: str | None) -> None:
         """Record the pending triggers and move the source's watermark (None: leave it) as one change."""
         fired = suppressed = 0
+        pce = self.ctx.settings.current().pce
+        if (pce.url, pce.org_id) != self.pce or self.ctx.flows().generation != self.generation:
+            raise StaleGeneration  # read from one PCE's data, about to be recorded as another's
         with self.ctx.db() as conn:
             for rule, triggers in self.pending:
                 for t in triggers:
