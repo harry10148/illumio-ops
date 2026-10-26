@@ -275,3 +275,16 @@ def test_event_without_host_names_its_actor_not_a_host():
     assert t.message_key == "alert_event_immediate_none"
     [t] = evaluate_event_rule(event_rule(), [ev(3)], 0, now=NOW)
     assert t.message_key == "alert_event_immediate" and t.params["hosts"] == ["h1"]
+
+
+def test_disk_low_summary_names_the_space():
+    """The message asks for {free} and {warn}: the trigger must carry them, readable (review: shown raw)."""
+    from illumio_ops.services.alerts.messages import AlertView, summary
+    t = evaluate_system(system_rule(SystemCheck.DISK_LOW),
+                        facts(disk_free_bytes=3 * 1024 ** 3, disk_warn_bytes=10 * 1024 ** 3), now=NOW)[0]
+    assert t.facts == {"free_bytes": 3 * 1024 ** 3, "warn_bytes": 10 * 1024 ** 3}
+    v = AlertView(**{f: None for f in AlertView.__dataclass_fields__} | {
+        "message_key": t.message_key, "params": t.params, "facts": t.facts})
+    from illumio_ops.domain.values import Language
+    text = summary(v, Language.EN)
+    assert "{" not in text and "3.0 GB" in text and "10.0 GB" in text

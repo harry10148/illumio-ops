@@ -350,12 +350,17 @@ def evaluate_lateral_rule(rule: LateralRule, changed: Sequence[DetectionFact]) -
 # ── system checks ────────────────────────────────────────────────────────────
 
 def _system(rule: SystemRule, subject: str, now: datetime, params: Mapping[str, Any],
-            window: tuple[datetime, datetime] | None = None) -> Trigger:
+            window: tuple[datetime, datetime] | None = None, facts: Mapping[str, Any] | None = None) -> Trigger:
     assert rule.severity is not None
     return Trigger(rule_id=rule.id, rule_type=AlertRuleType.SYSTEM, subject_key=subject, severity=rule.severity,
                    first_seen=window[0] if window else now, last_seen=window[1] if window else now, late=False,
-                   message_key=SYSTEM_MESSAGE_KEYS[rule.check], params=params, facts=dict(params), evidence=None,
+                   message_key=SYSTEM_MESSAGE_KEYS[rule.check], params=params,
+                   facts=dict(params if facts is None else facts), evidence=None,
                    confidence=Confidence(window=window))
+
+
+def _gb(n: int) -> str:
+    return f"{n / 1024 ** 3:.1f} GB"
 
 
 def evaluate_system(rule: SystemRule, facts: SystemFacts, *, now: datetime) -> list[Trigger]:
@@ -381,6 +386,6 @@ def evaluate_system(rule: SystemRule, facts: SystemFacts, *, now: datetime) -> l
     if check is SystemCheck.DISK_LOW:
         if facts.disk_free_bytes is None or facts.disk_warn_bytes is None or facts.disk_free_bytes >= facts.disk_warn_bytes:
             return []
-        return [_system(rule, check.value, now, {"free_bytes": facts.disk_free_bytes,
-                                                 "warn_bytes": facts.disk_warn_bytes})]
+        return [_system(rule, check.value, now, {"free": _gb(facts.disk_free_bytes), "warn": _gb(facts.disk_warn_bytes)},
+                        facts={"free_bytes": facts.disk_free_bytes, "warn_bytes": facts.disk_warn_bytes})]
     return []

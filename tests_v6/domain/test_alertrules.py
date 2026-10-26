@@ -156,3 +156,16 @@ def test_pack_lateral_notify_follows_flag():
         assert all(r.notify for r in rules if r.type != "lateral")
     systems = sorted(r.check.value for r in best_practice_rules(notify_new_defaults=True) if r.type == "system")
     assert systems == ["collection_failing", "data_loss", "disk_low", "job_failing", "pce_health"]
+
+
+def test_pattern_compiled_the_way_it_runs():
+    """(?i)x.* compiles on its own but not once anchored as the matcher runs it (review: saved, then every
+    evaluation of the batch raised and the watermark never moved)."""
+    for kw in ({"event_types": ["(?i)rule_set.*"]}, {"match_fields": {"created_by.user.username": "(?i)admin.*"}}):
+        with pytest.raises(ValidationError):
+            event_rule(**kw)
+
+
+def test_unrunnable_pattern_never_raises():
+    rule = event_rule().model_copy(update={"event_types": ["(?i)rule_set.*"]})  # stored before this check existed
+    assert event_matches(rule, {"event_type": "rule_set.create"}) is False

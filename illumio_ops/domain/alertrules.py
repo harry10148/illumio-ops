@@ -38,7 +38,7 @@ def _check_pattern(pattern: str) -> str:
     body = pattern.removeprefix("!")
     if body not in _ANY and _looks_like_regex(body):
         try:
-            re.compile(body)
+            re.compile(f"^{body}$")  # as the matcher runs it: a flag group that must lead fails only once anchored
         except re.error:
             raise ValueError("not a valid regular expression") from None
     return pattern
@@ -156,6 +156,14 @@ AlertRule = Annotated[EventRule | TrafficRule | BandwidthRule | VolumeRule | Sys
 
 # ── matching (5.x src/events/matcher.py) ─────────────────────────────────────
 
+def _regex_match(anchored: str, text: str) -> bool:
+    """A pattern stored before validation compiled it anchored cannot match, and never stops an evaluation."""
+    try:
+        return re.match(anchored, text) is not None
+    except re.error:
+        return False
+
+
 def _value_matches(pattern: str, value: str | None) -> bool:
     if pattern in _ANY:
         return True
@@ -165,7 +173,7 @@ def _value_matches(pattern: str, value: str | None) -> bool:
     if "|" in pattern and not _looks_like_regex(pattern):
         return normalized in pattern.split("|")
     if _looks_like_regex(pattern):
-        return re.match(f"^{pattern}$", normalized) is not None
+        return _regex_match(f"^{pattern}$", normalized)
     return pattern == normalized
 
 
@@ -206,7 +214,7 @@ def _type_matches(pattern: str, event_type: str) -> bool:
     if "|" in pattern and not _looks_like_regex(pattern):
         return event_type in pattern.split("|")
     if _looks_like_regex(pattern):
-        return re.match(f"^{pattern}$" if not pattern.startswith("^") else pattern, event_type) is not None
+        return _regex_match(f"^{pattern}$" if not pattern.startswith("^") else pattern, event_type)
     return pattern == event_type
 
 
