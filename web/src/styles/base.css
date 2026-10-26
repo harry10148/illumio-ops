@@ -186,3 +186,16 @@ textarea { width: 100%; padding: var(--space-4); border: 1px solid var(--line); 
 .chip { display: inline-flex; align-items: center; gap: var(--space-2); padding: 0 var(--space-2) 0 var(--space-4);
         border: 1px solid var(--line); border-radius: var(--radius-s); background: var(--fill); overflow-wrap: anywhere; }
 .chip .btn-quiet { height: auto; padding: 0 var(--space-3); border: 0; }
+/* Alerts (P4) */
+.page-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-5); flex-wrap: wrap; }
+.page-head h1 { margin: 0; }
+.page a:not([class]) { color: var(--text-1); text-decoration-color: var(--line); text-underline-offset: 2px; }
+.page a:not([class]):hover { text-decoration-color: currentColor; }
+.sentence { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); margin: 0; }
+.sentence input.narrow, input.narrow { width: 7em; }
+fieldset { border: 1px solid var(--line); border-radius: var(--radius-m); padding: var(--space-5) var(--space-6); margin: 0;
+           min-width: 0; display: grid; gap: var(--space-4); }
+legend { padding: 0 var(--space-2); color: var(--text-1); font-weight: 600; }
+td .badge + .badge { margin-left: var(--space-2); }
+a.btn-primary, a.btn-quiet { display: inline-flex; align-items: center; text-decoration: none; }
+.table input[type=checkbox] { height: auto; margin: 0; }
