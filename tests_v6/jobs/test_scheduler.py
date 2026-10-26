@@ -118,8 +118,47 @@ def test_traffic_job_runs_detection_after_cycle(tmp_path, monkeypatch):
     monkeypatch.setattr(scheduler, "finish_pending_switch", lambda ctx: None)
     monkeypatch.setattr(scheduler, "run_traffic_cycle", lambda ctx: calls.append("traffic"))
     monkeypatch.setattr(scheduler, "run_detection", lambda ctx, **kw: calls.append(("detect", kw)))
+    monkeypatch.setattr(scheduler, "evaluate_traffic", lambda ctx: calls.append("alerts_traffic"))
+    monkeypatch.setattr(scheduler, "evaluate_lateral", lambda ctx: calls.append("alerts_lateral"))
     build_scheduler(make_ctx(tmp_path)).get_job("collect_traffic").func()
-    assert calls == ["traffic", ("detect", {})]
+    assert calls == ["traffic", ("detect", {}), "alerts_traffic", "alerts_lateral"]
+
+
+def test_traffic_job_order_and_isolation(tmp_path, monkeypatch):
+    # A failing detection must not stop the alert evaluation after it; the job still records the failure.
+    from illumio_ops.jobs import scheduler
+    calls = []
+    monkeypatch.setattr(scheduler, "finish_pending_switch", lambda ctx: None)
+    monkeypatch.setattr(scheduler, "run_traffic_cycle", lambda ctx: None)
+
+    def broken(ctx, **kw):
+        raise RuntimeError("detector bug")
+    monkeypatch.setattr(scheduler, "run_detection", broken)
+    monkeypatch.setattr(scheduler, "evaluate_traffic", lambda ctx: calls.append("alerts_traffic"))
+    monkeypatch.setattr(scheduler, "evaluate_lateral", lambda ctx: calls.append("alerts_lateral"))
+    ctx = make_ctx(tmp_path)
+    build_scheduler(ctx).get_job("collect_traffic").func()
+    assert calls == ["alerts_traffic", "alerts_lateral"]
+    h = _health(ctx)["collect_traffic"]
+    assert h.last_ok is False and "detector bug" in h.last_error
+
+
+def test_events_job_evaluates_event_rules(tmp_path, monkeypatch):
+    from illumio_ops.jobs import scheduler
+    calls = []
+    monkeypatch.setattr(scheduler, "finish_pending_switch", lambda ctx: None)
+    monkeypatch.setattr(scheduler, "run_events_cycle", lambda ctx: calls.append("events"))
+    monkeypatch.setattr(scheduler, "evaluate_events", lambda ctx: calls.append("alerts"))
+    build_scheduler(make_ctx(tmp_path)).get_job("collect_events").func()
+    assert calls == ["events", "alerts"]
+
+
+def test_new_jobs_in_intervals(tmp_path):
+    ctx = make_ctx(tmp_path)
+    iv = job_intervals(ctx.settings.current())
+    assert iv["alerts_system"] == 60 and iv["alerts_retention"] == 86400
+    sched = build_scheduler(ctx)
+    assert sched.get_job("alerts_system") is not None and sched.get_job("alerts_retention") is not None
 
 
 def test_reread_with_rows_triggers_late_detection(tmp_path, monkeypatch):

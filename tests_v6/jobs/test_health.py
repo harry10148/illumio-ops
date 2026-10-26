@@ -39,3 +39,19 @@ def test_list_health_orders_by_job_id(tmp_path):
     for j in ("zeta", "alpha", "mid"):
         record_start(c, j, T0)
     assert [h.job_id for h in list_health(c)] == ["alpha", "mid", "zeta"]
+
+
+def test_consecutive_failures_reset_on_success(tmp_path):
+    from datetime import UTC, datetime
+
+    from illumio_ops.jobs.health import list_health, record_finish, record_start
+    from tests_v6.web.conftest import make_ctx
+    ctx = make_ctx(tmp_path)
+    now = datetime(2026, 10, 26, tzinfo=UTC)
+    with ctx.db() as conn:
+        record_start(conn, "j", now)
+        for err in ("a", "b"):
+            record_finish(conn, "j", now, err)
+        assert list_health(conn)[0].consecutive_failures == 2
+        record_finish(conn, "j", now, None)
+        assert list_health(conn)[0].consecutive_failures == 0

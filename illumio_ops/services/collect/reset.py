@@ -23,7 +23,12 @@ from illumio_ops.store.flowdb import binding
 APP_DB_PCE_DERIVED: tuple[str, ...] = ("pce_probe",)
 # tamper_annotations is the operator's input, not derived data: each row names its PCE and is listed only
 # while that PCE is configured, so switching back finds the notes again.
-APP_DB_PCE_INDEPENDENT: tuple[str, ...] = ("job_health", "tamper_annotations")
+# Alert records are kept the same way (spec §6.4: a PCE switch never touches them): each names its PCE, and the
+# evaluation watermarks start over for a PCE they were not about. Rule state, rule status and channel state belong
+# to the rules and channels, which do not change with the PCE.
+APP_DB_PCE_INDEPENDENT: tuple[str, ...] = ("job_health", "tamper_annotations", "alerts", "alert_deliveries",
+                                           "alert_notes", "alert_eval_state", "alert_rule_state", "alert_rule_status",
+                                           "channel_state")
 _CLEARERS: dict[str, Callable[[AppContext], None]] = {"pce_probe": pce_health.forget}
 
 

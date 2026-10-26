@@ -78,6 +78,8 @@ SETTINGS_READERS: dict[str, str] = {
     "lateral.detectors.blocked_surge_factor": "illumio_ops.services.analysis.detect",
     "lateral.detectors.exclude_system_accounts": "illumio_ops.services.analysis.detect",
     "lateral.detectors.precursor_hours": "illumio_ops.services.analysis.detect",
+    "alerts.rules": "illumio_ops.services.alerts.evaluate",
+    "alerts.retention_days": "illumio_ops.services.alerts.retention",
 }
 # Fields whose reader arrives later: value = the task or phase that adds it.
 PENDING_READERS: dict[str, str] = {
@@ -101,8 +103,6 @@ PENDING_READERS: dict[str, str] = {
     "alerts.channels.teams.webhook_url": "P4-T6",
     "alerts.channels.webhook.enabled": "P4-T6",
     "alerts.channels.webhook.url": "P4-T6",
-    "alerts.rules": "P4-T5",
-    "alerts.retention_days": "P4-T5",
 }
 # Fields with no runtime reader by design.
 STRUCTURAL: dict[str, str] = {

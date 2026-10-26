@@ -8,6 +8,13 @@ TABLE_OWNERS: dict[str, str] = {
     "job_health": "illumio_ops.jobs.health",
     "pce_probe": "illumio_ops.services.pce_health",
     "tamper_annotations": "illumio_ops.store.annotations",
+    "alerts": "illumio_ops.store.alerts",
+    "alert_deliveries": "illumio_ops.store.alerts",
+    "alert_notes": "illumio_ops.store.alerts",
+    "alert_rule_state": "illumio_ops.store.alerts",
+    "alert_rule_status": "illumio_ops.store.alerts",
+    "alert_eval_state": "illumio_ops.store.alerts",
+    "channel_state": "illumio_ops.store.alerts",
     # data/flows.sqlite
     "pce_binding": "illumio_ops.store.flowdb.binding",
     "ingest_state": "illumio_ops.store.flowdb.ingest_state",

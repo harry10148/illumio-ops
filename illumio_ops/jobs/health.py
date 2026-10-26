@@ -15,6 +15,7 @@ class JobHealth(BaseModel):
     last_error: str | None
     runs: int
     failures: int
+    consecutive_failures: int = 0
 
 
 def record_start(conn: sqlite3.Connection, job_id: str, at: datetime) -> None:
@@ -30,14 +31,15 @@ def record_finish(conn: sqlite3.Connection, job_id: str, at: datetime, error: st
     with conn:
         conn.execute(
             "UPDATE job_health SET last_finished_at = ?, last_ok = ?, last_error = ?, "
-            "runs = runs + 1, failures = failures + ? WHERE job_id = ?",
-            (at.isoformat(), error is None, error, 0 if error is None else 1, job_id),
+            "runs = runs + 1, failures = failures + ?, "
+            "consecutive_failures = CASE WHEN ? THEN 0 ELSE consecutive_failures + 1 END WHERE job_id = ?",
+            (at.isoformat(), error is None, error, 0 if error is None else 1, error is None, job_id),
         )
 
 
 def list_health(conn: sqlite3.Connection) -> list[JobHealth]:
     rows = conn.execute(
-        "SELECT job_id, last_started_at, last_finished_at, last_ok, last_error, runs, failures "
+        "SELECT job_id, last_started_at, last_finished_at, last_ok, last_error, runs, failures, consecutive_failures "
         "FROM job_health ORDER BY job_id"
     ).fetchall()
     return [JobHealth(
@@ -48,4 +50,5 @@ def list_health(conn: sqlite3.Connection) -> list[JobHealth]:
         last_error=r["last_error"],
         runs=r["runs"],
         failures=r["failures"],
+        consecutive_failures=r["consecutive_failures"],
     ) for r in rows]

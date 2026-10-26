@@ -95,6 +95,16 @@ def detections_since(conn: sqlite3.Connection, since: datetime, *, detectors: Co
     return conn.execute(sql + " ORDER BY last_seen DESC, id DESC LIMIT ?", [*params, limit]).fetchall()
 
 
+def detections_changed_since(conn: sqlite3.Connection, since: str, *, limit: int) -> list[sqlite3.Row]:
+    """Detections created or updated after this updated_at, oldest change first (alert evaluation)."""
+    return conn.execute("SELECT * FROM detections WHERE updated_at > ? ORDER BY updated_at, id LIMIT ?",
+                        (since, limit)).fetchall()
+
+
+def max_detection_update(conn: sqlite3.Connection) -> str:
+    return str(conn.execute("SELECT COALESCE(MAX(updated_at), '') FROM detections").fetchone()[0])
+
+
 def detections_ranked(conn: sqlite3.Connection, since: datetime, *, limit: int) -> tuple[list[sqlite3.Row], int]:
     """(the `limit` most important detections seen since `since` — severity, then a critical asset, then
     the newest — and how many there are in all)."""
