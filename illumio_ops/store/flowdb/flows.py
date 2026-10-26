@@ -1,4 +1,5 @@
-"""Writes to flows, flow_rollup_daily, connection_baseline and user_baseline.
+"""Writes to flows, flow_rollup_daily, the baselines (connection, user, account × source, process) and
+source_activity_hourly.
 
 One PCE record is one row. When both ends of a connection report it (spec §6.6 F11), the two
 rows share conn_key, exactly one is primary (the outbound one when present), and each row is
@@ -14,8 +15,8 @@ from datetime import UTC, datetime, timedelta
 from typing import Literal
 
 from illumio_ops.domain.flows import FlowRecord, ranges_within, record_key
-from illumio_ops.domain.identity import endpoint_key
-from illumio_ops.domain.values import DataOrigin, FlowDirection
+from illumio_ops.domain.identity import account_key, endpoint_key
+from illumio_ops.domain.values import DIRECTORY_PORTS, DataOrigin, FlowDirection
 from illumio_ops.store.flowdb import archive
 from illumio_ops.store.flowdb.db import db_day, db_time, transaction
 from illumio_ops.store.flowdb.labels import label_set_id
@@ -200,13 +201,14 @@ def _repair_tuple(conn: sqlite3.Connection, tup: tuple[str, str, int | None, int
 # "+is_primary" keeps the planner on ix_flows_conn: left to itself it picks ix_flows_primary_last
 # and walks every primary row, making each cycle slower as the store grows (test_query_plans).
 PRIMARY_OF_CONNECTION = ("SELECT src_key, dst_key, port, proto, first_detected, last_detected, initiator_user, "
-                         "policy_decision FROM flows WHERE conn_key = ? AND +is_primary = 1")
+                         "initiator_process, policy_decision FROM flows WHERE conn_key = ? AND +is_primary = 1")
 
 
-def _update_baselines(conn: sqlite3.Connection, conn_key: str) -> None:
-    row = conn.execute(PRIMARY_OF_CONNECTION, (conn_key,)).fetchone()
+def _update_baselines(conn: sqlite3.Connection, conn_key: str) -> sqlite3.Row | None:
+    """Fold the connection's primary row into the baselines; returns that row (None: the connection is gone)."""
+    row: sqlite3.Row | None = conn.execute(PRIMARY_OF_CONNECTION, (conn_key,)).fetchone()
     if row is None:
-        return
+        return None
     port = row["port"] if row["port"] is not None else NO_PORT
     # The newest observation's decision wins (SET expressions all read the row as it was before).
     conn.execute(
@@ -222,6 +224,18 @@ def _update_baselines(conn: sqlite3.Connection, conn_key: str) -> None:
             "VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(initiator_user, dst_key, port, proto) DO UPDATE SET "
             "first_seen = MIN(first_seen, excluded.first_seen), last_seen = MAX(last_seen, excluded.last_seen)",
             (row["initiator_user"], row["dst_key"], port, row["proto"], row["first_detected"], row["last_detected"]))
+        conn.execute(
+            "INSERT INTO account_source_baseline (account, src_key, first_seen, last_seen) VALUES (?, ?, ?, ?) "
+            "ON CONFLICT(account, src_key) DO UPDATE SET "
+            "first_seen = MIN(first_seen, excluded.first_seen), last_seen = MAX(last_seen, excluded.last_seen)",
+            (account_key(row["initiator_user"]), row["src_key"], row["first_detected"], row["last_detected"]))
+    if row["initiator_process"]:
+        conn.execute(
+            "INSERT INTO process_baseline (src_key, process, first_seen, last_seen) VALUES (?, ?, ?, ?) "
+            "ON CONFLICT(src_key, process) DO UPDATE SET "
+            "first_seen = MIN(first_seen, excluded.first_seen), last_seen = MAX(last_seen, excluded.last_seen)",
+            (row["src_key"], row["initiator_process"], row["first_detected"], row["last_detected"]))
+    return row
 
 
 def split_unseen(conn: sqlite3.Connection, records: Sequence[FlowRecord]) -> tuple[list[FlowRecord], list[FlowRecord]]:
@@ -264,7 +278,7 @@ def _settle_untracked(conn: sqlite3.Connection, conn_key: str) -> None:
 
 
 def _record_growth(conn: sqlite3.Connection, conn_key: str, *, before_last: dict[str, str | None],
-                   increments: Increments, stamp: str) -> None:
+                   increments: Increments, stamp: str) -> tuple[int, int | None]:
     """Record how much one connection grew past what its rows say was recorded already, then mark that much
     recorded on every row. A connection's count is the largest of its records' (both sides count the same
     connections), its bytes the primary row's. before_last: each written record's last_detected before this
@@ -272,7 +286,7 @@ def _record_growth(conn: sqlite3.Connection, conn_key: str, *, before_last: dict
     rows = conn.execute(_CONNECTION_ROWS, (conn_key,)).fetchall()
     primary = next((r for r in rows if r["is_primary"]), None)
     if primary is None:
-        return
+        return 0, None
     total = max(int(r["num_connections"]) for r in rows)
     total_bytes = _bytes_total(primary["bytes_in"], primary["bytes_out"])
     # A row that never had its counts recorded (written before 0005, joined by a pairing) counts in full.
@@ -283,7 +297,8 @@ def _record_growth(conn: sqlite3.Connection, conn_key: str, *, before_last: dict
                          else 0) or 0 for r in rows)
     grew = max(0, total - counted)
     grew_bytes = None if total_bytes is None else max(0, total_bytes - counted_bytes)
-    if increments != "none" and (grew > 0 or grew_bytes):
+    recorded = increments != "none" and (grew > 0 or bool(grew_bytes))
+    if recorded:
         last = max(str(r["last_detected"]) for r in rows)
         prior = [before_last.get(r["record_key"], r["last_detected"]) for r in rows]
         known = [p for p in prior if p is not None]
@@ -297,6 +312,37 @@ def _record_growth(conn: sqlite3.Connection, conn_key: str, *, before_last: dict
                                                    int(increments == "late")))
     conn.execute("UPDATE flows SET counted_connections = ?, counted_bytes = ? WHERE conn_key = ?",
                  (max(counted, total), max(counted_bytes, total_bytes or 0), conn_key))
+    return (grew, grew_bytes) if recorded else (0, None)
+
+
+# Hourly activity is kept for the 7 days a surge is compared with, and the hour being filled.
+ACTIVITY_KEEP = timedelta(days=8)
+Activity = dict[tuple[str, str, str], list[int]]  # (hour, src_key, class) -> [connections, bytes, bytes_known]
+
+
+def _add_activity(activity: Activity, row: sqlite3.Row, hour: str, grew: tuple[int, int | None]) -> None:
+    """Live growth that was not blocked counts toward its source's hour; directory ports count again on their own."""
+    connections, grown_bytes = grew
+    if not connections and not grown_bytes:
+        return
+    if str(row["policy_decision"]).startswith("blocked"):
+        return
+    classes = ("all", "directory") if row["port"] in DIRECTORY_PORTS else ("all",)
+    for cls in classes:
+        slot = activity.setdefault((hour, row["src_key"], cls), [0, 0, 0])
+        slot[0] += connections
+        if grown_bytes is not None:
+            slot[1] += grown_bytes
+            slot[2] += 1
+
+
+def _write_activity(conn: sqlite3.Connection, activity: Activity) -> None:
+    conn.executemany(
+        "INSERT INTO source_activity_hourly (hour, src_key, port_class, connections, bytes, bytes_known) "
+        "VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(hour, src_key, port_class) DO UPDATE SET "
+        "connections = connections + excluded.connections, bytes = bytes + excluded.bytes, "
+        "bytes_known = bytes_known + excluded.bytes_known",
+        [(*k, *v) for k, v in sorted(activity.items())])
 
 
 def upsert_flows(conn: sqlite3.Connection, records: Sequence[FlowRecord], *, origin: DataOrigin,
@@ -336,10 +382,15 @@ def upsert_flows(conn: sqlite3.Connection, records: Sequence[FlowRecord], *, ori
             keys |= tup_keys
             paired += tup_pairs
         ordered = sorted(keys)
+        activity: Activity = {}
+        hour = db_time(now.astimezone(UTC).replace(minute=0, second=0, microsecond=0))
         for conn_key in ordered:
             _merge_connection(conn, conn_key)
-            _update_baselines(conn, conn_key)
-            _record_growth(conn, conn_key, before_last=before_last, increments=increments, stamp=stamp)
+            primary = _update_baselines(conn, conn_key)
+            grew = _record_growth(conn, conn_key, before_last=before_last, increments=increments, stamp=stamp)
+            if increments == "cycle" and primary is not None:
+                _add_activity(activity, primary, hour, grew)
+        _write_activity(conn, activity)
         for i in range(0, len(ordered), 500):  # every row of a changed connection may have changed
             chunk = ordered[i:i + 500]
             days |= {d for (d,) in conn.execute(
@@ -347,6 +398,8 @@ def upsert_flows(conn: sqlite3.Connection, records: Sequence[FlowRecord], *, ori
                 chunk)}
         if increments != "none":
             conn.execute("DELETE FROM flow_increments WHERE observed_at < ?", (db_time(now - INCREMENT_KEEP),))
+        if increments == "cycle":
+            conn.execute("DELETE FROM source_activity_hourly WHERE hour < ?", (db_time(now - ACTIVITY_KEEP),))
         archive.mark_stale(conn, "flows", days)
         conn.executemany("INSERT INTO rollup_state (day, dirty) VALUES (?, 1) "
                          "ON CONFLICT(day) DO UPDATE SET dirty = 1", [(d,) for d in sorted(days)])
@@ -442,5 +495,8 @@ def delete_rollups_before(conn: sqlite3.Connection, day: str) -> int:
 def delete_baselines_before(conn: sqlite3.Connection, cutoff: datetime) -> int:
     """A connection not seen within the baseline window is 'new' again when it reappears."""
     with transaction(conn):
-        n = conn.execute("DELETE FROM connection_baseline WHERE last_seen < ?", (db_time(cutoff),)).rowcount
-        return n + conn.execute("DELETE FROM user_baseline WHERE last_seen < ?", (db_time(cutoff),)).rowcount
+        stamp = (db_time(cutoff),)
+        return sum(conn.execute(sql, stamp).rowcount for sql in (
+            "DELETE FROM connection_baseline WHERE last_seen < ?", "DELETE FROM user_baseline WHERE last_seen < ?",
+            "DELETE FROM account_source_baseline WHERE last_seen < ?",
+            "DELETE FROM process_baseline WHERE last_seen < ?"))

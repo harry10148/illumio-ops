@@ -470,7 +470,7 @@ class BaselineEdges(BaseModel):
 def baseline_edges(ctx: AppContext, ports: AdminPortSet, *, since: datetime,
                    classes: Collection[PortClass] | None = None) -> BaselineEdges:
     """The management-port connections seen since `since`, from the connection baseline (kept for the
-    baseline period in every collection mode). Reads by port through ix_baseline_port; the protocol and
+    baseline period in every collection mode). Reads by port through ix_baseline_port_src; the protocol and
     the time are checked here."""
     fdb, gen, settings = _store_read(ctx)
     collected = collects(settings, IngestSource.TRAFFIC)
@@ -569,7 +569,7 @@ FRESH = timedelta(hours=1)  # how far behind now the newest traffic coverage may
 def service_traffic(ctx: AppContext, targets: Collection[tuple[str, int, int]], *, since: datetime,
                     now: datetime) -> dict[tuple[str, int, int], TrafficSummary]:
     """Recent traffic to each (destination key, port, proto), from the connection baseline (read by port
-    through ix_baseline_port). A target nobody reached since `since` has sources 0 — only when traffic was
+    through ix_baseline_port_src). A target nobody reached since `since` has sources 0 — only when traffic was
     collected over that whole period; otherwise every target's sources are None (P3 final review #4)."""
     fdb, gen, settings = _store_read(ctx)
     wanted = set(targets)

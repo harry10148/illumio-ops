@@ -65,3 +65,18 @@ def test_increment_window_uses_observed_index(tmp_path):
                            "JOIN flows f ON f.conn_key = r.conn_key AND f.is_primary = 1 "
                            "WHERE i.late = 0 AND i.observed_at > ? AND i.observed_at <= ?", ("a", "b"))
     assert "ix_increments_observed" in plan and "ix_flows_conn" in plan, plan
+
+
+def test_peer_reads_use_the_port_source_index(tmp_path):
+    # P4.5 A: the destinations a peer group used on one port, read for every candidate behavior.
+    with FlowDb(tmp_path / "flows.sqlite").connect() as conn:
+        plan = _plan(conn, "SELECT DISTINCT dst_key FROM connection_baseline WHERE port = ? AND proto = ? "
+                           "AND src_key IN (?, ?) AND first_seen <= ?", (1, 6, "a", "b", "x"))
+    assert "ix_baseline_port_src" in plan, plan
+
+
+def test_activity_history_reads_by_hour(tmp_path):
+    with FlowDb(tmp_path / "flows.sqlite").connect() as conn:
+        plan = _plan(conn, "SELECT src_key, port_class, MAX(connections), MAX(bytes) FROM source_activity_hourly "
+                           "WHERE src_key IN (?) AND hour >= ? AND hour < ? GROUP BY src_key, port_class", ("a", "x", "y"))
+    assert "USING PRIMARY KEY" in plan or "SEARCH" in plan, plan
