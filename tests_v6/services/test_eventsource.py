@@ -129,3 +129,46 @@ def test_event_naming_no_host_is_counted_unmatched(tmp_path):
     _store_events(ctx, [bare])
     assert precursor_events(ctx, start=NOW - minutes(60), end=NOW).unmatched == 1
     assert tamper_events(ctx, start=NOW - minutes(60), end=NOW).unmatched == 1
+
+
+def test_events_after_skips_backfill(collected):
+    from illumio_ops.domain.events import normalize_event
+    from illumio_ops.domain.values import DataOrigin
+    from illumio_ops.services.eventsource import events_after, max_event_id
+    from illumio_ops.store.flowdb.events import upsert_events
+    with collected.flows().connect() as conn:
+        upsert_events(conn, [normalize_event({"href": "/orgs/1/events/old", "event_type": "user.sign_in",
+                                              "timestamp": "2026-10-01T00:00:00Z"})],
+                      origin=DataOrigin.BACKFILL, now=NOW)
+    rows, more = events_after(collected, 0, limit=100)
+    assert len(rows) == 5 and not more and all(r.origin == "ingest" for r in rows)
+    assert [r.id for r in rows] == sorted(r.id for r in rows) and max_event_id(collected) == 6
+
+
+def test_events_after_limit_and_more(collected):
+    from illumio_ops.services.eventsource import events_after
+    first, more = events_after(collected, 0, limit=2)
+    assert len(first) == 2 and more
+    rest, more = events_after(collected, first[-1].id, limit=10)
+    assert len(rest) == 3 and not more
+
+
+def test_events_in_window_exact_types(collected):
+    from illumio_ops.services.eventsource import events_in_window
+    rows = events_in_window(collected, start=NOW - minutes(60), end=NOW, exact_types=("user.sign_in",))
+    assert [r.event_type for r in rows] == ["user.sign_in"]
+    assert len(events_in_window(collected, start=NOW - minutes(60), end=NOW, exact_types=None)) == 5
+    assert events_in_window(collected, start=NOW - minutes(6), end=NOW, exact_types=None)[0].event_type == "user.sign_in"
+
+
+def test_new_event_host_through_ven(collected):
+    from illumio_ops.services.eventsource import events_after
+    ven = TAMPER[0]["created_by"]["ven"]["href"]
+    with collected.flows().connect() as conn:
+        workloads.replace_inventory(conn, [workloads.WorkloadRow(
+            href="/orgs/1/workloads/w-9", hostname="h9", name=None, managed=1, enforcement_mode=None,
+            visibility_level=None, os_id=None, ven_version=None, ven_href=ven, label_set=None, online=1,
+            risk_exposure=None, risk_percent=None, risk_updated_at=None, fetched_at="x")])
+    rows, _ = events_after(collected, 0, limit=100)
+    mine = [r for r in rows if r.created_by_href == ven]
+    assert mine and all(r.host_key == "/orgs/1/workloads/w-9" and r.hostname == "h9" for r in mine)

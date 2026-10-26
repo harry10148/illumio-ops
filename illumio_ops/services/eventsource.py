@@ -287,3 +287,59 @@ def tamper_events(ctx: AppContext, *, start: datetime, end: datetime) -> HostEve
         unmatched += missed
         items += [(endpoint_key(h, ""), raw) for h in sorted(hrefs)]
     return HostEvents(items=items, unmatched=unmatched)
+
+
+# ── new events for alert evaluation ──────────────────────────────────────────
+
+class NewEvent(EventRow):
+    id: int
+    host_key: str | None   # the workload the event is about (its href), when the store can tell
+    hostname: str | None
+
+
+_NEW_COLUMNS = ("e.id, e.href, e.event_type, e.severity, e.status, e.timestamp, e.created_by_kind, e.created_by_name, "
+                "e.created_by_href, e.tamper_classification, e.raw_json, e.origin, "
+                "COALESCE(e.workload_href, w.href) AS host_key, COALESCE(w.hostname, e.created_by_name) AS hostname")
+
+
+def _new_event(r: Any) -> NewEvent:
+    return NewEvent(**_event_row(r).model_dump(), id=r["id"], host_key=r["host_key"], hostname=r["hostname"])
+
+
+def _ingest_read(ctx: AppContext, sql: str, params: list[Any]) -> list[Any]:
+    fdb = ctx.flows()
+    gen = fdb.generation
+    settings = ctx.settings.current()
+    with fdb.connect() as conn:
+        require_same_pce(conn, settings.pce)
+        found = conn.execute(sql, params).fetchall()
+    if fdb.generation != gen:
+        raise StaleGeneration
+    return list(found)
+
+
+def events_after(ctx: AppContext, after_id: int, *, limit: int) -> tuple[list[NewEvent], bool]:
+    """Collected events stored after after_id, oldest first (a backfill's history is never evaluated, spec §7).
+    The second value says whether more are waiting."""
+    found = _ingest_read(ctx, f"SELECT {_NEW_COLUMNS} {EVENT_FROM} WHERE e.id > ? AND e.origin = 'ingest' "
+                              "ORDER BY e.id LIMIT ?", [after_id, limit + 1])
+    rows = [_new_event(r) for r in found]
+    return rows[:limit], len(rows) > limit
+
+
+def max_event_id(ctx: AppContext) -> int:
+    found = _ingest_read(ctx, "SELECT COALESCE(MAX(id), 0) FROM events", [])
+    return int(found[0][0])
+
+
+def events_in_window(ctx: AppContext, *, start: datetime, end: datetime,
+                     exact_types: tuple[str, ...] | None) -> list[NewEvent]:
+    """Collected events with start < timestamp <= end, optionally of these types only (a count rule)."""
+    sql = f"SELECT {_NEW_COLUMNS} {EVENT_FROM} WHERE e.timestamp > ? AND e.timestamp <= ? AND e.origin = 'ingest'"
+    params: list[Any] = [db_time(start), db_time(end)]
+    if exact_types is not None:
+        if not exact_types:
+            return []
+        sql += f" AND e.event_type IN ({','.join('?' * len(exact_types))})"
+        params.extend(exact_types)
+    return [_new_event(r) for r in _ingest_read(ctx, sql + " ORDER BY e.timestamp", params)]

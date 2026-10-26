@@ -202,3 +202,73 @@ def test_fill_that_re_pairs_a_stored_record_does_not_count_twice(collected, fake
     q = query_flows(collected, _spec(NOW - minutes(60), NOW), limit=100, order="last_detected_desc", fill_gaps=True)
     mine = [r for r in q.rows if r.src_ip == "10.0.1.5"]
     assert len(mine) == 2 and sum(r.bytes_in or 0 for r in mine) == 600
+
+
+# ── flow increments ──
+
+def _grow(ctx, fake_traffic, at, conns):
+    def answer(s, e, m):
+        rows = [raw_flow(i, NOW - minutes(30 + i), NOW - minutes(20 + i), user=f"LAB\\u{i}") for i in range(3)]
+        for r in rows:
+            r["num_connections"] = conns
+            r["timestamp_range"]["last_detected"] = at.strftime("%Y-%m-%dT%H:%M:%SZ")
+        return rows
+    fake_traffic.answer = answer
+    run_traffic_cycle(ctx, now=at)
+
+
+def _increments(ctx):
+    with ctx.flows().connect() as conn:
+        return [dict(r) for r in conn.execute("SELECT connections, late FROM flow_increments ORDER BY id")]
+
+
+def test_cold_start_catch_up_is_late_and_a_cycle_is_not(collected, fake_traffic):
+    assert _increments(collected) and all(i["late"] == 1 for i in _increments(collected))
+    _grow(collected, fake_traffic, NOW + minutes(10), 4)
+    assert [i for i in _increments(collected) if i["late"] == 0] == [{"connections": 3, "late": 0}] * 3
+
+
+def test_increment_totals_window_by_observed_at(collected, fake_traffic):
+    from illumio_ops.domain.filter import FlowCondition
+    from illumio_ops.services.flowsource import increment_totals
+    _grow(collected, fake_traffic, NOW + minutes(10), 4)
+    t = increment_totals(collected, FlowCondition(), start=NOW, end=NOW + minutes(20), new_after=NOW,
+                         rank_by="connections", now=NOW + minutes(20))
+    assert (t.connections, t.rows, t.new_rows, t.bytes, t.bytes_rows) == (9, 3, 3, None, 0)
+    assert len(t.top) == 3 and t.top[0].connections == 3
+    assert t.coverage.gaps == [(NOW + minutes(10), NOW + minutes(20), "not_yet_collected")]  # past the watermark
+    later = increment_totals(collected, FlowCondition(), start=NOW + minutes(10), end=NOW + minutes(20),
+                             new_after=NOW, rank_by="connections", now=NOW + minutes(20))
+    assert later.rows == 0  # observed at NOW+10 is not after the window's start
+    seen = increment_totals(collected, FlowCondition(), start=NOW, end=NOW + minutes(20), new_after=NOW + minutes(10),
+                            rank_by="connections", now=NOW + minutes(20))
+    assert (seen.rows, seen.new_rows) == (3, 0)
+
+
+def test_increment_totals_excludes_late(collected):
+    from illumio_ops.domain.filter import FlowCondition
+    from illumio_ops.services.flowsource import increment_totals
+    t = increment_totals(collected, FlowCondition(), start=NOW - timedelta(hours=25), end=NOW, new_after=NOW,
+                         rank_by="connections", now=NOW)
+    assert t.rows == 0 and t.connections == 0
+
+
+def test_increment_totals_condition_applies(collected, fake_traffic):
+    from illumio_ops.domain.filter import FlowCondition, PortProto
+    from illumio_ops.services.flowsource import increment_totals
+    _grow(collected, fake_traffic, NOW + minutes(10), 4)
+    kw = {"start": NOW, "end": NOW + minutes(20), "new_after": NOW, "rank_by": "connections", "now": NOW + minutes(20)}
+    assert increment_totals(collected, FlowCondition(ports=(PortProto(port=445),)), **kw).rows == 3
+    assert increment_totals(collected, FlowCondition(ports=(PortProto(port=22),)), **kw).rows == 0
+
+
+def test_increment_totals_reports_gaps(collected, fake_traffic):
+    from illumio_ops.domain.filter import FlowCondition
+    from illumio_ops.services.flowsource import increment_totals, increments_watermark
+    _grow(collected, fake_traffic, NOW + minutes(10), 4)
+    with collected.flows().connect() as conn:
+        ingest_state.record_gap(conn, IngestSource.TRAFFIC, NOW + minutes(1), NOW + minutes(5), "failed", "x", NOW)
+    t = increment_totals(collected, FlowCondition(), start=NOW, end=NOW + minutes(10), new_after=NOW,
+                         rank_by="mbps", now=NOW + minutes(10))
+    assert [g[2] for g in t.coverage.gaps] == ["ingest_failed"]
+    assert increments_watermark(collected) == NOW + minutes(10)

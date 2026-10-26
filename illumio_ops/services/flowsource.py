@@ -21,6 +21,7 @@ from pydantic import BaseModel, ConfigDict
 from illumio_ops.domain.detectors import Obs
 from illumio_ops.domain.filter import (
     FilterSpec,
+    FlowCondition,
     PortProto,
     matches,
     port_matches,
@@ -70,12 +71,16 @@ __all__ = [
     "FlowQuery",
     "FlowRow",
     "GapReason",
+    "IncrementTop",
+    "IncrementTotals",
     "Observations",
     "UserPair",
     "aggregate_flows",
     "baseline_edges",
     "baseline_first_seen",
     "field_coverage",
+    "increment_totals",
+    "increments_watermark",
     "new_user_pairs",
     "observations",
     "query_flows",
@@ -597,3 +602,84 @@ def service_traffic(ctx: AppContext, targets: Collection[tuple[str, int, int]], 
         out[key] = TrafficSummary(sources=len(srcs), last_seen=datetime.fromisoformat(last) if last else None,
                                   decisions=frozenset(decisions))
     return out
+
+
+# ── flow increments (alert thresholds, spec §6.6 F12) ────────────────────────
+
+class IncrementTop(BaseModel):
+    src: str
+    dst: str
+    port: int | None
+    proto: int
+    connections: int
+    mbps: float | None
+
+
+class IncrementTotals(BaseModel):
+    """Growth observed within (start, end] on the connections a condition matches. Late growth (the daily
+    re-read, a catch-up) is left out: counted at the moment it arrives it would look like a burst."""
+    connections: int
+    bytes: int | None        # None: no growth in the window carried byte data
+    bytes_rows: int
+    rows: int
+    new_rows: int            # observed after new_after: whether anything arrived since the last evaluation
+    max_mbps: float | None   # bytes over the flow time they span — a lower bound
+    top: list[IncrementTop]
+    coverage: Coverage
+
+
+TOP_INCREMENTS = 10
+# The connections whose growth was observed in a window were active shortly before it; this much flow time is
+# allowed on either side so the join never drops one, while observed_at does the real windowing.
+_FLOW_SLACK_BEFORE = timedelta(hours=24)
+_FLOW_SLACK_AFTER = timedelta(hours=1)
+
+
+def _mbps(bytes_: int | None, seconds: float) -> float | None:
+    return None if bytes_ is None else bytes_ * 8 / max(seconds, 1.0) / 1_000_000
+
+
+def increment_totals(ctx: AppContext, cond: FlowCondition, *, start: datetime, end: datetime, new_after: datetime,
+                     rank_by: Literal["connections", "mbps"], now: datetime | None = None) -> IncrementTotals:
+    at = (now or datetime.now(UTC)).astimezone(UTC)
+    fdb, gen, settings = _store_read(ctx)
+    floor = at - timedelta(days=settings.collection.retention.flow_days)
+    where, params = to_sql(cond.within(start - _FLOW_SLACK_BEFORE, end + _FLOW_SLACK_AFTER))
+    with fdb.connect() as conn:
+        require_same_pce(conn, settings.pce)
+        for name, fn in sql_functions().items():
+            conn.create_function(name, -1, fn, deterministic=True)
+        cov = store_coverage(conn, IngestSource.TRAFFIC, (start, end), floor=floor,
+                             collected=collects(settings, IngestSource.TRAFFIC))
+        rows = conn.execute(
+            "SELECT i.connections, i.bytes, i.seconds, i.observed_at, f.src_key, f.dst_key, f.src_hostname, "
+            "f.dst_hostname, f.port, f.proto FROM flow_increments i "
+            "JOIN flows f ON f.conn_key = i.conn_key AND f.is_primary = 1 "
+            f"WHERE i.late = 0 AND i.observed_at > ? AND i.observed_at <= ? AND {where}",
+            [db_time(start), db_time(end), *params]).fetchall()
+    if fdb.generation != gen:
+        raise StaleGeneration
+    with_bytes = [r for r in rows if r["bytes"] is not None]
+    rates = [(r, _mbps(r["bytes"], r["seconds"])) for r in rows]
+    key = (lambda pair: (pair[1] or 0.0)) if rank_by == "mbps" else (lambda pair: pair[0]["connections"])
+    top = [IncrementTop(src=r["src_hostname"] or r["src_key"], dst=r["dst_hostname"] or r["dst_key"], port=r["port"],
+                        proto=r["proto"], connections=r["connections"], mbps=rate)
+           for r, rate in sorted(rates, key=key, reverse=True)[:TOP_INCREMENTS]]
+    stamp = db_time(new_after)
+    gaps = merge_gaps(cov.gaps)
+    return IncrementTotals(
+        connections=sum(r["connections"] for r in rows),
+        bytes=sum(r["bytes"] for r in with_bytes) if with_bytes else None, bytes_rows=len(with_bytes),
+        rows=len(rows), new_rows=sum(1 for r in rows if r["observed_at"] > stamp),
+        max_mbps=max((rate for _, rate in rates if rate is not None), default=None), top=top,
+        coverage=Coverage(source="store", store_from=cov.store_from, store_to=cov.store_to, gaps=gaps,
+                          filled_from_pce=[], truncated=any(g[2] == "truncated" for g in gaps)))
+
+
+def increments_watermark(ctx: AppContext) -> datetime | None:
+    """When growth was last recorded (an alert evaluation's first run starts here, not at history)."""
+    fdb, _gen, settings = _store_read(ctx)
+    with fdb.connect() as conn:
+        require_same_pce(conn, settings.pce)
+        value = conn.execute("SELECT MAX(observed_at) FROM flow_increments").fetchone()[0]
+    return datetime.fromisoformat(value) if value else None

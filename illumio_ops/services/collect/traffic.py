@@ -42,6 +42,7 @@ from illumio_ops.store.flowdb.db import StaleGeneration, db_day, transaction
 from illumio_ops.store.flowdb.flows import refresh_rollups, upsert_flows
 
 SOURCE = IngestSource.TRAFFIC
+CATCH_UP_IS_LATE = timedelta(hours=1)
 # Records reach the PCE up to ~18 min after they happen (P2 Task 15 probe on lab: 32% later than
 # 10 min); a record is caught in every cycle phase only if its delay is within the overlap.
 OVERLAP = timedelta(minutes=30)
@@ -119,7 +120,10 @@ def run_traffic_cycle(ctx: AppContext, *, now: datetime | None = None) -> CycleR
                     # Flows, gaps and the watermark move together or not at all; the rollups once a
                     # cycle (a dirty day stays dirty until a cycle rebuilds it).
                     with transaction(conn):
-                        upsert_flows(conn, records, origin=DataOrigin.INGEST, now=at)
+                        # A catch-up hour that ended long ago is late data: its growth would look like a
+                        # burst happening now, so threshold rules do not count it (P4 plan, alert semantics).
+                        upsert_flows(conn, records, origin=DataOrigin.INGEST, now=at,
+                                     increments="cycle" if b > at - CATCH_UP_IS_LATE else "late")
                         if b == at:
                             refresh_rollups(conn, at, frozen_through=db_day(
                                 at - timedelta(days=settings.collection.retention.flow_days)))

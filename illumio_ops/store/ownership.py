@@ -34,4 +34,5 @@ TABLE_OWNERS: dict[str, str] = {
     "analysis_results": "illumio_ops.store.flowdb.analysis",
     "lateral_snapshot_daily": "illumio_ops.store.flowdb.analysis",
     "focus_items": "illumio_ops.store.flowdb.analysis",
+    "flow_increments": "illumio_ops.store.flowdb.flows",
 }

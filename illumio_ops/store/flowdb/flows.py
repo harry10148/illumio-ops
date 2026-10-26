@@ -11,6 +11,7 @@ import sqlite3
 from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
+from typing import Literal
 
 from illumio_ops.domain.flows import FlowRecord, ranges_within, record_key
 from illumio_ops.domain.identity import endpoint_key
@@ -235,15 +236,69 @@ def split_unseen(conn: sqlite3.Connection, records: Sequence[FlowRecord]) -> tup
     return new, grown
 
 
+Increments = Literal["cycle", "late", "none"]
+# Rule windows are at most 24 hours; the traffic overlap and some margin on top.
+INCREMENT_KEEP = timedelta(hours=26)
+# A daily bucket stops growing within a day of its first record; older connections of a tuple cannot have grown.
+_GROWING = timedelta(hours=72)
+
+
+@dataclass(frozen=True)
+class _TupleTotals:
+    connections: int
+    bytes: int | None
+    newest_last: str | None
+    oldest_first: str | None
+    newest_key: str | None
+
+
+TUPLE_TOTALS = ("SELECT conn_key, num_connections, bytes_in, bytes_out, first_detected, last_detected FROM flows "
+                "WHERE src_ip = ? AND dst_ip = ? AND port IS ? AND proto = ? AND is_primary = 1 AND first_detected >= ?")
+
+
+def _tuple_totals(conn: sqlite3.Connection, tup: tuple[str, str, int | None, int], since: str) -> _TupleTotals:
+    """The tuple's recent connections, each counted once through its primary row (the other side's report of
+    the same connection is not a primary, so a connection both VENs report adds once)."""
+    rows = conn.execute(TUPLE_TOTALS, (*tup, since)).fetchall()
+    known = [(r["bytes_in"] or 0) + (r["bytes_out"] or 0) for r in rows
+             if r["bytes_in"] is not None or r["bytes_out"] is not None]
+    newest = max(rows, key=lambda r: (r["last_detected"], r["conn_key"]), default=None)
+    return _TupleTotals(connections=sum(int(r["num_connections"]) for r in rows), bytes=sum(known) if known else None,
+                        newest_last=newest["last_detected"] if newest else None,
+                        oldest_first=min((r["first_detected"] for r in rows), default=None),
+                        newest_key=newest["conn_key"] if newest else None)
+
+
+def _write_increments(conn: sqlite3.Connection, before: dict[tuple[str, str, int | None, int], _TupleTotals],
+                      since: str, stamp: str, late: bool) -> None:
+    for tup, old in before.items():
+        new = _tuple_totals(conn, tup, since)
+        grew = max(0, new.connections - old.connections)
+        grew_bytes = None if new.bytes is None else max(0, new.bytes - (old.bytes or 0))
+        if new.newest_key is None or new.newest_last is None or (grew == 0 and not grew_bytes):
+            continue
+        if old.newest_last is not None:
+            seconds = (datetime.fromisoformat(new.newest_last) - datetime.fromisoformat(old.newest_last)).total_seconds()
+        else:
+            assert new.oldest_first is not None
+            seconds = (datetime.fromisoformat(new.newest_last)
+                       - datetime.fromisoformat(new.oldest_first)).total_seconds() + 1
+        conn.execute("INSERT INTO flow_increments (conn_key, observed_at, connections, bytes, seconds, late) "
+                     "VALUES (?, ?, ?, ?, ?, ?)", (new.newest_key, stamp, grew, grew_bytes, max(seconds, 0.0), int(late)))
+
+
 def upsert_flows(conn: sqlite3.Connection, records: Sequence[FlowRecord], *, origin: DataOrigin,
-                 now: datetime) -> UpsertStats:
+                 now: datetime, increments: Increments = "none") -> UpsertStats:
     """Write a batch in one transaction (nested in the caller's, if any). The caller holds
-    FlowDb.write_lock."""
+    FlowDb.write_lock. increments: "cycle" for live collection and "late" for the daily re-read record how
+    much each touched tuple grew (flow_increments); a backfill records none (spec §7: history is not alerted)."""
     stamp = db_time(now)
     inserted = refreshed = paired = unchanged = 0
     days: set[str] = set()
     tuples: set[tuple[str, str, int | None, int]] = set()
     written: set[str] = set()
+    since = db_time(now - _GROWING)
+    before: dict[tuple[str, str, int | None, int], _TupleTotals] = {}
     with transaction(conn):
         for r in records:
             key = record_key(r)
@@ -251,6 +306,9 @@ def upsert_flows(conn: sqlite3.Connection, records: Sequence[FlowRecord], *, ori
             if old is not None and _adds_nothing(old, r, origin):
                 unchanged += 1
                 continue
+            tup = (r.src_ip, r.dst_ip, r.port, r.proto)
+            if increments != "none" and tup not in before:
+                before[tup] = _tuple_totals(conn, tup, since)  # before this batch changes any row of it
             written.add(key)
             if old is not None:
                 days.add(str(old["last_detected"])[:10])
@@ -274,6 +332,9 @@ def upsert_flows(conn: sqlite3.Connection, records: Sequence[FlowRecord], *, ori
             days |= {d for (d,) in conn.execute(
                 f"SELECT DISTINCT substr(last_detected, 1, 10) FROM flows WHERE conn_key IN ({','.join('?' * len(chunk))})",
                 chunk)}
+        if increments != "none":
+            _write_increments(conn, before, since, stamp, late=increments == "late")
+            conn.execute("DELETE FROM flow_increments WHERE observed_at < ?", (db_time(now - INCREMENT_KEEP),))
         archive.mark_stale(conn, "flows", days)
         conn.executemany("INSERT INTO rollup_state (day, dirty) VALUES (?, 1) "
                          "ON CONFLICT(day) DO UPDATE SET dirty = 1", [(d,) for d in sorted(days)])
