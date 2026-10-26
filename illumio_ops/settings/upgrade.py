@@ -38,11 +38,25 @@ def _v3_to_v4(data: dict[str, Any]) -> dict[str, Any]:
     return data
 
 
+def _v4_to_v5(data: dict[str, Any]) -> dict[str, Any]:
+    # The anomaly detectors' settings (spec §6.5.8); what the file has stays as it is.
+    fresh = default_lateral().model_dump(mode="json")
+    lateral = data.setdefault("lateral", fresh)
+    if isinstance(lateral, dict):
+        for key, value in fresh.items():
+            lateral.setdefault(key, value)
+        if isinstance(lateral.get("detectors"), dict):
+            for key, value in fresh["detectors"].items():
+                lateral["detectors"].setdefault(key, value)
+    return data
+
+
 # source version -> function producing source version + 1
 UPGRADES: dict[int, Callable[[dict[str, Any]], dict[str, Any]]] = {
     1: _v1_to_v2,
     2: _v2_to_v3,
     3: _v3_to_v4,
+    4: _v4_to_v5,
 }
 
 

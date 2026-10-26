@@ -164,6 +164,14 @@ class DetectorKind(StrEnum):
     UNEXPECTED_INITIATOR = "unexpected_initiator"
 
 
+class PortClass(StrEnum):
+    """The three kinds of management port (spec §6.5.8): remote execution and control, directory and
+    authentication, and databases. Each detector reads the classes it is about."""
+    REMOTE = "remote"
+    DIRECTORY = "directory"
+    DATABASE = "database"
+
+
 class DetectorState(StrEnum):
     """What a detector run can say besides its detections: "no detection" is only ever OK."""
     OK = "ok"
@@ -283,6 +291,14 @@ LATERAL_PORTS_DEFAULT: tuple[tuple[int, str], ...] = (
     (5900, "VNC"), (5938, "TeamViewer"),
 )
 
+# Remote execution, reconnaissance and directory-attack tools whose connection to an internal host is worth
+# a look (spec §6.5.8 D and E③), as normalize_process names them; settings replace the list.
+DEFAULT_SUSPICIOUS_TOOLS: tuple[str, ...] = (
+    "powershell.exe", "pwsh.exe", "wmic.exe", "psexec.exe", "psexesvc.exe", "paexec.exe", "winrs.exe",
+    "certutil.exe", "mshta.exe", "rundll32.exe", "regsvr32.exe", "cscript.exe", "wscript.exe", "bitsadmin.exe",
+    "rubeus.exe", "mimikatz.exe", "sharphound.exe", "adfind.exe", "nc", "ncat", "socat", "nmap", "masscan",
+)
+
 # REST API guide: flow_summary records allowed, blocked and potentially blocked connections;
 # flow_drops only blocked and potentially blocked; flow_off nothing. Enhanced data collection
 # adds byte counts on top of flow_summary. Anything else is unknown, never guessed.
@@ -325,7 +341,7 @@ def parse_draft_policy_decision(raw: str) -> str:
 _ENUMS: tuple[type[StrEnum], ...] = (
     PolicyDecision, RuleAction, AlertRuleType, DeploymentType, Language, ProbeName,
     FlowDirection, VisibilityLevel, TamperClassification, IngestSource, DataOrigin, CapabilityState,
-    CollectionMode, Severity, DetectorKind, DetectorState, SegmentDimension, SegmentMetric, SegmentView,
+    CollectionMode, Severity, DetectorKind, PortClass, DetectorState, SegmentDimension, SegmentMetric, SegmentView,
     EdgeState, TamperPattern, TamperAction, PrecursorKind, RansomwareTrafficClass, FocusKind, Confidence,
     ThresholdType, ChannelKind, SystemCheck, DeliveryStatus,
 )

@@ -17,7 +17,7 @@ def _pce(**kw):
 
 def test_default_settings_values():
     s = default_settings(password_hash=HASH, secret_key=KEY, port=5443)
-    assert s.schema_version == 4 and s.revision == 0
+    assert s.schema_version == 5 and s.revision == 0
     assert s.pce.url == "" and s.pce.deployment_type is DeploymentType.ON_PREM
     assert s.web.port == 5443 and s.web.username == "illumio" and s.web.must_change_password is False
     assert s.web.session_lifetime_seconds == 28800 and s.web.allowed_ips == ()
@@ -289,3 +289,35 @@ def test_invalid_lateral_messages_do_not_echo_values():
     with pytest.raises(ValidationError) as e:
         Settings.model_validate(_with_lateral(environment_label_key="", graph_hops=99))
     assert "99" not in " ".join(err["msg"] for err in e.value.errors())
+
+
+def _lateral(**kw):
+    from illumio_ops.settings.schema import LateralSettings, default_lateral
+    return LateralSettings.model_validate(default_lateral().model_dump(mode="json") | kw)
+
+
+def test_peer_group_keys_rejects_empty_and_duplicates():
+    for bad in ([], ["app", "app"], ["a", "b", "c", "d", "e"], [""]):
+        with pytest.raises(ValidationError):
+            _lateral(peer_group_keys=bad)
+    assert _lateral(peer_group_keys=["app"]).peer_group_keys == ("app",)
+
+
+def test_directory_server_ips_rejects_networks():
+    with pytest.raises(ValidationError):
+        _lateral(directory_server_ips=["10.0.0.0/24"])
+    with pytest.raises(ValidationError):
+        _lateral(directory_server_ips=["dc-1"])
+    assert _lateral(directory_server_ips=[" 10.0.0.5 "]).directory_server_ips == ("10.0.0.5",)
+
+
+def test_suspicious_tools_are_normalized():
+    assert _lateral(suspicious_tools=["C:\\Tools\\PsExec.EXE", "/usr/bin/nc"]).suspicious_tools == ("psexec.exe", "nc")
+    assert _lateral(suspicious_tools=[]).suspicious_tools == ()
+
+
+def test_added_port_category():
+    lat = _lateral(extra_admin_ports=[{"port": 1521, "proto": 6, "category": "database"}])
+    assert lat.extra_admin_ports[0].category == "database"
+    with pytest.raises(ValidationError):
+        _lateral(extra_admin_ports=[{"port": 1521, "proto": 6, "category": "other"}])

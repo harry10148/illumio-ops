@@ -78,6 +78,19 @@ export type CollectionMode1 = ("full" | "alert" | "events_only")
  */
 export type DetectorState = ("ok" | "disabled" | "accumulating" | "no_data" | "collection_off" | "incomplete")
 /**
+ * The three kinds of management port (spec §6.5.8): remote execution and control, directory and
+ * authentication, and databases. Each detector reads the classes it is about.
+ */
+export type PortClass = ("remote" | "directory" | "database")
+/**
+ * The three kinds of management port (spec §6.5.8): remote execution and control, directory and
+ * authentication, and databases. Each detector reads the classes it is about.
+ * 
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "PortClass".
+ */
+export type PortClass1 = ("remote" | "directory" | "database")
+/**
  * This interface was referenced by `ContractRoot`'s JSON-Schema
  * via the `definition` "DeploymentType".
  */
@@ -876,14 +889,23 @@ source: ("builtin" | "pce" | "added")
 export interface DetectorSettings {
 account_fanout_targets: number
 account_fanout_window_minutes: number
+account_history_days: number
 blocked_surge_factor: number
 blocked_targets: number
 blocked_window_minutes: number
 chain_window_minutes: number
+directory_followup_minutes: number
+directory_min_connections: number
+directory_min_sources: number
 exclude_system_accounts: boolean
 fanout_targets: number
 fanout_window_minutes: number
+peer_min_group: number
 precursor_hours: number
+process_history_days: number
+volume_min_connections: number
+volume_min_mb: number
+volume_surge_factor: number
 }
 /**
  * This interface was referenced by `ContractRoot`'s JSON-Schema
@@ -937,19 +959,31 @@ export interface LateralSettings {
 admin_groups: LabelSelector[]
 critical_assets: LabelSelector[]
 detectors: DetectorSettings
+/**
+ * @maxItems 100
+ */
+directory_server_ips: string[]
+directory_servers: LabelSelector[]
 environment_label_key: string
 expected_initiators: ExpectedInitiators[]
 extra_admin_ports: PortEntry[]
 graph_hops: number
 include_pce_admin_services: boolean
 observation_days: number
+/**
+ * @minItems 1
+ * @maxItems 4
+ */
+peer_group_keys: [string]|[string, string]|[string, string, string]|[string, string, string, string]
 removed_admin_ports: PortEntry[]
+suspicious_tools: string[]
 }
 /**
  * This interface was referenced by `ContractRoot`'s JSON-Schema
  * via the `definition` "PortEntry".
  */
 export interface PortEntry {
+category?: PortClass
 port: number
 proto: (number | null)
 }
@@ -1447,6 +1481,11 @@ export const VALUES = {
     "blocked",
     "potentially_blocked",
     "unknown"
+  ],
+  "PortClass": [
+    "database",
+    "directory",
+    "remote"
   ],
   "PrecursorKind": [
     "offline",

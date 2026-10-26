@@ -25,9 +25,15 @@ from illumio_ops.domain.alertpack import best_practice_rules
 from illumio_ops.domain.alertrules import AlertRule
 from illumio_ops.domain.identity import normalize_process
 from illumio_ops.domain.netaddr import parse_ip_token
-from illumio_ops.domain.values import CollectionMode, DeploymentType, Language
+from illumio_ops.domain.values import (
+    DEFAULT_SUSPICIOUS_TOOLS,
+    CollectionMode,
+    DeploymentType,
+    Language,
+    PortClass,
+)
 
-SCHEMA_VERSION: Literal[4] = 4
+SCHEMA_VERSION: Literal[5] = 5
 _UTC_OFFSET = re.compile(r"UTC([+-]\d+(?:\.\d+)?)")
 
 
@@ -237,9 +243,23 @@ def _process_names(v: tuple[str, ...]) -> tuple[str, ...]:
     return tuple(out)
 
 
+def _addresses(v: tuple[str, ...]) -> tuple[str, ...]:
+    out = []
+    for token in v:
+        if "/" in token:
+            raise ValueError("every entry must be one address, not a network")
+        try:
+            out.append(str(parse_ip_token(token)))
+        except ValueError:
+            raise ValueError("every entry must be an IP address") from None
+    return tuple(out)
+
+
 class PortEntry(StrictModel):
     port: int = Field(ge=0, le=65535)
     proto: int | None = Field(ge=0, le=255)  # None = any protocol
+    # Which detectors an added port feeds (spec §6.5.8); a removal ignores it. Files before v5 have none.
+    category: PortClass = PortClass.REMOTE
 
 
 class LabelSelector(StrictModel):
@@ -265,6 +285,16 @@ class DetectorSettings(StrictModel):
     blocked_surge_factor: float = Field(ge=1.0, le=100.0)
     exclude_system_accounts: bool
     precursor_hours: int = Field(ge=1, le=168)
+    # Anomalies in allowed traffic (spec §6.5.8)
+    peer_min_group: int = Field(ge=3, le=1000)
+    volume_surge_factor: float = Field(ge=1.5, le=100.0)
+    volume_min_connections: int = Field(ge=10, le=10_000_000)
+    volume_min_mb: int = Field(ge=1, le=10_000_000)
+    directory_min_connections: int = Field(ge=10, le=10_000_000)
+    account_history_days: int = Field(ge=1, le=90)
+    process_history_days: int = Field(ge=1, le=90)
+    directory_min_sources: int = Field(ge=2, le=1000)
+    directory_followup_minutes: int = Field(ge=10, le=1440)
 
 
 class LateralSettings(StrictModel):
@@ -280,6 +310,20 @@ class LateralSettings(StrictModel):
     observation_days: int = Field(ge=1, le=365)
     expected_initiators: tuple[ExpectedInitiators, ...]
     detectors: DetectorSettings
+    # Peer groups are hosts sharing these label values (spec §6.5.8 A).
+    peer_group_keys: tuple[Annotated[str, Field(min_length=1, max_length=255)], ...] = Field(min_length=1,
+                                                                                             max_length=4)
+    # Directory servers as declared; the detectors also infer them from traffic (spec §6.5.8 E).
+    directory_servers: tuple[LabelSelector, ...]
+    directory_server_ips: Annotated[tuple[str, ...], AfterValidator(_addresses)] = Field(max_length=100)
+    suspicious_tools: Annotated[tuple[str, ...], AfterValidator(_process_names)]
+
+    @field_validator("peer_group_keys")
+    @classmethod
+    def _distinct_keys(cls, v: tuple[str, ...]) -> tuple[str, ...]:
+        if len(v) != len(set(v)):
+            raise ValueError("each label key may be listed once")
+        return v
 
     @field_validator("removed_admin_ports")
     @classmethod
@@ -413,7 +457,7 @@ class AlertSettings(StrictModel):
 
 
 class Settings(StrictModel):
-    schema_version: Literal[4]
+    schema_version: Literal[5]
     revision: int = Field(ge=0)
     pce: PceSettings
     web: WebSettings
@@ -477,8 +521,12 @@ def default_lateral() -> LateralSettings:
         detectors=DetectorSettings(
             fanout_targets=10, fanout_window_minutes=60, account_fanout_targets=10, account_fanout_window_minutes=60,
             chain_window_minutes=30, blocked_targets=5, blocked_window_minutes=60, blocked_surge_factor=3.0,
-            exclude_system_accounts=True, precursor_hours=24,
+            exclude_system_accounts=True, precursor_hours=24, peer_min_group=5, volume_surge_factor=3.0,
+            volume_min_connections=1000, volume_min_mb=1024, directory_min_connections=500, account_history_days=7,
+            process_history_days=7, directory_min_sources=3, directory_followup_minutes=30,
         ),
+        peer_group_keys=("app", "role"), directory_servers=(), directory_server_ips=(),
+        suspicious_tools=DEFAULT_SUSPICIOUS_TOOLS,
     )
 
 

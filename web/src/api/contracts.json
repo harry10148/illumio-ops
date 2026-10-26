@@ -11660,6 +11660,12 @@
                 "title": "Account Fanout Window Minutes",
                 "type": "integer"
               },
+              "account_history_days": {
+                "maximum": 90,
+                "minimum": 1,
+                "title": "Account History Days",
+                "type": "integer"
+              },
               "blocked_surge_factor": {
                 "maximum": 100.0,
                 "minimum": 1.0,
@@ -11684,6 +11690,24 @@
                 "title": "Chain Window Minutes",
                 "type": "integer"
               },
+              "directory_followup_minutes": {
+                "maximum": 1440,
+                "minimum": 10,
+                "title": "Directory Followup Minutes",
+                "type": "integer"
+              },
+              "directory_min_connections": {
+                "maximum": 10000000,
+                "minimum": 10,
+                "title": "Directory Min Connections",
+                "type": "integer"
+              },
+              "directory_min_sources": {
+                "maximum": 1000,
+                "minimum": 2,
+                "title": "Directory Min Sources",
+                "type": "integer"
+              },
               "exclude_system_accounts": {
                 "title": "Exclude System Accounts",
                 "type": "boolean"
@@ -11700,11 +11724,41 @@
                 "title": "Fanout Window Minutes",
                 "type": "integer"
               },
+              "peer_min_group": {
+                "maximum": 1000,
+                "minimum": 3,
+                "title": "Peer Min Group",
+                "type": "integer"
+              },
               "precursor_hours": {
                 "maximum": 168,
                 "minimum": 1,
                 "title": "Precursor Hours",
                 "type": "integer"
+              },
+              "process_history_days": {
+                "maximum": 90,
+                "minimum": 1,
+                "title": "Process History Days",
+                "type": "integer"
+              },
+              "volume_min_connections": {
+                "maximum": 10000000,
+                "minimum": 10,
+                "title": "Volume Min Connections",
+                "type": "integer"
+              },
+              "volume_min_mb": {
+                "maximum": 10000000,
+                "minimum": 1,
+                "title": "Volume Min Mb",
+                "type": "integer"
+              },
+              "volume_surge_factor": {
+                "maximum": 100.0,
+                "minimum": 1.5,
+                "title": "Volume Surge Factor",
+                "type": "number"
               }
             },
             "required": [
@@ -11717,7 +11771,16 @@
               "blocked_window_minutes",
               "blocked_surge_factor",
               "exclude_system_accounts",
-              "precursor_hours"
+              "precursor_hours",
+              "peer_min_group",
+              "volume_surge_factor",
+              "volume_min_connections",
+              "volume_min_mb",
+              "directory_min_connections",
+              "account_history_days",
+              "process_history_days",
+              "directory_min_sources",
+              "directory_followup_minutes"
             ],
             "title": "DetectorSettings",
             "type": "object"
@@ -11878,6 +11941,21 @@
               "detectors": {
                 "$ref": "#/$defs/DetectorSettings"
               },
+              "directory_server_ips": {
+                "items": {
+                  "type": "string"
+                },
+                "maxItems": 100,
+                "title": "Directory Server Ips",
+                "type": "array"
+              },
+              "directory_servers": {
+                "items": {
+                  "$ref": "#/$defs/LabelSelector"
+                },
+                "title": "Directory Servers",
+                "type": "array"
+              },
               "environment_label_key": {
                 "maxLength": 255,
                 "minLength": 1,
@@ -11914,11 +11992,29 @@
                 "title": "Observation Days",
                 "type": "integer"
               },
+              "peer_group_keys": {
+                "items": {
+                  "maxLength": 255,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "maxItems": 4,
+                "minItems": 1,
+                "title": "Peer Group Keys",
+                "type": "array"
+              },
               "removed_admin_ports": {
                 "items": {
                   "$ref": "#/$defs/PortEntry"
                 },
                 "title": "Removed Admin Ports",
+                "type": "array"
+              },
+              "suspicious_tools": {
+                "items": {
+                  "type": "string"
+                },
+                "title": "Suspicious Tools",
                 "type": "array"
               }
             },
@@ -11932,7 +12028,11 @@
               "graph_hops",
               "observation_days",
               "expected_initiators",
-              "detectors"
+              "detectors",
+              "peer_group_keys",
+              "directory_servers",
+              "directory_server_ips",
+              "suspicious_tools"
             ],
             "title": "LateralSettings",
             "type": "object"
@@ -12012,9 +12112,23 @@
             "title": "LateralStatus",
             "type": "object"
           },
+          "PortClass": {
+            "description": "The three kinds of management port (spec §6.5.8): remote execution and control, directory and\nauthentication, and databases. Each detector reads the classes it is about.",
+            "enum": [
+              "remote",
+              "directory",
+              "database"
+            ],
+            "title": "PortClass",
+            "type": "string"
+          },
           "PortEntry": {
             "additionalProperties": false,
             "properties": {
+              "category": {
+                "$ref": "#/$defs/PortClass",
+                "default": "remote"
+              },
               "port": {
                 "maximum": 65535,
                 "minimum": 0,
@@ -12127,6 +12241,12 @@
                 "title": "Account Fanout Window Minutes",
                 "type": "integer"
               },
+              "account_history_days": {
+                "maximum": 90,
+                "minimum": 1,
+                "title": "Account History Days",
+                "type": "integer"
+              },
               "blocked_surge_factor": {
                 "maximum": 100.0,
                 "minimum": 1.0,
@@ -12151,6 +12271,24 @@
                 "title": "Chain Window Minutes",
                 "type": "integer"
               },
+              "directory_followup_minutes": {
+                "maximum": 1440,
+                "minimum": 10,
+                "title": "Directory Followup Minutes",
+                "type": "integer"
+              },
+              "directory_min_connections": {
+                "maximum": 10000000,
+                "minimum": 10,
+                "title": "Directory Min Connections",
+                "type": "integer"
+              },
+              "directory_min_sources": {
+                "maximum": 1000,
+                "minimum": 2,
+                "title": "Directory Min Sources",
+                "type": "integer"
+              },
               "exclude_system_accounts": {
                 "title": "Exclude System Accounts",
                 "type": "boolean"
@@ -12167,11 +12305,41 @@
                 "title": "Fanout Window Minutes",
                 "type": "integer"
               },
+              "peer_min_group": {
+                "maximum": 1000,
+                "minimum": 3,
+                "title": "Peer Min Group",
+                "type": "integer"
+              },
               "precursor_hours": {
                 "maximum": 168,
                 "minimum": 1,
                 "title": "Precursor Hours",
                 "type": "integer"
+              },
+              "process_history_days": {
+                "maximum": 90,
+                "minimum": 1,
+                "title": "Process History Days",
+                "type": "integer"
+              },
+              "volume_min_connections": {
+                "maximum": 10000000,
+                "minimum": 10,
+                "title": "Volume Min Connections",
+                "type": "integer"
+              },
+              "volume_min_mb": {
+                "maximum": 10000000,
+                "minimum": 1,
+                "title": "Volume Min Mb",
+                "type": "integer"
+              },
+              "volume_surge_factor": {
+                "maximum": 100.0,
+                "minimum": 1.5,
+                "title": "Volume Surge Factor",
+                "type": "number"
               }
             },
             "required": [
@@ -12184,7 +12352,16 @@
               "blocked_window_minutes",
               "blocked_surge_factor",
               "exclude_system_accounts",
-              "precursor_hours"
+              "precursor_hours",
+              "peer_min_group",
+              "volume_surge_factor",
+              "volume_min_connections",
+              "volume_min_mb",
+              "directory_min_connections",
+              "account_history_days",
+              "process_history_days",
+              "directory_min_sources",
+              "directory_followup_minutes"
             ],
             "title": "DetectorSettings",
             "type": "object"
@@ -12272,6 +12449,21 @@
               "detectors": {
                 "$ref": "#/$defs/DetectorSettings"
               },
+              "directory_server_ips": {
+                "items": {
+                  "type": "string"
+                },
+                "maxItems": 100,
+                "title": "Directory Server Ips",
+                "type": "array"
+              },
+              "directory_servers": {
+                "items": {
+                  "$ref": "#/$defs/LabelSelector"
+                },
+                "title": "Directory Servers",
+                "type": "array"
+              },
               "environment_label_key": {
                 "maxLength": 255,
                 "minLength": 1,
@@ -12308,11 +12500,29 @@
                 "title": "Observation Days",
                 "type": "integer"
               },
+              "peer_group_keys": {
+                "items": {
+                  "maxLength": 255,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "maxItems": 4,
+                "minItems": 1,
+                "title": "Peer Group Keys",
+                "type": "array"
+              },
               "removed_admin_ports": {
                 "items": {
                   "$ref": "#/$defs/PortEntry"
                 },
                 "title": "Removed Admin Ports",
+                "type": "array"
+              },
+              "suspicious_tools": {
+                "items": {
+                  "type": "string"
+                },
+                "title": "Suspicious Tools",
                 "type": "array"
               }
             },
@@ -12326,14 +12536,32 @@
               "graph_hops",
               "observation_days",
               "expected_initiators",
-              "detectors"
+              "detectors",
+              "peer_group_keys",
+              "directory_servers",
+              "directory_server_ips",
+              "suspicious_tools"
             ],
             "title": "LateralSettings",
             "type": "object"
           },
+          "PortClass": {
+            "description": "The three kinds of management port (spec §6.5.8): remote execution and control, directory and\nauthentication, and databases. Each detector reads the classes it is about.",
+            "enum": [
+              "remote",
+              "directory",
+              "database"
+            ],
+            "title": "PortClass",
+            "type": "string"
+          },
           "PortEntry": {
             "additionalProperties": false,
             "properties": {
+              "category": {
+                "$ref": "#/$defs/PortClass",
+                "default": "remote"
+              },
               "port": {
                 "maximum": 65535,
                 "minimum": 0,
@@ -12457,6 +12685,12 @@
                 "title": "Account Fanout Window Minutes",
                 "type": "integer"
               },
+              "account_history_days": {
+                "maximum": 90,
+                "minimum": 1,
+                "title": "Account History Days",
+                "type": "integer"
+              },
               "blocked_surge_factor": {
                 "maximum": 100.0,
                 "minimum": 1.0,
@@ -12481,6 +12715,24 @@
                 "title": "Chain Window Minutes",
                 "type": "integer"
               },
+              "directory_followup_minutes": {
+                "maximum": 1440,
+                "minimum": 10,
+                "title": "Directory Followup Minutes",
+                "type": "integer"
+              },
+              "directory_min_connections": {
+                "maximum": 10000000,
+                "minimum": 10,
+                "title": "Directory Min Connections",
+                "type": "integer"
+              },
+              "directory_min_sources": {
+                "maximum": 1000,
+                "minimum": 2,
+                "title": "Directory Min Sources",
+                "type": "integer"
+              },
               "exclude_system_accounts": {
                 "title": "Exclude System Accounts",
                 "type": "boolean"
@@ -12497,11 +12749,41 @@
                 "title": "Fanout Window Minutes",
                 "type": "integer"
               },
+              "peer_min_group": {
+                "maximum": 1000,
+                "minimum": 3,
+                "title": "Peer Min Group",
+                "type": "integer"
+              },
               "precursor_hours": {
                 "maximum": 168,
                 "minimum": 1,
                 "title": "Precursor Hours",
                 "type": "integer"
+              },
+              "process_history_days": {
+                "maximum": 90,
+                "minimum": 1,
+                "title": "Process History Days",
+                "type": "integer"
+              },
+              "volume_min_connections": {
+                "maximum": 10000000,
+                "minimum": 10,
+                "title": "Volume Min Connections",
+                "type": "integer"
+              },
+              "volume_min_mb": {
+                "maximum": 10000000,
+                "minimum": 1,
+                "title": "Volume Min Mb",
+                "type": "integer"
+              },
+              "volume_surge_factor": {
+                "maximum": 100.0,
+                "minimum": 1.5,
+                "title": "Volume Surge Factor",
+                "type": "number"
               }
             },
             "required": [
@@ -12514,7 +12796,16 @@
               "blocked_window_minutes",
               "blocked_surge_factor",
               "exclude_system_accounts",
-              "precursor_hours"
+              "precursor_hours",
+              "peer_min_group",
+              "volume_surge_factor",
+              "volume_min_connections",
+              "volume_min_mb",
+              "directory_min_connections",
+              "account_history_days",
+              "process_history_days",
+              "directory_min_sources",
+              "directory_followup_minutes"
             ],
             "title": "DetectorSettings",
             "type": "object"
@@ -12675,6 +12966,21 @@
               "detectors": {
                 "$ref": "#/$defs/DetectorSettings"
               },
+              "directory_server_ips": {
+                "items": {
+                  "type": "string"
+                },
+                "maxItems": 100,
+                "title": "Directory Server Ips",
+                "type": "array"
+              },
+              "directory_servers": {
+                "items": {
+                  "$ref": "#/$defs/LabelSelector"
+                },
+                "title": "Directory Servers",
+                "type": "array"
+              },
               "environment_label_key": {
                 "maxLength": 255,
                 "minLength": 1,
@@ -12711,11 +13017,29 @@
                 "title": "Observation Days",
                 "type": "integer"
               },
+              "peer_group_keys": {
+                "items": {
+                  "maxLength": 255,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "maxItems": 4,
+                "minItems": 1,
+                "title": "Peer Group Keys",
+                "type": "array"
+              },
               "removed_admin_ports": {
                 "items": {
                   "$ref": "#/$defs/PortEntry"
                 },
                 "title": "Removed Admin Ports",
+                "type": "array"
+              },
+              "suspicious_tools": {
+                "items": {
+                  "type": "string"
+                },
+                "title": "Suspicious Tools",
                 "type": "array"
               }
             },
@@ -12729,7 +13053,11 @@
               "graph_hops",
               "observation_days",
               "expected_initiators",
-              "detectors"
+              "detectors",
+              "peer_group_keys",
+              "directory_servers",
+              "directory_server_ips",
+              "suspicious_tools"
             ],
             "title": "LateralSettings",
             "type": "object"
@@ -12809,9 +13137,23 @@
             "title": "LateralStatus",
             "type": "object"
           },
+          "PortClass": {
+            "description": "The three kinds of management port (spec §6.5.8): remote execution and control, directory and\nauthentication, and databases. Each detector reads the classes it is about.",
+            "enum": [
+              "remote",
+              "directory",
+              "database"
+            ],
+            "title": "PortClass",
+            "type": "string"
+          },
           "PortEntry": {
             "additionalProperties": false,
             "properties": {
+              "category": {
+                "$ref": "#/$defs/PortClass",
+                "default": "remote"
+              },
               "port": {
                 "maximum": 65535,
                 "minimum": 0,
@@ -14402,6 +14744,11 @@
       "blocked",
       "potentially_blocked",
       "unknown"
+    ],
+    "PortClass": [
+      "database",
+      "directory",
+      "remote"
     ],
     "PrecursorKind": [
       "offline",
