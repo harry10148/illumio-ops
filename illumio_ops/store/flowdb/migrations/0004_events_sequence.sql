@@ -1,6 +1,7 @@
 -- P4: event ids are never reused. Alert evaluation keeps the last evaluated id as its cursor; with a plain
 -- INTEGER PRIMARY KEY, retention deleting the highest row gave its id to the next event, which the cursor had
--- already passed. AUTOINCREMENT needs the table rebuilt (owner: store.flowdb.events).
+-- already passed. AUTOINCREMENT needs the table rebuilt (owner: store.flowdb.events): a full copy at startup,
+-- needing free disk at least the events table's size (spec §5: about 7.5 GB at 1,000 workloads).
 CREATE TABLE events_new (
     id                    INTEGER PRIMARY KEY AUTOINCREMENT,
     href                  TEXT NOT NULL UNIQUE,
