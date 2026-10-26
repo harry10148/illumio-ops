@@ -335,3 +335,14 @@ def test_pce_health_from_probe(ctx, monkeypatch):
     assert r.fired == 0  # within the cooldown of the first run's alert
     rows = [x for x in _alerts(ctx) if x["subject_key"] == "pce_health"]
     assert len(rows) == 1 and json.loads(rows[0]["params_json"])["failures"] == ["health"]
+
+
+def test_lateral_batches_do_not_skip_detections_sharing_an_update_time(ctx, monkeypatch):
+    # One detection run stamps every row it writes with the same updated_at (44k rows at scale, P3 Task 15):
+    # a watermark on updated_at alone skipped the rest of a batch cut inside that stamp.
+    evaluate_lateral(ctx, now=NOW)
+    for i in range(3):
+        _detect(ctx, fp=f"fanout|h{i}", at=NOW + minutes(1))
+    monkeypatch.setattr(evaluate, "DETECTION_BATCH", 1)
+    assert evaluate_lateral(ctx, now=NOW + minutes(2)).fired == 3
+    assert evaluate_lateral(ctx, now=NOW + minutes(3)).fired == 0

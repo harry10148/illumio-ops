@@ -73,6 +73,7 @@ from illumio_ops.store.flowdb import analysis, workloads
 EVENT_BATCH = 5_000
 EVENT_BATCHES = 10
 DETECTION_BATCH = 2_000
+DETECTION_BATCHES = 25
 
 SOURCE_EVENTS = "events"
 SOURCE_TRAFFIC = "traffic"
@@ -265,9 +266,15 @@ def evaluate_traffic(ctx: AppContext, *, now: datetime | None = None) -> EvalRun
 
 # ── lateral movement ─────────────────────────────────────────────────────────
 
-def _detection_fact(row: Any, *, mark: str, names: dict[str, str | None], previous: Severity | None) -> DetectionFact:
+def _is_new(row: Any, start: tuple[str, int]) -> bool:
+    """Created after the run's starting watermark (a new row's created_at equals its updated_at)."""
+    return bool(row["created_at"] > start[0] or (row["created_at"] == start[0] and row["id"] > start[1]))
+
+
+def _detection_fact(row: Any, *, start: tuple[str, int], names: dict[str, str | None],
+                    previous: Severity | None) -> DetectionFact:
     severity = Severity(row["severity"])
-    is_new = row["created_at"] > mark
+    is_new = _is_new(row, start)
     rose = previous is not None and SEVERITY_ORDER.index(severity) > SEVERITY_ORDER.index(previous)
     return DetectionFact(
         id=row["id"], detector=DetectorKind(row["detector"]), fingerprint=row["fingerprint"],
@@ -278,36 +285,52 @@ def _detection_fact(row: Any, *, mark: str, names: dict[str, str | None], previo
         confidence=json.loads(row["confidence_json"]), is_new=is_new, severity_rose=rose)
 
 
+def _mark(value: str) -> tuple[str, int]:
+    stamp, _, row_id = value.rpartition("|")
+    return stamp, int(row_id or 0)
+
+
 def evaluate_lateral(ctx: AppContext, *, now: datetime | None = None) -> EvalRun:
     at = _now(now)
     s = ctx.settings.current()
     run = EvalRun(source=SOURCE_LATERAL, evaluated=0, fired=0, suppressed=0, statuses={})
-    mark = _watermark(ctx, s, SOURCE_LATERAL)
-    with ctx.flows().connect() as conn:
-        if mark is None:
+    saved = _watermark(ctx, s, SOURCE_LATERAL)
+    if saved is None:
+        with ctx.flows().connect() as conn:
             newest = analysis.max_detection_update(conn)
-        else:
-            changed = analysis.detections_changed_since(conn, mark, limit=DETECTION_BATCH)
-            names = {w.href: w.hostname for w in workloads.all_workloads(conn)}
-    if mark is None:
-        _set_watermark(ctx, s, SOURCE_LATERAL, newest)
+        _set_watermark(ctx, s, SOURCE_LATERAL, f"{newest[0]}|{newest[1]}")
         return run
-    if not changed:
-        return run
+    mark = start = _mark(saved)
     rules: list[LateralRule] = _rules(s, LateralRule)
+    wanted = {d for r in rules for d in r.detectors}
     rec = _Recorder(ctx, s, at)
-    for rule in rules:
-        facts = []
-        for row in changed:
-            previous = None
-            if row["created_at"] <= mark:
-                with ctx.db() as conn:
-                    last = store.last_alert(conn, rule.id, row["fingerprint"])
-                previous = Severity(last["severity"]) if last is not None else None
-            facts.append(_detection_fact(row, mark=mark, names=names, previous=previous))
-        rec.record(rule, evaluate_lateral_rule(rule, facts))
-    run.evaluated = len(changed)
-    _set_watermark(ctx, s, SOURCE_LATERAL, changed[-1]["updated_at"])
+    with ctx.flows().connect() as conn:
+        names = {w.href: w.hostname for w in workloads.all_workloads(conn)}
+    for _ in range(DETECTION_BATCHES):
+        with ctx.flows().connect() as conn:
+            changed = analysis.detections_changed_since(conn, mark, limit=DETECTION_BATCH)
+        if not changed:
+            break
+        for rule in rules:
+            facts = []
+            for row in changed:
+                if DetectorKind(row["detector"]) not in wanted:
+                    continue
+                previous = None
+                if not _is_new(row, start):  # changed, not new: alert again only if its severity rose
+                    with ctx.db() as conn:
+                        last = store.last_alert(conn, rule.id, row["fingerprint"])
+                    previous = Severity(last["severity"]) if last is not None else None
+                facts.append(_detection_fact(row, start=start, names=names, previous=previous))
+            rec.record(rule, evaluate_lateral_rule(rule, facts))
+        run.evaluated += len(changed)
+        mark = (str(changed[-1]["updated_at"]), int(changed[-1]["id"]))
+        _set_watermark(ctx, s, SOURCE_LATERAL, f"{mark[0]}|{mark[1]}")
+        if len(changed) < DETECTION_BATCH:
+            break
+    else:
+        logger.info("alert evaluation: more than {} changed detections; the rest are evaluated next run",
+                    DETECTION_BATCH * DETECTION_BATCHES)
     return run.model_copy(update={"fired": rec.fired, "suppressed": rec.suppressed})
 
 

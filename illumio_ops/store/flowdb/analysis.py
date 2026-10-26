@@ -95,14 +95,16 @@ def detections_since(conn: sqlite3.Connection, since: datetime, *, detectors: Co
     return conn.execute(sql + " ORDER BY last_seen DESC, id DESC LIMIT ?", [*params, limit]).fetchall()
 
 
-def detections_changed_since(conn: sqlite3.Connection, since: str, *, limit: int) -> list[sqlite3.Row]:
-    """Detections created or updated after this updated_at, oldest change first (alert evaluation)."""
-    return conn.execute("SELECT * FROM detections WHERE updated_at > ? ORDER BY updated_at, id LIMIT ?",
-                        (since, limit)).fetchall()
+def detections_changed_since(conn: sqlite3.Connection, since: tuple[str, int], *, limit: int) -> list[sqlite3.Row]:
+    """Detections changed after (updated_at, id), in that order (alert evaluation). One detection run stamps all
+    its rows alike, so the id breaks the tie: a page cut inside one stamp continues where it stopped."""
+    return conn.execute("SELECT * FROM detections WHERE updated_at > ? OR (updated_at = ? AND id > ?) "
+                        "ORDER BY updated_at, id LIMIT ?", (since[0], since[0], since[1], limit)).fetchall()
 
 
-def max_detection_update(conn: sqlite3.Connection) -> str:
-    return str(conn.execute("SELECT COALESCE(MAX(updated_at), '') FROM detections").fetchone()[0])
+def max_detection_update(conn: sqlite3.Connection) -> tuple[str, int]:
+    row = conn.execute("SELECT updated_at, id FROM detections ORDER BY updated_at DESC, id DESC LIMIT 1").fetchone()
+    return (str(row["updated_at"]), int(row["id"])) if row is not None else ("", 0)
 
 
 def detections_ranked(conn: sqlite3.Connection, since: datetime, *, limit: int) -> tuple[list[sqlite3.Row], int]:
