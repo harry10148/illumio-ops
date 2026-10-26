@@ -12,6 +12,7 @@ from pathlib import Path
 from illumio_ops.domain.values import Language
 from illumio_ops.migrate.report import render
 from illumio_ops.migrate.v5 import migrate_v5, read_v5
+from illumio_ops.migrate.v5_alerts import read_v5_rules
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -31,7 +32,8 @@ def main(argv: list[str] | None = None) -> int:
     except ValueError as exc:
         sys.stderr.write(f"{exc}\n")
         return 65
-    result = migrate_v5(raw)
+    rules, legacy_channels = read_v5_rules(args.source)
+    result = migrate_v5(raw, rules=rules, legacy_channels=legacy_channels)
     sys.stdout.write(render(result.report, Language(args.lang)))
     if result.blocking:
         sys.stderr.write("these 5.x values cannot become v6 settings; nothing would be migrated:\n")
