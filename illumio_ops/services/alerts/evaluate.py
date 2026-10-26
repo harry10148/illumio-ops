@@ -95,28 +95,45 @@ def _rules(s: Settings, kind: type[Any]) -> list[Any]:
 
 
 class _Recorder:
-    """Gates triggers and records the alerts that pass, for one evaluation."""
+    """Gates triggers and records the alerts that pass. What one batch found is recorded together with the
+    source's new watermark, in one transaction: a failure leaves neither an alert, a cooldown nor the watermark
+    behind, so the retry sees the same data with the same state (a cooldown saved without its alert would
+    suppress the retry; an alert kept without the watermark would be written again)."""
 
     def __init__(self, ctx: AppContext, s: Settings, now: datetime) -> None:
         self.ctx, self.now = ctx, now
         self.pce = (s.pce.url, s.pce.org_id)
         self.channels = enabled_channels(s.alerts.channels)
         self.fired = self.suppressed = 0
+        self.pending: list[tuple[AlertRule, list[Trigger]]] = []
 
     def record(self, rule: AlertRule, triggers: Sequence[Trigger]) -> None:
-        for t in triggers:
-            with self.ctx.db() as conn:
-                g = gate(rule, store.rule_state(conn, rule.id, t.subject_key), self.now)
-                store.save_rule_state(conn, rule.id, t.subject_key, g.state,
-                                      suppressed=None if g.allowed else g.reason)  # type: ignore[arg-type]
-                if not g.allowed:
-                    self.suppressed += 1
-                    continue
-                hold = (DeliveryStatus.GROUPED if t.grouped_annotation is not None
-                        else None if rule.notify else DeliveryStatus.NOT_NOTIFIED)
-                store.insert_alert(conn, pce_url=self.pce[0], org_id=self.pce[1], rule_name=rule.name,
-                                   pack_key=rule.pack_key, trigger=t, at=self.now, channels=self.channels, hold=hold)
-                self.fired += 1
+        if triggers:
+            self.pending.append((rule, list(triggers)))
+
+    def commit(self, source: str, watermark: str | None) -> None:
+        """Record the pending triggers and move the source's watermark (None: leave it) as one change."""
+        fired = suppressed = 0
+        with self.ctx.db() as conn:
+            for rule, triggers in self.pending:
+                for t in triggers:
+                    g = gate(rule, store.rule_state(conn, rule.id, t.subject_key), self.now)
+                    store.save_rule_state(conn, rule.id, t.subject_key, g.state,
+                                          suppressed=None if g.allowed else g.reason)  # type: ignore[arg-type]
+                    if not g.allowed:
+                        suppressed += 1
+                        continue
+                    hold = (DeliveryStatus.GROUPED if t.grouped_annotation is not None
+                            else None if rule.notify else DeliveryStatus.NOT_NOTIFIED)
+                    store.insert_alert(conn, pce_url=self.pce[0], org_id=self.pce[1], rule_name=rule.name,
+                                       pack_key=rule.pack_key, trigger=t, at=self.now, channels=self.channels,
+                                       hold=hold)
+                    fired += 1
+            if watermark is not None:
+                store.set_eval_watermark(conn, source, watermark, pce_url=self.pce[0], org_id=self.pce[1])
+        self.pending.clear()
+        self.fired += fired
+        self.suppressed += suppressed
 
     def status(self, rule_id: str, status: str) -> None:
         with self.ctx.db() as conn:
@@ -209,7 +226,7 @@ def evaluate_events(ctx: AppContext, *, now: datetime | None = None) -> EvalRun:
             rec.record(rule, [_tamper(t, matched, cache, ctx) for t in triggers])
         run.evaluated += len(rows)
         after = rows[-1].id
-        _set_watermark(ctx, s, SOURCE_EVENTS, str(after))
+        rec.commit(SOURCE_EVENTS, str(after))
         if not more:
             break
     else:
@@ -262,7 +279,7 @@ def evaluate_traffic(ctx: AppContext, *, now: datetime | None = None) -> EvalRun
         run.statuses[rule.id] = status
         rec.record(rule, [trigger] if trigger else [])
         run.evaluated += 1
-    _set_watermark(ctx, s, SOURCE_TRAFFIC, max(since, newest or since).isoformat())
+    rec.commit(SOURCE_TRAFFIC, max(since, newest or since).isoformat())
     return run.model_copy(update={"fired": rec.fired, "suppressed": rec.suppressed})
 
 
@@ -338,7 +355,7 @@ def evaluate_lateral(ctx: AppContext, *, now: datetime | None = None) -> EvalRun
             rec.record(rule, evaluate_lateral_rule(rule, facts))
         run.evaluated += len(changed)
         mark = (str(changed[-1]["updated_at"]), int(changed[-1]["id"]))
-        _set_watermark(ctx, s, SOURCE_LATERAL, f"{mark[0]}|{mark[1]}")
+        rec.commit(SOURCE_LATERAL, f"{mark[0]}|{mark[1]}")
         if len(changed) < DETECTION_BATCH:
             break
     else:
@@ -368,6 +385,5 @@ def evaluate_system(ctx: AppContext, *, now: datetime | None = None,
     for rule in rules:
         rec.record(rule, evaluate_system_rule(rule, facts, now=at))
         run.evaluated += 1
-    if watches_gaps:
-        _set_watermark(ctx, s, SOURCE_SYSTEM, str(newest))
+    rec.commit(SOURCE_SYSTEM, str(newest) if watches_gaps else None)
     return run.model_copy(update={"fired": rec.fired, "suppressed": rec.suppressed})

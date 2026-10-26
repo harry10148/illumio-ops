@@ -116,6 +116,48 @@ def test_count_rule_window(ctx, pce):
     assert a["pack_key"] == "rule_login_failed" and json.loads(a["facts_json"])["matches"] == 5
 
 
+def _fail_once(monkeypatch, nth):
+    """Make the nth alert write of the run fail once, as a full disk or a locked database would."""
+    real, calls = store.insert_alert, []
+
+    def flaky(conn, **kw):
+        calls.append(1)
+        if len(calls) == nth:
+            raise OSError("disk I/O error")
+        return real(conn, **kw)
+    monkeypatch.setattr(evaluate.store, "insert_alert", flaky)
+
+
+def test_failed_alert_write_is_retried_not_swallowed_by_cooldown(ctx, pce, monkeypatch):
+    """The cooldown was saved before the alert was written: a failed write left the next try suppressed, no
+    alert at all (review)."""
+    _collect_and_evaluate(ctx, pce, NOW)
+    pce.event(2, "rule_set.create", NOW + minutes(1))
+    _fail_once(monkeypatch, 1)
+    with pytest.raises(OSError):
+        _collect_and_evaluate(ctx, pce, NOW + minutes(2))
+    r = evaluate_events(ctx, now=NOW + minutes(3))
+    assert (r.fired, r.suppressed) == (1, 0) and len(_alerts(ctx)) == 1
+
+
+def test_retried_batch_does_not_repeat_its_alerts(ctx, pce, monkeypatch):
+    """A batch is recorded whole or not at all: on retry, the alerts written before the failure are not written
+    again (a lateral rule's cooldown is 0, so nothing else would stop them)."""
+    def no_cooldown(d):
+        for r in d["alerts"]["rules"]:
+            if r["pack_key"] == "rule_ruleset_change":
+                r["cooldown_minutes"] = 0
+    ctx.settings.update(ctx.settings.current().revision, no_cooldown)
+    _collect_and_evaluate(ctx, pce, NOW)
+    pce.event(2, "rule_set.create", NOW + minutes(1))
+    pce.event(3, "rule_set.delete", NOW + minutes(1))
+    _fail_once(monkeypatch, 2)
+    with pytest.raises(OSError):
+        _collect_and_evaluate(ctx, pce, NOW + minutes(2))
+    evaluate_events(ctx, now=NOW + minutes(3))
+    assert sorted(a["subject_key"] for a in _alerts(ctx)) == ["rule_set.create", "rule_set.delete"]
+
+
 def test_cooldown_suppresses_and_counts(ctx, pce):
     _collect_and_evaluate(ctx, pce, NOW)
     pce.event(2, "rule_set.create", NOW + minutes(1))

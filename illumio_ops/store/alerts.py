@@ -31,27 +31,27 @@ def evidence_json(trigger: Trigger) -> str | None:
 def insert_alert(conn: sqlite3.Connection, *, pce_url: str, org_id: str, rule_name: str, pack_key: str | None,
                  trigger: Trigger, at: datetime, channels: Sequence[str], hold: DeliveryStatus | None) -> int:
     """One alert and its delivery rows: a pending row per channel; with hold (not_notified, grouped) one row
-    saying so; with no channel enabled one no_channel row. An alert is never stored without a delivery row."""
-    with conn:
-        cur = conn.execute(
-            "INSERT INTO alerts (pce_url, org_id, rule_id, rule_type, rule_name, pack_key, severity, subject_key, "
-            "fired_at, first_seen, last_seen, late, notify, grouped_annotation, message_key, params_json, facts_json, "
-            "evidence_json, confidence_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-            (pce_url, org_id, trigger.rule_id, trigger.rule_type.value, rule_name, pack_key, trigger.severity.value,
-             trigger.subject_key, _t(at), _t(trigger.first_seen), _t(trigger.last_seen), int(trigger.late),
-             int(hold is None), trigger.grouped_annotation, trigger.message_key,
-             json.dumps(trigger.params, default=str), json.dumps(trigger.facts, default=str), evidence_json(trigger),
-             json.dumps(asdict(trigger.confidence), default=str)))
-        alert_id = int(cur.lastrowid or 0)
-        rows: list[tuple[int, str, str, int, str | None]]
-        if hold is not None:
-            rows = [(alert_id, NOT_SENT, hold.value, 0, None)]
-        elif not channels:
-            rows = [(alert_id, NOT_SENT, DeliveryStatus.NO_CHANNEL.value, 0, None)]
-        else:
-            rows = [(alert_id, c, DeliveryStatus.PENDING.value, 0, _t(at)) for c in channels]
-        conn.executemany("INSERT INTO alert_deliveries (alert_id, channel, status, attempts, next_attempt_at) "
-                         "VALUES (?, ?, ?, ?, ?)", rows)
+    saying so; with no channel enabled one no_channel row. An alert is never stored without a delivery row.
+    The caller commits (the evaluation records a batch's alerts, rule states and watermark together)."""
+    cur = conn.execute(
+        "INSERT INTO alerts (pce_url, org_id, rule_id, rule_type, rule_name, pack_key, severity, subject_key, "
+        "fired_at, first_seen, last_seen, late, notify, grouped_annotation, message_key, params_json, facts_json, "
+        "evidence_json, confidence_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        (pce_url, org_id, trigger.rule_id, trigger.rule_type.value, rule_name, pack_key, trigger.severity.value,
+         trigger.subject_key, _t(at), _t(trigger.first_seen), _t(trigger.last_seen), int(trigger.late),
+         int(hold is None), trigger.grouped_annotation, trigger.message_key,
+         json.dumps(trigger.params, default=str), json.dumps(trigger.facts, default=str), evidence_json(trigger),
+         json.dumps(asdict(trigger.confidence), default=str)))
+    alert_id = int(cur.lastrowid or 0)
+    rows: list[tuple[int, str, str, int, str | None]]
+    if hold is not None:
+        rows = [(alert_id, NOT_SENT, hold.value, 0, None)]
+    elif not channels:
+        rows = [(alert_id, NOT_SENT, DeliveryStatus.NO_CHANNEL.value, 0, None)]
+    else:
+        rows = [(alert_id, c, DeliveryStatus.PENDING.value, 0, _t(at)) for c in channels]
+    conn.executemany("INSERT INTO alert_deliveries (alert_id, channel, status, attempts, next_attempt_at) "
+                     "VALUES (?, ?, ?, ?, ?)", rows)
     return alert_id
 
 
@@ -122,14 +122,13 @@ def save_rule_state(conn: sqlite3.Connection, rule_id: str, subject_key: str, st
                     suppressed: Literal["cooldown", "throttle"] | None) -> None:
     last = _t(state.last_fired_at) if state.last_fired_at else None
     recent = json.dumps([_t(t) for t in state.recent])
-    with conn:
-        conn.execute(
-            "INSERT INTO alert_rule_state (rule_id, subject_key, last_fired_at, recent_json, suppressed_cooldown, "
-            "suppressed_throttle) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(rule_id, subject_key) DO UPDATE SET "
-            "last_fired_at = excluded.last_fired_at, recent_json = excluded.recent_json, "
-            "suppressed_cooldown = suppressed_cooldown + excluded.suppressed_cooldown, "
-            "suppressed_throttle = suppressed_throttle + excluded.suppressed_throttle",
-            (rule_id, subject_key, last, recent, int(suppressed == "cooldown"), int(suppressed == "throttle")))
+    conn.execute(
+        "INSERT INTO alert_rule_state (rule_id, subject_key, last_fired_at, recent_json, suppressed_cooldown, "
+        "suppressed_throttle) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(rule_id, subject_key) DO UPDATE SET "
+        "last_fired_at = excluded.last_fired_at, recent_json = excluded.recent_json, "
+        "suppressed_cooldown = suppressed_cooldown + excluded.suppressed_cooldown, "
+        "suppressed_throttle = suppressed_throttle + excluded.suppressed_throttle",
+        (rule_id, subject_key, last, recent, int(suppressed == "cooldown"), int(suppressed == "throttle")))
 
 
 def set_rule_status(conn: sqlite3.Connection, rule_id: str, status: str, at: datetime) -> None:
@@ -176,10 +175,9 @@ def eval_watermark(conn: sqlite3.Connection, source: str, *, pce_url: str, org_i
 
 
 def set_eval_watermark(conn: sqlite3.Connection, source: str, value: str, *, pce_url: str, org_id: str) -> None:
-    with conn:
-        conn.execute("INSERT INTO alert_eval_state (source, pce_url, org_id, watermark) VALUES (?, ?, ?, ?) "
-                     "ON CONFLICT(source) DO UPDATE SET pce_url = excluded.pce_url, org_id = excluded.org_id, "
-                     "watermark = excluded.watermark", (source, pce_url, org_id, value))
+    conn.execute("INSERT INTO alert_eval_state (source, pce_url, org_id, watermark) VALUES (?, ?, ?, ?) "
+                 "ON CONFLICT(source) DO UPDATE SET pce_url = excluded.pce_url, org_id = excluded.org_id, "
+                 "watermark = excluded.watermark", (source, pce_url, org_id, value))
 
 
 # ── deliveries and channels ──────────────────────────────────────────────────
