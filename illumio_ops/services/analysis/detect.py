@@ -17,16 +17,15 @@ from illumio_ops.domain.detectors import (
     DetectorInput,
     DetectorStatus,
     HostLookup,
-    Obs,
     blocked_counts,
     dedup_windows,
     evaluable,
-    max_window_targets,
     run_detectors,
 )
 from illumio_ops.domain.filter import FilterSpec
 from illumio_ops.domain.lateral import HostInfo
 from illumio_ops.domain.values import DetectorKind, DetectorState, PolicyDecision
+from illumio_ops.services.analysis import blocked_history
 from illumio_ops.services.analysis.context import (
     LateralContext,
     host_for,
@@ -131,10 +130,14 @@ def run_detection(ctx: AppContext, *, now: datetime | None = None, window: tuple
         tuples = {(o.src_key, o.dst_key, o.port if o.port is not None else -1, o.proto)
                   for o in admin.rows if evaluable(o, inp0)}
         precursors = precursor_events(ctx, start=lo - cfg.precursor_window, end=hi)
+        history, history_mode = _blocked_history(ctx, inp0, at)
         inp = replace(inp0, baseline_first_seen=baseline_first_seen(ctx, tuples), precursors=precursors.items,
-                      blocked_history=_blocked_history(ctx, inp0, at))
+                      blocked_history=history)
         found, statuses = run_detectors(inp)
         status_rows = [_status(s, bool(gaps)) for s in statuses]
+        for row in status_rows:
+            if row["detector"] == DetectorKind.BLOCKED_SURGE.value and history_mode is not None:
+                row["params"]["history"] = history_mode
         with fdb.writing(lc.generation) as conn:
             new, updated = analysis.upsert_detections(conn, [_write(d) for d in found], dedup=dedup_windows(cfg),
                                                       late=late, at=at)
@@ -159,23 +162,18 @@ def _hosts(lc: LateralContext) -> HostLookup:
     return lookup
 
 
-HISTORY = timedelta(days=7)
+HISTORY = blocked_history.HISTORY
 
 
-def _blocked_history(ctx: AppContext, inp: DetectorInput, at: datetime) -> dict[str, int]:
+def _blocked_history(ctx: AppContext, inp: DetectorInput, at: datetime) -> tuple[dict[str, int], str | None]:
     """For the sources over the blocked threshold now: their most distinct blocked targets in any window of
-    the 7 days before this run's window (read only for them; usually none are over)."""
+    the 7 days before this run's window (usually none are over, and nothing is read). The second value says
+    whether the hourly cache served it ("cached") or all 7 days were read ("live")."""
     cfg = inp.config
     over = [src for src, n in blocked_counts(inp).items() if n >= cfg.blocked_targets]
     if not over:
-        return {}
-    lo = inp.window[0]
-    rows = observations(ctx, FilterSpec(start=lo - HISTORY, end=lo, decisions=(PolicyDecision.BLOCKED,)), now=at).rows
-    by_src: dict[str, list[Obs]] = {src: [] for src in over}
-    for o in rows:  # one pass: a scan per source was the slowest part of a busy run (P3 Task 15 scale)
-        if o.src_key in by_src and o.last <= lo:
-            by_src[o.src_key].append(o)
-    return {src: max_window_targets(found, cfg.blocked_window) for src, found in by_src.items()}
+        return {}, None
+    return blocked_history.history_for(ctx, over, window=cfg.blocked_window, lo=inp.window[0], now=at)
 
 
 def _pending(conn: Any) -> set[str]:
