@@ -53,6 +53,7 @@ from illumio_ops.domain.values import (
     CollectionMode,
     DeliveryStatus,
     DetectorKind,
+    IngestSource,
     Severity,
     SystemCheck,
     TamperPattern,
@@ -71,7 +72,7 @@ from illumio_ops.services.eventsource import (
 from illumio_ops.services.flowsource import increment_totals, increments_watermark
 from illumio_ops.settings.schema import Settings
 from illumio_ops.store import alerts as store
-from illumio_ops.store.flowdb import analysis, workloads
+from illumio_ops.store.flowdb import analysis, ingest_state, workloads
 
 EVENT_BATCH = 5_000
 EVENT_BATCHES = 10
@@ -167,6 +168,14 @@ def _set_watermark(ctx: AppContext, s: Settings, source: str, value: str) -> Non
         store.set_eval_watermark(conn, source, value, pce_url=s.pce.url, org_id=s.pce.org_id)
 
 
+def _collected(ctx: AppContext, source: IngestSource) -> bool:
+    """Whether a collection of this source has succeeded. Until one has, a first evaluation waits: starting its
+    watermark on an empty store would make the first successful cycle's cold start look new."""
+    with ctx.flows().connect() as conn:
+        state = ingest_state.get(conn, source)
+    return state is not None and state.last_ok_at is not None
+
+
 def _now(now: datetime | None) -> datetime:
     return (now or datetime.now(UTC)).astimezone(UTC)
 
@@ -224,6 +233,8 @@ def evaluate_events(ctx: AppContext, *, now: datetime | None = None) -> EvalRun:
     run = EvalRun(source=SOURCE_EVENTS, evaluated=0, fired=0, suppressed=0, statuses={})
     mark = _watermark(ctx, s, SOURCE_EVENTS)
     if mark is None:
+        if not _collected(ctx, IngestSource.EVENTS):
+            return run
         _set_watermark(ctx, s, SOURCE_EVENTS, str(max_event_id(ctx)))
         return run
     rules: list[EventRule] = _rules(s, EventRule)
@@ -278,6 +289,8 @@ def evaluate_traffic(ctx: AppContext, *, now: datetime | None = None) -> EvalRun
     newest = increments_watermark(ctx)
     mark = _watermark(ctx, s, SOURCE_TRAFFIC)
     if mark is None:
+        if not _collected(ctx, IngestSource.TRAFFIC):
+            return run
         _set_watermark(ctx, s, SOURCE_TRAFFIC, (newest or at).isoformat())
         return run
     since = datetime.fromisoformat(mark)
@@ -346,6 +359,8 @@ def evaluate_lateral(ctx: AppContext, *, now: datetime | None = None) -> EvalRun
     run = EvalRun(source=SOURCE_LATERAL, evaluated=0, fired=0, suppressed=0, statuses={})
     saved = _watermark(ctx, s, SOURCE_LATERAL)
     if saved is None:
+        if not _collected(ctx, IngestSource.TRAFFIC):
+            return run
         with ctx.flows().connect() as conn:
             newest = analysis.max_detection_update(conn)
         _set_watermark(ctx, s, SOURCE_LATERAL, f"{newest[0]}|{newest[1]}")

@@ -51,7 +51,10 @@ class Pce:
 
 @pytest.fixture
 def ctx(tmp_path):
-    return configured_ctx(tmp_path)
+    c = configured_ctx(tmp_path)
+    with c.flows().connect() as conn:  # a traffic collection has succeeded (a first evaluation waits for one)
+        ingest_state.mark_ok(conn, IngestSource.TRAFFIC, NOW - minutes(30), watermark=NOW - minutes(30), rows=0)
+    return c
 
 
 @pytest.fixture
@@ -79,6 +82,26 @@ def test_first_run_does_not_alert_history(ctx, pce):
     assert r.evaluated == 0 and _alerts(ctx) == []
     with ctx.db() as conn:
         assert store.eval_watermark(conn, "events", pce_url=PCE["url"], org_id=PCE["org_id"]) == "1"
+
+
+def test_first_run_after_a_failed_collection_does_not_alert_the_cold_start(ctx, pce, monkeypatch):
+    """The first collection failed: the evaluation must not start its watermark on the empty store, or the next
+    cycle's 24-hour cold start is alerted on as new (review)."""
+    def down(client, **kw):
+        raise OSError("PCE unreachable")
+    with monkeypatch.context() as m:
+        m.setattr(ev, "fetch_events", down)
+        try:
+            run_events_cycle(ctx, now=NOW)
+        except OSError:
+            pass
+        evaluate_events(ctx, now=NOW)
+    pce.event(1, "rule_set.create", NOW - timedelta(hours=20))
+    _collect_and_evaluate(ctx, pce, NOW + minutes(10))
+    assert _alerts(ctx) == []
+    pce.event(2, "rule_set.create", NOW + minutes(11))
+    _collect_and_evaluate(ctx, pce, NOW + minutes(12))
+    assert len(_alerts(ctx)) == 1
 
 
 def test_backfill_events_not_evaluated(ctx, pce):
@@ -465,3 +488,12 @@ def test_lateral_batches_do_not_skip_detections_sharing_an_update_time(ctx, monk
     monkeypatch.setattr(evaluate, "DETECTION_BATCH", 1)
     assert evaluate_lateral(ctx, now=NOW + minutes(2)).fired == 3
     assert evaluate_lateral(ctx, now=NOW + minutes(3)).fired == 0
+
+
+def test_traffic_and_lateral_wait_for_a_successful_collection(tmp_path):
+    fresh = configured_ctx(tmp_path)
+    evaluate_traffic(fresh, now=NOW)
+    evaluate_lateral(fresh, now=NOW)
+    with fresh.db() as conn:
+        assert [store.eval_watermark(conn, src, pce_url=PCE["url"], org_id=PCE["org_id"])
+                for src in ("traffic", "lateral")] == [None, None]
