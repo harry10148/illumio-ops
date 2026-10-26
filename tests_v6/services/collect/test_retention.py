@@ -145,3 +145,40 @@ def test_retention_waits_for_a_running_backfill(tmp_path):
         assert _count(ctx, "flows") == 1
     t.join(timeout=10)
     assert not t.is_alive() and _count(ctx, "flows") == 0
+
+
+def test_retention_drops_expired_detections_and_snapshots(tmp_path):
+    from illumio_ops.store.flowdb import analysis
+    from illumio_ops.store.flowdb.analysis import DetectionWrite, FocusWrite
+
+    ctx = configured_ctx(tmp_path)  # event_days 90, rollup_days 90
+    def det(fp, seen):
+        return DetectionWrite(detector="fanout", fingerprint=fp, subject_key="w", severity="medium", first_seen=seen,
+                              last_seen=seen, critical_asset=False, summary_json="{}", segment_json="{}",
+                              confidence_json="{}")
+    with ctx.flows().connect() as conn:
+        analysis.upsert_detections(conn, [det("old", NOW - timedelta(days=95)), det("new", NOW - timedelta(days=1))],
+                                   dedup={"fanout": timedelta(hours=1)}, late=False, at=NOW)
+        analysis.upsert_focus(conn, [FocusWrite("f", "tamper", 1.0, "{}")], at=NOW - timedelta(days=95))
+        analysis.upsert_focus(conn, [], at=NOW - timedelta(days=94))
+        analysis.write_lateral_snapshot(conn, (NOW - timedelta(days=100)).date().isoformat(), {})
+        analysis.write_lateral_snapshot(conn, NOW.date().isoformat(), {})
+    counts = run_retention(ctx, now=NOW)
+    assert counts["analysis"] == 3
+    assert _count(ctx, "detections") == 1 and _count(ctx, "focus_items") == 0
+    assert _count(ctx, "lateral_snapshot_daily") == 1
+
+
+def test_open_gaps_kept_as_long_as_the_baseline(tmp_path):
+    # Security review of 2e8efd82: an unresolved gap inside the baseline (what the analysis looks back over)
+    # must outlive a shorter rollup retention, or a failed read stops showing.
+    from illumio_ops.domain.values import IngestSource
+    from illumio_ops.store.flowdb import ingest_state
+    ctx = configured_ctx(tmp_path, mode="alert",
+                         retention={"flow_days": 7, "event_days": 90, "rollup_days": 7, "baseline_days": 30})
+    with ctx.flows().connect() as conn:
+        ingest_state.record_gap(conn, IngestSource.TRAFFIC, NOW - timedelta(days=10), NOW - timedelta(days=9, hours=23),
+                                "failed", "x", NOW - timedelta(days=10))
+    run_retention(ctx, now=NOW)
+    with ctx.flows().connect() as conn:
+        assert len(ingest_state.open_gaps(conn, IngestSource.TRAFFIC)) == 1

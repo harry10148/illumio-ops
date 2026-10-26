@@ -7,6 +7,7 @@ TABLE_OWNERS: dict[str, str] = {
     # data/app.sqlite
     "job_health": "illumio_ops.jobs.health",
     "pce_probe": "illumio_ops.services.pce_health",
+    "tamper_annotations": "illumio_ops.store.annotations",
     # data/flows.sqlite
     "pce_binding": "illumio_ops.store.flowdb.binding",
     "ingest_state": "illumio_ops.store.flowdb.ingest_state",
@@ -28,4 +29,9 @@ TABLE_OWNERS: dict[str, str] = {
     "org_risk_snapshot_daily": "illumio_ops.store.flowdb.ransomware",
     "pce_capabilities": "illumio_ops.store.flowdb.capabilities",
     "archive_log": "illumio_ops.store.flowdb.archive",
+    "detections": "illumio_ops.store.flowdb.analysis",
+    "analysis_runs": "illumio_ops.store.flowdb.analysis",
+    "analysis_results": "illumio_ops.store.flowdb.analysis",
+    "lateral_snapshot_daily": "illumio_ops.store.flowdb.analysis",
+    "focus_items": "illumio_ops.store.flowdb.analysis",
 }

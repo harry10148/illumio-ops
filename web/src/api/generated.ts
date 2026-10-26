@@ -24,6 +24,20 @@ export type CollectionMode = ("full" | "alert" | "events_only")
  */
 export type CollectionMode1 = ("full" | "alert" | "events_only")
 /**
+ * The lateral-movement detectors of spec §6.5.1.
+ * 
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "DetectorKind".
+ */
+export type DetectorKind = ("fanout" | "new_admin_connection" | "pivot_chain" | "blocked_surge" | "non_admin_group" | "cross_env" | "account_fanout" | "unexpected_initiator")
+/**
+ * What a detector run can say besides its detections: "no detection" is only ever OK.
+ * 
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "DetectorState".
+ */
+export type DetectorState = ("ok" | "disabled" | "accumulating" | "no_data" | "collection_off" | "incomplete")
+/**
  * This interface was referenced by `ContractRoot`'s JSON-Schema
  * via the `definition` "DeploymentType".
  */
@@ -276,6 +290,143 @@ jobs: JobView[]
 }
 /**
  * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "AdminPortView".
+ */
+export interface AdminPortView {
+name: (string | null)
+port: number
+proto: (number | null)
+source: ("builtin" | "pce" | "added")
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "DetectorSettings".
+ */
+export interface DetectorSettings {
+account_fanout_targets: number
+account_fanout_window_minutes: number
+blocked_surge_factor: number
+blocked_targets: number
+blocked_window_minutes: number
+chain_window_minutes: number
+exclude_system_accounts: boolean
+fanout_targets: number
+fanout_window_minutes: number
+precursor_hours: number
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "DetectorStatusView".
+ */
+export interface DetectorStatusView {
+detector: DetectorKind
+params: {
+[k: string]: unknown
+}
+reason_key: (string | null)
+state: DetectorState
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "ExpectedInitiators".
+ */
+export interface ExpectedInitiators {
+port: number
+/**
+ * @minItems 1
+ */
+processes: [string, ...(string)[]]
+proto: (number | null)
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "LabelChoice".
+ */
+export interface LabelChoice {
+key: string
+truncated: boolean
+values: string[]
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "LabelSelector".
+ */
+export interface LabelSelector {
+key: string
+value: string
+}
+/**
+ * Lateral-movement analysis (spec §6.5.1): which ports count as management, which hosts matter,
+ * and the detectors' thresholds.
+ * 
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "LateralSettings".
+ */
+export interface LateralSettings {
+admin_groups: LabelSelector[]
+critical_assets: LabelSelector[]
+detectors: DetectorSettings
+environment_label_key: string
+expected_initiators: ExpectedInitiators[]
+extra_admin_ports: PortEntry[]
+graph_hops: number
+include_pce_admin_services: boolean
+observation_days: number
+removed_admin_ports: PortEntry[]
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "PortEntry".
+ */
+export interface PortEntry {
+port: number
+proto: (number | null)
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "LateralStatus".
+ */
+export interface LateralStatus {
+baseline_backfilling: boolean
+baseline_days: number
+baseline_required: number
+collected: boolean
+detect_last_ok_at: (string | null)
+detectors: DetectorStatusView[]
+exposure_last_ok_at: (string | null)
+observation_days_used: number
+stale_selectors: StaleSelectorView[]
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "StaleSelectorView".
+ */
+export interface StaleSelectorView {
+key: string
+setting: ("critical_assets" | "admin_groups")
+value: string
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "LateralView".
+ */
+export interface LateralView {
+effective_ports: AdminPortView[]
+label_choices: LabelChoice[]
+revision: number
+settings: LateralSettings
+status: LateralStatus
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "LateralUpdate".
+ */
+export interface LateralUpdate {
+revision: number
+settings: LateralSettings
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
  * via the `definition` "LogQuery".
  */
 export interface LogQuery {
@@ -471,7 +622,7 @@ revision: number
 validity_days: number
 }
 
-export type OpId = "auth.csrf" | "auth.login" | "auth.logout" | "auth.me" | "auth.password" | "home.summary" | "i18n.dictionary" | "system.collection.backfill" | "system.collection.get" | "system.collection.status" | "system.collection.update" | "system.display.get" | "system.display.update" | "system.jobs.list" | "system.logs.query" | "system.pce.get" | "system.pce.latest" | "system.pce.probe" | "system.pce.update" | "system.security.get" | "system.security.update" | "system.tls.csr" | "system.tls.import" | "system.tls.renew" | "system.tls.status" | "system.tls.update";
+export type OpId = "auth.csrf" | "auth.login" | "auth.logout" | "auth.me" | "auth.password" | "home.summary" | "i18n.dictionary" | "system.collection.backfill" | "system.collection.get" | "system.collection.status" | "system.collection.update" | "system.display.get" | "system.display.update" | "system.jobs.list" | "system.lateral.get" | "system.lateral.update" | "system.logs.query" | "system.pce.get" | "system.pce.latest" | "system.pce.probe" | "system.pce.update" | "system.security.get" | "system.security.update" | "system.tls.csr" | "system.tls.import" | "system.tls.renew" | "system.tls.status" | "system.tls.update";
 
 export interface Requests {
   "auth.csrf": undefined;
@@ -488,6 +639,8 @@ export interface Requests {
   "system.display.get": undefined;
   "system.display.update": DisplayUpdate;
   "system.jobs.list": undefined;
+  "system.lateral.get": undefined;
+  "system.lateral.update": LateralUpdate;
   "system.logs.query": LogQuery;
   "system.pce.get": undefined;
   "system.pce.latest": undefined;
@@ -517,6 +670,8 @@ export interface Responses {
   "system.display.get": DisplayView;
   "system.display.update": DisplayView;
   "system.jobs.list": JobList;
+  "system.lateral.get": LateralView;
+  "system.lateral.update": LateralView;
   "system.logs.query": LogLines;
   "system.pce.get": PceConnection;
   "system.pce.latest": LatestProbe;
@@ -546,6 +701,8 @@ export const OPERATIONS = {
   "system.display.get": { method: "GET", path: "/api/system/display" },
   "system.display.update": { method: "PUT", path: "/api/system/display" },
   "system.jobs.list": { method: "GET", path: "/api/system/jobs" },
+  "system.lateral.get": { method: "GET", path: "/api/system/lateral" },
+  "system.lateral.update": { method: "PUT", path: "/api/system/lateral" },
   "system.logs.query": { method: "POST", path: "/api/system/logs/query" },
   "system.pce.get": { method: "GET", path: "/api/system/pce" },
   "system.pce.latest": { method: "GET", path: "/api/system/pce/latest" },
@@ -578,6 +735,11 @@ export const VALUES = {
     "events_only",
     "full"
   ],
+  "Confidence": [
+    "high",
+    "low",
+    "medium"
+  ],
   "DataOrigin": [
     "backfill",
     "ingest"
@@ -585,6 +747,24 @@ export const VALUES = {
   "DeploymentType": [
     "on_prem",
     "saas"
+  ],
+  "DetectorKind": [
+    "account_fanout",
+    "blocked_surge",
+    "cross_env",
+    "fanout",
+    "new_admin_connection",
+    "non_admin_group",
+    "pivot_chain",
+    "unexpected_initiator"
+  ],
+  "DetectorState": [
+    "accumulating",
+    "collection_off",
+    "disabled",
+    "incomplete",
+    "no_data",
+    "ok"
   ],
   "DraftPolicyDecision": [
     "allowed",
@@ -597,9 +777,30 @@ export const VALUES = {
     "potentially_blocked_by_override_deny",
     "unknown"
   ],
+  "EdgeState": [
+    "allowed",
+    "potentially_blocked",
+    "unknown"
+  ],
   "FlowDirection": [
     "inbound",
     "outbound"
+  ],
+  "FocusKind": [
+    "collection_gap",
+    "cross_env",
+    "data_coverage",
+    "detection",
+    "exposure_asset",
+    "mode_switch_blocker",
+    "pivot_host",
+    "ransomware_priority",
+    "setup_required",
+    "stale_selector",
+    "system_health",
+    "tamper",
+    "vendor_contradiction",
+    "visibility"
   ],
   "IngestSource": [
     "backfill",
@@ -618,19 +819,82 @@ export const VALUES = {
     "potentially_blocked",
     "unknown"
   ],
+  "PrecursorKind": [
+    "offline",
+    "suspend",
+    "tamper"
+  ],
   "ProbeName": [
     "health",
     "node_available",
     "noop"
+  ],
+  "RansomwareTrafficClass": [
+    "priority",
+    "protected",
+    "safe_to_block",
+    "suspicious",
+    "unknown"
   ],
   "RuleAction": [
     "allow",
     "deny",
     "override_deny"
   ],
+  "SegmentDimension": [
+    "actor",
+    "decision",
+    "direction",
+    "dst_host",
+    "dst_label",
+    "event_host",
+    "event_severity",
+    "event_type",
+    "initiator_process",
+    "initiator_user",
+    "service",
+    "service_process",
+    "service_user",
+    "src_host",
+    "src_label"
+  ],
+  "SegmentMetric": [
+    "bytes",
+    "connections",
+    "distinct_dst",
+    "distinct_ports",
+    "distinct_src",
+    "events",
+    "flows"
+  ],
+  "SegmentView": [
+    "detail",
+    "predicted_block",
+    "ranking"
+  ],
+  "Severity": [
+    "critical",
+    "high",
+    "low",
+    "medium"
+  ],
+  "TamperAction": [
+    "add_chain",
+    "add_rule",
+    "add_table",
+    "delete_chain",
+    "delete_rule",
+    "delete_table"
+  ],
   "TamperClassification": [
     "confirmed",
     "signal"
+  ],
+  "TamperPattern": [
+    "burst",
+    "regular_cycle",
+    "sporadic",
+    "too_few"
   ],
   "VisibilityLevel": [
     "enhanced_data_collection",

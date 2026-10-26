@@ -16,7 +16,7 @@ gap, because the windows it re-reads were collected.
 from __future__ import annotations
 
 import sqlite3
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from typing import Any
 
 from loguru import logger
@@ -71,6 +71,14 @@ def ensure_daily_reread(ctx: AppContext, *, now: datetime | None = None) -> Cycl
         return _reread(ctx, at=at, local_date=local.date().isoformat())
     finally:
         BACKFILL_LOCK.release()
+
+
+def last_reread_day(ctx: AppContext) -> date | None:
+    """The UTC day the latest re-read covered (the late detection pass evaluates it)."""
+    with ctx.flows().connect() as conn:
+        state = ingest_state.get(conn, SOURCE)
+    day = ((state.progress or {}) if state else {}).get(PLAN, {}).get("day")
+    return date.fromisoformat(day) if day else None
 
 
 def _reread(ctx: AppContext, *, at: datetime, local_date: str) -> CycleResult | None:

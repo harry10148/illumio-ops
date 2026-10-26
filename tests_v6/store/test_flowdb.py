@@ -23,7 +23,7 @@ def test_flowdb_migrates_on_first_connect(tmp_path):
     fdb = FlowDb(tmp_path / "data" / "flows.sqlite")
     with fdb.connect() as conn:
         assert FLOWDB_TABLES <= _tables(conn)
-        assert conn.execute("PRAGMA user_version").fetchone()[0] == 1
+        assert conn.execute("PRAGMA user_version").fetchone()[0] == 2
         assert conn.execute("PRAGMA journal_mode").fetchone()[0] == "wal"
 
 
@@ -177,3 +177,39 @@ def test_a_connection_asked_for_during_a_reset_gets_the_new_file(tmp_path):
     t.join(5)
     late.join(5)
     assert seen == [0]
+
+
+def test_connections_opened_during_a_long_migration_wait_for_it(tmp_path, monkeypatch):
+    # .106 upgrade: one job thread applied flow db 0002 while the others gave up on SQLite's busy
+    # timeout ("database is locked") and failed; at 1,000 workloads 0002 runs 820 s.
+    from illumio_ops.store import db as storedb
+
+    path = tmp_path / "flows.sqlite"
+    FlowDb(path).connect().close()  # the current schema, as an installed store has it
+    original = storedb._migrations
+    real = original(flowdb.MIGRATIONS_PACKAGE)
+    slow = ("CREATE TABLE slow_step AS WITH RECURSIVE c(x) AS "
+            "(SELECT 1 UNION ALL SELECT x + 1 FROM c WHERE x < 1500000) SELECT x FROM c;")
+    monkeypatch.setattr(storedb, "_migrations", lambda package=storedb.APP_MIGRATIONS:
+                        real + [(len(real) + 1, slow)] if package == flowdb.MIGRATIONS_PACKAGE
+                        else original(package))
+    monkeypatch.setattr(storedb, "BUSY_TIMEOUT_SECONDS", 0.1)
+    fdb = FlowDb(path)  # the upgraded program starts
+    start = threading.Barrier(4)
+    errors, versions = [], []
+
+    def job():
+        start.wait()
+        try:
+            with fdb.connect() as conn:
+                versions.append(conn.execute("PRAGMA user_version").fetchone()[0])
+        except Exception as exc:  # noqa: BLE001 - the failure under test
+            errors.append(exc)
+
+    threads = [threading.Thread(target=job) for _ in range(4)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join(60)
+    assert errors == []
+    assert versions == [len(real) + 1] * 4

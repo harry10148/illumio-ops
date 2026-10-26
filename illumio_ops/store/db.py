@@ -95,5 +95,10 @@ def migrate(conn: sqlite3.Connection, package: str = APP_MIGRATIONS) -> int:
     return _user_version(conn)
 
 
+def pending_migrations(conn: sqlite3.Connection, package: str = APP_MIGRATIONS) -> int:
+    """How many migrations migrate() would apply (0 for a database newer than this program)."""
+    return max(0, len(_migrations(package)) - _user_version(conn))
+
+
 def _user_version(conn: sqlite3.Connection) -> int:
     return int(conn.execute("PRAGMA user_version").fetchone()[0])

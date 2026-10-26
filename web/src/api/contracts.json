@@ -1286,6 +1286,1333 @@
         "type": "object"
       }
     },
+    "system.lateral.get": {
+      "method": "GET",
+      "path": "/api/system/lateral",
+      "request_schema": null,
+      "response_schema": {
+        "$defs": {
+          "AdminPortView": {
+            "properties": {
+              "name": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Name"
+              },
+              "port": {
+                "title": "Port",
+                "type": "integer"
+              },
+              "proto": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Proto"
+              },
+              "source": {
+                "enum": [
+                  "builtin",
+                  "pce",
+                  "added"
+                ],
+                "title": "Source",
+                "type": "string"
+              }
+            },
+            "required": [
+              "port",
+              "proto",
+              "name",
+              "source"
+            ],
+            "title": "AdminPortView",
+            "type": "object"
+          },
+          "DetectorKind": {
+            "description": "The lateral-movement detectors of spec §6.5.1.",
+            "enum": [
+              "fanout",
+              "new_admin_connection",
+              "pivot_chain",
+              "blocked_surge",
+              "non_admin_group",
+              "cross_env",
+              "account_fanout",
+              "unexpected_initiator"
+            ],
+            "title": "DetectorKind",
+            "type": "string"
+          },
+          "DetectorSettings": {
+            "additionalProperties": false,
+            "properties": {
+              "account_fanout_targets": {
+                "maximum": 10000,
+                "minimum": 2,
+                "title": "Account Fanout Targets",
+                "type": "integer"
+              },
+              "account_fanout_window_minutes": {
+                "maximum": 1440,
+                "minimum": 10,
+                "title": "Account Fanout Window Minutes",
+                "type": "integer"
+              },
+              "blocked_surge_factor": {
+                "maximum": 100.0,
+                "minimum": 1.0,
+                "title": "Blocked Surge Factor",
+                "type": "number"
+              },
+              "blocked_targets": {
+                "maximum": 10000,
+                "minimum": 2,
+                "title": "Blocked Targets",
+                "type": "integer"
+              },
+              "blocked_window_minutes": {
+                "maximum": 1440,
+                "minimum": 10,
+                "title": "Blocked Window Minutes",
+                "type": "integer"
+              },
+              "chain_window_minutes": {
+                "maximum": 1440,
+                "minimum": 10,
+                "title": "Chain Window Minutes",
+                "type": "integer"
+              },
+              "exclude_system_accounts": {
+                "title": "Exclude System Accounts",
+                "type": "boolean"
+              },
+              "fanout_targets": {
+                "maximum": 10000,
+                "minimum": 2,
+                "title": "Fanout Targets",
+                "type": "integer"
+              },
+              "fanout_window_minutes": {
+                "maximum": 1440,
+                "minimum": 10,
+                "title": "Fanout Window Minutes",
+                "type": "integer"
+              },
+              "precursor_hours": {
+                "maximum": 168,
+                "minimum": 1,
+                "title": "Precursor Hours",
+                "type": "integer"
+              }
+            },
+            "required": [
+              "fanout_targets",
+              "fanout_window_minutes",
+              "account_fanout_targets",
+              "account_fanout_window_minutes",
+              "chain_window_minutes",
+              "blocked_targets",
+              "blocked_window_minutes",
+              "blocked_surge_factor",
+              "exclude_system_accounts",
+              "precursor_hours"
+            ],
+            "title": "DetectorSettings",
+            "type": "object"
+          },
+          "DetectorState": {
+            "description": "What a detector run can say besides its detections: \"no detection\" is only ever OK.",
+            "enum": [
+              "ok",
+              "disabled",
+              "accumulating",
+              "no_data",
+              "collection_off",
+              "incomplete"
+            ],
+            "title": "DetectorState",
+            "type": "string"
+          },
+          "DetectorStatusView": {
+            "properties": {
+              "detector": {
+                "$ref": "#/$defs/DetectorKind"
+              },
+              "params": {
+                "additionalProperties": true,
+                "title": "Params",
+                "type": "object"
+              },
+              "reason_key": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Reason Key"
+              },
+              "state": {
+                "$ref": "#/$defs/DetectorState"
+              }
+            },
+            "required": [
+              "detector",
+              "state",
+              "reason_key",
+              "params"
+            ],
+            "title": "DetectorStatusView",
+            "type": "object"
+          },
+          "ExpectedInitiators": {
+            "additionalProperties": false,
+            "properties": {
+              "port": {
+                "maximum": 65535,
+                "minimum": 0,
+                "title": "Port",
+                "type": "integer"
+              },
+              "processes": {
+                "items": {
+                  "type": "string"
+                },
+                "minItems": 1,
+                "title": "Processes",
+                "type": "array"
+              },
+              "proto": {
+                "anyOf": [
+                  {
+                    "maximum": 255,
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Proto"
+              }
+            },
+            "required": [
+              "port",
+              "proto",
+              "processes"
+            ],
+            "title": "ExpectedInitiators",
+            "type": "object"
+          },
+          "LabelChoice": {
+            "properties": {
+              "key": {
+                "title": "Key",
+                "type": "string"
+              },
+              "truncated": {
+                "title": "Truncated",
+                "type": "boolean"
+              },
+              "values": {
+                "items": {
+                  "type": "string"
+                },
+                "title": "Values",
+                "type": "array"
+              }
+            },
+            "required": [
+              "key",
+              "values",
+              "truncated"
+            ],
+            "title": "LabelChoice",
+            "type": "object"
+          },
+          "LabelSelector": {
+            "additionalProperties": false,
+            "properties": {
+              "key": {
+                "maxLength": 255,
+                "minLength": 1,
+                "title": "Key",
+                "type": "string"
+              },
+              "value": {
+                "maxLength": 255,
+                "minLength": 1,
+                "title": "Value",
+                "type": "string"
+              }
+            },
+            "required": [
+              "key",
+              "value"
+            ],
+            "title": "LabelSelector",
+            "type": "object"
+          },
+          "LateralSettings": {
+            "additionalProperties": false,
+            "description": "Lateral-movement analysis (spec §6.5.1): which ports count as management, which hosts matter,\nand the detectors' thresholds.",
+            "properties": {
+              "admin_groups": {
+                "items": {
+                  "$ref": "#/$defs/LabelSelector"
+                },
+                "title": "Admin Groups",
+                "type": "array"
+              },
+              "critical_assets": {
+                "items": {
+                  "$ref": "#/$defs/LabelSelector"
+                },
+                "title": "Critical Assets",
+                "type": "array"
+              },
+              "detectors": {
+                "$ref": "#/$defs/DetectorSettings"
+              },
+              "environment_label_key": {
+                "maxLength": 255,
+                "minLength": 1,
+                "title": "Environment Label Key",
+                "type": "string"
+              },
+              "expected_initiators": {
+                "items": {
+                  "$ref": "#/$defs/ExpectedInitiators"
+                },
+                "title": "Expected Initiators",
+                "type": "array"
+              },
+              "extra_admin_ports": {
+                "items": {
+                  "$ref": "#/$defs/PortEntry"
+                },
+                "title": "Extra Admin Ports",
+                "type": "array"
+              },
+              "graph_hops": {
+                "maximum": 6,
+                "minimum": 1,
+                "title": "Graph Hops",
+                "type": "integer"
+              },
+              "include_pce_admin_services": {
+                "title": "Include Pce Admin Services",
+                "type": "boolean"
+              },
+              "observation_days": {
+                "maximum": 365,
+                "minimum": 1,
+                "title": "Observation Days",
+                "type": "integer"
+              },
+              "removed_admin_ports": {
+                "items": {
+                  "$ref": "#/$defs/PortEntry"
+                },
+                "title": "Removed Admin Ports",
+                "type": "array"
+              }
+            },
+            "required": [
+              "extra_admin_ports",
+              "removed_admin_ports",
+              "include_pce_admin_services",
+              "critical_assets",
+              "admin_groups",
+              "environment_label_key",
+              "graph_hops",
+              "observation_days",
+              "expected_initiators",
+              "detectors"
+            ],
+            "title": "LateralSettings",
+            "type": "object"
+          },
+          "LateralStatus": {
+            "properties": {
+              "baseline_backfilling": {
+                "title": "Baseline Backfilling",
+                "type": "boolean"
+              },
+              "baseline_days": {
+                "title": "Baseline Days",
+                "type": "number"
+              },
+              "baseline_required": {
+                "title": "Baseline Required",
+                "type": "integer"
+              },
+              "collected": {
+                "title": "Collected",
+                "type": "boolean"
+              },
+              "detect_last_ok_at": {
+                "anyOf": [
+                  {
+                    "format": "date-time",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Detect Last Ok At"
+              },
+              "detectors": {
+                "items": {
+                  "$ref": "#/$defs/DetectorStatusView"
+                },
+                "title": "Detectors",
+                "type": "array"
+              },
+              "exposure_last_ok_at": {
+                "anyOf": [
+                  {
+                    "format": "date-time",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Exposure Last Ok At"
+              },
+              "observation_days_used": {
+                "title": "Observation Days Used",
+                "type": "integer"
+              },
+              "stale_selectors": {
+                "items": {
+                  "$ref": "#/$defs/StaleSelectorView"
+                },
+                "title": "Stale Selectors",
+                "type": "array"
+              }
+            },
+            "required": [
+              "collected",
+              "baseline_days",
+              "baseline_required",
+              "baseline_backfilling",
+              "observation_days_used",
+              "detect_last_ok_at",
+              "detectors",
+              "exposure_last_ok_at",
+              "stale_selectors"
+            ],
+            "title": "LateralStatus",
+            "type": "object"
+          },
+          "PortEntry": {
+            "additionalProperties": false,
+            "properties": {
+              "port": {
+                "maximum": 65535,
+                "minimum": 0,
+                "title": "Port",
+                "type": "integer"
+              },
+              "proto": {
+                "anyOf": [
+                  {
+                    "maximum": 255,
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Proto"
+              }
+            },
+            "required": [
+              "port",
+              "proto"
+            ],
+            "title": "PortEntry",
+            "type": "object"
+          },
+          "StaleSelectorView": {
+            "properties": {
+              "key": {
+                "title": "Key",
+                "type": "string"
+              },
+              "setting": {
+                "enum": [
+                  "critical_assets",
+                  "admin_groups"
+                ],
+                "title": "Setting",
+                "type": "string"
+              },
+              "value": {
+                "title": "Value",
+                "type": "string"
+              }
+            },
+            "required": [
+              "setting",
+              "key",
+              "value"
+            ],
+            "title": "StaleSelectorView",
+            "type": "object"
+          }
+        },
+        "properties": {
+          "effective_ports": {
+            "items": {
+              "$ref": "#/$defs/AdminPortView"
+            },
+            "title": "Effective Ports",
+            "type": "array"
+          },
+          "label_choices": {
+            "items": {
+              "$ref": "#/$defs/LabelChoice"
+            },
+            "title": "Label Choices",
+            "type": "array"
+          },
+          "revision": {
+            "title": "Revision",
+            "type": "integer"
+          },
+          "settings": {
+            "$ref": "#/$defs/LateralSettings"
+          },
+          "status": {
+            "$ref": "#/$defs/LateralStatus"
+          }
+        },
+        "required": [
+          "revision",
+          "settings",
+          "effective_ports",
+          "label_choices",
+          "status"
+        ],
+        "title": "LateralView",
+        "type": "object"
+      }
+    },
+    "system.lateral.update": {
+      "method": "PUT",
+      "path": "/api/system/lateral",
+      "request_schema": {
+        "$defs": {
+          "DetectorSettings": {
+            "additionalProperties": false,
+            "properties": {
+              "account_fanout_targets": {
+                "maximum": 10000,
+                "minimum": 2,
+                "title": "Account Fanout Targets",
+                "type": "integer"
+              },
+              "account_fanout_window_minutes": {
+                "maximum": 1440,
+                "minimum": 10,
+                "title": "Account Fanout Window Minutes",
+                "type": "integer"
+              },
+              "blocked_surge_factor": {
+                "maximum": 100.0,
+                "minimum": 1.0,
+                "title": "Blocked Surge Factor",
+                "type": "number"
+              },
+              "blocked_targets": {
+                "maximum": 10000,
+                "minimum": 2,
+                "title": "Blocked Targets",
+                "type": "integer"
+              },
+              "blocked_window_minutes": {
+                "maximum": 1440,
+                "minimum": 10,
+                "title": "Blocked Window Minutes",
+                "type": "integer"
+              },
+              "chain_window_minutes": {
+                "maximum": 1440,
+                "minimum": 10,
+                "title": "Chain Window Minutes",
+                "type": "integer"
+              },
+              "exclude_system_accounts": {
+                "title": "Exclude System Accounts",
+                "type": "boolean"
+              },
+              "fanout_targets": {
+                "maximum": 10000,
+                "minimum": 2,
+                "title": "Fanout Targets",
+                "type": "integer"
+              },
+              "fanout_window_minutes": {
+                "maximum": 1440,
+                "minimum": 10,
+                "title": "Fanout Window Minutes",
+                "type": "integer"
+              },
+              "precursor_hours": {
+                "maximum": 168,
+                "minimum": 1,
+                "title": "Precursor Hours",
+                "type": "integer"
+              }
+            },
+            "required": [
+              "fanout_targets",
+              "fanout_window_minutes",
+              "account_fanout_targets",
+              "account_fanout_window_minutes",
+              "chain_window_minutes",
+              "blocked_targets",
+              "blocked_window_minutes",
+              "blocked_surge_factor",
+              "exclude_system_accounts",
+              "precursor_hours"
+            ],
+            "title": "DetectorSettings",
+            "type": "object"
+          },
+          "ExpectedInitiators": {
+            "additionalProperties": false,
+            "properties": {
+              "port": {
+                "maximum": 65535,
+                "minimum": 0,
+                "title": "Port",
+                "type": "integer"
+              },
+              "processes": {
+                "items": {
+                  "type": "string"
+                },
+                "minItems": 1,
+                "title": "Processes",
+                "type": "array"
+              },
+              "proto": {
+                "anyOf": [
+                  {
+                    "maximum": 255,
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Proto"
+              }
+            },
+            "required": [
+              "port",
+              "proto",
+              "processes"
+            ],
+            "title": "ExpectedInitiators",
+            "type": "object"
+          },
+          "LabelSelector": {
+            "additionalProperties": false,
+            "properties": {
+              "key": {
+                "maxLength": 255,
+                "minLength": 1,
+                "title": "Key",
+                "type": "string"
+              },
+              "value": {
+                "maxLength": 255,
+                "minLength": 1,
+                "title": "Value",
+                "type": "string"
+              }
+            },
+            "required": [
+              "key",
+              "value"
+            ],
+            "title": "LabelSelector",
+            "type": "object"
+          },
+          "LateralSettings": {
+            "additionalProperties": false,
+            "description": "Lateral-movement analysis (spec §6.5.1): which ports count as management, which hosts matter,\nand the detectors' thresholds.",
+            "properties": {
+              "admin_groups": {
+                "items": {
+                  "$ref": "#/$defs/LabelSelector"
+                },
+                "title": "Admin Groups",
+                "type": "array"
+              },
+              "critical_assets": {
+                "items": {
+                  "$ref": "#/$defs/LabelSelector"
+                },
+                "title": "Critical Assets",
+                "type": "array"
+              },
+              "detectors": {
+                "$ref": "#/$defs/DetectorSettings"
+              },
+              "environment_label_key": {
+                "maxLength": 255,
+                "minLength": 1,
+                "title": "Environment Label Key",
+                "type": "string"
+              },
+              "expected_initiators": {
+                "items": {
+                  "$ref": "#/$defs/ExpectedInitiators"
+                },
+                "title": "Expected Initiators",
+                "type": "array"
+              },
+              "extra_admin_ports": {
+                "items": {
+                  "$ref": "#/$defs/PortEntry"
+                },
+                "title": "Extra Admin Ports",
+                "type": "array"
+              },
+              "graph_hops": {
+                "maximum": 6,
+                "minimum": 1,
+                "title": "Graph Hops",
+                "type": "integer"
+              },
+              "include_pce_admin_services": {
+                "title": "Include Pce Admin Services",
+                "type": "boolean"
+              },
+              "observation_days": {
+                "maximum": 365,
+                "minimum": 1,
+                "title": "Observation Days",
+                "type": "integer"
+              },
+              "removed_admin_ports": {
+                "items": {
+                  "$ref": "#/$defs/PortEntry"
+                },
+                "title": "Removed Admin Ports",
+                "type": "array"
+              }
+            },
+            "required": [
+              "extra_admin_ports",
+              "removed_admin_ports",
+              "include_pce_admin_services",
+              "critical_assets",
+              "admin_groups",
+              "environment_label_key",
+              "graph_hops",
+              "observation_days",
+              "expected_initiators",
+              "detectors"
+            ],
+            "title": "LateralSettings",
+            "type": "object"
+          },
+          "PortEntry": {
+            "additionalProperties": false,
+            "properties": {
+              "port": {
+                "maximum": 65535,
+                "minimum": 0,
+                "title": "Port",
+                "type": "integer"
+              },
+              "proto": {
+                "anyOf": [
+                  {
+                    "maximum": 255,
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Proto"
+              }
+            },
+            "required": [
+              "port",
+              "proto"
+            ],
+            "title": "PortEntry",
+            "type": "object"
+          }
+        },
+        "properties": {
+          "revision": {
+            "title": "Revision",
+            "type": "integer"
+          },
+          "settings": {
+            "$ref": "#/$defs/LateralSettings"
+          }
+        },
+        "required": [
+          "revision",
+          "settings"
+        ],
+        "title": "LateralUpdate",
+        "type": "object"
+      },
+      "response_schema": {
+        "$defs": {
+          "AdminPortView": {
+            "properties": {
+              "name": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Name"
+              },
+              "port": {
+                "title": "Port",
+                "type": "integer"
+              },
+              "proto": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Proto"
+              },
+              "source": {
+                "enum": [
+                  "builtin",
+                  "pce",
+                  "added"
+                ],
+                "title": "Source",
+                "type": "string"
+              }
+            },
+            "required": [
+              "port",
+              "proto",
+              "name",
+              "source"
+            ],
+            "title": "AdminPortView",
+            "type": "object"
+          },
+          "DetectorKind": {
+            "description": "The lateral-movement detectors of spec §6.5.1.",
+            "enum": [
+              "fanout",
+              "new_admin_connection",
+              "pivot_chain",
+              "blocked_surge",
+              "non_admin_group",
+              "cross_env",
+              "account_fanout",
+              "unexpected_initiator"
+            ],
+            "title": "DetectorKind",
+            "type": "string"
+          },
+          "DetectorSettings": {
+            "additionalProperties": false,
+            "properties": {
+              "account_fanout_targets": {
+                "maximum": 10000,
+                "minimum": 2,
+                "title": "Account Fanout Targets",
+                "type": "integer"
+              },
+              "account_fanout_window_minutes": {
+                "maximum": 1440,
+                "minimum": 10,
+                "title": "Account Fanout Window Minutes",
+                "type": "integer"
+              },
+              "blocked_surge_factor": {
+                "maximum": 100.0,
+                "minimum": 1.0,
+                "title": "Blocked Surge Factor",
+                "type": "number"
+              },
+              "blocked_targets": {
+                "maximum": 10000,
+                "minimum": 2,
+                "title": "Blocked Targets",
+                "type": "integer"
+              },
+              "blocked_window_minutes": {
+                "maximum": 1440,
+                "minimum": 10,
+                "title": "Blocked Window Minutes",
+                "type": "integer"
+              },
+              "chain_window_minutes": {
+                "maximum": 1440,
+                "minimum": 10,
+                "title": "Chain Window Minutes",
+                "type": "integer"
+              },
+              "exclude_system_accounts": {
+                "title": "Exclude System Accounts",
+                "type": "boolean"
+              },
+              "fanout_targets": {
+                "maximum": 10000,
+                "minimum": 2,
+                "title": "Fanout Targets",
+                "type": "integer"
+              },
+              "fanout_window_minutes": {
+                "maximum": 1440,
+                "minimum": 10,
+                "title": "Fanout Window Minutes",
+                "type": "integer"
+              },
+              "precursor_hours": {
+                "maximum": 168,
+                "minimum": 1,
+                "title": "Precursor Hours",
+                "type": "integer"
+              }
+            },
+            "required": [
+              "fanout_targets",
+              "fanout_window_minutes",
+              "account_fanout_targets",
+              "account_fanout_window_minutes",
+              "chain_window_minutes",
+              "blocked_targets",
+              "blocked_window_minutes",
+              "blocked_surge_factor",
+              "exclude_system_accounts",
+              "precursor_hours"
+            ],
+            "title": "DetectorSettings",
+            "type": "object"
+          },
+          "DetectorState": {
+            "description": "What a detector run can say besides its detections: \"no detection\" is only ever OK.",
+            "enum": [
+              "ok",
+              "disabled",
+              "accumulating",
+              "no_data",
+              "collection_off",
+              "incomplete"
+            ],
+            "title": "DetectorState",
+            "type": "string"
+          },
+          "DetectorStatusView": {
+            "properties": {
+              "detector": {
+                "$ref": "#/$defs/DetectorKind"
+              },
+              "params": {
+                "additionalProperties": true,
+                "title": "Params",
+                "type": "object"
+              },
+              "reason_key": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Reason Key"
+              },
+              "state": {
+                "$ref": "#/$defs/DetectorState"
+              }
+            },
+            "required": [
+              "detector",
+              "state",
+              "reason_key",
+              "params"
+            ],
+            "title": "DetectorStatusView",
+            "type": "object"
+          },
+          "ExpectedInitiators": {
+            "additionalProperties": false,
+            "properties": {
+              "port": {
+                "maximum": 65535,
+                "minimum": 0,
+                "title": "Port",
+                "type": "integer"
+              },
+              "processes": {
+                "items": {
+                  "type": "string"
+                },
+                "minItems": 1,
+                "title": "Processes",
+                "type": "array"
+              },
+              "proto": {
+                "anyOf": [
+                  {
+                    "maximum": 255,
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Proto"
+              }
+            },
+            "required": [
+              "port",
+              "proto",
+              "processes"
+            ],
+            "title": "ExpectedInitiators",
+            "type": "object"
+          },
+          "LabelChoice": {
+            "properties": {
+              "key": {
+                "title": "Key",
+                "type": "string"
+              },
+              "truncated": {
+                "title": "Truncated",
+                "type": "boolean"
+              },
+              "values": {
+                "items": {
+                  "type": "string"
+                },
+                "title": "Values",
+                "type": "array"
+              }
+            },
+            "required": [
+              "key",
+              "values",
+              "truncated"
+            ],
+            "title": "LabelChoice",
+            "type": "object"
+          },
+          "LabelSelector": {
+            "additionalProperties": false,
+            "properties": {
+              "key": {
+                "maxLength": 255,
+                "minLength": 1,
+                "title": "Key",
+                "type": "string"
+              },
+              "value": {
+                "maxLength": 255,
+                "minLength": 1,
+                "title": "Value",
+                "type": "string"
+              }
+            },
+            "required": [
+              "key",
+              "value"
+            ],
+            "title": "LabelSelector",
+            "type": "object"
+          },
+          "LateralSettings": {
+            "additionalProperties": false,
+            "description": "Lateral-movement analysis (spec §6.5.1): which ports count as management, which hosts matter,\nand the detectors' thresholds.",
+            "properties": {
+              "admin_groups": {
+                "items": {
+                  "$ref": "#/$defs/LabelSelector"
+                },
+                "title": "Admin Groups",
+                "type": "array"
+              },
+              "critical_assets": {
+                "items": {
+                  "$ref": "#/$defs/LabelSelector"
+                },
+                "title": "Critical Assets",
+                "type": "array"
+              },
+              "detectors": {
+                "$ref": "#/$defs/DetectorSettings"
+              },
+              "environment_label_key": {
+                "maxLength": 255,
+                "minLength": 1,
+                "title": "Environment Label Key",
+                "type": "string"
+              },
+              "expected_initiators": {
+                "items": {
+                  "$ref": "#/$defs/ExpectedInitiators"
+                },
+                "title": "Expected Initiators",
+                "type": "array"
+              },
+              "extra_admin_ports": {
+                "items": {
+                  "$ref": "#/$defs/PortEntry"
+                },
+                "title": "Extra Admin Ports",
+                "type": "array"
+              },
+              "graph_hops": {
+                "maximum": 6,
+                "minimum": 1,
+                "title": "Graph Hops",
+                "type": "integer"
+              },
+              "include_pce_admin_services": {
+                "title": "Include Pce Admin Services",
+                "type": "boolean"
+              },
+              "observation_days": {
+                "maximum": 365,
+                "minimum": 1,
+                "title": "Observation Days",
+                "type": "integer"
+              },
+              "removed_admin_ports": {
+                "items": {
+                  "$ref": "#/$defs/PortEntry"
+                },
+                "title": "Removed Admin Ports",
+                "type": "array"
+              }
+            },
+            "required": [
+              "extra_admin_ports",
+              "removed_admin_ports",
+              "include_pce_admin_services",
+              "critical_assets",
+              "admin_groups",
+              "environment_label_key",
+              "graph_hops",
+              "observation_days",
+              "expected_initiators",
+              "detectors"
+            ],
+            "title": "LateralSettings",
+            "type": "object"
+          },
+          "LateralStatus": {
+            "properties": {
+              "baseline_backfilling": {
+                "title": "Baseline Backfilling",
+                "type": "boolean"
+              },
+              "baseline_days": {
+                "title": "Baseline Days",
+                "type": "number"
+              },
+              "baseline_required": {
+                "title": "Baseline Required",
+                "type": "integer"
+              },
+              "collected": {
+                "title": "Collected",
+                "type": "boolean"
+              },
+              "detect_last_ok_at": {
+                "anyOf": [
+                  {
+                    "format": "date-time",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Detect Last Ok At"
+              },
+              "detectors": {
+                "items": {
+                  "$ref": "#/$defs/DetectorStatusView"
+                },
+                "title": "Detectors",
+                "type": "array"
+              },
+              "exposure_last_ok_at": {
+                "anyOf": [
+                  {
+                    "format": "date-time",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Exposure Last Ok At"
+              },
+              "observation_days_used": {
+                "title": "Observation Days Used",
+                "type": "integer"
+              },
+              "stale_selectors": {
+                "items": {
+                  "$ref": "#/$defs/StaleSelectorView"
+                },
+                "title": "Stale Selectors",
+                "type": "array"
+              }
+            },
+            "required": [
+              "collected",
+              "baseline_days",
+              "baseline_required",
+              "baseline_backfilling",
+              "observation_days_used",
+              "detect_last_ok_at",
+              "detectors",
+              "exposure_last_ok_at",
+              "stale_selectors"
+            ],
+            "title": "LateralStatus",
+            "type": "object"
+          },
+          "PortEntry": {
+            "additionalProperties": false,
+            "properties": {
+              "port": {
+                "maximum": 65535,
+                "minimum": 0,
+                "title": "Port",
+                "type": "integer"
+              },
+              "proto": {
+                "anyOf": [
+                  {
+                    "maximum": 255,
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Proto"
+              }
+            },
+            "required": [
+              "port",
+              "proto"
+            ],
+            "title": "PortEntry",
+            "type": "object"
+          },
+          "StaleSelectorView": {
+            "properties": {
+              "key": {
+                "title": "Key",
+                "type": "string"
+              },
+              "setting": {
+                "enum": [
+                  "critical_assets",
+                  "admin_groups"
+                ],
+                "title": "Setting",
+                "type": "string"
+              },
+              "value": {
+                "title": "Value",
+                "type": "string"
+              }
+            },
+            "required": [
+              "setting",
+              "key",
+              "value"
+            ],
+            "title": "StaleSelectorView",
+            "type": "object"
+          }
+        },
+        "properties": {
+          "effective_ports": {
+            "items": {
+              "$ref": "#/$defs/AdminPortView"
+            },
+            "title": "Effective Ports",
+            "type": "array"
+          },
+          "label_choices": {
+            "items": {
+              "$ref": "#/$defs/LabelChoice"
+            },
+            "title": "Label Choices",
+            "type": "array"
+          },
+          "revision": {
+            "title": "Revision",
+            "type": "integer"
+          },
+          "settings": {
+            "$ref": "#/$defs/LateralSettings"
+          },
+          "status": {
+            "$ref": "#/$defs/LateralStatus"
+          }
+        },
+        "required": [
+          "revision",
+          "settings",
+          "effective_ports",
+          "label_choices",
+          "status"
+        ],
+        "title": "LateralView",
+        "type": "object"
+      }
+    },
     "system.logs.query": {
       "method": "POST",
       "path": "/api/system/logs/query",
@@ -2685,6 +4012,11 @@
       "events_only",
       "full"
     ],
+    "Confidence": [
+      "high",
+      "low",
+      "medium"
+    ],
     "DataOrigin": [
       "backfill",
       "ingest"
@@ -2692,6 +4024,24 @@
     "DeploymentType": [
       "on_prem",
       "saas"
+    ],
+    "DetectorKind": [
+      "account_fanout",
+      "blocked_surge",
+      "cross_env",
+      "fanout",
+      "new_admin_connection",
+      "non_admin_group",
+      "pivot_chain",
+      "unexpected_initiator"
+    ],
+    "DetectorState": [
+      "accumulating",
+      "collection_off",
+      "disabled",
+      "incomplete",
+      "no_data",
+      "ok"
     ],
     "DraftPolicyDecision": [
       "allowed",
@@ -2704,9 +4054,30 @@
       "potentially_blocked_by_override_deny",
       "unknown"
     ],
+    "EdgeState": [
+      "allowed",
+      "potentially_blocked",
+      "unknown"
+    ],
     "FlowDirection": [
       "inbound",
       "outbound"
+    ],
+    "FocusKind": [
+      "collection_gap",
+      "cross_env",
+      "data_coverage",
+      "detection",
+      "exposure_asset",
+      "mode_switch_blocker",
+      "pivot_host",
+      "ransomware_priority",
+      "setup_required",
+      "stale_selector",
+      "system_health",
+      "tamper",
+      "vendor_contradiction",
+      "visibility"
     ],
     "IngestSource": [
       "backfill",
@@ -2725,19 +4096,82 @@
       "potentially_blocked",
       "unknown"
     ],
+    "PrecursorKind": [
+      "offline",
+      "suspend",
+      "tamper"
+    ],
     "ProbeName": [
       "health",
       "node_available",
       "noop"
+    ],
+    "RansomwareTrafficClass": [
+      "priority",
+      "protected",
+      "safe_to_block",
+      "suspicious",
+      "unknown"
     ],
     "RuleAction": [
       "allow",
       "deny",
       "override_deny"
     ],
+    "SegmentDimension": [
+      "actor",
+      "decision",
+      "direction",
+      "dst_host",
+      "dst_label",
+      "event_host",
+      "event_severity",
+      "event_type",
+      "initiator_process",
+      "initiator_user",
+      "service",
+      "service_process",
+      "service_user",
+      "src_host",
+      "src_label"
+    ],
+    "SegmentMetric": [
+      "bytes",
+      "connections",
+      "distinct_dst",
+      "distinct_ports",
+      "distinct_src",
+      "events",
+      "flows"
+    ],
+    "SegmentView": [
+      "detail",
+      "predicted_block",
+      "ranking"
+    ],
+    "Severity": [
+      "critical",
+      "high",
+      "low",
+      "medium"
+    ],
+    "TamperAction": [
+      "add_chain",
+      "add_rule",
+      "add_table",
+      "delete_chain",
+      "delete_rule",
+      "delete_table"
+    ],
     "TamperClassification": [
       "confirmed",
       "signal"
+    ],
+    "TamperPattern": [
+      "burst",
+      "regular_cycle",
+      "sporadic",
+      "too_few"
     ],
     "VisibilityLevel": [
       "enhanced_data_collection",

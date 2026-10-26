@@ -5,13 +5,29 @@ from __future__ import annotations
 
 import json
 import time
+from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
 from typing import Any, Literal
 
 from loguru import logger
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
-from illumio_ops.domain.events import EventShapeError, normalize_event
+from illumio_ops.domain.detectors import Precursor
+from illumio_ops.domain.events import (
+    PRECURSOR_EVENT_TYPES,
+    EventHosts,
+    EventShapeError,
+    event_hosts,
+    normalize_event,
+    precursor_of,
+)
+from illumio_ops.domain.identity import endpoint_key
+from illumio_ops.domain.segment import (
+    EVENT_FROM,
+    EventSegment,
+    compile_event_ranking,
+    compile_event_where,
+)
 from illumio_ops.domain.values import IngestSource
 from illumio_ops.pce.client import PceNotConfigured
 from illumio_ops.pce.events import events_timeout, fetch_events
@@ -20,7 +36,8 @@ from illumio_ops.services.collect.mode import collects
 from illumio_ops.services.collect.traffic import PCE_FAILURES
 from illumio_ops.services.context import AppContext
 from illumio_ops.services.coverage import Coverage, merge_gaps, store_coverage
-from illumio_ops.store.flowdb.db import db_time
+from illumio_ops.services.flowsource import AggRow
+from illumio_ops.store.flowdb.db import StaleGeneration, db_time
 
 FILL_DEADLINE_SECONDS = 900
 
@@ -124,3 +141,149 @@ def query_events(ctx: AppContext, *, start: datetime, end: datetime, event_types
                       coverage=Coverage(source=source, store_from=cov.store_from, store_to=cov.store_to, gaps=kept,
                                         filled_from_pce=sorted(filled),
                                         truncated=any(g[2] == "truncated" for g in kept)))
+
+
+class EventAggregate(BaseModel):
+    rows: list[AggRow]
+    coverage: Coverage
+    limit_hit: bool
+
+
+def _event_row(r: Any) -> EventRow:
+    return EventRow(href=r["href"], event_type=r["event_type"], severity=r["severity"], status=r["status"],
+                    timestamp=datetime.fromisoformat(r["timestamp"]), created_by_kind=r["created_by_kind"],
+                    created_by_name=r["created_by_name"], created_by_href=r["created_by_href"],
+                    tamper_classification=r["tamper_classification"], raw=json.loads(r["raw_json"]),
+                    origin=r["origin"])
+
+
+def _segment_read(ctx: AppContext, seg: EventSegment, at: datetime,
+                  read: Callable[[Any], list[Any]]) -> tuple[list[Any], Coverage]:
+    """Run a store-only read of an event segment with its coverage (events never fill from the PCE here:
+    a ranking mixed with PCE rows could not be grouped the way the store's rows are)."""
+    fdb = ctx.flows()
+    gen = fdb.generation  # noted before the settings it goes with (FlowDb.generation)
+    settings = ctx.settings.current()
+    floor = at - timedelta(days=settings.collection.retention.event_days)
+    with fdb.connect() as conn:
+        require_same_pce(conn, settings.pce)
+        cov = store_coverage(conn, IngestSource.EVENTS, (seg.filter.start, seg.filter.end), floor=floor,
+                             collected=collects(settings, IngestSource.EVENTS))
+        found = read(conn)
+    if fdb.generation != gen:
+        raise StaleGeneration
+    gaps = merge_gaps(cov.gaps)
+    return found, Coverage(source="store", store_from=cov.store_from, store_to=cov.store_to, gaps=gaps,
+                           filled_from_pce=[], truncated=any(g[2] == "truncated" for g in gaps))
+
+
+def aggregate_events(ctx: AppContext, seg: EventSegment, *, now: datetime | None = None) -> EventAggregate:
+    at = (now or datetime.now(UTC)).astimezone(UTC)
+    sql, params = compile_event_ranking(seg)
+    found, cov = _segment_read(ctx, seg, at, lambda conn: conn.execute(sql, params).fetchall())
+    levels = len(seg.group_by)
+    rows = [AggRow(keys=[r[f"k{i}"] for i in range(levels)], display=[None] * levels, value=r["value"],
+                   bytes_known=None) for r in found]
+    return EventAggregate(rows=rows[:seg.limit], coverage=cov, limit_hit=len(rows) > seg.limit)
+
+
+def event_detail(ctx: AppContext, seg: EventSegment, *, now: datetime | None = None) -> EventQuery:
+    """An event segment's rows, newest first, with the same filter semantics as its ranking."""
+    at = (now or datetime.now(UTC)).astimezone(UTC)
+    where, params = compile_event_where(seg.filter)
+    sql = ("SELECT e.href, e.event_type, e.severity, e.status, e.timestamp, e.created_by_kind, e.created_by_name, "
+           f"e.created_by_href, e.tamper_classification, e.raw_json, e.origin {EVENT_FROM} WHERE {where} "
+           "ORDER BY e.timestamp DESC, e.id DESC LIMIT ?")
+    found, cov = _segment_read(ctx, seg, at, lambda conn: conn.execute(sql, [*params, seg.limit + 1]).fetchall())
+    rows = [_event_row(r) for r in found]
+    return EventQuery(rows=rows[:seg.limit], coverage=cov, limit_hit=len(rows) > seg.limit)
+
+
+class PrecursorEvents(BaseModel):
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+    items: list[Precursor]
+    unmatched: int  # hosts named in precursor events that match no host of the inventory
+
+
+class HostEvents(BaseModel):
+    items: list[tuple[str, dict[str, Any]]]  # (host key, raw event), oldest first
+    unmatched: int
+
+
+def _hosts_of(rows: list[Any]) -> Callable[[EventHosts], tuple[set[str], int]]:
+    """How an event's hosts become workload hrefs, each host on its own (one matched host must not keep the
+    others from the fallback, P3 final review #12): a VEN through the inventory, a workload href as it is,
+    and a host paired again (new VEN or workload href, same host) by its hostname when that names exactly
+    one host. Returns (the hrefs, how many of the event's hosts matched none)."""
+    by_ven: dict[str, str] = {h["ven_href"]: h["href"] for h in rows if h["ven_href"]}
+    known = {h["href"] for h in rows}
+    by_name: dict[str, list[str]] = {}
+    for h in rows:
+        if h["hostname"]:
+            by_name.setdefault(h["hostname"], []).append(h["href"])
+
+    def one(ven: str | None, workload: str | None, hostname: str | None) -> str | None:
+        if ven is not None and ven in by_ven:
+            return by_ven[ven]
+        if workload is not None and workload in known:
+            return workload
+        if hostname is not None and len(by_name.get(hostname, ())) == 1:
+            return by_name[hostname][0]
+        return None
+
+    def resolve(hosts: EventHosts) -> tuple[set[str], int]:
+        if not hosts.entities:
+            return set(), 1  # an event naming no host at all is unmatched, not invisible
+        found = [one(*e) for e in hosts.entities]
+        return {h for h in found if h is not None}, sum(1 for h in found if h is None)
+    return resolve
+
+
+def _typed_events(ctx: AppContext, types: list[str], start: datetime, end: datetime) -> tuple[list[Any], list[Any]]:
+    fdb = ctx.flows()
+    gen = fdb.generation  # noted before the settings it goes with (FlowDb.generation)
+    settings = ctx.settings.current()
+    with fdb.connect() as conn:
+        require_same_pce(conn, settings.pce)
+        found = conn.execute(f"SELECT raw_json, timestamp FROM events WHERE event_type IN ({','.join('?' * len(types))}) "
+                             "AND timestamp >= ? AND timestamp <= ? ORDER BY timestamp",
+                             [*types, db_time(start), db_time(end)]).fetchall()
+        hosts = conn.execute("SELECT href, hostname, ven_href FROM workloads").fetchall()
+    if fdb.generation != gen:
+        raise StaleGeneration
+    return found, hosts
+
+
+def precursor_events(ctx: AppContext, *, start: datetime, end: datetime) -> PrecursorEvents:
+    """Tampering, suspended and offline VENs in the store, by host. Events that match no host are counted,
+    not dropped."""
+    found, hosts = _typed_events(ctx, sorted(PRECURSOR_EVENT_TYPES), start, end)
+    resolve = _hosts_of(hosts)
+    items: list[Precursor] = []
+    unmatched = 0
+    for r in found:
+        res = precursor_of(json.loads(r["raw_json"]))
+        if res is None:
+            continue
+        kind, event_hosts, signal = res
+        hrefs, missed = resolve(event_hosts)
+        unmatched += missed
+        if not hrefs:
+            continue
+        at = datetime.fromisoformat(r["timestamp"])
+        items += [Precursor(host_key=endpoint_key(h, ""), kind=kind, at=at, signal=signal) for h in sorted(hrefs)]
+    return PrecursorEvents(items=items, unmatched=unmatched)
+
+
+def tamper_events(ctx: AppContext, *, start: datetime, end: datetime) -> HostEvents:
+    """Every agent.tampering event in the store with its host, the same host matching as precursors use."""
+    found, hosts = _typed_events(ctx, ["agent.tampering"], start, end)
+    resolve = _hosts_of(hosts)
+    items: list[tuple[str, dict[str, Any]]] = []
+    unmatched = 0
+    for r in found:
+        raw = json.loads(r["raw_json"])
+        hrefs, missed = resolve(event_hosts(raw))
+        unmatched += missed
+        items += [(endpoint_key(h, ""), raw) for h in sorted(hrefs)]
+    return HostEvents(items=items, unmatched=unmatched)

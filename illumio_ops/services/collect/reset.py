@@ -21,7 +21,9 @@ from illumio_ops.store.flowdb import binding
 # app.sqlite tables that describe one PCE (cleared on a switch) and those that do not.
 # tests_v6/services/collect/test_reset.py checks that every app.sqlite table is in exactly one.
 APP_DB_PCE_DERIVED: tuple[str, ...] = ("pce_probe",)
-APP_DB_PCE_INDEPENDENT: tuple[str, ...] = ("job_health",)
+# tamper_annotations is the operator's input, not derived data: each row names its PCE and is listed only
+# while that PCE is configured, so switching back finds the notes again.
+APP_DB_PCE_INDEPENDENT: tuple[str, ...] = ("job_health", "tamper_annotations")
 _CLEARERS: dict[str, Callable[[AppContext], None]] = {"pce_probe": pce_health.forget}
 
 

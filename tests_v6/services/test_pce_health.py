@@ -44,3 +44,28 @@ def test_second_probe_replaces_the_first(tmp_path):
     assert [(r.ok, r.category) for r in stored] == [(False, "auth_failed")]
     with ctx.db() as conn:
         assert conn.execute("SELECT count(*) FROM pce_probe").fetchone()[0] == 1
+
+
+@responses.activate
+def test_probe_of_previous_pce_is_not_written_after_switch(tmp_path):
+    ctx = make_ctx(tmp_path)
+    _configure(ctx, deployment_type="saas")
+
+    def switch_while_answering(request):
+        _configure(ctx, url="https://other.example.com:8443", org_id="2")
+        return (204, {}, "")
+
+    responses.add_callback(responses.GET, f"{BASE}/api/v2/noop", callback=switch_while_answering)
+    pce_health.run_probe(ctx)
+    assert pce_health.latest(ctx) is None
+
+
+@responses.activate
+def test_latest_ignores_result_of_other_pce(tmp_path):
+    ctx = make_ctx(tmp_path)
+    _configure(ctx, deployment_type="saas")
+    responses.add(responses.GET, f"{BASE}/api/v2/noop", status=204)
+    pce_health.run_probe(ctx)
+    assert pce_health.latest(ctx) is not None
+    _configure(ctx, org_id="2")  # same host, another organization
+    assert pce_health.latest(ctx) is None

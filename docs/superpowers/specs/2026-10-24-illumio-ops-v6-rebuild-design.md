@@ -145,6 +145,11 @@ SIEM 轉送（22.4 萬筆全數送達）**；GUI 告警收件匣 146 則從未�
   - **單次讀取的記憶體**：PCE 回來的流量解析後每筆約 6 KB，所以收集、回填、每日重讀每次查詢最多讀一小時的流量
     （1,000 台約 4.2 萬筆、約 260 MB），寫入後才讀下一段；查詢補缺口每次合計最多 5 萬筆（約 300 MB）。修正前回填與
     冷啟動一次讀一整天，1,000 台約 6 GB，會超過本表的記憶體【P2 Task 15 發現並修正】。
+  - **橫向移動分析**【P3 Task 15 量測 2026-10-26，限 4 GB；合成資料隨機全連通，3,000 個節點間 61.9 萬條管理 port 邊
+    （lab 113 條），每輪寫出 4.4 萬筆偵測，是最壞情況而非一般環境】：每小時分析 33–46 秒、記憶體增量約 0.8 GB（暴露面圖），
+    超過 0.5 GB 目標，所以 1,000 台建議 8 GB；每輪偵測熱 85 秒／冷 217 秒，在收集寫入之後、不持鎖，不延後收集，只延後
+    告警（P4 前置工作會把其中 40 秒的 7 天被擋歷史改成每小時快取）。升級時 flow 庫遷移在啟動時做（0002 約 20 分鐘），
+    期間 GUI 尚未開始服務。
 
   4 GB 已在目標內；8 GB 快約 25%，也給工作台（P6）查詢留餘裕。.106 同時跑 5.x 等服務，數字偏保守。紀錄見 P2 驗收報告與
   `tmp/v6-p2-verification/load-test.md`。
@@ -435,25 +440,27 @@ VEN 車隊總覽。架構保留「政策動作」服務的位置，v6.1 加入�
   （預設 30 天）內**實際觀察到**的管理 port 連線。v6.0 用觀察到的連線，不從政策推算可達性
   （政策推算延後，5.x 的 policy_resolver 可作為日後基礎）【判斷 修訂】。
 - **兩種狀態並排**：「現在」＝ reported 為 allowed 或 potentially_blocked 的邊（未強制所以會通）；
-  「全部強制後」＝只剩 allowed 的邊。差距就是強制的價值。
+  「全部強制後」＝只剩 allowed 的邊。差距就是強制的價值。reported 為 `unknown` 的邊（lab 管理 port 連線的 24%，
+  P3 Task 0）算進「現在」但標成 unknown 並計數揭露，不算進「全部強制後」；偵測器也把它當成「沒被擋」【判斷，P3】。
 - **指標**：每台主機在 k 跳內（預設 3；5.x 用 4）可觸及的主機數、可觸及每個重要資產的來源數與最短路徑、
   樞紐主機（5.x 的 articulation points 演算法可回收）、跨環境的管理 port 連線（5.x L010）。
 - **勒索防護疊加**：PCE 判定「未防護且 listening」的高風險服務，在圖上標成可落腳點（§6.5.6）。
 
 **正在發生（偵測器 → `lateral` 告警）**
 
-每輪收集（預設 10 分鐘）後在新資料上評估；門檻與視窗可調，以下為預設方向，數值由 builder 依實測定：
+每輪收集（預設 10 分鐘）後在新資料上評估；門檻與視窗可在設定頁「橫向移動」調整。v6.0 的預設值與依據如下，
+依據是 P3 Task 0 在 lab 的實測（.106 v6 流量庫，21 台，2026-09-21 至 10-25）：
 
-| 偵測器 | 判斷 | 5.x 現況 |
-|---|---|---|
-| 扇出 | 一台主機在視窗內對 ≥ N 台主機發起管理 port 連線 | 報表規則 B006（N=10），無告警 |
-| 新的管理連線 | 基準期（預設 30 天）未出現過的「來源 → 目的 × 管理 port」；指向重要資產時加重 | 無 |
-| 跳板鏈 | A→B 之後在時間 T 內出現 B→C，兩段都是管理 port | 只有報表的可達性，不看時序 |
-| 大量被擋嘗試 | 一台主機對多個目標的 reported `blocked` 連線突增 | 無 |
-| 非管理群組用管理協定 | 來源不在管理群組卻使用管理 port；未設定管理群組時此偵測器停用並說明 | 無 |
-| 跨環境管理 port | 不同 env label 之間有 allowed／potentially_blocked 的管理 port 連線 | 報表規則 L010，無告警 |
-| 帳號扇出 | 同一個發起端使用者在視窗內對 ≥ N 台主機發起管理 port 連線（§6.5.7；依賴使用者欄位覆蓋，覆蓋不足時標示） | 報表 mod06 只做排名，無告警 |
-| 非預期的發起 process | 管理 port 連線的發起端 process 不在該協定的常見清單（例：SMB 由 powershell／rundll32 發起、RDP 不是由 mstsc 發起）；清單可調 | 無 |
+| 偵測器 | 判斷 | v6.0 預設與實測依據 | 5.x 現況 |
+|---|---|---|---|
+| 扇出 | 一台主機在視窗內對 ≥ N 台主機發起管理 port 連線 | N=10、60 分鐘。lab 單一來源的不重複目的數，10 分鐘與 60 分鐘桶的 p99 分別為 2 與 3；34 天內 ≥ 10 的桶只有 3 個，都來自同一台 | 報表規則 B006（N=10），無告警 |
+| 新的管理連線 | 基準期（預設 30 天）未出現過的「來源 → 目的 × 管理 port」；指向重要資產時加重 | 基準期沿用收集設定的基準天數（預設 30）。lab 基準期滿後每天 1–9 組 | 無 |
+| 跳板鏈 | A→B 之後在時間 T 內出現 B→C，兩段都是管理 port | T=30 分鐘；兩段可能落在同一個 10 分鐘回報桶 | 只有報表的可達性，不看時序 |
+| 大量被擋嘗試 | 一台主機對多個目標的 reported `blocked` 連線突增 | 60 分鐘內被擋 ≥ 5 台目標，且至少是前 7 天任一同長視窗最大值的 3 倍（前 7 天沒有時只看門檻）；不限管理 port（掃描不只打管理 port）。lab 管理 port 被擋只有 2 列，門檻**沒有實測依據**，由測試資料決定 | 無 |
+| 非管理群組用管理協定 | 來源不在管理群組卻使用管理 port；未設定管理群組時此偵測器停用並說明 | 無數值；未設定管理群組時狀態為「停用」 | 無 |
+| 跨環境管理 port | 不同 env label 之間有 allowed／potentially_blocked 的管理 port 連線 | 環境 label key 預設 `env`；allowed 為 high，其餘 medium（保留一級給前兆加權）。lab 272 列、10 組 env 對 | 報表規則 L010，無告警 |
+| 帳號扇出 | 同一個發起端使用者在視窗內對 ≥ N 台主機發起管理 port 連線（§6.5.7；依賴使用者欄位覆蓋，覆蓋不足時標示） | N=10、60 分鐘，預設排除系統帳號。lab 11 個使用者用過管理 port，整段期間最多的對 29 台、次多 7 台；管理 port 列的使用者覆蓋 44% | 報表 mod06 只做排名，無告警 |
+| 非預期的發起 process | 管理 port 連線的發起端 process 不在該協定的常見清單（例：SMB 由 powershell／rundll32 發起、RDP 不是由 mstsc 發起）；清單可調 | 預設清單只涵蓋 445、3389、22、5985／5986、135，內容取自 lab 觀察到的值加常見工具；LDAP 389、Kerberos 88 的合法發起端太多，不設清單，沒有清單的 port 不評估。沒有 process 資料的連線計為「無法判斷」，不算非預期。lab 管理 port 列的 process 覆蓋 15% | 無 |
 
 - **前兆加權**：同一台主機在前 24 小時內出現 `agent.tampering`（尤其 signal 型）、`agent.suspend`、VEN 離線時，
   該主機發起的偵測嚴重度上調一級，告警裡寫明前兆。
@@ -592,15 +599,21 @@ services 條目只有 port、to_port、proto、process_name、windows_service_na
   `enforcement_boundaries` 帶 `[{href: /orgs/N/sec_policy/draft/rule_sets/<id>/deny_rules/<id>}]`，即「會擋下它的
   deny rule」。觀察到的 draft 值：allowed、potentially_blocked、blocked_by_boundary；`boundary_decision` 全為 null；
   `override_deny_rules` 欄位存在（此資料中為空）；`rules` 在 78 筆含 `essential_service_rule`。
+  **形狀（實測，lab，P3 Task 0，2 天 5,000 筆）**：draft 值 potentially_blocked 4,816、blocked_by_boundary 148、allowed 36；
+  `enforcement_boundaries` 為 `[{"href": "<deny rule href>"}]`；`rules` 是清單，lab 樣本每個元素都是
+  `{"essential_service_rule": "<字串>"}`，一般 allow rule 的元素預期為 `{"href": ...}`。deny rule 沒有名稱欄、`description`
+  多為空字串，辨識一條 deny rule 靠規則集名稱、型別（deny／override_deny）、consumers、providers 與 services。
 - **F2 欄位覆蓋低（實測，lab）**：位元組（`dst_bi`／`dst_bo`）1,008／19,098（5.3%），process 733（3.8%），
   使用者 2,356（12.3%）。lab 21 台中 20 台 `visibility_level = enhanced_data_collection`，**所以不是沒開 EDC**，
   原因未明。假設：位元組只出現在 `state` 為 active／closed 的 flow（778＋192＝970，接近 1,008），未驗證。
 - **F3 可見度可讀（實測）**：workload 的 `visibility_level`（lab：EDC 20、flow_summary 1；NFR：flow_summary 130）。
-- **F4 竄改事件有兩種（實測，lab 60 天 335 筆、6 台）**：`notifications[].info.event_classification` 為
+- **F4 竄改事件有兩種（實測，lab 60 天 335 筆、7 台；主機數與規律台數於 P3 Task 0 更正）**：`notifications[].info.event_classification` 為
   `confirmed`（322 筆，severity info，只有 beginning／ending_timestamp、num_events、tampering_revert_succeeded）或
   `signal`（13 筆，severity warning，`info.events[]` 帶 process_name〔iptables／ip6tables／nft〕、process_id、
   kernel_functions〔nf_tables_newrule／delrule／newchain／delchain〕、tamper_type、timestamp；原廠文件稱 VEN 26.2.20 起）。
-  3 台主機的竄改間隔中位數 10.1 分鐘，另兩台 0.6 與 26.9 分鐘。
+  **4 台**主機的竄改間隔中位數 10.1 分鐘、四分位都在中位數 ±1 分鐘內（規律循環：另一個防火牆管理程式與 VEN 搶同一張表，
+  dev.lab.local 是 NetBird），另兩台 0.6 與 26.9 分鐘，一台只有 1 筆。初版寫「6 台、3 台約 10 分鐘」，用的是較早的 60 天視窗；
+  P3 的分類門檻（規律＝至少 6 筆且四分位距 ≤ 中位數的 1/4；爆發＝中位間隔 ≤ 2 分鐘）以 2026-10-25 重錄的這份為準。
 - **F5 勒索防護 API（實測）**：workload `risk_summary.ransomware` = {workload_exposure_severity（critical／high／medium／
   low／fully_protected）, ransomware_protection_percent, last_updated_at}；`GET {workload}/risk_details` →
   `risk_details.ransomware.details[]` = {name, port, proto, severity, category（admin／legacy）, protection_state

@@ -1,0 +1,2099 @@
+[
+ {
+  "src": {
+   "ip": "10.0.0.2",
+   "workload": {
+    "hostname": "host-01",
+    "name": "host-01",
+    "href": "/orgs/1/workloads/w-01",
+    "os_type": "linux",
+    "enforcement_mode": "selective",
+    "endpoint": false,
+    "managed": true,
+    "labels": [
+     {
+      "href": "/orgs/1/labels/116",
+      "key": "app",
+      "value": "app-01"
+     },
+     {
+      "href": "/orgs/1/labels/21",
+      "key": "env",
+      "value": "env-02"
+     },
+     {
+      "href": "/orgs/1/labels/145",
+      "key": "loc",
+      "value": "loc-03"
+     },
+     {
+      "href": "/orgs/1/labels/110",
+      "key": "role",
+      "value": "role-04"
+     },
+     {
+      "href": "/orgs/1/labels/142",
+      "key": "Net",
+      "value": "Net-05"
+     },
+     {
+      "href": "/orgs/1/labels/69",
+      "key": "os",
+      "value": "os-06"
+     }
+    ],
+    "sub_labels": []
+   }
+  },
+  "dst": {
+   "ip": "10.0.0.3",
+   "workload": {
+    "hostname": "host-02",
+    "name": "host-02",
+    "href": "/orgs/1/workloads/w-02",
+    "os_type": "linux",
+    "enforcement_mode": "selective",
+    "endpoint": false,
+    "managed": true,
+    "labels": [
+     {
+      "href": "/orgs/1/labels/116",
+      "key": "app",
+      "value": "app-01"
+     },
+     {
+      "href": "/orgs/1/labels/21",
+      "key": "env",
+      "value": "env-02"
+     },
+     {
+      "href": "/orgs/1/labels/145",
+      "key": "loc",
+      "value": "loc-03"
+     },
+     {
+      "href": "/orgs/1/labels/2",
+      "key": "role",
+      "value": "role-07"
+     },
+     {
+      "href": "/orgs/1/labels/69",
+      "key": "os",
+      "value": "os-06"
+     },
+     {
+      "href": "/orgs/1/labels/142",
+      "key": "Net",
+      "value": "Net-05"
+     }
+    ],
+    "sub_labels": []
+   }
+  },
+  "network": {
+   "name": "Corporate",
+   "href": "/orgs/1/networks/27058b12-718b-4538-8cb9-e59169fa75ed"
+  },
+  "service": {
+   "port": 6379,
+   "proto": 6,
+   "process_name": "redis-check-rdb",
+   "user_name": "user-01"
+  },
+  "num_connections": 375,
+  "policy_decision": "potentially_blocked",
+  "state": "active",
+  "flow_direction": "inbound",
+  "dst_bi": 1996398,
+  "dst_bo": 899332,
+  "timestamp_range": {
+   "last_detected": "2026-10-25T15:59:58Z",
+   "first_detected": "2026-10-25T00:04:29Z"
+  },
+  "client_type": "server",
+  "seq_id": 58,
+  "caps": [
+   "write"
+  ],
+  "rules": [],
+  "enforcement_boundaries": [
+   {
+    "href": "/orgs/1/sec_policy/draft/rule_sets/673/deny_rules/309"
+   }
+  ],
+  "override_deny_rules": [],
+  "draft_policy_decision": "blocked_by_boundary"
+ },
+ {
+  "src": {
+   "ip": "10.0.0.2",
+   "workload": {
+    "hostname": "host-01",
+    "name": "host-01",
+    "href": "/orgs/1/workloads/w-01",
+    "os_type": "linux",
+    "enforcement_mode": "selective",
+    "endpoint": false,
+    "managed": true,
+    "labels": [
+     {
+      "href": "/orgs/1/labels/116",
+      "key": "app",
+      "value": "app-01"
+     },
+     {
+      "href": "/orgs/1/labels/21",
+      "key": "env",
+      "value": "env-02"
+     },
+     {
+      "href": "/orgs/1/labels/145",
+      "key": "loc",
+      "value": "loc-03"
+     },
+     {
+      "href": "/orgs/1/labels/110",
+      "key": "role",
+      "value": "role-04"
+     },
+     {
+      "href": "/orgs/1/labels/142",
+      "key": "Net",
+      "value": "Net-05"
+     },
+     {
+      "href": "/orgs/1/labels/69",
+      "key": "os",
+      "value": "os-06"
+     }
+    ],
+    "sub_labels": []
+   }
+  },
+  "dst": {
+   "ip": "10.0.0.3",
+   "workload": {
+    "hostname": "host-02",
+    "name": "host-02",
+    "href": "/orgs/1/workloads/w-02",
+    "os_type": "linux",
+    "enforcement_mode": "selective",
+    "endpoint": false,
+    "managed": true,
+    "labels": [
+     {
+      "href": "/orgs/1/labels/116",
+      "key": "app",
+      "value": "app-01"
+     },
+     {
+      "href": "/orgs/1/labels/21",
+      "key": "env",
+      "value": "env-02"
+     },
+     {
+      "href": "/orgs/1/labels/145",
+      "key": "loc",
+      "value": "loc-03"
+     },
+     {
+      "href": "/orgs/1/labels/2",
+      "key": "role",
+      "value": "role-07"
+     },
+     {
+      "href": "/orgs/1/labels/69",
+      "key": "os",
+      "value": "os-06"
+     },
+     {
+      "href": "/orgs/1/labels/142",
+      "key": "Net",
+      "value": "Net-05"
+     }
+    ],
+    "sub_labels": []
+   }
+  },
+  "network": {
+   "name": "Corporate",
+   "href": "/orgs/1/networks/27058b12-718b-4538-8cb9-e59169fa75ed"
+  },
+  "service": {
+   "port": 3306,
+   "proto": 6,
+   "process_name": "mysqld",
+   "user_name": "user-02"
+  },
+  "num_connections": 22252,
+  "policy_decision": "potentially_blocked",
+  "state": "closed",
+  "flow_direction": "inbound",
+  "dst_bi": 65567611,
+  "dst_bo": 103639911,
+  "timestamp_range": {
+   "last_detected": "2026-10-25T15:59:58Z",
+   "first_detected": "2026-10-25T00:09:29Z"
+  },
+  "client_type": "server",
+  "seq_id": 59,
+  "caps": [
+   "write"
+  ],
+  "rules": [],
+  "enforcement_boundaries": [
+   {
+    "href": "/orgs/1/sec_policy/draft/rule_sets/673/deny_rules/309"
+   }
+  ],
+  "override_deny_rules": [],
+  "draft_policy_decision": "blocked_by_boundary"
+ },
+ {
+  "src": {
+   "ip": "10.0.0.3",
+   "workload": {
+    "hostname": "host-02",
+    "name": "host-02",
+    "href": "/orgs/1/workloads/w-02",
+    "os_type": "linux",
+    "enforcement_mode": "selective",
+    "endpoint": false,
+    "managed": true,
+    "labels": [
+     {
+      "href": "/orgs/1/labels/116",
+      "key": "app",
+      "value": "app-01"
+     },
+     {
+      "href": "/orgs/1/labels/21",
+      "key": "env",
+      "value": "env-02"
+     },
+     {
+      "href": "/orgs/1/labels/145",
+      "key": "loc",
+      "value": "loc-03"
+     },
+     {
+      "href": "/orgs/1/labels/2",
+      "key": "role",
+      "value": "role-07"
+     },
+     {
+      "href": "/orgs/1/labels/69",
+      "key": "os",
+      "value": "os-06"
+     },
+     {
+      "href": "/orgs/1/labels/142",
+      "key": "Net",
+      "value": "Net-05"
+     }
+    ],
+    "sub_labels": []
+   }
+  },
+  "dst": {
+   "ip": "10.0.0.4",
+   "workload": {
+    "hostname": "host-03",
+    "name": "host-03",
+    "href": "/orgs/1/workloads/w-03",
+    "os_type": "windows",
+    "enforcement_mode": "selective",
+    "endpoint": false,
+    "managed": true,
+    "labels": [
+     {
+      "href": "/orgs/1/labels/121",
+      "key": "app",
+      "value": "app-08"
+     },
+     {
+      "href": "/orgs/1/labels/21",
+      "key": "env",
+      "value": "env-02"
+     },
+     {
+      "href": "/orgs/1/labels/145",
+      "key": "loc",
+      "value": "loc-03"
+     },
+     {
+      "href": "/orgs/1/labels/19",
+      "key": "role",
+      "value": "role-09"
+     },
+     {
+      "href": "/orgs/1/labels/67",
+      "key": "os",
+      "value": "os-10"
+     },
+     {
+      "href": "/orgs/1/labels/142",
+      "key": "Net",
+      "value": "Net-05"
+     }
+    ],
+    "sub_labels": []
+   }
+  },
+  "network": {
+   "name": "Corporate",
+   "href": "/orgs/1/networks/27058b12-718b-4538-8cb9-e59169fa75ed"
+  },
+  "service": {
+   "port": 53,
+   "proto": 17,
+   "user_name": "user-03"
+  },
+  "num_connections": 1004,
+  "policy_decision": "allowed",
+  "state": "timed out",
+  "flow_direction": "outbound",
+  "dst_bi": 107116,
+  "dst_bo": 189838,
+  "timestamp_range": {
+   "last_detected": "2026-10-25T15:56:52Z",
+   "first_detected": "2026-10-25T00:06:19Z"
+  },
+  "client_type": "server",
+  "seq_id": 186,
+  "caps": [
+   "write"
+  ],
+  "rules": [],
+  "enforcement_boundaries": [
+   {
+    "href": "/orgs/1/sec_policy/draft/rule_sets/673/deny_rules/309"
+   }
+  ],
+  "override_deny_rules": [],
+  "draft_policy_decision": "blocked_by_boundary"
+ },
+ {
+  "src": {
+   "ip": "10.0.0.5",
+   "workload": {
+    "hostname": "host-04",
+    "name": "host-04",
+    "href": "/orgs/1/workloads/w-04",
+    "os_type": "linux",
+    "enforcement_mode": "selective",
+    "endpoint": false,
+    "managed": true,
+    "labels": [
+     {
+      "href": "/orgs/1/labels/29",
+      "key": "app",
+      "value": "app-11"
+     },
+     {
+      "href": "/orgs/1/labels/21",
+      "key": "env",
+      "value": "env-02"
+     },
+     {
+      "href": "/orgs/1/labels/145",
+      "key": "loc",
+      "value": "loc-03"
+     },
+     {
+      "href": "/orgs/1/labels/65",
+      "key": "role",
+      "value": "role-12"
+     },
+     {
+      "href": "/orgs/1/labels/69",
+      "key": "os",
+      "value": "os-06"
+     },
+     {
+      "href": "/orgs/1/labels/143",
+      "key": "Net",
+      "value": "Net-13"
+     }
+    ],
+    "sub_labels": []
+   }
+  },
+  "dst": {
+   "ip": "10.0.0.6",
+   "workload": {
+    "hostname": "",
+    "name": "host-05",
+    "href": "/orgs/1/workloads/w-05",
+    "os_type": "linux",
+    "enforcement_mode": "visibility_only",
+    "endpoint": false,
+    "managed": false,
+    "labels": [
+     {
+      "href": "/orgs/1/labels/29",
+      "key": "app",
+      "value": "app-11"
+     },
+     {
+      "href": "/orgs/1/labels/21",
+      "key": "env",
+      "value": "env-02"
+     },
+     {
+      "href": "/orgs/1/labels/145",
+      "key": "loc",
+      "value": "loc-03"
+     },
+     {
+      "href": "/orgs/1/labels/120",
+      "key": "role",
+      "value": "role-14"
+     },
+     {
+      "href": "/orgs/1/labels/71",
+      "key": "os",
+      "value": "os-15"
+     },
+     {
+      "href": "/orgs/1/labels/143",
+      "key": "Net",
+      "value": "Net-13"
+     }
+    ],
+    "sub_labels": []
+   }
+  },
+  "network": {
+   "name": "Corporate",
+   "href": "/orgs/1/networks/27058b12-718b-4538-8cb9-e59169fa75ed"
+  },
+  "service": {
+   "port": 443,
+   "proto": 6,
+   "user_name": "user-04"
+  },
+  "num_connections": 4984,
+  "policy_decision": "potentially_blocked",
+  "state": "closed",
+  "flow_direction": "outbound",
+  "dst_bi": 54132856,
+  "dst_bo": 54196396,
+  "timestamp_range": {
+   "last_detected": "2026-10-25T15:56:37Z",
+   "first_detected": "2026-10-25T00:06:16Z"
+  },
+  "client_type": "server",
+  "seq_id": 193,
+  "caps": [
+   "write"
+  ],
+  "rules": [],
+  "enforcement_boundaries": [
+   {
+    "href": "/orgs/1/sec_policy/draft/rule_sets/673/deny_rules/309"
+   }
+  ],
+  "override_deny_rules": [],
+  "draft_policy_decision": "blocked_by_boundary"
+ },
+ {
+  "src": {
+   "ip": "10.0.0.5",
+   "workload": {
+    "hostname": "host-04",
+    "name": "host-04",
+    "href": "/orgs/1/workloads/w-04",
+    "os_type": "linux",
+    "enforcement_mode": "selective",
+    "endpoint": false,
+    "managed": true,
+    "labels": [
+     {
+      "href": "/orgs/1/labels/29",
+      "key": "app",
+      "value": "app-11"
+     },
+     {
+      "href": "/orgs/1/labels/21",
+      "key": "env",
+      "value": "env-02"
+     },
+     {
+      "href": "/orgs/1/labels/145",
+      "key": "loc",
+      "value": "loc-03"
+     },
+     {
+      "href": "/orgs/1/labels/65",
+      "key": "role",
+      "value": "role-12"
+     },
+     {
+      "href": "/orgs/1/labels/69",
+      "key": "os",
+      "value": "os-06"
+     },
+     {
+      "href": "/orgs/1/labels/143",
+      "key": "Net",
+      "value": "Net-13"
+     }
+    ],
+    "sub_labels": []
+   }
+  },
+  "dst": {
+   "ip": "10.0.0.7",
+   "workload": {
+    "hostname": "",
+    "name": "host-06",
+    "href": "/orgs/1/workloads/w-06",
+    "os_type": "linux",
+    "enforcement_mode": "visibility_only",
+    "endpoint": false,
+    "managed": false,
+    "labels": [
+     {
+      "href": "/orgs/1/labels/29",
+      "key": "app",
+      "value": "app-11"
+     },
+     {
+      "href": "/orgs/1/labels/21",
+      "key": "env",
+      "value": "env-02"
+     },
+     {
+      "href": "/orgs/1/labels/145",
+      "key": "loc",
+      "value": "loc-03"
+     },
+     {
+      "href": "/orgs/1/labels/78",
+      "key": "role",
+      "value": "role-16"
+     },
+     {
+      "href": "/orgs/1/labels/141",
+      "key": "Net",
+      "value": "Net-17"
+     },
+     {
+      "href": "/orgs/1/labels/71",
+      "key": "os",
+      "value": "os-15"
+     }
+    ],
+    "sub_labels": []
+   }
+  },
+  "network": {
+   "name": "Corporate",
+   "href": "/orgs/1/networks/27058b12-718b-4538-8cb9-e59169fa75ed"
+  },
+  "service": {
+   "port": 623,
+   "proto": 17,
+   "user_name": "user-04"
+  },
+  "num_connections": 5763,
+  "policy_decision": "potentially_blocked",
+  "state": "timed out",
+  "flow_direction": "outbound",
+  "dst_bi": 10657280,
+  "dst_bo": 10923564,
+  "timestamp_range": {
+   "last_detected": "2026-10-25T15:56:37Z",
+   "first_detected": "2026-10-25T00:05:31Z"
+  },
+  "client_type": "server",
+  "seq_id": 195,
+  "caps": [
+   "write"
+  ],
+  "rules": [],
+  "enforcement_boundaries": [
+   {
+    "href": "/orgs/1/sec_policy/draft/rule_sets/673/deny_rules/309"
+   }
+  ],
+  "override_deny_rules": [],
+  "draft_policy_decision": "blocked_by_boundary"
+ },
+ {
+  "src": {
+   "ip": "10.0.0.5",
+   "workload": {
+    "hostname": "host-04",
+    "name": "host-04",
+    "href": "/orgs/1/workloads/w-04",
+    "os_type": "linux",
+    "enforcement_mode": "selective",
+    "endpoint": false,
+    "managed": true,
+    "labels": [
+     {
+      "href": "/orgs/1/labels/29",
+      "key": "app",
+      "value": "app-11"
+     },
+     {
+      "href": "/orgs/1/labels/21",
+      "key": "env",
+      "value": "env-02"
+     },
+     {
+      "href": "/orgs/1/labels/145",
+      "key": "loc",
+      "value": "loc-03"
+     },
+     {
+      "href": "/orgs/1/labels/65",
+      "key": "role",
+      "value": "role-12"
+     },
+     {
+      "href": "/orgs/1/labels/69",
+      "key": "os",
+      "value": "os-06"
+     },
+     {
+      "href": "/orgs/1/labels/143",
+      "key": "Net",
+      "value": "Net-13"
+     }
+    ],
+    "sub_labels": []
+   }
+  },
+  "dst": {
+   "ip": "10.0.0.6",
+   "workload": {
+    "hostname": "",
+    "name": "host-05",
+    "href": "/orgs/1/workloads/w-05",
+    "os_type": "linux",
+    "enforcement_mode": "visibility_only",
+    "endpoint": false,
+    "managed": false,
+    "labels": [
+     {
+      "href": "/orgs/1/labels/29",
+      "key": "app",
+      "value": "app-11"
+     },
+     {
+      "href": "/orgs/1/labels/21",
+      "key": "env",
+      "value": "env-02"
+     },
+     {
+      "href": "/orgs/1/labels/145",
+      "key": "loc",
+      "value": "loc-03"
+     },
+     {
+      "href": "/orgs/1/labels/120",
+      "key": "role",
+      "value": "role-14"
+     },
+     {
+      "href": "/orgs/1/labels/71",
+      "key": "os",
+      "value": "os-15"
+     },
+     {
+      "href": "/orgs/1/labels/143",
+      "key": "Net",
+      "value": "Net-13"
+     }
+    ],
+    "sub_labels": []
+   }
+  },
+  "network": {
+   "name": "Corporate",
+   "href": "/orgs/1/networks/27058b12-718b-4538-8cb9-e59169fa75ed"
+  },
+  "service": {
+   "port": 443,
+   "proto": 6,
+   "user_name": "user-04"
+  },
+  "num_connections": 762,
+  "policy_decision": "potentially_blocked",
+  "state": "active",
+  "flow_direction": "outbound",
+  "dst_bi": 14669590,
+  "dst_bo": 19204778,
+  "timestamp_range": {
+   "last_detected": "2026-10-25T15:56:37Z",
+   "first_detected": "2026-10-25T00:01:16Z"
+  },
+  "client_type": "server",
+  "seq_id": 196,
+  "caps": [
+   "write"
+  ],
+  "rules": [],
+  "enforcement_boundaries": [
+   {
+    "href": "/orgs/1/sec_policy/draft/rule_sets/673/deny_rules/309"
+   }
+  ],
+  "override_deny_rules": [],
+  "draft_policy_decision": "blocked_by_boundary"
+ },
+ {
+  "src": {
+   "ip": "10.0.0.5",
+   "workload": {
+    "hostname": "host-04",
+    "name": "host-04",
+    "href": "/orgs/1/workloads/w-04",
+    "os_type": "linux",
+    "enforcement_mode": "selective",
+    "endpoint": false,
+    "managed": true,
+    "labels": [
+     {
+      "href": "/orgs/1/labels/29",
+      "key": "app",
+      "value": "app-11"
+     },
+     {
+      "href": "/orgs/1/labels/21",
+      "key": "env",
+      "value": "env-02"
+     },
+     {
+      "href": "/orgs/1/labels/145",
+      "key": "loc",
+      "value": "loc-03"
+     },
+     {
+      "href": "/orgs/1/labels/65",
+      "key": "role",
+      "value": "role-12"
+     },
+     {
+      "href": "/orgs/1/labels/69",
+      "key": "os",
+      "value": "os-06"
+     },
+     {
+      "href": "/orgs/1/labels/143",
+      "key": "Net",
+      "value": "Net-13"
+     }
+    ],
+    "sub_labels": []
+   }
+  },
+  "dst": {
+   "ip": "10.0.0.7",
+   "workload": {
+    "hostname": "",
+    "name": "host-06",
+    "href": "/orgs/1/workloads/w-06",
+    "os_type": "linux",
+    "enforcement_mode": "visibility_only",
+    "endpoint": false,
+    "managed": false,
+    "labels": [
+     {
+      "href": "/orgs/1/labels/29",
+      "key": "app",
+      "value": "app-11"
+     },
+     {
+      "href": "/orgs/1/labels/21",
+      "key": "env",
+      "value": "env-02"
+     },
+     {
+      "href": "/orgs/1/labels/145",
+      "key": "loc",
+      "value": "loc-03"
+     },
+     {
+      "href": "/orgs/1/labels/78",
+      "key": "role",
+      "value": "role-16"
+     },
+     {
+      "href": "/orgs/1/labels/141",
+      "key": "Net",
+      "value": "Net-17"
+     },
+     {
+      "href": "/orgs/1/labels/71",
+      "key": "os",
+      "value": "os-15"
+     }
+    ],
+    "sub_labels": []
+   }
+  },
+  "network": {
+   "name": "Corporate",
+   "href": "/orgs/1/networks/27058b12-718b-4538-8cb9-e59169fa75ed"
+  },
+  "service": {
+   "port": 623,
+   "proto": 17,
+   "user_name": "user-04"
+  },
+  "num_connections": 1169,
+  "policy_decision": "potentially_blocked",
+  "state": "active",
+  "flow_direction": "outbound",
+  "dst_bi": 1184592,
+  "dst_bo": 1214220,
+  "timestamp_range": {
+   "last_detected": "2026-10-25T15:56:37Z",
+   "first_detected": "2026-10-25T00:01:16Z"
+  },
+  "client_type": "server",
+  "seq_id": 198,
+  "caps": [
+   "write"
+  ],
+  "rules": [],
+  "enforcement_boundaries": [
+   {
+    "href": "/orgs/1/sec_policy/draft/rule_sets/673/deny_rules/309"
+   }
+  ],
+  "override_deny_rules": [],
+  "draft_policy_decision": "blocked_by_boundary"
+ },
+ {
+  "src": {
+   "ip": "10.0.0.8",
+   "workload": {
+    "hostname": "host-07",
+    "name": "host-07",
+    "href": "/orgs/1/workloads/w-07",
+    "os_type": "linux",
+    "enforcement_mode": "selective",
+    "endpoint": false,
+    "managed": true,
+    "labels": [
+     {
+      "href": "/orgs/1/labels/29",
+      "key": "app",
+      "value": "app-11"
+     },
+     {
+      "href": "/orgs/1/labels/21",
+      "key": "env",
+      "value": "env-02"
+     },
+     {
+      "href": "/orgs/1/labels/145",
+      "key": "loc",
+      "value": "loc-03"
+     },
+     {
+      "href": "/orgs/1/labels/37",
+      "key": "role",
+      "value": "role-18"
+     },
+     {
+      "href": "/orgs/1/labels/142",
+      "key": "Net",
+      "value": "Net-05"
+     }
+    ],
+    "sub_labels": []
+   }
+  },
+  "dst": {
+   "ip": "10.0.0.6",
+   "workload": {
+    "hostname": "",
+    "name": "host-05",
+    "href": "/orgs/1/workloads/w-05",
+    "os_type": "linux",
+    "enforcement_mode": "visibility_only",
+    "endpoint": false,
+    "managed": false,
+    "labels": [
+     {
+      "href": "/orgs/1/labels/29",
+      "key": "app",
+      "value": "app-11"
+     },
+     {
+      "href": "/orgs/1/labels/21",
+      "key": "env",
+      "value": "env-02"
+     },
+     {
+      "href": "/orgs/1/labels/145",
+      "key": "loc",
+      "value": "loc-03"
+     },
+     {
+      "href": "/orgs/1/labels/120",
+      "key": "role",
+      "value": "role-14"
+     },
+     {
+      "href": "/orgs/1/labels/71",
+      "key": "os",
+      "value": "os-15"
+     },
+     {
+      "href": "/orgs/1/labels/143",
+      "key": "Net",
+      "value": "Net-13"
+     }
+    ],
+    "sub_labels": []
+   }
+  },
+  "network": {
+   "name": "Corporate",
+   "href": "/orgs/1/networks/27058b12-718b-4538-8cb9-e59169fa75ed"
+  },
+  "service": {
+   "port": 11073,
+   "proto": 6
+  },
+  "num_connections": 1,
+  "policy_decision": "unknown",
+  "state": "snapshot",
+  "flow_direction": "outbound",
+  "dst_bi": 0,
+  "dst_bo": 0,
+  "timestamp_range": {
+   "last_detected": "2026-10-25T15:56:04Z",
+   "first_detected": "2026-10-25T15:56:04Z"
+  },
+  "client_type": "flowlink",
+  "seq_id": 214,
+  "caps": [
+   "write"
+  ],
+  "rules": [],
+  "enforcement_boundaries": [
+   {
+    "href": "/orgs/1/sec_policy/draft/rule_sets/673/deny_rules/309"
+   }
+  ],
+  "override_deny_rules": [],
+  "draft_policy_decision": "blocked_by_boundary"
+ },
+ {
+  "src": {
+   "ip": "10.0.0.9"
+  },
+  "dst": {
+   "ip": "10.0.0.10",
+   "workload": {
+    "hostname": "host-08",
+    "name": "host-08",
+    "href": "/orgs/1/workloads/w-08",
+    "os_type": "linux",
+    "enforcement_mode": "selective",
+    "endpoint": true,
+    "managed": true,
+    "labels": [
+     {
+      "href": "/orgs/1/labels/72",
+      "key": "app",
+      "value": "app-19"
+     },
+     {
+      "href": "/orgs/1/labels/248",
+      "key": "env",
+      "value": "env-20"
+     },
+     {
+      "href": "/orgs/1/labels/145",
+      "key": "loc",
+      "value": "loc-03"
+     },
+     {
+      "href": "/orgs/1/labels/135",
+      "key": "role",
+      "value": "role-21"
+     }
+    ],
+    "sub_labels": []
+   }
+  },
+  "network": {
+   "name": "External",
+   "href": "/orgs/1/networks/38423fa8-8f0a-4b33-a204-9cc502344df8"
+  },
+  "service": {
+   "port": 0,
+   "proto": 58
+  },
+  "num_connections": 8,
+  "policy_decision": "allowed",
+  "state": "timed out",
+  "icmp_type": 135,
+  "icmp_code": 0,
+  "flow_direction": "inbound",
+  "dst_bi": 0,
+  "dst_bo": 0,
+  "timestamp_range": {
+   "last_detected": "2026-10-25T15:58:37Z",
+   "first_detected": "2026-10-25T10:30:43Z"
+  },
+  "client_type": "endpoint",
+  "seq_id": 87,
+  "caps": [
+   "write"
+  ],
+  "rules": [
+   {
+    "essential_service_rule": "icmp_v6_ingress"
+   }
+  ],
+  "enforcement_boundaries": [],
+  "override_deny_rules": [],
+  "draft_policy_decision": "allowed"
+ },
+ {
+  "src": {
+   "ip": "10.0.0.11",
+   "workload": {
+    "hostname": "host-08",
+    "name": "host-08",
+    "href": "/orgs/1/workloads/w-08",
+    "os_type": "linux",
+    "enforcement_mode": "selective",
+    "endpoint": true,
+    "managed": true,
+    "labels": [
+     {
+      "href": "/orgs/1/labels/72",
+      "key": "app",
+      "value": "app-19"
+     },
+     {
+      "href": "/orgs/1/labels/248",
+      "key": "env",
+      "value": "env-20"
+     },
+     {
+      "href": "/orgs/1/labels/145",
+      "key": "loc",
+      "value": "loc-03"
+     },
+     {
+      "href": "/orgs/1/labels/135",
+      "key": "role",
+      "value": "role-21"
+     }
+    ],
+    "sub_labels": []
+   }
+  },
+  "dst": {
+   "ip": "10.0.0.12"
+  },
+  "network": {
+   "name": "External",
+   "href": "/orgs/1/networks/38423fa8-8f0a-4b33-a204-9cc502344df8"
+  },
+  "service": {
+   "port": 0,
+   "proto": 58
+  },
+  "num_connections": 2,
+  "transmission": "multicast",
+  "policy_decision": "potentially_blocked",
+  "state": "timed out",
+  "icmp_type": 143,
+  "icmp_code": 0,
+  "flow_direction": "outbound",
+  "dst_bi": 0,
+  "dst_bo": 0,
+  "timestamp_range": {
+   "last_detected": "2026-10-25T15:58:01Z",
+   "first_detected": "2026-10-25T15:43:01Z"
+  },
+  "client_type": "endpoint",
+  "seq_id": 107,
+  "caps": [
+   "write"
+  ],
+  "rules": [
+   {
+    "essential_service_rule": "icmp_v6_egress"
+   }
+  ],
+  "enforcement_boundaries": [],
+  "override_deny_rules": [],
+  "draft_policy_decision": "allowed"
+ },
+ {
+  "src": {
+   "ip": "10.0.0.13",
+   "workload": {
+    "hostname": "host-08",
+    "name": "host-08",
+    "href": "/orgs/1/workloads/w-08",
+    "os_type": "linux",
+    "enforcement_mode": "selective",
+    "endpoint": true,
+    "managed": true,
+    "labels": [
+     {
+      "href": "/orgs/1/labels/72",
+      "key": "app",
+      "value": "app-19"
+     },
+     {
+      "href": "/orgs/1/labels/248",
+      "key": "env",
+      "value": "env-20"
+     },
+     {
+      "href": "/orgs/1/labels/145",
+      "key": "loc",
+      "value": "loc-03"
+     },
+     {
+      "href": "/orgs/1/labels/135",
+      "key": "role",
+      "value": "role-21"
+     }
+    ],
+    "sub_labels": []
+   }
+  },
+  "dst": {
+   "ip": "10.0.0.12"
+  },
+  "network": {
+   "name": "External",
+   "href": "/orgs/1/networks/38423fa8-8f0a-4b33-a204-9cc502344df8"
+  },
+  "service": {
+   "port": 0,
+   "proto": 58
+  },
+  "num_connections": 1,
+  "transmission": "multicast",
+  "policy_decision": "potentially_blocked",
+  "state": "timed out",
+  "icmp_type": 143,
+  "icmp_code": 0,
+  "flow_direction": "outbound",
+  "dst_bi": 0,
+  "dst_bo": 0,
+  "timestamp_range": {
+   "last_detected": "2026-10-25T15:58:01Z",
+   "first_detected": "2026-10-25T15:58:01Z"
+  },
+  "client_type": "endpoint",
+  "seq_id": 108,
+  "caps": [
+   "write"
+  ],
+  "rules": [
+   {
+    "essential_service_rule": "icmp_v6_egress"
+   }
+  ],
+  "enforcement_boundaries": [],
+  "override_deny_rules": [],
+  "draft_policy_decision": "allowed"
+ },
+ {
+  "src": {
+   "ip": "10.0.0.14",
+   "workload": {
+    "hostname": "host-09",
+    "name": "host-09",
+    "href": "/orgs/1/workloads/w-09",
+    "os_type": "windows",
+    "enforcement_mode": "selective",
+    "endpoint": true,
+    "managed": true,
+    "labels": [
+     {
+      "href": "/orgs/1/labels/49",
+      "key": "app",
+      "value": "app-22"
+     },
+     {
+      "href": "/orgs/1/labels/21",
+      "key": "env",
+      "value": "env-02"
+     },
+     {
+      "href": "/orgs/1/labels/145",
+      "key": "loc",
+      "value": "loc-03"
+     },
+     {
+      "href": "/orgs/1/labels/39",
+      "key": "role",
+      "value": "role-23"
+     },
+     {
+      "href": "/orgs/1/labels/142",
+      "key": "Net",
+      "value": "Net-05"
+     },
+     {
+      "href": "/orgs/1/labels/68",
+      "key": "os",
+      "value": "os-24"
+     }
+    ],
+    "sub_labels": []
+   }
+  },
+  "dst": {
+   "ip": "10.0.0.15",
+   "ip_lists": [
+    {
+     "name": "PublicIP",
+     "href": "/orgs/1/sec_policy/draft/ip_lists/108",
+     "size": 4278059008,
+     "rules": [
+      {
+       "essential_service_rule": "dns_egress"
+      }
+     ],
+     "enforcement_boundaries": [],
+     "override_deny_rules": []
+    }
+   ]
+  },
+  "network": {
+   "name": "Corporate",
+   "href": "/orgs/1/networks/27058b12-718b-4538-8cb9-e59169fa75ed"
+  },
+  "service": {
+   "port": 53,
+   "proto": 17
+  },
+  "num_connections": 4,
+  "policy_decision": "unknown",
+  "state": "snapshot",
+  "flow_direction": "outbound",
+  "dst_bi": 0,
+  "dst_bo": 0,
+  "timestamp_range": {
+   "last_detected": "2026-10-25T15:55:42Z",
+   "first_detected": "2026-10-25T15:55:42Z"
+  },
+  "client_type": "flowlink",
+  "seq_id": 231,
+  "caps": [
+   "write"
+  ],
+  "rules": [
+   {
+    "essential_service_rule": "dns_egress"
+   }
+  ],
+  "enforcement_boundaries": [],
+  "override_deny_rules": [],
+  "draft_policy_decision": "allowed"
+ },
+ {
+  "src": {
+   "ip": "10.0.0.14",
+   "workload": {
+    "hostname": "host-09",
+    "name": "host-09",
+    "href": "/orgs/1/workloads/w-09",
+    "os_type": "windows",
+    "enforcement_mode": "selective",
+    "endpoint": true,
+    "managed": true,
+    "labels": [
+     {
+      "href": "/orgs/1/labels/49",
+      "key": "app",
+      "value": "app-22"
+     },
+     {
+      "href": "/orgs/1/labels/21",
+      "key": "env",
+      "value": "env-02"
+     },
+     {
+      "href": "/orgs/1/labels/145",
+      "key": "loc",
+      "value": "loc-03"
+     },
+     {
+      "href": "/orgs/1/labels/39",
+      "key": "role",
+      "value": "role-23"
+     },
+     {
+      "href": "/orgs/1/labels/142",
+      "key": "Net",
+      "value": "Net-05"
+     },
+     {
+      "href": "/orgs/1/labels/68",
+      "key": "os",
+      "value": "os-24"
+     }
+    ],
+    "sub_labels": []
+   }
+  },
+  "dst": {
+   "ip": "10.0.0.16",
+   "ip_lists": [
+    {
+     "name": "PublicIP",
+     "href": "/orgs/1/sec_policy/draft/ip_lists/108",
+     "size": 4278059008,
+     "rules": [
+      {
+       "essential_service_rule": "dns_egress"
+      }
+     ],
+     "enforcement_boundaries": [],
+     "override_deny_rules": []
+    }
+   ]
+  },
+  "network": {
+   "name": "Corporate",
+   "href": "/orgs/1/networks/27058b12-718b-4538-8cb9-e59169fa75ed"
+  },
+  "service": {
+   "port": 53,
+   "proto": 17
+  },
+  "num_connections": 4,
+  "policy_decision": "unknown",
+  "state": "snapshot",
+  "flow_direction": "outbound",
+  "dst_bi": 0,
+  "dst_bo": 0,
+  "timestamp_range": {
+   "last_detected": "2026-10-25T15:54:57Z",
+   "first_detected": "2026-10-25T15:54:57Z"
+  },
+  "client_type": "flowlink",
+  "seq_id": 275,
+  "caps": [
+   "write"
+  ],
+  "rules": [
+   {
+    "essential_service_rule": "dns_egress"
+   }
+  ],
+  "enforcement_boundaries": [],
+  "override_deny_rules": [],
+  "draft_policy_decision": "allowed"
+ },
+ {
+  "src": {
+   "ip": "10.0.0.17",
+   "workload": {
+    "hostname": "host-10",
+    "name": "host-10",
+    "href": "/orgs/1/workloads/w-10",
+    "os_type": "linux",
+    "enforcement_mode": "idle",
+    "endpoint": false,
+    "managed": true,
+    "labels": [
+     {
+      "href": "/orgs/1/labels/29",
+      "key": "app",
+      "value": "app-11"
+     },
+     {
+      "href": "/orgs/1/labels/53",
+      "key": "env",
+      "value": "env-25"
+     },
+     {
+      "href": "/orgs/1/labels/145",
+      "key": "loc",
+      "value": "loc-03"
+     },
+     {
+      "href": "/orgs/1/labels/249",
+      "key": "role",
+      "value": "role-26"
+     },
+     {
+      "href": "/orgs/1/labels/141",
+      "key": "Net",
+      "value": "Net-17"
+     },
+     {
+      "href": "/orgs/1/labels/138",
+      "key": "type",
+      "value": "type-27"
+     }
+    ],
+    "sub_labels": []
+   }
+  },
+  "dst": {
+   "ip": "10.0.0.18",
+   "ip_lists": [
+    {
+     "name": "PublicIP",
+     "href": "/orgs/1/sec_policy/draft/ip_lists/108",
+     "size": 4278059008,
+     "rules": [
+      {
+       "essential_service_rule": "dns_egress"
+      }
+     ],
+     "enforcement_boundaries": [],
+     "override_deny_rules": []
+    }
+   ]
+  },
+  "network": {
+   "name": "Corporate",
+   "href": "/orgs/1/networks/27058b12-718b-4538-8cb9-e59169fa75ed"
+  },
+  "service": {
+   "port": 53,
+   "proto": 17
+  },
+  "num_connections": 319,
+  "policy_decision": "unknown",
+  "state": "snapshot",
+  "flow_direction": "outbound",
+  "dst_bi": 319,
+  "dst_bo": 319,
+  "timestamp_range": {
+   "last_detected": "2026-10-25T15:54:49Z",
+   "first_detected": "2026-10-25T10:13:12Z"
+  },
+  "client_type": "server",
+  "seq_id": 286,
+  "caps": [
+   "write"
+  ],
+  "rules": [
+   {
+    "essential_service_rule": "dns_egress"
+   }
+  ],
+  "enforcement_boundaries": [],
+  "override_deny_rules": [],
+  "draft_policy_decision": "allowed"
+ },
+ {
+  "src": {
+   "ip": "10.0.0.19",
+   "workload": {
+    "hostname": "host-11",
+    "name": "host-11",
+    "href": "/orgs/1/workloads/w-11",
+    "os_type": "linux",
+    "enforcement_mode": "visibility_only",
+    "endpoint": false,
+    "managed": true,
+    "labels": [
+     {
+      "href": "/orgs/1/labels/55",
+      "key": "app",
+      "value": "app-28"
+     },
+     {
+      "href": "/orgs/1/labels/15",
+      "key": "env",
+      "value": "env-29"
+     },
+     {
+      "href": "/orgs/1/labels/145",
+      "key": "loc",
+      "value": "loc-03"
+     },
+     {
+      "href": "/orgs/1/labels/54",
+      "key": "role",
+      "value": "role-30"
+     },
+     {
+      "href": "/orgs/1/labels/69",
+      "key": "os",
+      "value": "os-06"
+     }
+    ],
+    "sub_labels": []
+   }
+  },
+  "dst": {
+   "ip": "10.0.0.20",
+   "workload": {
+    "hostname": null,
+    "name": "host-12",
+    "href": "/orgs/1/workloads/w-12",
+    "os_type": "unknown",
+    "enforcement_mode": "visibility_only",
+    "endpoint": false,
+    "managed": true,
+    "labels": [
+     {
+      "href": "/orgs/1/labels/42",
+      "key": "app",
+      "value": "app-31"
+     },
+     {
+      "href": "/orgs/1/labels/15",
+      "key": "env",
+      "value": "env-29"
+     },
+     {
+      "href": "/orgs/1/labels/145",
+      "key": "loc",
+      "value": "loc-03"
+     }
+    ],
+    "sub_labels": []
+   }
+  },
+  "network": {
+   "name": "Corporate",
+   "href": "/orgs/1/networks/27058b12-718b-4538-8cb9-e59169fa75ed"
+  },
+  "service": {
+   "port": 8080,
+   "proto": 6
+  },
+  "num_connections": 6369,
+  "policy_decision": "potentially_blocked",
+  "boundary_decision": null,
+  "state": "snapshot",
+  "icmp_type": 0,
+  "icmp_code": 0,
+  "flow_direction": "inbound",
+  "dst_bi": 0,
+  "dst_bo": 0,
+  "timestamp_range": {
+   "last_detected": "2026-10-25T16:02:20Z",
+   "first_detected": "2026-10-25T00:02:14Z"
+  },
+  "client_type": "server",
+  "seq_id": 0,
+  "caps": [
+   "write"
+  ],
+  "rules": [],
+  "enforcement_boundaries": [],
+  "override_deny_rules": [],
+  "draft_policy_decision": "potentially_blocked"
+ },
+ {
+  "src": {
+   "ip": "10.0.0.19",
+   "workload": {
+    "hostname": "host-11",
+    "name": "host-11",
+    "href": "/orgs/1/workloads/w-11",
+    "os_type": "linux",
+    "enforcement_mode": "visibility_only",
+    "endpoint": false,
+    "managed": true,
+    "labels": [
+     {
+      "href": "/orgs/1/labels/55",
+      "key": "app",
+      "value": "app-28"
+     },
+     {
+      "href": "/orgs/1/labels/15",
+      "key": "env",
+      "value": "env-29"
+     },
+     {
+      "href": "/orgs/1/labels/145",
+      "key": "loc",
+      "value": "loc-03"
+     },
+     {
+      "href": "/orgs/1/labels/54",
+      "key": "role",
+      "value": "role-30"
+     },
+     {
+      "href": "/orgs/1/labels/69",
+      "key": "os",
+      "value": "os-06"
+     }
+    ],
+    "sub_labels": []
+   }
+  },
+  "dst": {
+   "ip": "10.0.0.21",
+   "workload": {
+    "hostname": null,
+    "name": "host-12",
+    "href": "/orgs/1/workloads/w-12",
+    "os_type": "unknown",
+    "enforcement_mode": "visibility_only",
+    "endpoint": false,
+    "managed": true,
+    "labels": [
+     {
+      "href": "/orgs/1/labels/42",
+      "key": "app",
+      "value": "app-31"
+     },
+     {
+      "href": "/orgs/1/labels/15",
+      "key": "env",
+      "value": "env-29"
+     },
+     {
+      "href": "/orgs/1/labels/145",
+      "key": "loc",
+      "value": "loc-03"
+     }
+    ],
+    "sub_labels": []
+   }
+  },
+  "network": {
+   "name": "Corporate",
+   "href": "/orgs/1/networks/27058b12-718b-4538-8cb9-e59169fa75ed"
+  },
+  "service": {
+   "port": 8080,
+   "proto": 6
+  },
+  "num_connections": 6370,
+  "policy_decision": "potentially_blocked",
+  "boundary_decision": null,
+  "state": "snapshot",
+  "icmp_type": 0,
+  "icmp_code": 0,
+  "flow_direction": "inbound",
+  "dst_bi": 0,
+  "dst_bo": 0,
+  "timestamp_range": {
+   "last_detected": "2026-10-25T16:02:20Z",
+   "first_detected": "2026-10-25T00:02:14Z"
+  },
+  "client_type": "server",
+  "seq_id": 1,
+  "caps": [
+   "write"
+  ],
+  "rules": [],
+  "enforcement_boundaries": [],
+  "override_deny_rules": [],
+  "draft_policy_decision": "potentially_blocked"
+ },
+ {
+  "src": {
+   "ip": "10.0.0.19",
+   "workload": {
+    "hostname": "host-11",
+    "name": "host-11",
+    "href": "/orgs/1/workloads/w-11",
+    "os_type": "linux",
+    "enforcement_mode": "visibility_only",
+    "endpoint": false,
+    "managed": true,
+    "labels": [
+     {
+      "href": "/orgs/1/labels/55",
+      "key": "app",
+      "value": "app-28"
+     },
+     {
+      "href": "/orgs/1/labels/15",
+      "key": "env",
+      "value": "env-29"
+     },
+     {
+      "href": "/orgs/1/labels/145",
+      "key": "loc",
+      "value": "loc-03"
+     },
+     {
+      "href": "/orgs/1/labels/54",
+      "key": "role",
+      "value": "role-30"
+     },
+     {
+      "href": "/orgs/1/labels/69",
+      "key": "os",
+      "value": "os-06"
+     }
+    ],
+    "sub_labels": []
+   }
+  },
+  "dst": {
+   "ip": "10.0.0.21",
+   "workload": {
+    "hostname": null,
+    "name": "host-12",
+    "href": "/orgs/1/workloads/w-12",
+    "os_type": "unknown",
+    "enforcement_mode": "visibility_only",
+    "endpoint": false,
+    "managed": true,
+    "labels": [
+     {
+      "href": "/orgs/1/labels/42",
+      "key": "app",
+      "value": "app-31"
+     },
+     {
+      "href": "/orgs/1/labels/15",
+      "key": "env",
+      "value": "env-29"
+     },
+     {
+      "href": "/orgs/1/labels/145",
+      "key": "loc",
+      "value": "loc-03"
+     }
+    ],
+    "sub_labels": []
+   }
+  },
+  "network": {
+   "name": "Corporate",
+   "href": "/orgs/1/networks/27058b12-718b-4538-8cb9-e59169fa75ed"
+  },
+  "service": {
+   "port": 8181,
+   "proto": 6
+  },
+  "num_connections": 6370,
+  "policy_decision": "potentially_blocked",
+  "boundary_decision": null,
+  "state": "snapshot",
+  "icmp_type": 0,
+  "icmp_code": 0,
+  "flow_direction": "inbound",
+  "dst_bi": 0,
+  "dst_bo": 0,
+  "timestamp_range": {
+   "last_detected": "2026-10-25T16:02:20Z",
+   "first_detected": "2026-10-25T00:02:14Z"
+  },
+  "client_type": "server",
+  "seq_id": 2,
+  "caps": [
+   "write"
+  ],
+  "rules": [],
+  "enforcement_boundaries": [],
+  "override_deny_rules": [],
+  "draft_policy_decision": "potentially_blocked"
+ },
+ {
+  "src": {
+   "ip": "10.0.0.19",
+   "workload": {
+    "hostname": "host-11",
+    "name": "host-11",
+    "href": "/orgs/1/workloads/w-11",
+    "os_type": "linux",
+    "enforcement_mode": "visibility_only",
+    "endpoint": false,
+    "managed": true,
+    "labels": [
+     {
+      "href": "/orgs/1/labels/55",
+      "key": "app",
+      "value": "app-28"
+     },
+     {
+      "href": "/orgs/1/labels/15",
+      "key": "env",
+      "value": "env-29"
+     },
+     {
+      "href": "/orgs/1/labels/145",
+      "key": "loc",
+      "value": "loc-03"
+     },
+     {
+      "href": "/orgs/1/labels/54",
+      "key": "role",
+      "value": "role-30"
+     },
+     {
+      "href": "/orgs/1/labels/69",
+      "key": "os",
+      "value": "os-06"
+     }
+    ],
+    "sub_labels": []
+   }
+  },
+  "dst": {
+   "ip": "10.0.0.20",
+   "workload": {
+    "hostname": null,
+    "name": "host-12",
+    "href": "/orgs/1/workloads/w-12",
+    "os_type": "unknown",
+    "enforcement_mode": "visibility_only",
+    "endpoint": false,
+    "managed": true,
+    "labels": [
+     {
+      "href": "/orgs/1/labels/42",
+      "key": "app",
+      "value": "app-31"
+     },
+     {
+      "href": "/orgs/1/labels/15",
+      "key": "env",
+      "value": "env-29"
+     },
+     {
+      "href": "/orgs/1/labels/145",
+      "key": "loc",
+      "value": "loc-03"
+     }
+    ],
+    "sub_labels": []
+   }
+  },
+  "network": {
+   "name": "Corporate",
+   "href": "/orgs/1/networks/27058b12-718b-4538-8cb9-e59169fa75ed"
+  },
+  "service": {
+   "port": 8181,
+   "proto": 6
+  },
+  "num_connections": 6369,
+  "policy_decision": "potentially_blocked",
+  "boundary_decision": null,
+  "state": "snapshot",
+  "icmp_type": 0,
+  "icmp_code": 0,
+  "flow_direction": "inbound",
+  "dst_bi": 0,
+  "dst_bo": 0,
+  "timestamp_range": {
+   "last_detected": "2026-10-25T16:02:20Z",
+   "first_detected": "2026-10-25T00:02:14Z"
+  },
+  "client_type": "server",
+  "seq_id": 3,
+  "caps": [
+   "write"
+  ],
+  "rules": [],
+  "enforcement_boundaries": [],
+  "override_deny_rules": [],
+  "draft_policy_decision": "potentially_blocked"
+ },
+ {
+  "src": {
+   "ip": "10.0.0.19",
+   "workload": {
+    "hostname": "host-11",
+    "name": "host-11",
+    "href": "/orgs/1/workloads/w-11",
+    "os_type": "linux",
+    "enforcement_mode": "visibility_only",
+    "endpoint": false,
+    "managed": true,
+    "labels": [
+     {
+      "href": "/orgs/1/labels/55",
+      "key": "app",
+      "value": "app-28"
+     },
+     {
+      "href": "/orgs/1/labels/15",
+      "key": "env",
+      "value": "env-29"
+     },
+     {
+      "href": "/orgs/1/labels/145",
+      "key": "loc",
+      "value": "loc-03"
+     },
+     {
+      "href": "/orgs/1/labels/54",
+      "key": "role",
+      "value": "role-30"
+     },
+     {
+      "href": "/orgs/1/labels/69",
+      "key": "os",
+      "value": "os-06"
+     }
+    ],
+    "sub_labels": []
+   }
+  },
+  "dst": {
+   "ip": "10.0.0.22",
+   "workload": {
+    "hostname": null,
+    "name": "host-13",
+    "href": "/orgs/1/workloads/w-13",
+    "os_type": "unknown",
+    "enforcement_mode": "visibility_only",
+    "endpoint": false,
+    "managed": true,
+    "labels": [
+     {
+      "href": "/orgs/1/labels/42",
+      "key": "app",
+      "value": "app-31"
+     },
+     {
+      "href": "/orgs/1/labels/15",
+      "key": "env",
+      "value": "env-29"
+     },
+     {
+      "href": "/orgs/1/labels/145",
+      "key": "loc",
+      "value": "loc-03"
+     }
+    ],
+    "sub_labels": []
+   }
+  },
+  "network": {
+   "name": "Corporate",
+   "href": "/orgs/1/networks/27058b12-718b-4538-8cb9-e59169fa75ed"
+  },
+  "service": {
+   "port": 10250,
+   "proto": 6,
+   "process_name": "kubelet"
+  },
+  "num_connections": 12740,
+  "policy_decision": "potentially_blocked",
+  "boundary_decision": null,
+  "state": "snapshot",
+  "icmp_type": 0,
+  "icmp_code": 0,
+  "flow_direction": "inbound",
+  "dst_bi": 0,
+  "dst_bo": 0,
+  "timestamp_range": {
+   "last_detected": "2026-10-25T16:02:20Z",
+   "first_detected": "2026-10-25T00:02:14Z"
+  },
+  "client_type": "server",
+  "seq_id": 4,
+  "caps": [
+   "write"
+  ],
+  "rules": [],
+  "enforcement_boundaries": [],
+  "override_deny_rules": [],
+  "draft_policy_decision": "potentially_blocked"
+ },
+ {
+  "src": {
+   "ip": "10.0.0.23",
+   "workload": {
+    "hostname": null,
+    "name": "host-14",
+    "href": "/orgs/1/workloads/w-14",
+    "os_type": "unknown",
+    "enforcement_mode": "visibility_only",
+    "endpoint": false,
+    "managed": true,
+    "labels": [
+     {
+      "href": "/orgs/1/labels/40",
+      "key": "app",
+      "value": "app-32"
+     },
+     {
+      "href": "/orgs/1/labels/15",
+      "key": "env",
+      "value": "env-29"
+     },
+     {
+      "href": "/orgs/1/labels/145",
+      "key": "loc",
+      "value": "loc-03"
+     }
+    ],
+    "sub_labels": []
+   }
+  },
+  "dst": {
+   "ip": "10.0.0.21",
+   "workload": {
+    "hostname": null,
+    "name": "host-12",
+    "href": "/orgs/1/workloads/w-12",
+    "os_type": "unknown",
+    "enforcement_mode": "visibility_only",
+    "endpoint": false,
+    "managed": true,
+    "labels": [
+     {
+      "href": "/orgs/1/labels/42",
+      "key": "app",
+      "value": "app-31"
+     },
+     {
+      "href": "/orgs/1/labels/15",
+      "key": "env",
+      "value": "env-29"
+     },
+     {
+      "href": "/orgs/1/labels/145",
+      "key": "loc",
+      "value": "loc-03"
+     }
+    ],
+    "sub_labels": []
+   }
+  },
+  "network": {
+   "name": "local_k8s container network",
+   "href": "/orgs/1/networks/4a2560d2-7678-4a9b-9745-5bb562478996"
+  },
+  "service": {
+   "port": 53,
+   "proto": 17
+  },
+  "num_connections": 39371,
+  "policy_decision": "potentially_blocked",
+  "boundary_decision": null,
+  "state": "snapshot",
+  "icmp_type": 0,
+  "icmp_code": 0,
+  "flow_direction": "inbound",
+  "dst_bi": 0,
+  "dst_bo": 0,
+  "timestamp_range": {
+   "last_detected": "2026-10-25T16:02:19Z",
+   "first_detected": "2026-10-25T00:02:12Z"
+  },
+  "client_type": "server",
+  "seq_id": 5,
+  "caps": [
+   "write"
+  ],
+  "rules": [],
+  "enforcement_boundaries": [],
+  "override_deny_rules": [],
+  "draft_policy_decision": "potentially_blocked"
+ }
+]

@@ -54,3 +54,34 @@ def test_missing_href_or_timestamp_raises(raw):
 
 def test_raw_json_is_kept(raw):
     assert json.loads(normalize_event(raw[2]).raw_json)["href"] == raw[2]["href"]
+
+
+def test_event_hosts_three_shapes():
+    from illumio_ops.domain.events import event_hosts
+    agent = {"created_by": {"agent": {"href": "/orgs/1/agents/7", "hostname": "h1"},
+                            "ven": {"href": "/orgs/1/vens/v-1", "hostname": "h1"}}}
+    hosts = event_hosts(agent)
+    assert hosts.ven_hrefs == frozenset({"/orgs/1/vens/v-1"}) and hosts.hostnames == frozenset({"h1"})
+    offline = {"created_by": {"system": {}}, "resource_changes": [
+        {"resource": {"workload": {"href": "/orgs/1/workloads/w-9", "hostname": "dev"}},
+         "changes": {"online": {"before": True, "after": False}}}]}
+    hosts = event_hosts(offline)
+    assert hosts.workload_hrefs == frozenset({"/orgs/1/workloads/w-9"}) and hosts.hostnames == frozenset({"dev"})
+    assert event_hosts({"created_by": {"user": {"username": "a"}}}) == event_hosts({})
+
+
+def test_offline_precursor_only_on_online_to_offline():
+    from illumio_ops.domain.events import precursor_of
+    from illumio_ops.domain.values import PrecursorKind
+
+    def offline(before, after):
+        return {"event_type": "system_task.agent_offline_check", "created_by": {"system": {}}, "resource_changes": [
+            {"resource": {"workload": {"href": "/orgs/1/workloads/w-9", "hostname": "dev"}},
+             "changes": {"online": {"before": before, "after": after}}}]}
+    kind, hosts, signal = precursor_of(offline(True, False))
+    assert kind is PrecursorKind.OFFLINE and hosts.workload_hrefs == frozenset({"/orgs/1/workloads/w-9"}) and not signal
+    assert precursor_of(offline(False, True)) is None
+    tamper = {"event_type": "agent.tampering", "created_by": {"ven": {"href": "/orgs/1/vens/v-1", "hostname": "h"}},
+              "notifications": [{"info": {"event_classification": "signal"}}]}
+    assert precursor_of(tamper)[0] is PrecursorKind.TAMPER and precursor_of(tamper)[2] is True
+    assert precursor_of({"event_type": "user.sign_in", "created_by": {"user": {}}}) is None

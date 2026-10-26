@@ -311,3 +311,11 @@ def test_allowlist_with_no_valid_entry_blocks_instead_of_opening_up():
     result = migrate_v5(raw)
     assert result.settings is None and [p for p, _ in result.blocking] == ["web_gui.allowed_ips"]
     assert sorted(i.source for i in result.report.items) == sorted(leaf_keys(raw))
+
+
+
+@pytest.mark.parametrize("name", FIXTURE_NAMES)
+def test_migrator_output_has_default_lateral(name):
+    s = migrate_v5(_load(name)).settings
+    assert s.schema_version == 3
+    assert s.lateral.graph_hops == 3 and s.lateral.critical_assets == () and s.lateral.environment_label_key == "env"

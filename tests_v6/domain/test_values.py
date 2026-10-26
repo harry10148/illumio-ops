@@ -1,9 +1,12 @@
 from illumio_ops.domain.values import (
     KNOWN_DRAFT_POLICY_DECISIONS,
+    LATERAL_PORTS_DEFAULT,
     AlertRuleType,
     PolicyDecision,
+    Severity,
     export_value_domains,
     parse_draft_policy_decision,
+    raise_severity,
 )
 
 
@@ -32,3 +35,36 @@ def test_export_has_every_enum_and_no_ints():
                       "ProbeName", "DraftPolicyDecision"}
     assert all(isinstance(v, str) for vals in d.values() for v in vals)
     assert all(vals == sorted(vals) for vals in d.values())
+
+
+
+def test_raise_severity_caps_at_critical():
+    assert raise_severity(Severity.LOW) is Severity.MEDIUM
+    assert raise_severity(Severity.MEDIUM, 2) is Severity.CRITICAL
+    assert raise_severity(Severity.HIGH, 3) is Severity.CRITICAL
+    assert raise_severity(Severity.CRITICAL) is Severity.CRITICAL
+
+
+def test_new_value_domains_exported():
+    d = export_value_domains()
+    assert d["Severity"] == ["critical", "high", "low", "medium"]
+    assert set(d["DetectorKind"]) == {"fanout", "new_admin_connection", "pivot_chain", "blocked_surge",
+                                      "non_admin_group", "cross_env", "account_fanout", "unexpected_initiator"}
+    assert set(d["DetectorState"]) == {"ok", "disabled", "accumulating", "no_data", "collection_off", "incomplete"}
+    assert {"src_host", "dst_label", "service", "initiator_user", "event_type", "actor"} <= set(d["SegmentDimension"])
+    assert set(d["SegmentMetric"]) == {"flows", "connections", "distinct_dst", "distinct_src", "distinct_ports",
+                                       "bytes", "events"}
+    assert set(d["SegmentView"]) == {"detail", "ranking", "predicted_block"}
+    assert set(d["EdgeState"]) == {"allowed", "potentially_blocked", "unknown"}
+    assert set(d["TamperPattern"]) == {"regular_cycle", "burst", "sporadic", "too_few"}
+    assert set(d["TamperAction"]) == {"add_rule", "delete_rule", "add_chain", "delete_chain", "add_table", "delete_table"}
+    assert set(d["PrecursorKind"]) == {"tamper", "suspend", "offline"}
+    assert set(d["RansomwareTrafficClass"]) == {"priority", "safe_to_block", "suspicious", "protected", "unknown"}
+    assert len(d["FocusKind"]) == 14 and {"detection", "stale_selector", "vendor_contradiction"} <= set(d["FocusKind"])
+    assert set(d["Confidence"]) == {"high", "medium", "low"}
+
+
+def test_lateral_ports_default_is_the_5x_list():
+    assert [p for p, _ in LATERAL_PORTS_DEFAULT] == [445, 135, 139, 3389, 22, 5985, 5986, 23, 2049, 111, 389, 636,
+                                                    88, 1433, 3306, 5432]
+    assert dict(LATERAL_PORTS_DEFAULT)[111] == "RPC Portmapper" and dict(LATERAL_PORTS_DEFAULT)[5985] == "WinRM-HTTP"

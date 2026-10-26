@@ -20,7 +20,8 @@ from illumio_ops.settings.secrets import (
     new_secret_key,
 )
 from illumio_ops.settings.store import SettingsInvalid, SettingsStore
-from illumio_ops.store.db import connect, migrate
+from illumio_ops.store.db import connect, migrate, pending_migrations
+from illumio_ops.store.flowdb.db import MIGRATIONS_PACKAGE as FLOW_MIGRATIONS
 from illumio_ops.web.tls import build_ssl_context, cert_info, ensure_self_signed
 
 EXIT_LOCKED = 75   # EX_TEMPFAIL: another instance holds the lock
@@ -132,6 +133,21 @@ def prepare(root: Path | None) -> Runtime:
                 raise StartupError(EXIT_CONFIG, str(exc)) from None
         ssl_ctx, fingerprint = _tls_material(paths, s)
         ctx = AppContext(paths=paths, settings=store, served_tls=s.web.tls, served_cert_fingerprint=fingerprint)
+        # The flow database is migrated here, before the listener, as the app database is: on the first job's
+        # connection an upgrade's one-off migration (0002: 20 min at 1,000 workloads) held up every job and GUI
+        # request opening the store (D1, .106). A database newer than this program stops the start.
+        conn = connect(paths.flows_db)
+        try:
+            pending = pending_migrations(conn, FLOW_MIGRATIONS)
+        finally:
+            conn.close()  # a reset deletes this file; no connection outside FlowDb may stay open on it
+        if pending:
+            logger.warning("upgrading the flow database ({} migration(s)) before serving; at 1,000 workloads "
+                           "this can take 20 minutes", pending)
+        try:
+            ctx.flows().connect().close()
+        except RuntimeError as exc:
+            raise StartupError(EXIT_CONFIG, str(exc)) from None
         return Runtime(paths, ctx, ssl_ctx, lock_fd)
     except BaseException:
         os.close(lock_fd)

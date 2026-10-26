@@ -4,6 +4,7 @@ import { createRoot } from "react-dom/client";
 import { App } from "./App";
 import "./pages/system/PceConnection";
 import "./pages/system/Collection";
+import "./pages/system/Lateral";
 import "./pages/system/Jobs";
 import "./pages/system/Logs";
 import "./pages/system/Tls";

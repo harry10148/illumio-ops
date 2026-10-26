@@ -179,3 +179,10 @@ textarea { width: 100%; padding: var(--space-4); border: 1px solid var(--line); 
 .shell-banner { margin-bottom: var(--space-6); }
 .shell-banner a { color: inherit; font-weight: 600; }
 .spaced { margin-top: var(--space-6); }
+
+/* ── label pickers and inline control rows (Settings › Lateral movement) ── */
+.row { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--space-5); }
+.chips { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: var(--space-3); }
+.chip { display: inline-flex; align-items: center; gap: var(--space-2); padding: 0 var(--space-2) 0 var(--space-4);
+        border: 1px solid var(--line); border-radius: var(--radius-s); background: var(--fill); overflow-wrap: anywhere; }
+.chip .btn-quiet { height: auto; padding: 0 var(--space-3); border: 0; }

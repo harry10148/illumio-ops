@@ -153,3 +153,20 @@ def test_sql_and_predicate_agree_on_fixture(store, kw):
     via_sql = {r[0] for r in conn.execute(f"SELECT f.id FROM flows f WHERE {where}", params)}
     via_predicate = {r["id"] for r in rows if matches(s, r)}
     assert via_sql == via_predicate
+
+
+def test_public_port_and_endpoint_matchers_agree_with_matches():
+    from illumio_ops.domain.filter import (
+        EndpointFilter,
+        LabelCond,
+        PortProto,
+        endpoint_matches,
+        port_matches,
+    )
+    assert port_matches(PortProto(port=20, to_port=25, proto=6), 22, 6)
+    assert not port_matches(PortProto(port=22, proto=17), 22, 6)
+    assert port_matches(PortProto(proto=6), None, 6)
+    ep = EndpointFilter(labels=(LabelCond(key="app", values=("fin",)),), ips=("10.0.0.0/8",))
+    assert endpoint_matches(ep, href=None, ip="10.1.2.3", labels={})
+    assert endpoint_matches(ep, href="/w/1", ip="192.168.0.1", labels={"app": "fin"})
+    assert not endpoint_matches(ep, href="/w/1", ip="192.168.0.1", labels={"app": "hr"})

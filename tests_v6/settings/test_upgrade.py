@@ -30,7 +30,7 @@ def test_v1_file_loads_as_v2_in_memory(tmp_path):
     p = _v1(tmp_path)
     before, mtime = p.read_bytes(), os.stat(p).st_mtime_ns
     s = SettingsStore(p).load()
-    assert s.schema_version == SCHEMA_VERSION == 2
+    assert s.schema_version == SCHEMA_VERSION == 3
     assert s.collection.traffic_interval_seconds == 600
     assert s.collection.retention.baseline_days == 30
     assert p.read_bytes() == before and os.stat(p).st_mtime_ns == mtime
@@ -48,14 +48,15 @@ def test_invalid_v1_file_still_writes_nothing(tmp_path):
     assert p.read_bytes() == before
 
 
-def test_first_update_after_upgrade_writes_v2_without_conflict(tmp_path):
+def test_first_update_after_upgrade_writes_current_version_without_conflict(tmp_path):
     p = _v1(tmp_path)
     store = SettingsStore(p)
     s = store.load()
     new = store.update(s.revision, lambda d: d["display"].__setitem__("language", "zh_TW"))
     on_disk = json.loads(p.read_text())
-    assert on_disk["schema_version"] == 2
+    assert on_disk["schema_version"] == SCHEMA_VERSION
     assert on_disk["collection"]["traffic_interval_seconds"] == 600
+    assert on_disk["lateral"]["graph_hops"] == 3
     assert new.revision == s.revision + 1
 
 
@@ -77,3 +78,24 @@ def test_upgrade_leaves_current_version_untouched():
 def test_upgrade_passes_non_dict_through_to_validation():
     with pytest.raises(SettingsInvalid):
         validate_settings(["not", "a", "dict"])
+
+
+def _v2(tmp_path):
+    """A settings file exactly as P2 (schema 2) wrote it: no lateral section."""
+    d = default_settings(password_hash=HASH, secret_key=KEY).model_dump(mode="json")
+    d["schema_version"] = 2
+    del d["lateral"]
+    p = tmp_path / "settings.json"
+    p.write_text(json.dumps(d, indent=2))
+    p.chmod(0o600)
+    return p
+
+
+def test_v2_file_loads_as_v3_with_default_lateral(tmp_path):
+    p = _v2(tmp_path)
+    before, mtime = p.read_bytes(), os.stat(p).st_mtime_ns
+    s = SettingsStore(p).load()
+    assert s.schema_version == 3
+    assert s.lateral.graph_hops == 3 and s.lateral.observation_days == 30
+    assert s.lateral.detectors.fanout_targets == 10
+    assert p.read_bytes() == before and os.stat(p).st_mtime_ns == mtime

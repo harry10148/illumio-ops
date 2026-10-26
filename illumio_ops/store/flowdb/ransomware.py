@@ -39,6 +39,28 @@ def source_updated(conn: sqlite3.Connection) -> dict[str, str | None]:
     return {r[0]: r[1] for r in conn.execute("SELECT workload_href, source_updated_at FROM ransomware_fetch")}
 
 
+def admin_services(conn: sqlite3.Connection) -> list[tuple[int, int, str]]:
+    """The PCE's high-risk services of category admin, as (port, proto, name), once each."""
+    return [(int(p), int(proto), str(name)) for p, proto, name in conn.execute(
+        "SELECT DISTINCT port, proto, name FROM ransomware_services WHERE category = 'admin' AND port >= 0 "
+        "ORDER BY port, proto, name")]
+
+
+def unprotected_listening(conn: sqlite3.Connection) -> list[tuple[str, str, int, int, str | None]]:
+    """(workload href, service name, port, proto, severity) of every unprotected high-risk service the
+    PCE sees listening: the footholds on the exposure graph."""
+    return [(r[0], r[1], int(r[2]), int(r[3]), r[4]) for r in conn.execute(
+        "SELECT workload_href, name, port, proto, severity FROM ransomware_services "
+        "WHERE protection_state = 'unprotected' AND port_status = 'listening' ORDER BY workload_href, port, proto")]
+
+
+def services_by_host(conn: sqlite3.Connection) -> dict[str, list[sqlite3.Row]]:
+    out: dict[str, list[sqlite3.Row]] = {}
+    for r in conn.execute("SELECT * FROM ransomware_services ORDER BY workload_href, port, proto, name"):
+        out.setdefault(r["workload_href"], []).append(r)
+    return out
+
+
 def prune_missing(conn: sqlite3.Connection, keep: Iterable[str]) -> int:
     keep_set = set(keep)
     gone = [h for h in source_updated(conn) if h not in keep_set]

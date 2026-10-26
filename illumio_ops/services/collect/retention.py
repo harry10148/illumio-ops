@@ -9,7 +9,13 @@ from loguru import logger
 
 from illumio_ops.services.collect.backfill import BACKFILL_LOCK
 from illumio_ops.services.context import AppContext
-from illumio_ops.store.flowdb import archive, ingest_state, ransomware, workloads
+from illumio_ops.store.flowdb import (
+    analysis,
+    archive,
+    ingest_state,
+    ransomware,
+    workloads,
+)
 from illumio_ops.store.flowdb.db import FlowDb, StaleGeneration, db_day
 from illumio_ops.store.flowdb.events import delete_events_before
 from illumio_ops.store.flowdb.flows import (
@@ -47,7 +53,12 @@ def _run_retention(ctx: AppContext, *, now: datetime | None) -> dict[str, int]:
                 "snapshots": workloads.delete_snapshots_before(conn, rollup_day)
                 + ransomware.delete_snapshots_before(conn, rollup_day),
                 "baselines": delete_baselines_before(conn, at - timedelta(days=r.baseline_days)),
-                "gaps": ingest_state.delete_gaps_before(conn, at - timedelta(days=r.rollup_days)),
+                # Kept as long as the baseline too: the analysis looks back that far and must still see a
+                # failed read there (alert mode keeps rollups shorter than the baseline).
+                "gaps": ingest_state.delete_gaps_before(conn, at - timedelta(days=max(r.rollup_days, r.baseline_days))),
+                "analysis": analysis.delete_expired(conn, detections_before=at - timedelta(days=r.event_days),
+                                                    focus_before=at - timedelta(days=r.event_days),
+                                                    snapshot_day_before=rollup_day),
             }
     except StaleGeneration:
         logger.info("retention: the PCE was switched while it ran; the store was emptied anyway")

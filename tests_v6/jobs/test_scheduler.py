@@ -97,3 +97,74 @@ def test_backfill_check_also_runs_the_daily_reread(tmp_path, monkeypatch):
     ctx = make_ctx(tmp_path)
     build_scheduler(ctx).get_job("collect_backfill").func()
     assert calls == ["initial", "reread"] and _health(ctx)["collect_backfill"].last_ok is True
+
+
+def test_scheduler_registers_analysis_hourly(tmp_path, monkeypatch):
+    from illumio_ops.jobs import scheduler as sched_mod
+    ctx = make_ctx(tmp_path)
+    sched = build_scheduler(ctx)
+    job = sched.get_job("analysis_hourly")
+    assert job is not None and job.trigger.interval.total_seconds() == 3600
+    assert job.coalesce is True and job.max_instances == 1
+    calls = []
+    monkeypatch.setattr(sched_mod, "run_hourly_analysis", lambda c: calls.append(c))
+    sched_mod.build_scheduler(ctx).get_job("analysis_hourly").func()
+    assert calls == [ctx]
+
+
+def test_traffic_job_runs_detection_after_cycle(tmp_path, monkeypatch):
+    from illumio_ops.jobs import scheduler
+    calls = []
+    monkeypatch.setattr(scheduler, "finish_pending_switch", lambda ctx: None)
+    monkeypatch.setattr(scheduler, "run_traffic_cycle", lambda ctx: calls.append("traffic"))
+    monkeypatch.setattr(scheduler, "run_detection", lambda ctx, **kw: calls.append(("detect", kw)))
+    build_scheduler(make_ctx(tmp_path)).get_job("collect_traffic").func()
+    assert calls == ["traffic", ("detect", {})]
+
+
+def test_reread_with_rows_triggers_late_detection(tmp_path, monkeypatch):
+    from datetime import UTC, date, datetime
+
+    from illumio_ops.jobs import scheduler
+    from illumio_ops.services.collect import CycleResult
+    calls = []
+    monkeypatch.setattr(scheduler, "finish_pending_switch", lambda ctx: None)
+    monkeypatch.setattr(scheduler, "ensure_initial_backfill", lambda ctx: None)
+    monkeypatch.setattr(scheduler, "last_reread_day", lambda ctx: date(2026, 10, 24))
+    monkeypatch.setattr(scheduler, "run_detection", lambda ctx, **kw: calls.append(kw))
+    ctx = make_ctx(tmp_path)
+    monkeypatch.setattr(scheduler, "ensure_daily_reread", lambda ctx: CycleResult(0, 24, 0))
+    build_scheduler(ctx).get_job("collect_backfill").func()
+    assert calls == []  # nothing found late: nothing to evaluate
+    monkeypatch.setattr(scheduler, "ensure_daily_reread", lambda ctx: CycleResult(5, 24, 0))
+    build_scheduler(ctx).get_job("collect_backfill").func()
+    start = datetime(2026, 10, 24, tzinfo=UTC)
+    assert calls == [{"window": (start, datetime(2026, 10, 25, tzinfo=UTC)), "late": True}]
+
+
+def test_failed_late_pass_is_retried_on_the_next_run(tmp_path, monkeypatch):
+    # Final review #6: the re-read is done once; a late pass that failed must still run later.
+    from datetime import UTC, date, datetime
+
+    from illumio_ops.jobs import scheduler
+    from illumio_ops.services.collect import CycleResult
+    calls, fail = [], [True]
+
+    def detect(ctx, **kw):
+        calls.append(kw)
+        if fail[0]:
+            raise RuntimeError("disk full")
+    monkeypatch.setattr(scheduler, "finish_pending_switch", lambda ctx: None)
+    monkeypatch.setattr(scheduler, "ensure_initial_backfill", lambda ctx: None)
+    monkeypatch.setattr(scheduler, "last_reread_day", lambda ctx: date(2026, 10, 24))
+    monkeypatch.setattr(scheduler, "run_detection", detect)
+    monkeypatch.setattr(scheduler, "ensure_daily_reread", lambda ctx: CycleResult(5, 24, 0))
+    job = build_scheduler(make_ctx(tmp_path)).get_job("collect_backfill").func
+    job()  # the job records the failure (job health) and returns
+    fail[0] = False
+    monkeypatch.setattr(scheduler, "ensure_daily_reread", lambda ctx: None)  # today's re-read is done
+    job()
+    start = datetime(2026, 10, 24, tzinfo=UTC)
+    assert calls[1] == {"window": (start, datetime(2026, 10, 25, tzinfo=UTC)), "late": True}
+    job()
+    assert len(calls) == 2  # cleared once it succeeded

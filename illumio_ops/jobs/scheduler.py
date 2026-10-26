@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import traceback
 from collections.abc import Callable
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime, time, timedelta
 
 from apscheduler.schedulers.background import BackgroundScheduler
 from loguru import logger
@@ -12,11 +12,18 @@ from loguru import logger
 from illumio_ops.jobs.health import record_finish, record_start
 from illumio_ops.pce.client import PceNotConfigured
 from illumio_ops.services import pce_health
+from illumio_ops.services.analysis.detect import (
+    clear_late_day,
+    pending_late_days,
+    queue_late_day,
+    run_detection,
+)
+from illumio_ops.services.analysis.hourly import run_hourly_analysis
 from illumio_ops.services.collect.archive import run_archive
 from illumio_ops.services.collect.backfill import ensure_initial_backfill
 from illumio_ops.services.collect.events import run_events_cycle
 from illumio_ops.services.collect.inventory import run_inventory_cycle
-from illumio_ops.services.collect.reread import ensure_daily_reread
+from illumio_ops.services.collect.reread import ensure_daily_reread, last_reread_day
 from illumio_ops.services.collect.reset import finish_pending_switch
 from illumio_ops.services.collect.retention import run_retention
 from illumio_ops.services.collect.traffic import run_traffic_cycle
@@ -32,6 +39,8 @@ DAILY_SECONDS = 86400
 BACKFILL_CHECK_SECONDS = 600
 # Moves committed flow-store pages from the WAL into the database outside the write lock (FlowDb).
 FLOWS_CHECKPOINT_SECONDS = 60
+# The exposure graph, ransomware overlay, tamper summary and focus list (services.analysis.hourly).
+ANALYSIS_HOURLY_SECONDS = 3600
 # Collectors wait a little after start-up so the listener and the first probe come first.
 COLLECTOR_FIRST_RUN_DELAY = timedelta(seconds=30)
 
@@ -49,6 +58,7 @@ def job_intervals(settings: Settings) -> dict[str, int]:
         "collect_archive": DAILY_SECONDS,
         "collect_retention": DAILY_SECONDS,
         "flows_checkpoint": FLOWS_CHECKPOINT_SECONDS,
+        "analysis_hourly": ANALYSIS_HOURLY_SECONDS,
     }
 
 
@@ -93,6 +103,7 @@ def _collector_jobs(ctx: AppContext) -> dict[str, Callable[[], None]]:
     def traffic() -> None:
         finish_pending_switch(ctx)
         run_traffic_cycle(ctx)
+        run_detection(ctx)  # the detectors evaluate what the cycle just collected
 
     def events() -> None:
         finish_pending_switch(ctx)
@@ -105,7 +116,14 @@ def _collector_jobs(ctx: AppContext) -> dict[str, Callable[[], None]]:
     def backfill() -> None:
         finish_pending_switch(ctx)
         ensure_initial_backfill(ctx)
-        ensure_daily_reread(ctx)
+        reread = ensure_daily_reread(ctx)
+        day = last_reread_day(ctx) if reread is not None and reread.rows > 0 else None
+        if day is not None:  # records found late are evaluated, marked late; owed until a pass succeeds
+            queue_late_day(ctx, day)
+        for owed in pending_late_days(ctx):
+            start = datetime.combine(owed, time(0), UTC)
+            run_detection(ctx, window=(start, start + timedelta(days=1)), late=True)
+            clear_late_day(ctx, owed)
 
     def archive() -> None:
         run_archive(ctx)
@@ -116,10 +134,13 @@ def _collector_jobs(ctx: AppContext) -> dict[str, Callable[[], None]]:
     def checkpoint() -> None:
         ctx.flows().checkpoint()
 
+    def hourly_analysis() -> None:
+        run_hourly_analysis(ctx)
+
     # Archive runs before retention so that, with archiving on, expiring days are written first.
     return {"collect_traffic": traffic, "collect_events": events, "collect_inventory": inventory,
             "collect_backfill": backfill, "collect_archive": archive, "collect_retention": retention,
-            "flows_checkpoint": checkpoint}
+            "flows_checkpoint": checkpoint, "analysis_hourly": hourly_analysis}
 
 
 def build_scheduler(ctx: AppContext) -> BackgroundScheduler:

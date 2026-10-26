@@ -1,0 +1,6669 @@
+[
+ {
+  "host": "host-02",
+  "timestamp": "2026-09-06T14:15:41.431Z",
+  "severity": "warning",
+  "event_classification": "signal",
+  "num_events": null,
+  "tampering_revert_succeeded": null,
+  "events": [
+   {
+    "timestamp": "2026-09-06T14:15:41Z",
+    "tamper_type": "firewall",
+    "process_name": "iptables",
+    "process_id": 1849396,
+    "kernel_functions": [
+     "nfnetlink_rcv_batch,nf_tables_newrule",
+     "nfnetlink_rcv_batch,nf_tables_newchain"
+    ]
+   }
+  ],
+  "info_keys": [
+   "event_classification",
+   "events"
+  ]
+ },
+ {
+  "host": "host-02",
+  "timestamp": "2026-09-06T14:15:47.681Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-07",
+  "timestamp": "2026-09-09T01:27:32.072Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-07",
+  "timestamp": "2026-09-09T01:45:26.208Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-07",
+  "timestamp": "2026-09-09T01:54:54.274Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-07",
+  "timestamp": "2026-09-09T02:04:25.342Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-07",
+  "timestamp": "2026-09-09T02:13:42.412Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-07",
+  "timestamp": "2026-09-09T02:23:30.483Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-07",
+  "timestamp": "2026-09-09T02:33:44.557Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-07",
+  "timestamp": "2026-09-09T02:44:12.632Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-07",
+  "timestamp": "2026-09-09T02:53:32.705Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-07",
+  "timestamp": "2026-09-09T03:02:39.766Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-07",
+  "timestamp": "2026-09-09T03:12:22.839Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-07",
+  "timestamp": "2026-09-09T03:22:29.913Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-07",
+  "timestamp": "2026-09-09T03:31:37.981Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-07",
+  "timestamp": "2026-09-09T03:41:36.056Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-07",
+  "timestamp": "2026-09-09T03:51:22.131Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-07",
+  "timestamp": "2026-09-09T04:00:37.201Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-07",
+  "timestamp": "2026-09-09T04:11:23.280Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-07",
+  "timestamp": "2026-09-09T04:21:59.357Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-07",
+  "timestamp": "2026-09-09T04:32:35.439Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-07",
+  "timestamp": "2026-09-09T04:41:41.510Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-07",
+  "timestamp": "2026-09-09T04:50:50.575Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-07",
+  "timestamp": "2026-09-09T05:01:45.660Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-07",
+  "timestamp": "2026-09-09T05:12:31.744Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-07",
+  "timestamp": "2026-09-09T05:22:46.820Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-07",
+  "timestamp": "2026-09-09T05:32:57.891Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-07",
+  "timestamp": "2026-09-09T05:43:22.963Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-07",
+  "timestamp": "2026-09-09T05:53:06.027Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-07",
+  "timestamp": "2026-09-09T06:02:59.096Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-07",
+  "timestamp": "2026-09-09T06:12:06.161Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-07",
+  "timestamp": "2026-09-09T06:22:24.234Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-07",
+  "timestamp": "2026-09-09T06:32:32.304Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-07",
+  "timestamp": "2026-09-09T06:41:40.364Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-07",
+  "timestamp": "2026-09-09T06:52:24.434Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-07",
+  "timestamp": "2026-09-09T07:03:01.509Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-07",
+  "timestamp": "2026-09-09T07:13:12.587Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-07",
+  "timestamp": "2026-09-09T07:22:41.654Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-07",
+  "timestamp": "2026-09-09T07:33:09.723Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-07",
+  "timestamp": "2026-09-09T07:44:06.798Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-07",
+  "timestamp": "2026-09-09T07:53:12.864Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-07",
+  "timestamp": "2026-09-09T08:03:20.932Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-07",
+  "timestamp": "2026-09-09T08:12:33.995Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-07",
+  "timestamp": "2026-09-09T08:21:46.057Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-07",
+  "timestamp": "2026-09-09T08:32:29.129Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-07",
+  "timestamp": "2026-09-09T08:42:40.202Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-07",
+  "timestamp": "2026-09-09T08:51:50.270Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-07",
+  "timestamp": "2026-09-09T09:01:59.344Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-07",
+  "timestamp": "2026-09-09T09:11:58.413Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-07",
+  "timestamp": "2026-09-09T09:21:49.480Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-07",
+  "timestamp": "2026-09-09T09:31:58.550Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-07",
+  "timestamp": "2026-09-09T09:42:21.621Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-07",
+  "timestamp": "2026-09-09T09:52:50.698Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-07",
+  "timestamp": "2026-09-09T10:02:55.768Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-07",
+  "timestamp": "2026-09-09T10:12:34.830Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-07",
+  "timestamp": "2026-09-09T10:22:12.894Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-07",
+  "timestamp": "2026-09-09T10:31:59.958Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-07",
+  "timestamp": "2026-09-09T10:42:59.031Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-06",
+  "timestamp": "2026-09-14T23:47:19.107Z",
+  "severity": "warning",
+  "event_classification": "signal",
+  "num_events": null,
+  "tampering_revert_succeeded": null,
+  "events": [
+   {
+    "timestamp": "2026-09-14T23:47:18Z",
+    "tamper_type": "firewall",
+    "process_name": "iptables",
+    "process_id": 1478941,
+    "kernel_functions": [
+     "nfnetlink_rcv_batch,nf_tables_delrule"
+    ]
+   }
+  ],
+  "info_keys": [
+   "event_classification",
+   "events"
+  ]
+ },
+ {
+  "host": "host-05",
+  "timestamp": "2026-09-19T06:18:44.505Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-05",
+  "timestamp": "2026-09-19T06:29:31.712Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-05",
+  "timestamp": "2026-09-19T06:38:58.844Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-05",
+  "timestamp": "2026-09-19T06:48:55.027Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-05",
+  "timestamp": "2026-09-19T06:59:03.240Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-05",
+  "timestamp": "2026-09-19T07:09:44.465Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-05",
+  "timestamp": "2026-09-19T07:20:12.778Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-05",
+  "timestamp": "2026-09-19T07:31:11.030Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-05",
+  "timestamp": "2026-09-19T07:41:48.264Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-05",
+  "timestamp": "2026-09-19T07:52:13.405Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-05",
+  "timestamp": "2026-09-19T08:02:42.722Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-05",
+  "timestamp": "2026-09-19T08:13:35.960Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-05",
+  "timestamp": "2026-09-19T08:24:23.206Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-05",
+  "timestamp": "2026-09-19T08:34:32.395Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-05",
+  "timestamp": "2026-09-19T08:43:46.449Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-05",
+  "timestamp": "2026-09-19T08:52:46.728Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-05",
+  "timestamp": "2026-09-19T09:02:42.911Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-05",
+  "timestamp": "2026-09-19T09:11:51.082Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-05",
+  "timestamp": "2026-09-19T09:21:25.184Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-05",
+  "timestamp": "2026-09-19T09:30:53.379Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-05",
+  "timestamp": "2026-09-19T09:41:13.678Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-05",
+  "timestamp": "2026-09-19T09:51:12.925Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-05",
+  "timestamp": "2026-09-19T10:01:16.111Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-05",
+  "timestamp": "2026-09-19T10:10:25.224Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-05",
+  "timestamp": "2026-09-19T10:20:35.448Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-05",
+  "timestamp": "2026-09-19T10:30:15.778Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-05",
+  "timestamp": "2026-09-19T10:41:23.001Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-05",
+  "timestamp": "2026-09-19T10:51:44.237Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-05",
+  "timestamp": "2026-09-19T11:01:05.440Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-05",
+  "timestamp": "2026-09-19T11:10:27.657Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-05",
+  "timestamp": "2026-09-19T11:21:03.876Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-05",
+  "timestamp": "2026-09-19T11:31:05.066Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-05",
+  "timestamp": "2026-09-19T11:41:25.283Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-05",
+  "timestamp": "2026-09-19T11:50:54.486Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-05",
+  "timestamp": "2026-09-19T12:00:43.695Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-05",
+  "timestamp": "2026-09-19T12:11:45.831Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-05",
+  "timestamp": "2026-09-19T12:21:55.146Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-05",
+  "timestamp": "2026-09-19T12:31:28.231Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-05",
+  "timestamp": "2026-09-19T12:41:23.418Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-05",
+  "timestamp": "2026-09-19T12:50:38.601Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-05",
+  "timestamp": "2026-09-19T13:01:25.933Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-05",
+  "timestamp": "2026-09-19T13:10:54.035Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-05",
+  "timestamp": "2026-09-19T13:21:44.279Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-05",
+  "timestamp": "2026-09-19T13:32:07.573Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-05",
+  "timestamp": "2026-09-19T13:41:13.745Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-05",
+  "timestamp": "2026-09-19T13:51:23.939Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-05",
+  "timestamp": "2026-09-19T14:00:59.145Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-05",
+  "timestamp": "2026-09-19T14:11:14.358Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-05",
+  "timestamp": "2026-09-19T14:22:06.587Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-05",
+  "timestamp": "2026-09-19T14:32:59.832Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-05",
+  "timestamp": "2026-09-19T14:42:12.999Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-04",
+  "timestamp": "2026-09-20T14:27:05.045Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-04",
+  "timestamp": "2026-09-20T14:37:57.214Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-04",
+  "timestamp": "2026-09-20T14:48:57.307Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-04",
+  "timestamp": "2026-09-20T14:59:04.337Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-04",
+  "timestamp": "2026-09-20T15:08:48.365Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-04",
+  "timestamp": "2026-09-20T15:18:26.710Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-04",
+  "timestamp": "2026-09-20T15:27:34.835Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-04",
+  "timestamp": "2026-09-20T15:36:48.684Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-04",
+  "timestamp": "2026-09-20T15:47:33.043Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-04",
+  "timestamp": "2026-09-20T15:58:46.941Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-01T02:27:31.493Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-01T02:36:49.549Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-01T02:46:48.616Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-01T02:57:34.672Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-01T03:07:47.737Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-01T03:17:48.797Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-01T03:26:55.849Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-01T03:37:07.911Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-01T03:46:53.970Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-01T03:56:57.031Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-01T04:06:43.086Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-01T04:16:21.143Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-01T04:25:26.191Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-01T04:36:03.248Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-01T04:45:50.309Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-01T04:55:09.365Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-01T05:04:27.422Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-01T05:13:38.472Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-01T05:23:07.529Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-01T05:32:21.585Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-01T05:42:40.642Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-01T05:53:14.705Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-01T06:04:09.773Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-01T06:13:59.831Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-01T06:23:16.882Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-01T06:33:14.945Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-01T06:44:14.006Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-01T06:53:50.063Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-01T07:03:48.125Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-01T07:13:02.176Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-01T07:23:09.230Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-01T07:33:29.291Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-01T07:43:15.344Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-01T07:53:20.407Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-01T08:03:27.469Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-01T08:13:53.530Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-01T08:23:12.581Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-01T08:34:17.652Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-01T08:44:37.702Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-01T08:54:20.759Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-01T09:04:49.822Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-01T09:15:05.886Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-01T09:25:47.944Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-01T09:35:53.004Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-01T09:46:19.065Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-01T09:56:53.129Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-01T10:07:43.190Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-01T10:18:45.249Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-01T10:28:22.304Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-01T10:37:59.364Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-01T10:47:49.423Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-01T10:57:12.474Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-02",
+  "timestamp": "2026-10-01T11:03:51.124Z",
+  "severity": "warning",
+  "event_classification": "signal",
+  "num_events": null,
+  "tampering_revert_succeeded": null,
+  "events": [
+   {
+    "timestamp": "2026-10-01T11:03:51Z",
+    "tamper_type": "firewall",
+    "process_name": "nft",
+    "process_id": 1022307,
+    "kernel_functions": [
+     "nfnetlink_rcv_batch,nf_tables_deltable"
+    ]
+   }
+  ],
+  "info_keys": [
+   "event_classification",
+   "events"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-01T11:06:21.529Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-01T11:16:38.587Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-01T11:26:28.643Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-01T11:35:38.700Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-01T11:46:21.765Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-01T11:55:54.821Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-01T12:05:27.876Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-02",
+  "timestamp": "2026-10-01T12:09:22.842Z",
+  "severity": "warning",
+  "event_classification": "signal",
+  "num_events": null,
+  "tampering_revert_succeeded": null,
+  "events": [
+   {
+    "timestamp": "2026-10-01T12:09:22Z",
+    "tamper_type": "firewall",
+    "process_name": "iptables",
+    "process_id": 1037891,
+    "kernel_functions": [
+     "nfnetlink_rcv_batch,nf_tables_delrule"
+    ]
+   }
+  ],
+  "info_keys": [
+   "event_classification",
+   "events"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-01T12:15:44.935Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-01T12:26:11.995Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-02",
+  "timestamp": "2026-10-01T12:34:21.607Z",
+  "severity": "warning",
+  "event_classification": "signal",
+  "num_events": null,
+  "tampering_revert_succeeded": null,
+  "events": [
+   {
+    "timestamp": "2026-10-01T12:09:22Z",
+    "tamper_type": "firewall",
+    "process_name": "iptables",
+    "process_id": 1037896,
+    "kernel_functions": [
+     "nfnetlink_rcv_batch,nf_tables_delrule"
+    ]
+   },
+   {
+    "timestamp": "2026-10-01T12:09:22Z",
+    "tamper_type": "firewall",
+    "process_name": "iptables",
+    "process_id": 1037900,
+    "kernel_functions": [
+     "nfnetlink_rcv_batch,nf_tables_delrule"
+    ]
+   },
+   {
+    "timestamp": "2026-10-01T12:09:23Z",
+    "tamper_type": "firewall",
+    "process_name": "iptables",
+    "process_id": 1037960,
+    "kernel_functions": [
+     "nfnetlink_rcv_batch,nf_tables_newrule"
+    ]
+   },
+   {
+    "timestamp": "2026-10-01T12:09:23Z",
+    "tamper_type": "firewall",
+    "process_name": "iptables",
+    "process_id": 1037971,
+    "kernel_functions": [
+     "nfnetlink_rcv_batch,nf_tables_newrule"
+    ]
+   },
+   {
+    "timestamp": "2026-10-01T12:09:23Z",
+    "tamper_type": "firewall",
+    "process_name": "iptables",
+    "process_id": 1037975,
+    "kernel_functions": [
+     "nfnetlink_rcv_batch,nf_tables_newrule"
+    ]
+   },
+   {
+    "timestamp": "2026-10-01T12:34:21Z",
+    "tamper_type": "firewall",
+    "process_name": "iptables",
+    "process_id": 1043950,
+    "kernel_functions": [
+     "nfnetlink_rcv_batch,nf_tables_delrule"
+    ]
+   }
+  ],
+  "info_keys": [
+   "event_classification",
+   "events"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-01T12:36:24.054Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-01T12:45:39.118Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-02",
+  "timestamp": "2026-10-01T12:47:57.331Z",
+  "severity": "warning",
+  "event_classification": "signal",
+  "num_events": null,
+  "tampering_revert_succeeded": null,
+  "events": [
+   {
+    "timestamp": "2026-10-01T12:34:21Z",
+    "tamper_type": "firewall",
+    "process_name": "iptables",
+    "process_id": 1043955,
+    "kernel_functions": [
+     "nfnetlink_rcv_batch,nf_tables_delrule"
+    ]
+   },
+   {
+    "timestamp": "2026-10-01T12:34:21Z",
+    "tamper_type": "firewall",
+    "process_name": "iptables",
+    "process_id": 1043960,
+    "kernel_functions": [
+     "nfnetlink_rcv_batch,nf_tables_delrule"
+    ]
+   },
+   {
+    "timestamp": "2026-10-01T12:34:22Z",
+    "tamper_type": "firewall",
+    "process_name": "nft",
+    "process_id": 1044003,
+    "kernel_functions": [
+     "nfnetlink_rcv_batch,nf_tables_deltable"
+    ]
+   },
+   {
+    "timestamp": "2026-10-01T12:34:22Z",
+    "tamper_type": "firewall",
+    "process_name": "nft",
+    "process_id": 1044004,
+    "kernel_functions": [
+     "nfnetlink_rcv_batch,nf_tables_deltable"
+    ]
+   },
+   {
+    "timestamp": "2026-10-01T12:34:22Z",
+    "tamper_type": "firewall",
+    "process_name": "iptables",
+    "process_id": 1044006,
+    "kernel_functions": [
+     "nfnetlink_rcv_batch,nf_tables_delrule"
+    ]
+   },
+   {
+    "timestamp": "2026-10-01T12:34:22Z",
+    "tamper_type": "firewall",
+    "process_name": "iptables",
+    "process_id": 1044007,
+    "kernel_functions": [
+     "nfnetlink_rcv_batch,nf_tables_delrule"
+    ]
+   },
+   {
+    "timestamp": "2026-10-01T12:34:22Z",
+    "tamper_type": "firewall",
+    "process_name": null,
+    "process_id": 1044011,
+    "kernel_functions": [
+     "nfnetlink_rcv_batch,nf_tables_delrule"
+    ]
+   },
+   {
+    "timestamp": "2026-10-01T12:34:22Z",
+    "tamper_type": "firewall",
+    "process_name": null,
+    "process_id": 1044012,
+    "kernel_functions": [
+     "nfnetlink_rcv_batch,nf_tables_delchain"
+    ]
+   },
+   {
+    "timestamp": "2026-10-01T12:34:22Z",
+    "tamper_type": "firewall",
+    "process_name": "iptables",
+    "process_id": 1044013,
+    "kernel_functions": [
+     "nfnetlink_rcv_batch,nf_tables_delrule"
+    ]
+   },
+   {
+    "timestamp": "2026-10-01T12:34:22Z",
+    "tamper_type": "firewall",
+    "process_name": "iptables",
+    "process_id": 1044014,
+    "kernel_functions": [
+     "nfnetlink_rcv_batch,nf_tables_delchain"
+    ]
+   },
+   {
+    "timestamp": "2026-10-01T12:34:22Z",
+    "tamper_type": "firewall",
+    "process_name": "iptables",
+    "process_id": 1044015,
+    "kernel_functions": [
+     "nfnetlink_rcv_batch,nf_tables_delrule"
+    ]
+   },
+   {
+    "timestamp": "2026-10-01T12:34:22Z",
+    "tamper_type": "firewall",
+    "process_name": "iptables",
+    "process_id": 1044016,
+    "kernel_functions": [
+     "nfnetlink_rcv_batch,nf_tables_delchain"
+    ]
+   },
+   {
+    "timestamp": "2026-10-01T12:34:22Z",
+    "tamper_type": "firewall",
+    "process_name": "iptables",
+    "process_id": 1044017,
+    "kernel_functions": [
+     "nfnetlink_rcv_batch,nf_tables_delrule"
+    ]
+   },
+   {
+    "timestamp": "2026-10-01T12:34:22Z",
+    "tamper_type": "firewall",
+    "process_name": "iptables",
+    "process_id": 1044018,
+    "kernel_functions": [
+     "nfnetlink_rcv_batch,nf_tables_delchain"
+    ]
+   },
+   {
+    "timestamp": "2026-10-01T12:34:22Z",
+    "tamper_type": "firewall",
+    "process_name": "iptables",
+    "process_id": 1044019,
+    "kernel_functions": [
+     "nfnetlink_rcv_batch,nf_tables_delrule"
+    ]
+   },
+   {
+    "timestamp": "2026-10-01T12:34:22Z",
+    "tamper_type": "firewall",
+    "process_name": "iptables",
+    "process_id": 1044020,
+    "kernel_functions": [
+     "nfnetlink_rcv_batch,nf_tables_delchain"
+    ]
+   },
+   {
+    "timestamp": "2026-10-01T12:34:22Z",
+    "tamper_type": "firewall",
+    "process_name": null,
+    "process_id": 1044021,
+    "kernel_functions": [
+     "nfnetlink_rcv_batch,nf_tables_delrule"
+    ]
+   },
+   {
+    "timestamp": "2026-10-01T12:34:22Z",
+    "tamper_type": "firewall",
+    "process_name": "iptables",
+    "process_id": 1044022,
+    "kernel_functions": [
+     "nfnetlink_rcv_batch,nf_tables_delchain"
+    ]
+   },
+   {
+    "timestamp": "2026-10-01T12:34:22Z",
+    "tamper_type": "firewall",
+    "process_name": "iptables",
+    "process_id": 1044030,
+    "kernel_functions": [
+     "nfnetlink_rcv_batch,nf_tables_newchain"
+    ]
+   },
+   {
+    "timestamp": "2026-10-01T12:34:22Z",
+    "tamper_type": "firewall",
+    "process_name": "iptables",
+    "process_id": 1044032,
+    "kernel_functions": [
+     "nfnetlink_rcv_batch,nf_tables_newchain"
+    ]
+   },
+   {
+    "timestamp": "2026-10-01T12:34:22Z",
+    "tamper_type": "firewall",
+    "process_name": null,
+    "process_id": 1044035,
+    "kernel_functions": [
+     "nfnetlink_rcv_batch,nf_tables_newchain"
+    ]
+   },
+   {
+    "timestamp": "2026-10-01T12:34:22Z",
+    "tamper_type": "firewall",
+    "process_name": null,
+    "process_id": 1044037,
+    "kernel_functions": [
+     "nfnetlink_rcv_batch,nf_tables_newchain"
+    ]
+   },
+   {
+    "timestamp": "2026-10-01T12:34:22Z",
+    "tamper_type": "firewall",
+    "process_name": "iptables",
+    "process_id": 1044039,
+    "kernel_functions": [
+     "nfnetlink_rcv_batch,nf_tables_newchain"
+    ]
+   },
+   {
+    "timestamp": "2026-10-01T12:34:22Z",
+    "tamper_type": "firewall",
+    "process_name": null,
+    "process_id": 1044041,
+    "kernel_functions": [
+     "nfnetlink_rcv_batch,nf_tables_newrule"
+    ]
+   },
+   {
+    "timestamp": "2026-10-01T12:34:22Z",
+    "tamper_type": "firewall",
+    "process_name": null,
+    "process_id": 1044043,
+    "kernel_functions": [
+     "nfnetlink_rcv_batch,nf_tables_newrule"
+    ]
+   },
+   {
+    "timestamp": "2026-10-01T12:34:22Z",
+    "tamper_type": "firewall",
+    "process_name": "iptables",
+    "process_id": 1044045,
+    "kernel_functions": [
+     "nfnetlink_rcv_batch,nf_tables_delrule"
+    ]
+   },
+   {
+    "timestamp": "2026-10-01T12:34:22Z",
+    "tamper_type": "firewall",
+    "process_name": null,
+    "process_id": 1044046,
+    "kernel_functions": [
+     "nfnetlink_rcv_batch,nf_tables_newrule"
+    ]
+   },
+   {
+    "timestamp": "2026-10-01T12:34:22Z",
+    "tamper_type": "firewall",
+    "process_name": null,
+    "process_id": 1044048,
+    "kernel_functions": [
+     "nfnetlink_rcv_batch,nf_tables_newrule"
+    ]
+   },
+   {
+    "timestamp": "2026-10-01T12:34:22Z",
+    "tamper_type": "firewall",
+    "process_name": null,
+    "process_id": 1044050,
+    "kernel_functions": [
+     "nfnetlink_rcv_batch,nf_tables_newrule"
+    ]
+   },
+   {
+    "timestamp": "2026-10-01T12:34:22Z",
+    "tamper_type": "firewall",
+    "process_name": null,
+    "process_id": 1044052,
+    "kernel_functions": [
+     "nfnetlink_rcv_batch,nf_tables_newrule"
+    ]
+   },
+   {
+    "timestamp": "2026-10-01T12:34:22Z",
+    "tamper_type": "firewall",
+    "process_name": "ip6tables",
+    "process_id": 1044059,
+    "kernel_functions": [
+     "nfnetlink_rcv_batch,nf_tables_delrule"
+    ]
+   },
+   {
+    "timestamp": "2026-10-01T12:34:22Z",
+    "tamper_type": "firewall",
+    "process_name": "ip6tables",
+    "process_id": 1044060,
+    "kernel_functions": [
+     "nfnetlink_rcv_batch,nf_tables_delrule"
+    ]
+   },
+   {
+    "timestamp": "2026-10-01T12:34:22Z",
+    "tamper_type": "firewall",
+    "process_name": "ip6tables",
+    "process_id": 1044064,
+    "kernel_functions": [
+     "nfnetlink_rcv_batch,nf_tables_delrule"
+    ]
+   },
+   {
+    "timestamp": "2026-10-01T12:34:22Z",
+    "tamper_type": "firewall",
+    "process_name": "ip6tables",
+    "process_id": 1044065,
+    "kernel_functions": [
+     "nfnetlink_rcv_batch,nf_tables_delchain"
+    ]
+   },
+   {
+    "timestamp": "2026-10-01T12:34:22Z",
+    "tamper_type": "firewall",
+    "process_name": "ip6tables",
+    "process_id": 1044066,
+    "kernel_functions": [
+     "nfnetlink_rcv_batch,nf_tables_delrule"
+    ]
+   },
+   {
+    "timestamp": "2026-10-01T12:34:22Z",
+    "tamper_type": "firewall",
+    "process_name": "ip6tables",
+    "process_id": 1044067,
+    "kernel_functions": [
+     "nfnetlink_rcv_batch,nf_tables_delchain"
+    ]
+   },
+   {
+    "timestamp": "2026-10-01T12:34:22Z",
+    "tamper_type": "firewall",
+    "process_name": null,
+    "process_id": 1044068,
+    "kernel_functions": [
+     "nfnetlink_rcv_batch,nf_tables_delrule"
+    ]
+   },
+   {
+    "timestamp": "2026-10-01T12:34:22Z",
+    "tamper_type": "firewall",
+    "process_name": null,
+    "process_id": 1044069,
+    "kernel_functions": [
+     "nfnetlink_rcv_batch,nf_tables_delchain"
+    ]
+   },
+   {
+    "timestamp": "2026-10-01T12:34:22Z",
+    "tamper_type": "firewall",
+    "process_name": null,
+    "process_id": 1044070,
+    "kernel_functions": [
+     "nfnetlink_rcv_batch,nf_tables_delrule"
+    ]
+   },
+   {
+    "timestamp": "2026-10-01T12:34:22Z",
+    "tamper_type": "firewall",
+    "process_name": null,
+    "process_id": 1044071,
+    "kernel_functions": [
+     "nfnetlink_rcv_batch,nf_tables_delchain"
+    ]
+   },
+   {
+    "timestamp": "2026-10-01T12:34:22Z",
+    "tamper_type": "firewall",
+    "process_name": null,
+    "process_id": 1044072,
+    "kernel_functions": [
+     "nfnetlink_rcv_batch,nf_tables_delrule"
+    ]
+   },
+   {
+    "timestamp": "2026-10-01T12:34:22Z",
+    "tamper_type": "firewall",
+    "process_name": "ip6tables",
+    "process_id": 1044073,
+    "kernel_functions": [
+     "nfnetlink_rcv_batch,nf_tables_delchain"
+    ]
+   },
+   {
+    "timestamp": "2026-10-01T12:34:22Z",
+    "tamper_type": "firewall",
+    "process_name": null,
+    "process_id": 1044074,
+    "kernel_functions": [
+     "nfnetlink_rcv_batch,nf_tables_delrule"
+    ]
+   },
+   {
+    "timestamp": "2026-10-01T12:34:22Z",
+    "tamper_type": "firewall",
+    "process_name": "ip6tables",
+    "process_id": 1044075,
+    "kernel_functions": [
+     "nfnetlink_rcv_batch,nf_tables_delchain"
+    ]
+   },
+   {
+    "timestamp": "2026-10-01T12:34:22Z",
+    "tamper_type": "firewall",
+    "process_name": null,
+    "process_id": 1044083,
+    "kernel_functions": [
+     "nfnetlink_rcv_batch,nf_tables_newchain"
+    ]
+   },
+   {
+    "timestamp": "2026-10-01T12:34:22Z",
+    "tamper_type": "firewall",
+    "process_name": "ip6tables",
+    "process_id": 1044085,
+    "kernel_functions": [
+     "nfnetlink_rcv_batch,nf_tables_newchain"
+    ]
+   },
+   {
+    "timestamp": "2026-10-01T12:34:22Z",
+    "tamper_type": "firewall",
+    "process_name": null,
+    "process_id": 1044088,
+    "kernel_functions": [
+     "nfnetlink_rcv_batch,nf_tables_newchain"
+    ]
+   },
+   {
+    "timestamp": "2026-10-01T12:34:22Z",
+    "tamper_type": "firewall",
+    "process_name": null,
+    "process_id": 1044090,
+    "kernel_functions": [
+     "nfnetlink_rcv_batch,nf_tables_newchain"
+    ]
+   },
+   {
+    "timestamp": "2026-10-01T12:34:22Z",
+    "tamper_type": "firewall",
+    "process_name": null,
+    "process_id": 1044092,
+    "kernel_functions": [
+     "nfnetlink_rcv_batch,nf_tables_newchain"
+    ]
+   },
+   {
+    "timestamp": "2026-10-01T12:34:22Z",
+    "tamper_type": "firewall",
+    "process_name": "ip6tables",
+    "process_id": 1044094,
+    "kernel_functions": [
+     "nfnetlink_rcv_batch,nf_tables_newrule"
+    ]
+   },
+   {
+    "timestamp": "2026-10-01T12:34:22Z",
+    "tamper_type": "firewall",
+    "process_name": "ip6tables",
+    "process_id": 1044096,
+    "kernel_functions": [
+     "nfnetlink_rcv_batch,nf_tables_newrule"
+    ]
+   },
+   {
+    "timestamp": "2026-10-01T12:34:22Z",
+    "tamper_type": "firewall",
+    "process_name": "ip6tables",
+    "process_id": 1044098,
+    "kernel_functions": [
+     "nfnetlink_rcv_batch,nf_tables_delrule"
+    ]
+   },
+   {
+    "timestamp": "2026-10-01T12:34:22Z",
+    "tamper_type": "firewall",
+    "process_name": null,
+    "process_id": 1044099,
+    "kernel_functions": [
+     "nfnetlink_rcv_batch,nf_tables_newrule"
+    ]
+   },
+   {
+    "timestamp": "2026-10-01T12:34:22Z",
+    "tamper_type": "firewall",
+    "process_name": null,
+    "process_id": 1044101,
+    "kernel_functions": [
+     "nfnetlink_rcv_batch,nf_tables_newrule"
+    ]
+   },
+   {
+    "timestamp": "2026-10-01T12:34:22Z",
+    "tamper_type": "firewall",
+    "process_name": null,
+    "process_id": 1044103,
+    "kernel_functions": [
+     "nfnetlink_rcv_batch,nf_tables_newrule"
+    ]
+   },
+   {
+    "timestamp": "2026-10-01T12:34:22Z",
+    "tamper_type": "firewall",
+    "process_name": null,
+    "process_id": 1044105,
+    "kernel_functions": [
+     "nfnetlink_rcv_batch,nf_tables_newrule"
+    ]
+   },
+   {
+    "timestamp": "2026-10-01T12:34:22Z",
+    "tamper_type": "firewall",
+    "process_name": "iptables",
+    "process_id": 1044128,
+    "kernel_functions": [
+     "nfnetlink_rcv_batch,nf_tables_newrule"
+    ]
+   },
+   {
+    "timestamp": "2026-10-01T12:34:22Z",
+    "tamper_type": "firewall",
+    "process_name": null,
+    "process_id": 1044133,
+    "kernel_functions": [
+     "nfnetlink_rcv_batch,nf_tables_newrule"
+    ]
+   },
+   {
+    "timestamp": "2026-10-01T12:34:22Z",
+    "tamper_type": "firewall",
+    "process_name": null,
+    "process_id": 1044135,
+    "kernel_functions": [
+     "nfnetlink_rcv_batch,nf_tables_newrule"
+    ]
+   },
+   {
+    "timestamp": "2026-10-01T12:34:22Z",
+    "tamper_type": "firewall",
+    "process_name": null,
+    "process_id": 1044137,
+    "kernel_functions": [
+     "nfnetlink_rcv_batch,nf_tables_newrule"
+    ]
+   },
+   {
+    "timestamp": "2026-10-01T12:34:22Z",
+    "tamper_type": "firewall",
+    "process_name": "iptables",
+    "process_id": 1044140,
+    "kernel_functions": [
+     "nfnetlink_rcv_batch,nf_tables_delrule"
+    ]
+   },
+   {
+    "timestamp": "2026-10-01T12:34:22Z",
+    "tamper_type": "firewall",
+    "process_name": null,
+    "process_id": 1044141,
+    "kernel_functions": [
+     "nfnetlink_rcv_batch,nf_tables_newrule"
+    ]
+   },
+   {
+    "timestamp": "2026-10-01T12:34:22Z",
+    "tamper_type": "firewall",
+    "process_name": "ip6tables",
+    "process_id": 1044144,
+    "kernel_functions": [
+     "nfnetlink_rcv_batch,nf_tables_delrule"
+    ]
+   },
+   {
+    "timestamp": "2026-10-01T12:34:22Z",
+    "tamper_type": "firewall",
+    "process_name": null,
+    "process_id": 1044145,
+    "kernel_functions": [
+     "nfnetlink_rcv_batch,nf_tables_newrule"
+    ]
+   },
+   {
+    "timestamp": "2026-10-01T12:34:22Z",
+    "tamper_type": "firewall",
+    "process_name": "iptables",
+    "process_id": 1044147,
+    "kernel_functions": [
+     "nfnetlink_rcv_batch,nf_tables_delrule"
+    ]
+   },
+   {
+    "timestamp": "2026-10-01T12:34:22Z",
+    "tamper_type": "firewall",
+    "process_name": "iptables",
+    "process_id": 1044152,
+    "kernel_functions": [
+     "nfnetlink_rcv_batch,nf_tables_delrule"
+    ]
+   },
+   {
+    "timestamp": "2026-10-01T12:34:22Z",
+    "tamper_type": "firewall",
+    "process_name": "iptables",
+    "process_id": 1044154,
+    "kernel_functions": [
+     "nfnetlink_rcv_batch,nf_tables_delrule"
+    ]
+   },
+   {
+    "timestamp": "2026-10-01T12:34:22Z",
+    "tamper_type": "firewall",
+    "process_name": "iptables",
+    "process_id": 1044156,
+    "kernel_functions": [
+     "nfnetlink_rcv_batch,nf_tables_delrule"
+    ]
+   },
+   {
+    "timestamp": "2026-10-01T12:34:22Z",
+    "tamper_type": "firewall",
+    "process_name": "iptables",
+    "process_id": 1044158,
+    "kernel_functions": [
+     "nfnetlink_rcv_batch,nf_tables_delrule"
+    ]
+   },
+   {
+    "timestamp": "2026-10-01T12:34:22Z",
+    "tamper_type": "firewall",
+    "process_name": null,
+    "process_id": 1044160,
+    "kernel_functions": [
+     "nfnetlink_rcv_batch,nf_tables_newrule"
+    ]
+   },
+   {
+    "timestamp": "2026-10-01T12:34:22Z",
+    "tamper_type": "firewall",
+    "process_name": null,
+    "process_id": 1044168,
+    "kernel_functions": [
+     "nfnetlink_rcv_batch,nf_tables_newrule"
+    ]
+   },
+   {
+    "timestamp": "2026-10-01T12:34:22Z",
+    "tamper_type": "firewall",
+    "process_name": null,
+    "process_id": 1044173,
+    "kernel_functions": [
+     "nfnetlink_rcv_batch,nf_tables_newrule"
+    ]
+   },
+   {
+    "timestamp": "2026-10-01T12:34:22Z",
+    "tamper_type": "firewall",
+    "process_name": "iptables",
+    "process_id": 1044175,
+    "kernel_functions": [
+     "nfnetlink_rcv_batch,nf_tables_newrule"
+    ]
+   },
+   {
+    "timestamp": "2026-10-01T12:34:22Z",
+    "tamper_type": "firewall",
+    "process_name": null,
+    "process_id": 1044177,
+    "kernel_functions": [
+     "nfnetlink_rcv_batch,nf_tables_newrule"
+    ]
+   },
+   {
+    "timestamp": "2026-10-01T12:34:27Z",
+    "tamper_type": "firewall",
+    "process_name": "iptables",
+    "process_id": 1044388,
+    "kernel_functions": [
+     "nfnetlink_rcv_batch,nf_tables_newrule"
+    ]
+   },
+   {
+    "timestamp": "2026-10-01T12:34:27Z",
+    "tamper_type": "firewall",
+    "process_name": "iptables",
+    "process_id": 1044399,
+    "kernel_functions": [
+     "nfnetlink_rcv_batch,nf_tables_newrule"
+    ]
+   },
+   {
+    "timestamp": "2026-10-01T12:34:27Z",
+    "tamper_type": "firewall",
+    "process_name": "iptables",
+    "process_id": 1044406,
+    "kernel_functions": [
+     "nfnetlink_rcv_batch,nf_tables_newrule"
+    ]
+   },
+   {
+    "timestamp": "2026-10-01T12:47:57Z",
+    "tamper_type": "firewall",
+    "process_name": "iptables",
+    "process_id": 1050081,
+    "kernel_functions": [
+     "nfnetlink_rcv_batch,nf_tables_delrule"
+    ]
+   }
+  ],
+  "info_keys": [
+   "event_classification",
+   "events"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-01T12:56:32.174Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-01T13:06:58.231Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-01T13:16:06.284Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-01T13:25:43.342Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-01T13:35:08.396Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-01T13:45:27.455Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-01T13:54:41.508Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-01T14:03:53.559Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-01T14:14:27.614Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-01T14:23:48.664Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-01T14:33:52.724Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-01T14:43:41.786Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-01T14:53:18.847Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-01T15:03:13.902Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-01T15:12:19.956Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-01T15:22:27.016Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-01T15:32:32.072Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-01T15:42:36.133Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-03",
+  "timestamp": "2026-10-01T15:42:43.838Z",
+  "severity": "warning",
+  "event_classification": "signal",
+  "num_events": null,
+  "tampering_revert_succeeded": null,
+  "events": [
+   {
+    "timestamp": "2026-10-01T15:42:43Z",
+    "tamper_type": "firewall",
+    "process_name": null,
+    "process_id": 636631,
+    "kernel_functions": [
+     "nfnetlink_rcv_batch,nf_tables_newchain"
+    ]
+   }
+  ],
+  "info_keys": [
+   "event_classification",
+   "events"
+  ]
+ },
+ {
+  "host": "host-03",
+  "timestamp": "2026-10-01T15:42:50.436Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-03",
+  "timestamp": "2026-10-01T15:43:19.448Z",
+  "severity": "warning",
+  "event_classification": "signal",
+  "num_events": null,
+  "tampering_revert_succeeded": null,
+  "events": [
+   {
+    "timestamp": "2026-10-01T15:42:44Z",
+    "tamper_type": "firewall",
+    "process_name": "iptables",
+    "process_id": 636637,
+    "kernel_functions": [
+     "nfnetlink_rcv_batch,nf_tables_newchain"
+    ]
+   },
+   {
+    "timestamp": "2026-10-01T15:43:19Z",
+    "tamper_type": "firewall",
+    "process_name": "iptables",
+    "process_id": 637696,
+    "kernel_functions": [
+     "nfnetlink_rcv_batch,nf_tables_newchain"
+    ]
+   }
+  ],
+  "info_keys": [
+   "event_classification",
+   "events"
+  ]
+ },
+ {
+  "host": "host-03",
+  "timestamp": "2026-10-01T15:43:52.449Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-01T15:53:02.194Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-01T16:03:41.256Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-01T16:13:16.313Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-01T16:22:47.372Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-03",
+  "timestamp": "2026-10-01T16:30:12.672Z",
+  "severity": "warning",
+  "event_classification": "signal",
+  "num_events": null,
+  "tampering_revert_succeeded": null,
+  "events": [
+   {
+    "timestamp": "2026-10-01T16:30:12Z",
+    "tamper_type": "firewall",
+    "process_name": "iptables",
+    "process_id": 639714,
+    "kernel_functions": [
+     "nfnetlink_rcv_batch,nf_tables_newchain"
+    ]
+   }
+  ],
+  "info_keys": [
+   "event_classification",
+   "events"
+  ]
+ },
+ {
+  "host": "host-03",
+  "timestamp": "2026-10-01T16:30:18.859Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-01T16:32:01.428Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-03",
+  "timestamp": "2026-10-01T16:32:35.388Z",
+  "severity": "warning",
+  "event_classification": "signal",
+  "num_events": null,
+  "tampering_revert_succeeded": null,
+  "events": [
+   {
+    "timestamp": "2026-10-01T16:30:12Z",
+    "tamper_type": "firewall",
+    "process_name": "iptables",
+    "process_id": 639717,
+    "kernel_functions": [
+     "nfnetlink_rcv_batch,nf_tables_newchain"
+    ]
+   },
+   {
+    "timestamp": "2026-10-01T16:30:12Z",
+    "tamper_type": "firewall",
+    "process_name": "iptables",
+    "process_id": 639732,
+    "kernel_functions": [
+     "nfnetlink_rcv_batch,nf_tables_newrule"
+    ]
+   },
+   {
+    "timestamp": "2026-10-01T16:30:12Z",
+    "tamper_type": "firewall",
+    "process_name": "iptables",
+    "process_id": 639737,
+    "kernel_functions": [
+     "nfnetlink_rcv_batch,nf_tables_newrule"
+    ]
+   },
+   {
+    "timestamp": "2026-10-01T16:30:12Z",
+    "tamper_type": "firewall",
+    "process_name": "iptables",
+    "process_id": 639739,
+    "kernel_functions": [
+     "nfnetlink_rcv_batch,nf_tables_newrule"
+    ]
+   },
+   {
+    "timestamp": "2026-10-01T16:30:12Z",
+    "tamper_type": "firewall",
+    "process_name": "iptables",
+    "process_id": 639747,
+    "kernel_functions": [
+     "nfnetlink_rcv_batch,nf_tables_newchain"
+    ]
+   },
+   {
+    "timestamp": "2026-10-01T16:30:12Z",
+    "tamper_type": "firewall",
+    "process_name": null,
+    "process_id": 639752,
+    "kernel_functions": [
+     "nfnetlink_rcv_batch,nf_tables_newrule"
+    ]
+   },
+   {
+    "timestamp": "2026-10-01T16:30:12Z",
+    "tamper_type": "firewall",
+    "process_name": "iptables",
+    "process_id": 639754,
+    "kernel_functions": [
+     "nfnetlink_rcv_batch,nf_tables_newchain"
+    ]
+   },
+   {
+    "timestamp": "2026-10-01T16:30:12Z",
+    "tamper_type": "firewall",
+    "process_name": null,
+    "process_id": 639756,
+    "kernel_functions": [
+     "nfnetlink_rcv_batch,nf_tables_newrule"
+    ]
+   },
+   {
+    "timestamp": "2026-10-01T16:30:12Z",
+    "tamper_type": "firewall",
+    "process_name": "iptables",
+    "process_id": 639758,
+    "kernel_functions": [
+     "nfnetlink_rcv_batch,nf_tables_newrule"
+    ]
+   },
+   {
+    "timestamp": "2026-10-01T16:30:12Z",
+    "tamper_type": "firewall",
+    "process_name": "iptables",
+    "process_id": 639760,
+    "kernel_functions": [
+     "nfnetlink_rcv_batch,nf_tables_newchain"
+    ]
+   },
+   {
+    "timestamp": "2026-10-01T16:30:12Z",
+    "tamper_type": "firewall",
+    "process_name": null,
+    "process_id": 639764,
+    "kernel_functions": [
+     "nfnetlink_rcv_batch,nf_tables_newrule"
+    ]
+   },
+   {
+    "timestamp": "2026-10-01T16:30:12Z",
+    "tamper_type": "firewall",
+    "process_name": "iptables",
+    "process_id": 639766,
+    "kernel_functions": [
+     "nfnetlink_rcv_batch,nf_tables_newrule"
+    ]
+   },
+   {
+    "timestamp": "2026-10-01T16:30:12Z",
+    "tamper_type": "firewall",
+    "process_name": null,
+    "process_id": 639768,
+    "kernel_functions": [
+     "nfnetlink_rcv_batch,nf_tables_newchain"
+    ]
+   },
+   {
+    "timestamp": "2026-10-01T16:30:12Z",
+    "tamper_type": "firewall",
+    "process_name": "iptables",
+    "process_id": 639770,
+    "kernel_functions": [
+     "nfnetlink_rcv_batch,nf_tables_newrule"
+    ]
+   },
+   {
+    "timestamp": "2026-10-01T16:30:12Z",
+    "tamper_type": "firewall",
+    "process_name": "iptables",
+    "process_id": 639772,
+    "kernel_functions": [
+     "nfnetlink_rcv_batch,nf_tables_newrule"
+    ]
+   },
+   {
+    "timestamp": "2026-10-01T16:30:12Z",
+    "tamper_type": "firewall",
+    "process_name": "iptables",
+    "process_id": 639776,
+    "kernel_functions": [
+     "nfnetlink_rcv_batch,nf_tables_newrule"
+    ]
+   },
+   {
+    "timestamp": "2026-10-01T16:30:12Z",
+    "tamper_type": "firewall",
+    "process_name": null,
+    "process_id": 639780,
+    "kernel_functions": [
+     "nfnetlink_rcv_batch,nf_tables_newrule"
+    ]
+   },
+   {
+    "timestamp": "2026-10-01T16:30:12Z",
+    "tamper_type": "firewall",
+    "process_name": "iptables",
+    "process_id": 639790,
+    "kernel_functions": [
+     "nfnetlink_rcv_batch,nf_tables_newchain"
+    ]
+   },
+   {
+    "timestamp": "2026-10-01T16:30:12Z",
+    "tamper_type": "firewall",
+    "process_name": null,
+    "process_id": 639792,
+    "kernel_functions": [
+     "nfnetlink_rcv_batch,nf_tables_newchain"
+    ]
+   },
+   {
+    "timestamp": "2026-10-01T16:30:12Z",
+    "tamper_type": "firewall",
+    "process_name": null,
+    "process_id": 639794,
+    "kernel_functions": [
+     "nfnetlink_rcv_batch,nf_tables_newrule"
+    ]
+   },
+   {
+    "timestamp": "2026-10-01T16:30:12Z",
+    "tamper_type": "firewall",
+    "process_name": "iptables",
+    "process_id": 639796,
+    "kernel_functions": [
+     "nfnetlink_rcv_batch,nf_tables_newrule"
+    ]
+   },
+   {
+    "timestamp": "2026-10-01T16:30:12Z",
+    "tamper_type": "firewall",
+    "process_name": null,
+    "process_id": 639800,
+    "kernel_functions": [
+     "nfnetlink_rcv_batch,nf_tables_newrule"
+    ]
+   },
+   {
+    "timestamp": "2026-10-01T16:30:12Z",
+    "tamper_type": "firewall",
+    "process_name": "iptables",
+    "process_id": 639802,
+    "kernel_functions": [
+     "nfnetlink_rcv_batch,nf_tables_newrule"
+    ]
+   },
+   {
+    "timestamp": "2026-10-01T16:32:35Z",
+    "tamper_type": "firewall",
+    "process_name": "iptables",
+    "process_id": 640661,
+    "kernel_functions": [
+     "nfnetlink_rcv_batch,nf_tables_newchain"
+    ]
+   }
+  ],
+  "info_keys": [
+   "event_classification",
+   "events"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-01T16:42:53.490Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-03",
+  "timestamp": "2026-10-01T16:45:08.656Z",
+  "severity": "warning",
+  "event_classification": "signal",
+  "num_events": null,
+  "tampering_revert_succeeded": null,
+  "events": [
+   {
+    "timestamp": "2026-10-01T16:32:35Z",
+    "tamper_type": "firewall",
+    "process_name": "ip6tables",
+    "process_id": 640663,
+    "kernel_functions": [
+     "nfnetlink_rcv_batch,nf_tables_newchain"
+    ]
+   },
+   {
+    "timestamp": "2026-10-01T16:32:35Z",
+    "tamper_type": "firewall",
+    "process_name": "iptables",
+    "process_id": 640705,
+    "kernel_functions": [
+     "nfnetlink_rcv_batch,nf_tables_newchain"
+    ]
+   },
+   {
+    "timestamp": "2026-10-01T16:32:35Z",
+    "tamper_type": "firewall",
+    "process_name": "iptables",
+    "process_id": 640707,
+    "kernel_functions": [
+     "nfnetlink_rcv_batch,nf_tables_newrule"
+    ]
+   },
+   {
+    "timestamp": "2026-10-01T16:32:35Z",
+    "tamper_type": "firewall",
+    "process_name": "iptables",
+    "process_id": 640709,
+    "kernel_functions": [
+     "nfnetlink_rcv_batch,nf_tables_newrule"
+    ]
+   },
+   {
+    "timestamp": "2026-10-01T16:32:35Z",
+    "tamper_type": "firewall",
+    "process_name": null,
+    "process_id": 640711,
+    "kernel_functions": [
+     "nfnetlink_rcv_batch,nf_tables_newrule"
+    ]
+   },
+   {
+    "timestamp": "2026-10-01T16:32:35Z",
+    "tamper_type": "firewall",
+    "process_name": "iptables",
+    "process_id": 640719,
+    "kernel_functions": [
+     "nfnetlink_rcv_batch,nf_tables_newchain"
+    ]
+   },
+   {
+    "timestamp": "2026-10-01T16:32:35Z",
+    "tamper_type": "firewall",
+    "process_name": null,
+    "process_id": 640721,
+    "kernel_functions": [
+     "nfnetlink_rcv_batch,nf_tables_newrule"
+    ]
+   },
+   {
+    "timestamp": "2026-10-01T16:32:35Z",
+    "tamper_type": "firewall",
+    "process_name": "iptables",
+    "process_id": 640723,
+    "kernel_functions": [
+     "nfnetlink_rcv_batch,nf_tables_newchain"
+    ]
+   },
+   {
+    "timestamp": "2026-10-01T16:32:35Z",
+    "tamper_type": "firewall",
+    "process_name": "iptables",
+    "process_id": 640725,
+    "kernel_functions": [
+     "nfnetlink_rcv_batch,nf_tables_newrule"
+    ]
+   },
+   {
+    "timestamp": "2026-10-01T16:32:35Z",
+    "tamper_type": "firewall",
+    "process_name": "iptables",
+    "process_id": 640727,
+    "kernel_functions": [
+     "nfnetlink_rcv_batch,nf_tables_newrule"
+    ]
+   },
+   {
+    "timestamp": "2026-10-01T16:32:35Z",
+    "tamper_type": "firewall",
+    "process_name": null,
+    "process_id": 640729,
+    "kernel_functions": [
+     "nfnetlink_rcv_batch,nf_tables_newchain"
+    ]
+   },
+   {
+    "timestamp": "2026-10-01T16:32:35Z",
+    "tamper_type": "firewall",
+    "process_name": "iptables",
+    "process_id": 640731,
+    "kernel_functions": [
+     "nfnetlink_rcv_batch,nf_tables_newrule"
+    ]
+   },
+   {
+    "timestamp": "2026-10-01T16:32:35Z",
+    "tamper_type": "firewall",
+    "process_name": "iptables",
+    "process_id": 640733,
+    "kernel_functions": [
+     "nfnetlink_rcv_batch,nf_tables_newrule"
+    ]
+   },
+   {
+    "timestamp": "2026-10-01T16:32:35Z",
+    "tamper_type": "firewall",
+    "process_name": "iptables",
+    "process_id": 640735,
+    "kernel_functions": [
+     "nfnetlink_rcv_batch,nf_tables_newchain"
+    ]
+   },
+   {
+    "timestamp": "2026-10-01T16:32:35Z",
+    "tamper_type": "firewall",
+    "process_name": null,
+    "process_id": 640737,
+    "kernel_functions": [
+     "nfnetlink_rcv_batch,nf_tables_newrule"
+    ]
+   },
+   {
+    "timestamp": "2026-10-01T16:32:35Z",
+    "tamper_type": "firewall",
+    "process_name": "iptables",
+    "process_id": 640739,
+    "kernel_functions": [
+     "nfnetlink_rcv_batch,nf_tables_newrule"
+    ]
+   },
+   {
+    "timestamp": "2026-10-01T16:32:35Z",
+    "tamper_type": "firewall",
+    "process_name": "iptables",
+    "process_id": 640741,
+    "kernel_functions": [
+     "nfnetlink_rcv_batch,nf_tables_newrule"
+    ]
+   },
+   {
+    "timestamp": "2026-10-01T16:32:35Z",
+    "tamper_type": "firewall",
+    "process_name": null,
+    "process_id": 640743,
+    "kernel_functions": [
+     "nfnetlink_rcv_batch,nf_tables_newrule"
+    ]
+   },
+   {
+    "timestamp": "2026-10-01T16:32:35Z",
+    "tamper_type": "firewall",
+    "process_name": null,
+    "process_id": 640752,
+    "kernel_functions": [
+     "nfnetlink_rcv_batch,nf_tables_newchain"
+    ]
+   },
+   {
+    "timestamp": "2026-10-01T16:32:35Z",
+    "tamper_type": "firewall",
+    "process_name": "iptables",
+    "process_id": 640754,
+    "kernel_functions": [
+     "nfnetlink_rcv_batch,nf_tables_newchain"
+    ]
+   },
+   {
+    "timestamp": "2026-10-01T16:32:35Z",
+    "tamper_type": "firewall",
+    "process_name": "iptables",
+    "process_id": 640756,
+    "kernel_functions": [
+     "nfnetlink_rcv_batch,nf_tables_newrule"
+    ]
+   },
+   {
+    "timestamp": "2026-10-01T16:32:35Z",
+    "tamper_type": "firewall",
+    "process_name": "iptables",
+    "process_id": 640758,
+    "kernel_functions": [
+     "nfnetlink_rcv_batch,nf_tables_newrule"
+    ]
+   },
+   {
+    "timestamp": "2026-10-01T16:32:35Z",
+    "tamper_type": "firewall",
+    "process_name": null,
+    "process_id": 640760,
+    "kernel_functions": [
+     "nfnetlink_rcv_batch,nf_tables_newrule"
+    ]
+   },
+   {
+    "timestamp": "2026-10-01T16:32:35Z",
+    "tamper_type": "firewall",
+    "process_name": null,
+    "process_id": 640762,
+    "kernel_functions": [
+     "nfnetlink_rcv_batch,nf_tables_newrule"
+    ]
+   },
+   {
+    "timestamp": "2026-10-01T16:45:08Z",
+    "tamper_type": "firewall",
+    "process_name": "iptables",
+    "process_id": 645719,
+    "kernel_functions": [
+     "nfnetlink_rcv_batch,nf_tables_delrule"
+    ]
+   },
+   {
+    "timestamp": "2026-10-01T16:45:08Z",
+    "tamper_type": "firewall",
+    "process_name": "iptables",
+    "process_id": 645720,
+    "kernel_functions": [
+     "nfnetlink_rcv_batch,nf_tables_delrule"
+    ]
+   }
+  ],
+  "info_keys": [
+   "event_classification",
+   "events"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-01T16:52:14.546Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-01T17:01:36.603Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-01T17:10:54.659Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-01T17:21:57.751Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-01T17:32:43.791Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-01T17:42:59.851Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-01T17:53:47.918Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-01T18:04:37.980Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-01T18:14:31.036Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-01T18:23:37.093Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-01T18:33:47.144Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-01T18:44:23.202Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-01T18:54:47.261Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-01T19:05:51.329Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-01T19:15:39.394Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-01T19:24:51.446Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-01T19:35:27.515Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-01T19:44:40.569Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-01T19:55:09.633Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-01T20:04:56.690Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-01T20:15:19.752Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-01T20:25:42.819Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-01T20:35:10.874Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-01T20:45:25.941Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-01T20:56:00.009Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-01T21:05:50.077Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-01T21:16:39.136Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-01T21:27:36.203Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-01T21:38:17.268Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-01T21:47:46.324Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-01T21:57:47.386Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-01T22:08:30.447Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-01T22:19:17.512Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-01T22:29:06.573Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-01T22:40:03.632Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-01T22:51:08.690Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-01T23:00:41.738Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-01T23:11:00.800Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-01T23:21:40.872Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-01T23:31:13.928Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-01T23:40:55.990Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-01T23:50:53.051Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-02T00:01:41.115Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-02T00:12:44.181Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-02T00:23:26.248Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-02T00:34:16.312Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-02T00:43:34.367Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-02T00:53:45.426Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-02T01:04:43.489Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-02T01:14:35.543Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-02T01:24:41.601Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-02T01:35:06.663Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-02T01:45:10.720Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-02T01:55:41.783Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-02T02:06:18.847Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-02T02:16:04.905Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-02T02:26:26.969Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-02T02:35:51.054Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-02T02:45:18.076Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-02T02:54:43.130Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-02T03:04:35.184Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-02T03:13:40.232Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-02T03:24:24.290Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-02T03:34:02.345Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-02T03:44:17.406Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-02T03:55:03.467Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-02T04:04:58.527Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-02T04:15:06.588Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-02T04:25:26.647Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-02T04:36:17.710Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-02T04:45:52.767Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-02T04:55:57.834Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-02T05:06:31.891Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-02T05:16:55.956Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-02T05:26:29.011Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-02T05:36:45.073Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-02T05:46:05.130Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-02T05:55:25.188Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-02T06:06:06.249Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-02T06:15:15.305Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-02T06:25:24.369Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-02T06:34:35.421Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-02T06:43:41.478Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-02T06:54:33.541Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-02T07:03:54.605Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-02",
+  "timestamp": "2026-10-02T07:08:04.053Z",
+  "severity": "warning",
+  "event_classification": "signal",
+  "num_events": null,
+  "tampering_revert_succeeded": null,
+  "events": [
+   {
+    "timestamp": "2026-10-01T12:47:57Z",
+    "tamper_type": "firewall",
+    "process_name": "iptables",
+    "process_id": 1050086,
+    "kernel_functions": [
+     "nfnetlink_rcv_batch,nf_tables_delrule"
+    ]
+   },
+   {
+    "timestamp": "2026-10-01T12:47:57Z",
+    "tamper_type": "firewall",
+    "process_name": "iptables",
+    "process_id": 1050091,
+    "kernel_functions": [
+     "nfnetlink_rcv_batch,nf_tables_delrule"
+    ]
+   },
+   {
+    "timestamp": "2026-10-02T07:08:04Z",
+    "tamper_type": "firewall",
+    "process_name": "iptables",
+    "process_id": 1110867,
+    "kernel_functions": [
+     "nfnetlink_rcv_batch,nf_tables_newrule"
+    ]
+   }
+  ],
+  "info_keys": [
+   "event_classification",
+   "events"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-02T07:14:57.667Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-02T07:24:54.719Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-02",
+  "timestamp": "2026-10-02T07:34:58.540Z",
+  "severity": "warning",
+  "event_classification": "signal",
+  "num_events": null,
+  "tampering_revert_succeeded": null,
+  "events": [
+   {
+    "timestamp": "2026-10-02T07:08:04Z",
+    "tamper_type": "firewall",
+    "process_name": "iptables",
+    "process_id": 1110873,
+    "kernel_functions": [
+     "nfnetlink_rcv_batch,nf_tables_newrule"
+    ]
+   },
+   {
+    "timestamp": "2026-10-02T07:08:04Z",
+    "tamper_type": "firewall",
+    "process_name": "iptables",
+    "process_id": 1110877,
+    "kernel_functions": [
+     "nfnetlink_rcv_batch,nf_tables_newrule"
+    ]
+   },
+   {
+    "timestamp": "2026-10-02T07:34:58Z",
+    "tamper_type": "firewall",
+    "process_name": "iptables",
+    "process_id": 1123840,
+    "kernel_functions": [
+     "nfnetlink_rcv_batch,nf_tables_delrule"
+    ]
+   }
+  ],
+  "info_keys": [
+   "event_classification",
+   "events"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-02T07:35:33.779Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-02T07:46:26.836Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-02T07:56:32.890Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-02T08:06:45.954Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-02T08:15:57.010Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-02T08:25:30.069Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-02T08:35:37.131Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-02T08:46:24.198Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-02T08:57:14.264Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-02T09:07:29.329Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-02T09:16:54.390Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-02T09:27:49.460Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-02T09:37:14.516Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-02T09:48:11.579Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-02T09:57:56.637Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-02T10:07:53.700Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-02T10:18:29.760Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-02T10:28:25.826Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-02T10:39:21.890Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-02T10:48:52.948Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-02T10:58:10.003Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-02T11:08:35.064Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-02T11:18:44.127Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-02T11:28:21.187Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-02T11:37:45.238Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-02T11:48:38.303Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ },
+ {
+  "host": "host-01",
+  "timestamp": "2026-10-02T11:58:03.363Z",
+  "severity": "info",
+  "event_classification": "confirmed",
+  "num_events": 1,
+  "tampering_revert_succeeded": true,
+  "events": [],
+  "info_keys": [
+   "beginning_timestamp",
+   "ending_timestamp",
+   "event_classification",
+   "num_events",
+   "tampering_revert_succeeded"
+  ]
+ }
+]
