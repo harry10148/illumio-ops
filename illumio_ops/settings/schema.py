@@ -307,6 +307,16 @@ def _https_or_empty(v: str) -> str:
 HttpsUrl = Annotated[str, AfterValidator(_https_or_empty)]
 
 
+def _no_control(v: str) -> str:
+    # A control character in a token breaks the request line, and the error the HTTP library raises holds it.
+    if any(ord(c) < 32 or ord(c) == 127 for c in v):
+        raise ValueError("must not contain control characters")
+    return v
+
+
+Secret = Annotated[str, AfterValidator(_no_control)]
+
+
 def _require(enabled: bool, fields: dict[str, object]) -> None:
     missing = [name for name, value in fields.items() if not value]
     if enabled and missing:
@@ -319,7 +329,7 @@ class SmtpChannel(StrictModel):
     port: int = Field(ge=1, le=65535)
     security: Literal["none", "starttls", "tls"]
     username: str  # empty: no sign-in
-    password: str
+    password: Secret
     sender: str
     recipients: tuple[str, ...]
 
@@ -339,7 +349,7 @@ class SmtpChannel(StrictModel):
 
 class LineChannel(StrictModel):
     enabled: bool
-    access_token: str
+    access_token: Secret
     target_id: str
 
     @model_validator(mode="after")
@@ -350,7 +360,7 @@ class LineChannel(StrictModel):
 
 class TelegramChannel(StrictModel):
     enabled: bool
-    bot_token: str
+    bot_token: Secret
     chat_id: str
 
     @model_validator(mode="after")

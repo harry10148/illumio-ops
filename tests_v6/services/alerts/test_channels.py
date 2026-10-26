@@ -183,3 +183,30 @@ def test_header_injection_sanitized(smtp):
     assert send(ChannelKind.SMTP, smtp_cfg(smtp), RENDERED).ok
     data = [line for kind, line in _Smtp.log if kind == "DATA"]
     assert not any(line.lower().startswith("bcc:") for line in data)
+
+
+def test_error_body_scrubbed_before_it_is_cut(server, monkeypatch):
+    """A secret straddling the kept length must not survive as a prefix (review: cut first, scrub after)."""
+    _Handler.status = 400
+    echoed = "rejected /v2/bot/message/push Bearer "
+    monkeypatch.setattr(channels, "_ERROR_BODY", len(echoed) + 12)  # the cut falls inside the token
+    r = send(ChannelKind.LINE, cfg(), RENDERED)
+    assert not r.ok and TOKEN[:8] not in r.error
+
+
+def test_send_reports_any_transport_error_scrubbed(server):
+    """A token that breaks the request line raises http.client.InvalidURL with the whole URL in it."""
+    r = send(ChannelKind.TELEGRAM, cfg(telegram={"bot_token": BOT + "\n"}), RENDERED)
+    assert not r.ok and BOT not in r.error
+
+
+@pytest.mark.parametrize("model,field", [("LineChannel", "access_token"), ("TelegramChannel", "bot_token"),
+                                         ("SmtpChannel", "password")])
+def test_secrets_with_control_characters_rejected(model, field):
+    from pydantic import ValidationError
+
+    from illumio_ops.settings import schema
+    base = default_alerts(notify_new_defaults=True).channels.model_dump()[model.removesuffix("Channel").lower()]
+    base[field] = "abc\ndef"
+    with pytest.raises(ValidationError):
+        getattr(schema, model).model_validate(base)

@@ -3,6 +3,7 @@ a generic webhook and SMTP. Standard library only. Whatever a failure reports pa
 passwords and the secret part of webhook URLs never reach a delivery record, a log or the GUI (5.x L-12)."""
 from __future__ import annotations
 
+import http.client
 import json
 import smtplib
 import ssl
@@ -43,7 +44,9 @@ def _secrets(cfg: AlertChannels) -> list[str]:
             parts = urlsplit(url)
             tail = parts.path + (f"?{parts.query}" if parts.query else "")
             values += [tail, parts.path, parts.query]
-    return sorted((v for v in values if v and len(v) > 1), key=len, reverse=True)
+    # An exception message may hold a secret escaped (repr) or without the whitespace around it.
+    values += [form for v in list(values) if v for form in (v.strip(), repr(v)[1:-1])]
+    return sorted({v for v in values if v and len(v) > 1}, key=len, reverse=True)
 
 
 def scrub(text: str, cfg: AlertChannels) -> str:
@@ -67,11 +70,11 @@ def _post(url: str, body: dict[str, object], *, headers: dict[str, str], timeout
             return (True, None) if resp.status in _OK else (False, f"status={resp.status}")
     except urllib.error.HTTPError as exc:
         try:
-            detail = exc.read().decode("utf-8", "replace")[:_ERROR_BODY]
+            detail = exc.read().decode("utf-8", "replace")
         except Exception:  # noqa: BLE001 - an unreadable error body must not hide the status
             detail = ""
         return False, f"status={exc.code} {detail}".strip()
-    except (urllib.error.URLError, TimeoutError, OSError, ValueError) as exc:
+    except (urllib.error.URLError, http.client.HTTPException, TimeoutError, OSError, ValueError) as exc:
         return False, f"{type(exc).__name__}: {exc}"
 
 
@@ -127,7 +130,8 @@ def send(channel: ChannelKind, cfg: AlertChannels, rendered: Rendered, *, timeou
         except ValueError as exc:
             return SendResult(ok=False, error=str(exc))
         ok, error = _post(url, body or {}, headers={}, timeout=timeout)
-    return SendResult(ok=ok, error=None if ok else scrub(error or "failed", cfg))
+    # Scrubbed before it is cut: a secret straddling the cut would otherwise survive as a prefix.
+    return SendResult(ok=ok, error=None if ok else scrub(error or "failed", cfg)[:_ERROR_BODY])
 
 
 # ── saving and testing channel settings from the settings page ───────────────
