@@ -29,9 +29,10 @@ def test_docs_do_not_advertise_python38_source_runtime():
         assert "Python-3.8" not in text, f"{path} mentions Python-3.8 badge"
         assert "Python 3.8+" not in text, f"{path} mentions Python 3.8+"
 
-    assert "Python-3.10%2B" in docs["README.md"]
-    assert "Python-3.10%2B" in docs["README_zh.md"]
-    assert "3.10 以上" in docs["docs/guide/installation.md"]
+    # 3.11 since 2026-10-26: the locked pillow 13 needs Python >= 3.11 (CI matrix 3.11/3.12).
+    assert "Python-3.11%2B" in docs["README.md"]
+    assert "Python-3.11%2B" in docs["README_zh.md"]
+    assert "3.11 以上" in docs["docs/guide/installation.md"]
     assert "CPython 3.12" in docs["docs/guide/installation.md"]
 
 

@@ -61,8 +61,8 @@ venv（見 [installation.md](installation.md)「從原始碼安裝」）。
 
 ### 1.2 `TypeError: unsupported operand type(s) for |`
 
-直譯器版本低於 3.10（`X | Y` 型別聯集語法需要 3.10+）。離線 bundle 內建 CPython 3.12，不受主機 Python 版本影響；
-從原始碼安裝需重建 venv 為 3.10 以上直譯器。
+直譯器版本低於 3.11（`X | Y` 型別聯集語法需要 3.10+，鎖檔中的 pillow 13 需要 3.11+）。離線 bundle 內建 CPython 3.12，不受主機 Python 版本影響；
+從原始碼安裝需重建 venv 為 3.11 以上直譯器。
 
 ### 1.3 systemd 服務啟動失敗
 
