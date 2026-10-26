@@ -686,5 +686,11 @@
   "migrate_smtp_no_auth": "5.x 未啟用登入",
   "migrate_smtp_tls": "5.x 開啟 TLS 時用 STARTTLS，否則不加密",
   "alert_event_immediate_actor": "{actors} 執行 {event_types}（{matches} 筆）",
-  "alert_event_immediate_none": "{event_types}（{matches} 筆）"
+  "alert_event_immediate_none": "{event_types}（{matches} 筆）",
+  "alert_tamper_signal": "判讀：{process}（PID {pid}）— {actions}；這台主機的規律：{pattern}。",
+  "alert_tamper_confirmed": "判讀：VEN 已還原一次變更；這類事件不帶 process 資訊；這台主機的規律：{pattern}。",
+  "tamper_pattern_regular_cycle": "規律循環（多半是另一套防火牆程式改寫 VEN 的表）",
+  "tamper_pattern_burst": "短時間密集（人或腳本手動修改）",
+  "tamper_pattern_sporadic": "零星",
+  "tamper_pattern_too_few": "事件太少，無法判斷"
 }

@@ -11,7 +11,8 @@ from dataclasses import dataclass
 from datetime import datetime, tzinfo
 from typing import Any
 
-from illumio_ops.domain.values import ChannelKind, DeploymentType, Language, Severity
+from illumio_ops.domain.tamper import TAMPER_ACTION_KEYS, TAMPER_PATTERN_KEYS
+from illumio_ops.domain.values import ChannelKind, DeploymentType, Language, Severity, TamperAction, TamperPattern
 from illumio_ops.i18n import translate
 from illumio_ops.settings.schema import DisplaySettings, PceSettings
 
@@ -87,14 +88,40 @@ def _text_value(value: Any) -> str:
     return "" if value is None else str(value)
 
 
+def tamper_reading(v: AlertView, lang: Language) -> str | None:
+    """A tampering alert's reading (spec §6.5.2, §6.5.4): a signal event's process, PID and actions, or that a
+    confirmed event carries no process information; and the host's pattern."""
+    p = v.params
+    if "classification" not in p:
+        return None
+    try:
+        pattern = translate(lang, TAMPER_PATTERN_KEYS[TamperPattern(p.get("pattern") or TamperPattern.TOO_FEW)])
+    except ValueError:
+        pattern = translate(lang, TAMPER_PATTERN_KEYS[TamperPattern.TOO_FEW])
+    if p.get("has_process_info"):
+        names = []
+        for a in p.get("actions") or []:
+            try:
+                names.append(translate(lang, TAMPER_ACTION_KEYS[TamperAction(a)]))
+            except ValueError:
+                names.append(str(a))
+        return translate(lang, "alert_tamper_signal", {"process": str(p.get("process") or "?"),
+                                                       "pid": str(p.get("pid") or "?"), "actions": ", ".join(names),
+                                                       "pattern": pattern})
+    return translate(lang, "alert_tamper_confirmed", {"pattern": pattern})
+
+
 def summary(v: AlertView, lang: Language) -> str:
-    """The alert's one sentence: its message with the facts and parameters filled in."""
+    """The alert's one sentence: its message with the facts and parameters filled in (and a tampering alert's
+    reading after it)."""
     values = {**{k: _text_value(x) for k, x in v.facts.items()}, **{k: _text_value(x) for k, x in v.params.items()}}
     hosts = v.params.get("hosts")
     total = v.params.get("hosts_total")
     if isinstance(hosts, list) and isinstance(total, int) and total > len(hosts):
         values["hosts"] = f"{_text_value(hosts)} (+{total - len(hosts)})"
-    return translate(lang, v.message_key, values)
+    reading = tamper_reading(v, lang)
+    text = translate(lang, v.message_key, values)
+    return f"{text} {reading}" if reading else text
 
 
 def caveats(v: AlertView, lang: Language) -> list[str]:

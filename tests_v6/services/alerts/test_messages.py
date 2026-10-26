@@ -94,3 +94,22 @@ def test_teams_card_does_not_interpret_markdown_from_alert_data():
     blocks = r.card["attachments"][0]["content"]["body"]
     data = [b for b in blocks if "evil.example" in json.dumps(b)]
     assert data and all(b["type"] == "RichTextBlock" and b["inlines"][0]["type"] == "TextRun" for b in data)
+
+
+def _tamper(**reading):
+    v = view()
+    return AlertView(**{**v.__dict__, "params": {**v.params, **reading}})
+
+
+def test_tamper_alert_carries_its_reading_on_every_channel():
+    """Spec §6.5.2/§6.5.4: a signal event names process, PID and action; a confirmed one says it has no process
+    information; both name the host's pattern (review: stored, never shown)."""
+    signal = _tamper(classification="signal", process="nft", pid=4242, actions=["add_rule"], pattern="regular_cycle",
+                     has_process_info=True)
+    confirmed = _tamper(classification="confirmed", process=None, pid=None, actions=[], pattern="too_few",
+                        has_process_info=False)
+    for channel in ChannelKind:
+        text = json.dumps(render([signal], channel, lang=Language.EN, tz=UTC, console_url=None).__dict__)
+        assert "nft" in text and "4242" in text and "Added a rule" in text and "regular cycle" in text, channel
+        text = json.dumps(render([confirmed], channel, lang=Language.EN, tz=UTC, console_url=None).__dict__)
+        assert "no process information" in text, channel

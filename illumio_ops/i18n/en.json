@@ -686,5 +686,11 @@
   "migrate_smtp_no_auth": "sign-in was off in 5.x",
   "migrate_smtp_tls": "STARTTLS when 5.x had TLS on, otherwise none",
   "alert_event_immediate_actor": "{event_types} by {actors} ({matches})",
-  "alert_event_immediate_none": "{event_types} ({matches})"
+  "alert_event_immediate_none": "{event_types} ({matches})",
+  "alert_tamper_signal": "Reading: {process} (PID {pid}) — {actions}; pattern on this host: {pattern}.",
+  "alert_tamper_confirmed": "Reading: the VEN reverted a change; these events carry no process information; pattern on this host: {pattern}.",
+  "tamper_pattern_regular_cycle": "a regular cycle (often another firewall program rewriting the VEN's table)",
+  "tamper_pattern_burst": "a burst (changes by hand or by a script)",
+  "tamper_pattern_sporadic": "sporadic",
+  "tamper_pattern_too_few": "too few events to tell"
 }
