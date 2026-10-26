@@ -474,5 +474,7 @@
   "rule_system_disk_low": "Disk space low",
   "rule_lateral_fanout": "Fan-out on management ports",
   "rule_lateral_new_admin": "New management connection",
-  "rule_lateral_cross_env": "Management port across environments"
+  "rule_lateral_cross_env": "Management port across environments",
+  "err_not_a_flow_alert": "Only an alert about traffic has a policy to explain.",
+  "err_channel_credentials_required": "The mail server or account changed: type the password again."
 }

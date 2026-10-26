@@ -474,5 +474,7 @@
   "rule_system_disk_low": "磁碟空間不足",
   "rule_lateral_fanout": "管理 port 扇出",
   "rule_lateral_new_admin": "新的管理連線",
-  "rule_lateral_cross_env": "跨環境的管理 port 連線"
+  "rule_lateral_cross_env": "跨環境的管理 port 連線",
+  "err_not_a_flow_alert": "只有與流量有關的告警才有政策可解釋。",
+  "err_channel_credentials_required": "郵件伺服器或帳號已變更，請重新輸入密碼。"
 }

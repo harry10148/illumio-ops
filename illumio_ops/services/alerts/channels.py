@@ -128,3 +128,35 @@ def send(channel: ChannelKind, cfg: AlertChannels, rendered: Rendered, *, timeou
             return SendResult(ok=False, error=str(exc))
         ok, error = _post(url, body or {}, headers={}, timeout=timeout)
     return SendResult(ok=ok, error=None if ok else scrub(error or "failed", cfg))
+
+
+# ── saving and testing channel settings from the settings page ───────────────
+
+SECRET_FIELD_OF: dict[str, str] = {"smtp": "password", "line": "access_token", "telegram": "bot_token",
+                               "teams": "webhook_url", "webhook": "url"}
+_SMTP_DESTINATION = ("host", "port", "security", "username")
+
+
+class CredentialsRequired(Exception):
+    """A saved secret would go to a destination the operator changed without typing the secret again."""
+
+    def __init__(self, field: str) -> None:
+        self.field = field
+        super().__init__(field)
+
+
+def merge_channels(saved: AlertChannels, submitted: dict[str, dict[str, object]], *, mask: str) -> dict[str, object]:
+    """The submitted channel settings with each blank or masked secret replaced by the saved one: the page never
+    receives the secrets, so it cannot send them back. The SMTP password is kept only while the server and the
+    account stay the same — otherwise anyone holding a session could point it at their own mail server (the same
+    rule as the PCE connection page)."""
+    out: dict[str, dict[str, object]] = {name: dict(values) for name, values in submitted.items()}
+    for name, key in SECRET_FIELD_OF.items():
+        if out.get(name, {}).get(key) in ("", mask):
+            out.setdefault(name, {})[key] = getattr(getattr(saved, name), key)
+    smtp = out.get("smtp", {})
+    kept = submitted.get("smtp", {}).get("password") in ("", mask) and bool(saved.smtp.password)
+    moved = any(smtp.get(f) != getattr(saved.smtp, f) for f in _SMTP_DESTINATION)
+    if kept and moved:
+        raise CredentialsRequired("channels.smtp.password")
+    return dict(out)
