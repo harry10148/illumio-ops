@@ -331,6 +331,25 @@ def max_window_targets(rows: Sequence[Obs], window: timedelta) -> int:
     return best[0] if best else 0
 
 
+def window_targets_by_hour(rows: Sequence[Obs], window: timedelta) -> dict[datetime, int]:
+    """Per UTC hour: the most distinct targets a window of this length ending in that hour holds (the blocked
+    history's hourly cache keeps these, so the 7 days a run needs can be cut at any hour)."""
+    ordered = sorted(rows, key=lambda o: o.last)
+    counts: Counter[str] = Counter()
+    out: dict[datetime, int] = {}
+    j = 0
+    for o in ordered:
+        counts[o.dst_key] += 1
+        while ordered[j].last < o.last - window:
+            counts[ordered[j].dst_key] -= 1
+            if not counts[ordered[j].dst_key]:
+                del counts[ordered[j].dst_key]
+            j += 1
+        hour = o.last.replace(minute=0, second=0, microsecond=0)
+        out[hour] = max(out.get(hour, 0), len(counts))
+    return out
+
+
 def detect_blocked_surge(inp: DetectorInput) -> tuple[list[Detection], DetectorStatus]:
     """A source blocked from at least blocked_targets hosts within blocked_window, and at least
     blocked_surge_factor times its most in any such window of the 7 days before (the threshold alone when

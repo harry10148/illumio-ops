@@ -67,7 +67,7 @@ def test_stale_cache_falls_back_to_live(tmp_path):
     _data(ctx)
     _watermark(ctx, NOW - timedelta(minutes=120))
     build_blocked_history(ctx, NOW - timedelta(hours=3))
-    assert cached_history(ctx, window=WINDOW, before=NOW - timedelta(minutes=30), now=NOW) is None
+    assert cached_history(ctx, window=WINDOW, now=NOW) is None
     _, mode = history_for(ctx, [_src_key(ctx)], window=WINDOW, lo=NOW - timedelta(minutes=30), now=NOW)
     assert mode == "live"
 
@@ -77,17 +77,18 @@ def test_window_change_invalidates_cache(tmp_path):
     _data(ctx)
     _watermark(ctx, NOW - timedelta(minutes=120))
     build_blocked_history(ctx, NOW - timedelta(minutes=110))
-    assert cached_history(ctx, window=WINDOW, before=NOW, now=NOW) is not None
-    assert cached_history(ctx, window=timedelta(minutes=30), before=NOW, now=NOW) is None
+    assert cached_history(ctx, window=WINDOW, now=NOW) is not None
+    assert cached_history(ctx, window=timedelta(minutes=30), now=NOW) is None
 
 
 def test_cache_newer_than_the_window_is_not_used(tmp_path):
-    # A late pass over an old day: history must end where that window begins, which the cache is past.
+    # A late pass over an old day: its range ends hours before the cache's recent, exact hours.
     ctx = configured_ctx(tmp_path)
     _data(ctx)
     _watermark(ctx, NOW)
     build_blocked_history(ctx, NOW)
-    assert cached_history(ctx, window=WINDOW, before=NOW - timedelta(days=1), now=NOW) is None
+    _, mode = history_for(ctx, [_src_key(ctx)], window=WINDOW, lo=NOW - timedelta(days=1), now=NOW)
+    assert mode == "live"
 
 
 def test_detection_reads_only_tail_with_cache(tmp_path, monkeypatch):
@@ -96,15 +97,15 @@ def test_detection_reads_only_tail_with_cache(tmp_path, monkeypatch):
     through = NOW - timedelta(minutes=120)
     _watermark(ctx, through)
     build_blocked_history(ctx, NOW - timedelta(minutes=110))
-    starts = []
+    spans = []
     real = blocked_history.observations
 
     def spy(c, spec, **kw):
-        starts.append(spec.start)
+        spans.append(spec.end - spec.start)
         return real(c, spec, **kw)
     monkeypatch.setattr(blocked_history, "observations", spy)
-    history_for(ctx, [_src_key(ctx)], window=WINDOW, lo=NOW - timedelta(minutes=30), now=NOW)
-    assert starts == [through - WINDOW]
+    _, mode = history_for(ctx, [_src_key(ctx)], window=WINDOW, lo=NOW - timedelta(minutes=30), now=NOW)
+    assert mode == "cached" and len(spans) == 2 and sum(spans, timedelta()) <= timedelta(hours=6)  # not 7 days
 
 
 def test_detection_status_says_where_history_came_from(tmp_path):
@@ -118,3 +119,48 @@ def test_detection_status_says_where_history_came_from(tmp_path):
     with ctx.flows().connect() as conn:
         assert analysis.read_result(conn, blocked_history.KIND) is None
     assert detect.HISTORY == timedelta(days=7)
+
+
+def test_cache_serves_a_detection_on_the_real_schedule(tmp_path):
+    """Built by the hourly step at the watermark, read ten minutes later by a detection whose 60-minute window
+    starts before that watermark: the cache must serve it, as live would (scale run: it never did)."""
+    ctx = configured_ctx(tmp_path)
+    _data(ctx)
+    through = NOW - timedelta(minutes=10)
+    _watermark(ctx, through)
+    lo = NOW - WINDOW
+    live, _ = history_for(ctx, [_src_key(ctx)], window=WINDOW, lo=lo, now=NOW)
+    build_blocked_history(ctx, through)
+    cached, mode = history_for(ctx, [_src_key(ctx)], window=WINDOW, lo=lo, now=NOW)
+    assert mode == "cached" and cached == live
+
+
+def test_cache_drops_what_falls_out_of_the_seven_days(tmp_path):
+    """A peak inside the cache's 7 days but before the detection's (lo - 7 days) is not history (review)."""
+    ctx = configured_ctx(tmp_path)
+    through = NOW - timedelta(minutes=60)
+    peak = 60 + 7 * 1440 - 10  # 10 minutes after through - 7 days
+    _blocked(ctx, *((peak + k, 30 + k) for k in range(6)))
+    _watermark(ctx, through)
+    lo = through + timedelta(minutes=30)
+    live, _ = history_for(ctx, [_src_key(ctx)], window=WINDOW, lo=lo, now=NOW)
+    build_blocked_history(ctx, through + timedelta(minutes=5))
+    cached, _ = history_for(ctx, [_src_key(ctx)], window=WINDOW, lo=lo, now=NOW)
+    assert live == {_src_key(ctx): 0} and cached == live
+
+
+def test_cache_equals_live_for_any_run_start(tmp_path):
+    """The invariant behind every cut: for random traffic and run starts around the watermark, the cached
+    answer is the live one."""
+    import random
+    rng = random.Random(7)
+    ctx = configured_ctx(tmp_path)
+    _blocked(ctx, *((rng.randrange(0, 8 * 1440), rng.randrange(1, 40)) for _ in range(400)))
+    through = NOW - timedelta(minutes=37)
+    _watermark(ctx, through)
+    starts = [through + timedelta(minutes=m) for m in (-95, -61, -60, -59, -30, -1, 0, 1, 23, 37)]
+    live = [history_for(ctx, [_src_key(ctx)], window=WINDOW, lo=lo, now=NOW)[0] for lo in starts]
+    build_blocked_history(ctx, through)
+    for lo, expected in zip(starts, live, strict=True):
+        got, mode = history_for(ctx, [_src_key(ctx)], window=WINDOW, lo=lo, now=NOW)
+        assert mode == "cached" and got == expected, lo
