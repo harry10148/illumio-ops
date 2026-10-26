@@ -165,3 +165,36 @@ def test_missing_settings_on_an_existing_installation_is_refused(tmp_path):
     r = _run(tmp_path)
     assert r.returncode == 78 and "rescue" in r.stderr
     assert not rt.paths.settings_file.exists()
+
+
+def test_flow_database_is_migrated_before_serving(tmp_path):
+    # D1 (.106 upgrade): migrated on the first job's connection instead, the one-off 0002 (20 min at 1,000 workloads)
+    # held up every job and GUI request opening the store; at startup the listener simply starts after it.
+    import sqlite3
+
+    from illumio_ops.store.db import _migrations
+    from illumio_ops.store.flowdb.db import MIGRATIONS_PACKAGE
+
+    rt = prepare(tmp_path / "root")
+    try:
+        with sqlite3.connect(rt.paths.flows_db) as conn:
+            assert conn.execute("PRAGMA user_version").fetchone()[0] == len(_migrations(MIGRATIONS_PACKAGE))
+    finally:
+        rt.release()
+
+
+def test_newer_flow_database_is_refused_at_startup(tmp_path):
+    import sqlite3
+
+    from illumio_ops.runtime import StartupError
+
+    paths = resolve_paths(tmp_path / "root")
+    paths.ensure_dirs()
+    with sqlite3.connect(paths.flows_db) as conn:
+        conn.execute("PRAGMA user_version = 999")
+    try:
+        prepare(tmp_path / "root")
+    except StartupError as exc:
+        assert "999" in exc.message
+    else:
+        raise AssertionError("a flow database newer than the program was accepted")
