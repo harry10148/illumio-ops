@@ -31,7 +31,6 @@ from illumio_ops.store import alerts as store
 
 PAGE = 50
 EVIDENCE_LIMIT = 200
-_WORKLOAD = "/workloads/"
 
 
 class DeliveryView(BaseModel):
@@ -146,13 +145,9 @@ def list_alerts(ctx: AppContext, q: AlertQuery, *, now: datetime | None = None) 
 
 
 def _link(ctx: AppContext, row: sqlite3.Row) -> str:
-    """The PCE console, at the workload when the alert is about one (Task 11 checks the path on lab)."""
-    base = console_url(ctx.settings.current().pce)
-    params = json.loads(row["params_json"])
-    for candidate in (row["subject_key"], params.get("account")):
-        if isinstance(candidate, str) and candidate.startswith("/orgs/") and _WORKLOAD in candidate:
-            return f"{base}/#/workloads/{candidate.rsplit('/', 1)[-1]}"
-    return base
+    """The PCE console's front page. A deep link to the workload (#/workloads/<uuid>) is not documented by Illumio
+    and could not be confirmed on lab without a console sign-in (P4 acceptance), so none is made."""
+    return console_url(ctx.settings.current().pce)
 
 
 def alert_detail(ctx: AppContext, alert_id: int) -> AlertDetail | None:

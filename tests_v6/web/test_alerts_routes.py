@@ -103,7 +103,7 @@ def test_console_link_by_deployment(client, ctx):
         {"url": "https://pce.example:8443", "org_id": "1", "deployment_type": "on_prem"}))
     a = seed(ctx, subject="/orgs/1/workloads/0f6a3b2c-1111-2222-3333-444455556666")
     d = get(client, f"/api/alerts/{a}").get_json()["data"]
-    assert d["console_link"] == "https://pce.example:8443/#/workloads/0f6a3b2c-1111-2222-3333-444455556666"
+    assert d["console_link"] == "https://pce.example:8443"  # no undocumented deep link (P4 acceptance ruling)
     ctx.settings.update(ctx.settings.current().revision, lambda d: d["pce"].update({"deployment_type": "saas"}))
     b = seed(ctx, subject="disk_low")
     assert get(client, f"/api/alerts/{b}").get_json()["data"]["console_link"] == "https://console.illum.io"
