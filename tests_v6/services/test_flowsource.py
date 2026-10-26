@@ -272,3 +272,56 @@ def test_increment_totals_reports_gaps(collected, fake_traffic):
                          rank_by="mbps", now=NOW + minutes(10))
     assert [g[2] for g in t.coverage.gaps] == ["ingest_failed"]
     assert increments_watermark(collected) == NOW + minutes(10)
+
+
+# ── increments follow connections (review: they were the tuple's, pinned to a conn_key pairing rewrites) ──
+
+def _put(ctx, records, at):
+    from illumio_ops.domain.flows import normalize_flow
+    from illumio_ops.domain.values import DataOrigin
+    from illumio_ops.store.flowdb.flows import upsert_flows
+    with ctx.flows().write_lock, ctx.flows().connect() as conn:
+        upsert_flows(conn, [normalize_flow(r) for r in records], origin=DataOrigin.INGEST, now=at, increments="cycle")
+
+
+def _flow(first, last, *, direction="outbound", conns=1, decision="potentially_blocked"):
+    r = raw_flow(9, first, last, direction=direction)
+    r["num_connections"], r["policy_decision"] = conns, decision
+    return r
+
+
+def _total(ctx, at, **cond):
+    from illumio_ops.domain.filter import FlowCondition
+    from illumio_ops.services.flowsource import increment_totals
+    return increment_totals(ctx, FlowCondition(**cond), start=at - minutes(180), end=at, new_after=at - minutes(180),
+                            rank_by="connections", now=at).connections
+
+
+T = NOW + minutes(30)
+
+
+def test_increment_survives_its_record_pairing_later(collected):
+    """The inbound side first, alone; the outbound side pairs with it a cycle later: still 5 connections."""
+    _put(collected, [_flow(T - minutes(20), T - minutes(15), direction="inbound", conns=5)], T)
+    _put(collected, [_flow(T - minutes(20), T - minutes(15), direction="outbound", conns=5)], T + minutes(10))
+    assert _total(collected, T + minutes(10)) == 5
+
+
+def test_increments_keep_each_connections_decision(collected):
+    """Allowed 50 and a newer blocked 1 on one tuple: the blocked rule sees 1, not 51."""
+    from illumio_ops.domain.values import PolicyDecision
+    _put(collected, [_flow(T - minutes(40), T - minutes(30), conns=50, decision="allowed"),
+                     _flow(T - minutes(10), T - minutes(5), conns=1, decision="blocked")], T)
+    assert _total(collected, T, decisions=(PolicyDecision.BLOCKED,)) == 1
+    assert _total(collected, T, decisions=(PolicyDecision.ALLOWED,)) == 50
+
+
+def test_repairing_shrink_is_not_counted_again(collected):
+    """An inbound 10 and a separate outbound 1; the inbound's range grows until the two pair, and the outbound
+    grows to 10: one connection of 10 plus the 1 counted before the pairing, never 16."""
+    inbound = lambda last: _flow(T - minutes(60), last, direction="inbound", conns=10)
+    outbound = lambda conns: _flow(T - minutes(30), T - minutes(29), conns=conns)
+    _put(collected, [inbound(T - minutes(50)), outbound(1)], T)
+    _put(collected, [inbound(T - minutes(35)), outbound(5)], T + minutes(10))
+    _put(collected, [outbound(10)], T + minutes(20))
+    assert _total(collected, T + minutes(20)) == 11

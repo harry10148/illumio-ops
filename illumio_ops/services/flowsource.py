@@ -655,7 +655,8 @@ def increment_totals(ctx: AppContext, cond: FlowCondition, *, start: datetime, e
         rows = conn.execute(
             "SELECT i.connections, i.bytes, i.seconds, i.observed_at, f.src_key, f.dst_key, f.src_hostname, "
             "f.dst_hostname, f.port, f.proto FROM flow_increments i "
-            "JOIN flows f ON f.conn_key = i.conn_key AND f.is_primary = 1 "
+            # The record measured may have paired since: the connection's current primary row gives its dimensions.
+            "JOIN flows r ON r.record_key = i.record_key JOIN flows f ON f.conn_key = r.conn_key AND f.is_primary = 1 "
             f"WHERE i.late = 0 AND i.observed_at > ? AND i.observed_at <= ? AND {where}",
             [db_time(start), db_time(end), *params]).fetchall()
     if fdb.generation != gen:

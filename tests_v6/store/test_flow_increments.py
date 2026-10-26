@@ -1,4 +1,4 @@
-"""flow_increments: how much each (src, dst, port, proto) grew in one write (spec §6.6 F12: the PCE's counts
+"""flow_increments: how much each connection grew in one write (spec §6.6 F12: the PCE's counts
 are daily totals, so a threshold on them must use the growth, as 5.x flow_deltas did)."""
 from datetime import timedelta
 
@@ -28,7 +28,7 @@ def rec(*, conns=1, bi=None, bo=None, first_ago=30, last_ago=1, direction="outbo
 
 def increments(conn):
     return [dict(r) for r in conn.execute(
-        "SELECT conn_key, observed_at, connections, bytes, seconds, late FROM flow_increments ORDER BY id")]
+        "SELECT record_key, observed_at, connections, bytes, seconds, late FROM flow_increments ORDER BY id")]
 
 
 def test_new_record_increment_is_its_counts(conn):
@@ -90,8 +90,23 @@ def test_no_byte_data_is_null_not_zero(conn):
     assert increments(conn)[0]["bytes"] is None
 
 
-def test_increment_points_at_the_newest_primary(conn):
+def test_increment_names_the_connections_primary_record(conn):
     upsert_flows(conn, [rec(conns=2)], origin=DataOrigin.INGEST, now=NOW, increments="cycle")
     [i] = increments(conn)
-    primary = conn.execute("SELECT conn_key FROM flows WHERE is_primary = 1").fetchone()[0]
-    assert i["conn_key"] == primary
+    primary = conn.execute("SELECT record_key FROM flows WHERE is_primary = 1").fetchone()[0]
+    assert i["record_key"] == primary
+
+
+def test_backfilled_counts_are_not_growth_later(conn):
+    """A backfill records no increment, but its counts are recorded: a later cycle adds only what grew."""
+    upsert_flows(conn, [rec(conns=5)], origin=DataOrigin.BACKFILL, now=NOW)
+    upsert_flows(conn, [rec(conns=7)], origin=DataOrigin.INGEST, now=NOW + timedelta(minutes=10), increments="cycle")
+    assert [i["connections"] for i in increments(conn)] == [2]
+
+
+def test_row_written_before_0005_counts_as_recorded(conn):
+    upsert_flows(conn, [rec(conns=5)], origin=DataOrigin.BACKFILL, now=NOW)
+    conn.execute("UPDATE flows SET counted_connections = NULL, counted_bytes = NULL")
+    conn.commit()
+    upsert_flows(conn, [rec(conns=6)], origin=DataOrigin.INGEST, now=NOW + timedelta(minutes=10), increments="cycle")
+    assert [i["connections"] for i in increments(conn)] == [1]
