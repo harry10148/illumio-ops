@@ -115,6 +115,22 @@ def test_backfill_events_not_evaluated(ctx, pce):
     assert evaluate_events(ctx, now=NOW + minutes(5)).evaluated == 0 and _alerts(ctx) == []
 
 
+def test_event_id_not_reused_after_retention(ctx, pce):
+    """The newest row deleted by retention gave its id to the next event, which the watermark had passed (review:
+    a late old event as the highest id, removed, then a live one evaluated=0)."""
+    _collect_and_evaluate(ctx, pce, NOW)
+    pce.event(1, "rule_set.create", NOW + minutes(1))
+    pce.event(2, "rule_set.update", NOW - timedelta(days=89))  # arrives late, stored last
+    _collect_and_evaluate(ctx, pce, NOW + minutes(2))
+    with ctx.flows().connect() as conn:
+        top = conn.execute("SELECT max(id) FROM events").fetchone()[0]
+        conn.execute("DELETE FROM events WHERE id = ?", (top,))  # retention
+        conn.commit()
+    pce.items.clear()
+    pce.event(3, "rule_set.delete", NOW + minutes(3))
+    assert _collect_and_evaluate(ctx, pce, NOW + minutes(4)).evaluated == 1
+
+
 def test_immediate_event_alert_recorded_with_evidence(ctx, pce):
     _collect_and_evaluate(ctx, pce, NOW)
     pce.event(2, "rule_set.create", NOW + minutes(3))

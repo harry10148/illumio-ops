@@ -16,14 +16,15 @@ FLOWDB_TABLES = {
 
 
 def _tables(conn):
-    return {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+    # sqlite_sequence is SQLite's own (AUTOINCREMENT), not a table of ours
+    return {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")} - {"sqlite_sequence"}
 
 
 def test_flowdb_migrates_on_first_connect(tmp_path):
     fdb = FlowDb(tmp_path / "data" / "flows.sqlite")
     with fdb.connect() as conn:
         assert FLOWDB_TABLES <= _tables(conn)
-        assert conn.execute("PRAGMA user_version").fetchone()[0] == 3
+        assert conn.execute("PRAGMA user_version").fetchone()[0] == 4
         assert conn.execute("PRAGMA journal_mode").fetchone()[0] == "wal"
 
 
