@@ -12,7 +12,14 @@ from datetime import datetime, tzinfo
 from typing import Any
 
 from illumio_ops.domain.tamper import TAMPER_ACTION_KEYS, TAMPER_PATTERN_KEYS
-from illumio_ops.domain.values import ChannelKind, DeploymentType, Language, Severity, TamperAction, TamperPattern
+from illumio_ops.domain.values import (
+    ChannelKind,
+    DeploymentType,
+    Language,
+    Severity,
+    TamperAction,
+    TamperPattern,
+)
 from illumio_ops.i18n import translate
 from illumio_ops.settings.schema import DisplaySettings, PceSettings
 
