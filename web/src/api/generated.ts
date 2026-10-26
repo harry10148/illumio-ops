@@ -11,12 +11,12 @@ export type PolicyDecision = ("allowed" | "potentially_blocked" | "blocked" | "u
  */
 export type Severity = ("low" | "medium" | "high" | "critical")
 /**
- * The lateral-movement detectors of spec §6.5.1.
+ * The lateral-movement detectors of spec §6.5.1 and the allowed-traffic anomaly detectors of §6.5.8.
  * 
  * This interface was referenced by `ContractRoot`'s JSON-Schema
  * via the `definition` "DetectorKind".
  */
-export type DetectorKind = ("fanout" | "new_admin_connection" | "pivot_chain" | "blocked_surge" | "non_admin_group" | "cross_env" | "account_fanout" | "unexpected_initiator")
+export type DetectorKind = ("fanout" | "new_admin_connection" | "pivot_chain" | "blocked_surge" | "non_admin_group" | "cross_env" | "account_fanout" | "unexpected_initiator" | "peer_deviation" | "volume_surge")
 /**
  * An event rule fires on the matches of one evaluation (immediate) or on a count within its window.
  * 
@@ -1419,8 +1419,10 @@ export const VALUES = {
     "fanout",
     "new_admin_connection",
     "non_admin_group",
+    "peer_deviation",
     "pivot_chain",
-    "unexpected_initiator"
+    "unexpected_initiator",
+    "volume_surge"
   ],
   "DetectorState": [
     "accumulating",

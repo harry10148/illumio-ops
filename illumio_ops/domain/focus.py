@@ -82,6 +82,7 @@ DETECTION_TITLE_KEYS: Mapping[DetectorKind, str] = {
     DetectorKind.NON_ADMIN_GROUP: "focus_title_non_admin_group", DetectorKind.CROSS_ENV: "focus_title_cross_env",
     DetectorKind.ACCOUNT_FANOUT: "focus_title_account_fanout",
     DetectorKind.UNEXPECTED_INITIATOR: "focus_title_unexpected_initiator",
+    DetectorKind.PEER_DEVIATION: "focus_title_peer_deviation", DetectorKind.VOLUME_SURGE: "focus_title_volume_surge",
 }
 FOCUS_KEYS: Mapping[str, str] = {
     **{f"title_{k.value}": v for k, v in DETECTION_TITLE_KEYS.items()},

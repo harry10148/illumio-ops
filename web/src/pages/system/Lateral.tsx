@@ -16,6 +16,8 @@ const DETECTOR_KEYS: Record<string, string> = {
   cross_env: "detector_name_cross_env",
   account_fanout: "detector_name_account_fanout",
   unexpected_initiator: "detector_name_unexpected_initiator",
+  peer_deviation: "detector_name_peer_deviation",
+  volume_surge: "detector_name_volume_surge",
 };
 const STATE_KEYS: Record<string, string> = {
   ok: "detector_state_ok",

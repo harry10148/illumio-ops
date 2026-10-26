@@ -153,7 +153,7 @@ def raise_severity(s: Severity, steps: int = 1) -> Severity:
 
 
 class DetectorKind(StrEnum):
-    """The lateral-movement detectors of spec §6.5.1."""
+    """The lateral-movement detectors of spec §6.5.1 and the allowed-traffic anomaly detectors of §6.5.8."""
     FANOUT = "fanout"
     NEW_ADMIN_CONNECTION = "new_admin_connection"
     PIVOT_CHAIN = "pivot_chain"
@@ -162,6 +162,9 @@ class DetectorKind(StrEnum):
     CROSS_ENV = "cross_env"
     ACCOUNT_FANOUT = "account_fanout"
     UNEXPECTED_INITIATOR = "unexpected_initiator"
+    # anomalies in allowed traffic (spec §6.5.8)
+    PEER_DEVIATION = "peer_deviation"
+    VOLUME_SURGE = "volume_surge"
 
 
 class PortClass(StrEnum):

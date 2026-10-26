@@ -16,12 +16,13 @@ type RuleType = Rule["type"];
 const NEW_ID = "0".repeat(32);
 const SEVERITIES: Severity[] = ["low", "medium", "high", "critical"];
 const DETECTORS: DetectorKind[] = ["fanout", "new_admin_connection", "pivot_chain", "blocked_surge", "non_admin_group",
-                                   "cross_env", "account_fanout", "unexpected_initiator"];
+                                   "cross_env", "account_fanout", "unexpected_initiator", "peer_deviation", "volume_surge"];
 const DETECTOR_KEYS: Record<string, string> = {
   fanout: "detector_name_fanout", new_admin_connection: "detector_name_new_admin_connection",
   pivot_chain: "detector_name_pivot_chain", blocked_surge: "detector_name_blocked_surge",
   non_admin_group: "detector_name_non_admin_group", cross_env: "detector_name_cross_env",
   account_fanout: "detector_name_account_fanout", unexpected_initiator: "detector_name_unexpected_initiator",
+  peer_deviation: "detector_name_peer_deviation", volume_surge: "detector_name_volume_surge",
 };
 const CHECKS: SystemCheck[] = ["pce_health", "collection_failing", "data_loss", "job_failing", "disk_low"];
 const CHECK_KEYS: Record<string, string> = {

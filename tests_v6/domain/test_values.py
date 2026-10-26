@@ -49,7 +49,8 @@ def test_new_value_domains_exported():
     d = export_value_domains()
     assert d["Severity"] == ["critical", "high", "low", "medium"]
     assert set(d["DetectorKind"]) == {"fanout", "new_admin_connection", "pivot_chain", "blocked_surge",
-                                      "non_admin_group", "cross_env", "account_fanout", "unexpected_initiator"}
+                                      "non_admin_group", "cross_env", "account_fanout", "unexpected_initiator",
+                                      "peer_deviation", "volume_surge"}
     assert set(d["PortClass"]) == {"remote", "directory", "database"}
     assert set(d["DetectorState"]) == {"ok", "disabled", "accumulating", "no_data", "collection_off", "incomplete"}
     assert {"src_host", "dst_label", "service", "initiator_user", "event_type", "actor"} <= set(d["SegmentDimension"])

@@ -122,6 +122,53 @@ class DetectorConfig:
     admin_groups_configured: bool     # at least one admin-group selector names a label that exists
     environment_labels_present: bool  # the inventory carries the environment label key at all
     admin_groups_stale: bool = False  # selectors are set but every one names a label that is gone
+    # Anomalies in allowed traffic (spec §6.5.8)
+    peer_group_keys: tuple[str, ...] = ("app", "role")
+    peer_min_group: int = 5
+    volume_surge_factor: float = 3.0
+    volume_min_connections: int = 1000
+    volume_min_bytes: int = 1024 * 2**20
+    directory_min_connections: int = 500
+    account_history: timedelta = timedelta(days=7)
+    process_history: timedelta = timedelta(days=7)
+    suspicious_tools: frozenset[str] = frozenset()
+    directory_followup: timedelta = timedelta(minutes=30)
+
+
+@dataclass(frozen=True)
+class Activity:
+    """One source's live growth over the last hour, and the most it had in any hour of the 7 days before."""
+    connections: int
+    bytes: int | None                 # None: none of the growth carried byte counts
+    previous_connections: int
+    previous_bytes: int
+
+
+@dataclass(frozen=True)
+class AnomalyData:
+    """What the service looked up for the anomaly detectors, by the keys this run's connections name."""
+    # A: (source group, port, proto) -> destination signatures the group's hosts used before the window
+    peer_seen: Mapping[tuple[str, int, int], frozenset[str]] = field(default_factory=dict)
+    group_sizes: Mapping[str, int] = field(default_factory=dict)       # group -> managed hosts in it
+    # B, E③: (source, 'all' | 'directory') -> activity
+    activity: Mapping[tuple[str, str], Activity] = field(default_factory=dict)
+    activity_days: float = 0.0                                          # how far back the hourly activity reaches
+    live: bool = True                                                   # False in the late pass
+    # C: (account, source) -> first seen; account -> its earliest first seen and its sources before the window
+    account_first: Mapping[tuple[str, str], datetime] = field(default_factory=dict)
+    account_since: Mapping[str, datetime] = field(default_factory=dict)
+    account_sources: Mapping[str, int] = field(default_factory=dict)
+    # D: (source, process) -> first seen; source -> its earliest process first seen
+    process_first: Mapping[tuple[str, str], datetime] = field(default_factory=dict)
+    process_since: Mapping[str, datetime] = field(default_factory=dict)
+    # E: directory servers (inferred ∪ declared keys), declared addresses, and what the status says about them
+    directory_servers: frozenset[str] = frozenset()
+    directory_ips: frozenset[str] = frozenset()
+    directory_inferred: int = 0
+    directory_declared_missing: int = 0
+    directory_clients_before: frozenset[str] = frozenset()
+    # E④: (subject, detector, first seen, last seen) of directory detections stored by earlier runs
+    recent_directory: Sequence[tuple[str, str, datetime, datetime]] = ()
 
 
 HostLookup = Callable[[str, str, str | None, Mapping[str, str]], HostInfo]  # (key, ip, hostname, flow labels)
@@ -142,6 +189,8 @@ class DetectorInput:
     gaps: tuple[Gap, ...]
     # src -> the most distinct blocked targets it had in any blocked_window of the 7 days before
     blocked_history: Mapping[str, int] = field(default_factory=dict)
+    traffic_obs: Sequence[Obs] = ()   # every port, not blocked, last seen in the window (spec §6.5.8)
+    anomaly: AnomalyData = field(default_factory=AnomalyData)
 
 
 def evaluable(o: Obs, inp: DetectorInput) -> bool:
@@ -570,7 +619,10 @@ def apply_precursors(dets: Sequence[Detection], precursors: Sequence[Precursor],
     return out
 
 
-DETECTORS: dict[DetectorKind, Callable[[DetectorInput], tuple[list[Detection], DetectorStatus]]] = {
+from illumio_ops.domain import anomaly
+
+DetectorFn = Callable[[DetectorInput], tuple[list[Detection], DetectorStatus]]
+DETECTORS: dict[DetectorKind, DetectorFn] = {
     DetectorKind.FANOUT: detect_fanout,
     DetectorKind.NEW_ADMIN_CONNECTION: detect_new_admin,
     DetectorKind.PIVOT_CHAIN: detect_pivot_chain,
@@ -579,6 +631,9 @@ DETECTORS: dict[DetectorKind, Callable[[DetectorInput], tuple[list[Detection], D
     DetectorKind.CROSS_ENV: detect_cross_env,
     DetectorKind.ACCOUNT_FANOUT: detect_account_fanout,
     DetectorKind.UNEXPECTED_INITIATOR: detect_unexpected_initiator,
+    # Through a lambda: anomaly imports this module, so its functions may not exist yet when this line runs.
+    DetectorKind.PEER_DEVIATION: lambda i: anomaly.detect_peer_deviation(i),
+    DetectorKind.VOLUME_SURGE: lambda i: anomaly.detect_volume_surge(i),
 }
 
 
@@ -590,6 +645,7 @@ def dedup_windows(cfg: DetectorConfig) -> dict[str, timedelta]:
         DetectorKind.PIVOT_CHAIN: day, DetectorKind.NON_ADMIN_GROUP: day, DetectorKind.CROSS_ENV: day,
         DetectorKind.UNEXPECTED_INITIATOR: day, DetectorKind.ACCOUNT_FANOUT: cfg.account_fanout_window,
         DetectorKind.BLOCKED_SURGE: cfg.blocked_window,
+        DetectorKind.PEER_DEVIATION: timedelta(days=30), DetectorKind.VOLUME_SURGE: anomaly.SURGE_WINDOW,
     }
 
 
@@ -605,7 +661,8 @@ def run_detectors(inp: DetectorInput) -> tuple[list[Detection], list[DetectorSta
     """Every detector over the ingested rows only: backfilled history is baseline, never part of what an
     alert counts (spec §7). Without management ports the management detectors are off, not "any port"."""
     inp = replace(inp, obs=[o for o in inp.obs if o.origin == "ingest"],
-                  blocked_obs=[o for o in inp.blocked_obs if o.origin == "ingest"])
+                  blocked_obs=[o for o in inp.blocked_obs if o.origin == "ingest"],
+                  traffic_obs=[o for o in inp.traffic_obs if o.origin == "ingest"])
     no_ports = not inp.config.admin_ports.entries
     detections: list[Detection] = []
     statuses: list[DetectorStatus] = []

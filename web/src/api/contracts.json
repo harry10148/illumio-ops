@@ -100,7 +100,7 @@
             "type": "object"
           },
           "DetectorKind": {
-            "description": "The lateral-movement detectors of spec §6.5.1.",
+            "description": "The lateral-movement detectors of spec §6.5.1 and the allowed-traffic anomaly detectors of §6.5.8.",
             "enum": [
               "fanout",
               "new_admin_connection",
@@ -109,7 +109,9 @@
               "non_admin_group",
               "cross_env",
               "account_fanout",
-              "unexpected_initiator"
+              "unexpected_initiator",
+              "peer_deviation",
+              "volume_surge"
             ],
             "title": "DetectorKind",
             "type": "string"
@@ -1054,7 +1056,7 @@
             "type": "object"
           },
           "DetectorKind": {
-            "description": "The lateral-movement detectors of spec §6.5.1.",
+            "description": "The lateral-movement detectors of spec §6.5.1 and the allowed-traffic anomaly detectors of §6.5.8.",
             "enum": [
               "fanout",
               "new_admin_connection",
@@ -1063,7 +1065,9 @@
               "non_admin_group",
               "cross_env",
               "account_fanout",
-              "unexpected_initiator"
+              "unexpected_initiator",
+              "peer_deviation",
+              "volume_surge"
             ],
             "title": "DetectorKind",
             "type": "string"
@@ -2110,7 +2114,7 @@
             "type": "object"
           },
           "DetectorKind": {
-            "description": "The lateral-movement detectors of spec §6.5.1.",
+            "description": "The lateral-movement detectors of spec §6.5.1 and the allowed-traffic anomaly detectors of §6.5.8.",
             "enum": [
               "fanout",
               "new_admin_connection",
@@ -2119,7 +2123,9 @@
               "non_admin_group",
               "cross_env",
               "account_fanout",
-              "unexpected_initiator"
+              "unexpected_initiator",
+              "peer_deviation",
+              "volume_surge"
             ],
             "title": "DetectorKind",
             "type": "string"
@@ -3154,7 +3160,7 @@
             "type": "object"
           },
           "DetectorKind": {
-            "description": "The lateral-movement detectors of spec §6.5.1.",
+            "description": "The lateral-movement detectors of spec §6.5.1 and the allowed-traffic anomaly detectors of §6.5.8.",
             "enum": [
               "fanout",
               "new_admin_connection",
@@ -3163,7 +3169,9 @@
               "non_admin_group",
               "cross_env",
               "account_fanout",
-              "unexpected_initiator"
+              "unexpected_initiator",
+              "peer_deviation",
+              "volume_surge"
             ],
             "title": "DetectorKind",
             "type": "string"
@@ -4219,7 +4227,7 @@
             "type": "object"
           },
           "DetectorKind": {
-            "description": "The lateral-movement detectors of spec §6.5.1.",
+            "description": "The lateral-movement detectors of spec §6.5.1 and the allowed-traffic anomaly detectors of §6.5.8.",
             "enum": [
               "fanout",
               "new_admin_connection",
@@ -4228,7 +4236,9 @@
               "non_admin_group",
               "cross_env",
               "account_fanout",
-              "unexpected_initiator"
+              "unexpected_initiator",
+              "peer_deviation",
+              "volume_surge"
             ],
             "title": "DetectorKind",
             "type": "string"
@@ -5262,7 +5272,7 @@
             "type": "object"
           },
           "DetectorKind": {
-            "description": "The lateral-movement detectors of spec §6.5.1.",
+            "description": "The lateral-movement detectors of spec §6.5.1 and the allowed-traffic anomaly detectors of §6.5.8.",
             "enum": [
               "fanout",
               "new_admin_connection",
@@ -5271,7 +5281,9 @@
               "non_admin_group",
               "cross_env",
               "account_fanout",
-              "unexpected_initiator"
+              "unexpected_initiator",
+              "peer_deviation",
+              "volume_surge"
             ],
             "title": "DetectorKind",
             "type": "string"
@@ -6265,7 +6277,7 @@
             "type": "object"
           },
           "DetectorKind": {
-            "description": "The lateral-movement detectors of spec §6.5.1.",
+            "description": "The lateral-movement detectors of spec §6.5.1 and the allowed-traffic anomaly detectors of §6.5.8.",
             "enum": [
               "fanout",
               "new_admin_connection",
@@ -6274,7 +6286,9 @@
               "non_admin_group",
               "cross_env",
               "account_fanout",
-              "unexpected_initiator"
+              "unexpected_initiator",
+              "peer_deviation",
+              "volume_surge"
             ],
             "title": "DetectorKind",
             "type": "string"
@@ -7219,7 +7233,7 @@
             "type": "object"
           },
           "DetectorKind": {
-            "description": "The lateral-movement detectors of spec §6.5.1.",
+            "description": "The lateral-movement detectors of spec §6.5.1 and the allowed-traffic anomaly detectors of §6.5.8.",
             "enum": [
               "fanout",
               "new_admin_connection",
@@ -7228,7 +7242,9 @@
               "non_admin_group",
               "cross_env",
               "account_fanout",
-              "unexpected_initiator"
+              "unexpected_initiator",
+              "peer_deviation",
+              "volume_surge"
             ],
             "title": "DetectorKind",
             "type": "string"
@@ -11635,7 +11651,7 @@
             "type": "object"
           },
           "DetectorKind": {
-            "description": "The lateral-movement detectors of spec §6.5.1.",
+            "description": "The lateral-movement detectors of spec §6.5.1 and the allowed-traffic anomaly detectors of §6.5.8.",
             "enum": [
               "fanout",
               "new_admin_connection",
@@ -11644,7 +11660,9 @@
               "non_admin_group",
               "cross_env",
               "account_fanout",
-              "unexpected_initiator"
+              "unexpected_initiator",
+              "peer_deviation",
+              "volume_surge"
             ],
             "title": "DetectorKind",
             "type": "string"
@@ -12664,7 +12682,7 @@
             "type": "object"
           },
           "DetectorKind": {
-            "description": "The lateral-movement detectors of spec §6.5.1.",
+            "description": "The lateral-movement detectors of spec §6.5.1 and the allowed-traffic anomaly detectors of §6.5.8.",
             "enum": [
               "fanout",
               "new_admin_connection",
@@ -12673,7 +12691,9 @@
               "non_admin_group",
               "cross_env",
               "account_fanout",
-              "unexpected_initiator"
+              "unexpected_initiator",
+              "peer_deviation",
+              "volume_surge"
             ],
             "title": "DetectorKind",
             "type": "string"
@@ -14689,8 +14709,10 @@
       "fanout",
       "new_admin_connection",
       "non_admin_group",
+      "peer_deviation",
       "pivot_chain",
-      "unexpected_initiator"
+      "unexpected_initiator",
+      "volume_surge"
     ],
     "DetectorState": [
       "accumulating",
