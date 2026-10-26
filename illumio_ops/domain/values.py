@@ -279,6 +279,8 @@ LATERAL_PORTS_DEFAULT: tuple[tuple[int, str], ...] = (
     (445, "SMB"), (135, "RPC"), (139, "NetBIOS"), (3389, "RDP"), (22, "SSH"), (5985, "WinRM-HTTP"),
     (5986, "WinRM-HTTPS"), (23, "Telnet"), (2049, "NFS"), (111, "RPC Portmapper"), (389, "LDAP"),
     (636, "LDAPS"), (88, "Kerberos"), (1433, "MSSQL"), (3306, "MySQL"), (5432, "PostgreSQL"),
+    # In the PCE's admin category too; here so a PCE that reports no ransomware-protection services counts them.
+    (5900, "VNC"), (5938, "TeamViewer"),
 )
 
 # REST API guide: flow_summary records allowed, blocked and potentially blocked connections;

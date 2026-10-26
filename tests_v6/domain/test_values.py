@@ -64,9 +64,9 @@ def test_new_value_domains_exported():
     assert set(d["Confidence"]) == {"high", "medium", "low"}
 
 
-def test_lateral_ports_default_is_the_5x_list():
+def test_lateral_ports_default_is_the_5x_list_plus_remote_control():
     assert [p for p, _ in LATERAL_PORTS_DEFAULT] == [445, 135, 139, 3389, 22, 5985, 5986, 23, 2049, 111, 389, 636,
-                                                    88, 1433, 3306, 5432]
+                                                    88, 1433, 3306, 5432, 5900, 5938]
     assert dict(LATERAL_PORTS_DEFAULT)[111] == "RPC Portmapper" and dict(LATERAL_PORTS_DEFAULT)[5985] == "WinRM-HTTP"
 
 
