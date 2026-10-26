@@ -19,6 +19,7 @@ interface Props {
 }
 
 export function Shell({ me, onSignedOut }: Props) {
+  const main = navItems("main");
   const system = navItems("system");
 
   async function signOut() {
@@ -41,6 +42,11 @@ export function Shell({ me, onSignedOut }: Props) {
         <NavLink to="/" end className="nav-item">
           {t("nav_home")}
         </NavLink>
+        {main.map((item) => (
+          <NavLink key={item.path} to={item.path} className="nav-item">
+            {t(item.labelKey)}
+          </NavLink>
+        ))}
         {system.length > 0 && (
           <>
             <div className="nav-section">{t("nav_section_system")}</div>
