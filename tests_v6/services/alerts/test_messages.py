@@ -85,3 +85,12 @@ def test_console_url_defaults_by_deployment():
     assert console_url(PceSettings(**base, deployment_type="saas")) == "https://console.illum.io"
     custom = base | {"console_url": "https://acme.illumio.ai"}
     assert console_url(PceSettings(**custom, deployment_type="saas")) == "https://acme.illumio.ai"
+
+
+def test_teams_card_does_not_interpret_markdown_from_alert_data():
+    # Hostnames, users and processes come from the PCE; in a Markdown TextBlock "[x](https://evil)" becomes a link.
+    r = render([view(hosts=["[click](https://evil.example)"])], ChannelKind.TEAMS, lang=Language.EN, tz=UTC,
+               console_url=None)
+    blocks = r.card["attachments"][0]["content"]["body"]
+    data = [b for b in blocks if "evil.example" in json.dumps(b)]
+    assert data and all(b["type"] == "RichTextBlock" and b["inlines"][0]["type"] == "TextRun" for b in data)

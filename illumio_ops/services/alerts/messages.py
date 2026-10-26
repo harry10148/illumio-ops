@@ -170,9 +170,12 @@ def render(alerts: Sequence[AlertView], channel: ChannelKind, *, lang: Language,
         items: list[dict[str, Any]] = [{"type": "TextBlock", "text": translate(lang, "alert_card_title",
                                                                               {"n": str(len(alerts))}),
                                         "weight": "Bolder", "size": "Medium", "wrap": True}]
-        items += [{"type": "TextBlock", "text": _line(a, lang, tz, tz_label), "wrap": True} for a in shown]
+        # Alert lines carry PCE data (hostnames, users, processes): a TextBlock would render Markdown in them, so
+        # they go in TextRuns, which Teams shows as plain text.
+        items += [{"type": "RichTextBlock", "inlines": [{"type": "TextRun", "text": _line(a, lang, tz, tz_label)}]}
+                  for a in shown]
         if more:
-            items.append({"type": "TextBlock", "text": more, "isSubtle": True, "wrap": True})
+            items.append({"type": "RichTextBlock", "inlines": [{"type": "TextRun", "text": more, "isSubtle": True}]})
         card = {"type": "message", "attachments": [{
             "contentType": "application/vnd.microsoft.card.adaptive",
             "content": {"$schema": "http://adaptivecards.io/schemas/adaptive-card.json", "type": "AdaptiveCard",
