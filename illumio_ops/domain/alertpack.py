@@ -60,10 +60,19 @@ _LATERAL: tuple[tuple[str, DetectorKind], ...] = (
     ("rule_lateral_new_admin", DetectorKind.NEW_ADMIN_CONNECTION),
     ("rule_lateral_cross_env", DetectorKind.CROSS_ENV),
 )
+# Anomalies in allowed traffic (spec §6.5.8); a new process is low and is left to the focus list.
+ANOMALY: tuple[tuple[str, tuple[DetectorKind, ...]], ...] = (
+    ("rule_anomaly_peer", (DetectorKind.PEER_DEVIATION,)),
+    ("rule_anomaly_volume", (DetectorKind.VOLUME_SURGE,)),
+    ("rule_anomaly_account_source", (DetectorKind.ACCOUNT_NEW_SOURCE,)),
+    ("rule_anomaly_tool", (DetectorKind.SUSPICIOUS_TOOL,)),
+    ("rule_anomaly_directory", (DetectorKind.AUTH_TO_NON_DC, DetectorKind.NEW_DC_CLIENT, DetectorKind.DIRECTORY_SURGE)),
+)
 HIGH_BLOCKED = "rule_high_blocked"
 
 PACK_KEYS: frozenset[str] = frozenset(
-    {k for k, *_ in _EVENTS} | {k for k, *_ in _SYSTEM} | {k for k, _ in _LATERAL} | {HIGH_BLOCKED})
+    {k for k, *_ in _EVENTS} | {k for k, *_ in _SYSTEM} | {k for k, _ in _LATERAL} | {k for k, _ in ANOMALY}
+    | {HIGH_BLOCKED})
 
 
 def pack_rule_id(key: str) -> str:
@@ -71,8 +80,8 @@ def pack_rule_id(key: str) -> str:
 
 
 def best_practice_rules(*, notify_new_defaults: bool) -> tuple[AlertRule, ...]:
-    """notify_new_defaults applies to the lateral-movement rules only: an install upgraded from 5.x records
-    them without sending until the operator turns each on (spec §7)."""
+    """notify_new_defaults applies to the lateral-movement and anomaly rules only: an install upgraded from 5.x
+    records them without sending until the operator turns each on (spec §7)."""
     out: list[AlertRule] = []
     for key, types, threshold, count, window, cooldown, status, throttle in _EVENTS:
         out.append(EventRule(
@@ -92,4 +101,12 @@ def best_practice_rules(*, notify_new_defaults: bool) -> tuple[AlertRule, ...]:
         out.append(LateralRule(type="lateral", id=pack_rule_id(key), name="", pack_key=key, enabled=True,
                                notify=notify_new_defaults, severity=None, cooldown_minutes=0, throttle=None,
                                detectors=(detector,), min_severity=Severity.MEDIUM, critical_assets_only=False))
+    out += anomaly_rules(notify=notify_new_defaults)
     return tuple(out)
+
+
+def anomaly_rules(*, notify: bool) -> list[AlertRule]:
+    """The anomaly rules (spec §6.5.8). The v4 → v5 settings upgrade adds them recording only (notify False)."""
+    return [LateralRule(type="lateral", id=pack_rule_id(key), name="", pack_key=key, enabled=True, notify=notify,
+                        severity=None, cooldown_minutes=0, throttle=None, detectors=detectors,
+                        min_severity=Severity.MEDIUM, critical_assets_only=False) for key, detectors in ANOMALY]

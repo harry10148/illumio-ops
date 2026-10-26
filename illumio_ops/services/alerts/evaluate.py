@@ -59,6 +59,7 @@ from illumio_ops.domain.values import (
     TamperPattern,
     ThresholdType,
 )
+from illumio_ops.services.alerts import known
 from illumio_ops.services.alerts.channels import enabled_channels
 from illumio_ops.services.alerts.system import max_gap_id, system_facts
 from illumio_ops.services.analysis.tamper import list_annotations
@@ -390,6 +391,7 @@ def evaluate_lateral(ctx: AppContext, *, now: datetime | None = None) -> EvalRun
     rec = _Recorder(ctx, s, at)
     with ctx.flows().connect() as conn:
         names = {w.href: w.hostname for w in workloads.all_workloads(conn)}
+    marks = known.list_known(ctx).items
     for _ in range(DETECTION_BATCHES):
         with ctx.flows().connect() as conn:
             changed = analysis.detections_changed_since(conn, mark, limit=DETECTION_BATCH)
@@ -407,7 +409,7 @@ def evaluate_lateral(ctx: AppContext, *, now: datetime | None = None) -> EvalRun
                 facts.append(detection_fact(row, start=start, names=names, previous=previous))
                 if DetectorKind(row["detector"]) in rule.detectors:
                     rec.seen.append((rule.id, row["fingerprint"], row["severity"]))
-            rec.record(rule, evaluate_lateral_rule(rule, facts))
+            rec.record(rule, known.apply_known(evaluate_lateral_rule(rule, facts), marks))
         run.evaluated += len(changed)
         mark = (str(changed[-1]["updated_at"]), int(changed[-1]["id"]))
         rec.commit(SOURCE_LATERAL, f"{mark[0]}|{mark[1]}")

@@ -519,6 +519,34 @@ total: number
 }
 /**
  * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "KnownMark".
+ */
+export interface KnownMark {
+reason: string
+scope: ("detection" | "subject")
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "KnownView".
+ */
+export interface KnownView {
+created_at: string
+created_by: string
+detector: string
+fingerprint: (string | null)
+id: number
+reason: string
+subject_key: string
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "KnownList".
+ */
+export interface KnownList {
+items: KnownView[]
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
  * via the `definition` "NoteAdd".
  */
 export interface NoteAdd {
@@ -1228,7 +1256,7 @@ revision: number
 validity_days: number
 }
 
-export type OpId = "alert_rules.create" | "alert_rules.delete" | "alert_rules.list" | "alert_rules.pack" | "alert_rules.preview" | "alert_rules.update" | "alerts.evidence" | "alerts.explain" | "alerts.get" | "alerts.list" | "alerts.note_add" | "auth.csrf" | "auth.login" | "auth.logout" | "auth.me" | "auth.password" | "home.summary" | "i18n.dictionary" | "system.channels.get" | "system.channels.test" | "system.channels.update" | "system.collection.backfill" | "system.collection.get" | "system.collection.status" | "system.collection.update" | "system.display.get" | "system.display.update" | "system.jobs.list" | "system.lateral.get" | "system.lateral.update" | "system.logs.query" | "system.pce.get" | "system.pce.latest" | "system.pce.probe" | "system.pce.update" | "system.security.get" | "system.security.update" | "system.tls.csr" | "system.tls.import" | "system.tls.renew" | "system.tls.status" | "system.tls.update";
+export type OpId = "alert_rules.create" | "alert_rules.delete" | "alert_rules.list" | "alert_rules.pack" | "alert_rules.preview" | "alert_rules.update" | "alerts.evidence" | "alerts.explain" | "alerts.get" | "alerts.list" | "alerts.mark_known" | "alerts.note_add" | "auth.csrf" | "auth.login" | "auth.logout" | "auth.me" | "auth.password" | "home.summary" | "i18n.dictionary" | "system.channels.get" | "system.channels.test" | "system.channels.update" | "system.collection.backfill" | "system.collection.get" | "system.collection.status" | "system.collection.update" | "system.display.get" | "system.display.update" | "system.jobs.list" | "system.lateral.get" | "system.lateral.known" | "system.lateral.known_delete" | "system.lateral.update" | "system.logs.query" | "system.pce.get" | "system.pce.latest" | "system.pce.probe" | "system.pce.update" | "system.security.get" | "system.security.update" | "system.tls.csr" | "system.tls.import" | "system.tls.renew" | "system.tls.status" | "system.tls.update";
 
 export interface Requests {
   "alert_rules.create": RuleWrite;
@@ -1241,6 +1269,7 @@ export interface Requests {
   "alerts.explain": ExplainRequest;
   "alerts.get": undefined;
   "alerts.list": undefined;
+  "alerts.mark_known": KnownMark;
   "alerts.note_add": NoteAdd;
   "auth.csrf": undefined;
   "auth.login": LoginRequest;
@@ -1260,6 +1289,8 @@ export interface Requests {
   "system.display.update": DisplayUpdate;
   "system.jobs.list": undefined;
   "system.lateral.get": undefined;
+  "system.lateral.known": undefined;
+  "system.lateral.known_delete": undefined;
   "system.lateral.update": LateralUpdate;
   "system.logs.query": LogQuery;
   "system.pce.get": undefined;
@@ -1286,6 +1317,7 @@ export interface Responses {
   "alerts.explain": PolicyExplanation;
   "alerts.get": AlertDetail;
   "alerts.list": AlertList;
+  "alerts.mark_known": KnownList;
   "alerts.note_add": AlertDetail;
   "auth.csrf": CsrfToken;
   "auth.login": LoginResult;
@@ -1305,6 +1337,8 @@ export interface Responses {
   "system.display.update": DisplayView;
   "system.jobs.list": JobList;
   "system.lateral.get": LateralView;
+  "system.lateral.known": KnownList;
+  "system.lateral.known_delete": KnownList;
   "system.lateral.update": LateralView;
   "system.logs.query": LogLines;
   "system.pce.get": PceConnection;
@@ -1331,6 +1365,7 @@ export const OPERATIONS = {
   "alerts.explain": { method: "POST", path: "/api/alerts/<int:alert_id>/explain" },
   "alerts.get": { method: "GET", path: "/api/alerts/<int:alert_id>" },
   "alerts.list": { method: "GET", path: "/api/alerts" },
+  "alerts.mark_known": { method: "POST", path: "/api/alerts/<int:alert_id>/known" },
   "alerts.note_add": { method: "POST", path: "/api/alerts/<int:alert_id>/notes" },
   "auth.csrf": { method: "GET", path: "/api/auth/csrf" },
   "auth.login": { method: "POST", path: "/api/auth/login" },
@@ -1350,6 +1385,8 @@ export const OPERATIONS = {
   "system.display.update": { method: "PUT", path: "/api/system/display" },
   "system.jobs.list": { method: "GET", path: "/api/system/jobs" },
   "system.lateral.get": { method: "GET", path: "/api/system/lateral" },
+  "system.lateral.known": { method: "GET", path: "/api/system/lateral/known" },
+  "system.lateral.known_delete": { method: "DELETE", path: "/api/system/lateral/known/<int:mark_id>" },
   "system.lateral.update": { method: "PUT", path: "/api/system/lateral" },
   "system.logs.query": { method: "POST", path: "/api/system/logs/query" },
   "system.pce.get": { method: "GET", path: "/api/system/pce" },

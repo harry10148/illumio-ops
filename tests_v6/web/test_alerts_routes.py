@@ -116,3 +116,50 @@ def test_alert_routes_need_csrf_and_login(client, ctx):
     r = client.post(f"/api/alerts/{a}/notes", json={"body": "x"}, environ_overrides=LOCAL)
     assert r.status_code == 400 and r.get_json()["error"]["code"] == "csrf_error"
     assert csrf(client)
+
+
+def _lateral(ctx):
+    t = Trigger(rule_id="b" * 32, rule_type=AlertRuleType.LATERAL, subject_key="volume|/orgs/1/workloads/w1",
+                severity=Severity.MEDIUM, first_seen=NOW, last_seen=NOW, late=False,
+                message_key="focus_title_volume_surge",
+                params={"detector": "volume_surge", "account": "/orgs/1/workloads/w1", "host": "w1",
+                        "connections": 5000, "previous_max": 10},
+                facts={"detection_id": 1}, evidence=None, confidence=Confidence())
+    with ctx.db() as conn:
+        return store.insert_alert(conn, pce_url=ctx.settings.current().pce.url,
+                                  org_id=ctx.settings.current().pce.org_id, rule_name="", pack_key="rule_anomaly_volume",
+                                  trigger=t, at=NOW, channels=[], hold=None)
+
+
+def test_mark_known_rejects_non_lateral_alert(client, ctx):
+    login(client)
+    other = seed(ctx)
+    r = post(client, f"/api/alerts/{other}/known", {"scope": "detection", "reason": "fine"})
+    assert r.status_code == 400 and r.get_json()["error"]["code"] == "not_a_lateral_alert"
+    assert post(client, "/api/alerts/999999/known", {"scope": "detection", "reason": "x"}).status_code == 404
+
+
+def test_known_list_and_delete(client, ctx):
+    login(client)
+    a = _lateral(ctx)
+    r = post(client, f"/api/alerts/{a}/known", {"scope": "subject", "reason": "backup host"})
+    assert r.status_code == 200
+    [mark] = get(client, "/api/system/lateral/known").get_json()["data"]["items"]
+    assert (mark["detector"], mark["subject_key"], mark["fingerprint"], mark["reason"], mark["created_by"]) == (
+        "volume_surge", "/orgs/1/workloads/w1", None, "backup host", "illumio")
+    r = post(client, f"/api/alerts/{a}/known", {"scope": "detection", "reason": "this one"})
+    assert get(client, "/api/system/lateral/known").get_json()["data"]["items"][1]["fingerprint"] == \
+        "volume|/orgs/1/workloads/w1"
+    gone = client.delete(f"/api/system/lateral/known/{mark['id']}", environ_overrides=LOCAL,
+                         headers={"X-CSRFToken": csrf(client)})
+    assert gone.status_code == 200 and len(gone.get_json()["data"]["items"]) == 1
+    missing = client.delete("/api/system/lateral/known/999999", environ_overrides=LOCAL,
+                            headers={"X-CSRFToken": csrf(client)})
+    assert missing.status_code == 404
+
+
+def test_known_reason_required(client, ctx):
+    login(client)
+    a = _lateral(ctx)
+    assert post(client, f"/api/alerts/{a}/known", {"scope": "detection", "reason": ""}).status_code == 400
+    assert post(client, f"/api/alerts/{a}/known", {"scope": "everything", "reason": "x"}).status_code == 400

@@ -112,7 +112,7 @@ def test_v3_file_upgrades_to_v4_with_pack(tmp_path):
     p.write_text(json.dumps(d))
     p.chmod(0o600)
     s = SettingsStore(p).load()
-    assert s.schema_version == 5 and len(s.alerts.rules) == 25 and all(r.notify for r in s.alerts.rules)
+    assert s.schema_version == 5 and len(s.alerts.rules) == 30 and all(r.notify for r in s.alerts.rules)
     assert not s.alerts.channels.smtp.enabled
 
 
@@ -141,3 +141,15 @@ def test_v4_file_upgrades_to_v5_keeping_values():
     assert lat.peer_group_keys == ("app", "role")
     assert lat.detectors.directory_min_sources == 3 and lat.detectors.peer_min_group == 5
     assert "psexec.exe" in lat.suspicious_tools and lat.directory_server_ips == ()
+
+
+def test_v4_upgrade_adds_anomaly_rules_record_only():
+    """An install upgraded to v5 gets the anomaly rules recording only; the operator turns each on (P4.5)."""
+    d = _v4_dict()
+    d["alerts"]["rules"] = [r for r in d["alerts"]["rules"] if not str(r.get("pack_key")).startswith("rule_anomaly")]
+    kept = len(d["alerts"]["rules"])
+    s = validate_settings(upgrade(d))
+    added = [r for r in s.alerts.rules if r.pack_key.startswith("rule_anomaly")]
+    assert len(s.alerts.rules) == kept + 5 and len(added) == 5 and not any(r.notify for r in added)
+    again = validate_settings(upgrade(_v4_dict()))  # already has them: nothing is added twice
+    assert len(again.alerts.rules) == 30

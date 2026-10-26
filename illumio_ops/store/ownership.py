@@ -8,6 +8,7 @@ TABLE_OWNERS: dict[str, str] = {
     "job_health": "illumio_ops.jobs.health",
     "pce_probe": "illumio_ops.services.pce_health",
     "tamper_annotations": "illumio_ops.store.annotations",
+    "detection_annotations": "illumio_ops.store.detection_annotations",
     "alerts": "illumio_ops.store.alerts",
     "alert_deliveries": "illumio_ops.store.alerts",
     "alert_notes": "illumio_ops.store.alerts",

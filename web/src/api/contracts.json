@@ -9173,6 +9173,103 @@
         "type": "object"
       }
     },
+    "alerts.mark_known": {
+      "method": "POST",
+      "path": "/api/alerts/<int:alert_id>/known",
+      "request_schema": {
+        "properties": {
+          "reason": {
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Reason",
+            "type": "string"
+          },
+          "scope": {
+            "enum": [
+              "detection",
+              "subject"
+            ],
+            "title": "Scope",
+            "type": "string"
+          }
+        },
+        "required": [
+          "scope",
+          "reason"
+        ],
+        "title": "KnownMark",
+        "type": "object"
+      },
+      "response_schema": {
+        "$defs": {
+          "KnownView": {
+            "properties": {
+              "created_at": {
+                "format": "date-time",
+                "title": "Created At",
+                "type": "string"
+              },
+              "created_by": {
+                "title": "Created By",
+                "type": "string"
+              },
+              "detector": {
+                "title": "Detector",
+                "type": "string"
+              },
+              "fingerprint": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Fingerprint"
+              },
+              "id": {
+                "title": "Id",
+                "type": "integer"
+              },
+              "reason": {
+                "title": "Reason",
+                "type": "string"
+              },
+              "subject_key": {
+                "title": "Subject Key",
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "detector",
+              "subject_key",
+              "fingerprint",
+              "reason",
+              "created_by",
+              "created_at"
+            ],
+            "title": "KnownView",
+            "type": "object"
+          }
+        },
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/$defs/KnownView"
+            },
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "KnownList",
+        "type": "object"
+      }
+    },
     "alerts.note_add": {
       "method": "POST",
       "path": "/api/alerts/<int:alert_id>/notes",
@@ -12294,6 +12391,154 @@
           "status"
         ],
         "title": "LateralView",
+        "type": "object"
+      }
+    },
+    "system.lateral.known": {
+      "method": "GET",
+      "path": "/api/system/lateral/known",
+      "request_schema": null,
+      "response_schema": {
+        "$defs": {
+          "KnownView": {
+            "properties": {
+              "created_at": {
+                "format": "date-time",
+                "title": "Created At",
+                "type": "string"
+              },
+              "created_by": {
+                "title": "Created By",
+                "type": "string"
+              },
+              "detector": {
+                "title": "Detector",
+                "type": "string"
+              },
+              "fingerprint": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Fingerprint"
+              },
+              "id": {
+                "title": "Id",
+                "type": "integer"
+              },
+              "reason": {
+                "title": "Reason",
+                "type": "string"
+              },
+              "subject_key": {
+                "title": "Subject Key",
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "detector",
+              "subject_key",
+              "fingerprint",
+              "reason",
+              "created_by",
+              "created_at"
+            ],
+            "title": "KnownView",
+            "type": "object"
+          }
+        },
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/$defs/KnownView"
+            },
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "KnownList",
+        "type": "object"
+      }
+    },
+    "system.lateral.known_delete": {
+      "method": "DELETE",
+      "path": "/api/system/lateral/known/<int:mark_id>",
+      "request_schema": null,
+      "response_schema": {
+        "$defs": {
+          "KnownView": {
+            "properties": {
+              "created_at": {
+                "format": "date-time",
+                "title": "Created At",
+                "type": "string"
+              },
+              "created_by": {
+                "title": "Created By",
+                "type": "string"
+              },
+              "detector": {
+                "title": "Detector",
+                "type": "string"
+              },
+              "fingerprint": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Fingerprint"
+              },
+              "id": {
+                "title": "Id",
+                "type": "integer"
+              },
+              "reason": {
+                "title": "Reason",
+                "type": "string"
+              },
+              "subject_key": {
+                "title": "Subject Key",
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "detector",
+              "subject_key",
+              "fingerprint",
+              "reason",
+              "created_by",
+              "created_at"
+            ],
+            "title": "KnownView",
+            "type": "object"
+          }
+        },
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/$defs/KnownView"
+            },
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "KnownList",
         "type": "object"
       }
     },
