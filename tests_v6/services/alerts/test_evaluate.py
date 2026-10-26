@@ -430,6 +430,19 @@ def test_detection_older_than_alerting_does_not_alert_on_update(ctx):
     assert evaluate_lateral(ctx, now=NOW + minutes(4)).fired == 1
 
 
+def test_rise_held_by_cooldown_alerts_after_it(ctx):
+    """A rise the cooldown held back is not marked seen: once the cooldown is over, the next update alerts
+    (security review: the escalation was lost)."""
+    _lateral_rules(ctx, cooldown_minutes=60)
+    evaluate_lateral(ctx, now=NOW)
+    _detect(ctx, at=NOW + minutes(1))
+    assert evaluate_lateral(ctx, now=NOW + minutes(2)).fired == 1
+    _detect(ctx, severity="high", at=NOW + minutes(3))
+    assert evaluate_lateral(ctx, now=NOW + minutes(4)).suppressed == 1
+    _detect(ctx, severity="high", at=NOW + minutes(70))
+    assert evaluate_lateral(ctx, now=NOW + minutes(71)).fired == 1
+
+
 def test_lateral_fixed_rule_severity_does_not_realert(ctx):
     """The rule's own severity is the alert's, not the detection's: a repeat is not a rise (review)."""
     _lateral_rules(ctx, severity="low")

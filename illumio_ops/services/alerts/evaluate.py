@@ -138,6 +138,7 @@ class _Recorder:
     def commit(self, source: str, watermark: str | None) -> None:
         """Record the pending triggers and move the source's watermark (None: leave it) as one change."""
         fired = suppressed = 0
+        held: set[tuple[str, str]] = set()  # (rule, subject) whose alert the cooldown or throttle held back
         pce = self.ctx.settings.current().pce
         if (pce.url, pce.org_id) != self.pce or self.ctx.flows().generation != self.generation:
             raise StaleGeneration  # read from one PCE's data, about to be recorded as another's
@@ -149,6 +150,7 @@ class _Recorder:
                                           suppressed=None if g.allowed else g.reason)  # type: ignore[arg-type]
                     if not g.allowed:
                         suppressed += 1
+                        held.add((rule.id, t.subject_key))
                         continue
                     hold = (DeliveryStatus.GROUPED if t.grouped_annotation is not None
                             else None if rule.notify else DeliveryStatus.NOT_NOTIFIED)
@@ -157,7 +159,8 @@ class _Recorder:
                                        hold=hold)
                     fired += 1
             for rule_id, fingerprint, severity in self.seen:
-                store.set_seen_severity(conn, rule_id, fingerprint, severity)
+                if (rule_id, fingerprint) not in held:  # a rise held back stays a rise until it is alerted
+                    store.set_seen_severity(conn, rule_id, fingerprint, severity)
             if watermark is not None:
                 store.set_eval_watermark(conn, source, watermark, pce_url=self.pce[0], org_id=self.pce[1])
         self.pending.clear()
