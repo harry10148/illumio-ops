@@ -160,12 +160,16 @@ def _tamper_context(ctx: AppContext) -> tuple[dict[str, TamperPattern], list[Any
 def _tamper(trigger: Trigger, matched: Sequence[EventFact], ctx_cache: dict[str, Any], ctx: AppContext) -> Trigger:
     """Tampering alerts carry the reading (spec §6.5.2), and one a known cause explains is grouped, not sent."""
     tampering = [e for e in matched if e.event_type == "agent.tampering"]
+    # An immediate rule's trigger is one host's (or one event type's): read only its own events.
+    own = [e for e in tampering if (e.host_key or e.event_type) == trigger.subject_key]
+    tampering = own or tampering
     if not tampering:
         return trigger
     if "tamper" not in ctx_cache:
         ctx_cache["tamper"] = _tamper_context(ctx)
     patterns, notes = ctx_cache["tamper"]
-    readings = [r for e in tampering for r in interpret(e.raw)]
+    read = [(e.host_key, r) for e in tampering for r in interpret(e.raw)]
+    readings = [r for _, r in read]
     host = tampering[0].host_key
     pattern = patterns.get(host or "", TamperPattern.TOO_FEW)
     signal = next((r for r in readings if r.has_process_info), None)
@@ -173,7 +177,8 @@ def _tamper(trigger: Trigger, matched: Sequence[EventFact], ctx_cache: dict[str,
               "process": signal.process if signal else None, "pid": signal.pid if signal else None,
               "actions": [str(a) for a in signal.actions] if signal else [], "pattern": pattern.value,
               "has_process_info": signal is not None}
-    explained = {explained_by(r, host, pattern, notes) for r in readings} if host else {None}
+    # Grouped only when one known cause explains every reading, each against its own host.
+    explained = {explained_by(r, h, patterns.get(h, TamperPattern.TOO_FEW), notes) if h else None for h, r in read}
     grouped = next(iter(explained)) if len(explained) == 1 and None not in explained else None
     return Trigger(**{**trigger.__dict__, "params": params, "grouped_annotation": grouped})
 

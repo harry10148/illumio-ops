@@ -151,6 +151,30 @@ def test_tamper_with_known_cause_grouped_not_sent(ctx, pce):
         assert [d["status"] for d in store.deliveries(conn, [a["id"]])] == ["grouped"]
 
 
+def test_tamper_known_cause_only_groups_its_own_host(ctx, pce):
+    """A batch with tampering on two hosts, one with a known cause: only that host's alert is grouped (review:
+    both were, from the first host's reading)."""
+    from illumio_ops.services.analysis.tamper import add_annotation
+    _collect_and_evaluate(ctx, pce, NOW)
+    a_raw, b_raw = json.loads(json.dumps(TAMPER[0])), json.loads(json.dumps(TAMPER[0]))
+    b_raw["href"] = "/orgs/1/events/b-1"
+    b_raw["created_by"]["ven"]["href"] = "/orgs/1/vens/v-b"
+    for raw in (a_raw, b_raw):
+        raw["timestamp"] = _ts(NOW + minutes(1))
+    with ctx.flows().connect() as conn:
+        workloads.replace_inventory(conn, [workloads.WorkloadRow(
+            href=href, hostname=name, name=None, managed=1, enforcement_mode=None, visibility_level=None,
+            os_id=None, ven_version=None, ven_href=ven, label_set=None, online=1, risk_exposure=None,
+            risk_percent=None, risk_updated_at=None, fetched_at="x")
+            for href, name, ven in (("/orgs/1/workloads/w-9", "h9", a_raw["created_by"]["ven"]["href"]),
+                                    ("/orgs/1/workloads/w-8", "h8", "/orgs/1/vens/v-b"))])
+    add_annotation(ctx, host_href="/orgs/1/workloads/w-9", pattern=None, process=None, reason="NetBird", by="t")
+    pce.items += [a_raw, b_raw]
+    _collect_and_evaluate(ctx, pce, NOW + minutes(2))
+    grouped = {a["subject_key"]: a["grouped_annotation"] for a in _alerts(ctx)}
+    assert grouped["/orgs/1/workloads/w-9"] is not None and grouped["/orgs/1/workloads/w-8"] is None
+
+
 def test_late_event_marked_late(ctx, pce):
     _collect_and_evaluate(ctx, pce, NOW)
     pce.event(2, "rule_set.create", NOW - timedelta(hours=5))
