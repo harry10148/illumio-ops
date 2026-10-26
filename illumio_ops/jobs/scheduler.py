@@ -9,9 +9,18 @@ from datetime import UTC, datetime, time, timedelta
 from apscheduler.schedulers.background import BackgroundScheduler
 from loguru import logger
 
+from illumio_ops.domain.values import SystemCheck
 from illumio_ops.jobs.health import record_finish, record_start
 from illumio_ops.pce.client import PceNotConfigured
 from illumio_ops.services import pce_health
+from illumio_ops.services.alerts.dispatch import run_dispatch
+from illumio_ops.services.alerts.evaluate import (
+    evaluate_events,
+    evaluate_lateral,
+    evaluate_system,
+    evaluate_traffic,
+)
+from illumio_ops.services.alerts.retention import run_alert_retention
 from illumio_ops.services.analysis.detect import (
     clear_late_day,
     pending_late_days,
@@ -41,6 +50,10 @@ BACKFILL_CHECK_SECONDS = 600
 FLOWS_CHECKPOINT_SECONDS = 60
 # The exposure graph, ransomware overlay, tamper summary and focus list (services.analysis.hourly).
 ANALYSIS_HOURLY_SECONDS = 3600
+# The system checks (collection failing, data loss, failing jobs, disk) between collection cycles.
+ALERTS_SYSTEM_SECONDS = 60
+# Sends what is due; a slow channel holds up only this job, never a collector.
+ALERTS_DISPATCH_SECONDS = 60
 # Collectors wait a little after start-up so the listener and the first probe come first.
 COLLECTOR_FIRST_RUN_DELAY = timedelta(seconds=30)
 
@@ -59,6 +72,9 @@ def job_intervals(settings: Settings) -> dict[str, int]:
         "collect_retention": DAILY_SECONDS,
         "flows_checkpoint": FLOWS_CHECKPOINT_SECONDS,
         "analysis_hourly": ANALYSIS_HOURLY_SECONDS,
+        "alerts_system": ALERTS_SYSTEM_SECONDS,
+        "alerts_retention": DAILY_SECONDS,
+        "alerts_dispatch": ALERTS_DISPATCH_SECONDS,
     }
 
 
@@ -79,12 +95,27 @@ def instrument(job_id: str, fn: Callable[[], None], ctx: AppContext) -> Callable
     return run
 
 
+def run_steps(*steps: Callable[[], object]) -> None:
+    """Run every step even when one fails (a failed detection must not stop the alert evaluation after it);
+    the job then fails with the first error, so job health records it."""
+    first: Exception | None = None
+    for step in steps:
+        try:
+            step()
+        except Exception as exc:  # noqa: BLE001 - the remaining steps still run; the first error is raised below
+            logger.error("job step {} failed: {}", getattr(step, "__name__", step), traceback.format_exc())
+            first = first or exc
+    if first is not None:
+        raise first
+
+
 def _probe_job(ctx: AppContext) -> Callable[[], None]:
     def probe() -> None:
         try:
             pce_health.run_probe(ctx)
         except PceNotConfigured:
             return  # nothing to check yet; not a failure
+        evaluate_system(ctx, checks={SystemCheck.PCE_HEALTH})
     return probe
 
 
@@ -103,11 +134,13 @@ def _collector_jobs(ctx: AppContext) -> dict[str, Callable[[], None]]:
     def traffic() -> None:
         finish_pending_switch(ctx)
         run_traffic_cycle(ctx)
-        run_detection(ctx)  # the detectors evaluate what the cycle just collected
+        # The detectors evaluate what the cycle just collected; the alert rules then see both.
+        run_steps(lambda: run_detection(ctx), lambda: evaluate_traffic(ctx), lambda: evaluate_lateral(ctx))
 
     def events() -> None:
         finish_pending_switch(ctx)
         run_events_cycle(ctx)
+        evaluate_events(ctx)
 
     def inventory() -> None:
         finish_pending_switch(ctx)
@@ -124,6 +157,7 @@ def _collector_jobs(ctx: AppContext) -> dict[str, Callable[[], None]]:
             start = datetime.combine(owed, time(0), UTC)
             run_detection(ctx, window=(start, start + timedelta(days=1)), late=True)
             clear_late_day(ctx, owed)
+        evaluate_lateral(ctx)  # late detections alert too, marked late
 
     def archive() -> None:
         run_archive(ctx)
@@ -137,10 +171,20 @@ def _collector_jobs(ctx: AppContext) -> dict[str, Callable[[], None]]:
     def hourly_analysis() -> None:
         run_hourly_analysis(ctx)
 
+    def alerts_system() -> None:
+        evaluate_system(ctx, checks=[c for c in SystemCheck if c is not SystemCheck.PCE_HEALTH])
+
+    def alerts_retention() -> None:
+        run_alert_retention(ctx)
+
+    def alerts_dispatch() -> None:
+        run_dispatch(ctx)
+
     # Archive runs before retention so that, with archiving on, expiring days are written first.
     return {"collect_traffic": traffic, "collect_events": events, "collect_inventory": inventory,
             "collect_backfill": backfill, "collect_archive": archive, "collect_retention": retention,
-            "flows_checkpoint": checkpoint, "analysis_hourly": hourly_analysis}
+            "flows_checkpoint": checkpoint, "analysis_hourly": hourly_analysis, "alerts_system": alerts_system,
+            "alerts_retention": alerts_retention, "alerts_dispatch": alerts_dispatch}
 
 
 def build_scheduler(ctx: AppContext) -> BackgroundScheduler:

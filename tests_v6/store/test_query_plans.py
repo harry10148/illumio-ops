@@ -50,3 +50,18 @@ def test_composite_key_tables_are_one_tree(tmp_path):
     with FlowDb(tmp_path / "flows.sqlite").connect() as conn:
         sql = dict(conn.execute("SELECT name, sql FROM sqlite_master WHERE type = 'table'").fetchall())
     assert [n for n in names if "WITHOUT ROWID" not in sql[n].upper()] == []
+
+
+def test_connection_reads_use_the_connection_index(tmp_path):
+    # Read for every changed connection, inside the write lock (P4: growth per connection).
+    with FlowDb(tmp_path / "flows.sqlite").connect() as conn:
+        plan = _plan(conn, flows._CONNECTION_ROWS, ("k",))
+    assert "ix_flows_conn" in plan, plan
+
+
+def test_increment_window_uses_observed_index(tmp_path):
+    with FlowDb(tmp_path / "flows.sqlite").connect() as conn:
+        plan = _plan(conn, "SELECT * FROM flow_increments i JOIN flows r ON r.record_key = i.record_key "
+                           "JOIN flows f ON f.conn_key = r.conn_key AND f.is_primary = 1 "
+                           "WHERE i.late = 0 AND i.observed_at > ? AND i.observed_at <= ?", ("a", "b"))
+    assert "ix_increments_observed" in plan and "ix_flows_conn" in plan, plan

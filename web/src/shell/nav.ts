@@ -2,7 +2,7 @@
 // appear (no placeholders).
 import type { ComponentType } from "react";
 
-export type NavSection = "system";
+export type NavSection = "main" | "system";
 
 export interface NavItem {
   section: NavSection;
@@ -10,6 +10,8 @@ export interface NavItem {
   labelKey: string;
   order: number;
   component: ComponentType;
+  /** A page reached from another page (a detail, an editor): routed, not listed in the navigation. */
+  hidden?: boolean;
 }
 
 const items: NavItem[] = [];
@@ -19,7 +21,7 @@ export function registerNav(item: NavItem): void {
 }
 
 export function navItems(section: NavSection): NavItem[] {
-  return items.filter((i) => i.section === section).sort((a, b) => a.order - b.order);
+  return items.filter((i) => i.section === section && !i.hidden).sort((a, b) => a.order - b.order);
 }
 
 export function allNavItems(): NavItem[] {

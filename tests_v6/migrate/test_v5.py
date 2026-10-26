@@ -20,11 +20,19 @@ def _load(name):
     return json.loads((FIXTURES / name).read_text())
 
 
+# Items about something other than one config.json key: each rule, the new default rules, channel notes.
+DERIVED = ("(new) ", "rules[", "alerts.json", "alerts.channels.", "ILLUMIO_")
+
+
+def config_sources(report):
+    return [i.source for i in report.items if not i.source.startswith(DERIVED)]
+
+
 @pytest.mark.parametrize("name", FIXTURE_NAMES)
 def test_report_covers_every_input_leaf_key(name):
     raw = _load(name)
     report = migrate_v5(raw).report
-    sources = [i.source for i in report.items]
+    sources = config_sources(report)
     assert sorted(sources) == sorted(leaf_keys(raw))
     assert len(sources) == len(set(sources))
 
@@ -85,7 +93,7 @@ def test_deprecated_keys_dropped_with_reason():
 def test_phase_labels_follow_revised_roadmap():
     report = migrate_v5(_load("v5_2_x_config_106_redacted.json")).report
     by_source = {i.source: i for i in report.items}
-    assert by_source["smtp.host"].params == {"phase": "P4"} and by_source["smtp.host"].action == "unsupported"
+    assert by_source["smtp.host"].action == "carried" and by_source["smtp.host"].target == "alerts.channels.smtp.host"
     assert by_source["siem.enabled"].params == {"phase": "P7"}
     assert by_source["report_schedules"].params == {"phase": "P5"}
     assert by_source["pce_cache.siem_pending_warn_rows"].params == {"phase": "P7"}
@@ -285,14 +293,14 @@ def test_non_numeric_org_id_blocks_but_the_report_is_complete():
     raw["api"]["org_id"] = "tenant-a"
     result = migrate_v5(raw)
     assert result.settings is None and [p for p, _ in result.blocking] == ["api.org_id"]
-    assert sorted(i.source for i in result.report.items) == sorted(leaf_keys(raw))
+    assert sorted(config_sources(result.report)) == sorted(leaf_keys(raw))
 
 
 def test_dotted_extra_keys_stay_distinct():
     raw = _base()
     raw["web_gui"]["audit"] = {"destination": 1}
     raw["web_gui"]["audit.destination"] = 2
-    sources = [i.source for i in migrate_v5(raw).report.items]
+    sources = config_sources(migrate_v5(raw).report)
     assert len(sources) == len(set(sources)) == len(leaf_keys(raw))
 
 
@@ -310,12 +318,12 @@ def test_allowlist_with_no_valid_entry_blocks_instead_of_opening_up():
     raw["web_gui"]["allowed_ips"] = ["localhost", "server.example"]  # 5.x refused everyone
     result = migrate_v5(raw)
     assert result.settings is None and [p for p, _ in result.blocking] == ["web_gui.allowed_ips"]
-    assert sorted(i.source for i in result.report.items) == sorted(leaf_keys(raw))
+    assert sorted(config_sources(result.report)) == sorted(leaf_keys(raw))
 
 
 
 @pytest.mark.parametrize("name", FIXTURE_NAMES)
 def test_migrator_output_has_default_lateral(name):
     s = migrate_v5(_load(name)).settings
-    assert s.schema_version == 3
+    assert s.schema_version == 4
     assert s.lateral.graph_hops == 3 and s.lateral.critical_assets == () and s.lateral.environment_label_key == "env"

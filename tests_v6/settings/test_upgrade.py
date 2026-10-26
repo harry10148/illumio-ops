@@ -16,6 +16,8 @@ def _v1(tmp_path):
     d = default_settings(password_hash=HASH, secret_key=KEY).model_dump(mode="json")
     d["schema_version"] = 1
     del d["collection"]
+    del d["lateral"]
+    del d["alerts"]
     p = tmp_path / "settings.json"
     p.write_text(json.dumps(d, indent=2))
     p.chmod(0o600)
@@ -30,7 +32,7 @@ def test_v1_file_loads_as_v2_in_memory(tmp_path):
     p = _v1(tmp_path)
     before, mtime = p.read_bytes(), os.stat(p).st_mtime_ns
     s = SettingsStore(p).load()
-    assert s.schema_version == SCHEMA_VERSION == 3
+    assert s.schema_version == SCHEMA_VERSION == 4
     assert s.collection.traffic_interval_seconds == 600
     assert s.collection.retention.baseline_days == 30
     assert p.read_bytes() == before and os.stat(p).st_mtime_ns == mtime
@@ -85,17 +87,30 @@ def _v2(tmp_path):
     d = default_settings(password_hash=HASH, secret_key=KEY).model_dump(mode="json")
     d["schema_version"] = 2
     del d["lateral"]
+    del d["alerts"]
     p = tmp_path / "settings.json"
     p.write_text(json.dumps(d, indent=2))
     p.chmod(0o600)
     return p
 
 
-def test_v2_file_loads_as_v3_with_default_lateral(tmp_path):
+def test_v2_file_loads_as_current_with_default_lateral(tmp_path):
     p = _v2(tmp_path)
     before, mtime = p.read_bytes(), os.stat(p).st_mtime_ns
     s = SettingsStore(p).load()
-    assert s.schema_version == 3
+    assert s.schema_version == SCHEMA_VERSION
     assert s.lateral.graph_hops == 3 and s.lateral.observation_days == 30
     assert s.lateral.detectors.fanout_targets == 10
     assert p.read_bytes() == before and os.stat(p).st_mtime_ns == mtime
+
+
+def test_v3_file_upgrades_to_v4_with_pack(tmp_path):
+    d = default_settings(password_hash=HASH, secret_key=KEY).model_dump(mode="json")
+    d["schema_version"] = 3
+    del d["alerts"]
+    p = tmp_path / "settings.json"
+    p.write_text(json.dumps(d))
+    p.chmod(0o600)
+    s = SettingsStore(p).load()
+    assert s.schema_version == 4 and len(s.alerts.rules) == 25 and all(r.notify for r in s.alerts.rules)
+    assert not s.alerts.channels.smtp.enabled

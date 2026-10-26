@@ -77,11 +77,31 @@ SETTINGS_READERS: dict[str, str] = {
     "lateral.detectors.blocked_surge_factor": "illumio_ops.services.analysis.detect",
     "lateral.detectors.exclude_system_accounts": "illumio_ops.services.analysis.detect",
     "lateral.detectors.precursor_hours": "illumio_ops.services.analysis.detect",
+    "alerts.rules": "illumio_ops.services.alerts.evaluate",
+    "alerts.retention_days": "illumio_ops.services.alerts.retention",
+    "pce.console_url": "illumio_ops.services.alerts.messages",
+    "display.timezone": "illumio_ops.services.alerts.messages",
+    "alerts.channels.smtp.enabled": "illumio_ops.services.alerts.channels",
+    "alerts.channels.smtp.host": "illumio_ops.services.alerts.channels",
+    "alerts.channels.smtp.port": "illumio_ops.services.alerts.channels",
+    "alerts.channels.smtp.security": "illumio_ops.services.alerts.channels",
+    "alerts.channels.smtp.username": "illumio_ops.services.alerts.channels",
+    "alerts.channels.smtp.password": "illumio_ops.services.alerts.channels",
+    "alerts.channels.smtp.sender": "illumio_ops.services.alerts.channels",
+    "alerts.channels.smtp.recipients": "illumio_ops.services.alerts.channels",
+    "alerts.channels.line.enabled": "illumio_ops.services.alerts.channels",
+    "alerts.channels.line.access_token": "illumio_ops.services.alerts.channels",
+    "alerts.channels.line.target_id": "illumio_ops.services.alerts.channels",
+    "alerts.channels.telegram.enabled": "illumio_ops.services.alerts.channels",
+    "alerts.channels.telegram.bot_token": "illumio_ops.services.alerts.channels",
+    "alerts.channels.telegram.chat_id": "illumio_ops.services.alerts.channels",
+    "alerts.channels.teams.enabled": "illumio_ops.services.alerts.channels",
+    "alerts.channels.teams.webhook_url": "illumio_ops.services.alerts.channels",
+    "alerts.channels.webhook.enabled": "illumio_ops.services.alerts.channels",
+    "alerts.channels.webhook.url": "illumio_ops.services.alerts.channels",
 }
 # Fields whose reader arrives later: value = the task or phase that adds it.
 PENDING_READERS: dict[str, str] = {
-    "pce.console_url": "P3",
-    "display.timezone": "P3",
 }
 # Fields with no runtime reader by design.
 STRUCTURAL: dict[str, str] = {
@@ -185,6 +205,11 @@ def test_selftest_proper_reader_is_green(tmp_path):
 
 def test_no_p1_pending_left():
     assert [p for p, due in PENDING_READERS.items() if due.startswith("P1-")] == []
+
+
+def test_no_p4_pending_left():
+    # Tasks 5 and 6 add these readers; the gate is green again by the end of Task 9.
+    assert [p for p, due in PENDING_READERS.items() if due.startswith("P4-")] == []
 
 
 def test_no_p2_pending_left():

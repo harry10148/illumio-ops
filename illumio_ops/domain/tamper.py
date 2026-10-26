@@ -32,6 +32,12 @@ TAMPER_ACTION_KEYS: Mapping[TamperAction, str] = {
 }
 
 
+TAMPER_PATTERN_KEYS: Mapping[TamperPattern, str] = {
+    TamperPattern.REGULAR_CYCLE: "tamper_pattern_regular_cycle", TamperPattern.BURST: "tamper_pattern_burst",
+    TamperPattern.SPORADIC: "tamper_pattern_sporadic", TamperPattern.TOO_FEW: "tamper_pattern_too_few",
+}
+
+
 @dataclass(frozen=True)
 class TamperReading:
     at: datetime

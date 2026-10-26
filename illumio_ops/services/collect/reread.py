@@ -169,7 +169,7 @@ def _read_day(fdb: FlowDb, gen: int, settings: Settings, client: PceClient, plan
                     with fdb.writing(gen) as conn:
                         if not bound(conn):
                             return CycleResult(rows, windows, gaps, skipped)
-                        upsert_flows(conn, batch, origin=origin, now=at)
+                        upsert_flows(conn, batch, origin=origin, now=at, increments="late")
                     rows += len(batch)
                 with fdb.writing(gen) as conn:
                     if not bound(conn):

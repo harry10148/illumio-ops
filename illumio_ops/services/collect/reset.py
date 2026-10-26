@@ -16,15 +16,29 @@ from illumio_ops.services import pce_health
 from illumio_ops.services.collect.guard import normalize_target
 from illumio_ops.services.context import AppContext
 from illumio_ops.settings.schema import PceSettings
+from illumio_ops.store import alerts as alerts_store
 from illumio_ops.store.flowdb import binding
 
 # app.sqlite tables that describe one PCE (cleared on a switch) and those that do not.
 # tests_v6/services/collect/test_reset.py checks that every app.sqlite table is in exactly one.
-APP_DB_PCE_DERIVED: tuple[str, ...] = ("pce_probe",)
+APP_DB_PCE_DERIVED: tuple[str, ...] = ("pce_probe", "alert_eval_state")
 # tamper_annotations is the operator's input, not derived data: each row names its PCE and is listed only
 # while that PCE is configured, so switching back finds the notes again.
-APP_DB_PCE_INDEPENDENT: tuple[str, ...] = ("job_health", "tamper_annotations")
-_CLEARERS: dict[str, Callable[[AppContext], None]] = {"pce_probe": pce_health.forget}
+# Alert records are kept the same way (spec §6.4: a PCE switch never touches them): each names its PCE. The
+# evaluation watermarks are not: they point into the flow database the switch clears, so they go with it (a
+# switch back would otherwise resume from a cursor into the old data). Rule state, rule status and channel state
+# belong to the rules and channels, which do not change with the PCE.
+APP_DB_PCE_INDEPENDENT: tuple[str, ...] = ("job_health", "tamper_annotations", "alerts", "alert_deliveries",
+                                           "alert_notes", "alert_rule_state", "alert_rule_status", "channel_state")
+
+
+def _forget_alert_watermarks(ctx: AppContext) -> None:
+    with ctx.db() as conn:
+        alerts_store.clear_eval_state(conn)
+
+
+_CLEARERS: dict[str, Callable[[AppContext], None]] = {"pce_probe": pce_health.forget,
+                                                       "alert_eval_state": _forget_alert_watermarks}
 
 
 @dataclass(frozen=True)

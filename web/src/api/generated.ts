@@ -2,6 +2,48 @@
 /* eslint-disable */
 /**
  * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "PolicyDecision".
+ */
+export type PolicyDecision = ("allowed" | "potentially_blocked" | "blocked" | "unknown")
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "Severity".
+ */
+export type Severity = ("low" | "medium" | "high" | "critical")
+/**
+ * The lateral-movement detectors of spec §6.5.1.
+ * 
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "DetectorKind".
+ */
+export type DetectorKind = ("fanout" | "new_admin_connection" | "pivot_chain" | "blocked_surge" | "non_admin_group" | "cross_env" | "account_fanout" | "unexpected_initiator")
+/**
+ * An event rule fires on the matches of one evaluation (immediate) or on a count within its window.
+ * 
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "ThresholdType".
+ */
+export type ThresholdType = ("immediate" | "count")
+/**
+ * What a system rule watches: the PCE itself, and this product's own collection (5.x's watchdog and
+ * data-loss meta-alerts).
+ * 
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "SystemCheck".
+ */
+export type SystemCheck = ("pce_health" | "collection_failing" | "data_loss" | "job_failing" | "disk_low")
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "RuleAction".
+ */
+export type RuleAction = ("allow" | "deny" | "override_deny")
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "AlertRuleType".
+ */
+export type AlertRuleType = ("event" | "traffic" | "bandwidth" | "volume" | "system" | "lateral")
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
  * via the `definition` "Language".
  */
 export type Language = ("en" | "zh_TW")
@@ -10,6 +52,11 @@ export type Language = ("en" | "zh_TW")
  * via the `definition` "ProbeName".
  */
 export type ProbeName = ("noop" | "health" | "node_available")
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "ChannelKind".
+ */
+export type ChannelKind = ("smtp" | "line" | "telegram" | "teams" | "webhook")
 /**
  * What data collection reads (spec §6.4): everything; events plus short-lived traffic for
  * alerts; or events only.
@@ -24,13 +71,6 @@ export type CollectionMode = ("full" | "alert" | "events_only")
  */
 export type CollectionMode1 = ("full" | "alert" | "events_only")
 /**
- * The lateral-movement detectors of spec §6.5.1.
- * 
- * This interface was referenced by `ContractRoot`'s JSON-Schema
- * via the `definition` "DetectorKind".
- */
-export type DetectorKind = ("fanout" | "new_admin_connection" | "pivot_chain" | "blocked_surge" | "non_admin_group" | "cross_env" | "account_fanout" | "unexpected_initiator")
-/**
  * What a detector run can say besides its detections: "no detection" is only ever OK.
  * 
  * This interface was referenced by `ContractRoot`'s JSON-Schema
@@ -43,6 +83,434 @@ export type DetectorState = ("ok" | "disabled" | "accumulating" | "no_data" | "c
  */
 export type DeploymentType = ("on_prem" | "saas")
 
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "BandwidthRule".
+ */
+export interface BandwidthRule {
+condition: FlowCondition
+cooldown_minutes: number
+enabled: boolean
+id: string
+name: string
+notify: boolean
+pack_key: (string | null)
+severity: (Severity | null)
+threshold_mbps: number
+throttle: (Throttle | null)
+type: "bandwidth"
+window_minutes: number
+}
+/**
+ * A flow filter without its time window: what an alert rule (and later a saved report section) stores.
+ * within() gives the FilterSpec for a window; every field, default and check is FilterSpec's.
+ * 
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "FlowCondition".
+ */
+export interface FlowCondition {
+decisions?: PolicyDecision[]
+dst?: (EndpointFilter | null)
+dst_exclude?: (EndpointFilter | null)
+exclude_ports?: PortProto[]
+exclude_system_accounts?: boolean
+initiator_process?: (string | null)
+initiator_user?: (string | null)
+ports?: PortProto[]
+service_process?: (string | null)
+service_user?: (string | null)
+src?: (EndpointFilter | null)
+src_exclude?: (EndpointFilter | null)
+text?: (string | null)
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "EndpointFilter".
+ */
+export interface EndpointFilter {
+hrefs?: string[]
+ips?: string[]
+labels?: LabelCond[]
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "LabelCond".
+ */
+export interface LabelCond {
+key: string
+/**
+ * @minItems 1
+ */
+values: [string, ...(string)[]]
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "PortProto".
+ */
+export interface PortProto {
+port?: (number | null)
+proto?: (number | null)
+to_port?: (number | null)
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "Throttle".
+ */
+export interface Throttle {
+count: number
+period_minutes: number
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "EventRule".
+ */
+export interface EventRule {
+cooldown_minutes: number
+enabled: boolean
+event_severity: string
+/**
+ * @minItems 1
+ */
+event_types: [string, ...(string)[]]
+id: string
+match_fields: {
+[k: string]: string
+}
+name: string
+notify: boolean
+pack_key: (string | null)
+severity: (Severity | null)
+status: string
+threshold: ThresholdType
+threshold_count: number
+throttle: (Throttle | null)
+type: "event"
+window_minutes: number
+}
+/**
+ * severity None: each alert takes its detection's severity (precursor weighting included).
+ * 
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "LateralRule".
+ */
+export interface LateralRule {
+cooldown_minutes: number
+critical_assets_only: boolean
+/**
+ * @minItems 1
+ */
+detectors: [DetectorKind, ...(DetectorKind)[]]
+enabled: boolean
+id: string
+min_severity: Severity
+name: string
+notify: boolean
+pack_key: (string | null)
+severity: (Severity | null)
+throttle: (Throttle | null)
+type: "lateral"
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "SystemRule".
+ */
+export interface SystemRule {
+check: SystemCheck
+cooldown_minutes: number
+enabled: boolean
+id: string
+name: string
+notify: boolean
+pack_key: (string | null)
+severity: (Severity | null)
+throttle: (Throttle | null)
+type: "system"
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "TrafficRule".
+ */
+export interface TrafficRule {
+condition: FlowCondition
+cooldown_minutes: number
+enabled: boolean
+id: string
+name: string
+notify: boolean
+pack_key: (string | null)
+severity: (Severity | null)
+threshold_connections: number
+throttle: (Throttle | null)
+type: "traffic"
+window_minutes: number
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "VolumeRule".
+ */
+export interface VolumeRule {
+condition: FlowCondition
+cooldown_minutes: number
+enabled: boolean
+id: string
+name: string
+notify: boolean
+pack_key: (string | null)
+severity: (Severity | null)
+threshold_mb: number
+throttle: (Throttle | null)
+type: "volume"
+window_minutes: number
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "RuleWrite".
+ */
+export interface RuleWrite {
+revision: number
+rule: (EventRule | TrafficRule | BandwidthRule | VolumeRule | SystemRule | LateralRule)
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "RuleListItem".
+ */
+export interface RuleListItem {
+display_name: string
+rule: (EventRule | TrafficRule | BandwidthRule | VolumeRule | SystemRule | LateralRule)
+summary: (RuleSummary | null)
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "RuleSummary".
+ */
+export interface RuleSummary {
+fired_7d: number
+last_fired_at: (string | null)
+last_status: (string | null)
+suppressed_cooldown: number
+suppressed_throttle: number
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "RulesView".
+ */
+export interface RulesView {
+items: RuleListItem[]
+pack_missing: number
+revision: number
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "RuleDelete".
+ */
+export interface RuleDelete {
+revision: number
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "PackApply".
+ */
+export interface PackApply {
+mode: ("append_missing" | "replace")
+revision: number
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "RulePreviewRequest".
+ */
+export interface RulePreviewRequest {
+hours: number
+rule: (EventRule | TrafficRule | BandwidthRule | VolumeRule | SystemRule | LateralRule)
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "RulePreview".
+ */
+export interface RulePreview {
+coverage_note: (string | null)
+samples: {
+[k: string]: unknown
+}[]
+status: ("ok" | "not_applicable")
+would_fire: number
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "Coverage".
+ */
+export interface Coverage {
+filled_from_pce: [unknown, unknown][]
+gaps: [unknown, unknown, unknown][]
+source: ("store" | "pce" | "mixed")
+store_from: (string | null)
+store_to: (string | null)
+truncated: boolean
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "AlertEvidence".
+ */
+export interface AlertEvidence {
+coverage: (Coverage | null)
+kind: (("flow" | "event") | null)
+limit_hit: boolean
+rows: {
+[k: string]: unknown
+}[]
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "ExplainRequest".
+ */
+export interface ExplainRequest {
+dst_href: (string | null)
+dst_ip: string
+port: number
+proto: number
+src_href: (string | null)
+src_ip: string
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "ActorRef".
+ */
+export interface ActorRef {
+exclusion?: boolean
+href: (string | null)
+key: (string | null)
+kind: ("label" | "label_group" | "ip_list" | "workload" | "all_workloads" | "virtual_service" | "other")
+name: (string | null)
+value: (string | null)
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "RuleRef".
+ */
+export interface RuleRef {
+consumers: ActorRef[]
+description: (string | null)
+enabled: boolean
+href: string
+providers: ActorRef[]
+rule_type: RuleAction
+ruleset_href: string
+ruleset_name: string
+services: ServiceRef[]
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "ServiceRef".
+ */
+export interface ServiceRef {
+href: (string | null)
+name: (string | null)
+port: (number | null)
+proto: (number | null)
+to_port: (number | null)
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "PolicyExplanation".
+ */
+export interface PolicyExplanation {
+allow: RuleRef[]
+basis: ("active" | "draft")
+deny: RuleRef[]
+override_deny: RuleRef[]
+partial: boolean
+pce_error: (string | null)
+pce_status: (number | null)
+source: ("pce" | "none")
+unresolved: string[]
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "DeliveryView".
+ */
+export interface DeliveryView {
+attempts: number
+channel: string
+last_error: (string | null)
+sent_at: (string | null)
+status: string
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "NoteView".
+ */
+export interface NoteView {
+body: string
+created_at: string
+created_by: string
+id: number
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "AlertDetail".
+ */
+export interface AlertDetail {
+caveats: string[]
+confidence: {
+[k: string]: unknown
+}
+console_link: (string | null)
+deliveries: DeliveryView[]
+evidence_kind: (("flow" | "event") | null)
+facts: {
+[k: string]: unknown
+}
+fired_at: string
+first_seen: string
+grouped: boolean
+id: number
+last_seen: string
+late: boolean
+notes: NoteView[]
+params: {
+[k: string]: unknown
+}
+rule_id: string
+rule_name: string
+rule_type: AlertRuleType
+severity: Severity
+subject_key: string
+summary: string
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "AlertItem".
+ */
+export interface AlertItem {
+caveats: string[]
+deliveries: DeliveryView[]
+fired_at: string
+grouped: boolean
+id: number
+late: boolean
+rule_id: string
+rule_name: string
+rule_type: AlertRuleType
+severity: Severity
+subject_key: string
+summary: string
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "AlertList".
+ */
+export interface AlertList {
+items: AlertItem[]
+page: number
+page_size: number
+total: number
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "NoteAdd".
+ */
+export interface NoteAdd {
+body: string
+}
 /**
  * This interface was referenced by `ContractRoot`'s JSON-Schema
  * via the `definition` "CsrfToken".
@@ -128,6 +596,109 @@ pce: (PceSummary | null)
  */
 export interface Dictionary {
 [k: string]: string
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "ChannelState".
+ */
+export interface ChannelState {
+channel: string
+consecutive_failures: number
+cooldown_until: (string | null)
+last_error: (string | null)
+last_ok_at: (string | null)
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "ChannelsInput".
+ */
+export interface ChannelsInput {
+line: LineInput
+smtp: SmtpInput
+teams: TeamsInput
+telegram: TelegramInput
+webhook: WebhookInput
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "LineInput".
+ */
+export interface LineInput {
+access_token: string
+enabled: boolean
+target_id: string
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "SmtpInput".
+ */
+export interface SmtpInput {
+enabled: boolean
+host: string
+password: string
+port: number
+recipients: string[]
+security: ("none" | "starttls" | "tls")
+sender: string
+username: string
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "TeamsInput".
+ */
+export interface TeamsInput {
+enabled: boolean
+webhook_url: string
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "TelegramInput".
+ */
+export interface TelegramInput {
+bot_token: string
+chat_id: string
+enabled: boolean
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "WebhookInput".
+ */
+export interface WebhookInput {
+enabled: boolean
+url: string
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "ChannelsView".
+ */
+export interface ChannelsView {
+channels: ChannelsInput
+revision: number
+state: ChannelState[]
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "ChannelTest".
+ */
+export interface ChannelTest {
+channel: ChannelKind
+channels?: (ChannelsInput | null)
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "ChannelTestResult".
+ */
+export interface ChannelTestResult {
+error: (string | null)
+ok: boolean
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "ChannelsUpdate".
+ */
+export interface ChannelsUpdate {
+channels: ChannelsInput
+revision: number
 }
 /**
  * This interface was referenced by `ContractRoot`'s JSON-Schema
@@ -622,9 +1193,20 @@ revision: number
 validity_days: number
 }
 
-export type OpId = "auth.csrf" | "auth.login" | "auth.logout" | "auth.me" | "auth.password" | "home.summary" | "i18n.dictionary" | "system.collection.backfill" | "system.collection.get" | "system.collection.status" | "system.collection.update" | "system.display.get" | "system.display.update" | "system.jobs.list" | "system.lateral.get" | "system.lateral.update" | "system.logs.query" | "system.pce.get" | "system.pce.latest" | "system.pce.probe" | "system.pce.update" | "system.security.get" | "system.security.update" | "system.tls.csr" | "system.tls.import" | "system.tls.renew" | "system.tls.status" | "system.tls.update";
+export type OpId = "alert_rules.create" | "alert_rules.delete" | "alert_rules.list" | "alert_rules.pack" | "alert_rules.preview" | "alert_rules.update" | "alerts.evidence" | "alerts.explain" | "alerts.get" | "alerts.list" | "alerts.note_add" | "auth.csrf" | "auth.login" | "auth.logout" | "auth.me" | "auth.password" | "home.summary" | "i18n.dictionary" | "system.channels.get" | "system.channels.test" | "system.channels.update" | "system.collection.backfill" | "system.collection.get" | "system.collection.status" | "system.collection.update" | "system.display.get" | "system.display.update" | "system.jobs.list" | "system.lateral.get" | "system.lateral.update" | "system.logs.query" | "system.pce.get" | "system.pce.latest" | "system.pce.probe" | "system.pce.update" | "system.security.get" | "system.security.update" | "system.tls.csr" | "system.tls.import" | "system.tls.renew" | "system.tls.status" | "system.tls.update";
 
 export interface Requests {
+  "alert_rules.create": RuleWrite;
+  "alert_rules.delete": RuleDelete;
+  "alert_rules.list": undefined;
+  "alert_rules.pack": PackApply;
+  "alert_rules.preview": RulePreviewRequest;
+  "alert_rules.update": RuleWrite;
+  "alerts.evidence": undefined;
+  "alerts.explain": ExplainRequest;
+  "alerts.get": undefined;
+  "alerts.list": undefined;
+  "alerts.note_add": NoteAdd;
   "auth.csrf": undefined;
   "auth.login": LoginRequest;
   "auth.logout": undefined;
@@ -632,6 +1214,9 @@ export interface Requests {
   "auth.password": PasswordChangeRequest;
   "home.summary": undefined;
   "i18n.dictionary": undefined;
+  "system.channels.get": undefined;
+  "system.channels.test": ChannelTest;
+  "system.channels.update": ChannelsUpdate;
   "system.collection.backfill": BackfillRequest;
   "system.collection.get": undefined;
   "system.collection.status": undefined;
@@ -656,6 +1241,17 @@ export interface Requests {
 }
 
 export interface Responses {
+  "alert_rules.create": RulesView;
+  "alert_rules.delete": RulesView;
+  "alert_rules.list": RulesView;
+  "alert_rules.pack": RulesView;
+  "alert_rules.preview": RulePreview;
+  "alert_rules.update": RulesView;
+  "alerts.evidence": AlertEvidence;
+  "alerts.explain": PolicyExplanation;
+  "alerts.get": AlertDetail;
+  "alerts.list": AlertList;
+  "alerts.note_add": AlertDetail;
   "auth.csrf": CsrfToken;
   "auth.login": LoginResult;
   "auth.logout": Empty;
@@ -663,6 +1259,9 @@ export interface Responses {
   "auth.password": CsrfToken;
   "home.summary": HomeSummary;
   "i18n.dictionary": Dictionary;
+  "system.channels.get": ChannelsView;
+  "system.channels.test": ChannelTestResult;
+  "system.channels.update": ChannelsView;
   "system.collection.backfill": BackfillAccepted;
   "system.collection.get": CollectionView;
   "system.collection.status": CollectionStatus;
@@ -687,6 +1286,17 @@ export interface Responses {
 }
 
 export const OPERATIONS = {
+  "alert_rules.create": { method: "POST", path: "/api/alert-rules" },
+  "alert_rules.delete": { method: "DELETE", path: "/api/alert-rules/<rule_id>" },
+  "alert_rules.list": { method: "GET", path: "/api/alert-rules" },
+  "alert_rules.pack": { method: "POST", path: "/api/alert-rules/pack" },
+  "alert_rules.preview": { method: "POST", path: "/api/alert-rules/preview" },
+  "alert_rules.update": { method: "PUT", path: "/api/alert-rules/<rule_id>" },
+  "alerts.evidence": { method: "GET", path: "/api/alerts/<int:alert_id>/evidence" },
+  "alerts.explain": { method: "POST", path: "/api/alerts/<int:alert_id>/explain" },
+  "alerts.get": { method: "GET", path: "/api/alerts/<int:alert_id>" },
+  "alerts.list": { method: "GET", path: "/api/alerts" },
+  "alerts.note_add": { method: "POST", path: "/api/alerts/<int:alert_id>/notes" },
   "auth.csrf": { method: "GET", path: "/api/auth/csrf" },
   "auth.login": { method: "POST", path: "/api/auth/login" },
   "auth.logout": { method: "POST", path: "/api/auth/logout" },
@@ -694,6 +1304,9 @@ export const OPERATIONS = {
   "auth.password": { method: "POST", path: "/api/auth/password" },
   "home.summary": { method: "GET", path: "/api/home/summary" },
   "i18n.dictionary": { method: "GET", path: "/api/i18n/<lang>" },
+  "system.channels.get": { method: "GET", path: "/api/system/channels" },
+  "system.channels.test": { method: "POST", path: "/api/system/channels/test" },
+  "system.channels.update": { method: "PUT", path: "/api/system/channels" },
   "system.collection.backfill": { method: "POST", path: "/api/system/collection/backfill" },
   "system.collection.get": { method: "GET", path: "/api/system/collection" },
   "system.collection.status": { method: "GET", path: "/api/system/collection/status" },
@@ -721,6 +1334,7 @@ export const VALUES = {
   "AlertRuleType": [
     "bandwidth",
     "event",
+    "lateral",
     "system",
     "traffic",
     "volume"
@@ -729,6 +1343,13 @@ export const VALUES = {
     "supported",
     "unknown",
     "unsupported"
+  ],
+  "ChannelKind": [
+    "line",
+    "smtp",
+    "teams",
+    "telegram",
+    "webhook"
   ],
   "CollectionMode": [
     "alert",
@@ -743,6 +1364,14 @@ export const VALUES = {
   "DataOrigin": [
     "backfill",
     "ingest"
+  ],
+  "DeliveryStatus": [
+    "failed",
+    "grouped",
+    "no_channel",
+    "not_notified",
+    "pending",
+    "sent"
   ],
   "DeploymentType": [
     "on_prem",
@@ -878,6 +1507,13 @@ export const VALUES = {
     "low",
     "medium"
   ],
+  "SystemCheck": [
+    "collection_failing",
+    "data_loss",
+    "disk_low",
+    "job_failing",
+    "pce_health"
+  ],
   "TamperAction": [
     "add_chain",
     "add_rule",
@@ -895,6 +1531,10 @@ export const VALUES = {
     "regular_cycle",
     "sporadic",
     "too_few"
+  ],
+  "ThresholdType": [
+    "count",
+    "immediate"
   ],
   "VisibilityLevel": [
     "enhanced_data_collection",

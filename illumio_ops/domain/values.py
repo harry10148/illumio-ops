@@ -28,6 +28,41 @@ class AlertRuleType(StrEnum):
     BANDWIDTH = "bandwidth"
     VOLUME = "volume"
     SYSTEM = "system"
+    LATERAL = "lateral"
+
+
+class ThresholdType(StrEnum):
+    """An event rule fires on the matches of one evaluation (immediate) or on a count within its window."""
+    IMMEDIATE = "immediate"
+    COUNT = "count"
+
+
+class ChannelKind(StrEnum):
+    SMTP = "smtp"
+    LINE = "line"
+    TELEGRAM = "telegram"
+    TEAMS = "teams"
+    WEBHOOK = "webhook"
+
+
+class SystemCheck(StrEnum):
+    """What a system rule watches: the PCE itself, and this product's own collection (5.x's watchdog and
+    data-loss meta-alerts)."""
+    PCE_HEALTH = "pce_health"
+    COLLECTION_FAILING = "collection_failing"
+    DATA_LOSS = "data_loss"
+    JOB_FAILING = "job_failing"
+    DISK_LOW = "disk_low"
+
+
+class DeliveryStatus(StrEnum):
+    """One alert on one channel. An alert that is not sent still has a row saying why."""
+    PENDING = "pending"
+    SENT = "sent"
+    FAILED = "failed"
+    NOT_NOTIFIED = "not_notified"   # the rule records only
+    GROUPED = "grouped"             # tampering with a known cause
+    NO_CHANNEL = "no_channel"       # no channel was enabled
 
 
 class DeploymentType(StrEnum):
@@ -100,6 +135,16 @@ class Severity(StrEnum):
 
 
 SEVERITY_ORDER: tuple[Severity, ...] = (Severity.LOW, Severity.MEDIUM, Severity.HIGH, Severity.CRITICAL)
+
+
+# PCE event severities (err / warning / info) as alert severities, for event rules set to "as the event".
+EVENT_SEVERITY_TO_ALERT: dict[str, Severity] = {
+    "err": Severity.HIGH, "error": Severity.HIGH, "warning": Severity.MEDIUM, "info": Severity.LOW,
+}
+
+
+def alert_severity_of_event(event_severity: str | None) -> Severity:
+    return EVENT_SEVERITY_TO_ALERT.get((event_severity or "").strip().lower(), Severity.MEDIUM)
 
 
 def raise_severity(s: Severity, steps: int = 1) -> Severity:
@@ -234,6 +279,8 @@ LATERAL_PORTS_DEFAULT: tuple[tuple[int, str], ...] = (
     (445, "SMB"), (135, "RPC"), (139, "NetBIOS"), (3389, "RDP"), (22, "SSH"), (5985, "WinRM-HTTP"),
     (5986, "WinRM-HTTPS"), (23, "Telnet"), (2049, "NFS"), (111, "RPC Portmapper"), (389, "LDAP"),
     (636, "LDAPS"), (88, "Kerberos"), (1433, "MSSQL"), (3306, "MySQL"), (5432, "PostgreSQL"),
+    # In the PCE's admin category too; here so a PCE that reports no ransomware-protection services counts them.
+    (5900, "VNC"), (5938, "TeamViewer"),
 )
 
 # REST API guide: flow_summary records allowed, blocked and potentially blocked connections;
@@ -280,6 +327,7 @@ _ENUMS: tuple[type[StrEnum], ...] = (
     FlowDirection, VisibilityLevel, TamperClassification, IngestSource, DataOrigin, CapabilityState,
     CollectionMode, Severity, DetectorKind, DetectorState, SegmentDimension, SegmentMetric, SegmentView,
     EdgeState, TamperPattern, TamperAction, PrecursorKind, RansomwareTrafficClass, FocusKind, Confidence,
+    ThresholdType, ChannelKind, SystemCheck, DeliveryStatus,
 )
 
 

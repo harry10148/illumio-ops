@@ -170,3 +170,24 @@ def test_public_port_and_endpoint_matchers_agree_with_matches():
     assert endpoint_matches(ep, href=None, ip="10.1.2.3", labels={})
     assert endpoint_matches(ep, href="/w/1", ip="192.168.0.1", labels={"app": "fin"})
     assert not endpoint_matches(ep, href="/w/1", ip="192.168.0.1", labels={"app": "hr"})
+
+
+def test_flow_condition_fields_equal_filter_spec_minus_window():
+    from illumio_ops.domain.filter import FlowCondition
+    assert set(FlowCondition.model_fields) == set(FilterSpec.model_fields) - {"start", "end"}
+    for name, f in FlowCondition.model_fields.items():
+        assert f.annotation == FilterSpec.model_fields[name].annotation, name
+        assert f.default == FilterSpec.model_fields[name].default, name
+
+
+def test_within_round_trips():
+    from illumio_ops.domain.filter import (
+        EndpointFilter,
+        FlowCondition,
+        LabelCond,
+        PortProto,
+    )
+    cond = FlowCondition(src=EndpointFilter(labels=(LabelCond(key="env", values=("Prod",)),)),
+                         ports=(PortProto(port=22, proto=6),), decisions=("blocked",), initiator_user="root")
+    spec = cond.within(T0, T1)
+    assert (spec.start, spec.end) == (T0, T1) and spec.condition() == cond

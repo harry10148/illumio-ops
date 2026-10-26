@@ -81,9 +81,11 @@ export async function call<Op extends OpId>(
   op: Op,
   body?: Requests[Op],
   params?: Record<string, string>,
+  query?: Record<string, string>,
 ): Promise<Envelope<Responses[Op]>> {
   const { method, path } = OPERATIONS[op];
-  const url = buildPath(path, params);
+  const search = query ? new URLSearchParams(Object.entries(query).filter(([, v]) => v !== "")).toString() : "";
+  const url = buildPath(path, params) + (search ? `?${search}` : "");
 
   const send = async (): Promise<Response> => {
     const headers: Record<string, string> = { Accept: "application/json" };

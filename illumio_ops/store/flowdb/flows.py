@@ -11,6 +11,7 @@ import sqlite3
 from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
+from typing import Literal
 
 from illumio_ops.domain.flows import FlowRecord, ranges_within, record_key
 from illumio_ops.domain.identity import endpoint_key
@@ -58,8 +59,10 @@ _INSERT = (
     "src_href, dst_href, src_hostname, dst_hostname, src_managed, dst_managed, src_mode, dst_mode, "
     "src_label_set, dst_label_set, port, proto, initiator_process, initiator_user, service_process, "
     "service_user, windows_service, policy_decision, first_detected, last_detected, num_connections, "
-    "bytes_in, bytes_out, own_bytes_in, own_bytes_out, state, transmission, network_href, origin, ingested_at) "
-    "VALUES (?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+    "bytes_in, bytes_out, own_bytes_in, own_bytes_out, state, transmission, network_href, origin, ingested_at, "
+    "counted_connections, counted_bytes) "  # a new record: none of its counts recorded as growth yet
+    "VALUES (?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, "
+    "0, 0)"
 )
 
 
@@ -92,9 +95,9 @@ def _refresh(conn: sqlite3.Connection, row_id: int, r: FlowRecord, origin: DataO
 
 
 # The record's own counts (a primary row's bytes_* are its connection's).
-_STORED = ("SELECT id, direction, last_detected, num_connections, own_bytes_in AS bytes_in, "
+_STORED = ("SELECT id, conn_key, direction, last_detected, num_connections, own_bytes_in AS bytes_in, "
            "own_bytes_out AS bytes_out, initiator_process, "
-           "initiator_user, service_process, service_user, origin FROM flows WHERE record_key = ?")
+           "initiator_user, service_process, service_user, origin, counted_connections FROM flows WHERE record_key = ?")
 
 
 def _adds_nothing(old: sqlite3.Row, r: FlowRecord, origin: DataOrigin) -> bool:
@@ -235,15 +238,79 @@ def split_unseen(conn: sqlite3.Connection, records: Sequence[FlowRecord]) -> tup
     return new, grown
 
 
+Increments = Literal["cycle", "late", "none"]
+# Rule windows are at most 24 hours; the traffic overlap and some margin on top.
+INCREMENT_KEEP = timedelta(hours=26)
+
+_CONNECTION_ROWS = ("SELECT record_key, is_primary, num_connections, bytes_in, bytes_out, own_bytes_in, own_bytes_out, "
+                    "first_detected, last_detected, counted_connections, counted_bytes FROM flows WHERE conn_key = ?")
+
+
+def _bytes_total(bytes_in: int | None, bytes_out: int | None) -> int | None:
+    return None if bytes_in is None and bytes_out is None else (bytes_in or 0) + (bytes_out or 0)
+
+
+def _settle_untracked(conn: sqlite3.Connection, conn_key: str) -> None:
+    """A connection written before increments were kept per connection: what it holds now counts as recorded,
+    before this batch changes any of its rows (only rows still untracked are set)."""
+    rows = conn.execute(_CONNECTION_ROWS, (conn_key,)).fetchall()
+    primary = next((r for r in rows if r["is_primary"]), None)
+    if primary is None:
+        return
+    conn.execute("UPDATE flows SET counted_connections = ?, counted_bytes = ? "
+                 "WHERE conn_key = ? AND counted_connections IS NULL",
+                 (max(int(r["num_connections"]) for r in rows),
+                  _bytes_total(primary["bytes_in"], primary["bytes_out"]) or 0, conn_key))
+
+
+def _record_growth(conn: sqlite3.Connection, conn_key: str, *, before_last: dict[str, str | None],
+                   increments: Increments, stamp: str) -> None:
+    """Record how much one connection grew past what its rows say was recorded already, then mark that much
+    recorded on every row. A connection's count is the largest of its records' (both sides count the same
+    connections), its bytes the primary row's. before_last: each written record's last_detected before this
+    batch (None: new), for the flow time the growth spans."""
+    rows = conn.execute(_CONNECTION_ROWS, (conn_key,)).fetchall()
+    primary = next((r for r in rows if r["is_primary"]), None)
+    if primary is None:
+        return
+    total = max(int(r["num_connections"]) for r in rows)
+    total_bytes = _bytes_total(primary["bytes_in"], primary["bytes_out"])
+    # A row that never had its counts recorded (written before 0005, joined by a pairing) counts in full.
+    counted = max(int(r["num_connections"] if r["counted_connections"] is None else r["counted_connections"])
+                  for r in rows)
+    counted_bytes = max((r["counted_bytes"] if r["counted_bytes"] is not None
+                         else _bytes_total(r["own_bytes_in"], r["own_bytes_out"]) if r["counted_connections"] is None
+                         else 0) or 0 for r in rows)
+    grew = max(0, total - counted)
+    grew_bytes = None if total_bytes is None else max(0, total_bytes - counted_bytes)
+    if increments != "none" and (grew > 0 or grew_bytes):
+        last = max(str(r["last_detected"]) for r in rows)
+        prior = [before_last.get(r["record_key"], r["last_detected"]) for r in rows]
+        known = [p for p in prior if p is not None]
+        if known:
+            seconds = (datetime.fromisoformat(last) - datetime.fromisoformat(max(known))).total_seconds()
+        else:  # every record of it is new: the growth spans the connection's whole range
+            seconds = (datetime.fromisoformat(last)
+                       - datetime.fromisoformat(min(str(r["first_detected"]) for r in rows))).total_seconds() + 1
+        conn.execute("INSERT INTO flow_increments (record_key, observed_at, connections, bytes, seconds, late) "
+                     "VALUES (?, ?, ?, ?, ?, ?)", (primary["record_key"], stamp, grew, grew_bytes, max(seconds, 0.0),
+                                                   int(increments == "late")))
+    conn.execute("UPDATE flows SET counted_connections = ?, counted_bytes = ? WHERE conn_key = ?",
+                 (max(counted, total), max(counted_bytes, total_bytes or 0), conn_key))
+
+
 def upsert_flows(conn: sqlite3.Connection, records: Sequence[FlowRecord], *, origin: DataOrigin,
-                 now: datetime) -> UpsertStats:
+                 now: datetime, increments: Increments = "none") -> UpsertStats:
     """Write a batch in one transaction (nested in the caller's, if any). The caller holds
-    FlowDb.write_lock."""
+    FlowDb.write_lock. increments: "cycle" for live collection and "late" for the daily re-read record how
+    much each touched connection grew (flow_increments); a backfill records none (spec §7: history is not
+    alerted), but its counts are marked recorded all the same, so later growth is measured from them."""
     stamp = db_time(now)
     inserted = refreshed = paired = unchanged = 0
     days: set[str] = set()
     tuples: set[tuple[str, str, int | None, int]] = set()
     written: set[str] = set()
+    before_last: dict[str, str | None] = {}
     with transaction(conn):
         for r in records:
             key = record_key(r)
@@ -252,6 +319,9 @@ def upsert_flows(conn: sqlite3.Connection, records: Sequence[FlowRecord], *, ori
                 unchanged += 1
                 continue
             written.add(key)
+            before_last[key] = str(old["last_detected"]) if old is not None else None
+            if old is not None and old["counted_connections"] is None:
+                _settle_untracked(conn, str(old["conn_key"]))
             if old is not None:
                 days.add(str(old["last_detected"])[:10])
                 _refresh(conn, int(old["id"]), r, origin, stamp)
@@ -269,11 +339,14 @@ def upsert_flows(conn: sqlite3.Connection, records: Sequence[FlowRecord], *, ori
         for conn_key in ordered:
             _merge_connection(conn, conn_key)
             _update_baselines(conn, conn_key)
+            _record_growth(conn, conn_key, before_last=before_last, increments=increments, stamp=stamp)
         for i in range(0, len(ordered), 500):  # every row of a changed connection may have changed
             chunk = ordered[i:i + 500]
             days |= {d for (d,) in conn.execute(
                 f"SELECT DISTINCT substr(last_detected, 1, 10) FROM flows WHERE conn_key IN ({','.join('?' * len(chunk))})",
                 chunk)}
+        if increments != "none":
+            conn.execute("DELETE FROM flow_increments WHERE observed_at < ?", (db_time(now - INCREMENT_KEEP),))
         archive.mark_stale(conn, "flows", days)
         conn.executemany("INSERT INTO rollup_state (day, dirty) VALUES (?, 1) "
                          "ON CONFLICT(day) DO UPDATE SET dirty = 1", [(d,) for d in sorted(days)])

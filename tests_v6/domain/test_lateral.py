@@ -51,3 +51,11 @@ def test_selector_union_semantics():
 
 def test_stale_selector_detected():
     assert stale_selectors([("app", "Finance"), ("app", "Gone")], {("app", "Finance")}) == [("app", "Gone")]
+
+
+def test_builtin_covers_remote_control_without_the_pce():
+    """VNC and TeamViewer are in the PCE's admin category; the built-in list carries them too, so a PCE that does
+    not report ransomware-protection services still counts them (P4: cover as much as the vendor list)."""
+    from illumio_ops.domain.values import LATERAL_PORTS_DEFAULT
+    s = effective_admin_ports(LATERAL_PORTS_DEFAULT, (), extra=(), removed=(), include_pce=False)
+    assert s.matches(5900, 6) and s.matches(5938, 6)

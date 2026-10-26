@@ -163,6 +163,19 @@ def open_gaps(conn: sqlite3.Connection, source: str | None = None) -> list[Gap]:
             for r in rows]
 
 
+def gaps_after(conn: sqlite3.Connection, after_id: int) -> list[Gap]:
+    """Every gap recorded after this id, resolved or not (a gap filled within a minute was still data loss)."""
+    rows = conn.execute("SELECT * FROM ingest_gaps WHERE id > ? ORDER BY id", (after_id,)).fetchall()
+    return [Gap(id=r["id"], source=r["source"], window_start=datetime.fromisoformat(r["window_start"]),
+                window_end=datetime.fromisoformat(r["window_end"]), kind=r["kind"], detail=r["detail"],
+                recorded_at=datetime.fromisoformat(r["recorded_at"]), resolved_at=_t(r["resolved_at"]))
+            for r in rows]
+
+
+def max_gap_id(conn: sqlite3.Connection) -> int:
+    return int(conn.execute("SELECT COALESCE(MAX(id), 0) FROM ingest_gaps").fetchone()[0])
+
+
 def delete_gaps_before(conn: sqlite3.Connection, cutoff: datetime) -> int:
     with transaction(conn):
         return conn.execute("DELETE FROM ingest_gaps WHERE recorded_at < ?", (db_time(cutoff),)).rowcount

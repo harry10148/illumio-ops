@@ -21,11 +21,13 @@ from pydantic import (
     model_validator,
 )
 
+from illumio_ops.domain.alertpack import best_practice_rules
+from illumio_ops.domain.alertrules import AlertRule
 from illumio_ops.domain.identity import normalize_process
 from illumio_ops.domain.netaddr import parse_ip_token
 from illumio_ops.domain.values import CollectionMode, DeploymentType, Language
 
-SCHEMA_VERSION: Literal[3] = 3
+SCHEMA_VERSION: Literal[4] = 4
 _UTC_OFFSET = re.compile(r"UTC([+-]\d+(?:\.\d+)?)")
 
 
@@ -296,8 +298,122 @@ class LateralSettings(StrictModel):
         return v
 
 
+def _https_or_empty(v: str) -> str:
+    if v and not re.match(r"^https://[^/\s]+", v):
+        raise ValueError("must be an https:// URL")
+    return v
+
+
+HttpsUrl = Annotated[str, AfterValidator(_https_or_empty)]
+
+
+def _no_control(v: str) -> str:
+    # A control character in a token breaks the request line, and the error the HTTP library raises holds it.
+    if any(ord(c) < 32 or ord(c) == 127 for c in v):
+        raise ValueError("must not contain control characters")
+    return v
+
+
+Secret = Annotated[str, AfterValidator(_no_control)]
+
+
+def _require(enabled: bool, fields: dict[str, object]) -> None:
+    missing = [name for name, value in fields.items() if not value]
+    if enabled and missing:
+        raise ValueError(f"an enabled channel needs {', '.join(missing)}")
+
+
+class SmtpChannel(StrictModel):
+    enabled: bool
+    host: str
+    port: int = Field(ge=1, le=65535)
+    security: Literal["none", "starttls", "tls"]
+    username: str  # empty: no sign-in
+    password: Secret
+    sender: str
+    recipients: tuple[str, ...]
+
+    @field_validator("recipients")
+    @classmethod
+    def _addresses(cls, v: tuple[str, ...]) -> tuple[str, ...]:
+        out = tuple(a.strip() for a in v)
+        if any("@" not in a or any(c in a for c in "\r\n,; ") for a in out):
+            raise ValueError("every recipient must be one email address")
+        return out
+
+    @model_validator(mode="after")
+    def _complete(self) -> SmtpChannel:
+        _require(self.enabled, {"host": self.host, "sender": self.sender, "recipients": self.recipients})
+        return self
+
+
+class LineChannel(StrictModel):
+    enabled: bool
+    access_token: Secret
+    target_id: str
+
+    @model_validator(mode="after")
+    def _complete(self) -> LineChannel:
+        _require(self.enabled, {"access_token": self.access_token, "target_id": self.target_id})
+        return self
+
+
+class TelegramChannel(StrictModel):
+    enabled: bool
+    bot_token: Secret
+    chat_id: str
+
+    @model_validator(mode="after")
+    def _complete(self) -> TelegramChannel:
+        _require(self.enabled, {"bot_token": self.bot_token, "chat_id": self.chat_id})
+        return self
+
+
+class TeamsChannel(StrictModel):
+    enabled: bool
+    webhook_url: HttpsUrl
+
+    @model_validator(mode="after")
+    def _complete(self) -> TeamsChannel:
+        _require(self.enabled, {"webhook_url": self.webhook_url})
+        return self
+
+
+class WebhookChannel(StrictModel):
+    enabled: bool
+    url: HttpsUrl
+
+    @model_validator(mode="after")
+    def _complete(self) -> WebhookChannel:
+        _require(self.enabled, {"url": self.url})
+        return self
+
+
+class AlertChannels(StrictModel):
+    smtp: SmtpChannel
+    line: LineChannel
+    telegram: TelegramChannel
+    teams: TeamsChannel
+    webhook: WebhookChannel
+
+
+class AlertSettings(StrictModel):
+    """Notification channels, the alert rules (spec §6.5 告警) and how long alert records are kept."""
+    channels: AlertChannels
+    rules: tuple[AlertRule, ...] = Field(max_length=300)
+    retention_days: int = Field(ge=1, le=3650)
+
+    @field_validator("rules")
+    @classmethod
+    def _unique_ids(cls, v: tuple[AlertRule, ...]) -> tuple[AlertRule, ...]:
+        ids = [r.id for r in v]
+        if len(ids) != len(set(ids)):
+            raise ValueError("rule ids must be unique")
+        return v
+
+
 class Settings(StrictModel):
-    schema_version: Literal[3]
+    schema_version: Literal[4]
     revision: int = Field(ge=0)
     pce: PceSettings
     web: WebSettings
@@ -308,6 +424,23 @@ class Settings(StrictModel):
     # baseline on the data-collection page must not fail on a field of another page. The exposure
     # graph uses the smaller of the two and says so (P3 Task 1 ruling).
     lateral: LateralSettings
+    alerts: AlertSettings
+
+
+def default_alerts(*, notify_new_defaults: bool) -> AlertSettings:
+    """Every channel off, alert records kept 90 days, the best-practice pack (spec §6.5.2)."""
+    return AlertSettings(
+        channels=AlertChannels(
+            smtp=SmtpChannel(enabled=False, host="", port=25, security="none", username="", password="", sender="",
+                             recipients=()),
+            line=LineChannel(enabled=False, access_token="", target_id=""),
+            telegram=TelegramChannel(enabled=False, bot_token="", chat_id=""),
+            teams=TeamsChannel(enabled=False, webhook_url=""),
+            webhook=WebhookChannel(enabled=False, url=""),
+        ),
+        rules=best_practice_rules(notify_new_defaults=notify_new_defaults),
+        retention_days=90,
+    )
 
 
 def default_collection() -> CollectionSettings:
@@ -371,4 +504,5 @@ def default_settings(*, password_hash: str, secret_key: str, port: int = 5001) -
         logging=LoggingSettings(level="INFO"),
         collection=default_collection(),
         lateral=default_lateral(),
+        alerts=default_alerts(notify_new_defaults=True),
     )
