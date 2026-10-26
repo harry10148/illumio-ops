@@ -18,7 +18,7 @@ from illumio_ops.domain.alertrules import AlertRule
 from illumio_ops.migrate.report import Action, MigrationItem
 from illumio_ops.settings.schema import AlertChannels, AlertSettings, default_alerts
 
-_RULE: TypeAdapter[Any] = TypeAdapter(AlertRule)  # type: ignore[arg-type]  # an Annotated union
+_RULE: TypeAdapter[Any] = TypeAdapter(AlertRule)  # an Annotated union
 _PD = {0: "allowed", 1: "potentially_blocked", 2: "blocked"}  # -1, 3 or missing: every decision
 _THROTTLE = re.compile(r"^\s*(\d+)\s*/\s*(\d+)([smhd]?)\s*$", re.IGNORECASE)
 _UNIT = {"s": 1 / 60, "m": 1, "h": 60, "d": 1440}
