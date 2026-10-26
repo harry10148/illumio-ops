@@ -3998,6 +3998,7 @@
     "AlertRuleType": [
       "bandwidth",
       "event",
+      "lateral",
       "system",
       "traffic",
       "volume"
@@ -4006,6 +4007,13 @@
       "supported",
       "unknown",
       "unsupported"
+    ],
+    "ChannelKind": [
+      "line",
+      "smtp",
+      "teams",
+      "telegram",
+      "webhook"
     ],
     "CollectionMode": [
       "alert",
@@ -4020,6 +4028,14 @@
     "DataOrigin": [
       "backfill",
       "ingest"
+    ],
+    "DeliveryStatus": [
+      "failed",
+      "grouped",
+      "no_channel",
+      "not_notified",
+      "pending",
+      "sent"
     ],
     "DeploymentType": [
       "on_prem",
@@ -4155,6 +4171,13 @@
       "low",
       "medium"
     ],
+    "SystemCheck": [
+      "collection_failing",
+      "data_loss",
+      "disk_low",
+      "job_failing",
+      "pce_health"
+    ],
     "TamperAction": [
       "add_chain",
       "add_rule",
@@ -4172,6 +4195,10 @@
       "regular_cycle",
       "sporadic",
       "too_few"
+    ],
+    "ThresholdType": [
+      "count",
+      "immediate"
     ],
     "VisibilityLevel": [
       "enhanced_data_collection",

@@ -721,6 +721,7 @@ export const VALUES = {
   "AlertRuleType": [
     "bandwidth",
     "event",
+    "lateral",
     "system",
     "traffic",
     "volume"
@@ -729,6 +730,13 @@ export const VALUES = {
     "supported",
     "unknown",
     "unsupported"
+  ],
+  "ChannelKind": [
+    "line",
+    "smtp",
+    "teams",
+    "telegram",
+    "webhook"
   ],
   "CollectionMode": [
     "alert",
@@ -743,6 +751,14 @@ export const VALUES = {
   "DataOrigin": [
     "backfill",
     "ingest"
+  ],
+  "DeliveryStatus": [
+    "failed",
+    "grouped",
+    "no_channel",
+    "not_notified",
+    "pending",
+    "sent"
   ],
   "DeploymentType": [
     "on_prem",
@@ -878,6 +894,13 @@ export const VALUES = {
     "low",
     "medium"
   ],
+  "SystemCheck": [
+    "collection_failing",
+    "data_loss",
+    "disk_low",
+    "job_failing",
+    "pce_health"
+  ],
   "TamperAction": [
     "add_chain",
     "add_rule",
@@ -895,6 +918,10 @@ export const VALUES = {
     "regular_cycle",
     "sporadic",
     "too_few"
+  ],
+  "ThresholdType": [
+    "count",
+    "immediate"
   ],
   "VisibilityLevel": [
     "enhanced_data_collection",

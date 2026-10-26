@@ -10,6 +10,7 @@ from __future__ import annotations
 import ast
 from pathlib import Path
 
+import pytest
 from pydantic import BaseModel
 
 from illumio_ops.settings.schema import Settings
@@ -80,8 +81,28 @@ SETTINGS_READERS: dict[str, str] = {
 }
 # Fields whose reader arrives later: value = the task or phase that adds it.
 PENDING_READERS: dict[str, str] = {
-    "pce.console_url": "P3",
-    "display.timezone": "P3",
+    "pce.console_url": "P4-T6",
+    "display.timezone": "P4-T6",
+    "alerts.channels.smtp.enabled": "P4-T6",
+    "alerts.channels.smtp.host": "P4-T6",
+    "alerts.channels.smtp.port": "P4-T6",
+    "alerts.channels.smtp.security": "P4-T6",
+    "alerts.channels.smtp.username": "P4-T6",
+    "alerts.channels.smtp.password": "P4-T6",
+    "alerts.channels.smtp.sender": "P4-T6",
+    "alerts.channels.smtp.recipients": "P4-T6",
+    "alerts.channels.line.enabled": "P4-T6",
+    "alerts.channels.line.access_token": "P4-T6",
+    "alerts.channels.line.target_id": "P4-T6",
+    "alerts.channels.telegram.enabled": "P4-T6",
+    "alerts.channels.telegram.bot_token": "P4-T6",
+    "alerts.channels.telegram.chat_id": "P4-T6",
+    "alerts.channels.teams.enabled": "P4-T6",
+    "alerts.channels.teams.webhook_url": "P4-T6",
+    "alerts.channels.webhook.enabled": "P4-T6",
+    "alerts.channels.webhook.url": "P4-T6",
+    "alerts.rules": "P4-T5",
+    "alerts.retention_days": "P4-T5",
 }
 # Fields with no runtime reader by design.
 STRUCTURAL: dict[str, str] = {
@@ -185,6 +206,12 @@ def test_selftest_proper_reader_is_green(tmp_path):
 
 def test_no_p1_pending_left():
     assert [p for p, due in PENDING_READERS.items() if due.startswith("P1-")] == []
+
+
+@pytest.mark.xfail(strict=True, reason="the readers arrive in P4 Tasks 5 and 6; remove this marker then")
+def test_no_p4_pending_left():
+    # Tasks 5 and 6 add these readers; the gate is green again by the end of Task 9.
+    assert [p for p, due in PENDING_READERS.items() if due.startswith("P4-")] == []
 
 
 def test_no_p2_pending_left():

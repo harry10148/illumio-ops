@@ -12,6 +12,7 @@ from typing import Any
 
 from illumio_ops.settings.schema import (
     SCHEMA_VERSION,
+    default_alerts,
     default_collection,
     default_lateral,
 )
@@ -31,10 +32,17 @@ def _v2_to_v3(data: dict[str, Any]) -> dict[str, Any]:
     return data
 
 
+def _v3_to_v4(data: dict[str, Any]) -> dict[str, Any]:
+    # A v3 file is a v6 install, not a 5.x upgrade: the new default rules notify (spec §7 is about 5.x).
+    data["alerts"] = default_alerts(notify_new_defaults=True).model_dump(mode="json")
+    return data
+
+
 # source version -> function producing source version + 1
 UPGRADES: dict[int, Callable[[dict[str, Any]], dict[str, Any]]] = {
     1: _v1_to_v2,
     2: _v2_to_v3,
+    3: _v3_to_v4,
 }
 
 

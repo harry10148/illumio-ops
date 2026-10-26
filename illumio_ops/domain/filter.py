@@ -75,9 +75,9 @@ class EndpointFilter(_Model):
         return not (self.labels or self.hrefs or self.ips)
 
 
-class FilterSpec(_Model):
-    start: AwareDatetime
-    end: AwareDatetime
+class FlowCondition(_Model):
+    """A flow filter without its time window: what an alert rule (and later a saved report section) stores.
+    within() gives the FilterSpec for a window; every field, default and check is FilterSpec's."""
     src: EndpointFilter | None = None
     dst: EndpointFilter | None = None
     src_exclude: EndpointFilter | None = None
@@ -91,6 +91,14 @@ class FilterSpec(_Model):
     service_user: str | None = None
     text: str | None = None
     exclude_system_accounts: bool = False
+
+    def within(self, start: datetime, end: datetime) -> FilterSpec:
+        return FilterSpec(start=start, end=end, **dict(self))
+
+
+class FilterSpec(FlowCondition):
+    start: AwareDatetime
+    end: AwareDatetime
 
     # The store keeps milliseconds: a bound finer than that is moved inward to the next whole
     # millisecond, so the SQL bound and the per-record predicate see the same window.
@@ -110,6 +118,9 @@ class FilterSpec(_Model):
         if self.end <= self.start:
             raise ValueError("end must be after start")
         return self
+
+    def condition(self) -> FlowCondition:
+        return FlowCondition(**{k: v for k, v in self if k not in ("start", "end")})
 
 
 # ── shared helpers ───────────────────────────────────────────────────────────

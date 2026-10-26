@@ -17,7 +17,7 @@ def _pce(**kw):
 
 def test_default_settings_values():
     s = default_settings(password_hash=HASH, secret_key=KEY, port=5443)
-    assert s.schema_version == 3 and s.revision == 0
+    assert s.schema_version == 4 and s.revision == 0
     assert s.pce.url == "" and s.pce.deployment_type is DeploymentType.ON_PREM
     assert s.web.port == 5443 and s.web.username == "illumio" and s.web.must_change_password is False
     assert s.web.session_lifetime_seconds == 28800 and s.web.allowed_ips == ()
@@ -77,7 +77,58 @@ def test_redact_masks_nonempty_secrets_only(initial):
     r = redact(initial)
     assert r["web"]["password_hash"] == MASK and r["web"]["secret_key"] == MASK
     assert r["pce"]["api_key"] == "" and r["pce"]["api_secret"] == ""  # empty stays empty: "not set"
-    assert SECRET_FIELDS == {"pce.api_key", "pce.api_secret", "web.password_hash", "web.secret_key"}
+    assert SECRET_FIELDS == {"pce.api_key", "pce.api_secret", "web.password_hash", "web.secret_key",
+                             "alerts.channels.smtp.password", "alerts.channels.line.access_token",
+                             "alerts.channels.telegram.bot_token", "alerts.channels.teams.webhook_url",
+                             "alerts.channels.webhook.url"}
+
+
+def _with_alerts(initial, **channels):
+    d = initial.model_dump(mode="json")
+    for name, values in channels.items():
+        d["alerts"]["channels"][name].update(values)
+    return d
+
+
+def test_default_alerts(initial):
+    a = initial.alerts
+    assert a.retention_days == 90 and not any(getattr(a.channels, c).enabled for c in
+                                              ("smtp", "line", "telegram", "teams", "webhook"))
+    assert len(a.rules) == 25 and all(r.notify for r in a.rules)
+
+
+def test_redact_masks_channel_secrets(initial):
+    d = _with_alerts(initial, line={"access_token": "tok", "target_id": "U1"}, teams={"webhook_url": "https://t/x?sig=1"})
+    r = redact(Settings.model_validate(d))
+    assert r["alerts"]["channels"]["line"]["access_token"] == MASK and r["alerts"]["channels"]["line"]["target_id"] == "U1"
+    assert r["alerts"]["channels"]["teams"]["webhook_url"] == MASK and r["alerts"]["channels"]["webhook"]["url"] == ""
+
+
+def test_enabled_smtp_requires_host_sender_recipients(initial):
+    with pytest.raises(ValidationError):
+        Settings.model_validate(_with_alerts(initial, smtp={"enabled": True}))
+    ok = _with_alerts(initial, smtp={"enabled": True, "host": "mail", "sender": "a@b", "recipients": ["c@d"]})
+    assert Settings.model_validate(ok).alerts.channels.smtp.enabled
+    with pytest.raises(ValidationError):
+        Settings.model_validate(_with_alerts(initial, smtp={"recipients": ["not-an-address"]}))
+
+
+def test_enabled_line_requires_token_and_target(initial):
+    with pytest.raises(ValidationError):
+        Settings.model_validate(_with_alerts(initial, line={"enabled": True, "access_token": "t"}))
+
+
+def test_channel_urls_must_be_https(initial):
+    for name, field in (("teams", "webhook_url"), ("webhook", "url")):
+        with pytest.raises(ValidationError):
+            Settings.model_validate(_with_alerts(initial, **{name: {field: "http://hook.example/x"}}))
+
+
+def test_duplicate_rule_ids_rejected(initial):
+    d = initial.model_dump(mode="json")
+    d["alerts"]["rules"].append(d["alerts"]["rules"][0])
+    with pytest.raises(ValidationError):
+        Settings.model_validate(d)
 
 
 def test_timezone_accepts_the_5x_formats():

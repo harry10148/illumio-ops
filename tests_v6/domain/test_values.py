@@ -15,7 +15,7 @@ def test_policy_decision_values_are_exact_strings():
 
 
 def test_alert_rule_types_include_volume():
-    assert {v.value for v in AlertRuleType} == {"event", "traffic", "bandwidth", "volume", "system"}
+    assert {v.value for v in AlertRuleType} == {"event", "traffic", "bandwidth", "volume", "system", "lateral"}
 
 
 def test_draft_decision_unknown_value_passes_through():
@@ -68,3 +68,15 @@ def test_lateral_ports_default_is_the_5x_list():
     assert [p for p, _ in LATERAL_PORTS_DEFAULT] == [445, 135, 139, 3389, 22, 5985, 5986, 23, 2049, 111, 389, 636,
                                                     88, 1433, 3306, 5432]
     assert dict(LATERAL_PORTS_DEFAULT)[111] == "RPC Portmapper" and dict(LATERAL_PORTS_DEFAULT)[5985] == "WinRM-HTTP"
+
+
+def test_alert_value_domains():
+    from illumio_ops.domain.values import Severity, alert_severity_of_event
+    d = export_value_domains()
+    assert "lateral" in d["AlertRuleType"]
+    assert d["ChannelKind"] == ["line", "smtp", "teams", "telegram", "webhook"]
+    assert d["SystemCheck"] == ["collection_failing", "data_loss", "disk_low", "job_failing", "pce_health"]
+    assert d["ThresholdType"] == ["count", "immediate"]
+    assert set(d["DeliveryStatus"]) == {"pending", "sent", "failed", "not_notified", "grouped", "no_channel"}
+    assert [alert_severity_of_event(s) for s in ("err", "error", "warning", "info", None, "odd")] == [
+        Severity.HIGH, Severity.HIGH, Severity.MEDIUM, Severity.LOW, Severity.MEDIUM, Severity.MEDIUM]
