@@ -362,6 +362,30 @@ def test_lateral_fixed_rule_severity_does_not_realert(ctx):
     assert evaluate_lateral(ctx, now=NOW + minutes(4)).fired == 0
 
 
+def test_concurrent_lateral_evaluations_alert_once(ctx, monkeypatch):
+    """collect_traffic and collect_backfill both evaluate lateral rules; run together, both read the same
+    watermark and each recorded the detection (review)."""
+    import threading
+    import time as _time
+    evaluate_lateral(ctx, now=NOW)
+    _detect(ctx, at=NOW + minutes(1))
+    real = evaluate.analysis.detections_changed_since
+
+    def slow(conn, mark, *, limit):
+        rows = real(conn, mark, limit=limit)
+        _time.sleep(0.3)
+        return rows
+    monkeypatch.setattr(evaluate.analysis, "detections_changed_since", slow)
+    threads = [threading.Thread(target=evaluate_lateral, args=(ctx,), kwargs={"now": NOW + minutes(2)})
+               for _ in range(2)]
+    for t in threads:
+        t.start()
+        _time.sleep(0.05)
+    for t in threads:
+        t.join()
+    assert len(_alerts(ctx)) == 1
+
+
 def test_lateral_notify_false_recorded(ctx):
     def quiet(d):
         for r in d["alerts"]["rules"]:

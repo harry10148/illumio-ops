@@ -8,8 +8,10 @@ after a PCE switch — only sets the watermark to now: history (and the initial 
 """
 from __future__ import annotations
 
+import functools
 import json
-from collections.abc import Collection, Sequence
+import threading
+from collections.abc import Callable, Collection, Sequence
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
@@ -80,6 +82,21 @@ SOURCE_EVENTS = "events"
 SOURCE_TRAFFIC = "traffic"
 SOURCE_LATERAL = "lateral"
 SOURCE_SYSTEM = "system"
+
+
+# One evaluation per source at a time: two jobs evaluate lateral rules (traffic and backfill) and two the system
+# checks (probe and alerts_system); run together, both would read the same watermark and record the same alerts.
+_LOCKS = {source: threading.Lock() for source in (SOURCE_EVENTS, SOURCE_TRAFFIC, SOURCE_LATERAL, SOURCE_SYSTEM)}
+
+
+def _one_at_a_time(source: str) -> Callable[[Callable[..., EvalRun]], Callable[..., EvalRun]]:
+    def wrap(fn: Callable[..., EvalRun]) -> Callable[..., EvalRun]:
+        @functools.wraps(fn)
+        def run(*args: Any, **kwargs: Any) -> EvalRun:
+            with _LOCKS[source]:
+                return fn(*args, **kwargs)
+        return run
+    return wrap
 
 
 class EvalRun(BaseModel):
@@ -200,6 +217,7 @@ def _tamper(trigger: Trigger, matched: Sequence[EventFact], ctx_cache: dict[str,
     return Trigger(**{**trigger.__dict__, "params": params, "grouped_annotation": grouped})
 
 
+@_one_at_a_time(SOURCE_EVENTS)
 def evaluate_events(ctx: AppContext, *, now: datetime | None = None) -> EvalRun:
     at = _now(now)
     s = ctx.settings.current()
@@ -245,6 +263,7 @@ def increment_facts(totals: Any, at: datetime, watermark: datetime | None) -> In
         gaps=tuple(totals.coverage.gaps), latency_seconds=int((at - watermark).total_seconds()) if watermark else None)
 
 
+@_one_at_a_time(SOURCE_TRAFFIC)
 def evaluate_traffic(ctx: AppContext, *, now: datetime | None = None) -> EvalRun:
     at = _now(now)
     s = ctx.settings.current()
@@ -320,6 +339,7 @@ def _mark(value: str) -> tuple[str, int]:
     return stamp, int(row_id or 0)
 
 
+@_one_at_a_time(SOURCE_LATERAL)
 def evaluate_lateral(ctx: AppContext, *, now: datetime | None = None) -> EvalRun:
     at = _now(now)
     s = ctx.settings.current()
@@ -366,6 +386,7 @@ def evaluate_lateral(ctx: AppContext, *, now: datetime | None = None) -> EvalRun
 
 # ── system checks ────────────────────────────────────────────────────────────
 
+@_one_at_a_time(SOURCE_SYSTEM)
 def evaluate_system(ctx: AppContext, *, now: datetime | None = None,
                     checks: Collection[SystemCheck] | None = None) -> EvalRun:
     at = _now(now)
