@@ -71,6 +71,14 @@ export type CollectionMode = ("full" | "alert" | "events_only")
  */
 export type CollectionMode1 = ("full" | "alert" | "events_only")
 /**
+ * The three kinds of management port (spec §6.5.8): remote execution and control, directory and
+ * authentication, and databases. Each detector reads the classes it is about.
+ * 
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "PortClass".
+ */
+export type PortClass = ("remote" | "directory" | "database")
+/**
  * What a detector run can say besides its detections: "no detection" is only ever OK.
  * 
  * This interface was referenced by `ContractRoot`'s JSON-Schema
@@ -80,14 +88,6 @@ export type DetectorState = ("ok" | "disabled" | "accumulating" | "no_data" | "c
 /**
  * The three kinds of management port (spec §6.5.8): remote execution and control, directory and
  * authentication, and databases. Each detector reads the classes it is about.
- */
-export type PortClass = ("remote" | "directory" | "database")
-/**
- * The three kinds of management port (spec §6.5.8): remote execution and control, directory and
- * authentication, and databases. Each detector reads the classes it is about.
- * 
- * This interface was referenced by `ContractRoot`'s JSON-Schema
- * via the `definition` "PortClass".
  */
 export type PortClass1 = ("remote" | "directory" | "database")
 /**
@@ -877,6 +877,7 @@ jobs: JobView[]
  * via the `definition` "AdminPortView".
  */
 export interface AdminPortView {
+category: PortClass
 name: (string | null)
 port: number
 proto: (number | null)
@@ -983,7 +984,7 @@ suspicious_tools: string[]
  * via the `definition` "PortEntry".
  */
 export interface PortEntry {
-category?: PortClass
+category?: PortClass1
 port: number
 proto: (number | null)
 }

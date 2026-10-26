@@ -12,18 +12,24 @@ Time is the VEN-reported timestamp_range of a daily flow bucket, at ten-minute g
 from __future__ import annotations
 
 from collections import Counter
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Callable, Collection, Mapping, Sequence
 from dataclasses import dataclass, field, replace
 from datetime import datetime, timedelta
 from typing import Any
 
 from illumio_ops.domain.filter import EndpointFilter, FilterSpec
 from illumio_ops.domain.identity import account_key, is_system_account
-from illumio_ops.domain.lateral import AdminPortSet, HostInfo
+from illumio_ops.domain.lateral import (
+    EXECUTION,
+    EXECUTION_OR_DATA,
+    AdminPortSet,
+    HostInfo,
+)
 from illumio_ops.domain.segment import FlowSegment
 from illumio_ops.domain.values import (
     DetectorKind,
     DetectorState,
+    PortClass,
     PrecursorKind,
     SegmentView,
     Severity,
@@ -147,6 +153,12 @@ def not_blocked(o: Obs) -> bool:
     return not o.decision.startswith("blocked")
 
 
+def of_class(inp: DetectorInput, classes: Collection[PortClass]) -> list[Obs]:
+    """The management-port observations on ports of these classes (spec §6.5.8: each detector reads its own)."""
+    ports = inp.config.admin_ports
+    return [o for o in inp.obs if ports.matches(o.port, o.proto, classes)]
+
+
 def _dst_host(o: Obs, inp: DetectorInput) -> HostInfo:
     return inp.hosts(o.dst_key, o.dst_ip, o.dst_hostname, o.dst_labels)
 
@@ -156,12 +168,13 @@ def _endpoint(href: str | None, ip: str) -> EndpointFilter:
 
 
 def evidence(inp: DetectorInput, start: datetime, end: datetime, *, src: Obs | None = None,
-             dst: Obs | None = None) -> FlowSegment:
-    """The detail segment that shows a detection's connections in the workbench."""
+             dst: Obs | None = None, classes: Collection[PortClass] | None = None) -> FlowSegment:
+    """The detail segment that shows a detection's connections in the workbench, on the ports of the classes its
+    detector reads."""
     spec = FilterSpec(start=start, end=end if end > start else start + timedelta(seconds=1),
                       src=_endpoint(src.src_href, src.src_ip) if src else None,
                       dst=_endpoint(dst.dst_href, dst.dst_ip) if dst else None,
-                      ports=inp.config.admin_ports.port_filters())
+                      ports=inp.config.admin_ports.port_filters(classes))
     return FlowSegment(filter=spec, view=SegmentView.DETAIL, limit=200)
 
 
@@ -177,7 +190,7 @@ def detect_fanout(inp: DetectorInput) -> tuple[list[Detection], DetectorStatus]:
     fanout_window (5.x B006: high when an allowed connection is among them, else medium)."""
     cfg = inp.config
     by_src: dict[str, list[Obs]] = {}
-    for o in inp.obs:
+    for o in of_class(inp, EXECUTION_OR_DATA):
         if not_blocked(o):
             by_src.setdefault(o.src_key, []).append(o)
     out = []
@@ -210,7 +223,7 @@ def detect_fanout(inp: DetectorInput) -> tuple[list[Detection], DetectorStatus]:
             summary={"targets": best[0], "sample_targets": _names(window_rows),
                      "ports": sorted({o.port for o in window_rows if o.port is not None}),
                      "window_minutes": int(cfg.fanout_window / timedelta(minutes=1))},
-            segment=evidence(inp, last - cfg.fanout_window, last, src=window_rows[-1]),
+            segment=evidence(inp, last - cfg.fanout_window, last, src=window_rows[-1], classes=EXECUTION_OR_DATA),
             confidence=DetectionConfidence(incomplete_gaps=inp.gaps)))
     return out, DetectorStatus(DetectorKind.FANOUT, DetectorState.OK)
 
@@ -224,7 +237,7 @@ def detect_new_admin(inp: DetectorInput) -> tuple[list[Detection], DetectorStatu
                                   {"days": round(inp.baseline_days, 1), "required": inp.baseline_required})
     lo, hi = inp.window
     seen: dict[tuple[str, str, int, int], Obs] = {}
-    for o in inp.obs:
+    for o in of_class(inp, EXECUTION_OR_DATA):
         if not evaluable(o, inp):
             continue
         key = (o.src_key, o.dst_key, o.port if o.port is not None else -1, o.proto)
@@ -239,7 +252,7 @@ def detect_new_admin(inp: DetectorInput) -> tuple[list[Detection], DetectorStatu
             subject_key=src, severity=Severity.HIGH if critical else Severity.MEDIUM,
             first_seen=inp.baseline_first_seen[(src, dst, port, proto)], last_seen=o.last, critical_asset=critical,
             summary={"target": o.dst_hostname or o.dst_ip, "port": port, "proto": proto, "decision": o.decision},
-            segment=evidence(inp, o.first, o.last, src=o, dst=o),
+            segment=evidence(inp, o.first, o.last, src=o, dst=o, classes=EXECUTION_OR_DATA),
             confidence=DetectionConfidence(baseline_days=round(inp.baseline_days, 1), incomplete_gaps=inp.gaps)))
     return out, DetectorStatus(DetectorKind.NEW_ADMIN_CONNECTION, DetectorState.OK)
 
@@ -280,7 +293,7 @@ def detect_pivot_chain(inp: DetectorInput) -> tuple[list[Detection], DetectorSta
     Flow times come in ten-minute reporting buckets, so the two legs may share one: the summary says the
     legs connect in time, never that it is a proven chain."""
     cfg = inp.config
-    legs = [o for o in inp.obs if not_blocked(o)]
+    legs = [o for o in of_class(inp, EXECUTION) if not_blocked(o)]
     from_host: dict[str, list[Obs]] = {}
     for o in legs:
         from_host.setdefault(o.src_key, []).append(o)
@@ -304,7 +317,7 @@ def detect_pivot_chain(inp: DetectorInput) -> tuple[list[Detection], DetectorSta
             last_seen=max(ab.last, bc.last), critical_asset=critical,
             summary={"via": ab.dst_hostname or ab.dst_ip, "target": bc.dst_hostname or bc.dst_ip,
                      "ports": [ab.port, bc.port], "chains_through_pivot": per_pivot[b]},
-            segment=evidence(inp, min(ab.first, bc.first), max(ab.last, bc.last), src=ab),
+            segment=evidence(inp, min(ab.first, bc.first), max(ab.last, bc.last), src=ab, classes=EXECUTION),
             confidence=DetectionConfidence(incomplete_gaps=inp.gaps)))
     return out, DetectorStatus(DetectorKind.PIVOT_CHAIN, DetectorState.OK)
 
@@ -374,9 +387,10 @@ def detect_blocked_surge(inp: DetectorInput) -> tuple[list[Detection], DetectorS
     return out, DetectorStatus(DetectorKind.BLOCKED_SURGE, DetectorState.OK)
 
 
-def _per_tuple(inp: DetectorInput, keep: Callable[[Obs], bool]) -> dict[tuple[str, str, int, int], Obs]:
+def _per_tuple(inp: DetectorInput, keep: Callable[[Obs], bool],
+               classes: Collection[PortClass]) -> dict[tuple[str, str, int, int], Obs]:
     out: dict[tuple[str, str, int, int], Obs] = {}
-    for o in inp.obs:
+    for o in of_class(inp, classes):
         if evaluable(o, inp) and keep(o):
             out.setdefault((o.src_key, o.dst_key, o.port if o.port is not None else -1, o.proto), o)
     return out
@@ -389,14 +403,14 @@ def detect_non_admin_group(inp: DetectorInput) -> tuple[list[Detection], Detecto
         return [], DetectorStatus(DetectorKind.NON_ADMIN_GROUP, DetectorState.DISABLED, reason)
     out = []
     for (src, dst, port, proto), o in sorted(_per_tuple(inp, lambda o: not_blocked(o)
-                                                        and not _src_host(o, inp).admin_group).items()):
+                                                        and not _src_host(o, inp).admin_group, EXECUTION).items()):
         critical = _dst_host(o, inp).critical
         out.append(Detection(
             detector=DetectorKind.NON_ADMIN_GROUP, fingerprint=f"nag|{src}|{dst}|{port}|{proto}", subject_key=src,
             severity=Severity.HIGH if critical else Severity.MEDIUM, first_seen=o.first, last_seen=o.last,
             critical_asset=critical,
             summary={"target": o.dst_hostname or o.dst_ip, "port": port, "proto": proto, "decision": o.decision},
-            segment=evidence(inp, o.first, o.last, src=o, dst=o),
+            segment=evidence(inp, o.first, o.last, src=o, dst=o, classes=EXECUTION),
             confidence=DetectionConfidence(incomplete_gaps=inp.gaps)))
     return out, DetectorStatus(DetectorKind.NON_ADMIN_GROUP, DetectorState.OK)
 
@@ -410,7 +424,7 @@ def detect_cross_env(inp: DetectorInput) -> tuple[list[Detection], DetectorStatu
                                   {"label_key": cfg.environment_label_key})
     key = cfg.environment_label_key
     out = []
-    for (src, dst, port, proto), o in sorted(_per_tuple(inp, not_blocked).items()):
+    for (src, dst, port, proto), o in sorted(_per_tuple(inp, not_blocked, EXECUTION_OR_DATA).items()):
         se, de = _src_host(o, inp).labels.get(key), _dst_host(o, inp).labels.get(key)
         if not (se and de and se != de):
             continue
@@ -420,7 +434,7 @@ def detect_cross_env(inp: DetectorInput) -> tuple[list[Detection], DetectorStatu
             last_seen=o.last, critical_asset=_dst_host(o, inp).critical,
             summary={"target": o.dst_hostname or o.dst_ip, "src_env": se, "dst_env": de, "port": port,
                      "decision": o.decision},
-            segment=evidence(inp, o.first, o.last, src=o, dst=o),
+            segment=evidence(inp, o.first, o.last, src=o, dst=o, classes=EXECUTION_OR_DATA),
             confidence=DetectionConfidence(incomplete_gaps=inp.gaps)))
     return out, DetectorStatus(DetectorKind.CROSS_ENV, DetectorState.OK)
 
@@ -429,7 +443,7 @@ def detect_account_fanout(inp: DetectorInput) -> tuple[list[Detection], Detector
     """One initiating account starting management-port connections to at least account_fanout_targets
     hosts within its window. Only as good as the user field's coverage, which every result states."""
     cfg = inp.config
-    rows = [o for o in inp.obs if not_blocked(o)]
+    rows = [o for o in of_class(inp, EXECUTION) if not_blocked(o)]
     in_window = [o for o in rows if evaluable(o, inp)]
     covered = [o for o in in_window if o.initiator_user]
     if in_window and not covered:
@@ -458,7 +472,7 @@ def detect_account_fanout(inp: DetectorInput) -> tuple[list[Detection], Detector
                      "window_minutes": int(cfg.account_fanout_window / timedelta(minutes=1))},
             segment=FlowSegment(filter=FilterSpec(start=last - cfg.account_fanout_window, end=last,
                                                   initiator_user=window_rows[-1].initiator_user,
-                                                  ports=cfg.admin_ports.port_filters()),
+                                                  ports=cfg.admin_ports.port_filters(EXECUTION)),
                                 view=SegmentView.DETAIL, limit=200),
             confidence=DetectionConfidence(field="initiator_user", covered=len(covered), total=len(in_window),
                                            incomplete_gaps=inp.gaps)))
@@ -475,7 +489,7 @@ def detect_unexpected_initiator(inp: DetectorInput) -> tuple[list[Detection], De
     found: dict[tuple[str, str, int, int], Obs] = {}
     judged = not_evaluable = 0
     listed: list[Obs] = []
-    for o in inp.obs:
+    for o in of_class(inp, EXECUTION):
         if not evaluable(o, inp) or o.port is None:
             continue
         expected = cfg.expected.get((o.port, o.proto), cfg.expected.get((o.port, None)))
@@ -499,7 +513,7 @@ def detect_unexpected_initiator(inp: DetectorInput) -> tuple[list[Detection], De
             subject_key=src, severity=Severity.HIGH if critical else Severity.MEDIUM, first_seen=o.first,
             last_seen=o.last, critical_asset=critical,
             summary={"process": process, "port": port, "proto": proto, "target": o.dst_hostname or o.dst_ip},
-            segment=evidence(inp, o.first, o.last, src=o),
+            segment=evidence(inp, o.first, o.last, src=o, classes=EXECUTION),
             confidence=DetectionConfidence(field="initiator_process", covered=judged, total=judged + not_evaluable,
                                            incomplete_gaps=inp.gaps)))
     if not not_evaluable:
@@ -579,8 +593,12 @@ def dedup_windows(cfg: DetectorConfig) -> dict[str, timedelta]:
     }
 
 
-# The detectors that read management-port connections; the blocked-surge detector reads every port.
-MANAGEMENT_DETECTORS = frozenset(DetectorKind) - {DetectorKind.BLOCKED_SURGE}
+# The detectors that read management-port connections, listed (a detector added later is not one by default);
+# the blocked-surge detector reads every port.
+MANAGEMENT_DETECTORS: frozenset[DetectorKind] = frozenset({
+    DetectorKind.FANOUT, DetectorKind.NEW_ADMIN_CONNECTION, DetectorKind.PIVOT_CHAIN, DetectorKind.NON_ADMIN_GROUP,
+    DetectorKind.CROSS_ENV, DetectorKind.ACCOUNT_FANOUT, DetectorKind.UNEXPECTED_INITIATOR,
+})
 
 
 def run_detectors(inp: DetectorInput) -> tuple[list[Detection], list[DetectorStatus]]:

@@ -8,7 +8,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel
 
-from illumio_ops.domain.values import DetectorKind, DetectorState
+from illumio_ops.domain.values import DetectorKind, DetectorState, PortClass
 from illumio_ops.services.analysis.context import load_lateral_context
 from illumio_ops.services.context import AppContext
 from illumio_ops.store.flowdb import analysis
@@ -21,6 +21,7 @@ class AdminPortView(BaseModel):
     proto: int | None
     name: str | None
     source: Literal["builtin", "pce", "added"]
+    category: PortClass
 
 
 class LabelChoice(BaseModel):
@@ -74,7 +75,8 @@ def lateral_overview(ctx: AppContext, *, now: datetime | None = None) -> Lateral
     for k, v in sorted(lc.known_labels):
         by_key.setdefault(k, []).append(v)
     return LateralOverview(
-        effective_ports=[AdminPortView(port=e.port, proto=e.proto, name=e.name, source=e.source)
+        effective_ports=[AdminPortView(port=e.port, proto=e.proto, name=e.name, source=e.source,
+                                                   category=e.category)
                          for e in lc.admin_ports.entries],
         label_choices=[LabelChoice(key=k, values=vs[:MAX_LABEL_VALUES], truncated=len(vs) > MAX_LABEL_VALUES)
                        for k, vs in sorted(by_key.items())],

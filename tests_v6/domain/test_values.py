@@ -65,10 +65,16 @@ def test_new_value_domains_exported():
     assert set(d["Confidence"]) == {"high", "medium", "low"}
 
 
-def test_lateral_ports_default_is_the_5x_list_plus_remote_control():
-    assert [p for p, _ in LATERAL_PORTS_DEFAULT] == [445, 135, 139, 3389, 22, 5985, 5986, 23, 2049, 111, 389, 636,
-                                                    88, 1433, 3306, 5432, 5900, 5938]
-    assert dict(LATERAL_PORTS_DEFAULT)[111] == "RPC Portmapper" and dict(LATERAL_PORTS_DEFAULT)[5985] == "WinRM-HTTP"
+def test_lateral_ports_default_is_the_5x_list_in_three_classes():
+    from illumio_ops.domain.values import DIRECTORY_PORTS, PortClass
+    by_class: dict = {}
+    for port, _, cls in LATERAL_PORTS_DEFAULT:
+        by_class.setdefault(cls, set()).add(port)
+    assert by_class[PortClass.REMOTE] == {445, 135, 139, 3389, 22, 5985, 5986, 23, 2049, 111, 5900, 5938}
+    assert by_class[PortClass.DIRECTORY] == DIRECTORY_PORTS == {88, 464, 389, 636, 3268, 3269, 9389}
+    assert by_class[PortClass.DATABASE] == {1433, 3306, 5432}
+    names = {p: n for p, n, _ in LATERAL_PORTS_DEFAULT}
+    assert names[111] == "RPC Portmapper" and names[5985] == "WinRM-HTTP" and len(names) == len(LATERAL_PORTS_DEFAULT)
 
 
 def test_alert_value_domains():

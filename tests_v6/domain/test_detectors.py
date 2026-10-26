@@ -5,6 +5,7 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from illumio_ops.domain.detectors import (
+    MANAGEMENT_DETECTORS,
     DetectorConfig,
     DetectorInput,
     Obs,
@@ -335,7 +336,7 @@ def test_backfill_rows_never_count_toward_thresholds():
 def test_empty_admin_port_set_disables_management_detectors():
     # Final review #8: no management ports must not mean "every port".
     cfg = replace(CFG, admin_ports=effective_admin_ports(LATERAL_PORTS_DEFAULT, (), extra=(),
-                                                         removed=[(p, None) for p, _ in LATERAL_PORTS_DEFAULT],
+                                                         removed=[(p, None) for p, *_ in LATERAL_PORTS_DEFAULT],
                                                          include_pce=False))
     dets, statuses = run_detectors(inp(fan("/w/a", 12, port=443), cfg=cfg))
     assert dets == []
@@ -388,3 +389,69 @@ def test_blocked_surge_first_seen_is_bounded_by_its_window():
     long = obs("/w/a", "/w/long", decision="blocked", minutes_ago=6, first_ago=DAY_LONG)
     [d] = detect_blocked_surge(inp([], blocked=[long] + _blocked("/w/a", 4)))[0]
     assert d.first_seen >= d.last_seen - CFG.blocked_window
+
+
+# ── management ports in three classes (spec §6.5.8) ──────────────────────────
+EXEC_OR_DATA_KINDS = {DetectorKind.FANOUT, DetectorKind.NEW_ADMIN_CONNECTION, DetectorKind.CROSS_ENV}
+
+
+def _mixed(src, n_each, **kw):
+    """n_each targets on each of 389, 88, 1433 and 445."""
+    return [obs(src, f"/w/{port}-{i:02d}", port=port, **kw) for port in (389, 88, 1433, 445) for i in range(n_each)]
+
+
+def test_fanout_port_classes():
+    [d], _ = detect_fanout(inp(_mixed("/w/a", 5)))  # 5 on 1433 + 5 on 445 = 10; directory ports do not count
+    assert d.summary["targets"] == 10 and set(d.summary["ports"]) == {445, 1433}
+    assert {p.port for p in d.segment.filter.ports} >= {445, 1433} and not {389, 88} & {p.port for p in d.segment.filter.ports}
+
+
+def test_new_admin_connection_port_classes():
+    rows = _mixed("/w/a", 1)
+    first = {(o.src_key, o.dst_key, o.port, o.proto): NOW - timedelta(minutes=10) for o in rows}
+    dets, _ = detect_new_admin(inp(rows, first_seen=first))
+    assert {d.summary["port"] for d in dets} == {445, 1433}
+
+
+def test_cross_env_port_classes():
+    rows = [replace(o, src_labels={"env": "Prod"}, dst_labels={"env": "Dev"}) for o in _mixed("/w/a", 1)]
+    dets, _ = detect_cross_env(inp(rows))
+    assert {d.summary["port"] for d in dets} == {445, 1433}
+
+
+def test_pivot_chain_port_classes():
+    rows = [obs("/w/a", "/w/b", port=port, minutes_ago=20) for port in (389, 1433)] + \
+           [obs("/w/b", "/w/c", port=port, minutes_ago=10) for port in (88, 1433)]
+    assert detect_pivot_chain(inp(rows))[0] == []
+    rows += [obs("/w/a", "/w/b", port=445, minutes_ago=20), obs("/w/b", "/w/c", port=22, minutes_ago=10)]
+    [d], _ = detect_pivot_chain(inp(rows))
+    assert d.summary["ports"] == [445, 22]
+
+
+def test_non_admin_group_port_classes():
+    cfg = replace(CFG, admin_groups_configured=True)
+    dets, _ = detect_non_admin_group(inp(_mixed("/w/a", 1), cfg=cfg))
+    assert {d.summary["port"] for d in dets} == {445}
+
+
+def test_account_fanout_port_classes():
+    rows = [replace(o, initiator_user="corp\\bob") for o in _mixed("/w/a", 6)]  # 6 per port
+    assert detect_account_fanout(inp(rows))[0] == []  # only the 6 on 445 count, below 10
+    [d], _ = detect_account_fanout(inp(rows + [replace(o, initiator_user="corp\\bob")
+                                               for o in fan("/w/a", 10, port=3389)]))
+    assert d.summary["targets"] == 16
+
+
+def test_unexpected_initiator_port_classes():
+    cfg = replace(CFG, expected={**CFG.expected, (389, 6): frozenset({"lsass.exe"}),
+                                 (1433, 6): frozenset({"sqlservr.exe"})})
+    rows = [obs("/w/a", "/w/b", port=port, proc="powershell.exe") for port in (389, 1433, 445)]
+    dets, _ = detect_unexpected_initiator(inp(rows, cfg=cfg))
+    assert {d.summary["port"] for d in dets} == {445}
+
+
+def test_no_admin_ports_disables_only_management_detectors():
+    assert DetectorKind.BLOCKED_SURGE not in MANAGEMENT_DETECTORS
+    assert MANAGEMENT_DETECTORS == {DetectorKind.FANOUT, DetectorKind.NEW_ADMIN_CONNECTION, DetectorKind.PIVOT_CHAIN,
+                                    DetectorKind.NON_ADMIN_GROUP, DetectorKind.CROSS_ENV, DetectorKind.ACCOUNT_FANOUT,
+                                    DetectorKind.UNEXPECTED_INITIATOR}

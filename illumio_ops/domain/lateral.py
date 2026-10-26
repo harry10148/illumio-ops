@@ -8,6 +8,7 @@ from functools import cached_property
 from typing import Literal
 
 from illumio_ops.domain.filter import PortProto
+from illumio_ops.domain.values import PortClass
 
 Selector = tuple[str, str]  # (label key, label value)
 
@@ -18,6 +19,13 @@ class AdminPort:
     proto: int | None  # None = any protocol
     name: str | None
     source: Literal["builtin", "pce", "added"]
+    category: PortClass = PortClass.REMOTE
+
+
+# Which classes each kind of reader takes (spec §6.5.8).
+EXECUTION: frozenset[PortClass] = frozenset({PortClass.REMOTE})
+EXECUTION_OR_DATA: frozenset[PortClass] = frozenset({PortClass.REMOTE, PortClass.DATABASE})
+GRAPH_CLASSES = EXECUTION_OR_DATA  # the exposure graph: directory edges would make every member reach the DCs
 
 
 @dataclass(frozen=True)
@@ -25,30 +33,45 @@ class AdminPortSet:
     entries: tuple[AdminPort, ...]
 
     @cached_property
-    def _lookup(self) -> frozenset[tuple[int, int | None]]:
-        return frozenset((e.port, e.proto) for e in self.entries)
+    def _lookup(self) -> dict[tuple[int, int | None], PortClass]:
+        out: dict[tuple[int, int | None], PortClass] = {}
+        for e in self.entries:
+            out.setdefault((e.port, e.proto), e.category)
+        return out
 
-    def matches(self, port: int | None, proto: int) -> bool:
-        # Read for every baseline row of the exposure graph: a set lookup, not a scan of the entries.
-        return port is not None and ((port, None) in self._lookup or (port, proto) in self._lookup)
+    def class_of(self, port: int | None, proto: int) -> PortClass | None:
+        # Read for every baseline row of the exposure graph: a dict lookup, not a scan of the entries.
+        if port is None:
+            return None
+        found = self._lookup.get((port, proto))
+        return found if found is not None else self._lookup.get((port, None))
+
+    def matches(self, port: int | None, proto: int, classes: Collection[PortClass] | None = None) -> bool:
+        found = self.class_of(port, proto)
+        return found is not None and (classes is None or found in classes)
 
     @cached_property
-    def _filters(self) -> tuple[PortProto, ...]:
-        return tuple(dict.fromkeys(PortProto(port=e.port, proto=e.proto) for e in self.entries))
+    def _filters(self) -> dict[frozenset[PortClass] | None, tuple[PortProto, ...]]:
+        return {}
 
-    def port_filters(self) -> tuple[PortProto, ...]:
-        return self._filters  # every detection's evidence segment carries it
+    def port_filters(self, classes: Collection[PortClass] | None = None) -> tuple[PortProto, ...]:
+        """Every detection's evidence segment carries the ports of the classes its detector reads."""
+        key = None if classes is None else frozenset(classes)
+        if key not in self._filters:
+            self._filters[key] = tuple(dict.fromkeys(PortProto(port=e.port, proto=e.proto) for e in self.entries
+                                                     if key is None or e.category in key))
+        return self._filters[key]
 
 
-def effective_admin_ports(builtin: Sequence[tuple[int, str]], pce_admin: Sequence[tuple[int, int, str]],
-                          extra: Sequence[tuple[int, int | None]], removed: Sequence[tuple[int, int | None]],
-                          include_pce: bool) -> AdminPortSet:
-    """Built-in list ∪ the PCE's high-risk services of category admin (when included) ∪ ports added, minus
-    the ports removed; a removal without a protocol removes the port for every protocol."""
-    candidates = [AdminPort(p, None, name, "builtin") for p, name in builtin]
+def effective_admin_ports(builtin: Sequence[tuple[int, str, PortClass]], pce_admin: Sequence[tuple[int, int, str]],
+                          extra: Sequence[tuple[int, int | None, PortClass]],
+                          removed: Sequence[tuple[int, int | None]], include_pce: bool) -> AdminPortSet:
+    """Built-in list ∪ the PCE's high-risk services of category admin (when included; remote execution) ∪ ports
+    added, minus the ports removed; a removal without a protocol removes the port for every protocol."""
+    candidates = [AdminPort(p, None, name, "builtin", cls) for p, name, cls in builtin]
     if include_pce:
-        candidates += [AdminPort(p, proto, name, "pce") for p, proto, name in pce_admin]
-    candidates += [AdminPort(p, proto, None, "added") for p, proto in extra]
+        candidates += [AdminPort(p, proto, name, "pce", PortClass.REMOTE) for p, proto, name in pce_admin]
+    candidates += [AdminPort(p, proto, None, "added", cls) for p, proto, cls in extra]
 
     def gone(e: AdminPort) -> bool:
         return any(p == e.port and (proto is None or proto == e.proto) for p, proto in removed)

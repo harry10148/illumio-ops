@@ -11585,6 +11585,9 @@
         "$defs": {
           "AdminPortView": {
             "properties": {
+              "category": {
+                "$ref": "#/$defs/PortClass"
+              },
               "name": {
                 "anyOf": [
                   {
@@ -11625,7 +11628,8 @@
               "port",
               "proto",
               "name",
-              "source"
+              "source",
+              "category"
             ],
             "title": "AdminPortView",
             "type": "object"
@@ -12610,6 +12614,9 @@
         "$defs": {
           "AdminPortView": {
             "properties": {
+              "category": {
+                "$ref": "#/$defs/PortClass"
+              },
               "name": {
                 "anyOf": [
                   {
@@ -12650,7 +12657,8 @@
               "port",
               "proto",
               "name",
-              "source"
+              "source",
+              "category"
             ],
             "title": "AdminPortView",
             "type": "object"

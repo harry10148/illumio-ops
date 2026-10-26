@@ -104,3 +104,13 @@ def test_stale_generation_drops_exposure(tmp_path, monkeypatch):
     assert run_hourly_analysis(ctx, now=NOW)["exposure"] == "stale"
     with ctx.flows().connect() as conn:
         assert analysis.read_result(conn, "exposure") is None
+
+
+def test_exposure_graph_excludes_directory_ports(tmp_path):
+    """Spec §6.5.8: the graph draws remote-execution and database connections; Kerberos and LDAP would make
+    every domain member reach the directory servers."""
+    ctx = _setup(tmp_path)
+    _write(ctx, [_flow(1, 1, port=389), _flow(2, 1, port=88), _flow(3, 1, port=1433, dst="/orgs/1/workloads/db"),
+                 _flow(4, 1, port=445, dst="/orgs/1/workloads/fs")])
+    r = run_exposure(ctx, now=NOW)
+    assert r.edges_now == 2

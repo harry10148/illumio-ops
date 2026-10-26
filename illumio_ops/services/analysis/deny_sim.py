@@ -9,7 +9,7 @@ from pydantic import BaseModel
 
 from illumio_ops.domain.deny import DenyProposal, apply_deny, proposal_filter
 from illumio_ops.domain.exposure import EdgeIn, build_graph, edge_state, paths_to
-from illumio_ops.domain.lateral import HostInfo
+from illumio_ops.domain.lateral import GRAPH_CLASSES, HostInfo
 from illumio_ops.domain.segment import FlowSegment, GroupBy
 from illumio_ops.domain.values import SegmentDimension, SegmentMetric, SegmentView
 from illumio_ops.services.analysis.context import host_for, load_lateral_context
@@ -64,7 +64,7 @@ def simulate_deny(ctx: AppContext, proposal: DenyProposal, *, now: datetime | No
     detail = query_flows(ctx, spec, limit=sample, order="connections_desc", now=at)
 
     edges = []
-    for e in baseline_edges(ctx, lc.admin_ports, since=start).edges:
+    for e in baseline_edges(ctx, lc.admin_ports, since=start, classes=GRAPH_CLASSES).edges:
         state = edge_state(e.decision)
         if state is not None:
             edges.append(EdgeIn(e.src_key, e.dst_key, e.port, e.proto, state))

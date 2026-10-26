@@ -7,6 +7,7 @@ from datetime import datetime, timedelta
 from illumio_ops.domain import exposure as domain_exposure
 from illumio_ops.domain.exposure import EdgeIn, ExposureResult, Foothold, edge_state
 from illumio_ops.domain.identity import endpoint_key
+from illumio_ops.domain.lateral import GRAPH_CLASSES
 from illumio_ops.services.analysis.context import load_lateral_context
 from illumio_ops.services.context import AppContext
 from illumio_ops.services.flowsource import baseline_edges
@@ -30,7 +31,7 @@ def run_exposure(ctx: AppContext, *, now: datetime) -> ExposureResult | None:
     # The graph cannot look further back than the baseline keeps (P3 Task 1 ruling).
     days = min(lat.observation_days, lc.baseline_required)
     since = now - timedelta(days=days)
-    found = baseline_edges(ctx, lc.admin_ports, since=since)
+    found = baseline_edges(ctx, lc.admin_ports, since=since, classes=GRAPH_CLASSES)
     edges = []
     for e in found.edges:
         state = edge_state(e.decision)

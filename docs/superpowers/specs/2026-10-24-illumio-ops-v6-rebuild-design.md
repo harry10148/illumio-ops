@@ -433,12 +433,17 @@ VEN 車隊總覽。架構保留「政策動作」服務的位置，v6.1 加入�
 
 **共用定義**
 
-- **管理／橫向 port 集合**：值域登錄定義一次。預設為 5.x `_LATERAL_PORTS`（16 個：SMB 445、RPC 135、NetBIOS 139、
-  RDP 3389、SSH 22、WinRM 5985/5986、Telnet 23、NFS 2049、RPC portmapper 111、LDAP 389/636、Kerberos 88、
-  MSSQL 1433、MySQL 3306、PostgreSQL 5432；P4 加入 PCE admin 類也有的 VNC 5900、TeamViewer 5938，共 18 個）與 PCE
-  勒索高風險服務中 category=admin 者（§6.6 F5）的聯集；可在設定頁增減。不改用原廠清單取代內建【使用者 2026-10-26：
-  盡量涵蓋】：原廠 admin 類沒有 LDAP、Kerberos、資料庫，且只在 PCE 回報勒索防護服務時才有；`legacy` 類（HTTP 80、FTP…）
-  不是管理 port，不納入。
+- **管理／橫向 port 集合**：值域登錄定義一次，分三類（§6.5.8，P4.5 實作）：
+  - 遠端執行／控制：SMB 445、RPC 135、NetBIOS 139、RDP 3389、SSH 22、WinRM 5985/5986、Telnet 23、NFS 2049、RPC
+    portmapper 111、VNC 5900、TeamViewer 5938，以及 PCE 勒索高風險服務中 category=admin 者（§6.6 F5）。
+  - 目錄／認證：Kerberos 88/464、LDAP 389/636、Global Catalog 3268/3269、ADWS 9389。
+  - 資料庫：MSSQL 1433、MySQL 3306、PostgreSQL 5432。
+  前 16 個來自 5.x `_LATERAL_PORTS`；P4 加入 VNC、TeamViewer，P4.5 加入 464、3268、3269、9389。可在設定頁增減，新增時選
+  類別（預設遠端執行）。不改用原廠清單取代內建【使用者 2026-10-26：盡量涵蓋】：原廠 admin 類沒有 LDAP、Kerberos、資料庫，
+  且只在 PCE 回報勒索防護服務時才有；`legacy` 類（HTTP 80、FTP…）不是管理 port，不納入。
+  - **誰讀哪一類**：扇出、新的管理連線、跨環境讀遠端執行＋資料庫；跳板鏈、非管理群組、帳號扇出、非預期的發起 process
+    只讀遠端執行；目錄／認證只給 §6.5.8 E 的偵測器。暴露面的圖只畫遠端執行＋資料庫【判斷 P4.5】：Kerberos／LDAP 邊會讓
+    每台網域成員都「可觸及」目錄伺服器。
 - **重要資產**與**管理群組**：在設定頁以 label 選定（例：`app=Finance`、`role=DB` 為重要資產；`role=Jump`、
   `app=IT-Admin` 為管理群組）。未設定時：暴露面以「可觸及的主機數」排序所有主機，依賴重要資產的項目不出現，
   首頁顯示一項「尚未設定重要資產／管理群組」引導設定。不做猜測式預設【判斷 修訂】。

@@ -44,7 +44,7 @@ from illumio_ops.domain.segment import (
     FlowSegment,
     compile_flow_ranking,
 )
-from illumio_ops.domain.values import FlowDirection, IngestSource
+from illumio_ops.domain.values import FlowDirection, IngestSource, PortClass
 from illumio_ops.pce.async_query import run_traffic_query
 from illumio_ops.pce.client import PceNotConfigured
 from illumio_ops.services.collect.guard import require_same_pce
@@ -467,13 +467,14 @@ class BaselineEdges(BaseModel):
     collected: bool
 
 
-def baseline_edges(ctx: AppContext, ports: AdminPortSet, *, since: datetime) -> BaselineEdges:
+def baseline_edges(ctx: AppContext, ports: AdminPortSet, *, since: datetime,
+                   classes: Collection[PortClass] | None = None) -> BaselineEdges:
     """The management-port connections seen since `since`, from the connection baseline (kept for the
     baseline period in every collection mode). Reads by port through ix_baseline_port; the protocol and
     the time are checked here."""
     fdb, gen, settings = _store_read(ctx)
     collected = collects(settings, IngestSource.TRAFFIC)
-    numbers = sorted({e.port for e in ports.entries})
+    numbers = sorted({e.port for e in ports.entries if classes is None or e.category in classes})
     if not collected or not numbers:
         return BaselineEdges(edges=[], baseline_from=None, collected=collected)
     stamp = db_time(since)
@@ -486,7 +487,7 @@ def baseline_edges(ctx: AppContext, ports: AdminPortSet, *, since: datetime) -> 
         # Host keys repeat on every row of a host: one string per host, not one per row.
         edges = [BaselineEdge(src_key=sys.intern(src), dst_key=sys.intern(dst), port=port, proto=proto,
                               decision=decision)
-                 for src, dst, port, proto, decision in cur if ports.matches(port, proto)]
+                 for src, dst, port, proto, decision in cur if ports.matches(port, proto, classes)]
         ranges = ingest_state.coverage(conn, IngestSource.TRAFFIC)
     if fdb.generation != gen:
         raise StaleGeneration
