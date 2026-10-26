@@ -202,7 +202,8 @@ def detect_fanout(inp: DetectorInput) -> tuple[list[Detection], DetectorStatus]:
         severity = Severity.HIGH if any(o.decision == "allowed" for o in window_rows) else Severity.MEDIUM
         if critical:
             severity = raise_severity(severity)
-        first, last = min(o.first for o in window_rows), window_rows[-1].last
+        last = window_rows[-1].last
+        first = _window_start(window_rows, last, cfg.fanout_window)
         out.append(Detection(
             detector=DetectorKind.FANOUT, fingerprint=f"fanout|{src}", subject_key=src, severity=severity,
             first_seen=first, last_seen=last, critical_asset=critical,
@@ -245,6 +246,13 @@ def detect_new_admin(inp: DetectorInput) -> tuple[list[Detection], DetectorStatu
 
 def _src_host(o: Obs, inp: DetectorInput) -> HostInfo:
     return inp.hosts(o.src_key, o.src_ip, o.src_hostname, o.src_labels)
+
+
+def _window_start(rows: Sequence[Obs], last: datetime, window: timedelta) -> datetime:
+    """A windowed detection's first_seen: its rows' earliest start, but not before the window. A PCE record
+    can span a day (first 10-25 00:01, last 10-26 00:21 on .106); its start would date the detection a day
+    early and stretch the store dedup over a whole day of separate bursts."""
+    return max(min(o.first for o in rows), last - window)
 
 
 def _max_window(rows: list[Obs], window: timedelta, key: Callable[[Obs], str],
@@ -336,7 +344,8 @@ def detect_blocked_surge(inp: DetectorInput) -> tuple[list[Detection], DetectorS
         rows = sorted((o for o in inp.blocked_obs if o.src_key == src), key=lambda o: o.last)
         out.append(Detection(
             detector=DetectorKind.BLOCKED_SURGE, fingerprint=f"blocked|{src}", subject_key=src, severity=Severity.MEDIUM,
-            first_seen=rows[0].first, last_seen=rows[-1].last, critical_asset=any(_dst_host(o, inp).critical for o in rows),
+            first_seen=_window_start(rows, rows[-1].last, cfg.blocked_window), last_seen=rows[-1].last,
+            critical_asset=any(_dst_host(o, inp).critical for o in rows),
             summary={"targets": n, "previous_max": previous, "sample_targets": _names(rows),
                      "window_minutes": int(cfg.blocked_window / timedelta(minutes=1))},
             segment=FlowSegment(filter=FilterSpec(start=rows[-1].last - cfg.blocked_window, end=rows[-1].last,
@@ -423,7 +432,7 @@ def detect_account_fanout(inp: DetectorInput) -> tuple[list[Detection], Detector
         last = window_rows[-1].last
         out.append(Detection(
             detector=DetectorKind.ACCOUNT_FANOUT, fingerprint=f"acct|{account}", subject_key=account,
-            severity=Severity.HIGH, first_seen=min(o.first for o in window_rows), last_seen=last,
+            severity=Severity.HIGH, first_seen=_window_start(window_rows, last, cfg.account_fanout_window), last_seen=last,
             critical_asset=any(_dst_host(o, inp).critical for o in window_rows),
             summary={"targets": best[0], "sample_targets": _names(window_rows),
                      "sources": sorted({o.src_hostname or o.src_ip for o in window_rows})[:SAMPLE],
