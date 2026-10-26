@@ -2,6 +2,8 @@
 import json
 from pathlib import Path
 
+import pytest
+
 from illumio_ops.domain.alertpack import pack_rule_id
 from illumio_ops.domain.values import Language
 from illumio_ops.migrate.report import render
@@ -117,6 +119,13 @@ def test_unsupported_filterbar_key_disables_rule():
     assert section["rules"][0]["enabled"] is False
     lost = {i.source.split(" · ")[-1] for i in items if i.reason_key == "migrate_rule_filter_unsupported"}
     assert lost == {"src_iplists", "any_label"}
+
+
+@pytest.mark.parametrize("field,value", [("src_ip_in", "CorporateServers"), ("src_labels", ["no-equals-sign"])])
+def test_condition_part_lost_disables_rule(field, value):
+    """An IP list name (or an unreadable label) v6 cannot hold widens the rule: it is carried off (review)."""
+    section, _ = migrate_alerts({}, [{"type": "traffic", "name": "x", "pd": 2, field: value}], None)
+    assert section["rules"][0]["enabled"] is False
 
 
 def test_invalid_regex_rule_disabled_not_blocking():

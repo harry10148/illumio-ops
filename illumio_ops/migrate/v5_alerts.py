@@ -227,6 +227,10 @@ class _Lost:
         self.keys.append((key, reason))
 
 
+# A part of a flow rule's condition v6 cannot hold: without it the rule matches more, so it is carried off.
+_NARROWING_LOST = frozenset({"migrate_rule_filter_unsupported", "migrate_rule_iplist_name", "migrate_rule_bad_label"})
+
+
 def _side(rule: dict[str, Any], lost: _Lost, *, labels: tuple[str, ...], ips: tuple[str, ...],
           hrefs: tuple[str, ...]) -> dict[str, Any] | None:
     by_key: dict[str, list[str]] = {}
@@ -377,7 +381,7 @@ def convert_rule(rule: dict[str, Any], *, used_ids: set[str]) -> tuple[dict[str,
                field: max(1, int(threshold)) if kind == "traffic" else max(threshold, 0.001),
                "window_minutes": min(max(window, MIN_FLOW_WINDOW), 1440)}
         handled = _FLOW_KEYS | _COMMON_KEYS
-        if any(r == "migrate_rule_filter_unsupported" for _, r in lost.keys):
+        if any(r in _NARROWING_LOST for _, r in lost.keys):  # the condition would match more than in 5.x
             out["enabled"] = False
     elif kind == "system" and str(rule.get("filter_value") or "") == "pce_health":
         base = _base(rule, rule_id=rule_id, pack_key=None, enabled=enabled, severity="high", lost=lost)
