@@ -13,6 +13,7 @@ from illumio_ops.services.collect.guard import require_same_pce
 from illumio_ops.services.context import AppContext
 from illumio_ops.services.coverage import store_coverage
 from illumio_ops.store.flowdb.db import StaleGeneration, db_time
+from illumio_ops.store.flowdb.flows import INCREMENT_PRIMARY_JOIN
 
 CHUNK = 200
 T = TypeVar("T")
@@ -169,7 +170,7 @@ def activity_now(ctx: AppContext, *, since: datetime, until: datetime) -> dict[t
     with _reading(ctx) as conn:
         for src, port, connections, grown_bytes in conn.execute(
                 "SELECT f.src_key, f.port, i.connections, i.bytes FROM flow_increments i "
-                "JOIN flows r ON r.record_key = i.record_key JOIN flows f ON f.conn_key = r.conn_key AND f.is_primary = 1 "
+                f"{INCREMENT_PRIMARY_JOIN} "
                 "WHERE i.late = 0 AND i.observed_at > ? AND i.observed_at <= ? "
                 "AND f.policy_decision NOT LIKE 'blocked%'", (db_time(since), db_time(until))):
             for cls in (("all", "directory") if port in DIRECTORY_PORTS else ("all",)):

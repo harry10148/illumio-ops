@@ -61,10 +61,18 @@ def test_connection_reads_use_the_connection_index(tmp_path):
 
 def test_increment_window_uses_observed_index(tmp_path):
     with FlowDb(tmp_path / "flows.sqlite").connect() as conn:
-        plan = _plan(conn, "SELECT * FROM flow_increments i JOIN flows r ON r.record_key = i.record_key "
-                           "JOIN flows f ON f.conn_key = r.conn_key AND f.is_primary = 1 "
+        plan = _plan(conn, f"SELECT * FROM flow_increments i {flows.INCREMENT_PRIMARY_JOIN} "
                            "WHERE i.late = 0 AND i.observed_at > ? AND i.observed_at <= ?", ("a", "b"))
-    assert "ix_increments_observed" in plan and "ix_flows_conn" in plan, plan
+    assert "ix_increments_observed" in plan, plan
+
+
+def test_increment_reaches_its_primary_row_by_rowid(tmp_path):
+    """Scale (.106, 8.3M rows): the measured record is nearly always still the primary; a conn_key lookup per
+    increment besides made a 60-minute window read 14 s cold against 1.3 s."""
+    with FlowDb(tmp_path / "flows.sqlite").connect() as conn:
+        plan = _plan(conn, f"SELECT * FROM flow_increments i {flows.INCREMENT_PRIMARY_JOIN} "
+                           "WHERE i.observed_at > ?", ("a",))
+    assert "SEARCH f USING INTEGER PRIMARY KEY" in plan, plan
 
 
 def test_peer_reads_use_the_port_source_index(tmp_path):

@@ -204,6 +204,13 @@ PRIMARY_OF_CONNECTION = ("SELECT src_key, dst_key, port, proto, first_detected, 
                          "initiator_process, policy_decision FROM flows WHERE conn_key = ? AND +is_primary = 1")
 
 
+# From an increment to its connection's current primary row (pairing may have moved it since the measure). The
+# record measured nearly always still is that row: reaching it by rowid spares a conn_key lookup per increment,
+# 14 s against 1.3 s cold for a peak hour on 8.3M rows (test_query_plans).
+INCREMENT_PRIMARY_JOIN = ("JOIN flows r ON r.record_key = i.record_key "
+                          "JOIN flows f ON f.id = CASE WHEN r.is_primary = 1 THEN r.id ELSE "
+                          "(SELECT p.id FROM flows p WHERE p.conn_key = r.conn_key AND +p.is_primary = 1) END")
+
 def _update_baselines(conn: sqlite3.Connection, conn_key: str) -> sqlite3.Row | None:
     """Fold the connection's primary row into the baselines; returns that row (None: the connection is gone)."""
     row: sqlite3.Row | None = conn.execute(PRIMARY_OF_CONNECTION, (conn_key,)).fetchone()

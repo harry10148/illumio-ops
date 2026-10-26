@@ -104,6 +104,18 @@ def test_activity_reads(ctx):
     assert fa.activity_coverage(ctx) == (NOW - timedelta(days=2)).replace(minute=0)
 
 
+def test_activity_now_takes_the_connections_current_primary_row(ctx):
+    """The record measured may have paired since: its connection's primary row names the source."""
+    write(ctx, [rec(1, conns=9)], now=NOW - timedelta(minutes=20), increments="cycle")
+    with ctx.flows().connect() as conn:
+        conn.execute("CREATE TEMP TABLE t AS SELECT * FROM flows")
+        conn.execute("UPDATE t SET id = NULL, record_key = 'paired', src_key = 'other', is_primary = 1")
+        conn.execute("UPDATE flows SET is_primary = 0")
+        conn.execute("INSERT INTO flows SELECT * FROM t")
+        conn.commit()
+    assert fa.activity_now(ctx, since=NOW - timedelta(minutes=60), until=NOW) == {("other", "all"): (9, None)}
+
+
 def _switching(ctx, monkeypatch):
     fdb = ctx.flows()
     real = fdb.connect
