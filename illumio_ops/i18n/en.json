@@ -425,5 +425,15 @@
   "det_precursor_hours": "Precursors: hours before",
   "det_exclude_system": "Leave out system accounts",
   "lateral_expected_title": "Expected initiating processes",
-  "lateral_expected_hint": "Comma-separated; a connection on the port started by another process is reported."
+  "lateral_expected_hint": "Comma-separated; a connection on the port started by another process is reported.",
+  "alert_event_immediate": "{event_types} on {hosts} ({matches})",
+  "alert_event_count": "{matches} {event_types} events in {window_minutes} minutes (threshold {threshold})",
+  "alert_traffic": "{connections} new connections in {window_minutes} minutes (threshold {threshold})",
+  "alert_volume": "{mb} MB transferred in {window_minutes} minutes (threshold {threshold} MB)",
+  "alert_bandwidth": "At least {mbps} Mbps on one connection (threshold {threshold} Mbps)",
+  "alert_system_pce_health": "The PCE health check failed: {failures}",
+  "alert_system_collection_failing": "Collecting {source} has failed {failures} times in a row: {error}",
+  "alert_system_data_loss": "Data is missing for {source} ({kind}) from {start} to {end}",
+  "alert_system_job_failing": "Background job {job} has failed {failures} times in a row: {error}",
+  "alert_system_disk_low": "Disk space is low: {free} left, warning below {warn}"
 }

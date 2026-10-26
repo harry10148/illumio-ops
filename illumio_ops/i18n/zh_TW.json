@@ -425,5 +425,15 @@
   "det_precursor_hours": "前兆：往前幾小時",
   "det_exclude_system": "排除系統帳號",
   "lateral_expected_title": "預期的發起 process",
-  "lateral_expected_hint": "以逗號分隔；該 port 的連線若由其他 process 發起就會回報。"
+  "lateral_expected_hint": "以逗號分隔；該 port 的連線若由其他 process 發起就會回報。",
+  "alert_event_immediate": "{hosts} 發生 {event_types}（{matches} 筆）",
+  "alert_event_count": "{window_minutes} 分鐘內 {matches} 筆 {event_types} 事件（門檻 {threshold}）",
+  "alert_traffic": "{window_minutes} 分鐘內新增 {connections} 條連線（門檻 {threshold}）",
+  "alert_volume": "{window_minutes} 分鐘內傳輸 {mb} MB（門檻 {threshold} MB）",
+  "alert_bandwidth": "單一連線至少 {mbps} Mbps（門檻 {threshold} Mbps）",
+  "alert_system_pce_health": "PCE 健康檢查失敗：{failures}",
+  "alert_system_collection_failing": "收集 {source} 已連續失敗 {failures} 次：{error}",
+  "alert_system_data_loss": "{source} 從 {start} 到 {end} 的資料缺漏（{kind}）",
+  "alert_system_job_failing": "背景工作 {job} 已連續失敗 {failures} 次：{error}",
+  "alert_system_disk_low": "磁碟空間不足：剩 {free}，低於警告值 {warn}"
 }
