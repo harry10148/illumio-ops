@@ -116,7 +116,8 @@ def detect_peer_deviation(inp: DetectorInput) -> tuple[list[Detection], Detector
         first = inp.baseline_first_seen.get((o.src_key, o.dst_key, o.port, o.proto))
         if first is None or not lo < first <= hi:
             continue
-        group = group_of(_src_host(o, inp).labels, keys)
+        source = _src_host(o, inp)
+        group = group_of(source.labels, keys) if source.managed else None  # only managed hosts are peers
         if group is None or data.group_sizes.get(group, 0) < cfg.peer_min_group:
             continue
         sig = target_signature(o.dst_key, o.dst_ip, _dst_host(o, inp), keys)
@@ -169,7 +170,8 @@ def _surge(inp: DetectorInput, kind: DetectorKind, cls: str, min_connections: in
     for (src, c), a in sorted(data.activity.items()):
         if c != cls:
             continue
-        by_bytes = cls == "all" and a.bytes is not None and over(a.bytes, a.previous_bytes, cfg.volume_min_bytes)
+        by_bytes = (cls == "all" and a.bytes is not None and a.previous_bytes is not None
+                    and over(a.bytes, a.previous_bytes, cfg.volume_min_bytes))
         if not (over(a.connections, a.previous_connections, min_connections) or by_bytes):
             continue
         ip = src[3:] if src.startswith("ip:") else ""
@@ -178,13 +180,21 @@ def _surge(inp: DetectorInput, kind: DetectorKind, cls: str, min_connections: in
             detector=kind, fingerprint=f"{prefix}|{src}", subject_key=src,
             severity=raise_severity(Severity.MEDIUM) if host.critical else Severity.MEDIUM,
             first_seen=hi - SURGE_WINDOW, last_seen=hi, critical_asset=host.critical,
+            # Both metrics, whichever fired: the sentence shows each, "—" where no byte data was there to compare.
             summary={"connections": a.connections, "bytes": a.bytes, "previous_max": a.previous_connections,
-                     "previous_max_bytes": a.previous_bytes, "window_minutes": int(SURGE_WINDOW / timedelta(minutes=1))},
+                     "previous_max_bytes": a.previous_bytes, "mb": _mb(a.bytes), "previous_max_mb": _mb(a.previous_bytes),
+                     "window_minutes": int(SURGE_WINDOW / timedelta(minutes=1))},
             segment=FlowSegment(filter=FilterSpec(start=hi - SURGE_WINDOW, end=hi, src=_endpoint(src, ip),
                                                   decisions=NOT_BLOCKED, ports=ports),
                                 view=SegmentView.DETAIL, limit=200),
-            confidence=DetectionConfidence(incomplete_gaps=inp.gaps)))
+            confidence=DetectionConfidence(incomplete_gaps=(*inp.gaps, *data.activity_gaps))))
+    if data.activity_gaps:  # the history compared with has holes: a surge may only look like one
+        return out, _status(kind, DetectorState.INCOMPLETE, history_gaps=len(data.activity_gaps))
     return out, _status(kind)
+
+
+def _mb(value: int | None) -> int | str:
+    return "—" if value is None else round(value / 2**20)
 
 
 def detect_volume_surge(inp: DetectorInput) -> tuple[list[Detection], DetectorStatus]:
@@ -370,10 +380,11 @@ def _is_server(o: Obs, data: AnomalyData) -> bool:
 
 
 def _servers_status(kind: DetectorKind, data: AnomalyData) -> DetectorStatus:
+    """Running, saying how many directory servers traffic showed (and how many declared ones it did not)."""
     if data.directory_declared_missing:
         return _status(kind, reason="detector_directory_mismatch", missing=data.directory_declared_missing,
                        inferred=data.directory_inferred)
-    return _status(kind, inferred=data.directory_inferred)
+    return _status(kind, reason="detector_directory_inferred", inferred=data.directory_inferred)
 
 
 def detect_auth_to_non_dc(inp: DetectorInput) -> tuple[list[Detection], DetectorStatus]:
@@ -434,10 +445,12 @@ def detect_new_dc_client(inp: DetectorInput) -> tuple[list[Detection], DetectorS
             found.setdefault(o.src_key, o)
     out = []
     for src, o in sorted(found.items()):
+        critical = _dst_host(o, inp).critical
         severity = Severity.LOW if o.src_managed else Severity.MEDIUM
         out.append(Detection(
-            detector=kind, fingerprint=f"dcclient|{src}", subject_key=src, severity=severity, first_seen=o.first,
-            last_seen=o.last, critical_asset=False,
+            detector=kind, fingerprint=f"dcclient|{src}", subject_key=src,
+            severity=raise_severity(severity) if critical else severity, first_seen=o.first, last_seen=o.last,
+            critical_asset=critical,
             summary={"target": o.dst_hostname or o.dst_ip, "port": o.port, "managed": o.src_managed},
             segment=_pair_segment(o),
             confidence=DetectionConfidence(baseline_days=round(inp.baseline_days, 1), incomplete_gaps=inp.gaps)))

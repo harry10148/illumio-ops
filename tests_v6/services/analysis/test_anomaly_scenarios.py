@@ -152,3 +152,40 @@ def test_statuses_name_every_anomaly_detector(tmp_path, name):
     ctx = setup(tmp_path, inventory={"srv-3": {}}, history=[], live=[])
     r = run_detection(ctx, now=NOW)
     assert name in {s["detector"] for s in r.statuses}
+
+
+def test_declared_ip_directory_server_client_is_not_new(tmp_path):
+    """Review: a source that always used a directory server declared by IP is not a new client when it starts on
+    another directory port."""
+    ctx = setup(tmp_path, inventory={"ws-5": {}},
+                history=[flow("ws-5", "ip:10.0.7.7", port=88, minutes_ago=20 * DAY)],
+                live=[flow("ws-5", "ip:10.0.7.7", port=389, minutes_ago=5)])
+    ctx.settings.update(ctx.settings.current().revision,
+                        lambda d: d["lateral"].update({"directory_server_ips": ["10.0.7.7"]}))
+    run_detection(ctx, now=NOW)
+    assert "new_dc_client" not in kinds(ctx) and "auth_to_non_dc" not in kinds(ctx)
+
+
+def test_followup_finds_the_subjects_directory_detection_among_many(tmp_path):
+    """Review: more recent directory detections than one read returns must not hide the one about this host."""
+    from illumio_ops.domain.filter import FilterSpec
+    from illumio_ops.domain.segment import FlowSegment
+    from illumio_ops.domain.values import SegmentView
+    from illumio_ops.store.flowdb.analysis import DetectionWrite
+    inventory = {**{f"t{i}": {} for i in range(10)}}
+    live = [flow("ip:10.0.8.8", f"t{i}", port=445, minutes_ago=15) for i in range(10)]
+    ctx = setup(tmp_path, inventory=inventory, history=[], live=live)
+    seg = FlowSegment(filter=FilterSpec(start=NOW - timedelta(hours=1), end=NOW), view=SegmentView.DETAIL, limit=10)
+
+    def write(subject, minutes_ago):
+        return DetectionWrite(detector="auth_to_non_dc", fingerprint=f"authdst|{subject}|x|389", subject_key=subject,
+                              severity="medium", first_seen=NOW - timedelta(minutes=minutes_ago + 1),
+                              last_seen=NOW - timedelta(minutes=minutes_ago), critical_asset=False, summary_json="{}",
+                              segment_json=seg.model_dump_json(), confidence_json="{}")
+    with ctx.flows().connect() as conn:
+        analysis.upsert_detections(conn, [write("ip:10.0.8.8", 25)] + [write(f"ip:10.9.{i // 250}.{i % 250}", 20)
+                                                                         for i in range(600)],
+                                   dedup={"auth_to_non_dc": timedelta(days=1)}, late=False, at=NOW - timedelta(minutes=20))
+    run_detection(ctx, now=NOW)
+    [fan] = by_kind(ctx, "fanout")
+    assert "after_directory" in json.loads(fan["summary_json"])

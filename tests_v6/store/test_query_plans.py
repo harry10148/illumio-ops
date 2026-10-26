@@ -77,6 +77,7 @@ def test_peer_reads_use_the_port_source_index(tmp_path):
 
 def test_activity_history_reads_by_hour(tmp_path):
     with FlowDb(tmp_path / "flows.sqlite").connect() as conn:
-        plan = _plan(conn, "SELECT src_key, port_class, MAX(connections), MAX(bytes) FROM source_activity_hourly "
+        plan = _plan(conn, "SELECT src_key, port_class, MAX(connections), MAX(CASE WHEN bytes_known > 0 THEN bytes END) "
+                           "FROM source_activity_hourly "
                            "WHERE src_key IN (?) AND hour >= ? AND hour < ? GROUP BY src_key, port_class", ("a", "x", "y"))
     assert "USING PRIMARY KEY" in plan or "SEARCH" in plan, plan

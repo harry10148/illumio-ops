@@ -141,7 +141,7 @@ class Activity:
     connections: int
     bytes: int | None                 # None: none of the growth carried byte counts
     previous_connections: int
-    previous_bytes: int
+    previous_bytes: int | None        # None: no hour of the 7 days carried byte counts (unknown, not zero)
 
 
 @dataclass(frozen=True)
@@ -153,6 +153,7 @@ class AnomalyData:
     # B, E③: (source, 'all' | 'directory') -> activity
     activity: Mapping[tuple[str, str], Activity] = field(default_factory=dict)
     activity_days: float = 0.0                                          # how far back the hourly activity reaches
+    activity_gaps: tuple[Gap, ...] = ()                                 # collection gaps in the 7 days compared with
     live: bool = True                                                   # False in the late pass
     # C: (account, source) -> first seen; account -> its earliest first seen and its sources before the window
     account_first: Mapping[tuple[str, str], datetime] = field(default_factory=dict)

@@ -8,9 +8,10 @@ from contextlib import contextmanager
 from datetime import datetime
 from typing import Any, TypeVar
 
-from illumio_ops.domain.values import DIRECTORY_PORTS
+from illumio_ops.domain.values import DIRECTORY_PORTS, IngestSource
 from illumio_ops.services.collect.guard import require_same_pce
 from illumio_ops.services.context import AppContext
+from illumio_ops.services.coverage import store_coverage
 from illumio_ops.store.flowdb.db import StaleGeneration, db_time
 
 CHUNK = 200
@@ -107,35 +108,50 @@ def peer_seen(ctx: AppContext, members: Collection[str], port: int, proto: int, 
     return out
 
 
-def directory_sources(ctx: AppContext, ports: Collection[int], *, since: datetime) -> dict[str, int]:
+PortSpec = tuple[int, int | None]  # (port, protocol or None for any)
+
+
+def _port_clause(ports: Sequence[PortSpec]) -> tuple[str, list[int]]:
+    """Each directory port with its own protocol (TCP 8443 added as directory does not make UDP 8443 one)."""
+    parts, params = [], []
+    for port, proto in ports:
+        if proto is None:
+            parts.append("port = ?")
+            params.append(port)
+        else:
+            parts.append("(port = ? AND proto = ?)")
+            params += [port, proto]
+    return "(" + " OR ".join(parts) + ")", params
+
+
+def directory_sources(ctx: AppContext, ports: Collection[PortSpec], *, since: datetime) -> dict[str, int]:
     """Destination -> how many distinct sources connected to it on these ports and were still seen since `since`."""
-    numbers = sorted(set(ports))
-    if not numbers:
-        with _reading(ctx):
-            return {}
+    specs = sorted(set(ports), key=str)
     with _reading(ctx) as conn:
+        if not specs:
+            return {}
+        clause, params = _port_clause(specs)
         return {k: n for k, n in conn.execute(
-            "SELECT dst_key, COUNT(DISTINCT src_key) FROM connection_baseline "
-            f"WHERE port IN ({','.join('?' * len(numbers))}) AND last_seen >= ? GROUP BY dst_key",
-            [*numbers, db_time(since)])}
+            f"SELECT dst_key, COUNT(DISTINCT src_key) FROM connection_baseline WHERE {clause} AND last_seen >= ? "
+            "GROUP BY dst_key", [*params, db_time(since)])}
 
 
 def directory_clients_before(ctx: AppContext, srcs: Collection[str], servers: Collection[str],
-                             ports: Collection[int], *, before: datetime) -> set[str]:
+                             ports: Collection[PortSpec], *, before: datetime) -> set[str]:
     """Of these sources, those that had connected to any of the servers on these ports before `before`."""
     out: set[str] = set()
-    numbers = sorted(set(ports))
+    specs = sorted(set(ports), key=str)
     server_list = sorted(set(servers))
     with _reading(ctx) as conn:
-        if not numbers or not server_list:
+        if not specs or not server_list:
             return out
+        clause, params = _port_clause(specs)
         for chunk in _chunks(srcs):
             out |= {r[0] for r in conn.execute(
                 "SELECT DISTINCT src_key FROM connection_baseline "
                 f"WHERE src_key IN ({','.join('?' * len(chunk))}) "
-                f"AND dst_key IN ({','.join('?' * len(server_list))}) "
-                f"AND port IN ({','.join('?' * len(numbers))}) AND first_seen <= ?",
-                [*chunk, *server_list, *numbers, db_time(before)])}
+                f"AND dst_key IN ({','.join('?' * len(server_list))}) AND {clause} AND first_seen <= ?",
+                [*chunk, *server_list, *params, db_time(before)])}
     return out
 
 
@@ -161,17 +177,26 @@ def activity_now(ctx: AppContext, *, since: datetime, until: datetime) -> dict[t
 
 
 def activity_history(ctx: AppContext, srcs: Sequence[str] | Collection[str], *, start: datetime,
-                     end: datetime) -> dict[tuple[str, str], tuple[int, int]]:
-    """(src_key, class) -> the most connections and the most bytes in any hour of [start, end)."""
-    out: dict[tuple[str, str], tuple[int, int]] = {}
+                     end: datetime) -> dict[tuple[str, str], tuple[int, int | None]]:
+    """(src_key, class) -> the most connections in any hour of [start, end), and the most bytes in any hour that
+    carried byte counts (None when none did: unknown, not zero)."""
+    out: dict[tuple[str, str], tuple[int, int | None]] = {}
     with _reading(ctx) as conn:
         for chunk in _chunks(srcs):
             for src, cls, connections, grown_bytes in conn.execute(
-                    "SELECT src_key, port_class, MAX(connections), MAX(bytes) FROM source_activity_hourly "
+                    "SELECT src_key, port_class, MAX(connections), MAX(CASE WHEN bytes_known > 0 THEN bytes END) "
+                    "FROM source_activity_hourly "
                     f"WHERE src_key IN ({','.join('?' * len(chunk))}) AND hour >= ? AND hour < ? "
                     "GROUP BY src_key, port_class", [*chunk, db_time(start), db_time(end)]):
                 out[(src, cls)] = (connections, grown_bytes)
     return out
+
+
+def activity_gaps(ctx: AppContext, *, start: datetime, end: datetime) -> list[tuple[datetime, datetime, str]]:
+    """Traffic collection gaps in [start, end): hours with less activity than there was, behind a surge's history."""
+    with _reading(ctx) as conn:
+        cov = store_coverage(conn, IngestSource.TRAFFIC, (start, end), floor=start)
+    return [g for g in cov.gaps if g[2] in ("truncated", "ingest_failed", "not_yet_collected")]
 
 
 def activity_coverage(ctx: AppContext) -> datetime | None:

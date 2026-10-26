@@ -153,3 +153,14 @@ def test_v4_upgrade_adds_anomaly_rules_record_only():
     assert len(s.alerts.rules) == kept + 5 and len(added) == 5 and not any(r.notify for r in added)
     again = validate_settings(upgrade(_v4_dict()))  # already has them: nothing is added twice
     assert len(again.alerts.rules) == 30
+
+
+def test_v4_at_the_old_rule_limit_still_loads_after_the_anomaly_rules_join():
+    """Review: 300 rules (the v4 limit) plus the five anomaly rules must not make the file invalid."""
+    d = _v4_dict()
+    d["alerts"]["rules"] = [r for r in d["alerts"]["rules"] if not str(r.get("pack_key")).startswith("rule_anomaly")]
+    template = next(r for r in d["alerts"]["rules"] if r["type"] == "event")
+    while len(d["alerts"]["rules"]) < 300:
+        d["alerts"]["rules"].append({**template, "id": f"{len(d['alerts']['rules']):032x}", "pack_key": None,
+                                       "name": f"r{len(d['alerts']['rules'])}"})
+    assert len(validate_settings(upgrade(d)).alerts.rules) == 305

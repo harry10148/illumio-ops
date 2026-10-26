@@ -70,9 +70,9 @@ def test_peer_seen(ctx):
 def test_directory_reads(ctx):
     write(ctx, [rec(i, minutes_ago=3 * DAY, port=88) for i in (1, 2, 3)] + [rec(4, port=389)],
           origin=DataOrigin.BACKFILL)
-    assert fa.directory_sources(ctx, [88, 389], since=NOW - timedelta(days=30)) == {DST: 4}
-    assert fa.directory_sources(ctx, [389], since=NOW - timedelta(days=30)) == {DST: 1}
-    before = fa.directory_clients_before(ctx, [SRC.format(i) for i in (1, 4, 9)], [DST], [88, 389],
+    assert fa.directory_sources(ctx, [(88, None), (389, None)], since=NOW - timedelta(days=30)) == {DST: 4}
+    assert fa.directory_sources(ctx, [(389, None)], since=NOW - timedelta(days=30)) == {DST: 1}
+    before = fa.directory_clients_before(ctx, [SRC.format(i) for i in (1, 4, 9)], [DST], [(88, None), (389, None)],
                                          before=NOW - timedelta(days=1))
     assert before == {SRC.format(1)}
 
@@ -85,7 +85,7 @@ def test_activity_reads(ctx):
     assert now == {(SRC.format(1), "all"): (300, None), (SRC.format(2), "all"): (7, None),
                    (SRC.format(2), "directory"): (7, None)}
     hist = fa.activity_history(ctx, [SRC.format(1)], start=NOW - timedelta(days=7), end=NOW - timedelta(hours=2))
-    assert hist == {(SRC.format(1), "all"): (60, 0)}
+    assert hist == {(SRC.format(1), "all"): (60, None)}  # no hour carried byte data
     assert fa.activity_coverage(ctx) == (NOW - timedelta(days=2)).replace(minute=0)
 
 
@@ -106,13 +106,44 @@ def _switching(ctx, monkeypatch):
     lambda c: fa.process_first_seen(c, [("a", "b")]),
     lambda c: fa.process_since(c, ["a"]),
     lambda c: fa.peer_seen(c, ["a"], 1, 6, before=NOW),
-    lambda c: fa.directory_sources(c, [88], since=NOW),
-    lambda c: fa.directory_clients_before(c, ["a"], ["b"], [88], before=NOW),
+    lambda c: fa.directory_sources(c, [(88, None)], since=NOW),
+    lambda c: fa.directory_clients_before(c, ["a"], ["b"], [(88, None)], before=NOW),
     lambda c: fa.activity_now(c, since=NOW, until=NOW),
     lambda c: fa.activity_history(c, ["a"], start=NOW, end=NOW),
     lambda c: fa.activity_coverage(c),
+    lambda c: fa.activity_gaps(c, start=NOW, end=NOW),
 ])
 def test_reads_raise_stale_after_pce_switch(ctx, monkeypatch, read):
     _switching(ctx, monkeypatch)
     with pytest.raises(StaleGeneration):
         read(ctx)
+
+
+def test_activity_history_bytes_only_from_hours_with_byte_data(ctx):
+    with ctx.flows().connect() as conn:
+        conn.executemany("INSERT INTO source_activity_hourly VALUES (?, ?, 'all', ?, ?, ?)", [
+            ("2026-10-23T10:00:00.000+00:00", "s", 10, 0, 0), ("2026-10-23T11:00:00.000+00:00", "s", 5, 900, 2)])
+        conn.commit()
+    hist = fa.activity_history(ctx, ["s"], start=NOW - timedelta(days=7), end=NOW)
+    assert hist == {("s", "all"): (10, 900)}
+
+
+def test_directory_reads_keep_each_ports_protocol(ctx):
+    """Review: TCP 8443 added as a directory port must not make UDP 8443 traffic count toward inference."""
+    udp = [rec(i, minutes_ago=3 * DAY, port=8443) for i in (1, 2, 3)]
+    udp = [type(r)(**{**r.__dict__, "proto": 17}) for r in udp]
+    write(ctx, udp, origin=DataOrigin.BACKFILL)
+    assert fa.directory_sources(ctx, [(8443, 6)], since=NOW - timedelta(days=30)) == {}
+    assert fa.directory_sources(ctx, [(8443, None)], since=NOW - timedelta(days=30)) == {DST: 3}
+    assert fa.directory_clients_before(ctx, [SRC.format(1)], [DST], [(8443, 6)], before=NOW) == set()
+
+
+def test_activity_gaps_name_recorded_gaps(ctx):
+    from illumio_ops.domain.values import IngestSource
+    from illumio_ops.store.flowdb import ingest_state
+    with ctx.flows().connect() as conn:
+        ingest_state.add_coverage(conn, IngestSource.TRAFFIC, NOW - timedelta(days=8), NOW)
+        ingest_state.record_gap(conn, IngestSource.TRAFFIC, NOW - timedelta(days=3, hours=1), NOW - timedelta(days=3),
+                                kind="truncated", detail="x", at=NOW)
+    gaps = fa.activity_gaps(ctx, start=NOW - timedelta(days=7), end=NOW)
+    assert [(g[0], g[2]) for g in gaps] == [(NOW - timedelta(days=3, hours=1), "truncated")]

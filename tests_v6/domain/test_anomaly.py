@@ -162,7 +162,7 @@ def test_volume_surge_on_connections():
     assert status.state is DetectorState.OK
     assert d.detector is DetectorKind.VOLUME_SURGE and d.fingerprint == "volume|/w/a"
     assert d.summary == {"connections": 1200, "bytes": None, "previous_max": 300, "previous_max_bytes": 0,
-                         "window_minutes": 60}
+                         "mb": "—", "previous_max_mb": 0, "window_minutes": 60}
     assert d.last_seen == NOW and d.first_seen == NOW - timedelta(minutes=60)
 
 
@@ -176,6 +176,23 @@ def test_volume_surge_on_bytes_only():
     gib = 2**30
     [d], _ = surge({("/w/a", "all"): Activity(50, 4 * gib, 40, gib)})
     assert d.summary["bytes"] == 4 * gib
+
+
+def test_volume_bytes_not_judged_without_byte_history():
+    """Review: hours without byte data are not a zero-byte history; a source whose bytes appear now is judged by
+    connections only until its history carries bytes."""
+    gib = 2**30
+    assert surge({("/w/a", "all"): Activity(50, 4 * gib, 40, None)})[0] == []
+    assert len(surge({("/w/a", "all"): Activity(50, 4 * gib, 40, 0)})[0]) == 1  # a real zero: the floor alone
+
+
+def test_volume_history_gap_is_stated():
+    """Review: a gap in the 7 days compared with makes the surge's history incomplete; say so on the detection and the
+    status, never "ok" as if the history were whole."""
+    gap = (NOW - timedelta(days=3, hours=1), NOW - timedelta(days=3), "truncated")
+    [d], status = run([], data=AnomalyData(activity={("/w/a", "all"): Activity(5000, None, 100, None)},
+                                           activity_days=8.0, activity_gaps=(gap,)), detector=detect_volume_surge)
+    assert gap in d.confidence.incomplete_gaps and status.state is DetectorState.INCOMPLETE
 
 
 def test_volume_ignores_directory_class():
@@ -444,6 +461,41 @@ def test_followup_reads_stored_and_this_runs_directory_detections():
                                                         NOW - timedelta(minutes=20))]))
     [fan_det] = [d for d in run_detectors(stored)[0] if d.detector is DetectorKind.FANOUT]
     assert "after_directory" in fan_det.summary
+
+
+# ── review fixes ──────────────────────────────────────────────────────────────
+
+def test_new_dc_client_to_critical_server_is_raised():
+    rows = [obs("/w/ws4", "/w/fin", port=389)]
+    [d], _ = run(rows, first_seen=new(rows), data=AnomalyData(directory_servers=frozenset({"/w/fin"})),
+                 detector=detect_new_dc_client)
+    assert d.severity is Severity.MEDIUM and d.critical_asset
+
+
+def test_unmanaged_source_is_not_a_peer():
+    rows = [replace(traffic("ip:10.0.0.9", "/w/hr"), src_managed=False, src_href=None)]
+    assert run(rows, first_seen=new(rows), data=AnomalyData(group_sizes=GROUPS))[0] == []
+
+
+def test_directory_status_says_how_many_servers_were_inferred():
+    _, status = run([], data=dc_data(), detector=detect_auth_to_non_dc)
+    assert status.reason_key == "detector_directory_inferred" and status.params["inferred"] == 1
+
+
+def test_volume_summary_carries_both_metrics():
+    gib = 2**30
+    [d], _ = surge({("/w/a", "all"): Activity(50, 4 * gib, 40, gib)})
+    assert d.summary["mb"] == 4096 and d.summary["previous_max_mb"] == 1024
+    [d], _ = surge({("/w/a", "all"): Activity(5000, None, 0, None)})
+    assert d.summary["mb"] == "—" and d.summary["previous_max_mb"] == "—"
+
+
+def test_titles_say_what_the_summary_holds():
+    for lang in ("en", "zh_TW"):
+        d = json.loads((I18N / f"{lang}.json").read_text())
+        assert "{mb}" in d["focus_title_volume_surge"] and "{previous_max_mb}" in d["focus_title_volume_surge"]
+        assert "{starters}" in d["focus_title_peer_deviation"]
+        assert "{inferred}" in d["detector_directory_mismatch"]
 
 
 # ── registration ─────────────────────────────────────────────────────────────
