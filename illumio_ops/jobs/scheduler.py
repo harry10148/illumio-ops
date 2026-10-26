@@ -13,6 +13,7 @@ from illumio_ops.domain.values import SystemCheck
 from illumio_ops.jobs.health import record_finish, record_start
 from illumio_ops.pce.client import PceNotConfigured
 from illumio_ops.services import pce_health
+from illumio_ops.services.alerts.dispatch import run_dispatch
 from illumio_ops.services.alerts.evaluate import (
     evaluate_events,
     evaluate_lateral,
@@ -51,6 +52,8 @@ FLOWS_CHECKPOINT_SECONDS = 60
 ANALYSIS_HOURLY_SECONDS = 3600
 # The system checks (collection failing, data loss, failing jobs, disk) between collection cycles.
 ALERTS_SYSTEM_SECONDS = 60
+# Sends what is due; a slow channel holds up only this job, never a collector.
+ALERTS_DISPATCH_SECONDS = 60
 # Collectors wait a little after start-up so the listener and the first probe come first.
 COLLECTOR_FIRST_RUN_DELAY = timedelta(seconds=30)
 
@@ -71,6 +74,7 @@ def job_intervals(settings: Settings) -> dict[str, int]:
         "analysis_hourly": ANALYSIS_HOURLY_SECONDS,
         "alerts_system": ALERTS_SYSTEM_SECONDS,
         "alerts_retention": DAILY_SECONDS,
+        "alerts_dispatch": ALERTS_DISPATCH_SECONDS,
     }
 
 
@@ -173,11 +177,14 @@ def _collector_jobs(ctx: AppContext) -> dict[str, Callable[[], None]]:
     def alerts_retention() -> None:
         run_alert_retention(ctx)
 
+    def alerts_dispatch() -> None:
+        run_dispatch(ctx)
+
     # Archive runs before retention so that, with archiving on, expiring days are written first.
     return {"collect_traffic": traffic, "collect_events": events, "collect_inventory": inventory,
             "collect_backfill": backfill, "collect_archive": archive, "collect_retention": retention,
             "flows_checkpoint": checkpoint, "analysis_hourly": hourly_analysis, "alerts_system": alerts_system,
-            "alerts_retention": alerts_retention}
+            "alerts_retention": alerts_retention, "alerts_dispatch": alerts_dispatch}
 
 
 def build_scheduler(ctx: AppContext) -> BackgroundScheduler:

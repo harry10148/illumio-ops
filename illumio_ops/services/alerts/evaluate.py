@@ -56,6 +56,7 @@ from illumio_ops.domain.values import (
     TamperPattern,
     ThresholdType,
 )
+from illumio_ops.services.alerts.channels import enabled_channels
 from illumio_ops.services.alerts.system import max_gap_id, system_facts
 from illumio_ops.services.analysis.tamper import list_annotations
 from illumio_ops.services.context import AppContext
@@ -66,7 +67,7 @@ from illumio_ops.services.eventsource import (
     max_event_id,
 )
 from illumio_ops.services.flowsource import increment_totals, increments_watermark
-from illumio_ops.settings.schema import AlertChannels, Settings
+from illumio_ops.settings.schema import Settings
 from illumio_ops.store import alerts as store
 from illumio_ops.store.flowdb import analysis, workloads
 
@@ -87,10 +88,6 @@ class EvalRun(BaseModel):
     fired: int
     suppressed: int
     statuses: dict[str, str]
-
-
-def enabled_channels(channels: AlertChannels) -> list[str]:
-    return [name for name in ("smtp", "line", "telegram", "teams", "webhook") if getattr(channels, name).enabled]
 
 
 def _rules(s: Settings, kind: type[Any]) -> list[Any]:

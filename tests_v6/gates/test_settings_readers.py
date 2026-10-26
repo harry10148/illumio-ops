@@ -10,7 +10,6 @@ from __future__ import annotations
 import ast
 from pathlib import Path
 
-import pytest
 from pydantic import BaseModel
 
 from illumio_ops.settings.schema import Settings
@@ -80,29 +79,29 @@ SETTINGS_READERS: dict[str, str] = {
     "lateral.detectors.precursor_hours": "illumio_ops.services.analysis.detect",
     "alerts.rules": "illumio_ops.services.alerts.evaluate",
     "alerts.retention_days": "illumio_ops.services.alerts.retention",
+    "pce.console_url": "illumio_ops.services.alerts.messages",
+    "display.timezone": "illumio_ops.services.alerts.messages",
+    "alerts.channels.smtp.enabled": "illumio_ops.services.alerts.channels",
+    "alerts.channels.smtp.host": "illumio_ops.services.alerts.channels",
+    "alerts.channels.smtp.port": "illumio_ops.services.alerts.channels",
+    "alerts.channels.smtp.security": "illumio_ops.services.alerts.channels",
+    "alerts.channels.smtp.username": "illumio_ops.services.alerts.channels",
+    "alerts.channels.smtp.password": "illumio_ops.services.alerts.channels",
+    "alerts.channels.smtp.sender": "illumio_ops.services.alerts.channels",
+    "alerts.channels.smtp.recipients": "illumio_ops.services.alerts.channels",
+    "alerts.channels.line.enabled": "illumio_ops.services.alerts.channels",
+    "alerts.channels.line.access_token": "illumio_ops.services.alerts.channels",
+    "alerts.channels.line.target_id": "illumio_ops.services.alerts.channels",
+    "alerts.channels.telegram.enabled": "illumio_ops.services.alerts.channels",
+    "alerts.channels.telegram.bot_token": "illumio_ops.services.alerts.channels",
+    "alerts.channels.telegram.chat_id": "illumio_ops.services.alerts.channels",
+    "alerts.channels.teams.enabled": "illumio_ops.services.alerts.channels",
+    "alerts.channels.teams.webhook_url": "illumio_ops.services.alerts.channels",
+    "alerts.channels.webhook.enabled": "illumio_ops.services.alerts.channels",
+    "alerts.channels.webhook.url": "illumio_ops.services.alerts.channels",
 }
 # Fields whose reader arrives later: value = the task or phase that adds it.
 PENDING_READERS: dict[str, str] = {
-    "pce.console_url": "P4-T6",
-    "display.timezone": "P4-T6",
-    "alerts.channels.smtp.enabled": "P4-T6",
-    "alerts.channels.smtp.host": "P4-T6",
-    "alerts.channels.smtp.port": "P4-T6",
-    "alerts.channels.smtp.security": "P4-T6",
-    "alerts.channels.smtp.username": "P4-T6",
-    "alerts.channels.smtp.password": "P4-T6",
-    "alerts.channels.smtp.sender": "P4-T6",
-    "alerts.channels.smtp.recipients": "P4-T6",
-    "alerts.channels.line.enabled": "P4-T6",
-    "alerts.channels.line.access_token": "P4-T6",
-    "alerts.channels.line.target_id": "P4-T6",
-    "alerts.channels.telegram.enabled": "P4-T6",
-    "alerts.channels.telegram.bot_token": "P4-T6",
-    "alerts.channels.telegram.chat_id": "P4-T6",
-    "alerts.channels.teams.enabled": "P4-T6",
-    "alerts.channels.teams.webhook_url": "P4-T6",
-    "alerts.channels.webhook.enabled": "P4-T6",
-    "alerts.channels.webhook.url": "P4-T6",
 }
 # Fields with no runtime reader by design.
 STRUCTURAL: dict[str, str] = {
@@ -208,7 +207,6 @@ def test_no_p1_pending_left():
     assert [p for p, due in PENDING_READERS.items() if due.startswith("P1-")] == []
 
 
-@pytest.mark.xfail(strict=True, reason="the readers arrive in P4 Tasks 5 and 6; remove this marker then")
 def test_no_p4_pending_left():
     # Tasks 5 and 6 add these readers; the gate is green again by the end of Task 9.
     assert [p for p, due in PENDING_READERS.items() if due.startswith("P4-")] == []
