@@ -3,7 +3,7 @@ each source's hourly activity. Every read is by the keys a run's candidates name
 raises StaleGeneration when the PCE was switched while it read (nothing of the previous PCE reaches a detector)."""
 from __future__ import annotations
 
-from collections.abc import Callable, Collection, Iterator, Sequence
+from collections.abc import Callable, Collection, Iterator, Mapping, Sequence
 from contextlib import contextmanager
 from datetime import datetime
 from typing import Any, TypeVar
@@ -96,15 +96,19 @@ def process_since(ctx: AppContext, srcs: Collection[str]) -> dict[str, datetime]
                         "GROUP BY src_key", srcs)
 
 
-def peer_seen(ctx: AppContext, members: Collection[str], port: int, proto: int, *, before: datetime) -> set[str]:
-    """The destinations any of these sources had used on this port before `before` (ix_baseline_port_src)."""
-    out: set[str] = set()
+def peer_seen(ctx: AppContext, queries: Mapping[tuple[str, int, int], Collection[str]], *,
+              before: datetime) -> dict[tuple[str, int, int], set[str]]:
+    """(group, port, proto) -> the destinations any of the group's members had used on that port before `before`
+    (ix_baseline_port_src). Every group is read on one connection."""
+    out: dict[tuple[str, int, int], set[str]] = {}
     with _reading(ctx) as conn:
-        for chunk in _chunks(members):
-            out |= {r[0] for r in conn.execute(
-                "SELECT DISTINCT dst_key FROM connection_baseline WHERE port = ? AND proto = ? "
-                f"AND src_key IN ({','.join('?' * len(chunk))}) AND first_seen <= ?",
-                [port, proto, *chunk, db_time(before)])}
+        for (group, port, proto), members in sorted(queries.items()):
+            seen = out.setdefault((group, port, proto), set())
+            for chunk in _chunks(members):
+                seen |= {r[0] for r in conn.execute(
+                    "SELECT DISTINCT dst_key FROM connection_baseline WHERE port = ? AND proto = ? "
+                    f"AND src_key IN ({','.join('?' * len(chunk))}) AND first_seen <= ?",
+                    [port, proto, *chunk, db_time(before)])}
     return out
 
 

@@ -61,15 +61,16 @@ def _peers(ctx: AppContext, lc: LateralContext, inp: DetectorInput, rows: Sequen
         group = group_of(src.labels, keys) if src is not None and src.managed else None
         if group is not None and sizes.get(group, 0) >= cfg.peer_min_group and _first_in_window(inp, o):
             wanted.add((group, o.port, o.proto))
+    found = fa.peer_seen(ctx, {w: members[w[0]] for w in wanted}, before=inp.window[0]) if wanted else {}
     seen: dict[tuple[str, int, int], frozenset[str]] = {}
-    for group, port, proto in sorted(wanted):
+    for asked, dsts in found.items():
         sigs = set()
-        for dst in fa.peer_seen(ctx, members[group], port, proto, before=inp.window[0]):
+        for dst in dsts:
             ip = dst[3:] if dst.startswith("ip:") else ""
             sig = target_signature(dst, ip, host_for(lc, dst, ip=ip, hostname=None), keys)
             if sig is not None:
                 sigs.add(sig)
-        seen[(group, port, proto)] = frozenset(sigs)
+        seen[asked] = frozenset(sigs)
     return sizes, seen
 
 

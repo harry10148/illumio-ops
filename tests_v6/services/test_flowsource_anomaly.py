@@ -63,8 +63,23 @@ def test_peer_seen(ctx):
     write(ctx, [rec(1, minutes_ago=5 * DAY, port=8443), rec(2, port=8443), rec(3, minutes_ago=5 * DAY, port=22)],
           origin=DataOrigin.BACKFILL)
     members = [SRC.format(i) for i in (1, 2, 3)]
-    assert fa.peer_seen(ctx, members, 8443, 6, before=NOW - timedelta(days=1)) == {DST}
-    assert fa.peer_seen(ctx, members[1:], 8443, 6, before=NOW - timedelta(days=1)) == set()
+    got = fa.peer_seen(ctx, {("g", 8443, 6): members, ("h", 8443, 6): members[1:], ("g", 22, 6): members},
+                       before=NOW - timedelta(days=1))
+    assert got == {("g", 8443, 6): {DST}, ("h", 8443, 6): set(), ("g", 22, 6): {DST}}
+
+
+def test_peer_seen_reads_every_group_on_one_connection(ctx, monkeypatch):
+    """Scale: a run asks about thousands of (group, port) pairs; each must not open its own connection."""
+    write(ctx, [rec(1, minutes_ago=5 * DAY, port=8443)], origin=DataOrigin.BACKFILL)
+    fdb = ctx.flows()
+    real, opened = fdb.connect, []
+
+    def connect():
+        opened.append(1)
+        return real()
+    monkeypatch.setattr(fdb, "connect", connect)
+    fa.peer_seen(ctx, {(f"g{i}", 8443, 6): [SRC.format(1)] for i in range(50)}, before=NOW)
+    assert len(opened) == 1
 
 
 def test_directory_reads(ctx):
@@ -105,7 +120,7 @@ def _switching(ctx, monkeypatch):
     lambda c: fa.account_history(c, ["a"], before=NOW),
     lambda c: fa.process_first_seen(c, [("a", "b")]),
     lambda c: fa.process_since(c, ["a"]),
-    lambda c: fa.peer_seen(c, ["a"], 1, 6, before=NOW),
+    lambda c: fa.peer_seen(c, {("g", 1, 6): ["a"]}, before=NOW),
     lambda c: fa.directory_sources(c, [(88, None)], since=NOW),
     lambda c: fa.directory_clients_before(c, ["a"], ["b"], [(88, None)], before=NOW),
     lambda c: fa.activity_now(c, since=NOW, until=NOW),
