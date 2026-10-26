@@ -129,6 +129,7 @@ class _Recorder:
         self.channels = enabled_channels(s.alerts.channels)
         self.fired = self.suppressed = 0
         self.pending: list[tuple[AlertRule, list[Trigger]]] = []
+        self.seen: list[tuple[str, str, str]] = []  # (rule, detection fingerprint, its severity) evaluated
 
     def record(self, rule: AlertRule, triggers: Sequence[Trigger]) -> None:
         if triggers:
@@ -155,9 +156,12 @@ class _Recorder:
                                        pack_key=rule.pack_key, trigger=t, at=self.now, channels=self.channels,
                                        hold=hold)
                     fired += 1
+            for rule_id, fingerprint, severity in self.seen:
+                store.set_seen_severity(conn, rule_id, fingerprint, severity)
             if watermark is not None:
                 store.set_eval_watermark(conn, source, watermark, pce_url=self.pce[0], org_id=self.pce[1])
         self.pending.clear()
+        self.seen.clear()
         self.fired += fired
         self.suppressed += suppressed
 
@@ -330,22 +334,26 @@ def _is_new(row: Any, start: tuple[str, int]) -> bool:
     return bool(row["created_at"] > start[0] or (row["created_at"] == start[0] and row["id"] > start[1]))
 
 
-def _alerted_severity(last: Any) -> Severity | None:
-    """The detection's severity when this rule last alerted on it (an alert's own severity may be the rule's)."""
+def _previous_severity(conn: Any, rule_id: str, fingerprint: str) -> Severity | None:
+    """The detection's severity when this rule last evaluated it — not the last alert's severity, which may be the
+    rule's own, and kept when no alert fired (a detection below the rule's floor). Before that was kept: the
+    detection's severity on the rule's last alert. None: the rule has not seen it (it predates alerting)."""
+    seen = store.seen_severity(conn, rule_id, fingerprint)
+    if seen is not None:
+        return Severity(seen)
+    last = store.last_alert(conn, rule_id, fingerprint)
     if last is None:
         return None
-    facts = json.loads(last["facts_json"])
-    return Severity(facts.get("detection_severity") or last["severity"])
+    return Severity(json.loads(last["facts_json"]).get("detection_severity") or last["severity"])
 
 
 def detection_fact(row: Any, *, start: tuple[str, int], names: dict[str, str | None],
                     previous: Severity | None) -> DetectionFact:
-    """previous: the detection's severity when the rule last alerted on it; None, an updated detection the rule
-    has not alerted on yet (it was below the rule's floor, or the rule is newer): it counts as risen, so the rule
-    alerts the first time the detection qualifies."""
+    """previous: the detection's severity when the rule last evaluated it; None for one the rule has not seen,
+    which only sets the baseline (a detection older than alerting is history, spec §7)."""
     severity = Severity(row["severity"])
     is_new = _is_new(row, start)
-    rose = previous is None or SEVERITY_ORDER.index(severity) > SEVERITY_ORDER.index(previous)
+    rose = previous is not None and SEVERITY_ORDER.index(severity) > SEVERITY_ORDER.index(previous)
     return DetectionFact(
         id=row["id"], detector=DetectorKind(row["detector"]), fingerprint=row["fingerprint"],
         subject_key=row["subject_key"], subject_name=names.get(row["subject_key"]) or row["subject_key"],
@@ -392,9 +400,10 @@ def evaluate_lateral(ctx: AppContext, *, now: datetime | None = None) -> EvalRun
                 previous = None
                 if not _is_new(row, start):  # changed, not new: alert again only if its severity rose
                     with ctx.db() as conn:
-                        last = store.last_alert(conn, rule.id, row["fingerprint"])
-                    previous = _alerted_severity(last)
+                        previous = _previous_severity(conn, rule.id, row["fingerprint"])
                 facts.append(detection_fact(row, start=start, names=names, previous=previous))
+                if DetectorKind(row["detector"]) in rule.detectors:
+                    rec.seen.append((rule.id, row["fingerprint"], row["severity"]))
             rec.record(rule, evaluate_lateral_rule(rule, facts))
         run.evaluated += len(changed)
         mark = (str(changed[-1]["updated_at"]), int(changed[-1]["id"]))

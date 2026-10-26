@@ -131,6 +131,19 @@ def save_rule_state(conn: sqlite3.Connection, rule_id: str, subject_key: str, st
         (rule_id, subject_key, last, recent, int(suppressed == "cooldown"), int(suppressed == "throttle")))
 
 
+def seen_severity(conn: sqlite3.Connection, rule_id: str, subject_key: str) -> str | None:
+    row = conn.execute("SELECT seen_severity FROM alert_rule_state WHERE rule_id = ? AND subject_key = ?",
+                       (rule_id, subject_key)).fetchone()
+    return None if row is None else row["seen_severity"]
+
+
+def set_seen_severity(conn: sqlite3.Connection, rule_id: str, subject_key: str, severity: str) -> None:
+    """The detection's severity as this rule last evaluated it (the caller commits)."""
+    conn.execute("INSERT INTO alert_rule_state (rule_id, subject_key, last_fired_at, recent_json, seen_severity) "
+                 "VALUES (?, ?, NULL, '[]', ?) ON CONFLICT(rule_id, subject_key) DO UPDATE SET "
+                 "seen_severity = excluded.seen_severity", (rule_id, subject_key, severity))
+
+
 def set_rule_status(conn: sqlite3.Connection, rule_id: str, status: str, at: datetime) -> None:
     with conn:
         conn.execute("INSERT INTO alert_rule_status (rule_id, status, evaluated_at) VALUES (?, ?, ?) "

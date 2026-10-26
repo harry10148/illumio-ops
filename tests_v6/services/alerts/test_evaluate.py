@@ -419,6 +419,17 @@ def test_lateral_alerts_when_a_detection_first_reaches_the_floor(ctx):
     assert evaluate_lateral(ctx, now=NOW + minutes(4)).fired == 1
 
 
+def test_detection_older_than_alerting_does_not_alert_on_update(ctx):
+    """A detection that existed before the first evaluation is history (spec §7): its next update, at the same
+    severity, is not an alert (.106 after the fix-pass deploy: one did)."""
+    _detect(ctx, at=NOW - minutes(5))
+    evaluate_lateral(ctx, now=NOW)
+    _detect(ctx, at=NOW + minutes(1))
+    assert evaluate_lateral(ctx, now=NOW + minutes(2)).fired == 0
+    _detect(ctx, severity="high", at=NOW + minutes(3))  # but a rise still alerts
+    assert evaluate_lateral(ctx, now=NOW + minutes(4)).fired == 1
+
+
 def test_lateral_fixed_rule_severity_does_not_realert(ctx):
     """The rule's own severity is the alert's, not the detection's: a repeat is not a rise (review)."""
     _lateral_rules(ctx, severity="low")
