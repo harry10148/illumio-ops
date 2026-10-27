@@ -373,6 +373,8 @@ policy_usage 與 rule_hit_count 在目錄中並列於「規則使用」之下，
 - PCE 拒絕（403 等）時照實顯示 PCE 的回應與「需要可寫入、具組織管理權限的 API key」，不得顯示成功。
 - 架構上歸在報表服務的「報表前置設定」，不開「政策動作」服務。
 
+**已釐清（2026-10-27）**：SaaS 不允許經 API 修改任何報表範本（NFR 上 owner user key 與臨時 owner service account 對 RHC 與已開啟範本的 no-op PUT 皆 403），與官方 KB 4243〈Enabling the Rule Hit Count Feature〉一致——三步 API 只適用地端，SaaS 需聯絡 account team 或開支援案件。產品在 SaaS 走「PCE 拒絕」分支並如實說明這點；地端照三步開啟。以下為原始紀錄。
+
 **P5 開工時要先釐清的已知風險**：NFR SaaS（26.40.2）以 owner 角色的 user API key 對
 `PUT /report_templates/rule_hit_count_report` 回 403（連 `enabled:false` 也是），`optional_features` 沒有相關旗標，
 官方文件也未列 SaaS 差異。P5 要在 NFR 找出原因（例如 API key 的類型或角色、租戶設定），在那之前上述流程的第 3 步
