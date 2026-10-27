@@ -373,6 +373,7 @@ class ReportType(StrEnum):
     LATERAL_POSTURE = "lateral_posture"
     NEW_CONNECTIONS = "new_connections"
     UNMANAGED_ENDPOINTS = "unmanaged_endpoints"
+    TRAFFIC = "traffic"
 
 
 class ReportFormat(StrEnum):

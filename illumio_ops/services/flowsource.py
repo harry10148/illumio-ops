@@ -450,6 +450,44 @@ def group_for_findings(conn: Any, spec: FilterSpec, *, env_key: str, table: str)
         ["app", env_key, "app", env_key, *params])
 
 
+class DecisionTotals(BaseModel):
+    decision: str
+    flows: int
+    connections: int
+    into_managed: int  # flows whose destination is a managed host: the one definition of inbound
+
+
+class FlowTotals(BaseModel):
+    """A period's totals over the primary rows a filter matches (flows = connection records)."""
+    flows: int
+    connections: int
+    sources: int
+    destinations: int
+    from_unmanaged: int
+    to_unmanaged: int
+    by_decision: list[DecisionTotals]
+
+
+def flow_totals(ctx: AppContext, spec: FilterSpec) -> FlowTotals:
+    fdb, gen, settings = _store_read(ctx)
+    with fdb.connect() as conn:
+        require_same_pce(conn, settings.pce)
+        for name, fn in sql_functions().items():
+            conn.create_function(name, -1, fn, deterministic=True)
+        where, params = to_sql(spec)
+        decisions = [DecisionTotals(decision=r[0], flows=r[1], connections=r[2] or 0, into_managed=r[3] or 0)
+                     for r in conn.execute(
+                         "SELECT f.policy_decision, COUNT(*), SUM(f.num_connections), SUM(f.dst_managed = 1) "
+                         f"FROM flows f WHERE {where} GROUP BY 1 ORDER BY 2 DESC", params)]
+        r = conn.execute("SELECT COUNT(DISTINCT f.src_key), COUNT(DISTINCT f.dst_key), SUM(f.src_managed = 0), "
+                         f"SUM(f.dst_managed = 0) FROM flows f WHERE {where}", params).fetchone()
+    if fdb.generation != gen:
+        raise StaleGeneration
+    return FlowTotals(flows=sum(d.flows for d in decisions), connections=sum(d.connections for d in decisions),
+                      sources=r[0], destinations=r[1], from_unmanaged=r[2] or 0, to_unmanaged=r[3] or 0,
+                      by_decision=decisions)
+
+
 def new_user_pairs(ctx: AppContext, ports: Sequence[PortProto], *, since: datetime) -> list[UserPair]:
     """User x destination x port combinations first seen since `since` (spec §6.5.7, "new combinations
     against the baseline"). user_baseline holds only connections with a user (about a tenth of them on

@@ -86,11 +86,14 @@ def pce_target(pce: PceSettings) -> str:
     return f"{url}#{org}"
 
 
-def traffic_covered(ctx: AppContext, start: datetime, end: datetime, *, now: datetime) -> bool:
+def traffic_covered(ctx: AppContext, start: datetime, end: datetime, *, now: datetime,
+                    flows: bool = False) -> bool:
     """Traffic was collected for all of [start, end) with no recorded gap: only then is a count over it a
-    number to compare with (spec §4.3: missing data is never shown as 0)."""
+    number to compare with (spec §4.3: missing data is never shown as 0). flows: the count reads the flows
+    table, kept flow_days, not the rollups' rollup_days."""
     settings = ctx.settings.current()
-    floor = now - timedelta(days=settings.collection.retention.rollup_days)
+    retention = settings.collection.retention
+    floor = now - timedelta(days=retention.flow_days if flows else retention.rollup_days)
     with ctx.flows().connect() as conn:
         cov = store_coverage(conn, IngestSource.TRAFFIC, (start, end), floor=floor,
                              collected=collects(settings, IngestSource.TRAFFIC))

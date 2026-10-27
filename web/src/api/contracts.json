@@ -10246,7 +10246,8 @@
             "enum": [
               "lateral_posture",
               "new_connections",
-              "unmanaged_endpoints"
+              "unmanaged_endpoints",
+              "traffic"
             ],
             "title": "ReportType",
             "type": "string"
@@ -10698,7 +10699,8 @@
             "enum": [
               "lateral_posture",
               "new_connections",
-              "unmanaged_endpoints"
+              "unmanaged_endpoints",
+              "traffic"
             ],
             "title": "ReportType",
             "type": "string"
@@ -11242,7 +11244,8 @@
             "enum": [
               "lateral_posture",
               "new_connections",
-              "unmanaged_endpoints"
+              "unmanaged_endpoints",
+              "traffic"
             ],
             "title": "ReportType",
             "type": "string"
@@ -11774,7 +11777,8 @@
             "enum": [
               "lateral_posture",
               "new_connections",
-              "unmanaged_endpoints"
+              "unmanaged_endpoints",
+              "traffic"
             ],
             "title": "ReportType",
             "type": "string"
@@ -12485,7 +12489,8 @@
             "enum": [
               "lateral_posture",
               "new_connections",
-              "unmanaged_endpoints"
+              "unmanaged_endpoints",
+              "traffic"
             ],
             "title": "ReportType",
             "type": "string"
@@ -12937,7 +12942,8 @@
             "enum": [
               "lateral_posture",
               "new_connections",
-              "unmanaged_endpoints"
+              "unmanaged_endpoints",
+              "traffic"
             ],
             "title": "ReportType",
             "type": "string"
@@ -13080,7 +13086,8 @@
             "enum": [
               "lateral_posture",
               "new_connections",
-              "unmanaged_endpoints"
+              "unmanaged_endpoints",
+              "traffic"
             ],
             "title": "ReportType",
             "type": "string"
@@ -13403,7 +13410,8 @@
             "enum": [
               "lateral_posture",
               "new_connections",
-              "unmanaged_endpoints"
+              "unmanaged_endpoints",
+              "traffic"
             ],
             "title": "ReportType",
             "type": "string"
@@ -19449,6 +19457,7 @@
     "ReportType": [
       "lateral_posture",
       "new_connections",
+      "traffic",
       "unmanaged_endpoints"
     ],
     "RuleAction": [

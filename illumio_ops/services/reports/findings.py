@@ -25,6 +25,8 @@ from loguru import logger
 
 from illumio_ops.domain.filter import FilterSpec
 from illumio_ops.domain.findings_rules import (
+    BY_ID,
+    CATEGORY_KEYS,
     CLEARTEXT_PORTS,
     CRITICAL_PORTS,
     DB_PORTS,
@@ -36,12 +38,13 @@ from illumio_ops.domain.findings_rules import (
     RuleOutcome,
     ranked,
 )
+from illumio_ops.domain.report import Column, Finding, TableBlock
 from illumio_ops.domain.values import Language, PortClass, Severity
 from illumio_ops.services import flowsource
 from illumio_ops.services.analysis.context import load_lateral_context
 from illumio_ops.services.context import AppContext
 from illumio_ops.services.reports import reads
-from illumio_ops.services.reports.common import host_name, port_text
+from illumio_ops.services.reports.common import host_name, port_text, severity_name, tr
 from illumio_ops.settings.schema import ReportRuleThresholds
 from illumio_ops.store.flowdb import analysis
 
@@ -351,3 +354,35 @@ def run_rules(ctx: AppContext, spec: FilterSpec, thresholds: ReportRuleThreshold
             if outcome is not None:
                 out.append(outcome)
     return ranked(out)
+
+
+# ── outcomes as report content ───────────────────────────────────────────────
+
+def _params(o: RuleOutcome) -> dict[str, Any]:
+    return {k: f"{v:,}" if isinstance(v, int) and not isinstance(v, bool) else v for k, v in o.params.items()}
+
+
+def as_findings(outcomes: list[RuleOutcome], lang: Language, *, limit: int) -> tuple[Finding, ...]:
+    """The first `limit` rules that fired (outcomes are ranked), as the report's key findings."""
+    return tuple(Finding(severity=o.severity, title=tr(lang, BY_ID[o.rule_id].name_key),
+                         why=tr(lang, o.desc_key, **_params(o)), action=tr(lang, o.rec_key, **_params(o)))
+                 for o in outcomes if o.severity is not None)[:limit]
+
+
+def outcomes_table(outcomes: list[RuleOutcome], lang: Language, *, title: str) -> TableBlock:
+    """Every rule that fired or could not be evaluated, with what it found and what to do."""
+    def row(o: RuleOutcome) -> tuple[str, ...]:
+        info = BY_ID[o.rule_id]
+        head = (o.rule_id, tr(lang, info.name_key), tr(lang, CATEGORY_KEYS[info.category]))
+        if o.severity is None:
+            return (*head, tr(lang, "rpt_rule_not_evaluated"), tr(lang, "rpt_rule_error", error=o.error), "")
+        return (*head, severity_name(lang, o.severity.value), tr(lang, o.desc_key, **_params(o)),
+                tr(lang, o.rec_key, **_params(o)))
+    columns = (Column(key="rule", label=tr(lang, "rpt_col_rule")), Column(key="name", label=tr(lang, "rpt_col_name")),
+               Column(key="category", label=tr(lang, "rpt_col_category")),
+               Column(key="severity", label=tr(lang, "rpt_col_severity")),
+               Column(key="found", label=tr(lang, "rpt_col_found")),
+               Column(key="action", label=tr(lang, "rpt_col_action")))
+    rows = tuple(row(o) for o in outcomes)
+    return TableBlock(title=title, columns=columns, rows=rows, total_rows=len(rows),
+                      empty_text=tr(lang, "rpt_rules_none_fired"))
