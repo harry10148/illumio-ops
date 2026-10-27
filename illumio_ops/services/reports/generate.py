@@ -182,6 +182,8 @@ def run_queued(ctx: AppContext, *, now: datetime | None = None) -> int | None:
         return row.id
     with ctx.db() as conn:
         store.finish(conn, row.id, status=ReportStatus.DONE, at=datetime.now(UTC), files=files, kpis=kpis)
+        if params.email:  # the list says so while the email is going out
+            store.set_email(conn, row.id, status="sending", detail=None)
     if params.email:
         deliver(ctx, row.id, doc, params, [out_dir / f for f in files], tz=tz)
     return row.id

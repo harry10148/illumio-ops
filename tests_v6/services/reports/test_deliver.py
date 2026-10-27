@@ -106,3 +106,18 @@ def test_external_url_validated(tmp_path, url):
     ctx = configured_ctx(tmp_path)
     with pytest.raises(SettingsInvalid):
         ctx.settings.update(ctx.settings.current().revision, lambda d: d["reports"].update(gui_external_url=url))
+
+
+def test_sending_shown_between_done_and_sent(tmp_path, monkeypatch):
+    """Lab: a finished report showed no email status while its email was still going out."""
+    ctx = _ctx(tmp_path, 25)
+    _register(monkeypatch, FakeBuilder())
+    seen = []
+
+    def watch(ctx_, report_id, *a, **kw):
+        with ctx_.db() as conn:
+            seen.append(store.get(conn, report_id).email_status)
+        return "sent"
+    monkeypatch.setattr(generate, "deliver", watch)
+    _run(ctx, email=True)
+    assert seen == ["sending"]

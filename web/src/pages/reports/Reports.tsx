@@ -232,7 +232,7 @@ export function Reports() {
       else setError(env.error);
     });
   }, [highlight, data]);
-  const busy = data?.items.some((r) => r.status === "queued" || r.status === "running") ?? false;
+  const busy = data?.items.some((r) => r.status === "queued" || r.status === "running" || r.email_status === "sending") ?? false;
   useEffect(() => {
     if (!busy) return undefined;
     const timer = window.setInterval(() => void load(), POLL_MS);

@@ -23,7 +23,7 @@ export const STATUS_KEYS: Record<string, string> = {
 };
 export const STATUS_TONES: Record<string, string> = { queued: "info", running: "info", done: "ok", failed: "danger" };
 export const EMAIL_KEYS: Record<string, string> = {
-  sent: "gui_reports_email_sent", failed: "gui_reports_email_failed",
+  sending: "gui_reports_email_sending", sent: "gui_reports_email_sent", failed: "gui_reports_email_failed",
   skipped_no_smtp: "gui_reports_email_skipped",
 };
 export const LOOKBACK_CHOICES = ["1", "7", "14", "30", "90"];
