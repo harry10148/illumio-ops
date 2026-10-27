@@ -785,10 +785,22 @@ trigger: string
  * via the `definition` "CatalogEntry".
  */
 export interface CatalogEntry {
+accepts_filter: boolean
 available: boolean
 group: string
+max_lookback: (number | null)
 reason_key: (string | null)
 report_type: ReportType
+requires_app: boolean
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "LabelChoice".
+ */
+export interface LabelChoice {
+key: string
+truncated: boolean
+values: string[]
 }
 /**
  * This interface was referenced by `ContractRoot`'s JSON-Schema
@@ -797,6 +809,7 @@ report_type: ReportType
 export interface Catalog {
 entries: CatalogEntry[]
 gui_external_url_set: boolean
+label_choices: LabelChoice[]
 smtp_enabled: boolean
 }
 /**
@@ -1146,15 +1159,6 @@ port: number
  */
 processes: [string, ...(string)[]]
 proto: (number | null)
-}
-/**
- * This interface was referenced by `ContractRoot`'s JSON-Schema
- * via the `definition` "LabelChoice".
- */
-export interface LabelChoice {
-key: string
-truncated: boolean
-values: string[]
 }
 /**
  * This interface was referenced by `ContractRoot`'s JSON-Schema

@@ -11,7 +11,7 @@ from pydantic import BaseModel, Field
 
 from illumio_ops.domain.values import ReportStatus
 from illumio_ops.services.reports import schedules
-from illumio_ops.services.reports.generate import refusal
+from illumio_ops.services.reports.generate import REFUSAL_FIELDS, refusal
 from illumio_ops.services.reports.views import ReportItem, get_report
 from illumio_ops.settings.schema import ReportSchedule, ReportScheduleFields
 from illumio_ops.web.auth import get_ctx
@@ -78,9 +78,6 @@ def _view() -> SchedulesView:
     status = schedules.schedule_status(ctx)
     items = [ScheduleItem(schedule=x, **vars(status[x.id])) for x in s.reports.schedules]
     return SchedulesView(revision=s.revision, items=items, smtp_enabled=s.alerts.channels.smtp.enabled)
-
-
-REFUSAL_FIELDS = {"rpt_err_lookback_beyond_retention": "lookback_days", "rpt_err_app_required": "filter"}
 
 
 def _check(fields: ReportScheduleFields) -> None:

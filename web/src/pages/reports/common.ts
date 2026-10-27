@@ -36,6 +36,13 @@ export const EMAIL_KEYS: Record<string, string> = {
 };
 export const LOOKBACK_CHOICES = ["1", "7", "14", "30", "90"];
 
+/** The lookback choices a type can read: the flow reports stop at the flow retention (it is offered itself). */
+export function lookbackChoices(max: number | null | undefined): string[] {
+  if (max == null) return LOOKBACK_CHOICES;
+  const kept = LOOKBACK_CHOICES.filter((d) => Number(d) <= max);
+  return kept.includes(String(max)) ? kept : [...kept, String(max)];
+}
+
 export function word(keys: Record<string, string>, value: string): string {
   const key = keys[value];
   return key ? t(key) : value;

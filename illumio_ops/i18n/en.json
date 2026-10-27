@@ -1337,5 +1337,19 @@
   "rpt_app_tbl_uncovered_in": "Uncovered inbound connections",
   "rpt_app_tbl_uncovered_out": "Uncovered outbound connections",
   "rpt_app_findings_intro": "The rules evaluated on this app's flows only (both directions), with the same thresholds as the other reports.",
-  "rpt_app_quality_split": "Inbound, outbound and intra-app traffic are counted once each: intra-app traffic is not repeated on either side. The app is matched exactly as the PCE names it."
+  "rpt_app_quality_split": "Inbound, outbound and intra-app traffic are counted once each: intra-app traffic is not repeated on either side. The app is matched exactly as the PCE names it.",
+  "rpt_err_filter_not_supported": "This report type does not take a filter; it always covers every host.",
+  "gui_reports_filter": "Filter",
+  "gui_reports_filter_hint": "Optional: narrow the report to hosts with these labels. Without a filter it covers every host.",
+  "gui_reports_filter_app_required": "Choose the app this report is about (an app label on either side); an environment may narrow it.",
+  "gui_reports_filter_no_labels": "No labels yet: the inventory has not been collected.",
+  "gui_reports_filter_source": "Source",
+  "gui_reports_filter_destination": "Destination",
+  "gui_reports_filter_side": "Side",
+  "gui_reports_filter_key": "Label",
+  "gui_reports_filter_value": "Value",
+  "gui_reports_filter_pick": "Choose…",
+  "gui_reports_filter_remove": "Remove",
+  "gui_reports_filter_add": "Add a condition",
+  "gui_reports_filter_truncated": "Only the first 500 values are listed."
 }

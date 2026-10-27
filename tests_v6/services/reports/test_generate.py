@@ -266,7 +266,7 @@ def test_lookback_beyond_flow_retention_refused(ctx, monkeypatch):
 def test_app_required_for_app_reports(ctx, monkeypatch):
     from illumio_ops.domain.filter import EndpointFilter, FlowCondition, LabelCond
     reg = {t: ReportSpec(report_type=t, group="inventory", needs_traffic=True, build=FakeBuilder(),
-                         requires_app=True) for t in ReportType}
+                         requires_app=True, accepts_filter=True) for t in ReportType}
     monkeypatch.setattr(registry, "REGISTRY", reg)
     rid = generate.enqueue(ctx, ReportParams(report_type=LATERAL), trigger="manual", schedule_id=None, now=NOW)
     assert _row(ctx, rid).error_key == "rpt_err_app_required"

@@ -1337,5 +1337,19 @@
   "rpt_app_tbl_uncovered_in": "未涵蓋的連入連線",
   "rpt_app_tbl_uncovered_out": "未涵蓋的連出連線",
   "rpt_app_findings_intro": "規則只以此 app 的流量（雙向）評估，門檻與其他報表相同。",
-  "rpt_app_quality_split": "連入、連出與 app 內流量各只計一次：app 內流量不會在兩側重複出現。App 依 PCE 的名稱完全比對。"
+  "rpt_app_quality_split": "連入、連出與 app 內流量各只計一次：app 內流量不會在兩側重複出現。App 依 PCE 的名稱完全比對。",
+  "rpt_err_filter_not_supported": "此報表類型不接受篩選，一律涵蓋所有主機。",
+  "gui_reports_filter": "篩選",
+  "gui_reports_filter_hint": "選填：只看帶有這些標籤的主機。不設篩選則涵蓋所有主機。",
+  "gui_reports_filter_app_required": "請選擇此報表要看的 app（任一側的 app 標籤）；可再加環境縮小範圍。",
+  "gui_reports_filter_no_labels": "還沒有標籤：清冊尚未收集。",
+  "gui_reports_filter_source": "來源",
+  "gui_reports_filter_destination": "目的端",
+  "gui_reports_filter_side": "端點",
+  "gui_reports_filter_key": "標籤",
+  "gui_reports_filter_value": "值",
+  "gui_reports_filter_pick": "請選擇…",
+  "gui_reports_filter_remove": "移除",
+  "gui_reports_filter_add": "新增條件",
+  "gui_reports_filter_truncated": "只列出前 500 個值。"
 }

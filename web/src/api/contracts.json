@@ -13067,6 +13067,10 @@
         "$defs": {
           "CatalogEntry": {
             "properties": {
+              "accepts_filter": {
+                "title": "Accepts Filter",
+                "type": "boolean"
+              },
               "available": {
                 "title": "Available",
                 "type": "boolean"
@@ -13074,6 +13078,17 @@
               "group": {
                 "title": "Group",
                 "type": "string"
+              },
+              "max_lookback": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Max Lookback"
               },
               "reason_key": {
                 "anyOf": [
@@ -13088,15 +13103,48 @@
               },
               "report_type": {
                 "$ref": "#/$defs/ReportType"
+              },
+              "requires_app": {
+                "title": "Requires App",
+                "type": "boolean"
               }
             },
             "required": [
               "report_type",
               "group",
               "available",
-              "reason_key"
+              "reason_key",
+              "accepts_filter",
+              "requires_app",
+              "max_lookback"
             ],
             "title": "CatalogEntry",
+            "type": "object"
+          },
+          "LabelChoice": {
+            "properties": {
+              "key": {
+                "title": "Key",
+                "type": "string"
+              },
+              "truncated": {
+                "title": "Truncated",
+                "type": "boolean"
+              },
+              "values": {
+                "items": {
+                  "type": "string"
+                },
+                "title": "Values",
+                "type": "array"
+              }
+            },
+            "required": [
+              "key",
+              "values",
+              "truncated"
+            ],
+            "title": "LabelChoice",
             "type": "object"
           },
           "ReportType": {
@@ -13126,6 +13174,13 @@
             "title": "Gui External Url Set",
             "type": "boolean"
           },
+          "label_choices": {
+            "items": {
+              "$ref": "#/$defs/LabelChoice"
+            },
+            "title": "Label Choices",
+            "type": "array"
+          },
           "smtp_enabled": {
             "title": "Smtp Enabled",
             "type": "boolean"
@@ -13133,6 +13188,7 @@
         },
         "required": [
           "entries",
+          "label_choices",
           "smtp_enabled",
           "gui_external_url_set"
         ],

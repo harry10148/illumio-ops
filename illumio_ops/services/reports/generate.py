@@ -108,6 +108,11 @@ def availability(ctx: AppContext) -> dict[ReportType, str | None]:
             for t, spec in specs().items()}
 
 
+# The parameter each refusal is about, for the API's field name.
+REFUSAL_FIELDS = {"rpt_err_lookback_beyond_retention": "lookback_days", "rpt_err_app_required": "filter",
+                  "rpt_err_filter_not_supported": "filter"}
+
+
 def refusal(settings: Settings, params: ReportParams) -> str | None:
     """Why these parameters cannot make this report (the reason is stored on a failed row), or None."""
     spec = specs().get(params.report_type)
@@ -115,6 +120,8 @@ def refusal(settings: Settings, params: ReportParams) -> str | None:
         return None
     if spec.max_lookback is not None and params.lookback_days > spec.max_lookback(settings):
         return "rpt_err_lookback_beyond_retention"
+    if params.filter is not None and not spec.accepts_filter:
+        return "rpt_err_filter_not_supported"
     if spec.requires_app and not names_app(params.filter):
         return "rpt_err_app_required"
     return None

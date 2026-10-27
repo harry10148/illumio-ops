@@ -64,6 +64,7 @@ class ReportSpec:
     build: Callable[[BuildInput], ReportDocument]
     max_lookback: Callable[[Settings], int] | None = None  # the most days back the report's data reaches
     requires_app: bool = False  # the filter must name an app label (one application's report)
+    accepts_filter: bool = False  # the report reads ReportParams.filter (flow reports); others refuse one
 
 
 REGISTRY: dict[ReportType, ReportSpec] = {}
@@ -87,13 +88,14 @@ def _builtin() -> dict[ReportType, ReportSpec]:
         ReportType.NEW_CONNECTIONS: ReportSpec(ReportType.NEW_CONNECTIONS, "analysis", True, build_new_connections),
         ReportType.UNMANAGED_ENDPOINTS: ReportSpec(ReportType.UNMANAGED_ENDPOINTS, "inventory", True, build_unmanaged),
         ReportType.TRAFFIC: ReportSpec(ReportType.TRAFFIC, "analysis", True, build_traffic,
-                                       max_lookback=flow_days),
+                                       max_lookback=flow_days, accepts_filter=True),
         ReportType.SECURITY_RISK: ReportSpec(ReportType.SECURITY_RISK, "assessment", True, build_security_risk,
-                                             max_lookback=flow_days),
+                                             max_lookback=flow_days, accepts_filter=True),
         ReportType.NETWORK_INVENTORY: ReportSpec(ReportType.NETWORK_INVENTORY, "inventory", True,
-                                                 build_network_inventory, max_lookback=flow_days),
+                                                 build_network_inventory, max_lookback=flow_days, accepts_filter=True),
         ReportType.APP_SUMMARY: ReportSpec(ReportType.APP_SUMMARY, "analysis", True, build_app_summary,
-                                           max_lookback=flow_days, requires_app=True),
+                                           max_lookback=flow_days, requires_app=True,
+                                           accepts_filter=True),
     }
 
 

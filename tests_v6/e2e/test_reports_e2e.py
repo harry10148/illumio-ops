@@ -79,3 +79,52 @@ def test_schedule_create_and_run_now(context, live_app):
     marked = page.locator("[data-highlight=true]")
     expect(marked).to_contain_text("Daily lateral")
     assert [s.name for s in live_app.ctx.settings.current().reports.schedules] == ["Daily lateral"]
+
+
+def _finance_inventory(ctx):
+    from illumio_ops.store.flowdb import labels, workloads
+    with ctx.flows().connect() as conn:
+        workloads.replace_inventory(conn, [workloads.WorkloadRow(
+            href="/orgs/1/workloads/f1", hostname="f1", name=None, managed=1, enforcement_mode="full",
+            visibility_level=None, os_id=None, ven_version=None, ven_href=None,
+            label_set=labels.label_set_id(conn, (("app", "Finance"), ("env", "Prod"))), online=1, risk_exposure=None,
+            risk_percent=None, risk_updated_at=None, fetched_at="x")])
+        conn.commit()
+
+
+def test_app_summary_needs_an_app(context, live_app):
+    _finance_inventory(live_app.ctx)
+    page = context.new_page()
+    _reports(page, live_app.url)
+    entry = page.locator("[data-report-type=app_summary]")
+    entry.get_by_role("button", name="Generate…").click()
+    form = entry.locator("[data-role=generate-form]")
+    go = form.get_by_role("button", name="Generate", exact=True)
+    expect(go).to_be_disabled()  # no app chosen yet
+    form.locator("select[name=filter_value]").select_option("Finance")
+    go.click()
+    row = page.locator("[data-role=report-list] tbody tr").first
+    expect(row).to_have_attribute("data-status", "queued")
+    generate.run_queued(live_app.ctx)
+    expect(row).to_have_attribute("data-status", "done", timeout=10_000)
+    with page.expect_download() as dl:
+        row.get_by_role("link", name="HTML").click()
+    assert "App summary: Finance" in Path(dl.value.path()).read_text(encoding="utf-8")
+
+
+def test_schedule_with_filter(context, live_app):
+    _finance_inventory(live_app.ctx)
+    page = context.new_page()
+    _reports(page, live_app.url)
+    page.get_by_role("tab", name="Schedules").click()
+    page.get_by_role("button", name="Add a schedule").click()
+    editor = page.locator("[data-role=schedule-editor]")
+    editor.locator("input[name=name]").fill("Finance traffic")
+    editor.locator("select[name=report_type]").select_option("traffic")
+    editor.get_by_role("button", name="Add a condition").click()
+    editor.locator("select[name=filter_value]").select_option("Finance")
+    editor.get_by_role("button", name="Save").click()
+    row = page.locator("[data-role=schedule-list] tbody tr").first
+    expect(row.locator("[data-role=schedule-filter]")).to_have_text("app = Finance")
+    saved = live_app.ctx.settings.current().reports.schedules[0]
+    assert saved.filter is not None and saved.filter.dst.labels[0].values == ("Finance",)
