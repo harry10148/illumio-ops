@@ -62,10 +62,12 @@ def _names(inp: BuildInput, rows: Sequence[AggRow], group_by: Sequence[GroupBy])
 
 
 def ranking(inp: BuildInput, *, title: str, group_by: Sequence[GroupBy], metric: SegmentMetric,
-            columns: Sequence[Column], extra: FlowCondition | None = None, limit: int = 20) -> TableBlock:
-    """A top-`limit` ranking as a table: one column per grouping level, then the metric."""
-    seg = FlowSegment(filter=window(inp, extra), group_by=tuple(group_by), metric=metric, view=SegmentView.RANKING,
-                      limit=limit)
+            columns: Sequence[Column], extra: FlowCondition | None = None, limit: int = 20,
+            spec: FilterSpec | None = None) -> TableBlock:
+    """A top-`limit` ranking as a table: one column per grouping level, then the metric. `spec` replaces the
+    report's window and filter (a report that builds its own sides, such as one app's inbound traffic)."""
+    seg = FlowSegment(filter=spec or window(inp, extra), group_by=tuple(group_by), metric=metric,
+                      view=SegmentView.RANKING, limit=limit)
     result = run_segment(inp.ctx, seg, now=inp.now)
     rows_in = result.ranking or []
     names = _names(inp, rows_in, group_by)

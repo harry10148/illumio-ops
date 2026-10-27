@@ -16,7 +16,7 @@ from __future__ import annotations
 import json
 import sqlite3
 import traceback
-from collections.abc import Callable, Collection
+from collections.abc import Callable, Collection, Sequence
 from datetime import datetime
 from statistics import median
 from typing import Any
@@ -328,7 +328,7 @@ RULE_FUNCTIONS: dict[str, Callable[[_Run], RuleOutcome | None]] = {
 }
 
 
-def run_rules(ctx: AppContext, spec: FilterSpec, thresholds: ReportRuleThresholds, lang: Language, *,
+def run_rules(ctx: AppContext, spec: FilterSpec | Sequence[FilterSpec], thresholds: ReportRuleThresholds, lang: Language, *,
               now: datetime) -> list[RuleOutcome]:
     """Every rule that fired or could not be evaluated, most severe first."""
     lc = load_lateral_context(ctx, now=now)

@@ -430,13 +430,19 @@ def _label_of(side: str) -> str:
             "AND m.key = ?), '')")
 
 
-def group_for_findings(conn: Any, spec: FilterSpec, *, env_key: str, table: str) -> None:
+def group_for_findings(conn: Any, spec: FilterSpec | Sequence[FilterSpec], *, env_key: str, table: str) -> None:
     """The findings engine's one read of a period (services.reports.findings): the primary rows grouped by
     source, destination, service, decision, managed sides, app and environment labels and user, into the
-    TEMP table `table` on `conn` (a connection from reports.reads.reading, which holds the PCE guard)."""
+    TEMP table `table` on `conn` (a connection from reports.reads.reading, which holds the PCE guard).
+    Several specs: the rows any of them matches (one application's traffic in either direction)."""
     for name, fn in sql_functions().items():
         conn.create_function(name, -1, fn, deterministic=True)
-    where, params = to_sql(spec)
+    parts, params = [], []
+    for s in [spec] if isinstance(spec, FilterSpec) else spec:
+        w, p = to_sql(s)
+        parts.append(f"({w})")
+        params += p
+    where = " OR ".join(parts)
     conn.execute(f"DROP TABLE IF EXISTS temp.{table}")
     conn.execute(
         f"CREATE TEMP TABLE {table} AS SELECT f.src_key, f.dst_key, COALESCE(f.port, -1) AS port, f.proto, "

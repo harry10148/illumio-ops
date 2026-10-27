@@ -8,6 +8,7 @@ export const TYPE_KEYS: Record<string, string> = {
   traffic: "rpt_title_traffic",
   security_risk: "rpt_title_security_risk",
   network_inventory: "rpt_title_network_inventory",
+  app_summary: "rpt_title_app_summary",
 };
 export const TYPE_DESC_KEYS: Record<string, string> = {
   lateral_posture: "gui_reports_desc_lateral_posture",
@@ -16,6 +17,7 @@ export const TYPE_DESC_KEYS: Record<string, string> = {
   traffic: "gui_reports_desc_traffic",
   security_risk: "gui_reports_desc_security_risk",
   network_inventory: "gui_reports_desc_network_inventory",
+  app_summary: "gui_reports_desc_app_summary",
 };
 export const GROUP_KEYS: Record<string, string> = {
   lateral: "gui_reports_group_lateral", inventory: "gui_reports_group_inventory",
