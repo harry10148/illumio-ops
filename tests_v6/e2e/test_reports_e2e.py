@@ -128,3 +128,25 @@ def test_schedule_with_filter(context, live_app):
     expect(row.locator("[data-role=schedule-filter]")).to_have_text("app = Finance")
     saved = live_app.ctx.settings.current().reports.schedules[0]
     assert saved.filter is not None and saved.filter.dst.labels[0].values == ("Finance",)
+
+
+def test_editing_a_schedule_keeps_filter_fields_the_picker_does_not_show(context, live_app):
+    _finance_inventory(live_app.ctx)
+    ctx = live_app.ctx
+    sched = {"id": "a" * 32, "name": "Finance 443", "enabled": True, "report_type": "traffic", "lookback_days": 7,
+             "frequency": "daily", "day_of_week": None, "day_of_month": None, "hour": 8, "minute": 0,
+             "formats": ["html"], "email": False, "recipients": [], "lang": None, "keep": 30,
+             "filter": {"dst": {"labels": [{"key": "app", "values": ["Finance"]}]}, "ports": [{"port": 443, "proto": 6}],
+                        "src_exclude": {"ips": ["10.9.0.0/16"]}}}
+    ctx.settings.update(ctx.settings.current().revision, lambda d: d["reports"]["schedules"].append(sched))
+    page = context.new_page()
+    _reports(page, live_app.url)
+    page.get_by_role("tab", name="Schedules").click()
+    page.locator("[data-role=schedule-list] tbody tr").first.get_by_role("button", name="Edit").click()
+    editor = page.locator("[data-role=schedule-editor]")
+    editor.locator("input[name=name]").fill("Finance 443 renamed")
+    editor.get_by_role("button", name="Save").click()
+    expect(page.locator("[data-role=schedule-list] tbody tr").first).to_contain_text("Finance 443 renamed")
+    saved = ctx.settings.current().reports.schedules[0].filter
+    assert saved is not None and [p.port for p in saved.ports] == [443] and saved.src_exclude.ips == ("10.9.0.0/16",)
+    assert saved.dst.labels[0].values == ("Finance",)

@@ -9,14 +9,12 @@ from collections import Counter
 from collections.abc import Mapping
 from typing import Any
 
-from illumio_ops.domain.filter import EndpointFilter, FlowCondition
 from illumio_ops.domain.findings_rules import (
     BY_ID,
     CATEGORY_KEYS,
     SEVERITY_RANK,
     RuleOutcome,
 )
-from illumio_ops.domain.lateral import HostInfo
 from illumio_ops.domain.maturity import MaturityInputs, maturity
 from illumio_ops.domain.ransomware import service_coverage
 from illumio_ops.domain.report import (
@@ -30,6 +28,7 @@ from illumio_ops.domain.report import (
 from illumio_ops.domain.segment import GroupBy
 from illumio_ops.domain.values import (
     PolicyDecision,
+    PortClass,
     SegmentDimension,
     SegmentMetric,
     Severity,
@@ -51,8 +50,8 @@ TOP = 20
 RANSOMWARE_TOP = 10
 KEY_FINDINGS = 5
 APP = "app"  # the app label key
-UNCOVERED = FlowCondition(decisions=(PolicyDecision.POTENTIALLY_BLOCKED, PolicyDecision.BLOCKED))
-PB_ONLY = FlowCondition(decisions=(PolicyDecision.POTENTIALLY_BLOCKED,))
+UNCOVERED = (PolicyDecision.POTENTIALLY_BLOCKED, PolicyDecision.BLOCKED)
+PB_ONLY = (PolicyDecision.POTENTIALLY_BLOCKED,)
 MODES = ("full", "selective", "visibility_only", "idle")
 _CATEGORY_ORDER = {c: i for i, c in enumerate(CATEGORY_KEYS)}
 _KPI_KEYS = {
@@ -63,19 +62,6 @@ _KPI_KEYS = {
     "ransomware_protected_pct": "rpt_sec_kpi_ransomware_protected", "lateral_detections": "rpt_sec_kpi_detections",
 }
 _FLOW_KPIS = ("allowed_pct", "pb_flows", "blocked_flows", "unmanaged_connections", "admin_open_connections")
-
-
-def _side_matches(host: HostInfo, side: EndpointFilter | None) -> bool:
-    return side is not None and bool(side.labels) and all(host.labels.get(lc.key) in lc.values for lc in side.labels)
-
-
-def _in_scope(host: HostInfo, cond: FlowCondition | None) -> bool:
-    """A managed host the report is about: all of them, or those whose labels match a side of the filter."""
-    if not host.managed:
-        return False
-    if cond is None or not any(s is not None and s.labels for s in (cond.src, cond.dst)):
-        return True
-    return _side_matches(host, cond.src) or _side_matches(host, cond.dst)
 
 
 def _flow_kpis(t: FlowTotals) -> dict[str, float | int]:
@@ -91,11 +77,13 @@ def _ransomware_counts(result: Mapping[str, Any] | None, hrefs: set[str] | None)
     """(critical/high services the PCE rated, of them protected); None without ransomware data."""
     if not result or result.get("unsupported"):
         return None
-    rated = [s for h in result.get("hosts") or () if hrefs is None or h.get("href") in hrefs
-             for s in h.get("services") or () if str(s.get("severity") or "").lower() in ("critical", "high")]
+    known = [service_coverage(s.get("protection_state")) for h in result.get("hosts") or ()
+             if hrefs is None or h.get("href") in hrefs for s in h.get("services") or ()
+             if str(s.get("severity") or "").lower() in ("critical", "high")]
+    rated = [c for c in known if c is not None]  # an unknown protection state is neither protected nor not
     if not rated:
         return None
-    return len(rated), sum(1 for s in rated if service_coverage(s.get("protection_state")) == 1.0)
+    return len(rated), sum(1 for c in rated if c == 1.0)
 
 
 def _by_category(outcomes: list[RuleOutcome]) -> list[RuleOutcome]:
@@ -110,7 +98,8 @@ def build_security_risk(inp: BuildInput) -> ReportDocument:
         return tr(lang, msg, **params)
 
     lc = load_lateral_context(inp.ctx, now=inp.now)
-    admin = {(e.port, e.proto) for e in lc.admin_ports.entries}
+    # Remote-execution ports, any protocol where configured so (the rule engine's management ports)
+    admin = {(e.port, e.proto) for e in lc.admin_ports.entries if e.category is PortClass.REMOTE}
     cond = inp.params.filter
     spec = flowsections.window(inp)
     totals = flow_totals(inp.ctx, spec, admin_ports=admin)
@@ -119,7 +108,7 @@ def build_security_risk(inp: BuildInput) -> ReportDocument:
                                      admin_ports=admin))
               if traffic_covered(inp.ctx, prev_start, inp.start, now=inp.now, flows=True) else None)
     no_flows = t("rpt_no_flows_filtered" if cond is not None else "rpt_no_flows")
-    hosts = [h for h in lc.hosts.values() if _in_scope(h, cond)]
+    hosts = [h for h in lc.hosts.values() if flowsections.host_in_scope(h, cond)]
     modes = Counter(h.enforcement_mode for h in hosts)
     with reads.reading(inp.ctx) as conn:
         rw_row = analysis.read_result(conn, "ransomware")
@@ -143,7 +132,8 @@ def build_security_risk(inp: BuildInput) -> ReportDocument:
     # ── key metrics ─────────────────────────────────────────────────────────
     now_flow = _flow_kpis(totals)
     values: dict[str, float | int | None] = {
-        "maturity": round(score.score, 1) if score.score is not None else None,
+        # Without matching traffic the score would rest on the inventory alone: not shown (Review Focus 1).
+        "maturity": round(score.score, 1) if score.score is not None and totals.flows else None,
         "enforced_hosts_pct": round(100 * (modes["full"] + modes["selective"]) / len(hosts), 1) if hosts else None,
         **{k: (now_flow[k] if totals.flows else None) for k in _FLOW_KPIS},
         "critical_high_findings": len(fired) if totals.flows else None,
@@ -152,8 +142,8 @@ def build_security_risk(inp: BuildInput) -> ReportDocument:
     }
     notes: dict[str, str | None] = {k: (no_flows if values[k] is None else None) for k in _FLOW_KPIS}
     notes.update(
-        maturity=(t("rpt_sec_grade", grade=score.grade,
-                    parts=sum(1 for v in score.parts.values() if v is not None))
+        maturity=(no_flows if not totals.flows else
+                  t("rpt_sec_grade", grade=score.grade, parts=sum(1 for v in score.parts.values() if v is not None))
                   if score.grade else t("rpt_sec_maturity_none")),
         enforced_hosts_pct=None if hosts else t("rpt_sec_no_hosts"),
         critical_high_findings=None if totals.flows else no_flows,
@@ -185,9 +175,10 @@ def build_security_risk(inp: BuildInput) -> ReportDocument:
                                         outbound=pct(by["allowed"].from_managed if "allowed" in by else 0, out)),))
 
     # ── traffic no rule covers ──────────────────────────────────────────────
-    def two_labels(title: str, extra: FlowCondition, second: GroupBy, second_label: str) -> TableBlock:
+    def two_labels(title: str, decisions: tuple[PolicyDecision, ...], second: GroupBy,
+                   second_label: str) -> TableBlock:
         return flowsections.ranking(
-            inp, title=title, extra=extra, metric=SegmentMetric.CONNECTIONS, limit=TOP,
+            inp, title=title, decisions=decisions, metric=SegmentMetric.CONNECTIONS, limit=TOP,
             group_by=(GroupBy(dimension=SegmentDimension.SRC_LABEL, label_key=APP), second),
             columns=(Column(key="src", label=t("rpt_col_src_label", key="app")),
                      Column(key="second", label=second_label),
@@ -205,7 +196,7 @@ def build_security_risk(inp: BuildInput) -> ReportDocument:
         "columns": (*uncovered_base.columns, Column(key="advice", label=t("rpt_col_action"))),
         "rows": tuple((*r, advice(r[0], r[1])) for r in uncovered_base.rows)})
     port_gaps = flowsections.ranking(
-        inp, title=t("rpt_sec_tbl_port_gaps"), extra=UNCOVERED, metric=SegmentMetric.CONNECTIONS, limit=TOP,
+        inp, title=t("rpt_sec_tbl_port_gaps"), decisions=UNCOVERED, metric=SegmentMetric.CONNECTIONS, limit=TOP,
         group_by=(GroupBy(dimension=SegmentDimension.SERVICE),),
         columns=(Column(key="service", label=t("rpt_col_service")),
                  Column(key="n", label=t("rpt_col_connections"), kind="number")))
@@ -231,7 +222,7 @@ def build_security_risk(inp: BuildInput) -> ReportDocument:
 
     # ── potentially blocked ─────────────────────────────────────────────────
     pb_base = flowsections.ranking(
-        inp, title=t("rpt_sec_tbl_pb"), extra=PB_ONLY, metric=SegmentMetric.CONNECTIONS, limit=TOP,
+        inp, title=t("rpt_sec_tbl_pb"), decisions=PB_ONLY, metric=SegmentMetric.CONNECTIONS, limit=TOP,
         group_by=(GroupBy(dimension=SegmentDimension.DST_LABEL, label_key=APP),
                   GroupBy(dimension=SegmentDimension.SERVICE)),
         columns=(Column(key="dst", label=t("rpt_col_dst_label", key="app")),
@@ -249,7 +240,8 @@ def build_security_risk(inp: BuildInput) -> ReportDocument:
     elif rw.get("unsupported"):
         rw_blocks = (TextBlock(paragraphs=(t("rpt_sec_rw_unsupported"),)),)
     else:
-        priority = list(rw.get("priority") or ())
+        scope = {h.href for h in hosts if h.href} if cond is not None else None
+        priority = [r for r in rw.get("priority") or () if scope is None or r.get("host") in scope]
         rw_blocks = (TableBlock(
             title=t("rpt_sec_tbl_ransomware"),
             columns=(Column(key="host", label=t("rpt_col_host")), Column(key="service", label=t("rpt_col_name")),
@@ -303,7 +295,7 @@ def build_security_risk(inp: BuildInput) -> ReportDocument:
     lateral_lines.append(t("rpt_sec_lateral_see", report=t("rpt_title_lateral_posture")))
 
     filter_line = flowsections.filter_text(cond, lang)
-    quality = (*coverage_note(inp.ctx, inp.start, inp.end, lang, now=inp.now, tz=inp.tz),
+    quality = (*coverage_note(inp.ctx, inp.start, inp.end, lang, now=inp.now, tz=inp.tz, flows=True),
                *((t("rpt_quality_filter", filter=filter_line),) if filter_line else ()),
                t("rpt_trf_quality_counts"), t("rpt_sec_quality_maturity"), *flowsections.coverage_lines(inp, fc))
     return ReportDocument(
@@ -323,4 +315,5 @@ def build_security_risk(inp: BuildInput) -> ReportDocument:
             Section(id="users", title=t("rpt_sec_sec_users"), blocks=tuple(user_blocks)),
             Section(id="lateral", title=t("rpt_sec_sec_lateral"), blocks=(TextBlock(paragraphs=tuple(lateral_lines)),)),
             Section(id="findings", title=t("rpt_trf_sec_findings"), intro=t("rpt_trf_findings_intro"),
-                    blocks=(findings.outcomes_table(_by_category(outcomes), lang, title=t("rpt_sec_tbl_findings")),))))
+                    blocks=(findings.outcomes_table(_by_category(outcomes), lang, title=t("rpt_sec_tbl_findings"),
+                                                    evaluated=bool(totals.flows)),))))

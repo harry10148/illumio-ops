@@ -1351,5 +1351,7 @@
   "gui_reports_filter_pick": "請選擇…",
   "gui_reports_filter_remove": "移除",
   "gui_reports_filter_add": "新增條件",
-  "gui_reports_filter_truncated": "只列出前 500 個值。"
+  "gui_reports_filter_truncated": "只列出前 500 個值。",
+  "rpt_rules_not_evaluated": "規則未評估：期間內沒有符合此報表的流量。",
+  "rpt_err_app_filter_shape": "應用摘要的篩選只能在一側指定 app，另一側不可有條件，也不可排除或指定個別主機；其他篩選請改用流量報表。"
 }

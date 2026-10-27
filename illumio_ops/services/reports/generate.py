@@ -34,6 +34,7 @@ from illumio_ops.services.reports.deliver import deliver, gui_link
 from illumio_ops.services.reports.registry import (
     BuildInput,
     ReportParams,
+    app_filter_ok,
     names_app,
     specs,
 )
@@ -110,7 +111,7 @@ def availability(ctx: AppContext) -> dict[ReportType, str | None]:
 
 # The parameter each refusal is about, for the API's field name.
 REFUSAL_FIELDS = {"rpt_err_lookback_beyond_retention": "lookback_days", "rpt_err_app_required": "filter",
-                  "rpt_err_filter_not_supported": "filter"}
+                  "rpt_err_filter_not_supported": "filter", "rpt_err_app_filter_shape": "filter"}
 
 
 def refusal(settings: Settings, params: ReportParams) -> str | None:
@@ -124,6 +125,8 @@ def refusal(settings: Settings, params: ReportParams) -> str | None:
         return "rpt_err_filter_not_supported"
     if spec.requires_app and not names_app(params.filter):
         return "rpt_err_app_required"
+    if spec.requires_app and not app_filter_ok(params.filter):
+        return "rpt_err_app_filter_shape"
     return None
 
 
@@ -220,11 +223,13 @@ def run_queued(ctx: AppContext, *, now: datetime | None = None) -> int | None:
 
 
 def coverage_note(ctx: AppContext, start: datetime, end: datetime, lang: Language, *, now: datetime,
-                  tz: tzinfo | None) -> tuple[str, ...]:
-    """The data-quality lines about traffic in the period: whole period, or where it starts and every gap."""
+                  tz: tzinfo | None, flows: bool = False) -> tuple[str, ...]:
+    """The data-quality lines about traffic in the period: whole period, or where it starts and every gap.
+    flows: the report reads the flows table (kept flow_days), not the rollups (rollup_days)."""
     settings = ctx.settings.current()
     fdb = ctx.flows()
-    floor = now - timedelta(days=settings.collection.retention.rollup_days)
+    retention = settings.collection.retention
+    floor = now - timedelta(days=retention.flow_days if flows else retention.rollup_days)
     with fdb.connect() as conn:
         require_same_pce(conn, settings.pce)
         cov = store_coverage(conn, IngestSource.TRAFFIC, (start, end), floor=floor,

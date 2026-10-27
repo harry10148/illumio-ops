@@ -12,7 +12,6 @@ from illumio_ops.domain.filter import (
     EndpointFilter,
     FilterSpec,
     FlowCondition,
-    LabelCond,
 )
 from illumio_ops.domain.report import (
     Column,
@@ -43,14 +42,13 @@ APP = "app"
 UNCOVERED = (PolicyDecision.POTENTIALLY_BLOCKED, PolicyDecision.BLOCKED)
 
 
-def app_endpoint(cond: FlowCondition | None, env_key: str) -> EndpointFilter:
-    """The app (and environment) the filter names, on whichever side it names them."""
-    found: dict[str, LabelCond] = {}
+def app_endpoint(cond: FlowCondition | None) -> EndpointFilter:
+    """The app's end as the filter names it: every label condition on the side that names an app (the app,
+    and an environment, role or other label that narrows it). registry.app_filter_ok has refused the rest."""
     for side in (cond.dst, cond.src) if cond is not None else ():
-        for lc in side.labels if side is not None else ():
-            if lc.key in (APP, env_key):
-                found.setdefault(lc.key, lc)
-    return EndpointFilter(labels=tuple(found[k] for k in (APP, env_key) if k in found))
+        if side is not None and any(lc.key == APP for lc in side.labels):
+            return EndpointFilter(labels=side.labels)
+    return EndpointFilter()
 
 
 def _sides(inp: BuildInput, ep: EndpointFilter, start: datetime | None = None,
@@ -84,7 +82,7 @@ def build_app_summary(inp: BuildInput) -> ReportDocument:
 
     lc = load_lateral_context(inp.ctx, now=inp.now)
     env_key = lc.settings.environment_label_key
-    ep = app_endpoint(inp.params.filter, env_key)
+    ep = app_endpoint(inp.params.filter)
     conds = {c.key: " / ".join(c.values) for c in ep.labels}
     app_name = conds.get(APP, "")
     title = t("rpt_app_title_env", app=app_name, env=conds[env_key]) if env_key in conds else \
@@ -133,11 +131,9 @@ def build_app_summary(inp: BuildInput) -> ReportDocument:
 
     def peer_ranking(title_key: str, side: str, dim: SegmentDimension, *, uncovered: bool = False,
                      limit: int = TOP) -> TableBlock:
-        spec = sides[side]
-        if uncovered:
-            spec = spec.model_copy(update={"decisions": UNCOVERED})
         return flowsections.ranking(
-            inp, title=t(title_key), spec=spec, metric=SegmentMetric.CONNECTIONS, limit=limit,
+            inp, title=t(title_key), spec=sides[side], decisions=UNCOVERED if uncovered else (),
+            metric=SegmentMetric.CONNECTIONS, limit=limit,
             group_by=(GroupBy(dimension=dim, label_key=APP), GroupBy(dimension=SegmentDimension.SERVICE)),
             columns=(Column(key="peer", label=t("rpt_col_peer_app")), Column(key="service", label=t("rpt_col_service")),
                      Column(key="n", label=t("rpt_col_connections"), kind="number")))
@@ -167,7 +163,7 @@ def build_app_summary(inp: BuildInput) -> ReportDocument:
                                   inp.ctx.settings.current().reports.rule_thresholds, lang,
                                   now=inp.now, scoped=True) if flows else []
     filter_line = flowsections.filter_text(inp.params.filter, lang)
-    quality = (*coverage_note(inp.ctx, inp.start, inp.end, lang, now=inp.now, tz=inp.tz),
+    quality = (*coverage_note(inp.ctx, inp.start, inp.end, lang, now=inp.now, tz=inp.tz, flows=True),
                *((t("rpt_quality_filter", filter=filter_line),) if filter_line else ()),
                t("rpt_app_quality_split"), t("rpt_trf_quality_counts"))
     return ReportDocument(
@@ -188,7 +184,8 @@ def build_app_summary(inp: BuildInput) -> ReportDocument:
                 peer_ranking("rpt_app_tbl_uncovered_out", "outbound", SegmentDimension.DST_LABEL, uncovered=True,
                              limit=UNCOVERED_TOP))),
             Section(id="findings", title=t("rpt_trf_sec_findings"), intro=t("rpt_app_findings_intro"),
-                    blocks=(findings.outcomes_table(outcomes, lang, title=t("rpt_trf_tbl_findings")),))))
+                    blocks=(findings.outcomes_table(outcomes, lang, title=t("rpt_trf_tbl_findings"),
+                                                    evaluated=bool(flows)),))))
 
 
 def _kpi_values(parts: dict[str, FlowTotals], decisions: dict[str, tuple[int, int]]) -> dict[str, float | int]:

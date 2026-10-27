@@ -132,7 +132,7 @@ function Editor({ initial, catalog, smtp, onSave, onCancel, error }: {
       {error && <p className="form-error span-all">{t(error.message_key, error.params)}{error.field ? ` (${error.field})` : ""}</p>}
       <div className="actions span-all">
         <button type="button" className="btn-primary"
-          onClick={() => onSave({ ...s, filter: entry?.accepts_filter ? conditionOf(rows) : null,
+          onClick={() => onSave({ ...s, filter: entry?.accepts_filter ? conditionOf(rows, initial.filter) : null,
                                   recipients: recipients.split(/[\s,;]+/).filter((r) => r !== "") })}>{t("btn_save")}</button>
         <button type="button" className="btn-quiet" onClick={onCancel}>{t("btn_cancel")}</button>
       </div>

@@ -54,7 +54,7 @@ def build_network_inventory(inp: BuildInput) -> ReportDocument:
 
     # ── label hygiene ───────────────────────────────────────────────────────
     keys = (APP, env_key, *HYGIENE_KEYS[1:])
-    managed = [h for h in lc.hosts.values() if h.managed]
+    managed = [h for h in lc.hosts.values() if flowsections.host_in_scope(h, inp.params.filter)]
     missing = sorted(((h.hostname or h.key, [k for k in keys if not h.labels.get(k)]) for h in managed),
                      key=lambda r: (-len(r[1]), r[0]))
     missing = [(name, ks) for name, ks in missing if ks]
@@ -109,7 +109,9 @@ def build_network_inventory(inp: BuildInput) -> ReportDocument:
                     ", ".join(s for _, s in sorted(services[a], key=lambda x: -x[0])[:TOP_SERVICES]), sources[a])
                    for a in apps[:TOP]),
         total_rows=len(apps), empty_text=no_flows,
-        limit_note=t("rpt_inv_pairs_limit", n=f"{PAIR_LIMIT:,}") if hit_a or hit_b else None)
+        limit_note=" ".join(n for n in (t("rpt_limit_top_n", n=TOP) if len(apps) > TOP else "",
+                                        t("rpt_inv_pairs_limit", n=f"{PAIR_LIMIT:,}") if hit_a or hit_b else "")
+                            if n) or None)
 
     # ── unmanaged sources into apps ─────────────────────────────────────────
     unmanaged = TableBlock(
@@ -134,7 +136,7 @@ def build_network_inventory(inp: BuildInput) -> ReportDocument:
             note=None if apps else no_flows),
     )
     filter_line = flowsections.filter_text(inp.params.filter, lang)
-    quality = (*coverage_note(inp.ctx, inp.start, inp.end, lang, now=inp.now, tz=inp.tz),
+    quality = (*coverage_note(inp.ctx, inp.start, inp.end, lang, now=inp.now, tz=inp.tz, flows=True),
                *((t("rpt_quality_filter", filter=filter_line),) if filter_line else ()),
                t("rpt_trf_quality_counts"), t("rpt_inv_quality_inventory"))
     return ReportDocument(
@@ -150,4 +152,5 @@ def build_network_inventory(inp: BuildInput) -> ReportDocument:
                     blocks=(provided,)),
             Section(id="unmanaged", title=t("rpt_inv_sec_unmanaged"), blocks=(unmanaged,)),
             Section(id="findings", title=t("rpt_trf_sec_findings"), intro=t("rpt_trf_findings_intro"),
-                    blocks=(findings.outcomes_table(outcomes, lang, title=t("rpt_trf_tbl_findings")),))))
+                    blocks=(findings.outcomes_table(outcomes, lang, title=t("rpt_trf_tbl_findings"),
+                                                    evaluated=bool(totals)),))))

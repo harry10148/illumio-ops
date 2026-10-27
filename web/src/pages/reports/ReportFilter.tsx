@@ -16,16 +16,22 @@ export function rowsOf(cond: FlowCondition | null | undefined): FilterRow[] {
   return out;
 }
 
-export function conditionOf(rows: FilterRow[]): FlowCondition | null {
+/** The picker's rows as a filter. `base` is the filter being edited: what the picker does not show (ports,
+ * decisions, exclusions, individual hosts, users) is kept, and only its label conditions are replaced. */
+export function conditionOf(rows: FilterRow[], base?: FlowCondition | null): FlowCondition | null {
   const done = rows.filter((r) => r.key !== "" && r.value !== "");
-  if (done.length === 0) return null;
   const side = (s: Side): EndpointFilter | null => {
     const byKey = new Map<string, string[]>();
     for (const r of done.filter((x) => x.side === s)) byKey.set(r.key, [...new Set([...(byKey.get(r.key) ?? []), r.value])]);
-    if (byKey.size === 0) return null;
-    return { labels: [...byKey].map(([key, values]) => ({ key, values: values as LabelCond["values"] })) };
+    const kept = base?.[s];
+    const labels = [...byKey].map(([key, values]) => ({ key, values: values as LabelCond["values"] }));
+    if (labels.length === 0 && !kept?.hrefs?.length && !kept?.ips?.length) return null;
+    return { ...(kept ?? {}), labels };
   };
-  return { src: side("src"), dst: side("dst") };
+  const out: FlowCondition = { ...(base ?? {}), src: side("src"), dst: side("dst") };
+  const rest = Object.entries(out).some(([k, v]) =>
+    k !== "src" && k !== "dst" && v !== null && v !== undefined && v !== false && !(Array.isArray(v) && v.length === 0));
+  return out.src || out.dst || rest ? out : null;
 }
 
 export function namesApp(rows: FilterRow[]): boolean {

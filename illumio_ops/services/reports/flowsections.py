@@ -7,10 +7,12 @@ from collections.abc import Sequence
 from typing import Any
 
 from illumio_ops.domain.filter import EndpointFilter, FilterSpec, FlowCondition
+from illumio_ops.domain.lateral import HostInfo
 from illumio_ops.domain.report import Cell, Column, TableBlock
 from illumio_ops.domain.segment import FlowSegment, GroupBy
 from illumio_ops.domain.values import (
     Language,
+    PolicyDecision,
     SegmentDimension,
     SegmentMetric,
     SegmentView,
@@ -28,13 +30,19 @@ _HOSTS = (SegmentDimension.SRC_HOST, SegmentDimension.DST_HOST)
 _LABELS = (SegmentDimension.SRC_LABEL, SegmentDimension.DST_LABEL)
 
 
-def window(inp: BuildInput, extra: FlowCondition | None = None) -> FilterSpec:
-    """The report's period and filter, narrowed further by `extra` (a section's own conditions)."""
+def window(inp: BuildInput) -> FilterSpec:
+    """The report's period and filter."""
     base = dict(inp.params.filter) if inp.params.filter is not None else {}
-    for key, value in dict(extra or FlowCondition()).items():
-        if value not in (None, (), False):
-            base[key] = value
     return FilterSpec(start=inp.start, end=inp.end, **base)
+
+
+def narrowed(spec: FilterSpec, decisions: Sequence[PolicyDecision]) -> FilterSpec | None:
+    """`spec` limited to `decisions` as well: a section's own decisions narrow the report's filter, never
+    replace it. None when the two share no decision (the section has nothing to show)."""
+    if not spec.decisions:
+        return spec.model_copy(update={"decisions": tuple(decisions)})
+    both = tuple(d for d in spec.decisions if d in decisions)
+    return spec.model_copy(update={"decisions": both}) if both else None
 
 
 def _key_text(inp: BuildInput, g: GroupBy, key: Any, display: str | None, names: dict[str, str]) -> str:
@@ -62,12 +70,19 @@ def _names(inp: BuildInput, rows: Sequence[AggRow], group_by: Sequence[GroupBy])
 
 
 def ranking(inp: BuildInput, *, title: str, group_by: Sequence[GroupBy], metric: SegmentMetric,
-            columns: Sequence[Column], extra: FlowCondition | None = None, limit: int = 20,
+            columns: Sequence[Column], decisions: Sequence[PolicyDecision] = (), limit: int = 20,
             spec: FilterSpec | None = None, skip_empty: bool = False) -> TableBlock:
     """A top-`limit` ranking as a table: one column per grouping level, then the metric. `spec` replaces the
-    report's window and filter (a report that builds its own sides, such as one app's inbound traffic).
-    skip_empty: flows without the grouped field (no user, no process) are not ranked as a "(none)" row."""
-    seg = FlowSegment(filter=spec or window(inp, extra), group_by=tuple(group_by), metric=metric,
+    report's window and filter (a report that builds its own sides, such as one app's inbound traffic);
+    `decisions` narrows it (see narrowed). skip_empty: flows without the grouped field (no user, no
+    process) are not ranked as a "(none)" row."""
+    empty = tr(inp.lang, "rpt_no_flows_filtered" if inp.params.filter is not None else "rpt_no_flows")
+    base: FilterSpec | None = spec or window(inp)
+    if decisions and base is not None:
+        base = narrowed(base, decisions)
+    if base is None:
+        return TableBlock(title=title, columns=tuple(columns), rows=(), total_rows=0, empty_text=empty)
+    seg = FlowSegment(filter=base, group_by=tuple(group_by), metric=metric,
                       view=SegmentView.RANKING, limit=limit + 1 if skip_empty else limit)
     result = run_segment(inp.ctx, seg, now=inp.now)
     rows_in = result.ranking or []
@@ -80,7 +95,6 @@ def ranking(inp: BuildInput, *, title: str, group_by: Sequence[GroupBy], metric:
     rows: tuple[tuple[Cell, ...], ...] = tuple(
         (*(_key_text(inp, g, r.keys[i], r.display[i], names) for i, g in enumerate(group_by)), r.value)
         for r in rows_in)
-    empty = tr(inp.lang, "rpt_no_flows_filtered" if inp.params.filter is not None else "rpt_no_flows")
     return TableBlock(title=title, columns=tuple(columns), rows=rows, total_rows=len(rows), empty_text=empty,
                       limit_note=tr(inp.lang, "rpt_limit_top_n", n=limit) if limit_hit else None)
 
@@ -121,3 +135,17 @@ def coverage_lines(inp: BuildInput, fc: FieldCoverage | None) -> tuple[str, ...]
         return f"{100 * n / fc.total:.1f}"
     return (tr(inp.lang, "rpt_field_coverage", process=pct(fc.initiator_process), user=pct(fc.initiator_user),
                bytes=pct(fc.bytes)),)
+
+
+def _side_matches(host: HostInfo, side: EndpointFilter | None) -> bool:
+    return side is not None and bool(side.labels) and all(host.labels.get(lc.key) in lc.values for lc in side.labels)
+
+
+def host_in_scope(host: HostInfo, cond: FlowCondition | None) -> bool:
+    """A managed host a filtered report is about: all of them, or those whose labels match a side of the filter
+    exactly (the inventory parts of the reports follow the same filter as their flows)."""
+    if not host.managed:
+        return False
+    if cond is None or not any(s is not None and s.labels for s in (cond.src, cond.dst)):
+        return True
+    return _side_matches(host, cond.src) or _side_matches(host, cond.dst)

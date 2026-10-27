@@ -103,6 +103,11 @@ class EventSegment(_Model):
 
 # ── flows ────────────────────────────────────────────────────────────────────
 
+def user_key_sql(column: str) -> str:
+    """The SQL that makes one user of an account's spellings (shared with the findings engine)."""
+    return _user(column)
+
+
 def _user(column: str) -> str:
     """Domain accounts (DOMAIN\\acct, acct@domain) are case-insensitive; local Linux accounts are not."""
     return (f"CASE WHEN instr({column}, '\\') > 0 OR instr({column}, '@') > 0 "

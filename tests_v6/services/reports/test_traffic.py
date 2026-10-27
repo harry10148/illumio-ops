@@ -121,7 +121,7 @@ def test_unmanaged_summary(ctx):
 
 def test_lookback_limited_to_flow_retention(ctx):
     assert specs()[ReportType.TRAFFIC].max_lookback(ctx.settings.current()) == \
-        ctx.settings.current().collection.retention.flow_days
+        ctx.settings.current().collection.retention.flow_days - 1
 
 
 def test_zh_tw_builds(ctx):

@@ -43,6 +43,7 @@ from illumio_ops.domain.segment import (
     FIELD_COVERAGE_SQL,
     FlowSegment,
     compile_flow_ranking,
+    user_key_sql,
 )
 from illumio_ops.domain.values import FlowDirection, IngestSource, PortClass
 from illumio_ops.pce.async_query import run_traffic_query
@@ -449,7 +450,8 @@ def group_for_findings(conn: Any, spec: FilterSpec | Sequence[FilterSpec], *, en
         "f.policy_decision AS decision, f.src_managed, f.dst_managed, "
         f"{_label_of('src')} AS src_app, {_label_of('src')} AS src_env, "
         f"{_label_of('dst')} AS dst_app, {_label_of('dst')} AS dst_env, "
-        "COALESCE(f.initiator_user, '') AS user, COUNT(*) AS flows, SUM(f.num_connections) AS connections, "
+        f"COALESCE({user_key_sql('f.initiator_user')}, '') AS user, "
+        "COUNT(*) AS flows, SUM(f.num_connections) AS connections, "
         "SUM(COALESCE(f.bytes_in, 0) + COALESCE(f.bytes_out, 0)) AS bytes, "
         "SUM(f.bytes_in IS NOT NULL OR f.bytes_out IS NOT NULL) AS bytes_rows "
         f"FROM flows f WHERE {where} GROUP BY 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12",

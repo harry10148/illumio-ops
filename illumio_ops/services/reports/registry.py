@@ -71,8 +71,9 @@ REGISTRY: dict[ReportType, ReportSpec] = {}
 
 
 def flow_days(settings: Settings) -> int:
-    """The flow reports read the flows table, kept this many days."""
-    return settings.collection.retention.flow_days
+    """The flow reports read the flows table, kept flow_days back from now. A period starts at a calendar
+    midnight, so its first day is whole only when it starts at most flow_days - 1 days before today."""
+    return max(1, settings.collection.retention.flow_days - 1)
 
 
 def _builtin() -> dict[ReportType, ReportSpec]:
@@ -111,3 +112,16 @@ def names_app(cond: FlowCondition | None) -> bool:
     if cond is None:
         return False
     return any(lc.key == "app" for side in (cond.src, cond.dst) if side is not None for lc in side.labels)
+
+
+def app_filter_ok(cond: FlowCondition | None) -> bool:
+    """One application's report needs a filter it can honour whole: an app named on one side only, nothing
+    else on the other side and no exclusions or individual hosts (the report builds both directions from
+    that side). Ports, decisions and the user/process conditions stay as they are."""
+    if cond is None:
+        return False
+    named = [s for s in (cond.src, cond.dst) if s is not None and any(lc.key == "app" for lc in s.labels)]
+    if len(named) != 1 or named[0].hrefs or named[0].ips:
+        return False
+    other = cond.dst if named[0] is cond.src else cond.src
+    return all(e is None or e.is_empty() for e in (other, cond.src_exclude, cond.dst_exclude))

@@ -18,7 +18,6 @@ import sqlite3
 import traceback
 from collections.abc import Callable, Collection, Sequence
 from datetime import datetime
-from statistics import median
 from typing import Any
 
 from loguru import logger
@@ -51,6 +50,7 @@ from illumio_ops.store.flowdb import analysis
 MiB = 1024 * 1024
 TOP = 5
 _AGG = "rpt_agg"
+_PAIRS = "rpt_pairs"
 
 
 def _ports(pairs: Collection[tuple[int, int | None]]) -> tuple[str, list[Any]]:
@@ -61,7 +61,7 @@ CROSS_ENV = "src_env != '' AND dst_env != '' AND src_env != dst_env"
 
 
 class _Run:
-    def __init__(self, conn: sqlite3.Connection, t: ReportRuleThresholds, lang: Language, admin: set[tuple[int, int]],
+    def __init__(self, conn: sqlite3.Connection, t: ReportRuleThresholds, lang: Language, admin: set[tuple[int, int | None]],
                  names: Callable[[str], str], exposure: dict[str, Any] | None) -> None:
         self.conn, self.t, self.lang, self.admin, self.names, self.exposure = conn, t, lang, admin, names, exposure
 
@@ -168,22 +168,28 @@ def _b007(r: _Run) -> RuleOutcome | None:
 
 
 def _b008(r: _Run) -> RuleOutcome | None:
-    totals = [b for (b,) in r.conn.execute(
-        f"SELECT SUM(bytes) FROM {_AGG} WHERE bytes_rows > 0 GROUP BY src_key, dst_key, port, proto")]
-    if len(totals) < 2:
+    # The per-pair totals stay in SQLite (millions of pairs at scale); only the order statistics come out.
+    r.conn.execute(f"DROP TABLE IF EXISTS temp.{_PAIRS}")
+    r.conn.execute(f"CREATE TEMP TABLE {_PAIRS} AS SELECT src_key, dst_key, port, proto, SUM(bytes) AS b "
+                   f"FROM {_AGG} WHERE bytes_rows > 0 GROUP BY src_key, dst_key, port, proto")
+    n = int(r.conn.execute(f"SELECT COUNT(*) FROM {_PAIRS}").fetchone()[0])
+    if n < 2:
         return None
-    ordered = sorted(totals)
-    p = ordered[min(len(ordered) - 1, int(len(ordered) * r.t.high_bytes_percentile / 100))]
-    limit = max(p, r.t.high_bytes_median_factor * median(ordered), r.t.high_bytes_min_mb * MiB)
-    rows = r.conn.execute(
-        f"SELECT src_key, dst_key, port, proto, SUM(bytes) AS b FROM {_AGG} WHERE bytes_rows > 0 "
-        "GROUP BY src_key, dst_key, port, proto HAVING b > ? ORDER BY b DESC", (limit,)).fetchall()
-    if not rows:
+
+    def nth(k: int) -> float:
+        return float(r.conn.execute(f"SELECT b FROM {_PAIRS} ORDER BY b LIMIT 1 OFFSET ?", (k,)).fetchone()[0])
+    p = nth(min(n - 1, int(n * r.t.high_bytes_percentile / 100)))
+    mid = nth(n // 2) if n % 2 else (nth(n // 2 - 1) + nth(n // 2)) / 2
+    limit = max(p, r.t.high_bytes_median_factor * mid, r.t.high_bytes_min_mb * MiB)
+    n_out = int(r.conn.execute(f"SELECT COUNT(*) FROM {_PAIRS} WHERE b > ?", (limit,)).fetchone()[0])
+    if not n_out:
         return None
+    rows = r.conn.execute(f"SELECT src_key, dst_key, port, proto, b FROM {_PAIRS} WHERE b > ? ORDER BY b DESC "
+                          f"LIMIT {TOP}", (limit,)).fetchall()
     return RuleOutcome("B008", Severity.MEDIUM, "rpt_rule_b008_desc", "rpt_rule_b008_rec", {
-        "n_outliers": len(rows), "limit_mb": f"{limit / MiB:.1f}", "n_with_bytes": len(totals),
-        "top_pairs": ", ".join(f"{r.names(s)} → {r.names(d)} {port_text(p_, q)} ({b / MiB:.1f} MB)"
-                               for s, d, p_, q, b in rows[:TOP])})
+        "n_outliers": n_out, "limit_mb": f"{limit / MiB:.1f}", "n_with_bytes": n,
+        "top_pairs": ", ".join(f"{r.names(s_)} → {r.names(d)} {port_text(p_, q)} ({b / MiB:.1f} MB)"
+                               for s_, d, p_, q, b in rows)})
 
 
 def _b009(r: _Run) -> RuleOutcome | None:
@@ -334,10 +340,8 @@ def run_rules(ctx: AppContext, spec: FilterSpec | Sequence[FilterSpec], threshol
     app, some labels), so rules that read whole-estate analyses (L006's exposure graph) keep only the hosts
     that appear in the filtered flows."""
     lc = load_lateral_context(ctx, now=now)
-    admin = {(e.port, e.proto) for e in lc.admin_ports.entries if e.category is PortClass.REMOTE
-             and e.proto is not None}
-    admin |= {(e.port, p) for e in lc.admin_ports.entries if e.category is PortClass.REMOTE and e.proto is None
-              for p in (6, 17)}
+    # proto None: any protocol (port_clause matches the port alone), as the detectors and flow_totals read it
+    admin = {(e.port, e.proto) for e in lc.admin_ports.entries if e.category is PortClass.REMOTE}
 
     def names(key: str) -> str:
         return host_name(lc.hosts, key, lang)
@@ -374,8 +378,9 @@ def as_findings(outcomes: list[RuleOutcome], lang: Language, *, limit: int) -> t
                  for o in outcomes if o.severity is not None)[:limit]
 
 
-def outcomes_table(outcomes: list[RuleOutcome], lang: Language, *, title: str) -> TableBlock:
-    """Every rule that fired or could not be evaluated, with what it found and what to do."""
+def outcomes_table(outcomes: list[RuleOutcome], lang: Language, *, title: str, evaluated: bool = True) -> TableBlock:
+    """Every rule that fired or could not be evaluated, with what it found and what to do. evaluated=False: the
+    rules did not run (no traffic matched), which the empty table says instead of "no rule fired"."""
     def row(o: RuleOutcome) -> tuple[str, ...]:
         info = BY_ID[o.rule_id]
         head = (o.rule_id, tr(lang, info.name_key), tr(lang, CATEGORY_KEYS[info.category]))
@@ -390,4 +395,4 @@ def outcomes_table(outcomes: list[RuleOutcome], lang: Language, *, title: str) -
                Column(key="action", label=tr(lang, "rpt_col_action")))
     rows = tuple(row(o) for o in outcomes)
     return TableBlock(title=title, columns=columns, rows=rows, total_rows=len(rows),
-                      empty_text=tr(lang, "rpt_rules_none_fired"))
+                      empty_text=tr(lang, "rpt_rules_none_fired" if evaluated else "rpt_rules_not_evaluated"))

@@ -130,7 +130,7 @@ def test_catalog_says_what_each_type_takes(client, ctx):
     assert types["app_summary"]["requires_app"] and types["app_summary"]["accepts_filter"]
     assert types["traffic"]["accepts_filter"] and not types["traffic"]["requires_app"]
     assert not types["lateral_posture"]["accepts_filter"] and types["lateral_posture"]["max_lookback"] is None
-    assert types["traffic"]["max_lookback"] == ctx.settings.current().collection.retention.flow_days
+    assert types["traffic"]["max_lookback"] == ctx.settings.current().collection.retention.flow_days - 1
     choices = {c["key"]: c["values"] for c in data["label_choices"]}
     assert choices["app"] == ["Finance"] and choices["env"] == ["Prod"]
 

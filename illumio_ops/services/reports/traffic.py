@@ -100,7 +100,7 @@ def build_traffic(inp: BuildInput) -> ReportDocument:
     outcomes = findings.run_rules(inp.ctx, spec, inp.ctx.settings.current().reports.rule_thresholds, lang,
                                   now=inp.now, scoped=inp.params.filter is not None) if totals.flows else []
     filter_line = flowsections.filter_text(inp.params.filter, lang)
-    quality = (*coverage_note(inp.ctx, inp.start, inp.end, lang, now=inp.now, tz=inp.tz),
+    quality = (*coverage_note(inp.ctx, inp.start, inp.end, lang, now=inp.now, tz=inp.tz, flows=True),
                *((t("rpt_quality_filter", filter=filter_line),) if filter_line else ()),
                t("rpt_trf_quality_counts"), *flowsections.coverage_lines(inp, fc))
     return ReportDocument(
@@ -114,4 +114,5 @@ def build_traffic(inp: BuildInput) -> ReportDocument:
                   Section(id="bytes", title=t("rpt_trf_sec_bytes"), intro=bytes_intro, blocks=bytes_blocks),
                   Section(id="unmanaged", title=t("rpt_trf_sec_unmanaged"), blocks=(unmanaged,)),
                   Section(id="findings", title=t("rpt_trf_sec_findings"), intro=t("rpt_trf_findings_intro"),
-                          blocks=(findings.outcomes_table(outcomes, lang, title=t("rpt_trf_tbl_findings")),))))
+                          blocks=(findings.outcomes_table(outcomes, lang, title=t("rpt_trf_tbl_findings"),
+                                                    evaluated=bool(totals.flows)),))))
