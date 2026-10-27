@@ -1550,6 +1550,21 @@ export const VALUES = {
     "suspicious",
     "unknown"
   ],
+  "ReportFormat": [
+    "html",
+    "xlsx"
+  ],
+  "ReportStatus": [
+    "done",
+    "failed",
+    "queued",
+    "running"
+  ],
+  "ReportType": [
+    "lateral_posture",
+    "new_connections",
+    "unmanaged_endpoints"
+  ],
   "RuleAction": [
     "allow",
     "deny",

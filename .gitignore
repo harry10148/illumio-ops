@@ -53,6 +53,10 @@ reports/
 # design/v3 同理，而且它現在是報表殼的**設計權威**——drift guard 直接讀它，
 # 漏掉的話 CI 會在一個本機看不到的地方紅（本機檔案存在、repo 裡沒有）。
 !design/v3/reports/
+# v6 原始碼裡名為 reports 的套件／頁面／測試目錄是程式碼，不是產出（P5a）。
+!illumio_ops/**/reports/
+!tests_v6/**/reports/
+!web/src/**/reports/
 build/
 dist/
 scripts/audit_i18n_report.md

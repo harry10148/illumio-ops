@@ -356,12 +356,31 @@ def parse_draft_policy_decision(raw: str) -> str:
     return raw.strip().lower()
 
 
+class ReportType(StrEnum):
+    """Report types (spec §6.5 報表, §6.5.5); 5b and 5c add the 5.x types."""
+    LATERAL_POSTURE = "lateral_posture"
+    NEW_CONNECTIONS = "new_connections"
+    UNMANAGED_ENDPOINTS = "unmanaged_endpoints"
+
+
+class ReportFormat(StrEnum):
+    HTML = "html"
+    XLSX = "xlsx"
+
+
+class ReportStatus(StrEnum):
+    QUEUED = "queued"
+    RUNNING = "running"
+    DONE = "done"
+    FAILED = "failed"
+
+
 _ENUMS: tuple[type[StrEnum], ...] = (
     PolicyDecision, RuleAction, AlertRuleType, DeploymentType, Language, ProbeName,
     FlowDirection, VisibilityLevel, TamperClassification, IngestSource, DataOrigin, CapabilityState,
     CollectionMode, Severity, DetectorKind, PortClass, DetectorState, SegmentDimension, SegmentMetric, SegmentView,
     EdgeState, TamperPattern, TamperAction, PrecursorKind, RansomwareTrafficClass, FocusKind, Confidence,
-    ThresholdType, ChannelKind, SystemCheck, DeliveryStatus,
+    ThresholdType, ChannelKind, SystemCheck, DeliveryStatus, ReportType, ReportFormat, ReportStatus,
 )
 
 
