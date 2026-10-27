@@ -246,3 +246,16 @@ def test_detection_previous_none_when_not_collected(ctx):
     _exposure(ctx)
     k = {x.key: x for x in build_lateral_posture(_inp(ctx)).kpis}
     assert k["new_detections"].previous is None
+
+
+def test_finding_params_show_addresses_without_key_prefix(ctx):
+    """Lab: a detection about an unmanaged source read "ip:139.138.105.82" in the finding's title."""
+    item = {"kind": "pivot_host", "fingerprint": "f", "severity": "high", "critical_asset": False,
+            "confidence": "high", "title_key": "focus_title_pivot_host", "why_key": "focus_why_pivot",
+            "params": {"host": "ip:139.138.105.82"}, "action": {"target": "host"}, "score": 1,
+            "first_seen": NOW.isoformat(), "new_this_week": True, "weeks_persisting": 0}
+    with ctx.flows().connect() as conn:
+        analysis.write_result(conn, "focus", params={}, result={"items": [item]}, at=NOW)
+        conn.commit()
+    [f] = build_lateral_posture(_inp(ctx)).findings
+    assert f.title.startswith("139.138.105.82 ")

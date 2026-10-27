@@ -66,7 +66,9 @@ def _findings(focus: Mapping[str, Any] | None, lang: Language) -> tuple[Finding,
         action = FINDING_KINDS.get(item.get("kind"))
         if action is None:
             continue
-        params = {k: v for k, v in (item.get("params") or {}).items() if not isinstance(v, (dict, list))}
+        # Endpoint keys of unmanaged addresses are ip:<address>; a reader sees the address.
+        params = {k: v.removeprefix("ip:") if isinstance(v, str) else v
+                  for k, v in (item.get("params") or {}).items() if not isinstance(v, (dict, list))}
         out.append(Finding(severity=Severity(item.get("severity", "medium")),
                            title=tr(lang, item["title_key"], **params), why=tr(lang, item["why_key"], **params),
                            action=tr(lang, action)))
