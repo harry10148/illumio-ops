@@ -1066,5 +1066,8 @@
   "gui_reports_trigger_manual": "By hand",
   "gui_reports_when_daily": "Every day at {time}",
   "gui_reports_when_monthly": "Day {day} of every month at {time}",
-  "gui_reports_when_weekly": "Every {day} at {time}"
+  "gui_reports_when_weekly": "Every {day} at {time}",
+  "rpt_host_removed": "Removed workload …{id}",
+  "rpt_new_older_than_baseline": "The baseline keeps only connections seen in the last {days} days, so connections that first appeared earlier in this period and then stopped are not counted.",
+  "rpt_new_left_out": "{n} new connections on dynamic ports ({port} and up) or without a port (such as ICMP) are not counted."
 }

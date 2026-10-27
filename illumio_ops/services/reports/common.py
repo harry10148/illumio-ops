@@ -40,12 +40,17 @@ def tr(lang: Language, msg: str, /, **params: object) -> str:
     return translate(lang, msg, {k: "" if v is None else str(v) for k, v in params.items()})
 
 
-def host_name(hosts: Mapping[str, HostInfo], key: str) -> str:
-    """A host as an operator knows it: its hostname, else the address of an ip:<address> key, else the key."""
+def host_name(hosts: Mapping[str, HostInfo], key: str, lang: Language) -> str:
+    """A host as an operator knows it: its hostname, else the address of an ip:<address> key; a workload no
+    longer in the inventory is said to be removed (its href means nothing to a reader)."""
     host = hosts.get(key)
     if host is not None and host.hostname:
         return host.hostname
-    return key.removeprefix("ip:")
+    if key.startswith("ip:"):
+        return key.removeprefix("ip:")
+    if host is None and "/workloads/" in key:
+        return tr(lang, "rpt_host_removed", id=key.rsplit("/", 1)[-1][-6:])
+    return key
 
 
 def port_text(port: int | None, proto: int) -> str:

@@ -1066,5 +1066,8 @@
   "gui_reports_trigger_manual": "手動",
   "gui_reports_when_daily": "每天 {time}",
   "gui_reports_when_monthly": "每月 {day} 日 {time}",
-  "gui_reports_when_weekly": "每{day} {time}"
+  "gui_reports_when_weekly": "每{day} {time}",
+  "rpt_host_removed": "已移除的 workload …{id}",
+  "rpt_new_older_than_baseline": "基準期連線表只保留最近 {days} 天內仍出現的連線；本期較早出現、之後未再出現的連線不在統計內。",
+  "rpt_new_left_out": "{n} 條使用動態 port（{port} 以上）或沒有 port（例如 ICMP）的新連線未列入統計。"
 }

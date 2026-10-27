@@ -6,7 +6,7 @@ from __future__ import annotations
 import os
 import shutil
 import traceback
-from datetime import UTC, datetime, time, timedelta, tzinfo
+from datetime import UTC, date, datetime, time, timedelta, tzinfo
 from pathlib import Path
 from urllib.parse import urlsplit
 
@@ -22,7 +22,11 @@ from illumio_ops.domain.values import (
     ReportType,
 )
 from illumio_ops.i18n import translate
-from illumio_ops.services.collect.guard import BindingMismatch, require_same_pce
+from illumio_ops.services.collect.guard import (
+    BindingMismatch,
+    normalize_target,
+    require_same_pce,
+)
 from illumio_ops.services.collect.mode import collects, in_mode
 from illumio_ops.services.context import AppContext
 from illumio_ops.services.coverage import store_coverage
@@ -53,11 +57,38 @@ def pce_label(ctx: AppContext) -> str:
     return f"{host} (org {pce.org_id})" if pce.org_id else host
 
 
+def _midnight(day: date, tz: tzinfo | None) -> datetime:
+    """00:00 of a calendar day in the display zone, as UTC (each end on its own: a DST change between them)."""
+    local = datetime.combine(day, time(0))
+    return (local.replace(tzinfo=tz) if tz is not None else local.astimezone()).astimezone(UTC)
+
+
 def period(now: datetime, lookback_days: int, tz: tzinfo | None) -> tuple[datetime, datetime]:
     """The last `lookback_days` whole days in the display zone, ending at today's 00:00 there (end exclusive)."""
-    local = now.astimezone(tz)
-    end = datetime.combine(local.date(), time(0), local.tzinfo).astimezone(UTC)
-    return end - timedelta(days=lookback_days), end
+    today = now.astimezone(tz).date()
+    return _midnight(today - timedelta(days=lookback_days), tz), _midnight(today, tz)
+
+
+def previous_period(start: datetime, end: datetime, tz: tzinfo | None) -> tuple[datetime, datetime]:
+    """The same number of calendar days just before [start, end)."""
+    days = (end.astimezone(tz).date() - start.astimezone(tz).date()).days
+    return _midnight(start.astimezone(tz).date() - timedelta(days=days), tz), start
+
+
+def pce_target(ctx: AppContext) -> str:
+    url, org = normalize_target(ctx.settings.current().pce.url, ctx.settings.current().pce.org_id)
+    return f"{url}#{org}"
+
+
+def traffic_covered(ctx: AppContext, start: datetime, end: datetime, *, now: datetime) -> bool:
+    """Traffic was collected for all of [start, end) with no recorded gap: only then is a count over it a
+    number to compare with (spec §4.3: missing data is never shown as 0)."""
+    settings = ctx.settings.current()
+    floor = now - timedelta(days=settings.collection.retention.rollup_days)
+    with ctx.flows().connect() as conn:
+        cov = store_coverage(conn, IngestSource.TRAFFIC, (start, end), floor=floor,
+                             collected=collects(settings, IngestSource.TRAFFIC))
+    return cov.covers_any and not cov.gaps
 
 
 def availability(ctx: AppContext) -> dict[ReportType, str | None]:
@@ -77,7 +108,7 @@ def enqueue(ctx: AppContext, params: ReportParams, *, trigger: str, schedule_id:
         return store.insert(conn, report_type=params.report_type.value, params_json=params.model_dump_json(),
                             status=ReportStatus.FAILED if reason else ReportStatus.QUEUED, trigger=trigger,
                             schedule_id=schedule_id, pce_label=pce_label(ctx), period_start=start, period_end=end,
-                            created_at=now, error_key=reason)
+                            created_at=now, error_key=reason, pce_target=pce_target(ctx))
 
 
 def recover_running(ctx: AppContext) -> int:
@@ -120,6 +151,8 @@ def run_queued(ctx: AppContext, *, now: datetime | None = None) -> int | None:
     generation = fdb.generation
     try:
         params = ReportParams.model_validate(row.params)
+        if row.pce_target and row.pce_target != pce_target(ctx):
+            raise _Fail("rpt_err_pce_switched")  # queued for another PCE than the one configured now
         spec = specs().get(params.report_type)
         if spec is None:
             raise _Fail("rpt_unavailable_not_built")

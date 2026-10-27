@@ -102,6 +102,10 @@ def test_kpis_from_snapshots_and_previous(ctx):
     _detection(ctx, "fanout", datetime(2026, 10, 21, tzinfo=UTC))
     _detection(ctx, "fanout", datetime(2026, 10, 22, tzinfo=UTC), subject=B)
     _detection(ctx, "fanout", datetime(2026, 10, 15, tzinfo=UTC), subject=B)  # previous period
+    from illumio_ops.domain.values import IngestSource
+    from illumio_ops.store.flowdb import ingest_state
+    with ctx.flows().connect() as conn:
+        ingest_state.add_coverage(conn, IngestSource.TRAFFIC, START - (END - START), END)
     doc = build_lateral_posture(_inp(ctx))
     k = {x.key: x for x in doc.kpis}
     assert len(doc.kpis) == 4
@@ -207,13 +211,17 @@ def test_directory_section_marks_inferred_and_declared(ctx):
                      origin=DataOrigin.INGEST, now=NOW)
         for day in ("2026-10-14", "2026-10-22"):
             rebuild_rollup(conn, day)
+    from illumio_ops.domain.values import IngestSource
+    from illumio_ops.store.flowdb import ingest_state
+    with ctx.flows().connect() as conn:
+        ingest_state.add_coverage(conn, IngestSource.TRAFFIC, START - (END - START), END)
     sec = _section(build_lateral_posture(_inp(ctx)), "directory")
     servers, _detections, sources = [b for b in sec.blocks if isinstance(b, TableBlock)]
     rows = {r[0]: r for r in servers.rows}
     assert "fin-db-01" in rows and "Inferred" in rows["fin-db-01"][2]
     assert "10.0.9.10" in rows and "Declared" in rows["10.0.9.10"][2]
-    by_src = {r[0]: r for r in sources.rows}  # sources outside the inventory are shown by their key
-    s1 = by_src["/orgs/1/workloads/src-1"]
+    by_src = {r[0]: r for r in sources.rows}  # sources no longer in the inventory are named as removed
+    s1 = by_src["Removed workload …src-1"]
     assert s1[1] == 1 and s1[2] == 0 and "None last period" in s1[3]  # the previous period had none from it
 
 
@@ -232,3 +240,9 @@ def test_generated_through_the_one_path_in_both_languages(ctx):
     assert [r.status for r in rows] == [ReportStatus.DONE, ReportStatus.DONE], [r.error_detail for r in rows]
     html = (ctx.paths.reports_dir / str(ids[1]) / next(f for f in rows[1].files if f.endswith(".html"))).read_text()
     assert "橫向移動態勢" in html and "rpt_" not in html
+
+
+def test_detection_previous_none_when_not_collected(ctx):
+    _exposure(ctx)
+    k = {x.key: x for x in build_lateral_posture(_inp(ctx)).kpis}
+    assert k["new_detections"].previous is None

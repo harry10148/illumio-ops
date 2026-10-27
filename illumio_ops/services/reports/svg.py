@@ -5,6 +5,7 @@ import html
 from collections.abc import Sequence
 
 # Bars are coloured by the shell stylesheet (render_html.EXTRA_CSS), not here: no colour literals in markup.
+MAX_BAR = 40.0  # one day of data must not fill the chart
 
 
 def bar_svg(points: Sequence[tuple[str, int | float | None]], *, width: int = 640, height: int = 160) -> str:
@@ -13,7 +14,7 @@ def bar_svg(points: Sequence[tuple[str, int | float | None]], *, width: int = 64
     top = max((v for _, v in points if v is not None), default=0) or 1
     pad_bottom, pad_top = 22, 14
     slot = width / n
-    bar_w = max(slot * 0.7, 1.0)
+    bar_w = min(max(slot * 0.7, 1.0), MAX_BAR)
     usable = height - pad_bottom - pad_top
     parts = [(f'<svg class="report-bars" role="img" viewBox="0 0 {width} {height}" width="100%" '
              f'preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">')]

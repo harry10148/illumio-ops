@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import sqlite3
 from collections.abc import Sequence
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any
 
 from illumio_ops.domain.report import (
@@ -24,7 +24,11 @@ from illumio_ops.services.reports.common import (
     port_text,
     tr,
 )
-from illumio_ops.services.reports.generate import coverage_note
+from illumio_ops.services.reports.generate import (
+    coverage_note,
+    previous_period,
+    traffic_covered,
+)
 from illumio_ops.services.reports.registry import BuildInput
 from illumio_ops.store.flowdb.db import db_time
 
@@ -33,7 +37,10 @@ ADMIN_ROW_LIMIT = 5_000
 TOP = 20
 DECISION_KEYS = {"allowed": "decision_allowed", "potentially_blocked": "decision_potentially_blocked",
                  "blocked": "decision_blocked", "unknown": "decision_unknown"}
-_WINDOW = "first_seen >= ? AND first_seen < ?"
+DYNAMIC_FROM = 49152  # IANA dynamic ports: a new one is a client's or an RPC endpoint's, not a new service
+# Connections on a dynamic port or with no port (ICMP) are left out of every number and list, and counted aside.
+_ELIGIBLE = f"port >= 0 AND port < {DYNAMIC_FROM}"
+_WINDOW = f"first_seen >= ? AND first_seen < ? AND {_ELIGIBLE}"
 
 
 def _where(lc: LateralContext, kind: str) -> tuple[str, list[Any]]:
@@ -62,7 +69,7 @@ class _Builder:
         return tr(self.lang, msg, **params)
 
     def name(self, key: str) -> str:
-        return host_name(self.lc.hosts, key)
+        return host_name(self.lc.hosts, key, self.lang)
 
     def port_class(self, port: int, proto: int) -> str:
         cls = self.lc.admin_ports.class_of(None if port < 0 else port, proto)
@@ -104,12 +111,20 @@ class _Builder:
 def build_new_connections(inp: BuildInput) -> ReportDocument:
     b = _Builder(inp)
     lc = b.lc
-    period = inp.end - inp.start
     window = [db_time(inp.start), db_time(inp.end)]
     kinds = ("new", "admin", "critical", "unmanaged_source")
+    prev_start, _ = previous_period(inp.start, inp.end, inp.tz)
+    # The baseline keeps a connection only while it was seen within baseline_days: older periods are partial.
+    baseline_days = inp.ctx.settings.current().collection.retention.baseline_days
+    kept_from = inp.now - timedelta(days=baseline_days)
+    prev_known = prev_start >= kept_from and traffic_covered(inp.ctx, prev_start, inp.start, now=inp.now)
     with reads.reading(inp.ctx) as conn:
         now_counts = {k: _count(conn, lc, k, inp.start, inp.end) for k in kinds}
-        before = {k: _count(conn, lc, k, inp.start - period, inp.start) for k in kinds}
+        before: dict[str, int | None] = {k: _count(conn, lc, k, prev_start, inp.start) if prev_known else None
+                                         for k in kinds}
+        left_out = int(conn.execute(
+            f"SELECT COUNT(*) FROM connection_baseline WHERE first_seen >= ? AND first_seen < ? AND NOT ({_ELIGIBLE})",
+            window).fetchone()[0])
         by_service = conn.execute(f"SELECT port, proto, COUNT(*) AS n FROM connection_baseline WHERE {_WINDOW} "
                                   "GROUP BY port, proto ORDER BY n DESC, port LIMIT ?", [*window, TOP]).fetchall()
         services_total = conn.execute(f"SELECT COUNT(*) FROM (SELECT 1 FROM connection_baseline WHERE {_WINDOW} "
@@ -128,8 +143,10 @@ def build_new_connections(inp: BuildInput) -> ReportDocument:
         "detector_baseline_accumulating", days=f"{lc.baseline_days:.0f}", required=lc.baseline_required)
     labels = {"new": "rpt_new_kpi_new", "admin": "rpt_new_kpi_admin", "critical": "rpt_new_kpi_critical",
               "unmanaged_source": "rpt_new_kpi_unmanaged_source"}
+    partial = b.t("rpt_new_older_than_baseline", days=baseline_days) if inp.start < kept_from else None
+    note = " ".join(x for x in (partial, accumulating) if x) or None
     kpis = tuple(Kpi(key=k, label=b.t(labels[k]), value=now_counts[k], previous=before[k], better="lower",
-                     note=accumulating) for k in kinds)
+                     note=note) for k in kinds)
     empty = b.t("rpt_new_none")
     service_table = TableBlock(title=b.t("rpt_new_tbl_by_service"), columns=(
         Column(key="service", label=b.t("rpt_col_service")), Column(key="class", label=b.t("rpt_col_port_class")),
@@ -152,8 +169,12 @@ def build_new_connections(inp: BuildInput) -> ReportDocument:
                            total_rows=max(now_counts["new"], len(all_rows)), empty_text=empty,
                            limit_note=b.limit_note(len(all_rows), now_counts["new"]))
     quality = [*coverage_note(inp.ctx, inp.start, inp.end, inp.lang, now=inp.now, tz=inp.tz)]
+    if partial:
+        quality.append(partial)
     if accumulating:
         quality.append(accumulating)
+    if left_out:
+        quality.append(b.t("rpt_new_left_out", n=f"{left_out:,}", port=DYNAMIC_FROM))
     return ReportDocument(
         report_type=inp.params.report_type, lang=inp.lang, title=b.t("rpt_title_new_connections"),
         period_start=inp.start, period_end=inp.end, generated_at=inp.now, pce_label=inp.pce_label, kpis=kpis,

@@ -60,6 +60,7 @@ def _tables(doc, sid):
 
 
 def test_counts_and_previous_window(ctx):
+    _covered(ctx, START - (END - START), END)
     k = {x.key: x for x in build_new_connections(_inp(ctx)).kpis}
     assert (k["new"].value, k["new"].previous) == (4, 1)
     assert (k["admin"].value, k["admin"].previous) == (2, 0)
@@ -117,3 +118,47 @@ def test_findings_critical_first_then_unmanaged(ctx):
     f = build_new_connections(_inp(ctx)).findings
     assert [x.severity.value for x in f] == ["high", "medium"]
     assert "3389/TCP" in f[0].title and "fin-db-01" in f[0].title and "10.9.9.9" in f[1].title
+
+
+def _covered(ctx, start, end):
+    from illumio_ops.domain.values import IngestSource
+    from illumio_ops.store.flowdb import ingest_state
+    with ctx.flows().connect() as conn:
+        ingest_state.add_coverage(conn, IngestSource.TRAFFIC, start, end)
+
+
+def test_previous_none_when_previous_period_not_collected(ctx):
+    """Review: an uncollected previous period was compared as 0 (a false ▲)."""
+    _covered(ctx, START, END)  # only this period
+    k = {x.key: x for x in build_new_connections(_inp(ctx)).kpis}
+    assert k["new"].previous is None and k["admin"].previous is None
+
+
+def test_previous_kept_when_collected(ctx):
+    _covered(ctx, START - (END - START), END)
+    assert {x.key: x for x in build_new_connections(_inp(ctx)).kpis}["new"].previous == 1
+
+
+def test_period_older_than_the_baseline_keeps_says_so(ctx):
+    """Review: the baseline drops connections not seen for baseline_days, so an older period is incomplete."""
+    inp = BuildInput(**{**_inp(ctx).__dict__, "start": NOW - timedelta(days=90), "end": END})
+    doc = build_new_connections(inp)
+    assert all(k.previous is None for k in doc.kpis)
+    assert any("30 days" in q for q in doc.data_quality)
+
+
+def test_dynamic_ports_and_portless_left_out_and_counted(ctx):
+    d = datetime(2026, 10, 23, tzinfo=UTC)
+    _baseline(ctx, [(A, "ip:10.1.1.9", 50123, d, "allowed"), (A, "ip:10.1.1.9", -1, d, "allowed")])
+    doc = build_new_connections(_inp(ctx))
+    assert {x.key: x for x in doc.kpis}["new"].value == 4  # the two above are not counted
+    assert any("2" in q and "49152" in q for q in doc.data_quality)
+
+
+def test_removed_workload_named_as_removed(ctx):
+    d = datetime(2026, 10, 23, tzinfo=UTC)
+    _baseline(ctx, [("/orgs/1/workloads/2c10dcd1-3bf6-4a7c-b441-14f549a8f1eb", A, 22, d, "allowed")])
+    [table] = _tables(build_new_connections(_inp(ctx)), "all")
+    names = {r[0] for r in table.rows}
+    assert "Removed workload …a8f1eb" in names
+    assert not any(n.startswith("/orgs/") for n in names)

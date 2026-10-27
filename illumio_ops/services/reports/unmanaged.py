@@ -21,7 +21,11 @@ from illumio_ops.domain.values import Severity
 from illumio_ops.services.analysis.context import load_lateral_context
 from illumio_ops.services.reports import reads
 from illumio_ops.services.reports.common import port_text, tr
-from illumio_ops.services.reports.generate import coverage_note
+from illumio_ops.services.reports.generate import (
+    coverage_note,
+    previous_period,
+    traffic_covered,
+)
 from illumio_ops.services.reports.registry import BuildInput
 
 ROW_LIMIT = 100_000
@@ -47,14 +51,16 @@ class _Endpoint:
     last_day: str
     decisions: list[str]
     ports: list[tuple[int, int, int]] = field(default_factory=list)  # (connections, port, proto), busiest first
-    admin_in: list[tuple[int, int]] = field(default_factory=list)    # management ports it used toward managed hosts
+    admin_in: list[tuple[int, int]] = field(default_factory=list)    # management ports it connected to managed hosts on
+    admin_peers: int = 0                                               # managed hosts it reached on those ports
 
     @property
     def address(self) -> str:
         return self.key[3:]
 
 
-def _endpoints(conn: sqlite3.Connection, days: tuple[str, str]) -> dict[str, _Endpoint]:
+def _endpoints(conn: sqlite3.Connection, days: tuple[str, str],
+               admin: list[tuple[int, int | None]]) -> dict[str, _Endpoint]:
     params = [*days, *days]
     out = {r[0]: _Endpoint(key=r[0], dirs=set(str(r[1]).split(",")), peers=r[2], connections=r[3], first_day=r[4],
                            last_day=r[5], decisions=sorted(set(str(r[6]).split(","))))
@@ -68,6 +74,15 @@ def _endpoints(conn: sqlite3.Connection, days: tuple[str, str]) -> dict[str, _En
     for ep, ports in by_port.items():
         if ep in out:
             out[ep].ports = sorted(ports, key=lambda x: (-x[0], x[1]))
+    if admin:  # only connections the unmanaged end started into managed hosts (dir 'in'), on management ports
+        clause, admin_params = reads.port_clause(admin)
+        inbound = f"SELECT * FROM ({_SIDES}) WHERE dir = 'in' AND {clause}"
+        for ep, port, proto in conn.execute(f"SELECT DISTINCT ep, port, proto FROM ({inbound}) ORDER BY port",
+                                            [*params, *admin_params]):
+            out[ep].admin_in.append((port, proto))
+        for ep, peers in conn.execute(f"SELECT ep, COUNT(DISTINCT peer) FROM ({inbound}) GROUP BY ep",
+                                      [*params, *admin_params]):
+            out[ep].admin_peers = int(peers)
     return out
 
 
@@ -78,13 +93,12 @@ def build_unmanaged(inp: BuildInput) -> ReportDocument:
         return tr(lang, msg, **params)
 
     lc = load_lateral_context(inp.ctx, now=inp.now)
-    period = inp.end - inp.start
+    admin = [(e.port, e.proto) for e in lc.admin_ports.entries]
+    prev_start, _ = previous_period(inp.start, inp.end, inp.tz)
+    prev_known = traffic_covered(inp.ctx, prev_start, inp.start, now=inp.now)
     with reads.reading(inp.ctx) as conn:
-        now_eps = _endpoints(conn, reads.utc_days(inp.start, inp.end))
-        before_eps = _endpoints(conn, reads.utc_days(inp.start - period, inp.start))
-    for eps in (now_eps, before_eps):
-        for e in eps.values():
-            e.admin_in = [(p, q) for n, p, q in e.ports if "in" in e.dirs and lc.admin_ports.matches(p, q)]
+        now_eps = _endpoints(conn, reads.utc_days(inp.start, inp.end), admin)
+        before_eps = _endpoints(conn, reads.utc_days(prev_start, inp.start), admin) if prev_known else {}
 
     def counts(eps: dict[str, _Endpoint]) -> dict[str, int]:
         return {"total": len(eps), "private": sum(1 for e in eps.values() if not is_public(e.address)),
@@ -94,7 +108,7 @@ def build_unmanaged(inp: BuildInput) -> ReportDocument:
     now_c, before_c = counts(now_eps), counts(before_eps)
     labels = {"total": "rpt_unm_kpi_total", "private": "rpt_unm_kpi_private",
               "admin_sources": "rpt_unm_kpi_admin_sources", "public": "rpt_unm_kpi_public"}
-    kpis = tuple(Kpi(key=k, label=t(labels[k]), value=now_c[k], previous=before_c[k] if before_eps or now_eps else None,
+    kpis = tuple(Kpi(key=k, label=t(labels[k]), value=now_c[k], previous=before_c[k] if prev_known else None,
                      better="lower") for k in labels)
 
     def direction(e: _Endpoint) -> str:
@@ -132,20 +146,21 @@ def build_unmanaged(inp: BuildInput) -> ReportDocument:
     cand_table = TableBlock(title=t("rpt_unm_tbl_candidates"), columns=columns,
                             rows=tuple(row(e) for e in candidates), total_rows=len(candidates),
                             empty_text=t("rpt_unm_candidates_none", n=CANDIDATE_MIN_PEERS))
-    admin = [e for e in ordered if e.admin_in]
+    admin_eps = sorted((e for e in ordered if e.admin_in), key=lambda e: (-e.admin_peers, e.key))
     admin_table = TableBlock(title=t("rpt_unm_tbl_admin"), columns=(
         Column(key="address", label=t("rpt_col_address")), Column(key="scope", label=t("rpt_col_scope")),
         Column(key="ports", label=t("rpt_col_admin_ports")),
         Column(key="peers", label=t("rpt_col_managed_peers"), kind="number")),
-        rows=tuple((e.address, scope(e), ", ".join(port_text(p, q) for p, q in e.admin_in), e.peers) for e in admin),
-        total_rows=len(admin), empty_text=t("rpt_unm_admin_none"))
+        rows=tuple((e.address, scope(e), ", ".join(port_text(p, q) for p, q in e.admin_in), e.admin_peers)
+                   for e in admin_eps),
+        total_rows=len(admin_eps), empty_text=t("rpt_unm_admin_none"))
     public = [e for e in ordered if is_public(e.address)]
     public_table = TableBlock(title=t("rpt_unm_tbl_public"), columns=columns, rows=tuple(row(e) for e in public),
                               total_rows=len(public), empty_text=t("rpt_unm_public_none"))
     findings = tuple(Finding(severity=Severity.MEDIUM if not is_public(e.address) else Severity.HIGH,
                              title=t("rpt_unm_finding_admin", address=e.address,
-                                     ports=", ".join(port_text(p, q) for p, q in e.admin_in), peers=e.peers),
-                             why=t("rpt_unm_why_admin"), action=t("rpt_unm_action_admin")) for e in admin[:5])
+                                     ports=", ".join(port_text(p, q) for p, q in e.admin_in), peers=e.admin_peers),
+                             why=t("rpt_unm_why_admin"), action=t("rpt_unm_action_admin")) for e in admin_eps[:5])
     quality = (*coverage_note(inp.ctx, inp.start, inp.end, lang, now=inp.now, tz=inp.tz), t("rpt_quality_utc_days"))
     return ReportDocument(
         report_type=inp.params.report_type, lang=lang, title=t("rpt_title_unmanaged"), period_start=inp.start,

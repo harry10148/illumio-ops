@@ -25,10 +25,9 @@ def run_report_retention(ctx: AppContext, *, now: datetime | None = None) -> int
         ids = store.ids_created_before(conn, at - timedelta(days=settings.retention_days))
         for s in settings.schedules:  # each schedule also keeps only its newest `keep` reports
             ids += store.ids_beyond_keep(conn, s.id, s.keep)
-        ids = sorted(set(ids))
-        store.delete(conn, ids)
-    _remove_files(ctx, ids)
-    return len(ids)
+        gone = store.delete(conn, sorted(set(ids)))
+    _remove_files(ctx, gone)
+    return len(gone)
 
 
 def remove_report(ctx: AppContext, report_id: int) -> Literal["removed", "running", "missing"]:
@@ -36,8 +35,7 @@ def remove_report(ctx: AppContext, report_id: int) -> Literal["removed", "runnin
         row = store.get(conn, report_id)
         if row is None:
             return "missing"
-        if row.status is ReportStatus.RUNNING:
-            return "running"
-        store.delete(conn, [report_id])
+        if row.status is ReportStatus.RUNNING or not store.delete(conn, [report_id]):
+            return "running"  # claimed by the reports job between the read and the delete
     _remove_files(ctx, [report_id])
     return "removed"

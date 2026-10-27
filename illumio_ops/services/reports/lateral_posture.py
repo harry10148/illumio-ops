@@ -30,7 +30,11 @@ from illumio_ops.services.reports.common import (
     severity_name,
     tr,
 )
-from illumio_ops.services.reports.generate import coverage_note
+from illumio_ops.services.reports.generate import (
+    coverage_note,
+    previous_period,
+    traffic_covered,
+)
 from illumio_ops.services.reports.registry import BuildInput
 from illumio_ops.store.flowdb import analysis
 from illumio_ops.store.flowdb.db import db_day
@@ -81,7 +85,7 @@ class _Builder:
         return tr(self.lang, msg, **params)
 
     def name(self, key: str) -> str:
-        return host_name(self.lc.hosts, key)
+        return host_name(self.lc.hosts, key, self.lang)
 
     def not_computed(self, title: str) -> TableBlock:
         return TableBlock(title=title, columns=(Column(key="x", label=title),), rows=(), total_rows=0,
@@ -89,7 +93,7 @@ class _Builder:
 
     # ── key metrics ──────────────────────────────────────────────────────────
     def kpis(self, exposure: Mapping[str, Any] | None, snaps: Sequence[tuple[str, dict[str, Any]]],
-             detections_now: int, detections_before: int) -> tuple[Kpi, ...]:
+             detections_now: int, detections_before: int | None) -> tuple[Kpi, ...]:
         inp = self.inp
         last_day = db_day(inp.end - timedelta(microseconds=1))
         prev_day = db_day(inp.start - timedelta(microseconds=1))
@@ -270,11 +274,12 @@ class _Builder:
             Column(key="sources", label=self.t("rpt_col_sources_in_period"), kind="number"),
             Column(key="basis", label=self.t("rpt_col_basis"))),
             rows=tuple(servers), total_rows=len(servers), empty_text=self.t("rpt_lat_dir_none"))
-        period = (inp.end - inp.start)
+        prev_start, _ = previous_period(inp.start, inp.end, inp.tz)
+        prev_known = traffic_covered(inp.ctx, prev_start, inp.start, now=inp.now)
         with reads.reading(inp.ctx) as conn:
             dets, det_total = analysis.detections_first_seen_between(conn, inp.start, inp.end, limit=DETECTION_ROWS)
             days = reads.utc_days(inp.start, inp.end)
-            prev_days = reads.utc_days(inp.start - period, inp.start)
+            prev_days = reads.utc_days(prev_start, inp.start)
             top = reads.rollup_sources_on_ports(conn, days, ds.ports, limit=DIRECTORY_SOURCES) if ds.ports else []
             prev = reads.rollup_connections_of(conn, prev_days, ds.ports, [s for s, _ in top]) if ds.ports else {}
         directory_ports = {p for p, _ in ds.ports}
@@ -291,8 +296,11 @@ class _Builder:
             total_rows=len(relevant), empty_text=self.t("rpt_lat_dir_detections_none"),
             limit_note=self.t("rpt_limit_detections_read", n=DETECTION_ROWS, total=det_total)
             if det_total > len(dets) else None)
-        source_rows = []
+        source_rows: list[tuple[str, int, int | None, str]] = []
         for src, n in top:
+            if not prev_known:  # the previous period was not (fully) collected: nothing to compare with
+                source_rows.append((self.name(src), n, None, self.t("rpt_kpi_no_previous")))
+                continue
             before = prev.get(src, 0)
             change = self.t("rpt_lat_dir_prev_none") if before == 0 else self.t("rpt_lat_dir_times",
                                                                                  x=f"{n / before:.1f}")
@@ -351,14 +359,20 @@ def build_lateral_posture(inp: BuildInput) -> ReportDocument:
         snaps = analysis.lateral_snapshots(conn, db_day(inp.start - period - timedelta(days=1)),
                                            db_day(inp.end - timedelta(microseconds=1)))
         counts = analysis.detection_counts(conn, inp.start, inp.end)
-        before = sum(n for n, _ in analysis.detection_counts(conn, inp.start - period, inp.start).values())
+        before = sum(n for n, _ in analysis.detection_counts(
+            conn, previous_period(inp.start, inp.end, inp.tz)[0], inp.start).values())
         rows, total = analysis.detections_first_seen_between(conn, inp.start, inp.end, limit=DETECTION_ROWS)
+    prev_start, _ = previous_period(inp.start, inp.end, inp.tz)
+    if not traffic_covered(inp.ctx, prev_start, inp.start, now=inp.now):
+        before_count: int | None = None
+    else:
+        before_count = before
     exposure = json.loads(exposure_row["result_json"]) if exposure_row is not None else None
     focus = json.loads(focus_row["result_json"]) if focus_row is not None else None
     return ReportDocument(
         report_type=inp.params.report_type, lang=inp.lang, title=b.t("rpt_title_lateral_posture"),
         period_start=inp.start, period_end=inp.end, generated_at=inp.now, pce_label=inp.pce_label,
-        kpis=b.kpis(exposure, snaps, sum(n for n, _ in counts.values()), before),
+        kpis=b.kpis(exposure, snaps, sum(n for n, _ in counts.values()), before_count),
         findings=_findings(focus, inp.lang), data_quality=b.quality(exposure_row),
         sections=(b.exposure_section(exposure, snaps), b.assets_section(exposure), b.reach_section(exposure),
                   b.pivots_section(exposure), b.detections_section(counts, rows, total),

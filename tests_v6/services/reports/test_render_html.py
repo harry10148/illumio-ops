@@ -103,3 +103,16 @@ def test_bars_none_is_gap_not_zero():
 def test_bars_escape_labels():
     svg = bar_svg((("<b>", 1),))
     assert "<b>" not in svg
+
+
+def test_long_tables_may_break_across_printed_pages():
+    out = render_html(make_doc(sections=(Section(id="s", title="S", blocks=(table([(f"h{i}", i) for i in range(40)]),)),)),
+                      tz=UTC)
+    assert 'report-table-panel--long' in out and "break-inside: auto" in out
+
+
+def test_bar_width_capped():
+    import re as _re
+    svg = bar_svg((("d1", 3),))
+    widths = [float(w) for w in _re.findall(r'<rect [^>]*width="([\d.]+)"', svg)]
+    assert widths and max(widths) <= 40

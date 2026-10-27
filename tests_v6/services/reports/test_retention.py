@@ -42,3 +42,26 @@ def test_remove_report_refuses_running(tmp_path):
     assert retention.remove_report(ctx, running) == "running"
     assert retention.remove_report(ctx, done) == "removed" and not (ctx.paths.reports_dir / str(done)).exists()
     assert retention.remove_report(ctx, 12345) == "missing"
+
+
+def test_remove_only_clears_files_of_rows_it_deleted(tmp_path, monkeypatch):
+    """Review: a delete racing the job's claim removed the directory of a report now running."""
+    ctx = configured_ctx(tmp_path)
+    rid = _add(ctx, NOW, ReportStatus.QUEUED)
+    real_get = store.get
+
+    def get_then_claimed(conn, report_id):
+        row = real_get(conn, report_id)
+        store.claim_next(conn, at=NOW)  # the reports job claims it between the read and the delete
+        return row
+    monkeypatch.setattr(store, "get", get_then_claimed)
+    assert retention.remove_report(ctx, rid) == "running"
+    assert (ctx.paths.reports_dir / str(rid)).exists()
+
+
+def test_claim_is_atomic_and_skips_deleted(tmp_path):
+    ctx = configured_ctx(tmp_path)
+    rid = _add(ctx, NOW, ReportStatus.QUEUED)
+    with ctx.db() as conn:
+        assert store.delete(conn, [rid]) == [rid]
+        assert store.claim_next(conn, at=NOW) is None

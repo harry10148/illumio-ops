@@ -34,7 +34,11 @@ EXTRA_CSS = """
 .report-bars text { fill: var(--ink); }
 .kpi-trend { font-size: 0.8em; color: var(--tone-neutral-fg); }
 .kpi-note { font-size: 0.8em; color: var(--tone-neutral-fg); }
+/* A long table may break across printed pages (rows still never split; the header repeats): the shell keeps a
+   panel whole, which moved every long table to a fresh page and left the page before it blank. */
+@media print { .report-table-panel--long { break-inside: auto; } }
 """
+LONG_TABLE_ROWS = 15
 
 
 @cache
@@ -113,7 +117,8 @@ def _table(t: TableBlock, sheet: str, tz: tzinfo | None, lang: Language) -> str:
                 f'<span class="empty-text">{_esc(t.empty_text)}</span></div>')
     shown = t.rows[:HTML_ROW_CAP]
     wide = len(t.columns) >= WIDE_COLUMNS
-    panel = "report-table-panel" + (" report-table-panel--wide report-table-panel--landscape" if wide else "")
+    panel = ("report-table-panel" + (" report-table-panel--wide report-table-panel--landscape" if wide else "")
+             + (" report-table-panel--long" if len(shown) > LONG_TABLE_ROWS else ""))
     numeric = {i for i, c in enumerate(t.columns) if c.kind == "number"}
     cols = "".join("<col>" for _ in t.columns)
     ths = "".join(f'<th scope="col"{" class=\"num\"" if i in numeric else ""}>'

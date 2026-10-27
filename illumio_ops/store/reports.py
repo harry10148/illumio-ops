@@ -35,6 +35,7 @@ class ReportRow:
     kpis: list[dict[str, Any]]
     email_status: str | None
     email_detail: str | None
+    pce_target: str
 
 
 def _opt(value: str | None) -> datetime | None:
@@ -49,31 +50,31 @@ def _row(r: sqlite3.Row) -> ReportRow:
         period_end=datetime.fromisoformat(r["period_end"]), created_at=datetime.fromisoformat(r["created_at"]),
         started_at=_opt(r["started_at"]), finished_at=_opt(r["finished_at"]), error_key=r["error_key"],
         error_detail=r["error_detail"], files=json.loads(r["files_json"]), kpis=json.loads(r["kpis_json"]),
-        email_status=r["email_status"], email_detail=r["email_detail"])
+        email_status=r["email_status"], email_detail=r["email_detail"], pce_target=r["pce_target"])
 
 
 def insert(conn: sqlite3.Connection, *, report_type: str, params_json: str, status: ReportStatus, trigger: str,
            schedule_id: str | None, pce_label: str, period_start: datetime, period_end: datetime,
-           created_at: datetime, error_key: str | None = None, error_detail: str | None = None) -> int:
+           created_at: datetime, error_key: str | None = None, error_detail: str | None = None,
+           pce_target: str = "") -> int:
     finished = _t(created_at) if status is ReportStatus.FAILED else None
     cur = conn.execute(
         "INSERT INTO reports (report_type, params_json, status, trigger, schedule_id, pce_label, period_start, "
-        "period_end, created_at, finished_at, error_key, error_detail) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "period_end, created_at, finished_at, error_key, error_detail, pce_target) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         (report_type, params_json, status.value, trigger, schedule_id, pce_label, _t(period_start), _t(period_end),
-         _t(created_at), finished, error_key, error_detail))
+         _t(created_at), finished, error_key, error_detail, pce_target))
     conn.commit()
     return int(cur.lastrowid or 0)
 
 
 def claim_next(conn: sqlite3.Connection, *, at: datetime) -> ReportRow | None:
-    """The oldest queued report, now marked running (one writer: the reports job)."""
-    row = conn.execute("SELECT id FROM reports WHERE status = 'queued' ORDER BY id LIMIT 1").fetchone()
-    if row is None:
-        return None
-    conn.execute("UPDATE reports SET status = 'running', started_at = ? WHERE id = ? AND status = 'queued'",
-                 (_t(at), row["id"]))
+    """The oldest queued report, now marked running, in one statement (a delete in between cannot be lost)."""
+    claimed = conn.execute(
+        "UPDATE reports SET status = 'running', started_at = ? WHERE id = "
+        "(SELECT id FROM reports WHERE status = 'queued' ORDER BY id LIMIT 1) RETURNING *", (_t(at),)).fetchone()
     conn.commit()
-    return get(conn, row["id"])
+    return _row(claimed) if claimed is not None else None
 
 
 def finish(conn: sqlite3.Connection, report_id: int, *, status: ReportStatus, at: datetime, files: list[str],
@@ -113,9 +114,14 @@ def ids_created_before(conn: sqlite3.Connection, before: datetime) -> list[int]:
         "SELECT id FROM reports WHERE created_at < ? AND status != 'running' ORDER BY id", (_t(before),))]
 
 
-def delete(conn: sqlite3.Connection, report_ids: list[int]) -> None:
-    conn.executemany("DELETE FROM reports WHERE id = ? AND status != 'running'", [(i,) for i in report_ids])
+def delete(conn: sqlite3.Connection, report_ids: list[int]) -> list[int]:
+    """Delete the rows that are not running; returns the ids actually deleted (only their files may go)."""
+    gone = []
+    for i in report_ids:
+        if conn.execute("DELETE FROM reports WHERE id = ? AND status != 'running' RETURNING id", (i,)).fetchone():
+            gone.append(i)
     conn.commit()
+    return gone
 
 
 def schedule_last_due(conn: sqlite3.Connection) -> dict[str, datetime]:

@@ -181,3 +181,43 @@ def test_coverage_note_whole_period(ctx):
         ingest_state.add_coverage(conn, IngestSource.TRAFFIC, start - timedelta(days=3), end + timedelta(hours=1))
     notes = generate.coverage_note(ctx, start, end, Language.EN, now=NOW, tz=UTC)
     assert any("whole period" in n for n in notes)
+
+
+def test_period_starts_at_display_midnight_across_dst():
+    """Review: the start was the UTC end minus whole days, an hour off when the span crosses a DST change."""
+    from zoneinfo import ZoneInfo
+    ny = ZoneInfo("America/New_York")  # DST starts 2026-03-08
+    s, e = generate.period(datetime(2026, 3, 9, 12, tzinfo=UTC), 1, ny)
+    assert s.astimezone(ny) == datetime(2026, 3, 8, tzinfo=ny) and e.astimezone(ny) == datetime(2026, 3, 9, tzinfo=ny)
+    s7, _ = generate.period(datetime(2026, 3, 9, 12, tzinfo=UTC), 7, ny)
+    assert s7.astimezone(ny).replace(tzinfo=None) == datetime(2026, 3, 2)
+
+
+def test_previous_period_also_at_midnight():
+    from zoneinfo import ZoneInfo
+    ny = ZoneInfo("America/New_York")
+    s, e = generate.period(datetime(2026, 3, 9, 12, tzinfo=UTC), 1, ny)
+    ps, pe = generate.previous_period(s, e, ny)
+    assert pe == s and ps.astimezone(ny) == datetime(2026, 3, 7, tzinfo=ny)
+
+
+def test_queued_report_fails_when_pce_changed_before_it_ran(ctx, monkeypatch):
+    """Review: a report queued for PCE A and run after a switch to B read B's data under A's name."""
+    _register(monkeypatch, FakeBuilder())
+    rid = generate.enqueue(ctx, ReportParams(report_type=LATERAL), trigger="manual", schedule_id=None, now=NOW)
+    ctx.settings.update(ctx.settings.current().revision, lambda d: d["pce"].update(url="https://other.example:8443"))
+    generate.run_queued(ctx, now=NOW)
+    row = _row(ctx, rid)
+    assert row.status is ReportStatus.FAILED and row.error_key == "rpt_err_pce_switched"
+
+
+def test_previous_covered_only_when_fully_collected(ctx):
+    start, end = datetime(2026, 10, 20, tzinfo=UTC), datetime(2026, 10, 27, tzinfo=UTC)
+    assert generate.traffic_covered(ctx, start, end, now=NOW) is False  # nothing collected
+    with ctx.flows().connect() as conn:
+        ingest_state.add_coverage(conn, IngestSource.TRAFFIC, start - timedelta(days=1), end)
+    assert generate.traffic_covered(ctx, start, end, now=NOW) is True
+    with ctx.flows().connect() as conn:
+        ingest_state.record_gap(conn, IngestSource.TRAFFIC, datetime(2026, 10, 22, tzinfo=UTC),
+                                datetime(2026, 10, 22, 1, tzinfo=UTC), kind="failed", detail="x", at=NOW)
+    assert generate.traffic_covered(ctx, start, end, now=NOW) is False

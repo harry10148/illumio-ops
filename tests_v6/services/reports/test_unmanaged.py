@@ -73,6 +73,10 @@ def test_admin_port_sources(ctx):
 
 
 def test_kpis_and_previous_window(ctx):
+    from illumio_ops.domain.values import IngestSource
+    from illumio_ops.store.flowdb import ingest_state
+    with ctx.flows().connect() as conn:
+        ingest_state.add_coverage(conn, IngestSource.TRAFFIC, START - (END - START), END)
     k = {x.key: x for x in build_unmanaged(_inp(ctx)).kpis}
     assert (k["total"].value, k["total"].previous) == (3, 1)
     assert (k["private"].value, k["private"].previous) == (2, 1)
@@ -91,3 +95,28 @@ def test_empty_period_says_why(ctx):
                         "end": datetime(2026, 9, 8, tzinfo=UTC)})
     t = _table(build_unmanaged(inp), "all")
     assert t.rows == () and t.empty_text
+
+
+def test_outbound_management_port_is_not_an_inbound_use(tmp_path):
+    """Review: a managed host connecting to U on 445 made U look like it used 445 into managed hosts."""
+    c = configured_ctx(tmp_path)
+    _rollup(c, [("2026-10-21", "ip:10.4.4.4", W.format("a"), 443, "allowed", 3),
+                ("2026-10-21", W.format("b"), "ip:10.4.4.4", 445, "allowed", 3)])
+    doc = build_unmanaged(_inp(c))
+    assert _table(doc, "admin").rows == () and doc.findings == ()
+
+
+def test_admin_peers_count_only_admin_targets(tmp_path):
+    c = configured_ctx(tmp_path)
+    _rollup(c, [("2026-10-21", "ip:10.4.4.4", W.format("a"), 22, "allowed", 3),
+                ("2026-10-21", "ip:10.4.4.4", W.format("b"), 443, "allowed", 3)])
+    [row] = _table(build_unmanaged(_inp(c)), "admin").rows
+    assert row[3] == 1  # only a was reached on a management port
+
+
+def test_previous_none_when_previous_period_not_collected(ctx):
+    from illumio_ops.domain.values import IngestSource
+    from illumio_ops.store.flowdb import ingest_state
+    with ctx.flows().connect() as conn:
+        ingest_state.add_coverage(conn, IngestSource.TRAFFIC, START, END)
+    assert all(k.previous is None for k in build_unmanaged(_inp(ctx)).kpis)
