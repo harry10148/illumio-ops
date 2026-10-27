@@ -170,9 +170,9 @@ def test_incomplete_channel_disabled():
 def test_new_lateral_defaults_not_notified():
     section, items = migrate_alerts({}, [], None)
     lateral = [r for r in section["rules"] if r["type"] == "lateral"]
-    assert len(lateral) == 3 and not any(r["notify"] for r in lateral)
+    assert len(lateral) == 8 and not any(r["notify"] for r in lateral)
     assert all(r["notify"] for r in section["rules"] if r["type"] == "system")
-    assert sum(i.reason_key == "migrate_new_default_quiet" for i in items) == 3
+    assert sum(i.reason_key == "migrate_new_default_quiet" for i in items) == 8
 
 
 def test_report_never_contains_secret_values():

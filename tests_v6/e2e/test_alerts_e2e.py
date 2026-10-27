@@ -162,3 +162,30 @@ def test_direct_link_detail_note(context, live_app):
         notes.get_by_role("button", name="Add note").click()
     assert resp.value.status == 200
     expect(notes).to_contain_text("Opened from a link.")
+
+
+def test_lateral_alert_marked_known_then_removed(context, live_app):
+    """Spec §6.5.8: mark a detection known from its alert; the mark is listed on the Lateral page and can be removed."""
+    now = datetime.now(UTC)
+    t = Trigger(rule_id="b" * 32, rule_type=AlertRuleType.LATERAL, subject_key="volume|/orgs/1/workloads/w1",
+                severity=Severity.MEDIUM, first_seen=now, last_seen=now, late=False, message_key="focus_title_volume_surge",
+                params={"detector": "volume_surge", "account": "/orgs/1/workloads/w1", "host": "w1",
+                        "connections": 5000, "previous_max": 10}, facts={}, evidence=None, confidence=Confidence())
+    pce = live_app.ctx.settings.current().pce
+    with live_app.ctx.db() as conn:
+        a = store.insert_alert(conn, pce_url=pce.url, org_id=pce.org_id, rule_name="", pack_key="rule_anomaly_volume",
+                               trigger=t, at=now, channels=[], hold=None)
+    page = context.new_page()
+    sign_in(page, live_app.url)
+    page.goto(f"{live_app.url}/alerts/{a}")
+    form = page.locator("[data-role=mark-known]")
+    form.locator("input[name=known_reason]").fill("Nightly backup host")
+    form.get_by_label("Every detection of this kind about this host (or account)").check()
+    form.get_by_role("button", name="Mark known").click()
+    expect(form.locator(".form-ok")).to_have_text("Marked known.")
+    page.click("nav >> text=Lateral movement")
+    known = page.locator("[data-role=known-detections]")
+    expect(known).to_contain_text("Nightly backup host")
+    expect(known).to_contain_text("every detection of this kind about /orgs/1/workloads/w1")
+    known.get_by_role("button", name="Remove").click()
+    expect(known).to_contain_text("No detection is marked known.")

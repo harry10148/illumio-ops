@@ -22,13 +22,14 @@ from illumio_ops.store.flowdb import binding
 # app.sqlite tables that describe one PCE (cleared on a switch) and those that do not.
 # tests_v6/services/collect/test_reset.py checks that every app.sqlite table is in exactly one.
 APP_DB_PCE_DERIVED: tuple[str, ...] = ("pce_probe", "alert_eval_state")
-# tamper_annotations is the operator's input, not derived data: each row names its PCE and is listed only
+# tamper_annotations and detection_annotations are the operator's input, not derived data: each row names its PCE and is listed only
 # while that PCE is configured, so switching back finds the notes again.
 # Alert records are kept the same way (spec §6.4: a PCE switch never touches them): each names its PCE. The
 # evaluation watermarks are not: they point into the flow database the switch clears, so they go with it (a
 # switch back would otherwise resume from a cursor into the old data). Rule state, rule status and channel state
 # belong to the rules and channels, which do not change with the PCE.
-APP_DB_PCE_INDEPENDENT: tuple[str, ...] = ("job_health", "tamper_annotations", "alerts", "alert_deliveries",
+APP_DB_PCE_INDEPENDENT: tuple[str, ...] = ("job_health", "tamper_annotations", "detection_annotations", "alerts",
+                                           "alert_deliveries",
                                            "alert_notes", "alert_rule_state", "alert_rule_status", "channel_state")
 
 

@@ -5,8 +5,9 @@ from illumio_ops.domain.lateral import (
     selector_matches,
     stale_selectors,
 )
+from illumio_ops.domain.values import PortClass
 
-BUILTIN = ((445, "SMB"), (22, "SSH"))
+BUILTIN = ((445, "SMB", PortClass.REMOTE), (22, "SSH", PortClass.REMOTE))
 PCE = ((3389, 6, "RDP"), (3389, 17, "RDP"))
 
 
@@ -15,7 +16,7 @@ def _entries(ps):
 
 
 def test_effective_ports_union_and_removal():
-    ps = effective_admin_ports(BUILTIN, PCE, extra=((8080, 6),), removed=((22, None),), include_pce=True)
+    ps = effective_admin_ports(BUILTIN, PCE, extra=((8080, 6, PortClass.REMOTE),), removed=((22, None),), include_pce=True)
     assert _entries(ps) == {(445, None, "builtin"), (3389, 6, "pce"), (3389, 17, "pce"), (8080, 6, "added")}
     assert next(e for e in ps.entries if e.port == 445).name == "SMB"
     assert next(e for e in ps.entries if e.port == 8080).name is None
@@ -59,3 +60,20 @@ def test_builtin_covers_remote_control_without_the_pce():
     from illumio_ops.domain.values import LATERAL_PORTS_DEFAULT
     s = effective_admin_ports(LATERAL_PORTS_DEFAULT, (), extra=(), removed=(), include_pce=False)
     assert s.matches(5900, 6) and s.matches(5938, 6)
+
+
+def test_admin_port_set_class_of():
+    from illumio_ops.domain.values import LATERAL_PORTS_DEFAULT
+    s = effective_admin_ports(LATERAL_PORTS_DEFAULT, PCE, extra=(), removed=(), include_pce=True)
+    assert s.class_of(389, 6) is PortClass.DIRECTORY and s.class_of(88, 17) is PortClass.DIRECTORY
+    assert s.class_of(1433, 6) is PortClass.DATABASE and s.class_of(445, 6) is PortClass.REMOTE
+    assert s.class_of(3389, 17) is PortClass.REMOTE and s.class_of(8080, 6) is None and s.class_of(None, 6) is None
+    assert s.matches(389, 6) and not s.matches(389, 6, {PortClass.REMOTE, PortClass.DATABASE})
+    assert PortProto(port=389) not in s.port_filters({PortClass.REMOTE})
+    assert PortProto(port=389) in s.port_filters() and PortProto(port=389) in s.port_filters({PortClass.DIRECTORY})
+    assert {e.port for e in s.entries if e.category is PortClass.DIRECTORY} == {88, 389, 636, 464, 3268, 3269, 9389}
+
+
+def test_added_port_keeps_its_category():
+    s = effective_admin_ports(BUILTIN, (), extra=((1521, 6, PortClass.DATABASE),), removed=(), include_pce=False)
+    assert s.class_of(1521, 6) is PortClass.DATABASE

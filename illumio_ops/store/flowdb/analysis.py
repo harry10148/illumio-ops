@@ -95,6 +95,21 @@ def detections_since(conn: sqlite3.Connection, since: datetime, *, detectors: Co
     return conn.execute(sql + " ORDER BY last_seen DESC, id DESC LIMIT ?", [*params, limit]).fetchall()
 
 
+def detections_about(conn: sqlite3.Connection, subjects: Collection[str], *, since: datetime,
+                     detectors: Collection[str]) -> list[sqlite3.Row]:
+    """Every detection of these detectors about these subjects seen since `since` (ix_detections_subject); no cap,
+    the subjects bound it."""
+    ordered = sorted(set(subjects))
+    kinds = sorted(set(detectors))
+    out: list[sqlite3.Row] = []
+    for i in range(0, len(ordered), 500):
+        chunk = ordered[i:i + 500]
+        out += conn.execute(
+            f"SELECT * FROM detections WHERE subject_key IN ({','.join('?' * len(chunk))}) AND last_seen >= ? "
+            f"AND detector IN ({','.join('?' * len(kinds))})", [*chunk, db_time(since), *kinds]).fetchall()
+    return out
+
+
 def detections_changed_since(conn: sqlite3.Connection, since: tuple[str, int], *, limit: int) -> list[sqlite3.Row]:
     """Detections changed after (updated_at, id), in that order (alert evaluation). One detection run stamps all
     its rows alike, so the id breaks the tie: a page cut inside one stamp continues where it stopped."""

@@ -565,3 +565,42 @@ def test_traffic_and_lateral_wait_for_a_successful_collection(tmp_path):
     with fresh.db() as conn:
         assert [store.eval_watermark(conn, src, pce_url=PCE["url"], org_id=PCE["org_id"])
                 for src in ("traffic", "lateral")] == [None, None]
+
+
+# ── known detections (spec §6.5.8: marked known, still recorded, not sent) ────
+
+def _mark(ctx, *, fingerprint="fanout|h1", subject="/orgs/1/workloads/h1", pce_url=None, reason="nightly backup"):
+    from illumio_ops.store import detection_annotations
+    with ctx.db() as conn:
+        return detection_annotations.add(conn, pce_url=pce_url or PCE["url"], org_id=PCE["org_id"], detector="fanout",
+                                         subject_key=subject, fingerprint=fingerprint, reason=reason,
+                                         created_by="illumio", at=NOW)
+
+
+def test_known_detection_is_grouped(ctx):
+    mark = _mark(ctx)
+    evaluate_lateral(ctx, now=NOW)
+    _detect(ctx, at=NOW + minutes(1))
+    assert evaluate_lateral(ctx, now=NOW + minutes(2)).fired == 1
+    [a] = _alerts(ctx)
+    assert a["grouped_annotation"] == mark and a["notify"] == 0
+    assert json.loads(a["params_json"])["known_reason"] == "nightly backup"
+
+
+def test_known_subject_groups_every_detection_of_that_kind(ctx):
+    _mark(ctx, fingerprint=None)
+    evaluate_lateral(ctx, now=NOW)
+    _detect(ctx, fp="fanout|h1-other", at=NOW + minutes(1))
+    evaluate_lateral(ctx, now=NOW + minutes(2))
+    [a] = _alerts(ctx)
+    assert a["grouped_annotation"] is not None
+
+
+def test_known_mark_of_other_fingerprint_or_pce_ignored(ctx):
+    _mark(ctx, fingerprint="fanout|elsewhere")
+    _mark(ctx, pce_url="https://other.example:8443")
+    evaluate_lateral(ctx, now=NOW)
+    _detect(ctx, at=NOW + minutes(1))
+    evaluate_lateral(ctx, now=NOW + minutes(2))
+    [a] = _alerts(ctx)
+    assert a["grouped_annotation"] is None and a["notify"] == 1

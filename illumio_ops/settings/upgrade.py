@@ -10,6 +10,7 @@ import copy
 from collections.abc import Callable
 from typing import Any
 
+from illumio_ops.domain.alertpack import anomaly_rules
 from illumio_ops.settings.schema import (
     SCHEMA_VERSION,
     default_alerts,
@@ -38,11 +39,30 @@ def _v3_to_v4(data: dict[str, Any]) -> dict[str, Any]:
     return data
 
 
+def _v4_to_v5(data: dict[str, Any]) -> dict[str, Any]:
+    # The anomaly detectors' settings (spec §6.5.8); what the file has stays as it is.
+    fresh = default_lateral().model_dump(mode="json")
+    lateral = data.setdefault("lateral", fresh)
+    if isinstance(lateral, dict):
+        for key, value in fresh.items():
+            lateral.setdefault(key, value)
+        if isinstance(lateral.get("detectors"), dict):
+            for key, value in fresh["detectors"].items():
+                lateral["detectors"].setdefault(key, value)
+    # The anomaly rules join the pack recording only: an upgraded install turns each on (as for 5.x, spec §7).
+    alerts = data.get("alerts")
+    if isinstance(alerts, dict) and isinstance(alerts.get("rules"), list):
+        have = {r.get("pack_key") for r in alerts["rules"] if isinstance(r, dict)}
+        alerts["rules"] += [r.model_dump(mode="json") for r in anomaly_rules(notify=False) if r.pack_key not in have]
+    return data
+
+
 # source version -> function producing source version + 1
 UPGRADES: dict[int, Callable[[dict[str, Any]], dict[str, Any]]] = {
     1: _v1_to_v2,
     2: _v2_to_v3,
     3: _v3_to_v4,
+    4: _v4_to_v5,
 }
 
 

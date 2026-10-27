@@ -100,7 +100,7 @@
             "type": "object"
           },
           "DetectorKind": {
-            "description": "The lateral-movement detectors of spec §6.5.1.",
+            "description": "The lateral-movement detectors of spec §6.5.1 and the allowed-traffic anomaly detectors of §6.5.8.",
             "enum": [
               "fanout",
               "new_admin_connection",
@@ -109,7 +109,15 @@
               "non_admin_group",
               "cross_env",
               "account_fanout",
-              "unexpected_initiator"
+              "unexpected_initiator",
+              "peer_deviation",
+              "volume_surge",
+              "account_new_source",
+              "suspicious_tool",
+              "new_process",
+              "auth_to_non_dc",
+              "new_dc_client",
+              "directory_surge"
             ],
             "title": "DetectorKind",
             "type": "string"
@@ -1054,7 +1062,7 @@
             "type": "object"
           },
           "DetectorKind": {
-            "description": "The lateral-movement detectors of spec §6.5.1.",
+            "description": "The lateral-movement detectors of spec §6.5.1 and the allowed-traffic anomaly detectors of §6.5.8.",
             "enum": [
               "fanout",
               "new_admin_connection",
@@ -1063,7 +1071,15 @@
               "non_admin_group",
               "cross_env",
               "account_fanout",
-              "unexpected_initiator"
+              "unexpected_initiator",
+              "peer_deviation",
+              "volume_surge",
+              "account_new_source",
+              "suspicious_tool",
+              "new_process",
+              "auth_to_non_dc",
+              "new_dc_client",
+              "directory_surge"
             ],
             "title": "DetectorKind",
             "type": "string"
@@ -2110,7 +2126,7 @@
             "type": "object"
           },
           "DetectorKind": {
-            "description": "The lateral-movement detectors of spec §6.5.1.",
+            "description": "The lateral-movement detectors of spec §6.5.1 and the allowed-traffic anomaly detectors of §6.5.8.",
             "enum": [
               "fanout",
               "new_admin_connection",
@@ -2119,7 +2135,15 @@
               "non_admin_group",
               "cross_env",
               "account_fanout",
-              "unexpected_initiator"
+              "unexpected_initiator",
+              "peer_deviation",
+              "volume_surge",
+              "account_new_source",
+              "suspicious_tool",
+              "new_process",
+              "auth_to_non_dc",
+              "new_dc_client",
+              "directory_surge"
             ],
             "title": "DetectorKind",
             "type": "string"
@@ -3154,7 +3178,7 @@
             "type": "object"
           },
           "DetectorKind": {
-            "description": "The lateral-movement detectors of spec §6.5.1.",
+            "description": "The lateral-movement detectors of spec §6.5.1 and the allowed-traffic anomaly detectors of §6.5.8.",
             "enum": [
               "fanout",
               "new_admin_connection",
@@ -3163,7 +3187,15 @@
               "non_admin_group",
               "cross_env",
               "account_fanout",
-              "unexpected_initiator"
+              "unexpected_initiator",
+              "peer_deviation",
+              "volume_surge",
+              "account_new_source",
+              "suspicious_tool",
+              "new_process",
+              "auth_to_non_dc",
+              "new_dc_client",
+              "directory_surge"
             ],
             "title": "DetectorKind",
             "type": "string"
@@ -4219,7 +4251,7 @@
             "type": "object"
           },
           "DetectorKind": {
-            "description": "The lateral-movement detectors of spec §6.5.1.",
+            "description": "The lateral-movement detectors of spec §6.5.1 and the allowed-traffic anomaly detectors of §6.5.8.",
             "enum": [
               "fanout",
               "new_admin_connection",
@@ -4228,7 +4260,15 @@
               "non_admin_group",
               "cross_env",
               "account_fanout",
-              "unexpected_initiator"
+              "unexpected_initiator",
+              "peer_deviation",
+              "volume_surge",
+              "account_new_source",
+              "suspicious_tool",
+              "new_process",
+              "auth_to_non_dc",
+              "new_dc_client",
+              "directory_surge"
             ],
             "title": "DetectorKind",
             "type": "string"
@@ -5262,7 +5302,7 @@
             "type": "object"
           },
           "DetectorKind": {
-            "description": "The lateral-movement detectors of spec §6.5.1.",
+            "description": "The lateral-movement detectors of spec §6.5.1 and the allowed-traffic anomaly detectors of §6.5.8.",
             "enum": [
               "fanout",
               "new_admin_connection",
@@ -5271,7 +5311,15 @@
               "non_admin_group",
               "cross_env",
               "account_fanout",
-              "unexpected_initiator"
+              "unexpected_initiator",
+              "peer_deviation",
+              "volume_surge",
+              "account_new_source",
+              "suspicious_tool",
+              "new_process",
+              "auth_to_non_dc",
+              "new_dc_client",
+              "directory_surge"
             ],
             "title": "DetectorKind",
             "type": "string"
@@ -6265,7 +6313,7 @@
             "type": "object"
           },
           "DetectorKind": {
-            "description": "The lateral-movement detectors of spec §6.5.1.",
+            "description": "The lateral-movement detectors of spec §6.5.1 and the allowed-traffic anomaly detectors of §6.5.8.",
             "enum": [
               "fanout",
               "new_admin_connection",
@@ -6274,7 +6322,15 @@
               "non_admin_group",
               "cross_env",
               "account_fanout",
-              "unexpected_initiator"
+              "unexpected_initiator",
+              "peer_deviation",
+              "volume_surge",
+              "account_new_source",
+              "suspicious_tool",
+              "new_process",
+              "auth_to_non_dc",
+              "new_dc_client",
+              "directory_surge"
             ],
             "title": "DetectorKind",
             "type": "string"
@@ -7219,7 +7275,7 @@
             "type": "object"
           },
           "DetectorKind": {
-            "description": "The lateral-movement detectors of spec §6.5.1.",
+            "description": "The lateral-movement detectors of spec §6.5.1 and the allowed-traffic anomaly detectors of §6.5.8.",
             "enum": [
               "fanout",
               "new_admin_connection",
@@ -7228,7 +7284,15 @@
               "non_admin_group",
               "cross_env",
               "account_fanout",
-              "unexpected_initiator"
+              "unexpected_initiator",
+              "peer_deviation",
+              "volume_surge",
+              "account_new_source",
+              "suspicious_tool",
+              "new_process",
+              "auth_to_non_dc",
+              "new_dc_client",
+              "directory_surge"
             ],
             "title": "DetectorKind",
             "type": "string"
@@ -9106,6 +9170,103 @@
           "page_size"
         ],
         "title": "AlertList",
+        "type": "object"
+      }
+    },
+    "alerts.mark_known": {
+      "method": "POST",
+      "path": "/api/alerts/<int:alert_id>/known",
+      "request_schema": {
+        "properties": {
+          "reason": {
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Reason",
+            "type": "string"
+          },
+          "scope": {
+            "enum": [
+              "detection",
+              "subject"
+            ],
+            "title": "Scope",
+            "type": "string"
+          }
+        },
+        "required": [
+          "scope",
+          "reason"
+        ],
+        "title": "KnownMark",
+        "type": "object"
+      },
+      "response_schema": {
+        "$defs": {
+          "KnownView": {
+            "properties": {
+              "created_at": {
+                "format": "date-time",
+                "title": "Created At",
+                "type": "string"
+              },
+              "created_by": {
+                "title": "Created By",
+                "type": "string"
+              },
+              "detector": {
+                "title": "Detector",
+                "type": "string"
+              },
+              "fingerprint": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Fingerprint"
+              },
+              "id": {
+                "title": "Id",
+                "type": "integer"
+              },
+              "reason": {
+                "title": "Reason",
+                "type": "string"
+              },
+              "subject_key": {
+                "title": "Subject Key",
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "detector",
+              "subject_key",
+              "fingerprint",
+              "reason",
+              "created_by",
+              "created_at"
+            ],
+            "title": "KnownView",
+            "type": "object"
+          }
+        },
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/$defs/KnownView"
+            },
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "KnownList",
         "type": "object"
       }
     },
@@ -11585,6 +11746,9 @@
         "$defs": {
           "AdminPortView": {
             "properties": {
+              "category": {
+                "$ref": "#/$defs/PortClass"
+              },
               "name": {
                 "anyOf": [
                   {
@@ -11625,13 +11789,14 @@
               "port",
               "proto",
               "name",
-              "source"
+              "source",
+              "category"
             ],
             "title": "AdminPortView",
             "type": "object"
           },
           "DetectorKind": {
-            "description": "The lateral-movement detectors of spec §6.5.1.",
+            "description": "The lateral-movement detectors of spec §6.5.1 and the allowed-traffic anomaly detectors of §6.5.8.",
             "enum": [
               "fanout",
               "new_admin_connection",
@@ -11640,7 +11805,15 @@
               "non_admin_group",
               "cross_env",
               "account_fanout",
-              "unexpected_initiator"
+              "unexpected_initiator",
+              "peer_deviation",
+              "volume_surge",
+              "account_new_source",
+              "suspicious_tool",
+              "new_process",
+              "auth_to_non_dc",
+              "new_dc_client",
+              "directory_surge"
             ],
             "title": "DetectorKind",
             "type": "string"
@@ -11658,6 +11831,12 @@
                 "maximum": 1440,
                 "minimum": 10,
                 "title": "Account Fanout Window Minutes",
+                "type": "integer"
+              },
+              "account_history_days": {
+                "maximum": 90,
+                "minimum": 1,
+                "title": "Account History Days",
                 "type": "integer"
               },
               "blocked_surge_factor": {
@@ -11684,6 +11863,24 @@
                 "title": "Chain Window Minutes",
                 "type": "integer"
               },
+              "directory_followup_minutes": {
+                "maximum": 1440,
+                "minimum": 10,
+                "title": "Directory Followup Minutes",
+                "type": "integer"
+              },
+              "directory_min_connections": {
+                "maximum": 10000000,
+                "minimum": 10,
+                "title": "Directory Min Connections",
+                "type": "integer"
+              },
+              "directory_min_sources": {
+                "maximum": 1000,
+                "minimum": 2,
+                "title": "Directory Min Sources",
+                "type": "integer"
+              },
               "exclude_system_accounts": {
                 "title": "Exclude System Accounts",
                 "type": "boolean"
@@ -11700,11 +11897,41 @@
                 "title": "Fanout Window Minutes",
                 "type": "integer"
               },
+              "peer_min_group": {
+                "maximum": 1000,
+                "minimum": 3,
+                "title": "Peer Min Group",
+                "type": "integer"
+              },
               "precursor_hours": {
                 "maximum": 168,
                 "minimum": 1,
                 "title": "Precursor Hours",
                 "type": "integer"
+              },
+              "process_history_days": {
+                "maximum": 90,
+                "minimum": 1,
+                "title": "Process History Days",
+                "type": "integer"
+              },
+              "volume_min_connections": {
+                "maximum": 10000000,
+                "minimum": 10,
+                "title": "Volume Min Connections",
+                "type": "integer"
+              },
+              "volume_min_mb": {
+                "maximum": 10000000,
+                "minimum": 1,
+                "title": "Volume Min Mb",
+                "type": "integer"
+              },
+              "volume_surge_factor": {
+                "maximum": 100.0,
+                "minimum": 1.5,
+                "title": "Volume Surge Factor",
+                "type": "number"
               }
             },
             "required": [
@@ -11717,7 +11944,16 @@
               "blocked_window_minutes",
               "blocked_surge_factor",
               "exclude_system_accounts",
-              "precursor_hours"
+              "precursor_hours",
+              "peer_min_group",
+              "volume_surge_factor",
+              "volume_min_connections",
+              "volume_min_mb",
+              "directory_min_connections",
+              "account_history_days",
+              "process_history_days",
+              "directory_min_sources",
+              "directory_followup_minutes"
             ],
             "title": "DetectorSettings",
             "type": "object"
@@ -11878,6 +12114,21 @@
               "detectors": {
                 "$ref": "#/$defs/DetectorSettings"
               },
+              "directory_server_ips": {
+                "items": {
+                  "type": "string"
+                },
+                "maxItems": 100,
+                "title": "Directory Server Ips",
+                "type": "array"
+              },
+              "directory_servers": {
+                "items": {
+                  "$ref": "#/$defs/LabelSelector"
+                },
+                "title": "Directory Servers",
+                "type": "array"
+              },
               "environment_label_key": {
                 "maxLength": 255,
                 "minLength": 1,
@@ -11914,11 +12165,29 @@
                 "title": "Observation Days",
                 "type": "integer"
               },
+              "peer_group_keys": {
+                "items": {
+                  "maxLength": 255,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "maxItems": 4,
+                "minItems": 1,
+                "title": "Peer Group Keys",
+                "type": "array"
+              },
               "removed_admin_ports": {
                 "items": {
                   "$ref": "#/$defs/PortEntry"
                 },
                 "title": "Removed Admin Ports",
+                "type": "array"
+              },
+              "suspicious_tools": {
+                "items": {
+                  "type": "string"
+                },
+                "title": "Suspicious Tools",
                 "type": "array"
               }
             },
@@ -11932,7 +12201,11 @@
               "graph_hops",
               "observation_days",
               "expected_initiators",
-              "detectors"
+              "detectors",
+              "peer_group_keys",
+              "directory_servers",
+              "directory_server_ips",
+              "suspicious_tools"
             ],
             "title": "LateralSettings",
             "type": "object"
@@ -12012,9 +12285,23 @@
             "title": "LateralStatus",
             "type": "object"
           },
+          "PortClass": {
+            "description": "The three kinds of management port (spec §6.5.8): remote execution and control, directory and\nauthentication, and databases. Each detector reads the classes it is about.",
+            "enum": [
+              "remote",
+              "directory",
+              "database"
+            ],
+            "title": "PortClass",
+            "type": "string"
+          },
           "PortEntry": {
             "additionalProperties": false,
             "properties": {
+              "category": {
+                "$ref": "#/$defs/PortClass",
+                "default": "remote"
+              },
               "port": {
                 "maximum": 65535,
                 "minimum": 0,
@@ -12107,6 +12394,154 @@
         "type": "object"
       }
     },
+    "system.lateral.known": {
+      "method": "GET",
+      "path": "/api/system/lateral/known",
+      "request_schema": null,
+      "response_schema": {
+        "$defs": {
+          "KnownView": {
+            "properties": {
+              "created_at": {
+                "format": "date-time",
+                "title": "Created At",
+                "type": "string"
+              },
+              "created_by": {
+                "title": "Created By",
+                "type": "string"
+              },
+              "detector": {
+                "title": "Detector",
+                "type": "string"
+              },
+              "fingerprint": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Fingerprint"
+              },
+              "id": {
+                "title": "Id",
+                "type": "integer"
+              },
+              "reason": {
+                "title": "Reason",
+                "type": "string"
+              },
+              "subject_key": {
+                "title": "Subject Key",
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "detector",
+              "subject_key",
+              "fingerprint",
+              "reason",
+              "created_by",
+              "created_at"
+            ],
+            "title": "KnownView",
+            "type": "object"
+          }
+        },
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/$defs/KnownView"
+            },
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "KnownList",
+        "type": "object"
+      }
+    },
+    "system.lateral.known_delete": {
+      "method": "DELETE",
+      "path": "/api/system/lateral/known/<int:mark_id>",
+      "request_schema": null,
+      "response_schema": {
+        "$defs": {
+          "KnownView": {
+            "properties": {
+              "created_at": {
+                "format": "date-time",
+                "title": "Created At",
+                "type": "string"
+              },
+              "created_by": {
+                "title": "Created By",
+                "type": "string"
+              },
+              "detector": {
+                "title": "Detector",
+                "type": "string"
+              },
+              "fingerprint": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Fingerprint"
+              },
+              "id": {
+                "title": "Id",
+                "type": "integer"
+              },
+              "reason": {
+                "title": "Reason",
+                "type": "string"
+              },
+              "subject_key": {
+                "title": "Subject Key",
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "detector",
+              "subject_key",
+              "fingerprint",
+              "reason",
+              "created_by",
+              "created_at"
+            ],
+            "title": "KnownView",
+            "type": "object"
+          }
+        },
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/$defs/KnownView"
+            },
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "KnownList",
+        "type": "object"
+      }
+    },
     "system.lateral.update": {
       "method": "PUT",
       "path": "/api/system/lateral",
@@ -12125,6 +12560,12 @@
                 "maximum": 1440,
                 "minimum": 10,
                 "title": "Account Fanout Window Minutes",
+                "type": "integer"
+              },
+              "account_history_days": {
+                "maximum": 90,
+                "minimum": 1,
+                "title": "Account History Days",
                 "type": "integer"
               },
               "blocked_surge_factor": {
@@ -12151,6 +12592,24 @@
                 "title": "Chain Window Minutes",
                 "type": "integer"
               },
+              "directory_followup_minutes": {
+                "maximum": 1440,
+                "minimum": 10,
+                "title": "Directory Followup Minutes",
+                "type": "integer"
+              },
+              "directory_min_connections": {
+                "maximum": 10000000,
+                "minimum": 10,
+                "title": "Directory Min Connections",
+                "type": "integer"
+              },
+              "directory_min_sources": {
+                "maximum": 1000,
+                "minimum": 2,
+                "title": "Directory Min Sources",
+                "type": "integer"
+              },
               "exclude_system_accounts": {
                 "title": "Exclude System Accounts",
                 "type": "boolean"
@@ -12167,11 +12626,41 @@
                 "title": "Fanout Window Minutes",
                 "type": "integer"
               },
+              "peer_min_group": {
+                "maximum": 1000,
+                "minimum": 3,
+                "title": "Peer Min Group",
+                "type": "integer"
+              },
               "precursor_hours": {
                 "maximum": 168,
                 "minimum": 1,
                 "title": "Precursor Hours",
                 "type": "integer"
+              },
+              "process_history_days": {
+                "maximum": 90,
+                "minimum": 1,
+                "title": "Process History Days",
+                "type": "integer"
+              },
+              "volume_min_connections": {
+                "maximum": 10000000,
+                "minimum": 10,
+                "title": "Volume Min Connections",
+                "type": "integer"
+              },
+              "volume_min_mb": {
+                "maximum": 10000000,
+                "minimum": 1,
+                "title": "Volume Min Mb",
+                "type": "integer"
+              },
+              "volume_surge_factor": {
+                "maximum": 100.0,
+                "minimum": 1.5,
+                "title": "Volume Surge Factor",
+                "type": "number"
               }
             },
             "required": [
@@ -12184,7 +12673,16 @@
               "blocked_window_minutes",
               "blocked_surge_factor",
               "exclude_system_accounts",
-              "precursor_hours"
+              "precursor_hours",
+              "peer_min_group",
+              "volume_surge_factor",
+              "volume_min_connections",
+              "volume_min_mb",
+              "directory_min_connections",
+              "account_history_days",
+              "process_history_days",
+              "directory_min_sources",
+              "directory_followup_minutes"
             ],
             "title": "DetectorSettings",
             "type": "object"
@@ -12272,6 +12770,21 @@
               "detectors": {
                 "$ref": "#/$defs/DetectorSettings"
               },
+              "directory_server_ips": {
+                "items": {
+                  "type": "string"
+                },
+                "maxItems": 100,
+                "title": "Directory Server Ips",
+                "type": "array"
+              },
+              "directory_servers": {
+                "items": {
+                  "$ref": "#/$defs/LabelSelector"
+                },
+                "title": "Directory Servers",
+                "type": "array"
+              },
               "environment_label_key": {
                 "maxLength": 255,
                 "minLength": 1,
@@ -12308,11 +12821,29 @@
                 "title": "Observation Days",
                 "type": "integer"
               },
+              "peer_group_keys": {
+                "items": {
+                  "maxLength": 255,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "maxItems": 4,
+                "minItems": 1,
+                "title": "Peer Group Keys",
+                "type": "array"
+              },
               "removed_admin_ports": {
                 "items": {
                   "$ref": "#/$defs/PortEntry"
                 },
                 "title": "Removed Admin Ports",
+                "type": "array"
+              },
+              "suspicious_tools": {
+                "items": {
+                  "type": "string"
+                },
+                "title": "Suspicious Tools",
                 "type": "array"
               }
             },
@@ -12326,14 +12857,32 @@
               "graph_hops",
               "observation_days",
               "expected_initiators",
-              "detectors"
+              "detectors",
+              "peer_group_keys",
+              "directory_servers",
+              "directory_server_ips",
+              "suspicious_tools"
             ],
             "title": "LateralSettings",
             "type": "object"
           },
+          "PortClass": {
+            "description": "The three kinds of management port (spec §6.5.8): remote execution and control, directory and\nauthentication, and databases. Each detector reads the classes it is about.",
+            "enum": [
+              "remote",
+              "directory",
+              "database"
+            ],
+            "title": "PortClass",
+            "type": "string"
+          },
           "PortEntry": {
             "additionalProperties": false,
             "properties": {
+              "category": {
+                "$ref": "#/$defs/PortClass",
+                "default": "remote"
+              },
               "port": {
                 "maximum": 65535,
                 "minimum": 0,
@@ -12382,6 +12931,9 @@
         "$defs": {
           "AdminPortView": {
             "properties": {
+              "category": {
+                "$ref": "#/$defs/PortClass"
+              },
               "name": {
                 "anyOf": [
                   {
@@ -12422,13 +12974,14 @@
               "port",
               "proto",
               "name",
-              "source"
+              "source",
+              "category"
             ],
             "title": "AdminPortView",
             "type": "object"
           },
           "DetectorKind": {
-            "description": "The lateral-movement detectors of spec §6.5.1.",
+            "description": "The lateral-movement detectors of spec §6.5.1 and the allowed-traffic anomaly detectors of §6.5.8.",
             "enum": [
               "fanout",
               "new_admin_connection",
@@ -12437,7 +12990,15 @@
               "non_admin_group",
               "cross_env",
               "account_fanout",
-              "unexpected_initiator"
+              "unexpected_initiator",
+              "peer_deviation",
+              "volume_surge",
+              "account_new_source",
+              "suspicious_tool",
+              "new_process",
+              "auth_to_non_dc",
+              "new_dc_client",
+              "directory_surge"
             ],
             "title": "DetectorKind",
             "type": "string"
@@ -12455,6 +13016,12 @@
                 "maximum": 1440,
                 "minimum": 10,
                 "title": "Account Fanout Window Minutes",
+                "type": "integer"
+              },
+              "account_history_days": {
+                "maximum": 90,
+                "minimum": 1,
+                "title": "Account History Days",
                 "type": "integer"
               },
               "blocked_surge_factor": {
@@ -12481,6 +13048,24 @@
                 "title": "Chain Window Minutes",
                 "type": "integer"
               },
+              "directory_followup_minutes": {
+                "maximum": 1440,
+                "minimum": 10,
+                "title": "Directory Followup Minutes",
+                "type": "integer"
+              },
+              "directory_min_connections": {
+                "maximum": 10000000,
+                "minimum": 10,
+                "title": "Directory Min Connections",
+                "type": "integer"
+              },
+              "directory_min_sources": {
+                "maximum": 1000,
+                "minimum": 2,
+                "title": "Directory Min Sources",
+                "type": "integer"
+              },
               "exclude_system_accounts": {
                 "title": "Exclude System Accounts",
                 "type": "boolean"
@@ -12497,11 +13082,41 @@
                 "title": "Fanout Window Minutes",
                 "type": "integer"
               },
+              "peer_min_group": {
+                "maximum": 1000,
+                "minimum": 3,
+                "title": "Peer Min Group",
+                "type": "integer"
+              },
               "precursor_hours": {
                 "maximum": 168,
                 "minimum": 1,
                 "title": "Precursor Hours",
                 "type": "integer"
+              },
+              "process_history_days": {
+                "maximum": 90,
+                "minimum": 1,
+                "title": "Process History Days",
+                "type": "integer"
+              },
+              "volume_min_connections": {
+                "maximum": 10000000,
+                "minimum": 10,
+                "title": "Volume Min Connections",
+                "type": "integer"
+              },
+              "volume_min_mb": {
+                "maximum": 10000000,
+                "minimum": 1,
+                "title": "Volume Min Mb",
+                "type": "integer"
+              },
+              "volume_surge_factor": {
+                "maximum": 100.0,
+                "minimum": 1.5,
+                "title": "Volume Surge Factor",
+                "type": "number"
               }
             },
             "required": [
@@ -12514,7 +13129,16 @@
               "blocked_window_minutes",
               "blocked_surge_factor",
               "exclude_system_accounts",
-              "precursor_hours"
+              "precursor_hours",
+              "peer_min_group",
+              "volume_surge_factor",
+              "volume_min_connections",
+              "volume_min_mb",
+              "directory_min_connections",
+              "account_history_days",
+              "process_history_days",
+              "directory_min_sources",
+              "directory_followup_minutes"
             ],
             "title": "DetectorSettings",
             "type": "object"
@@ -12675,6 +13299,21 @@
               "detectors": {
                 "$ref": "#/$defs/DetectorSettings"
               },
+              "directory_server_ips": {
+                "items": {
+                  "type": "string"
+                },
+                "maxItems": 100,
+                "title": "Directory Server Ips",
+                "type": "array"
+              },
+              "directory_servers": {
+                "items": {
+                  "$ref": "#/$defs/LabelSelector"
+                },
+                "title": "Directory Servers",
+                "type": "array"
+              },
               "environment_label_key": {
                 "maxLength": 255,
                 "minLength": 1,
@@ -12711,11 +13350,29 @@
                 "title": "Observation Days",
                 "type": "integer"
               },
+              "peer_group_keys": {
+                "items": {
+                  "maxLength": 255,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "maxItems": 4,
+                "minItems": 1,
+                "title": "Peer Group Keys",
+                "type": "array"
+              },
               "removed_admin_ports": {
                 "items": {
                   "$ref": "#/$defs/PortEntry"
                 },
                 "title": "Removed Admin Ports",
+                "type": "array"
+              },
+              "suspicious_tools": {
+                "items": {
+                  "type": "string"
+                },
+                "title": "Suspicious Tools",
                 "type": "array"
               }
             },
@@ -12729,7 +13386,11 @@
               "graph_hops",
               "observation_days",
               "expected_initiators",
-              "detectors"
+              "detectors",
+              "peer_group_keys",
+              "directory_servers",
+              "directory_server_ips",
+              "suspicious_tools"
             ],
             "title": "LateralSettings",
             "type": "object"
@@ -12809,9 +13470,23 @@
             "title": "LateralStatus",
             "type": "object"
           },
+          "PortClass": {
+            "description": "The three kinds of management port (spec §6.5.8): remote execution and control, directory and\nauthentication, and databases. Each detector reads the classes it is about.",
+            "enum": [
+              "remote",
+              "directory",
+              "database"
+            ],
+            "title": "PortClass",
+            "type": "string"
+          },
           "PortEntry": {
             "additionalProperties": false,
             "properties": {
+              "category": {
+                "$ref": "#/$defs/PortClass",
+                "default": "remote"
+              },
               "port": {
                 "maximum": 65535,
                 "minimum": 0,
@@ -14334,13 +15009,21 @@
     ],
     "DetectorKind": [
       "account_fanout",
+      "account_new_source",
+      "auth_to_non_dc",
       "blocked_surge",
       "cross_env",
+      "directory_surge",
       "fanout",
       "new_admin_connection",
+      "new_dc_client",
+      "new_process",
       "non_admin_group",
+      "peer_deviation",
       "pivot_chain",
-      "unexpected_initiator"
+      "suspicious_tool",
+      "unexpected_initiator",
+      "volume_surge"
     ],
     "DetectorState": [
       "accumulating",
@@ -14402,6 +15085,11 @@
       "blocked",
       "potentially_blocked",
       "unknown"
+    ],
+    "PortClass": [
+      "database",
+      "directory",
+      "remote"
     ],
     "PrecursorKind": [
       "offline",

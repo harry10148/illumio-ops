@@ -32,7 +32,7 @@ def test_v1_file_loads_as_v2_in_memory(tmp_path):
     p = _v1(tmp_path)
     before, mtime = p.read_bytes(), os.stat(p).st_mtime_ns
     s = SettingsStore(p).load()
-    assert s.schema_version == SCHEMA_VERSION == 4
+    assert s.schema_version == SCHEMA_VERSION == 5
     assert s.collection.traffic_interval_seconds == 600
     assert s.collection.retention.baseline_days == 30
     assert p.read_bytes() == before and os.stat(p).st_mtime_ns == mtime
@@ -112,5 +112,55 @@ def test_v3_file_upgrades_to_v4_with_pack(tmp_path):
     p.write_text(json.dumps(d))
     p.chmod(0o600)
     s = SettingsStore(p).load()
-    assert s.schema_version == 4 and len(s.alerts.rules) == 25 and all(r.notify for r in s.alerts.rules)
+    assert s.schema_version == 5 and len(s.alerts.rules) == 30 and all(r.notify for r in s.alerts.rules)
     assert not s.alerts.channels.smtp.enabled
+
+
+def _v4_dict():
+    d = default_settings(password_hash=HASH, secret_key=KEY).model_dump(mode="json")
+    d["schema_version"] = 4
+    lat = d["lateral"]
+    for k in ("peer_group_keys", "directory_servers", "directory_server_ips", "suspicious_tools"):
+        del lat[k]
+    for k in ("peer_min_group", "volume_surge_factor", "volume_min_connections", "volume_min_mb",
+              "directory_min_connections", "account_history_days", "process_history_days", "directory_min_sources",
+              "directory_followup_minutes"):
+        del lat["detectors"][k]
+    lat["extra_admin_ports"] = [{"port": 8443, "proto": 6}]
+    lat["removed_admin_ports"] = [{"port": 23, "proto": None}]
+    lat["detectors"]["fanout_targets"] = 12
+    return d
+
+
+def test_v4_file_upgrades_to_v5_keeping_values():
+    s = validate_settings(upgrade(_v4_dict()))
+    assert s.schema_version == SCHEMA_VERSION == 5
+    lat = s.lateral
+    assert lat.detectors.fanout_targets == 12
+    assert lat.extra_admin_ports[0].category == "remote" and lat.removed_admin_ports[0].port == 23
+    assert lat.peer_group_keys == ("app", "role")
+    assert lat.detectors.directory_min_sources == 3 and lat.detectors.peer_min_group == 5
+    assert "psexec.exe" in lat.suspicious_tools and lat.directory_server_ips == ()
+
+
+def test_v4_upgrade_adds_anomaly_rules_record_only():
+    """An install upgraded to v5 gets the anomaly rules recording only; the operator turns each on (P4.5)."""
+    d = _v4_dict()
+    d["alerts"]["rules"] = [r for r in d["alerts"]["rules"] if not str(r.get("pack_key")).startswith("rule_anomaly")]
+    kept = len(d["alerts"]["rules"])
+    s = validate_settings(upgrade(d))
+    added = [r for r in s.alerts.rules if r.pack_key.startswith("rule_anomaly")]
+    assert len(s.alerts.rules) == kept + 5 and len(added) == 5 and not any(r.notify for r in added)
+    again = validate_settings(upgrade(_v4_dict()))  # already has them: nothing is added twice
+    assert len(again.alerts.rules) == 30
+
+
+def test_v4_at_the_old_rule_limit_still_loads_after_the_anomaly_rules_join():
+    """Review: 300 rules (the v4 limit) plus the five anomaly rules must not make the file invalid."""
+    d = _v4_dict()
+    d["alerts"]["rules"] = [r for r in d["alerts"]["rules"] if not str(r.get("pack_key")).startswith("rule_anomaly")]
+    template = next(r for r in d["alerts"]["rules"] if r["type"] == "event")
+    while len(d["alerts"]["rules"]) < 300:
+        d["alerts"]["rules"].append({**template, "id": f"{len(d['alerts']['rules']):032x}", "pack_key": None,
+                                       "name": f"r{len(d['alerts']['rules'])}"})
+    assert len(validate_settings(upgrade(d)).alerts.rules) == 305

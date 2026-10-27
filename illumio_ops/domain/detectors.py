@@ -12,18 +12,24 @@ Time is the VEN-reported timestamp_range of a daily flow bucket, at ten-minute g
 from __future__ import annotations
 
 from collections import Counter
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Callable, Collection, Mapping, Sequence
 from dataclasses import dataclass, field, replace
 from datetime import datetime, timedelta
 from typing import Any
 
 from illumio_ops.domain.filter import EndpointFilter, FilterSpec
 from illumio_ops.domain.identity import account_key, is_system_account
-from illumio_ops.domain.lateral import AdminPortSet, HostInfo
+from illumio_ops.domain.lateral import (
+    EXECUTION,
+    EXECUTION_OR_DATA,
+    AdminPortSet,
+    HostInfo,
+)
 from illumio_ops.domain.segment import FlowSegment
 from illumio_ops.domain.values import (
     DetectorKind,
     DetectorState,
+    PortClass,
     PrecursorKind,
     SegmentView,
     Severity,
@@ -116,6 +122,54 @@ class DetectorConfig:
     admin_groups_configured: bool     # at least one admin-group selector names a label that exists
     environment_labels_present: bool  # the inventory carries the environment label key at all
     admin_groups_stale: bool = False  # selectors are set but every one names a label that is gone
+    # Anomalies in allowed traffic (spec §6.5.8)
+    peer_group_keys: tuple[str, ...] = ("app", "role")
+    peer_min_group: int = 5
+    volume_surge_factor: float = 3.0
+    volume_min_connections: int = 1000
+    volume_min_bytes: int = 1024 * 2**20
+    directory_min_connections: int = 500
+    account_history: timedelta = timedelta(days=7)
+    process_history: timedelta = timedelta(days=7)
+    suspicious_tools: frozenset[str] = frozenset()
+    directory_followup: timedelta = timedelta(minutes=30)
+
+
+@dataclass(frozen=True)
+class Activity:
+    """One source's live growth over the last hour, and the most it had in any hour of the 7 days before."""
+    connections: int
+    bytes: int | None                 # None: none of the growth carried byte counts
+    previous_connections: int
+    previous_bytes: int | None        # None: no hour of the 7 days carried byte counts (unknown, not zero)
+
+
+@dataclass(frozen=True)
+class AnomalyData:
+    """What the service looked up for the anomaly detectors, by the keys this run's connections name."""
+    # A: (source group, port, proto) -> destination signatures the group's hosts used before the window
+    peer_seen: Mapping[tuple[str, int, int], frozenset[str]] = field(default_factory=dict)
+    group_sizes: Mapping[str, int] = field(default_factory=dict)       # group -> managed hosts in it
+    # B, E③: (source, 'all' | 'directory') -> activity
+    activity: Mapping[tuple[str, str], Activity] = field(default_factory=dict)
+    activity_days: float = 0.0                                          # how far back the hourly activity reaches
+    activity_gaps: tuple[Gap, ...] = ()                                 # collection gaps in the 7 days compared with
+    live: bool = True                                                   # False in the late pass
+    # C: (account, source) -> first seen; account -> its earliest first seen and its sources before the window
+    account_first: Mapping[tuple[str, str], datetime] = field(default_factory=dict)
+    account_since: Mapping[str, datetime] = field(default_factory=dict)
+    account_sources: Mapping[str, int] = field(default_factory=dict)
+    # D: (source, process) -> first seen; source -> its earliest process first seen
+    process_first: Mapping[tuple[str, str], datetime] = field(default_factory=dict)
+    process_since: Mapping[str, datetime] = field(default_factory=dict)
+    # E: directory servers (inferred ∪ declared keys), declared addresses, and what the status says about them
+    directory_servers: frozenset[str] = frozenset()
+    directory_ips: frozenset[str] = frozenset()
+    directory_inferred: int = 0
+    directory_declared_missing: int = 0
+    directory_clients_before: frozenset[str] = frozenset()
+    # E④: (subject, detector, first seen, last seen) of directory detections stored by earlier runs
+    recent_directory: Sequence[tuple[str, str, datetime, datetime]] = ()
 
 
 HostLookup = Callable[[str, str, str | None, Mapping[str, str]], HostInfo]  # (key, ip, hostname, flow labels)
@@ -136,6 +190,8 @@ class DetectorInput:
     gaps: tuple[Gap, ...]
     # src -> the most distinct blocked targets it had in any blocked_window of the 7 days before
     blocked_history: Mapping[str, int] = field(default_factory=dict)
+    traffic_obs: Sequence[Obs] = ()   # every port, not blocked, last seen in the window (spec §6.5.8)
+    anomaly: AnomalyData = field(default_factory=AnomalyData)
 
 
 def evaluable(o: Obs, inp: DetectorInput) -> bool:
@@ -147,6 +203,12 @@ def not_blocked(o: Obs) -> bool:
     return not o.decision.startswith("blocked")
 
 
+def of_class(inp: DetectorInput, classes: Collection[PortClass]) -> list[Obs]:
+    """The management-port observations on ports of these classes (spec §6.5.8: each detector reads its own)."""
+    ports = inp.config.admin_ports
+    return [o for o in inp.obs if ports.matches(o.port, o.proto, classes)]
+
+
 def _dst_host(o: Obs, inp: DetectorInput) -> HostInfo:
     return inp.hosts(o.dst_key, o.dst_ip, o.dst_hostname, o.dst_labels)
 
@@ -156,12 +218,13 @@ def _endpoint(href: str | None, ip: str) -> EndpointFilter:
 
 
 def evidence(inp: DetectorInput, start: datetime, end: datetime, *, src: Obs | None = None,
-             dst: Obs | None = None) -> FlowSegment:
-    """The detail segment that shows a detection's connections in the workbench."""
+             dst: Obs | None = None, classes: Collection[PortClass] | None = None) -> FlowSegment:
+    """The detail segment that shows a detection's connections in the workbench, on the ports of the classes its
+    detector reads."""
     spec = FilterSpec(start=start, end=end if end > start else start + timedelta(seconds=1),
                       src=_endpoint(src.src_href, src.src_ip) if src else None,
                       dst=_endpoint(dst.dst_href, dst.dst_ip) if dst else None,
-                      ports=inp.config.admin_ports.port_filters())
+                      ports=inp.config.admin_ports.port_filters(classes))
     return FlowSegment(filter=spec, view=SegmentView.DETAIL, limit=200)
 
 
@@ -177,7 +240,7 @@ def detect_fanout(inp: DetectorInput) -> tuple[list[Detection], DetectorStatus]:
     fanout_window (5.x B006: high when an allowed connection is among them, else medium)."""
     cfg = inp.config
     by_src: dict[str, list[Obs]] = {}
-    for o in inp.obs:
+    for o in of_class(inp, EXECUTION_OR_DATA):
         if not_blocked(o):
             by_src.setdefault(o.src_key, []).append(o)
     out = []
@@ -210,7 +273,7 @@ def detect_fanout(inp: DetectorInput) -> tuple[list[Detection], DetectorStatus]:
             summary={"targets": best[0], "sample_targets": _names(window_rows),
                      "ports": sorted({o.port for o in window_rows if o.port is not None}),
                      "window_minutes": int(cfg.fanout_window / timedelta(minutes=1))},
-            segment=evidence(inp, last - cfg.fanout_window, last, src=window_rows[-1]),
+            segment=evidence(inp, last - cfg.fanout_window, last, src=window_rows[-1], classes=EXECUTION_OR_DATA),
             confidence=DetectionConfidence(incomplete_gaps=inp.gaps)))
     return out, DetectorStatus(DetectorKind.FANOUT, DetectorState.OK)
 
@@ -224,7 +287,7 @@ def detect_new_admin(inp: DetectorInput) -> tuple[list[Detection], DetectorStatu
                                   {"days": round(inp.baseline_days, 1), "required": inp.baseline_required})
     lo, hi = inp.window
     seen: dict[tuple[str, str, int, int], Obs] = {}
-    for o in inp.obs:
+    for o in of_class(inp, EXECUTION_OR_DATA):
         if not evaluable(o, inp):
             continue
         key = (o.src_key, o.dst_key, o.port if o.port is not None else -1, o.proto)
@@ -239,7 +302,7 @@ def detect_new_admin(inp: DetectorInput) -> tuple[list[Detection], DetectorStatu
             subject_key=src, severity=Severity.HIGH if critical else Severity.MEDIUM,
             first_seen=inp.baseline_first_seen[(src, dst, port, proto)], last_seen=o.last, critical_asset=critical,
             summary={"target": o.dst_hostname or o.dst_ip, "port": port, "proto": proto, "decision": o.decision},
-            segment=evidence(inp, o.first, o.last, src=o, dst=o),
+            segment=evidence(inp, o.first, o.last, src=o, dst=o, classes=EXECUTION_OR_DATA),
             confidence=DetectionConfidence(baseline_days=round(inp.baseline_days, 1), incomplete_gaps=inp.gaps)))
     return out, DetectorStatus(DetectorKind.NEW_ADMIN_CONNECTION, DetectorState.OK)
 
@@ -280,7 +343,7 @@ def detect_pivot_chain(inp: DetectorInput) -> tuple[list[Detection], DetectorSta
     Flow times come in ten-minute reporting buckets, so the two legs may share one: the summary says the
     legs connect in time, never that it is a proven chain."""
     cfg = inp.config
-    legs = [o for o in inp.obs if not_blocked(o)]
+    legs = [o for o in of_class(inp, EXECUTION) if not_blocked(o)]
     from_host: dict[str, list[Obs]] = {}
     for o in legs:
         from_host.setdefault(o.src_key, []).append(o)
@@ -304,7 +367,7 @@ def detect_pivot_chain(inp: DetectorInput) -> tuple[list[Detection], DetectorSta
             last_seen=max(ab.last, bc.last), critical_asset=critical,
             summary={"via": ab.dst_hostname or ab.dst_ip, "target": bc.dst_hostname or bc.dst_ip,
                      "ports": [ab.port, bc.port], "chains_through_pivot": per_pivot[b]},
-            segment=evidence(inp, min(ab.first, bc.first), max(ab.last, bc.last), src=ab),
+            segment=evidence(inp, min(ab.first, bc.first), max(ab.last, bc.last), src=ab, classes=EXECUTION),
             confidence=DetectionConfidence(incomplete_gaps=inp.gaps)))
     return out, DetectorStatus(DetectorKind.PIVOT_CHAIN, DetectorState.OK)
 
@@ -374,9 +437,10 @@ def detect_blocked_surge(inp: DetectorInput) -> tuple[list[Detection], DetectorS
     return out, DetectorStatus(DetectorKind.BLOCKED_SURGE, DetectorState.OK)
 
 
-def _per_tuple(inp: DetectorInput, keep: Callable[[Obs], bool]) -> dict[tuple[str, str, int, int], Obs]:
+def _per_tuple(inp: DetectorInput, keep: Callable[[Obs], bool],
+               classes: Collection[PortClass]) -> dict[tuple[str, str, int, int], Obs]:
     out: dict[tuple[str, str, int, int], Obs] = {}
-    for o in inp.obs:
+    for o in of_class(inp, classes):
         if evaluable(o, inp) and keep(o):
             out.setdefault((o.src_key, o.dst_key, o.port if o.port is not None else -1, o.proto), o)
     return out
@@ -389,14 +453,14 @@ def detect_non_admin_group(inp: DetectorInput) -> tuple[list[Detection], Detecto
         return [], DetectorStatus(DetectorKind.NON_ADMIN_GROUP, DetectorState.DISABLED, reason)
     out = []
     for (src, dst, port, proto), o in sorted(_per_tuple(inp, lambda o: not_blocked(o)
-                                                        and not _src_host(o, inp).admin_group).items()):
+                                                        and not _src_host(o, inp).admin_group, EXECUTION).items()):
         critical = _dst_host(o, inp).critical
         out.append(Detection(
             detector=DetectorKind.NON_ADMIN_GROUP, fingerprint=f"nag|{src}|{dst}|{port}|{proto}", subject_key=src,
             severity=Severity.HIGH if critical else Severity.MEDIUM, first_seen=o.first, last_seen=o.last,
             critical_asset=critical,
             summary={"target": o.dst_hostname or o.dst_ip, "port": port, "proto": proto, "decision": o.decision},
-            segment=evidence(inp, o.first, o.last, src=o, dst=o),
+            segment=evidence(inp, o.first, o.last, src=o, dst=o, classes=EXECUTION),
             confidence=DetectionConfidence(incomplete_gaps=inp.gaps)))
     return out, DetectorStatus(DetectorKind.NON_ADMIN_GROUP, DetectorState.OK)
 
@@ -410,7 +474,7 @@ def detect_cross_env(inp: DetectorInput) -> tuple[list[Detection], DetectorStatu
                                   {"label_key": cfg.environment_label_key})
     key = cfg.environment_label_key
     out = []
-    for (src, dst, port, proto), o in sorted(_per_tuple(inp, not_blocked).items()):
+    for (src, dst, port, proto), o in sorted(_per_tuple(inp, not_blocked, EXECUTION_OR_DATA).items()):
         se, de = _src_host(o, inp).labels.get(key), _dst_host(o, inp).labels.get(key)
         if not (se and de and se != de):
             continue
@@ -420,7 +484,7 @@ def detect_cross_env(inp: DetectorInput) -> tuple[list[Detection], DetectorStatu
             last_seen=o.last, critical_asset=_dst_host(o, inp).critical,
             summary={"target": o.dst_hostname or o.dst_ip, "src_env": se, "dst_env": de, "port": port,
                      "decision": o.decision},
-            segment=evidence(inp, o.first, o.last, src=o, dst=o),
+            segment=evidence(inp, o.first, o.last, src=o, dst=o, classes=EXECUTION_OR_DATA),
             confidence=DetectionConfidence(incomplete_gaps=inp.gaps)))
     return out, DetectorStatus(DetectorKind.CROSS_ENV, DetectorState.OK)
 
@@ -429,7 +493,7 @@ def detect_account_fanout(inp: DetectorInput) -> tuple[list[Detection], Detector
     """One initiating account starting management-port connections to at least account_fanout_targets
     hosts within its window. Only as good as the user field's coverage, which every result states."""
     cfg = inp.config
-    rows = [o for o in inp.obs if not_blocked(o)]
+    rows = [o for o in of_class(inp, EXECUTION) if not_blocked(o)]
     in_window = [o for o in rows if evaluable(o, inp)]
     covered = [o for o in in_window if o.initiator_user]
     if in_window and not covered:
@@ -458,7 +522,7 @@ def detect_account_fanout(inp: DetectorInput) -> tuple[list[Detection], Detector
                      "window_minutes": int(cfg.account_fanout_window / timedelta(minutes=1))},
             segment=FlowSegment(filter=FilterSpec(start=last - cfg.account_fanout_window, end=last,
                                                   initiator_user=window_rows[-1].initiator_user,
-                                                  ports=cfg.admin_ports.port_filters()),
+                                                  ports=cfg.admin_ports.port_filters(EXECUTION)),
                                 view=SegmentView.DETAIL, limit=200),
             confidence=DetectionConfidence(field="initiator_user", covered=len(covered), total=len(in_window),
                                            incomplete_gaps=inp.gaps)))
@@ -475,7 +539,7 @@ def detect_unexpected_initiator(inp: DetectorInput) -> tuple[list[Detection], De
     found: dict[tuple[str, str, int, int], Obs] = {}
     judged = not_evaluable = 0
     listed: list[Obs] = []
-    for o in inp.obs:
+    for o in of_class(inp, EXECUTION):
         if not evaluable(o, inp) or o.port is None:
             continue
         expected = cfg.expected.get((o.port, o.proto), cfg.expected.get((o.port, None)))
@@ -499,7 +563,7 @@ def detect_unexpected_initiator(inp: DetectorInput) -> tuple[list[Detection], De
             subject_key=src, severity=Severity.HIGH if critical else Severity.MEDIUM, first_seen=o.first,
             last_seen=o.last, critical_asset=critical,
             summary={"process": process, "port": port, "proto": proto, "target": o.dst_hostname or o.dst_ip},
-            segment=evidence(inp, o.first, o.last, src=o),
+            segment=evidence(inp, o.first, o.last, src=o, classes=EXECUTION),
             confidence=DetectionConfidence(field="initiator_process", covered=judged, total=judged + not_evaluable,
                                            incomplete_gaps=inp.gaps)))
     if not not_evaluable:
@@ -537,6 +601,10 @@ def _coverage_status(kind: DetectorKind, keys: tuple[str, str], params: dict[str
     return DetectorStatus(kind, DetectorState.OK, keys[0], params)
 
 
+# Detections whose subject is an account, not a host: a host's precursor does not raise them.
+ACCOUNT_DETECTORS = frozenset({DetectorKind.ACCOUNT_FANOUT, DetectorKind.ACCOUNT_NEW_SOURCE})
+
+
 def apply_precursors(dets: Sequence[Detection], precursors: Sequence[Precursor], *,
                      window: timedelta) -> list[Detection]:
     """A host-led detection whose host showed a precursor (tampering, a suspended or offline VEN) within
@@ -547,7 +615,7 @@ def apply_precursors(dets: Sequence[Detection], precursors: Sequence[Precursor],
     out = []
     for d in dets:
         found = [p for p in by_host.get(d.subject_key, ()) if d.first_seen - window <= p.at <= d.last_seen]
-        if d.detector is DetectorKind.ACCOUNT_FANOUT or not found:
+        if d.detector in ACCOUNT_DETECTORS or not found:
             out.append(d)
             continue
         listed = [{"kind": p.kind.value, "at": p.at.isoformat(), "signal": p.signal}
@@ -556,7 +624,10 @@ def apply_precursors(dets: Sequence[Detection], precursors: Sequence[Precursor],
     return out
 
 
-DETECTORS: dict[DetectorKind, Callable[[DetectorInput], tuple[list[Detection], DetectorStatus]]] = {
+from illumio_ops.domain import anomaly
+
+DetectorFn = Callable[[DetectorInput], tuple[list[Detection], DetectorStatus]]
+DETECTORS: dict[DetectorKind, DetectorFn] = {
     DetectorKind.FANOUT: detect_fanout,
     DetectorKind.NEW_ADMIN_CONNECTION: detect_new_admin,
     DetectorKind.PIVOT_CHAIN: detect_pivot_chain,
@@ -565,6 +636,15 @@ DETECTORS: dict[DetectorKind, Callable[[DetectorInput], tuple[list[Detection], D
     DetectorKind.CROSS_ENV: detect_cross_env,
     DetectorKind.ACCOUNT_FANOUT: detect_account_fanout,
     DetectorKind.UNEXPECTED_INITIATOR: detect_unexpected_initiator,
+    # Through a lambda: anomaly imports this module, so its functions may not exist yet when this line runs.
+    DetectorKind.PEER_DEVIATION: lambda i: anomaly.detect_peer_deviation(i),
+    DetectorKind.VOLUME_SURGE: lambda i: anomaly.detect_volume_surge(i),
+    DetectorKind.ACCOUNT_NEW_SOURCE: lambda i: anomaly.detect_account_new_source(i),
+    DetectorKind.SUSPICIOUS_TOOL: lambda i: anomaly.detect_suspicious_tool(i),
+    DetectorKind.NEW_PROCESS: lambda i: anomaly.detect_new_process(i),
+    DetectorKind.AUTH_TO_NON_DC: lambda i: anomaly.detect_auth_to_non_dc(i),
+    DetectorKind.NEW_DC_CLIENT: lambda i: anomaly.detect_new_dc_client(i),
+    DetectorKind.DIRECTORY_SURGE: lambda i: anomaly.detect_directory_surge(i),
 }
 
 
@@ -576,18 +656,27 @@ def dedup_windows(cfg: DetectorConfig) -> dict[str, timedelta]:
         DetectorKind.PIVOT_CHAIN: day, DetectorKind.NON_ADMIN_GROUP: day, DetectorKind.CROSS_ENV: day,
         DetectorKind.UNEXPECTED_INITIATOR: day, DetectorKind.ACCOUNT_FANOUT: cfg.account_fanout_window,
         DetectorKind.BLOCKED_SURGE: cfg.blocked_window,
+        DetectorKind.PEER_DEVIATION: timedelta(days=30), DetectorKind.VOLUME_SURGE: anomaly.SURGE_WINDOW,
+        DetectorKind.ACCOUNT_NEW_SOURCE: timedelta(days=30), DetectorKind.SUSPICIOUS_TOOL: day,
+        DetectorKind.NEW_PROCESS: timedelta(days=30), DetectorKind.AUTH_TO_NON_DC: day,
+        DetectorKind.NEW_DC_CLIENT: timedelta(days=30), DetectorKind.DIRECTORY_SURGE: anomaly.SURGE_WINDOW,
     }
 
 
-# The detectors that read management-port connections; the blocked-surge detector reads every port.
-MANAGEMENT_DETECTORS = frozenset(DetectorKind) - {DetectorKind.BLOCKED_SURGE}
+# The detectors that read management-port connections, listed (a detector added later is not one by default);
+# the blocked-surge detector reads every port.
+MANAGEMENT_DETECTORS: frozenset[DetectorKind] = frozenset({
+    DetectorKind.FANOUT, DetectorKind.NEW_ADMIN_CONNECTION, DetectorKind.PIVOT_CHAIN, DetectorKind.NON_ADMIN_GROUP,
+    DetectorKind.CROSS_ENV, DetectorKind.ACCOUNT_FANOUT, DetectorKind.UNEXPECTED_INITIATOR,
+})
 
 
 def run_detectors(inp: DetectorInput) -> tuple[list[Detection], list[DetectorStatus]]:
     """Every detector over the ingested rows only: backfilled history is baseline, never part of what an
     alert counts (spec §7). Without management ports the management detectors are off, not "any port"."""
     inp = replace(inp, obs=[o for o in inp.obs if o.origin == "ingest"],
-                  blocked_obs=[o for o in inp.blocked_obs if o.origin == "ingest"])
+                  blocked_obs=[o for o in inp.blocked_obs if o.origin == "ingest"],
+                  traffic_obs=[o for o in inp.traffic_obs if o.origin == "ingest"])
     no_ports = not inp.config.admin_ports.entries
     detections: list[Detection] = []
     statuses: list[DetectorStatus] = []
@@ -598,4 +687,8 @@ def run_detectors(inp: DetectorInput) -> tuple[list[Detection], list[DetectorSta
         found, status = DETECTORS[kind](inp)
         detections += found
         statuses.append(status)
-    return apply_precursors(detections, inp.precursors, window=inp.config.precursor_window), statuses
+    raised = apply_precursors(detections, inp.precursors, window=inp.config.precursor_window)
+    directory = [(d.subject_key, d.detector.value, d.first_seen, d.last_seen) for d in detections
+                 if d.detector in anomaly.DIRECTORY_DETECTORS]
+    return anomaly.apply_directory_followup(raised, [*inp.anomaly.recent_directory, *directory],
+                                            window=inp.config.directory_followup), statuses

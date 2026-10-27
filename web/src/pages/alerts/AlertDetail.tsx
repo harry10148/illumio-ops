@@ -124,6 +124,45 @@ function Evidence({ alertId, kind }: { alertId: string; kind: string | null }) {
   );
 }
 
+/** Mark the detection behind a lateral alert known (spec §6.5.8): later alerts about it are recorded, not sent. */
+function MarkKnown({ alertId }: { alertId: string }) {
+  const [reason, setReason] = useState("");
+  const [scope, setScope] = useState<"detection" | "subject">("detection");
+  const [error, setError] = useState<ApiError | null>(null);
+  const [done, setDone] = useState(false);
+  async function submit(e: FormEvent) {
+    e.preventDefault();
+    const env = await call("alerts.mark_known", { scope, reason }, { alert_id: alertId });
+    if (env.ok) {
+      setDone(true);
+      setError(null);
+    } else setError(env.error);
+  }
+  return (
+    <form className="card stack" onSubmit={submit} data-role="mark-known">
+      <h2>{t("alert_known_title")}</h2>
+      <p className="hint">{t("alert_known_hint")}</p>
+      <label className="block">
+        {t("alert_known_reason_label")}
+        <input name="known_reason" value={reason} maxLength={500} onChange={(e) => { setReason(e.target.value); setDone(false); }} />
+      </label>
+      <label className="check">
+        <input type="radio" name="known_scope" checked={scope === "detection"} onChange={() => setScope("detection")} />
+        {t("alert_known_scope_detection")}
+      </label>
+      <label className="check">
+        <input type="radio" name="known_scope" checked={scope === "subject"} onChange={() => setScope("subject")} />
+        {t("alert_known_scope_subject")}
+      </label>
+      {error && <p className="form-error">{t(error.message_key, error.params)}</p>}
+      {done && <p className="form-ok" role="status">{t("alert_known_marked")}</p>}
+      <div className="actions">
+        <button type="submit" className="btn-primary" disabled={!reason.trim()}>{t("alert_known_mark")}</button>
+      </div>
+    </form>
+  );
+}
+
 export function AlertDetail() {
   const lang = useLang();
   const { id = "" } = useParams();
@@ -173,7 +212,9 @@ export function AlertDetail() {
         </p>
         <p className="hint">{t("alert_fired_at", { at: formatTime(d.fired_at, lang) })}</p>
         {d.caveats.map((c) => <p key={c} className="notice">{c}</p>)}
-        {d.grouped && <p className="hint">{t("alert_grouped_known_cause")}</p>}
+        {d.grouped && typeof d.params.known_reason === "string"
+          ? <p className="hint" data-role="known-reason">{t("alert_known_reason", { reason: d.params.known_reason })}</p>
+          : d.grouped && <p className="hint">{t("alert_grouped_known_cause")}</p>}
       </div>
       <div className="card stack">
         <h2>{t("alert_evidence_title")}</h2>
@@ -192,6 +233,7 @@ export function AlertDetail() {
           ))}
         </ul>
       </div>
+      {d.rule_type === "lateral" && <MarkKnown alertId={id} />}
       <form className="card stack" onSubmit={addNote} data-role="notes">
         <h2>{t("alert_notes_title")}</h2>
         {d.notes.length === 0 ? <p className="muted">{t("alert_notes_none")}</p> : (

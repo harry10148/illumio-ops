@@ -2,7 +2,7 @@ import { type FormEvent, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 
 import { type ApiError, call } from "../../api/client";
-import type { DetectorStatusView, LabelChoice, LabelSelector, LateralSettings, LateralView, PortEntry } from "../../api/generated";
+import type { DetectorStatusView, KnownView, LabelChoice, LabelSelector, LateralSettings, LateralView, PortClass, PortEntry } from "../../api/generated";
 import { formatTime } from "../../components/ProbeResults";
 import { t, useLang } from "../../i18n";
 import { registerNav } from "../../shell/nav";
@@ -16,6 +16,20 @@ const DETECTOR_KEYS: Record<string, string> = {
   cross_env: "detector_name_cross_env",
   account_fanout: "detector_name_account_fanout",
   unexpected_initiator: "detector_name_unexpected_initiator",
+  peer_deviation: "detector_name_peer_deviation",
+  volume_surge: "detector_name_volume_surge",
+  account_new_source: "detector_name_account_new_source",
+  suspicious_tool: "detector_name_suspicious_tool",
+  new_process: "detector_name_new_process",
+  auth_to_non_dc: "detector_name_auth_to_non_dc",
+  new_dc_client: "detector_name_new_dc_client",
+  directory_surge: "detector_name_directory_surge",
+};
+// The allowed-traffic anomaly detectors (spec §6.5.8), listed apart from the lateral-movement ones.
+const ANOMALY_DETECTORS = new Set(["peer_deviation", "volume_surge", "account_new_source", "suspicious_tool", "new_process",
+                                   "auth_to_non_dc", "new_dc_client", "directory_surge"]);
+const CLASS_KEYS: Record<string, string> = {
+  remote: "port_class_remote", directory: "port_class_directory", database: "port_class_database",
 };
 const STATE_KEYS: Record<string, string> = {
   ok: "detector_state_ok",
@@ -41,6 +55,15 @@ const NUMBERS: { key: string; labelKey: string }[] = [
   { key: "blocked_window_minutes", labelKey: "det_blocked_window" },
   { key: "blocked_surge_factor", labelKey: "det_blocked_factor" },
   { key: "precursor_hours", labelKey: "det_precursor_hours" },
+  { key: "peer_min_group", labelKey: "det_peer_min_group" },
+  { key: "volume_surge_factor", labelKey: "det_volume_factor" },
+  { key: "volume_min_connections", labelKey: "det_volume_min_connections" },
+  { key: "volume_min_mb", labelKey: "det_volume_min_mb" },
+  { key: "directory_min_connections", labelKey: "det_directory_min_connections" },
+  { key: "directory_min_sources", labelKey: "det_directory_min_sources" },
+  { key: "directory_followup_minutes", labelKey: "det_directory_followup" },
+  { key: "account_history_days", labelKey: "det_account_history" },
+  { key: "process_history_days", labelKey: "det_process_history" },
 ];
 const GRAPH_FIELDS = new Set(["graph_hops", "observation_days"]);
 
@@ -73,6 +96,73 @@ function toNumbers(s: LateralSettings): Record<string, string> {
 
 function detectorLine(d: DetectorStatusView): string {
   return d.reason_key ? t(d.reason_key, asText(d.params)) : "";
+}
+
+function listText(items: readonly string[]): string {
+  return items.join(", ");
+}
+
+function splitList(text: string): string[] {
+  return text.split(/[,\n]/).map((x) => x.trim()).filter(Boolean);
+}
+
+function DetectorList({ items, titleKey }: { items: DetectorStatusView[]; titleKey: string }) {
+  if (items.length === 0) return null;
+  return (
+    <>
+      <h3>{t(titleKey)}</h3>
+      <ul className="status-list">
+        {items.map((d) => (
+          <li key={d.detector} data-detector={d.detector}>
+            <span className="status-name">{label(DETECTOR_KEYS, d.detector)}</span>
+            <span className="badge" data-tone={STATE_TONES[d.state] ?? "neutral"}>{label(STATE_KEYS, d.state)}</span>
+            {d.reason_key && <span className="hint">{detectorLine(d)}</span>}
+          </li>
+        ))}
+      </ul>
+    </>
+  );
+}
+
+/** Detections marked known from an alert (spec §6.5.8): still recorded, grouped instead of sent. */
+function KnownMarks() {
+  const lang = useLang();
+  const [items, setItems] = useState<KnownView[] | null>(null);
+  const [error, setError] = useState<ApiError | null>(null);
+  useEffect(() => {
+    void call("system.lateral.known").then((env) => {
+      if (env.ok && env.data) setItems(env.data.items);
+      else setError(env.error);
+    });
+  }, []);
+  async function remove(id: number) {
+    const env = await call("system.lateral.known_delete", undefined, { mark_id: String(id) });
+    if (env.ok && env.data) setItems(env.data.items);
+    else setError(env.error);
+  }
+  return (
+    <div className="card stack" data-role="known-detections">
+      <h2>{t("lateral_known_title")}</h2>
+      <p className="hint">{t("lateral_known_hint")}</p>
+      {error && <p className="form-error">{t(error.message_key, error.params)}</p>}
+      {items !== null && items.length === 0 && <p className="muted">{t("lateral_known_none")}</p>}
+      {items !== null && items.length > 0 && (
+        <ul className="stack">
+          {items.map((m) => (
+            <li key={m.id} data-known={m.id}>
+              <strong>{label(DETECTOR_KEYS, m.detector)}</strong>{" "}
+              {m.fingerprint ? m.subject_key : t("lateral_known_scope_all", { subject: m.subject_key })}
+              <p>{m.reason}</p>
+              <p className="hint">
+                {t("alert_note_by", { who: m.created_by, at: formatTime(m.created_at, lang) })}{" "}
+                <button type="button" className="btn-quiet" onClick={() => void remove(m.id)}>{t("lateral_known_remove")}</button>
+              </p>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
 }
 
 /** Pick key=value from the labels the current inventory carries. */
@@ -126,7 +216,8 @@ export function Lateral() {
   const [settings, setSettings] = useState<LateralSettings | null>(null);
   const [numbers, setNumbers] = useState<Record<string, string>>({});
   const [processes, setProcesses] = useState<Record<string, string>>({});
-  const [newPort, setNewPort] = useState({ port: "", proto: "6" });
+  const [newPort, setNewPort] = useState<{ port: string; proto: string; category: PortClass }>({ port: "", proto: "6", category: "remote" });
+  const [lists, setLists] = useState<Record<string, string>>({});
   const [error, setError] = useState<ApiError | null>(null);
   const [saved, setSaved] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -136,6 +227,8 @@ export function Lateral() {
     setSettings(v.settings);
     setNumbers(toNumbers(v.settings));
     setProcesses(Object.fromEntries(v.settings.expected_initiators.map((e) => [portText(e), e.processes.join(", ")])));
+    setLists({ peer_group_keys: listText(v.settings.peer_group_keys), directory_server_ips: listText(v.settings.directory_server_ips),
+               suspicious_tools: listText(v.settings.suspicious_tools) });
   };
 
   useEffect(() => {
@@ -159,6 +252,9 @@ export function Lateral() {
       graph_hops: n("graph_hops"),
       observation_days: n("observation_days"),
       detectors: detectors as unknown as LateralSettings["detectors"],
+      peer_group_keys: splitList(lists.peer_group_keys ?? "") as LateralSettings["peer_group_keys"],
+      directory_server_ips: splitList(lists.directory_server_ips ?? ""),
+      suspicious_tools: splitList(lists.suspicious_tools ?? ""),
       expected_initiators: s.expected_initiators.map((e) => ({
         ...e,
         processes: (processes[portText(e)] ?? "").split(",").map((p) => p.trim()).filter(Boolean) as [string, ...string[]],
@@ -195,10 +291,10 @@ export function Lateral() {
   const addPort = () => {
     const port = Number(newPort.port);
     if (!Number.isInteger(port) || port < 0 || port > 65535) return;
-    const entry: PortEntry = { port, proto: newPort.proto === "" ? null : Number(newPort.proto) };
+    const entry: PortEntry = { port, proto: newPort.proto === "" ? null : Number(newPort.proto), category: newPort.category };
     if (settings.extra_admin_ports.some((p) => samePort(p, entry))) return;
     change({ ...settings, extra_admin_ports: [...settings.extra_admin_ports, entry] });
-    setNewPort({ port: "", proto: "6" });
+    setNewPort({ port: "", proto: "6", category: "remote" });
   };
   return (
     <section className="page stack">
@@ -219,17 +315,8 @@ export function Lateral() {
           {" · "}
           {st.exposure_last_ok_at ? t("lateral_exposure_last", { at: formatTime(st.exposure_last_ok_at, lang) }) : t("lateral_exposure_never")}
         </p>
-        {st.detectors.length > 0 && (
-          <ul className="status-list">
-            {st.detectors.map((d) => (
-              <li key={d.detector} data-detector={d.detector}>
-                <span className="status-name">{label(DETECTOR_KEYS, d.detector)}</span>
-                <span className="badge" data-tone={STATE_TONES[d.state] ?? "neutral"}>{label(STATE_KEYS, d.state)}</span>
-                {d.reason_key && <span className="hint">{detectorLine(d)}</span>}
-              </li>
-            ))}
-          </ul>
-        )}
+        <DetectorList titleKey="lateral_detectors_lateral" items={st.detectors.filter((d) => !ANOMALY_DETECTORS.has(d.detector))} />
+        <DetectorList titleKey="lateral_detectors_anomaly" items={st.detectors.filter((d) => ANOMALY_DETECTORS.has(d.detector))} />
         {st.stale_selectors.map((s) => (
           <p key={`${s.setting}-${s.key}-${s.value}`} className="badge" data-tone="warn">
             {t("lateral_stale_selector", { setting: label(SETTING_KEYS, s.setting), key: s.key, value: s.value })}
@@ -250,6 +337,7 @@ export function Lateral() {
               <tr key={`${p.source}-${p.port}-${p.proto}`} data-port={p.port}>
                 <td>{portText(p)}</td>
                 <td>{p.name ?? ""}</td>
+                <td><span className="badge" data-tone="info" data-class={p.category}>{label(CLASS_KEYS, p.category)}</span></td>
                 <td><span className="badge" data-tone="neutral">{label(SOURCE_KEYS, p.source)}</span></td>
                 <td>
                   <button type="button" className="btn-quiet" onClick={() => p.source === "added"
@@ -287,6 +375,12 @@ export function Lateral() {
               <option value="">{t("proto_any")}</option>
             </select>
           </label>
+          <label>
+            {t("lateral_port_class")}
+            <select name="new_category" value={newPort.category} onChange={(e) => setNewPort({ ...newPort, category: e.target.value as PortClass })}>
+              {Object.keys(CLASS_KEYS).map((c) => <option key={c} value={c}>{label(CLASS_KEYS, c)}</option>)}
+            </select>
+          </label>
           <button type="button" className="btn-quiet" onClick={addPort}>{t("lateral_add_port")}</button>
         </div>
         <label className="check">
@@ -313,6 +407,29 @@ export function Lateral() {
           <input name="environment_label_key" value={settings.environment_label_key}
                  onChange={(e) => change({ ...settings, environment_label_key: e.target.value })} />
         </label>
+
+        <div className="block" data-role="anomaly-settings">
+        <h3>{t("lateral_anomaly_title")}</h3>
+        <p className="hint">{t("lateral_anomaly_hint")}</p>
+        <label>
+          {t("lateral_peer_keys")}
+          <input name="peer_group_keys" value={lists.peer_group_keys ?? ""}
+                 onChange={(e) => { setLists({ ...lists, peer_group_keys: e.target.value }); setSaved(false); }} />
+        </label>
+        <p className="hint">{t("lateral_directory_hint")}</p>
+        <LabelPicker name="directory_servers" choices={view.label_choices} selected={settings.directory_servers}
+                     onChange={(next) => change({ ...settings, directory_servers: next })} />
+        <label>
+          {t("lateral_directory_ips")}
+          <input name="directory_server_ips" value={lists.directory_server_ips ?? ""}
+                 onChange={(e) => { setLists({ ...lists, directory_server_ips: e.target.value }); setSaved(false); }} />
+        </label>
+        <label className="block">
+          {t("lateral_tools")}
+          <textarea name="suspicious_tools" rows={3} value={lists.suspicious_tools ?? ""}
+                    onChange={(e) => { setLists({ ...lists, suspicious_tools: e.target.value }); setSaved(false); }} />
+        </label>
+        </div>
 
         <h3>{t("lateral_detectors_settings_title")}</h3>
         <div className="form-grid">
@@ -351,6 +468,7 @@ export function Lateral() {
           <button type="submit" className="btn-primary" disabled={busy}>{t("btn_save")}</button>
         </div>
       </form>
+      <KnownMarks />
     </section>
   );
 }

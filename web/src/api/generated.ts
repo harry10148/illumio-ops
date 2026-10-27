@@ -11,12 +11,12 @@ export type PolicyDecision = ("allowed" | "potentially_blocked" | "blocked" | "u
  */
 export type Severity = ("low" | "medium" | "high" | "critical")
 /**
- * The lateral-movement detectors of spec §6.5.1.
+ * The lateral-movement detectors of spec §6.5.1 and the allowed-traffic anomaly detectors of §6.5.8.
  * 
  * This interface was referenced by `ContractRoot`'s JSON-Schema
  * via the `definition` "DetectorKind".
  */
-export type DetectorKind = ("fanout" | "new_admin_connection" | "pivot_chain" | "blocked_surge" | "non_admin_group" | "cross_env" | "account_fanout" | "unexpected_initiator")
+export type DetectorKind = ("fanout" | "new_admin_connection" | "pivot_chain" | "blocked_surge" | "non_admin_group" | "cross_env" | "account_fanout" | "unexpected_initiator" | "peer_deviation" | "volume_surge" | "account_new_source" | "suspicious_tool" | "new_process" | "auth_to_non_dc" | "new_dc_client" | "directory_surge")
 /**
  * An event rule fires on the matches of one evaluation (immediate) or on a count within its window.
  * 
@@ -71,12 +71,25 @@ export type CollectionMode = ("full" | "alert" | "events_only")
  */
 export type CollectionMode1 = ("full" | "alert" | "events_only")
 /**
+ * The three kinds of management port (spec §6.5.8): remote execution and control, directory and
+ * authentication, and databases. Each detector reads the classes it is about.
+ * 
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "PortClass".
+ */
+export type PortClass = ("remote" | "directory" | "database")
+/**
  * What a detector run can say besides its detections: "no detection" is only ever OK.
  * 
  * This interface was referenced by `ContractRoot`'s JSON-Schema
  * via the `definition` "DetectorState".
  */
 export type DetectorState = ("ok" | "disabled" | "accumulating" | "no_data" | "collection_off" | "incomplete")
+/**
+ * The three kinds of management port (spec §6.5.8): remote execution and control, directory and
+ * authentication, and databases. Each detector reads the classes it is about.
+ */
+export type PortClass1 = ("remote" | "directory" | "database")
 /**
  * This interface was referenced by `ContractRoot`'s JSON-Schema
  * via the `definition` "DeploymentType".
@@ -506,6 +519,34 @@ total: number
 }
 /**
  * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "KnownMark".
+ */
+export interface KnownMark {
+reason: string
+scope: ("detection" | "subject")
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "KnownView".
+ */
+export interface KnownView {
+created_at: string
+created_by: string
+detector: string
+fingerprint: (string | null)
+id: number
+reason: string
+subject_key: string
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "KnownList".
+ */
+export interface KnownList {
+items: KnownView[]
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
  * via the `definition` "NoteAdd".
  */
 export interface NoteAdd {
@@ -864,6 +905,7 @@ jobs: JobView[]
  * via the `definition` "AdminPortView".
  */
 export interface AdminPortView {
+category: PortClass
 name: (string | null)
 port: number
 proto: (number | null)
@@ -876,14 +918,23 @@ source: ("builtin" | "pce" | "added")
 export interface DetectorSettings {
 account_fanout_targets: number
 account_fanout_window_minutes: number
+account_history_days: number
 blocked_surge_factor: number
 blocked_targets: number
 blocked_window_minutes: number
 chain_window_minutes: number
+directory_followup_minutes: number
+directory_min_connections: number
+directory_min_sources: number
 exclude_system_accounts: boolean
 fanout_targets: number
 fanout_window_minutes: number
+peer_min_group: number
 precursor_hours: number
+process_history_days: number
+volume_min_connections: number
+volume_min_mb: number
+volume_surge_factor: number
 }
 /**
  * This interface was referenced by `ContractRoot`'s JSON-Schema
@@ -937,19 +988,31 @@ export interface LateralSettings {
 admin_groups: LabelSelector[]
 critical_assets: LabelSelector[]
 detectors: DetectorSettings
+/**
+ * @maxItems 100
+ */
+directory_server_ips: string[]
+directory_servers: LabelSelector[]
 environment_label_key: string
 expected_initiators: ExpectedInitiators[]
 extra_admin_ports: PortEntry[]
 graph_hops: number
 include_pce_admin_services: boolean
 observation_days: number
+/**
+ * @minItems 1
+ * @maxItems 4
+ */
+peer_group_keys: [string]|[string, string]|[string, string, string]|[string, string, string, string]
 removed_admin_ports: PortEntry[]
+suspicious_tools: string[]
 }
 /**
  * This interface was referenced by `ContractRoot`'s JSON-Schema
  * via the `definition` "PortEntry".
  */
 export interface PortEntry {
+category?: PortClass1
 port: number
 proto: (number | null)
 }
@@ -1193,7 +1256,7 @@ revision: number
 validity_days: number
 }
 
-export type OpId = "alert_rules.create" | "alert_rules.delete" | "alert_rules.list" | "alert_rules.pack" | "alert_rules.preview" | "alert_rules.update" | "alerts.evidence" | "alerts.explain" | "alerts.get" | "alerts.list" | "alerts.note_add" | "auth.csrf" | "auth.login" | "auth.logout" | "auth.me" | "auth.password" | "home.summary" | "i18n.dictionary" | "system.channels.get" | "system.channels.test" | "system.channels.update" | "system.collection.backfill" | "system.collection.get" | "system.collection.status" | "system.collection.update" | "system.display.get" | "system.display.update" | "system.jobs.list" | "system.lateral.get" | "system.lateral.update" | "system.logs.query" | "system.pce.get" | "system.pce.latest" | "system.pce.probe" | "system.pce.update" | "system.security.get" | "system.security.update" | "system.tls.csr" | "system.tls.import" | "system.tls.renew" | "system.tls.status" | "system.tls.update";
+export type OpId = "alert_rules.create" | "alert_rules.delete" | "alert_rules.list" | "alert_rules.pack" | "alert_rules.preview" | "alert_rules.update" | "alerts.evidence" | "alerts.explain" | "alerts.get" | "alerts.list" | "alerts.mark_known" | "alerts.note_add" | "auth.csrf" | "auth.login" | "auth.logout" | "auth.me" | "auth.password" | "home.summary" | "i18n.dictionary" | "system.channels.get" | "system.channels.test" | "system.channels.update" | "system.collection.backfill" | "system.collection.get" | "system.collection.status" | "system.collection.update" | "system.display.get" | "system.display.update" | "system.jobs.list" | "system.lateral.get" | "system.lateral.known" | "system.lateral.known_delete" | "system.lateral.update" | "system.logs.query" | "system.pce.get" | "system.pce.latest" | "system.pce.probe" | "system.pce.update" | "system.security.get" | "system.security.update" | "system.tls.csr" | "system.tls.import" | "system.tls.renew" | "system.tls.status" | "system.tls.update";
 
 export interface Requests {
   "alert_rules.create": RuleWrite;
@@ -1206,6 +1269,7 @@ export interface Requests {
   "alerts.explain": ExplainRequest;
   "alerts.get": undefined;
   "alerts.list": undefined;
+  "alerts.mark_known": KnownMark;
   "alerts.note_add": NoteAdd;
   "auth.csrf": undefined;
   "auth.login": LoginRequest;
@@ -1225,6 +1289,8 @@ export interface Requests {
   "system.display.update": DisplayUpdate;
   "system.jobs.list": undefined;
   "system.lateral.get": undefined;
+  "system.lateral.known": undefined;
+  "system.lateral.known_delete": undefined;
   "system.lateral.update": LateralUpdate;
   "system.logs.query": LogQuery;
   "system.pce.get": undefined;
@@ -1251,6 +1317,7 @@ export interface Responses {
   "alerts.explain": PolicyExplanation;
   "alerts.get": AlertDetail;
   "alerts.list": AlertList;
+  "alerts.mark_known": KnownList;
   "alerts.note_add": AlertDetail;
   "auth.csrf": CsrfToken;
   "auth.login": LoginResult;
@@ -1270,6 +1337,8 @@ export interface Responses {
   "system.display.update": DisplayView;
   "system.jobs.list": JobList;
   "system.lateral.get": LateralView;
+  "system.lateral.known": KnownList;
+  "system.lateral.known_delete": KnownList;
   "system.lateral.update": LateralView;
   "system.logs.query": LogLines;
   "system.pce.get": PceConnection;
@@ -1296,6 +1365,7 @@ export const OPERATIONS = {
   "alerts.explain": { method: "POST", path: "/api/alerts/<int:alert_id>/explain" },
   "alerts.get": { method: "GET", path: "/api/alerts/<int:alert_id>" },
   "alerts.list": { method: "GET", path: "/api/alerts" },
+  "alerts.mark_known": { method: "POST", path: "/api/alerts/<int:alert_id>/known" },
   "alerts.note_add": { method: "POST", path: "/api/alerts/<int:alert_id>/notes" },
   "auth.csrf": { method: "GET", path: "/api/auth/csrf" },
   "auth.login": { method: "POST", path: "/api/auth/login" },
@@ -1315,6 +1385,8 @@ export const OPERATIONS = {
   "system.display.update": { method: "PUT", path: "/api/system/display" },
   "system.jobs.list": { method: "GET", path: "/api/system/jobs" },
   "system.lateral.get": { method: "GET", path: "/api/system/lateral" },
+  "system.lateral.known": { method: "GET", path: "/api/system/lateral/known" },
+  "system.lateral.known_delete": { method: "DELETE", path: "/api/system/lateral/known/<int:mark_id>" },
   "system.lateral.update": { method: "PUT", path: "/api/system/lateral" },
   "system.logs.query": { method: "POST", path: "/api/system/logs/query" },
   "system.pce.get": { method: "GET", path: "/api/system/pce" },
@@ -1379,13 +1451,21 @@ export const VALUES = {
   ],
   "DetectorKind": [
     "account_fanout",
+    "account_new_source",
+    "auth_to_non_dc",
     "blocked_surge",
     "cross_env",
+    "directory_surge",
     "fanout",
     "new_admin_connection",
+    "new_dc_client",
+    "new_process",
     "non_admin_group",
+    "peer_deviation",
     "pivot_chain",
-    "unexpected_initiator"
+    "suspicious_tool",
+    "unexpected_initiator",
+    "volume_surge"
   ],
   "DetectorState": [
     "accumulating",
@@ -1447,6 +1527,11 @@ export const VALUES = {
     "blocked",
     "potentially_blocked",
     "unknown"
+  ],
+  "PortClass": [
+    "database",
+    "directory",
+    "remote"
   ],
   "PrecursorKind": [
     "offline",

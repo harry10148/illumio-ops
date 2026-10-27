@@ -90,7 +90,7 @@ def load_lateral_context(ctx: AppContext, *, now: datetime) -> LateralContext:
     return LateralContext(
         settings=lat,
         admin_ports=effective_admin_ports(
-            LATERAL_PORTS_DEFAULT, pce_admin, extra=[(e.port, e.proto) for e in lat.extra_admin_ports],
+            LATERAL_PORTS_DEFAULT, pce_admin, extra=[(e.port, e.proto, e.category) for e in lat.extra_admin_ports],
             removed=[(e.port, e.proto) for e in lat.removed_admin_ports], include_pce=lat.include_pce_admin_services),
         hosts=hosts, label_sets=sets, known_labels=known, collected=collects(settings, IngestSource.TRAFFIC),
         baseline_days=_baseline_days(ranges, watermark, required), baseline_required=required,

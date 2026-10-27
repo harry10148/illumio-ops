@@ -6,7 +6,8 @@ from flask import Blueprint, request
 from flask_login import current_user
 from pydantic import BaseModel, Field, ValidationError
 
-from illumio_ops.services.alerts import views
+from illumio_ops.services.alerts import known, views
+from illumio_ops.services.alerts.known import KnownList, KnownMark
 from illumio_ops.services.alerts.views import (
     AlertDetail,
     AlertEvidence,
@@ -27,6 +28,7 @@ OP_LIST = operation("alerts.list", "GET", "/api/alerts", None, AlertList)
 OP_GET = operation("alerts.get", "GET", "/api/alerts/<int:alert_id>", None, AlertDetail)
 OP_EVIDENCE = operation("alerts.evidence", "GET", "/api/alerts/<int:alert_id>/evidence", None, AlertEvidence)
 OP_NOTE = operation("alerts.note_add", "POST", "/api/alerts/<int:alert_id>/notes", NoteAdd, AlertDetail)
+OP_KNOWN = operation("alerts.mark_known", "POST", "/api/alerts/<int:alert_id>/known", KnownMark, KnownList)
 OP_EXPLAIN = operation("alerts.explain", "POST", "/api/alerts/<int:alert_id>/explain", ExplainRequest,
                        PolicyExplanation)
 
@@ -78,6 +80,17 @@ def explain(body: ExplainRequest, alert_id: int) -> PolicyExplanation:
         found = views.explain(get_ctx(), alert_id, body)
     except views.NotFlowAlert:
         raise ApiFailure(400, "not_a_flow_alert", "err_not_a_flow_alert") from None
+    if found is None:
+        raise _missing()
+    return found
+
+
+@api_route(bp, OP_KNOWN)
+def mark_known(body: KnownMark, alert_id: int) -> KnownList:
+    try:
+        found = known.mark_known(get_ctx(), alert_id, body, by=str(current_user.get_id()))
+    except known.NotLateralAlert:
+        raise ApiFailure(400, "not_a_lateral_alert", "err_not_a_lateral_alert") from None
     if found is None:
         raise _missing()
     return found

@@ -151,7 +151,10 @@ def test_pack_lateral_notify_follows_flag():
         rules = best_practice_rules(notify_new_defaults=flag)
         lateral = [r for r in rules if r.type == "lateral"]
         assert sorted(d.value for r in lateral for d in r.detectors) == sorted(
-            [DetectorKind.FANOUT, DetectorKind.NEW_ADMIN_CONNECTION, DetectorKind.CROSS_ENV])
+            [DetectorKind.FANOUT, DetectorKind.NEW_ADMIN_CONNECTION, DetectorKind.CROSS_ENV,
+             DetectorKind.PEER_DEVIATION, DetectorKind.VOLUME_SURGE, DetectorKind.ACCOUNT_NEW_SOURCE,
+             DetectorKind.SUSPICIOUS_TOOL, DetectorKind.AUTH_TO_NON_DC, DetectorKind.NEW_DC_CLIENT,
+             DetectorKind.DIRECTORY_SURGE])
         assert all(r.notify is flag for r in lateral)
         assert all(r.notify for r in rules if r.type != "lateral")
     systems = sorted(r.check.value for r in best_practice_rules(notify_new_defaults=True) if r.type == "system")
@@ -169,3 +172,13 @@ def test_pattern_compiled_the_way_it_runs():
 def test_unrunnable_pattern_never_raises():
     rule = event_rule().model_copy(update={"event_types": ["(?i)rule_set.*"]})  # stored before this check existed
     assert event_matches(rule, {"event_type": "rule_set.create"}) is False
+
+
+def test_pack_has_anomaly_rules():
+    """Spec §6.5.8: one rule per anomaly kind (the directory ones together); a new process is low and has none."""
+    by_key = {r.pack_key: r for r in best_practice_rules(notify_new_defaults=True)}
+    assert [d.value for d in by_key["rule_anomaly_directory"].detectors] == [
+        "auth_to_non_dc", "new_dc_client", "directory_surge"]
+    assert {"rule_anomaly_peer", "rule_anomaly_volume", "rule_anomaly_account_source", "rule_anomaly_tool"} <= set(by_key)
+    assert not any(DetectorKind.NEW_PROCESS in getattr(r, "detectors", ()) for r in by_key.values())
+    assert all(by_key[k].min_severity == "medium" and by_key[k].enabled for k in by_key if k.startswith("rule_anomaly"))

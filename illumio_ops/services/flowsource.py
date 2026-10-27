@@ -44,7 +44,7 @@ from illumio_ops.domain.segment import (
     FlowSegment,
     compile_flow_ranking,
 )
-from illumio_ops.domain.values import FlowDirection, IngestSource
+from illumio_ops.domain.values import FlowDirection, IngestSource, PortClass
 from illumio_ops.pce.async_query import run_traffic_query
 from illumio_ops.pce.client import PceNotConfigured
 from illumio_ops.services.collect.guard import require_same_pce
@@ -60,6 +60,7 @@ from illumio_ops.services.coverage import (
 from illumio_ops.settings.schema import PceSettings
 from illumio_ops.store.flowdb import ingest_state
 from illumio_ops.store.flowdb.db import StaleGeneration, db_time
+from illumio_ops.store.flowdb.flows import INCREMENT_PRIMARY_JOIN
 
 __all__ = [
     "AggRow",
@@ -467,13 +468,14 @@ class BaselineEdges(BaseModel):
     collected: bool
 
 
-def baseline_edges(ctx: AppContext, ports: AdminPortSet, *, since: datetime) -> BaselineEdges:
+def baseline_edges(ctx: AppContext, ports: AdminPortSet, *, since: datetime,
+                   classes: Collection[PortClass] | None = None) -> BaselineEdges:
     """The management-port connections seen since `since`, from the connection baseline (kept for the
-    baseline period in every collection mode). Reads by port through ix_baseline_port; the protocol and
+    baseline period in every collection mode). Reads by port through ix_baseline_port_src; the protocol and
     the time are checked here."""
     fdb, gen, settings = _store_read(ctx)
     collected = collects(settings, IngestSource.TRAFFIC)
-    numbers = sorted({e.port for e in ports.entries})
+    numbers = sorted({e.port for e in ports.entries if classes is None or e.category in classes})
     if not collected or not numbers:
         return BaselineEdges(edges=[], baseline_from=None, collected=collected)
     stamp = db_time(since)
@@ -486,7 +488,7 @@ def baseline_edges(ctx: AppContext, ports: AdminPortSet, *, since: datetime) -> 
         # Host keys repeat on every row of a host: one string per host, not one per row.
         edges = [BaselineEdge(src_key=sys.intern(src), dst_key=sys.intern(dst), port=port, proto=proto,
                               decision=decision)
-                 for src, dst, port, proto, decision in cur if ports.matches(port, proto)]
+                 for src, dst, port, proto, decision in cur if ports.matches(port, proto, classes)]
         ranges = ingest_state.coverage(conn, IngestSource.TRAFFIC)
     if fdb.generation != gen:
         raise StaleGeneration
@@ -568,7 +570,7 @@ FRESH = timedelta(hours=1)  # how far behind now the newest traffic coverage may
 def service_traffic(ctx: AppContext, targets: Collection[tuple[str, int, int]], *, since: datetime,
                     now: datetime) -> dict[tuple[str, int, int], TrafficSummary]:
     """Recent traffic to each (destination key, port, proto), from the connection baseline (read by port
-    through ix_baseline_port). A target nobody reached since `since` has sources 0 — only when traffic was
+    through ix_baseline_port_src). A target nobody reached since `since` has sources 0 — only when traffic was
     collected over that whole period; otherwise every target's sources are None (P3 final review #4)."""
     fdb, gen, settings = _store_read(ctx)
     wanted = set(targets)
@@ -656,7 +658,7 @@ def increment_totals(ctx: AppContext, cond: FlowCondition, *, start: datetime, e
             "SELECT i.connections, i.bytes, i.seconds, i.observed_at, f.src_key, f.dst_key, f.src_hostname, "
             "f.dst_hostname, f.port, f.proto FROM flow_increments i "
             # The record measured may have paired since: the connection's current primary row gives its dimensions.
-            "JOIN flows r ON r.record_key = i.record_key JOIN flows f ON f.conn_key = r.conn_key AND f.is_primary = 1 "
+            f"{INCREMENT_PRIMARY_JOIN} "
             f"WHERE i.late = 0 AND i.observed_at > ? AND i.observed_at <= ? AND {where}",
             [db_time(start), db_time(end), *params]).fetchall()
     if fdb.generation != gen:

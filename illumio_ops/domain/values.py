@@ -153,7 +153,7 @@ def raise_severity(s: Severity, steps: int = 1) -> Severity:
 
 
 class DetectorKind(StrEnum):
-    """The lateral-movement detectors of spec §6.5.1."""
+    """The lateral-movement detectors of spec §6.5.1 and the allowed-traffic anomaly detectors of §6.5.8."""
     FANOUT = "fanout"
     NEW_ADMIN_CONNECTION = "new_admin_connection"
     PIVOT_CHAIN = "pivot_chain"
@@ -162,6 +162,23 @@ class DetectorKind(StrEnum):
     CROSS_ENV = "cross_env"
     ACCOUNT_FANOUT = "account_fanout"
     UNEXPECTED_INITIATOR = "unexpected_initiator"
+    # anomalies in allowed traffic (spec §6.5.8)
+    PEER_DEVIATION = "peer_deviation"
+    VOLUME_SURGE = "volume_surge"
+    ACCOUNT_NEW_SOURCE = "account_new_source"
+    SUSPICIOUS_TOOL = "suspicious_tool"
+    NEW_PROCESS = "new_process"
+    AUTH_TO_NON_DC = "auth_to_non_dc"
+    NEW_DC_CLIENT = "new_dc_client"
+    DIRECTORY_SURGE = "directory_surge"
+
+
+class PortClass(StrEnum):
+    """The three kinds of management port (spec §6.5.8): remote execution and control, directory and
+    authentication, and databases. Each detector reads the classes it is about."""
+    REMOTE = "remote"
+    DIRECTORY = "directory"
+    DATABASE = "database"
 
 
 class DetectorState(StrEnum):
@@ -274,13 +291,30 @@ class Confidence(StrEnum):
 
 
 # The default management / lateral port set, as 5.x _LATERAL_PORTS (src/report/analysis/
-# mod15_lateral_movement.py, 5.x f022272e); settings add to and remove from it (spec §6.5.1).
-LATERAL_PORTS_DEFAULT: tuple[tuple[int, str], ...] = (
-    (445, "SMB"), (135, "RPC"), (139, "NetBIOS"), (3389, "RDP"), (22, "SSH"), (5985, "WinRM-HTTP"),
-    (5986, "WinRM-HTTPS"), (23, "Telnet"), (2049, "NFS"), (111, "RPC Portmapper"), (389, "LDAP"),
-    (636, "LDAPS"), (88, "Kerberos"), (1433, "MSSQL"), (3306, "MySQL"), (5432, "PostgreSQL"),
+# mod15_lateral_movement.py, 5.x f022272e), in the three classes of spec §6.5.8; settings add to and remove
+# from it (spec §6.5.1).
+LATERAL_PORTS_DEFAULT: tuple[tuple[int, str, PortClass], ...] = (
+    (445, "SMB", PortClass.REMOTE), (135, "RPC", PortClass.REMOTE), (139, "NetBIOS", PortClass.REMOTE),
+    (3389, "RDP", PortClass.REMOTE), (22, "SSH", PortClass.REMOTE), (5985, "WinRM-HTTP", PortClass.REMOTE),
+    (5986, "WinRM-HTTPS", PortClass.REMOTE), (23, "Telnet", PortClass.REMOTE), (2049, "NFS", PortClass.REMOTE),
+    (111, "RPC Portmapper", PortClass.REMOTE),
     # In the PCE's admin category too; here so a PCE that reports no ransomware-protection services counts them.
-    (5900, "VNC"), (5938, "TeamViewer"),
+    (5900, "VNC", PortClass.REMOTE), (5938, "TeamViewer", PortClass.REMOTE),
+    (88, "Kerberos", PortClass.DIRECTORY), (464, "Kerberos-PW", PortClass.DIRECTORY),
+    (389, "LDAP", PortClass.DIRECTORY), (636, "LDAPS", PortClass.DIRECTORY), (3268, "LDAP-GC", PortClass.DIRECTORY),
+    (3269, "LDAPS-GC", PortClass.DIRECTORY), (9389, "ADWS", PortClass.DIRECTORY),
+    (1433, "MSSQL", PortClass.DATABASE), (3306, "MySQL", PortClass.DATABASE), (5432, "PostgreSQL", PortClass.DATABASE),
+)
+# The built-in directory ports: the flow store counts each source's directory traffic per hour by them (it
+# does not read settings).
+DIRECTORY_PORTS: frozenset[int] = frozenset(p for p, _, c in LATERAL_PORTS_DEFAULT if c is PortClass.DIRECTORY)
+
+# Remote execution, reconnaissance and directory-attack tools whose connection to an internal host is worth
+# a look (spec §6.5.8 D and E③), as normalize_process names them; settings replace the list.
+DEFAULT_SUSPICIOUS_TOOLS: tuple[str, ...] = (
+    "powershell.exe", "pwsh.exe", "wmic.exe", "psexec.exe", "psexesvc.exe", "paexec.exe", "winrs.exe",
+    "certutil.exe", "mshta.exe", "rundll32.exe", "regsvr32.exe", "cscript.exe", "wscript.exe", "bitsadmin.exe",
+    "rubeus.exe", "mimikatz.exe", "sharphound.exe", "adfind.exe", "nc", "ncat", "socat", "nmap", "masscan",
 )
 
 # REST API guide: flow_summary records allowed, blocked and potentially blocked connections;
@@ -325,7 +359,7 @@ def parse_draft_policy_decision(raw: str) -> str:
 _ENUMS: tuple[type[StrEnum], ...] = (
     PolicyDecision, RuleAction, AlertRuleType, DeploymentType, Language, ProbeName,
     FlowDirection, VisibilityLevel, TamperClassification, IngestSource, DataOrigin, CapabilityState,
-    CollectionMode, Severity, DetectorKind, DetectorState, SegmentDimension, SegmentMetric, SegmentView,
+    CollectionMode, Severity, DetectorKind, PortClass, DetectorState, SegmentDimension, SegmentMetric, SegmentView,
     EdgeState, TamperPattern, TamperAction, PrecursorKind, RansomwareTrafficClass, FocusKind, Confidence,
     ThresholdType, ChannelKind, SystemCheck, DeliveryStatus,
 )
