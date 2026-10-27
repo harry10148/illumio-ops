@@ -461,9 +461,9 @@ class AlertSettings(StrictModel):
         return v
 
 
-class ReportSchedule(StrictModel):
-    """A built-in report run on a schedule: its type and parameters, not its output (spec §6.3)."""
-    id: str = Field(pattern=r"^[0-9a-f]{32}$")
+class ReportScheduleFields(StrictModel):
+    """A built-in report run on a schedule: its type and parameters, not its output (spec §6.3). The page edits
+    these; the server assigns the id (ReportSchedule)."""
     name: str = Field(min_length=1, max_length=80)
     enabled: bool
     report_type: ReportType
@@ -488,7 +488,7 @@ class ReportSchedule(StrictModel):
         return out
 
     @model_validator(mode="after")
-    def _calendar(self) -> ReportSchedule:
+    def _calendar(self) -> ReportScheduleFields:
         if (self.frequency == "weekly") != (self.day_of_week is not None):
             raise ValueError("day_of_week is set for a weekly schedule and only for one")
         if (self.frequency == "monthly") != (self.day_of_month is not None):
@@ -496,6 +496,10 @@ class ReportSchedule(StrictModel):
         if len(set(self.formats)) != len(self.formats):
             raise ValueError("each format once")
         return self
+
+
+class ReportSchedule(ReportScheduleFields):
+    id: str = Field(pattern=r"^[0-9a-f]{32}$")
 
 
 class ReportSettings(StrictModel):

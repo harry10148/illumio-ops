@@ -9828,6 +9828,2391 @@
         "type": "object"
       }
     },
+    "report_schedules.create": {
+      "method": "POST",
+      "path": "/api/report-schedules",
+      "request_schema": {
+        "$defs": {
+          "Language": {
+            "enum": [
+              "en",
+              "zh_TW"
+            ],
+            "title": "Language",
+            "type": "string"
+          },
+          "ReportFormat": {
+            "enum": [
+              "html",
+              "xlsx"
+            ],
+            "title": "ReportFormat",
+            "type": "string"
+          },
+          "ReportScheduleFields": {
+            "additionalProperties": false,
+            "description": "A built-in report run on a schedule: its type and parameters, not its output (spec §6.3). The page edits\nthese; the server assigns the id (ReportSchedule).",
+            "properties": {
+              "day_of_month": {
+                "anyOf": [
+                  {
+                    "maximum": 31,
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Day Of Month"
+              },
+              "day_of_week": {
+                "anyOf": [
+                  {
+                    "maximum": 6,
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Day Of Week"
+              },
+              "email": {
+                "title": "Email",
+                "type": "boolean"
+              },
+              "enabled": {
+                "title": "Enabled",
+                "type": "boolean"
+              },
+              "formats": {
+                "items": {
+                  "$ref": "#/$defs/ReportFormat"
+                },
+                "minItems": 1,
+                "title": "Formats",
+                "type": "array"
+              },
+              "frequency": {
+                "enum": [
+                  "daily",
+                  "weekly",
+                  "monthly"
+                ],
+                "title": "Frequency",
+                "type": "string"
+              },
+              "hour": {
+                "maximum": 23,
+                "minimum": 0,
+                "title": "Hour",
+                "type": "integer"
+              },
+              "keep": {
+                "maximum": 365,
+                "minimum": 1,
+                "title": "Keep",
+                "type": "integer"
+              },
+              "lang": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/Language"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "lookback_days": {
+                "maximum": 90,
+                "minimum": 1,
+                "title": "Lookback Days",
+                "type": "integer"
+              },
+              "minute": {
+                "maximum": 59,
+                "minimum": 0,
+                "title": "Minute",
+                "type": "integer"
+              },
+              "name": {
+                "maxLength": 80,
+                "minLength": 1,
+                "title": "Name",
+                "type": "string"
+              },
+              "recipients": {
+                "items": {
+                  "type": "string"
+                },
+                "maxItems": 50,
+                "title": "Recipients",
+                "type": "array"
+              },
+              "report_type": {
+                "$ref": "#/$defs/ReportType"
+              }
+            },
+            "required": [
+              "name",
+              "enabled",
+              "report_type",
+              "lookback_days",
+              "frequency",
+              "day_of_week",
+              "day_of_month",
+              "hour",
+              "minute",
+              "formats",
+              "email",
+              "recipients",
+              "lang",
+              "keep"
+            ],
+            "title": "ReportScheduleFields",
+            "type": "object"
+          },
+          "ReportType": {
+            "description": "Report types (spec §6.5 報表, §6.5.5); 5b and 5c add the 5.x types.",
+            "enum": [
+              "lateral_posture",
+              "new_connections",
+              "unmanaged_endpoints"
+            ],
+            "title": "ReportType",
+            "type": "string"
+          }
+        },
+        "properties": {
+          "revision": {
+            "title": "Revision",
+            "type": "integer"
+          },
+          "schedule": {
+            "$ref": "#/$defs/ReportScheduleFields"
+          }
+        },
+        "required": [
+          "revision",
+          "schedule"
+        ],
+        "title": "ScheduleWrite",
+        "type": "object"
+      },
+      "response_schema": {
+        "$defs": {
+          "Language": {
+            "enum": [
+              "en",
+              "zh_TW"
+            ],
+            "title": "Language",
+            "type": "string"
+          },
+          "ReportFormat": {
+            "enum": [
+              "html",
+              "xlsx"
+            ],
+            "title": "ReportFormat",
+            "type": "string"
+          },
+          "ReportSchedule": {
+            "additionalProperties": false,
+            "properties": {
+              "day_of_month": {
+                "anyOf": [
+                  {
+                    "maximum": 31,
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Day Of Month"
+              },
+              "day_of_week": {
+                "anyOf": [
+                  {
+                    "maximum": 6,
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Day Of Week"
+              },
+              "email": {
+                "title": "Email",
+                "type": "boolean"
+              },
+              "enabled": {
+                "title": "Enabled",
+                "type": "boolean"
+              },
+              "formats": {
+                "items": {
+                  "$ref": "#/$defs/ReportFormat"
+                },
+                "minItems": 1,
+                "title": "Formats",
+                "type": "array"
+              },
+              "frequency": {
+                "enum": [
+                  "daily",
+                  "weekly",
+                  "monthly"
+                ],
+                "title": "Frequency",
+                "type": "string"
+              },
+              "hour": {
+                "maximum": 23,
+                "minimum": 0,
+                "title": "Hour",
+                "type": "integer"
+              },
+              "id": {
+                "pattern": "^[0-9a-f]{32}$",
+                "title": "Id",
+                "type": "string"
+              },
+              "keep": {
+                "maximum": 365,
+                "minimum": 1,
+                "title": "Keep",
+                "type": "integer"
+              },
+              "lang": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/Language"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "lookback_days": {
+                "maximum": 90,
+                "minimum": 1,
+                "title": "Lookback Days",
+                "type": "integer"
+              },
+              "minute": {
+                "maximum": 59,
+                "minimum": 0,
+                "title": "Minute",
+                "type": "integer"
+              },
+              "name": {
+                "maxLength": 80,
+                "minLength": 1,
+                "title": "Name",
+                "type": "string"
+              },
+              "recipients": {
+                "items": {
+                  "type": "string"
+                },
+                "maxItems": 50,
+                "title": "Recipients",
+                "type": "array"
+              },
+              "report_type": {
+                "$ref": "#/$defs/ReportType"
+              }
+            },
+            "required": [
+              "name",
+              "enabled",
+              "report_type",
+              "lookback_days",
+              "frequency",
+              "day_of_week",
+              "day_of_month",
+              "hour",
+              "minute",
+              "formats",
+              "email",
+              "recipients",
+              "lang",
+              "keep",
+              "id"
+            ],
+            "title": "ReportSchedule",
+            "type": "object"
+          },
+          "ReportStatus": {
+            "enum": [
+              "queued",
+              "running",
+              "done",
+              "failed"
+            ],
+            "title": "ReportStatus",
+            "type": "string"
+          },
+          "ReportType": {
+            "description": "Report types (spec §6.5 報表, §6.5.5); 5b and 5c add the 5.x types.",
+            "enum": [
+              "lateral_posture",
+              "new_connections",
+              "unmanaged_endpoints"
+            ],
+            "title": "ReportType",
+            "type": "string"
+          },
+          "ScheduleItem": {
+            "properties": {
+              "consecutive_failures": {
+                "title": "Consecutive Failures",
+                "type": "integer"
+              },
+              "last_finished_at": {
+                "anyOf": [
+                  {
+                    "format": "date-time",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Last Finished At"
+              },
+              "last_report_id": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Last Report Id"
+              },
+              "last_status": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/ReportStatus"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "next_run": {
+                "anyOf": [
+                  {
+                    "format": "date-time",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Next Run"
+              },
+              "schedule": {
+                "$ref": "#/$defs/ReportSchedule"
+              }
+            },
+            "required": [
+              "schedule",
+              "next_run",
+              "last_report_id",
+              "last_status",
+              "last_finished_at",
+              "consecutive_failures"
+            ],
+            "title": "ScheduleItem",
+            "type": "object"
+          }
+        },
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/$defs/ScheduleItem"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "revision": {
+            "title": "Revision",
+            "type": "integer"
+          },
+          "smtp_enabled": {
+            "title": "Smtp Enabled",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "revision",
+          "items",
+          "smtp_enabled"
+        ],
+        "title": "SchedulesView",
+        "type": "object"
+      }
+    },
+    "report_schedules.delete": {
+      "method": "DELETE",
+      "path": "/api/report-schedules/<schedule_id>",
+      "request_schema": {
+        "properties": {
+          "revision": {
+            "title": "Revision",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "revision"
+        ],
+        "title": "ScheduleDelete",
+        "type": "object"
+      },
+      "response_schema": {
+        "$defs": {
+          "Language": {
+            "enum": [
+              "en",
+              "zh_TW"
+            ],
+            "title": "Language",
+            "type": "string"
+          },
+          "ReportFormat": {
+            "enum": [
+              "html",
+              "xlsx"
+            ],
+            "title": "ReportFormat",
+            "type": "string"
+          },
+          "ReportSchedule": {
+            "additionalProperties": false,
+            "properties": {
+              "day_of_month": {
+                "anyOf": [
+                  {
+                    "maximum": 31,
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Day Of Month"
+              },
+              "day_of_week": {
+                "anyOf": [
+                  {
+                    "maximum": 6,
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Day Of Week"
+              },
+              "email": {
+                "title": "Email",
+                "type": "boolean"
+              },
+              "enabled": {
+                "title": "Enabled",
+                "type": "boolean"
+              },
+              "formats": {
+                "items": {
+                  "$ref": "#/$defs/ReportFormat"
+                },
+                "minItems": 1,
+                "title": "Formats",
+                "type": "array"
+              },
+              "frequency": {
+                "enum": [
+                  "daily",
+                  "weekly",
+                  "monthly"
+                ],
+                "title": "Frequency",
+                "type": "string"
+              },
+              "hour": {
+                "maximum": 23,
+                "minimum": 0,
+                "title": "Hour",
+                "type": "integer"
+              },
+              "id": {
+                "pattern": "^[0-9a-f]{32}$",
+                "title": "Id",
+                "type": "string"
+              },
+              "keep": {
+                "maximum": 365,
+                "minimum": 1,
+                "title": "Keep",
+                "type": "integer"
+              },
+              "lang": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/Language"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "lookback_days": {
+                "maximum": 90,
+                "minimum": 1,
+                "title": "Lookback Days",
+                "type": "integer"
+              },
+              "minute": {
+                "maximum": 59,
+                "minimum": 0,
+                "title": "Minute",
+                "type": "integer"
+              },
+              "name": {
+                "maxLength": 80,
+                "minLength": 1,
+                "title": "Name",
+                "type": "string"
+              },
+              "recipients": {
+                "items": {
+                  "type": "string"
+                },
+                "maxItems": 50,
+                "title": "Recipients",
+                "type": "array"
+              },
+              "report_type": {
+                "$ref": "#/$defs/ReportType"
+              }
+            },
+            "required": [
+              "name",
+              "enabled",
+              "report_type",
+              "lookback_days",
+              "frequency",
+              "day_of_week",
+              "day_of_month",
+              "hour",
+              "minute",
+              "formats",
+              "email",
+              "recipients",
+              "lang",
+              "keep",
+              "id"
+            ],
+            "title": "ReportSchedule",
+            "type": "object"
+          },
+          "ReportStatus": {
+            "enum": [
+              "queued",
+              "running",
+              "done",
+              "failed"
+            ],
+            "title": "ReportStatus",
+            "type": "string"
+          },
+          "ReportType": {
+            "description": "Report types (spec §6.5 報表, §6.5.5); 5b and 5c add the 5.x types.",
+            "enum": [
+              "lateral_posture",
+              "new_connections",
+              "unmanaged_endpoints"
+            ],
+            "title": "ReportType",
+            "type": "string"
+          },
+          "ScheduleItem": {
+            "properties": {
+              "consecutive_failures": {
+                "title": "Consecutive Failures",
+                "type": "integer"
+              },
+              "last_finished_at": {
+                "anyOf": [
+                  {
+                    "format": "date-time",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Last Finished At"
+              },
+              "last_report_id": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Last Report Id"
+              },
+              "last_status": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/ReportStatus"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "next_run": {
+                "anyOf": [
+                  {
+                    "format": "date-time",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Next Run"
+              },
+              "schedule": {
+                "$ref": "#/$defs/ReportSchedule"
+              }
+            },
+            "required": [
+              "schedule",
+              "next_run",
+              "last_report_id",
+              "last_status",
+              "last_finished_at",
+              "consecutive_failures"
+            ],
+            "title": "ScheduleItem",
+            "type": "object"
+          }
+        },
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/$defs/ScheduleItem"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "revision": {
+            "title": "Revision",
+            "type": "integer"
+          },
+          "smtp_enabled": {
+            "title": "Smtp Enabled",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "revision",
+          "items",
+          "smtp_enabled"
+        ],
+        "title": "SchedulesView",
+        "type": "object"
+      }
+    },
+    "report_schedules.list": {
+      "method": "GET",
+      "path": "/api/report-schedules",
+      "request_schema": null,
+      "response_schema": {
+        "$defs": {
+          "Language": {
+            "enum": [
+              "en",
+              "zh_TW"
+            ],
+            "title": "Language",
+            "type": "string"
+          },
+          "ReportFormat": {
+            "enum": [
+              "html",
+              "xlsx"
+            ],
+            "title": "ReportFormat",
+            "type": "string"
+          },
+          "ReportSchedule": {
+            "additionalProperties": false,
+            "properties": {
+              "day_of_month": {
+                "anyOf": [
+                  {
+                    "maximum": 31,
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Day Of Month"
+              },
+              "day_of_week": {
+                "anyOf": [
+                  {
+                    "maximum": 6,
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Day Of Week"
+              },
+              "email": {
+                "title": "Email",
+                "type": "boolean"
+              },
+              "enabled": {
+                "title": "Enabled",
+                "type": "boolean"
+              },
+              "formats": {
+                "items": {
+                  "$ref": "#/$defs/ReportFormat"
+                },
+                "minItems": 1,
+                "title": "Formats",
+                "type": "array"
+              },
+              "frequency": {
+                "enum": [
+                  "daily",
+                  "weekly",
+                  "monthly"
+                ],
+                "title": "Frequency",
+                "type": "string"
+              },
+              "hour": {
+                "maximum": 23,
+                "minimum": 0,
+                "title": "Hour",
+                "type": "integer"
+              },
+              "id": {
+                "pattern": "^[0-9a-f]{32}$",
+                "title": "Id",
+                "type": "string"
+              },
+              "keep": {
+                "maximum": 365,
+                "minimum": 1,
+                "title": "Keep",
+                "type": "integer"
+              },
+              "lang": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/Language"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "lookback_days": {
+                "maximum": 90,
+                "minimum": 1,
+                "title": "Lookback Days",
+                "type": "integer"
+              },
+              "minute": {
+                "maximum": 59,
+                "minimum": 0,
+                "title": "Minute",
+                "type": "integer"
+              },
+              "name": {
+                "maxLength": 80,
+                "minLength": 1,
+                "title": "Name",
+                "type": "string"
+              },
+              "recipients": {
+                "items": {
+                  "type": "string"
+                },
+                "maxItems": 50,
+                "title": "Recipients",
+                "type": "array"
+              },
+              "report_type": {
+                "$ref": "#/$defs/ReportType"
+              }
+            },
+            "required": [
+              "name",
+              "enabled",
+              "report_type",
+              "lookback_days",
+              "frequency",
+              "day_of_week",
+              "day_of_month",
+              "hour",
+              "minute",
+              "formats",
+              "email",
+              "recipients",
+              "lang",
+              "keep",
+              "id"
+            ],
+            "title": "ReportSchedule",
+            "type": "object"
+          },
+          "ReportStatus": {
+            "enum": [
+              "queued",
+              "running",
+              "done",
+              "failed"
+            ],
+            "title": "ReportStatus",
+            "type": "string"
+          },
+          "ReportType": {
+            "description": "Report types (spec §6.5 報表, §6.5.5); 5b and 5c add the 5.x types.",
+            "enum": [
+              "lateral_posture",
+              "new_connections",
+              "unmanaged_endpoints"
+            ],
+            "title": "ReportType",
+            "type": "string"
+          },
+          "ScheduleItem": {
+            "properties": {
+              "consecutive_failures": {
+                "title": "Consecutive Failures",
+                "type": "integer"
+              },
+              "last_finished_at": {
+                "anyOf": [
+                  {
+                    "format": "date-time",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Last Finished At"
+              },
+              "last_report_id": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Last Report Id"
+              },
+              "last_status": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/ReportStatus"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "next_run": {
+                "anyOf": [
+                  {
+                    "format": "date-time",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Next Run"
+              },
+              "schedule": {
+                "$ref": "#/$defs/ReportSchedule"
+              }
+            },
+            "required": [
+              "schedule",
+              "next_run",
+              "last_report_id",
+              "last_status",
+              "last_finished_at",
+              "consecutive_failures"
+            ],
+            "title": "ScheduleItem",
+            "type": "object"
+          }
+        },
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/$defs/ScheduleItem"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "revision": {
+            "title": "Revision",
+            "type": "integer"
+          },
+          "smtp_enabled": {
+            "title": "Smtp Enabled",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "revision",
+          "items",
+          "smtp_enabled"
+        ],
+        "title": "SchedulesView",
+        "type": "object"
+      }
+    },
+    "report_schedules.run_now": {
+      "method": "POST",
+      "path": "/api/report-schedules/<schedule_id>/run",
+      "request_schema": {
+        "properties": {},
+        "title": "RunNow",
+        "type": "object"
+      },
+      "response_schema": {
+        "$defs": {
+          "Language": {
+            "enum": [
+              "en",
+              "zh_TW"
+            ],
+            "title": "Language",
+            "type": "string"
+          },
+          "ReportStatus": {
+            "enum": [
+              "queued",
+              "running",
+              "done",
+              "failed"
+            ],
+            "title": "ReportStatus",
+            "type": "string"
+          }
+        },
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "email_detail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email Detail"
+          },
+          "email_status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email Status"
+          },
+          "error_detail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Detail"
+          },
+          "error_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Key"
+          },
+          "files": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Files",
+            "type": "array"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "lang": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/Language"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "lookback_days": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lookback Days"
+          },
+          "pce_label": {
+            "title": "Pce Label",
+            "type": "string"
+          },
+          "period_end": {
+            "format": "date-time",
+            "title": "Period End",
+            "type": "string"
+          },
+          "period_start": {
+            "format": "date-time",
+            "title": "Period Start",
+            "type": "string"
+          },
+          "report_type": {
+            "title": "Report Type",
+            "type": "string"
+          },
+          "schedule_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Schedule Id"
+          },
+          "schedule_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Schedule Name"
+          },
+          "status": {
+            "$ref": "#/$defs/ReportStatus"
+          },
+          "trigger": {
+            "title": "Trigger",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "report_type",
+          "status",
+          "trigger",
+          "schedule_id",
+          "schedule_name",
+          "pce_label",
+          "period_start",
+          "period_end",
+          "created_at",
+          "finished_at",
+          "error_key",
+          "error_detail",
+          "files",
+          "email_status",
+          "email_detail",
+          "lookback_days",
+          "lang"
+        ],
+        "title": "ReportItem",
+        "type": "object"
+      }
+    },
+    "report_schedules.update": {
+      "method": "PUT",
+      "path": "/api/report-schedules/<schedule_id>",
+      "request_schema": {
+        "$defs": {
+          "Language": {
+            "enum": [
+              "en",
+              "zh_TW"
+            ],
+            "title": "Language",
+            "type": "string"
+          },
+          "ReportFormat": {
+            "enum": [
+              "html",
+              "xlsx"
+            ],
+            "title": "ReportFormat",
+            "type": "string"
+          },
+          "ReportScheduleFields": {
+            "additionalProperties": false,
+            "description": "A built-in report run on a schedule: its type and parameters, not its output (spec §6.3). The page edits\nthese; the server assigns the id (ReportSchedule).",
+            "properties": {
+              "day_of_month": {
+                "anyOf": [
+                  {
+                    "maximum": 31,
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Day Of Month"
+              },
+              "day_of_week": {
+                "anyOf": [
+                  {
+                    "maximum": 6,
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Day Of Week"
+              },
+              "email": {
+                "title": "Email",
+                "type": "boolean"
+              },
+              "enabled": {
+                "title": "Enabled",
+                "type": "boolean"
+              },
+              "formats": {
+                "items": {
+                  "$ref": "#/$defs/ReportFormat"
+                },
+                "minItems": 1,
+                "title": "Formats",
+                "type": "array"
+              },
+              "frequency": {
+                "enum": [
+                  "daily",
+                  "weekly",
+                  "monthly"
+                ],
+                "title": "Frequency",
+                "type": "string"
+              },
+              "hour": {
+                "maximum": 23,
+                "minimum": 0,
+                "title": "Hour",
+                "type": "integer"
+              },
+              "keep": {
+                "maximum": 365,
+                "minimum": 1,
+                "title": "Keep",
+                "type": "integer"
+              },
+              "lang": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/Language"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "lookback_days": {
+                "maximum": 90,
+                "minimum": 1,
+                "title": "Lookback Days",
+                "type": "integer"
+              },
+              "minute": {
+                "maximum": 59,
+                "minimum": 0,
+                "title": "Minute",
+                "type": "integer"
+              },
+              "name": {
+                "maxLength": 80,
+                "minLength": 1,
+                "title": "Name",
+                "type": "string"
+              },
+              "recipients": {
+                "items": {
+                  "type": "string"
+                },
+                "maxItems": 50,
+                "title": "Recipients",
+                "type": "array"
+              },
+              "report_type": {
+                "$ref": "#/$defs/ReportType"
+              }
+            },
+            "required": [
+              "name",
+              "enabled",
+              "report_type",
+              "lookback_days",
+              "frequency",
+              "day_of_week",
+              "day_of_month",
+              "hour",
+              "minute",
+              "formats",
+              "email",
+              "recipients",
+              "lang",
+              "keep"
+            ],
+            "title": "ReportScheduleFields",
+            "type": "object"
+          },
+          "ReportType": {
+            "description": "Report types (spec §6.5 報表, §6.5.5); 5b and 5c add the 5.x types.",
+            "enum": [
+              "lateral_posture",
+              "new_connections",
+              "unmanaged_endpoints"
+            ],
+            "title": "ReportType",
+            "type": "string"
+          }
+        },
+        "properties": {
+          "revision": {
+            "title": "Revision",
+            "type": "integer"
+          },
+          "schedule": {
+            "$ref": "#/$defs/ReportScheduleFields"
+          }
+        },
+        "required": [
+          "revision",
+          "schedule"
+        ],
+        "title": "ScheduleWrite",
+        "type": "object"
+      },
+      "response_schema": {
+        "$defs": {
+          "Language": {
+            "enum": [
+              "en",
+              "zh_TW"
+            ],
+            "title": "Language",
+            "type": "string"
+          },
+          "ReportFormat": {
+            "enum": [
+              "html",
+              "xlsx"
+            ],
+            "title": "ReportFormat",
+            "type": "string"
+          },
+          "ReportSchedule": {
+            "additionalProperties": false,
+            "properties": {
+              "day_of_month": {
+                "anyOf": [
+                  {
+                    "maximum": 31,
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Day Of Month"
+              },
+              "day_of_week": {
+                "anyOf": [
+                  {
+                    "maximum": 6,
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Day Of Week"
+              },
+              "email": {
+                "title": "Email",
+                "type": "boolean"
+              },
+              "enabled": {
+                "title": "Enabled",
+                "type": "boolean"
+              },
+              "formats": {
+                "items": {
+                  "$ref": "#/$defs/ReportFormat"
+                },
+                "minItems": 1,
+                "title": "Formats",
+                "type": "array"
+              },
+              "frequency": {
+                "enum": [
+                  "daily",
+                  "weekly",
+                  "monthly"
+                ],
+                "title": "Frequency",
+                "type": "string"
+              },
+              "hour": {
+                "maximum": 23,
+                "minimum": 0,
+                "title": "Hour",
+                "type": "integer"
+              },
+              "id": {
+                "pattern": "^[0-9a-f]{32}$",
+                "title": "Id",
+                "type": "string"
+              },
+              "keep": {
+                "maximum": 365,
+                "minimum": 1,
+                "title": "Keep",
+                "type": "integer"
+              },
+              "lang": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/Language"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "lookback_days": {
+                "maximum": 90,
+                "minimum": 1,
+                "title": "Lookback Days",
+                "type": "integer"
+              },
+              "minute": {
+                "maximum": 59,
+                "minimum": 0,
+                "title": "Minute",
+                "type": "integer"
+              },
+              "name": {
+                "maxLength": 80,
+                "minLength": 1,
+                "title": "Name",
+                "type": "string"
+              },
+              "recipients": {
+                "items": {
+                  "type": "string"
+                },
+                "maxItems": 50,
+                "title": "Recipients",
+                "type": "array"
+              },
+              "report_type": {
+                "$ref": "#/$defs/ReportType"
+              }
+            },
+            "required": [
+              "name",
+              "enabled",
+              "report_type",
+              "lookback_days",
+              "frequency",
+              "day_of_week",
+              "day_of_month",
+              "hour",
+              "minute",
+              "formats",
+              "email",
+              "recipients",
+              "lang",
+              "keep",
+              "id"
+            ],
+            "title": "ReportSchedule",
+            "type": "object"
+          },
+          "ReportStatus": {
+            "enum": [
+              "queued",
+              "running",
+              "done",
+              "failed"
+            ],
+            "title": "ReportStatus",
+            "type": "string"
+          },
+          "ReportType": {
+            "description": "Report types (spec §6.5 報表, §6.5.5); 5b and 5c add the 5.x types.",
+            "enum": [
+              "lateral_posture",
+              "new_connections",
+              "unmanaged_endpoints"
+            ],
+            "title": "ReportType",
+            "type": "string"
+          },
+          "ScheduleItem": {
+            "properties": {
+              "consecutive_failures": {
+                "title": "Consecutive Failures",
+                "type": "integer"
+              },
+              "last_finished_at": {
+                "anyOf": [
+                  {
+                    "format": "date-time",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Last Finished At"
+              },
+              "last_report_id": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Last Report Id"
+              },
+              "last_status": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/ReportStatus"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "next_run": {
+                "anyOf": [
+                  {
+                    "format": "date-time",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Next Run"
+              },
+              "schedule": {
+                "$ref": "#/$defs/ReportSchedule"
+              }
+            },
+            "required": [
+              "schedule",
+              "next_run",
+              "last_report_id",
+              "last_status",
+              "last_finished_at",
+              "consecutive_failures"
+            ],
+            "title": "ScheduleItem",
+            "type": "object"
+          }
+        },
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/$defs/ScheduleItem"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "revision": {
+            "title": "Revision",
+            "type": "integer"
+          },
+          "smtp_enabled": {
+            "title": "Smtp Enabled",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "revision",
+          "items",
+          "smtp_enabled"
+        ],
+        "title": "SchedulesView",
+        "type": "object"
+      }
+    },
+    "reports.catalog": {
+      "method": "GET",
+      "path": "/api/reports/catalog",
+      "request_schema": null,
+      "response_schema": {
+        "$defs": {
+          "CatalogEntry": {
+            "properties": {
+              "available": {
+                "title": "Available",
+                "type": "boolean"
+              },
+              "group": {
+                "title": "Group",
+                "type": "string"
+              },
+              "reason_key": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Reason Key"
+              },
+              "report_type": {
+                "$ref": "#/$defs/ReportType"
+              }
+            },
+            "required": [
+              "report_type",
+              "group",
+              "available",
+              "reason_key"
+            ],
+            "title": "CatalogEntry",
+            "type": "object"
+          },
+          "ReportType": {
+            "description": "Report types (spec §6.5 報表, §6.5.5); 5b and 5c add the 5.x types.",
+            "enum": [
+              "lateral_posture",
+              "new_connections",
+              "unmanaged_endpoints"
+            ],
+            "title": "ReportType",
+            "type": "string"
+          }
+        },
+        "properties": {
+          "entries": {
+            "items": {
+              "$ref": "#/$defs/CatalogEntry"
+            },
+            "title": "Entries",
+            "type": "array"
+          },
+          "gui_external_url_set": {
+            "title": "Gui External Url Set",
+            "type": "boolean"
+          },
+          "smtp_enabled": {
+            "title": "Smtp Enabled",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "entries",
+          "smtp_enabled",
+          "gui_external_url_set"
+        ],
+        "title": "Catalog",
+        "type": "object"
+      }
+    },
+    "reports.delete": {
+      "method": "DELETE",
+      "path": "/api/reports/<int:report_id>",
+      "request_schema": null,
+      "response_schema": {
+        "properties": {},
+        "title": "Empty",
+        "type": "object"
+      }
+    },
+    "reports.generate": {
+      "method": "POST",
+      "path": "/api/reports",
+      "request_schema": {
+        "$defs": {
+          "Language": {
+            "enum": [
+              "en",
+              "zh_TW"
+            ],
+            "title": "Language",
+            "type": "string"
+          },
+          "ReportFormat": {
+            "enum": [
+              "html",
+              "xlsx"
+            ],
+            "title": "ReportFormat",
+            "type": "string"
+          },
+          "ReportType": {
+            "description": "Report types (spec §6.5 報表, §6.5.5); 5b and 5c add the 5.x types.",
+            "enum": [
+              "lateral_posture",
+              "new_connections",
+              "unmanaged_endpoints"
+            ],
+            "title": "ReportType",
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "properties": {
+          "email": {
+            "default": false,
+            "title": "Email",
+            "type": "boolean"
+          },
+          "formats": {
+            "default": [
+              "html",
+              "xlsx"
+            ],
+            "items": {
+              "$ref": "#/$defs/ReportFormat"
+            },
+            "title": "Formats",
+            "type": "array"
+          },
+          "lang": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/Language"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "lookback_days": {
+            "default": 7,
+            "maximum": 90,
+            "minimum": 1,
+            "title": "Lookback Days",
+            "type": "integer"
+          },
+          "recipients": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 50,
+            "title": "Recipients",
+            "type": "array"
+          },
+          "report_type": {
+            "$ref": "#/$defs/ReportType"
+          }
+        },
+        "required": [
+          "report_type"
+        ],
+        "title": "ReportParams",
+        "type": "object"
+      },
+      "response_schema": {
+        "$defs": {
+          "Language": {
+            "enum": [
+              "en",
+              "zh_TW"
+            ],
+            "title": "Language",
+            "type": "string"
+          },
+          "ReportStatus": {
+            "enum": [
+              "queued",
+              "running",
+              "done",
+              "failed"
+            ],
+            "title": "ReportStatus",
+            "type": "string"
+          }
+        },
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "email_detail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email Detail"
+          },
+          "email_status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email Status"
+          },
+          "error_detail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Detail"
+          },
+          "error_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Key"
+          },
+          "files": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Files",
+            "type": "array"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "lang": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/Language"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "lookback_days": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lookback Days"
+          },
+          "pce_label": {
+            "title": "Pce Label",
+            "type": "string"
+          },
+          "period_end": {
+            "format": "date-time",
+            "title": "Period End",
+            "type": "string"
+          },
+          "period_start": {
+            "format": "date-time",
+            "title": "Period Start",
+            "type": "string"
+          },
+          "report_type": {
+            "title": "Report Type",
+            "type": "string"
+          },
+          "schedule_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Schedule Id"
+          },
+          "schedule_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Schedule Name"
+          },
+          "status": {
+            "$ref": "#/$defs/ReportStatus"
+          },
+          "trigger": {
+            "title": "Trigger",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "report_type",
+          "status",
+          "trigger",
+          "schedule_id",
+          "schedule_name",
+          "pce_label",
+          "period_start",
+          "period_end",
+          "created_at",
+          "finished_at",
+          "error_key",
+          "error_detail",
+          "files",
+          "email_status",
+          "email_detail",
+          "lookback_days",
+          "lang"
+        ],
+        "title": "ReportItem",
+        "type": "object"
+      }
+    },
+    "reports.get": {
+      "method": "GET",
+      "path": "/api/reports/<int:report_id>",
+      "request_schema": null,
+      "response_schema": {
+        "$defs": {
+          "Language": {
+            "enum": [
+              "en",
+              "zh_TW"
+            ],
+            "title": "Language",
+            "type": "string"
+          },
+          "ReportStatus": {
+            "enum": [
+              "queued",
+              "running",
+              "done",
+              "failed"
+            ],
+            "title": "ReportStatus",
+            "type": "string"
+          }
+        },
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "email_detail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email Detail"
+          },
+          "email_status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email Status"
+          },
+          "error_detail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Detail"
+          },
+          "error_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Key"
+          },
+          "files": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Files",
+            "type": "array"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "lang": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/Language"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "lookback_days": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lookback Days"
+          },
+          "pce_label": {
+            "title": "Pce Label",
+            "type": "string"
+          },
+          "period_end": {
+            "format": "date-time",
+            "title": "Period End",
+            "type": "string"
+          },
+          "period_start": {
+            "format": "date-time",
+            "title": "Period Start",
+            "type": "string"
+          },
+          "report_type": {
+            "title": "Report Type",
+            "type": "string"
+          },
+          "schedule_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Schedule Id"
+          },
+          "schedule_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Schedule Name"
+          },
+          "status": {
+            "$ref": "#/$defs/ReportStatus"
+          },
+          "trigger": {
+            "title": "Trigger",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "report_type",
+          "status",
+          "trigger",
+          "schedule_id",
+          "schedule_name",
+          "pce_label",
+          "period_start",
+          "period_end",
+          "created_at",
+          "finished_at",
+          "error_key",
+          "error_detail",
+          "files",
+          "email_status",
+          "email_detail",
+          "lookback_days",
+          "lang"
+        ],
+        "title": "ReportItem",
+        "type": "object"
+      }
+    },
+    "reports.list": {
+      "method": "GET",
+      "path": "/api/reports",
+      "request_schema": null,
+      "response_schema": {
+        "$defs": {
+          "Language": {
+            "enum": [
+              "en",
+              "zh_TW"
+            ],
+            "title": "Language",
+            "type": "string"
+          },
+          "ReportItem": {
+            "properties": {
+              "created_at": {
+                "format": "date-time",
+                "title": "Created At",
+                "type": "string"
+              },
+              "email_detail": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Email Detail"
+              },
+              "email_status": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Email Status"
+              },
+              "error_detail": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Error Detail"
+              },
+              "error_key": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Error Key"
+              },
+              "files": {
+                "items": {
+                  "type": "string"
+                },
+                "title": "Files",
+                "type": "array"
+              },
+              "finished_at": {
+                "anyOf": [
+                  {
+                    "format": "date-time",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Finished At"
+              },
+              "id": {
+                "title": "Id",
+                "type": "integer"
+              },
+              "lang": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/Language"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "lookback_days": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Lookback Days"
+              },
+              "pce_label": {
+                "title": "Pce Label",
+                "type": "string"
+              },
+              "period_end": {
+                "format": "date-time",
+                "title": "Period End",
+                "type": "string"
+              },
+              "period_start": {
+                "format": "date-time",
+                "title": "Period Start",
+                "type": "string"
+              },
+              "report_type": {
+                "title": "Report Type",
+                "type": "string"
+              },
+              "schedule_id": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Schedule Id"
+              },
+              "schedule_name": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Schedule Name"
+              },
+              "status": {
+                "$ref": "#/$defs/ReportStatus"
+              },
+              "trigger": {
+                "title": "Trigger",
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "report_type",
+              "status",
+              "trigger",
+              "schedule_id",
+              "schedule_name",
+              "pce_label",
+              "period_start",
+              "period_end",
+              "created_at",
+              "finished_at",
+              "error_key",
+              "error_detail",
+              "files",
+              "email_status",
+              "email_detail",
+              "lookback_days",
+              "lang"
+            ],
+            "title": "ReportItem",
+            "type": "object"
+          },
+          "ReportStatus": {
+            "enum": [
+              "queued",
+              "running",
+              "done",
+              "failed"
+            ],
+            "title": "ReportStatus",
+            "type": "string"
+          }
+        },
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/$defs/ReportItem"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "page": {
+            "title": "Page",
+            "type": "integer"
+          },
+          "page_size": {
+            "title": "Page Size",
+            "type": "integer"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "total",
+          "page",
+          "page_size"
+        ],
+        "title": "ReportPage",
+        "type": "object"
+      }
+    },
     "system.channels.get": {
       "method": "GET",
       "path": "/api/system/channels",
@@ -14128,6 +16513,87 @@
           "reset"
         ],
         "title": "PceConnectionSaved",
+        "type": "object"
+      }
+    },
+    "system.reports.get": {
+      "method": "GET",
+      "path": "/api/system/reports",
+      "request_schema": null,
+      "response_schema": {
+        "properties": {
+          "gui_external_url": {
+            "title": "Gui External Url",
+            "type": "string"
+          },
+          "retention_days": {
+            "title": "Retention Days",
+            "type": "integer"
+          },
+          "revision": {
+            "title": "Revision",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "revision",
+          "gui_external_url",
+          "retention_days"
+        ],
+        "title": "ReportSettingsView",
+        "type": "object"
+      }
+    },
+    "system.reports.update": {
+      "method": "PUT",
+      "path": "/api/system/reports",
+      "request_schema": {
+        "properties": {
+          "gui_external_url": {
+            "maxLength": 500,
+            "title": "Gui External Url",
+            "type": "string"
+          },
+          "retention_days": {
+            "maximum": 3650,
+            "minimum": 1,
+            "title": "Retention Days",
+            "type": "integer"
+          },
+          "revision": {
+            "title": "Revision",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "revision",
+          "gui_external_url",
+          "retention_days"
+        ],
+        "title": "ReportSettingsUpdate",
+        "type": "object"
+      },
+      "response_schema": {
+        "properties": {
+          "gui_external_url": {
+            "title": "Gui External Url",
+            "type": "string"
+          },
+          "retention_days": {
+            "title": "Retention Days",
+            "type": "integer"
+          },
+          "revision": {
+            "title": "Revision",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "revision",
+          "gui_external_url",
+          "retention_days"
+        ],
+        "title": "ReportSettingsView",
         "type": "object"
       }
     },
