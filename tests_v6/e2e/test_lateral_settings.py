@@ -42,7 +42,7 @@ def test_critical_asset_picked_saved_and_kept(context, live_app):
 def test_invalid_value_is_said_in_words_and_ports_listed(context, live_app):
     page = context.new_page()
     _open(page, live_app.url)
-    expect(page.locator("[data-role=admin-ports] tr[data-port='3389']")).to_contain_text("Built in")
+    expect(page.locator("[data-role=admin-ports] tr[data-port='3389']").first).to_contain_text("Built in")
     expect(page.locator("[data-role=baseline]")).to_contain_text("of 30 days")
     form = page.locator("[data-role=lateral-settings]")
     form.locator("input[name=graph_hops]").fill("9")
@@ -64,7 +64,7 @@ def test_observation_beyond_baseline_says_what_is_used(context, live_app):
 def test_anomaly_settings_and_port_class_saved_and_kept(context, live_app):
     page = context.new_page()
     _open(page, live_app.url)
-    expect(page.locator("[data-role=admin-ports] tr[data-port='389'] [data-class=directory]")).to_have_text(
+    expect(page.locator("[data-role=admin-ports] tr[data-port='389'] [data-class=directory]").first).to_have_text(
         "Directory / authentication")
     form = page.locator("[data-role=lateral-settings]")
     form.locator("input[name=new_port]").fill("1521")

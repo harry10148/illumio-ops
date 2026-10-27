@@ -17,7 +17,7 @@ def _entries(ps):
 
 def test_effective_ports_union_and_removal():
     ps = effective_admin_ports(BUILTIN, PCE, extra=((8080, 6, PortClass.REMOTE),), removed=((22, None),), include_pce=True)
-    assert _entries(ps) == {(445, None, "builtin"), (3389, 6, "pce"), (3389, 17, "pce"), (8080, 6, "added")}
+    assert _entries(ps) == {(445, 6, "builtin"), (3389, 6, "pce"), (3389, 17, "pce"), (8080, 6, "added")}
     assert next(e for e in ps.entries if e.port == 445).name == "SMB"
     assert next(e for e in ps.entries if e.port == 8080).name is None
 
@@ -28,12 +28,14 @@ def test_pce_admin_services_toggle():
 
 
 def test_any_protocol_entry_matches_both():
-    ps = effective_admin_ports(BUILTIN, PCE, extra=(), removed=(), include_pce=True)
-    assert ps.matches(445, 6) and ps.matches(445, 17)
+    # A port added without a protocol matches both (built-ins carry their own protocols since 2026-10-27).
+    ps = effective_admin_ports(BUILTIN, PCE, extra=((4444, None, PortClass.REMOTE),), removed=(), include_pce=True)
+    assert ps.matches(4444, 6) and ps.matches(4444, 17)
+    assert ps.matches(445, 6) and not ps.matches(445, 17)
     assert ps.matches(3389, 6) and not ps.matches(8080, 6) and not ps.matches(None, 6)
     only_tcp = effective_admin_ports((), ((3389, 6, "RDP"),), extra=(), removed=(), include_pce=True)
     assert only_tcp.matches(3389, 6) and not only_tcp.matches(3389, 17)
-    assert set(ps.port_filters()) >= {PortProto(port=445), PortProto(port=3389, proto=6)}
+    assert set(ps.port_filters()) >= {PortProto(port=4444), PortProto(port=445, proto=6), PortProto(port=3389, proto=6)}
 
 
 def test_removed_without_proto_removes_all_protocols():
@@ -69,11 +71,31 @@ def test_admin_port_set_class_of():
     assert s.class_of(1433, 6) is PortClass.DATABASE and s.class_of(445, 6) is PortClass.REMOTE
     assert s.class_of(3389, 17) is PortClass.REMOTE and s.class_of(8080, 6) is None and s.class_of(None, 6) is None
     assert s.matches(389, 6) and not s.matches(389, 6, {PortClass.REMOTE, PortClass.DATABASE})
-    assert PortProto(port=389) not in s.port_filters({PortClass.REMOTE})
-    assert PortProto(port=389) in s.port_filters() and PortProto(port=389) in s.port_filters({PortClass.DIRECTORY})
+    ldap = {PortProto(port=389, proto=6), PortProto(port=389, proto=17)}
+    assert not ldap & set(s.port_filters({PortClass.REMOTE}))
+    assert ldap <= set(s.port_filters()) and ldap <= set(s.port_filters({PortClass.DIRECTORY}))
     assert {e.port for e in s.entries if e.category is PortClass.DIRECTORY} == {88, 389, 636, 464, 3268, 3269, 9389}
 
 
 def test_added_port_keeps_its_category():
     s = effective_admin_ports(BUILTIN, (), extra=((1521, 6, PortClass.DATABASE),), removed=(), include_pce=False)
     assert s.class_of(1521, 6) is PortClass.DATABASE
+
+
+def test_builtin_ports_carry_their_protocols():
+    """A UDP reply landing on an ephemeral port numbered 1433 or 5985 is not a management connection (lab: 8.8.8.8
+    "1433/UDP into 8 hosts"; dc → MacBook "UDP 5985"); UDP counts only where the service itself uses UDP."""
+    from illumio_ops.domain.values import LATERAL_PORTS_DEFAULT
+    s = effective_admin_ports(LATERAL_PORTS_DEFAULT, (), extra=(), removed=(), include_pce=False)
+    assert s.matches(1433, 6) and not s.matches(1433, 17)
+    assert s.matches(5985, 6) and not s.matches(5985, 17)
+    assert s.matches(3269, 6) and not s.matches(3269, 17)
+    for port in (88, 464, 389, 3389, 2049, 111, 5938):
+        assert s.matches(port, 17), port
+    assert all(e.proto in (6, 17) for e in s.entries if e.source == "builtin")
+
+
+def test_removing_a_builtin_without_protocol_removes_both():
+    from illumio_ops.domain.values import LATERAL_PORTS_DEFAULT
+    s = effective_admin_ports(LATERAL_PORTS_DEFAULT, (), extra=(), removed=((389, None),), include_pce=False)
+    assert not s.matches(389, 6) and not s.matches(389, 17)

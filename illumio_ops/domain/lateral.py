@@ -8,7 +8,7 @@ from functools import cached_property
 from typing import Literal
 
 from illumio_ops.domain.filter import PortProto
-from illumio_ops.domain.values import PortClass
+from illumio_ops.domain.values import PortClass, builtin_protocols
 
 Selector = tuple[str, str]  # (label key, label value)
 
@@ -66,9 +66,9 @@ class AdminPortSet:
 def effective_admin_ports(builtin: Sequence[tuple[int, str, PortClass]], pce_admin: Sequence[tuple[int, int, str]],
                           extra: Sequence[tuple[int, int | None, PortClass]],
                           removed: Sequence[tuple[int, int | None]], include_pce: bool) -> AdminPortSet:
-    """Built-in list ∪ the PCE's high-risk services of category admin (when included; remote execution) ∪ ports
+    """Built-in list (each port on its own protocols, values.builtin_protocols) ∪ the PCE's high-risk services of category admin (when included; remote execution) ∪ ports
     added, minus the ports removed; a removal without a protocol removes the port for every protocol."""
-    candidates = [AdminPort(p, None, name, "builtin", cls) for p, name, cls in builtin]
+    candidates = [AdminPort(p, proto, name, "builtin", cls) for p, name, cls in builtin for proto in builtin_protocols(p)]
     if include_pce:
         candidates += [AdminPort(p, proto, name, "pce", PortClass.REMOTE) for p, proto, name in pce_admin]
     candidates += [AdminPort(p, proto, None, "added", cls) for p, proto, cls in extra]
