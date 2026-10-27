@@ -138,7 +138,7 @@ _METRICS: dict[SegmentMetric, str] = {
 }
 
 
-def compile_flow_ranking(seg: FlowSegment) -> tuple[str, list[Any]]:
+def compile_flow_ranking(seg: FlowSegment, *, wide: bool = False) -> tuple[str, list[Any]]:
     """SELECT k0, d0[, k1, d1], value, bytes_known ... LIMIT limit + 1 (one more row says the limit was hit).
     k = the group key, d = what to show for it (NULL when the key itself is shown)."""
     joins: list[str] = []
@@ -155,7 +155,7 @@ def compile_flow_ranking(seg: FlowSegment) -> tuple[str, list[Any]]:
             column = _FLOW_COLUMNS[g.dimension]
         keys.append(column)
         select += [f"{column} AS k{i}", f"{_HOST_DISPLAY.get(g.dimension, 'NULL')} AS d{i}"]
-    where, where_params = to_sql(seg.filter)
+    where, where_params = to_sql(seg.filter, wide=wide)
     bytes_known = "COUNT(f.bytes_in)" if seg.metric is SegmentMetric.BYTES else "NULL"
     sql = (f"SELECT {', '.join(select)}, {_METRICS[seg.metric]} AS value, {bytes_known} AS bytes_known "
            f"FROM flows f {' '.join(joins)} WHERE {where} GROUP BY {', '.join(keys)} "

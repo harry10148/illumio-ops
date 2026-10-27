@@ -370,6 +370,19 @@ def query_flows(ctx: AppContext, spec: FilterSpec, *, limit: int, order: Order,
     )
 
 
+WIDE_SHARE = 0.25  # of the stored time span: above it a window reads most rows, and a scan beats the index
+
+
+def wide_window(conn: Any, spec: FilterSpec) -> bool:
+    """The window covers most of what the store holds (to_sql's `wide`)."""
+    lo, hi = conn.execute("SELECT MIN(last_detected), MAX(last_detected) FROM flows").fetchone()
+    if lo is None:
+        return False
+    first, last = datetime.fromisoformat(lo), datetime.fromisoformat(hi)
+    span = (last - first).total_seconds()
+    overlap = (min(spec.end, last) - max(spec.start, first)).total_seconds()
+    return overlap > 0 and (span <= 0 or overlap / span > WIDE_SHARE)
+
 def _store_read(ctx: AppContext) -> tuple[Any, int, Any]:
     """(flow db, generation noted before the settings, settings) for a store-only read."""
     fdb = ctx.flows()
@@ -396,9 +409,10 @@ def aggregate_flows(ctx: AppContext, seg: FlowSegment, *, now: datetime | None =
             conn.create_function(name, -1, fn, deterministic=True)
         cov = store_coverage(conn, IngestSource.TRAFFIC, (seg.filter.start, seg.filter.end), floor=floor,
                              collected=collects(settings, IngestSource.TRAFFIC))
-        sql, params = compile_flow_ranking(seg)
+        wide = wide_window(conn, seg.filter)
+        sql, params = compile_flow_ranking(seg, wide=wide)
         found = conn.execute(sql, params).fetchall()
-        where, where_params = to_sql(seg.filter)
+        where, where_params = to_sql(seg.filter, wide=wide)
         fields = _field_coverage(conn, where, where_params) if with_field_coverage else None
     if fdb.generation != gen:
         raise StaleGeneration
@@ -419,7 +433,7 @@ def field_coverage(ctx: AppContext, spec: FilterSpec) -> FieldCoverage:
         require_same_pce(conn, settings.pce)
         for name, fn in sql_functions().items():
             conn.create_function(name, -1, fn, deterministic=True)
-        where, params = to_sql(spec)
+        where, params = to_sql(spec, wide=wide_window(conn, spec))
         fields = _field_coverage(conn, where, params)
     if fdb.generation != gen:
         raise StaleGeneration
@@ -440,7 +454,7 @@ def group_for_findings(conn: Any, spec: FilterSpec | Sequence[FilterSpec], *, en
         conn.create_function(name, -1, fn, deterministic=True)
     parts, params = [], []
     for s in [spec] if isinstance(spec, FilterSpec) else spec:
-        w, p = to_sql(s)
+        w, p = to_sql(s, wide=wide_window(conn, s))
         parts.append(f"({w})")
         params += p
     where = " OR ".join(parts)
@@ -493,7 +507,7 @@ def flow_totals(ctx: AppContext, spec: FilterSpec, *,
         require_same_pce(conn, settings.pce)
         for name, fn in sql_functions().items():
             conn.create_function(name, -1, fn, deterministic=True)
-        where, params = to_sql(spec)
+        where, params = to_sql(spec, wide=wide_window(conn, spec))
         decisions = [DecisionTotals(decision=r[0], flows=r[1], connections=r[2] or 0, into_managed=r[3] or 0,
                                     from_managed=r[4] or 0)
                      for r in conn.execute(
@@ -528,7 +542,7 @@ def label_mix(ctx: AppContext, spec: FilterSpec, *, app_key: str, env_key: str, 
         require_same_pce(conn, settings.pce)
         for name, fn in sql_functions().items():
             conn.create_function(name, -1, fn, deterministic=True)
-        where, params = to_sql(spec)
+        where, params = to_sql(spec, wide=wide_window(conn, spec))
         sub = rows.format(where=where)
         keys = [app_key, env_key, app_key, env_key, *params]
         r = conn.execute(
@@ -638,7 +652,7 @@ def observations(ctx: AppContext, spec: FilterSpec, *, now: datetime | None = No
             conn.create_function(name, -1, fn, deterministic=True)
         cov = store_coverage(conn, IngestSource.TRAFFIC, (spec.start, spec.end), floor=floor,
                              collected=collects(settings, IngestSource.TRAFFIC))
-        where, params = to_sql(spec)
+        where, params = to_sql(spec, wide=wide_window(conn, spec))
         found = conn.execute(f"SELECT {_OBS_COLUMNS} FROM flows f WHERE {where}", params).fetchall()
         labels = _labels(conn, {r[k] for r in found for k in ("src_label_set", "dst_label_set") if r[k]})
     if fdb.generation != gen:
