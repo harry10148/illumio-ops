@@ -16,12 +16,16 @@ def _remove_files(ctx: AppContext, report_ids: list[int]) -> None:
 
 
 def run_report_retention(ctx: AppContext, *, now: datetime | None = None) -> int:
-    """Remove reports (rows and files) older than reports.retention_days; a running one waits for the next day.
+    """Remove reports (rows and files) older than reports.retention_days or beyond their schedule's keep; a
+    running one waits for the next day.
     Directories that are not a known report's are never touched."""
     at = (now or datetime.now(UTC)).astimezone(UTC)
-    days = ctx.settings.current().reports.retention_days
+    settings = ctx.settings.current().reports
     with ctx.db() as conn:
-        ids = store.ids_created_before(conn, at - timedelta(days=days))
+        ids = store.ids_created_before(conn, at - timedelta(days=settings.retention_days))
+        for s in settings.schedules:  # each schedule also keeps only its newest `keep` reports
+            ids += store.ids_beyond_keep(conn, s.id, s.keep)
+        ids = sorted(set(ids))
         store.delete(conn, ids)
     _remove_files(ctx, ids)
     return len(ids)

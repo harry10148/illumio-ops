@@ -39,6 +39,7 @@ from illumio_ops.services.collect.traffic import run_traffic_cycle
 from illumio_ops.services.context import AppContext
 from illumio_ops.services.reports.generate import recover_running, run_queued
 from illumio_ops.services.reports.retention import run_report_retention
+from illumio_ops.services.reports.schedules import tick_schedules
 from illumio_ops.settings.schema import Settings
 from illumio_ops.web.tls import ensure_self_signed
 
@@ -193,6 +194,7 @@ def _collector_jobs(ctx: AppContext) -> dict[str, Callable[[], None]]:
         if not recovered:  # reports left running by a stopped service start again
             recover_running(ctx)
             recovered = True
+        tick_schedules(ctx)
         run_queued(ctx)
 
     def reports_retention() -> None:

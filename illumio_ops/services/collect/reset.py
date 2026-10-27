@@ -28,11 +28,12 @@ APP_DB_PCE_DERIVED: tuple[str, ...] = ("pce_probe", "alert_eval_state")
 # evaluation watermarks are not: they point into the flow database the switch clears, so they go with it (a
 # switch back would otherwise resume from a cursor into the old data). Rule state, rule status and channel state
 # belong to the rules and channels, which do not change with the PCE. Generated reports are outputs the operator
-# keeps or deletes; each row names the PCE it was made from (P5a), so a switch leaves them.
+# keeps or deletes; each row names the PCE it was made from (P5a), so a switch leaves them, and the schedules'
+# last-due times belong to the schedules.
 APP_DB_PCE_INDEPENDENT: tuple[str, ...] = ("job_health", "tamper_annotations", "detection_annotations", "alerts",
                                            "alert_deliveries",
                                            "alert_notes", "alert_rule_state", "alert_rule_status", "channel_state",
-                                           "reports")
+                                           "reports", "report_schedule_state")
 
 
 def _forget_alert_watermarks(ctx: AppContext) -> None:

@@ -32,6 +32,8 @@ from illumio_ops.domain.values import (
     DeploymentType,
     Language,
     PortClass,
+    ReportFormat,
+    ReportType,
 )
 
 SCHEMA_VERSION: Literal[6] = 6
@@ -459,10 +461,55 @@ class AlertSettings(StrictModel):
         return v
 
 
+class ReportSchedule(StrictModel):
+    """A built-in report run on a schedule: its type and parameters, not its output (spec §6.3)."""
+    id: str = Field(pattern=r"^[0-9a-f]{32}$")
+    name: str = Field(min_length=1, max_length=80)
+    enabled: bool
+    report_type: ReportType
+    lookback_days: int = Field(ge=1, le=90)
+    frequency: Literal["daily", "weekly", "monthly"]
+    day_of_week: int | None = Field(ge=0, le=6)  # 0 = Monday; weekly only
+    day_of_month: int | None = Field(ge=1, le=31)  # monthly only; a shorter month runs on its last day
+    hour: int = Field(ge=0, le=23)  # display time zone
+    minute: int = Field(ge=0, le=59)
+    formats: tuple[ReportFormat, ...] = Field(min_length=1)
+    email: bool
+    recipients: tuple[str, ...] = Field(max_length=50)  # empty: the SMTP channel's recipients
+    lang: Language | None  # None: the display language
+    keep: int = Field(ge=1, le=365)  # newest reports of this schedule kept
+
+    @field_validator("recipients")
+    @classmethod
+    def _addresses(cls, v: tuple[str, ...]) -> tuple[str, ...]:
+        out = tuple(a.strip() for a in v)
+        if any("@" not in a or any(c in a for c in "\r\n,; ") for a in out):
+            raise ValueError("every recipient must be one email address")
+        return out
+
+    @model_validator(mode="after")
+    def _calendar(self) -> ReportSchedule:
+        if (self.frequency == "weekly") != (self.day_of_week is not None):
+            raise ValueError("day_of_week is set for a weekly schedule and only for one")
+        if (self.frequency == "monthly") != (self.day_of_month is not None):
+            raise ValueError("day_of_month is set for a monthly schedule and only for one")
+        if len(set(self.formats)) != len(self.formats):
+            raise ValueError("each format once")
+        return self
+
+
 class ReportSettings(StrictModel):
-    """Reports (spec §6.5 報表): the address emailed reports link back to and how long reports are kept."""
+    """Reports (spec §6.5 報表): the address emailed reports link back to, how long reports are kept, schedules."""
     gui_external_url: str  # "" = emails carry no link (spec §6.5.5)
     retention_days: int = Field(ge=1, le=3650)
+    schedules: tuple[ReportSchedule, ...] = Field(max_length=100)
+
+    @field_validator("schedules")
+    @classmethod
+    def _unique(cls, v: tuple[ReportSchedule, ...]) -> tuple[ReportSchedule, ...]:
+        if len({s.id for s in v}) != len(v):
+            raise ValueError("schedule ids must be unique")
+        return v
 
     @field_validator("gui_external_url")
     @classmethod
@@ -510,7 +557,7 @@ def default_alerts(*, notify_new_defaults: bool) -> AlertSettings:
 
 def default_reports() -> ReportSettings:
     """Defaults for a fresh install and for upgrading a schema-5 file."""
-    return ReportSettings(gui_external_url="", retention_days=90)
+    return ReportSettings(gui_external_url="", retention_days=90, schedules=())
 
 
 def default_collection() -> CollectionSettings:

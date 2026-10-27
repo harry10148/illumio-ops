@@ -1,4 +1,4 @@
-"""Report records in data/app.sqlite (owner of reports). The services decide what to generate and when; this
+"""Report records in data/app.sqlite (owner of reports and report_schedule_state). The services decide what to generate and when; this
 module only stores."""
 from __future__ import annotations
 
@@ -116,3 +116,32 @@ def ids_created_before(conn: sqlite3.Connection, before: datetime) -> list[int]:
 def delete(conn: sqlite3.Connection, report_ids: list[int]) -> None:
     conn.executemany("DELETE FROM reports WHERE id = ? AND status != 'running'", [(i,) for i in report_ids])
     conn.commit()
+
+
+def schedule_last_due(conn: sqlite3.Connection) -> dict[str, datetime]:
+    return {r[0]: datetime.fromisoformat(r[1]) for r in conn.execute(
+        "SELECT schedule_id, last_due FROM report_schedule_state")}
+
+
+def set_schedule_last_due(conn: sqlite3.Connection, schedule_id: str, last_due: datetime) -> None:
+    conn.execute("INSERT INTO report_schedule_state (schedule_id, last_due) VALUES (?, ?) "
+                 "ON CONFLICT(schedule_id) DO UPDATE SET last_due = excluded.last_due", (schedule_id, _t(last_due)))
+    conn.commit()
+
+
+def forget_schedules_except(conn: sqlite3.Connection, keep: list[str]) -> None:
+    conn.execute(f"DELETE FROM report_schedule_state WHERE schedule_id NOT IN ({','.join('?' * len(keep))})", keep)
+    conn.commit()
+
+
+def schedule_reports(conn: sqlite3.Connection, schedule_id: str, *, limit: int) -> list[ReportRow]:
+    """The schedule's newest reports, newest first."""
+    rows = conn.execute("SELECT * FROM reports WHERE schedule_id = ? ORDER BY id DESC LIMIT ?",
+                        (schedule_id, limit)).fetchall()
+    return [_row(r) for r in rows]
+
+
+def ids_beyond_keep(conn: sqlite3.Connection, schedule_id: str, keep: int) -> list[int]:
+    return [r[0] for r in conn.execute(
+        "SELECT id FROM reports WHERE schedule_id = ? AND status IN ('done', 'failed') ORDER BY id DESC "
+        "LIMIT -1 OFFSET ?", (schedule_id, keep))]

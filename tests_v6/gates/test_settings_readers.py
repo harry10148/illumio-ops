@@ -94,6 +94,7 @@ SETTINGS_READERS: dict[str, str] = {
     "alerts.retention_days": "illumio_ops.services.alerts.retention",
     "reports.retention_days": "illumio_ops.services.reports.retention",
     "reports.gui_external_url": "illumio_ops.services.reports.generate",
+    "reports.schedules": "illumio_ops.services.reports.schedules",
     "pce.console_url": "illumio_ops.services.alerts.messages",
     "display.timezone": "illumio_ops.services.alerts.messages",
     "alerts.channels.smtp.enabled": "illumio_ops.services.alerts.channels",
