@@ -325,6 +325,6 @@ def test_allowlist_with_no_valid_entry_blocks_instead_of_opening_up():
 @pytest.mark.parametrize("name", FIXTURE_NAMES)
 def test_migrator_output_has_default_lateral(name):
     s = migrate_v5(_load(name)).settings
-    assert s.schema_version == 6
+    assert s.schema_version == 7
     assert s.reports.retention_days == 90
     assert s.lateral.graph_hops == 3 and s.lateral.critical_assets == () and s.lateral.environment_label_key == "env"

@@ -63,6 +63,14 @@ def _v5_to_v6(data: dict[str, Any]) -> dict[str, Any]:
     return data
 
 
+def _v6_to_v7(data: dict[str, Any]) -> dict[str, Any]:
+    # The findings rules' thresholds (P5b-1); the rest of the reports section stays as it is.
+    reports = data.get("reports")
+    if isinstance(reports, dict):
+        reports.setdefault("rule_thresholds", default_reports().rule_thresholds.model_dump(mode="json"))
+    return data
+
+
 # source version -> function producing source version + 1
 UPGRADES: dict[int, Callable[[dict[str, Any]], dict[str, Any]]] = {
     1: _v1_to_v2,
@@ -70,6 +78,7 @@ UPGRADES: dict[int, Callable[[dict[str, Any]], dict[str, Any]]] = {
     3: _v3_to_v4,
     4: _v4_to_v5,
     5: _v5_to_v6,
+    6: _v6_to_v7,
 }
 
 

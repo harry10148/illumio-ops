@@ -37,7 +37,7 @@ from illumio_ops.domain.values import (
     ReportType,
 )
 
-SCHEMA_VERSION: Literal[6] = 6
+SCHEMA_VERSION: Literal[7] = 7
 _UTC_OFFSET = re.compile(r"UTC([+-]\d+(?:\.\d+)?)")
 
 
@@ -551,7 +551,7 @@ class ReportSettings(StrictModel):
 
 
 class Settings(StrictModel):
-    schema_version: Literal[6]
+    schema_version: Literal[7]
     revision: int = Field(ge=0)
     pce: PceSettings
     web: WebSettings
