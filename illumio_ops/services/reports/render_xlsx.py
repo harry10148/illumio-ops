@@ -5,6 +5,7 @@ from __future__ import annotations
 
 from datetime import tzinfo
 from io import BytesIO
+from typing import Any
 
 from openpyxl import Workbook
 from openpyxl.cell import WriteOnlyCell
@@ -19,6 +20,7 @@ from illumio_ops.services.reports.sheets import RESERVED, sheet_names
 _FORMULA_START = ("=", "+", "-", "@", "\t", "\r")
 MAX_WIDTH = 60
 WRAP = Alignment(wrap_text=True, vertical="top")
+WRAP_FROM = MAX_WIDTH - 10  # characters; shorter text fits its column
 BOLD = Font(bold=True)
 SUMMARY_SHEET = {Language.EN: RESERVED[0], Language.ZH_TW: RESERVED[1]}
 
@@ -44,15 +46,22 @@ def _sheet(wb: Workbook, title: str, rows: list[list[Cell]], *, bold_rows: set[i
         ws.column_dimensions[get_column_letter(i + 1)].width = min(w + 2, MAX_WIDTH)
     if freeze_after is not None:
         ws.freeze_panes = f"A{freeze_after + 1}"
+    # A styled cell costs ~50x a plain value in openpyxl: only text that can exceed its column is wrapped (a
+    # column is at most MAX_WIDTH wide), so 100,000-row tables stay seconds, not minutes.
     for n, row in enumerate(rows, start=1):
-        out = []
+        out: list[Any] = []
         for v in row:
-            cell = WriteOnlyCell(ws, value=safe(v))
+            value = safe(v)
             if n in bold_rows:
+                cell = WriteOnlyCell(ws, value=value)
                 cell.font = BOLD
-            elif isinstance(v, str):
+                out.append(cell)
+            elif isinstance(v, str) and len(v) > WRAP_FROM:
+                cell = WriteOnlyCell(ws, value=value)
                 cell.alignment = WRAP
-            out.append(cell)
+                out.append(cell)
+            else:
+                out.append(value)
         ws.append(out)
 
 
