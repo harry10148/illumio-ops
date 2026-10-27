@@ -1070,5 +1070,22 @@
   "rpt_host_removed": "已移除的 workload …{id}",
   "rpt_new_older_than_baseline": "基準期連線表只保留最近 {days} 天內仍出現的連線；本期較早出現、之後未再出現的連線不在統計內。",
   "rpt_new_left_out": "{n} 條使用動態 port（{port} 以上）或沒有 port（例如 ICMP）的新連線未列入統計。",
-  "gui_reports_email_sending": "寄送中…"
+  "gui_reports_email_sending": "寄送中…",
+  "rpt_no_label": "（無標籤）",
+  "rpt_none_value": "（無）",
+  "rpt_direction_inbound": "由目的端回報",
+  "rpt_direction_outbound": "由來源端回報",
+  "rpt_no_flows": "本期沒有流量。",
+  "rpt_no_flows_filtered": "本期沒有符合報表篩選條件的流量。",
+  "rpt_limit_top_n": "只列出前 {n} 名。",
+  "rpt_filter_label": "{side} {key} ＝ {values}",
+  "rpt_filter_or": " 或 ",
+  "rpt_filter_source": "來源",
+  "rpt_filter_destination": "目的",
+  "rpt_filter_hosts": "{side}：{n} 台主機",
+  "rpt_filter_ports": "Port {ports}",
+  "rpt_filter_decisions": "判定：{decisions}",
+  "rpt_field_coverage": "本期連線中，{process}% 帶程式、{user}% 帶使用者、{bytes}% 帶位元組；依這些欄位的排名只涵蓋這部分。",
+  "rpt_err_lookback_beyond_retention": "期間超過流量保留天數（資料收集 → 保留），請選較短的期間。",
+  "rpt_err_app_required": "這份報表針對單一應用：請選擇 app 標籤。"
 }

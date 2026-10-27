@@ -9833,6 +9833,202 @@
       "path": "/api/report-schedules",
       "request_schema": {
         "$defs": {
+          "EndpointFilter": {
+            "additionalProperties": false,
+            "properties": {
+              "hrefs": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Hrefs",
+                "type": "array"
+              },
+              "ips": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Ips",
+                "type": "array"
+              },
+              "labels": {
+                "default": [],
+                "items": {
+                  "$ref": "#/$defs/LabelCond"
+                },
+                "title": "Labels",
+                "type": "array"
+              }
+            },
+            "title": "EndpointFilter",
+            "type": "object"
+          },
+          "FlowCondition": {
+            "additionalProperties": false,
+            "description": "A flow filter without its time window: what an alert rule (and later a saved report section) stores.\nwithin() gives the FilterSpec for a window; every field, default and check is FilterSpec's.",
+            "properties": {
+              "decisions": {
+                "default": [],
+                "items": {
+                  "$ref": "#/$defs/PolicyDecision"
+                },
+                "title": "Decisions",
+                "type": "array"
+              },
+              "dst": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/EndpointFilter"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
+              },
+              "dst_exclude": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/EndpointFilter"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
+              },
+              "exclude_ports": {
+                "default": [],
+                "items": {
+                  "$ref": "#/$defs/PortProto"
+                },
+                "title": "Exclude Ports",
+                "type": "array"
+              },
+              "exclude_system_accounts": {
+                "default": false,
+                "title": "Exclude System Accounts",
+                "type": "boolean"
+              },
+              "initiator_process": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Initiator Process"
+              },
+              "initiator_user": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Initiator User"
+              },
+              "ports": {
+                "default": [],
+                "items": {
+                  "$ref": "#/$defs/PortProto"
+                },
+                "title": "Ports",
+                "type": "array"
+              },
+              "service_process": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Service Process"
+              },
+              "service_user": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Service User"
+              },
+              "src": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/EndpointFilter"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
+              },
+              "src_exclude": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/EndpointFilter"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
+              },
+              "text": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Text"
+              }
+            },
+            "title": "FlowCondition",
+            "type": "object"
+          },
+          "LabelCond": {
+            "additionalProperties": false,
+            "properties": {
+              "key": {
+                "minLength": 1,
+                "title": "Key",
+                "type": "string"
+              },
+              "values": {
+                "items": {
+                  "type": "string"
+                },
+                "minItems": 1,
+                "title": "Values",
+                "type": "array"
+              }
+            },
+            "required": [
+              "key",
+              "values"
+            ],
+            "title": "LabelCond",
+            "type": "object"
+          },
           "Language": {
             "enum": [
               "en",
@@ -9840,6 +10036,65 @@
             ],
             "title": "Language",
             "type": "string"
+          },
+          "PolicyDecision": {
+            "enum": [
+              "allowed",
+              "potentially_blocked",
+              "blocked",
+              "unknown"
+            ],
+            "title": "PolicyDecision",
+            "type": "string"
+          },
+          "PortProto": {
+            "additionalProperties": false,
+            "properties": {
+              "port": {
+                "anyOf": [
+                  {
+                    "maximum": 65535,
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Port"
+              },
+              "proto": {
+                "anyOf": [
+                  {
+                    "maximum": 255,
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Proto"
+              },
+              "to_port": {
+                "anyOf": [
+                  {
+                    "maximum": 65535,
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "To Port"
+              }
+            },
+            "title": "PortProto",
+            "type": "object"
           },
           "ReportFormat": {
             "enum": [
@@ -9886,6 +10141,17 @@
               "enabled": {
                 "title": "Enabled",
                 "type": "boolean"
+              },
+              "filter": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/FlowCondition"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
               },
               "formats": {
                 "items": {
@@ -10004,6 +10270,202 @@
       },
       "response_schema": {
         "$defs": {
+          "EndpointFilter": {
+            "additionalProperties": false,
+            "properties": {
+              "hrefs": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Hrefs",
+                "type": "array"
+              },
+              "ips": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Ips",
+                "type": "array"
+              },
+              "labels": {
+                "default": [],
+                "items": {
+                  "$ref": "#/$defs/LabelCond"
+                },
+                "title": "Labels",
+                "type": "array"
+              }
+            },
+            "title": "EndpointFilter",
+            "type": "object"
+          },
+          "FlowCondition": {
+            "additionalProperties": false,
+            "description": "A flow filter without its time window: what an alert rule (and later a saved report section) stores.\nwithin() gives the FilterSpec for a window; every field, default and check is FilterSpec's.",
+            "properties": {
+              "decisions": {
+                "default": [],
+                "items": {
+                  "$ref": "#/$defs/PolicyDecision"
+                },
+                "title": "Decisions",
+                "type": "array"
+              },
+              "dst": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/EndpointFilter"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
+              },
+              "dst_exclude": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/EndpointFilter"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
+              },
+              "exclude_ports": {
+                "default": [],
+                "items": {
+                  "$ref": "#/$defs/PortProto"
+                },
+                "title": "Exclude Ports",
+                "type": "array"
+              },
+              "exclude_system_accounts": {
+                "default": false,
+                "title": "Exclude System Accounts",
+                "type": "boolean"
+              },
+              "initiator_process": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Initiator Process"
+              },
+              "initiator_user": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Initiator User"
+              },
+              "ports": {
+                "default": [],
+                "items": {
+                  "$ref": "#/$defs/PortProto"
+                },
+                "title": "Ports",
+                "type": "array"
+              },
+              "service_process": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Service Process"
+              },
+              "service_user": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Service User"
+              },
+              "src": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/EndpointFilter"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
+              },
+              "src_exclude": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/EndpointFilter"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
+              },
+              "text": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Text"
+              }
+            },
+            "title": "FlowCondition",
+            "type": "object"
+          },
+          "LabelCond": {
+            "additionalProperties": false,
+            "properties": {
+              "key": {
+                "minLength": 1,
+                "title": "Key",
+                "type": "string"
+              },
+              "values": {
+                "items": {
+                  "type": "string"
+                },
+                "minItems": 1,
+                "title": "Values",
+                "type": "array"
+              }
+            },
+            "required": [
+              "key",
+              "values"
+            ],
+            "title": "LabelCond",
+            "type": "object"
+          },
           "Language": {
             "enum": [
               "en",
@@ -10011,6 +10473,65 @@
             ],
             "title": "Language",
             "type": "string"
+          },
+          "PolicyDecision": {
+            "enum": [
+              "allowed",
+              "potentially_blocked",
+              "blocked",
+              "unknown"
+            ],
+            "title": "PolicyDecision",
+            "type": "string"
+          },
+          "PortProto": {
+            "additionalProperties": false,
+            "properties": {
+              "port": {
+                "anyOf": [
+                  {
+                    "maximum": 65535,
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Port"
+              },
+              "proto": {
+                "anyOf": [
+                  {
+                    "maximum": 255,
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Proto"
+              },
+              "to_port": {
+                "anyOf": [
+                  {
+                    "maximum": 65535,
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "To Port"
+              }
+            },
+            "title": "PortProto",
+            "type": "object"
           },
           "ReportFormat": {
             "enum": [
@@ -10056,6 +10577,17 @@
               "enabled": {
                 "title": "Enabled",
                 "type": "boolean"
+              },
+              "filter": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/FlowCondition"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
               },
               "formats": {
                 "items": {
@@ -10282,6 +10814,202 @@
       },
       "response_schema": {
         "$defs": {
+          "EndpointFilter": {
+            "additionalProperties": false,
+            "properties": {
+              "hrefs": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Hrefs",
+                "type": "array"
+              },
+              "ips": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Ips",
+                "type": "array"
+              },
+              "labels": {
+                "default": [],
+                "items": {
+                  "$ref": "#/$defs/LabelCond"
+                },
+                "title": "Labels",
+                "type": "array"
+              }
+            },
+            "title": "EndpointFilter",
+            "type": "object"
+          },
+          "FlowCondition": {
+            "additionalProperties": false,
+            "description": "A flow filter without its time window: what an alert rule (and later a saved report section) stores.\nwithin() gives the FilterSpec for a window; every field, default and check is FilterSpec's.",
+            "properties": {
+              "decisions": {
+                "default": [],
+                "items": {
+                  "$ref": "#/$defs/PolicyDecision"
+                },
+                "title": "Decisions",
+                "type": "array"
+              },
+              "dst": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/EndpointFilter"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
+              },
+              "dst_exclude": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/EndpointFilter"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
+              },
+              "exclude_ports": {
+                "default": [],
+                "items": {
+                  "$ref": "#/$defs/PortProto"
+                },
+                "title": "Exclude Ports",
+                "type": "array"
+              },
+              "exclude_system_accounts": {
+                "default": false,
+                "title": "Exclude System Accounts",
+                "type": "boolean"
+              },
+              "initiator_process": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Initiator Process"
+              },
+              "initiator_user": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Initiator User"
+              },
+              "ports": {
+                "default": [],
+                "items": {
+                  "$ref": "#/$defs/PortProto"
+                },
+                "title": "Ports",
+                "type": "array"
+              },
+              "service_process": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Service Process"
+              },
+              "service_user": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Service User"
+              },
+              "src": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/EndpointFilter"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
+              },
+              "src_exclude": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/EndpointFilter"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
+              },
+              "text": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Text"
+              }
+            },
+            "title": "FlowCondition",
+            "type": "object"
+          },
+          "LabelCond": {
+            "additionalProperties": false,
+            "properties": {
+              "key": {
+                "minLength": 1,
+                "title": "Key",
+                "type": "string"
+              },
+              "values": {
+                "items": {
+                  "type": "string"
+                },
+                "minItems": 1,
+                "title": "Values",
+                "type": "array"
+              }
+            },
+            "required": [
+              "key",
+              "values"
+            ],
+            "title": "LabelCond",
+            "type": "object"
+          },
           "Language": {
             "enum": [
               "en",
@@ -10289,6 +11017,65 @@
             ],
             "title": "Language",
             "type": "string"
+          },
+          "PolicyDecision": {
+            "enum": [
+              "allowed",
+              "potentially_blocked",
+              "blocked",
+              "unknown"
+            ],
+            "title": "PolicyDecision",
+            "type": "string"
+          },
+          "PortProto": {
+            "additionalProperties": false,
+            "properties": {
+              "port": {
+                "anyOf": [
+                  {
+                    "maximum": 65535,
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Port"
+              },
+              "proto": {
+                "anyOf": [
+                  {
+                    "maximum": 255,
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Proto"
+              },
+              "to_port": {
+                "anyOf": [
+                  {
+                    "maximum": 65535,
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "To Port"
+              }
+            },
+            "title": "PortProto",
+            "type": "object"
           },
           "ReportFormat": {
             "enum": [
@@ -10334,6 +11121,17 @@
               "enabled": {
                 "title": "Enabled",
                 "type": "boolean"
+              },
+              "filter": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/FlowCondition"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
               },
               "formats": {
                 "items": {
@@ -10548,6 +11346,202 @@
       "request_schema": null,
       "response_schema": {
         "$defs": {
+          "EndpointFilter": {
+            "additionalProperties": false,
+            "properties": {
+              "hrefs": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Hrefs",
+                "type": "array"
+              },
+              "ips": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Ips",
+                "type": "array"
+              },
+              "labels": {
+                "default": [],
+                "items": {
+                  "$ref": "#/$defs/LabelCond"
+                },
+                "title": "Labels",
+                "type": "array"
+              }
+            },
+            "title": "EndpointFilter",
+            "type": "object"
+          },
+          "FlowCondition": {
+            "additionalProperties": false,
+            "description": "A flow filter without its time window: what an alert rule (and later a saved report section) stores.\nwithin() gives the FilterSpec for a window; every field, default and check is FilterSpec's.",
+            "properties": {
+              "decisions": {
+                "default": [],
+                "items": {
+                  "$ref": "#/$defs/PolicyDecision"
+                },
+                "title": "Decisions",
+                "type": "array"
+              },
+              "dst": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/EndpointFilter"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
+              },
+              "dst_exclude": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/EndpointFilter"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
+              },
+              "exclude_ports": {
+                "default": [],
+                "items": {
+                  "$ref": "#/$defs/PortProto"
+                },
+                "title": "Exclude Ports",
+                "type": "array"
+              },
+              "exclude_system_accounts": {
+                "default": false,
+                "title": "Exclude System Accounts",
+                "type": "boolean"
+              },
+              "initiator_process": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Initiator Process"
+              },
+              "initiator_user": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Initiator User"
+              },
+              "ports": {
+                "default": [],
+                "items": {
+                  "$ref": "#/$defs/PortProto"
+                },
+                "title": "Ports",
+                "type": "array"
+              },
+              "service_process": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Service Process"
+              },
+              "service_user": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Service User"
+              },
+              "src": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/EndpointFilter"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
+              },
+              "src_exclude": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/EndpointFilter"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
+              },
+              "text": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Text"
+              }
+            },
+            "title": "FlowCondition",
+            "type": "object"
+          },
+          "LabelCond": {
+            "additionalProperties": false,
+            "properties": {
+              "key": {
+                "minLength": 1,
+                "title": "Key",
+                "type": "string"
+              },
+              "values": {
+                "items": {
+                  "type": "string"
+                },
+                "minItems": 1,
+                "title": "Values",
+                "type": "array"
+              }
+            },
+            "required": [
+              "key",
+              "values"
+            ],
+            "title": "LabelCond",
+            "type": "object"
+          },
           "Language": {
             "enum": [
               "en",
@@ -10555,6 +11549,65 @@
             ],
             "title": "Language",
             "type": "string"
+          },
+          "PolicyDecision": {
+            "enum": [
+              "allowed",
+              "potentially_blocked",
+              "blocked",
+              "unknown"
+            ],
+            "title": "PolicyDecision",
+            "type": "string"
+          },
+          "PortProto": {
+            "additionalProperties": false,
+            "properties": {
+              "port": {
+                "anyOf": [
+                  {
+                    "maximum": 65535,
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Port"
+              },
+              "proto": {
+                "anyOf": [
+                  {
+                    "maximum": 255,
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Proto"
+              },
+              "to_port": {
+                "anyOf": [
+                  {
+                    "maximum": 65535,
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "To Port"
+              }
+            },
+            "title": "PortProto",
+            "type": "object"
           },
           "ReportFormat": {
             "enum": [
@@ -10600,6 +11653,17 @@
               "enabled": {
                 "title": "Enabled",
                 "type": "boolean"
+              },
+              "filter": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/FlowCondition"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
               },
               "formats": {
                 "items": {
@@ -11008,6 +12072,202 @@
       "path": "/api/report-schedules/<schedule_id>",
       "request_schema": {
         "$defs": {
+          "EndpointFilter": {
+            "additionalProperties": false,
+            "properties": {
+              "hrefs": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Hrefs",
+                "type": "array"
+              },
+              "ips": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Ips",
+                "type": "array"
+              },
+              "labels": {
+                "default": [],
+                "items": {
+                  "$ref": "#/$defs/LabelCond"
+                },
+                "title": "Labels",
+                "type": "array"
+              }
+            },
+            "title": "EndpointFilter",
+            "type": "object"
+          },
+          "FlowCondition": {
+            "additionalProperties": false,
+            "description": "A flow filter without its time window: what an alert rule (and later a saved report section) stores.\nwithin() gives the FilterSpec for a window; every field, default and check is FilterSpec's.",
+            "properties": {
+              "decisions": {
+                "default": [],
+                "items": {
+                  "$ref": "#/$defs/PolicyDecision"
+                },
+                "title": "Decisions",
+                "type": "array"
+              },
+              "dst": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/EndpointFilter"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
+              },
+              "dst_exclude": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/EndpointFilter"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
+              },
+              "exclude_ports": {
+                "default": [],
+                "items": {
+                  "$ref": "#/$defs/PortProto"
+                },
+                "title": "Exclude Ports",
+                "type": "array"
+              },
+              "exclude_system_accounts": {
+                "default": false,
+                "title": "Exclude System Accounts",
+                "type": "boolean"
+              },
+              "initiator_process": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Initiator Process"
+              },
+              "initiator_user": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Initiator User"
+              },
+              "ports": {
+                "default": [],
+                "items": {
+                  "$ref": "#/$defs/PortProto"
+                },
+                "title": "Ports",
+                "type": "array"
+              },
+              "service_process": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Service Process"
+              },
+              "service_user": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Service User"
+              },
+              "src": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/EndpointFilter"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
+              },
+              "src_exclude": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/EndpointFilter"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
+              },
+              "text": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Text"
+              }
+            },
+            "title": "FlowCondition",
+            "type": "object"
+          },
+          "LabelCond": {
+            "additionalProperties": false,
+            "properties": {
+              "key": {
+                "minLength": 1,
+                "title": "Key",
+                "type": "string"
+              },
+              "values": {
+                "items": {
+                  "type": "string"
+                },
+                "minItems": 1,
+                "title": "Values",
+                "type": "array"
+              }
+            },
+            "required": [
+              "key",
+              "values"
+            ],
+            "title": "LabelCond",
+            "type": "object"
+          },
           "Language": {
             "enum": [
               "en",
@@ -11015,6 +12275,65 @@
             ],
             "title": "Language",
             "type": "string"
+          },
+          "PolicyDecision": {
+            "enum": [
+              "allowed",
+              "potentially_blocked",
+              "blocked",
+              "unknown"
+            ],
+            "title": "PolicyDecision",
+            "type": "string"
+          },
+          "PortProto": {
+            "additionalProperties": false,
+            "properties": {
+              "port": {
+                "anyOf": [
+                  {
+                    "maximum": 65535,
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Port"
+              },
+              "proto": {
+                "anyOf": [
+                  {
+                    "maximum": 255,
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Proto"
+              },
+              "to_port": {
+                "anyOf": [
+                  {
+                    "maximum": 65535,
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "To Port"
+              }
+            },
+            "title": "PortProto",
+            "type": "object"
           },
           "ReportFormat": {
             "enum": [
@@ -11061,6 +12380,17 @@
               "enabled": {
                 "title": "Enabled",
                 "type": "boolean"
+              },
+              "filter": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/FlowCondition"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
               },
               "formats": {
                 "items": {
@@ -11179,6 +12509,202 @@
       },
       "response_schema": {
         "$defs": {
+          "EndpointFilter": {
+            "additionalProperties": false,
+            "properties": {
+              "hrefs": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Hrefs",
+                "type": "array"
+              },
+              "ips": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Ips",
+                "type": "array"
+              },
+              "labels": {
+                "default": [],
+                "items": {
+                  "$ref": "#/$defs/LabelCond"
+                },
+                "title": "Labels",
+                "type": "array"
+              }
+            },
+            "title": "EndpointFilter",
+            "type": "object"
+          },
+          "FlowCondition": {
+            "additionalProperties": false,
+            "description": "A flow filter without its time window: what an alert rule (and later a saved report section) stores.\nwithin() gives the FilterSpec for a window; every field, default and check is FilterSpec's.",
+            "properties": {
+              "decisions": {
+                "default": [],
+                "items": {
+                  "$ref": "#/$defs/PolicyDecision"
+                },
+                "title": "Decisions",
+                "type": "array"
+              },
+              "dst": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/EndpointFilter"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
+              },
+              "dst_exclude": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/EndpointFilter"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
+              },
+              "exclude_ports": {
+                "default": [],
+                "items": {
+                  "$ref": "#/$defs/PortProto"
+                },
+                "title": "Exclude Ports",
+                "type": "array"
+              },
+              "exclude_system_accounts": {
+                "default": false,
+                "title": "Exclude System Accounts",
+                "type": "boolean"
+              },
+              "initiator_process": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Initiator Process"
+              },
+              "initiator_user": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Initiator User"
+              },
+              "ports": {
+                "default": [],
+                "items": {
+                  "$ref": "#/$defs/PortProto"
+                },
+                "title": "Ports",
+                "type": "array"
+              },
+              "service_process": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Service Process"
+              },
+              "service_user": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Service User"
+              },
+              "src": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/EndpointFilter"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
+              },
+              "src_exclude": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/EndpointFilter"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
+              },
+              "text": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Text"
+              }
+            },
+            "title": "FlowCondition",
+            "type": "object"
+          },
+          "LabelCond": {
+            "additionalProperties": false,
+            "properties": {
+              "key": {
+                "minLength": 1,
+                "title": "Key",
+                "type": "string"
+              },
+              "values": {
+                "items": {
+                  "type": "string"
+                },
+                "minItems": 1,
+                "title": "Values",
+                "type": "array"
+              }
+            },
+            "required": [
+              "key",
+              "values"
+            ],
+            "title": "LabelCond",
+            "type": "object"
+          },
           "Language": {
             "enum": [
               "en",
@@ -11186,6 +12712,65 @@
             ],
             "title": "Language",
             "type": "string"
+          },
+          "PolicyDecision": {
+            "enum": [
+              "allowed",
+              "potentially_blocked",
+              "blocked",
+              "unknown"
+            ],
+            "title": "PolicyDecision",
+            "type": "string"
+          },
+          "PortProto": {
+            "additionalProperties": false,
+            "properties": {
+              "port": {
+                "anyOf": [
+                  {
+                    "maximum": 65535,
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Port"
+              },
+              "proto": {
+                "anyOf": [
+                  {
+                    "maximum": 255,
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Proto"
+              },
+              "to_port": {
+                "anyOf": [
+                  {
+                    "maximum": 65535,
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "To Port"
+              }
+            },
+            "title": "PortProto",
+            "type": "object"
           },
           "ReportFormat": {
             "enum": [
@@ -11231,6 +12816,17 @@
               "enabled": {
                 "title": "Enabled",
                 "type": "boolean"
+              },
+              "filter": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/FlowCondition"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
               },
               "formats": {
                 "items": {
@@ -11531,6 +13127,202 @@
       "path": "/api/reports",
       "request_schema": {
         "$defs": {
+          "EndpointFilter": {
+            "additionalProperties": false,
+            "properties": {
+              "hrefs": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Hrefs",
+                "type": "array"
+              },
+              "ips": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Ips",
+                "type": "array"
+              },
+              "labels": {
+                "default": [],
+                "items": {
+                  "$ref": "#/$defs/LabelCond"
+                },
+                "title": "Labels",
+                "type": "array"
+              }
+            },
+            "title": "EndpointFilter",
+            "type": "object"
+          },
+          "FlowCondition": {
+            "additionalProperties": false,
+            "description": "A flow filter without its time window: what an alert rule (and later a saved report section) stores.\nwithin() gives the FilterSpec for a window; every field, default and check is FilterSpec's.",
+            "properties": {
+              "decisions": {
+                "default": [],
+                "items": {
+                  "$ref": "#/$defs/PolicyDecision"
+                },
+                "title": "Decisions",
+                "type": "array"
+              },
+              "dst": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/EndpointFilter"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
+              },
+              "dst_exclude": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/EndpointFilter"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
+              },
+              "exclude_ports": {
+                "default": [],
+                "items": {
+                  "$ref": "#/$defs/PortProto"
+                },
+                "title": "Exclude Ports",
+                "type": "array"
+              },
+              "exclude_system_accounts": {
+                "default": false,
+                "title": "Exclude System Accounts",
+                "type": "boolean"
+              },
+              "initiator_process": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Initiator Process"
+              },
+              "initiator_user": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Initiator User"
+              },
+              "ports": {
+                "default": [],
+                "items": {
+                  "$ref": "#/$defs/PortProto"
+                },
+                "title": "Ports",
+                "type": "array"
+              },
+              "service_process": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Service Process"
+              },
+              "service_user": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Service User"
+              },
+              "src": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/EndpointFilter"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
+              },
+              "src_exclude": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/EndpointFilter"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
+              },
+              "text": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Text"
+              }
+            },
+            "title": "FlowCondition",
+            "type": "object"
+          },
+          "LabelCond": {
+            "additionalProperties": false,
+            "properties": {
+              "key": {
+                "minLength": 1,
+                "title": "Key",
+                "type": "string"
+              },
+              "values": {
+                "items": {
+                  "type": "string"
+                },
+                "minItems": 1,
+                "title": "Values",
+                "type": "array"
+              }
+            },
+            "required": [
+              "key",
+              "values"
+            ],
+            "title": "LabelCond",
+            "type": "object"
+          },
           "Language": {
             "enum": [
               "en",
@@ -11538,6 +13330,65 @@
             ],
             "title": "Language",
             "type": "string"
+          },
+          "PolicyDecision": {
+            "enum": [
+              "allowed",
+              "potentially_blocked",
+              "blocked",
+              "unknown"
+            ],
+            "title": "PolicyDecision",
+            "type": "string"
+          },
+          "PortProto": {
+            "additionalProperties": false,
+            "properties": {
+              "port": {
+                "anyOf": [
+                  {
+                    "maximum": 65535,
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Port"
+              },
+              "proto": {
+                "anyOf": [
+                  {
+                    "maximum": 255,
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Proto"
+              },
+              "to_port": {
+                "anyOf": [
+                  {
+                    "maximum": 65535,
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "To Port"
+              }
+            },
+            "title": "PortProto",
+            "type": "object"
           },
           "ReportFormat": {
             "enum": [
@@ -11564,6 +13415,17 @@
             "default": false,
             "title": "Email",
             "type": "boolean"
+          },
+          "filter": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/FlowCondition"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
           },
           "formats": {
             "default": [

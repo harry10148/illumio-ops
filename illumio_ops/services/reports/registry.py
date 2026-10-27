@@ -9,9 +9,11 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from illumio_ops.domain.filter import FlowCondition
 from illumio_ops.domain.report import ReportDocument
 from illumio_ops.domain.values import Language, ReportFormat, ReportType
 from illumio_ops.services.context import AppContext
+from illumio_ops.settings.schema import Settings
 
 Group = Literal["lateral", "inventory", "analysis", "assessment", "operations"]
 
@@ -22,6 +24,7 @@ class ReportParams(BaseModel):
     lookback_days: int = Field(default=7, ge=1, le=90)
     lang: Language | None = None  # None: the display language
     formats: tuple[ReportFormat, ...] = (ReportFormat.HTML, ReportFormat.XLSX)
+    filter: FlowCondition | None = None  # flow reports only: e.g. one app (labels), as the workbench filters
     email: bool = False
     recipients: tuple[str, ...] = Field(default=(), max_length=50)  # empty: the SMTP channel's recipients
 
@@ -59,6 +62,8 @@ class ReportSpec:
     group: Group
     needs_traffic: bool
     build: Callable[[BuildInput], ReportDocument]
+    max_lookback: Callable[[Settings], int] | None = None  # the most days back the report's data reaches
+    requires_app: bool = False  # the filter must name an app label (one application's report)
 
 
 REGISTRY: dict[ReportType, ReportSpec] = {}
@@ -80,3 +85,10 @@ def specs() -> dict[ReportType, ReportSpec]:
     if not REGISTRY:
         REGISTRY.update(_builtin())
     return REGISTRY
+
+
+def names_app(cond: FlowCondition | None) -> bool:
+    """The filter narrows to an application: an app label on either side."""
+    if cond is None:
+        return False
+    return any(lc.key == "app" for side in (cond.src, cond.dst) if side is not None for lc in side.labels)

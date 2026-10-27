@@ -24,6 +24,7 @@ from pydantic import (
 
 from illumio_ops.domain.alertpack import best_practice_rules
 from illumio_ops.domain.alertrules import AlertRule
+from illumio_ops.domain.filter import FlowCondition
 from illumio_ops.domain.identity import normalize_process
 from illumio_ops.domain.netaddr import parse_ip_token
 from illumio_ops.domain.values import (
@@ -478,6 +479,7 @@ class ReportScheduleFields(StrictModel):
     recipients: tuple[str, ...] = Field(max_length=50)  # empty: the SMTP channel's recipients
     lang: Language | None  # None: the display language
     keep: int = Field(ge=1, le=365)  # newest reports of this schedule kept
+    filter: FlowCondition | None = None  # flow reports: e.g. one application
 
     @field_validator("recipients")
     @classmethod

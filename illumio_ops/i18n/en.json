@@ -1070,5 +1070,22 @@
   "rpt_host_removed": "Removed workload …{id}",
   "rpt_new_older_than_baseline": "The baseline keeps only connections seen in the last {days} days, so connections that first appeared earlier in this period and then stopped are not counted.",
   "rpt_new_left_out": "{n} new connections on dynamic ports ({port} and up) or without a port (such as ICMP) are not counted.",
-  "gui_reports_email_sending": "Sending…"
+  "gui_reports_email_sending": "Sending…",
+  "rpt_no_label": "(no label)",
+  "rpt_none_value": "(none)",
+  "rpt_direction_inbound": "Reported by the destination",
+  "rpt_direction_outbound": "Reported by the source",
+  "rpt_no_flows": "No traffic in this period.",
+  "rpt_no_flows_filtered": "No traffic in this period matches the report's filter.",
+  "rpt_limit_top_n": "Only the top {n} are listed.",
+  "rpt_filter_label": "{side} {key} = {values}",
+  "rpt_filter_or": " or ",
+  "rpt_filter_source": "Source",
+  "rpt_filter_destination": "Destination",
+  "rpt_filter_hosts": "{side}: {n} hosts",
+  "rpt_filter_ports": "Ports {ports}",
+  "rpt_filter_decisions": "Decisions: {decisions}",
+  "rpt_field_coverage": "Of the period's connections, {process}% carry a process, {user}% a user and {bytes}% byte counts; rankings by these cover only that share.",
+  "rpt_err_lookback_beyond_retention": "The period is longer than the traffic kept (Data collection > retention); choose fewer days.",
+  "rpt_err_app_required": "This report is about one application: choose an app label."
 }

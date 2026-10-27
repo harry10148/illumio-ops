@@ -667,6 +667,7 @@ day_of_month: (number | null)
 day_of_week: (number | null)
 email: boolean
 enabled: boolean
+filter?: (FlowCondition | null)
 /**
  * @minItems 1
  */
@@ -701,6 +702,7 @@ day_of_month: (number | null)
 day_of_week: (number | null)
 email: boolean
 enabled: boolean
+filter?: (FlowCondition | null)
 /**
  * @minItems 1
  */
@@ -803,6 +805,7 @@ smtp_enabled: boolean
  */
 export interface ReportParams {
 email?: boolean
+filter?: (FlowCondition | null)
 formats?: ReportFormat[]
 lang?: (Language | null)
 lookback_days?: number
