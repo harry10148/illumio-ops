@@ -979,5 +979,12 @@
   "rpt_unm_intro": "An address is unmanaged when no VEN reports from it; only its traffic with managed hosts is seen.",
   "rpt_unm_finding_admin": "{address} used {ports} into {peers} managed hosts",
   "rpt_unm_why_admin": "A host without a VEN reaching management ports cannot be watched or contained by the PCE.",
-  "rpt_unm_action_admin": "Find the owner; install a VEN or restrict management ports to known admin hosts."
+  "rpt_unm_action_admin": "Find the owner; install a VEN or restrict management ports to known admin hosts.",
+  "rpt_mail_subject": "[illumio-ops] {title} {period}: {status}",
+  "rpt_mail_status_items": "{n} to look at",
+  "rpt_mail_status_none": "nothing to act on",
+  "rpt_mail_kpis": "Key metrics",
+  "rpt_mail_link": "Open this report in illumio-ops: {url}",
+  "rpt_mail_no_link": "No GUI address is set (Settings → Reports), so this email has no link.",
+  "rpt_mail_xlsx_too_large": "The XLSX is too large to attach (over {mb} MB together); download it from the Reports page."
 }

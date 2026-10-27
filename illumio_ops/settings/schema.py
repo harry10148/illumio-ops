@@ -9,6 +9,7 @@ from __future__ import annotations
 import re
 from datetime import UTC, timedelta, timezone, tzinfo
 from typing import Annotated, Literal
+from urllib.parse import urlsplit
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from pydantic import (
@@ -459,8 +460,20 @@ class AlertSettings(StrictModel):
 
 
 class ReportSettings(StrictModel):
-    """Reports (spec §6.5 報表): how long generated reports are kept."""
+    """Reports (spec §6.5 報表): the address emailed reports link back to and how long reports are kept."""
+    gui_external_url: str  # "" = emails carry no link (spec §6.5.5)
     retention_days: int = Field(ge=1, le=3650)
+
+    @field_validator("gui_external_url")
+    @classmethod
+    def _external_url(cls, v: str) -> str:
+        v = v.strip()
+        if not v:
+            return v
+        parts = urlsplit(v)
+        if parts.scheme not in ("https", "http") or not parts.hostname or parts.query or parts.fragment:
+            raise ValueError("must be an http(s) address without a query or fragment, or empty")
+        return v.rstrip("/")
 
 
 class Settings(StrictModel):
@@ -497,7 +510,7 @@ def default_alerts(*, notify_new_defaults: bool) -> AlertSettings:
 
 def default_reports() -> ReportSettings:
     """Defaults for a fresh install and for upgrading a schema-5 file."""
-    return ReportSettings(retention_days=90)
+    return ReportSettings(gui_external_url="", retention_days=90)
 
 
 def default_collection() -> CollectionSettings:

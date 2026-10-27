@@ -979,5 +979,12 @@
   "rpt_unm_intro": "沒有 VEN 回報的位址即為非受管；只看得到它與受管主機之間的流量。",
   "rpt_unm_finding_admin": "{address} 以 {ports} 連入 {peers} 台受管主機",
   "rpt_unm_why_admin": "沒有 VEN 的主機使用管理 port，PCE 無法觀察或圍堵它。",
-  "rpt_unm_action_admin": "找出負責人；裝上 VEN，或只允許已知的管理主機使用管理 port。"
+  "rpt_unm_action_admin": "找出負責人；裝上 VEN，或只允許已知的管理主機使用管理 port。",
+  "rpt_mail_subject": "［illumio-ops］{title} {period}：{status}",
+  "rpt_mail_status_items": "{n} 項需要處理",
+  "rpt_mail_status_none": "沒有需要處理的項目",
+  "rpt_mail_kpis": "關鍵指標",
+  "rpt_mail_link": "在 illumio-ops 開啟此報表：{url}",
+  "rpt_mail_no_link": "未設定 GUI 對外網址（設定 → 報表），信件不含連結。",
+  "rpt_mail_xlsx_too_large": "XLSX 太大無法附加（合計超過 {mb} MB），請到報表頁下載。"
 }

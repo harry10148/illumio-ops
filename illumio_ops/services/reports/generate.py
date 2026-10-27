@@ -26,6 +26,7 @@ from illumio_ops.services.collect.guard import BindingMismatch, require_same_pce
 from illumio_ops.services.collect.mode import collects, in_mode
 from illumio_ops.services.context import AppContext
 from illumio_ops.services.coverage import store_coverage
+from illumio_ops.services.reports.deliver import deliver, gui_link
 from illumio_ops.services.reports.registry import BuildInput, ReportParams, specs
 from illumio_ops.services.reports.render_html import fmt_time, render_html
 from illumio_ops.services.reports.render_xlsx import render_xlsx
@@ -130,6 +131,7 @@ def run_queued(ctx: AppContext, *, now: datetime | None = None) -> int | None:
                                     pce_label=row.pce_label))
         if fdb.generation != generation:
             raise _Fail("rpt_err_pce_switched")
+        doc = doc.model_copy(update={"gui_link": gui_link(settings.reports.gui_external_url, row.id)})
         files = _write(out_dir, doc, row.id, params.formats, tz)
         kpis = [{"key": k.key, "label": k.label, "value": k.value, "previous": k.previous} for k in doc.kpis]
     except Exception as exc:  # noqa: BLE001 - a report's failure is recorded on the report, never raised to the job
@@ -147,6 +149,8 @@ def run_queued(ctx: AppContext, *, now: datetime | None = None) -> int | None:
         return row.id
     with ctx.db() as conn:
         store.finish(conn, row.id, status=ReportStatus.DONE, at=datetime.now(UTC), files=files, kpis=kpis)
+    if params.email:
+        deliver(ctx, row.id, doc, params, [out_dir / f for f in files], tz=tz)
     return row.id
 
 

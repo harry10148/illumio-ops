@@ -9,7 +9,10 @@ import smtplib
 import ssl
 import urllib.error
 import urllib.request
+from collections.abc import Sequence
 from dataclasses import dataclass
+from email import encoders
+from email.mime.base import MIMEBase
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from urllib.parse import urlsplit
@@ -83,14 +86,29 @@ def _header(value: str) -> str:
     return value.replace("\r", " ").replace("\n", " ")
 
 
-def _smtp(cfg: SmtpChannel, rendered: Rendered, *, timeout: float) -> tuple[bool, str | None]:
-    msg = MIMEMultipart("alternative")
+def send_mail(cfg: SmtpChannel, *, subject: str, text: str, html: str | None,
+              attachments: Sequence[tuple[str, str, bytes]] = (), recipients: Sequence[str] | None = None,
+              timeout: float) -> tuple[bool, str | None]:
+    """The one SMTP sender (alerts and reports; 5.x had three). attachments: (file name, MIME type, bytes);
+    recipients: None = the channel's own."""
+    body = MIMEMultipart("alternative")
+    body.attach(MIMEText(text, "plain", "utf-8"))  # plain first: clients show the last part they can
+    if html:
+        body.attach(MIMEText(html, "html", "utf-8"))
+    msg: MIMEMultipart = body
+    if attachments:
+        msg = MIMEMultipart("mixed")
+        msg.attach(body)
+        for name, mime, data in attachments:
+            maintype, _, subtype = mime.partition("/")
+            part = MIMEBase(maintype, subtype)
+            part.set_payload(data)
+            encoders.encode_base64(part)
+            part.add_header("Content-Disposition", "attachment", filename=_header(name))
+            msg.attach(part)
     sender = _header(cfg.sender)
-    recipients = [_header(r).strip() for r in cfg.recipients]
-    msg["Subject"], msg["From"], msg["To"] = _header(rendered.subject), sender, ", ".join(recipients)
-    msg.attach(MIMEText(rendered.text, "plain", "utf-8"))  # plain first: clients show the last part they can
-    if rendered.html:
-        msg.attach(MIMEText(rendered.html, "html", "utf-8"))
+    to = [_header(r).strip() for r in (cfg.recipients if recipients is None else recipients)]
+    msg["Subject"], msg["From"], msg["To"] = _header(subject), sender, ", ".join(to)
     try:
         context = ssl.create_default_context()
         if cfg.security == "tls":
@@ -104,12 +122,16 @@ def _smtp(cfg: SmtpChannel, rendered: Rendered, *, timeout: float) -> tuple[bool
                 server.ehlo()
             if cfg.username:
                 server.login(cfg.username, cfg.password)
-            refused = server.sendmail(sender, recipients, msg.as_string())
+            refused = server.sendmail(sender, to, msg.as_string())
     except (smtplib.SMTPException, OSError) as exc:
         return False, f"{type(exc).__name__}: {exc}"
     if refused:
         return False, "refused: " + ", ".join(sorted(refused))
     return True, None
+
+
+def _smtp(cfg: SmtpChannel, rendered: Rendered, *, timeout: float) -> tuple[bool, str | None]:
+    return send_mail(cfg, subject=rendered.subject, text=rendered.text, html=rendered.html, timeout=timeout)
 
 
 def send(channel: ChannelKind, cfg: AlertChannels, rendered: Rendered, *, timeout: float = 10.0) -> SendResult:

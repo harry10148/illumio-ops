@@ -22,6 +22,16 @@ class ReportParams(BaseModel):
     lookback_days: int = Field(default=7, ge=1, le=90)
     lang: Language | None = None  # None: the display language
     formats: tuple[ReportFormat, ...] = (ReportFormat.HTML, ReportFormat.XLSX)
+    email: bool = False
+    recipients: tuple[str, ...] = Field(default=(), max_length=50)  # empty: the SMTP channel's recipients
+
+    @field_validator("recipients")
+    @classmethod
+    def _addresses(cls, v: tuple[str, ...]) -> tuple[str, ...]:
+        out = tuple(a.strip() for a in v)
+        if any("@" not in a or any(c in a for c in "\r\n,; ") for a in out):
+            raise ValueError("every recipient must be one email address")
+        return out
 
     @field_validator("formats")
     @classmethod

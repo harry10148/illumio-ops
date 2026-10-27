@@ -38,7 +38,7 @@ EXTRA_CSS = """
 
 
 @cache
-def _asset(name: str) -> str:
+def asset(name: str) -> str:
     return resources.files("illumio_ops.services.reports").joinpath("assets", name).read_text(encoding="utf-8")
 
 
@@ -205,7 +205,7 @@ def render_html(doc: ReportDocument, *, tz: tzinfo | None) -> str:
     return ("<!DOCTYPE html>\n"
             f'<html lang="{lang_attr}"><head><meta charset="utf-8">'
             '<meta name="viewport" content="width=device-width,initial-scale=1">'
-            f"<title>{_esc(doc.title)}</title><style>\n{_asset('report_shell.css')}\n{EXTRA_CSS}</style></head>"
+            f"<title>{_esc(doc.title)}</title><style>\n{asset('report_shell.css')}\n{EXTRA_CSS}</style></head>"
             f'<body data-report-title="{_esc(doc.title)}"><div class="sheet"><div class="doc">'
             f'{cover}{summary}{toc}<div class="chapters">{chapters}</div></div></div>'
-            f"<script>\n{_asset('report_table.js')}</script></body></html>")
+            f"<script>\n{asset('report_table.js')}</script></body></html>")
