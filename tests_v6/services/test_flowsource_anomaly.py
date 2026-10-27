@@ -174,3 +174,12 @@ def test_activity_gaps_name_recorded_gaps(ctx):
                                 kind="truncated", detail="x", at=NOW)
     gaps = fa.activity_gaps(ctx, start=NOW - timedelta(days=7), end=NOW)
     assert [(g[0], g[2]) for g in gaps] == [(NOW - timedelta(days=3, hours=1), "truncated")]
+
+
+def test_directory_activity_needs_the_directory_protocol(ctx):
+    """UDP to an ephemeral port numbered 3268 is not directory traffic (Global Catalog is TCP)."""
+    tcp = rec(1, port=3268, conns=5)
+    udp = type(tcp)(**{**rec(2, port=3268, conns=7).__dict__, "proto": 17})
+    write(ctx, [tcp, udp], now=NOW - timedelta(minutes=20), increments="cycle")
+    now = fa.activity_now(ctx, since=NOW - timedelta(minutes=60), until=NOW)
+    assert (SRC.format(1), "directory") in now and (SRC.format(2), "directory") not in now

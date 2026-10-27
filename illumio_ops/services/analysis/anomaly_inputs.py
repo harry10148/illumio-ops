@@ -2,8 +2,8 @@
 the account, process and directory baselines — looked up only for the keys this run's candidates name."""
 from __future__ import annotations
 
-from collections.abc import Sequence
-from dataclasses import replace
+from collections.abc import Mapping, Sequence
+from dataclasses import dataclass, replace
 from datetime import UTC, datetime, timedelta
 
 from illumio_ops.domain.anomaly import (
@@ -25,7 +25,7 @@ from illumio_ops.domain.detectors import (
     not_blocked,
 )
 from illumio_ops.domain.identity import account_key
-from illumio_ops.domain.lateral import selector_matches
+from illumio_ops.domain.lateral import AdminPortSet, selector_matches
 from illumio_ops.services import flowsource_anomaly as fa
 from illumio_ops.services.analysis.context import LateralContext, host_for
 from illumio_ops.services.context import AppContext
@@ -92,25 +92,47 @@ def _activity(ctx: AppContext, inp: DetectorInput, at: datetime) -> tuple[
     return {k: Activity(v[0], v[1], *history.get(k, (0, None))) for k, v in over.items()}, days, gaps
 
 
-def _with_directory(ctx: AppContext, lc: LateralContext, inp: DetectorInput, rows: Sequence[Obs], at: datetime,
-                    data: AnomalyData) -> AnomalyData:
-    cfg = inp.config
+@dataclass(frozen=True)
+class DirectoryServers:
+    """The directory servers (spec §6.5.8 E): inferred from traffic, declared by label, declared by address.
+    The detectors and the lateral posture report read them through directory_servers()."""
+    inferred: frozenset[str]
+    declared: frozenset[str]
+    ips: frozenset[str]
+    sources: Mapping[str, int]  # destination -> distinct sources on directory ports since `since`
+    ports: tuple[fa.PortSpec, ...]
+
+    @property
+    def servers(self) -> frozenset[str]:
+        return self.inferred | self.declared
+
+
+def directory_servers(ctx: AppContext, lc: LateralContext, admin_ports: AdminPortSet, *,
+                      since: datetime) -> DirectoryServers:
     lat: LateralSettings = lc.settings
-    ports = sorted({(e.port, e.proto) for e in cfg.admin_ports.entries if e.category in DIRECTORY}, key=str)
+    ports = tuple(sorted({(e.port, e.proto) for e in admin_ports.entries if e.category in DIRECTORY}, key=str))
+    ips = frozenset(lat.directory_server_ips)
+    selectors = [(s.key, s.value) for s in lat.directory_servers]
+    declared = frozenset(k for k, h in lc.hosts.items() if selectors and selector_matches(h.labels, selectors))
     if not ports:
-        return data
-    since = at - timedelta(days=lc.baseline_required)
+        return DirectoryServers(frozenset(), declared, ips, {}, ports)
 
     def internal(key: str) -> bool:
         host = lc.hosts.get(key)
         return host.managed if host is not None else key.startswith("ip:") and not is_public(key[3:])
 
     counts = fa.directory_sources(ctx, ports, since=since)
-    inferred = {k for k, n in counts.items() if n >= lat.detectors.directory_min_sources and internal(k)}
-    selectors = [(s.key, s.value) for s in lat.directory_servers]
-    declared = {k for k, h in lc.hosts.items() if selectors and selector_matches(h.labels, selectors)}
-    servers = inferred | declared
-    ips = frozenset(lat.directory_server_ips)
+    inferred = frozenset(k for k, n in counts.items() if n >= lat.detectors.directory_min_sources and internal(k))
+    return DirectoryServers(inferred, declared, ips, counts, ports)
+
+
+def _with_directory(ctx: AppContext, lc: LateralContext, inp: DetectorInput, rows: Sequence[Obs], at: datetime,
+                    data: AnomalyData) -> AnomalyData:
+    cfg = inp.config
+    ds = directory_servers(ctx, lc, cfg.admin_ports, since=at - timedelta(days=lc.baseline_required))
+    if not ds.ports:
+        return data
+    servers, ips, ports = ds.servers, ds.ips, ds.ports
     directory_rows = [o for o in rows if cfg.admin_ports.matches(o.port, o.proto, DIRECTORY)
                       and (o.dst_key in servers or o.dst_ip in ips)]
     candidates = {o.src_key for o in directory_rows if _first_in_window(inp, o)}
@@ -122,8 +144,8 @@ def _with_directory(ctx: AppContext, lc: LateralContext, inp: DetectorInput, row
     with ctx.flows().connect() as conn:
         recent = analysis.detections_about(conn, subjects, since=inp.window[0] - cfg.directory_followup,
                                            detectors=[d.value for d in DIRECTORY_DETECTORS])
-    return replace(data, directory_servers=frozenset(servers), directory_ips=ips, directory_inferred=len(inferred),
-                   directory_declared_missing=len(declared - inferred), directory_clients_before=frozenset(before),
+    return replace(data, directory_servers=frozenset(servers), directory_ips=ips, directory_inferred=len(ds.inferred),
+                   directory_declared_missing=len(ds.declared - ds.inferred), directory_clients_before=frozenset(before),
                    recent_directory=[(r["subject_key"], r["detector"], datetime.fromisoformat(r["first_seen"]),
                                       datetime.fromisoformat(r["last_seen"])) for r in recent])
 

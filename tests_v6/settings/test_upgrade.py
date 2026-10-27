@@ -32,7 +32,7 @@ def test_v1_file_loads_as_v2_in_memory(tmp_path):
     p = _v1(tmp_path)
     before, mtime = p.read_bytes(), os.stat(p).st_mtime_ns
     s = SettingsStore(p).load()
-    assert s.schema_version == SCHEMA_VERSION == 5
+    assert s.schema_version == SCHEMA_VERSION == 6
     assert s.collection.traffic_interval_seconds == 600
     assert s.collection.retention.baseline_days == 30
     assert p.read_bytes() == before and os.stat(p).st_mtime_ns == mtime
@@ -112,7 +112,7 @@ def test_v3_file_upgrades_to_v4_with_pack(tmp_path):
     p.write_text(json.dumps(d))
     p.chmod(0o600)
     s = SettingsStore(p).load()
-    assert s.schema_version == 5 and len(s.alerts.rules) == 30 and all(r.notify for r in s.alerts.rules)
+    assert s.schema_version == SCHEMA_VERSION and len(s.alerts.rules) == 30 and all(r.notify for r in s.alerts.rules)
     assert not s.alerts.channels.smtp.enabled
 
 
@@ -134,7 +134,7 @@ def _v4_dict():
 
 def test_v4_file_upgrades_to_v5_keeping_values():
     s = validate_settings(upgrade(_v4_dict()))
-    assert s.schema_version == SCHEMA_VERSION == 5
+    assert s.schema_version == SCHEMA_VERSION == 6
     lat = s.lateral
     assert lat.detectors.fanout_targets == 12
     assert lat.extra_admin_ports[0].category == "remote" and lat.removed_admin_ports[0].port == 23
@@ -164,3 +164,12 @@ def test_v4_at_the_old_rule_limit_still_loads_after_the_anomaly_rules_join():
         d["alerts"]["rules"].append({**template, "id": f"{len(d['alerts']['rules']):032x}", "pack_key": None,
                                        "name": f"r{len(d['alerts']['rules'])}"})
     assert len(validate_settings(upgrade(d)).alerts.rules) == 305
+
+
+def test_v5_file_upgrades_to_v6_with_reports():
+    d = default_settings(password_hash=HASH, secret_key=KEY).model_dump(mode="json")
+    d["schema_version"] = 5
+    del d["reports"]
+    s = validate_settings(upgrade(d))
+    assert s.schema_version == SCHEMA_VERSION == 6
+    assert s.reports.retention_days == 90

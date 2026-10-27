@@ -16,6 +16,7 @@ from illumio_ops.settings.schema import (
     default_alerts,
     default_collection,
     default_lateral,
+    default_reports,
 )
 
 
@@ -57,12 +58,18 @@ def _v4_to_v5(data: dict[str, Any]) -> dict[str, Any]:
     return data
 
 
+def _v5_to_v6(data: dict[str, Any]) -> dict[str, Any]:
+    data["reports"] = default_reports().model_dump(mode="json")
+    return data
+
+
 # source version -> function producing source version + 1
 UPGRADES: dict[int, Callable[[dict[str, Any]], dict[str, Any]]] = {
     1: _v1_to_v2,
     2: _v2_to_v3,
     3: _v3_to_v4,
     4: _v4_to_v5,
+    5: _v5_to_v6,
 }
 
 

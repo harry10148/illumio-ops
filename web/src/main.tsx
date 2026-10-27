@@ -6,6 +6,7 @@ import "./pages/alerts/AlertList";
 import "./pages/alerts/AlertDetail";
 import "./pages/alerts/Rules";
 import "./pages/alerts/RuleEditor";
+import "./pages/reports/Reports";
 import "./pages/system/PceConnection";
 import "./pages/system/Channels";
 import "./pages/system/Collection";
@@ -15,6 +16,7 @@ import "./pages/system/Logs";
 import "./pages/system/Tls";
 import "./pages/system/Security";
 import "./pages/system/Display";
+import "./pages/system/ReportSettings";
 import "./styles/tokens.css";
 import "./styles/base.css";
 

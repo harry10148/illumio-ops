@@ -54,6 +54,23 @@ export type Language = ("en" | "zh_TW")
 export type ProbeName = ("noop" | "health" | "node_available")
 /**
  * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "ReportFormat".
+ */
+export type ReportFormat = ("html" | "xlsx")
+/**
+ * Report types (spec §6.5 報表, §6.5.5); 5b and 5c add the 5.x types.
+ * 
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "ReportType".
+ */
+export type ReportType = ("lateral_posture" | "new_connections" | "unmanaged_endpoints")
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "ReportStatus".
+ */
+export type ReportStatus = ("queued" | "running" | "done" | "failed")
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
  * via the `definition` "ChannelKind".
  */
 export type ChannelKind = ("smtp" | "line" | "telegram" | "teams" | "webhook")
@@ -639,6 +656,173 @@ export interface Dictionary {
 [k: string]: string
 }
 /**
+ * A built-in report run on a schedule: its type and parameters, not its output (spec §6.3). The page edits
+ * these; the server assigns the id (ReportSchedule).
+ * 
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "ReportScheduleFields".
+ */
+export interface ReportScheduleFields {
+day_of_month: (number | null)
+day_of_week: (number | null)
+email: boolean
+enabled: boolean
+/**
+ * @minItems 1
+ */
+formats: [ReportFormat, ...(ReportFormat)[]]
+frequency: ("daily" | "weekly" | "monthly")
+hour: number
+keep: number
+lang: (Language | null)
+lookback_days: number
+minute: number
+name: string
+/**
+ * @maxItems 50
+ */
+recipients: string[]
+report_type: ReportType
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "ScheduleWrite".
+ */
+export interface ScheduleWrite {
+revision: number
+schedule: ReportScheduleFields
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "ReportSchedule".
+ */
+export interface ReportSchedule {
+day_of_month: (number | null)
+day_of_week: (number | null)
+email: boolean
+enabled: boolean
+/**
+ * @minItems 1
+ */
+formats: [ReportFormat, ...(ReportFormat)[]]
+frequency: ("daily" | "weekly" | "monthly")
+hour: number
+id: string
+keep: number
+lang: (Language | null)
+lookback_days: number
+minute: number
+name: string
+/**
+ * @maxItems 50
+ */
+recipients: string[]
+report_type: ReportType
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "ScheduleItem".
+ */
+export interface ScheduleItem {
+consecutive_failures: number
+last_finished_at: (string | null)
+last_report_id: (number | null)
+last_status: (ReportStatus | null)
+next_run: (string | null)
+schedule: ReportSchedule
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "SchedulesView".
+ */
+export interface SchedulesView {
+items: ScheduleItem[]
+revision: number
+smtp_enabled: boolean
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "ScheduleDelete".
+ */
+export interface ScheduleDelete {
+revision: number
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "RunNow".
+ */
+export interface RunNow {
+
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "ReportItem".
+ */
+export interface ReportItem {
+created_at: string
+email_detail: (string | null)
+email_status: (string | null)
+error_detail: (string | null)
+error_key: (string | null)
+files: string[]
+finished_at: (string | null)
+id: number
+lang: (Language | null)
+lookback_days: (number | null)
+pce_label: string
+period_end: string
+period_start: string
+report_type: string
+schedule_id: (string | null)
+schedule_name: (string | null)
+status: ReportStatus
+trigger: string
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "CatalogEntry".
+ */
+export interface CatalogEntry {
+available: boolean
+group: string
+reason_key: (string | null)
+report_type: ReportType
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "Catalog".
+ */
+export interface Catalog {
+entries: CatalogEntry[]
+gui_external_url_set: boolean
+smtp_enabled: boolean
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "ReportParams".
+ */
+export interface ReportParams {
+email?: boolean
+formats?: ReportFormat[]
+lang?: (Language | null)
+lookback_days?: number
+/**
+ * @maxItems 50
+ */
+recipients?: string[]
+report_type: ReportType
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "ReportPage".
+ */
+export interface ReportPage {
+items: ReportItem[]
+page: number
+page_size: number
+total: number
+}
+/**
  * This interface was referenced by `ContractRoot`'s JSON-Schema
  * via the `definition` "ChannelState".
  */
@@ -1155,6 +1339,24 @@ verify_tls: (boolean | string)
 }
 /**
  * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "ReportSettingsView".
+ */
+export interface ReportSettingsView {
+gui_external_url: string
+retention_days: number
+revision: number
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "ReportSettingsUpdate".
+ */
+export interface ReportSettingsUpdate {
+gui_external_url: string
+retention_days: number
+revision: number
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
  * via the `definition` "SecurityView".
  */
 export interface SecurityView {
@@ -1256,7 +1458,7 @@ revision: number
 validity_days: number
 }
 
-export type OpId = "alert_rules.create" | "alert_rules.delete" | "alert_rules.list" | "alert_rules.pack" | "alert_rules.preview" | "alert_rules.update" | "alerts.evidence" | "alerts.explain" | "alerts.get" | "alerts.list" | "alerts.mark_known" | "alerts.note_add" | "auth.csrf" | "auth.login" | "auth.logout" | "auth.me" | "auth.password" | "home.summary" | "i18n.dictionary" | "system.channels.get" | "system.channels.test" | "system.channels.update" | "system.collection.backfill" | "system.collection.get" | "system.collection.status" | "system.collection.update" | "system.display.get" | "system.display.update" | "system.jobs.list" | "system.lateral.get" | "system.lateral.known" | "system.lateral.known_delete" | "system.lateral.update" | "system.logs.query" | "system.pce.get" | "system.pce.latest" | "system.pce.probe" | "system.pce.update" | "system.security.get" | "system.security.update" | "system.tls.csr" | "system.tls.import" | "system.tls.renew" | "system.tls.status" | "system.tls.update";
+export type OpId = "alert_rules.create" | "alert_rules.delete" | "alert_rules.list" | "alert_rules.pack" | "alert_rules.preview" | "alert_rules.update" | "alerts.evidence" | "alerts.explain" | "alerts.get" | "alerts.list" | "alerts.mark_known" | "alerts.note_add" | "auth.csrf" | "auth.login" | "auth.logout" | "auth.me" | "auth.password" | "home.summary" | "i18n.dictionary" | "report_schedules.create" | "report_schedules.delete" | "report_schedules.list" | "report_schedules.run_now" | "report_schedules.update" | "reports.catalog" | "reports.delete" | "reports.generate" | "reports.get" | "reports.list" | "system.channels.get" | "system.channels.test" | "system.channels.update" | "system.collection.backfill" | "system.collection.get" | "system.collection.status" | "system.collection.update" | "system.display.get" | "system.display.update" | "system.jobs.list" | "system.lateral.get" | "system.lateral.known" | "system.lateral.known_delete" | "system.lateral.update" | "system.logs.query" | "system.pce.get" | "system.pce.latest" | "system.pce.probe" | "system.pce.update" | "system.reports.get" | "system.reports.update" | "system.security.get" | "system.security.update" | "system.tls.csr" | "system.tls.import" | "system.tls.renew" | "system.tls.status" | "system.tls.update";
 
 export interface Requests {
   "alert_rules.create": RuleWrite;
@@ -1278,6 +1480,16 @@ export interface Requests {
   "auth.password": PasswordChangeRequest;
   "home.summary": undefined;
   "i18n.dictionary": undefined;
+  "report_schedules.create": ScheduleWrite;
+  "report_schedules.delete": ScheduleDelete;
+  "report_schedules.list": undefined;
+  "report_schedules.run_now": RunNow;
+  "report_schedules.update": ScheduleWrite;
+  "reports.catalog": undefined;
+  "reports.delete": undefined;
+  "reports.generate": ReportParams;
+  "reports.get": undefined;
+  "reports.list": undefined;
   "system.channels.get": undefined;
   "system.channels.test": ChannelTest;
   "system.channels.update": ChannelsUpdate;
@@ -1297,6 +1509,8 @@ export interface Requests {
   "system.pce.latest": undefined;
   "system.pce.probe": undefined;
   "system.pce.update": PceConnectionUpdate;
+  "system.reports.get": undefined;
+  "system.reports.update": ReportSettingsUpdate;
   "system.security.get": undefined;
   "system.security.update": SecurityUpdate;
   "system.tls.csr": CsrRequest;
@@ -1326,6 +1540,16 @@ export interface Responses {
   "auth.password": CsrfToken;
   "home.summary": HomeSummary;
   "i18n.dictionary": Dictionary;
+  "report_schedules.create": SchedulesView;
+  "report_schedules.delete": SchedulesView;
+  "report_schedules.list": SchedulesView;
+  "report_schedules.run_now": ReportItem;
+  "report_schedules.update": SchedulesView;
+  "reports.catalog": Catalog;
+  "reports.delete": Empty;
+  "reports.generate": ReportItem;
+  "reports.get": ReportItem;
+  "reports.list": ReportPage;
   "system.channels.get": ChannelsView;
   "system.channels.test": ChannelTestResult;
   "system.channels.update": ChannelsView;
@@ -1345,6 +1569,8 @@ export interface Responses {
   "system.pce.latest": LatestProbe;
   "system.pce.probe": ProbeRun;
   "system.pce.update": PceConnectionSaved;
+  "system.reports.get": ReportSettingsView;
+  "system.reports.update": ReportSettingsView;
   "system.security.get": SecurityView;
   "system.security.update": SecurityView;
   "system.tls.csr": CsrResult;
@@ -1374,6 +1600,16 @@ export const OPERATIONS = {
   "auth.password": { method: "POST", path: "/api/auth/password" },
   "home.summary": { method: "GET", path: "/api/home/summary" },
   "i18n.dictionary": { method: "GET", path: "/api/i18n/<lang>" },
+  "report_schedules.create": { method: "POST", path: "/api/report-schedules" },
+  "report_schedules.delete": { method: "DELETE", path: "/api/report-schedules/<schedule_id>" },
+  "report_schedules.list": { method: "GET", path: "/api/report-schedules" },
+  "report_schedules.run_now": { method: "POST", path: "/api/report-schedules/<schedule_id>/run" },
+  "report_schedules.update": { method: "PUT", path: "/api/report-schedules/<schedule_id>" },
+  "reports.catalog": { method: "GET", path: "/api/reports/catalog" },
+  "reports.delete": { method: "DELETE", path: "/api/reports/<int:report_id>" },
+  "reports.generate": { method: "POST", path: "/api/reports" },
+  "reports.get": { method: "GET", path: "/api/reports/<int:report_id>" },
+  "reports.list": { method: "GET", path: "/api/reports" },
   "system.channels.get": { method: "GET", path: "/api/system/channels" },
   "system.channels.test": { method: "POST", path: "/api/system/channels/test" },
   "system.channels.update": { method: "PUT", path: "/api/system/channels" },
@@ -1393,6 +1629,8 @@ export const OPERATIONS = {
   "system.pce.latest": { method: "GET", path: "/api/system/pce/latest" },
   "system.pce.probe": { method: "POST", path: "/api/system/pce/probe" },
   "system.pce.update": { method: "PUT", path: "/api/system/pce" },
+  "system.reports.get": { method: "GET", path: "/api/system/reports" },
+  "system.reports.update": { method: "PUT", path: "/api/system/reports" },
   "system.security.get": { method: "GET", path: "/api/system/security" },
   "system.security.update": { method: "PUT", path: "/api/system/security" },
   "system.tls.csr": { method: "POST", path: "/api/system/tls/csr" },
@@ -1549,6 +1787,21 @@ export const VALUES = {
     "safe_to_block",
     "suspicious",
     "unknown"
+  ],
+  "ReportFormat": [
+    "html",
+    "xlsx"
+  ],
+  "ReportStatus": [
+    "done",
+    "failed",
+    "queued",
+    "running"
+  ],
+  "ReportType": [
+    "lateral_posture",
+    "new_connections",
+    "unmanaged_endpoints"
   ],
   "RuleAction": [
     "allow",

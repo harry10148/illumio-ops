@@ -305,9 +305,21 @@ LATERAL_PORTS_DEFAULT: tuple[tuple[int, str, PortClass], ...] = (
     (3269, "LDAPS-GC", PortClass.DIRECTORY), (9389, "ADWS", PortClass.DIRECTORY),
     (1433, "MSSQL", PortClass.DATABASE), (3306, "MySQL", PortClass.DATABASE), (5432, "PostgreSQL", PortClass.DATABASE),
 )
-# The built-in directory ports: the flow store counts each source's directory traffic per hour by them (it
-# does not read settings).
-DIRECTORY_PORTS: frozenset[int] = frozenset(p for p, _, c in LATERAL_PORTS_DEFAULT if c is PortClass.DIRECTORY)
+# Every built-in port is TCP; these services also run over UDP (Kerberos, kpasswd, CLDAP, RDP's UDP transport, NFS,
+# the RPC portmapper, TeamViewer). Matching any protocol made a UDP reply that lands on an ephemeral port numbered
+# 1433 or 5985 look like a management connection (2026-10-27, lab).
+TCP, UDP = 6, 17
+BUILTIN_UDP_PORTS: frozenset[int] = frozenset({88, 464, 389, 3389, 2049, 111, 5938})
+
+
+def builtin_protocols(port: int) -> tuple[int, ...]:
+    return (TCP, UDP) if port in BUILTIN_UDP_PORTS else (TCP,)
+
+
+# The built-in directory ports and their protocols: the flow store counts each source's directory traffic per hour
+# by them (it does not read settings).
+DIRECTORY_PORTS: frozenset[tuple[int, int]] = frozenset(
+    (p, proto) for p, _, c in LATERAL_PORTS_DEFAULT if c is PortClass.DIRECTORY for proto in builtin_protocols(p))
 
 # Remote execution, reconnaissance and directory-attack tools whose connection to an internal host is worth
 # a look (spec §6.5.8 D and E③), as normalize_process names them; settings replace the list.
@@ -356,12 +368,31 @@ def parse_draft_policy_decision(raw: str) -> str:
     return raw.strip().lower()
 
 
+class ReportType(StrEnum):
+    """Report types (spec §6.5 報表, §6.5.5); 5b and 5c add the 5.x types."""
+    LATERAL_POSTURE = "lateral_posture"
+    NEW_CONNECTIONS = "new_connections"
+    UNMANAGED_ENDPOINTS = "unmanaged_endpoints"
+
+
+class ReportFormat(StrEnum):
+    HTML = "html"
+    XLSX = "xlsx"
+
+
+class ReportStatus(StrEnum):
+    QUEUED = "queued"
+    RUNNING = "running"
+    DONE = "done"
+    FAILED = "failed"
+
+
 _ENUMS: tuple[type[StrEnum], ...] = (
     PolicyDecision, RuleAction, AlertRuleType, DeploymentType, Language, ProbeName,
     FlowDirection, VisibilityLevel, TamperClassification, IngestSource, DataOrigin, CapabilityState,
     CollectionMode, Severity, DetectorKind, PortClass, DetectorState, SegmentDimension, SegmentMetric, SegmentView,
     EdgeState, TamperPattern, TamperAction, PrecursorKind, RansomwareTrafficClass, FocusKind, Confidence,
-    ThresholdType, ChannelKind, SystemCheck, DeliveryStatus,
+    ThresholdType, ChannelKind, SystemCheck, DeliveryStatus, ReportType, ReportFormat, ReportStatus,
 )
 
 

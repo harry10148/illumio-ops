@@ -37,6 +37,9 @@ from illumio_ops.services.collect.reset import finish_pending_switch
 from illumio_ops.services.collect.retention import run_retention
 from illumio_ops.services.collect.traffic import run_traffic_cycle
 from illumio_ops.services.context import AppContext
+from illumio_ops.services.reports.generate import recover_running, run_queued
+from illumio_ops.services.reports.retention import run_report_retention
+from illumio_ops.services.reports.schedules import tick_schedules
 from illumio_ops.settings.schema import Settings
 from illumio_ops.web.tls import ensure_self_signed
 
@@ -54,6 +57,8 @@ ANALYSIS_HOURLY_SECONDS = 3600
 ALERTS_SYSTEM_SECONDS = 60
 # Sends what is due; a slow channel holds up only this job, never a collector.
 ALERTS_DISPATCH_SECONDS = 60
+# Queued reports are picked up within this; one report per run, so a long one never piles up behind itself.
+REPORTS_RUN_SECONDS = 30
 # Collectors wait a little after start-up so the listener and the first probe come first.
 COLLECTOR_FIRST_RUN_DELAY = timedelta(seconds=30)
 
@@ -75,6 +80,8 @@ def job_intervals(settings: Settings) -> dict[str, int]:
         "alerts_system": ALERTS_SYSTEM_SECONDS,
         "alerts_retention": DAILY_SECONDS,
         "alerts_dispatch": ALERTS_DISPATCH_SECONDS,
+        "reports_run": REPORTS_RUN_SECONDS,
+        "reports_retention": DAILY_SECONDS,
     }
 
 
@@ -180,11 +187,25 @@ def _collector_jobs(ctx: AppContext) -> dict[str, Callable[[], None]]:
     def alerts_dispatch() -> None:
         run_dispatch(ctx)
 
+    recovered = False
+
+    def reports_run() -> None:
+        nonlocal recovered
+        if not recovered:  # reports left running by a stopped service start again
+            recover_running(ctx)
+            recovered = True
+        tick_schedules(ctx)
+        run_queued(ctx)
+
+    def reports_retention() -> None:
+        run_report_retention(ctx)
+
     # Archive runs before retention so that, with archiving on, expiring days are written first.
     return {"collect_traffic": traffic, "collect_events": events, "collect_inventory": inventory,
             "collect_backfill": backfill, "collect_archive": archive, "collect_retention": retention,
             "flows_checkpoint": checkpoint, "analysis_hourly": hourly_analysis, "alerts_system": alerts_system,
-            "alerts_retention": alerts_retention, "alerts_dispatch": alerts_dispatch}
+            "alerts_retention": alerts_retention, "alerts_dispatch": alerts_dispatch,
+            "reports_run": reports_run, "reports_retention": reports_retention}
 
 
 def build_scheduler(ctx: AppContext) -> BackgroundScheduler:

@@ -334,7 +334,7 @@ def _add_activity(activity: Activity, row: sqlite3.Row, hour: str, grew: tuple[i
         return
     if str(row["policy_decision"]).startswith("blocked"):
         return
-    classes = ("all", "directory") if row["port"] in DIRECTORY_PORTS else ("all",)
+    classes = ("all", "directory") if (row["port"], row["proto"]) in DIRECTORY_PORTS else ("all",)
     for cls in classes:
         slot = activity.setdefault((hour, row["src_key"], cls), [0, 0, 0])
         slot[0] += connections

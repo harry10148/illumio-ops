@@ -168,12 +168,12 @@ def activity_now(ctx: AppContext, *, since: datetime, until: datetime) -> dict[t
     cycles saw grow in (since, until], not blocked and not late."""
     out: dict[tuple[str, str], list[Any]] = {}
     with _reading(ctx) as conn:
-        for src, port, connections, grown_bytes in conn.execute(
-                "SELECT f.src_key, f.port, i.connections, i.bytes FROM flow_increments i "
+        for src, port, proto, connections, grown_bytes in conn.execute(
+                "SELECT f.src_key, f.port, f.proto, i.connections, i.bytes FROM flow_increments i "
                 f"{INCREMENT_PRIMARY_JOIN} "
                 "WHERE i.late = 0 AND i.observed_at > ? AND i.observed_at <= ? "
                 "AND f.policy_decision NOT LIKE 'blocked%'", (db_time(since), db_time(until))):
-            for cls in (("all", "directory") if port in DIRECTORY_PORTS else ("all",)):
+            for cls in (("all", "directory") if (port, proto) in DIRECTORY_PORTS else ("all",)):
                 slot = out.setdefault((src, cls), [0, None])
                 slot[0] += connections
                 if grown_bytes is not None:
