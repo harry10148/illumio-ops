@@ -49,3 +49,14 @@ def test_xlsx_builder_limit_note_written():
 def test_xlsx_long_cell_kept_whole(doc_with_rows):
     ws = next(w for w in _wb(doc_with_rows(1, cell="y" * 2500)).worksheets if w.title != "Summary")
     assert ws["A2"].value == "y" * 2500 and ws["A2"].alignment.wrap_text
+
+
+def test_xlsx_shortened_sheet_name_keeps_full_title():
+    """A sheet name is at most 31 characters (Excel): the table's whole title is then the first row."""
+    long = "Outbound connections by destination app and service"
+    doc = make_doc(sections=(Section(id="a", title="A", blocks=(table([("a", 1)], title=long),
+                                                                table([("b", 2)], title="Short"))),))
+    wb = _wb(doc)
+    first, second = (ws for ws in wb.worksheets if ws.title != "Summary")
+    assert first.title != long and first["A1"].value == long and first["A2"].value == "Col 0"
+    assert second.title == "Short" and second["A1"].value == "Col 0"
