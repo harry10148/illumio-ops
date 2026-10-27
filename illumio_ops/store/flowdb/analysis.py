@@ -132,6 +132,34 @@ def detections_ranked(conn: sqlite3.Connection, since: datetime, *, limit: int) 
     return rows, int(total)
 
 
+def detections_first_seen_between(conn: sqlite3.Connection, start: datetime, end: datetime, *,
+                                  limit: int) -> tuple[list[sqlite3.Row], int]:
+    """(detections that first appeared in [start, end) — most important first, as detections_ranked — and how
+    many there are in all)."""
+    rank = " ".join(f"WHEN '{s.value}' THEN {i}" for i, s in enumerate(SEVERITY_ORDER))
+    window = (db_time(start), db_time(end))
+    rows = conn.execute(f"SELECT * FROM detections WHERE first_seen >= ? AND first_seen < ? ORDER BY CASE severity "
+                        f"{rank} ELSE -1 END DESC, critical_asset DESC, first_seen DESC, id DESC LIMIT ?",
+                        (*window, limit)).fetchall()
+    total = conn.execute("SELECT COUNT(*) FROM detections WHERE first_seen >= ? AND first_seen < ?",
+                         window).fetchone()[0]
+    return rows, int(total)
+
+
+def detection_counts(conn: sqlite3.Connection, start: datetime, end: datetime) -> dict[str, tuple[int, int]]:
+    """detector -> (detections first seen in [start, end), how many of them high or critical)."""
+    return {r[0]: (r[1], r[2]) for r in conn.execute(
+        "SELECT detector, COUNT(*), SUM(severity IN ('high', 'critical')) FROM detections "
+        "WHERE first_seen >= ? AND first_seen < ? GROUP BY detector", (db_time(start), db_time(end)))}
+
+
+def lateral_snapshots(conn: sqlite3.Connection, first_day: str, last_day: str) -> list[tuple[str, dict[str, Any]]]:
+    """(day, metrics) for the stored days in [first_day, last_day], oldest first."""
+    return [(r[0], json.loads(r[1])) for r in conn.execute(
+        "SELECT day, metrics_json FROM lateral_snapshot_daily WHERE day >= ? AND day <= ? ORDER BY day",
+        (first_day, last_day))]
+
+
 def get_run(conn: sqlite3.Connection, kind: str) -> sqlite3.Row | None:
     row: sqlite3.Row | None = conn.execute("SELECT * FROM analysis_runs WHERE kind = ?", (kind,)).fetchone()
     return row

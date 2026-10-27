@@ -55,7 +55,10 @@ REGISTRY: dict[ReportType, ReportSpec] = {}
 
 
 def _builtin() -> dict[ReportType, ReportSpec]:
-    return {}
+    from illumio_ops.services.reports.lateral_posture import build_lateral_posture
+    return {
+        ReportType.LATERAL_POSTURE: ReportSpec(ReportType.LATERAL_POSTURE, "lateral", True, build_lateral_posture),
+    }
 
 
 def specs() -> dict[ReportType, ReportSpec]:

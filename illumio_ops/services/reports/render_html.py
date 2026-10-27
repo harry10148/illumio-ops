@@ -46,8 +46,8 @@ def _esc(value: object) -> str:
     return html.escape("" if value is None else str(value), quote=True)
 
 
-def tr(lang: Language, key: str, **params: object) -> str:
-    return translate(lang, key, {k: str(v) for k, v in params.items()})
+def tr(lang: Language, msg: str, /, **params: object) -> str:
+    return translate(lang, msg, {k: str(v) for k, v in params.items()})
 
 
 def fmt_number(value: float) -> str:
