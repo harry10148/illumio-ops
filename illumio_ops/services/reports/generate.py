@@ -34,6 +34,7 @@ from illumio_ops.services.reports.deliver import deliver, gui_link
 from illumio_ops.services.reports.registry import BuildInput, ReportParams, specs
 from illumio_ops.services.reports.render_html import fmt_time, render_html
 from illumio_ops.services.reports.render_xlsx import render_xlsx
+from illumio_ops.settings.schema import PceSettings
 from illumio_ops.store import reports as store
 from illumio_ops.store.flowdb.db import StaleGeneration
 
@@ -51,8 +52,7 @@ class _Fail(Exception):
         self.key, self.detail = key, detail
 
 
-def pce_label(ctx: AppContext) -> str:
-    pce = ctx.settings.current().pce
+def pce_label(pce: PceSettings) -> str:
     host = urlsplit(pce.url).hostname or pce.url
     return f"{host} (org {pce.org_id})" if pce.org_id else host
 
@@ -75,8 +75,9 @@ def previous_period(start: datetime, end: datetime, tz: tzinfo | None) -> tuple[
     return _midnight(start.astimezone(tz).date() - timedelta(days=days), tz), start
 
 
-def pce_target(ctx: AppContext) -> str:
-    url, org = normalize_target(ctx.settings.current().pce.url, ctx.settings.current().pce.org_id)
+def pce_target(pce: PceSettings) -> str:
+    """The PCE's identity (normalized URL and org); taken from the same settings snapshot as its label."""
+    url, org = normalize_target(pce.url, pce.org_id)
     return f"{url}#{org}"
 
 
@@ -107,8 +108,8 @@ def enqueue(ctx: AppContext, params: ReportParams, *, trigger: str, schedule_id:
     with ctx.db() as conn:
         return store.insert(conn, report_type=params.report_type.value, params_json=params.model_dump_json(),
                             status=ReportStatus.FAILED if reason else ReportStatus.QUEUED, trigger=trigger,
-                            schedule_id=schedule_id, pce_label=pce_label(ctx), period_start=start, period_end=end,
-                            created_at=now, error_key=reason, pce_target=pce_target(ctx))
+                            schedule_id=schedule_id, pce_label=pce_label(settings.pce), period_start=start,
+                            period_end=end, created_at=now, error_key=reason, pce_target=pce_target(settings.pce))
 
 
 def recover_running(ctx: AppContext) -> int:
@@ -151,8 +152,10 @@ def run_queued(ctx: AppContext, *, now: datetime | None = None) -> int | None:
     generation = fdb.generation
     try:
         params = ReportParams.model_validate(row.params)
-        if row.pce_target and row.pce_target != pce_target(ctx):
-            raise _Fail("rpt_err_pce_switched")  # queued for another PCE than the one configured now
+        # Queued for another PCE than the one configured now — or before reports recorded their PCE (''): either
+        # way the data read now may not be the PCE the report names.
+        if row.pce_target != pce_target(settings.pce):
+            raise _Fail("rpt_err_pce_switched")
         spec = specs().get(params.report_type)
         if spec is None:
             raise _Fail("rpt_unavailable_not_built")

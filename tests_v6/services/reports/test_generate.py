@@ -221,3 +221,27 @@ def test_previous_covered_only_when_fully_collected(ctx):
         ingest_state.record_gap(conn, IngestSource.TRAFFIC, datetime(2026, 10, 22, tzinfo=UTC),
                                 datetime(2026, 10, 22, 1, tzinfo=UTC), kind="failed", detail="x", at=NOW)
     assert generate.traffic_covered(ctx, start, end, now=NOW) is False
+
+
+def test_report_without_pce_target_is_not_run(ctx, monkeypatch):
+    """Re-review: a row queued before the column existed has pce_target '' and skipped the check."""
+    _register(monkeypatch, FakeBuilder())
+    with ctx.db() as conn:
+        rid = store.insert(conn, report_type="lateral_posture", params_json='{"report_type": "lateral_posture"}',
+                           status=ReportStatus.QUEUED, trigger="manual", schedule_id=None, pce_label="A",
+                           period_start=NOW, period_end=NOW, created_at=NOW)
+    generate.run_queued(ctx, now=NOW)
+    assert _row(ctx, rid).error_key == "rpt_err_pce_switched"
+
+
+def test_label_and_target_from_one_settings_snapshot(ctx, monkeypatch):
+    """Re-review: label and target were read from two snapshots; a switch in between stored A's name with B."""
+    _register(monkeypatch, FakeBuilder())
+    real = ctx.settings.current
+    first = real()
+    other = first.model_copy(update={"pce": first.pce.model_copy(update={"url": "https://b.example:8443"})})
+    calls = iter([first] + [other] * 50)
+    monkeypatch.setattr(ctx.settings, "current", lambda: next(calls))
+    rid = generate.enqueue(ctx, ReportParams(report_type=LATERAL), trigger="manual", schedule_id=None, now=NOW)
+    row = _row(ctx, rid)
+    assert "pce.example.com" in row.pce_label and "pce.example.com" in row.pce_target
