@@ -10247,7 +10247,8 @@
               "lateral_posture",
               "new_connections",
               "unmanaged_endpoints",
-              "traffic"
+              "traffic",
+              "security_risk"
             ],
             "title": "ReportType",
             "type": "string"
@@ -10700,7 +10701,8 @@
               "lateral_posture",
               "new_connections",
               "unmanaged_endpoints",
-              "traffic"
+              "traffic",
+              "security_risk"
             ],
             "title": "ReportType",
             "type": "string"
@@ -11245,7 +11247,8 @@
               "lateral_posture",
               "new_connections",
               "unmanaged_endpoints",
-              "traffic"
+              "traffic",
+              "security_risk"
             ],
             "title": "ReportType",
             "type": "string"
@@ -11778,7 +11781,8 @@
               "lateral_posture",
               "new_connections",
               "unmanaged_endpoints",
-              "traffic"
+              "traffic",
+              "security_risk"
             ],
             "title": "ReportType",
             "type": "string"
@@ -12490,7 +12494,8 @@
               "lateral_posture",
               "new_connections",
               "unmanaged_endpoints",
-              "traffic"
+              "traffic",
+              "security_risk"
             ],
             "title": "ReportType",
             "type": "string"
@@ -12943,7 +12948,8 @@
               "lateral_posture",
               "new_connections",
               "unmanaged_endpoints",
-              "traffic"
+              "traffic",
+              "security_risk"
             ],
             "title": "ReportType",
             "type": "string"
@@ -13087,7 +13093,8 @@
               "lateral_posture",
               "new_connections",
               "unmanaged_endpoints",
-              "traffic"
+              "traffic",
+              "security_risk"
             ],
             "title": "ReportType",
             "type": "string"
@@ -13411,7 +13418,8 @@
               "lateral_posture",
               "new_connections",
               "unmanaged_endpoints",
-              "traffic"
+              "traffic",
+              "security_risk"
             ],
             "title": "ReportType",
             "type": "string"
@@ -19457,6 +19465,7 @@
     "ReportType": [
       "lateral_posture",
       "new_connections",
+      "security_risk",
       "traffic",
       "unmanaged_endpoints"
     ],

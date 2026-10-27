@@ -455,6 +455,7 @@ class DecisionTotals(BaseModel):
     flows: int
     connections: int
     into_managed: int  # flows whose destination is a managed host: the one definition of inbound
+    from_managed: int  # flows whose source is a managed host
 
 
 class FlowTotals(BaseModel):
@@ -465,27 +466,40 @@ class FlowTotals(BaseModel):
     destinations: int
     from_unmanaged: int
     to_unmanaged: int
+    from_unmanaged_connections: int
+    admin_open_connections: int  # on the given management ports, decision not blocked
     by_decision: list[DecisionTotals]
 
 
-def flow_totals(ctx: AppContext, spec: FilterSpec) -> FlowTotals:
+def flow_totals(ctx: AppContext, spec: FilterSpec, *,
+                admin_ports: Collection[tuple[int, int | None]] = ()) -> FlowTotals:
     fdb, gen, settings = _store_read(ctx)
+    admin_sql, admin_params = "0", []
+    if admin_ports:
+        parts = []
+        for port, proto in sorted(admin_ports, key=str):
+            parts.append("(f.port = ?)" if proto is None else "(f.port = ? AND f.proto = ?)")
+            admin_params += [port] if proto is None else [port, proto]
+        admin_sql = f"({' OR '.join(parts)}) AND f.policy_decision != 'blocked'"
     with fdb.connect() as conn:
         require_same_pce(conn, settings.pce)
         for name, fn in sql_functions().items():
             conn.create_function(name, -1, fn, deterministic=True)
         where, params = to_sql(spec)
-        decisions = [DecisionTotals(decision=r[0], flows=r[1], connections=r[2] or 0, into_managed=r[3] or 0)
+        decisions = [DecisionTotals(decision=r[0], flows=r[1], connections=r[2] or 0, into_managed=r[3] or 0,
+                                    from_managed=r[4] or 0)
                      for r in conn.execute(
-                         "SELECT f.policy_decision, COUNT(*), SUM(f.num_connections), SUM(f.dst_managed = 1) "
-                         f"FROM flows f WHERE {where} GROUP BY 1 ORDER BY 2 DESC", params)]
+                         "SELECT f.policy_decision, COUNT(*), SUM(f.num_connections), SUM(f.dst_managed = 1), "
+                         f"SUM(f.src_managed = 1) FROM flows f WHERE {where} GROUP BY 1 ORDER BY 2 DESC", params)]
         r = conn.execute("SELECT COUNT(DISTINCT f.src_key), COUNT(DISTINCT f.dst_key), SUM(f.src_managed = 0), "
-                         f"SUM(f.dst_managed = 0) FROM flows f WHERE {where}", params).fetchone()
+                         "SUM(f.dst_managed = 0), SUM(CASE WHEN f.src_managed = 0 THEN f.num_connections END), "
+                         f"SUM(CASE WHEN {admin_sql} THEN f.num_connections END) FROM flows f WHERE {where}",
+                         [*admin_params, *params]).fetchone()
     if fdb.generation != gen:
         raise StaleGeneration
     return FlowTotals(flows=sum(d.flows for d in decisions), connections=sum(d.connections for d in decisions),
                       sources=r[0], destinations=r[1], from_unmanaged=r[2] or 0, to_unmanaged=r[3] or 0,
-                      by_decision=decisions)
+                      from_unmanaged_connections=r[4] or 0, admin_open_connections=r[5] or 0, by_decision=decisions)
 
 
 def new_user_pairs(ctx: AppContext, ports: Sequence[PortProto], *, since: datetime) -> list[UserPair]:
