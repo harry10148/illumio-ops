@@ -65,15 +65,21 @@ class ReportSpec:
     max_lookback: Callable[[Settings], int] | None = None  # the most days back the report's data reaches
     requires_app: bool = False  # the filter must name an app label (one application's report)
     accepts_filter: bool = False  # the report reads ReportParams.filter (flow reports); others refuse one
+    retention: Callable[[Settings], int] | None = None  # days its data is kept: the period may not start earlier
 
 
 REGISTRY: dict[ReportType, ReportSpec] = {}
 
 
+def flow_retention(settings: Settings) -> int:
+    """The flow reports read the flows table, kept flow_days back from now."""
+    return settings.collection.retention.flow_days
+
+
 def flow_days(settings: Settings) -> int:
-    """The flow reports read the flows table, kept flow_days back from now. A period starts at a calendar
-    midnight, so its first day is whole only when it starts at most flow_days - 1 days before today."""
-    return max(1, settings.collection.retention.flow_days - 1)
+    """The lookback the flow reports offer: a period starts at a calendar midnight, so it reaches back at most
+    flow_days - 1 whole days (refusal also checks the exact start against the retention floor)."""
+    return settings.collection.retention.flow_days - 1
 
 
 def _builtin() -> dict[ReportType, ReportSpec]:
@@ -89,14 +95,17 @@ def _builtin() -> dict[ReportType, ReportSpec]:
         ReportType.NEW_CONNECTIONS: ReportSpec(ReportType.NEW_CONNECTIONS, "analysis", True, build_new_connections),
         ReportType.UNMANAGED_ENDPOINTS: ReportSpec(ReportType.UNMANAGED_ENDPOINTS, "inventory", True, build_unmanaged),
         ReportType.TRAFFIC: ReportSpec(ReportType.TRAFFIC, "analysis", True, build_traffic,
-                                       max_lookback=flow_days, accepts_filter=True),
+                                       max_lookback=flow_days, accepts_filter=True,
+                                       retention=flow_retention),
         ReportType.SECURITY_RISK: ReportSpec(ReportType.SECURITY_RISK, "assessment", True, build_security_risk,
-                                             max_lookback=flow_days, accepts_filter=True),
+                                             max_lookback=flow_days, accepts_filter=True,
+                                       retention=flow_retention),
         ReportType.NETWORK_INVENTORY: ReportSpec(ReportType.NETWORK_INVENTORY, "inventory", True,
-                                                 build_network_inventory, max_lookback=flow_days, accepts_filter=True),
+                                                 build_network_inventory, max_lookback=flow_days, accepts_filter=True,
+                                       retention=flow_retention),
         ReportType.APP_SUMMARY: ReportSpec(ReportType.APP_SUMMARY, "analysis", True, build_app_summary,
                                            max_lookback=flow_days, requires_app=True,
-                                           accepts_filter=True),
+                                           accepts_filter=True, retention=flow_retention),
     }
 
 

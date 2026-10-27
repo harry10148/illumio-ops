@@ -6,7 +6,12 @@ from __future__ import annotations
 from collections.abc import Sequence
 from typing import Any
 
-from illumio_ops.domain.filter import EndpointFilter, FilterSpec, FlowCondition
+from illumio_ops.domain.filter import (
+    EndpointFilter,
+    FilterSpec,
+    FlowCondition,
+    endpoint_matches,
+)
 from illumio_ops.domain.lateral import HostInfo
 from illumio_ops.domain.report import Cell, Column, TableBlock
 from illumio_ops.domain.segment import FlowSegment, GroupBy
@@ -137,15 +142,20 @@ def coverage_lines(inp: BuildInput, fc: FieldCoverage | None) -> tuple[str, ...]
                bytes=pct(fc.bytes)),)
 
 
-def _side_matches(host: HostInfo, side: EndpointFilter | None) -> bool:
-    return side is not None and bool(side.labels) and all(host.labels.get(lc.key) in lc.values for lc in side.labels)
-
-
 def host_in_scope(host: HostInfo, cond: FlowCondition | None) -> bool:
-    """A managed host a filtered report is about: all of them, or those whose labels match a side of the filter
-    exactly (the inventory parts of the reports follow the same filter as their flows)."""
+    """A managed host a filtered report is about: one an include side of the filter matches (labels, href or
+    address, as the flows are matched) and that side's exclusion does not; every host without include
+    conditions, minus the excluded ones. Inventory hosts carry no address here, so an address-only side
+    matches none of them."""
     if not host.managed:
         return False
-    if cond is None or not any(s is not None and s.labels for s in (cond.src, cond.dst)):
+    if cond is None:
         return True
-    return _side_matches(host, cond.src) or _side_matches(host, cond.dst)
+
+    def hits(ep: EndpointFilter | None) -> bool:
+        return ep is not None and not ep.is_empty() and endpoint_matches(ep, href=host.href, ip="", labels=host.labels)
+    sides = [(cond.src, cond.src_exclude), (cond.dst, cond.dst_exclude)]
+    includes = [(inc, exc) for inc, exc in sides if inc is not None and not inc.is_empty()]
+    if not includes:
+        return not any(hits(exc) for _, exc in sides)
+    return any(hits(inc) and not hits(exc) for inc, exc in includes)

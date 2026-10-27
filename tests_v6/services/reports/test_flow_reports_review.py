@@ -187,3 +187,35 @@ def test_port_filter_kept_by_app_summary(ctx):
     _write(ctx, [flow(src_app="Web", dst_app="Finance", port=443), flow(src_app="Web", dst_app="Finance", port=80)])
     cond = FlowCondition(dst=EndpointFilter(labels=(FIN,)), ports=(PortProto(port=443, proto=6),))
     assert [r[1] for r in _table(_build(ctx, ReportType.APP_SUMMARY, cond), "inbound").rows] == ["443/TCP"]
+
+
+# Re-review round 2 ---------------------------------------------------------------------------------------------
+
+def test_refusal_checks_the_actual_period_start(ctx):
+    """flow_days=1 at noon: yesterday 00:00 is already pruned, so no whole day can be reported."""
+    ctx.settings.update(ctx.settings.current().revision, lambda d: (
+        d["collection"].update(mode="alert"), d["collection"]["retention"].update(flow_days=1)))
+    s = ctx.settings.current()
+    noon = datetime(2026, 10, 27, 12, tzinfo=UTC)
+    assert generate.refusal(s, ReportParams(report_type=ReportType.TRAFFIC, lookback_days=1), now=noon) == \
+        "rpt_err_lookback_beyond_retention"
+
+
+def test_refusal_across_dst(ctx):
+    """New York, the evening after the November change: 34 days back from local midnight reaches past 35 x 24 h."""
+    ctx.settings.update(ctx.settings.current().revision, lambda d: d["display"].update(timezone="America/New_York"))
+    s = ctx.settings.current()
+    late = datetime(2026, 11, 3, 4, 30, tzinfo=UTC)  # 2026-11-02 23:30 in New York
+    assert generate.refusal(s, ReportParams(report_type=ReportType.TRAFFIC, lookback_days=34), now=late) == \
+        "rpt_err_lookback_beyond_retention"
+    assert generate.refusal(s, ReportParams(report_type=ReportType.TRAFFIC, lookback_days=33), now=late) is None
+
+
+def test_inventory_scope_follows_hrefs_and_exclusions(ctx):
+    _inventory(ctx, [("f1", {"app": "Finance"}, "full"), ("f2", {"app": "Finance"}, "idle"),
+                     ("o1", {"app": "Other"}, "full")])
+    _write(ctx, [flow(port=443, dst_app="Finance")])
+    by_href = FlowCondition(dst=EndpointFilter(hrefs=("/orgs/1/workloads/f1",)))
+    assert _kpi(_build(ctx, ReportType.NETWORK_INVENTORY, by_href))["managed_hosts"].value == 1
+    minus = FlowCondition(dst=EndpointFilter(labels=(FIN,)), dst_exclude=EndpointFilter(hrefs=("/orgs/1/workloads/f2",)))
+    assert _kpi(_build(ctx, ReportType.SECURITY_RISK, minus))["enforced_hosts_pct"].value == 100.0

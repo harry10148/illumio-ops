@@ -114,13 +114,19 @@ REFUSAL_FIELDS = {"rpt_err_lookback_beyond_retention": "lookback_days", "rpt_err
                   "rpt_err_filter_not_supported": "filter", "rpt_err_app_filter_shape": "filter"}
 
 
-def refusal(settings: Settings, params: ReportParams) -> str | None:
-    """Why these parameters cannot make this report (the reason is stored on a failed row), or None."""
+def refusal(settings: Settings, params: ReportParams, *, now: datetime | None = None) -> str | None:
+    """Why these parameters cannot make this report (the reason is stored on a failed row), or None. With
+    `now`, the period's actual start is checked against the retention floor (a DST change or a short
+    retention can put it a few hours past what the lookback limit allows)."""
     spec = specs().get(params.report_type)
     if spec is None:
         return None
     if spec.max_lookback is not None and params.lookback_days > spec.max_lookback(settings):
         return "rpt_err_lookback_beyond_retention"
+    if spec.retention is not None and now is not None:
+        start, _ = period(now, params.lookback_days, settings.display.zone())
+        if start < now - timedelta(days=spec.retention(settings)):
+            return "rpt_err_lookback_beyond_retention"
     if params.filter is not None and not spec.accepts_filter:
         return "rpt_err_filter_not_supported"
     if spec.requires_app and not names_app(params.filter):
@@ -134,7 +140,8 @@ def enqueue(ctx: AppContext, params: ReportParams, *, trigger: str, schedule_id:
     """A queued report, or a failed one at once when it cannot be made (the reason is stored, no files)."""
     settings = ctx.settings.current()
     start, end = period(now, params.lookback_days, settings.display.zone())
-    reason = availability(ctx).get(params.report_type, "rpt_unavailable_not_built") or refusal(settings, params)
+    reason = availability(ctx).get(params.report_type, "rpt_unavailable_not_built") or refusal(settings, params,
+                                                                                                now=now)
     with ctx.db() as conn:
         return store.insert(conn, report_type=params.report_type.value, params_json=params.model_dump_json(),
                             status=ReportStatus.FAILED if reason else ReportStatus.QUEUED, trigger=trigger,

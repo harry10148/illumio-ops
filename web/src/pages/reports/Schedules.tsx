@@ -22,6 +22,13 @@ function blank(type: string): ReportScheduleFields {
   };
 }
 
+/** A lookback the type can read: kept when offered, else the longest one offered. */
+function fitLookback(days: number, max: number | null | undefined): number {
+  const choices = lookbackChoices(max);
+  if (choices.length === 0 || choices.includes(String(days))) return days;
+  return Number(choices[choices.length - 1]);
+}
+
 function when(s: ReportScheduleFields): string {
   const time = `${String(s.hour).padStart(2, "0")}:${String(s.minute).padStart(2, "0")}`;
   if (s.frequency === "weekly") return t("gui_reports_when_weekly", { day: t(WEEKDAY_KEYS[s.day_of_week ?? 0] ?? "weekday_mon"), time });
@@ -33,7 +40,11 @@ function Editor({ initial, catalog, smtp, onSave, onCancel, error }: {
   initial: ReportScheduleFields; catalog: Catalog; smtp: boolean; error: ApiError | null;
   onSave: (s: ReportScheduleFields) => void; onCancel: () => void;
 }) {
-  const [s, setS] = useState<ReportScheduleFields>(initial);
+  const [s, setS] = useState<ReportScheduleFields>(() => ({
+    ...initial,
+    lookback_days: fitLookback(initial.lookback_days,
+      catalog.entries.find((c) => c.report_type === initial.report_type)?.max_lookback),
+  }));
   const [recipients, setRecipients] = useState(initial.recipients.join(", "));
   const [rows, setRows] = useState<FilterRow[]>(rowsOf(initial.filter));
   const entry = catalog.entries.find((c) => c.report_type === s.report_type);
@@ -56,7 +67,8 @@ function Editor({ initial, catalog, smtp, onSave, onCancel, error }: {
         <select name="report_type" value={s.report_type}
           onChange={(e) => {
             const next = catalog.entries.find((c) => c.report_type === e.target.value);
-            set({ report_type: e.target.value as ReportScheduleFields["report_type"] });
+            set({ report_type: e.target.value as ReportScheduleFields["report_type"],
+                  lookback_days: fitLookback(s.lookback_days, next?.max_lookback) });
             if (next?.requires_app && !namesApp(rows)) setRows([...rows, { side: "dst", key: "app", value: "" }]);
           }}>
           {catalog.entries.map((c) => <option key={c.report_type} value={c.report_type}>{word(TYPE_KEYS, c.report_type)}</option>)}

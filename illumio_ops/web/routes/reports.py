@@ -2,6 +2,8 @@
 downloading a report's file (not under /api: a file, not an envelope; the login check is done here)."""
 from __future__ import annotations
 
+from datetime import UTC, datetime
+
 from flask import Blueprint, Response, request, send_from_directory
 from flask_login import current_user
 from pydantic import BaseModel, Field, ValidationError
@@ -54,7 +56,7 @@ def get_report(report_id: int) -> ReportItem:
 @api_route(bp, OP_GENERATE)
 def generate(body: ReportParams) -> ReportItem:
     ctx = get_ctx()
-    reason = refusal(ctx.settings.current(), body)
+    reason = refusal(ctx.settings.current(), body, now=datetime.now(UTC))
     if reason:
         raise ApiFailure(400, "invalid_input", reason, field=f"report.{REFUSAL_FIELDS[reason]}")
     return views.generate_now(ctx, body)

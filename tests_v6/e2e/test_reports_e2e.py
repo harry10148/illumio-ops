@@ -150,3 +150,19 @@ def test_editing_a_schedule_keeps_filter_fields_the_picker_does_not_show(context
     saved = ctx.settings.current().reports.schedules[0].filter
     assert saved is not None and [p.port for p in saved.ports] == [443] and saved.src_exclude.ips == ("10.9.0.0/16",)
     assert saved.dst.labels[0].values == ("Finance",)
+
+
+def test_schedule_lookback_stays_within_the_type(context, live_app):
+    ctx = live_app.ctx
+    ctx.settings.update(ctx.settings.current().revision, lambda d: d["collection"]["retention"].update(
+        flow_days=7, baseline_days=7))
+    page = context.new_page()
+    _reports(page, live_app.url)
+    page.get_by_role("tab", name="Schedules").click()
+    page.get_by_role("button", name="Add a schedule").click()
+    editor = page.locator("[data-role=schedule-editor]")
+    editor.locator("input[name=name]").fill("Short retention")
+    editor.locator("select[name=report_type]").select_option("traffic")
+    editor.get_by_role("button", name="Save").click()
+    expect(page.locator("[data-role=schedule-list] tbody tr").first).to_contain_text("Short retention")
+    assert ctx.settings.current().reports.schedules[0].lookback_days == 6

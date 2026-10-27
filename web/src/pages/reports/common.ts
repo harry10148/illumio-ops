@@ -39,6 +39,7 @@ export const LOOKBACK_CHOICES = ["1", "7", "14", "30", "90"];
 /** The lookback choices a type can read: the flow reports stop at the flow retention (it is offered itself). */
 export function lookbackChoices(max: number | null | undefined): string[] {
   if (max == null) return LOOKBACK_CHOICES;
+  if (max < 1) return [];
   const kept = LOOKBACK_CHOICES.filter((d) => Number(d) <= max);
   return kept.includes(String(max)) ? kept : [...kept, String(max)];
 }
