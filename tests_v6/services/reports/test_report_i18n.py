@@ -14,10 +14,15 @@ from illumio_ops.services.reports.registry import BuildInput, ReportParams, spec
 from illumio_ops.services.reports.render_email import render_email
 from illumio_ops.services.reports.render_html import render_html
 from illumio_ops.services.reports.render_xlsx import render_xlsx
-from tests_v6.services.reports.test_lateral_posture import _detection, _exposure, _hosts, _snapshot
+from tests_v6.services.collect.conftest import configured_ctx
+from tests_v6.services.reports.test_lateral_posture import (
+    _detection,
+    _exposure,
+    _hosts,
+    _snapshot,
+)
 from tests_v6.services.reports.test_new_connections import _baseline
 from tests_v6.services.reports.test_unmanaged import _rollup
-from tests_v6.services.collect.conftest import configured_ctx
 
 NOW = datetime(2026, 10, 27, 1, 0, tzinfo=UTC)
 START, END = datetime(2026, 10, 20, tzinfo=UTC), datetime(2026, 10, 27, tzinfo=UTC)
