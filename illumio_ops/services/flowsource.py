@@ -502,6 +502,41 @@ def flow_totals(ctx: AppContext, spec: FilterSpec, *,
                       from_unmanaged_connections=r[4] or 0, admin_open_connections=r[5] or 0, by_decision=decisions)
 
 
+class LabelMix(BaseModel):
+    """How the period's flows sit against the labels (network inventory report)."""
+    unlabeled_app_flows: int  # flows where a managed end has no app label
+    same_env_connections: int
+    cross_env_connections: int
+    unknown_env_connections: int  # an end without an environment label
+    unmanaged_into_apps: list[tuple[str | None, int, int]]  # (destination app, connections, sources), busiest first
+    unmanaged_into_apps_total: int  # destination apps unmanaged sources reached
+
+
+def label_mix(ctx: AppContext, spec: FilterSpec, *, app_key: str, env_key: str, top: int) -> LabelMix:
+    fdb, gen, settings = _store_read(ctx)
+    rows = (f"SELECT f.src_key, f.src_managed, f.dst_managed, f.num_connections, {_label_of('src')} AS sa, "
+            f"{_label_of('src')} AS se, {_label_of('dst')} AS da, {_label_of('dst')} AS de FROM flows f WHERE {{where}}")
+    with fdb.connect() as conn:
+        require_same_pce(conn, settings.pce)
+        for name, fn in sql_functions().items():
+            conn.create_function(name, -1, fn, deterministic=True)
+        where, params = to_sql(spec)
+        sub = rows.format(where=where)
+        keys = [app_key, env_key, app_key, env_key, *params]
+        r = conn.execute(
+            "SELECT SUM((src_managed = 1 AND sa = '') OR (dst_managed = 1 AND da = '')), "
+            "SUM(CASE WHEN se != '' AND de != '' AND se = de THEN num_connections END), "
+            "SUM(CASE WHEN se != '' AND de != '' AND se != de THEN num_connections END), "
+            f"SUM(CASE WHEN se = '' OR de = '' THEN num_connections END) FROM ({sub})", keys).fetchone()
+        into = conn.execute(f"SELECT NULLIF(da, ''), SUM(num_connections) AS n, COUNT(DISTINCT src_key) FROM ({sub}) "
+                            "WHERE src_managed = 0 AND dst_managed = 1 GROUP BY da ORDER BY n DESC, da", keys).fetchall()
+    if fdb.generation != gen:
+        raise StaleGeneration
+    return LabelMix(unlabeled_app_flows=r[0] or 0, same_env_connections=r[1] or 0, cross_env_connections=r[2] or 0,
+                    unknown_env_connections=r[3] or 0, unmanaged_into_apps=[(a, n, s) for a, n, s in into[:top]],
+                    unmanaged_into_apps_total=len(into))
+
+
 def new_user_pairs(ctx: AppContext, ports: Sequence[PortProto], *, since: datetime) -> list[UserPair]:
     """User x destination x port combinations first seen since `since` (spec §6.5.7, "new combinations
     against the baseline"). user_baseline holds only connections with a user (about a tenth of them on

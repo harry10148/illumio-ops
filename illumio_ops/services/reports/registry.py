@@ -76,6 +76,7 @@ def flow_days(settings: Settings) -> int:
 
 def _builtin() -> dict[ReportType, ReportSpec]:
     from illumio_ops.services.reports.lateral_posture import build_lateral_posture
+    from illumio_ops.services.reports.network_inventory import build_network_inventory
     from illumio_ops.services.reports.new_connections import build_new_connections
     from illumio_ops.services.reports.security_risk import build_security_risk
     from illumio_ops.services.reports.traffic import build_traffic
@@ -88,6 +89,8 @@ def _builtin() -> dict[ReportType, ReportSpec]:
                                        max_lookback=flow_days),
         ReportType.SECURITY_RISK: ReportSpec(ReportType.SECURITY_RISK, "assessment", True, build_security_risk,
                                              max_lookback=flow_days),
+        ReportType.NETWORK_INVENTORY: ReportSpec(ReportType.NETWORK_INVENTORY, "inventory", True,
+                                                 build_network_inventory, max_lookback=flow_days),
     }
 
 

@@ -375,6 +375,7 @@ class ReportType(StrEnum):
     UNMANAGED_ENDPOINTS = "unmanaged_endpoints"
     TRAFFIC = "traffic"
     SECURITY_RISK = "security_risk"
+    NETWORK_INVENTORY = "network_inventory"
 
 
 class ReportFormat(StrEnum):

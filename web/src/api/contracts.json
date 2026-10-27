@@ -10248,7 +10248,8 @@
               "new_connections",
               "unmanaged_endpoints",
               "traffic",
-              "security_risk"
+              "security_risk",
+              "network_inventory"
             ],
             "title": "ReportType",
             "type": "string"
@@ -10702,7 +10703,8 @@
               "new_connections",
               "unmanaged_endpoints",
               "traffic",
-              "security_risk"
+              "security_risk",
+              "network_inventory"
             ],
             "title": "ReportType",
             "type": "string"
@@ -11248,7 +11250,8 @@
               "new_connections",
               "unmanaged_endpoints",
               "traffic",
-              "security_risk"
+              "security_risk",
+              "network_inventory"
             ],
             "title": "ReportType",
             "type": "string"
@@ -11782,7 +11785,8 @@
               "new_connections",
               "unmanaged_endpoints",
               "traffic",
-              "security_risk"
+              "security_risk",
+              "network_inventory"
             ],
             "title": "ReportType",
             "type": "string"
@@ -12495,7 +12499,8 @@
               "new_connections",
               "unmanaged_endpoints",
               "traffic",
-              "security_risk"
+              "security_risk",
+              "network_inventory"
             ],
             "title": "ReportType",
             "type": "string"
@@ -12949,7 +12954,8 @@
               "new_connections",
               "unmanaged_endpoints",
               "traffic",
-              "security_risk"
+              "security_risk",
+              "network_inventory"
             ],
             "title": "ReportType",
             "type": "string"
@@ -13094,7 +13100,8 @@
               "new_connections",
               "unmanaged_endpoints",
               "traffic",
-              "security_risk"
+              "security_risk",
+              "network_inventory"
             ],
             "title": "ReportType",
             "type": "string"
@@ -13419,7 +13426,8 @@
               "new_connections",
               "unmanaged_endpoints",
               "traffic",
-              "security_risk"
+              "security_risk",
+              "network_inventory"
             ],
             "title": "ReportType",
             "type": "string"
@@ -19464,6 +19472,7 @@
     ],
     "ReportType": [
       "lateral_posture",
+      "network_inventory",
       "new_connections",
       "security_risk",
       "traffic",
