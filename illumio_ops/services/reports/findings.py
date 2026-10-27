@@ -329,8 +329,10 @@ RULE_FUNCTIONS: dict[str, Callable[[_Run], RuleOutcome | None]] = {
 
 
 def run_rules(ctx: AppContext, spec: FilterSpec | Sequence[FilterSpec], thresholds: ReportRuleThresholds, lang: Language, *,
-              now: datetime) -> list[RuleOutcome]:
-    """Every rule that fired or could not be evaluated, most severe first."""
+              now: datetime, scoped: bool = False) -> list[RuleOutcome]:
+    """Every rule that fired or could not be evaluated, most severe first. scoped: the report is filtered (one
+    app, some labels), so rules that read whole-estate analyses (L006's exposure graph) keep only the hosts
+    that appear in the filtered flows."""
     lc = load_lateral_context(ctx, now=now)
     admin = {(e.port, e.proto) for e in lc.admin_ports.entries if e.category is PortClass.REMOTE
              and e.proto is not None}
@@ -344,6 +346,9 @@ def run_rules(ctx: AppContext, spec: FilterSpec | Sequence[FilterSpec], threshol
         row = analysis.read_result(conn, "exposure")
         exposure = json.loads(row["result_json"]) if row is not None else None
         flowsource.group_for_findings(conn, spec, env_key=lc.settings.environment_label_key, table=_AGG)
+        if scoped and exposure is not None:
+            present = {k for (k,) in conn.execute(f"SELECT src_key FROM {_AGG} UNION SELECT dst_key FROM {_AGG}")}
+            exposure = {**exposure, "hosts": [h for h in exposure.get("hosts") or () if h.get("key") in present]}
         run = _Run(conn, thresholds, lang, admin, names, exposure)
         for rule_id, rule in RULE_FUNCTIONS.items():
             try:

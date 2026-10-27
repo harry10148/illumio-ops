@@ -95,9 +95,10 @@ def test_zero_user_coverage_says_so(ctx):
 
 
 def test_users_ranked_when_present(ctx):
-    _write(ctx, [flow(dst=f"t{i}", port=443, user="CORP\\alice") for i in range(3)])
+    _write(ctx, [flow(dst=f"t{i}", port=443, user="CORP\\alice") for i in range(3)] +
+           [flow(dst=f"n{i}", port=443) for i in range(5)])  # flows without a user are not a "(none)" user
     users = next(t for t in _tables(_build(ctx), "users") if "user" in t.title.lower())
-    assert users.rows[0][1] == 3
+    assert users.rows == (("corp\\alice", 3),)
 
 
 def test_filter_with_no_flows_says_so(ctx):

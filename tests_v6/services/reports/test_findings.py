@@ -217,3 +217,16 @@ def test_thresholds_from_settings(ctx):
     got = {o.rule_id for o in findings.run_rules(ctx, SPEC, ctx.settings.current().reports.rule_thresholds,
                                                  Language.EN, now=NOW)}
     assert "B004" in got
+
+
+def test_l006_scoped_to_the_filtered_flows(ctx):
+    """A filtered report (one app) lists only exposure hosts that appear in its own flows."""
+    _write(ctx, [flow(src="hub", port=443)])
+    with ctx.flows().connect() as conn:
+        analysis.write_result(conn, "exposure", params={}, at=NOW, result={
+            "hosts": [{"key": "/orgs/1/workloads/hub", "reach_now": 9}, {"key": "/orgs/1/workloads/far", "reach_now": 9}]})
+        conn.commit()
+    t = ctx.settings.current().reports.rule_thresholds
+    whole = {o.rule_id: o for o in findings.run_rules(ctx, SPEC, t, Language.EN, now=NOW)}
+    scoped = {o.rule_id: o for o in findings.run_rules(ctx, SPEC, t, Language.EN, now=NOW, scoped=True)}
+    assert whole["L006"].params["n_hosts"] == 2 and scoped["L006"].params["n_hosts"] == 1

@@ -137,7 +137,7 @@ def build_security_risk(inp: BuildInput) -> ReportDocument:
         ransomware_services=rw_counts[0] if rw_counts else None,
         ransomware_protected=rw_counts[1] if rw_counts else None))
     outcomes = findings.run_rules(inp.ctx, spec, inp.ctx.settings.current().reports.rule_thresholds, lang,
-                                  now=inp.now) if totals.flows else []
+                                  now=inp.now, scoped=cond is not None) if totals.flows else []
     fired = [o for o in outcomes if o.severity in (Severity.CRITICAL, Severity.HIGH)]
 
     # ── key metrics ─────────────────────────────────────────────────────────
@@ -274,7 +274,7 @@ def build_security_risk(inp: BuildInput) -> ReportDocument:
     if fc.initiator_user:
         user_blocks.append(flowsections.ranking(
             inp, title=t("rpt_sec_tbl_users"), metric=SegmentMetric.DISTINCT_DST, limit=TOP,
-            group_by=(GroupBy(dimension=SegmentDimension.INITIATOR_USER),),
+            group_by=(GroupBy(dimension=SegmentDimension.INITIATOR_USER),), skip_empty=True,
             columns=(Column(key="user", label=t("rpt_col_user")),
                      Column(key="n", label=t("rpt_col_distinct_destinations"), kind="number"))))
     else:
@@ -282,7 +282,7 @@ def build_security_risk(inp: BuildInput) -> ReportDocument:
     if fc.initiator_process:
         user_blocks.append(flowsections.ranking(
             inp, title=t("rpt_sec_tbl_processes"), metric=SegmentMetric.CONNECTIONS, limit=TOP,
-            group_by=(GroupBy(dimension=SegmentDimension.INITIATOR_PROCESS),),
+            group_by=(GroupBy(dimension=SegmentDimension.INITIATOR_PROCESS),), skip_empty=True,
             columns=(Column(key="process", label=t("rpt_col_process")),
                      Column(key="n", label=t("rpt_col_connections"), kind="number"))))
     else:

@@ -63,20 +63,26 @@ def _names(inp: BuildInput, rows: Sequence[AggRow], group_by: Sequence[GroupBy])
 
 def ranking(inp: BuildInput, *, title: str, group_by: Sequence[GroupBy], metric: SegmentMetric,
             columns: Sequence[Column], extra: FlowCondition | None = None, limit: int = 20,
-            spec: FilterSpec | None = None) -> TableBlock:
+            spec: FilterSpec | None = None, skip_empty: bool = False) -> TableBlock:
     """A top-`limit` ranking as a table: one column per grouping level, then the metric. `spec` replaces the
-    report's window and filter (a report that builds its own sides, such as one app's inbound traffic)."""
+    report's window and filter (a report that builds its own sides, such as one app's inbound traffic).
+    skip_empty: flows without the grouped field (no user, no process) are not ranked as a "(none)" row."""
     seg = FlowSegment(filter=spec or window(inp, extra), group_by=tuple(group_by), metric=metric,
-                      view=SegmentView.RANKING, limit=limit)
+                      view=SegmentView.RANKING, limit=limit + 1 if skip_empty else limit)
     result = run_segment(inp.ctx, seg, now=inp.now)
     rows_in = result.ranking or []
+    limit_hit = result.limit_hit
+    if skip_empty:
+        rows_in = [r for r in rows_in if any(k not in (None, "") for k in r.keys)]
+        limit_hit = limit_hit or len(rows_in) > limit
+        rows_in = rows_in[:limit]
     names = _names(inp, rows_in, group_by)
     rows: tuple[tuple[Cell, ...], ...] = tuple(
         (*(_key_text(inp, g, r.keys[i], r.display[i], names) for i, g in enumerate(group_by)), r.value)
         for r in rows_in)
     empty = tr(inp.lang, "rpt_no_flows_filtered" if inp.params.filter is not None else "rpt_no_flows")
     return TableBlock(title=title, columns=tuple(columns), rows=rows, total_rows=len(rows), empty_text=empty,
-                      limit_note=tr(inp.lang, "rpt_limit_top_n", n=limit) if result.limit_hit else None)
+                      limit_note=tr(inp.lang, "rpt_limit_top_n", n=limit) if limit_hit else None)
 
 
 def _side_text(side: EndpointFilter, lang: Language, prefix_key: str) -> list[str]:

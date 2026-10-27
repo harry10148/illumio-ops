@@ -122,7 +122,7 @@ def build_network_inventory(inp: BuildInput) -> ReportDocument:
         limit_note=t("rpt_limit_top_n", n=TOP) if mix.unmanaged_into_apps_total > TOP else None)
 
     outcomes = findings.run_rules(inp.ctx, spec, inp.ctx.settings.current().reports.rule_thresholds, lang,
-                                  now=inp.now) if totals else []
+                                  now=inp.now, scoped=inp.params.filter is not None) if totals else []
     kpis = (
         Kpi(key="managed_hosts", label=t("rpt_inv_kpi_managed_hosts"), value=len(managed), previous=None),
         Kpi(key="hosts_missing_labels", label=t("rpt_inv_kpi_missing_labels"), value=len(missing), previous=None,

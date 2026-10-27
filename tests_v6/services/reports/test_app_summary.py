@@ -114,3 +114,13 @@ def test_findings_only_this_app(ctx):
 def test_zh_tw_builds(ctx):
     _write(ctx, [flow(src_app="Web", dst_app="Finance", port=443)])
     assert "Finance" in _build(ctx, _app("Finance"), Language.ZH_TW).title
+
+
+def test_exposure_finding_limited_to_the_app(ctx):
+    from illumio_ops.store.flowdb import analysis
+    _write(ctx, [flow(src_app="Web", dst_app="Finance", port=443)])
+    with ctx.flows().connect() as conn:
+        analysis.write_result(conn, "exposure", params={}, at=NOW, result={
+            "hosts": [{"key": "/orgs/1/workloads/elsewhere", "reach_now": 50}]})
+        conn.commit()
+    assert not any(r[0] == "L006" for r in _table(_build(ctx, _app("Finance")), "findings").rows)

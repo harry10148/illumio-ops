@@ -98,7 +98,7 @@ def build_traffic(inp: BuildInput) -> ReportDocument:
                                       t("rpt_trf_unmanaged_see")))
 
     outcomes = findings.run_rules(inp.ctx, spec, inp.ctx.settings.current().reports.rule_thresholds, lang,
-                                  now=inp.now) if totals.flows else []
+                                  now=inp.now, scoped=inp.params.filter is not None) if totals.flows else []
     filter_line = flowsections.filter_text(inp.params.filter, lang)
     quality = (*coverage_note(inp.ctx, inp.start, inp.end, lang, now=inp.now, tz=inp.tz),
                *((t("rpt_quality_filter", filter=filter_line),) if filter_line else ()),

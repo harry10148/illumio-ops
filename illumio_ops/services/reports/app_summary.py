@@ -165,7 +165,7 @@ def build_app_summary(inp: BuildInput) -> ReportDocument:
 
     outcomes = findings.run_rules(inp.ctx, [sides["touching_dst"], sides["touching_src"]],
                                   inp.ctx.settings.current().reports.rule_thresholds, lang,
-                                  now=inp.now) if flows else []
+                                  now=inp.now, scoped=True) if flows else []
     filter_line = flowsections.filter_text(inp.params.filter, lang)
     quality = (*coverage_note(inp.ctx, inp.start, inp.end, lang, now=inp.now, tz=inp.tz),
                *((t("rpt_quality_filter", filter=filter_line),) if filter_line else ()),
