@@ -7,8 +7,8 @@ from datetime import tzinfo
 from io import BytesIO
 
 from openpyxl import Workbook
-from openpyxl.styles import Alignment, Font
 from openpyxl.cell import WriteOnlyCell
+from openpyxl.styles import Alignment, Font
 from openpyxl.utils import get_column_letter
 
 from illumio_ops.domain.report import XLSX_ROW_CAP, Cell, ReportDocument, period_text

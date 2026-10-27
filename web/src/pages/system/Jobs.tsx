@@ -18,6 +18,11 @@ const JOB_LABEL_KEYS: Record<string, string> = {
   collect_retention: "job_name_collect_retention",
   flows_checkpoint: "job_name_flows_checkpoint",
   analysis_hourly: "job_name_analysis_hourly",
+  alerts_system: "job_name_alerts_system",
+  alerts_retention: "job_name_alerts_retention",
+  alerts_dispatch: "job_name_alerts_dispatch",
+  reports_run: "job_name_reports_run",
+  reports_retention: "job_name_reports_retention",
 };
 
 function every(seconds: number | null): string {

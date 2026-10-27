@@ -33,7 +33,7 @@ from illumio_ops.domain.values import (
     PortClass,
 )
 
-SCHEMA_VERSION: Literal[5] = 5
+SCHEMA_VERSION: Literal[6] = 6
 _UTC_OFFSET = re.compile(r"UTC([+-]\d+(?:\.\d+)?)")
 
 
@@ -458,8 +458,13 @@ class AlertSettings(StrictModel):
         return v
 
 
+class ReportSettings(StrictModel):
+    """Reports (spec §6.5 報表): how long generated reports are kept."""
+    retention_days: int = Field(ge=1, le=3650)
+
+
 class Settings(StrictModel):
-    schema_version: Literal[5]
+    schema_version: Literal[6]
     revision: int = Field(ge=0)
     pce: PceSettings
     web: WebSettings
@@ -471,6 +476,7 @@ class Settings(StrictModel):
     # graph uses the smaller of the two and says so (P3 Task 1 ruling).
     lateral: LateralSettings
     alerts: AlertSettings
+    reports: ReportSettings
 
 
 def default_alerts(*, notify_new_defaults: bool) -> AlertSettings:
@@ -487,6 +493,11 @@ def default_alerts(*, notify_new_defaults: bool) -> AlertSettings:
         rules=best_practice_rules(notify_new_defaults=notify_new_defaults),
         retention_days=90,
     )
+
+
+def default_reports() -> ReportSettings:
+    """Defaults for a fresh install and for upgrading a schema-5 file."""
+    return ReportSettings(retention_days=90)
 
 
 def default_collection() -> CollectionSettings:
@@ -555,4 +566,5 @@ def default_settings(*, password_hash: str, secret_key: str, port: int = 5001) -
         collection=default_collection(),
         lateral=default_lateral(),
         alerts=default_alerts(notify_new_defaults=True),
+        reports=default_reports(),
     )

@@ -34,7 +34,7 @@ def test_html_long_cell_points_to_xlsx(doc_with_rows):
 def test_kpi_without_value_is_not_zero():
     k = Kpi(key="k", label="Assets reachable", value=None, previous=None, note="no critical assets set")
     out = render_html(make_doc(kpis=(k,)), tz=UTC)
-    kpi_html = re.search(r'<div class="kpi" data-kpi="k">.*?</div>\s*</div>', out, re.S).group(0)
+    kpi_html = re.search(r'<div class="kpi" data-kpi="k">.*?</div>\s*</div>', out, re.DOTALL).group(0)
     assert ">0<" not in kpi_html and "no critical assets set" in kpi_html
 
 

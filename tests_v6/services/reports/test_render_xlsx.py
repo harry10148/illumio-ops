@@ -26,7 +26,7 @@ def test_xlsx_summary_sheet_has_kpis_and_quality():
 
 def test_xlsx_neutralises_formulas(doc_with_rows):
     wb = _wb(doc_with_rows(1, cell="=cmd|' /C calc'!A0"))
-    ws = [w for w in wb.worksheets if w.title != "Summary"][0]
+    ws = next(w for w in wb.worksheets if w.title != "Summary")
     assert ws["A2"].value.startswith("'=")
 
 
@@ -41,11 +41,11 @@ def test_xlsx_sheet_names_unique_and_short():
 
 def test_xlsx_builder_limit_note_written():
     t = table([("a", 1)], total=5).model_copy(update={"limit_note": "Only the first 1 of 5"})
-    ws = [w for w in _wb(make_doc(sections=(Section(id="s", title="S", blocks=(t,)),))).worksheets
-          if w.title != "Summary"][0]
+    ws = next(w for w in _wb(make_doc(sections=(Section(id="s", title="S", blocks=(t,)),))).worksheets
+          if w.title != "Summary")
     assert ws["A1"].value == "Only the first 1 of 5" and ws["A2"].value == "Col 0"
 
 
 def test_xlsx_long_cell_kept_whole(doc_with_rows):
-    ws = [w for w in _wb(doc_with_rows(1, cell="y" * 2500)).worksheets if w.title != "Summary"][0]
+    ws = next(w for w in _wb(doc_with_rows(1, cell="y" * 2500)).worksheets if w.title != "Summary")
     assert ws["A2"].value == "y" * 2500 and ws["A2"].alignment.wrap_text

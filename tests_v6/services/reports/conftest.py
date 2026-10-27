@@ -10,10 +10,10 @@ END = datetime(2026, 10, 27, tzinfo=UTC)
 
 
 def make_doc(**over):
-    base = dict(report_type=ReportType.LATERAL_POSTURE, lang=Language.EN, title="Lateral movement posture",
-                period_start=START, period_end=END, generated_at=END, pce_label="pce.lab.local",
-                kpis=(Kpi(key="k1", label="Pivot hosts", value=3, previous=1, better="lower"),),
-                findings=(), data_quality=("Traffic covers the whole period.",), sections=())
+    base = {"report_type": ReportType.LATERAL_POSTURE, "lang": Language.EN, "title": "Lateral movement posture",
+                "period_start": START, "period_end": END, "generated_at": END, "pce_label": "pce.lab.local",
+                "kpis": (Kpi(key="k1", label="Pivot hosts", value=3, previous=1, better="lower"),),
+                "findings": (), "data_quality": ("Traffic covers the whole period.",), "sections": ()}
     base.update(over)
     return ReportDocument(**base)
 

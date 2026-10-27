@@ -15,8 +15,8 @@ def bar_svg(points: Sequence[tuple[str, int | float | None]], *, width: int = 64
     slot = width / n
     bar_w = max(slot * 0.7, 1.0)
     usable = height - pad_bottom - pad_top
-    parts = [f'<svg class="report-bars" role="img" viewBox="0 0 {width} {height}" width="100%" '
-             f'preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">']
+    parts = [(f'<svg class="report-bars" role="img" viewBox="0 0 {width} {height}" width="100%" '
+             f'preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">')]
     label_every = max(1, n // 12)
     for i, (label, value) in enumerate(points):
         x = i * slot + (slot - bar_w) / 2

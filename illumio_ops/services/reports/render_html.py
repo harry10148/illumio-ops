@@ -24,8 +24,8 @@ from illumio_ops.domain.report import (
 )
 from illumio_ops.domain.values import Language, Severity
 from illumio_ops.i18n import translate
-from illumio_ops.services.reports.svg import bar_svg
 from illumio_ops.services.reports.sheets import sheet_names
+from illumio_ops.services.reports.svg import bar_svg
 
 SEVERITY_TONE = {Severity.CRITICAL: "crit", Severity.HIGH: "crit", Severity.MEDIUM: "warn", Severity.LOW: "info"}
 WIDE_COLUMNS = 9  # report_shell.css: tables this wide get a landscape print page
@@ -50,7 +50,7 @@ def tr(lang: Language, key: str, **params: object) -> str:
     return translate(lang, key, {k: str(v) for k, v in params.items()})
 
 
-def fmt_number(value: int | float) -> str:
+def fmt_number(value: float) -> str:
     return f"{value:,}" if isinstance(value, int) else f"{value:,.1f}"
 
 
