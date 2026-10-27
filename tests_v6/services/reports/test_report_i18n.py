@@ -26,7 +26,7 @@ from tests_v6.services.reports.test_unmanaged import _rollup
 
 NOW = datetime(2026, 10, 27, 1, 0, tzinfo=UTC)
 START, END = datetime(2026, 10, 20, tzinfo=UTC), datetime(2026, 10, 27, tzinfo=UTC)
-RAW_KEY = re.compile(r"\b(?:rpt|gui_reports|detector_name|decision|severity)_[a-z_]+\b")
+RAW_KEY = re.compile(r"\b(?:rpt|gui_reports|detector_name|decision|severity)_[a-z0-9_]+\b")
 EN = json.loads((Path(__file__).resolve().parents[3] / "illumio_ops/i18n/en.json")
                 .read_text(encoding="utf-8"))
 

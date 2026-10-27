@@ -425,6 +425,31 @@ def field_coverage(ctx: AppContext, spec: FilterSpec) -> FieldCoverage:
     return fields
 
 
+def _label_of(side: str) -> str:
+    return (f"COALESCE((SELECT m.value FROM label_set_members m WHERE m.set_id = f.{side}_label_set "
+            "AND m.key = ?), '')")
+
+
+def group_for_findings(conn: Any, spec: FilterSpec, *, env_key: str, table: str) -> None:
+    """The findings engine's one read of a period (services.reports.findings): the primary rows grouped by
+    source, destination, service, decision, managed sides, app and environment labels and user, into the
+    TEMP table `table` on `conn` (a connection from reports.reads.reading, which holds the PCE guard)."""
+    for name, fn in sql_functions().items():
+        conn.create_function(name, -1, fn, deterministic=True)
+    where, params = to_sql(spec)
+    conn.execute(f"DROP TABLE IF EXISTS temp.{table}")
+    conn.execute(
+        f"CREATE TEMP TABLE {table} AS SELECT f.src_key, f.dst_key, COALESCE(f.port, -1) AS port, f.proto, "
+        "f.policy_decision AS decision, f.src_managed, f.dst_managed, "
+        f"{_label_of('src')} AS src_app, {_label_of('src')} AS src_env, "
+        f"{_label_of('dst')} AS dst_app, {_label_of('dst')} AS dst_env, "
+        "COALESCE(f.initiator_user, '') AS user, COUNT(*) AS flows, SUM(f.num_connections) AS connections, "
+        "SUM(COALESCE(f.bytes_in, 0) + COALESCE(f.bytes_out, 0)) AS bytes, "
+        "SUM(f.bytes_in IS NOT NULL OR f.bytes_out IS NOT NULL) AS bytes_rows "
+        f"FROM flows f WHERE {where} GROUP BY 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12",
+        ["app", env_key, "app", env_key, *params])
+
+
 def new_user_pairs(ctx: AppContext, ports: Sequence[PortProto], *, since: datetime) -> list[UserPair]:
     """User x destination x port combinations first seen since `since` (spec §6.5.7, "new combinations
     against the baseline"). user_baseline holds only connections with a user (about a tenth of them on

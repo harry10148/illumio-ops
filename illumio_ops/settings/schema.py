@@ -504,11 +504,32 @@ class ReportSchedule(ReportScheduleFields):
     id: str = Field(pattern=r"^[0-9a-f]{32}$")
 
 
+class ReportRuleThresholds(StrictModel):
+    """The findings engine's thresholds (5.x config/report_config.yaml values as defaults; P5b-1)."""
+    unmanaged_connection: int = Field(ge=1)       # B004: flows from unmanaged sources
+    min_policy_coverage_pct: float = Field(ge=0, le=100)  # B005
+    lateral_outbound_dst: int = Field(ge=1)       # B006: destinations one source reaches on management ports
+    user_destination: int = Field(ge=1)           # B007: destinations one user reaches
+    high_bytes_percentile: float = Field(gt=0, lt=100)  # B008
+    high_bytes_median_factor: float = Field(gt=0)  # B008
+    high_bytes_min_mb: float = Field(ge=0)        # B008
+    cross_env_connection: int = Field(ge=1)       # B009: flows across environments
+    discovery_protocol: int = Field(ge=1)         # L002
+    db_unique_src_app: int = Field(ge=1)          # L003
+    identity_unique_src_app: int = Field(ge=1)    # L005
+    blast_radius: int = Field(ge=1)               # L006: hosts one host reaches
+    unmanaged_critical: int = Field(ge=1)         # L007
+    pb_lateral: int = Field(ge=1)                 # L008
+    exfil_mb: float = Field(gt=0)                 # L009
+    cross_env_lateral: int = Field(ge=1)          # L010
+
+
 class ReportSettings(StrictModel):
     """Reports (spec §6.5 報表): the address emailed reports link back to, how long reports are kept, schedules."""
     gui_external_url: str  # "" = emails carry no link (spec §6.5.5)
     retention_days: int = Field(ge=1, le=3650)
     schedules: tuple[ReportSchedule, ...] = Field(max_length=100)
+    rule_thresholds: ReportRuleThresholds
 
     @field_validator("schedules")
     @classmethod
@@ -563,7 +584,11 @@ def default_alerts(*, notify_new_defaults: bool) -> AlertSettings:
 
 def default_reports() -> ReportSettings:
     """Defaults for a fresh install and for upgrading a schema-5 file."""
-    return ReportSettings(gui_external_url="", retention_days=90, schedules=())
+    return ReportSettings(gui_external_url="", retention_days=90, schedules=(), rule_thresholds=ReportRuleThresholds(
+        unmanaged_connection=50, min_policy_coverage_pct=30, lateral_outbound_dst=10, user_destination=20,
+        high_bytes_percentile=95, high_bytes_median_factor=10, high_bytes_min_mb=1, cross_env_connection=100,
+        discovery_protocol=10, db_unique_src_app=5, identity_unique_src_app=3, blast_radius=5, unmanaged_critical=5,
+        pb_lateral=10, exfil_mb=100, cross_env_lateral=5))
 
 
 def default_collection() -> CollectionSettings:
