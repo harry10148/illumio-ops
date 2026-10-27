@@ -427,3 +427,24 @@ def test_history_is_recorded_only_for_count_rules():
         az._analyze_event_batch([_raw_event()], None)
     assert "imm" not in az.state["history"]
     assert len(az.state["history"]["cnt"]) == 1
+
+
+# ─── An intermittent signal: one quiet cycle must not restart its alert ───────
+
+def test_one_quiet_cycle_does_not_reset_a_running_cooldown():
+    """2026-10-27 on .106: the basis guard fired at 10:22:39, the 10:23:09 cycle had no matching flow, and the
+    meta-alert went out again at 10:24:39 -- the quiet cycle had cleared the 60-minute cooldown."""
+    import datetime as dt
+
+    from src.events.poller import format_utc
+    az = _analyzer([])
+    now = dt.datetime.now(dt.timezone.utc)
+    az.state["basis_mismatch"] = {}
+    az.state["basis_mismatch_last_alert_at"] = format_utc(now - dt.timedelta(minutes=1))
+    az._maybe_alert_overflow()  # the quiet cycle
+    assert az.state["basis_mismatch_last_alert_at"]
+    az.state["basis_mismatch"] = {"rule_names": "高 Blocked 流量", "worst_window_minutes": 10}
+    az._maybe_alert_overflow()  # the signal back two minutes later
+    assert not [c for c in az.reporter.add_health_alert.call_args_list
+                if "basis" in str(c.args[0].get("rule", "")) or "聚合" in str(c.args[0].get("rule", ""))]
+    az.reporter.add_health_alert.assert_not_called()

@@ -1700,16 +1700,17 @@ class Analyzer:
         self, *, state_key: str, cooldown_key: str, rule_key: str, details_key: str, log_label: str
     ) -> None:
         overflow = self.state.get(state_key) or {}
-        if not overflow:
-            # 事件已解除：清掉冷卻時戳，否則下一次「不同的」資料遺失事件會被
-            # 前一次的時戳壓制到最多 OVERFLOW_ALERT_COOLDOWN_MINUTES 之久而
-            # 完全不通知。與 watchdog 的作法一致（StatsTracker.record_pce_success
-            # 在 PCE 復原時把 watchdog_last_alert_at 清成 None）。
-            if self.state.get(cooldown_key):
-                self.state[cooldown_key] = None
-            return
         now_utc = datetime.datetime.now(datetime.timezone.utc)
         last = parse_event_timestamp(self.state.get(cooldown_key))
+        if not overflow:
+            # 事件已解除：冷卻到期後清掉時戳，讓下一次「不同的」事件不受舊時戳影響。
+            # 冷卻期內不清：間歇出現的訊號（例如 basis 守門，某一輪剛好沒有命中的
+            # flow）若一輪沉默就清，下一輪再出現時會立刻重發——2026-10-27 .106 上
+            # 同一則告警相隔 2 分鐘發兩次，60 分鐘冷卻形同失效。
+            if self.state.get(cooldown_key) and (
+                    last is None or (now_utc - last).total_seconds() >= OVERFLOW_ALERT_COOLDOWN_MINUTES * 60):
+                self.state[cooldown_key] = None
+            return
         if last and (now_utc - last).total_seconds() < OVERFLOW_ALERT_COOLDOWN_MINUTES * 60:
             return
         self.state[cooldown_key] = format_utc(now_utc)
