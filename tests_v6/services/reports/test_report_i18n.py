@@ -12,12 +12,23 @@ from openpyxl import load_workbook
 from illumio_ops.domain.filter import EndpointFilter, FlowCondition, LabelCond
 from illumio_ops.domain.findings_rules import RULES
 from illumio_ops.domain.values import DataOrigin, Language, ReportType
+from illumio_ops.services.analysis.predicted_block import (
+    PredictedGroup,
+    PredictedSummary,
+)
+from illumio_ops.services.analysis.ransomware import HostRansomware
+from illumio_ops.services.reports import ransomware_report
+from illumio_ops.services.reports import readiness as readiness_report
 from illumio_ops.services.reports.registry import BuildInput, ReportParams, specs
 from illumio_ops.services.reports.render_email import render_email
 from illumio_ops.services.reports.render_html import render_html
 from illumio_ops.services.reports.render_xlsx import render_xlsx
+from illumio_ops.store.flowdb import analysis
+from illumio_ops.store.flowdb.db import db_time
+from illumio_ops.store.flowdb.events import upsert_events
 from illumio_ops.store.flowdb.flows import upsert_flows
 from tests_v6.services.collect.conftest import configured_ctx
+from tests_v6.services.reports.test_audit import event as audit_event
 from tests_v6.services.reports.test_findings import flow
 from tests_v6.services.reports.test_lateral_posture import (
     _detection,
@@ -52,7 +63,59 @@ def ctx(tmp_path_factory):
     _rollup(c, [("2026-10-21", "ip:10.5.5.5", "/orgs/1/workloads/a", 445, "allowed", 10),
                 ("2026-10-23", "/orgs/1/workloads/a", "ip:8.8.8.8", 53, "allowed", 3)])
     _rule_flows(c)
-    return c
+    _p5b2_sample(c)
+    mp = pytest.MonkeyPatch()
+    # The readiness report's draft recompute is a PCE call: a fixed answer here, so every section has content.
+    mp.setattr(readiness_report, "predicted_summary", lambda ctx, spec, **kw: PredictedSummary(
+        groups=[PredictedGroup(dst_app="DB", rule_href="/orgs/1/sec_policy/draft/rule_sets/1/deny_rules/2", flows=3,
+                               connections=7)], rules={}, blocked_flows=3, blocked_connections=7, capped=True,
+        computed_at=NOW, unsupported=False, missing_rules=["/orgs/1/sec_policy/draft/rule_sets/1/deny_rules/2"]))
+    mp.setattr(ransomware_report, "host_ransomware", lambda ctx, href, **kw: HostRansomware.model_construct(
+        breakdown=None, allow_rules={"445/6": []}, allow_status={"445/6": "error"}))
+    yield c
+    mp.undo()
+
+
+def _p5b2_sample(c):
+    """VEN status, events, ransomware and tampering, so the P5b-2 reports render every section (P5b-2 Task 6)."""
+    hb = NOW - timedelta(hours=5)
+    with c.flows().connect() as conn:
+        conn.execute("UPDATE workloads SET agent_status = 'active', last_heartbeat_at = ?, policy_sync_state = "
+                     "'syncing', fw_config_current = 0, policy_received_at = ?, policy_applied_at = ?",
+                     (db_time(NOW - timedelta(minutes=5)), db_time(NOW - timedelta(minutes=10)), db_time(hb)))
+        conn.execute("UPDATE workloads SET online = 0, last_heartbeat_at = ? WHERE href = '/orgs/1/workloads/b'",
+                     (db_time(hb),))
+        analysis.write_result(conn, "tamper", params={}, at=NOW, result={"unmatched": 0, "hosts": [
+            {"href": "/orgs/1/workloads/a", "hostname": "app-01", "n_60d": 4, "n_7d": 2, "pattern": "periodic",
+             "median_minutes": 10.0, "last_at": NOW.isoformat(), "unexplained_7d": 1, "has_signal": True}]})
+        svc = {"name": "SMB", "port": 445, "proto": 6, "severity": "critical", "category": "admin",
+               "protection_state": "unprotected", "port_status": "listening", "active_policy": "allowed", "weight": 40,
+               "coverage": 0.0, "contribution": 40.0, "traffic": "priority", "recent_sources": 3}
+        listed = {"host": "/orgs/1/workloads/a", "hostname": "app-01", "name": "SMB", "port": 445, "proto": 6,
+                  "severity": "critical", "weight": 40, "recent_sources": 3}
+        analysis.write_result(conn, "ransomware", params={}, at=NOW, result={
+            "unsupported": False, "contradictions": 1, "priority": [listed], "safe_to_block": [listed],
+            "suspicious": [listed], "hosts": [
+                {"href": "/orgs/1/workloads/a", "hostname": "app-01", "enforcement_mode": "selective",
+                 "pce_percent": 10.0, "pce_exposure": "critical", "computed_percent": 10.0, "approximate": True,
+                 "contradiction": False, "services": [svc]},
+                {"href": "/orgs/1/workloads/b", "hostname": "bak-01", "enforcement_mode": "selective",
+                 "pce_percent": 0.0, "pce_exposure": "high", "computed_percent": 100.0, "approximate": True,
+                 "contradiction": True, "services": [{**svc, "protection_state": "protected_open"}]}]})
+        conn.execute("INSERT INTO ransomware_snapshot_daily (day, workload_href, name, port, proto, severity, "
+                     "protection_state, port_status) VALUES ('2026-10-22', '/orgs/1/workloads/a', 'SMB', 445, 6, "
+                     "'critical', 'unprotected', 'listening')")
+        conn.execute("INSERT INTO org_risk_snapshot_daily (day, summary_json) VALUES ('2026-10-26', ?)",
+                     (json.dumps({"ransomware": {"ransomware_protection_coverage_percent": 12.5}}),))
+        d = datetime(2026, 10, 22, 3, tzinfo=UTC)
+        events = [audit_event("agent.tampering", d, system=True),
+                  audit_event("sec_policy.create", d, user="alice", extra={"resource_changes": [{"resource": {
+                      "sec_policy": {"commit_message": "open db", "workloads_affected": 3}}}]}),
+                  audit_event("rule_set.update", d, user="alice"),
+                  *(audit_event("request.authentication_failed", d + timedelta(minutes=i), user="eve",
+                                ip="10.1.1.1", status="failure") for i in range(5))]
+        upsert_events(conn, events, origin=DataOrigin.INGEST, now=NOW)
+        conn.commit()
 
 
 def _rule_flows(c):
