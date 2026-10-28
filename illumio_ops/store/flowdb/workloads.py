@@ -25,6 +25,15 @@ class WorkloadRow:
     risk_percent: float | None
     risk_updated_at: str | None
     fetched_at: str
+    # agent.status (0008); None: not reported, or the row predates the columns
+    agent_status: str | None = None
+    last_heartbeat_at: str | None = None
+    policy_sync_state: str | None = None
+    policy_received_at: str | None = None
+    policy_applied_at: str | None = None
+    managed_since: str | None = None
+    fw_config_current: int | None = None
+    agent_health_json: str | None = None  # agent.status.agent_health as the PCE sent it
 
 
 _COLUMNS = ", ".join(f.name for f in fields(WorkloadRow))
