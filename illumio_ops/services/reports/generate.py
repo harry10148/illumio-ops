@@ -13,6 +13,7 @@ from urllib.parse import urlsplit
 
 from loguru import logger
 
+from illumio_ops.domain.filter import FilterSpec
 from illumio_ops.domain.report import ReportDocument
 from illumio_ops.domain.values import (
     CollectionMode,
@@ -130,6 +131,10 @@ def _ondemand_lines(res: OnDemandResult, start: datetime, lang: Language, tz: tz
         lines.append(tr("rpt_quality_ondemand_none"))
     elif res.earliest > start + timedelta(days=1):
         lines.append(tr("rpt_quality_ondemand_earliest", start=fmt_time(res.earliest.isoformat(), tz)))
+    if res.truncated:  # the baseline before the period included: a connection it missed would count as new
+        lines.append(tr("rpt_quality_ondemand_truncated", n=len(res.truncated),
+                        start=fmt_time(res.truncated[0][0].isoformat(), tz),
+                        end=fmt_time(res.truncated[-1][1].isoformat(), tz)))
     if res.unread_from is not None:
         lines.append(tr("rpt_quality_ondemand_capped", n=f"{res.rows:,}",
                         start=fmt_time(res.unread_from.isoformat(), tz)))
@@ -142,7 +147,9 @@ def _build(ctx: AppContext, spec: ReportSpec, inp: BuildInput) -> ReportDocument
     settings = ctx.settings.current()
     lead = spec.ondemand_lead(settings) if spec.ondemand_lead else timedelta(0)
     try:
-        with pull_period(ctx, start=inp.start - lead, end=inp.end, now=inp.now) as res:
+        pushed = None if inp.params.filter is None else FilterSpec.model_validate(
+            {**inp.params.filter.model_dump(), "start": inp.start - lead, "end": inp.end})
+        with pull_period(ctx, start=inp.start - lead, end=inp.end, spec=pushed, now=inp.now) as res:
             if spec.ondemand_prepare is not None:
                 spec.ondemand_prepare(res.ctx, inp.now)
             doc = spec.build(dataclasses.replace(inp, ctx=res.ctx))
@@ -226,10 +233,10 @@ def run_queued(ctx: AppContext, *, now: datetime | None = None) -> int | None:
     if row is None:
         return None
     out_dir = ctx.paths.reports_dir / str(row.id)
+    fdb = ctx.flows()
+    generation = fdb.generation  # noted before the settings it goes with: a switch in between fails the report
     settings = ctx.settings.current()
     tz = settings.display.zone()
-    fdb = ctx.flows()
-    generation = fdb.generation
     try:
         params = ReportParams.model_validate(row.params)
         # Queued for another PCE than the one configured now — or before reports recorded their PCE (''): either

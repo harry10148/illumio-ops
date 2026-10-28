@@ -180,3 +180,46 @@ def test_install_store_of_another_pce_is_not_copied(ctx, pce):
     with pytest.raises(BindingMismatch), ondemand.pull_period(ctx, start=START, end=END, now=NOW):
         pass
     assert _leftovers(ctx) == [] and pce.payloads == []
+
+
+def test_parent_result_released_before_halving(ctx, pce, monkeypatch):
+    """Review #2: a capped window's rows were held on the stack while both halves were read (12 deep: 600k rows)."""
+    import weakref
+    monkeypatch.setattr(ondemand, "PER_QUERY", 30)
+    refs: list[weakref.ref] = []
+    alive_at_call: list[int] = []
+    inner = pce.__call__
+
+    def tracking(client, payload, **kw):
+        alive_at_call.append(sum(1 for r in refs if r() is not None))
+        res = inner(client, payload, **kw)
+        refs.append(weakref.ref(res))
+        return res
+    monkeypatch.setattr(ondemand, "run_traffic_query", tracking)
+    with ondemand.pull_period(ctx, start=START, end=END, now=NOW) as res:
+        assert res.rows == 72
+    assert max(alive_at_call) == 0
+
+
+def test_install_connection_held_while_seeding(ctx, pce, monkeypatch):
+    """Review #3: the copy read the install's store through ATTACH alone, which a PCE switch's reset cannot see."""
+    seen = []
+    real = ondemand.labels.copy_from
+
+    def spy(conn, schema):
+        seen.append(any(not c.closed for c in list(ctx.flows()._open)))
+        real(conn, schema)
+    monkeypatch.setattr(ondemand.labels, "copy_from", spy)
+    with ondemand.pull_period(ctx, start=START, end=END, now=NOW):
+        pass
+    assert seen == [True]
+
+
+def test_install_lateral_snapshots_not_copied(ctx, pce):
+    """Review #4: an old daily posture snapshot outranked the exposure computed from the pull."""
+    from illumio_ops.store.flowdb import analysis
+    with ctx.flows().connect() as conn:
+        analysis.write_lateral_snapshot(conn, "2026-10-26", {"pivots_now": 99})
+        conn.commit()
+    with ondemand.pull_period(ctx, start=START, end=END, now=NOW) as res, res.ctx.flows().connect() as conn:
+        assert conn.execute("SELECT count(*) FROM lateral_snapshot_daily").fetchone()[0] == 0

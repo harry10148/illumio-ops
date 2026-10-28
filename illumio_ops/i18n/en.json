@@ -1572,5 +1572,7 @@
   "rpt_quality_ondemand": "Traffic was queried from the PCE when the report was made (this install keeps no traffic for the period); labels as they are now, not as they were when the traffic happened.",
   "rpt_quality_ondemand_none": "The PCE returned no traffic for the period: it may keep no traffic that old.",
   "rpt_quality_ondemand_earliest": "The PCE returned traffic from {start} on: it keeps no older traffic for this period.",
-  "rpt_quality_ondemand_capped": "Reading stopped at {n} rows: traffic from {start} on is not in this report. A shorter period, or alert or full mode, covers it."
+  "rpt_quality_ondemand_capped": "Reading stopped at {n} rows: traffic from {start} on is not in this report. A shorter period, or alert or full mode, covers it.",
+  "rpt_quality_ondemand_truncated": "{n} query window(s) between {start} and {end} reached the PCE's limit and were cut short: connections in them may be missing (a connection missing from the baseline would count as new).",
+  "rpt_rule_l006_no_exposure": "the exposure graph has not been computed (it needs alert or full mode, or the first hourly analysis)"
 }

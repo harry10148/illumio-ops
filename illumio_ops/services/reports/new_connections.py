@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import sqlite3
 from collections.abc import Sequence
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Any
 
 from illumio_ops.domain.report import (
@@ -116,7 +116,7 @@ def build_new_connections(inp: BuildInput) -> ReportDocument:
     prev_start, _ = previous_period(inp.start, inp.end, inp.tz)
     # The baseline keeps a connection only while it was seen within baseline_days: older periods are partial.
     baseline_days = inp.ctx.settings.current().collection.retention.baseline_days
-    kept_from = inp.now - timedelta(days=baseline_days)
+    kept_from = inp.ctx.traffic_floor(baseline_days, inp.now)  # an on-demand pull holds its whole baseline
     prev_known = prev_start >= kept_from and traffic_covered(inp.ctx, prev_start, inp.start, now=inp.now)
     with reads.reading(inp.ctx) as conn:
         now_counts = {k: _count(conn, lc, k, inp.start, inp.end) for k in kinds}

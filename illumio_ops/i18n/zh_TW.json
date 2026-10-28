@@ -1572,5 +1572,7 @@
   "rpt_quality_ondemand": "流量是在產生報表時向 PCE 查詢的（本機沒有保存這段期間的流量）；標籤是查詢當下的值，不是流量發生當時的值。",
   "rpt_quality_ondemand_none": "PCE 沒有回傳這段期間的任何流量：PCE 可能沒有保留這麼久以前的流量。",
   "rpt_quality_ondemand_earliest": "PCE 只回傳 {start} 之後的流量：更早的流量 PCE 沒有保留。",
-  "rpt_quality_ondemand_capped": "讀到 {n} 列即停止：{start} 之後的流量不在這份報表中。縮短期間，或改用告警或完整模式，才能涵蓋。"
+  "rpt_quality_ondemand_capped": "讀到 {n} 列即停止：{start} 之後的流量不在這份報表中。縮短期間，或改用告警或完整模式，才能涵蓋。",
+  "rpt_quality_ondemand_truncated": "{start} 至 {end} 之間有 {n} 個查詢區段達到 PCE 的上限而被截短：其中的連線可能缺漏（基準期缺漏的連線會被算成新連線）。",
+  "rpt_rule_l006_no_exposure": "尚未計算暴露面（需要告警或完整模式，或等第一次每小時分析完成）"
 }

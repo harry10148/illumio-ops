@@ -163,3 +163,58 @@ def test_ondemand_lookback_reaches_90_days(tmp_path, pce):
     ctx = configured_ctx(tmp_path, mode="lightweight")
     assert generate.refusal(ctx.settings.current(), ReportParams(report_type=ReportType.TRAFFIC, lookback_days=90),
                             now=NOW) is None
+
+
+def test_pce_switch_between_settings_and_generation_fails(tmp_path, pce):
+    """Review #1: a switch landing after the settings were read and before the generation was noted made a report
+    named for PCE A out of PCE B's traffic."""
+    ctx = configured_ctx(tmp_path, mode="lightweight")
+    rid = generate.enqueue(ctx, ReportParams(report_type=ReportType.TRAFFIC, lang=Language.EN), trigger="manual",
+                           schedule_id=None, now=NOW)
+    real = ctx.flows
+    switched = []
+
+    def flows():
+        fdb = real()
+        if not switched:
+            switched.append(1)
+            ctx.settings.update(ctx.settings.current().revision,
+                                lambda d: d["pce"].update(url="https://other.example.com:8443"))
+            fdb.reset()
+        return fdb
+    object.__setattr__(ctx, "flows", flows)
+    generate.run_queued(ctx, now=NOW)
+    with ctx.db() as conn:
+        row = store.get(conn, rid)
+    assert row.status is ReportStatus.FAILED and row.error_key == "rpt_err_pce_switched"
+
+
+def test_report_filter_pushed_to_pce(tmp_path, pce):
+    """Review #5: a blocked-SSH report downloaded the whole estate's traffic first."""
+    from illumio_ops.domain.filter import FlowCondition
+    ctx = configured_ctx(tmp_path, mode="lightweight")
+    cond = FlowCondition.model_validate({"ports": [{"port": 22, "proto": 6}], "decisions": ["blocked"]})
+    _run(ctx, filter=cond)
+    assert pce.payloads and all(p["policy_decisions"] == ["blocked"] for p in pce.payloads)
+    assert all(p["services"]["include"] == [{"port": 22, "proto": 6}] for p in pce.payloads)
+
+
+def test_lead_truncation_disclosed(tmp_path, pce, monkeypatch):
+    """Review #6: a window cut short in the baseline before the period was said nowhere, so a connection the
+    baseline missed counts as new."""
+    monkeypatch.setattr(ondemand, "PER_QUERY", 1)
+    monkeypatch.setattr(ondemand, "MAX_DEPTH", 0)
+    ctx = configured_ctx(tmp_path, mode="lightweight")
+    pce.rows = [raw(30, day=10), raw(31, day=10), raw(32, day=24)]  # 10-10 is in the baseline, before the period
+    html = _html(ctx, _run(ctx, ReportType.NEW_CONNECTIONS))
+    assert "query window(s) between" in html and "reached the PCE" in html
+
+
+def test_new_connections_ondemand_compares_previous_past_baseline_days(tmp_path, pce):
+    """Review #8: a pull that holds the previous period was still refused the comparison by the install's own
+    baseline retention."""
+    ctx = configured_ctx(tmp_path, mode="lightweight")
+    pce.rows = [raw(40, day=1), raw(41, day=20)]
+    row = _run(ctx, ReportType.NEW_CONNECTIONS, lookback=30)
+    assert row.status is ReportStatus.DONE, row.error_key
+    assert next(k for k in row.kpis if k["key"] == "new")["previous"] is not None

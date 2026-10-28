@@ -123,6 +123,7 @@ def _walk(ctx: AppContext, fdb: FlowDb, client: object, spec: FilterSpec | None,
                                deadline=time.monotonic() + QUERY_DEADLINE_SECONDS)
     state.windows += 1
     if result.capped and depth < MAX_DEPTH and (b - a) > MIN_WINDOW:
+        del result  # not held while the halves are read (12 levels deep that was 600,000 rows)
         mid = a + (b - a) / 2
         _walk(ctx, fdb, client, spec, a, mid, depth + 1, state, at)
         _walk(ctx, fdb, client, spec, mid, b, depth + 1, state, at)
@@ -155,9 +156,10 @@ def pull_period(ctx: AppContext, *, start: datetime, end: datetime, spec: Filter
     fdb = FlowDb(path)
     try:
         state = _Pull()
-        with ctx.flows().connect() as install:  # migrated, and about this PCE, before anything is copied from it
+        # A tracked connection to the install's store, held while it is attached: a PCE switch's reset waits for
+        # it before deleting the file. The store is migrated, and about this PCE, before anything is copied.
+        with ctx.flows().connect() as install, fdb.writing(fdb.generation) as conn:
             require_same_pce(install, settings.pce)
-        with fdb.writing(fdb.generation) as conn:
             ensure_binding(conn, settings.pce, at)
             _seed(conn, ctx.flows().path)
         try:
