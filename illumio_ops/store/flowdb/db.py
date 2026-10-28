@@ -165,6 +165,10 @@ class FlowDb:
                     self._anchor.execute("SELECT count(*) FROM sqlite_master").fetchone()
             self._gate.notify_all()
 
+    def close(self) -> None:
+        """Let go of the idle anchor connection: a throwaway store (services/ondemand.py) before its file goes."""
+        self._drop_anchor()
+
     def _drop_anchor(self) -> None:
         with self._open_lock:
             anchor, self._anchor = self._anchor, None
