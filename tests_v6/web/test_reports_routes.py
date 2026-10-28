@@ -53,11 +53,12 @@ def test_catalog_lists_built_types(client, ctx):
     assert all(e["available"] for e in types.values()) and data["smtp_enabled"] is False
 
 
-def test_catalog_lightweight_unavailable(client, ctx):
+def test_catalog_lightweight_available(client, ctx):
+    """Lightweight mode pulls a flow report's period from the PCE (spec §6.4, 2026-10-29): nothing is greyed."""
     ctx.settings.update(ctx.settings.current().revision, lambda d: d["collection"].update(mode="lightweight"))
     login(client)
-    e = get(client, "/api/reports/catalog").get_json()["data"]["entries"][0]
-    assert e["available"] is False and e["reason_key"] == "rpt_unavailable_lightweight"
+    entries = get(client, "/api/reports/catalog").get_json()["data"]["entries"]
+    assert all(e["available"] and e["reason_key"] is None for e in entries)
 
 
 def test_generate_then_list_and_get(client, ctx):
@@ -130,7 +131,7 @@ def test_catalog_says_what_each_type_takes(client, ctx):
     assert types["app_summary"]["requires_app"] and types["app_summary"]["accepts_filter"]
     assert types["traffic"]["accepts_filter"] and not types["traffic"]["requires_app"]
     assert not types["lateral_posture"]["accepts_filter"] and types["lateral_posture"]["max_lookback"] is None
-    assert types["traffic"]["max_lookback"] == ctx.settings.current().collection.retention.flow_days - 1
+    assert types["traffic"]["max_lookback"] == 90  # beyond the kept flow_days the period is pulled on demand
     choices = {c["key"]: c["values"] for c in data["label_choices"]}
     assert choices["app"] == ["Finance"] and choices["env"] == ["Prod"]
 
@@ -142,7 +143,7 @@ def test_generate_refusals_name_the_field(client, ctx):
     assert r.status_code == 400 and r.get_json()["error"]["field"] == "report.filter"
     assert r.get_json()["error"]["message_key"] == "rpt_err_app_required"
     r = post(client, "/api/reports", {"report_type": "traffic", "lookback_days": 90})
-    assert r.status_code == 400 and r.get_json()["error"]["field"] == "report.lookback_days"
+    assert r.status_code == 200  # past the kept 35 days: pulled from the PCE on demand (spec §6.4)
     r = post(client, "/api/reports", {"report_type": "lateral_posture", "filter": APP_FILTER})
     assert r.status_code == 400 and r.get_json()["error"]["message_key"] == "rpt_err_filter_not_supported"
     r = post(client, "/api/reports", {"report_type": "app_summary", "filter": APP_FILTER})
@@ -155,4 +156,4 @@ def test_lightweight_types_available(client, ctx):
     login(client)
     entries = {e["report_type"]: e for e in get(client, "/api/reports/catalog").get_json()["data"]["entries"]}
     assert all(entries[t]["available"] for t in ("ven_status", "audit", "ransomware"))
-    assert not entries["readiness"]["available"] and not entries["traffic"]["available"]
+    assert entries["readiness"]["available"] and entries["traffic"]["available"]  # pulled on demand

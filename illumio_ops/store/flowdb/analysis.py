@@ -236,3 +236,11 @@ def delete_expired(conn: sqlite3.Connection, *, detections_before: datetime, foc
                           (db_time(focus_before),)).rowcount
         n += conn.execute("DELETE FROM lateral_snapshot_daily WHERE day < ?", (snapshot_day_before,)).rowcount
     return n
+
+
+def copy_from(conn: sqlite3.Connection, schema: str) -> None:
+    """Copy detections, daily lateral snapshots and the analysis results from an attached store (an on-demand
+    store starts from the install's). The exposure result stays behind: it is computed again from the pull."""
+    conn.execute(f"INSERT INTO detections SELECT * FROM {schema}.detections")
+    conn.execute(f"INSERT INTO lateral_snapshot_daily SELECT * FROM {schema}.lateral_snapshot_daily")
+    conn.execute(f"INSERT INTO analysis_results SELECT * FROM {schema}.analysis_results WHERE kind <> 'exposure'")

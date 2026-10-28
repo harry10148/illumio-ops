@@ -106,3 +106,11 @@ def org_summaries(conn: sqlite3.Connection, last_day: str) -> list[tuple[str, di
     """The organisation summaries up to `last_day`, newest first."""
     return [(r[0], json.loads(r[1])) for r in conn.execute(
         "SELECT day, summary_json FROM org_risk_snapshot_daily WHERE day <= ? ORDER BY day DESC", (last_day,))]
+
+
+def copy_from(conn: sqlite3.Connection, schema: str) -> None:
+    """Copy the ransomware state from an attached store (an on-demand store starts from the install's)."""
+    conn.execute(f"INSERT INTO ransomware_services SELECT * FROM {schema}.ransomware_services")
+    conn.execute(f"INSERT INTO ransomware_fetch SELECT * FROM {schema}.ransomware_fetch")
+    conn.execute(f"INSERT INTO ransomware_snapshot_daily SELECT * FROM {schema}.ransomware_snapshot_daily")
+    conn.execute(f"INSERT INTO org_risk_snapshot_daily SELECT * FROM {schema}.org_risk_snapshot_daily")

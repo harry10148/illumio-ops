@@ -792,7 +792,6 @@
   "rpt_xlsx_change": "變化",
   "rpt_xlsx_note": "說明",
   "rpt_xlsx_capped": "工作表只能放前 {shown} 列，共 {total} 列。",
-  "rpt_unavailable_lightweight": "需要流量資料：目前資料收集模式為「輕量」。請到「資料收集」頁改為告警或完整模式。",
   "rpt_unavailable_not_built": "此版本不提供這種報表。",
   "rpt_err_pce_switched": "產生報表期間 PCE 設定已變更，未保留任何檔案。請重新產生。",
   "rpt_err_internal": "內部錯誤，報表未能產生。",
@@ -1568,5 +1567,10 @@
   "rpt_quality_analysis_failed": "最近一次執行失敗（{error}）：呈現的是最後一次成功的結果。",
   "rpt_rw_org_last_known": "本期間沒有組織摘要；最後一次讀到的是 {day}。",
   "rpt_rdy_advice_not_assessed": "未評估：本期間沒有連入它的流量。",
-  "rpt_rdy_predicted_none_unconfirmed": "沒有找到會被擋的連線，但有些流量沒有草稿判定：這不代表確認「不會擋任何流量」。"
+  "rpt_rdy_predicted_none_unconfirmed": "沒有找到會被擋的連線，但有些流量沒有草稿判定：這不代表確認「不會擋任何流量」。",
+  "rpt_err_ondemand_failed": "PCE 無法回答這段期間的流量查詢。請稍後再試；若持續失敗，請檢查 PCE 健康狀態與「資料收集」頁。",
+  "rpt_quality_ondemand": "流量是在產生報表時向 PCE 查詢的（本機沒有保存這段期間的流量）；標籤是查詢當下的值，不是流量發生當時的值。",
+  "rpt_quality_ondemand_none": "PCE 沒有回傳這段期間的任何流量：PCE 可能沒有保留這麼久以前的流量。",
+  "rpt_quality_ondemand_earliest": "PCE 只回傳 {start} 之後的流量：更早的流量 PCE 沒有保留。",
+  "rpt_quality_ondemand_capped": "讀到 {n} 列即停止：{start} 之後的流量不在這份報表中。縮短期間，或改用告警或完整模式，才能涵蓋。"
 }

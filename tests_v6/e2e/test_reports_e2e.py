@@ -51,15 +51,15 @@ def test_linked_report_is_marked(context, live_app):
     expect(page.locator(f"[data-report-id='{rid}']")).to_have_attribute("data-highlight", "true")
 
 
-def test_lightweight_mode_greys_out_with_reason(context, live_app):
+def test_lightweight_mode_flow_reports_available(context, live_app):
+    """Lightweight mode pulls a flow report's period from the PCE when it is made (spec §6.4, 2026-10-29)."""
     ctx = live_app.ctx
     ctx.settings.update(ctx.settings.current().revision, lambda d: d["collection"].update(mode="lightweight"))
     page = context.new_page()
     _reports(page, live_app.url)
     entry = page.locator("[data-report-type=lateral_posture]")
-    expect(entry).to_have_attribute("data-available", "false")
-    expect(entry.get_by_role("button", name="Generate…")).to_be_disabled()
-    expect(entry.locator("[data-role=unavailable]")).to_contain_text("lightweight")
+    expect(entry).to_have_attribute("data-available", "true")
+    expect(entry.get_by_role("button", name="Generate…")).to_be_enabled()
 
 
 def test_schedule_create_and_run_now(context, live_app):
@@ -165,7 +165,8 @@ def test_schedule_lookback_stays_within_the_type(context, live_app):
     editor.locator("select[name=report_type]").select_option("traffic")
     editor.get_by_role("button", name="Save").click()
     expect(page.locator("[data-role=schedule-list] tbody tr").first).to_contain_text("Short retention")
-    assert ctx.settings.current().reports.schedules[0].lookback_days == 6
+    # past the kept 7 days the period is pulled on demand, so the usual week is offered (spec §6.4)
+    assert ctx.settings.current().reports.schedules[0].lookback_days == 7
 
 
 def test_audit_in_lightweight_mode(context, live_app):
@@ -185,7 +186,7 @@ def test_audit_in_lightweight_mode(context, live_app):
     _reports(page, live_app.url)
     entry = page.locator("[data-report-type=audit]")
     expect(entry).to_have_attribute("data-available", "true")
-    expect(page.locator("[data-report-type=traffic]")).to_have_attribute("data-available", "false")
+    expect(page.locator("[data-report-type=traffic]")).to_have_attribute("data-available", "true")
     entry.get_by_role("button", name="Generate…").click()
     entry.locator("[data-role=generate-form]").get_by_role("button", name="Generate", exact=True).click()
     row = page.locator("[data-role=report-list] tbody tr").first

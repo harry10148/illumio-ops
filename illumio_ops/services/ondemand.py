@@ -9,6 +9,7 @@ however it ends; the service sweeps leftovers at start."""
 from __future__ import annotations
 
 import dataclasses
+import sqlite3
 import time
 import uuid
 from collections.abc import Iterator
@@ -29,7 +30,14 @@ from illumio_ops.services.collect.traffic import (
 )
 from illumio_ops.services.collect.windows import MAX_DEPTH, MIN_WINDOW
 from illumio_ops.services.context import AppContext
-from illumio_ops.store.flowdb import ingest_state
+from illumio_ops.store.flowdb import (
+    analysis,
+    capabilities,
+    ingest_state,
+    labels,
+    ransomware,
+    workloads,
+)
 from illumio_ops.store.flowdb.db import FlowDb, transaction
 from illumio_ops.store.flowdb.flows import refresh_rollups, upsert_flows
 
@@ -78,6 +86,19 @@ def sweep_leftovers(paths: InstallPaths) -> int:
             p.unlink(missing_ok=True)
             n += 1
     return n
+
+
+def _seed(conn: sqlite3.Connection, install: Path) -> None:
+    """What the reports read besides traffic, copied from the install's store before the pull (label sets
+    first: the pulled flows add to them). Traffic, its baselines and events stay behind."""
+    conn.execute("ATTACH DATABASE ? AS install", (str(install),))
+    try:
+        with transaction(conn):
+            for copy in (labels.copy_from, workloads.copy_from, ransomware.copy_from, capabilities.copy_from,
+                         analysis.copy_from):
+                copy(conn, "install")
+    finally:
+        conn.execute("DETACH DATABASE install")
 
 
 def _payload(spec: FilterSpec | None, a: datetime, b: datetime) -> dict[str, object]:
@@ -132,8 +153,10 @@ def pull_period(ctx: AppContext, *, start: datetime, end: datetime, spec: Filter
     fdb = FlowDb(path)
     try:
         state = _Pull()
+        ctx.flows().connect().close()  # the install's store exists and is migrated before it is read from
         with fdb.writing(fdb.generation) as conn:
             ensure_binding(conn, settings.pce, at)
+            _seed(conn, ctx.flows().path)
         cur = start
         try:
             with ctx.pce_client(settings.pce) as client:
@@ -150,7 +173,7 @@ def pull_period(ctx: AppContext, *, start: datetime, end: datetime, spec: Filter
                 ingest_state.record_gap(conn, IngestSource.TRAFFIC, state.unread_from, end, "truncated",
                                         f"stopped at {ONDEMAND_MAX_ROWS} rows", at)
             refresh_rollups(conn, at, today_every=timedelta(0))
-        yield OnDemandResult(ctx=dataclasses.replace(ctx, flowdb=fdb), rows=state.rows, windows=state.windows,
+        yield OnDemandResult(ctx=dataclasses.replace(ctx, flowdb=fdb, ondemand=True), rows=state.rows, windows=state.windows,
                              truncated=state.truncated, earliest=state.earliest,
                              capped_total=state.unread_from is not None, unread_from=state.unread_from)
     finally:

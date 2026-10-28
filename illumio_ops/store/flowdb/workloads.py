@@ -65,3 +65,9 @@ def snapshot_day(conn: sqlite3.Connection, day: str) -> int:
 def delete_snapshots_before(conn: sqlite3.Connection, day: str) -> int:
     with transaction(conn):
         return conn.execute("DELETE FROM workload_snapshot_daily WHERE day < ?", (day,)).rowcount
+
+
+def copy_from(conn: sqlite3.Connection, schema: str) -> None:
+    """Copy the inventory from an attached store (an on-demand store starts from the install's, ondemand.py)."""
+    conn.execute(f"INSERT INTO workloads SELECT * FROM {schema}.workloads")
+    conn.execute(f"INSERT INTO workload_snapshot_daily SELECT * FROM {schema}.workload_snapshot_daily")

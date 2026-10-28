@@ -4,6 +4,7 @@ from __future__ import annotations
 import sqlite3
 from collections.abc import Callable
 from dataclasses import dataclass, field
+from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING
 
 from illumio_ops.paths import InstallPaths
@@ -32,6 +33,9 @@ class AppContext:
     # The one outbound PCE budget for the whole process (5.x had two that ignored each other).
     rate_limiter: RateLimiter | None = None
     scheduler: BackgroundScheduler | None = None
+    # A throwaway store filled from the PCE for one period (services/ondemand.py): it holds that whole period
+    # whatever the install's retention says, and its traffic counts as collected.
+    ondemand: bool = False
 
     def __post_init__(self) -> None:
         if self.flowdb is None:
@@ -41,6 +45,10 @@ class AppContext:
 
     def db(self) -> sqlite3.Connection:
         return connect(self.paths.app_db)
+
+    def traffic_floor(self, days: int, now: datetime) -> datetime:
+        """Where kept traffic starts: `days` back from now, or nothing cut off in an on-demand store."""
+        return datetime.min.replace(tzinfo=UTC) if self.ondemand else now - timedelta(days=days)
 
     def flows(self) -> FlowDb:
         assert self.flowdb is not None  # set in __post_init__

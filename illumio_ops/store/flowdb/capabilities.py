@@ -27,3 +27,8 @@ def record(conn: sqlite3.Connection, name: str, state: CapabilityState, detail: 
 def all(conn: sqlite3.Connection) -> dict[str, CapabilityRow]:
     return {r["name"]: CapabilityRow(r["name"], r["state"], r["detail"], datetime.fromisoformat(r["checked_at"]))
             for r in conn.execute("SELECT * FROM pce_capabilities").fetchall()}
+
+
+def copy_from(conn: sqlite3.Connection, schema: str) -> None:
+    """Copy what the PCE was found to support from an attached store (an on-demand store starts from the install's)."""
+    conn.execute(f"INSERT INTO pce_capabilities SELECT * FROM {schema}.pce_capabilities")

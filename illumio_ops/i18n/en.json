@@ -792,7 +792,6 @@
   "rpt_xlsx_change": "Change",
   "rpt_xlsx_note": "Note",
   "rpt_xlsx_capped": "Only the first {shown} of {total} rows fit in a worksheet.",
-  "rpt_unavailable_lightweight": "Needs traffic: the data collection mode is lightweight. Switch to alert or full mode on the Data collection page.",
   "rpt_unavailable_not_built": "This report type is not available in this version.",
   "rpt_err_pce_switched": "The PCE was changed while the report was being made; nothing was kept. Generate it again.",
   "rpt_err_internal": "The report could not be made because of an internal error.",
@@ -1568,5 +1567,10 @@
   "rpt_quality_analysis_failed": "Its latest run failed ({error}): the results shown are from the last run that succeeded.",
   "rpt_rw_org_last_known": "No organisation summary in this period; the last one read is from {day}.",
   "rpt_rdy_advice_not_assessed": "Not assessed: no traffic into it in this period.",
-  "rpt_rdy_predicted_none_unconfirmed": "No blocked connection was found, but some flows had no draft decision: this is not a confirmed \"blocks nothing\"."
+  "rpt_rdy_predicted_none_unconfirmed": "No blocked connection was found, but some flows had no draft decision: this is not a confirmed \"blocks nothing\".",
+  "rpt_err_ondemand_failed": "The PCE could not answer the traffic query for this period. Try again later; if it keeps failing, check the PCE's health and the data collection page.",
+  "rpt_quality_ondemand": "Traffic was queried from the PCE when the report was made (this install keeps no traffic for the period); labels as they are now, not as they were when the traffic happened.",
+  "rpt_quality_ondemand_none": "The PCE returned no traffic for the period: it may keep no traffic that old.",
+  "rpt_quality_ondemand_earliest": "The PCE returned traffic from {start} on: it keeps no older traffic for this period.",
+  "rpt_quality_ondemand_capped": "Reading stopped at {n} rows: traffic from {start} on is not in this report. A shorter period, or alert or full mode, covers it."
 }

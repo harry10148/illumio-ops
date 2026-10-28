@@ -40,3 +40,9 @@ def known_labels(conn: sqlite3.Connection) -> set[tuple[str, str]]:
     on a flow, including labels deleted from the PCE long ago."""
     return {(k, v) for k, v in conn.execute(
         "SELECT DISTINCT m.key, m.value FROM label_set_members m JOIN workloads w ON w.label_set = m.set_id")}
+
+
+def copy_from(conn: sqlite3.Connection, schema: str) -> None:
+    """Copy every label set from an attached store (an on-demand store starts from the install's, ondemand.py)."""
+    conn.execute(f"INSERT INTO label_sets SELECT * FROM {schema}.label_sets")
+    conn.execute(f"INSERT INTO label_set_members SELECT * FROM {schema}.label_set_members")
