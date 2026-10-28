@@ -140,3 +140,13 @@ def test_all_kpis_rendered(ctx):
 def test_zh_tw_builds(ctx):
     _write(ctx, [event("agent.tampering", D, system=True)])
     assert _build(ctx, Language.ZH_TW).title
+
+
+def test_provision_as_the_pce_sends_it(ctx):
+    """Lab, 2026-10-28: sec_policy.create carries before/after pairs under changes (the report failed on them)."""
+    _write(ctx, [event("sec_policy.create", D, user="admin@lab.local", ip="192.168.20.30", extra={"resource_changes": [{
+        "resource": {"sec_policy": {"href": "/orgs/1/sec_policy/673", "commit_message": "", "version": 673}},
+        "changes": {"commit_message": {"before": None, "after": "open db"}, "version": {"before": None, "after": 673},
+                    "workloads_affected": {"before": None, "after": 1}}, "change_type": "create"}]})])
+    row = _tables(_build(ctx), "policy")[0].rows[0]
+    assert row[1:] == ("admin@lab.local", 1, "open db")

@@ -74,9 +74,15 @@ def _walk(value: Any) -> Iterator[Mapping[str, Any]]:
             yield from _walk(v)
 
 
+def _value(v: Any) -> Any:
+    """A changed field comes as {"before": ..., "after": ...}: the value it has now."""
+    return v.get("after") if isinstance(v, Mapping) and "after" in v else v
+
+
 def _first(raw: Mapping[str, Any], key: str) -> Any:
-    """The first value of `key` anywhere in the event (the PCE nests sec_policy under resource_changes)."""
-    return next((m[key] for m in _walk(raw) if key in m and m[key] not in (None, "")), None)
+    """The first non-empty value of `key` anywhere in the event (the PCE nests sec_policy under resource_changes,
+    and its changes as before/after pairs)."""
+    return next((v for m in _walk(raw) if key in m and (v := _value(m[key])) not in (None, "")), None)
 
 
 def _actor(r: EventRow) -> str | None:
