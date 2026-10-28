@@ -1,11 +1,10 @@
 """On-demand traffic (spec §6.4, 2026-10-29): a period read from the PCE into a throwaway flow store when the
 install keeps no traffic for it (lightweight mode, or a period past the local retention).
 
-The store has the same schema as the install's own, so a report is built from it with the same SQL. A query
-returns at most PER_QUERY rows (lab: one download of 150k rows peaked at 1.4 GB), each written before the next
-is read. The whole span is asked first and a window at the cap is halved like a collection cycle's, so a span
-the PCE keeps nothing for costs one query (lab: daily windows took 16 minutes over an empty 30-day baseline);
-what still caps at the smallest window is kept and recorded as a truncated gap. The file lives under the install's data directory and goes when the pull ends,
+The store has the same schema as the install's own, so a report is built from it with the same SQL. It is read
+a day at a time, each query at most PER_QUERY rows (lab: one download of 150k rows peaked at 1.4 GB) and written
+before the next is read; a day at the cap is halved like a collection cycle's window, and what still caps at the
+smallest window is kept and recorded as a truncated gap. The file lives under the install's data directory and goes when the pull ends,
 however it ends; the service sweeps leftovers at start."""
 from __future__ import annotations
 
@@ -45,6 +44,10 @@ from illumio_ops.store.flowdb.flows import refresh_rollups, upsert_flows
 PER_QUERY = 50_000  # rows one query may return: about 400 MB held while it is parsed
 ONDEMAND_MAX_ROWS = 1_000_000  # rows one pull may read in all; the rest of the period is a recorded gap
 QUERY_NAME = "illumio-ops on-demand"
+# Lab, 2026-10-29: a query costs by the rows it returns (one dense day ~25k rows in 18 s; a capped 50k-row query
+# 30 s, thrown away when halved), so the span is read a day at a time: halving from the whole span spent more on
+# discarded capped answers than daily windows did (posture 1,290 s against 960 s).
+WINDOW = timedelta(days=1)
 
 
 class OnDemandFailed(Exception):
@@ -164,7 +167,11 @@ def pull_period(ctx: AppContext, *, start: datetime, end: datetime, spec: Filter
             _seed(conn, ctx.flows().path)
         try:
             with ctx.pce_client(settings.pce) as client:
-                _walk(ctx, fdb, client, spec, start, end, 0, state, at)
+                cur = start
+                while cur < end and state.unread_from is None:
+                    nxt = min(cur + WINDOW, end)
+                    _walk(ctx, fdb, client, spec, cur, nxt, 0, state, at)
+                    cur = nxt
         except PCE_FAILURES as exc:
             a, b = state.reading
             raise OnDemandFailed(f"the PCE could not answer {a.isoformat()} – {b.isoformat()}: {exc}") from exc

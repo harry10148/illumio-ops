@@ -76,7 +76,7 @@ REGISTRY: dict[ReportType, ReportSpec] = {}
 
 
 # A period the install does not keep is pulled from the PCE (spec §6.4); the PCE keeps traffic only so long
-# (lab: about 9 days), and the report says where its answer starts. The lookback offered is the request's own
+# (how long varies by PCE), and the report says where its answer starts. The lookback offered is the request's own
 # limit (90 days); the floor is two days more, so a period starting at a local midnight, across a DST change,
 # is never refused for an hour.
 ONDEMAND_LOOKBACK = 90

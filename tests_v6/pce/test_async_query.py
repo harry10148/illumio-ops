@@ -210,3 +210,24 @@ def test_capped_when_rows_reach_max_results(client):
     responses.add(responses.GET, f"{Q}/download", body=_gz([{"a": i} for i in range(3)]))
     responses.add(responses.DELETE, Q, status=204)
     assert run_traffic_query(client, _payload(max_results=3), deadline=_deadline()).capped is True
+
+
+@responses.activate
+def test_capped_when_matches_reach_max_results_with_fewer_rows(client):
+    """Lab, 2026-10-29: a 30-day query for 200,000 rows came back with 169,707 rows and matches_count 220,000
+    (1.1 x the cap). The rows are aggregated, so fewer rows than the cap does not mean the answer was whole."""
+    _submit_ok()
+    responses.add(responses.GET, Q, json={"status": "completed", "matches_count": 110, "flows_count": 85})
+    responses.add(responses.GET, f"{Q}/download", body=_gz([{"a": i} for i in range(85)]))
+    responses.add(responses.DELETE, Q, status=204)
+    assert run_traffic_query(client, _payload(max_results=100), deadline=_deadline()).capped is True
+
+
+@responses.activate
+def test_not_capped_when_matches_below_max_results(client):
+    """Lab 7 days: matches 193,476, flows 152,623 for a 200,000 cap: whole (aggregation, not truncation)."""
+    _submit_ok()
+    responses.add(responses.GET, Q, json={"status": "completed", "matches_count": 96, "flows_count": 76})
+    responses.add(responses.GET, f"{Q}/download", body=_gz([{"a": i} for i in range(76)]))
+    responses.add(responses.DELETE, Q, status=204)
+    assert run_traffic_query(client, _payload(max_results=100), deadline=_deadline()).capped is False
