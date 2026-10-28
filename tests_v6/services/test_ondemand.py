@@ -73,12 +73,27 @@ def test_pull_writes_rows_into_temp_db(ctx, pce):
     assert _count(ctx) == 0  # the install's own store is untouched
 
 
-def test_windows_start_daily(ctx, pce):
-    with ondemand.pull_period(ctx, start=START, end=END, now=NOW):
+def test_one_query_when_the_period_fits(ctx, pce):
+    """Lab, 2026-10-29: daily windows cost a 30-day baseline 30 queries on days the PCE kept nothing (16 minutes).
+    The per-query cap already bounds memory, so a span is read whole and halved only when it caps."""
+    with ondemand.pull_period(ctx, start=START, end=END, now=NOW) as res:
+        assert res.rows == 72
+    assert [(p["start_date"][:10], p["end_date"][:10]) for p in pce.payloads] == [("2026-10-25", "2026-10-28")]
+    assert pce.payloads[0]["max_results"] == ondemand.PER_QUERY
+
+
+def test_empty_span_costs_one_query(ctx, pce):
+    pce.answer = lambda s, e, n: []
+    with ondemand.pull_period(ctx, start=START - timedelta(days=30), end=END, now=NOW):
         pass
-    spans = [(datetime.fromisoformat(p["end_date"]) - datetime.fromisoformat(p["start_date"])) for p in pce.payloads]
-    assert len(spans) == 3 and all(s == timedelta(days=1) for s in spans)
-    assert all(p["max_results"] == ondemand.PER_QUERY for p in pce.payloads)
+    assert len(pce.payloads) == 1
+
+
+def test_capped_span_halved_until_it_fits(ctx, pce, monkeypatch):
+    monkeypatch.setattr(ondemand, "PER_QUERY", 30)
+    with ondemand.pull_period(ctx, start=START, end=END, now=NOW) as res:
+        assert res.rows == 72 and not res.truncated
+    assert len(pce.payloads) == 7  # 72 capped, 2 x 36 capped, 4 x 18
 
 
 def test_capped_window_split_then_truncated(ctx, pce, monkeypatch):
@@ -94,33 +109,30 @@ def test_capped_window_split_then_truncated(ctx, pce, monkeypatch):
 
 
 def test_total_cap_stops_and_says_so(ctx, pce, monkeypatch):
+    monkeypatch.setattr(ondemand, "PER_QUERY", 30)
     monkeypatch.setattr(ondemand, "ONDEMAND_MAX_ROWS", 30)
     with ondemand.pull_period(ctx, start=START, end=END, now=NOW) as res:
-        assert res.capped_total and res.unread_from == START + timedelta(days=2)
-        assert res.rows == 48  # two whole days read before the cap stopped the third
+        # the first half is read in two quarters (18 + 18 rows); the cap then stops the second half
+        assert res.capped_total and res.rows == 36 and res.unread_from == START + timedelta(hours=36)
         with res.ctx.flows().connect() as conn:
             cov = store_coverage(conn, IngestSource.TRAFFIC, (START, END), floor=START, collected=True)
-        assert any(g[0] == START + timedelta(days=2) for g in cov.gaps)
-    assert len(pce.payloads) == 2
+        assert any(g[0] == START + timedelta(hours=36) for g in cov.gaps)
 
 
 def test_condition_sent_to_pce(ctx, pce):
     spec = FilterSpec(start=START, end=END, decisions=(PolicyDecision.BLOCKED,))
     with ondemand.pull_period(ctx, start=START, end=END, spec=spec, now=NOW):
         pass
-    assert all(p["policy_decisions"] == ["blocked"] for p in pce.payloads)
-    assert [p["start_date"][:10] for p in pce.payloads] == ["2026-10-25", "2026-10-26", "2026-10-27"]
+    assert [p["policy_decisions"] for p in pce.payloads] == [["blocked"]]
 
 
 def test_window_failure_fails_pull(ctx, pce):
     def answer(s, e, n):
-        if s.day == 26:
-            raise PceQueryError("poll", 500)
-        return _hourly(s, e, n)
+        raise PceQueryError("poll", 500)
     pce.answer = answer
     with pytest.raises(ondemand.OnDemandFailed) as e, ondemand.pull_period(ctx, start=START, end=END, now=NOW):
         pass
-    assert "2026-10-26" in str(e.value) and _leftovers(ctx) == []
+    assert "2026-10-25" in str(e.value) and _leftovers(ctx) == []
 
 
 def test_tmp_removed_on_success(ctx, pce):
@@ -150,7 +162,7 @@ def test_startup_sweeps_leftovers(ctx):
 
 
 def test_earliest_reported(ctx, pce):
-    pce.answer = lambda s, e, n: [] if s.day == 25 else _hourly(s, e, n)
+    pce.answer = lambda s, e, n: _hourly(max(s, datetime(2026, 10, 26, tzinfo=UTC)), e, n)
     with ondemand.pull_period(ctx, start=START, end=END, now=NOW) as res:
         assert res.earliest == datetime(2026, 10, 26, tzinfo=UTC)
 
