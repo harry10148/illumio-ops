@@ -22,6 +22,7 @@ from illumio_ops.services.analysis.context import load_lateral_context
 from illumio_ops.services.analysis.tamper import list_annotations
 from illumio_ops.services.reports import reads
 from illumio_ops.services.reports.common import tr
+from illumio_ops.services.reports.history import previous_values
 from illumio_ops.services.reports.registry import BuildInput
 from illumio_ops.services.reports.render_html import fmt_time
 from illumio_ops.store.flowdb import analysis, labels, workloads
@@ -87,6 +88,7 @@ def build_ven_status(inp: BuildInput) -> ReportDocument:
         fleet = [w for w in workloads.all_workloads(conn) if w.managed]
         sets = labels.label_sets(conn, {w.label_set for w in fleet if w.label_set is not None})
         tamper_row = analysis.read_result(conn, "tamper")
+        computed_at, run_error = reads.analysis_state(conn, "tamper")
     name = {w.href: w.hostname or w.href.rsplit("/", 1)[-1] for w in fleet}
     buckets = {w.href: bucket(w, now) for w in fleet}
     counts = Counter(buckets.values())
@@ -99,7 +101,8 @@ def build_ven_status(inp: BuildInput) -> ReportDocument:
         "managed": len(fleet), "online": counts["online"], "lost_24h": counts["lost_24h"],
         "lost_48h": counts["lost_48h"], "long_offline": counts["long_offline"], "status_unknown": counts["unknown"],
         "sync_problems": len(trouble), "unexplained_tamper": unexplained if tamper is not None else None}
-    kpis = tuple(Kpi(key=k, label=t(label), value=values[k], previous=None,
+    before = previous_values(inp)
+    kpis = tuple(Kpi(key=k, label=t(label), value=values[k], previous=(before or {}).get(k),
                      better="higher" if k in ("managed", "online") else "lower",
                      note=t("rpt_lat_not_computed") if values[k] is None else None) for k, label in _KPI_KEYS.items())
 
@@ -182,6 +185,10 @@ def build_ven_status(inp: BuildInput) -> ReportDocument:
     latest = max((w.fetched_at for w in fleet), default=None)
     quality = [t("rpt_ven_quality_inventory", at=fmt_time(latest, inp.tz)) if latest else t("rpt_ven_quality_no_inventory"),
                t("rpt_ven_quality_online")]
+    if computed_at:
+        quality.append(t("rpt_quality_analysis_at", at=fmt_time(computed_at, inp.tz)))
+    if run_error:
+        quality.append(t("rpt_quality_analysis_failed", error=run_error[:200]))
     if counts["unknown"]:
         quality.append(t("rpt_ven_quality_unknown", n=counts["unknown"]))
     return ReportDocument(

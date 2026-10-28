@@ -1554,7 +1554,7 @@
   "rpt_rdy_col_rule": "Deny rule",
   "rpt_rdy_rule_missing": "Rule {id} (no longer in the draft)",
   "rpt_rdy_predicted_none": "The draft policy blocks none of the period's traffic.",
-  "rpt_rdy_predicted_capped": "The PCE stopped at its 200,000-row limit: more traffic may be blocked than shown.",
+  "rpt_rdy_predicted_capped": "The PCE stopped at the {n} rows this report asks for: more traffic may be blocked than shown.",
   "rpt_rdy_predicted_unsupported": "This PCE does not recompute traffic against the draft policy.",
   "rpt_rdy_predicted_failed": "The draft recompute could not be read from the PCE ({error}); the rest of the report stands.",
   "rpt_rdy_sec_queue": "Order to enforce in",
@@ -1562,5 +1562,9 @@
   "rpt_rdy_tbl_queue": "Enforcement queue",
   "rpt_rdy_col_next": "Next step",
   "rpt_rdy_quality_definition": "An app's traffic is the connections into its managed hosts; connections are num_connections summed. Labels are matched exactly.",
-  "rpt_rdy_quality_unknown": "{pct}% of the connections into managed hosts had no reported decision; they are left out of \"allowed by a rule\" and \"not potentially blocked\"."
+  "rpt_rdy_quality_unknown": "{pct}% of the connections into managed hosts had no reported decision; they are left out of \"allowed by a rule\" and \"not potentially blocked\".",
+  "rpt_rdy_predicted_undetermined": "The PCE gave no draft decision for {n} flows into managed hosts: what the draft would block is not fully known.",
+  "rpt_quality_analysis_at": "The analysis this report reads was computed at {at}.",
+  "rpt_quality_analysis_failed": "Its latest run failed ({error}): the results shown are from the last run that succeeded.",
+  "rpt_rw_org_last_known": "No organisation summary in this period; the last one read is from {day}."
 }

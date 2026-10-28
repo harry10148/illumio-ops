@@ -4,7 +4,7 @@ from the events the product collected. Actors are users and service accounts onl
 correlated as one person (5.x counted every system event under one "System" actor)."""
 from __future__ import annotations
 
-from collections import Counter, defaultdict
+from collections import Counter
 from collections.abc import Iterator, Mapping
 from datetime import datetime, timedelta
 from typing import Any
@@ -28,9 +28,8 @@ from illumio_ops.domain.report import (
     TableBlock,
     TextBlock,
 )
-from illumio_ops.domain.segment import EventFilter, EventSegment, GroupBy
-from illumio_ops.domain.values import SegmentDimension, SegmentView, Severity
-from illumio_ops.services.analysis.segments import run_segment
+from illumio_ops.domain.segment import EventFilter, EventSegment
+from illumio_ops.domain.values import SegmentView, Severity
 from illumio_ops.services.eventsource import (
     USER_KINDS,
     AuditCounts,
@@ -39,6 +38,7 @@ from illumio_ops.services.eventsource import (
     event_detail,
 )
 from illumio_ops.services.reports.common import severity_name, tr
+from illumio_ops.services.reports.generate import previous_period
 from illumio_ops.services.reports.registry import BuildInput
 
 TOP = 20
@@ -111,8 +111,9 @@ def build_audit(inp: BuildInput) -> ReportDocument:
         return tr(lang, msg, **params)
 
     counts = audit_counts(inp.ctx, start=inp.start, end=inp.end, top=TOP, now=inp.now)
-    period = inp.end - inp.start
-    prev = audit_counts(inp.ctx, start=inp.start - period, end=inp.start, top=0, now=inp.now)
+    prev_start, _ = previous_period(inp.start, inp.end, inp.tz)
+    prev = audit_counts(inp.ctx, start=prev_start, end=inp.start, top=0, now=inp.now)
+    last = inp.end - timedelta(microseconds=1)  # event segments include their end: the period's is excluded
     before = _values(prev) if not prev.coverage.gaps else None
     none = t("rpt_aud_no_events")
     now_v = _values(counts)
@@ -122,19 +123,12 @@ def build_audit(inp: BuildInput) -> ReportDocument:
                      note=None if counts.total else none) for k, label in _KPI_KEYS.items())
 
     def detail(types: tuple[str, ...], limit: int) -> tuple[list[EventRow], bool]:
-        q = event_detail(inp.ctx, EventSegment(filter=EventFilter(start=inp.start, end=inp.end, event_types=types),
+        q = event_detail(inp.ctx, EventSegment(filter=EventFilter(start=inp.start, end=last, event_types=types),
                                                view=SegmentView.DETAIL, limit=limit), now=inp.now)
         return q.rows, q.limit_hit
 
     # ── attention ───────────────────────────────────────────────────────────
-    by_actor = run_segment(inp.ctx, EventSegment(
-        filter=EventFilter(start=inp.start, end=inp.end), view=SegmentView.RANKING, limit=1000,
-        group_by=(GroupBy(dimension=SegmentDimension.EVENT_TYPE), GroupBy(dimension=SegmentDimension.ACTOR))),
-        now=inp.now)
-    actors: dict[str, list[str]] = defaultdict(list)
-    for r in by_actor.ranking or []:
-        if r.keys[1] not in (None, "") and len(actors[str(r.keys[0])]) < 3:
-            actors[str(r.keys[0])].append(f"{r.keys[1]} ({r.value})")
+    actors = {k: [f"{name} ({n})" for name, n in v] for k, v in counts.type_users.items()}
     risky = sorted(((k, risk_of(k), n) for k, n in counts.by_type.items() if risk_of(k) is not None),
                    key=lambda x: (SEVERITY_RANK[x[1]], -x[2], x[0]))  # type: ignore[index]
     attention = TableBlock(
@@ -160,10 +154,12 @@ def build_audit(inp: BuildInput) -> ReportDocument:
         total_rows=len(types), empty_text=none,
         limit_note=t("rpt_limit_top_n", n=TOP) if len(types) > TOP else None)
     per_day: Counter[str] = Counter()
-    for hour, n in counts.by_hour.items():
-        per_day[datetime.fromisoformat(hour + ":00:00+00:00").astimezone(inp.tz).strftime("%Y-%m-%d")] += n
-    days = [(inp.start + timedelta(days=i)).astimezone(inp.tz).strftime("%Y-%m-%d") for i in range(period.days or 1)]
-    trend = BarBlock(title=t("rpt_aud_bar_daily"), points=tuple((d, per_day.get(d, 0)) for d in days), empty_text=none)
+    for minute, n in counts.by_minute.items():
+        per_day[datetime.fromisoformat(minute + ":00+00:00").astimezone(inp.tz).strftime("%Y-%m-%d")] += n
+    first_day, last_day = inp.start.astimezone(inp.tz).date(), last.astimezone(inp.tz).date()
+    days = [(first_day + timedelta(days=i)).isoformat() for i in range((last_day - first_day).days + 1)]
+    trend = BarBlock(title=t("rpt_aud_bar_daily"), empty_text=none,
+                     points=tuple((d, per_day.get(d, 0) if counts.total else None) for d in days))
 
     # ── users ───────────────────────────────────────────────────────────────
     users = TableBlock(

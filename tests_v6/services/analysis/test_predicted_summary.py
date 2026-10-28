@@ -12,7 +12,8 @@ def test_predicted_grouped_by_rule(tmp_path, fake):  # noqa: F811
     by_rule = {}
     for g in s.groups:
         by_rule[g.rule_href] = by_rule.get(g.rule_href, 0) + g.flows
-    assert by_rule == {TEDT_DENY: 8} and s.blocked_flows == 8 and s.rules[TEDT_DENY].ruleset_name == "tedt"
+    # 8 flows are blocked; 3 of them go into managed hosts (what enforcement blocks; the others go to addresses)
+    assert by_rule == {TEDT_DENY: 3} and s.blocked_flows == 3 and s.rules[TEDT_DENY].ruleset_name == "tedt"
     assert s.unsupported is False and s.capped is False
 
 

@@ -68,7 +68,7 @@ def ctx(tmp_path_factory):
     # The readiness report's draft recompute is a PCE call: a fixed answer here, so every section has content.
     mp.setattr(readiness_report, "predicted_summary", lambda ctx, spec, **kw: PredictedSummary(
         groups=[PredictedGroup(dst_app="DB", rule_href="/orgs/1/sec_policy/draft/rule_sets/1/deny_rules/2", flows=3,
-                               connections=7)], rules={}, blocked_flows=3, blocked_connections=7, capped=True,
+                               connections=7)], rules={}, blocked_flows=3, blocked_connections=7, undetermined_flows=2, capped=True,
         computed_at=NOW, unsupported=False, missing_rules=["/orgs/1/sec_policy/draft/rule_sets/1/deny_rules/2"]))
     mp.setattr(ransomware_report, "host_ransomware", lambda ctx, href, **kw: HostRansomware.model_construct(
         breakdown=None, allow_rules={"445/6": []}, allow_status={"445/6": "error"}))

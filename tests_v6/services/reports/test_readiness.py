@@ -26,7 +26,8 @@ START, END = datetime(2026, 10, 20, tzinfo=UTC), datetime(2026, 10, 27, tzinfo=U
 def summary(**kw):
     base = {"groups": [PredictedGroup(dst_app="DB", rule_href="/orgs/1/sec_policy/draft/rule_sets/1/deny_rules/2",
                                       flows=3, connections=7)],
-            "rules": {}, "blocked_flows": 3, "blocked_connections": 7, "capped": False, "computed_at": NOW,
+            "rules": {}, "blocked_flows": 3, "blocked_connections": 7, "undetermined_flows": 0, "capped": False,
+            "computed_at": NOW,
             "unsupported": False, "missing_rules": ["/orgs/1/sec_policy/draft/rule_sets/1/deny_rules/2"]}
     return PredictedSummary(**{**base, **kw})
 

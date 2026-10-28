@@ -27,6 +27,7 @@ from illumio_ops.store.flowdb import capabilities
 from illumio_ops.store.flowdb.db import StaleGeneration
 
 _ALWAYS = (datetime(1970, 1, 1, tzinfo=UTC), datetime(9999, 1, 1, tzinfo=UTC))
+DECIDED = frozenset({"allowed", "potentially_blocked"})  # with blocked_*: a draft decision the PCE gave
 
 
 class PredictedRow(BaseModel):
@@ -83,7 +84,10 @@ def _recompute(ctx: AppContext, spec: FilterSpec, *, max_results: int, deadline_
                             **fetch_policy_names(client, "draft", deadline=deadline).__dict__)
     views: dict[str, DraftView] = {}
     records = []
-    for raw in result.rows:
+    raws = result.rows
+    raws.reverse()
+    while raws:  # each PCE row is let go once read: 200,000 of them are most of the memory a recompute holds
+        raw = raws.pop()
         try:
             rec = normalize_flow(raw)
         except FlowShapeError:
@@ -139,6 +143,7 @@ class PredictedSummary(BaseModel):
     rules: dict[str, RuleRef]
     blocked_flows: int
     blocked_connections: int
+    undetermined_flows: int  # the PCE gave no draft decision: zero blocked is then not a confirmed answer
     capped: bool
     computed_at: datetime
     unsupported: bool
@@ -150,7 +155,13 @@ def predicted_summary(ctx: AppContext, spec: FilterSpec, *, app_key: str = "app"
     rc = _recompute(ctx, spec, max_results=max_results, deadline_seconds=deadline_seconds)
     counts: dict[tuple[str | None, str], list[int]] = {}
     flows = connections = 0
+    undetermined = 0
     for row in rc.rows:
+        if not row.flow.dst_managed:  # what enforcement would block is traffic into managed hosts
+            continue
+        if row.draft_decision not in DECIDED and not row.draft_decision.startswith("blocked"):
+            undetermined += 1
+            continue
         if not row.draft_decision.startswith("blocked"):
             continue
         flows += 1
@@ -165,7 +176,8 @@ def predicted_summary(ctx: AppContext, spec: FilterSpec, *, app_key: str = "app"
     groups = sorted((PredictedGroup(dst_app=app, rule_href=h, flows=f, connections=n) for (app, h), (f, n) in counts.items()),
                     key=lambda g: (-g.connections, g.dst_app or "", g.rule_href))
     return PredictedSummary(groups=groups, rules={h: rc.rules[h] for h in sorted(named) if h in rc.rules},
-                            blocked_flows=flows, blocked_connections=connections, capped=rc.capped,
+                            blocked_flows=flows, blocked_connections=connections, undetermined_flows=undetermined,
+                            capped=rc.capped,
                             computed_at=rc.at, unsupported=rc.unsupported, missing_rules=sorted(named - rc.rules.keys()))
 
 

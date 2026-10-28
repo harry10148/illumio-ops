@@ -1554,7 +1554,7 @@
   "rpt_rdy_col_rule": "deny rule",
   "rpt_rdy_rule_missing": "規則 {id}（已不在草稿中）",
   "rpt_rdy_predicted_none": "草稿政策不會擋下期間內的任何流量。",
-  "rpt_rdy_predicted_capped": "PCE 在 200,000 筆上限停止：實際被擋的流量可能比列出的多。",
+  "rpt_rdy_predicted_capped": "PCE 在此報表要求的 {n} 筆上限停止：實際被擋的流量可能比列出的多。",
   "rpt_rdy_predicted_unsupported": "此 PCE 不支援依草稿政策重算流量。",
   "rpt_rdy_predicted_failed": "無法從 PCE 取得草稿重算結果（{error}）；報表其餘部分照常。",
   "rpt_rdy_sec_queue": "推進順序",
@@ -1562,5 +1562,9 @@
   "rpt_rdy_tbl_queue": "強制推進佇列",
   "rpt_rdy_col_next": "下一步",
   "rpt_rdy_quality_definition": "app 的流量指連入其受管主機的連線；連線數為 num_connections 加總。標籤完全比對。",
-  "rpt_rdy_quality_unknown": "連入受管主機的連線中有 {pct}% 沒有回報判定；這些連線不列入「有規則允許」與「非可能被擋」的計算。"
+  "rpt_rdy_quality_unknown": "連入受管主機的連線中有 {pct}% 沒有回報判定；這些連線不列入「有規則允許」與「非可能被擋」的計算。",
+  "rpt_rdy_predicted_undetermined": "PCE 對 {n} 筆連入受管主機的流量沒有給出草稿判定：草稿會擋下什麼並不完全確定。",
+  "rpt_quality_analysis_at": "本報表讀取的分析計算於 {at}。",
+  "rpt_quality_analysis_failed": "最近一次執行失敗（{error}）：呈現的是最後一次成功的結果。",
+  "rpt_rw_org_last_known": "本期間沒有組織摘要；最後一次讀到的是 {day}。"
 }

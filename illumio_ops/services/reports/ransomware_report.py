@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Mapping, Sequence
-from datetime import timedelta
+from datetime import date, timedelta
 from typing import Any
 
 from loguru import logger
@@ -23,7 +23,10 @@ from illumio_ops.domain.report import (
 from illumio_ops.services.analysis.ransomware import host_ransomware
 from illumio_ops.services.reports import reads
 from illumio_ops.services.reports.common import port_text, severity_name, tr
+from illumio_ops.services.reports.generate import previous_period
+from illumio_ops.services.reports.history import previous_values
 from illumio_ops.services.reports.registry import BuildInput
+from illumio_ops.services.reports.render_html import fmt_time
 from illumio_ops.store.flowdb import analysis, ransomware
 from illumio_ops.store.flowdb.db import db_day
 
@@ -55,13 +58,19 @@ def build_ransomware(inp: BuildInput) -> ReportDocument:
         row = analysis.read_result(conn, "ransomware")
         by_day = ransomware.protected_by_day(conn, first_day, last_day)
         orgs = ransomware.org_summaries(conn, last_day)
+        computed_at, run_error = reads.analysis_state(conn, "ransomware")
     result: dict[str, Any] | None = json.loads(row["result_json"]) if row is not None else None
     status = None if result is None else "unsupported" if result.get("unsupported") else "ok"
     missing = t("rpt_rw_not_computed") if status is None else t("rpt_rw_unsupported")
     hosts: list[dict[str, Any]] = list((result or {}).get("hosts") or ())
     lists = {key: list((result or {}).get(key) or ()) for _, key, *_ in _LISTS}
-    org_now = next((p for _, s in orgs if (p := _org_percent(s)) is not None), None)
-    org_before = next((p for d, s in orgs if d < first_day and (p := _org_percent(s)) is not None), None)
+    # The organisation summary of the period (its latest day), and of the period before: never an older reading.
+    prev_first = db_day(previous_period(inp.start, inp.end, inp.tz)[0])
+    readings = [(d, p) for d, s in orgs if (p := _org_percent(s)) is not None]
+    org_now = next((p for d, p in readings if d >= first_day), None)
+    org_before = next((p for d, p in readings if prev_first <= d < first_day), None)
+    org_last = readings[0][0] if readings and org_now is None else None
+    before = previous_values(inp)
     values: dict[str, float | int | None] = {
         "rated_hosts": len(hosts), "org_percent": org_now, "priority": len(lists["priority"]),
         "safe_to_block": len(lists["safe_to_block"]), "suspicious": len(lists["suspicious"]),
@@ -69,10 +78,11 @@ def build_ransomware(inp: BuildInput) -> ReportDocument:
     ok = status == "ok"
     kpis = tuple(Kpi(key=k, label=t(label), value=(values[k] if ok or (k == "org_percent" and values[k] is not None)
                                                    else None),
-                     previous=org_before if k == "org_percent" else None,
+                     previous=org_before if k == "org_percent" else (before or {}).get(k),
                      unit="percent" if k == "org_percent" else "count",
                      better="higher" if k in ("org_percent", "rated_hosts") else "lower",
-                     note=(t("rpt_rw_org_missing") if k == "org_percent" and values[k] is None
+                     note=(t("rpt_rw_org_last_known", day=org_last) if k == "org_percent" and org_last
+                           else t("rpt_rw_org_missing") if k == "org_percent" and values[k] is None
                            else None if ok or k == "org_percent" else missing))
                  for k, label in _KPI_KEYS.items())
 
@@ -157,13 +167,19 @@ def build_ransomware(inp: BuildInput) -> ReportDocument:
         limit_note=t("rpt_rw_allow_top", n=ALLOW_HOSTS) if len(top_hosts) > ALLOW_HOSTS else None)
 
     # ── trend ───────────────────────────────────────────────────────────────
-    days = [db_day(inp.start + timedelta(days=i)) for i in range((inp.end - inp.start).days or 1)]
+    # The snapshots are per UTC day: every UTC day the period touches, both ends included.
+    first, last = date.fromisoformat(first_day), date.fromisoformat(last_day)
+    days = [(first + timedelta(days=i)).isoformat() for i in range((last - first).days + 1)]
     trend = BarBlock(title=t("rpt_rw_bar_trend"),
                      points=tuple((d, round(100 * by_day[d][1] / by_day[d][0], 1) if d in by_day and by_day[d][0]
                                    else None) for d in days),
                      empty_text=t("rpt_rw_none_trend"))
 
     quality = [t("rpt_rw_quality_source"), t("rpt_rw_quality_approx")]
+    if computed_at:
+        quality.append(t("rpt_quality_analysis_at", at=fmt_time(computed_at, inp.tz)))
+    if run_error:
+        quality.append(t("rpt_quality_analysis_failed", error=run_error[:200]))
     if values["contradictions"]:
         quality.append(t("rpt_rw_quality_contradictions", n=values["contradictions"]))
     blocks_missing: Sequence[TextBlock] = () if ok else (TextBlock(paragraphs=(missing,)),)

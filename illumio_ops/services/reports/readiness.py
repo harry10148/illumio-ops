@@ -7,6 +7,7 @@ from collections import Counter
 
 from loguru import logger
 
+from illumio_ops.domain.filter import FlowCondition
 from illumio_ops.domain.readiness import WEIGHTS, Readiness, ReadinessInputs, readiness
 from illumio_ops.domain.report import (
     Column,
@@ -19,6 +20,7 @@ from illumio_ops.domain.report import (
 from illumio_ops.domain.values import PortClass
 from illumio_ops.pce.async_query import PceQueryError
 from illumio_ops.pce.client import PceNotConfigured
+from illumio_ops.pce.collections import PceCollectionIncomplete
 from illumio_ops.services.analysis.context import load_lateral_context
 from illumio_ops.services.analysis.predicted_block import (
     PredictedSummary,
@@ -29,10 +31,14 @@ from illumio_ops.services.flowsource import readiness_rows
 from illumio_ops.services.reports import flowsections
 from illumio_ops.services.reports.common import tr
 from illumio_ops.services.reports.generate import coverage_note
+from illumio_ops.services.reports.history import previous_values
 from illumio_ops.services.reports.registry import BuildInput
 
 APP = "app"
 PREDICTED_ROWS = 50
+# Rows the draft recompute asks the PCE for: its answer is held whole while it is read (about 4 KB a row in
+# memory), so 50,000 keeps a report within its half-gigabyte budget; more is disclosed as capped.
+PREDICTED_MAX_RESULTS = 50_000
 _FACTOR_KEYS = {"policy": "rpt_rdy_factor_policy", "ringfence": "rpt_rdy_factor_ringfence",
                 "enforcement": "rpt_rdy_factor_enforcement", "staged": "rpt_rdy_factor_staged",
                 "remote": "rpt_rdy_factor_remote"}
@@ -55,9 +61,12 @@ def build_readiness(inp: BuildInput) -> ReportDocument:
     spec = flowsections.window(inp)
     flows = {(r.app, r.env): r for r in readiness_rows(inp.ctx, spec, app_key=APP, env_key=env_key,
                                                        remote_ports=remote)}
+    # The apps assessed are destinations: a source condition narrows their traffic, never their hosts.
+    cond = inp.params.filter
+    dst_scope = FlowCondition(dst=cond.dst, dst_exclude=cond.dst_exclude) if cond is not None else None
     hosts: dict[tuple[str | None, str | None], Counter[str]] = {}
     for h in lc.hosts.values():
-        if flowsections.host_in_scope(h, inp.params.filter):
+        if flowsections.host_in_scope(h, dst_scope):
             key = (h.labels.get(APP) or None, h.labels.get(env_key) or None)
             hosts.setdefault(key, Counter())[h.enforcement_mode or "unknown"] += 1
     no_label = t("rpt_no_label")
@@ -67,22 +76,24 @@ def build_readiness(inp: BuildInput) -> ReportDocument:
     scored: list[tuple[tuple[str | None, str | None], Readiness, Counter[str]]] = []
     for key in sorted(set(flows) | set(hosts), key=lambda k: (k[0] or "", k[1] or "")):
         f, m = flows.get(key), hosts.get(key, Counter())
+        if f is None or not f.connections:  # no traffic into it in the period: not assessed (Review Focus 1)
+            scored.append((key, Readiness(score=None, grade=None, parts=dict.fromkeys(WEIGHTS), blocking=None), m))
+            continue
         scored.append((key, readiness(ReadinessInputs(
-            connections=f.connections if f else 0, decided=f.connections - f.unknown if f else 0,
-            allowed=f.allowed if f else 0, same_app=f.same_app if f else 0,
-            potentially_blocked=f.potentially_blocked if f else 0, remote=f.remote if f else 0,
-            remote_allowed=f.remote_allowed if f else 0, hosts=sum(m.values()), full=m["full"],
+            connections=f.connections, decided=f.connections - f.unknown, allowed=f.allowed, same_app=f.same_app,
+            potentially_blocked=f.potentially_blocked, remote=f.remote, remote_allowed=f.remote_allowed,
+            hosts=sum(m.values()), full=m["full"],
             selective=m["selective"])), m))
 
     # ── predicted blocks ────────────────────────────────────────────────────
     predicted: PredictedSummary | None = None
     failure: str | None = None
     try:
-        predicted = predicted_summary(inp.ctx, spec, app_key=APP)
-    except (PceQueryError, PceNotConfigured, *PCE_FAILURES) as exc:
+        predicted = predicted_summary(inp.ctx, spec, app_key=APP, max_results=PREDICTED_MAX_RESULTS)
+    except (PceQueryError, PceCollectionIncomplete, PceNotConfigured, *PCE_FAILURES) as exc:
         logger.warning("predicted blocks for the readiness report could not be computed: {}", exc)
         failure = f"{type(exc).__name__}: {exc}"[:200]
-    usable = predicted is not None and not predicted.unsupported
+    usable = predicted is not None and not predicted.unsupported and not predicted.undetermined_flows
 
     rated = [r.score for _, r, _ in scored if r.score is not None]
     values: dict[str, float | int | None] = {
@@ -92,9 +103,12 @@ def build_readiness(inp: BuildInput) -> ReportDocument:
         "predicted_blocked": predicted.blocked_connections if usable and predicted else None}
     no_data = t("rpt_no_flows_filtered" if inp.params.filter is not None else "rpt_rdy_no_apps")
     notes = {"overall": None if rated else no_data,
-             "predicted_blocked": None if usable else (t("rpt_rdy_predicted_unsupported") if predicted
-                                                       else t("rpt_rdy_predicted_failed", error=failure or ""))}
-    kpis = tuple(Kpi(key=k, label=t(label), value=values[k], previous=None,
+             "predicted_blocked": None if usable else (
+                 t("rpt_rdy_predicted_failed", error=failure or "") if predicted is None
+                 else t("rpt_rdy_predicted_unsupported") if predicted.unsupported
+                 else t("rpt_rdy_predicted_undetermined", n=f"{predicted.undetermined_flows:,}"))}
+    before = previous_values(inp)
+    kpis = tuple(Kpi(key=k, label=t(label), value=values[k], previous=before.get(k) if before else None,
                      unit="percent" if k == "overall" else "count",
                      better="higher" if k in ("ready", "overall") else "lower" if k != "apps" else "neutral",
                      note=notes.get(k)) for k, label in _KPI_KEYS.items())
@@ -127,6 +141,8 @@ def build_readiness(inp: BuildInput) -> ReportDocument:
     elif predicted.unsupported:
         predicted_blocks = (TextBlock(paragraphs=(t("rpt_rdy_predicted_unsupported"),)),)
     else:
+        undetermined = (TextBlock(paragraphs=(t("rpt_rdy_predicted_undetermined", n=f"{predicted.undetermined_flows:,}"),)),)
+
         def rule_name(href: str) -> str:
             ref = predicted.rules.get(href) if predicted else None
             if ref is None:
@@ -144,7 +160,8 @@ def build_readiness(inp: BuildInput) -> ReportDocument:
             total_rows=len(groups), empty_text=t("rpt_rdy_predicted_none"),
             limit_note=" ".join(x for x in (
                 t("rpt_limit_top_n", n=PREDICTED_ROWS) if len(groups) > PREDICTED_ROWS else "",
-                t("rpt_rdy_predicted_capped") if predicted.capped else "") if x) or None),)
+                t("rpt_rdy_predicted_capped", n=f"{PREDICTED_MAX_RESULTS:,}") if predicted.capped else "") if x)
+                or None), *(undetermined if predicted.undetermined_flows else ()))
 
     queue_rows = sorted((x for x in scored if x[1].score is not None), key=lambda x: (-(x[1].score or 0), name(x[0])))
     queue = TableBlock(

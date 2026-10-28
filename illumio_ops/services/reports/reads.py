@@ -9,6 +9,7 @@ from datetime import datetime, timedelta
 
 from illumio_ops.services.collect.guard import require_same_pce
 from illumio_ops.services.context import AppContext
+from illumio_ops.store.flowdb import analysis
 from illumio_ops.store.flowdb.db import StaleGeneration, db_day
 
 PortSpec = tuple[int, int | None]  # (port, protocol or None for any)
@@ -83,3 +84,12 @@ def hostnames(conn: sqlite3.Connection, hrefs: Sequence[str] | set[str]) -> dict
             if name:
                 out[href] = name
     return out
+
+
+def analysis_state(conn: sqlite3.Connection, kind: str) -> tuple[str | None, str | None]:
+    """(when the stored result was computed, the error of a later failed run): a report built on a stored
+    analysis says how old it is, and that the latest run failed (a stale result is not presented as current)."""
+    row = analysis.read_result(conn, kind)
+    run = analysis.get_run(conn, kind)
+    return (row["computed_at"] if row is not None else None,
+            run["last_error"] if run is not None and run["last_error"] else None)
