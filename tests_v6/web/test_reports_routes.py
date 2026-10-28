@@ -53,11 +53,11 @@ def test_catalog_lists_built_types(client, ctx):
     assert all(e["available"] for e in types.values()) and data["smtp_enabled"] is False
 
 
-def test_catalog_events_only_unavailable(client, ctx):
-    ctx.settings.update(ctx.settings.current().revision, lambda d: d["collection"].update(mode="events_only"))
+def test_catalog_lightweight_unavailable(client, ctx):
+    ctx.settings.update(ctx.settings.current().revision, lambda d: d["collection"].update(mode="lightweight"))
     login(client)
     e = get(client, "/api/reports/catalog").get_json()["data"]["entries"][0]
-    assert e["available"] is False and e["reason_key"] == "rpt_unavailable_events_only"
+    assert e["available"] is False and e["reason_key"] == "rpt_unavailable_lightweight"
 
 
 def test_generate_then_list_and_get(client, ctx):
@@ -149,9 +149,9 @@ def test_generate_refusals_name_the_field(client, ctx):
     assert r.status_code == 200 and r.get_json()["data"]["status"] == "queued"
 
 
-def test_events_only_types_available(client, ctx):
-    """VEN status, audit and ransomware protection read no traffic: they stay available in events-only mode."""
-    ctx.settings.update(ctx.settings.current().revision, lambda d: d["collection"].update(mode="events_only"))
+def test_lightweight_types_available(client, ctx):
+    """VEN status, audit and ransomware protection read no traffic: they stay available in lightweight mode."""
+    ctx.settings.update(ctx.settings.current().revision, lambda d: d["collection"].update(mode="lightweight"))
     login(client)
     entries = {e["report_type"]: e for e in get(client, "/api/reports/catalog").get_json()["data"]["entries"]}
     assert all(entries[t]["available"] for t in ("ven_status", "audit", "ransomware"))

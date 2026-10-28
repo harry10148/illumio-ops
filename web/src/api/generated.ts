@@ -76,17 +76,17 @@ export type ReportStatus = ("queued" | "running" | "done" | "failed")
 export type ChannelKind = ("smtp" | "line" | "telegram" | "teams" | "webhook")
 /**
  * What data collection reads (spec §6.4): everything; events plus short-lived traffic for
- * alerts; or events only.
+ * alerts; or no traffic at all (lightweight, the new-install default: flow reports query the PCE on demand).
  * 
  * This interface was referenced by `ContractRoot`'s JSON-Schema
  * via the `definition` "CollectionMode".
  */
-export type CollectionMode = ("full" | "alert" | "events_only")
+export type CollectionMode = ("full" | "alert" | "lightweight")
 /**
  * What data collection reads (spec §6.4): everything; events plus short-lived traffic for
- * alerts; or events only.
+ * alerts; or no traffic at all (lightweight, the new-install default: flow reports query the PCE on demand).
  */
-export type CollectionMode1 = ("full" | "alert" | "events_only")
+export type CollectionMode1 = ("full" | "alert" | "lightweight")
 /**
  * The three kinds of management port (spec §6.5.8): remote execution and control, directory and
  * authentication, and databases. Each detector reads the classes it is about.
@@ -1670,8 +1670,8 @@ export const VALUES = {
   ],
   "CollectionMode": [
     "alert",
-    "events_only",
-    "full"
+    "full",
+    "lightweight"
   ],
   "Confidence": [
     "high",

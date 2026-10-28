@@ -105,7 +105,7 @@ def availability(ctx: AppContext) -> dict[ReportType, str | None]:
     """Each built type -> None when it can be generated now, else the message key saying why not."""
     settings = ctx.settings.current()
     traffic = in_mode(settings, IngestSource.TRAFFIC)
-    return {t: ("rpt_unavailable_events_only" if spec.needs_traffic and not traffic else None)
+    return {t: ("rpt_unavailable_lightweight" if spec.needs_traffic and not traffic else None)
             for t, spec in specs().items()}
 
 

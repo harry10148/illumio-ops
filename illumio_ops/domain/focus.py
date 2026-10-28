@@ -98,14 +98,14 @@ FOCUS_KEYS: Mapping[str, str] = {
     "title_collection_gap": "focus_title_collection_gap", "title_job_failing": "focus_title_job_failing",
     "title_pce_probe": "focus_title_pce_probe", "title_setup_critical": "focus_title_setup_critical",
     "title_setup_admin": "focus_title_setup_admin", "title_stale_selector": "focus_title_stale_selector",
-    "title_events_only": "focus_title_events_only",
+    "title_lightweight": "focus_title_lightweight",
     "why_detection": "focus_why_detection", "why_exposure_asset": "focus_why_exposure_asset",
     "why_pivot": "focus_why_pivot", "why_cross_env": "focus_why_cross_env", "why_tamper_cycle": "focus_why_tamper_cycle",
     "why_tamper": "focus_why_tamper", "why_ransomware": "focus_why_ransomware",
     "why_contradiction": "focus_why_contradiction", "why_mode_switch": "focus_why_mode_switch",
     "why_coverage": "focus_why_coverage", "why_visibility": "focus_why_visibility", "why_gap": "focus_why_gap",
     "why_health": "focus_why_health", "why_setup": "focus_why_setup", "why_stale": "focus_why_stale",
-    "why_events_only": "focus_why_events_only",
+    "why_lightweight": "focus_why_lightweight",
 }
 
 
@@ -256,7 +256,7 @@ def setup_items(*, critical_set: bool, admin_set: bool, stale: Sequence[tuple[st
     """What the analysis needs from the operator. Without traffic collection only that is said: nothing else on
     the lateral side can be found."""
     if not collected:
-        return [_item(FocusKind.SETUP_REQUIRED, "events-only", Severity.LOW, "title_events_only", "why_events_only", {},
+        return [_item(FocusKind.SETUP_REQUIRED, "lightweight", Severity.LOW, "title_lightweight", "why_lightweight", {},
                       FocusAction(target="settings_collection"))]
     out = []
     if not critical_set:

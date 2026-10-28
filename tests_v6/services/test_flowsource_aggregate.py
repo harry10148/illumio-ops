@@ -105,8 +105,8 @@ def test_aggregate_total_equals_detail_count(ctx):
     assert sum(r.value for r in a.rows) == len(detail.rows) == 6
 
 
-def test_events_only_mode_reports_collection_off(tmp_path, fake):
-    c = configured_ctx(tmp_path, mode="events_only")
+def test_lightweight_mode_reports_collection_off(tmp_path, fake):
+    c = configured_ctx(tmp_path, mode="lightweight")
     a = aggregate_flows(c, rank(D.SRC_HOST), now=NOW)
     assert a.rows == [] and [g[2] for g in a.coverage.gaps] == ["collection_off"]
 

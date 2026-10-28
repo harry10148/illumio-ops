@@ -297,7 +297,7 @@ def evaluate_traffic(ctx: AppContext, *, now: datetime | None = None) -> EvalRun
     run = EvalRun(source=SOURCE_TRAFFIC, evaluated=0, fired=0, suppressed=0, statuses={})
     rules = [r for r in s.alerts.rules if r.enabled and isinstance(r, TrafficRule | BandwidthRule | VolumeRule)]
     rec = _Recorder(ctx, s, at)
-    if s.collection.mode is CollectionMode.EVENTS_ONLY or not s.collection.enabled:
+    if s.collection.mode is CollectionMode.LIGHTWEIGHT or not s.collection.enabled:
         for r in rules:
             rec.status(r.id, "collection_off")
             run.statuses[r.id] = "collection_off"

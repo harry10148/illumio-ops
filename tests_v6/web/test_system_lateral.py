@@ -75,7 +75,7 @@ def test_label_choices_truncation_flag(client, ctx, monkeypatch):
     assert choices["env"] == {"key": "env", "values": ["Prod"], "truncated": False}
 
 
-def test_events_only_status_says_mode_required(client, ctx):
+def test_lightweight_status_says_mode_required(client, ctx):
     login(client)
-    ctx.settings.update(ctx.settings.current().revision, lambda d: d["collection"].update({"mode": "events_only"}))
+    ctx.settings.update(ctx.settings.current().revision, lambda d: d["collection"].update({"mode": "lightweight"}))
     assert _get(client)["status"]["collected"] is False

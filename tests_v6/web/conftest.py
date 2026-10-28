@@ -40,8 +40,12 @@ def make_ctx(tmp_path, **web_overrides):
     store = SettingsStore(paths.settings_file)
     s = default_settings(password_hash=cached_hash(ADMIN_PASSWORD), secret_key=new_secret_key())
     store.create_initial(password_hash=s.web.password_hash, secret_key=s.web.secret_key)
-    if web_overrides:
-        store.update(0, lambda d: d["web"].update(web_overrides))
+    def mutate(d):
+        # The suite was written against full collection; new installs default to lightweight (spec §6.4,
+        # 2026-10-29), and the tests about lightweight set it themselves.
+        d["collection"]["mode"] = "full"
+        d["web"].update(web_overrides)
+    store.update(0, mutate)
     ctx = AppContext(paths=paths, settings=store)
     with ctx.db() as conn:
         migrate(conn)

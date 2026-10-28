@@ -36,8 +36,8 @@ def _ctx(tmp_path, mode, **collection):
     return configured_ctx(tmp_path, mode=mode, **collection)
 
 
-def test_events_only_skips_traffic(tmp_path, fake_traffic, event_calls):
-    ctx = _ctx(tmp_path, "events_only")
+def test_lightweight_skips_traffic(tmp_path, fake_traffic, event_calls):
+    ctx = _ctx(tmp_path, "lightweight")
     fake_traffic.answer = lambda s, e, m: [raw_flow(1, NOW - minutes(30), NOW - minutes(20))]
     run_traffic_cycle(ctx, now=NOW)
     run_events_cycle(ctx, now=NOW)
@@ -59,7 +59,7 @@ def test_alert_mode_skips_traffic_backfill(tmp_path, fake_traffic, event_calls):
 
 
 def test_switching_to_full_backfills_the_traffic_it_never_read(tmp_path, fake_traffic, event_calls):
-    ctx = _ctx(tmp_path, "events_only", backfill_days=2)
+    ctx = _ctx(tmp_path, "lightweight", backfill_days=2)
     ensure_initial_backfill(ctx, now=NOW)
     assert fake_traffic.calls == []
     ctx.settings.update(ctx.settings.current().revision, lambda d: d["collection"].update({"mode": "full"}))
@@ -80,7 +80,7 @@ def _settings(mode, flow, rollup, baseline=30):
 
 def test_alert_mode_allows_short_flow_retention():
     assert CollectionSettings.model_validate(_settings("alert", 3, 3)).mode is CollectionMode.ALERT
-    assert CollectionSettings.model_validate(_settings("events_only", 3, 3)).retention.flow_days == 3
+    assert CollectionSettings.model_validate(_settings("lightweight", 3, 3)).retention.flow_days == 3
 
 
 def test_full_mode_requires_flow_retention_over_baseline():
@@ -99,12 +99,13 @@ def test_archive_error_names_the_archive_field():
     assert exc.value.errors()[0]["loc"] == ("archive",)
 
 
-def test_default_mode_is_full():
-    assert default_collection().mode is CollectionMode.FULL
+def test_default_mode_is_lightweight():
+    """Spec §6.4 (2026-10-29): new installs keep no traffic; alert mode is the step up."""
+    assert default_collection().mode is CollectionMode.LIGHTWEIGHT
 
 
 def test_coverage_reports_collection_off(tmp_path, fake_traffic, event_calls):
-    ctx = _ctx(tmp_path, "events_only")
+    ctx = _ctx(tmp_path, "lightweight")
     q = query_flows(ctx, FilterSpec(start=NOW - minutes(60), end=NOW), limit=10, order="last_detected_desc", now=NOW)
     assert [g[2] for g in q.coverage.gaps] == ["collection_off"]
     run_events_cycle(ctx, now=NOW)
@@ -116,7 +117,7 @@ def test_coverage_reports_collection_off(tmp_path, fake_traffic, event_calls):
 
 
 def test_status_marks_sources_outside_mode(tmp_path):
-    st = collection_status(_ctx(tmp_path, "events_only"), now=NOW)
+    st = collection_status(_ctx(tmp_path, "lightweight"), now=NOW)
     collected = {s.source: s.collected for s in st.sources}
     assert collected == {"traffic": False, "events": True, "inventory": True, "ransomware": True, "backfill": True}
-    assert st.mode == "events_only"
+    assert st.mode == "lightweight"

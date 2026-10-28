@@ -55,7 +55,7 @@ def test_build_scheduler_registers_jobs_with_safe_defaults(tmp_path):
 
 def test_job_intervals_follow_settings(tmp_path):
     ctx = make_ctx(tmp_path)
-    ctx.settings.update(0, lambda d: d["collection"].update({"traffic_interval_seconds": 900,
+    ctx.settings.update(ctx.settings.current().revision, lambda d: d["collection"].update({"traffic_interval_seconds": 900,
                                                              "events_interval_seconds": 120}))
     iv = job_intervals(ctx.settings.current())
     assert (iv["collect_traffic"], iv["collect_events"], iv["pce_probe"]) == (900, 120, 300)
@@ -73,7 +73,7 @@ def test_collectors_registered_and_first_run_delayed(tmp_path):
 def test_apply_schedule_reschedules_changed_interval(tmp_path):
     ctx = make_ctx(tmp_path)
     sched = build_scheduler(ctx)
-    ctx.settings.update(0, lambda d: d["collection"].update({"traffic_interval_seconds": 1800}))
+    ctx.settings.update(ctx.settings.current().revision, lambda d: d["collection"].update({"traffic_interval_seconds": 1800}))
     apply_schedule(sched, ctx.settings.current())
     assert sched.get_job("collect_traffic").trigger.interval.total_seconds() == 1800
     assert sched.get_job("collect_events").trigger.interval.total_seconds() == 300

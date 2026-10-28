@@ -51,15 +51,15 @@ def test_linked_report_is_marked(context, live_app):
     expect(page.locator(f"[data-report-id='{rid}']")).to_have_attribute("data-highlight", "true")
 
 
-def test_events_only_mode_greys_out_with_reason(context, live_app):
+def test_lightweight_mode_greys_out_with_reason(context, live_app):
     ctx = live_app.ctx
-    ctx.settings.update(ctx.settings.current().revision, lambda d: d["collection"].update(mode="events_only"))
+    ctx.settings.update(ctx.settings.current().revision, lambda d: d["collection"].update(mode="lightweight"))
     page = context.new_page()
     _reports(page, live_app.url)
     entry = page.locator("[data-report-type=lateral_posture]")
     expect(entry).to_have_attribute("data-available", "false")
     expect(entry.get_by_role("button", name="Generate…")).to_be_disabled()
-    expect(entry.locator("[data-role=unavailable]")).to_contain_text("events only")
+    expect(entry.locator("[data-role=unavailable]")).to_contain_text("lightweight")
 
 
 def test_schedule_create_and_run_now(context, live_app):
@@ -168,14 +168,14 @@ def test_schedule_lookback_stays_within_the_type(context, live_app):
     assert ctx.settings.current().reports.schedules[0].lookback_days == 6
 
 
-def test_audit_in_events_only_mode(context, live_app):
+def test_audit_in_lightweight_mode(context, live_app):
     from datetime import UTC, datetime, timedelta
 
     from illumio_ops.domain.values import DataOrigin
     from illumio_ops.store.flowdb.events import upsert_events
     from tests_v6.services.reports.test_audit import event
     ctx = live_app.ctx
-    ctx.settings.update(ctx.settings.current().revision, lambda d: d["collection"].update(mode="events_only"))
+    ctx.settings.update(ctx.settings.current().revision, lambda d: d["collection"].update(mode="lightweight"))
     yesterday = datetime.now(UTC) - timedelta(days=1)
     with ctx.flows().connect() as conn:
         upsert_events(conn, [event("sec_policy.create", yesterday, user="alice")], origin=DataOrigin.INGEST,

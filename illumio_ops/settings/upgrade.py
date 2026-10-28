@@ -71,6 +71,14 @@ def _v6_to_v7(data: dict[str, Any]) -> dict[str, Any]:
     return data
 
 
+def _v7_to_v8(data: dict[str, Any]) -> dict[str, Any]:
+    # "Events only" became "lightweight" (spec §6.4, 2026-10-29); every other mode stays as installed.
+    collection = data.get("collection")
+    if isinstance(collection, dict) and collection.get("mode") == "events_only":
+        collection["mode"] = "lightweight"
+    return data
+
+
 # source version -> function producing source version + 1
 UPGRADES: dict[int, Callable[[dict[str, Any]], dict[str, Any]]] = {
     1: _v1_to_v2,
@@ -79,6 +87,7 @@ UPGRADES: dict[int, Callable[[dict[str, Any]], dict[str, Any]]] = {
     4: _v4_to_v5,
     5: _v5_to_v6,
     6: _v6_to_v7,
+    7: _v7_to_v8,
 }
 
 

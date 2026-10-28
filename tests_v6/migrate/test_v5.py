@@ -164,18 +164,18 @@ def test_filter_and_sampling_dropped_with_reason():
     assert next(i for i in report.items if i.source == "pce_cache.flow_delta_enabled").action == "dropped"
 
 
-def test_cache_off_becomes_events_only():
+def test_cache_off_maps_to_lightweight():
     r = migrate_v5(_with_cache(enabled=False))
-    assert (r.settings.collection.enabled, r.settings.collection.mode) == (True, "events_only")
+    assert (r.settings.collection.enabled, r.settings.collection.mode) == (True, "lightweight")
     item = _cache_item(r, "pce_cache.enabled")
     assert (item.target, item.action, item.reason_key) == (
-        "collection.mode", "rewritten", "migrate_cache_off_events_only")
+        "collection.mode", "rewritten", "migrate_cache_off_lightweight")
     r = migrate_v5(_with_cache(enabled=True))
     assert r.settings.collection.mode == "full"
     assert _cache_item(r, "pce_cache.enabled").reason_key == "migrate_cache_on_full"
     raw = _base()
     raw.pop("pce_cache", None)
-    assert migrate_v5(raw).settings.collection.mode == "events_only"  # 5.x kept no traffic
+    assert migrate_v5(raw).settings.collection.mode == "lightweight"  # 5.x kept no traffic
 
 
 def test_106_pce_cache_every_leaf_accounted_for():
@@ -325,6 +325,6 @@ def test_allowlist_with_no_valid_entry_blocks_instead_of_opening_up():
 @pytest.mark.parametrize("name", FIXTURE_NAMES)
 def test_migrator_output_has_default_lateral(name):
     s = migrate_v5(_load(name)).settings
-    assert s.schema_version == 7
+    assert s.schema_version == 8
     assert s.reports.retention_days == 90
     assert s.lateral.graph_hops == 3 and s.lateral.critical_assets == () and s.lateral.environment_label_key == "env"

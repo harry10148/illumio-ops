@@ -30,9 +30,9 @@ def test_queue_order_and_claim(tmp_path):
 def test_failed_at_insert_is_finished(tmp_path):
     ctx = make_ctx(tmp_path)
     with ctx.db() as conn:
-        rid = _insert(conn, status=ReportStatus.FAILED, error_key="rpt_unavailable_events_only")
+        rid = _insert(conn, status=ReportStatus.FAILED, error_key="rpt_unavailable_lightweight")
         row = store.get(conn, rid)
-    assert row.finished_at == T and row.error_key == "rpt_unavailable_events_only"
+    assert row.finished_at == T and row.error_key == "rpt_unavailable_lightweight"
 
 
 def test_list_newest_first_and_delete_skips_running(tmp_path):

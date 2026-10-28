@@ -76,20 +76,20 @@ def test_formats_respected(ctx, monkeypatch):
     assert [f.rsplit(".", 1)[1] for f in _row(ctx, rid).files] == ["xlsx"]
 
 
-def test_events_only_mode_fails_with_reason(tmp_path, monkeypatch):
-    ctx = configured_ctx(tmp_path, mode="events_only")
+def test_lightweight_mode_fails_with_reason(tmp_path, monkeypatch):
+    ctx = configured_ctx(tmp_path, mode="lightweight")
     b = FakeBuilder()
     _register(monkeypatch, b)
     rid = generate.enqueue(ctx, ReportParams(report_type=LATERAL), trigger="schedule", schedule_id="s", now=NOW)
     row = _row(ctx, rid)
-    assert row.status is ReportStatus.FAILED and row.error_key == "rpt_unavailable_events_only" and row.files == []
+    assert row.status is ReportStatus.FAILED and row.error_key == "rpt_unavailable_lightweight" and row.files == []
     assert generate.run_queued(ctx, now=NOW) is None and b.calls == []
 
 
 def test_availability_lists_the_reason(tmp_path, monkeypatch):
     _register(monkeypatch, FakeBuilder())
-    assert generate.availability(configured_ctx(tmp_path, mode="events_only"))[LATERAL] == \
-        "rpt_unavailable_events_only"
+    assert generate.availability(configured_ctx(tmp_path, mode="lightweight"))[LATERAL] == \
+        "rpt_unavailable_lightweight"
     assert generate.availability(configured_ctx(tmp_path / "b"))[LATERAL] is None
 
 

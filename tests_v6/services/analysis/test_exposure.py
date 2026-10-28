@@ -59,8 +59,8 @@ def test_exposure_marks_critical_assets(tmp_path):
     assert (asset.key, asset.sources_now, asset.sources_enforced) == ("/orgs/1/workloads/dst", 2, 1)
 
 
-def test_events_only_mode_stores_collection_off(tmp_path):
-    ctx = configured_ctx(tmp_path, mode="events_only")
+def test_lightweight_mode_stores_collection_off(tmp_path):
+    ctx = configured_ctx(tmp_path, mode="lightweight")
     assert run_exposure(ctx, now=NOW) is None
     with ctx.flows().connect() as conn:
         assert json.loads(analysis.get_run(conn, "exposure")["status_json"])["state"] == "collection_off"

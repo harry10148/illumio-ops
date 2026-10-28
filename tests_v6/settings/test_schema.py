@@ -17,7 +17,7 @@ def _pce(**kw):
 
 def test_default_settings_values():
     s = default_settings(password_hash=HASH, secret_key=KEY, port=5443)
-    assert s.schema_version == 7 and s.revision == 0
+    assert s.schema_version == 8 and s.revision == 0
     assert s.pce.url == "" and s.pce.deployment_type is DeploymentType.ON_PREM
     assert s.web.port == 5443 and s.web.username == "illumio" and s.web.must_change_password is False
     assert s.web.session_lifetime_seconds == 28800 and s.web.allowed_ips == ()
@@ -199,7 +199,7 @@ def _with_collection(**changes):
 def test_retention_flow_days_below_baseline_is_invalid():
     from illumio_ops.settings.store import SettingsInvalid, validate_settings
     with pytest.raises(SettingsInvalid) as e:
-        validate_settings(_with_collection(retention__flow_days=20))
+        validate_settings(_with_collection(mode="full", retention__flow_days=20))
     [(loc, msg)] = e.value.errors
     assert loc == "collection.retention" and "flow_days" in msg and "20" not in msg
 
@@ -321,3 +321,8 @@ def test_added_port_category():
     assert lat.extra_admin_ports[0].category == "database"
     with pytest.raises(ValidationError):
         _lateral(extra_admin_ports=[{"port": 1521, "proto": 6, "category": "other"}])
+
+
+def test_new_install_is_lightweight():
+    """Spec §6.4 (2026-10-29): a new install collects no traffic until the operator picks alert or full."""
+    assert default_settings(password_hash=HASH, secret_key=KEY).collection.mode.value == "lightweight"
