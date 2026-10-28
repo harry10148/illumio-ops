@@ -93,7 +93,9 @@ def build_readiness(inp: BuildInput) -> ReportDocument:
     except (PceQueryError, PceCollectionIncomplete, PceNotConfigured, *PCE_FAILURES) as exc:
         logger.warning("predicted blocks for the readiness report could not be computed: {}", exc)
         failure = f"{type(exc).__name__}: {exc}"[:200]
-    usable = predicted is not None and not predicted.unsupported and not predicted.undetermined_flows
+    # Blocked connections found stand; a zero with undetermined flows is not a confirmed "blocks nothing".
+    usable = (predicted is not None and not predicted.unsupported
+              and (predicted.blocked_flows > 0 or not predicted.undetermined_flows))
 
     rated = [r.score for _, r, _ in scored if r.score is not None]
     values: dict[str, float | int | None] = {
@@ -103,10 +105,11 @@ def build_readiness(inp: BuildInput) -> ReportDocument:
         "predicted_blocked": predicted.blocked_connections if usable and predicted else None}
     no_data = t("rpt_no_flows_filtered" if inp.params.filter is not None else "rpt_rdy_no_apps")
     notes = {"overall": None if rated else no_data,
-             "predicted_blocked": None if usable else (
+             "predicted_blocked": (
                  t("rpt_rdy_predicted_failed", error=failure or "") if predicted is None
                  else t("rpt_rdy_predicted_unsupported") if predicted.unsupported
-                 else t("rpt_rdy_predicted_undetermined", n=f"{predicted.undetermined_flows:,}"))}
+                 else t("rpt_rdy_predicted_undetermined", n=f"{predicted.undetermined_flows:,}")
+                 if predicted.undetermined_flows else None)}
     before = previous_values(inp)
     kpis = tuple(Kpi(key=k, label=t(label), value=values[k], previous=before.get(k) if before else None,
                      unit="percent" if k == "overall" else "count",

@@ -246,3 +246,11 @@ def test_readiness_asks_for_50000_rows(ctx, monkeypatch):
     write_flows(ctx, [flow(src_app="Web", dst_app="DB", port=5432)])
     _build(ctx, ReportType.READINESS)
     assert asked["max_results"] == 50_000
+
+
+def test_blocked_count_kept_with_a_few_undetermined(ctx, monkeypatch):
+    """Lab: 1 flow without a draft decision hid 1.3 million blocked connections. Only a zero is unconfirmed."""
+    monkeypatch.setattr(readiness_report, "predicted_summary", lambda ctx_, spec, **kw: summary(undetermined_flows=1))
+    write_flows(ctx, [flow(src_app="Web", dst_app="DB", port=5432)])
+    k = _kpi(_build(ctx, ReportType.READINESS))["predicted_blocked"]
+    assert k.value == 7 and "1" in k.note
