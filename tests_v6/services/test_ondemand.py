@@ -153,3 +153,18 @@ def test_earliest_reported(ctx, pce):
     pce.answer = lambda s, e, n: [] if s.day == 25 else _hourly(s, e, n)
     with ondemand.pull_period(ctx, start=START, end=END, now=NOW) as res:
         assert res.earliest == datetime(2026, 10, 26, tzinfo=UTC)
+
+
+def test_install_store_of_another_pce_is_not_copied(ctx, pce):
+    """The install's store still holds the previous PCE's data (a switch whose clearing has not run): its
+    inventory must not reach a report about the new PCE."""
+    from datetime import UTC, datetime
+
+    from illumio_ops.services.collect.guard import BindingMismatch
+    from illumio_ops.store.flowdb import binding
+    with ctx.flows().connect() as conn:
+        binding.bind(conn, "https://old.example.com:8443", "9", datetime(2026, 1, 1, tzinfo=UTC))
+        conn.commit()
+    with pytest.raises(BindingMismatch), ondemand.pull_period(ctx, start=START, end=END, now=NOW):
+        pass
+    assert _leftovers(ctx) == [] and pce.payloads == []

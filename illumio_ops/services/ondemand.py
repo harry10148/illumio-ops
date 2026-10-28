@@ -22,7 +22,7 @@ from illumio_ops.domain.filter import FilterSpec, to_pce_payload
 from illumio_ops.domain.values import DataOrigin, IngestSource
 from illumio_ops.paths import InstallPaths
 from illumio_ops.pce.async_query import run_traffic_query, traffic_payload
-from illumio_ops.services.collect.guard import ensure_binding
+from illumio_ops.services.collect.guard import ensure_binding, require_same_pce
 from illumio_ops.services.collect.traffic import (
     PCE_FAILURES,
     QUERY_DEADLINE_SECONDS,
@@ -153,7 +153,8 @@ def pull_period(ctx: AppContext, *, start: datetime, end: datetime, spec: Filter
     fdb = FlowDb(path)
     try:
         state = _Pull()
-        ctx.flows().connect().close()  # the install's store exists and is migrated before it is read from
+        with ctx.flows().connect() as install:  # migrated, and about this PCE, before anything is copied from it
+            require_same_pce(install, settings.pce)
         with fdb.writing(fdb.generation) as conn:
             ensure_binding(conn, settings.pce, at)
             _seed(conn, ctx.flows().path)
