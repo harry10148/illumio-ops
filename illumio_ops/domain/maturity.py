@@ -22,6 +22,7 @@ class MaturityInputs:
     unmanaged_source_connections: int
     ransomware_services: int | None  # critical/high services the PCE rated; None: no ransomware data
     ransomware_protected: int | None
+    undecided_connections: int = 0  # no reported decision: left out of the policy part
 
 
 @dataclass(frozen=True)
@@ -39,7 +40,8 @@ def maturity(m: MaturityInputs) -> Maturity:
     share = (lambda n: n / m.connections) if m.connections else None
     parts: dict[str, float | None] = {
         "enforcement": (m.hosts_full + 0.5 * m.hosts_selective) / m.hosts_managed if m.hosts_managed else None,
-        "policy": share(m.allowed_connections) if share else None,
+        "policy": (m.allowed_connections / (m.connections - m.undecided_connections)
+                   if m.connections - m.undecided_connections > 0 else None),
         "lateral": 1 - min(share(m.admin_open_connections), LATERAL_CAP) / LATERAL_CAP if share else None,
         "managed": 1 - min(share(m.unmanaged_source_connections), MANAGED_CAP) / MANAGED_CAP if share else None,
         "ransomware": (m.ransomware_protected or 0) / m.ransomware_services if m.ransomware_services else None,

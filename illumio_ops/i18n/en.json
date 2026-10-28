@@ -1282,7 +1282,7 @@
   "rpt_sec_lateral_exposure": "Now: {assets} critical assets reachable, {pivots} pivot hosts, {cross_env} cross-environment paths.",
   "rpt_sec_lateral_see": "The {report} report has the paths, pivots and detections.",
   "rpt_sec_tbl_findings": "Rules that fired, by category",
-  "rpt_sec_quality_maturity": "Maturity: enforcement 40 (full + half of selective), allowed connections 25, management ports not blocked 15, unmanaged sources 10, protected ransomware services 10; a part without data is left out and the rest rescaled.",
+  "rpt_sec_quality_maturity": "Maturity: enforcement 40 (full + half of selective), allowed share of connections with a reported decision 25, management ports not blocked 15, unmanaged sources 10, protected ransomware services 10; a part without data is left out and the rest rescaled.",
   "rpt_title_network_inventory": "Network inventory",
   "gui_reports_desc_network_inventory": "How the estate is labelled and how apps depend on each other: label hygiene, app-to-app dependencies, services each app provides, unmanaged sources into apps.",
   "rpt_inv_kpi_managed_hosts": "Managed hosts",
@@ -1561,5 +1561,6 @@
   "rpt_rdy_queue_intro": "The apps closest to ready first, each with the factor that costs it the most points.",
   "rpt_rdy_tbl_queue": "Enforcement queue",
   "rpt_rdy_col_next": "Next step",
-  "rpt_rdy_quality_definition": "An app's traffic is the connections into its managed hosts; connections are num_connections summed. Labels are matched exactly."
+  "rpt_rdy_quality_definition": "An app's traffic is the connections into its managed hosts; connections are num_connections summed. Labels are matched exactly.",
+  "rpt_rdy_quality_unknown": "{pct}% of the connections into managed hosts had no reported decision; they are left out of \"allowed by a rule\" and \"not potentially blocked\"."
 }

@@ -45,3 +45,11 @@ def test_no_data_no_score():
 
 def test_grades():
     assert [grade(s) for s in (85, 84.9, 70, 55, 40, 39.9)] == ["A", "B", "B", "C", "D", "F"]
+
+
+def test_policy_part_over_decided_connections():
+    """A connection without a reported decision says nothing about policy (the readiness report's rule, P5b-2)."""
+    m = maturity(_inputs(connections=100, allowed_connections=20, undecided_connections=80))
+    assert m.parts["policy"] == pytest.approx(1.0)
+    m = maturity(_inputs(connections=100, allowed_connections=0, undecided_connections=100))
+    assert m.parts["policy"] is None

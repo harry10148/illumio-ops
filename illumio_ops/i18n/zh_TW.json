@@ -1282,7 +1282,7 @@
   "rpt_sec_lateral_exposure": "目前：{assets} 個關鍵資產可被觸及、{pivots} 台跳板主機、{cross_env} 條跨環境路徑。",
   "rpt_sec_lateral_see": "「{report}」報表列出路徑、跳板與偵測。",
   "rpt_sec_tbl_findings": "依類別列出觸發的規則",
-  "rpt_sec_quality_maturity": "成熟度：強制 40（full 加 selective 的一半）、有規則允許的連線 25、未被擋的管理 port 15、非受管來源 10、已防護的勒索服務 10；沒有資料的項目不計，其餘按比例放大。",
+  "rpt_sec_quality_maturity": "成熟度：強制 40（full 加 selective 的一半）、有回報判定的連線中有規則允許的比例 25、未被擋的管理 port 15、非受管來源 10、已防護的勒索服務 10；沒有資料的項目不計，其餘按比例放大。",
   "rpt_title_network_inventory": "網路盤點",
   "gui_reports_desc_network_inventory": "環境的標籤狀況與 app 之間的相依：標籤衛生、app 對 app 相依、各 app 提供的服務、連入 app 的非受管來源。",
   "rpt_inv_kpi_managed_hosts": "受管主機",
@@ -1561,5 +1561,6 @@
   "rpt_rdy_queue_intro": "最接近就緒的 app 在前，各附扣分最多的因子。",
   "rpt_rdy_tbl_queue": "強制推進佇列",
   "rpt_rdy_col_next": "下一步",
-  "rpt_rdy_quality_definition": "app 的流量指連入其受管主機的連線；連線數為 num_connections 加總。標籤完全比對。"
+  "rpt_rdy_quality_definition": "app 的流量指連入其受管主機的連線；連線數為 num_connections 加總。標籤完全比對。",
+  "rpt_rdy_quality_unknown": "連入受管主機的連線中有 {pct}% 沒有回報判定；這些連線不列入「有規則允許」與「非可能被擋」的計算。"
 }

@@ -130,3 +130,20 @@ def test_filter_narrows_apps(ctx):
 def test_zh_tw_builds(ctx):
     _write(ctx, [flow(src_app="Web", dst_app="DB", port=5432)])
     assert _build(ctx, lang=Language.ZH_TW).title
+
+
+def test_unknown_decisions_left_out(ctx):
+    """Lab, 2026-10-28: 84% of the traffic had no reported decision and every app scored F on "allowed by a rule".
+    A connection without a decision says nothing about policy: it is left out of policy and staged, and said."""
+    _write(ctx, [flow(src_app="Web", dst_app="DB", port=5432, conns=2),
+                 flow(src_app="Web", dst_app="DB", port=5432, decision="unknown", conns=8)])
+    doc = _build(ctx)
+    row = {r[0]: r for r in _table(doc, "scores").rows}["DB (Dev)"]
+    assert row[3] == "100.0%" and row[6] == "100.0%"  # policy and staged over the 2 decided connections
+    assert any("80.0%" in q for q in doc.data_quality)
+
+
+def test_all_unknown_no_policy_factor(ctx):
+    _write(ctx, [flow(src_app="Web", dst_app="DB", port=5432, decision="unknown", conns=5)])
+    row = {r[0]: r for r in _table(_build(ctx), "scores").rows}["DB (Dev)"]
+    assert row[3] == "—" and row[6] == "—"

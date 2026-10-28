@@ -121,6 +121,7 @@ def build_security_risk(inp: BuildInput) -> ReportDocument:
     score = maturity(MaturityInputs(
         hosts_managed=len(hosts), hosts_full=modes["full"], hosts_selective=modes["selective"],
         connections=totals.connections, allowed_connections=allowed_connections,
+        undecided_connections=by["unknown"].connections if "unknown" in by else 0,
         admin_open_connections=totals.admin_open_connections,
         unmanaged_source_connections=totals.from_unmanaged_connections,
         ransomware_services=rw_counts[0] if rw_counts else None,

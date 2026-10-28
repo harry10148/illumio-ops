@@ -571,6 +571,7 @@ class ReadinessRow(BaseModel):
     app: str | None
     env: str | None
     connections: int
+    unknown: int  # without a reported decision
     allowed: int
     same_app: int
     potentially_blocked: int
@@ -592,14 +593,16 @@ def readiness_rows(ctx: AppContext, spec: FilterSpec, *, app_key: str, env_key: 
                f"{_label_of('dst')} AS da, {_label_of('dst')} AS de FROM flows f WHERE {where} AND f.dst_managed = 1")
         found = conn.execute(
             "SELECT NULLIF(da, ''), NULLIF(de, ''), SUM(n), SUM(CASE WHEN d = 'allowed' THEN n END), "
+            "SUM(CASE WHEN d IS NULL OR d = 'unknown' THEN n END), "
             "SUM(CASE WHEN da != '' AND sa = da THEN n END), SUM(CASE WHEN d = 'potentially_blocked' THEN n END), "
             f"SUM(CASE WHEN {remote_sql} THEN n END), SUM(CASE WHEN {remote_sql} AND d = 'allowed' THEN n END) "
             f"FROM ({sub}) r GROUP BY da, de",
             [*remote_params, *remote_params, app_key, app_key, env_key, *params]).fetchall()
     if fdb.generation != gen:
         raise StaleGeneration
-    return [ReadinessRow(app=r[0], env=r[1], connections=r[2] or 0, allowed=r[3] or 0, same_app=r[4] or 0,
-                         potentially_blocked=r[5] or 0, remote=r[6] or 0, remote_allowed=r[7] or 0) for r in found]
+    return [ReadinessRow(app=r[0], env=r[1], connections=r[2] or 0, allowed=r[3] or 0, unknown=r[4] or 0,
+                         same_app=r[5] or 0, potentially_blocked=r[6] or 0, remote=r[7] or 0, remote_allowed=r[8] or 0)
+            for r in found]
 
 def new_user_pairs(ctx: AppContext, ports: Sequence[PortProto], *, since: datetime) -> list[UserPair]:
     """User x destination x port combinations first seen since `since` (spec §6.5.7, "new combinations

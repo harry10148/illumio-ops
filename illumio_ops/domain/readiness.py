@@ -1,5 +1,6 @@
 """Whether one app is ready for enforcement (P5b-2 Task 5): 5.x readiness's five factors and weights, over the app's
-inbound connections (enforcement blocks what comes in) and its own hosts. A factor without data is left out and the
+inbound connections (enforcement blocks what comes in) and its own hosts. A connection without a reported decision
+says nothing about policy, so policy and staged are shares of the decided ones. A factor without data is left out and the
 others rescaled; grades are the maturity score's (A ≥ 85, B ≥ 70, C ≥ 55, D ≥ 40), one scale for both reports."""
 from __future__ import annotations
 
@@ -13,6 +14,7 @@ WEIGHTS = {"policy": 35, "ringfence": 20, "enforcement": 20, "staged": 15, "remo
 @dataclass(frozen=True)
 class ReadinessInputs:
     connections: int          # into the app's managed hosts
+    decided: int              # of them with a reported decision: policy and staged are shares of these
     allowed: int
     same_app: int             # from the app itself
     potentially_blocked: int
@@ -34,9 +36,9 @@ class Readiness:
 def readiness(i: ReadinessInputs) -> Readiness:
     def share(n: float, d: int) -> float | None:
         return n / d if d else None
-    staged = share(i.potentially_blocked, i.connections)
+    staged = share(i.potentially_blocked, i.decided)
     parts: dict[str, float | None] = {
-        "policy": share(i.allowed, i.connections), "ringfence": share(i.same_app, i.connections),
+        "policy": share(i.allowed, i.decided), "ringfence": share(i.same_app, i.connections),
         "enforcement": share(i.full + 0.5 * i.selective, i.hosts) if i.hosts else None,
         "staged": None if staged is None else 1 - staged, "remote": share(i.remote_allowed, i.remote)}
     known = {k: v for k, v in parts.items() if v is not None}

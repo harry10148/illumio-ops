@@ -68,7 +68,8 @@ def build_readiness(inp: BuildInput) -> ReportDocument:
     for key in sorted(set(flows) | set(hosts), key=lambda k: (k[0] or "", k[1] or "")):
         f, m = flows.get(key), hosts.get(key, Counter())
         scored.append((key, readiness(ReadinessInputs(
-            connections=f.connections if f else 0, allowed=f.allowed if f else 0, same_app=f.same_app if f else 0,
+            connections=f.connections if f else 0, decided=f.connections - f.unknown if f else 0,
+            allowed=f.allowed if f else 0, same_app=f.same_app if f else 0,
             potentially_blocked=f.potentially_blocked if f else 0, remote=f.remote if f else 0,
             remote_allowed=f.remote_allowed if f else 0, hosts=sum(m.values()), full=m["full"],
             selective=m["selective"])), m))
@@ -155,10 +156,13 @@ def build_readiness(inp: BuildInput) -> ReportDocument:
                    for k, r, _ in queue_rows),
         total_rows=len(queue_rows), empty_text=no_data)
 
+    total = sum(r.connections for r in flows.values())
+    unknown = sum(r.unknown for r in flows.values())
     filter_line = flowsections.filter_text(inp.params.filter, lang)
     quality = (*coverage_note(inp.ctx, inp.start, inp.end, lang, now=inp.now, tz=inp.tz, flows=True),
                *((t("rpt_quality_filter", filter=filter_line),) if filter_line else ()),
-               t("rpt_rdy_quality_definition"))
+               t("rpt_rdy_quality_definition"),
+               *((t("rpt_rdy_quality_unknown", pct=f"{100 * unknown / total:.1f}"),) if unknown else ()))
     return ReportDocument(
         report_type=inp.params.report_type, lang=lang, title=t("rpt_title_readiness"), period_start=inp.start,
         period_end=inp.end, generated_at=inp.now, pce_label=inp.pce_label, kpis=kpis, findings=(),
