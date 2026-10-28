@@ -254,3 +254,28 @@ def test_blocked_count_kept_with_a_few_undetermined(ctx, monkeypatch):
     write_flows(ctx, [flow(src_app="Web", dst_app="DB", port=5432)])
     k = _kpi(_build(ctx, ReportType.READINESS))["predicted_blocked"]
     assert k.value == 7 and "1" in k.note
+
+
+# Re-review round 2 ---------------------------------------------------------------------------------------------
+
+def test_unscored_app_gets_no_advice_and_is_not_counted(ctx):
+    _inventory(ctx, [("d1", "DB", "full")])
+    doc = _build(ctx, ReportType.READINESS)
+    row = _tables(doc, "scores")[0].rows[0]
+    assert "not assessed" in row[-1].lower() and _kpi(doc)["apps"].value == 0
+
+
+def test_empty_predicted_table_not_claimed_with_undetermined(ctx, monkeypatch):
+    monkeypatch.setattr(readiness_report, "predicted_summary", lambda ctx_, spec, **kw: summary(
+        groups=[], blocked_flows=0, blocked_connections=0, undetermined_flows=1))
+    write_flows(ctx, [flow(src_app="Web", dst_app="DB", port=5432)])
+    assert "blocks none" not in _tables(_build(ctx, ReportType.READINESS), "predicted")[0].empty_text
+
+
+def test_known_draft_decisions_are_decided(tmp_path, fake, monkeypatch):  # noqa: F811
+    rows = copy.deepcopy(ROWS)
+    for r in rows:
+        r["draft_policy_decision"] = "allowed_across_boundary"
+    monkeypatch.setattr(predicted_block, "run_traffic_query", lambda client, payload, **kw: AsyncQueryResult(
+        rows=rows, matches_count=len(rows), flows_count=len(rows), capped=False))
+    assert predicted_summary(configured_ctx(tmp_path), SPEC).undetermined_flows == 0

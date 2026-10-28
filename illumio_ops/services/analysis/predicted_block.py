@@ -18,7 +18,7 @@ from illumio_ops.domain.flows import (
     record_key,
 )
 from illumio_ops.domain.policy import DraftView, RuleRef, index_rules, parse_draft
-from illumio_ops.domain.values import CapabilityState
+from illumio_ops.domain.values import KNOWN_DRAFT_POLICY_DECISIONS, CapabilityState
 from illumio_ops.pce.async_query import PceQueryError, run_traffic_query
 from illumio_ops.pce.policy import fetch_policy_names, fetch_rule_sets
 from illumio_ops.services.context import AppContext
@@ -27,7 +27,7 @@ from illumio_ops.store.flowdb import capabilities
 from illumio_ops.store.flowdb.db import StaleGeneration
 
 _ALWAYS = (datetime(1970, 1, 1, tzinfo=UTC), datetime(9999, 1, 1, tzinfo=UTC))
-DECIDED = frozenset({"allowed", "potentially_blocked"})  # with blocked_*: a draft decision the PCE gave
+DECIDED = KNOWN_DRAFT_POLICY_DECISIONS - {"unknown"}  # a draft decision the PCE gave
 
 
 class PredictedRow(BaseModel):
@@ -159,7 +159,7 @@ def predicted_summary(ctx: AppContext, spec: FilterSpec, *, app_key: str = "app"
     for row in rc.rows:
         if not row.flow.dst_managed:  # what enforcement would block is traffic into managed hosts
             continue
-        if row.draft_decision not in DECIDED and not row.draft_decision.startswith("blocked"):
+        if row.draft_decision not in DECIDED:
             undetermined += 1
             continue
         if not row.draft_decision.startswith("blocked"):

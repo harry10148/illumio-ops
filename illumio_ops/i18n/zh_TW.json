@@ -1566,5 +1566,7 @@
   "rpt_rdy_predicted_undetermined": "PCE 對 {n} 筆連入受管主機的流量沒有給出草稿判定：草稿會擋下什麼並不完全確定。",
   "rpt_quality_analysis_at": "本報表讀取的分析計算於 {at}。",
   "rpt_quality_analysis_failed": "最近一次執行失敗（{error}）：呈現的是最後一次成功的結果。",
-  "rpt_rw_org_last_known": "本期間沒有組織摘要；最後一次讀到的是 {day}。"
+  "rpt_rw_org_last_known": "本期間沒有組織摘要；最後一次讀到的是 {day}。",
+  "rpt_rdy_advice_not_assessed": "未評估：本期間沒有連入它的流量。",
+  "rpt_rdy_predicted_none_unconfirmed": "沒有找到會被擋的連線，但有些流量沒有草稿判定：這不代表確認「不會擋任何流量」。"
 }

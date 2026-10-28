@@ -99,7 +99,7 @@ def build_readiness(inp: BuildInput) -> ReportDocument:
 
     rated = [r.score for _, r, _ in scored if r.score is not None]
     values: dict[str, float | int | None] = {
-        "apps": len(scored), "ready": sum(1 for _, r, _ in scored if r.grade in ("A", "B")),
+        "apps": sum(1 for _, r, _ in scored if r.score is not None), "ready": sum(1 for _, r, _ in scored if r.grade in ("A", "B")),
         "held_back": sum(1 for _, r, _ in scored if r.grade in ("D", "F")),
         "overall": round(sum(rated) / len(rated), 1) if rated else None,
         "predicted_blocked": predicted.blocked_connections if usable and predicted else None}
@@ -124,6 +124,8 @@ def build_readiness(inp: BuildInput) -> ReportDocument:
                  idle=m["idle"]) if m else t("rpt_rdy_no_hosts")
 
     def advice(r: Readiness) -> str:
+        if r.score is None:
+            return t("rpt_rdy_advice_not_assessed")
         return t(_ADVICE_KEYS[r.blocking]) if r.blocking else t("rpt_rdy_advice_ready")
     scores = TableBlock(
         title=t("rpt_rdy_tbl_scores"),
@@ -160,7 +162,9 @@ def build_readiness(inp: BuildInput) -> ReportDocument:
                      Column(key="connections", label=t("rpt_col_connections"), kind="number")),
             rows=tuple((g.dst_app or no_label, rule_name(g.rule_href), g.flows, g.connections)
                        for g in groups[:PREDICTED_ROWS]),
-            total_rows=len(groups), empty_text=t("rpt_rdy_predicted_none"),
+            total_rows=len(groups),
+            empty_text=t("rpt_rdy_predicted_none_unconfirmed") if predicted.undetermined_flows
+            else t("rpt_rdy_predicted_none"),
             limit_note=" ".join(x for x in (
                 t("rpt_limit_top_n", n=PREDICTED_ROWS) if len(groups) > PREDICTED_ROWS else "",
                 t("rpt_rdy_predicted_capped", n=f"{PREDICTED_MAX_RESULTS:,}") if predicted.capped else "") if x)

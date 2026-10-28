@@ -1566,5 +1566,7 @@
   "rpt_rdy_predicted_undetermined": "The PCE gave no draft decision for {n} flows into managed hosts: what the draft would block is not fully known.",
   "rpt_quality_analysis_at": "The analysis this report reads was computed at {at}.",
   "rpt_quality_analysis_failed": "Its latest run failed ({error}): the results shown are from the last run that succeeded.",
-  "rpt_rw_org_last_known": "No organisation summary in this period; the last one read is from {day}."
+  "rpt_rw_org_last_known": "No organisation summary in this period; the last one read is from {day}.",
+  "rpt_rdy_advice_not_assessed": "Not assessed: no traffic into it in this period.",
+  "rpt_rdy_predicted_none_unconfirmed": "No blocked connection was found, but some flows had no draft decision: this is not a confirmed \"blocks nothing\"."
 }
