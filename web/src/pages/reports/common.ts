@@ -12,6 +12,7 @@ export const TYPE_KEYS: Record<string, string> = {
   ven_status: "rpt_title_ven_status",
   audit: "rpt_title_audit",
   ransomware: "rpt_title_ransomware",
+  readiness: "rpt_title_readiness",
 };
 export const TYPE_DESC_KEYS: Record<string, string> = {
   lateral_posture: "gui_reports_desc_lateral_posture",
@@ -24,6 +25,7 @@ export const TYPE_DESC_KEYS: Record<string, string> = {
   ven_status: "gui_reports_desc_ven_status",
   audit: "gui_reports_desc_audit",
   ransomware: "gui_reports_desc_ransomware",
+  readiness: "gui_reports_desc_readiness",
 };
 export const GROUP_KEYS: Record<string, string> = {
   lateral: "gui_reports_group_lateral", inventory: "gui_reports_group_inventory",

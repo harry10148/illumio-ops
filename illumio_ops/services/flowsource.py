@@ -493,16 +493,23 @@ class FlowTotals(BaseModel):
     by_decision: list[DecisionTotals]
 
 
+
+def _ports_sql(ports: Collection[tuple[int, int | None]], alias: str = "f") -> tuple[str, list[Any]]:
+    """(port, proto) pairs as one SQL condition; proto None matches the port on any protocol. No pairs: false."""
+    if not ports:
+        return "0", []
+    parts, params = [], []
+    for port, proto in sorted(ports, key=str):
+        parts.append(f"({alias}.port = ?)" if proto is None else f"({alias}.port = ? AND {alias}.proto = ?)")
+        params += [port] if proto is None else [port, proto]
+    return f"({' OR '.join(parts)})", params
+
 def flow_totals(ctx: AppContext, spec: FilterSpec, *,
                 admin_ports: Collection[tuple[int, int | None]] = ()) -> FlowTotals:
     fdb, gen, settings = _store_read(ctx)
-    admin_sql, admin_params = "0", []
+    admin_sql, admin_params = _ports_sql(admin_ports)
     if admin_ports:
-        parts = []
-        for port, proto in sorted(admin_ports, key=str):
-            parts.append("(f.port = ?)" if proto is None else "(f.port = ? AND f.proto = ?)")
-            admin_params += [port] if proto is None else [port, proto]
-        admin_sql = f"({' OR '.join(parts)}) AND f.policy_decision != 'blocked'"
+        admin_sql = f"{admin_sql} AND f.policy_decision != 'blocked'"
     with fdb.connect() as conn:
         require_same_pce(conn, settings.pce)
         for name, fn in sql_functions().items():
@@ -558,6 +565,41 @@ def label_mix(ctx: AppContext, spec: FilterSpec, *, app_key: str, env_key: str, 
                     unknown_env_connections=r[3] or 0, unmanaged_into_apps=[(a, n, s) for a, n, s in into[:top]],
                     unmanaged_into_apps_total=len(into))
 
+
+class ReadinessRow(BaseModel):
+    """Connections into one app (environment)'s managed hosts (the readiness report)."""
+    app: str | None
+    env: str | None
+    connections: int
+    allowed: int
+    same_app: int
+    potentially_blocked: int
+    remote: int
+    remote_allowed: int
+
+
+def readiness_rows(ctx: AppContext, spec: FilterSpec, *, app_key: str, env_key: str,
+                   remote_ports: Collection[tuple[int, int | None]]) -> list[ReadinessRow]:
+    """Per destination app and environment, the connections into its managed hosts: one pass."""
+    fdb, gen, settings = _store_read(ctx)
+    remote_sql, remote_params = _ports_sql(remote_ports, "r")
+    with fdb.connect() as conn:
+        require_same_pce(conn, settings.pce)
+        for name, fn in sql_functions().items():
+            conn.create_function(name, -1, fn, deterministic=True)
+        where, params = to_sql(spec, wide=wide_window(conn, spec))
+        sub = (f"SELECT f.port, f.proto, f.policy_decision AS d, f.num_connections AS n, {_label_of('src')} AS sa, "
+               f"{_label_of('dst')} AS da, {_label_of('dst')} AS de FROM flows f WHERE {where} AND f.dst_managed = 1")
+        found = conn.execute(
+            "SELECT NULLIF(da, ''), NULLIF(de, ''), SUM(n), SUM(CASE WHEN d = 'allowed' THEN n END), "
+            "SUM(CASE WHEN da != '' AND sa = da THEN n END), SUM(CASE WHEN d = 'potentially_blocked' THEN n END), "
+            f"SUM(CASE WHEN {remote_sql} THEN n END), SUM(CASE WHEN {remote_sql} AND d = 'allowed' THEN n END) "
+            f"FROM ({sub}) r GROUP BY da, de",
+            [*remote_params, *remote_params, app_key, app_key, env_key, *params]).fetchall()
+    if fdb.generation != gen:
+        raise StaleGeneration
+    return [ReadinessRow(app=r[0], env=r[1], connections=r[2] or 0, allowed=r[3] or 0, same_app=r[4] or 0,
+                         potentially_blocked=r[5] or 0, remote=r[6] or 0, remote_allowed=r[7] or 0) for r in found]
 
 def new_user_pairs(ctx: AppContext, ports: Sequence[PortProto], *, since: datetime) -> list[UserPair]:
     """User x destination x port combinations first seen since `since` (spec §6.5.7, "new combinations

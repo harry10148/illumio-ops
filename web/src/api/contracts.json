@@ -10253,7 +10253,8 @@
               "app_summary",
               "ven_status",
               "audit",
-              "ransomware"
+              "ransomware",
+              "readiness"
             ],
             "title": "ReportType",
             "type": "string"
@@ -10712,7 +10713,8 @@
               "app_summary",
               "ven_status",
               "audit",
-              "ransomware"
+              "ransomware",
+              "readiness"
             ],
             "title": "ReportType",
             "type": "string"
@@ -11263,7 +11265,8 @@
               "app_summary",
               "ven_status",
               "audit",
-              "ransomware"
+              "ransomware",
+              "readiness"
             ],
             "title": "ReportType",
             "type": "string"
@@ -11802,7 +11805,8 @@
               "app_summary",
               "ven_status",
               "audit",
-              "ransomware"
+              "ransomware",
+              "readiness"
             ],
             "title": "ReportType",
             "type": "string"
@@ -12520,7 +12524,8 @@
               "app_summary",
               "ven_status",
               "audit",
-              "ransomware"
+              "ransomware",
+              "readiness"
             ],
             "title": "ReportType",
             "type": "string"
@@ -12979,7 +12984,8 @@
               "app_summary",
               "ven_status",
               "audit",
-              "ransomware"
+              "ransomware",
+              "readiness"
             ],
             "title": "ReportType",
             "type": "string"
@@ -13177,7 +13183,8 @@
               "app_summary",
               "ven_status",
               "audit",
-              "ransomware"
+              "ransomware",
+              "readiness"
             ],
             "title": "ReportType",
             "type": "string"
@@ -13515,7 +13522,8 @@
               "app_summary",
               "ven_status",
               "audit",
-              "ransomware"
+              "ransomware",
+              "readiness"
             ],
             "title": "ReportType",
             "type": "string"
@@ -19514,6 +19522,7 @@
       "events",
       "inventory",
       "ransomware",
+      "readiness",
       "traffic"
     ],
     "Language": [
@@ -19565,6 +19574,7 @@
       "network_inventory",
       "new_connections",
       "ransomware",
+      "readiness",
       "security_risk",
       "traffic",
       "unmanaged_endpoints",
