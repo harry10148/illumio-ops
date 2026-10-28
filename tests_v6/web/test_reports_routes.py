@@ -49,7 +49,7 @@ def test_catalog_lists_built_types(client, ctx):
     login(client)
     data = get(client, "/api/reports/catalog").get_json()["data"]
     types = {e["report_type"]: e for e in data["entries"]}
-    assert set(types) == {"lateral_posture", "new_connections", "unmanaged_endpoints"}
+    assert set(types) == {"lateral_posture", "new_connections", "unmanaged_endpoints", "traffic", "security_risk", "network_inventory", "app_summary"}
     assert all(e["available"] for e in types.values()) and data["smtp_enabled"] is False
 
 
@@ -110,3 +110,40 @@ def test_delete(client, ctx):
     assert delete(client, f"/api/reports/{rid}").status_code == 200
     assert not (ctx.paths.reports_dir / str(rid)).exists()
     assert delete(client, f"/api/reports/{rid}").status_code == 404
+
+
+APP_FILTER = {"dst": {"labels": [{"key": "app", "values": ["Finance"]}]}}
+
+
+def test_catalog_says_what_each_type_takes(client, ctx):
+    from illumio_ops.store.flowdb import labels, workloads
+    with ctx.flows().connect() as conn:  # the picker offers the inventory's labels
+        workloads.replace_inventory(conn, [workloads.WorkloadRow(
+            href="/orgs/1/workloads/f1", hostname="f1", name=None, managed=1, enforcement_mode="full",
+            visibility_level=None, os_id=None, ven_version=None, ven_href=None,
+            label_set=labels.label_set_id(conn, (("app", "Finance"), ("env", "Prod"))), online=1, risk_exposure=None,
+            risk_percent=None, risk_updated_at=None, fetched_at="x")])
+        conn.commit()
+    login(client)
+    data = get(client, "/api/reports/catalog").get_json()["data"]
+    types = {e["report_type"]: e for e in data["entries"]}
+    assert types["app_summary"]["requires_app"] and types["app_summary"]["accepts_filter"]
+    assert types["traffic"]["accepts_filter"] and not types["traffic"]["requires_app"]
+    assert not types["lateral_posture"]["accepts_filter"] and types["lateral_posture"]["max_lookback"] is None
+    assert types["traffic"]["max_lookback"] == ctx.settings.current().collection.retention.flow_days - 1
+    choices = {c["key"]: c["values"] for c in data["label_choices"]}
+    assert choices["app"] == ["Finance"] and choices["env"] == ["Prod"]
+
+
+def test_generate_refusals_name_the_field(client, ctx):
+    _configure(ctx)
+    login(client)
+    r = post(client, "/api/reports", {"report_type": "app_summary"})
+    assert r.status_code == 400 and r.get_json()["error"]["field"] == "report.filter"
+    assert r.get_json()["error"]["message_key"] == "rpt_err_app_required"
+    r = post(client, "/api/reports", {"report_type": "traffic", "lookback_days": 90})
+    assert r.status_code == 400 and r.get_json()["error"]["field"] == "report.lookback_days"
+    r = post(client, "/api/reports", {"report_type": "lateral_posture", "filter": APP_FILTER})
+    assert r.status_code == 400 and r.get_json()["error"]["message_key"] == "rpt_err_filter_not_supported"
+    r = post(client, "/api/reports", {"report_type": "app_summary", "filter": APP_FILTER})
+    assert r.status_code == 200 and r.get_json()["data"]["status"] == "queued"

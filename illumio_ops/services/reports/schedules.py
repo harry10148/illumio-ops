@@ -46,7 +46,7 @@ def due_time(s: ReportSchedule, *, after: datetime, tz: tzinfo | None) -> dateti
 
 def params_of(s: ReportSchedule) -> ReportParams:
     return ReportParams(report_type=s.report_type, lookback_days=s.lookback_days, lang=s.lang, formats=s.formats,
-                        email=s.email, recipients=s.recipients)
+                        email=s.email, recipients=s.recipients, filter=s.filter)
 
 
 def tick_schedules(ctx: AppContext, *, now: datetime | None = None) -> list[int]:

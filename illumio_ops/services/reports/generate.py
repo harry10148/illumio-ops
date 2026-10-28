@@ -31,10 +31,16 @@ from illumio_ops.services.collect.mode import collects, in_mode
 from illumio_ops.services.context import AppContext
 from illumio_ops.services.coverage import store_coverage
 from illumio_ops.services.reports.deliver import deliver, gui_link
-from illumio_ops.services.reports.registry import BuildInput, ReportParams, specs
+from illumio_ops.services.reports.registry import (
+    BuildInput,
+    ReportParams,
+    app_filter_ok,
+    names_app,
+    specs,
+)
 from illumio_ops.services.reports.render_html import fmt_time, render_html
 from illumio_ops.services.reports.render_xlsx import render_xlsx
-from illumio_ops.settings.schema import PceSettings
+from illumio_ops.settings.schema import PceSettings, Settings
 from illumio_ops.store import reports as store
 from illumio_ops.store.flowdb.db import StaleGeneration
 
@@ -81,11 +87,14 @@ def pce_target(pce: PceSettings) -> str:
     return f"{url}#{org}"
 
 
-def traffic_covered(ctx: AppContext, start: datetime, end: datetime, *, now: datetime) -> bool:
+def traffic_covered(ctx: AppContext, start: datetime, end: datetime, *, now: datetime,
+                    flows: bool = False) -> bool:
     """Traffic was collected for all of [start, end) with no recorded gap: only then is a count over it a
-    number to compare with (spec §4.3: missing data is never shown as 0)."""
+    number to compare with (spec §4.3: missing data is never shown as 0). flows: the count reads the flows
+    table, kept flow_days, not the rollups' rollup_days."""
     settings = ctx.settings.current()
-    floor = now - timedelta(days=settings.collection.retention.rollup_days)
+    retention = settings.collection.retention
+    floor = now - timedelta(days=retention.flow_days if flows else retention.rollup_days)
     with ctx.flows().connect() as conn:
         cov = store_coverage(conn, IngestSource.TRAFFIC, (start, end), floor=floor,
                              collected=collects(settings, IngestSource.TRAFFIC))
@@ -100,11 +109,39 @@ def availability(ctx: AppContext) -> dict[ReportType, str | None]:
             for t, spec in specs().items()}
 
 
+# The parameter each refusal is about, for the API's field name.
+REFUSAL_FIELDS = {"rpt_err_lookback_beyond_retention": "lookback_days", "rpt_err_app_required": "filter",
+                  "rpt_err_filter_not_supported": "filter", "rpt_err_app_filter_shape": "filter"}
+
+
+def refusal(settings: Settings, params: ReportParams, *, now: datetime | None = None) -> str | None:
+    """Why these parameters cannot make this report (the reason is stored on a failed row), or None. With
+    `now`, the period's actual start is checked against the retention floor (a DST change or a short
+    retention can put it a few hours past what the lookback limit allows)."""
+    spec = specs().get(params.report_type)
+    if spec is None:
+        return None
+    if spec.max_lookback is not None and params.lookback_days > spec.max_lookback(settings):
+        return "rpt_err_lookback_beyond_retention"
+    if spec.retention is not None and now is not None:
+        start, _ = period(now, params.lookback_days, settings.display.zone())
+        if start < now - timedelta(days=spec.retention(settings)):
+            return "rpt_err_lookback_beyond_retention"
+    if params.filter is not None and not spec.accepts_filter:
+        return "rpt_err_filter_not_supported"
+    if spec.requires_app and not names_app(params.filter):
+        return "rpt_err_app_required"
+    if spec.requires_app and not app_filter_ok(params.filter):
+        return "rpt_err_app_filter_shape"
+    return None
+
+
 def enqueue(ctx: AppContext, params: ReportParams, *, trigger: str, schedule_id: str | None, now: datetime) -> int:
     """A queued report, or a failed one at once when it cannot be made (the reason is stored, no files)."""
     settings = ctx.settings.current()
     start, end = period(now, params.lookback_days, settings.display.zone())
-    reason = availability(ctx).get(params.report_type, "rpt_unavailable_not_built")
+    reason = availability(ctx).get(params.report_type, "rpt_unavailable_not_built") or refusal(settings, params,
+                                                                                                now=now)
     with ctx.db() as conn:
         return store.insert(conn, report_type=params.report_type.value, params_json=params.model_dump_json(),
                             status=ReportStatus.FAILED if reason else ReportStatus.QUEUED, trigger=trigger,
@@ -193,11 +230,13 @@ def run_queued(ctx: AppContext, *, now: datetime | None = None) -> int | None:
 
 
 def coverage_note(ctx: AppContext, start: datetime, end: datetime, lang: Language, *, now: datetime,
-                  tz: tzinfo | None) -> tuple[str, ...]:
-    """The data-quality lines about traffic in the period: whole period, or where it starts and every gap."""
+                  tz: tzinfo | None, flows: bool = False) -> tuple[str, ...]:
+    """The data-quality lines about traffic in the period: whole period, or where it starts and every gap.
+    flows: the report reads the flows table (kept flow_days), not the rollups (rollup_days)."""
     settings = ctx.settings.current()
     fdb = ctx.flows()
-    floor = now - timedelta(days=settings.collection.retention.rollup_days)
+    retention = settings.collection.retention
+    floor = now - timedelta(days=retention.flow_days if flows else retention.rollup_days)
     with fdb.connect() as conn:
         require_same_pce(conn, settings.pce)
         cov = store_coverage(conn, IngestSource.TRAFFIC, (start, end), floor=floor,

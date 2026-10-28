@@ -373,6 +373,10 @@ class ReportType(StrEnum):
     LATERAL_POSTURE = "lateral_posture"
     NEW_CONNECTIONS = "new_connections"
     UNMANAGED_ENDPOINTS = "unmanaged_endpoints"
+    TRAFFIC = "traffic"
+    SECURITY_RISK = "security_risk"
+    NETWORK_INVENTORY = "network_inventory"
+    APP_SUMMARY = "app_summary"
 
 
 class ReportFormat(StrEnum):

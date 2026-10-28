@@ -5,7 +5,8 @@ import { type ApiError, call } from "../../api/client";
 import type { Catalog, ReportScheduleFields, SchedulesView, ScheduleItem } from "../../api/generated";
 import { formatTime } from "../../components/ProbeResults";
 import { t, useLang } from "../../i18n";
-import { LOOKBACK_CHOICES, STATUS_KEYS, STATUS_TONES, TYPE_KEYS, word } from "./common";
+import { STATUS_KEYS, STATUS_TONES, TYPE_KEYS, lookbackChoices, word } from "./common";
+import { type FilterRow, ReportFilter, conditionOf, namesApp, rowsOf } from "./ReportFilter";
 
 const WEEKDAY_KEYS = ["weekday_mon", "weekday_tue", "weekday_wed", "weekday_thu", "weekday_fri", "weekday_sat",
   "weekday_sun"];
@@ -17,8 +18,15 @@ function blank(type: string): ReportScheduleFields {
   return {
     name: "", enabled: true, report_type: type as ReportScheduleFields["report_type"], lookback_days: 7,
     frequency: "weekly", day_of_week: 0, day_of_month: null, hour: 8, minute: 0, formats: ["html", "xlsx"],
-    email: false, recipients: [], lang: null, keep: 30,
+    email: false, recipients: [], lang: null, keep: 30, filter: null,
   };
+}
+
+/** A lookback the type can read: kept when offered, else the longest one offered. */
+function fitLookback(days: number, max: number | null | undefined): number {
+  const choices = lookbackChoices(max);
+  if (choices.length === 0 || choices.includes(String(days))) return days;
+  return Number(choices[choices.length - 1]);
 }
 
 function when(s: ReportScheduleFields): string {
@@ -32,8 +40,14 @@ function Editor({ initial, catalog, smtp, onSave, onCancel, error }: {
   initial: ReportScheduleFields; catalog: Catalog; smtp: boolean; error: ApiError | null;
   onSave: (s: ReportScheduleFields) => void; onCancel: () => void;
 }) {
-  const [s, setS] = useState<ReportScheduleFields>(initial);
+  const [s, setS] = useState<ReportScheduleFields>(() => ({
+    ...initial,
+    lookback_days: fitLookback(initial.lookback_days,
+      catalog.entries.find((c) => c.report_type === initial.report_type)?.max_lookback),
+  }));
   const [recipients, setRecipients] = useState(initial.recipients.join(", "));
+  const [rows, setRows] = useState<FilterRow[]>(rowsOf(initial.filter));
+  const entry = catalog.entries.find((c) => c.report_type === s.report_type);
   const set = (patch: Partial<ReportScheduleFields>) => setS({ ...s, ...patch });
   const freq = (f: ReportScheduleFields["frequency"]) => set({
     frequency: f, day_of_week: f === "weekly" ? (s.day_of_week ?? 0) : null,
@@ -51,14 +65,19 @@ function Editor({ initial, catalog, smtp, onSave, onCancel, error }: {
       <label>
         {t("gui_reports_col_report")}
         <select name="report_type" value={s.report_type}
-          onChange={(e) => set({ report_type: e.target.value as ReportScheduleFields["report_type"] })}>
+          onChange={(e) => {
+            const next = catalog.entries.find((c) => c.report_type === e.target.value);
+            set({ report_type: e.target.value as ReportScheduleFields["report_type"],
+                  lookback_days: fitLookback(s.lookback_days, next?.max_lookback) });
+            if (next?.requires_app && !namesApp(rows)) setRows([...rows, { side: "dst", key: "app", value: "" }]);
+          }}>
           {catalog.entries.map((c) => <option key={c.report_type} value={c.report_type}>{word(TYPE_KEYS, c.report_type)}</option>)}
         </select>
       </label>
       <label>
         {t("gui_reports_lookback")}
         <select name="lookback_days" value={String(s.lookback_days)} onChange={(e) => set({ lookback_days: Number(e.target.value) })}>
-          {LOOKBACK_CHOICES.map((d) => <option key={d} value={d}>{t("gui_reports_days", { n: d })}</option>)}
+          {lookbackChoices(entry?.max_lookback).map((d) => <option key={d} value={d}>{t("gui_reports_days", { n: d })}</option>)}
         </select>
       </label>
       <label>
@@ -112,6 +131,9 @@ function Editor({ initial, catalog, smtp, onSave, onCancel, error }: {
             onChange={(e) => setRecipients(e.target.value)} />
         </label>
       )}
+      {entry?.accepts_filter && (
+        <ReportFilter choices={catalog.label_choices} rows={rows} onChange={setRows} requireApp={entry.requires_app} />
+      )}
       <label>
         {t("gui_reports_keep")}
         <input name="keep" type="number" min={1} max={365} value={s.keep} onChange={(e) => set({ keep: Number(e.target.value) })} />
@@ -122,7 +144,8 @@ function Editor({ initial, catalog, smtp, onSave, onCancel, error }: {
       {error && <p className="form-error span-all">{t(error.message_key, error.params)}{error.field ? ` (${error.field})` : ""}</p>}
       <div className="actions span-all">
         <button type="button" className="btn-primary"
-          onClick={() => onSave({ ...s, recipients: recipients.split(/[\s,;]+/).filter((r) => r !== "") })}>{t("btn_save")}</button>
+          onClick={() => onSave({ ...s, filter: entry?.accepts_filter ? conditionOf(rows, initial.filter) : null,
+                                  recipients: recipients.split(/[\s,;]+/).filter((r) => r !== "") })}>{t("btn_save")}</button>
         <button type="button" className="btn-quiet" onClick={onCancel}>{t("btn_cancel")}</button>
       </div>
     </div>
@@ -208,7 +231,14 @@ export function Schedules({ catalog }: { catalog: Catalog }) {
                 return (
                   <tr key={s.id} data-schedule-id={s.id}>
                     <td>{s.name}</td>
-                    <td>{word(TYPE_KEYS, s.report_type)}<div className="hint">{t("gui_reports_days", { n: String(s.lookback_days) })}</div></td>
+                    <td>
+                      {word(TYPE_KEYS, s.report_type)}<div className="hint">{t("gui_reports_days", { n: String(s.lookback_days) })}</div>
+                      {rowsOf(s.filter).length > 0 && (
+                        <div className="hint" data-role="schedule-filter">
+                          {rowsOf(s.filter).map((r) => `${r.key} = ${r.value}`).join(", ")}
+                        </div>
+                      )}
+                    </td>
                     <td>{when(s)}{s.email && <div className="hint">{t("gui_reports_email")}</div>}</td>
                     <td>{item.next_run ? formatTime(item.next_run, lang) : t("gui_reports_disabled")}</td>
                     <td>

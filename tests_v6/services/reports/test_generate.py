@@ -245,3 +245,32 @@ def test_label_and_target_from_one_settings_snapshot(ctx, monkeypatch):
     rid = generate.enqueue(ctx, ReportParams(report_type=LATERAL), trigger="manual", schedule_id=None, now=NOW)
     row = _row(ctx, rid)
     assert "pce.example.com" in row.pce_label and "pce.example.com" in row.pce_target
+
+
+def test_lookback_beyond_flow_retention_refused(ctx, monkeypatch):
+    reg = {t: ReportSpec(report_type=t, group="analysis", needs_traffic=True, build=FakeBuilder(),
+                         max_lookback=lambda s: s.collection.retention.flow_days) for t in ReportType}
+    monkeypatch.setattr(registry, "REGISTRY", reg)
+    ctx.settings.update(ctx.settings.current().revision,
+                        lambda d: d["collection"].update(mode="alert", retention={**d["collection"]["retention"],
+                                                                                    "flow_days": 3}))
+    rid = generate.enqueue(ctx, ReportParams(report_type=LATERAL, lookback_days=7), trigger="manual",
+                           schedule_id=None, now=NOW)
+    row = _row(ctx, rid)
+    assert row.status is ReportStatus.FAILED and row.error_key == "rpt_err_lookback_beyond_retention"
+    ok = generate.enqueue(ctx, ReportParams(report_type=LATERAL, lookback_days=3), trigger="manual",
+                          schedule_id=None, now=NOW)
+    assert _row(ctx, ok).status is ReportStatus.QUEUED
+
+
+def test_app_required_for_app_reports(ctx, monkeypatch):
+    from illumio_ops.domain.filter import EndpointFilter, FlowCondition, LabelCond
+    reg = {t: ReportSpec(report_type=t, group="inventory", needs_traffic=True, build=FakeBuilder(),
+                         requires_app=True, accepts_filter=True) for t in ReportType}
+    monkeypatch.setattr(registry, "REGISTRY", reg)
+    rid = generate.enqueue(ctx, ReportParams(report_type=LATERAL), trigger="manual", schedule_id=None, now=NOW)
+    assert _row(ctx, rid).error_key == "rpt_err_app_required"
+    cond = FlowCondition(dst=EndpointFilter(labels=(LabelCond(key="app", values=("Finance",)),)))
+    rid2 = generate.enqueue(ctx, ReportParams(report_type=LATERAL, filter=cond), trigger="manual", schedule_id=None,
+                            now=NOW)
+    assert _row(ctx, rid2).status is ReportStatus.QUEUED

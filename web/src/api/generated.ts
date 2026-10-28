@@ -63,7 +63,7 @@ export type ReportFormat = ("html" | "xlsx")
  * This interface was referenced by `ContractRoot`'s JSON-Schema
  * via the `definition` "ReportType".
  */
-export type ReportType = ("lateral_posture" | "new_connections" | "unmanaged_endpoints")
+export type ReportType = ("lateral_posture" | "new_connections" | "unmanaged_endpoints" | "traffic" | "security_risk" | "network_inventory" | "app_summary")
 /**
  * This interface was referenced by `ContractRoot`'s JSON-Schema
  * via the `definition` "ReportStatus".
@@ -667,6 +667,7 @@ day_of_month: (number | null)
 day_of_week: (number | null)
 email: boolean
 enabled: boolean
+filter?: (FlowCondition | null)
 /**
  * @minItems 1
  */
@@ -701,6 +702,7 @@ day_of_month: (number | null)
 day_of_week: (number | null)
 email: boolean
 enabled: boolean
+filter?: (FlowCondition | null)
 /**
  * @minItems 1
  */
@@ -783,10 +785,22 @@ trigger: string
  * via the `definition` "CatalogEntry".
  */
 export interface CatalogEntry {
+accepts_filter: boolean
 available: boolean
 group: string
+max_lookback: (number | null)
 reason_key: (string | null)
 report_type: ReportType
+requires_app: boolean
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "LabelChoice".
+ */
+export interface LabelChoice {
+key: string
+truncated: boolean
+values: string[]
 }
 /**
  * This interface was referenced by `ContractRoot`'s JSON-Schema
@@ -795,6 +809,7 @@ report_type: ReportType
 export interface Catalog {
 entries: CatalogEntry[]
 gui_external_url_set: boolean
+label_choices: LabelChoice[]
 smtp_enabled: boolean
 }
 /**
@@ -803,6 +818,7 @@ smtp_enabled: boolean
  */
 export interface ReportParams {
 email?: boolean
+filter?: (FlowCondition | null)
 formats?: ReportFormat[]
 lang?: (Language | null)
 lookback_days?: number
@@ -1143,15 +1159,6 @@ port: number
  */
 processes: [string, ...(string)[]]
 proto: (number | null)
-}
-/**
- * This interface was referenced by `ContractRoot`'s JSON-Schema
- * via the `definition` "LabelChoice".
- */
-export interface LabelChoice {
-key: string
-truncated: boolean
-values: string[]
 }
 /**
  * This interface was referenced by `ContractRoot`'s JSON-Schema
@@ -1799,8 +1806,12 @@ export const VALUES = {
     "running"
   ],
   "ReportType": [
+    "app_summary",
     "lateral_posture",
+    "network_inventory",
     "new_connections",
+    "security_risk",
+    "traffic",
     "unmanaged_endpoints"
   ],
   "RuleAction": [

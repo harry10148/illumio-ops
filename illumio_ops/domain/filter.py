@@ -291,10 +291,12 @@ def _sql_port(p: PortProto, a: str, params: list[Any]) -> str:
     return "(" + " AND ".join(parts) + ")"
 
 
-def to_sql(spec: FilterSpec, *, table_alias: str = "f") -> tuple[str, list[Any]]:
+def to_sql(spec: FilterSpec, *, table_alias: str = "f", wide: bool = False) -> tuple[str, list[Any]]:
+    """wide: the window holds most of the stored rows, so the time bound must not pick the last_detected index
+    (walking it for most of the table is several times slower than a scan; flowsource.wide_window decides)."""
     a = table_alias
     params: list[Any] = [store_time(spec.start), store_time(spec.end)]
-    clauses = [f"{a}.is_primary = 1", f"{a}.last_detected >= ?", f"{a}.first_detected <= ?"]
+    clauses = [f"{a}.is_primary = 1", f"{'+' if wide else ''}{a}.last_detected >= ?", f"{a}.first_detected <= ?"]
     for side, ep, negate in (("src", spec.src, False), ("dst", spec.dst, False),
                              ("src", spec.src_exclude, True), ("dst", spec.dst_exclude, True)):
         if ep is not None and not ep.is_empty():

@@ -10,7 +10,7 @@ import {
   EMAIL_KEYS,
   GROUP_KEYS,
   GROUP_ORDER,
-  LOOKBACK_CHOICES,
+  lookbackChoices,
   STATUS_KEYS,
   STATUS_TONES,
   TYPE_DESC_KEYS,
@@ -18,12 +18,15 @@ import {
   periodText,
   word,
 } from "./common";
+import { type FilterRow, ReportFilter, conditionOf, namesApp } from "./ReportFilter";
 import { Schedules } from "./Schedules";
 
 const POLL_MS = 5000;
 
 function GenerateForm({ entry, catalog, onDone }: { entry: CatalogEntry; catalog: Catalog; onDone: () => void }) {
-  const [days, setDays] = useState("7");
+  const choices = lookbackChoices(entry.max_lookback);
+  const [days, setDays] = useState(choices.includes("7") ? "7" : (choices[choices.length - 1] ?? "1"));
+  const [rows, setRows] = useState<FilterRow[]>(entry.requires_app ? [{ side: "dst", key: "app", value: "" }] : []);
   const [lang, setLang] = useState("");
   const [html, setHtml] = useState(true);
   const [xlsx, setXlsx] = useState(true);
@@ -38,6 +41,7 @@ function GenerateForm({ entry, catalog, onDone }: { entry: CatalogEntry; catalog
     const env = await call("reports.generate", {
       report_type: entry.report_type,
       lookback_days: Number(days),
+      filter: entry.accepts_filter ? conditionOf(rows) : null,
       lang: lang === "" ? null : (lang as "en" | "zh_TW"),
       formats,
       email,
@@ -56,7 +60,7 @@ function GenerateForm({ entry, catalog, onDone }: { entry: CatalogEntry; catalog
         <label>
           {t("gui_reports_lookback")}
           <select name="lookback_days" value={days} onChange={(e) => setDays(e.target.value)}>
-            {LOOKBACK_CHOICES.map((d) => <option key={d} value={d}>{t("gui_reports_days", { n: d })}</option>)}
+            {choices.map((d) => <option key={d} value={d}>{t("gui_reports_days", { n: d })}</option>)}
           </select>
         </label>
         <label>
@@ -86,9 +90,13 @@ function GenerateForm({ entry, catalog, onDone }: { entry: CatalogEntry; catalog
           </label>
         )}
       </div>
+      {entry.accepts_filter && (
+        <ReportFilter choices={catalog.label_choices} rows={rows} onChange={setRows} requireApp={entry.requires_app} />
+      )}
       {error && <p className="form-error">{t(error.message_key, error.params)}</p>}
       <div className="actions">
-        <button type="button" className="btn-primary" disabled={busy || (!html && !xlsx)} onClick={() => void submit()}>
+        <button type="button" className="btn-primary"
+          disabled={busy || (!html && !xlsx) || (entry.requires_app && !namesApp(rows))} onClick={() => void submit()}>
           {t("gui_reports_generate")}
         </button>
       </div>

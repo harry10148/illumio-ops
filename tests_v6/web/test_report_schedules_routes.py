@@ -84,3 +84,17 @@ def test_report_settings(client):
     bad = put(client, "/api/system/reports", {"revision": r.get_json()["data"]["revision"],
                                               "gui_external_url": "ftp://x", "retention_days": 30})
     assert bad.status_code == 400
+
+
+def test_schedule_lookback_validated(client, ctx, monkeypatch):
+    from illumio_ops.domain.values import ReportType
+    from illumio_ops.services.reports import registry
+    real = registry.specs()
+    patched = dict(real)
+    patched[ReportType.LATERAL_POSTURE] = registry.ReportSpec(
+        ReportType.LATERAL_POSTURE, "lateral", True, real[ReportType.LATERAL_POSTURE].build,
+        max_lookback=lambda s: 3)
+    monkeypatch.setattr(registry, "REGISTRY", patched)
+    login(client)
+    r = _create(client)  # lookback_days 7 > 3
+    assert r.status_code == 400 and r.get_json()["error"]["field"] == "schedule.lookback_days"

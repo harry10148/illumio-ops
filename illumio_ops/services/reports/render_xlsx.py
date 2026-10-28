@@ -90,7 +90,10 @@ def render_xlsx(doc: ReportDocument, *, tz: tzinfo | None) -> bytes:
     _sheet(wb, SUMMARY_SHEET[doc.lang], _summary_rows(doc, tz), bold_rows={1, 6}, freeze_after=None)
     tables = doc.tables()
     for (_, t), name in zip(tables, sheet_names([t.title for _, t in tables]), strict=True):
-        notes: list[list[Cell]] = [[t.limit_note]] if t.limit_note else []
+        # Excel caps a sheet name at 31 characters: a shortened one has the table's whole title above it.
+        notes: list[list[Cell]] = [[t.title]] if name != t.title else []
+        if t.limit_note:
+            notes.append([t.limit_note])
         if len(t.rows) > XLSX_ROW_CAP:
             notes.append([tr(doc.lang, "rpt_xlsx_capped", shown=XLSX_ROW_CAP, total=len(t.rows))])
         header: list[Cell] = [c.label for c in t.columns]

@@ -11,6 +11,7 @@ from pydantic import BaseModel, Field
 
 from illumio_ops.domain.values import ReportStatus
 from illumio_ops.services.reports import schedules
+from illumio_ops.services.reports.generate import REFUSAL_FIELDS, refusal
 from illumio_ops.services.reports.views import ReportItem, get_report
 from illumio_ops.settings.schema import ReportSchedule, ReportScheduleFields
 from illumio_ops.web.auth import get_ctx
@@ -79,6 +80,14 @@ def _view() -> SchedulesView:
     return SchedulesView(revision=s.revision, items=items, smtp_enabled=s.alerts.channels.smtp.enabled)
 
 
+def _check(fields: ReportScheduleFields) -> None:
+    """The same refusal a manual request gets, at save time (a schedule that could never run is not saved)."""
+    params = schedules.params_of(ReportSchedule(**fields.model_dump(), id="0" * 32))
+    reason = refusal(get_ctx().settings.current(), params)
+    if reason:
+        raise ApiFailure(400, "invalid_input", reason, field=f"schedule.{REFUSAL_FIELDS[reason]}")
+
+
 def _list(d: dict[str, Any]) -> list[dict[str, Any]]:
     items: list[dict[str, Any]] = d["reports"]["schedules"]
     return items
@@ -91,6 +100,7 @@ def list_schedules() -> SchedulesView:
 
 @api_route(bp, OP_CREATE)
 def create_schedule(body: ScheduleWrite) -> SchedulesView:
+    _check(body.schedule)
     new = body.schedule.model_dump(mode="json") | {"id": uuid.uuid4().hex}
     get_ctx().settings.update(body.revision, lambda d: _list(d).append(new))
     return _view()
@@ -98,6 +108,7 @@ def create_schedule(body: ScheduleWrite) -> SchedulesView:
 
 @api_route(bp, OP_UPDATE)
 def update_schedule(body: ScheduleWrite, schedule_id: str) -> SchedulesView:
+    _check(body.schedule)
     def mutate(d: dict[str, Any]) -> None:
         items = _list(d)
         for i, old in enumerate(items):

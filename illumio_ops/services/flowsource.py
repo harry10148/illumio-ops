@@ -43,6 +43,7 @@ from illumio_ops.domain.segment import (
     FIELD_COVERAGE_SQL,
     FlowSegment,
     compile_flow_ranking,
+    user_key_sql,
 )
 from illumio_ops.domain.values import FlowDirection, IngestSource, PortClass
 from illumio_ops.pce.async_query import run_traffic_query
@@ -369,6 +370,19 @@ def query_flows(ctx: AppContext, spec: FilterSpec, *, limit: int, order: Order,
     )
 
 
+WIDE_SHARE = 0.25  # of the stored time span: above it a window reads most rows, and a scan beats the index
+
+
+def wide_window(conn: Any, spec: FilterSpec) -> bool:
+    """The window covers most of what the store holds (to_sql's `wide`)."""
+    lo, hi = conn.execute("SELECT MIN(last_detected), MAX(last_detected) FROM flows").fetchone()
+    if lo is None:
+        return False
+    first, last = datetime.fromisoformat(lo), datetime.fromisoformat(hi)
+    span = (last - first).total_seconds()
+    overlap = (min(spec.end, last) - max(spec.start, first)).total_seconds()
+    return overlap > 0 and (span <= 0 or overlap / span > WIDE_SHARE)
+
 def _store_read(ctx: AppContext) -> tuple[Any, int, Any]:
     """(flow db, generation noted before the settings, settings) for a store-only read."""
     fdb = ctx.flows()
@@ -395,9 +409,10 @@ def aggregate_flows(ctx: AppContext, seg: FlowSegment, *, now: datetime | None =
             conn.create_function(name, -1, fn, deterministic=True)
         cov = store_coverage(conn, IngestSource.TRAFFIC, (seg.filter.start, seg.filter.end), floor=floor,
                              collected=collects(settings, IngestSource.TRAFFIC))
-        sql, params = compile_flow_ranking(seg)
+        wide = wide_window(conn, seg.filter)
+        sql, params = compile_flow_ranking(seg, wide=wide)
         found = conn.execute(sql, params).fetchall()
-        where, where_params = to_sql(seg.filter)
+        where, where_params = to_sql(seg.filter, wide=wide)
         fields = _field_coverage(conn, where, where_params) if with_field_coverage else None
     if fdb.generation != gen:
         raise StaleGeneration
@@ -418,11 +433,130 @@ def field_coverage(ctx: AppContext, spec: FilterSpec) -> FieldCoverage:
         require_same_pce(conn, settings.pce)
         for name, fn in sql_functions().items():
             conn.create_function(name, -1, fn, deterministic=True)
-        where, params = to_sql(spec)
+        where, params = to_sql(spec, wide=wide_window(conn, spec))
         fields = _field_coverage(conn, where, params)
     if fdb.generation != gen:
         raise StaleGeneration
     return fields
+
+
+def _label_of(side: str) -> str:
+    return (f"COALESCE((SELECT m.value FROM label_set_members m WHERE m.set_id = f.{side}_label_set "
+            "AND m.key = ?), '')")
+
+
+def group_for_findings(conn: Any, spec: FilterSpec | Sequence[FilterSpec], *, env_key: str, table: str) -> None:
+    """The findings engine's one read of a period (services.reports.findings): the primary rows grouped by
+    source, destination, service, decision, managed sides, app and environment labels and user, into the
+    TEMP table `table` on `conn` (a connection from reports.reads.reading, which holds the PCE guard).
+    Several specs: the rows any of them matches (one application's traffic in either direction)."""
+    for name, fn in sql_functions().items():
+        conn.create_function(name, -1, fn, deterministic=True)
+    parts, params = [], []
+    for s in [spec] if isinstance(spec, FilterSpec) else spec:
+        w, p = to_sql(s, wide=wide_window(conn, s))
+        parts.append(f"({w})")
+        params += p
+    where = " OR ".join(parts)
+    conn.execute(f"DROP TABLE IF EXISTS temp.{table}")
+    conn.execute(
+        f"CREATE TEMP TABLE {table} AS SELECT f.src_key, f.dst_key, COALESCE(f.port, -1) AS port, f.proto, "
+        "f.policy_decision AS decision, f.src_managed, f.dst_managed, "
+        f"{_label_of('src')} AS src_app, {_label_of('src')} AS src_env, "
+        f"{_label_of('dst')} AS dst_app, {_label_of('dst')} AS dst_env, "
+        f"COALESCE({user_key_sql('f.initiator_user')}, '') AS user, "
+        "COUNT(*) AS flows, SUM(f.num_connections) AS connections, "
+        "SUM(COALESCE(f.bytes_in, 0) + COALESCE(f.bytes_out, 0)) AS bytes, "
+        "SUM(f.bytes_in IS NOT NULL OR f.bytes_out IS NOT NULL) AS bytes_rows "
+        f"FROM flows f WHERE {where} GROUP BY 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12",
+        ["app", env_key, "app", env_key, *params])
+
+
+class DecisionTotals(BaseModel):
+    decision: str
+    flows: int
+    connections: int
+    into_managed: int  # flows whose destination is a managed host: the one definition of inbound
+    from_managed: int  # flows whose source is a managed host
+
+
+class FlowTotals(BaseModel):
+    """A period's totals over the primary rows a filter matches (flows = connection records)."""
+    flows: int
+    connections: int
+    sources: int
+    destinations: int
+    from_unmanaged: int
+    to_unmanaged: int
+    from_unmanaged_connections: int
+    admin_open_connections: int  # on the given management ports, decision not blocked
+    by_decision: list[DecisionTotals]
+
+
+def flow_totals(ctx: AppContext, spec: FilterSpec, *,
+                admin_ports: Collection[tuple[int, int | None]] = ()) -> FlowTotals:
+    fdb, gen, settings = _store_read(ctx)
+    admin_sql, admin_params = "0", []
+    if admin_ports:
+        parts = []
+        for port, proto in sorted(admin_ports, key=str):
+            parts.append("(f.port = ?)" if proto is None else "(f.port = ? AND f.proto = ?)")
+            admin_params += [port] if proto is None else [port, proto]
+        admin_sql = f"({' OR '.join(parts)}) AND f.policy_decision != 'blocked'"
+    with fdb.connect() as conn:
+        require_same_pce(conn, settings.pce)
+        for name, fn in sql_functions().items():
+            conn.create_function(name, -1, fn, deterministic=True)
+        where, params = to_sql(spec, wide=wide_window(conn, spec))
+        decisions = [DecisionTotals(decision=r[0], flows=r[1], connections=r[2] or 0, into_managed=r[3] or 0,
+                                    from_managed=r[4] or 0)
+                     for r in conn.execute(
+                         "SELECT f.policy_decision, COUNT(*), SUM(f.num_connections), SUM(f.dst_managed = 1), "
+                         f"SUM(f.src_managed = 1) FROM flows f WHERE {where} GROUP BY 1 ORDER BY 2 DESC", params)]
+        r = conn.execute("SELECT COUNT(DISTINCT f.src_key), COUNT(DISTINCT f.dst_key), SUM(f.src_managed = 0), "
+                         "SUM(f.dst_managed = 0), SUM(CASE WHEN f.src_managed = 0 THEN f.num_connections END), "
+                         f"SUM(CASE WHEN {admin_sql} THEN f.num_connections END) FROM flows f WHERE {where}",
+                         [*admin_params, *params]).fetchone()
+    if fdb.generation != gen:
+        raise StaleGeneration
+    return FlowTotals(flows=sum(d.flows for d in decisions), connections=sum(d.connections for d in decisions),
+                      sources=r[0], destinations=r[1], from_unmanaged=r[2] or 0, to_unmanaged=r[3] or 0,
+                      from_unmanaged_connections=r[4] or 0, admin_open_connections=r[5] or 0, by_decision=decisions)
+
+
+class LabelMix(BaseModel):
+    """How the period's flows sit against the labels (network inventory report)."""
+    unlabeled_app_flows: int  # flows where a managed end has no app label
+    same_env_connections: int
+    cross_env_connections: int
+    unknown_env_connections: int  # an end without an environment label
+    unmanaged_into_apps: list[tuple[str | None, int, int]]  # (destination app, connections, sources), busiest first
+    unmanaged_into_apps_total: int  # destination apps unmanaged sources reached
+
+
+def label_mix(ctx: AppContext, spec: FilterSpec, *, app_key: str, env_key: str, top: int) -> LabelMix:
+    fdb, gen, settings = _store_read(ctx)
+    rows = (f"SELECT f.src_key, f.src_managed, f.dst_managed, f.num_connections, {_label_of('src')} AS sa, "
+            f"{_label_of('src')} AS se, {_label_of('dst')} AS da, {_label_of('dst')} AS de FROM flows f WHERE {{where}}")
+    with fdb.connect() as conn:
+        require_same_pce(conn, settings.pce)
+        for name, fn in sql_functions().items():
+            conn.create_function(name, -1, fn, deterministic=True)
+        where, params = to_sql(spec, wide=wide_window(conn, spec))
+        sub = rows.format(where=where)
+        keys = [app_key, env_key, app_key, env_key, *params]
+        r = conn.execute(
+            "SELECT SUM((src_managed = 1 AND sa = '') OR (dst_managed = 1 AND da = '')), "
+            "SUM(CASE WHEN se != '' AND de != '' AND se = de THEN num_connections END), "
+            "SUM(CASE WHEN se != '' AND de != '' AND se != de THEN num_connections END), "
+            f"SUM(CASE WHEN se = '' OR de = '' THEN num_connections END) FROM ({sub})", keys).fetchone()
+        into = conn.execute(f"SELECT NULLIF(da, ''), SUM(num_connections) AS n, COUNT(DISTINCT src_key) FROM ({sub}) "
+                            "WHERE src_managed = 0 AND dst_managed = 1 GROUP BY da ORDER BY n DESC, da", keys).fetchall()
+    if fdb.generation != gen:
+        raise StaleGeneration
+    return LabelMix(unlabeled_app_flows=r[0] or 0, same_env_connections=r[1] or 0, cross_env_connections=r[2] or 0,
+                    unknown_env_connections=r[3] or 0, unmanaged_into_apps=[(a, n, s) for a, n, s in into[:top]],
+                    unmanaged_into_apps_total=len(into))
 
 
 def new_user_pairs(ctx: AppContext, ports: Sequence[PortProto], *, since: datetime) -> list[UserPair]:
@@ -518,7 +652,7 @@ def observations(ctx: AppContext, spec: FilterSpec, *, now: datetime | None = No
             conn.create_function(name, -1, fn, deterministic=True)
         cov = store_coverage(conn, IngestSource.TRAFFIC, (spec.start, spec.end), floor=floor,
                              collected=collects(settings, IngestSource.TRAFFIC))
-        where, params = to_sql(spec)
+        where, params = to_sql(spec, wide=wide_window(conn, spec))
         found = conn.execute(f"SELECT {_OBS_COLUMNS} FROM flows f WHERE {where}", params).fetchall()
         labels = _labels(conn, {r[k] for r in found for k in ("src_label_set", "dst_label_set") if r[k]})
     if fdb.generation != gen:
