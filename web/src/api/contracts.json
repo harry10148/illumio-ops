@@ -10251,7 +10251,8 @@
               "security_risk",
               "network_inventory",
               "app_summary",
-              "ven_status"
+              "ven_status",
+              "audit"
             ],
             "title": "ReportType",
             "type": "string"
@@ -10708,7 +10709,8 @@
               "security_risk",
               "network_inventory",
               "app_summary",
-              "ven_status"
+              "ven_status",
+              "audit"
             ],
             "title": "ReportType",
             "type": "string"
@@ -11257,7 +11259,8 @@
               "security_risk",
               "network_inventory",
               "app_summary",
-              "ven_status"
+              "ven_status",
+              "audit"
             ],
             "title": "ReportType",
             "type": "string"
@@ -11794,7 +11797,8 @@
               "security_risk",
               "network_inventory",
               "app_summary",
-              "ven_status"
+              "ven_status",
+              "audit"
             ],
             "title": "ReportType",
             "type": "string"
@@ -12510,7 +12514,8 @@
               "security_risk",
               "network_inventory",
               "app_summary",
-              "ven_status"
+              "ven_status",
+              "audit"
             ],
             "title": "ReportType",
             "type": "string"
@@ -12967,7 +12972,8 @@
               "security_risk",
               "network_inventory",
               "app_summary",
-              "ven_status"
+              "ven_status",
+              "audit"
             ],
             "title": "ReportType",
             "type": "string"
@@ -13163,7 +13169,8 @@
               "security_risk",
               "network_inventory",
               "app_summary",
-              "ven_status"
+              "ven_status",
+              "audit"
             ],
             "title": "ReportType",
             "type": "string"
@@ -13499,7 +13506,8 @@
               "security_risk",
               "network_inventory",
               "app_summary",
-              "ven_status"
+              "ven_status",
+              "audit"
             ],
             "title": "ReportType",
             "type": "string"
@@ -19544,6 +19552,7 @@
     ],
     "ReportType": [
       "app_summary",
+      "audit",
       "lateral_posture",
       "network_inventory",
       "new_connections",

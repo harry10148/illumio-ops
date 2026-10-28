@@ -84,6 +84,7 @@ def flow_days(settings: Settings) -> int:
 
 def _builtin() -> dict[ReportType, ReportSpec]:
     from illumio_ops.services.reports.app_summary import build_app_summary
+    from illumio_ops.services.reports.audit import build_audit
     from illumio_ops.services.reports.lateral_posture import build_lateral_posture
     from illumio_ops.services.reports.network_inventory import build_network_inventory
     from illumio_ops.services.reports.new_connections import build_new_connections
@@ -108,6 +109,7 @@ def _builtin() -> dict[ReportType, ReportSpec]:
                                            max_lookback=flow_days, requires_app=True,
                                            accepts_filter=True, retention=flow_retention),
         ReportType.VEN_STATUS: ReportSpec(ReportType.VEN_STATUS, "operations", False, build_ven_status),
+        ReportType.AUDIT: ReportSpec(ReportType.AUDIT, "operations", False, build_audit),
     }
 
 

@@ -378,6 +378,7 @@ class ReportType(StrEnum):
     NETWORK_INVENTORY = "network_inventory"
     APP_SUMMARY = "app_summary"
     VEN_STATUS = "ven_status"
+    AUDIT = "audit"
 
 
 class ReportFormat(StrEnum):
