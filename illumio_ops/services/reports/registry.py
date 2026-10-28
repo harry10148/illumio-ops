@@ -88,6 +88,7 @@ def _builtin() -> dict[ReportType, ReportSpec]:
     from illumio_ops.services.reports.lateral_posture import build_lateral_posture
     from illumio_ops.services.reports.network_inventory import build_network_inventory
     from illumio_ops.services.reports.new_connections import build_new_connections
+    from illumio_ops.services.reports.ransomware_report import build_ransomware
     from illumio_ops.services.reports.security_risk import build_security_risk
     from illumio_ops.services.reports.traffic import build_traffic
     from illumio_ops.services.reports.unmanaged import build_unmanaged
@@ -110,6 +111,7 @@ def _builtin() -> dict[ReportType, ReportSpec]:
                                            accepts_filter=True, retention=flow_retention),
         ReportType.VEN_STATUS: ReportSpec(ReportType.VEN_STATUS, "operations", False, build_ven_status),
         ReportType.AUDIT: ReportSpec(ReportType.AUDIT, "operations", False, build_audit),
+        ReportType.RANSOMWARE: ReportSpec(ReportType.RANSOMWARE, "assessment", False, build_ransomware),
     }
 
 

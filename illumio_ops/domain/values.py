@@ -379,6 +379,7 @@ class ReportType(StrEnum):
     APP_SUMMARY = "app_summary"
     VEN_STATUS = "ven_status"
     AUDIT = "audit"
+    RANSOMWARE = "ransomware"
 
 
 class ReportFormat(StrEnum):

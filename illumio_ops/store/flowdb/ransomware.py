@@ -90,3 +90,19 @@ def delete_snapshots_before(conn: sqlite3.Connection, day: str) -> int:
     with transaction(conn):
         n = conn.execute("DELETE FROM ransomware_snapshot_daily WHERE day < ?", (day,)).rowcount
         return n + conn.execute("DELETE FROM org_risk_snapshot_daily WHERE day < ?", (day,)).rowcount
+
+
+def protected_by_day(conn: sqlite3.Connection, first_day: str, last_day: str) -> dict[str, tuple[int, int]]:
+    """day -> (critical/high services with a known protection state, of them protected), from the daily snapshots.
+    A state the PCE did not give is neither (the ransomware report's trend)."""
+    return {r[0]: (r[1], r[2] or 0) for r in conn.execute(
+        "SELECT day, COUNT(*), SUM(protection_state LIKE 'protected%') FROM ransomware_snapshot_daily "
+        "WHERE day >= ? AND day <= ? AND lower(severity) IN ('critical', 'high') "
+        "AND (protection_state = 'unprotected' OR protection_state LIKE 'protected%') GROUP BY day",
+        (first_day, last_day))}
+
+
+def org_summaries(conn: sqlite3.Connection, last_day: str) -> list[tuple[str, dict[str, Any]]]:
+    """The organisation summaries up to `last_day`, newest first."""
+    return [(r[0], json.loads(r[1])) for r in conn.execute(
+        "SELECT day, summary_json FROM org_risk_snapshot_daily WHERE day <= ? ORDER BY day DESC", (last_day,))]

@@ -10252,7 +10252,8 @@
               "network_inventory",
               "app_summary",
               "ven_status",
-              "audit"
+              "audit",
+              "ransomware"
             ],
             "title": "ReportType",
             "type": "string"
@@ -10710,7 +10711,8 @@
               "network_inventory",
               "app_summary",
               "ven_status",
-              "audit"
+              "audit",
+              "ransomware"
             ],
             "title": "ReportType",
             "type": "string"
@@ -11260,7 +11262,8 @@
               "network_inventory",
               "app_summary",
               "ven_status",
-              "audit"
+              "audit",
+              "ransomware"
             ],
             "title": "ReportType",
             "type": "string"
@@ -11798,7 +11801,8 @@
               "network_inventory",
               "app_summary",
               "ven_status",
-              "audit"
+              "audit",
+              "ransomware"
             ],
             "title": "ReportType",
             "type": "string"
@@ -12515,7 +12519,8 @@
               "network_inventory",
               "app_summary",
               "ven_status",
-              "audit"
+              "audit",
+              "ransomware"
             ],
             "title": "ReportType",
             "type": "string"
@@ -12973,7 +12978,8 @@
               "network_inventory",
               "app_summary",
               "ven_status",
-              "audit"
+              "audit",
+              "ransomware"
             ],
             "title": "ReportType",
             "type": "string"
@@ -13170,7 +13176,8 @@
               "network_inventory",
               "app_summary",
               "ven_status",
-              "audit"
+              "audit",
+              "ransomware"
             ],
             "title": "ReportType",
             "type": "string"
@@ -13507,7 +13514,8 @@
               "network_inventory",
               "app_summary",
               "ven_status",
-              "audit"
+              "audit",
+              "ransomware"
             ],
             "title": "ReportType",
             "type": "string"
@@ -19556,6 +19564,7 @@
       "lateral_posture",
       "network_inventory",
       "new_connections",
+      "ransomware",
       "security_risk",
       "traffic",
       "unmanaged_endpoints",
