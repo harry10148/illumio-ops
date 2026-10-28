@@ -6,6 +6,7 @@ inventory: a partial list would make missing hosts look like hosts that left.
 """
 from __future__ import annotations
 
+import json
 import sqlite3
 import time
 from collections.abc import Mapping
@@ -68,7 +69,24 @@ def _row(conn: Any, w: Mapping[str, Any], fetched_at: str) -> workloads.Workload
         risk_exposure=rw.get("workload_exposure_severity"),
         risk_percent=float(pct) if isinstance(pct, (int, float)) and not isinstance(pct, bool) else None,
         risk_updated_at=rw.get("last_updated_at"), fetched_at=fetched_at,
+        agent_status=status.get("status"), last_heartbeat_at=_stamp(status.get("last_heartbeat_on")),
+        policy_sync_state=status.get("security_policy_sync_state"),
+        policy_received_at=_stamp(status.get("security_policy_received_at") or status.get("security_policy_refresh_at")),
+        policy_applied_at=_stamp(status.get("security_policy_applied_at")),
+        managed_since=_stamp(status.get("managed_since")),
+        fw_config_current=None if status.get("fw_config_current") is None else int(bool(status["fw_config_current"])),
+        agent_health_json=json.dumps(status["agent_health"]) if isinstance(status.get("agent_health"), list) else None,
     )
+
+
+def _stamp(value: Any) -> str | None:
+    """A PCE timestamp in the stored format; None when missing or unreadable."""
+    if not isinstance(value, str) or not value:
+        return None
+    try:
+        return db_time(datetime.fromisoformat(value).astimezone(UTC))
+    except ValueError:
+        return None
 
 
 def visibility_summary(conn: Any) -> dict[str, int]:

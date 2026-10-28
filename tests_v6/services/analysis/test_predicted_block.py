@@ -28,7 +28,8 @@ def fake(monkeypatch):
 
     def query(client, payload, *, deadline, compute_draft=False, delete_after=True):
         calls["queries"].append((payload, compute_draft))
-        return AsyncQueryResult(rows=ROWS, matches_count=len(ROWS), flows_count=len(ROWS), capped=False)
+        # A copy: the recompute consumes the rows it reads.
+        return AsyncQueryResult(rows=list(ROWS), matches_count=len(ROWS), flows_count=len(ROWS), capped=False)
 
     def rule_sets(client, pversion, *, deadline):
         calls["rule_sets"] += 1

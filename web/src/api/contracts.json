@@ -10250,7 +10250,11 @@
               "traffic",
               "security_risk",
               "network_inventory",
-              "app_summary"
+              "app_summary",
+              "ven_status",
+              "audit",
+              "ransomware",
+              "readiness"
             ],
             "title": "ReportType",
             "type": "string"
@@ -10706,7 +10710,11 @@
               "traffic",
               "security_risk",
               "network_inventory",
-              "app_summary"
+              "app_summary",
+              "ven_status",
+              "audit",
+              "ransomware",
+              "readiness"
             ],
             "title": "ReportType",
             "type": "string"
@@ -11254,7 +11262,11 @@
               "traffic",
               "security_risk",
               "network_inventory",
-              "app_summary"
+              "app_summary",
+              "ven_status",
+              "audit",
+              "ransomware",
+              "readiness"
             ],
             "title": "ReportType",
             "type": "string"
@@ -11790,7 +11802,11 @@
               "traffic",
               "security_risk",
               "network_inventory",
-              "app_summary"
+              "app_summary",
+              "ven_status",
+              "audit",
+              "ransomware",
+              "readiness"
             ],
             "title": "ReportType",
             "type": "string"
@@ -12505,7 +12521,11 @@
               "traffic",
               "security_risk",
               "network_inventory",
-              "app_summary"
+              "app_summary",
+              "ven_status",
+              "audit",
+              "ransomware",
+              "readiness"
             ],
             "title": "ReportType",
             "type": "string"
@@ -12961,7 +12981,11 @@
               "traffic",
               "security_risk",
               "network_inventory",
-              "app_summary"
+              "app_summary",
+              "ven_status",
+              "audit",
+              "ransomware",
+              "readiness"
             ],
             "title": "ReportType",
             "type": "string"
@@ -13156,7 +13180,11 @@
               "traffic",
               "security_risk",
               "network_inventory",
-              "app_summary"
+              "app_summary",
+              "ven_status",
+              "audit",
+              "ransomware",
+              "readiness"
             ],
             "title": "ReportType",
             "type": "string"
@@ -13491,7 +13519,11 @@
               "traffic",
               "security_risk",
               "network_inventory",
-              "app_summary"
+              "app_summary",
+              "ven_status",
+              "audit",
+              "ransomware",
+              "readiness"
             ],
             "title": "ReportType",
             "type": "string"
@@ -19490,6 +19522,7 @@
       "events",
       "inventory",
       "ransomware",
+      "readiness",
       "traffic"
     ],
     "Language": [
@@ -19536,12 +19569,16 @@
     ],
     "ReportType": [
       "app_summary",
+      "audit",
       "lateral_posture",
       "network_inventory",
       "new_connections",
+      "ransomware",
+      "readiness",
       "security_risk",
       "traffic",
-      "unmanaged_endpoints"
+      "unmanaged_endpoints",
+      "ven_status"
     ],
     "RuleAction": [
       "allow",

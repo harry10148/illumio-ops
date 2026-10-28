@@ -24,11 +24,12 @@ from illumio_ops.domain.events import (
 from illumio_ops.domain.identity import endpoint_key
 from illumio_ops.domain.segment import (
     EVENT_FROM,
+    EventFilter,
     EventSegment,
     compile_event_ranking,
     compile_event_where,
 )
-from illumio_ops.domain.values import IngestSource
+from illumio_ops.domain.values import IngestSource, SegmentView
 from illumio_ops.pce.client import PceNotConfigured
 from illumio_ops.pce.events import events_timeout, fetch_events
 from illumio_ops.services.collect.guard import require_same_pce
@@ -197,6 +198,69 @@ def event_detail(ctx: AppContext, seg: EventSegment, *, now: datetime | None = N
     found, cov = _segment_read(ctx, seg, at, lambda conn: conn.execute(sql, [*params, seg.limit + 1]).fetchall())
     rows = [_event_row(r) for r in found]
     return EventQuery(rows=rows[:seg.limit], coverage=cov, limit_hit=len(rows) > seg.limit)
+
+
+USER_KINDS = ("user", "service_account")  # the creators an audit counts as people; VENs and the system are not
+
+
+class AuditUser(BaseModel):
+    name: str
+    events: int
+    failures: int
+    source_ips: int
+
+
+class AuditCounts(BaseModel):
+    """A period's events counted for the audit report, in one pass over the store."""
+    total: int
+    by_type: dict[str, int]
+    by_minute: dict[str, int]  # UTC minute "YYYY-MM-DDTHH:MM" -> events (a display zone may be a half hour off)
+    actors: int  # distinct users and service accounts
+    source_ips: int
+    users: list[AuditUser]  # busiest first, at most `top`
+    users_total: int
+    type_users: dict[str, list[tuple[str, int]]]  # event type -> its top 3 users and service accounts
+    failed_by_ip: dict[str, list[datetime]]  # failed sign-ins per source address, oldest first
+    coverage: Coverage
+
+
+def audit_counts(ctx: AppContext, *, start: datetime, end: datetime, top: int = 20,
+                 now: datetime | None = None) -> AuditCounts:
+    at = (now or datetime.now(UTC)).astimezone(UTC)
+    seg = EventSegment(filter=EventFilter(start=start, end=end), view=SegmentView.DETAIL, limit=1)
+    window = ["e.timestamp >= ?", "e.timestamp < ?"]
+    params = [db_time(start), db_time(end)]
+    kinds = f"e.created_by_kind IN ({','.join('?' * len(USER_KINDS))}) AND TRIM(COALESCE(e.created_by_name, '')) != ''"
+    ip = "json_extract(e.raw_json, '$.action.src_ip')"
+
+    def read(conn: Any) -> Any:
+        where = " AND ".join(window)
+        by_type = dict(conn.execute(f"SELECT e.event_type, COUNT(*) FROM events e WHERE {where} GROUP BY 1", params)
+                       .fetchall())
+        by_minute = dict(conn.execute(f"SELECT substr(e.timestamp, 1, 16), COUNT(*) FROM events e WHERE {where} "
+                                      "GROUP BY 1", params).fetchall())
+        type_users: dict[str, list[tuple[str, int]]] = {}
+        for et, name, n in conn.execute(
+                f"SELECT e.event_type, e.created_by_name, COUNT(*) AS n FROM events e WHERE {where} AND {kinds} "
+                "GROUP BY 1, 2 ORDER BY 1, n DESC, 2", [*params, *USER_KINDS]):
+            if len(type_users.setdefault(et, [])) < 3:
+                type_users[et].append((name, n))
+        actors, ips = conn.execute(
+            f"SELECT COUNT(DISTINCT CASE WHEN {kinds} THEN e.created_by_name END), COUNT(DISTINCT {ip}) "
+            f"FROM events e WHERE {where}", [*USER_KINDS, *params]).fetchone()
+        users = conn.execute(
+            f"SELECT e.created_by_name, COUNT(*) AS n, SUM(e.status = 'failure'), COUNT(DISTINCT {ip}) FROM events e "
+            f"WHERE {where} AND {kinds} GROUP BY 1 ORDER BY n DESC, 1", [*params, *USER_KINDS]).fetchall()
+        failed: dict[str, list[datetime]] = {}
+        for addr, ts in conn.execute(f"SELECT {ip}, e.timestamp FROM events e WHERE {where} AND e.event_type = ? "
+                                     f"AND {ip} IS NOT NULL ORDER BY e.timestamp", [*params, "request.authentication_failed"]):
+            failed.setdefault(str(addr), []).append(datetime.fromisoformat(ts))
+        return by_type, by_minute, actors, ips, users, failed, type_users
+    (by_type, by_minute, actors, ips, users, failed, type_users), cov = _segment_read(ctx, seg, at, read)
+    return AuditCounts(total=sum(by_type.values()), by_type=by_type, by_minute=by_minute, actors=actors or 0,
+                       type_users=type_users,
+                       source_ips=ips or 0, users_total=len(users), failed_by_ip=failed, coverage=cov,
+                       users=[AuditUser(name=u[0], events=u[1], failures=u[2] or 0, source_ips=u[3]) for u in users[:top]])
 
 
 class PrecursorEvents(BaseModel):

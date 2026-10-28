@@ -104,6 +104,7 @@ class IngestSource(StrEnum):
     EVENTS = "events"
     INVENTORY = "inventory"
     RANSOMWARE = "ransomware"
+    READINESS = "readiness"
     BACKFILL = "backfill"
 
 
@@ -377,6 +378,10 @@ class ReportType(StrEnum):
     SECURITY_RISK = "security_risk"
     NETWORK_INVENTORY = "network_inventory"
     APP_SUMMARY = "app_summary"
+    VEN_STATUS = "ven_status"
+    AUDIT = "audit"
+    RANSOMWARE = "ransomware"
+    READINESS = "readiness"
 
 
 class ReportFormat(StrEnum):

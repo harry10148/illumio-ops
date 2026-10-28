@@ -49,7 +49,7 @@ def test_catalog_lists_built_types(client, ctx):
     login(client)
     data = get(client, "/api/reports/catalog").get_json()["data"]
     types = {e["report_type"]: e for e in data["entries"]}
-    assert set(types) == {"lateral_posture", "new_connections", "unmanaged_endpoints", "traffic", "security_risk", "network_inventory", "app_summary"}
+    assert set(types) == {"lateral_posture", "new_connections", "unmanaged_endpoints", "traffic", "security_risk", "network_inventory", "app_summary", "ven_status", "audit", "ransomware", "readiness"}
     assert all(e["available"] for e in types.values()) and data["smtp_enabled"] is False
 
 
@@ -147,3 +147,12 @@ def test_generate_refusals_name_the_field(client, ctx):
     assert r.status_code == 400 and r.get_json()["error"]["message_key"] == "rpt_err_filter_not_supported"
     r = post(client, "/api/reports", {"report_type": "app_summary", "filter": APP_FILTER})
     assert r.status_code == 200 and r.get_json()["data"]["status"] == "queued"
+
+
+def test_events_only_types_available(client, ctx):
+    """VEN status, audit and ransomware protection read no traffic: they stay available in events-only mode."""
+    ctx.settings.update(ctx.settings.current().revision, lambda d: d["collection"].update(mode="events_only"))
+    login(client)
+    entries = {e["report_type"]: e for e in get(client, "/api/reports/catalog").get_json()["data"]["entries"]}
+    assert all(entries[t]["available"] for t in ("ven_status", "audit", "ransomware"))
+    assert not entries["readiness"]["available"] and not entries["traffic"]["available"]

@@ -151,3 +151,11 @@ def ids_beyond_keep(conn: sqlite3.Connection, schedule_id: str, keep: int) -> li
     return [r[0] for r in conn.execute(
         "SELECT id FROM reports WHERE schedule_id = ? AND status IN ('done', 'failed') ORDER BY id DESC "
         "LIMIT -1 OFFSET ?", (schedule_id, keep))]
+
+
+def done_ending_at(conn: sqlite3.Connection, report_type: str, period_end: datetime, pce_target: str) -> list[ReportRow]:
+    """Finished reports of a type whose period ended at `period_end`, for one PCE, newest first: the previous
+    period of a report starting there."""
+    return [_row(r) for r in conn.execute(
+        "SELECT * FROM reports WHERE report_type = ? AND status = 'done' AND period_end = ? AND pce_target = ? "
+        "ORDER BY id DESC", (report_type, _t(period_end), pce_target))]

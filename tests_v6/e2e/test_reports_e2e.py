@@ -166,3 +166,32 @@ def test_schedule_lookback_stays_within_the_type(context, live_app):
     editor.get_by_role("button", name="Save").click()
     expect(page.locator("[data-role=schedule-list] tbody tr").first).to_contain_text("Short retention")
     assert ctx.settings.current().reports.schedules[0].lookback_days == 6
+
+
+def test_audit_in_events_only_mode(context, live_app):
+    from datetime import UTC, datetime, timedelta
+
+    from illumio_ops.domain.values import DataOrigin
+    from illumio_ops.store.flowdb.events import upsert_events
+    from tests_v6.services.reports.test_audit import event
+    ctx = live_app.ctx
+    ctx.settings.update(ctx.settings.current().revision, lambda d: d["collection"].update(mode="events_only"))
+    yesterday = datetime.now(UTC) - timedelta(days=1)
+    with ctx.flows().connect() as conn:
+        upsert_events(conn, [event("sec_policy.create", yesterday, user="alice")], origin=DataOrigin.INGEST,
+                      now=datetime.now(UTC))
+        conn.commit()
+    page = context.new_page()
+    _reports(page, live_app.url)
+    entry = page.locator("[data-report-type=audit]")
+    expect(entry).to_have_attribute("data-available", "true")
+    expect(page.locator("[data-report-type=traffic]")).to_have_attribute("data-available", "false")
+    entry.get_by_role("button", name="Generate…").click()
+    entry.locator("[data-role=generate-form]").get_by_role("button", name="Generate", exact=True).click()
+    row = page.locator("[data-role=report-list] tbody tr").first
+    expect(row).to_have_attribute("data-status", "queued")
+    generate.run_queued(live_app.ctx)
+    expect(row).to_have_attribute("data-status", "done", timeout=10_000)
+    with page.expect_download() as dl:
+        row.get_by_role("link", name="HTML").click()
+    assert "Policy provisions" in Path(dl.value.path()).read_text(encoding="utf-8")
