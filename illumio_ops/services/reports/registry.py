@@ -90,6 +90,7 @@ def _builtin() -> dict[ReportType, ReportSpec]:
     from illumio_ops.services.reports.security_risk import build_security_risk
     from illumio_ops.services.reports.traffic import build_traffic
     from illumio_ops.services.reports.unmanaged import build_unmanaged
+    from illumio_ops.services.reports.ven_status import build_ven_status
     return {
         ReportType.LATERAL_POSTURE: ReportSpec(ReportType.LATERAL_POSTURE, "lateral", True, build_lateral_posture),
         ReportType.NEW_CONNECTIONS: ReportSpec(ReportType.NEW_CONNECTIONS, "analysis", True, build_new_connections),
@@ -106,6 +107,7 @@ def _builtin() -> dict[ReportType, ReportSpec]:
         ReportType.APP_SUMMARY: ReportSpec(ReportType.APP_SUMMARY, "analysis", True, build_app_summary,
                                            max_lookback=flow_days, requires_app=True,
                                            accepts_filter=True, retention=flow_retention),
+        ReportType.VEN_STATUS: ReportSpec(ReportType.VEN_STATUS, "operations", False, build_ven_status),
     }
 
 

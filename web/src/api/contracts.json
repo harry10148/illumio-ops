@@ -10250,7 +10250,8 @@
               "traffic",
               "security_risk",
               "network_inventory",
-              "app_summary"
+              "app_summary",
+              "ven_status"
             ],
             "title": "ReportType",
             "type": "string"
@@ -10706,7 +10707,8 @@
               "traffic",
               "security_risk",
               "network_inventory",
-              "app_summary"
+              "app_summary",
+              "ven_status"
             ],
             "title": "ReportType",
             "type": "string"
@@ -11254,7 +11256,8 @@
               "traffic",
               "security_risk",
               "network_inventory",
-              "app_summary"
+              "app_summary",
+              "ven_status"
             ],
             "title": "ReportType",
             "type": "string"
@@ -11790,7 +11793,8 @@
               "traffic",
               "security_risk",
               "network_inventory",
-              "app_summary"
+              "app_summary",
+              "ven_status"
             ],
             "title": "ReportType",
             "type": "string"
@@ -12505,7 +12509,8 @@
               "traffic",
               "security_risk",
               "network_inventory",
-              "app_summary"
+              "app_summary",
+              "ven_status"
             ],
             "title": "ReportType",
             "type": "string"
@@ -12961,7 +12966,8 @@
               "traffic",
               "security_risk",
               "network_inventory",
-              "app_summary"
+              "app_summary",
+              "ven_status"
             ],
             "title": "ReportType",
             "type": "string"
@@ -13156,7 +13162,8 @@
               "traffic",
               "security_risk",
               "network_inventory",
-              "app_summary"
+              "app_summary",
+              "ven_status"
             ],
             "title": "ReportType",
             "type": "string"
@@ -13491,7 +13498,8 @@
               "traffic",
               "security_risk",
               "network_inventory",
-              "app_summary"
+              "app_summary",
+              "ven_status"
             ],
             "title": "ReportType",
             "type": "string"
@@ -19541,7 +19549,8 @@
       "new_connections",
       "security_risk",
       "traffic",
-      "unmanaged_endpoints"
+      "unmanaged_endpoints",
+      "ven_status"
     ],
     "RuleAction": [
       "allow",
