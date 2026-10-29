@@ -153,3 +153,23 @@ def test_scheduled_not_enabled_fails(ctx, monkeypatch):
         row = store.get(conn, rid)
     assert row.status is ReportStatus.FAILED and row.error_key == "rpt_unavailable_rhc_off"
     assert not list((ctx.paths.reports_dir / str(rid)).glob("*"))
+
+
+# ── lab 2026-10-30: the PCE's report also lists Draft-only rules (pending create) under active hrefs, 0, "N/A" ──
+
+def test_zero_row_not_in_active_policy_is_not_zero(ctx, monkeypatch):
+    draft_only = RhcRow(rule_href="/orgs/1/sec_policy/active/rule_sets/673/deny_rules/309", ruleset_name="tedt",
+                        description="", hit_count=0, last_hit_at=None)
+    monkeypatch.setattr(rule_hit_count, "pull_rhc", lambda ctx, start, end: _pull(rows=[*_pull().rows, draft_only]))
+    doc = _build(ctx)
+    assert _ids(_table(doc, "zero")) == ["#11"]
+    unprovisioned = [b for b in _section(doc, "no_record").blocks if isinstance(b, TableBlock)][1]
+    assert [r[0] for r in unprovisioned.rows] == ["tedt"]
+    assert {x.key: x.value for x in doc.kpis}["zero"] == 1
+
+
+def test_zero_table_shows_last_hit_before_the_period(ctx, monkeypatch):
+    old = RhcRow(rule_href=f"{A}/sec_rules/11", ruleset_name="Web", description="", hit_count=0,
+                 last_hit_at="2026-06-26T09:09:16Z")
+    monkeypatch.setattr(rule_hit_count, "pull_rhc", lambda ctx, start, end: _pull(rows=[_pull().rows[0], old]))
+    assert "2026-06-26" in _table(_build(ctx), "zero").rows[0][3]

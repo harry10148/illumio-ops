@@ -1822,5 +1822,8 @@
   "rpt_rhc_finding_pending_action": "檢視 Draft 的變更（規則使用報表），Provision 或還原。",
   "rpt_rhc_quality_source": "命中次數來自 PCE 的 Rule Hit Count 報表，由 VEN 統計；PCE 保留 90 天。",
   "rpt_rhc_quality_unparsed": "PCE 報表中有 {n} 列的命中次數無法讀取，已略過，沒有當成 0 次。",
-  "rpt_rhc_quality_gone": "有 {n} 條有計數的規則已不在生效政策中（之後被刪除或變更），以 PCE 報表中的 Ruleset 名稱列出。"
+  "rpt_rhc_quality_gone": "有 {n} 條有計數的規則已不在生效政策中（之後被刪除或變更），以 PCE 報表中的 Ruleset 名稱列出。",
+  "rpt_rhc_col_last_hit_ever": "最後命中（不限期間）",
+  "rpt_rhc_never": "從未",
+  "rpt_rhc_tbl_unprovisioned": "PCE 報表有列、但不在生效政策中的規則（只在 Draft，或之後被刪除）：沒有計數，不是 0 次"
 }

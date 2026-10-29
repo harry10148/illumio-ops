@@ -1822,5 +1822,8 @@
   "rpt_rhc_finding_pending_action": "Review the Draft changes (Policy usage report) and provision or revert them.",
   "rpt_rhc_quality_source": "Hit counts come from the PCE's Rule Hit Count report, counted by the VENs; the PCE keeps them 90 days.",
   "rpt_rhc_quality_unparsed": "{n} row(s) of the PCE's report had a hit count that could not be read; they are left out, not counted as 0.",
-  "rpt_rhc_quality_gone": "{n} counted rule(s) are no longer in the provisioned policy (deleted or changed since); they are listed under the ruleset name the PCE reported."
+  "rpt_rhc_quality_gone": "{n} counted rule(s) are no longer in the provisioned policy (deleted or changed since); they are listed under the ruleset name the PCE reported.",
+  "rpt_rhc_col_last_hit_ever": "Last hit (any time)",
+  "rpt_rhc_never": "never",
+  "rpt_rhc_tbl_unprovisioned": "Listed by the PCE but not in the provisioned policy (Draft only, or deleted since): no count, not 0"
 }

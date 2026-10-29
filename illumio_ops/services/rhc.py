@@ -278,6 +278,11 @@ def _norm(header: str) -> str:
     return re.sub(r"[^a-z0-9]+", "_", header.strip().lower()).strip("_")
 
 
+def _when(value: str) -> str | None:
+    """The PCE writes "N/A" for a rule never hit (lab, 2026-10-30)."""
+    return None if value.strip().upper() in ("", "N/A", "NA", "-") else value.strip()
+
+
 def parse_rhc_csv(text: str) -> tuple[list[RhcRow], int]:
     """Rows with a rule and a readable hit count, and how many were left out. A blank or unreadable count is left
     out rather than read as 0, which would list the rule as unused."""
@@ -299,5 +304,5 @@ def parse_rhc_csv(text: str) -> tuple[list[RhcRow], int]:
             continue
         rows.append(RhcRow(rule_href=rec["rule_href"], ruleset_name=rec.get("ruleset_name", ""),
                            description=rec.get("description", ""), hit_count=hits,
-                           last_hit_at=rec.get("last_hit_at") or None))
+                           last_hit_at=_when(rec.get("last_hit_at", ""))))
     return rows, unparsed

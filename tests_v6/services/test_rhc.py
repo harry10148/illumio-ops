@@ -287,3 +287,9 @@ def test_cached_status_reuses_a_recent_check(wctx):
     assert len(responses.calls) == 2
     rhc.rhc_status(wctx)
     assert len(responses.calls) == 4
+
+
+def test_csv_na_last_hit_is_none():
+    """Lab 2026-10-30: the PCE writes "N/A" for a rule never hit."""
+    rows, _ = rhc.parse_rhc_csv("Rule HREF,Rule Hit Count,Timestamp of Last Hit\n/orgs/1/x/1,0,N/A\n")
+    assert rows[0].last_hit_at is None

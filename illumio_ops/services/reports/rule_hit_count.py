@@ -69,7 +69,11 @@ def build_rule_hit_count(inp: BuildInput) -> ReportDocument:
     any_text = t("rpt_pu_any")
     by_href = {r.rule_href: r for r in pull.rows}
     hit = sorted((r for r in pull.rows if r.hit_count > 0), key=lambda r: (-r.hit_count, r.rule_href))
-    zero = sorted((r for r in pull.rows if r.hit_count == 0), key=lambda r: r.rule_href)
+    # The PCE's report also lists rules that are only in Draft (a ruleset pending create), under active hrefs with
+    # 0 hits (lab, 2026-10-30): not provisioned, so not "0 hits". A 0 for a rule deleted since is no count either.
+    zero = sorted((r for r in pull.rows if r.hit_count == 0 and r.rule_href in rules), key=lambda r: r.rule_href)
+    unprovisioned = sorted((r for r in pull.rows if r.hit_count == 0 and r.rule_href not in rules),
+                           key=lambda r: (r.ruleset_name, r.rule_href))
     # Enabled provisioned rules the PCE has no count for; a disabled rule is not expected to have one.
     no_record = sorted((r for r in rules.values() if r.enabled and r.href not in by_href),
                        key=lambda r: (r.ruleset_name, r.href))
@@ -95,9 +99,18 @@ def build_rule_hit_count(inp: BuildInput) -> ReportDocument:
         rows=tuple((c[0], c[1], c[2], r.hit_count, fmt_time(r.last_hit_at, inp.tz) if r.last_hit_at else "—", c[3])
                    for r in hit[:ROWS] for c in (cells(r),)),
         total_rows=len(hit), empty_text=t("rpt_rhc_none_hit"), limit_note=limit(len(hit)))
-    zero_table = TableBlock(title=t("rpt_rhc_tbl_zero"), columns=base_cols,
-                            rows=tuple(cells(r) for r in zero[:ROWS]), total_rows=len(zero),
-                            empty_text=t("rpt_rhc_none_zero"), limit_note=limit(len(zero)))
+    zero_table = TableBlock(
+        title=t("rpt_rhc_tbl_zero"),
+        columns=(*base_cols[:3], Column(key="last", label=t("rpt_rhc_col_last_hit_ever")), base_cols[3]),
+        rows=tuple((c[0], c[1], c[2], fmt_time(r.last_hit_at, inp.tz) if r.last_hit_at else t("rpt_rhc_never"), c[3])
+                   for r in zero[:ROWS] for c in (cells(r),)),
+        total_rows=len(zero), empty_text=t("rpt_rhc_none_zero"), limit_note=limit(len(zero)))
+    unprovisioned_table = TableBlock(
+        title=t("rpt_rhc_tbl_unprovisioned"),
+        columns=(Column(key="ruleset", label="Ruleset"), Column(key="rule", label=t("rpt_pu_col_rule"))),
+        rows=tuple((r.ruleset_name or "—", f"#{r.rule_href.rsplit('/', 1)[-1]} {r.description}".strip())
+                   for r in unprovisioned[:ROWS]),
+        total_rows=len(unprovisioned), empty_text="", limit_note=limit(len(unprovisioned)))
     no_record_table = TableBlock(
         title=t("rpt_rhc_tbl_no_record"), columns=base_cols,
         rows=tuple((r.ruleset_name, f"{rule_id(r)} {r.description or ''}".strip(), t(_TYPE_KEYS[r.rule_type]),
@@ -119,7 +132,8 @@ def build_rule_hit_count(inp: BuildInput) -> ReportDocument:
         pending_blocks = (TextBlock(paragraphs=(t("rpt_rhc_pending_none"),)),)
 
     enabled_rules = sum(1 for r in rules.values() if r.enabled)
-    values = {"rules": enabled_rules, "hit": len(hit), "zero": len(zero), "no_record": len(no_record)}
+    values = {"rules": enabled_rules, "hit": len(hit), "zero": len(zero),
+              "no_record": len(no_record) + len(unprovisioned)}
     kpis = tuple(Kpi(key=k, label=t(label), value=values[k], previous=None, unit="count",
                      better="neutral" if k in ("rules", "no_record") else "higher" if k == "hit" else "lower")
                  for k, label in _KPI_KEYS.items())
@@ -133,7 +147,7 @@ def build_rule_hit_count(inp: BuildInput) -> ReportDocument:
     quality = [t("rpt_rhc_quality_source")]
     if pull.unparsed:
         quality.append(t("rpt_rhc_quality_unparsed", n=pull.unparsed))
-    gone = sum(1 for r in pull.rows if r.rule_href not in rules)
+    gone = sum(1 for r in pull.rows if r.rule_href not in rules and r.hit_count > 0)
     if gone:
         quality.append(t("rpt_rhc_quality_gone", n=gone))
     return ReportDocument(
@@ -146,6 +160,6 @@ def build_rule_hit_count(inp: BuildInput) -> ReportDocument:
                   Section(id="zero", title=t("rpt_rhc_sec_zero"), intro=t("rpt_rhc_zero_intro"),
                           blocks=(zero_table,)),
                   Section(id="no_record", title=t("rpt_rhc_sec_no_record"), intro=t("rpt_rhc_no_record_intro"),
-                          blocks=(no_record_table,)),
+                          blocks=(no_record_table, *((unprovisioned_table,) if unprovisioned else ()))),
                   Section(id="pending", title=t("rpt_rhc_sec_pending"), intro=t("rpt_rhc_pending_intro"),
                           blocks=pending_blocks)))
