@@ -1734,5 +1734,10 @@
   "rpt_rw_explain_mode_unknown": "The PCE scores it {pce}; the host's enforcement mode is not known here, so its services cannot be judged. It shows once the next inventory collection reads it.",
   "rpt_pu_kpi_read_only": "In the traffic read: some windows were cut short.",
   "rpt_pu_finding_unused_read": "{n} rule(s) were not used in the traffic read",
-  "rpt_pu_quality_undetermined": "{n} connection(s) got no Draft decision from the PCE: they count neither for a rule nor as “no rule allows”."
+  "rpt_pu_quality_undetermined": "{n} connection(s) got no Draft decision from the PCE: they count neither for a rule nor as “no rule allows”.",
+  "pce_write_key_title": "Write key (optional)",
+  "pce_write_key_hint": "Used only for Rule Hit Count: turning it on from this product and producing its report. The PCE allows both only for the Owner role. Leave blank if you turn Rule Hit Count on in the PCE console; everything else uses the key above.",
+  "pce_write_api_key": "Write API key",
+  "pce_write_api_secret": "Write API secret",
+  "pce_write_key_clear": "Remove the saved write key"
 }

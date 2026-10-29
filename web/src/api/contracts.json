@@ -18127,6 +18127,14 @@
               }
             ],
             "title": "Verify Tls"
+          },
+          "write_api_key": {
+            "title": "Write Api Key",
+            "type": "string"
+          },
+          "write_api_secret": {
+            "title": "Write Api Secret",
+            "type": "string"
           }
         },
         "required": [
@@ -18137,7 +18145,9 @@
           "api_secret",
           "deployment_type",
           "console_url",
-          "verify_tls"
+          "verify_tls",
+          "write_api_key",
+          "write_api_secret"
         ],
         "title": "PceConnection",
         "type": "object"
@@ -18341,6 +18351,11 @@
             "title": "Api Secret",
             "type": "string"
           },
+          "clear_write_key": {
+            "default": false,
+            "title": "Clear Write Key",
+            "type": "boolean"
+          },
           "console_url": {
             "anyOf": [
               {
@@ -18380,6 +18395,18 @@
               }
             ],
             "title": "Verify Tls"
+          },
+          "write_api_key": {
+            "default": "",
+            "maxLength": 512,
+            "title": "Write Api Key",
+            "type": "string"
+          },
+          "write_api_secret": {
+            "default": "",
+            "maxLength": 1024,
+            "title": "Write Api Secret",
+            "type": "string"
           }
         },
         "required": [
@@ -18489,6 +18516,14 @@
               }
             ],
             "title": "Verify Tls"
+          },
+          "write_api_key": {
+            "title": "Write Api Key",
+            "type": "string"
+          },
+          "write_api_secret": {
+            "title": "Write Api Secret",
+            "type": "string"
           }
         },
         "required": [
@@ -18500,6 +18535,8 @@
           "deployment_type",
           "console_url",
           "verify_tls",
+          "write_api_key",
+          "write_api_secret",
           "reset"
         ],
         "title": "PceConnectionSaved",

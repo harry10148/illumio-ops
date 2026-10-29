@@ -81,6 +81,10 @@ class PceSettings(StrictModel):
     console_url: str | None
     verify_tls: bool | str  # str = path to a CA bundle
     events_timeout_seconds: int | None = Field(ge=5, le=600)
+    # Optional (spec §6.5 key decision): an owner service account for Rule Hit Count and quarantine only; the main
+    # key above stays read_only. Empty: those features are greyed out and say why.
+    write_api_key: str = ""
+    write_api_secret: str = ""
 
     @field_validator("url")
     @classmethod

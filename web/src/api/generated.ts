@@ -1291,6 +1291,8 @@ org_id: string
 revision: number
 url: string
 verify_tls: (boolean | string)
+write_api_key: string
+write_api_secret: string
 }
 /**
  * This interface was referenced by `ContractRoot`'s JSON-Schema
@@ -1314,12 +1316,15 @@ run: (ProbeRun | null)
 export interface PceConnectionUpdate {
 api_key: string
 api_secret: string
+clear_write_key?: boolean
 console_url: (string | null)
 deployment_type: DeploymentType
 org_id: string
 revision: number
 url: string
 verify_tls: (boolean | string)
+write_api_key?: string
+write_api_secret?: string
 }
 /**
  * This interface was referenced by `ContractRoot`'s JSON-Schema
@@ -1343,6 +1348,8 @@ reset: (PceReset | null)
 revision: number
 url: string
 verify_tls: (boolean | string)
+write_api_key: string
+write_api_secret: string
 }
 /**
  * This interface was referenced by `ContractRoot`'s JSON-Schema
