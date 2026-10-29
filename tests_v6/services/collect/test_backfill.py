@@ -93,11 +93,11 @@ def test_resumed_initial_backfill_reads_only_what_the_mode_now_collects(tmp_path
     ctx = configured_ctx(tmp_path, backfill_days=2)
     fake_traffic.answer = lambda s, e, m: (_ for _ in ()).throw(PceQueryError("timeout"))
     ensure_initial_backfill(ctx, now=NOW)  # full mode: traffic and events, stopped on day 1
-    ctx.settings.update(ctx.settings.current().revision, lambda d: d["collection"].update({"mode": "events_only"}))
+    ctx.settings.update(ctx.settings.current().revision, lambda d: d["collection"].update({"mode": "lightweight"}))
     fake_traffic.calls.clear()
     fake_traffic.answer = lambda s, e, m: []
     ensure_initial_backfill(ctx, now=NOW + timedelta(minutes=10))
-    assert fake_traffic.calls == []  # no traffic query in events-only mode
+    assert fake_traffic.calls == []  # no traffic query in lightweight mode
     with ctx.flows().connect() as conn:
         progress = ingest_state.get(conn, IngestSource.BACKFILL).progress
     assert progress["initial"]["finished"] is True and progress["initial_done"] == ["events"]

@@ -110,10 +110,10 @@ class IngestSource(StrEnum):
 
 class CollectionMode(StrEnum):
     """What data collection reads (spec §6.4): everything; events plus short-lived traffic for
-    alerts; or events only."""
+    alerts; or no traffic at all (lightweight, the new-install default: flow reports query the PCE on demand)."""
     FULL = "full"
     ALERT = "alert"
-    EVENTS_ONLY = "events_only"
+    LIGHTWEIGHT = "lightweight"
 
 
 class CapabilityState(StrEnum):

@@ -48,10 +48,10 @@ def test_first_seen_persists_across_runs(tmp_path):
     assert later["setup|critical"]["new_this_week"] is False and later["setup|critical"]["weeks_persisting"] == 1
 
 
-def test_events_only_mode_lists_only_the_mode(tmp_path):
-    ctx = configured_ctx(tmp_path, mode="events_only")
+def test_lightweight_mode_lists_only_the_mode(tmp_path):
+    ctx = configured_ctx(tmp_path, mode="lightweight")
     build_focus(ctx, NOW)
-    assert [i["title_key"] for i in _result(ctx)["items"]] == ["focus_title_events_only"]
+    assert [i["title_key"] for i in _result(ctx)["items"]] == ["focus_title_lightweight"]
 
 
 def test_every_focus_key_in_both_languages():

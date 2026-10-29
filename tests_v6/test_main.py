@@ -198,3 +198,19 @@ def test_newer_flow_database_is_refused_at_startup(tmp_path):
         assert "999" in exc.message
     else:
         raise AssertionError("a flow database newer than the program was accepted")
+
+
+def test_startup_sweeps_ondemand_leftovers(tmp_path):
+    """A pull interrupted by a crash or a stop leaves its throwaway store behind (spec §6.4, 2026-10-29)."""
+    from illumio_ops.services.ondemand import ondemand_dir
+
+    rt = prepare(tmp_path / "root")
+    rt.release()
+    d = ondemand_dir(rt.paths)
+    d.mkdir(parents=True, exist_ok=True)
+    (d / "x.sqlite").write_bytes(b"x")
+    rt = prepare(tmp_path / "root")
+    try:
+        assert list(d.iterdir()) == []
+    finally:
+        rt.release()

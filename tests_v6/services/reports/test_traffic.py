@@ -119,9 +119,9 @@ def test_unmanaged_summary(ctx):
     assert "Of 3 flows, 1 came from" in text and "1 went to" in text
 
 
-def test_lookback_limited_to_flow_retention(ctx):
-    assert specs()[ReportType.TRAFFIC].max_lookback(ctx.settings.current()) == \
-        ctx.settings.current().collection.retention.flow_days - 1
+def test_lookback_reaches_the_ondemand_limit(ctx):
+    """Past the kept 35 days the period is pulled from the PCE (spec §6.4): 90 days, the request's own limit."""
+    assert specs()[ReportType.TRAFFIC].max_lookback(ctx.settings.current()) == 90
 
 
 def test_zh_tw_builds(ctx):

@@ -15190,11 +15190,11 @@
             "type": "object"
           },
           "CollectionMode": {
-            "description": "What data collection reads (spec §6.4): everything; events plus short-lived traffic for\nalerts; or events only.",
+            "description": "What data collection reads (spec §6.4): everything; events plus short-lived traffic for\nalerts; or no traffic at all (lightweight, the new-install default: flow reports query the PCE on demand).",
             "enum": [
               "full",
               "alert",
-              "events_only"
+              "lightweight"
             ],
             "title": "CollectionMode",
             "type": "string"
@@ -15620,11 +15620,11 @@
             "type": "object"
           },
           "CollectionMode": {
-            "description": "What data collection reads (spec §6.4): everything; events plus short-lived traffic for\nalerts; or events only.",
+            "description": "What data collection reads (spec §6.4): everything; events plus short-lived traffic for\nalerts; or no traffic at all (lightweight, the new-install default: flow reports query the PCE on demand).",
             "enum": [
               "full",
               "alert",
-              "events_only"
+              "lightweight"
             ],
             "title": "CollectionMode",
             "type": "string"
@@ -15775,11 +15775,11 @@
             "type": "object"
           },
           "CollectionMode": {
-            "description": "What data collection reads (spec §6.4): everything; events plus short-lived traffic for\nalerts; or events only.",
+            "description": "What data collection reads (spec §6.4): everything; events plus short-lived traffic for\nalerts; or no traffic at all (lightweight, the new-install default: flow reports query the PCE on demand).",
             "enum": [
               "full",
               "alert",
-              "events_only"
+              "lightweight"
             ],
             "title": "CollectionMode",
             "type": "string"
@@ -19431,8 +19431,8 @@
     ],
     "CollectionMode": [
       "alert",
-      "events_only",
-      "full"
+      "full",
+      "lightweight"
     ],
     "Confidence": [
       "high",

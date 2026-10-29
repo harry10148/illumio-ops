@@ -3,6 +3,7 @@ reports job runs the oldest queued row through its builder and the renderers. A 
 says why and leaves no files; nothing half-made or mixed from two PCEs is kept."""
 from __future__ import annotations
 
+import dataclasses
 import os
 import shutil
 import traceback
@@ -12,6 +13,7 @@ from urllib.parse import urlsplit
 
 from loguru import logger
 
+from illumio_ops.domain.filter import FilterSpec
 from illumio_ops.domain.report import ReportDocument
 from illumio_ops.domain.values import (
     CollectionMode,
@@ -27,13 +29,15 @@ from illumio_ops.services.collect.guard import (
     normalize_target,
     require_same_pce,
 )
-from illumio_ops.services.collect.mode import collects, in_mode
+from illumio_ops.services.collect.mode import collects
 from illumio_ops.services.context import AppContext
 from illumio_ops.services.coverage import store_coverage
+from illumio_ops.services.ondemand import OnDemandFailed, OnDemandResult, pull_period
 from illumio_ops.services.reports.deliver import deliver, gui_link
 from illumio_ops.services.reports.registry import (
     BuildInput,
     ReportParams,
+    ReportSpec,
     app_filter_ok,
     names_app,
     specs,
@@ -94,19 +98,65 @@ def traffic_covered(ctx: AppContext, start: datetime, end: datetime, *, now: dat
     table, kept flow_days, not the rollups' rollup_days."""
     settings = ctx.settings.current()
     retention = settings.collection.retention
-    floor = now - timedelta(days=retention.flow_days if flows else retention.rollup_days)
+    floor = ctx.traffic_floor(retention.flow_days if flows else retention.rollup_days, now)
     with ctx.flows().connect() as conn:
         cov = store_coverage(conn, IngestSource.TRAFFIC, (start, end), floor=floor,
-                             collected=collects(settings, IngestSource.TRAFFIC))
+                             collected=ctx.ondemand or collects(settings, IngestSource.TRAFFIC))
     return cov.covers_any and not cov.gaps
 
 
 def availability(ctx: AppContext) -> dict[ReportType, str | None]:
-    """Each built type -> None when it can be generated now, else the message key saying why not."""
+    """Each built type -> None when it can be generated now, else the message key saying why not. Every mode
+    can make every type: a flow report the install keeps no traffic for pulls it from the PCE (spec §6.4)."""
+    return {t: None for t in specs()}
+
+
+def pulls_on_demand(ctx: AppContext, spec: ReportSpec, start: datetime, now: datetime) -> bool:
+    """The report reads traffic the install does not keep: lightweight mode keeps none, the others keep
+    flow_days. A gap inside the kept range stays a disclosed gap (a pull would be slower than the gap is worth)."""
+    if not spec.needs_traffic:
+        return False
     settings = ctx.settings.current()
-    traffic = in_mode(settings, IngestSource.TRAFFIC)
-    return {t: ("rpt_unavailable_events_only" if spec.needs_traffic and not traffic else None)
-            for t, spec in specs().items()}
+    if settings.collection.mode is CollectionMode.LIGHTWEIGHT:
+        return True
+    return start < now - timedelta(days=settings.collection.retention.flow_days)
+
+
+def _ondemand_lines(res: OnDemandResult, start: datetime, lang: Language, tz: tzinfo | None) -> tuple[str, ...]:
+    def tr(key: str, **params: object) -> str:
+        return translate(lang, key, {k: str(v) for k, v in params.items()})
+
+    lines = [tr("rpt_quality_ondemand")]
+    if res.earliest is None:
+        lines.append(tr("rpt_quality_ondemand_none"))
+    elif res.earliest > start + timedelta(days=1):
+        lines.append(tr("rpt_quality_ondemand_earliest", start=fmt_time(res.earliest.isoformat(), tz)))
+    if res.truncated:  # the baseline before the period included: a connection it missed would count as new
+        lines.append(tr("rpt_quality_ondemand_truncated", n=len(res.truncated),
+                        start=fmt_time(res.truncated[0][0].isoformat(), tz),
+                        end=fmt_time(res.truncated[-1][1].isoformat(), tz)))
+    if res.unread_from is not None:
+        lines.append(tr("rpt_quality_ondemand_capped", n=f"{res.rows:,}",
+                        start=fmt_time(res.unread_from.isoformat(), tz)))
+    return tuple(lines)
+
+
+def _build(ctx: AppContext, spec: ReportSpec, inp: BuildInput) -> ReportDocument:
+    if not pulls_on_demand(ctx, spec, inp.start, inp.now):
+        return spec.build(inp)
+    settings = ctx.settings.current()
+    lead = spec.ondemand_lead(settings) if spec.ondemand_lead else timedelta(0)
+    try:
+        pushed = None if inp.params.filter is None else FilterSpec.model_validate(
+            {**inp.params.filter.model_dump(), "start": inp.start - lead, "end": inp.end})
+        with pull_period(ctx, start=inp.start - lead, end=inp.end, spec=pushed, now=inp.now) as res:
+            if spec.ondemand_prepare is not None:
+                spec.ondemand_prepare(res.ctx, inp.now)
+            doc = spec.build(dataclasses.replace(inp, ctx=res.ctx))
+    except OnDemandFailed as exc:
+        raise _Fail("rpt_err_ondemand_failed", str(exc)[:ERROR_DETAIL_MAX]) from exc
+    return doc.model_copy(update={"data_quality": (*doc.data_quality,
+                                                   *_ondemand_lines(res, inp.start, inp.lang, inp.tz))})
 
 
 # The parameter each refusal is about, for the API's field name.
@@ -183,10 +233,10 @@ def run_queued(ctx: AppContext, *, now: datetime | None = None) -> int | None:
     if row is None:
         return None
     out_dir = ctx.paths.reports_dir / str(row.id)
+    fdb = ctx.flows()
+    generation = fdb.generation  # noted before the settings it goes with: a switch in between fails the report
     settings = ctx.settings.current()
     tz = settings.display.zone()
-    fdb = ctx.flows()
-    generation = fdb.generation
     try:
         params = ReportParams.model_validate(row.params)
         # Queued for another PCE than the one configured now — or before reports recorded their PCE (''): either
@@ -199,9 +249,9 @@ def run_queued(ctx: AppContext, *, now: datetime | None = None) -> int | None:
         reason = availability(ctx).get(params.report_type)
         if reason:
             raise _Fail(reason)
-        doc = spec.build(BuildInput(ctx=ctx, params=params, start=row.period_start, end=row.period_end,
-                                    lang=params.lang or settings.display.language, tz=tz, now=at,
-                                    pce_label=row.pce_label))
+        doc = _build(ctx, spec, BuildInput(ctx=ctx, params=params, start=row.period_start, end=row.period_end,
+                                           lang=params.lang or settings.display.language, tz=tz, now=at,
+                                           pce_label=row.pce_label))
         if fdb.generation != generation:
             raise _Fail("rpt_err_pce_switched")
         doc = doc.model_copy(update={"gui_link": gui_link(settings.reports.gui_external_url, row.id)})
@@ -236,17 +286,17 @@ def coverage_note(ctx: AppContext, start: datetime, end: datetime, lang: Languag
     settings = ctx.settings.current()
     fdb = ctx.flows()
     retention = settings.collection.retention
-    floor = now - timedelta(days=retention.flow_days if flows else retention.rollup_days)
+    floor = ctx.traffic_floor(retention.flow_days if flows else retention.rollup_days, now)
     with fdb.connect() as conn:
         require_same_pce(conn, settings.pce)
         cov = store_coverage(conn, IngestSource.TRAFFIC, (start, end), floor=floor,
-                             collected=collects(settings, IngestSource.TRAFFIC))
+                             collected=ctx.ondemand or collects(settings, IngestSource.TRAFFIC))
 
     def tr(key: str, **params: object) -> str:
         return translate(lang, key, {k: str(v) for k, v in params.items()})
 
     lines = []
-    if settings.collection.mode is CollectionMode.ALERT:
+    if settings.collection.mode is CollectionMode.ALERT and not ctx.ondemand:
         lines.append(tr("rpt_quality_alert_mode", days=settings.collection.retention.flow_days))
     if not cov.gaps:
         lines.append(tr("rpt_quality_traffic_whole"))

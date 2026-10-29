@@ -37,7 +37,7 @@ from illumio_ops.domain.values import (
     ReportType,
 )
 
-SCHEMA_VERSION: Literal[7] = 7
+SCHEMA_VERSION: Literal[8] = 8
 _UTC_OFFSET = re.compile(r"UTC([+-]\d+(?:\.\d+)?)")
 
 
@@ -551,7 +551,7 @@ class ReportSettings(StrictModel):
 
 
 class Settings(StrictModel):
-    schema_version: Literal[7]
+    schema_version: Literal[8]
     revision: int = Field(ge=0)
     pce: PceSettings
     web: WebSettings
@@ -592,9 +592,10 @@ def default_reports() -> ReportSettings:
 
 
 def default_collection() -> CollectionSettings:
-    """Defaults for a fresh install and for upgrading a schema-1 file (spec §6.5 data collection)."""
+    """Defaults for a fresh install and for upgrading a schema-1 file (spec §6.5 data collection): lightweight,
+    no traffic kept (spec §6.4, 2026-10-29); the retention values apply once the operator picks alert or full."""
     return CollectionSettings(
-        enabled=True, traffic_interval_seconds=600, events_interval_seconds=300,
+        enabled=True, mode=CollectionMode.LIGHTWEIGHT, traffic_interval_seconds=600, events_interval_seconds=300,
         inventory_interval_seconds=3600, rate_limit_per_minute=400, backfill_days=30,
         disk_free_warn_gb=10,
         retention=RetentionSettings(flow_days=35, event_days=90, rollup_days=90, baseline_days=30),

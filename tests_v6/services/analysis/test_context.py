@@ -64,8 +64,8 @@ def test_admin_ports_from_builtin_pce_and_settings(tmp_path):
     assert not any(e.port in (23, 21) for e in lc.admin_ports.entries)
 
 
-def test_context_events_only_mode_not_collected(tmp_path):
-    assert load_lateral_context(configured_ctx(tmp_path, mode="events_only"), now=NOW).collected is False
+def test_context_lightweight_mode_not_collected(tmp_path):
+    assert load_lateral_context(configured_ctx(tmp_path, mode="lightweight"), now=NOW).collected is False
     assert load_lateral_context(configured_ctx(tmp_path / "b"), now=NOW).collected is True
 
 

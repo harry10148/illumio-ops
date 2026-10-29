@@ -113,7 +113,7 @@ def _classes(ctx):
 
 def test_traffic_not_collected_is_unknown_not_safe_to_block(tmp_path):
     # Final review #4: no traffic collected read as "nobody connects", so a listening RDP was "safe to block".
-    classes, res = _classes(_ctx(tmp_path, mode="events_only"))
+    classes, res = _classes(_ctx(tmp_path, mode="lightweight"))
     assert classes[(WEB, "SMB")] == "unknown" and res["safe_to_block"] == []
 
 

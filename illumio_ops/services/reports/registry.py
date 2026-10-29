@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import datetime, tzinfo
+from datetime import datetime, timedelta, tzinfo
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
@@ -66,20 +66,40 @@ class ReportSpec:
     requires_app: bool = False  # the filter must name an app label (one application's report)
     accepts_filter: bool = False  # the report reads ReportParams.filter (flow reports); others refuse one
     retention: Callable[[Settings], int] | None = None  # days its data is kept: the period may not start earlier
+    # On demand (spec §6.4): how far before the period the pull starts (a baseline the report compares with),
+    # and a step run on the pulled store before the build (an analysis the report reads instead of computing).
+    ondemand_lead: Callable[[Settings], timedelta] | None = None
+    ondemand_prepare: Callable[[AppContext, datetime], None] | None = None
 
 
 REGISTRY: dict[ReportType, ReportSpec] = {}
 
 
+# A period the install does not keep is pulled from the PCE (spec §6.4); the PCE keeps traffic only so long
+# (how long varies by PCE), and the report says where its answer starts. The lookback offered is the request's own
+# limit (90 days); the floor is two days more, so a period starting at a local midnight, across a DST change,
+# is never refused for an hour.
+ONDEMAND_LOOKBACK = 90
+
+
 def flow_retention(settings: Settings) -> int:
-    """The flow reports read the flows table, kept flow_days back from now."""
-    return settings.collection.retention.flow_days
+    """The flow reports read the flows table, kept flow_days back from now, or pull an older period on demand."""
+    return max(settings.collection.retention.flow_days, ONDEMAND_LOOKBACK + 2)
 
 
 def flow_days(settings: Settings) -> int:
     """The lookback the flow reports offer: a period starts at a calendar midnight, so it reaches back at most
-    flow_days - 1 whole days (refusal also checks the exact start against the retention floor)."""
-    return settings.collection.retention.flow_days - 1
+    flow_days - 1 whole days of the kept traffic, and at least ONDEMAND_LOOKBACK days pulled on demand."""
+    return max(settings.collection.retention.flow_days - 1, ONDEMAND_LOOKBACK)
+
+
+def baseline_lead(settings: Settings) -> timedelta:
+    return timedelta(days=settings.collection.retention.baseline_days)
+
+
+def _prepare_exposure(ctx: AppContext, now: datetime) -> None:
+    from illumio_ops.services.analysis.exposure import run_exposure
+    run_exposure(ctx, now=now)
 
 
 def _builtin() -> dict[ReportType, ReportSpec]:
@@ -95,8 +115,10 @@ def _builtin() -> dict[ReportType, ReportSpec]:
     from illumio_ops.services.reports.unmanaged import build_unmanaged
     from illumio_ops.services.reports.ven_status import build_ven_status
     return {
-        ReportType.LATERAL_POSTURE: ReportSpec(ReportType.LATERAL_POSTURE, "lateral", True, build_lateral_posture),
-        ReportType.NEW_CONNECTIONS: ReportSpec(ReportType.NEW_CONNECTIONS, "analysis", True, build_new_connections),
+        ReportType.LATERAL_POSTURE: ReportSpec(ReportType.LATERAL_POSTURE, "lateral", True, build_lateral_posture,
+                                               ondemand_lead=baseline_lead, ondemand_prepare=_prepare_exposure),
+        ReportType.NEW_CONNECTIONS: ReportSpec(ReportType.NEW_CONNECTIONS, "analysis", True, build_new_connections,
+                                               ondemand_lead=baseline_lead),
         ReportType.UNMANAGED_ENDPOINTS: ReportSpec(ReportType.UNMANAGED_ENDPOINTS, "inventory", True, build_unmanaged),
         ReportType.TRAFFIC: ReportSpec(ReportType.TRAFFIC, "analysis", True, build_traffic,
                                        max_lookback=flow_days, accepts_filter=True,

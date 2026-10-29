@@ -84,7 +84,7 @@ def test_replace_restores_pack_keeps_custom():
 
 def test_rule_list_includes_last_status(tmp_path, monkeypatch):
     from illumio_ops.services.alerts.evaluate import evaluate_traffic
-    ctx = configured_ctx(tmp_path, mode="events_only")
+    ctx = configured_ctx(tmp_path, mode="lightweight")
     evaluate_traffic(ctx, now=NOW)
     items = {i.rule.id: i for i in rule_list(ctx, now=NOW)}
     hb = items[pack_rule_id("rule_high_blocked")]

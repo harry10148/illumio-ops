@@ -147,9 +147,9 @@ def test_stale_selector_item():
     assert s.params == {"setting": "critical_assets", "key": "app", "value": "Gone"}
 
 
-def test_events_only_mode_item():
+def test_lightweight_mode_item():
     [e] = setup_items(critical_set=True, admin_set=True, stale=[], collected=False)
-    assert e.title_key == "focus_title_events_only" and e.action.target == "settings_collection"
+    assert e.title_key == "focus_title_lightweight" and e.action.target == "settings_collection"
 
 
 def test_every_focus_key_is_listed():

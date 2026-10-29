@@ -94,8 +94,8 @@ def test_late_reread_pass_marks_late(ctx):
     assert _run_row(ctx)["watermark"] is None  # a late pass never moves the live watermark
 
 
-def test_events_only_mode_collection_off(tmp_path):
-    c = configured_ctx(tmp_path, mode="events_only")
+def test_lightweight_mode_collection_off(tmp_path):
+    c = configured_ctx(tmp_path, mode="lightweight")
     r = run_detection(c, now=NOW)
     assert r.new == 0 and {s["state"] for s in r.statuses} == {"collection_off"}
     assert json.loads(_run_row(c)["status_json"])["fanout"]["state"] == "collection_off"

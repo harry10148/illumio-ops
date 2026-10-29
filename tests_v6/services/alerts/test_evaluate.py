@@ -350,8 +350,8 @@ def test_traffic_rule_incomplete_with_gap(ctx):
     assert a["rule_id"] == pack and json.loads(a["confidence_json"])["incomplete_gaps"]
 
 
-def test_events_only_mode_collection_off(tmp_path):
-    ctx = configured_ctx(tmp_path, mode="events_only")
+def test_lightweight_mode_collection_off(tmp_path):
+    ctx = configured_ctx(tmp_path, mode="lightweight")
     r = evaluate_traffic(ctx, now=NOW)
     assert r.statuses and set(r.statuses.values()) == {"collection_off"}
 

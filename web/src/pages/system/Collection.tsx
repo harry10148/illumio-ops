@@ -32,9 +32,9 @@ const CAP_KEYS: Record<string, string> = {
   draft_recompute: "cap_draft_recompute",
 };
 const MODES: { value: CollectionMode; labelKey: string; hintKey: string }[] = [
-  { value: "full", labelKey: "mode_full", hintKey: "mode_full_hint" },
+  { value: "lightweight", labelKey: "mode_lightweight", hintKey: "mode_lightweight_hint" },
   { value: "alert", labelKey: "mode_alert", hintKey: "mode_alert_hint" },
-  { value: "events_only", labelKey: "mode_events_only", hintKey: "mode_events_only_hint" },
+  { value: "full", labelKey: "mode_full", hintKey: "mode_full_hint" },
 ];
 const CAP_STATE_KEYS: Record<string, string> = {
   supported: "cap_state_supported",
@@ -208,7 +208,7 @@ export function Collection() {
   const chooseMode = (mode: CollectionMode) => {
     if (!form) return;
     const next = { ...form, mode };
-    if (mode === "alert") Object.assign(next, { flow_days: "3", rollup_days: "3" });
+    if (mode === "alert") Object.assign(next, { flow_days: "8", rollup_days: "8" });  // a weekly report reads locally
     if (mode === "full" && Number(form.flow_days) < Number(form.baseline_days)) {
       Object.assign(next, { flow_days: "35", rollup_days: String(Math.max(90, Number(form.rollup_days) || 0)) });
     }

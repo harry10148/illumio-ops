@@ -156,5 +156,8 @@ def run_traffic_query(client: PceClient, payload: Mapping[str, Any], *, deadline
         rows=rows,
         matches_count=matches if isinstance(matches, int) else None,
         flows_count=flows if isinstance(flows, int) else None,
-        capped=len(rows) >= int(payload["max_results"]),
+        # The PCE stops matching at its limit (lab: matches_count 220,000 = 1.1 x a 200,000 cap) and then
+        # aggregates, so a truncated answer can hold fewer rows than the cap; the match count says so.
+        capped=len(rows) >= int(payload["max_results"])
+        or (isinstance(matches, int) and matches >= int(payload["max_results"])),
     )

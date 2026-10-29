@@ -313,13 +313,13 @@ def query_flows(ctx: AppContext, spec: FilterSpec, *, limit: int, order: Order,
     fdb = ctx.flows()
     gen = fdb.generation  # noted before the settings it goes with (FlowDb.generation)
     settings = ctx.settings.current()
-    floor = at - timedelta(days=settings.collection.retention.flow_days)
+    floor = ctx.traffic_floor(settings.collection.retention.flow_days, at)
     with fdb.connect() as conn:
         require_same_pce(conn, settings.pce)
         for name, fn in sql_functions().items():
             conn.create_function(name, -1, fn, deterministic=True)
         cov = store_coverage(conn, IngestSource.TRAFFIC, (spec.start, spec.end), floor=floor,
-                             collected=collects(settings, IngestSource.TRAFFIC))
+                             collected=ctx.ondemand or collects(settings, IngestSource.TRAFFIC))
         where, params = to_sql(spec)
         db_rows = conn.execute(f"SELECT {_COLUMNS} FROM flows f WHERE {where} ORDER BY {_ORDER_SQL[order]} LIMIT ?",
                                [*params, limit + 1]).fetchall()
@@ -402,13 +402,13 @@ def aggregate_flows(ctx: AppContext, seg: FlowSegment, *, now: datetime | None =
     coverage is a second scan of the same rows; a caller that does not show it skips it."""
     at = (now or datetime.now(UTC)).astimezone(UTC)
     fdb, gen, settings = _store_read(ctx)
-    floor = at - timedelta(days=settings.collection.retention.flow_days)
+    floor = ctx.traffic_floor(settings.collection.retention.flow_days, at)
     with fdb.connect() as conn:
         require_same_pce(conn, settings.pce)
         for name, fn in sql_functions().items():
             conn.create_function(name, -1, fn, deterministic=True)
         cov = store_coverage(conn, IngestSource.TRAFFIC, (seg.filter.start, seg.filter.end), floor=floor,
-                             collected=collects(settings, IngestSource.TRAFFIC))
+                             collected=ctx.ondemand or collects(settings, IngestSource.TRAFFIC))
         wide = wide_window(conn, seg.filter)
         sql, params = compile_flow_ranking(seg, wide=wide)
         found = conn.execute(sql, params).fetchall()
@@ -653,7 +653,7 @@ def baseline_edges(ctx: AppContext, ports: AdminPortSet, *, since: datetime,
     baseline period in every collection mode). Reads by port through ix_baseline_port_src; the protocol and
     the time are checked here."""
     fdb, gen, settings = _store_read(ctx)
-    collected = collects(settings, IngestSource.TRAFFIC)
+    collected = ctx.ondemand or collects(settings, IngestSource.TRAFFIC)
     numbers = sorted({e.port for e in ports.entries if classes is None or e.category in classes})
     if not collected or not numbers:
         return BaselineEdges(edges=[], baseline_from=None, collected=collected)
@@ -690,13 +690,13 @@ def observations(ctx: AppContext, spec: FilterSpec, *, now: datetime | None = No
     caller bounds the time window and the ports."""
     at = (now or datetime.now(UTC)).astimezone(UTC)
     fdb, gen, settings = _store_read(ctx)
-    floor = at - timedelta(days=settings.collection.retention.flow_days)
+    floor = ctx.traffic_floor(settings.collection.retention.flow_days, at)
     with fdb.connect() as conn:
         require_same_pce(conn, settings.pce)
         for name, fn in sql_functions().items():
             conn.create_function(name, -1, fn, deterministic=True)
         cov = store_coverage(conn, IngestSource.TRAFFIC, (spec.start, spec.end), floor=floor,
-                             collected=collects(settings, IngestSource.TRAFFIC))
+                             collected=ctx.ondemand or collects(settings, IngestSource.TRAFFIC))
         where, params = to_sql(spec, wide=wide_window(conn, spec))
         found = conn.execute(f"SELECT {_OBS_COLUMNS} FROM flows f WHERE {where}", params).fetchall()
         labels = _labels(conn, {r[k] for r in found for k in ("src_label_set", "dst_label_set") if r[k]})
@@ -755,7 +755,7 @@ def service_traffic(ctx: AppContext, targets: Collection[tuple[str, int, int]], 
     wanted = set(targets)
     numbers = sorted({port for _, port, _ in wanted})
     unknown = {t: TrafficSummary(sources=None, last_seen=None, decisions=frozenset()) for t in wanted}
-    if not numbers or not collects(settings, IngestSource.TRAFFIC):
+    if not numbers or not (ctx.ondemand or collects(settings, IngestSource.TRAFFIC)):
         return unknown
     out = {t: TrafficSummary(sources=0, last_seen=None, decisions=frozenset()) for t in wanted}
     stamp = db_time(since)
@@ -825,14 +825,14 @@ def increment_totals(ctx: AppContext, cond: FlowCondition, *, start: datetime, e
                      rank_by: Literal["connections", "mbps"], now: datetime | None = None) -> IncrementTotals:
     at = (now or datetime.now(UTC)).astimezone(UTC)
     fdb, gen, settings = _store_read(ctx)
-    floor = at - timedelta(days=settings.collection.retention.flow_days)
+    floor = ctx.traffic_floor(settings.collection.retention.flow_days, at)
     where, params = to_sql(cond.within(start - _FLOW_SLACK_BEFORE, end + _FLOW_SLACK_AFTER))
     with fdb.connect() as conn:
         require_same_pce(conn, settings.pce)
         for name, fn in sql_functions().items():
             conn.create_function(name, -1, fn, deterministic=True)
         cov = store_coverage(conn, IngestSource.TRAFFIC, (start, end), floor=floor,
-                             collected=collects(settings, IngestSource.TRAFFIC))
+                             collected=ctx.ondemand or collects(settings, IngestSource.TRAFFIC))
         rows = conn.execute(
             "SELECT i.connections, i.bytes, i.seconds, i.observed_at, f.src_key, f.dst_key, f.src_hostname, "
             "f.dst_hostname, f.port, f.proto FROM flow_increments i "

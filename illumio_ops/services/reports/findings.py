@@ -264,6 +264,8 @@ def _l005(r: _Run) -> RuleOutcome | None:
 
 
 def _l006(r: _Run) -> RuleOutcome | None:
+    if r.exposure is None:  # lightweight mode, or before the first hourly run: unknown, not "no host"
+        return RuleOutcome("L006", None, "", "", {}, error=tr(r.lang, "rpt_rule_l006_no_exposure"))
     hosts = [h for h in (r.exposure or {}).get("hosts") or () if int(h.get("reach_now") or 0) >= r.t.blast_radius]
     if not hosts:
         return None

@@ -206,8 +206,8 @@ def test_waits_for_an_unfinished_initial_backfill(tmp_path, fake_traffic, fake_e
     assert ensure_daily_reread(ctx, now=RUN) is None and fake_traffic.calls == []
 
 
-def test_events_only_mode_rereads_events_and_adds_only_new_ones(tmp_path, fake_traffic, fake_events):
-    ctx = _ctx(tmp_path, mode="events_only")
+def test_lightweight_mode_rereads_events_and_adds_only_new_ones(tmp_path, fake_traffic, fake_events):
+    ctx = _ctx(tmp_path, mode="lightweight")
     _cover(ctx, "traffic", DAY - timedelta(days=1), RUN)
     _cover(ctx, "events", DAY - timedelta(days=1), RUN)
     fake_events.items = [_event(1, DAY + HOUR)]
@@ -262,7 +262,7 @@ def test_progress_moves_only_with_what_was_stored(tmp_path, fake_traffic, fake_e
 
 
 def test_a_source_added_since_the_last_attempt_is_read_from_the_start(tmp_path, fake_traffic, fake_events):
-    ctx = _ctx(tmp_path, mode="events_only")
+    ctx = _ctx(tmp_path, mode="lightweight")
     _cover(ctx, "traffic", DAY - timedelta(days=1), RUN)
     _cover(ctx, "events", DAY - timedelta(days=1), RUN)
 

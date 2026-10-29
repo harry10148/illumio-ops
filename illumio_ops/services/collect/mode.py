@@ -1,5 +1,5 @@
 """Which sources each collection mode reads (spec §6.4): full reads everything, alert keeps
-traffic briefly and never backfills it, events_only reads no traffic at all."""
+traffic briefly and never backfills it, lightweight reads no traffic at all."""
 from __future__ import annotations
 
 from illumio_ops.domain.values import CollectionMode, IngestSource
@@ -9,7 +9,7 @@ _ALWAYS = frozenset({IngestSource.EVENTS, IngestSource.INVENTORY, IngestSource.R
 MODE_SOURCES: dict[CollectionMode, frozenset[IngestSource]] = {
     CollectionMode.FULL: _ALWAYS | {IngestSource.TRAFFIC},
     CollectionMode.ALERT: _ALWAYS | {IngestSource.TRAFFIC},
-    CollectionMode.EVENTS_ONLY: _ALWAYS,
+    CollectionMode.LIGHTWEIGHT: _ALWAYS,
 }
 
 

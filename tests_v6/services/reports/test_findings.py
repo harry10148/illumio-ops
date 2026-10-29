@@ -176,6 +176,9 @@ def test_l010_cross_env_management(ctx):
 
 def test_nothing_fires_on_quiet_traffic(ctx):
     _write(ctx, [flow(port=443)])
+    with ctx.flows().connect() as conn:  # an exposure graph with no far-reaching host (without one L006 is unknown)
+        analysis.write_result(conn, "exposure", params={}, at=NOW, result={"hosts": []})
+        conn.commit()
     assert run(ctx) == {}
 
 
@@ -230,3 +233,11 @@ def test_l006_scoped_to_the_filtered_flows(ctx):
     whole = {o.rule_id: o for o in findings.run_rules(ctx, SPEC, t, Language.EN, now=NOW)}
     scoped = {o.rule_id: o for o in findings.run_rules(ctx, SPEC, t, Language.EN, now=NOW, scoped=True)}
     assert whole["L006"].params["n_hosts"] == 2 and scoped["L006"].params["n_hosts"] == 1
+
+
+def test_l006_not_evaluated_without_exposure(ctx):
+    """Review #7: with no exposure graph (lightweight mode, or before the first hourly run) L006 vanished as if
+    no host reached too far; it says it was not evaluated."""
+    _write(ctx, [flow(port=22)])
+    o = run(ctx)["L006"]
+    assert o.severity is None and o.error

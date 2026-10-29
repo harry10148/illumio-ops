@@ -236,3 +236,11 @@ def delete_expired(conn: sqlite3.Connection, *, detections_before: datetime, foc
                           (db_time(focus_before),)).rowcount
         n += conn.execute("DELETE FROM lateral_snapshot_daily WHERE day < ?", (snapshot_day_before,)).rowcount
     return n
+
+
+def copy_from(conn: sqlite3.Connection, schema: str) -> None:
+    """Copy detections and the analysis results from an attached store (an on-demand store starts from the
+    install's; the posture report computes its exposure again from the pull). The daily posture snapshots stay
+    behind: an old day's numbers would outrank what the pull shows (review #4)."""
+    conn.execute(f"INSERT INTO detections SELECT * FROM {schema}.detections")
+    conn.execute(f"INSERT INTO analysis_results SELECT * FROM {schema}.analysis_results")

@@ -13,6 +13,7 @@ from loguru import logger
 
 from illumio_ops.paths import InstallPaths, resolve_paths
 from illumio_ops.services.context import AppContext
+from illumio_ops.services.ondemand import sweep_leftovers
 from illumio_ops.settings.schema import Settings
 from illumio_ops.settings.secrets import (
     DEFAULT_ADMIN_PASSWORD,
@@ -112,6 +113,8 @@ def prepare(root: Path | None) -> Runtime:
     paths.ensure_dirs()
     lock_fd = acquire_service_lock(paths)
     try:
+        if swept := sweep_leftovers(paths):  # an on-demand pull cut off by a crash or a stop
+            logger.info("removed {} leftover on-demand file(s)", swept)
         store = SettingsStore(paths.settings_file)
         try:
             s = load_settings(store)
