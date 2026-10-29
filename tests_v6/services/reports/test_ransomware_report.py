@@ -232,3 +232,12 @@ def test_unenforced_host_says_the_vendor_counts_nothing(ctx):
                                     services=[svc("RDP", 3389, state="protected_closed")])]})
     text = _tables(_build(ctx), "hosts")[0].rows[0][-1]
     assert "Visibility Only" in text and "Selective or Full" in text
+
+
+def test_full_host_gap_not_explained_as_selective(ctx):
+    """Review #7: only a Selective host's gap is the Deny Rule coverage; a Full host's is a disagreement."""
+    _result(ctx, {"unsupported": False, "contradictions": 1, "priority": [], "safe_to_block": [], "suspicious": [],
+                  "hosts": [hostrow("f", pce=0.0, computed=100.0, contradiction=True, mode="full",
+                                    services=[svc("RDP", 3389, state="protected_closed")])]})
+    text = _tables(_build(ctx), "hosts")[0].rows[0][-1]
+    assert "move it to Full" not in text and "PCE console" in text

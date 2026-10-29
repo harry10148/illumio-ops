@@ -1729,5 +1729,10 @@
   "rpt_pu_finding_pending_why": "This report counts the Draft policy, which differs from the policy in force.",
   "rpt_pu_finding_pending_action": "Provision or discard the pending changes, or read this report as describing the Draft.",
   "rpt_pu_quality_source": "Counted by the PCE: the period's traffic recomputed against the Draft policy, a day at a time; a connection both ends reported counts once.",
-  "rpt_pu_quality_truncated": "{n} window(s) reached the PCE's per-query limit and were cut short: counts are of the traffic read."
+  "rpt_pu_quality_truncated": "{n} window(s) reached the PCE's per-query limit and were cut short: counts are of the traffic read.",
+  "rpt_rw_explain_mismatch": "The PCE scores it {pce}, but as a {mode} host it should count every high-risk service as protected (about {computed}): the PCE's numbers disagree; check the host on the PCE console.",
+  "rpt_rw_explain_mode_unknown": "The PCE scores it {pce}; the host's enforcement mode is not known here, so its services cannot be judged. It shows once the next inventory collection reads it.",
+  "rpt_pu_kpi_read_only": "In the traffic read: some windows were cut short.",
+  "rpt_pu_finding_unused_read": "{n} rule(s) were not used in the traffic read",
+  "rpt_pu_quality_undetermined": "{n} connection(s) got no Draft decision from the PCE: they count neither for a rule nor as “no rule allows”."
 }

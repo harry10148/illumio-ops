@@ -1729,5 +1729,10 @@
   "rpt_pu_finding_pending_why": "這份報表依 Draft 政策計算，與目前生效的政策不同。",
   "rpt_pu_finding_pending_action": "Provision 或捨棄這些待處理的變更；在那之前，請把這份報表當成描述 Draft 的結果。",
   "rpt_pu_quality_source": "由 PCE 比對：期間內的流量依 Draft 政策逐日重算；兩端都回報的同一條連線只算一次。",
-  "rpt_pu_quality_truncated": "有 {n} 個時段達到 PCE 單次查詢上限而被截短：數字以讀到的流量為準。"
+  "rpt_pu_quality_truncated": "有 {n} 個時段達到 PCE 單次查詢上限而被截短：數字以讀到的流量為準。",
+  "rpt_rw_explain_mismatch": "PCE 給 {pce}，但 {mode} 的主機應把所有高風險服務都算為已防護（約 {computed}）：PCE 的數字對不起來，請到 PCE 主控台確認這台主機。",
+  "rpt_rw_explain_mode_unknown": "PCE 給 {pce}；目前不知道這台主機的強制模式，所以無法判斷它的服務。下一次清冊收集讀到模式後就會顯示。",
+  "rpt_pu_kpi_read_only": "以讀到的流量為準：有時段被截短。",
+  "rpt_pu_finding_unused_read": "{n} 條規則在讀到的流量中沒有命中",
+  "rpt_pu_quality_undetermined": "有 {n} 條連線 PCE 沒有給出 Draft 判定：不算在任何規則，也不算在「沒有規則允許」中。"
 }

@@ -58,6 +58,12 @@ NAMES_SHOWN = 5  # service names in a host's explanation; the rest are counted
 _EXPOSURE_KEYS = {"fully_protected": "rpt_rw_exposure_fully_protected"}
 
 
+def _open(s: Mapping[str, Any]) -> bool:
+    """Unprotected as the vendor counts it for the host's mode (the analysis's effective coverage)."""
+    cov = s.get("coverage")
+    return cov == 0.0 if isinstance(cov, (int, float)) else s.get("protection_state") == "unprotected"
+
+
 def _state_key(state: object) -> str:
     s = str(state or "")
     return ("rpt_rw_state_protected" if s.startswith("protected") else "rpt_rw_state_unprotected"
@@ -133,13 +139,16 @@ def build_ransomware(inp: BuildInput) -> ReportDocument:
 
     def explain(h: Mapping[str, Any]) -> str:
         """What the host's numbers mean, in words."""
-        open_ = [s for s in h.get("services") or () if s.get("protection_state") == "unprotected"]
+        open_ = [s for s in h.get("services") or () if _open(s)]
         mode = str(h.get("enforcement_mode") or "")
         if mode in UNENFORCED_MODES:  # the vendor counts only Selective or Full hosts (user 2026-10-29)
             return t("rpt_rw_explain_unenforced", pce=pct(h.get("pce_percent")), mode=MODE_NAMES.get(mode, mode))
-        if h.get("contradiction"):
-            return t("rpt_rw_explain_contradiction", pce=pct(h.get("pce_percent")),
-                     computed=pct(h.get("computed_percent")), mode=MODE_NAMES.get(mode, mode or "—"))
+        if mode not in MODE_NAMES:  # review #6: no mode to judge by
+            return t("rpt_rw_explain_mode_unknown", pce=pct(h.get("pce_percent")))
+        if h.get("contradiction"):  # review #7: only Selective's gap is the Deny Rule coverage
+            key = "rpt_rw_explain_contradiction" if mode == "selective" else "rpt_rw_explain_mismatch"
+            return t(key, pce=pct(h.get("pce_percent")), computed=pct(h.get("computed_percent")),
+                     mode=MODE_NAMES[mode])
         if not open_:
             return t("rpt_rw_explain_protected")
         names = list(dict.fromkeys(str(s.get("name")) for s in open_))  # a service on TCP and UDP is named once
@@ -167,7 +176,7 @@ def build_ransomware(inp: BuildInput) -> ReportDocument:
                  Column(key="explain", label=t("rpt_rdy_col_explain"))),
         rows=tuple((name(h), pct(h.get("pce_percent")), pct(h.get("computed_percent")),
                     exposure(h.get("pce_exposure")),
-                    sum(1 for s in h.get("services") or () if s.get("protection_state") == "unprotected"),
+                    sum(1 for s in h.get("services") or () if _open(s)),
                     t("rpt_rw_contradiction_yes") if h.get("contradiction") else "", explain(h)) for h in ranked),
         total_rows=len(ranked), empty_text=t("rpt_rw_none_hosts") if ok else missing)
     services = [(h, s) for h in ranked for s in h.get("services") or ()]
@@ -242,7 +251,7 @@ def build_ransomware(inp: BuildInput) -> ReportDocument:
         findings.append(Finding(severity=Severity.HIGH, title=t("rpt_rw_finding_priority", n=len(lists["priority"])),
                                 why=t("rpt_rw_finding_priority_why"), action=t("rpt_rw_finding_priority_action")))
     unsorted = sum(1 for h in hosts for s in h.get("services") or ()
-                   if s.get("protection_state") == "unprotected" and s.get("traffic") == "unknown")
+                   if _open(s) and s.get("traffic") == "unknown")
     if ok and unsorted:  # lightweight mode keeps no traffic: the lists stay empty, the services do not go away
         findings.append(Finding(severity=Severity.MEDIUM, title=t("rpt_rw_finding_unsorted", n=unsorted),
                                 why=t("rpt_rw_finding_unsorted_why"), action=t("rpt_rw_finding_unsorted_action")))

@@ -70,11 +70,12 @@ def build_policy_usage(inp: BuildInput) -> ReportDocument:
     hits = usage.hits if usage and not usage.unsupported else {}
     allow = sorted((r for r in rules.values() if r.rule_type is RuleAction.ALLOW), key=lambda r: (r.ruleset_name, r.href))
     deny = [r for r in rules.values() if r.rule_type is not RuleAction.ALLOW]
+    ok = usage is not None and not usage.unsupported
     used = sorted((r for r in allow if r.href in hits), key=lambda r: -hits[r.href].connections)
-    unused = [r for r in allow if r.enabled and r.href not in hits]
+    # Without a recompute nothing is known to be unused (review #4).
+    unused = [r for r in allow if r.enabled and r.href not in hits] if ok else []
     disabled = [r for r in allow if not r.enabled]
     deny_hit = sorted((r for r in deny if r.href in hits), key=lambda r: -hits[r.href].connections)
-    ok = usage is not None and not usage.unsupported
     missing = (t("rpt_pu_failed", error=failure or "") if usage is None else t("rpt_pu_unsupported"))
 
     values: dict[str, int | None] = {
@@ -82,9 +83,15 @@ def build_policy_usage(inp: BuildInput) -> ReportDocument:
         "unused": len(unused) if ok else None, "disabled": len(disabled) if usage else None,
         "deny_hit": len(deny_hit) if ok else None,
         "no_rule": usage.no_rule_connections if ok and usage else None}
+    read_only = t("rpt_pu_kpi_read_only") if usage and usage.truncated else None  # review #8
+
+    def note(k: str) -> str | None:
+        if values[k] is None:
+            return missing
+        return read_only if k in ("used", "unused", "deny_hit", "no_rule") else None
     kpis = tuple(Kpi(key=k, label=t(label), value=values[k], previous=None, unit="count",
                      better="neutral" if k in ("rules", "disabled") else "higher" if k == "used" else "lower",
-                     note=None if values[k] is not None else missing) for k, label in _KPI_KEYS.items())
+                     note=note(k)) for k, label in _KPI_KEYS.items())
 
     # ── pending changes: is the draft the active policy? ─────────────────────
     pending_blocks: tuple[TextBlock | TableBlock, ...]
@@ -141,7 +148,9 @@ def build_policy_usage(inp: BuildInput) -> ReportDocument:
 
     findings: list[Finding] = []
     if ok and unused:
-        findings.append(Finding(severity=Severity.LOW, title=t("rpt_pu_finding_unused", n=len(unused)),
+        findings.append(Finding(severity=Severity.LOW,
+                                title=t("rpt_pu_finding_unused_read" if read_only else "rpt_pu_finding_unused",
+                                        n=len(unused)),
                                 why=t("rpt_pu_finding_unused_why"), action=t("rpt_pu_finding_unused_action")))
     if usage and usage.pending:
         findings.append(Finding(severity=Severity.LOW, title=t("rpt_pu_finding_pending", n=len(usage.pending)),
@@ -150,6 +159,8 @@ def build_policy_usage(inp: BuildInput) -> ReportDocument:
     quality = [t("rpt_pu_quality_source")]
     if usage and usage.truncated:
         quality.append(t("rpt_pu_quality_truncated", n=len(usage.truncated)))
+    if usage and usage.undetermined_connections:
+        quality.append(t("rpt_pu_quality_undetermined", n=f"{usage.undetermined_connections:,}"))
     if usage:
         quality.append(t("rpt_quality_analysis_at", at=fmt_time(usage.computed_at.isoformat(), inp.tz)))
     return ReportDocument(

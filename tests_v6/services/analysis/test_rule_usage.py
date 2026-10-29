@@ -139,3 +139,42 @@ def test_no_rule_total_counts_every_group(ctx, pce, monkeypatch):
                 row(6, 25, decision="potentially_blocked", conns=2, port=22)]
     u = rule_usage.rule_usage(ctx, start=START, end=END, now=NOW)
     assert len(u.no_rule) == 1 and u.no_rule_connections == 7
+
+
+# ── final review (Codex, 2026-10-30) ─────────────────────────────────────────
+
+def test_record_in_two_windows_counted_once(ctx, pce, monkeypatch):
+    """Review #1: a daily-bucket record overlaps both halves of a split day; it belongs to the window holding its
+    first sighting and is counted there only."""
+    monkeypatch.setattr(rule_usage, "PER_QUERY", 2)
+    r = row(1, 25, allow=[ALLOW], conns=6)
+    r["timestamp_range"] = {"first_detected": "2026-10-25T01:00:00Z", "last_detected": "2026-10-25T23:00:00Z"}
+
+    def answer_overlap(client, payload, **kw):
+        pce.payloads.append(payload)
+        a, b = datetime.fromisoformat(payload["start_date"]), datetime.fromisoformat(payload["end_date"])
+        rows = [dict(r)] if a < datetime(2026, 10, 25, 23, tzinfo=UTC) and b > datetime(2026, 10, 25, 1, tzinfo=UTC) \
+            else []
+        rows += [row(50 + i, 25) for i in range(2)] if (b - a).days >= 1 else []  # the whole day caps: split
+        return AsyncQueryResult(rows=rows, matches_count=len(rows), flows_count=len(rows), capped=len(rows) >= 2)
+    monkeypatch.setattr(rule_usage, "run_traffic_query", answer_overlap)
+    u = rule_usage.rule_usage(ctx, start=START, end=START + timedelta(days=1), now=NOW)
+    assert (u.hits[ALLOW].flows, u.hits[ALLOW].connections) == (1, 6)
+
+
+def test_rules_counted_by_decision(ctx, pce):
+    """Review #2: allowed across a boundary is not the Deny Rule blocking it; blocked by an override deny is not the
+    allow rule allowing it."""
+    pce.rows = [row(1, 25, decision="allowed_across_boundary", allow=[ALLOW], deny=[DENY], conns=3),
+                row(2, 25, decision="blocked_by_override_deny", allow=[IDLE], conns=2)]
+    pce.rows[1]["override_deny_rules"] = [{"href": DENY}]
+    u = rule_usage.rule_usage(ctx, start=START, end=END, now=NOW)
+    assert u.hits[ALLOW].connections == 3 and IDLE not in u.hits
+    assert u.hits[DENY].connections == 2  # the override deny that did block
+
+
+def test_undetermined_not_no_rule(ctx, pce):
+    """Review #3: no draft decision says nothing about rules; counted apart and said."""
+    pce.rows = [row(1, 25, decision="unknown", conns=6)]
+    u = rule_usage.rule_usage(ctx, start=START, end=END, now=NOW)
+    assert u.no_rule_connections == 0 and u.undetermined_connections == 6

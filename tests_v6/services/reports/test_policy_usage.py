@@ -27,7 +27,7 @@ def usage(**kw):
     base = {"rules": index_rules(SETS), "hits": {ALLOW: RuleHits(flows=2, connections=7, top_pairs=[("Web", "DB", 7)]),
                                                  DENY: RuleHits(flows=1, connections=2, top_pairs=[])},
             "no_rule": [NoRuleGroup(src_app="Batch", dst_app="DB", port=1433, proto=6, connections=5)],
-            "no_rule_total": 1, "no_rule_connections": 9, "windows": 7, "truncated": [], "unsupported": False, "pending": [], "computed_at": NOW}
+            "no_rule_total": 1, "no_rule_connections": 9, "undetermined_connections": 0, "windows": 7, "truncated": [], "unsupported": False, "pending": [], "computed_at": NOW}
     return RuleUsage(**{**base, **kw})
 
 
@@ -113,3 +113,24 @@ def test_failure_report_still_built(ctx, monkeypatch):
 
 def test_zh_tw_builds(ctx):
     assert _build(ctx, lang=Language.ZH_TW).title
+
+
+def test_unsupported_lists_no_rule_as_unused(ctx, monkeypatch):
+    """Review #4: without a recompute nothing is known to be unused."""
+    monkeypatch.setattr(policy_usage, "rule_usage", lambda ctx, **kw: usage(unsupported=True, hits={}, no_rule=[]))
+    doc = _build(ctx)
+    assert _table(doc, "unused").rows == () and "does not recompute" in _table(doc, "unused").empty_text
+    assert not any("not used" in f.title for f in doc.findings)
+
+
+def test_truncated_unused_hedged_everywhere(ctx, monkeypatch):
+    """Review #8: the KPI and the finding say "in the traffic read" too."""
+    monkeypatch.setattr(policy_usage, "rule_usage", lambda ctx, **kw: usage(truncated=[(START, END)]))
+    doc = _build(ctx)
+    assert {k.key: k for k in doc.kpis}["unused"].note
+    assert any("read" in f.title for f in doc.findings)
+
+
+def test_undetermined_disclosed(ctx, monkeypatch):
+    monkeypatch.setattr(policy_usage, "rule_usage", lambda ctx, **kw: usage(undetermined_connections=4))
+    assert any("4" in q and "decision" in q for q in _build(ctx).data_quality)

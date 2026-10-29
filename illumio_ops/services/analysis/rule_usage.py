@@ -67,6 +67,7 @@ class RuleUsage(BaseModel):
     no_rule: list[NoRuleGroup]
     no_rule_total: int  # groups, before the top NO_RULE_TOP
     no_rule_connections: int  # every group's connections, not only the top NO_RULE_TOP
+    undetermined_connections: int  # the PCE gave no draft decision: neither a rule's nor "no rule"
     windows: int
     truncated: list[tuple[datetime, datetime]]
     unsupported: bool
@@ -80,41 +81,61 @@ class _Counts:
         self.connections: Counter[str] = Counter()
         self.pairs: Counter[tuple[str, str | None, str | None]] = Counter()
         self.no_rule: Counter[tuple[str | None, str | None, int | None, int]] = Counter()
+        self.undetermined = 0
         self.windows = 0
         self.truncated: list[tuple[datetime, datetime]] = []
 
 
-def _count(raws: list[dict[str, Any]], c: _Counts) -> None:
+# Which rules a decision says took effect (review #2): an allow rule only when the connection is allowed, a Deny
+# Rule only when it blocks (or would, once enforced) — allowed across a boundary is not the boundary blocking it.
+_ALLOWED = frozenset({"allowed", "allowed_across_boundary"})
+_BY_DENY = frozenset({"blocked_by_boundary", "potentially_blocked_by_boundary"})
+_BY_OVERRIDE = frozenset({"blocked_by_override_deny", "potentially_blocked_by_override_deny"})
+_NO_RULE = frozenset({"potentially_blocked", "blocked"})  # default deny: nothing allows it, nothing denies it
+
+
+def _count(raws: list[dict[str, Any]], c: _Counts, own_from: datetime | None) -> None:
+    """own_from: a connection belongs to the window holding its first sighting (review #1: a day-long PCE record
+    comes back from both halves of a split day, and a record overlapping midnight from both days)."""
     records, views = draft_records(raws)
     for primary, partner in group_pairs(records):
+        first = min(primary.first_detected, partner.first_detected) if partner is not None else primary.first_detected
+        if own_from is not None and first < own_from:
+            continue
         flow = pair_row(primary, partner)
         ends = [views[record_key(primary)]] + ([views[record_key(partner)]] if partner is not None else [])
-        allows = dict.fromkeys(h for v in ends for h in v.allow_rule_hrefs)
-        denies = dict.fromkeys(h for v in ends for h in (*v.deny_rule_hrefs, *v.override_deny_hrefs))
+        allows = dict.fromkeys(h for v in ends if v.draft_decision in _ALLOWED for h in v.allow_rule_hrefs)
+        denies = dict.fromkeys(
+            h for v in ends for h in (v.deny_rule_hrefs if v.draft_decision in _BY_DENY else
+                                      v.override_deny_hrefs if v.draft_decision in _BY_OVERRIDE else ()))
         n = flow.num_connections
         sa, da = flow.src_labels.get(APP) or None, flow.dst_labels.get(APP) or None
         for h in (*allows, *denies):
             c.flows[h] += 1
             c.connections[h] += n
             c.pairs[(h, sa, da)] += n
-        decided_allowed = any(v.draft_decision == "allowed" for v in ends)
-        if not allows and not denies and not decided_allowed:
+        decisions = {v.draft_decision for v in ends}
+        if allows or denies:
+            continue
+        if decisions <= _NO_RULE:
             c.no_rule[(sa, da, flow.port, flow.proto)] += n
+        elif not decisions & (_ALLOWED | _BY_DENY | _BY_OVERRIDE | _NO_RULE):  # review #3: unknown says nothing
+            c.undetermined += n
 
 
-def _walk(client: PceClient, a: datetime, b: datetime, depth: int, c: _Counts) -> None:
+def _walk(client: PceClient, a: datetime, b: datetime, depth: int, c: _Counts, own_from: datetime | None) -> None:
     result = run_traffic_query(client, traffic_payload(a, b, max_results=PER_QUERY, query_name="illumio-ops rule usage"),
                                deadline=time.monotonic() + QUERY_DEADLINE_SECONDS, compute_draft=True)
     c.windows += 1
     if result.capped and depth < MAX_SPLITS:
         del result  # not held while the halves are read
         mid = a + (b - a) / 2
-        _walk(client, a, mid, depth + 1, c)
-        _walk(client, mid, b, depth + 1, c)
+        _walk(client, a, mid, depth + 1, c, own_from)
+        _walk(client, mid, b, depth + 1, c, mid)
         return
     if result.capped:
         c.truncated.append((a, b))
-    _count(result.rows, c)
+    _count(result.rows, c, own_from)
 
 
 def rule_usage(ctx: AppContext, *, start: datetime, end: datetime, now: datetime | None = None) -> RuleUsage:
@@ -132,7 +153,7 @@ def rule_usage(ctx: AppContext, *, start: datetime, end: datetime, now: datetime
         try:
             while cur < end:
                 nxt = min(cur + WINDOW, end)
-                _walk(client, cur, nxt, 0, c)
+                _walk(client, cur, nxt, 0, c, None if cur == start else cur)
                 cur = nxt
         except PceQueryError as exc:
             if exc.stage == "update_rules" and exc.status == 404:
@@ -141,6 +162,7 @@ def rule_usage(ctx: AppContext, *, start: datetime, end: datetime, now: datetime
                     capabilities.record(conn, "draft_recompute", CapabilityState.UNSUPPORTED,
                                         "update_rules answered 404", at)
                 return RuleUsage(rules=rules, hits={}, no_rule=[], no_rule_total=0, no_rule_connections=0,
+                                 undetermined_connections=0,
                                  windows=c.windows, truncated=[],
                                  unsupported=True, pending=pending, computed_at=at)
             raise
@@ -152,5 +174,6 @@ def rule_usage(ctx: AppContext, *, start: datetime, end: datetime, now: datetime
     return RuleUsage(rules=rules, hits=hits,
                      no_rule=[NoRuleGroup(src_app=k[0], dst_app=k[1], port=k[2], proto=k[3], connections=n)
                               for k, n in groups[:NO_RULE_TOP]],
-                     no_rule_total=len(groups), no_rule_connections=sum(c.no_rule.values()), windows=c.windows, truncated=c.truncated, unsupported=False,
+                     no_rule_total=len(groups), no_rule_connections=sum(c.no_rule.values()),
+                     undetermined_connections=c.undetermined, windows=c.windows, truncated=c.truncated, unsupported=False,
                      pending=pending, computed_at=at)
