@@ -126,9 +126,47 @@ function autoFitColumns(table) {
     headers.forEach((th, i) => { th.style.width = ''; if (cols[i]) cols[i].style.width = ''; });
   }
 
-  const { widths, category } = measureColumnWidths(table);
+  const measured = measureColumnWidths(table);
+  const category = measured.category;
+  /* A text column's one-line width can be thousands of pixels (an explanation, a list of connections): it is
+     capped, so its text wraps, never wider than TEXT_MAX unless its header is (2026-10-29, readiness on lab:
+     the last column of "what to do first" sat past the right edge). */
+  const TEXT_MAX = 420;
+  const TEXT_MIN = 160;
+  const widths = measured.widths.map((w, i) =>
+    category[i] === 'text' ? Math.min(w, Math.max(TEXT_MAX, measured.headerWidths[i])) : w);
   const containerWidth = wrap ? wrap.clientWidth : table.parentElement.clientWidth;
-  const naturalTotal = widths.reduce((a, b) => a + b, 0);
+  let naturalTotal = widths.reduce((a, b) => a + b, 0);
+  /* Still wider than the page: the text columns give up width (down to TEXT_MIN, or their header) and wrap,
+     so a table of a few columns fits; only when that is not enough does it scroll. */
+  if (!isWide && naturalTotal > containerWidth) {
+    const textIdx = widths.map((_, i) => i).filter(i => category[i] === 'text');
+    const fixed = widths.reduce((s, w, i) => s + (category[i] === 'text' ? 0 : w), 0);
+    const floor = i => Math.max(TEXT_MIN, measured.headerWidths[i]);
+    const avail = containerWidth - fixed;
+    if (textIdx.length && avail >= textIdx.reduce((s, i) => s + floor(i), 0)) {
+      /* Proportional shares; a column whose share is under its floor keeps the floor and the rest share
+         what is left, until every share holds. */
+      let open = textIdx.slice();
+      let room = avail;
+      for (let changed = true; changed;) {
+        changed = false;
+        const openTotal = open.reduce((s, i) => s + widths[i], 0) || 1;
+        for (const i of open) {
+          if (room * widths[i] / openTotal < floor(i)) {
+            widths[i] = floor(i);
+            room -= widths[i];
+            open = open.filter(j => j !== i);
+            changed = true;
+            break;
+          }
+        }
+      }
+      const openTotal = open.reduce((s, i) => s + widths[i], 0) || 1;
+      open.forEach(i => { widths[i] = Math.floor(room * widths[i] / openTotal); });
+      naturalTotal = widths.reduce((a, b) => a + b, 0);
+    }
+  }
 
   let finalWidths;
   let tableMinWidth;
