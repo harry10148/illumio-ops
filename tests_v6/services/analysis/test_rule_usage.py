@@ -130,3 +130,12 @@ def test_pending_parsed():
     assert parse_pending(body) == [PendingItem(kind="rule_sets", href="/orgs/1/sec_policy/draft/rule_sets/663",
                                                name="G_Deny", update_type="create",
                                                updated_at="2026-08-04T02:19:25.504Z")]
+
+
+def test_no_rule_total_counts_every_group(ctx, pce, monkeypatch):
+    """Lab 2026-10-29: the KPI added up only the 50 groups shown."""
+    monkeypatch.setattr(rule_usage, "NO_RULE_TOP", 1)
+    pce.rows = [row(5, 25, decision="potentially_blocked", conns=5, port=1433),
+                row(6, 25, decision="potentially_blocked", conns=2, port=22)]
+    u = rule_usage.rule_usage(ctx, start=START, end=END, now=NOW)
+    assert len(u.no_rule) == 1 and u.no_rule_connections == 7

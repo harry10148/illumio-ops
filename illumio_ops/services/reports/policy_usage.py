@@ -81,7 +81,7 @@ def build_policy_usage(inp: BuildInput) -> ReportDocument:
         "rules": len(allow) if usage else None, "used": len(used) if ok else None,
         "unused": len(unused) if ok else None, "disabled": len(disabled) if usage else None,
         "deny_hit": len(deny_hit) if ok else None,
-        "no_rule": sum(g.connections for g in usage.no_rule) if ok and usage else None}
+        "no_rule": usage.no_rule_connections if ok and usage else None}
     kpis = tuple(Kpi(key=k, label=t(label), value=values[k], previous=None, unit="count",
                      better="neutral" if k in ("rules", "disabled") else "higher" if k == "used" else "lower",
                      note=None if values[k] is not None else missing) for k, label in _KPI_KEYS.items())

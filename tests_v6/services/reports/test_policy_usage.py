@@ -27,7 +27,7 @@ def usage(**kw):
     base = {"rules": index_rules(SETS), "hits": {ALLOW: RuleHits(flows=2, connections=7, top_pairs=[("Web", "DB", 7)]),
                                                  DENY: RuleHits(flows=1, connections=2, top_pairs=[])},
             "no_rule": [NoRuleGroup(src_app="Batch", dst_app="DB", port=1433, proto=6, connections=5)],
-            "no_rule_total": 1, "windows": 7, "truncated": [], "unsupported": False, "pending": [], "computed_at": NOW}
+            "no_rule_total": 1, "no_rule_connections": 9, "windows": 7, "truncated": [], "unsupported": False, "pending": [], "computed_at": NOW}
     return RuleUsage(**{**base, **kw})
 
 
@@ -63,7 +63,7 @@ def test_how_to_read_first(ctx):
 def test_sections_and_kpis(ctx):
     doc = _build(ctx)
     k = {x.key: x.value for x in doc.kpis}
-    assert (k["rules"], k["used"], k["unused"], k["disabled"], k["deny_hit"], k["no_rule"]) == (3, 1, 1, 1, 1, 5)
+    assert (k["rules"], k["used"], k["unused"], k["disabled"], k["deny_hit"], k["no_rule"]) == (3, 1, 1, 1, 1, 9)
     used = _table(doc, "used")
     assert used.rows[0][0] == "Web" and used.rows[0][3:5] == (2, 7) and "Web → DB" in used.rows[0][5]
     assert [r[0] for r in _table(doc, "unused").rows] == ["Web"] and IDLE.rsplit("/", 1)[-1] in _table(doc, "unused").rows[0][1]

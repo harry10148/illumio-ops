@@ -66,6 +66,7 @@ class RuleUsage(BaseModel):
     hits: dict[str, RuleHits]
     no_rule: list[NoRuleGroup]
     no_rule_total: int  # groups, before the top NO_RULE_TOP
+    no_rule_connections: int  # every group's connections, not only the top NO_RULE_TOP
     windows: int
     truncated: list[tuple[datetime, datetime]]
     unsupported: bool
@@ -139,7 +140,8 @@ def rule_usage(ctx: AppContext, *, start: datetime, end: datetime, now: datetime
                 with fdb.writing(fdb.generation) as conn:
                     capabilities.record(conn, "draft_recompute", CapabilityState.UNSUPPORTED,
                                         "update_rules answered 404", at)
-                return RuleUsage(rules=rules, hits={}, no_rule=[], no_rule_total=0, windows=c.windows, truncated=[],
+                return RuleUsage(rules=rules, hits={}, no_rule=[], no_rule_total=0, no_rule_connections=0,
+                                 windows=c.windows, truncated=[],
                                  unsupported=True, pending=pending, computed_at=at)
             raise
     hits = {h: RuleHits(flows=c.flows[h], connections=c.connections[h],
@@ -150,5 +152,5 @@ def rule_usage(ctx: AppContext, *, start: datetime, end: datetime, now: datetime
     return RuleUsage(rules=rules, hits=hits,
                      no_rule=[NoRuleGroup(src_app=k[0], dst_app=k[1], port=k[2], proto=k[3], connections=n)
                               for k, n in groups[:NO_RULE_TOP]],
-                     no_rule_total=len(groups), windows=c.windows, truncated=c.truncated, unsupported=False,
+                     no_rule_total=len(groups), no_rule_connections=sum(c.no_rule.values()), windows=c.windows, truncated=c.truncated, unsupported=False,
                      pending=pending, computed_at=at)
