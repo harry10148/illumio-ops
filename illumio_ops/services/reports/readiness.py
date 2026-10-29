@@ -17,13 +17,14 @@ from illumio_ops.domain.readiness import (
 )
 from illumio_ops.domain.report import (
     Column,
+    Finding,
     Kpi,
     ReportDocument,
     Section,
     TableBlock,
     TextBlock,
 )
-from illumio_ops.domain.values import PortClass
+from illumio_ops.domain.values import PortClass, Severity
 from illumio_ops.pce.async_query import PceQueryError
 from illumio_ops.pce.client import PceNotConfigured
 from illumio_ops.pce.collections import PceCollectionIncomplete
@@ -118,7 +119,7 @@ def build_readiness(inp: BuildInput) -> ReportDocument:
     values: dict[str, float | int | None] = {
         "apps": sum(1 for _, r, _ in scored if r.score is not None), "ready": sum(1 for _, r, _ in scored if r.grade in ("A", "B")),
         "held_back": sum(1 for _, r, _ in scored if r.grade in ("D", "F")),
-        "overall": round(sum(rated) / len(rated), 1) if rated else None,
+        "overall": round(sum(rated) / len(rated)) if rated else None,  # points, as each app's score
         "predicted_blocked": predicted.blocked_connections if usable and predicted else None}
     no_data = t("rpt_no_flows_filtered" if inp.params.filter is not None else "rpt_rdy_no_apps")
     notes = {"overall": None if rated else no_data,
@@ -129,7 +130,7 @@ def build_readiness(inp: BuildInput) -> ReportDocument:
                  if predicted.undetermined_flows else None)}
     before = previous_values(inp)
     kpis = tuple(Kpi(key=k, label=t(label), value=values[k], previous=before.get(k) if before else None,
-                     unit="percent" if k == "overall" else "count",
+                     unit="count",
                      better="higher" if k in ("ready", "overall") else "lower" if k != "apps" else "neutral",
                      note=notes.get(k)) for k, label in _KPI_KEYS.items())
 
@@ -212,9 +213,12 @@ def build_readiness(inp: BuildInput) -> ReportDocument:
                      key=lambda x: (-(x[1].score or 0), name(x[0])))[:NEXT_APPS]
     next_steps = TableBlock(
         title=t("rpt_rdy_tbl_next"),
+        # the next step and the rules to write in one column: at 1280 px a fourth column was past the edge
         columns=(Column(key="app", label=t("rpt_col_app_env")), Column(key="where", label=t("rpt_rdy_col_where")),
-                 Column(key="next", label=t("rpt_rdy_col_next")), Column(key="links", label=t("rpt_rdy_col_links"))),
-        rows=tuple((name(k), explain(r), advice(r), links(k)) for k, r, _ in closest),
+                 Column(key="next", label=t("rpt_rdy_col_next"))),
+        rows=tuple((name(k), explain(r), advice(r) if links(k) == "—" else t("rpt_rdy_next_with_links",
+                                                                                advice=advice(r), links=links(k)))
+                   for k, r, _ in closest),
         total_rows=len(closest), empty_text=no_data)
     factors = TableBlock(
         title=t("rpt_rdy_tbl_factors"),
@@ -230,6 +234,14 @@ def build_readiness(inp: BuildInput) -> ReportDocument:
         rows=tuple((g, t(rng), t(means)) for g, (rng, means) in _GRADE_KEYS.items()),
         total_rows=len(_GRADE_KEYS), empty_text="")
 
+    findings: tuple[Finding, ...] = ()
+    if values["held_back"] and closest:
+        first_key, first, _ = closest[0]
+        findings = (Finding(severity=Severity.MEDIUM,
+                            title=t("rpt_rdy_finding_title", n=values["held_back"], total=values["apps"]),
+                            why=t("rpt_rdy_finding_why", app=name(first_key), explain=explain(first)),
+                            action=t("rpt_rdy_finding_action")),)
+
     total = sum(r.connections for r in flows.values())
     unknown = sum(r.unknown for r in flows.values())
     filter_line = flowsections.filter_text(inp.params.filter, lang)
@@ -239,7 +251,7 @@ def build_readiness(inp: BuildInput) -> ReportDocument:
                *((t("rpt_rdy_quality_unknown", pct=f"{100 * unknown / total:.1f}"),) if unknown else ()))
     return ReportDocument(
         report_type=inp.params.report_type, lang=lang, title=t("rpt_title_readiness"), period_start=inp.start,
-        period_end=inp.end, generated_at=inp.now, pce_label=inp.pce_label, kpis=kpis, findings=(),
+        period_end=inp.end, generated_at=inp.now, pce_label=inp.pce_label, kpis=kpis, findings=findings,
         data_quality=quality,
         sections=(Section(id="how", title=t("rpt_rdy_sec_how"), intro=t("rpt_rdy_how_intro"), blocks=(factors, grades)),
                   Section(id="next", title=t("rpt_rdy_sec_next"), intro=t("rpt_rdy_next_intro"), blocks=(next_steps,)),

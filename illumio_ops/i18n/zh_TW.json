@@ -1524,7 +1524,7 @@
   "rpt_rdy_kpi_apps": "評估的 app 數",
   "rpt_rdy_kpi_ready": "可切換（A 或 B）",
   "rpt_rdy_kpi_held_back": "受阻（D 或 F）",
-  "rpt_rdy_kpi_overall": "平均準備度",
+  "rpt_rdy_kpi_overall": "平均分數（0–100）",
   "rpt_rdy_kpi_predicted": "草稿政策會擋下的連線數",
   "rpt_rdy_no_apps": "本期間沒有任何 app 有連入流量或受管主機。",
   "rpt_rdy_factor_policy": "有規則允許",
@@ -1609,5 +1609,8 @@
   "rpt_rdy_next_intro": "最接近可以切強制的幾個 app，各寫出目前狀況、下一步，以及最常見、還沒有規則允許的連入連線（目前回報「可能被擋」，切強制後會被擋掉）。",
   "rpt_rdy_tbl_next": "最接近可以切強制的 app",
   "rpt_rdy_col_where": "目前狀況",
-  "rpt_rdy_col_links": "先替這些連線寫規則"
+  "rpt_rdy_next_with_links": "{advice}先從這些連線開始：{links}",
+  "rpt_rdy_finding_title": "{total} 個 app 中有 {n} 個還不能切強制",
+  "rpt_rdy_finding_why": "現在切強制會擋掉正常流量。最接近的是 {app}：{explain}",
+  "rpt_rdy_finding_action": "照「先做什麼」處理：裡面列出最接近的幾個 app，以及要先替哪些連線寫規則。"
 }

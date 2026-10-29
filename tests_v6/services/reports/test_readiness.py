@@ -179,7 +179,7 @@ def test_next_steps_list_the_connections_to_write_rules_for(ctx):
                  flow(src_app="Web", dst_app="DB", port=5432, conns=1)])
     rows = _table(_build(ctx), "next").rows
     db = next(r for r in rows if r[0] == "DB (Dev)")
-    assert "Web → 5432/TCP" in db[3] and db[3].index("Web") < db[3].index("Batch")  # busiest first
+    assert "Web → 5432/TCP" in db[2] and db[2].index("Web →") < db[2].index("Batch")  # busiest first
 
 
 def test_projected_score_with_one_factor_fixed():
@@ -187,3 +187,26 @@ def test_projected_score_with_one_factor_fixed():
     r = readiness(ReadinessInputs(connections=10, decided=10, allowed=1, same_app=10, potentially_blocked=9,
                                   remote=0, remote_allowed=0, hosts=1, full=1, selective=0))
     assert r.blocking == "policy" and score_with(r.parts, "policy") > r.score
+
+
+def test_summary_says_how_many_cannot_enforce_and_the_closest(ctx):
+    """Lab 2026-10-29: 18 apps at F under "nothing to handle this period"."""
+    _inventory(ctx, [("d1", "DB", "selective")])
+    _write(ctx, [flow(src_app="Web", dst_app="DB", port=5432, decision="potentially_blocked", conns=9)])
+    doc = _build(ctx)
+    [f] = doc.findings
+    assert "1" in f.title and "DB (Dev)" in f.why and "What to do first" in f.action
+
+
+def test_average_score_in_points(ctx):
+    _write(ctx, [flow(src_app="Web", dst_app="DB", port=5432)])
+    k = {k.key: k for k in _build(ctx).kpis}["overall"]
+    assert k.unit == "count" and isinstance(k.value, int)
+
+
+def test_next_step_and_rules_to_write_in_one_column(ctx):
+    """Lab 2026-10-29: at 1280 px the rules to write were past the table's right edge."""
+    _inventory(ctx, [("d1", "DB", "selective")])
+    _write(ctx, [flow(src_app="Web", dst_app="DB", port=5432, decision="potentially_blocked", conns=9)])
+    table = _table(_build(ctx), "next")
+    assert len(table.columns) == 3 and "Web → 5432/TCP" in table.rows[0][2]

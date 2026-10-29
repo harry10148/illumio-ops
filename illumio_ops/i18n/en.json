@@ -1524,7 +1524,7 @@
   "rpt_rdy_kpi_apps": "Apps assessed",
   "rpt_rdy_kpi_ready": "Ready (A or B)",
   "rpt_rdy_kpi_held_back": "Held back (D or F)",
-  "rpt_rdy_kpi_overall": "Average readiness",
+  "rpt_rdy_kpi_overall": "Average score (0–100)",
   "rpt_rdy_kpi_predicted": "Connections the draft would block",
   "rpt_rdy_no_apps": "No app has traffic into its hosts or managed hosts in this period.",
   "rpt_rdy_factor_policy": "Allowed by a rule",
@@ -1609,5 +1609,8 @@
   "rpt_rdy_next_intro": "The apps closest to enforcement, each with where it stands, the next step, and its busiest connections in that no rule allows yet (reported potentially blocked: enforcement would block them).",
   "rpt_rdy_tbl_next": "The apps closest to enforcement",
   "rpt_rdy_col_where": "Where it stands",
-  "rpt_rdy_col_links": "Write rules for these first"
+  "rpt_rdy_next_with_links": "{advice} Start with: {links}",
+  "rpt_rdy_finding_title": "{n} of {total} apps cannot be enforced yet",
+  "rpt_rdy_finding_why": "Enforcing them now would block normal traffic. The closest is {app}: {explain}",
+  "rpt_rdy_finding_action": "Follow “What to do first”: it lists, for the closest apps, the connections to write rules for."
 }
