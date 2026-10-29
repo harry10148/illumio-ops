@@ -7,11 +7,13 @@ import time
 from collections.abc import Iterable, Iterator
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict
 
 from illumio_ops.domain.filter import FilterSpec, matches, to_pce_payload
 from illumio_ops.domain.flows import (
+    FlowRecord,
     FlowShapeError,
     group_pairs,
     normalize_flow,
@@ -59,6 +61,23 @@ class _Recompute:
     gen: int
 
 
+def draft_records(raws: list[dict[str, Any]]) -> tuple[list[FlowRecord], dict[str, DraftView]]:
+    """The recomputed rows as flow records, with each record's draft decision and rules. Each PCE row is let go
+    once read (the list is emptied): 200,000 of them are most of the memory a recompute holds."""
+    views: dict[str, DraftView] = {}
+    records: list[FlowRecord] = []
+    raws.reverse()
+    while raws:
+        raw = raws.pop()
+        try:
+            rec = normalize_flow(raw)
+        except FlowShapeError:
+            continue
+        records.append(rec)
+        views[record_key(rec)] = parse_draft(raw)
+    return records, views
+
+
 def _recompute(ctx: AppContext, spec: FilterSpec, *, max_results: int, deadline_seconds: int) -> _Recompute:
     at = datetime.now(UTC)
     fdb = ctx.flows()
@@ -82,18 +101,7 @@ def _recompute(ctx: AppContext, spec: FilterSpec, *, max_results: int, deadline_
             raise
         rules = index_rules(fetch_rule_sets(client, "draft", deadline=deadline),
                             **fetch_policy_names(client, "draft", deadline=deadline).__dict__)
-    views: dict[str, DraftView] = {}
-    records = []
-    raws = result.rows
-    raws.reverse()
-    while raws:  # each PCE row is let go once read: 200,000 of them are most of the memory a recompute holds
-        raw = raws.pop()
-        try:
-            rec = normalize_flow(raw)
-        except FlowShapeError:
-            continue
-        records.append(rec)
-        views[record_key(rec)] = parse_draft(raw)
+    records, views = draft_records(result.rows)
 
     def rows() -> Iterator[PredictedRow]:
         # A connection both VENs reported is one row with both ends' attributes, filtered as such (P3 final

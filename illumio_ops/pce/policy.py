@@ -5,6 +5,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Literal
 
+from pydantic import BaseModel, ConfigDict
+
 from illumio_ops.pce.client import PceClient
 from illumio_ops.pce.collections import PceCollectionIncomplete, get_all
 
@@ -42,3 +44,31 @@ def fetch_policy_names(client: PceClient, pversion: Version, *, deadline: float)
             if r.get("href"):
                 names[r["href"]] = str(r.get("name") or "")
     return PolicyNames(labels=labels, names=names)
+
+
+class PendingItem(BaseModel):
+    """A draft change not yet provisioned (GET /sec_policy/pending, lab 2026-10-29: {"rule_sets": [{href, name,
+    update_type, updated_at, ...}], ...})."""
+    model_config = ConfigDict(frozen=True)
+    kind: str
+    href: str
+    name: str | None
+    update_type: str | None
+    updated_at: str | None
+
+
+def parse_pending(body: Any) -> list[PendingItem]:
+    if not isinstance(body, dict):
+        raise TypeError("pending changes: response is not an object")
+    return [PendingItem(kind=str(kind), href=str(item["href"]), name=item.get("name"),
+                        update_type=item.get("update_type"), updated_at=item.get("updated_at"))
+            for kind, items in body.items() if isinstance(items, list)
+            for item in items if isinstance(item, dict) and item.get("href")]
+
+
+def fetch_pending(client: PceClient, *, deadline: float) -> list[PendingItem]:
+    """Every change the draft holds that is not active yet; a failed read is raised, never "nothing pending"."""
+    resp = client.request("GET", "/sec_policy/pending", timeout=60, deadline=deadline)
+    if resp.status != 200:
+        raise PceCollectionIncomplete("/sec_policy/pending", 0, f"HTTP {resp.status}")
+    return parse_pending(resp.json())
