@@ -11,6 +11,7 @@ from typing import Any
 
 from loguru import logger
 
+from illumio_ops.domain.ransomware import UNENFORCED_MODES
 from illumio_ops.domain.report import (
     BarBlock,
     Column,
@@ -52,6 +53,7 @@ _TERMS = (("rpt_rw_col_pce_percent", "rpt_rw_term_pce_means", "rpt_rw_term_pce_u
           ("rpt_rw_sec_suspicious", "rpt_rw_suspicious_intro", "rpt_rw_term_suspicious_use"))
 
 
+MODE_NAMES = {"full": "Full", "selective": "Selective", "visibility_only": "Visibility Only", "idle": "Idle"}
 NAMES_SHOWN = 5  # service names in a host's explanation; the rest are counted
 _EXPOSURE_KEYS = {"fully_protected": "rpt_rw_exposure_fully_protected"}
 
@@ -132,8 +134,12 @@ def build_ransomware(inp: BuildInput) -> ReportDocument:
     def explain(h: Mapping[str, Any]) -> str:
         """What the host's numbers mean, in words."""
         open_ = [s for s in h.get("services") or () if s.get("protection_state") == "unprotected"]
+        mode = str(h.get("enforcement_mode") or "")
+        if mode in UNENFORCED_MODES:  # the vendor counts only Selective or Full hosts (user 2026-10-29)
+            return t("rpt_rw_explain_unenforced", pce=pct(h.get("pce_percent")), mode=MODE_NAMES.get(mode, mode))
         if h.get("contradiction"):
-            return t("rpt_rw_explain_contradiction", pce=pct(h.get("pce_percent")), n=len(open_))
+            return t("rpt_rw_explain_contradiction", pce=pct(h.get("pce_percent")),
+                     computed=pct(h.get("computed_percent")), mode=MODE_NAMES.get(mode, mode or "—"))
         if not open_:
             return t("rpt_rw_explain_protected")
         names = list(dict.fromkeys(str(s.get("name")) for s in open_))  # a service on TCP and UDP is named once

@@ -26,8 +26,8 @@ def svc(name, port, *, severity="critical", state="unprotected", status="listeni
             "contribution": 0.0, "traffic": traffic, "recent_sources": sources}
 
 
-def hostrow(name, *, pce=10.0, computed=10.0, contradiction=False, services=()):
-    return {"href": f"/orgs/1/workloads/{name}", "hostname": name, "enforcement_mode": "visibility_only",
+def hostrow(name, *, pce=10.0, computed=10.0, contradiction=False, services=(), mode="selective"):
+    return {"href": f"/orgs/1/workloads/{name}", "hostname": name, "enforcement_mode": mode,
             "pce_percent": pce, "pce_exposure": "critical", "computed_percent": computed, "approximate": True,
             "contradiction": contradiction, "services": list(services)}
 
@@ -161,7 +161,7 @@ def test_how_to_read_explains_the_numbers(ctx):
     doc = _build(ctx)
     assert doc.sections[0].id == "how"
     terms = {r[0] for r in _tables(doc, "how")[0].rows}
-    assert {"PCE score", "Computed from its services (approximate)", "PCE numbers disagree"} <= terms
+    assert {"PCE score", "Computed from its services (approximate)", "The two scores differ"} <= terms
 
 
 def test_each_host_says_what_its_numbers_mean(ctx):
@@ -169,7 +169,7 @@ def test_each_host_says_what_its_numbers_mean(ctx):
     rows = {r[0]: r for r in _tables(_build(ctx), "hosts")[0].rows}
     assert "1 high-risk service(s) unprotected" in rows["bad"][-1] and "SMB" in rows["bad"][-1]
     assert "protected" in rows["good"][-1].lower()
-    assert "PCE console" in rows["liar"][-1]  # the disagreement and where to check it
+    assert "Selective" in rows["liar"][-1] and "Deny Rule" in rows["liar"][-1]  # why, and how to raise it
 
 
 def test_protection_states_in_words(ctx):
@@ -203,7 +203,7 @@ def test_exposure_in_words(ctx):
 def test_contradiction_with_nothing_unprotected_reads(ctx):
     _std(ctx)
     liar = {r[0]: r for r in _tables(_build(ctx), "hosts")[0].rows}["liar"][-1]
-    assert "—" not in liar and "0 unprotected" in liar
+    assert "—" not in liar and "go by the pce score" in liar.lower()
 
 
 def test_unprotected_with_unknown_traffic_is_a_finding(ctx):
@@ -223,3 +223,12 @@ def test_host_explanation_does_not_point_to_empty_lists(ctx):
                   "hosts": [hostrow("dev", services=[svc("SMB", 445, traffic="unknown", sources=None)])]})
     text = _tables(_build(ctx), "hosts")[0].rows[0][-1]
     assert "Fix first" not in text and "traffic" in text
+
+
+def test_unenforced_host_says_the_vendor_counts_nothing(ctx):
+    """User 2026-10-29: the vendor counts only Selective or Full hosts; a Visibility Only host scores 0 for that."""
+    _result(ctx, {"unsupported": False, "contradictions": 0, "priority": [], "safe_to_block": [], "suspicious": [],
+                  "hosts": [hostrow("vis", pce=0.0, computed=0.0, mode="visibility_only",
+                                    services=[svc("RDP", 3389, state="protected_closed")])]})
+    text = _tables(_build(ctx), "hosts")[0].rows[0][-1]
+    assert "Visibility Only" in text and "Selective or Full" in text

@@ -61,3 +61,19 @@ def test_empty_recommendation_ok():
     b = host_breakdown("/w/1", "h1", None, None, None, [svc("RDP", 3389, "critical", "unprotected", "listening")],
                        traffic={(3389, 6): 2})
     assert b.services[0].traffic is T.PRIORITY and b.services[0].recent_sources == 2
+
+
+def test_unenforced_hosts_count_nothing():
+    """User 2026-10-29, Visualization Guide: only Selective or Full hosts count as protected; a Visibility Only or
+    Idle host scores 0 whatever its services' states — the approximation follows the vendor, so it is no gap."""
+    for mode in ("visibility_only", "idle"):
+        b = host_breakdown("/w/1", "h1", mode, 0.0, "critical",
+                           [svc("RDP", 3389, "critical", "protected_closed")], traffic={})
+        assert b.computed_percent == 0.0 and b.contradiction is False, mode
+
+
+def test_full_counts_every_service():
+    """Full enforcement: every risky service counts as protected, rule or not."""
+    b = host_breakdown("/w/1", "h1", "full", 100.0, "fully_protected",
+                       [svc("SMB", 445, "high", "unprotected", "listening")], traffic={})
+    assert b.computed_percent == 100.0 and b.contradiction is False
