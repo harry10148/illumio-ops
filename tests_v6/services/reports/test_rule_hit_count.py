@@ -188,3 +188,15 @@ def test_zero_finding_counts_allow_rules_only(ctx, monkeypatch):
     assert len(_table(doc, "zero").rows) == 2
     [f] = [f for f in doc.findings if "0 hits" in f.title]
     assert f.title.startswith("1 ")
+
+
+def test_rule_provisioned_after_the_period_is_not_zero(ctx, monkeypatch):
+    """Review #2: a rule created after the period ends is listed by the PCE with 0 — it had no count then."""
+    later = [{**RULE_SETS[0], "rules": [*RULE_SETS[0]["rules"][:1],
+                                        {**RULE_SETS[0]["rules"][1], "created_at": "2026-10-30T01:00:00Z"},
+                                        *RULE_SETS[0]["rules"][2:]]}]
+    monkeypatch.setattr(rule_hit_count, "fetch_rule_sets", lambda client, pversion, *, deadline: later)
+    doc = _build(ctx)
+    assert _ids(_table(doc, "zero")) == []
+    listed = [b for b in _section(doc, "no_record").blocks if isinstance(b, TableBlock)][1]
+    assert [r[1].split()[0] for r in listed.rows] == ["#11"]

@@ -1809,7 +1809,7 @@
   "rpt_rhc_sec_zero": "0 次的規則",
   "rpt_rhc_zero_intro": "已 Provision 且有計數，但期間內沒有被命中。允許規則 0 次可列入檢視；為少見作業（年度批次、災難備援）而設的規則維持 0 次是正常的。Deny Rule 0 次只代表沒有人嘗試它擋住的路。",
   "rpt_rhc_sec_no_record": "沒有紀錄的規則",
-  "rpt_rhc_no_record_intro": "啟用中、已 Provision，但 PCE 沒有計數的規則。這不代表規則沒在用：請確認它何時 Provision、Rule Hit Count 何時開啟。第二個表（若有）列出 PCE 報表有列、但不在生效政策中的規則——只在 Draft，或之後被刪除：它們同樣沒有計數，不是 0 次。",
+  "rpt_rhc_no_record_intro": "啟用中、已 Provision，但 PCE 沒有計數的規則。這不代表規則沒在用：請確認它何時 Provision、Rule Hit Count 何時開啟。第二個表（若有）列出 PCE 報表列為 0、但期間內其實沒有計數的規則——只在 Draft、之後被刪除，或在期間結束後才建立：它們不是 0 次。",
   "rpt_rhc_sec_pending": "等待 Provision 的變更",
   "rpt_rhc_pending_intro": "Rule Hit Count 只計算已 Provision 的規則，還在 Draft 的變更不在這份報表裡。",
   "rpt_rhc_pending_none": "沒有等待 Provision 的變更：上面的規則就是完整的政策。",
@@ -1825,5 +1825,7 @@
   "rpt_rhc_quality_gone": "有 {n} 條有計數的規則已不在生效政策中（之後被刪除或變更），以 PCE 報表中的 Ruleset 名稱列出。",
   "rpt_rhc_col_last_hit_ever": "最後命中（不限期間）",
   "rpt_rhc_never": "從未",
-  "rpt_rhc_tbl_unprovisioned": "有列出、未 Provision"
+  "rpt_rhc_tbl_unprovisioned": "有列出、沒有計數",
+  "rhc_err_firewall_changed": "開啟過程中 firewall settings 的 Draft 被其他人修改，所以沒有 Provision。VEN 的 Rule Hit Count 設定目前在 Draft：請到 PCE 檢視 firewall settings 後 Provision 或還原。",
+  "rhc_err_pce_changed": "開啟過程中 PCE 連線被修改，已在列出的步驟之後停止。"
 }

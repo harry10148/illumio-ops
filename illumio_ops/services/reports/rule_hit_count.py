@@ -6,6 +6,8 @@ schedule never produces an empty report."""
 from __future__ import annotations
 
 import time
+from datetime import datetime
+from typing import Any
 
 from loguru import logger
 
@@ -43,6 +45,19 @@ _KPI_KEYS = {"rules": "rpt_rhc_kpi_rules", "hit": "rpt_rhc_kpi_hit", "zero": "rp
              "no_record": "rpt_rhc_kpi_no_record"}
 
 
+def _created(sets: list[dict[str, Any]]) -> dict[str, datetime | None]:
+    """Each rule's created_at as the PCE gives it (None when absent or unreadable)."""
+    out: dict[str, datetime | None] = {}
+    for rs in sets:
+        for rule in [*(rs.get("rules") or []), *(rs.get("deny_rules") or [])]:
+            raw = rule.get("created_at") if isinstance(rule, dict) else None
+            try:
+                out[rule["href"]] = datetime.fromisoformat(raw) if raw else None
+            except (ValueError, AttributeError, KeyError, TypeError):
+                continue
+    return out
+
+
 def build_rule_hit_count(inp: BuildInput) -> ReportDocument:
     lang = inp.lang
 
@@ -57,8 +72,8 @@ def build_rule_hit_count(inp: BuildInput) -> ReportDocument:
         settings = inp.ctx.settings.current()
         deadline = time.monotonic() + POLICY_DEADLINE_SECONDS
         with inp.ctx.pce_client(settings.pce) as client:
-            rules = index_rules(fetch_rule_sets(client, "active", deadline=deadline),
-                                **fetch_policy_names(client, "active", deadline=deadline).__dict__)
+            sets = fetch_rule_sets(client, "active", deadline=deadline)
+            rules = index_rules(sets, **fetch_policy_names(client, "active", deadline=deadline).__dict__)
             pending = fetch_pending(client, deadline=deadline)
     except RhcPullError as exc:
         raise ReportFailed(exc.key, exc.detail) from exc
@@ -71,8 +86,11 @@ def build_rule_hit_count(inp: BuildInput) -> ReportDocument:
     hit = sorted((r for r in pull.rows if r.hit_count > 0), key=lambda r: (-r.hit_count, r.rule_href))
     # The PCE's report also lists rules that are only in Draft (a ruleset pending create), under active hrefs with
     # 0 hits (lab, 2026-10-30): not provisioned, so not "0 hits". A 0 for a rule deleted since is no count either.
-    zero = sorted((r for r in pull.rows if r.hit_count == 0 and r.rule_href in rules), key=lambda r: r.rule_href)
-    unprovisioned = sorted((r for r in pull.rows if r.hit_count == 0 and r.rule_href not in rules),
+    # A rule created after the period ended had no count in it either (final review #2).
+    later = {h for h, at in _created(sets).items() if at is not None and at >= inp.end}
+    counted = {h for h in rules if h not in later}
+    zero = sorted((r for r in pull.rows if r.hit_count == 0 and r.rule_href in counted), key=lambda r: r.rule_href)
+    unprovisioned = sorted((r for r in pull.rows if r.hit_count == 0 and r.rule_href not in counted),
                            key=lambda r: (r.ruleset_name, r.rule_href))
     # Enabled provisioned rules the PCE has no count for; a disabled rule is not expected to have one.
     no_record = sorted((r for r in rules.values() if r.enabled and r.href not in by_href),

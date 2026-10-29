@@ -1809,7 +1809,7 @@
   "rpt_rhc_sec_zero": "Rules with 0 hits",
   "rpt_rhc_zero_intro": "Provisioned and counted, but nothing hit them in the period. An allow rule at 0 is a candidate for review; one for a rare job (yearly batch, disaster recovery) can legitimately stay at 0. A Deny Rule at 0 only means nothing tried the path it blocks.",
   "rpt_rhc_sec_no_record": "Rules with no record",
-  "rpt_rhc_no_record_intro": "Enabled provisioned rules the PCE has no count for. Not evidence that a rule is unused: check when it was provisioned and when Rule Hit Count was turned on. The second table (when present) lists rules the PCE's report includes although they are not in the provisioned policy — only in Draft, or deleted since: they have no count either, and are not 0.",
+  "rpt_rhc_no_record_intro": "Enabled provisioned rules the PCE has no count for. Not evidence that a rule is unused: check when it was provisioned and when Rule Hit Count was turned on. The second table (when present) lists rules the PCE's report includes with 0 that had no count in the period — only in Draft, deleted since, or created after the period ended: they are not 0.",
   "rpt_rhc_sec_pending": "Changes waiting to be provisioned",
   "rpt_rhc_pending_intro": "Rule Hit Count counts provisioned rules only; changes still in Draft are not in this report.",
   "rpt_rhc_pending_none": "Nothing is waiting to be provisioned: the rules above are the whole policy.",
@@ -1825,5 +1825,7 @@
   "rpt_rhc_quality_gone": "{n} counted rule(s) are no longer in the provisioned policy (deleted or changed since); they are listed under the ruleset name the PCE reported.",
   "rpt_rhc_col_last_hit_ever": "Last hit (any time)",
   "rpt_rhc_never": "never",
-  "rpt_rhc_tbl_unprovisioned": "Listed, not provisioned"
+  "rpt_rhc_tbl_unprovisioned": "Listed, no count",
+  "rhc_err_firewall_changed": "Draft firewall settings changed while Rule Hit Count was being turned on (someone else edited them), so nothing was provisioned. The VENs' Rule Hit Count setting is in Draft: review firewall settings in the PCE and provision or revert them.",
+  "rhc_err_pce_changed": "The PCE connection was changed while Rule Hit Count was being turned on; it stopped after the steps listed."
 }

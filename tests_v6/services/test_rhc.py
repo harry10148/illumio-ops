@@ -293,3 +293,97 @@ def test_csv_na_last_hit_is_none():
     """Lab 2026-10-30: the PCE writes "N/A" for a rule never hit."""
     rows, _ = rhc.parse_rhc_csv("Rule HREF,Rule Hit Count,Timestamp of Last Hit\n/orgs/1/x/1,0,N/A\n")
     assert rows[0].last_hit_at is None
+
+
+# ── final review (Codex, 2026-10-30) ─────────────────────────────────────────
+
+@responses.activate
+def test_firewall_settings_changed_meanwhile_not_provisioned(wctx):
+    """Review #1: someone edits Draft firewall_settings between the check and the provision: their edit would ship
+    with ours. Re-read before provisioning; anything besides our scopes differing from active stops it."""
+    responses.add(responses.GET, TPL, json={"enabled": True})
+    responses.add(responses.GET, ACTIVE_FW, json={"rule_hit_count_enabled_scopes": [], "ip_forwarding": False})
+    responses.add(responses.GET, DRAFT_FW, json={"rule_hit_count_enabled_scopes": [], "ip_forwarding": False})
+    responses.add(responses.PUT, DRAFT_FW, status=204)
+    responses.add(responses.GET, ACTIVE_FW, json={"rule_hit_count_enabled_scopes": [], "ip_forwarding": False})
+    responses.add(responses.GET, DRAFT_FW, json={"rule_hit_count_enabled_scopes": [[]], "ip_forwarding": True,
+                                                 "update_type": "update", "updated_at": "x"})
+    responses.add(responses.POST, f"{ORG}/sec_policy", status=201, json={})
+    r = rhc.enable_rhc(wctx)
+    assert not r.ok and r.error_key == "rhc_err_firewall_changed" and r.steps_done == ["ven_firewall_settings_draft"]
+    assert not any(c.request.method == "POST" for c in responses.calls)
+
+
+@responses.activate
+def test_only_our_change_is_provisioned(wctx):
+    responses.add(responses.GET, TPL, json={"enabled": True})
+    responses.add(responses.GET, ACTIVE_FW, json={"rule_hit_count_enabled_scopes": [], "ip_forwarding": False})
+    responses.add(responses.GET, DRAFT_FW, json={"rule_hit_count_enabled_scopes": [], "ip_forwarding": False})
+    responses.add(responses.PUT, DRAFT_FW, status=204)
+    responses.add(responses.GET, ACTIVE_FW, json={"rule_hit_count_enabled_scopes": [], "ip_forwarding": False,
+                                                  "updated_at": "a"})
+    responses.add(responses.GET, DRAFT_FW, json={"rule_hit_count_enabled_scopes": [[]], "ip_forwarding": False,
+                                                 "update_type": "update", "updated_at": "b", "updated_by": {}})
+    responses.add(responses.POST, f"{ORG}/sec_policy", status=201, json={})
+    assert rhc.enable_rhc(wctx).ok
+
+
+@responses.activate
+def test_pce_switched_during_enable_stops(wctx):
+    """Review #3: the whole run uses the settings it started with; a switch before a write stops it."""
+    _off()
+
+    def switch(request):
+        wctx.settings.update(wctx.settings.current().revision,
+                             lambda d: d["pce"].update(url="https://other.example.com:8443", org_id="2"))
+        return (204, {}, b"")
+    responses.add_callback(responses.PUT, TPL, callback=switch)
+    r = rhc.enable_rhc(wctx)
+    assert not r.ok and r.error_key == "rhc_err_pce_changed" and r.steps_done == ["pce_report_template"]
+    assert not any(c.request.method == "POST" or c.request.url == DRAFT_FW and c.request.method == "PUT"
+                   for c in responses.calls)
+
+
+@responses.activate
+def test_status_read_while_switching_not_cached_for_new_pce(wctx):
+    """Review #4: a check of PCE A finishing after the switch to B is not B's answer."""
+    rhc.forget_status()
+
+    def answer(request):
+        wctx.settings.update(wctx.settings.current().revision,
+                             lambda d: d["pce"].update(url="https://other.example.com:8443"))
+        return (200, {}, json.dumps({"rule_hit_count_enabled_scopes": [[]]}))
+    responses.add(responses.GET, TPL, json={"enabled": True})
+    responses.add_callback(responses.GET, ACTIVE_FW, callback=answer)
+    rhc.rhc_status(wctx)
+    assert rhc._cache == {}
+
+
+def test_cache_key_changes_with_credentials(wctx):
+    """Review #4: another write key or TLS check is not the same answer."""
+    k1 = rhc._cache_key(wctx.settings.current().pce)
+    wctx.settings.update(wctx.settings.current().revision, lambda d: d["pce"].update(write_api_key="other"))
+    assert rhc._cache_key(wctx.settings.current().pce) != k1
+
+
+@responses.activate
+def test_non_json_answer_is_unknown(wctx):
+    """Review #5: a 200 sign-in page must not break the whole report catalog."""
+    responses.add(responses.GET, TPL, body="<html>Sign in</html>", status=200)
+    responses.add(responses.GET, ACTIVE_FW, body="<html>Sign in</html>", status=200)
+    s = rhc.rhc_status(wctx)
+    assert s.state is RhcState.UNKNOWN and s.reason_key == "rhc_reason_unreachable"
+
+
+@responses.activate
+def test_enable_non_json_answer_stops(wctx):
+    responses.add(responses.GET, TPL, body="<html/>", status=200)
+    assert rhc.enable_rhc(wctx).error_key == "rhc_err_unreachable"
+
+
+@responses.activate
+def test_pull_non_json_submit_answer(wctx):
+    responses.add(responses.POST, f"{ORG}/reports", status=201, body="<html/>")
+    with pytest.raises(rhc.RhcPullError) as e:
+        rhc.pull_rhc(wctx, START, END)
+    assert e.value.key == "rhc_err_pull_failed"
