@@ -94,7 +94,7 @@ def test_contradiction_flagged_not_ranked(ctx):
     _std(ctx)
     rows = _tables(_build(ctx), "hosts")[0].rows
     assert [r[0] for r in rows] == ["bad", "good", "liar"]  # ranked by computed share; the contradiction last
-    assert rows[2][-1] and not rows[0][-1]
+    assert rows[2][-2] and not rows[0][-2]  # the flag; the explanation is last
 
 
 def test_allow_rules_top_hosts_only(ctx, monkeypatch):
@@ -152,3 +152,74 @@ def test_not_computed_and_unsupported_say_so(tmp_path, ctx):
 def test_zh_tw_builds(ctx):
     _std(ctx)
     assert _build(ctx, Language.ZH_TW).title
+
+
+# ── readable (2026-10-29: customers could not read the scores; keep them, explain them) ──────────────────────
+
+def test_how_to_read_explains_the_numbers(ctx):
+    _std(ctx)
+    doc = _build(ctx)
+    assert doc.sections[0].id == "how"
+    terms = {r[0] for r in _tables(doc, "how")[0].rows}
+    assert {"PCE score", "Computed from its services (approximate)", "PCE numbers disagree"} <= terms
+
+
+def test_each_host_says_what_its_numbers_mean(ctx):
+    _std(ctx)
+    rows = {r[0]: r for r in _tables(_build(ctx), "hosts")[0].rows}
+    assert "1 high-risk service(s) unprotected" in rows["bad"][-1] and "SMB" in rows["bad"][-1]
+    assert "protected" in rows["good"][-1].lower()
+    assert "PCE console" in rows["liar"][-1]  # the disagreement and where to check it
+
+
+def test_protection_states_in_words(ctx):
+    _std(ctx)
+    states = {r[5] for r in _tables(_build(ctx), "hosts")[1].rows}
+    assert states <= {"Unprotected", "Protected", "Unknown"}
+
+
+def test_summary_finding_for_services_in_use(ctx):
+    _std(ctx, n_priority=2)
+    [f, *_] = _build(ctx).findings
+    assert "2" in f.title and "Fix first" in f.action
+
+
+def test_host_explanation_names_few_services_once(ctx):
+    """Lab 2026-10-29: 24 names with S-SSH twice (TCP and UDP) in one cell."""
+    many = [svc(f"S-{i}", 1000 + i) for i in range(8)] + [svc("S-0", 2000)]
+    _result(ctx, {"unsupported": False, "contradictions": 0, "priority": [], "safe_to_block": [], "suspicious": [],
+                  "hosts": [hostrow("big", services=many)]})
+    text = _tables(_build(ctx), "hosts")[0].rows[0][-1]
+    assert text.count("S-0") == 1 and "S-7" not in text and "and 3 more" in text
+
+
+def test_exposure_in_words(ctx):
+    _result(ctx, {"unsupported": False, "contradictions": 0, "priority": [], "safe_to_block": [], "suspicious": [],
+                  "hosts": [{**hostrow("ok", services=[svc("RDP", 3389, state="protected_closed")]),
+                             "pce_exposure": "fully_protected"}]})
+    assert _tables(_build(ctx), "hosts")[0].rows[0][3] == "Fully protected"
+
+
+def test_contradiction_with_nothing_unprotected_reads(ctx):
+    _std(ctx)
+    liar = {r[0]: r for r in _tables(_build(ctx), "hosts")[0].rows}["liar"][-1]
+    assert "—" not in liar and "0 unprotected" in liar
+
+
+def test_unprotected_with_unknown_traffic_is_a_finding(ctx):
+    """Lightweight mode keeps no traffic: unprotected services cannot be sorted into the lists, which stay empty;
+    the summary must not say there is nothing to handle."""
+    _result(ctx, {"unsupported": False, "contradictions": 0, "priority": [], "safe_to_block": [], "suspicious": [],
+                  "hosts": [hostrow("dev", services=[svc("SMB", 445, traffic="unknown", sources=None),
+                                                     svc("RDP", 3389, traffic="unknown", sources=None)])]})
+    [f] = _build(ctx).findings
+    assert "2" in f.title and "alert mode" in f.action
+
+
+def test_host_explanation_does_not_point_to_empty_lists(ctx):
+    """With no traffic to sort by, the services are in no list: the explanation says so instead of sending the
+    reader to "Fix first"."""
+    _result(ctx, {"unsupported": False, "contradictions": 0, "priority": [], "safe_to_block": [], "suspicious": [],
+                  "hosts": [hostrow("dev", services=[svc("SMB", 445, traffic="unknown", sources=None)])]})
+    text = _tables(_build(ctx), "hosts")[0].rows[0][-1]
+    assert "Fix first" not in text and "traffic" in text

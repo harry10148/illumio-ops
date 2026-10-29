@@ -604,6 +604,40 @@ def readiness_rows(ctx: AppContext, spec: FilterSpec, *, app_key: str, env_key: 
                          same_app=r[5] or 0, potentially_blocked=r[6] or 0, remote=r[7] or 0, remote_allowed=r[8] or 0)
             for r in found]
 
+class UnruledLink(BaseModel):
+    model_config = ConfigDict(frozen=True)
+    src_app: str | None
+    port: int | None
+    proto: int
+    connections: int
+
+
+def unruled_inbound(ctx: AppContext, spec: FilterSpec, *, app_key: str, env_key: str,
+                    top: int) -> dict[tuple[str | None, str | None], list[UnruledLink]]:
+    """Per destination app and environment, the busiest inbound connections with no rule allowing them (reported
+    potentially blocked: enforcement would block them), by source app and service: the rules to write first."""
+    fdb, gen, settings = _store_read(ctx)
+    with fdb.connect() as conn:
+        require_same_pce(conn, settings.pce)
+        for name, fn in sql_functions().items():
+            conn.create_function(name, -1, fn, deterministic=True)
+        where, params = to_sql(spec, wide=wide_window(conn, spec))
+        sub = (f"SELECT f.port, f.proto, f.num_connections AS n, {_label_of('src')} AS sa, {_label_of('dst')} AS da, "
+               f"{_label_of('dst')} AS de FROM flows f WHERE {where} AND f.dst_managed = 1 "
+               "AND f.policy_decision = 'potentially_blocked'")
+        found = conn.execute(
+            "SELECT da, de, sa, port, proto, n FROM (SELECT NULLIF(da, '') AS da, NULLIF(de, '') AS de, "
+            "NULLIF(sa, '') AS sa, port, proto, SUM(n) AS n, ROW_NUMBER() OVER (PARTITION BY da, de "
+            "ORDER BY SUM(n) DESC, sa, port) AS rn FROM (" + sub + ") GROUP BY da, de, sa, port, proto) WHERE rn <= ?",
+            [app_key, app_key, env_key, *params, top]).fetchall()
+    if fdb.generation != gen:
+        raise StaleGeneration
+    out: dict[tuple[str | None, str | None], list[UnruledLink]] = {}
+    for da, de, sa, port, proto, n in found:
+        out.setdefault((da, de), []).append(UnruledLink(src_app=sa, port=port, proto=proto, connections=n or 0))
+    return out
+
+
 def new_user_pairs(ctx: AppContext, ports: Sequence[PortProto], *, since: datetime) -> list[UserPair]:
     """User x destination x port combinations first seen since `since` (spec §6.5.7, "new combinations
     against the baseline"). user_baseline holds only connections with a user (about a tenth of them on

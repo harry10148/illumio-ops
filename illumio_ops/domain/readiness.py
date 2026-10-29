@@ -33,6 +33,15 @@ class Readiness:
     blocking: str | None  # the factor that costs the most points
 
 
+def score_with(parts: dict[str, float | None], factor: str) -> float | None:
+    """The score with one factor at full marks: what fixing the factor that costs most would give."""
+    known = {k: v for k, v in parts.items() if v is not None}
+    if factor not in known:
+        return None
+    known[factor] = 1.0
+    return 100 * sum(WEIGHTS[k] * v for k, v in known.items()) / sum(WEIGHTS[k] for k in known)
+
+
 def readiness(i: ReadinessInputs) -> Readiness:
     def share(n: float, d: int) -> float | None:
         return n / d if d else None

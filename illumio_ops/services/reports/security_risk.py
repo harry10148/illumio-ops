@@ -15,7 +15,13 @@ from illumio_ops.domain.findings_rules import (
     SEVERITY_RANK,
     RuleOutcome,
 )
-from illumio_ops.domain.maturity import MaturityInputs, maturity
+from illumio_ops.domain.maturity import WEIGHTS as MATURITY_WEIGHTS
+from illumio_ops.domain.maturity import (
+    MaturityInputs,
+    losing_most,
+    maturity,
+    score_with,
+)
 from illumio_ops.domain.ransomware import service_coverage
 from illumio_ops.domain.report import (
     Column,
@@ -54,6 +60,19 @@ UNCOVERED = (PolicyDecision.POTENTIALLY_BLOCKED, PolicyDecision.BLOCKED)
 PB_ONLY = (PolicyDecision.POTENTIALLY_BLOCKED,)
 MODES = ("full", "selective", "visibility_only", "idle")
 _CATEGORY_ORDER = {c: i for i, c in enumerate(CATEGORY_KEYS)}
+_PART_KEYS = {"enforcement": "rpt_sec_part_enforcement", "policy": "rpt_sec_part_policy",
+              "lateral": "rpt_sec_part_lateral", "managed": "rpt_sec_part_managed",
+              "ransomware": "rpt_sec_part_ransomware"}
+_PART_MEASURES = {"enforcement": "rpt_sec_measures_enforcement", "policy": "rpt_sec_measures_policy",
+                  "lateral": "rpt_sec_measures_lateral", "managed": "rpt_sec_measures_managed",
+                  "ransomware": "rpt_sec_measures_ransomware"}
+_PART_FULL = {"enforcement": "rpt_sec_full_enforcement", "policy": "rpt_sec_full_policy",
+              "lateral": "rpt_sec_full_lateral", "managed": "rpt_sec_full_managed",
+              "ransomware": "rpt_sec_full_ransomware"}
+# grade -> (score range, what it means for segmentation)
+_GRADE_KEYS = {"A": ("rpt_rdy_range_a", "rpt_sec_means_a"), "B": ("rpt_rdy_range_b", "rpt_sec_means_b"),
+               "C": ("rpt_rdy_range_c", "rpt_sec_means_c"), "D": ("rpt_rdy_range_d", "rpt_sec_means_d"),
+               "F": ("rpt_rdy_range_f", "rpt_sec_means_f")}
 _KPI_KEYS = {
     "maturity": "rpt_sec_kpi_maturity", "enforced_hosts_pct": "rpt_sec_kpi_enforced_hosts",
     "allowed_pct": "rpt_sec_kpi_allowed_pct", "pb_flows": "rpt_sec_kpi_pb_flows",
@@ -134,28 +153,56 @@ def build_security_risk(inp: BuildInput) -> ReportDocument:
     now_flow = _flow_kpis(totals)
     values: dict[str, float | int | None] = {
         # Without matching traffic the score would rest on the inventory alone: not shown (Review Focus 1).
-        "maturity": round(score.score, 1) if score.score is not None and totals.flows else None,
+        # whole points, as the explanation says them
+        "maturity": round(score.score) if score.score is not None and totals.flows else None,
         "enforced_hosts_pct": round(100 * (modes["full"] + modes["selective"]) / len(hosts), 1) if hosts else None,
         **{k: (now_flow[k] if totals.flows else None) for k in _FLOW_KPIS},
         "critical_high_findings": len(fired) if totals.flows else None,
         "ransomware_protected_pct": round(100 * rw_counts[1] / rw_counts[0], 1) if rw_counts else None,
         "lateral_detections": sum(n for n, _ in detections.values()),
     }
+    def maturity_note() -> str:
+        worst = losing_most(score.parts)
+        if worst is None:
+            return t("rpt_sec_maturity_full", grade=score.grade)
+        fixed = score_with(score.parts, worst)
+        return t("rpt_sec_maturity_note", grade=score.grade, part=t(_PART_KEYS[worst]),
+                 got=f"{MATURITY_WEIGHTS[worst] * (score.parts[worst] or 0):.0f}", weight=MATURITY_WEIGHTS[worst],
+                 fixed=f"{fixed:.0f}" if fixed is not None else "—")
     notes: dict[str, str | None] = {k: (no_flows if values[k] is None else None) for k in _FLOW_KPIS}
     notes.update(
-        maturity=(no_flows if not totals.flows else
-                  t("rpt_sec_grade", grade=score.grade, parts=sum(1 for v in score.parts.values() if v is not None))
-                  if score.grade else t("rpt_sec_maturity_none")),
+        maturity=(no_flows if not totals.flows else maturity_note() if score.grade else t("rpt_sec_maturity_none")),
         enforced_hosts_pct=None if hosts else t("rpt_sec_no_hosts"),
         critical_high_findings=None if totals.flows else no_flows,
         ransomware_protected_pct=None if rw_counts else t("rpt_sec_rw_no_data"),
         lateral_detections=t("rpt_sec_detections_all_hosts"))
-    percent = {"maturity", "enforced_hosts_pct", "allowed_pct", "ransomware_protected_pct"}
+    percent = {"enforced_hosts_pct", "allowed_pct", "ransomware_protected_pct"}
     higher = {"maturity", "enforced_hosts_pct", "allowed_pct", "ransomware_protected_pct"}
     kpis = tuple(Kpi(key=k, label=t(label), value=values[k],
                      previous=before[k] if before is not None and k in before else None,
                      unit="percent" if k in percent else "count", better="higher" if k in higher else "lower",
                      note=notes.get(k)) for k, label in _KPI_KEYS.items())
+
+    # ── how the maturity score is worked out ────────────────────────────────
+    def got(part: str) -> str:
+        v = score.parts.get(part)
+        if v is None or not totals.flows:
+            return t("rpt_sec_part_no_data")
+        return t("rpt_sec_part_got", got=f"{MATURITY_WEIGHTS[part] * v:.0f}", weight=MATURITY_WEIGHTS[part])
+    parts_table = TableBlock(
+        title=t("rpt_sec_tbl_parts"),
+        columns=(Column(key="part", label=t("rpt_sec_col_part")), Column(key="measures", label=t("rpt_rdy_col_measures")),
+                 Column(key="full", label=t("rpt_rdy_col_full_marks")), Column(key="points", label=t("rpt_rdy_col_points")),
+                 Column(key="now", label=t("rpt_sec_col_this_period"))),
+        rows=tuple((t(_PART_KEYS[k]), t(_PART_MEASURES[k]), t(_PART_FULL[k]), str(w), got(k))
+                   for k, w in MATURITY_WEIGHTS.items()),
+        total_rows=len(MATURITY_WEIGHTS), empty_text="")
+    grades_table = TableBlock(
+        title=t("rpt_rdy_tbl_grades"),
+        columns=(Column(key="grade", label=t("rpt_rdy_col_grade")), Column(key="range", label=t("rpt_rdy_col_range")),
+                 Column(key="means", label=t("rpt_rdy_col_means"))),
+        rows=tuple((g, t(rng), t(means)) for g, (rng, means) in _GRADE_KEYS.items()),
+        total_rows=len(_GRADE_KEYS), empty_text="")
 
     # ── coverage ────────────────────────────────────────────────────────────
     def pct(n: int, d: int) -> str:
@@ -298,12 +345,14 @@ def build_security_risk(inp: BuildInput) -> ReportDocument:
     filter_line = flowsections.filter_text(cond, lang)
     quality = (*coverage_note(inp.ctx, inp.start, inp.end, lang, now=inp.now, tz=inp.tz, flows=True),
                *((t("rpt_quality_filter", filter=filter_line),) if filter_line else ()),
-               t("rpt_trf_quality_counts"), t("rpt_sec_quality_maturity"), *flowsections.coverage_lines(inp, fc))
+               t("rpt_trf_quality_counts"), *flowsections.coverage_lines(inp, fc))
     return ReportDocument(
         report_type=inp.params.report_type, lang=lang, title=t("rpt_title_security_risk"), period_start=inp.start,
         period_end=inp.end, generated_at=inp.now, pce_label=inp.pce_label, kpis=kpis,
         findings=findings.as_findings(fired, lang, limit=KEY_FINDINGS), data_quality=quality,
         sections=(
+            Section(id="how", title=t("rpt_sec_sec_how"), intro=t("rpt_sec_how_intro"),
+                    blocks=(parts_table, grades_table)),
             Section(id="coverage", title=t("rpt_sec_sec_coverage"), intro=t("rpt_sec_coverage_intro"),
                     blocks=(coverage, direction)),
             Section(id="uncovered", title=t("rpt_sec_sec_uncovered"), intro=t("rpt_sec_uncovered_intro"),

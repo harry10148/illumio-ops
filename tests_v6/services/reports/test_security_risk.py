@@ -83,7 +83,7 @@ def test_maturity_from_inventory_and_connections(ctx):
     doc = _build(ctx)
     kpi = {k.key: k for k in doc.kpis}
     # enforcement 0.75 x40, policy 0.75 x25, lateral 1 x15, managed 1 x10; no ransomware data: out of 90
-    assert kpi["maturity"].value == pytest.approx(round(100 * (30 + 18.75 + 15 + 10) / 90, 1))
+    assert kpi["maturity"].value == round(100 * (30 + 18.75 + 15 + 10) / 90)  # whole points
     assert "B" in kpi["maturity"].note
 
 
@@ -155,4 +155,26 @@ def test_lateral_summary_points_to_report(ctx):
 def test_zh_tw_builds(ctx):
     _write(ctx, [flow(port=5900)])
     doc = _build(ctx, lang=Language.ZH_TW)
-    assert doc.title and doc.findings[0].title == "勒索軟體高風險遠端存取 Port"
+    assert doc.title and doc.findings[0].title == "勒索軟體高風險遠端存取 port"
+
+
+# ── readable (2026-10-29: customers could not read the scores; keep them, explain them) ──────────────────────
+
+def test_how_maturity_is_scored_with_this_periods_points(ctx):
+    _inventory(ctx, [("a1", "full", "Web", "Dev"), ("a2", "visibility_only", "Web", "Dev")])
+    _write(ctx, [flow(port=443, conns=3), flow(port=443, decision="potentially_blocked", conns=7)])
+    doc = _build(ctx)
+    assert doc.sections[0].id == "how"
+    parts, grades = _tables(doc, "how")
+    assert len(parts.rows) == 5 and {r[3] for r in parts.rows} == {"40", "25", "15", "10"}
+    enforced = next(r for r in parts.rows if r[0] == "Hosts enforced")
+    assert enforced[4].startswith("20 of 40")  # half the hosts enforced: 20 of its 40 points
+    assert [r[0] for r in grades.rows] == ["A", "B", "C", "D", "F"]
+
+
+def test_maturity_note_names_the_part_losing_most_and_the_score_without_it(ctx):
+    _inventory(ctx, [("a1", "full", "Web", "Dev")])
+    _write(ctx, [flow(port=443, decision="potentially_blocked", conns=10)])
+    k = {x.key: x for x in _build(ctx).kpis}["maturity"]
+    assert k.unit == "count" and isinstance(k.value, int)
+    assert "Allowed by a rule" in k.note and "about" in k.note

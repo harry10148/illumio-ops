@@ -245,6 +245,19 @@ SIEM 轉送（22.4 萬筆全數送達）**；GUI 告警收件匣 146 則從未�
 - 保留的 v3.1 原則：每頁一顆主要動作、人話文案、畫面不印路由／設定鍵名／原始 JSON；Direction D 視覺 token
   （白底、細線、Orange 只給動作、Montserrat＋Noto Sans TC，P1 已實作）沿用【判斷 修訂】。
 
+### 6.2.1 中文用語【使用者 2026-10-29】
+
+PCE 主控台沒有中文介面（原廠中文文件的截圖欄位也是英文），客戶在報表看到的字要能回主控台找到，所以：
+
+| 保留英文（照主控台寫法與大小寫） | 翻成中文 |
+|---|---|
+| PCE、VEN、Explorer、Rule Hit Count | 主機（一般稱呼；指 PCE 物件時寫 Workload）、受管／非受管 |
+| Workload、Ruleset、Deny Rule、Override Deny、Label、IP List | 規則（Illumio 的允許規則）、政策、服務、連線、流量、強制（概念） |
+| 強制模式 Idle、Visibility Only、Selective、Full | port 一律小寫 port，不寫「連接埠」 |
+| 判定 Allowed、Potentially Blocked、Blocked、Unknown；Draft、Active、Provision；Visibility | 動作「擋下」「允許」用中文，判定值用英文 |
+
+守門：`tests_v6/i18n/test_terminology.py` 列出每個不得出現在 zh_TW 的舊寫法（例如「可能被擋」「agent」「標籤」「full 強制」），出現即紅。
+
 ### 6.3 架構分層【判斷】
 
 ```
