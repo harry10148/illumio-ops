@@ -214,3 +214,12 @@ def test_unprotected_with_unknown_traffic_is_a_finding(ctx):
                                                      svc("RDP", 3389, traffic="unknown", sources=None)])]})
     [f] = _build(ctx).findings
     assert "2" in f.title and "alert mode" in f.action
+
+
+def test_host_explanation_does_not_point_to_empty_lists(ctx):
+    """With no traffic to sort by, the services are in no list: the explanation says so instead of sending the
+    reader to "Fix first"."""
+    _result(ctx, {"unsupported": False, "contradictions": 0, "priority": [], "safe_to_block": [], "suspicious": [],
+                  "hosts": [hostrow("dev", services=[svc("SMB", 445, traffic="unknown", sources=None)])]})
+    text = _tables(_build(ctx), "hosts")[0].rows[0][-1]
+    assert "Fix first" not in text and "traffic" in text

@@ -1673,5 +1673,6 @@
   "rpt_rw_exposure_fully_protected": "已完全防護",
   "rpt_rw_finding_unsorted": "{n} 個未防護的高風險服務無法判斷是否有人使用",
   "rpt_rw_finding_unsorted_why": "要分到「優先修補」或「可直接封鎖」，需要近 30 天的流量，而這個安裝沒有保存流量（輕量模式）。",
-  "rpt_rw_finding_unsorted_action": "到「主機與分數」看各主機未防護的服務；要自動分類，請到「資料收集」頁改為告警模式。"
+  "rpt_rw_finding_unsorted_action": "到「主機與分數」看各主機未防護的服務；要自動分類，請到「資料收集」頁改為告警模式。",
+  "rpt_rw_explain_open_unsorted": "{n} 個高風險服務未防護（{names}）。沒有保存流量，不知道是否有人使用，所以不在任何清單：先確認哪些必須對外開放，其餘加上防護。"
 }

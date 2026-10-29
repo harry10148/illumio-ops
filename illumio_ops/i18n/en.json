@@ -1673,5 +1673,6 @@
   "rpt_rw_exposure_fully_protected": "Fully protected",
   "rpt_rw_finding_unsorted": "{n} unprotected high-risk service(s) could not be sorted by use",
   "rpt_rw_finding_unsorted_why": "Sorting them into “Fix first” and “Safe to block now” needs the last 30 days of traffic, which this install does not keep (lightweight mode).",
-  "rpt_rw_finding_unsorted_action": "See each host's unprotected services under “Hosts and their scores”; to have them sorted automatically, switch to alert mode on the Data collection page."
+  "rpt_rw_finding_unsorted_action": "See each host's unprotected services under “Hosts and their scores”; to have them sorted automatically, switch to alert mode on the Data collection page.",
+  "rpt_rw_explain_open_unsorted": "{n} high-risk service(s) unprotected ({names}). Whether anyone uses them is unknown (no traffic kept), so they are in no list: decide which must stay reachable, and protect the rest."
 }

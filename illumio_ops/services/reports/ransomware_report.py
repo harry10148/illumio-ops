@@ -140,6 +140,8 @@ def build_ransomware(inp: BuildInput) -> ReportDocument:
         shown = ", ".join(names[:NAMES_SHOWN])
         if len(names) > NAMES_SHOWN:
             shown = t("rpt_rw_names_more", names=shown, n=len(names) - NAMES_SHOWN)
+        if all(s.get("traffic") == "unknown" for s in open_):  # no traffic to sort by: in no list
+            return t("rpt_rw_explain_open_unsorted", n=len(open_), names=shown)
         return t("rpt_rw_explain_open", n=len(open_), names=shown)
 
     def exposure(v: Any) -> str:
