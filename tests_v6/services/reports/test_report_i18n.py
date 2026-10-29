@@ -11,18 +11,20 @@ from openpyxl import load_workbook
 
 from illumio_ops.domain.filter import EndpointFilter, FlowCondition, LabelCond
 from illumio_ops.domain.findings_rules import RULES
-from illumio_ops.domain.values import DataOrigin, Language, ReportType
+from illumio_ops.domain.values import DataOrigin, Language, ReportType, RhcState
+from illumio_ops.pce.policy import PendingItem, PolicyNames
 from illumio_ops.services.analysis.predicted_block import (
     PredictedGroup,
     PredictedSummary,
 )
 from illumio_ops.services.analysis.ransomware import HostRansomware
-from illumio_ops.services.reports import ransomware_report
+from illumio_ops.services.reports import ransomware_report, rule_hit_count
 from illumio_ops.services.reports import readiness as readiness_report
 from illumio_ops.services.reports.registry import BuildInput, ReportParams, specs
 from illumio_ops.services.reports.render_email import render_email
 from illumio_ops.services.reports.render_html import render_html
 from illumio_ops.services.reports.render_xlsx import render_xlsx
+from illumio_ops.services.rhc import RhcPull, RhcRow, RhcStatus
 from illumio_ops.store.flowdb import analysis
 from illumio_ops.store.flowdb.db import db_time
 from illumio_ops.store.flowdb.events import upsert_events
@@ -42,6 +44,8 @@ from tests_v6.services.reports.test_unmanaged import _rollup
 NOW = datetime(2026, 10, 27, 1, 0, tzinfo=UTC)
 START, END = datetime(2026, 10, 20, tzinfo=UTC), datetime(2026, 10, 27, tzinfo=UTC)
 RAW_KEY = re.compile(r"\b(?:rpt|gui_reports|detector_name|decision|severity)_[a-z0-9_]+\b")
+# PCE console words zh_TW keeps in English (spec §6.2.1): not report copy left untranslated.
+PCE_TERMS = frozenset({"Rule Hit Count", "Override Deny"})
 APP_DB = FlowCondition(dst=EndpointFilter(labels=(LabelCond(key="app", values=("DB",)),)))
 EN = json.loads((Path(__file__).resolve().parents[3] / "illumio_ops/i18n/en.json")
                 .read_text(encoding="utf-8"))
@@ -70,10 +74,34 @@ def ctx(tmp_path_factory):
         groups=[PredictedGroup(dst_app="DB", rule_href="/orgs/1/sec_policy/draft/rule_sets/1/deny_rules/2", flows=3,
                                connections=7)], rules={}, blocked_flows=3, blocked_connections=7, undetermined_flows=2, capped=True,
         computed_at=NOW, unsupported=False, missing_rules=["/orgs/1/sec_policy/draft/rule_sets/1/deny_rules/2"]))
+    _rhc_sample(mp)
     mp.setattr(ransomware_report, "host_ransomware", lambda ctx, href, **kw: HostRansomware.model_construct(
         breakdown=None, allow_rules={"445/6": []}, allow_status={"445/6": "error"}))
     yield c
     mp.undo()
+
+
+def _rhc_sample(mp):
+    """Rule Hit Count on, one rule hit, one at 0, one with no record, one pending change (P5c-2)."""
+    a = "/orgs/1/sec_policy/active/rule_sets/1"
+    mp.setattr(rule_hit_count, "rhc_status", lambda ctx: RhcStatus(
+        state=RhcState.ENABLED, pce_report=True, ven_scopes=True, reason_key=None, detail=None, write_key=True,
+        saas=False))
+    mp.setattr(rule_hit_count, "pull_rhc", lambda ctx, start, end: RhcPull(rows=[
+        RhcRow(rule_href=f"{a}/sec_rules/1", ruleset_name="Web", description="", hit_count=9,
+               last_hit_at="2026-10-26T10:00:00Z"),
+        RhcRow(rule_href=f"{a}/sec_rules/2", ruleset_name="Web", description="", hit_count=0, last_hit_at=None),
+        RhcRow(rule_href=f"{a}/sec_rules/9", ruleset_name="Old", description="", hit_count=1, last_hit_at=None)],
+        start=start, end=end, unparsed=1))
+    rule = {"consumers": [], "providers": [], "ingress_services": [], "enabled": True}
+    mp.setattr(rule_hit_count, "fetch_rule_sets", lambda client, pversion, *, deadline: [
+        {"href": a, "name": "Web", "rules": [{**rule, "href": f"{a}/sec_rules/{i}"} for i in (1, 2, 3)],
+         "deny_rules": [{**rule, "href": f"{a}/deny_rules/4", "override": True}]}])
+    mp.setattr(rule_hit_count, "fetch_policy_names",
+               lambda client, pversion, *, deadline: PolicyNames(labels={}, names={}))
+    mp.setattr(rule_hit_count, "fetch_pending", lambda client, *, deadline: [PendingItem(
+        kind="rule_sets", href="/orgs/1/sec_policy/draft/rule_sets/7", name="New", update_type="create",
+        updated_at="2026-10-26T00:00:00Z")])
 
 
 def _p5b2_sample(c):
@@ -161,7 +189,7 @@ def test_no_raw_keys_in_output(ctx, report_type, lang):
 @pytest.mark.parametrize("report_type", list(ReportType))
 def test_zh_tw_has_no_english_report_copy(ctx, report_type):
     english = [v for k, v in EN.items() if k.startswith(("rpt_", "detector_name_")) and len(v) > 12
-               and not re.search(r"\{\w+\}", v) and v.isascii()]
+               and not re.search(r"\{\w+\}", v) and v.isascii() and v not in PCE_TERMS]
     for kind, text in _outputs(ctx, report_type, Language.ZH_TW).items():
         leaked = [s for s in english if s in text]
         assert leaked == [], f"{report_type} {kind}: {leaked[:3]}"

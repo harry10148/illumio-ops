@@ -392,6 +392,7 @@ class ReportType(StrEnum):
     RANSOMWARE = "ransomware"
     READINESS = "readiness"
     POLICY_USAGE = "policy_usage"
+    RULE_HIT_COUNT = "rule_hit_count"
 
 
 class ReportFormat(StrEnum):

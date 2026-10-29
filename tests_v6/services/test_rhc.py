@@ -10,6 +10,8 @@ from illumio_ops.domain.values import RhcState
 from illumio_ops.services import rhc
 from tests_v6.services.collect.conftest import configured_ctx
 
+pytestmark = pytest.mark.real_rhc
+
 ORG = "https://pce.example.com:8443/api/v2/orgs/1"
 TPL = f"{ORG}/report_templates/rule_hit_count_report"
 ACTIVE_FW = f"{ORG}/sec_policy/active/firewall_settings"
@@ -271,3 +273,17 @@ def test_pull_refused(ctx):
     with pytest.raises(rhc.RhcPullError) as e:
         rhc.pull_rhc(ctx, START, END)
     assert e.value.key == "rhc_err_pull_refused" and "not enabled" in (e.value.detail or "")
+
+
+@responses.activate
+def test_cached_status_reuses_a_recent_check(wctx):
+    """The report catalog asks on every load; the PCE is asked at most once per STATUS_CACHE_SECONDS, and an
+    explicit check (rhc_status) refreshes it."""
+    responses.add(responses.GET, TPL, json={"enabled": True})
+    responses.add(responses.GET, ACTIVE_FW, json={"rule_hit_count_enabled_scopes": [[]]})
+    rhc.forget_status()
+    assert rhc.cached_status(wctx).state is RhcState.ENABLED
+    assert rhc.cached_status(wctx).state is RhcState.ENABLED
+    assert len(responses.calls) == 2
+    rhc.rhc_status(wctx)
+    assert len(responses.calls) == 4

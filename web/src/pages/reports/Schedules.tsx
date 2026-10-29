@@ -71,7 +71,11 @@ function Editor({ initial, catalog, smtp, onSave, onCancel, error }: {
                   lookback_days: fitLookback(s.lookback_days, next?.max_lookback) });
             if (next?.requires_app && !namesApp(rows)) setRows([...rows, { side: "dst", key: "app", value: "" }]);
           }}>
-          {catalog.entries.map((c) => <option key={c.report_type} value={c.report_type}>{word(TYPE_KEYS, c.report_type)}</option>)}
+          {catalog.entries.map((c) => (
+            <option key={c.report_type} value={c.report_type} disabled={!c.available && c.report_type !== initial.report_type}>
+              {word(TYPE_KEYS, c.report_type)}
+            </option>
+          ))}
         </select>
       </label>
       <label>

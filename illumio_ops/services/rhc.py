@@ -10,6 +10,7 @@ from __future__ import annotations
 import csv
 import io
 import re
+import threading
 import time
 from datetime import UTC, datetime
 from typing import Any
@@ -33,6 +34,7 @@ ALL_VENS: list[list[Any]] = [[]]
 STEPS = ("pce_report_template", "ven_firewall_settings_draft", "provisioned")
 PULL_TIMEOUT_SECONDS = 600
 POLL_SECONDS = 5
+STATUS_CACHE_SECONDS = 300
 _TRANSPORT = (PceTransportError, PceBudgetExhausted)
 _sleep = time.sleep
 
@@ -94,8 +96,39 @@ def _scopes_on(body: Any) -> bool:
     return isinstance(body, dict) and bool(body.get("rule_hit_count_enabled_scopes"))
 
 
+_cache: dict[tuple[str, str, bool], tuple[float, RhcStatus]] = {}
+_cache_lock = threading.Lock()
+
+
+def _cache_key(ctx: AppContext) -> tuple[str, str, bool]:
+    pce = ctx.settings.current().pce
+    return (pce.url, pce.org_id, _has_write_key(ctx))
+
+
+def forget_status() -> None:
+    with _cache_lock:
+        _cache.clear()
+
+
+def cached_status(ctx: AppContext) -> RhcStatus:
+    """A check from the last STATUS_CACHE_SECONDS, else a fresh one: the report catalog asks on every load."""
+    key = _cache_key(ctx)
+    with _cache_lock:
+        hit = _cache.get(key)
+    if hit is not None and time.monotonic() - hit[0] < STATUS_CACHE_SECONDS:
+        return hit[1]
+    return rhc_status(ctx)
+
+
 def rhc_status(ctx: AppContext) -> RhcStatus:
-    """Never raises: what cannot be read is `unknown`, with the reason."""
+    """Never raises: what cannot be read is `unknown`, with the reason. Every check refreshes cached_status."""
+    result = _read_status(ctx)
+    with _cache_lock:
+        _cache[_cache_key(ctx)] = (time.monotonic(), result)
+    return result
+
+
+def _read_status(ctx: AppContext) -> RhcStatus:
     write_key, saas = _has_write_key(ctx), ctx.settings.current().pce.deployment_type is DeploymentType.SAAS
 
     def status(state: RhcState, pce: bool | None, ven: bool | None, reason: str | None,

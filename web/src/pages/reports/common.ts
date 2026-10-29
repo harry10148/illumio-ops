@@ -14,6 +14,7 @@ export const TYPE_KEYS: Record<string, string> = {
   ransomware: "rpt_title_ransomware",
   readiness: "rpt_title_readiness",
   policy_usage: "rpt_title_policy_usage",
+  rule_hit_count: "rpt_title_rule_hit_count",
 };
 export const TYPE_DESC_KEYS: Record<string, string> = {
   lateral_posture: "gui_reports_desc_lateral_posture",
@@ -28,6 +29,7 @@ export const TYPE_DESC_KEYS: Record<string, string> = {
   ransomware: "gui_reports_desc_ransomware",
   readiness: "gui_reports_desc_readiness",
   policy_usage: "gui_reports_desc_policy_usage",
+  rule_hit_count: "gui_reports_desc_rule_hit_count",
 };
 export const GROUP_KEYS: Record<string, string> = {
   lateral: "gui_reports_group_lateral", inventory: "gui_reports_group_inventory",
