@@ -1798,7 +1798,7 @@
   "rpt_rhc_col_last_hit": "最後命中",
   "rpt_rhc_tbl_hit": "期間內有命中的規則",
   "rpt_rhc_tbl_zero": "有紀錄但 0 次的規則",
-  "rpt_rhc_tbl_no_record": "沒有紀錄的已 Provision 規則",
+  "rpt_rhc_tbl_no_record": "已 Provision、沒有紀錄",
   "rpt_rhc_none_hit": "期間內沒有規則被命中。",
   "rpt_rhc_none_zero": "有紀錄的規則都至少被命中一次。",
   "rpt_rhc_none_no_record": "啟用中的已 Provision 規則都有紀錄。",
@@ -1807,14 +1807,14 @@
   "rpt_rhc_sec_hit": "有命中的規則",
   "rpt_rhc_hit_intro": "命中次數多的在前。",
   "rpt_rhc_sec_zero": "0 次的規則",
-  "rpt_rhc_zero_intro": "已 Provision 且有計數，但期間內沒有被命中。可列入檢視；為少見作業（年度批次、災難備援）而設的規則維持 0 次是正常的。",
+  "rpt_rhc_zero_intro": "已 Provision 且有計數，但期間內沒有被命中。允許規則 0 次可列入檢視；為少見作業（年度批次、災難備援）而設的規則維持 0 次是正常的。Deny Rule 0 次只代表沒有人嘗試它擋住的路。",
   "rpt_rhc_sec_no_record": "沒有紀錄的規則",
-  "rpt_rhc_no_record_intro": "啟用中、已 Provision，但 PCE 沒有計數的規則。這不代表規則沒在用：請確認它何時 Provision、Rule Hit Count 何時開啟。",
+  "rpt_rhc_no_record_intro": "啟用中、已 Provision，但 PCE 沒有計數的規則。這不代表規則沒在用：請確認它何時 Provision、Rule Hit Count 何時開啟。第二個表（若有）列出 PCE 報表有列、但不在生效政策中的規則——只在 Draft，或之後被刪除：它們同樣沒有計數，不是 0 次。",
   "rpt_rhc_sec_pending": "等待 Provision 的變更",
   "rpt_rhc_pending_intro": "Rule Hit Count 只計算已 Provision 的規則，還在 Draft 的變更不在這份報表裡。",
   "rpt_rhc_pending_none": "沒有等待 Provision 的變更：上面的規則就是完整的政策。",
   "rpt_rhc_pending_some": "有 {n} 項變更還在 Draft、尚未 Provision，所以這裡沒有它們的計數。要看期間內的流量會怎麼用到它們，請看「規則使用」報表。",
-  "rpt_rhc_finding_zero": "{n} 條已 Provision 規則在期間內 0 次命中",
+  "rpt_rhc_finding_zero": "{n} 條已 Provision 的允許規則在期間內 0 次命中",
   "rpt_rhc_finding_zero_why": "沒人用的規則仍然開著一條攻擊者可以利用的路。",
   "rpt_rhc_finding_zero_action": "與應用負責人確認每條規則是否仍需要；不需要的移除或縮小範圍。",
   "rpt_rhc_finding_pending": "有 {n} 項變更等待 Provision",
@@ -1825,5 +1825,5 @@
   "rpt_rhc_quality_gone": "有 {n} 條有計數的規則已不在生效政策中（之後被刪除或變更），以 PCE 報表中的 Ruleset 名稱列出。",
   "rpt_rhc_col_last_hit_ever": "最後命中（不限期間）",
   "rpt_rhc_never": "從未",
-  "rpt_rhc_tbl_unprovisioned": "PCE 報表有列、但不在生效政策中的規則（只在 Draft，或之後被刪除）：沒有計數，不是 0 次"
+  "rpt_rhc_tbl_unprovisioned": "有列出、未 Provision"
 }

@@ -173,3 +173,18 @@ def test_zero_table_shows_last_hit_before_the_period(ctx, monkeypatch):
                  last_hit_at="2026-06-26T09:09:16Z")
     monkeypatch.setattr(rule_hit_count, "pull_rhc", lambda ctx, start, end: _pull(rows=[_pull().rows[0], old]))
     assert "2026-06-26" in _table(_build(ctx), "zero").rows[0][3]
+
+
+def test_zero_finding_counts_allow_rules_only(ctx, monkeypatch):
+    """Lab 2026-10-30: a Deny Rule at 0 means nothing tried the blocked path — not an open path to review."""
+    d = "/orgs/1/sec_policy/active/rule_sets/2/deny_rules/5"
+    sets = [*RULE_SETS, {"href": "/orgs/1/sec_policy/active/rule_sets/2", "name": "Guard", "rules": [],
+                         "deny_rules": [{"href": d, "enabled": True, "consumers": [], "providers": [],
+                                         "ingress_services": []}]}]
+    monkeypatch.setattr(rule_hit_count, "fetch_rule_sets", lambda client, pversion, *, deadline: sets)
+    zero_deny = RhcRow(rule_href=d, ruleset_name="Guard", description="", hit_count=0, last_hit_at=None)
+    monkeypatch.setattr(rule_hit_count, "pull_rhc", lambda ctx, start, end: _pull(rows=[*_pull().rows, zero_deny]))
+    doc = _build(ctx)
+    assert len(_table(doc, "zero").rows) == 2
+    [f] = [f for f in doc.findings if "0 hits" in f.title]
+    assert f.title.startswith("1 ")

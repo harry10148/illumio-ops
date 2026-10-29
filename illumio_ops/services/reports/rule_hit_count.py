@@ -138,8 +138,10 @@ def build_rule_hit_count(inp: BuildInput) -> ReportDocument:
                      better="neutral" if k in ("rules", "no_record") else "higher" if k == "hit" else "lower")
                  for k, label in _KPI_KEYS.items())
     findings: list[Finding] = []
-    if zero:
-        findings.append(Finding(severity=Severity.LOW, title=t("rpt_rhc_finding_zero", n=len(zero)),
+    # An allow rule at 0 still opens a path; a Deny Rule at 0 only means nothing tried the path it blocks.
+    zero_allow = [r for r in zero if rules[r.rule_href].rule_type is RuleAction.ALLOW]
+    if zero_allow:
+        findings.append(Finding(severity=Severity.LOW, title=t("rpt_rhc_finding_zero", n=len(zero_allow)),
                                 why=t("rpt_rhc_finding_zero_why"), action=t("rpt_rhc_finding_zero_action")))
     if pending:
         findings.append(Finding(severity=Severity.LOW, title=t("rpt_rhc_finding_pending", n=len(pending)),

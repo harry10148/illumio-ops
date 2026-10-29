@@ -1798,7 +1798,7 @@
   "rpt_rhc_col_last_hit": "Last hit",
   "rpt_rhc_tbl_hit": "Rules hit in the period",
   "rpt_rhc_tbl_zero": "Rules recorded with 0 hits",
-  "rpt_rhc_tbl_no_record": "Provisioned rules with no record",
+  "rpt_rhc_tbl_no_record": "Provisioned, no record",
   "rpt_rhc_none_hit": "No rule was hit in the period.",
   "rpt_rhc_none_zero": "Every recorded rule was hit at least once.",
   "rpt_rhc_none_no_record": "Every enabled provisioned rule has a record.",
@@ -1807,14 +1807,14 @@
   "rpt_rhc_sec_hit": "Rules hit",
   "rpt_rhc_hit_intro": "Most hits first.",
   "rpt_rhc_sec_zero": "Rules with 0 hits",
-  "rpt_rhc_zero_intro": "Provisioned and counted, but nothing hit them in the period. Candidates for review; a rule for a rare job (yearly batch, disaster recovery) can legitimately stay at 0.",
+  "rpt_rhc_zero_intro": "Provisioned and counted, but nothing hit them in the period. An allow rule at 0 is a candidate for review; one for a rare job (yearly batch, disaster recovery) can legitimately stay at 0. A Deny Rule at 0 only means nothing tried the path it blocks.",
   "rpt_rhc_sec_no_record": "Rules with no record",
-  "rpt_rhc_no_record_intro": "Enabled provisioned rules the PCE has no count for. Not evidence that a rule is unused: check when it was provisioned and when Rule Hit Count was turned on.",
+  "rpt_rhc_no_record_intro": "Enabled provisioned rules the PCE has no count for. Not evidence that a rule is unused: check when it was provisioned and when Rule Hit Count was turned on. The second table (when present) lists rules the PCE's report includes although they are not in the provisioned policy — only in Draft, or deleted since: they have no count either, and are not 0.",
   "rpt_rhc_sec_pending": "Changes waiting to be provisioned",
   "rpt_rhc_pending_intro": "Rule Hit Count counts provisioned rules only; changes still in Draft are not in this report.",
   "rpt_rhc_pending_none": "Nothing is waiting to be provisioned: the rules above are the whole policy.",
   "rpt_rhc_pending_some": "{n} change(s) are in Draft and not provisioned, so they have no counts here. Use the Policy usage report to see how the period's traffic would use them.",
-  "rpt_rhc_finding_zero": "{n} provisioned rule(s) had 0 hits in the period",
+  "rpt_rhc_finding_zero": "{n} provisioned allow rule(s) had 0 hits in the period",
   "rpt_rhc_finding_zero_why": "A rule nothing uses still opens a path an attacker could use.",
   "rpt_rhc_finding_zero_action": "Check with the application owners whether each rule is still needed; remove or narrow the ones that are not.",
   "rpt_rhc_finding_pending": "{n} change(s) are waiting to be provisioned",
@@ -1825,5 +1825,5 @@
   "rpt_rhc_quality_gone": "{n} counted rule(s) are no longer in the provisioned policy (deleted or changed since); they are listed under the ruleset name the PCE reported.",
   "rpt_rhc_col_last_hit_ever": "Last hit (any time)",
   "rpt_rhc_never": "never",
-  "rpt_rhc_tbl_unprovisioned": "Listed by the PCE but not in the provisioned policy (Draft only, or deleted since): no count, not 0"
+  "rpt_rhc_tbl_unprovisioned": "Listed, not provisioned"
 }
