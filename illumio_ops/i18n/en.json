@@ -1662,11 +1662,16 @@
   "rpt_rw_state_unknown": "Unknown",
   "rpt_rw_explain_open": "{n} high-risk service(s) unprotected ({names}): see this host in “Fix first” and “Safe to block now”.",
   "rpt_rw_explain_protected": "Every high-risk service is protected.",
-  "rpt_rw_explain_contradiction": "The PCE scores it {pce} but its own service list does not match ({n} unprotected): check the host on the PCE console.",
+  "rpt_rw_explain_contradiction": "The PCE scores it {pce}, but its own service list does not match ({n} unprotected): check the host on the PCE console.",
   "rpt_rw_finding_priority": "{n} unprotected high-risk service(s) are in use",
   "rpt_rw_finding_priority_why": "They are open to any source and were reached in the last 30 days: ransomware can spread through them from those sources.",
   "rpt_rw_finding_priority_action": "Follow “Fix first”: write rules for the sources using each service, then close it to everyone else.",
   "rpt_rw_finding_safe": "{n} unprotected high-risk service(s) can be blocked now",
   "rpt_rw_finding_safe_why": "Nobody reached them in the last 30 days, yet any source could.",
-  "rpt_rw_finding_safe_action": "Follow “Safe to block now”: a deny rule or turning the service off affects no source seen."
+  "rpt_rw_finding_safe_action": "Follow “Safe to block now”: a deny rule or turning the service off affects no source seen.",
+  "rpt_rw_names_more": "{names} and {n} more",
+  "rpt_rw_exposure_fully_protected": "Fully protected",
+  "rpt_rw_finding_unsorted": "{n} unprotected high-risk service(s) could not be sorted by use",
+  "rpt_rw_finding_unsorted_why": "Sorting them into “Fix first” and “Safe to block now” needs the last 30 days of traffic, which this install does not keep (lightweight mode).",
+  "rpt_rw_finding_unsorted_action": "See each host's unprotected services under “Hosts and their scores”; to have them sorted automatically, switch to alert mode on the Data collection page."
 }

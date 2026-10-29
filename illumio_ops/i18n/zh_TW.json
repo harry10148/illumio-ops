@@ -1662,11 +1662,16 @@
   "rpt_rw_state_unknown": "未知",
   "rpt_rw_explain_open": "{n} 個高風險服務未防護（{names}）：到「優先修補」與「可直接封鎖」找這台主機的服務。",
   "rpt_rw_explain_protected": "高風險服務都已防護。",
-  "rpt_rw_explain_contradiction": "PCE 給 {pce}，但它自己的服務明細對不起來（{n} 個未防護）：請到 PCE 主控台確認這台主機。",
+  "rpt_rw_explain_contradiction": "PCE 給 {pce}，但它自己的服務明細對不起來（明細有 {n} 個未防護）：請到 PCE 主控台確認這台主機。",
   "rpt_rw_finding_priority": "{n} 個未防護的高風險服務正在被使用",
   "rpt_rw_finding_priority_why": "這些服務任何來源都連得到，近 30 天也確實有人連：勒索軟體可以從這些來源經由它們擴散。",
   "rpt_rw_finding_priority_action": "照「優先修補」處理：先替正在使用的來源寫規則，再對其他來源封住服務。",
   "rpt_rw_finding_safe": "{n} 個未防護的高風險服務可以直接封鎖",
   "rpt_rw_finding_safe_why": "近 30 天沒有人連，但任何來源都連得到。",
-  "rpt_rw_finding_safe_action": "照「可直接封鎖」處理：寫 deny rule 或關閉服務，不影響已觀察到的來源。"
+  "rpt_rw_finding_safe_action": "照「可直接封鎖」處理：寫 deny rule 或關閉服務，不影響已觀察到的來源。",
+  "rpt_rw_names_more": "{names} 等另 {n} 個",
+  "rpt_rw_exposure_fully_protected": "已完全防護",
+  "rpt_rw_finding_unsorted": "{n} 個未防護的高風險服務無法判斷是否有人使用",
+  "rpt_rw_finding_unsorted_why": "要分到「優先修補」或「可直接封鎖」，需要近 30 天的流量，而這個安裝沒有保存流量（輕量模式）。",
+  "rpt_rw_finding_unsorted_action": "到「主機與分數」看各主機未防護的服務；要自動分類，請到「資料收集」頁改為告警模式。"
 }

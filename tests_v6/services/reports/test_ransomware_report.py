@@ -182,3 +182,35 @@ def test_summary_finding_for_services_in_use(ctx):
     _std(ctx, n_priority=2)
     [f, *_] = _build(ctx).findings
     assert "2" in f.title and "Fix first" in f.action
+
+
+def test_host_explanation_names_few_services_once(ctx):
+    """Lab 2026-10-29: 24 names with S-SSH twice (TCP and UDP) in one cell."""
+    many = [svc(f"S-{i}", 1000 + i) for i in range(8)] + [svc("S-0", 2000)]
+    _result(ctx, {"unsupported": False, "contradictions": 0, "priority": [], "safe_to_block": [], "suspicious": [],
+                  "hosts": [hostrow("big", services=many)]})
+    text = _tables(_build(ctx), "hosts")[0].rows[0][-1]
+    assert text.count("S-0") == 1 and "S-7" not in text and "and 3 more" in text
+
+
+def test_exposure_in_words(ctx):
+    _result(ctx, {"unsupported": False, "contradictions": 0, "priority": [], "safe_to_block": [], "suspicious": [],
+                  "hosts": [{**hostrow("ok", services=[svc("RDP", 3389, state="protected_closed")]),
+                             "pce_exposure": "fully_protected"}]})
+    assert _tables(_build(ctx), "hosts")[0].rows[0][3] == "Fully protected"
+
+
+def test_contradiction_with_nothing_unprotected_reads(ctx):
+    _std(ctx)
+    liar = {r[0]: r for r in _tables(_build(ctx), "hosts")[0].rows}["liar"][-1]
+    assert "—" not in liar and "0 unprotected" in liar
+
+
+def test_unprotected_with_unknown_traffic_is_a_finding(ctx):
+    """Lightweight mode keeps no traffic: unprotected services cannot be sorted into the lists, which stay empty;
+    the summary must not say there is nothing to handle."""
+    _result(ctx, {"unsupported": False, "contradictions": 0, "priority": [], "safe_to_block": [], "suspicious": [],
+                  "hosts": [hostrow("dev", services=[svc("SMB", 445, traffic="unknown", sources=None),
+                                                     svc("RDP", 3389, traffic="unknown", sources=None)])]})
+    [f] = _build(ctx).findings
+    assert "2" in f.title and "alert mode" in f.action
