@@ -1545,7 +1545,6 @@
   "rpt_rdy_tbl_scores": "Readiness by app (environment)",
   "rpt_rdy_col_score": "Score",
   "rpt_rdy_col_grade": "Grade",
-  "rpt_rdy_col_blocking": "Holding it back",
   "rpt_rdy_col_modes": "Host modes",
   "rpt_rdy_sec_predicted": "What the draft policy would block",
   "rpt_rdy_predicted_intro": "The PCE recomputed the period's traffic against the draft policy: connections a deny rule would block, by destination app and rule.",

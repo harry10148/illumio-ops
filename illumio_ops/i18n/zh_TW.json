@@ -1545,7 +1545,6 @@
   "rpt_rdy_tbl_scores": "依 app（環境）的準備度",
   "rpt_rdy_col_score": "分數",
   "rpt_rdy_col_grade": "等級",
-  "rpt_rdy_col_blocking": "主要阻礙",
   "rpt_rdy_col_modes": "主機模式",
   "rpt_rdy_sec_predicted": "草稿政策會擋下什麼",
   "rpt_rdy_predicted_intro": "PCE 依草稿政策重算期間內的流量：會被 deny rule 擋下的連線，依目的端 app 與規則列出。",

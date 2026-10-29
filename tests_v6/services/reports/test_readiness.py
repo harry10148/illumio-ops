@@ -80,7 +80,7 @@ def test_enforcement_from_inventory_exact_labels(ctx):
     _inventory(ctx, [("d1", "DB", "full"), ("d2", "DB", "selective"), ("x", "db", "full")])
     _write(ctx, [flow(src_app="Web", dst_app="DB", port=5432)])
     row = {r[0]: r for r in _table(_build(ctx), "scores").rows}["DB (Dev)"]
-    assert row[6] == "75.0%" and "1 full, 1 selective" in row[10]
+    assert row[6] == "75.0%" and "1 full, 1 selective" in row[9]
 
 
 def test_predicted_grouped_by_rule(ctx):

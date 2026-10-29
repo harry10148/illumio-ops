@@ -172,11 +172,10 @@ def build_readiness(inp: BuildInput) -> ReportDocument:
                  Column(key="grade", label=t("rpt_rdy_col_grade")),
                  Column(key="explain", label=t("rpt_rdy_col_explain")),
                  *(Column(key=k, label=t(_FACTOR_KEYS[k])) for k in WEIGHTS),
-                 Column(key="blocking", label=t("rpt_rdy_col_blocking")),
                  Column(key="modes", label=t("rpt_rdy_col_modes")), Column(key="advice", label=t("rpt_col_action"))),
-        rows=tuple((name(k), round(r.score, 1) if r.score is not None else None, r.grade or "—", explain(r),
-                    *(pct(r.parts[f]) for f in WEIGHTS), t(_FACTOR_KEYS[r.blocking]) if r.blocking else "—",
-                    modes(m), advice(r)) for k, r, m in scored),
+        # whole points, as the explanation says them
+        rows=tuple((name(k), round(r.score) if r.score is not None else None, r.grade or "—", explain(r),
+                    *(pct(r.parts[f]) for f in WEIGHTS), modes(m), advice(r)) for k, r, m in scored),
         total_rows=len(scored), empty_text=no_data)
 
     predicted_blocks: tuple[TableBlock | TextBlock, ...]
