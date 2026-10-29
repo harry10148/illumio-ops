@@ -155,7 +155,7 @@ def test_lateral_summary_points_to_report(ctx):
 def test_zh_tw_builds(ctx):
     _write(ctx, [flow(port=5900)])
     doc = _build(ctx, lang=Language.ZH_TW)
-    assert doc.title and doc.findings[0].title == "勒索軟體高風險遠端存取 Port"
+    assert doc.title and doc.findings[0].title == "勒索軟體高風險遠端存取 port"
 
 
 # ── readable (2026-10-29: customers could not read the scores; keep them, explain them) ──────────────────────
