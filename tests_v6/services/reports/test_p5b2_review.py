@@ -116,7 +116,7 @@ def test_no_traffic_not_scored(ctx):
     doc = _build(ctx, ReportType.READINESS)
     db = {r[0]: r for r in _tables(doc, "scores")[0].rows}["DB (Dev)"]
     assert db[1] is None and db[2] == "—" and _kpi(doc)["ready"].value == 1  # Web only
-    assert "DB (Dev)" not in [r[0] for r in _tables(doc, "queue")[0].rows]
+    assert "DB (Dev)" not in [r[0] for r in _tables(doc, "next")[0].rows]
 
 
 # 7: a stored result is dated, and a later failure is said
@@ -138,7 +138,7 @@ def test_readiness_source_filter_keeps_destination_hosts(ctx):
     write_flows(ctx, [flow(src_app="Web", dst_app="DB", port=5432)])
     cond = FlowCondition(src=EndpointFilter(labels=(LabelCond(key="app", values=("Web",)),)))
     rows = {r[0]: r for r in _tables(_build(ctx, ReportType.READINESS, cond=cond), "scores")[0].rows}
-    assert rows["DB (Dev)"][5] == "100.0%" and rows["Web (Dev)"][1] is None  # Web has no traffic into it here
+    assert rows["DB (Dev)"][6] == "100.0%" and rows["Web (Dev)"][1] is None  # Web has no traffic into it here
 
 
 # 9: the predicted blocks counted are the ones into managed hosts, as the scores
