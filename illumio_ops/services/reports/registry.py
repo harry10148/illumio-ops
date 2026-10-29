@@ -15,7 +15,7 @@ from illumio_ops.domain.values import Language, ReportFormat, ReportType
 from illumio_ops.services.context import AppContext
 from illumio_ops.settings.schema import Settings
 
-Group = Literal["lateral", "inventory", "analysis", "assessment", "operations"]
+Group = Literal["lateral", "inventory", "analysis", "assessment", "policy", "operations"]
 
 
 class ReportParams(BaseModel):
@@ -80,6 +80,7 @@ REGISTRY: dict[ReportType, ReportSpec] = {}
 # limit (90 days); the floor is two days more, so a period starting at a local midnight, across a DST change,
 # is never refused for an hour.
 ONDEMAND_LOOKBACK = 90
+POLICY_USAGE_MAX_DAYS = 30
 
 
 def flow_retention(settings: Settings) -> int:
@@ -108,6 +109,7 @@ def _builtin() -> dict[ReportType, ReportSpec]:
     from illumio_ops.services.reports.lateral_posture import build_lateral_posture
     from illumio_ops.services.reports.network_inventory import build_network_inventory
     from illumio_ops.services.reports.new_connections import build_new_connections
+    from illumio_ops.services.reports.policy_usage import build_policy_usage
     from illumio_ops.services.reports.ransomware_report import build_ransomware
     from illumio_ops.services.reports.readiness import build_readiness
     from illumio_ops.services.reports.security_risk import build_security_risk
@@ -135,6 +137,10 @@ def _builtin() -> dict[ReportType, ReportSpec]:
         ReportType.VEN_STATUS: ReportSpec(ReportType.VEN_STATUS, "operations", False, build_ven_status),
         ReportType.AUDIT: ReportSpec(ReportType.AUDIT, "operations", False, build_audit),
         ReportType.RANSOMWARE: ReportSpec(ReportType.RANSOMWARE, "assessment", False, build_ransomware),
+        # Reads the PCE's draft recompute, not the install's traffic: the same in every collection mode; a day per
+        # recompute, so a month at most.
+        ReportType.POLICY_USAGE: ReportSpec(ReportType.POLICY_USAGE, "policy", False, build_policy_usage,
+                                            max_lookback=lambda settings: POLICY_USAGE_MAX_DAYS),
         ReportType.READINESS: ReportSpec(ReportType.READINESS, "assessment", True, build_readiness,
                                          max_lookback=flow_days, accepts_filter=True, retention=flow_retention),
     }

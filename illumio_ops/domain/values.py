@@ -382,6 +382,7 @@ class ReportType(StrEnum):
     AUDIT = "audit"
     RANSOMWARE = "ransomware"
     READINESS = "readiness"
+    POLICY_USAGE = "policy_usage"
 
 
 class ReportFormat(StrEnum):
