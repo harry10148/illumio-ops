@@ -4,6 +4,7 @@ import { type ApiError, call } from "../../api/client";
 import type { ReportSettingsView } from "../../api/generated";
 import { t } from "../../i18n";
 import { registerNav } from "../../shell/nav";
+import { RhcSection } from "./RhcSection";
 
 export function ReportSettings() {
   const [view, setView] = useState<ReportSettingsView | null>(null);
@@ -64,6 +65,7 @@ export function ReportSettings() {
           </div>
         </form>
       )}
+      <RhcSection />
     </section>
   );
 }
