@@ -18,6 +18,7 @@ SEVERITY_WEIGHT: Mapping[str, int] = {"critical": 40, "high": 30, "medium": 20, 
 # see partial coverage (allow rules beside a deny), so small differences are the approximation, not the PCE
 # contradicting itself; lab's case is 100 against 0 (spec §6.6 F5).
 CONTRADICTION_POINTS = 25.0
+UNENFORCED_MODES = frozenset({"visibility_only", "idle"})
 
 
 def service_coverage(protection_state: str | None) -> float | None:
@@ -33,11 +34,15 @@ def service_coverage(protection_state: str | None) -> float | None:
 
 def classify_traffic(protection_state: str | None, port_status: str | None,
                      recent_sources: int | None) -> RansomwareTrafficClass:
+    return _classify(service_coverage(protection_state), port_status, recent_sources)
+
+
+def _classify(coverage: float | None, port_status: str | None, recent_sources: int | None) -> RansomwareTrafficClass:
     """Unprotected and listening: in use (priority) or idle (safe to block); unprotected and not listening
     yet connected to: suspicious. Without traffic data nothing is guessed."""
-    if service_coverage(protection_state) == 1.0:
+    if coverage == 1.0:
         return RansomwareTrafficClass.PROTECTED
-    if service_coverage(protection_state) != 0.0 or recent_sources is None:
+    if coverage != 0.0 or recent_sources is None:
         return RansomwareTrafficClass.UNKNOWN
     listening = (port_status or "").lower() == "listening"
     if listening:
@@ -80,17 +85,26 @@ def host_breakdown(href: str, hostname: str | None, enforcement_mode: str | None
                    traffic: Mapping[tuple[int, int], int | None]) -> HostBreakdown:
     """`traffic`: (port, proto) -> distinct recent sources (absent = traffic not known)."""
     rows = []
+    mode = (enforcement_mode or "").lower()
     for s in services:
         port, proto = int(s.get("port", -1)), int(s.get("proto", 0))
         weight = SEVERITY_WEIGHT.get(str(s.get("severity") or "").lower())
-        coverage = service_coverage(s.get("protection_state"))
+        # The vendor counts only enforced hosts (user 2026-10-29, Visualization Guide): Full protects every risky
+        # service rule or not, Visibility Only and Idle protect none; Selective goes by each service's state.
+        state = service_coverage(s.get("protection_state"))
+        # The score counts a service only as the vendor does for the host's mode; an unknown or missing mode is not
+        # assumed enforced, so it scores nothing (review #6). The action lists go by the same, except that with no
+        # mode they keep the PCE's own per-service state.
+        effective = 1.0 if mode == "full" else 0.0 if mode in UNENFORCED_MODES else state if mode == "selective" else None
+        coverage = effective
         sources = traffic.get((port, proto))
         rows.append(ServiceContribution(
             name=str(s.get("name") or ""), port=port, proto=proto, severity=s.get("severity"),
             category=s.get("category"), protection_state=s.get("protection_state"), port_status=s.get("port_status"),
             active_policy=s.get("active_policy"), weight=weight, coverage=coverage,
             contribution=weight * coverage if weight is not None and coverage is not None else None,
-            traffic=classify_traffic(s.get("protection_state"), s.get("port_status"), sources),
+            # By the effective state (review #5): a Full host's service is protected, so in no action list.
+            traffic=_classify(state if effective is None else effective, s.get("port_status"), sources),
             recent_sources=sources))
     known = [r for r in rows if r.weight is not None and r.coverage is not None]
     total = sum(r.weight for r in known if r.weight is not None)

@@ -10254,7 +10254,8 @@
               "ven_status",
               "audit",
               "ransomware",
-              "readiness"
+              "readiness",
+              "policy_usage"
             ],
             "title": "ReportType",
             "type": "string"
@@ -10714,7 +10715,8 @@
               "ven_status",
               "audit",
               "ransomware",
-              "readiness"
+              "readiness",
+              "policy_usage"
             ],
             "title": "ReportType",
             "type": "string"
@@ -11266,7 +11268,8 @@
               "ven_status",
               "audit",
               "ransomware",
-              "readiness"
+              "readiness",
+              "policy_usage"
             ],
             "title": "ReportType",
             "type": "string"
@@ -11806,7 +11809,8 @@
               "ven_status",
               "audit",
               "ransomware",
-              "readiness"
+              "readiness",
+              "policy_usage"
             ],
             "title": "ReportType",
             "type": "string"
@@ -12525,7 +12529,8 @@
               "ven_status",
               "audit",
               "ransomware",
-              "readiness"
+              "readiness",
+              "policy_usage"
             ],
             "title": "ReportType",
             "type": "string"
@@ -12985,7 +12990,8 @@
               "ven_status",
               "audit",
               "ransomware",
-              "readiness"
+              "readiness",
+              "policy_usage"
             ],
             "title": "ReportType",
             "type": "string"
@@ -13184,7 +13190,8 @@
               "ven_status",
               "audit",
               "ransomware",
-              "readiness"
+              "readiness",
+              "policy_usage"
             ],
             "title": "ReportType",
             "type": "string"
@@ -13523,7 +13530,8 @@
               "ven_status",
               "audit",
               "ransomware",
-              "readiness"
+              "readiness",
+              "policy_usage"
             ],
             "title": "ReportType",
             "type": "string"
@@ -19573,6 +19581,7 @@
       "lateral_posture",
       "network_inventory",
       "new_connections",
+      "policy_usage",
       "ransomware",
       "readiness",
       "security_risk",

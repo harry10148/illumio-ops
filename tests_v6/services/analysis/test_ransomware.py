@@ -22,7 +22,7 @@ FIN, WEB = "/orgs/1/workloads/fin", "/orgs/1/workloads/web"
 
 
 def _wl(href, name, percent, exposure="critical"):
-    return workloads.WorkloadRow(href=href, hostname=name, name=None, managed=1, enforcement_mode="visibility_only",
+    return workloads.WorkloadRow(href=href, hostname=name, name=None, managed=1, enforcement_mode="selective",
                                  visibility_level=None, os_id=None, ven_version=None, ven_href=None, label_set=None,
                                  online=1, risk_exposure=exposure, risk_percent=percent, risk_updated_at=None,
                                  fetched_at="x")

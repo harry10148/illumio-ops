@@ -41,10 +41,10 @@ def test_all_protected_vs_pce_zero_is_contradiction():
 def test_unknown_protection_state_excluded_from_percent():
     assert service_coverage("protected_open") == 1.0 and service_coverage("unprotected") == 0.0
     assert service_coverage("something_new") is None and service_coverage(None) is None
-    b = host_breakdown("/w/1", "h1", None, None, None, [svc("RDP", 3389, "critical", "protected_closed"),
-                                                         svc("X", 9, "high", "weird")], traffic={})
+    b = host_breakdown("/w/1", "h1", "selective", None, None, [svc("RDP", 3389, "critical", "protected_closed"),
+                                                                svc("X", 9, "high", "weird")], traffic={})
     assert b.computed_percent == 100.0 and b.contradiction is False
-    none_known = host_breakdown("/w/1", "h1", None, 10.0, None, [svc("X", 9, "high", "weird")], traffic={})
+    none_known = host_breakdown("/w/1", "h1", "selective", 10.0, None, [svc("X", 9, "high", "weird")], traffic={})
     assert none_known.computed_percent is None and none_known.contradiction is False
 
 
@@ -61,3 +61,34 @@ def test_empty_recommendation_ok():
     b = host_breakdown("/w/1", "h1", None, None, None, [svc("RDP", 3389, "critical", "unprotected", "listening")],
                        traffic={(3389, 6): 2})
     assert b.services[0].traffic is T.PRIORITY and b.services[0].recent_sources == 2
+
+
+def test_unenforced_hosts_count_nothing():
+    """User 2026-10-29, Visualization Guide: only Selective or Full hosts count as protected; a Visibility Only or
+    Idle host scores 0 whatever its services' states — the approximation follows the vendor, so it is no gap."""
+    for mode in ("visibility_only", "idle"):
+        b = host_breakdown("/w/1", "h1", mode, 0.0, "critical",
+                           [svc("RDP", 3389, "critical", "protected_closed")], traffic={})
+        assert b.computed_percent == 0.0 and b.contradiction is False, mode
+
+
+def test_full_counts_every_service():
+    """Full enforcement: every risky service counts as protected, rule or not."""
+    b = host_breakdown("/w/1", "h1", "full", 100.0, "fully_protected",
+                       [svc("SMB", 445, "high", "unprotected", "listening")], traffic={})
+    assert b.computed_percent == 100.0 and b.contradiction is False
+
+
+def test_full_host_services_not_in_action_lists():
+    """Review #5: a Full host's service counts as protected, so it is not sent to "Fix first"."""
+    b = host_breakdown("/w/1", "h1", "full", 100.0, "fully_protected",
+                       [svc("SMB", 445, "high", "unprotected", "listening")], traffic={(445, 6): 3})
+    assert b.services[0].traffic is T.PROTECTED
+
+
+def test_unknown_mode_not_judged():
+    """Review #6: a missing or new mode is not assumed enforced."""
+    for mode in (None, "future_mode"):
+        b = host_breakdown("/w/1", "h1", mode, 0.0, None, [svc("RDP", 3389, "critical", "protected_closed")],
+                           traffic={})
+        assert b.computed_percent is None and b.contradiction is False, mode
