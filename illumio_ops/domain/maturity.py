@@ -36,6 +36,24 @@ def grade(score: float) -> str:
     return next((g for floor, g in GRADES if score >= floor), "F")
 
 
+def losing_most(parts: dict[str, float | None]) -> str | None:
+    """The part that costs the most points, or None when nothing loses any."""
+    known = {k: v for k, v in parts.items() if v is not None}
+    if not known:
+        return None
+    worst = max(known, key=lambda k: WEIGHTS[k] * (1 - known[k]))
+    return worst if WEIGHTS[worst] * (1 - known[worst]) > 0 else None
+
+
+def score_with(parts: dict[str, float | None], part: str) -> float | None:
+    """The score with one part at full marks: what fixing the part that costs most would give."""
+    known = {k: v for k, v in parts.items() if v is not None}
+    if part not in known:
+        return None
+    known[part] = 1.0
+    return 100 * sum(WEIGHTS[k] * v for k, v in known.items()) / sum(WEIGHTS[k] for k in known)
+
+
 def maturity(m: MaturityInputs) -> Maturity:
     share = (lambda n: n / m.connections) if m.connections else None
     parts: dict[str, float | None] = {

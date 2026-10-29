@@ -14,12 +14,14 @@ from loguru import logger
 from illumio_ops.domain.report import (
     BarBlock,
     Column,
+    Finding,
     Kpi,
     ReportDocument,
     Section,
     TableBlock,
     TextBlock,
 )
+from illumio_ops.domain.values import Severity
 from illumio_ops.services.analysis.ransomware import host_ransomware
 from illumio_ops.services.reports import reads
 from illumio_ops.services.reports.common import port_text, severity_name, tr
@@ -39,6 +41,21 @@ _LISTS = (("priority", "priority", "rpt_rw_sec_priority", "rpt_rw_priority_intro
           ("safe", "safe_to_block", "rpt_rw_sec_safe", "rpt_rw_safe_intro", "rpt_rw_none_safe"),
           ("suspicious", "suspicious", "rpt_rw_sec_suspicious", "rpt_rw_suspicious_intro", "rpt_rw_none_suspicious"))
 _STATUS_KEYS = {"error": "rpt_rw_allow_error", "partial": "rpt_rw_allow_partial"}
+# "How to read this report": (term, what it means, what to do with it)
+_TERMS = (("rpt_rw_col_pce_percent", "rpt_rw_term_pce_means", "rpt_rw_term_pce_use"),
+          ("rpt_rw_col_computed", "rpt_rw_term_computed_means", "rpt_rw_term_computed_use"),
+          ("rpt_rw_col_exposure", "rpt_rw_term_exposure_means", "rpt_rw_term_exposure_use"),
+          ("rpt_rw_col_contradiction", "rpt_rw_term_contradiction_means", "rpt_rw_term_contradiction_use"),
+          ("rpt_rw_col_state", "rpt_rw_term_state_means", "rpt_rw_term_state_use"),
+          ("rpt_rw_sec_priority", "rpt_rw_priority_intro", "rpt_rw_term_priority_use"),
+          ("rpt_rw_sec_safe", "rpt_rw_safe_intro", "rpt_rw_term_safe_use"),
+          ("rpt_rw_sec_suspicious", "rpt_rw_suspicious_intro", "rpt_rw_term_suspicious_use"))
+
+
+def _state_key(state: object) -> str:
+    s = str(state or "")
+    return ("rpt_rw_state_protected" if s.startswith("protected") else "rpt_rw_state_unprotected"
+            if s == "unprotected" else "rpt_rw_state_unknown")
 
 
 def _org_percent(summary: Mapping[str, Any]) -> float | None:
@@ -107,6 +124,15 @@ def build_ransomware(inp: BuildInput) -> ReportDocument:
     # ── hosts, ranked by the computed share; contradictions last and flagged ─────
     def pct(v: Any) -> str:
         return f"{float(v):.1f}%" if isinstance(v, (int, float)) else "—"
+
+    def explain(h: Mapping[str, Any]) -> str:
+        """What the host's numbers mean, in words."""
+        open_ = [s for s in h.get("services") or () if s.get("protection_state") == "unprotected"]
+        if h.get("contradiction"):
+            return t("rpt_rw_explain_contradiction", pce=pct(h.get("pce_percent")), n=len(open_) or "—")
+        if not open_:
+            return t("rpt_rw_explain_protected")
+        return t("rpt_rw_explain_open", n=len(open_), names=", ".join(str(s.get("name")) for s in open_))
     ranked = sorted(hosts, key=lambda h: (bool(h.get("contradiction")), h.get("computed_percent") is None,
                                           h.get("computed_percent") or 0.0, name(h)))
     host_table = TableBlock(
@@ -115,11 +141,12 @@ def build_ransomware(inp: BuildInput) -> ReportDocument:
                  Column(key="computed", label=t("rpt_rw_col_computed")),
                  Column(key="exposure", label=t("rpt_rw_col_exposure")),
                  Column(key="unprotected", label=t("rpt_rw_col_unprotected"), kind="number"),
-                 Column(key="contradiction", label=t("rpt_rw_col_contradiction"))),
+                 Column(key="contradiction", label=t("rpt_rw_col_contradiction")),
+                 Column(key="explain", label=t("rpt_rdy_col_explain"))),
         rows=tuple((name(h), pct(h.get("pce_percent")), pct(h.get("computed_percent")),
-                    str(h.get("pce_exposure") or "—"),
+                    severity_name(lang, str(h.get("pce_exposure")).lower()) if h.get("pce_exposure") else "—",
                     sum(1 for s in h.get("services") or () if s.get("protection_state") == "unprotected"),
-                    t("rpt_rw_contradiction_yes") if h.get("contradiction") else "") for h in ranked),
+                    t("rpt_rw_contradiction_yes") if h.get("contradiction") else "", explain(h)) for h in ranked),
         total_rows=len(ranked), empty_text=t("rpt_rw_none_hosts") if ok else missing)
     services = [(h, s) for h in ranked for s in h.get("services") or ()]
     service_table = TableBlock(
@@ -132,7 +159,7 @@ def build_ransomware(inp: BuildInput) -> ReportDocument:
                  Column(key="contribution", label=t("rpt_rw_col_contribution"))),
         rows=tuple((name(h), s.get("name"), port_text(s.get("port"), int(s.get("proto") or 0)),
                     severity_name(lang, str(s.get("severity") or "").lower()), s.get("weight"),
-                    str(s.get("protection_state") or "—"),
+                    t(_state_key(s.get("protection_state"))),
                     pct(100 * s["coverage"]) if isinstance(s.get("coverage"), (int, float)) else "—",
                     f"{s['contribution']:.1f}" if isinstance(s.get("contribution"), (int, float)) else "—")
                    for h, s in services),
@@ -183,11 +210,24 @@ def build_ransomware(inp: BuildInput) -> ReportDocument:
     if values["contradictions"]:
         quality.append(t("rpt_rw_quality_contradictions", n=values["contradictions"]))
     blocks_missing: Sequence[TextBlock] = () if ok else (TextBlock(paragraphs=(missing,)),)
+    terms = TableBlock(
+        title=t("rpt_rw_tbl_terms"),
+        columns=(Column(key="term", label=t("rpt_rw_col_term")), Column(key="means", label=t("rpt_rdy_col_means")),
+                 Column(key="use", label=t("rpt_rw_col_use"))),
+        rows=tuple((t(term), t(means), t(use)) for term, means, use in _TERMS), total_rows=len(_TERMS), empty_text="")
+    findings: list[Finding] = []
+    if ok and lists["priority"]:
+        findings.append(Finding(severity=Severity.HIGH, title=t("rpt_rw_finding_priority", n=len(lists["priority"])),
+                                why=t("rpt_rw_finding_priority_why"), action=t("rpt_rw_finding_priority_action")))
+    if ok and lists["safe_to_block"]:
+        findings.append(Finding(severity=Severity.MEDIUM, title=t("rpt_rw_finding_safe", n=len(lists["safe_to_block"])),
+                                why=t("rpt_rw_finding_safe_why"), action=t("rpt_rw_finding_safe_action")))
     return ReportDocument(
         report_type=inp.params.report_type, lang=lang, title=t("rpt_title_ransomware"), period_start=inp.start,
-        period_end=inp.end, generated_at=inp.now, pce_label=inp.pce_label, kpis=kpis, findings=(),
+        period_end=inp.end, generated_at=inp.now, pce_label=inp.pce_label, kpis=kpis, findings=tuple(findings),
         data_quality=tuple(quality),
-        sections=(*(s.model_copy(update={"blocks": (*blocks_missing, *s.blocks)}) for s in list_sections),
+        sections=(Section(id="how", title=t("rpt_rdy_sec_how"), intro=t("rpt_rw_how_intro"), blocks=(terms,)),
+                  *(s.model_copy(update={"blocks": (*blocks_missing, *s.blocks)}) for s in list_sections),
                   Section(id="hosts", title=t("rpt_rw_sec_hosts"), intro=t("rpt_rw_hosts_intro"),
                           blocks=(host_table, service_table)),
                   Section(id="allow", title=t("rpt_rw_sec_allow"), intro=t("rpt_rw_allow_intro"), blocks=(allow_table,)),
