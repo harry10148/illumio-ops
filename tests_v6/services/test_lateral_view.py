@@ -1,6 +1,7 @@
 """The lateral movement page (P6c): the hourly exposure result read as stored, hosts named, detections only where
 traffic is collected; in lightweight mode the graph's management ports pulled from the PCE and held 30 minutes."""
 import json
+import time
 from contextlib import contextmanager
 from datetime import UTC, datetime, timedelta
 
@@ -15,6 +16,7 @@ from illumio_ops.services import lateral_view
 from illumio_ops.services.ondemand import OnDemandResult
 from illumio_ops.store.flowdb import analysis, capabilities, workloads
 from illumio_ops.store.flowdb.analysis import DetectionWrite
+from illumio_ops.store.flowdb.db import db_time
 from tests_v6.services.collect.conftest import configured_ctx
 
 NOW = datetime(2026, 10, 30, 12, tzinfo=UTC)
@@ -250,3 +252,93 @@ def test_simulate_waits_for_another_pull(light, pulls, monkeypatch):
         assert not done.wait(0.5) and len(pulls["specs"]) == 1  # still waiting: nothing pulled
     assert done.wait(5) and len(pulls["specs"]) == 2
     t.join(5)
+
+
+# ── final review (2026-10-30) ─────────────────────────────────────────────────
+
+def test_simulate_refuses_a_pce_switched_while_waiting(light, pulls, monkeypatch):
+    """#2: the PCE changed while the simulation waited for another pull: not the held graph of the previous PCE
+    with the new PCE's traffic."""
+    import threading
+
+    from illumio_ops.services import ondemand
+    from illumio_ops.store.flowdb.db import StaleGeneration
+    monkeypatch.setattr(lateral_view, "_named", lambda ctx, sim, pull: sim)
+    monkeypatch.setattr(lateral_view, "simulate_deny", lambda *a, **kw: "sim")
+    lateral_view.compute(light, 7, now=NOW)
+    out = {}
+
+    def run():
+        try:
+            out["r"] = lateral_view.simulate(light, TO_DB, now=NOW)
+        except Exception as exc:  # noqa: BLE001
+            out["e"] = exc
+    with ondemand.INTERACTIVE_PULL:
+        t = threading.Thread(target=run)
+        t.start()
+        time.sleep(0.3)
+        light.settings.update(light.settings.current().revision,
+                              lambda d: d["pce"].update(url="https://pce-b.example:8443"))
+    t.join(5)
+    assert isinstance(out.get("e"), (StaleGeneration, lateral_view.NotComputed)) and len(pulls["specs"]) == 1
+
+
+def test_full_simulation_uses_the_shown_graph(ctx, monkeypatch):
+    """#3: the page's cuts come from the hourly result; the simulation reads the same period and leaves out the
+    connections first seen after it was computed."""
+    from illumio_ops.domain.values import DataOrigin
+    from illumio_ops.store.flowdb.flows import upsert_flows
+    from tests_v6.services.reports.test_findings import flow
+    _store(ctx, at=NOW - timedelta(minutes=30))
+    with ctx.flows().connect() as conn:
+        upsert_flows(conn, [flow(src="late", dst="db", port=3389)], origin=DataOrigin.INGEST, now=NOW)
+        conn.execute("UPDATE connection_baseline SET first_seen = ?, last_seen = ?",
+                     (db_time(NOW - timedelta(minutes=5)), db_time(NOW - timedelta(minutes=5))))
+        conn.commit()
+    seen = {}
+
+    def fake_sim(c, proposal, *, now=None, window=None, edges=None):
+        seen.update(window=window, edges=edges)
+        return "sim"
+    monkeypatch.setattr(lateral_view, "simulate_deny", fake_sim)
+    monkeypatch.setattr(lateral_view, "_named", lambda c, sim, pull: sim)
+    lateral_view.simulate(ctx, TO_DB, now=NOW)
+    assert seen["window"] == (NOW - timedelta(minutes=30, days=30), NOW - timedelta(minutes=30))
+    assert seen["edges"] == []  # the connection first seen after the result is not in its graph
+
+
+def test_old_result_with_collection_stopped_or_failed_run(tmp_path, ctx):
+    """#4: an old result is shown with what happened since: collection stopped, or the last computation failed."""
+    _store(ctx)
+    with ctx.flows().connect() as conn:
+        analysis.set_run(conn, "exposure", error="Boom")
+        conn.commit()
+    v = lateral_view.view(ctx, now=NOW)
+    assert v.state == "ok" and v.last_run_failed and not v.collection_stopped
+    ctx.settings.update(ctx.settings.current().revision, lambda d: d["collection"].update(enabled=False))
+    assert lateral_view.view(ctx, now=NOW).collection_stopped
+
+
+def test_detection_state(ctx):
+    """#5: no detection run yet, or a failed one, is not "no detection in the last 7 days"."""
+    assert lateral_view.view(ctx, now=NOW).detect_state == "not_run"
+    with ctx.flows().connect() as conn:
+        analysis.set_run(conn, "detect", error="Boom")
+        conn.commit()
+    assert lateral_view.view(ctx, now=NOW).detect_state == "failed"
+    with ctx.flows().connect() as conn:
+        analysis.set_run(conn, "detect", ok_at=NOW)
+        conn.commit()
+    assert lateral_view.view(ctx, now=NOW).detect_state == "ok"
+
+
+def test_ransomware_details_read_counted(ctx):
+    """#6: footholds come from the hosts' ransomware details; hosts the PCE rated whose details were not read are
+    counted, so an empty list is not "no foothold"."""
+    v = lateral_view.view(ctx, now=NOW)
+    assert (v.ransomware_rated, v.ransomware_unread) == (0, 0)
+    with ctx.flows().connect() as conn:
+        conn.execute("UPDATE workloads SET risk_percent = 40, risk_updated_at = 'x'")
+        conn.commit()
+    v = lateral_view.view(ctx, now=NOW)
+    assert (v.ransomware_rated, v.ransomware_unread) == (3, 3)

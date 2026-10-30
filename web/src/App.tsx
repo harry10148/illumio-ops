@@ -3,7 +3,7 @@ import { BrowserRouter } from "react-router-dom";
 
 import { AUTH_REQUIRED_EVENT, call } from "./api/client";
 import type { Me } from "./api/generated";
-import { LangContext, type Lang, initialLang, loadDictionary, rememberLang, t } from "./i18n";
+import { LangContext, type Lang, fetchDictionary, initialLang, rememberLang, t, applyDictionary } from "./i18n";
 import { Login } from "./pages/Login";
 import { PasswordChange } from "./pages/PasswordChange";
 import { ME_CHANGED_EVENT, Shell } from "./shell/Shell";
@@ -27,11 +27,15 @@ export function App() {
   }, []);
 
   useEffect(() => {
-    void loadDictionary(lang).then(() => {
+    let live = true;  // an answer for a language no longer wanted (one asked before sign-in) is dropped
+    void fetchDictionary(lang).then((dict) => {
+      if (!live) return;
+      applyDictionary(lang, dict);
       rememberLang(lang);
       setLoadedLang(lang);
       setDictVersion((v) => v + 1);
     });
+    return () => { live = false; };
   }, [lang]);
 
   useEffect(() => {

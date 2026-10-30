@@ -15296,6 +15296,10 @@
             "title": "Admin Set",
             "type": "boolean"
           },
+          "collection_stopped": {
+            "title": "Collection Stopped",
+            "type": "boolean"
+          },
           "computed_at": {
             "anyOf": [
               {
@@ -15311,6 +15315,15 @@
           "critical_set": {
             "title": "Critical Set",
             "type": "boolean"
+          },
+          "detect_state": {
+            "enum": [
+              "ok",
+              "failed",
+              "not_run"
+            ],
+            "title": "Detect State",
+            "type": "string"
           },
           "detections": {
             "items": {
@@ -15343,6 +15356,10 @@
                 "type": "null"
               }
             ]
+          },
+          "last_run_failed": {
+            "title": "Last Run Failed",
+            "type": "boolean"
           },
           "lightweight_days": {
             "items": {
@@ -15378,6 +15395,14 @@
                 "type": "null"
               }
             ]
+          },
+          "ransomware_rated": {
+            "title": "Ransomware Rated",
+            "type": "integer"
+          },
+          "ransomware_unread": {
+            "title": "Ransomware Unread",
+            "type": "integer"
           },
           "ransomware_unsupported": {
             "title": "Ransomware Unsupported",
@@ -15428,6 +15453,11 @@
           "detectors",
           "detections",
           "detections_total",
+          "collection_stopped",
+          "last_run_failed",
+          "detect_state",
+          "ransomware_rated",
+          "ransomware_unread",
           "observation_days_setting",
           "lightweight_days",
           "port_names"
@@ -16867,6 +16897,10 @@
             "title": "Admin Set",
             "type": "boolean"
           },
+          "collection_stopped": {
+            "title": "Collection Stopped",
+            "type": "boolean"
+          },
           "computed_at": {
             "anyOf": [
               {
@@ -16882,6 +16916,15 @@
           "critical_set": {
             "title": "Critical Set",
             "type": "boolean"
+          },
+          "detect_state": {
+            "enum": [
+              "ok",
+              "failed",
+              "not_run"
+            ],
+            "title": "Detect State",
+            "type": "string"
           },
           "detections": {
             "items": {
@@ -16914,6 +16957,10 @@
                 "type": "null"
               }
             ]
+          },
+          "last_run_failed": {
+            "title": "Last Run Failed",
+            "type": "boolean"
           },
           "lightweight_days": {
             "items": {
@@ -16949,6 +16996,14 @@
                 "type": "null"
               }
             ]
+          },
+          "ransomware_rated": {
+            "title": "Ransomware Rated",
+            "type": "integer"
+          },
+          "ransomware_unread": {
+            "title": "Ransomware Unread",
+            "type": "integer"
           },
           "ransomware_unsupported": {
             "title": "Ransomware Unsupported",
@@ -16999,6 +17054,11 @@
           "detectors",
           "detections",
           "detections_total",
+          "collection_stopped",
+          "last_run_failed",
+          "detect_state",
+          "ransomware_rated",
+          "ransomware_unread",
           "observation_days_setting",
           "lightweight_days",
           "port_names"

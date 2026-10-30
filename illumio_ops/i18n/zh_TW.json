@@ -2209,5 +2209,13 @@
   "lat_csv_last": "最後見",
   "lat_on_page": "橫向移動頁",
   "lat_not_set": "未設定",
-  "lat_sim_assets_unset": "尚未設定重要資產：不顯示可觸及數的變化。"
+  "lat_sim_assets_unset": "尚未設定重要資產：不顯示可觸及數的變化。",
+  "lat_run_failed": "最近一次每小時計算失敗：下方數字是上一次成功的結果。",
+  "lat_collection_stopped": "目前已停止收集流量：下方是最後一次算出的數字，不會再更新。",
+  "lat_detect_failed": "最近一次偵測執行失敗：偵測可能有遺漏。",
+  "lat_detect_not_run": "偵測還沒有執行過。",
+  "lat_detections_none_before": "到上一次成功的偵測為止，近 7 天沒有偵測。",
+  "lat_rw_unread": "PCE 有評分的 {total} 台主機中，有 {n} 台的勒索明細還沒讀到（或之後有變動）：可落腳點可能有遺漏。",
+  "lat_rw_not_rated": "PCE 沒有給任何主機勒索評分：無法判斷可落腳點。",
+  "lat_footholds_none_read": "已讀到明細的主機中，沒有未防護且在 listening 的高風險服務。"
 }

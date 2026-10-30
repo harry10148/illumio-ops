@@ -682,10 +682,10 @@ class BaselineEdges(BaseModel):
 
 
 def baseline_edges(ctx: AppContext, ports: AdminPortSet, *, since: datetime,
-                   classes: Collection[PortClass] | None = None) -> BaselineEdges:
+                   classes: Collection[PortClass] | None = None, until: datetime | None = None) -> BaselineEdges:
     """The management-port connections seen since `since`, from the connection baseline (kept for the
     baseline period in every collection mode). Reads by port through ix_baseline_port_src; the protocol and
-    the time are checked here."""
+    the time are checked here. `until`: only the connections first seen by then (the graph as it was computed)."""
     fdb, gen, settings = _store_read(ctx)
     collected = ctx.ondemand or collects(settings, IngestSource.TRAFFIC)
     numbers = sorted({e.port for e in ports.entries if classes is None or e.category in classes})
@@ -697,7 +697,9 @@ def baseline_edges(ctx: AppContext, ports: AdminPortSet, *, since: datetime,
         # Rows are turned into edges as they are read, never all held at once.
         cur = conn.execute(
             "SELECT src_key, dst_key, port, proto, last_decision FROM connection_baseline "
-            f"WHERE port IN ({','.join('?' * len(numbers))}) AND last_seen >= ?", [*numbers, stamp])
+            f"WHERE port IN ({','.join('?' * len(numbers))}) AND last_seen >= ?"
+            + ("" if until is None else " AND first_seen <= ?"),
+            [*numbers, stamp, *([] if until is None else [db_time(until)])])
         # Host keys repeat on every row of a host: one string per host, not one per row.
         edges = [BaselineEdge(src_key=sys.intern(src), dst_key=sys.intern(dst), port=port, proto=proto,
                               decision=decision)

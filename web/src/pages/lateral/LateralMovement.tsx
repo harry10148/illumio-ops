@@ -59,9 +59,11 @@ export default function LateralMovement() {
   }, [page, section]);
 
   async function compute() {
+    if (!page) return;
+    const offered = page.lightweight_days.includes(days) ? days : page.lightweight_days[page.lightweight_days.length - 1] ?? 1;
     setBusy(true);
     setError(null);
-    const env = await call("lateral.compute", { days: days as 1 | 7 | 30 });
+    const env = await call("lateral.compute", { days: offered as 1 | 7 | 30 });
     setBusy(false);
     if (env.ok && env.data) setPage(env.data);
     else setError(env.error);
@@ -129,6 +131,8 @@ export default function LateralMovement() {
             start: formatTime(ex.observation_from, lang), end: formatTime(ex.observation_to, lang), hops: String(ex.hops) })}</p>
         )}
         {page.stale && <p className="notice" data-role="lat-stale">{t("lat_stale")}</p>}
+        {ex && page.last_run_failed && <p className="notice" data-role="lat-run-failed">{t("lat_run_failed")} <Link to="/system/jobs">{t("lat_open_jobs")}</Link></p>}
+        {ex && page.collection_stopped && <p className="notice" data-role="lat-collection-stopped">{t("lat_collection_stopped")} <Link to="/system/collection">{t("lat_open_collection")}</Link></p>}
         {page.pull && <Pulled info={page.pull} />}
         {page.source === "pulled" && ex && (
           <p className="hint" data-role="lat-period-note">{t("lat_period_note", {
@@ -179,8 +183,13 @@ export default function LateralMovement() {
         <div className="card stack" id="lat-footholds" data-section="footholds">
           <h2>{t("lat_footholds")}</h2>
           <p className="hint">{t("lat_footholds_hint")}</p>
+          {!page.ransomware_unsupported && page.ransomware_unread > 0 && (
+            <p className="notice" data-role="rw-unread">{t("lat_rw_unread", { n: String(page.ransomware_unread),
+              total: String(page.ransomware_rated) })}</p>
+          )}
           {page.ransomware_unsupported ? <p className="notice">{t("rpt_rw_unsupported")}</p>
-            : ex.footholds.length === 0 ? <p className="muted">{t("lat_footholds_none")}</p> : (
+            : ex.footholds.length === 0 && page.ransomware_rated === 0 ? <p className="muted" data-role="rw-not-rated">{t("lat_rw_not_rated")}</p>
+            : ex.footholds.length === 0 ? <p className="muted">{t(page.ransomware_unread > 0 ? "lat_footholds_none_read" : "lat_footholds_none")}</p> : (
               <ul className="plain-list">
                 {ex.footholds.map((f) => (
                   <li key={`${f.host}|${f.port}/${f.proto}`}>
@@ -463,7 +472,9 @@ function Happening({ page }: { page: LateralPage }) {
               ))}
             </ul>
           )}
-          {page.detections.length === 0 ? <p className="muted">{t("lat_detections_none")}</p> : (
+          {page.detect_state === "failed" && <p className="notice" data-role="detect-failed">{t("lat_detect_failed")} <Link to="/system/jobs">{t("lat_open_jobs")}</Link></p>}
+          {page.detect_state === "not_run" && page.detections.length === 0 ? <p className="notice" data-role="detect-not-run">{t("lat_detect_not_run")}</p>
+            : page.detections.length === 0 ? <p className="muted">{t(page.detect_state === "failed" ? "lat_detections_none_before" : "lat_detections_none")}</p> : (
             <ul className="focus-list" data-role="detections">
               {page.detections.map((d) => {
                 const p = Object.fromEntries(Object.entries(d.params).filter(([, v]) => v !== null && typeof v !== "object")

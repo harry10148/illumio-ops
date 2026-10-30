@@ -2209,5 +2209,13 @@
   "lat_csv_last": "Last seen",
   "lat_on_page": "Lateral movement",
   "lat_not_set": "Not set",
-  "lat_sim_assets_unset": "No critical assets are set: the change in reach is not shown."
+  "lat_sim_assets_unset": "No critical assets are set: the change in reach is not shown.",
+  "lat_run_failed": "The latest hourly computation failed: the numbers below are from the last one that succeeded.",
+  "lat_collection_stopped": "Traffic is no longer collected: the numbers below are the last ones computed and will not change.",
+  "lat_detect_failed": "The latest detection run failed: detections may be missing.",
+  "lat_detect_not_run": "Detections have not been evaluated yet.",
+  "lat_detections_none_before": "No detection in the last 7 days up to the last run that succeeded.",
+  "lat_rw_unread": "The ransomware details of {n} of {total} rated hosts have not been read (or changed since): footholds may be missing.",
+  "lat_rw_not_rated": "The PCE gives no host a ransomware rating: footholds cannot be told.",
+  "lat_footholds_none_read": "No unprotected, listening high-risk service on the hosts whose details were read."
 }

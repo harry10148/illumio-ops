@@ -1094,13 +1094,16 @@ unread_from: (string | null)
  */
 export interface LateralPage {
 admin_set: boolean
+collection_stopped: boolean
 computed_at: (string | null)
 critical_set: boolean
+detect_state: ("ok" | "failed" | "not_run")
 detections: LateralDetection[]
 detections_available: boolean
 detections_total: number
 detectors: DetectorStatusView[]
 exposure: (ExposureResult | null)
+last_run_failed: boolean
 lightweight_days: number[]
 names: {
 [k: string]: string
@@ -1110,6 +1113,8 @@ port_names: {
 [k: string]: string
 }
 pull: (PullInfo | null)
+ransomware_rated: number
+ransomware_unread: number
 ransomware_unsupported: boolean
 source: (("stored" | "pulled") | null)
 stale: boolean

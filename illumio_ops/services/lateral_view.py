@@ -34,7 +34,8 @@ from illumio_ops.services.context import AppContext
 from illumio_ops.services.hosts import display_names
 from illumio_ops.services.ondemand import INTERACTIVE_PULL, pull_period
 from illumio_ops.services.workbench_store import PullInfo
-from illumio_ops.store.flowdb import analysis, capabilities
+from illumio_ops.store.flowdb import analysis, capabilities, workloads
+from illumio_ops.store.flowdb import ransomware as ransomware_store
 from illumio_ops.store.flowdb.db import StaleGeneration
 
 KEEP = timedelta(minutes=30)
@@ -82,6 +83,11 @@ class LateralPage(BaseModel):
     detectors: list[DetectorStatusView]
     detections: list[LateralDetection]
     detections_total: int
+    collection_stopped: bool  # traffic is no longer collected: the result shown is the last one computed
+    last_run_failed: bool     # the latest hourly computation failed: the result shown is older
+    detect_state: Literal["ok", "failed", "not_run"]  # the latest detection run; "not_run": none succeeded yet
+    ransomware_rated: int     # hosts the PCE gives a ransomware rating
+    ransomware_unread: int    # of those, hosts whose details (where footholds come from) were not read, or are older
     observation_days_setting: int
     lightweight_days: list[int]
     port_names: dict[str, str]  # "<port>/<proto>" -> the management port's name (RDP, SMB...)
@@ -178,8 +184,19 @@ def view(ctx: AppContext, *, now: datetime | None = None) -> LateralPage:
         run = analysis.get_run(conn, "exposure")
         cap = capabilities.all(conn).get("ransomware_risk")
         detectors = detector_states(conn)
+        detect_run = analysis.get_run(conn, "detect")
+        held_rw = ransomware_store.source_updated(conn)
+        inventory = workloads.all_workloads(conn)
         detections, total = _detections(ctx, conn, at) if lc.collected and not light else ([], 0)
-    base: dict[str, Any] = {"critical_set": bool(lc.settings.critical_assets), "admin_set": bool(lc.settings.admin_groups),
+    rated = [w for w in inventory if w.risk_percent is not None or w.risk_updated_at is not None]
+    unread = sum(1 for w in rated if w.href not in held_rw or (w.risk_updated_at and held_rw[w.href] != w.risk_updated_at))
+    detect_state: Literal["ok", "failed", "not_run"] = (
+        "failed" if detect_run is not None and detect_run["last_error"]
+        else "ok" if detect_run is not None and detect_run["last_ok_at"] else "not_run")
+    base: dict[str, Any] = {"collection_stopped": not light and not lc.collected,
+                            "last_run_failed": not light and run is not None and bool(run["last_error"]),
+                            "detect_state": detect_state, "ransomware_rated": len(rated), "ransomware_unread": unread,
+                            "critical_set": bool(lc.settings.critical_assets), "admin_set": bool(lc.settings.admin_groups),
             "ransomware_unsupported": cap is not None and cap.state == CapabilityState.UNSUPPORTED,
             "detections_available": lc.collected and not light, "detectors": [] if light else detectors,
             "detections": detections, "detections_total": total,
@@ -254,21 +271,36 @@ def _named(ctx: AppContext, sim: DenySimulation, pull: PullInfo | None) -> DenyS
 
 def simulate(ctx: AppContext, proposal: DenyProposal, *, now: datetime | None = None) -> DenySimulationView:
     """What the deny rule would block and how it changes the reach of each critical asset; read-only, never a write
-    to the PCE. Lightweight mode: the proposal's own traffic is read from the PCE for the held period, and the graph
-    is the held one (NotComputed when none is held)."""
+    to the PCE. The graph is the one the page shows: in full and alert mode the stored result's period, without the
+    connections first seen after it was computed; in lightweight mode the held one, with the proposal's own traffic
+    read from the PCE for its period (NotComputed when none is held)."""
     at = (now or datetime.now(UTC)).astimezone(UTC)
     with ctx.flows().connect() as conn:
         require_same_pce(conn, ctx.settings.current().pce)
+        row = None if _lightweight(ctx) else analysis.read_result(conn, "exposure")
     if not _lightweight(ctx):
-        return _named(ctx, simulate_deny(ctx, proposal, now=at), None)
+        if row is None:
+            return _named(ctx, simulate_deny(ctx, proposal, now=at), None)
+        shown = ExposureResult.model_validate_json(row["result_json"])
+        lc = load_lateral_context(ctx, now=at)
+        start, end = shown.observation_from, shown.observation_to
+        edges = graph_edges(ctx, lc, since=start, until=end)
+        return _named(ctx, simulate_deny(ctx, proposal, now=at, window=(start, end), edges=edges), None)
     lc = load_lateral_context(ctx, now=at)
     h = _current(lambda days: _key(ctx, lc, days), _clock(now, at))
     if h is None:
         raise NotComputed
     start, end = h.window
-    with _pull_lock, pull_period(ctx, start=start, end=end, spec=proposal_filter(proposal, start=start, end=end),
-                                 now=at) as res:
-        sim = simulate_deny(res.ctx, proposal, now=at, window=h.window, edges=h.edges)
-        pull = PullInfo(start=start, end=end, rows=res.rows, capped=res.capped_total, unread_from=res.unread_from,
-                        truncated_windows=len(res.truncated), read_at=at)
-        return _named(res.ctx, sim, pull)
+    with _pull_lock:
+        # the PCE may have changed while another pull held the lock: not the previous PCE's graph
+        if _key(ctx, lc, h.key[3])[:3] != h.key[:3] or _current(lambda days: _key(ctx, lc, days), _clock(now, at)) is not h:
+            raise StaleGeneration
+        with pull_period(ctx, start=start, end=end, spec=proposal_filter(proposal, start=start, end=end),
+                         now=at) as res:
+            sim = simulate_deny(res.ctx, proposal, now=at, window=h.window, edges=h.edges)
+            pull = PullInfo(start=start, end=end, rows=res.rows, capped=res.capped_total, unread_from=res.unread_from,
+                            truncated_windows=len(res.truncated), read_at=at)
+            named = _named(res.ctx, sim, pull)
+        if _key(ctx, lc, h.key[3])[:3] != h.key[:3]:
+            raise StaleGeneration
+        return named

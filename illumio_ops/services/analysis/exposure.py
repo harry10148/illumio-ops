@@ -19,10 +19,11 @@ KIND = "exposure"
 compute_exposure = domain_exposure.compute_exposure  # module attribute: tests stand in for it
 
 
-def graph_edges(ctx: AppContext, lc: LateralContext, *, since: datetime) -> list[EdgeIn]:
-    """The graph's edges: the management-port connections seen since `since` that were not blocked."""
+def graph_edges(ctx: AppContext, lc: LateralContext, *, since: datetime, until: datetime | None = None) -> list[EdgeIn]:
+    """The graph's edges: the management-port connections seen since `since` that were not blocked (and, with
+    `until`, first seen by then)."""
     edges = []
-    for e in baseline_edges(ctx, lc.admin_ports, since=since, classes=GRAPH_CLASSES).edges:
+    for e in baseline_edges(ctx, lc.admin_ports, since=since, classes=GRAPH_CLASSES, until=until).edges:
         state = edge_state(e.decision)
         if state is not None:
             edges.append(EdgeIn(e.src_key, e.dst_key, e.port, e.proto, state))

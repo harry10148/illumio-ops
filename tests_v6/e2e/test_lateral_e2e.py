@@ -168,3 +168,31 @@ def test_csv_cells_never_formulas(context, live_app):
     text = Path(dl.value.path()).read_text(encoding="utf-8-sig")
     row = text.splitlines()[1]
     assert row.startswith("\"'=HYPERLINK(") and ",'-fin," in row
+
+
+# ── final review (2026-10-30) ─────────────────────────────────────────────────
+
+def test_states_said_not_shown_as_nothing(context, live_app):
+    """#4–#6: a failed hourly run, detections never evaluated, and ransomware details not read are said; the
+    detections and footholds sections do not say "none"."""
+    _seed(live_app)
+    with live_app.ctx.flows().connect() as conn:
+        analysis.set_run(conn, "exposure", error="Boom")
+        conn.execute("UPDATE workloads SET risk_percent = 40, risk_updated_at = 'x'")
+        conn.commit()
+    page = _open(context, live_app)
+    expect(page.locator("[data-role=lat-run-failed]")).to_have_count(1)
+    expect(page.locator("[data-role=detect-not-run]")).to_have_count(1)
+    expect(page.locator("[data-role=rw-unread]")).to_have_count(1)
+    assert "No detection in the last 7 days" not in page.locator("[data-section=detections]").inner_text()
+
+
+def test_short_observation_computes_the_offered_period(context, live_app):
+    """#7: with a 1-day observation period the only choice is 1 day, and that is what is asked for."""
+    _seed(live_app, mode="lightweight")
+    live_app.ctx.settings.update(live_app.ctx.settings.current().revision,
+                                 lambda d: d["lateral"].update(observation_days=1))
+    page = _open(context, live_app)
+    with page.expect_request("**/api/lateral/compute") as req:
+        page.click("[data-role=lat-compute]")
+    assert json.loads(req.value.post_data)["days"] == 1
