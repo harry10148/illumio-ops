@@ -126,3 +126,18 @@ def test_given_edges_used(ctx, monkeypatch):
     sim = simulate_deny(ctx, TO_FIN_RDP, now=NOW, window=window, edges=edges)
     [change] = sim.reach_change
     assert (change.before, change.after) == (2, 1) and sim.window == window
+
+
+def test_every_cut_simulates_to_its_own_numbers(ctx):
+    """Lab acceptance 2026-10-30: a host cut said 6 → 1 and its simulation 6 → 2. What the page suggests and what the
+    simulation of that suggestion says must be the same numbers."""
+    from illumio_ops.domain.exposure import build_graph, suggest_cuts
+    from illumio_ops.services.analysis.context import load_lateral_context
+    from illumio_ops.services.analysis.exposure import graph_edges
+    lc = load_lateral_context(ctx, now=NOW)
+    g = build_graph(graph_edges(ctx, lc, since=NOW - timedelta(days=30)), enforced=False)
+    cuts = suggest_cuts(g, "/orgs/1/workloads/d9", 3, top=10)
+    assert {c.kind for c in cuts} == {"edge", "node"}
+    for cut in cuts:
+        [change] = simulate_deny(ctx, cut_to_proposal(cut, {}), now=NOW).reach_change
+        assert (change.before, change.after) == (cut.before, cut.after), cut

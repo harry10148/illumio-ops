@@ -21,8 +21,10 @@ function protoName(p: number): string {
 }
 
 function csvCell(v: string | number): string {
-  const s = String(v);
-  return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  // A cell a spreadsheet would read as a formula (a hostname from the PCE starting with =, +, -, @) is kept as text.
+  const raw = String(v);
+  const s = typeof v === "string" && /^[=+\-@\t\r]/.test(raw) ? `'${raw}` : raw;
+  return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
 }
 
 /** The sample as CSV, built here: the list the rule would block, to hand to whoever writes the rule. */
@@ -63,7 +65,9 @@ function Ranked({ title, rows, names, role }: { title: string; rows: AggRow[]; n
   );
 }
 
-export function Simulation({ suggestion, onClose }: { suggestion: Suggestion; onClose: () => void }) {
+export function Simulation({ suggestion, criticalSet, onClose }: {
+  suggestion: Suggestion; criticalSet: boolean; onClose: () => void;
+}) {
   const lang = useLang();
   const [res, setRes] = useState<DenySimulationView | null>(null);
   const [error, setError] = useState<ApiError | null>(null);
@@ -103,7 +107,9 @@ export function Simulation({ suggestion, onClose }: { suggestion: Suggestion; on
           {sim.coverage.gaps.length > 0 && <p className="notice" data-role="caveat">{t("wb_gaps", { n: String(sim.coverage.gaps.length) })}</p>}
           {sim.coverage.truncated && <p className="notice" data-role="caveat">{t("wb_truncated")}</p>}
           {sim.limit_hit && <p className="hint" data-role="caveat">{t("lat_sim_limit_hit")}</p>}
-          {sim.reach_change.length === 0 ? <p className="muted">{t("lat_sim_no_assets")}</p> : (
+          {sim.reach_change.length === 0 ? (
+            <p className="muted" data-role="sim-no-assets">{t(criticalSet ? "lat_sim_no_assets" : "lat_sim_assets_unset")}</p>
+          ) : (
             <div className="table-wrap">
               <table className="table" data-role="sim-reach">
                 <thead><tr><th>{t("lat_asset")}</th><th>{t("lat_sim_before")}</th><th>{t("lat_sim_after")}</th></tr></thead>

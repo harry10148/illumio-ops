@@ -119,8 +119,9 @@ def _reverse(g: Graph) -> list[list[int]]:
 
 
 def _paths_to(g: Graph, rev: list[list[int]], target: int, hops: int, *, skip_edge: tuple[int, int] | None = None,
-              skip_node: int | None = None) -> dict[int, int]:
-    """Reverse BFS from target: source -> next hop on its shortest path (ties by node name)."""
+              skip_into: int | None = None) -> dict[int, int]:
+    """Reverse BFS from target: source -> next hop on its shortest path (ties by node name). skip_into drops every
+    edge into that host (a deny rule on everything into it): it still reaches on its own way out."""
     nxt: dict[int, int] = {}
     dist = {target: 0}
     q = deque([target])
@@ -129,7 +130,7 @@ def _paths_to(g: Graph, rev: list[list[int]], target: int, hops: int, *, skip_ed
         if dist[node] == hops:
             continue
         for pred in rev[node]:
-            if pred in dist or pred == skip_node or (pred, node) == skip_edge:
+            if pred in dist or node == skip_into or (pred, node) == skip_edge:
                 continue
             dist[pred] = dist[node] + 1
             nxt[pred] = node
@@ -256,7 +257,8 @@ class Cut(BaseModel):
 
 def suggest_cuts(g: Graph, target: str, hops: int, *, top: int = 3, max_candidates: int = 20) -> list[Cut]:
     """Greedy single cuts: of the edges and intermediate hosts on the shortest paths into `target`, the
-    ones whose removal leaves the fewest hosts reaching it. Ties: an edge before a host, fewer ports
+    ones whose removal leaves the fewest hosts reaching it. A host cut is the deny rule on everything into the
+    host (what deny.cut_to_proposal simulates): the host itself stays a source. Ties: an edge before a host, fewer ports
     first (the narrowest deny rule), then by name."""
     if target not in g.index:
         return []
@@ -283,7 +285,7 @@ def suggest_cuts(g: Graph, target: str, hops: int, *, top: int = 3, max_candidat
             ports = sorted(g.edge_info[(a, b)][0])
             cuts.append(Cut(kind="edge", src=g.nodes[a], dst=g.nodes[b], ports=ports, before=before, after=after))
         else:
-            after = len(_paths_to(g, rev, t, hops, skip_node=a))
+            after = len(_paths_to(g, rev, t, hops, skip_into=a))
             cuts.append(Cut(kind="node", src=g.nodes[a], dst=None, ports=[], before=before, after=after))
     cuts.sort(key=lambda c: (c.after, c.kind != "edge", len(c.ports), c.src, c.dst or ""))
     return cuts[:top]

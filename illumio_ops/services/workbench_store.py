@@ -15,7 +15,7 @@ from pydantic import BaseModel
 
 from illumio_ops.domain.values import CollectionMode
 from illumio_ops.services.context import AppContext
-from illumio_ops.services.ondemand import OnDemandResult, open_period
+from illumio_ops.services.ondemand import INTERACTIVE_PULL, OnDemandResult, open_period
 from illumio_ops.store.flowdb.db import StaleGeneration
 
 KEEP = timedelta(minutes=30)
@@ -48,7 +48,7 @@ class _Held:
 
 _held: _Held | None = None
 _lock = threading.Lock()  # bookkeeping only, never held while the PCE answers
-_pull_lock = threading.Lock()  # one pull at a time (security review #2: a pull no longer blocks readers)
+_pull_lock = INTERACTIVE_PULL  # one pull at a time, shared with the lateral page (a pull no longer blocks readers)
 
 
 def _floor(t: datetime) -> datetime:

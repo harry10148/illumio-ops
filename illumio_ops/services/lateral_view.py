@@ -32,7 +32,7 @@ from illumio_ops.services.analysis.status import DetectorStatusView, detector_st
 from illumio_ops.services.collect.guard import require_same_pce
 from illumio_ops.services.context import AppContext
 from illumio_ops.services.hosts import display_names
-from illumio_ops.services.ondemand import pull_period
+from illumio_ops.services.ondemand import INTERACTIVE_PULL, pull_period
 from illumio_ops.services.workbench_store import PullInfo
 from illumio_ops.store.flowdb import analysis, capabilities
 from illumio_ops.store.flowdb.db import StaleGeneration
@@ -100,7 +100,7 @@ class _Held:
 
 _held: _Held | None = None
 _lock = threading.Lock()  # bookkeeping only, never held while the PCE answers
-_pull_lock = threading.Lock()  # one pull at a time
+_pull_lock = INTERACTIVE_PULL  # one interactive pull at a time, shared with the workbench
 
 
 def drop() -> None:
@@ -266,7 +266,8 @@ def simulate(ctx: AppContext, proposal: DenyProposal, *, now: datetime | None = 
     if h is None:
         raise NotComputed
     start, end = h.window
-    with pull_period(ctx, start=start, end=end, spec=proposal_filter(proposal, start=start, end=end), now=at) as res:
+    with _pull_lock, pull_period(ctx, start=start, end=end, spec=proposal_filter(proposal, start=start, end=end),
+                                 now=at) as res:
         sim = simulate_deny(res.ctx, proposal, now=at, window=h.window, edges=h.edges)
         pull = PullInfo(start=start, end=end, rows=res.rows, capped=res.capped_total, unread_from=res.unread_from,
                         truncated_windows=len(res.truncated), read_at=at)

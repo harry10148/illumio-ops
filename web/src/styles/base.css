@@ -243,7 +243,7 @@ code.cmd { white-space: pre-wrap; word-break: break-all; font-size: var(--fs-min
 .plain-list { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-2); }
 .lat-compare { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: var(--space-4); }
 .lat-paths-wrap { overflow-x: auto; }
-.lat-paths { display: block; }
+.lat-paths { display: block; max-width: 100%; height: auto; }
 .lat-node { fill: var(--surface-1); stroke: var(--line); }
 .lat-node-asset { fill: var(--tone-crit-bg); stroke: var(--tone-crit-border); }
 .lat-node-cut { stroke: var(--tone-ok-border); stroke-width: 2; }
@@ -257,4 +257,5 @@ code.cmd { white-space: pre-wrap; word-break: break-all; font-size: var(--fs-min
 .lat-matrix td[data-state=allowed] { background: var(--tone-crit-bg); }
 .lat-matrix td[data-state=potentially_blocked] { background: var(--tone-warn-bg); }
 .lat-matrix td[data-state=unknown] { background: var(--tone-neutral-bg); }
-.lat-matrix th { white-space: nowrap; }
+.lat-matrix th { white-space: nowrap; text-transform: none; }  /* Label values keep their case */
+[data-section=status] p { margin: 0; }

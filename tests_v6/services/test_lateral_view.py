@@ -232,3 +232,21 @@ def test_simulate_lightweight_uses_held_edges(light, pulls, monkeypatch):
 def test_port_names_for_paths(ctx):
     names = lateral_view.view(ctx, now=NOW).port_names
     assert names.get("3389/6") and names.get("445/6")
+
+
+def test_simulate_waits_for_another_pull(light, pulls, monkeypatch):
+    """Security review: one interactive pull from the PCE at a time — a simulation waits while the workbench (or the
+    exposure computation) is reading, instead of a second download running beside it."""
+    import threading
+
+    from illumio_ops.services import ondemand
+    monkeypatch.setattr(lateral_view, "_named", lambda ctx, sim, pull: sim)
+    monkeypatch.setattr(lateral_view, "simulate_deny", lambda *a, **kw: "sim")
+    lateral_view.compute(light, 7, now=NOW)
+    done = threading.Event()
+    with ondemand.INTERACTIVE_PULL:
+        t = threading.Thread(target=lambda: (lateral_view.simulate(light, TO_DB, now=NOW), done.set()))
+        t.start()
+        assert not done.wait(0.5) and len(pulls["specs"]) == 1  # still waiting: nothing pulled
+    assert done.wait(5) and len(pulls["specs"]) == 2
+    t.join(5)

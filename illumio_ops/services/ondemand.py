@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import dataclasses
 import sqlite3
+import threading
 import time
 import uuid
 from collections.abc import Callable, Iterator
@@ -48,6 +49,10 @@ QUERY_NAME = "illumio-ops on-demand"
 # 30 s, thrown away when halved), so the span is read a day at a time: halving from the whole span spent more on
 # discarded capped answers than daily windows did (posture 1,290 s against 960 s).
 WINDOW = timedelta(days=1)
+# One interactive pull at a time (the workbench, the lateral page's exposure and simulations; security review
+# 2026-10-30): each holds up to PER_QUERY rows being parsed and a throwaway store, so a second click waits for the
+# first instead of a second download running beside it.
+INTERACTIVE_PULL = threading.Lock()
 
 
 class OnDemandFailed(Exception):

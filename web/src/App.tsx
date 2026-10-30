@@ -13,6 +13,7 @@ type Auth = { state: "checking" } | { state: "signed-out" } | { state: "signed-i
 export function App() {
   const [lang, setLang] = useState<Lang>(initialLang);
   const [dictVersion, setDictVersion] = useState(0);
+  const [loadedLang, setLoadedLang] = useState<Lang | null>(null);
   const [auth, setAuth] = useState<Auth>({ state: "checking" });
 
   const refreshMe = useCallback(async () => {
@@ -28,6 +29,7 @@ export function App() {
   useEffect(() => {
     void loadDictionary(lang).then(() => {
       rememberLang(lang);
+      setLoadedLang(lang);
       setDictVersion((v) => v + 1);
     });
   }, [lang]);
@@ -44,7 +46,10 @@ export function App() {
     };
   }, [refreshMe]);
 
-  if (dictVersion === 0 || auth.state === "checking") {
+  // Signed in, the page waits for the display language's words: drawn in the browser's language first, the shell
+  // was mounted again when they arrived, and what a page had started on the first mount was lost (P6c lab).
+  const waiting = auth.state === "signed-in" && loadedLang !== lang;
+  if (dictVersion === 0 || auth.state === "checking" || waiting) {
     return <div className="center-page muted">{dictVersion ? t("loading") : "…"}</div>;
   }
 

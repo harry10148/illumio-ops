@@ -2147,7 +2147,7 @@
   "lat_cuts": "建議切斷點",
   "lat_cuts_none": "沒有單一切斷點能降低可觸及數。",
   "lat_cut_edge": "只切 {src} → {dst} 的 {ports}：可觸及 {asset} 的主機從 {before} 台降到 {after} 台。",
-  "lat_cut_node": "隔開 {host}：可觸及 {asset} 的主機從 {before} 台降到 {after} 台。",
+  "lat_cut_node": "拒絕所有進入 {host} 的連線：可觸及 {asset} 的主機從 {before} 台降到 {after} 台。",
   "lat_simulate": "試算",
   "lat_reach": "可觸及排名",
   "lat_reach_hint": "每台主機經管理 port 在 {hops} 跳內可觸及的主機數。",
@@ -2187,7 +2187,7 @@
   "lat_sim_title": "Deny rule 試算",
   "lat_sim_close": "關閉",
   "lat_sim_readonly": "唯讀：依觀察到的流量計算，不會寫入 PCE。",
-  "lat_sim_node_inbound": "只計算進入該主機的流量；圖上同時移除了它往外的路。",
+  "lat_sim_node_inbound": "這條規則只擋進入該主機的連線；它自己往外的連線不受影響，所以它仍算一個來源。",
   "lat_sim_running": "試算中…",
   "lat_sim_counts": "會擋下 {start} – {end} 觀察到的 {connections} 條連線（{flows} 筆 flow）。",
   "lat_sim_limit_hit": "下方清單已達上限而截斷。",
@@ -2207,5 +2207,7 @@
   "lat_csv_connections": "連線數",
   "lat_csv_first": "首見",
   "lat_csv_last": "最後見",
-  "lat_on_page": "橫向移動頁"
+  "lat_on_page": "橫向移動頁",
+  "lat_not_set": "未設定",
+  "lat_sim_assets_unset": "尚未設定重要資產：不顯示可觸及數的變化。"
 }

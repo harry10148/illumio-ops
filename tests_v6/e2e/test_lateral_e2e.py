@@ -2,6 +2,7 @@
 cut points of a critical asset, a cut simulated, and what the page says when something is missing."""
 import json
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
 
 from playwright.sync_api import expect
 
@@ -89,6 +90,11 @@ def test_critical_not_set_guides(context, live_app):
     _seed(live_app, critical=False)
     page = _open(context, live_app)
     expect(page.locator("[data-role=critical-not-set]")).to_have_count(1)
+    # lab acceptance 2026-10-30: "critical assets reachable 0" read as none reachable; nothing is set
+    expect(page.locator("[data-role=assets-now]")).to_have_text("Not set")
+    expect(page.locator("[data-role=assets-enforced]")).to_have_text("Not set")
+    page.locator("[data-role=sim-cross]").first.click()  # nothing set is not "no host matches"
+    expect(page.locator("[data-role=sim-no-assets]")).to_have_text("No critical assets are set: the change in reach is not shown.")
     expect(page.locator("[data-role=reach] tbody tr")).to_have_count(20)  # the ranking covers every host
 
 
@@ -136,3 +142,29 @@ def test_result_json_names_never_hrefs(live_app):
     v = lateral_view.view(live_app.ctx)
     assert all(not n.startswith("/orgs/") for n in v.names.values())
     assert json.loads(v.model_dump_json())["state"] == "ok"
+
+
+def test_csv_cells_never_formulas(context, live_app):
+    """Security review: a hostname from the PCE starting with = (or + - @) is written as text, not a formula a
+    spreadsheet would run."""
+    from illumio_ops.domain.flows import normalize_flow
+    from illumio_ops.domain.values import DataOrigin
+    from illumio_ops.store.flowdb.flows import upsert_flows
+    from tests_v6.services.collect.conftest import raw_flow
+    _seed(live_app)
+    now = datetime.now(UTC)
+    raw = raw_flow(1, now - timedelta(days=1, minutes=5), now - timedelta(days=1), port=3389)
+    raw["src"]["workload"].update(href=W + "h01", hostname='=HYPERLINK("http://x","y")')
+    raw["dst"]["workload"].update(href=W + "fin", hostname="-fin")
+    with live_app.ctx.flows().connect() as conn:
+        upsert_flows(conn, [normalize_flow(raw)], origin=DataOrigin.INGEST, now=now)
+        conn.commit()
+    page = _open(context, live_app)
+    page.locator("[data-role=sim-cut]").first.click()
+    csv_button = page.locator("[data-role=sim-csv]")
+    expect(csv_button).to_be_enabled()
+    with page.expect_download() as dl:
+        csv_button.click()
+    text = Path(dl.value.path()).read_text(encoding="utf-8-sig")
+    row = text.splitlines()[1]
+    assert row.startswith("\"'=HYPERLINK(") and ",'-fin," in row

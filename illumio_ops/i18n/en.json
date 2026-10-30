@@ -2147,7 +2147,7 @@
   "lat_cuts": "Suggested cut points",
   "lat_cuts_none": "No single cut lowers the reach.",
   "lat_cut_edge": "Cut only {src} → {dst} on {ports}: hosts reaching {asset} go from {before} to {after}.",
-  "lat_cut_node": "Isolate {host}: hosts reaching {asset} go from {before} to {after}.",
+  "lat_cut_node": "Deny everything into {host}: hosts reaching {asset} go from {before} to {after}.",
   "lat_simulate": "Simulate",
   "lat_reach": "Reach ranking",
   "lat_reach_hint": "How many hosts each host reaches over management ports within {hops} hops.",
@@ -2187,7 +2187,7 @@
   "lat_sim_title": "Deny rule simulation",
   "lat_sim_close": "Close",
   "lat_sim_readonly": "Read-only: computed from the observed traffic; nothing is written to the PCE.",
-  "lat_sim_node_inbound": "Only the traffic into the host is counted; the graph also removes its way out.",
+  "lat_sim_node_inbound": "The rule blocks only connections into the host; its own connections out are untouched, so it still counts as a source.",
   "lat_sim_running": "Simulating…",
   "lat_sim_counts": "Would block {connections} connections ({flows} flows) seen {start} – {end}.",
   "lat_sim_limit_hit": "The lists below are cut at their limit.",
@@ -2207,5 +2207,7 @@
   "lat_csv_connections": "Connections",
   "lat_csv_first": "First seen",
   "lat_csv_last": "Last seen",
-  "lat_on_page": "Lateral movement"
+  "lat_on_page": "Lateral movement",
+  "lat_not_set": "Not set",
+  "lat_sim_assets_unset": "No critical assets are set: the change in reach is not shown."
 }

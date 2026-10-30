@@ -210,3 +210,12 @@ def test_result_without_groups_loads():
     stored = r.model_dump(mode="json")
     stored.pop("groups")  # a result computed before P6c
     assert ExposureResult.model_validate(stored).groups == {}
+
+
+def test_host_cut_counts_what_its_deny_rule_leaves():
+    """Lab acceptance 2026-10-30: "isolate batch: 6 → 1" was simulated as 6 → 2. A host cut is the deny rule
+    "everything into the host": the host itself still reaches the asset on its own way out, so it stays a source."""
+    edges = [e("s1", "bak"), e("s2", "bak"), e("bak", "fin", port=3389), e("x", "fin")]
+    g = build_graph(edges, enforced=False)
+    [node] = [c for c in suggest_cuts(g, "fin", 3, top=10) if c.kind == "node"]
+    assert node.src == "bak" and node.before == 4 and node.after == 2  # bak itself and x

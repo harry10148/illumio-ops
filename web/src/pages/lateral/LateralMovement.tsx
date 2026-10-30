@@ -142,8 +142,8 @@ export default function LateralMovement() {
           </p>
         ))}
       </div>
-      {suggestion && <Simulation suggestion={suggestion} onClose={() => setSuggestion(null)} />}
-      {ex && <Compare ex={ex} />}
+      {suggestion && <Simulation suggestion={suggestion} criticalSet={page.critical_set} onClose={() => setSuggestion(null)} />}
+      {ex && <Compare ex={ex} critical={page.critical_set} />}
       {ex && (
         <Assets ex={ex} critical={page.critical_set} preselect={params.get("asset")} name={name} onCut={suggestCut} />
       )}
@@ -197,7 +197,7 @@ export default function LateralMovement() {
   );
 }
 
-function Compare({ ex }: { ex: ExposureResult }) {
+function Compare({ ex, critical }: { ex: ExposureResult; critical: boolean }) {
   const pivotsNow = ex.hosts.filter((h) => h.pivot_now).length;
   const pivotsEnf = ex.hosts.filter((h) => h.pivot_enforced).length;
   const assetsNow = ex.assets.filter((a) => a.sources_now > 0).length;
@@ -209,7 +209,7 @@ function Compare({ ex }: { ex: ExposureResult }) {
         <p className="hint">{t("lat_now_hint")}</p>
         <dl className="host-facts">
           <dt>{t("lat_edges")}</dt><dd data-role="edges-now">{ex.edges_now.toLocaleString()}</dd>
-          <dt>{t("lat_assets_reachable")}</dt><dd>{assetsNow}</dd>
+          <dt>{t("lat_assets_reachable")}</dt><dd data-role="assets-now">{critical ? assetsNow : t("lat_not_set")}</dd>
           <dt>{t("lat_pivots")}</dt><dd>{pivotsNow}</dd>
         </dl>
       </div>
@@ -218,7 +218,7 @@ function Compare({ ex }: { ex: ExposureResult }) {
         <p className="hint">{t("lat_enforced_hint")}</p>
         <dl className="host-facts">
           <dt>{t("lat_edges")}</dt><dd data-role="edges-enforced">{ex.edges_enforced.toLocaleString()}</dd>
-          <dt>{t("lat_assets_reachable")}</dt><dd>{assetsEnf}</dd>
+          <dt>{t("lat_assets_reachable")}</dt><dd data-role="assets-enforced">{critical ? assetsEnf : t("lat_not_set")}</dd>
           <dt>{t("lat_pivots")}</dt><dd>{pivotsEnf}</dd>
         </dl>
       </div>
