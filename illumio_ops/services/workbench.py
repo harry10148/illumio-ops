@@ -115,9 +115,36 @@ def _read_ctx(ctx: AppContext, req: FlowRequest | EventRequest,
         yield got
 
 
+_HOST_DIMENSIONS = frozenset({SegmentDimension.SRC_HOST, SegmentDimension.DST_HOST, SegmentDimension.EVENT_HOST})
+
+
+def _named(ctx: AppContext, rows: list[AggRow], group_by: tuple[GroupBy, ...]) -> list[AggRow]:
+    """A host the flows carry no hostname for is shown by the inventory's hostname or name, not its href (lab
+    acceptance 2026-10-30: the PCE sends some workloads without one)."""
+    levels = [i for i, g in enumerate(group_by) if g.dimension in _HOST_DIMENSIONS]
+    hrefs = {str(r.keys[i]) for r in rows for i in levels if r.display[i] is None and str(r.keys[i]).startswith("/orgs/")}
+    if not hrefs:
+        return rows
+    with ctx.flows().connect() as conn:
+        found = conn.execute(f"SELECT href, COALESCE(hostname, name) FROM workloads WHERE href IN "
+                             f"({','.join('?' * len(hrefs))})", sorted(hrefs)).fetchall()
+    names = {h: n for h, n in found if n}
+    out = []
+    for r in rows:
+        display = list(r.display)
+        for i in levels:
+            if display[i] is None and str(r.keys[i]) in names:
+                display[i] = names[str(r.keys[i])]
+        out.append(r.model_copy(update={"display": display}))
+    return out
+
+
 def run(ctx: AppContext, req: FlowRequest | EventRequest, *, now: datetime | None = None) -> WorkbenchResult:
     with _read_ctx(ctx, req, now) as (read, pulled):
-        return WorkbenchResult(result=run_segment(read, req.segment(), now=now), pulled=pulled)
+        result = run_segment(read, req.segment(), now=now)
+        if result.ranking:
+            result = result.model_copy(update={"ranking": _named(read, result.ranking, req.group_by)})
+        return WorkbenchResult(result=result, pulled=pulled)
 
 
 def dimension(ctx: AppContext, req: FlowRequest | EventRequest, dim: SegmentDimension, *,
@@ -128,10 +155,11 @@ def dimension(ctx: AppContext, req: FlowRequest | EventRequest, dim: SegmentDime
                       limit=DIMENSION_TOP)
     if isinstance(seg, EventSegment):
         e = aggregate_events(ctx, seg, now=now)
-        return DimensionTop(rows=e.rows, limit_hit=e.limit_hit, coverage=e.coverage)
+        return DimensionTop(rows=_named(ctx, e.rows, seg.group_by), limit_hit=e.limit_hit, coverage=e.coverage)
     with _read_ctx(ctx, req, now) as (read, pulled):
         f = aggregate_flows(read, seg, now=now, with_field_coverage=False)
-        return DimensionTop(rows=f.rows, limit_hit=f.limit_hit, coverage=f.coverage, pulled=pulled)
+        return DimensionTop(rows=_named(read, f.rows, seg.group_by), limit_hit=f.limit_hit, coverage=f.coverage,
+                            pulled=pulled)
 
 
 def from_alert(ctx: AppContext, alert_id: int) -> FlowRequest | EventRequest | None:

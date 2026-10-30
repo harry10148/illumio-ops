@@ -67,3 +67,21 @@ def test_from_alert_dimensions_ranking_events(context, live_app):
     page.click("text=Events")
     page.wait_for_selector("[data-dim=event_type]")
     assert page.locator("[data-dim=dst_host]").count() == 0
+
+
+def test_one_query_per_change(context, live_app):
+    """Lab acceptance 2026-10-30: every change sent the query twice (writing the address gave react-router a new
+    setSearchParams, which re-ran the effect). One click, one query."""
+    alert_id = _seed(live_app)
+    page = context.new_page()
+    sign_in(page, live_app.url)
+    runs = []
+    page.on("request", lambda r: runs.append(r.url) if r.url.endswith("/api/workbench/run") else None)
+    page.goto(f"{live_app.url}/investigate?alert={alert_id}")
+    page.locator("[data-dim=dst_host] .wb-dim-row").first.wait_for()
+    page.wait_for_timeout(1500)
+    before = len(runs)
+    page.locator("[data-dim=dst_host] .wb-dim-row", has_text="db").click()
+    page.wait_for_selector("[data-chip^='dst:h:']")
+    page.wait_for_timeout(1500)
+    assert len(runs) - before == 1

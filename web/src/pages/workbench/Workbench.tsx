@@ -1,4 +1,4 @@
-import { type FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { type FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 
 import { type ApiError, call } from "../../api/client";
@@ -205,6 +205,10 @@ function Ranking({ result, levels }: { result: SegmentResult; levels: number }) 
 
 export function Workbench() {
   const [params, setParams] = useSearchParams();
+  // react-router hands out a new setSearchParams whenever the address changes: kept in a ref so writing the
+  // conditions to the address does not run the query a second time (lab acceptance 2026-10-30)
+  const setParamsRef = useRef(setParams);
+  setParamsRef.current = setParams;
   const [meta, setMeta] = useState<WorkbenchMeta | null>(null);
   const [req, setReq] = useState<Req | null>(null);
   const [alertId, setAlertId] = useState<string | null>(null);
@@ -255,9 +259,9 @@ export function Workbench() {
     const next = new URLSearchParams();
     next.set("q", JSON.stringify(req));
     if (alertId) next.set("alert", alertId);
-    setParams(next, { replace: true });
+    setParamsRef.current(next, { replace: true });
     void run(req);
-  }, [req, alertId, run, setParams]);
+  }, [req, alertId, run]);
 
   if (!req) return <section className="page"><p className="muted">{t("loading")}</p></section>;
 

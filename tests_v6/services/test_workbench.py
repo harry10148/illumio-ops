@@ -121,3 +121,22 @@ def test_lightweight_reuses_pull(tmp_path, monkeypatch):
         assert got.pulled is not None and got.pulled.rows == 7 and top.pulled is not None and len(opened) == 1
     finally:
         workbench_store.drop()
+
+
+def test_host_without_hostname_named_from_inventory(ctx):
+    """Lab acceptance 2026-10-30: flows the PCE sends without a hostname showed a workload href; the inventory's
+    hostname (or name) is shown instead."""
+    from illumio_ops.store.flowdb import workloads
+    with ctx.flows().connect() as conn:
+        upsert_flows(conn, [flow(src="x", dst="nohost", port=22)], origin=DataOrigin.INGEST, now=NOW)
+        conn.execute("UPDATE flows SET dst_hostname = NULL WHERE dst_key = '/orgs/1/workloads/nohost'")
+        workloads.replace_inventory(conn, [workloads.WorkloadRow(
+            href="/orgs/1/workloads/nohost", hostname=None, name="k8s-node02", managed=1, enforcement_mode=None,
+            visibility_level=None, os_id=None, ven_version=None, ven_href=None, label_set=None, online=1,
+            risk_exposure=None, risk_percent=None, risk_updated_at=None, fetched_at="x")])
+        conn.commit()
+    top = workbench.dimension(ctx, _flows(), SegmentDimension.DST_HOST, now=NOW)
+    assert {r.keys[0]: r.display[0] for r in top.rows}["/orgs/1/workloads/nohost"] == "k8s-node02"
+    ranked = workbench.run(ctx, _flows(view=SegmentView.RANKING, group_by=(GroupBy(dimension=SegmentDimension.DST_HOST),)),
+                           now=NOW).result.ranking
+    assert {r.keys[0]: r.display[0] for r in ranked}["/orgs/1/workloads/nohost"] == "k8s-node02"
