@@ -691,6 +691,8 @@ VEN 車隊總覽。架構保留「政策動作」服務的位置，v6.1 加入�
 
 **policy_diff（P5c-3，2026-10-30）**：報表名「待 Provision 的政策變更」。產生當下即時讀 Draft 與 active 的 Ruleset（含 Deny Rule、Override Deny）、IP list、服務、Label Group 逐欄比對（移植 5.x 差異核心，不用 pandas）；任何讀取失敗報表即失敗，不把讀不到當成「全被刪除」。規則以「集合/id」為鍵；物件成員比集合（順序不算變更），新增成員標「放行範圍變大」。風險：停用（Draft 停用、生效中啟用）＝高；重新啟用或刪除＝中；範圍變大且被生效中的啟用允許規則引用＝高。新增的 Ruleset 以整體列出並寫規則數。最後修改者取本機事件庫期間內最新一筆政策事件，依 `resource_changes[].href`（Draft 路徑，lab 實測）對應（5.x 依名稱，改名或同名會錯）；最多讀 1,000 筆並揭露。待 Provision 清單中不比對的類別（firewall settings、virtual service…）另列。期間只決定歸因讀哪段事件。**自訂報表**移到 P6（由工作台存下的分析段落組成，P6 才有工作台）。
 
+**policy_resolver（P5c-4，2026-10-30）**：報表平台加 JSON／CSV 兩種格式，型別宣告自己產出哪些格式（預設 HTML＋XLSX），要求或排程不支援的格式即拒絕並指出欄位；CSV 為 UTF-8 BOM、每格套用與 XLSX 相同的公式防護；附件超過 20 MB 不附、信件說明到報表頁下載。policy_resolver 只出 JSON＋CSV：產生當下即時讀生效 Ruleset、全部主機（含非受管，只有 public_ip 時用它）、IP list、Label Group、服務，移植 5.x 展開核心（5.x 測試原樣沿用）。安全審查後的修正（都是「比規則寬」）：All Workloads 展開成所有主機位址（有 scope 時為 scope 內），不再寫 ANY；排除以位址包含關係扣減，IP list 的排除範圍會扣掉；沒有 port 的服務（未知或以程序定義）標出、不當任何 port；Deny Rule 的服務在 `service_ports`（5.x 只讀 ingress_services，把 Deny Rule 展成任何 port）；每條規則上限以「來源×目的×服務」計 10 萬列；總上限 50 萬列傳進展開，放不下的規則整條略過、只計數不建（不會出現半條規則），被截斷的 Ruleset 尾端加說明列、JSON 帶旗標。最終審查後改照 Illumio 規則語意（5.x 皆有誤）：同一側不同維度的 Label／Label Group 取交集、同維度取聯集（scope 亦同）；多個 scope 逐一展開再合併（不再產生跨 scope 列）；明確指定的 workload 也受 scope 限縮；Provider 以 virtual service 解析的規則、或引用 PCE 上不存在物件的規則，列為「無法展開」（每條一列說明並計數），不放寬也不無聲略過；`use_workload_subnets` 改出介面網段；JSON 的 truncated 旗標也涵蓋被摘要與無法展開的規則。lab Draft 實測 testapp 從 280 列（聯集）降為 24 列。
+
 #### 6.5.6 勒索防護【使用者 修訂；細節為判斷】
 
 - **改用 PCE 的判定**：高風險服務清單、嚴重度、逐服務防護狀態、listening／inactive、主機暴露等級，取自 PCE

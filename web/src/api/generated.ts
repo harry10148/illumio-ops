@@ -56,14 +56,14 @@ export type ProbeName = ("noop" | "health" | "node_available")
  * This interface was referenced by `ContractRoot`'s JSON-Schema
  * via the `definition` "ReportFormat".
  */
-export type ReportFormat = ("html" | "xlsx")
+export type ReportFormat = ("html" | "xlsx" | "json" | "csv")
 /**
  * Report types (spec §6.5 報表, §6.5.5); 5b and 5c add the 5.x types.
  * 
  * This interface was referenced by `ContractRoot`'s JSON-Schema
  * via the `definition` "ReportType".
  */
-export type ReportType = ("lateral_posture" | "new_connections" | "unmanaged_endpoints" | "traffic" | "security_risk" | "network_inventory" | "app_summary" | "ven_status" | "audit" | "ransomware" | "readiness" | "policy_usage" | "rule_hit_count" | "policy_diff")
+export type ReportType = ("lateral_posture" | "new_connections" | "unmanaged_endpoints" | "traffic" | "security_risk" | "network_inventory" | "app_summary" | "ven_status" | "audit" | "ransomware" | "readiness" | "policy_usage" | "rule_hit_count" | "policy_diff" | "policy_resolver")
 /**
  * This interface was referenced by `ContractRoot`'s JSON-Schema
  * via the `definition` "ReportStatus".
@@ -794,6 +794,7 @@ trigger: string
 export interface CatalogEntry {
 accepts_filter: boolean
 available: boolean
+formats: ReportFormat[]
 group: string
 max_lookback: (number | null)
 reason_key: (string | null)
@@ -1856,7 +1857,9 @@ export const VALUES = {
     "unknown"
   ],
   "ReportFormat": [
+    "csv",
     "html",
+    "json",
     "xlsx"
   ],
   "ReportStatus": [
@@ -1872,6 +1875,7 @@ export const VALUES = {
     "network_inventory",
     "new_connections",
     "policy_diff",
+    "policy_resolver",
     "policy_usage",
     "ransomware",
     "readiness",

@@ -53,7 +53,7 @@ function Editor({ initial, catalog, smtp, onSave, onCancel, error }: {
     frequency: f, day_of_week: f === "weekly" ? (s.day_of_week ?? 0) : null,
     day_of_month: f === "monthly" ? (s.day_of_month ?? 1) : null,
   });
-  const toggleFormat = (f: "html" | "xlsx", on: boolean) =>
+  const toggleFormat = (f: ReportScheduleFields["formats"][number], on: boolean) =>
     // An empty list is sent as is: the server refuses it and names the field.
     set({ formats: (on ? [...new Set([...s.formats, f])] : s.formats.filter((x) => x !== f)) as ReportScheduleFields["formats"] });
   return (
@@ -68,7 +68,10 @@ function Editor({ initial, catalog, smtp, onSave, onCancel, error }: {
           onChange={(e) => {
             const next = catalog.entries.find((c) => c.report_type === e.target.value);
             set({ report_type: e.target.value as ReportScheduleFields["report_type"],
-                  lookback_days: fitLookback(s.lookback_days, next?.max_lookback) });
+                  lookback_days: fitLookback(s.lookback_days, next?.max_lookback),
+                  // keep the chosen formats the new type also makes; none left: all it makes
+                  formats: (s.formats.filter((f) => next?.formats.includes(f)).length
+                    ? s.formats.filter((f) => next?.formats.includes(f)) : next?.formats ?? s.formats) as ReportScheduleFields["formats"] });
             if (next?.requires_app && !namesApp(rows)) setRows([...rows, { side: "dst", key: "app", value: "" }]);
           }}>
           {catalog.entries.map((c) => (
@@ -121,8 +124,10 @@ function Editor({ initial, catalog, smtp, onSave, onCancel, error }: {
         </select>
       </label>
       <div className="row span-all">
-        <label><input type="checkbox" checked={s.formats.includes("html")} onChange={(e) => toggleFormat("html", e.target.checked)} /> HTML</label>
-        <label><input type="checkbox" checked={s.formats.includes("xlsx")} onChange={(e) => toggleFormat("xlsx", e.target.checked)} /> XLSX</label>
+        {(entry?.formats ?? ["html", "xlsx"]).map((f) => (
+          <label key={f}><input type="checkbox" name={f} checked={s.formats.includes(f)}
+            onChange={(e) => toggleFormat(f, e.target.checked)} /> {f.toUpperCase()}</label>
+        ))}
         <label><input type="checkbox" name="email" checked={s.email} onChange={(e) => set({ email: e.target.checked })} /> {t("gui_reports_email")}</label>
         {s.email && !smtp && (
           <span className="hint">{t("gui_reports_email_needs_smtp")} <Link to="/system/channels">{t("gui_reports_channels_link")}</Link></span>

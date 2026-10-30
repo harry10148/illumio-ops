@@ -6,7 +6,7 @@ from pathlib import Path
 
 from pydantic import BaseModel
 
-from illumio_ops.domain.values import Language, ReportStatus, ReportType
+from illumio_ops.domain.values import Language, ReportFormat, ReportStatus, ReportType
 from illumio_ops.services.analysis.status import MAX_LABEL_VALUES, LabelChoice
 from illumio_ops.services.context import AppContext
 from illumio_ops.services.reports.generate import availability, enqueue
@@ -25,6 +25,7 @@ class CatalogEntry(BaseModel):
     accepts_filter: bool  # a label filter narrows the report
     requires_app: bool  # the filter must name an app
     max_lookback: int | None  # the most days back this type can read
+    formats: list[ReportFormat]  # the formats this type makes
 
 
 class Catalog(BaseModel):
@@ -73,7 +74,8 @@ def catalog(ctx: AppContext) -> Catalog:
     return Catalog(entries=[CatalogEntry(report_type=t, group=s.group, available=avail.get(t) is None,
                                          reason_key=avail.get(t), accepts_filter=s.accepts_filter,
                                          requires_app=s.requires_app,
-                                         max_lookback=s.max_lookback(settings) if s.max_lookback else None)
+                                         max_lookback=s.max_lookback(settings) if s.max_lookback else None,
+                                         formats=list(s.formats))
                             for t, s in specs().items()],
                    label_choices=[LabelChoice(key=k, values=vs[:MAX_LABEL_VALUES], truncated=len(vs) > MAX_LABEL_VALUES)
                                   for k, vs in sorted(by_key.items())],

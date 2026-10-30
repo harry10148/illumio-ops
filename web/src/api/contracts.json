@@ -10099,7 +10099,9 @@
           "ReportFormat": {
             "enum": [
               "html",
-              "xlsx"
+              "xlsx",
+              "json",
+              "csv"
             ],
             "title": "ReportFormat",
             "type": "string"
@@ -10257,7 +10259,8 @@
               "readiness",
               "policy_usage",
               "rule_hit_count",
-              "policy_diff"
+              "policy_diff",
+              "policy_resolver"
             ],
             "title": "ReportType",
             "type": "string"
@@ -10547,7 +10550,9 @@
           "ReportFormat": {
             "enum": [
               "html",
-              "xlsx"
+              "xlsx",
+              "json",
+              "csv"
             ],
             "title": "ReportFormat",
             "type": "string"
@@ -10720,7 +10725,8 @@
               "readiness",
               "policy_usage",
               "rule_hit_count",
-              "policy_diff"
+              "policy_diff",
+              "policy_resolver"
             ],
             "title": "ReportType",
             "type": "string"
@@ -11102,7 +11108,9 @@
           "ReportFormat": {
             "enum": [
               "html",
-              "xlsx"
+              "xlsx",
+              "json",
+              "csv"
             ],
             "title": "ReportFormat",
             "type": "string"
@@ -11275,7 +11283,8 @@
               "readiness",
               "policy_usage",
               "rule_hit_count",
-              "policy_diff"
+              "policy_diff",
+              "policy_resolver"
             ],
             "title": "ReportType",
             "type": "string"
@@ -11645,7 +11654,9 @@
           "ReportFormat": {
             "enum": [
               "html",
-              "xlsx"
+              "xlsx",
+              "json",
+              "csv"
             ],
             "title": "ReportFormat",
             "type": "string"
@@ -11818,7 +11829,8 @@
               "readiness",
               "policy_usage",
               "rule_hit_count",
-              "policy_diff"
+              "policy_diff",
+              "policy_resolver"
             ],
             "title": "ReportType",
             "type": "string"
@@ -12382,7 +12394,9 @@
           "ReportFormat": {
             "enum": [
               "html",
-              "xlsx"
+              "xlsx",
+              "json",
+              "csv"
             ],
             "title": "ReportFormat",
             "type": "string"
@@ -12540,7 +12554,8 @@
               "readiness",
               "policy_usage",
               "rule_hit_count",
-              "policy_diff"
+              "policy_diff",
+              "policy_resolver"
             ],
             "title": "ReportType",
             "type": "string"
@@ -12830,7 +12845,9 @@
           "ReportFormat": {
             "enum": [
               "html",
-              "xlsx"
+              "xlsx",
+              "json",
+              "csv"
             ],
             "title": "ReportFormat",
             "type": "string"
@@ -13003,7 +13020,8 @@
               "readiness",
               "policy_usage",
               "rule_hit_count",
-              "policy_diff"
+              "policy_diff",
+              "policy_resolver"
             ],
             "title": "ReportType",
             "type": "string"
@@ -13117,6 +13135,13 @@
                 "title": "Available",
                 "type": "boolean"
               },
+              "formats": {
+                "items": {
+                  "$ref": "#/$defs/ReportFormat"
+                },
+                "title": "Formats",
+                "type": "array"
+              },
               "group": {
                 "title": "Group",
                 "type": "string"
@@ -13158,7 +13183,8 @@
               "reason_key",
               "accepts_filter",
               "requires_app",
-              "max_lookback"
+              "max_lookback",
+              "formats"
             ],
             "title": "CatalogEntry",
             "type": "object"
@@ -13189,6 +13215,16 @@
             "title": "LabelChoice",
             "type": "object"
           },
+          "ReportFormat": {
+            "enum": [
+              "html",
+              "xlsx",
+              "json",
+              "csv"
+            ],
+            "title": "ReportFormat",
+            "type": "string"
+          },
           "ReportType": {
             "description": "Report types (spec §6.5 報表, §6.5.5); 5b and 5c add the 5.x types.",
             "enum": [
@@ -13205,7 +13241,8 @@
               "readiness",
               "policy_usage",
               "rule_hit_count",
-              "policy_diff"
+              "policy_diff",
+              "policy_resolver"
             ],
             "title": "ReportType",
             "type": "string"
@@ -13526,7 +13563,9 @@
           "ReportFormat": {
             "enum": [
               "html",
-              "xlsx"
+              "xlsx",
+              "json",
+              "csv"
             ],
             "title": "ReportFormat",
             "type": "string"
@@ -13547,7 +13586,8 @@
               "readiness",
               "policy_usage",
               "rule_hit_count",
-              "policy_diff"
+              "policy_diff",
+              "policy_resolver"
             ],
             "title": "ReportType",
             "type": "string"
@@ -19878,7 +19918,9 @@
       "unknown"
     ],
     "ReportFormat": [
+      "csv",
       "html",
+      "json",
       "xlsx"
     ],
     "ReportStatus": [
@@ -19894,6 +19936,7 @@
       "network_inventory",
       "new_connections",
       "policy_diff",
+      "policy_resolver",
       "policy_usage",
       "ransomware",
       "readiness",

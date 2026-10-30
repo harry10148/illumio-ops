@@ -28,8 +28,8 @@ function GenerateForm({ entry, catalog, onDone }: { entry: CatalogEntry; catalog
   const [days, setDays] = useState(choices.includes("7") ? "7" : (choices[choices.length - 1] ?? "1"));
   const [rows, setRows] = useState<FilterRow[]>(entry.requires_app ? [{ side: "dst", key: "app", value: "" }] : []);
   const [lang, setLang] = useState("");
-  const [html, setHtml] = useState(true);
-  const [xlsx, setXlsx] = useState(true);
+  // The formats this type makes, all on by default (policy_resolver: JSON and CSV only).
+  const [formats, setFormats] = useState<CatalogEntry["formats"]>(entry.formats);
   const [email, setEmail] = useState(false);
   const [recipients, setRecipients] = useState("");
   const [error, setError] = useState<ApiError | null>(null);
@@ -37,7 +37,6 @@ function GenerateForm({ entry, catalog, onDone }: { entry: CatalogEntry; catalog
 
   async function submit() {
     setBusy(true);
-    const formats = [...(html ? ["html" as const] : []), ...(xlsx ? ["xlsx" as const] : [])];
     const env = await call("reports.generate", {
       report_type: entry.report_type,
       lookback_days: Number(days),
@@ -71,8 +70,13 @@ function GenerateForm({ entry, catalog, onDone }: { entry: CatalogEntry; catalog
             <option value="en">{t("gui_reports_language_en")}</option>
           </select>
         </label>
-        <label><input type="checkbox" name="html" checked={html} onChange={(e) => setHtml(e.target.checked)} /> HTML</label>
-        <label><input type="checkbox" name="xlsx" checked={xlsx} onChange={(e) => setXlsx(e.target.checked)} /> XLSX</label>
+        {entry.formats.map((f) => (
+          <label key={f}>
+            <input type="checkbox" name={f} checked={formats.includes(f)}
+              onChange={(e) => setFormats(e.target.checked ? entry.formats.filter((x) => x === f || formats.includes(x))
+                : formats.filter((x) => x !== f))} /> {f.toUpperCase()}
+          </label>
+        ))}
       </div>
       <div className="row">
         <label>
@@ -96,7 +100,7 @@ function GenerateForm({ entry, catalog, onDone }: { entry: CatalogEntry; catalog
       {error && <p className="form-error">{t(error.message_key, error.params)}</p>}
       <div className="actions">
         <button type="button" className="btn-primary"
-          disabled={busy || (!html && !xlsx) || (entry.requires_app && !namesApp(rows))} onClick={() => void submit()}>
+          disabled={busy || formats.length === 0 || (entry.requires_app && !namesApp(rows))} onClick={() => void submit()}>
           {t("gui_reports_generate")}
         </button>
       </div>
