@@ -1943,5 +1943,6 @@
   "migrate_schedule_cron_paused": "A cron expression v6 schedules cannot hold: carried as a weekly schedule, paused. Set its time and turn it on.",
   "migrate_schedule_type_paused": "A schedule type or weekday 5.x could not run: carried paused. Check its time and turn it on.",
   "migrate_schedule_filter_paused": "Traffic filters are not carried (running without them would report more than 5.x did): paused. Add the filter and turn it on.",
-  "migrate_schedule_rewritten": "Carried; changed to fit v6: {what}."
+  "migrate_schedule_rewritten": "Carried; changed to fit v6: {what}.",
+  "migrate_schedule_never_ran": "5.x never ran this schedule (a report type or weekday it did not recognize); carried with what it meant, paused. Turn it on if you want it."
 }

@@ -123,8 +123,7 @@ def _schedule(s: Any, name: str, label: str, settings: Settings,
         flt = _app_filter(s)
         if flt is None:  # 5.x refused to run it
             return None, _item(label, None, "unsupported", "migrate_schedule_app_missing")
-    if str(s.get("report_type")) == "audit_summary":
-        changed.append("report type")
+    never_ran = str(s.get("report_type")) == "audit_summary"  # an older name 5.x no longer dispatched
     stype = str(s.get("schedule_type") or "weekly")
     frequency = stype if stype in ("daily", "weekly", "monthly") else "weekly"
     if s.get("cron_expr"):
@@ -136,6 +135,10 @@ def _schedule(s: Any, name: str, label: str, settings: Settings,
     dow = _weekday(s.get("day_of_week", "monday")) if frequency == "weekly" else None
     if frequency == "weekly" and dow is None:
         dow, paused = 0, paused or "migrate_schedule_type_paused"
+    elif frequency == "weekly" and str(s.get("day_of_week", "monday")).strip().lower() not in WEEKDAYS:
+        never_ran = True  # 5.x compared full lowercase names: "mon" never fired
+    if never_ran and not s.get("cron_expr"):
+        paused = paused or "migrate_schedule_never_ran"
     dom = min(max(int(s.get("day_of_month") or 1), 1), 31) if frequency == "monthly" else None
     lookback = int(s.get("lookback_days") or 7)
     cap = spec.max_lookback(settings) if spec.max_lookback else 90

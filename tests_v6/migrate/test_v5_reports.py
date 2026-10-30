@@ -40,11 +40,15 @@ def test_schedule_carried():
     assert items["report_schedules[0] Weekly"].action == "carried"
 
 
-def test_audit_summary_is_audit():
-    """The .106 config has audit_summary, a name 5.x no longer ran (unknown type): the intent is the audit report."""
-    reports, items = _run(_raw(schedules=[_sched(report_type="audit_summary", day_of_week="mon")]))
-    assert reports.schedules[0].report_type.value == "audit"
-    assert items["report_schedules[0] Weekly"].reason_key == "migrate_schedule_rewritten"
+def test_schedules_5x_never_ran_are_paused():
+    """The .106 config's schedule: audit_summary (a type 5.x did not know) and "mon" (5.x compared full weekday
+    names, so it never fired — 5.x's own comment says so). Carried with the intent, paused: v6 does not start
+    sending what 5.x never did."""
+    reports, items = _run(_raw(schedules=[_sched(report_type="audit_summary"), _sched(id=2, name="Mon", day_of_week="mon")]))
+    a, m = reports.schedules
+    assert (a.report_type.value, a.enabled, m.day_of_week, m.enabled) == ("audit", False, 0, False)
+    assert {items["report_schedules[0] Weekly"].reason_key, items["report_schedules[1] Mon"].reason_key} == \
+        {"migrate_schedule_never_ran"}
 
 
 def test_cron_and_filters_pause():

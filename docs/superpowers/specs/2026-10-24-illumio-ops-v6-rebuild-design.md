@@ -693,6 +693,8 @@ VEN 車隊總覽。架構保留「政策動作」服務的位置，v6.1 加入�
 
 **policy_resolver（P5c-4，2026-10-30）**：報表平台加 JSON／CSV 兩種格式，型別宣告自己產出哪些格式（預設 HTML＋XLSX），要求或排程不支援的格式即拒絕並指出欄位；CSV 為 UTF-8 BOM、每格套用與 XLSX 相同的公式防護；附件超過 20 MB 不附、信件說明到報表頁下載。policy_resolver 只出 JSON＋CSV：產生當下即時讀生效 Ruleset、全部主機（含非受管，只有 public_ip 時用它）、IP list、Label Group、服務，移植 5.x 展開核心（5.x 測試原樣沿用）。安全審查後的修正（都是「比規則寬」）：All Workloads 展開成所有主機位址（有 scope 時為 scope 內），不再寫 ANY；排除以位址包含關係扣減，IP list 的排除範圍會扣掉；沒有 port 的服務（未知或以程序定義）標出、不當任何 port；Deny Rule 的服務在 `service_ports`（5.x 只讀 ingress_services，把 Deny Rule 展成任何 port）；每條規則上限以「來源×目的×服務」計 10 萬列；總上限 50 萬列傳進展開，放不下的規則整條略過、只計數不建（不會出現半條規則），被截斷的 Ruleset 尾端加說明列、JSON 帶旗標。最終審查後改照 Illumio 規則語意（5.x 皆有誤）：同一側不同維度的 Label／Label Group 取交集、同維度取聯集（scope 亦同）；多個 scope 逐一展開再合併（不再產生跨 scope 列）；明確指定的 workload 也受 scope 限縮；Provider 以 virtual service 解析的規則、或引用 PCE 上不存在物件的規則，列為「無法展開」（每條一列說明並計數），不放寬也不無聲略過；`use_workload_subnets` 改出介面網段；JSON 的 truncated 旗標也涵蓋被摘要與無法展開的規則。lab Draft 實測 testapp 從 280 列（聯集）降為 24 列。
 
+**遷移器報表段（P5c-5，2026-10-30）**：`report_schedules` 逐個遷移並逐個寫進報告：型別對照（含 .106 的舊名 `audit_summary`→audit）、格式與 lookback 依型別調整、收件人檢查、保留份數夾在 1–365、排程時區改用顯示時區時寫明。v6 承載不了的（cron 運算式、流量篩選）遷移但暫停，絕不放寬執行；5.x 從未執行過的排程（不認得的型別、`mon` 這類星期縮寫——5.x 只比對完整小寫星期名，其原始碼註解已承認）依原意遷移並暫停，v6 不開始寄出 5.x 從沒寄過的東西；未知型別或沒有指定應用的應用摘要略過並寫明。`report.retention_days` 與 `web_gui.public_url` 遷移；其餘 `report.*` 是已移除 CLI 的預設值，列為 v6 不支援。.106 真實 5.x 設定唯讀試跑：無阻擋，唯一排程（audit_summary、mon）遷為暫停的 audit。
+
 #### 6.5.6 勒索防護【使用者 修訂；細節為判斷】
 
 - **改用 PCE 的判定**：高風險服務清單、嚴重度、逐服務防護狀態、listening／inactive、主機暴露等級，取自 PCE
