@@ -148,6 +148,15 @@
                 },
                 "title": "Labels",
                 "type": "array"
+              },
+              "match": {
+                "default": "any",
+                "enum": [
+                  "any",
+                  "all"
+                ],
+                "title": "Match",
+                "type": "string"
               }
             },
             "title": "EndpointFilter",
@@ -333,6 +342,14 @@
                 "default": null,
                 "title": "Initiator Process"
               },
+              "initiator_processes": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Initiator Processes",
+                "type": "array"
+              },
               "initiator_user": {
                 "anyOf": [
                   {
@@ -344,6 +361,14 @@
                 ],
                 "default": null,
                 "title": "Initiator User"
+              },
+              "initiator_users": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Initiator Users",
+                "type": "array"
               },
               "ports": {
                 "default": [],
@@ -365,6 +390,14 @@
                 "default": null,
                 "title": "Service Process"
               },
+              "service_processes": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Service Processes",
+                "type": "array"
+              },
               "service_user": {
                 "anyOf": [
                   {
@@ -376,6 +409,14 @@
                 ],
                 "default": null,
                 "title": "Service User"
+              },
+              "service_users": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Service Users",
+                "type": "array"
               },
               "src": {
                 "anyOf": [
@@ -552,7 +593,7 @@
                 "anyOf": [
                   {
                     "maximum": 65535,
-                    "minimum": 0,
+                    "minimum": -1,
                     "type": "integer"
                   },
                   {
@@ -1110,6 +1151,15 @@
                 },
                 "title": "Labels",
                 "type": "array"
+              },
+              "match": {
+                "default": "any",
+                "enum": [
+                  "any",
+                  "all"
+                ],
+                "title": "Match",
+                "type": "string"
               }
             },
             "title": "EndpointFilter",
@@ -1295,6 +1345,14 @@
                 "default": null,
                 "title": "Initiator Process"
               },
+              "initiator_processes": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Initiator Processes",
+                "type": "array"
+              },
               "initiator_user": {
                 "anyOf": [
                   {
@@ -1306,6 +1364,14 @@
                 ],
                 "default": null,
                 "title": "Initiator User"
+              },
+              "initiator_users": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Initiator Users",
+                "type": "array"
               },
               "ports": {
                 "default": [],
@@ -1327,6 +1393,14 @@
                 "default": null,
                 "title": "Service Process"
               },
+              "service_processes": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Service Processes",
+                "type": "array"
+              },
               "service_user": {
                 "anyOf": [
                   {
@@ -1338,6 +1412,14 @@
                 ],
                 "default": null,
                 "title": "Service User"
+              },
+              "service_users": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Service Users",
+                "type": "array"
               },
               "src": {
                 "anyOf": [
@@ -1514,7 +1596,7 @@
                 "anyOf": [
                   {
                     "maximum": 65535,
-                    "minimum": 0,
+                    "minimum": -1,
                     "type": "integer"
                   },
                   {
@@ -2174,6 +2256,15 @@
                 },
                 "title": "Labels",
                 "type": "array"
+              },
+              "match": {
+                "default": "any",
+                "enum": [
+                  "any",
+                  "all"
+                ],
+                "title": "Match",
+                "type": "string"
               }
             },
             "title": "EndpointFilter",
@@ -2359,6 +2450,14 @@
                 "default": null,
                 "title": "Initiator Process"
               },
+              "initiator_processes": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Initiator Processes",
+                "type": "array"
+              },
               "initiator_user": {
                 "anyOf": [
                   {
@@ -2370,6 +2469,14 @@
                 ],
                 "default": null,
                 "title": "Initiator User"
+              },
+              "initiator_users": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Initiator Users",
+                "type": "array"
               },
               "ports": {
                 "default": [],
@@ -2391,6 +2498,14 @@
                 "default": null,
                 "title": "Service Process"
               },
+              "service_processes": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Service Processes",
+                "type": "array"
+              },
               "service_user": {
                 "anyOf": [
                   {
@@ -2402,6 +2517,14 @@
                 ],
                 "default": null,
                 "title": "Service User"
+              },
+              "service_users": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Service Users",
+                "type": "array"
               },
               "src": {
                 "anyOf": [
@@ -2578,7 +2701,7 @@
                 "anyOf": [
                   {
                     "maximum": 65535,
-                    "minimum": 0,
+                    "minimum": -1,
                     "type": "integer"
                   },
                   {
@@ -3226,6 +3349,15 @@
                 },
                 "title": "Labels",
                 "type": "array"
+              },
+              "match": {
+                "default": "any",
+                "enum": [
+                  "any",
+                  "all"
+                ],
+                "title": "Match",
+                "type": "string"
               }
             },
             "title": "EndpointFilter",
@@ -3411,6 +3543,14 @@
                 "default": null,
                 "title": "Initiator Process"
               },
+              "initiator_processes": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Initiator Processes",
+                "type": "array"
+              },
               "initiator_user": {
                 "anyOf": [
                   {
@@ -3422,6 +3562,14 @@
                 ],
                 "default": null,
                 "title": "Initiator User"
+              },
+              "initiator_users": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Initiator Users",
+                "type": "array"
               },
               "ports": {
                 "default": [],
@@ -3443,6 +3591,14 @@
                 "default": null,
                 "title": "Service Process"
               },
+              "service_processes": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Service Processes",
+                "type": "array"
+              },
               "service_user": {
                 "anyOf": [
                   {
@@ -3454,6 +3610,14 @@
                 ],
                 "default": null,
                 "title": "Service User"
+              },
+              "service_users": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Service Users",
+                "type": "array"
               },
               "src": {
                 "anyOf": [
@@ -3630,7 +3794,7 @@
                 "anyOf": [
                   {
                     "maximum": 65535,
-                    "minimum": 0,
+                    "minimum": -1,
                     "type": "integer"
                   },
                   {
@@ -4299,6 +4463,15 @@
                 },
                 "title": "Labels",
                 "type": "array"
+              },
+              "match": {
+                "default": "any",
+                "enum": [
+                  "any",
+                  "all"
+                ],
+                "title": "Match",
+                "type": "string"
               }
             },
             "title": "EndpointFilter",
@@ -4484,6 +4657,14 @@
                 "default": null,
                 "title": "Initiator Process"
               },
+              "initiator_processes": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Initiator Processes",
+                "type": "array"
+              },
               "initiator_user": {
                 "anyOf": [
                   {
@@ -4495,6 +4676,14 @@
                 ],
                 "default": null,
                 "title": "Initiator User"
+              },
+              "initiator_users": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Initiator Users",
+                "type": "array"
               },
               "ports": {
                 "default": [],
@@ -4516,6 +4705,14 @@
                 "default": null,
                 "title": "Service Process"
               },
+              "service_processes": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Service Processes",
+                "type": "array"
+              },
               "service_user": {
                 "anyOf": [
                   {
@@ -4527,6 +4724,14 @@
                 ],
                 "default": null,
                 "title": "Service User"
+              },
+              "service_users": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Service Users",
+                "type": "array"
               },
               "src": {
                 "anyOf": [
@@ -4703,7 +4908,7 @@
                 "anyOf": [
                   {
                     "maximum": 65535,
-                    "minimum": 0,
+                    "minimum": -1,
                     "type": "integer"
                   },
                   {
@@ -5350,6 +5555,15 @@
                 },
                 "title": "Labels",
                 "type": "array"
+              },
+              "match": {
+                "default": "any",
+                "enum": [
+                  "any",
+                  "all"
+                ],
+                "title": "Match",
+                "type": "string"
               }
             },
             "title": "EndpointFilter",
@@ -5535,6 +5749,14 @@
                 "default": null,
                 "title": "Initiator Process"
               },
+              "initiator_processes": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Initiator Processes",
+                "type": "array"
+              },
               "initiator_user": {
                 "anyOf": [
                   {
@@ -5546,6 +5768,14 @@
                 ],
                 "default": null,
                 "title": "Initiator User"
+              },
+              "initiator_users": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Initiator Users",
+                "type": "array"
               },
               "ports": {
                 "default": [],
@@ -5567,6 +5797,14 @@
                 "default": null,
                 "title": "Service Process"
               },
+              "service_processes": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Service Processes",
+                "type": "array"
+              },
               "service_user": {
                 "anyOf": [
                   {
@@ -5578,6 +5816,14 @@
                 ],
                 "default": null,
                 "title": "Service User"
+              },
+              "service_users": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Service Users",
+                "type": "array"
               },
               "src": {
                 "anyOf": [
@@ -5754,7 +6000,7 @@
                 "anyOf": [
                   {
                     "maximum": 65535,
-                    "minimum": 0,
+                    "minimum": -1,
                     "type": "integer"
                   },
                   {
@@ -6361,6 +6607,15 @@
                 },
                 "title": "Labels",
                 "type": "array"
+              },
+              "match": {
+                "default": "any",
+                "enum": [
+                  "any",
+                  "all"
+                ],
+                "title": "Match",
+                "type": "string"
               }
             },
             "title": "EndpointFilter",
@@ -6546,6 +6801,14 @@
                 "default": null,
                 "title": "Initiator Process"
               },
+              "initiator_processes": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Initiator Processes",
+                "type": "array"
+              },
               "initiator_user": {
                 "anyOf": [
                   {
@@ -6557,6 +6820,14 @@
                 ],
                 "default": null,
                 "title": "Initiator User"
+              },
+              "initiator_users": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Initiator Users",
+                "type": "array"
               },
               "ports": {
                 "default": [],
@@ -6578,6 +6849,14 @@
                 "default": null,
                 "title": "Service Process"
               },
+              "service_processes": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Service Processes",
+                "type": "array"
+              },
               "service_user": {
                 "anyOf": [
                   {
@@ -6589,6 +6868,14 @@
                 ],
                 "default": null,
                 "title": "Service User"
+              },
+              "service_users": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Service Users",
+                "type": "array"
               },
               "src": {
                 "anyOf": [
@@ -6765,7 +7052,7 @@
                 "anyOf": [
                   {
                     "maximum": 65535,
-                    "minimum": 0,
+                    "minimum": -1,
                     "type": "integer"
                   },
                   {
@@ -7323,6 +7610,15 @@
                 },
                 "title": "Labels",
                 "type": "array"
+              },
+              "match": {
+                "default": "any",
+                "enum": [
+                  "any",
+                  "all"
+                ],
+                "title": "Match",
+                "type": "string"
               }
             },
             "title": "EndpointFilter",
@@ -7508,6 +7804,14 @@
                 "default": null,
                 "title": "Initiator Process"
               },
+              "initiator_processes": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Initiator Processes",
+                "type": "array"
+              },
               "initiator_user": {
                 "anyOf": [
                   {
@@ -7519,6 +7823,14 @@
                 ],
                 "default": null,
                 "title": "Initiator User"
+              },
+              "initiator_users": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Initiator Users",
+                "type": "array"
               },
               "ports": {
                 "default": [],
@@ -7540,6 +7852,14 @@
                 "default": null,
                 "title": "Service Process"
               },
+              "service_processes": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Service Processes",
+                "type": "array"
+              },
               "service_user": {
                 "anyOf": [
                   {
@@ -7551,6 +7871,14 @@
                 ],
                 "default": null,
                 "title": "Service User"
+              },
+              "service_users": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Service Users",
+                "type": "array"
               },
               "src": {
                 "anyOf": [
@@ -7727,7 +8055,7 @@
                 "anyOf": [
                   {
                     "maximum": 65535,
-                    "minimum": 0,
+                    "minimum": -1,
                     "type": "integer"
                   },
                   {
@@ -9859,6 +10187,15 @@
                 },
                 "title": "Labels",
                 "type": "array"
+              },
+              "match": {
+                "default": "any",
+                "enum": [
+                  "any",
+                  "all"
+                ],
+                "title": "Match",
+                "type": "string"
               }
             },
             "title": "EndpointFilter",
@@ -9923,6 +10260,14 @@
                 "default": null,
                 "title": "Initiator Process"
               },
+              "initiator_processes": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Initiator Processes",
+                "type": "array"
+              },
               "initiator_user": {
                 "anyOf": [
                   {
@@ -9934,6 +10279,14 @@
                 ],
                 "default": null,
                 "title": "Initiator User"
+              },
+              "initiator_users": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Initiator Users",
+                "type": "array"
               },
               "ports": {
                 "default": [],
@@ -9955,6 +10308,14 @@
                 "default": null,
                 "title": "Service Process"
               },
+              "service_processes": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Service Processes",
+                "type": "array"
+              },
               "service_user": {
                 "anyOf": [
                   {
@@ -9966,6 +10327,14 @@
                 ],
                 "default": null,
                 "title": "Service User"
+              },
+              "service_users": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Service Users",
+                "type": "array"
               },
               "src": {
                 "anyOf": [
@@ -10054,7 +10423,7 @@
                 "anyOf": [
                   {
                     "maximum": 65535,
-                    "minimum": 0,
+                    "minimum": -1,
                     "type": "integer"
                   },
                   {
@@ -10310,6 +10679,15 @@
                 },
                 "title": "Labels",
                 "type": "array"
+              },
+              "match": {
+                "default": "any",
+                "enum": [
+                  "any",
+                  "all"
+                ],
+                "title": "Match",
+                "type": "string"
               }
             },
             "title": "EndpointFilter",
@@ -10374,6 +10752,14 @@
                 "default": null,
                 "title": "Initiator Process"
               },
+              "initiator_processes": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Initiator Processes",
+                "type": "array"
+              },
               "initiator_user": {
                 "anyOf": [
                   {
@@ -10385,6 +10771,14 @@
                 ],
                 "default": null,
                 "title": "Initiator User"
+              },
+              "initiator_users": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Initiator Users",
+                "type": "array"
               },
               "ports": {
                 "default": [],
@@ -10406,6 +10800,14 @@
                 "default": null,
                 "title": "Service Process"
               },
+              "service_processes": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Service Processes",
+                "type": "array"
+              },
               "service_user": {
                 "anyOf": [
                   {
@@ -10417,6 +10819,14 @@
                 ],
                 "default": null,
                 "title": "Service User"
+              },
+              "service_users": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Service Users",
+                "type": "array"
               },
               "src": {
                 "anyOf": [
@@ -10505,7 +10915,7 @@
                 "anyOf": [
                   {
                     "maximum": 65535,
-                    "minimum": 0,
+                    "minimum": -1,
                     "type": "integer"
                   },
                   {
@@ -10868,6 +11278,15 @@
                 },
                 "title": "Labels",
                 "type": "array"
+              },
+              "match": {
+                "default": "any",
+                "enum": [
+                  "any",
+                  "all"
+                ],
+                "title": "Match",
+                "type": "string"
               }
             },
             "title": "EndpointFilter",
@@ -10932,6 +11351,14 @@
                 "default": null,
                 "title": "Initiator Process"
               },
+              "initiator_processes": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Initiator Processes",
+                "type": "array"
+              },
               "initiator_user": {
                 "anyOf": [
                   {
@@ -10943,6 +11370,14 @@
                 ],
                 "default": null,
                 "title": "Initiator User"
+              },
+              "initiator_users": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Initiator Users",
+                "type": "array"
               },
               "ports": {
                 "default": [],
@@ -10964,6 +11399,14 @@
                 "default": null,
                 "title": "Service Process"
               },
+              "service_processes": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Service Processes",
+                "type": "array"
+              },
               "service_user": {
                 "anyOf": [
                   {
@@ -10975,6 +11418,14 @@
                 ],
                 "default": null,
                 "title": "Service User"
+              },
+              "service_users": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Service Users",
+                "type": "array"
               },
               "src": {
                 "anyOf": [
@@ -11063,7 +11514,7 @@
                 "anyOf": [
                   {
                     "maximum": 65535,
-                    "minimum": 0,
+                    "minimum": -1,
                     "type": "integer"
                   },
                   {
@@ -11414,6 +11865,15 @@
                 },
                 "title": "Labels",
                 "type": "array"
+              },
+              "match": {
+                "default": "any",
+                "enum": [
+                  "any",
+                  "all"
+                ],
+                "title": "Match",
+                "type": "string"
               }
             },
             "title": "EndpointFilter",
@@ -11478,6 +11938,14 @@
                 "default": null,
                 "title": "Initiator Process"
               },
+              "initiator_processes": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Initiator Processes",
+                "type": "array"
+              },
               "initiator_user": {
                 "anyOf": [
                   {
@@ -11489,6 +11957,14 @@
                 ],
                 "default": null,
                 "title": "Initiator User"
+              },
+              "initiator_users": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Initiator Users",
+                "type": "array"
               },
               "ports": {
                 "default": [],
@@ -11510,6 +11986,14 @@
                 "default": null,
                 "title": "Service Process"
               },
+              "service_processes": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Service Processes",
+                "type": "array"
+              },
               "service_user": {
                 "anyOf": [
                   {
@@ -11521,6 +12005,14 @@
                 ],
                 "default": null,
                 "title": "Service User"
+              },
+              "service_users": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Service Users",
+                "type": "array"
               },
               "src": {
                 "anyOf": [
@@ -11609,7 +12101,7 @@
                 "anyOf": [
                   {
                     "maximum": 65535,
-                    "minimum": 0,
+                    "minimum": -1,
                     "type": "integer"
                   },
                   {
@@ -12154,6 +12646,15 @@
                 },
                 "title": "Labels",
                 "type": "array"
+              },
+              "match": {
+                "default": "any",
+                "enum": [
+                  "any",
+                  "all"
+                ],
+                "title": "Match",
+                "type": "string"
               }
             },
             "title": "EndpointFilter",
@@ -12218,6 +12719,14 @@
                 "default": null,
                 "title": "Initiator Process"
               },
+              "initiator_processes": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Initiator Processes",
+                "type": "array"
+              },
               "initiator_user": {
                 "anyOf": [
                   {
@@ -12229,6 +12738,14 @@
                 ],
                 "default": null,
                 "title": "Initiator User"
+              },
+              "initiator_users": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Initiator Users",
+                "type": "array"
               },
               "ports": {
                 "default": [],
@@ -12250,6 +12767,14 @@
                 "default": null,
                 "title": "Service Process"
               },
+              "service_processes": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Service Processes",
+                "type": "array"
+              },
               "service_user": {
                 "anyOf": [
                   {
@@ -12261,6 +12786,14 @@
                 ],
                 "default": null,
                 "title": "Service User"
+              },
+              "service_users": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Service Users",
+                "type": "array"
               },
               "src": {
                 "anyOf": [
@@ -12349,7 +12882,7 @@
                 "anyOf": [
                   {
                     "maximum": 65535,
-                    "minimum": 0,
+                    "minimum": -1,
                     "type": "integer"
                   },
                   {
@@ -12605,6 +13138,15 @@
                 },
                 "title": "Labels",
                 "type": "array"
+              },
+              "match": {
+                "default": "any",
+                "enum": [
+                  "any",
+                  "all"
+                ],
+                "title": "Match",
+                "type": "string"
               }
             },
             "title": "EndpointFilter",
@@ -12669,6 +13211,14 @@
                 "default": null,
                 "title": "Initiator Process"
               },
+              "initiator_processes": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Initiator Processes",
+                "type": "array"
+              },
               "initiator_user": {
                 "anyOf": [
                   {
@@ -12680,6 +13230,14 @@
                 ],
                 "default": null,
                 "title": "Initiator User"
+              },
+              "initiator_users": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Initiator Users",
+                "type": "array"
               },
               "ports": {
                 "default": [],
@@ -12701,6 +13259,14 @@
                 "default": null,
                 "title": "Service Process"
               },
+              "service_processes": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Service Processes",
+                "type": "array"
+              },
               "service_user": {
                 "anyOf": [
                   {
@@ -12712,6 +13278,14 @@
                 ],
                 "default": null,
                 "title": "Service User"
+              },
+              "service_users": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Service Users",
+                "type": "array"
               },
               "src": {
                 "anyOf": [
@@ -12800,7 +13374,7 @@
                 "anyOf": [
                   {
                     "maximum": 65535,
-                    "minimum": 0,
+                    "minimum": -1,
                     "type": "integer"
                   },
                   {
@@ -13323,6 +13897,15 @@
                 },
                 "title": "Labels",
                 "type": "array"
+              },
+              "match": {
+                "default": "any",
+                "enum": [
+                  "any",
+                  "all"
+                ],
+                "title": "Match",
+                "type": "string"
               }
             },
             "title": "EndpointFilter",
@@ -13387,6 +13970,14 @@
                 "default": null,
                 "title": "Initiator Process"
               },
+              "initiator_processes": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Initiator Processes",
+                "type": "array"
+              },
               "initiator_user": {
                 "anyOf": [
                   {
@@ -13398,6 +13989,14 @@
                 ],
                 "default": null,
                 "title": "Initiator User"
+              },
+              "initiator_users": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Initiator Users",
+                "type": "array"
               },
               "ports": {
                 "default": [],
@@ -13419,6 +14018,14 @@
                 "default": null,
                 "title": "Service Process"
               },
+              "service_processes": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Service Processes",
+                "type": "array"
+              },
               "service_user": {
                 "anyOf": [
                   {
@@ -13430,6 +14037,14 @@
                 ],
                 "default": null,
                 "title": "Service User"
+              },
+              "service_users": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Service Users",
+                "type": "array"
               },
               "src": {
                 "anyOf": [
@@ -13518,7 +14133,7 @@
                 "anyOf": [
                   {
                     "maximum": 65535,
-                    "minimum": 0,
+                    "minimum": -1,
                     "type": "integer"
                   },
                   {
@@ -19764,6 +20379,2776 @@
           "restart_required"
         ],
         "title": "TlsStatus",
+        "type": "object"
+      }
+    },
+    "workbench.dimension": {
+      "method": "POST",
+      "path": "/api/workbench/dimension",
+      "request_schema": {
+        "$defs": {
+          "EndpointFilter": {
+            "additionalProperties": false,
+            "properties": {
+              "hrefs": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Hrefs",
+                "type": "array"
+              },
+              "ips": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Ips",
+                "type": "array"
+              },
+              "labels": {
+                "default": [],
+                "items": {
+                  "$ref": "#/$defs/LabelCond"
+                },
+                "title": "Labels",
+                "type": "array"
+              },
+              "match": {
+                "default": "any",
+                "enum": [
+                  "any",
+                  "all"
+                ],
+                "title": "Match",
+                "type": "string"
+              }
+            },
+            "title": "EndpointFilter",
+            "type": "object"
+          },
+          "EventRequest": {
+            "additionalProperties": false,
+            "properties": {
+              "actor": {
+                "anyOf": [
+                  {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Actor"
+              },
+              "actors": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Actors",
+                "type": "array"
+              },
+              "end": {
+                "format": "date-time",
+                "title": "End",
+                "type": "string"
+              },
+              "event_types": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Event Types",
+                "type": "array"
+              },
+              "group_by": {
+                "default": [],
+                "items": {
+                  "$ref": "#/$defs/GroupBy"
+                },
+                "maxItems": 2,
+                "title": "Group By",
+                "type": "array"
+              },
+              "host_hrefs": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Host Hrefs",
+                "type": "array"
+              },
+              "limit": {
+                "default": 200,
+                "maximum": 1000,
+                "minimum": 1,
+                "title": "Limit",
+                "type": "integer"
+              },
+              "mode": {
+                "const": "events",
+                "title": "Mode",
+                "type": "string"
+              },
+              "severities": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Severities",
+                "type": "array"
+              },
+              "start": {
+                "format": "date-time",
+                "title": "Start",
+                "type": "string"
+              },
+              "view": {
+                "$ref": "#/$defs/SegmentView"
+              }
+            },
+            "required": [
+              "start",
+              "end",
+              "view",
+              "mode"
+            ],
+            "title": "EventRequest",
+            "type": "object"
+          },
+          "FlowCondition": {
+            "additionalProperties": false,
+            "description": "A flow filter without its time window: what an alert rule (and later a saved report section) stores.\nwithin() gives the FilterSpec for a window; every field, default and check is FilterSpec's.",
+            "properties": {
+              "decisions": {
+                "default": [],
+                "items": {
+                  "$ref": "#/$defs/PolicyDecision"
+                },
+                "title": "Decisions",
+                "type": "array"
+              },
+              "dst": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/EndpointFilter"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
+              },
+              "dst_exclude": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/EndpointFilter"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
+              },
+              "exclude_ports": {
+                "default": [],
+                "items": {
+                  "$ref": "#/$defs/PortProto"
+                },
+                "title": "Exclude Ports",
+                "type": "array"
+              },
+              "exclude_system_accounts": {
+                "default": false,
+                "title": "Exclude System Accounts",
+                "type": "boolean"
+              },
+              "initiator_process": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Initiator Process"
+              },
+              "initiator_processes": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Initiator Processes",
+                "type": "array"
+              },
+              "initiator_user": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Initiator User"
+              },
+              "initiator_users": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Initiator Users",
+                "type": "array"
+              },
+              "ports": {
+                "default": [],
+                "items": {
+                  "$ref": "#/$defs/PortProto"
+                },
+                "title": "Ports",
+                "type": "array"
+              },
+              "service_process": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Service Process"
+              },
+              "service_processes": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Service Processes",
+                "type": "array"
+              },
+              "service_user": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Service User"
+              },
+              "service_users": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Service Users",
+                "type": "array"
+              },
+              "src": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/EndpointFilter"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
+              },
+              "src_exclude": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/EndpointFilter"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
+              },
+              "text": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Text"
+              }
+            },
+            "title": "FlowCondition",
+            "type": "object"
+          },
+          "FlowRequest": {
+            "additionalProperties": false,
+            "properties": {
+              "condition": {
+                "$ref": "#/$defs/FlowCondition",
+                "default": {
+                  "decisions": [],
+                  "dst": null,
+                  "dst_exclude": null,
+                  "exclude_ports": [],
+                  "exclude_system_accounts": false,
+                  "initiator_process": null,
+                  "initiator_processes": [],
+                  "initiator_user": null,
+                  "initiator_users": [],
+                  "ports": [],
+                  "service_process": null,
+                  "service_processes": [],
+                  "service_user": null,
+                  "service_users": [],
+                  "src": null,
+                  "src_exclude": null,
+                  "text": null
+                }
+              },
+              "end": {
+                "format": "date-time",
+                "title": "End",
+                "type": "string"
+              },
+              "group_by": {
+                "default": [],
+                "items": {
+                  "$ref": "#/$defs/GroupBy"
+                },
+                "maxItems": 2,
+                "title": "Group By",
+                "type": "array"
+              },
+              "limit": {
+                "default": 200,
+                "maximum": 1000,
+                "minimum": 1,
+                "title": "Limit",
+                "type": "integer"
+              },
+              "metric": {
+                "$ref": "#/$defs/SegmentMetric",
+                "default": "flows"
+              },
+              "mode": {
+                "const": "flows",
+                "title": "Mode",
+                "type": "string"
+              },
+              "start": {
+                "format": "date-time",
+                "title": "Start",
+                "type": "string"
+              },
+              "view": {
+                "$ref": "#/$defs/SegmentView"
+              }
+            },
+            "required": [
+              "start",
+              "end",
+              "view",
+              "mode"
+            ],
+            "title": "FlowRequest",
+            "type": "object"
+          },
+          "GroupBy": {
+            "additionalProperties": false,
+            "properties": {
+              "dimension": {
+                "$ref": "#/$defs/SegmentDimension"
+              },
+              "label_key": {
+                "anyOf": [
+                  {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Label Key"
+              }
+            },
+            "required": [
+              "dimension"
+            ],
+            "title": "GroupBy",
+            "type": "object"
+          },
+          "LabelCond": {
+            "additionalProperties": false,
+            "properties": {
+              "key": {
+                "minLength": 1,
+                "title": "Key",
+                "type": "string"
+              },
+              "values": {
+                "items": {
+                  "type": "string"
+                },
+                "minItems": 1,
+                "title": "Values",
+                "type": "array"
+              }
+            },
+            "required": [
+              "key",
+              "values"
+            ],
+            "title": "LabelCond",
+            "type": "object"
+          },
+          "PolicyDecision": {
+            "enum": [
+              "allowed",
+              "potentially_blocked",
+              "blocked",
+              "unknown"
+            ],
+            "title": "PolicyDecision",
+            "type": "string"
+          },
+          "PortProto": {
+            "additionalProperties": false,
+            "properties": {
+              "port": {
+                "anyOf": [
+                  {
+                    "maximum": 65535,
+                    "minimum": -1,
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Port"
+              },
+              "proto": {
+                "anyOf": [
+                  {
+                    "maximum": 255,
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Proto"
+              },
+              "to_port": {
+                "anyOf": [
+                  {
+                    "maximum": 65535,
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "To Port"
+              }
+            },
+            "title": "PortProto",
+            "type": "object"
+          },
+          "SegmentDimension": {
+            "enum": [
+              "src_host",
+              "dst_host",
+              "src_label",
+              "dst_label",
+              "service",
+              "initiator_process",
+              "initiator_user",
+              "service_process",
+              "service_user",
+              "decision",
+              "direction",
+              "event_type",
+              "event_host",
+              "event_severity",
+              "actor"
+            ],
+            "title": "SegmentDimension",
+            "type": "string"
+          },
+          "SegmentMetric": {
+            "enum": [
+              "flows",
+              "connections",
+              "distinct_dst",
+              "distinct_src",
+              "distinct_ports",
+              "bytes",
+              "events"
+            ],
+            "title": "SegmentMetric",
+            "type": "string"
+          },
+          "SegmentView": {
+            "enum": [
+              "detail",
+              "ranking",
+              "predicted_block"
+            ],
+            "title": "SegmentView",
+            "type": "string"
+          }
+        },
+        "properties": {
+          "dimension": {
+            "$ref": "#/$defs/SegmentDimension"
+          },
+          "label_key": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Label Key"
+          },
+          "request": {
+            "discriminator": {
+              "mapping": {
+                "events": "#/$defs/EventRequest",
+                "flows": "#/$defs/FlowRequest"
+              },
+              "propertyName": "mode"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/$defs/FlowRequest"
+              },
+              {
+                "$ref": "#/$defs/EventRequest"
+              }
+            ],
+            "title": "Request"
+          }
+        },
+        "required": [
+          "request",
+          "dimension"
+        ],
+        "title": "WorkbenchDimension",
+        "type": "object"
+      },
+      "response_schema": {
+        "$defs": {
+          "AggRow": {
+            "properties": {
+              "bytes_known": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Bytes Known"
+              },
+              "display": {
+                "items": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "title": "Display",
+                "type": "array"
+              },
+              "keys": {
+                "items": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "integer"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "title": "Keys",
+                "type": "array"
+              },
+              "value": {
+                "title": "Value",
+                "type": "integer"
+              }
+            },
+            "required": [
+              "keys",
+              "display",
+              "value",
+              "bytes_known"
+            ],
+            "title": "AggRow",
+            "type": "object"
+          },
+          "Coverage": {
+            "properties": {
+              "filled_from_pce": {
+                "items": {
+                  "maxItems": 2,
+                  "minItems": 2,
+                  "prefixItems": [
+                    {
+                      "format": "date-time",
+                      "type": "string"
+                    },
+                    {
+                      "format": "date-time",
+                      "type": "string"
+                    }
+                  ],
+                  "type": "array"
+                },
+                "title": "Filled From Pce",
+                "type": "array"
+              },
+              "gaps": {
+                "items": {
+                  "maxItems": 3,
+                  "minItems": 3,
+                  "prefixItems": [
+                    {
+                      "format": "date-time",
+                      "type": "string"
+                    },
+                    {
+                      "format": "date-time",
+                      "type": "string"
+                    },
+                    {
+                      "type": "string"
+                    }
+                  ],
+                  "type": "array"
+                },
+                "title": "Gaps",
+                "type": "array"
+              },
+              "source": {
+                "enum": [
+                  "store",
+                  "pce",
+                  "mixed"
+                ],
+                "title": "Source",
+                "type": "string"
+              },
+              "store_from": {
+                "anyOf": [
+                  {
+                    "format": "date-time",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Store From"
+              },
+              "store_to": {
+                "anyOf": [
+                  {
+                    "format": "date-time",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Store To"
+              },
+              "truncated": {
+                "title": "Truncated",
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "source",
+              "store_from",
+              "store_to",
+              "gaps",
+              "filled_from_pce",
+              "truncated"
+            ],
+            "title": "Coverage",
+            "type": "object"
+          },
+          "PullInfo": {
+            "description": "What was read from the PCE for this answer: said on the page (anti-goal: nothing silent).",
+            "properties": {
+              "capped": {
+                "title": "Capped",
+                "type": "boolean"
+              },
+              "end": {
+                "format": "date-time",
+                "title": "End",
+                "type": "string"
+              },
+              "read_at": {
+                "format": "date-time",
+                "title": "Read At",
+                "type": "string"
+              },
+              "rows": {
+                "title": "Rows",
+                "type": "integer"
+              },
+              "start": {
+                "format": "date-time",
+                "title": "Start",
+                "type": "string"
+              },
+              "truncated_windows": {
+                "title": "Truncated Windows",
+                "type": "integer"
+              },
+              "unread_from": {
+                "anyOf": [
+                  {
+                    "format": "date-time",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Unread From"
+              }
+            },
+            "required": [
+              "start",
+              "end",
+              "rows",
+              "capped",
+              "unread_from",
+              "truncated_windows",
+              "read_at"
+            ],
+            "title": "PullInfo",
+            "type": "object"
+          }
+        },
+        "properties": {
+          "coverage": {
+            "$ref": "#/$defs/Coverage"
+          },
+          "limit_hit": {
+            "title": "Limit Hit",
+            "type": "boolean"
+          },
+          "pulled": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/PullInfo"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "rows": {
+            "items": {
+              "$ref": "#/$defs/AggRow"
+            },
+            "title": "Rows",
+            "type": "array"
+          }
+        },
+        "required": [
+          "rows",
+          "limit_hit",
+          "coverage"
+        ],
+        "title": "DimensionTop",
+        "type": "object"
+      }
+    },
+    "workbench.from_alert": {
+      "method": "GET",
+      "path": "/api/workbench/from-alert/<int:alert_id>",
+      "request_schema": null,
+      "response_schema": {
+        "$defs": {
+          "EndpointFilter": {
+            "additionalProperties": false,
+            "properties": {
+              "hrefs": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Hrefs",
+                "type": "array"
+              },
+              "ips": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Ips",
+                "type": "array"
+              },
+              "labels": {
+                "default": [],
+                "items": {
+                  "$ref": "#/$defs/LabelCond"
+                },
+                "title": "Labels",
+                "type": "array"
+              },
+              "match": {
+                "default": "any",
+                "enum": [
+                  "any",
+                  "all"
+                ],
+                "title": "Match",
+                "type": "string"
+              }
+            },
+            "title": "EndpointFilter",
+            "type": "object"
+          },
+          "EventRequest": {
+            "additionalProperties": false,
+            "properties": {
+              "actor": {
+                "anyOf": [
+                  {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Actor"
+              },
+              "actors": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Actors",
+                "type": "array"
+              },
+              "end": {
+                "format": "date-time",
+                "title": "End",
+                "type": "string"
+              },
+              "event_types": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Event Types",
+                "type": "array"
+              },
+              "group_by": {
+                "default": [],
+                "items": {
+                  "$ref": "#/$defs/GroupBy"
+                },
+                "maxItems": 2,
+                "title": "Group By",
+                "type": "array"
+              },
+              "host_hrefs": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Host Hrefs",
+                "type": "array"
+              },
+              "limit": {
+                "default": 200,
+                "maximum": 1000,
+                "minimum": 1,
+                "title": "Limit",
+                "type": "integer"
+              },
+              "mode": {
+                "const": "events",
+                "title": "Mode",
+                "type": "string"
+              },
+              "severities": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Severities",
+                "type": "array"
+              },
+              "start": {
+                "format": "date-time",
+                "title": "Start",
+                "type": "string"
+              },
+              "view": {
+                "$ref": "#/$defs/SegmentView"
+              }
+            },
+            "required": [
+              "start",
+              "end",
+              "view",
+              "mode"
+            ],
+            "title": "EventRequest",
+            "type": "object"
+          },
+          "FlowCondition": {
+            "additionalProperties": false,
+            "description": "A flow filter without its time window: what an alert rule (and later a saved report section) stores.\nwithin() gives the FilterSpec for a window; every field, default and check is FilterSpec's.",
+            "properties": {
+              "decisions": {
+                "default": [],
+                "items": {
+                  "$ref": "#/$defs/PolicyDecision"
+                },
+                "title": "Decisions",
+                "type": "array"
+              },
+              "dst": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/EndpointFilter"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
+              },
+              "dst_exclude": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/EndpointFilter"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
+              },
+              "exclude_ports": {
+                "default": [],
+                "items": {
+                  "$ref": "#/$defs/PortProto"
+                },
+                "title": "Exclude Ports",
+                "type": "array"
+              },
+              "exclude_system_accounts": {
+                "default": false,
+                "title": "Exclude System Accounts",
+                "type": "boolean"
+              },
+              "initiator_process": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Initiator Process"
+              },
+              "initiator_processes": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Initiator Processes",
+                "type": "array"
+              },
+              "initiator_user": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Initiator User"
+              },
+              "initiator_users": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Initiator Users",
+                "type": "array"
+              },
+              "ports": {
+                "default": [],
+                "items": {
+                  "$ref": "#/$defs/PortProto"
+                },
+                "title": "Ports",
+                "type": "array"
+              },
+              "service_process": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Service Process"
+              },
+              "service_processes": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Service Processes",
+                "type": "array"
+              },
+              "service_user": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Service User"
+              },
+              "service_users": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Service Users",
+                "type": "array"
+              },
+              "src": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/EndpointFilter"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
+              },
+              "src_exclude": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/EndpointFilter"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
+              },
+              "text": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Text"
+              }
+            },
+            "title": "FlowCondition",
+            "type": "object"
+          },
+          "FlowRequest": {
+            "additionalProperties": false,
+            "properties": {
+              "condition": {
+                "$ref": "#/$defs/FlowCondition",
+                "default": {
+                  "decisions": [],
+                  "dst": null,
+                  "dst_exclude": null,
+                  "exclude_ports": [],
+                  "exclude_system_accounts": false,
+                  "initiator_process": null,
+                  "initiator_processes": [],
+                  "initiator_user": null,
+                  "initiator_users": [],
+                  "ports": [],
+                  "service_process": null,
+                  "service_processes": [],
+                  "service_user": null,
+                  "service_users": [],
+                  "src": null,
+                  "src_exclude": null,
+                  "text": null
+                }
+              },
+              "end": {
+                "format": "date-time",
+                "title": "End",
+                "type": "string"
+              },
+              "group_by": {
+                "default": [],
+                "items": {
+                  "$ref": "#/$defs/GroupBy"
+                },
+                "maxItems": 2,
+                "title": "Group By",
+                "type": "array"
+              },
+              "limit": {
+                "default": 200,
+                "maximum": 1000,
+                "minimum": 1,
+                "title": "Limit",
+                "type": "integer"
+              },
+              "metric": {
+                "$ref": "#/$defs/SegmentMetric",
+                "default": "flows"
+              },
+              "mode": {
+                "const": "flows",
+                "title": "Mode",
+                "type": "string"
+              },
+              "start": {
+                "format": "date-time",
+                "title": "Start",
+                "type": "string"
+              },
+              "view": {
+                "$ref": "#/$defs/SegmentView"
+              }
+            },
+            "required": [
+              "start",
+              "end",
+              "view",
+              "mode"
+            ],
+            "title": "FlowRequest",
+            "type": "object"
+          },
+          "GroupBy": {
+            "additionalProperties": false,
+            "properties": {
+              "dimension": {
+                "$ref": "#/$defs/SegmentDimension"
+              },
+              "label_key": {
+                "anyOf": [
+                  {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Label Key"
+              }
+            },
+            "required": [
+              "dimension"
+            ],
+            "title": "GroupBy",
+            "type": "object"
+          },
+          "LabelCond": {
+            "additionalProperties": false,
+            "properties": {
+              "key": {
+                "minLength": 1,
+                "title": "Key",
+                "type": "string"
+              },
+              "values": {
+                "items": {
+                  "type": "string"
+                },
+                "minItems": 1,
+                "title": "Values",
+                "type": "array"
+              }
+            },
+            "required": [
+              "key",
+              "values"
+            ],
+            "title": "LabelCond",
+            "type": "object"
+          },
+          "PolicyDecision": {
+            "enum": [
+              "allowed",
+              "potentially_blocked",
+              "blocked",
+              "unknown"
+            ],
+            "title": "PolicyDecision",
+            "type": "string"
+          },
+          "PortProto": {
+            "additionalProperties": false,
+            "properties": {
+              "port": {
+                "anyOf": [
+                  {
+                    "maximum": 65535,
+                    "minimum": -1,
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Port"
+              },
+              "proto": {
+                "anyOf": [
+                  {
+                    "maximum": 255,
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Proto"
+              },
+              "to_port": {
+                "anyOf": [
+                  {
+                    "maximum": 65535,
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "To Port"
+              }
+            },
+            "title": "PortProto",
+            "type": "object"
+          },
+          "SegmentDimension": {
+            "enum": [
+              "src_host",
+              "dst_host",
+              "src_label",
+              "dst_label",
+              "service",
+              "initiator_process",
+              "initiator_user",
+              "service_process",
+              "service_user",
+              "decision",
+              "direction",
+              "event_type",
+              "event_host",
+              "event_severity",
+              "actor"
+            ],
+            "title": "SegmentDimension",
+            "type": "string"
+          },
+          "SegmentMetric": {
+            "enum": [
+              "flows",
+              "connections",
+              "distinct_dst",
+              "distinct_src",
+              "distinct_ports",
+              "bytes",
+              "events"
+            ],
+            "title": "SegmentMetric",
+            "type": "string"
+          },
+          "SegmentView": {
+            "enum": [
+              "detail",
+              "ranking",
+              "predicted_block"
+            ],
+            "title": "SegmentView",
+            "type": "string"
+          }
+        },
+        "properties": {
+          "alert_id": {
+            "title": "Alert Id",
+            "type": "integer"
+          },
+          "request": {
+            "discriminator": {
+              "mapping": {
+                "events": "#/$defs/EventRequest",
+                "flows": "#/$defs/FlowRequest"
+              },
+              "propertyName": "mode"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/$defs/FlowRequest"
+              },
+              {
+                "$ref": "#/$defs/EventRequest"
+              }
+            ],
+            "title": "Request"
+          }
+        },
+        "required": [
+          "request",
+          "alert_id"
+        ],
+        "title": "WorkbenchStart",
+        "type": "object"
+      }
+    },
+    "workbench.meta": {
+      "method": "GET",
+      "path": "/api/workbench/meta",
+      "request_schema": null,
+      "response_schema": {
+        "$defs": {
+          "CollectionMode": {
+            "description": "What data collection reads (spec §6.4): everything; events plus short-lived traffic for\nalerts; or no traffic at all (lightweight, the new-install default: flow reports query the PCE on demand).",
+            "enum": [
+              "full",
+              "alert",
+              "lightweight"
+            ],
+            "title": "CollectionMode",
+            "type": "string"
+          }
+        },
+        "properties": {
+          "default_days": {
+            "title": "Default Days",
+            "type": "integer"
+          },
+          "dimension_top": {
+            "title": "Dimension Top",
+            "type": "integer"
+          },
+          "label_keys": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Label Keys",
+            "type": "array"
+          },
+          "max_days": {
+            "title": "Max Days",
+            "type": "integer"
+          },
+          "mode": {
+            "$ref": "#/$defs/CollectionMode"
+          }
+        },
+        "required": [
+          "label_keys",
+          "mode",
+          "default_days",
+          "max_days",
+          "dimension_top"
+        ],
+        "title": "WorkbenchMeta",
+        "type": "object"
+      }
+    },
+    "workbench.run": {
+      "method": "POST",
+      "path": "/api/workbench/run",
+      "request_schema": {
+        "$defs": {
+          "EndpointFilter": {
+            "additionalProperties": false,
+            "properties": {
+              "hrefs": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Hrefs",
+                "type": "array"
+              },
+              "ips": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Ips",
+                "type": "array"
+              },
+              "labels": {
+                "default": [],
+                "items": {
+                  "$ref": "#/$defs/LabelCond"
+                },
+                "title": "Labels",
+                "type": "array"
+              },
+              "match": {
+                "default": "any",
+                "enum": [
+                  "any",
+                  "all"
+                ],
+                "title": "Match",
+                "type": "string"
+              }
+            },
+            "title": "EndpointFilter",
+            "type": "object"
+          },
+          "EventRequest": {
+            "additionalProperties": false,
+            "properties": {
+              "actor": {
+                "anyOf": [
+                  {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Actor"
+              },
+              "actors": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Actors",
+                "type": "array"
+              },
+              "end": {
+                "format": "date-time",
+                "title": "End",
+                "type": "string"
+              },
+              "event_types": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Event Types",
+                "type": "array"
+              },
+              "group_by": {
+                "default": [],
+                "items": {
+                  "$ref": "#/$defs/GroupBy"
+                },
+                "maxItems": 2,
+                "title": "Group By",
+                "type": "array"
+              },
+              "host_hrefs": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Host Hrefs",
+                "type": "array"
+              },
+              "limit": {
+                "default": 200,
+                "maximum": 1000,
+                "minimum": 1,
+                "title": "Limit",
+                "type": "integer"
+              },
+              "mode": {
+                "const": "events",
+                "title": "Mode",
+                "type": "string"
+              },
+              "severities": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Severities",
+                "type": "array"
+              },
+              "start": {
+                "format": "date-time",
+                "title": "Start",
+                "type": "string"
+              },
+              "view": {
+                "$ref": "#/$defs/SegmentView"
+              }
+            },
+            "required": [
+              "start",
+              "end",
+              "view",
+              "mode"
+            ],
+            "title": "EventRequest",
+            "type": "object"
+          },
+          "FlowCondition": {
+            "additionalProperties": false,
+            "description": "A flow filter without its time window: what an alert rule (and later a saved report section) stores.\nwithin() gives the FilterSpec for a window; every field, default and check is FilterSpec's.",
+            "properties": {
+              "decisions": {
+                "default": [],
+                "items": {
+                  "$ref": "#/$defs/PolicyDecision"
+                },
+                "title": "Decisions",
+                "type": "array"
+              },
+              "dst": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/EndpointFilter"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
+              },
+              "dst_exclude": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/EndpointFilter"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
+              },
+              "exclude_ports": {
+                "default": [],
+                "items": {
+                  "$ref": "#/$defs/PortProto"
+                },
+                "title": "Exclude Ports",
+                "type": "array"
+              },
+              "exclude_system_accounts": {
+                "default": false,
+                "title": "Exclude System Accounts",
+                "type": "boolean"
+              },
+              "initiator_process": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Initiator Process"
+              },
+              "initiator_processes": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Initiator Processes",
+                "type": "array"
+              },
+              "initiator_user": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Initiator User"
+              },
+              "initiator_users": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Initiator Users",
+                "type": "array"
+              },
+              "ports": {
+                "default": [],
+                "items": {
+                  "$ref": "#/$defs/PortProto"
+                },
+                "title": "Ports",
+                "type": "array"
+              },
+              "service_process": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Service Process"
+              },
+              "service_processes": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Service Processes",
+                "type": "array"
+              },
+              "service_user": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Service User"
+              },
+              "service_users": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Service Users",
+                "type": "array"
+              },
+              "src": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/EndpointFilter"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
+              },
+              "src_exclude": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/EndpointFilter"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
+              },
+              "text": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Text"
+              }
+            },
+            "title": "FlowCondition",
+            "type": "object"
+          },
+          "FlowRequest": {
+            "additionalProperties": false,
+            "properties": {
+              "condition": {
+                "$ref": "#/$defs/FlowCondition",
+                "default": {
+                  "decisions": [],
+                  "dst": null,
+                  "dst_exclude": null,
+                  "exclude_ports": [],
+                  "exclude_system_accounts": false,
+                  "initiator_process": null,
+                  "initiator_processes": [],
+                  "initiator_user": null,
+                  "initiator_users": [],
+                  "ports": [],
+                  "service_process": null,
+                  "service_processes": [],
+                  "service_user": null,
+                  "service_users": [],
+                  "src": null,
+                  "src_exclude": null,
+                  "text": null
+                }
+              },
+              "end": {
+                "format": "date-time",
+                "title": "End",
+                "type": "string"
+              },
+              "group_by": {
+                "default": [],
+                "items": {
+                  "$ref": "#/$defs/GroupBy"
+                },
+                "maxItems": 2,
+                "title": "Group By",
+                "type": "array"
+              },
+              "limit": {
+                "default": 200,
+                "maximum": 1000,
+                "minimum": 1,
+                "title": "Limit",
+                "type": "integer"
+              },
+              "metric": {
+                "$ref": "#/$defs/SegmentMetric",
+                "default": "flows"
+              },
+              "mode": {
+                "const": "flows",
+                "title": "Mode",
+                "type": "string"
+              },
+              "start": {
+                "format": "date-time",
+                "title": "Start",
+                "type": "string"
+              },
+              "view": {
+                "$ref": "#/$defs/SegmentView"
+              }
+            },
+            "required": [
+              "start",
+              "end",
+              "view",
+              "mode"
+            ],
+            "title": "FlowRequest",
+            "type": "object"
+          },
+          "GroupBy": {
+            "additionalProperties": false,
+            "properties": {
+              "dimension": {
+                "$ref": "#/$defs/SegmentDimension"
+              },
+              "label_key": {
+                "anyOf": [
+                  {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Label Key"
+              }
+            },
+            "required": [
+              "dimension"
+            ],
+            "title": "GroupBy",
+            "type": "object"
+          },
+          "LabelCond": {
+            "additionalProperties": false,
+            "properties": {
+              "key": {
+                "minLength": 1,
+                "title": "Key",
+                "type": "string"
+              },
+              "values": {
+                "items": {
+                  "type": "string"
+                },
+                "minItems": 1,
+                "title": "Values",
+                "type": "array"
+              }
+            },
+            "required": [
+              "key",
+              "values"
+            ],
+            "title": "LabelCond",
+            "type": "object"
+          },
+          "PolicyDecision": {
+            "enum": [
+              "allowed",
+              "potentially_blocked",
+              "blocked",
+              "unknown"
+            ],
+            "title": "PolicyDecision",
+            "type": "string"
+          },
+          "PortProto": {
+            "additionalProperties": false,
+            "properties": {
+              "port": {
+                "anyOf": [
+                  {
+                    "maximum": 65535,
+                    "minimum": -1,
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Port"
+              },
+              "proto": {
+                "anyOf": [
+                  {
+                    "maximum": 255,
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Proto"
+              },
+              "to_port": {
+                "anyOf": [
+                  {
+                    "maximum": 65535,
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "To Port"
+              }
+            },
+            "title": "PortProto",
+            "type": "object"
+          },
+          "SegmentDimension": {
+            "enum": [
+              "src_host",
+              "dst_host",
+              "src_label",
+              "dst_label",
+              "service",
+              "initiator_process",
+              "initiator_user",
+              "service_process",
+              "service_user",
+              "decision",
+              "direction",
+              "event_type",
+              "event_host",
+              "event_severity",
+              "actor"
+            ],
+            "title": "SegmentDimension",
+            "type": "string"
+          },
+          "SegmentMetric": {
+            "enum": [
+              "flows",
+              "connections",
+              "distinct_dst",
+              "distinct_src",
+              "distinct_ports",
+              "bytes",
+              "events"
+            ],
+            "title": "SegmentMetric",
+            "type": "string"
+          },
+          "SegmentView": {
+            "enum": [
+              "detail",
+              "ranking",
+              "predicted_block"
+            ],
+            "title": "SegmentView",
+            "type": "string"
+          }
+        },
+        "properties": {
+          "request": {
+            "discriminator": {
+              "mapping": {
+                "events": "#/$defs/EventRequest",
+                "flows": "#/$defs/FlowRequest"
+              },
+              "propertyName": "mode"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/$defs/FlowRequest"
+              },
+              {
+                "$ref": "#/$defs/EventRequest"
+              }
+            ],
+            "title": "Request"
+          }
+        },
+        "required": [
+          "request"
+        ],
+        "title": "WorkbenchRun",
+        "type": "object"
+      },
+      "response_schema": {
+        "$defs": {
+          "AggRow": {
+            "properties": {
+              "bytes_known": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Bytes Known"
+              },
+              "display": {
+                "items": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "title": "Display",
+                "type": "array"
+              },
+              "keys": {
+                "items": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "integer"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "title": "Keys",
+                "type": "array"
+              },
+              "value": {
+                "title": "Value",
+                "type": "integer"
+              }
+            },
+            "required": [
+              "keys",
+              "display",
+              "value",
+              "bytes_known"
+            ],
+            "title": "AggRow",
+            "type": "object"
+          },
+          "Coverage": {
+            "properties": {
+              "filled_from_pce": {
+                "items": {
+                  "maxItems": 2,
+                  "minItems": 2,
+                  "prefixItems": [
+                    {
+                      "format": "date-time",
+                      "type": "string"
+                    },
+                    {
+                      "format": "date-time",
+                      "type": "string"
+                    }
+                  ],
+                  "type": "array"
+                },
+                "title": "Filled From Pce",
+                "type": "array"
+              },
+              "gaps": {
+                "items": {
+                  "maxItems": 3,
+                  "minItems": 3,
+                  "prefixItems": [
+                    {
+                      "format": "date-time",
+                      "type": "string"
+                    },
+                    {
+                      "format": "date-time",
+                      "type": "string"
+                    },
+                    {
+                      "type": "string"
+                    }
+                  ],
+                  "type": "array"
+                },
+                "title": "Gaps",
+                "type": "array"
+              },
+              "source": {
+                "enum": [
+                  "store",
+                  "pce",
+                  "mixed"
+                ],
+                "title": "Source",
+                "type": "string"
+              },
+              "store_from": {
+                "anyOf": [
+                  {
+                    "format": "date-time",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Store From"
+              },
+              "store_to": {
+                "anyOf": [
+                  {
+                    "format": "date-time",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Store To"
+              },
+              "truncated": {
+                "title": "Truncated",
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "source",
+              "store_from",
+              "store_to",
+              "gaps",
+              "filled_from_pce",
+              "truncated"
+            ],
+            "title": "Coverage",
+            "type": "object"
+          },
+          "EventRow": {
+            "properties": {
+              "created_by_href": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Created By Href"
+              },
+              "created_by_kind": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Created By Kind"
+              },
+              "created_by_name": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Created By Name"
+              },
+              "event_type": {
+                "title": "Event Type",
+                "type": "string"
+              },
+              "href": {
+                "title": "Href",
+                "type": "string"
+              },
+              "origin": {
+                "title": "Origin",
+                "type": "string"
+              },
+              "raw": {
+                "additionalProperties": true,
+                "title": "Raw",
+                "type": "object"
+              },
+              "severity": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Severity"
+              },
+              "status": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Status"
+              },
+              "tamper_classification": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Tamper Classification"
+              },
+              "timestamp": {
+                "format": "date-time",
+                "title": "Timestamp",
+                "type": "string"
+              }
+            },
+            "required": [
+              "href",
+              "event_type",
+              "severity",
+              "status",
+              "timestamp",
+              "created_by_kind",
+              "created_by_name",
+              "created_by_href",
+              "tamper_classification",
+              "raw",
+              "origin"
+            ],
+            "title": "EventRow",
+            "type": "object"
+          },
+          "FieldCoverage": {
+            "description": "How many of the matching connections carry each optional field (spec §6.5.7: process and user\nare on few flows, bytes on fewer).",
+            "properties": {
+              "bytes": {
+                "title": "Bytes",
+                "type": "integer"
+              },
+              "initiator_process": {
+                "title": "Initiator Process",
+                "type": "integer"
+              },
+              "initiator_user": {
+                "title": "Initiator User",
+                "type": "integer"
+              },
+              "service_process": {
+                "title": "Service Process",
+                "type": "integer"
+              },
+              "service_user": {
+                "title": "Service User",
+                "type": "integer"
+              },
+              "total": {
+                "title": "Total",
+                "type": "integer"
+              }
+            },
+            "required": [
+              "total",
+              "initiator_process",
+              "initiator_user",
+              "service_process",
+              "service_user",
+              "bytes"
+            ],
+            "title": "FieldCoverage",
+            "type": "object"
+          },
+          "FlowRow": {
+            "properties": {
+              "bytes_in": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Bytes In"
+              },
+              "bytes_out": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Bytes Out"
+              },
+              "conn_key": {
+                "title": "Conn Key",
+                "type": "string"
+              },
+              "direction": {
+                "title": "Direction",
+                "type": "string"
+              },
+              "dst_hostname": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Dst Hostname"
+              },
+              "dst_href": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Dst Href"
+              },
+              "dst_ip": {
+                "title": "Dst Ip",
+                "type": "string"
+              },
+              "dst_key": {
+                "title": "Dst Key",
+                "type": "string"
+              },
+              "dst_labels": {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "title": "Dst Labels",
+                "type": "object"
+              },
+              "dst_managed": {
+                "title": "Dst Managed",
+                "type": "boolean"
+              },
+              "dst_mode": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Dst Mode"
+              },
+              "first_detected": {
+                "format": "date-time",
+                "title": "First Detected",
+                "type": "string"
+              },
+              "initiator_process": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Initiator Process"
+              },
+              "initiator_user": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Initiator User"
+              },
+              "last_detected": {
+                "format": "date-time",
+                "title": "Last Detected",
+                "type": "string"
+              },
+              "num_connections": {
+                "title": "Num Connections",
+                "type": "integer"
+              },
+              "origin": {
+                "title": "Origin",
+                "type": "string"
+              },
+              "policy_decision": {
+                "title": "Policy Decision",
+                "type": "string"
+              },
+              "port": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Port"
+              },
+              "proto": {
+                "title": "Proto",
+                "type": "integer"
+              },
+              "record_key": {
+                "title": "Record Key",
+                "type": "string"
+              },
+              "service_process": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Service Process"
+              },
+              "service_user": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Service User"
+              },
+              "src_hostname": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Src Hostname"
+              },
+              "src_href": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Src Href"
+              },
+              "src_ip": {
+                "title": "Src Ip",
+                "type": "string"
+              },
+              "src_key": {
+                "title": "Src Key",
+                "type": "string"
+              },
+              "src_labels": {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "title": "Src Labels",
+                "type": "object"
+              },
+              "src_managed": {
+                "title": "Src Managed",
+                "type": "boolean"
+              },
+              "src_mode": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Src Mode"
+              },
+              "state": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "State"
+              },
+              "windows_service": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Windows Service"
+              }
+            },
+            "required": [
+              "record_key",
+              "conn_key",
+              "direction",
+              "src_ip",
+              "dst_ip",
+              "src_key",
+              "dst_key",
+              "src_href",
+              "dst_href",
+              "src_hostname",
+              "dst_hostname",
+              "src_managed",
+              "dst_managed",
+              "src_mode",
+              "dst_mode",
+              "src_labels",
+              "dst_labels",
+              "port",
+              "proto",
+              "initiator_process",
+              "initiator_user",
+              "service_process",
+              "service_user",
+              "windows_service",
+              "policy_decision",
+              "first_detected",
+              "last_detected",
+              "num_connections",
+              "bytes_in",
+              "bytes_out",
+              "state",
+              "origin"
+            ],
+            "title": "FlowRow",
+            "type": "object"
+          },
+          "PullInfo": {
+            "description": "What was read from the PCE for this answer: said on the page (anti-goal: nothing silent).",
+            "properties": {
+              "capped": {
+                "title": "Capped",
+                "type": "boolean"
+              },
+              "end": {
+                "format": "date-time",
+                "title": "End",
+                "type": "string"
+              },
+              "read_at": {
+                "format": "date-time",
+                "title": "Read At",
+                "type": "string"
+              },
+              "rows": {
+                "title": "Rows",
+                "type": "integer"
+              },
+              "start": {
+                "format": "date-time",
+                "title": "Start",
+                "type": "string"
+              },
+              "truncated_windows": {
+                "title": "Truncated Windows",
+                "type": "integer"
+              },
+              "unread_from": {
+                "anyOf": [
+                  {
+                    "format": "date-time",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Unread From"
+              }
+            },
+            "required": [
+              "start",
+              "end",
+              "rows",
+              "capped",
+              "unread_from",
+              "truncated_windows",
+              "read_at"
+            ],
+            "title": "PullInfo",
+            "type": "object"
+          },
+          "SegmentResult": {
+            "properties": {
+              "coverage": {
+                "$ref": "#/$defs/Coverage"
+              },
+              "detail": {
+                "anyOf": [
+                  {
+                    "items": {
+                      "$ref": "#/$defs/FlowRow"
+                    },
+                    "type": "array"
+                  },
+                  {
+                    "items": {
+                      "$ref": "#/$defs/EventRow"
+                    },
+                    "type": "array"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Detail"
+              },
+              "field_coverage": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/FieldCoverage"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "latency_seconds": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Latency Seconds"
+              },
+              "limit_hit": {
+                "title": "Limit Hit",
+                "type": "boolean"
+              },
+              "observed_from": {
+                "format": "date-time",
+                "title": "Observed From",
+                "type": "string"
+              },
+              "observed_to": {
+                "format": "date-time",
+                "title": "Observed To",
+                "type": "string"
+              },
+              "predicted": {
+                "default": null,
+                "title": "Predicted"
+              },
+              "ranking": {
+                "anyOf": [
+                  {
+                    "items": {
+                      "$ref": "#/$defs/AggRow"
+                    },
+                    "type": "array"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Ranking"
+              },
+              "view": {
+                "$ref": "#/$defs/SegmentView"
+              }
+            },
+            "required": [
+              "view",
+              "coverage",
+              "field_coverage",
+              "limit_hit",
+              "observed_from",
+              "observed_to",
+              "latency_seconds"
+            ],
+            "title": "SegmentResult",
+            "type": "object"
+          },
+          "SegmentView": {
+            "enum": [
+              "detail",
+              "ranking",
+              "predicted_block"
+            ],
+            "title": "SegmentView",
+            "type": "string"
+          }
+        },
+        "properties": {
+          "pulled": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/PullInfo"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "result": {
+            "$ref": "#/$defs/SegmentResult"
+          }
+        },
+        "required": [
+          "result",
+          "pulled"
+        ],
+        "title": "WorkbenchResult",
         "type": "object"
       }
     }

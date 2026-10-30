@@ -183,7 +183,7 @@ def aggregate_events(ctx: AppContext, seg: EventSegment, *, now: datetime | None
     sql, params = compile_event_ranking(seg)
     found, cov = _segment_read(ctx, seg, at, lambda conn: conn.execute(sql, params).fetchall())
     levels = len(seg.group_by)
-    rows = [AggRow(keys=[r[f"k{i}"] for i in range(levels)], display=[None] * levels, value=r["value"],
+    rows = [AggRow(keys=[r[f"k{i}"] for i in range(levels)], display=[r[f"d{i}"] for i in range(levels)], value=r["value"],
                    bytes_known=None) for r in found]
     return EventAggregate(rows=rows[:seg.limit], coverage=cov, limit_hit=len(rows) > seg.limit)
 

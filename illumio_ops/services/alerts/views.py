@@ -169,7 +169,7 @@ def alert_detail(ctx: AppContext, alert_id: int) -> AlertDetail | None:
                         created_at=datetime.fromisoformat(n["created_at"])) for n in notes])
 
 
-def _evidence_segment(ctx: AppContext, alert_id: int) -> tuple[str | None, dict[str, Any] | None] | None:
+def evidence_segment(ctx: AppContext, alert_id: int) -> tuple[str | None, dict[str, Any] | None] | None:
     url, org = _pce(ctx)
     with ctx.db() as conn:
         row = store.get_alert(conn, alert_id, pce_url=url, org_id=org)
@@ -182,7 +182,7 @@ def _evidence_segment(ctx: AppContext, alert_id: int) -> tuple[str | None, dict[
 
 
 def alert_evidence(ctx: AppContext, alert_id: int) -> AlertEvidence | None:
-    found = _evidence_segment(ctx, alert_id)
+    found = evidence_segment(ctx, alert_id)
     if found is None:
         return None
     kind, segment = found
@@ -208,7 +208,7 @@ def add_note(ctx: AppContext, alert_id: int, *, body: str, by: str) -> AlertDeta
 
 
 def explain(ctx: AppContext, alert_id: int, req: ExplainRequest) -> PolicyExplanation | None:
-    found = _evidence_segment(ctx, alert_id)
+    found = evidence_segment(ctx, alert_id)
     if found is None:
         return None
     if found[0] != "flow":

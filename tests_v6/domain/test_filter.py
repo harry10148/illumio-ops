@@ -121,6 +121,16 @@ SPECS = [
     {"text": "host-0"},
     {"exclude_system_accounts": True},
     {"start": T0 + timedelta(days=4, hours=6, minutes=50), "end": T1},
+    # P6a final review: an "all" endpoint, exact value sets, a service without a port
+    {"dst": EndpointFilter(match="all", labels=(LabelCond(key="app", values=("DemoApp",)),), ips=("10.0.0.0/8",))},
+    {"src": EndpointFilter(match="all", labels=(LabelCond(key="env", values=("Server",)),), ips=("10.0.0.3",))},
+    {"src": EndpointFilter(match="all", hrefs=("/orgs/1/workloads/a",), ips=("10.0.0.3",))},
+    {"initiator_users": ("user-0", "USER-1")},
+    {"initiator_processes": ("calico-node", "CALICO")},
+    {"service_processes": ("mysqld",)},
+    {"service_users": ("root",)},
+    {"ports": (PortProto(port=-1, proto=1),)},
+    {"exclude_ports": (PortProto(port=-1, proto=6),)},
 ]
 
 
@@ -191,3 +201,51 @@ def test_within_round_trips():
                          ports=(PortProto(port=22, proto=6),), decisions=("blocked",), initiator_user="root")
     spec = cond.within(T0, T1)
     assert (spec.start, spec.end) == (T0, T1) and spec.condition() == cond
+
+
+
+# ── P6a final review (Codex, 2026-10-30) ─────────────────────────────────────
+
+def test_endpoint_all_is_an_intersection():
+    """#3: the workbench's "role=Web and this host" narrows; the default stays the union."""
+    from illumio_ops.domain.filter import endpoint_matches
+    both = EndpointFilter(match="all", labels=(LabelCond(key="env", values=("Prod",)),), hrefs=("/w/a",))
+    either = both.model_copy(update={"match": "any"})
+    assert endpoint_matches(both, href="/w/a", ip="1.1.1.1", labels={"env": "Prod"})
+    assert not endpoint_matches(both, href="/w/b", ip="1.1.1.1", labels={"env": "Prod"})
+    assert endpoint_matches(either, href="/w/b", ip="1.1.1.1", labels={"env": "Prod"})
+
+
+def test_endpoint_all_hosts_are_one_part():
+    """Two hosts picked on one side, one by href and one by address (no workload), are either host: the hosts
+    together are one condition, intersected with the labels."""
+    from illumio_ops.domain.filter import endpoint_matches
+    ep = EndpointFilter(match="all", labels=(LabelCond(key="env", values=("Prod",)),), hrefs=("/w/a",), ips=("9.9.9.9",))
+    assert endpoint_matches(ep, href="/w/a", ip="1.1.1.1", labels={"env": "Prod"})
+    assert endpoint_matches(ep, href=None, ip="9.9.9.9", labels={"env": "Prod"})
+    assert not endpoint_matches(ep, href="/w/b", ip="1.1.1.1", labels={"env": "Prod"})
+    assert not endpoint_matches(ep, href="/w/a", ip="1.1.1.1", labels={"env": "Dev"})
+
+
+def test_exact_values_are_not_partial():
+    """#5: choosing bash does not take in bash-helper; domain accounts compare case-insensitively."""
+    s = spec(initiator_processes=("bash",), initiator_users=("CORP\\Alice",))
+    assert matches(s, _row({"initiator_process": "bash", "initiator_user": "corp\\alice"}))
+    assert not matches(s, _row({"initiator_process": "bash-helper", "initiator_user": "corp\\alice"}))
+
+
+def test_no_port_is_not_any_port():
+    """#6: -1 is "no port"; a protocol alone still means any port."""
+    s = spec(ports=(PortProto(port=-1, proto=6),))
+    assert matches(s, _row({"port": None, "proto": 6})) and not matches(s, _row({"port": 443, "proto": 6}))
+    assert matches(spec(ports=(PortProto(proto=6),)), _row({"port": 443, "proto": 6}))
+
+
+def test_new_conditions_stay_local_in_the_payload():
+    """What the PCE cannot filter goes to the residual, never to a wider payload."""
+    s = spec(ports=(PortProto(port=-1, proto=6),), initiator_processes=("bash",),
+             dst=EndpointFilter(match="all", labels=(LabelCond(key="app", values=("A",)),), hrefs=("/w/a",)))
+    payload, residual = to_pce_payload(s, max_results=10, query_name="q", label_hrefs={("app", "A"): "/l/1"})
+    assert payload["services"]["include"] == [] and residual.ports == s.ports
+    assert payload["destinations"]["include"] == [[]] and residual.dst == s.dst
+    assert residual.initiator_processes == ("bash",)

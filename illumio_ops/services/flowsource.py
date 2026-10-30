@@ -910,3 +910,18 @@ def increment_times(ctx: AppContext, *, start: datetime, end: datetime) -> list[
         found = conn.execute("SELECT DISTINCT observed_at FROM flow_increments WHERE late = 0 AND observed_at > ? "
                              "AND observed_at <= ? ORDER BY observed_at", (db_time(start), db_time(end))).fetchall()
     return [datetime.fromisoformat(r[0]) for r in found]
+
+
+def host_addresses(ctx: AppContext, hrefs: set[str]) -> dict[str, str]:
+    """An address each workload href was seen with in the flows: how to show a host the PCE sent no hostname for
+    and the inventory does not hold (a container or deleted workload)."""
+    out: dict[str, str] = {}
+    if not hrefs:
+        return out
+    with ctx.flows().connect() as conn:
+        for h in sorted(hrefs):
+            row = conn.execute("SELECT dst_ip FROM flows WHERE dst_key = ? UNION ALL "
+                               "SELECT src_ip FROM flows WHERE src_key = ? LIMIT 1", (h, h)).fetchone()
+            if row:
+                out[h] = row[0]
+    return out
