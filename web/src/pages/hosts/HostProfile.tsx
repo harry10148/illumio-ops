@@ -5,7 +5,7 @@ import { Link, useSearchParams } from "react-router-dom";
 
 import { type ApiError, call } from "../../api/client";
 import type {
-  DimensionTop, EndpointFilter, EventRow, FlowCondition1, HostProfile as Profile, HostRansomware, HostTamper,
+  DimensionTop, EndpointFilter, EventRow, FlowCondition1, FlowRow, HostProfile as Profile, HostRansomware, HostTamper,
   PullInfo, SegmentDimension,
 } from "../../api/generated";
 import { formatTime } from "../../components/ProbeResults";
@@ -287,7 +287,7 @@ function Ransomware({ hostKey, initial }: { hostKey: string; initial: HostRansom
       {b.services.length === 0 ? <p className="muted">{t("hosts_rw_none")}</p> : (
         <div className="table-wrap">
           <table className="table" data-role="rw-services">
-            <thead><tr><th>{t("rpt_col_service")}</th><th>{t("evidence_col_port")}</th><th>{t("evidence_col_severity")}</th>
+            <thead><tr><th>{t("rpt_col_name")}</th><th>{t("rpt_col_service")}</th><th>{t("evidence_col_severity")}</th>
               <th>{t("rpt_rw_col_state")}</th><th>{t("rpt_rw_col_weight")}</th><th>{t("rpt_rw_col_coverage")}</th>
               <th>{t("rpt_rw_col_contribution")}</th><th>{t("hosts_rw_traffic")}</th>{asked && <th>{t("rpt_rw_col_rules")}</th>}</tr></thead>
             <tbody>
@@ -338,6 +338,7 @@ export function HostProfile() {
   const [hours, setHours] = useState(24);
   const [pulled, setPulled] = useState<PullInfo | null>(null);
   const span = useMemo(() => period(hours), [hours]);
+  const [seenAs, setSeenAs] = useState<string | null>(null);
 
   useEffect(() => {
     setProfile(null);
@@ -347,6 +348,24 @@ export function HostProfile() {
       else setError(env.error);
     });
   }, [key]);
+
+  // No name in the store (lightweight mode keeps no flows): the name or address its own traffic carries.
+  useEffect(() => {
+    setSeenAs(null);
+    if (!profile || profile.name !== profile.key) return;
+    let live = true;
+    const ask = async (s: "src" | "dst") => {
+      const env = await call("workbench.run", { request: { mode: "flows", view: "detail", limit: 1, ...span,
+        condition: { [s]: { hrefs: [profile.key] } } } });
+      const row = env.ok && env.data ? (env.data.result.detail?.[0] as FlowRow | undefined) : undefined;
+      return row ? (s === "dst" ? row.dst_hostname ?? row.dst_ip : row.src_hostname ?? row.src_ip) : null;
+    };
+    void (async () => {
+      const found = (await ask("dst")) ?? (await ask("src"));
+      if (live && found) setSeenAs(found);
+    })();
+    return () => { live = false; };
+  }, [profile, span]);
 
   if (error) return <section className="page"><p className="form-error">{t(error.message_key, error.params)}</p></section>;
   if (!profile) return <section className="page"><p className="muted">{t("loading")}</p></section>;
@@ -362,7 +381,7 @@ export function HostProfile() {
   return (
     <section className="page" data-role="host-profile">
       <div className="page-head">
-        <h1>{profile.name}</h1>
+        <h1>{seenAs ?? profile.name}</h1>
         <label>
           {t("wb_period")}
           <select name="period" value={hours} onChange={(e) => setHours(Number(e.target.value))}>

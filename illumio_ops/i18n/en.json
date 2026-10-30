@@ -2092,5 +2092,6 @@
   "hosts_rw_protected": "Protected",
   "hosts_rw_unknown": "Unknown",
   "hosts_rw_allow_hint": "Sources a rule lets in still count as attack surface: that is the vendor's design.",
-  "hosts_rw_allow_button": "Find the rules that let sources in (asks the PCE)"
+  "hosts_rw_allow_button": "Find the rules that let sources in (asks the PCE)",
+  "home_focus_more": "The top {shown} of {total} are shown: show all"
 }

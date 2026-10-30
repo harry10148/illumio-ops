@@ -15,6 +15,7 @@ const SOURCE_KEYS: Record<string, string> = {
 const STATUS_KEYS: Record<string, string> = {
   missing: "home_focus_status_missing", stale: "home_focus_status_stale", error: "home_focus_status_error",
 };
+const TOP = 10;  // the ranked list's head first: a lab estate had 117 items, 102 of them detections
 const PATTERN_KEYS: Record<string, string> = {
   regular_cycle: "tamper_pattern_regular_cycle", burst: "tamper_pattern_burst", sporadic: "tamper_pattern_sporadic",
   too_few: "tamper_pattern_too_few",
@@ -53,6 +54,7 @@ function Focus() {
   const lang = useLang();
   const [view, setView] = useState<FocusView | null>(null);
   const [error, setError] = useState<ApiError | null>(null);
+  const [all, setAll] = useState(false);
 
   useEffect(() => {
     void call("home.focus").then((env) => {
@@ -82,7 +84,12 @@ function Focus() {
       )}
       {view?.computed_at && view.items.length === 0 && problems.length === 0 && <p className="muted">{t("home_focus_empty")}</p>}
       {view && view.items.length > 0 && (
-        <ol className="focus-list">{view.items.map((it) => <FocusItem key={it.fingerprint} item={it} />)}</ol>
+        <ol className="focus-list">{(all ? view.items : view.items.slice(0, TOP)).map((it) => <FocusItem key={it.fingerprint} item={it} />)}</ol>
+      )}
+      {view && !all && view.items.length > TOP && (
+        <button type="button" className="btn-quiet" data-role="focus-more" onClick={() => setAll(true)}>
+          {t("home_focus_more", { shown: String(TOP), total: String(view.items.length) })}
+        </button>
       )}
     </div>
   );

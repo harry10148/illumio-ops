@@ -233,3 +233,5 @@ ul.notice { list-style: none; }
 .host-facts dd { margin: 0; }
 .host-facts .badge + .badge { margin-left: var(--space-2); }
 code.cmd { white-space: pre-wrap; word-break: break-all; font-size: var(--fs-mini); }
+[data-role=host-profile] .card > .row:first-child { justify-content: space-between; align-items: baseline; }
+[data-role=host-profile] .card h3 { margin: 0; }

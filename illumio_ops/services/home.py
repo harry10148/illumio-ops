@@ -20,7 +20,9 @@ from illumio_ops.domain.values import (
 from illumio_ops.services import workbench
 from illumio_ops.services.analysis.focus import STALE_AFTER
 from illumio_ops.services.context import AppContext
-from illumio_ops.store.flowdb import analysis
+from illumio_ops.services.flowsource import host_addresses
+from illumio_ops.services.hosts import WORKLOAD_HREF
+from illumio_ops.store.flowdb import analysis, workloads
 
 WEEK = timedelta(days=7)
 ROUTES = {"settings_lateral": "/system/lateral", "settings_collection": "/system/collection",
@@ -79,6 +81,20 @@ def _link(item: dict[str, Any], computed_at: datetime) -> FocusLink | None:
     return FocusLink(route=route) if route else None
 
 
+def _named(ctx: AppContext, items: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Each workload href in an item's words as the host is shown elsewhere: the inventory's hostname or name, else
+    an address it was seen with (the PCE sends no hostname for some workloads, lab 2026-10-30)."""
+    hrefs = {v for it in items for v in (it.get("params") or {}).values() if isinstance(v, str) and WORKLOAD_HREF.match(v)}
+    if not hrefs:
+        return items
+    with ctx.flows().connect() as conn:
+        names = {w.href: w.hostname or w.name for w in workloads.all_workloads(conn) if w.href in hrefs}
+    names = {h: n for h, n in names.items() if n}
+    names |= host_addresses(ctx, hrefs - set(names))
+    return [{**it, "params": {k: names.get(v, v) if isinstance(v, str) else v for k, v in (it.get("params") or {}).items()}}
+            for it in items]
+
+
 def focus_view(ctx: AppContext, *, now: datetime | None = None) -> FocusView:
     at = (now or datetime.now(UTC)).astimezone(UTC)
     with ctx.flows().connect() as conn:
@@ -88,6 +104,6 @@ def focus_view(ctx: AppContext, *, now: datetime | None = None) -> FocusView:
     result = json.loads(row["result_json"])
     computed = datetime.fromisoformat(result["computed_at"])
     items = [FocusEntry(**{k: v for k, v in it.items() if k != "action"}, link=_link(it, computed))
-             for it in result.get("items") or ()]
+             for it in _named(ctx, list(result.get("items") or ()))]
     return FocusView(computed_at=computed, stale=computed < at - STALE_AFTER, items=items,
                      sources_status=dict(result.get("sources_status") or {}))

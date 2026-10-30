@@ -66,3 +66,21 @@ def test_unmanaged_address_shows_traffic_only(context, live_app):
     expect(page.locator("[data-section=tamper]")).to_have_count(0)
     expect(page.locator("[data-section=events]")).to_have_count(0)
     expect(page.locator("[data-section=src_host]")).to_have_count(2)  # who connects, and mode switch by source
+
+
+def test_unnamed_host_named_from_its_traffic(context, live_app):
+    """Lab acceptance 2026-10-30: in lightweight mode the store holds no flows, so a host the inventory has no name
+    for was titled with its href; the page names it from the traffic it reads."""
+    import json as _json
+    _seed(live_app)
+    page = context.new_page()
+    sign_in(page, live_app.url)
+
+    def unnamed(route):
+        resp = route.fetch()
+        body = _json.loads(resp.text())
+        body["data"]["name"] = body["data"]["key"]  # as the lightweight store answers
+        route.fulfill(response=resp, body=_json.dumps(body))
+    page.route("**/api/hosts/profile*", unnamed)
+    page.goto(f"{live_app.url}/hosts?key={DB}")
+    expect(page.locator("h1")).to_have_text("db")

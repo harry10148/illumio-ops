@@ -78,3 +78,30 @@ def test_focus_links(ctx):
     mode_switch = json.loads(links[5].query["q"])
     assert mode_switch["condition"]["decisions"] == ["potentially_blocked"] and mode_switch["view"] == "ranking"
     assert [lk.route for lk in links[6:]] == ["/system/lateral", "/system/collection", "/system/jobs", "/system/pce"]
+
+
+def test_focus_hosts_named(ctx):
+    """Lab acceptance 2026-10-30: items about a host the PCE sent no hostname for showed its href; the inventory's
+    name, else an address it was seen with, is shown."""
+    from illumio_ops.domain.values import DataOrigin
+    from illumio_ops.store.flowdb import workloads
+    from illumio_ops.store.flowdb.flows import upsert_flows
+    from tests_v6.services.reports.test_findings import flow
+    with ctx.flows().connect() as conn:
+        workloads.replace_inventory(conn, [workloads.WorkloadRow(
+            href="/orgs/1/workloads/k8s", hostname=None, name="k8s-node02", managed=1, enforcement_mode=None,
+            visibility_level=None, os_id=None, ven_version=None, ven_href=None, label_set=None, online=1,
+            risk_exposure=None, risk_percent=None, risk_updated_at=None, fetched_at="x")])
+        upsert_flows(conn, [flow(src="x", dst="ghost", port=22)], origin=DataOrigin.INGEST, now=NOW)
+        conn.execute("UPDATE flows SET dst_hostname = NULL WHERE dst_key = '/orgs/1/workloads/ghost'")
+        ip = conn.execute("SELECT dst_ip FROM flows WHERE dst_key = '/orgs/1/workloads/ghost'").fetchone()[0]
+        conn.commit()
+    items = [_item("detection", "workbench") for _ in range(3)]
+    items[0]["params"] = {"host": "/orgs/1/workloads/k8s", "targets": 4}
+    items[1]["params"] = {"host": "/orgs/1/workloads/ghost", "account": "/orgs/1/workloads/ghost"}
+    items[2]["params"] = {"host": "web01"}
+    for i, it in enumerate(items):
+        it["fingerprint"] = f"f{i}"
+    _store(ctx, items)
+    got = [i.params for i in home.focus_view(ctx, now=NOW).items]
+    assert got == [{"host": "k8s-node02", "targets": 4}, {"host": ip, "account": ip}, {"host": "web01"}]

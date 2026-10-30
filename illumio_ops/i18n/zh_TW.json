@@ -2092,5 +2092,6 @@
   "hosts_rw_protected": "已防護",
   "hosts_rw_unknown": "無法判斷",
   "hosts_rw_allow_hint": "被規則允許的來源仍算攻擊面，這是原廠刻意的設計。",
-  "hosts_rw_allow_button": "查出允許來源的規則（向 PCE 查詢）"
+  "hosts_rw_allow_button": "查出允許來源的規則（向 PCE 查詢）",
+  "home_focus_more": "顯示前 {shown} 項，共 {total} 項：顯示全部"
 }
