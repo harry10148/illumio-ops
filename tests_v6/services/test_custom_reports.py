@@ -136,7 +136,8 @@ def test_report_runs_each_section_on_its_period(ctx):
     rep = cr.add_section(ctx, report_id=rep.id, name=None, title="Tampering", request=_events(), by="a", now=NOW)
     doc = _make(ctx, rep.id, gui="https://ops.example")
     assert doc.title == "DB watch" and [s.title for s in doc.sections] == ["Who reaches db", "Connections", "Tampering"]
-    ranking, detail, events = (s.blocks[0] for s in doc.sections)
+    from illumio_ops.domain.report import TableBlock
+    ranking, detail, events = (next(b for b in s.blocks if isinstance(b, TableBlock)) for s in doc.sections)
     assert {r[0]: r[1] for r in ranking.rows} == {"adm": 2, "bak": 1}
     assert len(detail.rows) == 3 and events.rows == () and events.empty_text
     assert doc.sections[0].workbench_link.startswith("https://ops.example/investigate?q=")
@@ -187,3 +188,17 @@ def test_event_only_report_pulls_nothing_in_lightweight(tmp_path):
     cr.add_section(light, report_id=rep.id, name=None, title="f", request=_ranking(), by="a", now=NOW)
     assert pulls_on_demand(light, spec, NOW - timedelta(days=7), NOW,
                            ReportParams(report_type=ReportType.CUSTOM, custom_id=rep.id))
+
+
+def test_uncollected_period_is_not_said_as_nothing(ctx):
+    """Lab acceptance 2026-10-31: an event section read "no events in the period" for a period no events were
+    collected for; each section says where its data has gaps, and the report says the traffic's coverage."""
+    from illumio_ops.domain.report import TextBlock
+    rep = cr.add_section(ctx, report_id=None, name="R", title="Events", request=_events(), by="a", now=NOW)
+    cr.add_section(ctx, report_id=rep.id, name=None, title="Flows", by="a", now=NOW,
+                   request=FlowRequest(mode="flows", start=NOW - timedelta(days=1), end=NOW, view="detail"))
+    doc = _make(ctx, rep.id)
+    for sec in doc.sections:
+        notes = [p for b in sec.blocks if isinstance(b, TextBlock) for p in b.paragraphs]
+        assert notes, sec.title  # the gap is said beside the empty table
+    assert any("traffic" in q.lower() or "flow" in q.lower() for q in doc.data_quality)

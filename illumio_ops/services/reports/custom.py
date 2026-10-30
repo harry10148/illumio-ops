@@ -5,6 +5,7 @@ from __future__ import annotations
 
 from urllib.parse import urlencode
 
+from illumio_ops.domain.filter import FlowCondition
 from illumio_ops.domain.report import (
     Cell,
     Column,
@@ -17,13 +18,16 @@ from illumio_ops.domain.segment import EventSegment, FlowSegment
 from illumio_ops.domain.values import ReportType, SegmentDimension, SegmentView
 from illumio_ops.services import custom_reports
 from illumio_ops.services.analysis.segments import run_segment
+from illumio_ops.services.coverage import Coverage
 from illumio_ops.services.custom_reports import CustomSection
 from illumio_ops.services.eventsource import EventRow
 from illumio_ops.services.flowsource import FlowRow
 from illumio_ops.services.reports import flowsections
 from illumio_ops.services.reports.common import port_text, tr
 from illumio_ops.services.reports.flowsections import DECISION_KEYS
+from illumio_ops.services.reports.generate import coverage_note
 from illumio_ops.services.reports.registry import BuildInput, ReportFailed
+from illumio_ops.services.reports.render_html import fmt_time
 
 DIM_KEYS = {d: f"wb_dim_{d.value}" for d in SegmentDimension}
 METRIC_KEYS = {"flows": "wb_metric_flows", "connections": "wb_metric_connections", "distinct_dst": "wb_metric_distinct_dst",
@@ -39,7 +43,19 @@ def _link(inp: BuildInput, sec: CustomSection) -> str | None:
     return f"{base.rstrip('/')}/investigate?{urlencode({'q': req.model_dump_json(exclude_none=True)})}"
 
 
-def _flow_detail(inp: BuildInput, seg: FlowSegment, title: str) -> TableBlock:
+def _gaps(inp: BuildInput, cov: Coverage | None) -> tuple[TextBlock, ...]:
+    """Where this section's data has holes (not collected, failed, cut): said beside the table, never an empty
+    table that reads as "nothing happened"."""
+    if cov is None or not (cov.gaps or cov.truncated):
+        return ()
+    lines = [tr(inp.lang, "rpt_cust_gaps", n=len(cov.gaps), start=fmt_time(cov.gaps[0][0].isoformat(), inp.tz),
+                end=fmt_time(cov.gaps[0][1].isoformat(), inp.tz))] if cov.gaps else []
+    if cov.truncated:
+        lines.append(tr(inp.lang, "rpt_cust_truncated"))
+    return (TextBlock(paragraphs=tuple(lines)),)
+
+
+def _flow_detail(inp: BuildInput, seg: FlowSegment, title: str) -> tuple[TableBlock, Coverage]:
     def t(k: str) -> str:
         return tr(inp.lang, k)
     result = run_segment(inp.ctx, seg, now=inp.now)
@@ -54,10 +70,10 @@ def _flow_detail(inp: BuildInput, seg: FlowSegment, title: str) -> TableBlock:
                               Column(key="decision", label=t("evidence_col_decision")),
                               Column(key="connections", label=t("evidence_col_connections"), kind="number")),
         rows=rows, total_rows=len(rows), empty_text=t("rpt_no_flows_filtered"),
-        limit_note=tr(inp.lang, "rpt_limit_top_n", n=seg.limit) if result.limit_hit else None)
+        limit_note=tr(inp.lang, "rpt_limit_top_n", n=seg.limit) if result.limit_hit else None), result.coverage
 
 
-def _event_table(inp: BuildInput, seg: EventSegment, title: str) -> TableBlock:
+def _event_table(inp: BuildInput, seg: EventSegment, title: str) -> tuple[TableBlock, Coverage]:
     def t(k: str) -> str:
         return tr(inp.lang, k)
     result = run_segment(inp.ctx, seg, now=inp.now)
@@ -75,13 +91,21 @@ def _event_table(inp: BuildInput, seg: EventSegment, title: str) -> TableBlock:
         rows = tuple((r.timestamp.isoformat(), r.event_type, r.severity or "", r.created_by_name or "")
                      for r in result.detail or [] if isinstance(r, EventRow))
     return TableBlock(title=title, columns=columns, rows=rows, total_rows=len(rows), empty_text=t("rpt_cust_no_events"),
-                      limit_note=tr(inp.lang, "rpt_limit_top_n", n=seg.limit) if result.limit_hit else None)
+                      limit_note=tr(inp.lang, "rpt_limit_top_n", n=seg.limit) if result.limit_hit else None), \
+        result.coverage
+
+
+def flows_coverage(inp: BuildInput) -> Coverage:
+    """The traffic store's coverage of the report's period (what a flow ranking read)."""
+    seg = FlowSegment(filter=FlowCondition().within(inp.start, inp.end), view=SegmentView.DETAIL, limit=1)
+    return run_segment(inp.ctx, seg, now=inp.now).coverage
 
 
 def _section(inp: BuildInput, i: int, sec: CustomSection) -> Section:
     seg = sec.segment.materialize(inp.start, inp.end)
+    cov: Coverage | None = None
     if isinstance(seg, EventSegment):
-        block = _event_table(inp, seg, sec.title)
+        block, cov = _event_table(inp, seg, sec.title)
     elif seg.view is SegmentView.RANKING:
         columns = (*(Column(key=f"k{j}", label=tr(inp.lang, DIM_KEYS[g.dimension])) for j, g in enumerate(seg.group_by)),
                    Column(key="v", label=tr(inp.lang, METRIC_KEYS.get(seg.metric.value, "rpt_col_metric")),
@@ -89,10 +113,13 @@ def _section(inp: BuildInput, i: int, sec: CustomSection) -> Section:
         block = flowsections.ranking(inp, title=sec.title, group_by=seg.group_by, metric=seg.metric, columns=columns,
                                      limit=seg.limit, spec=seg.filter)
     else:
-        block = _flow_detail(inp, seg, sec.title)
+        block, cov = _flow_detail(inp, seg, sec.title)
     words = flowsections.filter_text(sec.segment.condition, inp.lang) if sec.segment.mode == "flows" else None
     intro = tr(inp.lang, "rpt_cust_conditions", conditions=words) if words else ""
-    return Section(id=f"s{i + 1}", title=sec.title, intro=intro, blocks=(block,), workbench_link=_link(inp, sec))
+    if cov is None:  # a flow ranking: the store's coverage of the section's own period
+        cov = flows_coverage(inp)
+    return Section(id=f"s{i + 1}", title=sec.title, intro=intro, blocks=(*_gaps(inp, cov), block),
+                   workbench_link=_link(inp, sec))
 
 
 def build_custom(inp: BuildInput) -> ReportDocument:
@@ -101,8 +128,10 @@ def build_custom(inp: BuildInput) -> ReportDocument:
         raise ReportFailed("rpt_err_custom_missing")  # deleted after it was queued or scheduled
     sections = tuple(_section(inp, i, s) for i, s in enumerate(rep.sections))
     quality: tuple[str, ...] = ()
+    if any(sec.segment.mode == "flows" for sec in rep.sections):
+        quality += coverage_note(inp.ctx, inp.start, inp.end, inp.lang, now=inp.now, tz=inp.tz, flows=True)
     if not inp.ctx.settings.current().reports.gui_external_url:
-        quality = (tr(inp.lang, "rpt_cust_no_links"),)
+        quality += (tr(inp.lang, "rpt_cust_no_links"),)
     return ReportDocument(
         report_type=ReportType.CUSTOM, lang=inp.lang, title=rep.name, period_start=inp.start, period_end=inp.end,
         generated_at=inp.now, pce_label=inp.pce_label, kpis=(), findings=(), data_quality=quality,

@@ -2344,5 +2344,7 @@
   "rpt_err_custom_not_supported": "只有自訂報表才能指定自訂報表。",
   "rpt_err_custom_required": "請選擇要產生哪一份自訂報表。",
   "rpt_open_in_workbench": "在工作台開啟",
-  "rpt_title_custom": "自訂報表"
+  "rpt_title_custom": "自訂報表",
+  "rpt_cust_gaps": "這一節的資料有 {n} 段缺口（第一段 {start} – {end}）；數字不含那些時間。",
+  "rpt_cust_truncated": "這一節有部分資料因 PCE 的上限而截斷。"
 }
