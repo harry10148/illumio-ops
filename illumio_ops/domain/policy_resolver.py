@@ -368,23 +368,35 @@ def _minus(nets: list[Any], excluded: list[Any]) -> list[Any]:
 def _subtract(values: list[str], excludes: set[str]) -> list[str]:
     """values minus the excluded addresses, by containment, not by string (security review): an excluded CIDR
     removes the hosts and the part of a wider network it covers. What is not an address (an FQDN) is removed only
-    by an identical exclusion."""
+    by an identical exclusion. Single hosts are set lookups; network arithmetic only where a side is wider than one
+    host (security review: 5,000 x 5,000 hosts took 28 s)."""
     if not excludes:
         return values
-    ex_nets = [n for e in excludes for n in (_network(e) or [])]
+    hosts: set[Any] = set()
+    wide: list[Any] = []
+    for e in excludes:
+        for n in _network(e) or []:
+            (hosts.add(n.network_address) if n.num_addresses == 1 else wide.append(n))
+    if not hosts and not wide:
+        return [v for v in values if v not in excludes]
     out: list[str] = []
     for v in values:
         if v in excludes:
             continue
         nets = _network(v)
-        if nets is None or not ex_nets:
+        if nets is None:
             out.append(v)
-            continue
-        rest = _minus(nets, ex_nets)
-        if rest == nets:
-            out.append(v)
+        elif len(nets) == 1 and nets[0].num_addresses == 1:
+            addr = nets[0].network_address
+            if addr not in hosts and not any(addr in w for w in wide):
+                out.append(v)
         else:
-            out.extend(str(n.network_address) if n.num_addresses == 1 else str(n) for n in rest)
+            inside = [ipaddress.ip_network(h) for h in hosts if any(h in n for n in nets)]
+            rest = _minus(nets, [*wide, *inside])
+            if rest == nets:
+                out.append(v)
+            else:
+                out.extend(str(n.network_address) if n.num_addresses == 1 else str(n) for n in rest)
     return out
 
 

@@ -578,3 +578,15 @@ def test_unresolved_service_is_not_any_port():
                     "providers": [{"ip_address": {"value": "2.2.2.2"}}], "ingress_services": [{"href": "/svc/9"}]}])
     rows = resolve_ruleset(rs, **_lookups(), service_to_ports={}, service_to_names={"/svc/9": "Proc"})
     assert rows[0]["port"] != "ANY" and rows[0]["port"].startswith("<") and rows[0]["service_name"] == "Proc"
+
+
+def test_subtract_many_hosts_is_fast():
+    """Security review: 5,000 hosts minus 5,000 excluded hosts must not be 25 million network operations."""
+    import time
+
+    from illumio_ops.domain.policy_resolver import _subtract
+    kept = [f"10.{i // 250}.{i % 250}.1" for i in range(5000)]
+    excluded = {f"10.{i // 250}.{i % 250}.2" for i in range(5000)} | {"10.0.0.0/30"}
+    t0 = time.monotonic()
+    out = _subtract(kept, excluded)
+    assert out == kept[1:] and time.monotonic() - t0 < 1.0  # 10.0.0.1 is inside 10.0.0.0/30
