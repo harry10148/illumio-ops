@@ -63,7 +63,7 @@ export type ReportFormat = ("html" | "xlsx" | "json" | "csv")
  * This interface was referenced by `ContractRoot`'s JSON-Schema
  * via the `definition` "ReportType".
  */
-export type ReportType = ("lateral_posture" | "new_connections" | "unmanaged_endpoints" | "traffic" | "security_risk" | "network_inventory" | "app_summary" | "ven_status" | "audit" | "ransomware" | "readiness" | "policy_usage" | "rule_hit_count" | "policy_diff")
+export type ReportType = ("lateral_posture" | "new_connections" | "unmanaged_endpoints" | "traffic" | "security_risk" | "network_inventory" | "app_summary" | "ven_status" | "audit" | "ransomware" | "readiness" | "policy_usage" | "rule_hit_count" | "policy_diff" | "policy_resolver")
 /**
  * This interface was referenced by `ContractRoot`'s JSON-Schema
  * via the `definition` "ReportStatus".
@@ -1875,6 +1875,7 @@ export const VALUES = {
     "network_inventory",
     "new_connections",
     "policy_diff",
+    "policy_resolver",
     "policy_usage",
     "ransomware",
     "readiness",

@@ -10259,7 +10259,8 @@
               "readiness",
               "policy_usage",
               "rule_hit_count",
-              "policy_diff"
+              "policy_diff",
+              "policy_resolver"
             ],
             "title": "ReportType",
             "type": "string"
@@ -10724,7 +10725,8 @@
               "readiness",
               "policy_usage",
               "rule_hit_count",
-              "policy_diff"
+              "policy_diff",
+              "policy_resolver"
             ],
             "title": "ReportType",
             "type": "string"
@@ -11281,7 +11283,8 @@
               "readiness",
               "policy_usage",
               "rule_hit_count",
-              "policy_diff"
+              "policy_diff",
+              "policy_resolver"
             ],
             "title": "ReportType",
             "type": "string"
@@ -11826,7 +11829,8 @@
               "readiness",
               "policy_usage",
               "rule_hit_count",
-              "policy_diff"
+              "policy_diff",
+              "policy_resolver"
             ],
             "title": "ReportType",
             "type": "string"
@@ -12550,7 +12554,8 @@
               "readiness",
               "policy_usage",
               "rule_hit_count",
-              "policy_diff"
+              "policy_diff",
+              "policy_resolver"
             ],
             "title": "ReportType",
             "type": "string"
@@ -13015,7 +13020,8 @@
               "readiness",
               "policy_usage",
               "rule_hit_count",
-              "policy_diff"
+              "policy_diff",
+              "policy_resolver"
             ],
             "title": "ReportType",
             "type": "string"
@@ -13235,7 +13241,8 @@
               "readiness",
               "policy_usage",
               "rule_hit_count",
-              "policy_diff"
+              "policy_diff",
+              "policy_resolver"
             ],
             "title": "ReportType",
             "type": "string"
@@ -13579,7 +13586,8 @@
               "readiness",
               "policy_usage",
               "rule_hit_count",
-              "policy_diff"
+              "policy_diff",
+              "policy_resolver"
             ],
             "title": "ReportType",
             "type": "string"
@@ -19928,6 +19936,7 @@
       "network_inventory",
       "new_connections",
       "policy_diff",
+      "policy_resolver",
       "policy_usage",
       "ransomware",
       "readiness",

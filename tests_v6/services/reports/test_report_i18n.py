@@ -13,12 +13,14 @@ from illumio_ops.domain.filter import EndpointFilter, FlowCondition, LabelCond
 from illumio_ops.domain.findings_rules import RULES
 from illumio_ops.domain.values import DataOrigin, Language, ReportType, RhcState
 from illumio_ops.pce.policy import PendingItem, PolicyNames
+from illumio_ops.services.analysis.policy_resolver import Resolved
 from illumio_ops.services.analysis.predicted_block import (
     PredictedGroup,
     PredictedSummary,
 )
 from illumio_ops.services.analysis.ransomware import HostRansomware
 from illumio_ops.services.reports import policy_diff as policy_diff_report
+from illumio_ops.services.reports import policy_resolver as policy_resolver_report
 from illumio_ops.services.reports import ransomware_report, rule_hit_count
 from illumio_ops.services.reports import readiness as readiness_report
 from illumio_ops.services.reports.registry import BuildInput, ReportParams, specs
@@ -77,6 +79,11 @@ def ctx(tmp_path_factory):
         computed_at=NOW, unsupported=False, missing_rules=["/orgs/1/sec_policy/draft/rule_sets/1/deny_rules/2"]))
     _rhc_sample(mp)
     _pdf_sample(mp)
+    mp.setattr(policy_resolver_report, "resolve", lambda ctx, **kw: Resolved(
+        rows=[{"ruleset_name": "Web", "rule_href": "/r/1", "action": "allow", "src_ip": "<5001 hosts: expansion capped>",
+               "dst_ip": "10.0.0.2", "port": 1433, "protocol": "TCP", "truncated": "src"}],
+        per_ruleset={"Web": 1}, rule_count=1, rules_capped=1, truncated_rulesets=["Web"], rows_omitted=3,
+        computed_at=NOW))
     mp.setattr(ransomware_report, "host_ransomware", lambda ctx, href, **kw: HostRansomware.model_construct(
         breakdown=None, allow_rules={"445/6": []}, allow_status={"445/6": "error"}))
     yield c

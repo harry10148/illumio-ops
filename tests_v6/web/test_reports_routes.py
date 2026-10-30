@@ -49,7 +49,7 @@ def test_catalog_lists_built_types(client, ctx):
     login(client)
     data = get(client, "/api/reports/catalog").get_json()["data"]
     types = {e["report_type"]: e for e in data["entries"]}
-    assert set(types) == {"lateral_posture", "new_connections", "unmanaged_endpoints", "traffic", "security_risk", "network_inventory", "app_summary", "ven_status", "audit", "ransomware", "readiness", "policy_usage", "rule_hit_count", "policy_diff"}
+    assert set(types) == {"lateral_posture", "new_connections", "unmanaged_endpoints", "traffic", "security_risk", "network_inventory", "app_summary", "ven_status", "audit", "ransomware", "readiness", "policy_usage", "rule_hit_count", "policy_diff", "policy_resolver"}
     assert all(e["available"] for e in types.values()) and data["smtp_enabled"] is False
 
 

@@ -126,6 +126,7 @@ def _builtin() -> dict[ReportType, ReportSpec]:
     from illumio_ops.services.reports.network_inventory import build_network_inventory
     from illumio_ops.services.reports.new_connections import build_new_connections
     from illumio_ops.services.reports.policy_diff import build_policy_diff
+    from illumio_ops.services.reports.policy_resolver import build_policy_resolver
     from illumio_ops.services.reports.policy_usage import build_policy_usage
     from illumio_ops.services.reports.ransomware_report import build_ransomware
     from illumio_ops.services.reports.readiness import build_readiness
@@ -165,6 +166,10 @@ def _builtin() -> dict[ReportType, ReportSpec]:
         # Draft against active, read when the report runs; the period bounds the events used for attribution.
         ReportType.POLICY_DIFF: ReportSpec(ReportType.POLICY_DIFF, "policy", False, build_policy_diff,
                                            max_lookback=lambda settings: POLICY_DIFF_MAX_DAYS),
+        # The policy in force when it runs, as rows for other tools: JSON and CSV only (spec §6.5, user).
+        ReportType.POLICY_RESOLVER: ReportSpec(ReportType.POLICY_RESOLVER, "policy", False, build_policy_resolver,
+                                               max_lookback=lambda settings: 1,
+                                               formats=(ReportFormat.JSON, ReportFormat.CSV)),
         ReportType.READINESS: ReportSpec(ReportType.READINESS, "assessment", True, build_readiness,
                                          max_lookback=flow_days, accepts_filter=True, retention=flow_retention),
     }

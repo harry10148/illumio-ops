@@ -394,6 +394,7 @@ class ReportType(StrEnum):
     POLICY_USAGE = "policy_usage"
     RULE_HIT_COUNT = "rule_hit_count"
     POLICY_DIFF = "policy_diff"
+    POLICY_RESOLVER = "policy_resolver"
 
 
 class ReportFormat(StrEnum):
