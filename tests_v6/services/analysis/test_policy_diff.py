@@ -90,3 +90,12 @@ def test_fetch_failure_raises(ctx, pce):
     pce.fail = PceCollectionIncomplete("/sec_policy/active/rule_sets", 0, "HTTP 500")
     with pytest.raises(PceCollectionIncomplete):
         policy_diff.policy_diff(ctx, start=START, end=END, now=NOW)
+
+
+def test_removed_rule_attributed(ctx, pce):
+    """Final review #3: a deletion's event names the Draft href."""
+    pce.sets = {"draft": [rs(D)], "active": [rs(A, rules=[rule(A, 4)])]}
+    _write(ctx, [_changed(f"{D}/rule_sets/1/sec_rules/4", datetime(2026, 10, 27, tzinfo=UTC), "remover",
+                          "sec_rule.delete")])
+    d = policy_diff.policy_diff(ctx, start=START, end=END, now=NOW)
+    assert d.attribution[f"{D}/rule_sets/1/sec_rules/4"].actor == "remover"

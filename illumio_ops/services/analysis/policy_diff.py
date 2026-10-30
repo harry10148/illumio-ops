@@ -15,6 +15,7 @@ from illumio_ops.domain.policy_diff import (
     Change,
     diff_objects,
     diff_rule_sets,
+    draft_href,
     grade,
     object_refs,
 )
@@ -52,7 +53,7 @@ class PolicyDiff(BaseModel):
     changes: list[Change]
     pending: list[PendingItem]
     other_pending: list[PendingItem]  # pending kinds not compared here (firewall settings, virtual services, ...)
-    attribution: dict[str, Attribution]  # Draft href -> newest event naming it
+    attribution: dict[str, Attribution]  # Draft href (draft_href) -> newest event naming it
     attribution_limited: bool  # more policy events in the period than were read
     computed_at: datetime
 
@@ -94,7 +95,7 @@ def policy_diff(ctx: AppContext, *, start: datetime, end: datetime, now: datetim
                                     kind=kind, fields=fields, names=names)  # type: ignore[arg-type]
         pending = fetch_pending(client, deadline=deadline)
     changes = grade(changes, object_refs(active_sets))
-    attribution, limited = _attribution(ctx, start, end, at, {c.href for c in changes})
+    attribution, limited = _attribution(ctx, start, end, at, {draft_href(c.href) for c in changes})
     return PolicyDiff(changes=changes, pending=pending,
                       other_pending=[p for p in pending if p.kind not in COMPARED_PENDING],
                       attribution=attribution, attribution_limited=limited, computed_at=at)

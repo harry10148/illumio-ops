@@ -8,7 +8,7 @@ from collections.abc import Callable
 
 from loguru import logger
 
-from illumio_ops.domain.policy_diff import Change
+from illumio_ops.domain.policy_diff import Change, draft_href
 from illumio_ops.domain.report import (
     Column,
     Finding,
@@ -76,7 +76,7 @@ def build_policy_diff(inp: BuildInput) -> ReportDocument:
         return v
 
     def who(c: Change) -> str:
-        a = diff.attribution.get(c.href)
+        a = diff.attribution.get(draft_href(c.href))
         return f"{a.actor} ({fmt_time(a.at.isoformat(), inp.tz)})" if a else "—"
 
     def label(mapping: dict[str, str], key: str) -> str:

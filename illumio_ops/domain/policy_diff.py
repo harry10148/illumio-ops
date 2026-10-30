@@ -62,7 +62,7 @@ def _actors(items: Sequence[Any] | None, names: Mapping[str, str]) -> str:
                 tokens.append(f"{neg}{key}:{names.get(ref['href'], ref['href'])}")
                 break
         else:
-            if it.get("proto") is not None or it.get("port") is not None:
+            if any(it.get(k) is not None for k in ("proto", "port", "icmp_type", "icmp_code")):
                 tokens.append(_port(it))
             elif isinstance(it.get("href"), str):
                 tokens.append(f"service:{names.get(it['href'], it['href'])}")
@@ -72,10 +72,22 @@ def _actors(items: Sequence[Any] | None, names: Mapping[str, str]) -> str:
 
 
 def _port(it: Mapping[str, Any]) -> str:
+    """proto/port[-to_port], with ICMP type and code when given (final review #1: they are part of the service)."""
     if it.get("port") is None:
-        return f"proto:{it.get('proto')}"
-    text = f"{it.get('proto')}/{it['port']}"
-    return f"{text}-{it['to_port']}" if it.get("to_port") is not None else text
+        text = f"proto:{it.get('proto')}"
+    else:
+        text = f"{it.get('proto')}/{it['port']}"
+        if it.get("to_port") is not None:
+            text += f"-{it['to_port']}"
+    for key in ("icmp_type", "icmp_code"):
+        if it.get(key) is not None:
+            text += f" {key.split('_')[1]}:{it[key]}"
+    return text
+
+
+def draft_href(href: str) -> str:
+    """The Draft href an object's events name, also for an object removed in Draft (final review #3)."""
+    return href.replace("/sec_policy/active/", "/sec_policy/draft/", 1)
 
 
 def _rules(rs: Mapping[str, Any]) -> Iterator[tuple[dict[str, Any], str, str]]:

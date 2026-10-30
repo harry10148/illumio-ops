@@ -19,14 +19,17 @@ def fetch_rule_sets(client: PceClient, pversion: Version, *, deadline: float) ->
     sets = get_all(client, f"/sec_policy/{pversion}/rule_sets", params={}, deadline=deadline)
     for rs in sets:
         if "deny_rules" not in rs and rs.get("href"):
-            path = f"{rs['href']}/deny_rules"
-            resp = client.request("GET", path, org_scoped=False, timeout=60, deadline=deadline)
-            body = resp.json() if resp.status == 200 else None
-            if not isinstance(body, list):  # a failed read is not "no deny rules" (P3 final review #16)
-                raise PceCollectionIncomplete(path, 0, f"HTTP {resp.status}" if resp.status != 200 else
-                                              "response is not a list")
-            rs["deny_rules"] = body
+            # Read like any collection (P5c-3 final review #2): one GET took a full page as the whole set. A failed
+            # read raises — it is not "no deny rules" (P3 final review #16).
+            rs["deny_rules"] = get_all(client, f"{_org_relative(rs['href'])}/deny_rules", params={},
+                                       deadline=deadline)
     return sets
+
+
+def _org_relative(href: str) -> str:
+    """/orgs/1/sec_policy/... -> /sec_policy/... (the client adds the org)."""
+    parts = href.split("/", 3)
+    return f"/{parts[3]}" if len(parts) == 4 and parts[1] == "orgs" else href
 
 
 def fetch_objects(client: PceClient, pversion: Version, kind: str, *, deadline: float) -> list[dict[str, Any]]:

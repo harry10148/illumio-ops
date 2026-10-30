@@ -181,3 +181,25 @@ def test_expanded_referenced_object_high():
 def test_removed_object_medium_added_blank():
     ch = grade(diff_objects([ipl(D, 2)], [ipl(A, 3)], kind="ip_list", fields=IPL, names={}), {})
     assert {(c.change, c.risk) for c in ch} == {("added", ""), ("removed", "medium")}
+
+
+# ── final review (Codex, 2026-10-30) ─────────────────────────────────────────
+
+def test_icmp_type_change_detected():
+    """Review #1: ICMP type and code are part of a service; dropping them hid the change."""
+    svc = ["service_ports", "windows_services", "description"]
+    ch = diff_objects([{"href": f"{D}/services/1", "name": "Ping", "service_ports": [{"proto": 1}]}],
+                      [{"href": f"{A}/services/1", "name": "Ping", "service_ports": [{"proto": 1, "icmp_type": 8,
+                                                                                         "icmp_code": 0}]}],
+                      kind="service", fields=svc, names={})
+    assert [c.field for c in ch] == ["service_ports"]
+    rules = diff_rule_sets([rs(D, rules=[rule(D, 1, services=({"proto": 1},))])],
+                           [rs(A, rules=[rule(A, 1, services=({"proto": 1, "icmp_type": 8},))])], NAMES)
+    assert [c.field for c in rules] == ["services"]
+
+
+def test_removed_change_attributes_to_its_draft_href():
+    """Review #3: events name the Draft href; a removed item's href is the active one."""
+    from illumio_ops.domain.policy_diff import draft_href
+    [c] = [c for c in diff_rule_sets([rs(D)], [rs(A, rules=[rule(A, 4)])], NAMES) if c.kind == "rule"]
+    assert draft_href(c.href) == f"{D}/rule_sets/1/sec_rules/4"

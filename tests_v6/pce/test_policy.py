@@ -53,3 +53,17 @@ def test_failed_deny_rule_read_is_an_error_not_an_empty_list(client):
     responses.add(responses.GET, f"{ORG}/sec_policy/draft/rule_sets/2/deny_rules", status=500, json={})
     with pytest.raises(PceCollectionIncomplete):
         fetch_rule_sets(client, "draft", deadline=_deadline())
+
+
+@responses.activate
+def test_deny_rules_beyond_a_page_are_not_cut_short(client):
+    """P5c-3 final review #2: one GET of the deny_rules sub-collection took a full page as the whole collection."""
+    import pytest
+
+    from illumio_ops.pce.collections import PAGE_LIMIT, PceCollectionIncomplete
+    responses.add(responses.GET, f"{ORG}/sec_policy/draft/rule_sets", json=[
+        {"href": "/orgs/1/sec_policy/draft/rule_sets/2", "name": "big", "rules": []}])
+    responses.add(responses.GET, f"{ORG}/sec_policy/draft/rule_sets/2/deny_rules",
+                  json=[{"href": f"/orgs/1/sec_policy/draft/rule_sets/2/deny_rules/{i}"} for i in range(PAGE_LIMIT)])
+    with pytest.raises(PceCollectionIncomplete):  # the async read is not accepted here: fails, never 500 of 501
+        fetch_rule_sets(client, "draft", deadline=_deadline())
