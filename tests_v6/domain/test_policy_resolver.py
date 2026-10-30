@@ -589,7 +589,9 @@ def test_subtract_many_hosts_is_fast():
     excluded = {f"10.{i // 250}.{i % 250}.2" for i in range(5000)} | {"10.0.0.0/30"}
     t0 = time.monotonic()
     out = _subtract(kept, excluded)
-    assert out == kept[1:] and time.monotonic() - t0 < 1.0  # 10.0.0.1 is inside 10.0.0.0/30
+    elapsed = time.monotonic() - t0
+    assert out == kept[1:]  # 10.0.0.1 is inside 10.0.0.0/30
+    assert elapsed < 5.0  # was 28 s; 0.3 s here, a shared CI runner is slower (CI 2026-10-30 failed at 1.0)
 
 
 # ── final review (Codex, 2026-10-30): Illumio's own semantics, nothing silent ──

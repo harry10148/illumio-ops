@@ -21,7 +21,7 @@ def _load(name):
 
 
 # Items about something other than one config.json key: each rule, the new default rules, channel notes.
-DERIVED = ("(new) ", "rules[", "alerts.json", "alerts.channels.", "ILLUMIO_")
+DERIVED = ("(new) ", "rules[", "alerts.json", "alerts.channels.", "ILLUMIO_", "report_schedules[")
 
 
 def config_sources(report):
@@ -95,14 +95,14 @@ def test_phase_labels_follow_revised_roadmap():
     by_source = {i.source: i for i in report.items}
     assert by_source["smtp.host"].action == "carried" and by_source["smtp.host"].target == "alerts.channels.smtp.host"
     assert by_source["siem.enabled"].params == {"phase": "P7"}
-    assert by_source["report_schedules"].params == {"phase": "P5"}
+    assert by_source["report_schedules"].target == "reports.schedules"  # P5c-5: carried
     assert by_source["pce_cache.siem_pending_warn_rows"].params == {"phase": "P7"}
     assert by_source["settings.theme"].reason_key == "migrate_not_in_v6"
     assert by_source["api.profile"].action == "dropped"
     raw = _base()
     raw["web_gui"]["public_url"] = "https://ops.example.com"
     item = next(i for i in migrate_v5(raw).report.items if i.source == "web_gui.public_url")
-    assert item.params == {"phase": "P5"}
+    assert item.target == "reports.gui_external_url" and item.action == "carried"  # P5c-5
     assert not any(i.params.get("phase") in ("P2", "P3") for i in report.items)
 
 
@@ -326,5 +326,5 @@ def test_allowlist_with_no_valid_entry_blocks_instead_of_opening_up():
 def test_migrator_output_has_default_lateral(name):
     s = migrate_v5(_load(name)).settings
     assert s.schema_version == 8
-    assert s.reports.retention_days == 90
+    assert s.reports.retention_days == 30  # 5.x report.retention_days, carried (P5c-5)
     assert s.lateral.graph_hops == 3 and s.lateral.critical_assets == () and s.lateral.environment_label_key == "env"
