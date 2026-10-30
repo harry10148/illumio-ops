@@ -89,3 +89,18 @@ def test_catalog_lists_formats(ctx):
     from illumio_ops.services.reports.views import catalog
     entries = {e.report_type: e for e in catalog(ctx).entries}
     assert entries[ROWS_TYPE].formats == [J, C] and entries[ReportType.AUDIT].formats == [H, X]
+
+
+def test_csv_cells_cannot_be_formulas(ctx, monkeypatch):
+    """Security review: ruleset and service names come from the PCE; a cell starting = + - @ would run as a formula
+    in Excel. The same guard as the XLSX (render_xlsx.safe); the JSON keeps the value as is."""
+    def doc(inp):
+        return _doc(inp).model_copy(update={"export": RowsExport(columns=("ruleset", "n"),
+                                                                 rows=[("=HYPERLINK(\"x\")", 5), ("@cmd", -1)])})
+    registry.REGISTRY[ROWS_TYPE] = ReportSpec(report_type=ROWS_TYPE, group="policy", needs_traffic=False, build=doc,
+                                              formats=(J, C))
+    row = _run(ctx, (J, C))
+    out = ctx.paths.reports_dir / str(row.id)
+    rows = list(csv.reader(io.StringIO(next(out.glob("*.csv")).read_bytes().decode("utf-8-sig"))))
+    assert rows[1] == ["'=HYPERLINK(\"x\")", "5"] and rows[2] == ["'@cmd", "-1"]
+    assert json.loads(next(out.glob("*.json")).read_text())["rows"][0]["ruleset"] == "=HYPERLINK(\"x\")"

@@ -49,7 +49,7 @@ from illumio_ops.services.reports.registry import (
     specs,
 )
 from illumio_ops.services.reports.render_html import fmt_time, render_html
-from illumio_ops.services.reports.render_xlsx import render_xlsx
+from illumio_ops.services.reports.render_xlsx import render_xlsx, safe
 from illumio_ops.settings.schema import PceSettings, Settings
 from illumio_ops.store import reports as store
 from illumio_ops.store.flowdb.db import StaleGeneration
@@ -235,8 +235,9 @@ def _render(doc: ReportDocument, fmt: ReportFormat, tz: tzinfo | None) -> bytes:
         return json.dumps(body, ensure_ascii=False, indent=1).encode("utf-8")
     buf = io.StringIO()
     writer = csv.writer(buf, lineterminator="\r\n")
-    writer.writerow(ex.columns)
-    writer.writerows(ex.rows)
+    # Values come from the PCE (ruleset, service names): the XLSX guard keeps a cell from running as a formula.
+    writer.writerow([safe(c) for c in ex.columns])
+    writer.writerows([safe(c) for c in r] for r in ex.rows)
     return buf.getvalue().encode("utf-8-sig")  # the BOM: Excel reads UTF-8 only with it
 
 
