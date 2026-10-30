@@ -2093,5 +2093,9 @@
   "hosts_rw_unknown": "Unknown",
   "hosts_rw_allow_hint": "Sources a rule lets in still count as attack surface: that is the vendor's design.",
   "hosts_rw_allow_button": "Find the rules that let sources in (asks the PCE)",
-  "home_focus_more": "The top {shown} of {total} are shown: show all"
+  "home_focus_more": "The top {shown} of {total} are shown: show all",
+  "hosts_rw_details_stale": "The PCE's rating of this host changed after its details were read: the details below are older; the next inventory run reads them again.",
+  "hosts_rw_details_missing": "The ransomware details of this host have not been read from the PCE yet (or the reads failed): nothing can be said about its services.",
+  "hosts_rw_details_not_rated": "The PCE gives this host no ransomware protection rating.",
+  "home_focus_detections_capped": "{total} detections this week; the list was built from the top {considered}."
 }

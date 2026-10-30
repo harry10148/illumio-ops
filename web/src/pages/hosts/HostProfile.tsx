@@ -5,7 +5,7 @@ import { Link, useSearchParams } from "react-router-dom";
 
 import { type ApiError, call } from "../../api/client";
 import type {
-  DimensionTop, EndpointFilter, EventRow, FlowCondition1, FlowRow, HostProfile as Profile, HostRansomware, HostTamper,
+  Coverage, DimensionTop, EndpointFilter, EventRow, FlowCondition1, FlowRow, HostProfile as Profile, HostRansomware, HostTamper,
   PullInfo, SegmentDimension,
 } from "../../api/generated";
 import { formatTime } from "../../components/ProbeResults";
@@ -13,6 +13,7 @@ import { t, useLang } from "../../i18n";
 import { registerNav } from "../../shell/nav";
 import { SEVERITY_KEYS, word } from "../alerts/common";
 import type { Req } from "../workbench/conditions";
+import { Pulled } from "../workbench/Workbench";
 
 // Literal maps: i18n keys are never built from data.
 const MODE_KEYS: Record<string, string> = {
@@ -31,6 +32,9 @@ const CLASS_KEYS: Record<string, string> = {
   priority: "rpt_rw_sec_priority", safe_to_block: "rpt_rw_sec_safe", suspicious: "rpt_rw_sec_suspicious",
   protected: "hosts_rw_protected", unknown: "hosts_rw_unknown",
 };
+const DETAILS_KEYS: Record<string, string> = {
+  stale: "hosts_rw_details_stale", missing: "hosts_rw_details_missing", not_rated: "hosts_rw_details_not_rated",
+};
 const ALLOW_KEYS: Record<string, string> = { error: "rpt_rw_allow_error", partial: "rpt_rw_allow_partial" };
 const PERIODS: [string, number][] = [["wb_period_1h", 1], ["wb_period_1d", 24], ["wb_period_7d", 168]];
 const READINGS_SHOWN = 50;
@@ -42,6 +46,17 @@ function period(hours: number): { start: string; end: string } {
 
 function investigate(req: Req): string {
   return `/investigate?${new URLSearchParams({ q: JSON.stringify(req) }).toString()}`;
+}
+
+/** What the numbers below do not include (a gap in the collection, a PCE answer cut at its limit): never silent. */
+function Caveats({ coverage, limitHit }: { coverage: Coverage; limitHit?: boolean }) {
+  return (
+    <>
+      {coverage.gaps.length > 0 && <p className="notice" data-role="caveat">{t("wb_gaps", { n: String(coverage.gaps.length) })}</p>}
+      {coverage.truncated && <p className="notice" data-role="caveat">{t("wb_truncated")}</p>}
+      {limitHit && <p className="hint" data-role="caveat">{t("wb_limit_hit")}</p>}
+    </>
+  );
 }
 
 function shownKey(key: string, display: string | null | undefined): string {
@@ -81,6 +96,7 @@ function HostTop({ title, req, dimension, hostLinks, onPulled }: {
       </div>
       {error && <p className="form-error">{t(error.message_key, error.params)}</p>}
       {!top && !error && <p className="muted">{t("loading")}</p>}
+      {top && <Caveats coverage={top.coverage} />}
       {top && top.rows.length === 0 && <p className="muted">{t("wb_dim_none")}</p>}
       {top && top.rows.length > 0 && (
         <table className="table">
@@ -106,6 +122,7 @@ function HostTop({ title, req, dimension, hostLinks, onPulled }: {
 function Events({ href, span, onPulled }: { href: string; span: { start: string; end: string }; onPulled: (p: PullInfo) => void }) {
   const lang = useLang();
   const [rows, setRows] = useState<EventRow[] | null>(null);
+  const [caveat, setCaveat] = useState<{ coverage: Coverage; limitHit: boolean } | null>(null);
   const [error, setError] = useState<ApiError | null>(null);
   const req = useMemo<Req>(() => ({ mode: "events", view: "detail", host_hrefs: [href], limit: 50, ...span }), [href, span]);
 
@@ -116,6 +133,7 @@ function Events({ href, span, onPulled }: { href: string; span: { start: string;
       if (!live) return;
       if (env.ok && env.data) {
         setRows((env.data.result.detail ?? []) as EventRow[]);
+        setCaveat({ coverage: env.data.result.coverage, limitHit: env.data.result.limit_hit });
         if (env.data.pulled) onPulled(env.data.pulled);
       } else setError(env.error);
     });
@@ -128,6 +146,7 @@ function Events({ href, span, onPulled }: { href: string; span: { start: string;
       <div className="row"><h3>{t("hosts_events")}</h3><Link to={investigate(req)}>{t("hosts_open_workbench")}</Link></div>
       {error && <p className="form-error">{t(error.message_key, error.params)}</p>}
       {!rows && !error && <p className="muted">{t("loading")}</p>}
+      {caveat && <Caveats coverage={caveat.coverage} limitHit={caveat.limitHit} />}
       {rows && rows.length === 0 && <p className="muted">{t("wb_empty")}</p>}
       {rows && rows.length > 0 && (
         <div className="table-wrap">
@@ -308,7 +327,7 @@ function Ransomware({ hostKey, initial }: { hostKey: string; initial: HostRansom
                       <td>
                         {status && ALLOW_KEYS[status] ? t(ALLOW_KEYS[status]) : null}
                         {rules === undefined ? "—" : rules.length === 0 ? (status === "ok" ? t("rpt_rw_allow_none") : null)
-                          : rules.map((r) => r.ruleset_name).join("、")}
+                          : rules.map((r) => `${r.ruleset_name}：${r.description || r.href.split("/").pop()}`).join("、")}
                       </td>
                     )}
                   </tr>
@@ -341,12 +360,15 @@ export function HostProfile() {
   const [seenAs, setSeenAs] = useState<string | null>(null);
 
   useEffect(() => {
+    let live = true;  // a slower answer for the host left behind must not replace this one
     setProfile(null);
     setError(null);
     void call("hosts.profile", undefined, undefined, { key }).then((env) => {
+      if (!live) return;
       if (env.ok && env.data) setProfile(env.data);
       else setError(env.error);
     });
+    return () => { live = false; };
   }, [key]);
 
   // No name in the store (lightweight mode keeps no flows): the name or address its own traffic carries.
@@ -411,10 +433,7 @@ export function HostProfile() {
           </p>
         )}
       </div>
-      {pulled && (
-        <p className="hint" data-role="pulled">{t("wb_pulled", { start: formatTime(pulled.start, lang), end: formatTime(pulled.end, lang),
-          rows: pulled.rows.toLocaleString(), at: formatTime(pulled.read_at, lang) })}</p>
-      )}
+      {pulled && <Pulled info={pulled} />}
       <div className="host-grid">
         <HostTop title={t("hosts_who_connects")} req={into} dimension="src_host" hostLinks onPulled={setPulled} />
         <HostTop title={t("hosts_ports")} req={into} dimension="service" hostLinks={false} onPulled={setPulled} />
@@ -426,7 +445,12 @@ export function HostProfile() {
       {profile.managed && <Events href={profile.key} span={span} onPulled={setPulled} />}
       {profile.tamper && <Tamper hostKey={profile.key} href={profile.key} tamper={profile.tamper} onChange={setProfile} />}
       {profile.ransomware_unsupported && <p className="notice">{t("rpt_rw_unsupported")}</p>}
-      {profile.ransomware && <Ransomware hostKey={profile.key} initial={profile.ransomware} />}
+      {profile.ransomware_details && profile.ransomware_details !== "ok" && (
+        <p className="notice" data-role="rw-details">{word(DETAILS_KEYS, profile.ransomware_details)}</p>
+      )}
+      {profile.ransomware && profile.ransomware_details !== "not_rated" && profile.ransomware_details !== "missing" && (
+        <Ransomware hostKey={profile.key} initial={profile.ransomware} />
+      )}
     </section>
   );
 }

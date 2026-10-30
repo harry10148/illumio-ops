@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field
 from illumio_ops.domain.values import TamperPattern
 from illumio_ops.services import hosts
 from illumio_ops.services.analysis.ransomware import HostRansomware
+from illumio_ops.services.collect.guard import BindingMismatch
 from illumio_ops.services.hosts import HostProfile
 from illumio_ops.web.auth import get_ctx
 from illumio_ops.web.contract import ApiFailure, api_route, operation
@@ -33,6 +34,10 @@ OP_NOTE_REMOVE = operation("hosts.tamper_note_remove", "POST", "/api/hosts/tampe
 bp = Blueprint("hosts", __name__)
 
 
+def _switched() -> ApiFailure:
+    return ApiFailure(409, "pce_switched", "wb_pce_switched")
+
+
 def _invalid() -> ApiFailure:
     return ApiFailure(400, "invalid_input", "err_invalid_input", field="key")  # never echo input
 
@@ -41,6 +46,8 @@ def _invalid() -> ApiFailure:
 def profile() -> HostProfile:
     try:
         return hosts.profile(get_ctx(), request.args.get("key", ""))
+    except BindingMismatch:
+        raise _switched() from None
     except ValueError:
         raise _invalid() from None
 
@@ -49,6 +56,8 @@ def profile() -> HostProfile:
 def ransomware_allows(body: HostKey) -> HostRansomware:
     try:
         return hosts.ransomware_allows(get_ctx(), body.key)
+    except BindingMismatch:
+        raise _switched() from None
     except ValueError:
         raise _invalid() from None
 
@@ -60,6 +69,8 @@ def tamper_note_add(body: TamperNoteAdd) -> HostProfile:
         hosts.add_tamper_note(ctx, body.key, pattern=body.pattern, process=body.process, reason=body.reason,
                               by=str(current_user.get_id()))
         return hosts.profile(ctx, body.key)
+    except BindingMismatch:
+        raise _switched() from None
     except ValueError:
         raise _invalid() from None
 
@@ -68,7 +79,12 @@ def tamper_note_add(body: TamperNoteAdd) -> HostProfile:
 def tamper_note_remove(body: HostKey, note_id: int) -> HostProfile:
     ctx = get_ctx()
     try:
-        hosts.remove_tamper_note(ctx, note_id)
-        return hosts.profile(ctx, body.key)
+        hosts.parse_key(body.key)  # refused before anything is removed
     except ValueError:
+        raise _invalid() from None
+    hosts.remove_tamper_note(ctx, note_id)
+    try:
+        return hosts.profile(ctx, body.key)
+    except BindingMismatch:
+        raise _switched() from None
         raise _invalid() from None

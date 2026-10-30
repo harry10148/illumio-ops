@@ -19,6 +19,7 @@ from illumio_ops.domain.values import (
 )
 from illumio_ops.services import workbench
 from illumio_ops.services.analysis.focus import STALE_AFTER
+from illumio_ops.services.collect.guard import require_same_pce
 from illumio_ops.services.context import AppContext
 from illumio_ops.services.flowsource import host_addresses
 from illumio_ops.services.hosts import WORKLOAD_HREF
@@ -55,6 +56,8 @@ class FocusView(BaseModel):
     stale: bool
     items: list[FocusEntry]
     sources_status: dict[str, str]
+    detections_total: int = 0       # detections of the last 7 days ...
+    detections_considered: int = 0  # ... of which the list was built from (the builder keeps the top 500)
 
 
 def _workbench(req: workbench.FlowRequest | workbench.EventRequest) -> FocusLink:
@@ -98,6 +101,7 @@ def _named(ctx: AppContext, items: list[dict[str, Any]]) -> list[dict[str, Any]]
 def focus_view(ctx: AppContext, *, now: datetime | None = None) -> FocusView:
     at = (now or datetime.now(UTC)).astimezone(UTC)
     with ctx.flows().connect() as conn:
+        require_same_pce(conn, ctx.settings.current().pce)  # a switch not yet cleared: not the previous PCE's list
         row = analysis.read_result(conn, "focus")
     if row is None:
         return FocusView(computed_at=None, stale=False, items=[], sources_status={})
@@ -105,5 +109,8 @@ def focus_view(ctx: AppContext, *, now: datetime | None = None) -> FocusView:
     computed = datetime.fromisoformat(result["computed_at"])
     items = [FocusEntry(**{k: v for k, v in it.items() if k != "action"}, link=_link(it, computed))
              for it in _named(ctx, list(result.get("items") or ()))]
+    detections = result.get("detections") or {}
     return FocusView(computed_at=computed, stale=computed < at - STALE_AFTER, items=items,
-                     sources_status=dict(result.get("sources_status") or {}))
+                     sources_status=dict(result.get("sources_status") or {}),
+                     detections_total=int(detections.get("total") or 0),
+                     detections_considered=int(detections.get("considered") or 0))

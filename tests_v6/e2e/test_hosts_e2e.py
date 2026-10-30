@@ -84,3 +84,38 @@ def test_unnamed_host_named_from_its_traffic(context, live_app):
     page.route("**/api/hosts/profile*", unnamed)
     page.goto(f"{live_app.url}/hosts?key={DB}")
     expect(page.locator("h1")).to_have_text("db")
+
+
+def test_late_profile_does_not_replace_current(context, live_app):
+    """Final review #5: open B from A's page, go back to A before B answers; B's late answer must not show under A."""
+    _seed(live_app)
+    page = context.new_page()
+    sign_in(page, live_app.url)
+    held = []
+    page.route("**/api/hosts/profile*adm*", lambda route: held.append(route))
+    page.goto(f"{live_app.url}/hosts?key={DB}")
+    expect(page.locator("h1")).to_have_text("db")
+    page.locator("[data-section=src_host]").first.locator("a", has_text="adm").click()
+    page.wait_for_timeout(500)
+    page.go_back()
+    expect(page.locator("h1")).to_have_text("db")
+    held[0].continue_()
+    page.wait_for_timeout(1500)
+    expect(page.locator("h1")).to_have_text("db")
+
+
+def test_cut_answer_is_said(context, live_app):
+    """Final review #2: a section whose answer was cut at the PCE's limit says so, rather than looking complete."""
+    import json as _json
+    _seed(live_app)
+    page = context.new_page()
+    sign_in(page, live_app.url)
+
+    def truncated(route):
+        resp = route.fetch()
+        body = _json.loads(resp.text())
+        body["data"]["coverage"]["truncated"] = True
+        route.fulfill(response=resp, body=_json.dumps(body))
+    page.route("**/api/workbench/dimension", truncated)
+    page.goto(f"{live_app.url}/hosts?key={DB}")
+    expect(page.locator("[data-section=src_host] [data-role=caveat]").first).to_have_count(1)

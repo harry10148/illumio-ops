@@ -105,3 +105,26 @@ def test_focus_hosts_named(ctx):
     _store(ctx, items)
     got = [i.params for i in home.focus_view(ctx, now=NOW).items]
     assert got == [{"host": "k8s-node02", "targets": 4}, {"host": ip, "account": ip}, {"host": "web01"}]
+
+
+def test_focus_of_another_pce_refused(ctx):
+    """Final review #1: a PCE switch whose clearing has not finished must not show the previous PCE's list."""
+    from illumio_ops.services.collect.guard import BindingMismatch, ensure_binding
+    with ctx.flows().connect() as conn:
+        ensure_binding(conn, ctx.settings.current().pce, NOW)
+        conn.commit()
+    _store(ctx, [_item("tamper", "host", host_key="/orgs/1/workloads/w1")])
+    ctx.settings.update(ctx.settings.current().revision, lambda d: d["pce"].update(url="https://pce-b.example:8443"))
+    with pytest.raises(BindingMismatch):
+        home.focus_view(ctx, now=NOW)
+
+
+def test_focus_detections_considered_carried(ctx):
+    """Final review #7: the builder keeps the top 500 detections of a week; the page says when there were more."""
+    with ctx.flows().connect() as conn:
+        analysis.write_result(conn, "focus", params={}, result={
+            "computed_at": NOW.isoformat(), "items": [], "sources_status": {},
+            "detections": {"total": 600, "considered": 500}, "traffic_computed_at": None}, at=NOW)
+        conn.commit()
+    v = home.focus_view(ctx, now=NOW)
+    assert (v.detections_total, v.detections_considered) == (600, 500)

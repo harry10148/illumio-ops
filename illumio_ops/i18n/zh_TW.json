@@ -2093,5 +2093,9 @@
   "hosts_rw_unknown": "無法判斷",
   "hosts_rw_allow_hint": "被規則允許的來源仍算攻擊面，這是原廠刻意的設計。",
   "hosts_rw_allow_button": "查出允許來源的規則（向 PCE 查詢）",
-  "home_focus_more": "顯示前 {shown} 項，共 {total} 項：顯示全部"
+  "home_focus_more": "顯示前 {shown} 項，共 {total} 項：顯示全部",
+  "hosts_rw_details_stale": "PCE 對這台主機的評等在讀取明細後有變：以下明細較舊，下一輪清冊收集會重讀。",
+  "hosts_rw_details_missing": "還沒從 PCE 讀到這台主機的勒索防護明細（或讀取失敗）：無法判斷它的服務。",
+  "hosts_rw_details_not_rated": "PCE 沒有給這台主機勒索防護評等。",
+  "home_focus_detections_capped": "本週有 {total} 則偵測，清單只納入排名前 {considered} 則。"
 }

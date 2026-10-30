@@ -82,7 +82,13 @@ function Focus() {
           ))}
         </ul>
       )}
-      {view?.computed_at && view.items.length === 0 && problems.length === 0 && <p className="muted">{t("home_focus_empty")}</p>}
+      {view?.computed_at && !view.stale && view.items.length === 0 && problems.length === 0 && (
+        <p className="muted">{t("home_focus_empty")}</p>
+      )}
+      {view && (view.detections_total ?? 0) > (view.detections_considered ?? 0) && (
+        <p className="notice" data-role="focus-detections-capped">{t("home_focus_detections_capped", {
+          total: String(view.detections_total), considered: String(view.detections_considered) })}</p>
+      )}
       {view && view.items.length > 0 && (
         <ol className="focus-list">{(all ? view.items : view.items.slice(0, TOP)).map((it) => <FocusItem key={it.fingerprint} item={it} />)}</ol>
       )}

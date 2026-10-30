@@ -9,9 +9,10 @@ from pydantic import BaseModel
 from illumio_ops.jobs.health import list_health
 from illumio_ops.jobs.scheduler import PCE_PROBE_SECONDS, job_intervals
 from illumio_ops.services import home, pce_health
+from illumio_ops.services.collect.guard import BindingMismatch
 from illumio_ops.services.home import FocusView
 from illumio_ops.web.auth import get_ctx
-from illumio_ops.web.contract import api_route, operation
+from illumio_ops.web.contract import ApiFailure, api_route, operation
 from illumio_ops.web.routes.system_pce import ProbeItem, _items
 
 
@@ -81,4 +82,7 @@ def home_summary() -> HomeSummary:
 
 @api_route(bp, OP_FOCUS)
 def home_focus() -> FocusView:
-    return home.focus_view(get_ctx())
+    try:
+        return home.focus_view(get_ctx())
+    except BindingMismatch:
+        raise ApiFailure(409, "pce_switched", "wb_pce_switched") from None

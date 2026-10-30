@@ -69,7 +69,7 @@ function Coverage({ result, bytes }: { result: SegmentResult; bytes: boolean }) 
   );
 }
 
-function Pulled({ info }: { info: PullInfo }) {
+export function Pulled({ info }: { info: PullInfo }) {
   const lang = useLang();
   return (
     <div className="stack" data-role="pulled">

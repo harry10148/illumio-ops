@@ -66,3 +66,34 @@ def test_tamper_note_explains_readings(ctx):
     hosts.remove_tamper_note(ctx, note)
     p = hosts.profile(ctx, HOST, now=NOW + timedelta(seconds=1))
     assert p.tamper is not None and p.tamper.explained == {}
+
+
+def test_host_of_another_pce_refused(ctx):
+    """Final review #1: the exposure slice and the tamper reading of a PCE whose clearing has not finished."""
+    from illumio_ops.services.collect.guard import BindingMismatch, ensure_binding
+    with ctx.flows().connect() as conn:
+        ensure_binding(conn, ctx.settings.current().pce, NOW)
+        conn.commit()
+    ctx.settings.update(ctx.settings.current().revision, lambda d: d["pce"].update(url="https://pce-b.example:8443"))
+    for key in (HOST, "ip:10.0.0.9"):
+        with pytest.raises(BindingMismatch):
+            hosts.profile(ctx, key, now=NOW)
+
+
+def test_ransomware_details_state(ctx):
+    """Final review #3: details never read (or failed) are not "no high-risk service"."""
+    from illumio_ops.store.flowdb import ransomware as rstore
+    p = hosts.profile(ctx, HOST, now=NOW)
+    assert p.ransomware_details == "not_rated"  # the PCE gave this host no rating
+    with ctx.flows().connect() as conn:
+        conn.execute("UPDATE workloads SET risk_percent = 40, risk_updated_at = '2026-10-29T00:00:00Z'")
+        conn.commit()
+    assert hosts.profile(ctx, HOST, now=NOW).ransomware_details == "missing"
+    with ctx.flows().connect() as conn:
+        rstore.upsert_services(conn, HOST, [], source_updated_at="2026-10-28T00:00:00Z", at=NOW)
+        conn.commit()
+    assert hosts.profile(ctx, HOST, now=NOW).ransomware_details == "stale"
+    with ctx.flows().connect() as conn:
+        rstore.upsert_services(conn, HOST, [], source_updated_at="2026-10-29T00:00:00Z", at=NOW)
+        conn.commit()
+    assert hosts.profile(ctx, HOST, now=NOW).ransomware_details == "ok"

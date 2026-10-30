@@ -52,3 +52,22 @@ def test_long_list_shows_the_top_first(context, live_app):
     expect(page.locator(".focus-item")).to_have_count(10)
     page.click("[data-role=focus-more]")
     expect(page.locator(".focus-item")).to_have_count(12)
+
+
+def _write(live_app, *, at, items=(), detections=None):
+    with live_app.ctx.flows().connect() as conn:
+        analysis.write_result(conn, "focus", params={}, result={
+            "computed_at": at.isoformat(), "items": list(items), "sources_status": {},
+            "detections": detections or {"total": 0, "considered": 0}, "traffic_computed_at": None}, at=at)
+        conn.commit()
+
+
+def test_stale_empty_list_is_not_all_clear(context, live_app):
+    """Final review #6: an empty list the hourly run stopped updating is not "nothing to look at"."""
+    from datetime import timedelta
+    _write(live_app, at=datetime.now(UTC) - timedelta(hours=3), detections={"total": 600, "considered": 500})
+    page = context.new_page()
+    sign_in(page, live_app.url)
+    page.goto(f"{live_app.url}/")
+    expect(page.locator("[data-role=focus-detections-capped]")).to_have_count(1)  # final review #7
+    expect(page.locator("[data-role=focus] p.muted")).to_have_count(0)

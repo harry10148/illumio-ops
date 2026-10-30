@@ -77,3 +77,16 @@ def test_home_focus(client, ctx):
     login(client)
     data = client.get("/api/home/focus", environ_overrides=LOCAL).get_json()["data"]
     assert data["computed_at"] is None and data["items"] == []
+
+
+def test_switch_not_cleared_is_409(client, ctx):
+    """Final review #1: before a PCE switch is cleared the store holds the previous PCE's data: refused, not 500."""
+    from illumio_ops.services.collect.guard import ensure_binding
+    _seed(ctx)
+    with ctx.flows().connect() as conn:
+        ensure_binding(conn, ctx.settings.current().pce, datetime(2026, 10, 27, tzinfo=UTC))
+        conn.commit()
+    ctx.settings.update(ctx.settings.current().revision, lambda d: d["pce"].update(url="https://pce-b.example:8443"))
+    login(client)
+    assert client.get("/api/home/focus", environ_overrides=LOCAL).status_code == 409
+    assert post(client, "/api/workbench/run", {"request": REQ}).status_code == 409

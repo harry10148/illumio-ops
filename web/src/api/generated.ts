@@ -710,6 +710,8 @@ route: string
  */
 export interface FocusView {
 computed_at: (string | null)
+detections_considered?: number
+detections_total?: number
 items: FocusEntry[]
 sources_status: {
 [k: string]: string
@@ -931,6 +933,7 @@ labels: {
 managed: boolean
 name: string
 ransomware: (HostRansomware | null)
+ransomware_details?: (("ok" | "stale" | "missing" | "not_rated") | null)
 ransomware_unsupported: boolean
 tamper: (HostTamper | null)
 }

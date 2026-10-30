@@ -10165,6 +10165,16 @@
             ],
             "title": "Computed At"
           },
+          "detections_considered": {
+            "default": 0,
+            "title": "Detections Considered",
+            "type": "integer"
+          },
+          "detections_total": {
+            "default": 0,
+            "title": "Detections Total",
+            "type": "integer"
+          },
           "items": {
             "items": {
               "$ref": "#/$defs/FocusEntry"
@@ -11502,6 +11512,24 @@
                 "type": "null"
               }
             ]
+          },
+          "ransomware_details": {
+            "anyOf": [
+              {
+                "enum": [
+                  "ok",
+                  "stale",
+                  "missing",
+                  "not_rated"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Ransomware Details"
           },
           "ransomware_unsupported": {
             "title": "Ransomware Unsupported",
@@ -13310,6 +13338,24 @@
               }
             ]
           },
+          "ransomware_details": {
+            "anyOf": [
+              {
+                "enum": [
+                  "ok",
+                  "stale",
+                  "missing",
+                  "not_rated"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Ransomware Details"
+          },
           "ransomware_unsupported": {
             "title": "Ransomware Unsupported",
             "type": "boolean"
@@ -14563,6 +14609,24 @@
                 "type": "null"
               }
             ]
+          },
+          "ransomware_details": {
+            "anyOf": [
+              {
+                "enum": [
+                  "ok",
+                  "stale",
+                  "missing",
+                  "not_rated"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Ransomware Details"
           },
           "ransomware_unsupported": {
             "title": "Ransomware Unsupported",
