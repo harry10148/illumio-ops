@@ -9,6 +9,7 @@ import { formatTime } from "../../components/ProbeResults";
 import { t, useLang } from "../../i18n";
 import { registerNav } from "../../shell/nav";
 import { QuarantineDialog, type QuarantineHost } from "../quarantine/QuarantineDialog";
+import { Predicted } from "./Predicted";
 import { type Dim, EVENT_DIMS, FLOW_DIMS, OPEN_BY_DEFAULT, type Req, addValue, chips, chosen, dimId } from "./conditions";
 
 // Literal maps: i18n keys are never built from data.
@@ -427,6 +428,7 @@ export function Workbench() {
                 : <Detail result={result} mode={req.mode} />}
             </>
           )}
+          {req.mode === "flows" && <Predicted req={req} />}
         </div>
       </div>
     </section>

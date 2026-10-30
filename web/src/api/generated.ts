@@ -2353,6 +2353,40 @@ request: (FlowRequest | EventRequest)
 }
 /**
  * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "PredictedBlock".
+ */
+export interface PredictedBlock {
+capped: boolean
+computed_at: string
+limit_hit: boolean
+missing_rules: string[]
+rows: PredictedRow[]
+rules: {
+[k: string]: RuleRef
+}
+unsupported: boolean
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "PredictedRow".
+ */
+export interface PredictedRow {
+allow_rules: string[]
+blocking_rules: string[]
+draft_decision: string
+essential_service_rules: string[]
+flow: FlowRow
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "PredictedView".
+ */
+export interface PredictedView {
+predicted: PredictedBlock
+request: FlowRequest
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
  * via the `definition` "EventRow".
  */
 export interface EventRow {
@@ -2397,7 +2431,7 @@ pulled: (PullInfo | null)
 result: SegmentResult
 }
 
-export type OpId = "alert_rules.create" | "alert_rules.delete" | "alert_rules.list" | "alert_rules.pack" | "alert_rules.preview" | "alert_rules.update" | "alerts.evidence" | "alerts.explain" | "alerts.get" | "alerts.list" | "alerts.mark_known" | "alerts.note_add" | "auth.csrf" | "auth.login" | "auth.logout" | "auth.me" | "auth.password" | "home.focus" | "home.summary" | "hosts.profile" | "hosts.ransomware_allows" | "hosts.tamper_note_add" | "hosts.tamper_note_remove" | "i18n.dictionary" | "lateral.compute" | "lateral.simulate" | "lateral.view" | "quarantine.apply" | "quarantine.history" | "quarantine.preview" | "quarantine.remove" | "report_schedules.create" | "report_schedules.delete" | "report_schedules.list" | "report_schedules.run_now" | "report_schedules.update" | "reports.catalog" | "reports.delete" | "reports.generate" | "reports.get" | "reports.list" | "rhc.enable" | "rhc.status" | "system.channels.get" | "system.channels.test" | "system.channels.update" | "system.collection.backfill" | "system.collection.get" | "system.collection.status" | "system.collection.update" | "system.display.get" | "system.display.update" | "system.jobs.list" | "system.lateral.get" | "system.lateral.known" | "system.lateral.known_delete" | "system.lateral.update" | "system.logs.query" | "system.pce.get" | "system.pce.latest" | "system.pce.probe" | "system.pce.update" | "system.reports.get" | "system.reports.update" | "system.security.get" | "system.security.update" | "system.tls.csr" | "system.tls.import" | "system.tls.renew" | "system.tls.status" | "system.tls.update" | "workbench.dimension" | "workbench.from_alert" | "workbench.meta" | "workbench.run";
+export type OpId = "alert_rules.create" | "alert_rules.delete" | "alert_rules.list" | "alert_rules.pack" | "alert_rules.preview" | "alert_rules.update" | "alerts.evidence" | "alerts.explain" | "alerts.get" | "alerts.list" | "alerts.mark_known" | "alerts.note_add" | "auth.csrf" | "auth.login" | "auth.logout" | "auth.me" | "auth.password" | "home.focus" | "home.summary" | "hosts.profile" | "hosts.ransomware_allows" | "hosts.tamper_note_add" | "hosts.tamper_note_remove" | "i18n.dictionary" | "lateral.compute" | "lateral.simulate" | "lateral.view" | "quarantine.apply" | "quarantine.history" | "quarantine.preview" | "quarantine.remove" | "report_schedules.create" | "report_schedules.delete" | "report_schedules.list" | "report_schedules.run_now" | "report_schedules.update" | "reports.catalog" | "reports.delete" | "reports.generate" | "reports.get" | "reports.list" | "rhc.enable" | "rhc.status" | "system.channels.get" | "system.channels.test" | "system.channels.update" | "system.collection.backfill" | "system.collection.get" | "system.collection.status" | "system.collection.update" | "system.display.get" | "system.display.update" | "system.jobs.list" | "system.lateral.get" | "system.lateral.known" | "system.lateral.known_delete" | "system.lateral.update" | "system.logs.query" | "system.pce.get" | "system.pce.latest" | "system.pce.probe" | "system.pce.update" | "system.reports.get" | "system.reports.update" | "system.security.get" | "system.security.update" | "system.tls.csr" | "system.tls.import" | "system.tls.renew" | "system.tls.status" | "system.tls.update" | "workbench.dimension" | "workbench.from_alert" | "workbench.meta" | "workbench.predicted" | "workbench.run";
 
 export interface Requests {
   "alert_rules.create": RuleWrite;
@@ -2474,6 +2508,7 @@ export interface Requests {
   "workbench.dimension": WorkbenchDimension;
   "workbench.from_alert": undefined;
   "workbench.meta": undefined;
+  "workbench.predicted": WorkbenchRun;
   "workbench.run": WorkbenchRun;
 }
 
@@ -2552,6 +2587,7 @@ export interface Responses {
   "workbench.dimension": DimensionTop;
   "workbench.from_alert": WorkbenchStart;
   "workbench.meta": WorkbenchMeta;
+  "workbench.predicted": PredictedView;
   "workbench.run": WorkbenchResult;
 }
 
@@ -2630,6 +2666,7 @@ export const OPERATIONS = {
   "workbench.dimension": { method: "POST", path: "/api/workbench/dimension" },
   "workbench.from_alert": { method: "GET", path: "/api/workbench/from-alert/<int:alert_id>" },
   "workbench.meta": { method: "GET", path: "/api/workbench/meta" },
+  "workbench.predicted": { method: "POST", path: "/api/workbench/predicted" },
   "workbench.run": { method: "POST", path: "/api/workbench/run" },
 } as const satisfies Record<OpId, { method: string; path: string }>;
 

@@ -264,3 +264,7 @@ code.cmd { white-space: pre-wrap; word-break: break-all; font-size: var(--fs-min
 [data-role=quarantine] { border: 1px solid var(--tone-warn-border); }
 [data-role=quarantine] .row:first-child { justify-content: space-between; align-items: baseline; }
 .q-detail { overflow-wrap: anywhere; max-width: 32rem; }
+
+/* Predicted blocks (P6e) */
+.pred-rules { overflow-wrap: anywhere; min-width: 18rem; }
+.pred-rules > div + div { margin-top: var(--space-1); }
