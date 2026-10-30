@@ -72,3 +72,15 @@ def test_level_states():
     # only in draft: not provisioned yet
     assert level_states(active=none, draft=active)["Severe"] == "draft_only"
     assert set(LEVELS) == {"Mild", "Moderate", "Severe"}
+
+
+def test_scope_counts_only_with_an_enabled_rule():
+    """Final review #4: a rule set scoped to Severe whose rules are all turned off isolates nothing."""
+    rs = {"name": "Q-scope", "enabled": True, "scopes": [[{"label": {"href": SEV}}]],
+          "rules": [{"enabled": False, "consumers": [{"actors": "ams"}], "providers": [{"actors": "ams"}],
+                     "ingress_services": []}], "deny_rules": []}
+    refs = policy_refs([rs], HREFS)
+    assert level_states(active=refs, draft=refs)["Severe"] == "disabled"
+    on = {**rs, "rules": [{**rs["rules"][0], "enabled": True}]}
+    refs = policy_refs([on], HREFS)
+    assert level_states(active=refs, draft=refs)["Severe"] == "active"

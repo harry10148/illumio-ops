@@ -19,6 +19,10 @@ def add(conn: sqlite3.Connection, *, pce_url: str, org_id: str, at: datetime, by
     return int(cur.lastrowid or 0)
 
 
+def finish(conn: sqlite3.Connection, action_id: int, *, result: str, detail: str | None) -> None:
+    conn.execute("UPDATE quarantine_actions SET result = ?, detail = ? WHERE id = ?", (result, detail, action_id))
+
+
 def recent(conn: sqlite3.Connection, *, pce_url: str, org_id: str, workload_href: str | None,
            limit: int) -> list[sqlite3.Row]:
     sql = "SELECT * FROM quarantine_actions WHERE pce_url = ? AND org_id = ?"

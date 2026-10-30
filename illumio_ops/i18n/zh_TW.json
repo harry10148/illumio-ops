@@ -2275,5 +2275,11 @@
   "q_err_no_write_key": "隔離需要選填的寫入用 key：請在 PCE 連線設定填寫。",
   "q_err_no_policy": "沒有生效的政策引用這個等級：請確認仍要套上 Label。",
   "q_err_pce": "PCE 無法回應：{error}",
-  "q_err_pce_not_configured": "尚未設定 PCE 連線。"
+  "q_err_pce_not_configured": "尚未設定 PCE 連線。",
+  "q_status_unknown": "不確定：沒有收到 PCE 的回應，請到 PCE 確認該 Workload",
+  "q_status_refused": "拒絕",
+  "q_status_pending": "未完成",
+  "q_detail_pce_changed": "批次進行中 PCE 連線被更換：未寫入。",
+  "q_detail_no_policy": "沒有生效的政策且未確認。",
+  "q_detail_no_write_key": "未設定寫入用 key。"
 }

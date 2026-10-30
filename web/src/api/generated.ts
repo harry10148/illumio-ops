@@ -1265,7 +1265,7 @@ detail: (string | null)
 key: string
 name: string
 previous: (string | null)
-status: ("ok" | "failed" | "skipped" | "not_quarantined")
+status: ("ok" | "failed" | "skipped" | "not_quarantined" | "unknown")
 }
 /**
  * This interface was referenced by `ContractRoot`'s JSON-Schema
@@ -1321,6 +1321,9 @@ level: string
  * via the `definition` "QuarantineCheck".
  */
 export interface QuarantineCheck {
+all_labels: {
+[k: string]: string
+}
 labels: {
 [k: string]: string | null
 }

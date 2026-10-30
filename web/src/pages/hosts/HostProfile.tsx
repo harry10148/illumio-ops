@@ -13,7 +13,7 @@ import { t, useLang } from "../../i18n";
 import { registerNav } from "../../shell/nav";
 import { SEVERITY_KEYS, word } from "../alerts/common";
 import type { Req } from "../workbench/conditions";
-import { LEVEL_KEYS, Outcome, QuarantineDialog, STATUS_KEYS, nonEmpty } from "../quarantine/QuarantineDialog";
+import { DETAIL_KEYS, LEVEL_KEYS, Outcome, QuarantineDialog, STATUS_KEYS, nonEmpty } from "../quarantine/QuarantineDialog";
 import { Pulled } from "../workbench/Workbench";
 
 // Literal maps: i18n keys are never built from data.
@@ -404,7 +404,7 @@ function QuarantineSection({ hostKey, name, current }: { hostKey: string; name: 
             {history.map((a) => (
               <li key={a.id}>
                 {formatTime(a.at, lang)} · {a.by} · {a.action === "apply" ? t("q_history_apply", { level: t(LEVEL_KEYS[a.level ?? ""] ?? a.level ?? "") })
-                  : t("q_history_remove")} · {word(STATUS_KEYS, a.result)}{a.detail ? ` · ${a.detail}` : ""}
+                  : t("q_history_remove")} · {word(STATUS_KEYS, a.result)}{a.detail ? ` · ${word(DETAIL_KEYS, a.detail)}` : ""}
               </li>
             ))}
           </ul>

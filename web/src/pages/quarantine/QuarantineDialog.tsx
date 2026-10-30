@@ -27,6 +27,10 @@ const RULE_KEYS: Record<string, string> = {
 };
 const STATUS_KEYS: Record<string, string> = {
   ok: "q_status_ok", failed: "q_status_failed", skipped: "q_status_skipped", not_quarantined: "q_status_not_quarantined",
+  unknown: "q_status_unknown", refused: "q_status_refused", pending: "q_status_pending",
+};
+const DETAIL_KEYS: Record<string, string> = {
+  pce_changed: "q_detail_pce_changed", no_policy: "q_detail_no_policy", no_write_key: "q_detail_no_write_key",
 };
 const REASON_KEYS: Record<string, string> = { unmanaged: "q_reason_unmanaged", not_in_inventory: "q_reason_not_in_inventory" };
 const TOP = 5;
@@ -203,7 +207,7 @@ export function Outcome({ outcome }: { outcome: QuarantineOutcome }) {
               <tr key={r.key} data-status={r.status}>
                 <td>{r.name}</td><td>{word(STATUS_KEYS, r.status)}</td>
                 <td>{r.previous ? t(LEVEL_KEYS[r.previous] ?? r.previous) : "—"}</td>
-                <td className="q-detail">{r.detail ? (REASON_KEYS[r.detail] ? t(REASON_KEYS[r.detail] ?? "") : r.detail) : ""}</td>
+                <td className="q-detail">{r.detail ? word({ ...REASON_KEYS, ...DETAIL_KEYS }, r.detail) : ""}</td>
               </tr>
             ))}
           </tbody>
@@ -213,4 +217,4 @@ export function Outcome({ outcome }: { outcome: QuarantineOutcome }) {
   );
 }
 
-export { LEVEL_KEYS, STATUS_KEYS, nonEmpty };
+export { DETAIL_KEYS, LEVEL_KEYS, STATUS_KEYS, nonEmpty };

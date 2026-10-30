@@ -84,8 +84,10 @@ def policy_refs(rule_sets: Iterable[Mapping[str, Any]],
                 continue
             for scope in rs.get("scopes") or ():
                 if _refers(scope, href):
+                    # a scope isolates through the rule set's rules: in force only while one of them is on
                     out[level].append(QuarantineRuleRef(
-                        ruleset=name, ruleset_enabled=rs_on, rule_type="scope", enabled=True, side="scope",
+                        ruleset=name, ruleset_enabled=rs_on, rule_type="scope", side="scope",
+                        enabled=any(bool(r.get("enabled", True)) for _, r in rules),
                         consumers=[], providers=[], services=[]))
                     break
             for kind, r in rules:

@@ -17139,7 +17139,8 @@
                   "ok",
                   "failed",
                   "skipped",
-                  "not_quarantined"
+                  "not_quarantined",
+                  "unknown"
                 ],
                 "title": "Status",
                 "type": "string"
@@ -18027,6 +18028,13 @@
           },
           "QuarantineCheck": {
             "properties": {
+              "all_labels": {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "title": "All Labels",
+                "type": "object"
+              },
               "labels": {
                 "additionalProperties": {
                   "anyOf": [
@@ -18063,6 +18071,7 @@
             "required": [
               "write_key",
               "labels",
+              "all_labels",
               "levels",
               "names"
             ],
@@ -18336,7 +18345,8 @@
                   "ok",
                   "failed",
                   "skipped",
-                  "not_quarantined"
+                  "not_quarantined",
+                  "unknown"
                 ],
                 "title": "Status",
                 "type": "string"

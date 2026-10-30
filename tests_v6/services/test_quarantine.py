@@ -229,3 +229,93 @@ def test_secrets_never_recorded(ctx):
     with ctx.db() as conn:
         dump = json.dumps([dict(r) for r in conn.execute("SELECT * FROM quarantine_actions")])
     assert "wk" not in dump.replace("workloads", "") and "ws" not in dump
+
+
+# ── final review (2026-10-31) ─────────────────────────────────────────────────
+
+@responses.activate
+def test_switch_mid_batch_stops_and_records_under_the_pce_written(ctx):
+    """#1: the PCE changed while a batch ran: the rest are not written (their hrefs belong to the previous PCE)."""
+    from illumio_ops.store.flowdb import workloads as wls
+    with ctx.flows().connect() as conn:
+        wls.replace_inventory(conn, [_wl(WL, "web-01", "selective"), _wl("/orgs/1/workloads/w3", "web-03", "selective")])
+        conn.commit()
+    _policy()
+    _workload(WL, [APP])
+    _workload("/orgs/1/workloads/w3", [APP])
+
+    def switch(request):
+        ctx.settings.update(ctx.settings.current().revision, lambda d: d["pce"].update(url="https://pce-b.example:8443"))
+        return (204, {}, "")
+    responses.add_callback(responses.PUT, f"{API}{WL}", callback=switch)
+    out = quarantine.apply(ctx, [WL, "/orgs/1/workloads/w3"], "Severe", by="a", acknowledge_no_policy=False, now=NOW)
+    assert [(r.status, r.detail) for r in out.results] == [("ok", None), ("failed", "pce_changed")]
+    assert sum(1 for c in responses.calls if c.request.method == "PUT") == 1
+    with ctx.db() as conn:
+        urls = {r["pce_url"] for r in conn.execute("SELECT pce_url FROM quarantine_actions")}
+    assert urls == {"https://pce.example.com:8443"}
+
+
+@responses.activate
+def test_write_is_never_retried_blindly(ctx, monkeypatch):
+    """#2: a retried PUT resends labels read before someone else changed them: the write goes out once."""
+    from illumio_ops.pce.client import PceClient
+    sent = []
+    real = PceClient.request
+
+    def spy(self, method, path, **kw):
+        if method == "PUT":
+            sent.append(kw.get("bounded"))
+        return real(self, method, path, **kw)
+    monkeypatch.setattr(PceClient, "request", spy)
+    _policy()
+    _workload(WL, [APP])
+    responses.add(responses.PUT, f"{API}{WL}", status=204)
+    quarantine.apply(ctx, [WL], "Severe", by="a", acknowledge_no_policy=False, now=NOW)
+    assert sent == [True]
+
+
+@responses.activate
+def test_write_timeout_is_unknown_and_recorded(ctx):
+    """#3: the PCE may have applied a write whose answer never came: said, recorded, the batch goes on."""
+    import requests
+
+    from illumio_ops.store.flowdb import workloads as wls
+    with ctx.flows().connect() as conn:
+        wls.replace_inventory(conn, [_wl(WL, "web-01", "selective"), _wl("/orgs/1/workloads/w3", "web-03", "selective")])
+        conn.commit()
+    _policy()
+    _workload(WL, [APP])
+    _workload("/orgs/1/workloads/w3", [APP])
+    responses.add(responses.PUT, f"{API}{WL}", body=requests.exceptions.ReadTimeout("read timed out"))
+    responses.add(responses.PUT, f"{API}/orgs/1/workloads/w3", status=204)
+    out = quarantine.apply(ctx, [WL, "/orgs/1/workloads/w3"], "Severe", by="a", acknowledge_no_policy=False, now=NOW)
+    assert [r.status for r in out.results] == ["unknown", "ok"]
+    assert quarantine.history(ctx, WL)[0].result == "unknown"
+
+
+@responses.activate
+def test_other_quarantine_values_recognised(ctx):
+    """#5: a Quarantine label of another value (href only on the workload) is a quarantine, and removed."""
+    legacy = {"href": "/orgs/1/labels/77", "key": "Quarantine", "value": "Legacy", "usage": {"ruleset": False}}
+    _policy(labels=[*LABELS, legacy])
+    _workload(WL, [APP, {"href": "/orgs/1/labels/77"}])
+    responses.add(responses.PUT, f"{API}{WL}", status=204)
+    [r] = quarantine.remove(ctx, [WL], by="a", now=NOW).results
+    assert (r.status, r.previous) == ("ok", "Legacy")
+    put = next(c for c in responses.calls if c.request.method == "PUT")
+    assert json.loads(put.request.body) == {"labels": [{"href": APP["href"]}]}
+
+
+@responses.activate
+def test_refusals_recorded(ctx, tmp_path):
+    """#7: a request refused before writing (no policy acknowledged, no write key) is recorded too."""
+    _policy()
+    with pytest.raises(quarantine.NoPolicy):
+        quarantine.apply(ctx, [WL], "Mild", by="a", acknowledge_no_policy=False, now=NOW)
+    [row] = quarantine.history(ctx, WL)
+    assert (row.result, row.detail) == ("refused", "no_policy")
+    c = _ctx(tmp_path / "nokey", write=False)
+    with pytest.raises(quarantine.NoWriteKey):
+        quarantine.remove(c, [WL], by="a", now=NOW)
+    assert quarantine.history(c, WL)[0].detail == "no_write_key"

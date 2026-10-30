@@ -23,7 +23,7 @@ from illumio_ops.domain.deny import DenyProposal, proposal_filter
 from illumio_ops.domain.filter import EndpointFilter
 from illumio_ops.domain.quarantine import KEY, LEVELS, LevelState, QuarantineRuleRef
 from illumio_ops.domain.values import CollectionMode
-from illumio_ops.pce.client import PceClient
+from illumio_ops.pce.client import PceBudgetExhausted, PceClient, PceTransportError
 from illumio_ops.pce.collections import get_all
 from illumio_ops.pce.policy import fetch_rule_sets
 from illumio_ops.services.analysis.deny_sim import DenySimulation, simulate_deny
@@ -33,6 +33,7 @@ from illumio_ops.services.hosts import display_names, parse_key
 from illumio_ops.services.lateral_view import DenySimulationView
 from illumio_ops.services.ondemand import INTERACTIVE_PULL, pull_period
 from illumio_ops.services.workbench_store import PullInfo
+from illumio_ops.settings.schema import PceSettings
 from illumio_ops.store import quarantine_actions as actions
 from illumio_ops.store.flowdb import labels as label_store
 from illumio_ops.store.flowdb import workloads
@@ -43,6 +44,7 @@ DEADLINE_S = 120
 DETAIL_MAX = 300
 NAMES_MAX = 50  # actors and services named per check: one GET each
 NO_ENFORCEMENT = frozenset({"visibility_only", "idle"})
+PCE_TRANSPORT = (PceTransportError, PceBudgetExhausted)
 
 
 class NoWriteKey(Exception):
@@ -61,6 +63,7 @@ class QuarantineLevelPolicy(BaseModel):
 class QuarantineCheck(BaseModel):
     write_key: bool
     labels: dict[str, str | None]       # level -> its label's href; None: not on the PCE yet (created when applied)
+    all_labels: dict[str, str]          # every Quarantine label on the PCE: href -> value
     levels: dict[str, QuarantineLevelPolicy]
     names: dict[str, str]               # actor and service hrefs -> how they read
 
@@ -85,7 +88,7 @@ class QuarantinePreview(BaseModel):
 class QuarantineResult(BaseModel):
     key: str
     name: str
-    status: Literal["ok", "failed", "skipped", "not_quarantined"]
+    status: Literal["ok", "failed", "skipped", "not_quarantined", "unknown"]  # unknown: the write's answer never came
     detail: str | None
     previous: str | None
 
@@ -112,24 +115,26 @@ class QuarantineAction(BaseModel):
     detail: str | None
 
 
-def _write_key(ctx: AppContext) -> bool:
-    pce = ctx.settings.current().pce
-    return bool(pce.write_api_key and pce.write_api_secret)
-
 
 def _detail(status: int, body: bytes) -> str:
     return f"HTTP {status} {body[:DETAIL_MAX].decode('utf-8', 'replace')}".strip()
 
 
-def _label_hrefs(rows: Sequence[dict[str, Any]]) -> tuple[dict[str, str | None], bool]:
+def _label_hrefs(rows: Sequence[dict[str, Any]]) -> tuple[dict[str, str | None], bool, dict[str, str]]:
+    """(each level's label href, whether any rule set or boundary names one, every Quarantine label href -> its value:
+    a value other than the three levels is still a quarantine, recognised and removed by href)."""
     hrefs: dict[str, str | None] = {level: None for level in LEVELS}
+    every: dict[str, str] = {}
     used = False
     for lb in rows:
-        if lb.get("key") == KEY and lb.get("value") in hrefs and not lb.get("deleted"):
+        if lb.get("key") != KEY or lb.get("deleted") or not lb.get("href"):
+            continue
+        every[str(lb["href"])] = str(lb.get("value") or "")
+        if lb.get("value") in hrefs:
             hrefs[str(lb["value"])] = str(lb["href"])
             usage = lb.get("usage") or {}
             used = used or bool(usage.get("ruleset") or usage.get("enforcement_boundary"))
-    return hrefs, used
+    return hrefs, used, every
 
 
 def _names(client: PceClient, refs: dict[str, list[QuarantineRuleRef]], deadline: float) -> dict[str, str]:
@@ -150,13 +155,13 @@ def _names(client: PceClient, refs: dict[str, list[QuarantineRuleRef]], deadline
     return out
 
 
-def check(ctx: AppContext) -> QuarantineCheck:
+def check(ctx: AppContext, cfg: PceSettings | None = None) -> QuarantineCheck:
     """Which policy refers to each level, read on the main key. The labels' usage flags say first whether any rule set
     names them at all; only then are the rule sets read."""
     deadline = time.monotonic() + DEADLINE_S
-    cfg = ctx.settings.current().pce
+    cfg = cfg or ctx.settings.current().pce
     with ctx.pce_client(cfg) as client:
-        hrefs, used = _label_hrefs(get_all(client, "/labels", params={"key": KEY, "usage": "true"}, deadline=deadline))
+        hrefs, used, every = _label_hrefs(get_all(client, "/labels", params={"key": KEY, "usage": "true"}, deadline=deadline))
         empty: dict[str, list[QuarantineRuleRef]] = {level: [] for level in LEVELS}
         active, draft = empty, empty
         if used:
@@ -166,17 +171,18 @@ def check(ctx: AppContext) -> QuarantineCheck:
         states = dq.level_states(active=active, draft=draft)
         shown = {level: active[level] or (draft[level] if states[level] == "draft_only" else []) for level in LEVELS}
         names = _names(client, shown, deadline) if any(shown.values()) else {}
-    return QuarantineCheck(write_key=_write_key(ctx), labels=hrefs, names=names,
+    return QuarantineCheck(write_key=bool(cfg.write_api_key and cfg.write_api_secret), labels=hrefs, all_labels=every,
+                           names=names,
                            levels={level: QuarantineLevelPolicy(state=states[level], rules=shown[level])
                                    for level in LEVELS})
 
 
-def _targets(ctx: AppContext, keys: Sequence[str]) -> list[QuarantineTarget]:
+def _targets(ctx: AppContext, keys: Sequence[str], cfg: PceSettings | None = None) -> list[QuarantineTarget]:
     if len(keys) > MAX_BATCH:
         raise ValueError(f"at most {MAX_BATCH} hosts at a time")
     parsed = [(k, *parse_key(k)) for k in dict.fromkeys(keys)]  # ValueError on a malformed key
     with ctx.flows().connect() as conn:
-        require_same_pce(conn, ctx.settings.current().pce)
+        require_same_pce(conn, cfg or ctx.settings.current().pce)
         inventory = {w.href: w for w in workloads.all_workloads(conn)}
         sets = label_store.label_sets(conn, {w.label_set for w in inventory.values() if w.label_set is not None})
     names = display_names(ctx, [k for k, _, _ in parsed])
@@ -226,81 +232,106 @@ def preview(ctx: AppContext, keys: Sequence[str], level: str, *, now: datetime |
                              outbound=_simulate(ctx, DenyProposal(src=hosts, dst=EndpointFilter()), at))
 
 
-def _record(ctx: AppContext, *, at: datetime, by: str, action: str, target: QuarantineTarget, level: str | None,
-            previous: str | None, original: Sequence[dict[str, Any]], result: str, detail: str | None) -> None:
-    pce = ctx.settings.current().pce
+Ident = tuple[str, str, int]
+
+
+def _ident(ctx: AppContext, cfg: PceSettings) -> Ident:
+    return (cfg.url, cfg.org_id, ctx.flows().generation)
+
+
+def _record(ctx: AppContext, cfg: PceSettings, *, at: datetime, by: str, action: str, target: QuarantineTarget,
+            level: str | None, previous: str | None, original: Sequence[dict[str, Any]], result: str,
+            detail: str | None) -> int:
+    """One row per host and attempt, under the PCE written to (not whatever is configured by now)."""
     kept = [{k: lb.get(k) for k in ("href", "key", "value")} for lb in original]  # labels only, never more
     with ctx.db() as conn:
-        actions.add(conn, pce_url=pce.url, org_id=pce.org_id, at=at, by=by, action=action, workload_href=target.key,
-                    hostname=target.name, level=level, previous_level=previous, original_labels=kept, result=result,
-                    detail=detail)
+        return actions.add(conn, pce_url=cfg.url, org_id=cfg.org_id, at=at, by=by, action=action,
+                           workload_href=target.key, hostname=target.name, level=level, previous_level=previous,
+                           original_labels=kept, result=result, detail=detail)
 
 
-def _previous(labels: Sequence[dict[str, Any]], q_hrefs: dict[str, str]) -> str | None:
-    by_href = {h: level for level, h in q_hrefs.items()}
+def _previous(labels: Sequence[dict[str, Any]], every: dict[str, str]) -> str | None:
     for lb in labels:
         if lb.get("key") == KEY:
-            return str(lb.get("value") or by_href.get(str(lb.get("href")), "?"))
-        if lb.get("href") in by_href:
-            return by_href[str(lb["href"])]
+            return str(lb.get("value") or every.get(str(lb.get("href")), "?"))
+        if lb.get("href") in every:
+            return every[str(lb["href"])] or "?"
     return None
 
 
-def _change(ctx: AppContext, keys: Sequence[str], level: str | None, *, by: str, at: datetime,
-            q_hrefs: dict[str, str | None], create: bool) -> QuarantineOutcome:
+def _refused(ctx: AppContext, cfg: PceSettings, targets: Sequence[QuarantineTarget], *, action: str,
+             level: str | None, by: str, at: datetime, why: str) -> None:
+    for t in targets:
+        if t.ok:
+            _record(ctx, cfg, at=at, by=by, action=action, target=t, level=level, previous=None, original=[],
+                    result="refused", detail=why)
+
+
+def _change(ctx: AppContext, cfg: PceSettings, ident: Ident, targets: Sequence[QuarantineTarget], level: str | None,
+            *, by: str, at: datetime, chk: QuarantineCheck, create: bool) -> QuarantineOutcome:
     action: Literal["apply", "remove"] = "remove" if level is None else "apply"
-    targets = _targets(ctx, keys)
     results: list[QuarantineResult] = []
     label_created, label_error = False, None
-    known = {lv: h for lv, h in q_hrefs.items() if h}
-    with ctx.pce_write_client() as client:
-        target_href = known.get(level) if level else None
+    every = dict(chk.all_labels)
+
+    def done(t: QuarantineTarget, status: str, detail: str | None, previous: str | None,
+             original: Sequence[dict[str, Any]] = (), row: int | None = None) -> None:
+        results.append(QuarantineResult(key=t.key, name=t.name, status=status, detail=detail,  # type: ignore[arg-type]
+                                        previous=previous))
+        if row is None:
+            _record(ctx, cfg, at=at, by=by, action=action, target=t, level=level, previous=previous,
+                    original=original, result=status, detail=detail)
+        else:
+            with ctx.db() as conn:
+                actions.finish(conn, row, result=status, detail=detail)
+
+    with ctx.pce_write_client(cfg) as client:
+        target_href = chk.labels.get(level) if level else None
         if level and target_href is None and create:
             r = client.request("POST", "/labels", json={"key": KEY, "value": level}, timeout=30)
             body = r.json() if r.status == 201 else None
             if isinstance(body, dict) and body.get("href"):
                 target_href, label_created = str(body["href"]), True
-                known[level] = target_href
+                every[target_href] = level
             else:
                 label_error = _detail(r.status, r.body)
         for t in targets:
+            if _ident(ctx, ctx.settings.current().pce) != ident:
+                # the PCE changed mid-batch: these hrefs are the previous PCE's; nothing more is written
+                done(t, "failed", "pce_changed", None)
+                continue
             if not t.ok:
-                results.append(QuarantineResult(key=t.key, name=t.name, status="skipped", detail=t.reason,
-                                                previous=None))
-                _record(ctx, at=at, by=by, action=action, target=t, level=level, previous=None, original=[],
-                        result="skipped", detail=t.reason)
+                done(t, "skipped", t.reason, None)
                 continue
             if level and target_href is None:
-                results.append(QuarantineResult(key=t.key, name=t.name, status="failed", detail=label_error,
-                                                previous=None))
-                _record(ctx, at=at, by=by, action=action, target=t, level=level, previous=None, original=[],
-                        result="failed", detail=label_error)
+                done(t, "failed", label_error, None)
                 continue
-            got = client.request("GET", t.key, org_scoped=False, timeout=30)  # as it is now, right before the write
+            try:
+                got = client.request("GET", t.key, org_scoped=False, timeout=30)  # as it is now, right before the write
+            except PCE_TRANSPORT as exc:
+                done(t, "failed", str(exc)[:DETAIL_MAX], None)
+                continue
             body = got.json() if got.status == 200 else None
             if not isinstance(body, dict) or not isinstance(body.get("labels"), list):
-                detail = _detail(got.status, got.body)
-                results.append(QuarantineResult(key=t.key, name=t.name, status="failed", detail=detail,
-                                                previous=None))
-                _record(ctx, at=at, by=by, action=action, target=t, level=level, previous=None, original=[],
-                        result="failed", detail=detail)
+                done(t, "failed", _detail(got.status, got.body), None)
                 continue
             original = [lb for lb in body["labels"] if isinstance(lb, dict)]
-            previous = _previous(original, known)
+            previous = _previous(original, every)
             if level is None and previous is None:
-                results.append(QuarantineResult(key=t.key, name=t.name, status="not_quarantined", detail=None,
-                                                previous=None))
-                _record(ctx, at=at, by=by, action=action, target=t, level=None, previous=None, original=original,
-                        result="not_quarantined", detail=None)
+                done(t, "not_quarantined", None, None, original)
                 continue
-            labels = dq.relabel(original, target_href, set(known.values()))
-            put = client.request("PUT", t.key, org_scoped=False, json={"labels": labels}, timeout=30)
+            labels = dq.relabel(original, target_href, set(every))
+            # the intent first: a write whose answer never comes is still on record
+            row = _record(ctx, cfg, at=at, by=by, action=action, target=t, level=level, previous=previous,
+                          original=original, result="pending", detail=None)
+            try:
+                # sent once (no transparent retry): a retry would resend labels read before someone else's change
+                put = client.request("PUT", t.key, org_scoped=False, json={"labels": labels}, timeout=30, bounded=True)
+            except PCE_TRANSPORT as exc:
+                done(t, "unknown", str(exc)[:DETAIL_MAX], previous, row=row)
+                continue
             ok = put.status in (200, 204)
-            put_detail = None if ok else _detail(put.status, put.body)
-            results.append(QuarantineResult(key=t.key, name=t.name, status="ok" if ok else "failed",
-                                            detail=put_detail, previous=previous))
-            _record(ctx, at=at, by=by, action=action, target=t, level=level, previous=previous, original=original,
-                    result="ok" if ok else "failed", detail=put_detail)
+            done(t, "ok" if ok else "failed", None if ok else _detail(put.status, put.body), previous, row=row)
     logger.info("quarantine {} {} by {}: {}", action, level, by,
                 {r.status: sum(1 for x in results if x.status == r.status) for r in results})
     return QuarantineOutcome(action=action, level=level, label_created=label_created, label_error=label_error,
@@ -310,29 +341,37 @@ def _change(ctx: AppContext, keys: Sequence[str], level: str | None, *, by: str,
 def apply(ctx: AppContext, keys: Sequence[str], level: str, *, by: str, acknowledge_no_policy: bool,
           now: datetime | None = None) -> QuarantineOutcome:
     """Put `level` on each workload (replacing another level). Raises NoWriteKey, NoPolicy (no enabled rule in the
-    active policy refers to the level and the person did not acknowledge it), ValueError."""
+    active policy refers to the level and the person did not acknowledge it), ValueError. One PCE throughout: the
+    one configured when it starts."""
     if level not in LEVELS:
         raise ValueError("unknown quarantine level")
-    if len(keys) > MAX_BATCH:
-        raise ValueError(f"at most {MAX_BATCH} hosts at a time")
-    if not _write_key(ctx):
+    at = (now or datetime.now(UTC)).astimezone(UTC)
+    cfg = ctx.settings.current().pce
+    ident = _ident(ctx, cfg)
+    targets = _targets(ctx, keys, cfg)
+    if not (cfg.write_api_key and cfg.write_api_secret):
+        _refused(ctx, cfg, targets, action="apply", level=level, by=by, at=at, why="no_write_key")
         raise NoWriteKey
-    chk = check(ctx)  # again here: the page's answer may be old, and the request is not trusted to have asked
+    chk = check(ctx, cfg)  # again here: the page's answer may be old, and the request is not trusted to have asked
     if chk.levels[level].state != "active" and not acknowledge_no_policy:
+        _refused(ctx, cfg, targets, action="apply", level=level, by=by, at=at, why="no_policy")
         raise NoPolicy
-    return _change(ctx, keys, level, by=by, at=(now or datetime.now(UTC)).astimezone(UTC), q_hrefs=chk.labels,
-                   create=True)
+    return _change(ctx, cfg, ident, targets, level, by=by, at=at, chk=chk, create=True)
 
 
 def remove(ctx: AppContext, keys: Sequence[str], *, by: str, now: datetime | None = None) -> QuarantineOutcome:
-    if len(keys) > MAX_BATCH:
-        raise ValueError(f"at most {MAX_BATCH} hosts at a time")
-    if not _write_key(ctx):
+    at = (now or datetime.now(UTC)).astimezone(UTC)
+    cfg = ctx.settings.current().pce
+    ident = _ident(ctx, cfg)
+    targets = _targets(ctx, keys, cfg)
+    if not (cfg.write_api_key and cfg.write_api_secret):
+        _refused(ctx, cfg, targets, action="remove", level=None, by=by, at=at, why="no_write_key")
         raise NoWriteKey
     deadline = time.monotonic() + DEADLINE_S
-    with ctx.pce_client() as client:
-        hrefs, _ = _label_hrefs(get_all(client, "/labels", params={"key": KEY}, deadline=deadline))
-    return _change(ctx, keys, None, by=by, at=(now or datetime.now(UTC)).astimezone(UTC), q_hrefs=hrefs, create=False)
+    with ctx.pce_client(cfg) as client:
+        hrefs, _, every = _label_hrefs(get_all(client, "/labels", params={"key": KEY}, deadline=deadline))
+    chk = QuarantineCheck(write_key=True, labels=hrefs, all_labels=every, levels={}, names={})
+    return _change(ctx, cfg, ident, targets, None, by=by, at=at, chk=chk, create=False)
 
 
 def history(ctx: AppContext, key: str | None = None, *, limit: int = 50) -> list[QuarantineAction]:
