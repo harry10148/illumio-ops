@@ -149,6 +149,8 @@ def _bars(b: BarBlock, lang: Language) -> str:
 
 def _section_body(s: Section, names: dict[int, str], tz: tzinfo | None, lang: Language) -> str:
     parts = [f'<p class="section-intro">{_esc(s.intro)}</p>'] if s.intro else []
+    if s.workbench_link:
+        parts.append(f'<p class="section-link"><a href="{_esc(s.workbench_link)}">{_esc(tr(lang, "rpt_open_in_workbench"))}</a></p>')
     for block in s.blocks:
         if isinstance(block, TableBlock):
             parts.append(_table(block, names[id(block)], tz, lang))

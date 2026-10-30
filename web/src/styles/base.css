@@ -268,3 +268,8 @@ code.cmd { white-space: pre-wrap; word-break: break-all; font-size: var(--fs-min
 /* Predicted blocks (P6e) */
 .pred-rules { overflow-wrap: anywhere; min-width: 18rem; }
 .pred-rules > div + div { margin-top: var(--space-1); }
+
+/* Custom reports (P6e) */
+.cust-report + .cust-report { border-top: 1px solid var(--mark); padding-top: var(--space-4); }
+.cust-sections { margin: 0; padding-left: var(--space-6); }
+.cust-sections li { margin: var(--space-1) 0; }

@@ -19,6 +19,7 @@ TABLE_OWNERS: dict[str, str] = {
     "reports": "illumio_ops.store.reports",
     "report_schedule_state": "illumio_ops.store.reports",
     "quarantine_actions": "illumio_ops.store.quarantine_actions",
+    "custom_reports": "illumio_ops.store.custom_reports",
     # data/flows.sqlite
     "pce_binding": "illumio_ops.store.flowdb.binding",
     "ingest_state": "illumio_ops.store.flowdb.ingest_state",

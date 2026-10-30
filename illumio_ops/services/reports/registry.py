@@ -15,7 +15,7 @@ from illumio_ops.domain.values import Language, ReportFormat, ReportType, RhcSta
 from illumio_ops.services.context import AppContext
 from illumio_ops.settings.schema import Settings
 
-Group = Literal["lateral", "inventory", "analysis", "assessment", "policy", "operations"]
+Group = Literal["lateral", "inventory", "analysis", "assessment", "policy", "operations", "custom"]
 
 
 class ReportFailed(Exception):
@@ -35,6 +35,7 @@ class ReportParams(BaseModel):
     filter: FlowCondition | None = None  # flow reports only: e.g. one app (labels), as the workbench filters
     email: bool = False
     recipients: tuple[str, ...] = Field(default=(), max_length=50)  # empty: the SMTP channel's recipients
+    custom_id: int | None = None  # the custom report to make (report_type custom only)
 
     @field_validator("recipients")
     @classmethod
@@ -79,6 +80,8 @@ class ReportSpec:
     ondemand_lead: Callable[[Settings], timedelta] | None = None
     ondemand_prepare: Callable[[AppContext, datetime], None] | None = None
     formats: tuple[ReportFormat, ...] = (ReportFormat.HTML, ReportFormat.XLSX)  # the formats this type makes
+    # Whether these parameters read traffic, when the type alone does not say (a custom report of event sections)
+    needs_traffic_for: Callable[[AppContext, ReportParams], bool] | None = None
 
 
 REGISTRY: dict[ReportType, ReportSpec] = {}
@@ -120,8 +123,12 @@ def _prepare_exposure(ctx: AppContext, now: datetime) -> None:
 
 
 def _builtin() -> dict[ReportType, ReportSpec]:
+    from illumio_ops.services.custom_reports import (
+        needs_traffic as custom_needs_traffic,
+    )
     from illumio_ops.services.reports.app_summary import build_app_summary
     from illumio_ops.services.reports.audit import build_audit
+    from illumio_ops.services.reports.custom import build_custom
     from illumio_ops.services.reports.lateral_posture import build_lateral_posture
     from illumio_ops.services.reports.network_inventory import build_network_inventory
     from illumio_ops.services.reports.new_connections import build_new_connections
@@ -170,6 +177,10 @@ def _builtin() -> dict[ReportType, ReportSpec]:
         ReportType.POLICY_RESOLVER: ReportSpec(ReportType.POLICY_RESOLVER, "policy", False, build_policy_resolver,
                                                max_lookback=lambda settings: 1,
                                                formats=(ReportFormat.JSON, ReportFormat.CSV)),
+        # Sections saved from the workbench (P6e): the period a flow report offers; traffic only with a flow section.
+        ReportType.CUSTOM: ReportSpec(ReportType.CUSTOM, "custom", True, build_custom, max_lookback=flow_days,
+                                      retention=flow_retention,
+                                      needs_traffic_for=lambda ctx, p: custom_needs_traffic(ctx, p.custom_id)),
         ReportType.READINESS: ReportSpec(ReportType.READINESS, "assessment", True, build_readiness,
                                          max_lookback=flow_days, accepts_filter=True, retention=flow_retention),
     }

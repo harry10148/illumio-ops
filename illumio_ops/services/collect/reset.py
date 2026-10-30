@@ -29,11 +29,13 @@ APP_DB_PCE_DERIVED: tuple[str, ...] = ("pce_probe", "alert_eval_state")
 # switch back would otherwise resume from a cursor into the old data). Rule state, rule status and channel state
 # belong to the rules and channels, which do not change with the PCE. Generated reports are outputs the operator
 # keeps or deletes; each row names the PCE it was made from (P5a), so a switch leaves them, and the schedules'
-# last-due times belong to the schedules. Quarantine actions are a record of writes made to a PCE: each names it.
+# last-due times belong to the schedules. Quarantine actions are a record of writes made to a PCE: each names it. Custom
+# reports are the operator's definitions, like the schedules that use them.
 APP_DB_PCE_INDEPENDENT: tuple[str, ...] = ("job_health", "tamper_annotations", "detection_annotations", "alerts",
                                            "alert_deliveries",
                                            "alert_notes", "alert_rule_state", "alert_rule_status", "channel_state",
-                                           "reports", "report_schedule_state", "quarantine_actions")
+                                           "reports", "report_schedule_state", "quarantine_actions",
+                                           "custom_reports")
 
 
 def _forget_alert_watermarks(ctx: AppContext) -> None:

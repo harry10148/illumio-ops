@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 
 import { type ApiError, call } from "../../api/client";
-import type { Catalog, ReportScheduleFields, SchedulesView, ScheduleItem } from "../../api/generated";
+import type { Catalog, CustomReport, ReportScheduleFields, SchedulesView, ScheduleItem } from "../../api/generated";
 import { formatTime } from "../../components/ProbeResults";
 import { t, useLang } from "../../i18n";
 import { STATUS_KEYS, STATUS_TONES, TYPE_KEYS, lookbackChoices, word } from "./common";
@@ -48,6 +48,11 @@ function Editor({ initial, catalog, smtp, onSave, onCancel, error }: {
   const [recipients, setRecipients] = useState(initial.recipients.join(", "));
   const [rows, setRows] = useState<FilterRow[]>(rowsOf(initial.filter));
   const entry = catalog.entries.find((c) => c.report_type === s.report_type);
+  const [customs, setCustoms] = useState<CustomReport[] | null>(null);
+  useEffect(() => {
+    if (s.report_type !== "custom" || customs) return;
+    void call("custom_reports.list").then((env) => { if (env.ok && env.data) setCustoms(env.data.reports); });
+  }, [s.report_type, customs]);
   const set = (patch: Partial<ReportScheduleFields>) => setS({ ...s, ...patch });
   const freq = (f: ReportScheduleFields["frequency"]) => set({
     frequency: f, day_of_week: f === "weekly" ? (s.day_of_week ?? 0) : null,
@@ -81,6 +86,16 @@ function Editor({ initial, catalog, smtp, onSave, onCancel, error }: {
           ))}
         </select>
       </label>
+      {s.report_type === "custom" && (
+        <label>
+          {t("cust_which")}
+          <select name="custom_id" value={s.custom_id ?? ""}
+            onChange={(e) => set({ custom_id: e.target.value === "" ? null : Number(e.target.value) })}>
+            <option value="">{t("cust_pick")}</option>
+            {(customs ?? []).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+          </select>
+        </label>
+      )}
       <label>
         {t("gui_reports_lookback")}
         <select name="lookback_days" value={String(s.lookback_days)} onChange={(e) => set({ lookback_days: Number(e.target.value) })}>

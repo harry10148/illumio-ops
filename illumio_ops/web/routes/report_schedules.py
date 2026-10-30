@@ -9,7 +9,8 @@ from typing import Any
 from flask import Blueprint
 from pydantic import BaseModel, Field
 
-from illumio_ops.domain.values import ReportStatus
+from illumio_ops.domain.values import ReportStatus, ReportType
+from illumio_ops.services import custom_reports
 from illumio_ops.services.reports import schedules
 from illumio_ops.services.reports.generate import REFUSAL_FIELDS, availability, refusal
 from illumio_ops.services.reports.views import ReportItem, get_report
@@ -84,6 +85,8 @@ def _check(fields: ReportScheduleFields) -> None:
     """The same refusal a manual request gets, at save time (a schedule that could never run is not saved)."""
     params = schedules.params_of(ReportSchedule(**fields.model_dump(), id="0" * 32))
     reason = refusal(get_ctx().settings.current(), params)
+    if reason is None and params.report_type is ReportType.CUSTOM and custom_reports.get(get_ctx(), params.custom_id or 0) is None:
+        reason = "rpt_err_custom_missing"
     if reason:
         raise ApiFailure(400, "invalid_input", reason, field=f"schedule.{REFUSAL_FIELDS[reason]}")
     # A type greyed out (rule_hit_count until Rule Hit Count is on) cannot be scheduled; a paused one can be saved.

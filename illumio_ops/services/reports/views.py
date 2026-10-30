@@ -7,6 +7,7 @@ from pathlib import Path
 from pydantic import BaseModel
 
 from illumio_ops.domain.values import Language, ReportFormat, ReportStatus, ReportType
+from illumio_ops.services import custom_reports
 from illumio_ops.services.analysis.status import MAX_LABEL_VALUES, LabelChoice
 from illumio_ops.services.context import AppContext
 from illumio_ops.services.reports.generate import availability, enqueue
@@ -54,6 +55,7 @@ class ReportItem(BaseModel):
     email_detail: str | None
     lookback_days: int | None
     lang: Language | None
+    custom_name: str | None = None  # a custom report's name (None also when it was deleted since)
 
 
 class ReportPage(BaseModel):
@@ -86,13 +88,15 @@ def catalog(ctx: AppContext) -> Catalog:
 def _item(ctx: AppContext, row: store.ReportRow) -> ReportItem:
     names = {s.id: s.name for s in ctx.settings.current().reports.schedules}
     lang = row.params.get("lang")
+    custom_id = row.params.get("custom_id")
+    custom = custom_reports.get(ctx, int(custom_id)) if isinstance(custom_id, int) else None
     return ReportItem(id=row.id, report_type=row.report_type, status=row.status, trigger=row.trigger,
                       schedule_id=row.schedule_id, schedule_name=names.get(row.schedule_id or ""),
                       pce_label=row.pce_label, period_start=row.period_start, period_end=row.period_end,
                       created_at=row.created_at, finished_at=row.finished_at, error_key=row.error_key,
                       error_detail=row.error_detail, files=row.files, email_status=row.email_status,
                       email_detail=row.email_detail, lookback_days=row.params.get("lookback_days"),
-                      lang=Language(lang) if lang else None)
+                      lang=Language(lang) if lang else None, custom_name=custom.name if custom else None)
 
 
 def list_reports(ctx: AppContext, *, page: int) -> ReportPage:

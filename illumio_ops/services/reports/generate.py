@@ -27,7 +27,7 @@ from illumio_ops.domain.values import (
     ReportType,
 )
 from illumio_ops.i18n import translate
-from illumio_ops.services import rhc
+from illumio_ops.services import custom_reports, rhc
 from illumio_ops.services.collect.guard import (
     BindingMismatch,
     normalize_target,
@@ -118,10 +118,13 @@ def availability(ctx: AppContext) -> dict[ReportType, str | None]:
     return out
 
 
-def pulls_on_demand(ctx: AppContext, spec: ReportSpec, start: datetime, now: datetime) -> bool:
+def pulls_on_demand(ctx: AppContext, spec: ReportSpec, start: datetime, now: datetime,
+                    params: ReportParams | None = None) -> bool:
     """The report reads traffic the install does not keep: lightweight mode keeps none, the others keep
     flow_days. A gap inside the kept range stays a disclosed gap (a pull would be slower than the gap is worth)."""
     if not spec.needs_traffic:
+        return False
+    if spec.needs_traffic_for is not None and params is not None and not spec.needs_traffic_for(ctx, params):
         return False
     settings = ctx.settings.current()
     if settings.collection.mode is CollectionMode.LIGHTWEIGHT:
@@ -149,7 +152,7 @@ def _ondemand_lines(res: OnDemandResult, start: datetime, lang: Language, tz: tz
 
 
 def _build(ctx: AppContext, spec: ReportSpec, inp: BuildInput) -> ReportDocument:
-    if not pulls_on_demand(ctx, spec, inp.start, inp.now):
+    if not pulls_on_demand(ctx, spec, inp.start, inp.now, inp.params):
         return spec.build(inp)
     settings = ctx.settings.current()
     lead = spec.ondemand_lead(settings) if spec.ondemand_lead else timedelta(0)
@@ -167,7 +170,8 @@ def _build(ctx: AppContext, spec: ReportSpec, inp: BuildInput) -> ReportDocument
 
 
 # The parameter each refusal is about, for the API's field name.
-REFUSAL_FIELDS = {"rpt_err_lookback_beyond_retention": "lookback_days", "rpt_err_app_required": "filter",
+REFUSAL_FIELDS = {"rpt_err_custom_required": "custom_id", "rpt_err_custom_not_supported": "custom_id",
+                  "rpt_err_custom_missing": "custom_id", "rpt_err_lookback_beyond_retention": "lookback_days", "rpt_err_app_required": "filter",
                   "rpt_err_filter_not_supported": "filter", "rpt_err_app_filter_shape": "filter",
                   "rpt_err_format_unsupported": "formats"}
 
@@ -189,6 +193,10 @@ def refusal(settings: Settings, params: ReportParams, *, now: datetime | None = 
             return "rpt_err_lookback_beyond_retention"
     if params.filter is not None and not spec.accepts_filter:
         return "rpt_err_filter_not_supported"
+    if params.report_type is ReportType.CUSTOM and params.custom_id is None:
+        return "rpt_err_custom_required"
+    if params.report_type is not ReportType.CUSTOM and params.custom_id is not None:
+        return "rpt_err_custom_not_supported"
     if spec.requires_app and not names_app(params.filter):
         return "rpt_err_app_required"
     if spec.requires_app and not app_filter_ok(params.filter):
@@ -202,6 +210,8 @@ def enqueue(ctx: AppContext, params: ReportParams, *, trigger: str, schedule_id:
     start, end = period(now, params.lookback_days, settings.display.zone())
     reason = availability(ctx).get(params.report_type, "rpt_unavailable_not_built") or refusal(settings, params,
                                                                                                 now=now)
+    if reason is None and params.report_type is ReportType.CUSTOM and custom_reports.get(ctx, params.custom_id or 0) is None:
+        reason = "rpt_err_custom_missing"
     with ctx.db() as conn:
         return store.insert(conn, report_type=params.report_type.value, params_json=params.model_dump_json(),
                             status=ReportStatus.FAILED if reason else ReportStatus.QUEUED, trigger=trigger,

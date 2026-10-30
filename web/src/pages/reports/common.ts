@@ -17,6 +17,7 @@ export const TYPE_KEYS: Record<string, string> = {
   rule_hit_count: "rpt_title_rule_hit_count",
   policy_diff: "rpt_title_policy_diff",
   policy_resolver: "rpt_title_policy_resolver",
+  custom: "rpt_title_custom",
 };
 export const TYPE_DESC_KEYS: Record<string, string> = {
   lateral_posture: "gui_reports_desc_lateral_posture",
@@ -34,13 +35,14 @@ export const TYPE_DESC_KEYS: Record<string, string> = {
   rule_hit_count: "gui_reports_desc_rule_hit_count",
   policy_diff: "gui_reports_desc_policy_diff",
   policy_resolver: "gui_reports_desc_policy_resolver",
+  custom: "gui_reports_desc_custom",
 };
 export const GROUP_KEYS: Record<string, string> = {
   lateral: "gui_reports_group_lateral", inventory: "gui_reports_group_inventory",
   analysis: "gui_reports_group_analysis", assessment: "gui_reports_group_assessment",
-  policy: "gui_reports_group_policy", operations: "gui_reports_group_operations",
+  policy: "gui_reports_group_policy", operations: "gui_reports_group_operations", custom: "gui_reports_group_custom",
 };
-export const GROUP_ORDER = ["lateral", "inventory", "analysis", "assessment", "policy", "operations"];
+export const GROUP_ORDER = ["lateral", "inventory", "analysis", "assessment", "policy", "operations", "custom"];
 export const STATUS_KEYS: Record<string, string> = {
   queued: "gui_reports_status_queued", running: "gui_reports_status_running",
   done: "gui_reports_status_done", failed: "gui_reports_status_failed",

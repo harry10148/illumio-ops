@@ -96,6 +96,7 @@ class Section(_Model):
     title: str
     intro: str = ""
     blocks: tuple[Block, ...] = ()
+    workbench_link: str | None = None  # the section's analysis segment opened in the workbench (custom reports)
 
 
 class RowsExport(_Model):
