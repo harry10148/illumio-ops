@@ -98,3 +98,20 @@ def test_schedule_lookback_validated(client, ctx, monkeypatch):
     login(client)
     r = _create(client)  # lookback_days 7 > 3
     assert r.status_code == 400 and r.get_json()["error"]["field"] == "schedule.lookback_days"
+
+
+def test_rhc_schedule_refused_while_off(client, monkeypatch):
+    """Spec §6.5 RHC: greyed out until it is on — cannot be scheduled either; a paused one can be saved."""
+    from illumio_ops.domain.values import RhcState
+    from illumio_ops.services import rhc
+    from illumio_ops.services.rhc import RhcStatus
+    monkeypatch.setattr(rhc, "cached_status", lambda ctx: RhcStatus(
+        state=RhcState.DISABLED, pce_report=False, ven_scopes=False, reason_key=None, detail=None, write_key=True,
+        saas=False))
+    login(client)
+    r = _create(client, SCHEDULE | {"report_type": "rule_hit_count", "lookback_days": 30})
+    err = r.get_json()["error"]
+    assert r.status_code == 400 and err["message_key"] == "rpt_unavailable_rhc_off"
+    assert err["field"] == "schedule.report_type"
+    assert _create(client, SCHEDULE | {"report_type": "rule_hit_count", "lookback_days": 30,
+                                       "enabled": False}).status_code == 200

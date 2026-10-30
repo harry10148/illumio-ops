@@ -19,6 +19,10 @@ interface Form {
   console_url: string;
   tls: TlsMode;
   ca_path: string;
+  write_api_key: string;
+  write_api_secret: string;
+  write_saved: boolean;
+  clear_write_key: boolean;
 }
 
 function toForm(c: Conn): Form {
@@ -32,6 +36,10 @@ function toForm(c: Conn): Form {
     console_url: c.console_url ?? "",
     tls,
     ca_path: typeof c.verify_tls === "string" ? c.verify_tls : "",
+    write_api_key: c.write_api_key,
+    write_api_secret: c.write_api_secret,
+    write_saved: Boolean(c.write_api_key || c.write_api_secret),
+    clear_write_key: false,
   };
 }
 
@@ -94,6 +102,9 @@ export function PceConnection() {
       deployment_type: form.deployment_type,
       console_url: form.console_url.trim() || null,
       verify_tls,
+      write_api_key: form.clear_write_key ? "" : form.write_api_key,
+      write_api_secret: form.clear_write_key ? "" : form.write_api_secret,
+      clear_write_key: form.clear_write_key,
     });
     setBusy(false);
     if (env.ok && env.data) {
@@ -185,6 +196,28 @@ export function PceConnection() {
             <FieldError name="ca_path" error={error} />
           </label>
         )}
+        <fieldset>
+          <legend>{t("pce_write_key_title")}</legend>
+          <p className="hint">{t("pce_write_key_hint")}</p>
+          <label>
+            {t("pce_write_api_key")}
+            <input name="write_api_key" autoComplete="off" value={form.write_api_key} disabled={form.clear_write_key}
+                   onChange={(e) => set("write_api_key", e.target.value)} />
+            <FieldError name="write_api_key" error={error} />
+          </label>
+          <label>
+            {t("pce_write_api_secret")}
+            <input name="write_api_secret" type="password" autoComplete="new-password" value={form.write_api_secret}
+                   disabled={form.clear_write_key} onChange={(e) => set("write_api_secret", e.target.value)} />
+            <span className="hint">{t("pce_secret_hint")}</span>
+          </label>
+          {form.write_saved && (
+            <label>
+              <input type="checkbox" name="clear_write_key" checked={form.clear_write_key}
+                     onChange={(e) => set("clear_write_key", e.target.checked)} /> {t("pce_write_key_clear")}
+            </label>
+          )}
+        </fieldset>
         {generalError && (
           <div className="form-error" role="alert">
             {t(generalError.message_key, generalError.params)}

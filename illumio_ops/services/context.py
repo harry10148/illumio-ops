@@ -8,7 +8,7 @@ from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING
 
 from illumio_ops.paths import InstallPaths
-from illumio_ops.pce.client import PceClient, client_from_settings
+from illumio_ops.pce.client import PceClient, PceNotConfigured, client_from_settings
 from illumio_ops.pce.rate_limit import RateLimiter
 from illumio_ops.settings.schema import PceSettings, TlsSettings
 from illumio_ops.settings.store import SettingsStore
@@ -45,6 +45,15 @@ class AppContext:
 
     def db(self) -> sqlite3.Connection:
         return connect(self.paths.app_db)
+
+    def pce_write_client(self, pce: PceSettings | None = None) -> PceClient:
+        """A client on the optional write key (Rule Hit Count, quarantine); PceNotConfigured when it is not set."""
+        cfg = pce if pce is not None else self.settings.current().pce
+        if not (cfg.write_api_key and cfg.write_api_secret):
+            raise PceNotConfigured()
+        return self.pce_factory(cfg.model_copy(update={"api_key": cfg.write_api_key,
+                                                       "api_secret": cfg.write_api_secret}),
+                                rate_limiter=self.rate_limiter)
 
     def traffic_floor(self, days: int, now: datetime) -> datetime:
         """Where kept traffic starts: `days` back from now, or nothing cut off in an on-demand store."""

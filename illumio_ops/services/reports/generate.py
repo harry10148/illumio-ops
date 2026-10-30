@@ -24,6 +24,7 @@ from illumio_ops.domain.values import (
     ReportType,
 )
 from illumio_ops.i18n import translate
+from illumio_ops.services import rhc
 from illumio_ops.services.collect.guard import (
     BindingMismatch,
     normalize_target,
@@ -35,7 +36,9 @@ from illumio_ops.services.coverage import store_coverage
 from illumio_ops.services.ondemand import OnDemandFailed, OnDemandResult, pull_period
 from illumio_ops.services.reports.deliver import deliver, gui_link
 from illumio_ops.services.reports.registry import (
+    RHC_UNAVAILABLE,
     BuildInput,
+    ReportFailed,
     ReportParams,
     ReportSpec,
     app_filter_ok,
@@ -56,10 +59,7 @@ GAP_REASON_KEYS = {"before_retention": "rpt_gap_reason_before_retention",
                    "truncated": "rpt_gap_reason_truncated"}
 
 
-class _Fail(Exception):
-    def __init__(self, key: str, detail: str | None = None) -> None:
-        super().__init__(key)
-        self.key, self.detail = key, detail
+_Fail = ReportFailed
 
 
 def pce_label(pce: PceSettings) -> str:
@@ -107,8 +107,12 @@ def traffic_covered(ctx: AppContext, start: datetime, end: datetime, *, now: dat
 
 def availability(ctx: AppContext) -> dict[ReportType, str | None]:
     """Each built type -> None when it can be generated now, else the message key saying why not. Every mode
-    can make every type: a flow report the install keeps no traffic for pulls it from the PCE (spec §6.4)."""
-    return {t: None for t in specs()}
+    can make every type: a flow report the install keeps no traffic for pulls it from the PCE (spec §6.4) — except
+    rule_hit_count, greyed out until Rule Hit Count is on (spec §6.5 RHC; a recent check, not one per call)."""
+    out: dict[ReportType, str | None] = {t: None for t in specs()}
+    if ReportType.RULE_HIT_COUNT in out:
+        out[ReportType.RULE_HIT_COUNT] = RHC_UNAVAILABLE.get(rhc.cached_status(ctx).state)
+    return out
 
 
 def pulls_on_demand(ctx: AppContext, spec: ReportSpec, start: datetime, now: datetime) -> bool:

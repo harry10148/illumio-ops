@@ -204,3 +204,43 @@ def test_a_switch_that_must_wait_for_a_reader_says_so_in_words(client, ctx, monk
     body = r.get_json()
     assert r.status_code == 503 and body["error"]["code"] == "pce_switch_pending"
     assert ctx.settings.current().pce.org_id == "2" and _bound(ctx) is not None  # saved; cleared later
+
+
+# ── optional write key (P5c-2: Rule Hit Count enable) ────────────────────────
+
+def test_write_key_saved_masked_and_kept(client, ctx):
+    login(client)
+    assert _save(client, write_api_key="wk", write_api_secret="WRITESECRET").status_code == 200
+    r = client.get("/api/system/pce", environ_overrides=LOCAL)
+    data = r.get_json()["data"]
+    assert data["write_api_key"] == MASK and data["write_api_secret"] == MASK and b"WRITESECRET" not in r.data
+    assert _save(client, api_key=MASK, api_secret=MASK, write_api_key=MASK, write_api_secret="").status_code == 200
+    pce = ctx.settings.current().pce
+    assert (pce.write_api_key, pce.write_api_secret) == ("wk", "WRITESECRET")
+
+
+def test_write_key_absent_reads_empty(client):
+    login(client)
+    _save(client)
+    data = client.get("/api/system/pce", environ_overrides=LOCAL).get_json()["data"]
+    assert data["write_api_key"] == "" and data["write_api_secret"] == ""
+
+
+def test_write_key_cleared(client, ctx):
+    login(client)
+    _save(client, write_api_key="wk", write_api_secret="WRITESECRET")
+    assert _save(client, api_key=MASK, api_secret=MASK, clear_write_key=True).status_code == 200
+    pce = ctx.settings.current().pce
+    assert (pce.write_api_key, pce.write_api_secret) == ("", "")
+
+
+def test_moving_pce_requires_reentering_or_clearing_write_key(client, ctx):
+    login(client)
+    _save(client, write_api_key="wk", write_api_secret="WRITESECRET")
+    moved = "https://new-pce.example.com:8443"
+    r = _save(client, url=moved, api_key="k2", api_secret="s2", write_api_key=MASK, write_api_secret=MASK)
+    err = r.get_json()["error"]
+    assert r.status_code == 400 and err["code"] == "credentials_required" and err["field"] == "write_api_key"
+    assert ctx.settings.current().pce.url == BASE
+    ok = _save(client, url=moved, api_key="k2", api_secret="s2", clear_write_key=True)
+    assert ok.status_code == 200 and ctx.settings.current().pce.write_api_secret == ""

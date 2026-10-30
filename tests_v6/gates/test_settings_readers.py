@@ -21,6 +21,8 @@ SETTINGS_READERS: dict[str, str] = {
     "pce.org_id": "illumio_ops.pce.client",
     "pce.api_key": "illumio_ops.pce.client",
     "pce.api_secret": "illumio_ops.pce.client",
+    "pce.write_api_key": "illumio_ops.services.context",
+    "pce.write_api_secret": "illumio_ops.services.context",
     "pce.verify_tls": "illumio_ops.pce.client",
     "pce.deployment_type": "illumio_ops.services.pce_health",
     "web.username": "illumio_ops.web.auth",

@@ -31,7 +31,7 @@ _KPI_KEYS = {"rules": "rpt_pu_kpi_rules", "used": "rpt_pu_kpi_used", "unused": "
              "disabled": "rpt_pu_kpi_disabled", "deny_hit": "rpt_pu_kpi_deny_hit", "no_rule": "rpt_pu_kpi_no_rule"}
 
 
-def _rule_id(r: RuleRef) -> str:
+def rule_id(r: RuleRef) -> str:
     return f"#{r.href.rsplit('/', 1)[-1]}"
 
 
@@ -40,7 +40,7 @@ def _actor(a: ActorRef) -> str:
     return f"−{text}" if a.exclusion else text
 
 
-def _scope(r: RuleRef, any_text: str) -> str:
+def rule_scope(r: RuleRef, any_text: str) -> str:
     consumers = ", ".join(_actor(a) for a in r.consumers) or any_text
     providers = ", ".join(_actor(a) for a in r.providers) or any_text
     services = ", ".join(s.name or port_text(s.port, s.proto or 0) for s in r.services) or any_text
@@ -64,7 +64,7 @@ def build_policy_usage(inp: BuildInput) -> ReportDocument:
     no_label = t("rpt_no_label")
 
     def rule_cells(r: RuleRef) -> tuple[str, str, str]:
-        return (r.ruleset_name, f"{_rule_id(r)} {r.description or ''}".strip(), _scope(r, any_text))
+        return (r.ruleset_name, f"{rule_id(r)} {r.description or ''}".strip(), rule_scope(r, any_text))
 
     rules = usage.rules if usage else {}
     hits = usage.hits if usage and not usage.unsupported else {}

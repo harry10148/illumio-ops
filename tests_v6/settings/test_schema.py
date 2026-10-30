@@ -77,7 +77,8 @@ def test_redact_masks_nonempty_secrets_only(initial):
     r = redact(initial)
     assert r["web"]["password_hash"] == MASK and r["web"]["secret_key"] == MASK
     assert r["pce"]["api_key"] == "" and r["pce"]["api_secret"] == ""  # empty stays empty: "not set"
-    assert SECRET_FIELDS == {"pce.api_key", "pce.api_secret", "web.password_hash", "web.secret_key",
+    assert SECRET_FIELDS == {"pce.api_key", "pce.api_secret", "pce.write_api_key", "pce.write_api_secret",
+                             "web.password_hash", "web.secret_key",
                              "alerts.channels.smtp.password", "alerts.channels.line.access_token",
                              "alerts.channels.telegram.bot_token", "alerts.channels.teams.webhook_url",
                              "alerts.channels.webhook.url"}

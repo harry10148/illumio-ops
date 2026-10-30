@@ -11,11 +11,19 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from illumio_ops.domain.filter import FlowCondition
 from illumio_ops.domain.report import ReportDocument
-from illumio_ops.domain.values import Language, ReportFormat, ReportType
+from illumio_ops.domain.values import Language, ReportFormat, ReportType, RhcState
 from illumio_ops.services.context import AppContext
 from illumio_ops.settings.schema import Settings
 
 Group = Literal["lateral", "inventory", "analysis", "assessment", "policy", "operations"]
+
+
+class ReportFailed(Exception):
+    """A builder's way to fail the report with a message key (and detail) instead of producing it."""
+
+    def __init__(self, key: str, detail: str | None = None) -> None:
+        super().__init__(key)
+        self.key, self.detail = key, detail
 
 
 class ReportParams(BaseModel):
@@ -81,6 +89,12 @@ REGISTRY: dict[ReportType, ReportSpec] = {}
 # is never refused for an hour.
 ONDEMAND_LOOKBACK = 90
 POLICY_USAGE_MAX_DAYS = 30
+RHC_MAX_DAYS = 90  # the PCE keeps rule hits 90 days
+
+# Why rule_hit_count is greyed out, by Rule Hit Count's state (spec §6.5 RHC).
+RHC_UNAVAILABLE: dict[RhcState, str | None] = {
+    RhcState.ENABLED: None, RhcState.PARTIAL: "rpt_unavailable_rhc_off", RhcState.DISABLED: "rpt_unavailable_rhc_off",
+    RhcState.UNSUPPORTED: "rpt_unavailable_rhc_unsupported", RhcState.UNKNOWN: "rpt_unavailable_rhc_unknown"}
 
 
 def flow_retention(settings: Settings) -> int:
@@ -112,6 +126,7 @@ def _builtin() -> dict[ReportType, ReportSpec]:
     from illumio_ops.services.reports.policy_usage import build_policy_usage
     from illumio_ops.services.reports.ransomware_report import build_ransomware
     from illumio_ops.services.reports.readiness import build_readiness
+    from illumio_ops.services.reports.rule_hit_count import build_rule_hit_count
     from illumio_ops.services.reports.security_risk import build_security_risk
     from illumio_ops.services.reports.traffic import build_traffic
     from illumio_ops.services.reports.unmanaged import build_unmanaged
@@ -141,6 +156,9 @@ def _builtin() -> dict[ReportType, ReportSpec]:
         # recompute, so a month at most.
         ReportType.POLICY_USAGE: ReportSpec(ReportType.POLICY_USAGE, "policy", False, build_policy_usage,
                                             max_lookback=lambda settings: POLICY_USAGE_MAX_DAYS),
+        # The PCE's own report of provisioned rules' hits: greyed out until Rule Hit Count is on (availability).
+        ReportType.RULE_HIT_COUNT: ReportSpec(ReportType.RULE_HIT_COUNT, "policy", False, build_rule_hit_count,
+                                              max_lookback=lambda settings: RHC_MAX_DAYS),
         ReportType.READINESS: ReportSpec(ReportType.READINESS, "assessment", True, build_readiness,
                                          max_lookback=flow_days, accepts_filter=True, retention=flow_retention),
     }

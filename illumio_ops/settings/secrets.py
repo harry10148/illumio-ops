@@ -11,7 +11,7 @@ from illumio_ops.settings.schema import Settings
 
 MASK = "********"
 SECRET_FIELDS: frozenset[str] = frozenset(
-    {"pce.api_key", "pce.api_secret", "web.password_hash", "web.secret_key",
+    {"pce.api_key", "pce.api_secret", "pce.write_api_key", "pce.write_api_secret", "web.password_hash", "web.secret_key",
      # Channel secrets; the webhook URLs carry their secret in the path or query (5.x L-12).
      "alerts.channels.smtp.password", "alerts.channels.line.access_token", "alerts.channels.telegram.bot_token",
      "alerts.channels.teams.webhook_url", "alerts.channels.webhook.url"}

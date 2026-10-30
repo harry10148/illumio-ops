@@ -11,7 +11,7 @@ from pydantic import BaseModel, Field
 
 from illumio_ops.domain.values import ReportStatus
 from illumio_ops.services.reports import schedules
-from illumio_ops.services.reports.generate import REFUSAL_FIELDS, refusal
+from illumio_ops.services.reports.generate import REFUSAL_FIELDS, availability, refusal
 from illumio_ops.services.reports.views import ReportItem, get_report
 from illumio_ops.settings.schema import ReportSchedule, ReportScheduleFields
 from illumio_ops.web.auth import get_ctx
@@ -86,6 +86,10 @@ def _check(fields: ReportScheduleFields) -> None:
     reason = refusal(get_ctx().settings.current(), params)
     if reason:
         raise ApiFailure(400, "invalid_input", reason, field=f"schedule.{REFUSAL_FIELDS[reason]}")
+    # A type greyed out (rule_hit_count until Rule Hit Count is on) cannot be scheduled; a paused one can be saved.
+    unavailable = availability(get_ctx()).get(params.report_type) if fields.enabled else None
+    if unavailable:
+        raise ApiFailure(400, "invalid_input", unavailable, field="schedule.report_type")
 
 
 def _list(d: dict[str, Any]) -> list[dict[str, Any]]:

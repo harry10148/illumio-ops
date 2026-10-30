@@ -27,6 +27,9 @@ class PceConnection(BaseModel):
     deployment_type: DeploymentType
     console_url: str | None
     verify_tls: bool | str
+    # Optional key with write access, used only to enable Rule Hit Count (spec §6.5, P5c-2).
+    write_api_key: str
+    write_api_secret: str
 
 
 class PceConnectionUpdate(BaseModel):
@@ -38,6 +41,9 @@ class PceConnectionUpdate(BaseModel):
     deployment_type: DeploymentType
     console_url: str | None = Field(max_length=2048)
     verify_tls: bool | str
+    write_api_key: str = Field(default="", max_length=512)
+    write_api_secret: str = Field(default="", max_length=1024)
+    clear_write_key: bool = False
 
 
 class PceReset(BaseModel):
@@ -93,12 +99,15 @@ def get_connection() -> PceConnection:
 
 @api_route(bp, OP_UPDATE)
 def update_connection(body: PceConnectionUpdate) -> PceConnectionSaved:
-    fields = body.model_dump(mode="json", exclude={"revision"})
+    fields = body.model_dump(mode="json", exclude={"revision", "clear_write_key"})
     # A blank or masked secret means "keep what is saved": the form never receives
     # the real values, so it cannot send them back.
     kept = [k for k in ("api_key", "api_secret") if fields[k] in ("", MASK)]
-    for k in kept:
+    write_kept = [k for k in ("write_api_key", "write_api_secret") if fields[k] in ("", MASK)]
+    for k in kept + write_kept:
         del fields[k]
+    if body.clear_write_key:
+        fields.update(write_api_key="", write_api_secret="")
     # ...except when the destination or its TLS check changes: otherwise anyone holding
     # a session could point the saved credentials at their own host and read them off
     # the next connection test.
@@ -106,6 +115,8 @@ def update_connection(body: PceConnectionUpdate) -> PceConnectionSaved:
     moved = (body.url.rstrip("/") != saved.url or body.verify_tls != saved.verify_tls)
     if kept and moved and (saved.api_key or saved.api_secret):
         raise ApiFailure(400, "credentials_required", "err_credentials_required", field="api_key")
+    if write_kept and not body.clear_write_key and moved and (saved.write_api_key or saved.write_api_secret):
+        raise ApiFailure(400, "credentials_required", "err_credentials_required", field="write_api_key")
     # The service account must be able to read the CA bundle (systemd hides /root and /home).
     if isinstance(body.verify_tls, str) and body.verify_tls.startswith("/") and not os.access(body.verify_tls, os.R_OK):
         raise ApiFailure(400, "ca_bundle_unreadable", "err_ca_bundle_unreadable", field="verify_tls")

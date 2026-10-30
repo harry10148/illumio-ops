@@ -122,6 +122,15 @@ class CapabilityState(StrEnum):
     UNKNOWN = "unknown"
 
 
+class RhcState(StrEnum):
+    """Rule Hit Count: the PCE report template and the VENs' firewall_settings scopes (spec §6.5 RHC)."""
+    ENABLED = "enabled"
+    PARTIAL = "partial"
+    DISABLED = "disabled"
+    UNSUPPORTED = "unsupported"
+    UNKNOWN = "unknown"
+
+
 class DataOrigin(StrEnum):
     INGEST = "ingest"
     BACKFILL = "backfill"
@@ -383,6 +392,7 @@ class ReportType(StrEnum):
     RANSOMWARE = "ransomware"
     READINESS = "readiness"
     POLICY_USAGE = "policy_usage"
+    RULE_HIT_COUNT = "rule_hit_count"
 
 
 class ReportFormat(StrEnum):

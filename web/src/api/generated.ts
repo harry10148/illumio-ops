@@ -63,12 +63,19 @@ export type ReportFormat = ("html" | "xlsx")
  * This interface was referenced by `ContractRoot`'s JSON-Schema
  * via the `definition` "ReportType".
  */
-export type ReportType = ("lateral_posture" | "new_connections" | "unmanaged_endpoints" | "traffic" | "security_risk" | "network_inventory" | "app_summary" | "ven_status" | "audit" | "ransomware" | "readiness" | "policy_usage")
+export type ReportType = ("lateral_posture" | "new_connections" | "unmanaged_endpoints" | "traffic" | "security_risk" | "network_inventory" | "app_summary" | "ven_status" | "audit" | "ransomware" | "readiness" | "policy_usage" | "rule_hit_count")
 /**
  * This interface was referenced by `ContractRoot`'s JSON-Schema
  * via the `definition` "ReportStatus".
  */
 export type ReportStatus = ("queued" | "running" | "done" | "failed")
+/**
+ * Rule Hit Count: the PCE report template and the VENs' firewall_settings scopes (spec §6.5 RHC).
+ * 
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "RhcState".
+ */
+export type RhcState = ("enabled" | "partial" | "disabled" | "unsupported" | "unknown")
 /**
  * This interface was referenced by `ContractRoot`'s JSON-Schema
  * via the `definition` "ChannelKind".
@@ -840,6 +847,45 @@ total: number
 }
 /**
  * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "RhcEnable".
+ */
+export interface RhcEnable {
+confirm: boolean
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "EnableResult".
+ */
+export interface EnableResult {
+detail: (string | null)
+error_key: (string | null)
+ok: boolean
+skipped: string[]
+steps_done: string[]
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "RhcStatus".
+ */
+export interface RhcStatus {
+detail: (string | null)
+pce_report: (boolean | null)
+reason_key: (string | null)
+saas: boolean
+state: RhcState
+ven_scopes: (boolean | null)
+write_key: boolean
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "RhcEnabled".
+ */
+export interface RhcEnabled {
+result: EnableResult
+status: RhcStatus
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
  * via the `definition` "ChannelState".
  */
 export interface ChannelState {
@@ -1291,6 +1337,8 @@ org_id: string
 revision: number
 url: string
 verify_tls: (boolean | string)
+write_api_key: string
+write_api_secret: string
 }
 /**
  * This interface was referenced by `ContractRoot`'s JSON-Schema
@@ -1314,12 +1362,15 @@ run: (ProbeRun | null)
 export interface PceConnectionUpdate {
 api_key: string
 api_secret: string
+clear_write_key?: boolean
 console_url: (string | null)
 deployment_type: DeploymentType
 org_id: string
 revision: number
 url: string
 verify_tls: (boolean | string)
+write_api_key?: string
+write_api_secret?: string
 }
 /**
  * This interface was referenced by `ContractRoot`'s JSON-Schema
@@ -1343,6 +1394,8 @@ reset: (PceReset | null)
 revision: number
 url: string
 verify_tls: (boolean | string)
+write_api_key: string
+write_api_secret: string
 }
 /**
  * This interface was referenced by `ContractRoot`'s JSON-Schema
@@ -1465,7 +1518,7 @@ revision: number
 validity_days: number
 }
 
-export type OpId = "alert_rules.create" | "alert_rules.delete" | "alert_rules.list" | "alert_rules.pack" | "alert_rules.preview" | "alert_rules.update" | "alerts.evidence" | "alerts.explain" | "alerts.get" | "alerts.list" | "alerts.mark_known" | "alerts.note_add" | "auth.csrf" | "auth.login" | "auth.logout" | "auth.me" | "auth.password" | "home.summary" | "i18n.dictionary" | "report_schedules.create" | "report_schedules.delete" | "report_schedules.list" | "report_schedules.run_now" | "report_schedules.update" | "reports.catalog" | "reports.delete" | "reports.generate" | "reports.get" | "reports.list" | "system.channels.get" | "system.channels.test" | "system.channels.update" | "system.collection.backfill" | "system.collection.get" | "system.collection.status" | "system.collection.update" | "system.display.get" | "system.display.update" | "system.jobs.list" | "system.lateral.get" | "system.lateral.known" | "system.lateral.known_delete" | "system.lateral.update" | "system.logs.query" | "system.pce.get" | "system.pce.latest" | "system.pce.probe" | "system.pce.update" | "system.reports.get" | "system.reports.update" | "system.security.get" | "system.security.update" | "system.tls.csr" | "system.tls.import" | "system.tls.renew" | "system.tls.status" | "system.tls.update";
+export type OpId = "alert_rules.create" | "alert_rules.delete" | "alert_rules.list" | "alert_rules.pack" | "alert_rules.preview" | "alert_rules.update" | "alerts.evidence" | "alerts.explain" | "alerts.get" | "alerts.list" | "alerts.mark_known" | "alerts.note_add" | "auth.csrf" | "auth.login" | "auth.logout" | "auth.me" | "auth.password" | "home.summary" | "i18n.dictionary" | "report_schedules.create" | "report_schedules.delete" | "report_schedules.list" | "report_schedules.run_now" | "report_schedules.update" | "reports.catalog" | "reports.delete" | "reports.generate" | "reports.get" | "reports.list" | "rhc.enable" | "rhc.status" | "system.channels.get" | "system.channels.test" | "system.channels.update" | "system.collection.backfill" | "system.collection.get" | "system.collection.status" | "system.collection.update" | "system.display.get" | "system.display.update" | "system.jobs.list" | "system.lateral.get" | "system.lateral.known" | "system.lateral.known_delete" | "system.lateral.update" | "system.logs.query" | "system.pce.get" | "system.pce.latest" | "system.pce.probe" | "system.pce.update" | "system.reports.get" | "system.reports.update" | "system.security.get" | "system.security.update" | "system.tls.csr" | "system.tls.import" | "system.tls.renew" | "system.tls.status" | "system.tls.update";
 
 export interface Requests {
   "alert_rules.create": RuleWrite;
@@ -1497,6 +1550,8 @@ export interface Requests {
   "reports.generate": ReportParams;
   "reports.get": undefined;
   "reports.list": undefined;
+  "rhc.enable": RhcEnable;
+  "rhc.status": undefined;
   "system.channels.get": undefined;
   "system.channels.test": ChannelTest;
   "system.channels.update": ChannelsUpdate;
@@ -1557,6 +1612,8 @@ export interface Responses {
   "reports.generate": ReportItem;
   "reports.get": ReportItem;
   "reports.list": ReportPage;
+  "rhc.enable": RhcEnabled;
+  "rhc.status": RhcStatus;
   "system.channels.get": ChannelsView;
   "system.channels.test": ChannelTestResult;
   "system.channels.update": ChannelsView;
@@ -1617,6 +1674,8 @@ export const OPERATIONS = {
   "reports.generate": { method: "POST", path: "/api/reports" },
   "reports.get": { method: "GET", path: "/api/reports/<int:report_id>" },
   "reports.list": { method: "GET", path: "/api/reports" },
+  "rhc.enable": { method: "POST", path: "/api/rhc/enable" },
+  "rhc.status": { method: "GET", path: "/api/rhc" },
   "system.channels.get": { method: "GET", path: "/api/system/channels" },
   "system.channels.test": { method: "POST", path: "/api/system/channels/test" },
   "system.channels.update": { method: "PUT", path: "/api/system/channels" },
@@ -1815,6 +1874,7 @@ export const VALUES = {
     "policy_usage",
     "ransomware",
     "readiness",
+    "rule_hit_count",
     "security_risk",
     "traffic",
     "unmanaged_endpoints",

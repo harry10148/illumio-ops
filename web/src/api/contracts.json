@@ -10255,7 +10255,8 @@
               "audit",
               "ransomware",
               "readiness",
-              "policy_usage"
+              "policy_usage",
+              "rule_hit_count"
             ],
             "title": "ReportType",
             "type": "string"
@@ -10716,7 +10717,8 @@
               "audit",
               "ransomware",
               "readiness",
-              "policy_usage"
+              "policy_usage",
+              "rule_hit_count"
             ],
             "title": "ReportType",
             "type": "string"
@@ -11269,7 +11271,8 @@
               "audit",
               "ransomware",
               "readiness",
-              "policy_usage"
+              "policy_usage",
+              "rule_hit_count"
             ],
             "title": "ReportType",
             "type": "string"
@@ -11810,7 +11813,8 @@
               "audit",
               "ransomware",
               "readiness",
-              "policy_usage"
+              "policy_usage",
+              "rule_hit_count"
             ],
             "title": "ReportType",
             "type": "string"
@@ -12530,7 +12534,8 @@
               "audit",
               "ransomware",
               "readiness",
-              "policy_usage"
+              "policy_usage",
+              "rule_hit_count"
             ],
             "title": "ReportType",
             "type": "string"
@@ -12991,7 +12996,8 @@
               "audit",
               "ransomware",
               "readiness",
-              "policy_usage"
+              "policy_usage",
+              "rule_hit_count"
             ],
             "title": "ReportType",
             "type": "string"
@@ -13191,7 +13197,8 @@
               "audit",
               "ransomware",
               "readiness",
-              "policy_usage"
+              "policy_usage",
+              "rule_hit_count"
             ],
             "title": "ReportType",
             "type": "string"
@@ -13531,7 +13538,8 @@
               "audit",
               "ransomware",
               "readiness",
-              "policy_usage"
+              "policy_usage",
+              "rule_hit_count"
             ],
             "title": "ReportType",
             "type": "string"
@@ -14200,6 +14208,265 @@
           "page_size"
         ],
         "title": "ReportPage",
+        "type": "object"
+      }
+    },
+    "rhc.enable": {
+      "method": "POST",
+      "path": "/api/rhc/enable",
+      "request_schema": {
+        "properties": {
+          "confirm": {
+            "title": "Confirm",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "confirm"
+        ],
+        "title": "RhcEnable",
+        "type": "object"
+      },
+      "response_schema": {
+        "$defs": {
+          "EnableResult": {
+            "properties": {
+              "detail": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Detail"
+              },
+              "error_key": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Error Key"
+              },
+              "ok": {
+                "title": "Ok",
+                "type": "boolean"
+              },
+              "skipped": {
+                "items": {
+                  "type": "string"
+                },
+                "title": "Skipped",
+                "type": "array"
+              },
+              "steps_done": {
+                "items": {
+                  "type": "string"
+                },
+                "title": "Steps Done",
+                "type": "array"
+              }
+            },
+            "required": [
+              "ok",
+              "steps_done",
+              "skipped",
+              "error_key",
+              "detail"
+            ],
+            "title": "EnableResult",
+            "type": "object"
+          },
+          "RhcState": {
+            "description": "Rule Hit Count: the PCE report template and the VENs' firewall_settings scopes (spec §6.5 RHC).",
+            "enum": [
+              "enabled",
+              "partial",
+              "disabled",
+              "unsupported",
+              "unknown"
+            ],
+            "title": "RhcState",
+            "type": "string"
+          },
+          "RhcStatus": {
+            "properties": {
+              "detail": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Detail"
+              },
+              "pce_report": {
+                "anyOf": [
+                  {
+                    "type": "boolean"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Pce Report"
+              },
+              "reason_key": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Reason Key"
+              },
+              "saas": {
+                "title": "Saas",
+                "type": "boolean"
+              },
+              "state": {
+                "$ref": "#/$defs/RhcState"
+              },
+              "ven_scopes": {
+                "anyOf": [
+                  {
+                    "type": "boolean"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Ven Scopes"
+              },
+              "write_key": {
+                "title": "Write Key",
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "state",
+              "pce_report",
+              "ven_scopes",
+              "reason_key",
+              "detail",
+              "write_key",
+              "saas"
+            ],
+            "title": "RhcStatus",
+            "type": "object"
+          }
+        },
+        "properties": {
+          "result": {
+            "$ref": "#/$defs/EnableResult"
+          },
+          "status": {
+            "$ref": "#/$defs/RhcStatus"
+          }
+        },
+        "required": [
+          "result",
+          "status"
+        ],
+        "title": "RhcEnabled",
+        "type": "object"
+      }
+    },
+    "rhc.status": {
+      "method": "GET",
+      "path": "/api/rhc",
+      "request_schema": null,
+      "response_schema": {
+        "$defs": {
+          "RhcState": {
+            "description": "Rule Hit Count: the PCE report template and the VENs' firewall_settings scopes (spec §6.5 RHC).",
+            "enum": [
+              "enabled",
+              "partial",
+              "disabled",
+              "unsupported",
+              "unknown"
+            ],
+            "title": "RhcState",
+            "type": "string"
+          }
+        },
+        "properties": {
+          "detail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Detail"
+          },
+          "pce_report": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pce Report"
+          },
+          "reason_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason Key"
+          },
+          "saas": {
+            "title": "Saas",
+            "type": "boolean"
+          },
+          "state": {
+            "$ref": "#/$defs/RhcState"
+          },
+          "ven_scopes": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ven Scopes"
+          },
+          "write_key": {
+            "title": "Write Key",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "state",
+          "pce_report",
+          "ven_scopes",
+          "reason_key",
+          "detail",
+          "write_key",
+          "saas"
+        ],
+        "title": "RhcStatus",
         "type": "object"
       }
     },
@@ -18127,6 +18394,14 @@
               }
             ],
             "title": "Verify Tls"
+          },
+          "write_api_key": {
+            "title": "Write Api Key",
+            "type": "string"
+          },
+          "write_api_secret": {
+            "title": "Write Api Secret",
+            "type": "string"
           }
         },
         "required": [
@@ -18137,7 +18412,9 @@
           "api_secret",
           "deployment_type",
           "console_url",
-          "verify_tls"
+          "verify_tls",
+          "write_api_key",
+          "write_api_secret"
         ],
         "title": "PceConnection",
         "type": "object"
@@ -18341,6 +18618,11 @@
             "title": "Api Secret",
             "type": "string"
           },
+          "clear_write_key": {
+            "default": false,
+            "title": "Clear Write Key",
+            "type": "boolean"
+          },
           "console_url": {
             "anyOf": [
               {
@@ -18380,6 +18662,18 @@
               }
             ],
             "title": "Verify Tls"
+          },
+          "write_api_key": {
+            "default": "",
+            "maxLength": 512,
+            "title": "Write Api Key",
+            "type": "string"
+          },
+          "write_api_secret": {
+            "default": "",
+            "maxLength": 1024,
+            "title": "Write Api Secret",
+            "type": "string"
           }
         },
         "required": [
@@ -18489,6 +18783,14 @@
               }
             ],
             "title": "Verify Tls"
+          },
+          "write_api_key": {
+            "title": "Write Api Key",
+            "type": "string"
+          },
+          "write_api_secret": {
+            "title": "Write Api Secret",
+            "type": "string"
           }
         },
         "required": [
@@ -18500,6 +18802,8 @@
           "deployment_type",
           "console_url",
           "verify_tls",
+          "write_api_key",
+          "write_api_secret",
           "reset"
         ],
         "title": "PceConnectionSaved",
@@ -19584,6 +19888,7 @@
       "policy_usage",
       "ransomware",
       "readiness",
+      "rule_hit_count",
       "security_risk",
       "traffic",
       "unmanaged_endpoints",
