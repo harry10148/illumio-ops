@@ -4,6 +4,8 @@ number. The dimension panel is one single-level ranking per dimension, computed 
 Task 14: six dimensions over 7 days scan 25 s on 1,000 hosts)."""
 from __future__ import annotations
 
+from collections.abc import Iterator
+from contextlib import contextmanager
 from datetime import UTC, datetime, timedelta
 from typing import Annotated, Literal
 
@@ -101,18 +103,21 @@ class WorkbenchMeta(BaseModel):
     dimension_top: int
 
 
-def _read_ctx(ctx: AppContext, req: FlowRequest | EventRequest, now: datetime | None) -> tuple[AppContext,
-                                                                                               PullInfo | None]:
-    """Traffic the install does not keep is read from the PCE once and held (workbench_store); events are always
-    collected."""
+@contextmanager
+def _read_ctx(ctx: AppContext, req: FlowRequest | EventRequest,
+              now: datetime | None) -> Iterator[tuple[AppContext, PullInfo | None]]:
+    """Traffic the install does not keep is read from the PCE once and held for the request (workbench_store);
+    events are always collected."""
     if isinstance(req, EventRequest):
-        return ctx, None
-    return workbench_store.context_for(ctx, req.start, req.end, now=now)
+        yield ctx, None
+        return
+    with workbench_store.lease(ctx, req.start, req.end, now=now) as got:
+        yield got
 
 
 def run(ctx: AppContext, req: FlowRequest | EventRequest, *, now: datetime | None = None) -> WorkbenchResult:
-    read, pulled = _read_ctx(ctx, req, now)
-    return WorkbenchResult(result=run_segment(read, req.segment(), now=now), pulled=pulled)
+    with _read_ctx(ctx, req, now) as (read, pulled):
+        return WorkbenchResult(result=run_segment(read, req.segment(), now=now), pulled=pulled)
 
 
 def dimension(ctx: AppContext, req: FlowRequest | EventRequest, dim: SegmentDimension, *,
@@ -124,9 +129,9 @@ def dimension(ctx: AppContext, req: FlowRequest | EventRequest, dim: SegmentDime
     if isinstance(seg, EventSegment):
         e = aggregate_events(ctx, seg, now=now)
         return DimensionTop(rows=e.rows, limit_hit=e.limit_hit, coverage=e.coverage)
-    read, pulled = _read_ctx(ctx, req, now)
-    f = aggregate_flows(read, seg, now=now, with_field_coverage=False)
-    return DimensionTop(rows=f.rows, limit_hit=f.limit_hit, coverage=f.coverage, pulled=pulled)
+    with _read_ctx(ctx, req, now) as (read, pulled):
+        f = aggregate_flows(read, seg, now=now, with_field_coverage=False)
+        return DimensionTop(rows=f.rows, limit_hit=f.limit_hit, coverage=f.coverage, pulled=pulled)
 
 
 def from_alert(ctx: AppContext, alert_id: int) -> FlowRequest | EventRequest | None:
