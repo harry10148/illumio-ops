@@ -50,6 +50,8 @@ def test_recompute_shows_the_blocking_rule(context, live_app, monkeypatch):
     expect(row).to_have_count(1)
     text = row.inner_text()
     assert "web-01" in text and "Quarantine" in text and "app=Jumpdesk" in text and "/orgs/" not in text
+    assert "3389/TCP" in text  # the protocol by name (lab 2026-10-31: "59412/6")
+    expect(panel.locator("[data-role=pred-stale]")).to_have_count(0)  # unchanged conditions are not "changed"
     page.locator("select[name=period]").select_option(index=1)  # the conditions change: another period
     expect(panel.locator("[data-role=pred-stale]")).to_have_count(1)
 

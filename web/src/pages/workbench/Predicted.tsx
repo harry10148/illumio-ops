@@ -29,9 +29,13 @@ function actor(a: ActorRef): string {
   return a.exclusion ? t("wb_pred_except", { what: text }) : text;
 }
 
+function protoName(p: number): string {
+  return p === 6 ? "TCP" : p === 17 ? "UDP" : p === 1 ? "ICMP" : String(p);
+}
+
 function service(s: ServiceRef): string {
   if (s.name) return s.name;
-  const proto = s.proto === 6 ? "TCP" : s.proto === 17 ? "UDP" : s.proto === null ? "" : String(s.proto);
+  const proto = s.proto === null ? "" : protoName(s.proto);
   return `${s.port ?? "*"}${s.to_port ? `-${s.to_port}` : ""}${proto ? `/${proto}` : ""}`;
 }
 
@@ -52,21 +56,24 @@ export function Predicted({ req }: { req: Req }) {
   const [error, setError] = useState<ApiError | null>(null);
   const [busy, setBusy] = useState(false);
   const [all, setAll] = useState(false);
+  const [asked, setAsked] = useState<string | null>(null);  // the request as sent: the server's copy adds defaults
 
   async function run() {
     setBusy(true);
     setError(null);
+    const sent = JSON.stringify(req);
     const env = await call("workbench.predicted", { request: req as PredictedView["request"] });
     setBusy(false);
     if (env.ok && env.data) {
       setView(env.data);
+      setAsked(sent);
       setAll(false);
     } else {
       setError(env.error);
     }
   }
 
-  const changed = view !== null && JSON.stringify({ ...view.request, view: req.view }) !== JSON.stringify({ ...req, view: req.view });
+  const changed = view !== null && asked !== JSON.stringify(req);
   const pb = view?.predicted;
   const rows = pb ? (all ? pb.rows : pb.rows.slice(0, SHOWN)) : [];
   return (
@@ -101,7 +108,7 @@ export function Predicted({ req }: { req: Req }) {
                       <tr key={r.flow.record_key} data-draft={r.draft_decision}>
                         <td>{end(r.flow.src_hostname, r.flow.src_ip)}</td>
                         <td>{end(r.flow.dst_hostname, r.flow.dst_ip)}</td>
-                        <td className="nowrap">{r.flow.port ?? "—"}/{r.flow.proto}</td>
+                        <td className="nowrap">{r.flow.port ?? "—"}/{protoName(r.flow.proto)}</td>
                         <td>{word(DECISION_KEYS, r.flow.policy_decision)}</td>
                         <td>{word(DECISION_KEYS, r.draft_decision)}</td>
                         <td className="pred-rules">
