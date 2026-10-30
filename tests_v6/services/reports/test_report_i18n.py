@@ -83,6 +83,7 @@ def ctx(tmp_path_factory):
         rows=[{"ruleset_name": "Web", "rule_href": "/r/1", "action": "allow", "src_ip": "<5001 hosts: expansion capped>",
                "dst_ip": "10.0.0.2", "port": 1433, "protocol": "TCP", "truncated": "src"}],
         per_ruleset={"Web": 1}, rule_count=1, rules_capped=1, truncated_rulesets=["Web"], rows_omitted=3,
+        not_expanded=[("Web", "/r/2", "virtual_services"), ("Web", "/r/3", "unknown_reference")],
         computed_at=NOW))
     mp.setattr(ransomware_report, "host_ransomware", lambda ctx, href, **kw: HostRansomware.model_construct(
         breakdown=None, allow_rules={"445/6": []}, allow_status={"445/6": "error"}))

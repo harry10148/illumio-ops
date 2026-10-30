@@ -1931,5 +1931,9 @@
   "rpt_prs_col_rows": "Rows",
   "rpt_prs_none": "No enabled rule in force resolves to addresses.",
   "rpt_prs_how_intro": "This report expands every enabled rule in force (allow rules, Deny Rules, Override Deny) into source IP × destination IP × port rows, from the PCE when it runs. The rows are in the JSON and CSV files.",
-  "rpt_prs_how_columns": "Columns (the same in every language): {columns}. ANY means any address or port (a rule with no source or no service); {ams} is every workload's address, not ANY. A service with no ports (unknown, or process-based) is shown as such, not as any port. Rulesets limit the destinations to their scope; excluded addresses and IP-list exclusion ranges are taken out. Unmanaged workloads with labels are included."
+  "rpt_prs_how_columns": "Columns (the same in every language): {columns}. ANY means any address or port (a rule with no source or no service); {ams} is every workload's address, not ANY. A service with no ports (unknown, or process-based) is shown as such, not as any port. Rulesets limit the destinations to their scope; excluded addresses and IP-list exclusion ranges are taken out. Unmanaged workloads with labels are included.",
+  "rpt_prs_kpi_not_expanded": "Rules not expanded",
+  "rpt_prs_finding_not_expanded": "{n} rule(s) could not be expanded faithfully",
+  "rpt_prs_finding_not_expanded_why": "They use virtual services (whose services come from the virtual service) or refer to something the PCE does not hold. Each has a row saying so (truncated = not_expanded); none is widened or dropped silently.",
+  "rpt_prs_finding_not_expanded_action": "Compare these rules in the PCE by hand."
 }

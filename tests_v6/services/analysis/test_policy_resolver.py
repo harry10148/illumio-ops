@@ -26,7 +26,8 @@ def ctx(tmp_path, monkeypatch):
         return SETS
     monkeypatch.setattr(policy_resolver, "fetch_rule_sets", rule_sets)
     monkeypatch.setattr(policy_resolver, "fetch_objects", lambda client, pversion, kind, *, deadline: [])
-    monkeypatch.setattr(policy_resolver, "get_all", lambda client, path, *, params, deadline: WORKLOADS)
+    monkeypatch.setattr(policy_resolver, "get_all", lambda client, path, *, params, deadline:
+                        WORKLOADS if path == "/workloads" else [{"href": WEB, "key": "role"}, {"href": DB, "key": "role"}])
     c = configured_ctx(tmp_path)
     c._state = state
     return c
@@ -51,3 +52,12 @@ def test_fetch_failure_raises(ctx):
     ctx._state["fail"] = PceCollectionIncomplete("/sec_policy/active/rule_sets", 0, "HTTP 500")
     with pytest.raises(PceCollectionIncomplete):
         policy_resolver.resolve(ctx)
+
+
+def test_not_expanded_rule_disclosed(ctx, monkeypatch):
+    """Final review #4/#5: a rule that cannot be expanded faithfully gets a row saying so (CSV) and is counted."""
+    vs = [{**SETS[0], "rules": [{**SETS[0]["rules"][0], "resolve_labels_as": {"providers": ["virtual_services"]}}]}]
+    monkeypatch.setattr(policy_resolver, "fetch_rule_sets", lambda client, pversion, *, deadline: vs)
+    r = policy_resolver.resolve(ctx)
+    assert r.not_expanded == [("Web", f"{A}/rule_sets/1/sec_rules/1", "virtual_services")]
+    assert r.rows[-1]["truncated"] == "not_expanded" and "virtual_services" in r.rows[-1]["src_ip"]

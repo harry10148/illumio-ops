@@ -590,3 +590,94 @@ def test_subtract_many_hosts_is_fast():
     t0 = time.monotonic()
     out = _subtract(kept, excluded)
     assert out == kept[1:] and time.monotonic() - t0 < 1.0  # 10.0.0.1 is inside 10.0.0.0/30
+
+
+# ── final review (Codex, 2026-10-30): Illumio's own semantics, nothing silent ──
+
+from illumio_ops.domain.policy_resolver import resolve_ruleset_within
+
+KEYS = {"/l/web": "role", "/l/db": "role", "/l/prod": "env", "/l/dev": "env"}
+L2IP = {"/l/web": ["10.0.0.1", "10.0.0.2"], "/l/db": ["10.0.0.3", "10.0.0.4"],
+        "/l/prod": ["10.0.0.1", "10.0.0.3"], "/l/dev": ["10.0.0.2", "10.0.0.4"]}
+W2IP = {"/wl/1": ["10.0.0.1"], "/wl/2": ["10.0.0.2"], "/wl/3": ["10.0.0.3"], "/wl/4": ["10.0.0.4"]}
+KNOWN = {"label": set(KEYS), "label_group": set(), "ip_list": {"/ipl/x"}, "workload": set(W2IP)}
+
+
+def _strict(rs, **kw):
+    return resolve_ruleset_within(rs, limit=None, label_to_ips=L2IP, iplist_to_cidrs={"/ipl/x": ["192.0.2.0/24"]},
+                                  label_group_to_labels={}, workload_to_ips=W2IP, label_keys=KEYS, known=KNOWN, **kw)
+
+
+def _rule(cons, prov, **kw):
+    return {"href": "/r/1", "enabled": True, "consumers": cons, "providers": prov,
+            "ingress_services": [{"port": 443, "proto": 6}], **kw}
+
+
+def L(h, **kw):
+    return {"label": {"href": h}, **kw}
+
+
+def test_labels_of_different_keys_are_anded():
+    """Review #1: role=Web and env=Prod is Web ∩ Prod, not Web ∪ Prod; same key stays OR."""
+    rows, _, _ = _strict(_ruleset([_rule([L("/l/web"), L("/l/prod")], [L("/l/db"), L("/l/web")])]))
+    assert {r["src_ip"] for r in rows} == {"10.0.0.1"}
+    assert {r["dst_ip"] for r in rows} == {"10.0.0.1", "10.0.0.2", "10.0.0.3", "10.0.0.4"}
+
+
+def test_each_scope_expanded_on_its_own():
+    """Review #2: Prod and Dev scopes with All Workloads → All Workloads: no Prod → Dev rows."""
+    rs = _ruleset([_rule([{"actors": "ams"}], [{"actors": "ams"}])], scopes=[[L("/l/prod")], [L("/l/dev")]])
+    rows, _, _ = _strict(rs)
+    pairs = {(r["src_ip"], r["dst_ip"]) for r in rows}
+    prod, dev = {"10.0.0.1", "10.0.0.3"}, {"10.0.0.2", "10.0.0.4"}
+    assert pairs == {(a, b) for s in (prod, dev) for a in s for b in s}
+
+
+def test_explicit_workload_actor_scoped():
+    """Review #3: in a Prod-scoped ruleset an explicit Dev workload as provider is outside the scope."""
+    rs = _ruleset([_rule([{"ip_list": {"href": "/ipl/x"}}], [{"workload": {"href": "/wl/2"}},
+                                                               {"workload": {"href": "/wl/1"}}])],
+                  scopes=[[L("/l/prod")]])
+    rows, _, _ = _strict(rs)
+    assert {r["dst_ip"] for r in rows} == {"10.0.0.1"}
+
+
+def test_virtual_service_rule_not_expanded():
+    """Review #4: providers resolved as virtual services take their services from the virtual service: not ANY."""
+    rs = _ruleset([_rule([L("/l/web")], [L("/l/db")], ingress_services=[],
+                         resolve_labels_as={"providers": ["virtual_services"], "consumers": ["workloads"]})])
+    rows, _, issues = _strict(rs)
+    assert rows == [] and issues == [("/r/1", "virtual_services")]
+
+
+def test_unknown_reference_disclosed_not_dropped():
+    """Review #5: an unknown include or exclusion is disclosed; an unknown exclusion never yields the full set."""
+    rows, _, issues = _strict(_ruleset([_rule([{"actors": "ams"}, {"ip_list": {"href": "/ipl/gone"}, "exclusion": True}],
+                                              [L("/l/db")])]))
+    assert rows == [] and issues == [("/r/1", "unknown_reference")]
+    rows2, _, issues2 = _strict(_ruleset([_rule([L("/l/nope")], [L("/l/db")])]))
+    assert rows2 == [] and issues2 == [("/r/1", "unknown_reference")]
+
+
+def test_known_but_empty_is_not_an_issue():
+    keys = {**KEYS, "/l/empty": "app"}
+    rows, _, issues = resolve_ruleset_within(
+        _ruleset([_rule([L("/l/empty")], [L("/l/db")])]), limit=None, label_to_ips=L2IP, iplist_to_cidrs={},
+        label_group_to_labels={}, workload_to_ips=W2IP, label_keys=keys, known={**KNOWN, "label": set(keys)})
+    assert rows == [] and issues == []
+
+
+def test_workload_subnets_used_when_asked():
+    """Review #6: use_workload_subnets on the provider side gives the interface's network, not its address."""
+    rs = _ruleset([_rule([{"ip_list": {"href": "/ipl/x"}}], [{"workload": {"href": "/wl/1"}}],
+                         use_workload_subnets=["providers"])])
+    rows, _, _ = _strict(rs, ip_to_subnet={"10.0.0.1": "10.0.0.0/24"})
+    assert {r["dst_ip"] for r in rows} == {"10.0.0.0/24"}
+
+
+def test_build_label_keys_and_subnets():
+    from illumio_ops.domain.policy_resolver import build_ip_to_subnet, build_label_keys
+    assert build_label_keys([{"href": "/l/1", "key": "app"}], [{"href": "/lg/1", "key": "env"}]) == \
+        {"/l/1": "app", "/lg/1": "env"}
+    assert build_ip_to_subnet([{"interfaces": [{"address": "10.0.0.10", "cidr_block": 24}, {"address": "10.1.1.1"}]}]) \
+        == {"10.0.0.10": "10.0.0.0/24"}

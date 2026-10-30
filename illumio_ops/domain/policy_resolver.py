@@ -36,135 +36,121 @@ def _proto_name(proto: Any) -> str:
         return str(proto)
 
 
-def _actor_ips(
-    actor: dict[str, Any],
-    *,
-    label_to_ips: dict[str, list[str]],
-    iplist_to_cidrs: dict[str, list[str]],
-    label_group_to_labels: dict[str, list[str]],
-    workload_to_ips: dict[str, list[str]],
-) -> tuple[list[str], str]:
-    """Return (ip_values, kind) for one actor; unknown refs -> ([], kind)."""
+Lookups = dict[str, Any]
+_WORKLOAD_KINDS = ("label", "label_group", "workload")  # what a scope narrows; IP lists and literals it does not
+
+
+def _label_ips(href: str, lk: Lookups) -> set[str]:
+    return set(lk["label_to_ips"].get(href, []))
+
+
+def _group_ips(href: str, lk: Lookups) -> set[str]:
+    return {ip for lh in lk["label_group_to_labels"].get(href, []) for ip in lk["label_to_ips"].get(lh, [])}
+
+
+def _unknown(actor: dict[str, Any], lk: Lookups) -> bool:
+    """With `known` (every object the PCE has), a reference it does not hold: the rule cannot be expanded faithfully
+    (final review #5). A known object with no members is not unknown."""
+    known = lk.get("known")
+    if known is None:
+        return False
+    for kind in ("label", "label_group", "ip_list", "workload"):
+        ref = actor.get(kind)
+        if isinstance(ref, dict):
+            return ref.get("href", "") not in known.get(kind, set())
+    return False
+
+
+def _key(kind: str, href: str, lk: Lookups) -> str:
+    """The label dimension (role, env, ...) a label or label group is in; one shared key without label_keys (the
+    5.x behaviour, where every label was ORed)."""
+    keys = lk.get("label_keys")
+    return "" if keys is None else f"{keys.get(href, href)}"
+
+
+def _actor_ips(actor: dict[str, Any], lk: Lookups) -> tuple[set[str], str]:
+    """(addresses, kind) of one actor; an unknown reference gives none."""
     if actor.get("actors") == "ams":  # All Workloads: every workload's address, never ANY (security review)
-        return _all_workloads(workload_to_ips), "all_workloads"
+        return set(_all_workloads(lk["workload_to_ips"])), "all_workloads"
     if "label" in actor:
-        href = actor["label"].get("href", "")
-        return list(label_to_ips.get(href, [])), "label"
+        return _label_ips(actor["label"].get("href", ""), lk), "label"
     if "label_group" in actor:
-        href = actor["label_group"].get("href", "")
-        ips: list[str] = []
-        for lh in label_group_to_labels.get(href, []):
-            ips.extend(label_to_ips.get(lh, []))
-        return ips, "label_group"
+        return _group_ips(actor["label_group"].get("href", ""), lk), "label_group"
     if "ip_list" in actor:
-        href = actor["ip_list"].get("href", "")
-        return list(iplist_to_cidrs.get(href, [])), "ip_list"
+        return set(lk["iplist_to_cidrs"].get(actor["ip_list"].get("href", ""), [])), "ip_list"
     if "workload" in actor:
-        href = actor["workload"].get("href", "")
-        return list(workload_to_ips.get(href, [])), "workload"
+        return set(lk["workload_to_ips"].get(actor["workload"].get("href", ""), [])), "workload"
     if "ip_address" in actor:
         val = actor["ip_address"].get("value")
-        return ([val], "ip_address") if val else ([], "ip_address")
-    return [], "unknown"
+        return ({val} if val else set()), "ip_address"
+    return set(), "unknown"
 
 
-def _scope_ip_set(
-    scopes: list[Any],
-    *,
-    label_to_ips: dict[str, list[str]],
-    label_group_to_labels: dict[str, list[str]],
-) -> set[str] | None:
-    """Ruleset scopes → 允許的 workload IP 集合；None＝不設限。
-
-    Illumio scope 語意：同一 scope 內的 entries 取 AND（workload 必須同時帶有
-    全部 scope label → IP 交集）；多個 scope 取 OR（聯集）。label_group entry
-    以成員 label 的 IP 聯集視為單一 entry。帶 ``exclusion: true`` 的 entry 於
-    該 scope 交集後扣除。空 scopes 或「All」scope（無任何 label entry）→ None。
-
-    限制：只有 exclusion entry 而無 include entry 的 scope 無法從 lookups 推得
-    全集，保守解析為空集合（fail-closed）。
-    """
-    constrained = False
-    union: set[str] = set()
+def _scope_sets(scopes: list[Any], lk: Lookups) -> list[set[str]] | None:
+    """Each scope's workload addresses, kept apart (final review #2: one union let an intra-scope rule cross from
+    Prod to Dev); None when the ruleset is not scoped. Within a scope, labels of different keys are ANDed, of the
+    same key ORed (label groups count as their key); exclusions are subtracted. A scope with only exclusions, or
+    labels that resolve to nothing, is empty (fail closed)."""
+    out: list[set[str]] = []
     for scope in scopes or []:
-        inc_sets: list[set[str]] = []
+        by_key: dict[str, set[str]] = {}
         exc: set[str] = set()
         for entry in scope or []:
-            if "label" in entry:
-                ips = set(label_to_ips.get(entry["label"].get("href", ""), []))
-            elif "label_group" in entry:
-                ips = set()
-                for lh in label_group_to_labels.get(entry["label_group"].get("href", ""), []):
-                    ips.update(label_to_ips.get(lh, []))
-            else:
+            kind = "label" if "label" in entry else "label_group" if "label_group" in entry else None
+            if kind is None:
                 continue
+            href = entry[kind].get("href", "")
+            ips = _label_ips(href, lk) if kind == "label" else _group_ips(href, lk)
             if entry.get("exclusion"):
-                exc.update(ips)
+                exc |= ips
             else:
-                inc_sets.append(ips)
-        if not inc_sets and not exc:
-            continue  # 「All」scope：不設限
-        constrained = True
-        cur = set.intersection(*inc_sets) if inc_sets else set()
-        union.update(cur - exc)
-    return union if constrained else None
+                by_key.setdefault(_key(kind, href, lk) if lk.get("label_keys") is not None else href, set()).update(ips)
+        if not by_key and not exc:
+            return None  # an "All" scope: not narrowed
+        cur = set.intersection(*by_key.values()) if by_key else set()
+        out.append(cur - exc)
+    return out or None
 
 
-def _side_ips(
-    actors: list[dict[str, Any]],
-    lookups: dict[str, Any],
-    *,
-    scope_ips: set[str] | None = None,
-) -> tuple[list[str], str]:
-    """Resolve a consumer/provider actor list to (deduped IPs, kind).
-
-    Returns ([], kind) when concrete actors exist but all resolve to zero IPs
-    (unknown refs, scoped out, etc.) — the caller should then drop the rule.
-    Returns ([ANY], "any") only when the actors list is empty.
-
-    scope_ips 語意（2026-07-13 修正：舊實作以「actor 的 label href 是否在
-    scope label 清單內」過濾——role-type actor 幾乎不會是 scope label，帶
-    scope 的 ruleset 因此恆解析為 0 列）：
-    - None → 不設限；
-    - set → label / label_group actor 的 IP 與 scope IP 取**交集**；``ams``
-      （All Workloads）展開為 scope IP 全集（排序後，輸出確定性）；明確 IP
-      來源（ip_list / workload / ip_address）不受 scope 過濾，原樣通過。
-
-    Note: for a multi-actor list the returned ``kind`` reflects the LAST
-    actor's kind; it is metadata only and does not affect IP correctness.
-    """
+def _side_ips(actors: list[dict[str, Any]], lk: Lookups, *, scope_ips: set[str] | None = None,
+              subnets: bool = False) -> tuple[list[str], str]:
+    """A consumer or provider list as addresses. Labels and label groups: different keys ANDed, the same key ORed
+    (final review #1); the other actors are added. The scope narrows the workload kinds — labels, label groups, All
+    Workloads and explicit workloads (final review #3) — not IP lists or literal addresses. Exclusions are
+    subtracted by containment. `subnets`: workload addresses become their interface networks (use_workload_subnets,
+    final review #6). An empty list is ANY (5.x)."""
     if not actors:
         return [_ANY], "any"
-
-    # 真 PCE 形狀：entry 可帶 exclusion: true（「A 排除 B」）。先收集排除集，
-    # include 結果最後扣除；排除 actor 不受 scope 交集影響（先取全集再扣）。
     excludes: set[str] = set()
-    for actor in actors:
-        if actor.get("exclusion"):
-            ips, _k = _actor_ips(actor, **lookups)
-            excludes.update(ips)
-
-    out: list[str] = []
+    by_key: dict[str, set[str]] = {}
+    workload_part: set[str] = set()
+    explicit: set[str] = set()
     kind = "any"
-    seen: set[str] = set()
     for actor in actors:
+        ips, k = _actor_ips(actor, lk)
         if actor.get("exclusion"):
+            excludes |= ips
             continue
-        if actor.get("actors") == "ams":
-            # All Workloads: the scope's addresses, else every workload's — never ANY, which takes in the internet
-            # (security review 2026-10-30; 5.x printed ANY).
-            ips = sorted(scope_ips) if scope_ips is not None else _all_workloads(lookups["workload_to_ips"])
-            k = "all_workloads"
-        else:
-            ips, k = _actor_ips(actor, **lookups)
-            if scope_ips is not None and ("label" in actor or "label_group" in actor):
-                ips = [ip for ip in ips if ip in scope_ips]
         kind = k
-        for ip in _subtract(ips, excludes):
-            if ip not in seen:
-                seen.add(ip)
-                out.append(ip)
-    return out, kind
+        if k in ("label", "label_group"):
+            href = actor[k].get("href", "")
+            group = _key(k, href, lk) if lk.get("label_keys") is not None else ""
+            by_key.setdefault(group, set()).update(ips)
+        elif k == "all_workloads":  # in a scope: the scope's addresses (5.x); else every workload's
+            workload_part |= set(scope_ips) if scope_ips is not None else ips
+        elif k == "workload":
+            workload_part |= ips
+        else:
+            explicit |= ips
+    if by_key:
+        workload_part |= set.intersection(*by_key.values())
+    if scope_ips is not None:
+        workload_part &= scope_ips
+    if subnets:
+        to_net = lk.get("ip_to_subnet") or {}
+        workload_part = {to_net.get(ip, ip) for ip in workload_part}
+    out = _subtract(sorted(workload_part) + sorted(explicit - workload_part), excludes)
+    return list(dict.fromkeys(out)), kind
 
 
 def _services(rule: dict[str, Any], service_to_ports: dict[str, list[dict[str, Any]]],
@@ -234,19 +220,9 @@ def _cap_sides(srcs: list[str], dsts: list[str], services: int = 1) -> tuple[lis
     return srcs, dsts, ",".join(capped)
 
 
-def resolve_ruleset(
-    ruleset: dict[str, Any],
-    *,
-    label_to_ips: dict[str, list[str]],
-    iplist_to_cidrs: dict[str, list[str]],
-    label_group_to_labels: dict[str, list[str]],
-    workload_to_ips: dict[str, list[str]],
-    service_to_ports: dict[str, list[dict[str, Any]]] | None = None,
-    service_to_names: dict[str, str] | None = None,
-) -> list[dict[str, Any]]:
-    return resolve_ruleset_within(ruleset, limit=None, label_to_ips=label_to_ips, iplist_to_cidrs=iplist_to_cidrs,
-                                  label_group_to_labels=label_group_to_labels, workload_to_ips=workload_to_ips,
-                                  service_to_ports=service_to_ports, service_to_names=service_to_names)[0]
+def resolve_ruleset(ruleset: dict[str, Any], **lookups: Any) -> list[dict[str, Any]]:
+    """Every row of one ruleset (no total limit)."""
+    return resolve_ruleset_within(ruleset, limit=None, **lookups)[0]
 
 
 def resolve_ruleset_within(
@@ -259,83 +235,74 @@ def resolve_ruleset_within(
     workload_to_ips: dict[str, list[str]],
     service_to_ports: dict[str, list[dict[str, Any]]] | None = None,
     service_to_names: dict[str, str] | None = None,
-) -> tuple[list[dict[str, Any]], int]:
-    """(rows, omitted): at most `limit` rows; a rule that would pass it is counted, never built (security review:
-    the total cap applied after a whole ruleset was in memory)."""
+    label_keys: dict[str, str] | None = None,
+    known: dict[str, set[str]] | None = None,
+    ip_to_subnet: dict[str, str] | None = None,
+) -> tuple[list[dict[str, Any]], int, list[tuple[str, str]]]:
+    """(rows, omitted, not_expanded). At most `limit` rows: a rule that would pass it is counted, never built
+    (security review). not_expanded: (rule href, reason) for a rule that cannot be expanded faithfully — a
+    reference the PCE does not hold, or providers resolved as virtual services (their services come from the virtual
+    service) — disclosed by the caller, never dropped or widened (final review #4, #5). Each scope is expanded on
+    its own and the rows merged (final review #2). Disabled rulesets and rules are skipped."""
     omitted = 0
-    # Disabled rulesets and rules are skipped: the report describes policy actually enforced.
-    # A disabled ruleset is not enforced: nothing to resolve.
+    issues: list[tuple[str, str]] = []
     if not ruleset.get("enabled", True):
-        return [], 0
-    lookups = {
-        "label_to_ips": label_to_ips,
-        "iplist_to_cidrs": iplist_to_cidrs,
-        "label_group_to_labels": label_group_to_labels,
-        "workload_to_ips": workload_to_ips,
-    }
+        return [], 0, issues
+    lk: Lookups = {"label_to_ips": label_to_ips, "iplist_to_cidrs": iplist_to_cidrs,
+                   "label_group_to_labels": label_group_to_labels, "workload_to_ips": workload_to_ips,
+                   "label_keys": label_keys, "known": known, "ip_to_subnet": ip_to_subnet}
     service_to_ports = service_to_ports or {}
     service_to_names = service_to_names or {}
     rs_name = ruleset.get("name", "")
-    scope_ips = _scope_ip_set(ruleset.get("scopes") or [],
-                              label_to_ips=label_to_ips,
-                              label_group_to_labels=label_group_to_labels)
-
+    scope_sets = _scope_sets(ruleset.get("scopes") or [], lk)
+    scope_unknown = any(_unknown(e, lk) for sc in ruleset.get("scopes") or [] for e in sc or [])
     rows: list[dict[str, Any]] = []
     seen: set[tuple[Any, ...]] = set()
-    # deny_rules 也展開（第三方防火牆實作需要 deny 列；2026-07-13 前只讀
-    # rules，deny-only ruleset 恆為 0 列）。action：allow / deny / override_deny。
-    rule_groups = (
-        ("allow", ruleset.get("rules") or []),
-        (None, ruleset.get("deny_rules") or []),
-    )
-    for action, rules in rule_groups:
+    # deny_rules expand too (a firewall needs the deny rows); action: allow / deny / override_deny.
+    for action, rules in (("allow", ruleset.get("rules") or []), (None, ruleset.get("deny_rules") or [])):
         for rule in rules:
             if not rule.get("enabled", True):
                 continue
             act = action or ("override_deny" if rule.get("override") else "deny")
             rule_href = rule.get("href", "")
-            # consumers 同受 scope 約束（intra-scope ruleset 雙側都在 scope 內）；
-            # unscoped_consumers=true 時 consumers 恢復全域。
-            cons_scope = None if rule.get("unscoped_consumers") else scope_ips
-            srcs, src_kind = _side_ips(rule.get("consumers") or [], lookups,
-                                       scope_ips=cons_scope)
-            dsts, dst_kind = _side_ips(rule.get("providers") or [], lookups,
-                                       scope_ips=scope_ips)
-            # Drop the rule if either side resolved to zero IPs (unknown refs,
-            # scoped out, or empty after scope filtering).
-            if not srcs or not dsts:
+            resolve_as = rule.get("resolve_labels_as") or {}
+            if any("virtual_services" in (resolve_as.get(side) or []) for side in ("providers", "consumers")):
+                issues.append((rule_href, "virtual_services"))
+                continue
+            actors = [*(rule.get("consumers") or []), *(rule.get("providers") or [])]
+            if scope_unknown or any(_unknown(a, lk) for a in actors):
+                issues.append((rule_href, "unknown_reference"))
                 continue
             svcs = _services(rule, service_to_ports, service_to_names)
-            srcs, dsts, truncated = _cap_sides(srcs, dsts, len(svcs))
-            if limit is not None and len(rows) + len(srcs) * len(dsts) * len(svcs) > limit:
-                omitted += len(srcs) * len(dsts) * len(svcs)  # counted, never built (security review)
-                continue
-            for svc in svcs:
-                for s_ip in srcs:
-                    for d_ip in dsts:
-                        key = (rule_href, act, s_ip, d_ip, svc["port"],
-                               svc.get("port_to"), svc["protocol"])
-                        if key in seen:
-                            continue
-                        seen.add(key)
-                        row = {
-                            "ruleset_name": rs_name,
-                            "rule_href": rule_href,
-                            "action": act,
-                            "src_ip": s_ip,
-                            "dst_ip": d_ip,
-                            "port": svc["port"],
-                            "protocol": svc["protocol"],
-                            "src_kind": src_kind,
-                            "dst_kind": dst_kind,
-                            "service_name": svc["name"],
-                        }
-                        if "port_to" in svc:
-                            row["port_to"] = svc["port_to"]
-                        if truncated:
-                            row["truncated"] = truncated
-                        rows.append(row)
-    return rows, omitted
+            subnet_sides = set(rule.get("use_workload_subnets") or [])
+            for scope_ips in (scope_sets if scope_sets is not None else [None]):
+                cons_scope = None if rule.get("unscoped_consumers") else scope_ips
+                srcs, src_kind = _side_ips(rule.get("consumers") or [], lk, scope_ips=cons_scope,
+                                           subnets="consumers" in subnet_sides)
+                dsts, dst_kind = _side_ips(rule.get("providers") or [], lk, scope_ips=scope_ips,
+                                           subnets="providers" in subnet_sides)
+                if not srcs or not dsts:  # nothing in this scope (or a side resolves to no address)
+                    continue
+                srcs, dsts, truncated = _cap_sides(srcs, dsts, len(svcs))
+                if limit is not None and len(rows) + len(srcs) * len(dsts) * len(svcs) > limit:
+                    omitted += len(srcs) * len(dsts) * len(svcs)  # counted, never built (security review)
+                    continue
+                for svc in svcs:
+                    for s_ip in srcs:
+                        for d_ip in dsts:
+                            key = (rule_href, act, s_ip, d_ip, svc["port"], svc.get("port_to"), svc["protocol"])
+                            if key in seen:
+                                continue
+                            seen.add(key)
+                            row = {"ruleset_name": rs_name, "rule_href": rule_href, "action": act, "src_ip": s_ip,
+                                   "dst_ip": d_ip, "port": svc["port"], "protocol": svc["protocol"],
+                                   "src_kind": src_kind, "dst_kind": dst_kind, "service_name": svc["name"]}
+                            if "port_to" in svc:
+                                row["port_to"] = svc["port_to"]
+                            if truncated:
+                                row["truncated"] = truncated
+                            rows.append(row)
+    return rows, omitted, issues
 
 
 def _all_workloads(workload_to_ips: dict[str, list[str]]) -> list[str]:
@@ -510,3 +477,22 @@ def build_service_to_names(services: list[dict[str, Any]]) -> dict[str, str]:
         if href and name:
             out[href] = name
     return out
+
+
+def build_label_keys(labels: list[dict[str, Any]], groups: list[dict[str, Any]]) -> dict[str, str]:
+    """Label and label group href -> its key (role, app, env, loc, ...): the dimension rules AND across."""
+    return {str(x["href"]): str(x.get("key") or "") for x in [*labels, *groups] if x.get("href")}
+
+
+def build_ip_to_subnet(workloads: list[dict[str, Any]]) -> dict[str, str]:
+    """Interface address -> its network (address/cidr_block), for rules with use_workload_subnets."""
+    out: dict[str, str] = {}
+    for wl in workloads:
+        for i in wl.get("interfaces") or []:
+            if i.get("address") and i.get("cidr_block") is not None:
+                try:
+                    out[i["address"]] = str(ipaddress.ip_network(f"{i['address']}/{i['cidr_block']}", strict=False))
+                except ValueError:
+                    continue
+    return out
+

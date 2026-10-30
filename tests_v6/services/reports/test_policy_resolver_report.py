@@ -22,7 +22,7 @@ ROW = {"ruleset_name": "Web", "rule_href": "/r/1", "action": "allow", "src_ip": 
 
 def _resolved(**kw):
     base = {"rows": [ROW], "per_ruleset": {"Web": 1}, "rule_count": 1, "rules_capped": 0, "truncated_rulesets": [],
-            "rows_omitted": 0, "computed_at": NOW}
+            "rows_omitted": 0, "not_expanded": [], "computed_at": NOW}
     return Resolved(**{**base, **kw})
 
 
@@ -70,3 +70,13 @@ def test_fetch_failure_fails_report(ctx, monkeypatch):
 
 def test_zh_tw_builds(ctx):
     assert _build(ctx, lang=Language.ZH_TW).title
+
+
+def test_top_level_flag_counts_summarized_and_not_expanded(ctx, monkeypatch):
+    """Final review #7: a rule summarized or not expanded leaves the file incomplete too."""
+    monkeypatch.setattr(report, "resolve", lambda ctx, **kw: _resolved(rules_capped=1))
+    assert _build(ctx).export.meta["truncated"] is True
+    monkeypatch.setattr(report, "resolve", lambda ctx, **kw: _resolved(not_expanded=[("Web", "/r/2", "unknown_reference")]))
+    doc = _build(ctx)
+    assert doc.export.meta["truncated"] is True and doc.export.meta["rules_not_expanded"] == 1
+    assert {k.key: k.value for k in doc.kpis}["not_expanded"] == 1 and doc.findings
