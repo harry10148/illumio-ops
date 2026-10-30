@@ -196,3 +196,15 @@ def test_short_observation_computes_the_offered_period(context, live_app):
     with page.expect_request("**/api/lateral/compute") as req:
         page.click("[data-role=lat-compute]")
     assert json.loads(req.value.post_data)["days"] == 1
+
+
+def test_pivots_quarantined_as_a_batch(context, live_app):
+    """P6d: pivot hosts picked and quarantined together; with no PCE set up the dialog says so."""
+    _seed(live_app)
+    page = _open(context, live_app)
+    button = page.locator("[data-role=pivots-quarantine]")
+    expect(button).to_be_disabled()
+    page.locator("[data-role=pivots] input[type=checkbox]").first.check()
+    button.click()
+    dialog = page.locator("[data-role=quarantine]")
+    expect(dialog.locator(".form-error")).to_have_text("The PCE connection is not set up yet.")

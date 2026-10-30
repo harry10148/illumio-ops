@@ -8,6 +8,7 @@ import type {
 import { formatTime } from "../../components/ProbeResults";
 import { t, useLang } from "../../i18n";
 import { registerNav } from "../../shell/nav";
+import { QuarantineDialog, type QuarantineHost } from "../quarantine/QuarantineDialog";
 import { type Dim, EVENT_DIMS, FLOW_DIMS, OPEN_BY_DEFAULT, type Req, addValue, chips, chosen, dimId } from "./conditions";
 
 // Literal maps: i18n keys are never built from data.
@@ -25,6 +26,7 @@ const METRIC_KEYS: Record<string, string> = {
 };
 const HOST_DIMS = new Set<string>(["src_host", "dst_host", "event_host"]);
 const HOST_KEY = /^(\/orgs\/\d+\/workloads\/|ip:)/;  // what the host profile takes (an event's VEN href is not)
+const WORKLOAD = /^\/orgs\/\d+\/workloads\//;  // only a managed workload can be quarantined
 const PERIODS: [string, number][] = [["wb_period_1h", 1], ["wb_period_1d", 24], ["wb_period_7d", 168], ["wb_period_30d", 720]];
 
 function lastHours(hours: number): { start: string; end: string } {
@@ -81,9 +83,9 @@ export function Pulled({ info }: { info: PullInfo }) {
   );
 }
 
-function DimensionBox({ req, dim, open, onToggle, onPick, names }: {
+function DimensionBox({ req, dim, open, onToggle, onPick, names, onQuarantine }: {
   req: Req; dim: Dim; open: boolean; onToggle: () => void; onPick: (d: Dim, row: AggRow) => void;
-  names: Record<string, string>;
+  names: Record<string, string>; onQuarantine: (h: QuarantineHost) => void;
 }) {
   const [top, setTop] = useState<DimensionTop | null>(null);
   const [error, setError] = useState<ApiError | null>(null);
@@ -128,6 +130,10 @@ function DimensionBox({ req, dim, open, onToggle, onPick, names }: {
                 {HOST_DIMS.has(dim.dimension) && HOST_KEY.test(key) && (
                   <Link className="wb-dim-host" to={`/hosts?${new URLSearchParams({ key }).toString()}`}
                     aria-label={t("hosts_title")} title={t("hosts_title")}>↗</Link>
+                )}
+                {HOST_DIMS.has(dim.dimension) && WORKLOAD.test(key) && (
+                  <button type="button" className="wb-dim-host btn-quiet" data-role="wb-quarantine"
+                    aria-label={t("q_title")} title={t("q_title")} onClick={() => onQuarantine({ key, name: label })}>⊘</button>
                 )}
               </div>
             );
@@ -226,6 +232,7 @@ export function Workbench() {
   const [pulled, setPulled] = useState<PullInfo | null>(null);
   const [error, setError] = useState<ApiError | null>(null);
   const [busy, setBusy] = useState(false);
+  const [quarantine, setQuarantine] = useState<QuarantineHost | null>(null);
   const [open, setOpen] = useState<Set<string>>(new Set(OPEN_BY_DEFAULT));
   const [names, setNames] = useState<Record<string, string>>({});
   const [text, setText] = useState("");
@@ -327,6 +334,7 @@ export function Workbench() {
           </button>
         </div>
       </div>
+      {quarantine && <QuarantineDialog hosts={[quarantine]} onClose={() => setQuarantine(null)} />}
       <div className="card stack" data-role="conditions">
         <div className="row">
           <label>
@@ -364,7 +372,7 @@ export function Workbench() {
           <p className="hint">{t("wb_dims_hint")}</p>
           {dims.map((d) => (
             <DimensionBox key={`${req.mode}:${dimId(d)}`} req={{ ...req, view: "detail", group_by: [] } as Req} dim={d}
-              open={open.has(dimId(d))} names={names} onPick={pick}
+              open={open.has(dimId(d))} names={names} onPick={pick} onQuarantine={setQuarantine}
               onToggle={() => {
                 const s = new Set(open);
                 if (s.has(dimId(d))) s.delete(dimId(d));

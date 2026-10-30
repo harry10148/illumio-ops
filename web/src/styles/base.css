@@ -259,3 +259,8 @@ code.cmd { white-space: pre-wrap; word-break: break-all; font-size: var(--fs-min
 .lat-matrix td[data-state=unknown] { background: var(--tone-neutral-bg); }
 .lat-matrix th { white-space: nowrap; text-transform: none; }  /* Label values keep their case */
 [data-section=status] p { margin: 0; }
+
+/* Quarantine (P6d) */
+[data-role=quarantine] { border: 1px solid var(--tone-warn-border); }
+[data-role=quarantine] .row:first-child { justify-content: space-between; align-items: baseline; }
+.q-detail { overflow-wrap: anywhere; max-width: 32rem; }

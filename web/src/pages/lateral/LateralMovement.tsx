@@ -10,6 +10,7 @@ import { t, useLang } from "../../i18n";
 import { registerNav } from "../../shell/nav";
 import { SEVERITY_KEYS, SEVERITY_TONES, word } from "../alerts/common";
 import { DETECTOR_KEYS, STATE_KEYS, STATE_TONES } from "../system/Lateral";
+import { QuarantineDialog } from "../quarantine/QuarantineDialog";
 import { Pulled } from "../workbench/Workbench";
 import { Simulation, type Suggestion } from "./Simulation";
 
@@ -17,6 +18,7 @@ type Port = [number, number];
 type GroupEdge = [string | null, string | null, number, string];
 
 const HOSTS_SHOWN = 20;
+const WORKLOAD = /^\/orgs\/\d+\/workloads\//;  // only a managed workload can be quarantined
 const GROUPS_SHOWN = 30;
 const NAME_MAX = 22;  // a name longer than this is cut with "…" in the path diagram; the full name is its tooltip
 const DAY_KEYS: Record<number, string> = { 1: "lat_days_1", 7: "lat_days_7", 30: "lat_days_30" };
@@ -351,6 +353,13 @@ function Reach({ ex, name, focus }: { ex: ExposureResult; name: (k: string) => s
   }, [focus]);
   const shown = all ? ex.hosts : ex.hosts.slice(0, HOSTS_SHOWN);
   const pivots = ex.hosts.filter((h) => h.pivot_now);
+  const [picked, setPicked] = useState<Set<string>>(new Set());
+  const [isolating, setIsolating] = useState(false);
+  const toggle = (k: string) => setPicked((cur) => {
+    const next = new Set(cur);
+    if (next.has(k)) next.delete(k); else next.add(k);
+    return next;
+  });
   return (
     <>
       <div className="card stack" id="lat-reach" data-section="reach">
@@ -381,14 +390,23 @@ function Reach({ ex, name, focus }: { ex: ExposureResult; name: (k: string) => s
         <h2>{t("lat_pivots")}</h2>
         <p className="hint">{t("lat_pivots_hint")}</p>
         {pivots.length === 0 ? <p className="muted">{t("lat_pivots_none")}</p> : (
-          <ul className="plain-list">
-            {pivots.map((h) => (
-              <li key={h.key}>
-                <Link to={`/hosts?key=${encodeURIComponent(h.key)}`}>{name(h.key)}</Link>
-                <span className="hint">{h.pivot_enforced ? t("lat_pivot_still") : t("lat_pivot_gone")}</span>
-              </li>
-            ))}
-          </ul>
+          <>
+            <ul className="plain-list" data-role="pivots">
+              {pivots.map((h) => (
+                <li key={h.key}>
+                  <input type="checkbox" checked={picked.has(h.key)} disabled={!WORKLOAD.test(h.key)}
+                    onChange={() => toggle(h.key)} aria-label={name(h.key)} />{" "}
+                  <Link to={`/hosts?key=${encodeURIComponent(h.key)}`}>{name(h.key)}</Link>{" "}
+                  <span className="hint">{h.pivot_enforced ? t("lat_pivot_still") : t("lat_pivot_gone")}</span>
+                </li>
+              ))}
+            </ul>
+            <button type="button" className="btn-quiet" data-role="pivots-quarantine" disabled={picked.size === 0}
+              onClick={() => setIsolating(true)}>{t("lat_quarantine_picked", { n: String(picked.size) })}</button>
+            {isolating && (
+              <QuarantineDialog hosts={[...picked].map((k) => ({ key: k, name: name(k) }))} onClose={() => setIsolating(false)} />
+            )}
+          </>
         )}
       </div>
     </>
