@@ -1977,7 +1977,6 @@
   "wb_cond_event_host": "Host",
   "wb_cond_severity": "Severity",
   "wb_cond_actor": "Who",
-  "wb_lightweight_note": "Lightweight mode keeps no traffic: the period is read from the PCE when you search.",
   "wb_dims_hint": "The top values under the current conditions. Click one to add it.",
   "wb_dim_src_host": "Source host",
   "wb_dim_dst_host": "Destination host",
@@ -2017,5 +2016,10 @@
   "wb_from_pce": "Part of this was read from the PCE now (not collected).",
   "wb_limit_hit": "More rows match than are shown; narrow the conditions.",
   "wb_bytes_coverage": "Only {pct}% of the flows report bytes; a bytes measure reflects that part only.",
-  "wb_latency": "The newest collected data is {minutes} minutes old."
+  "wb_latency": "The newest collected data is {minutes} minutes old.",
+  "wb_pull_failed": "Could not read the period from the PCE: {error}",
+  "wb_pulled": "Read from the PCE for this page: {start} – {end}, {rows} rows, at {at}. Kept 30 minutes for the next clicks.",
+  "wb_pulled_capped": "The read stopped at its row limit; the period after {from} is not included.",
+  "wb_pulled_truncated": "{n} window(s) of the read were capped by the PCE; some connections in them are missing.",
+  "wb_pulling": "Reading the period from the PCE (about half a minute per day)…"
 }

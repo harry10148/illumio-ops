@@ -20445,6 +20445,61 @@
             ],
             "title": "Coverage",
             "type": "object"
+          },
+          "PullInfo": {
+            "description": "What was read from the PCE for this answer: said on the page (anti-goal: nothing silent).",
+            "properties": {
+              "capped": {
+                "title": "Capped",
+                "type": "boolean"
+              },
+              "end": {
+                "format": "date-time",
+                "title": "End",
+                "type": "string"
+              },
+              "read_at": {
+                "format": "date-time",
+                "title": "Read At",
+                "type": "string"
+              },
+              "rows": {
+                "title": "Rows",
+                "type": "integer"
+              },
+              "start": {
+                "format": "date-time",
+                "title": "Start",
+                "type": "string"
+              },
+              "truncated_windows": {
+                "title": "Truncated Windows",
+                "type": "integer"
+              },
+              "unread_from": {
+                "anyOf": [
+                  {
+                    "format": "date-time",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Unread From"
+              }
+            },
+            "required": [
+              "start",
+              "end",
+              "rows",
+              "capped",
+              "unread_from",
+              "truncated_windows",
+              "read_at"
+            ],
+            "title": "PullInfo",
+            "type": "object"
           }
         },
         "properties": {
@@ -20454,6 +20509,17 @@
           "limit_hit": {
             "title": "Limit Hit",
             "type": "boolean"
+          },
+          "pulled": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/PullInfo"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
           },
           "rows": {
             "items": {
@@ -22128,6 +22194,157 @@
             "title": "FlowRow",
             "type": "object"
           },
+          "PullInfo": {
+            "description": "What was read from the PCE for this answer: said on the page (anti-goal: nothing silent).",
+            "properties": {
+              "capped": {
+                "title": "Capped",
+                "type": "boolean"
+              },
+              "end": {
+                "format": "date-time",
+                "title": "End",
+                "type": "string"
+              },
+              "read_at": {
+                "format": "date-time",
+                "title": "Read At",
+                "type": "string"
+              },
+              "rows": {
+                "title": "Rows",
+                "type": "integer"
+              },
+              "start": {
+                "format": "date-time",
+                "title": "Start",
+                "type": "string"
+              },
+              "truncated_windows": {
+                "title": "Truncated Windows",
+                "type": "integer"
+              },
+              "unread_from": {
+                "anyOf": [
+                  {
+                    "format": "date-time",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Unread From"
+              }
+            },
+            "required": [
+              "start",
+              "end",
+              "rows",
+              "capped",
+              "unread_from",
+              "truncated_windows",
+              "read_at"
+            ],
+            "title": "PullInfo",
+            "type": "object"
+          },
+          "SegmentResult": {
+            "properties": {
+              "coverage": {
+                "$ref": "#/$defs/Coverage"
+              },
+              "detail": {
+                "anyOf": [
+                  {
+                    "items": {
+                      "$ref": "#/$defs/FlowRow"
+                    },
+                    "type": "array"
+                  },
+                  {
+                    "items": {
+                      "$ref": "#/$defs/EventRow"
+                    },
+                    "type": "array"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Detail"
+              },
+              "field_coverage": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/FieldCoverage"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "latency_seconds": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Latency Seconds"
+              },
+              "limit_hit": {
+                "title": "Limit Hit",
+                "type": "boolean"
+              },
+              "observed_from": {
+                "format": "date-time",
+                "title": "Observed From",
+                "type": "string"
+              },
+              "observed_to": {
+                "format": "date-time",
+                "title": "Observed To",
+                "type": "string"
+              },
+              "predicted": {
+                "default": null,
+                "title": "Predicted"
+              },
+              "ranking": {
+                "anyOf": [
+                  {
+                    "items": {
+                      "$ref": "#/$defs/AggRow"
+                    },
+                    "type": "array"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Ranking"
+              },
+              "view": {
+                "$ref": "#/$defs/SegmentView"
+              }
+            },
+            "required": [
+              "view",
+              "coverage",
+              "field_coverage",
+              "limit_hit",
+              "observed_from",
+              "observed_to",
+              "latency_seconds"
+            ],
+            "title": "SegmentResult",
+            "type": "object"
+          },
           "SegmentView": {
             "enum": [
               "detail",
@@ -22139,98 +22356,25 @@
           }
         },
         "properties": {
-          "coverage": {
-            "$ref": "#/$defs/Coverage"
-          },
-          "detail": {
+          "pulled": {
             "anyOf": [
               {
-                "items": {
-                  "$ref": "#/$defs/FlowRow"
-                },
-                "type": "array"
-              },
-              {
-                "items": {
-                  "$ref": "#/$defs/EventRow"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "Detail"
-          },
-          "field_coverage": {
-            "anyOf": [
-              {
-                "$ref": "#/$defs/FieldCoverage"
+                "$ref": "#/$defs/PullInfo"
               },
               {
                 "type": "null"
               }
             ]
           },
-          "latency_seconds": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Latency Seconds"
-          },
-          "limit_hit": {
-            "title": "Limit Hit",
-            "type": "boolean"
-          },
-          "observed_from": {
-            "format": "date-time",
-            "title": "Observed From",
-            "type": "string"
-          },
-          "observed_to": {
-            "format": "date-time",
-            "title": "Observed To",
-            "type": "string"
-          },
-          "predicted": {
-            "default": null,
-            "title": "Predicted"
-          },
-          "ranking": {
-            "anyOf": [
-              {
-                "items": {
-                  "$ref": "#/$defs/AggRow"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "Ranking"
-          },
-          "view": {
-            "$ref": "#/$defs/SegmentView"
+          "result": {
+            "$ref": "#/$defs/SegmentResult"
           }
         },
         "required": [
-          "view",
-          "coverage",
-          "field_coverage",
-          "limit_hit",
-          "observed_from",
-          "observed_to",
-          "latency_seconds"
+          "result",
+          "pulled"
         ],
-        "title": "SegmentResult",
+        "title": "WorkbenchResult",
         "type": "object"
       }
     }

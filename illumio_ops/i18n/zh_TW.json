@@ -1977,7 +1977,6 @@
   "wb_cond_event_host": "主機",
   "wb_cond_severity": "嚴重度",
   "wb_cond_actor": "操作者",
-  "wb_lightweight_note": "輕量模式不保存流量：查詢時才向 PCE 讀取這段期間。",
   "wb_dims_hint": "目前條件下各維度的前幾名，點一下即加入條件。",
   "wb_dim_src_host": "來源主機",
   "wb_dim_dst_host": "目的主機",
@@ -2017,5 +2016,10 @@
   "wb_from_pce": "其中一部分是現在向 PCE 讀取的（未收集）。",
   "wb_limit_hit": "符合的資料多於顯示的筆數，請縮小條件。",
   "wb_bytes_coverage": "只有 {pct}% 的流量有回報位元組；位元組指標只反映這部分。",
-  "wb_latency": "最新收集到的資料是 {minutes} 分鐘前的。"
+  "wb_latency": "最新收集到的資料是 {minutes} 分鐘前的。",
+  "wb_pull_failed": "無法向 PCE 讀取這段期間：{error}",
+  "wb_pulled": "本頁的資料是向 PCE 讀取的：{start} – {end}，{rows} 筆，讀取時間 {at}。保留 30 分鐘供之後的點選使用。",
+  "wb_pulled_capped": "讀取達到筆數上限而停止；{from} 之後的期間不包含在內。",
+  "wb_pulled_truncated": "讀取時有 {n} 個時段被 PCE 截斷，其中部分連線缺漏。",
+  "wb_pulling": "正在向 PCE 讀取這段期間（每天約半分鐘）…"
 }

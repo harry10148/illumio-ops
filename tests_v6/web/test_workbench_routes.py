@@ -21,7 +21,7 @@ def test_run_and_dimension(client, ctx):
     login(client)
     _seed(ctx)
     r = post(client, "/api/workbench/run", {"request": REQ})
-    assert r.status_code == 200 and len(r.get_json()["data"]["detail"]) == 2
+    assert r.status_code == 200 and len(r.get_json()["data"]["result"]["detail"]) == 2
     d = post(client, "/api/workbench/dimension", {"request": REQ, "dimension": "src_host"})
     assert d.status_code == 200 and len(d.get_json()["data"]["rows"]) == 2
 

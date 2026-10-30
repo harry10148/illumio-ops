@@ -17,12 +17,14 @@ from illumio_ops.domain.values import (
     SegmentMetric,
     SegmentView,
 )
+from illumio_ops.services import workbench_store
 from illumio_ops.services.alerts.views import evidence_segment
 from illumio_ops.services.analysis.segments import SegmentResult, run_segment
 from illumio_ops.services.context import AppContext
 from illumio_ops.services.coverage import Coverage
 from illumio_ops.services.eventsource import aggregate_events
 from illumio_ops.services.flowsource import AggRow, aggregate_flows
+from illumio_ops.services.workbench_store import PullInfo
 from illumio_ops.store.flowdb import labels
 
 MAX_DAYS = 30
@@ -83,6 +85,12 @@ class DimensionTop(BaseModel):
     rows: list[AggRow]
     limit_hit: bool  # more values than DIMENSION_TOP
     coverage: Coverage
+    pulled: PullInfo | None = None  # read from the PCE for this period (lightweight mode)
+
+
+class WorkbenchResult(BaseModel):
+    result: SegmentResult
+    pulled: PullInfo | None  # read from the PCE for this period (lightweight mode, or older than the kept traffic)
 
 
 class WorkbenchMeta(BaseModel):
@@ -93,8 +101,18 @@ class WorkbenchMeta(BaseModel):
     dimension_top: int
 
 
-def run(ctx: AppContext, req: FlowRequest | EventRequest, *, now: datetime | None = None) -> SegmentResult:
-    return run_segment(ctx, req.segment(), now=now)
+def _read_ctx(ctx: AppContext, req: FlowRequest | EventRequest, now: datetime | None) -> tuple[AppContext,
+                                                                                               PullInfo | None]:
+    """Traffic the install does not keep is read from the PCE once and held (workbench_store); events are always
+    collected."""
+    if isinstance(req, EventRequest):
+        return ctx, None
+    return workbench_store.context_for(ctx, req.start, req.end, now=now)
+
+
+def run(ctx: AppContext, req: FlowRequest | EventRequest, *, now: datetime | None = None) -> WorkbenchResult:
+    read, pulled = _read_ctx(ctx, req, now)
+    return WorkbenchResult(result=run_segment(read, req.segment(), now=now), pulled=pulled)
 
 
 def dimension(ctx: AppContext, req: FlowRequest | EventRequest, dim: SegmentDimension, *,
@@ -106,8 +124,9 @@ def dimension(ctx: AppContext, req: FlowRequest | EventRequest, dim: SegmentDime
     if isinstance(seg, EventSegment):
         e = aggregate_events(ctx, seg, now=now)
         return DimensionTop(rows=e.rows, limit_hit=e.limit_hit, coverage=e.coverage)
-    f = aggregate_flows(ctx, seg, now=now, with_field_coverage=False)
-    return DimensionTop(rows=f.rows, limit_hit=f.limit_hit, coverage=f.coverage)
+    read, pulled = _read_ctx(ctx, req, now)
+    f = aggregate_flows(read, seg, now=now, with_field_coverage=False)
+    return DimensionTop(rows=f.rows, limit_hit=f.limit_hit, coverage=f.coverage, pulled=pulled)
 
 
 def from_alert(ctx: AppContext, alert_id: int) -> FlowRequest | EventRequest | None:

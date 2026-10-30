@@ -7,8 +7,13 @@ from pydantic import BaseModel, Field, ValidationError
 
 from illumio_ops.domain.values import SegmentDimension
 from illumio_ops.services import workbench
-from illumio_ops.services.analysis.segments import SegmentResult
-from illumio_ops.services.workbench import DimensionTop, WorkbenchMeta, WorkbenchRequest
+from illumio_ops.services.ondemand import OnDemandFailed
+from illumio_ops.services.workbench import (
+    DimensionTop,
+    WorkbenchMeta,
+    WorkbenchRequest,
+    WorkbenchResult,
+)
 from illumio_ops.web.auth import get_ctx
 from illumio_ops.web.contract import ApiFailure, api_route, operation
 
@@ -29,7 +34,7 @@ class WorkbenchStart(BaseModel):
 
 
 OP_META = operation("workbench.meta", "GET", "/api/workbench/meta", None, WorkbenchMeta)
-OP_RUN = operation("workbench.run", "POST", "/api/workbench/run", WorkbenchRun, SegmentResult)
+OP_RUN = operation("workbench.run", "POST", "/api/workbench/run", WorkbenchRun, WorkbenchResult)
 OP_DIMENSION = operation("workbench.dimension", "POST", "/api/workbench/dimension", WorkbenchDimension, DimensionTop)
 OP_FROM_ALERT = operation("workbench.from_alert", "GET", "/api/workbench/from-alert/<int:alert_id>", None,
                           WorkbenchStart)
@@ -48,14 +53,19 @@ def meta() -> WorkbenchMeta:
 
 
 @api_route(bp, OP_RUN)
-def run(body: WorkbenchRun) -> SegmentResult:
-    return workbench.run(get_ctx(), body.request)
+def run(body: WorkbenchRun) -> WorkbenchResult:
+    try:
+        return workbench.run(get_ctx(), body.request)
+    except OnDemandFailed as exc:
+        raise ApiFailure(502, "pull_failed", "wb_pull_failed", params={"error": str(exc)[:300]}) from None
 
 
 @api_route(bp, OP_DIMENSION)
 def dimension(body: WorkbenchDimension) -> DimensionTop:
     try:
         return workbench.dimension(get_ctx(), body.request, body.dimension, label_key=body.label_key)
+    except OnDemandFailed as exc:
+        raise ApiFailure(502, "pull_failed", "wb_pull_failed", params={"error": str(exc)[:300]}) from None
     except (ValidationError, ValueError) as exc:
         raise _invalid(exc) from None
 

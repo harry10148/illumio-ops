@@ -1617,12 +1617,28 @@ keys: (string | number | null)[]
 value: number
 }
 /**
+ * What was read from the PCE for this answer: said on the page (anti-goal: nothing silent).
+ * 
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "PullInfo".
+ */
+export interface PullInfo {
+capped: boolean
+end: string
+read_at: string
+rows: number
+start: string
+truncated_windows: number
+unread_from: (string | null)
+}
+/**
  * This interface was referenced by `ContractRoot`'s JSON-Schema
  * via the `definition` "DimensionTop".
  */
 export interface DimensionTop {
 coverage: Coverage
 limit_hit: boolean
+pulled?: (PullInfo | null)
 rows: AggRow[]
 }
 /**
@@ -1744,6 +1760,14 @@ predicted?: {
 }
 ranking?: (AggRow[] | null)
 view: SegmentView
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "WorkbenchResult".
+ */
+export interface WorkbenchResult {
+pulled: (PullInfo | null)
+result: SegmentResult
 }
 
 export type OpId = "alert_rules.create" | "alert_rules.delete" | "alert_rules.list" | "alert_rules.pack" | "alert_rules.preview" | "alert_rules.update" | "alerts.evidence" | "alerts.explain" | "alerts.get" | "alerts.list" | "alerts.mark_known" | "alerts.note_add" | "auth.csrf" | "auth.login" | "auth.logout" | "auth.me" | "auth.password" | "home.summary" | "i18n.dictionary" | "report_schedules.create" | "report_schedules.delete" | "report_schedules.list" | "report_schedules.run_now" | "report_schedules.update" | "reports.catalog" | "reports.delete" | "reports.generate" | "reports.get" | "reports.list" | "rhc.enable" | "rhc.status" | "system.channels.get" | "system.channels.test" | "system.channels.update" | "system.collection.backfill" | "system.collection.get" | "system.collection.status" | "system.collection.update" | "system.display.get" | "system.display.update" | "system.jobs.list" | "system.lateral.get" | "system.lateral.known" | "system.lateral.known_delete" | "system.lateral.update" | "system.logs.query" | "system.pce.get" | "system.pce.latest" | "system.pce.probe" | "system.pce.update" | "system.reports.get" | "system.reports.update" | "system.security.get" | "system.security.update" | "system.tls.csr" | "system.tls.import" | "system.tls.renew" | "system.tls.status" | "system.tls.update" | "workbench.dimension" | "workbench.from_alert" | "workbench.meta" | "workbench.run";
@@ -1877,7 +1901,7 @@ export interface Responses {
   "workbench.dimension": DimensionTop;
   "workbench.from_alert": WorkbenchStart;
   "workbench.meta": WorkbenchMeta;
-  "workbench.run": SegmentResult;
+  "workbench.run": WorkbenchResult;
 }
 
 export const OPERATIONS = {

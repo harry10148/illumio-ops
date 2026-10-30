@@ -3,7 +3,7 @@ import { Link, useSearchParams } from "react-router-dom";
 
 import { type ApiError, call } from "../../api/client";
 import type {
-  AggRow, DimensionTop, EventRow, FlowRow, SegmentDimension, SegmentMetric, SegmentResult, WorkbenchMeta,
+  AggRow, DimensionTop, EventRow, FlowRow, PullInfo, SegmentDimension, SegmentMetric, SegmentResult, WorkbenchMeta,
 } from "../../api/generated";
 import { formatTime } from "../../components/ProbeResults";
 import { t, useLang } from "../../i18n";
@@ -63,6 +63,18 @@ function Coverage({ result, bytes }: { result: SegmentResult; bytes: boolean }) 
       {result.latency_seconds !== null && result.latency_seconds > 1800 && (
         <p className="hint">{t("wb_latency", { minutes: String(Math.round(result.latency_seconds / 60)) })}</p>
       )}
+    </div>
+  );
+}
+
+function Pulled({ info }: { info: PullInfo }) {
+  const lang = useLang();
+  return (
+    <div className="stack" data-role="pulled">
+      <p className="hint">{t("wb_pulled", { start: formatTime(info.start, lang), end: formatTime(info.end, lang),
+        rows: info.rows.toLocaleString(), at: formatTime(info.read_at, lang) })}</p>
+      {info.capped && info.unread_from && <p className="notice">{t("wb_pulled_capped", { from: formatTime(info.unread_from, lang) })}</p>}
+      {info.truncated_windows > 0 && <p className="notice">{t("wb_pulled_truncated", { n: String(info.truncated_windows) })}</p>}
     </div>
   );
 }
@@ -197,6 +209,7 @@ export function Workbench() {
   const [req, setReq] = useState<Req | null>(null);
   const [alertId, setAlertId] = useState<string | null>(null);
   const [result, setResult] = useState<SegmentResult | null>(null);
+  const [pulled, setPulled] = useState<PullInfo | null>(null);
   const [error, setError] = useState<ApiError | null>(null);
   const [busy, setBusy] = useState(false);
   const [open, setOpen] = useState<Set<string>>(new Set(OPEN_BY_DEFAULT));
@@ -231,7 +244,8 @@ export function Workbench() {
     const env = await call("workbench.run", { request: r });
     setBusy(false);
     if (env.ok && env.data) {
-      setResult(env.data);
+      setResult(env.data.result);
+      setPulled(env.data.pulled);
       setError(null);
     } else setError(env.error);
   }, []);
@@ -324,7 +338,8 @@ export function Workbench() {
             </li>
           ))}
         </ul>
-        {meta?.mode === "lightweight" && <p className="notice">{t("wb_lightweight_note")}</p>}
+        {busy && meta?.mode === "lightweight" && <p className="hint" data-role="pulling">{t("wb_pulling")}</p>}
+        {pulled && <Pulled info={pulled} />}
       </div>
       <div className="wb-body">
         <aside className="wb-dims card" data-role="dimensions">

@@ -43,12 +43,12 @@ def _flows(**kw):
 
 def test_run_detail_and_ranking_match_run_segment(ctx):
     req = _flows(view=SegmentView.RANKING, group_by=(GroupBy(dimension=SegmentDimension.DST_HOST),))
-    got = workbench.run(ctx, req, now=NOW)
+    got = workbench.run(ctx, req, now=NOW).result
     direct = run_segment(ctx, FlowSegment(filter=FlowCondition().within(START, END), view=SegmentView.RANKING,
                                           group_by=req.group_by, limit=req.limit), now=NOW)
     assert [(r.keys, r.value) for r in got.ranking] == [(r.keys, r.value) for r in direct.ranking]
     detail = workbench.run(ctx, _flows(condition=FlowCondition(dst=EndpointFilter(hrefs=("/orgs/1/workloads/db",)))),
-                           now=NOW)
+                           now=NOW).result
     assert len(detail.detail) == 3
 
 
@@ -72,7 +72,7 @@ def test_event_dimensions_only(ctx):
     assert {tuple(r.keys) for r in top.rows} == {("user.sign_in",), ("rule_set.update",)}
     with pytest.raises(ValidationError):
         workbench.dimension(ctx, req, SegmentDimension.SRC_HOST, now=NOW)
-    assert len(workbench.run(ctx, req, now=NOW).detail) == 2
+    assert len(workbench.run(ctx, req, now=NOW).result.detail) == 2
 
 
 def test_period_capped_30_days():
@@ -100,3 +100,24 @@ def test_from_alert_carries_segment(ctx, monkeypatch):
 def test_meta_lists_label_keys(ctx):
     m = workbench.meta(ctx)
     assert m.max_days == 30 and m.default_days == 1 and m.mode == "full"
+
+
+def test_lightweight_reuses_pull(tmp_path, monkeypatch):
+    """Review Focus 3: the first query pulls the period, the next clicks read the held pull, and the answer says so."""
+    from illumio_ops.services import workbench_store
+    from illumio_ops.services.ondemand import OnDemandResult
+    c = configured_ctx(tmp_path, mode="lightweight")
+    opened = []
+
+    def fake_open(ctx, *, start, end, spec=None, now=None):
+        opened.append((start, end))
+        return OnDemandResult(ctx=ctx, rows=7, windows=1, truncated=[], earliest=start, capped_total=False,
+                              unread_from=None), lambda: None
+    monkeypatch.setattr(workbench_store, "open_period", fake_open)
+    workbench_store.drop()
+    try:
+        got = workbench.run(c, _flows(), now=NOW)
+        top = workbench.dimension(c, _flows(), SegmentDimension.SRC_HOST, now=NOW)
+        assert got.pulled is not None and got.pulled.rows == 7 and top.pulled is not None and len(opened) == 1
+    finally:
+        workbench_store.drop()

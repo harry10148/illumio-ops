@@ -12,7 +12,7 @@ import dataclasses
 import sqlite3
 import time
 import uuid
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
@@ -146,17 +146,22 @@ def _walk(ctx: AppContext, fdb: FlowDb, client: object, spec: FilterSpec | None,
     state.rows += len(records)
 
 
-@contextmanager
-def pull_period(ctx: AppContext, *, start: datetime, end: datetime, spec: FilterSpec | None = None,
-                now: datetime | None = None) -> Iterator[OnDemandResult]:
-    """Read [start, end) from the PCE into a throwaway store and yield a context that reads it.
-    Raises OnDemandFailed when the PCE could not answer a window."""
+def open_period(ctx: AppContext, *, start: datetime, end: datetime, spec: FilterSpec | None = None,
+                now: datetime | None = None) -> tuple[OnDemandResult, Callable[[], None]]:
+    """Read [start, end) from the PCE into a throwaway store; returns the result and the function that closes and
+    deletes it (the workbench keeps one open across requests, services/workbench_store.py). Raises OnDemandFailed
+    when the PCE could not answer a window; nothing is left behind then."""
     at = (now or datetime.now(UTC)).astimezone(UTC)
     settings = ctx.settings.current()
     d = ondemand_dir(ctx.paths)
     d.mkdir(mode=0o700, parents=True, exist_ok=True)
     path = d / f"{uuid.uuid4().hex}.sqlite"
     fdb = FlowDb(path)
+
+    def close() -> None:
+        fdb.close()
+        for suffix in ("", "-wal", "-shm", "-journal"):
+            Path(f"{path}{suffix}").unlink(missing_ok=True)
     try:
         state = _Pull()
         # A tracked connection to the install's store, held while it is attached: a PCE switch's reset waits for
@@ -182,10 +187,21 @@ def pull_period(ctx: AppContext, *, start: datetime, end: datetime, spec: Filter
                 ingest_state.record_gap(conn, IngestSource.TRAFFIC, state.unread_from, end, "truncated",
                                         f"stopped at {ONDEMAND_MAX_ROWS} rows", at)
             refresh_rollups(conn, at, today_every=timedelta(0))
-        yield OnDemandResult(ctx=dataclasses.replace(ctx, flowdb=fdb, ondemand=True), rows=state.rows, windows=state.windows,
-                             truncated=state.truncated, earliest=state.earliest,
-                             capped_total=state.unread_from is not None, unread_from=state.unread_from)
+    except BaseException:
+        close()
+        raise
+    return OnDemandResult(ctx=dataclasses.replace(ctx, flowdb=fdb, ondemand=True), rows=state.rows,
+                          windows=state.windows, truncated=state.truncated, earliest=state.earliest,
+                          capped_total=state.unread_from is not None, unread_from=state.unread_from), close
+
+
+@contextmanager
+def pull_period(ctx: AppContext, *, start: datetime, end: datetime, spec: FilterSpec | None = None,
+                now: datetime | None = None) -> Iterator[OnDemandResult]:
+    """Read [start, end) from the PCE into a throwaway store and yield a context that reads it.
+    Raises OnDemandFailed when the PCE could not answer a window."""
+    result, close = open_period(ctx, start=start, end=end, spec=spec, now=now)
+    try:
+        yield result
     finally:
-        fdb.close()
-        for suffix in ("", "-wal", "-shm", "-journal"):
-            Path(f"{path}{suffix}").unlink(missing_ok=True)
+        close()
