@@ -24,6 +24,7 @@ from illumio_ops.web.ipallow import RstDrop, is_allowed, rst_drop
 from illumio_ops.web.routes import (
     alert_rules,
     alerts,
+    hosts,
     report_schedules,
     reports,
     rhc,
@@ -126,6 +127,7 @@ def create_app(ctx: AppContext, *, use_https: bool, static_dir: Path | None = No
     app.register_blueprint(report_schedules.bp)
     app.register_blueprint(rhc.bp)
     app.register_blueprint(workbench.bp)
+    app.register_blueprint(hosts.bp)
 
     # 8. The single-page app: hashed assets, anything else that is a file, else index.html
     @app.get("/")

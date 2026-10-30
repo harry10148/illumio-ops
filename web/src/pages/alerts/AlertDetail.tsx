@@ -204,6 +204,11 @@ export function AlertDetail() {
         {d.evidence_kind && (
           <Link className="btn-primary" to={`/investigate?alert=${id}`} data-role="open-workbench">{t("alert_open_workbench")}</Link>
         )}
+        {/^(\/orgs\/\d+\/workloads\/|ip:)/.test(d.subject_key) && (
+          <Link className="btn-quiet" to={`/hosts?${new URLSearchParams({ key: d.subject_key }).toString()}`} data-role="open-host">
+            {t("hosts_title")}
+          </Link>
+        )}
         {d.console_link && (
           <a className="btn-quiet" href={d.console_link} target="_blank" rel="noopener noreferrer">{t("alert_open_console")}</a>
         )}

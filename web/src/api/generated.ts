@@ -54,6 +54,30 @@ export type Language = ("en" | "zh_TW")
 export type ProbeName = ("noop" | "health" | "node_available")
 /**
  * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "TamperPattern".
+ */
+export type TamperPattern = ("regular_cycle" | "burst" | "sporadic" | "too_few")
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "CapabilityState".
+ */
+export type CapabilityState = ("supported" | "unsupported" | "unknown")
+/**
+ * An unprotected high-risk service by its recent traffic (spec §6.5.6).
+ * 
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "RansomwareTrafficClass".
+ */
+export type RansomwareTrafficClass = ("priority" | "safe_to_block" | "suspicious" | "protected" | "unknown")
+/**
+ * What a signal-type tamper event did, from its kernel functions (spec §6.6 F4).
+ * 
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "TamperAction".
+ */
+export type TamperAction = ("add_rule" | "delete_rule" | "add_chain" | "delete_chain" | "add_table" | "delete_table")
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
  * via the `definition` "ReportFormat".
  */
 export type ReportFormat = ("html" | "xlsx" | "json" | "csv")
@@ -651,6 +675,51 @@ old_password?: (string | null)
 }
 /**
  * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "FocusEntry".
+ */
+export interface FocusEntry {
+confidence: string
+critical_asset: boolean
+fingerprint: string
+first_seen: string
+kind: string
+link: (FocusLink | null)
+new_this_week: boolean
+params: {
+[k: string]: unknown
+}
+score: number
+severity: string
+title_key: string
+weeks_persisting: number
+why_key: string
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "FocusLink".
+ */
+export interface FocusLink {
+query?: {
+[k: string]: string
+}
+route: string
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "FocusView".
+ */
+export interface FocusView {
+computed_at: (string | null)
+detections_considered?: number
+detections_total?: number
+items: FocusEntry[]
+sources_status: {
+[k: string]: string
+}
+stale: boolean
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
  * via the `definition` "PceSummary".
  */
 export interface PceSummary {
@@ -675,6 +744,215 @@ status: (number | null)
  */
 export interface HomeSummary {
 pce: (PceSummary | null)
+}
+/**
+ * An operator's "known cause" for a host's or a pattern's tampering (spec §6.5.4 step 5).
+ * 
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "Annotation".
+ */
+export interface Annotation {
+host_href: (string | null)
+id: number
+pattern: (TamperPattern | null)
+process: (string | null)
+reason: string
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "AssetExposure".
+ */
+export interface AssetExposure {
+cuts: Cut[]
+key: string
+paths: string[][]
+sources_enforced: number
+sources_now: number
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "Cut".
+ */
+export interface Cut {
+after: number
+before: number
+dst: (string | null)
+kind: ("edge" | "node")
+ports: [unknown, unknown][]
+src: string
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "Command".
+ */
+export interface Command {
+platform: ("linux_nftables" | "linux_iptables_legacy" | "windows")
+purpose_key: string
+text: string
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "HostBreakdown".
+ */
+export interface HostBreakdown {
+approximate: boolean
+computed_percent: (number | null)
+contradiction: boolean
+enforcement_mode: (string | null)
+hostname: (string | null)
+href: string
+pce_exposure: (string | null)
+pce_percent: (number | null)
+services: ServiceContribution[]
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "ServiceContribution".
+ */
+export interface ServiceContribution {
+active_policy: (string | null)
+category: (string | null)
+contribution: (number | null)
+coverage: (number | null)
+name: string
+port: number
+port_status: (string | null)
+protection_state: (string | null)
+proto: number
+recent_sources: (number | null)
+severity: (string | null)
+traffic: RansomwareTrafficClass
+weight: (number | null)
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "HostExposureView".
+ */
+export interface HostExposureView {
+asset: (AssetExposure | null)
+computed_at: string
+pivot_enforced: boolean
+pivot_now: boolean
+reach_enforced: number
+reach_now: number
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "HostIdentity".
+ */
+export interface HostIdentity {
+agent_status: (string | null)
+enforcement_mode: (string | null)
+fetched_at: string
+hostname: (string | null)
+last_heartbeat_at: (string | null)
+name: (string | null)
+online: (boolean | null)
+os_id: (string | null)
+policy_applied_at: (string | null)
+policy_sync_state: (string | null)
+ven_version: (string | null)
+visibility_level: (string | null)
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "HostRansomware".
+ */
+export interface HostRansomware {
+allow_rules: {
+[k: string]: RuleRef[]
+}
+allow_status?: {
+[k: string]: string
+}
+breakdown: HostBreakdown
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "HostTamper".
+ */
+export interface HostTamper {
+annotations: Annotation[]
+explained: {
+[k: string]: number
+}
+guidance: Command[]
+pattern: PatternResult
+readings: TamperReading[]
+signal_capability: CapabilityState
+timeline: TimelineEvent[]
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "PatternResult".
+ */
+export interface PatternResult {
+kind: TamperPattern
+median_minutes: (number | null)
+n: number
+q1: (number | null)
+q3: (number | null)
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "TamperReading".
+ */
+export interface TamperReading {
+actions: (TamperAction | string)[]
+at: string
+classification: (string | null)
+has_process_info: boolean
+num_events: (number | null)
+pid: (number | null)
+process: (string | null)
+revert_succeeded: (boolean | null)
+tamper_type: (string | null)
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "TimelineEvent".
+ */
+export interface TimelineEvent {
+at: string
+event_type: string
+summary: string
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "HostProfile".
+ */
+export interface HostProfile {
+address: (string | null)
+exposure: (HostExposureView | null)
+identity: (HostIdentity | null)
+in_inventory: boolean
+key: string
+labels: {
+[k: string]: string
+}
+managed: boolean
+name: string
+ransomware: (HostRansomware | null)
+ransomware_details?: (("ok" | "stale" | "missing" | "not_rated") | null)
+ransomware_unsupported: boolean
+tamper: (HostTamper | null)
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "HostKey".
+ */
+export interface HostKey {
+key: string
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "TamperNoteAdd".
+ */
+export interface TamperNoteAdd {
+key: string
+pattern?: (TamperPattern | null)
+process?: (string | null)
+reason: string
 }
 /**
  * This interface was referenced by `ContractRoot`'s JSON-Schema
@@ -1780,7 +2058,7 @@ pulled: (PullInfo | null)
 result: SegmentResult
 }
 
-export type OpId = "alert_rules.create" | "alert_rules.delete" | "alert_rules.list" | "alert_rules.pack" | "alert_rules.preview" | "alert_rules.update" | "alerts.evidence" | "alerts.explain" | "alerts.get" | "alerts.list" | "alerts.mark_known" | "alerts.note_add" | "auth.csrf" | "auth.login" | "auth.logout" | "auth.me" | "auth.password" | "home.summary" | "i18n.dictionary" | "report_schedules.create" | "report_schedules.delete" | "report_schedules.list" | "report_schedules.run_now" | "report_schedules.update" | "reports.catalog" | "reports.delete" | "reports.generate" | "reports.get" | "reports.list" | "rhc.enable" | "rhc.status" | "system.channels.get" | "system.channels.test" | "system.channels.update" | "system.collection.backfill" | "system.collection.get" | "system.collection.status" | "system.collection.update" | "system.display.get" | "system.display.update" | "system.jobs.list" | "system.lateral.get" | "system.lateral.known" | "system.lateral.known_delete" | "system.lateral.update" | "system.logs.query" | "system.pce.get" | "system.pce.latest" | "system.pce.probe" | "system.pce.update" | "system.reports.get" | "system.reports.update" | "system.security.get" | "system.security.update" | "system.tls.csr" | "system.tls.import" | "system.tls.renew" | "system.tls.status" | "system.tls.update" | "workbench.dimension" | "workbench.from_alert" | "workbench.meta" | "workbench.run";
+export type OpId = "alert_rules.create" | "alert_rules.delete" | "alert_rules.list" | "alert_rules.pack" | "alert_rules.preview" | "alert_rules.update" | "alerts.evidence" | "alerts.explain" | "alerts.get" | "alerts.list" | "alerts.mark_known" | "alerts.note_add" | "auth.csrf" | "auth.login" | "auth.logout" | "auth.me" | "auth.password" | "home.focus" | "home.summary" | "hosts.profile" | "hosts.ransomware_allows" | "hosts.tamper_note_add" | "hosts.tamper_note_remove" | "i18n.dictionary" | "report_schedules.create" | "report_schedules.delete" | "report_schedules.list" | "report_schedules.run_now" | "report_schedules.update" | "reports.catalog" | "reports.delete" | "reports.generate" | "reports.get" | "reports.list" | "rhc.enable" | "rhc.status" | "system.channels.get" | "system.channels.test" | "system.channels.update" | "system.collection.backfill" | "system.collection.get" | "system.collection.status" | "system.collection.update" | "system.display.get" | "system.display.update" | "system.jobs.list" | "system.lateral.get" | "system.lateral.known" | "system.lateral.known_delete" | "system.lateral.update" | "system.logs.query" | "system.pce.get" | "system.pce.latest" | "system.pce.probe" | "system.pce.update" | "system.reports.get" | "system.reports.update" | "system.security.get" | "system.security.update" | "system.tls.csr" | "system.tls.import" | "system.tls.renew" | "system.tls.status" | "system.tls.update" | "workbench.dimension" | "workbench.from_alert" | "workbench.meta" | "workbench.run";
 
 export interface Requests {
   "alert_rules.create": RuleWrite;
@@ -1800,7 +2078,12 @@ export interface Requests {
   "auth.logout": undefined;
   "auth.me": undefined;
   "auth.password": PasswordChangeRequest;
+  "home.focus": undefined;
   "home.summary": undefined;
+  "hosts.profile": undefined;
+  "hosts.ransomware_allows": HostKey;
+  "hosts.tamper_note_add": TamperNoteAdd;
+  "hosts.tamper_note_remove": HostKey;
   "i18n.dictionary": undefined;
   "report_schedules.create": ScheduleWrite;
   "report_schedules.delete": ScheduleDelete;
@@ -1866,7 +2149,12 @@ export interface Responses {
   "auth.logout": Empty;
   "auth.me": Me;
   "auth.password": CsrfToken;
+  "home.focus": FocusView;
   "home.summary": HomeSummary;
+  "hosts.profile": HostProfile;
+  "hosts.ransomware_allows": HostRansomware;
+  "hosts.tamper_note_add": HostProfile;
+  "hosts.tamper_note_remove": HostProfile;
   "i18n.dictionary": Dictionary;
   "report_schedules.create": SchedulesView;
   "report_schedules.delete": SchedulesView;
@@ -1932,7 +2220,12 @@ export const OPERATIONS = {
   "auth.logout": { method: "POST", path: "/api/auth/logout" },
   "auth.me": { method: "GET", path: "/api/auth/me" },
   "auth.password": { method: "POST", path: "/api/auth/password" },
+  "home.focus": { method: "GET", path: "/api/home/focus" },
   "home.summary": { method: "GET", path: "/api/home/summary" },
+  "hosts.profile": { method: "GET", path: "/api/hosts/profile" },
+  "hosts.ransomware_allows": { method: "POST", path: "/api/hosts/ransomware-allows" },
+  "hosts.tamper_note_add": { method: "POST", path: "/api/hosts/tamper-notes" },
+  "hosts.tamper_note_remove": { method: "POST", path: "/api/hosts/tamper-notes/<int:note_id>/remove" },
   "i18n.dictionary": { method: "GET", path: "/api/i18n/<lang>" },
   "report_schedules.create": { method: "POST", path: "/api/report-schedules" },
   "report_schedules.delete": { method: "DELETE", path: "/api/report-schedules/<schedule_id>" },

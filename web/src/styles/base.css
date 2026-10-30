@@ -206,6 +206,8 @@ a.btn-primary, a.btn-quiet { display: inline-flex; align-items: center; text-dec
 .wb-dim-head::before { content: "▸ "; }
 .wb-dim-head[aria-expanded="true"]::before { content: "▾ "; }
 .wb-dim-body { display: flex; flex-direction: column; gap: var(--space-1); padding-left: var(--space-4); }
+.wb-dim-item { display: flex; align-items: center; }
+.wb-dim-host { padding: 0 var(--space-2); text-decoration: none; color: var(--text-3); }
 .wb-dim-row { display: flex; justify-content: space-between; gap: var(--space-4); width: 100%; background: none; border: 0;
               padding: var(--space-1) var(--space-2); cursor: pointer; color: var(--ink); text-align: left; border-radius: var(--radius-s); }
 .wb-dim-row:hover:not(:disabled) { background: var(--fill); }
@@ -215,3 +217,21 @@ a.btn-primary, a.btn-quiet { display: inline-flex; align-items: center; text-dec
 .wb-dim-value, .wb-num { font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
 .wb-main { min-width: 0; }
 @media (max-width: 900px) { .wb-body { grid-template-columns: 1fr; } .wb-dims { max-height: none; } }
+
+/* Home focus list (P6b) */
+.focus-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-3); }
+.focus-item { padding: var(--space-3) 0; border-top: 1px solid var(--mark); }
+.focus-item:first-child { border-top: 0; }
+.focus-item .row { gap: var(--space-3); flex-wrap: wrap; align-items: baseline; }
+.focus-item p { margin: var(--space-2) 0; }
+ul.notice { list-style: none; }
+
+/* Host profile (P6b) */
+.host-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: var(--space-4); }
+.host-facts { display: grid; grid-template-columns: max-content 1fr; gap: var(--space-2) var(--space-4); margin: 0; }
+.host-facts dt { color: var(--text-3); }
+.host-facts dd { margin: 0; }
+.host-facts .badge + .badge { margin-left: var(--space-2); }
+code.cmd { white-space: pre-wrap; word-break: break-all; font-size: var(--fs-mini); }
+[data-role=host-profile] .card > .row:first-child { justify-content: space-between; align-items: baseline; }
+[data-role=host-profile] .card h3 { margin: 0; }

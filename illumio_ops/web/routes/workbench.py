@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field, ValidationError
 
 from illumio_ops.domain.values import SegmentDimension
 from illumio_ops.services import workbench
+from illumio_ops.services.collect.guard import BindingMismatch
 from illumio_ops.services.ondemand import OnDemandFailed
 from illumio_ops.services.workbench import (
     DimensionTop,
@@ -57,7 +58,7 @@ def meta() -> WorkbenchMeta:
 def run(body: WorkbenchRun) -> WorkbenchResult:
     try:
         return workbench.run(get_ctx(), body.request)
-    except StaleGeneration:
+    except (StaleGeneration, BindingMismatch):
         raise ApiFailure(409, "pce_switched", "wb_pce_switched") from None
     except (ValidationError, ValueError) as exc:
         raise _invalid(exc) from None
@@ -69,7 +70,7 @@ def run(body: WorkbenchRun) -> WorkbenchResult:
 def dimension(body: WorkbenchDimension) -> DimensionTop:
     try:
         return workbench.dimension(get_ctx(), body.request, body.dimension, label_key=body.label_key)
-    except StaleGeneration:
+    except (StaleGeneration, BindingMismatch):
         raise ApiFailure(409, "pce_switched", "wb_pce_switched") from None
     except OnDemandFailed as exc:
         raise ApiFailure(502, "pull_failed", "wb_pull_failed", params={"error": str(exc)[:300]}) from None

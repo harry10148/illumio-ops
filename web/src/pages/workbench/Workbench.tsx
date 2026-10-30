@@ -23,6 +23,8 @@ const METRIC_KEYS: Record<string, string> = {
   distinct_src: "wb_metric_distinct_src", distinct_ports: "wb_metric_distinct_ports", bytes: "wb_metric_bytes",
   events: "wb_metric_events",
 };
+const HOST_DIMS = new Set<string>(["src_host", "dst_host", "event_host"]);
+const HOST_KEY = /^(\/orgs\/\d+\/workloads\/|ip:)/;  // what the host profile takes (an event's VEN href is not)
 const PERIODS: [string, number][] = [["wb_period_1h", 1], ["wb_period_1d", 24], ["wb_period_7d", 168], ["wb_period_30d", 720]];
 
 function lastHours(hours: number): { start: string; end: string } {
@@ -67,7 +69,7 @@ function Coverage({ result, bytes }: { result: SegmentResult; bytes: boolean }) 
   );
 }
 
-function Pulled({ info }: { info: PullInfo }) {
+export function Pulled({ info }: { info: PullInfo }) {
   const lang = useLang();
   return (
     <div className="stack" data-role="pulled">
@@ -117,11 +119,17 @@ function DimensionBox({ req, dim, open, onToggle, onPick, names }: {
             const pickable = dim.dimension !== "direction" && key !== "";
             const on = pickable && chosen(req, dim, key);
             return (
-              <button key={key} type="button" className="wb-dim-row" data-chosen={on} disabled={!pickable || on}
-                onClick={() => onPick(dim, row)} title={label}>
-                <span className="wb-dim-label">{label}</span>
-                <span className="wb-dim-value">{row.value.toLocaleString()}</span>
-              </button>
+              <div key={key} className="wb-dim-item">
+                <button type="button" className="wb-dim-row" data-chosen={on} disabled={!pickable || on}
+                  onClick={() => onPick(dim, row)} title={label}>
+                  <span className="wb-dim-label">{label}</span>
+                  <span className="wb-dim-value">{row.value.toLocaleString()}</span>
+                </button>
+                {HOST_DIMS.has(dim.dimension) && HOST_KEY.test(key) && (
+                  <Link className="wb-dim-host" to={`/hosts?${new URLSearchParams({ key }).toString()}`}
+                    aria-label={t("hosts_title")} title={t("hosts_title")}>↗</Link>
+                )}
+              </div>
             );
           })}
           {top?.limit_hit && <p className="hint">{t("wb_dim_top", { n: String(top.rows.length) })}</p>}
