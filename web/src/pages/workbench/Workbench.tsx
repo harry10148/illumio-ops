@@ -174,7 +174,8 @@ function Detail({ result, mode }: { result: SegmentResult; mode: Req["mode"] }) 
   );
 }
 
-function Ranking({ result, levels }: { result: SegmentResult; levels: number }) {
+function Ranking({ result, heads }: { result: SegmentResult; heads: string[] }) {
+  const levels = heads.length - 1;
   const rows = result.ranking ?? [];
   if (rows.length === 0) return <p className="muted">{t("wb_empty")}</p>;
   const shownKey = (r: AggRow, i: number) => {
@@ -185,6 +186,7 @@ function Ranking({ result, levels }: { result: SegmentResult; levels: number }) 
   return (
     <div className="table-wrap">
       <table className="table" data-role="wb-ranking">
+        <thead><tr>{heads.map((h, i) => <th key={i} className={i === heads.length - 1 ? "wb-num" : ""}>{h}</th>)}</tr></thead>
         <tbody>
           {rows.map((r, i) => {
             const prev = rows[i - 1];
@@ -400,7 +402,8 @@ export function Workbench() {
             <>
               <Coverage result={result} bytes={req.mode === "flows" && req.metric === "bytes"} />
               {result.view === "ranking"
-                ? <Ranking result={result} levels={(req.group_by ?? []).length || 1} />
+                ? <Ranking result={result} heads={[...(req.group_by ?? []).map((g) => t(DIM_KEYS[g.dimension] ?? g.dimension)),
+                    t(METRIC_KEYS[req.mode === "events" ? "events" : (req.metric ?? "flows")] ?? "")]} />
                 : <Detail result={result} mode={req.mode} />}
             </>
           )}
