@@ -8,7 +8,7 @@ from illumio_ops.domain import exposure as domain_exposure
 from illumio_ops.domain.exposure import EdgeIn, ExposureResult, Foothold, edge_state
 from illumio_ops.domain.identity import endpoint_key
 from illumio_ops.domain.lateral import GRAPH_CLASSES
-from illumio_ops.services.analysis.context import load_lateral_context
+from illumio_ops.services.analysis.context import LateralContext, load_lateral_context
 from illumio_ops.services.context import AppContext
 from illumio_ops.services.flowsource import baseline_edges
 from illumio_ops.settings.schema import LateralSettings
@@ -17,6 +17,33 @@ from illumio_ops.store.flowdb.db import db_day
 
 KIND = "exposure"
 compute_exposure = domain_exposure.compute_exposure  # module attribute: tests stand in for it
+
+
+def graph_edges(ctx: AppContext, lc: LateralContext, *, since: datetime, until: datetime | None = None) -> list[EdgeIn]:
+    """The graph's edges: the management-port connections seen since `since` that were not blocked (and, with
+    `until`, first seen by then)."""
+    edges = []
+    for e in baseline_edges(ctx, lc.admin_ports, since=since, classes=GRAPH_CLASSES, until=until).edges:
+        state = edge_state(e.decision)
+        if state is not None:
+            edges.append(EdgeIn(e.src_key, e.dst_key, e.port, e.proto, state))
+    return edges
+
+
+def exposure_from(ctx: AppContext, lc: LateralContext, edges: list[EdgeIn], *, since: datetime,
+                  now: datetime) -> ExposureResult:
+    lat: LateralSettings = lc.settings
+    with ctx.flows().connect() as conn:
+        landing = ransomware.unprotected_listening(conn)
+    footholds = [Foothold(host=endpoint_key(href, ""), name=name, port=port, proto=proto, severity=sev)
+                 for href, name, port, proto, sev in landing]
+    env_key = lat.environment_label_key
+    return compute_exposure(
+        edges, lc.hosts, footholds, hops=lat.graph_hops,
+        critical=frozenset(k for k, h in lc.hosts.items() if h.critical),
+        env_of={k: h.labels.get(env_key) for k, h in lc.hosts.items()},
+        computed_at=now, observation_from=since, observation_to=now,
+        group_of={key: {k: h.labels.get(key) for k, h in lc.hosts.items()} for key in dict.fromkeys(("app", env_key))})
 
 
 def run_exposure(ctx: AppContext, *, now: datetime) -> ExposureResult | None:
@@ -31,22 +58,7 @@ def run_exposure(ctx: AppContext, *, now: datetime) -> ExposureResult | None:
     # The graph cannot look further back than the baseline keeps (P3 Task 1 ruling).
     days = min(lat.observation_days, lc.baseline_required)
     since = now - timedelta(days=days)
-    found = baseline_edges(ctx, lc.admin_ports, since=since, classes=GRAPH_CLASSES)
-    edges = []
-    for e in found.edges:
-        state = edge_state(e.decision)
-        if state is not None:
-            edges.append(EdgeIn(e.src_key, e.dst_key, e.port, e.proto, state))
-    with fdb.connect() as conn:
-        landing = ransomware.unprotected_listening(conn)
-    footholds = [Foothold(host=endpoint_key(href, ""), name=name, port=port, proto=proto, severity=sev)
-                 for href, name, port, proto, sev in landing]
-    env_key = lat.environment_label_key
-    result = compute_exposure(
-        edges, lc.hosts, footholds, hops=lat.graph_hops,
-        critical=frozenset(k for k, h in lc.hosts.items() if h.critical),
-        env_of={k: h.labels.get(env_key) for k, h in lc.hosts.items()},
-        computed_at=now, observation_from=since, observation_to=now)
+    result = exposure_from(ctx, lc, graph_edges(ctx, lc, since=since), since=since, now=now)
     metrics = {
         "nodes": result.nodes, "edges_now": result.edges_now, "edges_enforced": result.edges_enforced,
         "unknown_edges": result.unknown_edges, "pivots_now": sum(h.pivot_now for h in result.hosts),

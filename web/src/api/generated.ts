@@ -77,6 +77,21 @@ export type RansomwareTrafficClass = ("priority" | "safe_to_block" | "suspicious
  */
 export type TamperAction = ("add_rule" | "delete_rule" | "add_chain" | "delete_chain" | "add_table" | "delete_table")
 /**
+ * An exposure-graph edge by the reported decision of its newest observation (blocked edges are
+ * not in the graph).
+ * 
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "EdgeState".
+ */
+export type EdgeState = ("allowed" | "potentially_blocked" | "unknown")
+/**
+ * What a detector run can say besides its detections: "no detection" is only ever OK.
+ * 
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "DetectorState".
+ */
+export type DetectorState = ("ok" | "disabled" | "accumulating" | "no_data" | "collection_off" | "incomplete")
+/**
  * This interface was referenced by `ContractRoot`'s JSON-Schema
  * via the `definition` "ReportFormat".
  */
@@ -126,13 +141,6 @@ export type CollectionMode1 = ("full" | "alert" | "lightweight")
  * via the `definition` "PortClass".
  */
 export type PortClass = ("remote" | "directory" | "database")
-/**
- * What a detector run can say besides its detections: "no detection" is only ever OK.
- * 
- * This interface was referenced by `ContractRoot`'s JSON-Schema
- * via the `definition` "DetectorState".
- */
-export type DetectorState = ("ok" | "disabled" | "accumulating" | "no_data" | "collection_off" | "incomplete")
 /**
  * The three kinds of management port (spec §6.5.8): remote execution and control, directory and
  * authentication, and databases. Each detector reads the classes it is about.
@@ -962,6 +970,280 @@ export interface Dictionary {
 [k: string]: string
 }
 /**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "LateralCompute".
+ */
+export interface LateralCompute {
+days: (1 | 7 | 30)
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "CrossEnvEdge".
+ */
+export interface CrossEnvEdge {
+dst: string
+dst_env: string
+ports: [unknown, unknown][]
+src: string
+src_env: string
+state: EdgeState
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "DetectorStatusView".
+ */
+export interface DetectorStatusView {
+detector: DetectorKind
+params: {
+[k: string]: unknown
+}
+reason_key: (string | null)
+state: DetectorState
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "ExposureResult".
+ */
+export interface ExposureResult {
+assets: AssetExposure[]
+computed_at: string
+cross_env: CrossEnvEdge[]
+cross_env_total: number
+edges_enforced: number
+edges_now: number
+footholds: Foothold[]
+groups?: {
+[k: string]: GroupGraph
+}
+hops: number
+hosts: HostExposure[]
+limits_hit: string[]
+nodes: number
+observation_from: string
+observation_to: string
+unknown_edges: number
+}
+/**
+ * A host with an unprotected, listening high-risk service (spec §6.5.6): a place to land.
+ * 
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "Foothold".
+ */
+export interface Foothold {
+host: string
+name: string
+port: number
+proto: number
+severity: (string | null)
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "GroupGraph".
+ */
+export interface GroupGraph {
+edges: [unknown, unknown, unknown, unknown][]
+groups: (string | null)[]
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "HostExposure".
+ */
+export interface HostExposure {
+key: string
+pivot_enforced: boolean
+pivot_now: boolean
+reach_enforced: number
+reach_now: number
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "LateralDetection".
+ */
+export interface LateralDetection {
+critical_asset: boolean
+detector: DetectorKind
+first_seen: string
+last_seen: string
+link_q: (string | null)
+params: {
+[k: string]: unknown
+}
+severity: string
+subject: string
+subject_name: string
+title_key: string
+}
+/**
+ * What was read from the PCE for this answer: said on the page (anti-goal: nothing silent).
+ * 
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "PullInfo".
+ */
+export interface PullInfo {
+capped: boolean
+end: string
+read_at: string
+rows: number
+start: string
+truncated_windows: number
+unread_from: (string | null)
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "LateralPage".
+ */
+export interface LateralPage {
+admin_set: boolean
+collection_stopped: boolean
+computed_at: (string | null)
+critical_set: boolean
+detect_state: ("ok" | "failed" | "not_run")
+detections: LateralDetection[]
+detections_available: boolean
+detections_total: number
+detectors: DetectorStatusView[]
+exposure: (ExposureResult | null)
+last_run_failed: boolean
+lightweight_days: number[]
+names: {
+[k: string]: string
+}
+observation_days_setting: number
+port_names: {
+[k: string]: string
+}
+pull: (PullInfo | null)
+ransomware_rated: number
+ransomware_unread: number
+ransomware_unsupported: boolean
+source: (("stored" | "pulled") | null)
+stale: boolean
+state: ("ok" | "not_computed" | "collection_off" | "lightweight")
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "DenyProposal".
+ */
+export interface DenyProposal {
+dst: EndpointFilter
+ports?: PortProto[]
+src: EndpointFilter
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "LateralSimulate".
+ */
+export interface LateralSimulate {
+proposal: DenyProposal
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "AggRow".
+ */
+export interface AggRow {
+bytes_known: (number | null)
+display: (string | null)[]
+keys: (string | number | null)[]
+value: number
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "AssetReachChange".
+ */
+export interface AssetReachChange {
+after: number
+asset: string
+before: number
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "DenySimulation".
+ */
+export interface DenySimulation {
+blocked_connections: number
+blocked_flows: number
+coverage: Coverage
+destinations: AggRow[]
+field_coverage: (FieldCoverage | null)
+limit_hit: boolean
+reach_change: AssetReachChange[]
+sample: FlowRow[]
+sources: AggRow[]
+/**
+ * @minItems 2
+ * @maxItems 2
+ */
+window: [unknown, unknown]
+}
+/**
+ * How many of the matching connections carry each optional field (spec §6.5.7: process and user
+ * are on few flows, bytes on fewer).
+ * 
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "FieldCoverage".
+ */
+export interface FieldCoverage {
+bytes: number
+initiator_process: number
+initiator_user: number
+service_process: number
+service_user: number
+total: number
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "FlowRow".
+ */
+export interface FlowRow {
+bytes_in: (number | null)
+bytes_out: (number | null)
+conn_key: string
+direction: string
+dst_hostname: (string | null)
+dst_href: (string | null)
+dst_ip: string
+dst_key: string
+dst_labels: {
+[k: string]: string
+}
+dst_managed: boolean
+dst_mode: (string | null)
+first_detected: string
+initiator_process: (string | null)
+initiator_user: (string | null)
+last_detected: string
+num_connections: number
+origin: string
+policy_decision: string
+port: (number | null)
+proto: number
+record_key: string
+service_process: (string | null)
+service_user: (string | null)
+src_hostname: (string | null)
+src_href: (string | null)
+src_ip: string
+src_key: string
+src_labels: {
+[k: string]: string
+}
+src_managed: boolean
+src_mode: (string | null)
+state: (string | null)
+windows_service: (string | null)
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "DenySimulationView".
+ */
+export interface DenySimulationView {
+names: {
+[k: string]: string
+}
+pull: (PullInfo | null)
+simulation: DenySimulation
+}
+/**
  * A built-in report run on a schedule: its type and parameters, not its output (spec §6.3). The page edits
  * these; the server assigns the id (ReportSchedule).
  * 
@@ -1484,18 +1766,6 @@ volume_surge_factor: number
 }
 /**
  * This interface was referenced by `ContractRoot`'s JSON-Schema
- * via the `definition` "DetectorStatusView".
- */
-export interface DetectorStatusView {
-detector: DetectorKind
-params: {
-[k: string]: unknown
-}
-reason_key: (string | null)
-state: DetectorState
-}
-/**
- * This interface was referenced by `ContractRoot`'s JSON-Schema
  * via the `definition` "ExpectedInitiators".
  */
 export interface ExpectedInitiators {
@@ -1896,31 +2166,6 @@ request: (FlowRequest | EventRequest)
 }
 /**
  * This interface was referenced by `ContractRoot`'s JSON-Schema
- * via the `definition` "AggRow".
- */
-export interface AggRow {
-bytes_known: (number | null)
-display: (string | null)[]
-keys: (string | number | null)[]
-value: number
-}
-/**
- * What was read from the PCE for this answer: said on the page (anti-goal: nothing silent).
- * 
- * This interface was referenced by `ContractRoot`'s JSON-Schema
- * via the `definition` "PullInfo".
- */
-export interface PullInfo {
-capped: boolean
-end: string
-read_at: string
-rows: number
-start: string
-truncated_windows: number
-unread_from: (string | null)
-}
-/**
- * This interface was referenced by `ContractRoot`'s JSON-Schema
  * via the `definition` "DimensionTop".
  */
 export interface DimensionTop {
@@ -1975,63 +2220,6 @@ tamper_classification: (string | null)
 timestamp: string
 }
 /**
- * How many of the matching connections carry each optional field (spec §6.5.7: process and user
- * are on few flows, bytes on fewer).
- * 
- * This interface was referenced by `ContractRoot`'s JSON-Schema
- * via the `definition` "FieldCoverage".
- */
-export interface FieldCoverage {
-bytes: number
-initiator_process: number
-initiator_user: number
-service_process: number
-service_user: number
-total: number
-}
-/**
- * This interface was referenced by `ContractRoot`'s JSON-Schema
- * via the `definition` "FlowRow".
- */
-export interface FlowRow {
-bytes_in: (number | null)
-bytes_out: (number | null)
-conn_key: string
-direction: string
-dst_hostname: (string | null)
-dst_href: (string | null)
-dst_ip: string
-dst_key: string
-dst_labels: {
-[k: string]: string
-}
-dst_managed: boolean
-dst_mode: (string | null)
-first_detected: string
-initiator_process: (string | null)
-initiator_user: (string | null)
-last_detected: string
-num_connections: number
-origin: string
-policy_decision: string
-port: (number | null)
-proto: number
-record_key: string
-service_process: (string | null)
-service_user: (string | null)
-src_hostname: (string | null)
-src_href: (string | null)
-src_ip: string
-src_key: string
-src_labels: {
-[k: string]: string
-}
-src_managed: boolean
-src_mode: (string | null)
-state: (string | null)
-windows_service: (string | null)
-}
-/**
  * This interface was referenced by `ContractRoot`'s JSON-Schema
  * via the `definition` "SegmentResult".
  */
@@ -2058,7 +2246,7 @@ pulled: (PullInfo | null)
 result: SegmentResult
 }
 
-export type OpId = "alert_rules.create" | "alert_rules.delete" | "alert_rules.list" | "alert_rules.pack" | "alert_rules.preview" | "alert_rules.update" | "alerts.evidence" | "alerts.explain" | "alerts.get" | "alerts.list" | "alerts.mark_known" | "alerts.note_add" | "auth.csrf" | "auth.login" | "auth.logout" | "auth.me" | "auth.password" | "home.focus" | "home.summary" | "hosts.profile" | "hosts.ransomware_allows" | "hosts.tamper_note_add" | "hosts.tamper_note_remove" | "i18n.dictionary" | "report_schedules.create" | "report_schedules.delete" | "report_schedules.list" | "report_schedules.run_now" | "report_schedules.update" | "reports.catalog" | "reports.delete" | "reports.generate" | "reports.get" | "reports.list" | "rhc.enable" | "rhc.status" | "system.channels.get" | "system.channels.test" | "system.channels.update" | "system.collection.backfill" | "system.collection.get" | "system.collection.status" | "system.collection.update" | "system.display.get" | "system.display.update" | "system.jobs.list" | "system.lateral.get" | "system.lateral.known" | "system.lateral.known_delete" | "system.lateral.update" | "system.logs.query" | "system.pce.get" | "system.pce.latest" | "system.pce.probe" | "system.pce.update" | "system.reports.get" | "system.reports.update" | "system.security.get" | "system.security.update" | "system.tls.csr" | "system.tls.import" | "system.tls.renew" | "system.tls.status" | "system.tls.update" | "workbench.dimension" | "workbench.from_alert" | "workbench.meta" | "workbench.run";
+export type OpId = "alert_rules.create" | "alert_rules.delete" | "alert_rules.list" | "alert_rules.pack" | "alert_rules.preview" | "alert_rules.update" | "alerts.evidence" | "alerts.explain" | "alerts.get" | "alerts.list" | "alerts.mark_known" | "alerts.note_add" | "auth.csrf" | "auth.login" | "auth.logout" | "auth.me" | "auth.password" | "home.focus" | "home.summary" | "hosts.profile" | "hosts.ransomware_allows" | "hosts.tamper_note_add" | "hosts.tamper_note_remove" | "i18n.dictionary" | "lateral.compute" | "lateral.simulate" | "lateral.view" | "report_schedules.create" | "report_schedules.delete" | "report_schedules.list" | "report_schedules.run_now" | "report_schedules.update" | "reports.catalog" | "reports.delete" | "reports.generate" | "reports.get" | "reports.list" | "rhc.enable" | "rhc.status" | "system.channels.get" | "system.channels.test" | "system.channels.update" | "system.collection.backfill" | "system.collection.get" | "system.collection.status" | "system.collection.update" | "system.display.get" | "system.display.update" | "system.jobs.list" | "system.lateral.get" | "system.lateral.known" | "system.lateral.known_delete" | "system.lateral.update" | "system.logs.query" | "system.pce.get" | "system.pce.latest" | "system.pce.probe" | "system.pce.update" | "system.reports.get" | "system.reports.update" | "system.security.get" | "system.security.update" | "system.tls.csr" | "system.tls.import" | "system.tls.renew" | "system.tls.status" | "system.tls.update" | "workbench.dimension" | "workbench.from_alert" | "workbench.meta" | "workbench.run";
 
 export interface Requests {
   "alert_rules.create": RuleWrite;
@@ -2085,6 +2273,9 @@ export interface Requests {
   "hosts.tamper_note_add": TamperNoteAdd;
   "hosts.tamper_note_remove": HostKey;
   "i18n.dictionary": undefined;
+  "lateral.compute": LateralCompute;
+  "lateral.simulate": LateralSimulate;
+  "lateral.view": undefined;
   "report_schedules.create": ScheduleWrite;
   "report_schedules.delete": ScheduleDelete;
   "report_schedules.list": undefined;
@@ -2156,6 +2347,9 @@ export interface Responses {
   "hosts.tamper_note_add": HostProfile;
   "hosts.tamper_note_remove": HostProfile;
   "i18n.dictionary": Dictionary;
+  "lateral.compute": LateralPage;
+  "lateral.simulate": DenySimulationView;
+  "lateral.view": LateralPage;
   "report_schedules.create": SchedulesView;
   "report_schedules.delete": SchedulesView;
   "report_schedules.list": SchedulesView;
@@ -2227,6 +2421,9 @@ export const OPERATIONS = {
   "hosts.tamper_note_add": { method: "POST", path: "/api/hosts/tamper-notes" },
   "hosts.tamper_note_remove": { method: "POST", path: "/api/hosts/tamper-notes/<int:note_id>/remove" },
   "i18n.dictionary": { method: "GET", path: "/api/i18n/<lang>" },
+  "lateral.compute": { method: "POST", path: "/api/lateral/compute" },
+  "lateral.simulate": { method: "POST", path: "/api/lateral/simulate" },
+  "lateral.view": { method: "GET", path: "/api/lateral" },
   "report_schedules.create": { method: "POST", path: "/api/report-schedules" },
   "report_schedules.delete": { method: "DELETE", path: "/api/report-schedules/<schedule_id>" },
   "report_schedules.list": { method: "GET", path: "/api/report-schedules" },

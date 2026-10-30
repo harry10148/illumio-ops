@@ -6,7 +6,7 @@ from __future__ import annotations
 from collections.abc import Callable, Mapping, Sequence
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, model_validator
 
 from illumio_ops.domain.exposure import Cut, EdgeIn
 from illumio_ops.domain.filter import (
@@ -28,6 +28,12 @@ class DenyProposal(BaseModel):
     src: EndpointFilter
     dst: EndpointFilter
     ports: tuple[PortProto, ...] = ()  # empty = all services
+
+    @model_validator(mode="after")
+    def _names_something(self) -> DenyProposal:
+        if self.src.is_empty() and self.dst.is_empty() and not self.ports:
+            raise ValueError("a deny rule names a source, a destination or a service")  # not "block everything"
+        return self
 
 
 def proposal_filter(p: DenyProposal, *, start: datetime, end: datetime) -> FilterSpec:
@@ -63,7 +69,7 @@ def _endpoint(key: str, hosts: Mapping[str, HostInfo]) -> EndpointFilter:
 
 def cut_to_proposal(cut: Cut, hosts: Mapping[str, HostInfo]) -> DenyProposal:
     """An edge cut becomes "deny <src> → <dst> on its ports"; a host cut becomes "deny everything into
-    the host" (the graph removes the host's way out too: the traffic count covers the way in only)."""
+    the host" — the same thing suggest_cuts counted, so the simulation repeats the cut's numbers."""
     if cut.kind == "edge" and cut.dst is not None:
         return DenyProposal(src=_endpoint(cut.src, hosts), dst=_endpoint(cut.dst, hosts),
                             ports=tuple(PortProto(port=port, proto=proto) for port, proto in cut.ports))

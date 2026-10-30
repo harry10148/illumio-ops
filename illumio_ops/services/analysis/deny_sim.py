@@ -3,16 +3,18 @@ collected over the observation period, and how it changes who can reach each cri
 store only; never writes to or asks the PCE."""
 from __future__ import annotations
 
+from collections.abc import Sequence
 from datetime import UTC, datetime, timedelta
 
 from pydantic import BaseModel
 
 from illumio_ops.domain.deny import DenyProposal, apply_deny, proposal_filter
-from illumio_ops.domain.exposure import EdgeIn, build_graph, edge_state, paths_to
-from illumio_ops.domain.lateral import GRAPH_CLASSES, HostInfo
+from illumio_ops.domain.exposure import EdgeIn, build_graph, paths_to
+from illumio_ops.domain.lateral import HostInfo
 from illumio_ops.domain.segment import FlowSegment, GroupBy
 from illumio_ops.domain.values import SegmentDimension, SegmentMetric, SegmentView
 from illumio_ops.services.analysis.context import host_for, load_lateral_context
+from illumio_ops.services.analysis.exposure import graph_edges
 from illumio_ops.services.context import AppContext
 from illumio_ops.services.coverage import Coverage
 from illumio_ops.services.flowsource import (
@@ -20,7 +22,6 @@ from illumio_ops.services.flowsource import (
     FieldCoverage,
     FlowRow,
     aggregate_flows,
-    baseline_edges,
     query_flows,
 )
 
@@ -46,12 +47,15 @@ class DenySimulation(BaseModel):
     field_coverage: FieldCoverage | None
 
 
-def simulate_deny(ctx: AppContext, proposal: DenyProposal, *, now: datetime | None = None,
-                  sample: int = 200) -> DenySimulation:
+def simulate_deny(ctx: AppContext, proposal: DenyProposal, *, now: datetime | None = None, sample: int = 200,
+                  window: tuple[datetime, datetime] | None = None,
+                  edges: Sequence[EdgeIn] | None = None) -> DenySimulation:
+    """`window` and `edges` (lightweight mode, P6c): the period pulled for the lateral page and its graph's edges,
+    in place of the observation period and the store's baseline."""
     at = (now or datetime.now(UTC)).astimezone(UTC)
     lc = load_lateral_context(ctx, now=at)
-    start = at - timedelta(days=min(lc.settings.observation_days, lc.baseline_required))
-    spec = proposal_filter(proposal, start=start, end=at)
+    start, end = window or (at - timedelta(days=min(lc.settings.observation_days, lc.baseline_required)), at)
+    spec = proposal_filter(proposal, start=start, end=end)
 
     def ranking(dim: SegmentDimension, metric: SegmentMetric, limit: int = TOP) -> FlowSegment:
         return FlowSegment(filter=spec, view=SegmentView.RANKING, group_by=(GroupBy(dimension=dim),),
@@ -63,11 +67,8 @@ def simulate_deny(ctx: AppContext, proposal: DenyProposal, *, now: datetime | No
     conns = aggregate_flows(ctx, ranking(SegmentDimension.DECISION, SegmentMetric.CONNECTIONS), now=at)
     detail = query_flows(ctx, spec, limit=sample, order="connections_desc", now=at)
 
-    edges = []
-    for e in baseline_edges(ctx, lc.admin_ports, since=start, classes=GRAPH_CLASSES).edges:
-        state = edge_state(e.decision)
-        if state is not None:
-            edges.append(EdgeIn(e.src_key, e.dst_key, e.port, e.proto, state))
+    if edges is None:
+        edges = graph_edges(ctx, lc, since=start)
 
     def host(key: str) -> HostInfo:
         return host_for(lc, key, ip=key[3:] if key.startswith("ip:") else "", hostname=None)
@@ -77,7 +78,7 @@ def simulate_deny(ctx: AppContext, proposal: DenyProposal, *, now: datetime | No
                                after=len(paths_to(after, k, lc.settings.graph_hops)))
               for k in sorted(k for k, h in lc.hosts.items() if h.critical)]
     return DenySimulation(
-        window=(start, at), blocked_flows=sum(r.value for r in flows.rows),
+        window=(start, end), blocked_flows=sum(r.value for r in flows.rows),
         blocked_connections=sum(r.value for r in conns.rows), sources=by_src.rows, destinations=by_dst.rows,
         sample=detail.rows, limit_hit=detail.limit_hit or by_src.limit_hit or by_dst.limit_hit,
         reach_change=change, coverage=by_src.coverage, field_coverage=by_src.field_coverage)

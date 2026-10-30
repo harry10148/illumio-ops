@@ -7,6 +7,7 @@ from __future__ import annotations
 import ipaddress
 import json
 import re
+from collections.abc import Iterable
 from datetime import UTC, datetime
 from typing import Literal
 
@@ -74,6 +75,20 @@ def parse_key(key: str) -> tuple[str | None, str | None]:
     if WORKLOAD_HREF.match(key):
         return key, None
     raise ValueError("a host is a workload href or ip:<address>")
+
+
+def display_names(ctx: AppContext, keys: Iterable[str]) -> dict[str, str]:
+    """How each host key is shown — never an href: the inventory's hostname or name, else an address the workload
+    was seen with in the flows (the PCE sends no hostname for some workloads, lab 2026-10-30), an unmanaged key as
+    its address. A workload neither holds keeps its href (nothing better is known)."""
+    keys = set(keys)
+    hrefs = {k for k in keys if WORKLOAD_HREF.match(k)}
+    names: dict[str, str] = {}
+    if hrefs:
+        with ctx.flows().connect() as conn:
+            names = {w.href: n for w in workloads.all_workloads(conn) if w.href in hrefs and (n := w.hostname or w.name)}
+        names |= host_addresses(ctx, hrefs - set(names))
+    return {k: names.get(k) or (k.removeprefix("ip:")) for k in keys}
 
 
 def _exposure(ctx: AppContext, key: str) -> HostExposureView | None:

@@ -27,14 +27,15 @@ export function rememberLang(lang: Lang): void {
   }
 }
 
-export async function loadDictionary(lang: Lang): Promise<boolean> {
+/** A language's words, fetched but not yet in use: the caller uses them only if still the language wanted. */
+export async function fetchDictionary(lang: Lang): Promise<Dict | null> {
   const env = await call("i18n.dictionary", undefined, { lang });
-  if (env.ok && env.data) {
-    current = env.data;
-    document.documentElement.lang = lang === "zh_TW" ? "zh-Hant-TW" : "en";
-    return true;
-  }
-  return false;
+  return env.ok && env.data ? env.data : null;
+}
+
+export function applyDictionary(lang: Lang, dict: Dict | null): void {
+  if (dict) current = dict;
+  document.documentElement.lang = lang === "zh_TW" ? "zh-Hant-TW" : "en";
 }
 
 export function t(key: string, params?: Record<string, string>): string {

@@ -114,3 +114,15 @@ def test_covered_request_not_blocked_by_a_pull(ctx, pulls, monkeypatch):
     assert done.wait(2)  # not held up by the 7-day pull
     release.set()
     t.join(5)
+
+
+def test_pull_shares_the_interactive_lock(ctx, pulls):
+    """Security review: the workbench's pull and the lateral page's pulls share one lock."""
+    import threading
+    done = threading.Event()
+    with ondemand.INTERACTIVE_PULL:
+        t = threading.Thread(target=lambda: (_ctx_for(ctx, NOW - timedelta(days=1), NOW, now=NOW), done.set()))
+        t.start()
+        assert not done.wait(0.5) and pulls["opened"] == []
+    assert done.wait(5) and len(pulls["opened"]) == 1
+    t.join(5)

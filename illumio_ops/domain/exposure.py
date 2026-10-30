@@ -119,8 +119,9 @@ def _reverse(g: Graph) -> list[list[int]]:
 
 
 def _paths_to(g: Graph, rev: list[list[int]], target: int, hops: int, *, skip_edge: tuple[int, int] | None = None,
-              skip_node: int | None = None) -> dict[int, int]:
-    """Reverse BFS from target: source -> next hop on its shortest path (ties by node name)."""
+              skip_into: int | None = None) -> dict[int, int]:
+    """Reverse BFS from target: source -> next hop on its shortest path (ties by node name). skip_into drops every
+    edge into that host (a deny rule on everything into it): it still reaches on its own way out."""
     nxt: dict[int, int] = {}
     dist = {target: 0}
     q = deque([target])
@@ -129,7 +130,7 @@ def _paths_to(g: Graph, rev: list[list[int]], target: int, hops: int, *, skip_ed
         if dist[node] == hops:
             continue
         for pred in rev[node]:
-            if pred in dist or pred == skip_node or (pred, node) == skip_edge:
+            if pred in dist or node == skip_into or (pred, node) == skip_edge:
                 continue
             dist[pred] = dist[node] + 1
             nxt[pred] = node
@@ -256,7 +257,8 @@ class Cut(BaseModel):
 
 def suggest_cuts(g: Graph, target: str, hops: int, *, top: int = 3, max_candidates: int = 20) -> list[Cut]:
     """Greedy single cuts: of the edges and intermediate hosts on the shortest paths into `target`, the
-    ones whose removal leaves the fewest hosts reaching it. Ties: an edge before a host, fewer ports
+    ones whose removal leaves the fewest hosts reaching it. A host cut is the deny rule on everything into the
+    host (what deny.cut_to_proposal simulates): the host itself stays a source. Ties: an edge before a host, fewer ports
     first (the narrowest deny rule), then by name."""
     if target not in g.index:
         return []
@@ -283,7 +285,7 @@ def suggest_cuts(g: Graph, target: str, hops: int, *, top: int = 3, max_candidat
             ports = sorted(g.edge_info[(a, b)][0])
             cuts.append(Cut(kind="edge", src=g.nodes[a], dst=g.nodes[b], ports=ports, before=before, after=after))
         else:
-            after = len(_paths_to(g, rev, t, hops, skip_node=a))
+            after = len(_paths_to(g, rev, t, hops, skip_into=a))
             cuts.append(Cut(kind="node", src=g.nodes[a], dst=None, ports=[], before=before, after=after))
     cuts.sort(key=lambda c: (c.after, c.kind != "edge", len(c.ports), c.src, c.dst or ""))
     return cuts[:top]
@@ -320,15 +322,19 @@ class ExposureResult(BaseModel):
     cross_env_total: int
     footholds: list[Foothold]
     limits_hit: list[str]
+    # the same graph summed by a label key (app, env), for the lateral page; empty in a result computed before P6c
+    groups: dict[str, GroupGraph] = {}
 
 
 def compute_exposure(edges: Sequence[EdgeIn], hosts: Mapping[str, HostInfo], footholds: Sequence[Foothold], *,
                      hops: int, critical: frozenset[str], env_of: Mapping[str, str | None], computed_at: datetime,
                      observation_from: datetime, observation_to: datetime, max_assets: int = 50,
-                     max_cross_env: int = 500) -> ExposureResult:
+                     max_cross_env: int = 500, group_of: Mapping[str, Mapping[str, str | None]] | None = None,
+                     max_group_edges: int = 2000) -> ExposureResult:
     """Everything the lateral-movement page, the focus list and the posture report read. Critical assets
     beyond max_assets (the least reachable ones) are listed with their numbers only, cross-environment
-    edges beyond max_cross_env are counted only, and limits_hit says so for each."""
+    edges beyond max_cross_env are counted only, a summary by label keeps its max_group_edges largest group pairs,
+    and limits_hit says so for each."""
     now = build_graph(edges, enforced=False)
     enf = build_graph(edges, enforced=True)
     reach_now = dict(zip(now.nodes, reach_counts(now, hops), strict=True))
@@ -351,9 +357,17 @@ def compute_exposure(edges: Sequence[EdgeIn], hosts: Mapping[str, HostInfo], foo
     crossing = cross_env(now, env_of)
     crossing.sort(key=lambda x: (x.state is not EdgeState.ALLOWED, x.src, x.dst))
     limits = (["assets"] if len(order) > max_assets else []) + (["cross_env"] if len(crossing) > max_cross_env else [])
+    groups = {}
+    for label_key, of in (group_of or {}).items():
+        gg = collapse(now, of)
+        if len(gg.edges) > max_group_edges:
+            kept = sorted(gg.edges, key=lambda x: (-x[2], str(x[0]), str(x[1])))[:max_group_edges]
+            gg = GroupGraph(groups=gg.groups, edges=sorted(kept, key=lambda x: (str(x[0]), str(x[1]))))
+            limits.append(f"groups:{label_key}")
+        groups[label_key] = gg
     return ExposureResult(
         computed_at=computed_at, observation_from=observation_from, observation_to=observation_to, hops=hops,
         nodes=len(now.nodes), edges_now=len(now.edge_info), edges_enforced=len(enf.edge_info),
         unknown_edges=sum(1 for _, st in now.edge_info.values() if st is EdgeState.UNKNOWN),
         hosts=host_rows, assets=assets, cross_env=crossing[:max_cross_env], cross_env_total=len(crossing),
-        footholds=list(footholds), limits_hit=limits)
+        footholds=list(footholds), limits_hit=limits, groups=groups)

@@ -71,3 +71,38 @@ def test_stale_empty_list_is_not_all_clear(context, live_app):
     page.goto(f"{live_app.url}/")
     expect(page.locator("[data-role=focus-detections-capped]")).to_have_count(1)  # final review #7
     expect(page.locator("[data-role=focus] p.muted")).to_have_count(0)
+
+
+def test_page_mounted_once_when_languages_differ(context, live_app):
+    """Lab acceptance 2026-10-30 (P6c): with the browser in English and the display language Chinese, the shell drew
+    the page in English and mounted it again once the Chinese words arrived — every first query ran twice, and an
+    action started on the first mount (the lateral page's compute) lost its answer."""
+    live_app.ctx.settings.update(live_app.ctx.settings.current().revision,
+                                 lambda d: d["display"].update(language="zh_TW"))
+    page = context.new_page()
+    sign_in(page, live_app.url)
+    asked = []
+    page.on("request", lambda r: asked.append(r.url) if r.url.endswith("/api/lateral") else None)
+    page.goto(f"{live_app.url}/lateral")
+    expect(page.locator("h1")).to_have_text("橫向移動")
+    page.wait_for_timeout(1000)
+    assert len(asked) == 1
+
+
+def test_late_browser_dictionary_does_not_stick_on_loading(context, live_app):
+    """Final review #1: the browser-language dictionary answering after the display language's left the page on
+    the loading screen for good."""
+    live_app.ctx.settings.update(live_app.ctx.settings.current().revision,
+                                 lambda d: d["display"].update(language="zh_TW"))
+    page = context.new_page()
+    sign_in(page, live_app.url)
+    page.add_init_script("try { localStorage.clear() } catch (e) {}")
+    held = []
+    page.route("**/api/i18n/en", lambda route: held.append(route))
+    page.goto(f"{live_app.url}/lateral")
+    expect(page.locator("h1")).to_have_text("橫向移動")
+    assert held
+    for r in held:
+        r.continue_()
+    page.wait_for_timeout(1000)
+    expect(page.locator("h1")).to_have_text("橫向移動")

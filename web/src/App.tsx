@@ -3,7 +3,7 @@ import { BrowserRouter } from "react-router-dom";
 
 import { AUTH_REQUIRED_EVENT, call } from "./api/client";
 import type { Me } from "./api/generated";
-import { LangContext, type Lang, initialLang, loadDictionary, rememberLang, t } from "./i18n";
+import { LangContext, type Lang, fetchDictionary, initialLang, rememberLang, t, applyDictionary } from "./i18n";
 import { Login } from "./pages/Login";
 import { PasswordChange } from "./pages/PasswordChange";
 import { ME_CHANGED_EVENT, Shell } from "./shell/Shell";
@@ -13,6 +13,7 @@ type Auth = { state: "checking" } | { state: "signed-out" } | { state: "signed-i
 export function App() {
   const [lang, setLang] = useState<Lang>(initialLang);
   const [dictVersion, setDictVersion] = useState(0);
+  const [loadedLang, setLoadedLang] = useState<Lang | null>(null);
   const [auth, setAuth] = useState<Auth>({ state: "checking" });
 
   const refreshMe = useCallback(async () => {
@@ -26,10 +27,15 @@ export function App() {
   }, []);
 
   useEffect(() => {
-    void loadDictionary(lang).then(() => {
+    let live = true;  // an answer for a language no longer wanted (one asked before sign-in) is dropped
+    void fetchDictionary(lang).then((dict) => {
+      if (!live) return;
+      applyDictionary(lang, dict);
       rememberLang(lang);
+      setLoadedLang(lang);
       setDictVersion((v) => v + 1);
     });
+    return () => { live = false; };
   }, [lang]);
 
   useEffect(() => {
@@ -44,7 +50,10 @@ export function App() {
     };
   }, [refreshMe]);
 
-  if (dictVersion === 0 || auth.state === "checking") {
+  // Signed in, the page waits for the display language's words: drawn in the browser's language first, the shell
+  // was mounted again when they arrived, and what a page had started on the first mount was lost (P6c lab).
+  const waiting = auth.state === "signed-in" && loadedLang !== lang;
+  if (dictVersion === 0 || auth.state === "checking" || waiting) {
     return <div className="center-page muted">{dictVersion ? t("loading") : "…"}</div>;
   }
 

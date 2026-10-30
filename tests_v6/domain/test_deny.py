@@ -30,8 +30,10 @@ def test_proposal_filter_excludes_already_blocked():
     spec = proposal_filter(DEV_TO_FIN_RDP, start=END - timedelta(days=30), end=END)
     assert set(spec.decisions) == {PolicyDecision.ALLOWED, PolicyDecision.POTENTIALLY_BLOCKED, PolicyDecision.UNKNOWN}
     assert spec.dst.hrefs == ("/w/fin",) and spec.ports == (PortProto(port=3389, proto=6),)
-    anything = proposal_filter(DenyProposal(src=EndpointFilter(), dst=EndpointFilter()), start=spec.start, end=END)
-    assert anything.src is None and anything.dst is None and anything.ports == ()
+    # an empty side is no condition on that side (an all-empty proposal is refused, P6c)
+    into = proposal_filter(DenyProposal(src=EndpointFilter(), dst=EndpointFilter(hrefs=("/w/fin",))),
+                           start=spec.start, end=END)
+    assert into.src is None and into.ports == ()
 
 
 def test_edge_matches_by_labels_href_ip_and_ports():
