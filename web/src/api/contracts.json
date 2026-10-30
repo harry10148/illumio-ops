@@ -10295,6 +10295,4307 @@
         "type": "object"
       }
     },
+    "hosts.profile": {
+      "method": "GET",
+      "path": "/api/hosts/profile",
+      "request_schema": null,
+      "response_schema": {
+        "$defs": {
+          "ActorRef": {
+            "properties": {
+              "exclusion": {
+                "default": false,
+                "title": "Exclusion",
+                "type": "boolean"
+              },
+              "href": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Href"
+              },
+              "key": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Key"
+              },
+              "kind": {
+                "enum": [
+                  "label",
+                  "label_group",
+                  "ip_list",
+                  "workload",
+                  "all_workloads",
+                  "virtual_service",
+                  "other"
+                ],
+                "title": "Kind",
+                "type": "string"
+              },
+              "name": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Name"
+              },
+              "value": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Value"
+              }
+            },
+            "required": [
+              "kind",
+              "key",
+              "value",
+              "name",
+              "href"
+            ],
+            "title": "ActorRef",
+            "type": "object"
+          },
+          "Annotation": {
+            "description": "An operator's \"known cause\" for a host's or a pattern's tampering (spec §6.5.4 step 5).",
+            "properties": {
+              "host_href": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Host Href"
+              },
+              "id": {
+                "title": "Id",
+                "type": "integer"
+              },
+              "pattern": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/TamperPattern"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "process": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Process"
+              },
+              "reason": {
+                "title": "Reason",
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "host_href",
+              "pattern",
+              "process",
+              "reason"
+            ],
+            "title": "Annotation",
+            "type": "object"
+          },
+          "AssetExposure": {
+            "properties": {
+              "cuts": {
+                "items": {
+                  "$ref": "#/$defs/Cut"
+                },
+                "title": "Cuts",
+                "type": "array"
+              },
+              "key": {
+                "title": "Key",
+                "type": "string"
+              },
+              "paths": {
+                "items": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "title": "Paths",
+                "type": "array"
+              },
+              "sources_enforced": {
+                "title": "Sources Enforced",
+                "type": "integer"
+              },
+              "sources_now": {
+                "title": "Sources Now",
+                "type": "integer"
+              }
+            },
+            "required": [
+              "key",
+              "sources_now",
+              "sources_enforced",
+              "paths",
+              "cuts"
+            ],
+            "title": "AssetExposure",
+            "type": "object"
+          },
+          "CapabilityState": {
+            "enum": [
+              "supported",
+              "unsupported",
+              "unknown"
+            ],
+            "title": "CapabilityState",
+            "type": "string"
+          },
+          "Command": {
+            "properties": {
+              "platform": {
+                "enum": [
+                  "linux_nftables",
+                  "linux_iptables_legacy",
+                  "windows"
+                ],
+                "title": "Platform",
+                "type": "string"
+              },
+              "purpose_key": {
+                "title": "Purpose Key",
+                "type": "string"
+              },
+              "text": {
+                "title": "Text",
+                "type": "string"
+              }
+            },
+            "required": [
+              "platform",
+              "purpose_key",
+              "text"
+            ],
+            "title": "Command",
+            "type": "object"
+          },
+          "Cut": {
+            "properties": {
+              "after": {
+                "title": "After",
+                "type": "integer"
+              },
+              "before": {
+                "title": "Before",
+                "type": "integer"
+              },
+              "dst": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Dst"
+              },
+              "kind": {
+                "enum": [
+                  "edge",
+                  "node"
+                ],
+                "title": "Kind",
+                "type": "string"
+              },
+              "ports": {
+                "items": {
+                  "maxItems": 2,
+                  "minItems": 2,
+                  "prefixItems": [
+                    {
+                      "type": "integer"
+                    },
+                    {
+                      "type": "integer"
+                    }
+                  ],
+                  "type": "array"
+                },
+                "title": "Ports",
+                "type": "array"
+              },
+              "src": {
+                "title": "Src",
+                "type": "string"
+              }
+            },
+            "required": [
+              "kind",
+              "src",
+              "dst",
+              "ports",
+              "before",
+              "after"
+            ],
+            "title": "Cut",
+            "type": "object"
+          },
+          "HostBreakdown": {
+            "properties": {
+              "approximate": {
+                "title": "Approximate",
+                "type": "boolean"
+              },
+              "computed_percent": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Computed Percent"
+              },
+              "contradiction": {
+                "title": "Contradiction",
+                "type": "boolean"
+              },
+              "enforcement_mode": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Enforcement Mode"
+              },
+              "hostname": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Hostname"
+              },
+              "href": {
+                "title": "Href",
+                "type": "string"
+              },
+              "pce_exposure": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Pce Exposure"
+              },
+              "pce_percent": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Pce Percent"
+              },
+              "services": {
+                "items": {
+                  "$ref": "#/$defs/ServiceContribution"
+                },
+                "title": "Services",
+                "type": "array"
+              }
+            },
+            "required": [
+              "href",
+              "hostname",
+              "enforcement_mode",
+              "pce_percent",
+              "pce_exposure",
+              "computed_percent",
+              "approximate",
+              "contradiction",
+              "services"
+            ],
+            "title": "HostBreakdown",
+            "type": "object"
+          },
+          "HostExposureView": {
+            "properties": {
+              "asset": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/AssetExposure"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "computed_at": {
+                "format": "date-time",
+                "title": "Computed At",
+                "type": "string"
+              },
+              "pivot_enforced": {
+                "title": "Pivot Enforced",
+                "type": "boolean"
+              },
+              "pivot_now": {
+                "title": "Pivot Now",
+                "type": "boolean"
+              },
+              "reach_enforced": {
+                "title": "Reach Enforced",
+                "type": "integer"
+              },
+              "reach_now": {
+                "title": "Reach Now",
+                "type": "integer"
+              }
+            },
+            "required": [
+              "computed_at",
+              "reach_now",
+              "reach_enforced",
+              "pivot_now",
+              "pivot_enforced",
+              "asset"
+            ],
+            "title": "HostExposureView",
+            "type": "object"
+          },
+          "HostIdentity": {
+            "properties": {
+              "agent_status": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Agent Status"
+              },
+              "enforcement_mode": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Enforcement Mode"
+              },
+              "fetched_at": {
+                "title": "Fetched At",
+                "type": "string"
+              },
+              "hostname": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Hostname"
+              },
+              "last_heartbeat_at": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Last Heartbeat At"
+              },
+              "name": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Name"
+              },
+              "online": {
+                "anyOf": [
+                  {
+                    "type": "boolean"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Online"
+              },
+              "os_id": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Os Id"
+              },
+              "policy_applied_at": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Policy Applied At"
+              },
+              "policy_sync_state": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Policy Sync State"
+              },
+              "ven_version": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Ven Version"
+              },
+              "visibility_level": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Visibility Level"
+              }
+            },
+            "required": [
+              "hostname",
+              "name",
+              "enforcement_mode",
+              "visibility_level",
+              "os_id",
+              "ven_version",
+              "online",
+              "agent_status",
+              "last_heartbeat_at",
+              "policy_sync_state",
+              "policy_applied_at",
+              "fetched_at"
+            ],
+            "title": "HostIdentity",
+            "type": "object"
+          },
+          "HostRansomware": {
+            "properties": {
+              "allow_rules": {
+                "additionalProperties": {
+                  "items": {
+                    "$ref": "#/$defs/RuleRef"
+                  },
+                  "type": "array"
+                },
+                "title": "Allow Rules",
+                "type": "object"
+              },
+              "allow_status": {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "default": {},
+                "title": "Allow Status",
+                "type": "object"
+              },
+              "breakdown": {
+                "$ref": "#/$defs/HostBreakdown"
+              }
+            },
+            "required": [
+              "breakdown",
+              "allow_rules"
+            ],
+            "title": "HostRansomware",
+            "type": "object"
+          },
+          "HostTamper": {
+            "properties": {
+              "annotations": {
+                "items": {
+                  "$ref": "#/$defs/Annotation"
+                },
+                "title": "Annotations",
+                "type": "array"
+              },
+              "explained": {
+                "additionalProperties": {
+                  "type": "integer"
+                },
+                "title": "Explained",
+                "type": "object"
+              },
+              "guidance": {
+                "items": {
+                  "$ref": "#/$defs/Command"
+                },
+                "title": "Guidance",
+                "type": "array"
+              },
+              "pattern": {
+                "$ref": "#/$defs/PatternResult"
+              },
+              "readings": {
+                "items": {
+                  "$ref": "#/$defs/TamperReading"
+                },
+                "title": "Readings",
+                "type": "array"
+              },
+              "signal_capability": {
+                "$ref": "#/$defs/CapabilityState"
+              },
+              "timeline": {
+                "items": {
+                  "$ref": "#/$defs/TimelineEvent"
+                },
+                "title": "Timeline",
+                "type": "array"
+              }
+            },
+            "required": [
+              "readings",
+              "pattern",
+              "timeline",
+              "guidance",
+              "annotations",
+              "explained",
+              "signal_capability"
+            ],
+            "title": "HostTamper",
+            "type": "object"
+          },
+          "PatternResult": {
+            "properties": {
+              "kind": {
+                "$ref": "#/$defs/TamperPattern"
+              },
+              "median_minutes": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Median Minutes"
+              },
+              "n": {
+                "title": "N",
+                "type": "integer"
+              },
+              "q1": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Q1"
+              },
+              "q3": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Q3"
+              }
+            },
+            "required": [
+              "kind",
+              "n",
+              "median_minutes",
+              "q1",
+              "q3"
+            ],
+            "title": "PatternResult",
+            "type": "object"
+          },
+          "RansomwareTrafficClass": {
+            "description": "An unprotected high-risk service by its recent traffic (spec §6.5.6).",
+            "enum": [
+              "priority",
+              "safe_to_block",
+              "suspicious",
+              "protected",
+              "unknown"
+            ],
+            "title": "RansomwareTrafficClass",
+            "type": "string"
+          },
+          "RuleAction": {
+            "enum": [
+              "allow",
+              "deny",
+              "override_deny"
+            ],
+            "title": "RuleAction",
+            "type": "string"
+          },
+          "RuleRef": {
+            "properties": {
+              "consumers": {
+                "items": {
+                  "$ref": "#/$defs/ActorRef"
+                },
+                "title": "Consumers",
+                "type": "array"
+              },
+              "description": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Description"
+              },
+              "enabled": {
+                "title": "Enabled",
+                "type": "boolean"
+              },
+              "href": {
+                "title": "Href",
+                "type": "string"
+              },
+              "providers": {
+                "items": {
+                  "$ref": "#/$defs/ActorRef"
+                },
+                "title": "Providers",
+                "type": "array"
+              },
+              "rule_type": {
+                "$ref": "#/$defs/RuleAction"
+              },
+              "ruleset_href": {
+                "title": "Ruleset Href",
+                "type": "string"
+              },
+              "ruleset_name": {
+                "title": "Ruleset Name",
+                "type": "string"
+              },
+              "services": {
+                "items": {
+                  "$ref": "#/$defs/ServiceRef"
+                },
+                "title": "Services",
+                "type": "array"
+              }
+            },
+            "required": [
+              "href",
+              "rule_type",
+              "enabled",
+              "ruleset_name",
+              "ruleset_href",
+              "description",
+              "consumers",
+              "providers",
+              "services"
+            ],
+            "title": "RuleRef",
+            "type": "object"
+          },
+          "ServiceContribution": {
+            "properties": {
+              "active_policy": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Active Policy"
+              },
+              "category": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Category"
+              },
+              "contribution": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Contribution"
+              },
+              "coverage": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Coverage"
+              },
+              "name": {
+                "title": "Name",
+                "type": "string"
+              },
+              "port": {
+                "title": "Port",
+                "type": "integer"
+              },
+              "port_status": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Port Status"
+              },
+              "protection_state": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Protection State"
+              },
+              "proto": {
+                "title": "Proto",
+                "type": "integer"
+              },
+              "recent_sources": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Recent Sources"
+              },
+              "severity": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Severity"
+              },
+              "traffic": {
+                "$ref": "#/$defs/RansomwareTrafficClass"
+              },
+              "weight": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Weight"
+              }
+            },
+            "required": [
+              "name",
+              "port",
+              "proto",
+              "severity",
+              "category",
+              "protection_state",
+              "port_status",
+              "active_policy",
+              "weight",
+              "coverage",
+              "contribution",
+              "traffic",
+              "recent_sources"
+            ],
+            "title": "ServiceContribution",
+            "type": "object"
+          },
+          "ServiceRef": {
+            "properties": {
+              "href": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Href"
+              },
+              "name": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Name"
+              },
+              "port": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Port"
+              },
+              "proto": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Proto"
+              },
+              "to_port": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "To Port"
+              }
+            },
+            "required": [
+              "port",
+              "to_port",
+              "proto",
+              "name",
+              "href"
+            ],
+            "title": "ServiceRef",
+            "type": "object"
+          },
+          "TamperAction": {
+            "description": "What a signal-type tamper event did, from its kernel functions (spec §6.6 F4).",
+            "enum": [
+              "add_rule",
+              "delete_rule",
+              "add_chain",
+              "delete_chain",
+              "add_table",
+              "delete_table"
+            ],
+            "title": "TamperAction",
+            "type": "string"
+          },
+          "TamperPattern": {
+            "enum": [
+              "regular_cycle",
+              "burst",
+              "sporadic",
+              "too_few"
+            ],
+            "title": "TamperPattern",
+            "type": "string"
+          },
+          "TamperReading": {
+            "properties": {
+              "actions": {
+                "items": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/TamperAction"
+                    },
+                    {
+                      "type": "string"
+                    }
+                  ]
+                },
+                "title": "Actions",
+                "type": "array"
+              },
+              "at": {
+                "format": "date-time",
+                "title": "At",
+                "type": "string"
+              },
+              "classification": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Classification"
+              },
+              "has_process_info": {
+                "title": "Has Process Info",
+                "type": "boolean"
+              },
+              "num_events": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Num Events"
+              },
+              "pid": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Pid"
+              },
+              "process": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Process"
+              },
+              "revert_succeeded": {
+                "anyOf": [
+                  {
+                    "type": "boolean"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Revert Succeeded"
+              },
+              "tamper_type": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Tamper Type"
+              }
+            },
+            "required": [
+              "at",
+              "classification",
+              "process",
+              "pid",
+              "actions",
+              "tamper_type",
+              "num_events",
+              "revert_succeeded",
+              "has_process_info"
+            ],
+            "title": "TamperReading",
+            "type": "object"
+          },
+          "TimelineEvent": {
+            "properties": {
+              "at": {
+                "format": "date-time",
+                "title": "At",
+                "type": "string"
+              },
+              "event_type": {
+                "title": "Event Type",
+                "type": "string"
+              },
+              "summary": {
+                "title": "Summary",
+                "type": "string"
+              }
+            },
+            "required": [
+              "at",
+              "event_type",
+              "summary"
+            ],
+            "title": "TimelineEvent",
+            "type": "object"
+          }
+        },
+        "properties": {
+          "address": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Address"
+          },
+          "exposure": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/HostExposureView"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "identity": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/HostIdentity"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "in_inventory": {
+            "title": "In Inventory",
+            "type": "boolean"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "labels": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Labels",
+            "type": "object"
+          },
+          "managed": {
+            "title": "Managed",
+            "type": "boolean"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "ransomware": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/HostRansomware"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "ransomware_unsupported": {
+            "title": "Ransomware Unsupported",
+            "type": "boolean"
+          },
+          "tamper": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/HostTamper"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "key",
+          "managed",
+          "in_inventory",
+          "name",
+          "address",
+          "identity",
+          "labels",
+          "exposure",
+          "tamper",
+          "ransomware",
+          "ransomware_unsupported"
+        ],
+        "title": "HostProfile",
+        "type": "object"
+      }
+    },
+    "hosts.ransomware_allows": {
+      "method": "POST",
+      "path": "/api/hosts/ransomware-allows",
+      "request_schema": {
+        "properties": {
+          "key": {
+            "maxLength": 300,
+            "minLength": 1,
+            "title": "Key",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key"
+        ],
+        "title": "HostKey",
+        "type": "object"
+      },
+      "response_schema": {
+        "$defs": {
+          "ActorRef": {
+            "properties": {
+              "exclusion": {
+                "default": false,
+                "title": "Exclusion",
+                "type": "boolean"
+              },
+              "href": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Href"
+              },
+              "key": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Key"
+              },
+              "kind": {
+                "enum": [
+                  "label",
+                  "label_group",
+                  "ip_list",
+                  "workload",
+                  "all_workloads",
+                  "virtual_service",
+                  "other"
+                ],
+                "title": "Kind",
+                "type": "string"
+              },
+              "name": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Name"
+              },
+              "value": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Value"
+              }
+            },
+            "required": [
+              "kind",
+              "key",
+              "value",
+              "name",
+              "href"
+            ],
+            "title": "ActorRef",
+            "type": "object"
+          },
+          "HostBreakdown": {
+            "properties": {
+              "approximate": {
+                "title": "Approximate",
+                "type": "boolean"
+              },
+              "computed_percent": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Computed Percent"
+              },
+              "contradiction": {
+                "title": "Contradiction",
+                "type": "boolean"
+              },
+              "enforcement_mode": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Enforcement Mode"
+              },
+              "hostname": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Hostname"
+              },
+              "href": {
+                "title": "Href",
+                "type": "string"
+              },
+              "pce_exposure": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Pce Exposure"
+              },
+              "pce_percent": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Pce Percent"
+              },
+              "services": {
+                "items": {
+                  "$ref": "#/$defs/ServiceContribution"
+                },
+                "title": "Services",
+                "type": "array"
+              }
+            },
+            "required": [
+              "href",
+              "hostname",
+              "enforcement_mode",
+              "pce_percent",
+              "pce_exposure",
+              "computed_percent",
+              "approximate",
+              "contradiction",
+              "services"
+            ],
+            "title": "HostBreakdown",
+            "type": "object"
+          },
+          "RansomwareTrafficClass": {
+            "description": "An unprotected high-risk service by its recent traffic (spec §6.5.6).",
+            "enum": [
+              "priority",
+              "safe_to_block",
+              "suspicious",
+              "protected",
+              "unknown"
+            ],
+            "title": "RansomwareTrafficClass",
+            "type": "string"
+          },
+          "RuleAction": {
+            "enum": [
+              "allow",
+              "deny",
+              "override_deny"
+            ],
+            "title": "RuleAction",
+            "type": "string"
+          },
+          "RuleRef": {
+            "properties": {
+              "consumers": {
+                "items": {
+                  "$ref": "#/$defs/ActorRef"
+                },
+                "title": "Consumers",
+                "type": "array"
+              },
+              "description": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Description"
+              },
+              "enabled": {
+                "title": "Enabled",
+                "type": "boolean"
+              },
+              "href": {
+                "title": "Href",
+                "type": "string"
+              },
+              "providers": {
+                "items": {
+                  "$ref": "#/$defs/ActorRef"
+                },
+                "title": "Providers",
+                "type": "array"
+              },
+              "rule_type": {
+                "$ref": "#/$defs/RuleAction"
+              },
+              "ruleset_href": {
+                "title": "Ruleset Href",
+                "type": "string"
+              },
+              "ruleset_name": {
+                "title": "Ruleset Name",
+                "type": "string"
+              },
+              "services": {
+                "items": {
+                  "$ref": "#/$defs/ServiceRef"
+                },
+                "title": "Services",
+                "type": "array"
+              }
+            },
+            "required": [
+              "href",
+              "rule_type",
+              "enabled",
+              "ruleset_name",
+              "ruleset_href",
+              "description",
+              "consumers",
+              "providers",
+              "services"
+            ],
+            "title": "RuleRef",
+            "type": "object"
+          },
+          "ServiceContribution": {
+            "properties": {
+              "active_policy": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Active Policy"
+              },
+              "category": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Category"
+              },
+              "contribution": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Contribution"
+              },
+              "coverage": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Coverage"
+              },
+              "name": {
+                "title": "Name",
+                "type": "string"
+              },
+              "port": {
+                "title": "Port",
+                "type": "integer"
+              },
+              "port_status": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Port Status"
+              },
+              "protection_state": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Protection State"
+              },
+              "proto": {
+                "title": "Proto",
+                "type": "integer"
+              },
+              "recent_sources": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Recent Sources"
+              },
+              "severity": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Severity"
+              },
+              "traffic": {
+                "$ref": "#/$defs/RansomwareTrafficClass"
+              },
+              "weight": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Weight"
+              }
+            },
+            "required": [
+              "name",
+              "port",
+              "proto",
+              "severity",
+              "category",
+              "protection_state",
+              "port_status",
+              "active_policy",
+              "weight",
+              "coverage",
+              "contribution",
+              "traffic",
+              "recent_sources"
+            ],
+            "title": "ServiceContribution",
+            "type": "object"
+          },
+          "ServiceRef": {
+            "properties": {
+              "href": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Href"
+              },
+              "name": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Name"
+              },
+              "port": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Port"
+              },
+              "proto": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Proto"
+              },
+              "to_port": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "To Port"
+              }
+            },
+            "required": [
+              "port",
+              "to_port",
+              "proto",
+              "name",
+              "href"
+            ],
+            "title": "ServiceRef",
+            "type": "object"
+          }
+        },
+        "properties": {
+          "allow_rules": {
+            "additionalProperties": {
+              "items": {
+                "$ref": "#/$defs/RuleRef"
+              },
+              "type": "array"
+            },
+            "title": "Allow Rules",
+            "type": "object"
+          },
+          "allow_status": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "default": {},
+            "title": "Allow Status",
+            "type": "object"
+          },
+          "breakdown": {
+            "$ref": "#/$defs/HostBreakdown"
+          }
+        },
+        "required": [
+          "breakdown",
+          "allow_rules"
+        ],
+        "title": "HostRansomware",
+        "type": "object"
+      }
+    },
+    "hosts.tamper_note_add": {
+      "method": "POST",
+      "path": "/api/hosts/tamper-notes",
+      "request_schema": {
+        "$defs": {
+          "TamperPattern": {
+            "enum": [
+              "regular_cycle",
+              "burst",
+              "sporadic",
+              "too_few"
+            ],
+            "title": "TamperPattern",
+            "type": "string"
+          }
+        },
+        "properties": {
+          "key": {
+            "maxLength": 300,
+            "minLength": 1,
+            "title": "Key",
+            "type": "string"
+          },
+          "pattern": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/TamperPattern"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "process": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Process"
+          },
+          "reason": {
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "reason"
+        ],
+        "title": "TamperNoteAdd",
+        "type": "object"
+      },
+      "response_schema": {
+        "$defs": {
+          "ActorRef": {
+            "properties": {
+              "exclusion": {
+                "default": false,
+                "title": "Exclusion",
+                "type": "boolean"
+              },
+              "href": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Href"
+              },
+              "key": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Key"
+              },
+              "kind": {
+                "enum": [
+                  "label",
+                  "label_group",
+                  "ip_list",
+                  "workload",
+                  "all_workloads",
+                  "virtual_service",
+                  "other"
+                ],
+                "title": "Kind",
+                "type": "string"
+              },
+              "name": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Name"
+              },
+              "value": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Value"
+              }
+            },
+            "required": [
+              "kind",
+              "key",
+              "value",
+              "name",
+              "href"
+            ],
+            "title": "ActorRef",
+            "type": "object"
+          },
+          "Annotation": {
+            "description": "An operator's \"known cause\" for a host's or a pattern's tampering (spec §6.5.4 step 5).",
+            "properties": {
+              "host_href": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Host Href"
+              },
+              "id": {
+                "title": "Id",
+                "type": "integer"
+              },
+              "pattern": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/TamperPattern"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "process": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Process"
+              },
+              "reason": {
+                "title": "Reason",
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "host_href",
+              "pattern",
+              "process",
+              "reason"
+            ],
+            "title": "Annotation",
+            "type": "object"
+          },
+          "AssetExposure": {
+            "properties": {
+              "cuts": {
+                "items": {
+                  "$ref": "#/$defs/Cut"
+                },
+                "title": "Cuts",
+                "type": "array"
+              },
+              "key": {
+                "title": "Key",
+                "type": "string"
+              },
+              "paths": {
+                "items": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "title": "Paths",
+                "type": "array"
+              },
+              "sources_enforced": {
+                "title": "Sources Enforced",
+                "type": "integer"
+              },
+              "sources_now": {
+                "title": "Sources Now",
+                "type": "integer"
+              }
+            },
+            "required": [
+              "key",
+              "sources_now",
+              "sources_enforced",
+              "paths",
+              "cuts"
+            ],
+            "title": "AssetExposure",
+            "type": "object"
+          },
+          "CapabilityState": {
+            "enum": [
+              "supported",
+              "unsupported",
+              "unknown"
+            ],
+            "title": "CapabilityState",
+            "type": "string"
+          },
+          "Command": {
+            "properties": {
+              "platform": {
+                "enum": [
+                  "linux_nftables",
+                  "linux_iptables_legacy",
+                  "windows"
+                ],
+                "title": "Platform",
+                "type": "string"
+              },
+              "purpose_key": {
+                "title": "Purpose Key",
+                "type": "string"
+              },
+              "text": {
+                "title": "Text",
+                "type": "string"
+              }
+            },
+            "required": [
+              "platform",
+              "purpose_key",
+              "text"
+            ],
+            "title": "Command",
+            "type": "object"
+          },
+          "Cut": {
+            "properties": {
+              "after": {
+                "title": "After",
+                "type": "integer"
+              },
+              "before": {
+                "title": "Before",
+                "type": "integer"
+              },
+              "dst": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Dst"
+              },
+              "kind": {
+                "enum": [
+                  "edge",
+                  "node"
+                ],
+                "title": "Kind",
+                "type": "string"
+              },
+              "ports": {
+                "items": {
+                  "maxItems": 2,
+                  "minItems": 2,
+                  "prefixItems": [
+                    {
+                      "type": "integer"
+                    },
+                    {
+                      "type": "integer"
+                    }
+                  ],
+                  "type": "array"
+                },
+                "title": "Ports",
+                "type": "array"
+              },
+              "src": {
+                "title": "Src",
+                "type": "string"
+              }
+            },
+            "required": [
+              "kind",
+              "src",
+              "dst",
+              "ports",
+              "before",
+              "after"
+            ],
+            "title": "Cut",
+            "type": "object"
+          },
+          "HostBreakdown": {
+            "properties": {
+              "approximate": {
+                "title": "Approximate",
+                "type": "boolean"
+              },
+              "computed_percent": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Computed Percent"
+              },
+              "contradiction": {
+                "title": "Contradiction",
+                "type": "boolean"
+              },
+              "enforcement_mode": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Enforcement Mode"
+              },
+              "hostname": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Hostname"
+              },
+              "href": {
+                "title": "Href",
+                "type": "string"
+              },
+              "pce_exposure": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Pce Exposure"
+              },
+              "pce_percent": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Pce Percent"
+              },
+              "services": {
+                "items": {
+                  "$ref": "#/$defs/ServiceContribution"
+                },
+                "title": "Services",
+                "type": "array"
+              }
+            },
+            "required": [
+              "href",
+              "hostname",
+              "enforcement_mode",
+              "pce_percent",
+              "pce_exposure",
+              "computed_percent",
+              "approximate",
+              "contradiction",
+              "services"
+            ],
+            "title": "HostBreakdown",
+            "type": "object"
+          },
+          "HostExposureView": {
+            "properties": {
+              "asset": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/AssetExposure"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "computed_at": {
+                "format": "date-time",
+                "title": "Computed At",
+                "type": "string"
+              },
+              "pivot_enforced": {
+                "title": "Pivot Enforced",
+                "type": "boolean"
+              },
+              "pivot_now": {
+                "title": "Pivot Now",
+                "type": "boolean"
+              },
+              "reach_enforced": {
+                "title": "Reach Enforced",
+                "type": "integer"
+              },
+              "reach_now": {
+                "title": "Reach Now",
+                "type": "integer"
+              }
+            },
+            "required": [
+              "computed_at",
+              "reach_now",
+              "reach_enforced",
+              "pivot_now",
+              "pivot_enforced",
+              "asset"
+            ],
+            "title": "HostExposureView",
+            "type": "object"
+          },
+          "HostIdentity": {
+            "properties": {
+              "agent_status": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Agent Status"
+              },
+              "enforcement_mode": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Enforcement Mode"
+              },
+              "fetched_at": {
+                "title": "Fetched At",
+                "type": "string"
+              },
+              "hostname": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Hostname"
+              },
+              "last_heartbeat_at": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Last Heartbeat At"
+              },
+              "name": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Name"
+              },
+              "online": {
+                "anyOf": [
+                  {
+                    "type": "boolean"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Online"
+              },
+              "os_id": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Os Id"
+              },
+              "policy_applied_at": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Policy Applied At"
+              },
+              "policy_sync_state": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Policy Sync State"
+              },
+              "ven_version": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Ven Version"
+              },
+              "visibility_level": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Visibility Level"
+              }
+            },
+            "required": [
+              "hostname",
+              "name",
+              "enforcement_mode",
+              "visibility_level",
+              "os_id",
+              "ven_version",
+              "online",
+              "agent_status",
+              "last_heartbeat_at",
+              "policy_sync_state",
+              "policy_applied_at",
+              "fetched_at"
+            ],
+            "title": "HostIdentity",
+            "type": "object"
+          },
+          "HostRansomware": {
+            "properties": {
+              "allow_rules": {
+                "additionalProperties": {
+                  "items": {
+                    "$ref": "#/$defs/RuleRef"
+                  },
+                  "type": "array"
+                },
+                "title": "Allow Rules",
+                "type": "object"
+              },
+              "allow_status": {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "default": {},
+                "title": "Allow Status",
+                "type": "object"
+              },
+              "breakdown": {
+                "$ref": "#/$defs/HostBreakdown"
+              }
+            },
+            "required": [
+              "breakdown",
+              "allow_rules"
+            ],
+            "title": "HostRansomware",
+            "type": "object"
+          },
+          "HostTamper": {
+            "properties": {
+              "annotations": {
+                "items": {
+                  "$ref": "#/$defs/Annotation"
+                },
+                "title": "Annotations",
+                "type": "array"
+              },
+              "explained": {
+                "additionalProperties": {
+                  "type": "integer"
+                },
+                "title": "Explained",
+                "type": "object"
+              },
+              "guidance": {
+                "items": {
+                  "$ref": "#/$defs/Command"
+                },
+                "title": "Guidance",
+                "type": "array"
+              },
+              "pattern": {
+                "$ref": "#/$defs/PatternResult"
+              },
+              "readings": {
+                "items": {
+                  "$ref": "#/$defs/TamperReading"
+                },
+                "title": "Readings",
+                "type": "array"
+              },
+              "signal_capability": {
+                "$ref": "#/$defs/CapabilityState"
+              },
+              "timeline": {
+                "items": {
+                  "$ref": "#/$defs/TimelineEvent"
+                },
+                "title": "Timeline",
+                "type": "array"
+              }
+            },
+            "required": [
+              "readings",
+              "pattern",
+              "timeline",
+              "guidance",
+              "annotations",
+              "explained",
+              "signal_capability"
+            ],
+            "title": "HostTamper",
+            "type": "object"
+          },
+          "PatternResult": {
+            "properties": {
+              "kind": {
+                "$ref": "#/$defs/TamperPattern"
+              },
+              "median_minutes": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Median Minutes"
+              },
+              "n": {
+                "title": "N",
+                "type": "integer"
+              },
+              "q1": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Q1"
+              },
+              "q3": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Q3"
+              }
+            },
+            "required": [
+              "kind",
+              "n",
+              "median_minutes",
+              "q1",
+              "q3"
+            ],
+            "title": "PatternResult",
+            "type": "object"
+          },
+          "RansomwareTrafficClass": {
+            "description": "An unprotected high-risk service by its recent traffic (spec §6.5.6).",
+            "enum": [
+              "priority",
+              "safe_to_block",
+              "suspicious",
+              "protected",
+              "unknown"
+            ],
+            "title": "RansomwareTrafficClass",
+            "type": "string"
+          },
+          "RuleAction": {
+            "enum": [
+              "allow",
+              "deny",
+              "override_deny"
+            ],
+            "title": "RuleAction",
+            "type": "string"
+          },
+          "RuleRef": {
+            "properties": {
+              "consumers": {
+                "items": {
+                  "$ref": "#/$defs/ActorRef"
+                },
+                "title": "Consumers",
+                "type": "array"
+              },
+              "description": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Description"
+              },
+              "enabled": {
+                "title": "Enabled",
+                "type": "boolean"
+              },
+              "href": {
+                "title": "Href",
+                "type": "string"
+              },
+              "providers": {
+                "items": {
+                  "$ref": "#/$defs/ActorRef"
+                },
+                "title": "Providers",
+                "type": "array"
+              },
+              "rule_type": {
+                "$ref": "#/$defs/RuleAction"
+              },
+              "ruleset_href": {
+                "title": "Ruleset Href",
+                "type": "string"
+              },
+              "ruleset_name": {
+                "title": "Ruleset Name",
+                "type": "string"
+              },
+              "services": {
+                "items": {
+                  "$ref": "#/$defs/ServiceRef"
+                },
+                "title": "Services",
+                "type": "array"
+              }
+            },
+            "required": [
+              "href",
+              "rule_type",
+              "enabled",
+              "ruleset_name",
+              "ruleset_href",
+              "description",
+              "consumers",
+              "providers",
+              "services"
+            ],
+            "title": "RuleRef",
+            "type": "object"
+          },
+          "ServiceContribution": {
+            "properties": {
+              "active_policy": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Active Policy"
+              },
+              "category": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Category"
+              },
+              "contribution": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Contribution"
+              },
+              "coverage": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Coverage"
+              },
+              "name": {
+                "title": "Name",
+                "type": "string"
+              },
+              "port": {
+                "title": "Port",
+                "type": "integer"
+              },
+              "port_status": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Port Status"
+              },
+              "protection_state": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Protection State"
+              },
+              "proto": {
+                "title": "Proto",
+                "type": "integer"
+              },
+              "recent_sources": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Recent Sources"
+              },
+              "severity": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Severity"
+              },
+              "traffic": {
+                "$ref": "#/$defs/RansomwareTrafficClass"
+              },
+              "weight": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Weight"
+              }
+            },
+            "required": [
+              "name",
+              "port",
+              "proto",
+              "severity",
+              "category",
+              "protection_state",
+              "port_status",
+              "active_policy",
+              "weight",
+              "coverage",
+              "contribution",
+              "traffic",
+              "recent_sources"
+            ],
+            "title": "ServiceContribution",
+            "type": "object"
+          },
+          "ServiceRef": {
+            "properties": {
+              "href": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Href"
+              },
+              "name": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Name"
+              },
+              "port": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Port"
+              },
+              "proto": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Proto"
+              },
+              "to_port": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "To Port"
+              }
+            },
+            "required": [
+              "port",
+              "to_port",
+              "proto",
+              "name",
+              "href"
+            ],
+            "title": "ServiceRef",
+            "type": "object"
+          },
+          "TamperAction": {
+            "description": "What a signal-type tamper event did, from its kernel functions (spec §6.6 F4).",
+            "enum": [
+              "add_rule",
+              "delete_rule",
+              "add_chain",
+              "delete_chain",
+              "add_table",
+              "delete_table"
+            ],
+            "title": "TamperAction",
+            "type": "string"
+          },
+          "TamperPattern": {
+            "enum": [
+              "regular_cycle",
+              "burst",
+              "sporadic",
+              "too_few"
+            ],
+            "title": "TamperPattern",
+            "type": "string"
+          },
+          "TamperReading": {
+            "properties": {
+              "actions": {
+                "items": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/TamperAction"
+                    },
+                    {
+                      "type": "string"
+                    }
+                  ]
+                },
+                "title": "Actions",
+                "type": "array"
+              },
+              "at": {
+                "format": "date-time",
+                "title": "At",
+                "type": "string"
+              },
+              "classification": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Classification"
+              },
+              "has_process_info": {
+                "title": "Has Process Info",
+                "type": "boolean"
+              },
+              "num_events": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Num Events"
+              },
+              "pid": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Pid"
+              },
+              "process": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Process"
+              },
+              "revert_succeeded": {
+                "anyOf": [
+                  {
+                    "type": "boolean"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Revert Succeeded"
+              },
+              "tamper_type": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Tamper Type"
+              }
+            },
+            "required": [
+              "at",
+              "classification",
+              "process",
+              "pid",
+              "actions",
+              "tamper_type",
+              "num_events",
+              "revert_succeeded",
+              "has_process_info"
+            ],
+            "title": "TamperReading",
+            "type": "object"
+          },
+          "TimelineEvent": {
+            "properties": {
+              "at": {
+                "format": "date-time",
+                "title": "At",
+                "type": "string"
+              },
+              "event_type": {
+                "title": "Event Type",
+                "type": "string"
+              },
+              "summary": {
+                "title": "Summary",
+                "type": "string"
+              }
+            },
+            "required": [
+              "at",
+              "event_type",
+              "summary"
+            ],
+            "title": "TimelineEvent",
+            "type": "object"
+          }
+        },
+        "properties": {
+          "address": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Address"
+          },
+          "exposure": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/HostExposureView"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "identity": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/HostIdentity"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "in_inventory": {
+            "title": "In Inventory",
+            "type": "boolean"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "labels": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Labels",
+            "type": "object"
+          },
+          "managed": {
+            "title": "Managed",
+            "type": "boolean"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "ransomware": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/HostRansomware"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "ransomware_unsupported": {
+            "title": "Ransomware Unsupported",
+            "type": "boolean"
+          },
+          "tamper": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/HostTamper"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "key",
+          "managed",
+          "in_inventory",
+          "name",
+          "address",
+          "identity",
+          "labels",
+          "exposure",
+          "tamper",
+          "ransomware",
+          "ransomware_unsupported"
+        ],
+        "title": "HostProfile",
+        "type": "object"
+      }
+    },
+    "hosts.tamper_note_remove": {
+      "method": "POST",
+      "path": "/api/hosts/tamper-notes/<int:note_id>/remove",
+      "request_schema": {
+        "properties": {
+          "key": {
+            "maxLength": 300,
+            "minLength": 1,
+            "title": "Key",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key"
+        ],
+        "title": "HostKey",
+        "type": "object"
+      },
+      "response_schema": {
+        "$defs": {
+          "ActorRef": {
+            "properties": {
+              "exclusion": {
+                "default": false,
+                "title": "Exclusion",
+                "type": "boolean"
+              },
+              "href": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Href"
+              },
+              "key": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Key"
+              },
+              "kind": {
+                "enum": [
+                  "label",
+                  "label_group",
+                  "ip_list",
+                  "workload",
+                  "all_workloads",
+                  "virtual_service",
+                  "other"
+                ],
+                "title": "Kind",
+                "type": "string"
+              },
+              "name": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Name"
+              },
+              "value": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Value"
+              }
+            },
+            "required": [
+              "kind",
+              "key",
+              "value",
+              "name",
+              "href"
+            ],
+            "title": "ActorRef",
+            "type": "object"
+          },
+          "Annotation": {
+            "description": "An operator's \"known cause\" for a host's or a pattern's tampering (spec §6.5.4 step 5).",
+            "properties": {
+              "host_href": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Host Href"
+              },
+              "id": {
+                "title": "Id",
+                "type": "integer"
+              },
+              "pattern": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/TamperPattern"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "process": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Process"
+              },
+              "reason": {
+                "title": "Reason",
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "host_href",
+              "pattern",
+              "process",
+              "reason"
+            ],
+            "title": "Annotation",
+            "type": "object"
+          },
+          "AssetExposure": {
+            "properties": {
+              "cuts": {
+                "items": {
+                  "$ref": "#/$defs/Cut"
+                },
+                "title": "Cuts",
+                "type": "array"
+              },
+              "key": {
+                "title": "Key",
+                "type": "string"
+              },
+              "paths": {
+                "items": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "title": "Paths",
+                "type": "array"
+              },
+              "sources_enforced": {
+                "title": "Sources Enforced",
+                "type": "integer"
+              },
+              "sources_now": {
+                "title": "Sources Now",
+                "type": "integer"
+              }
+            },
+            "required": [
+              "key",
+              "sources_now",
+              "sources_enforced",
+              "paths",
+              "cuts"
+            ],
+            "title": "AssetExposure",
+            "type": "object"
+          },
+          "CapabilityState": {
+            "enum": [
+              "supported",
+              "unsupported",
+              "unknown"
+            ],
+            "title": "CapabilityState",
+            "type": "string"
+          },
+          "Command": {
+            "properties": {
+              "platform": {
+                "enum": [
+                  "linux_nftables",
+                  "linux_iptables_legacy",
+                  "windows"
+                ],
+                "title": "Platform",
+                "type": "string"
+              },
+              "purpose_key": {
+                "title": "Purpose Key",
+                "type": "string"
+              },
+              "text": {
+                "title": "Text",
+                "type": "string"
+              }
+            },
+            "required": [
+              "platform",
+              "purpose_key",
+              "text"
+            ],
+            "title": "Command",
+            "type": "object"
+          },
+          "Cut": {
+            "properties": {
+              "after": {
+                "title": "After",
+                "type": "integer"
+              },
+              "before": {
+                "title": "Before",
+                "type": "integer"
+              },
+              "dst": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Dst"
+              },
+              "kind": {
+                "enum": [
+                  "edge",
+                  "node"
+                ],
+                "title": "Kind",
+                "type": "string"
+              },
+              "ports": {
+                "items": {
+                  "maxItems": 2,
+                  "minItems": 2,
+                  "prefixItems": [
+                    {
+                      "type": "integer"
+                    },
+                    {
+                      "type": "integer"
+                    }
+                  ],
+                  "type": "array"
+                },
+                "title": "Ports",
+                "type": "array"
+              },
+              "src": {
+                "title": "Src",
+                "type": "string"
+              }
+            },
+            "required": [
+              "kind",
+              "src",
+              "dst",
+              "ports",
+              "before",
+              "after"
+            ],
+            "title": "Cut",
+            "type": "object"
+          },
+          "HostBreakdown": {
+            "properties": {
+              "approximate": {
+                "title": "Approximate",
+                "type": "boolean"
+              },
+              "computed_percent": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Computed Percent"
+              },
+              "contradiction": {
+                "title": "Contradiction",
+                "type": "boolean"
+              },
+              "enforcement_mode": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Enforcement Mode"
+              },
+              "hostname": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Hostname"
+              },
+              "href": {
+                "title": "Href",
+                "type": "string"
+              },
+              "pce_exposure": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Pce Exposure"
+              },
+              "pce_percent": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Pce Percent"
+              },
+              "services": {
+                "items": {
+                  "$ref": "#/$defs/ServiceContribution"
+                },
+                "title": "Services",
+                "type": "array"
+              }
+            },
+            "required": [
+              "href",
+              "hostname",
+              "enforcement_mode",
+              "pce_percent",
+              "pce_exposure",
+              "computed_percent",
+              "approximate",
+              "contradiction",
+              "services"
+            ],
+            "title": "HostBreakdown",
+            "type": "object"
+          },
+          "HostExposureView": {
+            "properties": {
+              "asset": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/AssetExposure"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "computed_at": {
+                "format": "date-time",
+                "title": "Computed At",
+                "type": "string"
+              },
+              "pivot_enforced": {
+                "title": "Pivot Enforced",
+                "type": "boolean"
+              },
+              "pivot_now": {
+                "title": "Pivot Now",
+                "type": "boolean"
+              },
+              "reach_enforced": {
+                "title": "Reach Enforced",
+                "type": "integer"
+              },
+              "reach_now": {
+                "title": "Reach Now",
+                "type": "integer"
+              }
+            },
+            "required": [
+              "computed_at",
+              "reach_now",
+              "reach_enforced",
+              "pivot_now",
+              "pivot_enforced",
+              "asset"
+            ],
+            "title": "HostExposureView",
+            "type": "object"
+          },
+          "HostIdentity": {
+            "properties": {
+              "agent_status": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Agent Status"
+              },
+              "enforcement_mode": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Enforcement Mode"
+              },
+              "fetched_at": {
+                "title": "Fetched At",
+                "type": "string"
+              },
+              "hostname": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Hostname"
+              },
+              "last_heartbeat_at": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Last Heartbeat At"
+              },
+              "name": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Name"
+              },
+              "online": {
+                "anyOf": [
+                  {
+                    "type": "boolean"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Online"
+              },
+              "os_id": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Os Id"
+              },
+              "policy_applied_at": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Policy Applied At"
+              },
+              "policy_sync_state": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Policy Sync State"
+              },
+              "ven_version": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Ven Version"
+              },
+              "visibility_level": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Visibility Level"
+              }
+            },
+            "required": [
+              "hostname",
+              "name",
+              "enforcement_mode",
+              "visibility_level",
+              "os_id",
+              "ven_version",
+              "online",
+              "agent_status",
+              "last_heartbeat_at",
+              "policy_sync_state",
+              "policy_applied_at",
+              "fetched_at"
+            ],
+            "title": "HostIdentity",
+            "type": "object"
+          },
+          "HostRansomware": {
+            "properties": {
+              "allow_rules": {
+                "additionalProperties": {
+                  "items": {
+                    "$ref": "#/$defs/RuleRef"
+                  },
+                  "type": "array"
+                },
+                "title": "Allow Rules",
+                "type": "object"
+              },
+              "allow_status": {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "default": {},
+                "title": "Allow Status",
+                "type": "object"
+              },
+              "breakdown": {
+                "$ref": "#/$defs/HostBreakdown"
+              }
+            },
+            "required": [
+              "breakdown",
+              "allow_rules"
+            ],
+            "title": "HostRansomware",
+            "type": "object"
+          },
+          "HostTamper": {
+            "properties": {
+              "annotations": {
+                "items": {
+                  "$ref": "#/$defs/Annotation"
+                },
+                "title": "Annotations",
+                "type": "array"
+              },
+              "explained": {
+                "additionalProperties": {
+                  "type": "integer"
+                },
+                "title": "Explained",
+                "type": "object"
+              },
+              "guidance": {
+                "items": {
+                  "$ref": "#/$defs/Command"
+                },
+                "title": "Guidance",
+                "type": "array"
+              },
+              "pattern": {
+                "$ref": "#/$defs/PatternResult"
+              },
+              "readings": {
+                "items": {
+                  "$ref": "#/$defs/TamperReading"
+                },
+                "title": "Readings",
+                "type": "array"
+              },
+              "signal_capability": {
+                "$ref": "#/$defs/CapabilityState"
+              },
+              "timeline": {
+                "items": {
+                  "$ref": "#/$defs/TimelineEvent"
+                },
+                "title": "Timeline",
+                "type": "array"
+              }
+            },
+            "required": [
+              "readings",
+              "pattern",
+              "timeline",
+              "guidance",
+              "annotations",
+              "explained",
+              "signal_capability"
+            ],
+            "title": "HostTamper",
+            "type": "object"
+          },
+          "PatternResult": {
+            "properties": {
+              "kind": {
+                "$ref": "#/$defs/TamperPattern"
+              },
+              "median_minutes": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Median Minutes"
+              },
+              "n": {
+                "title": "N",
+                "type": "integer"
+              },
+              "q1": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Q1"
+              },
+              "q3": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Q3"
+              }
+            },
+            "required": [
+              "kind",
+              "n",
+              "median_minutes",
+              "q1",
+              "q3"
+            ],
+            "title": "PatternResult",
+            "type": "object"
+          },
+          "RansomwareTrafficClass": {
+            "description": "An unprotected high-risk service by its recent traffic (spec §6.5.6).",
+            "enum": [
+              "priority",
+              "safe_to_block",
+              "suspicious",
+              "protected",
+              "unknown"
+            ],
+            "title": "RansomwareTrafficClass",
+            "type": "string"
+          },
+          "RuleAction": {
+            "enum": [
+              "allow",
+              "deny",
+              "override_deny"
+            ],
+            "title": "RuleAction",
+            "type": "string"
+          },
+          "RuleRef": {
+            "properties": {
+              "consumers": {
+                "items": {
+                  "$ref": "#/$defs/ActorRef"
+                },
+                "title": "Consumers",
+                "type": "array"
+              },
+              "description": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Description"
+              },
+              "enabled": {
+                "title": "Enabled",
+                "type": "boolean"
+              },
+              "href": {
+                "title": "Href",
+                "type": "string"
+              },
+              "providers": {
+                "items": {
+                  "$ref": "#/$defs/ActorRef"
+                },
+                "title": "Providers",
+                "type": "array"
+              },
+              "rule_type": {
+                "$ref": "#/$defs/RuleAction"
+              },
+              "ruleset_href": {
+                "title": "Ruleset Href",
+                "type": "string"
+              },
+              "ruleset_name": {
+                "title": "Ruleset Name",
+                "type": "string"
+              },
+              "services": {
+                "items": {
+                  "$ref": "#/$defs/ServiceRef"
+                },
+                "title": "Services",
+                "type": "array"
+              }
+            },
+            "required": [
+              "href",
+              "rule_type",
+              "enabled",
+              "ruleset_name",
+              "ruleset_href",
+              "description",
+              "consumers",
+              "providers",
+              "services"
+            ],
+            "title": "RuleRef",
+            "type": "object"
+          },
+          "ServiceContribution": {
+            "properties": {
+              "active_policy": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Active Policy"
+              },
+              "category": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Category"
+              },
+              "contribution": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Contribution"
+              },
+              "coverage": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Coverage"
+              },
+              "name": {
+                "title": "Name",
+                "type": "string"
+              },
+              "port": {
+                "title": "Port",
+                "type": "integer"
+              },
+              "port_status": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Port Status"
+              },
+              "protection_state": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Protection State"
+              },
+              "proto": {
+                "title": "Proto",
+                "type": "integer"
+              },
+              "recent_sources": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Recent Sources"
+              },
+              "severity": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Severity"
+              },
+              "traffic": {
+                "$ref": "#/$defs/RansomwareTrafficClass"
+              },
+              "weight": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Weight"
+              }
+            },
+            "required": [
+              "name",
+              "port",
+              "proto",
+              "severity",
+              "category",
+              "protection_state",
+              "port_status",
+              "active_policy",
+              "weight",
+              "coverage",
+              "contribution",
+              "traffic",
+              "recent_sources"
+            ],
+            "title": "ServiceContribution",
+            "type": "object"
+          },
+          "ServiceRef": {
+            "properties": {
+              "href": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Href"
+              },
+              "name": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Name"
+              },
+              "port": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Port"
+              },
+              "proto": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Proto"
+              },
+              "to_port": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "To Port"
+              }
+            },
+            "required": [
+              "port",
+              "to_port",
+              "proto",
+              "name",
+              "href"
+            ],
+            "title": "ServiceRef",
+            "type": "object"
+          },
+          "TamperAction": {
+            "description": "What a signal-type tamper event did, from its kernel functions (spec §6.6 F4).",
+            "enum": [
+              "add_rule",
+              "delete_rule",
+              "add_chain",
+              "delete_chain",
+              "add_table",
+              "delete_table"
+            ],
+            "title": "TamperAction",
+            "type": "string"
+          },
+          "TamperPattern": {
+            "enum": [
+              "regular_cycle",
+              "burst",
+              "sporadic",
+              "too_few"
+            ],
+            "title": "TamperPattern",
+            "type": "string"
+          },
+          "TamperReading": {
+            "properties": {
+              "actions": {
+                "items": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/TamperAction"
+                    },
+                    {
+                      "type": "string"
+                    }
+                  ]
+                },
+                "title": "Actions",
+                "type": "array"
+              },
+              "at": {
+                "format": "date-time",
+                "title": "At",
+                "type": "string"
+              },
+              "classification": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Classification"
+              },
+              "has_process_info": {
+                "title": "Has Process Info",
+                "type": "boolean"
+              },
+              "num_events": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Num Events"
+              },
+              "pid": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Pid"
+              },
+              "process": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Process"
+              },
+              "revert_succeeded": {
+                "anyOf": [
+                  {
+                    "type": "boolean"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Revert Succeeded"
+              },
+              "tamper_type": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Tamper Type"
+              }
+            },
+            "required": [
+              "at",
+              "classification",
+              "process",
+              "pid",
+              "actions",
+              "tamper_type",
+              "num_events",
+              "revert_succeeded",
+              "has_process_info"
+            ],
+            "title": "TamperReading",
+            "type": "object"
+          },
+          "TimelineEvent": {
+            "properties": {
+              "at": {
+                "format": "date-time",
+                "title": "At",
+                "type": "string"
+              },
+              "event_type": {
+                "title": "Event Type",
+                "type": "string"
+              },
+              "summary": {
+                "title": "Summary",
+                "type": "string"
+              }
+            },
+            "required": [
+              "at",
+              "event_type",
+              "summary"
+            ],
+            "title": "TimelineEvent",
+            "type": "object"
+          }
+        },
+        "properties": {
+          "address": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Address"
+          },
+          "exposure": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/HostExposureView"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "identity": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/HostIdentity"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "in_inventory": {
+            "title": "In Inventory",
+            "type": "boolean"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "labels": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Labels",
+            "type": "object"
+          },
+          "managed": {
+            "title": "Managed",
+            "type": "boolean"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "ransomware": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/HostRansomware"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "ransomware_unsupported": {
+            "title": "Ransomware Unsupported",
+            "type": "boolean"
+          },
+          "tamper": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/HostTamper"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "key",
+          "managed",
+          "in_inventory",
+          "name",
+          "address",
+          "identity",
+          "labels",
+          "exposure",
+          "tamper",
+          "ransomware",
+          "ransomware_unsupported"
+        ],
+        "title": "HostProfile",
+        "type": "object"
+      }
+    },
     "i18n.dictionary": {
       "method": "GET",
       "path": "/api/i18n/<lang>",

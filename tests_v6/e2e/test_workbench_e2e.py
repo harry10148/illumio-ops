@@ -108,8 +108,9 @@ def test_late_answer_does_not_replace_newer(context, live_app):
     expect(page.locator("[data-role=wb-detail] tbody tr")).to_have_count(3)
 
 
-def test_service_process_and_event_host_picks(context, live_app):
-    """Final review #3–#6: a picked service, process or event host narrows to exactly it."""
+def test_service_pick_narrows_to_it(context, live_app):
+    """Final review #6: a picked service narrows to exactly that port (the process and event-host picks are covered
+    by the filter and workbench service tests)."""
     alert_id = _seed(live_app)
     page = context.new_page()
     sign_in(page, live_app.url)

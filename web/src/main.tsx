@@ -8,6 +8,7 @@ import "./pages/alerts/Rules";
 import "./pages/alerts/RuleEditor";
 import "./pages/reports/Reports";
 import "./pages/workbench/Workbench";
+import "./pages/hosts/HostProfile";
 import "./pages/system/PceConnection";
 import "./pages/system/Channels";
 import "./pages/system/Collection";
