@@ -1908,5 +1908,7 @@
   "rpt_pdf_finding_other_action": "Provision 前先到 PCE 檢視。",
   "rpt_pdf_quality_live": "Draft 與生效政策於 {at} 從 PCE 讀取。",
   "rpt_pdf_quality_who": "「最後修改者」取自本產品在期間內收集的 PCE 事件；期間外或開始收集前的變更顯示 —。",
-  "rpt_pdf_quality_who_limited": "「最後修改者」只讀了期間內最新的 {n} 筆政策事件。"
+  "rpt_pdf_quality_who_limited": "「最後修改者」只讀了期間內最新的 {n} 筆政策事件。",
+  "rpt_err_format_unsupported": "這種報表不提供這個格式。",
+  "rpt_mail_files_too_large": "檔案太大無法附加（合計超過 {mb} MB），請到報表頁下載。"
 }

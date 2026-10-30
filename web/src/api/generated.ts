@@ -56,7 +56,7 @@ export type ProbeName = ("noop" | "health" | "node_available")
  * This interface was referenced by `ContractRoot`'s JSON-Schema
  * via the `definition` "ReportFormat".
  */
-export type ReportFormat = ("html" | "xlsx")
+export type ReportFormat = ("html" | "xlsx" | "json" | "csv")
 /**
  * Report types (spec §6.5 報表, §6.5.5); 5b and 5c add the 5.x types.
  * 
@@ -794,6 +794,7 @@ trigger: string
 export interface CatalogEntry {
 accepts_filter: boolean
 available: boolean
+formats: ReportFormat[]
 group: string
 max_lookback: (number | null)
 reason_key: (string | null)
@@ -1856,7 +1857,9 @@ export const VALUES = {
     "unknown"
   ],
   "ReportFormat": [
+    "csv",
     "html",
+    "json",
     "xlsx"
   ],
   "ReportStatus": [

@@ -3,7 +3,10 @@ reports job runs the oldest queued row through its builder and the renderers. A 
 says why and leaves no files; nothing half-made or mixed from two PCEs is kept."""
 from __future__ import annotations
 
+import csv
 import dataclasses
+import io
+import json
 import os
 import shutil
 import traceback
@@ -165,7 +168,8 @@ def _build(ctx: AppContext, spec: ReportSpec, inp: BuildInput) -> ReportDocument
 
 # The parameter each refusal is about, for the API's field name.
 REFUSAL_FIELDS = {"rpt_err_lookback_beyond_retention": "lookback_days", "rpt_err_app_required": "filter",
-                  "rpt_err_filter_not_supported": "filter", "rpt_err_app_filter_shape": "filter"}
+                  "rpt_err_filter_not_supported": "filter", "rpt_err_app_filter_shape": "filter",
+                  "rpt_err_format_unsupported": "formats"}
 
 
 def refusal(settings: Settings, params: ReportParams, *, now: datetime | None = None) -> str | None:
@@ -175,6 +179,8 @@ def refusal(settings: Settings, params: ReportParams, *, now: datetime | None = 
     spec = specs().get(params.report_type)
     if spec is None:
         return None
+    if not set(params.formats) <= set(spec.formats):
+        return "rpt_err_format_unsupported"
     if spec.max_lookback is not None and params.lookback_days > spec.max_lookback(settings):
         return "rpt_err_lookback_beyond_retention"
     if spec.retention is not None and now is not None:
@@ -213,12 +219,33 @@ def _file_name(doc: ReportDocument, report_id: int, fmt: ReportFormat, tz: tzinf
     return f"{doc.report_type.value}-{last_day:%Y%m%d}-{report_id}.{fmt.value}"
 
 
+def _render(doc: ReportDocument, fmt: ReportFormat, tz: tzinfo | None) -> bytes:
+    if fmt is ReportFormat.HTML:
+        return render_html(doc, tz=tz).encode("utf-8")
+    if fmt is ReportFormat.XLSX:
+        return render_xlsx(doc, tz=tz)
+    if doc.export is None:
+        raise _Fail("rpt_err_internal", f"{doc.report_type.value} made no rows for {fmt.value}")
+    ex = doc.export
+    if fmt is ReportFormat.JSON:
+        body = {"report_type": doc.report_type.value, "pce": doc.pce_label, "generated_at": doc.generated_at.isoformat(),
+                "period_start": doc.period_start.isoformat(), "period_end": doc.period_end.isoformat(), **ex.meta,
+                "record_count": len(ex.rows), "columns": list(ex.columns),
+                "rows": [dict(zip(ex.columns, r, strict=True)) for r in ex.rows]}
+        return json.dumps(body, ensure_ascii=False, indent=1).encode("utf-8")
+    buf = io.StringIO()
+    writer = csv.writer(buf, lineterminator="\r\n")
+    writer.writerow(ex.columns)
+    writer.writerows(ex.rows)
+    return buf.getvalue().encode("utf-8-sig")  # the BOM: Excel reads UTF-8 only with it
+
+
 def _write(out_dir: Path, doc: ReportDocument, report_id: int, formats: tuple[ReportFormat, ...],
            tz: tzinfo | None) -> list[str]:
     out_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
     names = []
     for fmt in formats:
-        data = render_html(doc, tz=tz).encode("utf-8") if fmt is ReportFormat.HTML else render_xlsx(doc, tz=tz)
+        data = _render(doc, fmt, tz)
         name = _file_name(doc, report_id, fmt, tz)
         part = out_dir / (name + ".part")
         fd = os.open(part, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)

@@ -399,6 +399,8 @@ class ReportType(StrEnum):
 class ReportFormat(StrEnum):
     HTML = "html"
     XLSX = "xlsx"
+    JSON = "json"  # flat rows for other tools (policy_resolver)
+    CSV = "csv"
 
 
 class ReportStatus(StrEnum):

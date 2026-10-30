@@ -11,7 +11,14 @@ from __future__ import annotations
 from datetime import datetime, timedelta, tzinfo
 from typing import Literal
 
-from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, model_validator
+from pydantic import (
+    AwareDatetime,
+    BaseModel,
+    ConfigDict,
+    Field,
+    SkipValidation,
+    model_validator,
+)
 
 from illumio_ops.domain.values import Language, ReportType, Severity
 
@@ -91,6 +98,14 @@ class Section(_Model):
     blocks: tuple[Block, ...] = ()
 
 
+class RowsExport(_Model):
+    """A report's flat rows for the JSON and CSV formats (policy_resolver: rows for other tools, spec §6.5). The rows
+    are not validated one by one: half a million of them would cost seconds for nothing."""
+    columns: tuple[str, ...]
+    rows: SkipValidation[list[tuple[str | int | float | None, ...]]]
+    meta: dict[str, str | int | float | bool | None] = {}
+
+
 class ReportDocument(_Model):
     report_type: ReportType
     lang: Language
@@ -104,6 +119,7 @@ class ReportDocument(_Model):
     data_quality: tuple[str, ...]
     sections: tuple[Section, ...]
     gui_link: str | None = None
+    export: RowsExport | None = None  # the JSON / CSV content, for types that make those formats
 
     @model_validator(mode="after")
     def _ids(self) -> ReportDocument:

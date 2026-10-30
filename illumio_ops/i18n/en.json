@@ -1908,5 +1908,7 @@
   "rpt_pdf_finding_other_action": "Review them in the PCE before provisioning.",
   "rpt_pdf_quality_live": "Draft and active policy read from the PCE at {at}.",
   "rpt_pdf_quality_who": "“Last changed by” comes from the PCE events this product collected in the period; a change outside it, or before collection started, shows —.",
-  "rpt_pdf_quality_who_limited": "Only the newest {n} policy events in the period were read for “last changed by”."
+  "rpt_pdf_quality_who_limited": "Only the newest {n} policy events in the period were read for “last changed by”.",
+  "rpt_err_format_unsupported": "This report type does not make that format.",
+  "rpt_mail_files_too_large": "The files are too large to attach (over {mb} MB together); download them from the Reports page."
 }

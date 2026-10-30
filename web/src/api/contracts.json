@@ -10099,7 +10099,9 @@
           "ReportFormat": {
             "enum": [
               "html",
-              "xlsx"
+              "xlsx",
+              "json",
+              "csv"
             ],
             "title": "ReportFormat",
             "type": "string"
@@ -10547,7 +10549,9 @@
           "ReportFormat": {
             "enum": [
               "html",
-              "xlsx"
+              "xlsx",
+              "json",
+              "csv"
             ],
             "title": "ReportFormat",
             "type": "string"
@@ -11102,7 +11106,9 @@
           "ReportFormat": {
             "enum": [
               "html",
-              "xlsx"
+              "xlsx",
+              "json",
+              "csv"
             ],
             "title": "ReportFormat",
             "type": "string"
@@ -11645,7 +11651,9 @@
           "ReportFormat": {
             "enum": [
               "html",
-              "xlsx"
+              "xlsx",
+              "json",
+              "csv"
             ],
             "title": "ReportFormat",
             "type": "string"
@@ -12382,7 +12390,9 @@
           "ReportFormat": {
             "enum": [
               "html",
-              "xlsx"
+              "xlsx",
+              "json",
+              "csv"
             ],
             "title": "ReportFormat",
             "type": "string"
@@ -12830,7 +12840,9 @@
           "ReportFormat": {
             "enum": [
               "html",
-              "xlsx"
+              "xlsx",
+              "json",
+              "csv"
             ],
             "title": "ReportFormat",
             "type": "string"
@@ -13117,6 +13129,13 @@
                 "title": "Available",
                 "type": "boolean"
               },
+              "formats": {
+                "items": {
+                  "$ref": "#/$defs/ReportFormat"
+                },
+                "title": "Formats",
+                "type": "array"
+              },
               "group": {
                 "title": "Group",
                 "type": "string"
@@ -13158,7 +13177,8 @@
               "reason_key",
               "accepts_filter",
               "requires_app",
-              "max_lookback"
+              "max_lookback",
+              "formats"
             ],
             "title": "CatalogEntry",
             "type": "object"
@@ -13188,6 +13208,16 @@
             ],
             "title": "LabelChoice",
             "type": "object"
+          },
+          "ReportFormat": {
+            "enum": [
+              "html",
+              "xlsx",
+              "json",
+              "csv"
+            ],
+            "title": "ReportFormat",
+            "type": "string"
           },
           "ReportType": {
             "description": "Report types (spec §6.5 報表, §6.5.5); 5b and 5c add the 5.x types.",
@@ -13526,7 +13556,9 @@
           "ReportFormat": {
             "enum": [
               "html",
-              "xlsx"
+              "xlsx",
+              "json",
+              "csv"
             ],
             "title": "ReportFormat",
             "type": "string"
@@ -19878,7 +19910,9 @@
       "unknown"
     ],
     "ReportFormat": [
+      "csv",
       "html",
+      "json",
       "xlsx"
     ],
     "ReportStatus": [

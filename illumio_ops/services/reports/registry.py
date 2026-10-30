@@ -78,6 +78,7 @@ class ReportSpec:
     # and a step run on the pulled store before the build (an analysis the report reads instead of computing).
     ondemand_lead: Callable[[Settings], timedelta] | None = None
     ondemand_prepare: Callable[[AppContext, datetime], None] | None = None
+    formats: tuple[ReportFormat, ...] = (ReportFormat.HTML, ReportFormat.XLSX)  # the formats this type makes
 
 
 REGISTRY: dict[ReportType, ReportSpec] = {}

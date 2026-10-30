@@ -17,7 +17,8 @@ from illumio_ops.store import reports as store
 MAX_ATTACHMENTS_BYTES = 20 * 1024 * 1024
 DETAIL_MAX = 300
 MIME = {ReportFormat.HTML.value: "text/html", ReportFormat.XLSX.value:
-        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"}
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        ReportFormat.JSON.value: "application/json", ReportFormat.CSV.value: "text/csv"}
 TIMEOUT_SECONDS = 60.0
 
 
@@ -36,7 +37,8 @@ def deliver(ctx: AppContext, report_id: int, doc: ReportDocument, params: Report
         note = None
         if sum(len(a[2]) for a in attachments) > MAX_ATTACHMENTS_BYTES:
             attachments = [a for a in attachments if a[1] == MIME[ReportFormat.HTML.value]]
-            note = tr(doc.lang, "rpt_mail_xlsx_too_large", mb=MAX_ATTACHMENTS_BYTES // (1024 * 1024))
+            note = tr(doc.lang, "rpt_mail_xlsx_too_large" if attachments else "rpt_mail_files_too_large",
+                      mb=MAX_ATTACHMENTS_BYTES // (1024 * 1024))
         rendered = render_email(doc, tz=tz, note=note)
         ok, error = send_mail(smtp, subject=rendered.subject, text=rendered.text, html=rendered.html,
                               attachments=attachments, recipients=list(params.recipients) or None,
