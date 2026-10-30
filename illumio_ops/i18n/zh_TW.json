@@ -1931,5 +1931,5 @@
   "rpt_prs_col_rows": "列數",
   "rpt_prs_none": "沒有任何啟用中的生效規則能展開成位址。",
   "rpt_prs_how_intro": "這份報表在產生當下從 PCE 讀取，把每條啟用中的生效規則（允許規則、Deny Rule、Override Deny）展開成「來源 IP × 目的 IP × port」的列，內容在 JSON 與 CSV 檔中。",
-  "rpt_prs_how_columns": "欄位（各語言相同）：{columns}。ANY 表示任何位址或 port。Ruleset 的範圍會限縮目的端。帶 Label 的非受管主機也包含在內。"
+  "rpt_prs_how_columns": "欄位（各語言相同）：{columns}。ANY 表示任何位址或 port（規則沒有來源或沒有服務）；{ams} 是所有主機的位址，不是 ANY。沒有 port 的服務（未知或以程序定義）照實標出，不當成任何 port。Ruleset 的範圍會限縮目的端；被排除的位址與 IP list 的排除範圍都已扣除。帶 Label 的非受管主機也包含在內。"
 }

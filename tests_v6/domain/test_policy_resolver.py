@@ -78,8 +78,9 @@ def test_ip_address_literal_and_ams_sentinel():
         "ingress_services": [{"port": 443, "proto": 6}],
     }])
     rows = resolve_ruleset(rs, **_lookups())
-    assert rows[0]["src_ip"] == "ANY"
-    assert rows[0]["src_kind"] == "any"
+    # v6 (security review): All Workloads is every workload's address, not ANY (which takes in the internet)
+    assert rows[0]["src_ip"] == "172.16.0.10"
+    assert rows[0]["src_kind"] == "all_workloads"
     assert rows[0]["dst_ip"] == "8.8.8.8"
 
 
@@ -537,3 +538,43 @@ def test_public_ip_used_when_no_interfaces():
     wls = [{"href": "/wl/u", "public_ip": "203.0.113.5", "labels": [{"href": "/labels/web"}]}]
     assert build_workload_to_ips(wls) == {"/wl/u": ["203.0.113.5"]}
     assert build_label_to_ips(wls) == {"/labels/web": ["203.0.113.5"]}
+
+
+# ── security review (2026-10-30): nothing exported wider than the rule ──────
+
+def test_pair_cap_counts_services():
+    """300 x 300 pairs is under the cap, but times 2 services it is 180,000 rows: capped too."""
+    big = [f"10.1.{i // 250}.{i % 250}" for i in range(300)]
+    other = [f"10.2.{i // 250}.{i % 250}" for i in range(300)]
+    rs = _ruleset([{"href": "/r/1", "consumers": [{"label": {"href": "/a"}}], "providers": [{"label": {"href": "/b"}}],
+                    "ingress_services": [{"port": 80, "proto": 6}, {"port": 443, "proto": 6}]}])
+    rows = resolve_ruleset(rs, label_to_ips={"/a": big, "/b": other}, iplist_to_cidrs={}, label_group_to_labels={},
+                           workload_to_ips={})
+    assert len(rows) <= 100_000 and all(r.get("truncated") for r in rows)
+
+
+def test_ip_list_exclusion_ranges_subtracted():
+    ipls = [{"href": "/ipl/1", "ip_ranges": [{"from_ip": "10.0.0.0/24"},
+                                             {"from_ip": "10.0.0.128/25", "exclusion": True}]}]
+    assert build_iplist_to_cidrs(ipls) == {"/ipl/1": ["10.0.0.0/25"]}
+    ranged = [{"href": "/ipl/2", "ip_ranges": [{"from_ip": "10.0.0.0", "to_ip": "10.0.0.255"},
+                                               {"from_ip": "10.0.0.0", "to_ip": "10.0.0.127", "exclusion": True}]}]
+    assert build_iplist_to_cidrs(ranged) == {"/ipl/2": ["10.0.0.128/25"]}
+
+
+def test_excluded_actor_cidr_subtracted_by_containment():
+    rs = _ruleset([{"href": "/r/1", "consumers": [{"label": {"href": "/labels/web"}},
+                                                  {"ip_list": {"href": "/ip_lists/web-sub"}, "exclusion": True}],
+                    "providers": [{"ip_address": {"value": "8.8.8.8"}}], "ingress_services": [{"port": 443, "proto": 6}]}])
+    lk = {**_lookups(), "iplist_to_cidrs": {"/ip_lists/web-sub": ["10.0.1.0/30"]}}
+    rows = resolve_ruleset(rs, **lk)
+    assert [r["src_ip"] for r in rows] == ["10.0.1.5", "10.0.1.6"]  # .5/.6 are outside 10.0.1.0/30
+    lk2 = {**_lookups(), "iplist_to_cidrs": {"/ip_lists/web-sub": ["10.0.1.4/30"]}}
+    assert resolve_ruleset(rs, **lk2) == []
+
+
+def test_unresolved_service_is_not_any_port():
+    rs = _ruleset([{"href": "/r/1", "consumers": [{"ip_address": {"value": "1.1.1.1"}}],
+                    "providers": [{"ip_address": {"value": "2.2.2.2"}}], "ingress_services": [{"href": "/svc/9"}]}])
+    rows = resolve_ruleset(rs, **_lookups(), service_to_ports={}, service_to_names={"/svc/9": "Proc"})
+    assert rows[0]["port"] != "ANY" and rows[0]["port"].startswith("<") and rows[0]["service_name"] == "Proc"

@@ -8,6 +8,7 @@ capped at _MAX_RULE_PAIRS: the larger side becomes a summary token and the row s
 read wider than it is)."""
 from __future__ import annotations
 
+import ipaddress
 from typing import Any
 
 _ANY = "ANY"
@@ -44,8 +45,8 @@ def _actor_ips(
     workload_to_ips: dict[str, list[str]],
 ) -> tuple[list[str], str]:
     """Return (ip_values, kind) for one actor; unknown refs -> ([], kind)."""
-    if actor.get("actors") == "ams":
-        return [_ANY], "any"
+    if actor.get("actors") == "ams":  # All Workloads: every workload's address, never ANY (security review)
+        return _all_workloads(workload_to_ips), "all_workloads"
     if "label" in actor:
         href = actor["label"].get("href", "")
         return list(label_to_ips.get(href, [])), "label"
@@ -138,10 +139,8 @@ def _side_ips(
     # 真 PCE 形狀：entry 可帶 exclusion: true（「A 排除 B」）。先收集排除集，
     # include 結果最後扣除；排除 actor 不受 scope 交集影響（先取全集再扣）。
     excludes: set[str] = set()
-    has_exclusion = False
     for actor in actors:
         if actor.get("exclusion"):
-            has_exclusion = True
             ips, _k = _actor_ips(actor, **lookups)
             excludes.update(ips)
 
@@ -152,24 +151,17 @@ def _side_ips(
         if actor.get("exclusion"):
             continue
         if actor.get("actors") == "ams":
-            if scope_ips is not None:
-                ips, k = sorted(scope_ips), "any"
-            elif has_exclusion:
-                # ANY 無法表達「全部除了 X」：以 managed workload 全集展開
-                # 後扣除（寧窄勿寬；fail-closed）。
-                universe: set[str] = set()
-                for wl_ips in lookups["workload_to_ips"].values():
-                    universe.update(wl_ips)
-                ips, k = sorted(universe), "any"
-            else:
-                ips, k = [_ANY], "any"
+            # All Workloads: the scope's addresses, else every workload's — never ANY, which takes in the internet
+            # (security review 2026-10-30; 5.x printed ANY).
+            ips = sorted(scope_ips) if scope_ips is not None else _all_workloads(lookups["workload_to_ips"])
+            k = "all_workloads"
         else:
             ips, k = _actor_ips(actor, **lookups)
             if scope_ips is not None and ("label" in actor or "label_group" in actor):
                 ips = [ip for ip in ips if ip in scope_ips]
         kind = k
-        for ip in ips:
-            if ip not in seen and ip not in excludes:
+        for ip in _subtract(ips, excludes):
+            if ip not in seen:
                 seen.add(ip)
                 out.append(ip)
     return out, kind
@@ -200,8 +192,8 @@ def _services(rule: dict[str, Any], service_to_ports: dict[str, list[dict[str, A
             href = s["href"]
             svc_name = service_to_names.get(href, href)
             ports = service_to_ports.get(href, [])
-            if not ports:
-                out.append({"port": _ANY, "protocol": _ANY, "name": svc_name})
+            if not ports:  # unknown, or process-based (windows_services): not a port, never ANY (security review)
+                out.append({"port": f"<service without ports: {svc_name}>", "protocol": "", "name": svc_name})
             for p in ports:
                 entry = {"port": p.get("port", _ANY),
                          "protocol": _proto_name(p.get("proto")), "name": svc_name}
@@ -220,9 +212,11 @@ def _summary_token(n: int) -> str:
     return f"<{n} hosts: expansion capped>"
 
 
-def _cap_sides(srcs: list[str], dsts: list[str]) -> tuple[list[str], list[str], str]:
-    """回傳 (srcs, dsts, truncated)；truncated 為 ""/"src"/"dst"/"src,dst"。"""
-    if len(srcs) * len(dsts) <= _MAX_RULE_PAIRS:
+def _cap_sides(srcs: list[str], dsts: list[str], services: int = 1) -> tuple[list[str], list[str], str]:
+    """(srcs, dsts, truncated); truncated is ""/"src"/"dst"/"src,dst". The cap counts rows: pairs x services
+    (security review: 90,000 pairs x 50 services was 4.5 million rows under a 100,000 cap)."""
+    per = max(services, 1)
+    if len(srcs) * len(dsts) * per <= _MAX_RULE_PAIRS:
         return srcs, dsts, ""
     capped: list[str] = []
     # 先收斂較大的一側；若仍超過上限，兩側都收斂。
@@ -231,7 +225,7 @@ def _cap_sides(srcs: list[str], dsts: list[str]) -> tuple[list[str], list[str], 
     else:
         dsts, first, other = [_summary_token(len(dsts))], "dst", "src"
     capped.append(first)
-    if len(srcs) * len(dsts) > _MAX_RULE_PAIRS:
+    if len(srcs) * len(dsts) * per > _MAX_RULE_PAIRS:
         if other == "dst":
             dsts = [_summary_token(len(dsts))]
         else:
@@ -250,14 +244,29 @@ def resolve_ruleset(
     service_to_ports: dict[str, list[dict[str, Any]]] | None = None,
     service_to_names: dict[str, str] | None = None,
 ) -> list[dict[str, Any]]:
-    """Expand a single ruleset's rules into flat src/dst/port/proto rows.
+    return resolve_ruleset_within(ruleset, limit=None, label_to_ips=label_to_ips, iplist_to_cidrs=iplist_to_cidrs,
+                                  label_group_to_labels=label_group_to_labels, workload_to_ips=workload_to_ips,
+                                  service_to_ports=service_to_ports, service_to_names=service_to_names)[0]
 
-    Disabled rulesets (and disabled rules) are skipped — the report describes
-    policy that is actually enforced, so non-enforced entries are excluded.
-    """
+
+def resolve_ruleset_within(
+    ruleset: dict[str, Any],
+    *,
+    limit: int | None,
+    label_to_ips: dict[str, list[str]],
+    iplist_to_cidrs: dict[str, list[str]],
+    label_group_to_labels: dict[str, list[str]],
+    workload_to_ips: dict[str, list[str]],
+    service_to_ports: dict[str, list[dict[str, Any]]] | None = None,
+    service_to_names: dict[str, str] | None = None,
+) -> tuple[list[dict[str, Any]], int]:
+    """(rows, omitted): at most `limit` rows; a rule that would pass it is counted, never built (security review:
+    the total cap applied after a whole ruleset was in memory)."""
+    omitted = 0
+    # Disabled rulesets and rules are skipped: the report describes policy actually enforced.
     # A disabled ruleset is not enforced: nothing to resolve.
     if not ruleset.get("enabled", True):
-        return []
+        return [], 0
     lookups = {
         "label_to_ips": label_to_ips,
         "iplist_to_cidrs": iplist_to_cidrs,
@@ -296,8 +305,12 @@ def resolve_ruleset(
             # scoped out, or empty after scope filtering).
             if not srcs or not dsts:
                 continue
-            srcs, dsts, truncated = _cap_sides(srcs, dsts)
-            for svc in _services(rule, service_to_ports, service_to_names):
+            svcs = _services(rule, service_to_ports, service_to_names)
+            srcs, dsts, truncated = _cap_sides(srcs, dsts, len(svcs))
+            if limit is not None and len(rows) + len(srcs) * len(dsts) * len(svcs) > limit:
+                omitted += len(srcs) * len(dsts) * len(svcs)  # counted, never built (security review)
+                continue
+            for svc in svcs:
                 for s_ip in srcs:
                     for d_ip in dsts:
                         key = (rule_href, act, s_ip, d_ip, svc["port"],
@@ -322,7 +335,68 @@ def resolve_ruleset(
                         if truncated:
                             row["truncated"] = truncated
                         rows.append(row)
-    return rows
+    return rows, omitted
+
+
+def _all_workloads(workload_to_ips: dict[str, list[str]]) -> list[str]:
+    return sorted({ip for ips in workload_to_ips.values() for ip in ips})
+
+
+def _network(value: str) -> list[ipaddress.IPv4Network | ipaddress.IPv6Network] | None:
+    """An address, CIDR or a-b range as networks; None for what is not one (ANY, an FQDN, a summary token)."""
+    try:
+        if "-" in value:
+            a, b = (ipaddress.ip_address(x.strip()) for x in value.split("-", 1))
+            return list(ipaddress.summarize_address_range(a, b))
+        return [ipaddress.ip_network(value, strict=False)]
+    except (ValueError, TypeError):
+        return None
+
+
+def _minus(nets: list[Any], excluded: list[Any]) -> list[Any]:
+    for ex in excluded:
+        nxt: list[Any] = []
+        for n in nets:
+            if n.version != ex.version or not n.overlaps(ex):
+                nxt.append(n)
+            elif not ex.supernet_of(n):  # n contains part of ex: keep the rest
+                nxt.extend(n.address_exclude(ex))
+        nets = nxt
+    return nets
+
+
+def _subtract(values: list[str], excludes: set[str]) -> list[str]:
+    """values minus the excluded addresses, by containment, not by string (security review): an excluded CIDR
+    removes the hosts and the part of a wider network it covers. What is not an address (an FQDN) is removed only
+    by an identical exclusion."""
+    if not excludes:
+        return values
+    ex_nets = [n for e in excludes for n in (_network(e) or [])]
+    out: list[str] = []
+    for v in values:
+        if v in excludes:
+            continue
+        nets = _network(v)
+        if nets is None or not ex_nets:
+            out.append(v)
+            continue
+        rest = _minus(nets, ex_nets)
+        if rest == nets:
+            out.append(v)
+        else:
+            out.extend(str(n.network_address) if n.num_addresses == 1 else str(n) for n in rest)
+    return out
+
+
+def _ip_list_values(ranges: list[dict[str, Any]]) -> list[str]:
+    """An IP list's ranges with its exclusion ranges taken out (security review: 5.x listed an excluded range as
+    included)."""
+    def text(r: dict[str, Any]) -> str | None:
+        frm, to = r.get("from_ip"), r.get("to_ip")
+        return f"{frm}-{to}" if frm and to else (str(frm) if frm else None)
+    inc = [t for r in ranges if not r.get("exclusion") and (t := text(r))]
+    exc = {t for r in ranges if r.get("exclusion") and (t := text(r))}
+    return _subtract(inc, exc)
 
 
 def _workload_ips(wl: dict[str, Any]) -> list[str]:
@@ -372,13 +446,7 @@ def build_iplist_to_cidrs(ip_lists: list[dict[str, Any]]) -> dict[str, list[str]
         href = ipl.get("href")
         if not href:
             continue
-        vals: list[str] = []
-        for r in ipl.get("ip_ranges") or []:
-            frm, to = r.get("from_ip"), r.get("to_ip")
-            if frm and to:
-                vals.append(f"{frm}-{to}")
-            elif frm:
-                vals.append(frm)
+        vals = _ip_list_values(ipl.get("ip_ranges") or [])
         for f in ipl.get("fqdns") or []:
             fq = f.get("fqdn")
             if fq:

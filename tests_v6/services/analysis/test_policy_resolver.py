@@ -42,8 +42,9 @@ def test_rows_from_live_policy(ctx):
 def test_total_cap_notice_row(ctx, monkeypatch):
     monkeypatch.setattr(policy_resolver, "MAX_TOTAL_ROWS", 1)
     r = policy_resolver.resolve(ctx)
-    assert r.rows_omitted == 1 and r.truncated_rulesets == ["Web"]
-    assert r.rows[-1]["truncated"] == "total_row_cap" and "1 rows omitted" in r.rows[-1]["src_ip"]
+    # a rule that does not fit is left out whole (counted, never built): no half rule reaches a firewall import
+    assert r.rows_omitted == 2 and r.truncated_rulesets == ["Web"] and len(r.rows) == 1
+    assert r.rows[-1]["truncated"] == "total_row_cap" and "about 2 rows omitted" in r.rows[-1]["src_ip"]
 
 
 def test_fetch_failure_raises(ctx):

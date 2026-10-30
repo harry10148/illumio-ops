@@ -31,7 +31,7 @@ from illumio_ops.services.reports.render_html import fmt_time
 
 # The files' column names and values: data, the same in every language (not translated).
 COLUMN_GUIDE = ("ruleset_name, rule_href, action (allow / deny / override_deny), src_ip, dst_ip, port, port_to, protocol, "
-                "src_kind and dst_kind (label, label_group, ip_list, workload, any), service_name, truncated (src / dst: "
+                "src_kind and dst_kind (label, label_group, ip_list, workload, all_workloads, ip_address, any), service_name, truncated (src / dst: "
                 "that side is a summary; total_row_cap: rows left out)")
 BROAD_EXAMPLE = "All Workloads → All Workloads"
 _KPI_KEYS = {"rulesets": "rpt_prs_kpi_rulesets", "rules": "rpt_prs_kpi_rules", "rows": "rpt_prs_kpi_rows",
@@ -80,4 +80,4 @@ def build_policy_resolver(inp: BuildInput) -> ReportDocument:
         period_end=inp.end, generated_at=inp.now, pce_label=inp.pce_label, kpis=kpis, findings=tuple(findings),
         data_quality=tuple(quality), export=export,
         sections=(Section(id="how", title=t("rpt_rdy_sec_how"), intro=t("rpt_prs_how_intro"),
-                          blocks=(TextBlock(paragraphs=(t("rpt_prs_how_columns", columns=COLUMN_GUIDE),)), table)),))
+                          blocks=(TextBlock(paragraphs=(t("rpt_prs_how_columns", columns=COLUMN_GUIDE, ams="All Workloads"),)), table)),))

@@ -18,7 +18,7 @@ from illumio_ops.domain.policy_resolver import (
     build_service_to_names,
     build_service_to_ports,
     build_workload_to_ips,
-    resolve_ruleset,
+    resolve_ruleset_within,
 )
 from illumio_ops.pce.collections import get_all
 from illumio_ops.pce.policy import fetch_objects, fetch_rule_sets
@@ -41,7 +41,7 @@ class Resolved(BaseModel):
 
 
 def _notice(ruleset: str, omitted: int) -> dict[str, Any]:
-    token = f"<report row cap {MAX_TOTAL_ROWS} reached: {omitted} rows omitted>"
+    token = f"<report row cap {MAX_TOTAL_ROWS} reached: about {omitted} rows omitted>"
     return {"ruleset_name": ruleset, "rule_href": "", "action": "", "src_ip": token, "dst_ip": token, "port": "",
             "protocol": "", "src_kind": "", "dst_kind": "", "service_name": "", "truncated": "total_row_cap"}
 
@@ -70,14 +70,13 @@ def resolve(ctx: AppContext, *, now: datetime | None = None) -> Resolved:
         if rs.get("enabled", True):
             rule_count += sum(1 for r in [*(rs.get("rules") or []), *(rs.get("deny_rules") or [])]
                               if isinstance(r, dict) and r.get("enabled", True))
-        got = resolve_ruleset(rs, **lookups)
-        capped.update(r["rule_href"] for r in got if r.get("truncated"))
-        kept = got[:max(MAX_TOTAL_ROWS - sum(per.values()), 0)]
+        kept, left_out = resolve_ruleset_within(rs, limit=max(MAX_TOTAL_ROWS - sum(per.values()), 0), **lookups)
+        capped.update(r["rule_href"] for r in kept if r.get("truncated"))
         per[name] = per.get(name, 0) + len(kept)
         rows.extend(kept)
-        if len(kept) < len(got):
-            omitted += len(got) - len(kept)
+        if left_out:
+            omitted += left_out
             truncated.append(name)
-            rows.append(_notice(name, len(got) - len(kept)))
+            rows.append(_notice(name, left_out))
     return Resolved(rows=rows, per_ruleset=per, rule_count=rule_count, rules_capped=len(capped),
                     truncated_rulesets=truncated, rows_omitted=omitted, computed_at=at)
