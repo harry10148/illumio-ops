@@ -4,7 +4,7 @@ number. The dimension panel is one single-level ranking per dimension, computed 
 Task 14: six dimensions over 7 days scan 25 s on 1,000 hosts)."""
 from __future__ import annotations
 
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from datetime import UTC, datetime, timedelta
 from typing import Annotated, Literal
@@ -69,13 +69,14 @@ class EventRequest(_Request):
     event_types: tuple[str, ...] = ()
     severities: tuple[str, ...] = ()
     host_hrefs: tuple[str, ...] = ()
-    actor: str | None = Field(default=None, min_length=1)
+    actor: str | None = Field(default=None, min_length=1)  # partial (the search box)
+    actors: tuple[str, ...] = ()  # exact (a dimension click)
 
     def segment(self, *, view: SegmentView | None = None, group_by: tuple[GroupBy, ...] | None = None,
                 limit: int | None = None) -> EventSegment:
         return EventSegment(filter=EventFilter(start=self.start, end=self.end, event_types=self.event_types,
                                                severities=self.severities, host_hrefs=self.host_hrefs,
-                                               actor=self.actor),
+                                               actor=self.actor, actors=self.actors),
                             view=view or self.view, group_by=self.group_by if group_by is None else group_by,
                             metric=SegmentMetric.EVENTS, limit=limit or self.limit)
 
@@ -105,11 +106,11 @@ class WorkbenchMeta(BaseModel):
 
 @contextmanager
 def _read_ctx(ctx: AppContext, req: FlowRequest | EventRequest,
-              now: datetime | None) -> Iterator[tuple[AppContext, PullInfo | None]]:
+              now: datetime | None) -> Iterator[tuple[AppContext, PullInfo | None, Callable[[], None]]]:
     """Traffic the install does not keep is read from the PCE once and held for the request (workbench_store);
     events are always collected."""
     if isinstance(req, EventRequest):
-        yield ctx, None
+        yield ctx, None, lambda: None
         return
     with workbench_store.lease(ctx, req.start, req.end, now=now) as got:
         yield got
@@ -142,10 +143,12 @@ def _named(ctx: AppContext, rows: list[AggRow], group_by: tuple[GroupBy, ...]) -
 
 
 def run(ctx: AppContext, req: FlowRequest | EventRequest, *, now: datetime | None = None) -> WorkbenchResult:
-    with _read_ctx(ctx, req, now) as (read, pulled):
-        result = run_segment(read, req.segment(), now=now)
+    seg = req.segment()  # its own checks first: an invalid request never reads the PCE (final review #7)
+    with _read_ctx(ctx, req, now) as (read, pulled, check):
+        result = run_segment(read, seg, now=now)
         if result.ranking:
             result = result.model_copy(update={"ranking": _named(read, result.ranking, req.group_by)})
+        check()
         return WorkbenchResult(result=result, pulled=pulled)
 
 
@@ -158,8 +161,9 @@ def dimension(ctx: AppContext, req: FlowRequest | EventRequest, dim: SegmentDime
     if isinstance(seg, EventSegment):
         e = aggregate_events(ctx, seg, now=now)
         return DimensionTop(rows=_named(ctx, e.rows, seg.group_by), limit_hit=e.limit_hit, coverage=e.coverage)
-    with _read_ctx(ctx, req, now) as (read, pulled):
+    with _read_ctx(ctx, req, now) as (read, pulled, check):
         f = aggregate_flows(read, seg, now=now, with_field_coverage=False)
+        check()
         return DimensionTop(rows=_named(read, f.rows, seg.group_by), limit_hit=f.limit_hit, coverage=f.coverage,
                             pulled=pulled)
 
@@ -177,7 +181,7 @@ def from_alert(ctx: AppContext, alert_id: int) -> FlowRequest | EventRequest | N
     es = EventSegment.model_validate(raw)
     f = es.filter
     return EventRequest(mode="events", start=f.start, end=f.end, view=SegmentView.DETAIL, event_types=f.event_types,
-                        severities=f.severities, host_hrefs=f.host_hrefs, actor=f.actor)
+                        severities=f.severities, host_hrefs=f.host_hrefs, actor=f.actor, actors=f.actors)
 
 
 def meta(ctx: AppContext) -> WorkbenchMeta:

@@ -152,3 +152,64 @@ def test_host_unknown_to_inventory_shown_by_address(ctx):
         conn.commit()
     top = workbench.dimension(ctx, _flows(), SegmentDimension.DST_HOST, now=NOW)
     assert {r.keys[0]: r.display[0] for r in top.rows}["/orgs/1/workloads/ghost"] == ip
+
+
+# ── final review (Codex, 2026-10-30) ─────────────────────────────────────────
+
+def test_event_host_keyed_by_href_and_selectable(ctx):
+    """#4: an event host's key is its workload href (the name is what is shown), so choosing it narrows to it."""
+    from illumio_ops.store.flowdb import workloads
+    href = "/orgs/1/workloads/web01"
+    with ctx.flows().connect() as conn:
+        workloads.replace_inventory(conn, [workloads.WorkloadRow(
+            href=href, hostname="web01", name=None, managed=1, enforcement_mode=None, visibility_level=None,
+            os_id=None, ven_version=None, ven_href="/orgs/1/vens/v1", label_set=None, online=1, risk_exposure=None,
+            risk_percent=None, risk_updated_at=None, fetched_at="x")])
+        conn.commit()
+    _write(ctx, [event("agent.tampering", datetime(2026, 10, 24, tzinfo=UTC),
+                       extra={"created_by": {"ven": {"href": "/orgs/1/vens/v1", "hostname": "web01"}}})])
+    req = workbench.EventRequest(mode="events", start=START, end=END, view=SegmentView.DETAIL)
+    top = workbench.dimension(ctx, req, SegmentDimension.EVENT_HOST, now=NOW)
+    row = next(r for r in top.rows if r.keys[0] == href)
+    assert row.display[0] == "web01"
+    picked = req.model_copy(update={"host_hrefs": (href,)})
+    assert len(workbench.run(ctx, picked, now=NOW).result.detail) == 1
+
+
+def test_event_actors_exact(ctx):
+    """#5 for events: choosing an actor is that actor, not every name containing it."""
+    req = workbench.EventRequest(mode="events", start=START, end=END, view=SegmentView.DETAIL, actors=("alice",))
+    assert [r.created_by_name for r in workbench.run(ctx, req, now=NOW).result.detail] == ["alice"]
+
+
+def test_invalid_segment_refused_before_any_pull(tmp_path, monkeypatch):
+    """#7: a ranking without a group is refused before the period is read from the PCE."""
+    from illumio_ops.services import workbench_store
+    c = configured_ctx(tmp_path, mode="lightweight")
+    monkeypatch.setattr(workbench_store, "open_period", lambda *a, **k: pytest.fail("pulled"))
+    with pytest.raises(ValidationError):
+        workbench.run(c, _flows(view=SegmentView.RANKING, group_by=()), now=NOW)
+
+
+def test_pce_switch_during_a_held_read_refused(tmp_path, monkeypatch):
+    """#1: the PCE changes while a request reads the held pull: its answer is about the old PCE, so it is refused
+    (full mode raises StaleGeneration the same way) and the held pull is dropped."""
+    from illumio_ops.services import workbench_store
+    from illumio_ops.services.ondemand import OnDemandResult
+    from illumio_ops.store.flowdb.db import StaleGeneration
+    c = configured_ctx(tmp_path, mode="lightweight")
+    monkeypatch.setattr(workbench_store, "open_period", lambda ctx, **kw: (OnDemandResult(
+        ctx=ctx, rows=1, windows=1, truncated=[], earliest=None, capped_total=False, unread_from=None), lambda: None))
+    real = workbench.run_segment
+
+    def switch_meanwhile(read, seg, *, now=None):
+        out = real(read, seg, now=now)
+        c.flows().generation += 1
+        return out
+    monkeypatch.setattr(workbench, "run_segment", switch_meanwhile)
+    workbench_store.drop()
+    try:
+        with pytest.raises(StaleGeneration):
+            workbench.run(c, _flows(), now=NOW)
+    finally:
+        workbench_store.drop()

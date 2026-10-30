@@ -168,10 +168,14 @@ dst_exclude?: (EndpointFilter | null)
 exclude_ports?: PortProto[]
 exclude_system_accounts?: boolean
 initiator_process?: (string | null)
+initiator_processes?: string[]
 initiator_user?: (string | null)
+initiator_users?: string[]
 ports?: PortProto[]
 service_process?: (string | null)
+service_processes?: string[]
 service_user?: (string | null)
+service_users?: string[]
 src?: (EndpointFilter | null)
 src_exclude?: (EndpointFilter | null)
 text?: (string | null)
@@ -184,6 +188,7 @@ export interface EndpointFilter {
 hrefs?: string[]
 ips?: string[]
 labels?: LabelCond[]
+match?: ("any" | "all")
 }
 /**
  * This interface was referenced by `ContractRoot`'s JSON-Schema
@@ -1540,6 +1545,7 @@ validity_days: number
  */
 export interface EventRequest {
 actor?: (string | null)
+actors?: string[]
 end: string
 event_types?: string[]
 /**
@@ -1589,10 +1595,14 @@ dst_exclude?: (EndpointFilter | null)
 exclude_ports?: PortProto[]
 exclude_system_accounts?: boolean
 initiator_process?: (string | null)
+initiator_processes?: string[]
 initiator_user?: (string | null)
+initiator_users?: string[]
 ports?: PortProto[]
 service_process?: (string | null)
+service_processes?: string[]
 service_user?: (string | null)
+service_users?: string[]
 src?: (EndpointFilter | null)
 src_exclude?: (EndpointFilter | null)
 text?: (string | null)

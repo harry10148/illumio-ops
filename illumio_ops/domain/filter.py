@@ -8,8 +8,12 @@
 
 to_sql and matches must agree on every spec (tests_v6/domain/test_filter.py checks 20 of them).
 
-Endpoint semantics: an EndpointFilter is a union — the endpoint has all the listed label keys
-(each key: any of its values), OR is one of the hrefs, OR is in one of the IPs / networks.
+Endpoint semantics: an EndpointFilter is a union by default — the endpoint has all the listed label keys
+(each key: any of its values), OR is one of the hrefs, OR is in one of the IPs / networks. With match="all" the
+labels and the hosts (hrefs or addresses, together one part) must both hold when both are set (the workbench's
+"env=Prod and this host", P6a). A port of -1 is "no port" (a protocol
+alone is any port). The *_processes / *_users sets are exact values (domain accounts case-insensitive), the single
+fields are partial matches.
 """
 from __future__ import annotations
 
@@ -18,7 +22,7 @@ import itertools
 import re
 from collections.abc import Callable, Mapping
 from datetime import datetime, timedelta
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import (
     AwareDatetime,
@@ -46,7 +50,7 @@ class LabelCond(_Model):
 
 
 class PortProto(_Model):
-    port: int | None = Field(default=None, ge=0, le=65535)
+    port: int | None = Field(default=None, ge=-1, le=65535)  # -1: the service has no port (ICMP...), P6a
     to_port: int | None = Field(default=None, ge=0, le=65535)
     proto: int | None = Field(default=None, ge=0, le=255)
 
@@ -54,7 +58,7 @@ class PortProto(_Model):
     def _shape(self) -> PortProto:
         if self.port is None and self.proto is None:
             raise ValueError("a port or a protocol is required")
-        if self.to_port is not None and (self.port is None or self.to_port < self.port):
+        if self.to_port is not None and (self.port is None or self.port < 0 or self.to_port < self.port):
             raise ValueError("to_port needs a port no larger than it")
         return self
 
@@ -63,6 +67,11 @@ class EndpointFilter(_Model):
     labels: tuple[LabelCond, ...] = ()
     hrefs: tuple[str, ...] = ()
     ips: tuple[str, ...] = ()
+    match: Literal["any", "all"] = "any"  # any: one of the parts (the union); all: the labels and the hosts
+
+    def intersects(self) -> bool:
+        """Labels and hosts both set under match="all": an intersection, not the union."""
+        return self.match == "all" and bool(self.labels) and bool(self.hrefs or self.ips)
 
     @field_validator("ips")
     @classmethod
@@ -89,6 +98,11 @@ class FlowCondition(_Model):
     initiator_user: str | None = None
     service_process: str | None = None
     service_user: str | None = None
+    # exact values, any of them (the workbench's dimension clicks, P6a): unlike the partial fields above
+    initiator_processes: tuple[str, ...] = ()
+    initiator_users: tuple[str, ...] = ()
+    service_processes: tuple[str, ...] = ()
+    service_users: tuple[str, ...] = ()
     text: str | None = None
     exclude_system_accounts: bool = False
 
@@ -172,6 +186,17 @@ def _is_system(user: Any) -> int:
     return int(is_system_account(user if isinstance(user, str) else None))
 
 
+def user_key(name: str) -> str:
+    """Domain accounts (DOMAIN\\acct, acct@domain) are case-insensitive, local accounts are not: the key a
+    ranking groups users by (segment._user) and the exact user sets compare with."""
+    return name.lower() if ("\\" in name or "@" in name) else name
+
+
+def _sql_user(column: str) -> str:
+    return (f"CASE WHEN instr({column}, '\\') > 0 OR instr({column}, '@') > 0 "
+            f"THEN lower({column}) ELSE {column} END")
+
+
 def sql_functions() -> dict[str, Callable[..., int]]:
     """Functions to_sql's clauses call; register them on the connection before running them."""
     return {"ip_in_net": ip_in_net, "is_system_account": _is_system}
@@ -183,6 +208,8 @@ def _pce_side(ep: EndpointFilter | None, label_hrefs: Mapping[tuple[str, str], s
     """The include list for one side, or None when part of the union cannot go to the PCE."""
     if ep is None or ep.is_empty():
         return [[]]
+    if ep.intersects():
+        return None  # the PCE's include list is a union of groups: the intersection is checked locally
     exact, nets = _split_ips(ep.ips)
     if nets:
         return None
@@ -202,8 +229,8 @@ def _pce_side(ep: EndpointFilter | None, label_hrefs: Mapping[tuple[str, str], s
 
 def _pce_exclude(ep: EndpointFilter | None, label_hrefs: Mapping[tuple[str, str], str]) -> list[dict[str, Any]]:
     """Excluding part of the set at the PCE is safe; the residual excludes the rest."""
-    if ep is None:
-        return []
+    if ep is None or ep.intersects():
+        return []  # excluding a part of an intersection would exclude too much: the residual excludes it
     out: list[dict[str, Any]] = []
     if len(ep.labels) == 1:
         for v in ep.labels[0].values:
@@ -230,6 +257,9 @@ def to_pce_payload(spec: FilterSpec, *, max_results: int, query_name: str,
                    label_hrefs: Mapping[tuple[str, str], str]) -> tuple[dict[str, Any], FilterSpec]:
     src_inc = _pce_side(spec.src, label_hrefs)
     dst_inc = _pce_side(spec.dst, label_hrefs)
+    # "no port" (-1) has no PCE form: those service lists are checked locally
+    noport_in = any(p.port == -1 for p in spec.ports)
+    noport_ex = any(p.port == -1 for p in spec.exclude_ports)
     payload = {
         "query_name": query_name,
         "start_date": pce_time(spec.start),
@@ -240,14 +270,15 @@ def to_pce_payload(spec: FilterSpec, *, max_results: int, query_name: str,
                     "exclude": _pce_exclude(spec.src_exclude, label_hrefs)},
         "destinations": {"include": dst_inc if dst_inc is not None else [[]],
                          "exclude": _pce_exclude(spec.dst_exclude, label_hrefs)},
-        "services": {"include": [_pce_port(p) for p in spec.ports],
-                     "exclude": [_pce_port(p) for p in spec.exclude_ports]},
+        "services": {"include": [] if noport_in else [_pce_port(p) for p in spec.ports],
+                     "exclude": [] if noport_ex else [_pce_port(p) for p in spec.exclude_ports]},
         "sources_destinations_query_op": "and",
     }
     residual = spec.model_copy(update={
         "src": spec.src if src_inc is None else None,
         "dst": spec.dst if dst_inc is None else None,
-        "ports": (), "exclude_ports": (), "decisions": (),
+        "ports": spec.ports if noport_in else (), "exclude_ports": spec.exclude_ports if noport_ex else (),
+        "decisions": (),
     })
     return payload, residual
 
@@ -255,6 +286,7 @@ def to_pce_payload(spec: FilterSpec, *, max_results: int, query_name: str,
 # ── to_sql ───────────────────────────────────────────────────────────────────
 
 def _sql_side(ep: EndpointFilter, side: str, a: str, params: list[Any]) -> str:
+    """The parts of one endpoint (labels, hrefs, addresses), ORed — or labels AND hosts for match="all"."""
     parts: list[str] = []
     if ep.labels:
         keys = []
@@ -268,13 +300,20 @@ def _sql_side(ep: EndpointFilter, side: str, a: str, params: list[Any]) -> str:
         parts.append(f"COALESCE({a}.{side}_href, '') IN ({','.join('?' * len(ep.hrefs))})")
         params.extend(ep.hrefs)
     exact, nets = _split_ips(ep.ips)
+    addresses: list[str] = []
     if exact:
-        parts.append(f"{a}.{side}_ip IN ({','.join('?' * len(exact))})")
+        addresses.append(f"{a}.{side}_ip IN ({','.join('?' * len(exact))})")
         params.extend(exact)
     for net in nets:
-        parts.append(f"ip_in_net({a}.{side}_ip, ?) = 1")
+        addresses.append(f"ip_in_net({a}.{side}_ip, ?) = 1")
         params.append(net)
-    return "(" + " OR ".join(parts) + ")" if parts else "1"
+    if ep.hrefs:
+        addresses.insert(0, parts.pop())
+    if addresses:
+        parts.append("(" + " OR ".join(addresses) + ")")
+    if not parts:
+        return "1"
+    return "(" + (" AND " if ep.match == "all" else " OR ").join(parts) + ")"
 
 
 def _sql_port(p: PortProto, a: str, params: list[Any]) -> str:
@@ -314,6 +353,11 @@ def to_sql(spec: FilterSpec, *, table_alias: str = "f", wide: bool = False) -> t
         if term:
             clauses.append(f"{a}.{column} LIKE ? ESCAPE '\\'")
             params.append(like_pattern(term))
+        values = getattr(spec, f"{column}es" if column.endswith("process") else f"{column}s")
+        if values:
+            expr = _sql_user(f"{a}.{column}") if column.endswith("user") else f"{a}.{column}"
+            clauses.append(f"{expr} IN ({','.join('?' * len(values))})")
+            params.extend(user_key(x) if column.endswith("user") else x for x in values)
     if spec.text:
         pattern = like_pattern(spec.text)
         clauses.append("(" + " OR ".join(f"{a}.{c} LIKE ? ESCAPE '\\'" for c in _TEXT_COLUMNS) + ")")
@@ -349,13 +393,15 @@ def _when(value: Any) -> datetime:
 
 def _side_matches(ep: EndpointFilter, v: Mapping[str, Any], side: str) -> bool:
     labels = v.get(f"{side}_labels") or {}
-    if ep.labels and all(labels.get(c.key) in c.values for c in ep.labels):
-        return True
-    if (v.get(f"{side}_href") or "") in ep.hrefs:
-        return True
     exact, nets = _split_ips(ep.ips)
     ip = v.get(f"{side}_ip")
-    return ip in exact or any(ip_in_net(ip, n) for n in nets)
+    held = []  # (the part is set, the end satisfies it)
+    held.append((bool(ep.labels), bool(ep.labels) and all(labels.get(c.key) in c.values for c in ep.labels)))
+    held.append((bool(ep.hrefs or ep.ips), (v.get(f"{side}_href") or "") in ep.hrefs
+                 or ip in exact or any(ip_in_net(ip, n) for n in nets)))
+    if ep.match == "all":
+        return all(ok for is_set, ok in held if is_set)
+    return any(ok for is_set, ok in held if is_set)
 
 
 def _port_matches(p: PortProto, v: Mapping[str, Any]) -> bool:
@@ -398,6 +444,14 @@ def matches(spec: FilterSpec, record: FlowRecord | Mapping[str, Any]) -> bool:
         term = getattr(spec, column)
         if term and not _like(v.get(column), term):
             return False
+        values = getattr(spec, f"{column}es" if column.endswith("process") else f"{column}s")
+        if values:
+            got = v.get(column)
+            if column.endswith("user"):
+                if got is None or user_key(got) not in {user_key(x) for x in values}:
+                    return False
+            elif got not in values:
+                return False
     if spec.text and not any(_like(v.get(c), spec.text) for c in _TEXT_COLUMNS):
         return False
     return not (spec.exclude_system_accounts and is_system_account(v.get("initiator_user")))

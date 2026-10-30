@@ -85,3 +85,35 @@ def test_one_query_per_change(context, live_app):
     page.wait_for_selector("[data-chip^='dst:h:']")
     page.wait_for_timeout(1500)
     assert len(runs) - before == 1
+
+
+def test_late_answer_does_not_replace_newer(context, live_app):
+    """Final review #2: the first query answers after the narrowed one; the page keeps the narrowed answer."""
+    alert_id = _seed(live_app)
+    page = context.new_page()
+    sign_in(page, live_app.url)
+    held = []
+
+    def hold_first(route):
+        if not held:
+            held.append(route)
+        else:
+            route.continue_()
+    page.route("**/api/workbench/run", hold_first)
+    page.goto(f"{live_app.url}/investigate?alert={alert_id}")
+    page.locator("[data-dim=dst_host] .wb-dim-row", has_text="db").click()
+    expect(page.locator("[data-role=wb-detail] tbody tr")).to_have_count(3)
+    held[0].continue_()
+    page.wait_for_timeout(1500)
+    expect(page.locator("[data-role=wb-detail] tbody tr")).to_have_count(3)
+
+
+def test_service_process_and_event_host_picks(context, live_app):
+    """Final review #3–#6: a picked service, process or event host narrows to exactly it."""
+    alert_id = _seed(live_app)
+    page = context.new_page()
+    sign_in(page, live_app.url)
+    page.goto(f"{live_app.url}/investigate?alert={alert_id}")
+    page.locator("[data-dim=service] .wb-dim-row", has_text="445").click()
+    expect(page.locator("[data-role=wb-detail] tbody tr")).to_have_count(1)
+    assert page.locator("[data-dim=service] .wb-dim-row[data-chosen=true]").count() == 1

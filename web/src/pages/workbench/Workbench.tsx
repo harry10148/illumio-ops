@@ -245,9 +245,13 @@ export function Workbench() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // only the latest query's answer is shown: a slower earlier one arriving last must not replace it
+  const runSeq = useRef(0);
   const run = useCallback(async (r: Req) => {
+    const seq = ++runSeq.current;
     setBusy(true);
     const env = await call("workbench.run", { request: r });
+    if (seq !== runSeq.current) return;
     setBusy(false);
     if (env.ok && env.data) {
       setResult(env.data.result);

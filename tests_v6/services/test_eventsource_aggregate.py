@@ -41,9 +41,10 @@ def test_event_ranking_by_type_and_host(tmp_path, monkeypatch):
     by_host = aggregate_events(ctx, EventSegment(filter=flt.model_copy(update={"event_types": ("agent.tampering",)}),
                                                  view=V.RANKING, limit=10, group_by=(GroupBy(dimension=D.EVENT_HOST),)),
                                now=NOW)
-    hosts = {r.keys[0]: r.value for r in by_host.rows}
+    hosts = {r.display[0]: r.value for r in by_host.rows}  # P6a: keyed by href, shown by hostname
     on_ven = sum(1 for e in TAMPER if e["created_by"]["ven"]["href"] == ven)
     assert hosts["known-host"] == on_ven and sum(hosts.values()) == 4
+    assert {r.display[0]: r.keys[0] for r in by_host.rows}["known-host"] == "/orgs/1/workloads/w-9"
     detail = event_detail(ctx, EventSegment(filter=flt.model_copy(update={"host_hrefs": ("/orgs/1/workloads/w-9",)}),
                                             view=V.DETAIL, limit=10), now=NOW)
     assert len(detail.rows) == on_ven and detail.coverage.gaps == []

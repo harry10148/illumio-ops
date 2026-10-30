@@ -148,6 +148,15 @@
                 },
                 "title": "Labels",
                 "type": "array"
+              },
+              "match": {
+                "default": "any",
+                "enum": [
+                  "any",
+                  "all"
+                ],
+                "title": "Match",
+                "type": "string"
               }
             },
             "title": "EndpointFilter",
@@ -333,6 +342,14 @@
                 "default": null,
                 "title": "Initiator Process"
               },
+              "initiator_processes": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Initiator Processes",
+                "type": "array"
+              },
               "initiator_user": {
                 "anyOf": [
                   {
@@ -344,6 +361,14 @@
                 ],
                 "default": null,
                 "title": "Initiator User"
+              },
+              "initiator_users": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Initiator Users",
+                "type": "array"
               },
               "ports": {
                 "default": [],
@@ -365,6 +390,14 @@
                 "default": null,
                 "title": "Service Process"
               },
+              "service_processes": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Service Processes",
+                "type": "array"
+              },
               "service_user": {
                 "anyOf": [
                   {
@@ -376,6 +409,14 @@
                 ],
                 "default": null,
                 "title": "Service User"
+              },
+              "service_users": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Service Users",
+                "type": "array"
               },
               "src": {
                 "anyOf": [
@@ -552,7 +593,7 @@
                 "anyOf": [
                   {
                     "maximum": 65535,
-                    "minimum": 0,
+                    "minimum": -1,
                     "type": "integer"
                   },
                   {
@@ -1110,6 +1151,15 @@
                 },
                 "title": "Labels",
                 "type": "array"
+              },
+              "match": {
+                "default": "any",
+                "enum": [
+                  "any",
+                  "all"
+                ],
+                "title": "Match",
+                "type": "string"
               }
             },
             "title": "EndpointFilter",
@@ -1295,6 +1345,14 @@
                 "default": null,
                 "title": "Initiator Process"
               },
+              "initiator_processes": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Initiator Processes",
+                "type": "array"
+              },
               "initiator_user": {
                 "anyOf": [
                   {
@@ -1306,6 +1364,14 @@
                 ],
                 "default": null,
                 "title": "Initiator User"
+              },
+              "initiator_users": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Initiator Users",
+                "type": "array"
               },
               "ports": {
                 "default": [],
@@ -1327,6 +1393,14 @@
                 "default": null,
                 "title": "Service Process"
               },
+              "service_processes": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Service Processes",
+                "type": "array"
+              },
               "service_user": {
                 "anyOf": [
                   {
@@ -1338,6 +1412,14 @@
                 ],
                 "default": null,
                 "title": "Service User"
+              },
+              "service_users": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Service Users",
+                "type": "array"
               },
               "src": {
                 "anyOf": [
@@ -1514,7 +1596,7 @@
                 "anyOf": [
                   {
                     "maximum": 65535,
-                    "minimum": 0,
+                    "minimum": -1,
                     "type": "integer"
                   },
                   {
@@ -2174,6 +2256,15 @@
                 },
                 "title": "Labels",
                 "type": "array"
+              },
+              "match": {
+                "default": "any",
+                "enum": [
+                  "any",
+                  "all"
+                ],
+                "title": "Match",
+                "type": "string"
               }
             },
             "title": "EndpointFilter",
@@ -2359,6 +2450,14 @@
                 "default": null,
                 "title": "Initiator Process"
               },
+              "initiator_processes": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Initiator Processes",
+                "type": "array"
+              },
               "initiator_user": {
                 "anyOf": [
                   {
@@ -2370,6 +2469,14 @@
                 ],
                 "default": null,
                 "title": "Initiator User"
+              },
+              "initiator_users": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Initiator Users",
+                "type": "array"
               },
               "ports": {
                 "default": [],
@@ -2391,6 +2498,14 @@
                 "default": null,
                 "title": "Service Process"
               },
+              "service_processes": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Service Processes",
+                "type": "array"
+              },
               "service_user": {
                 "anyOf": [
                   {
@@ -2402,6 +2517,14 @@
                 ],
                 "default": null,
                 "title": "Service User"
+              },
+              "service_users": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Service Users",
+                "type": "array"
               },
               "src": {
                 "anyOf": [
@@ -2578,7 +2701,7 @@
                 "anyOf": [
                   {
                     "maximum": 65535,
-                    "minimum": 0,
+                    "minimum": -1,
                     "type": "integer"
                   },
                   {
@@ -3226,6 +3349,15 @@
                 },
                 "title": "Labels",
                 "type": "array"
+              },
+              "match": {
+                "default": "any",
+                "enum": [
+                  "any",
+                  "all"
+                ],
+                "title": "Match",
+                "type": "string"
               }
             },
             "title": "EndpointFilter",
@@ -3411,6 +3543,14 @@
                 "default": null,
                 "title": "Initiator Process"
               },
+              "initiator_processes": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Initiator Processes",
+                "type": "array"
+              },
               "initiator_user": {
                 "anyOf": [
                   {
@@ -3422,6 +3562,14 @@
                 ],
                 "default": null,
                 "title": "Initiator User"
+              },
+              "initiator_users": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Initiator Users",
+                "type": "array"
               },
               "ports": {
                 "default": [],
@@ -3443,6 +3591,14 @@
                 "default": null,
                 "title": "Service Process"
               },
+              "service_processes": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Service Processes",
+                "type": "array"
+              },
               "service_user": {
                 "anyOf": [
                   {
@@ -3454,6 +3610,14 @@
                 ],
                 "default": null,
                 "title": "Service User"
+              },
+              "service_users": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Service Users",
+                "type": "array"
               },
               "src": {
                 "anyOf": [
@@ -3630,7 +3794,7 @@
                 "anyOf": [
                   {
                     "maximum": 65535,
-                    "minimum": 0,
+                    "minimum": -1,
                     "type": "integer"
                   },
                   {
@@ -4299,6 +4463,15 @@
                 },
                 "title": "Labels",
                 "type": "array"
+              },
+              "match": {
+                "default": "any",
+                "enum": [
+                  "any",
+                  "all"
+                ],
+                "title": "Match",
+                "type": "string"
               }
             },
             "title": "EndpointFilter",
@@ -4484,6 +4657,14 @@
                 "default": null,
                 "title": "Initiator Process"
               },
+              "initiator_processes": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Initiator Processes",
+                "type": "array"
+              },
               "initiator_user": {
                 "anyOf": [
                   {
@@ -4495,6 +4676,14 @@
                 ],
                 "default": null,
                 "title": "Initiator User"
+              },
+              "initiator_users": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Initiator Users",
+                "type": "array"
               },
               "ports": {
                 "default": [],
@@ -4516,6 +4705,14 @@
                 "default": null,
                 "title": "Service Process"
               },
+              "service_processes": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Service Processes",
+                "type": "array"
+              },
               "service_user": {
                 "anyOf": [
                   {
@@ -4527,6 +4724,14 @@
                 ],
                 "default": null,
                 "title": "Service User"
+              },
+              "service_users": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Service Users",
+                "type": "array"
               },
               "src": {
                 "anyOf": [
@@ -4703,7 +4908,7 @@
                 "anyOf": [
                   {
                     "maximum": 65535,
-                    "minimum": 0,
+                    "minimum": -1,
                     "type": "integer"
                   },
                   {
@@ -5350,6 +5555,15 @@
                 },
                 "title": "Labels",
                 "type": "array"
+              },
+              "match": {
+                "default": "any",
+                "enum": [
+                  "any",
+                  "all"
+                ],
+                "title": "Match",
+                "type": "string"
               }
             },
             "title": "EndpointFilter",
@@ -5535,6 +5749,14 @@
                 "default": null,
                 "title": "Initiator Process"
               },
+              "initiator_processes": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Initiator Processes",
+                "type": "array"
+              },
               "initiator_user": {
                 "anyOf": [
                   {
@@ -5546,6 +5768,14 @@
                 ],
                 "default": null,
                 "title": "Initiator User"
+              },
+              "initiator_users": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Initiator Users",
+                "type": "array"
               },
               "ports": {
                 "default": [],
@@ -5567,6 +5797,14 @@
                 "default": null,
                 "title": "Service Process"
               },
+              "service_processes": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Service Processes",
+                "type": "array"
+              },
               "service_user": {
                 "anyOf": [
                   {
@@ -5578,6 +5816,14 @@
                 ],
                 "default": null,
                 "title": "Service User"
+              },
+              "service_users": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Service Users",
+                "type": "array"
               },
               "src": {
                 "anyOf": [
@@ -5754,7 +6000,7 @@
                 "anyOf": [
                   {
                     "maximum": 65535,
-                    "minimum": 0,
+                    "minimum": -1,
                     "type": "integer"
                   },
                   {
@@ -6361,6 +6607,15 @@
                 },
                 "title": "Labels",
                 "type": "array"
+              },
+              "match": {
+                "default": "any",
+                "enum": [
+                  "any",
+                  "all"
+                ],
+                "title": "Match",
+                "type": "string"
               }
             },
             "title": "EndpointFilter",
@@ -6546,6 +6801,14 @@
                 "default": null,
                 "title": "Initiator Process"
               },
+              "initiator_processes": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Initiator Processes",
+                "type": "array"
+              },
               "initiator_user": {
                 "anyOf": [
                   {
@@ -6557,6 +6820,14 @@
                 ],
                 "default": null,
                 "title": "Initiator User"
+              },
+              "initiator_users": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Initiator Users",
+                "type": "array"
               },
               "ports": {
                 "default": [],
@@ -6578,6 +6849,14 @@
                 "default": null,
                 "title": "Service Process"
               },
+              "service_processes": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Service Processes",
+                "type": "array"
+              },
               "service_user": {
                 "anyOf": [
                   {
@@ -6589,6 +6868,14 @@
                 ],
                 "default": null,
                 "title": "Service User"
+              },
+              "service_users": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Service Users",
+                "type": "array"
               },
               "src": {
                 "anyOf": [
@@ -6765,7 +7052,7 @@
                 "anyOf": [
                   {
                     "maximum": 65535,
-                    "minimum": 0,
+                    "minimum": -1,
                     "type": "integer"
                   },
                   {
@@ -7323,6 +7610,15 @@
                 },
                 "title": "Labels",
                 "type": "array"
+              },
+              "match": {
+                "default": "any",
+                "enum": [
+                  "any",
+                  "all"
+                ],
+                "title": "Match",
+                "type": "string"
               }
             },
             "title": "EndpointFilter",
@@ -7508,6 +7804,14 @@
                 "default": null,
                 "title": "Initiator Process"
               },
+              "initiator_processes": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Initiator Processes",
+                "type": "array"
+              },
               "initiator_user": {
                 "anyOf": [
                   {
@@ -7519,6 +7823,14 @@
                 ],
                 "default": null,
                 "title": "Initiator User"
+              },
+              "initiator_users": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Initiator Users",
+                "type": "array"
               },
               "ports": {
                 "default": [],
@@ -7540,6 +7852,14 @@
                 "default": null,
                 "title": "Service Process"
               },
+              "service_processes": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Service Processes",
+                "type": "array"
+              },
               "service_user": {
                 "anyOf": [
                   {
@@ -7551,6 +7871,14 @@
                 ],
                 "default": null,
                 "title": "Service User"
+              },
+              "service_users": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Service Users",
+                "type": "array"
               },
               "src": {
                 "anyOf": [
@@ -7727,7 +8055,7 @@
                 "anyOf": [
                   {
                     "maximum": 65535,
-                    "minimum": 0,
+                    "minimum": -1,
                     "type": "integer"
                   },
                   {
@@ -9859,6 +10187,15 @@
                 },
                 "title": "Labels",
                 "type": "array"
+              },
+              "match": {
+                "default": "any",
+                "enum": [
+                  "any",
+                  "all"
+                ],
+                "title": "Match",
+                "type": "string"
               }
             },
             "title": "EndpointFilter",
@@ -9923,6 +10260,14 @@
                 "default": null,
                 "title": "Initiator Process"
               },
+              "initiator_processes": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Initiator Processes",
+                "type": "array"
+              },
               "initiator_user": {
                 "anyOf": [
                   {
@@ -9934,6 +10279,14 @@
                 ],
                 "default": null,
                 "title": "Initiator User"
+              },
+              "initiator_users": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Initiator Users",
+                "type": "array"
               },
               "ports": {
                 "default": [],
@@ -9955,6 +10308,14 @@
                 "default": null,
                 "title": "Service Process"
               },
+              "service_processes": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Service Processes",
+                "type": "array"
+              },
               "service_user": {
                 "anyOf": [
                   {
@@ -9966,6 +10327,14 @@
                 ],
                 "default": null,
                 "title": "Service User"
+              },
+              "service_users": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Service Users",
+                "type": "array"
               },
               "src": {
                 "anyOf": [
@@ -10054,7 +10423,7 @@
                 "anyOf": [
                   {
                     "maximum": 65535,
-                    "minimum": 0,
+                    "minimum": -1,
                     "type": "integer"
                   },
                   {
@@ -10310,6 +10679,15 @@
                 },
                 "title": "Labels",
                 "type": "array"
+              },
+              "match": {
+                "default": "any",
+                "enum": [
+                  "any",
+                  "all"
+                ],
+                "title": "Match",
+                "type": "string"
               }
             },
             "title": "EndpointFilter",
@@ -10374,6 +10752,14 @@
                 "default": null,
                 "title": "Initiator Process"
               },
+              "initiator_processes": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Initiator Processes",
+                "type": "array"
+              },
               "initiator_user": {
                 "anyOf": [
                   {
@@ -10385,6 +10771,14 @@
                 ],
                 "default": null,
                 "title": "Initiator User"
+              },
+              "initiator_users": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Initiator Users",
+                "type": "array"
               },
               "ports": {
                 "default": [],
@@ -10406,6 +10800,14 @@
                 "default": null,
                 "title": "Service Process"
               },
+              "service_processes": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Service Processes",
+                "type": "array"
+              },
               "service_user": {
                 "anyOf": [
                   {
@@ -10417,6 +10819,14 @@
                 ],
                 "default": null,
                 "title": "Service User"
+              },
+              "service_users": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Service Users",
+                "type": "array"
               },
               "src": {
                 "anyOf": [
@@ -10505,7 +10915,7 @@
                 "anyOf": [
                   {
                     "maximum": 65535,
-                    "minimum": 0,
+                    "minimum": -1,
                     "type": "integer"
                   },
                   {
@@ -10868,6 +11278,15 @@
                 },
                 "title": "Labels",
                 "type": "array"
+              },
+              "match": {
+                "default": "any",
+                "enum": [
+                  "any",
+                  "all"
+                ],
+                "title": "Match",
+                "type": "string"
               }
             },
             "title": "EndpointFilter",
@@ -10932,6 +11351,14 @@
                 "default": null,
                 "title": "Initiator Process"
               },
+              "initiator_processes": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Initiator Processes",
+                "type": "array"
+              },
               "initiator_user": {
                 "anyOf": [
                   {
@@ -10943,6 +11370,14 @@
                 ],
                 "default": null,
                 "title": "Initiator User"
+              },
+              "initiator_users": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Initiator Users",
+                "type": "array"
               },
               "ports": {
                 "default": [],
@@ -10964,6 +11399,14 @@
                 "default": null,
                 "title": "Service Process"
               },
+              "service_processes": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Service Processes",
+                "type": "array"
+              },
               "service_user": {
                 "anyOf": [
                   {
@@ -10975,6 +11418,14 @@
                 ],
                 "default": null,
                 "title": "Service User"
+              },
+              "service_users": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Service Users",
+                "type": "array"
               },
               "src": {
                 "anyOf": [
@@ -11063,7 +11514,7 @@
                 "anyOf": [
                   {
                     "maximum": 65535,
-                    "minimum": 0,
+                    "minimum": -1,
                     "type": "integer"
                   },
                   {
@@ -11414,6 +11865,15 @@
                 },
                 "title": "Labels",
                 "type": "array"
+              },
+              "match": {
+                "default": "any",
+                "enum": [
+                  "any",
+                  "all"
+                ],
+                "title": "Match",
+                "type": "string"
               }
             },
             "title": "EndpointFilter",
@@ -11478,6 +11938,14 @@
                 "default": null,
                 "title": "Initiator Process"
               },
+              "initiator_processes": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Initiator Processes",
+                "type": "array"
+              },
               "initiator_user": {
                 "anyOf": [
                   {
@@ -11489,6 +11957,14 @@
                 ],
                 "default": null,
                 "title": "Initiator User"
+              },
+              "initiator_users": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Initiator Users",
+                "type": "array"
               },
               "ports": {
                 "default": [],
@@ -11510,6 +11986,14 @@
                 "default": null,
                 "title": "Service Process"
               },
+              "service_processes": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Service Processes",
+                "type": "array"
+              },
               "service_user": {
                 "anyOf": [
                   {
@@ -11521,6 +12005,14 @@
                 ],
                 "default": null,
                 "title": "Service User"
+              },
+              "service_users": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Service Users",
+                "type": "array"
               },
               "src": {
                 "anyOf": [
@@ -11609,7 +12101,7 @@
                 "anyOf": [
                   {
                     "maximum": 65535,
-                    "minimum": 0,
+                    "minimum": -1,
                     "type": "integer"
                   },
                   {
@@ -12154,6 +12646,15 @@
                 },
                 "title": "Labels",
                 "type": "array"
+              },
+              "match": {
+                "default": "any",
+                "enum": [
+                  "any",
+                  "all"
+                ],
+                "title": "Match",
+                "type": "string"
               }
             },
             "title": "EndpointFilter",
@@ -12218,6 +12719,14 @@
                 "default": null,
                 "title": "Initiator Process"
               },
+              "initiator_processes": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Initiator Processes",
+                "type": "array"
+              },
               "initiator_user": {
                 "anyOf": [
                   {
@@ -12229,6 +12738,14 @@
                 ],
                 "default": null,
                 "title": "Initiator User"
+              },
+              "initiator_users": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Initiator Users",
+                "type": "array"
               },
               "ports": {
                 "default": [],
@@ -12250,6 +12767,14 @@
                 "default": null,
                 "title": "Service Process"
               },
+              "service_processes": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Service Processes",
+                "type": "array"
+              },
               "service_user": {
                 "anyOf": [
                   {
@@ -12261,6 +12786,14 @@
                 ],
                 "default": null,
                 "title": "Service User"
+              },
+              "service_users": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Service Users",
+                "type": "array"
               },
               "src": {
                 "anyOf": [
@@ -12349,7 +12882,7 @@
                 "anyOf": [
                   {
                     "maximum": 65535,
-                    "minimum": 0,
+                    "minimum": -1,
                     "type": "integer"
                   },
                   {
@@ -12605,6 +13138,15 @@
                 },
                 "title": "Labels",
                 "type": "array"
+              },
+              "match": {
+                "default": "any",
+                "enum": [
+                  "any",
+                  "all"
+                ],
+                "title": "Match",
+                "type": "string"
               }
             },
             "title": "EndpointFilter",
@@ -12669,6 +13211,14 @@
                 "default": null,
                 "title": "Initiator Process"
               },
+              "initiator_processes": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Initiator Processes",
+                "type": "array"
+              },
               "initiator_user": {
                 "anyOf": [
                   {
@@ -12680,6 +13230,14 @@
                 ],
                 "default": null,
                 "title": "Initiator User"
+              },
+              "initiator_users": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Initiator Users",
+                "type": "array"
               },
               "ports": {
                 "default": [],
@@ -12701,6 +13259,14 @@
                 "default": null,
                 "title": "Service Process"
               },
+              "service_processes": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Service Processes",
+                "type": "array"
+              },
               "service_user": {
                 "anyOf": [
                   {
@@ -12712,6 +13278,14 @@
                 ],
                 "default": null,
                 "title": "Service User"
+              },
+              "service_users": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Service Users",
+                "type": "array"
               },
               "src": {
                 "anyOf": [
@@ -12800,7 +13374,7 @@
                 "anyOf": [
                   {
                     "maximum": 65535,
-                    "minimum": 0,
+                    "minimum": -1,
                     "type": "integer"
                   },
                   {
@@ -13323,6 +13897,15 @@
                 },
                 "title": "Labels",
                 "type": "array"
+              },
+              "match": {
+                "default": "any",
+                "enum": [
+                  "any",
+                  "all"
+                ],
+                "title": "Match",
+                "type": "string"
               }
             },
             "title": "EndpointFilter",
@@ -13387,6 +13970,14 @@
                 "default": null,
                 "title": "Initiator Process"
               },
+              "initiator_processes": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Initiator Processes",
+                "type": "array"
+              },
               "initiator_user": {
                 "anyOf": [
                   {
@@ -13398,6 +13989,14 @@
                 ],
                 "default": null,
                 "title": "Initiator User"
+              },
+              "initiator_users": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Initiator Users",
+                "type": "array"
               },
               "ports": {
                 "default": [],
@@ -13419,6 +14018,14 @@
                 "default": null,
                 "title": "Service Process"
               },
+              "service_processes": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Service Processes",
+                "type": "array"
+              },
               "service_user": {
                 "anyOf": [
                   {
@@ -13430,6 +14037,14 @@
                 ],
                 "default": null,
                 "title": "Service User"
+              },
+              "service_users": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Service Users",
+                "type": "array"
               },
               "src": {
                 "anyOf": [
@@ -13518,7 +14133,7 @@
                 "anyOf": [
                   {
                     "maximum": 65535,
-                    "minimum": 0,
+                    "minimum": -1,
                     "type": "integer"
                   },
                   {
@@ -19798,6 +20413,15 @@
                 },
                 "title": "Labels",
                 "type": "array"
+              },
+              "match": {
+                "default": "any",
+                "enum": [
+                  "any",
+                  "all"
+                ],
+                "title": "Match",
+                "type": "string"
               }
             },
             "title": "EndpointFilter",
@@ -19818,6 +20442,14 @@
                 ],
                 "default": null,
                 "title": "Actor"
+              },
+              "actors": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Actors",
+                "type": "array"
               },
               "end": {
                 "format": "date-time",
@@ -19946,6 +20578,14 @@
                 "default": null,
                 "title": "Initiator Process"
               },
+              "initiator_processes": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Initiator Processes",
+                "type": "array"
+              },
               "initiator_user": {
                 "anyOf": [
                   {
@@ -19957,6 +20597,14 @@
                 ],
                 "default": null,
                 "title": "Initiator User"
+              },
+              "initiator_users": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Initiator Users",
+                "type": "array"
               },
               "ports": {
                 "default": [],
@@ -19978,6 +20626,14 @@
                 "default": null,
                 "title": "Service Process"
               },
+              "service_processes": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Service Processes",
+                "type": "array"
+              },
               "service_user": {
                 "anyOf": [
                   {
@@ -19989,6 +20645,14 @@
                 ],
                 "default": null,
                 "title": "Service User"
+              },
+              "service_users": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Service Users",
+                "type": "array"
               },
               "src": {
                 "anyOf": [
@@ -20040,10 +20704,14 @@
                   "exclude_ports": [],
                   "exclude_system_accounts": false,
                   "initiator_process": null,
+                  "initiator_processes": [],
                   "initiator_user": null,
+                  "initiator_users": [],
                   "ports": [],
                   "service_process": null,
+                  "service_processes": [],
                   "service_user": null,
+                  "service_users": [],
                   "src": null,
                   "src_exclude": null,
                   "text": null
@@ -20164,7 +20832,7 @@
                 "anyOf": [
                   {
                     "maximum": 65535,
-                    "minimum": 0,
+                    "minimum": -1,
                     "type": "integer"
                   },
                   {
@@ -20570,6 +21238,15 @@
                 },
                 "title": "Labels",
                 "type": "array"
+              },
+              "match": {
+                "default": "any",
+                "enum": [
+                  "any",
+                  "all"
+                ],
+                "title": "Match",
+                "type": "string"
               }
             },
             "title": "EndpointFilter",
@@ -20590,6 +21267,14 @@
                 ],
                 "default": null,
                 "title": "Actor"
+              },
+              "actors": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Actors",
+                "type": "array"
               },
               "end": {
                 "format": "date-time",
@@ -20718,6 +21403,14 @@
                 "default": null,
                 "title": "Initiator Process"
               },
+              "initiator_processes": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Initiator Processes",
+                "type": "array"
+              },
               "initiator_user": {
                 "anyOf": [
                   {
@@ -20729,6 +21422,14 @@
                 ],
                 "default": null,
                 "title": "Initiator User"
+              },
+              "initiator_users": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Initiator Users",
+                "type": "array"
               },
               "ports": {
                 "default": [],
@@ -20750,6 +21451,14 @@
                 "default": null,
                 "title": "Service Process"
               },
+              "service_processes": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Service Processes",
+                "type": "array"
+              },
               "service_user": {
                 "anyOf": [
                   {
@@ -20761,6 +21470,14 @@
                 ],
                 "default": null,
                 "title": "Service User"
+              },
+              "service_users": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Service Users",
+                "type": "array"
               },
               "src": {
                 "anyOf": [
@@ -20812,10 +21529,14 @@
                   "exclude_ports": [],
                   "exclude_system_accounts": false,
                   "initiator_process": null,
+                  "initiator_processes": [],
                   "initiator_user": null,
+                  "initiator_users": [],
                   "ports": [],
                   "service_process": null,
+                  "service_processes": [],
                   "service_user": null,
+                  "service_users": [],
                   "src": null,
                   "src_exclude": null,
                   "text": null
@@ -20936,7 +21657,7 @@
                 "anyOf": [
                   {
                     "maximum": 65535,
-                    "minimum": 0,
+                    "minimum": -1,
                     "type": "integer"
                   },
                   {
@@ -21137,6 +21858,15 @@
                 },
                 "title": "Labels",
                 "type": "array"
+              },
+              "match": {
+                "default": "any",
+                "enum": [
+                  "any",
+                  "all"
+                ],
+                "title": "Match",
+                "type": "string"
               }
             },
             "title": "EndpointFilter",
@@ -21157,6 +21887,14 @@
                 ],
                 "default": null,
                 "title": "Actor"
+              },
+              "actors": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Actors",
+                "type": "array"
               },
               "end": {
                 "format": "date-time",
@@ -21285,6 +22023,14 @@
                 "default": null,
                 "title": "Initiator Process"
               },
+              "initiator_processes": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Initiator Processes",
+                "type": "array"
+              },
               "initiator_user": {
                 "anyOf": [
                   {
@@ -21296,6 +22042,14 @@
                 ],
                 "default": null,
                 "title": "Initiator User"
+              },
+              "initiator_users": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Initiator Users",
+                "type": "array"
               },
               "ports": {
                 "default": [],
@@ -21317,6 +22071,14 @@
                 "default": null,
                 "title": "Service Process"
               },
+              "service_processes": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Service Processes",
+                "type": "array"
+              },
               "service_user": {
                 "anyOf": [
                   {
@@ -21328,6 +22090,14 @@
                 ],
                 "default": null,
                 "title": "Service User"
+              },
+              "service_users": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Service Users",
+                "type": "array"
               },
               "src": {
                 "anyOf": [
@@ -21379,10 +22149,14 @@
                   "exclude_ports": [],
                   "exclude_system_accounts": false,
                   "initiator_process": null,
+                  "initiator_processes": [],
                   "initiator_user": null,
+                  "initiator_users": [],
                   "ports": [],
                   "service_process": null,
+                  "service_processes": [],
                   "service_user": null,
+                  "service_users": [],
                   "src": null,
                   "src_exclude": null,
                   "text": null
@@ -21503,7 +22277,7 @@
                 "anyOf": [
                   {
                     "maximum": 65535,
-                    "minimum": 0,
+                    "minimum": -1,
                     "type": "integer"
                   },
                   {

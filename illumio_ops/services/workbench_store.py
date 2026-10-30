@@ -16,6 +16,7 @@ from pydantic import BaseModel
 from illumio_ops.domain.values import CollectionMode
 from illumio_ops.services.context import AppContext
 from illumio_ops.services.ondemand import OnDemandResult, open_period
+from illumio_ops.store.flowdb.db import StaleGeneration
 
 KEEP = timedelta(minutes=30)
 HOUR = timedelta(hours=1)
@@ -97,6 +98,11 @@ def _release(h: _Held) -> None:
             h.close()
 
 
+def _same_pce(install: AppContext, key: tuple[str, str, int]) -> bool:
+    pce = install.settings.current().pce
+    return (pce.url, pce.org_id, install.flows().generation) == key
+
+
 def drop() -> None:
     with _lock:
         if _held is not None:
@@ -105,13 +111,15 @@ def drop() -> None:
 
 @contextmanager
 def lease(ctx: AppContext, start: datetime, end: datetime, *,
-          now: datetime | None = None) -> Iterator[tuple[AppContext, PullInfo | None]]:
-    """The context a workbench request reads, for the length of the request: the install's own, or the held pull
-    covering [start, end) (read now if none does). Raises OnDemandFailed when the PCE could not answer."""
+          now: datetime | None = None) -> Iterator[tuple[AppContext, PullInfo | None, Callable[[], None]]]:
+    """The context a workbench request reads, for the length of the request — the install's own, or the held pull
+    covering [start, end) (read now if none does) — and a check to call once the answer is computed: it raises
+    StaleGeneration when the PCE changed meanwhile and retires the pull (final review #1: the pull's own store
+    cannot see the install's reset). Raises OnDemandFailed when the PCE could not answer."""
     global _held
     at = (now or datetime.now(UTC)).astimezone(UTC)
     if not needs_pull(ctx, start, at):
-        yield ctx, None
+        yield ctx, None, lambda: None  # the install's own reads check their generation themselves
         return
     pce = ctx.settings.current().pce
     key = (pce.url, pce.org_id, ctx.flows().generation)
@@ -128,9 +136,18 @@ def lease(ctx: AppContext, start: datetime, end: datetime, *,
                         _retire(_held)
                     h = _held = _Held(key=key, start=a, end=b, result=result, close=close, read_at=at, since=clock,
                                       refs=1)
+    held = h
+
+    def check() -> None:
+        if not _same_pce(ctx, key):
+            with _lock:
+                if not held.retired:
+                    _retire(held)
+            raise StaleGeneration
     try:
-        r = h.result
-        yield r.ctx, PullInfo(start=h.start, end=h.end, rows=r.rows, capped=r.capped_total, unread_from=r.unread_from,
-                              truncated_windows=len(r.truncated), read_at=h.read_at)
+        r = held.result
+        yield r.ctx, PullInfo(start=held.start, end=held.end, rows=r.rows, capped=r.capped_total,
+                              unread_from=r.unread_from, truncated_windows=len(r.truncated),
+                              read_at=held.read_at), check
     finally:
-        _release(h)
+        _release(held)

@@ -2021,5 +2021,6 @@
   "wb_pulled": "本頁的資料是向 PCE 讀取的：{start} – {end}，{rows} 筆，讀取時間 {at}。保留 30 分鐘供之後的點選使用。",
   "wb_pulled_capped": "讀取達到筆數上限而停止；{from} 之後的期間不包含在內。",
   "wb_pulled_truncated": "讀取時有 {n} 個時段被 PCE 截斷，其中部分連線缺漏。",
-  "wb_pulling": "正在向 PCE 讀取這段期間（每天約半分鐘）…"
+  "wb_pulling": "正在向 PCE 讀取這段期間（每天約半分鐘）…",
+  "wb_pce_switched": "讀取期間 PCE 被變更了，請重新查詢。"
 }

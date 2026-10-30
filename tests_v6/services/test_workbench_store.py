@@ -12,8 +12,8 @@ NOW = datetime(2026, 10, 30, 12, 7, tzinfo=UTC)
 
 
 def _ctx_for(ctx, start, end, *, now):
-    with workbench_store.lease(ctx, start, end, now=now) as got:
-        return got
+    with workbench_store.lease(ctx, start, end, now=now) as (read, info, _check):
+        return read, info
 
 
 @pytest.fixture

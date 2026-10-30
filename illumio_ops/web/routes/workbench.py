@@ -14,6 +14,7 @@ from illumio_ops.services.workbench import (
     WorkbenchRequest,
     WorkbenchResult,
 )
+from illumio_ops.store.flowdb.db import StaleGeneration
 from illumio_ops.web.auth import get_ctx
 from illumio_ops.web.contract import ApiFailure, api_route, operation
 
@@ -56,6 +57,10 @@ def meta() -> WorkbenchMeta:
 def run(body: WorkbenchRun) -> WorkbenchResult:
     try:
         return workbench.run(get_ctx(), body.request)
+    except StaleGeneration:
+        raise ApiFailure(409, "pce_switched", "wb_pce_switched") from None
+    except (ValidationError, ValueError) as exc:
+        raise _invalid(exc) from None
     except OnDemandFailed as exc:
         raise ApiFailure(502, "pull_failed", "wb_pull_failed", params={"error": str(exc)[:300]}) from None
 
@@ -64,6 +69,8 @@ def run(body: WorkbenchRun) -> WorkbenchResult:
 def dimension(body: WorkbenchDimension) -> DimensionTop:
     try:
         return workbench.dimension(get_ctx(), body.request, body.dimension, label_key=body.label_key)
+    except StaleGeneration:
+        raise ApiFailure(409, "pce_switched", "wb_pce_switched") from None
     except OnDemandFailed as exc:
         raise ApiFailure(502, "pull_failed", "wb_pull_failed", params={"error": str(exc)[:300]}) from None
     except (ValidationError, ValueError) as exc:

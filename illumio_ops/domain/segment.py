@@ -76,6 +76,7 @@ class EventFilter(_Model):
     severities: tuple[str, ...] = ()
     host_hrefs: tuple[str, ...] = ()
     actor: str | None = Field(default=None, min_length=1)  # partial match, like_pattern semantics
+    actors: tuple[str, ...] = ()  # exact names, any of them (the workbench's dimension clicks, P6a)
 
     @model_validator(mode="after")
     def _window(self) -> EventFilter:
@@ -172,7 +173,10 @@ FIELD_COVERAGE_SQL = ("SELECT COUNT(*) AS total, COUNT(f.initiator_process) AS i
 
 _EVENT_COLUMNS: dict[SegmentDimension, str] = {
     SegmentDimension.EVENT_TYPE: "e.event_type",
-    SegmentDimension.EVENT_HOST: "COALESCE(w.hostname, e.created_by_name)",
+    # an href, never a name (P6a final review #4: a name cannot select the host back): the workload's, else the
+    # VEN's that sent it (a host the inventory does not hold); the hostname is what is shown
+    SegmentDimension.EVENT_HOST: "COALESCE(e.workload_href, w.href, "
+                                 "CASE WHEN e.created_by_kind = 'ven' THEN e.created_by_href END)",
     SegmentDimension.EVENT_SEVERITY: "e.severity",
     SegmentDimension.ACTOR: "e.created_by_name",
 }
@@ -189,17 +193,23 @@ def compile_event_where(f: EventFilter) -> tuple[str, list[Any]]:
             params.extend(values)
     if f.host_hrefs:
         marks = ",".join("?" * len(f.host_hrefs))
-        clauses.append(f"(e.workload_href IN ({marks}) OR w.href IN ({marks}))")
-        params.extend([*f.host_hrefs, *f.host_hrefs])
+        clauses.append(f"(e.workload_href IN ({marks}) OR w.href IN ({marks}) "
+                       f"OR (e.created_by_kind = 'ven' AND e.created_by_href IN ({marks})))")
+        params.extend([*f.host_hrefs, *f.host_hrefs, *f.host_hrefs])
     if f.actor:
         clauses.append("e.created_by_name LIKE ? ESCAPE '\\'")
         params.append(like_pattern(f.actor))
+    if f.actors:
+        clauses.append(f"e.created_by_name IN ({','.join('?' * len(f.actors))})")
+        params.extend(f.actors)
     return " AND ".join(clauses), params
 
 
 def compile_event_ranking(seg: EventSegment) -> tuple[str, list[Any]]:
     keys = [_EVENT_COLUMNS[g.dimension] for g in seg.group_by]
-    select = [f"{k} AS k{i}, NULL AS d{i}" for i, k in enumerate(keys)]
+    shown = "COALESCE(MAX(w.hostname), MAX(CASE WHEN e.created_by_kind = 'ven' THEN e.created_by_name END))"
+    select = [f"{k} AS k{i}, {shown if g.dimension is SegmentDimension.EVENT_HOST else 'NULL'} AS d{i}"
+              for i, (k, g) in enumerate(zip(keys, seg.group_by, strict=True))]
     where, params = compile_event_where(seg.filter)
     sql = (f"SELECT {', '.join(select)}, COUNT(*) AS value, NULL AS bytes_known {EVENT_FROM} WHERE {where} "
            f"GROUP BY {', '.join(keys)} ORDER BY value DESC, {', '.join(keys)} LIMIT ?")

@@ -53,3 +53,19 @@ def test_run_needs_csrf(client):
     login(client)
     r = client.post("/api/workbench/run", json={"request": REQ}, environ_overrides=LOCAL)
     assert r.status_code in (400, 403)
+
+
+def test_pce_switch_during_read_is_409(client, ctx, monkeypatch):
+    """Final review #1: an answer read across a PCE switch is refused with its own code, not a 500."""
+    from illumio_ops.services import workbench
+    from illumio_ops.store.flowdb.db import StaleGeneration
+
+    def stale(*a, **k):
+        raise StaleGeneration("switched")
+    login(client)
+    monkeypatch.setattr(workbench, "run", stale)
+    monkeypatch.setattr(workbench, "dimension", stale)
+    for path, body in (("/api/workbench/run", {"request": REQ}),
+                       ("/api/workbench/dimension", {"request": REQ, "dimension": "src_host"})):
+        r = post(client, path, body)
+        assert r.status_code == 409 and r.get_json()["error"]["code"] == "pce_switched"
