@@ -201,6 +201,9 @@ export function AlertDetail() {
       <p><Link to="/alerts">{t("alert_back")}</Link></p>
       <div className="page-head">
         <h1>{d.rule_name}</h1>
+        {d.evidence_kind && (
+          <Link className="btn-primary" to={`/investigate?alert=${id}`} data-role="open-workbench">{t("alert_open_workbench")}</Link>
+        )}
         {d.console_link && (
           <a className="btn-quiet" href={d.console_link} target="_blank" rel="noopener noreferrer">{t("alert_open_console")}</a>
         )}

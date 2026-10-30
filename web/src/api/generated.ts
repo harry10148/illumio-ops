@@ -119,6 +119,22 @@ export type PortClass1 = ("remote" | "directory" | "database")
  * via the `definition` "DeploymentType".
  */
 export type DeploymentType = ("on_prem" | "saas")
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "SegmentDimension".
+ */
+export type SegmentDimension = ("src_host" | "dst_host" | "src_label" | "dst_label" | "service" | "initiator_process" | "initiator_user" | "service_process" | "service_user" | "decision" | "direction" | "event_type" | "event_host" | "event_severity" | "actor")
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "SegmentView".
+ */
+export type SegmentView = ("detail" | "ranking" | "predicted_block")
+export type SegmentMetric = ("flows" | "connections" | "distinct_dst" | "distinct_src" | "distinct_ports" | "bytes" | "events")
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "SegmentMetric".
+ */
+export type SegmentMetric1 = ("flows" | "connections" | "distinct_dst" | "distinct_src" | "distinct_ports" | "bytes" | "events")
 
 /**
  * This interface was referenced by `ContractRoot`'s JSON-Schema
@@ -1518,8 +1534,219 @@ mode: ("self_signed" | "provided")
 revision: number
 validity_days: number
 }
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "EventRequest".
+ */
+export interface EventRequest {
+actor?: (string | null)
+end: string
+event_types?: string[]
+/**
+ * @maxItems 2
+ */
+group_by?: []|[GroupBy]|[GroupBy, GroupBy]
+host_hrefs?: string[]
+limit?: number
+mode: "events"
+severities?: string[]
+start: string
+view: SegmentView
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "GroupBy".
+ */
+export interface GroupBy {
+dimension: SegmentDimension
+label_key?: (string | null)
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "FlowRequest".
+ */
+export interface FlowRequest {
+condition?: FlowCondition1
+end: string
+/**
+ * @maxItems 2
+ */
+group_by?: []|[GroupBy]|[GroupBy, GroupBy]
+limit?: number
+metric?: SegmentMetric
+mode: "flows"
+start: string
+view: SegmentView
+}
+/**
+ * A flow filter without its time window: what an alert rule (and later a saved report section) stores.
+ * within() gives the FilterSpec for a window; every field, default and check is FilterSpec's.
+ */
+export interface FlowCondition1 {
+decisions?: PolicyDecision[]
+dst?: (EndpointFilter | null)
+dst_exclude?: (EndpointFilter | null)
+exclude_ports?: PortProto[]
+exclude_system_accounts?: boolean
+initiator_process?: (string | null)
+initiator_user?: (string | null)
+ports?: PortProto[]
+service_process?: (string | null)
+service_user?: (string | null)
+src?: (EndpointFilter | null)
+src_exclude?: (EndpointFilter | null)
+text?: (string | null)
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "WorkbenchDimension".
+ */
+export interface WorkbenchDimension {
+dimension: SegmentDimension
+label_key?: (string | null)
+request: (FlowRequest | EventRequest)
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "AggRow".
+ */
+export interface AggRow {
+bytes_known: (number | null)
+display: (string | null)[]
+keys: (string | number | null)[]
+value: number
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "DimensionTop".
+ */
+export interface DimensionTop {
+coverage: Coverage
+limit_hit: boolean
+rows: AggRow[]
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "WorkbenchStart".
+ */
+export interface WorkbenchStart {
+alert_id: number
+request: (FlowRequest | EventRequest)
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "WorkbenchMeta".
+ */
+export interface WorkbenchMeta {
+default_days: number
+dimension_top: number
+label_keys: string[]
+max_days: number
+mode: CollectionMode
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "WorkbenchRun".
+ */
+export interface WorkbenchRun {
+request: (FlowRequest | EventRequest)
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "EventRow".
+ */
+export interface EventRow {
+created_by_href: (string | null)
+created_by_kind: (string | null)
+created_by_name: (string | null)
+event_type: string
+href: string
+origin: string
+raw: {
+[k: string]: unknown
+}
+severity: (string | null)
+status: (string | null)
+tamper_classification: (string | null)
+timestamp: string
+}
+/**
+ * How many of the matching connections carry each optional field (spec §6.5.7: process and user
+ * are on few flows, bytes on fewer).
+ * 
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "FieldCoverage".
+ */
+export interface FieldCoverage {
+bytes: number
+initiator_process: number
+initiator_user: number
+service_process: number
+service_user: number
+total: number
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "FlowRow".
+ */
+export interface FlowRow {
+bytes_in: (number | null)
+bytes_out: (number | null)
+conn_key: string
+direction: string
+dst_hostname: (string | null)
+dst_href: (string | null)
+dst_ip: string
+dst_key: string
+dst_labels: {
+[k: string]: string
+}
+dst_managed: boolean
+dst_mode: (string | null)
+first_detected: string
+initiator_process: (string | null)
+initiator_user: (string | null)
+last_detected: string
+num_connections: number
+origin: string
+policy_decision: string
+port: (number | null)
+proto: number
+record_key: string
+service_process: (string | null)
+service_user: (string | null)
+src_hostname: (string | null)
+src_href: (string | null)
+src_ip: string
+src_key: string
+src_labels: {
+[k: string]: string
+}
+src_managed: boolean
+src_mode: (string | null)
+state: (string | null)
+windows_service: (string | null)
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "SegmentResult".
+ */
+export interface SegmentResult {
+coverage: Coverage
+detail?: (FlowRow[] | EventRow[] | null)
+field_coverage: (FieldCoverage | null)
+latency_seconds: (number | null)
+limit_hit: boolean
+observed_from: string
+observed_to: string
+predicted?: {
+[k: string]: unknown
+}
+ranking?: (AggRow[] | null)
+view: SegmentView
+}
 
-export type OpId = "alert_rules.create" | "alert_rules.delete" | "alert_rules.list" | "alert_rules.pack" | "alert_rules.preview" | "alert_rules.update" | "alerts.evidence" | "alerts.explain" | "alerts.get" | "alerts.list" | "alerts.mark_known" | "alerts.note_add" | "auth.csrf" | "auth.login" | "auth.logout" | "auth.me" | "auth.password" | "home.summary" | "i18n.dictionary" | "report_schedules.create" | "report_schedules.delete" | "report_schedules.list" | "report_schedules.run_now" | "report_schedules.update" | "reports.catalog" | "reports.delete" | "reports.generate" | "reports.get" | "reports.list" | "rhc.enable" | "rhc.status" | "system.channels.get" | "system.channels.test" | "system.channels.update" | "system.collection.backfill" | "system.collection.get" | "system.collection.status" | "system.collection.update" | "system.display.get" | "system.display.update" | "system.jobs.list" | "system.lateral.get" | "system.lateral.known" | "system.lateral.known_delete" | "system.lateral.update" | "system.logs.query" | "system.pce.get" | "system.pce.latest" | "system.pce.probe" | "system.pce.update" | "system.reports.get" | "system.reports.update" | "system.security.get" | "system.security.update" | "system.tls.csr" | "system.tls.import" | "system.tls.renew" | "system.tls.status" | "system.tls.update";
+export type OpId = "alert_rules.create" | "alert_rules.delete" | "alert_rules.list" | "alert_rules.pack" | "alert_rules.preview" | "alert_rules.update" | "alerts.evidence" | "alerts.explain" | "alerts.get" | "alerts.list" | "alerts.mark_known" | "alerts.note_add" | "auth.csrf" | "auth.login" | "auth.logout" | "auth.me" | "auth.password" | "home.summary" | "i18n.dictionary" | "report_schedules.create" | "report_schedules.delete" | "report_schedules.list" | "report_schedules.run_now" | "report_schedules.update" | "reports.catalog" | "reports.delete" | "reports.generate" | "reports.get" | "reports.list" | "rhc.enable" | "rhc.status" | "system.channels.get" | "system.channels.test" | "system.channels.update" | "system.collection.backfill" | "system.collection.get" | "system.collection.status" | "system.collection.update" | "system.display.get" | "system.display.update" | "system.jobs.list" | "system.lateral.get" | "system.lateral.known" | "system.lateral.known_delete" | "system.lateral.update" | "system.logs.query" | "system.pce.get" | "system.pce.latest" | "system.pce.probe" | "system.pce.update" | "system.reports.get" | "system.reports.update" | "system.security.get" | "system.security.update" | "system.tls.csr" | "system.tls.import" | "system.tls.renew" | "system.tls.status" | "system.tls.update" | "workbench.dimension" | "workbench.from_alert" | "workbench.meta" | "workbench.run";
 
 export interface Requests {
   "alert_rules.create": RuleWrite;
@@ -1581,6 +1808,10 @@ export interface Requests {
   "system.tls.renew": undefined;
   "system.tls.status": undefined;
   "system.tls.update": TlsUpdate;
+  "workbench.dimension": WorkbenchDimension;
+  "workbench.from_alert": undefined;
+  "workbench.meta": undefined;
+  "workbench.run": WorkbenchRun;
 }
 
 export interface Responses {
@@ -1643,6 +1874,10 @@ export interface Responses {
   "system.tls.renew": TlsStatus;
   "system.tls.status": TlsStatus;
   "system.tls.update": TlsStatus;
+  "workbench.dimension": DimensionTop;
+  "workbench.from_alert": WorkbenchStart;
+  "workbench.meta": WorkbenchMeta;
+  "workbench.run": SegmentResult;
 }
 
 export const OPERATIONS = {
@@ -1705,6 +1940,10 @@ export const OPERATIONS = {
   "system.tls.renew": { method: "POST", path: "/api/system/tls/renew" },
   "system.tls.status": { method: "GET", path: "/api/system/tls" },
   "system.tls.update": { method: "PUT", path: "/api/system/tls" },
+  "workbench.dimension": { method: "POST", path: "/api/workbench/dimension" },
+  "workbench.from_alert": { method: "GET", path: "/api/workbench/from-alert/<int:alert_id>" },
+  "workbench.meta": { method: "GET", path: "/api/workbench/meta" },
+  "workbench.run": { method: "POST", path: "/api/workbench/run" },
 } as const satisfies Record<OpId, { method: string; path: string }>;
 
 export const VALUES = {
