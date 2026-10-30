@@ -7,7 +7,7 @@ import { formatTime } from "../../components/ProbeResults";
 import { t, useLang } from "../../i18n";
 import { registerNav } from "../../shell/nav";
 
-const DETECTOR_KEYS: Record<string, string> = {
+export const DETECTOR_KEYS: Record<string, string> = {
   fanout: "detector_name_fanout",
   new_admin_connection: "detector_name_new_admin_connection",
   pivot_chain: "detector_name_pivot_chain",
@@ -31,7 +31,7 @@ const ANOMALY_DETECTORS = new Set(["peer_deviation", "volume_surge", "account_ne
 const CLASS_KEYS: Record<string, string> = {
   remote: "port_class_remote", directory: "port_class_directory", database: "port_class_database",
 };
-const STATE_KEYS: Record<string, string> = {
+export const STATE_KEYS: Record<string, string> = {
   ok: "detector_state_ok",
   disabled: "detector_state_disabled",
   accumulating: "detector_state_accumulating",
@@ -39,7 +39,7 @@ const STATE_KEYS: Record<string, string> = {
   collection_off: "detector_state_collection_off",
   incomplete: "detector_state_incomplete",
 };
-const STATE_TONES: Record<string, string> = { ok: "ok", incomplete: "warn", no_data: "warn", accumulating: "info" };
+export const STATE_TONES: Record<string, string> = { ok: "ok", incomplete: "warn", no_data: "warn", accumulating: "info" };
 const SOURCE_KEYS: Record<string, string> = { builtin: "port_source_builtin", pce: "port_source_pce", added: "port_source_added" };
 const SETTING_KEYS: Record<string, string> = { critical_assets: "lateral_critical_title", admin_groups: "lateral_admin_title" };
 // Detector thresholds and graph settings, shown as text while edited.

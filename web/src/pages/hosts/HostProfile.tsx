@@ -430,6 +430,9 @@ export function HostProfile() {
             {t("hosts_exposure", { now: String(profile.exposure.reach_now), enforced: String(profile.exposure.reach_enforced) })}
             {profile.exposure.pivot_now && <> {t("hosts_pivot")}</>}
             {profile.exposure.asset && <> {t("hosts_asset_sources", { n: String(profile.exposure.asset.sources_now) })}</>}
+            {" "}
+            <Link to={`/lateral?${new URLSearchParams({ [profile.exposure.asset ? "asset" : "host"]: profile.key }).toString()}`}
+              data-role="open-lateral">{t("lat_on_page")}</Link>
           </p>
         )}
       </div>

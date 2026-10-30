@@ -21,13 +21,15 @@ from illumio_ops.services import workbench
 from illumio_ops.services.analysis.focus import STALE_AFTER
 from illumio_ops.services.collect.guard import require_same_pce
 from illumio_ops.services.context import AppContext
-from illumio_ops.services.flowsource import host_addresses
-from illumio_ops.services.hosts import WORKLOAD_HREF
-from illumio_ops.store.flowdb import analysis, workloads
+from illumio_ops.services.hosts import WORKLOAD_HREF, display_names
+from illumio_ops.store.flowdb import analysis
 
 WEEK = timedelta(days=7)
 ROUTES = {"settings_lateral": "/system/lateral", "settings_collection": "/system/collection",
           "system_jobs": "/system/jobs", "system_pce": "/system/pce", "alerts": "/alerts"}
+# A lateral item without a host: where on the lateral page it is (the PCE's ransomware ratings contradicting the
+# computed ones bear on the footholds the page lists).
+LATERAL_SECTIONS = {"cross_env": "cross_env", "vendor_contradiction": "footholds"}
 
 
 class FocusLink(BaseModel):
@@ -67,8 +69,15 @@ def _workbench(req: workbench.FlowRequest | workbench.EventRequest) -> FocusLink
 def _link(item: dict[str, Any], computed_at: datetime) -> FocusLink | None:
     action = item.get("action") or {}
     target, key = action.get("target"), action.get("host_key")
-    if target in ("host", "lateral") and key:
-        return FocusLink(route="/hosts", query={"key": str(key)})  # a lateral item's host until the P6c page
+    if target == "host" and key:
+        return FocusLink(route="/hosts", query={"key": str(key)})
+    if target == "lateral":
+        # the lateral page (P6c): an asset preselected, a pivot's row shown, else the section the item is about
+        kind = item.get("kind")
+        if key:
+            return FocusLink(route="/lateral", query={"asset" if kind == "exposure_asset" else "host": str(key)})
+        section = LATERAL_SECTIONS.get(str(kind))
+        return FocusLink(route="/lateral", query={"section": section} if section else {})
     if target == "workbench" and action.get("segment"):
         try:
             return _workbench(workbench.request_for("flow", action["segment"]))
@@ -85,15 +94,11 @@ def _link(item: dict[str, Any], computed_at: datetime) -> FocusLink | None:
 
 
 def _named(ctx: AppContext, items: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """Each workload href in an item's words as the host is shown elsewhere: the inventory's hostname or name, else
-    an address it was seen with (the PCE sends no hostname for some workloads, lab 2026-10-30)."""
+    """Each workload href in an item's words as the host is shown elsewhere (hosts.display_names)."""
     hrefs = {v for it in items for v in (it.get("params") or {}).values() if isinstance(v, str) and WORKLOAD_HREF.match(v)}
     if not hrefs:
         return items
-    with ctx.flows().connect() as conn:
-        names = {w.href: w.hostname or w.name for w in workloads.all_workloads(conn) if w.href in hrefs}
-    names = {h: n for h, n in names.items() if n}
-    names |= host_addresses(ctx, hrefs - set(names))
+    names = display_names(ctx, hrefs)
     return [{**it, "params": {k: names.get(v, v) if isinstance(v, str) else v for k, v in (it.get("params") or {}).items()}}
             for it in items]
 

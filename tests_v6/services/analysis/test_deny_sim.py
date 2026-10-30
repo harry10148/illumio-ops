@@ -101,3 +101,28 @@ def test_simulation_never_calls_pce(ctx, monkeypatch):
     from illumio_ops.services import flowsource
     monkeypatch.setattr(flowsource, "run_traffic_query", no_pce)
     assert simulate_deny(ctx, TO_FIN_RDP, now=NOW).blocked_flows == 3
+
+
+# ── P6c ───────────────────────────────────────────────────────────────────────
+
+def test_all_empty_proposal_refused():
+    """No source, no destination, no service: a rule that blocks everything is not a suggestion to try."""
+    with pytest.raises(ValueError):
+        DenyProposal(src=EndpointFilter(), dst=EndpointFilter())
+
+
+def test_given_edges_used(ctx, monkeypatch):
+    """Lightweight mode: the graph is the edges pulled for the page, not the store's baseline."""
+    from illumio_ops.domain.exposure import EdgeIn
+    from illumio_ops.domain.values import EdgeState
+    from illumio_ops.services.analysis import exposure
+
+    def no_baseline(*a, **kw):
+        raise AssertionError("baseline_edges read although the edges were given")
+    monkeypatch.setattr(exposure, "baseline_edges", no_baseline)
+    edges = [EdgeIn("/orgs/1/workloads/s1", "/orgs/1/workloads/d9", 3389, 6, EdgeState.POTENTIALLY_BLOCKED),
+             EdgeIn("/orgs/1/workloads/s2", "/orgs/1/workloads/d9", 22, 6, EdgeState.ALLOWED)]
+    window = (NOW - timedelta(days=7), NOW)
+    sim = simulate_deny(ctx, TO_FIN_RDP, now=NOW, window=window, edges=edges)
+    [change] = sim.reach_change
+    assert (change.before, change.after) == (2, 1) and sim.window == window

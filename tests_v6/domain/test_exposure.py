@@ -6,6 +6,7 @@ from datetime import UTC, datetime, timedelta
 
 from illumio_ops.domain.exposure import (
     EdgeIn,
+    ExposureResult,
     Foothold,
     articulation_points,
     build_graph,
@@ -177,3 +178,35 @@ def test_reverse_graph_built_once_per_graph(monkeypatch):
     compute_exposure(edges, hosts, [], hops=3, critical=frozenset("cde"), env_of={}, computed_at=NOW,
                      observation_from=NOW - timedelta(days=30), observation_to=NOW)
     assert len(calls) <= 2
+
+
+# ── P6c: the lateral page's summary view by label ─────────────────────────────
+
+def _hosts(keys):
+    return {k: _host(k) for k in keys}
+
+
+def test_groups_collapsed_by_label():
+    edges = [e("a1", "b1", A), e("a2", "b1"), e("a1", "a2")]
+    r = compute_exposure(edges, _hosts(["a1", "a2", "b1"]), [], hops=3, critical=frozenset(), env_of={},
+                         computed_at=NOW, observation_from=NOW - timedelta(days=30), observation_to=NOW,
+                         group_of={"app": {"a1": "web", "a2": "web", "b1": "db"}})
+    edges_by = {(s, d): (n, st) for s, d, n, st in r.groups["app"].edges}
+    assert edges_by[("web", "db")] == (2, A) and edges_by[("web", "web")] == (1, P)
+    assert "groups:app" not in r.limits_hit
+
+
+def test_group_edges_capped():
+    edges = [e("a1", "b1"), e("b1", "c1")]
+    r = compute_exposure(edges, _hosts(["a1", "b1", "c1"]), [], hops=3, critical=frozenset(), env_of={},
+                         computed_at=NOW, observation_from=NOW - timedelta(days=30), observation_to=NOW,
+                         group_of={"app": {"a1": "x", "b1": "y", "c1": "z"}}, max_group_edges=1)
+    assert len(r.groups["app"].edges) == 1 and "groups:app" in r.limits_hit
+
+
+def test_result_without_groups_loads():
+    r = compute_exposure([e("a", "b")], _hosts(["a", "b"]), [], hops=3, critical=frozenset(), env_of={},
+                         computed_at=NOW, observation_from=NOW - timedelta(days=30), observation_to=NOW)
+    stored = r.model_dump(mode="json")
+    stored.pop("groups")  # a result computed before P6c
+    assert ExposureResult.model_validate(stored).groups == {}

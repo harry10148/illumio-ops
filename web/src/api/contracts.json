@@ -14672,6 +14672,2341 @@
         "type": "object"
       }
     },
+    "lateral.compute": {
+      "method": "POST",
+      "path": "/api/lateral/compute",
+      "request_schema": {
+        "properties": {
+          "days": {
+            "enum": [
+              1,
+              7,
+              30
+            ],
+            "title": "Days",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "days"
+        ],
+        "title": "LateralCompute",
+        "type": "object"
+      },
+      "response_schema": {
+        "$defs": {
+          "AssetExposure": {
+            "properties": {
+              "cuts": {
+                "items": {
+                  "$ref": "#/$defs/Cut"
+                },
+                "title": "Cuts",
+                "type": "array"
+              },
+              "key": {
+                "title": "Key",
+                "type": "string"
+              },
+              "paths": {
+                "items": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "title": "Paths",
+                "type": "array"
+              },
+              "sources_enforced": {
+                "title": "Sources Enforced",
+                "type": "integer"
+              },
+              "sources_now": {
+                "title": "Sources Now",
+                "type": "integer"
+              }
+            },
+            "required": [
+              "key",
+              "sources_now",
+              "sources_enforced",
+              "paths",
+              "cuts"
+            ],
+            "title": "AssetExposure",
+            "type": "object"
+          },
+          "CrossEnvEdge": {
+            "properties": {
+              "dst": {
+                "title": "Dst",
+                "type": "string"
+              },
+              "dst_env": {
+                "title": "Dst Env",
+                "type": "string"
+              },
+              "ports": {
+                "items": {
+                  "maxItems": 2,
+                  "minItems": 2,
+                  "prefixItems": [
+                    {
+                      "type": "integer"
+                    },
+                    {
+                      "type": "integer"
+                    }
+                  ],
+                  "type": "array"
+                },
+                "title": "Ports",
+                "type": "array"
+              },
+              "src": {
+                "title": "Src",
+                "type": "string"
+              },
+              "src_env": {
+                "title": "Src Env",
+                "type": "string"
+              },
+              "state": {
+                "$ref": "#/$defs/EdgeState"
+              }
+            },
+            "required": [
+              "src",
+              "dst",
+              "src_env",
+              "dst_env",
+              "ports",
+              "state"
+            ],
+            "title": "CrossEnvEdge",
+            "type": "object"
+          },
+          "Cut": {
+            "properties": {
+              "after": {
+                "title": "After",
+                "type": "integer"
+              },
+              "before": {
+                "title": "Before",
+                "type": "integer"
+              },
+              "dst": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Dst"
+              },
+              "kind": {
+                "enum": [
+                  "edge",
+                  "node"
+                ],
+                "title": "Kind",
+                "type": "string"
+              },
+              "ports": {
+                "items": {
+                  "maxItems": 2,
+                  "minItems": 2,
+                  "prefixItems": [
+                    {
+                      "type": "integer"
+                    },
+                    {
+                      "type": "integer"
+                    }
+                  ],
+                  "type": "array"
+                },
+                "title": "Ports",
+                "type": "array"
+              },
+              "src": {
+                "title": "Src",
+                "type": "string"
+              }
+            },
+            "required": [
+              "kind",
+              "src",
+              "dst",
+              "ports",
+              "before",
+              "after"
+            ],
+            "title": "Cut",
+            "type": "object"
+          },
+          "DetectorKind": {
+            "description": "The lateral-movement detectors of spec §6.5.1 and the allowed-traffic anomaly detectors of §6.5.8.",
+            "enum": [
+              "fanout",
+              "new_admin_connection",
+              "pivot_chain",
+              "blocked_surge",
+              "non_admin_group",
+              "cross_env",
+              "account_fanout",
+              "unexpected_initiator",
+              "peer_deviation",
+              "volume_surge",
+              "account_new_source",
+              "suspicious_tool",
+              "new_process",
+              "auth_to_non_dc",
+              "new_dc_client",
+              "directory_surge"
+            ],
+            "title": "DetectorKind",
+            "type": "string"
+          },
+          "DetectorState": {
+            "description": "What a detector run can say besides its detections: \"no detection\" is only ever OK.",
+            "enum": [
+              "ok",
+              "disabled",
+              "accumulating",
+              "no_data",
+              "collection_off",
+              "incomplete"
+            ],
+            "title": "DetectorState",
+            "type": "string"
+          },
+          "DetectorStatusView": {
+            "properties": {
+              "detector": {
+                "$ref": "#/$defs/DetectorKind"
+              },
+              "params": {
+                "additionalProperties": true,
+                "title": "Params",
+                "type": "object"
+              },
+              "reason_key": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Reason Key"
+              },
+              "state": {
+                "$ref": "#/$defs/DetectorState"
+              }
+            },
+            "required": [
+              "detector",
+              "state",
+              "reason_key",
+              "params"
+            ],
+            "title": "DetectorStatusView",
+            "type": "object"
+          },
+          "EdgeState": {
+            "description": "An exposure-graph edge by the reported decision of its newest observation (blocked edges are\nnot in the graph).",
+            "enum": [
+              "allowed",
+              "potentially_blocked",
+              "unknown"
+            ],
+            "title": "EdgeState",
+            "type": "string"
+          },
+          "ExposureResult": {
+            "properties": {
+              "assets": {
+                "items": {
+                  "$ref": "#/$defs/AssetExposure"
+                },
+                "title": "Assets",
+                "type": "array"
+              },
+              "computed_at": {
+                "format": "date-time",
+                "title": "Computed At",
+                "type": "string"
+              },
+              "cross_env": {
+                "items": {
+                  "$ref": "#/$defs/CrossEnvEdge"
+                },
+                "title": "Cross Env",
+                "type": "array"
+              },
+              "cross_env_total": {
+                "title": "Cross Env Total",
+                "type": "integer"
+              },
+              "edges_enforced": {
+                "title": "Edges Enforced",
+                "type": "integer"
+              },
+              "edges_now": {
+                "title": "Edges Now",
+                "type": "integer"
+              },
+              "footholds": {
+                "items": {
+                  "$ref": "#/$defs/Foothold"
+                },
+                "title": "Footholds",
+                "type": "array"
+              },
+              "groups": {
+                "additionalProperties": {
+                  "$ref": "#/$defs/GroupGraph"
+                },
+                "default": {},
+                "title": "Groups",
+                "type": "object"
+              },
+              "hops": {
+                "title": "Hops",
+                "type": "integer"
+              },
+              "hosts": {
+                "items": {
+                  "$ref": "#/$defs/HostExposure"
+                },
+                "title": "Hosts",
+                "type": "array"
+              },
+              "limits_hit": {
+                "items": {
+                  "type": "string"
+                },
+                "title": "Limits Hit",
+                "type": "array"
+              },
+              "nodes": {
+                "title": "Nodes",
+                "type": "integer"
+              },
+              "observation_from": {
+                "format": "date-time",
+                "title": "Observation From",
+                "type": "string"
+              },
+              "observation_to": {
+                "format": "date-time",
+                "title": "Observation To",
+                "type": "string"
+              },
+              "unknown_edges": {
+                "title": "Unknown Edges",
+                "type": "integer"
+              }
+            },
+            "required": [
+              "computed_at",
+              "observation_from",
+              "observation_to",
+              "hops",
+              "nodes",
+              "edges_now",
+              "edges_enforced",
+              "unknown_edges",
+              "hosts",
+              "assets",
+              "cross_env",
+              "cross_env_total",
+              "footholds",
+              "limits_hit"
+            ],
+            "title": "ExposureResult",
+            "type": "object"
+          },
+          "Foothold": {
+            "description": "A host with an unprotected, listening high-risk service (spec §6.5.6): a place to land.",
+            "properties": {
+              "host": {
+                "title": "Host",
+                "type": "string"
+              },
+              "name": {
+                "title": "Name",
+                "type": "string"
+              },
+              "port": {
+                "title": "Port",
+                "type": "integer"
+              },
+              "proto": {
+                "title": "Proto",
+                "type": "integer"
+              },
+              "severity": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Severity"
+              }
+            },
+            "required": [
+              "host",
+              "name",
+              "port",
+              "proto",
+              "severity"
+            ],
+            "title": "Foothold",
+            "type": "object"
+          },
+          "GroupGraph": {
+            "properties": {
+              "edges": {
+                "items": {
+                  "maxItems": 4,
+                  "minItems": 4,
+                  "prefixItems": [
+                    {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "integer"
+                    },
+                    {
+                      "$ref": "#/$defs/EdgeState"
+                    }
+                  ],
+                  "type": "array"
+                },
+                "title": "Edges",
+                "type": "array"
+              },
+              "groups": {
+                "items": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "title": "Groups",
+                "type": "array"
+              }
+            },
+            "required": [
+              "groups",
+              "edges"
+            ],
+            "title": "GroupGraph",
+            "type": "object"
+          },
+          "HostExposure": {
+            "properties": {
+              "key": {
+                "title": "Key",
+                "type": "string"
+              },
+              "pivot_enforced": {
+                "title": "Pivot Enforced",
+                "type": "boolean"
+              },
+              "pivot_now": {
+                "title": "Pivot Now",
+                "type": "boolean"
+              },
+              "reach_enforced": {
+                "title": "Reach Enforced",
+                "type": "integer"
+              },
+              "reach_now": {
+                "title": "Reach Now",
+                "type": "integer"
+              }
+            },
+            "required": [
+              "key",
+              "reach_now",
+              "reach_enforced",
+              "pivot_now",
+              "pivot_enforced"
+            ],
+            "title": "HostExposure",
+            "type": "object"
+          },
+          "LateralDetection": {
+            "properties": {
+              "critical_asset": {
+                "title": "Critical Asset",
+                "type": "boolean"
+              },
+              "detector": {
+                "$ref": "#/$defs/DetectorKind"
+              },
+              "first_seen": {
+                "format": "date-time",
+                "title": "First Seen",
+                "type": "string"
+              },
+              "last_seen": {
+                "format": "date-time",
+                "title": "Last Seen",
+                "type": "string"
+              },
+              "link_q": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Link Q"
+              },
+              "params": {
+                "additionalProperties": true,
+                "title": "Params",
+                "type": "object"
+              },
+              "severity": {
+                "title": "Severity",
+                "type": "string"
+              },
+              "subject": {
+                "title": "Subject",
+                "type": "string"
+              },
+              "subject_name": {
+                "title": "Subject Name",
+                "type": "string"
+              },
+              "title_key": {
+                "title": "Title Key",
+                "type": "string"
+              }
+            },
+            "required": [
+              "detector",
+              "severity",
+              "subject",
+              "subject_name",
+              "critical_asset",
+              "first_seen",
+              "last_seen",
+              "title_key",
+              "params",
+              "link_q"
+            ],
+            "title": "LateralDetection",
+            "type": "object"
+          },
+          "PullInfo": {
+            "description": "What was read from the PCE for this answer: said on the page (anti-goal: nothing silent).",
+            "properties": {
+              "capped": {
+                "title": "Capped",
+                "type": "boolean"
+              },
+              "end": {
+                "format": "date-time",
+                "title": "End",
+                "type": "string"
+              },
+              "read_at": {
+                "format": "date-time",
+                "title": "Read At",
+                "type": "string"
+              },
+              "rows": {
+                "title": "Rows",
+                "type": "integer"
+              },
+              "start": {
+                "format": "date-time",
+                "title": "Start",
+                "type": "string"
+              },
+              "truncated_windows": {
+                "title": "Truncated Windows",
+                "type": "integer"
+              },
+              "unread_from": {
+                "anyOf": [
+                  {
+                    "format": "date-time",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Unread From"
+              }
+            },
+            "required": [
+              "start",
+              "end",
+              "rows",
+              "capped",
+              "unread_from",
+              "truncated_windows",
+              "read_at"
+            ],
+            "title": "PullInfo",
+            "type": "object"
+          }
+        },
+        "properties": {
+          "admin_set": {
+            "title": "Admin Set",
+            "type": "boolean"
+          },
+          "computed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Computed At"
+          },
+          "critical_set": {
+            "title": "Critical Set",
+            "type": "boolean"
+          },
+          "detections": {
+            "items": {
+              "$ref": "#/$defs/LateralDetection"
+            },
+            "title": "Detections",
+            "type": "array"
+          },
+          "detections_available": {
+            "title": "Detections Available",
+            "type": "boolean"
+          },
+          "detections_total": {
+            "title": "Detections Total",
+            "type": "integer"
+          },
+          "detectors": {
+            "items": {
+              "$ref": "#/$defs/DetectorStatusView"
+            },
+            "title": "Detectors",
+            "type": "array"
+          },
+          "exposure": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/ExposureResult"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "lightweight_days": {
+            "items": {
+              "type": "integer"
+            },
+            "title": "Lightweight Days",
+            "type": "array"
+          },
+          "names": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Names",
+            "type": "object"
+          },
+          "observation_days_setting": {
+            "title": "Observation Days Setting",
+            "type": "integer"
+          },
+          "port_names": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Port Names",
+            "type": "object"
+          },
+          "pull": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/PullInfo"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "ransomware_unsupported": {
+            "title": "Ransomware Unsupported",
+            "type": "boolean"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "enum": [
+                  "stored",
+                  "pulled"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source"
+          },
+          "stale": {
+            "title": "Stale",
+            "type": "boolean"
+          },
+          "state": {
+            "enum": [
+              "ok",
+              "not_computed",
+              "collection_off",
+              "lightweight"
+            ],
+            "title": "State",
+            "type": "string"
+          }
+        },
+        "required": [
+          "state",
+          "source",
+          "computed_at",
+          "stale",
+          "exposure",
+          "names",
+          "pull",
+          "critical_set",
+          "admin_set",
+          "ransomware_unsupported",
+          "detections_available",
+          "detectors",
+          "detections",
+          "detections_total",
+          "observation_days_setting",
+          "lightweight_days",
+          "port_names"
+        ],
+        "title": "LateralPage",
+        "type": "object"
+      }
+    },
+    "lateral.simulate": {
+      "method": "POST",
+      "path": "/api/lateral/simulate",
+      "request_schema": {
+        "$defs": {
+          "DenyProposal": {
+            "additionalProperties": false,
+            "properties": {
+              "dst": {
+                "$ref": "#/$defs/EndpointFilter"
+              },
+              "ports": {
+                "default": [],
+                "items": {
+                  "$ref": "#/$defs/PortProto"
+                },
+                "title": "Ports",
+                "type": "array"
+              },
+              "src": {
+                "$ref": "#/$defs/EndpointFilter"
+              }
+            },
+            "required": [
+              "src",
+              "dst"
+            ],
+            "title": "DenyProposal",
+            "type": "object"
+          },
+          "EndpointFilter": {
+            "additionalProperties": false,
+            "properties": {
+              "hrefs": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Hrefs",
+                "type": "array"
+              },
+              "ips": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Ips",
+                "type": "array"
+              },
+              "labels": {
+                "default": [],
+                "items": {
+                  "$ref": "#/$defs/LabelCond"
+                },
+                "title": "Labels",
+                "type": "array"
+              },
+              "match": {
+                "default": "any",
+                "enum": [
+                  "any",
+                  "all"
+                ],
+                "title": "Match",
+                "type": "string"
+              }
+            },
+            "title": "EndpointFilter",
+            "type": "object"
+          },
+          "LabelCond": {
+            "additionalProperties": false,
+            "properties": {
+              "key": {
+                "minLength": 1,
+                "title": "Key",
+                "type": "string"
+              },
+              "values": {
+                "items": {
+                  "type": "string"
+                },
+                "minItems": 1,
+                "title": "Values",
+                "type": "array"
+              }
+            },
+            "required": [
+              "key",
+              "values"
+            ],
+            "title": "LabelCond",
+            "type": "object"
+          },
+          "PortProto": {
+            "additionalProperties": false,
+            "properties": {
+              "port": {
+                "anyOf": [
+                  {
+                    "maximum": 65535,
+                    "minimum": -1,
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Port"
+              },
+              "proto": {
+                "anyOf": [
+                  {
+                    "maximum": 255,
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Proto"
+              },
+              "to_port": {
+                "anyOf": [
+                  {
+                    "maximum": 65535,
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "To Port"
+              }
+            },
+            "title": "PortProto",
+            "type": "object"
+          }
+        },
+        "properties": {
+          "proposal": {
+            "$ref": "#/$defs/DenyProposal"
+          }
+        },
+        "required": [
+          "proposal"
+        ],
+        "title": "LateralSimulate",
+        "type": "object"
+      },
+      "response_schema": {
+        "$defs": {
+          "AggRow": {
+            "properties": {
+              "bytes_known": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Bytes Known"
+              },
+              "display": {
+                "items": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "title": "Display",
+                "type": "array"
+              },
+              "keys": {
+                "items": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "integer"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "title": "Keys",
+                "type": "array"
+              },
+              "value": {
+                "title": "Value",
+                "type": "integer"
+              }
+            },
+            "required": [
+              "keys",
+              "display",
+              "value",
+              "bytes_known"
+            ],
+            "title": "AggRow",
+            "type": "object"
+          },
+          "AssetReachChange": {
+            "properties": {
+              "after": {
+                "title": "After",
+                "type": "integer"
+              },
+              "asset": {
+                "title": "Asset",
+                "type": "string"
+              },
+              "before": {
+                "title": "Before",
+                "type": "integer"
+              }
+            },
+            "required": [
+              "asset",
+              "before",
+              "after"
+            ],
+            "title": "AssetReachChange",
+            "type": "object"
+          },
+          "Coverage": {
+            "properties": {
+              "filled_from_pce": {
+                "items": {
+                  "maxItems": 2,
+                  "minItems": 2,
+                  "prefixItems": [
+                    {
+                      "format": "date-time",
+                      "type": "string"
+                    },
+                    {
+                      "format": "date-time",
+                      "type": "string"
+                    }
+                  ],
+                  "type": "array"
+                },
+                "title": "Filled From Pce",
+                "type": "array"
+              },
+              "gaps": {
+                "items": {
+                  "maxItems": 3,
+                  "minItems": 3,
+                  "prefixItems": [
+                    {
+                      "format": "date-time",
+                      "type": "string"
+                    },
+                    {
+                      "format": "date-time",
+                      "type": "string"
+                    },
+                    {
+                      "type": "string"
+                    }
+                  ],
+                  "type": "array"
+                },
+                "title": "Gaps",
+                "type": "array"
+              },
+              "source": {
+                "enum": [
+                  "store",
+                  "pce",
+                  "mixed"
+                ],
+                "title": "Source",
+                "type": "string"
+              },
+              "store_from": {
+                "anyOf": [
+                  {
+                    "format": "date-time",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Store From"
+              },
+              "store_to": {
+                "anyOf": [
+                  {
+                    "format": "date-time",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Store To"
+              },
+              "truncated": {
+                "title": "Truncated",
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "source",
+              "store_from",
+              "store_to",
+              "gaps",
+              "filled_from_pce",
+              "truncated"
+            ],
+            "title": "Coverage",
+            "type": "object"
+          },
+          "DenySimulation": {
+            "properties": {
+              "blocked_connections": {
+                "title": "Blocked Connections",
+                "type": "integer"
+              },
+              "blocked_flows": {
+                "title": "Blocked Flows",
+                "type": "integer"
+              },
+              "coverage": {
+                "$ref": "#/$defs/Coverage"
+              },
+              "destinations": {
+                "items": {
+                  "$ref": "#/$defs/AggRow"
+                },
+                "title": "Destinations",
+                "type": "array"
+              },
+              "field_coverage": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/FieldCoverage"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "limit_hit": {
+                "title": "Limit Hit",
+                "type": "boolean"
+              },
+              "reach_change": {
+                "items": {
+                  "$ref": "#/$defs/AssetReachChange"
+                },
+                "title": "Reach Change",
+                "type": "array"
+              },
+              "sample": {
+                "items": {
+                  "$ref": "#/$defs/FlowRow"
+                },
+                "title": "Sample",
+                "type": "array"
+              },
+              "sources": {
+                "items": {
+                  "$ref": "#/$defs/AggRow"
+                },
+                "title": "Sources",
+                "type": "array"
+              },
+              "window": {
+                "maxItems": 2,
+                "minItems": 2,
+                "prefixItems": [
+                  {
+                    "format": "date-time",
+                    "type": "string"
+                  },
+                  {
+                    "format": "date-time",
+                    "type": "string"
+                  }
+                ],
+                "title": "Window",
+                "type": "array"
+              }
+            },
+            "required": [
+              "window",
+              "blocked_connections",
+              "blocked_flows",
+              "sources",
+              "destinations",
+              "sample",
+              "limit_hit",
+              "reach_change",
+              "coverage",
+              "field_coverage"
+            ],
+            "title": "DenySimulation",
+            "type": "object"
+          },
+          "FieldCoverage": {
+            "description": "How many of the matching connections carry each optional field (spec §6.5.7: process and user\nare on few flows, bytes on fewer).",
+            "properties": {
+              "bytes": {
+                "title": "Bytes",
+                "type": "integer"
+              },
+              "initiator_process": {
+                "title": "Initiator Process",
+                "type": "integer"
+              },
+              "initiator_user": {
+                "title": "Initiator User",
+                "type": "integer"
+              },
+              "service_process": {
+                "title": "Service Process",
+                "type": "integer"
+              },
+              "service_user": {
+                "title": "Service User",
+                "type": "integer"
+              },
+              "total": {
+                "title": "Total",
+                "type": "integer"
+              }
+            },
+            "required": [
+              "total",
+              "initiator_process",
+              "initiator_user",
+              "service_process",
+              "service_user",
+              "bytes"
+            ],
+            "title": "FieldCoverage",
+            "type": "object"
+          },
+          "FlowRow": {
+            "properties": {
+              "bytes_in": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Bytes In"
+              },
+              "bytes_out": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Bytes Out"
+              },
+              "conn_key": {
+                "title": "Conn Key",
+                "type": "string"
+              },
+              "direction": {
+                "title": "Direction",
+                "type": "string"
+              },
+              "dst_hostname": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Dst Hostname"
+              },
+              "dst_href": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Dst Href"
+              },
+              "dst_ip": {
+                "title": "Dst Ip",
+                "type": "string"
+              },
+              "dst_key": {
+                "title": "Dst Key",
+                "type": "string"
+              },
+              "dst_labels": {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "title": "Dst Labels",
+                "type": "object"
+              },
+              "dst_managed": {
+                "title": "Dst Managed",
+                "type": "boolean"
+              },
+              "dst_mode": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Dst Mode"
+              },
+              "first_detected": {
+                "format": "date-time",
+                "title": "First Detected",
+                "type": "string"
+              },
+              "initiator_process": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Initiator Process"
+              },
+              "initiator_user": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Initiator User"
+              },
+              "last_detected": {
+                "format": "date-time",
+                "title": "Last Detected",
+                "type": "string"
+              },
+              "num_connections": {
+                "title": "Num Connections",
+                "type": "integer"
+              },
+              "origin": {
+                "title": "Origin",
+                "type": "string"
+              },
+              "policy_decision": {
+                "title": "Policy Decision",
+                "type": "string"
+              },
+              "port": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Port"
+              },
+              "proto": {
+                "title": "Proto",
+                "type": "integer"
+              },
+              "record_key": {
+                "title": "Record Key",
+                "type": "string"
+              },
+              "service_process": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Service Process"
+              },
+              "service_user": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Service User"
+              },
+              "src_hostname": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Src Hostname"
+              },
+              "src_href": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Src Href"
+              },
+              "src_ip": {
+                "title": "Src Ip",
+                "type": "string"
+              },
+              "src_key": {
+                "title": "Src Key",
+                "type": "string"
+              },
+              "src_labels": {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "title": "Src Labels",
+                "type": "object"
+              },
+              "src_managed": {
+                "title": "Src Managed",
+                "type": "boolean"
+              },
+              "src_mode": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Src Mode"
+              },
+              "state": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "State"
+              },
+              "windows_service": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Windows Service"
+              }
+            },
+            "required": [
+              "record_key",
+              "conn_key",
+              "direction",
+              "src_ip",
+              "dst_ip",
+              "src_key",
+              "dst_key",
+              "src_href",
+              "dst_href",
+              "src_hostname",
+              "dst_hostname",
+              "src_managed",
+              "dst_managed",
+              "src_mode",
+              "dst_mode",
+              "src_labels",
+              "dst_labels",
+              "port",
+              "proto",
+              "initiator_process",
+              "initiator_user",
+              "service_process",
+              "service_user",
+              "windows_service",
+              "policy_decision",
+              "first_detected",
+              "last_detected",
+              "num_connections",
+              "bytes_in",
+              "bytes_out",
+              "state",
+              "origin"
+            ],
+            "title": "FlowRow",
+            "type": "object"
+          },
+          "PullInfo": {
+            "description": "What was read from the PCE for this answer: said on the page (anti-goal: nothing silent).",
+            "properties": {
+              "capped": {
+                "title": "Capped",
+                "type": "boolean"
+              },
+              "end": {
+                "format": "date-time",
+                "title": "End",
+                "type": "string"
+              },
+              "read_at": {
+                "format": "date-time",
+                "title": "Read At",
+                "type": "string"
+              },
+              "rows": {
+                "title": "Rows",
+                "type": "integer"
+              },
+              "start": {
+                "format": "date-time",
+                "title": "Start",
+                "type": "string"
+              },
+              "truncated_windows": {
+                "title": "Truncated Windows",
+                "type": "integer"
+              },
+              "unread_from": {
+                "anyOf": [
+                  {
+                    "format": "date-time",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Unread From"
+              }
+            },
+            "required": [
+              "start",
+              "end",
+              "rows",
+              "capped",
+              "unread_from",
+              "truncated_windows",
+              "read_at"
+            ],
+            "title": "PullInfo",
+            "type": "object"
+          }
+        },
+        "properties": {
+          "names": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Names",
+            "type": "object"
+          },
+          "pull": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/PullInfo"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "simulation": {
+            "$ref": "#/$defs/DenySimulation"
+          }
+        },
+        "required": [
+          "simulation",
+          "names",
+          "pull"
+        ],
+        "title": "DenySimulationView",
+        "type": "object"
+      }
+    },
+    "lateral.view": {
+      "method": "GET",
+      "path": "/api/lateral",
+      "request_schema": null,
+      "response_schema": {
+        "$defs": {
+          "AssetExposure": {
+            "properties": {
+              "cuts": {
+                "items": {
+                  "$ref": "#/$defs/Cut"
+                },
+                "title": "Cuts",
+                "type": "array"
+              },
+              "key": {
+                "title": "Key",
+                "type": "string"
+              },
+              "paths": {
+                "items": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "title": "Paths",
+                "type": "array"
+              },
+              "sources_enforced": {
+                "title": "Sources Enforced",
+                "type": "integer"
+              },
+              "sources_now": {
+                "title": "Sources Now",
+                "type": "integer"
+              }
+            },
+            "required": [
+              "key",
+              "sources_now",
+              "sources_enforced",
+              "paths",
+              "cuts"
+            ],
+            "title": "AssetExposure",
+            "type": "object"
+          },
+          "CrossEnvEdge": {
+            "properties": {
+              "dst": {
+                "title": "Dst",
+                "type": "string"
+              },
+              "dst_env": {
+                "title": "Dst Env",
+                "type": "string"
+              },
+              "ports": {
+                "items": {
+                  "maxItems": 2,
+                  "minItems": 2,
+                  "prefixItems": [
+                    {
+                      "type": "integer"
+                    },
+                    {
+                      "type": "integer"
+                    }
+                  ],
+                  "type": "array"
+                },
+                "title": "Ports",
+                "type": "array"
+              },
+              "src": {
+                "title": "Src",
+                "type": "string"
+              },
+              "src_env": {
+                "title": "Src Env",
+                "type": "string"
+              },
+              "state": {
+                "$ref": "#/$defs/EdgeState"
+              }
+            },
+            "required": [
+              "src",
+              "dst",
+              "src_env",
+              "dst_env",
+              "ports",
+              "state"
+            ],
+            "title": "CrossEnvEdge",
+            "type": "object"
+          },
+          "Cut": {
+            "properties": {
+              "after": {
+                "title": "After",
+                "type": "integer"
+              },
+              "before": {
+                "title": "Before",
+                "type": "integer"
+              },
+              "dst": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Dst"
+              },
+              "kind": {
+                "enum": [
+                  "edge",
+                  "node"
+                ],
+                "title": "Kind",
+                "type": "string"
+              },
+              "ports": {
+                "items": {
+                  "maxItems": 2,
+                  "minItems": 2,
+                  "prefixItems": [
+                    {
+                      "type": "integer"
+                    },
+                    {
+                      "type": "integer"
+                    }
+                  ],
+                  "type": "array"
+                },
+                "title": "Ports",
+                "type": "array"
+              },
+              "src": {
+                "title": "Src",
+                "type": "string"
+              }
+            },
+            "required": [
+              "kind",
+              "src",
+              "dst",
+              "ports",
+              "before",
+              "after"
+            ],
+            "title": "Cut",
+            "type": "object"
+          },
+          "DetectorKind": {
+            "description": "The lateral-movement detectors of spec §6.5.1 and the allowed-traffic anomaly detectors of §6.5.8.",
+            "enum": [
+              "fanout",
+              "new_admin_connection",
+              "pivot_chain",
+              "blocked_surge",
+              "non_admin_group",
+              "cross_env",
+              "account_fanout",
+              "unexpected_initiator",
+              "peer_deviation",
+              "volume_surge",
+              "account_new_source",
+              "suspicious_tool",
+              "new_process",
+              "auth_to_non_dc",
+              "new_dc_client",
+              "directory_surge"
+            ],
+            "title": "DetectorKind",
+            "type": "string"
+          },
+          "DetectorState": {
+            "description": "What a detector run can say besides its detections: \"no detection\" is only ever OK.",
+            "enum": [
+              "ok",
+              "disabled",
+              "accumulating",
+              "no_data",
+              "collection_off",
+              "incomplete"
+            ],
+            "title": "DetectorState",
+            "type": "string"
+          },
+          "DetectorStatusView": {
+            "properties": {
+              "detector": {
+                "$ref": "#/$defs/DetectorKind"
+              },
+              "params": {
+                "additionalProperties": true,
+                "title": "Params",
+                "type": "object"
+              },
+              "reason_key": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Reason Key"
+              },
+              "state": {
+                "$ref": "#/$defs/DetectorState"
+              }
+            },
+            "required": [
+              "detector",
+              "state",
+              "reason_key",
+              "params"
+            ],
+            "title": "DetectorStatusView",
+            "type": "object"
+          },
+          "EdgeState": {
+            "description": "An exposure-graph edge by the reported decision of its newest observation (blocked edges are\nnot in the graph).",
+            "enum": [
+              "allowed",
+              "potentially_blocked",
+              "unknown"
+            ],
+            "title": "EdgeState",
+            "type": "string"
+          },
+          "ExposureResult": {
+            "properties": {
+              "assets": {
+                "items": {
+                  "$ref": "#/$defs/AssetExposure"
+                },
+                "title": "Assets",
+                "type": "array"
+              },
+              "computed_at": {
+                "format": "date-time",
+                "title": "Computed At",
+                "type": "string"
+              },
+              "cross_env": {
+                "items": {
+                  "$ref": "#/$defs/CrossEnvEdge"
+                },
+                "title": "Cross Env",
+                "type": "array"
+              },
+              "cross_env_total": {
+                "title": "Cross Env Total",
+                "type": "integer"
+              },
+              "edges_enforced": {
+                "title": "Edges Enforced",
+                "type": "integer"
+              },
+              "edges_now": {
+                "title": "Edges Now",
+                "type": "integer"
+              },
+              "footholds": {
+                "items": {
+                  "$ref": "#/$defs/Foothold"
+                },
+                "title": "Footholds",
+                "type": "array"
+              },
+              "groups": {
+                "additionalProperties": {
+                  "$ref": "#/$defs/GroupGraph"
+                },
+                "default": {},
+                "title": "Groups",
+                "type": "object"
+              },
+              "hops": {
+                "title": "Hops",
+                "type": "integer"
+              },
+              "hosts": {
+                "items": {
+                  "$ref": "#/$defs/HostExposure"
+                },
+                "title": "Hosts",
+                "type": "array"
+              },
+              "limits_hit": {
+                "items": {
+                  "type": "string"
+                },
+                "title": "Limits Hit",
+                "type": "array"
+              },
+              "nodes": {
+                "title": "Nodes",
+                "type": "integer"
+              },
+              "observation_from": {
+                "format": "date-time",
+                "title": "Observation From",
+                "type": "string"
+              },
+              "observation_to": {
+                "format": "date-time",
+                "title": "Observation To",
+                "type": "string"
+              },
+              "unknown_edges": {
+                "title": "Unknown Edges",
+                "type": "integer"
+              }
+            },
+            "required": [
+              "computed_at",
+              "observation_from",
+              "observation_to",
+              "hops",
+              "nodes",
+              "edges_now",
+              "edges_enforced",
+              "unknown_edges",
+              "hosts",
+              "assets",
+              "cross_env",
+              "cross_env_total",
+              "footholds",
+              "limits_hit"
+            ],
+            "title": "ExposureResult",
+            "type": "object"
+          },
+          "Foothold": {
+            "description": "A host with an unprotected, listening high-risk service (spec §6.5.6): a place to land.",
+            "properties": {
+              "host": {
+                "title": "Host",
+                "type": "string"
+              },
+              "name": {
+                "title": "Name",
+                "type": "string"
+              },
+              "port": {
+                "title": "Port",
+                "type": "integer"
+              },
+              "proto": {
+                "title": "Proto",
+                "type": "integer"
+              },
+              "severity": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Severity"
+              }
+            },
+            "required": [
+              "host",
+              "name",
+              "port",
+              "proto",
+              "severity"
+            ],
+            "title": "Foothold",
+            "type": "object"
+          },
+          "GroupGraph": {
+            "properties": {
+              "edges": {
+                "items": {
+                  "maxItems": 4,
+                  "minItems": 4,
+                  "prefixItems": [
+                    {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "integer"
+                    },
+                    {
+                      "$ref": "#/$defs/EdgeState"
+                    }
+                  ],
+                  "type": "array"
+                },
+                "title": "Edges",
+                "type": "array"
+              },
+              "groups": {
+                "items": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "title": "Groups",
+                "type": "array"
+              }
+            },
+            "required": [
+              "groups",
+              "edges"
+            ],
+            "title": "GroupGraph",
+            "type": "object"
+          },
+          "HostExposure": {
+            "properties": {
+              "key": {
+                "title": "Key",
+                "type": "string"
+              },
+              "pivot_enforced": {
+                "title": "Pivot Enforced",
+                "type": "boolean"
+              },
+              "pivot_now": {
+                "title": "Pivot Now",
+                "type": "boolean"
+              },
+              "reach_enforced": {
+                "title": "Reach Enforced",
+                "type": "integer"
+              },
+              "reach_now": {
+                "title": "Reach Now",
+                "type": "integer"
+              }
+            },
+            "required": [
+              "key",
+              "reach_now",
+              "reach_enforced",
+              "pivot_now",
+              "pivot_enforced"
+            ],
+            "title": "HostExposure",
+            "type": "object"
+          },
+          "LateralDetection": {
+            "properties": {
+              "critical_asset": {
+                "title": "Critical Asset",
+                "type": "boolean"
+              },
+              "detector": {
+                "$ref": "#/$defs/DetectorKind"
+              },
+              "first_seen": {
+                "format": "date-time",
+                "title": "First Seen",
+                "type": "string"
+              },
+              "last_seen": {
+                "format": "date-time",
+                "title": "Last Seen",
+                "type": "string"
+              },
+              "link_q": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Link Q"
+              },
+              "params": {
+                "additionalProperties": true,
+                "title": "Params",
+                "type": "object"
+              },
+              "severity": {
+                "title": "Severity",
+                "type": "string"
+              },
+              "subject": {
+                "title": "Subject",
+                "type": "string"
+              },
+              "subject_name": {
+                "title": "Subject Name",
+                "type": "string"
+              },
+              "title_key": {
+                "title": "Title Key",
+                "type": "string"
+              }
+            },
+            "required": [
+              "detector",
+              "severity",
+              "subject",
+              "subject_name",
+              "critical_asset",
+              "first_seen",
+              "last_seen",
+              "title_key",
+              "params",
+              "link_q"
+            ],
+            "title": "LateralDetection",
+            "type": "object"
+          },
+          "PullInfo": {
+            "description": "What was read from the PCE for this answer: said on the page (anti-goal: nothing silent).",
+            "properties": {
+              "capped": {
+                "title": "Capped",
+                "type": "boolean"
+              },
+              "end": {
+                "format": "date-time",
+                "title": "End",
+                "type": "string"
+              },
+              "read_at": {
+                "format": "date-time",
+                "title": "Read At",
+                "type": "string"
+              },
+              "rows": {
+                "title": "Rows",
+                "type": "integer"
+              },
+              "start": {
+                "format": "date-time",
+                "title": "Start",
+                "type": "string"
+              },
+              "truncated_windows": {
+                "title": "Truncated Windows",
+                "type": "integer"
+              },
+              "unread_from": {
+                "anyOf": [
+                  {
+                    "format": "date-time",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Unread From"
+              }
+            },
+            "required": [
+              "start",
+              "end",
+              "rows",
+              "capped",
+              "unread_from",
+              "truncated_windows",
+              "read_at"
+            ],
+            "title": "PullInfo",
+            "type": "object"
+          }
+        },
+        "properties": {
+          "admin_set": {
+            "title": "Admin Set",
+            "type": "boolean"
+          },
+          "computed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Computed At"
+          },
+          "critical_set": {
+            "title": "Critical Set",
+            "type": "boolean"
+          },
+          "detections": {
+            "items": {
+              "$ref": "#/$defs/LateralDetection"
+            },
+            "title": "Detections",
+            "type": "array"
+          },
+          "detections_available": {
+            "title": "Detections Available",
+            "type": "boolean"
+          },
+          "detections_total": {
+            "title": "Detections Total",
+            "type": "integer"
+          },
+          "detectors": {
+            "items": {
+              "$ref": "#/$defs/DetectorStatusView"
+            },
+            "title": "Detectors",
+            "type": "array"
+          },
+          "exposure": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/ExposureResult"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "lightweight_days": {
+            "items": {
+              "type": "integer"
+            },
+            "title": "Lightweight Days",
+            "type": "array"
+          },
+          "names": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Names",
+            "type": "object"
+          },
+          "observation_days_setting": {
+            "title": "Observation Days Setting",
+            "type": "integer"
+          },
+          "port_names": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Port Names",
+            "type": "object"
+          },
+          "pull": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/PullInfo"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "ransomware_unsupported": {
+            "title": "Ransomware Unsupported",
+            "type": "boolean"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "enum": [
+                  "stored",
+                  "pulled"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source"
+          },
+          "stale": {
+            "title": "Stale",
+            "type": "boolean"
+          },
+          "state": {
+            "enum": [
+              "ok",
+              "not_computed",
+              "collection_off",
+              "lightweight"
+            ],
+            "title": "State",
+            "type": "string"
+          }
+        },
+        "required": [
+          "state",
+          "source",
+          "computed_at",
+          "stale",
+          "exposure",
+          "names",
+          "pull",
+          "critical_set",
+          "admin_set",
+          "ransomware_unsupported",
+          "detections_available",
+          "detectors",
+          "detections",
+          "detections_total",
+          "observation_days_setting",
+          "lightweight_days",
+          "port_names"
+        ],
+        "title": "LateralPage",
+        "type": "object"
+      }
+    },
     "report_schedules.create": {
       "method": "POST",
       "path": "/api/report-schedules",

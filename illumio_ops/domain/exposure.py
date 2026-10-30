@@ -320,15 +320,19 @@ class ExposureResult(BaseModel):
     cross_env_total: int
     footholds: list[Foothold]
     limits_hit: list[str]
+    # the same graph summed by a label key (app, env), for the lateral page; empty in a result computed before P6c
+    groups: dict[str, GroupGraph] = {}
 
 
 def compute_exposure(edges: Sequence[EdgeIn], hosts: Mapping[str, HostInfo], footholds: Sequence[Foothold], *,
                      hops: int, critical: frozenset[str], env_of: Mapping[str, str | None], computed_at: datetime,
                      observation_from: datetime, observation_to: datetime, max_assets: int = 50,
-                     max_cross_env: int = 500) -> ExposureResult:
+                     max_cross_env: int = 500, group_of: Mapping[str, Mapping[str, str | None]] | None = None,
+                     max_group_edges: int = 2000) -> ExposureResult:
     """Everything the lateral-movement page, the focus list and the posture report read. Critical assets
     beyond max_assets (the least reachable ones) are listed with their numbers only, cross-environment
-    edges beyond max_cross_env are counted only, and limits_hit says so for each."""
+    edges beyond max_cross_env are counted only, a summary by label keeps its max_group_edges largest group pairs,
+    and limits_hit says so for each."""
     now = build_graph(edges, enforced=False)
     enf = build_graph(edges, enforced=True)
     reach_now = dict(zip(now.nodes, reach_counts(now, hops), strict=True))
@@ -351,9 +355,17 @@ def compute_exposure(edges: Sequence[EdgeIn], hosts: Mapping[str, HostInfo], foo
     crossing = cross_env(now, env_of)
     crossing.sort(key=lambda x: (x.state is not EdgeState.ALLOWED, x.src, x.dst))
     limits = (["assets"] if len(order) > max_assets else []) + (["cross_env"] if len(crossing) > max_cross_env else [])
+    groups = {}
+    for label_key, of in (group_of or {}).items():
+        gg = collapse(now, of)
+        if len(gg.edges) > max_group_edges:
+            kept = sorted(gg.edges, key=lambda x: (-x[2], str(x[0]), str(x[1])))[:max_group_edges]
+            gg = GroupGraph(groups=gg.groups, edges=sorted(kept, key=lambda x: (str(x[0]), str(x[1]))))
+            limits.append(f"groups:{label_key}")
+        groups[label_key] = gg
     return ExposureResult(
         computed_at=computed_at, observation_from=observation_from, observation_to=observation_to, hops=hops,
         nodes=len(now.nodes), edges_now=len(now.edge_info), edges_enforced=len(enf.edge_info),
         unknown_edges=sum(1 for _, st in now.edge_info.values() if st is EdgeState.UNKNOWN),
         hosts=host_rows, assets=assets, cross_env=crossing[:max_cross_env], cross_env_total=len(crossing),
-        footholds=list(footholds), limits_hit=limits)
+        footholds=list(footholds), limits_hit=limits, groups=groups)

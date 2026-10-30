@@ -67,17 +67,21 @@ def test_focus_links(ctx):
         _item("data_coverage", "settings_collection"),
         _item("system_health", "system_jobs"),
         _item("system_health", "system_pce"),
+        _item("pivot_host", "lateral", host_key="/orgs/1/workloads/p1"),
+        _item("vendor_contradiction", "lateral"),
     ])
     links = [i.link for i in home.focus_view(ctx, now=NOW).items]
     q = json.loads(links[0].query["q"])
     assert links[0].route == "/investigate" and q["mode"] == "flows" and q["start"].startswith("2026-10-23")
     assert links[1] is None  # longer than the workbench's 30 days
     assert (links[2].route, links[2].query) == ("/hosts", {"key": "/orgs/1/workloads/w1"})
-    assert (links[3].route, links[3].query) == ("/hosts", {"key": "ip:10.0.0.9"})
-    assert links[4] is None  # the lateral page is P6c
+    assert (links[3].route, links[3].query) == ("/lateral", {"asset": "ip:10.0.0.9"})
+    assert (links[4].route, links[4].query) == ("/lateral", {"section": "cross_env"})
     mode_switch = json.loads(links[5].query["q"])
     assert mode_switch["condition"]["decisions"] == ["potentially_blocked"] and mode_switch["view"] == "ranking"
-    assert [lk.route for lk in links[6:]] == ["/system/lateral", "/system/collection", "/system/jobs", "/system/pce"]
+    assert [lk.route for lk in links[6:10]] == ["/system/lateral", "/system/collection", "/system/jobs", "/system/pce"]
+    assert (links[10].route, links[10].query) == ("/lateral", {"host": "/orgs/1/workloads/p1"})
+    assert (links[11].route, links[11].query) == ("/lateral", {"section": "footholds"})
 
 
 def test_focus_hosts_named(ctx):

@@ -6,7 +6,7 @@ from __future__ import annotations
 from collections.abc import Callable, Mapping, Sequence
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, model_validator
 
 from illumio_ops.domain.exposure import Cut, EdgeIn
 from illumio_ops.domain.filter import (
@@ -28,6 +28,12 @@ class DenyProposal(BaseModel):
     src: EndpointFilter
     dst: EndpointFilter
     ports: tuple[PortProto, ...] = ()  # empty = all services
+
+    @model_validator(mode="after")
+    def _names_something(self) -> DenyProposal:
+        if self.src.is_empty() and self.dst.is_empty() and not self.ports:
+            raise ValueError("a deny rule names a source, a destination or a service")  # not "block everything"
+        return self
 
 
 def proposal_filter(p: DenyProposal, *, start: datetime, end: datetime) -> FilterSpec:

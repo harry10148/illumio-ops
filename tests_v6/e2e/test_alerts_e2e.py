@@ -183,7 +183,7 @@ def test_lateral_alert_marked_known_then_removed(context, live_app):
     form.get_by_label("Every detection of this kind about this host (or account)").check()
     form.get_by_role("button", name="Mark known").click()
     expect(form.locator(".form-ok")).to_have_text("Marked known.")
-    page.click("nav >> text=Lateral movement")
+    page.click("nav >> a[href=\"/system/lateral\"]")
     known = page.locator("[data-role=known-detections]")
     expect(known).to_contain_text("Nightly backup host")
     expect(known).to_contain_text("every detection of this kind about /orgs/1/workloads/w1")

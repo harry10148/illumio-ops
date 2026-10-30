@@ -65,12 +65,21 @@ def _when(value: str | None) -> datetime | None:
     return datetime.fromisoformat(value) if value else None
 
 
+def detector_states(conn: Any) -> list[DetectorStatusView]:
+    """Each detector's state as the last detection run left it; empty until the first run."""
+    detect = analysis.get_run(conn, "detect")
+    statuses = json.loads(detect["status_json"]) if detect is not None and detect["status_json"] else {}
+    return [DetectorStatusView(detector=DetectorKind(s["detector"]), state=DetectorState(s["state"]),
+                               reason_key=s.get("reason_key"), params=s.get("params") or {})
+            for s in statuses.values()]
+
+
 def lateral_overview(ctx: AppContext, *, now: datetime | None = None) -> LateralOverview:
     at = (now or datetime.now(UTC)).astimezone(UTC)
     lc = load_lateral_context(ctx, now=at)
     with ctx.flows().connect() as conn:
         detect, exposure = analysis.get_run(conn, "detect"), analysis.get_run(conn, "exposure")
-    statuses = json.loads(detect["status_json"]) if detect is not None and detect["status_json"] else {}
+        detectors = detector_states(conn)
     by_key: dict[str, list[str]] = {}
     for k, v in sorted(lc.known_labels):
         by_key.setdefault(k, []).append(v)
@@ -85,8 +94,6 @@ def lateral_overview(ctx: AppContext, *, now: datetime | None = None) -> Lateral
             baseline_backfilling=lc.baseline_backfilling,
             observation_days_used=min(lc.settings.observation_days, lc.baseline_required),
             detect_last_ok_at=_when(detect["last_ok_at"]) if detect is not None else None,
-            detectors=[DetectorStatusView(detector=DetectorKind(s["detector"]), state=DetectorState(s["state"]),
-                                          reason_key=s.get("reason_key"), params=s.get("params") or {})
-                       for s in statuses.values()],
+            detectors=detectors,
             exposure_last_ok_at=_when(exposure["last_ok_at"]) if exposure is not None else None,
             stale_selectors=[StaleSelectorView(setting=s, key=k, value=v) for s, k, v in lc.stale]))
