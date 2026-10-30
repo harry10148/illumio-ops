@@ -90,6 +90,7 @@ REGISTRY: dict[ReportType, ReportSpec] = {}
 ONDEMAND_LOOKBACK = 90
 POLICY_USAGE_MAX_DAYS = 30
 RHC_MAX_DAYS = 90  # the PCE keeps rule hits 90 days
+POLICY_DIFF_MAX_DAYS = 90  # the period only bounds the events read for "who changed it"
 
 # Why rule_hit_count is greyed out, by Rule Hit Count's state (spec §6.5 RHC).
 RHC_UNAVAILABLE: dict[RhcState, str | None] = {
@@ -123,6 +124,7 @@ def _builtin() -> dict[ReportType, ReportSpec]:
     from illumio_ops.services.reports.lateral_posture import build_lateral_posture
     from illumio_ops.services.reports.network_inventory import build_network_inventory
     from illumio_ops.services.reports.new_connections import build_new_connections
+    from illumio_ops.services.reports.policy_diff import build_policy_diff
     from illumio_ops.services.reports.policy_usage import build_policy_usage
     from illumio_ops.services.reports.ransomware_report import build_ransomware
     from illumio_ops.services.reports.readiness import build_readiness
@@ -159,6 +161,9 @@ def _builtin() -> dict[ReportType, ReportSpec]:
         # The PCE's own report of provisioned rules' hits: greyed out until Rule Hit Count is on (availability).
         ReportType.RULE_HIT_COUNT: ReportSpec(ReportType.RULE_HIT_COUNT, "policy", False, build_rule_hit_count,
                                               max_lookback=lambda settings: RHC_MAX_DAYS),
+        # Draft against active, read when the report runs; the period bounds the events used for attribution.
+        ReportType.POLICY_DIFF: ReportSpec(ReportType.POLICY_DIFF, "policy", False, build_policy_diff,
+                                           max_lookback=lambda settings: POLICY_DIFF_MAX_DAYS),
         ReportType.READINESS: ReportSpec(ReportType.READINESS, "assessment", True, build_readiness,
                                          max_lookback=flow_days, accepts_filter=True, retention=flow_retention),
     }

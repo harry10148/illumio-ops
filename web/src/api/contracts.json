@@ -10256,7 +10256,8 @@
               "ransomware",
               "readiness",
               "policy_usage",
-              "rule_hit_count"
+              "rule_hit_count",
+              "policy_diff"
             ],
             "title": "ReportType",
             "type": "string"
@@ -10718,7 +10719,8 @@
               "ransomware",
               "readiness",
               "policy_usage",
-              "rule_hit_count"
+              "rule_hit_count",
+              "policy_diff"
             ],
             "title": "ReportType",
             "type": "string"
@@ -11272,7 +11274,8 @@
               "ransomware",
               "readiness",
               "policy_usage",
-              "rule_hit_count"
+              "rule_hit_count",
+              "policy_diff"
             ],
             "title": "ReportType",
             "type": "string"
@@ -11814,7 +11817,8 @@
               "ransomware",
               "readiness",
               "policy_usage",
-              "rule_hit_count"
+              "rule_hit_count",
+              "policy_diff"
             ],
             "title": "ReportType",
             "type": "string"
@@ -12535,7 +12539,8 @@
               "ransomware",
               "readiness",
               "policy_usage",
-              "rule_hit_count"
+              "rule_hit_count",
+              "policy_diff"
             ],
             "title": "ReportType",
             "type": "string"
@@ -12997,7 +13002,8 @@
               "ransomware",
               "readiness",
               "policy_usage",
-              "rule_hit_count"
+              "rule_hit_count",
+              "policy_diff"
             ],
             "title": "ReportType",
             "type": "string"
@@ -13198,7 +13204,8 @@
               "ransomware",
               "readiness",
               "policy_usage",
-              "rule_hit_count"
+              "rule_hit_count",
+              "policy_diff"
             ],
             "title": "ReportType",
             "type": "string"
@@ -13539,7 +13546,8 @@
               "ransomware",
               "readiness",
               "policy_usage",
-              "rule_hit_count"
+              "rule_hit_count",
+              "policy_diff"
             ],
             "title": "ReportType",
             "type": "string"
@@ -19885,6 +19893,7 @@
       "lateral_posture",
       "network_inventory",
       "new_connections",
+      "policy_diff",
       "policy_usage",
       "ransomware",
       "readiness",

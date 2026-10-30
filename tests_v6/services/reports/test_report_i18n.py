@@ -18,6 +18,7 @@ from illumio_ops.services.analysis.predicted_block import (
     PredictedSummary,
 )
 from illumio_ops.services.analysis.ransomware import HostRansomware
+from illumio_ops.services.reports import policy_diff as policy_diff_report
 from illumio_ops.services.reports import ransomware_report, rule_hit_count
 from illumio_ops.services.reports import readiness as readiness_report
 from illumio_ops.services.reports.registry import BuildInput, ReportParams, specs
@@ -75,6 +76,7 @@ def ctx(tmp_path_factory):
                                connections=7)], rules={}, blocked_flows=3, blocked_connections=7, undetermined_flows=2, capped=True,
         computed_at=NOW, unsupported=False, missing_rules=["/orgs/1/sec_policy/draft/rule_sets/1/deny_rules/2"]))
     _rhc_sample(mp)
+    _pdf_sample(mp)
     mp.setattr(ransomware_report, "host_ransomware", lambda ctx, href, **kw: HostRansomware.model_construct(
         breakdown=None, allow_rules={"445/6": []}, allow_status={"445/6": "error"}))
     yield c
@@ -102,6 +104,36 @@ def _rhc_sample(mp):
     mp.setattr(rule_hit_count, "fetch_pending", lambda client, *, deadline: [PendingItem(
         kind="rule_sets", href="/orgs/1/sec_policy/draft/rule_sets/7", name="New", update_type="create",
         updated_at="2026-10-26T00:00:00Z")])
+
+
+def _pdf_sample(mp):
+    """Every change kind, field and risk the policy diff report words (P5c-3)."""
+    from illumio_ops.domain.policy_diff import Change
+    from illumio_ops.services.analysis.policy_diff import Attribution, PolicyDiff
+    d = "/orgs/1/sec_policy/draft"
+    rule_fields = ("rule_type", "enabled", "description", "providers", "consumers", "services")
+    obj_fields = {"ip_list": ("ip_ranges", "fqdns", "description"),
+                  "service": ("service_ports", "windows_services", "description"),
+                  "label_group": ("labels", "sub_groups", "description")}
+    changes = [Change(kind="rule_set", change="modified", ruleset="Q", name="Q", ref="1", href=f"{d}/rule_sets/1",
+                      field=f, draft="False" if f == "enabled" else "x", active="True" if f == "enabled" else "y",
+                      risk="high" if f == "enabled" else "") for f in ("name", "enabled", "description", "rule_count")]
+    changes += [Change(kind="rule_set", change=ch, ruleset="N", name="N", ref="2", href=f"{d}/rule_sets/2", field="*",
+                       draft="N" if ch == "added" else "", active="N" if ch == "removed" else "", rule_count=3,
+                       risk="medium" if ch == "removed" else "") for ch in ("added", "removed")]
+    changes += [Change(kind="rule", change="modified", ruleset="Q", name="#5", ref="deny_rules/5",
+                       href=f"{d}/rule_sets/1/deny_rules/5", field=f,
+                       draft="override_deny" if f == "rule_type" else "a", active="deny" if f == "rule_type" else "b",
+                       rule_type="override_deny") for f in rule_fields]
+    changes += [Change(kind=k, change="modified", ruleset="", name="O", ref="3", href=f"{d}/{k}s/3", field=f,
+                       draft="a, b", active="a", scope_expanded=True, risk="high") for k, fs in obj_fields.items()
+                for f in fs]
+    mp.setattr(policy_diff_report, "policy_diff", lambda ctx, **kw: PolicyDiff(
+        changes=changes, pending=[], attribution={f"{d}/rule_sets/1": Attribution(
+            actor="admin", at=datetime(2026, 10, 25, tzinfo=UTC), event_type="rule_set.update")},
+        other_pending=[PendingItem(kind="firewall_settings", href=f"{d}/firewall_settings", name=None,
+                                   update_type="update", updated_at="2026-10-25T00:00:00Z")],
+        attribution_limited=True, computed_at=NOW))
 
 
 def _p5b2_sample(c):
