@@ -73,6 +73,8 @@ function Editor({ initial, catalog, smtp, onSave, onCancel, error }: {
           onChange={(e) => {
             const next = catalog.entries.find((c) => c.report_type === e.target.value);
             set({ report_type: e.target.value as ReportScheduleFields["report_type"],
+                  // only a custom report names one: switching away must not send it (the server refuses it)
+                  custom_id: e.target.value === "custom" ? s.custom_id : null,
                   lookback_days: fitLookback(s.lookback_days, next?.max_lookback),
                   // keep the chosen formats the new type also makes; none left: all it makes
                   formats: (s.formats.filter((f) => next?.formats.includes(f)).length

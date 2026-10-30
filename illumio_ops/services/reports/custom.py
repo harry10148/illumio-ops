@@ -3,6 +3,7 @@ report's period through run_segment — the same number the workbench shows — 
 section in the workbench when the GUI's external address is set and the period is one the workbench takes."""
 from __future__ import annotations
 
+import dataclasses
 from urllib.parse import urlencode
 
 from illumio_ops.domain.filter import FlowCondition
@@ -15,13 +16,18 @@ from illumio_ops.domain.report import (
     TextBlock,
 )
 from illumio_ops.domain.segment import EventSegment, FlowSegment
-from illumio_ops.domain.values import ReportType, SegmentDimension, SegmentView
+from illumio_ops.domain.values import (
+    ReportType,
+    SegmentDimension,
+    SegmentMetric,
+    SegmentView,
+)
 from illumio_ops.services import custom_reports
 from illumio_ops.services.analysis.segments import run_segment
 from illumio_ops.services.coverage import Coverage
 from illumio_ops.services.custom_reports import CustomSection
 from illumio_ops.services.eventsource import EventRow
-from illumio_ops.services.flowsource import FlowRow
+from illumio_ops.services.flowsource import FlowRow, field_coverage
 from illumio_ops.services.reports import flowsections
 from illumio_ops.services.reports.common import port_text, tr
 from illumio_ops.services.reports.flowsections import DECISION_KEYS
@@ -104,21 +110,29 @@ def flows_coverage(inp: BuildInput) -> Coverage:
 def _section(inp: BuildInput, i: int, sec: CustomSection) -> Section:
     seg = sec.segment.materialize(inp.start, inp.end)
     cov: Coverage | None = None
+    notes: tuple[TextBlock, ...] = ()
     if isinstance(seg, EventSegment):
-        block, cov = _event_table(inp, seg, sec.title)
+        # events are the install's: a store pulled for the traffic holds none
+        block, cov = _event_table(dataclasses.replace(inp, ctx=inp.install or inp.ctx), seg, sec.title)
     elif seg.view is SegmentView.RANKING:
         columns = (*(Column(key=f"k{j}", label=tr(inp.lang, DIM_KEYS[g.dimension])) for j, g in enumerate(seg.group_by)),
                    Column(key="v", label=tr(inp.lang, METRIC_KEYS.get(seg.metric.value, "rpt_col_metric")),
                           kind="number"))
         block = flowsections.ranking(inp, title=sec.title, group_by=seg.group_by, metric=seg.metric, columns=columns,
                                      limit=seg.limit, spec=seg.filter)
+        if seg.metric is SegmentMetric.BYTES:  # bytes ride on few flows (spec §6.5.7): say how many
+            fc = field_coverage(inp.ctx, seg.filter)
+            lines = flowsections.coverage_lines(inp, fc)
+            if fc is not None and fc.total and not fc.bytes:
+                lines = (*lines, tr(inp.lang, "rpt_cust_bytes_unknown"))
+            notes = (TextBlock(paragraphs=lines),) if lines else ()
     else:
         block, cov = _flow_detail(inp, seg, sec.title)
     words = flowsections.filter_text(sec.segment.condition, inp.lang) if sec.segment.mode == "flows" else None
     intro = tr(inp.lang, "rpt_cust_conditions", conditions=words) if words else ""
     if cov is None:  # a flow ranking: the store's coverage of the section's own period
         cov = flows_coverage(inp)
-    return Section(id=f"s{i + 1}", title=sec.title, intro=intro, blocks=(*_gaps(inp, cov), block),
+    return Section(id=f"s{i + 1}", title=sec.title, intro=intro, blocks=(*_gaps(inp, cov), *notes, block),
                    workbench_link=_link(inp, sec))
 
 

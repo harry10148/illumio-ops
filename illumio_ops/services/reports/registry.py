@@ -63,6 +63,8 @@ class BuildInput:
     tz: tzinfo | None
     now: datetime
     pce_label: str
+    # The install's context when ctx is a store pulled from the PCE (traffic only): what reads events uses it.
+    install: AppContext | None = None
 
 
 @dataclass(frozen=True)

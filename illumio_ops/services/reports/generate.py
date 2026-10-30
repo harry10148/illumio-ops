@@ -162,7 +162,7 @@ def _build(ctx: AppContext, spec: ReportSpec, inp: BuildInput) -> ReportDocument
         with pull_period(ctx, start=inp.start - lead, end=inp.end, spec=pushed, now=inp.now) as res:
             if spec.ondemand_prepare is not None:
                 spec.ondemand_prepare(res.ctx, inp.now)
-            doc = spec.build(dataclasses.replace(inp, ctx=res.ctx))
+            doc = spec.build(dataclasses.replace(inp, ctx=res.ctx, install=ctx))
     except OnDemandFailed as exc:
         raise _Fail("rpt_err_ondemand_failed", str(exc)[:ERROR_DETAIL_MAX]) from exc
     return doc.model_copy(update={"data_quality": (*doc.data_quality,

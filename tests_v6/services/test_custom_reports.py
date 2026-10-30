@@ -202,3 +202,79 @@ def test_uncollected_period_is_not_said_as_nothing(ctx):
         notes = [p for b in sec.blocks if isinstance(b, TextBlock) for p in b.paragraphs]
         assert notes, sec.title  # the gap is said beside the empty table
     assert any("traffic" in q.lower() or "flow" in q.lower() for q in doc.data_quality)
+
+
+# ── final review (2026-10-31) ─────────────────────────────────────────────────
+
+def test_mixed_report_reads_events_from_the_install(ctx):
+    """#1: in lightweight mode a report with a flow section is built on the pulled store, which holds no events:
+    the event sections read the install's events."""
+    import dataclasses
+    import tempfile
+    from pathlib import Path
+
+    from illumio_ops.domain.events import normalize_event
+    from illumio_ops.domain.report import TableBlock
+    from illumio_ops.domain.values import DataOrigin, Language, ReportType
+    from illumio_ops.services.reports.custom import build_custom
+    from illumio_ops.services.reports.registry import BuildInput, ReportParams
+    from illumio_ops.store.flowdb.events import upsert_events
+    from tests_v6.services.analysis.test_tamper import _tamper
+    with ctx.flows().connect() as conn:
+        upsert_events(conn, [normalize_event(_tamper(0, datetime(2026, 10, 22, tzinfo=UTC)))], origin=DataOrigin.INGEST,
+                      now=NOW)
+        conn.commit()
+    rep = cr.add_section(ctx, report_id=None, name="R", title="Tampering", request=_events(), by="a", now=NOW)
+    cr.add_section(ctx, report_id=rep.id, name=None, title="Flows", request=_ranking(), by="a", now=NOW)
+    other = configured_ctx(Path(tempfile.mkdtemp()))
+    pulled = dataclasses.replace(ctx, flowdb=other.flows(), ondemand=True)  # as ondemand makes it: no events
+    params = ReportParams(report_type=ReportType.CUSTOM, custom_id=rep.id, lookback_days=7)
+    doc = build_custom(BuildInput(ctx=pulled, params=params, start=datetime(2026, 10, 20, tzinfo=UTC),
+                                  end=datetime(2026, 10, 27, tzinfo=UTC), lang=Language.EN, tz=None, now=NOW,
+                                  pce_label="lab", install=ctx))
+    events = next(b for b in doc.sections[0].blocks if isinstance(b, TableBlock))
+    assert len(events.rows) == 1
+
+
+def test_a_deleted_reports_id_is_not_reused(ctx):
+    """#2: a queued request for a deleted custom report must not make the next one created."""
+    a = cr.add_section(ctx, report_id=None, name="A", title="a", request=_events(), by="a", now=NOW)
+    cr.delete(ctx, a.id)
+    b = cr.add_section(ctx, report_id=None, name="B", title="b", request=_events(), by="a", now=NOW)
+    assert b.id != a.id
+
+
+def test_concurrent_saves_both_kept(ctx, monkeypatch):
+    """#3: two saves into the same report at once both keep their section."""
+    import threading
+    import time as _time
+    rep = cr.add_section(ctx, report_id=None, name="R", title="first", request=_events(), by="a", now=NOW)
+    real_get = cr.store.get
+    slow = threading.Event()
+
+    def get(conn, report_id):
+        row = real_get(conn, report_id)
+        if threading.current_thread().name == "slow":
+            slow.set()
+            _time.sleep(0.4)  # another save comes in while this one holds what it read
+        return row
+    monkeypatch.setattr(cr.store, "get", get)
+    t = threading.Thread(name="slow", target=lambda: cr.add_section(
+        ctx, report_id=rep.id, name=None, title="A", request=_events(), by="a", now=NOW))
+    t.start()
+    assert slow.wait(5)
+    cr.add_section(ctx, report_id=rep.id, name=None, title="B", request=_events(), by="a", now=NOW)
+    t.join(5)
+    assert sorted(s.title for s in cr.get(ctx, rep.id).sections) == ["A", "B", "first"]
+
+
+def test_bytes_unknown_not_shown_as_zero(ctx):
+    """#4: a bytes ranking over flows that report no bytes says the bytes are unknown, not 0."""
+    from illumio_ops.domain.report import TextBlock
+    _flows_store(ctx)
+    req = FlowRequest(mode="flows", start=NOW - timedelta(days=1), end=NOW, view="ranking", metric="bytes",
+                      group_by=(GroupBy(dimension="src_host"),))
+    rep = cr.add_section(ctx, report_id=None, name="R", title="Bytes", request=req, by="a", now=NOW)
+    doc = _make(ctx, rep.id)
+    notes = " ".join(p for b in doc.sections[0].blocks if isinstance(b, TextBlock) for p in b.paragraphs)
+    assert "byte" in notes.lower()

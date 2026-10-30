@@ -2346,5 +2346,6 @@
   "rpt_open_in_workbench": "Open in the workbench",
   "rpt_title_custom": "Custom report",
   "rpt_cust_gaps": "This section's data has gaps ({n}; the first {start} – {end}); its numbers do not include that time.",
-  "rpt_cust_truncated": "Part of this section's data was cut at the PCE's limit."
+  "rpt_cust_truncated": "Part of this section's data was cut at the PCE's limit.",
+  "rpt_cust_bytes_unknown": "None of these flows reported bytes: the byte counts are unknown, not zero."
 }

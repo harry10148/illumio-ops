@@ -158,6 +158,7 @@ def add_section(ctx: AppContext, *, report_id: int | None, name: str | None, tit
     """Save the workbench's request as a section: of an existing custom report, or of a new one named `name`."""
     section = CustomSection(title=title.strip(), segment=from_request(request))
     with ctx.db() as conn:
+        conn.execute("BEGIN IMMEDIATE")  # read and write as one: a save in between is not lost
         if report_id is None:
             new_id = store.insert(conn, name=_name(name or ""), sections_json=_dump([section]), by=by, at=now)
             return _view(store.get(conn, new_id), _schedules(ctx))
@@ -173,6 +174,7 @@ def add_section(ctx: AppContext, *, report_id: int | None, name: str | None, tit
 
 def remove_section(ctx: AppContext, report_id: int, index: int, *, now: datetime) -> CustomReport:
     with ctx.db() as conn:
+        conn.execute("BEGIN IMMEDIATE")  # read and write as one: a save in between is not lost
         row = store.get(conn, report_id)
         if row is None:
             raise LookupError("no such custom report")
@@ -188,6 +190,7 @@ def remove_section(ctx: AppContext, report_id: int, index: int, *, now: datetime
 
 def rename(ctx: AppContext, report_id: int, name: str, *, now: datetime) -> CustomReport:
     with ctx.db() as conn:
+        conn.execute("BEGIN IMMEDIATE")  # read and write as one: a save in between is not lost
         row = store.get(conn, report_id)
         if row is None:
             raise LookupError("no such custom report")

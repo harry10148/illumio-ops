@@ -71,7 +71,7 @@ def test_reset_waits_for_running_collector(tmp_path):
 def test_app_db_tables_are_classified(tmp_path):
     ctx = configured_ctx(tmp_path)
     with ctx.db() as conn:
-        tables = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+        tables = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'")}  # SQLite's own (AUTOINCREMENT's sqlite_sequence)
     assert tables == set(APP_DB_PCE_DERIVED) | set(APP_DB_PCE_INDEPENDENT)
     assert not set(APP_DB_PCE_DERIVED) & set(APP_DB_PCE_INDEPENDENT)
 

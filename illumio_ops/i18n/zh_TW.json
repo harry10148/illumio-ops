@@ -2346,5 +2346,6 @@
   "rpt_open_in_workbench": "在工作台開啟",
   "rpt_title_custom": "自訂報表",
   "rpt_cust_gaps": "這一節的資料有 {n} 段缺口（第一段 {start} – {end}）；數字不含那些時間。",
-  "rpt_cust_truncated": "這一節有部分資料因 PCE 的上限而截斷。"
+  "rpt_cust_truncated": "這一節有部分資料因 PCE 的上限而截斷。",
+  "rpt_cust_bytes_unknown": "這些流量都沒有回報位元組：位元組數是未知，不是零。"
 }
