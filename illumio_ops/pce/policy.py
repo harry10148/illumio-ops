@@ -29,6 +29,11 @@ def fetch_rule_sets(client: PceClient, pversion: Version, *, deadline: float) ->
     return sets
 
 
+def fetch_objects(client: PceClient, pversion: Version, kind: str, *, deadline: float) -> list[dict[str, Any]]:
+    """Every IP list, service or label group (`kind`) of one policy version; a failed read is raised."""
+    return get_all(client, f"/sec_policy/{pversion}/{kind}", params={}, deadline=deadline)
+
+
 @dataclass(frozen=True)
 class PolicyNames:
     labels: dict[str, tuple[str, str]]  # label href -> (key, value)
