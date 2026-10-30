@@ -1935,5 +1935,13 @@
   "rpt_prs_kpi_not_expanded": "Rules not expanded",
   "rpt_prs_finding_not_expanded": "{n} rule(s) could not be expanded faithfully",
   "rpt_prs_finding_not_expanded_why": "They use virtual services (whose services come from the virtual service) or refer to something the PCE does not hold. Each has a row saying so (truncated = not_expanded); none is widened or dropped silently.",
-  "rpt_prs_finding_not_expanded_action": "Compare these rules in the PCE by hand."
+  "rpt_prs_finding_not_expanded_action": "Compare these rules in the PCE by hand.",
+  "migrate_schedules_listed": "Each schedule is listed below.",
+  "migrate_schedule_unreadable": "Not a schedule 5.x could read; skipped.",
+  "migrate_schedule_type_unknown": "Report type {type} does not exist in v6 (5.x did not run it either); skipped.",
+  "migrate_schedule_app_missing": "An application summary without an application: 5.x refused to run it; skipped.",
+  "migrate_schedule_cron_paused": "A cron expression v6 schedules cannot hold: carried as a weekly schedule, paused. Set its time and turn it on.",
+  "migrate_schedule_type_paused": "A schedule type or weekday 5.x could not run: carried paused. Check its time and turn it on.",
+  "migrate_schedule_filter_paused": "Traffic filters are not carried (running without them would report more than 5.x did): paused. Add the filter and turn it on.",
+  "migrate_schedule_rewritten": "Carried; changed to fit v6: {what}."
 }

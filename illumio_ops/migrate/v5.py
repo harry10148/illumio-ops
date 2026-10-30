@@ -21,6 +21,7 @@ from illumio_ops.domain.values import Language
 from illumio_ops.migrate.report import Action, MigrationItem, MigrationReport
 from illumio_ops.migrate.v5_alerts import migrate_alerts
 from illumio_ops.migrate.v5_models import V5Config
+from illumio_ops.migrate.v5_reports import migrate_reports
 from illumio_ops.settings.schema import DisplaySettings, Settings, default_settings
 from illumio_ops.settings.secrets import (
     DEFAULT_ADMIN_PASSWORD,
@@ -34,7 +35,8 @@ Path_ = tuple[str, ...]
 DEPRECATED_PREFIXES: tuple[Path_, ...] = (("report", "attack_surface"), ("web_gui", "tls", "http_redirect_port"),
                                           ("pce_profiles",), ("active_pce_id",),
                                           ("pce_cache", "archive_review_max_days"))
-PHASE_OF_SECTION = {"siem": "P7", "report": "P5", "report_schedules": "P5"}
+PHASE_OF_SECTION = {"siem": "P7"}
+REPORT_SECTIONS = ("report", "report_schedules")  # reported by migrate_reports, key by key
 ALERT_SECTIONS = ("alerts", "email", "smtp", "rules")  # reported by migrate_alerts, key by key
 NOT_IN_V6_SECTIONS = ("rule_scheduler", "scheduler", "rule_backups")
 SPECIAL: dict[Path_, tuple[Action, str, dict[str, str]]] = {
@@ -42,7 +44,6 @@ SPECIAL: dict[Path_, tuple[Action, str, dict[str, str]]] = {
     ("settings", "enable_health_check"): ("dropped", "migrate_always_on", {}),
     ("settings", "theme"): ("unsupported", "migrate_not_in_v6", {}),
     ("settings", "dashboard_queries"): ("unsupported", "migrate_not_in_v6", {}),
-    ("web_gui", "public_url"): ("unsupported", "migrate_arrives_in_phase", {"phase": "P5"}),
     ("pce_cache", "db_path"): ("dropped", "migrate_fixed_path", {}),
     ("pce_cache", "archive_dir"): ("dropped", "migrate_fixed_path", {}),
     ("pce_cache", "archive_interval_hours"): ("dropped", "migrate_archive_daily", {}),
@@ -283,7 +284,8 @@ def migrate_v5(raw: dict[str, Any], *, rules: list[dict[str, Any]] | None = None
     if not _HEX_KEY.fullmatch(secret_key):
         secret_key, key_item = new_secret_key(), ("rewritten", "migrate_secret_key_new")
 
-    out = default_settings(password_hash=password_hash, secret_key=secret_key).model_dump(mode="json")
+    defaults = default_settings(password_hash=password_hash, secret_key=secret_key)
+    out = defaults.model_dump(mode="json")
     if v5.web_gui.allowed_ips and not any(_is_ip(ip) for ip in v5.web_gui.allowed_ips):
         # 5.x refused every client with such a list; an empty v6 list would allow everyone.
         blocking.append(("web_gui.allowed_ips", "no entry is an IP address or network; fix the list in 5.x first"))
@@ -301,10 +303,12 @@ def migrate_v5(raw: dict[str, Any], *, rules: list[dict[str, Any]] | None = None
 
     out["alerts"], alert_items = migrate_alerts(raw, rules, legacy_channels)
     report.items.extend(alert_items)
+    out["reports"], report_items = migrate_reports(raw, defaults, v5.settings.timezone)
+    report.items.extend(report_items)
 
     for path in leaf_paths(raw):
         source = show(path)
-        if path[0] in ALERT_SECTIONS:
+        if path[0] in ALERT_SECTIONS or path[0] in REPORT_SECTIONS or path == ("web_gui", "public_url"):
             continue
         if any(path[:len(p)] == p for p in DEPRECATED_PREFIXES):
             add(MigrationItem(source, None, "dropped", "migrate_deprecated_in_5x"))

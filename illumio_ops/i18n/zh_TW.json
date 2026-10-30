@@ -1935,5 +1935,13 @@
   "rpt_prs_kpi_not_expanded": "無法展開的規則",
   "rpt_prs_finding_not_expanded": "有 {n} 條規則無法如實展開",
   "rpt_prs_finding_not_expanded_why": "它們使用虛擬服務（服務取自虛擬服務本身），或引用了 PCE 上不存在的物件。每條都有一列說明（truncated = not_expanded），不會被放寬，也不會被無聲略過。",
-  "rpt_prs_finding_not_expanded_action": "請到 PCE 手動比對這些規則。"
+  "rpt_prs_finding_not_expanded_action": "請到 PCE 手動比對這些規則。",
+  "migrate_schedules_listed": "每個排程分別列在下方。",
+  "migrate_schedule_unreadable": "不是 5.x 能讀的排程，已略過。",
+  "migrate_schedule_type_unknown": "報表型別 {type} 在 v6 不存在（5.x 也沒有執行它），已略過。",
+  "migrate_schedule_app_missing": "應用摘要沒有指定應用：5.x 拒絕執行，已略過。",
+  "migrate_schedule_cron_paused": "v6 排程無法表達這個 cron 運算式：以每週排程遷移並暫停，請設定時間後再啟用。",
+  "migrate_schedule_type_paused": "5.x 無法執行的排程類型或星期：遷移後暫停，請確認時間後再啟用。",
+  "migrate_schedule_filter_paused": "流量篩選沒有遷移（不帶篩選執行會比 5.x 報得更多）：已暫停，請加上篩選後再啟用。",
+  "migrate_schedule_rewritten": "已遷移；為符合 v6 而調整：{what}。"
 }
