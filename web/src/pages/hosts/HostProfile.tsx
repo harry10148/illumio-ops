@@ -6,13 +6,14 @@ import { Link, useSearchParams } from "react-router-dom";
 import { type ApiError, call } from "../../api/client";
 import type {
   Coverage, DimensionTop, EndpointFilter, EventRow, FlowCondition1, FlowRow, HostProfile as Profile, HostRansomware, HostTamper,
-  PullInfo, SegmentDimension,
+  PullInfo, QuarantineAction, QuarantineOutcome, SegmentDimension,
 } from "../../api/generated";
 import { formatTime } from "../../components/ProbeResults";
 import { t, useLang } from "../../i18n";
 import { registerNav } from "../../shell/nav";
 import { SEVERITY_KEYS, word } from "../alerts/common";
 import type { Req } from "../workbench/conditions";
+import { LEVEL_KEYS, Outcome, QuarantineDialog, STATUS_KEYS, nonEmpty } from "../quarantine/QuarantineDialog";
 import { Pulled } from "../workbench/Workbench";
 
 // Literal maps: i18n keys are never built from data.
@@ -38,6 +39,7 @@ const DETAILS_KEYS: Record<string, string> = {
 const ALLOW_KEYS: Record<string, string> = { error: "rpt_rw_allow_error", partial: "rpt_rw_allow_partial" };
 const PERIODS: [string, number][] = [["wb_period_1h", 1], ["wb_period_1d", 24], ["wb_period_7d", 168]];
 const READINGS_SHOWN = 50;
+const HISTORY_SHOWN = 10;
 
 function period(hours: number): { start: string; end: string } {
   const end = new Date();
@@ -348,6 +350,70 @@ function Ransomware({ hostKey, initial }: { hostKey: string; initial: HostRansom
   );
 }
 
+/** Quarantine (P6d): the level the inventory holds, put one on or take it off, and what was done to this host. */
+function QuarantineSection({ hostKey, name, current }: { hostKey: string; name: string; current: string | null }) {
+  const lang = useLang();
+  const [open, setOpen] = useState(false);
+  const [history, setHistory] = useState<QuarantineAction[] | null>(null);
+  const [confirming, setConfirming] = useState(false);
+  const [outcome, setOutcome] = useState<QuarantineOutcome | null>(null);
+  const [error, setError] = useState<ApiError | null>(null);
+  const [version, setVersion] = useState(0);
+
+  useEffect(() => {
+    let live = true;
+    void call("quarantine.history", undefined, undefined, { key: hostKey }).then((env) => {
+      if (live && env.ok && env.data) setHistory(env.data.actions.slice(0, HISTORY_SHOWN));
+    });
+    return () => { live = false; };
+  }, [hostKey, version]);
+
+  async function remove() {
+    setConfirming(false);
+    setError(null);
+    const env = await call("quarantine.remove", { keys: nonEmpty([hostKey]) });
+    if (env.ok && env.data) setOutcome(env.data);
+    else setError(env.error);
+    setVersion((v) => v + 1);
+  }
+
+  return (
+    <div className="card stack" data-section="quarantine">
+      <h2>{t("q_title")}</h2>
+      <p data-role="q-current">{current ? t("q_current", { level: t(LEVEL_KEYS[current] ?? current) }) : t("q_current_none")}</p>
+      <p className="hint">{t("q_inventory_lag")}</p>
+      <div className="row">
+        <button type="button" className="btn-quiet" data-role="q-open" onClick={() => setOpen(true)}>{t("q_open")}</button>
+        {!confirming && (
+          <button type="button" className="btn-quiet" data-role="q-remove" onClick={() => setConfirming(true)}>{t("q_remove")}</button>
+        )}
+        {confirming && (
+          <button type="button" className="btn-primary" data-role="q-remove-confirm" onClick={() => void remove()}>
+            {t("q_remove_confirm", { host: name })}
+          </button>
+        )}
+      </div>
+      {error && <p className="form-error">{t(error.message_key, error.params)}</p>}
+      {outcome && <Outcome outcome={outcome} />}
+      {open && <QuarantineDialog hosts={[{ key: hostKey, name }]} onClose={() => setOpen(false)}
+        onDone={() => setVersion((v) => v + 1)} />}
+      {history && history.length > 0 && (
+        <>
+          <h3>{t("q_history")}</h3>
+          <ul className="plain-list" data-role="q-history">
+            {history.map((a) => (
+              <li key={a.id}>
+                {formatTime(a.at, lang)} · {a.by} · {a.action === "apply" ? t("q_history_apply", { level: t(LEVEL_KEYS[a.level ?? ""] ?? a.level ?? "") })
+                  : t("q_history_remove")} · {word(STATUS_KEYS, a.result)}{a.detail ? ` · ${a.detail}` : ""}
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+    </div>
+  );
+}
+
 export function HostProfile() {
   const [params] = useSearchParams();
   const key = params.get("key") ?? "";
@@ -445,6 +511,9 @@ export function HostProfile() {
         <HostTop title={t("hosts_mode_switch_ports")} req={blocked} dimension="service" hostLinks={false} onPulled={setPulled} />
       </div>
       {mode === "full" && <p className="hint">{t("hosts_mode_switch_full")}</p>}
+      {profile.managed && profile.in_inventory && (
+        <QuarantineSection hostKey={profile.key} name={seenAs ?? profile.name} current={profile.labels["Quarantine"] ?? null} />
+      )}
       {profile.managed && <Events href={profile.key} span={span} onPulled={setPulled} />}
       {profile.tamper && <Tamper hostKey={profile.key} href={profile.key} tamper={profile.tamper} onChange={setProfile} />}
       {profile.ransomware_unsupported && <p className="notice">{t("rpt_rw_unsupported")}</p>}

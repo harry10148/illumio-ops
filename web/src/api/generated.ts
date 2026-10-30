@@ -1244,6 +1244,154 @@ pull: (PullInfo | null)
 simulation: DenySimulation
 }
 /**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "QuarantineApplyRequest".
+ */
+export interface QuarantineApplyRequest {
+acknowledge_no_policy?: boolean
+/**
+ * @minItems 1
+ * @maxItems 50
+ */
+keys: [string, ...(string)[]]
+level: string
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "QuarantineResult".
+ */
+export interface QuarantineResult {
+detail: (string | null)
+key: string
+name: string
+previous: (string | null)
+status: ("ok" | "failed" | "skipped" | "not_quarantined")
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "QuarantineOutcome".
+ */
+export interface QuarantineOutcome {
+action: ("apply" | "remove")
+label_created: boolean
+label_error: (string | null)
+level: (string | null)
+results: QuarantineResult[]
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "QuarantineAction".
+ */
+export interface QuarantineAction {
+action: string
+at: string
+by: string
+detail: (string | null)
+hostname: (string | null)
+id: number
+level: (string | null)
+original_labels: {
+[k: string]: unknown
+}[]
+previous_level: (string | null)
+result: string
+workload_href: string
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "QuarantineHistory".
+ */
+export interface QuarantineHistory {
+actions: QuarantineAction[]
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "QuarantinePreviewRequest".
+ */
+export interface QuarantinePreviewRequest {
+/**
+ * @minItems 1
+ * @maxItems 50
+ */
+keys: [string, ...(string)[]]
+level: string
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "QuarantineCheck".
+ */
+export interface QuarantineCheck {
+labels: {
+[k: string]: string | null
+}
+levels: {
+[k: string]: QuarantineLevelPolicy
+}
+names: {
+[k: string]: string
+}
+write_key: boolean
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "QuarantineLevelPolicy".
+ */
+export interface QuarantineLevelPolicy {
+rules: QuarantineRuleRef[]
+state: ("active" | "disabled" | "draft_only" | "none")
+}
+/**
+ * One place a level is referred to. Actors and services are hrefs ("all_workloads" for every workload,
+ * "<port>/<proto>" for a port written into the rule); the service names them.
+ * 
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "QuarantineRuleRef".
+ */
+export interface QuarantineRuleRef {
+consumers: string[]
+enabled: boolean
+providers: string[]
+rule_type: ("allow" | "deny" | "override_deny" | "scope")
+ruleset: string
+ruleset_enabled: boolean
+services: string[]
+side: ("consumer" | "provider" | "scope")
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "QuarantineTarget".
+ */
+export interface QuarantineTarget {
+current: (string | null)
+enforcement_mode: (string | null)
+key: string
+name: string
+no_enforcement: boolean
+ok: boolean
+reason: (("unmanaged" | "not_in_inventory") | null)
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "QuarantinePreview".
+ */
+export interface QuarantinePreview {
+check: QuarantineCheck
+inbound: (DenySimulationView | null)
+outbound: (DenySimulationView | null)
+targets: QuarantineTarget[]
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "QuarantineTargets".
+ */
+export interface QuarantineTargets {
+/**
+ * @minItems 1
+ * @maxItems 50
+ */
+keys: [string, ...(string)[]]
+}
+/**
  * A built-in report run on a schedule: its type and parameters, not its output (spec §6.3). The page edits
  * these; the server assigns the id (ReportSchedule).
  * 
@@ -2246,7 +2394,7 @@ pulled: (PullInfo | null)
 result: SegmentResult
 }
 
-export type OpId = "alert_rules.create" | "alert_rules.delete" | "alert_rules.list" | "alert_rules.pack" | "alert_rules.preview" | "alert_rules.update" | "alerts.evidence" | "alerts.explain" | "alerts.get" | "alerts.list" | "alerts.mark_known" | "alerts.note_add" | "auth.csrf" | "auth.login" | "auth.logout" | "auth.me" | "auth.password" | "home.focus" | "home.summary" | "hosts.profile" | "hosts.ransomware_allows" | "hosts.tamper_note_add" | "hosts.tamper_note_remove" | "i18n.dictionary" | "lateral.compute" | "lateral.simulate" | "lateral.view" | "report_schedules.create" | "report_schedules.delete" | "report_schedules.list" | "report_schedules.run_now" | "report_schedules.update" | "reports.catalog" | "reports.delete" | "reports.generate" | "reports.get" | "reports.list" | "rhc.enable" | "rhc.status" | "system.channels.get" | "system.channels.test" | "system.channels.update" | "system.collection.backfill" | "system.collection.get" | "system.collection.status" | "system.collection.update" | "system.display.get" | "system.display.update" | "system.jobs.list" | "system.lateral.get" | "system.lateral.known" | "system.lateral.known_delete" | "system.lateral.update" | "system.logs.query" | "system.pce.get" | "system.pce.latest" | "system.pce.probe" | "system.pce.update" | "system.reports.get" | "system.reports.update" | "system.security.get" | "system.security.update" | "system.tls.csr" | "system.tls.import" | "system.tls.renew" | "system.tls.status" | "system.tls.update" | "workbench.dimension" | "workbench.from_alert" | "workbench.meta" | "workbench.run";
+export type OpId = "alert_rules.create" | "alert_rules.delete" | "alert_rules.list" | "alert_rules.pack" | "alert_rules.preview" | "alert_rules.update" | "alerts.evidence" | "alerts.explain" | "alerts.get" | "alerts.list" | "alerts.mark_known" | "alerts.note_add" | "auth.csrf" | "auth.login" | "auth.logout" | "auth.me" | "auth.password" | "home.focus" | "home.summary" | "hosts.profile" | "hosts.ransomware_allows" | "hosts.tamper_note_add" | "hosts.tamper_note_remove" | "i18n.dictionary" | "lateral.compute" | "lateral.simulate" | "lateral.view" | "quarantine.apply" | "quarantine.history" | "quarantine.preview" | "quarantine.remove" | "report_schedules.create" | "report_schedules.delete" | "report_schedules.list" | "report_schedules.run_now" | "report_schedules.update" | "reports.catalog" | "reports.delete" | "reports.generate" | "reports.get" | "reports.list" | "rhc.enable" | "rhc.status" | "system.channels.get" | "system.channels.test" | "system.channels.update" | "system.collection.backfill" | "system.collection.get" | "system.collection.status" | "system.collection.update" | "system.display.get" | "system.display.update" | "system.jobs.list" | "system.lateral.get" | "system.lateral.known" | "system.lateral.known_delete" | "system.lateral.update" | "system.logs.query" | "system.pce.get" | "system.pce.latest" | "system.pce.probe" | "system.pce.update" | "system.reports.get" | "system.reports.update" | "system.security.get" | "system.security.update" | "system.tls.csr" | "system.tls.import" | "system.tls.renew" | "system.tls.status" | "system.tls.update" | "workbench.dimension" | "workbench.from_alert" | "workbench.meta" | "workbench.run";
 
 export interface Requests {
   "alert_rules.create": RuleWrite;
@@ -2276,6 +2424,10 @@ export interface Requests {
   "lateral.compute": LateralCompute;
   "lateral.simulate": LateralSimulate;
   "lateral.view": undefined;
+  "quarantine.apply": QuarantineApplyRequest;
+  "quarantine.history": undefined;
+  "quarantine.preview": QuarantinePreviewRequest;
+  "quarantine.remove": QuarantineTargets;
   "report_schedules.create": ScheduleWrite;
   "report_schedules.delete": ScheduleDelete;
   "report_schedules.list": undefined;
@@ -2350,6 +2502,10 @@ export interface Responses {
   "lateral.compute": LateralPage;
   "lateral.simulate": DenySimulationView;
   "lateral.view": LateralPage;
+  "quarantine.apply": QuarantineOutcome;
+  "quarantine.history": QuarantineHistory;
+  "quarantine.preview": QuarantinePreview;
+  "quarantine.remove": QuarantineOutcome;
   "report_schedules.create": SchedulesView;
   "report_schedules.delete": SchedulesView;
   "report_schedules.list": SchedulesView;
@@ -2424,6 +2580,10 @@ export const OPERATIONS = {
   "lateral.compute": { method: "POST", path: "/api/lateral/compute" },
   "lateral.simulate": { method: "POST", path: "/api/lateral/simulate" },
   "lateral.view": { method: "GET", path: "/api/lateral" },
+  "quarantine.apply": { method: "POST", path: "/api/quarantine/apply" },
+  "quarantine.history": { method: "GET", path: "/api/quarantine/history" },
+  "quarantine.preview": { method: "POST", path: "/api/quarantine/preview" },
+  "quarantine.remove": { method: "POST", path: "/api/quarantine/remove" },
   "report_schedules.create": { method: "POST", path: "/api/report-schedules" },
   "report_schedules.delete": { method: "DELETE", path: "/api/report-schedules/<schedule_id>" },
   "report_schedules.list": { method: "GET", path: "/api/report-schedules" },
