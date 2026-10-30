@@ -393,6 +393,7 @@ class ReportType(StrEnum):
     READINESS = "readiness"
     POLICY_USAGE = "policy_usage"
     RULE_HIT_COUNT = "rule_hit_count"
+    POLICY_DIFF = "policy_diff"
 
 
 class ReportFormat(StrEnum):
