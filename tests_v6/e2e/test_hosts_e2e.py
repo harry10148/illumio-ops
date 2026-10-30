@@ -84,6 +84,7 @@ def test_unnamed_host_named_from_its_traffic(context, live_app):
     page.route("**/api/hosts/profile*", unnamed)
     page.goto(f"{live_app.url}/hosts?key={DB}")
     expect(page.locator("h1")).to_have_text("db")
+    page.unroute_all(behavior="wait")  # the profile asked again may still be rewritten: not at browser close
 
 
 def test_late_profile_does_not_replace_current(context, live_app):
@@ -119,3 +120,4 @@ def test_cut_answer_is_said(context, live_app):
     page.route("**/api/workbench/dimension", truncated)
     page.goto(f"{live_app.url}/hosts?key={DB}")
     expect(page.locator("[data-section=src_host] [data-role=caveat]").first).to_have_count(1)
+    page.unroute_all(behavior="wait")  # the other sections' answers are still being rewritten: not at browser close
