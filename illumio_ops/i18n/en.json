@@ -1877,7 +1877,7 @@
   "rpt_pdf_tbl_risk": "Risky changes",
   "rpt_pdf_tbl_rule_sets": "Ruleset changes",
   "rpt_pdf_tbl_rules": "Rule changes",
-  "rpt_pdf_tbl_objects": "IP list, service and label group changes",
+  "rpt_pdf_tbl_objects": "Policy object changes",
   "rpt_pdf_tbl_other": "Other items waiting",
   "rpt_pdf_none_risk": "No risky change.",
   "rpt_pdf_none_rule_sets": "No ruleset changed.",
