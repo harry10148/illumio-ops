@@ -25,7 +25,7 @@ from illumio_ops.services.analysis.segments import SegmentResult, run_segment
 from illumio_ops.services.context import AppContext
 from illumio_ops.services.coverage import Coverage
 from illumio_ops.services.eventsource import aggregate_events
-from illumio_ops.services.flowsource import AggRow, aggregate_flows
+from illumio_ops.services.flowsource import AggRow, aggregate_flows, host_addresses
 from illumio_ops.services.workbench_store import PullInfo
 from illumio_ops.store.flowdb import labels
 
@@ -119,8 +119,8 @@ _HOST_DIMENSIONS = frozenset({SegmentDimension.SRC_HOST, SegmentDimension.DST_HO
 
 
 def _named(ctx: AppContext, rows: list[AggRow], group_by: tuple[GroupBy, ...]) -> list[AggRow]:
-    """A host the flows carry no hostname for is shown by the inventory's hostname or name, not its href (lab
-    acceptance 2026-10-30: the PCE sends some workloads without one)."""
+    """A host the flows carry no hostname for is shown by the inventory's hostname or name, else by its address —
+    never its href (lab acceptance 2026-10-30: the PCE sends some workloads without one)."""
     levels = [i for i, g in enumerate(group_by) if g.dimension in _HOST_DIMENSIONS]
     hrefs = {str(r.keys[i]) for r in rows for i in levels if r.display[i] is None and str(r.keys[i]).startswith("/orgs/")}
     if not hrefs:
@@ -128,7 +128,9 @@ def _named(ctx: AppContext, rows: list[AggRow], group_by: tuple[GroupBy, ...]) -
     with ctx.flows().connect() as conn:
         found = conn.execute(f"SELECT href, COALESCE(hostname, name) FROM workloads WHERE href IN "
                              f"({','.join('?' * len(hrefs))})", sorted(hrefs)).fetchall()
-    names = {h: n for h, n in found if n}
+        names = {h: n for h, n in found if n}
+    # in neither the flows' hostnames nor the inventory (a container or deleted workload): its address
+    names.update(host_addresses(ctx, hrefs - names.keys()))
     out = []
     for r in rows:
         display = list(r.display)

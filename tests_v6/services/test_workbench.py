@@ -140,3 +140,15 @@ def test_host_without_hostname_named_from_inventory(ctx):
     ranked = workbench.run(ctx, _flows(view=SegmentView.RANKING, group_by=(GroupBy(dimension=SegmentDimension.DST_HOST),)),
                            now=NOW).result.ranking
     assert {r.keys[0]: r.display[0] for r in ranked}["/orgs/1/workloads/nohost"] == "k8s-node02"
+
+
+def test_host_unknown_to_inventory_shown_by_address(ctx):
+    """Lab acceptance 2026-10-30: some hosts are in neither the flows' hostnames nor the inventory (container or
+    deleted workloads): their address is shown, never the href."""
+    with ctx.flows().connect() as conn:
+        upsert_flows(conn, [flow(src="x", dst="ghost", port=22)], origin=DataOrigin.INGEST, now=NOW)
+        conn.execute("UPDATE flows SET dst_hostname = NULL WHERE dst_key = '/orgs/1/workloads/ghost'")
+        ip = conn.execute("SELECT dst_ip FROM flows WHERE dst_key = '/orgs/1/workloads/ghost'").fetchone()[0]
+        conn.commit()
+    top = workbench.dimension(ctx, _flows(), SegmentDimension.DST_HOST, now=NOW)
+    assert {r.keys[0]: r.display[0] for r in top.rows}["/orgs/1/workloads/ghost"] == ip
