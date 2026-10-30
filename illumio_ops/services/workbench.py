@@ -21,17 +21,25 @@ from illumio_ops.domain.values import (
 )
 from illumio_ops.services import workbench_store
 from illumio_ops.services.alerts.views import evidence_segment
+from illumio_ops.services.analysis.predicted_block import PredictedBlock, predict_blocks
 from illumio_ops.services.analysis.segments import SegmentResult, run_segment
+from illumio_ops.services.collect.guard import require_same_pce
 from illumio_ops.services.context import AppContext
 from illumio_ops.services.coverage import Coverage
 from illumio_ops.services.eventsource import aggregate_events
 from illumio_ops.services.flowsource import AggRow, aggregate_flows, host_addresses
+from illumio_ops.services.ondemand import INTERACTIVE_PULL
 from illumio_ops.services.workbench_store import PullInfo
 from illumio_ops.store.flowdb import labels
 
 MAX_DAYS = 30
 DEFAULT_DAYS = 1
 DIMENSION_TOP = 10
+# The predicted-block view is one PCE recompute of the whole request (spec §6.6 F1, about a minute): bounded for a
+# request someone waits on — the report runs it in the background with 200k rows and 15 minutes.
+PREDICTED_LIMIT = 500
+PREDICTED_MAX_RESULTS = 50_000
+PREDICTED_DEADLINE = 300
 VIEWS = (SegmentView.DETAIL, SegmentView.RANKING)  # the predicted-block view is its own action (P6e)
 
 
@@ -150,6 +158,26 @@ def run(ctx: AppContext, req: FlowRequest | EventRequest, *, now: datetime | Non
             result = result.model_copy(update={"ranking": _named(read, result.ranking, req.group_by)})
         check()
         return WorkbenchResult(result=result, pulled=pulled)
+
+
+class PredictedView(BaseModel):
+    predicted: PredictedBlock
+    request: FlowRequest  # the conditions it was computed for: the page says when they have changed since
+
+
+def predicted(ctx: AppContext, req: FlowRequest | EventRequest) -> PredictedView:
+    """The request's flows recomputed on the PCE against the draft policy, each with the rules that would block or
+    allow it. Asked for explicitly (spec §6.5.3: not on every click); one PCE download at a time with the other
+    interactive pulls. Flows only (ValueError for events)."""
+    if not isinstance(req, FlowRequest):
+        raise ValueError("events have no predicted-block view")  # noqa: TRY004 - answered as invalid input (400)
+    seg = req.segment(view=SegmentView.PREDICTED_BLOCK, group_by=(), limit=PREDICTED_LIMIT)  # flows, not a ranking
+    with ctx.flows().connect() as conn:
+        require_same_pce(conn, ctx.settings.current().pce)
+    with INTERACTIVE_PULL:
+        pb = predict_blocks(ctx, seg.filter, limit=PREDICTED_LIMIT, max_results=PREDICTED_MAX_RESULTS,
+                            deadline_seconds=PREDICTED_DEADLINE)
+    return PredictedView(predicted=pb, request=req)
 
 
 def dimension(ctx: AppContext, req: FlowRequest | EventRequest, dim: SegmentDimension, *,

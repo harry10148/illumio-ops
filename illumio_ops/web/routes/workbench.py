@@ -6,11 +6,15 @@ from flask import Blueprint
 from pydantic import BaseModel, Field, ValidationError
 
 from illumio_ops.domain.values import SegmentDimension
+from illumio_ops.pce.async_query import PceQueryError
+from illumio_ops.pce.client import PceBudgetExhausted, PceTransportError
+from illumio_ops.pce.collections import PceCollectionIncomplete
 from illumio_ops.services import workbench
 from illumio_ops.services.collect.guard import BindingMismatch
 from illumio_ops.services.ondemand import OnDemandFailed
 from illumio_ops.services.workbench import (
     DimensionTop,
+    PredictedView,
     WorkbenchMeta,
     WorkbenchRequest,
     WorkbenchResult,
@@ -38,6 +42,7 @@ class WorkbenchStart(BaseModel):
 OP_META = operation("workbench.meta", "GET", "/api/workbench/meta", None, WorkbenchMeta)
 OP_RUN = operation("workbench.run", "POST", "/api/workbench/run", WorkbenchRun, WorkbenchResult)
 OP_DIMENSION = operation("workbench.dimension", "POST", "/api/workbench/dimension", WorkbenchDimension, DimensionTop)
+OP_PREDICTED = operation("workbench.predicted", "POST", "/api/workbench/predicted", WorkbenchRun, PredictedView)
 OP_FROM_ALERT = operation("workbench.from_alert", "GET", "/api/workbench/from-alert/<int:alert_id>", None,
                           WorkbenchStart)
 
@@ -84,3 +89,15 @@ def from_alert(alert_id: int) -> WorkbenchStart:
     if req is None:
         raise ApiFailure(404, "not_found", "err_not_found")
     return WorkbenchStart(request=req, alert_id=alert_id)
+
+
+@api_route(bp, OP_PREDICTED)
+def predicted(body: WorkbenchRun) -> PredictedView:
+    try:
+        return workbench.predicted(get_ctx(), body.request)
+    except (StaleGeneration, BindingMismatch):
+        raise ApiFailure(409, "pce_switched", "wb_pce_switched") from None
+    except (PceQueryError, PceCollectionIncomplete, PceTransportError, PceBudgetExhausted) as exc:
+        raise ApiFailure(502, "predicted_failed", "wb_predicted_failed", params={"error": str(exc)[:300]}) from None
+    except (ValidationError, ValueError) as exc:
+        raise _invalid(exc) from None

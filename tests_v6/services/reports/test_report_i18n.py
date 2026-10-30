@@ -204,10 +204,28 @@ def _rule_flows(c):
         upsert_flows(conn, flows, origin=DataOrigin.INGEST, now=NOW)
 
 
+def _custom(ctx):
+    """A custom report with each kind of section (P6e): a flow ranking, a flow detail, an event ranking."""
+    from illumio_ops.domain.segment import GroupBy
+    from illumio_ops.services import custom_reports
+    from illumio_ops.services.workbench import EventRequest, FlowRequest
+    window = {"start": END - timedelta(days=1), "end": END}
+    rep = custom_reports.add_section(ctx, report_id=None, name="Custom", title="Ranking", by="t", now=NOW,
+                                     request=FlowRequest(mode="flows", view="ranking",
+                                                         group_by=(GroupBy(dimension="dst_host"),), **window))
+    custom_reports.add_section(ctx, report_id=rep.id, name=None, title="Detail", by="t", now=NOW,
+                               request=FlowRequest(mode="flows", view="detail", **window))
+    custom_reports.add_section(ctx, report_id=rep.id, name=None, title="Events", by="t", now=NOW,
+                               request=EventRequest(mode="events", view="ranking",
+                                                    group_by=(GroupBy(dimension="event_type"),), **window))
+    return rep.id
+
+
 def _outputs(ctx, report_type, lang):
     cond = APP_DB if specs()[report_type].requires_app else None
-    inp = BuildInput(ctx=ctx, params=ReportParams(report_type=report_type, filter=cond), start=START, end=END,
-                     lang=lang, tz=UTC, now=NOW, pce_label="pce")
+    custom_id = _custom(ctx) if report_type is ReportType.CUSTOM else None
+    inp = BuildInput(ctx=ctx, params=ReportParams(report_type=report_type, filter=cond, custom_id=custom_id),
+                     start=START, end=END, lang=lang, tz=UTC, now=NOW, pce_label="pce")
     doc = specs()[report_type].build(inp).model_copy(update={"gui_link": "https://ops.example/reports?id=1"})
     wb = load_workbook(BytesIO(render_xlsx(doc, tz=UTC)))
     cells = "\n".join(str(c.value) for ws in wb.worksheets for row in ws.iter_rows() for c in row

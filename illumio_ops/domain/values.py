@@ -395,6 +395,7 @@ class ReportType(StrEnum):
     RULE_HIT_COUNT = "rule_hit_count"
     POLICY_DIFF = "policy_diff"
     POLICY_RESOLVER = "policy_resolver"
+    CUSTOM = "custom"  # sections saved from the workbench (P6e)
 
 
 class ReportFormat(StrEnum):

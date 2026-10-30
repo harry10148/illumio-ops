@@ -90,3 +90,22 @@ def test_switch_not_cleared_is_409(client, ctx):
     login(client)
     assert client.get("/api/home/focus", environ_overrides=LOCAL).status_code == 409
     assert post(client, "/api/workbench/run", {"request": REQ}).status_code == 409
+
+
+def test_predicted_events_refused_and_pce_failure_said(client, monkeypatch):
+    """P6e: the predicted-block view is flows only; a PCE that cannot recompute is said, not an empty table."""
+    from datetime import UTC, datetime, timedelta
+
+    from illumio_ops.pce.async_query import PceQueryError
+    from illumio_ops.services import workbench as wb
+    login(client)
+    end = datetime.now(UTC)
+    window = {"start": (end - timedelta(days=1)).isoformat(), "end": end.isoformat()}
+    r = post(client, "/api/workbench/predicted", {"request": {"mode": "events", "view": "detail", **window}})
+    assert r.status_code == 400
+
+    def boom(*a, **kw):
+        raise PceQueryError("update_rules", 500, "boom")
+    monkeypatch.setattr(wb, "predict_blocks", boom)
+    r = post(client, "/api/workbench/predicted", {"request": {"mode": "flows", "view": "detail", **window}})
+    assert r.status_code == 502 and r.get_json()["error"]["code"] == "predicted_failed"

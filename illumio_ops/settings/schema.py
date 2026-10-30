@@ -484,6 +484,7 @@ class ReportScheduleFields(StrictModel):
     lang: Language | None  # None: the display language
     keep: int = Field(ge=1, le=365)  # newest reports of this schedule kept
     filter: FlowCondition | None = None  # flow reports: e.g. one application
+    custom_id: int | None = None  # the custom report it makes (report_type custom only)
 
     @field_validator("recipients")
     @classmethod

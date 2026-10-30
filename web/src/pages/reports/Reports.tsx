@@ -19,11 +19,14 @@ import {
   word,
 } from "./common";
 import { type FilterRow, ReportFilter, conditionOf, namesApp } from "./ReportFilter";
+import { CustomReports } from "./CustomReports";
 import { Schedules } from "./Schedules";
 
 const POLL_MS = 5000;
 
-function GenerateForm({ entry, catalog, onDone }: { entry: CatalogEntry; catalog: Catalog; onDone: () => void }) {
+function GenerateForm({ entry, catalog, onDone, customId }: {
+  entry: CatalogEntry; catalog: Catalog; onDone: () => void; customId?: number;
+}) {
   const choices = lookbackChoices(entry.max_lookback);
   const [days, setDays] = useState(choices.includes("7") ? "7" : (choices[choices.length - 1] ?? "1"));
   const [rows, setRows] = useState<FilterRow[]>(entry.requires_app ? [{ side: "dst", key: "app", value: "" }] : []);
@@ -45,6 +48,7 @@ function GenerateForm({ entry, catalog, onDone }: { entry: CatalogEntry; catalog
       formats,
       email,
       recipients: recipients.split(/[\s,;]+/).filter((r) => r !== ""),
+      custom_id: customId ?? null,
     });
     setBusy(false);
     if (env.ok) {
@@ -131,12 +135,19 @@ function CatalogView({ catalog, onGenerated }: { catalog: Catalog; onGenerated: 
                     </div>
                   )}
                 </div>
-                <button type="button" className="btn-quiet" disabled={!e.available}
-                  onClick={() => setOpen(open === e.report_type ? null : e.report_type)}>
-                  {t("gui_reports_generate_open")}
-                </button>
+                {e.report_type !== "custom" && (
+                  <button type="button" className="btn-quiet" disabled={!e.available}
+                    onClick={() => setOpen(open === e.report_type ? null : e.report_type)}>
+                    {t("gui_reports_generate_open")}
+                  </button>
+                )}
               </div>
-              {open === e.report_type && (
+              {e.report_type === "custom" && (
+                <CustomReports generate={(customId, done) => (
+                  <GenerateForm entry={e} catalog={catalog} customId={customId} onDone={() => { done(); onGenerated(); }} />
+                )} />
+              )}
+              {open === e.report_type && e.report_type !== "custom" && (
                 <GenerateForm entry={e} catalog={catalog} onDone={() => { setOpen(null); onGenerated(); }} />
               )}
             </div>
@@ -181,7 +192,7 @@ function History({ data, highlight, onChanged }: { data: ReportPage; highlight: 
               <tr key={r.id} data-report-id={r.id} data-status={r.status} data-highlight={r.id === highlight ? "true" : undefined}
                 ref={r.id === highlight ? marked : undefined} className={r.id === highlight ? "notice" : undefined}>
                 <td>
-                  {word(TYPE_KEYS, r.report_type)}
+                  {word(TYPE_KEYS, r.report_type)}{r.custom_name ? `：${r.custom_name}` : ""}
                   <div className="hint">{r.pce_label}</div>
                 </td>
                 <td className="nowrap">{periodText(r.period_start, r.period_end, lang)}</td>

@@ -49,6 +49,23 @@ export type AlertRuleType = ("event" | "traffic" | "bandwidth" | "volume" | "sys
 export type Language = ("en" | "zh_TW")
 /**
  * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "SegmentDimension".
+ */
+export type SegmentDimension = ("src_host" | "dst_host" | "src_label" | "dst_label" | "service" | "initiator_process" | "initiator_user" | "service_process" | "service_user" | "decision" | "direction" | "event_type" | "event_host" | "event_severity" | "actor")
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "SegmentView".
+ */
+export type SegmentView = ("detail" | "ranking" | "predicted_block")
+export type SegmentMetric = ("flows" | "connections" | "distinct_dst" | "distinct_src" | "distinct_ports" | "bytes" | "events")
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "SegmentMetric".
+ */
+export type SegmentMetric1 = ("flows" | "connections" | "distinct_dst" | "distinct_src" | "distinct_ports" | "bytes" | "events")
+export type SegmentMetric2 = ("flows" | "connections" | "distinct_dst" | "distinct_src" | "distinct_ports" | "bytes" | "events")
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
  * via the `definition` "ProbeName".
  */
 export type ProbeName = ("noop" | "health" | "node_available")
@@ -102,7 +119,7 @@ export type ReportFormat = ("html" | "xlsx" | "json" | "csv")
  * This interface was referenced by `ContractRoot`'s JSON-Schema
  * via the `definition` "ReportType".
  */
-export type ReportType = ("lateral_posture" | "new_connections" | "unmanaged_endpoints" | "traffic" | "security_risk" | "network_inventory" | "app_summary" | "ven_status" | "audit" | "ransomware" | "readiness" | "policy_usage" | "rule_hit_count" | "policy_diff" | "policy_resolver")
+export type ReportType = ("lateral_posture" | "new_connections" | "unmanaged_endpoints" | "traffic" | "security_risk" | "network_inventory" | "app_summary" | "ven_status" | "audit" | "ransomware" | "readiness" | "policy_usage" | "rule_hit_count" | "policy_diff" | "policy_resolver" | "custom")
 /**
  * This interface was referenced by `ContractRoot`'s JSON-Schema
  * via the `definition` "ReportStatus".
@@ -151,22 +168,6 @@ export type PortClass1 = ("remote" | "directory" | "database")
  * via the `definition` "DeploymentType".
  */
 export type DeploymentType = ("on_prem" | "saas")
-/**
- * This interface was referenced by `ContractRoot`'s JSON-Schema
- * via the `definition` "SegmentDimension".
- */
-export type SegmentDimension = ("src_host" | "dst_host" | "src_label" | "dst_label" | "service" | "initiator_process" | "initiator_user" | "service_process" | "service_user" | "decision" | "direction" | "event_type" | "event_host" | "event_severity" | "actor")
-/**
- * This interface was referenced by `ContractRoot`'s JSON-Schema
- * via the `definition` "SegmentView".
- */
-export type SegmentView = ("detail" | "ranking" | "predicted_block")
-export type SegmentMetric = ("flows" | "connections" | "distinct_dst" | "distinct_src" | "distinct_ports" | "bytes" | "events")
-/**
- * This interface was referenced by `ContractRoot`'s JSON-Schema
- * via the `definition` "SegmentMetric".
- */
-export type SegmentMetric1 = ("flows" | "connections" | "distinct_dst" | "distinct_src" | "distinct_ports" | "bytes" | "events")
 
 /**
  * This interface was referenced by `ContractRoot`'s JSON-Schema
@@ -680,6 +681,140 @@ export interface PasswordChangeRequest {
 confirm_password: string
 new_password: string
 old_password?: (string | null)
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "EventRequest".
+ */
+export interface EventRequest {
+actor?: (string | null)
+actors?: string[]
+end: string
+event_types?: string[]
+/**
+ * @maxItems 2
+ */
+group_by?: []|[GroupBy]|[GroupBy, GroupBy]
+host_hrefs?: string[]
+limit?: number
+mode: "events"
+severities?: string[]
+start: string
+view: SegmentView
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "GroupBy".
+ */
+export interface GroupBy {
+dimension: SegmentDimension
+label_key?: (string | null)
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "FlowRequest".
+ */
+export interface FlowRequest {
+condition?: FlowCondition1
+end: string
+/**
+ * @maxItems 2
+ */
+group_by?: []|[GroupBy]|[GroupBy, GroupBy]
+limit?: number
+metric?: SegmentMetric
+mode: "flows"
+start: string
+view: SegmentView
+}
+/**
+ * A flow filter without its time window: what an alert rule (and later a saved report section) stores.
+ * within() gives the FilterSpec for a window; every field, default and check is FilterSpec's.
+ */
+export interface FlowCondition1 {
+decisions?: PolicyDecision[]
+dst?: (EndpointFilter | null)
+dst_exclude?: (EndpointFilter | null)
+exclude_ports?: PortProto[]
+exclude_system_accounts?: boolean
+initiator_process?: (string | null)
+initiator_processes?: string[]
+initiator_user?: (string | null)
+initiator_users?: string[]
+ports?: PortProto[]
+service_process?: (string | null)
+service_processes?: string[]
+service_user?: (string | null)
+service_users?: string[]
+src?: (EndpointFilter | null)
+src_exclude?: (EndpointFilter | null)
+text?: (string | null)
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "CustomSectionAdd".
+ */
+export interface CustomSectionAdd {
+name?: (string | null)
+report_id?: (number | null)
+request: (FlowRequest | EventRequest)
+title: string
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "CustomSection".
+ */
+export interface CustomSection {
+segment: CustomSegment
+title: string
+}
+/**
+ * An analysis segment without its period.
+ * 
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "CustomSegment".
+ */
+export interface CustomSegment {
+actor?: (string | null)
+actors?: string[]
+condition?: (FlowCondition | null)
+event_types?: string[]
+/**
+ * @maxItems 2
+ */
+group_by?: []|[GroupBy]|[GroupBy, GroupBy]
+host_hrefs?: string[]
+limit: number
+metric?: SegmentMetric2
+mode: ("flows" | "events")
+severities?: string[]
+view: SegmentView
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "CustomReport".
+ */
+export interface CustomReport {
+created_by: string
+id: number
+name: string
+schedules: string[]
+sections: CustomSection[]
+updated_at: string
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "CustomReportList".
+ */
+export interface CustomReportList {
+reports: CustomReport[]
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "CustomRename".
+ */
+export interface CustomRename {
+name: string
 }
 /**
  * This interface was referenced by `ContractRoot`'s JSON-Schema
@@ -1402,6 +1537,7 @@ keys: [string, ...(string)[]]
  * via the `definition` "ReportScheduleFields".
  */
 export interface ReportScheduleFields {
+custom_id?: (number | null)
 day_of_month: (number | null)
 day_of_week: (number | null)
 email: boolean
@@ -1437,6 +1573,7 @@ schedule: ReportScheduleFields
  * via the `definition` "ReportSchedule".
  */
 export interface ReportSchedule {
+custom_id?: (number | null)
 day_of_month: (number | null)
 day_of_week: (number | null)
 email: boolean
@@ -1501,6 +1638,7 @@ export interface RunNow {
  */
 export interface ReportItem {
 created_at: string
+custom_name?: (string | null)
 email_detail: (string | null)
 email_status: (string | null)
 error_detail: (string | null)
@@ -1557,6 +1695,7 @@ smtp_enabled: boolean
  * via the `definition` "ReportParams".
  */
 export interface ReportParams {
+custom_id?: (number | null)
 email?: boolean
 filter?: (FlowCondition | null)
 formats?: ReportFormat[]
@@ -2240,74 +2379,6 @@ validity_days: number
 }
 /**
  * This interface was referenced by `ContractRoot`'s JSON-Schema
- * via the `definition` "EventRequest".
- */
-export interface EventRequest {
-actor?: (string | null)
-actors?: string[]
-end: string
-event_types?: string[]
-/**
- * @maxItems 2
- */
-group_by?: []|[GroupBy]|[GroupBy, GroupBy]
-host_hrefs?: string[]
-limit?: number
-mode: "events"
-severities?: string[]
-start: string
-view: SegmentView
-}
-/**
- * This interface was referenced by `ContractRoot`'s JSON-Schema
- * via the `definition` "GroupBy".
- */
-export interface GroupBy {
-dimension: SegmentDimension
-label_key?: (string | null)
-}
-/**
- * This interface was referenced by `ContractRoot`'s JSON-Schema
- * via the `definition` "FlowRequest".
- */
-export interface FlowRequest {
-condition?: FlowCondition1
-end: string
-/**
- * @maxItems 2
- */
-group_by?: []|[GroupBy]|[GroupBy, GroupBy]
-limit?: number
-metric?: SegmentMetric
-mode: "flows"
-start: string
-view: SegmentView
-}
-/**
- * A flow filter without its time window: what an alert rule (and later a saved report section) stores.
- * within() gives the FilterSpec for a window; every field, default and check is FilterSpec's.
- */
-export interface FlowCondition1 {
-decisions?: PolicyDecision[]
-dst?: (EndpointFilter | null)
-dst_exclude?: (EndpointFilter | null)
-exclude_ports?: PortProto[]
-exclude_system_accounts?: boolean
-initiator_process?: (string | null)
-initiator_processes?: string[]
-initiator_user?: (string | null)
-initiator_users?: string[]
-ports?: PortProto[]
-service_process?: (string | null)
-service_processes?: string[]
-service_user?: (string | null)
-service_users?: string[]
-src?: (EndpointFilter | null)
-src_exclude?: (EndpointFilter | null)
-text?: (string | null)
-}
-/**
- * This interface was referenced by `ContractRoot`'s JSON-Schema
  * via the `definition` "WorkbenchDimension".
  */
 export interface WorkbenchDimension {
@@ -2350,6 +2421,40 @@ mode: CollectionMode
  */
 export interface WorkbenchRun {
 request: (FlowRequest | EventRequest)
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "PredictedBlock".
+ */
+export interface PredictedBlock {
+capped: boolean
+computed_at: string
+limit_hit: boolean
+missing_rules: string[]
+rows: PredictedRow[]
+rules: {
+[k: string]: RuleRef
+}
+unsupported: boolean
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "PredictedRow".
+ */
+export interface PredictedRow {
+allow_rules: string[]
+blocking_rules: string[]
+draft_decision: string
+essential_service_rules: string[]
+flow: FlowRow
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "PredictedView".
+ */
+export interface PredictedView {
+predicted: PredictedBlock
+request: FlowRequest
 }
 /**
  * This interface was referenced by `ContractRoot`'s JSON-Schema
@@ -2397,7 +2502,7 @@ pulled: (PullInfo | null)
 result: SegmentResult
 }
 
-export type OpId = "alert_rules.create" | "alert_rules.delete" | "alert_rules.list" | "alert_rules.pack" | "alert_rules.preview" | "alert_rules.update" | "alerts.evidence" | "alerts.explain" | "alerts.get" | "alerts.list" | "alerts.mark_known" | "alerts.note_add" | "auth.csrf" | "auth.login" | "auth.logout" | "auth.me" | "auth.password" | "home.focus" | "home.summary" | "hosts.profile" | "hosts.ransomware_allows" | "hosts.tamper_note_add" | "hosts.tamper_note_remove" | "i18n.dictionary" | "lateral.compute" | "lateral.simulate" | "lateral.view" | "quarantine.apply" | "quarantine.history" | "quarantine.preview" | "quarantine.remove" | "report_schedules.create" | "report_schedules.delete" | "report_schedules.list" | "report_schedules.run_now" | "report_schedules.update" | "reports.catalog" | "reports.delete" | "reports.generate" | "reports.get" | "reports.list" | "rhc.enable" | "rhc.status" | "system.channels.get" | "system.channels.test" | "system.channels.update" | "system.collection.backfill" | "system.collection.get" | "system.collection.status" | "system.collection.update" | "system.display.get" | "system.display.update" | "system.jobs.list" | "system.lateral.get" | "system.lateral.known" | "system.lateral.known_delete" | "system.lateral.update" | "system.logs.query" | "system.pce.get" | "system.pce.latest" | "system.pce.probe" | "system.pce.update" | "system.reports.get" | "system.reports.update" | "system.security.get" | "system.security.update" | "system.tls.csr" | "system.tls.import" | "system.tls.renew" | "system.tls.status" | "system.tls.update" | "workbench.dimension" | "workbench.from_alert" | "workbench.meta" | "workbench.run";
+export type OpId = "alert_rules.create" | "alert_rules.delete" | "alert_rules.list" | "alert_rules.pack" | "alert_rules.preview" | "alert_rules.update" | "alerts.evidence" | "alerts.explain" | "alerts.get" | "alerts.list" | "alerts.mark_known" | "alerts.note_add" | "auth.csrf" | "auth.login" | "auth.logout" | "auth.me" | "auth.password" | "custom_reports.add_section" | "custom_reports.delete" | "custom_reports.list" | "custom_reports.remove_section" | "custom_reports.rename" | "home.focus" | "home.summary" | "hosts.profile" | "hosts.ransomware_allows" | "hosts.tamper_note_add" | "hosts.tamper_note_remove" | "i18n.dictionary" | "lateral.compute" | "lateral.simulate" | "lateral.view" | "quarantine.apply" | "quarantine.history" | "quarantine.preview" | "quarantine.remove" | "report_schedules.create" | "report_schedules.delete" | "report_schedules.list" | "report_schedules.run_now" | "report_schedules.update" | "reports.catalog" | "reports.delete" | "reports.generate" | "reports.get" | "reports.list" | "rhc.enable" | "rhc.status" | "system.channels.get" | "system.channels.test" | "system.channels.update" | "system.collection.backfill" | "system.collection.get" | "system.collection.status" | "system.collection.update" | "system.display.get" | "system.display.update" | "system.jobs.list" | "system.lateral.get" | "system.lateral.known" | "system.lateral.known_delete" | "system.lateral.update" | "system.logs.query" | "system.pce.get" | "system.pce.latest" | "system.pce.probe" | "system.pce.update" | "system.reports.get" | "system.reports.update" | "system.security.get" | "system.security.update" | "system.tls.csr" | "system.tls.import" | "system.tls.renew" | "system.tls.status" | "system.tls.update" | "workbench.dimension" | "workbench.from_alert" | "workbench.meta" | "workbench.predicted" | "workbench.run";
 
 export interface Requests {
   "alert_rules.create": RuleWrite;
@@ -2417,6 +2522,11 @@ export interface Requests {
   "auth.logout": undefined;
   "auth.me": undefined;
   "auth.password": PasswordChangeRequest;
+  "custom_reports.add_section": CustomSectionAdd;
+  "custom_reports.delete": undefined;
+  "custom_reports.list": undefined;
+  "custom_reports.remove_section": Empty;
+  "custom_reports.rename": CustomRename;
   "home.focus": undefined;
   "home.summary": undefined;
   "hosts.profile": undefined;
@@ -2474,6 +2584,7 @@ export interface Requests {
   "workbench.dimension": WorkbenchDimension;
   "workbench.from_alert": undefined;
   "workbench.meta": undefined;
+  "workbench.predicted": WorkbenchRun;
   "workbench.run": WorkbenchRun;
 }
 
@@ -2495,6 +2606,11 @@ export interface Responses {
   "auth.logout": Empty;
   "auth.me": Me;
   "auth.password": CsrfToken;
+  "custom_reports.add_section": CustomReport;
+  "custom_reports.delete": Empty;
+  "custom_reports.list": CustomReportList;
+  "custom_reports.remove_section": CustomReport;
+  "custom_reports.rename": CustomReport;
   "home.focus": FocusView;
   "home.summary": HomeSummary;
   "hosts.profile": HostProfile;
@@ -2552,6 +2668,7 @@ export interface Responses {
   "workbench.dimension": DimensionTop;
   "workbench.from_alert": WorkbenchStart;
   "workbench.meta": WorkbenchMeta;
+  "workbench.predicted": PredictedView;
   "workbench.run": WorkbenchResult;
 }
 
@@ -2573,6 +2690,11 @@ export const OPERATIONS = {
   "auth.logout": { method: "POST", path: "/api/auth/logout" },
   "auth.me": { method: "GET", path: "/api/auth/me" },
   "auth.password": { method: "POST", path: "/api/auth/password" },
+  "custom_reports.add_section": { method: "POST", path: "/api/custom-reports/sections" },
+  "custom_reports.delete": { method: "DELETE", path: "/api/custom-reports/<int:report_id>" },
+  "custom_reports.list": { method: "GET", path: "/api/custom-reports" },
+  "custom_reports.remove_section": { method: "POST", path: "/api/custom-reports/<int:report_id>/sections/<int:index>/remove" },
+  "custom_reports.rename": { method: "POST", path: "/api/custom-reports/<int:report_id>/rename" },
   "home.focus": { method: "GET", path: "/api/home/focus" },
   "home.summary": { method: "GET", path: "/api/home/summary" },
   "hosts.profile": { method: "GET", path: "/api/hosts/profile" },
@@ -2630,6 +2752,7 @@ export const OPERATIONS = {
   "workbench.dimension": { method: "POST", path: "/api/workbench/dimension" },
   "workbench.from_alert": { method: "GET", path: "/api/workbench/from-alert/<int:alert_id>" },
   "workbench.meta": { method: "GET", path: "/api/workbench/meta" },
+  "workbench.predicted": { method: "POST", path: "/api/workbench/predicted" },
   "workbench.run": { method: "POST", path: "/api/workbench/run" },
 } as const satisfies Record<OpId, { method: string; path: string }>;
 
@@ -2797,6 +2920,7 @@ export const VALUES = {
   "ReportType": [
     "app_summary",
     "audit",
+    "custom",
     "lateral_posture",
     "network_inventory",
     "new_connections",
