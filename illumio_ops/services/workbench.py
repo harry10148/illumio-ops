@@ -4,10 +4,10 @@ number. The dimension panel is one single-level ranking per dimension, computed 
 Task 14: six dimensions over 7 days scan 25 s on 1,000 hosts)."""
 from __future__ import annotations
 
-from collections.abc import Callable, Iterator
+from collections.abc import Callable, Iterator, Mapping
 from contextlib import contextmanager
 from datetime import UTC, datetime, timedelta
-from typing import Annotated, Literal
+from typing import Annotated, Any, Literal
 
 from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, model_validator
 
@@ -173,7 +173,12 @@ def from_alert(ctx: AppContext, alert_id: int) -> FlowRequest | EventRequest | N
     found = evidence_segment(ctx, alert_id)
     if found is None or found[1] is None:
         return None
-    kind, raw = found
+    return request_for(found[0], found[1])
+
+
+def request_for(kind: str | None, raw: Mapping[str, Any]) -> FlowRequest | EventRequest:
+    """A stored analysis segment (an alert's evidence, a focus item's) as workbench conditions and period.
+    Raises ValidationError when it is no workbench request (longer than 30 days)."""
     if kind == "flow":
         fs = FlowSegment.model_validate(raw)
         return FlowRequest(mode="flows", condition=fs.filter.condition(), start=fs.filter.start, end=fs.filter.end,

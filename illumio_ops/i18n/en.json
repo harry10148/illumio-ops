@@ -2022,5 +2022,21 @@
   "wb_pulled_capped": "The read stopped at its row limit; the period after {from} is not included.",
   "wb_pulled_truncated": "{n} window(s) of the read were capped by the PCE; some connections in them are missing.",
   "wb_pulling": "Reading the period from the PCE (about half a minute per day)…",
-  "wb_pce_switched": "The PCE was changed while this was being read; run it again."
+  "wb_pce_switched": "The PCE was changed while this was being read; run it again.",
+  "home_focus_title": "What to look at now",
+  "home_focus_not_computed": "The focus list is computed every hour and has not been computed yet.",
+  "home_focus_computed": "Computed at {time}.",
+  "home_focus_stale": "Last computed at {time}: more than two hours without an update, so this list may be out of date.",
+  "home_focus_empty": "Nothing to look at right now.",
+  "home_focus_new": "New this week",
+  "home_focus_weeks": "For {n} weeks",
+  "home_focus_open": "Open",
+  "home_focus_src_exposure": "Lateral exposure",
+  "home_focus_src_ransomware": "Ransomware protection",
+  "home_focus_src_tamper": "Tampering",
+  "home_focus_src_detections": "Detections",
+  "home_focus_src_traffic": "Traffic coverage and mode switch",
+  "home_focus_status_missing": "not computed yet, its items are missing from the list",
+  "home_focus_status_stale": "out of date (missed an hourly run)",
+  "home_focus_status_error": "the last computation failed, its items may be missing"
 }

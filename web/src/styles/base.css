@@ -215,3 +215,11 @@ a.btn-primary, a.btn-quiet { display: inline-flex; align-items: center; text-dec
 .wb-dim-value, .wb-num { font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
 .wb-main { min-width: 0; }
 @media (max-width: 900px) { .wb-body { grid-template-columns: 1fr; } .wb-dims { max-height: none; } }
+
+/* Home focus list (P6b) */
+.focus-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-3); }
+.focus-item { padding: var(--space-3) 0; border-top: 1px solid var(--mark); }
+.focus-item:first-child { border-top: 0; }
+.focus-item .row { gap: var(--space-3); flex-wrap: wrap; align-items: baseline; }
+.focus-item p { margin: var(--space-2) 0; }
+ul.notice { list-style: none; }

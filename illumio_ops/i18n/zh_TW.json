@@ -2022,5 +2022,21 @@
   "wb_pulled_capped": "讀取達到筆數上限而停止；{from} 之後的期間不包含在內。",
   "wb_pulled_truncated": "讀取時有 {n} 個時段被 PCE 截斷，其中部分連線缺漏。",
   "wb_pulling": "正在向 PCE 讀取這段期間（每天約半分鐘）…",
-  "wb_pce_switched": "讀取期間 PCE 被變更了，請重新查詢。"
+  "wb_pce_switched": "讀取期間 PCE 被變更了，請重新查詢。",
+  "home_focus_title": "現在該關注什麼",
+  "home_focus_not_computed": "關注清單每小時計算一次，目前還沒算過。",
+  "home_focus_computed": "計算於 {time}。",
+  "home_focus_stale": "最後計算於 {time}，已超過兩小時沒更新，清單可能過時。",
+  "home_focus_empty": "目前沒有要關注的項目。",
+  "home_focus_new": "本週新出現",
+  "home_focus_weeks": "持續 {n} 週",
+  "home_focus_open": "查看",
+  "home_focus_src_exposure": "橫向移動暴露",
+  "home_focus_src_ransomware": "勒索防護",
+  "home_focus_src_tamper": "竄改",
+  "home_focus_src_detections": "偵測",
+  "home_focus_src_traffic": "流量覆蓋率與切換模式",
+  "home_focus_status_missing": "尚未計算，清單缺少這一類項目",
+  "home_focus_status_stale": "已過時（漏了每小時的計算）",
+  "home_focus_status_error": "上次計算失敗，這一類項目可能缺漏"
 }

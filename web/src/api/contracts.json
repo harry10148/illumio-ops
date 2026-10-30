@@ -10043,6 +10043,157 @@
         "type": "object"
       }
     },
+    "home.focus": {
+      "method": "GET",
+      "path": "/api/home/focus",
+      "request_schema": null,
+      "response_schema": {
+        "$defs": {
+          "FocusEntry": {
+            "properties": {
+              "confidence": {
+                "title": "Confidence",
+                "type": "string"
+              },
+              "critical_asset": {
+                "title": "Critical Asset",
+                "type": "boolean"
+              },
+              "fingerprint": {
+                "title": "Fingerprint",
+                "type": "string"
+              },
+              "first_seen": {
+                "format": "date-time",
+                "title": "First Seen",
+                "type": "string"
+              },
+              "kind": {
+                "title": "Kind",
+                "type": "string"
+              },
+              "link": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/FocusLink"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "new_this_week": {
+                "title": "New This Week",
+                "type": "boolean"
+              },
+              "params": {
+                "additionalProperties": true,
+                "title": "Params",
+                "type": "object"
+              },
+              "score": {
+                "title": "Score",
+                "type": "number"
+              },
+              "severity": {
+                "title": "Severity",
+                "type": "string"
+              },
+              "title_key": {
+                "title": "Title Key",
+                "type": "string"
+              },
+              "weeks_persisting": {
+                "title": "Weeks Persisting",
+                "type": "integer"
+              },
+              "why_key": {
+                "title": "Why Key",
+                "type": "string"
+              }
+            },
+            "required": [
+              "kind",
+              "fingerprint",
+              "severity",
+              "critical_asset",
+              "confidence",
+              "title_key",
+              "why_key",
+              "params",
+              "score",
+              "first_seen",
+              "new_this_week",
+              "weeks_persisting",
+              "link"
+            ],
+            "title": "FocusEntry",
+            "type": "object"
+          },
+          "FocusLink": {
+            "properties": {
+              "query": {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "default": {},
+                "title": "Query",
+                "type": "object"
+              },
+              "route": {
+                "title": "Route",
+                "type": "string"
+              }
+            },
+            "required": [
+              "route"
+            ],
+            "title": "FocusLink",
+            "type": "object"
+          }
+        },
+        "properties": {
+          "computed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Computed At"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/$defs/FocusEntry"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "sources_status": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Sources Status",
+            "type": "object"
+          },
+          "stale": {
+            "title": "Stale",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "computed_at",
+          "stale",
+          "items",
+          "sources_status"
+        ],
+        "title": "FocusView",
+        "type": "object"
+      }
+    },
     "home.summary": {
       "method": "GET",
       "path": "/api/home/summary",

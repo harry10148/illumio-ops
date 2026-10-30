@@ -69,3 +69,11 @@ def test_pce_switch_during_read_is_409(client, ctx, monkeypatch):
                        ("/api/workbench/dimension", {"request": REQ, "dimension": "src_host"})):
         r = post(client, path, body)
         assert r.status_code == 409 and r.get_json()["error"]["code"] == "pce_switched"
+
+
+def test_home_focus(client, ctx):
+    """P6b: the focus list as stored; before the first hourly run it says so."""
+    assert client.get("/api/home/focus", environ_overrides=LOCAL).status_code == 401
+    login(client)
+    data = client.get("/api/home/focus", environ_overrides=LOCAL).get_json()["data"]
+    assert data["computed_at"] is None and data["items"] == []
