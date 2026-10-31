@@ -237,3 +237,26 @@ def test_a_lone_record_waits_while_the_destination_has_sent_nothing_lately(ctx):
         run(ctx, bad)
     with ctx.db() as conn:
         assert store.dlq_count(conn, DEST) == 0
+
+
+def test_two_consecutive_records_that_always_fail_do_not_hold_the_destination(ctx):
+    run(ctx, FakeTransport())
+    add_events(ctx, [1, 2, 3, 4])
+    poison = FakeTransport(lambda n, line: REFUSED if "events/e1" in line or "events/e2" in line else None)
+    for _ in range(8):
+        run(ctx, poison)
+    with ctx.db() as conn:
+        dead = sorted(d.external_id for d in store.dlq_page(conn, destination_id=DEST, limit=10, offset=0))
+    assert dead == ["audit:1", "audit:2"]
+    assert set(sent_ids(poison)) == {"3", "4"}  # e3 may go twice (it was the probe): at least once
+
+
+def test_a_hard_cap_moves_the_head_even_when_nothing_can_tell(ctx):
+    from illumio_ops.services.siem.dispatch import HARD_FACTOR
+    run(ctx, FakeTransport())
+    add_events(ctx, [1])
+    bad = FakeTransport(lambda n, line: REFUSED)
+    for _ in range(3 * HARD_FACTOR):
+        run(ctx, bad)
+    with ctx.db() as conn:
+        assert store.dlq_count(conn, DEST) == 1

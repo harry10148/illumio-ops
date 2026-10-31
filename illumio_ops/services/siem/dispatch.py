@@ -42,6 +42,8 @@ BUDGET_SHARE = 0.8          # of the tick: the next tick never starts behind thi
 # drops must not hold the destination forever) — if the destination took something within RECENT_UP.
 STUCK_FACTOR = 10
 RECENT_UP = timedelta(hours=1)
+PROBE = 3          # later records tried to tell a record that fails from a destination that is down
+HARD_FACTOR = 100  # past max_retries × this, the head goes to the DLQ whatever the probes say (~8 h at the defaults)
 SYSLOG_HOST = "illumio-ops"  # the syslog host of this product's own events
 IDENTITY_TTL = 3600.0
 TransportFactory = Callable[[SiemDestination], Transport]
@@ -168,25 +170,32 @@ def _quarantine(ctx: AppContext, s: Settings, dest: SiemDestination, source: str
     return True
 
 
+def _skips(records: list[SiemRecord], head: SiemRecord, probed: SiemRecord) -> bool:
+    """Whether records lie between the head and the probe that went through: then the cursor moves past the head
+    only, and those are sent (or fail on their own) from the next tick — the probe goes again with them."""
+    return any(head.record_id < r.record_id < probed.record_id for r in records)
+
+
 def _recently_up(ctx: AppContext, dest: SiemDestination, at: datetime) -> bool:
     with ctx.db() as conn:
         sent = [c.last_sent_at for (d, _), c in store.cursors(conn).items() if d == dest.id and c.last_sent_at]
     return any(t >= at - RECENT_UP for t in sent)
 
 
-def _next_goes_through(transport: Transport, fmt: Formatter, records: list[SiemRecord], head: SiemRecord) -> bool:
-    """Tell a record that keeps failing from a destination that is down: send the next one. Nothing after it, or the
-    next one fails too: the destination is down, and nothing goes to the DLQ (a SIEM down for a day would otherwise
-    fill it with records that only waited)."""
-    nxt = next((r for r in records if r.record_id > head.record_id), None)
-    if nxt is None:
-        return False
-    try:
-        transport.send_record(fmt.format_record(nxt), _event_time(nxt))
-        transport.finish_batch()
-    except Exception:  # noqa: BLE001 — the destination is down: wait for it
-        return False
-    return True
+def _next_goes_through(transport: Transport, fmt: Formatter, records: list[SiemRecord],
+                       head: SiemRecord) -> SiemRecord | None:
+    """Tell a record that keeps failing from a destination that is down: send the next ones, up to PROBE. The first
+    that goes through is returned (the head is what fails); none: the destination is down, nothing goes to the DLQ
+    (a SIEM down for a day would otherwise fill it with records that only waited)."""
+    for nxt in [r for r in records if r.record_id > head.record_id][:PROBE]:
+        try:
+            transport.send_record(fmt.format_record(nxt), _event_time(nxt))
+            transport.finish_batch()
+        except Exception as exc:  # noqa: BLE001 — this one fails too: try the next
+            logger.debug("SIEM probe {} failed too: {}", nxt.external_id, exc)
+            continue
+        return nxt
+    return None
 
 
 def _run_source(ctx: AppContext, s: Settings, dest: SiemDestination, source: str, transport: Transport,
@@ -261,19 +270,22 @@ def _run_source(ctx: AppContext, s: Settings, dest: SiemDestination, source: str
                            head.external_id, attempts, error)
             # The cap only for a record nothing comes after, at a destination that took something within the hour:
             # with a later record the probe decides, and with no recent success it may as well be an outage.
-            stuck = (attempts >= dest.max_retries * STUCK_FACTOR
-                     and not any(r.record_id > head.record_id for r in records) and _recently_up(ctx, dest, at))
-            if attempts >= dest.max_retries and (stuck or _next_goes_through(transport, fmt, records, head)):
-                # The record after it went through (or it failed far too often): this one is what fails.
-                nxt = None if stuck else next(r for r in records if r.record_id > head.record_id)
+            stuck = attempts >= dest.max_retries * HARD_FACTOR or (
+                attempts >= dest.max_retries * STUCK_FACTOR
+                and not any(r.record_id > head.record_id for r in records) and _recently_up(ctx, dest, at))
+            probed = None if stuck or attempts < dest.max_retries else _next_goes_through(transport, fmt, records, head)
+            if stuck or probed is not None:
+                # A record after it went through (or it failed far too often): this one is what fails. The probed
+                # record was sent; any between them are tried again from the next tick.
+                nxt = probed
                 payload = payloads.get(head.record_id) or fmt.format_record(head)
                 if _quarantine(ctx, s, dest, source, head, payload, error, attempts, at):
                     run.quarantined += 1
                     run.sent += 0 if nxt is None else 1
                     with ctx.db() as conn:
                         store.advance(conn, dest.id, source, pce_url=pce.url, org_id=pce.org_id,
-                                      last_id=head.record_id if nxt is None else nxt.record_id,
-                                      sent=0 if nxt is None else 1, at=at)
+                                      last_id=head.record_id if nxt is None or _skips(records, head, nxt)
+                                      else nxt.record_id, sent=0 if nxt is None else 1, at=at)
                 else:
                     run.dlq_full = True
             return run
