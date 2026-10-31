@@ -42,29 +42,46 @@ def _mask_action(event: dict[str, Any]) -> None:
         action["src_ip"] = REDACTED
 
 
+_USER_KEYS = ("username", "name", "full_name", "email")
+
+
+def _redact_before_after(node: Any) -> None:
+    """Every before/after at any depth (a label change nests them: changes.labels.added[].after)."""
+    if isinstance(node, dict):
+        for k, v in node.items():
+            if k in ("before", "after"):
+                node[k] = REDACTED
+            else:
+                _redact_before_after(v)
+    elif isinstance(node, list):
+        for item in node:
+            _redact_before_after(item)
+
+
+def _redact_users(node: Any) -> None:
+    """A user object anywhere (resource.user of a user's own event, a user in a change): its sign-in name, name
+    and email."""
+    if isinstance(node, dict):
+        for k, v in node.items():
+            if k == "user" and isinstance(v, dict):
+                for key in _USER_KEYS:
+                    if v.get(key):
+                        v[key] = REDACTED
+            _redact_users(v)
+    elif isinstance(node, list):
+        for item in node:
+            _redact_users(item)
+
+
 def _mask_changes(event: dict[str, Any]) -> None:
-    """Redact before/after on every property of every resource_changes entry."""
+    """Redact the free text of every change and the users the changed resources name."""
     rc = event.get("resource_changes")
     if not isinstance(rc, list):
         return
     for entry in rc:
-        if not isinstance(entry, dict):
-            continue
-        changes = entry.get("changes")
-        # PCE schema variants: list of {name, before, after} OR dict keyed by attr name.
-        if isinstance(changes, list):
-            for ch in changes:
-                if not isinstance(ch, dict):
-                    continue
-                for k in ("before", "after"):
-                    if k in ch:
-                        ch[k] = REDACTED
-        elif isinstance(changes, dict):
-            for ch in changes.values():
-                if isinstance(ch, dict):
-                    for k in ("before", "after"):
-                        if k in ch:
-                            ch[k] = REDACTED
+        if isinstance(entry, dict):
+            _redact_before_after(entry.get("changes"))
+            _redact_users(entry)
 
 
 def _mask_top_level_actor(event: dict[str, Any]) -> None:

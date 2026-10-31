@@ -18,6 +18,7 @@ the header.
 from __future__ import annotations
 
 import json
+import re
 from datetime import UTC, datetime
 from typing import Any
 
@@ -40,8 +41,18 @@ _PROTO = {6: "tcp", 17: "udp", 1: "icmp"}
 _CS2_CHUNK = 3995
 
 
+_KEY_LIKE = re.compile(r"(\s[A-Za-z0-9_]+)=")
+
+
 def _clean(value: object) -> str:
     return str(value).replace("\r", " ").replace("\n", " ")
+
+
+def _clean_value(value: object) -> str:
+    """An extension value in the graylog dialect: unescaped like the PCE's own line, except an '=' after a space and
+    a word, which a CEF parser reads as the start of another key — a label or description could otherwise forge
+    `act=blocked` (P7 security review). The PCE does not do this; its lines are not parsed as CEF on arrival."""
+    return _KEY_LIKE.sub(r"\1\\=", _clean(value))
 
 
 def _escape_arcsight(value: object) -> str:
@@ -173,7 +184,7 @@ class PceNativeCEFFormatter(Formatter):
         self._pce_version = pce_version or "unknown"
         self._dialect = dialect
         self._arcsight = dialect == "arcsight"
-        self._v = _escape_arcsight if self._arcsight else _clean
+        self._v = _escape_arcsight if self._arcsight else _clean_value
 
     def _kv(self, ext: list[str], key: str, value: object) -> None:
         """Append key=value; the arcsight dialect skips empty values."""

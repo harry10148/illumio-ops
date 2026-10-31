@@ -154,3 +154,41 @@ def test_mask_redacts_notification_user_and_src_ip():
     assert out["notifications"][1]["info"]["src_ip"] == REDACTED
     assert out["notifications"][1]["info"]["api_endpoint"] == "/api/v2/users/login"
     assert event["notifications"][0]["info"]["user"]["username"] == "admin@lab.local"  # caller untouched
+
+
+def _emails(text: str) -> list[str]:
+    import re
+    return re.findall(r"[\w.+-]+@[\w-]+\.[\w.]+", text)
+
+
+def test_masked_real_events_carry_no_email_or_client_ip_in_any_format():
+    """The 19 recorded PCE events (golden pairs), masked: no email address and no client IP is left anywhere in
+    the forwarded line — the user's own resource (resource_changes[].resource.user) included (P7 security review)."""
+    import json
+    from pathlib import Path
+
+    from illumio_ops.siem.formatters.cef import CEFFormatter
+    from illumio_ops.siem.formatters.cef_pce import PceNativeCEFFormatter
+    from illumio_ops.siem.formatters.normalized_json import NormalizedJSONFormatter
+    pairs = json.loads(Path("tests_v6/siem/fixtures/pce_native_cef_pairs.json").read_text(encoding="utf-8"))["audit"]
+    leaked = []
+    for p in pairs:
+        ev = p["event"]
+        ip = (ev.get("action") or {}).get("src_ip")
+        masked = mask_event(ev, mask_pii=True)
+        for fmt in (PceNativeCEFFormatter(), CEFFormatter(), NormalizedJSONFormatter()):
+            line = fmt.format_event(masked)
+            if _emails(line) or (ip and ip != "FILTERED" and ip in line):
+                leaked.append((ev.get("event_type"), type(fmt).__name__, _emails(line)[:2]))
+    assert not leaked
+
+
+def test_mask_redacts_user_resource_and_nested_before_after():
+    ev = {"resource_changes": [{"resource": {"user": {"href": "/users/7", "username": "a@corp.example",
+                                                      "full_name": "A B"}},
+                                "changes": {"labels": {"added": [{"before": "x", "after": {"value": "proj-x"}}]}}}]}
+    out = mask_event(ev, mask_pii=True)
+    user = out["resource_changes"][0]["resource"]["user"]
+    assert user["username"] == REDACTED and user["full_name"] == REDACTED and user["href"] == "/users/7"
+    nested = out["resource_changes"][0]["changes"]["labels"]["added"][0]
+    assert nested["before"] == REDACTED and nested["after"] == REDACTED

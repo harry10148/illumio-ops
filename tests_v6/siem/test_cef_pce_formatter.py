@@ -126,3 +126,17 @@ def _keys(ext: str) -> list[str]:
 
 
 
+
+
+def test_value_cannot_inject_an_extension_key():
+    """The graylog dialect leaves values unescaped like the PCE does, except an '=' after a space and a word: that
+    would read as a new key (`act=blocked` smuggled in a label or description) — P7 security review."""
+    import re
+
+    from illumio_ops.siem.formatters.cef_pce import PceNativeCEFFormatter
+    ev = {"event_type": "rule_set.update", "status": "success", "timestamp": "2026-09-11T03:04:05.000Z",
+          "href": "/orgs/1/events/x", "action": {"api_endpoint": "/api/v2/x?a=b act=blocked cat=flow_summary"}}
+    line = PceNativeCEFFormatter().format_event(ev)
+    keys = re.findall(r"(?:^|(?<= ))([A-Za-z0-9_]+)=(?<!\\=)", line.split("|", 7)[7])
+    assert keys.count("act") == 0 and keys.count("cat") == 1
+    assert "?a=b act\\=blocked cat\\=flow_summary" in line
