@@ -7,6 +7,7 @@
 #     requirements-v6.lock
 #     illumio_ops/            the package, including the built web UI
 #     install.sh
+#     rollback.sh             goes back to 5.x after an upgrade (copied into the prefix)
 #     illumio-ops.service.in
 #
 # PYTHON (default python3) must have pip-tools for the lock freshness check.
@@ -73,8 +74,8 @@ echo "==> Wheels (all manylinux tags: some packages only publish older ones, e.g
     -r "$LOCK"
 
 rsync -a --exclude '__pycache__' --exclude '*.pyc' illumio_ops/ "$STAGE/illumio_ops/"
-cp "$LOCK" scripts/v6/install.sh scripts/v6/illumio-ops.service.in "$STAGE/"
-chmod +x "$STAGE/install.sh"
+cp "$LOCK" scripts/v6/install.sh scripts/v6/rollback.sh scripts/v6/illumio-ops.service.in "$STAGE/"
+chmod +x "$STAGE/install.sh" "$STAGE/rollback.sh"
 
 echo "==> Slimming the bundled Python"
 py="$STAGE/python"
