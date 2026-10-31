@@ -141,3 +141,12 @@ def test_a_linked_5x_file_stops_the_upgrade(v5, tmp_path, rel):
     with pytest.raises(UnsafeSource):
         upgrade(v5, tmp_path / "v6", now=NOW)
     assert not (tmp_path / "v6").exists()
+
+
+def test_tls_copy_refuses_a_hard_link(v5, tmp_path):
+    other = tmp_path / "other-file"
+    other.write_text("OTHER")
+    os.link(other, v5 / "config" / "tls" / "hard_key.pem")
+    lines = upgrade(v5, tmp_path / "v6", now=NOW)
+    assert not (tmp_path / "v6" / "config" / "tls" / "hard_key.pem").exists()
+    assert any("hard_key.pem" in line for line in lines)

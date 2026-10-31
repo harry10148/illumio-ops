@@ -65,18 +65,32 @@ class MigrationBlocked(Exception):
         self.result = result
 
 
-def _copy_file(src: Path, dst: Path, *, inside: Path, mode: int) -> bool:
-    """Copy one regular file that is inside the 5.x directory; False (nothing copied) for a link, anything else, or
-    a path that resolves outside it. The upgrade runs as root and the 5.x directory may be the service account's:
-    a link planted there must not make root copy what the account could not read (security review)."""
+def _open_beneath(root: Path, rel: Path) -> int:
+    """A read descriptor for root/rel, walked one directory at a time without following a link anywhere beneath
+    root (security review: a check, then an open by path, can be raced)."""
+    fd = os.open(root, os.O_RDONLY | os.O_DIRECTORY)
     try:
-        st = os.lstat(src)
-        if not stat.S_ISREG(st.st_mode) or not src.resolve().is_relative_to(inside.resolve()):
-            return False
-        fd = os.open(src, os.O_RDONLY | os.O_NOFOLLOW)
-    except OSError:
+        for part in rel.parts[:-1]:
+            nxt = os.open(part, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=fd)
+            os.close(fd)
+            fd = nxt
+        return os.open(rel.parts[-1], os.O_RDONLY | os.O_NOFOLLOW, dir_fd=fd)
+    finally:
+        os.close(fd)
+
+
+def _copy_file(src: Path, dst: Path, *, inside: Path, mode: int) -> bool:
+    """Copy one file of the 5.x directory: a regular file with one link, reached without following a link; False
+    (nothing copied) for anything else. The upgrade runs as root and the 5.x directory may be the service
+    account's: what it planted there must not make root copy what the account could not read (security review)."""
+    try:
+        fd = _open_beneath(inside, src.relative_to(inside))
+    except (OSError, ValueError):
         return False
     with os.fdopen(fd, "rb") as f:
+        st = os.fstat(f.fileno())
+        if not stat.S_ISREG(st.st_mode) or st.st_nlink != 1:
+            return False
         data = f.read()
     out = os.open(dst, os.O_WRONLY | os.O_CREAT | os.O_TRUNC | os.O_NOFOLLOW, mode)
     with os.fdopen(out, "wb") as f:
