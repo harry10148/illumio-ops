@@ -191,7 +191,7 @@ def test_parent_result_released_before_halving(ctx, pce, monkeypatch):
     monkeypatch.setattr(ondemand, "run_traffic_query", tracking)
     with ondemand.pull_period(ctx, start=START, end=END, now=NOW) as res:
         assert res.rows == 72
-    assert len(alive_at_call) == 21 and max(alive_at_call) == 0  # 3 days x (1 + 2 + 4)
+    assert len(alive_at_call) == 15 and max(alive_at_call) == 0  # (1 + 2 + 4), then two days of 4 quarters
 
 
 def test_install_connection_held_while_seeding(ctx, pce, monkeypatch):
@@ -216,3 +216,30 @@ def test_install_lateral_snapshots_not_copied(ctx, pce):
         conn.commit()
     with ondemand.pull_period(ctx, start=START, end=END, now=NOW) as res, res.ctx.flows().connect() as conn:
         assert conn.execute("SELECT count(*) FROM lateral_snapshot_daily").fetchone()[0] == 0
+
+
+def test_dense_days_start_at_the_size_that_fit(ctx, pce, monkeypatch):
+    """Lightweight final review (deferred): a capped day was halved blindly every day — 3 of 7 answers thrown away
+    per dense day. The PCE's matches_count stops near the cap (lab: 220,000 at 200,000), so it cannot say how many
+    pieces a day needs; the next day starts at the size that fit the day before."""
+    monkeypatch.setattr(ondemand, "PER_QUERY", 10)  # a day (24 rows) caps, its halves (12) cap, quarters (6) fit
+    with ondemand.pull_period(ctx, start=START, end=END, now=NOW) as res:
+        assert res.rows == 72 and not res.truncated
+    spans = [datetime.fromisoformat(p["end_date"]) - datetime.fromisoformat(p["start_date"]) for p in pce.payloads]
+    assert len(spans) == 7 + 4 + 4  # the first day finds the size; the next two are read at it, nothing discarded
+    assert spans[7:] == [timedelta(hours=6)] * 8
+
+
+def test_sparse_days_grow_back(ctx, pce, monkeypatch):
+    """A quiet day after a dense one: the pieces double again (towards a day) rather than staying small."""
+    monkeypatch.setattr(ondemand, "PER_QUERY", 10)
+    dense_day = START.date()
+    pce.answer = lambda s, e, n: _hourly(s, e, n) if s.date() == dense_day else []
+    with ondemand.pull_period(ctx, start=START, end=END, now=NOW):
+        pass
+    by_day: dict = {}
+    for p in pce.payloads:
+        s = datetime.fromisoformat(p["start_date"])
+        by_day.setdefault(s.date(), []).append(datetime.fromisoformat(p["end_date"]) - s)
+    days = sorted(by_day)
+    assert by_day[days[1]] == [timedelta(hours=6)] * 4 and by_day[days[2]] == [timedelta(hours=12)] * 2
