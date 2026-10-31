@@ -36,11 +36,16 @@ def _time(value: Any) -> datetime | None:
     return t.replace(tzinfo=UTC) if t.tzinfo is None else t.astimezone(UTC)
 
 
-def cache_store(v5_root: Path, raw: dict[str, Any]) -> Path:
+def cache_store(v5_root: Path, raw: dict[str, Any], original: Path | None = None) -> Path:
+    """original: where 5.x ran, when it has been moved to v5_root (an absolute path inside it moved with it)."""
     cache = raw.get("pce_cache") if isinstance(raw.get("pce_cache"), dict) else {}
     assert isinstance(cache, dict)
     path = Path(str(cache.get("db_path") or "data/pce_cache.sqlite"))
-    return path if path.is_absolute() else v5_root / path  # 5.x opened it relative to its install root
+    if not path.is_absolute():
+        return v5_root / path  # 5.x opened it relative to its install root
+    if original is not None and path.is_relative_to(original):
+        return v5_root / path.relative_to(original)
+    return path
 
 
 def _tables(db: sqlite3.Connection) -> set[str]:
@@ -64,7 +69,9 @@ def _analyzer(db: sqlite3.Connection) -> datetime | None:
     row = db.execute("SELECT last_ingested_at, last_row_id FROM ingestion_cursors WHERE consumer = 'analyzer' "
                      "AND source_table = 'pce_events'").fetchone()
     if row is None or row[0] is None:
-        return None
+        # No cursor yet: 5.x's analyzer had evaluated nothing it cached (its subscriber starts from the beginning).
+        first = _time(db.execute("SELECT MIN(timestamp) FROM pce_events").fetchone()[0])
+        return first - _MS if first else None
     at, last = row[0], row[1] or 0
     after = db.execute("SELECT MIN(timestamp) FROM pce_events WHERE ingested_at > ? OR (ingested_at = ? AND id > ?)",
                        (at, at, last)).fetchone()[0]
@@ -88,7 +95,7 @@ def _state_json(v5_root: Path) -> datetime | None:
         return None
 
 
-def read_handover(v5_root: Path, raw: dict[str, Any]) -> Handover:
+def read_handover(v5_root: Path, raw: dict[str, Any], original: Path | None = None) -> Handover:
     siem = raw.get("siem") if isinstance(raw.get("siem"), dict) else {}
     assert isinstance(siem, dict)
     names = [str(d.get("name") or "").strip() for d in siem.get("destinations") or [] if isinstance(d, dict)]
@@ -96,7 +103,7 @@ def read_handover(v5_root: Path, raw: dict[str, Any]) -> Handover:
     dlq: dict[str, int] = dict.fromkeys(names, 0)
     cache_on = isinstance(raw.get("pce_cache"), dict) and raw["pce_cache"].get("enabled") is True
     alert_floor = None
-    path = cache_store(v5_root, raw)
+    path = cache_store(v5_root, raw, original)
     if path.is_file():
         db = sqlite3.connect(f"file:{path}?mode=ro", uri=True)  # never written, never a WAL checkpoint
         try:

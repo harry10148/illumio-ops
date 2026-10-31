@@ -102,8 +102,10 @@ class MigrationResult:
     siem_origins: dict[str, list[str]] = field(default_factory=dict)  # 5.x destination name -> v6 ids
 
 
-def read_v5(v5_root: Path) -> dict[str, Any]:
-    data = json.loads((v5_root / "config" / "config.json").read_text(encoding="utf-8"))
+def read_v5(v5_root: Path, reader: Callable[[Path], str] | None = None) -> dict[str, Any]:
+    """reader: how a 5.x file is read (the upgrade reads by descriptor, never following a link)."""
+    path = v5_root / "config" / "config.json"
+    data = json.loads(reader(path) if reader else path.read_text(encoding="utf-8"))
     known = {"api", "web_gui", "settings", "alerts", "pce_cache", "siem", "report"}
     if not (isinstance(data, dict) and known & set(data) and "schema_version" not in data):
         raise ValueError("this is not a 5.x config.json")

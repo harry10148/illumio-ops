@@ -139,3 +139,24 @@ def test_backfill_before_the_first_cycle_stops_where_live_collection_will_start(
     ensure_initial_backfill(ctx, now=NOW)  # the scheduler may run it before the events cycle
     run_events_cycle(ctx, now=NOW)
     assert _q(ctx, "SELECT origin FROM events") == [{"origin": DataOrigin.INGEST.value}]
+
+
+def test_a_source_already_live_does_not_carry_backfill_past_another_sources_bound(tmp_path, fake_traffic, monkeypatch):
+    # final review: traffic collected through NOW, events still to start at the upgrade floor — backfill ends at the
+    # floor, or the events after it would be stored as backfill
+    from illumio_ops.domain.values import DataOrigin
+    from illumio_ops.services.collect.cycle import COLD_START_KEY
+    from illumio_ops.services.collect.events import run_events_cycle
+    ctx = configured_ctx(tmp_path, backfill_days=2)
+    floor = NOW - timedelta(hours=3)
+    with ctx.flows().connect() as conn:
+        ingest_state.mark_ok(conn, IngestSource.TRAFFIC, NOW, watermark=NOW, rows=0)
+        ingest_state.set_progress(conn, IngestSource.EVENTS, {COLD_START_KEY: floor.isoformat()})
+        conn.commit()
+    at = NOW - timedelta(hours=1)
+    gap = {"href": "/orgs/1/events/gap", "event_type": "rule_set.create", "timestamp": at.strftime("%Y-%m-%dT%H:%M:%SZ")}
+    monkeypatch.setattr(ev, "fetch_events", lambda client, **kw: EventsPage(
+        items=[gap] if kw["start"] <= at <= kw["end"] else [], capped=False))
+    ensure_initial_backfill(ctx, now=NOW)
+    run_events_cycle(ctx, now=NOW)
+    assert _q(ctx, "SELECT origin FROM events") == [{"origin": DataOrigin.INGEST.value}]

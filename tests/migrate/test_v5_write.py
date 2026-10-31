@@ -169,3 +169,19 @@ def test_a_fifo_in_the_tls_directory_is_skipped_not_waited_on(v5, tmp_path):
     os.mkfifo(v5 / "config" / "tls" / "pipe.pem")
     lines = upgrade(v5, tmp_path / "v6", now=NOW)  # a blocking open would hang here
     assert any("pipe.pem" in line for line in lines)
+
+
+def test_without_any_5x_progress_live_collection_still_starts_at_the_upgrade(v5, tmp_path):
+    # final review: a backfill running before the first cycle must not take [upgrade, first start] as history
+    (v5 / "data" / "pce_cache.sqlite").unlink()
+    root = tmp_path / "v6"
+    upgrade(v5, root, now=NOW)
+    with FlowDb(root / "data" / "flows.sqlite").connect() as conn:
+        assert datetime.fromisoformat(ingest_state.get(conn, IngestSource.EVENTS).progress[COLD_START_KEY]) == NOW
+
+
+def test_a_hard_linked_config_is_refused(v5, tmp_path):
+    from illumio_ops.migrate.v5_write import UnsafeSource
+    os.link(v5 / "config" / "config.json", tmp_path / "second-name")
+    with pytest.raises(UnsafeSource):
+        upgrade(v5, tmp_path / "v6", now=NOW)

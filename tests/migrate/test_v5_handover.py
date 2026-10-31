@@ -88,3 +88,18 @@ def test_the_5x_store_is_opened_read_only(tmp_path):
     before = (tmp_path / "data" / "pce_cache.sqlite").read_bytes()
     read_handover(tmp_path, RAW)
     assert (tmp_path / "data" / "pce_cache.sqlite").read_bytes() == before
+
+
+def test_without_an_analyzer_cursor_every_cached_event_is_still_to_alert(tmp_path):
+    # final review: 5.x's subscriber starts from the beginning when it has no cursor — none was evaluated
+    _db(tmp_path, EVENTS)
+    assert read_handover(tmp_path, RAW).event_alert_floor == T - MS
+
+
+def test_an_absolute_cache_path_inside_a_moved_5x_follows_it(tmp_path):
+    moved = tmp_path / "opt" / "illumio-ops.5x-1"
+    _db(moved, EVENTS, [(1, "graylog", "sent")])
+    raw = {**RAW, "pce_cache": {"enabled": True, "db_path": str(tmp_path / "opt" / "illumio-ops" / "data" /
+                                                                   "pce_cache.sqlite")}}
+    h = read_handover(moved, raw, original=tmp_path / "opt" / "illumio-ops")
+    assert h.audit_floors["graylog"] == T

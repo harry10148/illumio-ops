@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import os
 import stat
+from collections.abc import Callable
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -57,6 +58,24 @@ def _no_links(v5_root: Path, raw_db: Path) -> None:
     for p in (*(v5_root / r for r in _READ), raw_db):
         if p.is_symlink():
             raise UnsafeSource(str(p))
+
+
+def _reader(v5_root: Path) -> Callable[[Path], str]:
+    """Read a 5.x file by descriptor (as the TLS copy does): a link, a swapped-in link or anything but a regular
+    file with one link is refused, not followed (security review: a check then a read by path can be raced)."""
+    def read(path: Path) -> str:
+        try:
+            fd = _open_beneath(v5_root, path.relative_to(v5_root))
+        except FileNotFoundError:
+            raise
+        except (OSError, ValueError) as exc:
+            raise UnsafeSource(str(path)) from exc
+        with os.fdopen(fd, "rb") as f:
+            st = os.fstat(f.fileno())
+            if not stat.S_ISREG(st.st_mode) or st.st_nlink != 1:
+                raise UnsafeSource(str(path))
+            return f.read().decode("utf-8")
+    return read
 
 
 class MigrationBlocked(Exception):
@@ -156,17 +175,18 @@ def _handover(ctx: AppContext, s: Settings, result: MigrationResult, h: Handover
                            {"time": alert_floor.isoformat() if alert_floor else ""}))
     if alert_floor is not None:
         floors.append(alert_floor)
-    if floors:
-        start = max(min(floors), now - COLD_START_CAP)
-        if start > min(floors):
-            lines.append(translate(lang, "migrate_handover_capped", {"days": str(COLD_START_CAP.days),
-                                                                      "from": min(floors).isoformat(),
-                                                                      "to": start.isoformat()}))
-        with ctx.flows().connect() as conn:
-            for src in (IngestSource.EVENTS, IngestSource.TRAFFIC):
-                if collects(s, src):
-                    ingest_state.set_progress(conn, src, {COLD_START_KEY: start.isoformat()})
-            conn.commit()
+    # Live collection starts at the earliest floor, or at the upgrade without one — recorded either way, so a backfill
+    # running before the first cycle never takes that stretch as history (final review).
+    earliest = min(floors, default=now)
+    start = max(earliest, now - COLD_START_CAP)
+    if start > earliest:
+        lines.append(translate(lang, "migrate_handover_capped", {"days": str(COLD_START_CAP.days),
+                                                                  "from": earliest.isoformat(), "to": start.isoformat()}))
+    with ctx.flows().connect() as conn:
+        for src in (IngestSource.EVENTS, IngestSource.TRAFFIC):
+            if collects(s, src):
+                ingest_state.set_progress(conn, src, {COLD_START_KEY: start.isoformat()})
+        conn.commit()
     return lines
 
 
@@ -177,15 +197,14 @@ def upgrade(v5_root: Path, root: Path, *, now: datetime, lang: Language = Langua
     paths = InstallPaths(root)
     if paths.settings_file.exists():
         raise AlreadyInstalled(str(paths.settings_file))
-    if (v5_root / "config" / "config.json").is_symlink():
-        raise UnsafeSource(str(v5_root / "config" / "config.json"))
-    raw = read_v5(v5_root)
-    _no_links(v5_root, cache_store(v5_root, raw))
-    rules, legacy_channels = read_v5_rules(v5_root)
+    read = _reader(v5_root)
+    raw = read_v5(v5_root, read)
+    _no_links(v5_root, cache_store(v5_root, raw, original_root))
+    rules, legacy_channels = read_v5_rules(v5_root, read)
     result = migrate_v5(raw, rules=rules, legacy_channels=legacy_channels)
     if result.blocking or result.settings is None:
         raise MigrationBlocked(result)
-    h = read_handover(v5_root, raw)
+    h = read_handover(v5_root, raw, original_root)
     for d in (paths.config_dir, paths.data_dir, root / "logs"):
         d.mkdir(parents=True, exist_ok=True)
     s, skipped = _copy_tls(v5_root, paths, result.settings, original_root or v5_root)

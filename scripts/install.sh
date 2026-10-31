@@ -111,13 +111,19 @@ if (( ! NO_SYSTEMD )); then
     [[ $(id -u) -eq 0 ]] || die "run as root (or use --no-systemd for a user-level verification install)"
     command -v systemctl >/dev/null || die "systemctl not found (use --no-systemd)"
     if [[ -n "$UPGRADE_FROM" && -z "$OLD_SERVICE" ]]; then
-        for unit in /etc/systemd/system/*.service; do
-            if grep -qx "WorkingDirectory=$UPGRADE_FROM" "$unit" 2>/dev/null; then
+        # The 5.x unit: the one running the 5.x directory, wherever systemd keeps it.
+        for unit in /etc/systemd/system/*.service /usr/lib/systemd/system/*.service /lib/systemd/system/*.service; do
+            if [[ -f "$unit" ]] && grep -qx "WorkingDirectory=$UPGRADE_FROM" "$unit"; then
                 OLD_SERVICE="$(basename "$unit" .service)"
                 break
             fi
         done
+        if [[ -z "$OLD_SERVICE" ]] && systemctl cat illumio-ops 2>/dev/null | grep -qF "$UPGRADE_FROM"; then
+            OLD_SERVICE=illumio-ops
+        fi
+        [[ -n "$OLD_SERVICE" ]] || die "no systemd unit runs $UPGRADE_FROM: pass --old-service NAME, or --old-service none when 5.x does not run as a service; nothing was changed"
     fi
+    [[ "$OLD_SERVICE" == none ]] && OLD_SERVICE=""
     if [[ -e "/etc/systemd/system/${SERVICE}.service" && "$SERVICE" != "$OLD_SERVICE" ]]; then
         die "/etc/systemd/system/${SERVICE}.service already exists"
     fi
@@ -125,33 +131,46 @@ fi
 
 STAMP="$(date +%Y%m%d-%H%M%S)"
 V5_NOW="$UPGRADE_FROM"
+OLD_UNIT=""
 if [[ -n "$UPGRADE_FROM" ]]; then
-    # 5.x stops before its progress is read, so what it sent and evaluated no longer moves.
+    # Back up first, before anything changes: a backup that could not be made stops the upgrade here.
     BACKUP="$(mktemp -d)"
     WRAPPER=/usr/local/bin/illumio-ops
     if (( ! NO_SYSTEMD )) && [[ -n "$OLD_SERVICE" ]]; then
-        echo "==> Stopping and disabling the 5.x service $OLD_SERVICE"
-        systemctl stop "$OLD_SERVICE" || true
-        systemctl disable "$OLD_SERVICE" 2>/dev/null || true
-        [[ -f "/etc/systemd/system/${OLD_SERVICE}.service" ]] && cp -p "/etc/systemd/system/${OLD_SERVICE}.service" "$BACKUP/old.service"
+        OLD_UNIT="$(systemctl show -p FragmentPath --value "$OLD_SERVICE")"
+        [[ -f "$OLD_UNIT" ]] || die "cannot find the unit file of $OLD_SERVICE; nothing was changed"
+        cp -p "$OLD_UNIT" "$BACKUP/old.service" || die "could not back up $OLD_UNIT; nothing was changed"
     fi
     # The 5.x command wrapper, only when it is this installation's (it runs "$UPGRADE_FROM/illumio-ops.py").
+    TAKE_WRAPPER=0
     if (( ! NO_SYSTEMD )) && [[ -f "$WRAPPER" ]] && grep -qF "$UPGRADE_FROM/illumio-ops.py" "$WRAPPER"; then
-        cp -p "$WRAPPER" "$BACKUP/illumio-ops.wrapper"
-        rm -f "$WRAPPER"  # v6 has no command line
+        cp -p "$WRAPPER" "$BACKUP/illumio-ops.wrapper" || die "could not back up $WRAPPER; nothing was changed"
+        TAKE_WRAPPER=1
     fi
+    # 5.x stops before its progress is read, so what it sent and evaluated no longer moves; a stop that did not
+    # take ends the upgrade (5.x writing on while its directory moves would corrupt both).
+    if (( ! NO_SYSTEMD )) && [[ -n "$OLD_SERVICE" ]]; then
+        echo "==> Stopping and disabling the 5.x service $OLD_SERVICE"
+        systemctl stop "$OLD_SERVICE" || die "could not stop $OLD_SERVICE; nothing else was changed"
+        if systemctl is-active --quiet "$OLD_SERVICE"; then
+            die "$OLD_SERVICE is still running; nothing else was changed"
+        fi
+        systemctl disable "$OLD_SERVICE" 2>/dev/null || echo "    (could not disable $OLD_SERVICE; rollback.sh enables it again anyway)"
+    fi
+    (( TAKE_WRAPPER )) && rm -f "$WRAPPER"  # v6 has no command line
+    BACK="5.x is stopped; to start it again: systemctl enable --now ${OLD_SERVICE:-<its service>}"
     if [[ "$PREFIX" == "$UPGRADE_FROM" ]]; then
         V5_NOW="${UPGRADE_FROM}.5x-${STAMP}"
         echo "==> Moving the 5.x installation aside to $V5_NOW"
-        mv "$UPGRADE_FROM" "$V5_NOW"
+        mv "$UPGRADE_FROM" "$V5_NOW" || die "could not move $UPGRADE_FROM aside; $BACK (backups in $BACKUP)"
+        BACK="5.x is stopped and at $V5_NOW; move it back to $UPGRADE_FROM, then: systemctl enable --now ${OLD_SERVICE:-<its service>}"
     fi
-    mkdir -p "$PREFIX/rollback"
-    chmod 700 "$PREFIX/rollback"
-    cp -p "$BACKUP"/* "$PREFIX/rollback/" 2>/dev/null || true
+    mkdir -p "$PREFIX/rollback" && chmod 700 "$PREFIX/rollback" && cp -a "$BACKUP/." "$PREFIX/rollback/" \
+        || die "could not keep the backups in $PREFIX/rollback; $BACK (backups in $BACKUP)"
     rm -rf "$BACKUP"
     {
-        printf 'PREFIX=%q\nSERVICE=%q\nOLD_SERVICE=%q\nV5_NOW=%q\nV5_ORIGINAL=%q\nNO_SYSTEMD=%q\n' \
-            "$PREFIX" "$SERVICE" "$OLD_SERVICE" "$V5_NOW" "$UPGRADE_FROM" "$NO_SYSTEMD"
+        printf 'PREFIX=%q\nSERVICE=%q\nOLD_SERVICE=%q\nOLD_UNIT=%q\nV5_NOW=%q\nV5_ORIGINAL=%q\nNO_SYSTEMD=%q\n' \
+            "$PREFIX" "$SERVICE" "$OLD_SERVICE" "$OLD_UNIT" "$V5_NOW" "$UPGRADE_FROM" "$NO_SYSTEMD"
     } > "$PREFIX/rollback/rollback.env"
     cp "$BUNDLE_DIR/rollback.sh" "$PREFIX/rollback.sh"
     chmod 755 "$PREFIX/rollback.sh"

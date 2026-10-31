@@ -194,10 +194,17 @@ def ensure_initial_backfill(ctx: AppContext, *, now: datetime | None = None) -> 
     missing = tuple(s for s in backfill_sources(settings, manual=False) if str(s) not in done)
     if not missing:
         return None
-    # Backfill ends where live collection began, or will begin: a first cycle not run yet starts at its remembered
-    # cold-start bound (an upgrade from 5.x sets it to where 5.x stopped, P8) — the stretch after it is live data.
-    end = next((m.watermark for src in missing if (m := marks[src]) is not None and m.watermark), None) or min(
-        (datetime.fromisoformat(b) for src in missing if (m := marks[src]) is not None and m.progress
-         and (b := m.progress.get(COLD_START_KEY))), default=at)
+    # Backfill ends where live collection began, or will begin, for every source it reads — the earliest of them: a
+    # first cycle not run yet starts at its remembered cold-start bound (an upgrade from 5.x sets it to where 5.x
+    # stopped, P8), and the stretch after it is live data for that source (final review: traffic done first must not
+    # carry the events backfill past the events' bound).
+    starts = []
+    for src in missing:
+        m = marks[src]
+        if m is not None and m.watermark:
+            starts.append(m.watermark)
+        elif m is not None and m.progress and m.progress.get(COLD_START_KEY):
+            starts.append(datetime.fromisoformat(m.progress[COLD_START_KEY]))
+    end = min(starts, default=at)
     return run_backfill(ctx, start=end - timedelta(days=settings.collection.backfill_days), end=end,
                         plan="initial", sources=missing, now=at)

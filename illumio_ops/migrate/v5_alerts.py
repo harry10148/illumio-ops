@@ -8,6 +8,7 @@ import ipaddress
 import json
 import re
 import uuid
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -34,12 +35,15 @@ _UNSUPPORTED_FILTER_KEYS = ("src_iplists", "dst_iplists", "ex_src_iplists", "ex_
 _RULE_META = frozenset({"id", "type", "name", "name_key", "desc", "desc_key", "rec", "rec_key", "enabled", "filter_key"})
 
 
-def read_v5_rules(v5_root: Path) -> tuple[list[dict[str, Any]] | None, dict[str, Any] | None]:
-    """(the rules in config/alerts.json, or the channel settings when the file has the older layout)."""
+def read_v5_rules(v5_root: Path, reader: Callable[[Path], str] | None = None
+                  ) -> tuple[list[dict[str, Any]] | None, dict[str, Any] | None]:
+    """(the rules in config/alerts.json, or the channel settings when the file has the older layout). reader: how a
+    5.x file is read (the upgrade reads by descriptor, never following a link)."""
     path = v5_root / "config" / "alerts.json"
-    if not path.is_file():
+    try:
+        data = json.loads(reader(path) if reader else path.read_text(encoding="utf-8"))
+    except FileNotFoundError:
         return None, None
-    data = json.loads(path.read_text(encoding="utf-8"))
     if isinstance(data, dict) and "rules" in data:
         return list(data.get("rules") or []), None
     if isinstance(data, dict) and data:

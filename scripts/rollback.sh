@@ -15,7 +15,8 @@ die() { echo "rollback.sh: $*" >&2; exit 1; }
 
 [[ -f "$ENV_FILE" ]] || die "$ENV_FILE is missing: this directory was not made by an upgrade"
 # shellcheck source=/dev/null
-source "$ENV_FILE"   # PREFIX SERVICE OLD_SERVICE V5_NOW V5_ORIGINAL NO_SYSTEMD (written by install.sh, %q-quoted)
+OLD_UNIT=""
+source "$ENV_FILE"   # PREFIX SERVICE OLD_SERVICE OLD_UNIT V5_NOW V5_ORIGINAL NO_SYSTEMD (install.sh, %q-quoted)
 [[ "$PREFIX" == "$HERE" ]] || die "rollback.env names $PREFIX, but this script is in $HERE"
 [[ -d "$V5_NOW" ]] || die "the 5.x installation is no longer at $V5_NOW"
 if [[ "$V5_NOW" != "$V5_ORIGINAL" && -e "$V5_ORIGINAL" && "$V5_ORIGINAL" != "$PREFIX" ]]; then
@@ -27,11 +28,14 @@ fi
 
 AWAY="${PREFIX}.v6-rolled-back-$(date +%Y%m%d-%H%M%S)"
 KEEP="$(mktemp -d)"
-cp -p "$HERE/rollback/"* "$KEEP/" 2>/dev/null || true   # read before the v6 directory moves
+cp -a "$HERE/rollback/." "$KEEP/" || die "could not read the backups in $HERE/rollback; nothing was changed"
 
 if (( ! NO_SYSTEMD )); then
     echo "==> Stopping and disabling v6 ($SERVICE)"
-    systemctl stop "$SERVICE" 2>/dev/null || true
+    systemctl stop "$SERVICE" || die "could not stop $SERVICE; nothing else was changed"
+    if systemctl is-active --quiet "$SERVICE"; then
+        die "$SERVICE is still running; nothing else was changed"
+    fi
     systemctl disable "$SERVICE" 2>/dev/null || true
 fi
 echo "==> Moving v6 aside to $AWAY"
@@ -41,11 +45,9 @@ if [[ "$V5_NOW" != "$V5_ORIGINAL" ]]; then
     mv "$V5_NOW" "$V5_ORIGINAL"
 fi
 if (( ! NO_SYSTEMD )); then
-    if [[ "$SERVICE" != "$OLD_SERVICE" ]]; then
-        rm -f "/etc/systemd/system/${SERVICE}.service"
-    fi
+    rm -f "/etc/systemd/system/${SERVICE}.service"   # v6's unit; the 5.x one goes back where systemd had it
     if [[ -n "$OLD_SERVICE" && -f "$KEEP/old.service" ]]; then
-        cp -p "$KEEP/old.service" "/etc/systemd/system/${OLD_SERVICE}.service"
+        cp -p "$KEEP/old.service" "${OLD_UNIT:-/etc/systemd/system/${OLD_SERVICE}.service}"
     fi
     if [[ -f "$KEEP/illumio-ops.wrapper" ]]; then
         cp -p "$KEEP/illumio-ops.wrapper" /usr/local/bin/illumio-ops
