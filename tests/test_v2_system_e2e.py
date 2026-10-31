@@ -403,13 +403,16 @@ def test_display_language_reaches_the_request_body(v2_page):
 
     page.route("**/api/settings", _capture)
     try:
-        with page.expect_request(
-            lambda r: "/api/settings" in r.url and r.method == "POST"
+        # Waiting for the RESPONSE, not just the request: the request event fires
+        # before the route handler runs, so unrouting on it could let the POST
+        # through to the real server and persist the language (CI 2026-10-31).
+        with page.expect_response(
+            lambda r: "/api/settings" in r.url and r.request.method == "POST"
         ) as info:
             page.get_by_role("button", name=_labels(page)["gui_save"], exact=True).last.click()
-        # expect_request fails loudly if the click sends nothing, so "no request"
+        # expect_response fails loudly if the click sends nothing, so "no request"
         # can no longer look like a passing assertion.
-        body = info.value.post_data_json
+        body = info.value.request.post_data_json
     finally:
         page.unroute("**/api/settings", _capture)
 
