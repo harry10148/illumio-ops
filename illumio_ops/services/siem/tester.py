@@ -21,7 +21,7 @@ class SiemTestResult(BaseModel):
 
 
 def send_test(ctx: AppContext, dest: SiemDestination, *, now: datetime | None = None,
-                     transport_factory: TransportFactory = transport_for) -> SiemTestResult:
+                     transport_factory: TransportFactory | None = None) -> SiemTestResult:
     at = (now or datetime.now(UTC)).astimezone(UTC)
     lang = ctx.settings.current().display.language
     rec = SiemRecord(kind="test", record_id=int(at.timestamp()), time=at, signature="test",
@@ -29,7 +29,7 @@ def send_test(ctx: AppContext, dest: SiemDestination, *, now: datetime | None = 
     line = formatter_for(dest.format, host=SYSLOG_HOST).format_record(rec)
     transport = None
     try:
-        transport = transport_factory(dest)
+        transport = (transport_factory or transport_for)(dest)
         transport.send_record(line, at.timestamp())
         transport.finish_batch()
     except Exception as exc:  # noqa: BLE001 — the operator reads the reason on the page

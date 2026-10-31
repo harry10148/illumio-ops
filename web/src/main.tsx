@@ -20,6 +20,8 @@ import "./pages/system/Tls";
 import "./pages/system/Security";
 import "./pages/system/Display";
 import "./pages/system/ReportSettings";
+import "./pages/siem/Siem";
+import "./pages/siem/Dlq";
 import "./styles/tokens.css";
 import "./styles/base.css";
 

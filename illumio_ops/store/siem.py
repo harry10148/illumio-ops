@@ -111,8 +111,11 @@ def forget_destination(conn: sqlite3.Connection, destination_id: str, keep_sourc
     """Cursors of a removed destination, or of sources a destination no longer takes (taking one again starts over
     from the newest record, like a new destination)."""
     with conn:
+        if not keep_sources:  # NOT IN (NULL) would match nothing: a removed destination keeps no cursor
+            conn.execute("DELETE FROM siem_cursor WHERE destination_id = ?", (destination_id,))
+            return
         conn.execute(f"DELETE FROM siem_cursor WHERE destination_id = ? AND source NOT IN "
-                     f"({','.join('?' * len(keep_sources)) or 'NULL'})", (destination_id, *keep_sources))
+                     f"({','.join('?' * len(keep_sources))})", (destination_id, *keep_sources))
 
 
 # ── DLQ ──────────────────────────────────────────────────────────────────────
@@ -126,6 +129,7 @@ class DeadLetter:
     external_id: str
     event_time: datetime | None
     payload: str
+    sent_as: str
     error: str
     attempts: int
     quarantined_at: datetime
@@ -135,7 +139,7 @@ def _dead(row: sqlite3.Row) -> DeadLetter:
     return DeadLetter(id=row["id"], destination_id=row["destination_id"], source=row["source"],
                       record_id=row["record_id"], external_id=row["external_id"],
                       event_time=datetime.fromisoformat(row["event_time"]) if row["event_time"] else None,
-                      payload=row["payload"], error=row["error"], attempts=int(row["attempts"]),
+                      payload=row["payload"], sent_as=row["sent_as"], error=row["error"], attempts=int(row["attempts"]),
                       quarantined_at=datetime.fromisoformat(row["quarantined_at"]))
 
 
@@ -150,12 +154,14 @@ def dlq_counts(conn: sqlite3.Connection) -> dict[str, int]:
 
 
 def quarantine(conn: sqlite3.Connection, *, destination_id: str, source: str, record_id: int, external_id: str,
-               event_time: datetime | None, payload: str, error: str, attempts: int, at: datetime) -> None:
+               event_time: datetime | None, payload: str, sent_as: str, error: str, attempts: int,
+               at: datetime) -> None:
     with conn:
         conn.execute(
-            "INSERT INTO siem_dlq (destination_id, source, record_id, external_id, event_time, payload, error, "
-            "attempts, quarantined_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-            (destination_id, source, record_id, external_id, _t(event_time), payload, error[:2000], attempts, _t(at)))
+            "INSERT INTO siem_dlq (destination_id, source, record_id, external_id, event_time, payload, sent_as, error, "
+            "attempts, quarantined_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (destination_id, source, record_id, external_id, _t(event_time), payload, sent_as, error[:2000], attempts,
+             _t(at)))
 
 
 def dlq_page(conn: sqlite3.Connection, *, destination_id: str | None, limit: int, offset: int) -> list[DeadLetter]:

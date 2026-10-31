@@ -12,6 +12,7 @@ sending: a slow SIEM never keeps a PCE switch waiting."""
 from __future__ import annotations
 
 import errno
+import json
 import threading
 import time
 from collections.abc import Callable
@@ -90,6 +91,12 @@ def _formatter(ctx: AppContext, s: Settings, dest: SiemDestination) -> Formatter
                          host=SYSLOG_HOST)
 
 
+def sent_as(dest: SiemDestination) -> str:
+    """What a stored line was made for: a DLQ resend to a destination changed since (masking on, another host, another
+    format) is not made — the line would carry what the destination now asks to leave out (P7 security review)."""
+    return json.dumps([dest.transport.value, dest.host, dest.port, dest.format.value, dest.mask_pii])
+
+
 def _event_time(rec: SiemRecord) -> float:
     return rec.time.timestamp()
 
@@ -148,8 +155,8 @@ def _quarantine(ctx: AppContext, s: Settings, dest: SiemDestination, source: str
             store.note_error(conn, dest.id, source, "dlq_full", at)
             return False
         store.quarantine(conn, destination_id=dest.id, source=source, record_id=rec.record_id,
-                         external_id=rec.external_id, event_time=rec.time, payload=payload, error=error,
-                         attempts=attempts, at=at)
+                         external_id=rec.external_id, event_time=rec.time, payload=payload, sent_as=sent_as(dest),
+                         error=error, attempts=attempts, at=at)
     logger.warning("SIEM destination {}: {} moved to the DLQ ({})", dest.name, rec.external_id, error)
     return True
 

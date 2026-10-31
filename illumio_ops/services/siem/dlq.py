@@ -11,7 +11,7 @@ from loguru import logger
 from pydantic import BaseModel
 
 from illumio_ops.services.context import AppContext
-from illumio_ops.services.siem.dispatch import TransportFactory
+from illumio_ops.services.siem.dispatch import TransportFactory, sent_as
 from illumio_ops.siem.transports.factory import transport_for
 from illumio_ops.store import siem as store
 
@@ -23,19 +23,20 @@ class ResendResult(BaseModel):
     sent: int
     failed: int
     skipped: int        # its destination is gone or turned off
+    changed: int        # its destination changed since (masking, host, port, format): not resent, purge or keep
     remaining: int      # still in the DLQ (of the destination asked, or all)
     error: str | None
 
 
 def resend(ctx: AppContext, *, ids: Sequence[int] | None, destination_id: str | None,
-           transport_factory: TransportFactory = transport_for) -> ResendResult:
+           transport_factory: TransportFactory | None = None) -> ResendResult:
     """ids: those lines; None: the oldest RESEND_MAX of the destination (or of every destination)."""
     with ctx.db() as conn:
         dead = store.dlq_by_ids(conn, list(ids)) if ids is not None else store.dlq_after(
             conn, destination_id=destination_id, after_id=0, limit=RESEND_MAX)
     dead = dead[:RESEND_MAX]
     dests = {d.id: d for d in ctx.settings.current().siem.destinations if d.enabled}
-    sent = failed = skipped = 0
+    sent = failed = skipped = changed = 0
     last_error: str | None = None
     by_dest: dict[str, list[store.DeadLetter]] = {}
     for d in dead:
@@ -45,8 +46,14 @@ def resend(ctx: AppContext, *, ids: Sequence[int] | None, destination_id: str | 
         if dest is None:
             skipped += len(letters)
             continue
+        made_for = sent_as(dest)
+        stale = [d for d in letters if d.sent_as != made_for]
+        changed += len(stale)
+        letters = [d for d in letters if d.sent_as == made_for]
+        if not letters:
+            continue
         ok: list[int] = []
-        transport = transport_factory(dest)
+        transport = (transport_factory or transport_for)(dest)
         try:
             for d in letters:
                 try:
@@ -74,7 +81,8 @@ def resend(ctx: AppContext, *, ids: Sequence[int] | None, destination_id: str | 
         sent += len(ok)
     with ctx.db() as conn:
         remaining = store.dlq_count(conn, destination_id)
-    return ResendResult(sent=sent, failed=failed, skipped=skipped, remaining=remaining, error=last_error)
+    return ResendResult(sent=sent, failed=failed, skipped=skipped, changed=changed, remaining=remaining,
+                        error=last_error)
 
 
 def purge(ctx: AppContext, *, ids: Sequence[int] | None, destination_id: str | None) -> int:

@@ -34,7 +34,9 @@ CREATE TABLE siem_cursor (
 ) WITHOUT ROWID;
 
 -- Records a destination would not take (owner: illumio_ops.store.siem): the formatted line itself, so a resend does
--- not need the source row (retention may have deleted it).
+-- not need the source row (retention may have deleted it). sent_as: the destination's transport, host, port, format
+-- and masking when the line was made — a resend to a destination since changed (masking turned on, another host)
+-- is not made.
 CREATE TABLE siem_dlq (
     id             INTEGER PRIMARY KEY AUTOINCREMENT,
     destination_id TEXT NOT NULL,
@@ -43,6 +45,7 @@ CREATE TABLE siem_dlq (
     external_id    TEXT NOT NULL,
     event_time     TEXT,
     payload        TEXT NOT NULL,
+    sent_as        TEXT NOT NULL,
     error          TEXT NOT NULL,
     attempts       INTEGER NOT NULL,
     quarantined_at TEXT NOT NULL

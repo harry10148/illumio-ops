@@ -106,7 +106,7 @@ def test_status_says_failing_and_dlq_full(ctx):
     with ctx.db() as conn:
         for i in range(100):
             store.quarantine(conn, destination_id=DEST, source="audit", record_id=-i, external_id=f"x:{i}",
-                             event_time=None, payload="p", error="e", attempts=1, at=NOW)
+                             event_time=None, payload="p", sent_as="[]", error="e", attempts=1, at=NOW)
         store.note_error(conn, DEST, "audit", "dlq_full", NOW + timedelta(seconds=1))
     view = siem_status(ctx)
     assert view.destinations[0].dlq == 100 and view.destinations[0].sources[0].state == "dlq_full"

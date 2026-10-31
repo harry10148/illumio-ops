@@ -26331,6 +26331,1263 @@
         "type": "object"
       }
     },
+    "siem.destination.test": {
+      "method": "POST",
+      "path": "/api/siem/test",
+      "request_schema": {
+        "$defs": {
+          "PolicyDecision": {
+            "enum": [
+              "allowed",
+              "potentially_blocked",
+              "blocked",
+              "unknown"
+            ],
+            "title": "PolicyDecision",
+            "type": "string"
+          },
+          "SiemDestinationInput": {
+            "description": "The page's copy of a destination: a masked token is not a token, so what is saved or sent is validated as\nSiemDestination after the saved token is merged back in.",
+            "properties": {
+              "batch_size": {
+                "title": "Batch Size",
+                "type": "integer"
+              },
+              "enabled": {
+                "title": "Enabled",
+                "type": "boolean"
+              },
+              "format": {
+                "$ref": "#/$defs/SiemFormat"
+              },
+              "framing": {
+                "enum": [
+                  "lf",
+                  "octet_counting"
+                ],
+                "title": "Framing",
+                "type": "string"
+              },
+              "hec_token": {
+                "title": "Hec Token",
+                "type": "string"
+              },
+              "host": {
+                "title": "Host",
+                "type": "string"
+              },
+              "id": {
+                "title": "Id",
+                "type": "string"
+              },
+              "mask_pii": {
+                "title": "Mask Pii",
+                "type": "boolean"
+              },
+              "max_retries": {
+                "title": "Max Retries",
+                "type": "integer"
+              },
+              "name": {
+                "title": "Name",
+                "type": "string"
+              },
+              "new_connection_decisions": {
+                "items": {
+                  "$ref": "#/$defs/PolicyDecision"
+                },
+                "title": "New Connection Decisions",
+                "type": "array"
+              },
+              "port": {
+                "title": "Port",
+                "type": "integer"
+              },
+              "sources": {
+                "items": {
+                  "$ref": "#/$defs/SiemSource"
+                },
+                "title": "Sources",
+                "type": "array"
+              },
+              "transport": {
+                "$ref": "#/$defs/SiemTransport"
+              },
+              "verify_tls": {
+                "anyOf": [
+                  {
+                    "type": "boolean"
+                  },
+                  {
+                    "type": "string"
+                  }
+                ],
+                "title": "Verify Tls"
+              }
+            },
+            "required": [
+              "id",
+              "name",
+              "enabled",
+              "transport",
+              "format",
+              "host",
+              "port",
+              "framing",
+              "verify_tls",
+              "hec_token",
+              "batch_size",
+              "max_retries",
+              "sources",
+              "new_connection_decisions",
+              "mask_pii"
+            ],
+            "title": "SiemDestinationInput",
+            "type": "object"
+          },
+          "SiemFormat": {
+            "description": "How a SIEM destination's lines look (spec §6.5 SIEM 轉送).",
+            "enum": [
+              "cef",
+              "json",
+              "syslog_cef",
+              "syslog_json",
+              "cef_pce",
+              "syslog_cef_pce"
+            ],
+            "title": "SiemFormat",
+            "type": "string"
+          },
+          "SiemSource": {
+            "description": "What a destination receives: PCE audit events, this product's detections and alerts, and (optional) the first\ntime each connection appears in the baseline period. Never traffic records (spec §4.1 goal 4).",
+            "enum": [
+              "audit",
+              "findings",
+              "new_connections"
+            ],
+            "title": "SiemSource",
+            "type": "string"
+          },
+          "SiemTransport": {
+            "enum": [
+              "udp",
+              "tcp",
+              "tls",
+              "hec"
+            ],
+            "title": "SiemTransport",
+            "type": "string"
+          }
+        },
+        "properties": {
+          "destination": {
+            "$ref": "#/$defs/SiemDestinationInput"
+          }
+        },
+        "required": [
+          "destination"
+        ],
+        "title": "SiemTestRequest",
+        "type": "object"
+      },
+      "response_schema": {
+        "properties": {
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "line": {
+            "title": "Line",
+            "type": "string"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok",
+          "error",
+          "line"
+        ],
+        "title": "SiemTestView",
+        "type": "object"
+      }
+    },
+    "siem.dlq.list": {
+      "method": "GET",
+      "path": "/api/siem/dlq",
+      "request_schema": null,
+      "response_schema": {
+        "$defs": {
+          "DlqItem": {
+            "properties": {
+              "attempts": {
+                "title": "Attempts",
+                "type": "integer"
+              },
+              "destination": {
+                "title": "Destination",
+                "type": "string"
+              },
+              "destination_id": {
+                "title": "Destination Id",
+                "type": "string"
+              },
+              "error": {
+                "title": "Error",
+                "type": "string"
+              },
+              "event_time": {
+                "anyOf": [
+                  {
+                    "format": "date-time",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Event Time"
+              },
+              "external_id": {
+                "title": "External Id",
+                "type": "string"
+              },
+              "id": {
+                "title": "Id",
+                "type": "integer"
+              },
+              "preview": {
+                "title": "Preview",
+                "type": "string"
+              },
+              "quarantined_at": {
+                "format": "date-time",
+                "title": "Quarantined At",
+                "type": "string"
+              },
+              "source": {
+                "title": "Source",
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "destination_id",
+              "destination",
+              "source",
+              "external_id",
+              "event_time",
+              "error",
+              "attempts",
+              "quarantined_at",
+              "preview"
+            ],
+            "title": "DlqItem",
+            "type": "object"
+          }
+        },
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/$defs/DlqItem"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "limit": {
+            "title": "Limit",
+            "type": "integer"
+          },
+          "offset": {
+            "title": "Offset",
+            "type": "integer"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "total",
+          "limit",
+          "offset"
+        ],
+        "title": "DlqPage",
+        "type": "object"
+      }
+    },
+    "siem.dlq.purge": {
+      "method": "POST",
+      "path": "/api/siem/dlq/purge",
+      "request_schema": {
+        "description": "ids: those lines; none: every line of destination_id (or of every destination).",
+        "properties": {
+          "destination_id": {
+            "anyOf": [
+              {
+                "pattern": "^[0-9a-f]{32}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Destination Id"
+          },
+          "ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "integer"
+                },
+                "maxItems": 1000,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Ids"
+          }
+        },
+        "title": "DlqAction",
+        "type": "object"
+      },
+      "response_schema": {
+        "properties": {
+          "deleted": {
+            "title": "Deleted",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "deleted"
+        ],
+        "title": "DlqPurgeView",
+        "type": "object"
+      }
+    },
+    "siem.dlq.resend": {
+      "method": "POST",
+      "path": "/api/siem/dlq/resend",
+      "request_schema": {
+        "description": "ids: those lines; none: every line of destination_id (or of every destination).",
+        "properties": {
+          "destination_id": {
+            "anyOf": [
+              {
+                "pattern": "^[0-9a-f]{32}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Destination Id"
+          },
+          "ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "integer"
+                },
+                "maxItems": 1000,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Ids"
+          }
+        },
+        "title": "DlqAction",
+        "type": "object"
+      },
+      "response_schema": {
+        "properties": {
+          "changed": {
+            "title": "Changed",
+            "type": "integer"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "failed": {
+            "title": "Failed",
+            "type": "integer"
+          },
+          "remaining": {
+            "title": "Remaining",
+            "type": "integer"
+          },
+          "sent": {
+            "title": "Sent",
+            "type": "integer"
+          },
+          "skipped": {
+            "title": "Skipped",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "sent",
+          "failed",
+          "skipped",
+          "changed",
+          "remaining",
+          "error"
+        ],
+        "title": "DlqResendView",
+        "type": "object"
+      }
+    },
+    "siem.settings.get": {
+      "method": "GET",
+      "path": "/api/siem/settings",
+      "request_schema": null,
+      "response_schema": {
+        "$defs": {
+          "PolicyDecision": {
+            "enum": [
+              "allowed",
+              "potentially_blocked",
+              "blocked",
+              "unknown"
+            ],
+            "title": "PolicyDecision",
+            "type": "string"
+          },
+          "SiemDestinationInput": {
+            "description": "The page's copy of a destination: a masked token is not a token, so what is saved or sent is validated as\nSiemDestination after the saved token is merged back in.",
+            "properties": {
+              "batch_size": {
+                "title": "Batch Size",
+                "type": "integer"
+              },
+              "enabled": {
+                "title": "Enabled",
+                "type": "boolean"
+              },
+              "format": {
+                "$ref": "#/$defs/SiemFormat"
+              },
+              "framing": {
+                "enum": [
+                  "lf",
+                  "octet_counting"
+                ],
+                "title": "Framing",
+                "type": "string"
+              },
+              "hec_token": {
+                "title": "Hec Token",
+                "type": "string"
+              },
+              "host": {
+                "title": "Host",
+                "type": "string"
+              },
+              "id": {
+                "title": "Id",
+                "type": "string"
+              },
+              "mask_pii": {
+                "title": "Mask Pii",
+                "type": "boolean"
+              },
+              "max_retries": {
+                "title": "Max Retries",
+                "type": "integer"
+              },
+              "name": {
+                "title": "Name",
+                "type": "string"
+              },
+              "new_connection_decisions": {
+                "items": {
+                  "$ref": "#/$defs/PolicyDecision"
+                },
+                "title": "New Connection Decisions",
+                "type": "array"
+              },
+              "port": {
+                "title": "Port",
+                "type": "integer"
+              },
+              "sources": {
+                "items": {
+                  "$ref": "#/$defs/SiemSource"
+                },
+                "title": "Sources",
+                "type": "array"
+              },
+              "transport": {
+                "$ref": "#/$defs/SiemTransport"
+              },
+              "verify_tls": {
+                "anyOf": [
+                  {
+                    "type": "boolean"
+                  },
+                  {
+                    "type": "string"
+                  }
+                ],
+                "title": "Verify Tls"
+              }
+            },
+            "required": [
+              "id",
+              "name",
+              "enabled",
+              "transport",
+              "format",
+              "host",
+              "port",
+              "framing",
+              "verify_tls",
+              "hec_token",
+              "batch_size",
+              "max_retries",
+              "sources",
+              "new_connection_decisions",
+              "mask_pii"
+            ],
+            "title": "SiemDestinationInput",
+            "type": "object"
+          },
+          "SiemFormat": {
+            "description": "How a SIEM destination's lines look (spec §6.5 SIEM 轉送).",
+            "enum": [
+              "cef",
+              "json",
+              "syslog_cef",
+              "syslog_json",
+              "cef_pce",
+              "syslog_cef_pce"
+            ],
+            "title": "SiemFormat",
+            "type": "string"
+          },
+          "SiemSettingsInput": {
+            "properties": {
+              "backlog_warn_rows": {
+                "title": "Backlog Warn Rows",
+                "type": "integer"
+              },
+              "destinations": {
+                "items": {
+                  "$ref": "#/$defs/SiemDestinationInput"
+                },
+                "title": "Destinations",
+                "type": "array"
+              },
+              "dlq_max_per_dest": {
+                "title": "Dlq Max Per Dest",
+                "type": "integer"
+              },
+              "enabled": {
+                "title": "Enabled",
+                "type": "boolean"
+              },
+              "tick_seconds": {
+                "title": "Tick Seconds",
+                "type": "integer"
+              }
+            },
+            "required": [
+              "enabled",
+              "destinations",
+              "dlq_max_per_dest",
+              "tick_seconds",
+              "backlog_warn_rows"
+            ],
+            "title": "SiemSettingsInput",
+            "type": "object"
+          },
+          "SiemSource": {
+            "description": "What a destination receives: PCE audit events, this product's detections and alerts, and (optional) the first\ntime each connection appears in the baseline period. Never traffic records (spec §4.1 goal 4).",
+            "enum": [
+              "audit",
+              "findings",
+              "new_connections"
+            ],
+            "title": "SiemSource",
+            "type": "string"
+          },
+          "SiemTransport": {
+            "enum": [
+              "udp",
+              "tcp",
+              "tls",
+              "hec"
+            ],
+            "title": "SiemTransport",
+            "type": "string"
+          }
+        },
+        "properties": {
+          "revision": {
+            "title": "Revision",
+            "type": "integer"
+          },
+          "siem": {
+            "$ref": "#/$defs/SiemSettingsInput"
+          }
+        },
+        "required": [
+          "revision",
+          "siem"
+        ],
+        "title": "SiemSettingsView",
+        "type": "object"
+      }
+    },
+    "siem.settings.update": {
+      "method": "PUT",
+      "path": "/api/siem/settings",
+      "request_schema": {
+        "$defs": {
+          "PolicyDecision": {
+            "enum": [
+              "allowed",
+              "potentially_blocked",
+              "blocked",
+              "unknown"
+            ],
+            "title": "PolicyDecision",
+            "type": "string"
+          },
+          "SiemDestinationInput": {
+            "description": "The page's copy of a destination: a masked token is not a token, so what is saved or sent is validated as\nSiemDestination after the saved token is merged back in.",
+            "properties": {
+              "batch_size": {
+                "title": "Batch Size",
+                "type": "integer"
+              },
+              "enabled": {
+                "title": "Enabled",
+                "type": "boolean"
+              },
+              "format": {
+                "$ref": "#/$defs/SiemFormat"
+              },
+              "framing": {
+                "enum": [
+                  "lf",
+                  "octet_counting"
+                ],
+                "title": "Framing",
+                "type": "string"
+              },
+              "hec_token": {
+                "title": "Hec Token",
+                "type": "string"
+              },
+              "host": {
+                "title": "Host",
+                "type": "string"
+              },
+              "id": {
+                "title": "Id",
+                "type": "string"
+              },
+              "mask_pii": {
+                "title": "Mask Pii",
+                "type": "boolean"
+              },
+              "max_retries": {
+                "title": "Max Retries",
+                "type": "integer"
+              },
+              "name": {
+                "title": "Name",
+                "type": "string"
+              },
+              "new_connection_decisions": {
+                "items": {
+                  "$ref": "#/$defs/PolicyDecision"
+                },
+                "title": "New Connection Decisions",
+                "type": "array"
+              },
+              "port": {
+                "title": "Port",
+                "type": "integer"
+              },
+              "sources": {
+                "items": {
+                  "$ref": "#/$defs/SiemSource"
+                },
+                "title": "Sources",
+                "type": "array"
+              },
+              "transport": {
+                "$ref": "#/$defs/SiemTransport"
+              },
+              "verify_tls": {
+                "anyOf": [
+                  {
+                    "type": "boolean"
+                  },
+                  {
+                    "type": "string"
+                  }
+                ],
+                "title": "Verify Tls"
+              }
+            },
+            "required": [
+              "id",
+              "name",
+              "enabled",
+              "transport",
+              "format",
+              "host",
+              "port",
+              "framing",
+              "verify_tls",
+              "hec_token",
+              "batch_size",
+              "max_retries",
+              "sources",
+              "new_connection_decisions",
+              "mask_pii"
+            ],
+            "title": "SiemDestinationInput",
+            "type": "object"
+          },
+          "SiemFormat": {
+            "description": "How a SIEM destination's lines look (spec §6.5 SIEM 轉送).",
+            "enum": [
+              "cef",
+              "json",
+              "syslog_cef",
+              "syslog_json",
+              "cef_pce",
+              "syslog_cef_pce"
+            ],
+            "title": "SiemFormat",
+            "type": "string"
+          },
+          "SiemSettingsInput": {
+            "properties": {
+              "backlog_warn_rows": {
+                "title": "Backlog Warn Rows",
+                "type": "integer"
+              },
+              "destinations": {
+                "items": {
+                  "$ref": "#/$defs/SiemDestinationInput"
+                },
+                "title": "Destinations",
+                "type": "array"
+              },
+              "dlq_max_per_dest": {
+                "title": "Dlq Max Per Dest",
+                "type": "integer"
+              },
+              "enabled": {
+                "title": "Enabled",
+                "type": "boolean"
+              },
+              "tick_seconds": {
+                "title": "Tick Seconds",
+                "type": "integer"
+              }
+            },
+            "required": [
+              "enabled",
+              "destinations",
+              "dlq_max_per_dest",
+              "tick_seconds",
+              "backlog_warn_rows"
+            ],
+            "title": "SiemSettingsInput",
+            "type": "object"
+          },
+          "SiemSource": {
+            "description": "What a destination receives: PCE audit events, this product's detections and alerts, and (optional) the first\ntime each connection appears in the baseline period. Never traffic records (spec §4.1 goal 4).",
+            "enum": [
+              "audit",
+              "findings",
+              "new_connections"
+            ],
+            "title": "SiemSource",
+            "type": "string"
+          },
+          "SiemTransport": {
+            "enum": [
+              "udp",
+              "tcp",
+              "tls",
+              "hec"
+            ],
+            "title": "SiemTransport",
+            "type": "string"
+          }
+        },
+        "properties": {
+          "revision": {
+            "title": "Revision",
+            "type": "integer"
+          },
+          "siem": {
+            "$ref": "#/$defs/SiemSettingsInput"
+          }
+        },
+        "required": [
+          "revision",
+          "siem"
+        ],
+        "title": "SiemSettingsUpdate",
+        "type": "object"
+      },
+      "response_schema": {
+        "$defs": {
+          "PolicyDecision": {
+            "enum": [
+              "allowed",
+              "potentially_blocked",
+              "blocked",
+              "unknown"
+            ],
+            "title": "PolicyDecision",
+            "type": "string"
+          },
+          "SiemDestinationInput": {
+            "description": "The page's copy of a destination: a masked token is not a token, so what is saved or sent is validated as\nSiemDestination after the saved token is merged back in.",
+            "properties": {
+              "batch_size": {
+                "title": "Batch Size",
+                "type": "integer"
+              },
+              "enabled": {
+                "title": "Enabled",
+                "type": "boolean"
+              },
+              "format": {
+                "$ref": "#/$defs/SiemFormat"
+              },
+              "framing": {
+                "enum": [
+                  "lf",
+                  "octet_counting"
+                ],
+                "title": "Framing",
+                "type": "string"
+              },
+              "hec_token": {
+                "title": "Hec Token",
+                "type": "string"
+              },
+              "host": {
+                "title": "Host",
+                "type": "string"
+              },
+              "id": {
+                "title": "Id",
+                "type": "string"
+              },
+              "mask_pii": {
+                "title": "Mask Pii",
+                "type": "boolean"
+              },
+              "max_retries": {
+                "title": "Max Retries",
+                "type": "integer"
+              },
+              "name": {
+                "title": "Name",
+                "type": "string"
+              },
+              "new_connection_decisions": {
+                "items": {
+                  "$ref": "#/$defs/PolicyDecision"
+                },
+                "title": "New Connection Decisions",
+                "type": "array"
+              },
+              "port": {
+                "title": "Port",
+                "type": "integer"
+              },
+              "sources": {
+                "items": {
+                  "$ref": "#/$defs/SiemSource"
+                },
+                "title": "Sources",
+                "type": "array"
+              },
+              "transport": {
+                "$ref": "#/$defs/SiemTransport"
+              },
+              "verify_tls": {
+                "anyOf": [
+                  {
+                    "type": "boolean"
+                  },
+                  {
+                    "type": "string"
+                  }
+                ],
+                "title": "Verify Tls"
+              }
+            },
+            "required": [
+              "id",
+              "name",
+              "enabled",
+              "transport",
+              "format",
+              "host",
+              "port",
+              "framing",
+              "verify_tls",
+              "hec_token",
+              "batch_size",
+              "max_retries",
+              "sources",
+              "new_connection_decisions",
+              "mask_pii"
+            ],
+            "title": "SiemDestinationInput",
+            "type": "object"
+          },
+          "SiemFormat": {
+            "description": "How a SIEM destination's lines look (spec §6.5 SIEM 轉送).",
+            "enum": [
+              "cef",
+              "json",
+              "syslog_cef",
+              "syslog_json",
+              "cef_pce",
+              "syslog_cef_pce"
+            ],
+            "title": "SiemFormat",
+            "type": "string"
+          },
+          "SiemSettingsInput": {
+            "properties": {
+              "backlog_warn_rows": {
+                "title": "Backlog Warn Rows",
+                "type": "integer"
+              },
+              "destinations": {
+                "items": {
+                  "$ref": "#/$defs/SiemDestinationInput"
+                },
+                "title": "Destinations",
+                "type": "array"
+              },
+              "dlq_max_per_dest": {
+                "title": "Dlq Max Per Dest",
+                "type": "integer"
+              },
+              "enabled": {
+                "title": "Enabled",
+                "type": "boolean"
+              },
+              "tick_seconds": {
+                "title": "Tick Seconds",
+                "type": "integer"
+              }
+            },
+            "required": [
+              "enabled",
+              "destinations",
+              "dlq_max_per_dest",
+              "tick_seconds",
+              "backlog_warn_rows"
+            ],
+            "title": "SiemSettingsInput",
+            "type": "object"
+          },
+          "SiemSource": {
+            "description": "What a destination receives: PCE audit events, this product's detections and alerts, and (optional) the first\ntime each connection appears in the baseline period. Never traffic records (spec §4.1 goal 4).",
+            "enum": [
+              "audit",
+              "findings",
+              "new_connections"
+            ],
+            "title": "SiemSource",
+            "type": "string"
+          },
+          "SiemTransport": {
+            "enum": [
+              "udp",
+              "tcp",
+              "tls",
+              "hec"
+            ],
+            "title": "SiemTransport",
+            "type": "string"
+          }
+        },
+        "properties": {
+          "revision": {
+            "title": "Revision",
+            "type": "integer"
+          },
+          "siem": {
+            "$ref": "#/$defs/SiemSettingsInput"
+          }
+        },
+        "required": [
+          "revision",
+          "siem"
+        ],
+        "title": "SiemSettingsView",
+        "type": "object"
+      }
+    },
+    "siem.status": {
+      "method": "GET",
+      "path": "/api/siem/status",
+      "request_schema": null,
+      "response_schema": {
+        "$defs": {
+          "SiemDestinationStatus": {
+            "properties": {
+              "dlq": {
+                "title": "Dlq",
+                "type": "integer"
+              },
+              "dlq_max": {
+                "title": "Dlq Max",
+                "type": "integer"
+              },
+              "enabled": {
+                "title": "Enabled",
+                "type": "boolean"
+              },
+              "format": {
+                "$ref": "#/$defs/SiemFormat"
+              },
+              "host": {
+                "title": "Host",
+                "type": "string"
+              },
+              "id": {
+                "title": "Id",
+                "type": "string"
+              },
+              "name": {
+                "title": "Name",
+                "type": "string"
+              },
+              "port": {
+                "title": "Port",
+                "type": "integer"
+              },
+              "sources": {
+                "items": {
+                  "$ref": "#/$defs/SiemSourceStatus"
+                },
+                "title": "Sources",
+                "type": "array"
+              },
+              "transport": {
+                "$ref": "#/$defs/SiemTransport"
+              }
+            },
+            "required": [
+              "id",
+              "name",
+              "enabled",
+              "transport",
+              "format",
+              "host",
+              "port",
+              "dlq",
+              "dlq_max",
+              "sources"
+            ],
+            "title": "SiemDestinationStatus",
+            "type": "object"
+          },
+          "SiemFormat": {
+            "description": "How a SIEM destination's lines look (spec §6.5 SIEM 轉送).",
+            "enum": [
+              "cef",
+              "json",
+              "syslog_cef",
+              "syslog_json",
+              "cef_pce",
+              "syslog_cef_pce"
+            ],
+            "title": "SiemFormat",
+            "type": "string"
+          },
+          "SiemSourceStatus": {
+            "properties": {
+              "dropped": {
+                "title": "Dropped",
+                "type": "integer"
+              },
+              "last_error": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Last Error"
+              },
+              "last_error_at": {
+                "anyOf": [
+                  {
+                    "format": "date-time",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Last Error At"
+              },
+              "last_sent_at": {
+                "anyOf": [
+                  {
+                    "format": "date-time",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Last Sent At"
+              },
+              "pending": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Pending"
+              },
+              "sent": {
+                "title": "Sent",
+                "type": "integer"
+              },
+              "source": {
+                "enum": [
+                  "audit",
+                  "alerts",
+                  "detections",
+                  "new_connections"
+                ],
+                "title": "Source",
+                "type": "string"
+              },
+              "state": {
+                "enum": [
+                  "ok",
+                  "behind",
+                  "failing",
+                  "dlq_full",
+                  "waiting",
+                  "needs_alert_mode",
+                  "baseline_building",
+                  "off"
+                ],
+                "title": "State",
+                "type": "string"
+              }
+            },
+            "required": [
+              "source",
+              "state",
+              "pending",
+              "sent",
+              "dropped",
+              "last_sent_at",
+              "last_error",
+              "last_error_at"
+            ],
+            "title": "SiemSourceStatus",
+            "type": "object"
+          },
+          "SiemTransport": {
+            "enum": [
+              "udp",
+              "tcp",
+              "tls",
+              "hec"
+            ],
+            "title": "SiemTransport",
+            "type": "string"
+          }
+        },
+        "properties": {
+          "backlog_warn_rows": {
+            "title": "Backlog Warn Rows",
+            "type": "integer"
+          },
+          "baseline_days": {
+            "title": "Baseline Days",
+            "type": "integer"
+          },
+          "baseline_full": {
+            "title": "Baseline Full",
+            "type": "boolean"
+          },
+          "destinations": {
+            "items": {
+              "$ref": "#/$defs/SiemDestinationStatus"
+            },
+            "title": "Destinations",
+            "type": "array"
+          },
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "lightweight": {
+            "title": "Lightweight",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "enabled",
+          "lightweight",
+          "baseline_full",
+          "baseline_days",
+          "backlog_warn_rows",
+          "destinations"
+        ],
+        "title": "SiemStatusView",
+        "type": "object"
+      }
+    },
     "system.channels.get": {
       "method": "GET",
       "path": "/api/system/channels",

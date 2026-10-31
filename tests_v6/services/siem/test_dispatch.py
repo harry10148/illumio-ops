@@ -98,7 +98,7 @@ def test_a_full_dlq_stops_the_destination_where_it_is(ctx):
     with ctx.db() as conn:
         for i in range(100):
             store.quarantine(conn, destination_id=DEST, source="audit", record_id=-i, external_id=f"x:{i}",
-                             event_time=None, payload="p", error="e", attempts=1, at=NOW)
+                             event_time=None, payload="p", sent_as="[]", error="e", attempts=1, at=NOW)
     add_events(ctx, [1, 2])
     t = FakeTransport(lambda n, line: http_error(400) if "events/e1" in line else None)
     r = run(ctx, t).destinations["graylog"]["audit"]
