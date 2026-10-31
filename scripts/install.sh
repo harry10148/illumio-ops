@@ -135,7 +135,8 @@ if [[ -n "$UPGRADE_FROM" ]]; then
         systemctl disable "$OLD_SERVICE" 2>/dev/null || true
         [[ -f "/etc/systemd/system/${OLD_SERVICE}.service" ]] && cp -p "/etc/systemd/system/${OLD_SERVICE}.service" "$BACKUP/old.service"
     fi
-    if (( ! NO_SYSTEMD )) && [[ -e "$WRAPPER" ]]; then
+    # The 5.x command wrapper, only when it is this installation's (it runs "$UPGRADE_FROM/illumio-ops.py").
+    if (( ! NO_SYSTEMD )) && [[ -f "$WRAPPER" ]] && grep -qF "$UPGRADE_FROM/illumio-ops.py" "$WRAPPER"; then
         cp -p "$WRAPPER" "$BACKUP/illumio-ops.wrapper"
         rm -f "$WRAPPER"  # v6 has no command line
     fi
