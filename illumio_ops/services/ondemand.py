@@ -49,6 +49,9 @@ QUERY_NAME = "illumio-ops on-demand"
 # 30 s, thrown away when halved), so the span is read a day at a time: halving from the whole span spent more on
 # discarded capped answers than daily windows did (posture 1,290 s against 960 s).
 WINDOW = timedelta(days=1)
+# A day at the cap is halved until its pieces fit, and the next day is read in pieces of the size that fit (a day
+# is like the one before; the PCE's matches_count stops near the cap — lab: 220,000 at 200,000 — so it cannot say
+# how many pieces a day needs). A day that read under half a query's rows doubles them again, towards a day.
 # One interactive pull at a time (the workbench, the lateral page's exposure and simulations; security review
 # 2026-10-30): each holds up to PER_QUERY rows being parsed and a throwaway store, so a second click waits for the
 # first instead of a second download running beside it.
@@ -78,6 +81,7 @@ class _Pull:
     earliest: datetime | None = None
     unread_from: datetime | None = None
     reading: tuple[datetime, datetime] = (datetime.min.replace(tzinfo=UTC), datetime.min.replace(tzinfo=UTC))
+    fit: timedelta | None = None  # the smallest window of the day being read that came back whole
 
 
 def ondemand_dir(paths: InstallPaths) -> Path:
@@ -137,6 +141,8 @@ def _walk(ctx: AppContext, fdb: FlowDb, client: object, spec: FilterSpec | None,
         _walk(ctx, fdb, client, spec, mid, b, depth + 1, state, at)
         return
     capped = result.capped
+    if not capped:
+        state.fit = (b - a) if state.fit is None else min(state.fit, b - a)
     records, _skipped = normalize_all(result.rows)
     del result
     if records:
@@ -149,6 +155,16 @@ def _walk(ctx: AppContext, fdb: FlowDb, client: object, spec: FilterSpec | None,
                                     f"{len(records)} rows returned at the per-query limit", at)
             state.truncated.append((a, b, len(records)))
     state.rows += len(records)
+
+
+def _next_piece(piece: timedelta, fit: timedelta | None, rows: int) -> timedelta:
+    """The size the next day is read in: what fit today when today had to be halved, double it after a day that
+    read under half a query's rows."""
+    if fit is not None and fit < piece:
+        return fit
+    if rows * 2 <= PER_QUERY:
+        return min(piece * 2, WINDOW)
+    return piece
 
 
 def open_period(ctx: AppContext, *, start: datetime, end: datetime, spec: FilterSpec | None = None,
@@ -177,10 +193,16 @@ def open_period(ctx: AppContext, *, start: datetime, end: datetime, spec: Filter
             _seed(conn, ctx.flows().path)
         try:
             with ctx.pce_client(settings.pce) as client:
-                cur = start
+                cur, piece = start, WINDOW
                 while cur < end and state.unread_from is None:
                     nxt = min(cur + WINDOW, end)
-                    _walk(ctx, fdb, client, spec, cur, nxt, 0, state, at)
+                    state.fit, before = None, state.rows
+                    p = cur
+                    while p < nxt and state.unread_from is None:
+                        q = min(p + piece, nxt)
+                        _walk(ctx, fdb, client, spec, p, q, 0, state, at)
+                        p = q
+                    piece = _next_piece(piece, state.fit, state.rows - before)
                     cur = nxt
         except PCE_FAILURES as exc:
             a, b = state.reading

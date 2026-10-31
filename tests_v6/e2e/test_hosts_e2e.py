@@ -79,7 +79,8 @@ def test_unnamed_host_named_from_its_traffic(context, live_app):
     def unnamed(route):
         resp = route.fetch()
         body = _json.loads(resp.text())
-        body["data"]["name"] = body["data"]["key"]  # as the lightweight store answers
+        # as the lightweight store answers: no name it knew, the words for one (final review: not the href)
+        body["data"]["name"], body["data"]["named"] = "Removed workload …db", False
         route.fulfill(response=resp, body=_json.dumps(body))
     page.route("**/api/hosts/profile*", unnamed)
     page.goto(f"{live_app.url}/hosts?key={DB}")

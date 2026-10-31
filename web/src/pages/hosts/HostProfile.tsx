@@ -355,6 +355,7 @@ function QuarantineSection({ hostKey, name, current }: { hostKey: string; name: 
   const lang = useLang();
   const [open, setOpen] = useState(false);
   const [history, setHistory] = useState<QuarantineAction[] | null>(null);
+  const [historyError, setHistoryError] = useState<ApiError | null>(null);
   const [confirming, setConfirming] = useState(false);
   const [outcome, setOutcome] = useState<QuarantineOutcome | null>(null);
   const [error, setError] = useState<ApiError | null>(null);
@@ -363,7 +364,12 @@ function QuarantineSection({ hostKey, name, current }: { hostKey: string; name: 
   useEffect(() => {
     let live = true;
     void call("quarantine.history", undefined, undefined, { key: hostKey }).then((env) => {
-      if (live && env.ok && env.data) setHistory(env.data.actions.slice(0, HISTORY_SHOWN));
+      if (!live) return;
+      // unread is said: a missing record reads as "nothing was done to this host"
+      if (env.ok && env.data) {
+        setHistory(env.data.actions.slice(0, HISTORY_SHOWN));
+        setHistoryError(null);
+      } else setHistoryError(env.error);
     });
     return () => { live = false; };
   }, [hostKey, version]);
@@ -397,6 +403,11 @@ function QuarantineSection({ hostKey, name, current }: { hostKey: string; name: 
       {outcome && <Outcome outcome={outcome} />}
       {open && <QuarantineDialog hosts={[{ key: hostKey, name }]} onClose={() => setOpen(false)}
         onDone={() => setVersion((v) => v + 1)} />}
+      {historyError && (
+        <p className="form-error" data-role="q-history-error">
+          {t("q_history_unread")} {t(historyError.message_key, historyError.params)}
+        </p>
+      )}
       {history && history.length > 0 && (
         <>
           <h3>{t("q_history")}</h3>
@@ -440,7 +451,7 @@ export function HostProfile() {
   // No name in the store (lightweight mode keeps no flows): the name or address its own traffic carries.
   useEffect(() => {
     setSeenAs(null);
-    if (!profile || profile.name !== profile.key) return;
+    if (!profile || profile.named) return;
     let live = true;
     const ask = async (s: "src" | "dst") => {
       const env = await call("workbench.run", { request: { mode: "flows", view: "detail", limit: 1, ...span,

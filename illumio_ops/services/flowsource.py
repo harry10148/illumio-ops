@@ -915,15 +915,18 @@ def increment_times(ctx: AppContext, *, start: datetime, end: datetime) -> list[
 
 
 def host_addresses(ctx: AppContext, hrefs: set[str]) -> dict[str, str]:
-    """An address each workload href was seen with in the flows: how to show a host the PCE sent no hostname for
-    and the inventory does not hold (a container or deleted workload)."""
+    """What the flows called each workload href, else an address it was seen with: how to show a host the
+    inventory does not hold (a Kubernetes, container or deleted workload)."""
     out: dict[str, str] = {}
     if not hrefs:
         return out
     with ctx.flows().connect() as conn:
         for h in sorted(hrefs):
-            row = conn.execute("SELECT dst_ip FROM flows WHERE dst_key = ? UNION ALL "
-                               "SELECT src_ip FROM flows WHERE src_key = ? LIMIT 1", (h, h)).fetchone()
+            # one lookup, stopping at the first row (src_key / dst_key carry no index): a host's flows are named
+            # alike, so the first row's name, else its address (final review: a name-first scan cost two full scans
+            # for a host the flows never named)
+            row = conn.execute("SELECT dst_hostname, dst_ip FROM flows WHERE dst_key = ? UNION ALL "
+                               "SELECT src_hostname, src_ip FROM flows WHERE src_key = ? LIMIT 1", (h, h)).fetchone()
             if row:
-                out[h] = row[0]
+                out[h] = row[0] or row[1]
     return out

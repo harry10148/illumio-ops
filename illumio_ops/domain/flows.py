@@ -122,7 +122,9 @@ def normalize_flow(raw: Mapping[str, Any]) -> FlowRecord:
         direction=direction,
         src_ip=src_ip, dst_ip=dst_ip,
         src_href=src_wl.get("href") or None, dst_href=dst_wl.get("href") or None,
-        src_hostname=src_wl.get("hostname") or None, dst_hostname=dst_wl.get("hostname") or None,
+        # a Kubernetes Workload comes with hostname null and its name (lab 2026-10-31)
+        src_hostname=src_wl.get("hostname") or src_wl.get("name") or None,
+        dst_hostname=dst_wl.get("hostname") or dst_wl.get("name") or None,
         src_managed=bool(src_wl.get("managed")), dst_managed=bool(dst_wl.get("managed")),
         src_mode=src_wl.get("enforcement_mode") or None, dst_mode=dst_wl.get("enforcement_mode") or None,
         src_labels=_labels(src_wl), dst_labels=_labels(dst_wl),

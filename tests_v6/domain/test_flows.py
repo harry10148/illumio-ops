@@ -94,3 +94,14 @@ def _shift(r, *, start: datetime):
     from dataclasses import replace
     length = r.last_detected - r.first_detected
     return replace(r, first_detected=start.astimezone(UTC), last_detected=(start + length).astimezone(UTC))
+
+
+def test_kubernetes_workload_named_by_its_name(raw):
+    """Lab 2026-10-31: the PCE sends a Kubernetes Workload with hostname null and its name ("coredns"); the name is
+    what the flow is shown by, not the href."""
+    k8s = copy.deepcopy(raw[5])
+    k8s["dst"]["workload"].update(href="/orgs/1/kubernetes_workloads/698dd122-7dbd", hostname=None, name="coredns")
+    assert normalize_flow(k8s).dst_hostname == "coredns"
+    named = copy.deepcopy(raw[5])
+    named["dst"]["workload"].update(hostname="db01", name="DB 01")
+    assert normalize_flow(named).dst_hostname == "db01"  # a hostname, when sent, stays what it is shown by

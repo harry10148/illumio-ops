@@ -73,19 +73,6 @@ def rollup_connections_of(conn: sqlite3.Connection, days: tuple[str, str], ports
     return out
 
 
-def hostnames(conn: sqlite3.Connection, hrefs: Sequence[str] | set[str]) -> dict[str, str]:
-    """href -> hostname for the workloads in the current inventory (others are absent)."""
-    out: dict[str, str] = {}
-    ordered = sorted(set(hrefs))
-    for i in range(0, len(ordered), 500):
-        chunk = ordered[i:i + 500]
-        for href, name in conn.execute(f"SELECT href, COALESCE(hostname, name) FROM workloads WHERE href IN "
-                                       f"({','.join('?' * len(chunk))})", chunk):
-            if name:
-                out[href] = name
-    return out
-
-
 def analysis_state(conn: sqlite3.Connection, kind: str) -> tuple[str | None, str | None]:
     """(when the stored result was computed, the error of a later failed run): a report built on a stored
     analysis says how old it is, and that the latest run failed (a stale result is not presented as current)."""

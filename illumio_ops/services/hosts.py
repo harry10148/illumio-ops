@@ -14,17 +14,20 @@ from typing import Literal
 from pydantic import BaseModel
 
 from illumio_ops.domain.exposure import AssetExposure
-from illumio_ops.domain.values import CapabilityState, TamperPattern
+from illumio_ops.domain.values import CapabilityState, Language, TamperPattern
 from illumio_ops.services.analysis import ransomware, tamper
 from illumio_ops.services.analysis.ransomware import HostRansomware
 from illumio_ops.services.analysis.tamper import HostTamper
 from illumio_ops.services.collect.guard import require_same_pce
 from illumio_ops.services.context import AppContext
 from illumio_ops.services.flowsource import host_addresses
+from illumio_ops.services.reports.common import unnamed_host
 from illumio_ops.store.flowdb import analysis, capabilities, labels, workloads
 from illumio_ops.store.flowdb import ransomware as ransomware_store
 
 WORKLOAD_HREF = re.compile(r"^/orgs/\d+/workloads/[A-Za-z0-9_.-]+$")
+# every href a flow end is keyed by: a workload, a Kubernetes Workload, a container workload
+HOST_HREF = re.compile(r"^/orgs/\d+/(?:workloads|kubernetes_workloads|container_workloads)/[A-Za-z0-9_.-]+$")
 
 
 class HostIdentity(BaseModel):
@@ -55,7 +58,8 @@ class HostProfile(BaseModel):
     key: str
     managed: bool          # a workload href (False: an address the inventory does not hold)
     in_inventory: bool
-    name: str              # what to call it: hostname, name, an address seen in the flows, or the href
+    name: str              # what to call it: hostname, name, an address seen in the flows, or words (never the href)
+    named: bool = True     # False: the store knew no name or address (the page asks the host's own traffic)
     address: str | None    # the address of an unmanaged key
     identity: HostIdentity | None
     labels: dict[str, str]
@@ -77,18 +81,20 @@ def parse_key(key: str) -> tuple[str | None, str | None]:
     raise ValueError("a host is a workload href or ip:<address>")
 
 
-def display_names(ctx: AppContext, keys: Iterable[str]) -> dict[str, str]:
-    """How each host key is shown — never an href: the inventory's hostname or name, else an address the workload
-    was seen with in the flows (the PCE sends no hostname for some workloads, lab 2026-10-30), an unmanaged key as
-    its address. A workload neither holds keeps its href (nothing better is known)."""
+def display_names(ctx: AppContext, keys: Iterable[str], *, lang: Language | None = None) -> dict[str, str]:
+    """How each host key is shown — never an href: the inventory's hostname or name, else what the flows called it
+    or an address it was seen with (the PCE sends no hostname for some workloads, lab 2026-10-30; the inventory
+    holds no Kubernetes Workload, lab 2026-10-31), an unmanaged key as its address; a workload known nowhere is
+    said in words (`lang`, else the display language)."""
     keys = set(keys)
-    hrefs = {k for k in keys if WORKLOAD_HREF.match(k)}
+    hrefs = {k for k in keys if HOST_HREF.match(k)}
     names: dict[str, str] = {}
     if hrefs:
         with ctx.flows().connect() as conn:
             names = {w.href: n for w in workloads.all_workloads(conn) if w.href in hrefs and (n := w.hostname or w.name)}
         names |= host_addresses(ctx, hrefs - set(names))
-    return {k: names.get(k) or (k.removeprefix("ip:")) for k in keys}
+    said = lang or ctx.settings.current().display.language
+    return {k: names.get(k) or (unnamed_host(k, said) or k if k in hrefs else k.removeprefix("ip:")) for k in keys}
 
 
 def _exposure(ctx: AppContext, key: str) -> HostExposureView | None:
@@ -138,10 +144,11 @@ def profile(ctx: AppContext, key: str, *, now: datetime | None = None) -> HostPr
         else:
             details = "stale" if wl.risk_updated_at and held[href] != wl.risk_updated_at else "ok"
     name = (wl.hostname or wl.name) if wl is not None else None
+    named = bool(name) or bool(name := host_addresses(ctx, {href}).get(href))
     if not name:
-        name = host_addresses(ctx, {href}).get(href) or href
+        name = display_names(ctx, {href})[href]
     return HostProfile(
-        key=key, managed=True, in_inventory=wl is not None, name=name, address=None, identity=identity,
+        key=key, managed=True, in_inventory=wl is not None, name=name, named=named, address=None, identity=identity,
         labels=host_labels, exposure=_exposure(ctx, key), tamper=tamper.host_tamper(ctx, href, now=at),
         ransomware=ransomware.host_ransomware(ctx, href, now=at, explain_allows=False)
         if wl is not None and not unsupported else None,
