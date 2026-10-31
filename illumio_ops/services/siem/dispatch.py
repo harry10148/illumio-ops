@@ -4,8 +4,10 @@ write sends that batch again.
 
 A destination that cannot be reached (connection refused, timeout, a 5xx) stops for this tick at the record that
 failed — the rest of the batch is not tried, so they are not charged a failure (5.x circuit breaker) — and the next
-tick starts there again. The same record failing max_retries times in a row goes to the DLQ and the cursor moves on,
-so one record a peer always drops cannot hold a destination forever. A record the destination refuses for good (HTTP
+tick starts there again. When the same record has failed max_retries times in a row, the next one is tried: if it goes
+through, the first is what fails and goes to the DLQ, so one record a peer always drops cannot hold a destination
+forever; if it fails too, the destination is down and nothing goes to the DLQ (5.x moved a record there every
+max_retries ticks of an outage). A record the destination refuses for good (HTTP
 4xx other than 408/429, a datagram too large) goes to the DLQ at once and the batch goes on. A full DLQ stops the
 destination where it is: nothing is dropped, the status page says so. Nothing here holds a database connection while
 sending: a slow SIEM never keeps a PCE switch waiting."""
@@ -161,6 +163,21 @@ def _quarantine(ctx: AppContext, s: Settings, dest: SiemDestination, source: str
     return True
 
 
+def _next_goes_through(transport: Transport, fmt: Formatter, records: list[SiemRecord], head: SiemRecord) -> bool:
+    """Tell a record that keeps failing from a destination that is down: send the next one. Nothing after it, or the
+    next one fails too: the destination is down, and nothing goes to the DLQ (a SIEM down for a day would otherwise
+    fill it with records that only waited)."""
+    nxt = next((r for r in records if r.record_id > head.record_id), None)
+    if nxt is None:
+        return False
+    try:
+        transport.send_record(fmt.format_record(nxt), _event_time(nxt))
+        transport.finish_batch()
+    except Exception:  # noqa: BLE001 — the destination is down: wait for it
+        return False
+    return True
+
+
 def _run_source(ctx: AppContext, s: Settings, dest: SiemDestination, source: str, transport: Transport,
                 fmt: Formatter, deadline: float, clock: Callable[[], float], now: datetime | None) -> SourceRun:
     pce = s.pce
@@ -231,13 +248,16 @@ def _run_source(ctx: AppContext, s: Settings, dest: SiemDestination, source: str
             run.error, run.unreachable = error, True
             logger.warning("SIEM destination {} ({}): send failed at {} (attempt {}): {}", dest.name, source,
                            head.external_id, attempts, error)
-            if attempts >= dest.max_retries:
+            if attempts >= dest.max_retries and _next_goes_through(transport, fmt, records, head):
+                # The record after it goes through: this one is what fails, not the destination.
+                nxt = next(r for r in records if r.record_id > head.record_id)
                 payload = payloads.get(head.record_id) or fmt.format_record(head)
                 if _quarantine(ctx, s, dest, source, head, payload, error, attempts, at):
                     run.quarantined += 1
+                    run.sent += 1
                     with ctx.db() as conn:
                         store.advance(conn, dest.id, source, pce_url=pce.url, org_id=pce.org_id,
-                                      last_id=head.record_id, sent=0, at=at)
+                                      last_id=nxt.record_id, sent=1, at=at)
                 else:
                     run.dlq_full = True
             return run

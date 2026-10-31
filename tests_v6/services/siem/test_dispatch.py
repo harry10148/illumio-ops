@@ -64,12 +64,13 @@ def test_an_unreachable_destination_keeps_its_place_and_charges_only_the_head(ct
 def test_a_record_that_always_fails_goes_to_the_dlq_after_max_retries(ctx):
     run(ctx, FakeTransport())
     add_events(ctx, [1, 2, 3])
-    poison = FakeTransport(lambda n, line: REFUSED if '"e2"' in line or "events/e2" in line else None)
-    for _ in range(3):  # max_retries = 3
+    poison = FakeTransport(lambda n, line: REFUSED if "events/e2" in line else None)
+    for _ in range(3):  # max_retries = 3: on the third, the next record goes through, so e2 is what fails
         run(ctx, poison)
-    assert sent_ids(poison) == ["1"]
+    assert sent_ids(poison) == ["1", "3"]
     with ctx.db() as conn:
         [dead] = store.dlq_page(conn, destination_id=DEST, limit=10, offset=0)
+        assert store.get_cursor(conn, DEST, "audit").head_attempts == 0
     assert dead.external_id == "audit:2" and dead.attempts == 3 and "events/e2" in dead.payload
     run(ctx, poison)
     assert sent_ids(poison) == ["1", "3"]
@@ -187,3 +188,19 @@ def test_retention_counts_what_it_deletes_before_a_destination_sent_it(ctx):
     run_retention(ctx, now=NOW + timedelta(days=400))  # every event older than event_days
     with ctx.db() as conn:
         assert store.get_cursor(conn, DEST, "audit").dropped == 3
+
+
+def test_a_destination_down_for_long_moves_nothing_to_the_dlq(ctx):
+    """Every record fails: the destination is down, not a record — nothing trickles into the DLQ however long it is
+    down (5.x moved the head record there every max_retries ticks)."""
+    run(ctx, FakeTransport())
+    add_events(ctx, [1, 2, 3])
+    down = FakeTransport(lambda n, line: REFUSED)
+    for _ in range(12):
+        run(ctx, down)
+    with ctx.db() as conn:
+        assert store.dlq_count(conn, DEST) == 0
+        assert store.get_cursor(conn, DEST, "audit").last_id < 1 + 1000
+    up = FakeTransport()
+    run(ctx, up)
+    assert sent_ids(up) == ["1", "2", "3"]
