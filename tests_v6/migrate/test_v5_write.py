@@ -150,3 +150,22 @@ def test_tls_copy_refuses_a_hard_link(v5, tmp_path):
     lines = upgrade(v5, tmp_path / "v6", now=NOW)
     assert not (tmp_path / "v6" / "config" / "tls" / "hard_key.pem").exists()
     assert any("hard_key.pem" in line for line in lines)
+
+
+def test_a_certificate_path_climbing_out_of_the_5x_directory_is_not_copied(v5, tmp_path):
+    secret = tmp_path / "outside_key.pem"
+    secret.write_text("SECRET")
+    raw = json.loads((v5 / "config" / "config.json").read_text())
+    raw["web_gui"]["tls"].update({"self_signed": False, "cert_file": str(v5 / "config" / "tls" / "self_signed.pem"),
+                                  "key_file": str(v5 / "config" / ".." / ".." / "outside_key.pem")})
+    (v5 / "config" / "config.json").write_text(json.dumps(raw))
+    root = tmp_path / "v6"
+    lines = upgrade(v5, root, now=NOW)
+    assert not (root / "config" / "tls" / "outside_key.pem").exists()
+    assert any("outside_key.pem" in line for line in lines)
+
+
+def test_a_fifo_in_the_tls_directory_is_skipped_not_waited_on(v5, tmp_path):
+    os.mkfifo(v5 / "config" / "tls" / "pipe.pem")
+    lines = upgrade(v5, tmp_path / "v6", now=NOW)  # a blocking open would hang here
+    assert any("pipe.pem" in line for line in lines)

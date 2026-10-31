@@ -68,13 +68,16 @@ class MigrationBlocked(Exception):
 def _open_beneath(root: Path, rel: Path) -> int:
     """A read descriptor for root/rel, walked one directory at a time without following a link anywhere beneath
     root (security review: a check, then an open by path, can be raced)."""
+    if rel.is_absolute() or not rel.parts or any(part in ("", ".", "..") for part in rel.parts):
+        raise ValueError(f"{rel} does not name a file beneath {root}")  # ".." would walk out (security review)
     fd = os.open(root, os.O_RDONLY | os.O_DIRECTORY)
     try:
         for part in rel.parts[:-1]:
             nxt = os.open(part, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=fd)
             os.close(fd)
             fd = nxt
-        return os.open(rel.parts[-1], os.O_RDONLY | os.O_NOFOLLOW, dir_fd=fd)
+        # O_NONBLOCK: a FIFO planted there would otherwise hold the open forever; the caller checks the type
+        return os.open(rel.parts[-1], os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK | os.O_NOCTTY, dir_fd=fd)
     finally:
         os.close(fd)
 
