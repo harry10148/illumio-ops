@@ -207,11 +207,13 @@ def test_a_destination_down_for_long_moves_nothing_to_the_dlq(ctx):
 
 
 def test_a_lone_record_that_always_fails_still_reaches_the_dlq(ctx):
-    """Nothing after it to tell it from an outage: after STUCK_FACTOR × max_retries attempts it goes anyway, so one
-    record cannot hold a destination forever (P7 security review)."""
+    """Nothing after it to probe with, but the destination took a record within the hour: after STUCK_FACTOR ×
+    max_retries attempts it goes anyway, so one record cannot hold a destination forever (P7 security review)."""
     from illumio_ops.services.siem.dispatch import STUCK_FACTOR
     from illumio_ops.services.siem.status import siem_status
     run(ctx, FakeTransport())
+    add_events(ctx, [0])
+    run(ctx, FakeTransport())  # the destination is up: it took e0
     add_events(ctx, [1])
     bad = FakeTransport(lambda n, line: REFUSED)
     for _ in range(3 * STUCK_FACTOR - 1):
@@ -223,3 +225,15 @@ def test_a_lone_record_that_always_fails_still_reaches_the_dlq(ctx):
     run(ctx, bad)
     with ctx.db() as conn:
         assert store.dlq_count(conn, DEST) == 1
+
+
+def test_a_lone_record_waits_while_the_destination_has_sent_nothing_lately(ctx):
+    """No later record and no recent success: it may as well be an outage — nothing goes to the DLQ."""
+    from illumio_ops.services.siem.dispatch import STUCK_FACTOR
+    run(ctx, FakeTransport())
+    add_events(ctx, [1])
+    bad = FakeTransport(lambda n, line: REFUSED)
+    for _ in range(3 * STUCK_FACTOR + 5):
+        run(ctx, bad)
+    with ctx.db() as conn:
+        assert store.dlq_count(conn, DEST) == 0

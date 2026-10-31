@@ -7,7 +7,8 @@ failed — the rest of the batch is not tried, so they are not charged a failure
 tick starts there again. When the same record has failed max_retries times in a row, the next one is tried: if it goes
 through, the first is what fails and goes to the DLQ, so one record a peer always drops cannot hold a destination
 forever; if it fails too, the destination is down and nothing goes to the DLQ (5.x moved a record there every
-max_retries ticks of an outage) — until the same record has failed STUCK_FACTOR times that often, when it goes anyway. A record the destination refuses for good (HTTP
+max_retries ticks of an outage). A record nothing comes after goes anyway once it has failed STUCK_FACTOR times that
+often while the destination took something else within the hour. A record the destination refuses for good (HTTP
 4xx other than 408/429, a datagram too large) goes to the DLQ at once and the batch goes on. A full DLQ stops the
 destination where it is: nothing is dropped, the status page says so. Nothing here holds a database connection while
 sending: a slow SIEM never keeps a PCE switch waiting."""
@@ -18,7 +19,7 @@ import json
 import threading
 import time
 from collections.abc import Callable
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from urllib.parse import urlsplit
 
 import requests
@@ -36,10 +37,11 @@ from illumio_ops.siem.transports.base import Transport
 from illumio_ops.siem.transports.factory import transport_for
 from illumio_ops.store import siem as store
 
-BUDGET_SHARE = 0.8
-# A record that failed this many times max_retries goes to the DLQ even when nothing after it says whether the
-# destination is down (a lone record a peer always drops must not hold the destination forever).
-STUCK_FACTOR = 10          # of the tick: the next tick never starts behind this one
+BUDGET_SHARE = 0.8          # of the tick: the next tick never starts behind this one
+# A record nothing comes after that failed this many times max_retries goes to the DLQ (a lone record a peer always
+# drops must not hold the destination forever) — if the destination took something within RECENT_UP.
+STUCK_FACTOR = 10
+RECENT_UP = timedelta(hours=1)
 SYSLOG_HOST = "illumio-ops"  # the syslog host of this product's own events
 IDENTITY_TTL = 3600.0
 TransportFactory = Callable[[SiemDestination], Transport]
@@ -166,6 +168,12 @@ def _quarantine(ctx: AppContext, s: Settings, dest: SiemDestination, source: str
     return True
 
 
+def _recently_up(ctx: AppContext, dest: SiemDestination, at: datetime) -> bool:
+    with ctx.db() as conn:
+        sent = [c.last_sent_at for (d, _), c in store.cursors(conn).items() if d == dest.id and c.last_sent_at]
+    return any(t >= at - RECENT_UP for t in sent)
+
+
 def _next_goes_through(transport: Transport, fmt: Formatter, records: list[SiemRecord], head: SiemRecord) -> bool:
     """Tell a record that keeps failing from a destination that is down: send the next one. Nothing after it, or the
     next one fails too: the destination is down, and nothing goes to the DLQ (a SIEM down for a day would otherwise
@@ -251,7 +259,10 @@ def _run_source(ctx: AppContext, s: Settings, dest: SiemDestination, source: str
             run.error, run.unreachable = error, True
             logger.warning("SIEM destination {} ({}): send failed at {} (attempt {}): {}", dest.name, source,
                            head.external_id, attempts, error)
-            stuck = attempts >= dest.max_retries * STUCK_FACTOR
+            # The cap only for a record nothing comes after, at a destination that took something within the hour:
+            # with a later record the probe decides, and with no recent success it may as well be an outage.
+            stuck = (attempts >= dest.max_retries * STUCK_FACTOR
+                     and not any(r.record_id > head.record_id for r in records) and _recently_up(ctx, dest, at))
             if attempts >= dest.max_retries and (stuck or _next_goes_through(transport, fmt, records, head)):
                 # The record after it went through (or it failed far too often): this one is what fails.
                 nxt = None if stuck else next(r for r in records if r.record_id > head.record_id)
