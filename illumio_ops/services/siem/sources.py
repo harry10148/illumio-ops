@@ -36,7 +36,14 @@ from illumio_ops.services.hosts import display_names
 from illumio_ops.services.reports.common import DETECTOR_NAME_KEYS
 from illumio_ops.services.reports.flowsections import DECISION_KEYS
 from illumio_ops.settings.schema import SiemDestination
-from illumio_ops.siem.mask import mask_event
+from illumio_ops.siem.mask import (
+    REDACTED,
+    is_person,
+    mask_event,
+    mask_facts,
+    mask_text,
+    people_in,
+)
 from illumio_ops.siem.records import Endpoint, SiemRecord
 from illumio_ops.store.flowdb.labels import label_sets
 from illumio_ops.store.siem import FLOW_SOURCES
@@ -102,12 +109,18 @@ def _alerts(ctx: AppContext, after: int, limit: int, dest: SiemDestination) -> l
     for r in rows:
         v = alert_view(r)
         text = " ".join([summary(v, lang), *caveats(v, lang)])
+        subject = v.subject_key
+        facts: dict[str, Any] = {"rule_id": r["rule_id"], "subject": subject, "late": v.late, **dict(v.facts)}
+        if dest.mask_pii:
+            people = [*people_in(dict(v.params)), *people_in(dict(v.facts)), *([subject] if is_person(subject) else [])]
+            text, facts = mask_text(text, people), mask_facts(facts)
+            if is_person(subject):
+                subject = facts["subject"] = REDACTED
         out.append(SiemRecord(
             kind="alert", record_id=v.id, time=v.fired_at, signature=f"alert.{r['rule_type']}",
             name=rule_title(v, lang), severity=v.severity, summary=text,
-            src=_endpoint(v.subject_key, names), first_seen=_t(r["first_seen"]), last_seen=_t(r["last_seen"]),
-            facts={"rule_id": r["rule_id"], "subject": v.subject_key, "late": v.late, **dict(v.facts)},
-            pce_fqdn=fqdn))
+            src=_endpoint(subject, names), first_seen=_t(r["first_seen"]), last_seen=_t(r["last_seen"]),
+            facts=facts, pce_fqdn=fqdn))
     return out
 
 
@@ -130,16 +143,20 @@ def _detections(ctx: AppContext, after: int, limit: int, dest: SiemDestination) 
         values.update(host=names.get(subject, subject), account=subject, minutes=_text(found.get("window_minutes")))
         port = found.get("port") if isinstance(found.get("port"), int) else None
         proto = found.get("proto") if isinstance(found.get("proto"), int) else None
+        text = translate(lang, DETECTION_TITLE_KEYS[kind], values)
+        facts = {"detector": kind.value, "occurrences": int(r["occurrences"]),
+                 "critical_asset": bool(r["critical_asset"]), "late": bool(r["late"]), **found}
+        if dest.mask_pii:
+            people = [*people_in(found), *([subject] if is_person(subject) else [])]
+            text, facts = mask_text(text, people), mask_facts(facts)
+            if is_person(subject):
+                subject = REDACTED
         out.append(SiemRecord(
             kind="detection", record_id=int(r["id"]), time=_t(r["last_seen"]) or datetime.now(UTC),
             signature=f"detection.{kind.value}", name=translate(lang, DETECTOR_NAME_KEYS[kind]),
-            severity=Severity(r["severity"]), summary=translate(lang, DETECTION_TITLE_KEYS[kind], values),
-            src=_endpoint(subject, names), port=port, proto=proto,
+            severity=Severity(r["severity"]), summary=text, src=_endpoint(subject, names), port=port, proto=proto,
             decision=found.get("decision") if isinstance(found.get("decision"), str) else None,
-            first_seen=_t(r["first_seen"]), last_seen=_t(r["last_seen"]),
-            facts={"detector": kind.value, "occurrences": int(r["occurrences"]),
-                   "critical_asset": bool(r["critical_asset"]), "late": bool(r["late"]), **found},
-            pce_fqdn=fqdn))
+            first_seen=_t(r["first_seen"]), last_seen=_t(r["last_seen"]), facts=facts, pce_fqdn=fqdn))
     return out
 
 

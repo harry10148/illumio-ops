@@ -19,8 +19,9 @@ SECRET_FIELDS: frozenset[str] = frozenset(
 
 # A secret in every item of a list: (path of the list, field).
 LIST_SECRET_FIELDS: frozenset[tuple[str, str]] = frozenset({("siem.destinations", "hec_token")})
-# What a SIEM destination's saved HEC token may not follow without being typed again.
-_SIEM_DESTINATION = ("transport", "host", "port")
+# What a SIEM destination's saved HEC token may not follow without being typed again (verify_tls: turning
+# verification off would hand it to anyone in the path).
+_SIEM_DESTINATION = ("transport", "host", "port", "verify_tls")
 
 
 class CredentialsRequired(Exception):

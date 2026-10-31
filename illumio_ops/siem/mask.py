@@ -20,6 +20,7 @@ The mask returns a *new* dict; the caller's event object is not mutated.
 """
 from __future__ import annotations
 
+import re
 from copy import deepcopy
 from typing import Any
 
@@ -135,3 +136,56 @@ def mask_event(event: dict[str, Any], *, mask_pii: bool = False) -> dict[str, An
     _mask_changes(masked)
     _mask_notifications(masked)
     return masked
+
+
+# ── this product's own events (P7 security review) ───────────────────────────
+# A masked destination gets no account, actor or email from an alert or a detection either: the subject of an account
+# detection is a person's sign-in name, an event alert's facts name who did it. Hosts and addresses of workloads stay
+# (operational data, as 5.x kept a flow's addresses).
+_EMAIL = re.compile(r"[\w.+-]+@[\w-]+(?:\.[\w-]+)+")
+_PERSON_KEYS = frozenset({"actor", "actors", "account", "accounts", "user", "users", "username", "user_name",
+                          "created_by", "initiator_user", "email", "full_name", "sample_accounts"})
+
+
+def _redact_people(node: Any) -> Any:
+    if isinstance(node, dict):
+        return {k: (REDACTED if k in _PERSON_KEYS and v not in (None, "", [], {}) else _redact_people(v))
+                for k, v in node.items()}
+    if isinstance(node, list):
+        return [_redact_people(x) for x in node]
+    if isinstance(node, str):
+        return _EMAIL.sub(REDACTED, node)
+    return node
+
+
+def is_person(subject: str) -> bool:
+    """A subject that names an account, not a workload (an href) or an address (ip:...)."""
+    return bool(subject) and not subject.startswith(("/orgs/", "ip:"))
+
+
+def mask_text(text: str, people: list[str]) -> str:
+    for p in sorted({p for p in people if p}, key=len, reverse=True):
+        text = text.replace(p, REDACTED)
+    return _EMAIL.sub(REDACTED, text)
+
+
+def mask_facts(facts: dict[str, Any]) -> dict[str, Any]:
+    out: dict[str, Any] = _redact_people(facts)
+    return out
+
+
+def people_in(node: Any) -> list[str]:
+    """Every string a person key holds, at any depth (to take them out of a sentence too)."""
+    out: list[str] = []
+    if isinstance(node, dict):
+        for k, v in node.items():
+            if k in _PERSON_KEYS:
+                out += [x for x in (v if isinstance(v, list) else [v]) if isinstance(x, str)]
+                if isinstance(v, dict | list):
+                    out += people_in(v)
+            else:
+                out += people_in(v)
+    elif isinstance(node, list):
+        for x in node:
+            out += people_in(x)
+    return out

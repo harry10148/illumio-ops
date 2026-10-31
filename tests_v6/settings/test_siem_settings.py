@@ -107,3 +107,9 @@ def test_a_new_destination_gets_no_saved_token():
     saved = validate_settings(settings_with(dest(transport="hec", hec_token="tok-1"))).siem
     out = merge_siem_destinations(saved, [dest(id="f" * 32, transport="hec", hec_token=MASK)], mask=MASK)
     assert out[0]["hec_token"] == ""
+
+
+def test_a_kept_token_may_not_lose_tls_verification():
+    saved = validate_settings(settings_with(dest(transport="hec", hec_token="tok-1"))).siem
+    with pytest.raises(CredentialsRequired):
+        merge_siem_destinations(saved, [dest(transport="hec", hec_token=MASK, verify_tls=False)], mask=MASK)

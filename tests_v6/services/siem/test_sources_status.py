@@ -1,5 +1,6 @@
 """What each source sends, the status page's states, the test send, the backlog check (P7 Task 5)."""
 import json
+from dataclasses import replace
 from datetime import timedelta
 
 from illumio_ops.domain.alerting import SiemFact, SystemFacts, evaluate_system
@@ -147,3 +148,44 @@ def test_an_upgraded_file_gets_the_backlog_check(tmp_path):
     assert [r for r in out["alerts"]["rules"] if r.get("pack_key") == "rule_system_siem_backlog"]
     again = upgrade({**out, "schema_version": 8})  # already there: not added twice
     assert sum(r.get("pack_key") == "rule_system_siem_backlog" for r in again["alerts"]["rules"]) == 1
+
+
+def test_a_masked_destination_gets_no_account_or_email_from_findings(ctx):
+    from datetime import UTC, datetime
+
+    from illumio_ops.domain.alerting import Confidence, Trigger
+    from illumio_ops.domain.values import AlertRuleType, Severity
+    from illumio_ops.store import alerts as alert_store
+    configure(ctx, destination(sources=["findings"], mask_pii=True))
+    run(ctx, FakeTransport())
+    trig = Trigger(rule_id="r" * 32, rule_type=AlertRuleType.EVENT, subject_key="alice@corp.example",
+                   severity=Severity.HIGH, first_seen=NOW, last_seen=NOW, late=False, message_key="alert_system_disk_low",
+                   params={"free": "alice@corp.example", "warn": "x", "actors": ["alice@corp.example", "bob"]},
+                   facts={"created_by": "alice@corp.example", "events": [{"user": {"username": "bob@corp.example"}}]},
+                   evidence=None, confidence=Confidence())
+    with ctx.db() as conn:
+        alert_store.insert_alert(conn, pce_url="https://pce.test:8443", org_id="1", rule_name="r", pack_key=None,
+                                 trigger=trig, at=datetime(2026, 10, 31, 8, 0, tzinfo=UTC), channels=["line"], hold=None)
+        conn.commit()
+    det = replace(_det("account_fanout|CORP\\alice", seen=NOW, detector="account_fanout"), subject_key="CORP\\alice")
+    with ctx.flows().connect() as conn:
+        analysis.upsert_detections(conn, [det], dedup={"account_fanout": timedelta(minutes=60)}, late=False, at=NOW)
+        conn.commit()
+    t = FakeTransport()
+    run(ctx, t)
+    assert len(t.lines) == 2
+    for line in t.lines:
+        assert "alice" not in line and "bob" not in line and "@corp" not in line, line
+        assert "[REDACTED]" in line
+
+
+def test_an_unmasked_destination_keeps_the_account(ctx):
+    configure(ctx, destination(sources=["findings"]))
+    run(ctx, FakeTransport())
+    det = replace(_det("account_fanout|CORP\\alice", seen=NOW, detector="account_fanout"), subject_key="CORP\\alice")
+    with ctx.flows().connect() as conn:
+        analysis.upsert_detections(conn, [det], dedup={"account_fanout": timedelta(minutes=60)}, late=False, at=NOW)
+        conn.commit()
+    t = FakeTransport()
+    run(ctx, t)
+    assert "alice" in t.lines[0]
