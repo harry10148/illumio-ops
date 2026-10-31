@@ -413,6 +413,8 @@ def test_teardown_closes_surfaces_clears_callbacks_and_palette(v2_page):
 
     # Exercise the second mount's teardown independently.
     _open_all(page)
+    # The audit hook opens its modals asynchronously: a fixed 250 ms was not always enough on a CI runner.
+    page.locator(".modal").first.wait_for(state="attached", timeout=10_000)
     assert page.locator(".modal").count() >= 1
     _navigate(page, R_SYSTEM_PCE)
     assert page.locator(".modal").count() == 0
