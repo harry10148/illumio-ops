@@ -62,7 +62,8 @@ def _run_retention(ctx: AppContext, *, now: datetime | None) -> dict[str, int]:
                 **siem_guard.expiring(ctx, "detections", lambda after, _d: analysis.count_detections_before(
                     conn, detection_cut, after_id=after)),
                 **siem_guard.expiring(ctx, "new_connections", lambda after, d: count_new_connection_log_before(
-                    conn, log_cut, after_id=after, decisions=[x.value for x in d.new_connection_decisions])),
+                    conn, log_cut, after_id=after, decisions=[x.value for x in d.new_connection_decisions],
+                    internal_only=d.new_connection_internal_only)),
             }
             out = {
                 "flows": flows,

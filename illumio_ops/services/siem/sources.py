@@ -163,12 +163,14 @@ def _detections(ctx: AppContext, s: Settings, after: int, limit: int, dest: Siem
 # ── new connections ──────────────────────────────────────────────────────────
 
 def decision_clause(dest: SiemDestination) -> tuple[str, list[Any]]:
+    """What of the new-connection log a destination takes: its decisions, and no public end when it says so."""
+    public = " AND (public IS NULL OR public = 0)" if dest.new_connection_internal_only else ""
     decisions = [d.value for d in dest.new_connection_decisions]
     if not decisions:
-        return "", []
+        return public, []
     if PolicyDecision.UNKNOWN.value in decisions:  # a decision the flow did not carry reads as unknown
-        return (f" AND (decision IN ({','.join('?' * len(decisions))}) OR decision IS NULL)", decisions)
-    return f" AND decision IN ({','.join('?' * len(decisions))})", decisions
+        return (f" AND (decision IN ({','.join('?' * len(decisions))}) OR decision IS NULL){public}", decisions)
+    return f" AND decision IN ({','.join('?' * len(decisions))}){public}", decisions
 
 
 def _new_connections(ctx: AppContext, s: Settings, after: int, limit: int, dest: SiemDestination) -> list[SiemRecord]:

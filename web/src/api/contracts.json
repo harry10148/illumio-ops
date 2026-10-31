@@ -26399,6 +26399,10 @@
                 "title": "New Connection Decisions",
                 "type": "array"
               },
+              "new_connection_internal_only": {
+                "title": "New Connection Internal Only",
+                "type": "boolean"
+              },
               "port": {
                 "title": "Port",
                 "type": "integer"
@@ -26440,6 +26444,7 @@
               "max_retries",
               "sources",
               "new_connection_decisions",
+              "new_connection_internal_only",
               "mask_pii"
             ],
             "title": "SiemDestinationInput",
@@ -26833,6 +26838,10 @@
                 "title": "New Connection Decisions",
                 "type": "array"
               },
+              "new_connection_internal_only": {
+                "title": "New Connection Internal Only",
+                "type": "boolean"
+              },
               "port": {
                 "title": "Port",
                 "type": "integer"
@@ -26874,6 +26883,7 @@
               "max_retries",
               "sources",
               "new_connection_decisions",
+              "new_connection_internal_only",
               "mask_pii"
             ],
             "title": "SiemDestinationInput",
@@ -27034,6 +27044,10 @@
                 "title": "New Connection Decisions",
                 "type": "array"
               },
+              "new_connection_internal_only": {
+                "title": "New Connection Internal Only",
+                "type": "boolean"
+              },
               "port": {
                 "title": "Port",
                 "type": "integer"
@@ -27075,6 +27089,7 @@
               "max_retries",
               "sources",
               "new_connection_decisions",
+              "new_connection_internal_only",
               "mask_pii"
             ],
             "title": "SiemDestinationInput",
@@ -27231,6 +27246,10 @@
                 "title": "New Connection Decisions",
                 "type": "array"
               },
+              "new_connection_internal_only": {
+                "title": "New Connection Internal Only",
+                "type": "boolean"
+              },
               "port": {
                 "title": "Port",
                 "type": "integer"
@@ -27272,6 +27291,7 @@
               "max_retries",
               "sources",
               "new_connection_decisions",
+              "new_connection_internal_only",
               "mask_pii"
             ],
             "title": "SiemDestinationInput",

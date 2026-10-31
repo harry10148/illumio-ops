@@ -20,7 +20,7 @@ ID = "0123456789abcdef0123456789abcdef"
 def dest(**kw):
     base = {"id": ID, "name": "graylog", "enabled": True, "transport": "tcp", "format": "cef_pce",
             "host": "siem.example", "port": 5514, "framing": "lf", "verify_tls": True, "hec_token": "",
-            "batch_size": 100, "max_retries": 10, "sources": ["audit"], "new_connection_decisions": [],
+            "batch_size": 100, "max_retries": 10, "sources": ["audit"], "new_connection_decisions": [], "new_connection_internal_only": True,
             "mask_pii": False}
     base.update(kw)
     return base
@@ -46,7 +46,7 @@ def test_a_schema_8_file_loads_with_siem_off(tmp_path):
     p.write_text(json.dumps(d))
     p.chmod(0o600)
     s = SettingsStore(p).load()
-    assert s.schema_version == 9 and not s.siem.enabled and s.siem.destinations == ()
+    assert s.schema_version == 10 and not s.siem.enabled and s.siem.destinations == ()
 
 
 def test_a_complete_destination_is_valid():

@@ -22,3 +22,15 @@ def parse_ip_token(value: str) -> IpToken:
     if isinstance(addr, ipaddress.IPv6Address) and addr.ipv4_mapped:
         return addr.ipv4_mapped
     return addr
+
+
+def is_public(value: str | None) -> bool:
+    """A globally routed address (not RFC 1918, CGNAT, link-local, loopback, IPv6 ULA...); anything that is not an
+    address — empty, the PCE's FILTERED — is not public."""
+    try:
+        addr = ipaddress.ip_address(str(value or "").strip())
+    except ValueError:
+        return False
+    if isinstance(addr, ipaddress.IPv6Address) and addr.ipv4_mapped:
+        addr = addr.ipv4_mapped
+    return addr.is_global

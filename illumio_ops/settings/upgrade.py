@@ -91,6 +91,16 @@ def _v8_to_v9(data: dict[str, Any]) -> dict[str, Any]:
     return data
 
 
+def _v9_to_v10(data: dict[str, Any]) -> dict[str, Any]:
+    # New connections with a public end are left out unless a destination says otherwise (user 2026-10-31).
+    siem = data.get("siem")
+    if isinstance(siem, dict) and isinstance(siem.get("destinations"), list):
+        for d in siem["destinations"]:
+            if isinstance(d, dict):
+                d.setdefault("new_connection_internal_only", True)
+    return data
+
+
 # source version -> function producing source version + 1
 UPGRADES: dict[int, Callable[[dict[str, Any]], dict[str, Any]]] = {
     1: _v1_to_v2,
@@ -101,6 +111,7 @@ UPGRADES: dict[int, Callable[[dict[str, Any]], dict[str, Any]]] = {
     6: _v6_to_v7,
     7: _v7_to_v8,
     8: _v8_to_v9,
+    9: _v9_to_v10,
 }
 
 

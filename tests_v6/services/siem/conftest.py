@@ -18,7 +18,7 @@ DEST = "d" * 32
 def destination(**kw):
     base = {"id": DEST, "name": "graylog", "enabled": True, "transport": "tcp", "format": "json", "host": "siem.test",
             "port": 5514, "framing": "lf", "verify_tls": True, "hec_token": "", "batch_size": 100, "max_retries": 3,
-            "sources": ["audit"], "new_connection_decisions": [], "mask_pii": False}
+            "sources": ["audit"], "new_connection_decisions": [], "new_connection_internal_only": True, "mask_pii": False}
     base.update(kw)
     return base
 

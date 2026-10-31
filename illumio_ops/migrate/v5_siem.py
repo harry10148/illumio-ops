@@ -90,6 +90,8 @@ def _destination(i: int, d: dict[str, Any], names: set[str], mode: CollectionMod
             sources.append("new_connections")
             items.append(_item(f"{label}.source_types.traffic", f"{target}.sources.new_connections", "rewritten",
                                "migrate_siem_traffic_to_new_connections"))
+            items.append(_item(f"{label}.source_types.traffic", f"{target}.new_connection_internal_only", "rewritten",
+                               "migrate_siem_internal_only"))
             if mode is CollectionMode.LIGHTWEIGHT:
                 items.append(_item(f"{label}.source_types.traffic", f"{target}.sources.new_connections", "rewritten",
                                    "migrate_siem_needs_alert_mode"))
@@ -109,7 +111,8 @@ def _destination(i: int, d: dict[str, Any], names: set[str], mode: CollectionMod
         "port": port, "framing": "octet_counting" if d.get("framing") == "octet_counting" else "lf",
         "verify_tls": verify, "hec_token": str(d.get("hec_token") or ""),
         "batch_size": _clamp(d.get("batch_size"), 1, 10_000, 100), "max_retries": _clamp(retries, 1, 100, 10),
-        "sources": sources or ["audit"], "new_connection_decisions": decisions, "mask_pii": bool(d.get("mask_pii"))}
+        "sources": sources or ["audit"], "new_connection_decisions": decisions, "new_connection_internal_only": True,
+        "mask_pii": bool(d.get("mask_pii"))}
     if not sources:
         items.append(_item(f"{label}.source_types", f"{target}.sources", "rewritten", "migrate_siem_no_source"))
     for key in sorted(set(d) - DEST_KEYS):

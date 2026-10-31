@@ -49,6 +49,7 @@ class SiemDestinationInput(BaseModel):
     max_retries: int
     sources: list[SiemSource]
     new_connection_decisions: list[PolicyDecision]
+    new_connection_internal_only: bool
     mask_pii: bool
 
 

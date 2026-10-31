@@ -52,7 +52,7 @@ def test_the_hec_token_is_never_on_the_page(context, live_app):
     _set(live_app, lambda d: d["siem"].update(enabled=True, destinations=[{
         "id": DEST, "name": "splunk", "enabled": True, "transport": "hec", "format": "json", "host": "splunk.example",
         "port": 8088, "framing": "lf", "verify_tls": True, "hec_token": "HEC-PAGE-SECRET", "batch_size": 100,
-        "max_retries": 10, "sources": ["audit"], "new_connection_decisions": [], "mask_pii": False}]))
+        "max_retries": 10, "sources": ["audit"], "new_connection_decisions": [], "new_connection_internal_only": True, "mask_pii": False}]))
     page = context.new_page()
     sign_in(page, live_app.url)
     page.goto(f"{live_app.url}/siem")

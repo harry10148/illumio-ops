@@ -14,7 +14,7 @@ DEST = "a" * 32
 def dest(**kw):
     base = {"id": DEST, "name": "splunk", "enabled": True, "transport": "hec", "format": "json",
             "host": "splunk.example", "port": 8088, "framing": "lf", "verify_tls": True, "hec_token": "HEC-SECRET",
-            "batch_size": 100, "max_retries": 10, "sources": ["audit", "findings"], "new_connection_decisions": [],
+            "batch_size": 100, "max_retries": 10, "sources": ["audit", "findings"], "new_connection_decisions": [], "new_connection_internal_only": True,
             "mask_pii": False}
     base.update(kw)
     return base

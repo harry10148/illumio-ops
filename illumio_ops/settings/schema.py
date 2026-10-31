@@ -41,7 +41,7 @@ from illumio_ops.domain.values import (
     SiemTransport,
 )
 
-SCHEMA_VERSION: Literal[9] = 9
+SCHEMA_VERSION: Literal[10] = 10
 _UTC_OFFSET = re.compile(r"UTC([+-]\d+(?:\.\d+)?)")
 
 
@@ -580,6 +580,7 @@ class SiemDestination(StrictModel):
     max_retries: int = Field(ge=1, le=100)
     sources: tuple[SiemSource, ...] = Field(min_length=1)
     new_connection_decisions: tuple[PolicyDecision, ...]  # empty: every decision (5.x traffic_pd)
+    new_connection_internal_only: bool  # no new connection with a public end (internet scans of a firewall, 2026-10-31)
     mask_pii: bool
 
     @field_validator("host")
@@ -628,7 +629,7 @@ class SiemSettings(StrictModel):
 
 
 class Settings(StrictModel):
-    schema_version: Literal[9]
+    schema_version: Literal[10]
     revision: int = Field(ge=0)
     pce: PceSettings
     web: WebSettings

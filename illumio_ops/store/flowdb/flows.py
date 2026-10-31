@@ -16,6 +16,7 @@ from typing import Literal
 
 from illumio_ops.domain.flows import FlowRecord, ranges_within, record_key
 from illumio_ops.domain.identity import account_key, endpoint_key
+from illumio_ops.domain.netaddr import is_public
 from illumio_ops.domain.values import (
     DIRECTORY_PORTS,
     DYNAMIC_PORTS_FROM,
@@ -217,10 +218,11 @@ INCREMENT_PRIMARY_JOIN = ("JOIN flows r ON r.record_key = i.record_key "
                           "(SELECT p.id FROM flows p WHERE p.conn_key = r.conn_key AND +p.is_primary = 1) END")
 
 _BASELINE_HAS = "SELECT 1 FROM connection_baseline WHERE src_key = ? AND dst_key = ? AND port = ? AND proto = ?"
+_LOG_FIELDS = ("SELECT src_key, dst_key, proto, policy_decision, first_detected, src_ip, dst_ip, src_hostname, "
+               "dst_hostname, src_label_set, dst_label_set FROM flows WHERE conn_key = ? AND +is_primary = 1")
 _LOG_NEW = ("INSERT INTO new_connection_log (src_key, dst_key, port, proto, decision, first_seen, src_ip, dst_ip, "
-            "src_hostname, dst_hostname, src_label_set, dst_label_set, recorded_at) "
-            "SELECT src_key, dst_key, ?, proto, policy_decision, first_detected, src_ip, dst_ip, src_hostname, "
-            "dst_hostname, src_label_set, dst_label_set, ? FROM flows WHERE conn_key = ? AND +is_primary = 1")
+            "src_hostname, dst_hostname, src_label_set, dst_label_set, public, recorded_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
 NEW_CONNECTION_LOG_KEEP = timedelta(days=14)
 
 
@@ -234,7 +236,10 @@ def _update_baselines(conn: sqlite3.Connection, conn_key: str, *, log_new: bool 
     port = row["port"] if row["port"] is not None else NO_PORT
     if log_new and 0 <= port < DYNAMIC_PORTS_FROM and conn.execute(
             _BASELINE_HAS, (row["src_key"], row["dst_key"], port, row["proto"])).fetchone() is None:
-        conn.execute(_LOG_NEW, (port, stamp, conn_key))
+        r = conn.execute(_LOG_FIELDS, (conn_key,)).fetchone()
+        conn.execute(_LOG_NEW, (r["src_key"], r["dst_key"], port, r["proto"], r["policy_decision"], r["first_detected"],
+                                r["src_ip"], r["dst_ip"], r["src_hostname"], r["dst_hostname"], r["src_label_set"],
+                                r["dst_label_set"], int(is_public(r["src_ip"]) or is_public(r["dst_ip"])), stamp))
     # The newest observation's decision wins (SET expressions all read the row as it was before).
     conn.execute(
         "INSERT INTO connection_baseline (src_key, dst_key, port, proto, first_seen, last_seen, last_decision) "
@@ -520,9 +525,12 @@ def delete_rollups_before(conn: sqlite3.Connection, day: str) -> int:
 
 
 def count_new_connection_log_before(conn: sqlite3.Connection, cutoff: datetime, *, after_id: int,
-                                    decisions: Sequence[str] = ()) -> int:
-    """decisions: those a destination takes (none: all; unknown includes a connection with no decision)."""
+                                    decisions: Sequence[str] = (), internal_only: bool = False) -> int:
+    """decisions: those a destination takes (none: all; unknown includes a connection with no decision);
+    internal_only: it takes no connection with a public end."""
     sql, args = "SELECT COUNT(*) FROM new_connection_log WHERE id > ? AND recorded_at < ?", [after_id, db_time(cutoff)]
+    if internal_only:
+        sql += " AND (public IS NULL OR public = 0)"
     if decisions:
         marks = ",".join("?" * len(decisions))
         sql += f" AND (decision IN ({marks}){' OR decision IS NULL' if 'unknown' in decisions else ''})"

@@ -60,7 +60,7 @@ function blank(): SiemDestinationInput {
   return {
     id: newId(), name: "", enabled: true, transport: "tcp", format: "cef_pce", host: "", port: 514, framing: "lf",
     verify_tls: true, hec_token: "", batch_size: 100, max_retries: 10, sources: ["audit"], new_connection_decisions: [],
-    mask_pii: false,
+    new_connection_internal_only: true, mask_pii: false,
   };
 }
 
@@ -200,6 +200,13 @@ function DestinationCard({ d, lightweight, onChange, onRemove }: {
           <p className="notice" data-role="siem-needs-alert-mode">
             {t("siem_needs_alert_mode")} <Link to="/system/collection">{t("siem_go_collection")}</Link>
           </p>
+        )}
+        {d.sources.includes("new_connections") && (
+          <label className="check" data-role="siem-internal-only">
+            <input type="checkbox" name="siem_internal_only" checked={d.new_connection_internal_only}
+                   onChange={(e) => set("new_connection_internal_only", e.target.checked)} />
+            <span>{t("siem_internal_only")} <span className="hint">{t("siem_internal_only_hint")}</span></span>
+          </label>
         )}
         {d.sources.includes("new_connections") && (
           <div className="row" data-role="siem-decisions">

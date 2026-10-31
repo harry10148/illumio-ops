@@ -1796,6 +1796,7 @@ mask_pii: boolean
 max_retries: number
 name: string
 new_connection_decisions: PolicyDecision[]
+new_connection_internal_only: boolean
 port: number
 sources: SiemSource[]
 transport: SiemTransport

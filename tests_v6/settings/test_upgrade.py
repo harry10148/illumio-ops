@@ -32,7 +32,7 @@ def test_v1_file_loads_as_v2_in_memory(tmp_path):
     p = _v1(tmp_path)
     before, mtime = p.read_bytes(), os.stat(p).st_mtime_ns
     s = SettingsStore(p).load()
-    assert s.schema_version == SCHEMA_VERSION == 9
+    assert s.schema_version == SCHEMA_VERSION == 10
     assert s.collection.traffic_interval_seconds == 600
     assert s.collection.retention.baseline_days == 30
     assert p.read_bytes() == before and os.stat(p).st_mtime_ns == mtime
@@ -134,7 +134,7 @@ def _v4_dict():
 
 def test_v4_file_upgrades_to_v5_keeping_values():
     s = validate_settings(upgrade(_v4_dict()))
-    assert s.schema_version == SCHEMA_VERSION == 9
+    assert s.schema_version == SCHEMA_VERSION == 10
     lat = s.lateral
     assert lat.detectors.fanout_targets == 12
     assert lat.extra_admin_ports[0].category == "remote" and lat.removed_admin_ports[0].port == 23
@@ -171,7 +171,7 @@ def test_v5_file_upgrades_to_v6_with_reports():
     d["schema_version"] = 5
     del d["reports"]
     s = validate_settings(upgrade(d))
-    assert s.schema_version == SCHEMA_VERSION == 9
+    assert s.schema_version == SCHEMA_VERSION == 10
     assert s.reports.retention_days == 90
 
 
@@ -182,7 +182,7 @@ def test_v6_file_upgrades_to_v7_with_rule_thresholds():
     del d["reports"]["rule_thresholds"]
     d["reports"]["retention_days"] = 30
     s = validate_settings(upgrade(d))
-    assert s.schema_version == SCHEMA_VERSION == 9
+    assert s.schema_version == SCHEMA_VERSION == 10
     assert s.reports.retention_days == 30 and s.reports.rule_thresholds.unmanaged_connection == 50
 
 
@@ -193,7 +193,7 @@ def test_upgrade_keeps_mode(mode):
     d["schema_version"] = 7
     d["collection"]["mode"] = mode
     s = validate_settings(upgrade(d))
-    assert s.schema_version == SCHEMA_VERSION == 9 and s.collection.mode.value == mode
+    assert s.schema_version == SCHEMA_VERSION == 10 and s.collection.mode.value == mode
 
 
 def test_events_only_becomes_lightweight():
