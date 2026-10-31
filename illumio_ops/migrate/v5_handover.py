@@ -36,7 +36,7 @@ def _time(value: Any) -> datetime | None:
     return t.replace(tzinfo=UTC) if t.tzinfo is None else t.astimezone(UTC)
 
 
-def _store(v5_root: Path, raw: dict[str, Any]) -> Path:
+def cache_store(v5_root: Path, raw: dict[str, Any]) -> Path:
     cache = raw.get("pce_cache") if isinstance(raw.get("pce_cache"), dict) else {}
     assert isinstance(cache, dict)
     path = Path(str(cache.get("db_path") or "data/pce_cache.sqlite"))
@@ -96,7 +96,7 @@ def read_handover(v5_root: Path, raw: dict[str, Any]) -> Handover:
     dlq: dict[str, int] = dict.fromkeys(names, 0)
     cache_on = isinstance(raw.get("pce_cache"), dict) and raw["pce_cache"].get("enabled") is True
     alert_floor = None
-    path = _store(v5_root, raw)
+    path = cache_store(v5_root, raw)
     if path.is_file():
         db = sqlite3.connect(f"file:{path}?mode=ro", uri=True)  # never written, never a WAL checkpoint
         try:

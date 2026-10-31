@@ -13,7 +13,8 @@ Then, in the new root only (the 5.x installation is read, never written):
 """
 from __future__ import annotations
 
-import shutil
+import os
+import stat
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -22,7 +23,7 @@ from illumio_ops.i18n import translate
 from illumio_ops.migrate.report import render
 from illumio_ops.migrate.v5 import MigrationResult, migrate_v5, read_v5
 from illumio_ops.migrate.v5_alerts import read_v5_rules
-from illumio_ops.migrate.v5_handover import Handover, read_handover
+from illumio_ops.migrate.v5_handover import Handover, cache_store, read_handover
 from illumio_ops.paths import InstallPaths
 from illumio_ops.services.collect.cycle import COLD_START_KEY
 from illumio_ops.services.collect.mode import collects
@@ -44,34 +45,71 @@ class AlreadyInstalled(Exception):
     """The v6 root already has settings: an upgrade never overwrites an installation."""
 
 
+class UnsafeSource(Exception):
+    """A 5.x file the upgrade reads (as root) is a link: refused rather than followed (security review)."""
+
+
+# What the upgrade reads from 5.x, relative to its root (the cache database's own path is checked as configured).
+_READ = ("config", "config/config.json", "config/alerts.json", "data", "logs", "logs/state.json")
+
+
+def _no_links(v5_root: Path, raw_db: Path) -> None:
+    for p in (*(v5_root / r for r in _READ), raw_db):
+        if p.is_symlink():
+            raise UnsafeSource(str(p))
+
+
 class MigrationBlocked(Exception):
     def __init__(self, result: MigrationResult) -> None:
         super().__init__("5.x values that cannot become v6 settings")
         self.result = result
 
 
-def _copy_tls(v5_root: Path, paths: InstallPaths, s: Settings) -> Settings:
+def _copy_file(src: Path, dst: Path, *, inside: Path, mode: int) -> bool:
+    """Copy one regular file that is inside the 5.x directory; False (nothing copied) for a link, anything else, or
+    a path that resolves outside it. The upgrade runs as root and the 5.x directory may be the service account's:
+    a link planted there must not make root copy what the account could not read (security review)."""
+    try:
+        st = os.lstat(src)
+        if not stat.S_ISREG(st.st_mode) or not src.resolve().is_relative_to(inside.resolve()):
+            return False
+        fd = os.open(src, os.O_RDONLY | os.O_NOFOLLOW)
+    except OSError:
+        return False
+    with os.fdopen(fd, "rb") as f:
+        data = f.read()
+    out = os.open(dst, os.O_WRONLY | os.O_CREAT | os.O_TRUNC | os.O_NOFOLLOW, mode)
+    with os.fdopen(out, "wb") as f:
+        f.write(data)
+    os.chmod(dst, mode)
+    return True
+
+
+def _copy_tls(v5_root: Path, paths: InstallPaths, s: Settings, original: Path) -> tuple[Settings, list[str]]:
+    """original: where 5.x ran (its settings name files there); v5_root: where it is now (moved aside when v6 takes
+    its directory). Returns the settings and the files not copied."""
     src = v5_root / "config" / "tls"
     paths.tls_dir.mkdir(parents=True, exist_ok=True)
     paths.tls_dir.chmod(0o700)
-    if src.is_dir():
+    skipped: list[str] = []
+    if src.is_dir() and not src.is_symlink():
         for f in sorted(src.iterdir()):
-            if f.is_file():
-                dst = paths.tls_dir / f.name
-                shutil.copyfile(f, dst)
-                dst.chmod(0o600 if "key" in f.name.lower() else 0o644)
+            mode = 0o600 if "key" in f.name.lower() else 0o644
+            if not _copy_file(f, paths.tls_dir / f.name, inside=v5_root, mode=mode):
+                skipped.append(f.name)
     tls, moved = s.web.tls, {}
     for field in ("cert_file", "key_file"):
         value = getattr(tls, field)
-        if value and Path(value).resolve().is_relative_to(v5_root.resolve()):
+        if value and Path(value).is_relative_to(original):
             dst = paths.tls_dir / Path(value).name
-            if not dst.exists():
-                shutil.copyfile(value, dst)
-                dst.chmod(0o600 if field == "key_file" else 0o644)
+            if not dst.exists() and not _copy_file(v5_root / Path(value).relative_to(original), dst, inside=v5_root,
+                                                   mode=0o600 if field == "key_file" else 0o644):
+                skipped.append(Path(value).name)
+                continue
             moved[field] = str(dst)
-    if not moved:
-        return s
-    return s.model_copy(update={"web": s.web.model_copy(update={"tls": tls.model_copy(update=moved)})})
+    if moved:
+        s = s.model_copy(update={"web": s.web.model_copy(update={"tls": tls.model_copy(update=moved)})})
+    return s, skipped
 
 
 def _handover(ctx: AppContext, s: Settings, result: MigrationResult, h: Handover, now: datetime,
@@ -115,12 +153,17 @@ def _handover(ctx: AppContext, s: Settings, result: MigrationResult, h: Handover
     return lines
 
 
-def upgrade(v5_root: Path, root: Path, *, now: datetime, lang: Language = Language.EN) -> list[str]:
-    """Write v6 at root from the stopped 5.x at v5_root; returns what the handover did, one line each."""
+def upgrade(v5_root: Path, root: Path, *, now: datetime, lang: Language = Language.EN,
+            original_root: Path | None = None) -> list[str]:
+    """Write v6 at root from the stopped 5.x at v5_root (moved there from original_root, when given); returns what the
+    handover did, one line each."""
     paths = InstallPaths(root)
     if paths.settings_file.exists():
         raise AlreadyInstalled(str(paths.settings_file))
+    if (v5_root / "config" / "config.json").is_symlink():
+        raise UnsafeSource(str(v5_root / "config" / "config.json"))
     raw = read_v5(v5_root)
+    _no_links(v5_root, cache_store(v5_root, raw))
     rules, legacy_channels = read_v5_rules(v5_root)
     result = migrate_v5(raw, rules=rules, legacy_channels=legacy_channels)
     if result.blocking or result.settings is None:
@@ -128,12 +171,13 @@ def upgrade(v5_root: Path, root: Path, *, now: datetime, lang: Language = Langua
     h = read_handover(v5_root, raw)
     for d in (paths.config_dir, paths.data_dir, root / "logs"):
         d.mkdir(parents=True, exist_ok=True)
-    s = _copy_tls(v5_root, paths, result.settings)
+    s, skipped = _copy_tls(v5_root, paths, result.settings, original_root or v5_root)
     store = SettingsStore(paths.settings_file)
     store.create(s)
     with connect(paths.app_db) as conn:  # as the service's start does (runtime.prepare)
         migrate(conn)
-    lines = _handover(AppContext(paths=paths, settings=store), s, result, h, now, lang)
+    lines = [translate(lang, "migrate_tls_skipped", {"file": name}) for name in skipped]
+    lines += _handover(AppContext(paths=paths, settings=store), s, result, h, now, lang)
     (root / "logs" / REPORT_FILE).write_text(render(result.report, lang) + "\n" + "\n".join(lines) + "\n",
                                              encoding="utf-8")
     return lines

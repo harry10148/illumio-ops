@@ -2486,5 +2486,6 @@
   "migrate_handover_siem_dlq": "SIEM {name}：5.x 已放棄的 {n} 筆 audit 事件（它的 DLQ）不會再送",
   "migrate_handover_alerts": "事件告警：從 {time} 之後接續，這是 5.x 最後評估的事件時間",
   "migrate_handover_alerts_none": "事件告警：找不到 5.x 的進度，從升級時開始告警",
-  "migrate_handover_capped": "第一次收集最多往回 {days} 天，到 {to}；{from} 到 {to} 之間的事件不會送出也不會告警"
+  "migrate_handover_capped": "第一次收集最多往回 {days} 天，到 {to}；{from} 到 {to} 之間的事件不會送出也不會告警",
+  "migrate_tls_skipped": "TLS 檔案 {file} 沒有複製：不是 5.x 目錄內的一般檔案"
 }

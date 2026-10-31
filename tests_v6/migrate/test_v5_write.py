@@ -101,3 +101,43 @@ def test_the_command_writes_once_and_prints_the_handover(v5, tmp_path):
     assert "redacted-25" in r.stdout and "migration-report.txt" in r.stdout
     again = subprocess.run(cmd, capture_output=True, text=True, timeout=120, check=False, env=env, cwd=tmp_path)
     assert again.returncode == 73 and "nothing was changed" in again.stderr
+
+
+def test_a_provided_certificate_inside_a_moved_5x_root_is_copied(v5, tmp_path):
+    original = tmp_path / "opt-illumio-ops"  # where 5.x ran; v6 takes that directory, 5.x moves to v5
+    raw = json.loads((v5 / "config" / "config.json").read_text())
+    raw["web_gui"]["tls"].update({"self_signed": False, "cert_file": str(original / "config" / "tls" / "site.pem"),
+                                  "key_file": str(original / "config" / "tls" / "site_key.pem")})
+    (v5 / "config" / "config.json").write_text(json.dumps(raw))
+    (v5 / "config" / "tls" / "site.pem").write_text("SITE")
+    (v5 / "config" / "tls" / "site_key.pem").write_text("SITEKEY")
+    original.mkdir()  # migrate_v5 checks the path is absolute, the copy is what v6 reads
+    root = tmp_path / "v6"
+    upgrade(v5, root, now=NOW, original_root=original)
+    _, s = _ctx(root)
+    assert s.web.tls.cert_file == str(root / "config" / "tls" / "site.pem")
+    assert Path(s.web.tls.key_file).read_text() == "SITEKEY"
+
+
+def test_tls_copy_never_follows_a_link_out_of_the_5x_directory(v5, tmp_path):
+    # security review: the upgrade runs as root, the 5.x directory may be the service account's — a link planted
+    # there must not make root copy a file the account could not read into a place it can
+    secret = tmp_path / "root-only"
+    secret.write_text("SECRET")
+    (v5 / "config" / "tls" / "stolen_key.pem").symlink_to(secret)
+    root = tmp_path / "v6"
+    lines = upgrade(v5, root, now=NOW)
+    assert not (root / "config" / "tls" / "stolen_key.pem").exists()
+    assert any("stolen_key.pem" in line for line in lines)
+    assert (root / "config" / "tls" / "self_signed.pem").read_text() == "CERT"
+
+
+@pytest.mark.parametrize("rel", ["config/config.json", "data/pce_cache.sqlite"])
+def test_a_linked_5x_file_stops_the_upgrade(v5, tmp_path, rel):
+    from illumio_ops.migrate.v5_write import UnsafeSource
+    real = tmp_path / "elsewhere"
+    (v5 / rel).rename(real)
+    (v5 / rel).symlink_to(real)
+    with pytest.raises(UnsafeSource):
+        upgrade(v5, tmp_path / "v6", now=NOW)
+    assert not (tmp_path / "v6").exists()

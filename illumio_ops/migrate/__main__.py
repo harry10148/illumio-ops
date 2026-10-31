@@ -19,6 +19,7 @@ from illumio_ops.migrate.v5_write import (
     REPORT_FILE,
     AlreadyInstalled,
     MigrationBlocked,
+    UnsafeSource,
     upgrade,
 )
 
@@ -37,6 +38,7 @@ def main(argv: list[str] | None = None) -> int:
     mode.add_argument("--report-only", action="store_true", help="print the report and change nothing")
     mode.add_argument("--write", action="store_true", help="write the v6 settings and handover into --root")
     ap.add_argument("--root", type=Path, help="the new v6 root (with --write)")
+    ap.add_argument("--original-root", type=Path, help="where 5.x ran, when it has been moved to --from (with --write)")
     ap.add_argument("--lang", choices=[lang.value for lang in Language], default="en")
     args = ap.parse_args(argv)
     lang = Language(args.lang)
@@ -60,12 +62,17 @@ def main(argv: list[str] | None = None) -> int:
             return EX_DATAERR
         return 0
     try:
-        lines = upgrade(args.source, args.root, now=datetime.now(UTC).replace(microsecond=0), lang=lang)
+        lines = upgrade(args.source, args.root, now=datetime.now(UTC).replace(microsecond=0), lang=lang,
+                        original_root=args.original_root)
     except AlreadyInstalled as exc:
         sys.stderr.write(f"{exc} already exists; nothing was changed\n")
         return EX_CANTCREAT
     except MigrationBlocked as exc:
         _blocking(exc.result.blocking)
+        return EX_DATAERR
+    except UnsafeSource as exc:
+        sys.stderr.write(f"{exc} is a link; the upgrade does not follow links in the 5.x directory. Replace it with "
+                         "the file itself and run again; nothing was changed\n")
         return EX_DATAERR
     sys.stdout.write("".join(f"{line}\n" for line in lines))
     sys.stdout.write(f"{args.root / 'logs' / REPORT_FILE}\n")

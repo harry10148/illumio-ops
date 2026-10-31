@@ -2486,5 +2486,6 @@
   "migrate_handover_siem_dlq": "SIEM {name}: {n} audit events 5.x gave up on (its DLQ) are not sent again",
   "migrate_handover_alerts": "Event alerts: continue after {time}, the last event 5.x had evaluated",
   "migrate_handover_alerts_none": "Event alerts: no 5.x progress found; events are alerted from the upgrade",
-  "migrate_handover_capped": "The first collection reaches back {days} days, to {to}; events between {from} and {to} are not sent or alerted"
+  "migrate_handover_capped": "The first collection reaches back {days} days, to {to}; events between {from} and {to} are not sent or alerted",
+  "migrate_tls_skipped": "TLS file {file} was not copied: not a regular file inside the 5.x directory"
 }
