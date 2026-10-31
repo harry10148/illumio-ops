@@ -9,10 +9,10 @@ from flask import Blueprint
 from pydantic import BaseModel, ValidationError
 
 from illumio_ops.domain.values import ChannelKind
-from illumio_ops.services.alerts.channels import CredentialsRequired, merge_channels
+from illumio_ops.services.alerts.channels import merge_channels
 from illumio_ops.services.alerts.dispatch import send_test
 from illumio_ops.settings.schema import AlertChannels
-from illumio_ops.settings.secrets import MASK, redact
+from illumio_ops.settings.secrets import MASK, CredentialsRequired, redact
 from illumio_ops.store import alerts as store
 from illumio_ops.web.auth import get_ctx
 from illumio_ops.web.contract import ApiFailure, api_route, operation

@@ -16,7 +16,12 @@ from typing import Literal
 
 from illumio_ops.domain.flows import FlowRecord, ranges_within, record_key
 from illumio_ops.domain.identity import account_key, endpoint_key
-from illumio_ops.domain.values import DIRECTORY_PORTS, DataOrigin, FlowDirection
+from illumio_ops.domain.values import (
+    DIRECTORY_PORTS,
+    DYNAMIC_PORTS_FROM,
+    DataOrigin,
+    FlowDirection,
+)
 from illumio_ops.store.flowdb import archive
 from illumio_ops.store.flowdb.db import db_day, db_time, transaction
 from illumio_ops.store.flowdb.labels import label_set_id
@@ -211,12 +216,25 @@ INCREMENT_PRIMARY_JOIN = ("JOIN flows r ON r.record_key = i.record_key "
                           "JOIN flows f ON f.id = CASE WHEN r.is_primary = 1 THEN r.id ELSE "
                           "(SELECT p.id FROM flows p WHERE p.conn_key = r.conn_key AND +p.is_primary = 1) END")
 
-def _update_baselines(conn: sqlite3.Connection, conn_key: str) -> sqlite3.Row | None:
-    """Fold the connection's primary row into the baselines; returns that row (None: the connection is gone)."""
+_BASELINE_HAS = "SELECT 1 FROM connection_baseline WHERE src_key = ? AND dst_key = ? AND port = ? AND proto = ?"
+_LOG_NEW = ("INSERT INTO new_connection_log (src_key, dst_key, port, proto, decision, first_seen, src_ip, dst_ip, "
+            "src_hostname, dst_hostname, src_label_set, dst_label_set, recorded_at) "
+            "SELECT src_key, dst_key, ?, proto, policy_decision, first_detected, src_ip, dst_ip, src_hostname, "
+            "dst_hostname, src_label_set, dst_label_set, ? FROM flows WHERE conn_key = ? AND +is_primary = 1")
+NEW_CONNECTION_LOG_KEEP = timedelta(days=14)
+
+
+def _update_baselines(conn: sqlite3.Connection, conn_key: str, *, log_new: bool = False,
+                      stamp: str = "") -> sqlite3.Row | None:
+    """Fold the connection's primary row into the baselines; returns that row (None: the connection is gone).
+    log_new: a connection the baseline did not hold (on a service port) is written to new_connection_log."""
     row: sqlite3.Row | None = conn.execute(PRIMARY_OF_CONNECTION, (conn_key,)).fetchone()
     if row is None:
         return None
     port = row["port"] if row["port"] is not None else NO_PORT
+    if log_new and 0 <= port < DYNAMIC_PORTS_FROM and conn.execute(
+            _BASELINE_HAS, (row["src_key"], row["dst_key"], port, row["proto"])).fetchone() is None:
+        conn.execute(_LOG_NEW, (port, stamp, conn_key))
     # The newest observation's decision wins (SET expressions all read the row as it was before).
     conn.execute(
         "INSERT INTO connection_baseline (src_key, dst_key, port, proto, first_seen, last_seen, last_decision) "
@@ -353,11 +371,13 @@ def _write_activity(conn: sqlite3.Connection, activity: Activity) -> None:
 
 
 def upsert_flows(conn: sqlite3.Connection, records: Sequence[FlowRecord], *, origin: DataOrigin,
-                 now: datetime, increments: Increments = "none") -> UpsertStats:
+                 now: datetime, increments: Increments = "none", log_new_connections: bool = False) -> UpsertStats:
     """Write a batch in one transaction (nested in the caller's, if any). The caller holds
     FlowDb.write_lock. increments: "cycle" for live collection and "late" for the daily re-read record how
     much each touched connection grew (flow_increments); a backfill records none (spec §7: history is not
-    alerted), but its counts are marked recorded all the same, so later growth is measured from them."""
+    alerted), but its counts are marked recorded all the same, so later growth is measured from them.
+    log_new_connections: live data once the baseline period is full — each connection the baseline did not hold
+    goes to new_connection_log for the SIEM (a backfill never: history is not sent, spec §7)."""
     stamp = db_time(now)
     inserted = refreshed = paired = unchanged = 0
     days: set[str] = set()
@@ -393,7 +413,7 @@ def upsert_flows(conn: sqlite3.Connection, records: Sequence[FlowRecord], *, ori
         hour = db_time(now.astimezone(UTC).replace(minute=0, second=0, microsecond=0))
         for conn_key in ordered:
             _merge_connection(conn, conn_key)
-            primary = _update_baselines(conn, conn_key)
+            primary = _update_baselines(conn, conn_key, log_new=log_new_connections, stamp=stamp)
             grew = _record_growth(conn, conn_key, before_last=before_last, increments=increments, stamp=stamp)
             if increments == "cycle" and primary is not None:
                 _add_activity(activity, primary, hour, grew)
@@ -497,6 +517,22 @@ def delete_rollups_before(conn: sqlite3.Connection, day: str) -> int:
     with transaction(conn):
         conn.execute("DELETE FROM rollup_state WHERE day < ?", (day,))
         return conn.execute("DELETE FROM flow_rollup_daily WHERE day < ?", (day,)).rowcount
+
+
+def count_new_connection_log_before(conn: sqlite3.Connection, cutoff: datetime, *, after_id: int,
+                                    decisions: Sequence[str] = ()) -> int:
+    """decisions: those a destination takes (none: all; unknown includes a connection with no decision)."""
+    sql, args = "SELECT COUNT(*) FROM new_connection_log WHERE id > ? AND recorded_at < ?", [after_id, db_time(cutoff)]
+    if decisions:
+        marks = ",".join("?" * len(decisions))
+        sql += f" AND (decision IN ({marks}){' OR decision IS NULL' if 'unknown' in decisions else ''})"
+        args += list(decisions)
+    return int(conn.execute(sql, args).fetchone()[0])
+
+
+def delete_new_connection_log_before(conn: sqlite3.Connection, cutoff: datetime) -> int:
+    with transaction(conn):
+        return conn.execute("DELETE FROM new_connection_log WHERE recorded_at < ?", (db_time(cutoff),)).rowcount
 
 
 def delete_baselines_before(conn: sqlite3.Connection, cutoff: datetime) -> int:

@@ -31,7 +31,7 @@ export type ThresholdType = ("immediate" | "count")
  * This interface was referenced by `ContractRoot`'s JSON-Schema
  * via the `definition` "SystemCheck".
  */
-export type SystemCheck = ("pce_health" | "collection_failing" | "data_loss" | "job_failing" | "disk_low")
+export type SystemCheck = ("pce_health" | "collection_failing" | "data_loss" | "job_failing" | "disk_low" | "siem_backlog")
 /**
  * This interface was referenced by `ContractRoot`'s JSON-Schema
  * via the `definition` "RuleAction".
@@ -132,6 +132,26 @@ export type ReportStatus = ("queued" | "running" | "done" | "failed")
  * via the `definition` "RhcState".
  */
 export type RhcState = ("enabled" | "partial" | "disabled" | "unsupported" | "unknown")
+/**
+ * How a SIEM destination's lines look (spec §6.5 SIEM 轉送).
+ * 
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "SiemFormat".
+ */
+export type SiemFormat = ("cef" | "json" | "syslog_cef" | "syslog_json" | "cef_pce" | "syslog_cef_pce")
+/**
+ * What a destination receives: PCE audit events, this product's detections and alerts, and (optional) the first
+ * time each connection appears in the baseline period. Never traffic records (spec §4.1 goal 4).
+ * 
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "SiemSource".
+ */
+export type SiemSource = ("audit" | "findings" | "new_connections")
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "SiemTransport".
+ */
+export type SiemTransport = ("udp" | "tcp" | "tls" | "hec")
 /**
  * This interface was referenced by `ContractRoot`'s JSON-Schema
  * via the `definition` "ChannelKind".
@@ -1758,6 +1778,171 @@ result: EnableResult
 status: RhcStatus
 }
 /**
+ * The page's copy of a destination: a masked token is not a token, so what is saved or sent is validated as
+ * SiemDestination after the saved token is merged back in.
+ * 
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "SiemDestinationInput".
+ */
+export interface SiemDestinationInput {
+batch_size: number
+enabled: boolean
+format: SiemFormat
+framing: ("lf" | "octet_counting")
+hec_token: string
+host: string
+id: string
+mask_pii: boolean
+max_retries: number
+name: string
+new_connection_decisions: PolicyDecision[]
+port: number
+sources: SiemSource[]
+transport: SiemTransport
+verify_tls: (boolean | string)
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "SiemTestRequest".
+ */
+export interface SiemTestRequest {
+destination: SiemDestinationInput
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "SiemTestView".
+ */
+export interface SiemTestView {
+error: (string | null)
+line: string
+ok: boolean
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "DlqItem".
+ */
+export interface DlqItem {
+attempts: number
+destination: string
+destination_id: string
+error: string
+event_time: (string | null)
+external_id: string
+id: number
+preview: string
+quarantined_at: string
+source: string
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "DlqPage".
+ */
+export interface DlqPage {
+items: DlqItem[]
+limit: number
+offset: number
+total: number
+}
+/**
+ * ids: those lines; none: every line of destination_id (or of every destination).
+ * 
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "DlqAction".
+ */
+export interface DlqAction {
+destination_id?: (string | null)
+ids?: (number[] | null)
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "DlqPurgeView".
+ */
+export interface DlqPurgeView {
+deleted: number
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "DlqResendView".
+ */
+export interface DlqResendView {
+changed: number
+error: (string | null)
+failed: number
+remaining: number
+sent: number
+skipped: number
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "SiemSettingsInput".
+ */
+export interface SiemSettingsInput {
+backlog_warn_rows: number
+destinations: SiemDestinationInput[]
+dlq_max_per_dest: number
+enabled: boolean
+tick_seconds: number
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "SiemSettingsView".
+ */
+export interface SiemSettingsView {
+revision: number
+siem: SiemSettingsInput
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "SiemSettingsUpdate".
+ */
+export interface SiemSettingsUpdate {
+revision: number
+siem: SiemSettingsInput
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "SiemDestinationStatus".
+ */
+export interface SiemDestinationStatus {
+dlq: number
+dlq_max: number
+enabled: boolean
+format: SiemFormat
+host: string
+id: string
+name: string
+port: number
+sources: SiemSourceStatus[]
+transport: SiemTransport
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "SiemSourceStatus".
+ */
+export interface SiemSourceStatus {
+dropped: number
+head_attempts: number
+last_error: (string | null)
+last_error_at: (string | null)
+last_sent_at: (string | null)
+pending: (number | null)
+sent: number
+source: ("audit" | "alerts" | "detections" | "new_connections")
+state: ("ok" | "behind" | "failing" | "dlq_full" | "waiting" | "needs_alert_mode" | "baseline_building" | "off")
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "SiemStatusView".
+ */
+export interface SiemStatusView {
+backlog_warn_rows: number
+baseline_days: number
+baseline_full: boolean
+destinations: SiemDestinationStatus[]
+enabled: boolean
+lightweight: boolean
+}
+/**
  * This interface was referenced by `ContractRoot`'s JSON-Schema
  * via the `definition` "ChannelState".
  */
@@ -2503,7 +2688,7 @@ pulled: (PullInfo | null)
 result: SegmentResult
 }
 
-export type OpId = "alert_rules.create" | "alert_rules.delete" | "alert_rules.list" | "alert_rules.pack" | "alert_rules.preview" | "alert_rules.update" | "alerts.evidence" | "alerts.explain" | "alerts.get" | "alerts.list" | "alerts.mark_known" | "alerts.note_add" | "auth.csrf" | "auth.login" | "auth.logout" | "auth.me" | "auth.password" | "custom_reports.add_section" | "custom_reports.delete" | "custom_reports.list" | "custom_reports.remove_section" | "custom_reports.rename" | "home.focus" | "home.summary" | "hosts.profile" | "hosts.ransomware_allows" | "hosts.tamper_note_add" | "hosts.tamper_note_remove" | "i18n.dictionary" | "lateral.compute" | "lateral.simulate" | "lateral.view" | "quarantine.apply" | "quarantine.history" | "quarantine.preview" | "quarantine.remove" | "report_schedules.create" | "report_schedules.delete" | "report_schedules.list" | "report_schedules.run_now" | "report_schedules.update" | "reports.catalog" | "reports.delete" | "reports.generate" | "reports.get" | "reports.list" | "rhc.enable" | "rhc.status" | "system.channels.get" | "system.channels.test" | "system.channels.update" | "system.collection.backfill" | "system.collection.get" | "system.collection.status" | "system.collection.update" | "system.display.get" | "system.display.update" | "system.jobs.list" | "system.lateral.get" | "system.lateral.known" | "system.lateral.known_delete" | "system.lateral.update" | "system.logs.query" | "system.pce.get" | "system.pce.latest" | "system.pce.probe" | "system.pce.update" | "system.reports.get" | "system.reports.update" | "system.security.get" | "system.security.update" | "system.tls.csr" | "system.tls.import" | "system.tls.renew" | "system.tls.status" | "system.tls.update" | "workbench.dimension" | "workbench.from_alert" | "workbench.meta" | "workbench.predicted" | "workbench.run";
+export type OpId = "alert_rules.create" | "alert_rules.delete" | "alert_rules.list" | "alert_rules.pack" | "alert_rules.preview" | "alert_rules.update" | "alerts.evidence" | "alerts.explain" | "alerts.get" | "alerts.list" | "alerts.mark_known" | "alerts.note_add" | "auth.csrf" | "auth.login" | "auth.logout" | "auth.me" | "auth.password" | "custom_reports.add_section" | "custom_reports.delete" | "custom_reports.list" | "custom_reports.remove_section" | "custom_reports.rename" | "home.focus" | "home.summary" | "hosts.profile" | "hosts.ransomware_allows" | "hosts.tamper_note_add" | "hosts.tamper_note_remove" | "i18n.dictionary" | "lateral.compute" | "lateral.simulate" | "lateral.view" | "quarantine.apply" | "quarantine.history" | "quarantine.preview" | "quarantine.remove" | "report_schedules.create" | "report_schedules.delete" | "report_schedules.list" | "report_schedules.run_now" | "report_schedules.update" | "reports.catalog" | "reports.delete" | "reports.generate" | "reports.get" | "reports.list" | "rhc.enable" | "rhc.status" | "siem.destination.test" | "siem.dlq.list" | "siem.dlq.purge" | "siem.dlq.resend" | "siem.settings.get" | "siem.settings.update" | "siem.status" | "system.channels.get" | "system.channels.test" | "system.channels.update" | "system.collection.backfill" | "system.collection.get" | "system.collection.status" | "system.collection.update" | "system.display.get" | "system.display.update" | "system.jobs.list" | "system.lateral.get" | "system.lateral.known" | "system.lateral.known_delete" | "system.lateral.update" | "system.logs.query" | "system.pce.get" | "system.pce.latest" | "system.pce.probe" | "system.pce.update" | "system.reports.get" | "system.reports.update" | "system.security.get" | "system.security.update" | "system.tls.csr" | "system.tls.import" | "system.tls.renew" | "system.tls.status" | "system.tls.update" | "workbench.dimension" | "workbench.from_alert" | "workbench.meta" | "workbench.predicted" | "workbench.run";
 
 export interface Requests {
   "alert_rules.create": RuleWrite;
@@ -2554,6 +2739,13 @@ export interface Requests {
   "reports.list": undefined;
   "rhc.enable": RhcEnable;
   "rhc.status": undefined;
+  "siem.destination.test": SiemTestRequest;
+  "siem.dlq.list": undefined;
+  "siem.dlq.purge": DlqAction;
+  "siem.dlq.resend": DlqAction;
+  "siem.settings.get": undefined;
+  "siem.settings.update": SiemSettingsUpdate;
+  "siem.status": undefined;
   "system.channels.get": undefined;
   "system.channels.test": ChannelTest;
   "system.channels.update": ChannelsUpdate;
@@ -2638,6 +2830,13 @@ export interface Responses {
   "reports.list": ReportPage;
   "rhc.enable": RhcEnabled;
   "rhc.status": RhcStatus;
+  "siem.destination.test": SiemTestView;
+  "siem.dlq.list": DlqPage;
+  "siem.dlq.purge": DlqPurgeView;
+  "siem.dlq.resend": DlqResendView;
+  "siem.settings.get": SiemSettingsView;
+  "siem.settings.update": SiemSettingsView;
+  "siem.status": SiemStatusView;
   "system.channels.get": ChannelsView;
   "system.channels.test": ChannelTestResult;
   "system.channels.update": ChannelsView;
@@ -2722,6 +2921,13 @@ export const OPERATIONS = {
   "reports.list": { method: "GET", path: "/api/reports" },
   "rhc.enable": { method: "POST", path: "/api/rhc/enable" },
   "rhc.status": { method: "GET", path: "/api/rhc" },
+  "siem.destination.test": { method: "POST", path: "/api/siem/test" },
+  "siem.dlq.list": { method: "GET", path: "/api/siem/dlq" },
+  "siem.dlq.purge": { method: "POST", path: "/api/siem/dlq/purge" },
+  "siem.dlq.resend": { method: "POST", path: "/api/siem/dlq/resend" },
+  "siem.settings.get": { method: "GET", path: "/api/siem/settings" },
+  "siem.settings.update": { method: "PUT", path: "/api/siem/settings" },
+  "siem.status": { method: "GET", path: "/api/siem/status" },
   "system.channels.get": { method: "GET", path: "/api/system/channels" },
   "system.channels.test": { method: "POST", path: "/api/system/channels/test" },
   "system.channels.update": { method: "PUT", path: "/api/system/channels" },
@@ -2978,12 +3184,32 @@ export const VALUES = {
     "low",
     "medium"
   ],
+  "SiemFormat": [
+    "cef",
+    "cef_pce",
+    "json",
+    "syslog_cef",
+    "syslog_cef_pce",
+    "syslog_json"
+  ],
+  "SiemSource": [
+    "audit",
+    "findings",
+    "new_connections"
+  ],
+  "SiemTransport": [
+    "hec",
+    "tcp",
+    "tls",
+    "udp"
+  ],
   "SystemCheck": [
     "collection_failing",
     "data_loss",
     "disk_low",
     "job_failing",
-    "pce_health"
+    "pce_health",
+    "siem_backlog"
   ],
   "TamperAction": [
     "add_chain",

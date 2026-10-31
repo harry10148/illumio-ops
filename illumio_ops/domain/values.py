@@ -53,6 +53,7 @@ class SystemCheck(StrEnum):
     DATA_LOSS = "data_loss"
     JOB_FAILING = "job_failing"
     DISK_LOW = "disk_low"
+    SIEM_BACKLOG = "siem_backlog"  # a SIEM destination far behind, failing, or its DLQ full (P7)
 
 
 class DeliveryStatus(StrEnum):
@@ -412,12 +413,40 @@ class ReportStatus(StrEnum):
     FAILED = "failed"
 
 
+DYNAMIC_PORTS_FROM = 49152  # IANA dynamic ports: a new one is a client's or an RPC endpoint's, not a new service
+
+class SiemFormat(StrEnum):
+    """How a SIEM destination's lines look (spec §6.5 SIEM 轉送)."""
+    CEF = "cef"
+    JSON = "json"
+    SYSLOG_CEF = "syslog_cef"
+    SYSLOG_JSON = "syslog_json"
+    CEF_PCE = "cef_pce"
+    SYSLOG_CEF_PCE = "syslog_cef_pce"
+
+
+class SiemTransport(StrEnum):
+    UDP = "udp"
+    TCP = "tcp"
+    TLS = "tls"
+    HEC = "hec"
+
+
+class SiemSource(StrEnum):
+    """What a destination receives: PCE audit events, this product's detections and alerts, and (optional) the first
+    time each connection appears in the baseline period. Never traffic records (spec §4.1 goal 4)."""
+    AUDIT = "audit"
+    FINDINGS = "findings"
+    NEW_CONNECTIONS = "new_connections"
+
+
 _ENUMS: tuple[type[StrEnum], ...] = (
     PolicyDecision, RuleAction, AlertRuleType, DeploymentType, Language, ProbeName,
     FlowDirection, VisibilityLevel, TamperClassification, IngestSource, DataOrigin, CapabilityState,
     CollectionMode, Severity, DetectorKind, PortClass, DetectorState, SegmentDimension, SegmentMetric, SegmentView,
     EdgeState, TamperPattern, TamperAction, PrecursorKind, RansomwareTrafficClass, FocusKind, Confidence,
     ThresholdType, ChannelKind, SystemCheck, DeliveryStatus, ReportType, ReportFormat, ReportStatus,
+    SiemFormat, SiemTransport, SiemSource,
 )
 
 

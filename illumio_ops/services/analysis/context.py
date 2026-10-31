@@ -110,3 +110,17 @@ def host_for(lc: LateralContext, key: str, *, ip: str, hostname: str | None,
                     managed=False, labels=flow_labels, enforcement_mode=None, visibility_level=None, os_id=None,
                     ven_href=None, critical=selector_matches(flow_labels, _selectors(lc.settings.critical_assets)),
                     admin_group=selector_matches(flow_labels, _selectors(lc.settings.admin_groups)))
+
+
+def baseline_full(ctx: AppContext) -> bool:
+    """Whether the traffic baseline covers its whole period (load_lateral_context().baseline_full() without reading
+    the inventory): only then is a connection the baseline does not hold one seen for the first time in that period
+    (the SIEM's new-connection source, P7)."""
+    with ctx.flows().connect() as conn:
+        traffic = ingest_state.get(conn, IngestSource.TRAFFIC)
+        ranges = ingest_state.coverage(conn, IngestSource.TRAFFIC)
+        backfill = ingest_state.get(conn, IngestSource.BACKFILL)
+    initial: dict[str, object] = ((backfill.progress or {}) if backfill else {}).get("initial") or {}
+    required = ctx.settings.current().collection.retention.baseline_days
+    backfilling = bool(initial) and not initial.get("finished")
+    return not backfilling and _baseline_days(ranges, traffic.watermark if traffic else None, required) >= required

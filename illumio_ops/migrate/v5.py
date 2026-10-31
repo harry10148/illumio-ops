@@ -17,11 +17,12 @@ from typing import Any
 from pydantic import ValidationError
 
 from illumio_ops.domain.netaddr import parse_ip_token
-from illumio_ops.domain.values import Language
+from illumio_ops.domain.values import CollectionMode, Language
 from illumio_ops.migrate.report import Action, MigrationItem, MigrationReport
 from illumio_ops.migrate.v5_alerts import migrate_alerts
 from illumio_ops.migrate.v5_models import V5Config
 from illumio_ops.migrate.v5_reports import migrate_reports
+from illumio_ops.migrate.v5_siem import migrate_siem
 from illumio_ops.settings.schema import DisplaySettings, Settings, default_settings
 from illumio_ops.settings.secrets import (
     DEFAULT_ADMIN_PASSWORD,
@@ -35,7 +36,7 @@ Path_ = tuple[str, ...]
 DEPRECATED_PREFIXES: tuple[Path_, ...] = (("report", "attack_surface"), ("web_gui", "tls", "http_redirect_port"),
                                           ("pce_profiles",), ("active_pce_id",),
                                           ("pce_cache", "archive_review_max_days"))
-PHASE_OF_SECTION = {"siem": "P7"}
+PHASE_OF_SECTION: dict[str, str] = {}  # a section a later phase migrates (none left after P7)
 REPORT_SECTIONS = ("report", "report_schedules")  # reported by migrate_reports, key by key
 ALERT_SECTIONS = ("alerts", "email", "smtp", "rules")  # reported by migrate_alerts, key by key
 NOT_IN_V6_SECTIONS = ("rule_scheduler", "scheduler", "rule_backups")
@@ -52,7 +53,6 @@ SPECIAL: dict[Path_, tuple[Action, str, dict[str, str]]] = {
     ("pce_cache", "cache_read_max_rows"): ("dropped", "migrate_not_in_v6", {}),
     ("pce_cache", "flow_delta_enabled"): ("dropped", "migrate_not_in_v6", {}),
     ("pce_cache", "flow_obs_retention_hours"): ("dropped", "migrate_not_in_v6", {}),
-    ("pce_cache", "siem_pending_warn_rows"): ("unsupported", "migrate_arrives_in_phase", {"phase": "P7"}),
     ("logging", "json_sink"): ("unsupported", "migrate_not_in_v6", {}),
     ("logging", "rotation"): ("unsupported", "migrate_not_in_v6", {}),
     ("logging", "retention"): ("unsupported", "migrate_not_in_v6", {}),
@@ -305,11 +305,15 @@ def migrate_v5(raw: dict[str, Any], *, rules: list[dict[str, Any]] | None = None
     report.items.extend(alert_items)
     out["reports"], report_items = migrate_reports(raw, defaults, v5.settings.timezone)
     report.items.extend(report_items)
+    out["siem"], siem_items = migrate_siem(raw, mode=CollectionMode(out["collection"]["mode"]))
+    report.items.extend(siem_items)
 
     for path in leaf_paths(raw):
         source = show(path)
         if path[0] in ALERT_SECTIONS or path[0] in REPORT_SECTIONS or path == ("web_gui", "public_url"):
             continue
+        if path[0] == "siem" or path == ("pce_cache", "siem_pending_warn_rows"):
+            continue  # reported by migrate_siem, destination by destination
         if any(path[:len(p)] == p for p in DEPRECATED_PREFIXES):
             add(MigrationItem(source, None, "dropped", "migrate_deprecated_in_5x"))
         elif path == ("web_gui", "password"):

@@ -32,12 +32,16 @@ from illumio_ops.domain.values import (
     CollectionMode,
     DeploymentType,
     Language,
+    PolicyDecision,
     PortClass,
     ReportFormat,
     ReportType,
+    SiemFormat,
+    SiemSource,
+    SiemTransport,
 )
 
-SCHEMA_VERSION: Literal[8] = 8
+SCHEMA_VERSION: Literal[9] = 9
 _UTC_OFFSET = re.compile(r"UTC([+-]\d+(?:\.\d+)?)")
 
 
@@ -452,9 +456,9 @@ class AlertChannels(StrictModel):
 class AlertSettings(StrictModel):
     """Notification channels, the alert rules (spec §6.5 告警) and how long alert records are kept."""
     channels: AlertChannels
-    # 300 of the operator's own and room for the pack's later additions (v5 adds five: a file at the old limit must
-    # still load after an upgrade).
-    rules: tuple[AlertRule, ...] = Field(max_length=350)
+    # 300 of the operator's own and room for the pack's later additions: an upgrade adds pack rules (v5 five, v9 one),
+    # and a file at the old limit must still load after it — raise this with every rule an upgrade adds.
+    rules: tuple[AlertRule, ...] = Field(max_length=360)
     retention_days: int = Field(ge=1, le=3650)
 
     @field_validator("rules")
@@ -555,8 +559,76 @@ class ReportSettings(StrictModel):
         return v.rstrip("/")
 
 
+_HOST = re.compile(r"^[A-Za-z0-9._:\[\]-]+$")
+
+
+class SiemDestination(StrictModel):
+    """One place the SIEM forwarder sends to (spec §6.5 SIEM 轉送). An enabled destination is complete; a disabled one
+    may be a draft."""
+    id: str = Field(pattern=r"^[0-9a-f]{32}$")
+    name: str = Field(min_length=1, max_length=64)
+    enabled: bool
+    transport: SiemTransport
+    format: SiemFormat
+    host: str = Field(max_length=253)          # a name or an address, no scheme
+    port: int = Field(ge=1, le=65535)
+    framing: Literal["lf", "octet_counting"]   # tcp and tls: octet_counting is RFC 6587 / 5425
+    verify_tls: bool | str                     # tls and hec; str = path to a CA bundle
+    hec_token: Secret
+    batch_size: int = Field(ge=1, le=10_000)
+    # At least one: with none, one record that always fails would be sent to the DLQ by its first transient error.
+    max_retries: int = Field(ge=1, le=100)
+    sources: tuple[SiemSource, ...] = Field(min_length=1)
+    new_connection_decisions: tuple[PolicyDecision, ...]  # empty: every decision (5.x traffic_pd)
+    mask_pii: bool
+
+    @field_validator("host")
+    @classmethod
+    def _host(cls, v: str) -> str:
+        if v and not _HOST.match(v):
+            raise ValueError("must be a host name or an address, without a scheme or path")
+        return v
+
+    @field_validator("verify_tls")
+    @classmethod
+    def _ca_bundle(cls, v: bool | str) -> bool | str:
+        if isinstance(v, str) and not v.startswith("/"):
+            raise ValueError("a CA bundle must be an absolute path")
+        return v
+
+    @field_validator("sources", "new_connection_decisions")
+    @classmethod
+    def _distinct(cls, v: tuple[str, ...]) -> tuple[str, ...]:
+        if len(v) != len(set(v)):
+            raise ValueError("each value may be listed once")
+        return v
+
+    @model_validator(mode="after")
+    def _complete(self) -> SiemDestination:
+        need: dict[str, object] = {"host": self.host}
+        if self.transport is SiemTransport.HEC:
+            need["hec_token"] = self.hec_token
+        _require(self.enabled, need)
+        return self
+
+
+class SiemSettings(StrictModel):
+    enabled: bool
+    destinations: tuple[SiemDestination, ...] = Field(max_length=20)
+    dlq_max_per_dest: int = Field(ge=100, le=1_000_000)
+    tick_seconds: int = Field(ge=10, le=600)
+    backlog_warn_rows: int = Field(ge=1_000, le=10_000_000)
+
+    @field_validator("destinations")
+    @classmethod
+    def _unique(cls, v: tuple[SiemDestination, ...]) -> tuple[SiemDestination, ...]:
+        if len({d.id for d in v}) != len(v) or len({d.name.casefold() for d in v}) != len(v):
+            raise ValueError("destination ids and names must be unique")
+        return v
+
+
 class Settings(StrictModel):
-    schema_version: Literal[8]
+    schema_version: Literal[9]
     revision: int = Field(ge=0)
     pce: PceSettings
     web: WebSettings
@@ -569,6 +641,7 @@ class Settings(StrictModel):
     lateral: LateralSettings
     alerts: AlertSettings
     reports: ReportSettings
+    siem: SiemSettings
 
 
 def default_alerts(*, notify_new_defaults: bool) -> AlertSettings:
@@ -594,6 +667,12 @@ def default_reports() -> ReportSettings:
         high_bytes_percentile=95, high_bytes_median_factor=10, high_bytes_min_mb=1, cross_env_connection=100,
         discovery_protocol=10, db_unique_src_app=5, identity_unique_src_app=3, blast_radius=5, unmanaged_critical=5,
         pb_lateral=10, exfil_mb=100, cross_env_lateral=5))
+
+
+def default_siem() -> SiemSettings:
+    """Off, no destination (a fresh install, a schema-8 file, and the 5.x migrator's starting point)."""
+    return SiemSettings(enabled=False, destinations=(), dlq_max_per_dest=10_000, tick_seconds=30,
+                        backlog_warn_rows=50_000)
 
 
 def default_collection() -> CollectionSettings:
@@ -664,4 +743,5 @@ def default_settings(*, password_hash: str, secret_key: str, port: int = 5001) -
         lateral=default_lateral(),
         alerts=default_alerts(notify_new_defaults=True),
         reports=default_reports(),
+        siem=default_siem(),
     )

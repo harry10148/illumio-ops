@@ -54,6 +54,7 @@ _SYSTEM: tuple[tuple[str, SystemCheck, Severity], ...] = (
     ("rule_system_data_loss", SystemCheck.DATA_LOSS, Severity.HIGH),
     ("rule_system_job_failing", SystemCheck.JOB_FAILING, Severity.HIGH),
     ("rule_system_disk_low", SystemCheck.DISK_LOW, Severity.MEDIUM),
+    ("rule_system_siem_backlog", SystemCheck.SIEM_BACKLOG, Severity.MEDIUM),
 )
 _LATERAL: tuple[tuple[str, DetectorKind], ...] = (
     ("rule_lateral_fanout", DetectorKind.FANOUT),
@@ -110,3 +111,12 @@ def anomaly_rules(*, notify: bool) -> list[AlertRule]:
     return [LateralRule(type="lateral", id=pack_rule_id(key), name="", pack_key=key, enabled=True, notify=notify,
                         severity=None, cooldown_minutes=0, throttle=None, detectors=detectors,
                         min_severity=Severity.MEDIUM, critical_assets_only=False) for key, detectors in ANOMALY]
+
+
+def system_rule(key: str) -> AlertRule:
+    """One system rule of the pack by its key (an upgrade adds a system check the file does not have yet)."""
+    for k, check, severity in _SYSTEM:
+        if k == key:
+            return SystemRule(type="system", id=pack_rule_id(k), name="", pack_key=k, enabled=True, notify=True,
+                              severity=severity, cooldown_minutes=60, throttle=None, check=check)
+    raise KeyError(key)

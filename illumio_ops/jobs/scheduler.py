@@ -40,6 +40,7 @@ from illumio_ops.services.context import AppContext
 from illumio_ops.services.reports.generate import recover_running, run_queued
 from illumio_ops.services.reports.retention import run_report_retention
 from illumio_ops.services.reports.schedules import tick_schedules
+from illumio_ops.services.siem.dispatch import run_siem
 from illumio_ops.settings.schema import Settings
 from illumio_ops.web.tls import ensure_self_signed
 
@@ -82,6 +83,7 @@ def job_intervals(settings: Settings) -> dict[str, int]:
         "alerts_dispatch": ALERTS_DISPATCH_SECONDS,
         "reports_run": REPORTS_RUN_SECONDS,
         "reports_retention": DAILY_SECONDS,
+        "siem_dispatch": settings.siem.tick_seconds,
     }
 
 
@@ -200,12 +202,15 @@ def _collector_jobs(ctx: AppContext) -> dict[str, Callable[[], None]]:
     def reports_retention() -> None:
         run_report_retention(ctx)
 
+    def siem_dispatch() -> None:
+        run_siem(ctx)
+
     # Archive runs before retention so that, with archiving on, expiring days are written first.
     return {"collect_traffic": traffic, "collect_events": events, "collect_inventory": inventory,
             "collect_backfill": backfill, "collect_archive": archive, "collect_retention": retention,
             "flows_checkpoint": checkpoint, "analysis_hourly": hourly_analysis, "alerts_system": alerts_system,
             "alerts_retention": alerts_retention, "alerts_dispatch": alerts_dispatch,
-            "reports_run": reports_run, "reports_retention": reports_retention}
+            "reports_run": reports_run, "reports_retention": reports_retention, "siem_dispatch": siem_dispatch}
 
 
 def build_scheduler(ctx: AppContext) -> BackgroundScheduler:

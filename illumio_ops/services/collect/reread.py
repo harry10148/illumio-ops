@@ -24,6 +24,7 @@ from loguru import logger
 from illumio_ops.domain.values import DataOrigin, IngestSource
 from illumio_ops.pce.client import PceClient, PceNotConfigured
 from illumio_ops.pce.events import events_timeout
+from illumio_ops.services.analysis.context import baseline_full
 from illumio_ops.services.collect import CycleResult, drops_stale
 from illumio_ops.services.collect.backfill import BACKFILL_LOCK
 from illumio_ops.services.collect.events import fetch_event_rows, normalize_events
@@ -112,13 +113,14 @@ def _reread(ctx: AppContext, *, at: datetime, local_date: str) -> CycleResult | 
         client = ctx.pce_client(settings.pce)
     except PceNotConfigured:
         return None
-    return _read_day(fdb, gen, settings, client, plans, mine, begins, end, at)
+    # A late record is live data: the SIEM's new connections see it, once the baseline period is full.
+    return _read_day(fdb, gen, settings, client, plans, mine, begins, end, at, log_new=baseline_full(ctx))
 
 
 @drops_stale
 def _read_day(fdb: FlowDb, gen: int, settings: Settings, client: PceClient, plans: dict[str, Any],
               mine: dict[str, Any], begins: dict[IngestSource, datetime], end: datetime,
-              at: datetime) -> CycleResult:
+              at: datetime, *, log_new: bool = False) -> CycleResult:
     def failed(error: str) -> None:
         plans[PLAN] = {**mine, "attempts": mine["attempts"] + 1}
         with fdb.writing(gen) as conn:
@@ -169,7 +171,8 @@ def _read_day(fdb: FlowDb, gen: int, settings: Settings, client: PceClient, plan
                     with fdb.writing(gen) as conn:
                         if not bound(conn):
                             return CycleResult(rows, windows, gaps, skipped)
-                        upsert_flows(conn, batch, origin=origin, now=at, increments="late")
+                        upsert_flows(conn, batch, origin=origin, now=at, increments="late",
+                                     log_new_connections=log_new and origin is DataOrigin.INGEST)
                     rows += len(batch)
                 with fdb.writing(gen) as conn:
                     if not bound(conn):

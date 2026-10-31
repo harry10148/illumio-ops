@@ -20,6 +20,9 @@ TABLE_OWNERS: dict[str, str] = {
     "report_schedule_state": "illumio_ops.store.reports",
     "quarantine_actions": "illumio_ops.store.quarantine_actions",
     "custom_reports": "illumio_ops.store.custom_reports",
+    "alert_id_floor": "illumio_ops.store.alerts",
+    "siem_cursor": "illumio_ops.store.siem",
+    "siem_dlq": "illumio_ops.store.siem",
     # data/flows.sqlite
     "pce_binding": "illumio_ops.store.flowdb.binding",
     "ingest_state": "illumio_ops.store.flowdb.ingest_state",
@@ -50,4 +53,5 @@ TABLE_OWNERS: dict[str, str] = {
     "lateral_snapshot_daily": "illumio_ops.store.flowdb.analysis",
     "focus_items": "illumio_ops.store.flowdb.analysis",
     "flow_increments": "illumio_ops.store.flowdb.flows",
+    "new_connection_log": "illumio_ops.store.flowdb.flows",
 }

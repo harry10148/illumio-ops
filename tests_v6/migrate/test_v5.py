@@ -21,7 +21,7 @@ def _load(name):
 
 
 # Items about something other than one config.json key: each rule, the new default rules, channel notes.
-DERIVED = ("(new) ", "rules[", "alerts.json", "alerts.channels.", "ILLUMIO_", "report_schedules[")
+DERIVED = ("(new) ", "rules[", "alerts.json", "alerts.channels.", "ILLUMIO_", "report_schedules[", "siem.destinations[")
 
 
 def config_sources(report):
@@ -94,9 +94,9 @@ def test_phase_labels_follow_revised_roadmap():
     report = migrate_v5(_load("v5_2_x_config_106_redacted.json")).report
     by_source = {i.source: i for i in report.items}
     assert by_source["smtp.host"].action == "carried" and by_source["smtp.host"].target == "alerts.channels.smtp.host"
-    assert by_source["siem.enabled"].params == {"phase": "P7"}
+    assert by_source["siem.enabled"].target == "siem.enabled"  # P7: carried
     assert by_source["report_schedules"].target == "reports.schedules"  # P5c-5: carried
-    assert by_source["pce_cache.siem_pending_warn_rows"].params == {"phase": "P7"}
+    assert by_source["pce_cache.siem_pending_warn_rows"].target == "siem.backlog_warn_rows"  # P7
     assert by_source["settings.theme"].reason_key == "migrate_not_in_v6"
     assert by_source["api.profile"].action == "dropped"
     raw = _base()
@@ -325,6 +325,6 @@ def test_allowlist_with_no_valid_entry_blocks_instead_of_opening_up():
 @pytest.mark.parametrize("name", FIXTURE_NAMES)
 def test_migrator_output_has_default_lateral(name):
     s = migrate_v5(_load(name)).settings
-    assert s.schema_version == 8
+    assert s.schema_version == 9
     assert s.reports.retention_days == 30  # 5.x report.retention_days, carried (P5c-5)
     assert s.lateral.graph_hops == 3 and s.lateral.critical_assets == () and s.lateral.environment_label_key == "env"

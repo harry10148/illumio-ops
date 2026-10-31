@@ -8,6 +8,7 @@ from illumio_ops.domain.alerting import (
     GapFact,
     JobFact,
     ProbeFact,
+    SiemFact,
     SourceFact,
     SystemFacts,
 )
@@ -15,6 +16,7 @@ from illumio_ops.jobs.health import list_health
 from illumio_ops.services import pce_health
 from illumio_ops.services.collect.status import collection_status
 from illumio_ops.services.context import AppContext
+from illumio_ops.services.siem.status import siem_status
 from illumio_ops.store.flowdb import ingest_state
 
 # A probe older than this is not news: the probe job runs every 5 minutes.
@@ -41,8 +43,23 @@ def system_facts(ctx: AppContext, *, since_gap_id: int, now: datetime) -> tuple[
                       for s in status.sources if s.collected),
         new_gaps=tuple(GapFact(g.id, g.source, g.kind, g.window_start, g.window_end) for g in gaps),
         jobs=tuple(JobFact(j.job_id, j.consecutive_failures, j.last_error) for j in jobs),
-        disk_free_bytes=status.disk_free_bytes, disk_warn_bytes=warn,
+        disk_free_bytes=status.disk_free_bytes, disk_warn_bytes=warn, siem=_siem_facts(ctx),
     ), newest
+
+
+def _siem_facts(ctx: AppContext) -> tuple[SiemFact, ...]:
+    if not ctx.settings.current().siem.enabled:
+        return ()
+    out = []
+    for d in siem_status(ctx).destinations:
+        if not d.enabled:
+            continue
+        failing = [x for x in d.sources if x.state == "failing"]
+        out.append(SiemFact(destination_id=d.id, destination=d.name,
+                            pending=sum(x.pending or 0 for x in d.sources),
+                            warn=ctx.settings.current().siem.backlog_warn_rows, dlq_full=d.dlq >= d.dlq_max,
+                            failing=bool(failing), error=failing[0].last_error if failing else None))
+    return tuple(out)
 
 
 def max_gap_id(ctx: AppContext) -> int:

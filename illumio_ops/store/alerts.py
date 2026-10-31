@@ -33,10 +33,13 @@ def insert_alert(conn: sqlite3.Connection, *, pce_url: str, org_id: str, rule_na
     """One alert and its delivery rows: a pending row per channel; with hold (not_notified, grouped) one row
     saying so; with no channel enabled one no_channel row. An alert is never stored without a delivery row.
     The caller commits (the evaluation records a batch's alerts, rule states and watermark together)."""
+    # Above every id ever used (alert_id_floor): the SIEM reads alerts after the last id it sent, so a deleted newest
+    # alert's id is never given again (0012).
     cur = conn.execute(
-        "INSERT INTO alerts (pce_url, org_id, rule_id, rule_type, rule_name, pack_key, severity, subject_key, "
+        "INSERT INTO alerts (id, pce_url, org_id, rule_id, rule_type, rule_name, pack_key, severity, subject_key, "
         "fired_at, first_seen, last_seen, late, notify, grouped_annotation, message_key, params_json, facts_json, "
-        "evidence_json, confidence_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "evidence_json, confidence_json) VALUES ((SELECT MAX(COALESCE((SELECT MAX(id) FROM alerts), 0), "
+        "COALESCE((SELECT id FROM alert_id_floor), 0)) + 1), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         (pce_url, org_id, trigger.rule_id, trigger.rule_type.value, rule_name, pack_key, trigger.severity.value,
          trigger.subject_key, _t(at), _t(trigger.first_seen), _t(trigger.last_seen), int(trigger.late),
          int(hold is None), trigger.grouped_annotation, trigger.message_key,
@@ -231,6 +234,13 @@ def save_channel_state(conn: sqlite3.Connection, channel: str, *, consecutive_fa
                      "last_error = excluded.last_error, last_ok_at = COALESCE(excluded.last_ok_at, last_ok_at)",
                      (channel, consecutive_failures, _t(cooldown_until) if cooldown_until else None, last_error,
                       _t(last_ok_at) if last_ok_at else None))
+
+
+def count_notified_alerts_before(conn: sqlite3.Connection, cutoff: datetime, *, pce_url: str, org_id: str,
+                                after_id: int) -> int:
+    """Alerts the SIEM sends that delete_alerts_before would delete with an id above after_id (P7)."""
+    return int(conn.execute("SELECT COUNT(*) FROM alerts WHERE id > ? AND notify = 1 AND pce_url = ? AND org_id = ? "
+                            "AND fired_at < ?", (after_id, pce_url, org_id, _t(cutoff))).fetchone()[0])
 
 
 def delete_alerts_before(conn: sqlite3.Connection, cutoff: datetime) -> int:

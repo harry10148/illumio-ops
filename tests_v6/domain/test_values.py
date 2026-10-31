@@ -85,7 +85,7 @@ def test_alert_value_domains():
     d = export_value_domains()
     assert "lateral" in d["AlertRuleType"]
     assert d["ChannelKind"] == ["line", "smtp", "teams", "telegram", "webhook"]
-    assert d["SystemCheck"] == ["collection_failing", "data_loss", "disk_low", "job_failing", "pce_health"]
+    assert d["SystemCheck"] == ["collection_failing", "data_loss", "disk_low", "job_failing", "pce_health", "siem_backlog"]
     assert d["ThresholdType"] == ["count", "immediate"]
     assert set(d["DeliveryStatus"]) == {"pending", "sent", "failed", "not_notified", "grouped", "no_channel"}
     assert [alert_severity_of_event(s) for s in ("err", "error", "warning", "info", None, "odd")] == [

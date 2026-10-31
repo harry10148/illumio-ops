@@ -31,6 +31,7 @@ from illumio_ops.pce.client import (
     PceNotConfigured,
     PceTransportError,
 )
+from illumio_ops.services.analysis.context import baseline_full
 from illumio_ops.services.collect import CycleResult, drops_stale
 from illumio_ops.services.collect.cycle import begin, fail
 from illumio_ops.services.collect.guard import BindingMismatch, ensure_binding
@@ -99,6 +100,7 @@ def run_traffic_cycle(ctx: AppContext, *, now: datetime | None = None) -> CycleR
     fdb = ctx.flows()
     start, done_progress = begin(fdb, SOURCE, at, overlap=OVERLAP, cold_start=COLD_START, generation=gen)
     pieces = slices(start, at)  # a cold start or a catch-up is read and written an hour at a time
+    log_new = baseline_full(ctx)  # the SIEM's new connections: only once "first seen in the period" holds
     rows = windows = gaps = skipped = 0
     with client:
         for a, b in pieces:
@@ -123,7 +125,8 @@ def run_traffic_cycle(ctx: AppContext, *, now: datetime | None = None) -> CycleR
                         # A catch-up hour that ended long ago is late data: its growth would look like a
                         # burst happening now, so threshold rules do not count it (P4 plan, alert semantics).
                         upsert_flows(conn, records, origin=DataOrigin.INGEST, now=at,
-                                     increments="cycle" if b > at - CATCH_UP_IS_LATE else "late")
+                                     increments="cycle" if b > at - CATCH_UP_IS_LATE else "late",
+                                     log_new_connections=log_new)
                         if b == at:
                             refresh_rollups(conn, at, frozen_through=db_day(
                                 at - timedelta(days=settings.collection.retention.flow_days)))

@@ -10,13 +10,14 @@ import copy
 from collections.abc import Callable
 from typing import Any
 
-from illumio_ops.domain.alertpack import anomaly_rules
+from illumio_ops.domain.alertpack import anomaly_rules, system_rule
 from illumio_ops.settings.schema import (
     SCHEMA_VERSION,
     default_alerts,
     default_collection,
     default_lateral,
     default_reports,
+    default_siem,
 )
 
 
@@ -79,6 +80,17 @@ def _v7_to_v8(data: dict[str, Any]) -> dict[str, Any]:
     return data
 
 
+def _v8_to_v9(data: dict[str, Any]) -> dict[str, Any]:
+    data["siem"] = default_siem().model_dump(mode="json")  # P7: forwarding off until a destination is set
+    # The SIEM backlog check joins the pack like the other system checks (it says nothing while SIEM is off).
+    alerts = data.get("alerts")
+    if isinstance(alerts, dict) and isinstance(alerts.get("rules"), list):
+        have = {r.get("pack_key") for r in alerts["rules"] if isinstance(r, dict)}
+        if "rule_system_siem_backlog" not in have:
+            alerts["rules"].append(system_rule("rule_system_siem_backlog").model_dump(mode="json"))
+    return data
+
+
 # source version -> function producing source version + 1
 UPGRADES: dict[int, Callable[[dict[str, Any]], dict[str, Any]]] = {
     1: _v1_to_v2,
@@ -88,6 +100,7 @@ UPGRADES: dict[int, Callable[[dict[str, Any]], dict[str, Any]]] = {
     5: _v5_to_v6,
     6: _v6_to_v7,
     7: _v7_to_v8,
+    8: _v8_to_v9,
 }
 
 
