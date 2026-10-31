@@ -97,7 +97,8 @@ function StatusTable({ status }: { status: SiemStatusView }) {
               <td className="num">{s.sent.toLocaleString()}</td>
               <td className="nowrap">{s.last_sent_at ? formatTime(s.last_sent_at, lang) : "—"}</td>
               <td className="num">{s.dropped ? <span className="badge" data-tone="warn">{s.dropped.toLocaleString()}</span> : "0"}</td>
-              <td>{s.last_error ? <span className="hint" data-role="siem-error">{s.last_error === "dlq_full" ? t("siem_state_dlq_full") : s.last_error}{s.last_error_at ? ` · ${formatTime(s.last_error_at, lang)}` : ""}</span> : "—"}</td>
+              <td>{s.head_attempts > 0 && <div className="hint" data-role="siem-stuck">{t("siem_stuck", { n: String(s.head_attempts) })}</div>}
+                {s.last_error ? <span className="hint" data-role="siem-error">{s.last_error === "dlq_full" ? t("siem_state_dlq_full") : s.last_error}{s.last_error_at ? ` · ${formatTime(s.last_error_at, lang)}` : ""}</span> : "—"}</td>
             </tr>
           )))}
         </tbody>

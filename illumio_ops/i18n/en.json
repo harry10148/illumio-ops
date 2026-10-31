@@ -2469,5 +2469,6 @@
   "migrate_siem_unreadable": "not a destination v6 can hold; not carried",
   "migrate_siem_paused_incomplete": "on in 5.x but missing what v6 needs to send (its host, or a HEC token): carried off — complete it on the SIEM page",
   "migrate_siem_too_many": "v6 holds at most 20 destinations; not carried",
-  "migrate_siem_destinations_listed": "each destination is listed below"
+  "migrate_siem_destinations_listed": "each destination is listed below",
+  "siem_stuck": "The same record failed {n} times"
 }

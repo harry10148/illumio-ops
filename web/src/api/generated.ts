@@ -1921,6 +1921,7 @@ transport: SiemTransport
  */
 export interface SiemSourceStatus {
 dropped: number
+head_attempts: number
 last_error: (string | null)
 last_error_at: (string | null)
 last_sent_at: (string | null)

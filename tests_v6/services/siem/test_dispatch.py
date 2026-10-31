@@ -204,3 +204,22 @@ def test_a_destination_down_for_long_moves_nothing_to_the_dlq(ctx):
     up = FakeTransport()
     run(ctx, up)
     assert sent_ids(up) == ["1", "2", "3"]
+
+
+def test_a_lone_record_that_always_fails_still_reaches_the_dlq(ctx):
+    """Nothing after it to tell it from an outage: after STUCK_FACTOR × max_retries attempts it goes anyway, so one
+    record cannot hold a destination forever (P7 security review)."""
+    from illumio_ops.services.siem.dispatch import STUCK_FACTOR
+    from illumio_ops.services.siem.status import siem_status
+    run(ctx, FakeTransport())
+    add_events(ctx, [1])
+    bad = FakeTransport(lambda n, line: REFUSED)
+    for _ in range(3 * STUCK_FACTOR - 1):
+        run(ctx, bad)
+    src = siem_status(ctx).destinations[0].sources[0]
+    assert src.state == "failing" and src.head_attempts == 3 * STUCK_FACTOR - 1
+    with ctx.db() as conn:
+        assert store.dlq_count(conn, DEST) == 0
+    run(ctx, bad)
+    with ctx.db() as conn:
+        assert store.dlq_count(conn, DEST) == 1

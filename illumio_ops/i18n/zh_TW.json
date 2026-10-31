@@ -2469,5 +2469,6 @@
   "migrate_siem_unreadable": "v6 無法承載的目的地；未搬移",
   "migrate_siem_paused_incomplete": "5.x 中為開啟，但缺少 v6 送出所需的設定（主機或 HEC token）：搬移後關閉——到 SIEM 頁補齊",
   "migrate_siem_too_many": "v6 最多 20 個目的地；未搬移",
-  "migrate_siem_destinations_listed": "各目的地分列如下"
+  "migrate_siem_destinations_listed": "各目的地分列如下",
+  "siem_stuck": "同一筆已失敗 {n} 次"
 }

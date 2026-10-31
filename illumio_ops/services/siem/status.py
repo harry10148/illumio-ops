@@ -29,6 +29,7 @@ class SiemSourceStatus(BaseModel):
     last_sent_at: datetime | None
     last_error: str | None
     last_error_at: datetime | None
+    head_attempts: int           # how often the record it is stuck at has failed (0: not stuck)
 
 
 class SiemDestinationStatus(BaseModel):
@@ -95,7 +96,7 @@ def siem_status(ctx: AppContext) -> SiemStatusView:
                              dlq_full=dlq.get(d.id, 0) >= s.siem.dlq_max_per_dest, warn=s.siem.backlog_warn_rows),
                 pending=pending, sent=cur.sent if cur else 0, dropped=cur.dropped if cur else 0,
                 last_sent_at=cur.last_sent_at if cur else None, last_error=cur.last_error if cur else None,
-                last_error_at=cur.last_error_at if cur else None))
+                last_error_at=cur.last_error_at if cur else None, head_attempts=cur.head_attempts if cur else 0))
         out.append(SiemDestinationStatus(id=d.id, name=d.name, enabled=d.enabled, transport=d.transport,
                                          format=d.format, host=d.host, port=d.port, dlq=dlq.get(d.id, 0),
                                          dlq_max=s.siem.dlq_max_per_dest, sources=rows))
