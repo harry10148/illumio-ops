@@ -239,6 +239,7 @@ text?: (string | null)
  */
 export interface EndpointFilter {
 hrefs?: string[]
+ip_lists?: string[]
 ips?: string[]
 labels?: LabelCond[]
 match?: ("any" | "all")
@@ -2258,6 +2259,14 @@ proto: (number | null)
 }
 /**
  * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "IpListChoice".
+ */
+export interface IpListChoice {
+href: string
+name: string
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
  * via the `definition` "LabelSelector".
  */
 export interface LabelSelector {
@@ -2333,6 +2342,7 @@ value: string
  */
 export interface LateralView {
 effective_ports: AdminPortView[]
+ip_list_choices: IpListChoice[]
 label_choices: LabelChoice[]
 revision: number
 settings: LateralSettings

@@ -12,7 +12,9 @@ Endpoint semantics: an EndpointFilter is a union by default — the endpoint has
 (each key: any of its values), OR is one of the hrefs, OR is in one of the IPs / networks. With match="all" the
 labels and the hosts (hrefs or addresses, together one part) must both hold when both are set (the workbench's
 "env=Prod and this host", P6a). public is one more host part: a public address no Workload holds (netaddr.outside,
-user 2026-10-31: alert rules leave the internet side of a connection out). A port of -1 is "no port" (a protocol
+user 2026-10-31: alert rules leave the internet side of a connection out); so is ip_lists, PCE IP lists by href, whose
+networks the flow store keeps (to_sql reads them there; matches is given them). A list the PCE no longer has matches
+nothing. A port of -1 is "no port" (a protocol
 alone is any port). The *_processes / *_users sets are exact values (domain accounts case-insensitive), the single
 fields are partial matches.
 """
@@ -21,9 +23,9 @@ from __future__ import annotations
 import ipaddress
 import itertools
 import re
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Mapping, Sequence
 from datetime import datetime, timedelta
-from typing import Any, Literal
+from typing import Annotated, Any, Literal
 
 from pydantic import (
     AwareDatetime,
@@ -39,6 +41,8 @@ from illumio_ops.domain.identity import is_system_account
 from illumio_ops.domain.netaddr import outside, parse_ip_token
 from illumio_ops.domain.timefmt import pce_time, store_time
 from illumio_ops.domain.values import FlowDirection, PolicyDecision
+
+IpLists = Mapping[str, Sequence[str]]  # IP list href -> its networks
 
 
 class _Model(BaseModel):
@@ -68,12 +72,13 @@ class EndpointFilter(_Model):
     labels: tuple[LabelCond, ...] = ()
     hrefs: tuple[str, ...] = ()
     ips: tuple[str, ...] = ()
+    ip_lists: tuple[Annotated[str, Field(min_length=1, max_length=255)], ...] = ()
     public: bool = False
     match: Literal["any", "all"] = "any"  # any: one of the parts (the union); all: the labels and the hosts
 
     def intersects(self) -> bool:
         """Labels and hosts both set under match="all": an intersection, not the union."""
-        return self.match == "all" and bool(self.labels) and bool(self.hrefs or self.ips or self.public)
+        return self.match == "all" and bool(self.labels) and bool(self.hrefs or self.ips or self.ip_lists or self.public)
 
     @field_validator("ips")
     @classmethod
@@ -83,7 +88,7 @@ class EndpointFilter(_Model):
         return v
 
     def is_empty(self) -> bool:
-        return not (self.labels or self.hrefs or self.ips or self.public)
+        return not (self.labels or self.hrefs or self.ips or self.ip_lists or self.public)
 
 
 class FlowCondition(_Model):
@@ -217,7 +222,7 @@ def _pce_side(ep: EndpointFilter | None, label_hrefs: Mapping[tuple[str, str], s
     if ep.intersects():
         return None  # the PCE's include list is a union of groups: the intersection is checked locally
     exact, nets = _split_ips(ep.ips)
-    if nets or ep.public:
+    if nets or ep.public or ep.ip_lists:
         return None
     groups: list[list[dict[str, Any]]] = []
     if ep.labels:
@@ -313,6 +318,10 @@ def _sql_side(ep: EndpointFilter, side: str, a: str, params: list[Any]) -> str:
     for net in nets:
         addresses.append(f"ip_in_net({a}.{side}_ip, ?) = 1")
         params.append(net)
+    if ep.ip_lists:
+        addresses.append(f"EXISTS (SELECT 1 FROM ip_list_nets n WHERE n.href IN ({','.join('?' * len(ep.ip_lists))}) "
+                         f"AND ip_in_net({a}.{side}_ip, n.net) = 1)")
+        params.extend(ep.ip_lists)
     if ep.public:
         addresses.append(f"is_outside({a}.{side}_ip, {a}.{side}_href) = 1")
     if ep.hrefs:
@@ -399,15 +408,17 @@ def _when(value: Any) -> datetime:
     return value if isinstance(value, datetime) else datetime.fromisoformat(str(value))
 
 
-def _side_matches(ep: EndpointFilter, v: Mapping[str, Any], side: str) -> bool:
+def _side_matches(ep: EndpointFilter, v: Mapping[str, Any], side: str, ip_lists: IpLists) -> bool:
     labels = v.get(f"{side}_labels") or {}
     exact, nets = _split_ips(ep.ips)
     ip = v.get(f"{side}_ip")
     held = []  # (the part is set, the end satisfies it)
     held.append((bool(ep.labels), bool(ep.labels) and all(labels.get(c.key) in c.values for c in ep.labels)))
     href = v.get(f"{side}_href")
-    held.append((bool(ep.hrefs or ep.ips or ep.public), (href or "") in ep.hrefs
-                 or ip in exact or any(ip_in_net(ip, n) for n in nets) or (ep.public and outside(ip, href))))
+    listed = (n for h in ep.ip_lists for n in ip_lists.get(h, ()))
+    held.append((bool(ep.hrefs or ep.ips or ep.ip_lists or ep.public), (href or "") in ep.hrefs
+                 or ip in exact or any(ip_in_net(ip, n) for n in nets) or (ep.public and outside(ip, href))
+                 or any(ip_in_net(ip, n) for n in listed)))
     if ep.match == "all":
         return all(ok for is_set, ok in held if is_set)
     return any(ok for is_set, ok in held if is_set)
@@ -428,12 +439,19 @@ def port_matches(p: PortProto, port: int | None, proto: int) -> bool:
     return _port_matches(p, {"port": port, "proto": proto})
 
 
-def endpoint_matches(ep: EndpointFilter, *, href: str | None, ip: str, labels: Mapping[str, str]) -> bool:
+def ip_list_hrefs(spec: FlowCondition) -> set[str]:
+    """The IP lists a spec names on any side (what matches needs the networks of)."""
+    return {h for ep in (spec.src, spec.dst, spec.src_exclude, spec.dst_exclude) if ep is not None for h in ep.ip_lists}
+
+
+def endpoint_matches(ep: EndpointFilter, *, href: str | None, ip: str, labels: Mapping[str, str],
+                     ip_lists: IpLists | None = None) -> bool:
     """One endpoint condition on one end (a host's href, address and labels), as matches applies it."""
-    return _side_matches(ep, {"x_href": href, "x_ip": ip, "x_labels": labels}, "x")
+    return _side_matches(ep, {"x_href": href, "x_ip": ip, "x_labels": labels}, "x", ip_lists or {})
 
 
-def matches(spec: FilterSpec, record: FlowRecord | Mapping[str, Any]) -> bool:
+def matches(spec: FilterSpec, record: FlowRecord | Mapping[str, Any], *, ip_lists: IpLists | None = None) -> bool:
+    """ip_lists: the networks of the IP lists the spec names (the flow store's ip_lists.networks)."""
     v = _view(record)
     if v.get("is_primary", 1) != 1:
         return False
@@ -441,7 +459,7 @@ def matches(spec: FilterSpec, record: FlowRecord | Mapping[str, Any]) -> bool:
         return False
     for side, ep, negate in (("src", spec.src, False), ("dst", spec.dst, False),
                              ("src", spec.src_exclude, True), ("dst", spec.dst_exclude, True)):
-        if ep is not None and not ep.is_empty() and _side_matches(ep, v, side) == negate:
+        if ep is not None and not ep.is_empty() and _side_matches(ep, v, side, ip_lists or {}) == negate:
             return False
     if spec.ports and not any(_port_matches(p, v) for p in spec.ports):
         return False

@@ -11,7 +11,7 @@ from pydantic import BaseModel
 from illumio_ops.domain.values import DetectorKind, DetectorState, PortClass
 from illumio_ops.services.analysis.context import load_lateral_context
 from illumio_ops.services.context import AppContext
-from illumio_ops.store.flowdb import analysis
+from illumio_ops.store.flowdb import analysis, ip_lists
 
 MAX_LABEL_VALUES = 500  # values listed per label key; more are said to exist
 
@@ -28,6 +28,11 @@ class LabelChoice(BaseModel):
     key: str
     values: list[str]
     truncated: bool
+
+
+class IpListChoice(BaseModel):
+    href: str
+    name: str
 
 
 class DetectorStatusView(BaseModel):
@@ -58,6 +63,7 @@ class LateralStatus(BaseModel):
 class LateralOverview(BaseModel):
     effective_ports: list[AdminPortView]
     label_choices: list[LabelChoice]
+    ip_list_choices: list[IpListChoice]  # the PCE's active IP lists, for an alert rule's exclusion
     status: LateralStatus
 
 
@@ -80,6 +86,7 @@ def lateral_overview(ctx: AppContext, *, now: datetime | None = None) -> Lateral
     with ctx.flows().connect() as conn:
         detect, exposure = analysis.get_run(conn, "detect"), analysis.get_run(conn, "exposure")
         detectors = detector_states(conn)
+        lists = ip_lists.names(conn)
     by_key: dict[str, list[str]] = {}
     for k, v in sorted(lc.known_labels):
         by_key.setdefault(k, []).append(v)
@@ -89,6 +96,7 @@ def lateral_overview(ctx: AppContext, *, now: datetime | None = None) -> Lateral
                          for e in lc.admin_ports.entries],
         label_choices=[LabelChoice(key=k, values=vs[:MAX_LABEL_VALUES], truncated=len(vs) > MAX_LABEL_VALUES)
                        for k, vs in sorted(by_key.items())],
+        ip_list_choices=[IpListChoice(href=h, name=n) for h, n in lists],
         status=LateralStatus(
             collected=lc.collected, baseline_days=round(lc.baseline_days, 1), baseline_required=lc.baseline_required,
             baseline_backfilling=lc.baseline_backfilling,

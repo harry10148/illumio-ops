@@ -3,7 +3,7 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 
 import { type ApiError, call } from "../../api/client";
 import type {
-  DetectorKind, EventRule, FlowCondition, LabelChoice, RulePreview, RuleWrite, Severity, SystemCheck, ThresholdType,
+  DetectorKind, EventRule, FlowCondition, IpListChoice, LabelChoice, RulePreview, RuleWrite, Severity, SystemCheck, ThresholdType,
 } from "../../api/generated";
 import { ConditionEditor, Side } from "../../components/ConditionEditor";
 import { t } from "../../i18n";
@@ -73,6 +73,7 @@ export function RuleEditor() {
   const [revision, setRevision] = useState<number | null>(null);
   const [rule, setRule] = useState<Rule | null>(id === "new" ? blank("event") : null);
   const [choices, setChoices] = useState<LabelChoice[]>([]);
+  const [ipLists, setIpLists] = useState<IpListChoice[]>([]);
   const [error, setError] = useState<ApiError | null>(null);
   const [localError, setLocalError] = useState<string | null>(null);
   const [preview, setPreview] = useState<RulePreview | null>(null);
@@ -89,7 +90,9 @@ export function RuleEditor() {
         else setError({ code: "not_found", message_key: "err_not_found", params: {}, field: null });
       }
     });
-    void call("system.lateral.get").then((env) => { if (env.ok && env.data) setChoices(env.data.label_choices); });
+    void call("system.lateral.get").then((env) => {
+      if (env.ok && env.data) { setChoices(env.data.label_choices); setIpLists(env.data.ip_list_choices); }
+    });
   }, [id]);
 
   if (!rule || revision === null) {
@@ -163,7 +166,7 @@ export function RuleEditor() {
             </p>
             {fieldError("window_minutes")}
             <p className="hint">{t(rule.type === "traffic" ? "rule_traffic_hint" : "rule_bytes_hint")}</p>
-            <ConditionEditor value={rule.condition} choices={choices} onChange={(condition) => set({ condition })}
+            <ConditionEditor value={rule.condition} choices={choices} ipLists={ipLists} onChange={(condition) => set({ condition })}
                              onInvalid={setLocalError} />
             {localError && <p className="form-error" data-field={localError}>{t("rule_ports_invalid")}</p>}
             {fieldError("condition")}
@@ -211,7 +214,7 @@ export function RuleEditor() {
                      onChange={(e) => set({ critical_assets_only: e.target.checked })} />
               {t("rule_critical_only")}
             </label>
-            <Side name="exclude" value={rule.exclude} choices={choices} onChange={(exclude) => set({ exclude })} />
+            <Side name="exclude" value={rule.exclude} choices={choices} ipLists={ipLists} onChange={(exclude) => set({ exclude })} />
           </>
         )}
 

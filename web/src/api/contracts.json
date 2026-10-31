@@ -133,6 +133,16 @@
                 "title": "Hrefs",
                 "type": "array"
               },
+              "ip_lists": {
+                "default": [],
+                "items": {
+                  "maxLength": 255,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "title": "Ip Lists",
+                "type": "array"
+              },
               "ips": {
                 "default": [],
                 "items": {
@@ -1151,6 +1161,16 @@
                   "type": "string"
                 },
                 "title": "Hrefs",
+                "type": "array"
+              },
+              "ip_lists": {
+                "default": [],
+                "items": {
+                  "maxLength": 255,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "title": "Ip Lists",
                 "type": "array"
               },
               "ips": {
@@ -2275,6 +2295,16 @@
                 "title": "Hrefs",
                 "type": "array"
               },
+              "ip_lists": {
+                "default": [],
+                "items": {
+                  "maxLength": 255,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "title": "Ip Lists",
+                "type": "array"
+              },
               "ips": {
                 "default": [],
                 "items": {
@@ -3383,6 +3413,16 @@
                   "type": "string"
                 },
                 "title": "Hrefs",
+                "type": "array"
+              },
+              "ip_lists": {
+                "default": [],
+                "items": {
+                  "maxLength": 255,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "title": "Ip Lists",
                 "type": "array"
               },
               "ips": {
@@ -4516,6 +4556,16 @@
                 "title": "Hrefs",
                 "type": "array"
               },
+              "ip_lists": {
+                "default": [],
+                "items": {
+                  "maxLength": 255,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "title": "Ip Lists",
+                "type": "array"
+              },
               "ips": {
                 "default": [],
                 "items": {
@@ -5625,6 +5675,16 @@
                 "title": "Hrefs",
                 "type": "array"
               },
+              "ip_lists": {
+                "default": [],
+                "items": {
+                  "maxLength": 255,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "title": "Ip Lists",
+                "type": "array"
+              },
               "ips": {
                 "default": [],
                 "items": {
@@ -6694,6 +6754,16 @@
                 "title": "Hrefs",
                 "type": "array"
               },
+              "ip_lists": {
+                "default": [],
+                "items": {
+                  "maxLength": 255,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "title": "Ip Lists",
+                "type": "array"
+              },
               "ips": {
                 "default": [],
                 "items": {
@@ -7712,6 +7782,16 @@
                   "type": "string"
                 },
                 "title": "Hrefs",
+                "type": "array"
+              },
+              "ip_lists": {
+                "default": [],
+                "items": {
+                  "maxLength": 255,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "title": "Ip Lists",
                 "type": "array"
               },
               "ips": {
@@ -10195,6 +10275,16 @@
                 "title": "Hrefs",
                 "type": "array"
               },
+              "ip_lists": {
+                "default": [],
+                "items": {
+                  "maxLength": 255,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "title": "Ip Lists",
+                "type": "array"
+              },
               "ips": {
                 "default": [],
                 "items": {
@@ -10909,6 +10999,16 @@
                 "title": "Hrefs",
                 "type": "array"
               },
+              "ip_lists": {
+                "default": [],
+                "items": {
+                  "maxLength": 255,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "title": "Ip Lists",
+                "type": "array"
+              },
               "ips": {
                 "default": [],
                 "items": {
@@ -11504,6 +11604,16 @@
                 "title": "Hrefs",
                 "type": "array"
               },
+              "ip_lists": {
+                "default": [],
+                "items": {
+                  "maxLength": 255,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "title": "Ip Lists",
+                "type": "array"
+              },
               "ips": {
                 "default": [],
                 "items": {
@@ -12017,6 +12127,16 @@
                   "type": "string"
                 },
                 "title": "Hrefs",
+                "type": "array"
+              },
+              "ip_lists": {
+                "default": [],
+                "items": {
+                  "maxLength": 255,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "title": "Ip Lists",
                 "type": "array"
               },
               "ips": {
@@ -12571,6 +12691,16 @@
                   "type": "string"
                 },
                 "title": "Hrefs",
+                "type": "array"
+              },
+              "ip_lists": {
+                "default": [],
+                "items": {
+                  "maxLength": 255,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "title": "Ip Lists",
                 "type": "array"
               },
               "ips": {
@@ -18457,6 +18587,16 @@
                 "title": "Hrefs",
                 "type": "array"
               },
+              "ip_lists": {
+                "default": [],
+                "items": {
+                  "maxLength": 255,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "title": "Ip Lists",
+                "type": "array"
+              },
               "ips": {
                 "default": [],
                 "items": {
@@ -21388,6 +21528,16 @@
                 "title": "Hrefs",
                 "type": "array"
               },
+              "ip_lists": {
+                "default": [],
+                "items": {
+                  "maxLength": 255,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "title": "Ip Lists",
+                "type": "array"
+              },
               "ips": {
                 "default": [],
                 "items": {
@@ -21896,6 +22046,16 @@
                   "type": "string"
                 },
                 "title": "Hrefs",
+                "type": "array"
+              },
+              "ip_lists": {
+                "default": [],
+                "items": {
+                  "maxLength": 255,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "title": "Ip Lists",
                 "type": "array"
               },
               "ips": {
@@ -22515,6 +22675,16 @@
                 "title": "Hrefs",
                 "type": "array"
               },
+              "ip_lists": {
+                "default": [],
+                "items": {
+                  "maxLength": 255,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "title": "Ip Lists",
+                "type": "array"
+              },
               "ips": {
                 "default": [],
                 "items": {
@@ -23118,6 +23288,16 @@
                   "type": "string"
                 },
                 "title": "Hrefs",
+                "type": "array"
+              },
+              "ip_lists": {
+                "default": [],
+                "items": {
+                  "maxLength": 255,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "title": "Ip Lists",
                 "type": "array"
               },
               "ips": {
@@ -23931,6 +24111,16 @@
                 "title": "Hrefs",
                 "type": "array"
               },
+              "ip_lists": {
+                "default": [],
+                "items": {
+                  "maxLength": 255,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "title": "Ip Lists",
+                "type": "array"
+              },
               "ips": {
                 "default": [],
                 "items": {
@@ -24439,6 +24629,16 @@
                   "type": "string"
                 },
                 "title": "Hrefs",
+                "type": "array"
+              },
+              "ip_lists": {
+                "default": [],
+                "items": {
+                  "maxLength": 255,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "title": "Ip Lists",
                 "type": "array"
               },
               "ips": {
@@ -25217,6 +25417,16 @@
                   "type": "string"
                 },
                 "title": "Hrefs",
+                "type": "array"
+              },
+              "ip_lists": {
+                "default": [],
+                "items": {
+                  "maxLength": 255,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "title": "Ip Lists",
                 "type": "array"
               },
               "ips": {
@@ -30022,6 +30232,24 @@
             "title": "ExpectedInitiators",
             "type": "object"
           },
+          "IpListChoice": {
+            "properties": {
+              "href": {
+                "title": "Href",
+                "type": "string"
+              },
+              "name": {
+                "title": "Name",
+                "type": "string"
+              }
+            },
+            "required": [
+              "href",
+              "name"
+            ],
+            "title": "IpListChoice",
+            "type": "object"
+          },
           "LabelChoice": {
             "properties": {
               "key": {
@@ -30343,6 +30571,13 @@
             "title": "Effective Ports",
             "type": "array"
           },
+          "ip_list_choices": {
+            "items": {
+              "$ref": "#/$defs/IpListChoice"
+            },
+            "title": "Ip List Choices",
+            "type": "array"
+          },
           "label_choices": {
             "items": {
               "$ref": "#/$defs/LabelChoice"
@@ -30366,6 +30601,7 @@
           "settings",
           "effective_ports",
           "label_choices",
+          "ip_list_choices",
           "status"
         ],
         "title": "LateralView",
@@ -31207,6 +31443,24 @@
             "title": "ExpectedInitiators",
             "type": "object"
           },
+          "IpListChoice": {
+            "properties": {
+              "href": {
+                "title": "Href",
+                "type": "string"
+              },
+              "name": {
+                "title": "Name",
+                "type": "string"
+              }
+            },
+            "required": [
+              "href",
+              "name"
+            ],
+            "title": "IpListChoice",
+            "type": "object"
+          },
           "LabelChoice": {
             "properties": {
               "key": {
@@ -31528,6 +31782,13 @@
             "title": "Effective Ports",
             "type": "array"
           },
+          "ip_list_choices": {
+            "items": {
+              "$ref": "#/$defs/IpListChoice"
+            },
+            "title": "Ip List Choices",
+            "type": "array"
+          },
           "label_choices": {
             "items": {
               "$ref": "#/$defs/LabelChoice"
@@ -31551,6 +31812,7 @@
           "settings",
           "effective_ports",
           "label_choices",
+          "ip_list_choices",
           "status"
         ],
         "title": "LateralView",
@@ -33071,6 +33333,16 @@
                 "title": "Hrefs",
                 "type": "array"
               },
+              "ip_lists": {
+                "default": [],
+                "items": {
+                  "maxLength": 255,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "title": "Ip Lists",
+                "type": "array"
+              },
               "ips": {
                 "default": [],
                 "items": {
@@ -33901,6 +34173,16 @@
                 "title": "Hrefs",
                 "type": "array"
               },
+              "ip_lists": {
+                "default": [],
+                "items": {
+                  "maxLength": 255,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "title": "Ip Lists",
+                "type": "array"
+              },
               "ips": {
                 "default": [],
                 "items": {
@@ -34524,6 +34806,16 @@
                   "type": "string"
                 },
                 "title": "Hrefs",
+                "type": "array"
+              },
+              "ip_lists": {
+                "default": [],
+                "items": {
+                  "maxLength": 255,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "title": "Ip Lists",
                 "type": "array"
               },
               "ips": {
@@ -35163,6 +35455,16 @@
                   "type": "string"
                 },
                 "title": "Hrefs",
+                "type": "array"
+              },
+              "ip_lists": {
+                "default": [],
+                "items": {
+                  "maxLength": 255,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "title": "Ip Lists",
                 "type": "array"
               },
               "ips": {
@@ -36148,6 +36450,16 @@
                   "type": "string"
                 },
                 "title": "Hrefs",
+                "type": "array"
+              },
+              "ip_lists": {
+                "default": [],
+                "items": {
+                  "maxLength": 255,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "title": "Ip Lists",
                 "type": "array"
               },
               "ips": {

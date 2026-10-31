@@ -266,6 +266,12 @@ def test_a_detection_with_several_sources_is_left_out_only_when_every_source_mat
     assert evaluate_lateral_rule(lateral_rule(exclude=PUBLIC), [det(ends=both)]) == []
 
 
+def test_exclusion_by_ip_list():
+    ipl = EndpointFilter(ip_lists=("/l/9",))
+    assert evaluate_lateral_rule(lateral_rule(exclude=ipl), [det(ends=EGRESS)], ip_lists={"/l/9": ("20.27.0.0/16",)}) == []
+    assert len(evaluate_lateral_rule(lateral_rule(exclude=ipl), [det(ends=EGRESS)], ip_lists={})) == 1
+
+
 def test_without_exclusion_or_without_ends_nothing_is_left_out():
     assert len(evaluate_lateral_rule(lateral_rule(), [det(ends=SCAN)])) == 1
     # stored before detections kept their ends: what they were about is unknown, so the rule cannot leave it out

@@ -173,3 +173,41 @@ def test_inventory_job_interval_from_settings(tmp_path):
     ctx = configured_ctx(tmp_path, inventory_interval_seconds=7200)
     assert job_intervals(ctx.settings.current())["collect_inventory"] == 7200
     assert inventory.SOURCE == IngestSource.INVENTORY
+
+
+IPL = f"{API}/orgs/1/sec_policy/active/ip_lists"
+
+
+@responses.activate
+def test_inventory_keeps_the_pce_ip_lists(tmp_path):
+    # user 2026-10-31: an alert rule can leave out an IP list; its networks come from the inventory run
+    ctx = configured_ctx(tmp_path)
+    responses.add(responses.GET, WL, json=[_workload(1, risk=None)])
+    responses.add(responses.GET, SUMMARY, status=404)
+    responses.add(responses.GET, IPL, json=[
+        {"href": "/orgs/1/sec_policy/active/ip_lists/7", "name": "Scanners",
+         "ip_ranges": [{"from_ip": "10.9.0.0/16"}, {"from_ip": "10.9.9.0/24", "exclusion": True}]},
+        {"href": "/orgs/1/sec_policy/active/ip_lists/8", "name": "Partners", "fqdns": [{"fqdn": "x.example"}]}])
+    run_inventory_cycle(ctx, now=NOW)
+    from illumio_ops.store.flowdb import ip_lists
+    with ctx.flows().connect() as conn:
+        assert ip_lists.names(conn) == [("/orgs/1/sec_policy/active/ip_lists/8", "Partners"),
+                                        ("/orgs/1/sec_policy/active/ip_lists/7", "Scanners")]
+        nets = ip_lists.networks(conn)["/orgs/1/sec_policy/active/ip_lists/7"]
+    assert "10.9.0.0/21" in nets and not any(n.startswith("10.9.9.") for n in nets)
+
+
+@responses.activate
+def test_an_ip_list_failure_keeps_the_previous_lists_and_the_inventory(tmp_path):
+    ctx = configured_ctx(tmp_path)
+    responses.add(responses.GET, WL, json=[_workload(1, risk=None)])
+    responses.add(responses.GET, SUMMARY, status=404)
+    responses.add(responses.GET, IPL, json=[{"href": "/orgs/1/sec_policy/active/ip_lists/7", "name": "Scanners",
+                                             "ip_ranges": [{"from_ip": "10.9.0.0/16"}]}])
+    run_inventory_cycle(ctx, now=NOW)
+    responses.replace(responses.GET, IPL, status=500)
+    run_inventory_cycle(ctx, now=NOW + timedelta(hours=1))
+    from illumio_ops.store.flowdb import ip_lists
+    with ctx.flows().connect() as conn:
+        assert [n for _, n in ip_lists.names(conn)] == ["Scanners"]
+        assert ingest_state.get(conn, IngestSource.INVENTORY).last_error is None

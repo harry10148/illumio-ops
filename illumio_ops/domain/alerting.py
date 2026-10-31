@@ -21,7 +21,7 @@ from illumio_ops.domain.alertrules import (
     VolumeRule,
     event_matches,
 )
-from illumio_ops.domain.filter import EndpointFilter, endpoint_matches
+from illumio_ops.domain.filter import EndpointFilter, IpLists, endpoint_matches
 from illumio_ops.domain.focus import DETECTION_TITLE_KEYS
 from illumio_ops.domain.segment import EventFilter, EventSegment, FlowSegment
 from illumio_ops.domain.values import (
@@ -347,18 +347,20 @@ def evaluate_bandwidth_rule(rule: BandwidthRule, facts: IncrementFacts, *, now: 
 
 # ── lateral ──────────────────────────────────────────────────────────────────
 
-def excluded(exclude: EndpointFilter | None, ends: Sequence[EndFact] | None) -> bool:
+def excluded(exclude: EndpointFilter | None, ends: Sequence[EndFact] | None, ip_lists: IpLists | None = None) -> bool:
     """A detection a rule's exclusion leaves out: every one of its sources matches, or every one of its targets does
     (an internet scan, a connection out, a scanner the operator expects). Every, not any: one stray source of an
     account's fan-out must not silence the rest (security review 2026-10-31). Ends unknown: never left out."""
     if exclude is None or exclude.is_empty() or not ends:
         return False
-    hit = [(e.role, endpoint_matches(exclude, href=e.href, ip=e.ip, labels=e.labels)) for e in ends]
+    hit = [(e.role, endpoint_matches(exclude, href=e.href, ip=e.ip, labels=e.labels, ip_lists=ip_lists)) for e in ends]
     return any(bool(side) and all(side) for side in ([h for role, h in hit if role == r] for r in ("s", "t")))
 
 
-def evaluate_lateral_rule(rule: LateralRule, changed: Sequence[DetectionFact]) -> list[Trigger]:
-    """A detection alerts when it is new and again when its severity rises — not on every repeat."""
+def evaluate_lateral_rule(rule: LateralRule, changed: Sequence[DetectionFact], *,
+                          ip_lists: IpLists | None = None) -> list[Trigger]:
+    """A detection alerts when it is new and again when its severity rises — not on every repeat. ip_lists: the
+    networks of the IP lists the rule's exclusion names."""
     floor = SEVERITY_ORDER.index(rule.min_severity)
     out = []
     for d in changed:
@@ -366,7 +368,7 @@ def evaluate_lateral_rule(rule: LateralRule, changed: Sequence[DetectionFact]) -
             continue
         if SEVERITY_ORDER.index(d.severity) < floor or (rule.critical_assets_only and not d.critical_asset):
             continue
-        if excluded(rule.exclude, d.ends):
+        if excluded(rule.exclude, d.ends, ip_lists):
             continue
         c = d.confidence
         out.append(Trigger(

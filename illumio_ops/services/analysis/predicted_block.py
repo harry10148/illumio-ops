@@ -11,7 +11,7 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict
 
-from illumio_ops.domain.filter import FilterSpec, matches, to_pce_payload
+from illumio_ops.domain.filter import FilterSpec, ip_list_hrefs, matches, to_pce_payload
 from illumio_ops.domain.flows import (
     FlowRecord,
     FlowShapeError,
@@ -25,7 +25,7 @@ from illumio_ops.pce.async_query import PceQueryError, run_traffic_query
 from illumio_ops.pce.policy import fetch_policy_names, fetch_rule_sets
 from illumio_ops.services.context import AppContext
 from illumio_ops.services.flowsource import FlowRow, pair_row
-from illumio_ops.store.flowdb import capabilities
+from illumio_ops.store.flowdb import capabilities, ip_lists
 from illumio_ops.store.flowdb.db import StaleGeneration
 
 _ALWAYS = (datetime(1970, 1, 1, tzinfo=UTC), datetime(9999, 1, 1, tzinfo=UTC))
@@ -88,6 +88,8 @@ def _recompute(ctx: AppContext, spec: FilterSpec, *, max_results: int, deadline_
     # The PCE answered the time window (a daily flow bucket may reach past it); only the conditions it could
     # not take are checked here.
     residual = residual.model_copy(update={"start": _ALWAYS[0], "end": _ALWAYS[1]})
+    with fdb.connect() as conn:
+        nets = ip_lists.networks(conn, ip_list_hrefs(residual))
     deadline = time.monotonic() + deadline_seconds
     with ctx.pce_client(settings.pce) as client:
         try:
@@ -108,7 +110,7 @@ def _recompute(ctx: AppContext, spec: FilterSpec, *, max_results: int, deadline_
         # review #13); its draft evidence is both ends' rules.
         for primary, partner in group_pairs(records):
             flow = pair_row(primary, partner)
-            if not matches(residual, flow.model_dump()):
+            if not matches(residual, flow.model_dump(), ip_lists=nets):
                 continue
             ends = [views[record_key(primary)]] + ([views[record_key(partner)]] if partner is not None else [])
             decision = next((v.draft_decision for v in ends if v.draft_decision.startswith("blocked")),

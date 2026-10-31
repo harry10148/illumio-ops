@@ -30,6 +30,8 @@ TABLE_OWNERS: dict[str, str] = {
     "ingest_coverage": "illumio_ops.store.flowdb.ingest_state",
     "label_sets": "illumio_ops.store.flowdb.labels",
     "label_set_members": "illumio_ops.store.flowdb.labels",
+    "ip_lists": "illumio_ops.store.flowdb.ip_lists",
+    "ip_list_nets": "illumio_ops.store.flowdb.ip_lists",
     "flows": "illumio_ops.store.flowdb.flows",
     "flow_rollup_daily": "illumio_ops.store.flowdb.flows",
     "rollup_state": "illumio_ops.store.flowdb.flows",

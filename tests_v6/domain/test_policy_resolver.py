@@ -683,3 +683,11 @@ def test_build_label_keys_and_subnets():
         {"/l/1": "app", "/lg/1": "env"}
     assert build_ip_to_subnet([{"interfaces": [{"address": "10.0.0.10", "cidr_block": 24}, {"address": "10.1.1.1"}]}]) \
         == {"10.0.0.10": "10.0.0.0/24"}
+
+
+def test_ip_list_networks_take_exclusions_out_and_drop_fqdns():
+    from illumio_ops.domain.policy_resolver import ip_list_networks
+    ipl = {"href": "/x", "ip_ranges": [{"from_ip": "10.0.0.0/24"}, {"from_ip": "10.0.0.128/25", "exclusion": True},
+                                       {"from_ip": "192.168.1.10", "to_ip": "192.168.1.11"}],
+           "fqdns": [{"fqdn": "example.com"}]}
+    assert ip_list_networks(ipl) == ("10.0.0.0/25", "192.168.1.10/31")

@@ -2,7 +2,7 @@
 // be; ports, the reported decision, the initiating process or user. Labels come from the inventory the store holds.
 import { useState } from "react";
 
-import type { EndpointFilter, FlowCondition, LabelChoice, PolicyDecision, PortProto } from "../api/generated";
+import type { EndpointFilter, FlowCondition, IpListChoice, LabelChoice, PolicyDecision, PortProto } from "../api/generated";
 import { t } from "../i18n";
 
 const DECISIONS: PolicyDecision[] = ["allowed", "potentially_blocked", "blocked", "unknown"];
@@ -33,17 +33,21 @@ function parsePorts(text: string): PortProto[] | null {
 }
 
 // One endpoint condition; the lateral alert rule's exclusion uses it alone (name "exclude").
-export function Side({ name, value, choices, onChange }: {
-  name: string; value: EndpointFilter | null | undefined; choices: LabelChoice[];
+export function Side({ name, value, choices, ipLists = [], onChange }: {
+  name: string; value: EndpointFilter | null | undefined; choices: LabelChoice[]; ipLists?: IpListChoice[];
   onChange: (next: EndpointFilter | null) => void;
 }) {
   const v = value ?? {};
   const [key, setKey] = useState(choices[0]?.key ?? "");
   const choice = choices.find((c) => c.key === key);
   const [val, setVal] = useState("");
+  const [pick, setPick] = useState("");
   const labels = v.labels ?? [];
+  const lists = v.ip_lists ?? [];
+  const listName = (href: string) => ipLists.find((l) => l.href === href)?.name ?? t("cond_ip_list_gone");
   const set = (next: EndpointFilter) =>
-    onChange((next.labels?.length || next.ips?.length || next.hrefs?.length || next.public) ? next : null);
+    onChange((next.labels?.length || next.ips?.length || next.hrefs?.length || next.ip_lists?.length || next.public)
+      ? next : null);
   const add = () => {
     const chosen = val || choice?.values[0] || "";
     if (!key || !chosen) return;
@@ -83,6 +87,35 @@ export function Side({ name, value, choices, onChange }: {
         <input name={`${name}_ips`} defaultValue={(v.ips ?? []).join(", ")} placeholder="10.0.0.5, 10.1.0.0/16"
                onBlur={(e) => set({ ...v, ips: list(e.target.value) })} />
       </label>
+      {(ipLists.length > 0 || lists.length > 0) && (
+        <div className="stack" data-role="ip-lists">
+          <span>{t("cond_ip_lists")}</span>
+          {lists.length > 0 && (
+            <ul className="chips">
+              {lists.map((href) => (
+                <li key={href} className="chip" data-ip-list={href}>
+                  {listName(href)}
+                  <button type="button" className="btn-quiet" aria-label={t("lateral_remove_label")}
+                          onClick={() => set({ ...v, ip_lists: lists.filter((x) => x !== href) })}>×</button>
+                </li>
+              ))}
+            </ul>
+          )}
+          {ipLists.length > 0 && (
+            <div className="row">
+              <select name={`${name}_ip_list`} aria-label={t("cond_ip_lists")} value={pick || ipLists[0]?.href || ""}
+                      onChange={(e) => setPick(e.target.value)}>
+                {ipLists.map((l) => <option key={l.href} value={l.href}>{l.name}</option>)}
+              </select>
+              <button type="button" className="btn-quiet"
+                      onClick={() => {
+                        const href = pick || ipLists[0]?.href;
+                        if (href && !lists.includes(href)) set({ ...v, ip_lists: [...lists, href] });
+                      }}>{t("cond_add_ip_list")}</button>
+            </div>
+          )}
+        </div>
+      )}
       <label className="check">
         <input type="checkbox" name={`${name}_public`} checked={v.public ?? false}
                onChange={(e) => set({ ...v, public: e.target.checked })} />
@@ -93,23 +126,23 @@ export function Side({ name, value, choices, onChange }: {
   );
 }
 
-export function ConditionEditor({ value, choices, onChange, onInvalid }: {
-  value: FlowCondition; choices: LabelChoice[]; onChange: (next: FlowCondition) => void;
+export function ConditionEditor({ value, choices, ipLists = [], onChange, onInvalid }: {
+  value: FlowCondition; choices: LabelChoice[]; ipLists?: IpListChoice[]; onChange: (next: FlowCondition) => void;
   onInvalid: (field: string | null) => void;
 }) {
   const decisions = value.decisions ?? [];
   return (
     <div className="stack" data-role="condition">
       <div className="form-grid">
-        <Side name="src" value={value.src} choices={choices} onChange={(src) => onChange({ ...value, src })} />
-        <Side name="dst" value={value.dst} choices={choices} onChange={(dst) => onChange({ ...value, dst })} />
+        <Side name="src" value={value.src} choices={choices} ipLists={ipLists} onChange={(src) => onChange({ ...value, src })} />
+        <Side name="dst" value={value.dst} choices={choices} ipLists={ipLists} onChange={(dst) => onChange({ ...value, dst })} />
       </div>
       <details open={Boolean(value.src_exclude || value.dst_exclude)}>
         <summary>{t("cond_exclusions")}</summary>
         <div className="form-grid">
-          <Side name="src_exclude" value={value.src_exclude} choices={choices}
+          <Side name="src_exclude" value={value.src_exclude} choices={choices} ipLists={ipLists}
                 onChange={(src_exclude) => onChange({ ...value, src_exclude })} />
-          <Side name="dst_exclude" value={value.dst_exclude} choices={choices}
+          <Side name="dst_exclude" value={value.dst_exclude} choices={choices} ipLists={ipLists}
                 onChange={(dst_exclude) => onChange({ ...value, dst_exclude })} />
         </div>
       </details>

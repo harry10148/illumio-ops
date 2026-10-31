@@ -23,6 +23,7 @@ from illumio_ops.domain.filter import (
     FilterSpec,
     FlowCondition,
     PortProto,
+    ip_list_hrefs,
     matches,
     port_matches,
     sql_functions,
@@ -59,7 +60,7 @@ from illumio_ops.services.coverage import (
     store_coverage,
 )
 from illumio_ops.settings.schema import PceSettings
-from illumio_ops.store.flowdb import ingest_state
+from illumio_ops.store.flowdb import ingest_state, ip_lists
 from illumio_ops.store.flowdb.db import StaleGeneration, db_time
 from illumio_ops.store.flowdb.flows import INCREMENT_PRIMARY_JOIN
 
@@ -293,6 +294,7 @@ def _live_rows(conn: Any, spec: FilterSpec, fetched: list[FlowRecord]) -> tuple[
     # (P3 final review #3). A tuple with nothing new is left to the store.
     changed = {(r.src_ip, r.dst_ip, r.port, r.proto) for k, r in merged.items() if stored.get(k) != r}
     _, residual = to_pce_payload(spec, max_results=FILL_MAX_RESULTS, query_name="illumio-ops query", label_hrefs={})
+    nets = ip_lists.networks(conn, ip_list_hrefs(residual))
     out: list[FlowRow] = []
     superseded: set[str] = set()
     for primary, partner in group_pairs(list(merged.values())):
@@ -301,7 +303,7 @@ def _live_rows(conn: Any, spec: FilterSpec, fetched: list[FlowRecord]) -> tuple[
         keys = {record_key(primary)} | ({record_key(partner)} if partner is not None else set())
         superseded |= keys & stored.keys()
         row = _row_from_pce(primary, partner)
-        if matches(residual, row.model_dump()):
+        if matches(residual, row.model_dump(), ip_lists=nets):
             out.append(row)
     return out, superseded
 

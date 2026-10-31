@@ -103,7 +103,14 @@ def test_rule_traffic_exclusions_round_trip(context, live_app):
 
 
 def test_rule_lateral_exclusion_round_trip(context, live_app):
-    """User 2026-10-31: a lateral rule leaves out the internet side by default, and an address the operator names."""
+    """User 2026-10-31: a lateral rule leaves out the internet side by default, and an address or an IP list."""
+    from datetime import UTC, datetime
+
+    from illumio_ops.store.flowdb import ip_lists
+    with live_app.ctx.flows().connect() as conn:
+        ip_lists.replace_all(conn, [ip_lists.IpListRow("/orgs/1/sec_policy/active/ip_lists/7", "Scanners",
+                                                       ("10.9.0.0/16",))], at=datetime(2026, 10, 31, tzinfo=UTC))
+        conn.commit()
     page = context.new_page()
     sign_in(page, live_app.url)
     page.goto(f"{live_app.url}/alerts/rules/new")
@@ -115,13 +122,18 @@ def test_rule_lateral_exclusion_round_trip(context, live_app):
     expect(side).to_contain_text("does not alert")
     side.locator("input[name=exclude_ips]").fill("10.9.9.9")
     side.locator("input[name=exclude_ips]").blur()
+    side.get_by_role("button", name="Add IP list").click()
+    expect(side.locator("[data-ip-list]")).to_have_text("Scanners×")
     form.get_by_role("button", name="Save").click()
     page.wait_for_selector("[data-role=rule-list]")
     mine = next(r for r in live_app.ctx.settings.current().alerts.rules if r.name == "Fan-out but not the scanner")
     assert mine.exclude is not None and mine.exclude.public and mine.exclude.ips == ("10.9.9.9",)
+    assert mine.exclude.ip_lists == ("/orgs/1/sec_policy/active/ip_lists/7",)
     page.goto(f"{live_app.url}/alerts/rules/{mine.id}")
     side = page.locator("[data-side=exclude]")
     expect(side.locator("input[name=exclude_ips]")).to_have_value("10.9.9.9")
+    expect(side.locator("[data-ip-list]")).to_contain_text("Scanners")
+    side.locator("[data-ip-list] button").click()
     side.locator("input[name=exclude_public]").uncheck()
     side.locator("input[name=exclude_ips]").fill("")
     side.locator("input[name=exclude_ips]").blur()

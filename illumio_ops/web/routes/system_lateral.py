@@ -8,6 +8,7 @@ from illumio_ops.services.alerts import known
 from illumio_ops.services.alerts.known import KnownList
 from illumio_ops.services.analysis.status import (
     AdminPortView,
+    IpListChoice,
     LabelChoice,
     LateralStatus,
     lateral_overview,
@@ -22,6 +23,7 @@ class LateralView(BaseModel):
     settings: LateralSettings
     effective_ports: list[AdminPortView]
     label_choices: list[LabelChoice]
+    ip_list_choices: list[IpListChoice]
     status: LateralStatus
 
 
@@ -44,7 +46,7 @@ def _view() -> LateralView:
     s = ctx.settings.current()
     o = lateral_overview(ctx)
     return LateralView(revision=s.revision, settings=s.lateral, effective_ports=o.effective_ports,
-                       label_choices=o.label_choices, status=o.status)
+                       label_choices=o.label_choices, ip_list_choices=o.ip_list_choices, status=o.status)
 
 
 @api_route(bp, OP_GET)

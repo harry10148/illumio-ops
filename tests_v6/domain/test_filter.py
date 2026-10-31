@@ -315,3 +315,48 @@ def test_endpoint_matches_public():
     assert endpoint_matches(ep, href=None, ip="8.8.8.8", labels={})
     assert not endpoint_matches(ep, href="/w/1", ip="8.8.8.8", labels={})
     assert not endpoint_matches(ep, href=None, ip="10.1.2.3", labels={})
+
+
+# ── ip_lists: a PCE IP list by href, its networks from the inventory (user 2026-10-31) ──
+
+NETS = {"/orgs/1/sec_policy/active/ip_lists/9": ("114.35.37.0/24", "8.8.8.8/32")}
+IPL = "/orgs/1/sec_policy/active/ip_lists/9"
+IP_LIST_SPECS = [
+    {"dst": EndpointFilter(ip_lists=(IPL,))},
+    {"dst_exclude": EndpointFilter(ip_lists=(IPL,))},
+    {"src": EndpointFilter(ip_lists=("/orgs/1/sec_policy/active/ip_lists/gone",))},
+    {"dst": EndpointFilter(ip_lists=(IPL,), ips=("10.0.0.2",))},
+]
+
+
+@pytest.fixture(scope="module")
+def ip_list_store(public_store):
+    from illumio_ops.store.flowdb import ip_lists
+    conn, rows = public_store
+    ip_lists.replace_all(conn, [ip_lists.IpListRow(IPL, "Internet edge", NETS[IPL])], at=T1)
+    return conn, rows
+
+
+@pytest.mark.parametrize("kw", IP_LIST_SPECS, ids=[str(i) for i in range(len(IP_LIST_SPECS))])
+def test_ip_list_sql_and_predicate_agree(ip_list_store, kw):
+    conn, rows = ip_list_store
+    s = FilterSpec(**({"start": T0, "end": T1} | kw))
+    where, params = to_sql(s)
+    via_sql = {r[0] for r in conn.execute(f"SELECT f.id FROM flows f WHERE {where}", params)}
+    assert via_sql == {r["id"] for r in rows if matches(s, r, ip_lists=NETS)}
+
+
+def test_ip_list_matches_its_networks_and_a_deleted_list_nothing():
+    from illumio_ops.domain.filter import endpoint_matches
+    ep = EndpointFilter(ip_lists=(IPL,))
+    assert endpoint_matches(ep, href=None, ip="114.35.37.162", labels={}, ip_lists=NETS)
+    assert not endpoint_matches(ep, href=None, ip="10.0.0.2", labels={}, ip_lists=NETS)
+    assert not endpoint_matches(ep, href=None, ip="114.35.37.162", labels={}, ip_lists={})
+    assert not EndpointFilter(ip_lists=(IPL,)).is_empty()
+
+
+def test_ip_list_stays_local_for_the_pce():
+    s = spec(src=EndpointFilter(ip_lists=(IPL,)), dst_exclude=EndpointFilter(ip_lists=(IPL,)))
+    payload, residual = to_pce_payload(s, max_results=10, query_name="q", label_hrefs={})
+    assert payload["sources"]["include"] == [[]] and residual.src == s.src
+    assert payload["destinations"]["exclude"] == [] and residual.dst_exclude == s.dst_exclude

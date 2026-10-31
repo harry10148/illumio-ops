@@ -9,6 +9,7 @@ read wider than it is)."""
 from __future__ import annotations
 
 import ipaddress
+from collections.abc import Mapping
 from typing import Any
 
 _ANY = "ANY"
@@ -417,6 +418,12 @@ def build_label_to_ips(workloads: list[dict[str, Any]]) -> dict[str, list[str]]:
                     seen.add(ip)
                     bucket.append(ip)
     return out
+
+
+def ip_list_networks(ipl: Mapping[str, Any]) -> tuple[str, ...]:
+    """An IP list's networks, its exclusions taken out; an FQDN has no address to compare and is dropped."""
+    out = [str(n) for v in _ip_list_values(ipl.get("ip_ranges") or []) for n in _network(v) or []]
+    return tuple(dict.fromkeys(out))
 
 
 def build_iplist_to_cidrs(ip_lists: list[dict[str, Any]]) -> dict[str, list[str]]:

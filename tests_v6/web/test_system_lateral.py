@@ -79,3 +79,16 @@ def test_lightweight_status_says_mode_required(client, ctx):
     login(client)
     ctx.settings.update(ctx.settings.current().revision, lambda d: d["collection"].update({"mode": "lightweight"}))
     assert _get(client)["status"]["collected"] is False
+
+
+def test_ip_list_choices_come_from_the_inventory(client, ctx):
+    # user 2026-10-31: the alert rule editor picks IP lists to leave out
+    from datetime import UTC, datetime
+
+    from illumio_ops.store.flowdb import ip_lists
+    login(client)
+    with ctx.flows().connect() as conn:
+        ip_lists.replace_all(conn, [ip_lists.IpListRow("/orgs/1/sec_policy/active/ip_lists/7", "Scanners", ("10.9.0.0/16",))],
+                             at=datetime(2026, 10, 31, tzinfo=UTC))
+        conn.commit()
+    assert _get(client)["ip_list_choices"] == [{"href": "/orgs/1/sec_policy/active/ip_lists/7", "name": "Scanners"}]

@@ -15,6 +15,7 @@ from typing import Any
 
 from loguru import logger
 
+from illumio_ops.domain.policy_resolver import ip_list_networks
 from illumio_ops.domain.values import (
     CapabilityState,
     IngestSource,
@@ -23,13 +24,20 @@ from illumio_ops.domain.values import (
 from illumio_ops.pce.capabilities import detect_from_status, detect_from_workloads
 from illumio_ops.pce.client import PceClient, PceNotConfigured
 from illumio_ops.pce.collections import PceCollectionIncomplete, get_all
+from illumio_ops.pce.policy import fetch_objects
 from illumio_ops.services.collect import CycleResult, drops_stale
 from illumio_ops.services.collect.guard import BindingMismatch, ensure_binding
 from illumio_ops.services.collect.mode import collects
 from illumio_ops.services.collect.traffic import PCE_FAILURES
 from illumio_ops.services.context import AppContext
 from illumio_ops.settings.schema import PceSettings
-from illumio_ops.store.flowdb import capabilities, ingest_state, ransomware, workloads
+from illumio_ops.store.flowdb import (
+    capabilities,
+    ingest_state,
+    ip_lists,
+    ransomware,
+    workloads,
+)
 from illumio_ops.store.flowdb.db import (
     FlowDb,
     StaleGeneration,
@@ -101,6 +109,20 @@ def visibility_summary(conn: Any) -> dict[str, int]:
 
 def _deadline() -> float:
     return time.monotonic() + DEADLINE_SECONDS
+
+
+def _ip_lists(client: PceClient, fdb: FlowDb, gen: int, at: datetime) -> None:
+    """The active IP lists an alert rule can leave out (user 2026-10-31). A failed read keeps the previous lists and
+    never fails the inventory: a rule naming a list goes on matching the networks it had."""
+    try:
+        rows = fetch_objects(client, "active", "ip_lists", deadline=_deadline())
+    except (*PCE_FAILURES, PceCollectionIncomplete, ValueError) as exc:
+        logger.warning("IP lists could not be read, keeping the previous ones: {}", exc)
+        return
+    lists = [ip_lists.IpListRow(str(r["href"]), str(r.get("name") or ""), ip_list_networks(r))
+             for r in rows if isinstance(r, Mapping) and r.get("href")]
+    with fdb.writing(gen) as conn, transaction(conn):
+        ip_lists.replace_all(conn, lists, at=at)
 
 
 def _org_summary(client: PceClient, fdb: FlowDb, gen: int, day: str, at: datetime) -> str | None:
@@ -203,6 +225,7 @@ def _inventory(ctx: AppContext, client: PceClient, pce: PceSettings, fdb: FlowDb
                 for name, state in detect_from_workloads(rows).items():
                     capabilities.record(conn, name, state, None, at)
                 ingest_state.mark_ok(conn, SOURCE, at, watermark=None, rows=len(rows))
+        _ip_lists(client, fdb, gen, at)
         # The ransomware stage reports on its own source and never fails the inventory before it.
         try:
             summary_error = _org_summary(client, fdb, gen, day, at)

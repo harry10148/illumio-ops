@@ -74,7 +74,7 @@ from illumio_ops.services.eventsource import (
 from illumio_ops.services.flowsource import increment_totals, increments_watermark
 from illumio_ops.settings.schema import Settings
 from illumio_ops.store import alerts as store
-from illumio_ops.store.flowdb import analysis, ingest_state, workloads
+from illumio_ops.store.flowdb import analysis, ingest_state, ip_lists, workloads
 from illumio_ops.store.flowdb.db import StaleGeneration
 from illumio_ops.store.flowdb.labels import label_sets
 
@@ -413,6 +413,7 @@ def evaluate_lateral(ctx: AppContext, *, now: datetime | None = None) -> EvalRun
     rec = _Recorder(ctx, s, at)
     with ctx.flows().connect() as conn:
         names, labels = inventory(conn)
+        nets = ip_lists.networks(conn, {h for r in rules if r.exclude for h in r.exclude.ip_lists})
     marks = known.list_known(ctx).items
     for _ in range(DETECTION_BATCHES):
         with ctx.flows().connect() as conn:
@@ -431,7 +432,7 @@ def evaluate_lateral(ctx: AppContext, *, now: datetime | None = None) -> EvalRun
                 facts.append(detection_fact(row, start=start, names=names, labels=labels, previous=previous))
                 if DetectorKind(row["detector"]) in rule.detectors:
                     rec.seen.append((rule.id, row["fingerprint"], row["severity"]))
-            rec.record(rule, known.apply_known(evaluate_lateral_rule(rule, facts), marks))
+            rec.record(rule, known.apply_known(evaluate_lateral_rule(rule, facts, ip_lists=nets), marks))
         run.evaluated += len(changed)
         mark = (str(changed[-1]["updated_at"]), int(changed[-1]["id"]))
         rec.commit(SOURCE_LATERAL, f"{mark[0]}|{mark[1]}")
