@@ -16,7 +16,7 @@ from illumio_ops.domain.values import (
     SiemTransport,
 )
 from illumio_ops.services.siem import dlq
-from illumio_ops.services.siem.sources import CURSOR_SOURCES
+from illumio_ops.services.siem.cursors import place_new_cursors
 from illumio_ops.services.siem.status import SiemStatusView, siem_status
 from illumio_ops.services.siem.tester import send_test
 from illumio_ops.settings.schema import SiemDestination, SiemSettings
@@ -172,21 +172,12 @@ def update_settings(body: SiemSettingsUpdate) -> SiemSettingsView:
     ctx = get_ctx()
     merged = _merged(body.siem)
     try:
-        new = SiemSettings.model_validate(merged)
+        SiemSettings.model_validate(merged)
     except ValidationError as exc:
         raise _invalid(exc, "siem.") from None
     ctx.settings.update(body.revision, lambda d: d.__setitem__("siem", merged))
-    # A source a destination no longer takes (or a removed destination) forgets its place: taking it again starts
-    # after what is stored then, like a new destination.
-    with ctx.db() as conn:
-        kept = {d.id: [c for s in d.sources for c in _cursor_names(s)] for d in new.destinations}
-        for (dest_id, _source) in list(store.cursors(conn)):
-            store.forget_destination(conn, dest_id, kept.get(dest_id, []))
+    place_new_cursors(ctx)  # a new destination or source starts now, not at the next run
     return _view()
-
-
-def _cursor_names(source: SiemSource) -> tuple[str, ...]:
-    return CURSOR_SOURCES[source]
 
 
 @api_route(bp, OP_TEST)

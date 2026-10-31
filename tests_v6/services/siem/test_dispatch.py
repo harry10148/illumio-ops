@@ -140,7 +140,7 @@ def test_the_time_budget_ends_the_run(ctx):
     add_events(ctx, range(1, 11))
     ticks = iter(range(100))
     t = FakeTransport()
-    run_siem(ctx, now=NOW, transport_factory=lambda d: t, budget_seconds=3, clock=lambda: next(ticks))
+    run_siem(ctx, now=NOW, transport_factory=lambda d: t, budget_seconds=12, clock=lambda: next(ticks))
     assert 0 < len(t.lines) < 10
 
 

@@ -456,9 +456,9 @@ class AlertChannels(StrictModel):
 class AlertSettings(StrictModel):
     """Notification channels, the alert rules (spec §6.5 告警) and how long alert records are kept."""
     channels: AlertChannels
-    # 300 of the operator's own and room for the pack's later additions (v5 adds five: a file at the old limit must
-    # still load after an upgrade).
-    rules: tuple[AlertRule, ...] = Field(max_length=350)
+    # 300 of the operator's own and room for the pack's later additions: an upgrade adds pack rules (v5 five, v9 one),
+    # and a file at the old limit must still load after it — raise this with every rule an upgrade adds.
+    rules: tuple[AlertRule, ...] = Field(max_length=360)
     retention_days: int = Field(ge=1, le=3650)
 
     @field_validator("rules")

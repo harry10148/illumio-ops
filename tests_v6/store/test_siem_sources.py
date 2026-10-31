@@ -119,10 +119,12 @@ def test_failures_count_against_the_same_head_record(tmp_path):
         assert siem.record_failure(conn, "d" * 32, "audit", head_id=7, error="y", at=NOW) == 1
 
 
-def test_a_pce_switch_forgets_the_flow_store_cursors_only(tmp_path):
+def test_a_pce_switch_restarts_the_flow_store_cursors_only(tmp_path):
     ctx = make_ctx(tmp_path)
     with ctx.db() as conn:
         for source in ("audit", "alerts", "detections", "new_connections"):
             siem.start_cursor(conn, "d" * 32, source, pce_url="https://a", org_id="1", last_id=5)
-        siem.forget_flow_cursors(conn)
-        assert [s for (_, s) in siem.cursors(conn)] == ["alerts"]
+        siem.restart_flow_cursors(conn, pce_url="https://b", org_id="1")
+        got = {s: (c.pce_url, c.last_id) for (_, s), c in siem.cursors(conn).items()}
+    assert got == {"alerts": ("https://a", 5), "audit": ("https://b", 0), "detections": ("https://b", 0),
+                   "new_connections": ("https://b", 0)}

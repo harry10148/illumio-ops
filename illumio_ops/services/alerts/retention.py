@@ -14,7 +14,7 @@ def run_alert_retention(ctx: AppContext, *, now: datetime | None = None) -> int:
     cutoff = at - timedelta(days=days)
     pce = ctx.settings.current().pce
 
-    def unsent(after_id: int) -> int:
+    def unsent(after_id: int, _dest: object) -> int:
         with ctx.db() as conn:
             return store.count_notified_alerts_before(conn, cutoff, pce_url=pce.url, org_id=pce.org_id,
                                                       after_id=after_id)

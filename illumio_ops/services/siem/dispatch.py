@@ -59,6 +59,7 @@ class SourceRun(BaseModel):
     unreachable: bool = False   # the destination failed: its other sources wait for the next tick
     dlq_full: bool = False
     started: bool = False       # a new cursor was placed at the newest record
+    switched: bool = False      # the PCE was switched during the run: nothing more is sent
 
 
 class SiemRun(BaseModel):
@@ -120,18 +121,21 @@ def run_siem(ctx: AppContext, *, now: datetime | None = None, budget_seconds: fl
         if not s.siem.enabled:
             return SiemRun()
         deadline = clock() + (budget_seconds if budget_seconds is not None else s.siem.tick_seconds * BUDGET_SHARE)
+        gen = ctx.flows().generation  # noted with the settings snapshot: a PCE switch after it stops the run
         out = SiemRun()
-        for dest in s.siem.destinations:
-            if dest.enabled:
-                out.destinations[dest.name] = _run_destination(ctx, s, dest, deadline, transport_factory, clock,
-                                                               now)
+        enabled = [d for d in s.siem.destinations if d.enabled]
+        for i, dest in enumerate(enabled):
+            # An even share of what is left: a destination with a large backlog cannot starve the ones after it.
+            share = clock() + max(0.0, deadline - clock()) / (len(enabled) - i)
+            out.destinations[dest.name] = _run_destination(ctx, s, dest, share, transport_factory, clock, now, gen)
         return out
     finally:
         _RUN_LOCK.release()
 
 
 def _run_destination(ctx: AppContext, s: Settings, dest: SiemDestination, deadline: float,
-                     factory: TransportFactory, clock: Callable[[], float], now: datetime | None) -> dict[str, SourceRun]:
+                     factory: TransportFactory, clock: Callable[[], float], now: datetime | None,
+                     gen: int) -> dict[str, SourceRun]:
     results: dict[str, SourceRun] = {}
     try:
         transport = factory(dest)
@@ -143,10 +147,12 @@ def _run_destination(ctx: AppContext, s: Settings, dest: SiemDestination, deadli
                 store.note_error(conn, dest.id, source, f"setup: {exc}", at)
         return {source: SourceRun(error=f"setup: {exc}", unreachable=True) for source in sources.cursor_sources(dest)}
     try:
-        for source in sources.cursor_sources(dest):
-            r = _run_source(ctx, s, dest, source, transport, fmt, deadline, clock, now)
+        names = sources.cursor_sources(dest)
+        for i, source in enumerate(names):
+            share = clock() + max(0.0, deadline - clock()) / (len(names) - i)
+            r = _run_source(ctx, s, dest, source, transport, fmt, share, clock, now, gen)
             results[source] = r
-            if r.unreachable:
+            if r.unreachable or r.switched:
                 break
     finally:
         try:
@@ -199,7 +205,8 @@ def _next_goes_through(transport: Transport, fmt: Formatter, records: list[SiemR
 
 
 def _run_source(ctx: AppContext, s: Settings, dest: SiemDestination, source: str, transport: Transport,
-                fmt: Formatter, deadline: float, clock: Callable[[], float], now: datetime | None) -> SourceRun:
+                fmt: Formatter, deadline: float, clock: Callable[[], float], now: datetime | None,
+                gen: int) -> SourceRun:
     pce = s.pce
     run = SourceRun()
     with ctx.db() as conn:
@@ -213,13 +220,18 @@ def _run_source(ctx: AppContext, s: Settings, dest: SiemDestination, source: str
     last = cur.last_id
     read = sources.SOURCES[source].read
     while clock() < deadline:
-        records = read(ctx, last, dest.batch_size, dest)  # its connection is closed again before anything is sent
+        records = read(ctx, s, last, dest.batch_size, dest)  # its connection is closed again before anything is sent
         if not records:
             break
+        if ctx.flows().generation != gen:  # a PCE switch: these may be either PCE's, said as the run's PCE
+            run.switched = True
+            return run
         at = (now or datetime.now(UTC)).astimezone(UTC)
         consumed, sent, failure = last, 0, None
         payloads: dict[int, str] = {}
         for rec in records:
+            if clock() >= deadline:  # out of time mid-batch: what went out is advanced, the rest waits
+                break
             try:
                 payload = fmt.format_record(rec)
             except Exception as exc:  # noqa: BLE001 — a record that cannot be formatted must not stop the rest
@@ -272,8 +284,11 @@ def _run_source(ctx: AppContext, s: Settings, dest: SiemDestination, source: str
             # with a later record the probe decides, and with no recent success it may as well be an outage.
             stuck = attempts >= dest.max_retries * HARD_FACTOR or (
                 attempts >= dest.max_retries * STUCK_FACTOR
-                and not any(r.record_id > head.record_id for r in records) and _recently_up(ctx, dest, at))
-            probed = None if stuck or attempts < dest.max_retries else _next_goes_through(transport, fmt, records, head)
+                and not read(ctx, s, head.record_id, 1, dest) and _recently_up(ctx, dest, at))
+            ahead = [r for r in records if r.record_id > head.record_id]
+            if not stuck and attempts >= dest.max_retries and len(ahead) < PROBE:  # a small batch: read ahead to probe
+                ahead = read(ctx, s, head.record_id, PROBE, dest)
+            probed = None if stuck or attempts < dest.max_retries else _next_goes_through(transport, fmt, ahead, head)
             if stuck or probed is not None:
                 # A record after it went through (or it failed far too often): this one is what fails. The probed
                 # record was sent; any between them are tried again from the next tick.
@@ -284,11 +299,11 @@ def _run_source(ctx: AppContext, s: Settings, dest: SiemDestination, source: str
                     run.sent += 0 if nxt is None else 1
                     with ctx.db() as conn:
                         store.advance(conn, dest.id, source, pce_url=pce.url, org_id=pce.org_id,
-                                      last_id=head.record_id if nxt is None or _skips(records, head, nxt)
+                                      last_id=head.record_id if nxt is None or _skips(ahead, head, nxt)
                                       else nxt.record_id, sent=0 if nxt is None else 1, at=at)
                 else:
                     run.dlq_full = True
             return run
-        if len(records) < dest.batch_size:
+        if len(records) < dest.batch_size or consumed < records[-1].record_id:
             break
     return run

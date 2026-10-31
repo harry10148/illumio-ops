@@ -10,6 +10,7 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
+from urllib.parse import urlsplit
 
 from illumio_ops.domain.focus import DETECTION_TITLE_KEYS
 from illumio_ops.domain.values import (
@@ -35,7 +36,7 @@ from illumio_ops.services.eventsource import (
 from illumio_ops.services.hosts import display_names
 from illumio_ops.services.reports.common import DETECTOR_NAME_KEYS
 from illumio_ops.services.reports.flowsections import DECISION_KEYS
-from illumio_ops.settings.schema import SiemDestination
+from illumio_ops.settings.schema import Settings, SiemDestination
 from illumio_ops.siem.mask import (
     REDACTED,
     is_person,
@@ -63,13 +64,12 @@ def _t(value: str | None) -> datetime | None:
     return datetime.fromisoformat(value) if value else None
 
 
-def _lang(ctx: AppContext) -> Language:
-    return ctx.settings.current().display.language
+def _lang(s: Settings) -> Language:
+    return s.display.language
 
 
-def _pce_fqdn(ctx: AppContext) -> str:
-    from urllib.parse import urlsplit
-    return urlsplit(ctx.settings.current().pce.url).hostname or ""
+def _pce_fqdn(s: Settings) -> str:
+    return urlsplit(s.pce.url).hostname or ""
 
 
 def _endpoint(key: str, names: Mapping[str, str], **extra: Any) -> Endpoint:
@@ -88,23 +88,23 @@ def _text(value: Any) -> str:
 
 # ── audit ────────────────────────────────────────────────────────────────────
 
-def _audit(ctx: AppContext, after: int, limit: int, dest: SiemDestination) -> list[SiemRecord]:
+def _audit(ctx: AppContext, s: Settings, after: int, limit: int, dest: SiemDestination) -> list[SiemRecord]:
     return [SiemRecord(kind="audit", record_id=e.id, time=e.timestamp, event=mask_event(e.event, mask_pii=dest.mask_pii))
             for e in live_events_after(ctx, after, limit)]
 
 
 # ── alerts ───────────────────────────────────────────────────────────────────
 
-def _alerts(ctx: AppContext, after: int, limit: int, dest: SiemDestination) -> list[SiemRecord]:
-    pce = ctx.settings.current().pce
+def _alerts(ctx: AppContext, s: Settings, after: int, limit: int, dest: SiemDestination) -> list[SiemRecord]:
+    pce = s.pce
     with ctx.db() as conn:
         rows = conn.execute("SELECT * FROM alerts WHERE id > ? AND notify = 1 AND pce_url = ? AND org_id = ? "
                             "ORDER BY id LIMIT ?", (after, pce.url, pce.org_id, limit)).fetchall()
     if not rows:
         return []
-    lang = _lang(ctx)
+    lang = _lang(s)
     names = display_names(ctx, {str(r["subject_key"]) for r in rows if str(r["subject_key"]).startswith("/orgs/")})
-    fqdn = _pce_fqdn(ctx)
+    fqdn = _pce_fqdn(s)
     out = []
     for r in rows:
         v = alert_view(r)
@@ -126,14 +126,14 @@ def _alerts(ctx: AppContext, after: int, limit: int, dest: SiemDestination) -> l
 
 # ── detections ───────────────────────────────────────────────────────────────
 
-def _detections(ctx: AppContext, after: int, limit: int, dest: SiemDestination) -> list[SiemRecord]:
+def _detections(ctx: AppContext, s: Settings, after: int, limit: int, dest: SiemDestination) -> list[SiemRecord]:
     with ctx.flows().connect() as conn:
         rows = conn.execute("SELECT * FROM detections WHERE id > ? ORDER BY id LIMIT ?", (after, limit)).fetchall()
     if not rows:
         return []
-    lang = _lang(ctx)
+    lang = _lang(s)
     names = display_names(ctx, {str(r["subject_key"]) for r in rows if str(r["subject_key"]).startswith("/orgs/")})
-    fqdn = _pce_fqdn(ctx)
+    fqdn = _pce_fqdn(s)
     out = []
     for r in rows:
         kind = DetectorKind(r["detector"])
@@ -162,7 +162,7 @@ def _detections(ctx: AppContext, after: int, limit: int, dest: SiemDestination) 
 
 # ── new connections ──────────────────────────────────────────────────────────
 
-def _decision_clause(dest: SiemDestination) -> tuple[str, list[Any]]:
+def decision_clause(dest: SiemDestination) -> tuple[str, list[Any]]:
     decisions = [d.value for d in dest.new_connection_decisions]
     if not decisions:
         return "", []
@@ -171,16 +171,16 @@ def _decision_clause(dest: SiemDestination) -> tuple[str, list[Any]]:
     return f" AND decision IN ({','.join('?' * len(decisions))})", decisions
 
 
-def _new_connections(ctx: AppContext, after: int, limit: int, dest: SiemDestination) -> list[SiemRecord]:
-    clause, args = _decision_clause(dest)
+def _new_connections(ctx: AppContext, s: Settings, after: int, limit: int, dest: SiemDestination) -> list[SiemRecord]:
+    clause, args = decision_clause(dest)
     with ctx.flows().connect() as conn:
         rows = conn.execute(f"SELECT * FROM new_connection_log WHERE id > ?{clause} ORDER BY id LIMIT ?",
                             (after, *args, limit)).fetchall()
         sets = label_sets(conn, {s for r in rows for s in (r["src_label_set"], r["dst_label_set"]) if s is not None})
     if not rows:
         return []
-    lang = _lang(ctx)
-    fqdn = _pce_fqdn(ctx)
+    lang = _lang(s)
+    fqdn = _pce_fqdn(s)
     out = []
     for r in rows:
         decision = r["decision"] or PolicyDecision.UNKNOWN.value
@@ -207,7 +207,7 @@ def _new_connections(ctx: AppContext, after: int, limit: int, dest: SiemDestinat
 @dataclass(frozen=True)
 class Source:
     name: str
-    read: Callable[[AppContext, int, int, SiemDestination], list[SiemRecord]]
+    read: Callable[[AppContext, Settings, int, int, SiemDestination], list[SiemRecord]]
     max_sql: str           # the newest id (a new cursor starts there); "" for audit (EventSource reads events)
     pending_sql: str       # records a cursor at ? has not sent yet (without a destination's decision filter)
     in_flow_store: bool
@@ -237,9 +237,13 @@ def newest_id(ctx: AppContext, name: str) -> int:
     return _scalar(ctx, SOURCES[name], SOURCES[name].max_sql)
 
 
-def pending(ctx: AppContext, name: str, after: int) -> int:
+def pending(ctx: AppContext, name: str, after: int, dest: SiemDestination) -> int:
+    """Records a cursor at `after` has still to send — what the destination would receive (its decision filter)."""
     if name == AUDIT:
         return live_events_after_count(ctx, after)
     pce = ctx.settings.current().pce
+    if name == NEW_CONNECTIONS:
+        clause, extra = decision_clause(dest)
+        return _scalar(ctx, SOURCES[name], SOURCES[name].pending_sql + clause, (after, *extra))
     args: tuple[Any, ...] = (after, pce.url, pce.org_id) if name == ALERTS else (after,)
     return _scalar(ctx, SOURCES[name], SOURCES[name].pending_sql, args)

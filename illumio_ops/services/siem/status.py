@@ -89,7 +89,7 @@ def siem_status(ctx: AppContext) -> SiemStatusView:
             cur = cursors.get((d.id, source))
             if cur is not None and (cur.pce_url, cur.org_id) != (pce.url, pce.org_id):
                 cur = None  # another PCE's: starts over on the next tick
-            pending = sources.pending(ctx, source, cur.last_id) if cur is not None and on else None
+            pending = sources.pending(ctx, source, cur.last_id, d) if cur is not None and on else None
             rows.append(SiemSourceStatus(
                 source=source,  # type: ignore[arg-type]  # one of SourceName by sources.CURSOR_SOURCES
                 state=_state(source, cur, pending, on=on, light=light, full=full,

@@ -45,7 +45,7 @@ def test_add_a_destination_test_it_and_see_its_status(context, live_app, udp):
     page.get_by_role("button", name="Save").click()
     expect(page.locator("p.form-ok[role=status]")).to_have_text("Saved.")
     row = page.locator("[data-role=siem-status] tr[data-dest=local][data-source=audit]")
-    expect(row).to_have_attribute("data-state", "waiting")
+    expect(row).to_have_attribute("data-state", "ok")  # saving placed its cursor: nothing stored after it is skipped
 
 
 def test_the_hec_token_is_never_on_the_page(context, live_app):

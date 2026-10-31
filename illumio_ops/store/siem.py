@@ -101,10 +101,12 @@ def add_dropped(conn: sqlite3.Connection, counts: dict[tuple[str, str], int]) ->
                          [(n, d, s) for (d, s), n in counts.items() if n])
 
 
-def forget_flow_cursors(conn: sqlite3.Connection) -> None:
-    """A PCE switch recreates the flow store: its sources start over from the new store's newest id."""
+def restart_flow_cursors(conn: sqlite3.Connection, *, pce_url: str, org_id: str) -> None:
+    """A PCE switch recreates the flow store: its sources start again at its beginning, for the new PCE — what is
+    collected for it before the next SIEM run is sent (a backfill's history is not: audit sends live events only)."""
     with conn:
-        conn.execute(f"DELETE FROM siem_cursor WHERE source IN ({','.join('?' * len(FLOW_SOURCES))})", FLOW_SOURCES)
+        conn.execute(f"UPDATE siem_cursor SET last_id = 0, pce_url = ?, org_id = ?, head_id = NULL, head_attempts = 0 "
+                     f"WHERE source IN ({','.join('?' * len(FLOW_SOURCES))})", (pce_url, org_id, *FLOW_SOURCES))
 
 
 def forget_destination(conn: sqlite3.Connection, destination_id: str, keep_sources: Sequence[str]) -> None:

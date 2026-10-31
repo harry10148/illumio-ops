@@ -57,12 +57,12 @@ def _run_retention(ctx: AppContext, *, now: datetime | None) -> dict[str, int]:
             log_cut = at - NEW_CONNECTION_LOG_KEEP
             # What goes before a SIEM destination sent it is counted on its cursor (it never holds retention back).
             dropped = {
-                **siem_guard.expiring(ctx, "audit", lambda after: count_live_events_before(
+                **siem_guard.expiring(ctx, "audit", lambda after, _d: count_live_events_before(
                     conn, event_cut, archived_days=event_days, after_id=after)),
-                **siem_guard.expiring(ctx, "detections", lambda after: analysis.count_detections_before(
+                **siem_guard.expiring(ctx, "detections", lambda after, _d: analysis.count_detections_before(
                     conn, detection_cut, after_id=after)),
-                **siem_guard.expiring(ctx, "new_connections", lambda after: count_new_connection_log_before(
-                    conn, log_cut, after_id=after)),
+                **siem_guard.expiring(ctx, "new_connections", lambda after, d: count_new_connection_log_before(
+                    conn, log_cut, after_id=after, decisions=[x.value for x in d.new_connection_decisions])),
             }
             out = {
                 "flows": flows,

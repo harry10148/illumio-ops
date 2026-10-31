@@ -519,9 +519,15 @@ def delete_rollups_before(conn: sqlite3.Connection, day: str) -> int:
         return conn.execute("DELETE FROM flow_rollup_daily WHERE day < ?", (day,)).rowcount
 
 
-def count_new_connection_log_before(conn: sqlite3.Connection, cutoff: datetime, *, after_id: int) -> int:
-    return int(conn.execute("SELECT COUNT(*) FROM new_connection_log WHERE id > ? AND recorded_at < ?",
-                            (after_id, db_time(cutoff))).fetchone()[0])
+def count_new_connection_log_before(conn: sqlite3.Connection, cutoff: datetime, *, after_id: int,
+                                    decisions: Sequence[str] = ()) -> int:
+    """decisions: those a destination takes (none: all; unknown includes a connection with no decision)."""
+    sql, args = "SELECT COUNT(*) FROM new_connection_log WHERE id > ? AND recorded_at < ?", [after_id, db_time(cutoff)]
+    if decisions:
+        marks = ",".join("?" * len(decisions))
+        sql += f" AND (decision IN ({marks}){' OR decision IS NULL' if 'unknown' in decisions else ''})"
+        args += list(decisions)
+    return int(conn.execute(sql, args).fetchone()[0])
 
 
 def delete_new_connection_log_before(conn: sqlite3.Connection, cutoff: datetime) -> int:

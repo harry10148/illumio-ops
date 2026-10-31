@@ -32,7 +32,7 @@ APP_DB_PCE_DERIVED: tuple[str, ...] = ("pce_probe", "alert_eval_state", "siem_cu
 # keeps or deletes; each row names the PCE it was made from (P5a), so a switch leaves them, and the schedules'
 # last-due times belong to the schedules. Quarantine actions are a record of writes made to a PCE: each names it. Custom
 # reports are the operator's definitions, like the schedules that use them. The SIEM cursors into the flow store go
-# with it (the alerts cursor stays: alerts do); the SIEM DLQ holds lines already formatted, and the alert id floor
+# with it — they restart at the new store's beginning (the alerts cursor stays: alerts do); the SIEM DLQ holds lines already formatted, and the alert id floor
 # belongs to the alerts.
 APP_DB_PCE_INDEPENDENT: tuple[str, ...] = ("job_health", "tamper_annotations", "detection_annotations", "alerts",
                                            "alert_deliveries",
@@ -47,8 +47,9 @@ def _forget_alert_watermarks(ctx: AppContext) -> None:
 
 
 def _forget_siem_cursors(ctx: AppContext) -> None:
+    pce = ctx.settings.current().pce  # already the new one
     with ctx.db() as conn:
-        siem_store.forget_flow_cursors(conn)
+        siem_store.restart_flow_cursors(conn, pce_url=pce.url, org_id=pce.org_id)
 
 
 _CLEARERS: dict[str, Callable[[AppContext], None]] = {"pce_probe": pce_health.forget,
