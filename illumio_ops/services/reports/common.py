@@ -40,17 +40,25 @@ def tr(lang: Language, msg: str, /, **params: object) -> str:
     return translate(lang, msg, {k: "" if v is None else str(v) for k, v in params.items()})
 
 
+def unnamed_host(key: str, lang: Language) -> str | None:
+    """Words for a workload href nothing names (its href means nothing to a reader): a workload not in the inventory
+    has been removed; a Kubernetes or container workload is not one the inventory holds. None: not such an href."""
+    if "/workloads/" in key:
+        return tr(lang, "rpt_host_removed", id=key.rsplit("/", 1)[-1][-6:])
+    if "/kubernetes_workloads/" in key or "/container_workloads/" in key:
+        return tr(lang, "rpt_host_container", id=key.rsplit("/", 1)[-1][-6:])
+    return None
+
+
 def host_name(hosts: Mapping[str, HostInfo], key: str, lang: Language) -> str:
-    """A host as an operator knows it: its hostname, else the address of an ip:<address> key; a workload no
-    longer in the inventory is said to be removed (its href means nothing to a reader)."""
+    """A host as an operator knows it: its hostname, else the address of an ip:<address> key, else what it is
+    (unnamed_host)."""
     host = hosts.get(key)
     if host is not None and host.hostname:
         return host.hostname
     if key.startswith("ip:"):
         return key.removeprefix("ip:")
-    if host is None and "/workloads/" in key:
-        return tr(lang, "rpt_host_removed", id=key.rsplit("/", 1)[-1][-6:])
-    return key
+    return (unnamed_host(key, lang) if host is None else None) or key
 
 
 def port_text(port: int | None, proto: int) -> str:

@@ -24,7 +24,7 @@ from illumio_ops.domain.values import (
 )
 from illumio_ops.services.analysis.segments import run_segment
 from illumio_ops.services.flowsource import AggRow, FieldCoverage
-from illumio_ops.services.reports import reads
+from illumio_ops.services.hosts import display_names
 from illumio_ops.services.reports.common import host_name, port_text, tr
 from illumio_ops.services.reports.registry import BuildInput
 
@@ -66,12 +66,11 @@ def _key_text(inp: BuildInput, g: GroupBy, key: Any, display: str | None, names:
 
 
 def _names(inp: BuildInput, rows: Sequence[AggRow], group_by: Sequence[GroupBy]) -> dict[str, str]:
-    """Hostnames from the inventory for host keys the flows did not name (a removed workload stays a key)."""
+    """Host keys the flows did not name, as every page shows them (hosts.display_names): never an href."""
     keys = {str(r.keys[i]) for r in rows for i, g in enumerate(group_by) if g.dimension in _HOSTS and not r.display[i]}
     if not keys:
         return {}
-    with reads.reading(inp.ctx) as conn:
-        return reads.hostnames(conn, keys)
+    return display_names(inp.ctx, keys, lang=inp.lang)
 
 
 def ranking(inp: BuildInput, *, title: str, group_by: Sequence[GroupBy], metric: SegmentMetric,
