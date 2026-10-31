@@ -28,6 +28,7 @@ class Cursor:
     last_sent_at: datetime | None
     last_error: str | None
     last_error_at: datetime | None
+    floor_time: datetime | None = None  # a destination carried over from 5.x: what 5.x already sent is at or before
 
 
 def _cursor(row: sqlite3.Row) -> Cursor:
@@ -36,7 +37,8 @@ def _cursor(row: sqlite3.Row) -> Cursor:
                   head_attempts=int(row["head_attempts"]), sent=int(row["sent"]), dropped=int(row["dropped"]),
                   last_sent_at=datetime.fromisoformat(row["last_sent_at"]) if row["last_sent_at"] else None,
                   last_error=row["last_error"],
-                  last_error_at=datetime.fromisoformat(row["last_error_at"]) if row["last_error_at"] else None)
+                  last_error_at=datetime.fromisoformat(row["last_error_at"]) if row["last_error_at"] else None,
+                  floor_time=datetime.fromisoformat(row["floor_time"]) if row["floor_time"] else None)
 
 
 def cursors(conn: sqlite3.Connection) -> dict[tuple[str, str], Cursor]:
@@ -58,6 +60,13 @@ def start_cursor(conn: sqlite3.Connection, destination_id: str, source: str, *, 
             "ON CONFLICT(destination_id, source) DO UPDATE SET pce_url = excluded.pce_url, org_id = excluded.org_id, "
             "last_id = excluded.last_id, head_id = NULL, head_attempts = 0",
             (destination_id, source, pce_url, org_id, last_id))
+
+
+def set_floor(conn: sqlite3.Connection, destination_id: str, source: str, floor: datetime | None) -> None:
+    """P8 handover: records at or before floor are passed over without sending (None: the floor goes)."""
+    with conn:
+        conn.execute("UPDATE siem_cursor SET floor_time = ? WHERE destination_id = ? AND source = ?",
+                     (_t(floor), destination_id, source))
 
 
 def advance(conn: sqlite3.Connection, destination_id: str, source: str, *, pce_url: str, org_id: str, last_id: int,

@@ -18,6 +18,7 @@ from illumio_ops.domain.values import DataOrigin, IngestSource
 from illumio_ops.pce.client import PceNotConfigured
 from illumio_ops.pce.events import events_timeout
 from illumio_ops.services.collect import CycleResult, drops_stale
+from illumio_ops.services.collect.cycle import COLD_START_KEY
 from illumio_ops.services.collect.events import fetch_event_rows, normalize_events
 from illumio_ops.services.collect.guard import BindingMismatch, ensure_binding
 from illumio_ops.services.collect.mode import backfill_sources
@@ -193,6 +194,10 @@ def ensure_initial_backfill(ctx: AppContext, *, now: datetime | None = None) -> 
     missing = tuple(s for s in backfill_sources(settings, manual=False) if str(s) not in done)
     if not missing:
         return None
-    end = next((m.watermark for src in missing if (m := marks[src]) is not None and m.watermark), at)
+    # Backfill ends where live collection began, or will begin: a first cycle not run yet starts at its remembered
+    # cold-start bound (an upgrade from 5.x sets it to where 5.x stopped, P8) — the stretch after it is live data.
+    end = next((m.watermark for src in missing if (m := marks[src]) is not None and m.watermark), None) or min(
+        (datetime.fromisoformat(b) for src in missing if (m := marks[src]) is not None and m.progress
+         and (b := m.progress.get(COLD_START_KEY))), default=at)
     return run_backfill(ctx, start=end - timedelta(days=settings.collection.backfill_days), end=end,
                         plan="initial", sources=missing, now=at)

@@ -257,13 +257,16 @@ def evaluate_events(ctx: AppContext, *, now: datetime | None = None) -> EvalRun:
         return run
     rules: list[EventRule] = _rules(s, EventRule)
     rec = _Recorder(ctx, s, at)
-    after = int(mark)
+    # "t:<time>": an upgrade from 5.x (P8) — 5.x evaluated the events up to that time; the first events stored after
+    # the upgrade are read from the start and only the later ones evaluated, then the watermark is an id again.
+    floor = datetime.fromisoformat(mark[2:]) if mark.startswith("t:") else None
+    after = 0 if floor is not None else int(mark)
     cache: dict[str, Any] = {}
     for _ in range(EVENT_BATCHES):
         rows, more = events_after(ctx, after, limit=EVENT_BATCH)
         if not rows:
             break
-        facts = [event_fact(e) for e in rows]
+        facts = [event_fact(e) for e in rows if floor is None or e.timestamp > floor]
         for rule in rules:
             matched = [f for f in facts if event_matches(rule, f.raw)]
             if not matched:
@@ -271,7 +274,7 @@ def evaluate_events(ctx: AppContext, *, now: datetime | None = None) -> EvalRun:
             count = _window_matches(ctx, rule, at) if rule.threshold is ThresholdType.COUNT else 0
             triggers = evaluate_event_rule(rule, matched, count, now=at)
             rec.record(rule, [_tamper(t, matched, cache, ctx) for t in triggers])
-        run.evaluated += len(rows)
+        run.evaluated += len(facts)
         after = rows[-1].id
         rec.commit(SOURCE_EVENTS, str(after))
         if not more:

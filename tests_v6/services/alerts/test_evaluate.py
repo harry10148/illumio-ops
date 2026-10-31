@@ -633,3 +633,27 @@ def test_known_mark_of_other_fingerprint_or_pce_ignored(ctx):
     evaluate_lateral(ctx, now=NOW + minutes(2))
     [a] = _alerts(ctx)
     assert a["grouped_annotation"] is None and a["notify"] == 1
+
+
+# ── P8: an upgrade from 5.x continues where 5.x's event alerts stopped ──
+
+def test_an_upgrade_alerts_the_events_after_where_5x_stopped(ctx, pce):
+    # The migrator leaves the 5.x floor as the watermark: events after it were never evaluated (the service was down)
+    with ctx.db() as conn:
+        store.set_eval_watermark(conn, "events", "t:" + (NOW - minutes(30)).isoformat(), pce_url=PCE["url"],
+                                 org_id=PCE["org_id"])
+    pce.event(1, "rule_set.create", NOW - minutes(60))  # 5.x evaluated it
+    pce.event(2, "rule_set.create", NOW - minutes(10))  # during the upgrade
+    r = _collect_and_evaluate(ctx, pce, NOW)
+    assert r.evaluated == 1 and len(_alerts(ctx)) == 1
+    with ctx.db() as conn:
+        assert store.eval_watermark(conn, "events", pce_url=PCE["url"], org_id=PCE["org_id"]) == "2"
+
+
+def test_an_upgrade_floor_waits_for_the_first_events(ctx, pce):
+    with ctx.db() as conn:
+        store.set_eval_watermark(conn, "events", "t:" + (NOW - minutes(30)).isoformat(), pce_url=PCE["url"],
+                                 org_id=PCE["org_id"])
+    assert evaluate_events(ctx, now=NOW).evaluated == 0  # nothing collected yet: the floor stays
+    with ctx.db() as conn:
+        assert store.eval_watermark(conn, "events", pce_url=PCE["url"], org_id=PCE["org_id"]).startswith("t:")

@@ -117,3 +117,25 @@ def test_backfill_reads_traffic_by_the_hour_and_events_by_the_day(tmp_path, fake
     with ctx.flows().connect() as conn:
         assert ingest_state.coverage(conn, "traffic") == [(day, day + timedelta(days=1))]
         assert ingest_state.coverage(conn, "events") == [(day, day + timedelta(days=1))]
+
+
+def test_backfill_before_the_first_cycle_stops_where_live_collection_will_start(tmp_path, fake_traffic, monkeypatch):
+    # P8: after an upgrade the first cycles start at 5.x's floor (cold_start_from). Backfill running first must not
+    # take that stretch, or the downtime would be stored as backfill — never sent to SIEM, never alerted.
+    from illumio_ops.domain.values import DataOrigin
+    from illumio_ops.services.collect.cycle import COLD_START_KEY
+    from illumio_ops.services.collect.events import run_events_cycle
+    ctx = configured_ctx(tmp_path, backfill_days=2)
+    floor = NOW - timedelta(hours=3)
+    with ctx.flows().connect() as conn:
+        for src in (IngestSource.EVENTS, IngestSource.TRAFFIC):
+            ingest_state.set_progress(conn, src, {COLD_START_KEY: floor.isoformat()})
+        conn.commit()
+    gap = {"href": "/orgs/1/events/gap", "event_type": "rule_set.create",
+           "timestamp": (NOW - timedelta(hours=1)).strftime("%Y-%m-%dT%H:%M:%SZ")}
+    at = NOW - timedelta(hours=1)
+    monkeypatch.setattr(ev, "fetch_events", lambda client, **kw: EventsPage(
+        items=[gap] if kw["start"] <= at <= kw["end"] else [], capped=False))
+    ensure_initial_backfill(ctx, now=NOW)  # the scheduler may run it before the events cycle
+    run_events_cycle(ctx, now=NOW)
+    assert _q(ctx, "SELECT origin FROM events") == [{"origin": DataOrigin.INGEST.value}]

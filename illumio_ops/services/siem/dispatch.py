@@ -218,10 +218,16 @@ def _run_source(ctx: AppContext, s: Settings, dest: SiemDestination, source: str
             store.start_cursor(conn, dest.id, source, pce_url=pce.url, org_id=pce.org_id, last_id=newest)
         return SourceRun(started=True)
     last = cur.last_id
+    floor = cur.floor_time
     read = sources.SOURCES[source].read
     while clock() < deadline:
         records = read(ctx, s, last, dest.batch_size, dest)  # its connection is closed again before anything is sent
         if not records:
+            if floor is not None and last > 0:
+                # Caught up with what the first cycles after the upgrade stored: the floor goes, so an event that
+                # arrives late with an old timestamp (a VEN reconnecting) is not taken for one 5.x sent.
+                with ctx.db() as conn:
+                    store.set_floor(conn, dest.id, source, None)
             break
         if ctx.flows().generation != gen:  # a PCE switch: these may be either PCE's, said as the run's PCE
             run.switched = True
@@ -232,6 +238,9 @@ def _run_source(ctx: AppContext, s: Settings, dest: SiemDestination, source: str
         for rec in records:
             if clock() >= deadline:  # out of time mid-batch: what went out is advanced, the rest waits
                 break
+            if floor is not None and rec.time <= floor:  # 5.x sent it before the upgrade: passed over
+                consumed = rec.record_id
+                continue
             try:
                 payload = fmt.format_record(rec)
             except Exception as exc:  # noqa: BLE001 — a record that cannot be formatted must not stop the rest
