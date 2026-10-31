@@ -434,7 +434,9 @@ def detect_blocked_surge(inp: DetectorInput) -> tuple[list[Detection], DetectorS
         if n < cfg.blocked_targets or (previous and n < cfg.blocked_surge_factor * previous):
             continue
         rows = sorted((o for o in inp.blocked_obs if o.src_key == src), key=lambda o: o.last)
-        in_window = [o for o in rows if o.last >= rows[-1].last - cfg.blocked_window]
+        # The targets of the window that counted n (final review: not the latest window's, which may differ)
+        best = _max_window(rows, cfg.blocked_window, lambda o: o.dst_key, lambda o: evaluable(o, inp))
+        in_window = rows[best[1]:best[2] + 1] if best else rows
         out.append(Detection(
             detector=DetectorKind.BLOCKED_SURGE, fingerprint=f"blocked|{src}", subject_key=src, severity=Severity.MEDIUM,
             first_seen=_window_start(rows, rows[-1].last, cfg.blocked_window), last_seen=rows[-1].last,

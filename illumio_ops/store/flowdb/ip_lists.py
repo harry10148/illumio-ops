@@ -28,6 +28,11 @@ def replace_all(conn: sqlite3.Connection, rows: Sequence[IpListRow], *, at: date
                      [(r.href, n) for r in rows for n in r.nets])
 
 
+def forget_networks(conn: sqlite3.Connection) -> None:
+    """A failed read: the names stay, the networks go (a list then matches nothing). The caller holds the transaction."""
+    conn.execute("DELETE FROM ip_list_nets")
+
+
 def names(conn: sqlite3.Connection) -> list[tuple[str, str]]:
     """(href, name) of every list, by name."""
     return [(r[0], r[1]) for r in conn.execute("SELECT href, name FROM ip_lists ORDER BY name, href")]

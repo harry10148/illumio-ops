@@ -109,6 +109,7 @@ def detect_peer_deviation(inp: DetectorInput) -> tuple[list[Detection], Detector
                            min=cfg.peer_min_group)
     lo, hi = inp.window
     found: dict[tuple[str, str, int, int, str], Obs] = {}
+    targets: dict[tuple[str, str, int, int, str], list[Obs]] = {}
     for o in inp.traffic_obs:
         if not (evaluable(o, inp) and not_blocked(o)) or o.port is None or o.port >= DYNAMIC_PORTS:
             continue
@@ -125,6 +126,7 @@ def detect_peer_deviation(inp: DetectorInput) -> tuple[list[Detection], Detector
         if sig is None or sig in data.peer_seen.get((group, o.port, o.proto), frozenset()):
             continue
         found.setdefault((group, sig, o.port, o.proto, o.src_key), o)
+        targets.setdefault((group, sig, o.port, o.proto, o.src_key), []).append(o)
     starters = Counter((g, s, p, pr) for g, s, p, pr, _ in found)
     out = []
     for (group, sig, port, proto, src), o in sorted(found.items()):
@@ -147,7 +149,7 @@ def detect_peer_deviation(inp: DetectorInput) -> tuple[list[Detection], Detector
                                                   ports=(PortProto(port=port, proto=proto),)),
                                 view=SegmentView.DETAIL, limit=200),
             confidence=DetectionConfidence(baseline_days=round(inp.baseline_days, 1), incomplete_gaps=inp.gaps),
-            ends=ends((o,), (o,))))
+            ends=ends((o,), targets[(group, sig, port, proto, src)])))
     return out, _status(kind)
 
 
@@ -176,7 +178,7 @@ def _surge(inp: DetectorInput, kind: DetectorKind, cls: str, min_connections: in
                     and over(a.bytes, a.previous_bytes, cfg.volume_min_bytes))
         if not (over(a.connections, a.previous_connections, min_connections) or by_bytes):
             continue
-        ip = src[3:] if src.startswith("ip:") else ""
+        ip = src[3:] if src.startswith("ip:") else next((o.src_ip for o in inp.traffic_obs if o.src_key == src), "")
         host = inp.hosts(src, ip, None, {})
         out.append(Detection(
             detector=kind, fingerprint=f"{prefix}|{src}", subject_key=src,
@@ -441,12 +443,14 @@ def detect_new_dc_client(inp: DetectorInput) -> tuple[list[Detection], DetectorS
         return [], _accumulating(kind, inp)
     lo, hi = inp.window
     found: dict[str, Obs] = {}
+    servers: dict[str, list[Obs]] = {}
     for o in _directory_rows(inp):
         if not _is_server(o, data) or o.src_key in data.directory_clients_before:
             continue
         first = inp.baseline_first_seen.get((o.src_key, o.dst_key, o.port if o.port is not None else -1, o.proto))
         if first is not None and lo < first <= hi:
             found.setdefault(o.src_key, o)
+            servers.setdefault(o.src_key, []).append(o)
     out = []
     for src, o in sorted(found.items()):
         critical = _dst_host(o, inp).critical
@@ -458,7 +462,7 @@ def detect_new_dc_client(inp: DetectorInput) -> tuple[list[Detection], DetectorS
             summary={"target": o.dst_hostname or o.dst_ip, "port": o.port, "managed": o.src_managed},
             segment=_pair_segment(o),
             confidence=DetectionConfidence(baseline_days=round(inp.baseline_days, 1), incomplete_gaps=inp.gaps),
-            ends=ends((o,), (o,))))
+            ends=ends((o,), servers[src])))
     return out, _servers_status(kind, data)
 
 

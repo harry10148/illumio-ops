@@ -198,7 +198,9 @@ def test_inventory_keeps_the_pce_ip_lists(tmp_path):
 
 
 @responses.activate
-def test_an_ip_list_failure_keeps_the_previous_lists_and_the_inventory(tmp_path):
+def test_an_ip_list_failure_matches_nothing_until_the_next_read(tmp_path):
+    # final review 2026-10-31: a list the PCE changed must not go on silencing alerts with its old networks; the
+    # names stay for the editor, the networks go (an exclusion by the list then matches nothing: alerts, not silence)
     ctx = configured_ctx(tmp_path)
     responses.add(responses.GET, WL, json=[_workload(1, risk=None)])
     responses.add(responses.GET, SUMMARY, status=404)
@@ -209,5 +211,5 @@ def test_an_ip_list_failure_keeps_the_previous_lists_and_the_inventory(tmp_path)
     run_inventory_cycle(ctx, now=NOW + timedelta(hours=1))
     from illumio_ops.store.flowdb import ip_lists
     with ctx.flows().connect() as conn:
-        assert [n for _, n in ip_lists.names(conn)] == ["Scanners"]
+        assert [n for _, n in ip_lists.names(conn)] == ["Scanners"] and ip_lists.networks(conn) == {}
         assert ingest_state.get(conn, IngestSource.INVENTORY).last_error is None

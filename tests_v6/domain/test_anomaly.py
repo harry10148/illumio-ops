@@ -510,3 +510,30 @@ def test_every_detector_kind_is_registered():
                    if k not in d]
         assert missing == [], (lang, missing)
 
+
+
+# ── ends hold every target (final review 2026-10-31: a kept-first target let an exclusion of it silence the rest) ──
+
+def _targets(d):
+    return sorted(k for role, k, _ in d.ends if role == "t")
+
+
+def test_peer_deviation_ends_hold_every_target_of_the_group():
+    rows = [traffic("/w/p1", "/w/hr"), traffic("/w/p1", "/w/hr2")]
+    [d], _ = run(rows, first_seen=new(rows), data=AnomalyData(group_sizes=GROUPS))
+    assert _targets(d) == ["/w/hr", "/w/hr2"]
+
+
+def test_new_dc_client_ends_hold_every_directory_server():
+    rows = [obs("/w/ws4", DC, port=389), obs("/w/ws4", "/w/dc2", port=389)]
+    data = dc_data(directory_servers=frozenset({DC, "/w/dc2"}))
+    [d], _ = run(rows, first_seen=new(rows), data=data, detector=detect_new_dc_client)
+    assert _targets(d) == [DC, "/w/dc2"]
+
+
+def test_surge_source_end_carries_its_address():
+    # a managed source's address comes from the connections it made, so an exclusion by address can match it
+    rows = [obs("/w/a", "/w/b")]
+    data = AnomalyData(activity={("/w/a", "all"): Activity(1200, None, 300, 0)}, activity_days=8.0, live=True)
+    [d], _ = run(rows, data=data, detector=detect_volume_surge)
+    assert d.ends == (("s", "/w/a", "10.0.0.1"),)

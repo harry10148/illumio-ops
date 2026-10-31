@@ -479,3 +479,13 @@ def test_pivot_chain_ends_are_the_start_the_pivot_and_the_target():
     legs = [obs("/w/a", "/w/b", port=22, decision="allowed"), obs("/w/b", "/w/c", port=22, decision="allowed")]
     [d] = detect_pivot_chain(inp(legs))[0]
     assert [k for role, k, _ in d.ends if role == "s"] == ["/w/a"] and _targets(d) == ["/w/b", "/w/c"]
+
+
+def test_blocked_surge_ends_are_the_window_that_reached_the_threshold():
+    # final review 2026-10-31: five internal targets 90 minutes ago, one public target now; the count is the earlier
+    # window's, and so must the targets be (else the public one alone would let the default exclusion silence it)
+    early = [obs("/w/a", f"/w/b{i}", decision="blocked", port=1000 + i, minutes_ago=90) for i in range(5)]
+    late = [replace(obs("/w/a", "ip:8.8.8.8", decision="blocked", minutes_ago=5), dst_href=None, dst_ip="8.8.8.8")]
+    i = replace(inp([], blocked=early + late), window=(NOW - timedelta(minutes=120), NOW))
+    [d] = detect_blocked_surge(i)[0]
+    assert d.summary["targets"] == 5 and _targets(d) == [f"/w/b{i}" for i in range(5)]

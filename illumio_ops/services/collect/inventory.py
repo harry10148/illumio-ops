@@ -112,12 +112,15 @@ def _deadline() -> float:
 
 
 def _ip_lists(client: PceClient, fdb: FlowDb, gen: int, at: datetime) -> None:
-    """The active IP lists an alert rule can leave out (user 2026-10-31). A failed read keeps the previous lists and
-    never fails the inventory: a rule naming a list goes on matching the networks it had."""
+    """The active IP lists an alert rule can leave out (user 2026-10-31). A failed read never fails the inventory; it
+    keeps the names for the editor and drops the networks, so a rule naming a list matches nothing until the next read
+    (final review: networks the PCE may have changed must not go on silencing alerts)."""
     try:
         rows = fetch_objects(client, "active", "ip_lists", deadline=_deadline())
     except (*PCE_FAILURES, PceCollectionIncomplete, ValueError) as exc:
-        logger.warning("IP lists could not be read, keeping the previous ones: {}", exc)
+        logger.warning("IP lists could not be read; until the next read they leave nothing out: {}", exc)
+        with fdb.writing(gen) as conn, transaction(conn):
+            ip_lists.forget_networks(conn)
         return
     lists = [ip_lists.IpListRow(str(r["href"]), str(r.get("name") or ""), ip_list_networks(r))
              for r in rows if isinstance(r, Mapping) and r.get("href")]
