@@ -89,7 +89,7 @@ if [[ -n "$UPGRADE_FROM" ]]; then
     # The report first, from the bundle (dependencies into a scratch directory), before anything changes.
     SITE="$(mktemp -d)"
     trap 'rm -rf "$SITE"' EXIT
-    "$BUNDLE_DIR/python/bin/python3" -I -m pip install --quiet --no-index --no-warn-script-location \
+    "$BUNDLE_DIR/python/bin/python3" -I -m pip install --quiet --no-index --no-warn-script-location --root-user-action=ignore \
         --require-hashes --find-links "$BUNDLE_DIR/wheels" --target "$SITE" -r "$BUNDLE_DIR/requirements.lock"
     set +e
     (cd "$SITE" && env "PYTHONPATH=$BUNDLE_DIR:$SITE" PYTHONNOUSERSITE=1 "$BUNDLE_DIR/python/bin/python3" -P \
@@ -173,7 +173,7 @@ chmod -R go-w "$PREFIX/python" "$PREFIX/illumio_ops"
 cd "$PREFIX"  # a directory we own: never let python -m pick modules up from the caller's cwd
 
 echo "==> Installing locked dependencies (hash-checked, offline)"
-"$PREFIX/python/bin/python3" -I -m pip install --quiet --no-index --no-warn-script-location \
+"$PREFIX/python/bin/python3" -I -m pip install --quiet --no-index --no-warn-script-location --root-user-action=ignore \
     --require-hashes --find-links "$BUNDLE_DIR/wheels" -r "$BUNDLE_DIR/requirements.lock"
 
 for d in config data logs reports; do
