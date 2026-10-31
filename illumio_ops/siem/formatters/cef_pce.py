@@ -10,15 +10,13 @@ changes shape (event_type.status), severities change, and empty values
 (`outcome=`) are emitted on purpose — any SOC rule written against the old
 line would break, so the old line stays available.
 
-Values are NOT CEF-escaped.  The PCE does not escape them either
-(`suser=NT AUTHORITY\\SYSTEM` goes out verbatim) and cs2/cs4 carry JSON the
-SOC must be able to parse as-is.  Only CR/LF are flattened, and `|` only in
-the header.
+Values: the PCE escapes nothing (`suser=NT AUTHORITY\\SYSTEM` verbatim) and its cs2/cs4 carry JSON. v6 escapes
+'\\' and '=' as the CEF spec says (P7 security review: an unescaped ' act=blocked' in a label forges a key), so a spec
+parser reads back the PCE's own values; CR/LF are flattened, and `|` only matters in the header.
 """
 from __future__ import annotations
 
 import json
-import re
 from datetime import UTC, datetime
 from typing import Any
 
@@ -43,18 +41,15 @@ _PROTO = {6: "tcp", 17: "udp", 1: "icmp"}
 _CS2_CHUNK = 3995
 
 
-_KEY_LIKE = re.compile(r"(\s[A-Za-z0-9_]+)=")
-
-
 def _clean(value: object) -> str:
     return str(value).replace("\r", " ").replace("\n", " ")
 
 
 def _clean_value(value: object) -> str:
-    """An extension value in the graylog dialect: unescaped like the PCE's own line, except an '=' after a space and
-    a word, which a CEF parser reads as the start of another key — a label or description could otherwise forge
-    `act=blocked` (P7 security review). The PCE does not do this; its lines are not parsed as CEF on arrival."""
-    return _KEY_LIKE.sub(r"\1\\=", _clean(value))
+    """An extension value in the graylog dialect: '\\' and '=' escaped as the CEF spec says, line breaks flattened.
+    The PCE escapes nothing (its lines are not parsed as CEF on arrival); a value with ' act=blocked' in a label or
+    description would then forge a key in the SIEM (P7 security review). A spec parser reads the same value back."""
+    return _clean(value).replace("\\", "\\\\").replace("=", "\\=")
 
 
 def _escape_arcsight(value: object) -> str:

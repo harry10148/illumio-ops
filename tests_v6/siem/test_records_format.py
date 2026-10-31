@@ -17,10 +17,10 @@ DB = Endpoint(ip="10.0.0.9", host="db01", href="/orgs/1/workloads/w2", labels={"
 
 
 def detection(**kw):
-    base = dict(kind="detection", record_id=42, time=T0, signature="detection.fanout", name="SSH fan-out",
-                severity=Severity.HIGH, summary="web01 reached 12 hosts on 22/TCP in 60 minutes", src=WEB, port=22,
-                proto=6, first_seen=T0, last_seen=T0, facts={"targets": 12, "occurrences": 1},
-                pce_fqdn="pce.lab.local")
+    base = {"kind": "detection", "record_id": 42, "time": T0, "signature": "detection.fanout", "name": "SSH fan-out",
+                "severity": Severity.HIGH, "summary": "web01 reached 12 hosts on 22/TCP in 60 minutes", "src": WEB, "port": 22,
+                "proto": 6, "first_seen": T0, "last_seen": T0, "facts": {"targets": 12, "occurrences": 1},
+                "pce_fqdn": "pce.lab.local"}
     base.update(kw)
     return SiemRecord(**base)
 
@@ -85,7 +85,7 @@ def test_cef_escapes_what_would_break_a_key_or_the_line():
 
 
 def test_long_facts_are_cut_and_the_cut_is_said():
-    rec = detection(facts={"sample_targets": ["host-%04d" % i for i in range(1000)]})
+    rec = detection(facts={"sample_targets": [f"host-{i:04d}" for i in range(1000)]})
     kv = ext_keys(formatter_for(SiemFormat.CEF).format_record(rec))
     assert len(kv["cs5"].replace("\\=", "=")) <= CS_LIMIT and kv["cs6"] == "true" and kv["cs6Label"] == "facts_truncated"
     assert "cs6" not in ext_keys(formatter_for(SiemFormat.CEF).format_record(detection()))

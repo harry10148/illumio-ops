@@ -43,9 +43,23 @@ def test_resource_changes_chunk_into_cs3_and_drop_changes_past_two_chunks():
     assert " cs3=" not in line
 
 
+def _parse(line: str, *, escaped: bool) -> tuple[list[str], dict[str, str]]:
+    """(header fields, extension key -> value) as a spec parser reads them: values end at an unescaped ' key='; an
+    escaped line's '\\\\' and '\\=' are read back, a raw (PCE) line is taken as it is."""
+    head = line.split("|", 7)
+    parts = re.split(r"(?<!\\) (?=[A-Za-z0-9_]+=)", head[7])
+    out = {}
+    for part in parts:
+        k, v = part.split("=", 1)
+        out[k] = re.sub(r"\\(.)", r"\1", v) if escaped else v
+    return head[:7], out
+
+
 @pytest.mark.parametrize("pair", PAIRS["audit"], ids=[p["cef"].split("|")[4] for p in PAIRS["audit"]])
 def test_audit_event_matches_pce_native_line(pair):
-    assert _formatter().format_event(pair["event"]) == _expected_audit(pair)
+    """Field by field as a SIEM reads them: v6 escapes '\\' and '=' (the PCE does not), so the bytes differ only
+    where a value carries one of them."""
+    assert _parse(_formatter().format_event(pair["event"]), escaped=True) == _parse(_expected_audit(pair), escaped=False)
 
 
 def test_audit_signature_omits_status_when_null():
@@ -85,17 +99,17 @@ def test_audit_actor_variants():
     assert " duser=system " in empty and "duid=" not in empty
 
 
-def test_audit_values_are_not_cef_escaped_but_newlines_are_flattened():
+def test_audit_values_escape_backslash_and_equals_and_flatten_newlines():
     line = _formatter().format_event({
         "event_type": "x.y", "status": "success", "severity": "info", "timestamp": "2026-01-01T00:00:00Z",
         "created_by": {"user": {"href": "/users/1", "username": "DOM\\user=1"}},
         "action": {"api_endpoint": "/a?b=c", "api_method": "GET", "http_status_code": 200, "src_ip": "1.2.3.4"},
         "resource_changes": [{"changes": {"desc": {"before": "a\nb", "after": "\"q\""}}}],
     })
-    assert " duser=DOM\\user=1 " in line
-    assert " request=/a?b=c " in line
+    assert " duser=DOM\\\\user\\=1 " in line
+    assert " request=/a?b\\=c " in line
     assert "\n" not in line
-    assert '"after":"\\"q\\""' in line   # orjson 的 JSON 跳脫，不是 CEF 跳脫
+    assert '"after":"\\\\"q\\\\""' in line   # the JSON's own backslashes, CEF-escaped
 
 
 def test_audit_header_pipe_is_escaped_and_version_injected():
@@ -139,4 +153,4 @@ def test_value_cannot_inject_an_extension_key():
     line = PceNativeCEFFormatter().format_event(ev)
     keys = re.findall(r"(?:^|(?<= ))([A-Za-z0-9_]+)=(?<!\\=)", line.split("|", 7)[7])
     assert keys.count("act") == 0 and keys.count("cat") == 1
-    assert "?a=b act\\=blocked cat\\=flow_summary" in line
+    assert "?a\\=b act\\=blocked cat\\=flow_summary" in line
