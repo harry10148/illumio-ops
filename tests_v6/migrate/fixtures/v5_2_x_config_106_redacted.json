@@ -200,8 +200,8 @@
         "hec_token": null,
         "batch_size": 100,
         "source_types": [
-          "redacted-26",
-          "redacted-27"
+          "audit",
+          "traffic"
         ],
         "traffic_pd": [],
         "max_retries": 10,

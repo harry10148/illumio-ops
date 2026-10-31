@@ -2455,5 +2455,19 @@
   "siem_dlq_resent": "Resent {sent}; failed again {failed}; destination removed or off {skipped}; destination changed since {changed}; {remaining} left.",
   "siem_dlq_last_error": "Last error: {error}",
   "siem_dlq_purged": "Purged {n}.",
-  "err_siem_token_required": "Type the HEC token again: the destination's address or certificate check changed."
+  "err_siem_token_required": "Type the HEC token again: the destination's address or certificate check changed.",
+  "migrate_siem_renamed": "renamed: v6 destination names are unique and at most 64 characters",
+  "migrate_siem_unknown_transport": "a transport or format v6 does not have; not carried",
+  "migrate_siem_ca_relative": "a relative CA bundle path (5.x read it from its working folder); v6 needs an absolute path — the system CAs verify until you set one",
+  "migrate_siem_profile_dropped": "v6 has no SIEM profile; certificate checking is the destination's own setting",
+  "migrate_siem_tls_unverified": "certificate checking was off in 5.x and stays off",
+  "migrate_siem_traffic_to_new_connections": "v6 does not forward traffic records (daily running totals a SIEM would add up); this destination gets new connections instead, with the same decision filter",
+  "migrate_siem_needs_alert_mode": "new connections need alert or full mode; in lightweight mode this source sends nothing until data collection is switched",
+  "migrate_siem_source_unknown": "a source 5.x did not have; left out",
+  "migrate_siem_retries_raised": "raised to 1: with 0, a destination that is down would move a record to the DLQ every run",
+  "migrate_siem_no_source": "no source left: audit events are sent",
+  "migrate_siem_unreadable": "not a destination v6 can hold; not carried",
+  "migrate_siem_paused_incomplete": "on in 5.x but missing what v6 needs to send (its host, or a HEC token): carried off — complete it on the SIEM page",
+  "migrate_siem_too_many": "v6 holds at most 20 destinations; not carried",
+  "migrate_siem_destinations_listed": "each destination is listed below"
 }
