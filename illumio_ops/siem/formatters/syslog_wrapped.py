@@ -2,8 +2,10 @@ from __future__ import annotations
 
 from typing import Any
 
+from illumio_ops.domain.values import Severity
 from illumio_ops.siem.formatters.base import Formatter
 from illumio_ops.siem.formatters.syslog_header import event_record_time, wrap_rfc5424
+from illumio_ops.siem.records import SiemRecord
 
 _SYSLOG_SEV_MAP = {
     "info": 6,
@@ -14,6 +16,9 @@ _SYSLOG_SEV_MAP = {
     "critical": 2,
     "crit": 2,
 }
+
+
+_RECORD_SEV = {None: 6, Severity.LOW: 5, Severity.MEDIUM: 4, Severity.HIGH: 3, Severity.CRITICAL: 2}
 
 
 class SyslogWrappedFormatter(Formatter):
@@ -30,3 +35,8 @@ class SyslogWrappedFormatter(Formatter):
         sev_num = _SYSLOG_SEV_MAP.get(sev_str, 6)
         hostname = str(event.get("pce_fqdn") or self._host)
         return wrap_rfc5424(payload, severity=sev_num, hostname=hostname, timestamp=event_record_time(event))
+
+    def format_ops(self, rec: SiemRecord) -> str:
+        """This product's own event: the forwarder is the host, the record's own time the timestamp."""
+        return wrap_rfc5424(self._inner.format_ops(rec), severity=_RECORD_SEV.get(rec.severity, 6), hostname=self._host,
+                            timestamp=rec.time)

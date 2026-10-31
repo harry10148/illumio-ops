@@ -23,6 +23,8 @@ from datetime import UTC, datetime
 from typing import Any
 
 from illumio_ops.siem.formatters.base import Formatter
+from illumio_ops.siem.formatters.ops import ops_cef
+from illumio_ops.siem.records import SiemRecord
 
 # audit: info→1 / warning→3 / err→4 observed; the rest are ASSUMPTION
 # (monotone fill between observed points, never observed on a real PCE).
@@ -243,3 +245,7 @@ class PceNativeCEFFormatter(Formatter):
             self._kv(ext, "cs3", cs3)
             ext.append("cs3Label=resource_changes_2")
         return head + " ".join(ext)
+
+    def format_ops(self, rec: SiemRecord) -> str:
+        """Every CEF format sends this product's own events in its own CEF (device illumio-ops), cef_pce included."""
+        return ops_cef(rec)

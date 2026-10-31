@@ -5,6 +5,8 @@ from typing import Any
 
 from illumio_ops.siem.formatters.base import Formatter
 from illumio_ops.siem.formatters.cef import _extract_actor, _format_resource_changes
+from illumio_ops.siem.formatters.ops import ops_json
+from illumio_ops.siem.records import SiemRecord
 
 
 def _omit_none(d: dict[str, Any]) -> dict[str, Any]:
@@ -54,3 +56,6 @@ class NormalizedJSONFormatter(Formatter):
                 out["resource_changes"] = msg
 
         return dumps(_omit_none(out))
+
+    def format_ops(self, rec: SiemRecord) -> str:
+        return ops_json(rec)
