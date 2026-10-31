@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, "feat/v6-**"]
   pull_request:
     branches: [main]
 
@@ -12,26 +12,21 @@ concurrency:
 
 jobs:
   test:
-    name: test (py${{ matrix.python-version }})
+    name: py3.12
     runs-on: ubuntu-22.04
-    strategy:
-      fail-fast: false
-      matrix:
-        python-version: ["3.11", "3.12"]
-
     steps:
       - uses: actions/checkout@v6
 
-      - name: Set up Python ${{ matrix.python-version }}
+      - name: Set up Python 3.12
         uses: actions/setup-python@v6
         with:
-          python-version: ${{ matrix.python-version }}
+          python-version: "3.12"
           cache: pip
           cache-dependency-path: |
             requirements.lock
             requirements-dev.txt
 
-      - name: Install dependencies (locked + hash-verified)
+      - name: Install runtime dependencies (locked + hash-verified)
         run: |
           pip install --upgrade pip
           pip install --require-hashes -r requirements.lock
@@ -39,82 +34,39 @@ jobs:
       - name: Install dev dependencies
         run: pip install -r requirements-dev.txt
 
-      - name: Install Playwright Chromium (v2 GUI e2e)
-        # Chromium only, headless — the v2 e2e suite (tests/test_v2_*_e2e.py)
-        # never opens a headed browser or touches firefox/webkit. Without
-        # this step the browser binary is missing: the package install above
-        # already makes every v2 e2e test's
-        # `pytest.importorskip("playwright.sync_api")` guard pass (the
-        # *package* is present), so the tests would no longer skip — they
-        # would instead fail with "Executable doesn't exist" from
-        # `_v2_browser`'s `chromium.launch()` in tests/v2_e2e_utils.py. This
-        # step is what makes them actually pass instead.
+      - name: Install Playwright browser
+        # A clean runner has the playwright package but no browser binary.
         run: python -m playwright install --with-deps chromium
 
       - name: Security audit (pip-audit)
-        run: |
-          pip install pip-audit
-          pip-audit -r requirements.lock --strict
-        continue-on-error: false
+        run: pip-audit -r requirements.lock --strict
 
-      - name: Lint naive datetime
-        run: python3 scripts/check_no_naive_datetime.py
-
-      - name: Doc link check
-        run: python scripts/check_doc_links.py
-
-      - name: i18n audit
-        # Hard gate — promoted 2026-05-10 after the 3.26.0-i18n-architecture
-        # refactor cleared all residue (audit reports 0 findings).
-        run: python scripts/audit_i18n_usage.py
-
-      - name: Type check (strict subset)
-        # Hard gate — checks ONLY the 3 entry files Batch 5 M11 typed.
-        # --follow-imports=silent uses imported modules for type inference
-        # but suppresses their (still ~118) errors; promoting the rest to
-        # hard would require typing the transitive surface (gui/_helpers,
-        # html_exporter, cli/_render, …), tracked separately.
-        run: mypy --follow-imports=silent src/api_client.py src/analyzer.py src/reporter.py
-
-      - name: Run tests
-        # -n auto --dist loadfile。loadfile 不可省略，見 requirements-dev.txt。
-        #
-        # 2026-09-13 開過一次，CI 第一次跑紅兩支，退回單執行緒後查明根因：
-        # 那兩支在點擊之後用 inner_text()／count() 做**一次性**讀取，而它們等的
-        # 是「HTTP 回應抵達」或「抽屜關閉」——都不等於畫面重繪完成。本機 16 核
-        # 重繪夠快所以永遠綠，runner 2–4 核才會讀到上一輪的畫面。改用會自動
-        # 重試的 expect() 之後修好。
-        #
-        # 本機數字不預測 CI：這台 16 核 6:30，單執行緒 18:48；標準 runner 只有
-        # 2–4 核，加速會小得多。用 auto 正是因為兩邊核心數不同。
-        run: pytest --tb=short -n auto --dist loadfile
-
-  # 離線 bundle 的套件集合（requirements-offline.lock）必須在**它實際部署的
-  # Python** 上稽核，所以獨立成一個 job 而不是掛在 test matrix 底下。
-  # pip-audit 會把 requirements 裝進當前直譯器的臨時 venv 驗證（--no-deps 也擋不掉，
-  # 實測 run 30155387549），所以稽核要在出貨的 3.12 上跑，不能借 test matrix 的直譯器。
-  # test matrix 自 2026-10-26 起為 3.11/3.12：pillow 13（修補 2026-10 的 pillow 漏洞）
-  # 需要 Python >= 3.11，5.x 不再支援從原始碼以 3.10 安裝。
-  offline-audit:
-    name: Security audit (offline bundle lock)
-    runs-on: ubuntu-22.04
-    steps:
-      - uses: actions/checkout@v6
-
-      - name: Set up Python 3.12
-        # 必須與 scripts/build_offline_bundle.sh 的 PBS_PYTHON 大版本一致——
-        # bundle 帶的就是這個直譯器，稽核對象要跟出貨對象相同。
-        uses: actions/setup-python@v6
+      - name: Set up Node 22
+        uses: actions/setup-node@v4
         with:
-          python-version: "3.12"
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
 
-      - name: Audit the offline lock
-        # 沒有 --ignore-vuln：目標平台提升到 manylinux_2_28 之後，先前被
-        # manylinux_2_17 卡住的套件（pillow / pandas / greenlet / contourpy /
-        # argon2-cffi-bindings）都能升到已修補版本，這份鎖檔目前是零已知漏洞。
-        # 任何新漏洞——不論哪個套件——都會直接擋下 CI，這正是我們要的。
+      - name: Install frontend dependencies
+        run: npm ci --prefix web
+
+      - name: Generated contracts and types are committed and current
         run: |
-          pip install --upgrade pip
-          pip install pip-audit
-          pip-audit -r requirements-offline.lock --strict
-        continue-on-error: false
+          bash scripts/gen_contracts.sh
+          git diff --exit-code web/src/api/contracts.json web/src/api/generated.ts
+
+      - name: Frontend typecheck
+        run: npm --prefix web run typecheck
+
+      - name: Frontend build
+        run: npm --prefix web run build
+
+      - name: Lint (ruff)
+        run: ruff check illumio_ops tests scripts
+
+      - name: Type check (mypy strict)
+        run: mypy --config-file mypy.ini
+
+      - name: Tests
+        run: python -m pytest tests -n auto --dist loadfile

@@ -7,7 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/) —
 a plain `<major>.<minor>.<patch>` scheme. (Tags through v4.0.0 carried a
 `-topic-slug` codename suffix; the codename was retired in 4.1.0.)
 
-## [Unreleased]
+## [6.0.0] - unreleased
+
+v6 is a rebuild of illumio-ops around detecting lateral movement, GUI only. See README.md and
+docs/guide/v6-installation.md.
+
+### Upgrading from 5.x
+- `install.sh` upgrades a 5.x installation: settings, TLS, alert rules, channels, report schedules and SIEM
+  destinations are carried over with a report of every key; SIEM audit forwarding and event alerts continue where
+  the stopped 5.x got to (at least once); `rollback.sh` goes back. Data is not carried over: the PCE's retained
+  history is backfilled for reports.
+
+### Removed
+- The 5.x code (`src/`, its tests, CLI, `deploy/`, its scripts and CI). Its documentation is kept in
+  `docs/legacy-5.x/`.
+
+## [5.x Unreleased]
 
 ### Removed
 

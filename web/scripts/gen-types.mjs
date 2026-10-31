@@ -1,5 +1,5 @@
 // contracts.json (exported from the Python API contracts) -> src/api/generated.ts.
-// Run through scripts/v6/gen_contracts.sh; never edit generated.ts by hand.
+// Run through scripts/gen_contracts.sh; never edit generated.ts by hand.
 import { readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";

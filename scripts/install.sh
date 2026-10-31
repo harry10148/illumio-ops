@@ -1,590 +1,213 @@
 #!/usr/bin/env bash
-# Install or upgrade the illumio_ops offline bundle.
-# Run as root from the extracted bundle directory.
-# Usage:
-#   sudo ./install.sh                              # install / upgrade
-#   sudo ./install.sh --install-root /opt/custom   # custom path
+# illumio-ops v6 installer: a fresh install, or an upgrade of a 5.x installation (spec §7).
+#
+#   ./install.sh [--prefix DIR] [--service-name NAME] [--port N] [--no-systemd] [--print-unit]
+#                [--upgrade-from DIR] [--report-only] [--accept-report] [--lang en|zh_TW] [--old-service NAME]
+#
+# Copies the bundled Python and the illumio_ops package to the prefix, installs the locked
+# wheels with hash checking, creates the settings (fresh: `python -m illumio_ops.rescue init`;
+# upgrade: `python -m illumio_ops.migrate --write`; this script never writes settings itself),
+# renders the systemd unit, and stops there: it does not start the service.
+#   --no-systemd     copy, pip install and init as the current user only (verification runs)
+#   --print-unit     print the rendered unit and exit
+#   --upgrade-from   the 5.x installation to upgrade (found automatically when the prefix holds one).
+#                    The migration report is shown first; the upgrade stops and disables the 5.x
+#                    service, keeps its unit and wrapper, moves the 5.x directory aside only when v6
+#                    takes the same directory, and leaves PREFIX/rollback.sh to go back.
+#   --report-only    show the migration report and change nothing
+#   --accept-report  upgrade without asking (non-interactive)
+#   --old-service    the 5.x unit (default: the one whose WorkingDirectory is the 5.x directory)
 set -euo pipefail
 
-# The bundled interpreter is not marked externally-managed, so PEP 668 does not
-# hold its pip back from the host's user site-packages. Without this, installing
-# the bundle's wheel set UNINSTALLS whatever the operator had in
-# ~/.local/lib/pythonX.Y/site-packages for any package that shares a name —
-# observed on 2026-09-02, where a bundle install stripped greenlet, sqlalchemy,
-# pandas, numpy, apscheduler, matplotlib and pydantic out of a developer's
-# environment. The bundle is supposed to be self-contained in both directions:
-# it neither reads nor writes anything outside its own tree.
-export PYTHONNOUSERSITE=1
+PREFIX=/opt/illumio-ops
+SERVICE=illumio-ops
+PORT=5001
+NO_SYSTEMD=0
+PRINT_UNIT=0
+SERVICE_USER=illumio-ops
+UPGRADE_FROM=""
+REPORT_ONLY=0
+ACCEPT=0
+REPORT_LANG=en
+OLD_SERVICE=""
+BUNDLE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-INSTALL_ROOT="/opt/illumio-ops"
-ALLOW_DOWNGRADE=false
+die() { echo "install.sh: $*" >&2; exit 1; }
+
 while [[ $# -gt 0 ]]; do
     case "$1" in
-        --install-root) INSTALL_ROOT="$2"; shift 2 ;;
-        --allow-downgrade) ALLOW_DOWNGRADE=true; shift ;;
-        *) echo "Unknown option: $1"; exit 1 ;;
+        --prefix) PREFIX="${2:?}"; shift 2 ;;
+        --service-name) SERVICE="${2:?}"; shift 2 ;;
+        --port) PORT="${2:?}"; shift 2 ;;
+        --no-systemd) NO_SYSTEMD=1; shift ;;
+        --print-unit) PRINT_UNIT=1; shift ;;
+        --upgrade-from) UPGRADE_FROM="${2:?}"; shift 2 ;;
+        --report-only) REPORT_ONLY=1; shift ;;
+        --accept-report) ACCEPT=1; shift ;;
+        --lang) REPORT_LANG="${2:?}"; shift 2 ;;
+        --old-service) OLD_SERVICE="${2:?}"; shift 2 ;;
+        -h|--help) sed -n '2,23p' "$0"; exit 0 ;;
+        *) die "unknown option: $1" ;;
     esac
 done
 
-SERVICE_NAME="illumio-ops"
-SERVICE_FILE="/etc/systemd/system/${SERVICE_NAME}.service"
-SRC="$(cd "$(dirname "$0")" && pwd)"
+[[ "$PREFIX" == /* ]] || die "--prefix must be an absolute path"
+[[ "$SERVICE" =~ ^[A-Za-z0-9_.@-]+$ ]] || die "--service-name may only contain letters, digits, _ . @ -"
+[[ "$PORT" =~ ^[0-9]+$ ]] && (( PORT >= 1 && PORT <= 65535 )) || die "--port must be 1-65535"
+[[ "$REPORT_LANG" == en || "$REPORT_LANG" == zh_TW ]] || die "--lang must be en or zh_TW"
+[[ -z "$OLD_SERVICE" || "$OLD_SERVICE" =~ ^[A-Za-z0-9_.@-]+$ ]] || die "--old-service may only contain letters, digits, _ . @ -"
+PREFIX="${PREFIX%/}"
 
-migrate_from_underscore_root() {
-    # All identifiers below are env-var overridable so tests/test_install_migration.sh
-    # can exercise the function without touching real system users or paths.
-    # Defaults reproduce the original production behavior byte-for-byte.
-    local OLD_ROOT="${OLD_ROOT:-/opt/illumio_ops}"
-    local NEW_ROOT="${NEW_ROOT:-/opt/illumio-ops}"
-    local OLD_USER="${OLD_USER:-illumio_ops}"
-    local NEW_USER="${NEW_USER:-illumio-ops}"
-    local MIGRATE_SERVICE_NAME="${MIGRATE_SERVICE_NAME:-illumio-ops}"
-    # NOTE: USERMOD_CMD/GROUPMOD_CMD are invoked unquoted to allow the default
-    # "usermod -l" / "groupmod -n" to word-split into command + flag. Do not
-    # override with a value whose path contains whitespace.
-    local USERMOD_CMD="${USERMOD_CMD:-usermod -l}"
-    local GROUPMOD_CMD="${GROUPMOD_CMD:-groupmod -n}"
-
-    # Fix 5 (M1): root check must be first — all mutation steps require root.
-    # Skip the EUID check only when both OLD_ROOT and NEW_ROOT are overridden
-    # (test mode). Production never sets these env vars and so always trips the
-    # check. A partial override (one default, one custom) still requires root —
-    # that prevents accidental privilege bypass when an operator points the
-    # installer at a custom path.
-    if [[ "$OLD_ROOT" == "/opt/illumio_ops" || "$NEW_ROOT" == "/opt/illumio-ops" ]]; then
-        if [[ $EUID -ne 0 ]]; then
-            echo "ERROR: migration requires root (run install.sh with sudo)." >&2
-            exit 1
-        fi
-    fi
-
-    # Only migrate when old exists and new doesn't (and we haven't migrated already)
-    if [[ ! -d "$OLD_ROOT" ]]; then return 0; fi
-    if [[ -d "$NEW_ROOT" && -f "$NEW_ROOT/MIGRATED_FROM" ]]; then return 0; fi
-    if [[ -d "$NEW_ROOT" ]]; then
-        echo "ERROR: Both $OLD_ROOT and $NEW_ROOT exist. Manual cleanup required." >&2
-        exit 1
-    fi
-
-    echo "==> Migrating $OLD_ROOT → $NEW_ROOT"
-
-    # Pre-flight: cross-filesystem check
-    if [[ "$(stat -c %d "$OLD_ROOT")" != "$(stat -c %d "$(dirname "$NEW_ROOT")")" ]]; then
-        echo "ERROR: $OLD_ROOT and $NEW_ROOT parent are on different filesystems." >&2
-        echo "       Run 'rsync -aHAX $OLD_ROOT/ $NEW_ROOT/ && rm -rf $OLD_ROOT' manually." >&2
-        exit 1
-    fi
-
-    # Fix 1 (C1): detect partial-migration (usermod completed, mv did not).
-    if id "$NEW_USER" &>/dev/null; then
-        if [[ -d "$OLD_ROOT" ]]; then
-            # Partial migration: usermod succeeded, but mv hasn't completed.
-            # We can't safely auto-resume because we don't know which step failed.
-            echo "ERROR: Partial migration detected: user '$NEW_USER' exists but $OLD_ROOT also still exists." >&2
-            echo "       The previous install.sh run was interrupted between user rename and directory move." >&2
-            echo "       Resume manually:" >&2
-            echo "         groupmod -n $NEW_USER $OLD_USER 2>/dev/null || true   # safe if already renamed" >&2
-            echo "         mv $OLD_ROOT $NEW_ROOT" >&2
-            echo "         echo $OLD_ROOT > $NEW_ROOT/MIGRATED_FROM" >&2
-            echo "         chown $NEW_USER:$NEW_USER $NEW_ROOT/MIGRATED_FROM" >&2
-            echo "       Then re-run install.sh." >&2
-        else
-            echo "ERROR: User '$NEW_USER' already exists; cannot rename $OLD_USER." >&2
-        fi
-        exit 1
-    fi
-
-    # Fix 4 (I3): if OLD_ROOT exists but illumio_ops user has been manually deleted,
-    # usermod -l would fail cryptically — detect and surface it now.
-    if ! id "$OLD_USER" &>/dev/null; then
-        echo "ERROR: Directory $OLD_ROOT exists but user '$OLD_USER' does not." >&2
-        echo "       Manual cleanup required: rename or remove $OLD_ROOT, then re-run." >&2
-        exit 1
-    fi
-
-    # Fix 2 (I1): stop service only if running; fail loudly if stop fails.
-    if systemctl is-active --quiet "$MIGRATE_SERVICE_NAME" 2>/dev/null; then
-        systemctl stop "$MIGRATE_SERVICE_NAME" || {
-            echo "ERROR: Failed to stop $MIGRATE_SERVICE_NAME service; cannot rename user while it has running processes." >&2
-            echo "       Diagnose: systemctl status $MIGRATE_SERVICE_NAME" >&2
-            exit 1
-        }
-    fi
-
-    $USERMOD_CMD "$NEW_USER" "$OLD_USER" || { echo "FAIL: usermod"; exit 1; }
-    $GROUPMOD_CMD "$NEW_USER" "$OLD_USER" || { echo "FAIL: groupmod"; $USERMOD_CMD "$OLD_USER" "$NEW_USER"; exit 1; }
-    mv "$OLD_ROOT" "$NEW_ROOT" || {
-        echo "FAIL: mv — rolling back user/group rename"
-        $USERMOD_CMD "$OLD_USER" "$NEW_USER"
-        $GROUPMOD_CMD "$OLD_USER" "$NEW_USER"
-        exit 1
-    }
-    echo "$OLD_ROOT" > "$NEW_ROOT/MIGRATED_FROM"
-    chown "$NEW_USER:$NEW_USER" "$NEW_ROOT/MIGRATED_FROM"
-
-    # Fix 3 (I2): warn operator that service is left stopped.
-    echo "==> Migration complete; $NEW_ROOT/MIGRATED_FROM records source path."
-    echo "    NOTE: service was stopped for migration. The rest of install.sh will"
-    echo "    finish the upgrade flow; restart with 'sudo systemctl start illumio-ops' afterwards."
+render_unit() {
+    sed -e "s#@PREFIX@#${PREFIX}#g" -e "s#@SERVICE_NAME@#${SERVICE}#g" "$BUNDLE_DIR/illumio-ops.service.in"
 }
 
-# Warn when this appliance's cache may hold rows from more than one PCE.
-# Named + self-contained so tests/test_install_migration.sh can source just
-# this function, the same way it sources migrate_from_underscore_root.
-# $1 = INSTALL_ROOT, $2 = python interpreter
-check_pce_profile_contamination() {
-    local root="$1" py="$2"
-    [ -f "$root/config/config.json" ] || return 0
-    # Layer 2 of 2: no malformed config.json content may abort the caller (it
-    # runs under install.sh's `set -euo pipefail`). Layer 1 is inside the
-    # heredoc itself — every dict access on config-supplied data is guarded
-    # before this point is ever reached.
-    # -P: don't prepend cwd to sys.path. Only the explicit sys.path.insert(0,
-    # root) below may decide whether the real src.pce_target import succeeds
-    # — without it, running this from a directory that happens to have its
-    # own top-level src/ package (e.g. this repo's checkout) silently uses
-    # THAT module instead of root's, making the except/fallback branch below
-    # untestably dependent on the caller's cwd.
-    "$py" -P - "$root" <<'PYEOF' || true
-import json, os, sys, datetime
-from urllib.parse import urlsplit
-root = sys.argv[1]
-cfg_path = os.path.join(root, "config", "config.json")
-marker_path = os.path.join(root, "config", ".pce-profile-migration.json")
-sys.path.insert(0, root)
-try:
-    from src.pce_target import normalize_pce_url, normalize_org_id
-except Exception:
-    def normalize_pce_url(v): return str(v or "").rstrip("/")
-    def normalize_org_id(v): return str(v if v is not None else "").strip()
-
-def mask_pce_url(v):
-    # Never print userinfo: normalize_pce_url deliberately preserves it (a
-    # legacy profile URL can be https://user:pass@host, e.g. a reverse-proxy
-    # arrangement), and this text can land in a terminal or an installer log.
-    # The full, unmasked value is still used for comparison — only display
-    # goes through this.
-    s = str(v or "")
-    try:
-        parts = urlsplit(s)
-    except Exception:
-        parts = None
-    if parts and parts.scheme and parts.netloc:
-        netloc = parts.netloc
-        at = netloc.rfind("@")
-        hostport = netloc[at + 1:] if at >= 0 else netloc
-        return "%s://%s" % (parts.scheme, hostport)
-    # urlsplit found no scheme/netloc to mask (e.g. a bare hostname a typo
-    # left without "https://"). Still strip anything that looks like
-    # embedded userinfo (up to the last '@') before showing what's left —
-    # this branch never returns the raw value unmodified when an '@' is
-    # present. The caller also numbers each PCE it lists, so two entries
-    # that both end up here (or both end up empty) stay distinguishable.
-    at = s.rfind("@")
-    tail = s[at + 1:] if at >= 0 else s
-    return tail if tail else "<url unavailable>"
-
-try:
-    with open(cfg_path) as fh:
-        cfg = json.load(fh)
-    if not isinstance(cfg, dict):
-        raise ValueError("config.json top level is not an object")
-except Exception as exc:
-    print("    PCE profile check skipped (config unreadable): %s" % exc)
-    sys.exit(0)
-
-profiles = cfg.get("pce_profiles")
-targets = set()
-malformed = False
-if isinstance(profiles, list):
-    for p in profiles:
-        if not isinstance(p, dict):
-            malformed = True
-            continue
-        # One unparseable url (normalize_pce_url calls urlsplit, which can
-        # raise on a genuinely broken value) must not blank the whole check —
-        # skip that entry, still analyze the rest.
-        try:
-            targets.add((normalize_pce_url(p.get("url")), normalize_org_id(p.get("org_id"))))
-        except Exception:
-            malformed = True
-elif profiles is not None:
-    malformed = True
-
-pc_cfg = cfg.get("pce_cache")
-archive_dir = pc_cfg.get("archive_dir") if isinstance(pc_cfg, dict) else None
-if not isinstance(archive_dir, str) or not archive_dir.strip():
-    archive_dir = "data/archive"
-archive_dir = archive_dir.strip()
-archive_path = archive_dir if os.path.isabs(archive_dir) else os.path.join(root, archive_dir)
-_ts = datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-
-def print_remediation_commands():
-    print("    To keep the current PCE and clear what the others left behind:")
-    print("      sudo systemctl stop illumio-ops")
-    print("      sudo -u illumio-ops illumio-ops cache flush --confirm")
-    print("      sudo systemctl start illumio-ops")
-    print("")
-    print("    To move to a different PCE instead (clears as part of the switch):")
-    print("      sudo systemctl stop illumio-ops")
-    print("      sudo -u illumio-ops illumio-ops config login \\")
-    print("          --url <PCE URL> --org-id <org> --pce-target-change flush")
-    print("      sudo systemctl start illumio-ops")
-
-def print_archive_advice():
-    print("")
-    print("    Archive day files may span both PCEs too; clearing the cache does")
-    print("    not touch them. The PCE keeps only about three months, so anything")
-    print("    older than that has no other copy — MOVE the existing archive")
-    print("    directory aside (do not delete) so a clean one starts accumulating:")
-    print("      sudo mv %s %s.pre-pce-check-%s" % (archive_path, archive_path, _ts))
-
-if profiles is None:
-    # "The key is gone" is not "it's safe": a routine ConfigManager.save()
-    # strips pce_profiles from disk without ever touching the cache it may
-    # have contaminated. Only a marker that itself recorded 0-1 targets while
-    # the key still existed may silence this — anything else (no marker, an
-    # unreadable/unparseable marker, or a marker recording >1) must still say
-    # something.
-    marker_targets = None
-    marker_checked_at = None
-    if os.path.exists(marker_path):
-        try:
-            with open(marker_path) as mf:
-                marker_data = json.load(mf)
-            mt = marker_data.get("distinct_pce_targets")
-            # bool is a subclass of int in Python — reject it explicitly, or
-            # a marker with `"distinct_pce_targets": true` would pass this
-            # check and silence the very next branch (True <= 1 is True).
-            if isinstance(mt, int) and not isinstance(mt, bool):
-                marker_targets = mt
-                marker_checked_at = marker_data.get("checked_at", "unknown time")
-        except Exception:
-            marker_targets = None
-    if marker_targets is not None and marker_targets <= 1:
-        sys.exit(0)               # recorded while readable, 0-1 target: low risk
-    elif marker_targets is not None and marker_targets > 1:
-        print("")
-        print("    ============================================================")
-        print("    WARNING: this appliance was previously recorded with more")
-        print("    than one PCE configured (%d distinct targets, last checked" % marker_targets)
-        print("    %s)." % marker_checked_at)
-        print("    The pce_profiles key has since been removed from config.json")
-        print("    (a routine save does this even without an operator noticing),")
-        print("    so the individual PCE URLs can no longer be listed here — but")
-        print("    nothing has confirmed the cache was ever cleaned. Treat it as")
-        print("    still possibly holding rows from more than one PCE.")
-        print("")
-        print_remediation_commands()
-        print_archive_advice()
-        print("    ============================================================")
-        print("")
-    else:
-        print("    NOTE: PCE profiles were removed in a newer version. This config no")
-        print("          longer carries them, so whether this appliance ever switched")
-        print("          PCEs cannot be determined here. If it did, its cache may hold")
-        print("          rows from both. Check with: illumio-ops cache status")
-else:
-    api_cfg = cfg.get("api")
-    if not isinstance(api_cfg, dict):
-        api_cfg = {}
-    try:
-        api_t = (normalize_pce_url(api_cfg.get("url")), normalize_org_id(api_cfg.get("org_id")))
-    except Exception:
-        api_t = (None, None)
-    if len(targets) > 1:
-        print("")
-        print("    ============================================================")
-        print("    WARNING: this appliance was configured with more than one PCE.")
-        print("    Switching between them did NOT clear the cache, so the cached")
-        print("    traffic, events and ingestion positions may hold rows from")
-        print("    both, with nothing marking which came from which. Reports,")
-        print("    alerts and searches built on that cache span both environments.")
-        print("")
-        print("    PCEs found in this config:")
-        # Numbered: mask_pce_url can legitimately return the same placeholder
-        # for two different (unmaskable) urls, and without an ordinal those
-        # two lines would be textually identical — the operator couldn't
-        # tell there even are two.
-        for i, (url, org) in enumerate(sorted(targets), start=1):
-            mark = "  <- api currently points here" if (url, org) == api_t else ""
-            print("      %d) %s (org %s)%s" % (i, mask_pce_url(url), org, mark))
-        print("")
-        print_remediation_commands()
-        print_archive_advice()
-        print("")
-        print("    The other profiles' API credentials are still in config.json")
-        print("    under 'pce_profiles' and stay there until the next save.")
-        print("    ============================================================")
-        print("")
-    elif malformed and len(targets) == 1:
-        # malformed here can only mean an entry beyond the one that parsed —
-        # a single-entry list can't set malformed and still leave targets
-        # non-empty. So this appliance's pce_profiles has more than one row;
-        # the surviving count of 1 is not a finding of fact ("only one PCE
-        # ever configured") — it's missing information, and must not read as
-        # safe here or (via the marker written below) on any later run.
-        print("")
-        print("    ============================================================")
-        print("    WARNING: this appliance's pce_profiles has more than one entry,")
-        print("    but not all of them could be read (a malformed shape or an")
-        print("    unparseable url). Only one PCE could be positively identified —")
-        print("    that does NOT mean there was only one. Treat this the same as")
-        print("    a confirmed multi-PCE appliance: the cache may hold rows from")
-        print("    more than one, with nothing marking which came from which.")
-        print("")
-        print("    PCE positively identified in this config:")
-        for url, org in sorted(targets):
-            mark = "  <- api currently points here" if (url, org) == api_t else ""
-            print("      %s (org %s)%s" % (mask_pce_url(url), org, mark))
-        print("    (one or more other pce_profiles entries could not be parsed)")
-        print("")
-        print_remediation_commands()
-        print_archive_advice()
-        print("")
-        print("    The other profiles' API credentials are still in config.json")
-        print("    under 'pce_profiles' and stay there until the next save.")
-        print("    ============================================================")
-        print("")
-    elif malformed and not targets:
-        print("    NOTE: pce_profiles is present in config.json but not in the")
-        print("          expected shape (a list of {url, org_id} objects), so it")
-        print("          could not be read. If this appliance ever switched PCEs,")
-        print("          its cache may hold rows from more than one.")
-    else:
-        print("    NOTE: PCE profiles were removed in a newer version; the stored")
-        print("          credentials stay in config.json until the next save.")
-
-review_db = os.path.join(root, "data", "archive_review.sqlite")
-if os.path.exists(review_db):
-    mb = os.path.getsize(review_db) / (1024 * 1024)
-    print("    NOTE: %s (%.1f MB) is no longer read by any code and can be deleted."
-          % (review_db, mb))
-
-if profiles is not None:
-    # Nothing new to observe once the key is gone — leave any existing marker
-    # (and the history it carries) untouched rather than overwriting it with
-    # an empty-looking "0 targets" that was never actually checked.
-    #
-    # If any entry was skipped or malformed AND that left the surviving
-    # count at or below the "safe" threshold (<=1), that count is not a
-    # finding of fact — dropped entries could just as easily have been
-    # additional distinct PCEs. Record "degraded" (no usable count) instead
-    # of a number a later run's "profiles is None" branch would read as
-    # confirmed-safe. A malformed run that already found >1 targets doesn't
-    # need this: more findings can only raise a true count, never lower it,
-    # so a confirmed >1 is still a valid lower bound and stays a plain int.
-    degraded = malformed and len(targets) <= 1
-    payload = {"checked_at": datetime.datetime.now(datetime.timezone.utc).isoformat()}
-    if degraded:
-        payload["distinct_pce_targets"] = None
-        payload["degraded"] = True
-    else:
-        payload["distinct_pce_targets"] = len(targets)
-    try:
-        with open(marker_path, "w") as fh:
-            json.dump(payload, fh, indent=2)
-    except Exception:
-        pass
-PYEOF
-    return 0
-}
-
-# Run migration only for the default install root (custom paths bypass migration).
-if [[ "$INSTALL_ROOT" == "/opt/illumio-ops" ]]; then
-    migrate_from_underscore_root
+if (( PRINT_UNIT )); then
+    render_unit
+    exit 0
 fi
 
-IS_UPGRADE=false
-[ -f "$INSTALL_ROOT/config/config.json" ] && IS_UPGRADE=true
+if [[ -z "$UPGRADE_FROM" && -e "$PREFIX/illumio-ops.py" ]]; then
+    UPGRADE_FROM="$PREFIX"  # the prefix holds 5.x: this is an upgrade
+fi
+if [[ -n "$UPGRADE_FROM" ]]; then
+    [[ "$UPGRADE_FROM" == /* ]] || die "--upgrade-from must be an absolute path"
+    UPGRADE_FROM="${UPGRADE_FROM%/}"
+    [[ -f "$UPGRADE_FROM/illumio-ops.py" && -f "$UPGRADE_FROM/config/config.json" ]] \
+        || die "$UPGRADE_FROM is not an illumio-ops 5.x installation (no illumio-ops.py and config/config.json)"
+elif (( REPORT_ONLY || ACCEPT )); then
+    die "--report-only and --accept-report are for an upgrade (--upgrade-from)"
+fi
+if [[ "$PREFIX" != "$UPGRADE_FROM" && ( -e "$PREFIX/illumio_ops" || -e "$PREFIX/config/settings.json" ) ]]; then
+    die "$PREFIX already holds an illumio-ops v6 installation; nothing was changed"
+fi
+for need in python wheels illumio_ops requirements.lock illumio-ops.service.in rollback.sh; do
+    [[ -e "$BUNDLE_DIR/$need" ]] || die "bundle is incomplete: $need is missing next to install.sh"
+done
 
-# --- Upgrade guards ---------------------------------------------------------
-if [ "$IS_UPGRADE" = true ]; then
-    # Downgrade guard: db schema migrations are forward-only (PRAGMA
-    # user_version); installing an older bundle over a newer install is
-    # unsupported. Compare base versions (strip +hash dev suffix).
-    BUNDLE_BASE="$(cat "$SRC/VERSION" 2>/dev/null || echo unknown)"
-    BUNDLE_BASE="${BUNDLE_BASE%%+*}"
-    INSTALLED_VERSION=$(sed -n 's/^__version__ *= *["'"'"']\([^"'"'"']*\)["'"'"'].*/\1/p' \
-        "$INSTALL_ROOT/src/__init__.py" 2>/dev/null || true)
-    if [ -n "$INSTALLED_VERSION" ] && [ -n "$BUNDLE_BASE" ] && [ "$BUNDLE_BASE" != "unknown" ] \
-       && [ "$BUNDLE_BASE" != "$INSTALLED_VERSION" ] \
-       && [ "$(printf '%s\n%s\n' "$BUNDLE_BASE" "$INSTALLED_VERSION" | sort -V | tail -1)" = "$INSTALLED_VERSION" ]; then
-        if [ "$ALLOW_DOWNGRADE" != true ]; then
-            echo "ERROR: bundle version $BUNDLE_BASE is older than installed $INSTALLED_VERSION." >&2
-            echo "       Downgrade is unsupported (db schema migrations are forward-only)." >&2
-            echo "       Re-run with --allow-downgrade to proceed anyway." >&2
-            exit 1
-        fi
-        echo "WARNING: downgrading $INSTALLED_VERSION -> $BUNDLE_BASE (--allow-downgrade given)."
+if [[ -n "$UPGRADE_FROM" ]]; then
+    # The report first, from the bundle (dependencies into a scratch directory), before anything changes.
+    SITE="$(mktemp -d)"
+    trap 'rm -rf "$SITE"' EXIT
+    "$BUNDLE_DIR/python/bin/python3" -I -m pip install --quiet --no-index --no-warn-script-location \
+        --require-hashes --find-links "$BUNDLE_DIR/wheels" --target "$SITE" -r "$BUNDLE_DIR/requirements.lock"
+    set +e
+    (cd "$SITE" && env "PYTHONPATH=$BUNDLE_DIR:$SITE" PYTHONNOUSERSITE=1 "$BUNDLE_DIR/python/bin/python3" -P \
+        -m illumio_ops.migrate --from "$UPGRADE_FROM" --report-only --lang "$REPORT_LANG")
+    rc=$?
+    set -e
+    (( rc == 0 )) || die "the 5.x settings cannot be upgraded as they are (above); nothing was changed"
+    if (( REPORT_ONLY )); then
+        exit 0
     fi
-    # Fallback downgrade guard: a non-purge uninstall deletes src/ but keeps
-    # config/ + data/, so on reinstall INSTALLED_VERSION above is unreadable
-    # and the version-string comparison is skipped. Detect a newer-than-bundle
-    # DB directly: compare the DB's PRAGMA user_version against the highest
-    # migration this bundle's schema.py knows (_MIGRATION_AGG_BUCKET_DAY).
-    DB_FILE="$INSTALL_ROOT/data/pce_cache.sqlite"
-    if [ -z "$INSTALLED_VERSION" ] && [ -f "$DB_FILE" ] && [ -x "$SRC/python/bin/python3" ]; then
-        BUNDLE_MAX_UV=$(sed -n 's/^_MIGRATION_AGG_BUCKET_DAY = \([0-9][0-9]*\).*/\1/p' \
-            "$SRC/app/src/pce_cache/schema.py" 2>/dev/null || true)
-        DB_UV=$("$SRC/python/bin/python3" -c "
-import sqlite3, sys
-conn = sqlite3.connect(f'file:{sys.argv[1]}?mode=ro', uri=True)
-print(conn.execute('PRAGMA user_version').fetchone()[0])
-" "$DB_FILE" 2>/dev/null || true)
-        if [ -n "$BUNDLE_MAX_UV" ] && [ -n "$DB_UV" ] && [ "$DB_UV" -gt "$BUNDLE_MAX_UV" ] 2>/dev/null; then
-            if [ "$ALLOW_DOWNGRADE" != true ]; then
-                echo "ERROR: existing cache DB user_version=$DB_UV is newer than this bundle understands (max $BUNDLE_MAX_UV)." >&2
-                echo "       The DB was migrated by newer code; installing an older bundle over it is unsupported." >&2
-                echo "       Re-run with --allow-downgrade to proceed anyway." >&2
-                exit 1
+    if (( ! ACCEPT )); then
+        [[ -t 0 ]] || die "not a terminal: pass --accept-report to upgrade with this report; nothing was changed"
+        read -r -p "Upgrade $UPGRADE_FROM to v6 in $PREFIX with this report? Type yes: " answer
+        [[ "$answer" == yes ]] || die "cancelled; nothing was changed"
+    fi
+fi
+
+if (( ! NO_SYSTEMD )); then
+    [[ $(id -u) -eq 0 ]] || die "run as root (or use --no-systemd for a user-level verification install)"
+    command -v systemctl >/dev/null || die "systemctl not found (use --no-systemd)"
+    if [[ -n "$UPGRADE_FROM" && -z "$OLD_SERVICE" ]]; then
+        for unit in /etc/systemd/system/*.service; do
+            if grep -qx "WorkingDirectory=$UPGRADE_FROM" "$unit" 2>/dev/null; then
+                OLD_SERVICE="$(basename "$unit" .service)"
+                break
             fi
-            echo "WARNING: proceeding over newer cache DB (user_version=$DB_UV > max $BUNDLE_MAX_UV) (--allow-downgrade given)."
-        fi
+        done
     fi
-    # Service guard: upgrading files under a running service risks a torn
-    # state (old process, new site-packages). Stop it; operator restarts
-    # after reviewing the install output (docs already instruct this).
-    if systemctl is-active --quiet "$SERVICE_NAME" 2>/dev/null; then
-        echo "==> Stopping running service for upgrade"
-        systemctl stop "$SERVICE_NAME" || {
-            echo "ERROR: failed to stop $SERVICE_NAME; stop it manually and re-run." >&2
-            exit 1
-        }
-        echo "    NOTE: restart after install: sudo systemctl restart $SERVICE_NAME"
+    if [[ -e "/etc/systemd/system/${SERVICE}.service" && "$SERVICE" != "$OLD_SERVICE" ]]; then
+        die "/etc/systemd/system/${SERVICE}.service already exists"
     fi
 fi
 
-echo "==> Installing to $INSTALL_ROOT (upgrade=$IS_UPGRADE)"
-mkdir -p "$INSTALL_ROOT"
-# Ensure all runtime dirs exist — ProtectSystem=strict requires them before service startup
-mkdir -p "$INSTALL_ROOT/logs" "$INSTALL_ROOT/data" "$INSTALL_ROOT/reports" \
-         "$INSTALL_ROOT/config" "$INSTALL_ROOT/config/tls"
+STAMP="$(date +%Y%m%d-%H%M%S)"
+V5_NOW="$UPGRADE_FROM"
+if [[ -n "$UPGRADE_FROM" ]]; then
+    # 5.x stops before its progress is read, so what it sent and evaluated no longer moves.
+    BACKUP="$(mktemp -d)"
+    WRAPPER=/usr/local/bin/illumio-ops
+    if (( ! NO_SYSTEMD )) && [[ -n "$OLD_SERVICE" ]]; then
+        echo "==> Stopping and disabling the 5.x service $OLD_SERVICE"
+        systemctl stop "$OLD_SERVICE" || true
+        systemctl disable "$OLD_SERVICE" 2>/dev/null || true
+        [[ -f "/etc/systemd/system/${OLD_SERVICE}.service" ]] && cp -p "/etc/systemd/system/${OLD_SERVICE}.service" "$BACKUP/old.service"
+    fi
+    if (( ! NO_SYSTEMD )) && [[ -e "$WRAPPER" ]]; then
+        cp -p "$WRAPPER" "$BACKUP/illumio-ops.wrapper"
+        rm -f "$WRAPPER"  # v6 has no command line
+    fi
+    if [[ "$PREFIX" == "$UPGRADE_FROM" ]]; then
+        V5_NOW="${UPGRADE_FROM}.5x-${STAMP}"
+        echo "==> Moving the 5.x installation aside to $V5_NOW"
+        mv "$UPGRADE_FROM" "$V5_NOW"
+    fi
+    mkdir -p "$PREFIX/rollback"
+    chmod 700 "$PREFIX/rollback"
+    cp -p "$BACKUP"/* "$PREFIX/rollback/" 2>/dev/null || true
+    rm -rf "$BACKUP"
+    {
+        printf 'PREFIX=%q\nSERVICE=%q\nOLD_SERVICE=%q\nV5_NOW=%q\nV5_ORIGINAL=%q\nNO_SYSTEMD=%q\n' \
+            "$PREFIX" "$SERVICE" "$OLD_SERVICE" "$V5_NOW" "$UPGRADE_FROM" "$NO_SYSTEMD"
+    } > "$PREFIX/rollback/rollback.env"
+    cp "$BUNDLE_DIR/rollback.sh" "$PREFIX/rollback.sh"
+    chmod 755 "$PREFIX/rollback.sh"
+    echo "==> If anything below fails: $PREFIX/rollback.sh brings 5.x back"
+fi
 
-# --delete restores a pristine bundled runtime each install/upgrade. This is
-# what makes the dependency refresh deterministic: site-packages is reset to
-# the bundle's baseline, then pip below installs exactly the bundled wheels.
-# Without it, pip keeps every already-satisfied version from the previous
-# install and removed dependencies linger forever.
-rsync -a --delete "$SRC/python/" "$INSTALL_ROOT/python/"
+echo "==> Installing illumio-ops v6 into $PREFIX"
+mkdir -p "$PREFIX"
+# Copy without the archive's owner; as root, the code and the interpreter must be root's
+# (the service account only writes config/data/logs/reports).
+cp -R --preserve=mode,timestamps "$BUNDLE_DIR/python" "$PREFIX/python"
+cp -R --preserve=mode,timestamps "$BUNDLE_DIR/illumio_ops" "$PREFIX/illumio_ops"
+if (( ! NO_SYSTEMD )); then
+    chown root:root "$PREFIX"
+    chmod 755 "$PREFIX"
+    chown -R root:root "$PREFIX/python" "$PREFIX/illumio_ops"
+fi
+chmod -R go-w "$PREFIX/python" "$PREFIX/illumio_ops"
+cd "$PREFIX"  # a directory we own: never let python -m pick modules up from the caller's cwd
 
-if [ "$IS_UPGRADE" = true ]; then
-    # Preserve all of config/ on upgrade — never overwrite operator-owned files.
-    # --delete removes app files that no longer exist in the new release:
-    # renamed/deleted src modules would otherwise linger as importable zombie
-    # .py files. Operator/runtime dirs are excluded from deletion.
-    # Excludes are anchored (leading /) to the transfer root: unanchored
-    # patterns match at any depth and would freeze app-tree dirs like
-    # src/i18n/data/ out of the upgrade sync.
-    rsync -a --delete \
-        --exclude='/config/' --exclude='/data/' --exclude='/logs/' \
-        --exclude='/reports/' --exclude='/python/' \
-        --exclude='/MIGRATED_FROM' --exclude='/uninstall.sh' \
-        "$SRC/app/" "$INSTALL_ROOT/"
-    # Only update *.example templates so operators can diff for new config keys
-    rsync -a --include='*.example' --exclude='*' \
-        "$SRC/app/config/" "$INSTALL_ROOT/config/" 2>/dev/null || true
+echo "==> Installing locked dependencies (hash-checked, offline)"
+"$PREFIX/python/bin/python3" -I -m pip install --quiet --no-index --no-warn-script-location \
+    --require-hashes --find-links "$BUNDLE_DIR/wheels" -r "$BUNDLE_DIR/requirements.lock"
+
+for d in config data logs reports; do
+    mkdir -p "$PREFIX/$d"
+    chmod 700 "$PREFIX/$d"
+done
+
+# -P: do not put the current directory on sys.path; the package comes from PYTHONPATH only.
+PY=(env "PYTHONPATH=$PREFIX" PYTHONNOUSERSITE=1 "$PREFIX/python/bin/python3" -P)
+if [[ -n "$UPGRADE_FROM" ]]; then
+    # As the installing user (root): the 5.x directory may be one the service account cannot read.
+    MOVED=()
+    [[ "$V5_NOW" != "$UPGRADE_FROM" ]] && MOVED=(--original-root "$UPGRADE_FROM")
+    echo "==> Writing the v6 settings and continuing where 5.x stopped"
+    "${PY[@]}" -m illumio_ops.migrate --from "$V5_NOW" --write --root "$PREFIX" --lang "$REPORT_LANG" "${MOVED[@]}" \
+        || die "the upgrade did not complete; $PREFIX/rollback.sh brings 5.x back"
+    RUN=()
 else
-    rsync -a "$SRC/app/" "$INSTALL_ROOT/"
-    cp "$INSTALL_ROOT/config/config.json.example" "$INSTALL_ROOT/config/config.json"
+    RUN=("${PY[@]}" -m illumio_ops.rescue init --root "$PREFIX" --port "$PORT")
+fi
+if (( NO_SYSTEMD )); then
+    (( ${#RUN[@]} )) && "${RUN[@]}"
+    echo "==> Done (no systemd). Run: env PYTHONPATH=$PREFIX $PREFIX/python/bin/python3 -m illumio_ops serve --root $PREFIX"
+    exit 0
 fi
 
-# site-packages was reset by the python/ rsync above, so this installs the
-# bundle's exact wheel set (deterministic; no --upgrade needed).
-# --require-hashes：鎖檔逐檔釘了 SHA256，任何 wheel 被掉包／改動都會讓 pip 直接
-# 失敗。set -e 在最上面，pip 非零離開即中止安裝（不是印警告後照裝）。
-"$INSTALL_ROOT/python/bin/python3" -m pip install \
-    --no-index --find-links "$SRC/wheels" \
-    --require-hashes \
-    -r "$INSTALL_ROOT/requirements-offline.lock" --quiet
-
-# Migrate deprecated config fields on upgrade
-if [ "$IS_UPGRADE" = true ] && [ -f "$INSTALL_ROOT/config/config.json" ]; then
-    "$INSTALL_ROOT/python/bin/python3" -c "
-import json, sys
-p = sys.argv[1]
-try:
-    with open(p) as f: cfg = json.load(f)
-    changed = []
-    tls = cfg.get('web_gui', {}).get('tls', {})
-    if 'http_redirect_port' in tls:
-        del tls['http_redirect_port']
-        changed.append('web_gui.tls.http_redirect_port')
-    pc = cfg.get('pce_cache', {})
-    if 'archive_review_max_days' in pc:
-        del pc['archive_review_max_days']
-        changed.append('pce_cache.archive_review_max_days')
-    if changed:
-        with open(p, 'w') as f: json.dump(cfg, f, indent=2)
-        print('    Config migration: removed deprecated field(s):', ', '.join(changed))
-except Exception as e:
-    print('    Config migration warning:', e, file=sys.stderr)
-" "$INSTALL_ROOT/config/config.json" || true
+if ! getent passwd "$SERVICE_USER" >/dev/null; then
+    useradd --system --no-create-home --shell /sbin/nologin "$SERVICE_USER"
 fi
+chown -R "$SERVICE_USER:$SERVICE_USER" "$PREFIX/config" "$PREFIX/data" "$PREFIX/logs" "$PREFIX/reports"
+(( ${#RUN[@]} )) && runuser -u "$SERVICE_USER" -- "${RUN[@]}"
 
-if [ "$IS_UPGRADE" = true ]; then
-    check_pce_profile_contamination "$INSTALL_ROOT" "$INSTALL_ROOT/python/bin/python3"
-fi
-
-# --- Post-install verification -----------------------------------------------
-echo "==> Verifying installed dependencies"
-"$INSTALL_ROOT/python/bin/python3" "$INSTALL_ROOT/scripts/verify_deps.py" --offline-bundle || {
-    echo "ERROR: dependency verification failed — installation is incomplete." >&2
-    exit 1
-}
-(cd "$INSTALL_ROOT" && ./python/bin/python3 illumio-ops.py --help >/dev/null) || {
-    echo "ERROR: app smoke check failed (illumio-ops.py --help)." >&2
-    exit 1
-}
-echo "    Dependency and smoke checks passed."
-
-if ! id illumio-ops &>/dev/null; then
-    useradd --system --no-create-home --shell /sbin/nologin illumio-ops
-fi
-cp "$SRC/uninstall.sh" "$INSTALL_ROOT/uninstall.sh"
-chmod +x "$INSTALL_ROOT/uninstall.sh"
-chown -R illumio-ops:illumio-ops "$INSTALL_ROOT"
-chmod 600 "$INSTALL_ROOT/config/config.json" 2>/dev/null || true
-chmod 600 "$INSTALL_ROOT/config/alerts.json" 2>/dev/null || true
-
-# Fine-grained permissions: secrets 0600, configs 0640, sensitive dirs 0750
-find "$INSTALL_ROOT/config" -type f -name "*.json" -exec chmod 0600 {} \; 2>/dev/null || true
-find "$INSTALL_ROOT/config" -type f -name "*.yaml" -exec chmod 0640 {} \; 2>/dev/null || true
-find "$INSTALL_ROOT/config/tls" -type f -name "*key*.pem" -exec chmod 0600 {} \; 2>/dev/null || true
-find "$INSTALL_ROOT/config/tls" -type f -name "*.pem" ! -name "*key*" -exec chmod 0640 {} \; 2>/dev/null || true
-chmod 0750 "$INSTALL_ROOT/logs" "$INSTALL_ROOT/config" 2>/dev/null || true
-
-sed "s|/opt/illumio-ops|$INSTALL_ROOT|g" "$SRC/deploy/illumio-ops.service" > "$SERVICE_FILE"
-chmod 0644 "$SERVICE_FILE"
+render_unit > "/etc/systemd/system/${SERVICE}.service"
+chmod 644 "/etc/systemd/system/${SERVICE}.service"
 systemctl daemon-reload
-
-# CLI wrapper: give operators a stable `illumio-ops` command that always uses
-# the bundled Python. Running the app with the system python3 breaks on old
-# distros (system SQLite < 3.35 lacks INSERT ... RETURNING).
-WRAPPER=/usr/local/bin/illumio-ops
-cat > "$WRAPPER" <<EOF
-#!/usr/bin/env bash
-# cd first: relative paths from config (data/, logs/, reports/) resolve
-# against the process cwd, not the app root.
-cd "$INSTALL_ROOT" || exit 1
-# Keep the bundled interpreter off the operator's user site-packages (see the
-# note at the top of install.sh); the systemd unit gets the same via
-# Environment=.
-export PYTHONNOUSERSITE=1
-exec "$INSTALL_ROOT/python/bin/python3" "$INSTALL_ROOT/illumio-ops.py" "\$@"
-EOF
-chmod 0755 "$WRAPPER"
-
-if [ "$IS_UPGRADE" = true ]; then
-    echo "==> Upgrade complete."
-    echo "    Check for new config keys: diff $INSTALL_ROOT/config/config.json.example $INSTALL_ROOT/config/config.json"
-    echo "    Restart service          : sudo systemctl restart $SERVICE_NAME"
-    echo "    CLI usage    : illumio-ops --help   (wrapper installed at /usr/local/bin/illumio-ops)"
-else
-    echo "==> Installation complete."
-    echo "    Edit config : nano $INSTALL_ROOT/config/config.json"
-    echo "    Start service: sudo systemctl enable --now $SERVICE_NAME"
-    echo "    CLI usage    : illumio-ops --help   (wrapper installed at /usr/local/bin/illumio-ops)"
-    echo "    Uninstall    : sudo $INSTALL_ROOT/uninstall.sh"
-    echo "    Purge all    : sudo $INSTALL_ROOT/uninstall.sh --purge"
-fi
+echo "==> Installed. The service is NOT started. Start it with:"
+echo "    systemctl enable --now ${SERVICE}"
+echo "    then open https://<this host>:${PORT}/"

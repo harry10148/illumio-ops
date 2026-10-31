@@ -1,0 +1,209 @@
+import responses
+
+from illumio_ops.jobs.health import list_health
+from illumio_ops.jobs.scheduler import (
+    apply_schedule,
+    build_scheduler,
+    instrument,
+    job_intervals,
+)
+from tests.web.conftest import make_ctx
+
+
+def _health(ctx):
+    with ctx.db() as conn:
+        return {h.job_id: h for h in list_health(conn)}
+
+
+def test_instrument_records_failure_and_keeps_scheduler_alive(tmp_path):
+    ctx = make_ctx(tmp_path)
+    calls = []
+
+    def flaky():
+        calls.append(1)
+        if len(calls) == 1:
+            raise RuntimeError("first run fails")
+
+    job = instrument("flaky", flaky, ctx)
+    job()  # must not raise
+    h = _health(ctx)["flaky"]
+    assert (h.last_ok, h.failures, h.runs) == (False, 1, 1) and "first run fails" in h.last_error
+    job()
+    h = _health(ctx)["flaky"]
+    assert (h.last_ok, h.last_error, h.failures, h.runs) == (True, None, 1, 2)
+
+
+def test_probe_job_skips_when_unconfigured(tmp_path):
+    ctx = make_ctx(tmp_path)
+    sched = build_scheduler(ctx)
+    with responses.RequestsMock(assert_all_requests_are_fired=False) as rsps:
+        sched.get_job("pce_probe").func()
+        assert len(rsps.calls) == 0  # no HTTP at all
+    h = _health(ctx)["pce_probe"]
+    assert (h.last_ok, h.last_error) == (True, None)
+
+
+def test_build_scheduler_registers_jobs_with_safe_defaults(tmp_path):
+    sched = build_scheduler(make_ctx(tmp_path))
+    job = sched.get_job("pce_probe")
+    assert job_intervals(make_ctx(tmp_path / "b").settings.current())["pce_probe"] == 300
+    assert job.trigger.interval.total_seconds() == 300
+    assert job.coalesce is True and job.max_instances == 1
+    assert job.next_run_time is not None  # first run right away, not five minutes later
+    assert str(sched.timezone) == "UTC"
+
+
+def test_job_intervals_follow_settings(tmp_path):
+    ctx = make_ctx(tmp_path)
+    ctx.settings.update(ctx.settings.current().revision, lambda d: d["collection"].update({"traffic_interval_seconds": 900,
+                                                             "events_interval_seconds": 120}))
+    iv = job_intervals(ctx.settings.current())
+    assert (iv["collect_traffic"], iv["collect_events"], iv["pce_probe"]) == (900, 120, 300)
+
+
+def test_collectors_registered_and_first_run_delayed(tmp_path):
+    from datetime import UTC, datetime
+    sched = build_scheduler(make_ctx(tmp_path))
+    for job_id in ("collect_traffic", "collect_events"):
+        job = sched.get_job(job_id)
+        assert job is not None and job.coalesce is True and job.max_instances == 1
+        assert (job.next_run_time - datetime.now(UTC)).total_seconds() > 20
+
+
+def test_apply_schedule_reschedules_changed_interval(tmp_path):
+    ctx = make_ctx(tmp_path)
+    sched = build_scheduler(ctx)
+    ctx.settings.update(ctx.settings.current().revision, lambda d: d["collection"].update({"traffic_interval_seconds": 1800}))
+    apply_schedule(sched, ctx.settings.current())
+    assert sched.get_job("collect_traffic").trigger.interval.total_seconds() == 1800
+    assert sched.get_job("collect_events").trigger.interval.total_seconds() == 300
+
+
+def test_flow_store_checkpoint_runs_as_its_own_job(tmp_path):
+    from illumio_ops.jobs.scheduler import FLOWS_CHECKPOINT_SECONDS
+    ctx = make_ctx(tmp_path)
+    sched = build_scheduler(ctx)
+    job = sched.get_job("flows_checkpoint")
+    assert job is not None and job.trigger.interval.total_seconds() == FLOWS_CHECKPOINT_SECONDS == 60
+    job.func()
+    assert _health(ctx)["flows_checkpoint"].last_ok is True
+
+
+def test_backfill_check_also_runs_the_daily_reread(tmp_path, monkeypatch):
+    from illumio_ops.jobs import scheduler
+    calls = []
+    monkeypatch.setattr(scheduler, "ensure_initial_backfill", lambda ctx: calls.append("initial"))
+    monkeypatch.setattr(scheduler, "ensure_daily_reread", lambda ctx: calls.append("reread"))
+    ctx = make_ctx(tmp_path)
+    build_scheduler(ctx).get_job("collect_backfill").func()
+    assert calls == ["initial", "reread"] and _health(ctx)["collect_backfill"].last_ok is True
+
+
+def test_scheduler_registers_analysis_hourly(tmp_path, monkeypatch):
+    from illumio_ops.jobs import scheduler as sched_mod
+    ctx = make_ctx(tmp_path)
+    sched = build_scheduler(ctx)
+    job = sched.get_job("analysis_hourly")
+    assert job is not None and job.trigger.interval.total_seconds() == 3600
+    assert job.coalesce is True and job.max_instances == 1
+    calls = []
+    monkeypatch.setattr(sched_mod, "run_hourly_analysis", lambda c: calls.append(c))
+    sched_mod.build_scheduler(ctx).get_job("analysis_hourly").func()
+    assert calls == [ctx]
+
+
+def test_traffic_job_runs_detection_after_cycle(tmp_path, monkeypatch):
+    from illumio_ops.jobs import scheduler
+    calls = []
+    monkeypatch.setattr(scheduler, "finish_pending_switch", lambda ctx: None)
+    monkeypatch.setattr(scheduler, "run_traffic_cycle", lambda ctx: calls.append("traffic"))
+    monkeypatch.setattr(scheduler, "run_detection", lambda ctx, **kw: calls.append(("detect", kw)))
+    monkeypatch.setattr(scheduler, "evaluate_traffic", lambda ctx: calls.append("alerts_traffic"))
+    monkeypatch.setattr(scheduler, "evaluate_lateral", lambda ctx: calls.append("alerts_lateral"))
+    build_scheduler(make_ctx(tmp_path)).get_job("collect_traffic").func()
+    assert calls == ["traffic", ("detect", {}), "alerts_traffic", "alerts_lateral"]
+
+
+def test_traffic_job_order_and_isolation(tmp_path, monkeypatch):
+    # A failing detection must not stop the alert evaluation after it; the job still records the failure.
+    from illumio_ops.jobs import scheduler
+    calls = []
+    monkeypatch.setattr(scheduler, "finish_pending_switch", lambda ctx: None)
+    monkeypatch.setattr(scheduler, "run_traffic_cycle", lambda ctx: None)
+
+    def broken(ctx, **kw):
+        raise RuntimeError("detector bug")
+    monkeypatch.setattr(scheduler, "run_detection", broken)
+    monkeypatch.setattr(scheduler, "evaluate_traffic", lambda ctx: calls.append("alerts_traffic"))
+    monkeypatch.setattr(scheduler, "evaluate_lateral", lambda ctx: calls.append("alerts_lateral"))
+    ctx = make_ctx(tmp_path)
+    build_scheduler(ctx).get_job("collect_traffic").func()
+    assert calls == ["alerts_traffic", "alerts_lateral"]
+    h = _health(ctx)["collect_traffic"]
+    assert h.last_ok is False and "detector bug" in h.last_error
+
+
+def test_events_job_evaluates_event_rules(tmp_path, monkeypatch):
+    from illumio_ops.jobs import scheduler
+    calls = []
+    monkeypatch.setattr(scheduler, "finish_pending_switch", lambda ctx: None)
+    monkeypatch.setattr(scheduler, "run_events_cycle", lambda ctx: calls.append("events"))
+    monkeypatch.setattr(scheduler, "evaluate_events", lambda ctx: calls.append("alerts"))
+    build_scheduler(make_ctx(tmp_path)).get_job("collect_events").func()
+    assert calls == ["events", "alerts"]
+
+
+def test_new_jobs_in_intervals(tmp_path):
+    ctx = make_ctx(tmp_path)
+    iv = job_intervals(ctx.settings.current())
+    assert iv["alerts_system"] == 60 and iv["alerts_retention"] == 86400
+    sched = build_scheduler(ctx)
+    assert sched.get_job("alerts_system") is not None and sched.get_job("alerts_retention") is not None
+
+
+def test_reread_with_rows_triggers_late_detection(tmp_path, monkeypatch):
+    from datetime import UTC, date, datetime
+
+    from illumio_ops.jobs import scheduler
+    from illumio_ops.services.collect import CycleResult
+    calls = []
+    monkeypatch.setattr(scheduler, "finish_pending_switch", lambda ctx: None)
+    monkeypatch.setattr(scheduler, "ensure_initial_backfill", lambda ctx: None)
+    monkeypatch.setattr(scheduler, "last_reread_day", lambda ctx: date(2026, 10, 24))
+    monkeypatch.setattr(scheduler, "run_detection", lambda ctx, **kw: calls.append(kw))
+    ctx = make_ctx(tmp_path)
+    monkeypatch.setattr(scheduler, "ensure_daily_reread", lambda ctx: CycleResult(0, 24, 0))
+    build_scheduler(ctx).get_job("collect_backfill").func()
+    assert calls == []  # nothing found late: nothing to evaluate
+    monkeypatch.setattr(scheduler, "ensure_daily_reread", lambda ctx: CycleResult(5, 24, 0))
+    build_scheduler(ctx).get_job("collect_backfill").func()
+    start = datetime(2026, 10, 24, tzinfo=UTC)
+    assert calls == [{"window": (start, datetime(2026, 10, 25, tzinfo=UTC)), "late": True}]
+
+
+def test_failed_late_pass_is_retried_on_the_next_run(tmp_path, monkeypatch):
+    # Final review #6: the re-read is done once; a late pass that failed must still run later.
+    from datetime import UTC, date, datetime
+
+    from illumio_ops.jobs import scheduler
+    from illumio_ops.services.collect import CycleResult
+    calls, fail = [], [True]
+
+    def detect(ctx, **kw):
+        calls.append(kw)
+        if fail[0]:
+            raise RuntimeError("disk full")
+    monkeypatch.setattr(scheduler, "finish_pending_switch", lambda ctx: None)
+    monkeypatch.setattr(scheduler, "ensure_initial_backfill", lambda ctx: None)
+    monkeypatch.setattr(scheduler, "last_reread_day", lambda ctx: date(2026, 10, 24))
+    monkeypatch.setattr(scheduler, "run_detection", detect)
+    monkeypatch.setattr(scheduler, "ensure_daily_reread", lambda ctx: CycleResult(5, 24, 0))
+    job = build_scheduler(make_ctx(tmp_path)).get_job("collect_backfill").func
+    job()  # the job records the failure (job health) and returns
+    fail[0] = False
+    monkeypatch.setattr(scheduler, "ensure_daily_reread", lambda ctx: None)  # today's re-read is done
+    job()
+    start = datetime(2026, 10, 24, tzinfo=UTC)
+    assert calls[1] == {"window": (start, datetime(2026, 10, 25, tzinfo=UTC)), "late": True}
+    job()
+    assert len(calls) == 2  # cleared once it succeeded

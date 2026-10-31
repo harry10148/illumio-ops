@@ -55,7 +55,7 @@ reports/
 !design/v3/reports/
 # v6 原始碼裡名為 reports 的套件／頁面／測試目錄是程式碼，不是產出（P5a）。
 !illumio_ops/**/reports/
-!tests_v6/**/reports/
+!tests/**/reports/
 !web/src/**/reports/
 build/
 dist/

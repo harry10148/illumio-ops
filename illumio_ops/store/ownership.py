@@ -1,5 +1,5 @@
 """Which module may write each table, across both databases (table names are unique between
-them). tests_v6/gates/test_single_writer.py enforces it; a new table must be registered here
+them). tests/gates/test_single_writer.py enforces it; a new table must be registered here
 before any module can write it."""
 from __future__ import annotations
 

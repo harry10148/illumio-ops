@@ -6,7 +6,7 @@
 - to_sql: a WHERE clause over the flow store's primary rows (alias f).
 - matches: the same test on one record.
 
-to_sql and matches must agree on every spec (tests_v6/domain/test_filter.py checks 20 of them).
+to_sql and matches must agree on every spec (tests/domain/test_filter.py checks 20 of them).
 
 Endpoint semantics: an EndpointFilter is a union by default — the endpoint has all the listed label keys
 (each key: any of its values), OR is one of the hrefs, OR is in one of the IPs / networks. With match="all" the

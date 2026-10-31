@@ -21,7 +21,7 @@ from illumio_ops.store import siem as siem_store
 from illumio_ops.store.flowdb import binding
 
 # app.sqlite tables that describe one PCE (cleared on a switch) and those that do not.
-# tests_v6/services/collect/test_reset.py checks that every app.sqlite table is in exactly one.
+# tests/services/collect/test_reset.py checks that every app.sqlite table is in exactly one.
 APP_DB_PCE_DERIVED: tuple[str, ...] = ("pce_probe", "alert_eval_state", "siem_cursor")
 # tamper_annotations and detection_annotations are the operator's input, not derived data: each row names its PCE and is listed only
 # while that PCE is configured, so switching back finds the notes again.

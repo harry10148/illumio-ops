@@ -2,8 +2,8 @@
 title: v6 安裝、從 5.x 升級與回退
 last_verified: 2026-11-01
 verified_against:
-  - scripts/v6/install.sh
-  - scripts/v6/rollback.sh
+  - scripts/install.sh
+  - scripts/rollback.sh
   - illumio_ops/migrate/v5_write.py
   - illumio_ops/migrate/v5_handover.py
 ---

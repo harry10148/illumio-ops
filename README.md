@@ -1,61 +1,39 @@
 # illumio-ops
 
-![Version](https://img.shields.io/badge/Version-v5.2.0-blue?style=flat-square)
-![Python](https://img.shields.io/badge/Python-3.11%2B-yellow?style=flat-square&logo=python&logoColor=white)
-![API](https://img.shields.io/badge/Illumio_API-v25.2-green?style=flat-square)
+![Version](https://img.shields.io/badge/Version-v6.0.0-blue?style=flat-square)
+![Python](https://img.shields.io/badge/Python-3.12-yellow?style=flat-square&logo=python&logoColor=white)
 ![License](https://img.shields.io/badge/License-MIT-lightgrey?style=flat-square)
 
 > **[English](README.md)** | **[繁體中文](README_zh.md)**
 
-**illumio-ops** is an **agentless** monitoring and automation companion for **Illumio Core**. It talks to the
-**PCE (Policy Compute Engine) exclusively via the PCE REST API** — no agents are deployed, no Workloads are
-touched. It fills the operational gaps left by the PCE Web Console: scheduled reports, a security-rule engine
-over traffic flows, multi-channel alerting, SIEM forwarding, safe rule scheduling, and Workload quarantine —
-all from a single Python process exposing a Flask Web GUI, a Click CLI, and a background scheduler.
+**illumio-ops** is an agentless companion for **Illumio Core** focused on **lateral movement**: it reads the PCE
+through its REST API only (no agents, nothing changed on Workloads unless an operator quarantines one) and runs as
+one service with a web GUI. v6 is a rebuild of 5.x; it has no command line.
 
-## Features
+- **Detection** of lateral movement (fan-out, new management connections, pivot chains, cross-environment, …) and
+  of anomalies in allowed traffic, on a home focus list and the lateral-movement page.
+- **Alerts** on PCE events, traffic, detections and the product's own health, to email, LINE, Telegram, Teams and
+  webhooks; rules can leave out labels, Workloads, addresses, PCE IP lists and public addresses.
+- **Reports** (HTML, CSV, XLSX, JSON) by schedule or on demand, mailed with a readable summary.
+- **Investigation workbench**, host profiles, quarantine, Rule Hit Count.
+- **SIEM forwarding** of audit events, detections, alerts and new connections (syslog, TLS, Splunk HEC; CEF or JSON).
+- Three collection modes: lightweight (default; queries the PCE on demand), alerts, full.
 
-- **9-report family** — traffic, security & risk, audit, policy usage, VEN status, enforcement readiness, rule
-  hit count, policy diff (draft vs active), and policy resolver, rendered to HTML / CSV / XLSX.
-- **B/L/R security-rule engine** — B-series (ransomware / coverage) and L-series (lateral movement /
-  exfiltration) findings on traffic flows, plus R-series (R01–R05) draft-policy alignment checks.
-- **FilterBar v2 object selectors** — PCE-style label / IP-list / service filter objects shared across the
-  GUI and report engine, instead of free-text filter strings.
-- **5 alert channels** — Email, LINE, Webhook, Telegram, and Teams, with per-destination DLQ and a watchdog.
-- **SIEM forwarding** — CEF, JSON, and RFC5424 syslog, plus Splunk HEC, over UDP / TCP / TLS / HTTPS.
-- **Rule scheduler** — enable/disable PCE rules on a time window, with explicit CLI/GUI confirmation gates.
-- **Workload quarantine** — apply and release quarantine from the GUI or CLI, with an audit trail.
-- **pce_cache SQLite mirror** — optional WAL-mode local cache of PCE events and traffic, so reports and the
-  dashboard don't hammer the PCE.
-- **Job health observability** — every background job records `last_run` / `last_status` to
-  `logs/job_health.json`, so "should have run but didn't" is visible.
-- **Offline bundle installer** — air-gapped install path that ships pinned wheels alongside the source tree.
+## Install, upgrade from 5.x, roll back
 
-## Quick Start
+See [docs/guide/v6-installation.md](docs/guide/v6-installation.md): an offline bundle for Linux x86_64 (RHEL/Rocky),
+`install.sh` for a fresh install or an upgrade of a 5.x installation (settings carried over, SIEM and event alerts
+continue where 5.x stopped), and `rollback.sh` to go back. 5.x documentation is kept in
+[docs/legacy-5.x](docs/legacy-5.x/).
 
-```bash
-git clone <repo-url>
-cd illumio-ops
-cp config/config.json.example config/config.json   # edit api.url / api.org_id / api.key / api.secret
-python -m venv venv && source venv/bin/activate
-pip install -r requirements.txt
+## Development
 
-# Combined daemon + Web GUI at https://127.0.0.1:5001
-python illumio-ops.py --monitor-gui --interval 5 --port 5001
+```
+python3.12 -m venv .venv && .venv/bin/pip install --require-hashes -r requirements.lock -r requirements-dev.txt
+npm ci --prefix web
+bash scripts/gen_contracts.sh && npm --prefix web run build
+.venv/bin/python -m pytest tests -n auto --dist loadfile
 ```
 
-**First login:** default account `illumio` / password `illumio`; the forced first-login password change is currently disabled — change the password manually in Settings after first login. GUI passwords are hashed
-with **Argon2id**.
-
-The entry point `illumio-ops.py` dispatches to the **Click** command tree (e.g. `illumio-ops report traffic
---format html`, `illumio-ops status`) and keeps a **legacy argparse** path for the classic `--monitor` /
-`--gui` / `--report` flags — both styles work.
-
-## Full documentation (Traditional Chinese)
-
-Project documentation is maintained in Traditional Chinese. Start at **[docs/INDEX.md](docs/INDEX.md)** for
-the full documentation map — architecture, guides, and reference material.
-
-## License
-
-Released under the **MIT License** — see [LICENSE](LICENSE).
+CI (`.github/workflows/ci.yml`) also runs pip-audit, the contract diff, the frontend typecheck and build, ruff and
+mypy (strict). The offline bundle is built by `scripts/build_bundle.sh`.

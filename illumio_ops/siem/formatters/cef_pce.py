@@ -1,6 +1,6 @@
 """CEF that mirrors the PCE's own syslog export (`cef_pce`).
 
-Evidence: tests_v6/siem/fixtures/pce_native_cef_pairs.json — real pairs joined on
+Evidence: tests/siem/fixtures/pce_native_cef_pairs.json — real pairs joined on
 event_href between the ops cache and pce.lab.local's syslog (PCE 26.2.20,
 2026-09-11), plus a 3,000-line scan of the PCE stream in Graylog.  Every
 rule below that the scan could not observe is marked ASSUMPTION.
