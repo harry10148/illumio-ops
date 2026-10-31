@@ -78,3 +78,14 @@ def test_no_write_key_greyed_out(context, live_app, fake_pce):
     _, dialog = _open(context, live_app)
     expect(dialog.locator("[data-role=q-no-write-key]")).to_have_count(1)
     expect(dialog.locator("[data-role=q-apply]")).to_be_disabled()
+
+
+def test_history_unread_said(context, live_app, fake_pce):
+    """P6d deferred: the host page left the record out when reading it failed, which reads as "nothing was done"."""
+    _setup(live_app, fake_pce)
+    page = context.new_page()
+    sign_in(page, live_app.url)
+    page.route("**/api/quarantine/history*", lambda route: route.abort())
+    page.goto(f"{live_app.url}/hosts?key={WL}")
+    expect(page.locator("[data-role=q-history-error]")).to_have_count(1)
+    page.unroute_all(behavior="wait")
