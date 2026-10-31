@@ -387,7 +387,7 @@ PCE 主控台沒有中文介面（原廠中文文件的截圖欄位也是英文�
   每一則）、**新連線出現**（選用：每個「來源 → 目的 × port／協定」在基準期內第一次出現時送一筆，帶判定與兩端身分，
   **不帶連線數或位元組**，避免被當成量加總）。**不再轉送流量紀錄**（§4.1 目標 4、§6.6 F12）。格式 cef、json、syslog_cef、
   syslog_json、cef_pce、syslog_cef_pce（`cef_pce` 只用於 audit 事件，行為照 2026-09-12 Graylog 驗收；偵測與新連線事件
-  的欄位由 P7 計畫定義）；傳輸 udp、tcp、tls、hec；PII 遮罩；DLQ 檢視、重送、清除、匯出；狀態頁。依 policy decision
+  的欄位由 P7 定義，見 `docs/guide/v6-siem-east-west.md` §2）；傳輸 udp、tcp、tls、hec；PII 遮罩；DLQ 檢視、重送、清除、匯出；狀態頁。依 policy decision
   過濾改為只作用於「新連線出現」。
 - **管理**：PCE 連線（on-prem／SaaS、console_url、verify_ssl、事件 timeout）與手動健康檢查、
   管理者帳號（初始密碼與改密閘沿用 5.x：閘門機制存在，但依使用者先前要求預設不強制首次改密，
