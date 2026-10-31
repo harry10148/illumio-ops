@@ -40,13 +40,26 @@ def _higher(a: str, b: str) -> str:
     return a if SEVERITY_ORDER.index(Severity(a)) >= SEVERITY_ORDER.index(Severity(b)) else b
 
 
+# Past this many ends a detection's are unknown (never left out by an alert rule): the merge stays bounded.
+MAX_ENDS = 5000
+
+
+def _bounded(ends: str) -> str | None:
+    return None if len(json.loads(ends)) > MAX_ENDS else ends
+
+
 def _ends(old: str | None, new: str) -> str | None:
-    """Every end either pass saw, the earlier ones first; unknown stays unknown (a row stored before ends were)."""
+    """Every end either pass saw, the earlier ones first; unknown stays unknown (a row stored before ends were, or
+    one that passed MAX_ENDS)."""
     if old is None:
         return None
     merged = [tuple(e) for e in json.loads(old)]
-    merged += [e for e in (tuple(x) for x in json.loads(new)) if e not in set(merged)]
-    return json.dumps([list(e) for e in merged])
+    seen = set(merged)
+    for e in (tuple(x) for x in json.loads(new)):
+        if e not in seen:
+            seen.add(e)
+            merged.append(e)
+    return None if len(merged) > MAX_ENDS else json.dumps([list(e) for e in merged])
 
 
 def _distance(row: sqlite3.Row, d: DetectionWrite) -> timedelta:
@@ -91,7 +104,7 @@ def upsert_detections(conn: sqlite3.Connection, rows: Sequence[DetectionWrite], 
                     "created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?)",
                     (d.detector, d.fingerprint, d.subject_key, d.severity, db_time(d.first_seen),
                      db_time(d.last_seen), int(late), int(d.critical_asset), d.summary_json, d.segment_json,
-                     d.confidence_json, d.ends_json, stamp, stamp))
+                     d.confidence_json, _bounded(d.ends_json), stamp, stamp))
                 new += 1
     return new, updated
 

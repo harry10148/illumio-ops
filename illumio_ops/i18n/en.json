@@ -767,7 +767,7 @@
   "cond_public": "Public addresses",
   "cond_public_hint": "A public address that is not a Workload on the PCE: the internet side of a connection.",
   "rule_exclude": "Leave out",
-  "rule_exclude_hint": "A detection whose source matches, or whose every target matches, does not alert; the lateral page still shows it. Leave empty to leave nothing out.",
+  "rule_exclude_hint": "A detection whose every source, or every target, matches does not alert; the lateral page still shows it. Leave empty to leave nothing out.",
   "rule_match_fields": "Advanced: match event fields",
   "rule_match_fields_label": "Field matches, one per line",
   "rule_match_fields_hint": "path=pattern, e.g. created_by.user.username=admin@example.com; notification_type looks in every notification. Patterns work as for event types, ! negates.",

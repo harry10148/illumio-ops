@@ -348,13 +348,13 @@ def evaluate_bandwidth_rule(rule: BandwidthRule, facts: IncrementFacts, *, now: 
 # ── lateral ──────────────────────────────────────────────────────────────────
 
 def excluded(exclude: EndpointFilter | None, ends: Sequence[EndFact] | None) -> bool:
-    """A detection a rule's exclusion leaves out: one of its sources matches, or every one of its targets does
-    (an internet scan, a connection out, a scanner the operator expects). Ends unknown: never left out."""
+    """A detection a rule's exclusion leaves out: every one of its sources matches, or every one of its targets does
+    (an internet scan, a connection out, a scanner the operator expects). Every, not any: one stray source of an
+    account's fan-out must not silence the rest (security review 2026-10-31). Ends unknown: never left out."""
     if exclude is None or exclude.is_empty() or not ends:
         return False
     hit = [(e.role, endpoint_matches(exclude, href=e.href, ip=e.ip, labels=e.labels)) for e in ends]
-    targets = [h for role, h in hit if role == "t"]
-    return any(h for role, h in hit if role == "s") or (bool(targets) and all(targets))
+    return any(bool(side) and all(side) for side in ([h for role, h in hit if role == r] for r in ("s", "t")))
 
 
 def evaluate_lateral_rule(rule: LateralRule, changed: Sequence[DetectionFact]) -> list[Trigger]:

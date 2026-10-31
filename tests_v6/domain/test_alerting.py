@@ -258,6 +258,14 @@ def test_exclusion_by_label_address_and_workload():
     assert evaluate_lateral_rule(lateral_rule(exclude=EndpointFilter(hrefs=("/w/a",))), [det(ends=MIXED)]) == []
 
 
+def test_a_detection_with_several_sources_is_left_out_only_when_every_source_matches():
+    # security review 2026-10-31: one stray public source of an account's fan-out must not silence the rest
+    account = (end("s", "ip:8.8.8.8", "8.8.8.8"), end("s", "/w/a", "10.0.0.1"), end("t", "/w/b", "10.0.0.2"))
+    assert len(evaluate_lateral_rule(lateral_rule(exclude=PUBLIC), [det(ends=account)])) == 1
+    both = (end("s", "ip:8.8.8.8", "8.8.8.8"), end("s", "ip:1.1.1.1", "1.1.1.1"), end("t", "/w/b", "10.0.0.2"))
+    assert evaluate_lateral_rule(lateral_rule(exclude=PUBLIC), [det(ends=both)]) == []
+
+
 def test_without_exclusion_or_without_ends_nothing_is_left_out():
     assert len(evaluate_lateral_rule(lateral_rule(), [det(ends=SCAN)])) == 1
     # stored before detections kept their ends: what they were about is unknown, so the rule cannot leave it out

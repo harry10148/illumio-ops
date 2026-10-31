@@ -4,7 +4,7 @@ User 2026-10-31: 「我覺得排除針對告警就好吧？」 then 「等等目
 
 ## Decisions
 
-- One condition per lateral rule, `exclude: EndpointFilter | None`, applied to the detection's ends: left out when **a source end matches, or every target end matches** (targets non-empty). Account subjects are not ends; their source hosts are.
+- One condition per lateral rule, `exclude: EndpointFilter | None`, applied to the detection's ends: left out when **every source end matches, or every target end matches** (each side non-empty; "every" for sources too after the security review: one stray source of an account fan-out must not silence it). Ends capped at 5000 (beyond: unknown, never left out). Account subjects are not ends; their source hosts are.
 - Ends are stored with the detection (`detections.ends_json`, migration 0011): `[[role, key, ip], ...]`, role `s`/`t`, key href or `ip:…`. Labels come from the current inventory at evaluation. Rows stored before have no ends → nothing to compare → never excluded (fail open towards alerting).
 - `EndpointFilter.public: bool` = `netaddr.outside(ip, href)` (a public address no Workload holds). Works in `to_sql` (UDF), `matches`, and goes residual in `to_pce_payload`.
 - `EndpointFilter.ip_lists: tuple[str, ...]` (PCE IP list hrefs), synced by the inventory collector into flowdb `ip_list_ranges(href, net)`; ranges and exclusions resolved with `policy_resolver.build_iplist_to_cidrs`. A deleted list matches nothing.

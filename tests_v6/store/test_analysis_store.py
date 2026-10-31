@@ -148,6 +148,21 @@ def test_a_detection_keeps_every_end_it_was_seen_with(conn):
     assert json.loads(row["ends_json"]) == [*first, ["t", "ip:8.8.8.8", "8.8.8.8"]]
 
 
+def test_too_many_ends_are_unknown(conn):
+    # security review 2026-10-31: the merge is bounded; past the cap the ends are unknown, which never leaves out
+    many = [["t", f"ip:10.1.{i // 250}.{i % 250}", f"10.1.{i // 250}.{i % 250}"] for i in range(analysis.MAX_ENDS + 1)]
+    analysis.upsert_detections(conn, [replace(_det(), ends_json=json.dumps(many))], dedup=DEDUP, late=False, at=NOW)
+    assert analysis.detections_since(conn, NOW - timedelta(days=1), limit=10)[0]["ends_json"] is None
+    analysis.upsert_detections(conn, [replace(_det("fanout|w2"), ends_json=json.dumps(many[:-1]))],
+                               dedup=DEDUP, late=False, at=NOW)
+    later = NOW + timedelta(minutes=30)
+    analysis.upsert_detections(conn, [replace(_det("fanout|w2", seen=later), ends_json=json.dumps(many[-2:]))],
+                               dedup=DEDUP, late=False, at=later)
+    row = next(r for r in analysis.detections_since(conn, NOW - timedelta(days=1), limit=10)
+               if r["fingerprint"] == "fanout|w2")
+    assert row["ends_json"] is None
+
+
 def test_a_detection_stored_before_ends_has_none(conn):
     analysis.upsert_detections(conn, [_det()], dedup=DEDUP, late=False, at=NOW)
     conn.execute("UPDATE detections SET ends_json = NULL")
