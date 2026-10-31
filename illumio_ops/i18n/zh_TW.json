@@ -2474,6 +2474,6 @@
   "migrate_siem_destinations_listed": "各目的地分列如下",
   "siem_stuck": "同一筆已失敗 {n} 次",
   "siem_internal_only": "排除公網位址",
-  "siem_internal_only_hint": "只送兩端都是內部位址的連線（東西向）；網際網路對防火牆公網位址的掃描不送",
+  "siem_internal_only_hint": "只送兩端都在內部的連線（內部位址或 PCE 上的 Workload，即東西向）；網際網路對防火牆公網位址的掃描不送",
   "migrate_siem_internal_only": "兩端有公網位址的新連線不送（網際網路掃描會灌爆 SIEM）；要送請到 SIEM 頁取消勾選"
 }

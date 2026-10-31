@@ -451,8 +451,7 @@ export function Lateral() {
           <label className="check">
             <input type="checkbox" name="exclude_public" checked={settings.detectors.exclude_public}
                    onChange={(e) => change({ ...settings, detectors: { ...settings.detectors, exclude_public: e.target.checked } })} />
-            {t("det_exclude_public")}
-            <span className="hint">{t("det_exclude_public_hint")}</span>
+            <span>{t("det_exclude_public")} <span className="hint">{t("det_exclude_public_hint")}</span></span>
           </label>
         </div>
 

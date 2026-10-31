@@ -2474,6 +2474,6 @@
   "migrate_siem_destinations_listed": "each destination is listed below",
   "siem_stuck": "The same record failed {n} times",
   "siem_internal_only": "Leave out public addresses",
-  "siem_internal_only_hint": "send only connections whose two ends are internal addresses (east-west); internet scans of a firewall's public address are left out",
+  "siem_internal_only_hint": "send only connections whose two ends are inside (an internal address or a workload, i.e. east-west); internet scans of a firewall's public address are left out",
   "migrate_siem_internal_only": "new connections with a public end are left out (internet scans would flood it); untick on the SIEM page to send them"
 }

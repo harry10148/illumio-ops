@@ -85,3 +85,19 @@ def test_anomaly_settings_and_port_class_saved_and_kept(context, live_app):
     page.wait_for_selector("[data-role=lateral-settings]")
     expect(page.locator("input[name=peer_group_keys]")).to_have_value("app, env")
     expect(page.locator("[data-role=admin-ports] tr[data-port='1521'] [data-class=database]")).to_have_text("Database")
+
+
+def test_public_exclusion_on_by_default_and_turned_off(context, live_app):
+    page = context.new_page()
+    _open(page, live_app.url)
+    form = page.locator("[data-role=lateral-settings]")
+    box = form.locator("input[name=exclude_public]")
+    expect(box).to_be_checked()
+    expect(form.locator("label.check:has(input[name=exclude_public])")).to_contain_text("internet scans")
+    box.uncheck()
+    form.get_by_role("button", name="Save").click()
+    expect(form.locator(".form-ok")).to_have_text("Saved.")
+    assert live_app.ctx.settings.current().lateral.detectors.exclude_public is False
+    page.reload()
+    page.wait_for_selector("[data-role=lateral-settings]")
+    expect(page.locator("input[name=exclude_public]")).not_to_be_checked()
