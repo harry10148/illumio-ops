@@ -455,3 +455,27 @@ def test_no_admin_ports_disables_only_management_detectors():
     assert MANAGEMENT_DETECTORS == {DetectorKind.FANOUT, DetectorKind.NEW_ADMIN_CONNECTION, DetectorKind.PIVOT_CHAIN,
                                     DetectorKind.NON_ADMIN_GROUP, DetectorKind.CROSS_ENV, DetectorKind.ACCOUNT_FANOUT,
                                     DetectorKind.UNEXPECTED_INITIATOR}
+
+
+# ── ends: what an alert rule's exclusion compares (user 2026-10-31) ──────────
+
+def _targets(d):
+    return sorted(k for role, k, _ in d.ends if role == "t")
+
+
+def test_fanout_ends_are_its_source_and_every_target():
+    [d] = detect_fanout(inp(fan("/w/a", 12)))[0]
+    assert [e for e in d.ends if e[0] == "s"] == [("s", "/w/a", "10.0.0.1")]
+    assert _targets(d) == [f"/w/t{i:02d}" for i in range(12)]
+
+
+def test_unexpected_initiator_ends_hold_every_target_of_the_process():
+    [d] = detect_unexpected_initiator(inp([obs("/w/a", "/w/b", proc="powershell.exe"),
+                                           obs("/w/a", "/w/c", proc="powershell.exe")]))[0]
+    assert _targets(d) == ["/w/b", "/w/c"]
+
+
+def test_pivot_chain_ends_are_the_start_the_pivot_and_the_target():
+    legs = [obs("/w/a", "/w/b", port=22, decision="allowed"), obs("/w/b", "/w/c", port=22, decision="allowed")]
+    [d] = detect_pivot_chain(inp(legs))[0]
+    assert [k for role, k, _ in d.ends if role == "s"] == ["/w/a"] and _targets(d) == ["/w/b", "/w/c"]

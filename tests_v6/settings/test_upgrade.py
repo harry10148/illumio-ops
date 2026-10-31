@@ -4,6 +4,7 @@ import os
 
 import pytest
 
+from illumio_ops.domain.filter import EndpointFilter
 from illumio_ops.settings.schema import SCHEMA_VERSION, default_settings
 from illumio_ops.settings.store import SettingsInvalid, SettingsStore, validate_settings
 from illumio_ops.settings.upgrade import upgrade
@@ -32,7 +33,7 @@ def test_v1_file_loads_as_v2_in_memory(tmp_path):
     p = _v1(tmp_path)
     before, mtime = p.read_bytes(), os.stat(p).st_mtime_ns
     s = SettingsStore(p).load()
-    assert s.schema_version == SCHEMA_VERSION == 11
+    assert s.schema_version == SCHEMA_VERSION == 12
     assert s.collection.traffic_interval_seconds == 600
     assert s.collection.retention.baseline_days == 30
     assert p.read_bytes() == before and os.stat(p).st_mtime_ns == mtime
@@ -134,7 +135,7 @@ def _v4_dict():
 
 def test_v4_file_upgrades_to_v5_keeping_values():
     s = validate_settings(upgrade(_v4_dict()))
-    assert s.schema_version == SCHEMA_VERSION == 11
+    assert s.schema_version == SCHEMA_VERSION == 12
     lat = s.lateral
     assert lat.detectors.fanout_targets == 12
     assert lat.extra_admin_ports[0].category == "remote" and lat.removed_admin_ports[0].port == 23
@@ -171,7 +172,7 @@ def test_v5_file_upgrades_to_v6_with_reports():
     d["schema_version"] = 5
     del d["reports"]
     s = validate_settings(upgrade(d))
-    assert s.schema_version == SCHEMA_VERSION == 11
+    assert s.schema_version == SCHEMA_VERSION == 12
     assert s.reports.retention_days == 90
 
 
@@ -182,7 +183,7 @@ def test_v6_file_upgrades_to_v7_with_rule_thresholds():
     del d["reports"]["rule_thresholds"]
     d["reports"]["retention_days"] = 30
     s = validate_settings(upgrade(d))
-    assert s.schema_version == SCHEMA_VERSION == 11
+    assert s.schema_version == SCHEMA_VERSION == 12
     assert s.reports.retention_days == 30 and s.reports.rule_thresholds.unmanaged_connection == 50
 
 
@@ -193,7 +194,7 @@ def test_upgrade_keeps_mode(mode):
     d["schema_version"] = 7
     d["collection"]["mode"] = mode
     s = validate_settings(upgrade(d))
-    assert s.schema_version == SCHEMA_VERSION == 11 and s.collection.mode.value == mode
+    assert s.schema_version == SCHEMA_VERSION == 12 and s.collection.mode.value == mode
 
 
 def test_events_only_becomes_lightweight():
@@ -203,9 +204,32 @@ def test_events_only_becomes_lightweight():
     assert validate_settings(upgrade(d)).collection.mode.value == "lightweight"
 
 
-def test_a_v10_file_leaves_public_addresses_out_of_detection():
+def _v11(*, exclude_public):
     d = default_settings(password_hash=HASH, secret_key=KEY).model_dump(mode="json")
-    d["schema_version"] = 10
-    del d["lateral"]["detectors"]["exclude_public"]
+    d["schema_version"] = 11
+    d["lateral"]["detectors"]["exclude_public"] = exclude_public
+    for r in d["alerts"]["rules"]:
+        r.pop("exclude", None)
+    return d
+
+
+def test_a_v11_file_moves_the_public_exclusion_to_its_lateral_rules():
+    # User 2026-10-31: the exclusion is for alerts; what detection left out, every lateral rule now leaves out
+    s = validate_settings(upgrade(_v11(exclude_public=True)))
+    assert s.schema_version == SCHEMA_VERSION
+    lateral = [r for r in s.alerts.rules if r.type == "lateral"]
+    assert lateral and all(r.exclude == EndpointFilter(public=True) for r in lateral)
+    assert not hasattr(s.lateral.detectors, "exclude_public")
+
+
+def test_a_v11_file_that_detected_public_ends_alerts_on_them_still():
+    s = validate_settings(upgrade(_v11(exclude_public=False)))
+    assert all(r.exclude is None for r in s.alerts.rules if r.type == "lateral")
+
+
+def test_a_lateral_rule_keeps_an_exclusion_it_already_has():
+    d = _v11(exclude_public=True)
+    rule = next(r for r in d["alerts"]["rules"] if r["type"] == "lateral")
+    rule["exclude"] = {"ips": ["10.9.0.0/16"]}
     s = validate_settings(upgrade(d))
-    assert s.schema_version == SCHEMA_VERSION and s.lateral.detectors.exclude_public is True
+    assert next(r for r in s.alerts.rules if r.id == rule["id"]).exclude == EndpointFilter(ips=("10.9.0.0/16",))

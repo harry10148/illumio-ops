@@ -12,7 +12,7 @@ Time is the VEN-reported timestamp_range of a daily flow bucket, at ten-minute g
 from __future__ import annotations
 
 from collections import Counter
-from collections.abc import Callable, Collection, Mapping, Sequence
+from collections.abc import Callable, Collection, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field, replace
 from datetime import datetime, timedelta
 from typing import Any
@@ -38,6 +38,7 @@ from illumio_ops.domain.values import (
 
 SAMPLE = 10  # target names a detection's summary carries; the count is always the full one
 Gap = tuple[datetime, datetime, str]
+End = tuple[str, str, str]  # (role "s" source / "t" target, host key, address)
 
 
 @dataclass(frozen=True)
@@ -86,6 +87,7 @@ class Detection:
     summary: Mapping[str, Any]
     segment: FlowSegment              # reproduces the evidence: detail view over the evidence period
     confidence: DetectionConfidence
+    ends: tuple[End, ...] = ()        # every source and target host: what an alert rule's exclusion compares
 
 
 @dataclass(frozen=True)
@@ -213,6 +215,13 @@ def _dst_host(o: Obs, inp: DetectorInput) -> HostInfo:
     return inp.hosts(o.dst_key, o.dst_ip, o.dst_hostname, o.dst_labels)
 
 
+def ends(sources: Iterable[Obs] = (), targets: Iterable[Obs] = ()) -> tuple[End, ...]:
+    """The hosts a detection is about, each once: its sources and every one of its targets (an exclusion that
+    holds for all targets leaves the detection out, so none may be missing)."""
+    return tuple(dict.fromkeys([("s", o.src_key, o.src_ip) for o in sources]
+                               + [("t", o.dst_key, o.dst_ip) for o in targets]))
+
+
 def _endpoint(href: str | None, ip: str) -> EndpointFilter:
     return EndpointFilter(hrefs=(href,)) if href else EndpointFilter(ips=(ip,))
 
@@ -274,7 +283,7 @@ def detect_fanout(inp: DetectorInput) -> tuple[list[Detection], DetectorStatus]:
                      "ports": sorted({o.port for o in window_rows if o.port is not None}),
                      "window_minutes": int(cfg.fanout_window / timedelta(minutes=1))},
             segment=evidence(inp, last - cfg.fanout_window, last, src=window_rows[-1], classes=EXECUTION_OR_DATA),
-            confidence=DetectionConfidence(incomplete_gaps=inp.gaps)))
+            confidence=DetectionConfidence(incomplete_gaps=inp.gaps), ends=ends(window_rows[-1:], window_rows)))
     return out, DetectorStatus(DetectorKind.FANOUT, DetectorState.OK)
 
 
@@ -303,7 +312,8 @@ def detect_new_admin(inp: DetectorInput) -> tuple[list[Detection], DetectorStatu
             first_seen=inp.baseline_first_seen[(src, dst, port, proto)], last_seen=o.last, critical_asset=critical,
             summary={"target": o.dst_hostname or o.dst_ip, "port": port, "proto": proto, "decision": o.decision},
             segment=evidence(inp, o.first, o.last, src=o, dst=o, classes=EXECUTION_OR_DATA),
-            confidence=DetectionConfidence(baseline_days=round(inp.baseline_days, 1), incomplete_gaps=inp.gaps)))
+            confidence=DetectionConfidence(baseline_days=round(inp.baseline_days, 1), incomplete_gaps=inp.gaps),
+            ends=ends((o,), (o,))))
     return out, DetectorStatus(DetectorKind.NEW_ADMIN_CONNECTION, DetectorState.OK)
 
 
@@ -319,8 +329,8 @@ def _window_start(rows: Sequence[Obs], last: datetime, window: timedelta) -> dat
 
 
 def _max_window(rows: list[Obs], window: timedelta, key: Callable[[Obs], str],
-                ends: Callable[[Obs], bool]) -> tuple[int, int, int] | None:
-    """Over rows sorted by last: the window of at most `window` ending at a row `ends` accepts that holds
+                closes: Callable[[Obs], bool]) -> tuple[int, int, int] | None:
+    """Over rows sorted by last: the window of at most `window` ending at a row `closes` accepts that holds
     the most distinct key values -> (count, first index, last index)."""
     counts: Counter[str] = Counter()
     best: tuple[int, int, int] | None = None
@@ -332,7 +342,7 @@ def _max_window(rows: list[Obs], window: timedelta, key: Callable[[Obs], str],
             if not counts[key(rows[j])]:
                 del counts[key(rows[j])]
             j += 1
-        if ends(o) and (best is None or len(counts) > best[0]):
+        if closes(o) and (best is None or len(counts) > best[0]):
             best = (len(counts), j, i)
     return best
 
@@ -368,7 +378,7 @@ def detect_pivot_chain(inp: DetectorInput) -> tuple[list[Detection], DetectorSta
             summary={"via": ab.dst_hostname or ab.dst_ip, "target": bc.dst_hostname or bc.dst_ip,
                      "ports": [ab.port, bc.port], "chains_through_pivot": per_pivot[b]},
             segment=evidence(inp, min(ab.first, bc.first), max(ab.last, bc.last), src=ab, classes=EXECUTION),
-            confidence=DetectionConfidence(incomplete_gaps=inp.gaps)))
+            confidence=DetectionConfidence(incomplete_gaps=inp.gaps), ends=ends((ab,), (ab, bc))))
     return out, DetectorStatus(DetectorKind.PIVOT_CHAIN, DetectorState.OK)
 
 
@@ -424,6 +434,7 @@ def detect_blocked_surge(inp: DetectorInput) -> tuple[list[Detection], DetectorS
         if n < cfg.blocked_targets or (previous and n < cfg.blocked_surge_factor * previous):
             continue
         rows = sorted((o for o in inp.blocked_obs if o.src_key == src), key=lambda o: o.last)
+        in_window = [o for o in rows if o.last >= rows[-1].last - cfg.blocked_window]
         out.append(Detection(
             detector=DetectorKind.BLOCKED_SURGE, fingerprint=f"blocked|{src}", subject_key=src, severity=Severity.MEDIUM,
             first_seen=_window_start(rows, rows[-1].last, cfg.blocked_window), last_seen=rows[-1].last,
@@ -433,7 +444,7 @@ def detect_blocked_surge(inp: DetectorInput) -> tuple[list[Detection], DetectorS
             segment=FlowSegment(filter=FilterSpec(start=rows[-1].last - cfg.blocked_window, end=rows[-1].last,
                                                   src=_endpoint(rows[-1].src_href, rows[-1].src_ip)),
                                 view=SegmentView.DETAIL, limit=200),
-            confidence=DetectionConfidence(incomplete_gaps=inp.gaps)))
+            confidence=DetectionConfidence(incomplete_gaps=inp.gaps), ends=ends(rows[-1:], in_window)))
     return out, DetectorStatus(DetectorKind.BLOCKED_SURGE, DetectorState.OK)
 
 
@@ -461,7 +472,7 @@ def detect_non_admin_group(inp: DetectorInput) -> tuple[list[Detection], Detecto
             critical_asset=critical,
             summary={"target": o.dst_hostname or o.dst_ip, "port": port, "proto": proto, "decision": o.decision},
             segment=evidence(inp, o.first, o.last, src=o, dst=o, classes=EXECUTION),
-            confidence=DetectionConfidence(incomplete_gaps=inp.gaps)))
+            confidence=DetectionConfidence(incomplete_gaps=inp.gaps), ends=ends((o,), (o,))))
     return out, DetectorStatus(DetectorKind.NON_ADMIN_GROUP, DetectorState.OK)
 
 
@@ -485,7 +496,7 @@ def detect_cross_env(inp: DetectorInput) -> tuple[list[Detection], DetectorStatu
             summary={"target": o.dst_hostname or o.dst_ip, "src_env": se, "dst_env": de, "port": port,
                      "decision": o.decision},
             segment=evidence(inp, o.first, o.last, src=o, dst=o, classes=EXECUTION_OR_DATA),
-            confidence=DetectionConfidence(incomplete_gaps=inp.gaps)))
+            confidence=DetectionConfidence(incomplete_gaps=inp.gaps), ends=ends((o,), (o,))))
     return out, DetectorStatus(DetectorKind.CROSS_ENV, DetectorState.OK)
 
 
@@ -525,7 +536,7 @@ def detect_account_fanout(inp: DetectorInput) -> tuple[list[Detection], Detector
                                                   ports=cfg.admin_ports.port_filters(EXECUTION)),
                                 view=SegmentView.DETAIL, limit=200),
             confidence=DetectionConfidence(field="initiator_user", covered=len(covered), total=len(in_window),
-                                           incomplete_gaps=inp.gaps)))
+                                           incomplete_gaps=inp.gaps), ends=ends(window_rows, window_rows)))
     return out, _coverage_status(DetectorKind.ACCOUNT_FANOUT, ("detector_partial_users", "detector_partial_users_none_from"),
                                  {"covered": len(covered), "total": len(in_window)}, len(covered) < len(in_window),
                                  _kinds_without(in_window, lambda o: bool(o.initiator_user), inp))
@@ -537,6 +548,7 @@ def detect_unexpected_initiator(inp: DetectorInput) -> tuple[list[Detection], De
     called unexpected."""
     cfg = inp.config
     found: dict[tuple[str, str, int, int], Obs] = {}
+    targets: dict[tuple[str, str, int, int], list[Obs]] = {}
     judged = not_evaluable = 0
     listed: list[Obs] = []
     for o in of_class(inp, EXECUTION):
@@ -552,6 +564,7 @@ def detect_unexpected_initiator(inp: DetectorInput) -> tuple[list[Detection], De
         judged += 1
         if o.initiator_process not in expected:
             found.setdefault((o.src_key, o.initiator_process, o.port, o.proto), o)
+            targets.setdefault((o.src_key, o.initiator_process, o.port, o.proto), []).append(o)
     if not judged and not_evaluable:
         return [], DetectorStatus(DetectorKind.UNEXPECTED_INITIATOR, DetectorState.NO_DATA, "detector_no_process_data",
                                   {"not_evaluable": not_evaluable})
@@ -565,7 +578,8 @@ def detect_unexpected_initiator(inp: DetectorInput) -> tuple[list[Detection], De
             summary={"process": process, "port": port, "proto": proto, "target": o.dst_hostname or o.dst_ip},
             segment=evidence(inp, o.first, o.last, src=o, classes=EXECUTION),
             confidence=DetectionConfidence(field="initiator_process", covered=judged, total=judged + not_evaluable,
-                                           incomplete_gaps=inp.gaps)))
+                                           incomplete_gaps=inp.gaps),
+            ends=ends((o,), targets[(src, process, port, proto)])))
     if not not_evaluable:
         return out, DetectorStatus(DetectorKind.UNEXPECTED_INITIATOR, DetectorState.OK,
                                    params={"not_evaluable": 0})

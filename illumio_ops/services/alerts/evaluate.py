@@ -11,7 +11,7 @@ from __future__ import annotations
 import functools
 import json
 import threading
-from collections.abc import Callable, Collection, Sequence
+from collections.abc import Callable, Collection, Mapping, Sequence
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
@@ -20,6 +20,7 @@ from pydantic import BaseModel
 
 from illumio_ops.domain.alerting import (
     DetectionFact,
+    EndFact,
     EventFact,
     IncrementFacts,
     IncrementTopFact,
@@ -75,6 +76,7 @@ from illumio_ops.settings.schema import Settings
 from illumio_ops.store import alerts as store
 from illumio_ops.store.flowdb import analysis, ingest_state, workloads
 from illumio_ops.store.flowdb.db import StaleGeneration
+from illumio_ops.store.flowdb.labels import label_sets
 
 EVENT_BATCH = 5_000
 EVENT_BATCHES = 10
@@ -351,10 +353,29 @@ def _previous_severity(conn: Any, rule_id: str, fingerprint: str) -> Severity | 
     return Severity(json.loads(last["facts_json"]).get("detection_severity") or last["severity"])
 
 
-def detection_fact(row: Any, *, start: tuple[str, int], names: dict[str, str | None],
-                    previous: Severity | None) -> DetectionFact:
+def inventory(conn: Any) -> tuple[dict[str, str | None], dict[str, dict[str, str]]]:
+    """Each Workload's hostname and current labels, by href (what detection_fact names and excludes with)."""
+    rows = workloads.all_workloads(conn)
+    sets = label_sets(conn, {w.label_set for w in rows if w.label_set is not None})
+    return ({w.href: w.hostname for w in rows},
+            {w.href: sets.get(w.label_set, {}) for w in rows if w.label_set is not None})
+
+
+def _ends(raw: str | None, labels: Mapping[str, Mapping[str, str]]) -> tuple[EndFact, ...] | None:
+    if raw is None:
+        return None
+    out = []
+    for role, key, ip in json.loads(raw):
+        href = None if key.startswith("ip:") else key
+        out.append(EndFact(role=role, href=href, ip=ip, labels=labels.get(href, {}) if href else {}))
+    return tuple(out)
+
+
+def detection_fact(row: Any, *, start: tuple[str, int], names: Mapping[str, str | None],
+                   labels: Mapping[str, Mapping[str, str]], previous: Severity | None) -> DetectionFact:
     """previous: the detection's severity when the rule last evaluated it; None for one the rule has not seen,
-    which only sets the baseline (a detection older than alerting is history, spec §7)."""
+    which only sets the baseline (a detection older than alerting is history, spec §7). labels: the Workloads'
+    current labels, which a rule's exclusion compares the detection's ends with."""
     severity = Severity(row["severity"])
     is_new = _is_new(row, start)
     rose = previous is not None and SEVERITY_ORDER.index(severity) > SEVERITY_ORDER.index(previous)
@@ -364,7 +385,8 @@ def detection_fact(row: Any, *, start: tuple[str, int], names: dict[str, str | N
         severity=severity, critical_asset=bool(row["critical_asset"]), late=bool(row["late"]),
         first_seen=datetime.fromisoformat(row["first_seen"]), last_seen=datetime.fromisoformat(row["last_seen"]),
         summary=json.loads(row["summary_json"]), segment=FlowSegment.model_validate_json(row["segment_json"]),
-        confidence=json.loads(row["confidence_json"]), is_new=is_new, severity_rose=rose)
+        confidence=json.loads(row["confidence_json"]), is_new=is_new, severity_rose=rose,
+        ends=_ends(row["ends_json"], labels))
 
 
 def _mark(value: str) -> tuple[str, int]:
@@ -390,7 +412,7 @@ def evaluate_lateral(ctx: AppContext, *, now: datetime | None = None) -> EvalRun
     wanted = {d for r in rules for d in r.detectors}
     rec = _Recorder(ctx, s, at)
     with ctx.flows().connect() as conn:
-        names = {w.href: w.hostname for w in workloads.all_workloads(conn)}
+        names, labels = inventory(conn)
     marks = known.list_known(ctx).items
     for _ in range(DETECTION_BATCHES):
         with ctx.flows().connect() as conn:
@@ -406,7 +428,7 @@ def evaluate_lateral(ctx: AppContext, *, now: datetime | None = None) -> EvalRun
                 if not _is_new(row, start):  # changed, not new: alert again only if its severity rose
                     with ctx.db() as conn:
                         previous = _previous_severity(conn, rule.id, row["fingerprint"])
-                facts.append(detection_fact(row, start=start, names=names, previous=previous))
+                facts.append(detection_fact(row, start=start, names=names, labels=labels, previous=previous))
                 if DetectorKind(row["detector"]) in rule.detectors:
                     rec.seen.append((rule.id, row["fingerprint"], row["severity"]))
             rec.record(rule, known.apply_known(evaluate_lateral_rule(rule, facts), marks))

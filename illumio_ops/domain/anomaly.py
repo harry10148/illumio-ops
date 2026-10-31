@@ -26,6 +26,7 @@ from illumio_ops.domain.detectors import (
     _dst_host,
     _kinds_without,
     _src_host,
+    ends,
     evaluable,
     not_blocked,
 )
@@ -145,7 +146,8 @@ def detect_peer_deviation(inp: DetectorInput) -> tuple[list[Detection], Detector
                                                   src=_endpoint(src, o.src_ip), dst=_endpoint(o.dst_key, o.dst_ip),
                                                   ports=(PortProto(port=port, proto=proto),)),
                                 view=SegmentView.DETAIL, limit=200),
-            confidence=DetectionConfidence(baseline_days=round(inp.baseline_days, 1), incomplete_gaps=inp.gaps)))
+            confidence=DetectionConfidence(baseline_days=round(inp.baseline_days, 1), incomplete_gaps=inp.gaps),
+            ends=ends((o,), (o,))))
     return out, _status(kind)
 
 
@@ -187,7 +189,8 @@ def _surge(inp: DetectorInput, kind: DetectorKind, cls: str, min_connections: in
             segment=FlowSegment(filter=FilterSpec(start=hi - SURGE_WINDOW, end=hi, src=_endpoint(src, ip),
                                                   decisions=NOT_BLOCKED, ports=ports),
                                 view=SegmentView.DETAIL, limit=200),
-            confidence=DetectionConfidence(incomplete_gaps=(*inp.gaps, *data.activity_gaps))))
+            confidence=DetectionConfidence(incomplete_gaps=(*inp.gaps, *data.activity_gaps)),
+            ends=(("s", src, ip),)))
     if data.activity_gaps:  # the history compared with has holes: a surge may only look like one
         return out, _status(kind, DetectorState.INCOMPLETE, history_gaps=len(data.activity_gaps))
     return out, _status(kind)
@@ -255,7 +258,7 @@ def detect_account_new_source(inp: DetectorInput) -> tuple[list[Detection], Dete
                                                   initiator_user=hits[0].initiator_user, decisions=NOT_BLOCKED),
                                 view=SegmentView.DETAIL, limit=200),
             confidence=DetectionConfidence(field="initiator_user", covered=len(covered), total=len(rows),
-                                           incomplete_gaps=inp.gaps)))
+                                           incomplete_gaps=inp.gaps), ends=ends(hits, hits)))
     return out, _coverage_status(kind, ("detector_partial_users", "detector_partial_users_none_from"),
                                  {"covered": len(covered), "total": len(rows)}, len(covered) < len(rows),
                                  _kinds_without(rows, lambda o: bool(o.initiator_user), inp))
@@ -304,7 +307,7 @@ def detect_suspicious_tool(inp: DetectorInput) -> tuple[list[Detection], Detecto
                                                   initiator_process=process),
                                 view=SegmentView.DETAIL, limit=200),
             confidence=DetectionConfidence(field="initiator_process", covered=len(covered), total=len(rows),
-                                           incomplete_gaps=inp.gaps)))
+                                           incomplete_gaps=inp.gaps), ends=ends(hits[:1], hits)))
     return out, _process_status(kind, inp, rows, covered)
 
 
@@ -350,7 +353,8 @@ def detect_new_process(inp: DetectorInput) -> tuple[list[Detection], DetectorSta
                                                   initiator_process=process),
                                 view=SegmentView.DETAIL, limit=200),
             confidence=DetectionConfidence(field="initiator_process", covered=len(covered), total=len(rows),
-                                           baseline_days=round(inp.baseline_days, 1), incomplete_gaps=inp.gaps)))
+                                           baseline_days=round(inp.baseline_days, 1), incomplete_gaps=inp.gaps),
+            ends=ends(hits[:1], hits)))
     return out, _process_status(kind, inp, rows, covered)
 
 
@@ -411,7 +415,7 @@ def detect_auth_to_non_dc(inp: DetectorInput) -> tuple[list[Detection], Detector
             critical_asset=host.critical,
             summary={"target": o.dst_hostname or o.dst_ip, "port": port, "decision": o.decision},
             segment=_pair_segment(o),
-            confidence=DetectionConfidence(incomplete_gaps=inp.gaps)))
+            confidence=DetectionConfidence(incomplete_gaps=inp.gaps), ends=ends((o,), (o,))))
     return out, _servers_status(kind, data)
 
 
@@ -453,7 +457,8 @@ def detect_new_dc_client(inp: DetectorInput) -> tuple[list[Detection], DetectorS
             critical_asset=critical,
             summary={"target": o.dst_hostname or o.dst_ip, "port": o.port, "managed": o.src_managed},
             segment=_pair_segment(o),
-            confidence=DetectionConfidence(baseline_days=round(inp.baseline_days, 1), incomplete_gaps=inp.gaps)))
+            confidence=DetectionConfidence(baseline_days=round(inp.baseline_days, 1), incomplete_gaps=inp.gaps),
+            ends=ends((o,), (o,))))
     return out, _servers_status(kind, data)
 
 

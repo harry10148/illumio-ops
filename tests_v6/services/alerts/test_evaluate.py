@@ -368,7 +368,7 @@ def test_volume_no_byte_data_status(ctx):
 
 # ── lateral ──
 
-def _detect(ctx, severity="medium", fp="fanout|h1", at=NOW):
+def _detect(ctx, severity="medium", fp="fanout|h1", at=NOW, ends=(("s", "/orgs/1/workloads/h1", "10.0.0.1"),)):
     from illumio_ops.domain.filter import FilterSpec
     from illumio_ops.domain.segment import FlowSegment
     from illumio_ops.domain.values import SegmentView
@@ -378,7 +378,7 @@ def _detect(ctx, severity="medium", fp="fanout|h1", at=NOW):
             detector="fanout", fingerprint=fp, subject_key="/orgs/1/workloads/h1", severity=severity,
             first_seen=at - minutes(30), last_seen=at, critical_asset=False,
             summary_json=json.dumps({"targets": 12, "window_minutes": 60}), segment_json=seg.model_dump_json(),
-            confidence_json="{}")], dedup={"fanout": timedelta(hours=1)}, late=False, at=at)
+            confidence_json="{}", ends_json=json.dumps(ends))], dedup={"fanout": timedelta(hours=1)}, late=False, at=at)
 
 
 def test_lateral_alert_on_new_detection(ctx):
@@ -406,6 +406,35 @@ def _lateral_rules(ctx, **values):
             if r["type"] == "lateral":
                 r.update(values)
     ctx.settings.update(ctx.settings.current().revision, change)
+
+
+SCAN = (("s", "ip:66.132.186.241", "66.132.186.241"), ("t", "ip:114.35.37.162", "114.35.37.162"))
+EGRESS = (("s", "/orgs/1/workloads/h1", "10.0.0.1"), ("t", "ip:20.27.177.113", "20.27.177.113"))
+
+
+def test_default_lateral_rules_leave_the_internet_side_out(ctx):
+    # User 2026-10-31: the exclusion is for alerts. The scan and the egress are detections (the lateral page shows
+    # them) but no default rule alerts on them; an east-west one still alerts.
+    evaluate_lateral(ctx, now=NOW)
+    _detect(ctx, fp="fanout|scan", at=NOW + minutes(1), ends=SCAN)
+    _detect(ctx, fp="fanout|egress", at=NOW + minutes(1), ends=EGRESS)
+    _detect(ctx, fp="fanout|h1", at=NOW + minutes(1))
+    assert evaluate_lateral(ctx, now=NOW + minutes(2)).fired == 1
+    assert [a["subject_key"] for a in _alerts(ctx)] == ["fanout|h1"]
+
+
+def test_a_rule_without_exclusion_alerts_on_the_internet_side(ctx):
+    _lateral_rules(ctx, exclude=None)
+    evaluate_lateral(ctx, now=NOW)
+    _detect(ctx, fp="fanout|scan", at=NOW + minutes(1), ends=SCAN)
+    assert evaluate_lateral(ctx, now=NOW + minutes(2)).fired == 1
+
+
+def test_a_rule_leaves_out_an_address_range(ctx):
+    _lateral_rules(ctx, exclude={"ips": ["10.0.0.0/24"]})
+    evaluate_lateral(ctx, now=NOW)
+    _detect(ctx, at=NOW + minutes(1))
+    assert evaluate_lateral(ctx, now=NOW + minutes(2)).fired == 0
 
 
 def test_lateral_alerts_when_a_detection_first_reaches_the_floor(ctx):

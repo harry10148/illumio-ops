@@ -3,6 +3,7 @@ from datetime import UTC, datetime, timedelta
 
 from illumio_ops.domain.alerting import (
     DetectionFact,
+    EndFact,
     EventFact,
     GapFact,
     IncrementFacts,
@@ -28,7 +29,12 @@ from illumio_ops.domain.alertrules import (
     TrafficRule,
     VolumeRule,
 )
-from illumio_ops.domain.filter import FilterSpec, FlowCondition
+from illumio_ops.domain.filter import (
+    EndpointFilter,
+    FilterSpec,
+    FlowCondition,
+    LabelCond,
+)
 from illumio_ops.domain.segment import EventSegment, FlowSegment
 from illumio_ops.domain.values import (
     DetectorKind,
@@ -193,13 +199,13 @@ def det(**kw):
     d = {"id": 1, "detector": DetectorKind.FANOUT, "fingerprint": "fanout|h1", "subject_key": "/orgs/1/workloads/h1",
          "subject_name": "h1", "severity": Severity.MEDIUM,
          "critical_asset": False, "late": False, "first_seen": NOW - timedelta(hours=1), "last_seen": NOW,
-         "summary": {"targets": 12}, "segment": seg, "confidence": {}, "is_new": True, "severity_rose": False} | kw
+         "summary": {"targets": 12}, "segment": seg, "confidence": {}, "is_new": True, "severity_rose": False, "ends": ()} | kw
     return DetectionFact(**d)
 
 
 def lateral_rule(**kw):
     return LateralRule(**({**BASE, "severity": None, "type": "lateral", "detectors": (DetectorKind.FANOUT,),
-                           "min_severity": Severity.MEDIUM, "critical_assets_only": False} | kw))
+                           "min_severity": Severity.MEDIUM, "critical_assets_only": False, "exclude": None} | kw))
 
 
 def test_lateral_only_new_or_risen():
@@ -218,6 +224,44 @@ def test_lateral_min_severity_and_critical_only():
     assert evaluate_lateral_rule(lateral_rule(), [det(detector=DetectorKind.CROSS_ENV)]) == []
     [t] = evaluate_lateral_rule(lateral_rule(), [det(late=True)])
     assert t.late
+
+
+# ── exclusion (user 2026-10-31: 「排除針對告警就好」; labels, Workloads, addresses, public) ──
+
+def end(role, key, ip, labels=None):
+    return EndFact(role=role, href=None if key.startswith("ip:") else key, ip=ip, labels=labels or {})
+
+
+SCAN = (end("s", "ip:66.132.186.241", "66.132.186.241"), end("t", "ip:114.35.37.162", "114.35.37.162"))
+EGRESS = (end("s", "/w/a", "10.0.0.1"), end("t", "ip:20.27.177.113", "20.27.177.113"))
+MIXED = (end("s", "/w/a", "10.0.0.1"), end("t", "ip:8.8.8.8", "8.8.8.8"), end("t", "/w/b", "10.0.0.2", {"role": "db"}))
+PUBLIC = EndpointFilter(public=True)
+
+
+def test_exclusion_leaves_out_a_matching_source():
+    assert evaluate_lateral_rule(lateral_rule(exclude=PUBLIC), [det(ends=SCAN)]) == []
+
+
+def test_exclusion_leaves_out_a_detection_whose_every_target_matches():
+    assert evaluate_lateral_rule(lateral_rule(exclude=PUBLIC), [det(ends=EGRESS)]) == []
+
+
+def test_exclusion_keeps_a_detection_with_a_target_left():
+    assert len(evaluate_lateral_rule(lateral_rule(exclude=PUBLIC), [det(ends=MIXED)])) == 1
+
+
+def test_exclusion_by_label_address_and_workload():
+    by_label = EndpointFilter(labels=(LabelCond(key="role", values=("db",)),))
+    assert len(evaluate_lateral_rule(lateral_rule(exclude=by_label), [det(ends=MIXED)])) == 1  # 8.8.8.8 is left
+    both = EndpointFilter(labels=(LabelCond(key="role", values=("db",)),), ips=("8.8.0.0/16",))
+    assert evaluate_lateral_rule(lateral_rule(exclude=both), [det(ends=MIXED)]) == []
+    assert evaluate_lateral_rule(lateral_rule(exclude=EndpointFilter(hrefs=("/w/a",))), [det(ends=MIXED)]) == []
+
+
+def test_without_exclusion_or_without_ends_nothing_is_left_out():
+    assert len(evaluate_lateral_rule(lateral_rule(), [det(ends=SCAN)])) == 1
+    # stored before detections kept their ends: what they were about is unknown, so the rule cannot leave it out
+    assert len(evaluate_lateral_rule(lateral_rule(exclude=PUBLIC), [det(ends=None)])) == 1
 
 
 # ── system ──

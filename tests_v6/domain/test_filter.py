@@ -249,3 +249,69 @@ def test_new_conditions_stay_local_in_the_payload():
     assert payload["services"]["include"] == [] and residual.ports == s.ports
     assert payload["destinations"]["include"] == [[]] and residual.dst == s.dst
     assert residual.initiator_processes == ("bash",)
+
+
+# ── public: a public address no Workload holds (user 2026-10-31: alert rules leave the internet side out) ──
+
+PUBLIC_SPECS = [
+    {"src": EndpointFilter(public=True)},
+    {"dst": EndpointFilter(public=True)},
+    {"src_exclude": EndpointFilter(public=True)},
+    {"dst_exclude": EndpointFilter(public=True)},
+    {"src": EndpointFilter(public=True, ips=("10.0.0.1",))},
+    {"src": EndpointFilter(match="all", labels=(LabelCond(key="app", values=("DemoApp",)),), public=True)},
+]
+
+
+@pytest.fixture(scope="module")
+def public_store(tmp_path_factory):
+    from dataclasses import replace
+    db = FlowDb(tmp_path_factory.mktemp("p") / "flows.sqlite")
+    conn = db.connect()
+    base = normalize_flow(json.loads(FIXTURE.read_text())[0])
+    ends = [("10.0.0.1", "/orgs/1/workloads/a", "10.0.0.2", None), ("66.132.186.241", None, "114.35.37.162", None),
+            ("10.0.0.1", "/orgs/1/workloads/a", "8.8.8.8", None),
+            ("203.69.10.5", "/orgs/1/workloads/pub", "10.0.0.2", None)]
+    recs = [replace(base, src_ip=s, src_href=sh, dst_ip=d, dst_href=dh, port=1000 + i)
+            for i, (s, sh, d, dh) in enumerate(ends)]
+    upsert_flows(conn, recs, origin=DataOrigin.INGEST, now=T1)
+    for name, fn in sql_functions().items():
+        conn.create_function(name, -1, fn, deterministic=True)
+    rows = [dict(r) | {"src_labels": {}, "dst_labels": {}} for r in conn.execute("SELECT * FROM flows WHERE is_primary = 1")]
+    yield conn, rows
+    conn.close()
+
+
+@pytest.mark.parametrize("kw", PUBLIC_SPECS, ids=[str(i) for i in range(len(PUBLIC_SPECS))])
+def test_public_sql_and_predicate_agree(public_store, kw):
+    conn, rows = public_store
+    s = FilterSpec(**({"start": T0, "end": T1} | kw))
+    where, params = to_sql(s)
+    via_sql = {r[0] for r in conn.execute(f"SELECT f.id FROM flows f WHERE {where}", params)}
+    assert via_sql == {r["id"] for r in rows if matches(s, r)}
+
+
+def test_public_means_outside_the_estate(public_store):
+    _conn, rows = public_store
+    s = spec(src_exclude=EndpointFilter(public=True), dst_exclude=EndpointFilter(public=True))
+    kept = sorted((r["src_ip"], r["dst_ip"]) for r in rows if matches(s, r))
+    # the internet scan and the egress are out; a Workload numbered in public space is inside
+    assert kept == [("10.0.0.1", "10.0.0.2"), ("203.69.10.5", "10.0.0.2")]
+
+
+def test_public_is_a_condition_and_stays_local_for_the_pce():
+    assert not EndpointFilter(public=True).is_empty()
+    s = spec(src=EndpointFilter(public=True), dst_exclude=EndpointFilter(public=True, ips=("10.0.0.9",)))
+    payload, residual = to_pce_payload(s, max_results=10, query_name="q", label_hrefs={})
+    assert payload["sources"]["include"] == [[]]
+    assert residual.src == s.src
+    assert payload["destinations"]["exclude"] == [{"ip_address": "10.0.0.9"}]
+    assert residual.dst_exclude == s.dst_exclude
+
+
+def test_endpoint_matches_public():
+    from illumio_ops.domain.filter import endpoint_matches
+    ep = EndpointFilter(public=True)
+    assert endpoint_matches(ep, href=None, ip="8.8.8.8", labels={})
+    assert not endpoint_matches(ep, href="/w/1", ip="8.8.8.8", labels={})
+    assert not endpoint_matches(ep, href=None, ip="10.1.2.3", labels={})

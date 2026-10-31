@@ -14,7 +14,7 @@ from illumio_ops.domain.alertrules import (
     Throttle,
     TrafficRule,
 )
-from illumio_ops.domain.filter import FlowCondition
+from illumio_ops.domain.filter import EndpointFilter, FlowCondition
 from illumio_ops.domain.values import (
     DetectorKind,
     PolicyDecision,
@@ -56,6 +56,9 @@ _SYSTEM: tuple[tuple[str, SystemCheck, Severity], ...] = (
     ("rule_system_disk_low", SystemCheck.DISK_LOW, Severity.MEDIUM),
     ("rule_system_siem_backlog", SystemCheck.SIEM_BACKLOG, Severity.MEDIUM),
 )
+# Lateral rules leave out detections with a source, or only targets, outside the estate: internet scans of a firewall's
+# public address and connections out are not lateral movement (user 2026-10-31; the lateral page still shows them).
+NORTH_SOUTH = EndpointFilter(public=True)
 _LATERAL: tuple[tuple[str, DetectorKind], ...] = (
     ("rule_lateral_fanout", DetectorKind.FANOUT),
     ("rule_lateral_new_admin", DetectorKind.NEW_ADMIN_CONNECTION),
@@ -101,7 +104,8 @@ def best_practice_rules(*, notify_new_defaults: bool) -> tuple[AlertRule, ...]:
     for key, detector in _LATERAL:
         out.append(LateralRule(type="lateral", id=pack_rule_id(key), name="", pack_key=key, enabled=True,
                                notify=notify_new_defaults, severity=None, cooldown_minutes=0, throttle=None,
-                               detectors=(detector,), min_severity=Severity.MEDIUM, critical_assets_only=False))
+                               detectors=(detector,), min_severity=Severity.MEDIUM, critical_assets_only=False,
+                               exclude=NORTH_SOUTH))
     out += anomaly_rules(notify=notify_new_defaults)
     return tuple(out)
 
@@ -110,7 +114,8 @@ def anomaly_rules(*, notify: bool) -> list[AlertRule]:
     """The anomaly rules (spec §6.5.8). The v4 → v5 settings upgrade adds them recording only (notify False)."""
     return [LateralRule(type="lateral", id=pack_rule_id(key), name="", pack_key=key, enabled=True, notify=notify,
                         severity=None, cooldown_minutes=0, throttle=None, detectors=detectors,
-                        min_severity=Severity.MEDIUM, critical_assets_only=False) for key, detectors in ANOMALY]
+                        min_severity=Severity.MEDIUM, critical_assets_only=False, exclude=NORTH_SOUTH)
+            for key, detectors in ANOMALY]
 
 
 def system_rule(key: str) -> AlertRule:

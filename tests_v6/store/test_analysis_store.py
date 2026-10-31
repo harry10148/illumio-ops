@@ -1,6 +1,7 @@
 """Analysis tables of the flow database: detections (deduplicated), run state, results, daily lateral
 snapshots and the focus list's first-seen record."""
 import json
+from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 
 import pytest
@@ -133,3 +134,25 @@ def test_late_detection_within_window_extends_without_replacing_newer_evidence(c
     [row] = analysis.detections_since(conn, NOW - timedelta(days=1), limit=10)
     assert row["first_seen"].startswith("2026-10-25T11:25") and row["last_seen"].startswith("2026-10-25T12:00")
     assert json.loads(row["summary_json"])["targets"] == 12
+
+
+def test_a_detection_keeps_every_end_it_was_seen_with(conn):
+    # an alert rule's exclusion compares the ends: a later pass adding targets must not drop the earlier ones
+    first = [["s", "w1", "10.0.0.1"], ["t", "ip:10.0.0.2", "10.0.0.2"]]
+    analysis.upsert_detections(conn, [replace(_det(), ends_json=json.dumps(first))], dedup=DEDUP, late=False, at=NOW)
+    later = NOW + timedelta(minutes=30)
+    more = [["s", "w1", "10.0.0.1"], ["t", "ip:8.8.8.8", "8.8.8.8"]]
+    analysis.upsert_detections(conn, [replace(_det(seen=later), ends_json=json.dumps(more))],
+                               dedup=DEDUP, late=False, at=later)
+    [row] = analysis.detections_since(conn, NOW - timedelta(days=1), limit=10)
+    assert json.loads(row["ends_json"]) == [*first, ["t", "ip:8.8.8.8", "8.8.8.8"]]
+
+
+def test_a_detection_stored_before_ends_has_none(conn):
+    analysis.upsert_detections(conn, [_det()], dedup=DEDUP, late=False, at=NOW)
+    conn.execute("UPDATE detections SET ends_json = NULL")
+    later = NOW + timedelta(minutes=30)
+    analysis.upsert_detections(conn, [replace(_det(seen=later), ends_json='[["s", "w1", "10.0.0.1"]]')],
+                               dedup=DEDUP, late=False, at=later)
+    [row] = analysis.detections_since(conn, NOW - timedelta(days=1), limit=10)
+    assert row["ends_json"] is None  # what the earlier pass saw is unknown: the ends stay unknown, not partial

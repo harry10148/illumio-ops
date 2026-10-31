@@ -102,6 +102,34 @@ def test_rule_traffic_exclusions_round_trip(context, live_app):
     expect(page.locator("input[name=src_exclude_ips]")).to_have_value("10.9.9.9")
 
 
+def test_rule_lateral_exclusion_round_trip(context, live_app):
+    """User 2026-10-31: a lateral rule leaves out the internet side by default, and an address the operator names."""
+    page = context.new_page()
+    sign_in(page, live_app.url)
+    page.goto(f"{live_app.url}/alerts/rules/new")
+    form = page.locator("[data-role=rule-editor]")
+    form.locator("select[name=type]").select_option("lateral")
+    form.locator("input[name=name]").fill("Fan-out but not the scanner")
+    side = form.locator("[data-side=exclude]")
+    expect(side.locator("input[name=exclude_public]")).to_be_checked()
+    expect(side).to_contain_text("does not alert")
+    side.locator("input[name=exclude_ips]").fill("10.9.9.9")
+    side.locator("input[name=exclude_ips]").blur()
+    form.get_by_role("button", name="Save").click()
+    page.wait_for_selector("[data-role=rule-list]")
+    mine = next(r for r in live_app.ctx.settings.current().alerts.rules if r.name == "Fan-out but not the scanner")
+    assert mine.exclude is not None and mine.exclude.public and mine.exclude.ips == ("10.9.9.9",)
+    page.goto(f"{live_app.url}/alerts/rules/{mine.id}")
+    side = page.locator("[data-side=exclude]")
+    expect(side.locator("input[name=exclude_ips]")).to_have_value("10.9.9.9")
+    side.locator("input[name=exclude_public]").uncheck()
+    side.locator("input[name=exclude_ips]").fill("")
+    side.locator("input[name=exclude_ips]").blur()
+    page.locator("[data-role=rule-editor]").get_by_role("button", name="Save").click()
+    page.wait_for_selector("[data-role=rule-list]")
+    assert next(r for r in live_app.ctx.settings.current().alerts.rules if r.id == mine.id).exclude is None
+
+
 def test_rule_event_match_fields_round_trip(context, live_app):
     """Task 9: an event rule's advanced field matches, one path=pattern per line (review: no control)."""
     page = context.new_page()

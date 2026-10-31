@@ -14,7 +14,7 @@ from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-from illumio_ops.domain.filter import FlowCondition
+from illumio_ops.domain.filter import EndpointFilter, FlowCondition
 from illumio_ops.domain.values import DetectorKind, Severity, SystemCheck, ThresholdType
 
 _ID = re.compile(r"[0-9a-f]{32}")
@@ -143,11 +143,13 @@ class SystemRule(_NeedsSeverity):
 
 
 class LateralRule(RuleBase):
-    """severity None: each alert takes its detection's severity (precursor weighting included)."""
+    """severity None: each alert takes its detection's severity (precursor weighting included). exclude: a detection
+    whose source matches, or whose every target does, does not alert (it stays on the lateral page)."""
     type: Literal["lateral"]
     detectors: tuple[DetectorKind, ...] = Field(min_length=1)
     min_severity: Severity
     critical_assets_only: bool
+    exclude: EndpointFilter | None
 
 
 AlertRule = Annotated[EventRule | TrafficRule | BandwidthRule | VolumeRule | SystemRule | LateralRule,

@@ -110,6 +110,20 @@ def _v10_to_v11(data: dict[str, Any]) -> dict[str, Any]:
     return data
 
 
+def _v11_to_v12(data: dict[str, Any]) -> dict[str, Any]:
+    # The public-address exclusion moves from detection to the lateral alert rules (user 2026-10-31: the exclusion is
+    # for alerts; the lateral page shows every detection). A file that left public ends out of detection leaves them
+    # out of every lateral rule's alerts instead, so what was quiet stays quiet.
+    lateral = data.get("lateral")
+    detectors = lateral.get("detectors") if isinstance(lateral, dict) else None
+    public = bool(detectors.pop("exclude_public", True)) if isinstance(detectors, dict) else True
+    alerts = data.get("alerts")
+    for rule in alerts.get("rules", []) if isinstance(alerts, dict) and isinstance(alerts.get("rules"), list) else []:
+        if isinstance(rule, dict) and rule.get("type") == "lateral":
+            rule.setdefault("exclude", {"public": True} if public else None)
+    return data
+
+
 # source version -> function producing source version + 1
 UPGRADES: dict[int, Callable[[dict[str, Any]], dict[str, Any]]] = {
     1: _v1_to_v2,
@@ -122,6 +136,7 @@ UPGRADES: dict[int, Callable[[dict[str, Any]], dict[str, Any]]] = {
     8: _v8_to_v9,
     9: _v9_to_v10,
     10: _v10_to_v11,
+    11: _v11_to_v12,
 }
 
 

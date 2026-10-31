@@ -157,6 +157,11 @@
                 ],
                 "title": "Match",
                 "type": "string"
+              },
+              "public": {
+                "default": false,
+                "title": "Public",
+                "type": "boolean"
               }
             },
             "title": "EndpointFilter",
@@ -482,7 +487,7 @@
           },
           "LateralRule": {
             "additionalProperties": false,
-            "description": "severity None: each alert takes its detection's severity (precursor weighting included).",
+            "description": "severity None: each alert takes its detection's severity (precursor weighting included). exclude: a detection\nwhose source matches, or whose every target does, does not alert (it stays on the lateral page).",
             "properties": {
               "cooldown_minutes": {
                 "maximum": 10080,
@@ -505,6 +510,16 @@
               "enabled": {
                 "title": "Enabled",
                 "type": "boolean"
+              },
+              "exclude": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/EndpointFilter"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
               },
               "id": {
                 "title": "Id",
@@ -571,7 +586,8 @@
               "type",
               "detectors",
               "min_severity",
-              "critical_assets_only"
+              "critical_assets_only",
+              "exclude"
             ],
             "title": "LateralRule",
             "type": "object"
@@ -1161,6 +1177,11 @@
                 ],
                 "title": "Match",
                 "type": "string"
+              },
+              "public": {
+                "default": false,
+                "title": "Public",
+                "type": "boolean"
               }
             },
             "title": "EndpointFilter",
@@ -1486,7 +1507,7 @@
           },
           "LateralRule": {
             "additionalProperties": false,
-            "description": "severity None: each alert takes its detection's severity (precursor weighting included).",
+            "description": "severity None: each alert takes its detection's severity (precursor weighting included). exclude: a detection\nwhose source matches, or whose every target does, does not alert (it stays on the lateral page).",
             "properties": {
               "cooldown_minutes": {
                 "maximum": 10080,
@@ -1509,6 +1530,16 @@
               "enabled": {
                 "title": "Enabled",
                 "type": "boolean"
+              },
+              "exclude": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/EndpointFilter"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
               },
               "id": {
                 "title": "Id",
@@ -1575,7 +1606,8 @@
               "type",
               "detectors",
               "min_severity",
-              "critical_assets_only"
+              "critical_assets_only",
+              "exclude"
             ],
             "title": "LateralRule",
             "type": "object"
@@ -2267,6 +2299,11 @@
                 ],
                 "title": "Match",
                 "type": "string"
+              },
+              "public": {
+                "default": false,
+                "title": "Public",
+                "type": "boolean"
               }
             },
             "title": "EndpointFilter",
@@ -2592,7 +2629,7 @@
           },
           "LateralRule": {
             "additionalProperties": false,
-            "description": "severity None: each alert takes its detection's severity (precursor weighting included).",
+            "description": "severity None: each alert takes its detection's severity (precursor weighting included). exclude: a detection\nwhose source matches, or whose every target does, does not alert (it stays on the lateral page).",
             "properties": {
               "cooldown_minutes": {
                 "maximum": 10080,
@@ -2615,6 +2652,16 @@
               "enabled": {
                 "title": "Enabled",
                 "type": "boolean"
+              },
+              "exclude": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/EndpointFilter"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
               },
               "id": {
                 "title": "Id",
@@ -2681,7 +2728,8 @@
               "type",
               "detectors",
               "min_severity",
-              "critical_assets_only"
+              "critical_assets_only",
+              "exclude"
             ],
             "title": "LateralRule",
             "type": "object"
@@ -3361,6 +3409,11 @@
                 ],
                 "title": "Match",
                 "type": "string"
+              },
+              "public": {
+                "default": false,
+                "title": "Public",
+                "type": "boolean"
               }
             },
             "title": "EndpointFilter",
@@ -3686,7 +3739,7 @@
           },
           "LateralRule": {
             "additionalProperties": false,
-            "description": "severity None: each alert takes its detection's severity (precursor weighting included).",
+            "description": "severity None: each alert takes its detection's severity (precursor weighting included). exclude: a detection\nwhose source matches, or whose every target does, does not alert (it stays on the lateral page).",
             "properties": {
               "cooldown_minutes": {
                 "maximum": 10080,
@@ -3709,6 +3762,16 @@
               "enabled": {
                 "title": "Enabled",
                 "type": "boolean"
+              },
+              "exclude": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/EndpointFilter"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
               },
               "id": {
                 "title": "Id",
@@ -3775,7 +3838,8 @@
               "type",
               "detectors",
               "min_severity",
-              "critical_assets_only"
+              "critical_assets_only",
+              "exclude"
             ],
             "title": "LateralRule",
             "type": "object"
@@ -4476,6 +4540,11 @@
                 ],
                 "title": "Match",
                 "type": "string"
+              },
+              "public": {
+                "default": false,
+                "title": "Public",
+                "type": "boolean"
               }
             },
             "title": "EndpointFilter",
@@ -4801,7 +4870,7 @@
           },
           "LateralRule": {
             "additionalProperties": false,
-            "description": "severity None: each alert takes its detection's severity (precursor weighting included).",
+            "description": "severity None: each alert takes its detection's severity (precursor weighting included). exclude: a detection\nwhose source matches, or whose every target does, does not alert (it stays on the lateral page).",
             "properties": {
               "cooldown_minutes": {
                 "maximum": 10080,
@@ -4824,6 +4893,16 @@
               "enabled": {
                 "title": "Enabled",
                 "type": "boolean"
+              },
+              "exclude": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/EndpointFilter"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
               },
               "id": {
                 "title": "Id",
@@ -4890,7 +4969,8 @@
               "type",
               "detectors",
               "min_severity",
-              "critical_assets_only"
+              "critical_assets_only",
+              "exclude"
             ],
             "title": "LateralRule",
             "type": "object"
@@ -5569,6 +5649,11 @@
                 ],
                 "title": "Match",
                 "type": "string"
+              },
+              "public": {
+                "default": false,
+                "title": "Public",
+                "type": "boolean"
               }
             },
             "title": "EndpointFilter",
@@ -5894,7 +5979,7 @@
           },
           "LateralRule": {
             "additionalProperties": false,
-            "description": "severity None: each alert takes its detection's severity (precursor weighting included).",
+            "description": "severity None: each alert takes its detection's severity (precursor weighting included). exclude: a detection\nwhose source matches, or whose every target does, does not alert (it stays on the lateral page).",
             "properties": {
               "cooldown_minutes": {
                 "maximum": 10080,
@@ -5917,6 +6002,16 @@
               "enabled": {
                 "title": "Enabled",
                 "type": "boolean"
+              },
+              "exclude": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/EndpointFilter"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
               },
               "id": {
                 "title": "Id",
@@ -5983,7 +6078,8 @@
               "type",
               "detectors",
               "min_severity",
-              "critical_assets_only"
+              "critical_assets_only",
+              "exclude"
             ],
             "title": "LateralRule",
             "type": "object"
@@ -6622,6 +6718,11 @@
                 ],
                 "title": "Match",
                 "type": "string"
+              },
+              "public": {
+                "default": false,
+                "title": "Public",
+                "type": "boolean"
               }
             },
             "title": "EndpointFilter",
@@ -6947,7 +7048,7 @@
           },
           "LateralRule": {
             "additionalProperties": false,
-            "description": "severity None: each alert takes its detection's severity (precursor weighting included).",
+            "description": "severity None: each alert takes its detection's severity (precursor weighting included). exclude: a detection\nwhose source matches, or whose every target does, does not alert (it stays on the lateral page).",
             "properties": {
               "cooldown_minutes": {
                 "maximum": 10080,
@@ -6970,6 +7071,16 @@
               "enabled": {
                 "title": "Enabled",
                 "type": "boolean"
+              },
+              "exclude": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/EndpointFilter"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
               },
               "id": {
                 "title": "Id",
@@ -7036,7 +7147,8 @@
               "type",
               "detectors",
               "min_severity",
-              "critical_assets_only"
+              "critical_assets_only",
+              "exclude"
             ],
             "title": "LateralRule",
             "type": "object"
@@ -7626,6 +7738,11 @@
                 ],
                 "title": "Match",
                 "type": "string"
+              },
+              "public": {
+                "default": false,
+                "title": "Public",
+                "type": "boolean"
               }
             },
             "title": "EndpointFilter",
@@ -7951,7 +8068,7 @@
           },
           "LateralRule": {
             "additionalProperties": false,
-            "description": "severity None: each alert takes its detection's severity (precursor weighting included).",
+            "description": "severity None: each alert takes its detection's severity (precursor weighting included). exclude: a detection\nwhose source matches, or whose every target does, does not alert (it stays on the lateral page).",
             "properties": {
               "cooldown_minutes": {
                 "maximum": 10080,
@@ -7974,6 +8091,16 @@
               "enabled": {
                 "title": "Enabled",
                 "type": "boolean"
+              },
+              "exclude": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/EndpointFilter"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
               },
               "id": {
                 "title": "Id",
@@ -8040,7 +8167,8 @@
               "type",
               "detectors",
               "min_severity",
-              "critical_assets_only"
+              "critical_assets_only",
+              "exclude"
             ],
             "title": "LateralRule",
             "type": "object"
@@ -10091,6 +10219,11 @@
                 ],
                 "title": "Match",
                 "type": "string"
+              },
+              "public": {
+                "default": false,
+                "title": "Public",
+                "type": "boolean"
               }
             },
             "title": "EndpointFilter",
@@ -10800,6 +10933,11 @@
                 ],
                 "title": "Match",
                 "type": "string"
+              },
+              "public": {
+                "default": false,
+                "title": "Public",
+                "type": "boolean"
               }
             },
             "title": "EndpointFilter",
@@ -11390,6 +11528,11 @@
                 ],
                 "title": "Match",
                 "type": "string"
+              },
+              "public": {
+                "default": false,
+                "title": "Public",
+                "type": "boolean"
               }
             },
             "title": "EndpointFilter",
@@ -11900,6 +12043,11 @@
                 ],
                 "title": "Match",
                 "type": "string"
+              },
+              "public": {
+                "default": false,
+                "title": "Public",
+                "type": "boolean"
               }
             },
             "title": "EndpointFilter",
@@ -12449,6 +12597,11 @@
                 ],
                 "title": "Match",
                 "type": "string"
+              },
+              "public": {
+                "default": false,
+                "title": "Public",
+                "type": "boolean"
               }
             },
             "title": "EndpointFilter",
@@ -18328,6 +18481,11 @@
                 ],
                 "title": "Match",
                 "type": "string"
+              },
+              "public": {
+                "default": false,
+                "title": "Public",
+                "type": "boolean"
               }
             },
             "title": "EndpointFilter",
@@ -21254,6 +21412,11 @@
                 ],
                 "title": "Match",
                 "type": "string"
+              },
+              "public": {
+                "default": false,
+                "title": "Public",
+                "type": "boolean"
               }
             },
             "title": "EndpointFilter",
@@ -21759,6 +21922,11 @@
                 ],
                 "title": "Match",
                 "type": "string"
+              },
+              "public": {
+                "default": false,
+                "title": "Public",
+                "type": "boolean"
               }
             },
             "title": "EndpointFilter",
@@ -22371,6 +22539,11 @@
                 ],
                 "title": "Match",
                 "type": "string"
+              },
+              "public": {
+                "default": false,
+                "title": "Public",
+                "type": "boolean"
               }
             },
             "title": "EndpointFilter",
@@ -22971,6 +23144,11 @@
                 ],
                 "title": "Match",
                 "type": "string"
+              },
+              "public": {
+                "default": false,
+                "title": "Public",
+                "type": "boolean"
               }
             },
             "title": "EndpointFilter",
@@ -23777,6 +23955,11 @@
                 ],
                 "title": "Match",
                 "type": "string"
+              },
+              "public": {
+                "default": false,
+                "title": "Public",
+                "type": "boolean"
               }
             },
             "title": "EndpointFilter",
@@ -24282,6 +24465,11 @@
                 ],
                 "title": "Match",
                 "type": "string"
+              },
+              "public": {
+                "default": false,
+                "title": "Public",
+                "type": "boolean"
               }
             },
             "title": "EndpointFilter",
@@ -25055,6 +25243,11 @@
                 ],
                 "title": "Match",
                 "type": "string"
+              },
+              "public": {
+                "default": false,
+                "title": "Public",
+                "type": "boolean"
               }
             },
             "title": "EndpointFilter",
@@ -29666,10 +29859,6 @@
                 "title": "Directory Min Sources",
                 "type": "integer"
               },
-              "exclude_public": {
-                "title": "Exclude Public",
-                "type": "boolean"
-              },
               "exclude_system_accounts": {
                 "title": "Exclude System Accounts",
                 "type": "boolean"
@@ -29733,7 +29922,6 @@
               "blocked_window_minutes",
               "blocked_surge_factor",
               "exclude_system_accounts",
-              "exclude_public",
               "precursor_hours",
               "peer_min_group",
               "volume_surge_factor",
@@ -30400,10 +30588,6 @@
                 "title": "Directory Min Sources",
                 "type": "integer"
               },
-              "exclude_public": {
-                "title": "Exclude Public",
-                "type": "boolean"
-              },
               "exclude_system_accounts": {
                 "title": "Exclude System Accounts",
                 "type": "boolean"
@@ -30467,7 +30651,6 @@
               "blocked_window_minutes",
               "blocked_surge_factor",
               "exclude_system_accounts",
-              "exclude_public",
               "precursor_hours",
               "peer_min_group",
               "volume_surge_factor",
@@ -30861,10 +31044,6 @@
                 "title": "Directory Min Sources",
                 "type": "integer"
               },
-              "exclude_public": {
-                "title": "Exclude Public",
-                "type": "boolean"
-              },
               "exclude_system_accounts": {
                 "title": "Exclude System Accounts",
                 "type": "boolean"
@@ -30928,7 +31107,6 @@
               "blocked_window_minutes",
               "blocked_surge_factor",
               "exclude_system_accounts",
-              "exclude_public",
               "precursor_hours",
               "peer_min_group",
               "volume_surge_factor",
@@ -32917,6 +33095,11 @@
                 ],
                 "title": "Match",
                 "type": "string"
+              },
+              "public": {
+                "default": false,
+                "title": "Public",
+                "type": "boolean"
               }
             },
             "title": "EndpointFilter",
@@ -33742,6 +33925,11 @@
                 ],
                 "title": "Match",
                 "type": "string"
+              },
+              "public": {
+                "default": false,
+                "title": "Public",
+                "type": "boolean"
               }
             },
             "title": "EndpointFilter",
@@ -34362,6 +34550,11 @@
                 ],
                 "title": "Match",
                 "type": "string"
+              },
+              "public": {
+                "default": false,
+                "title": "Public",
+                "type": "boolean"
               }
             },
             "title": "EndpointFilter",
@@ -34996,6 +35189,11 @@
                 ],
                 "title": "Match",
                 "type": "string"
+              },
+              "public": {
+                "default": false,
+                "title": "Public",
+                "type": "boolean"
               }
             },
             "title": "EndpointFilter",
@@ -35976,6 +36174,11 @@
                 ],
                 "title": "Match",
                 "type": "string"
+              },
+              "public": {
+                "default": false,
+                "title": "Public",
+                "type": "boolean"
               }
             },
             "title": "EndpointFilter",

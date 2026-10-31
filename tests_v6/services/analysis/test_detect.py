@@ -181,11 +181,8 @@ def test_gap_in_lookback_marks_incomplete(ctx):
     assert next(s for s in r.statuses if s["detector"] == "fanout")["state"] == "incomplete"
 
 
-def _ctx_with(tmp_path, recs, *, exclude_public=True):
+def _ctx_with(tmp_path, recs):
     c = configured_ctx(tmp_path)
-    if not exclude_public:
-        c.settings.update(c.settings.current().revision,
-                          lambda d: d["lateral"]["detectors"].update({"exclude_public": False}))
     with c.flows().connect() as conn:
         upsert_flows(conn, recs, origin=DataOrigin.INGEST, now=NOW)
     _collected(c)
@@ -206,24 +203,22 @@ def _to_internet(n=10):
     return [replace(r, dst_ip=f"20.27.177.{i}", dst_href=None, dst_hostname=None) for i, r in enumerate(recs)]
 
 
-def test_an_internet_scan_is_not_a_detection(tmp_path):
-    # User 2026-10-31: the public-address exclusion belongs to the alerts. On the lab, internet scans of the firewall's
-    # public address were raised as new management connections and LDAP to a non-DC.
+def test_an_internet_scan_is_detected_with_its_ends(tmp_path):
+    # User 2026-10-31 (option 1): the lateral page shows every detection; the alert rules leave the internet side out,
+    # by the ends each detection keeps.
     ctx = _ctx_with(tmp_path, _from_internet())
     run_detection(ctx, now=NOW)
-    assert not _detections(ctx)
+    [d] = _detections(ctx)
+    ends = json.loads(d["ends_json"])
+    assert [e for e in ends if e[0] == "s"] == [["s", "ip:66.132.186.241", "66.132.186.241"]]
+    assert len([e for e in ends if e[0] == "t"]) == 10
 
 
-def test_connections_to_public_addresses_are_not_detections(tmp_path):
+def test_connections_to_public_addresses_are_detected(tmp_path):
     ctx = _ctx_with(tmp_path, _to_internet())
     run_detection(ctx, now=NOW)
-    assert not _detections(ctx)
-
-
-def test_without_the_exclusion_an_internet_source_is_detected(tmp_path):
-    ctx = _ctx_with(tmp_path, _from_internet(), exclude_public=False)
-    run_detection(ctx, now=NOW)
-    assert [d["detector"] for d in _detections(ctx)] == ["fanout"]
+    [d] = _detections(ctx)
+    assert sorted(e[2] for e in json.loads(d["ends_json"]) if e[0] == "t") == sorted(f"20.27.177.{i}" for i in range(10))
 
 
 def test_a_workload_numbered_in_public_space_is_still_detected(tmp_path):

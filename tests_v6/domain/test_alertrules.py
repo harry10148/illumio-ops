@@ -73,7 +73,7 @@ def test_event_rule_invalid_regex_rejected():
 
 
 def test_lateral_rule_needs_a_detector():
-    d = {**BASE, "type": "lateral", "detectors": [], "min_severity": "medium", "critical_assets_only": False}
+    d = {**BASE, "type": "lateral", "detectors": [], "min_severity": "medium", "critical_assets_only": False, "exclude": None}
     with pytest.raises(ValidationError):
         RULE.validate_python(d)
     d["detectors"] = ["fanout"]
@@ -91,7 +91,7 @@ def test_traffic_window_minimum():
 
 def test_severity_none_only_for_event_and_lateral_rules():
     assert event_rule(severity=None).severity is None
-    assert RULE.validate_python({**BASE, "severity": None, "type": "lateral", "detectors": ["fanout"],
+    assert RULE.validate_python({**BASE, "severity": None, "type": "lateral", "detectors": ["fanout"], "exclude": None,
                                  "min_severity": "low", "critical_assets_only": False}).severity is None
     with pytest.raises(ValidationError):
         RULE.validate_python({**BASE, "severity": None, "type": "system", "check": "disk_low"})

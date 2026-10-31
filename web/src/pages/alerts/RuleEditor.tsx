@@ -5,7 +5,7 @@ import { type ApiError, call } from "../../api/client";
 import type {
   DetectorKind, EventRule, FlowCondition, LabelChoice, RulePreview, RuleWrite, Severity, SystemCheck, ThresholdType,
 } from "../../api/generated";
-import { ConditionEditor } from "../../components/ConditionEditor";
+import { ConditionEditor, Side } from "../../components/ConditionEditor";
 import { t } from "../../i18n";
 import { registerNav } from "../../shell/nav";
 import { SEVERITY_KEYS, TYPE_KEYS, word } from "./common";
@@ -58,7 +58,7 @@ function blank(type: RuleType): Rule {
       return { ...base, type, severity: "high", check: "pce_health", cooldown_minutes: 60 };
     default:
       return { ...base, type: "lateral", severity: null, detectors: ["fanout"], min_severity: "medium",
-               critical_assets_only: false, cooldown_minutes: 0 };
+               critical_assets_only: false, exclude: { public: true }, cooldown_minutes: 0 };
   }
 }
 
@@ -211,6 +211,7 @@ export function RuleEditor() {
                      onChange={(e) => set({ critical_assets_only: e.target.checked })} />
               {t("rule_critical_only")}
             </label>
+            <Side name="exclude" value={rule.exclude} choices={choices} onChange={(exclude) => set({ exclude })} />
           </>
         )}
 

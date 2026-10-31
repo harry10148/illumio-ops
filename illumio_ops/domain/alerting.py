@@ -21,6 +21,7 @@ from illumio_ops.domain.alertrules import (
     VolumeRule,
     event_matches,
 )
+from illumio_ops.domain.filter import EndpointFilter, endpoint_matches
 from illumio_ops.domain.focus import DETECTION_TITLE_KEYS
 from illumio_ops.domain.segment import EventFilter, EventSegment, FlowSegment
 from illumio_ops.domain.values import (
@@ -156,6 +157,15 @@ class IncrementFacts:
 
 
 @dataclass(frozen=True)
+class EndFact:
+    """One host a detection is about: a source ("s") or a target ("t"), with its current labels."""
+    role: Literal["s", "t"]
+    href: str | None
+    ip: str
+    labels: Mapping[str, str]
+
+
+@dataclass(frozen=True)
 class DetectionFact:
     id: int
     detector: DetectorKind
@@ -172,6 +182,7 @@ class DetectionFact:
     confidence: Mapping[str, Any]
     is_new: bool
     severity_rose: bool
+    ends: tuple[EndFact, ...] | None = None  # None: stored before detections kept their ends
 
 
 @dataclass(frozen=True)
@@ -336,6 +347,16 @@ def evaluate_bandwidth_rule(rule: BandwidthRule, facts: IncrementFacts, *, now: 
 
 # ── lateral ──────────────────────────────────────────────────────────────────
 
+def excluded(exclude: EndpointFilter | None, ends: Sequence[EndFact] | None) -> bool:
+    """A detection a rule's exclusion leaves out: one of its sources matches, or every one of its targets does
+    (an internet scan, a connection out, a scanner the operator expects). Ends unknown: never left out."""
+    if exclude is None or exclude.is_empty() or not ends:
+        return False
+    hit = [(e.role, endpoint_matches(exclude, href=e.href, ip=e.ip, labels=e.labels)) for e in ends]
+    targets = [h for role, h in hit if role == "t"]
+    return any(h for role, h in hit if role == "s") or (bool(targets) and all(targets))
+
+
 def evaluate_lateral_rule(rule: LateralRule, changed: Sequence[DetectionFact]) -> list[Trigger]:
     """A detection alerts when it is new and again when its severity rises — not on every repeat."""
     floor = SEVERITY_ORDER.index(rule.min_severity)
@@ -344,6 +365,8 @@ def evaluate_lateral_rule(rule: LateralRule, changed: Sequence[DetectionFact]) -
         if not (d.is_new or d.severity_rose) or d.detector not in rule.detectors:
             continue
         if SEVERITY_ORDER.index(d.severity) < floor or (rule.critical_assets_only and not d.critical_asset):
+            continue
+        if excluded(rule.exclude, d.ends):
             continue
         c = d.confidence
         out.append(Trigger(

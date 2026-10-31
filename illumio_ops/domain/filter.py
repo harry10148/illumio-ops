@@ -11,7 +11,8 @@ to_sql and matches must agree on every spec (tests_v6/domain/test_filter.py chec
 Endpoint semantics: an EndpointFilter is a union by default — the endpoint has all the listed label keys
 (each key: any of its values), OR is one of the hrefs, OR is in one of the IPs / networks. With match="all" the
 labels and the hosts (hrefs or addresses, together one part) must both hold when both are set (the workbench's
-"env=Prod and this host", P6a). A port of -1 is "no port" (a protocol
+"env=Prod and this host", P6a). public is one more host part: a public address no Workload holds (netaddr.outside,
+user 2026-10-31: alert rules leave the internet side of a connection out). A port of -1 is "no port" (a protocol
 alone is any port). The *_processes / *_users sets are exact values (domain accounts case-insensitive), the single
 fields are partial matches.
 """
@@ -35,7 +36,7 @@ from pydantic import (
 
 from illumio_ops.domain.flows import FlowRecord
 from illumio_ops.domain.identity import is_system_account
-from illumio_ops.domain.netaddr import parse_ip_token
+from illumio_ops.domain.netaddr import outside, parse_ip_token
 from illumio_ops.domain.timefmt import pce_time, store_time
 from illumio_ops.domain.values import FlowDirection, PolicyDecision
 
@@ -67,11 +68,12 @@ class EndpointFilter(_Model):
     labels: tuple[LabelCond, ...] = ()
     hrefs: tuple[str, ...] = ()
     ips: tuple[str, ...] = ()
+    public: bool = False
     match: Literal["any", "all"] = "any"  # any: one of the parts (the union); all: the labels and the hosts
 
     def intersects(self) -> bool:
         """Labels and hosts both set under match="all": an intersection, not the union."""
-        return self.match == "all" and bool(self.labels) and bool(self.hrefs or self.ips)
+        return self.match == "all" and bool(self.labels) and bool(self.hrefs or self.ips or self.public)
 
     @field_validator("ips")
     @classmethod
@@ -81,7 +83,7 @@ class EndpointFilter(_Model):
         return v
 
     def is_empty(self) -> bool:
-        return not (self.labels or self.hrefs or self.ips)
+        return not (self.labels or self.hrefs or self.ips or self.public)
 
 
 class FlowCondition(_Model):
@@ -197,9 +199,13 @@ def _sql_user(column: str) -> str:
             f"THEN lower({column}) ELSE {column} END")
 
 
+def _is_outside(ip: Any, href: Any) -> int:
+    return int(outside(ip if isinstance(ip, str) else None, href if isinstance(href, str) else None))
+
+
 def sql_functions() -> dict[str, Callable[..., int]]:
     """Functions to_sql's clauses call; register them on the connection before running them."""
-    return {"ip_in_net": ip_in_net, "is_system_account": _is_system}
+    return {"ip_in_net": ip_in_net, "is_system_account": _is_system, "is_outside": _is_outside}
 
 
 # ── to_pce_payload ───────────────────────────────────────────────────────────
@@ -211,7 +217,7 @@ def _pce_side(ep: EndpointFilter | None, label_hrefs: Mapping[tuple[str, str], s
     if ep.intersects():
         return None  # the PCE's include list is a union of groups: the intersection is checked locally
     exact, nets = _split_ips(ep.ips)
-    if nets:
+    if nets or ep.public:
         return None
     groups: list[list[dict[str, Any]]] = []
     if ep.labels:
@@ -307,6 +313,8 @@ def _sql_side(ep: EndpointFilter, side: str, a: str, params: list[Any]) -> str:
     for net in nets:
         addresses.append(f"ip_in_net({a}.{side}_ip, ?) = 1")
         params.append(net)
+    if ep.public:
+        addresses.append(f"is_outside({a}.{side}_ip, {a}.{side}_href) = 1")
     if ep.hrefs:
         addresses.insert(0, parts.pop())
     if addresses:
@@ -397,8 +405,9 @@ def _side_matches(ep: EndpointFilter, v: Mapping[str, Any], side: str) -> bool:
     ip = v.get(f"{side}_ip")
     held = []  # (the part is set, the end satisfies it)
     held.append((bool(ep.labels), bool(ep.labels) and all(labels.get(c.key) in c.values for c in ep.labels)))
-    held.append((bool(ep.hrefs or ep.ips), (v.get(f"{side}_href") or "") in ep.hrefs
-                 or ip in exact or any(ip_in_net(ip, n) for n in nets)))
+    href = v.get(f"{side}_href")
+    held.append((bool(ep.hrefs or ep.ips or ep.public), (href or "") in ep.hrefs
+                 or ip in exact or any(ip_in_net(ip, n) for n in nets) or (ep.public and outside(ip, href))))
     if ep.match == "all":
         return all(ok for is_set, ok in held if is_set)
     return any(ok for is_set, ok in held if is_set)

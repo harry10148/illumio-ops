@@ -242,6 +242,7 @@ hrefs?: string[]
 ips?: string[]
 labels?: LabelCond[]
 match?: ("any" | "all")
+public?: boolean
 }
 /**
  * This interface was referenced by `ContractRoot`'s JSON-Schema
@@ -299,7 +300,8 @@ type: "event"
 window_minutes: number
 }
 /**
- * severity None: each alert takes its detection's severity (precursor weighting included).
+ * severity None: each alert takes its detection's severity (precursor weighting included). exclude: a detection
+ * whose source matches, or whose every target does, does not alert (it stays on the lateral page).
  * 
  * This interface was referenced by `ContractRoot`'s JSON-Schema
  * via the `definition` "LateralRule".
@@ -312,6 +314,7 @@ critical_assets_only: boolean
  */
 detectors: [DetectorKind, ...(DetectorKind)[]]
 enabled: boolean
+exclude: (EndpointFilter | null)
 id: string
 min_severity: Severity
 name: string
@@ -2231,7 +2234,6 @@ chain_window_minutes: number
 directory_followup_minutes: number
 directory_min_connections: number
 directory_min_sources: number
-exclude_public: boolean
 exclude_system_accounts: boolean
 fanout_targets: number
 fanout_window_minutes: number

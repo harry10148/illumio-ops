@@ -12,8 +12,9 @@ const DECISION_KEYS: Record<string, string> = {
 };
 
 const SIDE_KEYS: Record<string, string> = {
-  src: "cond_src", dst: "cond_dst", src_exclude: "cond_src_exclude", dst_exclude: "cond_dst_exclude",
+  src: "cond_src", dst: "cond_dst", src_exclude: "cond_src_exclude", dst_exclude: "cond_dst_exclude", exclude: "rule_exclude",
 };
+const HINT_KEYS: Record<string, string> = { src: "cond_side_hint", dst: "cond_side_hint", exclude: "rule_exclude_hint" };
 
 const list = (text: string) => text.split(/[\s,]+/).map((s) => s.trim()).filter(Boolean);
 
@@ -31,7 +32,8 @@ function parsePorts(text: string): PortProto[] | null {
   return out;
 }
 
-function Side({ name, value, choices, onChange }: {
+// One endpoint condition; the lateral alert rule's exclusion uses it alone (name "exclude").
+export function Side({ name, value, choices, onChange }: {
   name: string; value: EndpointFilter | null | undefined; choices: LabelChoice[];
   onChange: (next: EndpointFilter | null) => void;
 }) {
@@ -40,7 +42,8 @@ function Side({ name, value, choices, onChange }: {
   const choice = choices.find((c) => c.key === key);
   const [val, setVal] = useState("");
   const labels = v.labels ?? [];
-  const set = (next: EndpointFilter) => onChange((next.labels?.length || next.ips?.length || next.hrefs?.length) ? next : null);
+  const set = (next: EndpointFilter) =>
+    onChange((next.labels?.length || next.ips?.length || next.hrefs?.length || next.public) ? next : null);
   const add = () => {
     const chosen = val || choice?.values[0] || "";
     if (!key || !chosen) return;
@@ -80,7 +83,12 @@ function Side({ name, value, choices, onChange }: {
         <input name={`${name}_ips`} defaultValue={(v.ips ?? []).join(", ")} placeholder="10.0.0.5, 10.1.0.0/16"
                onBlur={(e) => set({ ...v, ips: list(e.target.value) })} />
       </label>
-      <p className="hint">{t(name.endsWith("_exclude") ? "cond_exclude_hint" : "cond_side_hint")}</p>
+      <label className="check">
+        <input type="checkbox" name={`${name}_public`} checked={v.public ?? false}
+               onChange={(e) => set({ ...v, public: e.target.checked })} />
+        <span>{t("cond_public")} <span className="hint">{t("cond_public_hint")}</span></span>
+      </label>
+      <p className="hint">{t(HINT_KEYS[name] ?? "cond_exclude_hint")}</p>
     </fieldset>
   );
 }
