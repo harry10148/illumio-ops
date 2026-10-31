@@ -58,7 +58,8 @@ class HostProfile(BaseModel):
     key: str
     managed: bool          # a workload href (False: an address the inventory does not hold)
     in_inventory: bool
-    name: str              # what to call it: hostname, name, an address seen in the flows, or the href
+    name: str              # what to call it: hostname, name, an address seen in the flows, or words (never the href)
+    named: bool = True     # False: the store knew no name or address (the page asks the host's own traffic)
     address: str | None    # the address of an unmanaged key
     identity: HostIdentity | None
     labels: dict[str, str]
@@ -143,10 +144,11 @@ def profile(ctx: AppContext, key: str, *, now: datetime | None = None) -> HostPr
         else:
             details = "stale" if wl.risk_updated_at and held[href] != wl.risk_updated_at else "ok"
     name = (wl.hostname or wl.name) if wl is not None else None
+    named = bool(name) or bool(name := host_addresses(ctx, {href}).get(href))
     if not name:
         name = display_names(ctx, {href})[href]
     return HostProfile(
-        key=key, managed=True, in_inventory=wl is not None, name=name, address=None, identity=identity,
+        key=key, managed=True, in_inventory=wl is not None, name=name, named=named, address=None, identity=identity,
         labels=host_labels, exposure=_exposure(ctx, key), tamper=tamper.host_tamper(ctx, href, now=at),
         ransomware=ransomware.host_ransomware(ctx, href, now=at, explain_allows=False)
         if wl is not None and not unsupported else None,

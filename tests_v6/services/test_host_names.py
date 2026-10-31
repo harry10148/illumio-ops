@@ -73,3 +73,31 @@ def test_report_ranking_never_shows_a_container_href(ctx):
     shown = {r[0] for r in table.rows}
     assert _ip(ctx, K8S) in shown
     assert not any(str(s).startswith("/orgs/") for s in shown)
+
+
+def test_one_lookup_per_unnamed_host(ctx, monkeypatch):
+    """Final review (Codex): the name was looked up before the address, so a host the flows never named cost two
+    unindexed scans of the flows table more than before (500k rows, 20 hosts: 0.0001 s → 2.4 s)."""
+    from illumio_ops.services.flowsource import host_addresses
+    statements: list[str] = []
+    real = ctx.flows().connect
+
+    def traced():
+        conn = real()
+        conn.set_trace_callback(statements.append)
+        return conn
+    monkeypatch.setattr(ctx.flows(), "connect", traced)
+    assert host_addresses(ctx, {K8S}) == {K8S: _ip_raw(real, K8S)}
+    assert len([s for s in statements if s.lstrip().upper().startswith("SELECT") and "FROM flows" in s]) == 1
+
+
+def _ip_raw(connect, key):
+    with connect() as conn:
+        return conn.execute("SELECT dst_ip FROM flows WHERE dst_key = ?", (key,)).fetchone()[0]
+
+
+def test_profile_of_an_unnamed_host_says_so(ctx):
+    """Final review (Codex): the host page asks the traffic for a name when the store had none; the words the
+    profile now gives instead of the href must not stop it asking."""
+    p = hosts.profile(ctx, GONE, now=NOW)
+    assert not p.named and not p.name.startswith("/orgs/")

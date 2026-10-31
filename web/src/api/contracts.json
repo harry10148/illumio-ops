@@ -14277,6 +14277,11 @@
             "title": "Name",
             "type": "string"
           },
+          "named": {
+            "default": true,
+            "title": "Named",
+            "type": "boolean"
+          },
           "ransomware": {
             "anyOf": [
               {
@@ -16102,6 +16107,11 @@
             "title": "Name",
             "type": "string"
           },
+          "named": {
+            "default": true,
+            "title": "Named",
+            "type": "boolean"
+          },
           "ransomware": {
             "anyOf": [
               {
@@ -17373,6 +17383,11 @@
           "name": {
             "title": "Name",
             "type": "string"
+          },
+          "named": {
+            "default": true,
+            "title": "Named",
+            "type": "boolean"
           },
           "ransomware": {
             "anyOf": [

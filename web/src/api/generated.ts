@@ -1075,6 +1075,7 @@ labels: {
 }
 managed: boolean
 name: string
+named?: boolean
 ransomware: (HostRansomware | null)
 ransomware_details?: (("ok" | "stale" | "missing" | "not_rated") | null)
 ransomware_unsupported: boolean

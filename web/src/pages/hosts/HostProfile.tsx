@@ -451,7 +451,7 @@ export function HostProfile() {
   // No name in the store (lightweight mode keeps no flows): the name or address its own traffic carries.
   useEffect(() => {
     setSeenAs(null);
-    if (!profile || profile.name !== profile.key) return;
+    if (!profile || profile.named) return;
     let live = true;
     const ask = async (s: "src" | "dst") => {
       const env = await call("workbench.run", { request: { mode: "flows", view: "detail", limit: 1, ...span,
