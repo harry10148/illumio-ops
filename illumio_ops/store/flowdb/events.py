@@ -47,6 +47,20 @@ def upsert_events(conn: sqlite3.Connection, records: Sequence[EventRecord], *, o
         return conn.total_changes - before
 
 
+def _expiring_days(conn: sqlite3.Connection, cutoff: datetime, archived_days: set[str] | None) -> list[str]:
+    rows = conn.execute("SELECT DISTINCT substr(timestamp, 1, 10) FROM events WHERE timestamp < ?",
+                        (db_time(cutoff),)).fetchall()
+    return [r[0] for r in rows if archived_days is None or r[0] in archived_days]
+
+
+def count_live_events_before(conn: sqlite3.Connection, cutoff: datetime, *, archived_days: set[str] | None,
+                             after_id: int) -> int:
+    """Live events delete_events_before would delete with an id above after_id (a SIEM cursor's, P7)."""
+    return sum(int(conn.execute("SELECT COUNT(*) FROM events WHERE id > ? AND origin = 'ingest' AND timestamp < ? "
+                                "AND substr(timestamp, 1, 10) = ?", (after_id, db_time(cutoff), d)).fetchone()[0])
+               for d in _expiring_days(conn, cutoff, archived_days))
+
+
 def delete_events_before(conn: sqlite3.Connection, cutoff: datetime, *, archived_days: set[str] | None) -> int:
     rows = conn.execute("SELECT DISTINCT substr(timestamp, 1, 10) FROM events WHERE timestamp < ?",
                         (db_time(cutoff),)).fetchall()

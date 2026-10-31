@@ -228,6 +228,12 @@ def upsert_focus(conn: sqlite3.Connection, items: Sequence[FocusWrite], *, at: d
             keep)}
 
 
+def count_detections_before(conn: sqlite3.Connection, before: datetime, *, after_id: int) -> int:
+    """Detections delete_expired would delete with an id above after_id (a SIEM cursor's, P7)."""
+    return int(conn.execute("SELECT COUNT(*) FROM detections WHERE id > ? AND last_seen < ?",
+                            (after_id, db_time(before))).fetchone()[0])
+
+
 def delete_expired(conn: sqlite3.Connection, *, detections_before: datetime, focus_before: datetime,
                    snapshot_day_before: str) -> int:
     with transaction(conn):

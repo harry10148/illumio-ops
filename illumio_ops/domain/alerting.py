@@ -55,7 +55,7 @@ LATERAL_MESSAGE_KEYS: Mapping[DetectorKind, str] = DETECTION_TITLE_KEYS
 SYSTEM_MESSAGE_KEYS: Mapping[SystemCheck, str] = {
     SystemCheck.PCE_HEALTH: "alert_system_pce_health", SystemCheck.COLLECTION_FAILING: "alert_system_collection_failing",
     SystemCheck.DATA_LOSS: "alert_system_data_loss", SystemCheck.JOB_FAILING: "alert_system_job_failing",
-    SystemCheck.DISK_LOW: "alert_system_disk_low",
+    SystemCheck.DISK_LOW: "alert_system_disk_low", SystemCheck.SIEM_BACKLOG: "alert_system_siem_backlog",
 }
 
 
@@ -205,6 +205,17 @@ class JobFact:
 
 
 @dataclass(frozen=True)
+class SiemFact:
+    destination_id: str
+    destination: str
+    pending: int        # records not sent yet, over the destination's sources
+    warn: int           # the backlog the operator set as too far behind
+    dlq_full: bool
+    failing: bool       # its last send failed
+    error: str | None
+
+
+@dataclass(frozen=True)
 class SystemFacts:
     probe: ProbeFact | None
     sources: tuple[SourceFact, ...] = ()
@@ -212,6 +223,7 @@ class SystemFacts:
     jobs: tuple[JobFact, ...] = ()
     disk_free_bytes: int | None = None
     disk_warn_bytes: int | None = None
+    siem: tuple[SiemFact, ...] = ()
 
 
 # ── events ───────────────────────────────────────────────────────────────────
@@ -389,4 +401,9 @@ def evaluate_system(rule: SystemRule, facts: SystemFacts, *, now: datetime) -> l
             return []
         return [_system(rule, check.value, now, {"free": _gb(facts.disk_free_bytes), "warn": _gb(facts.disk_warn_bytes)},
                         facts={"free_bytes": facts.disk_free_bytes, "warn_bytes": facts.disk_warn_bytes})]
+    if check is SystemCheck.SIEM_BACKLOG:
+        return [_system(rule, f"{check.value}:{f.destination_id}", now,
+                        {"destination": f.destination, "pending": f.pending, "warn": f.warn,
+                         "dlq_full": f.dlq_full, "error": f.error or ""})
+                for f in facts.siem if f.dlq_full or f.pending > f.warn]
     return []

@@ -2349,5 +2349,12 @@
   "rpt_title_custom": "自訂報表",
   "rpt_cust_gaps": "這一節的資料有 {n} 段缺口（第一段 {start} – {end}）；數字不含那些時間。",
   "rpt_cust_truncated": "這一節有部分資料因 PCE 的上限而截斷。",
-  "rpt_cust_bytes_unknown": "這些流量都沒有回報位元組：位元組數是未知，不是零。"
+  "rpt_cust_bytes_unknown": "這些流量都沒有回報位元組：位元組數是未知，不是零。",
+  "siem_new_connection_name": "新連線",
+  "siem_new_connection_summary": "{src} → {dst} 的 {port} 在基準期內第一次出現（{decision}）",
+  "siem_test_name": "illumio-ops 測試",
+  "siem_test_summary": "illumio-ops 的測試訊息：這個目的地可以送達",
+  "alert_system_siem_backlog": "SIEM 目的地 {destination} 落後：{pending} 筆尚未送出（超過 {warn} 即警示）",
+  "rule_system_siem_backlog": "SIEM 轉送落後",
+  "job_name_siem_dispatch": "SIEM 轉送"
 }

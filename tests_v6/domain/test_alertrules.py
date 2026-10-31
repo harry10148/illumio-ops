@@ -158,7 +158,7 @@ def test_pack_lateral_notify_follows_flag():
         assert all(r.notify is flag for r in lateral)
         assert all(r.notify for r in rules if r.type != "lateral")
     systems = sorted(r.check.value for r in best_practice_rules(notify_new_defaults=True) if r.type == "system")
-    assert systems == ["collection_failing", "data_loss", "disk_low", "job_failing", "pce_health"]
+    assert systems == ["collection_failing", "data_loss", "disk_low", "job_failing", "pce_health", "siem_backlog"]
 
 
 def test_pattern_compiled_the_way_it_runs():

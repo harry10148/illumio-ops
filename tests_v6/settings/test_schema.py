@@ -17,7 +17,7 @@ def _pce(**kw):
 
 def test_default_settings_values():
     s = default_settings(password_hash=HASH, secret_key=KEY, port=5443)
-    assert s.schema_version == 8 and s.revision == 0
+    assert s.schema_version == 9 and s.revision == 0
     assert s.pce.url == "" and s.pce.deployment_type is DeploymentType.ON_PREM
     assert s.web.port == 5443 and s.web.username == "illumio" and s.web.must_change_password is False
     assert s.web.session_lifetime_seconds == 28800 and s.web.allowed_ips == ()
@@ -95,7 +95,7 @@ def test_default_alerts(initial):
     a = initial.alerts
     assert a.retention_days == 90 and not any(getattr(a.channels, c).enabled for c in
                                               ("smtp", "line", "telegram", "teams", "webhook"))
-    assert len(a.rules) == 30 and all(r.notify for r in a.rules)
+    assert len(a.rules) == 31 and all(r.notify for r in a.rules)
 
 
 def test_redact_masks_channel_secrets(initial):

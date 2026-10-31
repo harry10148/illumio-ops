@@ -20,6 +20,7 @@ from urllib.parse import urlsplit
 from illumio_ops.domain.values import ChannelKind
 from illumio_ops.services.alerts.messages import Rendered
 from illumio_ops.settings.schema import AlertChannels, SmtpChannel
+from illumio_ops.settings.secrets import CredentialsRequired
 
 LINE_PUSH_URL = "https://api.line.me/v2/bot/message/push"
 TELEGRAM_API = "https://api.telegram.org"
@@ -163,12 +164,6 @@ SECRET_FIELD_OF: dict[str, str] = {"smtp": "password", "line": "access_token", "
 _SMTP_DESTINATION = ("host", "port", "security", "username")
 
 
-class CredentialsRequired(Exception):
-    """A saved secret would go to a destination the operator changed without typing the secret again."""
-
-    def __init__(self, field: str) -> None:
-        self.field = field
-        super().__init__(field)
 
 
 def merge_channels(saved: AlertChannels, submitted: dict[str, dict[str, object]], *, mask: str) -> dict[str, object]:

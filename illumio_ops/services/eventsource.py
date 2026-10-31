@@ -411,3 +411,31 @@ def events_in_window(ctx: AppContext, *, start: datetime, end: datetime,
         sql += f" AND e.event_type IN ({','.join('?' * len(exact_types))})"
         params.extend(exact_types)
     return [_new_event(r) for r in _ingest_read(ctx, sql + " ORDER BY e.timestamp", params)]
+
+
+# ── SIEM forwarding (P7) ──────────────────────────────────────────────────────
+
+class RawEvent(BaseModel):
+    id: int
+    timestamp: datetime
+    event: dict[str, Any]   # the PCE's own event, as the SIEM receives it
+
+
+def live_events_after(ctx: AppContext, after_id: int, limit: int) -> list[RawEvent]:
+    """Live events (not backfilled: history is not sent, spec §7) after an id, oldest first."""
+    with ctx.flows().connect() as conn:
+        rows = conn.execute("SELECT id, timestamp, raw_json FROM events WHERE id > ? AND origin = 'ingest' "
+                            "ORDER BY id LIMIT ?", (after_id, limit)).fetchall()
+    return [RawEvent(id=r["id"], timestamp=datetime.fromisoformat(r["timestamp"]), event=json.loads(r["raw_json"]))
+            for r in rows]
+
+
+def newest_event_id(ctx: AppContext) -> int:
+    with ctx.flows().connect() as conn:
+        return int(conn.execute("SELECT COALESCE(MAX(id), 0) FROM events").fetchone()[0])
+
+
+def live_events_after_count(ctx: AppContext, after_id: int) -> int:
+    with ctx.flows().connect() as conn:
+        return int(conn.execute("SELECT COUNT(*) FROM events WHERE id > ? AND origin = 'ingest'",
+                                (after_id,)).fetchone()[0])

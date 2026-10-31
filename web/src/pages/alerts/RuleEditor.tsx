@@ -34,10 +34,11 @@ const DETECTOR_KEYS: Record<string, string> = {
   new_process: "detector_name_new_process", auth_to_non_dc: "detector_name_auth_to_non_dc",
   new_dc_client: "detector_name_new_dc_client", directory_surge: "detector_name_directory_surge",
 };
-const CHECKS: SystemCheck[] = ["pce_health", "collection_failing", "data_loss", "job_failing", "disk_low"];
+const CHECKS: SystemCheck[] = ["pce_health", "collection_failing", "data_loss", "job_failing", "disk_low", "siem_backlog"];
 const CHECK_KEYS: Record<string, string> = {
   pce_health: "rule_system_pce_health", collection_failing: "rule_system_collection_failing",
   data_loss: "rule_system_data_loss", job_failing: "rule_system_job_failing", disk_low: "rule_system_disk_low",
+  siem_backlog: "rule_system_siem_backlog",
 };
 
 function blank(type: RuleType): Rule {

@@ -31,7 +31,7 @@ export type ThresholdType = ("immediate" | "count")
  * This interface was referenced by `ContractRoot`'s JSON-Schema
  * via the `definition` "SystemCheck".
  */
-export type SystemCheck = ("pce_health" | "collection_failing" | "data_loss" | "job_failing" | "disk_low")
+export type SystemCheck = ("pce_health" | "collection_failing" | "data_loss" | "job_failing" | "disk_low" | "siem_backlog")
 /**
  * This interface was referenced by `ContractRoot`'s JSON-Schema
  * via the `definition` "RuleAction".
@@ -2978,12 +2978,32 @@ export const VALUES = {
     "low",
     "medium"
   ],
+  "SiemFormat": [
+    "cef",
+    "cef_pce",
+    "json",
+    "syslog_cef",
+    "syslog_cef_pce",
+    "syslog_json"
+  ],
+  "SiemSource": [
+    "audit",
+    "findings",
+    "new_connections"
+  ],
+  "SiemTransport": [
+    "hec",
+    "tcp",
+    "tls",
+    "udp"
+  ],
   "SystemCheck": [
     "collection_failing",
     "data_loss",
     "disk_low",
     "job_failing",
-    "pce_health"
+    "pce_health",
+    "siem_backlog"
   ],
   "TamperAction": [
     "add_chain",

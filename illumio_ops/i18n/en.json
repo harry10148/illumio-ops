@@ -2349,5 +2349,12 @@
   "rpt_title_custom": "Custom report",
   "rpt_cust_gaps": "This section's data has gaps ({n}; the first {start} – {end}); its numbers do not include that time.",
   "rpt_cust_truncated": "Part of this section's data was cut at the PCE's limit.",
-  "rpt_cust_bytes_unknown": "None of these flows reported bytes: the byte counts are unknown, not zero."
+  "rpt_cust_bytes_unknown": "None of these flows reported bytes: the byte counts are unknown, not zero.",
+  "siem_new_connection_name": "New connection",
+  "siem_new_connection_summary": "{src} → {dst} on {port} for the first time in the baseline period ({decision})",
+  "siem_test_name": "illumio-ops test",
+  "siem_test_summary": "Test line from illumio-ops: this destination is reachable",
+  "alert_system_siem_backlog": "SIEM destination {destination} is behind: {pending} records not sent (warning above {warn})",
+  "rule_system_siem_backlog": "SIEM forwarding behind",
+  "job_name_siem_dispatch": "SIEM forwarding"
 }

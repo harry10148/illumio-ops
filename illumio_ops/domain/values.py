@@ -53,6 +53,7 @@ class SystemCheck(StrEnum):
     DATA_LOSS = "data_loss"
     JOB_FAILING = "job_failing"
     DISK_LOW = "disk_low"
+    SIEM_BACKLOG = "siem_backlog"  # a SIEM destination far behind, failing, or its DLQ full (P7)
 
 
 class DeliveryStatus(StrEnum):
@@ -411,6 +412,8 @@ class ReportStatus(StrEnum):
     DONE = "done"
     FAILED = "failed"
 
+
+DYNAMIC_PORTS_FROM = 49152  # IANA dynamic ports: a new one is a client's or an RPC endpoint's, not a new service
 
 class SiemFormat(StrEnum):
     """How a SIEM destination's lines look (spec §6.5 SIEM 轉送)."""

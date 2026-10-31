@@ -15,7 +15,7 @@ from illumio_ops.domain.report import (
     Section,
     TableBlock,
 )
-from illumio_ops.domain.values import Severity
+from illumio_ops.domain.values import DYNAMIC_PORTS_FROM, Severity
 from illumio_ops.services.analysis.context import LateralContext, load_lateral_context
 from illumio_ops.services.reports import reads
 from illumio_ops.services.reports.common import (
@@ -37,7 +37,7 @@ ADMIN_ROW_LIMIT = 5_000
 TOP = 20
 DECISION_KEYS = {"allowed": "decision_allowed", "potentially_blocked": "decision_potentially_blocked",
                  "blocked": "decision_blocked", "unknown": "decision_unknown"}
-DYNAMIC_FROM = 49152  # IANA dynamic ports: a new one is a client's or an RPC endpoint's, not a new service
+DYNAMIC_FROM = DYNAMIC_PORTS_FROM
 # Connections on a dynamic port or with no port (ICMP) are left out of every number and list, and counted aside.
 _ELIGIBLE = f"port >= 0 AND port < {DYNAMIC_FROM}"
 _WINDOW = f"first_seen >= ? AND first_seen < ? AND {_ELIGIBLE}"
