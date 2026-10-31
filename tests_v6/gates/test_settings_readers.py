@@ -78,6 +78,7 @@ SETTINGS_READERS: dict[str, str] = {
     "lateral.detectors.blocked_window_minutes": "illumio_ops.services.analysis.detect",
     "lateral.detectors.blocked_surge_factor": "illumio_ops.services.analysis.detect",
     "lateral.detectors.exclude_system_accounts": "illumio_ops.services.analysis.detect",
+    "lateral.detectors.exclude_public": "illumio_ops.services.analysis.detect",
     "lateral.detectors.precursor_hours": "illumio_ops.services.analysis.detect",
     "lateral.peer_group_keys": "illumio_ops.services.analysis.detect",
     "lateral.suspicious_tools": "illumio_ops.services.analysis.detect",

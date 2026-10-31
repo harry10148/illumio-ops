@@ -41,7 +41,7 @@ from illumio_ops.domain.values import (
     SiemTransport,
 )
 
-SCHEMA_VERSION: Literal[10] = 10
+SCHEMA_VERSION: Literal[11] = 11
 _UTC_OFFSET = re.compile(r"UTC([+-]\d+(?:\.\d+)?)")
 
 
@@ -296,6 +296,8 @@ class DetectorSettings(StrictModel):
     blocked_window_minutes: int = Field(ge=10, le=1440)
     blocked_surge_factor: float = Field(ge=1.0, le=100.0)
     exclude_system_accounts: bool
+    # No connection with an end outside the estate (internet scans of a firewall's public address, user 2026-10-31)
+    exclude_public: bool
     precursor_hours: int = Field(ge=1, le=168)
     # Anomalies in allowed traffic (spec §6.5.8)
     peer_min_group: int = Field(ge=3, le=1000)
@@ -629,7 +631,7 @@ class SiemSettings(StrictModel):
 
 
 class Settings(StrictModel):
-    schema_version: Literal[10]
+    schema_version: Literal[11]
     revision: int = Field(ge=0)
     pce: PceSettings
     web: WebSettings
@@ -711,7 +713,7 @@ def default_lateral() -> LateralSettings:
         detectors=DetectorSettings(
             fanout_targets=10, fanout_window_minutes=60, account_fanout_targets=10, account_fanout_window_minutes=60,
             chain_window_minutes=30, blocked_targets=5, blocked_window_minutes=60, blocked_surge_factor=3.0,
-            exclude_system_accounts=True, precursor_hours=24, peer_min_group=5, volume_surge_factor=3.0,
+            exclude_system_accounts=True, exclude_public=True, precursor_hours=24, peer_min_group=5, volume_surge_factor=3.0,
             volume_min_connections=1000, volume_min_mb=1024, directory_min_connections=500, account_history_days=7,
             process_history_days=7, directory_min_sources=3, directory_followup_minutes=30,
         ),

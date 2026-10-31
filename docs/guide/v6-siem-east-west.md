@@ -2,6 +2,7 @@
 title: v6 SIEM 轉送與東西向分析指引
 last_verified: 2026-10-31
 verified_against:
+  - illumio_ops/services/analysis/detect.py
   - illumio_ops/siem/formatters/ops.py
   - illumio_ops/services/siem/sources.py
   - illumio_ops/services/siem/dispatch.py
@@ -102,6 +103,7 @@ labels 在 `cs1`／`cs2`（JSON 的 `src_labels`／`dst_labels`）。例如 dev 
 
 - labels 是流量發生當時的 labels（新連線事件記錄的是那時的 label set）。
 - 新連線只看 port 小於 49152 的服務（動態 port 是客戶端或 RPC 端點，不是新服務）。
-- 「排除公網位址」（預設勾選）：任一端是公網位址的新連線不送，只留東西向；網際網路對防火牆公網位址的掃描不會灌進 SIEM。要看南北向的新連線就取消勾選。
+- 「排除公網位址」（預設勾選）：任一端是公網位址、且不是 PCE 上 Workload 的新連線不送，只留東西向；網際網路對防火牆公網位址的掃描不會灌進 SIEM。主機本身用公網位址編號的環境，PCE 上有 Workload 的那一端仍算內部。要看南北向的新連線就取消勾選。
+- 偵測（橫向移動頁、告警、送到 SIEM 的偵測）也預設排除同樣的連線：橫向移動設定頁的「排除公網位址」。取消勾選後，網際網路來源與連到外部的連線也會被偵測評估。
 - 「遮罩個人資料」開啟時：audit 的管理者 email、來源位址、變更內容文字，以及偵測與告警裡的帳號都換成 `[REDACTED]`；主機與 Workload 的位址保留。
 - DLQ 的訊息保留送出當時的格式；目的地之後改了遮罩、主機、port 或格式，那些訊息不會重送到新設定。

@@ -2231,6 +2231,7 @@ chain_window_minutes: number
 directory_followup_minutes: number
 directory_min_connections: number
 directory_min_sources: number
+exclude_public: boolean
 exclude_system_accounts: boolean
 fanout_targets: number
 fanout_window_minutes: number

@@ -17,7 +17,7 @@ def _pce(**kw):
 
 def test_default_settings_values():
     s = default_settings(password_hash=HASH, secret_key=KEY, port=5443)
-    assert s.schema_version == 10 and s.revision == 0
+    assert s.schema_version == 11 and s.revision == 0
     assert s.pce.url == "" and s.pce.deployment_type is DeploymentType.ON_PREM
     assert s.web.port == 5443 and s.web.username == "illumio" and s.web.must_change_password is False
     assert s.web.session_lifetime_seconds == 28800 and s.web.allowed_ips == ()

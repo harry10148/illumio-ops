@@ -448,6 +448,12 @@ export function Lateral() {
                    onChange={(e) => change({ ...settings, detectors: { ...settings.detectors, exclude_system_accounts: e.target.checked } })} />
             {t("det_exclude_system")}
           </label>
+          <label className="check">
+            <input type="checkbox" name="exclude_public" checked={settings.detectors.exclude_public}
+                   onChange={(e) => change({ ...settings, detectors: { ...settings.detectors, exclude_public: e.target.checked } })} />
+            {t("det_exclude_public")}
+            <span className="hint">{t("det_exclude_public_hint")}</span>
+          </label>
         </div>
 
         <h3>{t("lateral_expected_title")}</h3>

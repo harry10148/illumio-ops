@@ -29666,6 +29666,10 @@
                 "title": "Directory Min Sources",
                 "type": "integer"
               },
+              "exclude_public": {
+                "title": "Exclude Public",
+                "type": "boolean"
+              },
               "exclude_system_accounts": {
                 "title": "Exclude System Accounts",
                 "type": "boolean"
@@ -29729,6 +29733,7 @@
               "blocked_window_minutes",
               "blocked_surge_factor",
               "exclude_system_accounts",
+              "exclude_public",
               "precursor_hours",
               "peer_min_group",
               "volume_surge_factor",
@@ -30395,6 +30400,10 @@
                 "title": "Directory Min Sources",
                 "type": "integer"
               },
+              "exclude_public": {
+                "title": "Exclude Public",
+                "type": "boolean"
+              },
               "exclude_system_accounts": {
                 "title": "Exclude System Accounts",
                 "type": "boolean"
@@ -30458,6 +30467,7 @@
               "blocked_window_minutes",
               "blocked_surge_factor",
               "exclude_system_accounts",
+              "exclude_public",
               "precursor_hours",
               "peer_min_group",
               "volume_surge_factor",
@@ -30851,6 +30861,10 @@
                 "title": "Directory Min Sources",
                 "type": "integer"
               },
+              "exclude_public": {
+                "title": "Exclude Public",
+                "type": "boolean"
+              },
               "exclude_system_accounts": {
                 "title": "Exclude System Accounts",
                 "type": "boolean"
@@ -30914,6 +30928,7 @@
               "blocked_window_minutes",
               "blocked_surge_factor",
               "exclude_system_accounts",
+              "exclude_public",
               "precursor_hours",
               "peer_min_group",
               "volume_surge_factor",

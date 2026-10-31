@@ -34,3 +34,9 @@ def is_public(value: str | None) -> bool:
     if isinstance(addr, ipaddress.IPv6Address) and addr.ipv4_mapped:
         addr = addr.ipv4_mapped
     return addr.is_global
+
+
+def outside(ip: str | None, href: str | None) -> bool:
+    """An end outside the estate: a public address no workload holds. Some organisations number their own hosts in
+    public space; a workload the PCE knows is inside whatever its address."""
+    return not href and is_public(ip)

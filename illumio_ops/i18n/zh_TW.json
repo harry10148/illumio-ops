@@ -477,6 +477,8 @@
   "det_account_history": "帳號新來源：帳號至少有幾天歷史",
   "det_process_history": "新程式：主機至少有幾天程式歷史",
   "det_exclude_system": "排除系統帳號",
+  "det_exclude_public": "排除公網位址",
+  "det_exclude_public_hint": "一端是公網位址、且不是 PCE 上 Workload 的連線（網際網路掃描、連到外部）不列入偵測：那不是橫向移動。",
   "lateral_expected_title": "預期的發起 process",
   "lateral_expected_hint": "以逗號分隔；該 port 的連線若由其他 process 發起就會回報。",
   "alert_event_immediate": "{hosts} 發生 {event_types}（{matches} 筆）",

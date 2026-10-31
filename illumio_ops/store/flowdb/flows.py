@@ -16,7 +16,7 @@ from typing import Literal
 
 from illumio_ops.domain.flows import FlowRecord, ranges_within, record_key
 from illumio_ops.domain.identity import account_key, endpoint_key
-from illumio_ops.domain.netaddr import is_public
+from illumio_ops.domain.netaddr import outside
 from illumio_ops.domain.values import (
     DIRECTORY_PORTS,
     DYNAMIC_PORTS_FROM,
@@ -226,6 +226,10 @@ _LOG_NEW = ("INSERT INTO new_connection_log (src_key, dst_key, port, proto, deci
 NEW_CONNECTION_LOG_KEEP = timedelta(days=14)
 
 
+def _outside(key: str, ip: str | None) -> bool:
+    return outside(ip, None if key.startswith("ip:") else key)
+
+
 def _update_baselines(conn: sqlite3.Connection, conn_key: str, *, log_new: bool = False,
                       stamp: str = "") -> sqlite3.Row | None:
     """Fold the connection's primary row into the baselines; returns that row (None: the connection is gone).
@@ -239,7 +243,8 @@ def _update_baselines(conn: sqlite3.Connection, conn_key: str, *, log_new: bool 
         r = conn.execute(_LOG_FIELDS, (conn_key,)).fetchone()
         conn.execute(_LOG_NEW, (r["src_key"], r["dst_key"], port, r["proto"], r["policy_decision"], r["first_detected"],
                                 r["src_ip"], r["dst_ip"], r["src_hostname"], r["dst_hostname"], r["src_label_set"],
-                                r["dst_label_set"], int(is_public(r["src_ip"]) or is_public(r["dst_ip"])), stamp))
+                                r["dst_label_set"], int(_outside(r["src_key"], r["src_ip"]) or
+                                                        _outside(r["dst_key"], r["dst_ip"])), stamp))
     # The newest observation's decision wins (SET expressions all read the row as it was before).
     conn.execute(
         "INSERT INTO connection_baseline (src_key, dst_key, port, proto, first_seen, last_seen, last_decision) "

@@ -101,6 +101,15 @@ def _v9_to_v10(data: dict[str, Any]) -> dict[str, Any]:
     return data
 
 
+def _v10_to_v11(data: dict[str, Any]) -> dict[str, Any]:
+    # Detection leaves out connections with an end outside the estate (user 2026-10-31: the exclusion is for alerts).
+    lateral = data.get("lateral")
+    detectors = lateral.get("detectors") if isinstance(lateral, dict) else None
+    if isinstance(detectors, dict):
+        detectors.setdefault("exclude_public", True)
+    return data
+
+
 # source version -> function producing source version + 1
 UPGRADES: dict[int, Callable[[dict[str, Any]], dict[str, Any]]] = {
     1: _v1_to_v2,
@@ -112,6 +121,7 @@ UPGRADES: dict[int, Callable[[dict[str, Any]], dict[str, Any]]] = {
     7: _v7_to_v8,
     8: _v8_to_v9,
     9: _v9_to_v10,
+    10: _v10_to_v11,
 }
 
 

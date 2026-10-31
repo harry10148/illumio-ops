@@ -477,6 +477,8 @@
   "det_account_history": "Account from a new source: days of account history",
   "det_process_history": "New process: days of host process history",
   "det_exclude_system": "Leave out system accounts",
+  "det_exclude_public": "Leave out public addresses",
+  "det_exclude_public_hint": "Connections with an end at a public address that is not a workload (internet scans, traffic to the internet) are not detected: they are not lateral movement.",
   "lateral_expected_title": "Expected initiating processes",
   "lateral_expected_hint": "Comma-separated; a connection on the port started by another process is reported.",
   "alert_event_immediate": "{event_types} on {hosts} ({matches})",

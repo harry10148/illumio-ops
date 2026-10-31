@@ -18,6 +18,7 @@ from illumio_ops.domain.detectors import (
     DetectorInput,
     DetectorStatus,
     HostLookup,
+    Obs,
     blocked_counts,
     dedup_windows,
     evaluable,
@@ -25,6 +26,7 @@ from illumio_ops.domain.detectors import (
 )
 from illumio_ops.domain.filter import FilterSpec
 from illumio_ops.domain.lateral import HostInfo
+from illumio_ops.domain.netaddr import outside
 from illumio_ops.domain.values import DetectorKind, DetectorState, PolicyDecision
 from illumio_ops.services.analysis import blocked_history
 from illumio_ops.services.analysis.anomaly_inputs import load_anomaly_data
@@ -130,6 +132,10 @@ def run_detection(ctx: AppContext, *, now: datetime | None = None, window: tuple
                              now=at) if cfg.admin_ports.entries else blocked.model_copy(update={"rows": []})
         # Every port, not blocked, in the window: the anomaly detectors' connections (spec §6.5.8).
         traffic = observations(ctx, FilterSpec(start=lo, end=hi, decisions=NOT_BLOCKED), now=at)
+        if lc.settings.detectors.exclude_public:
+            # North-south is not lateral movement: internet scans of a firewall's public address, egress (2026-10-31).
+            admin, blocked, traffic = (r.model_copy(update={"rows": [o for o in r.rows if inside(o)]})
+                                       for r in (admin, blocked, traffic))
         # A gap anywhere the detectors look — the lookback before the window included — makes the run incomplete.
         gaps = tuple(g for g in admin.coverage.gaps + blocked.coverage.gaps + traffic.coverage.gaps
                      if g[0] < hi and g[1] > start)
@@ -166,6 +172,10 @@ def run_detection(ctx: AppContext, *, now: datetime | None = None, window: tuple
         except StaleGeneration:
             pass
         raise
+
+
+def inside(o: Obs) -> bool:
+    return not (outside(o.src_ip, o.src_href) or outside(o.dst_ip, o.dst_href))
 
 
 def _hosts(lc: LateralContext) -> HostLookup:

@@ -46,7 +46,7 @@ def test_a_schema_8_file_loads_with_siem_off(tmp_path):
     p.write_text(json.dumps(d))
     p.chmod(0o600)
     s = SettingsStore(p).load()
-    assert s.schema_version == 10 and not s.siem.enabled and s.siem.destinations == ()
+    assert s.schema_version == 11 and not s.siem.enabled and s.siem.destinations == ()
 
 
 def test_a_complete_destination_is_valid():

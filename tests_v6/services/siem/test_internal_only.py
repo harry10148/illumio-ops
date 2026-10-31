@@ -25,9 +25,9 @@ def test_public_means_a_globally_routed_address(ip, public):
     assert is_public(ip) is public
 
 
-def _log(ctx, *pairs):
+def _log(ctx, *pairs, dst_href=None):
     base = normalize_flow(json.loads(FIXTURE.read_text())[0])
-    recs = [replace(base, src_ip=s, dst_ip=d, src_href=None, dst_href=None, port=1000 + i)
+    recs = [replace(base, src_ip=s, dst_ip=d, src_href=None, dst_href=dst_href, port=1000 + i)
             for i, (s, d) in enumerate(pairs)]
     with ctx.flows().connect() as conn:
         upsert_flows(conn, recs, origin=DataOrigin.INGEST, now=NOW, increments="cycle", log_new_connections=True)
@@ -38,6 +38,12 @@ def _log(ctx, *pairs):
 def test_the_log_says_whether_an_end_is_public(ctx):
     rows = _log(ctx, ("10.0.0.1", "10.0.0.2"), ("66.132.186.241", "114.35.37.162"), ("10.0.0.1", "8.8.8.8"))
     assert {r["dst_ip"]: r["public"] for r in rows} == {"10.0.0.2": 0, "114.35.37.162": 1, "8.8.8.8": 1}
+
+
+def test_a_workload_numbered_in_public_space_is_not_public(ctx):
+    # Some organisations number their own hosts in public space: a workload the PCE knows is inside, whatever its address.
+    rows = _log(ctx, ("10.0.0.1", "203.69.10.5"), dst_href="/orgs/1/workloads/pub")
+    assert [r["public"] for r in rows] == [0]
 
 
 def test_internal_only_sends_the_east_west_ones_and_counts_only_them(ctx):
