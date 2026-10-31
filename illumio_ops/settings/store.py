@@ -127,6 +127,14 @@ class SettingsStore:
         self._disk_digest = hashlib.sha256(raw).hexdigest()
         raise SettingsConflict(stale, disk.revision)
 
+    def create(self, s: Settings) -> Settings:
+        """The first settings file, from settings made elsewhere (the 5.x upgrade); never replaces one."""
+        with self._lock:
+            self._write(s, replace=False)
+            self._current = s
+            self._sync_dir()
+        return s
+
     def create_initial(self, *, password_hash: str, secret_key: str, port: int = 5001) -> Settings:
         s = default_settings(password_hash=password_hash, secret_key=secret_key, port=port)
         with self._lock:

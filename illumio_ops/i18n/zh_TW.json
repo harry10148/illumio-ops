@@ -2480,5 +2480,11 @@
   "siem_stuck": "同一筆已失敗 {n} 次",
   "siem_internal_only": "排除公網位址",
   "siem_internal_only_hint": "只送兩端都在內部的連線（內部位址或 PCE 上的 Workload，即東西向）；網際網路對防火牆公網位址的掃描不送",
-  "migrate_siem_internal_only": "兩端有公網位址的新連線不送（網際網路掃描會灌爆 SIEM）；要送請到 SIEM 頁取消勾選"
+  "migrate_siem_internal_only": "兩端有公網位址的新連線不送（網際網路掃描會灌爆 SIEM）；要送請到 SIEM 頁取消勾選",
+  "migrate_handover_siem": "SIEM {name}：從 {time} 之後接續，這是 5.x 最後送出的 audit 事件時間（較早但仍在排隊的事件會再送一次：至少送達一次）",
+  "migrate_handover_siem_none": "SIEM {name}：找不到 5.x 送出的紀錄，從升級時開始送",
+  "migrate_handover_siem_dlq": "SIEM {name}：5.x 已放棄的 {n} 筆 audit 事件（它的 DLQ）不會再送",
+  "migrate_handover_alerts": "事件告警：從 {time} 之後接續，這是 5.x 最後評估的事件時間",
+  "migrate_handover_alerts_none": "事件告警：找不到 5.x 的進度，從升級時開始告警",
+  "migrate_handover_capped": "第一次收集最多往回 {days} 天，到 {to}；{from} 到 {to} 之間的事件不會送出也不會告警"
 }

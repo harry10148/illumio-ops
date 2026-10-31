@@ -99,6 +99,7 @@ class MigrationResult:
     settings: Settings | None
     report: MigrationReport
     blocking: list[tuple[str, str]] = field(default_factory=list)
+    siem_origins: dict[str, list[str]] = field(default_factory=dict)  # 5.x destination name -> v6 ids
 
 
 def read_v5(v5_root: Path) -> dict[str, Any]:
@@ -305,7 +306,8 @@ def migrate_v5(raw: dict[str, Any], *, rules: list[dict[str, Any]] | None = None
     report.items.extend(alert_items)
     out["reports"], report_items = migrate_reports(raw, defaults, v5.settings.timezone)
     report.items.extend(report_items)
-    out["siem"], siem_items = migrate_siem(raw, mode=CollectionMode(out["collection"]["mode"]))
+    origins: dict[str, list[str]] = {}
+    out["siem"], siem_items = migrate_siem(raw, mode=CollectionMode(out["collection"]["mode"]), origins=origins)
     report.items.extend(siem_items)
 
     for path in leaf_paths(raw):
@@ -351,6 +353,6 @@ def migrate_v5(raw: dict[str, Any], *, rules: list[dict[str, Any]] | None = None
     if blocking:
         return MigrationResult(None, report, blocking)
     try:
-        return MigrationResult(validate_settings(out), report)
+        return MigrationResult(validate_settings(out), report, siem_origins=origins)
     except SettingsInvalid as exc:
         return MigrationResult(None, report, list(exc.errors))

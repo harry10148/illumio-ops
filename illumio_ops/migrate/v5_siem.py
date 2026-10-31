@@ -132,9 +132,11 @@ def _destination(i: int, d: dict[str, Any], names: set[str], mode: CollectionMod
     return out
 
 
-def migrate_siem(raw: dict[str, Any], *, mode: CollectionMode) -> tuple[dict[str, Any], list[MigrationItem]]:
+def migrate_siem(raw: dict[str, Any], *, mode: CollectionMode,
+                 origins: dict[str, list[str]] | None = None) -> tuple[dict[str, Any], list[MigrationItem]]:
     """The v6 `siem` section and an item per 5.x siem key (and pce_cache.siem_pending_warn_rows). Values never appear
-    in the report — a HEC token is listed by its key only."""
+    in the report — a HEC token is listed by its key only. origins: filled with each 5.x destination name's v6 ids
+    (5.x keyed its sending progress by name; the P8 handover continues it)."""
     items: list[MigrationItem] = []
     out: dict[str, Any] = default_siem().model_dump(mode="json")
     section = raw.get("siem") if isinstance(raw.get("siem"), dict) else {}
@@ -173,6 +175,8 @@ def migrate_siem(raw: dict[str, Any], *, mode: CollectionMode) -> tuple[dict[str
             items.append(_item(f"siem.destinations[{i}]", None, "unsupported", "migrate_siem_too_many"))
             continue
         made = _destination(i, d, names, mode, items)
+        if made is not None and origins is not None:
+            origins.setdefault(str(d.get("name") or "").strip(), []).append(made["id"])
         if made is not None:
             carried.append(made)
     out["destinations"] = carried

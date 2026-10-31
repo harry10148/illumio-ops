@@ -2480,5 +2480,11 @@
   "siem_stuck": "The same record failed {n} times",
   "siem_internal_only": "Leave out public addresses",
   "siem_internal_only_hint": "send only connections whose two ends are inside (an internal address or a workload, i.e. east-west); internet scans of a firewall's public address are left out",
-  "migrate_siem_internal_only": "new connections with a public end are left out (internet scans would flood it); untick on the SIEM page to send them"
+  "migrate_siem_internal_only": "new connections with a public end are left out (internet scans would flood it); untick on the SIEM page to send them",
+  "migrate_handover_siem": "SIEM {name}: continues after {time}, the last audit event 5.x had sent (an older event still waiting is sent again: at least once)",
+  "migrate_handover_siem_none": "SIEM {name}: 5.x had sent nothing recorded; sending starts at the upgrade",
+  "migrate_handover_siem_dlq": "SIEM {name}: {n} audit events 5.x gave up on (its DLQ) are not sent again",
+  "migrate_handover_alerts": "Event alerts: continue after {time}, the last event 5.x had evaluated",
+  "migrate_handover_alerts_none": "Event alerts: no 5.x progress found; events are alerted from the upgrade",
+  "migrate_handover_capped": "The first collection reaches back {days} days, to {to}; events between {from} and {to} are not sent or alerted"
 }
