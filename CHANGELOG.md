@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/) —
 a plain `<major>.<minor>.<patch>` scheme. (Tags through v4.0.0 carried a
 `-topic-slug` codename suffix; the codename was retired in 4.1.0.)
 
-## [6.0.0] - unreleased
+## [6.0.0] - 2026-11-01
 
 v6 is a rebuild of illumio-ops around detecting lateral movement, GUI only. See README.md and
 docs/guide/v6-installation.md.
