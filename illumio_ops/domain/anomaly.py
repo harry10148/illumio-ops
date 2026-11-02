@@ -503,6 +503,7 @@ def apply_directory_followup(dets: Sequence[Detection], recent: Sequence[Recent]
 
 
 # ── the second batch (spec §6.5.8 第二批) ─────────────────────────────────────
+PAIR_ROLLOUT = 3   # clients starting on one new listener in one run: a service going live (G)
 HISTORY_DAYS = 14  # the hourly activity a quiet period and a host's usual hours reach back over (store keeps 15)
 
 
@@ -568,7 +569,8 @@ def detect_direction_reversal(inp: DetectorInput) -> tuple[list[Detection], Dete
 def detect_new_pair_port(inp: DetectorInput) -> tuple[list[Detection], DetectorStatus]:
     """G: a pair of hosts that already talked starting on a port it had never used. Medium when nobody had ever
     connected to the destination on that port (something new is listening there), low when the destination already
-    served it to others. Not when the source's peer group already uses that port toward the same kind of host."""
+    served it to others, or when PAIR_ROLLOUT or more of its known clients start on it in the same run (a service
+    going live). Not when the source's peer group already uses that port toward the same kind of host."""
     kind = DetectorKind.NEW_PAIR_PORT
     cfg, data = inp.config, inp.anomaly
     if not inp.baseline_full:
@@ -585,18 +587,20 @@ def detect_new_pair_port(inp: DetectorInput) -> tuple[list[Detection], DetectorS
             if sig is not None and sig in data.peer_seen.get((group, o.port, o.proto), frozenset()):
                 continue
         found.setdefault((o.src_key, o.dst_key, o.port, o.proto), []).append(o)
+    starters = Counter((dst, port, proto) for _, dst, port, proto in found)
     out = []
     for (src, dst, port, proto), hits in sorted(found.items()):
         o = hits[0]
         critical = _dst_host(o, inp).critical
         listener = (dst, port, proto) not in data.ports_served
-        base = Severity.MEDIUM if listener else Severity.LOW
+        n = starters[(dst, port, proto)]
+        base = Severity.MEDIUM if listener and n < PAIR_ROLLOUT else Severity.LOW
         out.append(Detection(
             detector=kind, fingerprint=f"pairport|{src}|{dst}|{port}|{proto}", subject_key=src,
             severity=raise_severity(base) if critical else base,
             first_seen=min(h.first for h in hits), last_seen=max(h.last for h in hits), critical_asset=critical,
             summary={"target": o.dst_hostname or o.dst_ip, "port": port, "proto": proto, "new_listener": listener,
-                     "decision": o.decision},
+                     "starters": n, "decision": o.decision},
             segment=_ports_segment(hits),
             confidence=DetectionConfidence(baseline_days=round(inp.baseline_days, 1), incomplete_gaps=inp.gaps),
             ends=ends(hits[:1], hits)))

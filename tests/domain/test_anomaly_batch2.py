@@ -320,3 +320,15 @@ def test_off_hours_ignores_gaps_before_the_activity_began():
     [_d], status = run([], data=off({"/w/a": 120}, {"/w/a": night_shift()}, days=8.0, gaps=(gap,)),
                       detector=detect_off_hours)
     assert status.state is DetectorState.OK
+
+
+def test_new_listener_many_clients_start_at_once_is_a_rollout_and_low():
+    """GUI check: six known clients starting on a new port of one host in one run is a service going live, not one
+    host's anomaly — each stays visible (low), none alerts."""
+    rows = [obs(f"/w/c{i}", "/w/b", port=9443) for i in range(3)]
+    data = AnomalyData(pairs_before=frozenset((f"/w/c{i}", "/w/b") for i in range(3)))
+    dets, _ = run(rows, first_seen=new(rows), data=data, detector=detect_new_pair_port)
+    assert [d.severity for d in dets] == [Severity.LOW] * 3 and all(d.summary["starters"] == 3 for d in dets)
+    two = rows[:2]
+    dets, _ = run(two, first_seen=new(two), data=data, detector=detect_new_pair_port)
+    assert [d.severity for d in dets] == [Severity.MEDIUM] * 2
