@@ -317,6 +317,6 @@ def test_batch2_titles_carry_their_summary():
 def test_off_hours_ignores_gaps_before_the_activity_began():
     """Scale run: the kept 14 days reach before an install's first live hour; a gap there is not missing activity."""
     gap = (HOUR.replace(hour=11) - timedelta(days=12), HOUR.replace(hour=12) - timedelta(days=12), "not_yet_collected")
-    [d], status = run([], data=off({"/w/a": 120}, {"/w/a": night_shift()}, days=8.0, gaps=(gap,)),
+    [_d], status = run([], data=off({"/w/a": 120}, {"/w/a": night_shift()}, days=8.0, gaps=(gap,)),
                       detector=detect_off_hours)
     assert status.state is DetectorState.OK
