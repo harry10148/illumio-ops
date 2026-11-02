@@ -2743,6 +2743,18 @@ tamper_classification: (string | null)
 timestamp: string
 }
 /**
+ * The ranking's peer-precedent column (services/workbench_peer.py).
+ * 
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "PeerPrecedent".
+ */
+export interface PeerPrecedent {
+ports: string[]
+reasons: (("no_group" | "group_too_small") | null)[]
+state: ("ok" | "no_source_dimension" | "needs_destination" | "basic_mode")
+values: (number | null)[]
+}
+/**
  * This interface was referenced by `ContractRoot`'s JSON-Schema
  * via the `definition` "SegmentResult".
  */
@@ -2765,6 +2777,7 @@ view: SegmentView
  * via the `definition` "WorkbenchResult".
  */
 export interface WorkbenchResult {
+peer?: (PeerPrecedent | null)
 pulled: (PullInfo | null)
 result: SegmentResult
 }

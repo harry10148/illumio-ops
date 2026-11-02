@@ -2568,5 +2568,15 @@
   "detect_kpi_new_week": "本週新偵測",
   "detect_kpi_new_week_needs_advanced": "需要進階模式",
   "detect_tune": "調整門檻",
-  "detect_attention_title": "需要注意"
+  "detect_attention_title": "需要注意",
+  "wb_peer_head_ports": "同群先例（{ports}）",
+  "wb_peer_head_any": "同群先例（任何 port）",
+  "wb_peer_hint": "來源主機同群組的其他成員，在查詢期間開始前的基準裡，有幾台連過同一種目的（目的的同群組，或該主機本身）",
+  "wb_peer_no_source": "同群先例：分組加入「來源主機」才會計算。",
+  "wb_peer_needs_destination": "同群先例：分組同時要有「來源主機」與「目的主機」才會計算。",
+  "wb_peer_basic_mode": "同群先例需要進階模式（基本模式不保留基準）。",
+  "wb_peer_no_group": "來源不在同群組",
+  "wb_peer_group_too_small": "群組太小",
+  "wb_field_coverage": "帶發起程式的連線佔 {process}%、帶帳號的佔 {user}%；依程式或帳號分組只涵蓋有值的部分。",
+  "wb_back_to_alert": "← 返回告警 #{id}"
 }

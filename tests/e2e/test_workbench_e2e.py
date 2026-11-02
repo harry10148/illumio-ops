@@ -118,3 +118,60 @@ def test_service_pick_narrows_to_it(context, live_app):
     page.locator("[data-dim=service] .wb-dim-row", has_text="445").click()
     expect(page.locator("[data-role=wb-detail] tbody tr")).to_have_count(1)
     assert page.locator("[data-dim=service] .wb-dim-row[data-chosen=true]").count() == 1
+
+
+# ── the investigation page (UI redesign spec §4.3, §5.1) ────────────────────
+
+def _ranking(page, live_app, alert_id, group_1):
+    page.goto(f"{live_app.url}/alerts/{alert_id}")
+    page.click("[data-role=open-workbench]")
+    page.wait_for_selector("[data-role=wb-detail]")
+    page.click("role=tab[name=/Ranking|排名/]")
+    page.select_option("select[name=group_0]", "src_host")
+    page.select_option("select[name=group_1]", group_1)
+    page.wait_for_selector("[data-role=wb-ranking] tr td:nth-child(3)")
+
+
+def test_from_alert_back_link(context, live_app):
+    alert_id = _seed(live_app)
+    page = context.new_page()
+    sign_in(page, live_app.url)
+    page.goto(f"{live_app.url}/alerts/{alert_id}")
+    page.click("[data-role=open-workbench]")
+    link = page.locator("[data-role=back-to-alert]")
+    expect(link).to_have_text(f"← Back to alert #{alert_id}")
+    assert link.get_attribute("href") == f"/alerts/{alert_id}"
+
+
+def test_peer_precedent_column_states(context, live_app):
+    alert_id = _seed(live_app)
+    page = context.new_page()
+    sign_in(page, live_app.url)
+    _ranking(page, live_app, alert_id, "service")
+    expect(page.locator("[data-role=peer-note]")).to_contain_text("source host and destination host")
+    expect(page.locator("[data-role=peer-head]")).to_have_count(0)
+    page.select_option("select[name=group_1]", "dst_host")
+    expect(page.locator("[data-role=peer-head]")).to_have_text("Peer precedent (any port)")
+    cells = page.locator("[data-role=peer-cell]")
+    expect(cells.first).to_be_visible()
+    assert "Source in no peer group" in page.inner_text("[data-role=wb-ranking]")  # the test hosts carry no labels
+
+
+def test_coverage_sentence(context, live_app):
+    alert_id = _seed(live_app)
+    page = context.new_page()
+    sign_in(page, live_app.url)
+    page.goto(f"{live_app.url}/alerts/{alert_id}")
+    page.click("[data-role=open-workbench]")
+    expect(page.locator("[data-role=field-coverage]")).to_contain_text("carry the initiating process")
+
+
+def test_workbench_no_overflow_760(narrow_context, live_app):
+    from tests.e2e.conftest import no_horizontal_overflow
+    alert_id = _seed(live_app)
+    page = narrow_context.new_page()
+    sign_in(page, live_app.url)
+    page.goto(f"{live_app.url}/alerts/{alert_id}")
+    page.click("[data-role=open-workbench]")
+    page.wait_for_selector("[data-role=wb-detail]")
+    assert no_horizontal_overflow(page)

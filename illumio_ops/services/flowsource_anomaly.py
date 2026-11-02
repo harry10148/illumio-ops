@@ -10,6 +10,7 @@ from datetime import datetime
 from typing import Any, TypeVar
 
 from illumio_ops.domain.anomaly import is_public
+from illumio_ops.domain.filter import PortProto
 from illumio_ops.domain.values import DIRECTORY_PORTS, IngestSource
 from illumio_ops.services.collect.guard import require_same_pce
 from illumio_ops.services.context import AppContext
@@ -112,6 +113,38 @@ def peer_seen(ctx: AppContext, queries: Mapping[tuple[str, int, int], Collection
                     "SELECT DISTINCT dst_key FROM connection_baseline WHERE port = ? AND proto = ? "
                     f"AND src_key IN ({','.join('?' * len(chunk))}) AND first_seen <= ?",
                     [port, proto, *chunk, db_time(before)])}
+    return out
+
+
+def peer_destinations(ctx: AppContext, members: Collection[str], *, ports: Sequence[PortProto],
+                      before: datetime) -> set[tuple[str, str]]:
+    """(source, destination) pairs these hosts had in the baseline before `before`, on any of `ports` as a flow
+    filter reads them (a range, a protocol alone; no ports: any port) — the investigation table's peer precedent."""
+    out: set[tuple[str, str]] = set()
+    port_sql = ""
+    port_params: list[int] = []
+    if ports:
+        parts = []
+        for pp in ports:
+            clause, params = [], []
+            if pp.port is not None and pp.to_port is not None:
+                clause.append("port BETWEEN ? AND ?")
+                params += [pp.port, pp.to_port]
+            elif pp.port is not None:
+                clause.append("port = ?")
+                params.append(pp.port)
+            if pp.proto is not None:
+                clause.append("proto = ?")
+                params.append(pp.proto)
+            parts.append("(" + " AND ".join(clause) + ")")
+            port_params += params
+        port_sql = " AND (" + " OR ".join(parts) + ")"
+    with _reading(ctx) as conn:
+        for chunk in _chunks(members):
+            out |= {(r[0], r[1]) for r in conn.execute(
+                f"SELECT DISTINCT src_key, dst_key FROM connection_baseline WHERE src_key IN "
+                f"({','.join('?' * len(chunk))}) AND first_seen <= ?{port_sql}",
+                [*chunk, db_time(before), *port_params])}
     return out
 
 

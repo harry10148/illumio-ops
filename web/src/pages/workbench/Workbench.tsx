@@ -3,9 +3,10 @@ import { Link, useSearchParams } from "react-router-dom";
 
 import { type ApiError, call } from "../../api/client";
 import type {
-  AggRow, DimensionTop, EventRow, FlowRow, PullInfo, SegmentDimension, SegmentMetric, SegmentResult, WorkbenchMeta,
+  AggRow, DimensionTop, EventRow, FlowRow, PeerPrecedent, PullInfo, SegmentDimension, SegmentMetric, SegmentResult, WorkbenchMeta,
 } from "../../api/generated";
 import { formatTime } from "../../components/ProbeResults";
+import { Reason } from "../../components/ui";
 import { t, useLang } from "../../i18n";
 import { registerNav } from "../../shell/nav";
 import { QuarantineDialog, type QuarantineHost } from "../quarantine/QuarantineDialog";
@@ -63,6 +64,11 @@ function Coverage({ result, bytes }: { result: SegmentResult; bytes: boolean }) 
       {c.truncated && <p className="notice">{t("wb_truncated")}</p>}
       {c.source !== "store" && <p className="hint">{t("wb_from_pce")}</p>}
       {result.limit_hit && <p className="hint">{t("wb_limit_hit")}</p>}
+      {fc && fc.total > 0 && (
+        <p className="hint" data-role="field-coverage">{t("wb_field_coverage", {
+          process: String(Math.round((fc.initiator_process / fc.total) * 100)),
+          user: String(Math.round((fc.initiator_user / fc.total) * 100)) })}</p>
+      )}
       {bytes && fc && fc.total > 0 && fc.bytes < fc.total && (
         <p className="hint">{t("wb_bytes_coverage", { pct: String(Math.round((fc.bytes / fc.total) * 100)) })}</p>
       )}
@@ -190,10 +196,17 @@ function Detail({ result, mode }: { result: SegmentResult; mode: Req["mode"] }) 
   );
 }
 
-function Ranking({ result, heads }: { result: SegmentResult; heads: string[] }) {
+const PEER_STATE_KEYS: Record<string, string> = {
+  no_source_dimension: "wb_peer_no_source", needs_destination: "wb_peer_needs_destination",
+  basic_mode: "wb_peer_basic_mode",
+};
+const PEER_ROW_KEYS: Record<string, string> = { no_group: "wb_peer_no_group", group_too_small: "wb_peer_group_too_small" };
+
+function Ranking({ result, heads, peer }: { result: SegmentResult; heads: string[]; peer: PeerPrecedent | null }) {
   const levels = heads.length - 1;
   const rows = result.ranking ?? [];
   if (rows.length === 0) return <p className="muted">{t("wb_empty")}</p>;
+  const showPeer = peer?.state === "ok";
   const shownKey = (r: AggRow, i: number) => {
     const k = r.keys[i];
     const s = r.display[i] ?? (typeof k === "string" && k.startsWith("ip:") ? k.slice(3) : k);
@@ -202,7 +215,14 @@ function Ranking({ result, heads }: { result: SegmentResult; heads: string[] }) 
   return (
     <div className="table-wrap">
       <table className="table" data-role="wb-ranking">
-        <thead><tr>{heads.map((h, i) => <th key={i} className={i === heads.length - 1 ? "wb-num" : ""}>{h}</th>)}</tr></thead>
+        <thead><tr>
+          {heads.map((h, i) => <th key={i} className={i === heads.length - 1 ? "wb-num" : ""}>{h}</th>)}
+          {showPeer && (
+            <th className="wb-num" data-role="peer-head" title={t("wb_peer_hint")}>
+              {peer.ports.length ? t("wb_peer_head_ports", { ports: peer.ports.join(", ") }) : t("wb_peer_head_any")}
+            </th>
+          )}
+        </tr></thead>
         <tbody>
           {rows.map((r, i) => {
             const prev = rows[i - 1];
@@ -212,11 +232,21 @@ function Ranking({ result, heads }: { result: SegmentResult; heads: string[] }) 
                 <td className={first ? "" : "muted"}>{first ? shownKey(r, 0) : ""}</td>
                 {levels === 2 && <td>{shownKey(r, 1)}</td>}
                 <td className="wb-num">{r.value.toLocaleString()}</td>
+                {showPeer && (
+                  <td className="wb-num" data-role="peer-cell">
+                    {peer.values[i] === null || peer.values[i] === undefined
+                      ? <Reason text={t(PEER_ROW_KEYS[peer.reasons[i] ?? ""] ?? "value_not_computed")} />
+                      : peer.values[i]}
+                  </td>
+                )}
               </tr>
             );
           })}
         </tbody>
       </table>
+      {peer && peer.state !== "ok" && (
+        <p className="hint" data-role="peer-note">{t(PEER_STATE_KEYS[peer.state] ?? "value_not_computed")}</p>
+      )}
     </div>
   );
 }
@@ -231,6 +261,7 @@ export function Workbench() {
   const [req, setReq] = useState<Req | null>(null);
   const [alertId, setAlertId] = useState<string | null>(null);
   const [result, setResult] = useState<SegmentResult | null>(null);
+  const [peer, setPeer] = useState<PeerPrecedent | null>(null);
   const [pulled, setPulled] = useState<PullInfo | null>(null);
   const [error, setError] = useState<ApiError | null>(null);
   const [busy, setBusy] = useState(false);
@@ -272,6 +303,7 @@ export function Workbench() {
     setBusy(false);
     if (env.ok && env.data) {
       setResult(env.data.result);
+      setPeer(env.data.peer ?? null);
       setPulled(env.data.pulled);
       setError(null);
     } else setError(env.error);
@@ -325,6 +357,7 @@ export function Workbench() {
 
   return (
     <section className="page wb" data-role="workbench">
+      {alertId && <p><Link to={`/alerts/${alertId}`} data-role="back-to-alert">{t("wb_back_to_alert", { id: alertId })}</Link></p>}
       <div className="page-head">
         <h1>{t("nav_workbench")}</h1>
         <div className="row" role="group" aria-label={t("wb_mode")}>
@@ -424,7 +457,7 @@ export function Workbench() {
             <>
               <Coverage result={result} bytes={req.mode === "flows" && req.metric === "bytes"} />
               {result.view === "ranking"
-                ? <Ranking result={result} heads={[...(req.group_by ?? []).map((g) => t(DIM_KEYS[g.dimension] ?? g.dimension)),
+                ? <Ranking result={result} peer={peer} heads={[...(req.group_by ?? []).map((g) => t(DIM_KEYS[g.dimension] ?? g.dimension)),
                     t(METRIC_KEYS[req.mode === "events" ? "events" : (req.metric ?? "flows")] ?? "")]} />
                 : <Detail result={result} mode={req.mode} />}
             </>

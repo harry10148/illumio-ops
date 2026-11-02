@@ -2568,5 +2568,15 @@
   "detect_kpi_new_week": "New detections this week",
   "detect_kpi_new_week_needs_advanced": "Needs advanced mode",
   "detect_tune": "Tune thresholds",
-  "detect_attention_title": "Needs attention"
+  "detect_attention_title": "Needs attention",
+  "wb_peer_head_ports": "Peer precedent ({ports})",
+  "wb_peer_head_any": "Peer precedent (any port)",
+  "wb_peer_hint": "How many other members of the source host's peer group had connected to the same kind of destination (its peer group, or the host itself) in the baseline before the period began",
+  "wb_peer_no_source": "Peer precedent: group by source host to compute it.",
+  "wb_peer_needs_destination": "Peer precedent: group by source host and destination host to compute it.",
+  "wb_peer_basic_mode": "Peer precedent needs advanced mode (basic mode keeps no baseline).",
+  "wb_peer_no_group": "Source in no peer group",
+  "wb_peer_group_too_small": "Group too small",
+  "wb_field_coverage": "{process}% of connections carry the initiating process and {user}% the account; grouping by either covers only those.",
+  "wb_back_to_alert": "← Back to alert #{id}"
 }

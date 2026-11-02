@@ -100,9 +100,22 @@ class DimensionTop(BaseModel):
     pulled: PullInfo | None = None  # read from the PCE for this period (lightweight mode)
 
 
+PeerState = Literal["ok", "no_source_dimension", "needs_destination", "basic_mode"]
+PeerRowReason = Literal["no_group", "group_too_small"]
+
+
+class PeerPrecedent(BaseModel):
+    """The ranking's peer-precedent column (services/workbench_peer.py)."""
+    state: PeerState
+    values: list[int | None]           # one per ranking row; None: not computed (state, or the row's reason)
+    reasons: list[PeerRowReason | None]
+    ports: list[str]                   # "1433/6" the count is about; empty: any port
+
+
 class WorkbenchResult(BaseModel):
     result: SegmentResult
     pulled: PullInfo | None  # read from the PCE for this period (lightweight mode, or older than the kept traffic)
+    peer: PeerPrecedent | None = None  # a flow ranking's peer-precedent column
 
 
 class WorkbenchMeta(BaseModel):
@@ -153,7 +166,13 @@ def run(ctx: AppContext, req: FlowRequest | EventRequest, *, now: datetime | Non
         if result.ranking:
             result = result.model_copy(update={"ranking": _named(read, result.ranking, req.group_by)})
         check()
-        return WorkbenchResult(result=result, pulled=pulled)
+    peer = None
+    if isinstance(req, FlowRequest) and result.ranking is not None:
+        from illumio_ops.services.workbench_peer import (
+            peer_precedent,  # imports this module
+        )
+        peer = peer_precedent(ctx, req, result.ranking, now=now)
+    return WorkbenchResult(result=result, pulled=pulled, peer=peer)
 
 
 class PredictedView(BaseModel):
