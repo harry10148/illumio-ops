@@ -10,7 +10,7 @@ from tests.e2e.conftest import sign_in
 def test_focus_not_computed_then_items(context, live_app):
     page = context.new_page()
     sign_in(page, live_app.url)
-    page.goto(f"{live_app.url}/attention")
+    page.goto(f"{live_app.url}/detect")
     expect(page.locator("[data-role=focus-not-computed]")).to_have_count(1)
 
     now = datetime.now(UTC)
@@ -36,9 +36,9 @@ def test_long_list_shows_the_top_first(context, live_app):
     """Lab acceptance 2026-10-30: 117 items (102 detections) listed at once; the top 10 come first, the rest on
     request, and the page says how many there are."""
     now = datetime.now(UTC)
-    items = [{"kind": "detection", "fingerprint": f"det|{i}", "severity": "medium", "critical_asset": False,
-              "confidence": "high", "title_key": "focus_title_fanout", "why_key": "focus_why_detection",
-              "params": {"host": f"h{i}", "minutes": 10, "targets": 5},
+    items = [{"kind": "pivot_host", "fingerprint": f"pivot|{i}", "severity": "medium", "critical_asset": False,
+              "confidence": "high", "title_key": "focus_title_pivot_host", "why_key": "focus_why_pivot",
+              "params": {"host": f"h{i}", "reach": 5, "assets": 2},
               "action": {"target": "alerts", "segment": None, "host_key": None}, "score": 1.0,
               "first_seen": now.isoformat(), "new_this_week": True, "weeks_persisting": 0} for i in range(12)]
     with live_app.ctx.flows().connect() as conn:
@@ -48,10 +48,10 @@ def test_long_list_shows_the_top_first(context, live_app):
         conn.commit()
     page = context.new_page()
     sign_in(page, live_app.url)
-    page.goto(f"{live_app.url}/attention")
-    expect(page.locator(".focus-item")).to_have_count(10)
+    page.goto(f"{live_app.url}/detect")
+    expect(page.locator("[data-role=focus] .focus-item")).to_have_count(10)
     page.click("[data-role=focus-more]")
-    expect(page.locator(".focus-item")).to_have_count(12)
+    expect(page.locator("[data-role=focus] .focus-item")).to_have_count(12)
 
 
 def _write(live_app, *, at, items=(), detections=None):
@@ -68,7 +68,7 @@ def test_stale_empty_list_is_not_all_clear(context, live_app):
     _write(live_app, at=datetime.now(UTC) - timedelta(hours=3), detections={"total": 600, "considered": 500})
     page = context.new_page()
     sign_in(page, live_app.url)
-    page.goto(f"{live_app.url}/attention")
+    page.goto(f"{live_app.url}/detect")
     expect(page.locator("[data-role=focus-detections-capped]")).to_have_count(1)  # final review #7
     expect(page.locator("[data-role=focus] p.muted")).to_have_count(0)
 
@@ -84,7 +84,7 @@ def test_page_mounted_once_when_languages_differ(context, live_app):
     asked = []
     page.on("request", lambda r: asked.append(r.url) if r.url.endswith("/api/lateral") else None)
     page.goto(f"{live_app.url}/lateral")
-    expect(page.locator("h1")).to_have_text("橫向移動")
+    expect(page.locator("h1")).to_have_text("偵測")
     page.wait_for_timeout(1000)
     assert len(asked) == 1
 
@@ -100,9 +100,9 @@ def test_late_browser_dictionary_does_not_stick_on_loading(context, live_app):
     held = []
     page.route("**/api/i18n/en", lambda route: held.append(route))
     page.goto(f"{live_app.url}/lateral")
-    expect(page.locator("h1")).to_have_text("橫向移動")
+    expect(page.locator("h1")).to_have_text("偵測")
     assert held
     for r in held:
         r.continue_()
     page.wait_for_timeout(1000)
-    expect(page.locator("h1")).to_have_text("橫向移動")
+    expect(page.locator("h1")).to_have_text("偵測")

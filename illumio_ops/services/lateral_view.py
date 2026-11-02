@@ -36,7 +36,7 @@ from illumio_ops.services.ondemand import INTERACTIVE_PULL, pull_period
 from illumio_ops.services.workbench_store import PullInfo
 from illumio_ops.store.flowdb import analysis, capabilities, workloads
 from illumio_ops.store.flowdb import ransomware as ransomware_store
-from illumio_ops.store.flowdb.db import StaleGeneration
+from illumio_ops.store.flowdb.db import StaleGeneration, db_day
 
 KEEP = timedelta(minutes=30)
 LIGHTWEIGHT_DAYS = (1, 7, 30)
@@ -68,6 +68,22 @@ class DenySimulationView(BaseModel):
     pull: PullInfo | None  # lightweight mode: the proposal's traffic read for it
 
 
+class SurfaceNumbers(BaseModel):
+    """The attack surface at the top of the detection page (UI redesign spec §4.2), each with the last stored day
+    before the result's own day for comparison (None: no such day). A number that cannot be computed is None with
+    its reason, never 0."""
+    reachable_critical: int | None
+    reachable_critical_prev: int | None
+    hubs: int
+    hubs_prev: int | None
+    residual_after_enforce: int | None  # critical assets still reachable once everything is enforced
+    residual_after_enforce_prev: int | None
+    cross_env: int
+    cross_env_prev: int | None
+    new_this_week: int | None  # detections first seen in the last 7 days; None where traffic is not collected
+    critical_reason: str | None  # why the critical-asset numbers are None
+
+
 class LateralPage(BaseModel):
     state: Literal["ok", "not_computed", "collection_off", "lightweight"]
     source: Literal["stored", "pulled"] | None
@@ -91,6 +107,7 @@ class LateralPage(BaseModel):
     observation_days_setting: int
     lightweight_days: list[int]
     port_names: dict[str, str]  # "<port>/<proto>" -> the management port's name (RDP, SMB...)
+    surface: SurfaceNumbers | None = None  # None until an exposure result exists
 
 
 @dataclass(frozen=True)
@@ -173,6 +190,30 @@ def _detections(ctx: AppContext, conn: Any, at: datetime) -> tuple[list[LateralD
     return out, total
 
 
+SNAPSHOT_LOOKBACK = timedelta(days=8)
+
+
+def _surface(result: ExposureResult, *, critical_set: bool, snaps: list[tuple[str, dict[str, Any]]],
+             new_this_week: int | None) -> SurfaceNumbers:
+    """snaps: the stored daily snapshots before the result's own day, oldest first (empty for a pulled result)."""
+    prev = snaps[-1][1] if snaps else {}
+
+    def before(key: str) -> int | None:
+        v = prev.get(key)
+        return int(v) if isinstance(v, int | float) else None
+
+    reach = sum(1 for a in result.assets if a.sources_now)
+    residual = sum(1 for a in result.assets if a.sources_enforced)
+    return SurfaceNumbers(
+        reachable_critical=reach if critical_set else None,
+        reachable_critical_prev=before("assets_reachable_now") if critical_set else None,
+        hubs=sum(h.pivot_now for h in result.hosts), hubs_prev=before("pivots_now"),
+        residual_after_enforce=residual if critical_set else None,
+        residual_after_enforce_prev=before("assets_reachable_enforced") if critical_set else None,
+        cross_env=result.cross_env_total, cross_env_prev=before("cross_env_edges"),
+        new_this_week=new_this_week, critical_reason=None if critical_set else "lat_surface_no_critical")
+
+
 def view(ctx: AppContext, *, now: datetime | None = None) -> LateralPage:
     at = (now or datetime.now(UTC)).astimezone(UTC)
     with ctx.flows().connect() as conn:
@@ -188,6 +229,11 @@ def view(ctx: AppContext, *, now: datetime | None = None) -> LateralPage:
         held_rw = ransomware_store.source_updated(conn)
         inventory = workloads.all_workloads(conn)
         detections, total = _detections(ctx, conn, at) if lc.collected and not light else ([], 0)
+        new_week = (analysis.detections_first_seen_between(conn, at - WEEK, at, limit=1)[1]
+                    if lc.collected and not light else None)
+        snap_rows = None if light or row is None else analysis.lateral_snapshots(
+            conn, db_day(datetime.fromisoformat(row["computed_at"]) - SNAPSHOT_LOOKBACK),
+            db_day(datetime.fromisoformat(row["computed_at"]) - timedelta(days=1)))
     rated = [w for w in inventory if w.risk_percent is not None or w.risk_updated_at is not None]
     unread = sum(1 for w in rated if w.href not in held_rw or (w.risk_updated_at and held_rw[w.href] != w.risk_updated_at))
     detect_state: Literal["ok", "failed", "not_run"] = (
@@ -210,7 +256,9 @@ def view(ctx: AppContext, *, now: datetime | None = None) -> LateralPage:
             return LateralPage(state="lightweight", source=None, computed_at=None, stale=False, exposure=None,
                                names={}, pull=None, **base)
         return LateralPage(state="ok", source="pulled", computed_at=h.result.computed_at, stale=False,
-                           exposure=h.result, names=h.names, pull=h.pull, **base)
+                           exposure=h.result, names=h.names, pull=h.pull,
+                           surface=_surface(h.result, critical_set=base["critical_set"], snaps=[],
+                                            new_this_week=None), **base)
     if row is None:
         off = run is not None and json.loads(run["status_json"] or "{}").get("state") == "collection_off"
         return LateralPage(state="collection_off" if off or not lc.collected else "not_computed", source=None,
@@ -218,7 +266,9 @@ def view(ctx: AppContext, *, now: datetime | None = None) -> LateralPage:
     result = ExposureResult.model_validate_json(row["result_json"])
     computed = datetime.fromisoformat(row["computed_at"])
     return LateralPage(state="ok", source="stored", computed_at=computed, stale=computed < at - STALE_AFTER,
-                       exposure=result, names=display_names(ctx, _keys_of(result)), pull=None, **base)
+                       exposure=result, names=display_names(ctx, _keys_of(result)), pull=None,
+                       surface=_surface(result, critical_set=base["critical_set"], snaps=snap_rows or [],
+                                        new_this_week=new_week), **base)
 
 
 def _floor(t: datetime) -> datetime:

@@ -66,11 +66,6 @@ export type SegmentMetric1 = ("flows" | "connections" | "distinct_dst" | "distin
 export type SegmentMetric2 = ("flows" | "connections" | "distinct_dst" | "distinct_src" | "distinct_ports" | "bytes" | "events")
 /**
  * This interface was referenced by `ContractRoot`'s JSON-Schema
- * via the `definition` "ProbeName".
- */
-export type ProbeName = ("noop" | "health" | "node_available")
-/**
- * This interface was referenced by `ContractRoot`'s JSON-Schema
  * via the `definition` "TamperPattern".
  */
 export type TamperPattern = ("regular_cycle" | "burst" | "sporadic" | "too_few")
@@ -188,6 +183,11 @@ export type PortClass1 = ("remote" | "directory" | "database")
  * via the `definition` "DeploymentType".
  */
 export type DeploymentType = ("on_prem" | "saas")
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "ProbeName".
+ */
+export type ProbeName = ("noop" | "health" | "node_available")
 
 /**
  * This interface was referenced by `ContractRoot`'s JSON-Schema
@@ -931,33 +931,6 @@ sources_status: {
 stale: boolean
 }
 /**
- * This interface was referenced by `ContractRoot`'s JSON-Schema
- * via the `definition` "PceSummary".
- */
-export interface PceSummary {
-checked_at: string
-results: ProbeItem[]
-stale: boolean
-}
-/**
- * This interface was referenced by `ContractRoot`'s JSON-Schema
- * via the `definition` "ProbeItem".
- */
-export interface ProbeItem {
-category: string
-detail_key: string
-name: ProbeName
-ok: boolean
-status: (number | null)
-}
-/**
- * This interface was referenced by `ContractRoot`'s JSON-Schema
- * via the `definition` "HomeSummary".
- */
-export interface HomeSummary {
-pce: (PceSummary | null)
-}
-/**
  * An operator's "known cause" for a host's or a pattern's tampering (spec §6.5.4 step 5).
  * 
  * This interface was referenced by `ContractRoot`'s JSON-Schema
@@ -1294,6 +1267,26 @@ truncated_windows: number
 unread_from: (string | null)
 }
 /**
+ * The attack surface at the top of the detection page (UI redesign spec §4.2), each with the last stored day
+ * before the result's own day for comparison (None: no such day). A number that cannot be computed is None with
+ * its reason, never 0.
+ * 
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "SurfaceNumbers".
+ */
+export interface SurfaceNumbers {
+critical_reason: (string | null)
+cross_env: number
+cross_env_prev: (number | null)
+hubs: number
+hubs_prev: (number | null)
+new_this_week: (number | null)
+reachable_critical: (number | null)
+reachable_critical_prev: (number | null)
+residual_after_enforce: (number | null)
+residual_after_enforce_prev: (number | null)
+}
+/**
  * This interface was referenced by `ContractRoot`'s JSON-Schema
  * via the `definition` "LateralPage".
  */
@@ -1324,6 +1317,7 @@ ransomware_unsupported: boolean
 source: (("stored" | "pulled") | null)
 stale: boolean
 state: ("ok" | "not_computed" | "collection_off" | "lightweight")
+surface?: (SurfaceNumbers | null)
 }
 /**
  * This interface was referenced by `ContractRoot`'s JSON-Schema
@@ -2464,6 +2458,17 @@ write_api_secret: string
 }
 /**
  * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "ProbeItem".
+ */
+export interface ProbeItem {
+category: string
+detail_key: string
+name: ProbeName
+ok: boolean
+status: (number | null)
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
  * via the `definition` "ProbeRun".
  */
 export interface ProbeRun {
@@ -2764,7 +2769,7 @@ pulled: (PullInfo | null)
 result: SegmentResult
 }
 
-export type OpId = "alert_rules.create" | "alert_rules.delete" | "alert_rules.list" | "alert_rules.pack" | "alert_rules.preview" | "alert_rules.update" | "alerts.evidence" | "alerts.explain" | "alerts.get" | "alerts.list" | "alerts.mark_known" | "alerts.note_add" | "auth.csrf" | "auth.login" | "auth.logout" | "auth.me" | "auth.password" | "custom_reports.add_section" | "custom_reports.delete" | "custom_reports.list" | "custom_reports.remove_section" | "custom_reports.rename" | "home.focus" | "home.summary" | "hosts.profile" | "hosts.ransomware_allows" | "hosts.tamper_note_add" | "hosts.tamper_note_remove" | "i18n.dictionary" | "lateral.compute" | "lateral.simulate" | "lateral.view" | "quarantine.apply" | "quarantine.history" | "quarantine.preview" | "quarantine.remove" | "report_schedules.create" | "report_schedules.delete" | "report_schedules.list" | "report_schedules.run_now" | "report_schedules.update" | "reports.catalog" | "reports.delete" | "reports.generate" | "reports.get" | "reports.list" | "rhc.enable" | "rhc.status" | "shell.status" | "siem.destination.test" | "siem.dlq.list" | "siem.dlq.purge" | "siem.dlq.resend" | "siem.settings.get" | "siem.settings.update" | "siem.status" | "system.channels.get" | "system.channels.test" | "system.channels.update" | "system.collection.backfill" | "system.collection.get" | "system.collection.status" | "system.collection.update" | "system.display.get" | "system.display.update" | "system.jobs.list" | "system.lateral.get" | "system.lateral.known" | "system.lateral.known_delete" | "system.lateral.update" | "system.logs.query" | "system.pce.get" | "system.pce.latest" | "system.pce.probe" | "system.pce.update" | "system.reports.get" | "system.reports.update" | "system.security.get" | "system.security.update" | "system.tls.csr" | "system.tls.import" | "system.tls.renew" | "system.tls.status" | "system.tls.update" | "workbench.dimension" | "workbench.from_alert" | "workbench.meta" | "workbench.predicted" | "workbench.run";
+export type OpId = "alert_rules.create" | "alert_rules.delete" | "alert_rules.list" | "alert_rules.pack" | "alert_rules.preview" | "alert_rules.update" | "alerts.evidence" | "alerts.explain" | "alerts.get" | "alerts.list" | "alerts.mark_known" | "alerts.note_add" | "auth.csrf" | "auth.login" | "auth.logout" | "auth.me" | "auth.password" | "custom_reports.add_section" | "custom_reports.delete" | "custom_reports.list" | "custom_reports.remove_section" | "custom_reports.rename" | "home.focus" | "hosts.profile" | "hosts.ransomware_allows" | "hosts.tamper_note_add" | "hosts.tamper_note_remove" | "i18n.dictionary" | "lateral.compute" | "lateral.simulate" | "lateral.view" | "quarantine.apply" | "quarantine.history" | "quarantine.preview" | "quarantine.remove" | "report_schedules.create" | "report_schedules.delete" | "report_schedules.list" | "report_schedules.run_now" | "report_schedules.update" | "reports.catalog" | "reports.delete" | "reports.generate" | "reports.get" | "reports.list" | "rhc.enable" | "rhc.status" | "shell.status" | "siem.destination.test" | "siem.dlq.list" | "siem.dlq.purge" | "siem.dlq.resend" | "siem.settings.get" | "siem.settings.update" | "siem.status" | "system.channels.get" | "system.channels.test" | "system.channels.update" | "system.collection.backfill" | "system.collection.get" | "system.collection.status" | "system.collection.update" | "system.display.get" | "system.display.update" | "system.jobs.list" | "system.lateral.get" | "system.lateral.known" | "system.lateral.known_delete" | "system.lateral.update" | "system.logs.query" | "system.pce.get" | "system.pce.latest" | "system.pce.probe" | "system.pce.update" | "system.reports.get" | "system.reports.update" | "system.security.get" | "system.security.update" | "system.tls.csr" | "system.tls.import" | "system.tls.renew" | "system.tls.status" | "system.tls.update" | "workbench.dimension" | "workbench.from_alert" | "workbench.meta" | "workbench.predicted" | "workbench.run";
 
 export interface Requests {
   "alert_rules.create": RuleWrite;
@@ -2790,7 +2795,6 @@ export interface Requests {
   "custom_reports.remove_section": Empty;
   "custom_reports.rename": CustomRename;
   "home.focus": undefined;
-  "home.summary": undefined;
   "hosts.profile": undefined;
   "hosts.ransomware_allows": HostKey;
   "hosts.tamper_note_add": TamperNoteAdd;
@@ -2882,7 +2886,6 @@ export interface Responses {
   "custom_reports.remove_section": CustomReport;
   "custom_reports.rename": CustomReport;
   "home.focus": FocusView;
-  "home.summary": HomeSummary;
   "hosts.profile": HostProfile;
   "hosts.ransomware_allows": HostRansomware;
   "hosts.tamper_note_add": HostProfile;
@@ -2974,7 +2977,6 @@ export const OPERATIONS = {
   "custom_reports.remove_section": { method: "POST", path: "/api/custom-reports/<int:report_id>/sections/<int:index>/remove" },
   "custom_reports.rename": { method: "POST", path: "/api/custom-reports/<int:report_id>/rename" },
   "home.focus": { method: "GET", path: "/api/home/focus" },
-  "home.summary": { method: "GET", path: "/api/home/summary" },
   "hosts.profile": { method: "GET", path: "/api/hosts/profile" },
   "hosts.ransomware_allows": { method: "POST", path: "/api/hosts/ransomware-allows" },
   "hosts.tamper_note_add": { method: "POST", path: "/api/hosts/tamper-notes" },

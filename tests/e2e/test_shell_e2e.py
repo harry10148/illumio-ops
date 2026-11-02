@@ -34,11 +34,11 @@ def test_basic_mode_marks_advanced_items(live_app, context):
     page = context.new_page()
     sign_in(page, live_app.url)
     page.locator("[data-role=shell-status]").wait_for()
-    detect = page.locator(".nav-item[data-nav='/lateral']")
+    detect = page.locator(".nav-item[data-nav='/detect']")
     assert detect.get_attribute("data-dimmed") == "true" and "◆" in detect.inner_text()
     assert detect.get_attribute("aria-disabled") is None
     detect.click()
-    page.wait_for_url("**/lateral")
+    page.wait_for_url("**/detect")
 
 
 def test_system_subnav(live_app, context):

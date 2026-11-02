@@ -342,3 +342,59 @@ def test_ransomware_details_read_counted(ctx):
         conn.commit()
     v = lateral_view.view(ctx, now=NOW)
     assert (v.ransomware_rated, v.ransomware_unread) == (3, 3)
+
+
+# ── the detection page's attack-surface numbers (UI redesign spec §4.2) ─────
+
+def _critical(ctx):
+    ctx.settings.update(ctx.settings.current().revision,
+                        lambda d: d["lateral"].update({"critical_assets": [{"key": "app", "value": "Finance"}]}))
+
+
+def test_surface_numbers_with_previous(ctx):
+    _critical(ctx)
+    _store(ctx)
+    with ctx.flows().connect() as conn:
+        day = (NOW - timedelta(days=1)).strftime("%Y-%m-%d")
+        analysis.write_lateral_snapshot(conn, day, {"assets_reachable_now": 5, "pivots_now": 3,
+                                                    "assets_reachable_enforced": 2, "cross_env_edges": 4})
+        conn.commit()
+    s = lateral_view.view(ctx, now=NOW).surface
+    assert s is not None
+    assert (s.reachable_critical, s.reachable_critical_prev) == (1, 5)
+    assert (s.hubs, s.hubs_prev) == (1, 3)
+    assert (s.residual_after_enforce, s.residual_after_enforce_prev) == (1, 2)
+    assert (s.cross_env, s.cross_env_prev) == (0, 4)
+
+
+def test_surface_without_previous_day(ctx):
+    _critical(ctx)
+    _store(ctx)
+    s = lateral_view.view(ctx, now=NOW).surface
+    assert s is not None and s.reachable_critical == 1 and s.reachable_critical_prev is None
+
+
+def test_surface_unknown_says_why(ctx):
+    _store(ctx)  # no critical asset label set
+    s = lateral_view.view(ctx, now=NOW).surface
+    assert s is not None and s.reachable_critical is None and s.residual_after_enforce is None
+    assert s.critical_reason == "lat_surface_no_critical"
+    assert s.hubs == 1  # hubs do not depend on critical assets
+
+
+def test_surface_none_before_first_computation(ctx):
+    assert lateral_view.view(ctx, now=NOW).surface is None
+
+
+def test_new_this_week_counts_detections_first_seen_7d(ctx):
+    _store(ctx)
+    with ctx.flows().connect() as conn:
+        for i, first in enumerate((NOW - timedelta(days=2), NOW - timedelta(days=9))):
+            analysis.upsert_detections(conn, [DetectionWrite(
+                detector="fanout", fingerprint=f"fanout|{i}", subject_key=WEB, severity="high",
+                first_seen=first, last_seen=NOW - timedelta(hours=1), critical_asset=False,
+                summary_json="{}", segment_json="{}", confidence_json="{}")],
+                dedup={"fanout": timedelta(minutes=1)}, late=False, at=NOW)
+        conn.commit()
+    s = lateral_view.view(ctx, now=NOW).surface
+    assert s is not None and s.new_this_week == 1

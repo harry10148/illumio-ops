@@ -1,12 +1,13 @@
+// The detection page's "needs attention" (UI redesign spec §4.2): the hourly focus list's items that are not
+// detections — exposure, hubs, coverage, readiness, collection — ranked as computed.
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 
-import { registerNav } from "../shell/nav";
-import { type ApiError, call } from "../api/client";
-import type { FocusEntry, FocusView, HomeSummary } from "../api/generated";
-import { ProbeResults, formatTime } from "../components/ProbeResults";
-import { t, useLang } from "../i18n";
-import { SEVERITY_KEYS, SEVERITY_TONES, word } from "./alerts/common";
+import { type ApiError, call } from "../../api/client";
+import type { FocusEntry, FocusView } from "../../api/generated";
+import { formatTime } from "../../components/ProbeResults";
+import { t, useLang } from "../../i18n";
+import { SEVERITY_KEYS, SEVERITY_TONES, word } from "../alerts/common";
 
 // Literal maps: i18n keys are never built from data.
 const SOURCE_KEYS: Record<string, string> = {
@@ -51,7 +52,8 @@ function FocusItem({ item }: { item: FocusEntry }) {
   );
 }
 
-function Focus() {
+/** The ranked focus list without detections (those are listed in the detection page's own section). */
+export function Attention() {
   const lang = useLang();
   const [view, setView] = useState<FocusView | null>(null);
   const [error, setError] = useState<ApiError | null>(null);
@@ -65,9 +67,10 @@ function Focus() {
   }, []);
 
   const problems = Object.entries(view?.sources_status ?? {}).filter(([, s]) => s !== "ok");
+  const items = (view?.items ?? []).filter((it) => it.kind !== "detection");
   return (
-    <div className="card stack" data-role="focus">
-      <h2>{t("home_focus_title")}</h2>
+    <div className="card stack" data-role="focus" id="attention">
+      <h2>{t("detect_attention_title")}</h2>
       {error && <p className="form-error">{t(error.message_key, error.params)}</p>}
       {!view && !error && <p className="muted">{t("loading")}</p>}
       {view && view.computed_at === null && <p className="notice" data-role="focus-not-computed">{t("home_focus_not_computed")}</p>}
@@ -83,54 +86,21 @@ function Focus() {
           ))}
         </ul>
       )}
-      {view?.computed_at && !view.stale && view.items.length === 0 && problems.length === 0 && (
+      {view?.computed_at && !view.stale && items.length === 0 && problems.length === 0 && (
         <p className="muted">{t("home_focus_empty")}</p>
       )}
       {view && (view.detections_total ?? 0) > (view.detections_considered ?? 0) && (
         <p className="notice" data-role="focus-detections-capped">{t("home_focus_detections_capped", {
           total: String(view.detections_total), considered: String(view.detections_considered) })}</p>
       )}
-      {view && view.items.length > 0 && (
-        <ol className="focus-list">{(all ? view.items : view.items.slice(0, TOP)).map((it) => <FocusItem key={it.fingerprint} item={it} />)}</ol>
+      {items.length > 0 && (
+        <ol className="focus-list">{(all ? items : items.slice(0, TOP)).map((it) => <FocusItem key={it.fingerprint} item={it} />)}</ol>
       )}
-      {view && !all && view.items.length > TOP && (
+      {!all && items.length > TOP && (
         <button type="button" className="btn-quiet" data-role="focus-more" onClick={() => setAll(true)}>
-          {t("home_focus_more", { shown: String(TOP), total: String(view.items.length) })}
+          {t("home_focus_more", { shown: String(TOP), total: String(items.length) })}
         </button>
       )}
     </div>
   );
 }
-
-export function Home() {
-  const [summary, setSummary] = useState<HomeSummary | null>(null);
-  const [error, setError] = useState<ApiError | null>(null);
-
-  useEffect(() => {
-    void call("home.summary").then((env) => {
-      if (env.ok && env.data) setSummary(env.data);
-      else setError(env.error);
-    });
-  }, []);
-
-  const pce = summary?.pce ?? null;
-  return (
-    <section className="page">
-      <h1>{t("nav_home")}</h1>
-      <Focus />
-      <div className="card">
-        <h2>{t("home_pce_title")}</h2>
-        {error && <p className="form-error">{t(error.message_key, error.params)}</p>}
-        {summary && (
-          <>
-            <ProbeResults checkedAt={pce?.checked_at ?? null} results={pce?.results ?? []} stale={pce?.stale ?? false} />
-            {!pce && <Link to="/system/pce">{t("home_pce_setup_link")}</Link>}
-          </>
-        )}
-      </div>
-    </section>
-  );
-}
-
-// Until the detection page takes the focus list over (plan A Task 3), it is reached here.
-registerNav({ section: "main", path: "/attention", labelKey: "nav_home", order: 90, component: Home, hidden: true });

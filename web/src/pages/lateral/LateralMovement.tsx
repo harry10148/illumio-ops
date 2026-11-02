@@ -1,17 +1,19 @@
 // Lateral movement (spec §6.5.1, P6c): what could happen (exposure: reach now and once enforced, paths into critical
 // assets and where to cut them), what is happening (detections), and what a suggested deny rule would block.
 import { useEffect, useMemo, useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, Navigate, useLocation, useSearchParams } from "react-router-dom";
 
 import { type ApiError, call } from "../../api/client";
 import type { AssetExposure, Cut, DenyProposal, EndpointFilter, ExposureResult, LateralPage } from "../../api/generated";
 import { formatTime } from "../../components/ProbeResults";
+import { KpiStrip, NeedsAdvanced, PageHead, type Tone } from "../../components/ui";
 import { t, useLang } from "../../i18n";
 import { registerNav } from "../../shell/nav";
 import { SEVERITY_KEYS, SEVERITY_TONES, word } from "../alerts/common";
 import { DETECTOR_KEYS, STATE_KEYS, STATE_TONES } from "../system/Lateral";
 import { QuarantineDialog } from "../quarantine/QuarantineDialog";
 import { Pulled } from "../workbench/Workbench";
+import { Attention } from "../detect/Attention";
 import { Simulation, type Suggestion } from "./Simulation";
 
 type Port = [number, number];
@@ -72,7 +74,7 @@ export default function LateralMovement() {
   }
 
   if (!page) {
-    return <section className="page"><h1>{t("lat_title")}</h1>
+    return <section className="page"><PageHead title={t("nav_detect")} />
       {error ? <p className="form-error">{t(error.message_key, error.params)}</p> : <p className="muted">{t("loading")}</p>}
     </section>;
   }
@@ -102,7 +104,8 @@ export default function LateralMovement() {
 
   return (
     <section className="page" data-role="lateral">
-      <h1>{t("lat_title")}</h1>
+      <PageHead title={t("nav_detect")} sub={t("detect_sub")} />
+      <Surface page={page} />
       <div className="card stack" data-section="status">
         {page.state === "not_computed" && (
           <p className="notice">{t("lat_not_computed")} <Link to="/system/jobs">{t("lat_open_jobs")}</Link></p>
@@ -204,6 +207,7 @@ export default function LateralMovement() {
         </div>
       )}
       <Happening page={page} />
+      <Attention />
     </section>
   );
 }
@@ -476,16 +480,17 @@ function Happening({ page }: { page: LateralPage }) {
     <div className="card stack" id="lat-detections" data-section="detections">
       <h2>{t("lat_happening")}</h2>
       {!page.detections_available ? (
-        <p className="notice" data-role="detections-need-mode">{t("lat_detections_need_mode")} <Link to="/system/collection">{t("lat_open_collection")}</Link></p>
+        <div data-role="detections-need-mode"><NeedsAdvanced what={t("lat_detections_need_mode")} /></div>
       ) : (
         <>
           {page.detectors.length > 0 && (
-            <ul className="status-list">
-              {page.detectors.filter((d) => d.state !== "ok").map((d) => (
-                <li key={d.detector}>
+            <ul className="status-list" data-role="detector-states">
+              {page.detectors.map((d) => (
+                <li key={d.detector} data-detector={d.detector} data-state={d.state}>
                   <span className="status-name">{word(DETECTOR_KEYS, d.detector)}</span>
                   <span className="badge" data-tone={STATE_TONES[d.state] ?? "neutral"}>{word(STATE_KEYS, d.state)}</span>
                   {d.reason_key && <span className="hint">{t(d.reason_key, Object.fromEntries(Object.entries(d.params).map(([k, v]) => [k, String(v)])))}</span>}
+                  <Link to="/system/lateral" className="hint">{t("detect_tune")}</Link>
                 </li>
               ))}
             </ul>
@@ -520,4 +525,39 @@ function Happening({ page }: { page: LateralPage }) {
   );
 }
 
-registerNav({ section: "main", path: "/lateral", labelKey: "nav_detect", order: 14, component: LateralMovement, needs: "advanced" });
+function delta(now: number | null | undefined, before: number | null | undefined): string | undefined {
+  if (now === null || now === undefined || before === null || before === undefined) return undefined;
+  const d = now - before;
+  return d === 0 ? t("detect_delta_same") : t("detect_delta", { d: d > 0 ? `+${d}` : String(d) });
+}
+
+/** The attack surface in numbers (spec §4.2): each with the previous stored day, or why it is not computed. */
+function Surface({ page }: { page: LateralPage }) {
+  const s = page.surface;
+  const none = t(page.state === "lightweight" ? "detect_surface_pull_first" : "detect_surface_not_computed");
+  const critical = s?.critical_reason ? t(s.critical_reason) : none;
+  const tone = (n: number | null | undefined): Tone => (n ? "high" : "muted");
+  return (
+    <KpiStrip items={[
+      { key: "reachable", label: t("detect_kpi_reachable"), value: s?.reachable_critical ?? null, reason: s ? critical : none,
+        tone: tone(s?.reachable_critical), delta: delta(s?.reachable_critical, s?.reachable_critical_prev) },
+      { key: "hubs", label: t("detect_kpi_hubs"), value: s ? s.hubs : null, reason: none,
+        delta: delta(s?.hubs, s?.hubs_prev) },
+      { key: "residual", label: t("detect_kpi_residual"), value: s?.residual_after_enforce ?? null, reason: s ? critical : none,
+        delta: delta(s?.residual_after_enforce, s?.residual_after_enforce_prev) },
+      { key: "cross_env", label: t("detect_kpi_cross_env"), value: s ? s.cross_env : null, reason: none,
+        delta: delta(s?.cross_env, s?.cross_env_prev) },
+      { key: "new_week", label: t("detect_kpi_new_week"), value: s?.new_this_week ?? null,
+        reason: t("detect_kpi_new_week_needs_advanced") },
+    ]} />
+  );
+}
+
+/** Old bookmarks of the lateral page land on the detection page with their query (asset=, host=, section=). */
+function LateralRedirect() {
+  const { search } = useLocation();
+  return <Navigate to={`/detect${search}`} replace />;
+}
+
+registerNav({ section: "main", path: "/detect", labelKey: "nav_detect", order: 14, component: LateralMovement, needs: "advanced" });
+registerNav({ section: "main", path: "/lateral", labelKey: "nav_detect", order: 14, component: LateralRedirect, hidden: true });

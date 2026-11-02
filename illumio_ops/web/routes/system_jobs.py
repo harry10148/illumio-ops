@@ -1,19 +1,18 @@
-"""System › Background jobs and the home page summary."""
+"""System › Background jobs, and the focus list the detection page shows."""
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import datetime
 
 from flask import Blueprint
 from pydantic import BaseModel
 
 from illumio_ops.jobs.health import list_health
-from illumio_ops.jobs.scheduler import PCE_PROBE_SECONDS, job_intervals
-from illumio_ops.services import home, pce_health
+from illumio_ops.jobs.scheduler import job_intervals
+from illumio_ops.services import home
 from illumio_ops.services.collect.guard import BindingMismatch
 from illumio_ops.services.home import FocusView
 from illumio_ops.web.auth import get_ctx
 from illumio_ops.web.contract import ApiFailure, api_route, operation
-from illumio_ops.web.routes.system_pce import ProbeItem, _items
 
 
 class JobView(BaseModel):
@@ -31,18 +30,7 @@ class JobList(BaseModel):
     jobs: list[JobView]
 
 
-class PceSummary(BaseModel):
-    checked_at: datetime
-    stale: bool
-    results: list[ProbeItem]
-
-
-class HomeSummary(BaseModel):
-    pce: PceSummary | None
-
-
 OP_JOBS = operation("system.jobs.list", "GET", "/api/system/jobs", None, JobList)
-OP_HOME = operation("home.summary", "GET", "/api/home/summary", None, HomeSummary)
 OP_FOCUS = operation("home.focus", "GET", "/api/home/focus", None, FocusView)
 
 bp = Blueprint("system_jobs", __name__)
@@ -68,16 +56,6 @@ def list_jobs() -> JobList:
             failures=h.failures if h else 0,
         ))
     return JobList(jobs=out)
-
-
-@api_route(bp, OP_HOME)
-def home_summary() -> HomeSummary:
-    stored = pce_health.latest(get_ctx())
-    if stored is None:
-        return HomeSummary(pce=None)
-    checked_at, results = stored
-    stale = (datetime.now(UTC) - checked_at).total_seconds() > 2 * PCE_PROBE_SECONDS
-    return HomeSummary(pce=PceSummary(checked_at=checked_at, stale=stale, results=_items(results)))
 
 
 @api_route(bp, OP_FOCUS)

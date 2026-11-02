@@ -75,7 +75,8 @@ h2 { font-size: var(--fs-ui); font-weight: 600; margin: 0 0 var(--space-4); }
 .needs-advanced { display: grid; gap: var(--space-3); padding: var(--space-5) var(--space-6);
                   border: 1px dashed var(--tone-adv-border); border-radius: var(--radius-l); background: var(--tone-adv-bg); }
 .needs-advanced p { margin: 0; }
-.kpi-strip { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: var(--space-4); }
+.kpi-strip { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: var(--space-4);
+              margin-bottom: var(--space-6); }
 .kpi { background: var(--surface-1); border: 1px solid var(--line-strong); border-radius: var(--radius-m);
        padding: var(--space-3) var(--space-5); min-width: 0; }
 .kpi[data-tone="crit"], .kpi[data-tone="high"] { background: var(--fill); border-color: var(--mark); }

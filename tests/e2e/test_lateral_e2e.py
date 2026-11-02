@@ -208,3 +208,41 @@ def test_pivots_quarantined_as_a_batch(context, live_app):
     button.click()
     dialog = page.locator("[data-role=quarantine]")
     expect(dialog.locator(".form-error")).to_have_text("The PCE connection is not set up yet.")
+
+
+# ── the detection page (UI redesign spec §4.2) ──────────────────────────────
+
+def test_detect_sections_present(context, live_app):
+    _seed(live_app)
+    page = _open(context, live_app, "/detect")
+    expect(page.locator("h1")).to_have_text("Detection")
+    strip = page.locator("[data-role=kpi-strip]")
+    expect(strip.locator("[data-kpi=reachable] .kpi-value")).to_have_count(1)
+    expect(strip.locator("[data-kpi=hubs] .kpi-value")).to_have_count(1)
+    expect(page.locator("[data-section=detections]")).to_have_count(1)
+    expect(page.locator("[data-role=focus]")).to_contain_text("Needs attention")
+
+
+def test_old_lateral_url_redirects(context, live_app):
+    _seed(live_app)
+    page = _open(context, live_app, "/lateral?section=cross_env")
+    page.wait_for_url(f"{live_app.url}/detect?section=cross_env")
+
+
+def test_basic_mode_explains_not_empty(context, live_app):
+    _seed(live_app, mode="lightweight")
+    page = _open(context, live_app, "/detect")
+    expect(page.locator("[data-role=detections-need-mode] [data-role=needs-advanced]")).to_have_count(1)
+    strip = page.locator("[data-role=kpi-strip]")
+    expect(strip.locator("[data-kpi=new_week] [data-reason]")).to_have_text("Needs advanced mode")
+    expect(strip.locator(".kpi-value")).to_have_count(0)  # nothing computed until the traffic is read
+
+
+def test_detect_no_overflow_760(narrow_context, live_app):
+    from tests.e2e.conftest import no_horizontal_overflow
+    _seed(live_app)
+    page = narrow_context.new_page()
+    sign_in(page, live_app.url)
+    page.goto(f"{live_app.url}/detect")
+    page.locator("[data-section=detections]").wait_for()
+    assert no_horizontal_overflow(page)

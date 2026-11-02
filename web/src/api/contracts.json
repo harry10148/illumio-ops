@@ -13673,107 +13673,6 @@
         "type": "object"
       }
     },
-    "home.summary": {
-      "method": "GET",
-      "path": "/api/home/summary",
-      "request_schema": null,
-      "response_schema": {
-        "$defs": {
-          "PceSummary": {
-            "properties": {
-              "checked_at": {
-                "format": "date-time",
-                "title": "Checked At",
-                "type": "string"
-              },
-              "results": {
-                "items": {
-                  "$ref": "#/$defs/ProbeItem"
-                },
-                "title": "Results",
-                "type": "array"
-              },
-              "stale": {
-                "title": "Stale",
-                "type": "boolean"
-              }
-            },
-            "required": [
-              "checked_at",
-              "stale",
-              "results"
-            ],
-            "title": "PceSummary",
-            "type": "object"
-          },
-          "ProbeItem": {
-            "properties": {
-              "category": {
-                "title": "Category",
-                "type": "string"
-              },
-              "detail_key": {
-                "title": "Detail Key",
-                "type": "string"
-              },
-              "name": {
-                "$ref": "#/$defs/ProbeName"
-              },
-              "ok": {
-                "title": "Ok",
-                "type": "boolean"
-              },
-              "status": {
-                "anyOf": [
-                  {
-                    "type": "integer"
-                  },
-                  {
-                    "type": "null"
-                  }
-                ],
-                "title": "Status"
-              }
-            },
-            "required": [
-              "name",
-              "ok",
-              "status",
-              "category",
-              "detail_key"
-            ],
-            "title": "ProbeItem",
-            "type": "object"
-          },
-          "ProbeName": {
-            "enum": [
-              "noop",
-              "health",
-              "node_available"
-            ],
-            "title": "ProbeName",
-            "type": "string"
-          }
-        },
-        "properties": {
-          "pce": {
-            "anyOf": [
-              {
-                "$ref": "#/$defs/PceSummary"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          }
-        },
-        "required": [
-          "pce"
-        ],
-        "title": "HomeSummary",
-        "type": "object"
-      }
-    },
     "hosts.profile": {
       "method": "GET",
       "path": "/api/hosts/profile",
@@ -18778,6 +18677,121 @@
             ],
             "title": "PullInfo",
             "type": "object"
+          },
+          "SurfaceNumbers": {
+            "description": "The attack surface at the top of the detection page (UI redesign spec §4.2), each with the last stored day\nbefore the result's own day for comparison (None: no such day). A number that cannot be computed is None with\nits reason, never 0.",
+            "properties": {
+              "critical_reason": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Critical Reason"
+              },
+              "cross_env": {
+                "title": "Cross Env",
+                "type": "integer"
+              },
+              "cross_env_prev": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Cross Env Prev"
+              },
+              "hubs": {
+                "title": "Hubs",
+                "type": "integer"
+              },
+              "hubs_prev": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Hubs Prev"
+              },
+              "new_this_week": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "New This Week"
+              },
+              "reachable_critical": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Reachable Critical"
+              },
+              "reachable_critical_prev": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Reachable Critical Prev"
+              },
+              "residual_after_enforce": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Residual After Enforce"
+              },
+              "residual_after_enforce_prev": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Residual After Enforce Prev"
+              }
+            },
+            "required": [
+              "reachable_critical",
+              "reachable_critical_prev",
+              "hubs",
+              "hubs_prev",
+              "residual_after_enforce",
+              "residual_after_enforce_prev",
+              "cross_env",
+              "cross_env_prev",
+              "new_this_week",
+              "critical_reason"
+            ],
+            "title": "SurfaceNumbers",
+            "type": "object"
           }
         },
         "properties": {
@@ -18925,6 +18939,17 @@
             ],
             "title": "State",
             "type": "string"
+          },
+          "surface": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/SurfaceNumbers"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
           }
         },
         "required": [
@@ -20399,6 +20424,121 @@
             ],
             "title": "PullInfo",
             "type": "object"
+          },
+          "SurfaceNumbers": {
+            "description": "The attack surface at the top of the detection page (UI redesign spec §4.2), each with the last stored day\nbefore the result's own day for comparison (None: no such day). A number that cannot be computed is None with\nits reason, never 0.",
+            "properties": {
+              "critical_reason": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Critical Reason"
+              },
+              "cross_env": {
+                "title": "Cross Env",
+                "type": "integer"
+              },
+              "cross_env_prev": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Cross Env Prev"
+              },
+              "hubs": {
+                "title": "Hubs",
+                "type": "integer"
+              },
+              "hubs_prev": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Hubs Prev"
+              },
+              "new_this_week": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "New This Week"
+              },
+              "reachable_critical": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Reachable Critical"
+              },
+              "reachable_critical_prev": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Reachable Critical Prev"
+              },
+              "residual_after_enforce": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Residual After Enforce"
+              },
+              "residual_after_enforce_prev": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Residual After Enforce Prev"
+              }
+            },
+            "required": [
+              "reachable_critical",
+              "reachable_critical_prev",
+              "hubs",
+              "hubs_prev",
+              "residual_after_enforce",
+              "residual_after_enforce_prev",
+              "cross_env",
+              "cross_env_prev",
+              "new_this_week",
+              "critical_reason"
+            ],
+            "title": "SurfaceNumbers",
+            "type": "object"
           }
         },
         "properties": {
@@ -20546,6 +20686,17 @@
             ],
             "title": "State",
             "type": "string"
+          },
+          "surface": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/SurfaceNumbers"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
           }
         },
         "required": [
