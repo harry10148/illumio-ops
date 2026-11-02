@@ -139,7 +139,7 @@ function MarkKnown({ alertId }: { alertId: string }) {
     } else setError(env.error);
   }
   return (
-    <form className="card stack" onSubmit={submit} data-role="mark-known">
+    <form className="card stack" onSubmit={submit} data-role="mark-known" id="mark-known">
       <h2>{t("alert_known_title")}</h2>
       <p className="hint">{t("alert_known_hint")}</p>
       <label className="block">
@@ -198,7 +198,7 @@ export function AlertDetail() {
   }
   return (
     <section className="page stack" data-role="alert-detail">
-      <p><Link to="/alerts">{t("alert_back")}</Link></p>
+      <p><Link to="/">{t("alert_back")}</Link></p>
       <div className="page-head">
         <h1>{d.rule_name}</h1>
         {d.evidence_kind && (
@@ -223,6 +223,27 @@ export function AlertDetail() {
         {d.grouped && typeof d.params.known_reason === "string"
           ? <p className="hint" data-role="known-reason">{t("alert_known_reason", { reason: d.params.known_reason })}</p>
           : d.grouped && <p className="hint">{t("alert_grouped_known_cause")}</p>}
+      </div>
+      <div className="card stack" data-role="alert-context">
+        <h2>{t("alert_timeline_title")}</h2>
+        <ol className="timeline" data-role="timeline">
+          {d.timeline.map((e, i) => (
+            <li key={i} data-kind={e.kind}><span className="mono">{formatTime(e.at, lang)}</span> {e.text}</li>
+          ))}
+        </ol>
+        <h2>{t("alert_beyond_title")}</h2>
+        {d.beyond_vendor.length === 0
+          ? <p className="muted">{t("alert_beyond_none")}</p>
+          : <ul className="plain-list" data-role="beyond">{d.beyond_vendor.map((x) => <li key={x}>{x}</li>)}</ul>}
+        {d.quarantine.eligible && d.quarantine.key ? (
+          <p>
+            <Link className="btn-quiet" to={`/hosts?${new URLSearchParams({ key: d.quarantine.key }).toString()}`}
+                  data-role="quarantine-host">{t("alert_quarantine_on_host", { host: d.quarantine.name ?? d.quarantine.key })}</Link>
+          </p>
+        ) : (
+          <p className="hint" data-role="quarantine-reason">{t(d.quarantine.reason === "unmanaged" ? "alert_q_unmanaged"
+            : d.quarantine.reason === "not_in_inventory" ? "alert_q_not_in_inventory" : "alert_q_no_subject")}</p>
+        )}
       </div>
       <div className="card stack">
         <h2>{t("alert_evidence_title")}</h2>

@@ -9426,6 +9426,66 @@
             "title": "NoteView",
             "type": "object"
           },
+          "QuarantineEligibility": {
+            "description": "Who the quarantine button would act on: only a managed workload the inventory holds (spec §4.4).",
+            "properties": {
+              "eligible": {
+                "title": "Eligible",
+                "type": "boolean"
+              },
+              "key": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Key"
+              },
+              "name": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Name"
+              },
+              "no_enforcement": {
+                "title": "No Enforcement",
+                "type": "boolean"
+              },
+              "reason": {
+                "anyOf": [
+                  {
+                    "enum": [
+                      "unmanaged",
+                      "not_in_inventory",
+                      "no_subject"
+                    ],
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Reason"
+              }
+            },
+            "required": [
+              "eligible",
+              "reason",
+              "no_enforcement",
+              "key",
+              "name"
+            ],
+            "title": "QuarantineEligibility",
+            "type": "object"
+          },
           "Severity": {
             "enum": [
               "low",
@@ -9435,9 +9495,56 @@
             ],
             "title": "Severity",
             "type": "string"
+          },
+          "TimelineEntry": {
+            "properties": {
+              "at": {
+                "format": "date-time",
+                "title": "At",
+                "type": "string"
+              },
+              "kind": {
+                "enum": [
+                  "alert",
+                  "detection",
+                  "event"
+                ],
+                "title": "Kind",
+                "type": "string"
+              },
+              "text": {
+                "title": "Text",
+                "type": "string"
+              }
+            },
+            "required": [
+              "at",
+              "kind",
+              "text"
+            ],
+            "title": "TimelineEntry",
+            "type": "object"
           }
         },
         "properties": {
+          "beyond_vendor": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Beyond Vendor",
+            "type": "array"
+          },
+          "category": {
+            "enum": [
+              "lateral",
+              "anomaly",
+              "traffic",
+              "event",
+              "system"
+            ],
+            "title": "Category",
+            "type": "string"
+          },
           "caveats": {
             "items": {
               "type": "string"
@@ -9467,6 +9574,17 @@
             },
             "title": "Deliveries",
             "type": "array"
+          },
+          "dst": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dst"
           },
           "evidence_kind": {
             "anyOf": [
@@ -9527,6 +9645,9 @@
             "title": "Params",
             "type": "object"
           },
+          "quarantine": {
+            "$ref": "#/$defs/QuarantineEligibility"
+          },
           "rule_id": {
             "title": "Rule Id",
             "type": "string"
@@ -9541,6 +9662,17 @@
           "severity": {
             "$ref": "#/$defs/Severity"
           },
+          "src": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Src"
+          },
           "subject_key": {
             "title": "Subject Key",
             "type": "string"
@@ -9548,6 +9680,13 @@
           "summary": {
             "title": "Summary",
             "type": "string"
+          },
+          "timeline": {
+            "items": {
+              "$ref": "#/$defs/TimelineEntry"
+            },
+            "title": "Timeline",
+            "type": "array"
           }
         },
         "required": [
@@ -9563,6 +9702,9 @@
           "late",
           "grouped",
           "deliveries",
+          "category",
+          "src",
+          "dst",
           "params",
           "facts",
           "confidence",
@@ -9570,7 +9712,10 @@
           "last_seen",
           "evidence_kind",
           "console_link",
-          "notes"
+          "notes",
+          "timeline",
+          "beyond_vendor",
+          "quarantine"
         ],
         "title": "AlertDetail",
         "type": "object"
@@ -9582,8 +9727,53 @@
       "request_schema": null,
       "response_schema": {
         "$defs": {
+          "AlertCounts": {
+            "description": "The period's alerts per severity and how many were marked as known, before the page's filters.",
+            "properties": {
+              "critical": {
+                "title": "Critical",
+                "type": "integer"
+              },
+              "grouped": {
+                "title": "Grouped",
+                "type": "integer"
+              },
+              "high": {
+                "title": "High",
+                "type": "integer"
+              },
+              "low": {
+                "title": "Low",
+                "type": "integer"
+              },
+              "medium": {
+                "title": "Medium",
+                "type": "integer"
+              }
+            },
+            "required": [
+              "critical",
+              "high",
+              "medium",
+              "low",
+              "grouped"
+            ],
+            "title": "AlertCounts",
+            "type": "object"
+          },
           "AlertItem": {
             "properties": {
+              "category": {
+                "enum": [
+                  "lateral",
+                  "anomaly",
+                  "traffic",
+                  "event",
+                  "system"
+                ],
+                "title": "Category",
+                "type": "string"
+              },
               "caveats": {
                 "items": {
                   "type": "string"
@@ -9597,6 +9787,17 @@
                 },
                 "title": "Deliveries",
                 "type": "array"
+              },
+              "dst": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Dst"
               },
               "fired_at": {
                 "format": "date-time",
@@ -9629,6 +9830,17 @@
               "severity": {
                 "$ref": "#/$defs/Severity"
               },
+              "src": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Src"
+              },
               "subject_key": {
                 "title": "Subject Key",
                 "type": "string"
@@ -9650,7 +9862,10 @@
               "caveats",
               "late",
               "grouped",
-              "deliveries"
+              "deliveries",
+              "category",
+              "src",
+              "dst"
             ],
             "title": "AlertItem",
             "type": "object"
@@ -9727,6 +9942,9 @@
           }
         },
         "properties": {
+          "counts": {
+            "$ref": "#/$defs/AlertCounts"
+          },
           "items": {
             "items": {
               "$ref": "#/$defs/AlertItem"
@@ -9751,7 +9969,8 @@
           "items",
           "total",
           "page",
-          "page_size"
+          "page_size",
+          "counts"
         ],
         "title": "AlertList",
         "type": "object"
@@ -9963,6 +10182,66 @@
             "title": "NoteView",
             "type": "object"
           },
+          "QuarantineEligibility": {
+            "description": "Who the quarantine button would act on: only a managed workload the inventory holds (spec §4.4).",
+            "properties": {
+              "eligible": {
+                "title": "Eligible",
+                "type": "boolean"
+              },
+              "key": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Key"
+              },
+              "name": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Name"
+              },
+              "no_enforcement": {
+                "title": "No Enforcement",
+                "type": "boolean"
+              },
+              "reason": {
+                "anyOf": [
+                  {
+                    "enum": [
+                      "unmanaged",
+                      "not_in_inventory",
+                      "no_subject"
+                    ],
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Reason"
+              }
+            },
+            "required": [
+              "eligible",
+              "reason",
+              "no_enforcement",
+              "key",
+              "name"
+            ],
+            "title": "QuarantineEligibility",
+            "type": "object"
+          },
           "Severity": {
             "enum": [
               "low",
@@ -9972,9 +10251,56 @@
             ],
             "title": "Severity",
             "type": "string"
+          },
+          "TimelineEntry": {
+            "properties": {
+              "at": {
+                "format": "date-time",
+                "title": "At",
+                "type": "string"
+              },
+              "kind": {
+                "enum": [
+                  "alert",
+                  "detection",
+                  "event"
+                ],
+                "title": "Kind",
+                "type": "string"
+              },
+              "text": {
+                "title": "Text",
+                "type": "string"
+              }
+            },
+            "required": [
+              "at",
+              "kind",
+              "text"
+            ],
+            "title": "TimelineEntry",
+            "type": "object"
           }
         },
         "properties": {
+          "beyond_vendor": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Beyond Vendor",
+            "type": "array"
+          },
+          "category": {
+            "enum": [
+              "lateral",
+              "anomaly",
+              "traffic",
+              "event",
+              "system"
+            ],
+            "title": "Category",
+            "type": "string"
+          },
           "caveats": {
             "items": {
               "type": "string"
@@ -10004,6 +10330,17 @@
             },
             "title": "Deliveries",
             "type": "array"
+          },
+          "dst": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dst"
           },
           "evidence_kind": {
             "anyOf": [
@@ -10064,6 +10401,9 @@
             "title": "Params",
             "type": "object"
           },
+          "quarantine": {
+            "$ref": "#/$defs/QuarantineEligibility"
+          },
           "rule_id": {
             "title": "Rule Id",
             "type": "string"
@@ -10078,6 +10418,17 @@
           "severity": {
             "$ref": "#/$defs/Severity"
           },
+          "src": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Src"
+          },
           "subject_key": {
             "title": "Subject Key",
             "type": "string"
@@ -10085,6 +10436,13 @@
           "summary": {
             "title": "Summary",
             "type": "string"
+          },
+          "timeline": {
+            "items": {
+              "$ref": "#/$defs/TimelineEntry"
+            },
+            "title": "Timeline",
+            "type": "array"
           }
         },
         "required": [
@@ -10100,6 +10458,9 @@
           "late",
           "grouped",
           "deliveries",
+          "category",
+          "src",
+          "dst",
           "params",
           "facts",
           "confidence",
@@ -10107,7 +10468,10 @@
           "last_seen",
           "evidence_kind",
           "console_link",
-          "notes"
+          "notes",
+          "timeline",
+          "beyond_vendor",
+          "quarantine"
         ],
         "title": "AlertDetail",
         "type": "object"

@@ -316,3 +316,21 @@ code.cmd { white-space: pre-wrap; word-break: break-all; font-size: var(--fs-min
 .cust-report + .cust-report { border-top: 1px solid var(--mark); padding-top: var(--space-4); }
 .cust-sections { margin: 0; padding-left: var(--space-6); }
 .cust-sections li { margin: var(--space-1) 0; }
+
+/* Alerts home (UI redesign sample 01) */
+.filter-bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-4);
+              margin: var(--space-6) 0 var(--space-5); }
+.chips-row { display: flex; flex-wrap: wrap; gap: var(--space-3); }
+.chip-btn { height: 28px; padding: 0 var(--space-5); border: 1px solid var(--line-strong); border-radius: var(--radius-s);
+            background: var(--surface-1); color: var(--text-2); font-size: var(--fs-mini); }
+.chip-btn[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-on); }
+.inline-label { display: flex; align-items: center; gap: var(--space-3); }
+.alert-side .row { gap: var(--space-3); }
+.side-title { margin: 0; font-size: 17px; line-height: 1.45; }
+.side-h { margin: 0 0 var(--space-3); font-size: var(--fs-mini); color: var(--text-3); font-weight: 500; }
+.timeline { list-style: none; margin: 0; padding-left: var(--space-5); border-left: 2px solid var(--line-strong);
+            display: grid; gap: var(--space-3); }
+.timeline .mono { color: var(--text-3); margin-right: var(--space-3); font-size: var(--fs-mini); }
+.timeline li[data-kind="alert"] { font-weight: 500; }
+.side-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-4); padding-top: var(--space-4);
+                border-top: 1px solid var(--line); }

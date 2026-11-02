@@ -198,6 +198,15 @@ def _targets(ctx: AppContext, keys: Sequence[str], cfg: PceSettings | None = Non
     return out
 
 
+def eligibility(ctx: AppContext, key: str) -> QuarantineTarget | None:
+    """Whether one host can be quarantined (a managed workload the inventory holds) and whether the label would take
+    effect; None when the key is no host (an account, a malformed key). The pages hide the button when not ok."""
+    try:
+        return _targets(ctx, [key])[0]
+    except ValueError:
+        return None
+
+
 def _named(ctx: AppContext, sim: DenySimulation, pull: PullInfo | None) -> DenySimulationView:
     keys = {k for r in (*sim.sources, *sim.destinations) for k in r.keys if isinstance(k, str)}
     keys |= {k for f in sim.sample for k in (f.src_key, f.dst_key)}

@@ -10,7 +10,7 @@ from tests.e2e.conftest import sign_in
 def test_focus_not_computed_then_items(context, live_app):
     page = context.new_page()
     sign_in(page, live_app.url)
-    page.goto(f"{live_app.url}/")
+    page.goto(f"{live_app.url}/attention")
     expect(page.locator("[data-role=focus-not-computed]")).to_have_count(1)
 
     now = datetime.now(UTC)
@@ -48,7 +48,7 @@ def test_long_list_shows_the_top_first(context, live_app):
         conn.commit()
     page = context.new_page()
     sign_in(page, live_app.url)
-    page.goto(f"{live_app.url}/")
+    page.goto(f"{live_app.url}/attention")
     expect(page.locator(".focus-item")).to_have_count(10)
     page.click("[data-role=focus-more]")
     expect(page.locator(".focus-item")).to_have_count(12)
@@ -68,7 +68,7 @@ def test_stale_empty_list_is_not_all_clear(context, live_app):
     _write(live_app, at=datetime.now(UTC) - timedelta(hours=3), detections={"total": 600, "considered": 500})
     page = context.new_page()
     sign_in(page, live_app.url)
-    page.goto(f"{live_app.url}/")
+    page.goto(f"{live_app.url}/attention")
     expect(page.locator("[data-role=focus-detections-capped]")).to_have_count(1)  # final review #7
     expect(page.locator("[data-role=focus] p.muted")).to_have_count(0)
 

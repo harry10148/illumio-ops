@@ -68,3 +68,11 @@ def delete_events_before(conn: sqlite3.Connection, cutoff: datetime, *, archived
     with transaction(conn):
         return sum(conn.execute("DELETE FROM events WHERE timestamp < ? AND substr(timestamp, 1, 10) = ?",
                                 (db_time(cutoff), d)).rowcount for d in days)
+
+
+def events_for_workload(conn: sqlite3.Connection, href: str, *, start: datetime, end: datetime,
+                        limit: int) -> list[sqlite3.Row]:
+    """A workload's events between start and end, oldest first (the alert detail's timeline)."""
+    return conn.execute("SELECT event_type, severity, timestamp, tamper_classification FROM events "
+                        "WHERE workload_href = ? AND timestamp >= ? AND timestamp <= ? ORDER BY timestamp, id LIMIT ?",
+                        (href, db_time(start), db_time(end), limit)).fetchall()

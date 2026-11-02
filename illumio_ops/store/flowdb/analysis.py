@@ -119,6 +119,18 @@ def detections_since(conn: sqlite3.Connection, since: datetime, *, detectors: Co
     return conn.execute(sql + " ORDER BY last_seen DESC, id DESC LIMIT ?", [*params, limit]).fetchall()
 
 
+def detection_by_id(conn: sqlite3.Connection, detection_id: int) -> sqlite3.Row | None:
+    row: sqlite3.Row | None = conn.execute("SELECT * FROM detections WHERE id = ?", (detection_id,)).fetchone()
+    return row
+
+
+def detections_of_subject(conn: sqlite3.Connection, subject: str, *, start: datetime, end: datetime,
+                          limit: int) -> list[sqlite3.Row]:
+    """A subject's detections first seen between start and end, oldest first (ix_detections_subject)."""
+    return conn.execute("SELECT * FROM detections WHERE subject_key = ? AND first_seen >= ? AND first_seen <= ? "
+                        "ORDER BY first_seen, id LIMIT ?", (subject, db_time(start), db_time(end), limit)).fetchall()
+
+
 def detections_about(conn: sqlite3.Connection, subjects: Collection[str], *, since: datetime,
                      detectors: Collection[str]) -> list[sqlite3.Row]:
     """Every detection of these detectors about these subjects seen since `since` (ix_detections_subject); no cap,

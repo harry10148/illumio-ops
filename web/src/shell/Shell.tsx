@@ -1,10 +1,9 @@
 import { useState } from "react";
-import { Link, NavLink, Route, Routes, useLocation } from "react-router-dom";
+import { Link, NavLink, Navigate, Route, Routes, useLocation } from "react-router-dom";
 
 import { call, setCsrfToken } from "../api/client";
 import type { Me, ShellStatus } from "../api/generated";
 import { t } from "../i18n";
-import { Home } from "../pages/Home";
 import { type NavItem, allNavItems, navItems } from "./nav";
 import { ShellStatusContext, useShellStatusPoll } from "./status";
 
@@ -115,11 +114,10 @@ export function Shell({ me, onSignedOut }: Props) {
           )}
           {inSystem && <SystemNav />}
           <Routes>
-            <Route path="/" element={<Home />} />
             {allNavItems().map(({ path, component: Page }) => (
               <Route key={path} path={path} element={<Page />} />
             ))}
-            <Route path="*" element={<Home />} />
+            <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </main>
       </div>

@@ -27,7 +27,7 @@ def test_alerts_nav_and_list(context, live_app):
     sign_in(page, live_app.url)
     page.click("nav >> text=Alerts")
     table = page.locator("[data-role=alert-list]")
-    expect(table.locator("tr[data-alert-id]")).to_have_count(2)
+    expect(table.locator("[data-alert-id]")).to_have_count(2)
     expect(table).to_contain_text("Disk space is low: 1 GB left")
     expect(table.locator("[data-delivery=pending]")).to_have_text("LINE: waiting")
     expect(table.locator("[data-delivery=not_notified]")).to_have_text("recorded only (rule setting)")
@@ -55,7 +55,8 @@ def test_alert_note_persists(context, live_app):
     page = context.new_page()
     sign_in(page, live_app.url)
     page.click("nav >> text=Alerts")
-    page.locator(f"tr[data-alert-id='{a}'] a").click()
+    page.locator(f"[data-alert-id='{a}']").click()
+    page.locator("[data-role=open-detail]").click()
     notes = page.locator("[data-role=notes]")
     notes.locator("textarea[name=note]").fill("Checked: the backup job filled the disk.")
     notes.get_by_role("button", name="Add note").click()
@@ -230,3 +231,88 @@ def test_lateral_alert_marked_known_then_removed(context, live_app):
     expect(known).to_contain_text("every detection of this kind about /orgs/1/workloads/w1")
     known.get_by_role("button", name="Remove").click()
     expect(known).to_contain_text("No detection is marked known.")
+
+
+# ── the alerts home page (UI redesign sample 01) ────────────────────────────
+
+def _lateral(ctx, detector, *, subject="ip:10.0.0.9"):
+    import json
+    from datetime import timedelta
+
+    from illumio_ops.store.flowdb import analysis
+    from illumio_ops.store.flowdb.analysis import DetectionWrite
+    now = datetime.now(UTC)
+    with ctx.flows().connect() as conn:
+        analysis.upsert_detections(conn, [DetectionWrite(
+            detector=detector, fingerprint=f"{detector}|{subject}", subject_key=subject, severity="high",
+            first_seen=now - timedelta(minutes=30), last_seen=now - timedelta(minutes=10), critical_asset=False,
+            summary_json=json.dumps({"process": "psexesvc.exe", "port": 445, "target": "db-01"}), segment_json="{}",
+            confidence_json="{}")], dedup={detector: timedelta(hours=1)}, late=False, at=now)
+        conn.commit()
+        det = int(conn.execute("SELECT id FROM detections WHERE fingerprint = ?", (f"{detector}|{subject}",))
+                  .fetchone()[0])
+    t = Trigger(rule_id="b" * 32, rule_type=AlertRuleType.LATERAL, subject_key=f"{detector}|{subject}",
+                severity=Severity.HIGH, first_seen=now, last_seen=now, late=False,
+                message_key="focus_title_new_process",
+                params={"detector": detector, "host": "10.0.0.9", "process": "psexesvc.exe", "port": 445,
+                        "target": "db-01"},
+                facts={"detection_id": det}, evidence=None, confidence=Confidence())
+    pce = ctx.settings.current().pce
+    with ctx.db() as conn:
+        return store.insert_alert(conn, pce_url=pce.url, org_id=pce.org_id, rule_name="", pack_key=None, trigger=t,
+                                  at=now, channels=["line"], hold=None)
+
+
+def test_home_is_alerts(context, live_app):
+    seed(live_app.ctx)
+    page = context.new_page()
+    sign_in(page, live_app.url)
+    expect(page.locator("[data-role=alerts-home]")).to_have_count(1)
+    expect(page.locator("[data-role=kpi-strip] [data-kpi=high] .kpi-value")).to_have_text("1")
+    expect(page.locator("[data-role=alert-side] [data-role=alert-summary]")).to_contain_text("Disk space is low")
+
+
+def test_old_alerts_url_redirects(context, live_app):
+    page = context.new_page()
+    sign_in(page, live_app.url)
+    page.goto(f"{live_app.url}/alerts?days=30")
+    page.wait_for_url(f"{live_app.url}/?days=30")
+    expect(page.locator("[data-role=alerts-home]")).to_have_count(1)
+
+
+def test_category_filter(context, live_app):
+    seed(live_app.ctx)
+    _lateral(live_app.ctx, "new_process")
+    page = context.new_page()
+    sign_in(page, live_app.url)
+    table = page.locator("[data-role=alert-list]")
+    expect(table.locator("[data-alert-id]")).to_have_count(2)
+    page.click("[data-category=anomaly]")
+    expect(table.locator("[data-alert-id]")).to_have_count(1)
+    expect(table).to_contain_text("Allowed-traffic anomaly")
+    page.click("[data-category=system]")
+    expect(table).to_contain_text("Disk space is low")
+
+
+def test_no_quarantine_button_for_unmanaged(context, live_app):
+    _lateral(live_app.ctx, "new_process", subject="ip:10.0.0.9")
+    page = context.new_page()
+    sign_in(page, live_app.url)
+    side = page.locator("[data-role=alert-side]")
+    expect(side.locator("[data-role=quarantine-reason]")).to_contain_text("not a managed host")
+    expect(side.locator("[data-role=quarantine]")).to_have_count(0)
+    expect(side.locator("[data-role=beyond]")).to_contain_text("psexesvc.exe")
+    expect(side.locator("[data-role=timeline] li")).not_to_have_count(0)
+
+
+def test_detail_below_list_at_760(narrow_context, live_app):
+    from tests.e2e.conftest import no_horizontal_overflow
+    seed(live_app.ctx)
+    page = narrow_context.new_page()
+    sign_in(page, live_app.url)
+    side = page.locator("[data-role=alert-side]")
+    side.wait_for()
+    table_box = page.locator("[data-role=alert-list]").bounding_box()
+    side_box = side.bounding_box()
+    assert table_box and side_box and side_box["y"] > table_box["y"] + table_box["height"] - 1
+    assert no_horizontal_overflow(page)

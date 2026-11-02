@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 
+import { registerNav } from "../shell/nav";
 import { type ApiError, call } from "../api/client";
 import type { FocusEntry, FocusView, HomeSummary } from "../api/generated";
 import { ProbeResults, formatTime } from "../components/ProbeResults";
@@ -130,3 +131,6 @@ export function Home() {
     </section>
   );
 }
+
+// Until the detection page takes the focus list over (plan A Task 3), it is reached here.
+registerNav({ section: "main", path: "/attention", labelKey: "nav_home", order: 90, component: Home, hidden: true });

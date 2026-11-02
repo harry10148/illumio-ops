@@ -58,19 +58,53 @@ def insert_alert(conn: sqlite3.Connection, *, pce_url: str, org_id: str, rule_na
     return alert_id
 
 
-def list_alerts(conn: sqlite3.Connection, *, pce_url: str, org_id: str, since: datetime, rule_type: str | None = None,
-                severity: str | None = None, rule_id: str | None = None, limit: int,
-                offset: int) -> tuple[list[sqlite3.Row], int]:
+def _where(*, pce_url: str, org_id: str, since: datetime, rule_types: Sequence[str] | None = None,
+           severity: str | None = None, rule_id: str | None = None, detectors_in: Sequence[str] | None = None,
+           detectors_not_in: Sequence[str] | None = None, ungrouped_only: bool = False) -> tuple[str, list[Any]]:
     clauses, params = ["pce_url = ?", "org_id = ?", "fired_at >= ?"], [pce_url, org_id, _t(since)]
-    for column, value in (("rule_type", rule_type), ("severity", severity), ("rule_id", rule_id)):
+    for column, value in (("severity", severity), ("rule_id", rule_id)):
         if value:
             clauses.append(f"{column} = ?")
             params.append(value)
-    where = " AND ".join(clauses)
+    if rule_types:
+        clauses.append(f"rule_type IN ({','.join('?' * len(rule_types))})")
+        params.extend(rule_types)
+    detector = "json_extract(params_json, '$.detector')"
+    if detectors_in:
+        clauses.append(f"{detector} IN ({','.join('?' * len(detectors_in))})")
+        params.extend(detectors_in)
+    if detectors_not_in:
+        clauses.append(f"({detector} IS NULL OR {detector} NOT IN ({','.join('?' * len(detectors_not_in))}))")
+        params.extend(detectors_not_in)
+    if ungrouped_only:
+        clauses.append("grouped_annotation IS NULL")
+    return " AND ".join(clauses), params
+
+
+def list_alerts(conn: sqlite3.Connection, *, pce_url: str, org_id: str, since: datetime, rule_type: str | None = None,
+                severity: str | None = None, rule_id: str | None = None, rule_types: Sequence[str] | None = None,
+                detectors_in: Sequence[str] | None = None, detectors_not_in: Sequence[str] | None = None,
+                ungrouped_only: bool = False, limit: int, offset: int) -> tuple[list[sqlite3.Row], int]:
+    """rule_types / detectors_in / detectors_not_in: a category's filter (domain/alertcategory.py); detectors are the
+    lateral alert's `detector` parameter."""
+    types = rule_types if rule_types else ((rule_type,) if rule_type else None)
+    where, params = _where(pce_url=pce_url, org_id=org_id, since=since, rule_types=types, severity=severity,
+                           rule_id=rule_id, detectors_in=detectors_in, detectors_not_in=detectors_not_in,
+                           ungrouped_only=ungrouped_only)
     rows = conn.execute(f"SELECT * FROM alerts WHERE {where} ORDER BY fired_at DESC, id DESC LIMIT ? OFFSET ?",
                         [*params, limit, offset]).fetchall()
     total = conn.execute(f"SELECT COUNT(*) FROM alerts WHERE {where}", params).fetchone()[0]
     return rows, int(total)
+
+
+def period_counts(conn: sqlite3.Connection, *, pce_url: str, org_id: str, since: datetime) -> dict[str, int]:
+    """Alerts fired since `since` per severity, and how many were marked as known (`grouped`)."""
+    where, params = _where(pce_url=pce_url, org_id=org_id, since=since)
+    out = {r[0]: int(r[1]) for r in conn.execute(
+        f"SELECT severity, COUNT(*) FROM alerts WHERE {where} GROUP BY severity", params)}
+    out["grouped"] = int(conn.execute(f"SELECT COUNT(*) FROM alerts WHERE {where} AND grouped_annotation IS NOT NULL",
+                                      params).fetchone()[0])
+    return out
 
 
 def count_ungrouped(conn: sqlite3.Connection, *, pce_url: str, org_id: str, since: datetime) -> int:

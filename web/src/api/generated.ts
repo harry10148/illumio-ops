@@ -560,16 +560,41 @@ created_by: string
 id: number
 }
 /**
+ * Who the quarantine button would act on: only a managed workload the inventory holds (spec §4.4).
+ * 
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "QuarantineEligibility".
+ */
+export interface QuarantineEligibility {
+eligible: boolean
+key: (string | null)
+name: (string | null)
+no_enforcement: boolean
+reason: (("unmanaged" | "not_in_inventory" | "no_subject") | null)
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "TimelineEntry".
+ */
+export interface TimelineEntry {
+at: string
+kind: ("alert" | "detection" | "event")
+text: string
+}
+/**
  * This interface was referenced by `ContractRoot`'s JSON-Schema
  * via the `definition` "AlertDetail".
  */
 export interface AlertDetail {
+beyond_vendor: string[]
+category: ("lateral" | "anomaly" | "traffic" | "event" | "system")
 caveats: string[]
 confidence: {
 [k: string]: unknown
 }
 console_link: (string | null)
 deliveries: DeliveryView[]
+dst: (string | null)
 evidence_kind: (("flow" | "event") | null)
 facts: {
 [k: string]: unknown
@@ -584,20 +609,38 @@ notes: NoteView[]
 params: {
 [k: string]: unknown
 }
+quarantine: QuarantineEligibility
 rule_id: string
 rule_name: string
 rule_type: AlertRuleType
 severity: Severity
+src: (string | null)
 subject_key: string
 summary: string
+timeline: TimelineEntry[]
+}
+/**
+ * The period's alerts per severity and how many were marked as known, before the page's filters.
+ * 
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "AlertCounts".
+ */
+export interface AlertCounts {
+critical: number
+grouped: number
+high: number
+low: number
+medium: number
 }
 /**
  * This interface was referenced by `ContractRoot`'s JSON-Schema
  * via the `definition` "AlertItem".
  */
 export interface AlertItem {
+category: ("lateral" | "anomaly" | "traffic" | "event" | "system")
 caveats: string[]
 deliveries: DeliveryView[]
+dst: (string | null)
 fired_at: string
 grouped: boolean
 id: number
@@ -606,6 +649,7 @@ rule_id: string
 rule_name: string
 rule_type: AlertRuleType
 severity: Severity
+src: (string | null)
 subject_key: string
 summary: string
 }
@@ -614,6 +658,7 @@ summary: string
  * via the `definition` "AlertList".
  */
 export interface AlertList {
+counts: AlertCounts
 items: AlertItem[]
 page: number
 page_size: number

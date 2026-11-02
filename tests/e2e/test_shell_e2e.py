@@ -54,8 +54,8 @@ def test_no_horizontal_overflow_760(live_app, narrow_context):
     sign_in(page, live_app.url)
     assert no_horizontal_overflow(page)
     page.get_by_role("button", name="Menu").click()
-    page.locator(".nav-item[data-nav='/alerts']").click()
-    page.wait_for_url("**/alerts")
+    page.locator(".nav-item[data-nav='/investigate']").click()
+    page.wait_for_url("**/investigate")
     assert no_horizontal_overflow(page)
 
 

@@ -2,7 +2,8 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 
 import { App } from "./App";
-import "./pages/alerts/AlertList";
+import "./pages/alerts/AlertsHome";
+import "./pages/Home";
 import "./pages/alerts/AlertDetail";
 import "./pages/alerts/Rules";
 import "./pages/alerts/RuleEditor";

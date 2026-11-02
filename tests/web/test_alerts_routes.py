@@ -163,3 +163,13 @@ def test_known_reason_required(client, ctx):
     a = _lateral(ctx)
     assert post(client, f"/api/alerts/{a}/known", {"scope": "detection", "reason": ""}).status_code == 400
     assert post(client, f"/api/alerts/{a}/known", {"scope": "everything", "reason": "x"}).status_code == 400
+
+
+def test_category_and_unprocessed_from_the_query_string(client, ctx):
+    login(client)
+    seed(ctx)
+    lateral = seed(ctx, rule_type=AlertRuleType.LATERAL)
+    data = get(client, "/api/alerts?category=lateral&unprocessed=true").get_json()["data"]
+    assert [i["id"] for i in data["items"]] == [lateral] and data["items"][0]["category"] == "lateral"
+    assert data["counts"] == {"critical": 0, "high": 2, "medium": 0, "low": 0, "grouped": 0}
+    assert get(client, "/api/alerts?category=nope").status_code == 400
