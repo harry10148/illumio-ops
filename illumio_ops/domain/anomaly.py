@@ -704,7 +704,9 @@ def detect_off_hours(inp: DetectorInput) -> tuple[list[Detection], DetectorStatu
         return [], off
     hour = _hour(inp)
     slots = {(hour - timedelta(hours=1)).hour, hour.hour}
-    start, end = hour - timedelta(days=HISTORY_DAYS), hour - timedelta(hours=1)
+    # the kept days, from the first live hour on (before it nothing was recorded, gap or not)
+    start = max(hour - timedelta(days=HISTORY_DAYS), hour - timedelta(days=data.activity_days))
+    end = hour - timedelta(hours=1)
     spans = [(start + timedelta(hours=i), start + timedelta(hours=i + 1))
              for i in range(int((end - start) / timedelta(hours=1)))
              if (start + timedelta(hours=i)).hour in slots]
