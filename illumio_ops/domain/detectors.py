@@ -135,6 +135,13 @@ class DetectorConfig:
     process_history: timedelta = timedelta(days=7)
     suspicious_tools: frozenset[str] = frozenset()
     directory_followup: timedelta = timedelta(minutes=30)
+    # The second batch (spec §6.5.8 第二批)
+    quiet: timedelta = timedelta(days=7)
+    quiet_min_connections: int = 100
+    staging_min_sources: int = 5
+    staging_min_bytes: int = 1024 * 2**20
+    off_hours_min_connections: int = 100
+    off_hours_min_days: int = 5
 
 
 @dataclass(frozen=True)

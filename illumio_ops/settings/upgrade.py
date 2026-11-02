@@ -124,6 +124,16 @@ def _v11_to_v12(data: dict[str, Any]) -> dict[str, Any]:
     return data
 
 
+def _v12_to_v13(data: dict[str, Any]) -> dict[str, Any]:
+    # The second batch of anomaly detectors (spec §6.5.8 第二批): their thresholds; what the file has stays as it is.
+    fresh = default_lateral().model_dump(mode="json")["detectors"]
+    lateral = data.get("lateral")
+    if isinstance(lateral, dict) and isinstance(lateral.get("detectors"), dict):
+        for key, value in fresh.items():
+            lateral["detectors"].setdefault(key, value)
+    return data
+
+
 # source version -> function producing source version + 1
 UPGRADES: dict[int, Callable[[dict[str, Any]], dict[str, Any]]] = {
     1: _v1_to_v2,
@@ -137,6 +147,7 @@ UPGRADES: dict[int, Callable[[dict[str, Any]], dict[str, Any]]] = {
     9: _v9_to_v10,
     10: _v10_to_v11,
     11: _v11_to_v12,
+    12: _v12_to_v13,
 }
 
 

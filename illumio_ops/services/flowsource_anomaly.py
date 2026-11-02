@@ -5,6 +5,7 @@ from __future__ import annotations
 
 from collections.abc import Callable, Collection, Iterator, Mapping, Sequence
 from contextlib import contextmanager
+from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, TypeVar
 
@@ -209,3 +210,99 @@ def activity_coverage(ctx: AppContext) -> datetime | None:
     with _reading(ctx) as conn:
         row = conn.execute("SELECT MIN(hour) FROM source_activity_hourly").fetchone()
     return datetime.fromisoformat(row[0]) if row and row[0] else None
+
+
+# ── second batch (spec §6.5.8 第二批) ─────────────────────────────────────────
+
+def pairs_before(ctx: AppContext, pairs: Collection[tuple[str, str]], *, before: datetime) -> set[tuple[str, str]]:
+    """Of these (src, dst), those the baseline had on any port before `before` (blocked attempts included)."""
+    out: set[tuple[str, str]] = set()
+    with _reading(ctx) as conn:
+        for chunk in _chunks(pairs):
+            marks = ",".join("(?, ?)" for _ in chunk)
+            out |= {(r[0], r[1]) for r in conn.execute(
+                "SELECT DISTINCT src_key, dst_key FROM connection_baseline "
+                f"WHERE (src_key, dst_key) IN (VALUES {marks}) AND first_seen <= ?",
+                [*(v for p in chunk for v in p), db_time(before)])}
+    return out
+
+
+def ports_served_before(ctx: AppContext, keys: Collection[tuple[str, int, int]], *,
+                        before: datetime) -> set[tuple[str, int, int]]:
+    """Of these (dst, port, proto), those any source had connected to before `before`."""
+    out: set[tuple[str, int, int]] = set()
+    with _reading(ctx) as conn:
+        for dst, port, proto in sorted(set(keys), key=str):
+            if conn.execute("SELECT 1 FROM connection_baseline WHERE port = ? AND proto = ? AND dst_key = ? "
+                            "AND first_seen <= ? LIMIT 1", (port, proto, dst, db_time(before))).fetchone():
+                out.add((dst, port, proto))
+    return out
+
+
+def sources_known_before(ctx: AppContext, srcs: Collection[str], *, before: datetime) -> set[str]:
+    """Of these sources, those the baseline saw start a connection before `before`."""
+    out: set[str] = set()
+    with _reading(ctx) as conn:
+        for src in sorted(set(srcs)):
+            if conn.execute("SELECT 1 FROM connection_baseline WHERE src_key = ? AND first_seen <= ? LIMIT 1",
+                            (src, db_time(before))).fetchone():
+                out.add(src)
+    return out
+
+
+def activity_hours(ctx: AppContext, srcs: Collection[str], *, start: datetime,
+                   end: datetime) -> dict[str, list[datetime]]:
+    """src_key -> the hours in [start, end) it had live activity in (any port), oldest first."""
+    out: dict[str, list[datetime]] = {}
+    with _reading(ctx) as conn:
+        for chunk in _chunks(srcs):
+            for src, hour in conn.execute(
+                    "SELECT src_key, hour FROM source_activity_hourly WHERE port_class = 'all' "
+                    f"AND src_key IN ({','.join('?' * len(chunk))}) AND hour >= ? AND hour < ? ORDER BY hour",
+                    [*chunk, db_time(start), db_time(end)]):
+                out.setdefault(src, []).append(datetime.fromisoformat(hour))
+    return out
+
+
+@dataclass(frozen=True)
+class FanIn:
+    """A destination's live growth over a span: what data staging (I) compares."""
+    connections: int
+    bytes: int                       # of the growth that carried byte counts
+    sources: int                     # distinct sources whose growth carried bytes
+    source_keys: tuple[str, ...]
+    with_bytes: int                  # increments that carried byte counts
+    increments: int
+
+
+def fan_in_now(ctx: AppContext, *, since: datetime, until: datetime) -> dict[str, FanIn]:
+    """dst_key -> what collection cycles saw grow toward it in (since, until], not blocked and not late."""
+    acc: dict[str, list[Any]] = {}
+    with _reading(ctx) as conn:
+        for src, dst, connections, grown_bytes in conn.execute(
+                "SELECT f.src_key, f.dst_key, i.connections, i.bytes FROM flow_increments i "
+                f"{INCREMENT_PRIMARY_JOIN} "
+                "WHERE i.late = 0 AND i.observed_at > ? AND i.observed_at <= ? "
+                "AND f.policy_decision NOT LIKE 'blocked%'", (db_time(since), db_time(until))):
+            slot = acc.setdefault(dst, [0, 0, set(), 0, 0])
+            slot[0] += connections
+            slot[4] += 1
+            if grown_bytes is not None:
+                slot[1] += grown_bytes
+                slot[2].add(src)
+                slot[3] += 1
+    return {d: FanIn(v[0], v[1], len(v[2]), tuple(sorted(v[2])), v[3], v[4]) for d, v in acc.items()}
+
+
+def destination_history(ctx: AppContext, dsts: Collection[str], *, start: datetime,
+                        end: datetime) -> dict[str, int | None]:
+    """dst_key -> the most bytes in any hour of [start, end) that carried byte counts (None when none did)."""
+    out: dict[str, int | None] = {}
+    with _reading(ctx) as conn:
+        for chunk in _chunks(dsts):
+            for dst, grown_bytes in conn.execute(
+                    "SELECT dst_key, MAX(CASE WHEN bytes_known > 0 THEN bytes END) FROM destination_activity_hourly "
+                    f"WHERE dst_key IN ({','.join('?' * len(chunk))}) AND hour >= ? AND hour < ? GROUP BY dst_key",
+                    [*chunk, db_time(start), db_time(end)]):
+                out[dst] = grown_bytes
+    return out

@@ -1,5 +1,5 @@
 """Writes to flows, flow_rollup_daily, the baselines (connection, user, account × source, process) and
-source_activity_hourly.
+the hourly activity of sources and destinations.
 
 One PCE record is one row. When both ends of a connection report it (spec §6.6 F11), the two
 rows share conn_key, exactly one is primary (the outbound one when present), and each row is
@@ -350,34 +350,44 @@ def _record_growth(conn: sqlite3.Connection, conn_key: str, *, before_last: dict
     return (grew, grew_bytes) if recorded else (0, None)
 
 
-# Hourly activity is kept for the 7 days a surge is compared with, and the hour being filled.
-ACTIVITY_KEEP = timedelta(days=8)
+# Hourly activity is kept 14 days and the hour being filled: a surge compares 7 days, a quiet host's silence and a
+# host's usual hours (spec §6.5.8 第二批) reach 14.
+ACTIVITY_KEEP = timedelta(days=15)
 Activity = dict[tuple[str, str, str], list[int]]  # (hour, src_key, class) -> [connections, bytes, bytes_known]
+DestActivity = dict[tuple[str, str], list[int]]   # (hour, dst_key) -> [connections, bytes, bytes_known]
 
 
-def _add_activity(activity: Activity, row: sqlite3.Row, hour: str, grew: tuple[int, int | None]) -> None:
-    """Live growth that was not blocked counts toward its source's hour; directory ports count again on their own."""
+def _add_activity(activity: Activity, dest: DestActivity, row: sqlite3.Row, hour: str,
+                  grew: tuple[int, int | None]) -> None:
+    """Live growth that was not blocked counts toward its source's hour (directory ports again on their own) and its
+    destination's."""
     connections, grown_bytes = grew
     if not connections and not grown_bytes:
         return
     if str(row["policy_decision"]).startswith("blocked"):
         return
     classes = ("all", "directory") if (row["port"], row["proto"]) in DIRECTORY_PORTS else ("all",)
-    for cls in classes:
-        slot = activity.setdefault((hour, row["src_key"], cls), [0, 0, 0])
+    slots = [activity.setdefault((hour, row["src_key"], cls), [0, 0, 0]) for cls in classes]
+    for slot in [*slots, dest.setdefault((hour, row["dst_key"]), [0, 0, 0])]:
         slot[0] += connections
         if grown_bytes is not None:
             slot[1] += grown_bytes
             slot[2] += 1
 
 
-def _write_activity(conn: sqlite3.Connection, activity: Activity) -> None:
+def _write_activity(conn: sqlite3.Connection, activity: Activity, dest: DestActivity) -> None:
     conn.executemany(
         "INSERT INTO source_activity_hourly (hour, src_key, port_class, connections, bytes, bytes_known) "
         "VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(hour, src_key, port_class) DO UPDATE SET "
         "connections = connections + excluded.connections, bytes = bytes + excluded.bytes, "
         "bytes_known = bytes_known + excluded.bytes_known",
         [(*k, *v) for k, v in sorted(activity.items())])
+    conn.executemany(
+        "INSERT INTO destination_activity_hourly (hour, dst_key, connections, bytes, bytes_known) "
+        "VALUES (?, ?, ?, ?, ?) ON CONFLICT(hour, dst_key) DO UPDATE SET "
+        "connections = connections + excluded.connections, bytes = bytes + excluded.bytes, "
+        "bytes_known = bytes_known + excluded.bytes_known",
+        [(*k, *v) for k, v in sorted(dest.items())])
 
 
 def upsert_flows(conn: sqlite3.Connection, records: Sequence[FlowRecord], *, origin: DataOrigin,
@@ -420,14 +430,15 @@ def upsert_flows(conn: sqlite3.Connection, records: Sequence[FlowRecord], *, ori
             paired += tup_pairs
         ordered = sorted(keys)
         activity: Activity = {}
+        dest: DestActivity = {}
         hour = db_time(now.astimezone(UTC).replace(minute=0, second=0, microsecond=0))
         for conn_key in ordered:
             _merge_connection(conn, conn_key)
             primary = _update_baselines(conn, conn_key, log_new=log_new_connections, stamp=stamp)
             grew = _record_growth(conn, conn_key, before_last=before_last, increments=increments, stamp=stamp)
             if increments == "cycle" and primary is not None:
-                _add_activity(activity, primary, hour, grew)
-        _write_activity(conn, activity)
+                _add_activity(activity, dest, primary, hour, grew)
+        _write_activity(conn, activity, dest)
         for i in range(0, len(ordered), 500):  # every row of a changed connection may have changed
             chunk = ordered[i:i + 500]
             days |= {d for (d,) in conn.execute(
@@ -437,6 +448,7 @@ def upsert_flows(conn: sqlite3.Connection, records: Sequence[FlowRecord], *, ori
             conn.execute("DELETE FROM flow_increments WHERE observed_at < ?", (db_time(now - INCREMENT_KEEP),))
         if increments == "cycle":
             conn.execute("DELETE FROM source_activity_hourly WHERE hour < ?", (db_time(now - ACTIVITY_KEEP),))
+            conn.execute("DELETE FROM destination_activity_hourly WHERE hour < ?", (db_time(now - ACTIVITY_KEEP),))
         archive.mark_stale(conn, "flows", days)
         conn.executemany("INSERT INTO rollup_state (day, dirty) VALUES (?, 1) "
                          "ON CONFLICT(day) DO UPDATE SET dirty = 1", [(d,) for d in sorted(days)])

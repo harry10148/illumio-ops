@@ -2238,9 +2238,15 @@ directory_min_sources: number
 exclude_system_accounts: boolean
 fanout_targets: number
 fanout_window_minutes: number
+off_hours_min_connections: number
+off_hours_min_days: number
 peer_min_group: number
 precursor_hours: number
 process_history_days: number
+quiet_days: number
+quiet_min_connections: number
+staging_min_mb: number
+staging_min_sources: number
 volume_min_connections: number
 volume_min_mb: number
 volume_surge_factor: number

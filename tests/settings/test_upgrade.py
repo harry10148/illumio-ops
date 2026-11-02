@@ -33,7 +33,7 @@ def test_v1_file_loads_as_v2_in_memory(tmp_path):
     p = _v1(tmp_path)
     before, mtime = p.read_bytes(), os.stat(p).st_mtime_ns
     s = SettingsStore(p).load()
-    assert s.schema_version == SCHEMA_VERSION == 12
+    assert s.schema_version == SCHEMA_VERSION == 13
     assert s.collection.traffic_interval_seconds == 600
     assert s.collection.retention.baseline_days == 30
     assert p.read_bytes() == before and os.stat(p).st_mtime_ns == mtime
@@ -135,7 +135,7 @@ def _v4_dict():
 
 def test_v4_file_upgrades_to_v5_keeping_values():
     s = validate_settings(upgrade(_v4_dict()))
-    assert s.schema_version == SCHEMA_VERSION == 12
+    assert s.schema_version == SCHEMA_VERSION == 13
     lat = s.lateral
     assert lat.detectors.fanout_targets == 12
     assert lat.extra_admin_ports[0].category == "remote" and lat.removed_admin_ports[0].port == 23
@@ -172,7 +172,7 @@ def test_v5_file_upgrades_to_v6_with_reports():
     d["schema_version"] = 5
     del d["reports"]
     s = validate_settings(upgrade(d))
-    assert s.schema_version == SCHEMA_VERSION == 12
+    assert s.schema_version == SCHEMA_VERSION == 13
     assert s.reports.retention_days == 90
 
 
@@ -183,7 +183,7 @@ def test_v6_file_upgrades_to_v7_with_rule_thresholds():
     del d["reports"]["rule_thresholds"]
     d["reports"]["retention_days"] = 30
     s = validate_settings(upgrade(d))
-    assert s.schema_version == SCHEMA_VERSION == 12
+    assert s.schema_version == SCHEMA_VERSION == 13
     assert s.reports.retention_days == 30 and s.reports.rule_thresholds.unmanaged_connection == 50
 
 
@@ -194,7 +194,7 @@ def test_upgrade_keeps_mode(mode):
     d["schema_version"] = 7
     d["collection"]["mode"] = mode
     s = validate_settings(upgrade(d))
-    assert s.schema_version == SCHEMA_VERSION == 12 and s.collection.mode.value == mode
+    assert s.schema_version == SCHEMA_VERSION == 13 and s.collection.mode.value == mode
 
 
 def test_events_only_becomes_lightweight():
@@ -233,3 +233,21 @@ def test_a_lateral_rule_keeps_an_exclusion_it_already_has():
     rule["exclude"] = {"ips": ["10.9.0.0/16"]}
     s = validate_settings(upgrade(d))
     assert next(r for r in s.alerts.rules if r.id == rule["id"]).exclude == EndpointFilter(ips=("10.9.0.0/16",))
+
+
+
+BATCH2_DETECTORS = {"quiet_days": 7, "quiet_min_connections": 100, "staging_min_sources": 5, "staging_min_mb": 1024,
+                    "off_hours_min_connections": 100, "off_hours_min_days": 5}
+
+
+def test_v12_settings_gain_batch2_detector_defaults():
+    """Spec §6.5.8 第二批: the new thresholds; what the file has stays as it is."""
+    d = default_settings(password_hash=HASH, secret_key=KEY).model_dump(mode="json")
+    d["schema_version"] = 12
+    for key in BATCH2_DETECTORS:
+        d["lateral"]["detectors"].pop(key, None)
+    d["lateral"]["detectors"]["volume_min_connections"] = 4321
+    s = validate_settings(upgrade(d))
+    assert s.schema_version == SCHEMA_VERSION == 13
+    assert {k: getattr(s.lateral.detectors, k) for k in BATCH2_DETECTORS} == BATCH2_DETECTORS
+    assert s.lateral.detectors.volume_min_connections == 4321

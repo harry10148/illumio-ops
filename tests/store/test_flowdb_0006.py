@@ -102,8 +102,8 @@ def test_activity_counts_cycle_growth_not_blocked(conn):
     assert hours == {db_time(NOW.replace(minute=0))}
 
 
-def test_activity_pruned_after_eight_days(conn):
-    upsert_flows(conn, [rec(1)], origin=DataOrigin.INGEST, now=NOW - timedelta(days=9), increments="cycle")
+def test_activity_pruned_after_fifteen_days(conn):
+    upsert_flows(conn, [rec(1)], origin=DataOrigin.INGEST, now=NOW - timedelta(days=16), increments="cycle")
     upsert_flows(conn, [rec(2)], origin=DataOrigin.INGEST, now=NOW, increments="cycle")
     assert {k[0] for k in _activity(conn)} == {"/orgs/1/workloads/src-2"}
 

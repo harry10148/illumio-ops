@@ -30085,6 +30085,18 @@
                 "title": "Fanout Window Minutes",
                 "type": "integer"
               },
+              "off_hours_min_connections": {
+                "maximum": 10000000,
+                "minimum": 10,
+                "title": "Off Hours Min Connections",
+                "type": "integer"
+              },
+              "off_hours_min_days": {
+                "maximum": 14,
+                "minimum": 3,
+                "title": "Off Hours Min Days",
+                "type": "integer"
+              },
               "peer_min_group": {
                 "maximum": 1000,
                 "minimum": 3,
@@ -30101,6 +30113,30 @@
                 "maximum": 90,
                 "minimum": 1,
                 "title": "Process History Days",
+                "type": "integer"
+              },
+              "quiet_days": {
+                "maximum": 14,
+                "minimum": 2,
+                "title": "Quiet Days",
+                "type": "integer"
+              },
+              "quiet_min_connections": {
+                "maximum": 10000000,
+                "minimum": 10,
+                "title": "Quiet Min Connections",
+                "type": "integer"
+              },
+              "staging_min_mb": {
+                "maximum": 10000000,
+                "minimum": 1,
+                "title": "Staging Min Mb",
+                "type": "integer"
+              },
+              "staging_min_sources": {
+                "maximum": 1000,
+                "minimum": 2,
+                "title": "Staging Min Sources",
                 "type": "integer"
               },
               "volume_min_connections": {
@@ -30141,7 +30177,13 @@
               "account_history_days",
               "process_history_days",
               "directory_min_sources",
-              "directory_followup_minutes"
+              "directory_followup_minutes",
+              "quiet_days",
+              "quiet_min_connections",
+              "staging_min_sources",
+              "staging_min_mb",
+              "off_hours_min_connections",
+              "off_hours_min_days"
             ],
             "title": "DetectorSettings",
             "type": "object"
@@ -30840,6 +30882,18 @@
                 "title": "Fanout Window Minutes",
                 "type": "integer"
               },
+              "off_hours_min_connections": {
+                "maximum": 10000000,
+                "minimum": 10,
+                "title": "Off Hours Min Connections",
+                "type": "integer"
+              },
+              "off_hours_min_days": {
+                "maximum": 14,
+                "minimum": 3,
+                "title": "Off Hours Min Days",
+                "type": "integer"
+              },
               "peer_min_group": {
                 "maximum": 1000,
                 "minimum": 3,
@@ -30856,6 +30910,30 @@
                 "maximum": 90,
                 "minimum": 1,
                 "title": "Process History Days",
+                "type": "integer"
+              },
+              "quiet_days": {
+                "maximum": 14,
+                "minimum": 2,
+                "title": "Quiet Days",
+                "type": "integer"
+              },
+              "quiet_min_connections": {
+                "maximum": 10000000,
+                "minimum": 10,
+                "title": "Quiet Min Connections",
+                "type": "integer"
+              },
+              "staging_min_mb": {
+                "maximum": 10000000,
+                "minimum": 1,
+                "title": "Staging Min Mb",
+                "type": "integer"
+              },
+              "staging_min_sources": {
+                "maximum": 1000,
+                "minimum": 2,
+                "title": "Staging Min Sources",
                 "type": "integer"
               },
               "volume_min_connections": {
@@ -30896,7 +30974,13 @@
               "account_history_days",
               "process_history_days",
               "directory_min_sources",
-              "directory_followup_minutes"
+              "directory_followup_minutes",
+              "quiet_days",
+              "quiet_min_connections",
+              "staging_min_sources",
+              "staging_min_mb",
+              "off_hours_min_connections",
+              "off_hours_min_days"
             ],
             "title": "DetectorSettings",
             "type": "object"
@@ -31296,6 +31380,18 @@
                 "title": "Fanout Window Minutes",
                 "type": "integer"
               },
+              "off_hours_min_connections": {
+                "maximum": 10000000,
+                "minimum": 10,
+                "title": "Off Hours Min Connections",
+                "type": "integer"
+              },
+              "off_hours_min_days": {
+                "maximum": 14,
+                "minimum": 3,
+                "title": "Off Hours Min Days",
+                "type": "integer"
+              },
               "peer_min_group": {
                 "maximum": 1000,
                 "minimum": 3,
@@ -31312,6 +31408,30 @@
                 "maximum": 90,
                 "minimum": 1,
                 "title": "Process History Days",
+                "type": "integer"
+              },
+              "quiet_days": {
+                "maximum": 14,
+                "minimum": 2,
+                "title": "Quiet Days",
+                "type": "integer"
+              },
+              "quiet_min_connections": {
+                "maximum": 10000000,
+                "minimum": 10,
+                "title": "Quiet Min Connections",
+                "type": "integer"
+              },
+              "staging_min_mb": {
+                "maximum": 10000000,
+                "minimum": 1,
+                "title": "Staging Min Mb",
+                "type": "integer"
+              },
+              "staging_min_sources": {
+                "maximum": 1000,
+                "minimum": 2,
+                "title": "Staging Min Sources",
                 "type": "integer"
               },
               "volume_min_connections": {
@@ -31352,7 +31472,13 @@
               "account_history_days",
               "process_history_days",
               "directory_min_sources",
-              "directory_followup_minutes"
+              "directory_followup_minutes",
+              "quiet_days",
+              "quiet_min_connections",
+              "staging_min_sources",
+              "staging_min_mb",
+              "off_hours_min_connections",
+              "off_hours_min_days"
             ],
             "title": "DetectorSettings",
             "type": "object"

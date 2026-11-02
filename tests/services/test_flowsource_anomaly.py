@@ -183,3 +183,94 @@ def test_directory_activity_needs_the_directory_protocol(ctx):
     write(ctx, [tcp, udp], now=NOW - timedelta(minutes=20), increments="cycle")
     now = fa.activity_now(ctx, since=NOW - timedelta(minutes=60), until=NOW)
     assert (SRC.format(1), "directory") in now and (SRC.format(2), "directory") not in now
+
+
+# ── second batch (F–J, spec §6.5.8 第二批) ─────────────────────────────────────
+
+def test_pairs_before_counts_any_port_and_blocked_rows(ctx):
+    blocked = rec(2, minutes_ago=3 * DAY, port=8080)
+    blocked = type(blocked)(**{**blocked.__dict__, "policy_decision": "blocked"})
+    write(ctx, [rec(1, minutes_ago=3 * DAY, port=8443), blocked, rec(3, port=8443)], origin=DataOrigin.BACKFILL)
+    got = fa.pairs_before(ctx, [(SRC.format(1), DST), (SRC.format(2), DST), (SRC.format(3), DST), ("x", DST)],
+                          before=NOW - timedelta(days=1))
+    assert got == {(SRC.format(1), DST), (SRC.format(2), DST)}
+
+
+def test_ports_served_before_any_source(ctx):
+    write(ctx, [rec(1, minutes_ago=3 * DAY, port=8443), rec(2, port=9000)], origin=DataOrigin.BACKFILL)
+    got = fa.ports_served_before(ctx, [(DST, 8443, 6), (DST, 9000, 6), (DST, 8443, 17)],
+                                 before=NOW - timedelta(days=1))
+    assert got == {(DST, 8443, 6)}
+
+
+def test_sources_known_before(ctx):
+    write(ctx, [rec(1, minutes_ago=10 * DAY), rec(2)], origin=DataOrigin.BACKFILL)
+    assert fa.sources_known_before(ctx, [SRC.format(1), SRC.format(2), "nobody"],
+                                   before=NOW - timedelta(days=7)) == {SRC.format(1)}
+
+
+def test_activity_hours(ctx):
+    write(ctx, [rec(1, conns=5)], now=NOW - timedelta(days=3), increments="cycle")
+    write(ctx, [rec(1, conns=9), rec(2, port=389, conns=3)], now=NOW - timedelta(days=1), increments="cycle")
+    got = fa.activity_hours(ctx, [SRC.format(1), SRC.format(2)], start=NOW - timedelta(days=7), end=NOW)
+    hour = lambda t: t.replace(minute=0, second=0, microsecond=0)
+    assert got == {SRC.format(1): [hour(NOW - timedelta(days=3)), hour(NOW - timedelta(days=1))],
+                   SRC.format(2): [hour(NOW - timedelta(days=1))]}
+
+
+def _with_bytes(r, n):
+    return type(r)(**{**r.__dict__, "bytes_in": n, "bytes_out": 0})
+
+
+def test_fan_in_now_counts_byte_carrying_sources(ctx):
+    write(ctx, [_with_bytes(rec(1, conns=2), 100), _with_bytes(rec(2, conns=3), 50), rec(3, conns=4)],
+          now=NOW - timedelta(minutes=20), increments="cycle")
+    got = fa.fan_in_now(ctx, since=NOW - timedelta(minutes=60), until=NOW)
+    f = got[DST]
+    assert (f.connections, f.bytes, f.sources, f.with_bytes, f.increments) == (9, 150, 2, 2, 3)
+    assert set(f.source_keys) == {SRC.format(1), SRC.format(2)}
+
+
+def test_destination_activity_counts_live_unblocked_growth_only(ctx):
+    write(ctx, [_with_bytes(rec(1, conns=2), 100)], now=NOW - timedelta(minutes=20), increments="cycle")
+    write(ctx, [_with_bytes(rec(2, conns=2), 70)], now=NOW - timedelta(minutes=20), increments="late")
+    write(ctx, [_with_bytes(rec(3, conns=2), 70)], now=NOW - timedelta(minutes=20))
+    blocked = _with_bytes(rec(4, conns=2), 70)
+    write(ctx, [type(blocked)(**{**blocked.__dict__, "policy_decision": "blocked"})],
+          now=NOW - timedelta(minutes=20), increments="cycle")
+    with ctx.flows().connect() as conn:
+        rows = conn.execute("SELECT dst_key, connections, bytes, bytes_known FROM destination_activity_hourly").fetchall()
+    assert [tuple(r) for r in rows] == [(DST, 2, 100, 1)]
+
+
+def test_destination_history_none_when_no_bytes(ctx):
+    with ctx.flows().connect() as conn:
+        conn.executemany("INSERT INTO destination_activity_hourly VALUES (?, ?, ?, ?, ?)", [
+            ("2026-10-23T10:00:00.000+00:00", "d", 10, 0, 0), ("2026-10-23T11:00:00.000+00:00", "d", 5, 900, 2),
+            ("2026-10-23T11:00:00.000+00:00", "e", 5, 0, 0)])
+        conn.commit()
+    assert fa.destination_history(ctx, ["d", "e", "f"], start=NOW - timedelta(days=7), end=NOW) == {"d": 900, "e": None}
+
+
+def test_activity_kept_fifteen_days(ctx):
+    write(ctx, [_with_bytes(rec(1, conns=2), 10)], now=NOW - timedelta(days=14), increments="cycle")
+    write(ctx, [_with_bytes(rec(2, conns=2), 10)], now=NOW - timedelta(days=16), increments="cycle")
+    write(ctx, [rec(3, conns=1)], now=NOW, increments="cycle")
+    with ctx.flows().connect() as conn:
+        src = {r[0] for r in conn.execute("SELECT src_key FROM source_activity_hourly")}
+        dst = conn.execute("SELECT COUNT(DISTINCT hour) FROM destination_activity_hourly").fetchone()[0]
+    assert src == {SRC.format(1), SRC.format(3)} and dst == 2
+
+
+@pytest.mark.parametrize("read", [
+    lambda c: fa.pairs_before(c, [("a", "b")], before=NOW),
+    lambda c: fa.ports_served_before(c, [("b", 1, 6)], before=NOW),
+    lambda c: fa.sources_known_before(c, ["a"], before=NOW),
+    lambda c: fa.activity_hours(c, ["a"], start=NOW, end=NOW),
+    lambda c: fa.fan_in_now(c, since=NOW, until=NOW),
+    lambda c: fa.destination_history(c, ["b"], start=NOW, end=NOW),
+])
+def test_batch2_reads_raise_stale_generation(ctx, monkeypatch, read):
+    _switching(ctx, monkeypatch)
+    with pytest.raises(StaleGeneration):
+        read(ctx)

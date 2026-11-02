@@ -41,7 +41,7 @@ from illumio_ops.domain.values import (
     SiemTransport,
 )
 
-SCHEMA_VERSION: Literal[12] = 12
+SCHEMA_VERSION: Literal[13] = 13
 _UTC_OFFSET = re.compile(r"UTC([+-]\d+(?:\.\d+)?)")
 
 
@@ -307,6 +307,13 @@ class DetectorSettings(StrictModel):
     process_history_days: int = Field(ge=1, le=90)
     directory_min_sources: int = Field(ge=2, le=1000)
     directory_followup_minutes: int = Field(ge=10, le=1440)
+    # The second batch (spec §6.5.8 第二批)
+    quiet_days: int = Field(ge=2, le=14)
+    quiet_min_connections: int = Field(ge=10, le=10_000_000)
+    staging_min_sources: int = Field(ge=2, le=1000)
+    staging_min_mb: int = Field(ge=1, le=10_000_000)
+    off_hours_min_connections: int = Field(ge=10, le=10_000_000)
+    off_hours_min_days: int = Field(ge=3, le=14)
 
 
 class LateralSettings(StrictModel):
@@ -629,7 +636,7 @@ class SiemSettings(StrictModel):
 
 
 class Settings(StrictModel):
-    schema_version: Literal[12]
+    schema_version: Literal[13]
     revision: int = Field(ge=0)
     pce: PceSettings
     web: WebSettings
@@ -713,7 +720,9 @@ def default_lateral() -> LateralSettings:
             chain_window_minutes=30, blocked_targets=5, blocked_window_minutes=60, blocked_surge_factor=3.0,
             exclude_system_accounts=True, precursor_hours=24, peer_min_group=5, volume_surge_factor=3.0,
             volume_min_connections=1000, volume_min_mb=1024, directory_min_connections=500, account_history_days=7,
-            process_history_days=7, directory_min_sources=3, directory_followup_minutes=30,
+            process_history_days=7, directory_min_sources=3, directory_followup_minutes=30, quiet_days=7,
+            quiet_min_connections=100, staging_min_sources=5, staging_min_mb=1024, off_hours_min_connections=100,
+            off_hours_min_days=5,
         ),
         peer_group_keys=("app", "role"), directory_servers=(), directory_server_ips=(),
         suspicious_tools=DEFAULT_SUSPICIOUS_TOOLS,

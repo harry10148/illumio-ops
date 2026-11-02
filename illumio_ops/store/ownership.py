@@ -40,6 +40,7 @@ TABLE_OWNERS: dict[str, str] = {
     "account_source_baseline": "illumio_ops.store.flowdb.flows",
     "process_baseline": "illumio_ops.store.flowdb.flows",
     "source_activity_hourly": "illumio_ops.store.flowdb.flows",
+    "destination_activity_hourly": "illumio_ops.store.flowdb.flows",
     "events": "illumio_ops.store.flowdb.events",
     "workloads": "illumio_ops.store.flowdb.workloads",
     "workload_snapshot_daily": "illumio_ops.store.flowdb.workloads",

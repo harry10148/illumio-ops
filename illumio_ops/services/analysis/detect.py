@@ -75,7 +75,10 @@ def _config(lc: LateralContext) -> DetectorConfig:
         volume_min_connections=d.volume_min_connections, volume_min_bytes=d.volume_min_mb * 2**20,
         directory_min_connections=d.directory_min_connections, account_history=timedelta(days=d.account_history_days),
         process_history=timedelta(days=d.process_history_days), suspicious_tools=frozenset(lat.suspicious_tools),
-        directory_followup=timedelta(minutes=d.directory_followup_minutes))
+        directory_followup=timedelta(minutes=d.directory_followup_minutes), quiet=timedelta(days=d.quiet_days),
+        quiet_min_connections=d.quiet_min_connections, staging_min_sources=d.staging_min_sources,
+        staging_min_bytes=d.staging_min_mb * 2**20, off_hours_min_connections=d.off_hours_min_connections,
+        off_hours_min_days=d.off_hours_min_days)
 
 
 def _status(s: DetectorStatus, incomplete: bool) -> dict[str, Any]:
