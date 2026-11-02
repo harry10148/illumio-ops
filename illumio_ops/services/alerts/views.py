@@ -32,6 +32,7 @@ from illumio_ops.services.context import AppContext
 from illumio_ops.services.coverage import Coverage
 from illumio_ops.services.eventsource import event_detail
 from illumio_ops.services.flowsource import query_flows
+from illumio_ops.services.hosts import QuarantineEligibility
 from illumio_ops.services.reports.common import DETECTOR_NAME_KEYS
 from illumio_ops.store import alerts as store
 from illumio_ops.store.flowdb import analysis as detection_store
@@ -90,15 +91,6 @@ class TimelineEntry(BaseModel):
     at: datetime
     kind: Literal["alert", "detection", "event"]
     text: str
-
-
-class QuarantineEligibility(BaseModel):
-    """Who the quarantine button would act on: only a managed workload the inventory holds (spec §4.4)."""
-    eligible: bool
-    reason: Literal["unmanaged", "not_in_inventory", "no_subject"] | None
-    no_enforcement: bool  # idle or visibility only: the label would isolate nothing
-    key: str | None
-    name: str | None
 
 
 class NoteView(BaseModel):

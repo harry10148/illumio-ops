@@ -1011,6 +1011,17 @@ weight: (number | null)
 }
 /**
  * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "HostDifference".
+ */
+export interface HostDifference {
+detection_id: number
+detector: string
+first_seen: string
+severity: string
+text: string
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
  * via the `definition` "HostExposureView".
  */
 export interface HostExposureView {
@@ -1103,11 +1114,33 @@ event_type: string
 summary: string
 }
 /**
+ * What the host usually does (spec §5.1): its top destinations, initiating processes and accounts by connections
+ * over the last USUAL_DAYS of daily rollups.
+ * 
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "HostUsual".
+ */
+export interface HostUsual {
+days_covered: number
+top_accounts: RankedValue[]
+top_destinations: RankedValue[]
+top_processes: RankedValue[]
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "RankedValue".
+ */
+export interface RankedValue {
+connections: number
+value: string
+}
+/**
  * This interface was referenced by `ContractRoot`'s JSON-Schema
  * via the `definition` "HostProfile".
  */
 export interface HostProfile {
 address: (string | null)
+different?: HostDifference[]
 exposure: (HostExposureView | null)
 identity: (HostIdentity | null)
 in_inventory: boolean
@@ -1118,10 +1151,13 @@ labels: {
 managed: boolean
 name: string
 named?: boolean
+quarantine?: (QuarantineEligibility | null)
 ransomware: (HostRansomware | null)
 ransomware_details?: (("ok" | "stale" | "missing" | "not_rated") | null)
 ransomware_unsupported: boolean
 tamper: (HostTamper | null)
+usual?: (HostUsual | null)
+usual_state?: ("ok" | "basic_mode" | "accumulating" | "no_data")
 }
 /**
  * This interface was referenced by `ContractRoot`'s JSON-Schema
@@ -1129,6 +1165,22 @@ tamper: (HostTamper | null)
  */
 export interface HostKey {
 key: string
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "HostHit".
+ */
+export interface HostHit {
+key: string
+managed: boolean
+name: string
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "HostSearch".
+ */
+export interface HostSearch {
+items: HostHit[]
 }
 /**
  * This interface was referenced by `ContractRoot`'s JSON-Schema
@@ -2782,7 +2834,7 @@ pulled: (PullInfo | null)
 result: SegmentResult
 }
 
-export type OpId = "alert_rules.create" | "alert_rules.delete" | "alert_rules.list" | "alert_rules.pack" | "alert_rules.preview" | "alert_rules.update" | "alerts.evidence" | "alerts.explain" | "alerts.get" | "alerts.list" | "alerts.mark_known" | "alerts.note_add" | "auth.csrf" | "auth.login" | "auth.logout" | "auth.me" | "auth.password" | "custom_reports.add_section" | "custom_reports.delete" | "custom_reports.list" | "custom_reports.remove_section" | "custom_reports.rename" | "home.focus" | "hosts.profile" | "hosts.ransomware_allows" | "hosts.tamper_note_add" | "hosts.tamper_note_remove" | "i18n.dictionary" | "lateral.compute" | "lateral.simulate" | "lateral.view" | "quarantine.apply" | "quarantine.history" | "quarantine.preview" | "quarantine.remove" | "report_schedules.create" | "report_schedules.delete" | "report_schedules.list" | "report_schedules.run_now" | "report_schedules.update" | "reports.catalog" | "reports.delete" | "reports.generate" | "reports.get" | "reports.list" | "rhc.enable" | "rhc.status" | "shell.status" | "siem.destination.test" | "siem.dlq.list" | "siem.dlq.purge" | "siem.dlq.resend" | "siem.settings.get" | "siem.settings.update" | "siem.status" | "system.channels.get" | "system.channels.test" | "system.channels.update" | "system.collection.backfill" | "system.collection.get" | "system.collection.status" | "system.collection.update" | "system.display.get" | "system.display.update" | "system.jobs.list" | "system.lateral.get" | "system.lateral.known" | "system.lateral.known_delete" | "system.lateral.update" | "system.logs.query" | "system.pce.get" | "system.pce.latest" | "system.pce.probe" | "system.pce.update" | "system.reports.get" | "system.reports.update" | "system.security.get" | "system.security.update" | "system.tls.csr" | "system.tls.import" | "system.tls.renew" | "system.tls.status" | "system.tls.update" | "workbench.dimension" | "workbench.from_alert" | "workbench.meta" | "workbench.predicted" | "workbench.run";
+export type OpId = "alert_rules.create" | "alert_rules.delete" | "alert_rules.list" | "alert_rules.pack" | "alert_rules.preview" | "alert_rules.update" | "alerts.evidence" | "alerts.explain" | "alerts.get" | "alerts.list" | "alerts.mark_known" | "alerts.note_add" | "auth.csrf" | "auth.login" | "auth.logout" | "auth.me" | "auth.password" | "custom_reports.add_section" | "custom_reports.delete" | "custom_reports.list" | "custom_reports.remove_section" | "custom_reports.rename" | "home.focus" | "hosts.profile" | "hosts.ransomware_allows" | "hosts.search" | "hosts.tamper_note_add" | "hosts.tamper_note_remove" | "i18n.dictionary" | "lateral.compute" | "lateral.simulate" | "lateral.view" | "quarantine.apply" | "quarantine.history" | "quarantine.preview" | "quarantine.remove" | "report_schedules.create" | "report_schedules.delete" | "report_schedules.list" | "report_schedules.run_now" | "report_schedules.update" | "reports.catalog" | "reports.delete" | "reports.generate" | "reports.get" | "reports.list" | "rhc.enable" | "rhc.status" | "shell.status" | "siem.destination.test" | "siem.dlq.list" | "siem.dlq.purge" | "siem.dlq.resend" | "siem.settings.get" | "siem.settings.update" | "siem.status" | "system.channels.get" | "system.channels.test" | "system.channels.update" | "system.collection.backfill" | "system.collection.get" | "system.collection.status" | "system.collection.update" | "system.display.get" | "system.display.update" | "system.jobs.list" | "system.lateral.get" | "system.lateral.known" | "system.lateral.known_delete" | "system.lateral.update" | "system.logs.query" | "system.pce.get" | "system.pce.latest" | "system.pce.probe" | "system.pce.update" | "system.reports.get" | "system.reports.update" | "system.security.get" | "system.security.update" | "system.tls.csr" | "system.tls.import" | "system.tls.renew" | "system.tls.status" | "system.tls.update" | "workbench.dimension" | "workbench.from_alert" | "workbench.meta" | "workbench.predicted" | "workbench.run";
 
 export interface Requests {
   "alert_rules.create": RuleWrite;
@@ -2810,6 +2862,7 @@ export interface Requests {
   "home.focus": undefined;
   "hosts.profile": undefined;
   "hosts.ransomware_allows": HostKey;
+  "hosts.search": undefined;
   "hosts.tamper_note_add": TamperNoteAdd;
   "hosts.tamper_note_remove": HostKey;
   "i18n.dictionary": undefined;
@@ -2901,6 +2954,7 @@ export interface Responses {
   "home.focus": FocusView;
   "hosts.profile": HostProfile;
   "hosts.ransomware_allows": HostRansomware;
+  "hosts.search": HostSearch;
   "hosts.tamper_note_add": HostProfile;
   "hosts.tamper_note_remove": HostProfile;
   "i18n.dictionary": Dictionary;
@@ -2992,6 +3046,7 @@ export const OPERATIONS = {
   "home.focus": { method: "GET", path: "/api/home/focus" },
   "hosts.profile": { method: "GET", path: "/api/hosts/profile" },
   "hosts.ransomware_allows": { method: "POST", path: "/api/hosts/ransomware-allows" },
+  "hosts.search": { method: "GET", path: "/api/hosts/search" },
   "hosts.tamper_note_add": { method: "POST", path: "/api/hosts/tamper-notes" },
   "hosts.tamper_note_remove": { method: "POST", path: "/api/hosts/tamper-notes/<int:note_id>/remove" },
   "i18n.dictionary": { method: "GET", path: "/api/i18n/<lang>" },

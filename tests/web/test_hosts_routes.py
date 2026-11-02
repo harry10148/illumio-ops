@@ -43,3 +43,12 @@ def test_refused_remove_changes_nothing(client, ctx, tmp_path):
     assert post(client, f"/api/hosts/tamper-notes/{note}/remove", {"key": "invalid-key"}).status_code == 400
     r = client.get("/api/hosts/profile", query_string={"key": HOST}, environ_overrides=LOCAL)
     assert [n["id"] for n in r.get_json()["data"]["tamper"]["annotations"]] == [note]
+
+
+def test_search(client, ctx):
+    assert client.get("/api/hosts/search?q=web", environ_overrides=LOCAL).status_code == 401
+    login(client)
+    r = client.get("/api/hosts/search", query_string={"q": "10.2.3.4"}, environ_overrides=LOCAL)
+    assert r.status_code == 200 and r.get_json()["data"]["items"] == [{"key": "ip:10.2.3.4", "name": "10.2.3.4",
+                                                                       "managed": False}]
+    assert client.get("/api/hosts/search", query_string={"q": "x" * 201}, environ_overrides=LOCAL).status_code == 400

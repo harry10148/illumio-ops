@@ -122,3 +122,62 @@ def test_cut_answer_is_said(context, live_app):
     page.goto(f"{live_app.url}/hosts?key={DB}")
     expect(page.locator("[data-section=src_host] [data-role=caveat]").first).to_have_count(1)
     page.unroute_all(behavior="wait")  # the other sections' answers are still being rewritten: not at browser close
+
+
+# ── the host page (UI redesign spec §4.4) ───────────────────────────────────
+
+def test_host_search_then_open(context, live_app):
+    _seed(live_app)
+    page = context.new_page()
+    sign_in(page, live_app.url)
+    page.click(".sidenav .nav-item[data-nav='/hosts']")
+    page.fill("input[name=host_q]", "db")
+    page.locator("[data-role=host-hits] a", has_text="db").click()
+    expect(page.locator("[data-role=host-profile] h1")).to_have_text("db")
+
+
+def test_unmanaged_host_has_no_quarantine_button(context, live_app):
+    _seed(live_app)
+    page = context.new_page()
+    sign_in(page, live_app.url)
+    page.goto(f"{live_app.url}/hosts?key=ip:10.0.0.250")
+    expect(page.locator("[data-role=q-not-eligible]")).to_contain_text("not a managed host")
+    expect(page.locator("[data-section=quarantine]")).to_have_count(0)
+
+
+def test_not_in_inventory_no_button(context, live_app):
+    _seed(live_app)
+    page = context.new_page()
+    sign_in(page, live_app.url)
+    page.goto(f"{live_app.url}/hosts?key=/orgs/1/workloads/gone")
+    expect(page.locator("[data-role=q-not-eligible]")).to_contain_text("not in the current inventory")
+    expect(page.locator("[data-section=quarantine]")).to_have_count(0)
+
+
+def test_visibility_host_marked_no_effect(context, live_app):
+    _seed(live_app)
+    page = context.new_page()
+    sign_in(page, live_app.url)
+    page.goto(f"{live_app.url}/hosts?key={DB}")
+    expect(page.locator("[data-role=q-no-effect]")).to_contain_text("no effect")
+    expect(page.locator("[data-role=q-remove]")).to_have_class("btn-danger")
+
+
+def test_usual_basic_mode_explained(context, live_app):
+    _seed(live_app)
+    live_app.ctx.settings.update(live_app.ctx.settings.current().revision,
+                                 lambda d: d["collection"].update(mode="lightweight"))
+    page = context.new_page()
+    sign_in(page, live_app.url)
+    page.goto(f"{live_app.url}/hosts?key={DB}")
+    expect(page.locator("[data-role=usual] [data-role=needs-advanced]")).to_have_count(1)
+
+
+def test_host_no_overflow_760(narrow_context, live_app):
+    from tests.e2e.conftest import no_horizontal_overflow
+    _seed(live_app)
+    page = narrow_context.new_page()
+    sign_in(page, live_app.url)
+    page.goto(f"{live_app.url}/hosts?key={DB}")
+    page.locator("[data-role=usual]").wait_for()
+    assert no_horizontal_overflow(page)

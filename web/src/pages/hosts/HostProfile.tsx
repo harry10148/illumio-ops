@@ -5,10 +5,10 @@ import { Link, useSearchParams } from "react-router-dom";
 
 import { type ApiError, call } from "../../api/client";
 import type {
-  Coverage, DimensionTop, EndpointFilter, EventRow, FlowCondition1, FlowRow, HostProfile as Profile, HostRansomware, HostTamper,
-  PullInfo, QuarantineAction, QuarantineOutcome, SegmentDimension,
+  Coverage, DimensionTop, EndpointFilter, EventRow, FlowCondition1, FlowRow, HostHit, HostProfile as Profile, HostRansomware, HostTamper, PullInfo, QuarantineAction, QuarantineOutcome, RankedValue, SegmentDimension,
 } from "../../api/generated";
 import { formatTime } from "../../components/ProbeResults";
+import { NeedsAdvanced, PageHead, Panel, SeverityTag } from "../../components/ui";
 import { t, useLang } from "../../i18n";
 import { registerNav } from "../../shell/nav";
 import { SEVERITY_KEYS, word } from "../alerts/common";
@@ -351,7 +351,9 @@ function Ransomware({ hostKey, initial }: { hostKey: string; initial: HostRansom
 }
 
 /** Quarantine (P6d): the level the inventory holds, put one on or take it off, and what was done to this host. */
-function QuarantineSection({ hostKey, name, current }: { hostKey: string; name: string; current: string | null }) {
+function QuarantineSection({ hostKey, name, current, noEffect }: {
+  hostKey: string; name: string; current: string | null; noEffect: boolean;
+}) {
   const lang = useLang();
   const [open, setOpen] = useState(false);
   const [history, setHistory] = useState<QuarantineAction[] | null>(null);
@@ -387,11 +389,13 @@ function QuarantineSection({ hostKey, name, current }: { hostKey: string; name: 
     <div className="card stack" data-section="quarantine">
       <h2>{t("q_title")}</h2>
       <p data-role="q-current">{current ? t("q_current", { level: t(LEVEL_KEYS[current] ?? current) }) : t("q_current_none")}</p>
+      {noEffect && <p className="notice" data-role="q-no-effect">{t("hosts_q_no_effect")}</p>}
+      <p className="hint">{t("q_policy_decides")}</p>
       <p className="hint">{t("q_inventory_lag")}</p>
       <div className="row">
         <button type="button" className="btn-quiet" data-role="q-open" onClick={() => setOpen(true)}>{t("q_open")}</button>
         {!confirming && (
-          <button type="button" className="btn-quiet" data-role="q-remove" onClick={() => setConfirming(true)}>{t("q_remove")}</button>
+          <button type="button" className="btn-danger" data-role="q-remove" onClick={() => setConfirming(true)}>{t("q_remove")}</button>
         )}
         {confirming && (
           <button type="button" className="btn-primary" data-role="q-remove-confirm" onClick={() => void remove()}>
@@ -479,6 +483,7 @@ export function HostProfile() {
 
   return (
     <section className="page" data-role="host-profile">
+      <p><Link to="/hosts">{t("hosts_back_to_search")}</Link></p>
       <div className="page-head">
         <h1>{seenAs ?? profile.name}</h1>
         <label>
@@ -508,11 +513,13 @@ export function HostProfile() {
             {profile.exposure.pivot_now && <> {t("hosts_pivot")}</>}
             {profile.exposure.asset && <> {t("hosts_asset_sources", { n: String(profile.exposure.asset.sources_now) })}</>}
             {" "}
-            <Link to={`/lateral?${new URLSearchParams({ [profile.exposure.asset ? "asset" : "host"]: profile.key }).toString()}`}
+            <Link to={`/detect?${new URLSearchParams({ [profile.exposure.asset ? "asset" : "host"]: profile.key }).toString()}`}
               data-role="open-lateral">{t("lat_on_page")}</Link>
           </p>
         )}
       </div>
+      <Panel title={t("hosts_usual_title")} role="usual"><Usual profile={profile} /></Panel>
+      <Panel title={t("hosts_different_title")} role="different-panel"><Different profile={profile} /></Panel>
       {pulled && <Pulled info={pulled} />}
       <div className="host-grid">
         <HostTop title={t("hosts_who_connects")} req={into} dimension="src_host" hostLinks onPulled={setPulled} />
@@ -522,8 +529,13 @@ export function HostProfile() {
         <HostTop title={t("hosts_mode_switch_ports")} req={blocked} dimension="service" hostLinks={false} onPulled={setPulled} />
       </div>
       {mode === "full" && <p className="hint">{t("hosts_mode_switch_full")}</p>}
-      {profile.managed && profile.in_inventory && (
-        <QuarantineSection hostKey={profile.key} name={seenAs ?? profile.name} current={profile.labels["Quarantine"] ?? null} />
+      {profile.quarantine?.eligible ? (
+        <QuarantineSection hostKey={profile.key} name={seenAs ?? profile.name} current={profile.labels["Quarantine"] ?? null}
+                           noEffect={profile.quarantine.no_enforcement} />
+      ) : (
+        <p className="card hint" data-role="q-not-eligible">
+          {t(profile.quarantine?.reason === "unmanaged" ? "alert_q_unmanaged" : "alert_q_not_in_inventory")}
+        </p>
       )}
       {profile.managed && <Events href={profile.key} span={span} onPulled={setPulled} />}
       {profile.tamper && <Tamper hostKey={profile.key} href={profile.key} tamper={profile.tamper} onChange={setProfile} />}
@@ -538,4 +550,95 @@ export function HostProfile() {
   );
 }
 
-registerNav({ section: "main", path: "/hosts", labelKey: "hosts_title", order: 16, component: HostProfile, hidden: true });
+function HostSearchPage() {
+  const [q, setQ] = useState("");
+  const [items, setItems] = useState<HostHit[] | null>(null);
+  const [error, setError] = useState<ApiError | null>(null);
+  useEffect(() => {
+    const text = q.trim();
+    if (!text) {
+      setItems(null);
+      return;
+    }
+    let live = true;
+    const timer = window.setTimeout(() => {
+      void call("hosts.search", undefined, undefined, { q: text }).then((env) => {
+        if (!live) return;
+        if (env.ok && env.data) {
+          setItems(env.data.items);
+          setError(null);
+        } else setError(env.error);
+      });
+    }, 250);
+    return () => { live = false; window.clearTimeout(timer); };
+  }, [q]);
+  return (
+    <section className="page" data-role="host-search">
+      <PageHead title={t("nav_hosts")} sub={t("hosts_search_sub")} />
+      <label className="block">
+        {t("hosts_search_label")}
+        <input name="host_q" value={q} maxLength={200} placeholder={t("hosts_search_placeholder")}
+               onChange={(e) => setQ(e.target.value)} autoFocus />
+      </label>
+      {error && <p className="form-error">{t(error.message_key, error.params)}</p>}
+      {items && (items.length === 0 ? <p className="muted">{t("hosts_search_none")}</p> : (
+        <ul className="plain-list spaced" data-role="host-hits">
+          {items.map((h) => (
+            <li key={h.key}>
+              <Link to={`/hosts?${new URLSearchParams({ key: h.key }).toString()}`}>{h.name}</Link>
+              {!h.managed && <span className="hint"> · {t("hosts_unmanaged_short")}</span>}
+            </li>
+          ))}
+        </ul>
+      ))}
+    </section>
+  );
+}
+
+function Usual({ profile }: { profile: Profile }) {
+  if (profile.usual_state === "basic_mode") return <NeedsAdvanced what={t("hosts_usual_basic")} />;
+  if (!profile.usual) return <p className="muted" data-role="usual-none">{t("hosts_usual_none")}</p>;
+  const u = profile.usual;
+  const list = (title: string, rows: RankedValue[], role: string) => (
+    <div>
+      <h3 className="side-h">{title}</h3>
+      {rows.length === 0 ? <p className="muted">{t("hosts_usual_empty")}</p> : (
+        <ol className="plain-list" data-role={role}>
+          {rows.map((r) => <li key={r.value}><span className="mono">{r.value}</span> <span className="hint">{r.connections.toLocaleString()}</span></li>)}
+        </ol>
+      )}
+    </div>
+  );
+  return (
+    <div className="stack">
+      <p className="hint">{u.days_covered >= 30 ? t("hosts_usual_window") : t("hosts_usual_partial", { days: String(u.days_covered) })}</p>
+      <div className="host-grid">
+        {list(t("hosts_usual_destinations"), u.top_destinations, "usual-destinations")}
+        {list(t("hosts_usual_processes"), u.top_processes, "usual-processes")}
+        {list(t("hosts_usual_accounts"), u.top_accounts, "usual-accounts")}
+      </div>
+    </div>
+  );
+}
+
+function Different({ profile }: { profile: Profile }) {
+  const lang = useLang();
+  if (profile.usual_state === "basic_mode") return <NeedsAdvanced what={t("hosts_different_basic")} />;
+  const different = profile.different ?? [];
+  if (different.length === 0) return <p className="muted" data-role="different-none">{t("hosts_different_none")}</p>;
+  return (
+    <ul className="plain-list" data-role="different">
+      {different.map((d) => (
+        <li key={d.detection_id}><SeverityTag severity={d.severity} /> {d.text}{" "}
+          <span className="hint mono">{formatTime(d.first_seen, lang)}</span></li>
+      ))}
+    </ul>
+  );
+}
+
+function HostRoute() {
+  const [params] = useSearchParams();
+  return params.get("key") ? <HostProfile /> : <HostSearchPage />;
+}
+
+registerNav({ section: "main", path: "/hosts", labelKey: "nav_hosts", order: 16, component: HostRoute });

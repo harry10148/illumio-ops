@@ -8,13 +8,21 @@ import ipaddress
 import json
 import re
 from collections.abc import Iterable
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime, timedelta
 from typing import Literal
 
 from pydantic import BaseModel
 
 from illumio_ops.domain.exposure import AssetExposure
-from illumio_ops.domain.values import CapabilityState, Language, TamperPattern
+from illumio_ops.domain.focus import DETECTION_TITLE_KEYS
+from illumio_ops.domain.values import (
+    CapabilityState,
+    CollectionMode,
+    DetectorKind,
+    Language,
+    TamperPattern,
+)
+from illumio_ops.i18n import translate
 from illumio_ops.services.analysis import ransomware, tamper
 from illumio_ops.services.analysis.ransomware import HostRansomware
 from illumio_ops.services.analysis.tamper import HostTamper
@@ -23,7 +31,9 @@ from illumio_ops.services.context import AppContext
 from illumio_ops.services.flowsource import host_addresses
 from illumio_ops.services.reports.common import unnamed_host
 from illumio_ops.store.flowdb import analysis, capabilities, labels, workloads
+from illumio_ops.store.flowdb import flows as flows_store
 from illumio_ops.store.flowdb import ransomware as ransomware_store
+from illumio_ops.store.flowdb.db import db_day
 
 WORKLOAD_HREF = re.compile(r"^/orgs/\d+/workloads/[A-Za-z0-9_.-]+$")
 # every href a flow end is keyed by: a workload, a Kubernetes Workload, a container workload
@@ -54,6 +64,37 @@ class HostExposureView(BaseModel):
     asset: AssetExposure | None  # set when the host is a critical asset
 
 
+class QuarantineEligibility(BaseModel):
+    """Who the quarantine button would act on: only a managed workload the inventory holds (spec §4.4)."""
+    eligible: bool
+    reason: Literal["unmanaged", "not_in_inventory", "no_subject"] | None
+    no_enforcement: bool  # Idle or Visibility Only: the label would isolate nothing
+    key: str | None
+    name: str | None
+
+
+class RankedValue(BaseModel):
+    value: str
+    connections: int
+
+
+class HostUsual(BaseModel):
+    """What the host usually does (spec §5.1): its top destinations, initiating processes and accounts by connections
+    over the last USUAL_DAYS of daily rollups."""
+    top_destinations: list[RankedValue]
+    top_processes: list[RankedValue]
+    top_accounts: list[RankedValue]
+    days_covered: int
+
+
+class HostDifference(BaseModel):
+    detection_id: int
+    detector: str
+    first_seen: datetime
+    severity: str
+    text: str
+
+
 class HostProfile(BaseModel):
     key: str
     managed: bool          # a workload href (False: an address the inventory does not hold)
@@ -70,6 +111,64 @@ class HostProfile(BaseModel):
     # the host's details as read: ok, stale (the PCE's rating changed since), missing (never read, or the reads
     # failed), not_rated (the PCE gave the host no ransomware rating)
     ransomware_details: Literal["ok", "stale", "missing", "not_rated"] | None = None
+    usual: HostUsual | None = None
+    usual_state: Literal["ok", "basic_mode", "accumulating", "no_data"] = "no_data"
+    different: list[HostDifference] = []
+    quarantine: QuarantineEligibility | None = None
+
+
+USUAL_DAYS = 30
+USUAL_TOP = 5
+USUAL_MIN_DAYS = 7     # fewer days of rollups: "accumulating", the ranking still shown
+DIFFERENT_DAYS = 7
+DIFFERENT_LIMIT = 20
+NO_ENFORCEMENT = frozenset({"visibility_only", "idle"})
+
+
+UsualState = Literal["ok", "basic_mode", "accumulating", "no_data"]
+
+
+def _usual(ctx: AppContext, key: str, at: datetime) -> tuple[HostUsual | None, UsualState]:
+    if ctx.settings.current().collection.mode is CollectionMode.LIGHTWEIGHT:
+        return None, "basic_mode"
+    since = at - timedelta(days=USUAL_DAYS)
+    with ctx.flows().connect() as conn:
+        first = flows_store.rollup_first_day(conn)
+        tops = {c: flows_store.rollup_top(conn, key, since_day=db_day(since), column=c, limit=USUAL_TOP)
+                for c in flows_store.ROLLUP_RANKED}
+    if first is None:
+        return None, "no_data"
+    covered = min(USUAL_DAYS, (at.date() - date.fromisoformat(first)).days)
+    names = display_names(ctx, {k for k, _ in tops["dst_key"]})
+    usual = HostUsual(
+        top_destinations=[RankedValue(value=names.get(k, k), connections=n) for k, n in tops["dst_key"]],
+        top_processes=[RankedValue(value=v, connections=n) for v, n in tops["initiator_process"]],
+        top_accounts=[RankedValue(value=v, connections=n) for v, n in tops["initiator_user"]],
+        days_covered=covered)
+    return usual, "ok" if covered >= USUAL_MIN_DAYS else "accumulating"
+
+
+def _different(ctx: AppContext, key: str, name: str, at: datetime) -> list[HostDifference]:
+    lang = ctx.settings.current().display.language
+    with ctx.flows().connect() as conn:
+        rows = analysis.detections_of_subject(conn, key, start=at - timedelta(days=DIFFERENT_DAYS), end=at,
+                                              limit=DIFFERENT_LIMIT)
+    out = []
+    for r in rows:
+        summary = json.loads(r["summary_json"] or "{}")
+        params = {k: str(v).removeprefix("ip:") for k, v in summary.items() if v is not None and not isinstance(v, dict | list)}
+        params |= {"host": name, "account": key, "minutes": str(summary.get("window_minutes", ""))}
+        out.append(HostDifference(detection_id=int(r["id"]), detector=str(r["detector"]),
+                                  first_seen=datetime.fromisoformat(r["first_seen"]), severity=str(r["severity"]),
+                                  text=translate(lang, DETECTION_TITLE_KEYS[DetectorKind(r["detector"])], params)))
+    return sorted(out, key=lambda d: d.first_seen, reverse=True)
+
+
+def _eligibility(key: str, name: str, *, managed: bool, in_inventory: bool, mode: str | None) -> QuarantineEligibility:
+    reason: Literal["unmanaged", "not_in_inventory"] | None = (
+        "unmanaged" if not managed else "not_in_inventory" if not in_inventory else None)
+    return QuarantineEligibility(eligible=reason is None, reason=reason, no_enforcement=mode in NO_ENFORCEMENT,
+                                 key=key, name=name)
 
 
 def parse_key(key: str) -> tuple[str | None, str | None]:
@@ -119,10 +218,14 @@ def profile(ctx: AppContext, key: str, *, now: datetime | None = None) -> HostPr
     href, address = parse_key(key)
     with ctx.flows().connect() as conn:
         require_same_pce(conn, ctx.settings.current().pce)  # a switch not yet cleared: not the previous PCE's host
+    usual, usual_state = _usual(ctx, key, at)
     if href is None:
-        return HostProfile(key=key, managed=False, in_inventory=False, name=address or key, address=address,
+        shown = address or key
+        return HostProfile(key=key, managed=False, in_inventory=False, name=shown, address=address,
                            identity=None, labels={}, exposure=_exposure(ctx, key), tamper=None, ransomware=None,
-                           ransomware_unsupported=False)
+                           ransomware_unsupported=False, usual=usual, usual_state=usual_state,
+                           different=_different(ctx, key, shown, at),
+                           quarantine=_eligibility(key, shown, managed=False, in_inventory=False, mode=None))
     with ctx.flows().connect() as conn:
         wl = next((w for w in workloads.all_workloads(conn) if w.href == href), None)
         host_labels = dict(labels.label_sets(conn, {wl.label_set}).get(wl.label_set, {})) \
@@ -152,7 +255,45 @@ def profile(ctx: AppContext, key: str, *, now: datetime | None = None) -> HostPr
         labels=host_labels, exposure=_exposure(ctx, key), tamper=tamper.host_tamper(ctx, href, now=at),
         ransomware=ransomware.host_ransomware(ctx, href, now=at, explain_allows=False)
         if wl is not None and not unsupported else None,
-        ransomware_unsupported=unsupported, ransomware_details=details)
+        ransomware_unsupported=unsupported, ransomware_details=details, usual=usual,
+        usual_state=usual_state, different=_different(ctx, key, name, at),
+        quarantine=_eligibility(key, name, managed=True, in_inventory=wl is not None,
+                                mode=wl.enforcement_mode if wl is not None else None))
+
+
+SEARCH_LIMIT = 50
+
+
+class HostHit(BaseModel):
+    key: str
+    name: str
+    managed: bool
+
+
+class HostSearch(BaseModel):
+    items: list[HostHit]
+
+
+def search(ctx: AppContext, q: str) -> HostSearch:
+    """Inventory workloads whose hostname or name contains `q` (any case), at most SEARCH_LIMIT; an address the
+    inventory does not name is offered as an unmanaged host."""
+    text = q.strip()
+    if not text:
+        return HostSearch(items=[])
+    try:
+        ip = str(ipaddress.ip_address(text))
+    except ValueError:
+        ip = None
+    with ctx.flows().connect() as conn:
+        require_same_pce(conn, ctx.settings.current().pce)
+        rows = workloads.all_workloads(conn)
+    low = text.lower()
+    hits = [HostHit(key=w.href, name=n, managed=bool(w.managed)) for w in rows
+            if (n := w.hostname or w.name) and low in n.lower()]
+    hits.sort(key=lambda h: h.name.lower())
+    if ip is not None and not hits:
+        hits = [HostHit(key=f"ip:{ip}", name=ip, managed=False)]
+    return HostSearch(items=hits[:SEARCH_LIMIT])
 
 
 def ransomware_allows(ctx: AppContext, key: str) -> HostRansomware:

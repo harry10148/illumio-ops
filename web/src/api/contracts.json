@@ -14040,6 +14040,40 @@
             "title": "HostBreakdown",
             "type": "object"
           },
+          "HostDifference": {
+            "properties": {
+              "detection_id": {
+                "title": "Detection Id",
+                "type": "integer"
+              },
+              "detector": {
+                "title": "Detector",
+                "type": "string"
+              },
+              "first_seen": {
+                "format": "date-time",
+                "title": "First Seen",
+                "type": "string"
+              },
+              "severity": {
+                "title": "Severity",
+                "type": "string"
+              },
+              "text": {
+                "title": "Text",
+                "type": "string"
+              }
+            },
+            "required": [
+              "detection_id",
+              "detector",
+              "first_seen",
+              "severity",
+              "text"
+            ],
+            "title": "HostDifference",
+            "type": "object"
+          },
           "HostExposureView": {
             "properties": {
               "asset": {
@@ -14317,6 +14351,44 @@
             "title": "HostTamper",
             "type": "object"
           },
+          "HostUsual": {
+            "description": "What the host usually does (spec §5.1): its top destinations, initiating processes and accounts by connections\nover the last USUAL_DAYS of daily rollups.",
+            "properties": {
+              "days_covered": {
+                "title": "Days Covered",
+                "type": "integer"
+              },
+              "top_accounts": {
+                "items": {
+                  "$ref": "#/$defs/RankedValue"
+                },
+                "title": "Top Accounts",
+                "type": "array"
+              },
+              "top_destinations": {
+                "items": {
+                  "$ref": "#/$defs/RankedValue"
+                },
+                "title": "Top Destinations",
+                "type": "array"
+              },
+              "top_processes": {
+                "items": {
+                  "$ref": "#/$defs/RankedValue"
+                },
+                "title": "Top Processes",
+                "type": "array"
+              }
+            },
+            "required": [
+              "top_destinations",
+              "top_processes",
+              "top_accounts",
+              "days_covered"
+            ],
+            "title": "HostUsual",
+            "type": "object"
+          },
           "PatternResult": {
             "properties": {
               "kind": {
@@ -14368,6 +14440,84 @@
               "q3"
             ],
             "title": "PatternResult",
+            "type": "object"
+          },
+          "QuarantineEligibility": {
+            "description": "Who the quarantine button would act on: only a managed workload the inventory holds (spec §4.4).",
+            "properties": {
+              "eligible": {
+                "title": "Eligible",
+                "type": "boolean"
+              },
+              "key": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Key"
+              },
+              "name": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Name"
+              },
+              "no_enforcement": {
+                "title": "No Enforcement",
+                "type": "boolean"
+              },
+              "reason": {
+                "anyOf": [
+                  {
+                    "enum": [
+                      "unmanaged",
+                      "not_in_inventory",
+                      "no_subject"
+                    ],
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Reason"
+              }
+            },
+            "required": [
+              "eligible",
+              "reason",
+              "no_enforcement",
+              "key",
+              "name"
+            ],
+            "title": "QuarantineEligibility",
+            "type": "object"
+          },
+          "RankedValue": {
+            "properties": {
+              "connections": {
+                "title": "Connections",
+                "type": "integer"
+              },
+              "value": {
+                "title": "Value",
+                "type": "string"
+              }
+            },
+            "required": [
+              "value",
+              "connections"
+            ],
+            "title": "RankedValue",
             "type": "object"
           },
           "RansomwareTrafficClass": {
@@ -14828,6 +14978,14 @@
             ],
             "title": "Address"
           },
+          "different": {
+            "default": [],
+            "items": {
+              "$ref": "#/$defs/HostDifference"
+            },
+            "title": "Different",
+            "type": "array"
+          },
           "exposure": {
             "anyOf": [
               {
@@ -14876,6 +15034,17 @@
             "title": "Named",
             "type": "boolean"
           },
+          "quarantine": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/QuarantineEligibility"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
           "ransomware": {
             "anyOf": [
               {
@@ -14917,6 +15086,28 @@
                 "type": "null"
               }
             ]
+          },
+          "usual": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/HostUsual"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "usual_state": {
+            "default": "no_data",
+            "enum": [
+              "ok",
+              "basic_mode",
+              "accumulating",
+              "no_data"
+            ],
+            "title": "Usual State",
+            "type": "string"
           }
         },
         "required": [
@@ -15446,6 +15637,52 @@
         "type": "object"
       }
     },
+    "hosts.search": {
+      "method": "GET",
+      "path": "/api/hosts/search",
+      "request_schema": null,
+      "response_schema": {
+        "$defs": {
+          "HostHit": {
+            "properties": {
+              "key": {
+                "title": "Key",
+                "type": "string"
+              },
+              "managed": {
+                "title": "Managed",
+                "type": "boolean"
+              },
+              "name": {
+                "title": "Name",
+                "type": "string"
+              }
+            },
+            "required": [
+              "key",
+              "name",
+              "managed"
+            ],
+            "title": "HostHit",
+            "type": "object"
+          }
+        },
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/$defs/HostHit"
+            },
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "HostSearch",
+        "type": "object"
+      }
+    },
     "hosts.tamper_note_add": {
       "method": "POST",
       "path": "/api/hosts/tamper-notes",
@@ -15870,6 +16107,40 @@
             "title": "HostBreakdown",
             "type": "object"
           },
+          "HostDifference": {
+            "properties": {
+              "detection_id": {
+                "title": "Detection Id",
+                "type": "integer"
+              },
+              "detector": {
+                "title": "Detector",
+                "type": "string"
+              },
+              "first_seen": {
+                "format": "date-time",
+                "title": "First Seen",
+                "type": "string"
+              },
+              "severity": {
+                "title": "Severity",
+                "type": "string"
+              },
+              "text": {
+                "title": "Text",
+                "type": "string"
+              }
+            },
+            "required": [
+              "detection_id",
+              "detector",
+              "first_seen",
+              "severity",
+              "text"
+            ],
+            "title": "HostDifference",
+            "type": "object"
+          },
           "HostExposureView": {
             "properties": {
               "asset": {
@@ -16147,6 +16418,44 @@
             "title": "HostTamper",
             "type": "object"
           },
+          "HostUsual": {
+            "description": "What the host usually does (spec §5.1): its top destinations, initiating processes and accounts by connections\nover the last USUAL_DAYS of daily rollups.",
+            "properties": {
+              "days_covered": {
+                "title": "Days Covered",
+                "type": "integer"
+              },
+              "top_accounts": {
+                "items": {
+                  "$ref": "#/$defs/RankedValue"
+                },
+                "title": "Top Accounts",
+                "type": "array"
+              },
+              "top_destinations": {
+                "items": {
+                  "$ref": "#/$defs/RankedValue"
+                },
+                "title": "Top Destinations",
+                "type": "array"
+              },
+              "top_processes": {
+                "items": {
+                  "$ref": "#/$defs/RankedValue"
+                },
+                "title": "Top Processes",
+                "type": "array"
+              }
+            },
+            "required": [
+              "top_destinations",
+              "top_processes",
+              "top_accounts",
+              "days_covered"
+            ],
+            "title": "HostUsual",
+            "type": "object"
+          },
           "PatternResult": {
             "properties": {
               "kind": {
@@ -16198,6 +16507,84 @@
               "q3"
             ],
             "title": "PatternResult",
+            "type": "object"
+          },
+          "QuarantineEligibility": {
+            "description": "Who the quarantine button would act on: only a managed workload the inventory holds (spec §4.4).",
+            "properties": {
+              "eligible": {
+                "title": "Eligible",
+                "type": "boolean"
+              },
+              "key": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Key"
+              },
+              "name": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Name"
+              },
+              "no_enforcement": {
+                "title": "No Enforcement",
+                "type": "boolean"
+              },
+              "reason": {
+                "anyOf": [
+                  {
+                    "enum": [
+                      "unmanaged",
+                      "not_in_inventory",
+                      "no_subject"
+                    ],
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Reason"
+              }
+            },
+            "required": [
+              "eligible",
+              "reason",
+              "no_enforcement",
+              "key",
+              "name"
+            ],
+            "title": "QuarantineEligibility",
+            "type": "object"
+          },
+          "RankedValue": {
+            "properties": {
+              "connections": {
+                "title": "Connections",
+                "type": "integer"
+              },
+              "value": {
+                "title": "Value",
+                "type": "string"
+              }
+            },
+            "required": [
+              "value",
+              "connections"
+            ],
+            "title": "RankedValue",
             "type": "object"
           },
           "RansomwareTrafficClass": {
@@ -16658,6 +17045,14 @@
             ],
             "title": "Address"
           },
+          "different": {
+            "default": [],
+            "items": {
+              "$ref": "#/$defs/HostDifference"
+            },
+            "title": "Different",
+            "type": "array"
+          },
           "exposure": {
             "anyOf": [
               {
@@ -16706,6 +17101,17 @@
             "title": "Named",
             "type": "boolean"
           },
+          "quarantine": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/QuarantineEligibility"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
           "ransomware": {
             "anyOf": [
               {
@@ -16747,6 +17153,28 @@
                 "type": "null"
               }
             ]
+          },
+          "usual": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/HostUsual"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "usual_state": {
+            "default": "no_data",
+            "enum": [
+              "ok",
+              "basic_mode",
+              "accumulating",
+              "no_data"
+            ],
+            "title": "Usual State",
+            "type": "string"
           }
         },
         "required": [
@@ -17147,6 +17575,40 @@
             "title": "HostBreakdown",
             "type": "object"
           },
+          "HostDifference": {
+            "properties": {
+              "detection_id": {
+                "title": "Detection Id",
+                "type": "integer"
+              },
+              "detector": {
+                "title": "Detector",
+                "type": "string"
+              },
+              "first_seen": {
+                "format": "date-time",
+                "title": "First Seen",
+                "type": "string"
+              },
+              "severity": {
+                "title": "Severity",
+                "type": "string"
+              },
+              "text": {
+                "title": "Text",
+                "type": "string"
+              }
+            },
+            "required": [
+              "detection_id",
+              "detector",
+              "first_seen",
+              "severity",
+              "text"
+            ],
+            "title": "HostDifference",
+            "type": "object"
+          },
           "HostExposureView": {
             "properties": {
               "asset": {
@@ -17424,6 +17886,44 @@
             "title": "HostTamper",
             "type": "object"
           },
+          "HostUsual": {
+            "description": "What the host usually does (spec §5.1): its top destinations, initiating processes and accounts by connections\nover the last USUAL_DAYS of daily rollups.",
+            "properties": {
+              "days_covered": {
+                "title": "Days Covered",
+                "type": "integer"
+              },
+              "top_accounts": {
+                "items": {
+                  "$ref": "#/$defs/RankedValue"
+                },
+                "title": "Top Accounts",
+                "type": "array"
+              },
+              "top_destinations": {
+                "items": {
+                  "$ref": "#/$defs/RankedValue"
+                },
+                "title": "Top Destinations",
+                "type": "array"
+              },
+              "top_processes": {
+                "items": {
+                  "$ref": "#/$defs/RankedValue"
+                },
+                "title": "Top Processes",
+                "type": "array"
+              }
+            },
+            "required": [
+              "top_destinations",
+              "top_processes",
+              "top_accounts",
+              "days_covered"
+            ],
+            "title": "HostUsual",
+            "type": "object"
+          },
           "PatternResult": {
             "properties": {
               "kind": {
@@ -17475,6 +17975,84 @@
               "q3"
             ],
             "title": "PatternResult",
+            "type": "object"
+          },
+          "QuarantineEligibility": {
+            "description": "Who the quarantine button would act on: only a managed workload the inventory holds (spec §4.4).",
+            "properties": {
+              "eligible": {
+                "title": "Eligible",
+                "type": "boolean"
+              },
+              "key": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Key"
+              },
+              "name": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Name"
+              },
+              "no_enforcement": {
+                "title": "No Enforcement",
+                "type": "boolean"
+              },
+              "reason": {
+                "anyOf": [
+                  {
+                    "enum": [
+                      "unmanaged",
+                      "not_in_inventory",
+                      "no_subject"
+                    ],
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Reason"
+              }
+            },
+            "required": [
+              "eligible",
+              "reason",
+              "no_enforcement",
+              "key",
+              "name"
+            ],
+            "title": "QuarantineEligibility",
+            "type": "object"
+          },
+          "RankedValue": {
+            "properties": {
+              "connections": {
+                "title": "Connections",
+                "type": "integer"
+              },
+              "value": {
+                "title": "Value",
+                "type": "string"
+              }
+            },
+            "required": [
+              "value",
+              "connections"
+            ],
+            "title": "RankedValue",
             "type": "object"
           },
           "RansomwareTrafficClass": {
@@ -17935,6 +18513,14 @@
             ],
             "title": "Address"
           },
+          "different": {
+            "default": [],
+            "items": {
+              "$ref": "#/$defs/HostDifference"
+            },
+            "title": "Different",
+            "type": "array"
+          },
           "exposure": {
             "anyOf": [
               {
@@ -17983,6 +18569,17 @@
             "title": "Named",
             "type": "boolean"
           },
+          "quarantine": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/QuarantineEligibility"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
           "ransomware": {
             "anyOf": [
               {
@@ -18024,6 +18621,28 @@
                 "type": "null"
               }
             ]
+          },
+          "usual": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/HostUsual"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "usual_state": {
+            "default": "no_data",
+            "enum": [
+              "ok",
+              "basic_mode",
+              "accumulating",
+              "no_data"
+            ],
+            "title": "Usual State",
+            "type": "string"
           }
         },
         "required": [

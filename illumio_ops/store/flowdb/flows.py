@@ -574,3 +574,22 @@ def delete_baselines_before(conn: sqlite3.Connection, cutoff: datetime) -> int:
             "DELETE FROM connection_baseline WHERE last_seen < ?", "DELETE FROM user_baseline WHERE last_seen < ?",
             "DELETE FROM account_source_baseline WHERE last_seen < ?",
             "DELETE FROM process_baseline WHERE last_seen < ?"))
+
+
+ROLLUP_RANKED = ("dst_key", "initiator_process", "initiator_user")
+
+
+def rollup_top(conn: sqlite3.Connection, src_key: str, *, since_day: str, column: str,
+               limit: int) -> list[tuple[str, int]]:
+    """A source's most-used values of one column (a destination, an initiating process, an account) by connections
+    in the daily rollups since `since_day`; unknown ('') values are left out — the host page's usual behaviour."""
+    if column not in ROLLUP_RANKED:
+        raise ValueError(column)
+    return [(r[0], int(r[1])) for r in conn.execute(
+        f"SELECT {column}, SUM(connections) AS n FROM flow_rollup_daily WHERE src_key = ? AND day >= ? "
+        f"AND {column} != '' GROUP BY {column} ORDER BY n DESC, {column} LIMIT ?", (src_key, since_day, limit))]
+
+
+def rollup_first_day(conn: sqlite3.Connection) -> str | None:
+    row = conn.execute("SELECT MIN(day) FROM flow_rollup_daily").fetchone()
+    return str(row[0]) if row and row[0] else None
