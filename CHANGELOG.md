@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/) —
 a plain `<major>.<minor>.<patch>` scheme. (Tags through v4.0.0 carried a
 `-topic-slug` codename suffix; the codename was retired in 4.1.0.)
 
+## [6.1.0] - unreleased
+
+### Added
+- Five more anomaly detectors on allowed traffic (spec §6.5.8, second batch), each comparing a host or a pair of
+  hosts with its own history:
+  - **Reversed direction**: B starts connections to A where only A had ever started them (a database connecting to
+    its application server).
+  - **New port on a known pair**: two hosts that already talked start on a new port; medium when nothing had ever
+    been served on that port at the destination (a new listener), low otherwise.
+  - **Quiet host wakes**: a managed host silent for 7 days (settable 2–14) starts at least 100 connections in an hour.
+  - **Data staging**: one internal host receives at least 1,024 MB in an hour from at least 5 internal hosts, three
+    times its own most in any hour of the week before. Judged only on connections that carry byte counts, and says
+    how many do.
+  - **Off-hours activity** (low, home page only): a host with a daily routine active at hours it never was.
+- Four best-practice rules for them. New installs notify; an upgraded install records them, and the operator turns
+  each on from the rules page.
+
+### Changed
+- Hourly activity is kept 15 days (was 8). An alert-rule file may hold 400 rules (was 360).
+
 ## [6.0.0] - 2026-11-01
 
 v6 is a rebuild of illumio-ops around detecting lateral movement, GUI only. See README.md and
