@@ -8,6 +8,8 @@ import { Login } from "./pages/Login";
 import { PasswordChange } from "./pages/PasswordChange";
 import { ME_CHANGED_EVENT, Shell } from "./shell/Shell";
 
+const DICTIONARY_TRIES = 4;
+
 type Auth = { state: "checking" } | { state: "signed-out" } | { state: "signed-in"; me: Me };
 
 export function App() {
@@ -28,13 +30,21 @@ export function App() {
 
   useEffect(() => {
     let live = true;  // an answer for a language no longer wanted (one asked before sign-in) is dropped
-    void fetchDictionary(lang).then((dict) => {
+    void (async () => {
+      // A failed answer is asked again (.135 acceptance: one failure left every label as its key); after the last
+      // try the page draws with what it has, so it never waits forever.
+      let dict = null;
+      for (let attempt = 0; attempt < DICTIONARY_TRIES && !dict; attempt++) {
+        if (attempt > 0) await new Promise((r) => window.setTimeout(r, 500 * attempt));
+        if (!live) return;
+        dict = await fetchDictionary(lang);
+      }
       if (!live) return;
       applyDictionary(lang, dict);
       rememberLang(lang);
       setLoadedLang(lang);
       setDictVersion((v) => v + 1);
-    });
+    })();
     return () => { live = false; };
   }, [lang]);
 

@@ -9,5 +9,7 @@ export default defineConfig({
     emptyOutDir: true,
     assetsDir: "assets",
     sourcemap: false,
+    // Fonts stay files: the server's CSP (font-src 'self') blocks a font inlined as a data: URI.
+    assetsInlineLimit: (file: string) => (file.endsWith(".woff2") ? false : undefined),
   },
 });
