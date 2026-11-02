@@ -1,7 +1,7 @@
 from playwright.sync_api import expect
 
 from illumio_ops.services.collect.traffic import run_traffic_cycle
-from tests.e2e.conftest import sign_in
+from tests.e2e.conftest import open_system, sign_in
 
 
 def _point_at(live_app, pce_url: str) -> None:
@@ -12,7 +12,7 @@ def _point_at(live_app, pce_url: str) -> None:
 
 def _open_collection(page, base_url: str) -> None:
     sign_in(page, base_url)
-    page.click("nav >> text=Data collection")
+    open_system(page, "Data collection")
     page.wait_for_selector("[data-role=collection-status]")
 
 
@@ -64,7 +64,7 @@ def test_logs_page_filters_by_level(context, live_app):
     (live_app.ctx.paths.logs_dir / "illumio-ops.log").write_text("\n".join(lines) + "\n")
     page = context.new_page()
     sign_in(page, live_app.url)
-    page.click("nav >> text=Logs")
+    open_system(page, "Logs")
     table = page.locator("[data-role=log-lines]")
     expect(table).to_contain_text("traffic failed")
     expect(table).to_contain_text("started")

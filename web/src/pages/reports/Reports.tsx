@@ -301,4 +301,4 @@ export function Reports() {
   );
 }
 
-registerNav({ section: "main", path: "/reports", labelKey: "nav_reports", order: 20, component: Reports });
+registerNav({ section: "output", path: "/reports", labelKey: "nav_reports", order: 20, component: Reports });

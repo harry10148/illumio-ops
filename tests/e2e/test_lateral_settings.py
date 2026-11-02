@@ -17,7 +17,8 @@ def _inventory(ctx):
 
 def _open(page, base_url):
     sign_in(page, base_url)
-    page.click("nav >> a[href=\"/system/lateral\"]")
+    page.click(".sidenav .nav-item[data-nav='/system']")
+    page.click(".subnav >> a[href=\"/system/lateral\"]")
     page.wait_for_selector("[data-role=lateral-settings]")
 
 

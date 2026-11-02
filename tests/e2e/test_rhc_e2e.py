@@ -1,5 +1,5 @@
 """Rule Hit Count on System › Report settings (spec §6.5 RHC): status, confirm, turn on; SaaS refusal in words."""
-from tests.e2e.conftest import sign_in
+from tests.e2e.conftest import open_system, sign_in
 
 ORG = "/api/v2/orgs/1"
 
@@ -11,7 +11,7 @@ def _configure(live_app, fake_pce, **pce):
 
 def _open(page, live_app):
     sign_in(page, live_app.url)
-    page.click("nav >> text=Report settings")
+    open_system(page, "Report settings")
     page.wait_for_selector("[data-role=rhc-state]")
 
 

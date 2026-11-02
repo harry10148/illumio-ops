@@ -106,4 +106,4 @@ export function Rules() {
   );
 }
 
-registerNav({ section: "main", path: "/alerts/rules", labelKey: "rules_title", order: 12, component: Rules, hidden: true });
+registerNav({ section: "bottom", path: "/alerts/rules", labelKey: "nav_alert_rules", order: 10, component: Rules });

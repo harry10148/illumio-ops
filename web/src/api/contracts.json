@@ -26784,6 +26784,65 @@
         "type": "object"
       }
     },
+    "shell.status": {
+      "method": "GET",
+      "path": "/api/shell/status",
+      "request_schema": null,
+      "response_schema": {
+        "$defs": {
+          "CollectionMode": {
+            "description": "What data collection reads (spec §6.4): everything; events plus short-lived traffic for\nalerts; or no traffic at all (lightweight, the new-install default: flow reports query the PCE on demand).",
+            "enum": [
+              "full",
+              "alert",
+              "lightweight"
+            ],
+            "title": "CollectionMode",
+            "type": "string"
+          }
+        },
+        "properties": {
+          "collection": {
+            "enum": [
+              "ok",
+              "degraded",
+              "failing",
+              "not_started"
+            ],
+            "title": "Collection",
+            "type": "string"
+          },
+          "collection_mode": {
+            "$ref": "#/$defs/CollectionMode"
+          },
+          "mode": {
+            "enum": [
+              "basic",
+              "advanced"
+            ],
+            "title": "Mode",
+            "type": "string"
+          },
+          "unprocessed_alerts": {
+            "title": "Unprocessed Alerts",
+            "type": "integer"
+          },
+          "write_key": {
+            "title": "Write Key",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "mode",
+          "collection_mode",
+          "collection",
+          "unprocessed_alerts",
+          "write_key"
+        ],
+        "title": "ShellStatus",
+        "type": "object"
+      }
+    },
     "siem.destination.test": {
       "method": "POST",
       "path": "/api/siem/test",

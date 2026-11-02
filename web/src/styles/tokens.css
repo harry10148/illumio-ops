@@ -1,220 +1,129 @@
 /* ============================================================================
-   tokens — Direction D "brand workbench", copied from 5.x src/static/css/v2/tokens.css (spec §5 of
-   docs/superpowers/specs/2026-09-03-ui-redesign-v3-design.md)
+   tokens — the light security console (docs/superpowers/specs/2026-11-03-v6-ui-redesign-design.md §7).
 
-   Visual DNA:
-     · LIGHT-FIRST: `:root` paints the light workbench; dark is the alternate.
-     · white surfaces, hairline borders, 6–8px radii, no elevation theatre
-     · the chrome is light too — no dark bezel any more
-     · Illumio orange is reserved for ACTIONS (links, the current tab's
-       underline, the one hot number on a page); never a fill. Text ON orange
-       fails AA (3.2:1), so filled controls use the deeper --accent-fg
-       (white on #C24300 = 5.1:1) — the hue stays, the contrast passes
-     · deep cyan (`--brand-deep`) carries avatars, secondary emphasis, charts
-     · tone marks keep a FIXED hue across themes; only ink + fill are themed
-     · Montserrat for display type and numerals; CJK body stays on system
-       fonts (the offline bundle ships no CJK web font on purpose)
+   · Light only: no theme switch, no dark values (spec §2 non-goal).
+   · Colour carries severity and state only, and never alone (a word goes with it).
+   · Times, numbers, host and program names are set in JetBrains Mono, bundled with the
+     frontend (no request leaves the server). Chinese uses the system font: a Chinese web
+     font is several MB and the emailed report HTML could not embed one either.
 
-   CONTRACT (components/areas may use ONLY tokens declared here):
-     --tone-{ok,warn,crit,info,neutral}-{bg,fg,border}
-     --surface-{0,1,2}   --text-{1,2,3}   --space-{1..8}
-     --font-{ui,display,num,mono}   --radius-{s,m,l}
-   EXTENDED SET (also tokens — same rule: no hardcoded colors outside this
-   file): --line, --line-soft, --surface-hover, --accent*, --brand-deep,
-   --chrome*, --track, --overlay, --shadow-{1,2}, --fs-*, --row-h, --ctl-h,
-   --chrome-h, --nav-pad-y, --lead.
-
-   DENSITY: [data-density="compact"] retunes --space-*, --fs-*, --lead, --row-h,
-   --ctl-h, --chrome-h, --nav-pad-y only. No rule outside this file may branch on
-   [data-density] — if a measurement needs to change with density, it becomes a
-   token here.
+   CONTRACT (components may use ONLY tokens declared here):
+     --tone-{ok,warn,crit,high,med,low,accum,adv,info,neutral}-{bg,fg,border}
+     --surface-{0,1,2}  --text-{1,2,3}  --space-{1..8}  --font-{ui,display,num,mono}  --radius-{s,m,l}
+   EXTENDED SET: --line, --line-soft, --surface-hover, --surface-active, --accent*, --brand-deep,
+   --chrome*, --track, --overlay, --shadow-{1,2}, --fs-*, --row-h, --ctl-h, --chrome-h, --nav-w, --lead.
    ============================================================================ */
 
-@font-face {
-  font-family: "Montserrat";
-  src: url("/fonts/Montserrat-VF.woff2") format("woff2-variations"),
-       url("/fonts/Montserrat-VF.woff2") format("woff2");
-  font-weight: 300 700;
-  font-style: normal;
-  font-display: swap;
-}
-
 :root {
-  --font-ui: "Noto Sans TC", "Noto Sans CJK TC", "PingFang TC", "Microsoft JhengHei", "Noto Sans", sans-serif;
-  --font-display: "Montserrat", var(--font-ui);
-  --font-num: "Montserrat", var(--font-ui);
-  --font-mono: "Noto Sans Mono", "DejaVu Sans Mono", "SFMono-Regular", Consolas, monospace;
+  color-scheme: light;
 
-  --radius-s: 4px;
-  --radius-m: 6px;
-  --radius-l: 8px;
+  --font-ui: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", "Noto Sans CJK TC", system-ui, sans-serif;
+  --font-display: var(--font-ui);
+  --font-mono: "JetBrains Mono Variable", "JetBrains Mono", ui-monospace, "SFMono-Regular", Consolas, monospace;
+  --font-num: var(--font-mono);
 
-  /* spacing — cozy (default) */
+  --radius-s: 3px;
+  --radius-m: 4px;
+  --radius-l: 6px;
+
   --space-1: 2px;
   --space-2: 4px;
   --space-3: 6px;
   --space-4: 8px;
   --space-5: 12px;
   --space-6: 16px;
-  --space-7: 24px;
-  --space-8: 32px;
+  --space-7: 20px;
+  --space-8: 28px;
 
-  /* type scale — cozy (default); unchanged from the density redesign, which
-   * already landed where Direction D wants it. */
-  --fs-micro: 11px;    /* uppercase eyebrows, column heads */
-  --fs-mini: 12px;     /* meta, captions */
-  --fs-body: 13px;     /* table cells, list rows */
-  --fs-ui: 14px;       /* base body */
-  --fs-lead: 17px;     /* panel lead numbers */
-  --fs-num: 21px;      /* instrument readouts */
-  --fs-display: 32px;  /* headline figures */
+  --fs-micro: 11px;
+  --fs-mini: 12px;
+  --fs-body: 13px;
+  --fs-ui: 13px;
+  --fs-lead: 18px;
+  --fs-num: 18px;
+  --fs-display: 28px;
   --lead: 1.5;
 
-  --row-h: 40px;       /* table row — roomier than the console */
-  --ctl-h: 36px;       /* buttons / inputs */
-  --chrome-h: 60px;    /* top bar height */
-  --nav-pad-y: 20px;   /* area nav vertical padding (sets the tab hit area) */
-}
+  --row-h: 36px;
+  --ctl-h: 32px;
+  --chrome-h: 52px;
+  --nav-w: 200px;
 
-[data-density="compact"] {
-  --space-1: 1px;
-  --space-2: 3px;
-  --space-3: 4px;
-  --space-4: 6px;
-  --space-5: 9px;
-  --space-6: 12px;
-  --space-7: 18px;
-  --space-8: 24px;
-
-  --fs-micro: 10px;
-  --fs-mini: 11px;
-  --fs-body: 12px;
-  --fs-ui: 13px;
-  --fs-lead: 15px;
-  --fs-num: 19px;
-  --fs-display: 28px;
-  --lead: 1.35;
-
-  --row-h: 32px;
-  --ctl-h: 30px;
-  --chrome-h: 48px;
-  --nav-pad-y: 14px;
-}
-
-/* --------------------------------------------------------------- light ---- */
-:root,
-[data-theme="light"] {
-  color-scheme: light;
-
+  /* surfaces and text */
   --surface-0: #FFFFFF;
   --surface-1: #FFFFFF;
-  --surface-2: #F7F4EE;
-  --surface-hover: #E5F2F9;
+  --surface-2: #F4F6F8;
+  --surface-hover: #F3F4F6;
+  --surface-active: #E8EEF7;
 
-  --text-1: #313638;
-  --text-2: #5B6164;
-  --text-3: #6E7578;
+  --text-1: #111827;
+  --text-2: #374151;
+  --text-3: #4B5563;
 
-  --line: #E6E2DA;
-  --line-soft: #F0EDE6;
-  --track: #EEEAE2;
+  --line: #E5E7EB;
+  --line-soft: #F0F2F5;
+  --line-strong: #CBD5E1;
+  --track: #E5E7EB;
 
-  --accent: #FF5500;
-  --accent-fg: #C24300;
+  /* the one action colour; destructive actions use the crit tone as a border */
+  --accent: #2563EB;
+  --accent-fg: #2563EB;
   --accent-on: #FFFFFF;
-  --brand-deep: #2D454C;
+  --accent-text: #1D4ED8;
+  --brand-deep: #1D4ED8;
 
-  /* chrome is light now: same paper as the page, one hairline below */
   --chrome: #FFFFFF;
-  --chrome-edge: #E6E2DA;
-  --chrome-text-1: #313638;
-  --chrome-text-2: #5B6164;
-  --chrome-text-3: #6E7578;
-  --chrome-line: #E6E2DA;
-  --chrome-hover: #F7F4EE;
-  --chrome-active: #F7F4EE;
+  --chrome-edge: #E5E7EB;
+  --chrome-text-1: #111827;
+  --chrome-text-2: #4B5563;
+  --chrome-text-3: #6B7280;
 
-  --overlay: rgba(49, 54, 56, .38);
-  --shadow-1: none;
-  --shadow-2: none;
+  --overlay: rgba(17, 24, 39, .32);
+  --shadow-1: 0 1px 2px rgba(17, 24, 39, .06);
+  --shadow-2: 0 10px 30px rgba(17, 24, 39, .12);
 
-  --tone-ok-border: #166644;
-  --tone-ok-bg: #E7F1EC;
-  --tone-ok-fg: #166644;
-  --tone-warn-border: #FFA22F;
-  --tone-warn-bg: #FFF3E0;
-  --tone-warn-fg: #8A5600;
-  --tone-crit-border: #BE122F;
-  --tone-crit-bg: #F9E6E9;
-  --tone-crit-fg: #BE122F;
-  --tone-info-border: #2D454C;
-  --tone-info-bg: #E5F2F9;
-  --tone-info-fg: #2D454C;
-  --tone-neutral-border: #9AA3A6;
-  --tone-neutral-bg: #F1F0EC;
-  --tone-neutral-fg: #5B6164;
+  /* severity (spec §7): text colours pass 4.5:1 on white and on their own fill */
+  --tone-crit-border: #FCA5A5;
+  --tone-crit-bg: #FEF2F2;
+  --tone-crit-fg: #B91C1C;
+  --tone-high-border: #FDBA74;
+  --tone-high-bg: #FFF7ED;
+  --tone-high-fg: #C2410C;
+  --tone-med-border: #FCD34D;
+  --tone-med-bg: #FEFCE8;
+  --tone-med-fg: #A16207;
+  --tone-low-border: #CBD5E1;
+  --tone-low-bg: #F8FAFC;
+  --tone-low-fg: #4B5563;
+  /* states */
+  --tone-ok-border: #86EFAC;
+  --tone-ok-bg: #F0FDF4;
+  --tone-ok-fg: #15803D;
+  --tone-accum-border: #93C5FD;
+  --tone-accum-bg: #EFF6FF;
+  --tone-accum-fg: #1D4ED8;
+  --tone-adv-border: #C4B5FD;
+  --tone-adv-bg: #F5F3FF;
+  --tone-adv-fg: #6D28D9;
+  /* older names the pages still use: warn reads as high, info as accumulating */
+  --tone-warn-border: var(--tone-high-border);
+  --tone-warn-bg: var(--tone-high-bg);
+  --tone-warn-fg: var(--tone-high-fg);
+  --tone-info-border: var(--tone-accum-border);
+  --tone-info-bg: var(--tone-accum-bg);
+  --tone-info-fg: var(--tone-accum-fg);
+  --tone-neutral-border: #CBD5E1;
+  --tone-neutral-bg: #F3F4F6;
+  --tone-neutral-fg: #4B5563;
 }
 
-/* ---------------------------------------------------------------- dark ---- */
-/* Secondary theme: kept for operators who prefer it, tuned to the same
-   brand hues; not the design origin any more. */
-[data-theme="dark"] {
-  color-scheme: dark;
-
-  --surface-0: #1B1F21;
-  --surface-1: #232829;
-  --surface-2: #2B3133;
-  --surface-hover: #2D454C;
-
-  --text-1: #F2F0EB;
-  --text-2: #B9B4AA;
-  --text-3: #8A9296;
-
-  --line: #3A4043;
-  --line-soft: #30363A;
-  --track: #30363A;
-
-  --accent: #FF5500;
-  --accent-fg: #FF7A33;
-  /* dark ink on the lighter orange / cyan: white on #FF7A33 is only 2.6:1 */
-  --accent-on: #1B1F21;
-  --brand-deep: #9CC3CF;
-
-  --chrome: #232829;
-  --chrome-edge: #3A4043;
-  --chrome-text-1: #F2F0EB;
-  --chrome-text-2: #B9B4AA;
-  --chrome-text-3: #8A9296;
-  --chrome-line: #3A4043;
-  --chrome-hover: #2B3133;
-  --chrome-active: #2B3133;
-
-  --overlay: rgba(0, 0, 0, .6);
-  --shadow-1: 0 1px 2px rgba(0, 0, 0, .45);
-  --shadow-2: 0 14px 40px rgba(0, 0, 0, .58);
-
-  --tone-ok-border: #166644;
-  --tone-ok-bg: #16302A;
-  --tone-ok-fg: #6FCF97;
-  --tone-warn-border: #FFA22F;
-  --tone-warn-bg: #3A2A12;
-  --tone-warn-fg: #FFC168;
-  --tone-crit-border: #BE122F;
-  --tone-crit-bg: #3A1A21;
-  --tone-crit-fg: #F08A97;
-  --tone-info-border: #2D454C;
-  --tone-info-bg: #1F3238;
-  --tone-info-fg: #9CC3CF;
-  --tone-neutral-border: #9AA3A6;
-  --tone-neutral-bg: #2B3133;
-  --tone-neutral-fg: #B9B4AA;
-}
-
-/* Tone carrier: any element with data-tone="ok|warn|crit|info|neutral" exposes
-   --mark / --ink / --fill so components never name a tone directly. */
+/* Tone carrier: any element with data-tone exposes --mark / --ink / --fill so components never name a tone. */
 [data-tone] { --mark: var(--tone-neutral-border); --ink: var(--tone-neutral-fg); --fill: var(--tone-neutral-bg); }
 [data-tone="ok"] { --mark: var(--tone-ok-border); --ink: var(--tone-ok-fg); --fill: var(--tone-ok-bg); }
-[data-tone="warn"] { --mark: var(--tone-warn-border); --ink: var(--tone-warn-fg); --fill: var(--tone-warn-bg); }
+[data-tone="warn"], [data-tone="high"] { --mark: var(--tone-high-border); --ink: var(--tone-high-fg); --fill: var(--tone-high-bg); }
 [data-tone="crit"] { --mark: var(--tone-crit-border); --ink: var(--tone-crit-fg); --fill: var(--tone-crit-bg); }
-[data-tone="info"] { --mark: var(--tone-info-border); --ink: var(--tone-info-fg); --fill: var(--tone-info-bg); }
-[data-tone="neutral"] { --mark: var(--tone-neutral-border); --ink: var(--tone-neutral-fg); --fill: var(--tone-neutral-bg); }
+[data-tone="med"] { --mark: var(--tone-med-border); --ink: var(--tone-med-fg); --fill: var(--tone-med-bg); }
+[data-tone="low"] { --mark: var(--tone-low-border); --ink: var(--tone-low-fg); --fill: var(--tone-low-bg); }
+[data-tone="info"], [data-tone="accum"] { --mark: var(--tone-accum-border); --ink: var(--tone-accum-fg); --fill: var(--tone-accum-bg); }
+[data-tone="adv"] { --mark: var(--tone-adv-border); --ink: var(--tone-adv-fg); --fill: var(--tone-adv-bg); }
+[data-tone="neutral"], [data-tone="muted"] { --mark: var(--tone-neutral-border); --ink: var(--tone-neutral-fg); --fill: var(--tone-neutral-bg); }

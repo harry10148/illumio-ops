@@ -73,6 +73,13 @@ def list_alerts(conn: sqlite3.Connection, *, pce_url: str, org_id: str, since: d
     return rows, int(total)
 
 
+def count_ungrouped(conn: sqlite3.Connection, *, pce_url: str, org_id: str, since: datetime) -> int:
+    """Alerts fired since `since` that nobody marked as known (no grouped annotation): the shell's unprocessed count."""
+    row = conn.execute("SELECT COUNT(*) FROM alerts WHERE pce_url = ? AND org_id = ? AND fired_at >= ? "
+                       "AND grouped_annotation IS NULL", (pce_url, org_id, _t(since))).fetchone()
+    return int(row[0])
+
+
 def get_alert(conn: sqlite3.Connection, alert_id: int, *, pce_url: str, org_id: str) -> sqlite3.Row | None:
     row: sqlite3.Row | None = conn.execute("SELECT * FROM alerts WHERE id = ? AND pce_url = ? AND org_id = ?",
                                            (alert_id, pce_url, org_id)).fetchone()

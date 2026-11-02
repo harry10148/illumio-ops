@@ -106,4 +106,4 @@ export function AlertList() {
   );
 }
 
-registerNav({ section: "main", path: "/alerts", labelKey: "nav_alerts", order: 10, component: AlertList });
+registerNav({ section: "main", path: "/alerts", labelKey: "nav_alerts", order: 10, component: AlertList, badge: "unprocessed" });

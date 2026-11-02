@@ -133,6 +133,14 @@ export type ReportStatus = ("queued" | "running" | "done" | "failed")
  */
 export type RhcState = ("enabled" | "partial" | "disabled" | "unsupported" | "unknown")
 /**
+ * What data collection reads (spec §6.4): everything; events plus short-lived traffic for
+ * alerts; or no traffic at all (lightweight, the new-install default: flow reports query the PCE on demand).
+ * 
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "CollectionMode".
+ */
+export type CollectionMode = ("full" | "alert" | "lightweight")
+/**
  * How a SIEM destination's lines look (spec §6.5 SIEM 轉送).
  * 
  * This interface was referenced by `ContractRoot`'s JSON-Schema
@@ -157,14 +165,6 @@ export type SiemTransport = ("udp" | "tcp" | "tls" | "hec")
  * via the `definition` "ChannelKind".
  */
 export type ChannelKind = ("smtp" | "line" | "telegram" | "teams" | "webhook")
-/**
- * What data collection reads (spec §6.4): everything; events plus short-lived traffic for
- * alerts; or no traffic at all (lightweight, the new-install default: flow reports query the PCE on demand).
- * 
- * This interface was referenced by `ContractRoot`'s JSON-Schema
- * via the `definition` "CollectionMode".
- */
-export type CollectionMode = ("full" | "alert" | "lightweight")
 /**
  * What data collection reads (spec §6.4): everything; events plus short-lived traffic for
  * alerts; or no traffic at all (lightweight, the new-install default: flow reports query the PCE on demand).
@@ -1782,6 +1782,17 @@ result: EnableResult
 status: RhcStatus
 }
 /**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "ShellStatus".
+ */
+export interface ShellStatus {
+collection: ("ok" | "degraded" | "failing" | "not_started")
+collection_mode: CollectionMode
+mode: ("basic" | "advanced")
+unprocessed_alerts: number
+write_key: boolean
+}
+/**
  * The page's copy of a destination: a masked token is not a token, so what is saved or sent is validated as
  * SiemDestination after the saved token is merged back in.
  * 
@@ -2708,7 +2719,7 @@ pulled: (PullInfo | null)
 result: SegmentResult
 }
 
-export type OpId = "alert_rules.create" | "alert_rules.delete" | "alert_rules.list" | "alert_rules.pack" | "alert_rules.preview" | "alert_rules.update" | "alerts.evidence" | "alerts.explain" | "alerts.get" | "alerts.list" | "alerts.mark_known" | "alerts.note_add" | "auth.csrf" | "auth.login" | "auth.logout" | "auth.me" | "auth.password" | "custom_reports.add_section" | "custom_reports.delete" | "custom_reports.list" | "custom_reports.remove_section" | "custom_reports.rename" | "home.focus" | "home.summary" | "hosts.profile" | "hosts.ransomware_allows" | "hosts.tamper_note_add" | "hosts.tamper_note_remove" | "i18n.dictionary" | "lateral.compute" | "lateral.simulate" | "lateral.view" | "quarantine.apply" | "quarantine.history" | "quarantine.preview" | "quarantine.remove" | "report_schedules.create" | "report_schedules.delete" | "report_schedules.list" | "report_schedules.run_now" | "report_schedules.update" | "reports.catalog" | "reports.delete" | "reports.generate" | "reports.get" | "reports.list" | "rhc.enable" | "rhc.status" | "siem.destination.test" | "siem.dlq.list" | "siem.dlq.purge" | "siem.dlq.resend" | "siem.settings.get" | "siem.settings.update" | "siem.status" | "system.channels.get" | "system.channels.test" | "system.channels.update" | "system.collection.backfill" | "system.collection.get" | "system.collection.status" | "system.collection.update" | "system.display.get" | "system.display.update" | "system.jobs.list" | "system.lateral.get" | "system.lateral.known" | "system.lateral.known_delete" | "system.lateral.update" | "system.logs.query" | "system.pce.get" | "system.pce.latest" | "system.pce.probe" | "system.pce.update" | "system.reports.get" | "system.reports.update" | "system.security.get" | "system.security.update" | "system.tls.csr" | "system.tls.import" | "system.tls.renew" | "system.tls.status" | "system.tls.update" | "workbench.dimension" | "workbench.from_alert" | "workbench.meta" | "workbench.predicted" | "workbench.run";
+export type OpId = "alert_rules.create" | "alert_rules.delete" | "alert_rules.list" | "alert_rules.pack" | "alert_rules.preview" | "alert_rules.update" | "alerts.evidence" | "alerts.explain" | "alerts.get" | "alerts.list" | "alerts.mark_known" | "alerts.note_add" | "auth.csrf" | "auth.login" | "auth.logout" | "auth.me" | "auth.password" | "custom_reports.add_section" | "custom_reports.delete" | "custom_reports.list" | "custom_reports.remove_section" | "custom_reports.rename" | "home.focus" | "home.summary" | "hosts.profile" | "hosts.ransomware_allows" | "hosts.tamper_note_add" | "hosts.tamper_note_remove" | "i18n.dictionary" | "lateral.compute" | "lateral.simulate" | "lateral.view" | "quarantine.apply" | "quarantine.history" | "quarantine.preview" | "quarantine.remove" | "report_schedules.create" | "report_schedules.delete" | "report_schedules.list" | "report_schedules.run_now" | "report_schedules.update" | "reports.catalog" | "reports.delete" | "reports.generate" | "reports.get" | "reports.list" | "rhc.enable" | "rhc.status" | "shell.status" | "siem.destination.test" | "siem.dlq.list" | "siem.dlq.purge" | "siem.dlq.resend" | "siem.settings.get" | "siem.settings.update" | "siem.status" | "system.channels.get" | "system.channels.test" | "system.channels.update" | "system.collection.backfill" | "system.collection.get" | "system.collection.status" | "system.collection.update" | "system.display.get" | "system.display.update" | "system.jobs.list" | "system.lateral.get" | "system.lateral.known" | "system.lateral.known_delete" | "system.lateral.update" | "system.logs.query" | "system.pce.get" | "system.pce.latest" | "system.pce.probe" | "system.pce.update" | "system.reports.get" | "system.reports.update" | "system.security.get" | "system.security.update" | "system.tls.csr" | "system.tls.import" | "system.tls.renew" | "system.tls.status" | "system.tls.update" | "workbench.dimension" | "workbench.from_alert" | "workbench.meta" | "workbench.predicted" | "workbench.run";
 
 export interface Requests {
   "alert_rules.create": RuleWrite;
@@ -2759,6 +2770,7 @@ export interface Requests {
   "reports.list": undefined;
   "rhc.enable": RhcEnable;
   "rhc.status": undefined;
+  "shell.status": undefined;
   "siem.destination.test": SiemTestRequest;
   "siem.dlq.list": undefined;
   "siem.dlq.purge": DlqAction;
@@ -2850,6 +2862,7 @@ export interface Responses {
   "reports.list": ReportPage;
   "rhc.enable": RhcEnabled;
   "rhc.status": RhcStatus;
+  "shell.status": ShellStatus;
   "siem.destination.test": SiemTestView;
   "siem.dlq.list": DlqPage;
   "siem.dlq.purge": DlqPurgeView;
@@ -2941,6 +2954,7 @@ export const OPERATIONS = {
   "reports.list": { method: "GET", path: "/api/reports" },
   "rhc.enable": { method: "POST", path: "/api/rhc/enable" },
   "rhc.status": { method: "GET", path: "/api/rhc" },
+  "shell.status": { method: "GET", path: "/api/shell/status" },
   "siem.destination.test": { method: "POST", path: "/api/siem/test" },
   "siem.dlq.list": { method: "GET", path: "/api/siem/dlq" },
   "siem.dlq.purge": { method: "POST", path: "/api/siem/dlq/purge" },

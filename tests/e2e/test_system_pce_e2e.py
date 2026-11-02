@@ -1,6 +1,6 @@
 from playwright.sync_api import expect
 
-from tests.e2e.conftest import sign_in
+from tests.e2e.conftest import open_system, sign_in
 
 
 def _fill_connection(page, pce_url: str) -> None:
@@ -13,7 +13,7 @@ def _fill_connection(page, pce_url: str) -> None:
 
 def _open_pce_page(page, base_url: str) -> None:
     sign_in(page, base_url)
-    page.click("nav >> text=PCE connection")
+    open_system(page, "PCE connection")
     page.wait_for_selector("input[name=url]")
 
 

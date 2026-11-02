@@ -328,4 +328,4 @@ export function Siem() {
   );
 }
 
-registerNav({ section: "main", path: "/siem", labelKey: "nav_siem", order: 22, component: Siem });
+registerNav({ section: "output", path: "/siem", labelKey: "nav_siem", order: 22, component: Siem });

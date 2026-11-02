@@ -130,4 +130,4 @@ export function Dlq() {
   );
 }
 
-registerNav({ section: "main", path: "/siem/dlq", labelKey: "siem_dlq_title", order: 23, component: Dlq, hidden: true });
+registerNav({ section: "output", path: "/siem/dlq", labelKey: "siem_dlq_title", order: 23, component: Dlq, hidden: true });

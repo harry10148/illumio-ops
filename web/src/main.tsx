@@ -22,6 +22,7 @@ import "./pages/system/Display";
 import "./pages/system/ReportSettings";
 import "./pages/siem/Siem";
 import "./pages/siem/Dlq";
+import "@fontsource-variable/jetbrains-mono";
 import "./styles/tokens.css";
 import "./styles/base.css";
 

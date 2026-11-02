@@ -7,7 +7,7 @@ import pytest
 from playwright.sync_api import expect
 
 from illumio_ops.services.alerts import channels
-from tests.e2e.conftest import sign_in
+from tests.e2e.conftest import open_system, sign_in
 
 
 class _Receiver(BaseHTTPRequestHandler):
@@ -39,7 +39,7 @@ def receiver(monkeypatch):
 def test_channels_mask_and_test_webhook(context, live_app, receiver):
     page = context.new_page()
     sign_in(page, live_app.url)
-    page.click("nav >> text=Notification channels")
+    open_system(page, "Notification channels")
     card = page.locator("[data-channel=webhook]")
     card.locator("input[name=webhook_url]").fill(receiver)
     card.get_by_role("button", name="Send a test").click()

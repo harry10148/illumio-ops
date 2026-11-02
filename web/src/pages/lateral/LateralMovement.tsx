@@ -520,4 +520,4 @@ function Happening({ page }: { page: LateralPage }) {
   );
 }
 
-registerNav({ section: "main", path: "/lateral", labelKey: "nav_lateral", order: 14, component: LateralMovement });
+registerNav({ section: "main", path: "/lateral", labelKey: "nav_detect", order: 14, component: LateralMovement, needs: "advanced" });

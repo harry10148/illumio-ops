@@ -57,9 +57,29 @@ def context(browser):
     ctx.close()
 
 
+NARROW = 760  # the narrow width every page is checked at (UI redesign spec §9)
+
+
+@pytest.fixture
+def narrow_context(browser):
+    ctx = browser.new_context(locale="en-US", viewport={"width": NARROW, "height": 900})
+    yield ctx
+    ctx.close()
+
+
+def no_horizontal_overflow(page) -> bool:
+    return bool(page.evaluate("document.documentElement.scrollWidth <= document.documentElement.clientWidth"))
+
+
 def sign_in(page, base_url: str) -> None:
     page.goto(base_url + "/")
     page.fill("input[autocomplete=username]", "illumio")
     page.fill("input[autocomplete=current-password]", ADMIN_PASSWORD)
     page.click("button[type=submit]")
     page.wait_for_selector(".shell")
+
+
+def open_system(page, label: str) -> None:
+    """System pages are listed in the System page's own sub-navigation (UI redesign spec §3)."""
+    page.click(".sidenav .nav-item[data-nav='/system']")
+    page.click(f".subnav >> text={label}")
